@@ -148,13 +148,29 @@ export const CompanionModal: React.FC<CompanionModalProps> = ({
         </div>
 
         {/* Input Bar */}
-        <form onSubmit={handleSend} className="p-3 bg-stone-950 border-t border-stone-800 flex gap-2">
+        <form onSubmit={handleSend} className="p-3 bg-stone-950 border-t border-stone-800 flex gap-2 items-center">
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onInput={(e) => {
               const val = (e.target as HTMLInputElement).value;
+              setInputText(val);
+            }}
+            onCompositionStart={(e) => {
+              const val = (e.currentTarget as HTMLInputElement).value;
+              setInputText(val);
+            }}
+            onCompositionUpdate={(e) => {
+              const val = (e.currentTarget as HTMLInputElement).value;
+              setInputText(val);
+            }}
+            onCompositionEnd={(e) => {
+              const val = (e.currentTarget as HTMLInputElement).value;
+              setInputText(val);
+            }}
+            onKeyUp={(e) => {
+              const val = (e.currentTarget as HTMLInputElement).value;
               if (val !== inputText) setInputText(val);
             }}
             placeholder="Ask MIKI for tactical advice or talk..."
@@ -169,11 +185,8 @@ export const CompanionModal: React.FC<CompanionModalProps> = ({
                 handleSend(e);
               }
             }}
-            className={`font-bold px-4 py-2 rounded-xl text-xs transition cursor-pointer ${
-              !inputText.trim() || isLoading
-                ? 'bg-stone-800 text-stone-500 opacity-60'
-                : 'bg-amber-500 hover:bg-amber-400 text-stone-950 active:scale-95 shadow-md shadow-amber-500/20'
-            }`}
+            className="font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center bg-amber-500 hover:bg-amber-400 text-stone-950 active:scale-95 shadow-md shadow-amber-500/20"
+            title="送信"
           >
             <Send className="w-4 h-4" />
           </button>

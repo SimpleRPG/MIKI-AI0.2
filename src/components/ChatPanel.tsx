@@ -92,13 +92,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setTimeout(() => setUrlCopied(false), 2500);
   };
 
-  const handleSend = (e?: React.FormEvent | React.MouseEvent | React.TouchEvent | React.KeyboardEvent) => {
+  const handleSend = (e?: React.FormEvent | React.MouseEvent | React.TouchEvent | React.PointerEvent | React.KeyboardEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
     const domValue = textareaRef.current?.value ?? '';
-    const textToSend = (domValue || inputText).trim();
+    const textToSend = (domValue || inputText || '').trim();
 
     if ((!textToSend && attachedFiles.length === 0) || isLoading) return;
 
@@ -681,14 +681,32 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             onChange={(e) => setInputText(e.target.value)}
             onInput={(e) => {
               const val = (e.target as HTMLTextAreaElement).value;
-              if (val !== inputText) {
-                setInputText(val);
-              }
+              setInputText(val);
+            }}
+            onCompositionStart={(e) => {
+              const val = (e.currentTarget as HTMLTextAreaElement).value;
+              setInputText(val);
+            }}
+            onCompositionUpdate={(e) => {
+              const val = (e.currentTarget as HTMLTextAreaElement).value;
+              setInputText(val);
+            }}
+            onCompositionEnd={(e) => {
+              const val = (e.currentTarget as HTMLTextAreaElement).value;
+              setInputText(val);
+            }}
+            onKeyUp={(e) => {
+              const val = (e.currentTarget as HTMLTextAreaElement).value;
+              if (val !== inputText) setInputText(val);
+            }}
+            onBlur={(e) => {
+              const val = (e.currentTarget as HTMLTextAreaElement).value;
+              if (val !== inputText) setInputText(val);
             }}
             onKeyDown={handleKeyDown}
             placeholder={`${persona.name}に指示（端末WebGPU・トークン消費0・ゲーム制作や雑談など）`}
             rows={1}
-            className="flex-1 bg-transparent border-none outline-none text-xs text-slate-100 placeholder-slate-500 resize-none py-1.5 px-1 leading-relaxed max-h-24"
+            className="flex-1 bg-transparent border-none outline-none text-xs text-slate-100 placeholder-slate-500 resize-none py-2 px-1 leading-relaxed max-h-24"
           />
 
           {isLoading || isGenerating ? (
@@ -699,7 +717,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 e.preventDefault();
                 onStopGeneration?.();
               }}
-              className="px-3 py-2 rounded-lg flex items-center gap-1.5 font-bold transition-all shrink-0 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-md shadow-rose-600/30 animate-pulse active:scale-95 cursor-pointer"
+              className="px-3 py-2 min-h-[40px] rounded-lg flex items-center gap-1.5 font-bold transition-all shrink-0 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-md shadow-rose-600/30 animate-pulse active:scale-95 cursor-pointer touch-manipulation"
               title="生成を中断する"
             >
               <Square className="w-3.5 h-3.5 fill-current" />
@@ -709,15 +727,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <button
               type="button"
               onClick={handleSend}
+              onTouchStart={(e) => {
+                // Ensure IME syncs before submit
+                const domVal = textareaRef.current?.value;
+                if (domVal && domVal !== inputText) setInputText(domVal);
+              }}
               onTouchEnd={(e) => {
                 e.preventDefault();
                 handleSend(e);
               }}
-              className={`p-2 sm:p-2.5 rounded-lg flex items-center justify-center font-bold transition-all shrink-0 cursor-pointer ${
-                !inputText.trim() && attachedFiles.length === 0
-                  ? 'bg-slate-800 text-slate-400 opacity-70 active:bg-slate-700'
-                  : 'bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 text-white shadow-md shadow-pink-500/25 active:scale-95'
-              }`}
+              onPointerUp={(e) => {
+                if (e.pointerType === 'touch') {
+                  handleSend(e);
+                }
+              }}
+              className="p-2 sm:p-2.5 min-w-[40px] min-h-[40px] rounded-lg flex items-center justify-center font-bold transition-all shrink-0 cursor-pointer touch-manipulation bg-gradient-to-r from-pink-500 via-rose-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 active:scale-90 text-white shadow-md shadow-pink-500/30 ring-1 ring-white/20"
               title="メッセージを送信"
               aria-label="送信"
             >
