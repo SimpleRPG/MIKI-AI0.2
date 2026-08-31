@@ -49,10 +49,15 @@ export const Header: React.FC<HeaderProps> = ({
   fps,
 }) => {
   const [urlCopied, setUrlCopied] = useState(false);
-  const PUBLIC_APP_URL = 'https://ais-pre-lmii4pykmv4ucirau7mbyp-23659957062.asia-northeast1.run.app';
+  const getPublicUrl = () => {
+    if (typeof window !== 'undefined' && window.location.href) {
+      return window.location.origin;
+    }
+    return 'https://ais-pre-sacdblu2nkpceyxfbc4t5c-387287333639.asia-northeast1.run.app';
+  };
 
   const handleCopyPublicUrl = () => {
-    navigator.clipboard.writeText(PUBLIC_APP_URL);
+    navigator.clipboard.writeText(getPublicUrl());
     setUrlCopied(true);
     setTimeout(() => setUrlCopied(false), 2500);
   };

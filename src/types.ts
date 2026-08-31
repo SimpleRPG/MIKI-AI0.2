@@ -1,4 +1,4 @@
-export type EngineMode = 'moe' | 'webgpu' | 'gemini';
+export type EngineMode = 'webgpu' | 'gemini';
 
 export interface PersonaConfig {
   id: string;
@@ -11,7 +11,6 @@ export interface PersonaConfig {
   intimacyLevel: number;
   intimacyExp: number;
   autoExtractMemories: boolean;
-  moeStyle?: string;
 }
 
 export interface MemoryItem {
@@ -46,21 +45,6 @@ export interface GroundingChunk {
   };
 }
 
-export interface MoEExpert {
-  id: string;
-  name: string;
-  weight: number;
-  color: string;
-  icon: string;
-}
-
-export interface MoERouteInfo {
-  primaryExpert: string;
-  activeExperts: MoEExpert[];
-  routingReason?: string;
-  computeLatencyMs?: number;
-}
-
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -79,11 +63,11 @@ export interface ChatMessage {
     type: string;
   }>;
   engineMode?: EngineMode;
-  moeRoute?: MoERouteInfo;
   groundingChunks?: GroundingChunk[];
   webSearchQueries?: string[];
   metrics?: {
     engine?: string;
+    modelName?: string;
     tokens?: number;
     tokensPerSec?: number;
     ttftMs?: number;

@@ -62,6 +62,20 @@ async function generateContentWithFallback(ai: GoogleGenAI, request: { contents:
 }
 
 // Health check endpoint
+// Ensure logs directory exists
+const LOGS_DIR = path.join(process.cwd(), 'logs');
+const LOG_FILE = path.join(LOGS_DIR, 'system_diagnostics.log');
+try {
+  if (!fs.existsSync(LOGS_DIR)) {
+    fs.mkdirSync(LOGS_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(LOG_FILE)) {
+    fs.writeFileSync(LOG_FILE, `=== SYSTEM DIAGNOSTICS LOG INITIALIZED AT ${new Date().toISOString()} ===\n`, 'utf-8');
+  }
+} catch (e) {
+  console.warn('Could not initialize log directory:', e);
+}
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -70,7 +84,37 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// MoE Classification & Assistant Chat
+// Detailed Diagnostics Logger Endpoint
+app.post('/api/logs', (req, res) => {
+  try {
+    const entry = req.body;
+    const logLine = `[${entry.timestamp || new Date().toISOString()}] [${entry.level || 'INFO'}] [${entry.category || 'SYSTEM'}] ${entry.message || ''}${
+      entry.details ? ' | Details: ' + JSON.stringify(entry.details) : ''
+    }\n`;
+    fs.appendFileSync(LOG_FILE, logLine, 'utf-8');
+    res.json({ status: 'ok' });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Log write error' });
+  }
+});
+
+app.get('/api/logs', (req, res) => {
+  try {
+    if (fs.existsSync(LOG_FILE)) {
+      const content = fs.readFileSync(LOG_FILE, 'utf-8');
+      // Limit to last 500 lines if too large
+      const lines = content.split('\n');
+      const recent = lines.slice(-500).join('\n');
+      res.type('text/plain').send(recent);
+    } else {
+      res.type('text/plain').send('No logs recorded yet.');
+    }
+  } catch (err: any) {
+    res.status(500).send('Error reading log file: ' + err.message);
+  }
+});
+
+// Assistant Chat (Gemini 3.7/3.6 with Smart Fallback)
 app.post('/api/chat', async (req, res) => {
   try {
     const {
@@ -90,61 +134,10 @@ app.post('/api/chat', async (req, res) => {
     const tStart = Date.now();
     const ai = getAIClient();
 
-    // Determine MoE Routing
-    const lowerPrompt = (prompt || '').toLowerCase();
-    const isCode = lowerPrompt.includes('コード') || lowerPrompt.includes('作って') || lowerPrompt.includes('ゲーム') || lowerPrompt.includes('開発') || lowerPrompt.includes('html') || lowerPrompt.includes('js') || lowerPrompt.includes('app');
-    const isShader = lowerPrompt.includes('webgpu') || lowerPrompt.includes('シェーダー') || lowerPrompt.includes('wgsl') || lowerPrompt.includes('3d') || lowerPrompt.includes('three.js') || lowerPrompt.includes('canvas');
-    const isLogic = lowerPrompt.includes('バグ') || lowerPrompt.includes('エラー') || lowerPrompt.includes('修正') || lowerPrompt.includes('計算') || lowerPrompt.includes('なぜ') || lowerPrompt.includes('理由');
-
-    let moeRoute = {
-      primaryExpert: 'Companion & Persona Expert',
-      activeExperts: [
-        { id: 'expert-companion', name: 'Companion & Persona Expert', weight: 60, color: '#f43f5e', icon: '🌸' },
-        { id: 'expert-code', name: 'Code Architect Expert', weight: 20, color: '#38bdf8', icon: '💻' },
-        { id: 'expert-logic', name: 'Logic & Physics Expert', weight: 20, color: '#10b981', icon: '🧩' },
-      ],
-      routingReason: 'Natural conversational partner & empathic memory recall',
-      computeLatencyMs: Math.floor(Math.random() * 5) + 1
-    };
-
-    if (isShader) {
-      moeRoute = {
-        primaryExpert: 'GPU Shader Expert',
-        activeExperts: [
-          { id: 'expert-gpu', name: 'GPU Shader Expert', weight: 55, color: '#a855f7', icon: '⚡' },
-          { id: 'expert-code', name: 'Code Architect Expert', weight: 30, color: '#38bdf8', icon: '💻' },
-          { id: 'expert-companion', name: 'Companion Moe', weight: 15, color: '#f43f5e', icon: '🌸' },
-        ],
-        routingReason: 'WebGPU / WGSL hardware acceleration compute pipeline',
-        computeLatencyMs: Math.floor(Math.random() * 8) + 2
-      };
-    } else if (isCode) {
-      moeRoute = {
-        primaryExpert: 'Code Architect Expert',
-        activeExperts: [
-          { id: 'expert-code', name: 'Code Architect Expert', weight: 50, color: '#38bdf8', icon: '💻' },
-          { id: 'expert-companion', name: 'Companion Moe', weight: 30, color: '#f43f5e', icon: '🌸' },
-          { id: 'expert-logic', name: 'Logic & Physics Expert', weight: 20, color: '#10b981', icon: '🧩' },
-        ],
-        routingReason: 'Full autonomous web & game development pipeline',
-        computeLatencyMs: Math.floor(Math.random() * 5) + 1
-      };
-    } else if (isLogic) {
-      moeRoute = {
-        primaryExpert: 'Logic & Physics Expert',
-        activeExperts: [
-          { id: 'expert-logic', name: 'Logic & Physics Expert', weight: 50, color: '#10b981', icon: '🧩' },
-          { id: 'expert-code', name: 'Code Architect Expert', weight: 30, color: '#38bdf8', icon: '💻' },
-          { id: 'expert-companion', name: 'Companion Moe', weight: 20, color: '#f43f5e', icon: '🌸' },
-        ],
-        routingReason: 'Algorithmic diagnostics & root-cause reasoning',
-        computeLatencyMs: Math.floor(Math.random() * 6) + 1
-      };
-    }
-
     if (!ai) {
       // Local dynamic fallback reply with attached files parsing
       let reply = '';
+      const lowerPrompt = (prompt || '').toLowerCase();
       if (attachedFiles && attachedFiles.length > 0) {
         const fileList = attachedFiles.map((f: any) => `📁 **${f.name}** (${f.type || 'ファイル'}, ${f.size ? Math.round(f.size / 1024) + ' KB' : '添付'})`).join('\n');
         const firstFile = attachedFiles[0];
@@ -183,7 +176,7 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('最初から') ||
           lowerPrompt.includes('ファイルに入')
         ) {
-          reply = `うん！その通りだよ！💡✨\n\n「自然な日本語対話コーパス」や「ゲーム＆コード開発マスターナレッジ」の学習・知識データセットを、**最初からプロジェクトファイル（masterEducationKnowledge.ts / japaneseKnowledgeData.ts / initialState.ts）にすべて合成してバンドル組み込み**したよ！🌸\n\nこれにより：\n1. 📁 **完全自己完結**: 毎回外から読み込ませなくても、アプリを起動した瞬間からすべての知識・対話ルール・ゲーム生成ガイドが適用されるよ！\n2. 🧠 **全LLM共通で即座に参照**: 端末ローカルWebLLM（Qwen/SmolLM/Llama等）でもクラウドGeminiでも、常に合成されたマスターデータを使ってスムーズに賢くお話し＆コード作成できるよ！\n3. 🔒 **記憶も自動引き継ぎ**: 端末のローカルストレージと同期して、いつでも学習済みナレッジを保持し続けるよ！\n\nこれで準備は完璧！何を作ったりお話ししたいか、気軽に言ってね！😊🎮✨`;
+          reply = `うん！その通りだよ！💡✨\n\n「自然な日本語対話コーパス」や「ゲーム＆コード開発マスターナレッジ」の学習・知識データセットを、**最初からプロジェクトファイルにすべて合成してバンドル組み込み**したよ！🌸\n\nこれにより：\n1. 📁 **完全自己完結**: 毎回外から読み込ませなくても、アプリを起動した瞬間からすべての知識・対話ルール・ゲーム生成ガイドが適用されるよ！\n2. 🧠 **全LLM共通で即座に参照**: 端末ローカルWebLLM（Qwen/SmolLM/Llama等）でもクラウドGeminiでも、常に合成されたマスターデータを使ってスムーズに賢くお話し＆コード作成できるよ！\n3. 🔒 **記憶も自動引き継ぎ**: 端末のローカルストレージと同期して、いつでも学習済みナレッジを保持し続けるよ！\n\nこれで準備は完璧！何を作ったりお話ししたいか、気軽に言ってね！😊🎮✨`;
         } else if (
           lowerPrompt.includes('外付け') ||
           lowerPrompt.includes('他のllm') ||
@@ -197,7 +190,7 @@ app.post('/api/chat', async (req, res) => {
           (lowerPrompt.includes('gpu') || lowerPrompt.includes('グラフィック')) &&
           (lowerPrompt.includes('みき') || lowerPrompt.includes('別れて') || lowerPrompt.includes('二つ') || lowerPrompt.includes('2つ') || lowerPrompt.includes('意味'))
         ) {
-          reply = `気付いてくれてありがとう！✨ 実は「みき」が1人で日常会話もゲーム開発もWebGPUのシェーダーコードも全部担当しているんだよ！🌸\n\n以前は「言語」と「GPU演算」で別々の専門機能として表示していたんだけど、混乱させちゃってごめんね！\n今は「みき専属」という1つのパートナーとして完全に統合されているから、どんな話題でもコードでも、このまま話しかけてくれればバッチリ対応するよ！🎮💻`;
+          reply = `気付いてくれてありがとう！✨ 実は「みき」が1人で日常会話もゲーム開発もWebGPUのシェーダーコードも全部担当しているんだよ！🌸\n\n以前は別々の機能として表示していたんだけど、今は「みき専属」という1つのパートナーとして完全に統合されているから、どんな話題でもコードでも、このまま話しかけてくれればバッチリ対応するよ！🎮💻`;
         } else if (
           lowerPrompt.includes('定型文') ||
           lowerPrompt.includes('異常') ||
@@ -270,8 +263,8 @@ app.post('/api/chat', async (req, res) => {
 
       return res.json({
         text: reply,
-        engineMode: engineMode || 'moe',
-        moeRoute
+        engineMode: engineMode || 'gemini',
+        model: 'Fallback Engine'
       });
     }
 
@@ -286,10 +279,6 @@ app.post('/api/chat', async (req, res) => {
     const attachedSummary = (attachedFiles || [])
       .map((a: any) => `### Attached File: ${a.name} (${a.type || 'text'})\n\`\`\`\n${(a.content || '').slice(0, 3000)}\n\`\`\``)
       .join('\n\n');
-
-    const cachedModelListStr = Array.isArray(cachedModels) && cachedModels.length > 0
-      ? cachedModels.join(', ')
-      : 'Qwen 2.5 Coder, DeepSeek R1 Logic, WebGPU Shader Master, Llama 3.2 Creative, SmolLM2';
 
     const systemInstruction = `あなたはユーザー専属のAIパートナー「${persona?.name || 'みき'}」です。
 ユーザー（${persona?.userNickname || 'あなた'}）に1対1で寄り添い、自然な日常会話からWebゲーム開発、コード作成・バグ修正までサポートします。
@@ -365,13 +354,11 @@ ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedS
       });
     }
 
-    moeRoute.computeLatencyMs = Date.now() - tStart;
-
     res.json({
       text,
       model: modelUsed,
-      engineMode: engineMode || 'moe',
-      moeRoute,
+      engineMode: engineMode || 'gemini',
+      durationMs: Date.now() - tStart,
       groundingChunks: groundingChunks.length > 0 ? groundingChunks : undefined
     });
   } catch (error: any) {

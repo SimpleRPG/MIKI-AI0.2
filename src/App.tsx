@@ -39,7 +39,6 @@ const DEFAULT_PERSONA: PersonaConfig = {
   intimacyLevel: 2,
   intimacyExp: 65,
   autoExtractMemories: true,
-  moeStyle: 'default',
 };
 
 const INITIAL_MEMORIES: MemoryItem[] = [
@@ -366,24 +365,22 @@ export default function App() {
       const activeGameCode = workspaceFiles.find((f) => f.path === 'index.html')?.content || '';
       const cachedModelsList = await webLLMService.listAllCachedModels().catch(() => []);
 
-      const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.council || SPEAKER_PROFILES.miki;
-      const isLocalPreferred = localStorage.getItem('miki_use_local_in_moe') !== 'false';
+      const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
       const gpuCheck = await webLLMService.isWebGPUSupported().catch(() => ({ supported: false }));
       const isGpuUsable = gpuCheck.supported;
 
       // Decide if we should execute directly via WebGPU
-      // In MoE mode, only run WebGPU if an engine is already loaded or already cached in device storage
-      const shouldRunWebGPU = engineMode === 'webgpu' || (engineMode === 'moe' && isGpuUsable && webLLMService.isLoaded());
+      const shouldRunWebGPU = engineMode === 'webgpu' && isGpuUsable;
 
-      // MoE Prompt Classification & Expert Specialization
-      const moeAnalysis = classifyPromptForMoE(text);
+      // Prompt Classification & Prompt Specialization
+      const promptAnalysis = classifyPromptForMoE(text);
 
-      // If local WebGPU execution is requested or active and GPU is usable
+      // If local WebGPU execution is requested and GPU is usable
       if (shouldRunWebGPU && isGpuUsable) {
         // Priority 1: If an engine is already loaded in VRAM, use it directly to prevent reload latency/failures!
         const targetModelId = (webLLMService.isLoaded() && webLLMService.getActiveModelId())
           ? webLLMService.getActiveModelId()!
-          : await webLLMService.findBestAvailableModel(moeAnalysis.role);
+          : await webLLMService.findBestAvailableModel(promptAnalysis.role);
 
         const assistantId = 'msg_asst_' + Date.now();
         currentAssistantIdRef.current = assistantId;
@@ -395,8 +392,7 @@ export default function App() {
             : `🔄 端末内モデル (${targetModelId.split('-')[0]}) を準備中... (トークン消費: 0)`,
           timestamp: Date.now(),
           speaker: activeSpeaker,
-          engineMode: engineMode === 'moe' ? 'webgpu' : engineMode,
-          moeRoute: moeAnalysis.route,
+          engineMode: 'webgpu',
           isStreaming: true,
           metrics: {
             engine: `On-Device (${targetModelId.split('-')[0]})`,
@@ -410,7 +406,7 @@ export default function App() {
         let isModelReady = webLLMService.isModelLoaded(targetModelId);
 
         // Always proceed to load/download if not yet ready
-        if (!isModelReady && (engineMode === 'webgpu' || isTargetCached)) {
+        if (!isModelReady) {
           try {
             await webLLMService.loadModel(targetModelId, (report) => {
               if (abortController.signal.aborted) return;
@@ -440,11 +436,11 @@ export default function App() {
 
         const tStart = performance.now();
         const isCodeModRequest =
-          (moeAnalysis.role === 'code' || moeAnalysis.role === 'shader' || moeAnalysis.role === 'logic') &&
+          (promptAnalysis.role === 'code' || promptAnalysis.role === 'shader' || promptAnalysis.role === 'logic') &&
           (text.includes('修正') || text.includes('変更') || text.includes('直して') || text.includes('追加'));
 
         const systemPrompt = buildExpertSystemPrompt(
-          moeAnalysis.role,
+          promptAnalysis.role,
           persona,
           activeMemories,
           workspaceFiles,
@@ -494,7 +490,7 @@ export default function App() {
           try {
             // Direct high-quality on-device inference with Miki persona & persistent memories
             for await (const chunk of webLLMService.streamChat(chatContext, {
-              temperature: moeAnalysis.temperature,
+              temperature: promptAnalysis.temperature,
               max_tokens: 384,
               fallbackModelId: targetModelId,
             })) {
@@ -535,14 +531,14 @@ export default function App() {
           return;
         }
 
-        // If WebGPU encountered an error or model not cached, smoothly fallback to high-speed hybrid engine
+        // If WebGPU encountered an error or model not cached, smoothly fallback to high-speed engine
         if (!webGpuSuccess || accumulated.trim().length === 0) {
           try {
             const fallbackRes = await sendChatMessage({
               prompt: text,
               history: messages,
               useSearch: false,
-              engineMode: 'moe',
+              engineMode: 'gemini',
               speakerMode,
               cachedModels: cachedModelsList,
               workspaceFiles,
@@ -556,9 +552,9 @@ export default function App() {
               return;
             }
 
-            let diagnosticCategory = 'ハイブリッド自動切替';
-            let diagnosticCause = '端末モデル未ロードのため、高速ハイブリッド推論で即座に返信しました。';
-            let diagnosticTip = '完全オフライン推論を行う場合は「端末ローカルLLM設定」からモデルをダウンロードしてください。';
+            let diagnosticCategory = '自律エンジン自動切替';
+            let diagnosticCause = '端末モデル未ロードまたはWebGPU初期化中のため、自律推論で即座に返信しました。';
+            let diagnosticTip = '完全オフライン推論を行う場合は「端末ローカルLLM設定」からモデルをロードしてください。';
 
             if (webGpuErrorDetails) {
               if (webGpuErrorDetails.includes('Quota') || webGpuErrorDetails.includes('quota') || webGpuErrorDetails.includes('容量')) {
@@ -625,12 +621,11 @@ export default function App() {
                   content: accumulated,
                   speaker: activeSpeaker,
                   isStreaming: false,
-                  moeRoute: moeAnalysis.route,
                   fallbackDiagnostic: diagnosticData,
                   metrics: {
                     engine: webGpuSuccess
                       ? `On-Device WebGPU (${targetModelId.split('-')[0]})`
-                      : `ハイブリッド推論 (${activeSpeaker.name})`,
+                      : `自律相棒エンジン (${activeSpeaker.name})`,
                     tokens: tokenCount,
                     tokensPerSec: tokPerSec,
                     ttftMs: Math.round((firstTokenTime || tEnd) - tStart),
@@ -676,7 +671,6 @@ export default function App() {
           timestamp: Date.now(),
           speaker: activeSpeaker,
           engineMode: response.engineMode || engineMode,
-          moeRoute: response.moeRoute || moeAnalysis.route,
           groundingChunks: response.groundingChunks,
           webSearchQueries: response.webSearchQueries,
           metrics: {

@@ -1,4 +1,14 @@
-import { CreateMLCEngine, MLCEngine, InitProgressReport, hasModelInCache, AppConfig, prebuiltAppConfig } from '@mlc-ai/web-llm';
+import {
+  CreateMLCEngine,
+  MLCEngine,
+  InitProgressReport,
+  hasModelInCache,
+  deleteModelAllInfoInCache,
+  deleteModelInCache,
+  AppConfig,
+  prebuiltAppConfig,
+} from '@mlc-ai/web-llm';
+import { systemLogger } from './systemLogger';
 
 export const KNOWN_MODEL_IDS = [
   'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
@@ -207,6 +217,16 @@ class WebLLMService {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(`miki_cached_model_${modelId}`);
       }
+
+      // 1. Call official MLC cleanup
+      try {
+        await deleteModelAllInfoInCache(modelId, CUSTOM_APP_CONFIG);
+      } catch {}
+      try {
+        await deleteModelInCache(modelId, CUSTOM_APP_CONFIG);
+      } catch {}
+
+      // 2. Manual cache storage purge
       if (typeof caches !== 'undefined') {
         const keys = await caches.keys();
         for (const key of keys) {
@@ -255,6 +275,13 @@ class WebLLMService {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(`miki_cached_model_${modelId}`);
     }
+    try {
+      await deleteModelAllInfoInCache(modelId, CUSTOM_APP_CONFIG);
+    } catch {}
+    try {
+      await deleteModelInCache(modelId, CUSTOM_APP_CONFIG);
+    } catch {}
+
     if (typeof caches !== 'undefined') {
       try {
         const keys = await caches.keys();
@@ -483,88 +510,123 @@ class WebLLMService {
     };
 
     this.initPromise = (async () => {
+      const maxAttempts = 3;
+      let lastAttemptError: any = null;
+      systemLogger.info('WEBGPU', `Starting model load/initialization for ${modelId}`);
+
       try {
-        if (this.engine) {
-          if ((this.engine as any).setInitProgressCallback) {
-            (this.engine as any).setInitProgressCallback(progressCallback);
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            if (attempt > 1) {
+              systemLogger.warn('WEBGPU', `Retrying model load (${attempt}/${maxAttempts}) for ${modelId}`);
+              progressCallback({
+                progress: 0,
+                text: `🔄 接続を再確立中 (${attempt}/${maxAttempts})... ダウンロードを継続します`,
+                timeElapsed: 0,
+              });
+              await new Promise((r) => setTimeout(r, 1000 * attempt));
+            }
+
+            if (this.engine) {
+              if ((this.engine as any).setInitProgressCallback) {
+                (this.engine as any).setInitProgressCallback(progressCallback);
+              }
+              await this.engine.reload(modelId);
+            } else {
+              this.engine = await CreateMLCEngine(modelId, {
+                appConfig: CUSTOM_APP_CONFIG,
+                initProgressCallback: progressCallback,
+              });
+            }
+
+            this.activeModelId = modelId;
+            this.setPreferredModelId(modelId);
+
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(`miki_cached_model_${modelId}`, 'true');
+            }
+            if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+              navigator.storage.persist().catch(() => {});
+            }
+
+            systemLogger.info('WEBGPU', `Model ${modelId} successfully loaded into VRAM`, { modelId, attempt });
+            return;
+          } catch (err: any) {
+            lastAttemptError = err;
+            this.activeModelId = null;
+            const errMsg = String(err?.message || err || '');
+            systemLogger.error('WEBGPU', `Error during model load attempt ${attempt}: ${errMsg}`, { modelId, attempt, error: errMsg });
+
+            const isQuota =
+              err?.name === 'QuotaExceededError' ||
+              errMsg.toLowerCase().includes('quota') ||
+              errMsg.includes('Quota exceeded') ||
+              errMsg.includes('quota');
+
+            const isGpuBufferError =
+              errMsg.includes('mapAsync') ||
+              errMsg.includes('unmapped') ||
+              errMsg.includes('GPUBuffer') ||
+              errMsg.includes('device lost') ||
+              errMsg.toLowerCase().includes('device was lost') ||
+              errMsg.toLowerCase().includes('gpudevicelostinfo');
+
+            if (isQuota) {
+              await this.repairModelCache(modelId).catch(() => {});
+              const quotaErr = new Error(
+                '端末ストレージの保存容量制限（Quota exceeded）に達しました。不要なモデルキャッシュを消去するか、超軽量モデル（SmolLM2-360M: 220MB）をご利用ください。'
+              );
+              (quotaErr as any).name = 'QuotaExceededError';
+              throw quotaErr;
+            }
+
+            if (isGpuBufferError) {
+              this.engine = null;
+              this.activeModelId = null;
+              const gpuErr = new Error(
+                `端末のGPUメモリ（VRAM）制約によりDevice Lostが発生しました。より軽量なモデル（SmolLM2-360M: 220MB）をご利用いただくか、自律相棒エンジンで快適にご利用いただけます。`
+              );
+              (gpuErr as any).name = 'GPUDeviceLostError';
+              throw gpuErr;
+            }
+
+            // Clean up partially initialized engine before next attempt
+            if (this.engine) {
+              try {
+                await (this.engine as any).unload?.();
+              } catch {}
+              this.engine = null;
+            }
+
+            // If there are still attempts remaining for network/cache errors, continue
+            if (attempt < maxAttempts) {
+              console.warn(`Load attempt ${attempt} failed with network/cache issue, retrying...`, err);
+              continue;
+            }
           }
-          await this.engine.reload(modelId);
-        } else {
-          this.engine = await CreateMLCEngine(modelId, {
-            appConfig: CUSTOM_APP_CONFIG,
-            initProgressCallback: progressCallback,
-          });
         }
 
-        this.activeModelId = modelId;
-        this.setPreferredModelId(modelId);
+        // If all retry attempts failed:
+        const finalErrMsg = String(lastAttemptError?.message || lastAttemptError || '');
+        const isFetchOrCacheError =
+          finalErrMsg.toLowerCase().includes('failed to fetch') ||
+          finalErrMsg.toLowerCase().includes('fetch failed') ||
+          finalErrMsg.toLowerCase().includes('networkerror') ||
+          finalErrMsg.toLowerCase().includes('cache') ||
+          finalErrMsg.toLowerCase().includes('net::') ||
+          finalErrMsg.toLowerCase().includes('abort') ||
+          finalErrMsg.includes('Failed to fetch') ||
+          finalErrMsg.includes("add' on 'cache");
 
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(`miki_cached_model_${modelId}`, 'true');
-        }
-        if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
-          navigator.storage.persist().catch(() => {});
-        }
-      } catch (err: any) {
-        this.activeModelId = null;
-        const errMsg = String(err?.message || err || '');
-        const isQuota =
-          err?.name === 'QuotaExceededError' ||
-          errMsg.toLowerCase().includes('quota') ||
-          errMsg.includes('Quota exceeded') ||
-          errMsg.includes('quota');
-
-        const isFetchError =
-          errMsg.toLowerCase().includes('failed to fetch') ||
-          errMsg.toLowerCase().includes('fetch failed') ||
-          errMsg.toLowerCase().includes('networkerror') ||
-          errMsg.toLowerCase().includes('load failed') ||
-          errMsg.toLowerCase().includes('net::') ||
-          errMsg.toLowerCase().includes('abort') ||
-          errMsg.includes('Failed to fetch');
-
-        const isGpuBufferError =
-          errMsg.includes('mapAsync') ||
-          errMsg.includes('unmapped') ||
-          errMsg.includes('GPUBuffer') ||
-          errMsg.includes('device lost');
-
-        if (isQuota) {
-          // Clean up incomplete shards to free up storage
-          await this.repairModelCache(modelId);
-          const quotaErr = new Error(
-            '端末ストレージの保存容量制限（Quota exceeded）に達しました。不要なモデルキャッシュを消去するか、超軽量モデル（SmolLM2-360M: 220MB）をご利用ください。'
-          );
-          (quotaErr as any).name = 'QuotaExceededError';
-          throw quotaErr;
-        }
-
-        const isCacheAddError =
-          errMsg.toLowerCase().includes("failed to execute 'add' on 'cache'") ||
-          errMsg.toLowerCase().includes('cache.add()') ||
-          errMsg.toLowerCase().includes('encountered a network error');
-
-        if (isCacheAddError || isFetchError) {
-          // Purge any corrupted partial files in cache for this model to allow clean retry
-          await this.repairModelCache(modelId).catch(() => {});
+        if (isFetchOrCacheError) {
           const fetchErr = new Error(
-            'モデルファイル取得中にキャッシュ通信エラーが発生しました（Cache.add network error）。破損した不完全キャッシュをクリアしました。「再試行」または「修復 & 再DL」をお試しください。'
+            'モデル取得中に通信エラーが発生しました。既にダウンロード済みのブロックは端末内に保持されています。「再開・リロード」で続きからダウンロードを再開できます。'
           );
           (fetchErr as any).name = 'NetworkFetchError';
           throw fetchErr;
         }
 
-        if (isGpuBufferError || errMsg.toLowerCase().includes('device was lost') || errMsg.toLowerCase().includes('gpudevicelostinfo')) {
-          this.engine = null;
-          this.activeModelId = null;
-          const gpuErr = new Error(
-            `端末のGPUメモリ（VRAM）制約によりDevice Lostが発生しました。より軽量なモデル（SmolLM2-360M: 220MB）をご利用いただくか、ハイブリッド合議知能モードで快適にご利用いただけます。`
-          );
-          (gpuErr as any).name = 'GPUDeviceLostError';
-          throw gpuErr;
-        }
-
-        throw err;
+        throw lastAttemptError;
       } finally {
         this.isInitializing = false;
         this.initPromise = null;
@@ -614,13 +676,32 @@ class WebLLMService {
 
   public async clearAllCaches(): Promise<void> {
     await this.cancelAndReset();
+    if (typeof localStorage !== 'undefined') {
+      try {
+        for (const mId of KNOWN_MODEL_IDS) {
+          localStorage.removeItem(`miki_cached_model_${mId}`);
+        }
+        const keys = Object.keys(localStorage);
+        for (const k of keys) {
+          if (k.startsWith('miki_cached_model_')) {
+            localStorage.removeItem(k);
+          }
+        }
+      } catch {}
+    }
+    for (const mId of KNOWN_MODEL_IDS) {
+      try {
+        await deleteModelAllInfoInCache(mId, CUSTOM_APP_CONFIG);
+      } catch {}
+      try {
+        await deleteModelInCache(mId, CUSTOM_APP_CONFIG);
+      } catch {}
+    }
     if (typeof caches !== 'undefined') {
       try {
         const keys = await caches.keys();
         for (const k of keys) {
-          if (k.includes('webllm') || k.includes('model') || k.includes('mlc') || k.includes('wasm')) {
-            await caches.delete(k);
-          }
+          await caches.delete(k);
         }
       } catch (e) {
         console.warn('Clear all caches error:', e);
@@ -631,7 +712,7 @@ class WebLLMService {
         const dbs = await indexedDB.databases?.();
         if (dbs) {
           for (const db of dbs) {
-            if (db.name && (db.name.includes('webllm') || db.name.includes('mlc'))) {
+            if (db.name && (db.name.includes('webllm') || db.name.includes('mlc') || db.name.includes('model'))) {
               indexedDB.deleteDatabase(db.name);
             }
           }

@@ -5,10 +5,10 @@ import {
   WorkspaceFile,
   GroundingChunk,
   EngineMode,
-  MoERouteInfo,
   GitHubRepoData
 } from '../types';
 import { generateSmartCompanionReply } from '../utils/companionEngine';
+import { systemLogger } from './systemLogger';
 
 export interface SendChatMessageParams {
   prompt: string;
@@ -28,7 +28,7 @@ export interface SendChatMessageParams {
 export interface ChatResponse {
   text: string;
   engineMode?: EngineMode;
-  moeRoute?: MoERouteInfo;
+  model?: string;
   groundingChunks?: GroundingChunk[];
   webSearchQueries?: string[];
 }
@@ -66,6 +66,13 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     throw new DOMException('Aborted', 'AbortError');
   }
 
+  systemLogger.info('CHAT', `Sending chat request (prompt length: ${params.prompt.length})`, {
+    engineMode: params.engineMode,
+    speakerMode: params.speakerMode,
+    attachedFilesCount: params.attachedFiles?.length || 0,
+    workspaceFilesCount: params.workspaceFiles?.length || 0,
+  });
+
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -75,16 +82,21 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     });
 
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      systemLogger.info('CHAT', 'Chat response received from server API', { model: data.model });
+      return data;
+    } else {
+      systemLogger.warn('CHAT', `Server chat API returned status ${res.status}`);
     }
   } catch (err: any) {
     if (err?.name === 'AbortError' || params.signal?.aborted) {
+      systemLogger.info('CHAT', 'Chat request aborted by user');
       throw err;
     }
-    // Network fetch failed (e.g. standalone APK environment or offline)
+    systemLogger.warn('CHAT', `Network chat fetch error, invoking autonomous fallback: ${err?.message || err}`);
   }
 
-  // Standalone / On-device Heuristic & MoE Companion Fallback
+  // Standalone / On-device Heuristic Companion Fallback
   const isCode = params.prompt.includes('作って') || params.prompt.includes('ゲーム') || params.prompt.includes('開発') || params.prompt.includes('コード');
   const reply = generateSmartCompanionReply(
     params.prompt,
@@ -94,19 +106,12 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     params.attachedFiles
   );
 
+  systemLogger.info('CHAT', 'Autonomous fallback companion generated response', { isCode });
+
   return {
     text: reply,
-    engineMode: 'moe',
-    moeRoute: {
-      primaryExpert: isCode ? 'Code Architect Expert' : 'Companion & Persona Expert',
-      activeExperts: [
-        { id: 'expert-companion', name: 'Companion Moe', weight: 50, color: '#f43f5e', icon: '🌸' },
-        { id: 'expert-code', name: 'Code Architect Expert', weight: 35, color: '#38bdf8', icon: '💻' },
-        { id: 'expert-logic', name: 'Logic Expert', weight: 15, color: '#10b981', icon: '🧩' },
-      ],
-      routingReason: 'On-Device Native Client Engine (Standalone APK mode)',
-      computeLatencyMs: 2
-    }
+    engineMode: 'gemini',
+    model: 'Smart Companion Engine'
   };
 }
 

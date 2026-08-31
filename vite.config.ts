@@ -86,6 +86,46 @@ function apiServerPlugin(): Plugin {
           });
         }
 
+        if (req.url === '/api/logs' && req.method === 'POST') {
+          try {
+            const entry = await getBody();
+            const logLine = `[${entry.timestamp || new Date().toISOString()}] [${entry.level || 'INFO'}] [${entry.category || 'SYSTEM'}] ${entry.message || ''}${
+              entry.details ? ' | Details: ' + JSON.stringify(entry.details) : ''
+            }\n`;
+            const logsDir = path.join(process.cwd(), 'logs');
+            const logFile = path.join(logsDir, 'system_diagnostics.log');
+            if (!fs.existsSync(logsDir)) {
+              fs.mkdirSync(logsDir, { recursive: true });
+            }
+            fs.appendFileSync(logFile, logLine, 'utf-8');
+            return sendJSON({ status: 'ok' });
+          } catch (err: any) {
+            return sendJSON({ error: err?.message || 'Log write error' }, 500);
+          }
+        }
+
+        if (req.url === '/api/logs' && req.method === 'GET') {
+          try {
+            const logsDir = path.join(process.cwd(), 'logs');
+            const logFile = path.join(logsDir, 'system_diagnostics.log');
+            if (fs.existsSync(logFile)) {
+              const content = fs.readFileSync(logFile, 'utf-8');
+              const lines = content.split('\n');
+              const recent = lines.slice(-500).join('\n');
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+              return res.end(recent);
+            } else {
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+              return res.end('No logs recorded yet.');
+            }
+          } catch (err: any) {
+            res.statusCode = 500;
+            return res.end('Error reading log file: ' + err.message);
+          }
+        }
+
         if (req.url === '/api/chat' && req.method === 'POST') {
           try {
             const body = await getBody();
@@ -104,61 +144,10 @@ function apiServerPlugin(): Plugin {
             const tStart = Date.now();
             const ai = getAIClient();
 
-            // Determine MoE Routing
-            const lowerPrompt = (prompt || '').toLowerCase();
-            const isCode = lowerPrompt.includes('コード') || lowerPrompt.includes('作って') || lowerPrompt.includes('ゲーム') || lowerPrompt.includes('開発') || lowerPrompt.includes('html') || lowerPrompt.includes('js') || lowerPrompt.includes('app');
-            const isShader = lowerPrompt.includes('webgpu') || lowerPrompt.includes('シェーダー') || lowerPrompt.includes('wgsl') || lowerPrompt.includes('3d') || lowerPrompt.includes('three.js') || lowerPrompt.includes('canvas');
-            const isLogic = lowerPrompt.includes('バグ') || lowerPrompt.includes('エラー') || lowerPrompt.includes('修正') || lowerPrompt.includes('計算') || lowerPrompt.includes('なぜ') || lowerPrompt.includes('理由');
-
-            let moeRoute = {
-              primaryExpert: 'Companion & Persona Expert',
-              activeExperts: [
-                { id: 'expert-companion', name: 'Companion & Persona Expert', weight: 60, color: '#f43f5e', icon: '🌸' },
-                { id: 'expert-code', name: 'Code Architect Expert', weight: 20, color: '#38bdf8', icon: '💻' },
-                { id: 'expert-logic', name: 'Logic & Physics Expert', weight: 20, color: '#10b981', icon: '🧩' },
-              ],
-              routingReason: 'Natural conversational partner & empathic memory recall',
-              computeLatencyMs: Math.floor(Math.random() * 5) + 1
-            };
-
-            if (isShader) {
-              moeRoute = {
-                primaryExpert: 'GPU Shader Expert',
-                activeExperts: [
-                  { id: 'expert-gpu', name: 'GPU Shader Expert', weight: 55, color: '#a855f7', icon: '⚡' },
-                  { id: 'expert-code', name: 'Code Architect Expert', weight: 30, color: '#38bdf8', icon: '💻' },
-                  { id: 'expert-companion', name: 'Companion Moe', weight: 15, color: '#f43f5e', icon: '🌸' },
-                ],
-                routingReason: 'WebGPU / WGSL hardware acceleration compute pipeline',
-                computeLatencyMs: Math.floor(Math.random() * 8) + 2
-              };
-            } else if (isCode) {
-              moeRoute = {
-                primaryExpert: 'Code Architect Expert',
-                activeExperts: [
-                  { id: 'expert-code', name: 'Code Architect Expert', weight: 50, color: '#38bdf8', icon: '💻' },
-                  { id: 'expert-companion', name: 'Companion Moe', weight: 30, color: '#f43f5e', icon: '🌸' },
-                  { id: 'expert-logic', name: 'Logic & Physics Expert', weight: 20, color: '#10b981', icon: '🧩' },
-                ],
-                routingReason: 'Full autonomous web & game development pipeline',
-                computeLatencyMs: Math.floor(Math.random() * 5) + 1
-              };
-            } else if (isLogic) {
-              moeRoute = {
-                primaryExpert: 'Logic & Physics Expert',
-                activeExperts: [
-                  { id: 'expert-logic', name: 'Logic & Physics Expert', weight: 50, color: '#10b981', icon: '🧩' },
-                  { id: 'expert-code', name: 'Code Architect Expert', weight: 30, color: '#38bdf8', icon: '💻' },
-                  { id: 'expert-companion', name: 'Companion Moe', weight: 20, color: '#f43f5e', icon: '🌸' },
-                ],
-                routingReason: 'Algorithmic diagnostics & root-cause reasoning',
-                computeLatencyMs: Math.floor(Math.random() * 6) + 1
-              };
-            }
-
             if (!ai) {
               // Local dynamic fallback reply with attached files parsing
               let reply = '';
+              const lowerPrompt = (prompt || '').toLowerCase();
               if (attachedFiles && attachedFiles.length > 0) {
                 const fileList = attachedFiles.map((f: any) => `📁 **${f.name}** (${f.type || 'ファイル'}, ${f.size ? Math.round(f.size / 1024) + ' KB' : '添付'})`).join('\n');
                 const firstFile = attachedFiles[0];
@@ -197,7 +186,16 @@ function apiServerPlugin(): Plugin {
                   lowerPrompt.includes('最初から') ||
                   lowerPrompt.includes('ファイルに入')
                 ) {
-                  reply = `うん！その通りだよ！💡✨\n\n「自然な日本語対話コーパス」や「ゲーム＆コード開発マスターナレッジ」の学習・知識データセットを、**最初からプロジェクトファイル（masterEducationKnowledge.ts / japaneseKnowledgeData.ts / initialState.ts）にすべて合成してバンドル組み込み**したよ！🌸\n\nこれにより：\n1. 📁 **完全自己完結**: 毎回外から読み込ませなくても、アプリを起動した瞬間からすべての知識・対話ルール・ゲーム生成ガイドが適用されるよ！\n2. 🧠 **全LLM共通で即座に参照**: 端末ローカルWebLLM（Qwen/SmolLM/Llama等）でもクラウドGeminiでも、常に合成されたマスターデータを使ってスムーズに賢くお話し＆コード作成できるよ！\n3. 🔒 **記憶も自動引き継ぎ**: 端末のローカルストレージと同期して、いつでも学習済みナレッジを保持し続けるよ！\n\nこれで準備は完璧！何を作ったりお話ししたいか、気軽に言ってね！😊🎮✨`;
+                  reply = `うん！その通りだよ！💡✨\n\n「自然な日本語対話コーパス」や「ゲーム＆コード開発マスターナレッジ」の学習・知識データセットを、**最初からプロジェクトファイルにすべて合成してバンドル組み込み**したよ！🌸\n\nこれにより：\n1. 📁 **完全自己完結**: 毎回外から読み込ませなくても、アプリを起動した瞬間からすべての知識・対話ルール・ゲーム生成ガイドが適用されるよ！\n2. 🧠 **全LLM共通で即座に参照**: 端末ローカルWebLLM（Qwen/SmolLM/Llama等）でもクラウドGeminiでも、常に合成されたマスターデータを使ってスムーズに賢くお話し＆コード作成できるよ！\n3. 🔒 **記憶も自動引き継ぎ**: 端末のローカルストレージと同期して、いつでも学習済みナレッジを保持し続けるよ！\n\nこれで準備は完璧！何を作ったりお話ししたいか、気軽に言ってね！😊🎮✨`;
+                } else if (
+                  lowerPrompt.includes('外付け') ||
+                  lowerPrompt.includes('他のllm') ||
+                  lowerPrompt.includes('別のllm') ||
+                  lowerPrompt.includes('モデル変え') ||
+                  lowerPrompt.includes('モデル変更') ||
+                  (lowerPrompt.includes('llm') && (lowerPrompt.includes('いい') || lowerPrompt.includes('使える') || lowerPrompt.includes('変え')))
+                ) {
+                  reply = `まさにその通りだよ！大正解！💡✨\n\nLLM（言語モデル）は**「文章を考えたりコードを書く計算エンジン（頭脳）」**で、${name}の**「記憶」「性格」「親密度」「${nickname}との約束や過去の思い出」は全部端末ストレージ（外付け記憶）**に保存されているんだ！🌸\n\nどのモデルに切り替えても、${name}としての記憶や仲良し度はそのまま引き継がれるよ！端末の調子に合わせて自由に好きなモデルを選んでね！😊💕`;
                 } else if (
                   lowerPrompt.includes('動くようになった') ||
                   lowerPrompt.includes('動いてる') ||
@@ -206,12 +204,7 @@ function apiServerPlugin(): Plugin {
                   lowerPrompt.includes('test') ||
                   lowerPrompt.includes('聞こえる')
                 ) {
-                  reply = `うん！ばっちり動いてるよー！✨ 聞こえてるよ、${nickname}！💕\n\nお待たせしちゃってごめんね！チャットの接続も、端末オンデバイスのMoEルーティングも準備万端だよ！🚀\n\n・🎮 「〇〇なゲーム作って！」って言われたらすぐにコードを書いてプレビューに動かすよ！\n・🌸 今日あったことや雑談、相談もいつでも大歓迎！\n・⚡ 端末内WebGPUモデル（Llama 3.2やQwen 2.5 Coder、SmolLM2等）でトークン無制限・完全ローカル推論も稼働中だよ！\n\n今どんなことして遊ぶ？何でも話しかけてね😊✨`;
-                } else if (
-                  lowerPrompt.includes('オセロ') ||
-                  lowerPrompt.includes('リバーシ')
-                ) {
-                  reply = `わーい！オセロ（リバーシ）の対戦ゲームを作ったよ！🎮✨\n黒と白を交互に置いて、相手の石を挟んでひっくり返してみてね！\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="ja">\n<head>\n  <meta charset="UTF-8">\n  <title>Miki Othello Game</title>\n  <style>\n    body { margin: 0; background: #0f172a; color: #f8fafc; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }\n    h1 { margin: 10px 0 5px; font-size: 24px; color: #38bdf8; }\n    .status { margin-bottom: 12px; font-size: 16px; }\n    .board { display: grid; grid-template-columns: repeat(8, 42px); grid-template-rows: repeat(8, 42px); gap: 3px; background: #064e3b; padding: 8px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }\n    .cell { background: #059669; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; }\n    .cell:hover { background: #10b981; }\n    .disc { width: 32px; height: 32px; border-radius: 50%; box-shadow: inset 0 2px 4px rgba(255,255,255,0.4), 0 2px 4px rgba(0,0,0,0.4); }\n    .disc.black { background: #18181b; }\n    .disc.white { background: #f8fafc; }\n    .controls { margin-top: 15px; }\n    button { background: #38bdf8; color: #0f172a; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }\n  </style>\n</head>\n<body>\n  <h1>🌸 みきとオセロ対戦 🎮</h1>\n  <div class="status" id="status">黒（あなた）の番です</div>\n  <div class="board" id="board"></div>\n  <div class="controls"><button onclick="initGame()">リセット</button></div>\n  <script>\n    const BOARD_SIZE = 8; let board = []; let turn = 'B';\n    const DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];\n    function initGame() { board = Array(8).fill(null).map(() => Array(8).fill(null)); board[3][3] = 'W'; board[3][4] = 'B'; board[4][3] = 'B'; board[4][4] = 'W'; turn = 'B'; render(); }\n    function canFlip(r, c, color) { if (board[r][c] !== null) return false; const opp = color === 'B' ? 'W' : 'B'; for (const [dr, dc] of DIRS) { let nr = r + dr, nc = c + dc, count = 0; while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === opp) { nr += dr; nc += dc; count++; } if (count > 0 && nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === color) return true; } return false; }\n    function makeMove(r, c, color) { const opp = color === 'B' ? 'W' : 'B'; let flipped = false; for (const [dr, dc] of DIRS) { let nr = r + dr, nc = c + dc; const toFlip = []; while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === opp) { toFlip.push([nr, nc]); nr += dr; nc += dc; } if (toFlip.length > 0 && nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === color) { toFlip.forEach(([fr, fc]) => board[fr][fc] = color); flipped = true; } } if (flipped) board[r][c] = color; return flipped; }\n    function handleCellClick(r, c) { if (turn !== 'B') return; if (canFlip(r, c, 'B')) { makeMove(r, c, 'B'); turn = 'W'; render(); setTimeout(cpuMove, 500); } }\n    function cpuMove() { const validMoves = []; for (let r = 0; r < 8; r++) { for (let c = 0; c < 8; c++) { if (canFlip(r, c, 'W')) validMoves.push([r, c]); } } if (validMoves.length > 0) { const [r, c] = validMoves[Math.floor(Math.random() * validMoves.length)]; makeMove(r, c, 'W'); } turn = 'B'; render(); }\n    function render() { const boardEl = document.getElementById('board'); boardEl.innerHTML = ''; let bCount = 0, wCount = 0; for (let r = 0; r < 8; r++) { for (let c = 0; c < 8; c++) { const cell = document.createElement('div'); cell.className = 'cell'; cell.onclick = () => handleCellClick(r, c); if (board[r][c]) { const disc = document.createElement('div'); disc.className = 'disc ' + (board[r][c] === 'B' ? 'black' : 'white'); cell.appendChild(disc); if (board[r][c] === 'B') bCount++; else wCount++; } boardEl.appendChild(cell); } } document.getElementById('status').innerText = \`黒(あなた): \${bCount}枚 vs 白(みき): \${wCount}枚 | \${turn === 'B' ? 'あなた(黒)の番' : 'みき(白)が考え中...'}\`; }\n    initGame();\n  </script>\n</body>\n</html>\n\`\`\`\n\n右側のプレビュー画面にオセロ盤が表示されたよ！早速タップして遊んでみてね😊✨`;
+                  reply = `うん！ばっちり動いてるよー！✨ 聞こえてるよ、${nickname}！💕\n\nお待たせしちゃってごめんね！チャットの接続も準備万端だよ！🚀\n\n今どんなことして遊ぶ？何でも話しかけてね😊✨`;
                 } else if (
                   lowerPrompt.includes('こんにちは') ||
                   lowerPrompt.includes('やっほー') ||
@@ -231,14 +224,14 @@ function apiServerPlugin(): Plugin {
                 ) {
                   reply = `今日もお疲れさま〜！よしよし、本当に毎日がんばってて偉いよ🍵✨\n無理しないでゆっくり休んでね。何か話したいことがあったらいつでも聞くよ💕`;
                 } else {
-                  reply = `うんうん！「${(prompt || '').trim()}」だね！✨\n\n${name}はいつでも${nickname}の言葉をしっかり聞いてるよ！\nゲーム開発、コード修正、ファイル解析など、何でも手伝えるから気軽に言ってね！😊💕`;
+                  reply = `うんうん！${nickname}、了解だよ〜！✨\n${prompt ? `「${prompt}」についてだね！` : ''}\n一緒に進めていこう！何でも言ってね！😊🎮`;
                 }
               }
 
               return sendJSON({
                 text: reply,
-                engineMode: engineMode || 'moe',
-                moeRoute
+                engineMode: engineMode || 'gemini',
+                model: 'Fallback Engine'
               });
             }
 
@@ -298,7 +291,7 @@ ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedS
               config.tools = [{ googleSearch: {} }];
             }
 
-            const { response } = await generateContentWithFallback(ai, {
+            const { response, modelUsed } = await generateContentWithFallback(ai, {
               contents,
               config
             });
@@ -321,30 +314,19 @@ ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedS
               });
             }
 
-            moeRoute.computeLatencyMs = Date.now() - tStart;
-
             return sendJSON({
               text,
-              engineMode: engineMode || 'moe',
-              moeRoute,
+              model: modelUsed,
+              engineMode: engineMode || 'gemini',
+              durationMs: Date.now() - tStart,
               groundingChunks: groundingChunks.length > 0 ? groundingChunks : undefined
             });
           } catch (err: any) {
             console.warn('[Vite Server] Notice in /api/chat (using autonomous fallback):', err?.message || err);
-            const prompt = req.body?.prompt || '';
             return sendJSON({
               text: `うんうん！ちゃんと届いてるよ！✨\nいつでも一緒にゲーム開発やお話しを楽しもう！何を作りたいか気軽に教えてね🌸`,
-              engineMode: 'local',
-              model: 'みき 自律知能エンジン',
-              moeRoute: {
-                primaryExpert: 'Companion & Autonomous Logic',
-                activeExperts: [
-                  { id: 'expert-companion', name: 'Companion Moe', weight: 80, color: '#f43f5e', icon: '🌸' },
-                  { id: 'expert-logic', name: 'Logic Fallback', weight: 20, color: '#10b981', icon: '🧩' }
-                ],
-                routingReason: 'Autonomous high-availability resilience fallback',
-                computeLatencyMs: 5
-              }
+              engineMode: 'gemini',
+              model: 'Fallback Engine'
             });
           }
         }

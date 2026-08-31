@@ -1,19 +1,16 @@
-import { MoERouteInfo, PersonaConfig, MemoryItem, WorkspaceFile } from '../types';
+import { PersonaConfig, MemoryItem, WorkspaceFile } from '../types';
 import { getNaturalJapanesePromptGuide } from '../data/japaneseKnowledgeData';
 import { getMasterEducationSystemPrompt } from '../data/masterEducationKnowledge';
 
 /**
- * Intelligent Prompt Analyzer for Unified Miki Assistant
- * Analyzes the user's intent to set appropriate temperature and instruction guidelines.
+ * Analyzes the user's intent to set appropriate temperature and prompt context.
  */
 export function classifyPromptForMoE(prompt: string): {
   role: 'code' | 'shader' | 'logic' | 'moe_chat';
-  route: MoERouteInfo;
   temperature: number;
 } {
   const p = (prompt || '').trim();
   const lowerPrompt = p.toLowerCase();
-  const tStart = performance.now();
 
   const isShader = /webgpu|wgsl|glsl|シェーダー|shader|three\.js|3d|threejs|パーティクル|流体|fluid/i.test(lowerPrompt);
   const isCode = /html|javascript|typescript|js|ts|css|react|コード|プログラム|関数|ゲーム|game|作って|作成|開発|実装|追加/i.test(lowerPrompt);
@@ -21,44 +18,26 @@ export function classifyPromptForMoE(prompt: string): {
 
   let role: 'code' | 'shader' | 'logic' | 'moe_chat' = 'moe_chat';
   let temp = 0.7;
-  let primaryExpert = '🌸 みき (親密対話)';
-  let reason = '自然な日本語対話・親密な記憶想起・日常のおしゃべり';
 
   if (isShader) {
     role = 'shader';
     temp = 0.6;
-    primaryExpert = '⚡ みき (WebGPU & グラフィック)';
-    reason = 'WebGPU / WGSL / Canvas 高速グラフィック・並列計算';
   } else if (isCode) {
     role = 'code';
     temp = 0.7;
-    primaryExpert = '💻 みき (コード & アプリ開発)';
-    reason = 'HTML5 / JS / Canvas 自律ゲーム＆Webアプリ開発';
   } else if (isLogic) {
     role = 'logic';
     temp = 0.3;
-    primaryExpert = '🧩 みき (ロジック & デバッグ)';
-    reason = 'コード診断・原因究明・論理デバッグ';
   }
-
-  const computeLatencyMs = Math.max(1, Math.round(performance.now() - tStart));
 
   return {
     role,
     temperature: temp,
-    route: {
-      primaryExpert,
-      activeExperts: [
-        { id: 'unified-miki', name: primaryExpert, weight: 100, color: '#f43f5e', icon: '🌸' }
-      ],
-      routingReason: reason,
-      computeLatencyMs,
-    },
   };
 }
 
 /**
- * Builds compact, high-efficiency System Prompt for Unified Miki on SLMs (Qwen2.5, Llama3.2, etc.)
+ * Builds compact, high-efficiency System Prompt for Miki on SLMs (Qwen2.5, Llama3.2, etc.)
  */
 export function buildExpertSystemPrompt(
   expertRole: 'code' | 'shader' | 'logic' | 'moe_chat',
@@ -110,3 +89,4 @@ ${getNaturalJapanesePromptGuide()}
 指示: ${expertInstruction}
 ${activeMemories ? `【大切な記憶・ユーザーの好み】\n${activeMemories}` : ''}${filesContext}`;
 }
+
