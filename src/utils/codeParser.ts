@@ -102,12 +102,15 @@ export function buildSandboxHtml(files: WorkspaceFile[]): string {
 (function() {
   const _send = (level, msg) => {
     try {
-      window.parent.postMessage({
-        type: 'GAME_CONSOLE',
-        level: level,
-        message: typeof msg === 'object' ? JSON.stringify(msg) : String(msg),
-        timestamp: Date.now()
-      }, '*');
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          source: 'MIKI_GAME_SANDBOX',
+          type: 'GAME_CONSOLE',
+          level: level,
+          message: typeof msg === 'object' ? JSON.stringify(msg) : String(msg),
+          timestamp: Date.now()
+        }, '*');
+      }
     } catch(e) {}
   };
 
@@ -133,17 +136,21 @@ export function buildSandboxHtml(files: WorkspaceFile[]): string {
   });
 
   // FPS Counter
-  let lastLoop = performance.now();
   let frameCount = 0;
   let fpsTimer = 0;
 
   function countFps(now) {
     frameCount++;
     if (now - fpsTimer >= 1000) {
-      window.parent.postMessage({
-        type: 'GAME_FPS',
-        fps: frameCount
-      }, '*');
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            source: 'MIKI_GAME_SANDBOX',
+            type: 'GAME_FPS',
+            fps: frameCount
+          }, '*');
+        }
+      } catch(e) {}
       frameCount = 0;
       fpsTimer = now;
     }

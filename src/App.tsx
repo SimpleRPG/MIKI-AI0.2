@@ -372,7 +372,8 @@ export default function App() {
       const isGpuUsable = gpuCheck.supported;
 
       // Decide if we should execute directly via WebGPU
-      const shouldRunWebGPU = engineMode === 'webgpu' || (engineMode === 'moe' && isGpuUsable && (webLLMService.isLoaded() || isLocalPreferred));
+      // In MoE mode, only run WebGPU if an engine is already loaded or already cached in device storage
+      const shouldRunWebGPU = engineMode === 'webgpu' || (engineMode === 'moe' && isGpuUsable && webLLMService.isLoaded());
 
       // MoE Prompt Classification & Expert Specialization
       const moeAnalysis = classifyPromptForMoE(text);
@@ -391,7 +392,7 @@ export default function App() {
           role: 'assistant',
           content: webLLMService.isLoaded()
             ? `⚡ オンデバイス (${targetModelId.split('-')[0]}) で推論中...`
-            : `🔄 端末内モデル (${targetModelId.split('-')[0]}) をロード中... (トークン消費: 0)`,
+            : `🔄 端末内モデル (${targetModelId.split('-')[0]}) を準備中... (トークン消費: 0)`,
           timestamp: Date.now(),
           speaker: activeSpeaker,
           engineMode: engineMode === 'moe' ? 'webgpu' : engineMode,
@@ -405,11 +406,11 @@ export default function App() {
         setIsLoading(false); // Hide the bottom loading indicator since placeholderMsg is active
 
         // Check if model is cached before attempting VRAM load
-        const isTargetCached = await webLLMService.isModelCached(targetModelId);
+        const isTargetCached = await webLLMService.isModelCached(targetModelId).catch(() => false);
         let isModelReady = webLLMService.isModelLoaded(targetModelId);
 
         // Always proceed to load/download if not yet ready
-        if (!isModelReady) {
+        if (!isModelReady && (engineMode === 'webgpu' || isTargetCached)) {
           try {
             await webLLMService.loadModel(targetModelId, (report) => {
               if (abortController.signal.aborted) return;
@@ -521,7 +522,7 @@ export default function App() {
             webGpuSuccess = accumulated.trim().length > 0;
           } catch (gpuErr: any) {
             webGpuErrorDetails = gpuErr?.message || String(gpuErr);
-            console.error('WebGPU execution error caught:', gpuErr);
+            console.warn('WebGPU execution error handled:', gpuErr);
             webGpuSuccess = false;
           }
         } else {
@@ -607,7 +608,7 @@ export default function App() {
             if (apiErr?.name === 'AbortError' || abortController.signal.aborted) {
               return;
             }
-            console.error('Fallback chat API error:', apiErr);
+            console.warn('Fallback chat API notice:', apiErr);
             accumulated = `⚠️ 応答生成中にエラーが発生しました:\n・API詳細: ${apiErr.message || '接続エラー'}`;
           }
         }
@@ -697,7 +698,7 @@ export default function App() {
         console.log('Chat request aborted.');
         return;
       }
-      console.error('Chat error:', err);
+      console.warn('Chat error caught gracefully:', err);
 
       // In case of WebGPU device/buffer interruption, reset instance for next prompt
       if (engineMode === 'webgpu') {
@@ -759,7 +760,7 @@ export default function App() {
         handleApplyCode(codeBlocks);
       }
     } catch (err: any) {
-      console.error(err);
+      console.warn('Auto-debug caught error:', err);
       setMessages((prev) => [
         ...prev,
         {
