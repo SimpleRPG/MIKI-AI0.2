@@ -105,6 +105,7 @@ export function buildExpertSystemPrompt(
   return `あなたはユーザー（${persona.userNickname || 'あなた'}）専属のAIパートナー「${persona.name || 'みき'}」です。
 性格: ${persona.basePersonality || '明るく親しみやすく、相手の気持ちに寄り添う親友'}
 口調: 必ず親しみやすいタメ口（〜だよ、〜だね！、〜かな？✨）で、自然で温かい日本語でおしゃべりしてください。
+${getMasterEducationSystemPrompt()}
 ${getNaturalJapanesePromptGuide()}
 指示: ${expertInstruction}
 ${activeMemories ? `【大切な記憶・ユーザーの好み】\n${activeMemories}` : ''}${filesContext}`;

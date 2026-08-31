@@ -159,6 +159,15 @@ function apiServerPlugin(): Plugin {
                 const name = persona?.name || 'みき';
 
                 if (
+                  lowerPrompt.includes('学習') ||
+                  lowerPrompt.includes('データ') ||
+                  lowerPrompt.includes('合成') ||
+                  lowerPrompt.includes('もとから') ||
+                  lowerPrompt.includes('最初から') ||
+                  lowerPrompt.includes('ファイルに入')
+                ) {
+                  reply = `うん！その通りだよ！💡✨\n\n「自然な日本語対話コーパス」や「ゲーム＆コード開発マスターナレッジ」の学習・知識データセットを、**最初からプロジェクトファイル（masterEducationKnowledge.ts / japaneseKnowledgeData.ts / initialState.ts）にすべて合成してバンドル組み込み**したよ！🌸\n\nこれにより：\n1. 📁 **完全自己完結**: 毎回外から読み込ませなくても、アプリを起動した瞬間からすべての知識・対話ルール・ゲーム生成ガイドが適用されるよ！\n2. 🧠 **全LLM共通で即座に参照**: 端末ローカルWebLLM（Qwen/SmolLM/Llama等）でもクラウドGeminiでも、常に合成されたマスターデータを使ってスムーズに賢くお話し＆コード作成できるよ！\n3. 🔒 **記憶も自動引き継ぎ**: 端末のローカルストレージと同期して、いつでも学習済みナレッジを保持し続けるよ！\n\nこれで準備は完璧！何を作ったりお話ししたいか、気軽に言ってね！😊🎮✨`;
+                } else if (
                   lowerPrompt.includes('動くようになった') ||
                   lowerPrompt.includes('動いてる') ||
                   lowerPrompt.includes('うごいてる') ||

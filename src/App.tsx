@@ -23,6 +23,7 @@ import { extractCodeBlocks } from './utils/codeParser';
 import { classifyPromptForMoE, buildExpertSystemPrompt } from './utils/moeRouter';
 import { SPEAKER_PROFILES, SpeakerProfile } from './data/speakers';
 import { INITIAL_JAPANESE_MEMORIES } from './data/japaneseKnowledgeData';
+import { MASTER_EDUCATION_MEMORIES } from './data/masterEducationKnowledge';
 import { MessageCircle, Play, Code2, Github, Brain, Sparkles, Cpu } from 'lucide-react';
 
 const DEFAULT_PERSONA: PersonaConfig = {
@@ -43,6 +44,7 @@ const DEFAULT_PERSONA: PersonaConfig = {
 
 const INITIAL_MEMORIES: MemoryItem[] = [
   ...INITIAL_JAPANESE_MEMORIES,
+  ...MASTER_EDUCATION_MEMORIES,
   {
     id: 'mem_1',
     category: 'profile',
@@ -91,7 +93,16 @@ export default function App() {
   });
   const [memories, setMemories] = useState<MemoryItem[]>(() => {
     const saved = localStorage.getItem('gamecraft_memories');
-    return saved ? JSON.parse(saved) : INITIAL_MEMORIES;
+    if (!saved) return INITIAL_MEMORIES;
+    try {
+      const parsed: MemoryItem[] = JSON.parse(saved);
+      // Ensure master synthesized dataset memories exist
+      const existingIds = new Set(parsed.map((m) => m.id));
+      const missingMasterMemories = INITIAL_MEMORIES.filter((m) => !existingIds.has(m.id));
+      return [...parsed, ...missingMasterMemories];
+    } catch {
+      return INITIAL_MEMORIES;
+    }
   });
 
   const [engineMode, setEngineMode] = useState<EngineMode>(() => {
