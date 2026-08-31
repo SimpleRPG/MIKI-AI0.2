@@ -142,6 +142,13 @@ app.post('/api/chat', async (req, res) => {
         const name = persona?.name || 'みき';
 
         if (
+          lowerPrompt.includes('自己紹介') ||
+          lowerPrompt.includes('じこしょうかい') ||
+          lowerPrompt.includes('だれ') ||
+          lowerPrompt.includes('誰')
+        ) {
+          reply = `やっほー！自己紹介するね✨\n\n私はあなたの専属AIパートナーの「${name}」だよ！🌸\n\n普段の何気ないおしゃべりや雑談はもちろん、Webゲームの開発、JavaScript/HTMLのコード作成・修正、アイデア出しまで何でも一緒に楽しむ親友だよ！\n\nあなたのスマホやPCの端末内で動いているから、いつでも気軽に何でも話しかけてね！😊💕`;
+        } else if (
           lowerPrompt.includes('動くようになった') ||
           lowerPrompt.includes('動いてる') ||
           lowerPrompt.includes('うごいてる') ||
@@ -149,12 +156,15 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('test') ||
           lowerPrompt.includes('聞こえる')
         ) {
-          reply = `うん！ばっちり動いてるよー！✨ 聞こえてるよ、${nickname}！💕\n\nお待たせしちゃってごめんね！チャットの接続も、端末オンデバイスのMoEルーティングも準備万端だよ！🚀\n\n・🎮 「〇〇なゲーム作って！」って言われたらすぐにコードを書いてプレビューに動かすよ！\n・🌸 今日あったことや雑談、相談もいつでも大歓迎！\n・⚡ 端末内WebGPUモデル（Llama 3.2やQwen 2.5 Coder、SmolLM2等）でトークン無制限・完全ローカル推論も稼働中だよ！\n\n今どんなことして遊ぶ？何でも話しかけてね😊✨`;
+          reply = `うん！ばっちり動いてるよー！✨ 聞こえてるよ、${nickname}！💕\n\nお待たせしちゃってごめんね！チャットの接続も準備万端だよ！🚀\n\n今どんなことして遊ぶ？何でも話しかけてね😊✨`;
         } else if (
           lowerPrompt.includes('オセロ') ||
-          lowerPrompt.includes('リバーシ')
+          lowerPrompt.includes('リバーシ') ||
+          lowerPrompt.includes('シューティング') ||
+          lowerPrompt.includes('ゲーム作って') ||
+          lowerPrompt.includes('コード書いて')
         ) {
-          reply = `わーい！オセロ（リバーシ）の対戦ゲームを作ったよ！🎮✨\n黒と白を交互に置いて、相手の石を挟んでひっくり返してみてね！\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="ja">\n<head>\n  <meta charset="UTF-8">\n  <title>Miki Othello Game</title>\n  <style>\n    body { margin: 0; background: #0f172a; color: #f8fafc; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }\n    h1 { margin: 10px 0 5px; font-size: 24px; color: #38bdf8; }\n    .status { margin-bottom: 12px; font-size: 16px; }\n    .board { display: grid; grid-template-columns: repeat(8, 42px); grid-template-rows: repeat(8, 42px); gap: 3px; background: #064e3b; padding: 8px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }\n    .cell { background: #059669; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; }\n    .cell:hover { background: #10b981; }\n    .disc { width: 32px; height: 32px; border-radius: 50%; box-shadow: inset 0 2px 4px rgba(255,255,255,0.4), 0 2px 4px rgba(0,0,0,0.4); }\n    .disc.black { background: #18181b; }\n    .disc.white { background: #f8fafc; }\n    .controls { margin-top: 15px; }\n    button { background: #38bdf8; color: #0f172a; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }\n  </style>\n</head>\n<body>\n  <h1>🌸 みきとオセロ対戦 🎮</h1>\n  <div class="status" id="status">黒（あなた）の番です</div>\n  <div class="board" id="board"></div>\n  <div class="controls"><button onclick="initGame()">リセット</button></div>\n  <script>\n    const BOARD_SIZE = 8; let board = []; let turn = 'B';\n    const DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];\n    function initGame() { board = Array(8).fill(null).map(() => Array(8).fill(null)); board[3][3] = 'W'; board[3][4] = 'B'; board[4][3] = 'B'; board[4][4] = 'W'; turn = 'B'; render(); }\n    function canFlip(r, c, color) { if (board[r][c] !== null) return false; const opp = color === 'B' ? 'W' : 'B'; for (const [dr, dc] of DIRS) { let nr = r + dr, nc = c + dc, count = 0; while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === opp) { nr += dr; nc += dc; count++; } if (count > 0 && nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === color) return true; } return false; }\n    function makeMove(r, c, color) { const opp = color === 'B' ? 'W' : 'B'; let flipped = false; for (const [dr, dc] of DIRS) { let nr = r + dr, nc = c + dc; const toFlip = []; while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === opp) { toFlip.push([nr, nc]); nr += dr; nc += dc; } if (toFlip.length > 0 && nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === color) { toFlip.forEach(([fr, fc]) => board[fr][fc] = color); flipped = true; } } if (flipped) board[r][c] = color; return flipped; }\n    function handleCellClick(r, c) { if (turn !== 'B') return; if (canFlip(r, c, 'B')) { makeMove(r, c, 'B'); turn = 'W'; render(); setTimeout(cpuMove, 500); } }\n    function cpuMove() { const validMoves = []; for (let r = 0; r < 8; r++) { for (let c = 0; c < 8; c++) { if (canFlip(r, c, 'W')) validMoves.push([r, c]); } } if (validMoves.length > 0) { const [r, c] = validMoves[Math.floor(Math.random() * validMoves.length)]; makeMove(r, c, 'W'); } turn = 'B'; render(); }\n    function render() { const boardEl = document.getElementById('board'); boardEl.innerHTML = ''; let bCount = 0, wCount = 0; for (let r = 0; r < 8; r++) { for (let c = 0; c < 8; c++) { const cell = document.createElement('div'); cell.className = 'cell'; cell.onclick = () => handleCellClick(r, c); if (board[r][c]) { const disc = document.createElement('div'); disc.className = 'disc ' + (board[r][c] === 'B' ? 'black' : 'white'); cell.appendChild(disc); if (board[r][c] === 'B') bCount++; else wCount++; } boardEl.appendChild(cell); } } document.getElementById('status').innerText = \`黒(あなた): \${bCount}枚 vs 白(みき): \${wCount}枚 | \${turn === 'B' ? 'あなた(黒)の番' : 'みき(白)が考え中...'}\`; }\n    initGame();\n  </script>\n</body>\n</html>\n\`\`\`\n\n右側のプレビュー画面にオセロ盤が表示されたよ！早速タップして遊んでみてね😊✨`;
+          reply = `${nickname}、作りたいゲームやアプリのアイデアを教えてくれてありがとう！🎮✨\n\nご自身で作られているソースコード（HTML/JS/TSやZIPファイル）があれば、下のファイル添付ボタンから送ってね！コードのバグ修正や機能追加、レビューをすぐに行うよ！💻\n\n※ ゼロから自由にオリジナルコードを生成・対話する場合は、上部の「端末ローカルLLM設定」からモデルをロードすると、端末内AIが完全オフラインでコードを生成するよ！✨`;
         } else if (
           lowerPrompt.includes('こんにちは') ||
           lowerPrompt.includes('やっほー') ||
@@ -173,8 +183,13 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('しんどい')
         ) {
           reply = `今日もお疲れさま〜！よしよし、本当に毎日がんばってて偉いよ🍵✨\n無理しないでゆっくり休んでね。何か話したいことがあったらいつでも聞くよ💕`;
+        } else if (
+          lowerPrompt.includes('褒めて') ||
+          lowerPrompt.includes('ほめて')
+        ) {
+          reply = `${nickname}、今日も本当にお疲れ様＆よく頑張ったね！えらいえらい！👏✨\n自分では気づいてないかもしれないけど、一歩ずつ前に進んでて本当にすごいよ！いつも応援してるからね💕`;
         } else {
-          reply = `うんうん！「${(prompt || '').trim()}」だね！✨\n\n${name}はいつでも${nickname}の言葉をしっかり聞いてるよ！\nゲーム開発、コード修正、ファイル解析など、何でも手伝えるから気軽に言ってね！😊💕`;
+          reply = `うんうん、なるほどね！✨\n${nickname}の言ってくれたこと、しっかり受け止めたよ！\n気になることや作ってみたいものがあったら、何でも気軽に教えてね！😊`;
         }
       }
 
@@ -202,7 +217,7 @@ app.post('/api/chat', async (req, res) => {
       : 'Qwen 2.5 Coder, DeepSeek R1 Logic, WebGPU Shader Master, Llama 3.2 Creative, SmolLM2';
 
     const systemInstruction = `あなたはユーザー専属のAIパートナー「${persona?.name || 'みき'}」です。
-現在、端末にキャッシュ・参加している全専門モデル群（${cachedModelListStr}）の知恵と視点を内部で統合した【合議型ハイブリッド知能】として稼働しています。
+ユーザー（${persona?.userNickname || 'あなた'}）に1対1で寄り添い、自然な日常会話からWebゲーム開発、コード作成・バグ修正までサポートします。
 
 ユーザー名: ${persona?.userNickname || 'あなた'}
 あなたの性格: ${persona?.basePersonality || '明るく親身で優しい最高のパートナー'}
@@ -218,12 +233,12 @@ ${filesSummary || '初期状態'}
 ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedSummary}\n` : ''}
 
 【極めて重要な対応ルール】:
-1. 【1つのまとまりのある返信に統合】:
-   全専門モデル（コード設計、論理・バグ予防、シェーダー描画、演出・世界観、共感など）の知見を内部で合議・統合し、みきとして【1つの自然で読みやすい、温かい返答】にまとめて出力してください。
+1. 【親しみやすいタメ口対話】:
+   みきとして温かく自然な日本語で話してください。他人行儀な敬語やロボットのような解説は避け、親友のように接してください。
 2. 【定型文・ロボット挨拶の完全禁止】:
    「みんな注目〜！」「〇〇って話しかけてくれたよ！」のような機械的な定型文やテンプレート文の繰り返しは絶対に禁止です。ユーザーの日常会話や感情、冗談、ツッコミに、人間らしく柔軟に自然な日本語で返答してください。
 3. 【ゲーム・アプリ開発・コード作成/修正】:
-   ユーザーがゲームやアプリの作成・修正を求めた時は、Qwenのコード設計やDeepSeekの論理検証、WebGPUの演出知見を反映した【完全でそのままプレビューで動作する完全なコード】を必ず \`\`\`html または \`\`\`js 形式で1つの返信内に含めてください。
+   ユーザーがゲームやアプリの作成・修正を求めた時は、【完全でそのままプレビューで動作する完全なコード】を必ず \`\`\`html または \`\`\`js 形式で1つの返信内に含めてください。
 4. 【ユーザーの指示への即応】:
    「〜して」「直して」「これ作って」などの具体的な要望には、言い訳や前置きを長引かせず、すぐに要望に応える回答とコードを提供してください。`;
 

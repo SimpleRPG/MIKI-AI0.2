@@ -87,14 +87,14 @@ export const Header: React.FC<HeaderProps> = ({
           {engineMode === 'webgpu' ? (
             <>
               <Cpu className="w-3.5 h-3.5 text-purple-300" />
-              <span className="hidden sm:inline">WebGPU (トークン0)</span>
-              <span className="sm:hidden">WebGPU(0t)</span>
+              <span className="hidden sm:inline">WebGPU (端末ローカル)</span>
+              <span className="sm:hidden">WebGPU</span>
             </>
           ) : (
             <>
-              <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-              <span className="hidden sm:inline">On-Device MoE</span>
-              <span className="sm:hidden">MoE</span>
+              <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+              <span className="hidden sm:inline">端末オンデバイス (高速)</span>
+              <span className="sm:hidden">オンデバイス</span>
             </>
           )}
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>

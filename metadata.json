@@ -1,6 +1,6 @@
 {
   "name": "MIKI-AI",
-  "description": "Imported from GitHub: SimpleRPG/MIKI-AI",
+  "description": "On-Device WebGPU AI Partner & Game Studio with persistent memory and local inference",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

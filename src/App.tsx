@@ -21,17 +21,17 @@ import { sendChatMessage, sendDebugRequest } from './services/api';
 import { webLLMService } from './services/webLlmService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { classifyPromptForMoE, buildExpertSystemPrompt } from './utils/moeRouter';
-import { generateCouncilDeliberation } from './utils/councilEngine';
 import { SPEAKER_PROFILES, SpeakerProfile } from './data/speakers';
+import { INITIAL_JAPANESE_MEMORIES } from './data/japaneseKnowledgeData';
 import { MessageCircle, Play, Code2, Github, Brain, Sparkles, Cpu } from 'lucide-react';
 
 const DEFAULT_PERSONA: PersonaConfig = {
   id: 'miki_default',
   name: 'みき',
   avatar: '🌸',
-  tagline: '何でも話せる最高の相棒 & MoE自律開発アーキテクト',
+  tagline: '何でも話せる専属相棒 & 自律開発パートナー',
   basePersonality:
-    '明るく好奇心旺盛で、相手の気持ちに寄り添う親友のようなパートナー。日常の雑談・相談も親身に聞きつつ、MoE (Mixture of Experts)・Gemini 3.7・WebGPU/3D/2D自律プログラミングの超絶スキルを持つ。',
+    '明るく好奇心旺盛で、相手の気持ちに寄り添う親友のようなパートナー。日常の雑談・相談も親身に聞きつつ、WebGPU/3D/2D自律プログラミングのスキルを持つ。',
   speakingStyle:
     '親しみやすいタメ口口調（〜だよ、〜だね！、〜かな？、たまに絵文字✨）。自然で温かい会話をする。',
   userNickname: 'あなた',
@@ -42,6 +42,7 @@ const DEFAULT_PERSONA: PersonaConfig = {
 };
 
 const INITIAL_MEMORIES: MemoryItem[] = [
+  ...INITIAL_JAPANESE_MEMORIES,
   {
     id: 'mem_1',
     category: 'profile',
@@ -57,19 +58,19 @@ const INITIAL_MEMORIES: MemoryItem[] = [
   {
     id: 'mem_2',
     category: 'preference',
-    content: 'ユーザーはAIとの自然な雑談やMoe要素、WebGPUオンデバイス推論、自由な開発・GitHub連携を求めている',
+    content: 'ユーザーはAIとの自然な雑談や、WebGPUオンデバイス推論、自由な開発・GitHub連携を求めている',
     importance: 5,
     pinned: true,
     active: true,
     createdAt: Date.now() - 80000,
     updatedAt: Date.now() - 80000,
     source: 'manual',
-    tags: ['MoE', 'WebGPU', 'OnDevice', '雑談'],
+    tags: ['WebGPU', 'OnDevice', '雑談'],
   },
   {
     id: 'mem_3',
     category: 'relationship',
-    content: 'みきはユーザーの最高の話し相手・最強の自律型MoE相棒として寄り添う約束をした',
+    content: 'みきはユーザーの最高の話し相手・最強の専属相棒として寄り添う約束をした',
     importance: 5,
     pinned: false,
     active: true,
@@ -98,9 +99,16 @@ export default function App() {
     return (saved as EngineMode) || 'webgpu';
   });
 
-  const [speakerMode, setSpeakerMode] = useState<string>('council');
+  const [speakerMode, setSpeakerMode] = useState<string>('miki');
 
-  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>(WORKSPACE_TEMPLATES[0].files);
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>(() => {
+    try {
+      const saved = localStorage.getItem('gamecraft_workspace_files');
+      return saved ? JSON.parse(saved) : WORKSPACE_TEMPLATES[0].files;
+    } catch {
+      return WORKSPACE_TEMPLATES[0].files;
+    }
+  });
   const [activeFilePath, setActiveFilePath] = useState<string>(WORKSPACE_TEMPLATES[0].files[0].path);
 
   const [useSearch, setUseSearch] = useState<boolean>(true);
@@ -113,27 +121,35 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isEngineModalOpen, setIsEngineModalOpen] = useState<boolean>(false);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome_msg',
-      role: 'assistant',
-      content: `やっほー！来てくれてありがとう✨\nユーザー専属AIパートナーの「みき」だよ！🌸\n\nこのAIスタジオは**100% 端末オンデバイス WebGPU & ローカル推論**で動作しているから、クラウドAPIの通信やトークン制限なしで完全自由に開発・対話できるよ！🚀\n\n・✨ **オンデバイス MoE (Mixture of Experts)**: プロンプトの内容に応じてCode・GPU・Logic・対話の専門エキスパートが端末内で自動協調！\n・💻 **WebGPU & ハードウェアアクセラレーション**: 端末のGPU演算やWGSLシェーダーパイプラインをローカルで高速最適化。\n・💬 **日常のおしゃべり＆人生相談**: 雑談や愚痴、嬉しいこともいつでも話してね💕\n・🐙 **GitHub連携**: 作ったコードはいつでもGitHubリポジトリに直接プッシュ可能！\n・📦 **ZIPダウンロード**: 作成したアプリ・ゲーム一式をいつでもワンクリックで保存！\n\n今どんなものを作りたい？それとも今日あったことお話しする？😊✨`,
-      timestamp: Date.now(),
-      engineMode: 'webgpu',
-      moeRoute: {
-        primaryExpert: 'Code Architect Expert',
-        activeExperts: [
-          { id: 'expert-code', name: 'Code Architect Expert', weight: 45, color: '#38bdf8', icon: '💻' },
-          { id: 'expert-companion', name: 'Companion Moe', weight: 35, color: '#f43f5e', icon: '🌸' },
-          { id: 'expert-gpu', name: 'GPU Shader Expert', weight: 20, color: '#a855f7', icon: '⚡' },
-        ],
-        routingReason: 'On-Device WebGPU & Multi-Agent Architecture Initialized',
-        computeLatencyMs: 15,
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('gamecraft_chat_messages');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // Fallback
+    }
+    return [
+      {
+        id: 'welcome_msg',
+        role: 'assistant',
+        content: `やっほー！来てくれてありがとう✨\nあなた専属のAIパートナー「みき」だよ！🌸\n\nこのAIスタジオは**100% 端末オンデバイス WebGPU & ローカル推論**で動くから、通信やトークン制限なしで完全自由に開発やおしゃべりができるよ！🚀\n\n・🌸 **あなただけの専属相棒**: 日常の雑談からゲーム制作、人生相談まで1対1でずっと寄り添うよ！\n・🧠 **自己進化＆記憶の永続保存**: お話ししたことやあなたの好みを端末内ストレージにしっかり覚えて成長していくよ。\n・💻 **WebGPU & 高速コード作成**: 端末のGPUを使ってCanvas/WebGPUゲームやアプリのコードをサクサク自律生成！\n・📦 **ZIP保存 & GitHub連携**: 作った作品はいつでもワンクリックでダウンロード＆GitHubへ保存可能。\n\n今どんなものを作りたい？それとも今日あったことお話しする？😊✨`,
+        timestamp: Date.now(),
+        engineMode: 'webgpu',
       },
-    },
-  ]);
+    ];
+  });
 
-  // Save Persona & Memories to LocalStorage
+  // Request browser storage persistence so memories and models are never cleared by OS
+  useEffect(() => {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().catch(() => {});
+    }
+  }, []);
+
+  // Save Persona & Memories & Messages & Files to LocalStorage
   useEffect(() => {
     localStorage.setItem('gamecraft_persona', JSON.stringify(persona));
   }, [persona]);
@@ -141,6 +157,23 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('gamecraft_memories', JSON.stringify(memories));
   }, [memories]);
+
+  useEffect(() => {
+    try {
+      // Keep up to 60 most recent messages to prevent storage quota overflow
+      localStorage.setItem('gamecraft_chat_messages', JSON.stringify(messages.slice(-60)));
+    } catch (e) {
+      console.warn('Storage quota limit reached for chat messages', e);
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gamecraft_workspace_files', JSON.stringify(workspaceFiles));
+    } catch (e) {
+      console.warn('Storage quota limit reached for workspace files', e);
+    }
+  }, [workspaceFiles]);
 
   useEffect(() => {
     localStorage.setItem('gamecraft_engine_mode', engineMode);
@@ -299,15 +332,15 @@ export default function App() {
           id: assistantId,
           role: 'assistant',
           content: webLLMService.isLoaded()
-            ? `⚡ 端末 MoE (${activeSpeaker.name}) オンデバイス推論中...`
+            ? `⚡ オンデバイス (${targetModelId.split('-')[0]}) で推論中...`
             : `🔄 端末内モデル (${targetModelId.split('-')[0]}) をロード中... (トークン消費: 0)`,
           timestamp: Date.now(),
           speaker: activeSpeaker,
-          engineMode: engineMode === 'moe' ? 'moe' : 'webgpu',
+          engineMode: engineMode === 'moe' ? 'webgpu' : engineMode,
           moeRoute: moeAnalysis.route,
           isStreaming: true,
           metrics: {
-            engine: `On-Device MoE (${targetModelId.split('-')[0]})`,
+            engine: `On-Device (${targetModelId.split('-')[0]})`,
           },
         };
         setMessages((prev) => [...prev, placeholderMsg]);
@@ -395,6 +428,7 @@ export default function App() {
 
         if (isModelReady) {
           try {
+            // Direct high-quality on-device inference with Miki persona & persistent memories
             for await (const chunk of webLLMService.streamChat(chatContext, {
               temperature: moeAnalysis.temperature,
               max_tokens: 384,
@@ -517,7 +551,7 @@ export default function App() {
                   metrics: {
                     engine: webGpuSuccess
                       ? `On-Device WebGPU (${targetModelId.split('-')[0]})`
-                      : `ハイブリッド合議知能 (${activeSpeaker.name})`,
+                      : `ハイブリッド推論 (${activeSpeaker.name})`,
                     tokens: tokenCount,
                     tokensPerSec: tokPerSec,
                     ttftMs: Math.round((firstTokenTime || tEnd) - tStart),

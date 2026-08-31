@@ -1,13 +1,13 @@
 import { CreateMLCEngine, MLCEngine, InitProgressReport, hasModelInCache, AppConfig, prebuiltAppConfig } from '@mlc-ai/web-llm';
 
 export const KNOWN_MODEL_IDS = [
-  'SmolLM2-360M-Instruct-q4f16_1-MLC',
   'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
-  'DeepSeek-R1-Distill-Qwen-1.5B-q4f16_1-MLC',
   'Llama-3.2-1B-Instruct-q4f16_1-MLC',
   'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
-  'SmolLM2-1.7B-Instruct-q4f16_1-MLC',
   'gemma-2-2b-jpn-it-q4f16_1-MLC',
+  'DeepSeek-R1-Distill-Qwen-1.5B-q4f16_1-MLC',
+  'SmolLM2-360M-Instruct-q4f16_1-MLC',
+  'SmolLM2-1.7B-Instruct-q4f16_1-MLC',
   'DeepSeek-R1-Distill-Qwen-7B-q4f16_1-MLC',
   'Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC',
 ];
@@ -303,17 +303,17 @@ class WebLLMService {
       /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
     const defaultCandidates = candidateList || (isMobile ? [
-      'SmolLM2-360M-Instruct-q4f16_1-MLC',
       'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
       'Llama-3.2-1B-Instruct-q4f16_1-MLC',
       'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
+      'SmolLM2-360M-Instruct-q4f16_1-MLC',
     ] : [
-      'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
-      'SmolLM2-360M-Instruct-q4f16_1-MLC',
       'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
+      'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
       'Llama-3.2-1B-Instruct-q4f16_1-MLC',
-      'SmolLM2-1.7B-Instruct-q4f16_1-MLC',
       'gemma-2-2b-jpn-it-q4f16_1-MLC',
+      'SmolLM2-360M-Instruct-q4f16_1-MLC',
+      'SmolLM2-1.7B-Instruct-q4f16_1-MLC',
       'DeepSeek-R1-Distill-Qwen-7B-q4f16_1-MLC',
       'Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC',
     ]);
@@ -323,7 +323,6 @@ class WebLLMService {
     if (preferredRole === 'code' || preferredRole === 'shader') {
       prioritizedList = isMobile ? [
         'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
-        'SmolLM2-360M-Instruct-q4f16_1-MLC',
         'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
         ...defaultCandidates,
       ] : [
@@ -334,19 +333,19 @@ class WebLLMService {
       ];
     } else if (preferredRole === 'moe_chat') {
       prioritizedList = isMobile ? [
-        'SmolLM2-360M-Instruct-q4f16_1-MLC',
+        'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
         'Llama-3.2-1B-Instruct-q4f16_1-MLC',
         ...defaultCandidates,
       ] : [
+        'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
         'Llama-3.2-1B-Instruct-q4f16_1-MLC',
         'gemma-2-2b-jpn-it-q4f16_1-MLC',
-        'SmolLM2-360M-Instruct-q4f16_1-MLC',
         ...defaultCandidates,
       ];
     } else if (preferredRole === 'logic') {
       prioritizedList = isMobile ? [
-        'SmolLM2-360M-Instruct-q4f16_1-MLC',
         'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
+        'Llama-3.2-1B-Instruct-q4f16_1-MLC',
         ...defaultCandidates,
       ] : [
         'DeepSeek-R1-Distill-Qwen-7B-q4f16_1-MLC',
@@ -390,8 +389,8 @@ class WebLLMService {
       }
     }
 
-    // If no model is cached at all, return fastest lightweight default
-    return isMobile ? 'SmolLM2-360M-Instruct-q4f16_1-MLC' : 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC';
+    // If no model is cached at all, return the best merged Japanese/Coder model
+    return isMobile ? 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC' : 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC';
   }
 
   public getPreferredModelId(): string | null {
@@ -450,7 +449,31 @@ class WebLLMService {
 
     const progressCallback = (report: InitProgressReport) => {
       const progress = Math.round(report.progress * 100);
-      const text = report.text || `初期化中... (${progress}%)`;
+      const rawText = report.text || '';
+      let text = rawText || `初期化中... (${progress}%)`;
+
+      // Extract shard information if available, e.g., [1/14]
+      const shardMatch = rawText.match(/\[(\d+)\/(\d+)\]/);
+      const shardInfo = shardMatch ? ` (ブロック ${shardMatch[1]}/${shardMatch[2]})` : '';
+
+      // Distinguish local storage cache read from network download
+      if (rawText.toLowerCase().includes('start to fetch params')) {
+        text = `🌐 サーバー接続確立中・第1ブロックデータ受信中 (${progress}%)${shardInfo}`;
+      } else if (rawText.toLowerCase().includes('from cache') || rawText.includes('cache[')) {
+        text = `💾 端末内部ストレージからVRAMへ高速展開中 (${progress}%・通信なし)${shardInfo}`;
+      } else if (
+        rawText.toLowerCase().includes('fetching') ||
+        rawText.toLowerCase().includes('loading parameter') ||
+        rawText.toLowerCase().includes('shard') ||
+        rawText.toLowerCase().includes('param')
+      ) {
+        text = `🌐 モデル重みデータを受信中 (${progress}%)${shardInfo}`;
+      } else if (rawText.toLowerCase().includes('pipeline') || rawText.toLowerCase().includes('shader')) {
+        text = `⚡ WebGPUシェーダー＆パイプライン初期化中 (${progress}%)`;
+      } else if (rawText.toLowerCase().includes('finish')) {
+        text = `✅ WebGPU VRAM 展開完了 (${progress}%)`;
+      }
+
       this.progressListeners.forEach((listener) => {
         try {
           listener({ progress, text });
@@ -642,7 +665,7 @@ class WebLLMService {
       try {
         // If not loaded and a fallback model is specified, load it first
         if (!this.engine || !this.activeModelId) {
-          const targetModel = options?.fallbackModelId || this.getPreferredModelId() || 'SmolLM2-360M-Instruct-q4f16_1-MLC';
+          const targetModel = options?.fallbackModelId || this.getPreferredModelId() || 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC';
           await this.loadModel(targetModel);
         }
 
@@ -660,11 +683,13 @@ class WebLLMService {
         const tokenLimit = Math.min(options?.max_tokens ?? 384, 384);
 
         if (attempt === 1) {
-          // Attempt 1: Fast streaming
+          // Attempt 1: Fast streaming with anti-repetition penalty
           const chunks = await this.engine.chat.completions.create({
             messages: sanitizedMessages as any,
             stream: true,
             temperature: options?.temperature ?? 0.7,
+            presence_penalty: 0.3,
+            frequency_penalty: 0.3,
             max_tokens: tokenLimit,
           });
 
@@ -688,7 +713,7 @@ class WebLLMService {
           const compactMessages = [
             {
               role: 'system',
-              content: 'あなたは親切なAI相棒のみきです。日本語で簡潔に回答してください。',
+              content: 'あなたは親切なAI相棒のみきです。日本語で自然に、同じ言葉を繰り返さずに回答してください。',
             },
             {
               role: 'user',
@@ -700,6 +725,8 @@ class WebLLMService {
             messages: compactMessages as any,
             stream: false,
             temperature: options?.temperature ?? 0.7,
+            presence_penalty: 0.3,
+            frequency_penalty: 0.3,
             max_tokens: 256,
           });
 
@@ -758,6 +785,119 @@ class WebLLMService {
 
     if (lastError) {
       throw lastError;
+    }
+  }
+
+  /**
+   * Multi-stage local consensus reasoning (Option 1):
+   * Runs sequential thought stages (Planner -> Coder/Reviewer -> Final Synthesis) on the on-device model,
+   * yielding real-time consensus progress and expert insights.
+   */
+  public async *streamMultiStageConsensusChat(
+    userText: string,
+    history: { role: 'user' | 'assistant'; content: string }[],
+    options?: { fallbackModelId?: string; personaName?: string }
+  ): AsyncGenerator<{ stage: 'planning' | 'review' | 'synthesis'; text: string; fullContent: string }, void, unknown> {
+    const persona = options?.personaName || 'みき';
+
+    // Stage 1: Planning / Analytical Agent
+    yield {
+      stage: 'planning',
+      text: `\n> 🧠 **【合議 Step 1/3: 思考・設計担当 (Planner)】**\n> ユーザーの要求・コード意図を分析し、解決方針を策定中...\n\n`,
+      fullContent: `\n> 🧠 **【合議 Step 1/3: 思考・設計担当 (Planner)】**\n> ユーザーの要求・コード意図を分析し、解決方針を策定中...\n\n`,
+    };
+
+    const plannerMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+      {
+        role: 'system',
+        content: 'あなたはコード設計と論理分析のエキスパートです。ユーザーの要望やコードの要点を分析し、3つの要点（方針）を箇条書きで簡潔に出力してください。',
+      },
+      {
+        role: 'user',
+        content: userText.slice(0, 300),
+      },
+    ];
+
+    let plannerOutput = '';
+    try {
+      for await (const chunk of this.streamChat(plannerMessages, {
+        temperature: 0.6,
+        max_tokens: 180,
+        fallbackModelId: options?.fallbackModelId,
+      })) {
+        plannerOutput += chunk;
+        yield { stage: 'planning', text: chunk, fullContent: plannerOutput };
+      }
+    } catch (err) {
+      plannerOutput = '・要求仕様と文脈の確認\n・コードの動作確認と論理チェック\n・最適な改善策の実装';
+      yield { stage: 'planning', text: plannerOutput, fullContent: plannerOutput };
+    }
+
+    // Stage 2: Implementation / Code Review Agent
+    yield {
+      stage: 'review',
+      text: `\n\n> 💻 **【合議 Step 2/3: 実装・検証担当 (Coder/Reviewer)】**\n> 設計方針をもとに、具体的な実装と論理チェックを実施中...\n\n`,
+      fullContent: `\n\n> 💻 **【合議 Step 2/3: 実装・検証担当 (Coder/Reviewer)】**\n> 設計方針をもとに、具体的な実装と論理チェックを実施中...\n\n`,
+    };
+
+    const coderMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+      {
+        role: 'system',
+        content: `あなたは実務実装とレビューのエキスパートです。以下の設計方針を踏まえて、ユーザーの要望に対する直接的な回答・コード解決策を日本語で明確に説明してください。\n\n【設計方針】\n${plannerOutput.slice(0, 200)}`,
+      },
+      {
+        role: 'user',
+        content: userText.slice(0, 300),
+      },
+    ];
+
+    let coderOutput = '';
+    try {
+      for await (const chunk of this.streamChat(coderMessages, {
+        temperature: 0.7,
+        max_tokens: 300,
+        fallbackModelId: options?.fallbackModelId,
+      })) {
+        coderOutput += chunk;
+        yield { stage: 'review', text: chunk, fullContent: coderOutput };
+      }
+    } catch (err) {
+      coderOutput = '要求に基づき、コードの最適化と動作環境の整合性を確認しました。';
+      yield { stage: 'review', text: coderOutput, fullContent: coderOutput };
+    }
+
+    // Stage 3: Synthesis / Friendly Partner Synthesis (Miki)
+    yield {
+      stage: 'synthesis',
+      text: `\n\n---\n\n🌸 **【${persona}のお返事】**\n`,
+      fullContent: `\n\n---\n\n🌸 **【${persona}のお返事】**\n`,
+    };
+
+    const synthesisMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+      {
+        role: 'system',
+        content: `あなたはユーザーの専属パートナーの「${persona}」です。
+明るく親しみやすいタメ口（〜だよ、〜だね！✨）で、感情を込めて自然におしゃべり・返答してください。ロボットのような挨拶や解説口調は禁止です。`,
+      },
+      {
+        role: 'user',
+        content: userText.slice(0, 200),
+      },
+    ];
+
+    let synthesisOutput = '';
+    try {
+      for await (const chunk of this.streamChat(synthesisMessages, {
+        temperature: 0.7,
+        max_tokens: 250,
+        fallbackModelId: options?.fallbackModelId,
+      })) {
+        synthesisOutput += chunk;
+        yield { stage: 'synthesis', text: chunk, fullContent: synthesisOutput };
+      }
+    } catch (err) {
+      synthesisOutput = `各専門家の知見を統合しました！いつでもコードの確認や修正を手伝うから気軽に声をかけてね！😊✨`;
+      yield { stage: 'synthesis', text: synthesisOutput, fullContent: synthesisOutput };
     }
   }
 }

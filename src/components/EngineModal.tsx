@@ -31,47 +31,17 @@ interface EngineModalProps {
 
 const OFFICIAL_LOCAL_MODELS: LocalLLMModel[] = [
   {
-    id: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
-    name: 'SmolLM2 360M Instruct',
-    expertRole: 'general',
-    expertName: 'Ultra-Fast Lightweight (最速・スマホ推奨)',
-    icon: '⚡',
-    sizeMB: 220,
-    parameters: '360M',
-    quantization: 'q4f16_1 (4-bit weights)',
-    vramMB: 650,
-    description: '超軽量・即時ダウンロード可能。スマートフォンや低スペック端末でも超高速にWebGPU動作します。',
-    huggingFaceRepo: 'mlc-ai/SmolLM2-360M-Instruct-q4f16_1-MLC',
-    downloadStatus: 'not_downloaded',
-    downloadProgress: 0,
-  },
-  {
     id: 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
     name: 'Qwen 2.5 Coder 0.5B Instruct',
     expertRole: 'code',
-    expertName: 'Ultra-Light Code (超軽量コード生成)',
-    icon: '🚀',
+    expertName: '🌸 日本語×開発 統合モデル (スマホ超推奨)',
+    icon: '🌸',
     sizeMB: 380,
     parameters: '0.5B',
     quantization: 'q4f16_1 (4-bit weights)',
     vramMB: 750,
-    description: 'わずか380MBで軽快に動作するコード特化モデル。スマホでもストレスなく高速ダウンロードできます。',
+    description: '【日本語・スマホ最優秀】わずか380MBで流暢な日本語会話とコード生成を1つのモデルで両立。スマホのWebGPUで最高速・安定に動きます。',
     huggingFaceRepo: 'mlc-ai/Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
-    downloadStatus: 'not_downloaded',
-    downloadProgress: 0,
-  },
-  {
-    id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
-    name: 'Llama 3.2 1B Instruct',
-    expertRole: 'moe_chat',
-    expertName: 'Companion Moe Expert (親密対話・感情共感)',
-    icon: '🌸',
-    sizeMB: 880,
-    parameters: '1.23B',
-    quantization: 'q4f16_1 (4-bit weights)',
-    vramMB: 1250,
-    description: 'Meta開発の軽量対話モデル。キャラクターMoe会話、親密なアシスタント対話をローカルWebGPUで実行します。',
-    huggingFaceRepo: 'mlc-ai/Llama-3.2-1B-Instruct-q4f16_1-MLC',
     downloadStatus: 'not_downloaded',
     downloadProgress: 0,
   },
@@ -79,29 +49,29 @@ const OFFICIAL_LOCAL_MODELS: LocalLLMModel[] = [
     id: 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
     name: 'Qwen 2.5 Coder 1.5B Instruct',
     expertRole: 'code',
-    expertName: 'Code & Logic Master (コード生成・高速推論)',
+    expertName: '⚡ 高精度 統合モデル (日本語＋高度コード)',
     icon: '⚡',
     sizeMB: 950,
     parameters: '1.54B',
     quantization: 'q4f16_1 (4-bit weights)',
     vramMB: 1400,
-    description: '1.5Bパラメータのコード特化モデル。Web開発・Python・アルゴリズム生成を端末上で高速に実行。',
+    description: '1.5Bパラメータの高性能統合モデル。自然な日本語の雑談と本格的なWebゲーム・アルゴリズム生成を両立します。',
     huggingFaceRepo: 'mlc-ai/Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
     downloadStatus: 'not_downloaded',
     downloadProgress: 0,
   },
   {
-    id: 'SmolLM2-1.7B-Instruct-q4f16_1-MLC',
-    name: 'SmolLM2 1.7B Instruct',
-    expertRole: 'general',
-    expertName: 'Lightweight Universal Expert (汎用・高効率)',
-    icon: '✨',
-    sizeMB: 980,
-    parameters: '1.71B',
+    id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
+    name: 'Llama 3.2 1B Instruct',
+    expertRole: 'moe_chat',
+    expertName: '💖 Llama 3.2 1B (親密対話・感情共感)',
+    icon: '💖',
+    sizeMB: 880,
+    parameters: '1.23B',
     quantization: 'q4f16_1 (4-bit weights)',
-    vramMB: 1400,
-    description: 'HuggingFace開発の高効率モデル。高精度な日常会話とコード補完を低負荷で実現します。',
-    huggingFaceRepo: 'mlc-ai/SmolLM2-1.7B-Instruct-q4f16_1-MLC',
+    vramMB: 1250,
+    description: 'Meta開発の最新軽量対話モデル。キャラクター会話、親密なアシスタント対話をローカルWebGPUで実行します。',
+    huggingFaceRepo: 'mlc-ai/Llama-3.2-1B-Instruct-q4f16_1-MLC',
     downloadStatus: 'not_downloaded',
     downloadProgress: 0,
   },
@@ -109,7 +79,7 @@ const OFFICIAL_LOCAL_MODELS: LocalLLMModel[] = [
     id: 'gemma-2-2b-jpn-it-q4f16_1-MLC',
     name: 'Gemma 2 2B Japanese Instruct',
     expertRole: 'general',
-    expertName: 'Google Gemma 2 (日本語・自然対話特化)',
+    expertName: '💎 Google Gemma 2 (日本語・自然対話特化)',
     icon: '💎',
     sizeMB: 1650,
     parameters: '2.61B',
@@ -121,10 +91,25 @@ const OFFICIAL_LOCAL_MODELS: LocalLLMModel[] = [
     downloadProgress: 0,
   },
   {
+    id: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
+    name: 'SmolLM2 360M Instruct',
+    expertRole: 'general',
+    expertName: '⚡ SmolLM2 360M (超軽量・英語/コード基礎)',
+    icon: '⚡',
+    sizeMB: 220,
+    parameters: '360M',
+    quantization: 'q4f16_1 (4-bit weights)',
+    vramMB: 650,
+    description: '超軽量220MB。英語での高速処理や超低メモリ環境向け（※日本語の会話にはQwen 0.5B推奨）。',
+    huggingFaceRepo: 'mlc-ai/SmolLM2-360M-Instruct-q4f16_1-MLC',
+    downloadStatus: 'not_downloaded',
+    downloadProgress: 0,
+  },
+  {
     id: 'DeepSeek-R1-Distill-Qwen-7B-q4f16_1-MLC',
     name: 'DeepSeek-R1 Distill Qwen 7B',
     expertRole: 'logic',
-    expertName: 'DeepSeek R1 (推論・思考・難問デバッグ)',
+    expertName: '🧩 DeepSeek R1 (推論・思考・難問デバッグ)',
     icon: '🧩',
     sizeMB: 4500,
     parameters: '7.61B',
@@ -139,7 +124,7 @@ const OFFICIAL_LOCAL_MODELS: LocalLLMModel[] = [
     id: 'Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC',
     name: 'Qwen 2.5 Coder 7B Instruct',
     expertRole: 'shader',
-    expertName: 'Pro Code & WebGPU Shader (プロ開発・高精度)',
+    expertName: '👑 Qwen 2.5 Coder 7B (プロ開発・高精度)',
     icon: '👑',
     sizeMB: 4600,
     parameters: '7.61B',
@@ -1061,6 +1046,11 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                                 {model.expertName}
                               </span>
+                              {model.sizeMB <= 400 && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-1 font-bold">
+                                  📱 スマホ・4G推奨
+                                </span>
+                              )}
                               {isLoaded && (
                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 font-bold">
                                   <Check className="w-3 h-3" /> WebGPU VRAM 稼働中
@@ -1167,7 +1157,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                       {isDownloading && (
                         <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
                           <div className="flex justify-between items-center text-xs text-slate-400">
-                            <span className="text-purple-300 font-mono text-[11px] truncate max-w-[65%]">
+                            <span className="text-purple-300 font-mono text-[11px] truncate max-w-[70%]">
                               {model.statusText || 'ダウンロード中...'}
                             </span>
                             <div className="flex items-center gap-2">
@@ -1187,12 +1177,42 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                               </span>
                             </div>
                           </div>
+
                           <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
                             <div
                               className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-sky-400 rounded-full transition-all duration-200"
                               style={{ width: `${Math.max(3, model.downloadProgress)}%` }}
                             />
                           </div>
+
+                          {/* 0% Explanation and tips for large models */}
+                          {model.downloadProgress === 0 && (
+                            <div className="p-2 rounded bg-purple-950/40 border border-purple-800/40 text-[10px] text-purple-200 space-y-1">
+                              <div className="flex items-center gap-1.5 font-bold text-purple-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping" />
+                                <span>第1データブロック（約100MB）を受信中（0%表示のまま少々お待ちください）</span>
+                              </div>
+                              <p className="text-slate-400 leading-normal">
+                                モデルは分割ブロックで届くため、最初のブロックが完了するまで0%表示となります。正常に通信中です。
+                              </p>
+                              {model.sizeMB >= 800 && (
+                                <div className="pt-1 flex items-center justify-between">
+                                  <span className="text-amber-300">💡 スマホですぐ試したい場合:</span>
+                                  <button
+                                    onClick={async () => {
+                                      await handleCancelDownload(model.id);
+                                      const smol = localModels.find((m) => m.id === 'SmolLM2-360M-Instruct-q4f16_1-MLC');
+                                      if (smol) handleDownloadAndLoad(smol);
+                                    }}
+                                    className="px-2 py-0.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-[10px] font-bold shadow transition-colors"
+                                  >
+                                    ⚡ 超高速 360M (220MB) に切り替え
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[10px] text-slate-400">
                             <span className="text-slate-300">
                               {model.downloadSpeed
@@ -1415,102 +1435,79 @@ export const EngineModal: React.FC<EngineModalProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  オンデバイス推論エンジンモードの切り替え
+                  推論エンジン・動作モードの切り替え
                 </label>
                 <div className="text-xs text-slate-400 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  100% 端末オンデバイス・通信ゼロ
+                  端末内ストレージ記憶連動・トークン0
                 </div>
               </div>
 
-              {/* MoE Card */}
+              {/* Unified Model Card */}
               <div
                 onClick={() => onSelectEngine('moe')}
                 className={`p-4 rounded-xl border transition-all cursor-pointer ${
                   engineMode === 'moe'
-                    ? 'bg-sky-950/40 border-sky-500 shadow-lg shadow-sky-500/10 ring-1 ring-sky-500'
+                    ? 'bg-pink-950/30 border-pink-500 shadow-lg shadow-pink-500/10 ring-1 ring-pink-500'
                     : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800/70 hover:border-slate-600'
                 }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                    <div className="p-2 rounded-lg bg-pink-500/20 text-pink-400 border border-pink-500/30">
                       <Sparkles className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-100 text-sm">オンデバイス MoE (Mixture of Experts)</span>
-                        <span className="text-[11px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-medium">
-                          推奨・端末内協調
+                        <span className="font-bold text-slate-100 text-sm">統合ハイブリッド相棒知能（みき）</span>
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-pink-500/20 text-pink-300 font-medium">
+                          標準・推奨
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-1">
-                        プロンプト内容を瞬時に分析し、コード・GPUシェーダー・ロジック・対話の各エキスパートへ動的ルーティング
+                        1つのモデルに日本語会話力と高度なプログラミング・自律思考能力を完全集約。人格がブレず高速に動作します。
                       </p>
                     </div>
                   </div>
-                  {engineMode === 'moe' && <CheckCircle2 className="w-5 h-5 text-sky-400 shrink-0" />}
+                  {engineMode === 'moe' && <CheckCircle2 className="w-5 h-5 text-pink-400 shrink-0" />}
                 </div>
 
-                {/* Sub-Experts Breakdown */}
+                {/* Capabilities Grid */}
                 <div className="mt-3 pt-3 border-t border-slate-700/40 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
+                    <span>🌸</span>
+                    <div>
+                      <div className="font-semibold text-pink-300">専属パートナー対話</div>
+                      <div className="text-[10px] text-slate-500">親密記憶＆温かいタメ口</div>
+                    </div>
+                  </div>
                   <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
                     <span>💻</span>
                     <div>
-                      <div className="font-semibold text-sky-300">Code Expert</div>
-                      <div className="text-[10px] text-slate-500">HTML5/JS/3D/Canvas</div>
+                      <div className="font-semibold text-sky-300">ゲーム＆Webコード生成</div>
+                      <div className="text-[10px] text-slate-500">HTML5/JS/Canvas/CSS</div>
                     </div>
                   </div>
                   <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
                     <span>⚡</span>
                     <div>
-                      <div className="font-semibold text-purple-300">GPU/Shader Expert</div>
-                      <div className="text-[10px] text-slate-500">WGSL/Compute/WebGL</div>
-                    </div>
-                  </div>
-                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                    <span>🧩</span>
-                    <div>
-                      <div className="font-semibold text-emerald-300">Logic & Math</div>
-                      <div className="text-[10px] text-slate-500">Physics & Rules</div>
-                    </div>
-                  </div>
-                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                    <span>🌸</span>
-                    <div>
-                      <div className="font-semibold text-rose-300">Companion Moe</div>
-                      <div className="text-[10px] text-slate-500">Empathy/Chat/Miki</div>
-                    </div>
-                  </div>
-                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                    <span>📥</span>
-                    <div>
-                      <div className="font-semibold text-amber-300">Local WebGPU LLM</div>
-                      <div className="text-[10px] text-slate-500">
-                        {totalCachedMB > 0 ? `${cachedCount}モデル キャッシュ稼働中` : '1モデル〜即時稼働'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                    <span>🔒</span>
-                    <div>
-                      <div className="font-semibold text-teal-300">100% Privacy</div>
-                      <div className="text-[10px] text-slate-500">外部送信ゼロ</div>
+                      <div className="font-semibold text-purple-300">WebGPU/3Dグラフィック</div>
+                      <div className="text-[10px] text-slate-500">Three.js / シェーダー</div>
                     </div>
                   </div>
                 </div>
 
-                {/* 1-Model MoE Explanatory Box */}
-                <div className="mt-3 p-3 rounded-lg bg-slate-900/90 border border-sky-900/50 text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
-                  <div className="font-bold text-sky-300 flex items-center gap-1.5">
+                {/* 1-Model Unified Explanatory Box */}
+                <div className="mt-3 p-3 rounded-lg bg-slate-900/90 border border-pink-900/40 text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
+                  <div className="font-bold text-pink-300 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>💡 1モデルのみのダウンロード時でも MoE は完全稼働します</span>
+                    <span>💡 1つのモデルで全領域をカバーする「統合育成型」アーキテクチャ</span>
                   </div>
                   <p className="text-slate-400">
-                    ・<strong>1モデル運用時</strong>: 端末内の1モデルに対して、プロンプトの種別（コード開発・対話・シェーダー・論理デバッグ）に応じた専門家プロンプト＆ハイパーパラメータ動的切り替えが行われます。
+                    ・<strong>人格と知識の統一</strong>: 会話、ゲーム開発、バグ診断を1つのモデル（みき）が記憶を引き継ぎながら担当するため、ブレない一貫したサポートが可能です。
                   </p>
                   <p className="text-slate-400">
-                    ・<strong>複数モデル運用時</strong>: Qwen（コード特化）やLlama/Gemma（対話特化）など、モデル単位での最適エキスパート自動ディスパッチ協調も有効になります。
+                    ・<strong>端末ストレージ学習</strong>: あなたとのやり取りやプロジェクトの好みを端末内ストレージに蓄積し、使い込むほどあなた専用に最適化されます。
                   </p>
                 </div>
               </div>
@@ -1600,6 +1597,31 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                 <p>
                   2. <strong>プライバシー保護</strong>: プロンプトやソースコードは外部サーバーへ一切送信されず、端末内ローカルで完結します。
                 </p>
+              </div>
+
+              {/* APK Native Storage Guide */}
+              <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-800/40 text-xs text-slate-300 space-y-3 leading-relaxed">
+                <div className="flex items-center gap-2 font-bold text-purple-300 text-sm">
+                  <HardDrive className="w-4 h-4 text-purple-400" />
+                  <span>📱 Android APK（ネイティブアプリ化）時のストレージ保存について</span>
+                </div>
+                <p className="text-slate-400 text-xs">
+                  ブラウザ版（現在）はブラウザのサンドボックス（CacheStorage）に保存されますが、<strong>Android APK / ネイティブアプリとしてビルドした場合</strong>は、以下の通り端末本体のストレージをフル活用できます：
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+                  <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+                    <div className="font-bold text-sky-300">📦 アプリ事前同梱（プリインストール）</div>
+                    <div className="text-slate-400">
+                      APKの <code>assets/models/</code> にモデルファイルを直接含めて配布することで、<strong>初回ダウンロード待ち0秒・完全通信不要</strong>で起動できます。
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+                    <div className="font-bold text-emerald-300">💾 端末専用ストレージへの直接保存</div>
+                    <div className="text-slate-400">
+                      <code>/data/data/com.miki.ai/files/models</code> または SDカード等の大容量ストレージに直接保存され、ブラウザのキャッシュ消去の影響を受けません。
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

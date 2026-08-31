@@ -255,29 +255,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
           </span>
-          <span className="font-semibold text-slate-300">発言モデル:</span>
+          <span className="font-semibold text-slate-300">相棒AI:</span>
 
-          {/* Model / Council Selector */}
+          {/* Model / Personality Focus Selector */}
           <select
             value={speakerMode}
             onChange={(e) => setSpeakerMode(e.target.value)}
-            className="bg-slate-950 border border-slate-700 text-sky-300 text-[11px] font-bold rounded-lg px-2 py-1 focus:outline-none focus:border-sky-500 transition-colors"
+            className="bg-slate-950 border border-slate-700 text-pink-300 text-[11px] font-bold rounded-lg px-2 py-1 focus:outline-none focus:border-pink-500 transition-colors"
           >
-            <option value="council">👥 全員で合議 (Council of 4 Experts)</option>
-            <option value="miki">🌸 みき (専属パートナー & 総合進行)</option>
-            <option value="qwen_coder">💻 Qwen 2.5 Coder (コード設計)</option>
-            <option value="deepseek_logic">🧩 DeepSeek R1 (論理・バグ検証)</option>
-            <option value="gpu_shader">⚡ WebGPU Shader (描画・高速化)</option>
-            <option value="smollm_fast">⚡ SmolLM2-360M (超軽量・即答)</option>
-            <option value="llama_creative">🔮 Llama 3.2 (演出・世界観)</option>
+            <option value="miki">🌸 みき (通常・全対話)</option>
+            <option value="qwen_coder">💻 みき (コード・開発モード)</option>
+            <option value="deepseek_logic">🧩 みき (原因分析・ロジックモード)</option>
+            <option value="gpu_shader">⚡ みき (WebGPU・シェーダーモード)</option>
           </select>
 
           <button
             onClick={onOpenEngineModal}
-            className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-purple-300 hover:bg-slate-700 border border-purple-500/40 font-mono transition-colors inline-flex items-center gap-1"
+            className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-pink-300 hover:bg-slate-700 border border-pink-500/40 font-mono transition-colors inline-flex items-center gap-1"
           >
             <Sparkles className="w-2.5 h-2.5" />
-            {engineMode === 'moe' ? 'On-Device MoE' : 'WebGPU'}
+            <span>WebGPUオンデバイス</span>
           </button>
         </div>
 
@@ -374,43 +371,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   </span>
                   {msg.engineMode && (
                     <span className="px-1.5 py-0.2 rounded bg-slate-800 text-sky-300 border border-slate-700 font-mono hidden sm:inline">
-                      {msg.engineMode === 'moe' ? 'MoE Router' : msg.engineMode === 'webgpu' ? 'WebGPU' : 'Gemini 3.7'}
+                      {msg.engineMode === 'webgpu' ? 'WebGPU' : 'ハイブリッド'}
                     </span>
                   )}
                 </div>
 
-                {/* MoE Routing Details Badge if present */}
-                {!isUser && msg.moeRoute && (
-                  <div className="flex flex-wrap items-center gap-1.5 bg-slate-950/80 border border-slate-800 px-2.5 py-1 rounded-lg text-[10.5px] text-slate-300 shadow-sm">
-                    <span className="text-sky-400 font-bold flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" />
-                      MoE ルーティング:
+                {/* Processing Speed & Token Stats */}
+                {!isUser && (msg.metrics?.ttftMs || msg.metrics?.tokensPerSec) && (
+                  <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-2.5 py-0.5 rounded-lg text-[10px] text-slate-400 font-mono shadow-sm">
+                    <span className="text-pink-400 font-bold flex items-center gap-1 font-sans">
+                      🌸 みき (オンデバイス推論)
                     </span>
-                    {msg.moeRoute.activeExperts.slice(0, 3).map((exp, idx) => (
-                      <span
-                        key={idx}
-                        className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-200 border border-slate-700 text-[10px]"
-                        style={{ color: exp.color }}
-                      >
-                        {exp.icon} {exp.name} ({exp.weight}%)
+                    {msg.metrics?.ttftMs ? (
+                      <span>⚡ 応答: {msg.metrics.ttftMs}ms</span>
+                    ) : null}
+                    {msg.metrics?.tokensPerSec ? (
+                      <span className="text-emerald-400 font-bold">
+                        ({msg.metrics.tokensPerSec} tok/s)
                       </span>
-                    ))}
-                    <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono ml-auto">
-                      {msg.metrics?.ttftMs ? (
-                        <span title="応答生成にかかった時間 (Time To First Token / Total)">
-                          ⚡ {msg.metrics.ttftMs}ms
-                        </span>
-                      ) : msg.moeRoute.computeLatencyMs ? (
-                        <span title="MoEルーター判定速度">
-                          ⚡ {msg.moeRoute.computeLatencyMs}ms
-                        </span>
-                      ) : null}
-                      {msg.metrics?.tokensPerSec ? (
-                        <span className="text-emerald-400 font-bold ml-1">
-                          ({msg.metrics.tokensPerSec} tok/s)
-                        </span>
-                      ) : null}
-                    </div>
+                    ) : null}
                   </div>
                 )}
 
@@ -601,10 +580,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               <div className="flex items-center gap-2 mb-1.5 font-semibold text-pink-400">
                 <RotateCw className="w-3.5 h-3.5 animate-spin" />
                 <span>
-                  {engineMode === 'moe'
-                    ? 'MoE ルーターがエキスパートを協調稼働中...'
-                    : engineMode === 'webgpu'
-                    ? 'GPU パイプライン＆コンピュート解析中...'
+                  {engineMode === 'webgpu'
+                    ? 'オンデバイス GPU で応答を生成中...'
                     : `${persona.name}が思考中...`}
                 </span>
               </div>
