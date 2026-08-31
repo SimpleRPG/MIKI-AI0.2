@@ -17,6 +17,28 @@ function getAIClient(): GoogleGenAI | null {
   return aiClient;
 }
 
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-pro', 'gemini-3.7-flash'];
+
+async function generateContentWithFallback(ai: GoogleGenAI, request: { contents: any; config?: any }) {
+  let lastError: any = null;
+  for (const model of GEMINI_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: request.contents,
+        config: request.config
+      });
+      if (response && response.text) {
+        return { response, modelUsed: model };
+      }
+    } catch (err: any) {
+      console.warn(`[Vite Server] Model ${model} failed, trying next fallback:`, err?.message || err);
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('All Gemini models failed');
+}
+
 function apiServerPlugin(): Plugin {
   return {
     name: 'api-server-plugin',
@@ -267,8 +289,7 @@ ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedS
               config.tools = [{ googleSearch: {} }];
             }
 
-            const response = await ai.models.generateContent({
-              model: 'gemini-3.7-flash',
+            const { response } = await generateContentWithFallback(ai, {
               contents,
               config
             });
@@ -320,8 +341,7 @@ Create a fully functional, self-contained, playable HTML5 web game for the genre
 The game MUST render completely in Canvas 2D or DOM, handle player keyboard/mouse input, include collision/combat/mechanics, and have 8-bit sound synthesizers with Web Audio API.
 Provide index.html and game.js code blocks with file path headers like \`\`\`html:/index.html and \`\`\`javascript:/game.js.`;
 
-            const response = await ai.models.generateContent({
-              model: 'gemini-3.7-flash',
+            const { response } = await generateContentWithFallback(ai, {
               contents: `Generate a full playable game for Title: "${title || 'New RPG'}", Theme/Prompt: "${prompt}"`,
               config: {
                 systemInstruction,
@@ -389,8 +409,7 @@ ${activeGameCode}
 
 エラーの原因を特定し、親切に1〜2文で解説した上で、完全にバグを修正した動くHTMLコードを \`\`\`html で囲んで出力してください。`;
 
-            const response = await ai.models.generateContent({
-              model: 'gemini-3.7-flash',
+            const { response } = await generateContentWithFallback(ai, {
               contents: prompt,
               config: { temperature: 0.2 }
             });

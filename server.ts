@@ -28,7 +28,7 @@ function getAIClient(): GoogleGenAI | null {
 }
 
 // Multi-model resilient Gemini caller
-const GEMINI_MODELS = ['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'];
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-pro', 'gemini-3.7-flash'];
 
 async function generateContentWithFallback(ai: GoogleGenAI, request: { contents: any; config?: any }) {
   let lastError: any = null;

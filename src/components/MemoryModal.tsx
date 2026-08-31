@@ -15,6 +15,9 @@ import {
   BookOpen,
   CheckCircle2,
   ArrowRight,
+  Send,
+  Wand2,
+  Check,
 } from 'lucide-react';
 import { MemoryItem, PersonaConfig } from '../types';
 import {
@@ -22,6 +25,7 @@ import {
   ANTI_ROBOTIC_JAPANESE_RULES,
   INITIAL_JAPANESE_MEMORIES,
 } from '../data/japaneseKnowledgeData';
+import { MASTER_EDUCATION_MEMORIES } from '../data/masterEducationKnowledge';
 
 export interface MemoryModalProps {
   isOpen: boolean;
@@ -40,10 +44,59 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   memories,
   onUpdateMemories,
 }) => {
-  const [newContent, setNewContent] = useState('');
-  const [newCategory, setNewCategory] = useState<MemoryItem['category']>('preference');
-  const [activeSubTab, setActiveSubTab] = useState<'persona' | 'memory' | 'japanese' | 'evolution'>('persona');
+  const [teachInput, setTeachInput] = useState('');
+  const [activeSubTab, setActiveSubTab] = useState<'persona' | 'teach' | 'memory' | 'corpus'>('teach');
   const [exportedStatus, setExportedStatus] = useState<string | null>(null);
+
+  // Auto classify category behind the scenes so user doesn't need to pick
+  const detectCategory = (text: string): MemoryItem['category'] => {
+    const t = text.toLowerCase();
+    if (t.includes('ゲーム') || t.includes('canvas') || t.includes('コード') || t.includes('ボタン') || t.includes('css') || t.includes('js') || t.includes('html') || t.includes('バグ')) {
+      return 'gamedev';
+    }
+    if (t.includes('好き') || t.includes('嫌い') || t.includes('好み') || t.includes('カラー') || t.includes('スタイル') || t.includes('テーマ')) {
+      return 'preference';
+    }
+    if (t.includes('私') || t.includes('僕') || t.includes('俺') || t.includes('名前') || t.includes('趣味') || t.includes('仕事') || t.includes('年齢')) {
+      return 'profile';
+    }
+    if (t.includes('約束') || t.includes('相棒') || t.includes('仲良') || t.includes('二人') || t.includes('友達')) {
+      return 'relationship';
+    }
+    return 'preference';
+  };
+
+  // Quick Direct Freeform Teaching (No category selection required!)
+  const handleQuickTeach = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = teachInput.trim();
+    if (!trimmed) return;
+
+    const category = detectCategory(trimmed);
+    const newItem: MemoryItem = {
+      id: 'mem_teach_' + Date.now(),
+      category,
+      content: trimmed,
+      importance: 5,
+      pinned: true,
+      active: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      source: 'manual',
+      tags: ['ユーザー直接教育', category],
+    };
+
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)((prev: MemoryItem[]) => {
+        const list = Array.isArray(prev) ? prev : memories;
+        return [newItem, ...list];
+      });
+    }
+
+    setTeachInput('');
+    setExportedStatus(`✨ 「${trimmed.slice(0, 24)}${trimmed.length > 24 ? '...' : ''}」を教育完了！全LLMに即時自動反映されました！🌸`);
+    setTimeout(() => setExportedStatus(null), 4000);
+  };
 
   const handleExportBackupJSON = () => {
     const backupData = {
@@ -114,64 +167,23 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
     setTimeout(() => setExportedStatus(null), 4000);
   };
 
-  const handleSyncJapaneseMemories = () => {
+  const handleSyncAllMasterKnowledge = () => {
     if (typeof onUpdateMemories === 'function') {
       (onUpdateMemories as any)((prev: MemoryItem[]) => {
         const currentList = Array.isArray(prev) ? prev : memories;
         const existingIds = new Set(currentList.map((m) => m.id));
-        const toAdd = INITIAL_JAPANESE_MEMORIES.filter((m) => !existingIds.has(m.id));
+        const allMaster = [...INITIAL_JAPANESE_MEMORIES, ...MASTER_EDUCATION_MEMORIES];
+        const toAdd = allMaster.filter((m) => !existingIds.has(m.id));
         if (toAdd.length === 0) {
-          setExportedStatus('✨ 日本語自然化データは既にすべて記憶に同期されています！');
+          setExportedStatus('✨ 全マスター教育データは既に記憶に完全同期されています！');
           setTimeout(() => setExportedStatus(null), 4000);
           return currentList;
         }
-        setExportedStatus(`✅ ${toAdd.length} 件の日本語自然化データを記憶に追加・同期しました！`);
+        setExportedStatus(`✅ ${toAdd.length} 件のマスター教育ナレッジを記憶に同期・適用しました！`);
         setTimeout(() => setExportedStatus(null), 4000);
         return [...toAdd, ...currentList];
       });
     }
-  };
-
-  const handleExportJapaneseCorpusJSON = () => {
-    const data = {
-      title: 'Miki Japanese Natural Dialogue & Anti-Robot Corpus',
-      version: '1.0.0',
-      timestamp: Date.now(),
-      corpus: JAPANESE_NATURAL_DIALOGUE_CORPUS,
-      antiRoboticRules: ANTI_ROBOTIC_JAPANESE_RULES,
-      starterMemories: INITIAL_JAPANESE_MEMORIES,
-    };
-    const jsonStr = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `miki_japanese_natural_corpus_${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setExportedStatus('✅ 日本語自然化コーパス(JSON)をダウンロードしました！');
-    setTimeout(() => setExportedStatus(null), 4000);
-  };
-
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newContent.trim()) return;
-    const newItem: MemoryItem = {
-      id: 'mem_' + Date.now(),
-      category: newCategory,
-      content: newContent.trim(),
-      importance: 5,
-      createdAt: Date.now(),
-      source: 'manual',
-    };
-
-    if (typeof onUpdateMemories === 'function') {
-      (onUpdateMemories as any)((prev: MemoryItem[]) => {
-        if (Array.isArray(prev)) return [newItem, ...prev];
-        return [newItem, ...memories];
-      });
-    }
-    setNewContent('');
   };
 
   const handleDelete = (id: string) => {
@@ -196,13 +208,13 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                <span>{persona.name} の設定 ＆ 自己進化エンジン</span>
+                <span>{persona.name} の教育・記憶 ＆ 自己進化エンジン</span>
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-semibold border border-pink-500/30">
                   親愛度 Lv.{persona.intimacyLevel}
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                あなたとの対話・記憶・クラウドLLMの知見を蓄積し、端末内ローカルAIを進化させます
+                カテゴリ選択不要で教えたいことを入力するだけで、全推論モデルに即座に教育・反映されます
               </p>
             </div>
           </div>
@@ -217,15 +229,17 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
         {/* SubTab Navigation */}
         <div className="flex border-b border-slate-800 bg-slate-950/40 px-4 gap-2 shrink-0 overflow-x-auto">
           <button
-            onClick={() => setActiveSubTab('persona')}
+            onClick={() => setActiveSubTab('teach')}
             className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
-              activeSubTab === 'persona'
-                ? 'border-pink-500 text-pink-300'
+              activeSubTab === 'teach'
+                ? 'border-amber-500 text-amber-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Smile className="w-4 h-4" />
-            <span>キャラクター・口調</span>
+            <GraduationCap className="w-4 h-4 text-amber-400" />
+            <span className="flex items-center gap-1.5">
+              ⚡ かんたんAI教育（自動反映） <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            </span>
           </button>
 
           <button
@@ -237,41 +251,220 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
             }`}
           >
             <Brain className="w-4 h-4" />
-            <span>長期記憶 ({memories.length}件)</span>
+            <span>記憶・ナレッジ一覧 ({memories.length}件)</span>
           </button>
 
           <button
-            onClick={() => setActiveSubTab('japanese')}
+            onClick={() => setActiveSubTab('persona')}
             className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
-              activeSubTab === 'japanese'
+              activeSubTab === 'persona'
+                ? 'border-pink-500 text-pink-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Smile className="w-4 h-4" />
+            <span>性格・口調</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('corpus')}
+            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+              activeSubTab === 'corpus'
                 ? 'border-rose-500 text-rose-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <BookOpen className="w-4 h-4" />
-            <span className="flex items-center gap-1">
-              🌸 日本語自然化コーパス
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('evolution')}
-            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
-              activeSubTab === 'evolution'
-                ? 'border-amber-500 text-amber-300'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <GraduationCap className="w-4 h-4" />
-            <span className="flex items-center gap-1">
-              自己進化・蒸留学習 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            </span>
+            <span>日本語自然化コーパス</span>
           </button>
         </div>
 
         {/* Body Content */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
-          {/* TAB 1: Persona Configuration */}
+          {/* TAB 1: Quick Auto Education (Category-Free) */}
+          {activeSubTab === 'teach' && (
+            <div className="space-y-4 text-xs">
+              {/* Feature Intro Banner */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-amber-950/40 via-purple-950/30 to-slate-900 border border-amber-500/40 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>カテゴリ不要！入力するだけで全エンジンへ即時自動教育</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] border border-emerald-500/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Auto-Reflection Active
+                  </span>
+                </div>
+                <p className="text-slate-300 leading-relaxed text-[11px]">
+                  基礎的な日本語やゲーム開発知識は<strong>最初からファイル内に合成済み</strong>です！
+                  さらに「好みの配色」「作りたいゲームの仕様」「二人の約束」「口調の好み」などを自由に入力するだけで、
+                  <strong>AIが自動で分類して長期記憶とプロンプトへ即時反映</strong>します。
+                </p>
+              </div>
+
+              {/* Instant Input Box */}
+              <form onSubmit={handleQuickTeach} className="bg-slate-950/90 border border-amber-500/30 rounded-xl p-3.5 space-y-3 shadow-lg shadow-amber-950/20">
+                <label className="block font-bold text-amber-200 text-xs flex items-center gap-1.5">
+                  <Wand2 className="w-4 h-4 text-amber-400" />
+                  <span>みきに教えたいこと・覚えてほしいこと（何でも自由に入力）</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={teachInput}
+                    onChange={(e) => setTeachInput(e.target.value)}
+                    placeholder="例: 配色はダークネオン調が好き / ボタンは角丸16pxにして / 好きなゲームはRPG"
+                    className="flex-1 bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 text-xs shadow-inner"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!teachInput.trim()}
+                    className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-400 hover:to-pink-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all shrink-0 cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>教育・即時反映</span>
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-400">ワンクリック例:</span>
+                  {[
+                    'HTML/Canvasゲームの操作説明は常に画面上に大きく出す',
+                    'サイバーパンク風のネオンカラーが好き',
+                    'タメ口で友達みたいに明るく励ましてほしい',
+                    'JavaScriptはES6+で綺麗にモジュール分割して',
+                  ].map((exampleText, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setTeachInput(exampleText)}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] border border-slate-800 transition-colors"
+                    >
+                      + {exampleText}
+                    </button>
+                  ))}
+                </div>
+              </form>
+
+              {exportedStatus && (
+                <div className="p-3 rounded-xl bg-amber-950/60 border border-amber-500/40 text-amber-200 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200">
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>{exportedStatus}</span>
+                </div>
+              )}
+
+              {/* Quick Status Stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+                  <div className="font-bold text-sky-300 flex items-center gap-1 text-[11px]">
+                    <span>1. ファイル初期合成済み</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    自然な日本語＆ゲーム制作マスターデータはビルド内に全合成済み。
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+                  <div className="font-bold text-amber-300 flex items-center gap-1 text-[11px]">
+                    <span>2. オンデバイス自動同期</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    入力された教育データは端末ストレージに保存され、全推論で参照。
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+                  <div className="font-bold text-emerald-300 flex items-center gap-1 text-[11px]">
+                    <span>3. 自己進化エクスポート</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    蓄積された知識はLoRA学習データ(JSONL)やバックアップとしていつでも保存可能。
+                  </p>
+                </div>
+              </div>
+
+              {/* Data Export & Sync Actions */}
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[11px] text-slate-300 font-medium">
+                  現在 <span className="text-amber-400 font-bold">{memories.length}</span> 件の教育・知識ナレッジを保持中
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleSyncAllMasterKnowledge}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition-all"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>マスター知識の再同期</span>
+                  </button>
+                  <button
+                    onClick={handleExportTrainingData}
+                    className="px-2.5 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/40 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition-all"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>LoRAデータ(JSONL)</span>
+                  </button>
+                  <button
+                    onClick={handleExportBackupJSON}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition-all"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>JSON保存</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: Long-Term Memory & Knowledge List */}
+          {activeSubTab === 'memory' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-200">保持している知識・記憶一覧 ({memories.length}件)</span>
+                <span className="text-slate-400 text-[11px]">端末内ストレージ永続保存中</span>
+              </div>
+
+              {/* Memory List */}
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                {memories.length === 0 ? (
+                  <div className="text-center py-6 text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-slate-800">
+                    保存された記憶はありません。「かんたんAI教育」タブから追加できます。
+                  </div>
+                ) : (
+                  memories.map((mem) => (
+                    <div
+                      key={mem.id}
+                      className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs hover:border-slate-700 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono shrink-0 ${
+                          mem.category === 'gamedev'
+                            ? 'bg-sky-950 text-sky-300 border border-sky-800'
+                            : mem.category === 'preference'
+                            ? 'bg-purple-950 text-purple-300 border border-purple-800'
+                            : mem.category === 'profile'
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                            : 'bg-slate-800 text-slate-300 border border-slate-700'
+                        }`}>
+                          {mem.category}
+                        </span>
+                        <span className="text-slate-200 truncate">{mem.content}</span>
+                      </div>
+
+                      <button
+                        onClick={() => handleDelete(mem.id)}
+                        className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors shrink-0 ml-2"
+                        title="記憶を削除"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: Persona Configuration */}
           {activeSubTab === 'persona' && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -355,117 +548,19 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: Long-Term Memory Cheat-sheet */}
-          {activeSubTab === 'memory' && (
-            <div className="space-y-4">
-              {/* Add Memory Form */}
-              <form onSubmit={handleAdd} className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-3">
-                <div className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Plus className="w-3.5 h-3.5 text-sky-400" />
-                  <span>新しい記憶・ルールを手動追加</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
-                  <select
-                    value={newCategory}
-                    onChange={(e: any) => setNewCategory(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-sky-500"
-                  >
-                    <option value="preference">開発の好み (UI/言語など)</option>
-                    <option value="gamedev">ゲーム開発・コーディング規則</option>
-                    <option value="profile">ユーザーの個人情報・趣味</option>
-                    <option value="relationship">関係性・思い出</option>
-                    <option value="chat">日常会話メモ</option>
-                  </select>
-
-                  <input
-                    type="text"
-                    value={newContent}
-                    onChange={(e) => setNewContent(e.target.value)}
-                    placeholder="例: 配色はネオンサイバーパンク調が好き、Tailwindを最優先"
-                    className="sm:col-span-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
-                  />
-
-                  <button
-                    type="submit"
-                    className="bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg px-3 py-1.5 text-xs transition-colors"
-                  >
-                    記憶を保存
-                  </button>
-                </div>
-              </form>
-
-              {/* Memory List */}
-              <div className="space-y-2">
-                <div className="text-xs font-semibold text-slate-400">現在保持している記憶 ({memories.length})</div>
-
-                {memories.length === 0 ? (
-                  <div className="text-center py-6 text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-slate-800">
-                    保存された記憶はありません。会話を重ねるか、上記から追加してください。
-                  </div>
-                ) : (
-                  memories.map((mem) => (
-                    <div
-                      key={mem.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono shrink-0 bg-slate-800 text-slate-300 border border-slate-700">
-                          {mem.category}
-                        </span>
-                        <span className="text-slate-200 truncate">{mem.content}</span>
-                      </div>
-
-                      <button
-                        onClick={() => handleDelete(mem.id)}
-                        className="p-1 text-slate-500 hover:text-rose-400 transition-colors shrink-0 ml-2"
-                        title="記憶を削除"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: Japanese Natural Dialogue Knowledge Corpus */}
-          {activeSubTab === 'japanese' && (
+          {/* TAB 4: Japanese Natural Dialogue Knowledge Corpus */}
+          {activeSubTab === 'corpus' && (
             <div className="space-y-4 text-xs">
               {/* Header Banner */}
-              <div className="p-4 rounded-xl bg-gradient-to-br from-rose-950/40 via-pink-950/30 to-slate-900 border border-rose-500/30 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 font-bold text-rose-300 text-sm">
-                    <BookOpen className="w-4 h-4 text-rose-400" />
-                    <span>日本語自然化コーパス ＆ 脱ロボット辞書</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleSyncJapaneseMemories}
-                      className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition-all shadow-md shadow-rose-900/30"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>記憶に即時同期</span>
-                    </button>
-                    <button
-                      onClick={handleExportJapaneseCorpusJSON}
-                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition-all"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>JSON保存</span>
-                    </button>
-                  </div>
+              <div className="p-4 rounded-xl bg-gradient-to-br from-rose-950/40 via-pink-950/30 to-slate-900 border border-rose-500/30 space-y-2.5">
+                <div className="flex items-center gap-2 font-bold text-rose-300 text-sm">
+                  <BookOpen className="w-4 h-4 text-rose-400" />
+                  <span>日本語自然化コーパス ＆ 脱ロボット辞書</span>
                 </div>
                 <p className="text-slate-300 leading-relaxed text-[11px]">
-                  小規模モデル（Qwen2.5等）やオンデバイスWebGPUで機械翻訳調・敬語オウム返しを防ぎ、
-                  <strong>「自然な相槌・温かいタメ口・親友同士のテンポ」</strong>で会話できるように設計された統合日本語データです。
+                  機械翻訳調や堅苦しい敬語オウム返しを防ぎ、
+                  <strong>「自然な相槌・温かいタメ口・親友同士のテンポ」</strong>で会話できるように設計された統合知識データです。
                 </p>
-                {exportedStatus && (
-                  <div className="p-2 rounded-lg bg-rose-950/60 border border-rose-500/40 text-rose-200 text-[11px] font-bold">
-                    {exportedStatus}
-                  </div>
-                )}
               </div>
 
               {/* Anti-Robotic Rules */}
@@ -494,7 +589,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5 text-rose-400" />
                   <span>対話シチュエーション別・自然な応答パターン</span>
                 </div>
-                <div className="space-y-2.5">
+                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                   {JAPANESE_NATURAL_DIALOGUE_CORPUS.map((cat, idx) => (
                     <div key={idx} className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/90 space-y-2">
                       <div className="font-bold text-slate-200 text-[11px] flex items-center justify-between">
@@ -522,118 +617,13 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
               </div>
             </div>
           )}
-
-          {/* TAB 4: Self-Evolution & Distillation */}
-          {activeSubTab === 'evolution' && (
-            <div className="space-y-4 text-xs">
-              {/* Overview Card */}
-              <div className="p-4 rounded-xl bg-gradient-to-br from-amber-950/40 via-purple-950/30 to-slate-900 border border-amber-500/30 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
-                    <Flame className="w-4 h-4 text-amber-400" />
-                    <span>自己成長・蒸留学習アーキテクチャ</span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px] border border-amber-500/30">
-                    Growth Engine Active
-                  </span>
-                </div>
-                <p className="text-slate-300 leading-relaxed text-[11px]">
-                  <strong>「色んなLLMの知識を学んで自分自身で成長していく」</strong>
-                  という最先端のAI蒸留（Knowledge Distillation）と継続学習（Continuous Fine-Tuning）の仕組みです。
-                </p>
-              </div>
-
-              {/* 3-Step Growth Mechanism */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
-                  <div className="font-bold text-sky-300 flex items-center gap-1 text-[11px]">
-                    <span>1. 蒸留データ収集</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-relaxed">
-                    ユーザーとの会話や、クラウドの強力なLLM（Gemini等）の高品質な回答を教師データとして端末内に自動蓄積。
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
-                  <div className="font-bold text-purple-300 flex items-center gap-1 text-[11px]">
-                    <span>2. オンデバイス記憶統合</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-relaxed">
-                    好みのコーディングスタイルや口調・会話履歴をプロンプトキャッシュとWebGPU推論時メモリに直接反映。
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
-                  <div className="font-bold text-emerald-300 flex items-center gap-1 text-[11px]">
-                    <span>3. LoRA 微調整エクスポート</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-relaxed">
-                    蓄積された会話・知識データを標準のJSONL形式で出力し、UnslothやHugging Faceでモデル自体の重み学習が可能。
-                  </p>
-                </div>
-              </div>
-
-              {/* Training Data Stats & Export */}
-              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="font-bold text-slate-200 text-xs">蓄積された学習・記憶データセット</div>
-                    <div className="text-[11px] text-slate-400">
-                      現在 <span className="text-amber-300 font-bold">{memories.length}</span> 件の記憶 ＆ 対話履歴が端末内ストレージに完全永続保存されています
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={handleExportTrainingData}
-                      className="px-3 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-md shadow-amber-900/30 transition-all"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>LoRA学習用JSONL</span>
-                    </button>
-                    <button
-                      onClick={handleExportBackupJSON}
-                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>バックアップ(JSON)</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Storage Info & Backup Restore */}
-                <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1 text-emerald-400 font-semibold">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      端末内ストレージ永続保存: 有効
-                    </span>
-                  </div>
-                  <label className="cursor-pointer text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 underline underline-offset-2">
-                    <span>バックアップJSONから復元</span>
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleImportBackupJSON}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-
-                {exportedStatus && (
-                  <div className="p-2 rounded-lg bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-[11px] text-center font-bold">
-                    {exportedStatus}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/90 flex justify-end shrink-0">
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs shadow-md shadow-pink-600/20 transition-colors"
+            className="px-5 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs shadow-md shadow-pink-600/20 transition-colors cursor-pointer"
           >
             完了
           </button>
@@ -642,3 +632,4 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
     </div>
   );
 };
+
