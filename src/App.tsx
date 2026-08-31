@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { ChatPanel } from './components/ChatPanel';
 import { GamePreview } from './components/GamePreview';
@@ -115,7 +115,11 @@ export default function App() {
   const [fps, setFps] = useState<number>(60);
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLogItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isDebugging, setIsDebugging] = useState<boolean>(false);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentAssistantIdRef = useRef<string | null>(null);
 
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
@@ -281,12 +285,55 @@ export default function App() {
     setMobileTab('preview');
   };
 
+  // Handle Stop Generation
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    webLLMService.interruptGenerate();
+
+    if (currentAssistantIdRef.current) {
+      const targetId = currentAssistantIdRef.current;
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id === targetId) {
+            let content = msg.content;
+            if (content.includes('初期化中') || content.includes('ロード中') || content.includes('推論中')) {
+              content = '⏹ 生成を中断しました。';
+            } else if (!content.includes('中断')) {
+              content = content + '\n\n*(⏹ 生成を中断しました)*';
+            }
+            return {
+              ...msg,
+              content,
+              isStreaming: false,
+            };
+          }
+          return msg;
+        })
+      );
+      currentAssistantIdRef.current = null;
+    }
+
+    setIsGenerating(false);
+    setIsLoading(false);
+  };
+
   // Handle Send Chat Message
   const handleSendMessage = async (
     text: string,
     attached?: { name: string; content: string; type: string }[]
   ) => {
     if (!text.trim() && (!attached || attached.length === 0)) return;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    setIsGenerating(true);
+    setIsLoading(true);
 
     // Auto extract memory heuristics
     if (persona.autoExtractMemories && text.trim()) {
@@ -302,7 +349,6 @@ export default function App() {
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setIsLoading(true);
 
     try {
       const activeMemories = memories.filter((m) => m.active);
@@ -328,6 +374,7 @@ export default function App() {
           : await webLLMService.findBestAvailableModel(moeAnalysis.role);
 
         const assistantId = 'msg_asst_' + Date.now();
+        currentAssistantIdRef.current = assistantId;
         const placeholderMsg: ChatMessage = {
           id: assistantId,
           role: 'assistant',
@@ -354,6 +401,7 @@ export default function App() {
         if (!isModelReady) {
           try {
             await webLLMService.loadModel(targetModelId, (report) => {
+              if (abortController.signal.aborted) return;
               setMessages((prev) =>
                 prev.map((msg) =>
                   msg.id === assistantId
@@ -372,6 +420,10 @@ export default function App() {
             console.warn('WebGPU Model download/load failed:', loadErr);
             isModelReady = false;
           }
+        }
+
+        if (abortController.signal.aborted) {
+          return;
         }
 
         const tStart = performance.now();
@@ -434,6 +486,9 @@ export default function App() {
               max_tokens: 384,
               fallbackModelId: targetModelId,
             })) {
+              if (abortController.signal.aborted) {
+                break;
+              }
               if (firstTokenTime === null) {
                 firstTokenTime = performance.now();
               }
@@ -464,6 +519,10 @@ export default function App() {
             : 'モデル未ダウンロード (端末ローカルLLM設定でダウンロード可能)';
         }
 
+        if (abortController.signal.aborted) {
+          return;
+        }
+
         // If WebGPU encountered an error or model not cached, smoothly fallback to high-speed hybrid engine
         if (!webGpuSuccess || accumulated.trim().length === 0) {
           try {
@@ -478,7 +537,12 @@ export default function App() {
               attachedFiles: attached,
               persona,
               memories: activeMemories,
+              signal: abortController.signal,
             });
+
+            if (abortController.signal.aborted) {
+              return;
+            }
 
             let diagnosticCategory = 'ハイブリッド自動切替';
             let diagnosticCause = '端末モデル未ロードのため、高速ハイブリッド推論で即座に返信しました。';
@@ -529,6 +593,9 @@ export default function App() {
             tokenCount = Math.round(accumulated.length / 3);
             firstTokenTime = performance.now();
           } catch (apiErr: any) {
+            if (apiErr?.name === 'AbortError' || abortController.signal.aborted) {
+              return;
+            }
             console.error('Fallback chat API error:', apiErr);
             accumulated = `⚠️ 応答生成中にエラーが発生しました:\n・API詳細: ${apiErr.message || '接続エラー'}`;
           }
@@ -568,6 +635,7 @@ export default function App() {
         }
       } else {
         // Cloud / Unified Hybrid Backend
+        const tStartCloud = performance.now();
         const response = await sendChatMessage({
           prompt: text,
           history: messages,
@@ -580,7 +648,14 @@ export default function App() {
           persona,
           memories: activeMemories,
           activeGameCode,
+          signal: abortController.signal,
         });
+
+        if (abortController.signal.aborted) {
+          return;
+        }
+        const tEndCloud = performance.now();
+        const durationCloudMs = Math.round(tEndCloud - tStartCloud);
 
         const assistantMsg: ChatMessage = {
           id: 'msg_asst_' + Date.now(),
@@ -593,7 +668,8 @@ export default function App() {
           groundingChunks: response.groundingChunks,
           webSearchQueries: response.webSearchQueries,
           metrics: {
-            engine: `合議型知能 (${activeSpeaker.name})`,
+            engine: 'Gemini 3.7 Flash',
+            ttftMs: durationCloudMs,
           },
         };
 
@@ -606,6 +682,10 @@ export default function App() {
         }
       }
     } catch (err: any) {
+      if (err?.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
+        console.log('Chat request aborted.');
+        return;
+      }
       console.error('Chat error:', err);
 
       // In case of WebGPU device/buffer interruption, reset instance for next prompt
@@ -624,6 +704,9 @@ export default function App() {
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
+      setIsGenerating(false);
+      currentAssistantIdRef.current = null;
+      abortControllerRef.current = null;
     }
   };
 
@@ -786,6 +869,8 @@ export default function App() {
               messages={messages}
               onSendMessage={handleSendMessage}
               isLoading={isLoading}
+              isGenerating={isGenerating}
+              onStopGeneration={handleStopGeneration}
               persona={persona}
               memories={memories}
               engineMode={engineMode}
@@ -855,6 +940,8 @@ export default function App() {
                 messages={messages}
                 onSendMessage={handleSendMessage}
                 isLoading={isLoading}
+                isGenerating={isGenerating}
+                onStopGeneration={handleStopGeneration}
                 persona={persona}
                 memories={memories}
                 engineMode={engineMode}

@@ -1,5 +1,6 @@
 import { MoERouteInfo, PersonaConfig, MemoryItem, WorkspaceFile } from '../types';
 import { getNaturalJapanesePromptGuide } from '../data/japaneseKnowledgeData';
+import { getMasterEducationSystemPrompt } from '../data/masterEducationKnowledge';
 
 /**
  * Intelligent Prompt Analyzer for Unified Miki Assistant

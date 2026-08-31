@@ -1,6 +1,6 @@
 {
-  "name": "MIKI-AI",
-  "description": "On-Device WebGPU AI Partner & Game Studio with persistent memory and local inference",
+  "name": "MIKI-AI Game Studio",
+  "description": "Miki AI Partner & Autonomous WebGPU Studio with on-device MoE (Mixture of Experts), WebLLM local execution, interactive game/app sandbox, and GitHub integration.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

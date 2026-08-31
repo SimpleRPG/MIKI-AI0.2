@@ -20,6 +20,8 @@ import {
   Users,
   User,
   Share2,
+  Square,
+  StopCircle,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode } from '../types';
 import { extractCodeBlocks } from '../utils/codeParser';
@@ -30,6 +32,8 @@ interface ChatPanelProps {
   messages: ChatMessage[];
   onSendMessage: (text: string, files?: { name: string; content: string; type: string }[]) => void;
   isLoading: boolean;
+  isGenerating?: boolean;
+  onStopGeneration?: () => void;
   persona: PersonaConfig;
   memories: MemoryItem[];
   engineMode: EngineMode;
@@ -49,6 +53,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   messages,
   onSendMessage,
   isLoading,
+  isGenerating = false,
+  onStopGeneration,
   persona,
   memories,
   engineMode,
@@ -234,18 +240,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   };
 
-  // Dual-purpose prompt suggestions (Moe Chat, Code & WebGPU)
-  const suggestions = [
-    { label: 'WebGPUシェーダーでリアルタイム流体アート作って', icon: '⚡' },
-    { label: 'Three.jsで3D惑星シミュレーター作成', icon: '🚀' },
-    { label: '今日何してた？雑談しよ！', icon: '🌸' },
-    { label: 'みき、大好きだよ〜', icon: '💖' },
-    { label: '疲れたから癒やして…', icon: '☕' },
-    { label: 'ミニゲームをゼロから開発して！', icon: '🎮' },
-    { label: 'コードのバグを診断・自動修正して', icon: '🔧' },
-    { label: 'GitHubにプッシュして保存して！', icon: '🐙' },
-  ];
-
   return (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 relative select-text">
       {/* Chat Header Subbar */}
@@ -369,15 +363,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   <span>
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
-                  {msg.engineMode && (
-                    <span className="px-1.5 py-0.2 rounded bg-slate-800 text-sky-300 border border-slate-700 font-mono hidden sm:inline">
-                      {msg.engineMode === 'webgpu' ? 'WebGPU' : 'ハイブリッド'}
-                    </span>
-                  )}
                 </div>
 
-                {/* Processing Speed & Token Stats */}
-                {!isUser && (msg.metrics?.ttftMs || msg.metrics?.tokensPerSec) && (
+                {/* Processing Speed & Engine stats */}
+                {!isUser && (msg.metrics?.engine || msg.metrics?.tokensPerSec || msg.metrics?.ttftMs) && (
                   <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-2.5 py-0.5 rounded-lg text-[10px] text-slate-400 font-mono shadow-sm">
                     <span className="text-pink-400 font-bold flex items-center gap-1 font-sans">
                       🌸 みき (オンデバイス推論)
@@ -545,24 +534,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   )}
                 </div>
 
-                {/* Message action buttons */}
+                {/* Message action buttons & Streaming Stop Button */}
                 {!isUser && (
-                  <div className="flex items-center gap-2 px-1 text-[10px] text-slate-500">
-                    <button
-                      onClick={() => speakText(msg.content)}
-                      className="hover:text-pink-400 flex items-center gap-1 transition-colors"
-                    >
-                      <Volume2 className="w-3 h-3" />
-                      <span>音声で聴く</span>
-                    </button>
-                    <span>•</span>
-                    <button
-                      onClick={() => handleCopy(msg.content, msg.id)}
-                      className="hover:text-slate-300 flex items-center gap-1 transition-colors"
-                    >
-                      <Copy className="w-3 h-3" />
-                      <span>コピー</span>
-                    </button>
+                  <div className="flex items-center justify-between px-1 text-[10px] text-slate-500">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => speakText(msg.content)}
+                        className="hover:text-pink-400 flex items-center gap-1 transition-colors"
+                      >
+                        <Volume2 className="w-3 h-3" />
+                        <span>音声で聴く</span>
+                      </button>
+                      <span>•</span>
+                      <button
+                        onClick={() => handleCopy(msg.content, msg.id)}
+                        className="hover:text-slate-300 flex items-center gap-1 transition-colors"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>コピー</span>
+                      </button>
+                    </div>
+
+                    {msg.isStreaming && onStopGeneration && (
+                      <button
+                        onClick={onStopGeneration}
+                        className="flex items-center gap-1 px-2 py-0.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 hover:text-rose-100 rounded text-[10.5px] font-semibold transition-all shadow-sm active:scale-95"
+                      >
+                        <Square className="w-2.5 h-2.5 fill-current" />
+                        <span>生成を停止</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -571,19 +572,30 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         })}
 
         {/* Loading Indicator */}
-        {isLoading && (
+        {(isLoading || isGenerating) && (
           <div className="flex gap-2.5 justify-start">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 flex items-center justify-center text-white text-base shadow-md shadow-pink-500/20 shrink-0 animate-pulse">
               {persona.avatar}
             </div>
             <div className="bg-slate-800/90 border border-slate-700/80 p-3 rounded-2xl rounded-tl-sm text-xs text-slate-300 max-w-[85%] shadow-lg">
-              <div className="flex items-center gap-2 mb-1.5 font-semibold text-pink-400">
-                <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                <span>
-                  {engineMode === 'webgpu'
-                    ? 'オンデバイス GPU で応答を生成中...'
-                    : `${persona.name}が思考中...`}
-                </span>
+              <div className="flex items-center justify-between gap-4 mb-1.5 font-semibold text-pink-400">
+                <div className="flex items-center gap-2">
+                  <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>
+                    {engineMode === 'webgpu'
+                      ? 'オンデバイス GPU で応答を生成中...'
+                      : `${persona.name}が思考中...`}
+                  </span>
+                </div>
+                {onStopGeneration && (
+                  <button
+                    onClick={onStopGeneration}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-md text-[11px] font-bold shadow transition-all active:scale-95"
+                  >
+                    <Square className="w-2.5 h-2.5 fill-current" />
+                    <span>停止</span>
+                  </button>
+                )}
               </div>
               <div className="space-y-1 text-[10.5px] text-slate-400">
                 <div className="flex items-center gap-1.5 text-pink-300">
@@ -602,24 +614,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         )}
 
         <div ref={messagesEndRef} />
-      </div>
-
-      {/* Suggestion Prompts */}
-      <div className="px-2.5 py-1.5 bg-slate-900/80 border-t border-slate-800/80 overflow-x-auto flex items-center gap-1.5 shrink-0 scrollbar-none">
-        <span className="text-[10px] text-slate-500 font-semibold uppercase shrink-0 flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-pink-400" />
-          <span className="hidden sm:inline">提案:</span>
-        </span>
-        {suggestions.map((s, idx) => (
-          <button
-            key={idx}
-            onClick={() => onSendMessage(s.label)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-slate-700/60 text-slate-300 hover:text-white text-[11px] whitespace-nowrap transition-colors"
-          >
-            <span>{s.icon}</span>
-            <span>{s.label}</span>
-          </button>
-        ))}
       </div>
 
       {/* Attached files preview bar */}
@@ -686,18 +680,30 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             className="flex-1 bg-transparent border-none outline-none text-xs text-slate-100 placeholder-slate-500 resize-none py-1.5 px-1 leading-relaxed max-h-24"
           />
 
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={(!inputText.trim() && attachedFiles.length === 0) || isLoading}
-            className={`p-2 sm:p-2.5 rounded-lg flex items-center justify-center font-bold transition-all shrink-0 ${
-              (!inputText.trim() && attachedFiles.length === 0) || isLoading
-                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 text-white shadow-md shadow-pink-500/25'
-            }`}
-          >
-            <Send className="w-4 h-4" />
-          </button>
+          {isLoading || isGenerating ? (
+            <button
+              type="button"
+              onClick={onStopGeneration}
+              className="px-3 py-2 rounded-lg flex items-center gap-1.5 font-bold transition-all shrink-0 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-md shadow-rose-600/30 animate-pulse active:scale-95 cursor-pointer"
+              title="生成を中断する"
+            >
+              <Square className="w-3.5 h-3.5 fill-current" />
+              <span className="text-xs">停止</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!inputText.trim() && attachedFiles.length === 0}
+              className={`p-2 sm:p-2.5 rounded-lg flex items-center justify-center font-bold transition-all shrink-0 ${
+                !inputText.trim() && attachedFiles.length === 0
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 text-white shadow-md shadow-pink-500/25 active:scale-95'
+              }`}
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Zero Cloud Token Guarantee Bar */}

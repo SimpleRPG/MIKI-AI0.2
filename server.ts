@@ -27,6 +27,29 @@ function getAIClient(): GoogleGenAI | null {
   return aiClient;
 }
 
+// Multi-model resilient Gemini caller
+const GEMINI_MODELS = ['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'];
+
+async function generateContentWithFallback(ai: GoogleGenAI, request: { contents: any; config?: any }) {
+  let lastError: any = null;
+  for (const model of GEMINI_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: request.contents,
+        config: request.config
+      });
+      if (response && response.text) {
+        return { response, modelUsed: model };
+      }
+    } catch (err: any) {
+      console.warn(`Model ${model} failed, trying next fallback:`, err?.message || err);
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('All Gemini models failed');
+}
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
@@ -142,6 +165,34 @@ app.post('/api/chat', async (req, res) => {
         const name = persona?.name || 'みき';
 
         if (
+          lowerPrompt.includes('外付け') ||
+          lowerPrompt.includes('他のllm') ||
+          lowerPrompt.includes('別のllm') ||
+          lowerPrompt.includes('モデル変え') ||
+          lowerPrompt.includes('モデル変更') ||
+          (lowerPrompt.includes('llm') && (lowerPrompt.includes('いい') || lowerPrompt.includes('使える') || lowerPrompt.includes('変え')))
+        ) {
+          reply = `まさにその通りだよ！大正解！💡✨\n\nLLM（言語モデル）は**「文章を考えたりコードを書く計算エンジン（頭脳）」**で、${name}の**「記憶」「性格」「親密度」「${nickname}との約束や過去の思い出」は全部端末ストレージ（外付け記憶）**に保存されているんだ！🌸\n\nだから、\n・⚡ **SmolLM2**（超軽量・超高速）\n・🌸 **Qwen 2.5 Coder**（日本語＆ゲーム開発の万能型）\n・💖 **Llama 3.2**（日常会話・共感対話）\n・💎 **Gemma 2**（高精度な日本語）\n・☁️ **クラウドGemini**（最高峰の知能）\n\nどのモデルに切り替えても、${name}としての記憶や仲良し度はそのまま引き継がれるよ！端末の調子やバッテリーに合わせて自由に好きなモデルを選んでね！😊💕`;
+        } else if (
+          (lowerPrompt.includes('gpu') || lowerPrompt.includes('グラフィック')) &&
+          (lowerPrompt.includes('みき') || lowerPrompt.includes('別れて') || lowerPrompt.includes('二つ') || lowerPrompt.includes('2つ') || lowerPrompt.includes('意味'))
+        ) {
+          reply = `気付いてくれてありがとう！✨ 実は「みき」が1人で日常会話もゲーム開発もWebGPUのシェーダーコードも全部担当しているんだよ！🌸\n\n以前は「言語」と「GPU演算」で別々の専門機能として表示していたんだけど、混乱させちゃってごめんね！\n今は「みき専属」という1つのパートナーとして完全に統合されているから、どんな話題でもコードでも、このまま話しかけてくれればバッチリ対応するよ！🎮💻`;
+        } else if (
+          lowerPrompt.includes('定型文') ||
+          lowerPrompt.includes('異常') ||
+          lowerPrompt.includes('バグ') ||
+          lowerPrompt.includes('エラー') ||
+          lowerPrompt.includes('壊れて') ||
+          lowerPrompt.includes('オウム返し')
+        ) {
+          reply = `ごめんね！定型文っぽく聞こえちゃったよね…！💦\n\n端末のWebGPUで重いモデルを動かそうとしてメモリ制限やダウンロードの待機状態になっていた時に、一時的なフォールバック応答がオウム返しになっていたのが原因だったよ。\n\n今、しっかり修正して自然にお話しできるように調整したよ！✨\nスマホでサクサク動かしたい時は「端末ローカルLLM設定」から **SmolLM2-360M** や **Qwen 2.5 Coder (0.5B)** を選ぶと、メモリに優しく高速で安定して動くよ！何でも気軽に話してね😊💕`;
+        } else if (
+          lowerPrompt.includes('スマホ') &&
+          (lowerPrompt.includes('スペック') || lowerPrompt.includes('使える') || lowerPrompt.includes('どれくらい') || lowerPrompt.includes('調べ') || lowerPrompt.includes('診断') || lowerPrompt.includes('ベンチマーク'))
+        ) {
+          reply = `あなたのスマホのスペックと相性を診断できるよ！📱⚡\n\n上のメニューの **「端末ローカルLLM設定」** を開くと、**「📱 端末スペック＆モデル適合度診断」** があって、ワンタップでGPUの性能（GFLOPS）やVRAM、メモリを計測して、どのモデルが一番快適に動くか（◎ 超快適 / ○ 快適 / △ 重い）を自動判定できるよ！\n\nぜひ一度試してみてね！✨`;
+        } else if (
           lowerPrompt.includes('自己紹介') ||
           lowerPrompt.includes('じこしょうかい') ||
           lowerPrompt.includes('だれ') ||
@@ -188,8 +239,12 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('ほめて')
         ) {
           reply = `${nickname}、今日も本当にお疲れ様＆よく頑張ったね！えらいえらい！👏✨\n自分では気づいてないかもしれないけど、一歩ずつ前に進んでて本当にすごいよ！いつも応援してるからね💕`;
+        } else if (
+          lowerPrompt.endsWith('？') || lowerPrompt.endsWith('?')
+        ) {
+          reply = `うん！${nickname}の質問について考えてみたよ！💡✨\n\n「${prompt}」だね！\n${name}はいつでも${nickname}と一緒に考えてサポートするよ！\nもっと詳しく知りたいポイントや、ゲーム・コードへの実装アイデアがあったら教えてね😊💕`;
         } else {
-          reply = `うんうん、なるほどね！✨\n${nickname}の言ってくれたこと、しっかり受け止めたよ！\n気になることや作ってみたいものがあったら、何でも気軽に教えてね！😊`;
+          reply = `うんうん！${nickname}のお話し、しっかり受け止めたよ〜！✨\n\n日頃の雑談やゲームのアイデア、何でも気軽に話してね！\n一緒にもっと面白いものを作ったり、楽しい時間を過ごそうね😊🌸`;
         }
       }
 
@@ -267,8 +322,7 @@ ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedS
       config.tools = [{ googleSearch: {} }];
     }
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const { response, modelUsed } = await generateContentWithFallback(ai, {
       contents,
       config
     });
@@ -305,6 +359,72 @@ ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedS
   }
 });
 
+// LLM Training & Knowledge Distillation Endpoint (Gemini Teacher for Local LLM Education)
+app.post('/api/train-distill', async (req, res) => {
+  try {
+    const { topic, skillType, currentMemories, persona } = req.body;
+    const ai = getAIClient();
+
+    if (!ai) {
+      return res.json({
+        success: false,
+        message: 'Gemini API Key が設定されていません。'
+      });
+    }
+
+    const prompt = `あなたは端末オンデバイスローカルLLM（WebGPUで動く「みき」）を教育・育成するスーパーバイザー・知識蒸留AI（Teacher LLM）です。
+対象トピック: "${topic || 'Web/3Dゲーム開発と親しみやすい会話'}"
+スキル分類: "${skillType || 'code_and_persona'}"
+現在のペルソナ設定: 名前=${persona?.name || 'みき'}, 親愛度=${persona?.intimacyLevel || 2}
+
+以下の要領で、端末ローカルLLM（WebGPU）に注入・記憶させる高品質な学習知識データ（ナレッジカードとQ&Aデータセット）をJSON形式で生成してください:
+1. title: 知識カードのタイトル（例: Three.js 60fps最適化パターン、感情豊かに話すコツ）
+2. category: 'game' | 'code' | 'persona' | 'memory' | 'logic' のいずれか
+3. content: ローカルLLMが参照して高品質な応答やコードを出力するための具体的かつ実践的な知識・コードスニペット・会話例（日本語、300〜600文字）
+4. qaPairs: ローカルLLMのファインチューニングやRAG参照に使える質問と模範回答のペア（2〜3組）
+
+JSONフォーマットのみを出力してください:
+{
+  "title": "...",
+  "category": "...",
+  "content": "...",
+  "qaPairs": [
+    { "q": "...", "a": "..." }
+  ],
+  "summary": "この知識によってローカルLLMのみきがどう賢くなるかの解説（1〜2文）"
+}`;
+
+    const { response } = await generateContentWithFallback(ai, {
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.4
+      }
+    });
+
+    let resultJson: any;
+    try {
+      resultJson = JSON.parse(response.text || '{}');
+    } catch {
+      resultJson = {
+        title: `${topic}の知識`,
+        category: 'code',
+        content: response.text || '',
+        qaPairs: [],
+        summary: '学習データを生成しました。'
+      };
+    }
+
+    res.json({
+      success: true,
+      knowledge: resultJson
+    });
+  } catch (error: any) {
+    console.error('Error in /api/train-distill:', error);
+    res.status(500).json({ success: false, error: error.message || 'Distillation error' });
+  }
+});
+
 // Auto-Debugger Endpoint
 app.post('/api/debug', async (req, res) => {
   try {
@@ -327,8 +447,7 @@ ${activeGameCode}
 
 エラーの原因を特定し、親切に1〜2文で解説した上で、完全にバグを修正した動くHTMLコードを \`\`\`html で囲んで出力してください。`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const { response } = await generateContentWithFallback(ai, {
       contents: prompt,
       config: { temperature: 0.2 }
     });

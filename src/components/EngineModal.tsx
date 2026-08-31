@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { EngineMode, WebGPUStatus, LocalLLMModel } from '../types';
+import { EngineMode, WebGPUStatus, LocalLLMModel, MemoryItem } from '../types';
 import { webLLMService } from '../services/webLlmService';
+import { deviceBenchmarkService, DeviceSpecReport } from '../services/deviceBenchmarkService';
+import { distillKnowledgeForLocalLLM } from '../services/api';
 import {
   Cpu,
   Sparkles,
@@ -20,6 +22,14 @@ import {
   X,
   RefreshCw,
   AlertCircle,
+  Smartphone,
+  Zap,
+  HelpCircle,
+  Layers,
+  GraduationCap,
+  BookOpen,
+  Brain,
+  Plus,
 } from 'lucide-react';
 
 interface EngineModalProps {
@@ -143,7 +153,25 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   engineMode,
   onSelectEngine,
 }) => {
-  const [activeTab, setActiveTab] = useState<'mode' | 'downloader' | 'gpu'>('downloader');
+  const [activeTab, setActiveTab] = useState<'downloader' | 'training' | 'benchmark' | 'architecture'>('downloader');
+
+  // LLM Training & Knowledge Distillation State
+  const [trainingTopic, setTrainingTopic] = useState('Three.js 3Dゲーム開発とパフォーマンス最適化');
+  const [customTrainingTopic, setCustomTrainingTopic] = useState('');
+  const [trainingSkillType, setTrainingSkillType] = useState<'code' | 'persona' | 'game' | 'logic'>('game');
+  const [isDistilling, setIsDistilling] = useState(false);
+  const [distilledResult, setDistilledResult] = useState<{
+    title: string;
+    category: string;
+    content: string;
+    qaPairs: Array<{ q: string; a: string }>;
+    summary: string;
+  } | null>(null);
+  const [distillSuccessMsg, setDistillSuccessMsg] = useState<string | null>(null);
+
+  // Device specs diagnosis
+  const [deviceReport, setDeviceReport] = useState<DeviceSpecReport | null>(null);
+  const [isDiagnosingDevice, setIsDiagnosingDevice] = useState(false);
 
   // GPU Hardware detection
   const [gpuInfo, setGpuInfo] = useState<WebGPUStatus>({
@@ -303,11 +331,15 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     }
   }, [isOpen]);
 
-  const runGpuBenchmark = () => {
+  const runGpuBenchmark = async () => {
     setIsBenchmarking(true);
     setBenchmarkResult(null);
 
-    setTimeout(() => {
+    try {
+      const gflops = await deviceBenchmarkService.runGPUBenchmark();
+      setBenchmarkResult(gflops);
+    } catch (e) {
+      console.warn('GPU benchmark error:', e);
       const t0 = performance.now();
       let acc = 0;
       for (let i = 0; i < 20000000; i++) {
@@ -316,9 +348,28 @@ export const EngineModal: React.FC<EngineModalProps> = ({
       const dt = performance.now() - t0;
       const gflops = Number(((20 / dt) * 1.8).toFixed(2));
       setBenchmarkResult(gflops);
+    } finally {
       setIsBenchmarking(false);
-    }, 400);
+    }
   };
+
+  const handleRunDeviceDiagnosis = async () => {
+    setIsDiagnosingDevice(true);
+    try {
+      const report = await deviceBenchmarkService.diagnoseDeviceSpecs();
+      setDeviceReport(report);
+    } catch (err) {
+      console.error('Device diagnosis failed:', err);
+    } finally {
+      setIsDiagnosingDevice(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && !deviceReport) {
+      handleRunDeviceDiagnosis();
+    }
+  }, [isOpen]);
 
   // Real Download & VRAM load using WebLLM
   const handleDownloadAndLoad = async (model: LocalLLMModel) => {
@@ -728,6 +779,60 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   const cachedCount = cachedModels.length;
   const totalCachedMB = cachedModels.reduce((sum, m) => sum + m.sizeMB, 0);
 
+  const handleRunDistillation = async () => {
+    const topicToUse = customTrainingTopic.trim() || trainingTopic;
+    if (!topicToUse) return;
+
+    setIsDistilling(true);
+    setDistilledResult(null);
+    setDistillSuccessMsg(null);
+
+    try {
+      const res = await distillKnowledgeForLocalLLM({
+        topic: topicToUse,
+        skillType: trainingSkillType,
+      });
+
+      if (res.success && res.knowledge) {
+        setDistilledResult(res.knowledge);
+      } else {
+        alert(res.error || '蒸留データの生成に失敗しました。');
+      }
+    } catch (err: any) {
+      alert(`蒸留エラー: ${err.message || err}`);
+    } finally {
+      setIsDistilling(false);
+    }
+  };
+
+  const handleSaveKnowledgeToMemory = () => {
+    if (!distilledResult) return;
+
+    try {
+      const savedMemoriesRaw = localStorage.getItem('gamecraft_memories');
+      const memoriesList: MemoryItem[] = savedMemoriesRaw ? JSON.parse(savedMemoriesRaw) : [];
+
+      const newMemory: MemoryItem = {
+        id: 'mem_distill_' + Date.now(),
+        category: 'gamedev',
+        content: `【知識カード: ${distilledResult.title}】\n${distilledResult.content}\n\nQ&A例:\n${(distilledResult.qaPairs || []).map((p: any) => `Q: ${p.q}\nA: ${p.a}`).join('\n')}`,
+        importance: 5,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        source: 'manual',
+        pinned: true,
+        active: true,
+        tags: ['distilled_llm_knowledge', distilledResult.category],
+      };
+
+      memoriesList.unshift(newMemory);
+      localStorage.setItem('gamecraft_memories', JSON.stringify(memoriesList));
+      setDistillSuccessMsg(`✨ 知識カード「${distilledResult.title}」を端末記憶 (Memory) に保存しました！みきが次回以降の会話・ゲーム作成でこの知識を活用します。`);
+    } catch (e) {
+      alert('記憶の保存に失敗しました。');
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -760,17 +865,17 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-800 bg-slate-950/40 px-4 sm:px-6 gap-2 shrink-0">
+        <div className="flex border-b border-slate-800 bg-slate-950/40 px-4 sm:px-6 gap-2 shrink-0 overflow-x-auto">
           <button
             onClick={() => setActiveTab('downloader')}
-            className={`py-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
+            className={`py-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'downloader'
                 ? 'border-purple-500 text-purple-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <ArrowDownToLine className="w-4 h-4" />
-            <span>オンデバイス LLM 重みダウンロード</span>
+            <span>📦 モデル一覧 & ダウンロード</span>
             {totalCachedMB > 0 && (
               <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
                 {(totalCachedMB / 1024).toFixed(1)} GB
@@ -779,32 +884,80 @@ export const EngineModal: React.FC<EngineModalProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('mode')}
-            className={`py-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
-              activeTab === 'mode'
+            onClick={() => setActiveTab('training')}
+            className={`py-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'training'
+                ? 'border-pink-500 text-pink-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <GraduationCap className="w-4 h-4 text-pink-400" />
+            <span>🎓 LLM教育・知識蒸留</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-pink-500/20 text-pink-300 border border-pink-500/30">
+              Teacher AI
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('benchmark')}
+            className={`py-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'benchmark'
                 ? 'border-sky-500 text-sky-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Sparkles className="w-4 h-4" />
-            <span>推論モード & MoE協調</span>
+            <Smartphone className="w-4 h-4" />
+            <span>📱 端末診断 & 推奨判定</span>
+            {deviceReport && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                {deviceReport.performanceTier.toUpperCase()}
+              </span>
+            )}
           </button>
 
           <button
-            onClick={() => setActiveTab('gpu')}
-            className={`py-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
-              activeTab === 'gpu'
-                ? 'border-emerald-500 text-emerald-300'
+            onClick={() => setActiveTab('architecture')}
+            className={`py-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'architecture'
+                ? 'border-indigo-500 text-indigo-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Activity className="w-4 h-4" />
-            <span>GPU ハードウェア状況</span>
+            <Sparkles className="w-4 h-4" />
+            <span>💡 外付け記憶＆モデル切替の仕組み</span>
           </button>
         </div>
 
         {/* Content Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
+          {/* Active WebGPU Engine Banner */}
+          <div className="p-3.5 rounded-xl bg-gradient-to-r from-purple-950/60 via-slate-900 to-pink-950/50 border border-purple-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-500/20 text-purple-300 rounded-lg border border-purple-500/40">
+                <Cpu className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm font-bold text-slate-100">
+                    ⚡ 端末オンデバイス WebGPU 推論（完全無料・トークン消費0）
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                </div>
+                <p className="text-[11px] text-slate-300/80">
+                  おしゃべりやゲーム作成はすべて端末内のローカルGPUで直接推論。教育・知識合成は「🎓 LLM教育」タブで実行できます。
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveTab('training')}
+              className="px-3 py-1.5 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 border border-pink-500/50 text-pink-200 text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 self-start sm:self-center"
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span>LLMを教育する</span>
+            </button>
+          </div>
+
           {/* WebGPU Warning if not supported */}
           {webGpuError && (
             <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-200 text-xs flex items-start gap-2.5">
@@ -938,6 +1091,71 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Recommended Model Quick Banner based on Device Diagnosis */}
+              {deviceReport && (
+                <div className="p-4 rounded-xl bg-gradient-to-r from-sky-950/60 to-purple-950/60 border border-sky-500/40 space-y-2">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sky-300 font-bold text-xs">
+                      <Smartphone className="w-4 h-4 text-sky-400 shrink-0" />
+                      <span>あなたの端末（{deviceReport.gpuName || 'スマホ/ブラウザ'}）に最適なモデル</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-200 border border-sky-500/30 uppercase font-mono">
+                        Tier: {deviceReport.performanceTier}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('benchmark')}
+                      className="text-[11px] text-sky-300 hover:text-sky-100 underline flex items-center gap-1 self-end sm:self-auto"
+                    >
+                      <span>詳しい端末診断結果を見る</span>
+                      <span>→</span>
+                    </button>
+                  </div>
+
+                  <div className="text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                    <div>
+                      <div className="font-bold text-slate-100 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <span>推奨: {deviceReport.recommendedModelName}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">{deviceReport.recommendationReason}</div>
+                    </div>
+
+                    {(() => {
+                      const recModel = localModels.find((m) => m.id === deviceReport.recommendedModelId);
+                      if (!recModel) return null;
+                      return (
+                        <div className="shrink-0 flex items-center gap-2">
+                          {recModel.downloadStatus === 'not_downloaded' && (
+                            <button
+                              onClick={() => handleDownloadAndLoad(recModel)}
+                              className="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-sky-600/20 transition-all"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>推奨モデルをDL & ロード</span>
+                            </button>
+                          )}
+                          {recModel.downloadStatus === 'cached' && (
+                            <button
+                              onClick={() => handleDownloadAndLoad(recModel)}
+                              className="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all"
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                              <span>VRAMへロード</span>
+                            </button>
+                          )}
+                          {recModel.downloadStatus === 'loaded_in_vram' && (
+                            <span className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>稼働中（最適）</span>
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
 
               {/* Models List */}
               <div className="space-y-3">
@@ -1430,198 +1648,430 @@ export const EngineModal: React.FC<EngineModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: Mode Selection */}
-          {activeTab === 'mode' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  推論エンジン・動作モードの切り替え
-                </label>
-                <div className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  端末内ストレージ記憶連動・トークン0
+          {/* TAB 2: LLM Education & Knowledge Distillation (Teacher AI) */}
+          {activeTab === 'training' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              {/* Header Box */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-slate-950 to-pink-950/30 border border-pink-500/30 space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-pink-500/20 text-pink-300 border border-pink-500/30">
+                    <GraduationCap className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                      <span>Teacher AI による端末ローカルLLMの教育・知識蒸留</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-bold border border-pink-500/30">
+                        Knowledge Distillation
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-300/80">
+                      大規模クラウドAI（Teacher）の知識を凝縮し、WebGPUで動く端末内ローカルLLM（みき）に高品質なナレッジカードとQ&amp;Aデータセットを注入・教育します。
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Unified Model Card */}
-              <div
-                onClick={() => onSelectEngine('moe')}
-                className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                  engineMode === 'moe'
-                    ? 'bg-pink-950/30 border-pink-500 shadow-lg shadow-pink-500/10 ring-1 ring-pink-500'
-                    : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800/70 hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-pink-500/20 text-pink-400 border border-pink-500/30">
-                      <Sparkles className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-100 text-sm">統合ハイブリッド相棒知能（みき）</span>
-                        <span className="text-[11px] px-2 py-0.5 rounded bg-pink-500/20 text-pink-300 font-medium">
-                          標準・推奨
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        1つのモデルに日本語会話力と高度なプログラミング・自律思考能力を完全集約。人格がブレず高速に動作します。
-                      </p>
-                    </div>
-                  </div>
-                  {engineMode === 'moe' && <CheckCircle2 className="w-5 h-5 text-pink-400 shrink-0" />}
+              {/* Training Preset Selection */}
+              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-pink-400" />
+                  <span>教育トピックを選択（または自由入力）</span>
                 </div>
 
-                {/* Capabilities Grid */}
-                <div className="mt-3 pt-3 border-t border-slate-700/40 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                    <span>🌸</span>
-                    <div>
-                      <div className="font-semibold text-pink-300">専属パートナー対話</div>
-                      <div className="text-[10px] text-slate-500">親密記憶＆温かいタメ口</div>
-                    </div>
-                  </div>
-                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                    <span>💻</span>
-                    <div>
-                      <div className="font-semibold text-sky-300">ゲーム＆Webコード生成</div>
-                      <div className="text-[10px] text-slate-500">HTML5/JS/Canvas/CSS</div>
-                    </div>
-                  </div>
-                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                    <span>⚡</span>
-                    <div>
-                      <div className="font-semibold text-purple-300">WebGPU/3Dグラフィック</div>
-                      <div className="text-[10px] text-slate-500">Three.js / シェーダー</div>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[
+                    {
+                      label: '🪐 Three.js 3Dゲーム & 60fps最適化',
+                      topic: 'Three.js 3Dゲーム開発、ライト・シャドウ・カメラ制御、60fps最適化',
+                      skill: 'game' as const,
+                    },
+                    {
+                      label: '🌸 相棒ペルソナ & 感情豊かな対話',
+                      topic: '親しみやすく自然な日本語会話、相棒ペルソナ、共感と励まし',
+                      skill: 'persona' as const,
+                    },
+                    {
+                      label: '🟢 2Dオセロ & ボードゲームAI',
+                      topic: 'オセロの合法手判定、ミニマックス探索AI、Canvasグラフィックス',
+                      skill: 'logic' as const,
+                    },
+                    {
+                      label: '⚡ WebGPUシェーダー & WGSLエフェクト',
+                      topic: 'WebGPUコンピュートシェーダー、WGSL、流体パーティクル表現',
+                      skill: 'code' as const,
+                    },
+                    {
+                      label: '🔧 自律デバッグ & 構文エラー修復',
+                      topic: 'JavaScript/TypeScript構文エラーの即時特定、スコープ解決ルール',
+                      skill: 'code' as const,
+                    },
+                  ].map((preset, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setTrainingTopic(preset.topic);
+                        setCustomTrainingTopic('');
+                        setTrainingSkillType(preset.skill);
+                      }}
+                      className={`p-2.5 rounded-lg border text-left text-xs transition-all ${
+                        trainingTopic === preset.topic && !customTrainingTopic
+                          ? 'bg-pink-500/20 border-pink-500/60 text-pink-200 font-bold'
+                          : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-300'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom Input */}
+                <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                  <label className="text-[11px] text-slate-400 block font-medium">
+                    自由入力トピック（教えたい特定のゲームジャンルや対話テーマ）:
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customTrainingTopic}
+                      onChange={(e) => setCustomTrainingTopic(e.target.value)}
+                      placeholder="例: レトロ風インベーダーゲームのスコア・衝突判定アルゴリズム"
+                      className="flex-1 bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-pink-500"
+                    />
+                    <select
+                      value={trainingSkillType}
+                      onChange={(e: any) => setTrainingSkillType(e.target.value)}
+                      className="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-pink-500"
+                    >
+                      <option value="game">🎮 ゲーム開発</option>
+                      <option value="code">💻 コーディング</option>
+                      <option value="persona">🌸 対話・性格</option>
+                      <option value="logic">🧩 ロジック</option>
+                    </select>
                   </div>
                 </div>
 
-                {/* 1-Model Unified Explanatory Box */}
-                <div className="mt-3 p-3 rounded-lg bg-slate-900/90 border border-pink-900/40 text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
-                  <div className="font-bold text-pink-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>💡 1つのモデルで全領域をカバーする「統合育成型」アーキテクチャ</span>
-                  </div>
-                  <p className="text-slate-400">
-                    ・<strong>人格と知識の統一</strong>: 会話、ゲーム開発、バグ診断を1つのモデル（みき）が記憶を引き継ぎながら担当するため、ブレない一貫したサポートが可能です。
-                  </p>
-                  <p className="text-slate-400">
-                    ・<strong>端末ストレージ学習</strong>: あなたとのやり取りやプロジェクトの好みを端末内ストレージに蓄積し、使い込むほどあなた専用に最適化されます。
-                  </p>
+                {/* Execute Button */}
+                <div className="pt-2 flex justify-end">
+                  <button
+                    onClick={handleRunDistillation}
+                    disabled={isDistilling}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-pink-500/25 flex items-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    <GraduationCap className={`w-4 h-4 ${isDistilling ? 'animate-spin' : ''}`} />
+                    <span>{isDistilling ? '知識蒸留・データ合成中...' : '🚀 知識蒸留・学習を実行する'}</span>
+                  </button>
                 </div>
               </div>
 
-              {/* WebGPU Card */}
-              <div
-                onClick={() => onSelectEngine('webgpu')}
-                className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                  engineMode === 'webgpu'
-                    ? 'bg-purple-950/40 border-purple-500 shadow-lg shadow-purple-500/10 ring-1 ring-purple-500'
-                    : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800/70 hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                      <Activity className="w-5 h-5" />
+              {/* Success Notification */}
+              {distillSuccessMsg && (
+                <div className="p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-200 text-xs flex items-center justify-between gap-2 animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{distillSuccessMsg}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Distillation Result Display */}
+              {distilledResult && (
+                <div className="p-4 rounded-xl bg-slate-950 border border-pink-500/40 space-y-3 animate-in fade-in duration-200">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <Brain className="w-4 h-4 text-pink-400" />
+                      <span className="font-bold text-slate-100 text-xs sm:text-sm">
+                        {distilledResult.title}
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-bold border border-pink-500/30 uppercase">
+                        {distilledResult.category}
+                      </span>
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-100 text-sm">WebGPU Compute Engine</span>
-                        <span className="text-[11px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-medium">
-                          ハードウェアGPU特化
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        WGSLシェーダー、並列コンピュートパイプライン、WebGL 2.0の最適化コード生成
-                      </p>
+
+                    <button
+                      onClick={handleSaveKnowledgeToMemory}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>✨ 端末記憶 (Memory) に保存して注入</span>
+                    </button>
+                  </div>
+
+                  {distilledResult.summary && (
+                    <div className="p-2.5 rounded-lg bg-pink-950/30 border border-pink-500/20 text-pink-200 text-[11px] leading-relaxed">
+                      💡 {distilledResult.summary}
+                    </div>
+                  )}
+
+                  {/* Knowledge Content */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-400">注入知識スニペット:</span>
+                    <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs text-slate-200 whitespace-pre-wrap font-mono leading-relaxed select-text">
+                      {distilledResult.content}
                     </div>
                   </div>
-                  {engineMode === 'webgpu' && <CheckCircle2 className="w-5 h-5 text-purple-400 shrink-0" />}
+
+                  {/* QA Pairs */}
+                  {distilledResult.qaPairs && distilledResult.qaPairs.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                      <span className="text-[11px] font-bold text-slate-400">合成されたQ&amp;Aデータセット (例):</span>
+                      <div className="space-y-1.5">
+                        {distilledResult.qaPairs.map((pair, idx) => (
+                          <div key={idx} className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-xs space-y-1">
+                            <div className="text-pink-300 font-semibold">Q: {pair.q}</div>
+                            <div className="text-slate-300 font-mono text-[11px]">A: {pair.a}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: Device Specs & Model Benchmark Diagnosis */}
+          {activeTab === 'benchmark' && (
+            <div className="space-y-5">
+              {/* Header card with quick diagnose button */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-100 text-sm flex items-center gap-2">
+                      <span>📱 スマホ＆端末ハードウェア適合度診断</span>
+                      {deviceReport && (
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30 uppercase">
+                          Tier: {deviceReport.performanceTier}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      あなたのスマホの GPU (WebGPU/WebGL)、VRAM、RAM、ストレージを計測し、快適に動くモデルを自動判定します
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleRunDeviceDiagnosis}
+                  disabled={isDiagnosingDevice}
+                  className="px-3.5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-sky-600/20 transition-all disabled:opacity-50 self-end sm:self-auto"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${isDiagnosingDevice ? 'animate-spin' : ''}`} />
+                  <span>{isDiagnosingDevice ? '診断実行中...' : 'ハードウェア再診断'}</span>
+                </button>
+              </div>
+
+              {/* Hardware Specs Grid */}
+              {deviceReport && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <div className="text-slate-400 text-[11px] flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-sky-400" />
+                      <span>GPU アダプター / レンダラー</span>
+                    </div>
+                    <div className="font-bold text-slate-200 truncate" title={deviceReport.gpuName}>
+                      {deviceReport.gpuName}
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      {deviceReport.isWebGPUSupported ? '✅ WebGPU ハードウェア対応' : '⚠️ WebGL2 フォールバック'}
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <div className="text-slate-400 text-[11px] flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <span>GPU 最大バッファ制限 / VRAM</span>
+                    </div>
+                    <div className="font-bold text-amber-300">
+                      最大 {deviceReport.maxBufferSizeMB} MB / 推論可能
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      {deviceReport.maxBufferSizeMB >= 512 ? '大半のモデルをロード可能' : '軽量(0.5B以下)モデル推奨'}
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <div className="text-slate-400 text-[11px] flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>GPU 演算能力 (GFLOPS)</span>
+                    </div>
+                    <div className="font-bold text-emerald-300 flex items-center justify-between">
+                      <span>{benchmarkResult !== null ? `${benchmarkResult} GFLOPS` : '実測テスト可能'}</span>
+                      <button
+                        onClick={runGpuBenchmark}
+                        disabled={isBenchmarking}
+                        className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 font-semibold transition-colors"
+                      >
+                        {isBenchmarking ? '計測中...' : '実測実行'}
+                      </button>
+                    </div>
+                    <div className="text-[10px] text-slate-500">シェーダー並列演算速度</div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <div className="text-slate-400 text-[11px] flex items-center gap-1.5">
+                      <HardDrive className="w-3.5 h-3.5 text-purple-400" />
+                      <span>端末メモリ (RAM) & CPU コア</span>
+                    </div>
+                    <div className="font-bold text-purple-300">
+                      RAM ~{deviceReport.deviceRamGB} GB / {deviceReport.cpuCores} CPU Cores
+                    </div>
+                    <div className="text-[10px] text-slate-500">ブラウザ報告値</div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1 sm:col-span-2">
+                    <div className="text-slate-400 text-[11px] flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                      <span>あなたのスマホの総合判定・推奨モデル</span>
+                    </div>
+                    <div className="font-bold text-pink-300 flex items-center gap-2">
+                      <span>{deviceReport.recommendedModelName}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300">{deviceReport.recommendationReason}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Model Compatibility Matrix */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-slate-200 text-xs flex items-center gap-2">
+                    <span>各モデルのスマホ適合度判定一覧</span>
+                    <span className="text-[10px] text-slate-400 font-normal">（あなたのスマホでの動作予測）</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {deviceReport?.compatibleModels.map((item) => {
+                    const statusConfig = {
+                      optimal: { label: '◎ 超快適 (最適)', bg: 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40' },
+                      supported: { label: '○ 動作可能', bg: 'bg-sky-950/60 text-sky-300 border-sky-500/40' },
+                      heavy: { label: '△ 重い/発熱注意', bg: 'bg-amber-950/60 text-amber-300 border-amber-500/40' },
+                      unsupported: { label: '✕ メモリ不足 (非推奨)', bg: 'bg-rose-950/60 text-rose-300 border-rose-500/40' },
+                    }[item.status];
+
+                    const matchedModel = localModels.find((m) => m.id === item.id);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-100">{item.name}</span>
+                            <span className={`text-[10px] px-2 py-0.2 rounded-full border font-bold ${statusConfig.bg}`}>
+                              {statusConfig.label}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400">{item.reason}</div>
+                        </div>
+
+                        {matchedModel && (
+                          <div className="shrink-0 flex items-center gap-2 self-end sm:self-auto">
+                            {matchedModel.downloadStatus === 'not_downloaded' && (
+                              <button
+                                onClick={() => {
+                                  setActiveTab('downloader');
+                                  handleDownloadAndLoad(matchedModel);
+                                }}
+                                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>ダウンロード</span>
+                              </button>
+                            )}
+                            {matchedModel.downloadStatus === 'cached' && (
+                              <button
+                                onClick={() => handleDownloadAndLoad(matchedModel)}
+                                className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                              >
+                                <Play className="w-3.5 h-3.5" />
+                                <span>ロード</span>
+                              </button>
+                            )}
+                            {matchedModel.downloadStatus === 'loaded_in_vram' && (
+                              <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>現在稼働中</span>
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 3: GPU Hardware Status & Benchmark */}
-          {activeTab === 'gpu' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-bold text-slate-200">端末 GPU ハードウェア検出状況</span>
-                  </div>
-                  <button
-                    onClick={runGpuBenchmark}
-                    disabled={isBenchmarking}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition-colors font-semibold"
-                  >
-                    <Play className="w-3.5 h-3.5 text-sky-400" />
-                    {isBenchmarking ? '計算ベンチマーク中...' : 'GPU ベンチマーク実行'}
-                  </button>
+          {/* TAB 3: Architecture & External Learning Explained */}
+          {activeTab === 'architecture' && (
+            <div className="space-y-5">
+              {/* Question 1: External Data & LLM Swapping */}
+              <div className="p-5 rounded-xl bg-slate-950/80 border border-pink-500/30 space-y-3">
+                <div className="flex items-center gap-2.5 text-pink-300 font-bold text-sm">
+                  <HelpCircle className="w-5 h-5 text-pink-400" />
+                  <span>Q. 学習データを外付けにするなら、LLMは他のものでもいいの？</span>
+                </div>
+                <div className="p-3.5 rounded-lg bg-pink-950/20 border border-pink-500/20 text-xs text-slate-200 leading-relaxed space-y-2">
+                  <div className="font-bold text-emerald-300">👉 A. まさにその通りです！どのモデルに切り替えても記憶はそのまま維持されます。</div>
+                  <p className="text-slate-300">
+                    このアプリでは、<strong>「LLM本体（計算・推論エンジン）」</strong>と<strong>「みきの人格・記憶・学習データ（外付けストレージ）」</strong>を完全に分離して設計しています。
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
-                    <div className="text-slate-500 text-[11px]">GPU アダプター名</div>
-                    <div className="font-semibold text-slate-200 mt-0.5 truncate">{gpuInfo.adapterName}</div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
-                    <div className="text-slate-500 text-[11px]">GPU アーキテクチャ / ベンダー</div>
-                    <div className="font-semibold text-slate-200 mt-0.5">
-                      {gpuInfo.vendor} ({gpuInfo.architecture || 'WebGPU Compatible'})
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
+                  <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1.5">
+                    <div className="font-bold text-sky-300 flex items-center gap-1.5">
+                      <Layers className="w-4 h-4" />
+                      <span>🧠 LLMモデル（交換可能な頭脳エンジン）</span>
                     </div>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      文章の組み立てやコードの生成を行う計算コアです。
+                      SmolLM2 (360M), Qwen 2.5 (0.5B), Llama 3.2 (1B), Gemma 2 (2B) など、スマホのスペックや充電残量に合わせて自由に切り替えられます。
+                    </p>
                   </div>
-                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
-                    <div className="text-slate-500 text-[11px]">Compute 最大バッファ制限</div>
-                    <div className="font-semibold text-purple-300 mt-0.5">
-                      {gpuInfo.maxBufferSize || 256} MB / Max Workgroup: {gpuInfo.maxComputeInvocations || 256}
+
+                  <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1.5">
+                    <div className="font-bold text-pink-300 flex items-center gap-1.5">
+                      <HardDrive className="w-4 h-4" />
+                      <span>🌸 外付け記憶ストレージ（みきの人格・思い出）</span>
                     </div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
-                    <div className="text-slate-500 text-[11px]">演算スループット推計</div>
-                    <div className="font-semibold text-sky-300 mt-0.5">
-                      {benchmarkResult !== null ? `${benchmarkResult} GFLOPS (実測)` : '未実行（ボタンで計測）'}
-                    </div>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      あなたとの会話履歴、親密度、学習したゲームコード、設定した口調などは、すべて端末のストレージ（LocalStorage / IndexedDB）に永続保存されます。モデルを変えてもみきとしての記憶は一切消えません。
+                    </p>
                   </div>
                 </div>
               </div>
 
+              {/* Question 2: Why GPU and Miki are Unified */}
+              <div className="p-5 rounded-xl bg-slate-950/80 border border-purple-500/30 space-y-3">
+                <div className="flex items-center gap-2.5 text-purple-300 font-bold text-sm">
+                  <HelpCircle className="w-5 h-5 text-purple-400" />
+                  <span>Q. GPU と みき専属（パートナー）が分かれている意味はあるの？</span>
+                </div>
+                <div className="p-3.5 rounded-lg bg-purple-950/20 border border-purple-500/20 text-xs text-slate-200 leading-relaxed space-y-2">
+                  <div className="font-bold text-purple-300">👉 A. 「みき」が1人で日常会話・ゲーム開発・WebGPUシェーダーのすべてを担当します！</div>
+                  <p className="text-slate-300">
+                    以前は「会話担当」と「GPUコード担当」で別々に表示されていましたが、混乱を避けるため現在は<strong>「🌸 みき専属（統合パートナー）」として1つに統合</strong>されています。
+                    みきに話しかけるだけで、雑談もコード作成もWebGPUグラフィックスも、文脈に合わせて自動で適切に対応します。
+                  </p>
+                </div>
+              </div>
+
+              {/* APK Storage Information */}
               <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800 text-xs text-slate-400 space-y-2 leading-relaxed">
-                <div className="font-bold text-slate-300">💡 端末オンデバイス WebGPU LLM の特徴</div>
-                <p>
-                  1. <strong>完全オフライン & ゼロ通信遅延</strong>: ダウンロードしたモデルはブラウザ内の IndexedDB/CacheStorage に保管され、サーバーを介さず端末の GPU / WebGPU で直接高速推論されます。
-                </p>
-                <p>
-                  2. <strong>プライバシー保護</strong>: プロンプトやソースコードは外部サーバーへ一切送信されず、端末内ローカルで完結します。
-                </p>
-              </div>
-
-              {/* APK Native Storage Guide */}
-              <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-800/40 text-xs text-slate-300 space-y-3 leading-relaxed">
-                <div className="flex items-center gap-2 font-bold text-purple-300 text-sm">
-                  <HardDrive className="w-4 h-4 text-purple-400" />
-                  <span>📱 Android APK（ネイティブアプリ化）時のストレージ保存について</span>
+                <div className="font-bold text-slate-300 flex items-center gap-1.5">
+                  <HardDrive className="w-4 h-4 text-emerald-400" />
+                  <span>📱 Android APK（ネイティブアプリ）にした場合のメリット</span>
                 </div>
-                <p className="text-slate-400 text-xs">
-                  ブラウザ版（現在）はブラウザのサンドボックス（CacheStorage）に保存されますが、<strong>Android APK / ネイティブアプリとしてビルドした場合</strong>は、以下の通り端末本体のストレージをフル活用できます：
+                <p>
+                  ブラウザ版ではブラウザのキャッシュ上限がありますが、<strong>Android APKとしてビルドした場合</strong>は端末本体の大容量ストレージ（内部ストレージやSDカード）に直接モデルを保存できます。また、APK内にモデルを事前同梱することで、初回起動時から完全通信不要で動作させることも可能です。
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
-                  <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
-                    <div className="font-bold text-sky-300">📦 アプリ事前同梱（プリインストール）</div>
-                    <div className="text-slate-400">
-                      APKの <code>assets/models/</code> にモデルファイルを直接含めて配布することで、<strong>初回ダウンロード待ち0秒・完全通信不要</strong>で起動できます。
-                    </div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
-                    <div className="font-bold text-emerald-300">💾 端末専用ストレージへの直接保存</div>
-                    <div className="text-slate-400">
-                      <code>/data/data/com.miki.ai/files/models</code> または SDカード等の大容量ストレージに直接保存され、ブラウザのキャッシュ消去の影響を受けません。
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           )}

@@ -22,6 +22,7 @@ export interface SendChatMessageParams {
   persona?: PersonaConfig;
   memories?: MemoryItem[];
   activeGameCode?: string;
+  signal?: AbortSignal;
 }
 
 export interface ChatResponse {
@@ -61,17 +62,25 @@ export async function checkServerHealth(): Promise<{ status: string; hasGeminiKe
 }
 
 export async function sendChatMessage(params: SendChatMessageParams): Promise<ChatResponse> {
+  if (params.signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
+      body: JSON.stringify(params),
+      signal: params.signal
     });
 
     if (res.ok) {
       return await res.json();
     }
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.name === 'AbortError' || params.signal?.aborted) {
+      throw err;
+    }
     // Network fetch failed (e.g. standalone APK environment or offline)
   }
 
@@ -99,6 +108,38 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
       computeLatencyMs: 2
     }
   };
+}
+
+export async function distillKnowledgeForLocalLLM(params: {
+  topic: string;
+  skillType: string;
+  currentMemories?: MemoryItem[];
+  persona?: PersonaConfig;
+}): Promise<{
+  success: boolean;
+  knowledge?: {
+    title: string;
+    category: string;
+    content: string;
+    qaPairs: Array<{ q: string; a: string }>;
+    summary: string;
+  };
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/train-distill', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error(`Distillation failed with status ${res.status}`);
+    return await res.json();
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'Distillation failed'
+    };
+  }
 }
 
 export async function sendDebugRequest(

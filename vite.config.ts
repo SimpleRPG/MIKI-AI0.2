@@ -259,7 +259,7 @@ ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedS
             }
 
             const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: 'gemini-3.7-flash',
               contents,
               config
             });
@@ -312,7 +312,7 @@ The game MUST render completely in Canvas 2D or DOM, handle player keyboard/mous
 Provide index.html and game.js code blocks with file path headers like \`\`\`html:/index.html and \`\`\`javascript:/game.js.`;
 
             const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: 'gemini-3.7-flash',
               contents: `Generate a full playable game for Title: "${title || 'New RPG'}", Theme/Prompt: "${prompt}"`,
               config: {
                 systemInstruction,
@@ -381,7 +381,7 @@ ${activeGameCode}
 エラーの原因を特定し、親切に1〜2文で解説した上で、完全にバグを修正した動くHTMLコードを \`\`\`html で囲んで出力してください。`;
 
             const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: 'gemini-3.7-flash',
               contents: prompt,
               config: { temperature: 0.2 }
             });

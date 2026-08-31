@@ -77,26 +77,12 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Engine Switcher Quick Button */}
         <button
           onClick={onOpenEngineModal}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
-            engineMode === 'webgpu'
-              ? 'bg-purple-500/20 border-purple-500/60 text-purple-200 hover:bg-purple-500/30 ring-1 ring-purple-500/30'
-              : 'bg-sky-500/15 border-sky-500/40 text-sky-300 hover:bg-sky-500/25'
-          }`}
-          title="推論エンジン・WebGPU端末ローカル（クラウドトークン消費0）"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all bg-purple-500/20 border-purple-500/60 text-purple-200 hover:bg-purple-500/30 ring-1 ring-purple-500/30"
+          title="端末オンデバイスWebGPU推論エンジン（完全無料・トークン消費0）"
         >
-          {engineMode === 'webgpu' ? (
-            <>
-              <Cpu className="w-3.5 h-3.5 text-purple-300" />
-              <span className="hidden sm:inline">WebGPU (端末ローカル)</span>
-              <span className="sm:hidden">WebGPU</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-              <span className="hidden sm:inline">端末オンデバイス (高速)</span>
-              <span className="sm:hidden">オンデバイス</span>
-            </>
-          )}
+          <Cpu className="w-3.5 h-3.5 text-purple-300" />
+          <span className="hidden sm:inline">⚡ WebGPU (オンデバイス)</span>
+          <span className="sm:hidden">WebGPU</span>
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
         </button>
       </div>

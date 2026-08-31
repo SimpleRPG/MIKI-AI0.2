@@ -27,6 +27,7 @@ class WebLLMService {
   private loadingModelId: string | null = null;
   private progressListeners: Set<(report: { progress: number; text: string }) => void> = new Set();
   private deviceLostHandlerAttached: boolean = false;
+  private isInterrupted: boolean = false;
 
   public async isWebGPUSupported(): Promise<{
     supported: boolean;
@@ -454,24 +455,24 @@ class WebLLMService {
 
       // Extract shard information if available, e.g., [1/14]
       const shardMatch = rawText.match(/\[(\d+)\/(\d+)\]/);
-      const shardInfo = shardMatch ? ` (ブロック ${shardMatch[1]}/${shardMatch[2]})` : '';
+      const shardInfo = shardMatch ? ` [ブロック ${shardMatch[1]}/${shardMatch[2]}]` : '';
 
-      // Distinguish local storage cache read from network download
+      // Distinguish local storage cache read from network download cleanly
       if (rawText.toLowerCase().includes('start to fetch params')) {
-        text = `🌐 サーバー接続確立中・第1ブロックデータ受信中 (${progress}%)${shardInfo}`;
+        text = `🌐 サーバー接続確立・データ受信中${shardInfo}`;
       } else if (rawText.toLowerCase().includes('from cache') || rawText.includes('cache[')) {
-        text = `💾 端末内部ストレージからVRAMへ高速展開中 (${progress}%・通信なし)${shardInfo}`;
+        text = `💾 端末ストレージからVRAMへ展開中${shardInfo}`;
       } else if (
         rawText.toLowerCase().includes('fetching') ||
         rawText.toLowerCase().includes('loading parameter') ||
         rawText.toLowerCase().includes('shard') ||
         rawText.toLowerCase().includes('param')
       ) {
-        text = `🌐 モデル重みデータを受信中 (${progress}%)${shardInfo}`;
+        text = `🌐 モデル重みデータを受信中${shardInfo}`;
       } else if (rawText.toLowerCase().includes('pipeline') || rawText.toLowerCase().includes('shader')) {
-        text = `⚡ WebGPUシェーダー＆パイプライン初期化中 (${progress}%)`;
+        text = `⚡ WebGPUシェーダー＆パイプライン初期化中`;
       } else if (rawText.toLowerCase().includes('finish')) {
-        text = `✅ WebGPU VRAM 展開完了 (${progress}%)`;
+        text = `✅ WebGPU VRAM 展開完了`;
       }
 
       this.progressListeners.forEach((listener) => {
@@ -577,7 +578,21 @@ class WebLLMService {
     await this.initPromise;
   }
 
+  public async interruptGenerate(): Promise<void> {
+    this.isInterrupted = true;
+    if (this.engine) {
+      try {
+        if (typeof (this.engine as any).interruptGenerate === 'function') {
+          await (this.engine as any).interruptGenerate();
+        }
+      } catch (e) {
+        console.warn('Error calling interruptGenerate on engine:', e);
+      }
+    }
+  }
+
   public async cancelAndReset(): Promise<void> {
+    this.isInterrupted = false;
     this.isInitializing = false;
     this.initPromise = null;
     this.loadingModelId = null;
@@ -695,6 +710,10 @@ class WebLLMService {
 
           let hasYielded = false;
           for await (const chunk of chunks) {
+            if (this.isInterrupted) {
+              this.isInterrupted = false;
+              return;
+            }
             const delta = chunk.choices[0]?.delta?.content || '';
             if (delta) {
               yield delta;
@@ -705,6 +724,10 @@ class WebLLMService {
             return;
           }
         } else {
+          if (this.isInterrupted) {
+            this.isInterrupted = false;
+            return;
+          }
           // Attempt 2 & 3: Atomic non-streaming completion with compact prompt to avoid GPUBuffer race conditions
           console.log(`[WebLLM] Retrying inference with atomic pass (attempt ${attempt}/${maxAttempts})...`);
           await new Promise((r) => setTimeout(r, 150 * attempt));
@@ -735,6 +758,10 @@ class WebLLMService {
             // Emulate smooth streaming typing effect
             const sliceSize = 10;
             for (let i = 0; i < fullContent.length; i += sliceSize) {
+              if (this.isInterrupted) {
+                this.isInterrupted = false;
+                return;
+              }
               yield fullContent.slice(i, i + sliceSize);
               await new Promise((r) => setTimeout(r, 15));
             }
