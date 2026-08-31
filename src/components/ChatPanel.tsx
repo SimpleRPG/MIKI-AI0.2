@@ -77,6 +77,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [urlCopied, setUrlCopied] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const PUBLIC_APP_URL = 'https://ais-pre-lmii4pykmv4ucirau7mbyp-23659957062.asia-northeast1.run.app';
@@ -91,18 +92,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setTimeout(() => setUrlCopied(false), 2500);
   };
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
-
-  const handleSend = (e?: React.FormEvent | React.MouseEvent | React.KeyboardEvent) => {
+  const handleSend = (e?: React.FormEvent | React.MouseEvent | React.TouchEvent | React.KeyboardEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    if ((!inputText.trim() && attachedFiles.length === 0) || isLoading) return;
-    onSendMessage(inputText.trim(), attachedFiles.length > 0 ? attachedFiles : undefined);
+    const domValue = textareaRef.current?.value ?? '';
+    const textToSend = (domValue || inputText).trim();
+
+    if ((!textToSend && attachedFiles.length === 0) || isLoading) return;
+
+    onSendMessage(textToSend, attachedFiles.length > 0 ? attachedFiles : undefined);
     setInputText('');
+    if (textareaRef.current) {
+      textareaRef.current.value = '';
+    }
     setAttachedFiles([]);
   };
 
@@ -672,8 +676,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </button>
 
           <textarea
+            ref={textareaRef}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
+            onInput={(e) => {
+              const val = (e.target as HTMLTextAreaElement).value;
+              if (val !== inputText) {
+                setInputText(val);
+              }
+            }}
             onKeyDown={handleKeyDown}
             placeholder={`${persona.name}に指示（端末WebGPU・トークン消費0・ゲーム制作や雑談など）`}
             rows={1}
@@ -684,6 +695,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <button
               type="button"
               onClick={onStopGeneration}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                onStopGeneration?.();
+              }}
               className="px-3 py-2 rounded-lg flex items-center gap-1.5 font-bold transition-all shrink-0 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-md shadow-rose-600/30 animate-pulse active:scale-95 cursor-pointer"
               title="生成を中断する"
             >
@@ -694,12 +709,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <button
               type="button"
               onClick={handleSend}
-              disabled={!inputText.trim() && attachedFiles.length === 0}
-              className={`p-2 sm:p-2.5 rounded-lg flex items-center justify-center font-bold transition-all shrink-0 ${
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                handleSend(e);
+              }}
+              className={`p-2 sm:p-2.5 rounded-lg flex items-center justify-center font-bold transition-all shrink-0 cursor-pointer ${
                 !inputText.trim() && attachedFiles.length === 0
-                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  ? 'bg-slate-800 text-slate-400 opacity-70 active:bg-slate-700'
                   : 'bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 text-white shadow-md shadow-pink-500/25 active:scale-95'
               }`}
+              title="メッセージを送信"
+              aria-label="送信"
             >
               <Send className="w-4 h-4" />
             </button>

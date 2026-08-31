@@ -153,14 +153,27 @@ export const CompanionModal: React.FC<CompanionModalProps> = ({
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
+            onInput={(e) => {
+              const val = (e.target as HTMLInputElement).value;
+              if (val !== inputText) setInputText(val);
+            }}
             placeholder="Ask MIKI for tactical advice or talk..."
             disabled={isLoading}
             className="flex-1 bg-stone-900 border border-stone-700 focus:border-amber-500 rounded-xl px-3 py-2 text-xs sm:text-sm text-stone-100 placeholder:text-stone-400 outline-none"
           />
           <button
             type="submit"
-            disabled={!inputText.trim() || isLoading}
-            className="bg-amber-500 hover:bg-amber-400 disabled:bg-stone-800 text-stone-950 font-bold px-4 py-2 rounded-xl text-xs transition cursor-pointer disabled:cursor-not-allowed"
+            onTouchEnd={(e) => {
+              if (inputText.trim() && !isLoading) {
+                e.preventDefault();
+                handleSend(e);
+              }
+            }}
+            className={`font-bold px-4 py-2 rounded-xl text-xs transition cursor-pointer ${
+              !inputText.trim() || isLoading
+                ? 'bg-stone-800 text-stone-500 opacity-60'
+                : 'bg-amber-500 hover:bg-amber-400 text-stone-950 active:scale-95 shadow-md shadow-amber-500/20'
+            }`}
           >
             <Send className="w-4 h-4" />
           </button>
