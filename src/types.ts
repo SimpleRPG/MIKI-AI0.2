@@ -133,6 +133,10 @@ export interface LocalLLMModel {
   downloadProgress: number;
   statusText?: string;
   errorMessage?: string;
+  downloadSpeed?: string;
+  etaSeconds?: number;
+  lastUpdatedTime?: number;
+  isStalled?: boolean;
 }
 
 export interface WebGPUStatus {

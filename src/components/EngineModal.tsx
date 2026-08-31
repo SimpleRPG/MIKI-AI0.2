@@ -31,21 +31,6 @@ interface EngineModalProps {
 
 const OFFICIAL_LOCAL_MODELS: LocalLLMModel[] = [
   {
-    id: 'DeepSeek-R1-Distill-Qwen-1.5B-q4f16_1-MLC',
-    name: 'DeepSeek-R1 Distill Qwen 1.5B',
-    expertRole: 'logic',
-    expertName: 'DeepSeek R1 Light (高速思考・軽量推論)',
-    icon: '🧩',
-    sizeMB: 1100,
-    parameters: '1.78B',
-    quantization: 'q4f16_1 (4-bit weights)',
-    vramMB: 1650,
-    description: 'スマホやノートPCでも高速動作する軽量版DeepSeek R1。論理推論・ステップバイステップ思考を端末完結で実行。',
-    huggingFaceRepo: 'mlc-ai/DeepSeek-R1-Distill-Qwen-1.5B-q4f16_1-MLC',
-    downloadStatus: 'not_downloaded',
-    downloadProgress: 0,
-  },
-  {
     id: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
     name: 'SmolLM2 360M Instruct',
     expertRole: 'general',
@@ -76,21 +61,6 @@ const OFFICIAL_LOCAL_MODELS: LocalLLMModel[] = [
     downloadProgress: 0,
   },
   {
-    id: 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
-    name: 'Qwen 2.5 Coder 1.5B Instruct',
-    expertRole: 'code',
-    expertName: 'Code & Logic Master (コード生成・高速推論)',
-    icon: '⚡',
-    sizeMB: 950,
-    parameters: '1.54B',
-    quantization: 'q4f16_1 (4-bit weights)',
-    vramMB: 1400,
-    description: '1.5Bパラメータのコード特化モデル。Web開発・Python・アルゴリズム生成を端末上で高速に実行。',
-    huggingFaceRepo: 'mlc-ai/Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
-    downloadStatus: 'not_downloaded',
-    downloadProgress: 0,
-  },
-  {
     id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
     name: 'Llama 3.2 1B Instruct',
     expertRole: 'moe_chat',
@@ -102,6 +72,21 @@ const OFFICIAL_LOCAL_MODELS: LocalLLMModel[] = [
     vramMB: 1250,
     description: 'Meta開発の軽量対話モデル。キャラクターMoe会話、親密なアシスタント対話をローカルWebGPUで実行します。',
     huggingFaceRepo: 'mlc-ai/Llama-3.2-1B-Instruct-q4f16_1-MLC',
+    downloadStatus: 'not_downloaded',
+    downloadProgress: 0,
+  },
+  {
+    id: 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
+    name: 'Qwen 2.5 Coder 1.5B Instruct',
+    expertRole: 'code',
+    expertName: 'Code & Logic Master (コード生成・高速推論)',
+    icon: '⚡',
+    sizeMB: 950,
+    parameters: '1.54B',
+    quantization: 'q4f16_1 (4-bit weights)',
+    vramMB: 1400,
+    description: '1.5Bパラメータのコード特化モデル。Web開発・Python・アルゴリズム生成を端末上で高速に実行。',
+    huggingFaceRepo: 'mlc-ai/Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
     downloadStatus: 'not_downloaded',
     downloadProgress: 0,
   },
@@ -353,6 +338,10 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   // Real Download & VRAM load using WebLLM
   const handleDownloadAndLoad = async (model: LocalLLMModel) => {
     setActiveLoadingModelId(model.id);
+    const startTime = performance.now();
+    let lastProgressTime = startTime;
+    let lastReportedProgress = 1;
+
     setLocalModels((prev) =>
       prev.map((m) =>
         m.id === model.id
@@ -362,6 +351,10 @@ export const EngineModal: React.FC<EngineModalProps> = ({
               downloadProgress: 1,
               statusText: 'WebGPU パイプラインを初期化中...',
               errorMessage: undefined,
+              downloadSpeed: undefined,
+              etaSeconds: undefined,
+              lastUpdatedTime: Date.now(),
+              isStalled: false,
             }
           : m
       )
@@ -369,6 +362,28 @@ export const EngineModal: React.FC<EngineModalProps> = ({
 
     try {
       await webLLMService.loadModel(model.id, (report) => {
+        const now = performance.now();
+        const progressDiff = report.progress - lastReportedProgress;
+        const timeDiffSec = (now - lastProgressTime) / 1000;
+
+        let speedStr: string | undefined = undefined;
+        let etaSec: number | undefined = undefined;
+
+        if (timeDiffSec > 0.4 && progressDiff > 0) {
+          const bytesTotal = model.sizeMB * 1024 * 1024;
+          const bytesDownloadedInDiff = (progressDiff / 100) * bytesTotal;
+          const bytesPerSec = bytesDownloadedInDiff / timeDiffSec;
+          const mbPerSec = bytesPerSec / (1024 * 1024);
+          speedStr = `${mbPerSec.toFixed(1)} MB/s`;
+
+          const remainingProgress = Math.max(0, 100 - report.progress);
+          const remainingBytes = (remainingProgress / 100) * bytesTotal;
+          etaSec = Math.ceil(remainingBytes / Math.max(bytesPerSec, 1024));
+
+          lastProgressTime = now;
+          lastReportedProgress = report.progress;
+        }
+
         setLocalModels((prev) =>
           prev.map((m) => {
             if (m.id === model.id) {
@@ -377,6 +392,10 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                 downloadProgress: report.progress,
                 statusText: report.text,
                 downloadStatus: report.progress >= 100 ? 'loaded_in_vram' : 'downloading',
+                downloadSpeed: speedStr || m.downloadSpeed,
+                etaSeconds: etaSec !== undefined ? etaSec : m.etaSeconds,
+                lastUpdatedTime: Date.now(),
+                isStalled: false,
               };
             }
             return m;
@@ -416,9 +435,17 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         errMsg.toLowerCase().includes('failed to fetch') ||
         errMsg.toLowerCase().includes('fetch failed') ||
         errMsg.toLowerCase().includes('networkerror') ||
+        errMsg.toLowerCase().includes('cache') ||
         errMsg.toLowerCase().includes('load failed') ||
         errMsg.toLowerCase().includes('net::') ||
         errMsg.includes('Failed to fetch');
+
+      const isDeviceLost =
+        err?.name === 'GPUDeviceLostError' ||
+        errMsg.toLowerCase().includes('device was lost') ||
+        errMsg.toLowerCase().includes('gpudevicelostinfo') ||
+        errMsg.toLowerCase().includes('gpu constraints') ||
+        errMsg.toLowerCase().includes('insufficient memory');
 
       let formattedStatus = 'エラーが発生しました';
       let formattedError = errMsg || 'ダウンロードまたはWebGPUロードに失敗しました';
@@ -426,9 +453,12 @@ export const EngineModal: React.FC<EngineModalProps> = ({
       if (isQuotaError) {
         formattedStatus = '容量不足 (Quota exceeded)';
         formattedError = '端末ストレージの保存容量上限（Quota exceeded）に達しました。不要なモデルキャッシュを削除するか、超軽量モデル（SmolLM2-360M: 220MB）をご利用ください。';
+      } else if (isDeviceLost) {
+        formattedStatus = 'GPUメモリ制限 (Device Lost)';
+        formattedError = '端末のGPUメモリ（VRAM）制約によりGPUがリセットされました。超軽量モデル（SmolLM2-360M: 220MB）をご利用ください。';
       } else if (isFetchError) {
-        formattedStatus = '通信エラー (Failed to fetch)';
-        formattedError = 'モデルデータ取得中の通信エラー（Failed to fetch）。Hugging Face / GitHub CDN への接続が一時的に中断されたか、広告ブロック/セキュリティ拡張機能により遮断された可能性があります。「再試行」または「修復 & 再DL」をお試しください。';
+        formattedStatus = '通信・キャッシュエラー';
+        formattedError = 'モデルデータ取得中に通信またはキャッシュエラーが発生しました。不完全なキャッシュは自動クリアされました。「再試行」または「修復 & 再DL」で再取得できます。';
       }
 
       await refreshStorageEstimate();
@@ -1137,24 +1167,38 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                       {isDownloading && (
                         <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
                           <div className="flex justify-between items-center text-xs text-slate-400">
-                            <span className="text-purple-300 font-mono text-[11px] truncate max-w-[70%]">
+                            <span className="text-purple-300 font-mono text-[11px] truncate max-w-[65%]">
                               {model.statusText || 'ダウンロード中...'}
                             </span>
                             <div className="flex items-center gap-2">
+                              {model.downloadSpeed && (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-900/60 text-purple-200 border border-purple-700/50 font-mono font-bold">
+                                  ⚡ {model.downloadSpeed}
+                                </span>
+                              )}
+                              {model.etaSeconds !== undefined && model.etaSeconds > 0 && (
+                                <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                                  (残り約 {model.etaSeconds < 60 ? `${model.etaSeconds}秒` : `${Math.ceil(model.etaSeconds / 60)}分`})
+                                </span>
+                              )}
                               <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
                               <span className="font-mono text-[11px] text-slate-200 font-bold">
                                 {model.downloadProgress}%
                               </span>
                             </div>
                           </div>
-                          <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
                             <div
-                              className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-sky-400 transition-all duration-200"
+                              className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-sky-400 rounded-full transition-all duration-200"
                               style={{ width: `${Math.max(3, model.downloadProgress)}%` }}
                             />
                           </div>
                           <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[10px] text-slate-400">
-                            <span>※ 通信が途切れて固まった場合は「再試行 (リロード)」または「中止」を押してください</span>
+                            <span className="text-slate-300">
+                              {model.downloadSpeed
+                                ? `🚀 通信速度: ${model.downloadSpeed} (正常に進行中)`
+                                : '⏳ サーバー接続・重み初期化中...'}
+                            </span>
                             <div className="flex items-center gap-1.5">
                               <button
                                 onClick={() => handleRetryDownload(model)}

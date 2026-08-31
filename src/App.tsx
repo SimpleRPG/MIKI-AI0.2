@@ -278,34 +278,17 @@ export default function App() {
 
       const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.council || SPEAKER_PROFILES.miki;
       const isLocalPreferred = localStorage.getItem('miki_use_local_in_moe') !== 'false';
-      const shouldRunLocal = engineMode === 'webgpu' || engineMode === 'moe' || (isLocalPreferred && webLLMService.isLoaded());
+      const gpuCheck = await webLLMService.isWebGPUSupported().catch(() => ({ supported: false }));
+      const isGpuUsable = gpuCheck.supported;
+
+      // Decide if we should execute directly via WebGPU
+      const shouldRunWebGPU = engineMode === 'webgpu' || (engineMode === 'moe' && isGpuUsable && (webLLMService.isLoaded() || isLocalPreferred));
 
       // MoE Prompt Classification & Expert Specialization
       const moeAnalysis = classifyPromptForMoE(text);
 
-      // If local WebGPU execution is requested or active
-      if (shouldRunLocal) {
-        const gpuCheck = await webLLMService.isWebGPUSupported();
-
-        if (!gpuCheck.supported) {
-          const assistantId = 'msg_asst_' + Date.now();
-          const zeroTokenNoticeMsg: ChatMessage = {
-            id: assistantId,
-            role: 'assistant',
-            content: `⚠️ **WebGPU がブラウザで検出されませんでした**\n\n【トークン消費ゼロ保護】\nクラウドトークンを意図せず消費しないよう、クラウドAPIへの自動切り替えを停止しました。\n\n・ChromeやEdgeの「設定 > システム > ハードウェアアクセラレーション」が有効になっているかご確認ください。\n・AIモデル設定画面からWebGPU対応状況をご確認いただけます。`,
-            timestamp: Date.now(),
-            speaker: activeSpeaker,
-            engineMode: 'webgpu',
-            moeRoute: moeAnalysis.route,
-            metrics: {
-              engine: 'WebGPU (Zero Cloud Tokens Policy)',
-            },
-          };
-          setMessages((prev) => [...prev, zeroTokenNoticeMsg]);
-          setIsLoading(false);
-          return;
-        }
-
+      // If local WebGPU execution is requested or active and GPU is usable
+      if (shouldRunWebGPU && isGpuUsable) {
         // Priority 1: If an engine is already loaded in VRAM, use it directly to prevent reload latency/failures!
         const targetModelId = (webLLMService.isLoaded() && webLLMService.getActiveModelId())
           ? webLLMService.getActiveModelId()!

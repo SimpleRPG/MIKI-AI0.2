@@ -12,22 +12,10 @@ export const KNOWN_MODEL_IDS = [
   'Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC',
 ];
 
-// AppConfig to support models like DeepSeek-R1-Distill-Qwen-1.5B and ensure fallback wasm URLs
+// AppConfig to support models and ensure reliable fallback wasm URLs with optimized mobile limits
 export const CUSTOM_APP_CONFIG: AppConfig = {
   model_list: [
     ...(prebuiltAppConfig.model_list || []),
-    {
-      model: 'https://huggingface.co/mlc-ai/DeepSeek-R1-Distill-Qwen-1.5B-q4f16_1-MLC',
-      model_id: 'DeepSeek-R1-Distill-Qwen-1.5B-q4f16_1-MLC',
-      model_lib:
-        `${(prebuiltAppConfig as any).use_web_worker ? 'webworker_' : ''}` +
-        'DeepSeek-R1-Distill-Qwen-1.5B-q4f16_1-ctx4k_cs1k-webgpu.wasm',
-      vram_required_MB: 1650,
-      low_resource_required: true,
-      overrides: {
-        context_window_size: 4096,
-      },
-    },
   ],
 };
 
@@ -38,6 +26,7 @@ class WebLLMService {
   private initPromise: Promise<void> | null = null;
   private loadingModelId: string | null = null;
   private progressListeners: Set<(report: { progress: number; text: string }) => void> = new Set();
+  private deviceLostHandlerAttached: boolean = false;
 
   public async isWebGPUSupported(): Promise<{
     supported: boolean;
@@ -526,19 +515,28 @@ class WebLLMService {
           throw quotaErr;
         }
 
-        if (isFetchError) {
+        const isCacheAddError =
+          errMsg.toLowerCase().includes("failed to execute 'add' on 'cache'") ||
+          errMsg.toLowerCase().includes('cache.add()') ||
+          errMsg.toLowerCase().includes('encountered a network error');
+
+        if (isCacheAddError || isFetchError) {
+          // Purge any corrupted partial files in cache for this model to allow clean retry
+          await this.repairModelCache(modelId).catch(() => {});
           const fetchErr = new Error(
-            'モデルファイル取得中の通信エラー（Failed to fetch）。Hugging Face / GitHub CDN への接続が一時的に中断されたか、広告ブロック/セキュリティ拡張機能により遮断された可能性があります。「再試行」または「修復 & 再DL」をお試しください。'
+            'モデルファイル取得中にキャッシュ通信エラーが発生しました（Cache.add network error）。破損した不完全キャッシュをクリアしました。「再試行」または「修復 & 再DL」をお試しください。'
           );
           (fetchErr as any).name = 'NetworkFetchError';
           throw fetchErr;
         }
 
-        if (isGpuBufferError) {
+        if (isGpuBufferError || errMsg.toLowerCase().includes('device was lost') || errMsg.toLowerCase().includes('gpudevicelostinfo')) {
+          this.engine = null;
+          this.activeModelId = null;
           const gpuErr = new Error(
-            `WebGPUバッファ初期化エラー: ${errMsg}。超軽量モデル（SmolLM2-360M）のご利用、またはブラウザのハードウェアアクセラレーション設定をご確認ください。`
+            `端末のGPUメモリ（VRAM）制約によりDevice Lostが発生しました。より軽量なモデル（SmolLM2-360M: 220MB）をご利用いただくか、ハイブリッド合議知能モードで快適にご利用いただけます。`
           );
-          (gpuErr as any).name = 'WebGPUBufferError';
+          (gpuErr as any).name = 'GPUDeviceLostError';
           throw gpuErr;
         }
 
