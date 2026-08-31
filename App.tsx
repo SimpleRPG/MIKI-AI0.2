@@ -341,7 +341,17 @@ export default function App() {
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
+    // If a previous local WebGPU generation is still actually running in the engine,
+    // aborting the UI-side loop above does NOT stop it — the engine keeps generating
+    // in the background. Starting a second generation on the same engine instance
+    // while the first is still in flight is a real cause of WebGPU freezes, so make
+    // sure it's genuinely stopped before we begin a new one.
+    if (isGenerating) {
+      await webLLMService.interruptGenerate();
+    }
+
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
     setIsGenerating(true);
