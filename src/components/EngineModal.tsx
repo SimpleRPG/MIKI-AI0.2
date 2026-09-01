@@ -338,50 +338,54 @@ export const EngineModal: React.FC<EngineModalProps> = ({
       const isEngineLoaded = webLLMService.isLoaded();
 
       let repairedCount = 0;
-      const updatedModels = await Promise.all(
-        localModels.map(async (m) => {
-          const integrity = await webLLMService.verifyModelCacheIntegrity(m.id);
-          if (activeLoaded === m.id && isEngineLoaded) {
+      setLocalModels((currentList) => {
+        // Asynchronously check integrity and update without dropping custom expert roles
+        Promise.all(
+          currentList.map(async (m) => {
+            const integrity = await webLLMService.verifyModelCacheIntegrity(m.id);
+            if (activeLoaded === m.id && isEngineLoaded) {
+              return {
+                ...m,
+                downloadStatus: 'loaded_in_vram' as const,
+                downloadProgress: 100,
+                statusText: 'WebGPU VRAM 稼働中 (推論可能)',
+                errorMessage: undefined,
+              };
+            }
+            if (integrity.isCached) {
+              return {
+                ...m,
+                downloadStatus: 'cached' as const,
+                downloadProgress: 100,
+                statusText: '端末キャッシュ済み (即時ロード可能)',
+                errorMessage: undefined,
+              };
+            }
+            if (integrity.status === 'partial') {
+              return {
+                ...m,
+                downloadStatus: (m.downloadStatus === 'downloading' ? 'downloading' : 'not_downloaded') as LocalLLMModel['downloadStatus'],
+                downloadProgress: Math.min(80, integrity.shardCount * 10),
+                statusText: `一部ダウンロード済み (${integrity.shardCount}ブロック保持)`,
+                errorMessage: undefined,
+              };
+            }
+            if (m.downloadStatus === 'downloading') {
+              return m;
+            }
             return {
               ...m,
-              downloadStatus: 'loaded_in_vram' as const,
-              downloadProgress: 100,
-              statusText: 'WebGPU VRAM 稼働中 (推論可能)',
+              downloadStatus: 'not_downloaded' as const,
+              downloadProgress: 0,
+              statusText: undefined,
               errorMessage: undefined,
             };
-          }
-          if (integrity.isCached) {
-            return {
-              ...m,
-              downloadStatus: 'cached' as const,
-              downloadProgress: 100,
-              statusText: '端末キャッシュ済み (即時ロード可能)',
-              errorMessage: undefined,
-            };
-          }
-          if (integrity.status === 'partial') {
-            return {
-              ...m,
-              downloadStatus: (m.downloadStatus === 'downloading' ? 'downloading' : 'not_downloaded') as LocalLLMModel['downloadStatus'],
-              downloadProgress: Math.min(80, integrity.shardCount * 10),
-              statusText: `一部ダウンロード済み (${integrity.shardCount}ブロック保持)`,
-              errorMessage: undefined,
-            };
-          }
-          if (m.downloadStatus === 'downloading') {
-            return m;
-          }
-          return {
-            ...m,
-            downloadStatus: 'not_downloaded' as const,
-            downloadProgress: 0,
-            statusText: undefined,
-            errorMessage: undefined,
-          };
-        })
-      );
-
-      setLocalModels(updatedModels);
+          })
+        ).then((updatedModels) => {
+          setLocalModels(updatedModels);
+        });
+        return currentList;
+      });
       setScanNotice(
         repairedCount > 0
           ? `スキャン完了: ${repairedCount} 件の中断キャッシュを検出しました。「修復＆再ダウンロード」が可能です。`

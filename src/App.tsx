@@ -109,7 +109,8 @@ export default function App() {
 
   const [engineMode, setEngineMode] = useState<EngineMode>(() => {
     const saved = localStorage.getItem('miki_active_engine_mode') as EngineMode;
-    return saved === 'webgpu' || saved === 'autonomous_rule' || saved === 'gemini_cloud' ? saved : 'webgpu';
+    const validModes: EngineMode[] = ['native_gpu', 'webgpu', 'external_gpu', 'autonomous_rule', 'gemini_cloud'];
+    return validModes.includes(saved) ? saved : 'native_gpu';
   });
 
   const handleSelectEngine = (mode: EngineMode) => {
