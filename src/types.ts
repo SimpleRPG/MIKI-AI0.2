@@ -1,4 +1,4 @@
-export type EngineMode = 'webgpu' | 'autonomous_rule' | 'gemini_cloud';
+export type EngineMode = 'native_gpu' | 'webgpu' | 'external_gpu' | 'autonomous_rule' | 'gemini_cloud';
 
 export interface PersonaConfig {
   id: string;
