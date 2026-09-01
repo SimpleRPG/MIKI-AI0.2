@@ -278,7 +278,7 @@ class NativeLlmService {
 
   public async loadNativeModel(
     modelId: string,
-    fileName?: string,
+    fileNameOrProgress?: string | ((report: { progress: number; text: string }) => void),
     options?: { nGpuLayers?: number; nCtx?: number; nThreads?: number },
     onProgress?: (report: { progress: number; text: string }) => void
   ): Promise<void> {
@@ -288,13 +288,16 @@ class NativeLlmService {
       );
     }
 
+    const actualFileName = typeof fileNameOrProgress === 'string' ? fileNameOrProgress : undefined;
+    const actualOnProgress = typeof fileNameOrProgress === 'function' ? fileNameOrProgress : onProgress;
+
     this.isModelLoading = true;
-    systemLogger.info('NATIVE_GPU', `🚀 llama.cpp C++ JNI でGGUFモデルをVRAM/RAMに展開中: ${modelId} (${fileName || modelId})`);
+    systemLogger.info('NATIVE_GPU', `🚀 llama.cpp C++ JNI でGGUFモデルをVRAM/RAMに展開中: ${modelId} (${actualFileName || modelId})`);
 
     let progressListener: any = null;
-    if (onProgress) {
+    if (actualOnProgress) {
       progressListener = await (NativeMlcPlugin as any).addListener?.('onProgress', (data: NativeLlmProgressEvent) => {
-        onProgress({
+        actualOnProgress({
           progress: Math.min(100, Math.max(0, Math.round(data.progress * 100))),
           text: data.text,
         });
@@ -304,7 +307,7 @@ class NativeLlmService {
     try {
       const res = await NativeMlcPlugin.loadModel({
         modelId,
-        fileName: fileName || `${modelId}.gguf`,
+        fileName: actualFileName || `${modelId}.gguf`,
         nGpuLayers: options?.nGpuLayers ?? 99,
         nCtx: options?.nCtx ?? 2048,
         nThreads: options?.nThreads ?? 4,

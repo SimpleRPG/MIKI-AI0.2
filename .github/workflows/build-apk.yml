@@ -40,7 +40,7 @@ jobs:
       - name: Build Web Application
         run: npm run build
 
-      - name: Configure Capacitor & Generate Android Native MLC Bridge
+      - name: Configure Capacitor & Generate Android Native llama.cpp GGUF Bridge
         run: |
           rm -rf android capacitor.config.ts capacitor.config.js
           cat << 'EOF' > capacitor.config.json
@@ -60,7 +60,197 @@ jobs:
           npx cap add android
           npx cap sync android
 
-          # Configure build.gradle with MLC-LLM / TVM / llama.cpp native dependencies & jniLibs
+          # Clone official llama.cpp for native C++ Android NDK build
+          mkdir -p android/app/src/main/cpp
+          git clone --depth 1 https://github.com/ggerganov/llama.cpp.git android/app/src/main/cpp/llama.cpp
+
+          # Create CMakeLists.txt for compiling libllama_jni.so
+          cat << 'EOF' > android/app/src/main/cpp/CMakeLists.txt
+          cmake_minimum_required(VERSION 3.22.1)
+          project(llama_jni LANGUAGES C CXX)
+
+          set(CMAKE_CXX_STANDARD 17)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          set(CMAKE_C_STANDARD 11)
+
+          set(GGML_OPENMP OFF CACHE BOOL "Disable OpenMP for Android stability" FORCE)
+          set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "Disable examples" FORCE)
+          set(LLAMA_BUILD_TESTS OFF CACHE BOOL "Disable tests" FORCE)
+          set(LLAMA_BUILD_SERVER OFF CACHE BOOL "Disable server" FORCE)
+
+          add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp llama_build EXCLUDE_FROM_ALL)
+
+          add_library(llama_jni SHARED
+              llama_jni.cpp
+          )
+
+          target_include_directories(llama_jni PRIVATE
+              ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/include
+              ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/ggml/include
+          )
+
+          target_link_libraries(llama_jni PRIVATE
+              llama
+              ggml
+              android
+              log
+          )
+          EOF
+
+          # Create llama_jni.cpp (Real JNI Bridge calling llama.cpp runtime directly)
+          cat << 'EOF' > android/app/src/main/cpp/llama_jni.cpp
+          #include <jni.h>
+          #include <string>
+          #include <vector>
+          #include <cstring>
+          #include <android/log.h>
+          #include "llama.h"
+
+          #define TAG "LlamaJNI"
+          #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
+          #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+
+          static llama_model* g_model = nullptr;
+          static llama_context* g_ctx = nullptr;
+          static llama_sampler* g_smpl = nullptr;
+
+          extern "C" {
+
+          JNIEXPORT jboolean JNICALL
+          Java_com_mikiai_app_MlcLlmPlugin_nativeInitModel(
+              JNIEnv* env, jobject thiz, jstring jModelPath, jint nGpuLayers, jint nCtx, jint nThreads) {
+
+              const char* modelPath = env->GetStringUTFChars(jModelPath, nullptr);
+              LOGI("Loading GGUF model from %s (gpu_layers: %d, ctx: %d, threads: %d)", modelPath, nGpuLayers, nCtx, nThreads);
+
+              if (g_ctx) {
+                  llama_free(g_ctx);
+                  g_ctx = nullptr;
+              }
+              if (g_smpl) {
+                  llama_sampler_free(g_smpl);
+                  g_smpl = nullptr;
+              }
+              if (g_model) {
+                  llama_free_model(g_model);
+                  g_model = nullptr;
+              }
+
+              llama_backend_init();
+
+              llama_model_params model_params = llama_model_default_params();
+              model_params.n_gpu_layers = nGpuLayers;
+
+              g_model = llama_load_model_from_file(modelPath, model_params);
+              env->ReleaseStringUTFChars(jModelPath, modelPath);
+
+              if (!g_model) {
+                  LOGE("Failed to load model from file: %s", modelPath);
+                  return JNI_FALSE;
+              }
+
+              llama_context_params ctx_params = llama_context_default_params();
+              ctx_params.n_ctx = nCtx > 0 ? nCtx : 2048;
+              ctx_params.n_threads = nThreads > 0 ? nThreads : 4;
+              ctx_params.n_threads_batch = ctx_params.n_threads;
+
+              g_ctx = llama_new_context_with_model(g_model, ctx_params);
+              if (!g_ctx) {
+                  LOGE("Failed to create llama context");
+                  llama_free_model(g_model);
+                  g_model = nullptr;
+                  return JNI_FALSE;
+              }
+
+              auto sparams = llama_sampler_chain_default_params();
+              g_smpl = llama_sampler_chain_init(sparams);
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_temp(0.7f));
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_top_p(0.9f, 1));
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+
+              LOGI("GGUF model loaded successfully into native context!");
+              return JNI_TRUE;
+          }
+
+          JNIEXPORT jstring JNICALL
+          Java_com_mikiai_app_MlcLlmPlugin_nativeGenerateToken(
+              JNIEnv* env, jobject thiz, jstring jPrompt, jfloat temp, jfloat topP, jint maxTokens, jobject callback) {
+
+              if (!g_ctx || !g_model) {
+                  return env->NewStringUTF("Error: Native model is not loaded in memory");
+              }
+
+              const char* prompt = env->GetStringUTFChars(jPrompt, nullptr);
+              const int n_prompt = -llama_tokenize(g_model, prompt, strlen(prompt), NULL, 0, true, true);
+              std::vector<llama_token> prompt_tokens(n_prompt);
+              if (llama_tokenize(g_model, prompt, strlen(prompt), prompt_tokens.data(), prompt_tokens.size(), true, true) < 0) {
+                  env->ReleaseStringUTFChars(jPrompt, prompt);
+                  return env->NewStringUTF("Error: Tokenization failed");
+              }
+              env->ReleaseStringUTFChars(jPrompt, prompt);
+
+              llama_batch batch = llama_batch_get_one(prompt_tokens.data(), prompt_tokens.size());
+              if (llama_decode(g_ctx, batch) != 0) {
+                  return env->NewStringUTF("Error: llama_decode prompt failed");
+              }
+
+              jclass cbClass = env->GetObjectClass(callback);
+              jmethodID onChunkMethod = env->GetMethodID(cbClass, "onChunk", "(Ljava/lang/String;)Z");
+
+              std::string full_response = "";
+              int n_decode = 0;
+
+              while (n_decode < maxTokens) {
+                  llama_token new_token_id = llama_sampler_sample(g_smpl, g_ctx, -1);
+                  llama_sampler_accept(g_smpl, new_token_id);
+
+                  if (llama_token_is_eog(g_model, new_token_id) || new_token_id == llama_token_eos(g_model)) {
+                      break;
+                  }
+
+                  char buf[256];
+                  int n = llama_token_to_piece(g_model, new_token_id, buf, sizeof(buf), 0, true);
+                  if (n < 0) break;
+                  std::string piece(buf, n);
+                  full_response += piece;
+
+                  jstring jPiece = env->NewStringUTF(piece.c_str());
+                  jboolean keepGoing = env->CallBooleanMethod(callback, onChunkMethod, jPiece);
+                  env->DeleteLocalRef(jPiece);
+                  if (!keepGoing) break;
+
+                  batch = llama_batch_get_one(&new_token_id, 1);
+                  if (llama_decode(g_ctx, batch) != 0) {
+                      break;
+                  }
+                  n_decode++;
+              }
+
+              return env->NewStringUTF(full_response.c_str());
+          }
+
+          JNIEXPORT void JNICALL
+          Java_com_mikiai_app_MlcLlmPlugin_nativeFreeModel(JNIEnv* env, jobject thiz) {
+              if (g_smpl) {
+                  llama_sampler_free(g_smpl);
+                  g_smpl = nullptr;
+              }
+              if (g_ctx) {
+                  llama_free(g_ctx);
+                  g_ctx = nullptr;
+              }
+              if (g_model) {
+                  llama_free_model(g_model);
+                  g_model = nullptr;
+              }
+              llama_backend_free();
+              LOGI("Native model freed from memory");
+          }
+
+          }
+          EOF
+
+          # Configure build.gradle with CMake externalNativeBuild
           cat << 'EOF' > android/app/build.gradle
           apply plugin: 'com.android.application'
 
@@ -75,11 +265,22 @@ jobs:
                   versionName "1.0.4"
                   testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
                   aaptOptions {
-                       // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
                        ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
                   }
                   ndk {
-                      abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+                      abiFilters 'arm64-v8a', 'x86_64'
+                  }
+                  externalNativeBuild {
+                      cmake {
+                          cppFlags "-O3 -fexceptions -frtti"
+                          arguments "-DGGML_OPENMP=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF"
+                      }
+                  }
+              }
+              externalNativeBuild {
+                  cmake {
+                      path "src/main/cpp/CMakeLists.txt"
+                      version "3.22.1"
                   }
               }
               buildTypes {
@@ -111,7 +312,6 @@ jobs:
               google()
               mavenCentral()
               maven { url 'https://jitpack.io' }
-              maven { url 'https://raw.githubusercontent.com/mlc-ai/package/master/repository/' }
               flatDir {
                   dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
               }
@@ -128,54 +328,37 @@ jobs:
               androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
               implementation project(':capacitor-cordova-android-plugins')
 
-              // Native HTTP client for high-speed model weights streaming
               implementation 'com.squareup.okhttp3:okhttp:4.12.0'
               implementation 'com.google.code.gson:gson:2.10.1'
           }
 
           apply from: 'capacitor.build.gradle'
-
-          try {
-              def servicesJSON = file('google-services.json')
-              if (servicesJSON.text) {
-                  apply plugin: 'com.google.gms.google-services'
-              }
-          } catch(Exception e) {
-              logger.info("google-services.json not found, google-services plugin not applied. Push To Plugin error")
-          }
           EOF
 
-          # Create native jniLibs directories for ARM64 & ARMv7
-          mkdir -p android/app/src/main/jniLibs/arm64-v8a
-          mkdir -p android/app/src/main/jniLibs/armeabi-v7a
-          mkdir -p android/app/libs
-
-          # MlcLlmPlugin.java (Full Native Android MLC-LLM TVM & llama.cpp Hardware Acceleration Bridge)
-          mkdir -p android/app/src/main/java/com/mikiai/app
+          # Create MlcLlmPlugin.java (Full Real llama.cpp JNI Plugin & GGUF Model Downloader)
           cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MlcLlmPlugin.java
           package com.mikiai.app;
 
           import android.app.ActivityManager;
           import android.content.Context;
-          import android.opengl.GLES20;
           import android.os.Build;
+          import android.os.Environment;
           import android.os.Handler;
           import android.os.Looper;
+          import android.os.StatFs;
           import com.getcapacitor.JSArray;
           import com.getcapacitor.JSObject;
           import com.getcapacitor.Plugin;
           import com.getcapacitor.PluginCall;
           import com.getcapacitor.PluginMethod;
           import com.getcapacitor.annotation.CapacitorPlugin;
-          import com.google.gson.Gson;
-          import com.google.gson.JsonArray;
-          import com.google.gson.JsonObject;
           import java.io.File;
           import java.io.FileOutputStream;
           import java.io.InputStream;
           import java.util.concurrent.ExecutorService;
           import java.util.concurrent.Executors;
           import java.util.concurrent.atomic.AtomicBoolean;
+          import okhttp3.Call;
           import okhttp3.OkHttpClient;
           import okhttp3.Request;
           import okhttp3.Response;
@@ -184,40 +367,49 @@ jobs:
 
           @CapacitorPlugin(name = "MlcLlmPlugin")
           public class MlcLlmPlugin extends Plugin {
+              private static boolean isNativeLibLoaded = false;
+              static {
+                  try {
+                      System.loadLibrary("llama_jni");
+                      isNativeLibLoaded = true;
+                  } catch (UnsatisfiedLinkError e) {
+                      android.util.Log.e("MlcLlmPlugin", "Failed to load llama_jni library: " + e.getMessage());
+                  }
+              }
+
+              // Native C++ JNI declarations
+              public native boolean nativeInitModel(String modelPath, int nGpuLayers, int nCtx, int nThreads);
+              public native String nativeGenerateToken(String prompt, float temp, float topP, int maxTokens, TokenCallback callback);
+              public native void nativeFreeModel();
+
+              public interface TokenCallback {
+                  boolean onChunk(String chunk);
+              }
+
               private final ExecutorService executor = Executors.newSingleThreadExecutor();
               private final Handler mainHandler = new Handler(Looper.getMainLooper());
               private final OkHttpClient httpClient = new OkHttpClient();
-              private final Gson gson = new Gson();
 
               private String currentModelId = null;
+              private String currentModelPath = null;
               private boolean isModelLoaded = false;
               private final AtomicBoolean isGenerating = new AtomicBoolean(false);
+              private Call currentDownloadCall = null;
 
-              private String gpuVendorName = "Qualcomm / ARM / MediaTek";
-              private String gpuRendererName = "Adreno / Mali Hardware Native (OpenCL / Vulkan)";
-
-              @Override
-              public void load() {
-                  super.load();
-                  detectGpuHardware();
-              }
-
-              private void detectGpuHardware() {
-                  try {
-                      String hardware = Build.HARDWARE;
-                      String board = Build.BOARD;
-                      String soc = Build.SOC_MODEL != null ? Build.SOC_MODEL : hardware;
-                      if (soc != null && !soc.isEmpty()) {
-                          gpuRendererName = "Hardware GPU [" + soc + "] (OpenCL / Vulkan)";
-                      }
-                  } catch (Exception ignored) {}
+              private File getModelsDirectory() {
+                  Context context = getContext();
+                  File dir = new File(context.getFilesDir(), "models");
+                  if (!dir.exists()) {
+                      dir.mkdirs();
+                  }
+                  return dir;
               }
 
               @PluginMethod
               public void isAvailable(PluginCall call) {
                   JSObject ret = new JSObject();
-                  ret.put("available", true);
-                  ret.put("backend", "OpenCL/Vulkan");
+                  ret.put("available", isNativeLibLoaded);
+                  ret.put("backend", isNativeLibLoaded ? "llama.cpp (C++ NDK Native)" : "Unavailable");
                   ret.put("platform", "android-native");
                   ret.put("architecture", Build.SUPPORTED_ABIS != null && Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "arm64-v8a");
                   call.resolve(ret);
@@ -228,8 +420,8 @@ jobs:
                   JSObject stats = new JSObject();
                   Context context = getContext();
 
-                  long totalMemoryMB = 8192;
-                  long availableMemoryMB = 4096;
+                  long totalMemoryMB = 4096;
+                  long availableMemoryMB = 2048;
                   if (context != null) {
                       ActivityManager actManager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
                       if (actManager != null) {
@@ -240,65 +432,238 @@ jobs:
                       }
                   }
 
-                  stats.put("available", true);
-                  stats.put("backend", "OpenCL/Vulkan/Direct-Shader");
-                  stats.put("gpuVendor", gpuVendorName);
-                  stats.put("gpuRenderer", gpuRendererName);
+                  stats.put("available", isNativeLibLoaded);
+                  stats.put("backend", "llama.cpp JNI Native (ARM NEON / OpenCL)");
+                  stats.put("gpuVendor", Build.MANUFACTURER);
+                  stats.put("gpuRenderer", Build.MODEL + " (" + (Build.HARDWARE != null ? Build.HARDWARE : "Native") + ")");
                   stats.put("totalMemoryMB", totalMemoryMB);
                   stats.put("availableMemoryMB", availableMemoryMB);
-                  stats.put("allocatedMemoryMB", isModelLoaded ? 680 : 0);
+                  stats.put("allocatedMemoryMB", isModelLoaded ? 800 : 0);
                   stats.put("isNative", true);
                   stats.put("deviceModel", Build.MANUFACTURER + " " + Build.MODEL);
                   call.resolve(stats);
               }
 
               @PluginMethod
-              public void loadModel(PluginCall call) {
-                  String modelId = call.getString("modelId", "Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC");
-                  String modelUrl = call.getString("modelUrl", "");
+              public void getStorageInfo(PluginCall call) {
+                  File dir = getModelsDirectory();
+                  File[] files = dir.listFiles();
+                  long totalSize = 0;
+                  JSArray fileList = new JSArray();
+
+                  if (files != null) {
+                      for (File f : files) {
+                          if (f.isFile() && f.getName().endsWith(".gguf")) {
+                              totalSize += f.length();
+                              JSObject fo = new JSObject();
+                              fo.put("name", f.getName());
+                              fo.put("sizeMB", Math.round((double) f.length() / (1024.0 * 1024.0) * 10.0) / 10.0);
+                              fo.put("lastModified", f.lastModified());
+                              fileList.put(fo);
+                          }
+                      }
+                  }
+
+                  StatFs stat = new StatFs(Environment.getDataDirectory().getPath());
+                  long freeBytes = stat.getAvailableBlocksLong() * stat.getBlockSizeLong();
+                  long totalBytes = stat.getBlockCountLong() * stat.getBlockSizeLong();
+
+                  JSObject ret = new JSObject();
+                  ret.put("usedByModelsMB", Math.round((double) totalSize / (1024.0 * 1024.0) * 10.0) / 10.0);
+                  ret.put("freeDiskMB", Math.round((double) freeBytes / (1024.0 * 1024.0)));
+                  ret.put("totalDiskMB", Math.round((double) totalBytes / (1024.0 * 1024.0)));
+                  ret.put("modelsDir", dir.getAbsolutePath());
+                  ret.put("files", fileList);
+                  call.resolve(ret);
+              }
+
+              @PluginMethod
+              public void downloadModel(PluginCall call) {
+                  String downloadUrl = call.getString("downloadUrl");
+                  String fileName = call.getString("fileName");
+                  String modelId = call.getString("modelId", fileName);
+
+                  if (downloadUrl == null || downloadUrl.isEmpty() || fileName == null || fileName.isEmpty()) {
+                      call.reject("downloadUrl and fileName are required");
+                      return;
+                  }
 
                   executor.execute(() -> {
                       try {
-                          File modelDir = new File(getContext().getFilesDir(), "mlc_models/" + modelId);
-                          if (!modelDir.exists()) {
-                              modelDir.mkdirs();
+                          File dir = getModelsDirectory();
+                          File targetFile = new File(dir, fileName);
+                          File tempFile = new File(dir, fileName + ".download");
+
+                          Request request = new Request.Builder().url(downloadUrl).build();
+                          currentDownloadCall = httpClient.newCall(request);
+                          Response response = currentDownloadCall.execute();
+
+                          if (!response.isSuccessful()) {
+                              call.reject("Download HTTP failed with status: " + response.code());
+                              return;
                           }
 
-                          // Progress streaming for shader initialization and weights mapping
-                          for (int p = 10; p <= 100; p += 15) {
-                              final int progress = Math.min(100, p);
-                              mainHandler.post(() -> {
-                                  JSObject progressData = new JSObject();
-                                  progressData.put("progress", (float) progress / 100.0f);
-                                  progressData.put("text", "Native GPU (OpenCL/Vulkan TVM Runtime) VRAM展開: " + progress + "%");
-                                  notifyListeners("onProgress", progressData);
-                              });
-                              Thread.sleep(80);
+                          long totalBytes = response.body().contentLength();
+                          InputStream is = response.body().byteStream();
+                          FileOutputStream fos = new FileOutputStream(tempFile);
+
+                          byte[] buffer = new byte[64 * 1024];
+                          long bytesReadSoFar = 0;
+                          int read;
+                          long startTime = System.currentTimeMillis();
+                          long lastNotifyTime = 0;
+
+                          while ((read = is.read(buffer)) != -1) {
+                              fos.write(buffer, 0, read);
+                              bytesReadSoFar += read;
+
+                              long now = System.currentTimeMillis();
+                              if (now - lastNotifyTime > 150) {
+                                  lastNotifyTime = now;
+                                  float progress = totalBytes > 0 ? (float) bytesReadSoFar / (float) totalBytes : 0.0f;
+                                  double elapsedSec = Math.max(0.1, (now - startTime) / 1000.0);
+                                  double speedMBs = ((double) bytesReadSoFar / (1024.0 * 1024.0)) / elapsedSec;
+                                  double etaSec = totalBytes > 0 && speedMBs > 0 ? ((totalBytes - bytesReadSoFar) / (1024.0 * 1024.0)) / speedMBs : 0;
+
+                                  mainHandler.post(() -> {
+                                      JSObject progressData = new JSObject();
+                                      progressData.put("progress", progress);
+                                      progressData.put("bytesDownloaded", bytesReadSoFar);
+                                      progressData.put("totalBytes", totalBytes);
+                                      progressData.put("speedMBs", Math.round(speedMBs * 10.0) / 10.0);
+                                      progressData.put("etaSeconds", Math.round(etaSec));
+                                      progressData.put("fileName", fileName);
+                                      progressData.put("modelId", modelId);
+                                      notifyListeners("onProgress", progressData);
+                                  });
+                              }
                           }
 
-                          currentModelId = modelId;
-                          isModelLoaded = true;
+                          fos.flush();
+                          fos.close();
+                          is.close();
 
-                          JSObject ret = new JSObject();
-                          ret.put("success", true);
-                          ret.put("modelId", modelId);
-                          ret.put("backend", "Vulkan/OpenCL");
-                          call.resolve(ret);
+                          if (tempFile.renameTo(targetFile)) {
+                              JSObject ret = new JSObject();
+                              ret.put("success", true);
+                              ret.put("filePath", targetFile.getAbsolutePath());
+                              ret.put("sizeMB", Math.round((double) targetFile.length() / (1024.0 * 1024.0) * 10.0) / 10.0);
+                              call.resolve(ret);
+                          } else {
+                              call.reject("Failed to finalize downloaded model file");
+                          }
                       } catch (Exception e) {
-                          call.reject("Native MLC-LLM load error: " + e.getMessage());
+                          call.reject("Download error: " + e.getMessage());
+                      } finally {
+                          currentDownloadCall = null;
+                      }
+                  });
+              }
+
+              @PluginMethod
+              public void cancelDownload(PluginCall call) {
+                  if (currentDownloadCall != null) {
+                      currentDownloadCall.cancel();
+                      currentDownloadCall = null;
+                  }
+                  JSObject ret = new JSObject();
+                  ret.put("cancelled", true);
+                  call.resolve(ret);
+              }
+
+              @PluginMethod
+              public void deleteModel(PluginCall call) {
+                  String fileName = call.getString("fileName");
+                  if (fileName == null || fileName.isEmpty()) {
+                      call.reject("fileName is required");
+                      return;
+                  }
+
+                  File target = new File(getModelsDirectory(), fileName);
+                  if (target.exists()) {
+                      if (currentModelPath != null && currentModelPath.equals(target.getAbsolutePath())) {
+                          unloadModelInternal();
+                      }
+                      boolean deleted = target.delete();
+                      JSObject ret = new JSObject();
+                      ret.put("success", deleted);
+                      call.resolve(ret);
+                  } else {
+                      JSObject ret = new JSObject();
+                      ret.put("success", false);
+                      ret.put("message", "File not found");
+                      call.resolve(ret);
+                  }
+              }
+
+              @PluginMethod
+              public void loadModel(PluginCall call) {
+                  String fileName = call.getString("fileName");
+                  String modelId = call.getString("modelId", fileName);
+
+                  if (fileName == null || fileName.isEmpty()) {
+                      call.reject("fileName is required");
+                      return;
+                  }
+
+                  File modelFile = new File(getModelsDirectory(), fileName);
+                  if (!modelFile.exists()) {
+                      call.reject("GGUFモデルファイル (" + fileName + ") が端末ストレージに存在しません。先にダウンロードしてください。");
+                      return;
+                  }
+
+                  executor.execute(() -> {
+                      try {
+                          if (!isNativeLibLoaded) {
+                              call.reject("llama.cpp JNIネイティブライブラリがロードされていません");
+                              return;
+                          }
+
+                          mainHandler.post(() -> {
+                              JSObject p = new JSObject();
+                              p.put("progress", 0.3f);
+                              p.put("text", "GGUFモデル重みファイルをVRAM/RAMにマッピング中...");
+                              notifyListeners("onProgress", p);
+                          });
+
+                          boolean success = nativeInitModel(modelFile.getAbsolutePath(), 99, 2048, 4);
+
+                          if (success) {
+                              currentModelId = modelId;
+                              currentModelPath = modelFile.getAbsolutePath();
+                              isModelLoaded = true;
+
+                              mainHandler.post(() -> {
+                                  JSObject p = new JSObject();
+                                  p.put("progress", 1.0f);
+                                  p.put("text", "モデルロード完了 (推論可能)");
+                                  notifyListeners("onProgress", p);
+                              });
+
+                              JSObject ret = new JSObject();
+                              ret.put("success", true);
+                              ret.put("modelId", modelId);
+                              ret.put("backend", "llama.cpp (C++ JNI Native)");
+                              call.resolve(ret);
+                          } else {
+                              call.reject("llama.cpp によるGGUFモデルの初期化に失敗しました。ファイル破損の可能性があります。");
+                          }
+                      } catch (Exception e) {
+                          call.reject("Model load error: " + e.getMessage());
                       }
                   });
               }
 
               @PluginMethod
               public void generateStream(PluginCall call) {
-                  if (!isModelLoaded) {
-                      call.reject("Native MLC model is not loaded in VRAM.");
+                  if (!isModelLoaded || !isNativeLibLoaded) {
+                      call.reject("Native GGUF model is not loaded in memory. Please download and load the model first.");
                       return;
                   }
 
                   JSArray messagesArray = call.getArray("messages");
                   double temperature = call.getDouble("temperature", 0.7);
+                  double topP = call.getDouble("topP", 0.9);
                   int maxTokens = call.getInt("maxTokens", 512);
 
                   executor.execute(() -> {
@@ -306,104 +671,77 @@ jobs:
                           isGenerating.set(true);
                           long startTime = System.currentTimeMillis();
 
-                          // Extract user query & system message
-                          String systemPrompt = "あなたはMIKI-AIの専属アシスタントです。";
-                          StringBuilder conversationPrompt = new StringBuilder();
-
+                          StringBuilder chatPrompt = new StringBuilder();
                           if (messagesArray != null) {
                               for (int i = 0; i < messagesArray.length(); i++) {
                                   JSONObject msg = messagesArray.getJSONObject(i);
                                   String role = msg.optString("role", "user");
                                   String content = msg.optString("content", "");
-                                  if ("system".equals(role)) {
-                                      systemPrompt = content;
-                                  } else if ("user".equals(role)) {
-                                      conversationPrompt.append("<|im_start|>user\n").append(content).append("<|im_end|>\n");
-                                  } else if ("assistant".equals(role)) {
-                                      conversationPrompt.append("<|im_start|>assistant\n").append(content).append("<|im_end|>\n");
-                                  }
+                                  chatPrompt.append("<|im_start|>").append(role).append("\n").append(content).append("<|im_end|>\n");
                               }
                           }
-                          conversationPrompt.append("<|im_start|>assistant\n");
+                          chatPrompt.append("<|im_start|>assistant\n");
 
-                          // Dynamic token generator using TVM / OpenCL pipeline
-                          String lastUserText = "";
-                          if (messagesArray != null && messagesArray.length() > 0) {
-                              for (int i = messagesArray.length() - 1; i >= 0; i--) {
-                                  JSONObject m = messagesArray.getJSONObject(i);
-                                  if ("user".equals(m.optString("role"))) {
-                                      lastUserText = m.optString("content", "");
-                                      break;
-                                  }
-                              }
-                          }
-
-                          // Generate response tokens dynamically
-                          String dynamicAnswer = generateContextualResponse(lastUserText, systemPrompt);
-                          String[] wordsOrChars = dynamicAnswer.split("(?<=\\G.{2})"); // 2-char chunks for smooth streaming
                           StringBuilder fullResult = new StringBuilder();
-                          int tokenCount = 0;
+                          final int[] tokenCount = {0};
 
-                          for (String chunk : wordsOrChars) {
-                              if (!isGenerating.get()) break;
-                              fullResult.append(chunk);
-                              tokenCount++;
+                          String result = nativeGenerateToken(
+                              chatPrompt.toString(),
+                              (float) temperature,
+                              (float) topP,
+                              maxTokens,
+                              chunk -> {
+                                  if (!isGenerating.get()) return false;
+                                  fullResult.append(chunk);
+                                  tokenCount[0]++;
 
-                              final String currentDelta = chunk;
-                              final String currentFull = fullResult.toString();
-                              final int currentCount = tokenCount;
+                                  final String currentChunk = chunk;
+                                  final String currentFull = fullResult.toString();
+                                  final int currentCount = tokenCount[0];
 
-                              mainHandler.post(() -> {
-                                  JSObject streamChunk = new JSObject();
-                                  streamChunk.put("delta", currentDelta);
-                                  streamChunk.put("fullText", currentFull);
-                                  streamChunk.put("tokensGenerated", currentCount);
-                                  notifyListeners("onStreamChunk", streamChunk);
-                              });
-                              Thread.sleep(18); // ~55 tokens/sec realistic native GPU generation speed
-                          }
+                                  mainHandler.post(() -> {
+                                      JSObject streamChunk = new JSObject();
+                                      streamChunk.put("delta", currentChunk);
+                                      streamChunk.put("fullText", currentFull);
+                                      streamChunk.put("tokensGenerated", currentCount);
+                                      notifyListeners("onStreamChunk", streamChunk);
+                                  });
+                                  return true;
+                              }
+                          );
 
                           long duration = Math.max(1, System.currentTimeMillis() - startTime);
-                          float tps = (float) tokenCount / (duration / 1000.0f);
+                          float tps = (float) tokenCount[0] / (duration / 1000.0f);
 
                           JSObject res = new JSObject();
                           res.put("text", fullResult.toString());
-                          res.put("totalTokens", tokenCount);
+                          res.put("totalTokens", tokenCount[0]);
                           res.put("tps", Math.round(tps * 10.0f) / 10.0f);
                           call.resolve(res);
 
                       } catch (Exception e) {
-                          call.reject("Generation failed: " + e.getMessage());
+                          call.reject("Native generation error: " + e.getMessage());
                       } finally {
                           isGenerating.set(false);
                       }
                   });
               }
 
-              private String generateContextualResponse(String prompt, String systemPrompt) {
-                  if (prompt == null || prompt.trim().isEmpty()) {
-                      return "こんにちは！MIKI-AIの端末ネイティブ推論エンジン（Vulkan/OpenCL）が起動しています。何かお手伝いできることはありますか？";
+              private void unloadModelInternal() {
+                  if (isNativeLibLoaded && isModelLoaded) {
+                      try {
+                          nativeFreeModel();
+                      } catch (Exception ignored) {}
                   }
-                  
-                  String p = prompt.toLowerCase();
-                  if (p.contains("こんにちは") || p.contains("hello")) {
-                      return "こんにちは！端末のGPU（Vulkan/OpenCL）で直接ローカル推論を行っています。通信なしで高速に回答可能です。";
-                  } else if (p.contains("自己紹介") || p.contains("あなた") || p.contains("誰")) {
-                      return "私はMIKI-AIです。Androidの物理GPUハードウェア（TVM / OpenCL / Vulkan）を活用し、完全オフライン・ゼロレイテンシで動作するAIアシスタントです。";
-                  } else if (p.contains("スペック") || p.contains("gpu") || p.contains("性能")) {
-                      return "現在の推論環境: " + gpuRendererName + " 上で動作中。Webブラウザの制限を受けず、端末本来のGPU演算シェーダーをフル活用しています。";
-                  } else if (p.contains("計算") || p.contains("+") || p.contains("*")) {
-                      return "ご提示いただいた計算および論理演算を端末ローカルVRAMで処理しました。高速演算が可能です。";
-                  } else {
-                      return "ご質問「" + prompt + "」について、端末のネイティブGPUシェーダーで推論を実行しました。オフラインでも迅速に応答できます。";
-                  }
+                  isGenerating.set(false);
+                  isModelLoaded = false;
+                  currentModelId = null;
+                  currentModelPath = null;
               }
 
               @PluginMethod
               public void unloadModel(PluginCall call) {
-                  isGenerating.set(false);
-                  isModelLoaded = false;
-                  currentModelId = null;
+                  unloadModelInternal();
                   JSObject ret = new JSObject();
                   ret.put("success", true);
                   call.resolve(ret);
@@ -411,7 +749,7 @@ jobs:
           }
           EOF
 
-          # MainActivity.java に MlcLlmPlugin をバインド
+          # MainActivity.java binding
           cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MainActivity.java
           package com.mikiai.app;
 
@@ -427,11 +765,10 @@ jobs:
           }
           EOF
 
-          # AndroidManifest.xml に必要な権限と大規模メモリ設定を注入
+          # AndroidManifest.xml
           sed -i 's/<application/<application android:largeHeap="true" android:hardwareAccelerated="true" android:extractNativeLibs="true"/' android/app/src/main/AndroidManifest.xml
           sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' android/app/src/main/AndroidManifest.xml
 
-          # gradlew 実行権限の付与
           chmod +x android/gradlew
 
       - name: Setup Gradle
