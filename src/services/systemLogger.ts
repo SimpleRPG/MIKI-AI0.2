@@ -6,12 +6,29 @@ export interface SystemLogEntry {
   category: 'WEBGPU' | 'INFERENCE' | 'NETWORK' | 'CACHE' | 'PERSISTENCE' | 'SERVER' | 'CHAT' | 'STEP';
   message: string;
   details?: any;
+  elapsedMs?: number;
+  relativeDeltaMs?: number;
+}
+
+export interface StepExecutionSnapshot {
+  stepNumber: number;
+  totalSteps: number;
+  title: string;
+  category: string;
+  timestamp: string;
+  elapsedMs: number;
+  relativeDeltaMs: number;
+  status: 'pending' | 'active' | 'success' | 'warn' | 'error';
+  details?: any;
 }
 
 class SystemLogger {
   private logs: SystemLogEntry[] = [];
   private maxLogs = 1000;
   private storageKey = 'miki_system_diagnostics_logs';
+  private sessionStartTime: number = 0;
+  private lastStepTimestamp: number = 0;
+  private currentSessionSteps: StepExecutionSnapshot[] = [];
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -26,19 +43,38 @@ class SystemLogger {
     }
   }
 
+  public startSession(): number {
+    this.sessionStartTime = performance.now();
+    this.lastStepTimestamp = this.sessionStartTime;
+    this.currentSessionSteps = [];
+    return this.sessionStartTime;
+  }
+
+  public getCurrentSessionSteps(): StepExecutionSnapshot[] {
+    return [...this.currentSessionSteps];
+  }
+
   public log(
     level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR',
     category: 'WEBGPU' | 'INFERENCE' | 'NETWORK' | 'CACHE' | 'PERSISTENCE' | 'SERVER' | 'CHAT' | 'STEP',
     message: string,
     details?: any
   ) {
+    const nowEpoch = Date.now();
+    const nowPerf = performance.now();
+    const elapsedMs = this.sessionStartTime > 0 ? Math.round(nowPerf - this.sessionStartTime) : undefined;
+    const relativeDeltaMs = this.lastStepTimestamp > 0 ? Math.round(nowPerf - this.lastStepTimestamp) : undefined;
+    this.lastStepTimestamp = nowPerf;
+
     const entry: SystemLogEntry = {
-      id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      id: 'log_' + nowEpoch + '_' + Math.random().toString(36).substring(2, 7),
       timestamp: new Date().toISOString(),
-      epoch: Date.now(),
+      epoch: nowEpoch,
       level,
       category,
       message,
+      elapsedMs,
+      relativeDeltaMs,
       details: details ? (typeof details === 'object' ? JSON.parse(JSON.stringify(details, this.getCircularReplacer())) : details) : undefined,
     };
 
@@ -56,8 +92,9 @@ class SystemLogger {
       this.syncToServer(entry).catch(() => {});
     }
 
-    // Console output
-    const formatted = `[${entry.timestamp}] [${entry.level}] [${entry.category}] ${entry.message}`;
+    // Console output with elapsed time indicators
+    const timingPrefix = elapsedMs !== undefined ? `[+${elapsedMs}ms]` : '';
+    const formatted = `[${entry.timestamp}] ${timingPrefix} [${entry.level.padEnd(5)}] [${entry.category.padEnd(9)}] ${entry.message}`;
     if (level === 'ERROR') {
       console.error(formatted, details || '');
     } else if (level === 'WARN') {
@@ -67,9 +104,36 @@ class SystemLogger {
     }
   }
 
-  public step(stepNumber: number, totalSteps: number, title: string, details?: any) {
-    const header = `▶ [工程 ${stepNumber}/${totalSteps}] ${title}`;
+  public step(
+    stepNumber: number,
+    totalSteps: number,
+    title: string,
+    details?: any,
+    status: StepExecutionSnapshot['status'] = 'success'
+  ): StepExecutionSnapshot {
+    const nowPerf = performance.now();
+    const elapsedMs = this.sessionStartTime > 0 ? Math.round(nowPerf - this.sessionStartTime) : 0;
+    const relativeDeltaMs = this.lastStepTimestamp > 0 ? Math.round(nowPerf - this.lastStepTimestamp) : 0;
+    
+    const deltaStr = relativeDeltaMs > 0 ? ` (+${relativeDeltaMs}ms / 累計: ${elapsedMs}ms)` : ` (累計: ${elapsedMs}ms)`;
+    const header = `▶ [工程 ${stepNumber}/${totalSteps}] ${title}${deltaStr}`;
+    
     this.log('INFO', 'STEP', header, details);
+
+    const stepSnapshot: StepExecutionSnapshot = {
+      stepNumber,
+      totalSteps,
+      title,
+      category: 'STEP',
+      timestamp: new Date().toISOString(),
+      elapsedMs,
+      relativeDeltaMs,
+      status,
+      details,
+    };
+
+    this.currentSessionSteps.push(stepSnapshot);
+    return stepSnapshot;
   }
 
   private getCircularReplacer() {
@@ -124,7 +188,12 @@ class SystemLogger {
 
   public exportAsFormattedText(): string {
     return this.logs
-      .map((l) => `[${l.timestamp}] [${l.level.padEnd(5)}] [${l.category.padEnd(9)}] ${l.message}${l.details ? '\n  詳細データ: ' + (typeof l.details === 'string' ? l.details : JSON.stringify(l.details, null, 2)) : ''}`)
+      .map((l) => {
+        const timingStr = l.elapsedMs !== undefined ? `[+${String(l.elapsedMs).padStart(5, ' ')}ms | Δ${String(l.relativeDeltaMs ?? 0).padStart(4, ' ')}ms] ` : '';
+        return `[${l.timestamp}] ${timingStr}[${l.level.padEnd(5)}] [${l.category.padEnd(9)}] ${l.message}${
+          l.details ? '\n  詳細データ: ' + (typeof l.details === 'string' ? l.details : JSON.stringify(l.details, null, 2)) : ''
+        }`;
+      })
       .join('\n');
   }
 

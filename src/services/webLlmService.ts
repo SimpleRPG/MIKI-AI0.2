@@ -1358,6 +1358,8 @@ class WebLLMService {
       });
     }
 
+    systemLogger.debug('INFERENCE', `[プロンプト整形] 送信ターン数: ${sanitizedMessages.length}, システム文字数: ${sanitizedMessages[0]?.content?.length ?? 0}, 入力文字数: ${latestUserText.length}`);
+
     // Wait for any active GPU inference pipeline to completely resolve and release staging buffers
     const currentInferenceLock = this.inferenceLock;
     let releaseInferenceLock: () => void = () => {};
@@ -1386,8 +1388,9 @@ class WebLLMService {
           const tokenLimit = Math.min(options?.max_tokens ?? 256, 256);
 
           if (attempt === 1) {
-            systemLogger.info('INFERENCE', `[WebGPU推論 試行 1/2] ストリーミング生成API呼び出し開始 (MaxTokens: ${tokenLimit}, Temperature: ${options?.temperature ?? 0.7})`);
+            systemLogger.info('INFERENCE', `[WebGPU推論 試行 1/2] ストリーミング生成API呼び出し開始 (MaxTokens: ${tokenLimit}, Temperature: ${options?.temperature ?? 0.7}, Model: ${this.activeModelId})`);
             
+            const createStartTime = performance.now();
             const createPromise = this.engine.chat.completions.create({
               messages: sanitizedMessages as any,
               stream: true,
@@ -1401,6 +1404,8 @@ class WebLLMService {
             );
 
             const chunks: any = await Promise.race([createPromise, timeoutPromise]);
+            const createElapsedMs = Math.round(performance.now() - createStartTime);
+            systemLogger.debug('INFERENCE', `[WebGPU Prefill通信確立] create()完了 (所要時間: ${createElapsedMs}ms)`);
 
             let hasYielded = false;
             let generatedChunkCount = 0;
@@ -1438,7 +1443,7 @@ class WebLLMService {
                 if (!firstTokenTime) {
                   firstTokenTime = now;
                   const ttftMs = Math.round(firstTokenTime - inferStartTime);
-                  systemLogger.info('INFERENCE', `WebGPU 初回トークン到達 (TTFT: ${ttftMs}ms)`);
+                  systemLogger.info('INFERENCE', `WebGPU 初回トークン到達 (TTFT: ${ttftMs}ms) | 先頭: "${delta.slice(0, 15)}"`);
                 }
 
                 yield delta;
@@ -1496,6 +1501,7 @@ class WebLLMService {
               },
             ];
 
+            systemLogger.debug('INFERENCE', `[WebGPUアトミック生成] 入力: "${latestUserText.slice(0, 50)}..."`);
             const atomicPromise = this.engine.chat.completions.create({
               messages: compactMessages as any,
               stream: false,

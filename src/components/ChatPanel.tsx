@@ -24,6 +24,13 @@ import {
   Square,
   StopCircle,
   FileText,
+  ChevronDown,
+  ChevronUp,
+  Activity,
+  CheckCircle2,
+  AlertCircle,
+  ListTree,
+  Clock,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode } from '../types';
 import { extractCodeBlocks } from '../utils/codeParser';
@@ -78,6 +85,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [appliedId, setAppliedId] = useState<string | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
+  const [expandedStepsMsgId, setExpandedStepsMsgId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -113,6 +121,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if ((!textToSend && attachedFiles.length === 0) || isLoading || isGenerating) return;
 
     lastSendTimeRef.current = now;
+    systemLogger.info('CHAT', `[UIイベント] チャット送信トリガー発火 (文字数: ${textToSend.length}, 添付: ${attachedFiles.length}件, モード: ${engineMode})`, {
+      textSnippet: textToSend.slice(0, 80),
+      attachedFiles: attachedFiles.map((a) => ({ name: a.name, size: a.size })),
+      speakerMode,
+      engineMode,
+    });
+
     onSendMessage(textToSend, attachedFiles.length > 0 ? attachedFiles : undefined);
     setInputText('');
     if (textareaRef.current) {
@@ -416,35 +431,151 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   </span>
                 </div>
 
-                {/* Processing Speed & Engine stats */}
-                {!isUser && (msg.metrics?.engine || msg.metrics?.tokensPerSec || msg.metrics?.ttftMs) && (
-                  <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-2.5 py-0.5 rounded-lg text-[10px] text-slate-400 font-mono shadow-sm">
-                    <span className="text-pink-400 font-bold flex items-center gap-1 font-sans">
-                      {msg.metrics?.engine && msg.metrics.engine.includes('WebGPU') ? (
-                        <>
-                          <Cpu className="w-3 h-3 text-purple-400" />
-                          <span className="text-purple-300 font-bold">{msg.metrics.engine}</span>
-                        </>
-                      ) : msg.metrics?.engine && msg.metrics.engine.includes('Gemini') ? (
-                        <>
-                          <Sparkles className="w-3 h-3 text-sky-400" />
-                          <span className="text-sky-300 font-bold">{msg.metrics.engine}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-3 h-3 text-amber-400" />
-                          <span className="text-amber-300 font-bold">{msg.metrics?.engine || 'CPUルールベース'}</span>
-                        </>
-                      )}
-                    </span>
-                    {msg.metrics?.ttftMs ? (
-                      <span>⚡ 応答: {msg.metrics.ttftMs}ms</span>
-                    ) : null}
-                    {msg.metrics?.tokensPerSec ? (
-                      <span className="text-emerald-400 font-bold">
-                        ({msg.metrics.tokensPerSec} tok/s)
-                      </span>
-                    ) : null}
+                {/* Processing Speed, Engine stats & 10-Step Telemetry Toggle */}
+                {!isUser && (
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    {(msg.metrics?.engine || msg.metrics?.tokensPerSec || msg.metrics?.ttftMs) && (
+                      <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-2.5 py-0.5 rounded-lg text-[10px] text-slate-400 font-mono shadow-sm">
+                        <span className="text-pink-400 font-bold flex items-center gap-1 font-sans">
+                          {msg.metrics?.engine && msg.metrics.engine.includes('WebGPU') ? (
+                            <>
+                              <Cpu className="w-3 h-3 text-purple-400" />
+                              <span className="text-purple-300 font-bold">{msg.metrics.engine}</span>
+                            </>
+                          ) : msg.metrics?.engine && msg.metrics.engine.includes('Gemini') ? (
+                            <>
+                              <Sparkles className="w-3 h-3 text-sky-400" />
+                              <span className="text-sky-300 font-bold">{msg.metrics.engine}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-3 h-3 text-amber-400" />
+                              <span className="text-amber-300 font-bold">{msg.metrics?.engine || 'CPUルールベース'}</span>
+                            </>
+                          )}
+                        </span>
+                        {msg.metrics?.ttftMs ? <span>⚡ 応答: {msg.metrics.ttftMs}ms</span> : null}
+                        {msg.metrics?.tokensPerSec ? (
+                          <span className="text-emerald-400 font-bold">({msg.metrics.tokensPerSec} tok/s)</span>
+                        ) : null}
+                      </div>
+                    )}
+
+                    {/* Interactive 10-Step Telemetry Inspector Button */}
+                    {msg.executionSteps && msg.executionSteps.length > 0 && (
+                      <button
+                        onClick={() =>
+                          setExpandedStepsMsgId(expandedStepsMsgId === msg.id ? null : msg.id)
+                        }
+                        className={`text-[10px] px-2 py-0.5 rounded-lg font-mono flex items-center gap-1 transition-all border ${
+                          expandedStepsMsgId === msg.id
+                            ? 'bg-sky-950 text-sky-200 border-sky-400/50 shadow-sm'
+                            : 'bg-slate-950/80 hover:bg-slate-900 text-slate-400 hover:text-sky-300 border-slate-800'
+                        }`}
+                        title="送信から返信までの10工程リアルタイムログを展開して確認"
+                      >
+                        <Activity className="w-3 h-3 text-sky-400" />
+                        <span>
+                          {expandedStepsMsgId === msg.id ? '工程ログを閉じる' : `10工程ログ (${msg.executionSteps.length}/10)`}
+                        </span>
+                        {expandedStepsMsgId === msg.id ? (
+                          <ChevronUp className="w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* 10-Step Interactive Telemetry Timeline Drawer */}
+                {!isUser && expandedStepsMsgId === msg.id && msg.executionSteps && (
+                  <div className="w-full bg-slate-950/95 border border-sky-500/30 rounded-xl p-2.5 sm:p-3 my-1 text-xs space-y-2 shadow-lg animate-fadeIn">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-slate-800 text-[11px]">
+                      <div className="flex items-center gap-1.5 text-sky-300 font-bold">
+                        <ListTree className="w-3.5 h-3.5 text-sky-400" />
+                        <span>チャット送信〜応答 10工程リアルタイム追跡</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const stepText = msg.executionSteps
+                              ?.map(
+                                (s) =>
+                                  `[工程 ${s.stepNumber}/${s.totalSteps}] +${s.elapsedMs}ms (Δ${s.relativeDeltaMs}ms) : ${s.title}${
+                                    s.details ? '\n  ' + JSON.stringify(s.details) : ''
+                                  }`
+                              )
+                              .join('\n');
+                            if (stepText) {
+                              navigator.clipboard.writeText(stepText);
+                              alert('工程ログをクリップボードにコピーしました！');
+                            }
+                          }}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] flex items-center gap-1 transition-colors border border-slate-700"
+                          title="このメッセージの工程ログをコピー"
+                        >
+                          <Copy className="w-2.5 h-2.5" />
+                          <span>ログコピー</span>
+                        </button>
+                        <button
+                          onClick={async () => {
+                            await systemLogger.downloadDiagnosticsTxtFile({
+                              engineMode: msg.engineMode,
+                              targetModel: msg.metrics?.engine,
+                            });
+                          }}
+                          className="px-2 py-0.5 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 rounded text-[10px] flex items-center gap-1 transition-colors border border-emerald-500/40 font-bold"
+                          title="全システム診断レポート(.txt)を保存"
+                        >
+                          <FileText className="w-2.5 h-2.5" />
+                          <span>診断txt保存</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 font-mono text-[10.5px]">
+                      {msg.executionSteps.map((step, idx) => {
+                        const isErr = step.status === 'error';
+                        const isWarn = step.status === 'warn';
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-1.5 rounded-lg border ${
+                              isErr
+                                ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                                : isWarn
+                                ? 'bg-amber-950/30 border-amber-500/30 text-amber-200'
+                                : 'bg-slate-900/80 border-slate-800/80 text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="flex items-center gap-1.5 truncate">
+                                <span className="px-1.5 py-0.2 rounded bg-sky-950 border border-sky-500/40 text-sky-300 font-bold text-[9.5px]">
+                                  {step.stepNumber}/{step.totalSteps}
+                                </span>
+                                <span className="font-sans font-medium text-slate-200 truncate">
+                                  {step.title}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 text-[9.5px] text-slate-400 shrink-0">
+                                <span className="text-emerald-400 font-bold">+{step.elapsedMs}ms</span>
+                                {(step.relativeDeltaMs ?? 0) > 0 && (
+                                  <span className="text-slate-500">(Δ{step.relativeDeltaMs}ms)</span>
+                                )}
+                              </div>
+                            </div>
+                            {step.details && (
+                              <div className="mt-1 pt-1 border-t border-slate-800/60 text-[9.5px] text-slate-400 whitespace-pre-wrap break-all bg-black/30 p-1 rounded">
+                                {typeof step.details === 'string'
+                                  ? step.details
+                                  : JSON.stringify(step.details, null, 2)}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 

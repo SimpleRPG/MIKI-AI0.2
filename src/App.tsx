@@ -359,12 +359,15 @@ export default function App() {
     setIsLoading(true);
 
     const sendStartTime = performance.now();
+    systemLogger.startSession();
 
-    // Step 1: Request received
-    systemLogger.step(1, 8, 'チャット送信リクエスト受付', {
+    // Step 1: Request received and user input analyzed
+    systemLogger.step(1, 10, 'チャット送信リクエスト受付 & 入力解析', {
       inputLength: text.length,
       snippet: text.slice(0, 100),
+      tokenEstimate: Math.ceil(text.length / 2.5),
       attachedCount: attached?.length || 0,
+      attachedFiles: attached?.map((a) => ({ name: a.name, size: a.content.length, type: a.type })),
       selectedEngineMode: engineMode,
       speakerMode,
     });
@@ -404,6 +407,7 @@ export default function App() {
                     ? '⏹ 生成を中断しました。'
                     : msg.content,
                 isStreaming: false,
+                executionSteps: systemLogger.getCurrentSessionSteps(),
               }
             : msg
         )
@@ -419,11 +423,19 @@ export default function App() {
       const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
       const activeMemories = memories.filter((m) => m.active);
 
+      // Step 2: Memory Retrieval & Context Association
+      systemLogger.step(2, 10, '会話記憶 (Memory) 照合 & 親密度コンテキスト検索', {
+        activeMemoriesCount: activeMemories.length,
+        intimacyLevel: persona.intimacyLevel,
+        intimacyExp: persona.intimacyExp,
+        speaker: activeSpeaker.name,
+      });
+
       // ==========================================
       // PATH 1: Instant Autonomous CPU Rule Engine
       // ==========================================
       if (engineMode === 'autonomous_rule') {
-        systemLogger.step(2, 8, 'CPU自律ルールベースエンジンで即時応答生成');
+        systemLogger.step(3, 10, 'CPU自律ルールベースエンジンで即時応答生成');
         const isCode =
           text.includes('作って') ||
           text.includes('ゲーム') ||
@@ -437,9 +449,10 @@ export default function App() {
           attached
         );
 
-        systemLogger.step(8, 8, 'CPU自律ルールベース応答完了', {
+        systemLogger.step(10, 10, 'CPU自律ルールベース応答完了', {
           responseLength: reply.length,
           snippet: reply.slice(0, 100),
+          totalElapsedMs: Math.round(performance.now() - sendStartTime),
         });
 
         const cpuMsg: ChatMessage = {
@@ -450,11 +463,13 @@ export default function App() {
           speaker: activeSpeaker,
           engineMode: 'autonomous_rule',
           isStreaming: false,
+          executionSteps: systemLogger.getCurrentSessionSteps(),
           metrics: {
             engine: `CPUルールベース (${activeSpeaker.name})`,
             tokens: Math.round(reply.length / 3),
             tokensPerSec: 100,
             ttftMs: 1,
+            totalDurationMs: Math.round(performance.now() - sendStartTime),
           },
         };
 
@@ -473,14 +488,15 @@ export default function App() {
       // ==========================================
       // PATH 2: WebGPU or Gemini Cloud Engine
       // ==========================================
-      // Step 2: Prompt classification & Hardware check
-      systemLogger.step(2, 8, 'プロンプト意図分類 & ハードウェア検証開始');
+      // Step 3: Prompt classification (MoE intent detection)
+      systemLogger.step(3, 10, 'MoE プロンプト意図分類 & パラメータ決定');
       const promptAnalysis = classifyPromptForMoE(text);
       systemLogger.info('INFERENCE', `プロンプト意図判定: [${promptAnalysis.role}] (Temp: ${promptAnalysis.temperature})`);
 
       const activeGameCode = workspaceFiles.find((f) => f.path === 'index.html')?.content || '';
 
-      // Non-blocking WebGPU checks with 2s timeout
+      // Step 4: Hardware & Storage Diagnosis
+      systemLogger.step(4, 10, '端末ハードウェア & WebGPU VRAM リアルタイム診断');
       const cachedModelsList = await Promise.race([
         webLLMService.listAllCachedModels().catch(() => []),
         new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 2000)),
@@ -492,12 +508,9 @@ export default function App() {
       ]);
       const isGpuUsable = gpuCheck.supported;
 
-      systemLogger.step(3, 8, 'WebGPU環境 & 端末リソース診断', {
-        webgpuSupported: isGpuUsable,
-        cachedModels: cachedModelsList,
-      });
+      systemLogger.debug('WEBGPU', `WebGPU診断完了: 可用性=${isGpuUsable}, キャッシュ済みモデル数=${cachedModelsList.length}`);
 
-      // Step 4: Model Selection & Cache verification
+      // Step 5: Model Selection & Cache verification
       const targetModelId = (webLLMService.isLoaded() && webLLMService.getActiveModelId())
         ? webLLMService.getActiveModelId()!
         : await Promise.race([
@@ -505,7 +518,7 @@ export default function App() {
             new Promise<string>((resolve) => setTimeout(() => resolve('SmolLM2-360M-Instruct-q4f16_1-MLC'), 2000)),
           ]);
 
-      systemLogger.step(4, 8, `推論対象モデル選定: ${targetModelId}`, {
+      systemLogger.step(5, 10, `推論対象モデル選定 & バインド確認: ${targetModelId}`, {
         isEngineLoaded: webLLMService.isLoaded(),
         activeModelId: webLLMService.getActiveModelId(),
         targetModelId,
@@ -527,6 +540,7 @@ export default function App() {
         speaker: activeSpeaker,
         engineMode: engineMode,
         isStreaming: true,
+        executionSteps: systemLogger.getCurrentSessionSteps(),
         metrics: {
           engine:
             engineMode === 'gemini_cloud'
@@ -536,14 +550,14 @@ export default function App() {
       };
       setMessages((prev) => [...prev, placeholderMsg]);
 
-      // Step 5: WebGPU Model Preparation ONLY if user selected WebGPU engine
+      // Step 6: WebGPU Model Load / VRAM Binding
       let isModelReady = webLLMService.isModelLoaded(targetModelId);
       const isTargetCached = await Promise.race([
         webLLMService.isModelCached(targetModelId).catch(() => false),
         new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
       ]);
 
-      systemLogger.step(5, 8, 'モデル重み & VRAMバインド状態確認', {
+      systemLogger.step(6, 10, 'モデル重み & VRAM展開 (必要な場合)', {
         targetModelId,
         isModelReady,
         isTargetCached,
@@ -563,6 +577,7 @@ export default function App() {
                       content: isTargetCached
                         ? `🔄 モデル初期化中: ${report.text} (${report.progress}%)`
                         : `📥 モデルダウンロード＆初期化中: ${report.text} (${report.progress}%)`,
+                      executionSteps: systemLogger.getCurrentSessionSteps(),
                     }
                   : msg
               )
@@ -587,12 +602,12 @@ export default function App() {
       }
 
       if (abortController.signal.aborted) {
-        handleAbortExit('工程 5 完了直後');
+        handleAbortExit('工程 6 完了直後');
         return;
       }
 
-      // Step 6: Context & System Prompt Compilation
-      systemLogger.step(6, 8, 'プロンプト & コンテキスト組み立て', {
+      // Step 7: System Prompt & Context Tokenization
+      systemLogger.step(7, 10, 'システムプロンプト合成 & コンテキストトークナイズ', {
         targetModelId,
         isModelReady,
         isGpuUsable,
@@ -650,9 +665,9 @@ export default function App() {
       let diagnosticData: ChatMessage['fallbackDiagnostic'] = undefined;
       let executedEngineLabel = 'CPUルールベース';
 
-      // Step 7: WebGPU 推論実行 / トークン生成
+      // Step 8: WebGPU Transformer Pipeline Execution
       if (engineMode === 'webgpu') {
-        systemLogger.step(7, 8, 'WebGPU Transformer推論実行', {
+        systemLogger.step(8, 10, 'WebGPU Transformer推論パイプライン実行 (Prefill & Decode)', {
           isModelReady,
           isGpuUsable,
           targetModelId,
@@ -675,7 +690,8 @@ export default function App() {
                 }
                 if (firstTokenTime === null) {
                   firstTokenTime = performance.now();
-                  systemLogger.info('INFERENCE', `WebGPU 初回トークン到達 (TTFT: ${Math.round(firstTokenTime - tStart)}ms)`);
+                  const ttft = Math.round(firstTokenTime - tStart);
+                  systemLogger.info('INFERENCE', `WebGPU 初回トークン到達 (TTFT: ${ttft}ms)`);
                 }
                 accumulated += chunk;
                 tokenCount++;
@@ -687,6 +703,7 @@ export default function App() {
                           ...msg,
                           content: accumulated,
                           isStreaming: true,
+                          executionSteps: systemLogger.getCurrentSessionSteps(),
                         }
                       : msg
                   )
@@ -720,14 +737,15 @@ export default function App() {
       }
 
       if (abortController.signal.aborted) {
-        handleAbortExit('工程 7 完了直後');
+        handleAbortExit('工程 8 完了直後');
         return;
       }
 
-      // Step 8: フォールバックまたは代替エンジンの判定
-      systemLogger.step(8, 8, '応答確定 & フォールバック処理判定', {
+      // Step 9: 例外検証 & 自己修復 / フォールバック調停
+      systemLogger.step(9, 10, '例外検証 & 自己修復 / フォールバック調停', {
         webGpuSuccess,
         executedEngineLabel,
+        hasError: !webGpuSuccess,
       });
 
       // Fallback or Explicit Alternative Engines (CPU Rule-based or Gemini Cloud)
@@ -819,9 +837,19 @@ export default function App() {
         }
       }
 
+      // Step 10: 応答確定・UIレンダリング & ワークスペース同期
       const tEnd = performance.now();
+      const totalElapsedMs = Math.round(tEnd - sendStartTime);
       const durationSec = (tEnd - (firstTokenTime || tStart)) / 1000;
       const tokPerSec = Number((tokenCount / Math.max(0.05, durationSec)).toFixed(1));
+
+      systemLogger.step(10, 10, '応答確定・UIレンダリング & ワークスペース同期', {
+        executedEngineLabel,
+        tokenCount,
+        tokPerSec,
+        totalElapsedMs,
+        ttftMs: Math.round((firstTokenTime || tEnd) - tStart),
+      });
 
       setMessages((prev) =>
         prev.map((msg) =>
@@ -832,18 +860,20 @@ export default function App() {
                 speaker: activeSpeaker,
                 isStreaming: false,
                 fallbackDiagnostic: diagnosticData,
+                executionSteps: systemLogger.getCurrentSessionSteps(),
                 metrics: {
                   engine: executedEngineLabel,
                   tokens: tokenCount,
                   tokensPerSec: tokPerSec,
                   ttftMs: Math.round((firstTokenTime || tEnd) - tStart),
+                  totalDurationMs: totalElapsedMs,
                 },
               }
             : msg
         )
       );
 
-      systemLogger.info('CHAT', `チャット処理全工程完了: [${executedEngineLabel}] (文字数: ${accumulated.length}, 所要時間: ${Math.round(tEnd - tStart)}ms)`);
+      systemLogger.info('CHAT', `チャット処理全工程完了: [${executedEngineLabel}] (文字数: ${accumulated.length}, 総所要時間: ${totalElapsedMs}ms, TTFT: ${Math.round((firstTokenTime || tEnd) - tStart)}ms)`);
 
       // Auto apply code
       const codeBlocks = extractCodeBlocks(accumulated);

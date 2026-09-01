@@ -45,6 +45,18 @@ export interface GroundingChunk {
   };
 }
 
+export interface ExecutionStep {
+  stepNumber: number;
+  totalSteps: number;
+  title: string;
+  category: string;
+  elapsedMs: number;
+  relativeMs?: number;
+  relativeDeltaMs?: number;
+  status: 'pending' | 'active' | 'success' | 'warn' | 'error';
+  details?: any;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -71,7 +83,9 @@ export interface ChatMessage {
     tokens?: number;
     tokensPerSec?: number;
     ttftMs?: number;
+    totalDurationMs?: number;
   };
+  executionSteps?: ExecutionStep[];
   isStreaming?: boolean;
   isError?: boolean;
   fallbackDiagnostic?: {
