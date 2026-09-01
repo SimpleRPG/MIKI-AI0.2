@@ -9,6 +9,7 @@ import {
   prebuiltAppConfig,
 } from '@mlc-ai/web-llm';
 import { systemLogger } from './systemLogger';
+import { nativeLlmService } from './nativeLlmService';
 
 export interface VRAMSnapshot {
   timestamp: number;
@@ -861,6 +862,27 @@ class WebLLMService {
       this.progressListeners.add(onProgress);
     }
 
+    if (nativeLlmService.isNative()) {
+      systemLogger.info('NATIVE_GPU', `📱 Android Native GPU (OpenCL/Vulkan) で直接モデルロードを実行します: ${targetModelId}`);
+      this.isInitializing = true;
+      this.loadingModelId = targetModelId;
+      try {
+        await nativeLlmService.loadNativeModel(targetModelId, onProgress);
+        this.activeModelId = targetModelId;
+        this.setPreferredModelId(targetModelId);
+        if (onProgress) {
+          onProgress({ progress: 100, text: 'Native GPU (OpenCL/Vulkan) ロード完了 (高速推論可能)' });
+        }
+        return;
+      } finally {
+        this.isInitializing = false;
+        this.loadingModelId = null;
+        if (onProgress) {
+          this.progressListeners.delete(onProgress);
+        }
+      }
+    }
+
     // If already loaded in VRAM with active engine
     if (this.engine && this.activeModelId === targetModelId) {
       systemLogger.info('WEBGPU', `モデル ${targetModelId} は既にVRAM上にロード済みです (即時利用可能)`);
@@ -1370,6 +1392,18 @@ class WebLLMService {
     try {
       await currentInferenceLock;
     } catch {}
+
+    if (nativeLlmService.isNative()) {
+      systemLogger.info('NATIVE_GPU', `⚡ 端末ネイティブGPU (OpenCL/Vulkan) ストリーミング推論開始`);
+      if (!this.activeModelId) {
+        const targetModel = options?.fallbackModelId || this.getPreferredModelId() || 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC';
+        await this.loadModel(targetModel);
+      }
+      for await (const chunk of nativeLlmService.streamNativeChat(sanitizedMessages, options)) {
+        yield chunk;
+      }
+      return;
+    }
 
     try {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {

@@ -3,7 +3,7 @@ export interface SystemLogEntry {
   timestamp: string;
   epoch: number;
   level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
-  category: 'WEBGPU' | 'INFERENCE' | 'NETWORK' | 'CACHE' | 'PERSISTENCE' | 'SERVER' | 'CHAT' | 'STEP';
+  category: 'WEBGPU' | 'NATIVE_GPU' | 'INFERENCE' | 'NETWORK' | 'CACHE' | 'PERSISTENCE' | 'SERVER' | 'CHAT' | 'STEP';
   message: string;
   details?: any;
   elapsedMs?: number;
@@ -56,7 +56,7 @@ class SystemLogger {
 
   public log(
     level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR',
-    category: 'WEBGPU' | 'INFERENCE' | 'NETWORK' | 'CACHE' | 'PERSISTENCE' | 'SERVER' | 'CHAT' | 'STEP',
+    category: SystemLogEntry['category'],
     message: string,
     details?: any
   ) {
