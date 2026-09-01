@@ -13,30 +13,31 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install Web Dependencies
-        run: npm install
-
-      - name: Build Web Application
-        run: npm run build
-
       - name: Setup Java JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: 17
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Capacitor & Generate Android Project
+      - name: Install Dependencies
         run: |
-          npm install -D @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "MIKI-AI Studio" "com.mikiai.app" --web-dir "dist"
+          npm install
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Configure Capacitor & Generate Android Platform
+        run: |
+          rm -rf android capacitor.config.ts capacitor.config.js
           cat << 'EOF' > capacitor.config.json
           {
             "appId": "com.mikiai.app",
@@ -53,17 +54,20 @@ jobs:
           EOF
           npx cap add android
           npx cap sync android
-          
-          # AndroidManifestに largeHeap="true" (メモリ制限解除・最大RAM解放) を自動注入
-          sed -i 's/<application/<application android:largeHeap="true" android:hardwareAccelerated="true"/' android/app/src/main/AndroidManifest.xml
-          echo "Injected largeHeap and hardwareAccelerated into AndroidManifest.xml"
 
-      - name: Build Debug APK
+          # メモリ制限解除（8GB RAM解放）& GPUハードウェアアクセラレーション付与
+          sed -i 's/<application/<application android:largeHeap="true" android:hardwareAccelerated="true"/' android/app/src/main/AndroidManifest.xml
+
+          # gradlew 実行権限の付与
+          chmod +x android/gradlew
+
+      - name: Build Android APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: miki-ai-debug-apk
+          name: miki-ai-app-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
