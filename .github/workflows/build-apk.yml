@@ -281,6 +281,7 @@ jobs:
           android {
               namespace "com.mikiai.app"
               compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 34
+              ndkVersion "26.1.10909125"
 
               defaultConfig {
                   applicationId "com.mikiai.app"
