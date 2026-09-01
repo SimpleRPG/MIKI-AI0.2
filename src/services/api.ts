@@ -51,13 +51,13 @@ export interface GitHubPushResult {
   branchUrl: string;
 }
 
-export async function checkServerHealth(): Promise<{ status: string; hasGeminiKey: boolean }> {
+export async function checkServerHealth(): Promise<{ status: string }> {
   try {
     const res = await fetch('/api/health');
     if (!res.ok) throw new Error('Health check failed');
     return await res.json();
   } catch {
-    return { status: 'offline', hasGeminiKey: false };
+    return { status: 'offline' };
   }
 }
 
@@ -66,6 +66,29 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     throw new DOMException('Aborted', 'AbortError');
   }
 
+  // 1. If CPU rule-based mode is chosen, execute INSTANTLY on client without any server/network delay!
+  if (params.engineMode === 'autonomous_rule') {
+    const isCode =
+      params.prompt.includes('作って') ||
+      params.prompt.includes('ゲーム') ||
+      params.prompt.includes('開発') ||
+      params.prompt.includes('コード');
+    const reply = generateSmartCompanionReply(
+      params.prompt,
+      params.persona,
+      params.memories,
+      isCode,
+      params.attachedFiles
+    );
+    systemLogger.info('CHAT', 'Instant client-side CPU rule-based response generated', { isCode });
+    return {
+      text: reply,
+      engineMode: 'autonomous_rule',
+      model: 'CPUルールベース自律エンジン',
+    };
+  }
+
+  // 2. Otherwise (Gemini Cloud or server fallback), fetch from /api/chat with timeout protection
   systemLogger.info('CHAT', `Sending chat request (prompt length: ${params.prompt.length})`, {
     engineMode: params.engineMode,
     speakerMode: params.speakerMode,
@@ -74,12 +97,25 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
   });
 
   try {
+    // 10 second timeout protection so UI never hangs
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), 10000);
+
+    const onUserAbort = () => {
+      clearTimeout(timeoutId);
+      timeoutController.abort();
+    };
+    params.signal?.addEventListener('abort', onUserAbort);
+
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
-      signal: params.signal
+      signal: timeoutController.signal,
     });
+
+    clearTimeout(timeoutId);
+    params.signal?.removeEventListener('abort', onUserAbort);
 
     if (res.ok) {
       const data = await res.json();
@@ -89,7 +125,7 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
       systemLogger.warn('CHAT', `Server chat API returned status ${res.status}`);
     }
   } catch (err: any) {
-    if (err?.name === 'AbortError' || params.signal?.aborted) {
+    if (params.signal?.aborted) {
       systemLogger.info('CHAT', 'Chat request aborted by user');
       throw err;
     }
@@ -110,7 +146,7 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
 
   return {
     text: reply,
-    engineMode: 'gemini',
+    engineMode: params.engineMode || 'autonomous_rule',
     model: 'Smart Companion Engine'
   };
 }

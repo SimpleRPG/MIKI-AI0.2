@@ -105,9 +105,14 @@ export default function App() {
   });
 
   const [engineMode, setEngineMode] = useState<EngineMode>(() => {
-    const saved = localStorage.getItem('gamecraft_engine_mode');
-    return (saved as EngineMode) || 'webgpu';
+    const saved = localStorage.getItem('miki_active_engine_mode') as EngineMode;
+    return saved === 'webgpu' || saved === 'autonomous_rule' || saved === 'gemini_cloud' ? saved : 'webgpu';
   });
+
+  const handleSelectEngine = (mode: EngineMode) => {
+    setEngineMode(mode);
+    localStorage.setItem('miki_active_engine_mode', mode);
+  };
 
   const [speakerMode, setSpeakerMode] = useState<string>('miki');
 
@@ -361,6 +366,7 @@ export default function App() {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
+      const promptAnalysis = classifyPromptForMoE(text);
       const activeMemories = memories.filter((m) => m.active);
       const activeGameCode = workspaceFiles.find((f) => f.path === 'index.html')?.content || '';
       const cachedModelsList = await webLLMService.listAllCachedModels().catch(() => []);
@@ -369,153 +375,182 @@ export default function App() {
       const gpuCheck = await webLLMService.isWebGPUSupported().catch(() => ({ supported: false }));
       const isGpuUsable = gpuCheck.supported;
 
-      // Decide if we should execute directly via WebGPU
-      const shouldRunWebGPU = engineMode === 'webgpu' && isGpuUsable;
+      // Execute on-device WebGPU engine
+      const targetModelId = (webLLMService.isLoaded() && webLLMService.getActiveModelId())
+        ? webLLMService.getActiveModelId()!
+        : await webLLMService.findBestAvailableModel(promptAnalysis.role);
 
-      // Prompt Classification & Prompt Specialization
-      const promptAnalysis = classifyPromptForMoE(text);
+      const assistantId = 'msg_asst_' + Date.now();
+      currentAssistantIdRef.current = assistantId;
 
-      // If local WebGPU execution is requested and GPU is usable
-      if (shouldRunWebGPU && isGpuUsable) {
-        // Priority 1: If an engine is already loaded in VRAM, use it directly to prevent reload latency/failures!
-        const targetModelId = (webLLMService.isLoaded() && webLLMService.getActiveModelId())
-          ? webLLMService.getActiveModelId()!
-          : await webLLMService.findBestAvailableModel(promptAnalysis.role);
+      // Clean placeholder message based on selected engineMode
+      const placeholderText =
+        engineMode === 'autonomous_rule'
+          ? `⚙️ CPUルールベースで思考中 (${activeSpeaker.name})...`
+          : engineMode === 'gemini_cloud'
+          ? `☁️ Gemini Cloud で生成中...`
+          : webLLMService.isLoaded()
+          ? `⚡ オンデバイス (${targetModelId.split('-')[0]}) で推論中...`
+          : `🔄 端末内モデル (${targetModelId.split('-')[0]}) を準備中... (トークン消費: 0)`;
 
-        const assistantId = 'msg_asst_' + Date.now();
-        currentAssistantIdRef.current = assistantId;
-        const placeholderMsg: ChatMessage = {
-          id: assistantId,
-          role: 'assistant',
-          content: webLLMService.isLoaded()
-            ? `⚡ オンデバイス (${targetModelId.split('-')[0]}) で推論中...`
-            : `🔄 端末内モデル (${targetModelId.split('-')[0]}) を準備中... (トークン消費: 0)`,
-          timestamp: Date.now(),
-          speaker: activeSpeaker,
-          engineMode: 'webgpu',
-          isStreaming: true,
-          metrics: {
-            engine: `On-Device (${targetModelId.split('-')[0]})`,
-          },
-        };
-        setMessages((prev) => [...prev, placeholderMsg]);
-        setIsLoading(false); // Hide the bottom loading indicator since placeholderMsg is active
+      const placeholderMsg: ChatMessage = {
+        id: assistantId,
+        role: 'assistant',
+        content: placeholderText,
+        timestamp: Date.now(),
+        speaker: activeSpeaker,
+        engineMode: engineMode,
+        isStreaming: true,
+        metrics: {
+          engine:
+            engineMode === 'autonomous_rule'
+              ? `CPUルールベース (${activeSpeaker.name})`
+              : engineMode === 'gemini_cloud'
+              ? 'Gemini Cloud'
+              : `On-Device (${targetModelId.split('-')[0]})`,
+        },
+      };
+      setMessages((prev) => [...prev, placeholderMsg]);
+      setIsLoading(false);
 
-        // Check if model is cached before attempting VRAM load
-        const isTargetCached = await webLLMService.isModelCached(targetModelId).catch(() => false);
-        let isModelReady = webLLMService.isModelLoaded(targetModelId);
+      // WebGPU Model Preparation ONLY if user selected WebGPU engine
+      let isModelReady = webLLMService.isModelLoaded(targetModelId);
+      const isTargetCached = await webLLMService.isModelCached(targetModelId).catch(() => false);
 
-        // Always proceed to load/download if not yet ready
-        if (!isModelReady) {
+      if (engineMode === 'webgpu' && isGpuUsable && !isModelReady) {
+        try {
+          const loadPromise = webLLMService.loadModel(targetModelId, (report) => {
+            if (abortController.signal.aborted) return;
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantId
+                  ? {
+                      ...msg,
+                      content: isTargetCached
+                        ? `🔄 モデル初期化中: ${report.text} (${report.progress}%)`
+                        : `📥 モデルダウンロード＆初期化中: ${report.text} (${report.progress}%)`,
+                    }
+                  : msg
+              )
+            );
+          });
+
+          // Timeout protection: if model is not yet downloaded, don't freeze the chat forever
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error('WebGPUロード待機タイムアウト (CPUルールベースで即答します)')),
+              isTargetCached ? 30000 : 12000
+            )
+          );
+
+          await Promise.race([loadPromise, timeoutPromise]);
+          isModelReady = webLLMService.isModelLoaded(targetModelId);
+        } catch (loadErr: any) {
+          console.warn('WebGPU Model load deferred/timed out:', loadErr);
+          isModelReady = false;
+        }
+      }
+
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      const tStart = performance.now();
+      const isCodeModRequest =
+        (promptAnalysis.role === 'code' || promptAnalysis.role === 'shader' || promptAnalysis.role === 'logic') &&
+        (text.includes('修正') || text.includes('変更') || text.includes('直して') || text.includes('追加'));
+
+      const systemPrompt = buildExpertSystemPrompt(
+        promptAnalysis.role,
+        persona,
+        activeMemories,
+        workspaceFiles,
+        { includeFiles: isCodeModRequest }
+      );
+
+      // Build clean, strictly-alternating conversation context for WebLLM (MLC)
+      const chatContext: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+        { role: 'system', content: systemPrompt },
+      ];
+
+      let userPromptContent = text;
+      if (attached && attached.length > 0) {
+        const attachedDesc = attached
+          .map((a) => `[添付: ${a.name} (${a.type})]\n${(a.content || '').slice(0, 600)}`)
+          .join('\n\n');
+        userPromptContent = `${attachedDesc}\n\n${text}`;
+      }
+
+      // Add recent history with strict user/assistant alternation
+      const historyCandidates = messages
+        .filter((m) => m.id !== 'welcome_msg' && m.id !== userMsg.id && m.content && m.content.trim())
+        .slice(-4);
+
+      let lastRole: 'system' | 'user' | 'assistant' = 'system';
+      for (const m of historyCandidates) {
+        const r: 'user' | 'assistant' = m.role === 'assistant' ? 'assistant' : 'user';
+        if (r !== lastRole) {
+          chatContext.push({ role: r, content: m.content.slice(0, 250) });
+          lastRole = r;
+        }
+      }
+
+      if (lastRole === 'user') {
+        chatContext.pop();
+      }
+      chatContext.push({ role: 'user', content: userPromptContent });
+
+      let accumulated = '';
+      let tokenCount = 0;
+      let firstTokenTime: number | null = null;
+      let webGpuSuccess = false;
+      let webGpuErrorDetails: string | null = null;
+      let diagnosticData: ChatMessage['fallbackDiagnostic'] = undefined;
+      let executedEngineLabel = 'CPUルールベース';
+
+      // 1. WebGPU Mode (Only run GPU Transformer if user chose webgpu)
+      if (engineMode === 'webgpu') {
+        if (isModelReady && isGpuUsable) {
           try {
-            await webLLMService.loadModel(targetModelId, (report) => {
-              if (abortController.signal.aborted) return;
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantId
-                    ? {
-                        ...msg,
-                        content: isTargetCached
-                          ? `🔄 モデル初期化中: ${report.text} (${report.progress}%)`
-                          : `📥 モデルダウンロード＆初期化中: ${report.text} (${report.progress}%)`,
-                      }
-                    : msg
-                )
-              );
-            });
-            isModelReady = webLLMService.isModelLoaded(targetModelId);
-          } catch (loadErr: any) {
-            console.warn('WebGPU Model download/load failed:', loadErr);
-            isModelReady = false;
-          }
-        }
+            // Overall stream timeout of 10s for mobile GPU safety
+            const streamPromise = (async () => {
+              for await (const chunk of webLLMService.streamChat(chatContext, {
+                temperature: promptAnalysis.temperature,
+                max_tokens: 384,
+                fallbackModelId: targetModelId,
+              })) {
+                if (abortController.signal.aborted) {
+                  break;
+                }
+                if (firstTokenTime === null) {
+                  firstTokenTime = performance.now();
+                }
+                accumulated += chunk;
+                tokenCount++;
 
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        const tStart = performance.now();
-        const isCodeModRequest =
-          (promptAnalysis.role === 'code' || promptAnalysis.role === 'shader' || promptAnalysis.role === 'logic') &&
-          (text.includes('修正') || text.includes('変更') || text.includes('直して') || text.includes('追加'));
-
-        const systemPrompt = buildExpertSystemPrompt(
-          promptAnalysis.role,
-          persona,
-          activeMemories,
-          workspaceFiles,
-          { includeFiles: isCodeModRequest }
-        );
-
-        // Build clean, strictly-alternating conversation context for WebLLM (MLC)
-        const chatContext: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
-          { role: 'system', content: systemPrompt },
-        ];
-
-        let userPromptContent = text;
-        if (attached && attached.length > 0) {
-          const attachedDesc = attached
-            .map((a) => `[添付: ${a.name} (${a.type})]\n${(a.content || '').slice(0, 600)}`)
-            .join('\n\n');
-          userPromptContent = `${attachedDesc}\n\n${text}`;
-        }
-
-        // Add recent history with strict user/assistant alternation to prevent MLC template parse errors
-        const historyCandidates = messages
-          .filter((m) => m.id !== 'welcome_msg' && m.id !== userMsg.id && m.content && m.content.trim())
-          .slice(-4);
-
-        let lastRole: 'system' | 'user' | 'assistant' = 'system';
-        for (const m of historyCandidates) {
-          const r: 'user' | 'assistant' = m.role === 'assistant' ? 'assistant' : 'user';
-          if (r !== lastRole) {
-            chatContext.push({ role: r, content: m.content.slice(0, 250) });
-            lastRole = r;
-          }
-        }
-
-        if (lastRole === 'user') {
-          chatContext.pop();
-        }
-        chatContext.push({ role: 'user', content: userPromptContent });
-
-        let accumulated = '';
-        let tokenCount = 0;
-        let firstTokenTime: number | null = null;
-        let webGpuSuccess = false;
-        let webGpuErrorDetails: string | null = null;
-        let diagnosticData: ChatMessage['fallbackDiagnostic'] = undefined;
-
-        if (isModelReady) {
-          try {
-            // Direct high-quality on-device inference with Miki persona & persistent memories
-            for await (const chunk of webLLMService.streamChat(chatContext, {
-              temperature: promptAnalysis.temperature,
-              max_tokens: 384,
-              fallbackModelId: targetModelId,
-            })) {
-              if (abortController.signal.aborted) {
-                break;
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantId
+                      ? {
+                          ...msg,
+                          content: accumulated,
+                          isStreaming: true,
+                        }
+                      : msg
+                  )
+                );
               }
-              if (firstTokenTime === null) {
-                firstTokenTime = performance.now();
-              }
-              accumulated += chunk;
-              tokenCount++;
+            })();
 
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantId
-                    ? {
-                        ...msg,
-                        content: accumulated,
-                        isStreaming: true,
-                      }
-                    : msg
-                )
-              );
-            }
+            const streamTimeout = new Promise<void>((_, reject) =>
+              setTimeout(() => reject(new Error('WebGPU推論待機タイムアウト (7秒無応答)')), 7000)
+            );
+
+            await Promise.race([streamPromise, streamTimeout]);
             webGpuSuccess = accumulated.trim().length > 0;
+            if (webGpuSuccess) {
+              executedEngineLabel = `On-Device WebGPU (${targetModelId.split('-')[0]})`;
+            }
           } catch (gpuErr: any) {
             webGpuErrorDetails = gpuErr?.message || String(gpuErr);
             console.warn('WebGPU execution error handled:', gpuErr);
@@ -526,35 +561,37 @@ export default function App() {
             ? 'モデルのVRAMロード待機中'
             : 'モデル未ダウンロード (端末ローカルLLM設定でダウンロード可能)';
         }
+      }
 
-        if (abortController.signal.aborted) {
-          return;
-        }
+      if (abortController.signal.aborted) {
+        return;
+      }
 
-        // If WebGPU encountered an error or model not cached, smoothly fallback to high-speed engine
-        if (!webGpuSuccess || accumulated.trim().length === 0) {
-          try {
-            const fallbackRes = await sendChatMessage({
-              prompt: text,
-              history: messages,
-              useSearch: false,
-              engineMode: 'gemini',
-              speakerMode,
-              cachedModels: cachedModelsList,
-              workspaceFiles,
-              attachedFiles: attached,
-              persona,
-              memories: activeMemories,
-              signal: abortController.signal,
-            });
+      // 2. Fallback or Explicit Alternative Engines (CPU Rule-based or Gemini Cloud)
+      if (!webGpuSuccess || accumulated.trim().length === 0) {
+        try {
+          const apiRes = await sendChatMessage({
+            prompt: text,
+            history: messages,
+            useSearch: engineMode === 'gemini_cloud' ? useSearch : false,
+            engineMode: engineMode,
+            speakerMode,
+            cachedModels: cachedModelsList,
+            workspaceFiles,
+            attachedFiles: attached,
+            persona,
+            memories: activeMemories,
+            signal: abortController.signal,
+          });
 
-            if (abortController.signal.aborted) {
-              return;
-            }
+          if (abortController.signal.aborted) {
+            return;
+          }
 
-            let diagnosticCategory = '自律エンジン自動切替';
-            let diagnosticCause = '端末モデル未ロードまたはWebGPU初期化中のため、自律推論で即座に返信しました。';
-            let diagnosticTip = '完全オフライン推論を行う場合は「端末ローカルLLM設定」からモデルをロードしてください。';
+          if (engineMode === 'webgpu') {
+            let diagnosticCategory = 'CPUルールベース切替';
+            let diagnosticCause = 'WebGPUモデル未ロードのため、CPUルールベースで即座に返信しました。';
+            let diagnosticTip = '完全GPU推論を行う場合は「端末ローカルLLM設定」からモデルをロードしてください。';
 
             if (webGpuErrorDetails) {
               if (webGpuErrorDetails.includes('Quota') || webGpuErrorDetails.includes('quota') || webGpuErrorDetails.includes('容量')) {
@@ -596,96 +633,53 @@ export default function App() {
               tip: diagnosticTip,
               modelId: targetModelId,
             };
-
-            accumulated = fallbackRes.text || '返答の生成が完了しました！';
-            tokenCount = Math.round(accumulated.length / 3);
-            firstTokenTime = performance.now();
-          } catch (apiErr: any) {
-            if (apiErr?.name === 'AbortError' || abortController.signal.aborted) {
-              return;
-            }
-            console.warn('Fallback chat API notice:', apiErr);
-            accumulated = `⚠️ 応答生成中にエラーが発生しました:\n・API詳細: ${apiErr.message || '接続エラー'}`;
+            executedEngineLabel = `CPUルールベース (${activeSpeaker.name})`;
+          } else if (engineMode === 'gemini_cloud') {
+            executedEngineLabel = 'Gemini 2.5 Flash (Cloud)';
+          } else {
+            executedEngineLabel = `CPUルールベース (${activeSpeaker.name})`;
           }
+
+          accumulated = apiRes.text || '返答の生成が完了しました！';
+          tokenCount = Math.round(accumulated.length / 3);
+          firstTokenTime = performance.now();
+        } catch (apiErr: any) {
+          if (apiErr?.name === 'AbortError' || abortController.signal.aborted) {
+            return;
+          }
+          console.warn('Fallback chat API notice:', apiErr);
+          accumulated = `⚠️ 応答生成中にエラーが発生しました:\n・詳細: ${apiErr.message || '接続エラー'}`;
         }
+      }
 
-        const tEnd = performance.now();
-        const durationSec = (tEnd - (firstTokenTime || tStart)) / 1000;
-        const tokPerSec = Number((tokenCount / Math.max(0.05, durationSec)).toFixed(1));
+      const tEnd = performance.now();
+      const durationSec = (tEnd - (firstTokenTime || tStart)) / 1000;
+      const tokPerSec = Number((tokenCount / Math.max(0.05, durationSec)).toFixed(1));
 
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantId
-              ? {
-                  ...msg,
-                  content: accumulated,
-                  speaker: activeSpeaker,
-                  isStreaming: false,
-                  fallbackDiagnostic: diagnosticData,
-                  metrics: {
-                    engine: webGpuSuccess
-                      ? `On-Device WebGPU (${targetModelId.split('-')[0]})`
-                      : `自律相棒エンジン (${activeSpeaker.name})`,
-                    tokens: tokenCount,
-                    tokensPerSec: tokPerSec,
-                    ttftMs: Math.round((firstTokenTime || tEnd) - tStart),
-                  },
-                }
-              : msg
-          )
-        );
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantId
+            ? {
+                ...msg,
+                content: accumulated,
+                speaker: activeSpeaker,
+                isStreaming: false,
+                fallbackDiagnostic: diagnosticData,
+                metrics: {
+                  engine: executedEngineLabel,
+                  tokens: tokenCount,
+                  tokensPerSec: tokPerSec,
+                  ttftMs: Math.round((firstTokenTime || tEnd) - tStart),
+                },
+              }
+            : msg
+        )
+      );
 
-        // Auto apply code
-        const codeBlocks = extractCodeBlocks(accumulated);
-        if (codeBlocks.length > 0) {
-          handleApplyCode(codeBlocks);
-        }
-      } else {
-        // Cloud / Unified Hybrid Backend
-        const tStartCloud = performance.now();
-        const response = await sendChatMessage({
-          prompt: text,
-          history: messages,
-          useSearch,
-          engineMode,
-          speakerMode,
-          cachedModels: cachedModelsList,
-          workspaceFiles,
-          attachedFiles: attached,
-          persona,
-          memories: activeMemories,
-          activeGameCode,
-          signal: abortController.signal,
-        });
-
-        if (abortController.signal.aborted) {
-          return;
-        }
-        const tEndCloud = performance.now();
-        const durationCloudMs = Math.round(tEndCloud - tStartCloud);
-
-        const assistantMsg: ChatMessage = {
-          id: 'msg_asst_' + Date.now(),
-          role: 'assistant',
-          content: response.text,
-          timestamp: Date.now(),
-          speaker: activeSpeaker,
-          engineMode: response.engineMode || engineMode,
-          groundingChunks: response.groundingChunks,
-          webSearchQueries: response.webSearchQueries,
-          metrics: {
-            engine: 'Gemini 3.7 Flash',
-            ttftMs: durationCloudMs,
-          },
-        };
-
-        setMessages((prev) => [...prev, assistantMsg]);
-
-        // Automatically check and apply code if present
-        const codeBlocks = extractCodeBlocks(response.text);
-        if (codeBlocks.length > 0) {
-          handleApplyCode(codeBlocks);
-        }
+      // Auto apply code
+      const codeBlocks = extractCodeBlocks(accumulated);
+      if (codeBlocks.length > 0) {
+        handleApplyCode(codeBlocks);
       }
     } catch (err: any) {
       if (err?.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
@@ -1134,9 +1128,7 @@ export default function App() {
         isOpen={isEngineModalOpen}
         onClose={() => setIsEngineModalOpen(false)}
         engineMode={engineMode}
-        onSelectEngine={(mode) => {
-          setEngineMode(mode);
-        }}
+        onSelectEngine={handleSelectEngine}
       />
 
       <MemoryModal

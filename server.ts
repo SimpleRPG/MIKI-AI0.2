@@ -27,35 +27,29 @@ function getAIClient(): GoogleGenAI | null {
   return aiClient;
 }
 
-// Multi-model resilient Gemini caller with active modern 2026 models
-const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.1-pro-preview'];
+// Multi-model resilient Gemini caller with active modern models from Google GenAI SDK
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro'];
 
 async function generateContentWithFallback(ai: GoogleGenAI, request: { contents: any; config?: any }) {
   let lastError: any = null;
   for (const model of GEMINI_MODELS) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: request.contents,
-          config: request.config
-        });
-        if (response && response.text) {
-          return { response, modelUsed: model };
-        }
-      } catch (err: any) {
-        const errMsg = String(err?.message || err);
-        console.warn(`[Gemini Server] Model ${model} (attempt ${attempt + 1}) notice:`, errMsg);
-        lastError = err;
-        // If 503 (high demand) or 429 (rate limit), wait briefly before retrying or switching models
-        if (errMsg.includes('503') || errMsg.includes('high demand') || errMsg.includes('429')) {
-          await new Promise((r) => setTimeout(r, 600));
-          continue;
-        } else {
-          // If model not found/deprecated, break to next model immediately
-          break;
-        }
+    try {
+      const callPromise = ai.models.generateContent({
+        model,
+        contents: request.contents,
+        config: request.config
+      });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Model ${model} timeout`)), 7000)
+      );
+      const response: any = await Promise.race([callPromise, timeoutPromise]);
+      if (response && response.text) {
+        return { response, modelUsed: model };
       }
+    } catch (err: any) {
+      const errMsg = String(err?.message || err);
+      console.warn(`[Gemini Server] Model ${model} notice:`, errMsg);
+      lastError = err;
     }
   }
   throw lastError || new Error('All Gemini models failed');

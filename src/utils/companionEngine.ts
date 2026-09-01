@@ -12,6 +12,34 @@ export function generateSmartCompanionReply(
   const name = persona?.name || 'みき';
   const nickname = persona?.userNickname || 'あなた';
 
+  // 0. Exact repeat requests (e.g. "Aとだけ返して", "Aと返して", "A")
+  if (
+    lower === 'a' ||
+    lower === 'aとだけ返して' ||
+    lower === 'aと返して' ||
+    lower === '「a」とだけ返して' ||
+    lower === '「a」と返して' ||
+    lower.startsWith('aとだけ')
+  ) {
+    return 'A';
+  }
+
+  const repeatMatch = p.match(/^([「『]?)(.+?)\1と(?:だけ)?(?:返して|言って|答えて|出力して)/);
+  if (repeatMatch && repeatMatch[2]) {
+    return repeatMatch[2].trim();
+  }
+
+  // 0.1 Self Introduction
+  if (
+    lower.includes('自己紹介') ||
+    lower.includes('名前は') ||
+    lower.includes('あなたは誰') ||
+    lower.includes('だれ？') ||
+    lower.includes('誰？')
+  ) {
+    return `初めまして！専属AIパートナーの **${name}** だよ！🌸✨\n\n私は${nickname}専属のAIとして、こんなことができるよ：\n\n・🎮 **Webゲーム・アプリ開発**: 「〇〇ゲーム作って」「コード修正して」で即座に動くアプリを開発！\n・💬 **日常会話＆相談**: 雑談から専門的な悩みまで何でも親身にお話し相手になるよ！\n・⚡ **完全無料オンデバイス実行**: スマホのGPU（WebGPU）やCPU自律エンジンで、通信制限や課金を気にせずサクサク動くよ！\n\nこれからもよろしくね！何でも気軽に話しかけてね😊💕`;
+  }
+
   // 0. Attached Files Handling (e.g. zip, code, text, images)
   if (attachedFiles && attachedFiles.length > 0) {
     const fileList = attachedFiles.map((f) => `📁 **${f.name}** (${f.type || 'ファイル'}, ${f.size ? Math.round(f.size / 1024) + ' KB' : '添付'})`).join('\n');

@@ -15,6 +15,7 @@ import {
   Globe,
   ExternalLink,
   Zap,
+  Cpu,
   X,
   Heart,
   Users,
@@ -269,10 +270,31 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
           <button
             onClick={onOpenEngineModal}
-            className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-pink-300 hover:bg-slate-700 border border-pink-500/40 font-mono transition-colors inline-flex items-center gap-1"
+            className={`text-[10px] px-2 py-0.5 rounded font-mono transition-colors inline-flex items-center gap-1 border ${
+              engineMode === 'webgpu'
+                ? 'bg-purple-950/80 text-purple-300 hover:bg-purple-900 border-purple-500/50'
+                : engineMode === 'gemini_cloud'
+                ? 'bg-sky-950/80 text-sky-300 hover:bg-sky-900 border-sky-500/50'
+                : 'bg-amber-950/80 text-amber-300 hover:bg-amber-900 border-amber-500/50'
+            }`}
+            title="推論エンジン設定（WebGPU / CPUルールベース / Gemini Cloud を選択）"
           >
-            <Sparkles className="w-2.5 h-2.5" />
-            <span>WebGPUオンデバイス</span>
+            {engineMode === 'webgpu' ? (
+              <>
+                <Cpu className="w-2.5 h-2.5 text-purple-400" />
+                <span>WebGPU (GPU推論)</span>
+              </>
+            ) : engineMode === 'gemini_cloud' ? (
+              <>
+                <Sparkles className="w-2.5 h-2.5 text-sky-400" />
+                <span>Gemini Cloud</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-2.5 h-2.5 text-amber-400" />
+                <span>CPUルールベース</span>
+              </>
+            )}
           </button>
         </div>
 
@@ -373,7 +395,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 {!isUser && (msg.metrics?.engine || msg.metrics?.tokensPerSec || msg.metrics?.ttftMs) && (
                   <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-2.5 py-0.5 rounded-lg text-[10px] text-slate-400 font-mono shadow-sm">
                     <span className="text-pink-400 font-bold flex items-center gap-1 font-sans">
-                      🌸 みき (オンデバイス推論)
+                      {msg.metrics?.engine && msg.metrics.engine.includes('WebGPU') ? (
+                        <>
+                          <Cpu className="w-3 h-3 text-purple-400" />
+                          <span className="text-purple-300 font-bold">{msg.metrics.engine}</span>
+                        </>
+                      ) : msg.metrics?.engine && msg.metrics.engine.includes('Gemini') ? (
+                        <>
+                          <Sparkles className="w-3 h-3 text-sky-400" />
+                          <span className="text-sky-300 font-bold">{msg.metrics.engine}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-3 h-3 text-amber-400" />
+                          <span className="text-amber-300 font-bold">{msg.metrics?.engine || 'CPUルールベース'}</span>
+                        </>
+                      )}
                     </span>
                     {msg.metrics?.ttftMs ? (
                       <span>⚡ 応答: {msg.metrics.ttftMs}ms</span>

@@ -3,6 +3,7 @@ import { EngineMode, WebGPUStatus, LocalLLMModel, MemoryItem } from '../types';
 import { webLLMService } from '../services/webLlmService';
 import { deviceBenchmarkService, DeviceSpecReport } from '../services/deviceBenchmarkService';
 import { distillKnowledgeForLocalLLM, sendChatMessage } from '../services/api';
+import { VRAMMonitor } from './VRAMMonitor';
 import {
   Cpu,
   Sparkles,
@@ -31,6 +32,7 @@ import {
   Brain,
   Plus,
   Copy,
+  Sliders,
 } from 'lucide-react';
 
 interface EngineModalProps {
@@ -154,7 +156,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   engineMode,
   onSelectEngine,
 }) => {
-  const [activeTab, setActiveTab] = useState<'downloader' | 'training' | 'benchmark' | 'architecture' | 'logs'>('downloader');
+  const [activeTab, setActiveTab] = useState<'downloader' | 'vram' | 'training' | 'benchmark' | 'architecture' | 'logs'>('downloader');
   const [systemLogsText, setSystemLogsText] = useState<string>('');
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
@@ -502,15 +504,33 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         errMsg.toLowerCase().includes('gpu constraints') ||
         errMsg.toLowerCase().includes('insufficient memory');
 
+      const isIdbStoreError =
+        errMsg.includes('object stores was not found') ||
+        errMsg.includes('IDBDatabase') ||
+        errMsg.includes('transaction') ||
+        errMsg.includes('urls');
+
+      const isWebGpuUnsupported =
+        errMsg.includes('WebGPU') ||
+        errMsg.includes('navigator.gpu') ||
+        errMsg.includes('サポートしていません') ||
+        errMsg.includes('アダプターの初期化に失敗');
+
       let formattedStatus = 'エラーが発生しました';
       let formattedError = errMsg || 'ダウンロードまたはWebGPUロードに失敗しました';
 
-      if (isQuotaError) {
+      if (isIdbStoreError) {
+        formattedStatus = 'ストレージ破損の自動修復完了';
+        formattedError = 'ブラウザ/WebView内のIndexedDBスキーマに不整合を検知したため、内部ストアを自動修復しました。「修復 & 再DL」をタップしてダウンロードを再開できます。';
+      } else if (isQuotaError) {
         formattedStatus = '容量不足 (Quota exceeded)';
         formattedError = '端末ストレージの保存容量上限（Quota exceeded）に達しました。不要なモデルキャッシュを削除するか、超軽量モデル（SmolLM2-360M: 220MB）をご利用ください。';
       } else if (isDeviceLost) {
         formattedStatus = 'GPUメモリ制限 (Device Lost)';
         formattedError = '端末のGPUメモリ（VRAM）制約によりGPUがリセットされました。超軽量モデル（SmolLM2-360M: 220MB）をご利用ください。';
+      } else if (isWebGpuUnsupported) {
+        formattedStatus = 'WebGPU非対応/未有効';
+        formattedError = 'WebGPUハードウェアアクセラレーションが無効またはAPK/WebView環境です。端末内自律推論エンジンで問題なくご利用いただけます。';
       } else if (isFetchError) {
         formattedStatus = '一時的な通信エラー';
         formattedError = 'モデルデータ取得中に通信が途切れました。ダウンロード済みのブロックは保持されています。「再開・リロード」で続きから再開するか、「修復 & 再DL」をお試しください。';
@@ -748,7 +768,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         const fallbackRes = await sendChatMessage({
           prompt: testPrompt || 'こんにちは！自己紹介と得意な開発分野を教えてください。',
           history: [],
-          engineMode: 'gemini',
+          engineMode: 'webgpu',
         });
         
         fullText = fallbackRes.text || `こんにちは！AIパートナーのみきです🌸\nWebGPUがオフラインまたは未初期化のため、内蔵の自律エンジンからお返事しています！ゲーム開発やコード修正、雑談など何でも手伝えますよ！✨`;
@@ -811,7 +831,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         const fallbackRes = await sendChatMessage({
           prompt: testPrompt || 'こんにちは！自己紹介と得意な開発分野を教えてください。',
           history: [],
-          engineMode: 'gemini',
+          engineMode: 'webgpu',
         });
         const resText = fallbackRes.text || 'こんにちは！みきです🌸 テスト推論を受け取りました！';
         setTestOutput((prev) => prev + resText);
@@ -900,7 +920,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
               <h2 className="text-base sm:text-lg font-bold text-slate-100 flex flex-wrap items-center gap-2">
                 <span>端末ローカル LLM / WebGPU エンジン</span>
                 <span className="text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 whitespace-nowrap shrink-0">
-                  {engineMode === 'webgpu' ? 'WebGPU On-Device' : 'Gemini Cloud'}
+                  WebGPU 100% オンデバイス
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
@@ -933,6 +953,18 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                 {(totalCachedMB / 1024).toFixed(1)} GB
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('vram')}
+            className={`py-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'vram'
+                ? 'border-purple-500 text-purple-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Activity className="w-4 h-4 text-purple-400" />
+            <span>📊 VRAM & メモリ監視</span>
           </button>
 
           <button
@@ -997,32 +1029,109 @@ export const EngineModal: React.FC<EngineModalProps> = ({
 
         {/* Content Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
-          {/* Active WebGPU Engine Banner */}
-          <div className="p-3.5 rounded-xl bg-gradient-to-r from-purple-950/60 via-slate-900 to-pink-950/50 border border-purple-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-500/20 text-purple-300 rounded-lg border border-purple-500/40">
-                <Cpu className="w-5 h-5 animate-pulse" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs sm:text-sm font-bold text-slate-100">
-                    ⚡ 端末オンデバイス WebGPU 推論（完全無料・トークン消費0）
-                  </span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                </div>
-                <p className="text-[11px] text-slate-300/80">
-                  おしゃべりやゲーム作成はすべて端末内のローカルGPUで直接推論。教育・知識合成は「🎓 LLM教育」タブで実行できます。
-                </p>
-              </div>
+          {/* Explicit Engine Mode Selector: WebGPU vs Autonomous Rule-based vs Gemini Cloud */}
+          <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3 shadow-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-purple-400" />
+                <span>推論エンジン切り替え（動作方式の完全分離）</span>
+              </span>
+              <span className="text-[10px] text-slate-400">
+                GPU・CPU・クラウドの役割を明確に選択
+              </span>
             </div>
 
-            <button
-              onClick={() => setActiveTab('training')}
-              className="px-3 py-1.5 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 border border-pink-500/50 text-pink-200 text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 self-start sm:self-center"
-            >
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>LLMを教育する</span>
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Option 1: WebGPU (True Local LLM) */}
+              <button
+                onClick={() => onSelectEngine('webgpu')}
+                className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all ${
+                  engineMode === 'webgpu'
+                    ? 'bg-purple-950/60 border-purple-500 text-purple-200 shadow-md shadow-purple-500/20 ring-1 ring-purple-500'
+                    : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
+                      <Cpu className="w-4 h-4 text-purple-400" />
+                      <span>① WebGPU (本物LLM)</span>
+                    </span>
+                    {engineMode === 'webgpu' && (
+                      <span className="text-[10px] bg-purple-500/30 text-purple-300 px-1.5 py-0.2 rounded font-bold border border-purple-400/40">
+                        選択中
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
+                    端末のGPU（VRAM）で行列計算。Qwen/SmolLM2等の重みモデルが1文字ずつ自律生成。
+                  </p>
+                </div>
+                <div className="text-[9.5px] text-purple-300 font-mono flex items-center gap-1 pt-1 border-t border-purple-500/20">
+                  <span>⚡ 実行場所: GPU (VRAM)</span>
+                </div>
+              </button>
+
+              {/* Option 2: Autonomous Rule-based (CPU / Backup) */}
+              <button
+                onClick={() => onSelectEngine('autonomous_rule')}
+                className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all ${
+                  engineMode === 'autonomous_rule'
+                    ? 'bg-amber-950/60 border-amber-500 text-amber-200 shadow-md shadow-amber-500/20 ring-1 ring-amber-500'
+                    : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
+                      <Zap className="w-4 h-4 text-amber-400" />
+                      <span>② CPUルールベース</span>
+                    </span>
+                    {engineMode === 'autonomous_rule' && (
+                      <span className="text-[10px] bg-amber-500/30 text-amber-300 px-1.5 py-0.2 rounded font-bold border border-amber-400/40">
+                        選択中
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
+                    GPU非対応環境や古い端末用。モデルDL不要でTypeScriptプログラムが即答。
+                  </p>
+                </div>
+                <div className="text-[9.5px] text-amber-300 font-mono flex items-center gap-1 pt-1 border-t border-amber-500/20">
+                  <span>⚙️ 実行場所: CPU (軽量ロジック)</span>
+                </div>
+              </button>
+
+              {/* Option 3: Gemini Cloud */}
+              <button
+                onClick={() => onSelectEngine('gemini_cloud')}
+                className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all ${
+                  engineMode === 'gemini_cloud'
+                    ? 'bg-sky-950/60 border-sky-500 text-sky-200 shadow-md shadow-sky-500/20 ring-1 ring-sky-500'
+                    : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
+                      <Sparkles className="w-4 h-4 text-sky-400" />
+                      <span>③ Gemini Cloud (超知能)</span>
+                    </span>
+                    {engineMode === 'gemini_cloud' && (
+                      <span className="text-[10px] bg-sky-500/30 text-sky-300 px-1.5 py-0.2 rounded font-bold border border-sky-400/40">
+                        選択中
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
+                    Google Cloudの最新Geminiで推論。高度な思考・大規模リファクタリングに対応。
+                  </p>
+                </div>
+                <div className="text-[9.5px] text-sky-300 font-mono flex items-center gap-1 pt-1 border-t border-sky-500/20">
+                  <span>☁️ 実行場所: クラウドAPI</span>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* WebGPU Warning if not supported */}
@@ -1579,10 +1688,13 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                           )}
 
                           {/* Network / Fetch Error Quick Action Banner */}
-                          {(model.errorMessage.includes('Failed to fetch') || model.errorMessage.includes('通信エラー')) && (
+                          {(model.errorMessage.includes('Failed to fetch') ||
+                            model.errorMessage.includes('通信エラー') ||
+                            model.errorMessage.includes('Cache') ||
+                            model.errorMessage.includes('network error')) && (
                             <div className="pt-2 border-t border-rose-900/60 flex flex-wrap items-center justify-between gap-2 text-[11px] text-rose-200">
                               <span>🌐 通信復旧ショートカット:</span>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center flex-wrap gap-1.5">
                                 <button
                                   onClick={() => handleDownloadAndLoad(model)}
                                   className="px-2.5 py-0.5 bg-sky-700 hover:bg-sky-600 text-white rounded text-[10px] font-bold transition-colors flex items-center gap-1"
@@ -1596,7 +1708,20 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                                 >
                                   キャッシュ修復
                                 </button>
-                                {model.id !== 'SmolLM2-360M-Instruct-q4f16_1-MLC' && (
+                                {model.id !== 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC' && (
+                                  <button
+                                    onClick={() => {
+                                      const qwen = localModels.find(
+                                        (m) => m.id === 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC'
+                                      );
+                                      if (qwen) handleDownloadAndLoad(qwen);
+                                    }}
+                                    className="px-2 py-0.5 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white rounded text-[10px] font-bold transition-colors flex items-center gap-1 shadow-sm"
+                                  >
+                                    🌸 超安定 Qwen 0.5B (380MB) をDL
+                                  </button>
+                                )}
+                                {model.id !== 'SmolLM2-360M-Instruct-q4f16_1-MLC' && model.id !== 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC' && (
                                   <button
                                     onClick={() => {
                                       const smol = localModels.find(
@@ -1606,7 +1731,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                                     }}
                                     className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/40 rounded text-[10px] font-bold transition-colors"
                                   >
-                                    ⚡ 最軽量SmolLM2 (220MB)
+                                    ⚡ 最軽量 SmolLM2 (220MB)
                                   </button>
                                 )}
                               </div>
@@ -1712,6 +1837,20 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {/* TAB: VRAM & GPU Memory Pressure Realtime Monitor */}
+          {activeTab === 'vram' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              <VRAMMonitor
+                localModels={localModels}
+                onSelectModelToLoad={(model) => {
+                  setActiveTab('downloader');
+                  handleDownloadAndLoad(model);
+                }}
+                onRefreshModels={runCacheIntegrityScan}
+              />
             </div>
           )}
 
@@ -2078,6 +2217,39 @@ export const EngineModal: React.FC<EngineModalProps> = ({
           {/* TAB 3: Architecture & External Learning Explained */}
           {activeTab === 'architecture' && (
             <div className="space-y-5">
+              {/* Question 0: GPU LLM vs CPU Rule-based engine */}
+              <div className="p-5 rounded-xl bg-slate-950/80 border border-purple-500/30 space-y-3">
+                <div className="flex items-center gap-2.5 text-purple-300 font-bold text-sm">
+                  <HelpCircle className="w-5 h-5 text-purple-400" />
+                  <span>Q. 「WebGPU推論」と「CPU自律エンジン」の違いは何？</span>
+                </div>
+                <div className="p-3.5 rounded-lg bg-purple-950/20 border border-purple-500/20 text-xs text-slate-200 leading-relaxed space-y-2">
+                  <div className="font-bold text-purple-300">👉 A. 計算場所と中身の仕組みが全く異なる2つの独立した方式です。</div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
+                  <div className="p-3 rounded-lg bg-slate-900/90 border border-purple-500/40 space-y-1.5">
+                    <div className="font-bold text-purple-300 flex items-center gap-1.5">
+                      <Cpu className="w-4 h-4 text-purple-400" />
+                      <span>⚡ ① WebGPU推論（本物のローカルLLM）</span>
+                    </div>
+                    <p className="text-slate-300 text-[11px] leading-relaxed">
+                      ダウンロードしたモデル重み（Qwen/SmolLM2など）を端末の<strong>GPU（グラフィックチップ・VRAM）</strong>に読み込み、Transformerニューラルネットワークで行列計算して自律生成します。
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-slate-900/90 border border-amber-500/40 space-y-1.5">
+                    <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-amber-400" />
+                      <span>⚙️ ② CPUルールベース（バックアップ用）</span>
+                    </div>
+                    <p className="text-slate-300 text-[11px] leading-relaxed">
+                      WebGPUが非対応な環境（古いスマホやWebView）でも動くよう、<strong>CPU上で動く軽量TypeScriptプログラム</strong>がキーワード判定や感情記憶をもとに文章を組み立てて返答します。
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Question 1: External Data & LLM Swapping */}
               <div className="p-5 rounded-xl bg-slate-950/80 border border-pink-500/30 space-y-3">
                 <div className="flex items-center gap-2.5 text-pink-300 font-bold text-sm">

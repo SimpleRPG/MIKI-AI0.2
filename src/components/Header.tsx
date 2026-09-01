@@ -82,13 +82,43 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Engine Switcher Quick Button */}
         <button
           onClick={onOpenEngineModal}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all bg-purple-500/20 border-purple-500/60 text-purple-200 hover:bg-purple-500/30 ring-1 ring-purple-500/30"
-          title="端末オンデバイスWebGPU推論エンジン（完全無料・トークン消費0）"
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
+            engineMode === 'webgpu'
+              ? 'bg-purple-500/20 border-purple-500/60 text-purple-200 hover:bg-purple-500/30 ring-1 ring-purple-500/30'
+              : engineMode === 'gemini_cloud'
+              ? 'bg-sky-500/20 border-sky-500/60 text-sky-200 hover:bg-sky-500/30 ring-1 ring-sky-500/30'
+              : 'bg-amber-500/20 border-amber-500/60 text-amber-200 hover:bg-amber-500/30 ring-1 ring-amber-500/30'
+          }`}
+          title={
+            engineMode === 'webgpu'
+              ? '【WebGPU】本物の端末内ローカルLLM（GPUニューラルネットワーク推論）'
+              : engineMode === 'gemini_cloud'
+              ? '【Gemini Cloud】Google Gemini 高性能クラウドAI'
+              : '【CPUルールベース】GPU不要の軽量バックアッププログラム'
+          }
         >
-          <Cpu className="w-3.5 h-3.5 text-purple-300" />
-          <span className="hidden sm:inline">⚡ WebGPU (オンデバイス)</span>
-          <span className="sm:hidden">WebGPU</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          {engineMode === 'webgpu' ? (
+            <>
+              <Cpu className="w-3.5 h-3.5 text-purple-300" />
+              <span className="hidden sm:inline">⚡ WebGPU (GPU推論)</span>
+              <span className="sm:hidden">WebGPU</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            </>
+          ) : engineMode === 'gemini_cloud' ? (
+            <>
+              <Sparkles className="w-3.5 h-3.5 text-sky-300" />
+              <span className="hidden sm:inline">☁️ Gemini Cloud</span>
+              <span className="sm:hidden">Gemini</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
+            </>
+          ) : (
+            <>
+              <Zap className="w-3.5 h-3.5 text-amber-300" />
+              <span className="hidden sm:inline">⚙️ CPUルールベース</span>
+              <span className="sm:hidden">CPUルール</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+            </>
+          )}
         </button>
       </div>
 

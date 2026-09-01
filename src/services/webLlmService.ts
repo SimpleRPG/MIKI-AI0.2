@@ -10,6 +10,107 @@ import {
 } from '@mlc-ai/web-llm';
 import { systemLogger } from './systemLogger';
 
+export interface VRAMSnapshot {
+  timestamp: number;
+  isWebGPUSupported: boolean;
+  adapterName: string;
+  vendor: string;
+  architecture: string;
+  activeModelId: string | null;
+  activeModelName: string | null;
+  parameters: string | null;
+  quantization: string | null;
+  isLoaded: boolean;
+  isLoading: boolean;
+  loadingProgress?: number;
+  
+  // Buffers (MB)
+  weightsBufferMB: number;
+  kvCacheBufferMB: number;
+  computeScratchpadMB: number;
+  totalUsedVRAM_MB: number;
+  
+  // Device limits & capacity (MB)
+  maxBufferSizeMB: number;
+  maxStorageBufferBindingSizeMB: number;
+  deviceEstimatedVRAM_MB: number;
+  
+  // Pressure & OOM Risk
+  pressureRatio: number;
+  pressureLevel: 'low' | 'moderate' | 'high' | 'critical';
+  oomRisk: 'safe' | 'low' | 'medium' | 'high' | 'critical';
+  oomRiskScore: number;
+  oomDiagnosticTips: string[];
+  
+  // System context
+  jsHeapUsedMB?: number;
+  jsHeapLimitMB?: number;
+  deviceRamGB?: number;
+  offloadStatus: 'full_gpu_vram' | 'hybrid_unloaded' | 'idle';
+}
+
+const MODEL_VRAM_SPECS: Record<
+  string,
+  { name: string; params: string; weightsMB: number; vramMB: number; quant: string; kvCacheMB: number }
+> = {
+  'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC': {
+    name: 'Qwen 2.5 Coder 0.5B Instruct',
+    params: '0.5B',
+    weightsMB: 380,
+    vramMB: 750,
+    quant: 'q4f16_1 (4-bit)',
+    kvCacheMB: 220,
+  },
+  'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC': {
+    name: 'Qwen 2.5 Coder 1.5B Instruct',
+    params: '1.54B',
+    weightsMB: 950,
+    vramMB: 1400,
+    quant: 'q4f16_1 (4-bit)',
+    kvCacheMB: 320,
+  },
+  'Llama-3.2-1B-Instruct-q4f16_1-MLC': {
+    name: 'Llama 3.2 1B Instruct',
+    params: '1.23B',
+    weightsMB: 880,
+    vramMB: 1250,
+    quant: 'q4f16_1 (4-bit)',
+    kvCacheMB: 280,
+  },
+  'gemma-2-2b-jpn-it-q4f16_1-MLC': {
+    name: 'Gemma 2 2B Japanese Instruct',
+    params: '2.61B',
+    weightsMB: 1650,
+    vramMB: 2300,
+    quant: 'q4f16_1 (4-bit)',
+    kvCacheMB: 480,
+  },
+  'SmolLM2-360M-Instruct-q4f16_1-MLC': {
+    name: 'SmolLM2 360M Instruct',
+    params: '360M',
+    weightsMB: 220,
+    vramMB: 650,
+    quant: 'q4f16_1 (4-bit)',
+    kvCacheMB: 160,
+  },
+  'DeepSeek-R1-Distill-Qwen-7B-q4f16_1-MLC': {
+    name: 'DeepSeek-R1 Distill Qwen 7B',
+    params: '7.61B',
+    weightsMB: 4500,
+    vramMB: 5600,
+    quant: 'q4f16_1 (4-bit)',
+    kvCacheMB: 800,
+  },
+  'Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC': {
+    name: 'Qwen 2.5 Coder 7B Instruct',
+    params: '7.61B',
+    weightsMB: 4600,
+    vramMB: 5800,
+    quant: 'q4f16_1 (4-bit)',
+    kvCacheMB: 850,
+  },
+};
+
 export const KNOWN_MODEL_IDS = [
   'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
   'Llama-3.2-1B-Instruct-q4f16_1-MLC',
@@ -22,12 +123,178 @@ export const KNOWN_MODEL_IDS = [
   'Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC',
 ];
 
-// AppConfig to support models and ensure reliable fallback wasm URLs with optimized mobile limits
 export const CUSTOM_APP_CONFIG: AppConfig = {
+  cacheBackend: 'indexeddb',
   model_list: [
     ...(prebuiltAppConfig.model_list || []),
   ],
 };
+
+/**
+ * Ensures all IndexedDB databases utilized by WebLLM have valid object stores.
+ * If any database exists in a corrupted state (missing 'urls' object store),
+ * it is deleted and cleanly rebuilt so WebLLM does not throw IDBDatabase transaction errors.
+ */
+export async function sanitizeIndexedDB(): Promise<void> {
+  if (typeof indexedDB === 'undefined') return;
+  const dbNames = ['webllm/model', 'webllm/wasm', 'webllm/config'];
+  for (const name of dbNames) {
+    await new Promise<void>((resolve) => {
+      try {
+        const req = indexedDB.open(name);
+        req.onupgradeneeded = (ev: any) => {
+          const db: IDBDatabase = ev.target.result;
+          if (!db.objectStoreNames.contains('urls')) {
+            db.createObjectStore('urls', { keyPath: 'url' });
+          }
+        };
+        req.onsuccess = (ev: any) => {
+          const db: IDBDatabase = ev.target.result;
+          if (!db.objectStoreNames.contains('urls')) {
+            db.close();
+            const delReq = indexedDB.deleteDatabase(name);
+            delReq.onsuccess = () => resolve();
+            delReq.onerror = () => resolve();
+          } else {
+            db.close();
+            resolve();
+          }
+        };
+        req.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
+}
+
+/**
+ * Helper to inspect IndexedDB storage for WebLLM model records safely
+ */
+async function countShardsInIndexedDB(modelId: string): Promise<number> {
+  if (typeof indexedDB === 'undefined') return 0;
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('webllm/model');
+      req.onupgradeneeded = (ev: any) => {
+        const db: IDBDatabase = ev.target.result;
+        if (!db.objectStoreNames.contains('urls')) {
+          db.createObjectStore('urls', { keyPath: 'url' });
+        }
+      };
+      req.onsuccess = (e: any) => {
+        const db: IDBDatabase = e.target.result;
+        if (!db.objectStoreNames.contains('urls')) {
+          db.close();
+          try {
+            indexedDB.deleteDatabase('webllm/model');
+          } catch {}
+          return resolve(0);
+        }
+        let count = 0;
+        try {
+          const tx = db.transaction(['urls'], 'readonly');
+          const store = tx.objectStore('urls');
+          const cursorReq = store.openCursor();
+          cursorReq.onsuccess = (ev: any) => {
+            const cursor = ev.target.result;
+            if (cursor) {
+              const key = String(cursor.key || cursor.value?.url || '');
+              if (key.includes(modelId)) {
+                count++;
+              }
+              cursor.continue();
+            } else {
+              db.close();
+              resolve(count);
+            }
+          };
+          cursorReq.onerror = () => {
+            db.close();
+            resolve(0);
+          };
+        } catch {
+          db.close();
+          resolve(0);
+        }
+      };
+      req.onerror = () => resolve(0);
+    } catch {
+      resolve(0);
+    }
+  });
+}
+
+/**
+ * Helper to purge model shards directly from IndexedDB safely
+ */
+async function deleteModelFromIndexedDB(modelId: string): Promise<number> {
+  if (typeof indexedDB === 'undefined') return 0;
+  return new Promise((resolve) => {
+    try {
+      const dbNames = ['webllm/model', 'webllm/wasm', 'webllm/config'];
+      let deleted = 0;
+      let pending = dbNames.length;
+
+      dbNames.forEach((name) => {
+        const req = indexedDB.open(name);
+        req.onupgradeneeded = (ev: any) => {
+          const db: IDBDatabase = ev.target.result;
+          if (!db.objectStoreNames.contains('urls')) {
+            db.createObjectStore('urls', { keyPath: 'url' });
+          }
+        };
+        req.onsuccess = (e: any) => {
+          const db: IDBDatabase = e.target.result;
+          if (!db.objectStoreNames.contains('urls')) {
+            db.close();
+            try {
+              indexedDB.deleteDatabase(name);
+            } catch {}
+            pending--;
+            if (pending === 0) resolve(deleted);
+            return;
+          }
+          try {
+            const tx = db.transaction(['urls'], 'readwrite');
+            const store = tx.objectStore('urls');
+            const cursorReq = store.openCursor();
+            cursorReq.onsuccess = (ev: any) => {
+              const cursor = ev.target.result;
+              if (cursor) {
+                const key = String(cursor.key || cursor.value?.url || '');
+                if (key.includes(modelId)) {
+                  cursor.delete();
+                  deleted++;
+                }
+                cursor.continue();
+              } else {
+                db.close();
+                pending--;
+                if (pending === 0) resolve(deleted);
+              }
+            };
+            cursorReq.onerror = () => {
+              db.close();
+              pending--;
+              if (pending === 0) resolve(deleted);
+            };
+          } catch {
+            db.close();
+            pending--;
+            if (pending === 0) resolve(deleted);
+          }
+        };
+        req.onerror = () => {
+          pending--;
+          if (pending === 0) resolve(deleted);
+        };
+      });
+    } catch {
+      resolve(0);
+    }
+  });
+}
 
 class WebLLMService {
   private engine: MLCEngine | null = null;
@@ -42,12 +309,13 @@ class WebLLMService {
   public async isWebGPUSupported(): Promise<{
     supported: boolean;
     adapterInfo?: { description: string; vendor: string; architecture?: string };
+    limits?: { maxBufferSize?: number; maxStorageBufferBindingSize?: number };
     error?: string;
   }> {
     if (typeof navigator === 'undefined' || !(navigator as any).gpu) {
       return {
         supported: false,
-        error: 'このブラウザは WebGPU をサポートしていません。Chrome / Edge / Brave 等をご利用ください。',
+        error: 'WebGPU非対応/未有効（APK・WebView・一部モバイル環境では端末内自律エンジンで高速動作します）',
       };
     }
 
@@ -56,7 +324,7 @@ class WebLLMService {
       if (!adapter) {
         return {
           supported: false,
-          error: 'WebGPU アダプターの初期化に失敗しました。ハードウェアアクセラレーションが有効かご確認ください。',
+          error: 'WebGPU アダプターの初期化に失敗しました。APK・WebView・一部端末では自律推論エンジンで動作します。',
         };
       }
 
@@ -70,9 +338,17 @@ class WebLLMService {
         architecture = adapter.info.architecture || architecture;
       }
 
+      const limits = adapter.limits
+        ? {
+            maxBufferSize: adapter.limits.maxBufferSize,
+            maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+          }
+        : undefined;
+
       return {
         supported: true,
         adapterInfo: { description, vendor, architecture },
+        limits,
       };
     } catch (e: any) {
       return {
@@ -106,9 +382,149 @@ class WebLLMService {
     return this.isLoaded() ? this.activeModelId : null;
   }
 
+  public async getVRAMSnapshot(): Promise<VRAMSnapshot> {
+    const gpuCheck = await this.isWebGPUSupported();
+    const activeId = this.getActiveModelId();
+    const modelSpec = activeId ? MODEL_VRAM_SPECS[activeId] : null;
+
+    // Detect browser / device RAM
+    let deviceRamGB: number | undefined = undefined;
+    if (typeof navigator !== 'undefined' && 'deviceMemory' in navigator) {
+      deviceRamGB = (navigator as any).deviceMemory;
+    }
+
+    // Detect JS Heap
+    let jsHeapUsedMB: number | undefined = undefined;
+    let jsHeapLimitMB: number | undefined = undefined;
+    if (typeof performance !== 'undefined' && (performance as any).memory) {
+      const mem = (performance as any).memory;
+      jsHeapUsedMB = Math.round(mem.usedJSHeapSize / (1024 * 1024));
+      jsHeapLimitMB = Math.round(mem.jsHeapSizeLimit / (1024 * 1024));
+    }
+
+    // Limits
+    const maxBufferSizeMB = gpuCheck.limits?.maxBufferSize
+      ? Math.round(gpuCheck.limits.maxBufferSize / (1024 * 1024))
+      : 512;
+    const maxStorageBufferBindingSizeMB = gpuCheck.limits?.maxStorageBufferBindingSize
+      ? Math.round(gpuCheck.limits.maxStorageBufferBindingSize / (1024 * 1024))
+      : 1024;
+
+    // Estimated device VRAM ceiling
+    let deviceEstimatedVRAM_MB = 2048;
+    if (deviceRamGB) {
+      // Typically on mobile/unified memory architectures, WebGPU VRAM ceiling is ~25-40% of system RAM
+      deviceEstimatedVRAM_MB = Math.max(1024, Math.round(deviceRamGB * 1024 * 0.35));
+    }
+
+    // Buffers allocation
+    const isLoaded = this.isLoaded();
+    const isLoading = this.isInitializing;
+    const weightsBufferMB = isLoaded && modelSpec ? modelSpec.weightsMB : 0;
+    const kvCacheBufferMB = isLoaded && modelSpec ? modelSpec.kvCacheMB : 0;
+    const computeScratchpadMB = isLoaded ? 80 : 0;
+    const totalUsedVRAM_MB = weightsBufferMB + kvCacheBufferMB + computeScratchpadMB;
+
+    // Pressure calculation
+    const pressureRatio = deviceEstimatedVRAM_MB > 0 ? totalUsedVRAM_MB / deviceEstimatedVRAM_MB : 0;
+    let pressureLevel: 'low' | 'moderate' | 'high' | 'critical' = 'low';
+    let oomRisk: 'safe' | 'low' | 'medium' | 'high' | 'critical' = 'safe';
+    let oomRiskScore = Math.min(100, Math.round(pressureRatio * 100));
+
+    const oomDiagnosticTips: string[] = [];
+
+    if (!gpuCheck.supported) {
+      pressureLevel = 'low';
+      oomRisk = 'safe';
+      oomRiskScore = 0;
+      oomDiagnosticTips.push('WebGPUが無効のため、VRAM負荷は発生していません。端末内自律推論エンジンで安全に動作しています。');
+    } else if (!isLoaded) {
+      pressureLevel = 'low';
+      oomRisk = 'safe';
+      oomRiskScore = 5;
+      oomDiagnosticTips.push('WebGPU VRAM上にアクティブなモデル重みは展開されていません（アイドル待機中）。');
+    } else {
+      if (pressureRatio > 0.85 || totalUsedVRAM_MB > 2500) {
+        pressureLevel = 'critical';
+        oomRisk = 'critical';
+        oomDiagnosticTips.push('⚠️ VRAM使用量が限界値に近づいています。ブラウザのタブが強制終了（OOMクラッシュ）する危険性があります。');
+        oomDiagnosticTips.push('💡 より軽量な「Qwen 2.5 Coder 0.5B (380MB)」または「SmolLM2-360M (220MB)」への切り替えを強く推奨します。');
+      } else if (pressureRatio > 0.65 || totalUsedVRAM_MB > 1500) {
+        pressureLevel = 'high';
+        oomRisk = 'high';
+        oomDiagnosticTips.push('⚠️ 中〜高メモリ負荷状態です。他の重いタブやアプリを閉じるとGPUクラッシュ（GPUDeviceLost）を予防できます。');
+      } else if (pressureRatio > 0.45) {
+        pressureLevel = 'moderate';
+        oomRisk = 'medium';
+        oomDiagnosticTips.push('✅ 適正なVRAM使用量です。現在のハードウェアで安定してオンデバイス推論が可能です。');
+      } else {
+        pressureLevel = 'low';
+        oomRisk = 'low';
+        oomDiagnosticTips.push('🟢 VRAM使用量に余裕があります。最高速度でWebGPU推論が実行されています。');
+      }
+
+      if (maxBufferSizeMB < 512) {
+        oomDiagnosticTips.push(`ℹ️ 端末のWebGPU maxBufferSize制約 (${maxBufferSizeMB}MB) が小さいため、7B以上の大型モデルは起動できない可能性があります。`);
+      }
+    }
+
+    return {
+      timestamp: Date.now(),
+      isWebGPUSupported: gpuCheck.supported,
+      adapterName: gpuCheck.adapterInfo?.description || 'WebGPU Adapter',
+      vendor: gpuCheck.adapterInfo?.vendor || 'Generic GPU',
+      architecture: gpuCheck.adapterInfo?.architecture || 'Unified/DirectX/Metal/Vulkan',
+      activeModelId: activeId,
+      activeModelName: modelSpec?.name || activeId || null,
+      parameters: modelSpec?.params || null,
+      quantization: modelSpec?.quant || (activeId ? 'q4f16_1' : null),
+      isLoaded,
+      isLoading,
+      weightsBufferMB,
+      kvCacheBufferMB,
+      computeScratchpadMB,
+      totalUsedVRAM_MB,
+      maxBufferSizeMB,
+      maxStorageBufferBindingSizeMB,
+      deviceEstimatedVRAM_MB,
+      pressureRatio: Number(pressureRatio.toFixed(2)),
+      pressureLevel,
+      oomRisk,
+      oomRiskScore,
+      oomDiagnosticTips,
+      jsHeapUsedMB,
+      jsHeapLimitMB,
+      deviceRamGB,
+      offloadStatus: isLoaded ? 'full_gpu_vram' : isLoading ? 'hybrid_unloaded' : 'idle',
+    };
+  }
+
+  public async unloadModel(): Promise<void> {
+    this.isInterrupted = true;
+    this.activeModelId = null;
+    if (this.engine) {
+      try {
+        await (this.engine as any).unload?.();
+      } catch (e) {
+        console.warn('Unload engine error:', e);
+      }
+      this.engine = null;
+    }
+  }
+
+  public async purgeKVCache(): Promise<void> {
+    if (this.engine && typeof (this.engine as any).resetChat === 'function') {
+      try {
+        await (this.engine as any).resetChat();
+      } catch (e) {
+        console.warn('Purge KV cache error:', e);
+      }
+    }
+  }
+
   public async isModelCached(modelId: string): Promise<boolean> {
     try {
-      // 1. Official WebLLM cache verification (authoritative)
+      // 1. Official WebLLM cache verification (authoritative, works with indexeddb backend)
       const isCachedInWebLLM = await hasModelInCache(modelId, CUSTOM_APP_CONFIG);
       if (isCachedInWebLLM) {
         if (typeof localStorage !== 'undefined') {
@@ -125,7 +541,16 @@ class WebLLMService {
       // Fall through to manual inspection only if hasModelInCache threw
     }
 
-    // 2. Strict CacheStorage inspection (requires ndarray-cache.json or multiple weight shards)
+    // 2. Direct IndexedDB inspection (shards stored in webllm/model store)
+    const idbShardCount = await countShardsInIndexedDB(modelId);
+    if (idbShardCount >= 2) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(`miki_cached_model_${modelId}`, 'true');
+      }
+      return true;
+    }
+
+    // 3. Strict CacheStorage inspection (for legacy cached shards)
     if (typeof caches !== 'undefined') {
       try {
         const keys = await caches.keys();
@@ -165,6 +590,11 @@ class WebLLMService {
     let shardCount = 0;
     let approximateBytes = 0;
 
+    // Check IndexedDB
+    const idbCount = await countShardsInIndexedDB(modelId);
+    shardCount += idbCount;
+
+    // Check legacy CacheStorage
     if (typeof caches !== 'undefined') {
       try {
         const keys = await caches.keys();
@@ -226,7 +656,11 @@ class WebLLMService {
         await deleteModelInCache(modelId, CUSTOM_APP_CONFIG);
       } catch {}
 
-      // 2. Manual cache storage purge
+      // 2. Direct IndexedDB purge
+      const idbRemoved = await deleteModelFromIndexedDB(modelId);
+      removedCount += idbRemoved;
+
+      // 3. Manual cache storage purge
       if (typeof caches !== 'undefined') {
         const keys = await caches.keys();
         for (const key of keys) {
@@ -281,6 +715,8 @@ class WebLLMService {
     try {
       await deleteModelInCache(modelId, CUSTOM_APP_CONFIG);
     } catch {}
+
+    await deleteModelFromIndexedDB(modelId);
 
     if (typeof caches !== 'undefined') {
       try {
@@ -514,6 +950,9 @@ class WebLLMService {
       let lastAttemptError: any = null;
       systemLogger.info('WEBGPU', `Starting model load/initialization for ${modelId}`);
 
+      // Ensure all IndexedDB stores exist cleanly before opening WebLLM
+      await sanitizeIndexedDB().catch(() => {});
+
       try {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           try {
@@ -521,10 +960,10 @@ class WebLLMService {
               systemLogger.warn('WEBGPU', `Retrying model load (${attempt}/${maxAttempts}) for ${modelId}`);
               progressCallback({
                 progress: 0,
-                text: `🔄 接続を再確立中 (${attempt}/${maxAttempts})... ダウンロードを継続します`,
+                text: `🔄 通信・ストレージを再同期中 (${attempt}/${maxAttempts})... ダウンロードを継続します`,
                 timeElapsed: 0,
               });
-              await new Promise((r) => setTimeout(r, 1000 * attempt));
+              await new Promise((r) => setTimeout(r, 1200 * attempt));
             }
 
             if (this.engine) {
@@ -557,6 +996,12 @@ class WebLLMService {
             const errMsg = String(err?.message || err || '');
             systemLogger.error('WEBGPU', `Error during model load attempt ${attempt}: ${errMsg}`, { modelId, attempt, error: errMsg });
 
+            const isIdbError =
+              errMsg.includes('object stores was not found') ||
+              errMsg.includes('IDBDatabase') ||
+              errMsg.includes('transaction') ||
+              errMsg.includes('urls');
+
             const isQuota =
               err?.name === 'QuotaExceededError' ||
               errMsg.toLowerCase().includes('quota') ||
@@ -570,6 +1015,15 @@ class WebLLMService {
               errMsg.includes('device lost') ||
               errMsg.toLowerCase().includes('device was lost') ||
               errMsg.toLowerCase().includes('gpudevicelostinfo');
+
+            if (isIdbError) {
+              console.warn('[WebLLM] Detected corrupted IndexedDB schema, rebuilding stores...');
+              await sanitizeIndexedDB().catch(() => {});
+              await deleteModelFromIndexedDB(modelId).catch(() => {});
+              if (attempt < maxAttempts) {
+                continue;
+              }
+            }
 
             if (isQuota) {
               await this.repairModelCache(modelId).catch(() => {});
@@ -779,8 +1233,8 @@ class WebLLMService {
         const tokenLimit = Math.min(options?.max_tokens ?? 384, 384);
 
         if (attempt === 1) {
-          // Attempt 1: Fast streaming with anti-repetition penalty
-          const chunks = await this.engine.chat.completions.create({
+          // Attempt 1: Fast streaming with anti-repetition penalty and watchdog timer
+          const createPromise = this.engine.chat.completions.create({
             messages: sanitizedMessages as any,
             stream: true,
             temperature: options?.temperature ?? 0.7,
@@ -789,18 +1243,44 @@ class WebLLMService {
             max_tokens: tokenLimit,
           });
 
+          // 8-second watchdog for initial create call
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('WebGPU推論がタイムアウト（8秒無応答）しました。')), 8000)
+          );
+
+          const chunks: any = await Promise.race([createPromise, timeoutPromise]);
+
           let hasYielded = false;
-          for await (const chunk of chunks) {
+          const asyncIter = chunks[Symbol.asyncIterator]();
+
+          while (true) {
             if (this.isInterrupted) {
               this.isInterrupted = false;
               return;
             }
-            const delta = chunk.choices[0]?.delta?.content || '';
+
+            // Per-token watchdog timeout (4 seconds max per token generation)
+            const tokenTimeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('WebGPUトークン生成タイムアウト (4秒無応答)')), 4000)
+            );
+
+            const nextResult: IteratorResult<any> = await Promise.race([
+              asyncIter.next(),
+              tokenTimeoutPromise,
+            ]);
+
+            if (nextResult.done) {
+              break;
+            }
+
+            const chunk = nextResult.value;
+            const delta = chunk?.choices?.[0]?.delta?.content || '';
             if (delta) {
               yield delta;
               hasYielded = true;
             }
           }
+
           if (hasYielded) {
             return;
           }
@@ -825,7 +1305,7 @@ class WebLLMService {
             },
           ];
 
-          const response = await this.engine.chat.completions.create({
+          const atomicPromise = this.engine.chat.completions.create({
             messages: compactMessages as any,
             stream: false,
             temperature: options?.temperature ?? 0.7,
@@ -833,6 +1313,12 @@ class WebLLMService {
             frequency_penalty: 0.3,
             max_tokens: 256,
           });
+
+          const atomicTimeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('WebGPUアトミック推論がタイムアウトしました。')), 10000)
+          );
+
+          const response = await Promise.race([atomicPromise, atomicTimeoutPromise]);
 
           const fullContent = (response as any).choices?.[0]?.message?.content || '';
           if (fullContent && fullContent.trim()) {
