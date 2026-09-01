@@ -20,6 +20,7 @@ import {
 import { sendChatMessage, sendDebugRequest } from './services/api';
 import { webLLMService } from './services/webLlmService';
 import { extractCodeBlocks } from './utils/codeParser';
+import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt } from './utils/moeRouter';
 import { SPEAKER_PROFILES, SpeakerProfile } from './data/speakers';
 import { INITIAL_JAPANESE_MEMORIES } from './data/japaneseKnowledgeData';
@@ -366,28 +367,85 @@ export default function App() {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const promptAnalysis = classifyPromptForMoE(text);
-      const activeMemories = memories.filter((m) => m.active);
-      const activeGameCode = workspaceFiles.find((f) => f.path === 'index.html')?.content || '';
-      const cachedModelsList = await webLLMService.listAllCachedModels().catch(() => []);
-
       const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
-      const gpuCheck = await webLLMService.isWebGPUSupported().catch(() => ({ supported: false }));
+      const activeMemories = memories.filter((m) => m.active);
+      const assistantId = 'msg_asst_' + Date.now();
+      currentAssistantIdRef.current = assistantId;
+
+      // ==========================================
+      // PATH 1: Instant Autonomous CPU Rule Engine
+      // ==========================================
+      if (engineMode === 'autonomous_rule') {
+        const isCode =
+          text.includes('作って') ||
+          text.includes('ゲーム') ||
+          text.includes('開発') ||
+          text.includes('コード');
+        const reply = generateSmartCompanionReply(
+          text,
+          persona,
+          activeMemories,
+          isCode,
+          attached
+        );
+
+        const cpuMsg: ChatMessage = {
+          id: assistantId,
+          role: 'assistant',
+          content: reply,
+          timestamp: Date.now(),
+          speaker: activeSpeaker,
+          engineMode: 'autonomous_rule',
+          isStreaming: false,
+          metrics: {
+            engine: `CPUルールベース (${activeSpeaker.name})`,
+            tokens: Math.round(reply.length / 3),
+            tokensPerSec: 100,
+            ttftMs: 1,
+          },
+        };
+
+        setMessages((prev) => [...prev, cpuMsg]);
+        setIsLoading(false);
+        setIsGenerating(false);
+
+        // Auto apply code if generated
+        const codeBlocks = extractCodeBlocks(reply);
+        if (codeBlocks.length > 0) {
+          handleApplyCode(codeBlocks);
+        }
+        return;
+      }
+
+      // ==========================================
+      // PATH 2: WebGPU or Gemini Cloud Engine
+      // ==========================================
+      const promptAnalysis = classifyPromptForMoE(text);
+      const activeGameCode = workspaceFiles.find((f) => f.path === 'index.html')?.content || '';
+
+      // Non-blocking WebGPU checks with 2s timeout
+      const cachedModelsList = await Promise.race([
+        webLLMService.listAllCachedModels().catch(() => []),
+        new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 2000)),
+      ]);
+
+      const gpuCheck = await Promise.race([
+        webLLMService.isWebGPUSupported().catch(() => ({ supported: false })),
+        new Promise<{ supported: boolean }>((resolve) => setTimeout(() => resolve({ supported: false }), 2000)),
+      ]);
       const isGpuUsable = gpuCheck.supported;
 
       // Execute on-device WebGPU engine
       const targetModelId = (webLLMService.isLoaded() && webLLMService.getActiveModelId())
         ? webLLMService.getActiveModelId()!
-        : await webLLMService.findBestAvailableModel(promptAnalysis.role);
-
-      const assistantId = 'msg_asst_' + Date.now();
-      currentAssistantIdRef.current = assistantId;
+        : await Promise.race([
+            webLLMService.findBestAvailableModel(promptAnalysis.role),
+            new Promise<string>((resolve) => setTimeout(() => resolve('SmolLM2-360M-Instruct-q4f16_1-MLC'), 2000)),
+          ]);
 
       // Clean placeholder message based on selected engineMode
       const placeholderText =
-        engineMode === 'autonomous_rule'
-          ? `⚙️ CPUルールベースで思考中 (${activeSpeaker.name})...`
-          : engineMode === 'gemini_cloud'
+        engineMode === 'gemini_cloud'
           ? `☁️ Gemini Cloud で生成中...`
           : webLLMService.isLoaded()
           ? `⚡ オンデバイス (${targetModelId.split('-')[0]}) で推論中...`
@@ -403,9 +461,7 @@ export default function App() {
         isStreaming: true,
         metrics: {
           engine:
-            engineMode === 'autonomous_rule'
-              ? `CPUルールベース (${activeSpeaker.name})`
-              : engineMode === 'gemini_cloud'
+            engineMode === 'gemini_cloud'
               ? 'Gemini Cloud'
               : `On-Device (${targetModelId.split('-')[0]})`,
         },
@@ -415,7 +471,10 @@ export default function App() {
 
       // WebGPU Model Preparation ONLY if user selected WebGPU engine
       let isModelReady = webLLMService.isModelLoaded(targetModelId);
-      const isTargetCached = await webLLMService.isModelCached(targetModelId).catch(() => false);
+      const isTargetCached = await Promise.race([
+        webLLMService.isModelCached(targetModelId).catch(() => false),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
+      ]);
 
       if (engineMode === 'webgpu' && isGpuUsable && !isModelReady) {
         try {
