@@ -513,23 +513,39 @@ export default function App() {
       systemLogger.debug('WEBGPU', `WebGPU診断完了: 可用性=${isGpuUsable}, キャッシュ済みモデル数=${cachedModelsList.length}`);
 
       // Step 5: Model Selection & Cache verification
-      const targetModelId = (webLLMService.isLoaded() && webLLMService.getActiveModelId())
-        ? webLLMService.getActiveModelId()!
-        : await Promise.race([
-            webLLMService.findBestAvailableModel(promptAnalysis.role),
-            new Promise<string>((resolve) => setTimeout(() => resolve('SmolLM2-360M-Instruct-q4f16_1-MLC'), 2000)),
-          ]);
+      let targetModelId = '';
+      if (engineMode === 'native_gpu') {
+        const activeGguf = nativeLlmService.getActiveModelId();
+        if (activeGguf) {
+          targetModelId = activeGguf;
+        } else {
+          const availableGgufs = await nativeLlmService.getAvailableGgufModels().catch(() => []);
+          targetModelId = availableGgufs[0]?.name || availableGgufs[0]?.fileName || 'Qwen 2.5 Coder 0.5B (GGUF)';
+        }
+        systemLogger.step(5, 10, `GGUF推論対象モデル選定 & バインド確認: ${targetModelId}`, {
+          engineMode: 'native_gpu',
+          targetModelId,
+          activeModelId: nativeLlmService.getActiveModelId(),
+        });
+      } else {
+        targetModelId = (webLLMService.isLoaded() && webLLMService.getActiveModelId())
+          ? webLLMService.getActiveModelId()!
+          : await Promise.race([
+              webLLMService.findBestAvailableModel(promptAnalysis.role),
+              new Promise<string>((resolve) => setTimeout(() => resolve('SmolLM2-360M-Instruct-q4f16_1-MLC'), 2000)),
+            ]);
 
-      systemLogger.step(5, 10, `推論対象モデル選定 & バインド確認: ${targetModelId}`, {
-        isEngineLoaded: webLLMService.isLoaded(),
-        activeModelId: webLLMService.getActiveModelId(),
-        targetModelId,
-      });
+        systemLogger.step(5, 10, `推論対象モデル選定 & バインド確認: ${targetModelId}`, {
+          isEngineLoaded: webLLMService.isLoaded(),
+          activeModelId: webLLMService.getActiveModelId(),
+          targetModelId,
+        });
+      }
 
       // Clean placeholder message based on selected engineMode
       const placeholderText =
         engineMode === 'native_gpu'
-          ? `⚡ 端末本体GPU (OpenCL / Vulkan) で直接推論中...`
+          ? `⚡ llama.cpp GGUF (${targetModelId.split(' ')[0]}) で直接推論中...`
           : engineMode === 'external_gpu'
           ? `🖥️ 外部ローカルLLM (Ollama/LM Studio) で推論中...`
           : engineMode === 'gemini_cloud'
@@ -550,7 +566,7 @@ export default function App() {
         metrics: {
           engine:
             engineMode === 'native_gpu'
-              ? 'Native GPU (Vulkan/OpenCL)'
+              ? `llama.cpp GGUF (${targetModelId.split(' ')[0]})`
               : engineMode === 'external_gpu'
               ? 'External Local LLM (Ollama)'
               : engineMode === 'gemini_cloud'
@@ -560,12 +576,14 @@ export default function App() {
       };
       setMessages((prev) => [...prev, placeholderMsg]);
 
-      // Step 6: WebGPU Model Load / VRAM Binding (only if webgpu mode)
-      let isModelReady = webLLMService.isModelLoaded(targetModelId);
-      const isTargetCached = await Promise.race([
-        webLLMService.isModelCached(targetModelId).catch(() => false),
-        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
-      ]);
+      // Step 6: Model Load / VRAM Binding
+      let isModelReady = engineMode === 'native_gpu' ? !!nativeLlmService.getActiveModelId() : webLLMService.isModelLoaded(targetModelId);
+      const isTargetCached = engineMode === 'native_gpu'
+        ? true
+        : await Promise.race([
+            webLLMService.isModelCached(targetModelId).catch(() => false),
+            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
+          ]);
 
       systemLogger.step(6, 10, 'モデル重み & VRAM展開 (必要な場合)', {
         targetModelId,
@@ -573,7 +591,28 @@ export default function App() {
         isTargetCached,
       });
 
-      if (engineMode === 'webgpu' && isGpuUsable && !isModelReady) {
+      if (engineMode === 'native_gpu' && !isModelReady) {
+        try {
+          systemLogger.info('NATIVE_GPU', '端末内のGGUFモデルを自動検索・展開します...');
+          const autoLoaded = await nativeLlmService.autoLoadDownloadedModelIfAvailable((report) => {
+            if (abortController.signal.aborted) return;
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantId
+                  ? {
+                      ...msg,
+                      content: `🔄 GGUFモデルVRAM展開中: ${report.text} (${report.progress}%)`,
+                      executionSteps: systemLogger.getCurrentSessionSteps(),
+                    }
+                  : msg
+              )
+            );
+          });
+          isModelReady = autoLoaded;
+        } catch (natLoadErr: any) {
+          systemLogger.warn('NATIVE_GPU', 'GGUFモデル自動ロード待機タイムアウト/スキップ:', natLoadErr?.message || natLoadErr);
+        }
+      } else if (engineMode === 'webgpu' && isGpuUsable && !isModelReady) {
         try {
           systemLogger.info('WEBGPU', `WebGPUモデル (${targetModelId}) のロードを開始します (キャッシュ状況: ${isTargetCached ? '端末キャッシュあり' : '未ダウンロード/要取得'})...`);
           const loadPromise = webLLMService.loadModel(targetModelId, (report) => {
@@ -705,10 +744,11 @@ export default function App() {
             );
           }
           webGpuSuccess = accumulated.trim().length > 0;
-          executedEngineLabel = '⚡ 端末本体物理GPU (OpenCL/Vulkan)';
+          executedEngineLabel = `⚡ llama.cpp GGUF (${nativeLlmService.getActiveModelId() || 'Native GPU'})`;
         } catch (natErr: any) {
-          systemLogger.warn('INFERENCE', 'Native GPU execution error:', natErr);
+          systemLogger.warn('INFERENCE', 'Native GPU execution error:', natErr?.message || natErr);
           webGpuSuccess = false;
+          webGpuErrorDetails = natErr?.message || String(natErr);
         }
       } else if (engineMode === 'external_gpu') {
         // ==========================================
@@ -1158,6 +1198,7 @@ export default function App() {
               persona={persona}
               memories={memories}
               engineMode={engineMode}
+              onEngineModeChange={setEngineMode}
               speakerMode={speakerMode}
               setSpeakerMode={setSpeakerMode}
               onApplyCode={handleApplyCode}
@@ -1229,6 +1270,7 @@ export default function App() {
                 persona={persona}
                 memories={memories}
                 engineMode={engineMode}
+                onEngineModeChange={setEngineMode}
                 speakerMode={speakerMode}
                 setSpeakerMode={setSpeakerMode}
                 onApplyCode={handleApplyCode}

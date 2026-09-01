@@ -6,6 +6,8 @@ import { deviceBenchmarkService, DeviceSpecReport } from '../services/deviceBenc
 import { distillKnowledgeForLocalLLM, sendChatMessage } from '../services/api';
 import { systemLogger } from '../services/systemLogger';
 import { VRAMMonitor } from './VRAMMonitor';
+import { GgufModelManager } from './GgufModelManager';
+import { ErrorBoundary } from './ErrorBoundary';
 import {
   Cpu,
   Sparkles,
@@ -159,7 +161,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   engineMode,
   onSelectEngine,
 }) => {
-  const [activeTab, setActiveTab] = useState<'downloader' | 'vram' | 'training' | 'benchmark' | 'architecture' | 'logs'>('downloader');
+  const [activeTab, setActiveTab] = useState<'downloader' | 'gguf' | 'vram' | 'training' | 'benchmark' | 'architecture' | 'logs'>('downloader');
   const [systemLogsText, setSystemLogsText] = useState<string>('');
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
@@ -1163,6 +1165,21 @@ export const EngineModal: React.FC<EngineModalProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('gguf')}
+            className={`py-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'gguf'
+                ? 'border-emerald-500 text-emerald-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-emerald-400" />
+            <span>⚡ GGUFネイティブ (llama.cpp)</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              Native
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('vram')}
             className={`py-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'vram'
@@ -2147,6 +2164,18 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {/* TAB: GGUF Model Manager (llama.cpp Native Engine) */}
+          {activeTab === 'gguf' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              <ErrorBoundary
+                fallbackTitle="GGUFモデルマネージャー"
+                fallbackMessage="GGUF管理モジュールの初期化を保護しました。「画面を安全に復旧」を押して再表示してください。"
+              >
+                <GgufModelManager />
+              </ErrorBoundary>
             </div>
           )}
 

@@ -862,24 +862,36 @@ class WebLLMService {
       this.progressListeners.add(onProgress);
     }
 
+    // If native platform is available and the GGUF model is ALREADY downloaded in native storage, we can use it.
+    // Otherwise, execute standard WebLLM (WebGPU) download and load pipeline.
     if (nativeLlmService.isNative()) {
-      systemLogger.info('NATIVE_GPU', `📱 Android Native GPU (OpenCL/Vulkan) で直接モデルロードを実行します: ${targetModelId}`);
-      this.isInitializing = true;
-      this.loadingModelId = targetModelId;
       try {
-        await nativeLlmService.loadNativeModel(targetModelId, onProgress);
-        this.activeModelId = targetModelId;
-        this.setPreferredModelId(targetModelId);
-        if (onProgress) {
-          onProgress({ progress: 100, text: 'Native GPU (OpenCL/Vulkan) ロード完了 (高速推論可能)' });
+        const storageInfo = await nativeLlmService.getStorageInfo();
+        const hasNativeGguf = storageInfo.files.some(
+          (f) => f.fileName === `${targetModelId}.gguf` || f.fileName.includes(targetModelId)
+        );
+        if (hasNativeGguf) {
+          systemLogger.info('NATIVE_GPU', `📱 端末内GGUFモデルを検出。Native GPU (OpenCL/Vulkan) でロードします: ${targetModelId}`);
+          this.isInitializing = true;
+          this.loadingModelId = targetModelId;
+          try {
+            await nativeLlmService.loadNativeModel(targetModelId, onProgress);
+            this.activeModelId = targetModelId;
+            this.setPreferredModelId(targetModelId);
+            if (onProgress) {
+              onProgress({ progress: 100, text: 'Native GPU (OpenCL/Vulkan) ロード完了 (高速推論可能)' });
+            }
+            return;
+          } finally {
+            this.isInitializing = false;
+            this.loadingModelId = null;
+            if (onProgress) {
+              this.progressListeners.delete(onProgress);
+            }
+          }
         }
-        return;
-      } finally {
-        this.isInitializing = false;
-        this.loadingModelId = null;
-        if (onProgress) {
-          this.progressListeners.delete(onProgress);
-        }
+      } catch {
+        // Fallback to standard WebGPU/WebLLM loader
       }
     }
 

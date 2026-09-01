@@ -274,6 +274,8 @@ class SystemLogger {
 
     // Cached model flags from localStorage
     const cachedFlags: string[] = [];
+    const ggufFiles: string[] = [];
+    let activeGgufModel = 'なし';
     if (typeof localStorage !== 'undefined') {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
@@ -281,6 +283,16 @@ class SystemLogger {
           cachedFlags.push(k.replace('miki_cached_model_', ''));
         }
       }
+      try {
+        const rawGguf = localStorage.getItem('miki_downloaded_gguf_files');
+        if (rawGguf) {
+          const list = JSON.parse(rawGguf);
+          if (Array.isArray(list)) {
+            ggufFiles.push(...list.map((f: any) => `${f.fileName || f.id} (${f.sizeMB || '?'}MB)`));
+          }
+        }
+        activeGgufModel = localStorage.getItem('miki_active_gguf_model') || 'なし';
+      } catch (e) {}
     }
 
     const reportHeader = `================================================================================
@@ -300,7 +312,9 @@ class SystemLogger {
 - GPU 制限・バッファ  : ${webgpuLimitsStr}
 - 現在の推論モード    : ${additionalContext?.engineMode || 'webgpu'}
 - 対象ローカルモデル  : ${additionalContext?.targetModel || '未定'}
-- 端末内キャッシュ済み: ${cachedFlags.length > 0 ? cachedFlags.join(', ') : 'なし (未ダウンロード)'}
+- WebGPUキャッシュ済み: ${cachedFlags.length > 0 ? cachedFlags.join(', ') : 'なし (未ダウンロード)'}
+- GGUF端末保存済み    : ${ggufFiles.length > 0 ? ggufFiles.join(', ') : 'なし (未ダウンロード)'}
+- GGUFアクティブモデル: ${activeGgufModel}
 
 ================================================================================
 【2. GPULLM (WebGPUローカルLLM) から返事が返ってこない主な理由と対策】

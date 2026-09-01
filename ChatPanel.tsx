@@ -36,6 +36,7 @@ import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode } fro
 import { extractCodeBlocks } from '../utils/codeParser';
 import { SPEAKER_PROFILES } from '../data/speakers';
 import { systemLogger } from '../services/systemLogger';
+import { nativeLlmService } from '../services/nativeLlmService';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -47,6 +48,7 @@ interface ChatPanelProps {
   persona: PersonaConfig;
   memories: MemoryItem[];
   engineMode: EngineMode;
+  onEngineModeChange?: (mode: EngineMode) => void;
   speakerMode: string;
   setSpeakerMode: (mode: string) => void;
   onApplyCode: (files: { path: string; name: string; content: string; language: string }[]) => void;
@@ -68,6 +70,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   persona,
   memories,
   engineMode,
+  onEngineModeChange,
   speakerMode,
   setSpeakerMode,
   onApplyCode,
@@ -86,6 +89,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
   const [expandedStepsMsgId, setExpandedStepsMsgId] = useState<string | null>(null);
+  const [ggufModels, setGgufModels] = useState<Array<{ id: string; fileName: string; name: string; sizeMB: number }>>([]);
+  const [activeGgufId, setActiveGgufId] = useState<string | null>(null);
+  const [isSwitchingGguf, setIsSwitchingGguf] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -93,6 +99,40 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const lastSendTimeRef = useRef<number>(0);
 
   const PUBLIC_APP_URL = 'https://ais-pre-lmii4pykmv4ucirau7mbyp-23659957062.asia-northeast1.run.app';
+
+  const refreshGgufModels = async () => {
+    try {
+      const list = await nativeLlmService.getAvailableGgufModels();
+      setGgufModels(list);
+      setActiveGgufId(nativeLlmService.getActiveModelId());
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    refreshGgufModels();
+  }, []);
+
+  useEffect(() => {
+    if (engineMode === 'native_gpu') {
+      refreshGgufModels();
+    }
+  }, [engineMode]);
+
+  const handleSelectGgufModel = async (modelId: string) => {
+    const target = ggufModels.find((m) => m.id === modelId);
+    if (!target) return;
+    setIsSwitchingGguf(true);
+    try {
+      await nativeLlmService.loadNativeModel(target.id, target.fileName);
+      setActiveGgufId(target.id);
+      onEngineModeChange?.('native_gpu');
+      systemLogger.info('NATIVE_GPU', `⚡ チャットヘッダーからGGUFモデル「${target.name}」に切り替えました。`);
+    } catch (err: any) {
+      systemLogger.error('NATIVE_GPU', `GGUFモデル切替エラー: ${err?.message || err}`);
+    } finally {
+      setIsSwitchingGguf(false);
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -315,9 +355,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 ? 'bg-purple-950/80 text-purple-300 hover:bg-purple-900 border-purple-500/50'
                 : engineMode === 'gemini_cloud'
                 ? 'bg-sky-950/80 text-sky-300 hover:bg-sky-900 border-sky-500/50'
+                : engineMode === 'native_gpu'
+                ? 'bg-emerald-950/80 text-emerald-300 hover:bg-emerald-900 border-emerald-500/50'
+                : engineMode === 'external_gpu'
+                ? 'bg-indigo-950/80 text-indigo-300 hover:bg-indigo-900 border-indigo-500/50'
                 : 'bg-amber-950/80 text-amber-300 hover:bg-amber-900 border-amber-500/50'
             }`}
-            title="推論エンジン設定（WebGPU / CPUルールベース / Gemini Cloud を選択）"
+            title="推論エンジン設定（GGUFネイティブ / WebGPU / 外部LLM / CPUルールベース / Gemini Cloud を選択）"
           >
             {engineMode === 'webgpu' ? (
               <>
@@ -329,6 +373,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <Sparkles className="w-2.5 h-2.5 text-sky-400" />
                 <span>Gemini Cloud</span>
               </>
+            ) : engineMode === 'native_gpu' ? (
+              <>
+                <Zap className="w-2.5 h-2.5 text-emerald-400" />
+                <span>GGUFネイティブ (本体GPU)</span>
+              </>
+            ) : engineMode === 'external_gpu' ? (
+              <>
+                <Cpu className="w-2.5 h-2.5 text-indigo-400" />
+                <span>外部ローカルLLM</span>
+              </>
             ) : (
               <>
                 <Zap className="w-2.5 h-2.5 text-amber-400" />
@@ -336,6 +390,30 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               </>
             )}
           </button>
+
+          {/* GGUF Native Model Selector — pick which downloaded .gguf file runs on the device GPU */}
+          {ggufModels.length > 0 && (
+            <select
+              value={activeGgufId || ''}
+              disabled={isSwitchingGguf}
+              onChange={(e) => handleSelectGgufModel(e.target.value)}
+              className={`bg-slate-950 border text-[11px] font-bold rounded-lg px-2 py-1 focus:outline-none transition-colors disabled:opacity-50 ${
+                engineMode === 'native_gpu'
+                  ? 'border-emerald-600 text-emerald-300 focus:border-emerald-400'
+                  : 'border-slate-700 text-slate-400 focus:border-emerald-500'
+              }`}
+              title="端末に保存済みのGGUFモデルから、本体GPUで動かすモデルを選択"
+            >
+              <option value="" disabled>
+                {isSwitchingGguf ? '⚡ 切替中...' : '⚡ GGUFモデルを選択'}
+              </option>
+              {ggufModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} ({m.sizeMB}MB){m.id === activeGgufId ? ' ✓' : ''}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
