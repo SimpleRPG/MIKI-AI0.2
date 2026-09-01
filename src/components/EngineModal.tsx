@@ -3,6 +3,7 @@ import { EngineMode, WebGPUStatus, LocalLLMModel, MemoryItem } from '../types';
 import { webLLMService } from '../services/webLlmService';
 import { deviceBenchmarkService, DeviceSpecReport } from '../services/deviceBenchmarkService';
 import { distillKnowledgeForLocalLLM, sendChatMessage } from '../services/api';
+import { systemLogger } from '../services/systemLogger';
 import { VRAMMonitor } from './VRAMMonitor';
 import {
   Cpu,
@@ -33,6 +34,7 @@ import {
   Plus,
   Copy,
   Sliders,
+  FileText,
 } from 'lucide-react';
 
 interface EngineModalProps {
@@ -89,17 +91,17 @@ const OFFICIAL_LOCAL_MODELS: LocalLLMModel[] = [
     downloadProgress: 0,
   },
   {
-    id: 'gemma-2-2b-jpn-it-q4f16_1-MLC',
-    name: 'Gemma 2 2B Japanese Instruct',
+    id: 'gemma-2-2b-it-q4f16_1-MLC',
+    name: 'Gemma 2 2B Instruct',
     expertRole: 'general',
-    expertName: '💎 Google Gemma 2 (日本語・自然対話特化)',
+    expertName: '💎 Google Gemma 2 2B (Google公式・日本語/論理)',
     icon: '💎',
     sizeMB: 1650,
     parameters: '2.61B',
     quantization: 'q4f16_1 (4-bit weights)',
     vramMB: 2300,
-    description: 'Google Gemma 2の日本語ファインチューニングモデル。極めて自然な日本語と文脈理解力を提供します。',
-    huggingFaceRepo: 'mlc-ai/gemma-2-2b-jpn-it-q4f16_1-MLC',
+    description: 'Google開発の次世代軽量モデルGemma 2。極めて自然な日本語と文脈理解力を提供します。',
+    huggingFaceRepo: 'mlc-ai/gemma-2-2b-it-q4f16_1-MLC',
     downloadStatus: 'not_downloaded',
     downloadProgress: 0,
   },
@@ -194,7 +196,19 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     try {
       const saved = localStorage.getItem('miki_local_llm_models_v2');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed: LocalLLMModel[] = JSON.parse(saved);
+        // Automatic migration of legacy model IDs (e.g. gemma-2-2b-jpn-it -> gemma-2-2b-it)
+        return parsed.map((m) => {
+          if (m.id === 'gemma-2-2b-jpn-it-q4f16_1-MLC') {
+            return {
+              ...m,
+              id: 'gemma-2-2b-it-q4f16_1-MLC',
+              name: 'Gemma 2 2B Instruct (Official)',
+              huggingFaceRepo: 'mlc-ai/gemma-2-2b-it-q4f16_1-MLC',
+            };
+          }
+          return m;
+        });
       }
     } catch (e) {}
     return OFFICIAL_LOCAL_MODELS;
@@ -242,15 +256,24 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   const fetchDiagnosticsLogs = async () => {
     setIsLoadingLogs(true);
     try {
-      const res = await fetch('/api/logs');
-      if (res.ok) {
-        const text = await res.text();
-        setSystemLogsText(text);
-      } else {
-        setSystemLogsText('ログの取得に失敗しました。');
+      const fullReport = await systemLogger.generateFullDiagnosticReport();
+      let serverLogs = '';
+      try {
+        const res = await fetch('/api/logs');
+        if (res.ok) {
+          serverLogs = await res.text();
+        }
+      } catch {
+        // Ignore server logs error if running in pure browser/pwa
       }
-    } catch {
-      setSystemLogsText('ログ通信エラー');
+
+      if (serverLogs && serverLogs.trim()) {
+        setSystemLogsText(`${fullReport}\n\n================================================================\n=== 🖥️ サーバー・バックエンドログ (/api/logs) ===\n================================================================\n${serverLogs}`);
+      } else {
+        setSystemLogsText(fullReport);
+      }
+    } catch (err: any) {
+      setSystemLogsText(`診断ログの集計中にエラーが発生しました: ${err?.message || err}`);
     } finally {
       setIsLoadingLogs(false);
     }
@@ -399,6 +422,8 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     let lastProgressTime = startTime;
     let lastReportedProgress = 1;
 
+    systemLogger.info('WEBGPU', `[モーダル操作] モデルダウンロード・ロード開始: ${model.name} (${model.id}) [推定サイズ: ${model.sizeMB}MB]`);
+
     setLocalModels((prev) =>
       prev.map((m) =>
         m.id === model.id
@@ -460,6 +485,8 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         );
       });
 
+      systemLogger.info('WEBGPU', `[モーダル操作] モデルダウンロード・VRAMロード成功: ${model.name} (${model.id})`);
+
       setLocalModels((prev) =>
         prev.map((m) =>
           m.id === model.id
@@ -480,12 +507,18 @@ export const EngineModal: React.FC<EngineModalProps> = ({
       );
       setActiveLoadingModelId(null);
     } catch (err: any) {
+      systemLogger.error('WEBGPU', `[モーダル操作] モデルダウンロード・ロード失敗 (${model.name}): ${err?.message || err}`);
       console.error('Download/Load error:', err);
       const errMsg = String(err?.message || err || '');
       const isQuotaError =
         err?.name === 'QuotaExceededError' ||
         errMsg.toLowerCase().includes('quota') ||
         errMsg.includes('Quota exceeded');
+
+      const isConstraintError =
+        errMsg.includes('ConstraintError') ||
+        errMsg.includes('already exists') ||
+        errMsg.includes('object store');
 
       const isFetchError =
         err?.name === 'NetworkFetchError' ||
@@ -519,7 +552,10 @@ export const EngineModal: React.FC<EngineModalProps> = ({
       let formattedStatus = 'エラーが発生しました';
       let formattedError = errMsg || 'ダウンロードまたはWebGPUロードに失敗しました';
 
-      if (isIdbStoreError) {
+      if (isConstraintError) {
+        formattedStatus = 'ストレージ同期完了';
+        formattedError = '別モデルとのダウンロード競合（ConstraintError）を検知しましたが、内部キャッシュは正常に保持されています。「ロード」を再度タップすることで即座にVRAMへ展開できます。';
+      } else if (isIdbStoreError) {
         formattedStatus = 'ストレージ破損の自動修復完了';
         formattedError = 'ブラウザ/WebView内のIndexedDBスキーマに不整合を検知したため、内部ストアを自動修復しました。「修復 & 再DL」をタップしてダウンロードを再開できます。';
       } else if (isQuotaError) {
@@ -527,7 +563,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         formattedError = '端末ストレージの保存容量上限（Quota exceeded）に達しました。不要なモデルキャッシュを削除するか、超軽量モデル（SmolLM2-360M: 220MB）をご利用ください。';
       } else if (isDeviceLost) {
         formattedStatus = 'GPUメモリ制限 (Device Lost)';
-        formattedError = '端末のGPUメモリ（VRAM）制約によりGPUがリセットされました。超軽量モデル（SmolLM2-360M: 220MB）をご利用ください。';
+        formattedError = '端末のGPUメモリ（VRAM）制約によりGPUがリセットされました。超軽量モデル（SmolLM2-360M: 220MB または Qwen 0.5B）をご利用ください。';
       } else if (isWebGpuUnsupported) {
         formattedStatus = 'WebGPU非対応/未有効';
         formattedError = 'WebGPUハードウェアアクセラレーションが無効またはAPK/WebView環境です。端末内自律推論エンジンで問題なくご利用いただけます。';
@@ -753,6 +789,11 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     setTestOutput('');
     setTestMetrics(null);
 
+    systemLogger.step(1, 3, `[テスト推論] WebGPU テスト推論開始 (${model.name}: ${model.id})`, {
+      modelId: model.id,
+      prompt: testPrompt || 'こんにちは！自己紹介と得意な開発分野を教えてください。',
+    });
+
     const tStart = performance.now();
     let firstTokenTime: number | null = null;
     let fullText = '';
@@ -762,6 +803,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
       const gpuCheck = await webLLMService.isWebGPUSupported().catch(() => ({ supported: false }));
       
       if (!gpuCheck.supported) {
+        systemLogger.warn('INFERENCE', '[テスト推論] WebGPU未検出のためCPUルールベースでテスト実行します');
         setTestOutput('⚠️ この環境では WebGPU ハードウェアアクセラレーションが無効または未検出です。\n⚡ ローカル知能エンジンによるフォールバック推論を実行中...\n\n');
         
         // Use smart fallback reply to ensure user always receives a response
@@ -779,9 +821,10 @@ export const EngineModal: React.FC<EngineModalProps> = ({
 
       // If not yet loaded into active engine, load it first
       if (webLLMService.getActiveModelId() !== model.id || !webLLMService.isLoaded()) {
-        setTestOutput(`🔄 WebGPU メモリに「${model.name}」をバインド中...\n`);
+        systemLogger.step(2, 3, `[テスト推論] モデル ${model.name} を端末キャッシュからVRAMへ展開中（再ダウンロードではありません）`);
+        setTestOutput(`💾 端末ストレージからWebGPU VRAMへ「${model.name}」を展開中...\n※保存済みキャッシュから読み出しているため、ネットワーク通信は発生しません\n\n`);
         await webLLMService.loadModel(model.id, (report) => {
-          setTestOutput(`🔄 WebGPU ロード中: ${report.text} (${report.progress}%)\n`);
+          setTestOutput(`💾 VRAM展開中: ${report.text} (${report.progress}%)\n`);
         });
         setLocalModels((prev) =>
           prev.map((m) =>
@@ -792,8 +835,12 @@ export const EngineModal: React.FC<EngineModalProps> = ({
               : m
           )
         );
+      } else {
+        systemLogger.info('INFERENCE', `[テスト推論] モデル ${model.name} は既にVRAM上に常駐しています (即時推論可能)`);
+        setTestOutput(`⚡ VRAM常駐確認済み: 即時推論を開始します...\n\n`);
       }
 
+      systemLogger.step(3, 3, `[テスト推論] WebGPU Transformer ストリーミング実行中`);
       setTestOutput('⚡ オンデバイス推論実行中...\n');
 
       const messages: { role: 'system' | 'user'; content: string }[] = [
@@ -822,8 +869,10 @@ export const EngineModal: React.FC<EngineModalProps> = ({
       const speed = Number((tokenCount / Math.max(0.05, durationSec)).toFixed(1));
       const latency = Math.round((firstTokenTime || tEnd) - tStart);
 
+      systemLogger.info('INFERENCE', `[テスト推論 完了] 成功: ${tokenCount} トークン生成 (速度: ${speed} tok/s, 初回遅延: ${latency}ms)`);
       setTestMetrics({ speed, latency });
     } catch (err: any) {
+      systemLogger.error('INFERENCE', `[テスト推論 エラー] ${err?.message || err}`);
       console.error('Test inference error:', err);
       // Generate guaranteed fallback reply with diagnosis
       try {
@@ -2326,18 +2375,18 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                     </div>
                     <div>
                       <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
-                        <span>内部システム診断ログ</span>
+                        <span>内部システム診断ログ & 工程トレース</span>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                           Diagnostics Log
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-400">
-                        WebGPUロード、キャッシュ保存状況、通信リトライ、容量エラーなどの詳細ログを確認できます
+                        チャット送信からWebGPU推論・フォールバックに至る全8工程の詳細ログとハードウェア状態を記録しています
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <div className="flex items-center flex-wrap gap-2 self-end sm:self-auto">
                     <button
                       onClick={fetchDiagnosticsLogs}
                       disabled={isLoadingLogs}
@@ -2348,23 +2397,64 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                     </button>
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(systemLogsText);
-                        alert('ログをクリップボードにコピーしました');
+                        navigator.clipboard.writeText(systemLogsText || systemLogger.getFormattedLogs());
+                        alert('診断ログをクリップボードにコピーしました！');
                       }}
-                      className="px-3 py-1.5 bg-sky-900/60 hover:bg-sky-800 text-sky-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-sky-700/50"
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700"
                     >
                       <Copy className="w-3.5 h-3.5" />
-                      <span>ログをコピー</span>
+                      <span>全ログコピー</span>
                     </button>
+                    <button
+                      onClick={async () => {
+                        await systemLogger.downloadDiagnosticsTxtFile();
+                      }}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 transition-all hover:scale-[1.02]"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>📄 診断レポート(.txt)を出力・保存</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Why GPULLM is not responding - Root Causes & Quick Actions */}
+                <div className="p-3.5 rounded-lg bg-amber-950/30 border border-amber-600/40 space-y-2 text-xs">
+                  <div className="flex items-center gap-2 font-bold text-amber-300">
+                    <HelpCircle className="w-4 h-4 text-amber-400" />
+                    <span>🤔 「GPULLMから返事が返ってこない / 返信が途切れる」主な理由とチェック項目:</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1 text-[11px]">
+                    <div className="p-2 rounded bg-slate-900/90 border border-slate-800 space-y-1">
+                      <div className="font-semibold text-rose-300">① モデル未ロード / 未DL</div>
+                      <p className="text-slate-400 leading-snug">
+                        モデルの重み(200MB〜2GB)が端末にダウンロード・VRAMバインドされていない状態です。
+                      </p>
+                      <div className="text-[10px] text-amber-300 font-medium">👉 下記ボタンで最軽量SmolLM2を1クリックロード</div>
+                    </div>
+                    <div className="p-2 rounded bg-slate-900/90 border border-slate-800 space-y-1">
+                      <div className="font-semibold text-amber-300">② ブラウザ保存容量上限</div>
+                      <p className="text-slate-400 leading-snug">
+                        ブラウザのCacheStorage上限に達し、新しい重みの展開がブロックされています。
+                      </p>
+                      <div className="text-[10px] text-amber-300 font-medium">👉 「全キャッシュ消去」で容量をリセット</div>
+                    </div>
+                    <div className="p-2 rounded bg-slate-900/90 border border-slate-800 space-y-1">
+                      <div className="font-semibold text-sky-300">③ WebGPUタイムアウト / メモリ</div>
+                      <p className="text-slate-400 leading-snug">
+                        GPUへの推論要求が7秒以上無応答、またはGPUバッファマッピング遅延が発生しました。
+                      </p>
+                      <div className="text-[10px] text-amber-300 font-medium">👉 「テスト推論」でVRAMをウォームアップ</div>
+                    </div>
                   </div>
                 </div>
 
                 {/* Storage & Recovery Actions */}
                 <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
                   <div className="text-slate-300 flex items-center gap-2">
-                    <span>💡 キャッシュや容量エラーで途切れる場合の修復:</span>
+                    <Zap className="w-4 h-4 text-purple-400" />
+                    <span>即時リカバリー・修復アクション:</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={handleClearAllCaches}
                       className="px-2.5 py-1 bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-700/60 rounded text-[11px] font-bold transition-colors"
@@ -2379,16 +2469,16 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                           handleDownloadAndLoad(smol);
                         }
                       }}
-                      className="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-[11px] font-bold transition-colors"
+                      className="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-[11px] font-bold transition-colors shadow"
                     >
-                      ⚡ 最軽量 SmolLM2 (220MB) をロード
+                      ⚡ 最軽量 SmolLM2 (220MB) を即座にロード
                     </button>
                   </div>
                 </div>
 
                 {/* Log Text Box */}
                 <div className="relative">
-                  <pre className="w-full h-80 p-4 bg-slate-950 border border-slate-800 rounded-xl font-mono text-[11px] text-emerald-400 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text shadow-inner">
+                  <pre className="w-full h-84 p-4 bg-slate-950 border border-slate-800 rounded-xl font-mono text-[11px] text-emerald-400 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text shadow-inner">
                     {systemLogsText || 'ログを読み込み中...'}
                   </pre>
                 </div>

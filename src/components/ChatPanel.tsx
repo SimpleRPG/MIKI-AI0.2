@@ -23,10 +23,12 @@ import {
   Share2,
   Square,
   StopCircle,
+  FileText,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode } from '../types';
 import { extractCodeBlocks } from '../utils/codeParser';
 import { SPEAKER_PROFILES } from '../data/speakers';
+import { systemLogger } from '../services/systemLogger';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -80,6 +82,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastSendTimeRef = useRef<number>(0);
 
   const PUBLIC_APP_URL = 'https://ais-pre-lmii4pykmv4ucirau7mbyp-23659957062.asia-northeast1.run.app';
 
@@ -98,17 +101,39 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       e.preventDefault();
       e.stopPropagation();
     }
+    const now = Date.now();
+    if (now - lastSendTimeRef.current < 600) {
+      // Debounce rapid duplicate touch/click events on mobile
+      return;
+    }
+
     const domValue = textareaRef.current?.value ?? '';
     const textToSend = (domValue || inputText || '').trim();
 
-    if ((!textToSend && attachedFiles.length === 0) || isLoading) return;
+    if ((!textToSend && attachedFiles.length === 0) || isLoading || isGenerating) return;
 
+    lastSendTimeRef.current = now;
     onSendMessage(textToSend, attachedFiles.length > 0 ? attachedFiles : undefined);
     setInputText('');
     if (textareaRef.current) {
       textareaRef.current.value = '';
     }
     setAttachedFiles([]);
+  };
+
+  const handleSafeStop = (e?: React.MouseEvent | React.TouchEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    // Prevent accidental stop triggered by finger release right after tapping send (under 750ms)
+    const elapsedSinceSend = Date.now() - lastSendTimeRef.current;
+    if (elapsedSinceSend < 750) {
+      systemLogger.warn('CHAT', `送信直後の誤タッチによる停止要求をブロックしました (経過時間: ${elapsedSinceSend}ms)`);
+      return;
+    }
+    systemLogger.info('CHAT', 'ユーザーが「停止」ボタンを押しました。');
+    onStopGeneration?.();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -425,21 +450,33 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                 {/* Fallback & WebGPU Status info bar */}
                 {!isUser && msg.fallbackDiagnostic && (
-                  <div className="flex items-center justify-between gap-2 bg-sky-950/40 border border-sky-500/20 px-2.5 py-1 rounded-lg text-[10.5px] text-sky-300">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 bg-amber-950/40 border border-amber-500/30 px-3 py-1.5 rounded-lg text-[11px] text-amber-200">
                     <div className="flex items-center gap-1.5 truncate">
-                      <span className="px-1.5 py-0.2 bg-sky-500/20 text-sky-300 rounded font-medium text-[10px]">
+                      <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded font-bold text-[10px]">
                         {msg.fallbackDiagnostic.category}
                       </span>
                       <span className="truncate text-slate-300">{msg.fallbackDiagnostic.cause}</span>
                     </div>
-                    {onOpenEngineModal && (
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                       <button
-                        onClick={onOpenEngineModal}
-                        className="text-[10px] text-sky-400 hover:text-sky-300 underline shrink-0 font-medium transition-colors"
+                        onClick={async () => {
+                          await systemLogger.downloadDiagnosticsTxtFile();
+                        }}
+                        className="text-[10px] text-emerald-300 hover:text-emerald-200 flex items-center gap-1 bg-emerald-950/70 border border-emerald-500/40 px-2 py-0.5 rounded font-bold transition-all hover:bg-emerald-900"
+                        title="診断レポート(.txt)をダウンロードして原因を確認・共有できます"
                       >
-                        端末LLM設定
+                        <FileText className="w-3 h-3" />
+                        <span>📄 診断txt保存</span>
                       </button>
-                    )}
+                      {onOpenEngineModal && (
+                        <button
+                          onClick={onOpenEngineModal}
+                          className="text-[10px] text-sky-400 hover:text-sky-300 underline font-medium transition-colors"
+                        >
+                          端末LLM設定
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -749,11 +786,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           {isLoading || isGenerating ? (
             <button
               type="button"
-              onClick={onStopGeneration}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                onStopGeneration?.();
-              }}
+              onClick={handleSafeStop}
               className="px-3 py-2 min-h-[40px] rounded-lg flex items-center gap-1.5 font-bold transition-all shrink-0 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-md shadow-rose-600/30 animate-pulse active:scale-95 cursor-pointer touch-manipulation"
               title="生成を中断する"
             >
@@ -764,20 +797,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <button
               type="button"
               onClick={handleSend}
-              onTouchStart={(e) => {
-                // Ensure IME syncs before submit
-                const domVal = textareaRef.current?.value;
-                if (domVal && domVal !== inputText) setInputText(domVal);
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                handleSend(e);
-              }}
-              onPointerUp={(e) => {
-                if (e.pointerType === 'touch') {
-                  handleSend(e);
-                }
-              }}
               className="p-2 sm:p-2.5 min-w-[40px] min-h-[40px] rounded-lg flex items-center justify-center font-bold transition-all shrink-0 cursor-pointer touch-manipulation bg-gradient-to-r from-pink-500 via-rose-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 active:scale-90 text-white shadow-md shadow-pink-500/30 ring-1 ring-white/20"
               title="メッセージを送信"
               aria-label="送信"

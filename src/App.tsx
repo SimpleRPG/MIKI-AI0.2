@@ -19,6 +19,7 @@ import {
 } from './types';
 import { sendChatMessage, sendDebugRequest } from './services/api';
 import { webLLMService } from './services/webLlmService';
+import { systemLogger } from './services/systemLogger';
 import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt } from './utils/moeRouter';
@@ -303,6 +304,11 @@ export default function App() {
 
   // Handle Stop Generation
   const handleStopGeneration = () => {
+    systemLogger.warn('CHAT', 'handleStopGeneration() が実行され、推論中断処理を開始します', {
+      targetAssistantId: currentAssistantIdRef.current,
+      hasActiveAbortController: Boolean(abortControllerRef.current),
+    });
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -315,7 +321,7 @@ export default function App() {
         prev.map((msg) => {
           if (msg.id === targetId) {
             let content = msg.content;
-            if (content.includes('初期化中') || content.includes('ロード中') || content.includes('推論中')) {
+            if (content.includes('初期化中') || content.includes('ロード中') || content.includes('推論中') || content.includes('準備中') || content.includes('生成中')) {
               content = '⏹ 生成を中断しました。';
             } else if (!content.includes('中断')) {
               content = content + '\n\n*(⏹ 生成を中断しました)*';
@@ -344,12 +350,24 @@ export default function App() {
     if (!text.trim() && (!attached || attached.length === 0)) return;
 
     if (abortControllerRef.current) {
+      systemLogger.warn('CHAT', '前回の未完了リクエストが存在したため中断して新規リクエストを開始します');
       abortControllerRef.current.abort();
     }
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
     setIsGenerating(true);
     setIsLoading(true);
+
+    const sendStartTime = performance.now();
+
+    // Step 1: Request received
+    systemLogger.step(1, 8, 'チャット送信リクエスト受付', {
+      inputLength: text.length,
+      snippet: text.slice(0, 100),
+      attachedCount: attached?.length || 0,
+      selectedEngineMode: engineMode,
+      speakerMode,
+    });
 
     // Auto extract memory heuristics
     if (persona.autoExtractMemories && text.trim()) {
@@ -366,16 +384,46 @@ export default function App() {
 
     setMessages((prev) => [...prev, userMsg]);
 
+    const assistantId = 'msg_asst_' + Date.now();
+    currentAssistantIdRef.current = assistantId;
+
+    const handleAbortExit = (stepName: string) => {
+      systemLogger.warn('CHAT', `チャット処理が中断シグナルにより中止されました [${stepName}]`, {
+        elapsedMs: Math.round(performance.now() - sendStartTime),
+      });
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantId
+            ? {
+                ...msg,
+                content:
+                  msg.content.includes('推論中') ||
+                  msg.content.includes('初期化中') ||
+                  msg.content.includes('準備中') ||
+                  msg.content.includes('生成中')
+                    ? '⏹ 生成を中断しました。'
+                    : msg.content,
+                isStreaming: false,
+              }
+            : msg
+        )
+      );
+      if (currentAssistantIdRef.current === assistantId) {
+        currentAssistantIdRef.current = null;
+      }
+      setIsGenerating(false);
+      setIsLoading(false);
+    };
+
     try {
       const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
       const activeMemories = memories.filter((m) => m.active);
-      const assistantId = 'msg_asst_' + Date.now();
-      currentAssistantIdRef.current = assistantId;
 
       // ==========================================
       // PATH 1: Instant Autonomous CPU Rule Engine
       // ==========================================
       if (engineMode === 'autonomous_rule') {
+        systemLogger.step(2, 8, 'CPU自律ルールベースエンジンで即時応答生成');
         const isCode =
           text.includes('作って') ||
           text.includes('ゲーム') ||
@@ -388,6 +436,11 @@ export default function App() {
           isCode,
           attached
         );
+
+        systemLogger.step(8, 8, 'CPU自律ルールベース応答完了', {
+          responseLength: reply.length,
+          snippet: reply.slice(0, 100),
+        });
 
         const cpuMsg: ChatMessage = {
           id: assistantId,
@@ -420,7 +473,11 @@ export default function App() {
       // ==========================================
       // PATH 2: WebGPU or Gemini Cloud Engine
       // ==========================================
+      // Step 2: Prompt classification & Hardware check
+      systemLogger.step(2, 8, 'プロンプト意図分類 & ハードウェア検証開始');
       const promptAnalysis = classifyPromptForMoE(text);
+      systemLogger.info('INFERENCE', `プロンプト意図判定: [${promptAnalysis.role}] (Temp: ${promptAnalysis.temperature})`);
+
       const activeGameCode = workspaceFiles.find((f) => f.path === 'index.html')?.content || '';
 
       // Non-blocking WebGPU checks with 2s timeout
@@ -435,13 +492,24 @@ export default function App() {
       ]);
       const isGpuUsable = gpuCheck.supported;
 
-      // Execute on-device WebGPU engine
+      systemLogger.step(3, 8, 'WebGPU環境 & 端末リソース診断', {
+        webgpuSupported: isGpuUsable,
+        cachedModels: cachedModelsList,
+      });
+
+      // Step 4: Model Selection & Cache verification
       const targetModelId = (webLLMService.isLoaded() && webLLMService.getActiveModelId())
         ? webLLMService.getActiveModelId()!
         : await Promise.race([
             webLLMService.findBestAvailableModel(promptAnalysis.role),
             new Promise<string>((resolve) => setTimeout(() => resolve('SmolLM2-360M-Instruct-q4f16_1-MLC'), 2000)),
           ]);
+
+      systemLogger.step(4, 8, `推論対象モデル選定: ${targetModelId}`, {
+        isEngineLoaded: webLLMService.isLoaded(),
+        activeModelId: webLLMService.getActiveModelId(),
+        targetModelId,
+      });
 
       // Clean placeholder message based on selected engineMode
       const placeholderText =
@@ -467,19 +535,26 @@ export default function App() {
         },
       };
       setMessages((prev) => [...prev, placeholderMsg]);
-      setIsLoading(false);
 
-      // WebGPU Model Preparation ONLY if user selected WebGPU engine
+      // Step 5: WebGPU Model Preparation ONLY if user selected WebGPU engine
       let isModelReady = webLLMService.isModelLoaded(targetModelId);
       const isTargetCached = await Promise.race([
         webLLMService.isModelCached(targetModelId).catch(() => false),
         new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
       ]);
 
+      systemLogger.step(5, 8, 'モデル重み & VRAMバインド状態確認', {
+        targetModelId,
+        isModelReady,
+        isTargetCached,
+      });
+
       if (engineMode === 'webgpu' && isGpuUsable && !isModelReady) {
         try {
+          systemLogger.info('WEBGPU', `WebGPUモデル (${targetModelId}) のロードを開始します (キャッシュ状況: ${isTargetCached ? '端末キャッシュあり' : '未ダウンロード/要取得'})...`);
           const loadPromise = webLLMService.loadModel(targetModelId, (report) => {
             if (abortController.signal.aborted) return;
+            systemLogger.debug('WEBGPU', `ロード進捗: ${report.text} (${report.progress}%)`);
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === assistantId
@@ -497,23 +572,31 @@ export default function App() {
           // Timeout protection: if model is not yet downloaded, don't freeze the chat forever
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(
-              () => reject(new Error('WebGPUロード待機タイムアウト (CPUルールベースで即答します)')),
+              () => reject(new Error('WebGPUロード待機タイムアウト (未ダウンロードまたはVRAM確保遅延のためCPUルールベースで即答します)')),
               isTargetCached ? 30000 : 12000
             )
           );
 
           await Promise.race([loadPromise, timeoutPromise]);
           isModelReady = webLLMService.isModelLoaded(targetModelId);
+          systemLogger.info('WEBGPU', `モデルロード完了: ${targetModelId} (推論可能状態)`);
         } catch (loadErr: any) {
-          console.warn('WebGPU Model load deferred/timed out:', loadErr);
+          systemLogger.warn('WEBGPU', 'WebGPU Model load deferred/timed out:', loadErr?.message || loadErr);
           isModelReady = false;
         }
       }
 
       if (abortController.signal.aborted) {
+        handleAbortExit('工程 5 完了直後');
         return;
       }
 
+      // Step 6: Context & System Prompt Compilation
+      systemLogger.step(6, 8, 'プロンプト & コンテキスト組み立て', {
+        targetModelId,
+        isModelReady,
+        isGpuUsable,
+      });
       const tStart = performance.now();
       const isCodeModRequest =
         (promptAnalysis.role === 'code' || promptAnalysis.role === 'shader' || promptAnalysis.role === 'logic') &&
@@ -567,15 +650,24 @@ export default function App() {
       let diagnosticData: ChatMessage['fallbackDiagnostic'] = undefined;
       let executedEngineLabel = 'CPUルールベース';
 
-      // 1. WebGPU Mode (Only run GPU Transformer if user chose webgpu)
+      // Step 7: WebGPU 推論実行 / トークン生成
       if (engineMode === 'webgpu') {
+        systemLogger.step(7, 8, 'WebGPU Transformer推論実行', {
+          isModelReady,
+          isGpuUsable,
+          targetModelId,
+          promptChars: userPromptContent.length,
+          contextMessageCount: chatContext.length,
+        });
+
         if (isModelReady && isGpuUsable) {
           try {
-            // Overall stream timeout of 10s for mobile GPU safety
+            systemLogger.info('INFERENCE', `WebGPU ストリーミング推論開始 (${targetModelId})`);
+            // Stream execution with safe mobile GPU timeout
             const streamPromise = (async () => {
               for await (const chunk of webLLMService.streamChat(chatContext, {
                 temperature: promptAnalysis.temperature,
-                max_tokens: 384,
+                max_tokens: 256,
                 fallbackModelId: targetModelId,
               })) {
                 if (abortController.signal.aborted) {
@@ -583,6 +675,7 @@ export default function App() {
                 }
                 if (firstTokenTime === null) {
                   firstTokenTime = performance.now();
+                  systemLogger.info('INFERENCE', `WebGPU 初回トークン到達 (TTFT: ${Math.round(firstTokenTime - tStart)}ms)`);
                 }
                 accumulated += chunk;
                 tokenCount++;
@@ -602,33 +695,45 @@ export default function App() {
             })();
 
             const streamTimeout = new Promise<void>((_, reject) =>
-              setTimeout(() => reject(new Error('WebGPU推論待機タイムアウト (7秒無応答)')), 7000)
+              setTimeout(() => reject(new Error('WebGPU推論待機タイムアウト (30秒無応答)')), 30000)
             );
 
             await Promise.race([streamPromise, streamTimeout]);
             webGpuSuccess = accumulated.trim().length > 0;
             if (webGpuSuccess) {
               executedEngineLabel = `On-Device WebGPU (${targetModelId.split('-')[0]})`;
+              systemLogger.info('INFERENCE', `WebGPU推論成功: 生成トークン数 ${tokenCount} (所要時間: ${Math.round(performance.now() - tStart)}ms)`);
             }
           } catch (gpuErr: any) {
             webGpuErrorDetails = gpuErr?.message || String(gpuErr);
-            console.warn('WebGPU execution error handled:', gpuErr);
+            systemLogger.warn('INFERENCE', 'WebGPU execution error caught:', webGpuErrorDetails);
             webGpuSuccess = false;
           }
         } else {
-          webGpuErrorDetails = isTargetCached
+          webGpuErrorDetails = !isGpuUsable
+            ? 'WebGPU非対応または無効 (ブラウザ設定または端末制限)'
+            : isTargetCached
             ? 'モデルのVRAMロード待機中'
             : 'モデル未ダウンロード (端末ローカルLLM設定でダウンロード可能)';
+          systemLogger.warn('INFERENCE', `WebGPU実行不可の理由: ${webGpuErrorDetails}`);
         }
       }
 
       if (abortController.signal.aborted) {
+        handleAbortExit('工程 7 完了直後');
         return;
       }
 
-      // 2. Fallback or Explicit Alternative Engines (CPU Rule-based or Gemini Cloud)
+      // Step 8: フォールバックまたは代替エンジンの判定
+      systemLogger.step(8, 8, '応答確定 & フォールバック処理判定', {
+        webGpuSuccess,
+        executedEngineLabel,
+      });
+
+      // Fallback or Explicit Alternative Engines (CPU Rule-based or Gemini Cloud)
       if (!webGpuSuccess || accumulated.trim().length === 0) {
         try {
+          systemLogger.info('CHAT', 'WebGPU未応答またはフォールバック要求のため、即時エンジンを呼び出します');
           const apiRes = await sendChatMessage({
             prompt: text,
             history: messages,
@@ -644,6 +749,7 @@ export default function App() {
           });
 
           if (abortController.signal.aborted) {
+            handleAbortExit('フォールバック処理完了直後');
             return;
           }
 
@@ -693,6 +799,7 @@ export default function App() {
               modelId: targetModelId,
             };
             executedEngineLabel = `CPUルールベース (${activeSpeaker.name})`;
+            systemLogger.warn('CHAT', `[GPULLM未応答診断] ${diagnosticCategory}: ${diagnosticCause}`, diagnosticData);
           } else if (engineMode === 'gemini_cloud') {
             executedEngineLabel = 'Gemini 2.5 Flash (Cloud)';
           } else {
@@ -704,9 +811,10 @@ export default function App() {
           firstTokenTime = performance.now();
         } catch (apiErr: any) {
           if (apiErr?.name === 'AbortError' || abortController.signal.aborted) {
+            handleAbortExit('フォールバックAPI例外捕捉');
             return;
           }
-          console.warn('Fallback chat API notice:', apiErr);
+          systemLogger.error('CHAT', 'Fallback chat API notice:', apiErr);
           accumulated = `⚠️ 応答生成中にエラーが発生しました:\n・詳細: ${apiErr.message || '接続エラー'}`;
         }
       }
@@ -735,6 +843,8 @@ export default function App() {
         )
       );
 
+      systemLogger.info('CHAT', `チャット処理全工程完了: [${executedEngineLabel}] (文字数: ${accumulated.length}, 所要時間: ${Math.round(tEnd - tStart)}ms)`);
+
       // Auto apply code
       const codeBlocks = extractCodeBlocks(accumulated);
       if (codeBlocks.length > 0) {
@@ -746,6 +856,7 @@ export default function App() {
         return;
       }
       console.warn('Chat error caught gracefully:', err);
+      systemLogger.error('CHAT', `チャット処理例外: ${err?.message || err}`);
 
       // In case of WebGPU device/buffer interruption, reset instance for next prompt
       if (engineMode === 'webgpu') {

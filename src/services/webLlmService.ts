@@ -77,8 +77,8 @@ const MODEL_VRAM_SPECS: Record<
     quant: 'q4f16_1 (4-bit)',
     kvCacheMB: 280,
   },
-  'gemma-2-2b-jpn-it-q4f16_1-MLC': {
-    name: 'Gemma 2 2B Japanese Instruct',
+  'gemma-2-2b-it-q4f16_1-MLC': {
+    name: 'Gemma 2 2B Instruct',
     params: '2.61B',
     weightsMB: 1650,
     vramMB: 2300,
@@ -115,7 +115,7 @@ export const KNOWN_MODEL_IDS = [
   'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
   'Llama-3.2-1B-Instruct-q4f16_1-MLC',
   'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
-  'gemma-2-2b-jpn-it-q4f16_1-MLC',
+  'gemma-2-2b-it-q4f16_1-MLC',
   'DeepSeek-R1-Distill-Qwen-1.5B-q4f16_1-MLC',
   'SmolLM2-360M-Instruct-q4f16_1-MLC',
   'SmolLM2-1.7B-Instruct-q4f16_1-MLC',
@@ -305,6 +305,7 @@ class WebLLMService {
   private progressListeners: Set<(report: { progress: number; text: string }) => void> = new Set();
   private deviceLostHandlerAttached: boolean = false;
   private isInterrupted: boolean = false;
+  private inferenceLock: Promise<void> = Promise.resolve();
 
   public async isWebGPUSupported(): Promise<{
     supported: boolean;
@@ -523,59 +524,27 @@ class WebLLMService {
   }
 
   public async isModelCached(modelId: string): Promise<boolean> {
+    const targetModelId = this.normalizeModelId(modelId);
     try {
-      // 1. Official WebLLM cache verification (authoritative, works with indexeddb backend)
-      const isCachedInWebLLM = await hasModelInCache(modelId, CUSTOM_APP_CONFIG);
+      // 1. Official WebLLM cache verification (authoritative, checks that all shards exist)
+      const isCachedInWebLLM = await hasModelInCache(targetModelId, CUSTOM_APP_CONFIG);
       if (isCachedInWebLLM) {
         if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(`miki_cached_model_${modelId}`, 'true');
+          localStorage.setItem(`miki_cached_model_${targetModelId}`, 'true');
         }
         return true;
       } else {
-        // If official check says false, clear any stale optimistic flag
         if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem(`miki_cached_model_${modelId}`);
+          localStorage.removeItem(`miki_cached_model_${targetModelId}`);
         }
+        return false;
       }
     } catch (e) {
-      // Fall through to manual inspection only if hasModelInCache threw
-    }
-
-    // 2. Direct IndexedDB inspection (shards stored in webllm/model store)
-    const idbShardCount = await countShardsInIndexedDB(modelId);
-    if (idbShardCount >= 2) {
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(`miki_cached_model_${modelId}`, 'true');
+        localStorage.removeItem(`miki_cached_model_${targetModelId}`);
       }
-      return true;
+      return false;
     }
-
-    // 3. Strict CacheStorage inspection (for legacy cached shards)
-    if (typeof caches !== 'undefined') {
-      try {
-        const keys = await caches.keys();
-        for (const key of keys) {
-          const cache = await caches.open(key);
-          const requests = await cache.keys();
-          const matching = requests.filter((req) => req.url.includes(modelId));
-          // Require at least 2 files (e.g. config/wasm + weight shards) to prevent false positives from partial 1-file downloads
-          if (matching.length >= 2) {
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(`miki_cached_model_${modelId}`, 'true');
-            }
-            return true;
-          }
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(`miki_cached_model_${modelId}`);
-    }
-
-    return false;
   }
 
   /**
@@ -587,11 +556,12 @@ class WebLLMService {
     approximateBytes: number;
     status: 'complete' | 'partial' | 'not_downloaded';
   }> {
+    const targetModelId = this.normalizeModelId(modelId);
     let shardCount = 0;
     let approximateBytes = 0;
 
     // Check IndexedDB
-    const idbCount = await countShardsInIndexedDB(modelId);
+    const idbCount = await countShardsInIndexedDB(targetModelId);
     shardCount += idbCount;
 
     // Check legacy CacheStorage
@@ -601,7 +571,7 @@ class WebLLMService {
         for (const key of keys) {
           const cache = await caches.open(key);
           const requests = await cache.keys();
-          const matching = requests.filter((req) => req.url.includes(modelId));
+          const matching = requests.filter((req) => req.url.includes(targetModelId));
           shardCount += matching.length;
         }
       } catch (e) {
@@ -609,7 +579,7 @@ class WebLLMService {
       }
     }
 
-    const officialCached = await this.isModelCached(modelId);
+    const officialCached = await this.isModelCached(targetModelId);
 
     if (officialCached) {
       return {
@@ -870,132 +840,303 @@ class WebLLMService {
     }
   }
 
+  private modelSwitchQueue: Promise<void> = Promise.resolve();
+  private activeLoadSessionId: number = 0;
+  private inFlightLoadMap: Map<string, Promise<void>> = new Map();
+
+  public normalizeModelId(modelId: string): string {
+    if (modelId === 'gemma-2-2b-jpn-it-q4f16_1-MLC') {
+      return 'gemma-2-2b-it-q4f16_1-MLC';
+    }
+    return modelId;
+  }
+
   public async loadModel(
     modelId: string,
     onProgress?: (report: { progress: number; text: string }) => void
   ): Promise<void> {
+    const targetModelId = this.normalizeModelId(modelId);
+
     if (onProgress) {
       this.progressListeners.add(onProgress);
     }
 
-    // If already loaded
-    if (this.engine && this.activeModelId === modelId) {
+    // If already loaded in VRAM with active engine
+    if (this.engine && this.activeModelId === targetModelId) {
+      systemLogger.info('WEBGPU', `モデル ${targetModelId} は既にVRAM上にロード済みです (即時利用可能)`);
       if (onProgress) {
-        onProgress({ progress: 100, text: 'ロード完了' });
+        onProgress({ progress: 100, text: 'WebGPU VRAM ロード完了 (推論可能)' });
         this.progressListeners.delete(onProgress);
       }
       return;
     }
 
-    // If currently initializing the same model, attach and wait for the same promise
-    if (this.initPromise && this.loadingModelId === modelId) {
+    // If this exact model is currently downloading/initializing, reuse the in-flight Promise
+    if (this.inFlightLoadMap.has(targetModelId)) {
+      systemLogger.info('WEBGPU', `[ロード重複防止] モデル ${targetModelId} は現在バックグラウンドでダウンロード/展開処理中です。既存セッションを共有して完了を待機します`);
       try {
-        await this.initPromise;
-      } finally {
+        await this.inFlightLoadMap.get(targetModelId);
         if (onProgress) {
           this.progressListeners.delete(onProgress);
         }
-      }
-      return;
-    }
-
-    // If another model is initializing, cancel or wait briefly
-    if (this.isInitializing && this.initPromise) {
-      try {
-        await this.initPromise;
-      } catch {
-        // ignore previous error and try loading new model
+        return;
+      } catch (e) {
+        if (onProgress) {
+          this.progressListeners.delete(onProgress);
+        }
+        throw e;
       }
     }
 
-    this.isInitializing = true;
-    this.loadingModelId = modelId;
+    // Mutex locking: chain all model switch requests sequentially to eliminate parallel IndexedDB race conditions
+    const currentSessionId = ++this.activeLoadSessionId;
+    systemLogger.info('WEBGPU', `モデル切替・ロード要求受付 (Session #${currentSessionId}): ${targetModelId}`);
 
-    const progressCallback = (report: InitProgressReport) => {
-      const progress = Math.round(report.progress * 100);
-      const rawText = report.text || '';
-      let text = rawText || `初期化中... (${progress}%)`;
+    const loadTask = async () => {
+      systemLogger.info('WEBGPU', `[Session #${currentSessionId}] モデル初期化タスク実行開始: ${targetModelId}`);
 
-      // Extract shard information if available, e.g., [1/14]
-      const shardMatch = rawText.match(/\[(\d+)\/(\d+)\]/);
-      const shardInfo = shardMatch ? ` [ブロック ${shardMatch[1]}/${shardMatch[2]}]` : '';
+      this.isInitializing = true;
+      this.loadingModelId = targetModelId;
 
-      // Distinguish local storage cache read from network download cleanly
-      if (rawText.toLowerCase().includes('start to fetch params')) {
-        text = `🌐 サーバー接続確立・データ受信中${shardInfo}`;
-      } else if (rawText.toLowerCase().includes('from cache') || rawText.includes('cache[')) {
-        text = `💾 端末ストレージからVRAMへ展開中${shardInfo}`;
-      } else if (
-        rawText.toLowerCase().includes('fetching') ||
-        rawText.toLowerCase().includes('loading parameter') ||
-        rawText.toLowerCase().includes('shard') ||
-        rawText.toLowerCase().includes('param')
-      ) {
-        text = `🌐 モデル重みデータを受信中${shardInfo}`;
-      } else if (rawText.toLowerCase().includes('pipeline') || rawText.toLowerCase().includes('shader')) {
-        text = `⚡ WebGPUシェーダー＆パイプライン初期化中`;
-      } else if (rawText.toLowerCase().includes('finish')) {
-        text = `✅ WebGPU VRAM 展開完了`;
-      }
+      const spec = MODEL_VRAM_SPECS[targetModelId];
+      const totalSizeMB = spec ? spec.weightsMB : 0;
+      let lastLoggedShard = '';
+      let loadStartTime = performance.now();
+      let lastReportedProgress = 0;
+      let lastProgressTime = performance.now();
+      let currentPhase = 'INIT'; // 'INIT' | 'DOWNLOAD' | 'EXPAND_TO_VRAM' | 'SHADER_JIT' | 'DONE'
+      let currentShardLabel = '';
 
-      this.progressListeners.forEach((listener) => {
-        try {
-          listener({ progress, text });
-        } catch {}
-      });
-    };
+      const progressCallback = (report: InitProgressReport) => {
+        const progress = Math.round(report.progress * 100);
+        const rawText = report.text || '';
+        let text = rawText || `初期化中... (${progress}%)`;
 
-    this.initPromise = (async () => {
-      const maxAttempts = 3;
-      let lastAttemptError: any = null;
-      systemLogger.info('WEBGPU', `Starting model load/initialization for ${modelId}`);
+        const shardMatch = rawText.match(/\[(\d+)\/(\d+)\]/);
+        const shardInfo = shardMatch ? ` [ブロック ${shardMatch[1]}/${shardMatch[2]}]` : '';
+        if (shardInfo) currentShardLabel = shardInfo;
+        const now = performance.now();
+        const elapsedSec = (now - loadStartTime) / 1000;
 
-      // Ensure all IndexedDB stores exist cleanly before opening WebLLM
-      await sanitizeIndexedDB().catch(() => {});
+        const isFromCache = rawText.toLowerCase().includes('from cache') || rawText.includes('cache[');
+        const isFetching = rawText.toLowerCase().includes('fetching') || rawText.toLowerCase().includes('loading parameter') || rawText.toLowerCase().includes('shard') || rawText.toLowerCase().includes('start to fetch');
+        const isShader = rawText.toLowerCase().includes('pipeline') || rawText.toLowerCase().includes('shader');
+        const isFinish = rawText.toLowerCase().includes('finish');
+
+        // Output raw event for complete diagnostic transparency
+        systemLogger.debug('WEBGPU', `[WebLLMイベント] 進捗: ${progress}% | 状態: "${rawText}" | 経過: ${elapsedSec.toFixed(1)}s`);
+
+        if (isFromCache && currentPhase !== 'EXPAND_TO_VRAM') {
+          currentPhase = 'EXPAND_TO_VRAM';
+          systemLogger.info('WEBGPU', `【工程 2/3: VRAM展開開始】端末内IndexedDBからWebGPU VRAMへ重みブロックを展開中... (${targetModelId})`);
+        } else if (isFetching && !isFromCache && currentPhase !== 'DOWNLOAD') {
+          currentPhase = 'DOWNLOAD';
+          systemLogger.info('WEBGPU', `【工程 1/3: ネットワーク受信】未保存シャードをHuggingFaceからダウンロード中... (回線状況により1ブロックあたり15〜40秒程度かかります) (${targetModelId})`);
+        }
+
+        if (shardMatch && (shardInfo !== lastLoggedShard || isFromCache)) {
+          lastLoggedShard = shardInfo;
+          const currentShard = parseInt(shardMatch[1], 10);
+          const totalShards = parseInt(shardMatch[2], 10);
+          const downloadedMB = totalSizeMB > 0 ? Math.round((currentShard / totalShards) * totalSizeMB) : 0;
+          
+          const timeDelta = (now - lastProgressTime) / 1000;
+          const progressDelta = progress - lastReportedProgress;
+          const speedMBs = (timeDelta > 0 && totalSizeMB > 0 && progressDelta > 0)
+            ? (((progressDelta / 100) * totalSizeMB) / timeDelta).toFixed(1)
+            : (elapsedSec > 0 && downloadedMB > 0 ? (downloadedMB / elapsedSec).toFixed(1) : '0.0');
+
+          const remainingMB = Math.max(0, totalSizeMB - downloadedMB);
+          const etaSec = Number(speedMBs) > 0 ? Math.round(remainingMB / Number(speedMBs)) : 0;
+          const etaStr = etaSec > 0 ? ` (残り約 ${etaSec}秒)` : '';
+
+          if (isFromCache) {
+            systemLogger.debug('WEBGPU', `[VRAM展開中] 💾 端末キャッシュからVRAMへ展開: ${shardInfo} (${downloadedMB}/${totalSizeMB}MB, 経過: ${elapsedSec.toFixed(1)}s)`);
+          } else {
+            systemLogger.info('WEBGPU', `[重み受信完了] 🌐 ネットワーク受信完了: ${shardInfo} (${progress}% 完了, ${downloadedMB}/${totalSizeMB}MB, 速度: ${speedMBs} MB/s, 経過: ${elapsedSec.toFixed(1)}s${etaStr})`);
+          }
+
+          lastReportedProgress = progress;
+          lastProgressTime = now;
+        }
+
+        if (rawText.toLowerCase().includes('start to fetch params')) {
+          text = `🌐 HuggingFace通信接続確立・重みデータ受信中${shardInfo}`;
+        } else if (isFromCache) {
+          text = `💾 端末ストレージからVRAMへ展開中${shardInfo}`;
+        } else if (isFetching) {
+          text = `🌐 モデル重みデータを受信中${shardInfo}`;
+        } else if (isShader) {
+          if (currentPhase !== 'SHADER_JIT') {
+            currentPhase = 'SHADER_JIT';
+            systemLogger.info('WEBGPU', `【工程 3/3: シェーダーJIT】WebGPUシェーダー最適化コンパイル＆パイプライン生成開始 (${targetModelId})`);
+          }
+          text = `⚡ WebGPUシェーダー＆パイプライン初期化中`;
+        } else if (isFinish) {
+          currentPhase = 'DONE';
+          text = `✅ WebGPU VRAM 展開完了`;
+          const totalSec = ((performance.now() - loadStartTime) / 1000).toFixed(2);
+          systemLogger.info('WEBGPU', `🎉 モデル重みの展開とWebGPUパイプライン初期化が完了しました (総所要時間: ${totalSec}s)`);
+        }
+
+        this.progressListeners.forEach((listener) => {
+          try {
+            listener({ progress, text });
+          } catch {}
+        });
+      };
 
       try {
+        // Step 1: Unload previous model safely from VRAM
+        systemLogger.step(1, 5, `前モデル (${this.activeModelId || 'なし'}) のVRAM解放とメモリクリーンアップ`, {
+          previousModel: this.activeModelId,
+          targetModel: targetModelId,
+        });
+
+        if (this.engine) {
+          try {
+            if (this.activeModelId !== targetModelId) {
+              systemLogger.info('WEBGPU', `既存モデル (${this.activeModelId}) をアンロードしてVRAMを解放します`);
+              if (typeof (this.engine as any).unload === 'function') {
+                await (this.engine as any).unload();
+              }
+              this.engine = null;
+              this.activeModelId = null;
+            }
+          } catch (unloadErr) {
+            systemLogger.warn('WEBGPU', '既存モデルのアンロード例外（無視して新規初期化を続行します）:', unloadErr);
+            this.engine = null;
+            this.activeModelId = null;
+          }
+        }
+
+        // Step 2: Storage verification & sanitize IndexedDB
+        systemLogger.step(2, 5, `ストレージ（IndexedDB/CacheStorage）キャッシュ検証 (${targetModelId})`);
+        await sanitizeIndexedDB().catch(() => {});
+        const cachedShardCount = await countShardsInIndexedDB(targetModelId).catch(() => 0);
+        systemLogger.info(
+          'WEBGPU',
+          `【ストレージ事前診断】モデル ${targetModelId}: 端末IndexedDB内に ${cachedShardCount} 個の重みシャードが保存されています。`
+        );
+
+        // Step 3 & 4: Model loading loop
+        systemLogger.step(3, 5, `モデル重みファイルダウンロード & VRAMバインド開始 (${targetModelId})`);
+        const maxAttempts = 2;
+        let lastAttemptError: any = null;
+
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          let watchdogInterval: any = null;
           try {
             if (attempt > 1) {
-              systemLogger.warn('WEBGPU', `Retrying model load (${attempt}/${maxAttempts}) for ${modelId}`);
+              systemLogger.warn('WEBGPU', `モデルロード再試行 (${attempt}/${maxAttempts}) [${targetModelId}]`);
               progressCallback({
                 progress: 0,
                 text: `🔄 通信・ストレージを再同期中 (${attempt}/${maxAttempts})... ダウンロードを継続します`,
                 timeElapsed: 0,
               });
-              await new Promise((r) => setTimeout(r, 1200 * attempt));
+              await new Promise((r) => setTimeout(r, 1000 * attempt));
             }
 
-            if (this.engine) {
-              if ((this.engine as any).setInitProgressCallback) {
-                (this.engine as any).setInitProgressCallback(progressCallback);
+            // Adaptive Watchdog with generous 180s timeout and periodic heartbeat logging
+            let lastWatchdogPing = performance.now();
+            let lastHeartbeatLog = performance.now();
+            const watchdogTimeoutSec = 180; // 3 minutes per shard to accommodate mobile 4G speeds
+
+            const watchdogPromise = new Promise<never>((_, reject) => {
+              watchdogInterval = setInterval(() => {
+                const now = performance.now();
+                const idleSec = (now - lastWatchdogPing) / 1000;
+                
+                // Heartbeat notification to UI and log every 10 seconds of download inactivity
+                if (idleSec >= 8 && now - lastHeartbeatLog >= 10000) {
+                  lastHeartbeatLog = now;
+                  const waitingMsg = `🌐 HuggingFaceから重みブロックを受信中... (${Math.round(idleSec)}秒経過 / ダウンロード継続中)`;
+                  systemLogger.info(
+                    'WEBGPU',
+                    `[ダウンロード継続中] ${currentShardLabel || '重みブロック'} を受信中... (待機経過: ${Math.round(idleSec)}秒 / タイムアウト上限: ${watchdogTimeoutSec}秒)`
+                  );
+                  this.progressListeners.forEach((listener) => {
+                    try {
+                      listener({
+                        progress: lastReportedProgress,
+                        text: waitingMsg,
+                      });
+                    } catch {}
+                  });
+                }
+
+                if (idleSec >= watchdogTimeoutSec) {
+                  if (watchdogInterval) clearInterval(watchdogInterval);
+                  reject(
+                    new Error(
+                      `モデル重みの通信/VRAM展開が無応答（${Math.round(
+                        idleSec
+                      )}秒）のため中断しました。通信が途切れたか、端末のWebGPUメモリ上限に達した可能性があります。「再開」するか、スマホに最適な超軽量モデル（Qwen 0.5B: 380MB / SmolLM2: 220MB）をご利用ください。`
+                    )
+                  );
+                }
+              }, 2000);
+            });
+
+            const wrappedProgressCallback = (report: InitProgressReport) => {
+              lastWatchdogPing = performance.now();
+              progressCallback(report);
+            };
+
+            const loadOperation = async () => {
+              if (this.engine) {
+                if ((this.engine as any).setInitProgressCallback) {
+                  (this.engine as any).setInitProgressCallback(wrappedProgressCallback);
+                }
+                await this.engine.reload(targetModelId);
+              } else {
+                this.engine = await CreateMLCEngine(targetModelId, {
+                  appConfig: CUSTOM_APP_CONFIG,
+                  initProgressCallback: wrappedProgressCallback,
+                });
               }
-              await this.engine.reload(modelId);
-            } else {
-              this.engine = await CreateMLCEngine(modelId, {
-                appConfig: CUSTOM_APP_CONFIG,
-                initProgressCallback: progressCallback,
-              });
-            }
+            };
 
-            this.activeModelId = modelId;
-            this.setPreferredModelId(modelId);
+            await Promise.race([loadOperation(), watchdogPromise]);
+            if (watchdogInterval) clearInterval(watchdogInterval);
+
+            this.activeModelId = targetModelId;
+            this.setPreferredModelId(targetModelId);
 
             if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(`miki_cached_model_${modelId}`, 'true');
+              localStorage.setItem(`miki_cached_model_${targetModelId}`, 'true');
             }
             if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
               navigator.storage.persist().catch(() => {});
             }
 
-            systemLogger.info('WEBGPU', `Model ${modelId} successfully loaded into VRAM`, { modelId, attempt });
+            // Step 5: Finished & VRAM allocation telemetry
+            const vramSnapshot = await this.getVRAMSnapshot().catch(() => null);
+            systemLogger.step(5, 5, `モデル切替・VRAMバインド完了 (${targetModelId})`, {
+              modelId: targetModelId,
+              attempt,
+              status: 'ready',
+              weightsVRAM_MB: vramSnapshot?.weightsBufferMB || spec?.weightsMB,
+              kvCacheVRAM_MB: vramSnapshot?.kvCacheBufferMB || spec?.kvCacheMB,
+              totalVRAM_MB: vramSnapshot?.totalUsedVRAM_MB || spec?.vramMB,
+              deviceEstimatedVRAM_MB: vramSnapshot?.deviceEstimatedVRAM_MB,
+              vramPressure: vramSnapshot ? `${Math.round(vramSnapshot.pressureRatio * 100)}% (${vramSnapshot.pressureLevel})` : undefined,
+              jsHeapUsedMB: vramSnapshot?.jsHeapUsedMB,
+            });
+            systemLogger.info('WEBGPU', `[VRAM展開ステータス] 重み: ${vramSnapshot?.weightsBufferMB ?? spec?.weightsMB ?? 0}MB | KVキャッシュ: ${vramSnapshot?.kvCacheBufferMB ?? spec?.kvCacheMB ?? 0}MB | 合計消費: ${vramSnapshot?.totalUsedVRAM_MB ?? spec?.vramMB ?? 0}MB | 推定負荷率: ${vramSnapshot ? Math.round(vramSnapshot.pressureRatio * 100) : 0}% (${vramSnapshot?.pressureLevel ?? 'normal'})`);
             return;
           } catch (err: any) {
+            if (watchdogInterval) clearInterval(watchdogInterval);
             lastAttemptError = err;
             this.activeModelId = null;
             const errMsg = String(err?.message || err || '');
-            systemLogger.error('WEBGPU', `Error during model load attempt ${attempt}: ${errMsg}`, { modelId, attempt, error: errMsg });
+            systemLogger.error('WEBGPU', `モデルロード試行 ${attempt}/${maxAttempts} でエラーが発生しました: ${errMsg}`, {
+              modelId: targetModelId,
+              attempt,
+              error: errMsg,
+            });
 
+            const isConstraintError = errMsg.includes('ConstraintError') || errMsg.includes('already exists');
             const isIdbError =
               errMsg.includes('object stores was not found') ||
               errMsg.includes('IDBDatabase') ||
@@ -1016,17 +1157,18 @@ class WebLLMService {
               errMsg.toLowerCase().includes('device was lost') ||
               errMsg.toLowerCase().includes('gpudevicelostinfo');
 
+            if (isConstraintError) {
+              systemLogger.info('WEBGPU', 'IndexedDBキー競合 (ConstraintError) を検知。キャッシュを保持したまま再同期します');
+            }
+
             if (isIdbError) {
-              console.warn('[WebLLM] Detected corrupted IndexedDB schema, rebuilding stores...');
+              systemLogger.warn('WEBGPU', 'IndexedDBスキーマ再構築を実行します');
               await sanitizeIndexedDB().catch(() => {});
-              await deleteModelFromIndexedDB(modelId).catch(() => {});
-              if (attempt < maxAttempts) {
-                continue;
-              }
+              await deleteModelFromIndexedDB(targetModelId).catch(() => {});
             }
 
             if (isQuota) {
-              await this.repairModelCache(modelId).catch(() => {});
+              await this.repairModelCache(targetModelId).catch(() => {});
               const quotaErr = new Error(
                 '端末ストレージの保存容量制限（Quota exceeded）に達しました。不要なモデルキャッシュを消去するか、超軽量モデル（SmolLM2-360M: 220MB）をご利用ください。'
               );
@@ -1038,13 +1180,12 @@ class WebLLMService {
               this.engine = null;
               this.activeModelId = null;
               const gpuErr = new Error(
-                `端末のGPUメモリ（VRAM）制約によりDevice Lostが発生しました。より軽量なモデル（SmolLM2-360M: 220MB）をご利用いただくか、自律相棒エンジンで快適にご利用いただけます。`
+                `端末のGPUメモリ（VRAM）制約によりDevice Lostが発生しました。より軽量なモデル（SmolLM2-360M: 220MB または Qwen 0.5B）をご利用ください。`
               );
               (gpuErr as any).name = 'GPUDeviceLostError';
               throw gpuErr;
             }
 
-            // Clean up partially initialized engine before next attempt
             if (this.engine) {
               try {
                 await (this.engine as any).unload?.();
@@ -1052,15 +1193,12 @@ class WebLLMService {
               this.engine = null;
             }
 
-            // If there are still attempts remaining for network/cache errors, continue
             if (attempt < maxAttempts) {
-              console.warn(`Load attempt ${attempt} failed with network/cache issue, retrying...`, err);
               continue;
             }
           }
         }
 
-        // If all retry attempts failed:
         const finalErrMsg = String(lastAttemptError?.message || lastAttemptError || '');
         const isFetchOrCacheError =
           finalErrMsg.toLowerCase().includes('failed to fetch') ||
@@ -1074,7 +1212,7 @@ class WebLLMService {
 
         if (isFetchOrCacheError) {
           const fetchErr = new Error(
-            'モデル取得中に通信エラーが発生しました。既にダウンロード済みのブロックは端末内に保持されています。「再開・リロード」で続きからダウンロードを再開できます。'
+            'モデル重みのダウンロード中にネットワーク切断が発生しました。保存済みのブロックは端末内に保持されています。「再ダウンロード」で続きから再開できます。'
           );
           (fetchErr as any).name = 'NetworkFetchError';
           throw fetchErr;
@@ -1082,16 +1220,23 @@ class WebLLMService {
 
         throw lastAttemptError;
       } finally {
-        this.isInitializing = false;
-        this.initPromise = null;
-        this.loadingModelId = null;
+        if (this.activeLoadSessionId === currentSessionId) {
+          this.isInitializing = false;
+          this.loadingModelId = null;
+        }
         if (onProgress) {
           this.progressListeners.delete(onProgress);
         }
       }
-    })();
+    };
 
-    await this.initPromise;
+    // Chain the task onto the mutex queue so loads never run concurrently
+    const loadPromise = this.modelSwitchQueue.then(loadTask, loadTask).finally(() => {
+      this.inFlightLoadMap.delete(targetModelId);
+    });
+    this.inFlightLoadMap.set(targetModelId, loadPromise);
+    this.modelSwitchQueue = loadPromise;
+    await loadPromise;
   }
 
   public async interruptGenerate(): Promise<void> {
@@ -1113,6 +1258,7 @@ class WebLLMService {
     this.initPromise = null;
     this.loadingModelId = null;
     this.activeModelId = null;
+    this.inFlightLoadMap.clear();
     this.progressListeners.clear();
     if (this.engine) {
       try {
@@ -1126,6 +1272,7 @@ class WebLLMService {
     this.isInitializing = false;
     this.initPromise = null;
     this.loadingModelId = null;
+    this.inFlightLoadMap.clear();
   }
 
   public async clearAllCaches(): Promise<void> {
@@ -1179,20 +1326,20 @@ class WebLLMService {
     messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
     options?: { temperature?: number; max_tokens?: number; fallbackModelId?: string }
   ): AsyncGenerator<string, void, unknown> {
-    const maxAttempts = 3;
+    const maxAttempts = 2;
     let lastError: any = null;
 
     // Extract the latest user input safely
     const latestUser = messages.filter((m) => m.role === 'user').pop();
     const latestUserText = (latestUser?.content || 'こんにちは').trim();
 
-    // Sanitize messages for on-device SLM execution: ensure alternating turns and compact length
-    let sanitizedMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [];
+    // Sanitize messages for on-device SLM execution: keep compact system prompt and short history for fast prefill
+    const sanitizedMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [];
     const sysMsg = messages.find((m) => m.role === 'system');
-    if (sysMsg) {
+    if (sysMsg && sysMsg.content) {
       sanitizedMessages.push({
         role: 'system',
-        content: sysMsg.content.slice(0, 350),
+        content: sysMsg.content.slice(0, 260),
       });
     } else {
       sanitizedMessages.push({
@@ -1201,184 +1348,218 @@ class WebLLMService {
       });
     }
 
-    // Include recent conversational context if available
+    // Include only 1-2 most recent turns to minimize GPU prefill latency on mobile
     const nonSysMsgs = messages.filter((m) => m.role !== 'system');
-    const recentTurns = nonSysMsgs.slice(-3);
+    const recentTurns = nonSysMsgs.slice(-2);
     for (const turn of recentTurns) {
       sanitizedMessages.push({
         role: turn.role,
-        content: (turn.content || '').slice(0, 400),
+        content: (turn.content || '').slice(0, 220),
       });
     }
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        // If not loaded and a fallback model is specified, load it first
-        if (!this.engine || !this.activeModelId) {
-          const targetModel = options?.fallbackModelId || this.getPreferredModelId() || 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC';
-          await this.loadModel(targetModel);
-        }
+    // Wait for any active GPU inference pipeline to completely resolve and release staging buffers
+    const currentInferenceLock = this.inferenceLock;
+    let releaseInferenceLock: () => void = () => {};
+    this.inferenceLock = new Promise<void>((resolve) => {
+      releaseInferenceLock = resolve;
+    });
 
-        if (!this.engine) {
-          throw new Error('WebGPU LLM エンジンがロードされていません。');
-        }
+    try {
+      await currentInferenceLock;
+    } catch {}
 
-        // Clean up KV cache before new completion to prevent buffer fragmentation/unmapped errors
+    try {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          if (typeof (this.engine as any).resetChat === 'function') {
-            await (this.engine as any).resetChat(false);
+          // If not loaded and a fallback model is specified, load it first
+          if (!this.engine || !this.activeModelId) {
+            const targetModel = options?.fallbackModelId || this.getPreferredModelId() || 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC';
+            systemLogger.info('INFERENCE', `[WebGPU推論 試行 ${attempt}/${maxAttempts}] エンジン未ロードのためロードを開始します: ${targetModel}`);
+            await this.loadModel(targetModel);
           }
-        } catch {}
 
-        const tokenLimit = Math.min(options?.max_tokens ?? 384, 384);
+          if (!this.engine) {
+            throw new Error('WebGPU LLM エンジンがロードされていません。');
+          }
 
-        if (attempt === 1) {
-          // Attempt 1: Fast streaming with anti-repetition penalty and watchdog timer
-          const createPromise = this.engine.chat.completions.create({
-            messages: sanitizedMessages as any,
-            stream: true,
-            temperature: options?.temperature ?? 0.7,
-            presence_penalty: 0.3,
-            frequency_penalty: 0.3,
-            max_tokens: tokenLimit,
-          });
+          const tokenLimit = Math.min(options?.max_tokens ?? 256, 256);
 
-          // 8-second watchdog for initial create call
-          const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('WebGPU推論がタイムアウト（8秒無応答）しました。')), 8000)
-          );
+          if (attempt === 1) {
+            systemLogger.info('INFERENCE', `[WebGPU推論 試行 1/2] ストリーミング生成API呼び出し開始 (MaxTokens: ${tokenLimit}, Temperature: ${options?.temperature ?? 0.7})`);
+            
+            const createPromise = this.engine.chat.completions.create({
+              messages: sanitizedMessages as any,
+              stream: true,
+              temperature: options?.temperature ?? 0.7,
+              max_tokens: tokenLimit,
+            });
 
-          const chunks: any = await Promise.race([createPromise, timeoutPromise]);
+            // 25-second watchdog for initial create/prefill (gives mobile GPUs adequate time for shader JIT & prefill)
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('WebGPU推論がタイムアウト（25秒無応答）しました。')), 25000)
+            );
 
-          let hasYielded = false;
-          const asyncIter = chunks[Symbol.asyncIterator]();
+            const chunks: any = await Promise.race([createPromise, timeoutPromise]);
 
-          while (true) {
+            let hasYielded = false;
+            let generatedChunkCount = 0;
+            let firstTokenTime: number | null = null;
+            let lastTokenTime: number = performance.now();
+            const inferStartTime = performance.now();
+
+            const asyncIter = chunks[Symbol.asyncIterator]();
+
+            while (true) {
+              if (this.isInterrupted) {
+                this.isInterrupted = false;
+                systemLogger.warn('INFERENCE', '[WebGPU推論] ユーザーによって生成が中断されました。');
+                return;
+              }
+
+              // Per-token watchdog timeout (10 seconds max per token generation)
+              const tokenTimeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('WebGPUトークン生成タイムアウト (10秒無応答)')), 10000)
+              );
+
+              const nextResult: IteratorResult<any> = await Promise.race([
+                asyncIter.next(),
+                tokenTimeoutPromise,
+              ]);
+
+              if (nextResult.done) {
+                break;
+              }
+
+              const now = performance.now();
+              const chunk = nextResult.value;
+              const delta = chunk?.choices?.[0]?.delta?.content || '';
+              if (delta) {
+                if (!firstTokenTime) {
+                  firstTokenTime = now;
+                  const ttftMs = Math.round(firstTokenTime - inferStartTime);
+                  systemLogger.info('INFERENCE', `WebGPU 初回トークン到達 (TTFT: ${ttftMs}ms)`);
+                }
+
+                yield delta;
+                hasYielded = true;
+                generatedChunkCount++;
+
+                // Periodic progress telemetry every 10 tokens
+                if (generatedChunkCount % 10 === 0) {
+                  const elapsedSinceFirst = (now - firstTokenTime) / 1000;
+                  const currentTps = elapsedSinceFirst > 0 ? (generatedChunkCount / elapsedSinceFirst).toFixed(1) : '0';
+                  const intervalMs = Math.round(now - lastTokenTime);
+                  systemLogger.debug('INFERENCE', `[WebGPU生成進捗] ${generatedChunkCount} チャンク到達 (速度: ${currentTps} tok/s, 直近間隔: ${intervalMs}ms)`);
+                }
+
+                lastTokenTime = now;
+              }
+            }
+
+            const totalTimeMs = Math.round(performance.now() - inferStartTime);
+            const genDurationSec = firstTokenTime ? (performance.now() - firstTokenTime) / 1000 : 0;
+            const avgTps = genDurationSec > 0 ? (generatedChunkCount / genDurationSec).toFixed(1) : '0';
+
+            systemLogger.info('INFERENCE', `[WebGPU推論 完了] 受信チャンク数: ${generatedChunkCount}, 総所要時間: ${totalTimeMs}ms (平均速度: ${avgTps} tok/s)`);
+
+            if (hasYielded) {
+              return;
+            }
+          } else {
             if (this.isInterrupted) {
               this.isInterrupted = false;
               return;
             }
+            // Attempt 2: Atomic non-streaming completion with compact prompt
+            systemLogger.info('INFERENCE', `[WebGPU推論 試行 2/2] アトミック(非ストリーミング)一括生成に切り替えてリトライします...`);
+            await new Promise((r) => setTimeout(r, 200));
 
-            // Per-token watchdog timeout (4 seconds max per token generation)
-            const tokenTimeoutPromise = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('WebGPUトークン生成タイムアウト (4秒無応答)')), 4000)
+            // Ensure engine is ready before attempt 2
+            if (!this.engine || !this.activeModelId) {
+              const targetModel =
+                options?.fallbackModelId ||
+                this.getPreferredModelId() ||
+                'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC';
+              systemLogger.info('WEBGPU', `[WebGPU自己修復] リトライ前にモデルを再初期化中: ${targetModel}`);
+              await this.loadModel(targetModel);
+            }
+
+            const compactMessages = [
+              {
+                role: 'system',
+                content: 'あなたは親切なAI相棒のみきです。日本語で自然に回答してください。',
+              },
+              {
+                role: 'user',
+                content: latestUserText.slice(0, 150),
+              },
+            ];
+
+            const atomicPromise = this.engine.chat.completions.create({
+              messages: compactMessages as any,
+              stream: false,
+              temperature: options?.temperature ?? 0.7,
+              max_tokens: 200,
+            });
+
+            const atomicTimeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('WebGPUアトミック推論がタイムアウト（20秒無応答）しました。')), 20000)
             );
 
-            const nextResult: IteratorResult<any> = await Promise.race([
-              asyncIter.next(),
-              tokenTimeoutPromise,
-            ]);
+            const response = await Promise.race([atomicPromise, atomicTimeoutPromise]);
 
-            if (nextResult.done) {
-              break;
-            }
-
-            const chunk = nextResult.value;
-            const delta = chunk?.choices?.[0]?.delta?.content || '';
-            if (delta) {
-              yield delta;
-              hasYielded = true;
-            }
-          }
-
-          if (hasYielded) {
-            return;
-          }
-        } else {
-          if (this.isInterrupted) {
-            this.isInterrupted = false;
-            return;
-          }
-          // Attempt 2 & 3: Atomic non-streaming completion with compact prompt to avoid GPUBuffer race conditions
-          console.log(`[WebLLM] Retrying inference with atomic pass (attempt ${attempt}/${maxAttempts})...`);
-          await new Promise((r) => setTimeout(r, 150 * attempt));
-
-          // Ensure ultra-compact payload on retry
-          const compactMessages = [
-            {
-              role: 'system',
-              content: 'あなたは親切なAI相棒のみきです。日本語で自然に、同じ言葉を繰り返さずに回答してください。',
-            },
-            {
-              role: 'user',
-              content: latestUserText.slice(0, 200),
-            },
-          ];
-
-          const atomicPromise = this.engine.chat.completions.create({
-            messages: compactMessages as any,
-            stream: false,
-            temperature: options?.temperature ?? 0.7,
-            presence_penalty: 0.3,
-            frequency_penalty: 0.3,
-            max_tokens: 256,
-          });
-
-          const atomicTimeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('WebGPUアトミック推論がタイムアウトしました。')), 10000)
-          );
-
-          const response = await Promise.race([atomicPromise, atomicTimeoutPromise]);
-
-          const fullContent = (response as any).choices?.[0]?.message?.content || '';
-          if (fullContent && fullContent.trim()) {
-            // Emulate smooth streaming typing effect
-            const sliceSize = 10;
-            for (let i = 0; i < fullContent.length; i += sliceSize) {
-              if (this.isInterrupted) {
-                this.isInterrupted = false;
-                return;
+            const fullContent = (response as any).choices?.[0]?.message?.content || '';
+            if (fullContent && fullContent.trim()) {
+              systemLogger.info('INFERENCE', `[WebGPU推論 試行 2] アトミック生成成功 (文字数: ${fullContent.length})`);
+              const sliceSize = 8;
+              for (let i = 0; i < fullContent.length; i += sliceSize) {
+                if (this.isInterrupted) {
+                  this.isInterrupted = false;
+                  return;
+                }
+                yield fullContent.slice(i, i + sliceSize);
+                await new Promise((r) => setTimeout(r, 15));
               }
-              yield fullContent.slice(i, i + sliceSize);
-              await new Promise((r) => setTimeout(r, 15));
+              return;
             }
-            return;
           }
-        }
-      } catch (err: any) {
-        lastError = err;
-        const errorMsg = err?.message || String(err);
-        console.warn(`[WebLLM] Inference attempt ${attempt} encountered error:`, errorMsg);
+        } catch (err: any) {
+          lastError = err;
+          const errorMsg = err?.message || String(err);
+          systemLogger.warn('INFERENCE', `[WebGPU推論 試行 ${attempt} エラー] ${errorMsg}`, { attempt, error: errorMsg });
 
-        // If Model not loaded, device lost, or mapAsync occurred, force re-load model into MLCEngine
-        if (
-          errorMsg.includes('Model not loaded') ||
-          errorMsg.includes('reload') ||
-          errorMsg.includes('mapAsync') ||
-          errorMsg.includes('unmapped') ||
-          errorMsg.includes('GPUBuffer') ||
-          errorMsg.includes('device')
-        ) {
-          try {
-            const targetModel =
-              options?.fallbackModelId ||
-              this.getPreferredModelId() ||
-              'SmolLM2-360M-Instruct-q4f16_1-MLC';
-            console.log(`[WebLLM] Auto-recovering: Re-binding model ${targetModel}...`);
-            this.engine = null;
-            this.activeModelId = null;
-            await this.loadModel(targetModel);
-          } catch (recErr) {
-            console.warn('[WebLLM] Recovery reload attempt failed:', recErr);
-          }
-        } else {
+          // Safe reset: attempt resetChat to clear KV cache
           try {
             if (this.engine && typeof (this.engine as any).resetChat === 'function') {
               await (this.engine as any).resetChat(false);
             }
           } catch {}
-        }
 
-        await new Promise((r) => setTimeout(r, 250 * attempt));
-
-        if (attempt >= maxAttempts) {
-          throw err;
+          // If attempt 1 failed with ANY error, cleanly re-sync the engine for attempt 2
+          if (attempt < maxAttempts) {
+            try {
+              const targetModel =
+                options?.fallbackModelId ||
+                this.activeModelId ||
+                this.getPreferredModelId() ||
+                'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC';
+              systemLogger.info('WEBGPU', `[WebGPU自己修復] エラー復旧のためモデルを再初期化中: ${targetModel}`);
+              this.engine = null;
+              this.activeModelId = null;
+              await this.loadModel(targetModel);
+            } catch (recErr: any) {
+              systemLogger.warn('WEBGPU', `[WebGPU自己修復再初期化エラー] ${recErr?.message || recErr}`);
+            }
+          }
         }
       }
-    }
 
-    if (lastError) {
-      throw lastError;
+      if (lastError) {
+        throw lastError;
+      }
+    } finally {
+      releaseInferenceLock();
     }
   }
 
