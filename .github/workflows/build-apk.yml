@@ -27,9 +27,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK Build-Tools & Platform (API 36)
+      - name: Install Android SDK Build-Tools, NDK & CMake
         run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
           yes | sdkmanager --licenses || true
 
       - name: Install Web Dependencies
@@ -60,9 +60,9 @@ jobs:
           npx cap add android
           npx cap sync android
 
-          # Clone official llama.cpp for native C++ Android NDK build
+          # Clone pinned stable llama.cpp for native C++ Android NDK build
           mkdir -p android/app/src/main/cpp
-          git clone --depth 1 https://github.com/ggerganov/llama.cpp.git android/app/src/main/cpp/llama.cpp
+          git clone --depth 1 --branch b3600 https://github.com/ggerganov/llama.cpp.git android/app/src/main/cpp/llama.cpp || git clone --depth 1 https://github.com/ggerganov/llama.cpp.git android/app/src/main/cpp/llama.cpp
 
           # Create CMakeLists.txt for compiling libllama_jni.so
           cat << 'EOF' > android/app/src/main/cpp/CMakeLists.txt
@@ -73,6 +73,7 @@ jobs:
           set(CMAKE_CXX_STANDARD_REQUIRED ON)
           set(CMAKE_C_STANDARD 11)
 
+          set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static" FORCE)
           set(GGML_OPENMP OFF CACHE BOOL "Disable OpenMP for Android stability" FORCE)
           set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "Disable examples" FORCE)
           set(LLAMA_BUILD_TESTS OFF CACHE BOOL "Disable tests" FORCE)
@@ -256,11 +257,13 @@ jobs:
 
           android {
               namespace "com.mikiai.app"
-              compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 36
+              compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 34
+              ndkVersion "26.1.10909125"
+
               defaultConfig {
                   applicationId "com.mikiai.app"
                   minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 26
-                  targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 36
+                  targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 34
                   versionCode 10400
                   versionName "1.0.4"
                   testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -273,7 +276,7 @@ jobs:
                   externalNativeBuild {
                       cmake {
                           cppFlags "-O3 -fexceptions -frtti"
-                          arguments "-DGGML_OPENMP=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF"
+                          arguments "-DGGML_OPENMP=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF", "-DBUILD_SHARED_LIBS=OFF"
                       }
                   }
               }
