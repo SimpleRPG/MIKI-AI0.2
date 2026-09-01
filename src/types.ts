@@ -127,6 +127,9 @@ export interface LocalLLMModel {
   vramMB: number;
   description: string;
   huggingFaceRepo: string;
+  format?: 'gguf' | 'mlc';
+  downloadUrl?: string;
+  fileName?: string;
   downloadStatus: 'not_downloaded' | 'downloading' | 'cached' | 'loaded_in_vram' | 'error';
   downloadProgress: number;
   statusText?: string;

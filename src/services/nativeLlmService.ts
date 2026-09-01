@@ -1,6 +1,5 @@
 import { registerPlugin, Capacitor } from '@capacitor/core';
 import { systemLogger } from './systemLogger';
-
 import { webLLMService } from './webLlmService';
 import { sendChatMessage } from './api';
 
@@ -10,9 +9,25 @@ export interface NativeGpuInfo {
   gpuVendor: string;
   gpuRenderer: string;
   totalMemoryMB: number;
+  availableMemoryMB?: number;
   allocatedMemoryMB: number;
   driverVersion?: string;
   isNative: boolean;
+  architecture?: string;
+}
+
+export interface NativeDownloadedFile {
+  fileName: string;
+  sizeMB: number;
+  lastModified: number;
+}
+
+export interface NativeStorageInfo {
+  totalDiskMB: number;
+  freeDiskMB: number;
+  usedByModelsMB: number;
+  modelsDir: string;
+  files: NativeDownloadedFile[];
 }
 
 export interface ExternalLocalLlmConfig {
@@ -24,7 +39,11 @@ export interface ExternalLocalLlmConfig {
 export interface NativeLlmProgressEvent {
   progress: number;
   text: string;
-  phase: string;
+  phase?: string;
+  bytesDownloaded?: number;
+  totalBytes?: number;
+  speedMBs?: number;
+  etaSeconds?: number;
 }
 
 export interface NativeLlmChunkEvent {
@@ -33,33 +52,64 @@ export interface NativeLlmChunkEvent {
   tokensGenerated: number;
 }
 
-export interface NativeMlcLlmPluginInterface {
-  isAvailable(): Promise<{ available: boolean; backend: string; platform: string }>;
+export interface NativeLlamaPluginInterface {
+  isAvailable(): Promise<{
+    available: boolean;
+    backend: string;
+    platform: string;
+    architecture: string;
+    hasGpuAcceleration: boolean;
+    engineType: string;
+  }>;
   getHardwareSpecs(): Promise<NativeGpuInfo>;
+  getStorageInfo(): Promise<NativeStorageInfo>;
+  downloadModel(options: {
+    modelId: string;
+    downloadUrl: string;
+    fileName: string;
+  }): Promise<{ success: boolean; filePath: string; sizeMB: number }>;
+  cancelDownload(options?: { modelId?: string }): Promise<{ success: boolean }>;
+  deleteModel(options: { fileName: string }): Promise<{ success: boolean }>;
   loadModel(options: {
     modelId: string;
-    modelUrl?: string;
-    kvCacheSize?: number;
-    maxGenLen?: number;
-  }): Promise<{ success: boolean; modelId: string }>;
+    fileName?: string;
+    filePath?: string;
+    nGpuLayers?: number;
+    nCtx?: number;
+    nThreads?: number;
+  }): Promise<{
+    success: boolean;
+    modelId: string;
+    backend: string;
+    nGpuLayers: number;
+    nCtx: number;
+    totalVramMB?: number;
+  }>;
   generateStream(options: {
     messages: Array<{ role: string; content: string }>;
     temperature?: number;
+    topP?: number;
     maxTokens?: number;
-  }): Promise<{ text: string; totalTokens: number; tps: number }>;
+    stopSequences?: string[];
+  }): Promise<{ text: string; totalTokens: number; tps: number; durationMs: number }>;
   unloadModel(): Promise<{ success: boolean }>;
 }
 
-export const NativeMlcPlugin = registerPlugin<NativeMlcLlmPluginInterface>('MlcLlmPlugin', {
+export const NativeMlcPlugin = registerPlugin<NativeLlamaPluginInterface>('MlcLlmPlugin', {
   web: () => ({
     async isAvailable() {
-      // In browser web mode, check navigator.gpu or hardware concurrency
-      const hasGpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
-      return { available: hasGpu, backend: 'Direct-Hardware-GPU', platform: 'web' };
+      return {
+        available: false,
+        backend: 'Browser-Web',
+        platform: 'web',
+        architecture: 'wasm/webgpu',
+        hasGpuAcceleration: typeof navigator !== 'undefined' && 'gpu' in navigator,
+        engineType: 'llama.cpp-jni-android-only',
+      };
     },
     async getHardwareSpecs() {
-      let renderer = 'Hardware GPU (Direct)';
-      let vendor = 'Hardware Vendor';
+      let renderer = 'Web Browser Client';
+      let vendor = 'Web Standard';
       try {
         if (typeof document !== 'undefined') {
           const canvas = document.createElement('canvas');
@@ -75,28 +125,38 @@ export const NativeMlcPlugin = registerPlugin<NativeMlcLlmPluginInterface>('MlcL
       } catch (e) {}
 
       return {
-        available: true,
-        backend: renderer.toLowerCase().includes('adreno')
-          ? 'Adreno-GPU'
-          : renderer.toLowerCase().includes('mali')
-          ? 'Mali-GPU'
-          : renderer.toLowerCase().includes('apple')
-          ? 'Metal'
-          : renderer.toLowerCase().includes('nvidia')
-          ? 'CUDA'
-          : 'Vulkan',
+        available: false,
+        backend: 'WebGPU',
         gpuVendor: vendor,
         gpuRenderer: renderer,
-        totalMemoryMB: 8192,
+        totalMemoryMB: 4096,
         allocatedMemoryMB: 0,
-        isNative: true,
+        isNative: false,
       };
     },
+    async getStorageInfo() {
+      return {
+        totalDiskMB: 10240,
+        freeDiskMB: 8192,
+        usedByModelsMB: 0,
+        modelsDir: 'browser-indexeddb',
+        files: [],
+      };
+    },
+    async downloadModel() {
+      throw new Error('GGUF native download is only available in the Android APK native runtime.');
+    },
+    async cancelDownload() {
+      return { success: true };
+    },
+    async deleteModel() {
+      return { success: true };
+    },
     async loadModel() {
-      return { success: true, modelId: 'native-direct-hardware' };
+      throw new Error('GGUF native C++ loader is only available in the Android APK native runtime.');
     },
     async generateStream() {
-      return { text: '本体GPUダイレクト推論が完了しました。', totalTokens: 45, tps: 68.5 };
+      throw new Error('Native C++ inference is only available in the Android APK native runtime.');
     },
     async unloadModel() {
       return { success: true };
@@ -120,12 +180,15 @@ class NativeLlmService {
       if (this.isNativePlatform) {
         const res = await NativeMlcPlugin.isAvailable();
         this.isAvailableOnDevice = !!res.available;
-        systemLogger.info('NATIVE_GPU', `📱 Android Native GPU エンジン (OpenCL/Vulkan/NPU) 検出: ${res.backend}`);
+        systemLogger.info(
+          'NATIVE_GPU',
+          `📱 Android Native C++ llama.cpp エンジン検出: ${res.backend} (${res.architecture})`
+        );
       } else {
-        this.isAvailableOnDevice = true; // Support direct hardware GPU pipeline in all environments
+        this.isAvailableOnDevice = false;
       }
     } catch (e) {
-      this.isAvailableOnDevice = true;
+      this.isAvailableOnDevice = false;
     }
     return this.isAvailableOnDevice;
   }
@@ -134,56 +197,128 @@ class NativeLlmService {
     return this.isNativePlatform && this.isAvailableOnDevice;
   }
 
-  public isAvailable(): boolean {
-    return this.isAvailableOnDevice;
+  public getActiveModelId(): string | null {
+    return this.activeModelId;
   }
 
   public async getHardwareSpecs(): Promise<NativeGpuInfo> {
     try {
-      return await NativeMlcPlugin.getHardwareSpecs();
-    } catch {
-      return {
-        available: true,
-        backend: 'Vulkan',
-        gpuVendor: 'Hardware GPU Direct',
-        gpuRenderer: 'Qualcomm Adreno / ARM Mali / Hardware Core',
-        totalMemoryMB: 8192,
-        allocatedMemoryMB: this.activeModelId ? 950 : 0,
-        isNative: true,
-      };
+      if (this.isNative()) {
+        return await NativeMlcPlugin.getHardwareSpecs();
+      }
+    } catch (e) {}
+
+    return {
+      available: this.isNative(),
+      backend: this.isNative() ? 'Vulkan' : 'WebGPU',
+      gpuVendor: this.isNative() ? 'Qualcomm / ARM' : 'Web Browser GPU',
+      gpuRenderer: this.isNative() ? 'Adreno / Mali Hardware Native' : 'Browser WebGPU Canvas',
+      totalMemoryMB: 8192,
+      availableMemoryMB: 4096,
+      allocatedMemoryMB: this.activeModelId ? 950 : 0,
+      isNative: this.isNative(),
+    };
+  }
+
+  public async getStorageInfo(): Promise<NativeStorageInfo> {
+    if (this.isNative()) {
+      try {
+        return await NativeMlcPlugin.getStorageInfo();
+      } catch (e) {
+        systemLogger.warn('NATIVE_GPU', `ストレージ容量の取得に失敗: ${e}`);
+      }
+    }
+    return {
+      totalDiskMB: 10240,
+      freeDiskMB: 8192,
+      usedByModelsMB: 0,
+      modelsDir: 'internal',
+      files: [],
+    };
+  }
+
+  public async downloadModel(
+    modelId: string,
+    downloadUrl: string,
+    fileName: string,
+    onProgress?: (report: { progress: number; text: string; speedMBs?: number; etaSeconds?: number }) => void
+  ): Promise<{ success: boolean; filePath: string; sizeMB: number }> {
+    if (!this.isNative()) {
+      throw new Error('GGUFモデルのネイティブ高速ダウンロードはAndroid APK実機環境でのみ利用可能です。');
+    }
+
+    systemLogger.info('NATIVE_GPU', `📥 GGUFモデルのダウンロード開始: ${fileName} (${downloadUrl})`);
+
+    let progressListener: any = null;
+    if (onProgress) {
+      progressListener = await (NativeMlcPlugin as any).addListener?.('onProgress', (data: NativeLlmProgressEvent) => {
+        onProgress({
+          progress: Math.min(100, Math.max(0, Math.round(data.progress * 100))),
+          text: data.text,
+          speedMBs: data.speedMBs,
+          etaSeconds: data.etaSeconds,
+        });
+      });
+    }
+
+    try {
+      const res = await NativeMlcPlugin.downloadModel({
+        modelId,
+        downloadUrl,
+        fileName,
+      });
+      systemLogger.info('NATIVE_GPU', `✅ GGUFモデルのダウンロード完了: ${fileName} (${res.sizeMB} MB)`);
+      return res;
+    } finally {
+      if (progressListener && typeof progressListener.remove === 'function') {
+        progressListener.remove();
+      }
     }
   }
 
   public async loadNativeModel(
     modelId: string,
+    fileName?: string,
+    options?: { nGpuLayers?: number; nCtx?: number; nThreads?: number },
     onProgress?: (report: { progress: number; text: string }) => void
   ): Promise<void> {
+    if (!this.isNative()) {
+      throw new Error(
+        '本体物理GPU (llama.cpp C++ JNI) エンジンはAndroid実機APKでのみ動作します。Web環境ではWebGPUまたはクラウドをご利用ください。'
+      );
+    }
+
     this.isModelLoading = true;
-    systemLogger.info('NATIVE_GPU', `🚀 端末本体GPU (OpenCL/Vulkan/Direct Shader) でモデルを展開中: ${modelId}`);
+    systemLogger.info('NATIVE_GPU', `🚀 llama.cpp C++ JNI でGGUFモデルをVRAM/RAMに展開中: ${modelId} (${fileName || modelId})`);
 
     let progressListener: any = null;
-    if (onProgress && this.isNative()) {
+    if (onProgress) {
       progressListener = await (NativeMlcPlugin as any).addListener?.('onProgress', (data: NativeLlmProgressEvent) => {
-        onProgress({ progress: Math.round(data.progress * 100), text: data.text });
+        onProgress({
+          progress: Math.min(100, Math.max(0, Math.round(data.progress * 100))),
+          text: data.text,
+        });
       });
-    } else if (onProgress) {
-      // Direct pipeline loading simulation for web fallback
-      for (let p = 10; p <= 100; p += 25) {
-        await new Promise((r) => setTimeout(r, 120));
-        onProgress({ progress: p, text: `本体GPUシェーダー最適化 & VRAMマッピング中... (${p}%)` });
-      }
     }
 
     try {
-      if (this.isNative()) {
-        await NativeMlcPlugin.loadModel({
-          modelId,
-          kvCacheSize: 512,
-          maxGenLen: 512,
-        });
-      }
+      const res = await NativeMlcPlugin.loadModel({
+        modelId,
+        fileName: fileName || `${modelId}.gguf`,
+        nGpuLayers: options?.nGpuLayers ?? 99,
+        nCtx: options?.nCtx ?? 2048,
+        nThreads: options?.nThreads ?? 4,
+      });
+
       this.activeModelId = modelId;
-      systemLogger.info('NATIVE_GPU', `✅ 端末本体GPU VRAMへのモデル重み直接バインド完了 (${modelId})`);
+      systemLogger.info(
+        'NATIVE_GPU',
+        `✅ llama.cpp C++ モデルロード完了: ${res.modelId} (バックエンド: ${res.backend}, GPUオフロード層: ${res.nGpuLayers}, Context: ${res.nCtx})`
+      );
+    } catch (err: any) {
+      this.activeModelId = null;
+      systemLogger.error('NATIVE_GPU', `❌ llama.cpp モデルロード失敗: ${err?.message || err}`);
+      throw err;
     } finally {
       this.isModelLoading = false;
       if (progressListener && typeof progressListener.remove === 'function') {
@@ -194,97 +329,88 @@ class NativeLlmService {
 
   public async *streamNativeChat(
     messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-    options?: { temperature?: number; max_tokens?: number }
+    options?: { temperature?: number; top_p?: number; max_tokens?: number }
   ): AsyncGenerator<string, void, unknown> {
-    systemLogger.info('NATIVE_GPU', `⚡ 端末本体のハードウェアGPU (OpenCL/Vulkan/Adreno/Mali) で直接推論を実行`);
-
-    if (this.isNative()) {
-      const chunkQueue: string[] = [];
-      let isDone = false;
-      let streamError: any = null;
-      let notifyNext: (() => void) | null = null;
-
-      const chunkListener = await (NativeMlcPlugin as any).addListener?.('onStreamChunk', (data: NativeLlmChunkEvent) => {
-        if (data.delta) {
-          chunkQueue.push(data.delta);
-          if (notifyNext) {
-            notifyNext();
-            notifyNext = null;
-          }
-        }
-      });
-
-      const executionPromise = NativeMlcPlugin.generateStream({
-        messages,
-        temperature: options?.temperature ?? 0.7,
-        maxTokens: options?.max_tokens ?? 256,
-      })
-        .then((res) => {
-          isDone = true;
-          if (notifyNext) {
-            notifyNext();
-            notifyNext = null;
-          }
-          systemLogger.info('NATIVE_GPU', `🎉 本体GPUダイレクト推論完了: ${res.totalTokens} tokens (${res.tps.toFixed(1)} tps)`);
-        })
-        .catch((err) => {
-          streamError = err;
-          isDone = true;
-          if (notifyNext) {
-            notifyNext();
-            notifyNext = null;
-          }
-        });
-
-      try {
-        while (!isDone || chunkQueue.length > 0) {
-          if (chunkQueue.length > 0) {
-            yield chunkQueue.shift()!;
-          } else if (!isDone) {
-            await new Promise<void>((resolve) => {
-              notifyNext = resolve;
-            });
-          }
-        }
-
-        if (streamError) {
-          throw streamError;
-        }
-        await executionPromise;
-      } finally {
-        if (chunkListener && typeof chunkListener.remove === 'function') {
-          chunkListener.remove();
-        }
-      }
-    } else {
-      // In web browser environment: execute real WebLLM inference if loaded, or real dynamic intelligence inference
+    if (!this.isNative()) {
+      // If user triggers Native GPU in Web preview, give clear honest guidance
       if (webLLMService.isLoaded()) {
+        systemLogger.info('NATIVE_GPU', `ℹ️ Webプレビュー環境のため、ロード済みのWebGPUエンジンへルーティングします。`);
         for await (const chunk of webLLMService.streamChat(messages, options)) {
           yield chunk;
         }
+        return;
       } else {
-        const lastUserMsg = messages.filter((m) => m.role === 'user').pop()?.content || '';
-        try {
-          const res = await sendChatMessage({
-            prompt: lastUserMsg,
-            history: messages.slice(0, -1).map((m, idx) => ({
-              id: `hist_${idx}`,
-              role: m.role === 'assistant' ? 'assistant' : 'user',
-              content: m.content,
-              timestamp: Date.now(),
-            })),
-          });
+        throw new Error(
+          '【未ロード】本体GPU (llama.cpp GGUF) はAndroid APK実機環境で動作します。Webブラウザ上では「WebGPU」または「Gemini クラウド」モードを選択してください。'
+        );
+      }
+    }
 
-          const fullAnswer = res.text || '質問内容を受け取りました。';
-          // Stream word/character chunks naturally
-          const stepSize = Math.max(1, Math.floor(fullAnswer.length / 30));
-          for (let i = 0; i < fullAnswer.length; i += stepSize) {
-            yield fullAnswer.slice(i, i + stepSize);
-            await new Promise((r) => setTimeout(r, 25));
-          }
-        } catch (e: any) {
-          yield `【推論エンジン】${lastUserMsg} について解析を行いました。WebGPUモデルまたはクラウドAPIをご利用ください。`;
+    if (!this.activeModelId) {
+      throw new Error('モデルがVRAM/RAMにロードされていません。エンジン設定からGGUFモデルをロードしてください。');
+    }
+
+    systemLogger.info('NATIVE_GPU', `⚡ llama.cpp C++ JNI ネイティブ推論を開始 (${this.activeModelId})`);
+
+    const chunkQueue: string[] = [];
+    let isDone = false;
+    let streamError: any = null;
+    let notifyNext: (() => void) | null = null;
+
+    const chunkListener = await (NativeMlcPlugin as any).addListener?.('onStreamChunk', (data: NativeLlmChunkEvent) => {
+      if (data && typeof data.delta === 'string') {
+        chunkQueue.push(data.delta);
+        if (notifyNext) {
+          notifyNext();
+          notifyNext = null;
         }
+      }
+    });
+
+    const executionPromise = NativeMlcPlugin.generateStream({
+      messages,
+      temperature: options?.temperature ?? 0.7,
+      topP: options?.top_p ?? 0.9,
+      maxTokens: options?.max_tokens ?? 512,
+    })
+      .then((res) => {
+        isDone = true;
+        if (notifyNext) {
+          notifyNext();
+          notifyNext = null;
+        }
+        systemLogger.info(
+          'NATIVE_GPU',
+          `🎉 llama.cpp 推論完了: ${res.totalTokens} tokens (${res.tps.toFixed(1)} tps, 処理時間: ${res.durationMs}ms)`
+        );
+      })
+      .catch((err) => {
+        streamError = err;
+        isDone = true;
+        if (notifyNext) {
+          notifyNext();
+          notifyNext = null;
+        }
+      });
+
+    try {
+      while (!isDone || chunkQueue.length > 0) {
+        if (chunkQueue.length > 0) {
+          yield chunkQueue.shift()!;
+        } else if (!isDone) {
+          await new Promise<void>((resolve) => {
+            notifyNext = resolve;
+          });
+        }
+      }
+
+      if (streamError) {
+        throw new Error(`llama.cpp ネイティブ推論エラー: ${streamError.message || streamError}`);
+      }
+      await executionPromise;
+    } finally {
+      if (chunkListener && typeof chunkListener.remove === 'function') {
+        chunkListener.remove();
       }
     }
   }
@@ -385,11 +511,17 @@ class NativeLlmService {
     }
   }
 
+  public async deleteDownloadedModel(fileName: string): Promise<void> {
+    if (this.isNative()) {
+      await NativeMlcPlugin.deleteModel({ fileName });
+    }
+  }
+
   public async unload(): Promise<void> {
     if (this.isNative()) {
       await NativeMlcPlugin.unloadModel();
-      this.activeModelId = null;
     }
+    this.activeModelId = null;
   }
 }
 
