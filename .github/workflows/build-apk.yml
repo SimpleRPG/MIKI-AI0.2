@@ -79,7 +79,7 @@ jobs:
 
           # Clone pinned stable llama.cpp for native C++ Android NDK build
           mkdir -p android/app/src/main/cpp
-          git clone --depth 1 --branch b3600 https://github.com/ggerganov/llama.cpp.git android/app/src/main/cpp/llama.cpp || git clone --depth 1 https://github.com/ggerganov/llama.cpp.git android/app/src/main/cpp/llama.cpp
+          git clone --depth 1 --branch b4000 https://github.com/ggerganov/llama.cpp.git android/app/src/main/cpp/llama.cpp || git clone --depth 1 https://github.com/ggerganov/llama.cpp.git android/app/src/main/cpp/llama.cpp
 
           # Create CMakeLists.txt for compiling libllama_jni.so
           cat << 'EOF' > android/app/src/main/cpp/CMakeLists.txt
