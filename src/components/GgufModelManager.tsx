@@ -37,12 +37,22 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
   const [testOutput, setTestOutput] = useState<string>('');
   const [customFilePickerOpen, setCustomFilePickerOpen] = useState(false);
 
+  const [notification, setNotification] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<string | null>(null);
+
+  const showNotification = (type: 'info' | 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => {
+      setNotification((prev) => (prev?.message === message ? null : prev));
+    }, 5000);
+  };
+
   const refreshStorage = async () => {
     try {
-      const info = await nativeLlmService.getStorageInfo();
-      setStorageInfo(info);
-      const specs = await nativeLlmService.getHardwareSpecs();
-      setHardwareSpecs(specs);
+      const info = await nativeLlmService.getStorageInfo().catch(() => null);
+      if (info) setStorageInfo(info);
+      const specs = await nativeLlmService.getHardwareSpecs().catch(() => null);
+      if (specs) setHardwareSpecs(specs);
       setActiveLoadedId(nativeLlmService.getActiveModelId());
     } catch (e) {
       console.warn('Failed to refresh storage info:', e);
@@ -72,10 +82,11 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
         }
       );
       systemLogger.info('NATIVE_GPU', `GGUFモデルのダウンロード完了: ${model.fileName}`);
+      showNotification('success', `GGUFモデル「${model.name}」の保存が完了しました。`);
       await refreshStorage();
     } catch (err: any) {
       systemLogger.error('NATIVE_GPU', `ダウンロードエラー: ${err?.message || err}`);
-      alert(`GGUFダウンロード通知:\n${err?.message || err}`);
+      showNotification('error', `ダウンロード通知: ${err?.message || err}`);
     } finally {
       setDownloadingModelId(null);
       setDownloadProgress(0);
@@ -88,22 +99,25 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
   const handleLoadGguf = async (model: GgufModelDefinition) => {
     try {
       systemLogger.info('NATIVE_GPU', `GGUFモデルをVRAM/RAMへロード: ${model.name}`);
+      showNotification('info', `GGUFモデル「${model.name}」を展開中...`);
       await nativeLlmService.loadNativeModel(model.id, model.fileName);
       setActiveLoadedId(model.id);
+      showNotification('success', `GGUFモデル「${model.name}」をVRAMにロードしました。即時推論可能です。`);
       await refreshStorage();
     } catch (err: any) {
       systemLogger.error('NATIVE_GPU', `GGUFモデルロード失敗: ${err?.message || err}`);
-      alert(`ロードエラー: ${err?.message || err}`);
+      showNotification('error', `ロード失敗: ${err?.message || err}`);
     }
   };
 
   const handleDeleteGguf = async (fileName: string) => {
-    if (!confirm(`端末内のGGUFファイル "${fileName}" を削除しますか？`)) return;
     try {
       await nativeLlmService.deleteDownloadedModel(fileName);
+      setDeleteConfirmTarget(null);
+      showNotification('info', `GGUFファイル「${fileName}」を端末から削除しました。`);
       await refreshStorage();
     } catch (err: any) {
-      alert(`削除エラー: ${err?.message || err}`);
+      showNotification('error', `削除エラー: ${err?.message || err}`);
     }
   };
 
@@ -151,6 +165,30 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
 
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
+      {/* Notification Toast Banner */}
+      {notification && (
+        <div
+          className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2 animate-in fade-in duration-150 shadow-lg ${
+            notification.type === 'success'
+              ? 'bg-emerald-950/80 border-emerald-500/80 text-emerald-200'
+              : notification.type === 'error'
+              ? 'bg-rose-950/80 border-rose-500/80 text-rose-200'
+              : 'bg-sky-950/80 border-sky-500/80 text-sky-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 shrink-0" />
+            <span>{notification.message}</span>
+          </div>
+          <button
+            onClick={() => setNotification(null)}
+            className="text-[10px] px-2 py-0.5 rounded bg-black/40 hover:bg-black/60 font-semibold"
+          >
+            閉じる
+          </button>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-950/60 via-slate-950 to-purple-950/60 border border-emerald-500/40 space-y-2.5">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -352,13 +390,31 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
                           </button>
                         )}
 
-                        <button
-                          onClick={() => handleDeleteGguf(model.fileName)}
-                          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                          title="端末からGGUFファイルを削除"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {deleteConfirmTarget === model.fileName ? (
+                          <div className="flex items-center gap-1 bg-rose-950/90 border border-rose-600 px-2 py-1 rounded-lg animate-in fade-in duration-100">
+                            <span className="text-[10px] text-rose-200 font-bold">削除?</span>
+                            <button
+                              onClick={() => handleDeleteGguf(model.fileName)}
+                              className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-[10px] font-bold"
+                            >
+                              確定
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmTarget(null)}
+                              className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteConfirmTarget(model.fileName)}
+                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                            title="端末からGGUFファイルを削除"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
