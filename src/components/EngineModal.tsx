@@ -838,7 +838,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         // ==========================================
         // PATH A: Native Hardware GPU Direct Mode
         // ==========================================
-        setTestOutput('⚡ 端末本体の物理GPU (OpenCL / Vulkan / Direct Shader) で直接推論中...\n\n');
+        setTestOutput('');
         const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
           {
             role: 'system',
