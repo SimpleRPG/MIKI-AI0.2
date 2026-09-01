@@ -641,7 +641,7 @@ app.post('/api/github/push', async (req, res) => {
 });
 
 // Full App ZIP Exporter
-app.get('/api/export-app-zip', async (req, res) => {
+app.get(['/api/export-app-zip', '/api/download-zip'], async (req, res) => {
   try {
     const zip = new JSZip();
 
@@ -649,7 +649,8 @@ app.get('/api/export-app-zip', async (req, res) => {
     const addFolderToZip = (dirPath: string, zipFolder: JSZip) => {
       const files = fs.readdirSync(dirPath);
       for (const file of files) {
-        if (file === 'node_modules' || file === 'dist' || file === '.git' || file === '.cache') continue;
+        if (file === 'node_modules' || file === 'dist' || file === '.git' || file === '.cache' || file === 'logs') continue;
+        if (file.endsWith('.zip') || file.endsWith('.tar.gz')) continue;
         const fullPath = path.join(dirPath, file);
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
@@ -663,9 +664,9 @@ app.get('/api/export-app-zip', async (req, res) => {
 
     addFolderToZip(process.cwd(), zip);
 
-    const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', 'attachment; filename="miki-ai-studio-full-project.zip"');
+    res.setHeader('Content-Disposition', 'attachment; filename="miki-ai-native-gpu-full.zip"');
     res.send(buffer);
   } catch (error: any) {
     console.error('Error in /api/export-app-zip:', error);
