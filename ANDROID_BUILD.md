@@ -28,8 +28,8 @@ PCやAndroid Studioの環境構築なしで、GitHubにコードを push する�
 
 1. **前提環境**:
    - **Node.js**: v20+
-   - **Android Studio**: 最新版 (Android SDK API 34 / Build-Tools 34.0.0)
-   - **Java**: JDK 17 / 21
+   - **Android Studio**: 最新版 (Android SDK API 36 / Build-Tools 36.0.0)
+   - **Java**: JDK 21 (Capacitor 8 系は Java 21 が必須)
 
 2. **ビルド手順**:
 ```bash
