@@ -29,7 +29,8 @@ jobs:
 
       - name: Install Android SDK Build-Tools, NDK & CMake
         run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
           yes | sdkmanager --licenses || true
 
       - name: Install Web Dependencies
@@ -59,6 +60,22 @@ jobs:
           EOF
           npx cap add android
           npx cap sync android
+
+          # Detect NDK Directory
+          NDK_DIR=""
+          if [ -d "$ANDROID_SDK_ROOT/ndk/26.1.10909125" ]; then
+            NDK_DIR="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
+          elif [ -n "$ANDROID_NDK_HOME" ] && [ -d "$ANDROID_NDK_HOME" ]; then
+            NDK_DIR="$ANDROID_NDK_HOME"
+          elif [ -d "$ANDROID_SDK_ROOT/ndk" ]; then
+            NDK_DIR=$(find "$ANDROID_SDK_ROOT/ndk" -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
+          fi
+
+          echo "Detected NDK path: $NDK_DIR"
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
+          if [ -n "$NDK_DIR" ]; then
+            echo "ndk.dir=$NDK_DIR" >> android/local.properties
+          fi
 
           # Clone pinned stable llama.cpp for native C++ Android NDK build
           mkdir -p android/app/src/main/cpp
@@ -92,7 +109,6 @@ jobs:
 
           target_link_libraries(llama_jni PRIVATE
               llama
-              ggml
               android
               log
           )
@@ -163,7 +179,7 @@ jobs:
                   return JNI_FALSE;
               }
 
-              auto sparams = llama_sampler_chain_default_params();
+              llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
               g_smpl = llama_sampler_chain_init(sparams);
               llama_sampler_chain_add(g_smpl, llama_sampler_init_temp(0.7f));
               llama_sampler_chain_add(g_smpl, llama_sampler_init_top_p(0.9f, 1));
@@ -182,15 +198,22 @@ jobs:
               }
 
               const char* prompt = env->GetStringUTFChars(jPrompt, nullptr);
-              const int n_prompt = -llama_tokenize(g_model, prompt, strlen(prompt), NULL, 0, true, true);
-              std::vector<llama_token> prompt_tokens(n_prompt);
-              if (llama_tokenize(g_model, prompt, strlen(prompt), prompt_tokens.data(), prompt_tokens.size(), true, true) < 0) {
-                  env->ReleaseStringUTFChars(jPrompt, prompt);
-                  return env->NewStringUTF("Error: Tokenization failed");
-              }
+              int n_prompt_neg = llama_tokenize(g_model, prompt, (int32_t)strlen(prompt), NULL, 0, true, true);
+              int n_prompt = n_prompt_neg < 0 ? -n_prompt_neg : n_prompt_neg;
+              if (n_prompt <= 0) n_prompt = 1;
+
+              std::vector<llama_token> prompt_tokens(n_prompt + 16);
+              int n_tokens = llama_tokenize(g_model, prompt, (int32_t)strlen(prompt), prompt_tokens.data(), (int32_t)prompt_tokens.size(), true, true);
               env->ReleaseStringUTFChars(jPrompt, prompt);
 
-              llama_batch batch = llama_batch_get_one(prompt_tokens.data(), prompt_tokens.size());
+              if (n_tokens < 0) {
+                  return env->NewStringUTF("Error: Tokenization failed");
+              }
+              prompt_tokens.resize(n_tokens);
+
+              llama_kv_cache_clear(g_ctx);
+
+              llama_batch batch = llama_batch_get_one(prompt_tokens.data(), (int32_t)prompt_tokens.size());
               if (llama_decode(g_ctx, batch) != 0) {
                   return env->NewStringUTF("Error: llama_decode prompt failed");
               }
@@ -258,7 +281,6 @@ jobs:
           android {
               namespace "com.mikiai.app"
               compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 34
-              ndkVersion "26.1.10909125"
 
               defaultConfig {
                   applicationId "com.mikiai.app"
@@ -523,16 +545,18 @@ jobs:
                               long now = System.currentTimeMillis();
                               if (now - lastNotifyTime > 150) {
                                   lastNotifyTime = now;
-                                  float progress = totalBytes > 0 ? (float) bytesReadSoFar / (float) totalBytes : 0.0f;
+                                  final long bytesDownloadedSnapshot = bytesReadSoFar;
+                                  final float progress = totalBytes > 0 ? (float) bytesDownloadedSnapshot / (float) totalBytes : 0.0f;
                                   double elapsedSec = Math.max(0.1, (now - startTime) / 1000.0);
-                                  double speedMBs = ((double) bytesReadSoFar / (1024.0 * 1024.0)) / elapsedSec;
-                                  double etaSec = totalBytes > 0 && speedMBs > 0 ? ((totalBytes - bytesReadSoFar) / (1024.0 * 1024.0)) / speedMBs : 0;
+                                  final double speedMBs = ((double) bytesDownloadedSnapshot / (1024.0 * 1024.0)) / elapsedSec;
+                                  final double etaSec = totalBytes > 0 && speedMBs > 0 ? ((totalBytes - bytesDownloadedSnapshot) / (1024.0 * 1024.0)) / speedMBs : 0;
+                                  final long totalBytesSnapshot = totalBytes;
 
                                   mainHandler.post(() -> {
                                       JSObject progressData = new JSObject();
                                       progressData.put("progress", progress);
-                                      progressData.put("bytesDownloaded", bytesReadSoFar);
-                                      progressData.put("totalBytes", totalBytes);
+                                      progressData.put("bytesDownloaded", bytesDownloadedSnapshot);
+                                      progressData.put("totalBytes", totalBytesSnapshot);
                                       progressData.put("speedMBs", Math.round(speedMBs * 10.0) / 10.0);
                                       progressData.put("etaSeconds", Math.round(etaSec));
                                       progressData.put("fileName", fileName);
@@ -693,23 +717,26 @@ jobs:
                               (float) temperature,
                               (float) topP,
                               maxTokens,
-                              chunk -> {
-                                  if (!isGenerating.get()) return false;
-                                  fullResult.append(chunk);
-                                  tokenCount[0]++;
+                              new TokenCallback() {
+                                  @Override
+                                  public boolean onChunk(String chunk) {
+                                      if (!isGenerating.get()) return false;
+                                      fullResult.append(chunk);
+                                      tokenCount[0]++;
 
-                                  final String currentChunk = chunk;
-                                  final String currentFull = fullResult.toString();
-                                  final int currentCount = tokenCount[0];
+                                      final String currentChunk = chunk;
+                                      final String currentFull = fullResult.toString();
+                                      final int currentCount = tokenCount[0];
 
-                                  mainHandler.post(() -> {
-                                      JSObject streamChunk = new JSObject();
-                                      streamChunk.put("delta", currentChunk);
-                                      streamChunk.put("fullText", currentFull);
-                                      streamChunk.put("tokensGenerated", currentCount);
-                                      notifyListeners("onStreamChunk", streamChunk);
-                                  });
-                                  return true;
+                                      mainHandler.post(() -> {
+                                          JSObject streamChunk = new JSObject();
+                                          streamChunk.put("delta", currentChunk);
+                                          streamChunk.put("fullText", currentFull);
+                                          streamChunk.put("tokensGenerated", currentCount);
+                                          notifyListeners("onStreamChunk", streamChunk);
+                                      });
+                                      return true;
+                                  }
                               }
                           );
 
