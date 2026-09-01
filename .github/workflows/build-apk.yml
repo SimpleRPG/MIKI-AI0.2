@@ -16,11 +16,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 22
 
       - name: Install Web Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Web Application
         run: npm run build
@@ -38,8 +37,26 @@ jobs:
         run: |
           npm install -D @capacitor/core @capacitor/cli @capacitor/android
           npx cap init "MIKI-AI Studio" "com.mikiai.app" --web-dir "dist"
+          cat << 'EOF' > capacitor.config.json
+          {
+            "appId": "com.mikiai.app",
+            "appName": "MIKI-AI Game Studio",
+            "webDir": "dist",
+            "android": {
+              "allowMixedContent": true,
+              "webContentsDebuggingEnabled": true
+            },
+            "server": {
+              "androidScheme": "https"
+            }
+          }
+          EOF
           npx cap add android
           npx cap sync android
+          
+          # AndroidManifestに largeHeap="true" (メモリ制限解除・最大RAM解放) を自動注入
+          sed -i 's/<application/<application android:largeHeap="true" android:hardwareAccelerated="true"/' android/app/src/main/AndroidManifest.xml
+          echo "Injected largeHeap and hardwareAccelerated into AndroidManifest.xml"
 
       - name: Build Debug APK
         working-directory: android
