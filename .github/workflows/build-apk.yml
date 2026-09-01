@@ -33,6 +33,12 @@ jobs:
           sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
           yes | sdkmanager --licenses || true
 
+      - name: Install Vulkan Build Tools (glslc shader compiler for GGML_VULKAN)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev glslc spirv-headers
+          glslc --version || true
+
       - name: Install Web Dependencies
         run: |
           npm install
@@ -81,6 +87,10 @@ jobs:
           mkdir -p android/app/src/main/cpp
           git clone --depth 1 --branch b4000 https://github.com/ggerganov/llama.cpp.git android/app/src/main/cpp/llama.cpp || git clone --depth 1 https://github.com/ggerganov/llama.cpp.git android/app/src/main/cpp/llama.cpp
 
+          # Clone Vulkan-Headers (the Android NDK ships vulkan.h but not the vulkan.hpp
+          # C++ bindings that ggml-vulkan requires) for the on-device GPU backend
+          git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git android/app/src/main/cpp/Vulkan-Headers
+
           # Create CMakeLists.txt for compiling libllama_jni.so
           cat << 'EOF' > android/app/src/main/cpp/CMakeLists.txt
           cmake_minimum_required(VERSION 3.22.1)
@@ -95,6 +105,15 @@ jobs:
           set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "Disable examples" FORCE)
           set(LLAMA_BUILD_TESTS OFF CACHE BOOL "Disable tests" FORCE)
           set(LLAMA_BUILD_SERVER OFF CACHE BOOL "Disable server" FORCE)
+
+          # Enable the Vulkan backend so ggml can offload layers to the device's
+          # own GPU (Adreno / Mali / PowerVR) at runtime. glslc (host tool, apt-installed)
+          # compiles the compute shaders; Vulkan-Headers supplies vulkan.hpp which the
+          # NDK does not ship. If no Vulkan driver is present on the phone, ggml
+          # transparently falls back to the CPU backend at runtime.
+          set(GGML_VULKAN ON CACHE BOOL "Enable Vulkan GPU backend" FORCE)
+          set(Vulkan_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Vulkan-Headers/include CACHE PATH "Vulkan headers with C++ bindings" FORCE)
+          add_compile_definitions(VK_USE_PLATFORM_ANDROID_KHR)
 
           add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp llama_build EXCLUDE_FROM_ALL)
 
@@ -111,6 +130,7 @@ jobs:
               llama
               android
               log
+              vulkan
           )
           EOF
 
@@ -299,7 +319,7 @@ jobs:
                   externalNativeBuild {
                       cmake {
                           cppFlags "-O3 -fexceptions -frtti"
-                          arguments "-DGGML_OPENMP=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF", "-DBUILD_SHARED_LIBS=OFF"
+                          arguments "-DGGML_OPENMP=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF", "-DBUILD_SHARED_LIBS=OFF", "-DGGML_VULKAN=ON"
                       }
                   }
               }
@@ -435,7 +455,7 @@ jobs:
               public void isAvailable(PluginCall call) {
                   JSObject ret = new JSObject();
                   ret.put("available", isNativeLibLoaded);
-                  ret.put("backend", isNativeLibLoaded ? "llama.cpp (C++ NDK Native)" : "Unavailable");
+                  ret.put("backend", isNativeLibLoaded ? "llama.cpp (C++ NDK Native / Vulkan GPU)" : "Unavailable");
                   ret.put("platform", "android-native");
                   ret.put("architecture", Build.SUPPORTED_ABIS != null && Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "arm64-v8a");
                   call.resolve(ret);
@@ -459,7 +479,7 @@ jobs:
                   }
 
                   stats.put("available", isNativeLibLoaded);
-                  stats.put("backend", "llama.cpp JNI Native (ARM NEON / OpenCL)");
+                  stats.put("backend", "llama.cpp JNI Native (Vulkan GPU, CPU fallback)");
                   stats.put("gpuVendor", Build.MANUFACTURER);
                   stats.put("gpuRenderer", Build.MODEL + " (" + (Build.HARDWARE != null ? Build.HARDWARE : "Native") + ")");
                   stats.put("totalMemoryMB", totalMemoryMB);
