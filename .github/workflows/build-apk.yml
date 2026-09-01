@@ -27,7 +27,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Dependencies
+      - name: Install Web Dependencies
         run: |
           npm install
           npm install @capacitor/core @capacitor/cli @capacitor/android
@@ -55,15 +55,18 @@ jobs:
           npx cap add android
           npx cap sync android
 
-          # メモリ制限解除（8GB RAM解放）& GPUハードウェアアクセラレーション付与
+          # メモリ制限解除（8GB RAM解放）& GPUハードウェアアクセラレーション
           sed -i 's/<application/<application android:largeHeap="true" android:hardwareAccelerated="true"/' android/app/src/main/AndroidManifest.xml
 
           # gradlew 実行権限の付与
           chmod +x android/gradlew
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Build Android APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
