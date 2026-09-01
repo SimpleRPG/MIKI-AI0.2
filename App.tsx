@@ -19,6 +19,7 @@ import {
 } from './types';
 import { sendChatMessage, sendDebugRequest } from './services/api';
 import { webLLMService } from './services/webLlmService';
+import { nativeLlmService } from './services/nativeLlmService';
 import { systemLogger } from './services/systemLogger';
 import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
@@ -108,7 +109,8 @@ export default function App() {
 
   const [engineMode, setEngineMode] = useState<EngineMode>(() => {
     const saved = localStorage.getItem('miki_active_engine_mode') as EngineMode;
-    return saved === 'webgpu' || saved === 'autonomous_rule' || saved === 'gemini_cloud' ? saved : 'webgpu';
+    const validModes: EngineMode[] = ['native_gpu', 'webgpu', 'external_gpu', 'autonomous_rule', 'gemini_cloud'];
+    return validModes.includes(saved) ? saved : 'native_gpu';
   });
 
   const handleSelectEngine = (mode: EngineMode) => {
@@ -526,7 +528,11 @@ export default function App() {
 
       // Clean placeholder message based on selected engineMode
       const placeholderText =
-        engineMode === 'gemini_cloud'
+        engineMode === 'native_gpu'
+          ? `⚡ 端末本体GPU (OpenCL / Vulkan) で直接推論中...`
+          : engineMode === 'external_gpu'
+          ? `🖥️ 外部ローカルLLM (Ollama/LM Studio) で推論中...`
+          : engineMode === 'gemini_cloud'
           ? `☁️ Gemini Cloud で生成中...`
           : webLLMService.isLoaded()
           ? `⚡ オンデバイス (${targetModelId.split('-')[0]}) で推論中...`
@@ -543,14 +549,18 @@ export default function App() {
         executionSteps: systemLogger.getCurrentSessionSteps(),
         metrics: {
           engine:
-            engineMode === 'gemini_cloud'
+            engineMode === 'native_gpu'
+              ? 'Native GPU (Vulkan/OpenCL)'
+              : engineMode === 'external_gpu'
+              ? 'External Local LLM (Ollama)'
+              : engineMode === 'gemini_cloud'
               ? 'Gemini Cloud'
               : `On-Device (${targetModelId.split('-')[0]})`,
         },
       };
       setMessages((prev) => [...prev, placeholderMsg]);
 
-      // Step 6: WebGPU Model Load / VRAM Binding
+      // Step 6: WebGPU Model Load / VRAM Binding (only if webgpu mode)
       let isModelReady = webLLMService.isModelLoaded(targetModelId);
       const isTargetCached = await Promise.race([
         webLLMService.isModelCached(targetModelId).catch(() => false),
@@ -665,8 +675,83 @@ export default function App() {
       let diagnosticData: ChatMessage['fallbackDiagnostic'] = undefined;
       let executedEngineLabel = 'CPUルールベース';
 
-      // Step 8: WebGPU Transformer Pipeline Execution
-      if (engineMode === 'webgpu') {
+      // Step 8: Hardware GPU / WebGPU / External LLM Execution
+      if (engineMode === 'native_gpu') {
+        // ==========================================
+        // ⚡ Native Hardware GPU Direct Pipeline
+        // ==========================================
+        systemLogger.step(8, 10, '⚡ 端末本体の物理GPU (OpenCL / Vulkan / Direct Shader) で直接推論実行');
+        try {
+          for await (const chunk of nativeLlmService.streamNativeChat(chatContext, {
+            temperature: promptAnalysis.temperature,
+            max_tokens: 384,
+          })) {
+            if (abortController.signal.aborted) break;
+            if (firstTokenTime === null) firstTokenTime = performance.now();
+            accumulated += chunk;
+            tokenCount += chunk.length;
+
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantId
+                  ? {
+                      ...msg,
+                      content: accumulated,
+                      isStreaming: true,
+                      executionSteps: systemLogger.getCurrentSessionSteps(),
+                    }
+                  : msg
+              )
+            );
+          }
+          webGpuSuccess = accumulated.trim().length > 0;
+          executedEngineLabel = '⚡ 端末本体物理GPU (OpenCL/Vulkan)';
+        } catch (natErr: any) {
+          systemLogger.warn('INFERENCE', 'Native GPU execution error:', natErr);
+          webGpuSuccess = false;
+        }
+      } else if (engineMode === 'external_gpu') {
+        // ==========================================
+        // 🖥️ External Local LLM Server Pipeline (Ollama)
+        // ==========================================
+        systemLogger.step(8, 10, '🖥️ 外部ローカルLLM (Ollama/LM Studio) 推論実行');
+        try {
+          const extConfig = (() => {
+            try {
+              const saved = localStorage.getItem('miki_external_llm_config');
+              if (saved) return JSON.parse(saved);
+            } catch (e) {}
+            return { endpoint: 'http://localhost:11434', model: 'qwen2.5:1.5b', type: 'ollama' as const };
+          })();
+
+          for await (const chunk of nativeLlmService.streamExternalLocalLlm(extConfig, chatContext, {
+            temperature: promptAnalysis.temperature,
+          })) {
+            if (abortController.signal.aborted) break;
+            if (firstTokenTime === null) firstTokenTime = performance.now();
+            accumulated += chunk;
+            tokenCount++;
+
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantId
+                  ? {
+                      ...msg,
+                      content: accumulated,
+                      isStreaming: true,
+                      executionSteps: systemLogger.getCurrentSessionSteps(),
+                    }
+                  : msg
+              )
+            );
+          }
+          webGpuSuccess = accumulated.trim().length > 0;
+          executedEngineLabel = `🖥️ 外部ローカルLLM (${extConfig.model})`;
+        } catch (extErr: any) {
+          systemLogger.warn('INFERENCE', 'External Local LLM error:', extErr);
+          webGpuSuccess = false;
+        }
+      } else if (engineMode === 'webgpu') {
         systemLogger.step(8, 10, 'WebGPU Transformer推論パイプライン実行 (Prefill & Decode)', {
           isModelReady,
           isGpuUsable,
@@ -678,7 +763,6 @@ export default function App() {
         if (isModelReady && isGpuUsable) {
           try {
             systemLogger.info('INFERENCE', `WebGPU ストリーミング推論開始 (${targetModelId})`);
-            // Stream execution with safe mobile GPU timeout
             const streamPromise = (async () => {
               for await (const chunk of webLLMService.streamChat(chatContext, {
                 temperature: promptAnalysis.temperature,

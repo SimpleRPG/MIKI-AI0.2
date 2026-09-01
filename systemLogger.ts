@@ -3,7 +3,7 @@ export interface SystemLogEntry {
   timestamp: string;
   epoch: number;
   level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
-  category: 'WEBGPU' | 'NATIVE_GPU' | 'INFERENCE' | 'NETWORK' | 'CACHE' | 'PERSISTENCE' | 'SERVER' | 'CHAT' | 'STEP';
+  category: 'WEBGPU' | 'NATIVE_GPU' | 'EXTERNAL_GPU' | 'INFERENCE' | 'NETWORK' | 'CACHE' | 'PERSISTENCE' | 'SERVER' | 'CHAT' | 'STEP';
   message: string;
   details?: any;
   elapsedMs?: number;

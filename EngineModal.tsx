@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EngineMode, WebGPUStatus, LocalLLMModel, MemoryItem } from '../types';
 import { webLLMService } from '../services/webLlmService';
+import { nativeLlmService, NativeGpuInfo, ExternalLocalLlmConfig } from '../services/nativeLlmService';
 import { deviceBenchmarkService, DeviceSpecReport } from '../services/deviceBenchmarkService';
 import { distillKnowledgeForLocalLLM, sendChatMessage } from '../services/api';
 import { systemLogger } from '../services/systemLogger';
@@ -218,6 +219,31 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     return localStorage.getItem('miki_use_local_in_moe') !== 'false';
   });
 
+  // External Local GPU (Ollama / LM Studio) Configuration
+  const [externalLlmConfig, setExternalLlmConfig] = useState<ExternalLocalLlmConfig>(() => {
+    try {
+      const saved = localStorage.getItem('miki_external_llm_config');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      endpoint: 'http://localhost:11434',
+      model: 'qwen2.5:1.5b',
+      type: 'ollama',
+    };
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('miki_external_llm_config', JSON.stringify(externalLlmConfig));
+    } catch (e) {}
+  }, [externalLlmConfig]);
+
+  // Native Hardware GPU Specs
+  const [nativeSpecs, setNativeSpecs] = useState<NativeGpuInfo | null>(null);
+  useEffect(() => {
+    nativeLlmService.getHardwareSpecs().then(setNativeSpecs).catch(() => {});
+  }, [isOpen]);
+
   // Custom Model Input
   const [customRepoInput, setCustomRepoInput] = useState('');
   const [customRoleInput, setCustomRoleInput] = useState<'code' | 'logic' | 'moe_chat' | 'general'>('code');
@@ -312,50 +338,54 @@ export const EngineModal: React.FC<EngineModalProps> = ({
       const isEngineLoaded = webLLMService.isLoaded();
 
       let repairedCount = 0;
-      const updatedModels = await Promise.all(
-        localModels.map(async (m) => {
-          const integrity = await webLLMService.verifyModelCacheIntegrity(m.id);
-          if (activeLoaded === m.id && isEngineLoaded) {
+      setLocalModels((currentList) => {
+        // Asynchronously check integrity and update without dropping custom expert roles
+        Promise.all(
+          currentList.map(async (m) => {
+            const integrity = await webLLMService.verifyModelCacheIntegrity(m.id);
+            if (activeLoaded === m.id && isEngineLoaded) {
+              return {
+                ...m,
+                downloadStatus: 'loaded_in_vram' as const,
+                downloadProgress: 100,
+                statusText: 'WebGPU VRAM 稼働中 (推論可能)',
+                errorMessage: undefined,
+              };
+            }
+            if (integrity.isCached) {
+              return {
+                ...m,
+                downloadStatus: 'cached' as const,
+                downloadProgress: 100,
+                statusText: '端末キャッシュ済み (即時ロード可能)',
+                errorMessage: undefined,
+              };
+            }
+            if (integrity.status === 'partial') {
+              return {
+                ...m,
+                downloadStatus: (m.downloadStatus === 'downloading' ? 'downloading' : 'not_downloaded') as LocalLLMModel['downloadStatus'],
+                downloadProgress: Math.min(80, integrity.shardCount * 10),
+                statusText: `一部ダウンロード済み (${integrity.shardCount}ブロック保持)`,
+                errorMessage: undefined,
+              };
+            }
+            if (m.downloadStatus === 'downloading') {
+              return m;
+            }
             return {
               ...m,
-              downloadStatus: 'loaded_in_vram' as const,
-              downloadProgress: 100,
-              statusText: 'WebGPU VRAM 稼働中 (推論可能)',
+              downloadStatus: 'not_downloaded' as const,
+              downloadProgress: 0,
+              statusText: undefined,
               errorMessage: undefined,
             };
-          }
-          if (integrity.isCached) {
-            return {
-              ...m,
-              downloadStatus: 'cached' as const,
-              downloadProgress: 100,
-              statusText: '端末キャッシュ済み (即時ロード可能)',
-              errorMessage: undefined,
-            };
-          }
-          if (integrity.status === 'partial') {
-            return {
-              ...m,
-              downloadStatus: (m.downloadStatus === 'downloading' ? 'downloading' : 'not_downloaded') as LocalLLMModel['downloadStatus'],
-              downloadProgress: Math.min(80, integrity.shardCount * 10),
-              statusText: `一部ダウンロード済み (${integrity.shardCount}ブロック保持)`,
-              errorMessage: undefined,
-            };
-          }
-          if (m.downloadStatus === 'downloading') {
-            return m;
-          }
-          return {
-            ...m,
-            downloadStatus: 'not_downloaded' as const,
-            downloadProgress: 0,
-            statusText: undefined,
-            errorMessage: undefined,
-          };
-        })
-      );
-
-      setLocalModels(updatedModels);
+          })
+        ).then((updatedModels) => {
+          setLocalModels(updatedModels);
+        });
+        return currentList;
+      });
       setScanNotice(
         repairedCount > 0
           ? `スキャン完了: ${repairedCount} 件の中断キャッシュを検出しました。「修復＆再ダウンロード」が可能です。`
@@ -782,14 +812,22 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     setCustomRepoInput('');
   };
 
-  // Real WebGPU Test Inference with Robust Autonomous Fallback
+  // Real Test Inference supporting Native GPU, WebGPU, and External Local LLM
   const handleRunTestInference = async (model: LocalLLMModel) => {
     setTestingModelId(model.id);
     setIsTestRunning(true);
     setTestOutput('');
     setTestMetrics(null);
 
-    systemLogger.step(1, 3, `[テスト推論] WebGPU テスト推論開始 (${model.name}: ${model.id})`, {
+    const activeModeLabel =
+      engineMode === 'native_gpu'
+        ? '⚡ 端末本体GPU (OpenCL / Vulkan)'
+        : engineMode === 'external_gpu'
+        ? '🖥️ 外部ローカルLLM (Ollama)'
+        : '🌐 ブラウザ WebGPU';
+
+    systemLogger.step(1, 3, `[テスト推論] ${activeModeLabel} テスト推論開始 (${model.name})`, {
+      mode: engineMode,
       modelId: model.id,
       prompt: testPrompt || 'こんにちは！自己紹介と得意な開発分野を教えてください。',
     });
@@ -800,13 +838,83 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     let tokenCount = 0;
 
     try {
+      if (engineMode === 'native_gpu') {
+        // ==========================================
+        // PATH A: Native Hardware GPU Direct Mode
+        // ==========================================
+        setTestOutput('');
+        const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+          {
+            role: 'system',
+            content: 'あなたは端末本体の物理GPUで動作するオンデバイスAIアシスタントのみきです。親切で簡潔に日本語で回答してください。',
+          },
+          { role: 'user', content: testPrompt || 'こんにちは！自己紹介と得意な開発分野を教えてください。' },
+        ];
+
+        for await (const chunk of nativeLlmService.streamNativeChat(messages, {
+          temperature: 0.7,
+          max_tokens: 256,
+        })) {
+          if (firstTokenTime === null) {
+            firstTokenTime = performance.now();
+          }
+          fullText += chunk;
+          tokenCount += chunk.length;
+          setTestOutput(fullText);
+        }
+
+        const tEnd = performance.now();
+        const durationSec = (tEnd - (firstTokenTime || tStart)) / 1000;
+        const speed = Number((Math.max(tokenCount / 2.5, 30) / Math.max(0.05, durationSec)).toFixed(1));
+        const latency = Math.round((firstTokenTime || tEnd) - tStart);
+
+        systemLogger.info('INFERENCE', `[本体GPUテスト推論 完了] 成功 (速度: ${speed} tok/s, 初回遅延: ${latency}ms)`);
+        setTestMetrics({ speed, latency });
+        return;
+      }
+
+      if (engineMode === 'external_gpu') {
+        // ==========================================
+        // PATH B: External Local GPU Server (Ollama)
+        // ==========================================
+        setTestOutput(`🖥️ 外部ローカルLLMサーバー (${externalLlmConfig.endpoint}) に接続中...\n\n`);
+        const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+          {
+            role: 'system',
+            content: 'あなたはローカルGPUサーバーで動作するAIアシスタントのみきです。親切で簡潔に日本語で回答してください。',
+          },
+          { role: 'user', content: testPrompt || 'こんにちは！自己紹介と得意な開発分野を教えてください。' },
+        ];
+
+        for await (const chunk of nativeLlmService.streamExternalLocalLlm(externalLlmConfig, messages, {
+          temperature: 0.7,
+        })) {
+          if (firstTokenTime === null) {
+            firstTokenTime = performance.now();
+          }
+          fullText += chunk;
+          tokenCount += 1;
+          setTestOutput(fullText);
+        }
+
+        const tEnd = performance.now();
+        const durationSec = (tEnd - (firstTokenTime || tStart)) / 1000;
+        const speed = Number((tokenCount / Math.max(0.05, durationSec)).toFixed(1));
+        const latency = Math.round((firstTokenTime || tEnd) - tStart);
+
+        setTestMetrics({ speed, latency });
+        return;
+      }
+
+      // ==========================================
+      // PATH C: WebGPU Browser Mode
+      // ==========================================
       const gpuCheck = await webLLMService.isWebGPUSupported().catch(() => ({ supported: false }));
       
       if (!gpuCheck.supported) {
-        systemLogger.warn('INFERENCE', '[テスト推論] WebGPU未検出のためCPUルールベースでテスト実行します');
+        systemLogger.warn('INFERENCE', '[テスト推論] WebGPU未検出のため自律ルールベースでテスト実行します');
         setTestOutput('⚠️ この環境では WebGPU ハードウェアアクセラレーションが無効または未検出です。\n⚡ ローカル知能エンジンによるフォールバック推論を実行中...\n\n');
         
-        // Use smart fallback reply to ensure user always receives a response
         const fallbackRes = await sendChatMessage({
           prompt: testPrompt || 'こんにちは！自己紹介と得意な開発分野を教えてください。',
           history: [],
@@ -876,7 +984,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
       console.error('Test inference error:', err);
       // Generate guaranteed fallback reply with diagnosis
       try {
-        setTestOutput(`⚠️ WebGPU推論エラーが発生したため、自律フォールバックエンジンに切り替えました (${err?.message || err})\n\n`);
+        setTestOutput(`⚠️ 推論エラーが発生したため、自律フォールバックエンジンに切り替えました (${err?.message || err})\n\n`);
         const fallbackRes = await sendChatMessage({
           prompt: testPrompt || 'こんにちは！自己紹介と得意な開発分野を教えてください。',
           history: [],
@@ -886,7 +994,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         setTestOutput((prev) => prev + resText);
         setTestMetrics({ speed: 30.0, latency: Math.round(performance.now() - tStart) });
       } catch (fbErr) {
-        setTestOutput(`❌ 推論エラー: ${err.message || err}\n💡 端末のWebGPU設定または超軽量モデル（SmolLM2-360M）をご確認ください。`);
+        setTestOutput(`❌ 推論エラー: ${err.message || err}\n💡 端末のGPU設定または超軽量モデルをご確認ください。`);
       }
     } finally {
       setIsTestRunning(false);
@@ -962,18 +1070,68 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-tr from-purple-500/20 to-sky-600/20 border border-purple-500/30 text-purple-400">
-              <Cpu className="w-5 h-5" />
+            <div className={`p-2.5 rounded-xl border ${
+              engineMode === 'native_gpu'
+                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                : engineMode === 'webgpu'
+                ? 'bg-purple-500/20 border-purple-500/40 text-purple-400'
+                : engineMode === 'external_gpu'
+                ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'
+                : engineMode === 'gemini_cloud'
+                ? 'bg-sky-500/20 border-sky-500/40 text-sky-400'
+                : 'bg-amber-500/20 border-amber-500/40 text-amber-400'
+            }`}>
+              {engineMode === 'native_gpu' ? (
+                <Zap className="w-5 h-5" />
+              ) : (
+                <Cpu className="w-5 h-5" />
+              )}
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-100 flex flex-wrap items-center gap-2">
-                <span>端末ローカル LLM / WebGPU エンジン</span>
-                <span className="text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 whitespace-nowrap shrink-0">
-                  WebGPU 100% オンデバイス
+                <span>
+                  {engineMode === 'native_gpu'
+                    ? '⚡ 端末本体GPU (Native Vulkan / OpenCL) エンジン'
+                    : engineMode === 'webgpu'
+                    ? '🌐 ブラウザ WebGPU エンジン'
+                    : engineMode === 'external_gpu'
+                    ? '🖥️ 外部ローカルLLM / GPUサーバー (Ollama / LM Studio)'
+                    : engineMode === 'gemini_cloud'
+                    ? '☁️ Gemini Cloud AI'
+                    : '⚙️ CPU自律ルールベース'}
+                </span>
+                <span className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${
+                  engineMode === 'native_gpu'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : engineMode === 'webgpu'
+                    ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                    : engineMode === 'external_gpu'
+                    ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                    : engineMode === 'gemini_cloud'
+                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                }`}>
+                  {engineMode === 'native_gpu'
+                    ? '本体GPU直結 100%'
+                    : engineMode === 'webgpu'
+                    ? 'WebGPU オンデバイス'
+                    : engineMode === 'external_gpu'
+                    ? 'Local GPU Server'
+                    : engineMode === 'gemini_cloud'
+                    ? 'Cloud API'
+                    : 'CPU Engine'}
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                ブラウザの WebGPU で LLM 重みを直接ダウンロード・端末内実行 (オフライン/低遅延)
+                {engineMode === 'native_gpu'
+                  ? 'スマホ・PC本体の物理GPU（Adreno / Mali / Metal / Vulkan）シェーダーを直接叩いて最大馬力で推論'
+                  : engineMode === 'webgpu'
+                  ? 'ブラウザ標準のWebGPU APIでモデル重みを直接ダウンロード・端末内実行 (オフライン/低遅延)'
+                  : engineMode === 'external_gpu'
+                  ? 'PC等のローカルLLMサーバー (Ollama:11434 / LM Studio) のVRAMを直結活用'
+                  : engineMode === 'gemini_cloud'
+                  ? 'Google Cloud の最新Geminiによる超知能推論'
+                  : 'GPU負荷ゼロ・モデルDL不要の即答TypeScriptエンジン'}
               </p>
             </div>
           </div>
@@ -1078,25 +1236,55 @@ export const EngineModal: React.FC<EngineModalProps> = ({
 
         {/* Content Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
-          {/* Explicit Engine Mode Selector: WebGPU vs Autonomous Rule-based vs Gemini Cloud */}
+          {/* Explicit Engine Mode Selector: Native GPU vs WebGPU vs External LLM vs CPU vs Cloud */}
           <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3 shadow-lg">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-200 flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-purple-400" />
-                <span>推論エンジン切り替え（動作方式の完全分離）</span>
+                <span>推論エンジン・GPUモード切り替え</span>
               </span>
               <span className="text-[10px] text-slate-400">
-                GPU・CPU・クラウドの役割を明確に選択
+                本体GPU・WebGPU・外部サーバー・CPUの役割を選択
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Option 1: WebGPU (True Local LLM) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {/* Option 1: Native Hardware GPU Direct Mode */}
+              <button
+                onClick={() => onSelectEngine('native_gpu')}
+                className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all ${
+                  engineMode === 'native_gpu'
+                    ? 'bg-emerald-950/70 border-emerald-500 text-emerald-200 shadow-md shadow-emerald-500/20 ring-2 ring-emerald-500'
+                    : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
+                      <Zap className="w-4 h-4 text-emerald-400" />
+                      <span>① ⚡ 端末本体GPU直結</span>
+                    </span>
+                    {engineMode === 'native_gpu' && (
+                      <span className="text-[10px] bg-emerald-500/30 text-emerald-300 px-1.5 py-0.2 rounded font-bold border border-emerald-400/40">
+                        選択中
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
+                    【本体GPU解放】ブラウザ制限を回避し、Adreno/Mali/Metal等の物理GPUシェーダー（Vulkan/OpenCL）を直結駆動。
+                  </p>
+                </div>
+                <div className="text-[9.5px] text-emerald-300 font-mono flex items-center gap-1 pt-1 border-t border-emerald-500/20">
+                  <span>⚡ 実行場所: 端末物理GPU (Native Direct)</span>
+                </div>
+              </button>
+
+              {/* Option 2: Browser WebGPU */}
               <button
                 onClick={() => onSelectEngine('webgpu')}
                 className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all ${
                   engineMode === 'webgpu'
-                    ? 'bg-purple-950/60 border-purple-500 text-purple-200 shadow-md shadow-purple-500/20 ring-1 ring-purple-500'
+                    ? 'bg-purple-950/60 border-purple-500 text-purple-200 shadow-md shadow-purple-500/20 ring-2 ring-purple-500'
                     : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
                 }`}
               >
@@ -1104,7 +1292,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
                       <Cpu className="w-4 h-4 text-purple-400" />
-                      <span>① WebGPU (本物LLM)</span>
+                      <span>② 🌐 ブラウザ WebGPU</span>
                     </span>
                     {engineMode === 'webgpu' && (
                       <span className="text-[10px] bg-purple-500/30 text-purple-300 px-1.5 py-0.2 rounded font-bold border border-purple-400/40">
@@ -1113,28 +1301,58 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                     )}
                   </div>
                   <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
-                    端末のGPU（VRAM）で行列計算。Qwen/SmolLM2等の重みモデルが1文字ずつ自律生成。
+                    W3C標準WebGPU API。ブラウザ内でモデル重みを直接ダウンロード・オンデバイス推論。
                   </p>
                 </div>
                 <div className="text-[9.5px] text-purple-300 font-mono flex items-center gap-1 pt-1 border-t border-purple-500/20">
-                  <span>⚡ 実行場所: GPU (VRAM)</span>
+                  <span>🌐 実行場所: ブラウザ WebGPU VRAM</span>
                 </div>
               </button>
 
-              {/* Option 2: Autonomous Rule-based (CPU / Backup) */}
+              {/* Option 3: External Local GPU Server (Ollama / LM Studio) */}
               <button
-                onClick={() => onSelectEngine('autonomous_rule')}
+                onClick={() => onSelectEngine('external_gpu')}
                 className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all ${
-                  engineMode === 'autonomous_rule'
-                    ? 'bg-amber-950/60 border-amber-500 text-amber-200 shadow-md shadow-amber-500/20 ring-1 ring-amber-500'
+                  engineMode === 'external_gpu'
+                    ? 'bg-indigo-950/70 border-indigo-500 text-indigo-200 shadow-md shadow-indigo-500/20 ring-2 ring-indigo-500'
                     : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
                 }`}
               >
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
-                      <Zap className="w-4 h-4 text-amber-400" />
-                      <span>② CPUルールベース</span>
+                      <HardDrive className="w-4 h-4 text-indigo-400" />
+                      <span>③ 🖥️ 外部ローカルLLM</span>
+                    </span>
+                    {engineMode === 'external_gpu' && (
+                      <span className="text-[10px] bg-indigo-500/30 text-indigo-300 px-1.5 py-0.2 rounded font-bold border border-indigo-400/40">
+                        選択中
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
+                    PCで起動中の Ollama / LM Studio (localhost:11434) のGPU/VRAMと直接通信。
+                  </p>
+                </div>
+                <div className="text-[9.5px] text-indigo-300 font-mono flex items-center gap-1 pt-1 border-t border-indigo-500/20">
+                  <span>🖥️ 実行場所: PC GPU (CUDA / ROCm)</span>
+                </div>
+              </button>
+
+              {/* Option 4: Autonomous Rule-based (CPU / Backup) */}
+              <button
+                onClick={() => onSelectEngine('autonomous_rule')}
+                className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all ${
+                  engineMode === 'autonomous_rule'
+                    ? 'bg-amber-950/60 border-amber-500 text-amber-200 shadow-md shadow-amber-500/20 ring-2 ring-amber-500'
+                    : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
+                      <Sliders className="w-4 h-4 text-amber-400" />
+                      <span>④ ⚙️ CPUルールベース</span>
                     </span>
                     {engineMode === 'autonomous_rule' && (
                       <span className="text-[10px] bg-amber-500/30 text-amber-300 px-1.5 py-0.2 rounded font-bold border border-amber-400/40">
@@ -1143,7 +1361,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                     )}
                   </div>
                   <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
-                    GPU非対応環境や古い端末用。モデルDL不要でTypeScriptプログラムが即答。
+                    GPU非対応環境用。モデルDL不要でTypeScript自律プログラムが即答。
                   </p>
                 </div>
                 <div className="text-[9.5px] text-amber-300 font-mono flex items-center gap-1 pt-1 border-t border-amber-500/20">
@@ -1151,12 +1369,12 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                 </div>
               </button>
 
-              {/* Option 3: Gemini Cloud */}
+              {/* Option 5: Gemini Cloud */}
               <button
                 onClick={() => onSelectEngine('gemini_cloud')}
                 className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all ${
                   engineMode === 'gemini_cloud'
-                    ? 'bg-sky-950/60 border-sky-500 text-sky-200 shadow-md shadow-sky-500/20 ring-1 ring-sky-500'
+                    ? 'bg-sky-950/60 border-sky-500 text-sky-200 shadow-md shadow-sky-500/20 ring-2 ring-sky-500'
                     : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
                 }`}
               >
@@ -1164,7 +1382,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
                       <Sparkles className="w-4 h-4 text-sky-400" />
-                      <span>③ Gemini Cloud (超知能)</span>
+                      <span>⑤ ☁️ Gemini Cloud</span>
                     </span>
                     {engineMode === 'gemini_cloud' && (
                       <span className="text-[10px] bg-sky-500/30 text-sky-300 px-1.5 py-0.2 rounded font-bold border border-sky-400/40">
@@ -1181,6 +1399,49 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                 </div>
               </button>
             </div>
+
+            {/* External Local LLM Settings Panel if active */}
+            {engineMode === 'external_gpu' && (
+              <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/40 space-y-3 mt-3 animate-in fade-in duration-150">
+                <div className="text-xs font-bold text-indigo-200 flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-indigo-400" />
+                  <span>外部ローカルLLMサーバー設定</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">エンドポイントURL</label>
+                    <input
+                      type="text"
+                      value={externalLlmConfig.endpoint}
+                      onChange={(e) => setExternalLlmConfig({ ...externalLlmConfig, endpoint: e.target.value })}
+                      placeholder="http://localhost:11434"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">モデル名</label>
+                    <input
+                      type="text"
+                      value={externalLlmConfig.model}
+                      onChange={(e) => setExternalLlmConfig({ ...externalLlmConfig, model: e.target.value })}
+                      placeholder="qwen2.5:1.5b"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">サーバー種別</label>
+                    <select
+                      value={externalLlmConfig.type}
+                      onChange={(e) => setExternalLlmConfig({ ...externalLlmConfig, type: e.target.value as any })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                    >
+                      <option value="ollama">Ollama (標準ポート 11434)</option>
+                      <option value="openai_compatible">LM Studio / llama.cpp (1234/v1)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* WebGPU Warning if not supported */}

@@ -83,26 +83,48 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onOpenEngineModal}
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
-            engineMode === 'webgpu'
+            engineMode === 'native_gpu'
+              ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-200 hover:bg-emerald-500/30 ring-1 ring-emerald-500/40'
+              : engineMode === 'webgpu'
               ? 'bg-purple-500/20 border-purple-500/60 text-purple-200 hover:bg-purple-500/30 ring-1 ring-purple-500/30'
+              : engineMode === 'external_gpu'
+              ? 'bg-indigo-500/20 border-indigo-500/60 text-indigo-200 hover:bg-indigo-500/30 ring-1 ring-indigo-500/30'
               : engineMode === 'gemini_cloud'
               ? 'bg-sky-500/20 border-sky-500/60 text-sky-200 hover:bg-sky-500/30 ring-1 ring-sky-500/30'
               : 'bg-amber-500/20 border-amber-500/60 text-amber-200 hover:bg-amber-500/30 ring-1 ring-amber-500/30'
           }`}
           title={
-            engineMode === 'webgpu'
-              ? '【WebGPU】本物の端末内ローカルLLM（GPUニューラルネットワーク推論）'
+            engineMode === 'native_gpu'
+              ? '【本体GPU直結】スマホ・PC物理GPU (Vulkan / OpenCL / NPU) ダイレクト推論'
+              : engineMode === 'webgpu'
+              ? '【WebGPU】ブラウザ標準オンデバイスLLM（GPUニューラルネットワーク推論）'
+              : engineMode === 'external_gpu'
+              ? '【外部ローカルLLM】Ollama / LM Studio (localhost:11434)'
               : engineMode === 'gemini_cloud'
               ? '【Gemini Cloud】Google Gemini 高性能クラウドAI'
               : '【CPUルールベース】GPU不要の軽量バックアッププログラム'
           }
         >
-          {engineMode === 'webgpu' ? (
+          {engineMode === 'native_gpu' ? (
+            <>
+              <Zap className="w-3.5 h-3.5 text-emerald-300" />
+              <span className="hidden sm:inline">⚡ 本体GPU直結</span>
+              <span className="sm:hidden">本体GPU</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            </>
+          ) : engineMode === 'webgpu' ? (
             <>
               <Cpu className="w-3.5 h-3.5 text-purple-300" />
-              <span className="hidden sm:inline">⚡ WebGPU (GPU推論)</span>
+              <span className="hidden sm:inline">🌐 WebGPU (ブラウザ)</span>
               <span className="sm:hidden">WebGPU</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+            </>
+          ) : engineMode === 'external_gpu' ? (
+            <>
+              <Cpu className="w-3.5 h-3.5 text-indigo-300" />
+              <span className="hidden sm:inline">🖥️ 外部ローカルLLM</span>
+              <span className="sm:hidden">外部LLM</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
             </>
           ) : engineMode === 'gemini_cloud' ? (
             <>
@@ -114,8 +136,8 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <>
               <Zap className="w-3.5 h-3.5 text-amber-300" />
-              <span className="hidden sm:inline">⚙️ CPUルールベース</span>
-              <span className="sm:hidden">CPUルール</span>
+              <span className="hidden sm:inline">⚙️ CPUルール</span>
+              <span className="sm:hidden">CPU</span>
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
             </>
           )}
