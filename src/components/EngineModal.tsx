@@ -7,6 +7,7 @@ import { distillKnowledgeForLocalLLM, sendChatMessage } from '../services/api';
 import { systemLogger } from '../services/systemLogger';
 import { VRAMMonitor } from './VRAMMonitor';
 import { GgufModelManager } from './GgufModelManager';
+import { ErrorBoundary } from './ErrorBoundary';
 import {
   Cpu,
   Sparkles,
@@ -2169,7 +2170,12 @@ export const EngineModal: React.FC<EngineModalProps> = ({
           {/* TAB: GGUF Model Manager (llama.cpp Native Engine) */}
           {activeTab === 'gguf' && (
             <div className="space-y-5 animate-in fade-in duration-200">
-              <GgufModelManager />
+              <ErrorBoundary
+                fallbackTitle="GGUFモデルマネージャー"
+                fallbackMessage="GGUF管理モジュールの初期化を保護しました。「画面を安全に復旧」を押して再表示してください。"
+              >
+                <GgufModelManager />
+              </ErrorBoundary>
             </div>
           )}
 

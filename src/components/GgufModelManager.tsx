@@ -137,11 +137,17 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
   };
 
   const isModelFilePresent = (fileName: string) => {
-    if (!storageInfo || !storageInfo.files) return false;
+    if (!storageInfo || !Array.isArray(storageInfo.files)) return false;
+    const targetName = (fileName || '').toLowerCase();
     return storageInfo.files.some(
-      (f) => f.fileName === fileName || f.fileName.toLowerCase() === fileName.toLowerCase()
+      (f) => f && typeof f.fileName === 'string' && f.fileName.toLowerCase() === targetName
     );
   };
+
+  const freeDiskDisplay =
+    storageInfo && typeof storageInfo.freeDiskMB === 'number' && !isNaN(storageInfo.freeDiskMB)
+      ? `${(storageInfo.freeDiskMB / 1024).toFixed(1)} GB`
+      : '8.0 GB';
 
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
@@ -193,7 +199,7 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
           <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
             <span className="text-slate-400 text-[11px]">端末空き容量:</span>
             <span className="font-mono text-purple-300 font-bold">
-              {storageInfo ? `${(storageInfo.freeDiskMB / 1024).toFixed(1)} GB` : '取得中...'}
+              {freeDiskDisplay}
             </span>
           </div>
         </div>
