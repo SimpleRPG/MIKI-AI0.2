@@ -942,6 +942,55 @@ export default function App() {
             };
             executedEngineLabel = `CPUルールベース (${activeSpeaker.name})`;
             systemLogger.warn('CHAT', `[GPULLM未応答診断] ${diagnosticCategory}: ${diagnosticCause}`, diagnosticData);
+          } else if (engineMode === 'native_gpu') {
+            // Fix C: native_gpu previously had no diagnostic branch at all, so a
+            // silent fallback here gave no indication that on-device GGUF
+            // inference actually failed (only the small engine label changed).
+            let diagnosticCategory = 'CPUルールベース切替';
+            let diagnosticCause = '端末内GGUFモデルでの推論に失敗したため、CPUルールベースで即座に返信しました。';
+            let diagnosticTip = '「端末ローカルLLM設定」からGGUFモデルの状態を確認してください。';
+
+            if (webGpuErrorDetails) {
+              if (
+                webGpuErrorDetails.includes('decode') ||
+                webGpuErrorDetails.includes('context') ||
+                webGpuErrorDetails.includes('コンテキスト') ||
+                webGpuErrorDetails.includes('ctx')
+              ) {
+                diagnosticCategory = 'コンテキスト長超過 (Context overflow)';
+                diagnosticCause = '会話履歴・記憶・添付コードの合計がモデルのコンテキスト上限(nCtx)を超え、llama_decodeが失敗しました。';
+                diagnosticTip = '会話を新規開始するか、記憶の件数・添付コードの量を減らしてから再度お試しください。';
+              } else if (
+                webGpuErrorDetails.includes('ロード済みのGGUFモデルがありません') ||
+                webGpuErrorDetails.includes('not loaded') ||
+                webGpuErrorDetails.includes('is not loaded')
+              ) {
+                diagnosticCategory = 'GGUFモデル未ロード';
+                diagnosticCause = '端末内にロード済みのGGUFモデルが見つかりませんでした。';
+                diagnosticTip = '「端末ローカルLLM設定」からGGUFモデルをダウンロード・VRAMロードしてください。';
+              } else if (webGpuErrorDetails.includes('初期化') || webGpuErrorDetails.includes('破損')) {
+                diagnosticCategory = 'モデル初期化失敗';
+                diagnosticCause = 'llama.cppによるGGUFモデルの初期化に失敗しました。ファイルが破損している可能性があります。';
+                diagnosticTip = '対象のGGUFファイルを削除して再ダウンロードしてください。';
+              } else if (
+                webGpuErrorDetails.includes('Native generation error') ||
+                webGpuErrorDetails.includes('JNI') ||
+                webGpuErrorDetails.includes('ネイティブライブラリ')
+              ) {
+                diagnosticCategory = 'ネイティブ推論エラー (JNI)';
+                diagnosticCause = 'llama.cpp C++ JNI層で例外が発生しました。';
+                diagnosticTip = 'アプリを再起動するか、モデルを再ロードしてから再度お試しください。';
+              }
+            }
+
+            diagnosticData = {
+              category: diagnosticCategory,
+              cause: diagnosticCause,
+              tip: diagnosticTip,
+              modelId: nativeLlmService.getActiveModelId() || 'unknown-gguf-model',
+            };
+            executedEngineLabel = `CPUルールベース (${activeSpeaker.name})`;
+            systemLogger.warn('CHAT', `[NativeGPU未応答診断] ${diagnosticCategory}: ${diagnosticCause}`, diagnosticData);
           } else if (engineMode === 'gemini_cloud') {
             executedEngineLabel = 'Gemini 2.5 Flash (Cloud)';
           } else {

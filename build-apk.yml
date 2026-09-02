@@ -857,6 +857,16 @@ jobs:
                               }
                           );
 
+                          // Fix B: nativeGenerateToken() returns the real failure reason
+                          // (e.g. "Error: llama_decode prompt failed") as its return value when
+                          // generation fails before any token callback fires. Previously this
+                          // `result` was discarded entirely and fullResult (empty) was resolved
+                          // as a "successful" empty response, hiding the real failure from JS.
+                          if (result != null && result.startsWith("Error:")) {
+                              call.reject(result);
+                              return;
+                          }
+
                           long duration = Math.max(1, System.currentTimeMillis() - startTime);
                           float tps = (float) tokenCount[0] / (duration / 1000.0f);
 
