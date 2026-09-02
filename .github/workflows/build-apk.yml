@@ -354,7 +354,7 @@ jobs:
                   externalNativeBuild {
                       cmake {
                           cppFlags "-O3 -fexceptions -frtti"
-                          arguments "-DGGML_OPENMP=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF", "-DBUILD_SHARED_LIBS=OFF", "-DGGML_VULKAN=ON"
+                          arguments "-DGGML_OPENMP=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF", "-DBUILD_SHARED_LIBS=OFF", "-DGGML_VULKAN=ON", "-DANDROID_PLATFORM=28"
                       }
                   }
               }
