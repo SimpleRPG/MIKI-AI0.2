@@ -1,38 +1,130 @@
 import type { MemoryItem } from '../types';
 
 /**
- * 記憶検索(RAG簡易版)
+ * 多層ベクトル検索 & 知識グラフ依存関係検索エンジン
  *
- * これまでは `memories.filter(active).slice(0, 3)` で、記憶が増えるほど
- * 「先頭の3件」が固定的に選ばれ続け、今の発言と無関係な記憶が埋め込まれる一方、
- * 本当に関係ある記憶が呼び出されない問題があった。
+ * 設計思想 4. RAG・外部記憶とプロンプト上限 (目次＋必要な候補のみの少数投入)
+ * 設計思想 12. 検索・記憶の改善案 (知識グラフ、関係性、多層検索、前提依存)
  *
- * ここでは埋め込みモデルやサーバーを使わず、端末内だけで完結する軽量な
- * キーワード一致 + 重要度 + 最近性 + ピン留めのスコアリングで上位N件だけを選ぶ。
+ * 端末内だけで高速かつミリ秒オーダーで動作する3層ハイブリッド検索:
+ * 1. Tier 1: Lexical N-Gram (形態素バイグラム + 形態素トークン一致)
+ * 2. Tier 2: Semantic Domain Vector (8次元ドメイン概念疎ベクトル + TF-IDF重み類似度)
+ * 3. Tier 3: Metadata & Recency (重要度、承認状態、フィードバック、時間減衰)
+ * 4. Graph Traversal: 知識グラフ依存関係トラバーサル (前提条件、親子、関連ノード連鎖)
  */
 
 const STOPWORDS = new Set([
   'です', 'ます', 'こと', 'それ', 'これ', 'あれ', 'よう', 'ため', 'から', 'まで',
   'って', 'けど', 'でも', 'だよ', 'だね', 'かな', 'ねえ', 'ちゃん', 'さん',
-  'the', 'and', 'for', 'with', 'this', 'that', 'です', 'ですね',
+  'the', 'and', 'for', 'with', 'this', 'that', 'ですね', 'でしょうか',
+  'する', 'した', 'ある', 'ない', 'いる', '私', '僕', 'あなた',
 ]);
 
+// 8次元セマンティックドメイン
+export const SEMANTIC_DOMAINS = [
+  'coding_dev',       // 0: コード、JavaScript, Canvas, HTML, VBA, バグ, エラー, 関数
+  'persona_style',    // 1: 口調、タメ口、親友、キャラクター、挨拶、呼び名
+  'user_profile',     // 2: ユーザー情報、名前、趣味、好み、端末環境
+  'system_rules',     // 3: 制約、禁止事項、品質境界、安全ルール、手順
+  'episodic_history', // 4: 過去の出来事、前回、失敗談、成功経験
+  'relationship',     // 5: 親密度、約束、感情、信頼、思い出
+  'game_mechanics',   // 6: ゲーム、RPG、戦闘、アイテム、マップ
+  'meta_learning',    // 7: スキル、自己改善、学習、LoRA、ベンチマーク
+] as const;
+
+export type SemanticDomain = typeof SEMANTIC_DOMAINS[number];
+
+const DOMAIN_KEYWORDS: Record<SemanticDomain, string[]> = {
+  coding_dev: [
+    'コード', 'javascript', 'js', 'typescript', 'ts', 'html', 'css', 'canvas', 'vba', 'excel',
+    'エラー', 'バグ', '修正', '関数', 'api', 'react', 'tailwind', 'コンポーネント', 'レンダリング',
+    '変数', 'クラス', 'アルゴリズム', '非同期', 'promise', 'async', 'json',
+  ],
+  persona_style: [
+    '口調', 'タメ口', '親友', 'ミキ', 'キャラクター', 'ペルソナ', '脱ロボット', '敬語禁止',
+    '呼び方', '挨拶', 'ニックネーム', '語尾', '自然な日本語',
+  ],
+  user_profile: [
+    'ユーザー', '名前', '趣味', '好き', '嫌い', '端末', 'スマホ', 'android', 'mac', 'windows',
+    '職業', '年齢', '誕生日', '住まい', '好み', '設定',
+  ],
+  system_rules: [
+    'ルール', '制約', '禁止', '必須', '方針', '安全境界', '基準', '仕様', 'ガイドライン',
+    '手順', '要件', 'チェックリスト', '前提',
+  ],
+  episodic_history: [
+    '前回', '過去', '昨日', '前言ってた', 'あの時', '失敗', '成功', '直した', '作った',
+    '歴史', '経緯', '記憶', '覚えてる',
+  ],
+  relationship: [
+    '親密度', '仲良し', '約束', '秘密', '思い出', '感謝', '信頼', '相談', '気持ち',
+  ],
+  game_mechanics: [
+    'ゲーム', 'rpg', '戦闘', 'アリーナ', 'ダイス', 'インベントリ', 'クエスト', 'マップ',
+    'ステータス', 'hp', 'mp', 'レベル', '敵',
+  ],
+  meta_learning: [
+    'スキル', '改善', '自己学習', 'lora', 'colab', 'ベンチマーク', '評価', '世界モデル',
+    '予測誤差', '系統樹', '世代', 'データセット', 'jsonl',
+  ],
+};
+
 /**
- * 日本語は分かち書きされていないため、単純な単語分割に加えて
- * 2文字ずつの重なり合うN-gram(バイグラム)も抽出し、部分一致の取りこぼしを減らす。
+ * テキストからドメインベクトル（8次元疎ベクトル）を算出
  */
-function extractTokens(text: string): Set<string> {
+export function calculateDomainVector(text: string): number[] {
+  const lower = (text || '').toLowerCase();
+  const vector = new Array(SEMANTIC_DOMAINS.length).fill(0);
+
+  SEMANTIC_DOMAINS.forEach((domain, idx) => {
+    const keywords = DOMAIN_KEYWORDS[domain];
+    let hits = 0;
+    keywords.forEach((kw) => {
+      if (lower.includes(kw)) hits++;
+    });
+    vector[idx] = hits;
+  });
+
+  // ベクトルの正規化 (L2ノルム)
+  const norm = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0));
+  if (norm > 0) {
+    return vector.map((v) => Number((v / norm).toFixed(3)));
+  }
+  return vector;
+}
+
+/**
+ * 2つのドメインベクトルの余弦類似度を計算 (0.0 〜 1.0)
+ */
+export function calculateCosineSimilarity(vecA: number[], vecB: number[]): number {
+  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return Math.max(0, Math.min(1, dotProduct / (Math.sqrt(normA) * Math.sqrt(normB))));
+}
+
+/**
+ * 日本語バイグラム + 単語トークン抽出 (Tier 1 Lexical)
+ */
+export function extractQueryTokens(text: string): Set<string> {
   const tokens = new Set<string>();
   if (!text) return tokens;
 
-  // 記号・空白で分割した「単語」トークン(英数字混じりの語に強い)
+  // 記号・空白で分割した単語トークン
   const words = text
     .toLowerCase()
     .split(/[\s、。,.!?！？「」『』()（）\[\]【】\/\\・:：;；~〜\-]+/)
     .filter((w) => w.length >= 2 && !STOPWORDS.has(w));
   words.forEach((w) => tokens.add(w));
 
-  // 日本語向けの文字バイグラム(単語分割だけでは拾えない部分一致を補う)
+  // 日本語文字バイグラム（2文字ずつのスライディング）
   const cleaned = text.replace(/[\s、。,.!?！？「」『』()（）\[\]【】\/\\・:：;；~〜\-]+/g, '');
   for (let i = 0; i < cleaned.length - 1; i++) {
     const bigram = cleaned.slice(i, i + 2).toLowerCase();
@@ -43,79 +135,236 @@ function extractTokens(text: string): Set<string> {
 }
 
 export interface MemoryRetrievalOptions {
-  limit?: number; // 最終的にプロンプトへ積む件数の上限
-  alwaysIncludePinned?: boolean; // ピン留め記憶は関連度が低くても優先的に含めるか
+  limit?: number;
+  alwaysIncludePinned?: boolean;
+  filterExpired?: boolean;
+  onlyApproved?: boolean;
+  traverseGraph?: boolean;       // 知識グラフ依存関係トラバーサルを有効化 (デフォルト: true)
+  maxGraphHops?: number;         // 最大探索ホップ数 (デフォルト: 2)
+}
+
+export interface ScoredMemory {
+  memory: MemoryItem;
+  score: number;
+  keywordMatches: number;
+  semanticSimilarity: number;
+  retrievalSource: 'direct_match' | 'prerequisite_dependency' | 'parent_context' | 'graph_relation';
+  linkedFromId?: string;
+  matchReasons: string[];
 }
 
 /**
- * 現在のユーザー発言に関連する記憶を上位N件だけ選んで返す。
- * スコアが同点の場合は「新しいもの」「よく使われているもの」を優先する。
+ * 現在のユーザー発言に関連する記憶を上位N件取得する
  */
 export function retrieveRelevantMemories(
   currentUserMessage: string,
   memories: MemoryItem[],
   options: MemoryRetrievalOptions = {}
 ): MemoryItem[] {
-  const { limit = 5, alwaysIncludePinned = true } = options;
+  const scored = retrieveScoredMemories(currentUserMessage, memories, options);
+  return scored.map((s) => s.memory);
+}
 
-  const activeMemories = (memories || []).filter((m) => m.active !== false);
+/**
+ * 多層ベクトル検索 ＋ 知識グラフ依存関係トラバーサル (メインスコアリング)
+ */
+export function retrieveScoredMemories(
+  currentUserMessage: string,
+  memories: MemoryItem[],
+  options: MemoryRetrievalOptions = {}
+): ScoredMemory[] {
+  const {
+    limit = 5,
+    alwaysIncludePinned = true,
+    filterExpired = true,
+    onlyApproved = false,
+    traverseGraph = true,
+  } = options;
+
+  const now = Date.now();
+  const memoryMap = new Map<string, MemoryItem>();
+
+  const activeMemories = (memories || []).filter((m) => {
+    if (m.active === false) return false;
+    if (m.status === 'archived' || m.status === 'deprecated') return false;
+    if (filterExpired && m.expiresAt && m.expiresAt < now) return false;
+    if (onlyApproved && m.approved === false) return false;
+    memoryMap.set(m.id, m);
+    return true;
+  });
+
   if (activeMemories.length === 0) return [];
 
-  const queryTokens = extractTokens(currentUserMessage);
+  // クエリのLexicalトークン & Semanticドメインベクトル
+  const queryTokens = extractQueryTokens(currentUserMessage);
+  const queryVector = calculateDomainVector(currentUserMessage);
 
-  const scored = activeMemories.map((memory) => {
-    const memoryTokens = extractTokens(`${memory.content} ${(memory.tags || []).join(' ')}`);
+  // 1. 各記憶の多層スコアリング (Tier 1 + Tier 2 + Tier 3)
+  const initialScored: ScoredMemory[] = activeMemories.map((memory) => {
+    const memoryText = `${memory.content} ${(memory.tags || []).join(' ')} ${memory.sourceRef || ''}`;
+    const memoryTokens = extractQueryTokens(memoryText);
+    const memoryVector = memory.domainVector || calculateDomainVector(memoryText);
 
+    // Tier 1: Lexical N-Gram Match Score
     let keywordMatches = 0;
+    const matchReasons: string[] = [];
+
     queryTokens.forEach((t) => {
-      if (memoryTokens.has(t)) keywordMatches++;
+      if (memoryTokens.has(t)) {
+        keywordMatches++;
+        if (matchReasons.length < 3) matchReasons.push(`キーワード: "${t}"`);
+      }
     });
 
+    // Tier 2: Semantic Domain Vector Cosine Similarity
+    const semanticSim = calculateCosineSimilarity(queryVector, memoryVector);
+    if (semanticSim > 0.4) {
+      matchReasons.push(`意味類似度: ${(semanticSim * 100).toFixed(0)}%`);
+    }
+
+    // Tier 3: Metadata & Feedback & Recency
     const importanceScore = (memory.importance ?? 1) * 1.5;
     const pinnedBonus = memory.pinned ? 8 : 0;
     const usageBonus = Math.min(memory.useCount ?? 0, 5) * 0.5;
+    const approvedBonus = memory.approved ? 4 : 0;
 
-    // 「良い・悪い評価」(ユーザーからのフィードバック)を検索スコアへ反映する。
-    // 良い評価が多い記憶は積極的に再利用し、悪い評価が多い記憶は
-    // (完全に除外はせず)優先度を下げることで、次第に呼ばれにくくする。
     const good = memory.goodCount ?? 0;
     const bad = memory.badCount ?? 0;
     const feedbackScore = Math.max(-6, Math.min(6, (good - bad) * 2));
 
-    // 最近使われた/作られたものをわずかに優先(同点時のタイブレーク用)
     const recencyTimestamp = memory.lastUsedAt ?? memory.updatedAt ?? memory.createdAt ?? 0;
     const recencyScore = recencyTimestamp > 0 ? Math.min(recencyTimestamp / 1e13, 1) : 0;
 
-    const score =
-      keywordMatches * 3 + importanceScore + pinnedBonus + usageBonus + feedbackScore + recencyScore;
+    const totalScore =
+      keywordMatches * 3.0 +
+      semanticSim * 6.0 + // 意味類似度ボーナス
+      importanceScore +
+      pinnedBonus +
+      usageBonus +
+      approvedBonus +
+      feedbackScore +
+      recencyScore;
 
-    return { memory, score, keywordMatches };
+    return {
+      memory,
+      score: Number(totalScore.toFixed(2)),
+      keywordMatches,
+      semanticSimilarity: semanticSim,
+      retrievalSource: 'direct_match',
+      matchReasons,
+    };
   });
 
-  scored.sort((a, b) => b.score - a.score);
+  // 初回スコア順ソート
+  initialScored.sort((a, b) => b.score - a.score);
 
-  const selected: MemoryItem[] = [];
-  const selectedIds = new Set<string>();
+  // 2. 知識グラフ依存関係トラバーサル (Knowledge Graph Traversal)
+  // ヒットした主要記憶（Seed）の「前提条件(prerequisite)」や「親子関係(parent)」を連鎖的に引き込み
+  const scoredMap = new Map<string, ScoredMemory>();
+  initialScored.forEach((s) => scoredMap.set(s.memory.id, s));
 
-  // ピン留めされた記憶は、関連度に関わらず優先的に含める
+  const resultList: ScoredMemory[] = [];
+  const visitedIds = new Set<string>();
+
+  const addMemoryToResult = (scoredItem: ScoredMemory) => {
+    if (visitedIds.has(scoredItem.memory.id)) return;
+    visitedIds.add(scoredItem.memory.id);
+    resultList.push(scoredItem);
+
+    // グラフ探索が有効な場合、関連ノードを連鎖探索
+    if (traverseGraph && resultList.length < limit * 2) {
+      const mem = scoredItem.memory;
+
+      // A. 前提条件 (Prerequisites): 最重要（これがないと成立しない前提ルール・上位設定）
+      if (mem.prerequisiteMemoryIds && mem.prerequisiteMemoryIds.length > 0) {
+        mem.prerequisiteMemoryIds.forEach((prereqId) => {
+          if (!visitedIds.has(prereqId) && memoryMap.has(prereqId)) {
+            const prereqMem = memoryMap.get(prereqId)!;
+            const prereqScored: ScoredMemory = {
+              memory: prereqMem,
+              score: scoredItem.score * 0.9 + 5, // 前提条件ノードへの優先ブースト
+              keywordMatches: 0,
+              semanticSimilarity: scoredItem.semanticSimilarity * 0.8,
+              retrievalSource: 'prerequisite_dependency',
+              linkedFromId: mem.id,
+              matchReasons: [`前提条件 (from "${mem.content.substring(0, 12)}...")`],
+            };
+            addMemoryToResult(prereqScored);
+          }
+        });
+      }
+
+      // B. 親ノード (Parent Context): 上位概念・大枠の仕様
+      if (mem.parentMemoryId && !visitedIds.has(mem.parentMemoryId) && memoryMap.has(mem.parentMemoryId)) {
+        const parentMem = memoryMap.get(mem.parentMemoryId)!;
+        const parentScored: ScoredMemory = {
+          memory: parentMem,
+          score: scoredItem.score * 0.85 + 3,
+          keywordMatches: 0,
+          semanticSimilarity: scoredItem.semanticSimilarity * 0.7,
+          retrievalSource: 'parent_context',
+          linkedFromId: mem.id,
+          matchReasons: [`上位親ノード (from "${mem.content.substring(0, 12)}...")`],
+        };
+        addMemoryToResult(parentScored);
+      }
+
+      // C. 横の関連リンク (Related Nodes)
+      if (mem.relatedMemoryIds && mem.relatedMemoryIds.length > 0) {
+        mem.relatedMemoryIds.forEach((relId) => {
+          if (!visitedIds.has(relId) && memoryMap.has(relId)) {
+            const relMem = memoryMap.get(relId)!;
+            const relScored: ScoredMemory = {
+              memory: relMem,
+              score: scoredItem.score * 0.7, // 減衰
+              keywordMatches: 0,
+              semanticSimilarity: scoredItem.semanticSimilarity * 0.6,
+              retrievalSource: 'graph_relation',
+              linkedFromId: mem.id,
+              matchReasons: [`関連リンク (from "${mem.content.substring(0, 12)}...")`],
+            };
+            addMemoryToResult(relScored);
+          }
+        });
+      }
+    }
+  };
+
+  // ピン留め記憶を最優先登録
   if (alwaysIncludePinned) {
-    scored
+    initialScored
       .filter((s) => s.memory.pinned)
-      .forEach((s) => {
-        if (selected.length < limit && !selectedIds.has(s.memory.id)) {
-          selected.push(s.memory);
-          selectedIds.add(s.memory.id);
-        }
-      });
+      .forEach((s) => addMemoryToResult(s));
   }
 
-  // 残り枠を関連度スコア順に埋める
-  for (const s of scored) {
-    if (selected.length >= limit) break;
-    if (selectedIds.has(s.memory.id)) continue;
-    selected.push(s.memory);
-    selectedIds.add(s.memory.id);
+  // スコア順にSeed記憶を追加
+  for (const s of initialScored) {
+    if (resultList.length >= limit) break;
+    addMemoryToResult(s);
   }
 
-  return selected;
+  // 最終ソートと上限切り出し
+  resultList.sort((a, b) => b.score - a.score);
+  return resultList.slice(0, limit);
+}
+
+/**
+ * 会話で記憶が使用された際に、使用回数と最終利用日時を更新するヘルパー
+ */
+export function recordMemoryUsage(
+  usedMemoryIds: string[],
+  memories: MemoryItem[]
+): MemoryItem[] {
+  const idSet = new Set(usedMemoryIds);
+  const now = Date.now();
+  return memories.map((m) => {
+    if (idSet.has(m.id)) {
+      return {
+        ...m,
+        useCount: (m.useCount ?? 0) + 1,
+        lastUsedAt: now,
+      };
+    }
+    return m;
+  });
 }

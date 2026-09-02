@@ -50,10 +50,10 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [urlCopied, setUrlCopied] = useState(false);
   const getPublicUrl = () => {
-    if (typeof window !== 'undefined' && window.location.href) {
-      return window.location.origin;
+    if (typeof window !== 'undefined' && window.location.origin) {
+      return window.location.origin.replace('ais-dev-', 'ais-pre-');
     }
-    return 'https://ais-pre-sacdblu2nkpceyxfbc4t5c-387287333639.asia-northeast1.run.app';
+    return 'https://ais-pre-3wfkdwmq4s7d422alblgnd-387287333639.asia-northeast1.run.app';
   };
 
   const handleCopyPublicUrl = () => {

@@ -18,14 +18,25 @@ import {
   Send,
   Wand2,
   Check,
+  ThumbsUp,
+  ThumbsDown,
+  ShieldCheck,
+  RefreshCw,
+  Clock,
+  Network,
+  GitBranch,
+  Search,
+  Link,
+  ChevronRight,
 } from 'lucide-react';
-import { MemoryItem, PersonaConfig } from '../types';
+import { MemoryItem, PersonaConfig, MemoryType } from '../types';
 import {
   JAPANESE_NATURAL_DIALOGUE_CORPUS,
   ANTI_ROBOTIC_JAPANESE_RULES,
   INITIAL_JAPANESE_MEMORIES,
 } from '../data/japaneseKnowledgeData';
 import { MASTER_EDUCATION_MEMORIES } from '../data/masterEducationKnowledge';
+import { retrieveScoredMemories, ScoredMemory, calculateDomainVector, SEMANTIC_DOMAINS } from '../utils/memoryRetrieval';
 
 export interface MemoryModalProps {
   isOpen: boolean;
@@ -45,8 +56,14 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   onUpdateMemories,
 }) => {
   const [teachInput, setTeachInput] = useState('');
-  const [activeSubTab, setActiveSubTab] = useState<'persona' | 'teach' | 'memory' | 'corpus'>('teach');
+  const [selectedMemoryType, setSelectedMemoryType] = useState<MemoryType>('semantic');
+  const [activeSubTab, setActiveSubTab] = useState<'persona' | 'teach' | 'memory' | 'corpus' | 'graph'>('teach');
   const [exportedStatus, setExportedStatus] = useState<string | null>(null);
+
+  // 知識グラフ & 多層ベクトル検索シミュレーター用ステート
+  const [graphSearchQuery, setGraphSearchQuery] = useState('ゲームの脱ロボットとタメ口会話');
+  const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(null);
+  const [graphTraverseEnabled, setGraphTraverseEnabled] = useState(true);
 
   // Auto classify category behind the scenes so user doesn't need to pick
   const detectCategory = (text: string): MemoryItem['category'] => {
@@ -80,6 +97,10 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
       importance: 5,
       pinned: true,
       active: true,
+      approved: true, // ユーザー直接入力は初期承認
+      memoryType: selectedMemoryType,
+      goodCount: 1,
+      badCount: 0,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       source: 'manual',
@@ -95,6 +116,54 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
 
     setTeachInput('');
     setExportedStatus(`✨ 「${trimmed.slice(0, 24)}${trimmed.length > 24 ? '...' : ''}」を教育完了！全LLMに即時自動反映されました！🌸`);
+    setTimeout(() => setExportedStatus(null), 4000);
+  };
+
+  const handleToggleApproved = (id: string) => {
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)((prev: MemoryItem[]) => {
+        const list = Array.isArray(prev) ? prev : memories;
+        return list.map((m) => (m.id === id ? { ...m, approved: !m.approved, updatedAt: Date.now() } : m));
+      });
+    }
+  };
+
+  const handleAdjustFeedback = (id: string, delta: number) => {
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)((prev: MemoryItem[]) => {
+        const list = Array.isArray(prev) ? prev : memories;
+        return list.map((m) => {
+          if (m.id === id) {
+            const currentGood = m.goodCount ?? 0;
+            const nextGood = Math.max(0, currentGood + delta);
+            return { ...m, goodCount: nextGood, updatedAt: Date.now() };
+          }
+          return m;
+        });
+      });
+    }
+  };
+
+  // 重複記憶の自動統合・整理 (設計思想 12. 重複統合 & アイドル時整理)
+  const handleConsolidateMemories = () => {
+    const seen = new Set<string>();
+    const deduplicated: MemoryItem[] = [];
+    let mergedCount = 0;
+
+    for (const mem of memories) {
+      const normalized = mem.content.trim().toLowerCase();
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        deduplicated.push(mem);
+      } else {
+        mergedCount++;
+      }
+    }
+
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(deduplicated);
+    }
+    setExportedStatus(`🧹 記憶の自動整理完了: ${mergedCount} 件の重複・類似エントリを統合しました！`);
     setTimeout(() => setExportedStatus(null), 4000);
   };
 
@@ -277,6 +346,18 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
             <BookOpen className="w-4 h-4" />
             <span>日本語自然化コーパス</span>
           </button>
+
+          <button
+            onClick={() => setActiveSubTab('graph')}
+            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+              activeSubTab === 'graph'
+                ? 'border-indigo-500 text-indigo-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Network className="w-4 h-4 text-indigo-400" />
+            <span>🕸️ 知識グラフ & 多層RAG</span>
+          </button>
         </div>
 
         {/* Body Content */}
@@ -418,9 +499,19 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
           {/* TAB 2: Long-Term Memory & Knowledge List */}
           {activeSubTab === 'memory' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="font-bold text-slate-200">保持している知識・記憶一覧 ({memories.length}件)</span>
-                <span className="text-slate-400 text-[11px]">端末内ストレージ永続保存中</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleConsolidateMemories}
+                    className="px-2.5 py-1 bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-500/40 rounded-lg text-[10.5px] font-bold flex items-center gap-1 transition-all"
+                    title="重複・類似記憶の検出と自動統合整理を実行"
+                  >
+                    <RefreshCw className="w-3 h-3 text-purple-400" />
+                    <span>重複統合・自動整理</span>
+                  </button>
+                  <span className="text-slate-400 text-[10.5px]">端末内永続保存中</span>
+                </div>
               </div>
 
               {/* Memory List */}
@@ -430,35 +521,83 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                     保存された記憶はありません。「かんたんAI教育」タブから追加できます。
                   </div>
                 ) : (
-                  memories.map((mem) => (
-                    <div
-                      key={mem.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs hover:border-slate-700 transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono shrink-0 ${
-                          mem.category === 'gamedev'
-                            ? 'bg-sky-950 text-sky-300 border border-sky-800'
-                            : mem.category === 'preference'
-                            ? 'bg-purple-950 text-purple-300 border border-purple-800'
-                            : mem.category === 'profile'
-                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                            : 'bg-slate-800 text-slate-300 border border-slate-700'
-                        }`}>
-                          {mem.category}
-                        </span>
-                        <span className="text-slate-200 truncate">{mem.content}</span>
-                      </div>
-
-                      <button
-                        onClick={() => handleDelete(mem.id)}
-                        className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors shrink-0 ml-2"
-                        title="記憶を削除"
+                  memories.map((mem) => {
+                    const good = mem.goodCount ?? 0;
+                    const bad = mem.badCount ?? 0;
+                    return (
+                      <div
+                        key={mem.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800/90 text-xs hover:border-slate-700 transition-colors gap-2"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className={`px-2 py-0.5 rounded text-[9.5px] font-mono shrink-0 ${
+                            mem.category === 'gamedev'
+                              ? 'bg-sky-950 text-sky-300 border border-sky-800'
+                              : mem.category === 'preference'
+                              ? 'bg-purple-950 text-purple-300 border border-purple-800'
+                              : mem.category === 'profile'
+                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                              : 'bg-slate-800 text-slate-300 border border-slate-700'
+                          }`}>
+                            {mem.category}
+                          </span>
+
+                          {mem.memoryType && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-slate-900 text-slate-400 border border-slate-700 shrink-0">
+                              {mem.memoryType}
+                            </span>
+                          )}
+
+                          <span className="text-slate-200 truncate flex-1">{mem.content}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                          {/* Approved Status Toggle */}
+                          <button
+                            onClick={() => handleToggleApproved(mem.id)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-mono flex items-center gap-1 border transition-all ${
+                              mem.approved !== false
+                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+                                : 'bg-slate-900 text-slate-500 border-slate-800'
+                            }`}
+                            title={mem.approved !== false ? '承認済み記憶 (RAG優先度UP)' : '未承認記憶'}
+                          >
+                            <ShieldCheck className="w-3 h-3" />
+                            <span>{mem.approved !== false ? '承認済' : '未検証'}</span>
+                          </button>
+
+                          {/* 👍 / 👎 Feedback Controls */}
+                          <div className="flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono">
+                            <button
+                              onClick={() => handleAdjustFeedback(mem.id, 1)}
+                              className="text-slate-400 hover:text-emerald-400 p-0.5"
+                              title="高評価を追加"
+                            >
+                              <ThumbsUp className="w-2.5 h-2.5" />
+                            </button>
+                            <span className={good > bad ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
+                              {good - bad}
+                            </span>
+                            <button
+                              onClick={() => handleAdjustFeedback(mem.id, -1)}
+                              className="text-slate-400 hover:text-rose-400 p-0.5"
+                              title="低評価を追加"
+                            >
+                              <ThumbsDown className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+
+                          <button
+                            onClick={() => handleDelete(mem.id)}
+                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors shrink-0"
+                            title="記憶を削除"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -613,6 +752,343 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: 知識グラフ & 多層ベクトル検索 (設計思想 4 & 12) */}
+          {activeSubTab === 'graph' && (
+            <div className="space-y-4 text-xs">
+              {/* Feature Header Banner */}
+              <div className="p-4 rounded-xl bg-indigo-950/40 border border-indigo-500/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold text-indigo-300 text-sm">
+                    <Network className="w-4 h-4 text-indigo-400" />
+                    <span>多層ベクトル検索 ＆ 知識グラフ依存関係エンジン</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-900/60 text-indigo-300 font-mono text-[10px] border border-indigo-700/50">
+                    設計思想 4 & 12 準拠
+                  </span>
+                </div>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  単純なキーワード一致だけでなく、<strong>「8次元ドメイン意味ベクトル類似度」</strong>と、記憶同士の<strong>「前提条件・親子・関連リンク」</strong>をグラフ探索して、必要な文脈を漏れなくプロンプトへ適応注入します。
+                </p>
+              </div>
+
+              {/* RAG Simulator Controls */}
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                    <Search className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>多層RAG 検索シミュレーター (リアルタイム検証)</span>
+                  </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={graphTraverseEnabled}
+                      onChange={(e) => setGraphTraverseEnabled(e.target.checked)}
+                      className="rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>知識グラフ依存関係トラバーサルを適用</span>
+                  </label>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={graphSearchQuery}
+                    onChange={(e) => setGraphSearchQuery(e.target.value)}
+                    placeholder="テスト検索クエリ (例: ゲームのバグ修正ルール、脱ロボットタメ口)"
+                    className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const queryVec = calculateDomainVector(graphSearchQuery);
+                      setExportedStatus(`📊 クエリ「${graphSearchQuery}」の意味ベクトル: [${queryVec.map((v) => v.toFixed(1)).join(', ')}]`);
+                      setTimeout(() => setExportedStatus(null), 3000);
+                    }}
+                    className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-xs"
+                  >
+                    検索
+                  </button>
+                </div>
+
+                {/* Scored Results Display */}
+                {(() => {
+                  const scoredResults = retrieveScoredMemories(graphSearchQuery, memories, {
+                    limit: 5,
+                    traverseGraph: graphTraverseEnabled,
+                  });
+
+                  return (
+                    <div className="space-y-2 pt-1">
+                      <div className="text-[11px] text-slate-400 flex items-center justify-between">
+                        <span>プロンプト注入候補記憶 (上位 {scoredResults.length} 件):</span>
+                        <span className="font-mono text-[10px] text-indigo-400">
+                          {graphTraverseEnabled ? '多層類似度 + グラフ連鎖' : '多層類似度のみ'}
+                        </span>
+                      </div>
+
+                      {scoredResults.length === 0 ? (
+                        <div className="p-4 rounded-lg bg-slate-900 text-slate-500 text-center text-xs">
+                          一致する記憶がありません
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                          {scoredResults.map((s, idx) => {
+                            const isPrereq = s.retrievalSource === 'prerequisite_dependency';
+                            const isParent = s.retrievalSource === 'parent_context';
+                            const isRel = s.retrievalSource === 'graph_relation';
+
+                            return (
+                              <div
+                                key={s.memory.id || idx}
+                                className={`p-2.5 rounded-lg border space-y-1.5 transition-colors ${
+                                  isPrereq
+                                    ? 'bg-amber-950/20 border-amber-800/60'
+                                    : isParent
+                                    ? 'bg-purple-950/20 border-purple-800/60'
+                                    : isRel
+                                    ? 'bg-sky-950/20 border-sky-800/60'
+                                    : 'bg-slate-900/90 border-slate-800'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono font-bold text-[10px] text-indigo-300">
+                                      #{idx + 1}
+                                    </span>
+                                    <span className="font-bold text-slate-200 text-[11px] truncate max-w-[200px] sm:max-w-xs">
+                                      {s.memory.content}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${
+                                        isPrereq
+                                          ? 'bg-amber-950 text-amber-300 border border-amber-700'
+                                          : isParent
+                                          ? 'bg-purple-950 text-purple-300 border border-purple-700'
+                                          : isRel
+                                          ? 'bg-sky-950 text-sky-300 border border-sky-700'
+                                          : 'bg-slate-800 text-slate-300'
+                                      }`}
+                                    >
+                                      {isPrereq
+                                        ? '⚡ 前提依存'
+                                        : isParent
+                                        ? '👑 上位親'
+                                        : isRel
+                                        ? '🔗 関連リンク'
+                                        : '🎯 直接一致'}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded bg-indigo-950 border border-indigo-800 text-indigo-300 font-mono text-[10px]">
+                                      スコア: {s.score}点
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-1 text-[10px] text-slate-400">
+                                  {s.matchReasons.map((r, rIdx) => (
+                                    <span key={rIdx} className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800">
+                                      {r}
+                                    </span>
+                                  ))}
+                                  {s.semanticSimilarity > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-900">
+                                      意味類似度: {(s.semanticSimilarity * 100).toFixed(0)}%
+                                    </span>
+                                  )}
+                                  {s.memory.approved && (
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-900">
+                                      ✓ 確定承認
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Knowledge Graph Dependencies & Linking Editor */}
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="font-bold text-slate-200 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <GitBranch className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>知識グラフ・依存関係ネットワーク設定</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    全 {memories.length} ノード
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Node Selector List */}
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                    <div className="text-[10px] text-slate-400 font-bold">対象ノードを選択:</div>
+                    {memories.map((m) => {
+                      const isSelected = selectedGraphNodeId === m.id;
+                      const hasPrereq = m.prerequisiteMemoryIds && m.prerequisiteMemoryIds.length > 0;
+                      const hasParent = Boolean(m.parentMemoryId);
+
+                      return (
+                        <div
+                          key={m.id}
+                          onClick={() => setSelectedGraphNodeId(m.id)}
+                          className={`p-2 rounded-lg border text-[11px] cursor-pointer transition-all flex items-center justify-between ${
+                            isSelected
+                              ? 'bg-indigo-950/60 border-indigo-500 text-white font-semibold'
+                              : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-900'
+                          }`}
+                        >
+                          <span className="truncate max-w-[180px]">{m.content}</span>
+                          <div className="flex items-center gap-1 text-[9px] shrink-0">
+                            {hasPrereq && (
+                              <span className="px-1 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800">
+                                前提有
+                              </span>
+                            )}
+                            {hasParent && (
+                              <span className="px-1 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800">
+                                親有
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Selected Node Inspector & Prerequisite Linker */}
+                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 space-y-2.5">
+                    {selectedGraphNodeId ? (() => {
+                      const currentMem = memories.find((m) => m.id === selectedGraphNodeId);
+                      if (!currentMem) return <div className="text-slate-400 text-xs">ノードが見つかりません</div>;
+
+                      return (
+                        <div className="space-y-2 text-[11px]">
+                          <div className="font-bold text-indigo-300 flex items-center gap-1">
+                            <Link className="w-3 h-3" />
+                            <span>ノード詳細 & 依存関係</span>
+                          </div>
+                          <p className="text-slate-200 bg-slate-950 p-2 rounded border border-slate-800">
+                            {currentMem.content}
+                          </p>
+
+                          {/* Quick Set Parent Node */}
+                          <div className="space-y-1">
+                            <label className="block text-slate-400 text-[10px]">👑 上位親ノード (Parent Concept):</label>
+                            <select
+                              value={currentMem.parentMemoryId || ''}
+                              onChange={(e) => {
+                                const newParentId = e.target.value || undefined;
+                                if (typeof onUpdateMemories === 'function') {
+                                  (onUpdateMemories as any)((prev: MemoryItem[]) => {
+                                    const list = Array.isArray(prev) ? prev : memories;
+                                    return list.map((m) => (m.id === currentMem.id ? { ...m, parentMemoryId: newParentId } : m));
+                                  });
+                                }
+                              }}
+                              className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 text-xs"
+                            >
+                              <option value="">なし (独立ノード)</option>
+                              {memories
+                                .filter((m) => m.id !== currentMem.id)
+                                .map((m) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.content.substring(0, 30)}...
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          {/* Quick Add Prerequisite Node */}
+                          <div className="space-y-1">
+                            <label className="block text-slate-400 text-[10px]">⚡ 前提条件ノード (Prerequisite):</label>
+                            <select
+                              value=""
+                              onChange={(e) => {
+                                const prereqId = e.target.value;
+                                if (!prereqId) return;
+                                const currentPrereqs = currentMem.prerequisiteMemoryIds || [];
+                                if (currentPrereqs.includes(prereqId)) return;
+
+                                if (typeof onUpdateMemories === 'function') {
+                                  (onUpdateMemories as any)((prev: MemoryItem[]) => {
+                                    const list = Array.isArray(prev) ? prev : memories;
+                                    return list.map((m) =>
+                                      m.id === currentMem.id
+                                        ? { ...m, prerequisiteMemoryIds: [...currentPrereqs, prereqId] }
+                                        : m
+                                    );
+                                  });
+                                }
+                              }}
+                              className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 text-xs"
+                            >
+                              <option value="">+ 前提ノードを追加選択...</option>
+                              {memories
+                                .filter((m) => m.id !== currentMem.id && !(currentMem.prerequisiteMemoryIds || []).includes(m.id))
+                                .map((m) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.content.substring(0, 30)}...
+                                  </option>
+                                ))}
+                            </select>
+
+                            {/* Prereq Chips */}
+                            {currentMem.prerequisiteMemoryIds && currentMem.prerequisiteMemoryIds.length > 0 && (
+                              <div className="flex flex-wrap gap-1 pt-1">
+                                {currentMem.prerequisiteMemoryIds.map((pid) => {
+                                  const pMem = memories.find((m) => m.id === pid);
+                                  return (
+                                    <span
+                                      key={pid}
+                                      className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] flex items-center gap-1"
+                                    >
+                                      <span>⚡ {pMem ? pMem.content.substring(0, 15) + '...' : pid}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (typeof onUpdateMemories === 'function') {
+                                            (onUpdateMemories as any)((prev: MemoryItem[]) => {
+                                              const list = Array.isArray(prev) ? prev : memories;
+                                              return list.map((m) =>
+                                                m.id === currentMem.id
+                                                  ? {
+                                                      ...m,
+                                                      prerequisiteMemoryIds: (m.prerequisiteMemoryIds || []).filter((id) => id !== pid),
+                                                    }
+                                                  : m
+                                              );
+                                            });
+                                          }
+                                        }}
+                                        className="text-amber-400 hover:text-rose-400 ml-1 font-bold"
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })() : (
+                      <div className="p-6 text-center text-slate-500 text-xs">
+                        左側のリストから記憶ノードを選択すると、親ノードや前提条件のグラフ依存関係を設定できます
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

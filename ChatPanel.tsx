@@ -31,12 +31,17 @@ import {
   AlertCircle,
   ListTree,
   Clock,
+  ThumbsUp,
+  ThumbsDown,
+  Brain,
+  Wrench,
+  FlaskConical,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode } from '../types';
 import { extractCodeBlocks } from '../utils/codeParser';
 import { SPEAKER_PROFILES } from '../data/speakers';
 import { systemLogger } from '../services/systemLogger';
-import { nativeLlmService } from '../services/nativeLlmService';
+import { selfImprovementService } from '../services/selfImprovementService';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -47,8 +52,8 @@ interface ChatPanelProps {
   onStopGeneration?: () => void;
   persona: PersonaConfig;
   memories: MemoryItem[];
+  onUpdateMemories?: React.Dispatch<React.SetStateAction<MemoryItem[]>> | ((memories: MemoryItem[]) => void);
   engineMode: EngineMode;
-  onEngineModeChange?: (mode: EngineMode) => void;
   speakerMode: string;
   setSpeakerMode: (mode: string) => void;
   onApplyCode: (files: { path: string; name: string; content: string; language: string }[]) => void;
@@ -59,6 +64,7 @@ interface ChatPanelProps {
   onOpenGamePreview?: () => void;
   onOpenEngineModal?: () => void;
   onOpenExportModal?: () => void;
+  onOpenSelfImprovementModal?: () => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -69,8 +75,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onStopGeneration,
   persona,
   memories,
+  onUpdateMemories,
   engineMode,
-  onEngineModeChange,
   speakerMode,
   setSpeakerMode,
   onApplyCode,
@@ -81,6 +87,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onOpenGamePreview,
   onOpenEngineModal,
   onOpenExportModal,
+  onOpenSelfImprovementModal,
 }) => {
   const [inputText, setInputText] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string; type: string; size: number }[]>([]);
@@ -89,50 +96,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
   const [expandedStepsMsgId, setExpandedStepsMsgId] = useState<string | null>(null);
-  const [ggufModels, setGgufModels] = useState<Array<{ id: string; fileName: string; name: string; sizeMB: number }>>([]);
-  const [activeGgufId, setActiveGgufId] = useState<string | null>(null);
-  const [isSwitchingGguf, setIsSwitchingGguf] = useState(false);
+  const [feedbackFeedbackId, setFeedbackFeedbackId] = useState<string | null>(null);
+  const [feedbackReasons, setFeedbackReasons] = useState<{ [msgId: string]: string }>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastSendTimeRef = useRef<number>(0);
 
-  const PUBLIC_APP_URL = 'https://ais-pre-lmii4pykmv4ucirau7mbyp-23659957062.asia-northeast1.run.app';
-
-  const refreshGgufModels = async () => {
-    try {
-      const list = await nativeLlmService.getAvailableGgufModels();
-      setGgufModels(list);
-      setActiveGgufId(nativeLlmService.getActiveModelId());
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    refreshGgufModels();
-  }, []);
-
-  useEffect(() => {
-    if (engineMode === 'native_gpu') {
-      refreshGgufModels();
-    }
-  }, [engineMode]);
-
-  const handleSelectGgufModel = async (modelId: string) => {
-    const target = ggufModels.find((m) => m.id === modelId);
-    if (!target) return;
-    setIsSwitchingGguf(true);
-    try {
-      await nativeLlmService.loadNativeModel(target.id, target.fileName);
-      setActiveGgufId(target.id);
-      onEngineModeChange?.('native_gpu');
-      systemLogger.info('NATIVE_GPU', `⚡ チャットヘッダーからGGUFモデル「${target.name}」に切り替えました。`);
-    } catch (err: any) {
-      systemLogger.error('NATIVE_GPU', `GGUFモデル切替エラー: ${err?.message || err}`);
-    } finally {
-      setIsSwitchingGguf(false);
-    }
-  };
+  const PUBLIC_APP_URL =
+    typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin.replace('ais-dev-', 'ais-pre-')
+      : 'https://ais-pre-3wfkdwmq4s7d422alblgnd-387287333639.asia-northeast1.run.app';
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -189,6 +164,55 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
     systemLogger.info('CHAT', 'ユーザーが「停止」ボタンを押しました。');
     onStopGeneration?.();
+  };
+
+  const handleFeedback = (msg: ChatMessage, type: 'good' | 'bad', reason?: string) => {
+    msg.userFeedback = type;
+    if (reason) msg.feedbackNote = reason;
+
+    // 記憶の評価スコアを更新
+    if (msg.usedMemories && msg.usedMemories.length > 0 && typeof onUpdateMemories === 'function') {
+      const usedIds = new Set(msg.usedMemories.map((m) => m.id));
+      (onUpdateMemories as any)((prev: MemoryItem[]) => {
+        const list = Array.isArray(prev) ? prev : memories;
+        return list.map((mem) => {
+          if (usedIds.has(mem.id)) {
+            return {
+              ...mem,
+              goodCount: type === 'good' ? (mem.goodCount ?? 0) + 1 : mem.goodCount,
+              badCount: type === 'bad' ? (mem.badCount ?? 0) + 1 : mem.badCount,
+            };
+          }
+          return mem;
+        });
+      });
+    }
+
+    // 学習データ / 自己改善データへ追加
+    if (type === 'good') {
+      selfImprovementService.addTrainingSample({
+        instruction: '直前の会話指示',
+        outputTarget: msg.content,
+        category: msg.content.includes('```') ? 'code' : 'chat',
+        reliability: 'high',
+        approved: true,
+      });
+      systemLogger.info('SELF_IMPROVEMENT', 'ユーザーから高評価(👍)を受信。Colab/LoRA用高品質教材に自動登録しました。');
+    } else {
+      selfImprovementService.diagnoseFailure(
+        '直前の会話指示',
+        msg.content,
+        reason || 'ユーザー低評価フィードバック',
+        {
+          memoriesUsedCount: (msg.usedMemories || []).length,
+          promptLengthChars: 1200,
+          engineMode: msg.engineMode || 'native_gpu',
+        }
+      );
+      systemLogger.warn('SELF_IMPROVEMENT', `ユーザーから低評価(👎)を受信 (理由: ${reason || '未指定'})。改善ルーターに記録しました。`);
+    }
+
+    setFeedbackFeedbackId(null);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -355,13 +379,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 ? 'bg-purple-950/80 text-purple-300 hover:bg-purple-900 border-purple-500/50'
                 : engineMode === 'gemini_cloud'
                 ? 'bg-sky-950/80 text-sky-300 hover:bg-sky-900 border-sky-500/50'
-                : engineMode === 'native_gpu'
-                ? 'bg-emerald-950/80 text-emerald-300 hover:bg-emerald-900 border-emerald-500/50'
-                : engineMode === 'external_gpu'
-                ? 'bg-indigo-950/80 text-indigo-300 hover:bg-indigo-900 border-indigo-500/50'
                 : 'bg-amber-950/80 text-amber-300 hover:bg-amber-900 border-amber-500/50'
             }`}
-            title="推論エンジン設定（GGUFネイティブ / WebGPU / 外部LLM / CPUルールベース / Gemini Cloud を選択）"
+            title="推論エンジン設定（WebGPU / CPUルールベース / Gemini Cloud を選択）"
           >
             {engineMode === 'webgpu' ? (
               <>
@@ -373,16 +393,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <Sparkles className="w-2.5 h-2.5 text-sky-400" />
                 <span>Gemini Cloud</span>
               </>
-            ) : engineMode === 'native_gpu' ? (
-              <>
-                <Zap className="w-2.5 h-2.5 text-emerald-400" />
-                <span>GGUFネイティブ (本体GPU)</span>
-              </>
-            ) : engineMode === 'external_gpu' ? (
-              <>
-                <Cpu className="w-2.5 h-2.5 text-indigo-400" />
-                <span>外部ローカルLLM</span>
-              </>
             ) : (
               <>
                 <Zap className="w-2.5 h-2.5 text-amber-400" />
@@ -390,33 +400,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               </>
             )}
           </button>
-
-          {/* GGUF Native Model Selector — pick which downloaded .gguf file runs on the device GPU */}
-          {ggufModels.length > 0 && (
-            <select
-              value={activeGgufId || ''}
-              disabled={isSwitchingGguf}
-              onChange={(e) => handleSelectGgufModel(e.target.value)}
-              className={`bg-slate-950 border text-[11px] font-bold rounded-lg px-2 py-1 focus:outline-none transition-colors disabled:opacity-50 ${
-                engineMode === 'native_gpu'
-                  ? 'border-emerald-600 text-emerald-300 focus:border-emerald-400'
-                  : 'border-slate-700 text-slate-400 focus:border-emerald-500'
-              }`}
-              title="端末に保存済みのGGUFモデルから、本体GPUで動かすモデルを選択"
-            >
-              <option value="" disabled>
-                {isSwitchingGguf ? '⚡ 切替中...' : '⚡ GGUFモデルを選択'}
-              </option>
-              {ggufModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ({m.sizeMB}MB){m.id === activeGgufId ? ' ✓' : ''}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Self Improvement Lab Button */}
+          {onOpenSelfImprovementModal && (
+            <button
+              onClick={onOpenSelfImprovementModal}
+              className="px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1 transition-all bg-purple-950/70 hover:bg-purple-900/90 text-purple-300 border-purple-500/40 shadow-sm"
+              title="自己改善研究所 (失敗診断・スキルライブラリ・Colab LoRA学習教材・系統樹)"
+            >
+              <FlaskConical className="w-3 h-3 text-purple-400" />
+              <span>自己改善</span>
+            </button>
+          )}
+
           {/* Public Share URL Copy Button */}
           <button
             onClick={handleCopyPublicUrl}
@@ -562,6 +560,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           <ChevronDown className="w-3 h-3" />
                         )}
                       </button>
+                    )}
+
+                    {/* Used Memories (RAG) Badge */}
+                    {msg.usedMemories && msg.usedMemories.length > 0 && (
+                      <div className="flex items-center gap-1 bg-purple-950/60 border border-purple-800/60 px-2 py-0.5 rounded-lg text-[9.5px] text-purple-300 font-mono" title={msg.usedMemories.map((m) => `・${m.content}`).join('\n')}>
+                        <Brain className="w-3 h-3 text-purple-400" />
+                        <span>記憶参照 ({msg.usedMemories.length}件)</span>
+                      </div>
+                    )}
+
+                    {/* Used Skills Badge */}
+                    {msg.usedSkills && msg.usedSkills.length > 0 && (
+                      <div className="flex items-center gap-1 bg-sky-950/60 border border-sky-800/60 px-2 py-0.5 rounded-lg text-[9.5px] text-sky-300 font-mono" title={msg.usedSkills.map((s) => s.name).join(', ')}>
+                        <Wrench className="w-3 h-3 text-sky-400" />
+                        <span>スキル適用: {msg.usedSkills[0].name}</span>
+                      </div>
                     )}
                   </div>
                 )}
@@ -823,33 +837,99 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                 {/* Message action buttons & Streaming Stop Button */}
                 {!isUser && (
-                  <div className="flex items-center justify-between px-1 text-[10px] text-slate-500">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => speakText(msg.content)}
-                        className="hover:text-pink-400 flex items-center gap-1 transition-colors"
-                      >
-                        <Volume2 className="w-3 h-3" />
-                        <span>音声で聴く</span>
-                      </button>
-                      <span>•</span>
-                      <button
-                        onClick={() => handleCopy(msg.content, msg.id)}
-                        className="hover:text-slate-300 flex items-center gap-1 transition-colors"
-                      >
-                        <Copy className="w-3 h-3" />
-                        <span>コピー</span>
-                      </button>
+                  <div className="flex flex-col gap-1.5 w-full">
+                    <div className="flex items-center justify-between px-1 text-[10px] text-slate-500">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => speakText(msg.content)}
+                          className="hover:text-pink-400 flex items-center gap-1 transition-colors"
+                        >
+                          <Volume2 className="w-3 h-3" />
+                          <span>音声</span>
+                        </button>
+                        <span>•</span>
+                        <button
+                          onClick={() => handleCopy(msg.content, msg.id)}
+                          className="hover:text-slate-300 flex items-center gap-1 transition-colors"
+                        >
+                          <Copy className="w-3 h-3" />
+                          <span>コピー</span>
+                        </button>
+
+                        {/* Inline Feedback Rating (設計思想 24. 第1世代) */}
+                        <span>•</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleFeedback(msg, 'good')}
+                            className={`p-1 rounded transition-all ${
+                              msg.userFeedback === 'good'
+                                ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
+                                : 'hover:text-emerald-400 text-slate-500'
+                            }`}
+                            title="役に立った (記憶スコア+ / LoRA教材に登録)"
+                          >
+                            <ThumbsUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (msg.userFeedback === 'bad') {
+                                handleFeedback(msg, 'bad');
+                              } else {
+                                setFeedbackFeedbackId(feedbackFeedbackId === msg.id ? null : msg.id);
+                              }
+                            }}
+                            className={`p-1 rounded transition-all ${
+                              msg.userFeedback === 'bad'
+                                ? 'bg-rose-950 text-rose-300 border border-rose-500/40'
+                                : 'hover:text-rose-400 text-slate-500'
+                            }`}
+                            title="見当違い・改善が必要 (改善ルーターに送信)"
+                          >
+                            <ThumbsDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {msg.isStreaming && onStopGeneration && (
+                        <button
+                          onClick={onStopGeneration}
+                          className="flex items-center gap-1 px-2 py-0.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 hover:text-rose-100 rounded text-[10.5px] font-semibold transition-all shadow-sm active:scale-95"
+                        >
+                          <Square className="w-2.5 h-2.5 fill-current" />
+                          <span>生成を停止</span>
+                        </button>
+                      )}
                     </div>
 
-                    {msg.isStreaming && onStopGeneration && (
-                      <button
-                        onClick={onStopGeneration}
-                        className="flex items-center gap-1 px-2 py-0.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 hover:text-rose-100 rounded text-[10.5px] font-semibold transition-all shadow-sm active:scale-95"
-                      >
-                        <Square className="w-2.5 h-2.5 fill-current" />
-                        <span>生成を停止</span>
-                      </button>
+                    {/* Negative Feedback Reasoning Popover */}
+                    {feedbackFeedbackId === msg.id && (
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-rose-500/40 text-xs space-y-2 animate-in fade-in">
+                        <div className="text-rose-300 font-bold text-[10.5px] flex items-center justify-between">
+                          <span>改善が必要な理由（自己改善ルーターに送信されます）:</span>
+                          <button
+                            onClick={() => setFeedbackFeedbackId(null)}
+                            className="text-slate-500 hover:text-slate-300"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            '記憶・過去の話を忘れている',
+                            'コードが動かない・構文エラー',
+                            '口調がロボット的・硬すぎる',
+                            '指示と違う・見当違い',
+                          ].map((reason, rIdx) => (
+                            <button
+                              key={rIdx}
+                              onClick={() => handleFeedback(msg, 'bad', reason)}
+                              className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-rose-950/40 text-slate-300 hover:text-rose-200 border border-slate-800 text-[10px] transition-colors"
+                            >
+                              {reason}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}

@@ -640,33 +640,41 @@ app.post('/api/github/push', async (req, res) => {
   }
 });
 
-// Full App ZIP Exporter
-app.get(['/api/export-app-zip', '/api/download-zip'], async (req, res) => {
+// Full App ZIP Exporter (Mobile & Desktop compatible)
+app.get(['/api/export-app-zip', '/api/download-zip', '/miki-project.zip', '/download-zip', '/export.zip'], async (req, res) => {
   try {
-    const zip = new JSZip();
+    const zipPath = path.join(process.cwd(), 'miki-project.zip');
+    let buffer: Buffer;
 
-    // Helper to recursively add folder
-    const addFolderToZip = (dirPath: string, zipFolder: JSZip) => {
-      const files = fs.readdirSync(dirPath);
-      for (const file of files) {
-        if (file === 'node_modules' || file === 'dist' || file === '.git' || file === '.cache' || file === 'logs') continue;
-        if (file.endsWith('.zip') || file.endsWith('.tar.gz')) continue;
-        const fullPath = path.join(dirPath, file);
-        const stat = fs.statSync(fullPath);
-        if (stat.isDirectory()) {
-          addFolderToZip(fullPath, zipFolder.folder(file)!);
-        } else {
-          const content = fs.readFileSync(fullPath);
-          zipFolder.file(file, content);
+    if (fs.existsSync(zipPath)) {
+      buffer = fs.readFileSync(zipPath);
+    } else {
+      const zip = new JSZip();
+      const addFolderToZip = (dirPath: string, zipFolder: JSZip) => {
+        const files = fs.readdirSync(dirPath);
+        for (const file of files) {
+          if (file === 'node_modules' || file === 'dist' || file === '.git' || file === '.cache' || file === 'logs') continue;
+          if (file.endsWith('.zip') || file.endsWith('.tar.gz')) continue;
+          const fullPath = path.join(dirPath, file);
+          const stat = fs.statSync(fullPath);
+          if (stat.isDirectory()) {
+            addFolderToZip(fullPath, zipFolder.folder(file)!);
+          } else {
+            const content = fs.readFileSync(fullPath);
+            zipFolder.file(file, content);
+          }
         }
-      }
-    };
+      };
 
-    addFolderToZip(process.cwd(), zip);
+      addFolderToZip(process.cwd(), zip);
+      buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    }
 
-    const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', 'attachment; filename="miki-ai-native-gpu-full.zip"');
+    res.setHeader('Content-Disposition', 'attachment; filename="miki-project.zip"');
+    res.setHeader('Content-Length', buffer.length.toString());
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.send(buffer);
   } catch (error: any) {
     console.error('Error in /api/export-app-zip:', error);

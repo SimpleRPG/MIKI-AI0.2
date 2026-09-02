@@ -491,76 +491,6 @@ export class NativeLlmService {
     }
   }
 
-  /**
-   * Sanitizes/trims the prompt payload before handing it to llama.cpp (JNI).
-   *
-   * Unlike WebGPU's tiny SLMs (compact 260/220-char caps), the native GGUF path
-   * usually runs with a larger nCtx (default 2048 tokens), so limits here are more
-   * generous — but they must still be BOUNDED. Without this, long-running
-   * conversations, large memory blocks, or code attachments accumulate in the
-   * system/user prompt without limit and can overflow nCtx, causing
-   * llama_decode to fail during prompt evaluation (see Fix B for how that
-   * failure now surfaces instead of silently resolving empty).
-   */
-  private sanitizeMessagesForNativeContext(
-    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-    nCtx: number = 2048,
-    maxTokens: number = 512
-  ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
-    const SYSTEM_CHAR_CAP = 1500;
-    const CURRENT_TURN_CHAR_CAP = 1200;
-    const HISTORY_TURN_CHAR_CAP = 300;
-    const MAX_HISTORY_TURNS = 4;
-    // Rough char/token estimate for mixed JP/EN text; kept conservative on purpose.
-    const CHARS_PER_TOKEN_ESTIMATE = 1.5;
-
-    const sysMsg = messages.find((m) => m.role === 'system');
-    const nonSysMsgs = messages.filter((m) => m.role !== 'system');
-    const currentTurn = nonSysMsgs[nonSysMsgs.length - 1];
-    const historyMsgs = nonSysMsgs.slice(0, -1).slice(-MAX_HISTORY_TURNS);
-
-    const sanitized: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
-
-    sanitized.push({
-      role: 'system',
-      content: (sysMsg?.content || 'あなたは明るく親切な専属AIパートナーです。日本語で自然に、簡潔に回答してください。').slice(
-        0,
-        SYSTEM_CHAR_CAP
-      ),
-    });
-
-    for (const m of historyMsgs) {
-      sanitized.push({ role: m.role, content: (m.content || '').slice(0, HISTORY_TURN_CHAR_CAP) });
-    }
-
-    if (currentTurn) {
-      sanitized.push({ role: currentTurn.role, content: (currentTurn.content || '').slice(0, CURRENT_TURN_CHAR_CAP) });
-    }
-
-    // Final hard safety net: reserve room for the model's own output tokens, then
-    // trim the oldest history turns (never the system prompt or the live user
-    // turn) until we're back under budget.
-    const promptTokenBudget = Math.max(256, nCtx - maxTokens - 64);
-    const charBudget = Math.floor(promptTokenBudget * CHARS_PER_TOKEN_ESTIMATE);
-    let totalChars = sanitized.reduce((sum, m) => sum + m.content.length, 0);
-
-    while (totalChars > charBudget && sanitized.length > 2) {
-      // Index 0 is always 'system', last index is always the live turn — drop from index 1 onward.
-      const removed = sanitized.splice(1, 1)[0];
-      if (!removed) break;
-      totalChars -= removed.content.length;
-    }
-
-    if (totalChars > charBudget) {
-      systemLogger.warn(
-        'NATIVE_GPU',
-        `⚠️ プロンプトがコンテキスト予算(${charBudget}文字相当)を超えたままです。応答が途中で打ち切られる可能性があります。`
-      );
-    }
-
-    return sanitized;
-  }
-
   public async *streamNativeChat(
     messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
     options?: { temperature?: number; top_p?: number; max_tokens?: number }
@@ -605,13 +535,6 @@ export class NativeLlmService {
       }
     }
 
-    const requestedMaxTokens = options?.max_tokens ?? 512;
-    const sanitizedMessages = this.sanitizeMessagesForNativeContext(messages, 2048, requestedMaxTokens);
-    systemLogger.debug(
-      'NATIVE_GPU',
-      `[プロンプト整形] 送信ターン数: ${sanitizedMessages.length}, システム文字数: ${sanitizedMessages[0]?.content?.length ?? 0}`
-    );
-
     systemLogger.info('NATIVE_GPU', `⚡ llama.cpp C++ JNI ネイティブ推論を開始 (${this.activeModelId})`);
 
     const chunkQueue: string[] = [];
@@ -632,10 +555,10 @@ export class NativeLlmService {
     });
 
     const executionPromise = (NativeMlcPlugin as any).generateStream({
-      messages: sanitizedMessages,
+      messages,
       temperature: options?.temperature ?? 0.7,
       topP: options?.top_p ?? 0.9,
-      maxTokens: requestedMaxTokens,
+      maxTokens: options?.max_tokens ?? 512,
       repetitionPenalty: 1.15,
       frequencyPenalty: 0.1,
       presencePenalty: 0.1,

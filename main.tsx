@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 
 // Prevent WebGPU / background abort recoverable notices from triggering parent frame tab shifts
@@ -11,7 +12,8 @@ window.addEventListener('unhandledrejection', (event) => {
     reason.includes('GPUBuffer') ||
     reason.includes('unmapped') ||
     reason.includes('AbortError') ||
-    reason.includes('aborted')
+    reason.includes('aborted') ||
+    reason.includes('plugin is not implemented')
   ) {
     event.preventDefault();
   }
@@ -23,7 +25,8 @@ window.addEventListener('error', (event) => {
     msg.includes('ResizeObserver') ||
     msg.includes('Device was lost') ||
     msg.includes('GPUBuffer') ||
-    msg.includes('unmapped')
+    msg.includes('unmapped') ||
+    msg.includes('plugin is not implemented')
   ) {
     event.preventDefault();
   }
@@ -31,6 +34,9 @@ window.addEventListener('error', (event) => {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );
+

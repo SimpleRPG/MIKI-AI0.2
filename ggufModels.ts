@@ -17,7 +17,7 @@ export interface GgufModelDefinition {
   description: string;
   downloadUrl: string;
   huggingFaceRepo: string;
-  recommendedFor: 'mobile_light' | 'mobile_balanced' | 'mobile_flagship' | 'desktop' | 'code';
+  recommendedFor: 'mobile_light' | 'mobile_balanced' | 'desktop' | 'code';
 }
 
 export const OFFICIAL_GGUF_MODELS: GgufModelDefinition[] = [
@@ -67,21 +67,6 @@ export const OFFICIAL_GGUF_MODELS: GgufModelDefinition[] = [
     recommendedFor: 'mobile_balanced',
   },
   {
-    id: 'qwen2.5-3b-instruct-q4_k_m',
-    name: 'Qwen 2.5 3B Instruct (GGUF Q4_K_M)',
-    expertName: '🏆 Qwen 2.5 3B (S25/ハイエンド機フラッグシップGGUF)',
-    icon: '🏆',
-    fileName: 'qwen2.5-3b-instruct-q4_k_m.gguf',
-    sizeMB: 1930,
-    parameters: '3.09B',
-    quantization: 'Q4_K_M (4-bit GGUF)',
-    vramMB: 2500,
-    description: 'Snapdragon 8 Elite搭載機（Galaxy S25等）クラスの余裕あるRAM/GPUを最大限活用する高精度モデル。日本語の自然さ・コード生成・論理推論すべてで最上位クラスの応答品質。',
-    downloadUrl: 'https://huggingFace.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf',
-    huggingFaceRepo: 'Qwen/Qwen2.5-3B-Instruct-GGUF',
-    recommendedFor: 'mobile_flagship',
-  },
-  {
     id: 'gemma-2-2b-it-q4_k_m',
     name: 'Gemma 2 2B Instruct (GGUF Q4_K_M)',
     expertName: '💎 Google Gemma 2 2B (Google公式・日本語論理 GGUF)',
@@ -91,10 +76,10 @@ export const OFFICIAL_GGUF_MODELS: GgufModelDefinition[] = [
     parameters: '2.61B',
     quantization: 'Q4_K_M (4-bit GGUF)',
     vramMB: 2200,
-    description: 'Google開発の次世代Gemma 2のGGUF形式。高い日本語文脈理解力と論理推論力を提供。ハイエンド機なら快適に動作します。',
+    description: 'Google開発の次世代Gemma 2のGGUF形式。高い日本語文脈理解力と論理推論力を提供。',
     downloadUrl: 'https://huggingFace.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf',
     huggingFaceRepo: 'bartowski/gemma-2-2b-it-GGUF',
-    recommendedFor: 'mobile_flagship',
+    recommendedFor: 'desktop',
   },
   {
     id: 'smollm2-360m-instruct-q4_k_m',
@@ -127,43 +112,3 @@ export const OFFICIAL_GGUF_MODELS: GgufModelDefinition[] = [
     recommendedFor: 'code',
   },
 ];
-
-/**
- * Determine which GGUF model best fits the detected device hardware.
- * - Flagship phones (Snapdragon 8 Gen3/Elite, Apple A17/A18/M-series, 8GB+ RAM):
- *   pick the largest 'mobile_flagship' model that fits comfortably in RAM.
- * - Mid-range phones (4-8GB RAM or Adreno 6xx/Mali-G7x class): 'mobile_balanced'.
- * - Everything else / unknown: 'mobile_light' (safest, always works).
- */
-export function pickBestGgufModelForDevice(
-  totalMemoryMB: number | undefined,
-  gpuRenderer: string | undefined
-): GgufModelDefinition {
-  const renderer = (gpuRenderer || '').toLowerCase();
-  const isFlagshipGpu =
-    renderer.includes('apple') ||
-    /\bm[1-4]\b/.test(renderer) ||
-    /adreno[\s-]?8\d\d/.test(renderer) ||
-    renderer.includes('elite') ||
-    /adreno[\s-]?7[5-9]\d/.test(renderer);
-
-  const ram = totalMemoryMB || 0;
-
-  let tier: GgufModelDefinition['recommendedFor'] = 'mobile_light';
-  if (ram >= 7000 || isFlagshipGpu) {
-    tier = 'mobile_flagship';
-  } else if (ram >= 3500) {
-    tier = 'mobile_balanced';
-  }
-
-  const candidates = OFFICIAL_GGUF_MODELS.filter((m) => m.recommendedFor === tier);
-  const pool = candidates.length > 0 ? candidates : OFFICIAL_GGUF_MODELS.filter((m) => m.recommendedFor === 'mobile_light');
-
-  // Within the chosen tier, prefer the largest (highest quality) model that still
-  // leaves headroom under the device's total RAM (rough 2x safety margin for OS + app).
-  const safeMaxVram = ram > 0 ? ram / 2 : Infinity;
-  const fitting = pool.filter((m) => m.vramMB <= safeMaxVram);
-  const finalPool = fitting.length > 0 ? fitting : pool;
-
-  return finalPool.reduce((best, m) => (m.vramMB > best.vramMB ? m : best), finalPool[0]);
-}

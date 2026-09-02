@@ -14,7 +14,7 @@ import {
   Sparkles,
   Smartphone,
 } from 'lucide-react';
-import { OFFICIAL_GGUF_MODELS, GgufModelDefinition, pickBestGgufModelForDevice } from '../services/ggufModels';
+import { OFFICIAL_GGUF_MODELS, GgufModelDefinition } from '../services/ggufModels';
 import { nativeLlmService, NativeStorageInfo, NativeGpuInfo } from '../services/nativeLlmService';
 import { systemLogger } from '../services/systemLogger';
 
@@ -163,11 +163,6 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
       ? `${(storageInfo.freeDiskMB / 1024).toFixed(1)} GB`
       : '8.0 GB';
 
-  const recommendedModel = pickBestGgufModelForDevice(
-    hardwareSpecs?.totalMemoryMB,
-    hardwareSpecs?.gpuRenderer
-  );
-
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
       {/* Notification Toast Banner */}
@@ -246,11 +241,6 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
             </span>
           </div>
         </div>
-
-        <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 text-xs">
-          <span className="text-amber-300 font-bold">🏆 この端末へのおすすめ:</span>
-          <span className="text-slate-200 font-semibold">{recommendedModel.expertName}</span>
-        </div>
       </div>
 
       {/* Model List Header */}
@@ -304,7 +294,6 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
             const isFilePresent = isModelFilePresent(model.fileName);
             const isLoaded = activeLoadedId === model.id;
             const isDownloadingThis = downloadingModelId === model.id;
-            const isRecommended = model.id === recommendedModel.id;
 
             return (
               <div
@@ -312,8 +301,6 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
                 className={`p-4 rounded-xl border transition-all ${
                   isLoaded
                     ? 'bg-emerald-950/30 border-emerald-500/80 ring-1 ring-emerald-500/40'
-                    : isRecommended
-                    ? 'bg-amber-950/20 border-amber-500/60 ring-1 ring-amber-500/30'
                     : isFilePresent
                     ? 'bg-slate-900/90 border-slate-700 hover:border-slate-600'
                     : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
@@ -330,11 +317,6 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                           {model.expertName}
                         </span>
-                        {isRecommended && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 font-bold">
-                            🏆 この端末におすすめ
-                          </span>
-                        )}
                         {model.sizeMB <= 400 && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 font-bold">
                             📱 スマホ最軽量
