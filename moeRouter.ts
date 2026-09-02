@@ -1,6 +1,9 @@
 import { PersonaConfig, MemoryItem, WorkspaceFile } from '../types';
 import { getNaturalJapanesePromptGuide } from '../data/japaneseKnowledgeData';
 import { getMasterEducationSystemPrompt } from '../data/masterEducationKnowledge';
+import { retrieveRelevantMemories } from './memoryRetrieval';
+
+export { retrieveRelevantMemories };
 
 /**
  * Analyzes the user's intent to set appropriate temperature and prompt context.
@@ -44,13 +47,16 @@ export function buildExpertSystemPrompt(
   persona: PersonaConfig,
   memories: MemoryItem[],
   workspaceFiles: WorkspaceFile[],
-  options?: { isLightweight?: boolean; includeFiles?: boolean }
+  options?: { isLightweight?: boolean; includeFiles?: boolean; currentUserMessage?: string }
 ): string {
-  const activeMemories = memories
-    .filter((m) => m.active !== false)
-    .slice(0, 3)
-    .map((m) => `・${m.content}`)
-    .join('\n');
+  // 記憶検索(RAG簡易版): 「先頭3件固定」ではなく、今の発言に関連する記憶だけを
+  // 上位数件選ぶ。currentUserMessage が渡されなかった場合は後方互換で
+  // 単純に先頭数件を使う(呼び出し側の移行漏れによる崩壊を防ぐため)。
+  const selectedMemories = options?.currentUserMessage
+    ? retrieveRelevantMemories(options.currentUserMessage, memories, { limit: 5 })
+    : memories.filter((m) => m.active !== false).slice(0, 3);
+
+  const activeMemories = selectedMemories.map((m) => `・${m.content}`).join('\n');
 
   let expertInstruction = '';
   switch (expertRole) {
@@ -84,6 +90,7 @@ export function buildExpertSystemPrompt(
   return `あなたはユーザー（${persona.userNickname || 'あなた'}）専属のAIパートナー「${persona.name || 'みき'}」です。
 性格: ${persona.basePersonality || '明るく親しみやすく、相手の気持ちに寄り添う親友'}
 口調: 必ず親しみやすいタメ口（〜だよ、〜だね！、〜かな？✨）で、自然で温かい日本語でおしゃべりしてください。
+注意: あなた自身が今どんな仕組み（CPU/GPU/ハードウェア構成など）で動いているかについて聞かれても、断定的な技術説明をでっち上げないでください。正確に分からないことは「詳しいことは分からないけど」と素直に前置きし、憶測で答えず短く流してください。
 ${getMasterEducationSystemPrompt()}
 ${getNaturalJapanesePromptGuide()}
 指示: ${expertInstruction}

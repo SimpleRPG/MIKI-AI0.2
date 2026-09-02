@@ -24,6 +24,10 @@ export interface MemoryItem {
   updatedAt?: number;
   source?: 'auto' | 'manual' | 'txt_import';
   tags?: string[];
+  lastUsedAt?: number;
+  useCount?: number;
+  goodCount?: number; // ユーザーが「役に立った」と評価した回数
+  badCount?: number; // ユーザーが「見当違い/不要」と評価した回数
 }
 
 export interface WorkspaceFile {
