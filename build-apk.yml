@@ -924,8 +924,28 @@ jobs:
           }
           EOF
 
+          # network_security_config.xml
+          # Allows the WebView to talk to an on-device local inference server
+          # (Termux-hosted llama.cpp server / Ollama, etc.) over plain HTTP via
+          # loopback. Android blocks cleartext traffic by default since API 28,
+          # which silently breaks nativeLlmService.ts's streamExternalLocalLlm()
+          # (external_gpu mode) when pointed at http://localhost:PORT.
+          # Only loopback addresses are allowlisted — this does NOT relax
+          # cleartext restrictions for any other host.
+          mkdir -p android/app/src/main/res/xml
+          cat << 'EOF' > android/app/src/main/res/xml/network_security_config.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <network-security-config>
+              <domain-config cleartextTrafficPermitted="true">
+                  <domain includeSubdomains="false">localhost</domain>
+                  <domain includeSubdomains="false">127.0.0.1</domain>
+                  <domain includeSubdomains="false">10.0.2.2</domain>
+              </domain-config>
+          </network-security-config>
+          EOF
+
           # AndroidManifest.xml
-          sed -i 's/<application/<application android:largeHeap="true" android:hardwareAccelerated="true" android:extractNativeLibs="true"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<application android:largeHeap="true" android:hardwareAccelerated="true" android:extractNativeLibs="true" android:networkSecurityConfig="@xml\/network_security_config"/' android/app/src/main/AndroidManifest.xml
           sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' android/app/src/main/AndroidManifest.xml
 
           chmod +x android/gradlew
