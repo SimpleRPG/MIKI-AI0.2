@@ -137,6 +137,14 @@ jobs:
           list(APPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/spirv-headers-install)
           set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
 
+          # Belt-and-suspenders: the SPIRV-Headers package config was found, but its
+          # imported target does not appear to propagate INTERFACE_INCLUDE_DIRECTORIES
+          # to ggml-vulkan's compile command (fatal error: 'spirv/unified1/spirv.hpp'
+          # file not found). include_directories() here applies to every target added
+          # via the add_subdirectory() below, so this guarantees the header is found
+          # regardless of how the package's own target wiring behaves.
+          include_directories(${CMAKE_CURRENT_SOURCE_DIR}/SPIRV-Headers/include)
+
           add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp llama_build EXCLUDE_FROM_ALL)
 
           add_library(llama_jni SHARED
