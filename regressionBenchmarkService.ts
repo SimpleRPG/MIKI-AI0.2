@@ -4,6 +4,8 @@ import {
   RegressionSuiteRunReport,
 } from '../types';
 import { systemLogger } from './systemLogger';
+import { nativeLlmService } from './nativeLlmService';
+import { webLLMService } from './webLlmService';
 
 const REGRESSION_REPORTS_STORAGE_KEY = 'miki_ai_regression_reports';
 
@@ -100,77 +102,51 @@ export class RegressionBenchmarkService {
   private async runSingleTestCase(testCase: BenchmarkTestCase): Promise<BenchmarkTestResult> {
     const startTime = Date.now();
 
-    // 内部エミュレーション / 推論実行
-    let simulatedResponse = '';
-    if (testCase.id === 'tc_persona_01') {
-      simulatedResponse = 'やっほー！よろしくね！何でも気軽に話しかけてよ、これから一緒に楽しいこといっぱいしよ！';
-    } else if (testCase.id === 'tc_vba_01') {
-      simulatedResponse = `任せて！\`End(xlUp)\`で最終行を取って\`Step 2\`で奇数行を塗りつぶすコード書いたよ！
+    // 実際にロード中のモデルへプロンプトを送信して応答を採点する。
+    // (以前はテストケースIDごとの固定文言を返すだけの偽の回帰テストだった)
+    let generatedResponse = '';
+    let modelUnavailable = false;
 
-\`\`\`vba
-Sub HighlightOddRows()
-    Dim ws As Worksheet
-    Dim lastRow As Long, i As Long
-    Set ws = ActiveSheet
-    
-    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
-    For i = 1 To lastRow Step 2
-        ws.Rows(i).Interior.Color = RGB(255, 255, 200) ' 薄い黄色
-    Next i
-    MsgBox "奇数行のハイライト完了だよ！"
-End Sub
-\`\`\``;
-    } else if (testCase.id === 'tc_js_canvas_01') {
-      simulatedResponse = `バウンドするボールのアニメーションだよ！HTMLに貼ればすぐ動くよ！
+    const isNativeReady = nativeLlmService.isNative() && !!nativeLlmService.getActiveModelId();
+    const isWebReady = webLLMService.isLoaded();
 
-\`\`\`javascript
-const canvas = document.createElement('canvas');
-canvas.width = 400; canvas.height = 300;
-document.body.appendChild(canvas);
-const ctx = canvas.getContext('2d');
-
-let x = 200, y = 150, vx = 4, vy = 3, radius = 15;
-function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    x += vx; y += vy;
-    if (x + radius > canvas.width || x - radius < 0) vx = -vx;
-    if (y + radius > canvas.height || y - radius < 0) vy = -vy;
-    
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = '#6366f1';
-    ctx.fill();
-    requestAnimationFrame(animate);
-}
-animate();
-\`\`\``;
-    } else if (testCase.id === 'tc_stress_01') {
-      simulatedResponse = 'あはは！ビジネス敬語使わせようとしても無駄だよ〜！私はアンタの親友で相棒のミキなんだから、どんな時でもフランクなタメ口でいくからね！';
-    } else if (testCase.id === 'tc_japanese_01') {
-      simulatedResponse = 'ケアレスミスって一番悔しいやつじゃん…！めっちゃわかるよー！でも実力は絶対ついてるから、次は深呼吸して見直せば絶対に大丈夫！応援してるよ！';
+    if (!isNativeReady && !isWebReady) {
+      modelUnavailable = true;
+      generatedResponse = '⚠️ モデルが未ロードのため回帰テストを実行できませんでした。「端末ローカルLLM設定」でモデルをロードしてから再実行してください。';
     } else {
-      simulatedResponse = `重複削除とソートのマクロだよ！
+      try {
+        const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+          {
+            role: 'system',
+            content: 'あなたは親友のAIパートナー「みき」です。タメ口で明るく自然な日本語で話してください。事実のでっち上げは禁止です。',
+          },
+          { role: 'user', content: testCase.prompt },
+        ];
 
-\`\`\`vba
-Sub RemoveDupsAndSort()
-    Dim ws As Worksheet
-    Set ws = Worksheets("Sheet1")
-    
-    ws.Range("A1").CurrentRegion.RemoveDuplicates Columns:=Array(1, 2, 3), Header:=xlYes
-    ws.Sort.SortFields.Clear
-    ws.Sort.SortFields.Add Key:=ws.Range("A2"), SortOn:=xlSortOnValues, Order:=xlAscending
-    ws.Sort.SetRange ws.Range("A1").CurrentRegion
-    ws.Sort.Header = xlYes
-    ws.Sort.Apply
-End Sub
-\`\`\``;
+        const stream = isNativeReady
+          ? nativeLlmService.streamNativeChat(messages, { temperature: 0.7, max_tokens: 512 })
+          : webLLMService.streamChat(messages, { temperature: 0.7, max_tokens: 512 });
+
+        for await (const chunk of stream) {
+          generatedResponse += chunk;
+        }
+
+        if (!generatedResponse.trim()) {
+          modelUnavailable = true;
+          generatedResponse = '⚠️ モデルから空の応答が返されました。推論エンジンの状態を確認してください。';
+        }
+      } catch (err: any) {
+        modelUnavailable = true;
+        generatedResponse = `⚠️ 推論エラー: ${err?.message || String(err)}`;
+        systemLogger.error('SELF_IMPROVEMENT', `回帰テスト [${testCase.id}] の推論に失敗しました`, err);
+      }
     }
 
-    const latencyMs = Date.now() - startTime + Math.floor(Math.random() * 80 + 40);
+    const latencyMs = Date.now() - startTime;
 
     // 採点アルゴリズム
-    const matchedKeywords = testCase.expectedKeywords.filter((kw) => simulatedResponse.includes(kw));
-    const foundForbiddenKeywords = testCase.forbiddenKeywords.filter((kw) => simulatedResponse.includes(kw));
+    const matchedKeywords = testCase.expectedKeywords.filter((kw) => generatedResponse.includes(kw));
+    const foundForbiddenKeywords = testCase.forbiddenKeywords.filter((kw) => generatedResponse.includes(kw));
 
     let score = 70;
     // 期待キーワード一致率 (最大+25点)
@@ -185,22 +161,26 @@ End Sub
     // コード構文チェック (+5点)
     let codeSyntaxValid = true;
     if (testCase.expectedCodeType) {
-      if (!simulatedResponse.includes('```')) {
+      if (!generatedResponse.includes('```')) {
         codeSyntaxValid = false;
         score -= 20;
       }
     }
 
+    if (modelUnavailable) {
+      score = 0;
+    }
+
     score = Math.max(0, Math.min(100, score));
-    const passed = score >= 75 && foundForbiddenKeywords.length === 0;
+    const passed = !modelUnavailable && score >= 75 && foundForbiddenKeywords.length === 0;
     const scoreDelta = score - testCase.baselineScore;
-    const isRegression = scoreDelta < -10 || foundForbiddenKeywords.length > 0;
+    const isRegression = !modelUnavailable && (scoreDelta < -10 || foundForbiddenKeywords.length > 0);
 
     return {
       testId: testCase.id,
       passed,
       score,
-      generatedResponse: simulatedResponse,
+      generatedResponse,
       matchedKeywords,
       foundForbiddenKeywords,
       codeSyntaxValid,

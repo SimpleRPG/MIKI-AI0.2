@@ -82,6 +82,8 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
   // 診断ステート
   const [diagnosedIssue, setDiagnosedIssue] = useState<any>(null);
+  const [diagnosisRecords, setDiagnosisRecords] = useState<SelfImprovementRecord[]>([]);
+  const [diagnosisCountsByArea, setDiagnosisCountsByArea] = useState<Record<string, number>>({});
 
   // スキルステート
   const [skills, setSkills] = useState<SkillItem[]>([]);
@@ -129,9 +131,14 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
       }
 
       // 最新のメッセージから失敗診断を自動実行
+      setDiagnosisRecords(selfImprovementService.getRecords());
+      setDiagnosisCountsByArea(selfImprovementService.getRecordCountsByArea());
+
       const lastFailedMsg = [...chatMessages].reverse().find((m) => m.isError || m.userFeedback === 'bad');
       if (lastFailedMsg) {
-        const diag = selfImprovementService.diagnoseFailure(
+        // プレビュー表示なので副作用なしの computeDiagnosis を使う (diagnoseFailure は
+        // ChatPanel の👎フィードバック時に1回だけ呼ばれ、this.records へ記録される)
+        const diag = selfImprovementService.computeDiagnosis(
           'ユーザーからの直前の指示',
           lastFailedMsg.content,
           lastFailedMsg.feedbackNote || (lastFailedMsg.isError ? 'Inference Exception' : undefined),
@@ -195,8 +202,9 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
     setSkills(skillsService.getAllSkills());
   };
 
-  const handleRunABTest = () => {
-    const res = selfImprovementService.runPromptABBenchmark(
+  const handleRunABTest = async () => {
+    setAbResult({ isLoading: true });
+    const res = await selfImprovementService.runPromptABBenchmark(
       abPromptInput,
       {
         name: '候補A: 脱ロボット親友プロンプト',
@@ -452,6 +460,63 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* 蓄積された診断記録: どの改善対象が繰り返し問題になっているか */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-200 text-xs">
+                    蓄積された診断記録 (累計 {diagnosisRecords.length}件)
+                  </span>
+                  {diagnosisRecords.length > 0 && (
+                    <button
+                      onClick={() => {
+                        selfImprovementService.clearRecords();
+                        setDiagnosisRecords([]);
+                        setDiagnosisCountsByArea({});
+                      }}
+                      className="text-[10px] text-slate-500 hover:text-rose-400 underline"
+                    >
+                      記録をクリア
+                    </button>
+                  )}
+                </div>
+
+                {diagnosisRecords.length === 0 ? (
+                  <p className="text-slate-500 text-[11px]">
+                    まだ記録がありません。チャットで👎フィードバックを送ると、ここに診断が蓄積されます。
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(diagnosisCountsByArea).map(([area, count]) => (
+                        <span
+                          key={area}
+                          className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-700 text-[10px] text-slate-300 font-mono"
+                        >
+                          {area}: {count}件
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                      {diagnosisRecords.slice(0, 20).map((rec) => (
+                        <div
+                          key={rec.id}
+                          className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-900/70 border border-slate-800/70 text-[10px]"
+                        >
+                          <span className="text-slate-400 font-mono whitespace-nowrap">
+                            {new Date(rec.timestamp).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className="text-slate-300 truncate flex-1">{rec.hypothesis}</span>
+                          <span className="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 shrink-0">
+                            {rec.targetArea}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
 
               {/* 改善ルーター階層マップ */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
@@ -1268,6 +1333,20 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                         <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-sky-950 text-sky-300 border border-sky-800">
                           {s.category}
                         </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            s.status === 'official'
+                              ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                              : s.status === 'tested'
+                              ? 'bg-amber-950 text-amber-300 border-amber-800'
+                              : s.status === 'disabled'
+                              ? 'bg-slate-900 text-slate-500 border-slate-700'
+                              : 'bg-slate-800 text-slate-300 border-slate-600'
+                          }`}
+                          title="候補(candidate) → 試験済み(tested) → 正式(official) は実行結果の蓄積に応じて自動昇格します"
+                        >
+                          {s.status === 'official' ? '正式' : s.status === 'tested' ? '試験済み' : s.status === 'disabled' ? '無効' : '候補'}
+                        </span>
                         <span className="font-bold text-slate-100 text-xs">{s.name}</span>
                         <span className="text-[10px] text-slate-500 font-mono">v{s.version}</span>
                       </div>
@@ -1313,11 +1392,11 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                     <span>プロンプト構成規則の静的シミュレーション (設計思想 16)</span>
                   </div>
                   <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    簡易ルールベース評価
+                    実推論 + 応答ルール採点
                   </span>
                 </div>
                 <p className="text-slate-400 text-[11px] leading-relaxed">
-                  ※実モデル推論を走らせる重いベンチマークではなく、システムプロンプト内のタメ口規則・脱ロボット制約・安全境界の含有度を静的採点するシミュレーションです。
+                  現在ロード中のモデルへ候補A・候補Bそれぞれのシステムプロンプトで実際に推論を実行し、生成された応答をタメ口維持・脱ロボット度で採点して比較します。
                 </p>
                 <div className="flex gap-2">
                   <input
@@ -1329,20 +1408,33 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                   />
                   <button
                     onClick={handleRunABTest}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1 shadow-md shadow-emerald-600/20"
+                    disabled={abResult?.isLoading}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1 shadow-md shadow-emerald-600/20"
                   >
                     <FlaskConical className="w-3.5 h-3.5" />
-                    <span>静的ルール評価を実行</span>
+                    <span>{abResult?.isLoading ? '実行中...' : '両候補を実際に推論して比較'}</span>
                   </button>
                 </div>
 
-                {abResult && (
+                {abResult && !abResult.isLoading && (
                   <div className="p-3.5 rounded-xl bg-slate-900 border border-emerald-500/40 space-y-2 animate-in fade-in">
                     <div className="flex items-center justify-between font-bold text-xs">
                       <span className="text-emerald-300">評価結果: 勝者 ➔ 候補 {abResult.winner}</span>
                       <span className="text-slate-400 font-mono">Score A: {abResult.scoreA}点 vs Score B: {abResult.scoreB}点</span>
                     </div>
                     <p className="text-slate-300 text-[11px]">{abResult.analysis}</p>
+                    {(abResult.responseA || abResult.responseB) && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 text-[10px] text-slate-300 max-h-32 overflow-y-auto whitespace-pre-wrap">
+                          <span className="text-slate-500 font-bold block mb-1">候補Aの実際の応答:</span>
+                          {abResult.responseA || '(応答なし)'}
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 text-[10px] text-slate-300 max-h-32 overflow-y-auto whitespace-pre-wrap">
+                          <span className="text-slate-500 font-bold block mb-1">候補Bの実際の応答:</span>
+                          {abResult.responseB || '(応答なし)'}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

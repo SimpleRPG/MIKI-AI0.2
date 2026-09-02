@@ -6,6 +6,9 @@ import {
   ChatMessage,
   SkillItem,
 } from '../types';
+import { nativeLlmService } from './nativeLlmService';
+import { webLLMService } from './webLlmService';
+import { systemLogger } from './systemLogger';
 
 const RECORDS_STORAGE_KEY = 'miki_ai_self_improvement_records';
 const TRAINING_DATA_STORAGE_KEY = 'miki_ai_training_samples';
@@ -102,10 +105,11 @@ class SelfImprovementService {
   }
 
   /**
-   * 失敗原因の自動診断 & 改善先ルーター
+   * 失敗原因の自動診断ロジック本体 (副作用なし・純粋関数)
+   * モーダルのプレビュー表示など、記録を残さず計算結果だけ欲しい場合はこちらを使う。
    * 設計思想 9. メタ学習 & 14. タスク計画
    */
-  public diagnoseFailure(
+  public computeDiagnosis(
     userMessage: string,
     assistantResponse: string,
     errorDetails?: string,
@@ -193,6 +197,66 @@ class SelfImprovementService {
       suggestedFixArea: 'model',
       recommendation: 'この失敗ケースをJSONL学習データとして保存し、Colab環境でのLoRA学習データセットに含めてください。',
     };
+  }
+
+  /**
+   * 失敗原因の自動診断 & 改善先ルーター (this.records へ永続化する版)
+   * ユーザーからの実際の👎フィードバック等、「1回の失敗イベント」につき1回だけ呼ぶこと。
+   * プレビュー表示など繰り返し呼ばれる可能性がある箇所では computeDiagnosis() を使うこと。
+   */
+  public diagnoseFailure(
+    userMessage: string,
+    assistantResponse: string,
+    errorDetails?: string,
+    contextInfo?: {
+      memoriesUsedCount: number;
+      promptLengthChars: number;
+      engineMode: string;
+      modelId?: string;
+    }
+  ): {
+    category: string;
+    rootCause: string;
+    suggestedFixArea: 'memory' | 'retrieval' | 'prompt' | 'skill' | 'tool' | 'model' | 'no_change';
+    recommendation: string;
+  } {
+    const diagnosis = this.computeDiagnosis(userMessage, assistantResponse, errorDetails, contextInfo);
+
+    const record: SelfImprovementRecord = {
+      id: 'diag_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      timestamp: Date.now(),
+      type: 'failure_diagnosis',
+      targetArea: diagnosis.suggestedFixArea,
+      hypothesis: diagnosis.category,
+      baseline: userMessage,
+      candidate: assistantResponse,
+      result: 'inconclusive',
+      adopted: false,
+    };
+    this.records.unshift(record);
+    this.saveRecords();
+
+    return diagnosis;
+  }
+
+  /**
+   * 蓄積された診断記録の削除 (設計思想 25. 安全・品質境界)
+   */
+  public clearRecords(): void {
+    this.records = [];
+    this.saveRecords();
+  }
+
+  /**
+   * 改善対象領域(記憶/検索/プロンプト/スキル/モデル)別の蓄積件数
+   * SelfImprovementModal での「どの改善対象が繰り返し問題になっているか」表示に使用
+   */
+  public getRecordCountsByArea(): Record<string, number> {
+    const counts: Record<string, number> = {};
+    for (const rec of this.records) {
+      counts[rec.targetArea] = (counts[rec.targetArea] || 0) + 1;
+    }
+    return counts;
   }
 
   /**
@@ -396,42 +460,88 @@ print("🎉 学習とGGUF変換が完了しました！ 'miki_model_candidate_q4
    * 設計思想 16. 複数候補、反証、テスト
    * ※実モデル推論のA/Bテストではなく、プロンプト内のタメ口制約・脱ロボット文言・安全境界の含有度を静的評価するシミュレーションです。
    */
-  public runPromptABBenchmark(
+  /**
+   * 実際にロード中のモデルへ候補A/Bのシステムプロンプトを送信し、
+   * 生成された応答を静的ルールで採点して比較する (プロンプトA/Bテスト)。
+   * 設計思想 15. 評価・検証 & 16. 複数候補、反証、テスト
+   * (以前はプロンプト文字列自体にキーワードが含まれるかだけを見る、実推論を伴わない偽の判定だった)
+   */
+  public async runPromptABBenchmark(
     testPrompt: string,
     variantA: { name: string; systemPrompt: string },
     variantB: { name: string; systemPrompt: string }
-  ): {
+  ): Promise<{
     winner: 'A' | 'B' | 'TIE';
     scoreA: number;
     scoreB: number;
+    responseA: string;
+    responseB: string;
     analysis: string;
-    isSimulation: true;
-  } {
-    // 静的ルール評価基準: 自然な日本語表現指定、脱ロボット度、タメ口維持制約、指示追従境界
-    const evaluate = (p: string) => {
-      let s = 50;
-      if (p.includes('タメ口') || p.includes('親友')) s += 15;
-      if (p.includes('ロボット') || p.includes('自然な日本語')) s += 15;
-      if (p.includes('でっち上げ') || p.includes('安全') || p.includes('制約')) s += 10;
-      return Math.min(100, s);
+    isSimulation: boolean;
+  }> {
+    const isNativeReady = nativeLlmService.isNative() && !!nativeLlmService.getActiveModelId();
+    const isWebReady = webLLMService.isLoaded();
+
+    if (!isNativeReady && !isWebReady) {
+      return {
+        winner: 'TIE',
+        scoreA: 0,
+        scoreB: 0,
+        responseA: '',
+        responseB: '',
+        analysis: '⚠️ モデルが未ロードのためA/Bテストを実行できませんでした。「端末ローカルLLM設定」でモデルをロードしてから再実行してください。',
+        isSimulation: true,
+      };
+    }
+
+    const runVariant = async (variant: { systemPrompt: string }): Promise<string> => {
+      const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+        { role: 'system', content: variant.systemPrompt },
+        { role: 'user', content: testPrompt },
+      ];
+      let out = '';
+      try {
+        const stream = isNativeReady
+          ? nativeLlmService.streamNativeChat(messages, { temperature: 0.7, max_tokens: 400 })
+          : webLLMService.streamChat(messages, { temperature: 0.7, max_tokens: 400 });
+        for await (const chunk of stream) {
+          out += chunk;
+        }
+      } catch (err: any) {
+        systemLogger.error('SELF_IMPROVEMENT', 'プロンプトA/Bテストの推論に失敗しました', err);
+        out = '';
+      }
+      return out;
     };
 
-    const scoreA = evaluate(variantA.systemPrompt);
-    const scoreB = evaluate(variantB.systemPrompt);
+    const [responseA, responseB] = await Promise.all([runVariant(variantA), runVariant(variantB)]);
 
+    // 実際の生成結果を静的ルールで採点 (プロンプト文字列自体ではなく、モデルの応答を見る)
+    const evaluate = (resp: string) => {
+      if (!resp.trim()) return 0;
+      let s = 50;
+      if (resp.includes('だよ') || resp.includes('だね') || resp.includes('よ！') || resp.includes('ね！')) s += 15;
+      if (resp.includes('でございます') || resp.includes('承知いたしました') || resp.includes('恐縮')) s -= 25;
+      if (resp.length > 20 && resp.length < 600) s += 10;
+      if (resp.includes('```')) s += 5;
+      return Math.max(0, Math.min(100, s));
+    };
+
+    const scoreA = evaluate(responseA);
+    const scoreB = evaluate(responseB);
     const winner = scoreA > scoreB ? 'A' : scoreB > scoreA ? 'B' : 'TIE';
 
     return {
       winner,
       scoreA,
       scoreB,
+      responseA,
+      responseB,
       analysis:
-        winner === 'A'
-          ? `【静的シミュレーション】候補A「${variantA.name}」が脱ロボット規則とペルソナ親和性ルールで優勢です。（※実推論評価ではありません）`
-          : winner === 'B'
-          ? `【静的シミュレーション】候補B「${variantB.name}」が制約遵守と日本語自然度ルールで優勢です。（※実推論評価ではありません）`
-          : '【静的シミュレーション】両候補ともに同等の静的ルール適合度を示しています。',
-      isSimulation: true,
+        winner === 'TIE'
+          ? '両候補の実際の生成応答が同等の静的ルール適合度を示しています。'
+          : `候補${winner}「${winner === 'A' ? variantA.name : variantB.name}」の実際の生成応答が、脱ロボット度・タメ口維持・応答長のルールで優勢でした。`,
+      isSimulation: false,
     };
   }
 }

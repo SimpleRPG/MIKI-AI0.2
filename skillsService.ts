@@ -1,4 +1,5 @@
 import { SkillItem } from '../types';
+import { systemLogger } from './systemLogger';
 
 const SKILLS_STORAGE_KEY = 'miki_ai_skills_library';
 
@@ -214,18 +215,61 @@ class SkillsService {
   }
 
   /**
-   * スキルの実行結果（成功・失敗）を記録
+   * スキルの実行結果（成功・失敗）を記録し、蓄積データに基づいて
+   * 候補(candidate) → 試験済み(tested) → 正式(official) の自動昇格判定を行う。
+   * 失敗が続いた場合は降格もする(反証による自己修正)。
+   * 設計思想 13. スキルライブラリー & 16. 複数候補、反証、テスト
    */
   public recordExecutionResult(id: string, success: boolean): void {
     const skill = this.skills.find((s) => s.id === id);
-    if (skill) {
-      if (success) {
-        skill.successCount = (skill.successCount || 0) + 1;
-      } else {
-        skill.failureCount = (skill.failureCount || 0) + 1;
+    if (!skill) return;
+
+    if (success) {
+      skill.successCount = (skill.successCount || 0) + 1;
+    } else {
+      skill.failureCount = (skill.failureCount || 0) + 1;
+    }
+    skill.updatedAt = Date.now();
+
+    this.evaluatePromotion(skill);
+    this.saveSkills();
+  }
+
+  /**
+   * 蓄積された成功/失敗件数に基づく昇格・降格しきい値判定 (副作用: skill.status を書き換える)
+   */
+  private evaluatePromotion(skill: SkillItem): void {
+    const total = (skill.successCount || 0) + (skill.failureCount || 0);
+    if (total === 0) return;
+    const successRate = (skill.successCount || 0) / total;
+    const prevStatus = skill.status;
+
+    if (skill.status === 'candidate') {
+      // candidate -> tested: 最低5回試され、成功率70%以上
+      if (total >= 5 && successRate >= 0.7) {
+        skill.status = 'tested';
       }
-      skill.updatedAt = Date.now();
-      this.saveSkills();
+    } else if (skill.status === 'tested') {
+      // tested -> official: 最低15回試され、成功率85%以上の安定実績
+      if (total >= 15 && successRate >= 0.85) {
+        skill.status = 'official';
+      }
+      // tested -> candidate に逆戻り: 十分な試行数があるのに成功率が悪化
+      else if (total >= 8 && successRate < 0.5) {
+        skill.status = 'candidate';
+      }
+    } else if (skill.status === 'official') {
+      // official でも成績が悪化し続けたら降格 (反証による自己修正)
+      if (total >= 10 && successRate < 0.6) {
+        skill.status = 'tested';
+      }
+    }
+
+    if (skill.status !== prevStatus) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `スキル「${skill.name}」のステータスが ${prevStatus} → ${skill.status} に変化 (成功率 ${Math.round(successRate * 100)}%, 試行 ${total}回)`
+      );
     }
   }
 }
