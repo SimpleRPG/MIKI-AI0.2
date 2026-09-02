@@ -233,12 +233,6 @@ jobs:
                   return JNI_FALSE;
               }
 
-              llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
-              g_smpl = llama_sampler_chain_init(sparams);
-              llama_sampler_chain_add(g_smpl, llama_sampler_init_temp(0.7f));
-              llama_sampler_chain_add(g_smpl, llama_sampler_init_top_p(0.9f, 1));
-              llama_sampler_chain_add(g_smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
-
               LOGI("GGUF model loaded successfully into native context!");
               return JNI_TRUE;
           }
@@ -271,6 +265,18 @@ jobs:
               if (llama_decode(g_ctx, batch) != 0) {
                   return env->NewStringUTF("Error: llama_decode prompt failed");
               }
+
+              // Build a request-scoped sampler using this call's actual temperature/top_p
+              // (previously these were ignored and a fixed 0.7/0.9 sampler from load-time was reused).
+              if (g_smpl) {
+                  llama_sampler_free(g_smpl);
+                  g_smpl = nullptr;
+              }
+              llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
+              g_smpl = llama_sampler_chain_init(sparams);
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_temp(temp > 0.0f ? temp : 0.7f));
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_top_p(topP > 0.0f ? topP : 0.9f, 1));
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
               jclass cbClass = env->GetObjectClass(callback);
               jmethodID onChunkMethod = env->GetMethodID(cbClass, "onChunk", "(Ljava/lang/String;)Z");
@@ -712,27 +718,32 @@ jobs:
                       return;
                   }
 
-                  File target = new File(getModelsDirectory(), fileName);
-                  if (target.exists()) {
-                      if (currentModelPath != null && currentModelPath.equals(target.getAbsolutePath())) {
-                          unloadModelInternal();
+                  executor.execute(() -> {
+                      File target = new File(getModelsDirectory(), fileName);
+                      if (target.exists()) {
+                          if (currentModelPath != null && currentModelPath.equals(target.getAbsolutePath())) {
+                              unloadModelInternal();
+                          }
+                          boolean deleted = target.delete();
+                          JSObject ret = new JSObject();
+                          ret.put("success", deleted);
+                          call.resolve(ret);
+                      } else {
+                          JSObject ret = new JSObject();
+                          ret.put("success", false);
+                          ret.put("message", "File not found");
+                          call.resolve(ret);
                       }
-                      boolean deleted = target.delete();
-                      JSObject ret = new JSObject();
-                      ret.put("success", deleted);
-                      call.resolve(ret);
-                  } else {
-                      JSObject ret = new JSObject();
-                      ret.put("success", false);
-                      ret.put("message", "File not found");
-                      call.resolve(ret);
-                  }
+                  });
               }
 
               @PluginMethod
               public void loadModel(PluginCall call) {
                   String fileName = call.getString("fileName");
                   String modelId = call.getString("modelId", fileName);
+                  int nGpuLayers = call.getInt("nGpuLayers", 99);
+                  int nCtx = call.getInt("nCtx", 2048);
+                  int nThreads = call.getInt("nThreads", 4);
 
                   if (fileName == null || fileName.isEmpty()) {
                       call.reject("fileName is required");
@@ -759,7 +770,7 @@ jobs:
                               notifyListeners("onProgress", p);
                           });
 
-                          boolean success = nativeInitModel(modelFile.getAbsolutePath(), 99, 2048, 4);
+                          boolean success = nativeInitModel(modelFile.getAbsolutePath(), nGpuLayers, nCtx, nThreads);
 
                           if (success) {
                               currentModelId = modelId;
@@ -877,10 +888,12 @@ jobs:
 
               @PluginMethod
               public void unloadModel(PluginCall call) {
-                  unloadModelInternal();
-                  JSObject ret = new JSObject();
-                  ret.put("success", true);
-                  call.resolve(ret);
+                  executor.execute(() -> {
+                      unloadModelInternal();
+                      JSObject ret = new JSObject();
+                      ret.put("success", true);
+                      call.resolve(ret);
+                  });
               }
           }
           EOF
