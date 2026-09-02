@@ -10,6 +10,7 @@ import { worldModelService } from './worldModelService';
 import { selfImprovementService } from './selfImprovementService';
 import { systemLogger } from './systemLogger';
 import { calculateDomainVector, calculateCosineSimilarity } from '../utils/memoryRetrieval';
+import { nativeBackgroundService } from './nativeBackgroundService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -24,7 +25,7 @@ const WORK_MANAGER_CONFIG_KEY = 'miki_ai_workmanager_config';
 export class BackgroundWorkerService {
   private constraints: WorkManagerConstraints = {
     requiresCharging: true,
-    requiresDeviceIdle: true,
+    requiresDeviceIdle: false, // チャット中も裏で回して良い、という指示に合わせてデフォルトOFF
     requiresUnmeteredWifi: true,
     batteryNotLow: true,
     nightTimeOnly: false, // デモや検証用にデフォルトは終日許可
@@ -59,6 +60,11 @@ export class BackgroundWorkerService {
     this.initHardwareMonitors();
     this.initIdleDetector();
     this.scheduleNextRun();
+    // If background self-improvement is enabled (default), keep the native
+    // process alive so the scheduler above still ticks while backgrounded.
+    if (this.isRegistered) {
+      nativeBackgroundService.start().catch(() => {});
+    }
   }
 
   private loadState(): void {
@@ -440,6 +446,13 @@ class MikiAutonomousWorker(appContext: Context, workerParams: WorkerParameters) 
   public toggleRegistered(registered: boolean): void {
     this.isRegistered = registered;
     this.saveState();
+    // Pausing stops the foreground keep-alive service too (screen off / app
+    // backgrounded no longer needs to be kept awake); resuming restarts it.
+    if (registered) {
+      nativeBackgroundService.start().catch(() => {});
+    } else {
+      nativeBackgroundService.stop().catch(() => {});
+    }
   }
 
   public setMockBattery(charging: boolean, level: number): void {

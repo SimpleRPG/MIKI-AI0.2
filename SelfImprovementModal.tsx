@@ -707,6 +707,36 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                 </div>
               )}
 
+              {/* Pause / Resume — also starts/stops the native foreground keep-alive
+                  service on Android, so the scheduler above keeps ticking while
+                  backgrounded or the screen is off. */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Shield className={`w-4 h-4 ${wmStatus?.isRegistered ? 'text-emerald-400' : 'text-slate-500'}`} />
+                  <div>
+                    <div className="text-xs font-bold text-slate-200">
+                      バックグラウンド自己改善: {wmStatus?.isRegistered ? '稼働中' : '一時停止中'}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      チャット中も裏で回り続けます。一時停止するとバックグラウンド維持も止まります。
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    backgroundWorkerService.toggleRegistered(!(wmStatus?.isRegistered ?? true));
+                    setWmStatus(backgroundWorkerService.getStatus());
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                    wmStatus?.isRegistered
+                      ? 'bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-200'
+                      : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-200'
+                  }`}
+                >
+                  {wmStatus?.isRegistered ? '一時停止する' : '再開する'}
+                </button>
+              </div>
+
               {/* Hardware Status & Constraint Evaluation Banner */}
               {(() => {
                 const constraintCheck = backgroundWorkerService.evaluateConstraints();

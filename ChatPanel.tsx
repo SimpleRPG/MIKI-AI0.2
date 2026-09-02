@@ -42,6 +42,7 @@ import { extractCodeBlocks } from '../utils/codeParser';
 import { SPEAKER_PROFILES } from '../data/speakers';
 import { systemLogger } from '../services/systemLogger';
 import { selfImprovementService } from '../services/selfImprovementService';
+import { skillsService } from '../services/skillsService';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -185,6 +186,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           }
           return mem;
         });
+      });
+    }
+
+    // 適用されたスキルの成功/失敗カウントを更新（候補スキル試験の判断材料）
+    if (msg.usedSkills && msg.usedSkills.length > 0) {
+      msg.usedSkills.forEach((s) => {
+        skillsService.recordExecutionResult(s.id, type === 'good');
       });
     }
 
