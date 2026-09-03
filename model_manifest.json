@@ -3,8 +3,8 @@
   "generatedAt": "2026-09-03T13:20:00Z",
   "nativeEnvironment": {
     "engine": "llama.cpp",
-    "pinnedCommit": "b4600",
-    "pinnedCommitHash": "553f1e46e9e864514bbd6bf4009146db66be0541",
+    "pinnedCommit": "b10775",
+    "pinnedCommitHash": "",
     "repository": "https://github.com/ggml-org/llama.cpp.git",
     "vulkanHeaders": {
       "repository": "https://github.com/KhronosGroup/Vulkan-Headers.git",
