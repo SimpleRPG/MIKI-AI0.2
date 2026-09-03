@@ -33,6 +33,7 @@ import { systemLogger } from './services/systemLogger';
 import { worldModelService } from './services/worldModelService';
 import { storageService } from './services/storageService';
 import { completionJudgeService } from './services/completionJudgeService';
+import { selfImprovementService } from './services/selfImprovementService';
 import { schemaValidationService } from './services/schemaValidationService';
 import { nativeBackgroundService } from './services/nativeBackgroundService';
 import { backgroundWorkerService } from './services/backgroundWorkerService';
@@ -686,6 +687,32 @@ export default function App() {
       taskPlan: plan,
     });
 
+    // 48章の完了判定が自動的に FAILED / BLOCKED を検出した場合、
+    // ユーザーの👎を待たずに自己改善ルーターへ自動的に診断依頼する。
+    // ※ PARTIAL は正常な途中経過であり得るため除外（ノイズ防止）。
+    // ※ EXTERNAL_COMPILE_REQUIRED / RUNTIME_TEST_REQUIRED は外部確認が必要な正常振る舞いのため除外。
+    // ※ CANCELLED / COMPLETE は対象外。
+    if (
+      (planEvaluation.status === 'FAILED' || planEvaluation.status === 'BLOCKED') &&
+      !planEvaluation.autoDiagnosedAt
+    ) {
+      selfImprovementService.diagnoseFailure(
+        initialGoal,
+        combinedSummary,
+        `[自動検出] 完了判定: ${planEvaluation.status} - ${planEvaluation.reason}`,
+        {
+          memoriesUsedCount: (relevantMemories || []).length,
+          promptLengthChars: 1200,
+          engineMode: engineMode || 'native_gpu',
+        }
+      );
+      planEvaluation.autoDiagnosedAt = Date.now();
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🔍 完了判定(${planEvaluation.status})を自動検出し、改善ルーターへ自動登録しました(ユーザー操作不要)。`
+      );
+    }
+
     systemLogger.step(10, 10, '🧭 多段推論タスク計画完了', {
       planId: plan.id,
       totalSteps: plan.totalSteps,
@@ -975,6 +1002,32 @@ export default function App() {
           executionSteps: systemLogger.getCurrentSessionSteps(),
           executedTools: cpuExecutedTools,
         });
+
+        // 48章の完了判定が自動的に FAILED / BLOCKED を検出した場合、
+        // ユーザーの👎を待たずに自己改善ルーターへ自動的に診断依頼する。
+        // ※ PARTIAL は正常な途中経過であり得るため除外（ノイズ防止）。
+        // ※ EXTERNAL_COMPILE_REQUIRED / RUNTIME_TEST_REQUIRED は外部確認が必要な正常振る舞いのため除外。
+        // ※ CANCELLED / COMPLETE は対象外。
+        if (
+          (cpuEvaluation.status === 'FAILED' || cpuEvaluation.status === 'BLOCKED') &&
+          !cpuEvaluation.autoDiagnosedAt
+        ) {
+          selfImprovementService.diagnoseFailure(
+            text,
+            reply,
+            `[自動検出] 完了判定: ${cpuEvaluation.status} - ${cpuEvaluation.reason}`,
+            {
+              memoriesUsedCount: 0,
+              promptLengthChars: 1200,
+              engineMode: 'autonomous_rule',
+            }
+          );
+          cpuEvaluation.autoDiagnosedAt = Date.now();
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            `🔍 完了判定(${cpuEvaluation.status})を自動検出し、改善ルーターへ自動登録しました(ユーザー操作不要)。`
+          );
+        }
 
         const cpuMsg: ChatMessage = {
           id: assistantId,
@@ -1610,6 +1663,32 @@ export default function App() {
         files: workspaceFiles,
       });
 
+      // 48章の完了判定が自動的に FAILED / BLOCKED を検出した場合、
+      // ユーザーの👎を待たずに自己改善ルーターへ自動的に診断依頼する。
+      // ※ PARTIAL は正常な途中経過であり得るため除外（ノイズ防止）。
+      // ※ EXTERNAL_COMPILE_REQUIRED / RUNTIME_TEST_REQUIRED は外部確認が必要な正常振る舞いのため除外。
+      // ※ CANCELLED / COMPLETE は対象外。
+      if (
+        (streamEvaluation.status === 'FAILED' || streamEvaluation.status === 'BLOCKED') &&
+        !streamEvaluation.autoDiagnosedAt
+      ) {
+        selfImprovementService.diagnoseFailure(
+          text,
+          accumulated,
+          `[自動検出] 完了判定: ${streamEvaluation.status} - ${streamEvaluation.reason}`,
+          {
+            memoriesUsedCount: (promptBuildResult.usedMemories || []).length,
+            promptLengthChars: 1200,
+            engineMode: engineMode || 'native_gpu',
+          }
+        );
+        streamEvaluation.autoDiagnosedAt = Date.now();
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `🔍 完了判定(${streamEvaluation.status})を自動検出し、改善ルーターへ自動登録しました(ユーザー操作不要)。`
+        );
+      }
+
       systemLogger.info('CHAT', `[完了判定器] 応答完了判定: [${streamEvaluation.status}] スコア:${streamEvaluation.score}% - ${streamEvaluation.headline}`, {
         status: streamEvaluation.status,
         score: streamEvaluation.score,
@@ -1709,6 +1788,32 @@ export default function App() {
         executionSteps: systemLogger.getCurrentSessionSteps(),
       });
 
+      // 48章の完了判定が自動的に FAILED / BLOCKED を検出した場合、
+      // ユーザーの👎を待たずに自己改善ルーターへ自動的に診断依頼する。
+      // ※ PARTIAL は正常な途中経過であり得るため除外（ノイズ防止）。
+      // ※ EXTERNAL_COMPILE_REQUIRED / RUNTIME_TEST_REQUIRED は外部確認が必要な正常振る舞いのため除外。
+      // ※ CANCELLED / COMPLETE は対象外。
+      if (
+        (errorEvaluation.status === 'FAILED' || errorEvaluation.status === 'BLOCKED') &&
+        !errorEvaluation.autoDiagnosedAt
+      ) {
+        selfImprovementService.diagnoseFailure(
+          text,
+          errorText,
+          `[自動検出] 完了判定: ${errorEvaluation.status} - ${errorEvaluation.reason} (例外: ${err?.message || err})`,
+          {
+            memoriesUsedCount: 0,
+            promptLengthChars: 1200,
+            engineMode: engineMode || 'native_gpu',
+          }
+        );
+        errorEvaluation.autoDiagnosedAt = Date.now();
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `🔍 完了判定(${errorEvaluation.status})を自動検出し、改善ルーターへ自動登録しました(ユーザー操作不要)。`
+        );
+      }
+
       const errorMsg: ChatMessage = {
         id: 'msg_err_' + Date.now(),
         role: 'assistant',
@@ -1774,6 +1879,32 @@ export default function App() {
         executionSteps: systemLogger.getCurrentSessionSteps(),
         files: workspaceFiles,
       });
+
+      // 48章の完了判定が自動的に FAILED / BLOCKED を検出した場合、
+      // ユーザーの👎を待たずに自己改善ルーターへ自動的に診断依頼する。
+      // ※ PARTIAL は正常な途中経過であり得るため除外（ノイズ防止）。
+      // ※ EXTERNAL_COMPILE_REQUIRED / RUNTIME_TEST_REQUIRED は外部確認が必要な正常振る舞いのため除外。
+      // ※ CANCELLED / COMPLETE は対象外。
+      if (
+        (debugEvaluation.status === 'FAILED' || debugEvaluation.status === 'BLOCKED') &&
+        !debugEvaluation.autoDiagnosedAt
+      ) {
+        selfImprovementService.diagnoseFailure(
+          `サンドボックス実行エラーの自動修復: ${errorSummary}`,
+          responseText,
+          `[自動検出] 完了判定: ${debugEvaluation.status} - ${debugEvaluation.reason}`,
+          {
+            memoriesUsedCount: 0,
+            promptLengthChars: 1200,
+            engineMode: engineMode || 'native_gpu',
+          }
+        );
+        debugEvaluation.autoDiagnosedAt = Date.now();
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `🔍 完了判定(${debugEvaluation.status})を自動検出し、改善ルーターへ自動登録しました(ユーザー操作不要)。`
+        );
+      }
 
       const assistantMsg: ChatMessage = {
         id: 'msg_dbg_res_' + Date.now(),

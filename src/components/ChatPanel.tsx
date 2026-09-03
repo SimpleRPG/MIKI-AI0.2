@@ -246,17 +246,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         systemLogger.warn('SELF_IMPROVEMENT', 'ユーザー高評価(👍)を受信しましたが、コンテンツ安全境界フィルタにより教材登録から除外・ログ記録されました。');
       }
     } else {
-      selfImprovementService.diagnoseFailure(
-        userPrompt,
-        msg.content,
-        reason || 'ユーザー低評価フィードバック',
-        {
-          memoriesUsedCount: (msg.usedMemories || []).length,
-          promptLengthChars: 1200,
-          engineMode: msg.engineMode || 'native_gpu',
-        }
-      );
-      systemLogger.warn('SELF_IMPROVEMENT', `ユーザーから低評価(👎)を受信 (理由: ${reason || '未指定'})。改善ルーターに記録しました。`);
+      if (msg.completionEvaluation?.autoDiagnosedAt) {
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          'この応答は既に完了判定(48章)により自動診断済みのため、👎による重複登録をスキップしました。'
+        );
+      } else {
+        selfImprovementService.diagnoseFailure(
+          userPrompt,
+          msg.content,
+          reason || 'ユーザー低評価フィードバック',
+          {
+            memoriesUsedCount: (msg.usedMemories || []).length,
+            promptLengthChars: 1200,
+            engineMode: msg.engineMode || 'native_gpu',
+          }
+        );
+        systemLogger.warn('SELF_IMPROVEMENT', `ユーザーから低評価(👎)を受信 (理由: ${reason || '未指定'})。改善ルーターに記録しました。`);
+      }
     }
 
     setFeedbackFeedbackId(null);

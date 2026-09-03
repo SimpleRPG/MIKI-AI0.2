@@ -398,6 +398,18 @@ class SelfImprovementService {
   } {
     const diagnosis = this.computeDiagnosis(userMessage, assistantResponse, errorDetails, contextInfo);
 
+    // 二重登録防止: 直近(10秒以内)で同一の userMessage と assistantResponse の failure_diagnosis が存在する場合はスキップ
+    const recentDuplicate = this.records.find(
+      (r) =>
+        r.type === 'failure_diagnosis' &&
+        r.baseline === userMessage &&
+        r.candidate === assistantResponse &&
+        Date.now() - r.timestamp < 10000
+    );
+    if (recentDuplicate) {
+      return diagnosis;
+    }
+
     const record: SelfImprovementRecord = {
       id: 'diag_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       timestamp: Date.now(),

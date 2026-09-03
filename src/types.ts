@@ -1036,6 +1036,7 @@ export interface CompletionEvaluation {
   detectedCodeTypes: string[]; // 'vba', 'typescript', 'python' など
   requiresExternalVerification: boolean;
   evaluatedAt: number;
+  autoDiagnosedAt?: number; // 48章: FAILED/BLOCKED自動検出で診断済みの場合に記録（手動👎時の二重登録防止）
   manuallyOverridden?: boolean;
 }
 
