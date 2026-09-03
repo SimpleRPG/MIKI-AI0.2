@@ -70,6 +70,7 @@ import {
 import { regressionBenchmarkService } from '../services/regressionBenchmarkService';
 import { nativeBackgroundService } from '../services/nativeBackgroundService';
 import { toolsService } from '../services/toolsService';
+import { syntheticDataService } from '../services/syntheticDataService';
 import { retrieveScoredMemories } from '../utils/memoryRetrieval';
 
 export interface SelfImprovementModalProps {
@@ -155,6 +156,8 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   const [splitStats, setSplitStats] = useState<TrainingDataSplitStats>(() =>
     selfImprovementService.getSplitStats()
   );
+  const [isGeneratingSynthetic, setIsGeneratingSynthetic] = useState(false);
+  const [syntheticMessage, setSyntheticMessage] = useState<string | null>(null);
 
   // 世代管理ステート
   const [generations, setGenerations] = useState<ModelGeneration[]>([]);
@@ -467,6 +470,27 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
       `✓ クリーンアップ完了: 重複除外 ${res.removedDuplicates}件, 低品質除外 ${res.prunedLowQuality}件 (現在有効データ: ${res.afterCount}件)`
     );
     setTimeout(() => setCleanupMessage(null), 5000);
+  };
+
+  const handleGenerateSyntheticBatch = async () => {
+    setIsGeneratingSynthetic(true);
+    setSyntheticMessage(null);
+    try {
+      const summary = await syntheticDataService.generateSyntheticBatch({
+        batchSize: 6,
+        testWithLocalModel: true,
+      });
+      setTrainingSamples(selfImprovementService.getTrainingSamples());
+      setSplitStats(selfImprovementService.getSplitStats());
+      setSyntheticMessage(
+        `✓ 弱点分野「${summary.weaknessCategory}」の練習問題バッチを通常プログラムで作成・機械検証完了！ (+${summary.approvedCount}件の高品質教材を自動登録 / ${summary.durationMs}ms)`
+      );
+      setTimeout(() => setSyntheticMessage(null), 8000);
+    } catch (err: any) {
+      setSyntheticMessage(`❌ 合成教材の生成中にエラーが発生しました: ${err?.message || err}`);
+    } finally {
+      setIsGeneratingSynthetic(false);
+    }
   };
 
   const handleAutoExtractSkills = () => {
@@ -2930,8 +2954,26 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                   const approvedCount = trainingSamples.filter((s) => s.approved).length;
                   const threshold = 50;
                   const pct = Math.min(100, Math.round((approvedCount / threshold) * 100));
+
+                  // source 別内訳の計算 (文書33節 & 要件5)
+                  const localCount = trainingSamples.filter(
+                    (s) => !s.source || s.source === 'local_user' || s.source === 'autonomous_cycle'
+                  ).length;
+                  const teacherCount = trainingSamples.filter((s) => s.source === 'external_teacher').length;
+                  const syntheticCount = trainingSamples.filter((s) => s.source === 'synthetic').length;
+
+                  // 弱点検出情報
+                  const weakness = syntheticDataService.detectWeaknessCategory();
+
+                  // synthetic 教材のカテゴリ分布
+                  const synSamples = trainingSamples.filter((s) => s.source === 'synthetic');
+                  const synCats: Record<string, number> = {};
+                  synSamples.forEach((s) => {
+                    synCats[s.category] = (synCats[s.category] || 0) + 1;
+                  });
+
                   return (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-slate-300">
                           有効学習サンプル数: <strong className="text-slate-100 font-mono">{trainingSamples.length}件</strong> (承認済み: <strong className="text-amber-300 font-mono">{approvedCount}件</strong> / 次期学習推奨閾値: <strong className="text-slate-200 font-mono">{threshold}件</strong>)
@@ -2945,6 +2987,111 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                           className={`h-full transition-all duration-300 ${approvedCount >= threshold ? 'bg-emerald-500' : 'bg-amber-500'}`}
                           style={{ width: `${pct}%` }}
                         />
+                      </div>
+
+                      {/* Source 別内訳バッジ (実会話 / external_teacher / synthetic) */}
+                      <div className="pt-2 border-t border-slate-800/60">
+                        <div className="flex items-center justify-between text-[11px] mb-1.5">
+                          <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-amber-400" />
+                            <span>教材データソース別内訳 (設計思想 33節・53節)</span>
+                          </span>
+                          <span className="text-slate-400 text-[10px]">
+                            機械検証済み合成データは高信頼(high)として学習対象
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="p-2.5 rounded-lg bg-sky-950/40 border border-sky-800/60 flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <div className="text-[11px] font-bold text-sky-300 flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-sky-400" />
+                                <span>実会話 / 端末対話</span>
+                              </div>
+                              <div className="text-[9px] text-slate-400">ユーザー操作・修復ログ</div>
+                            </div>
+                            <span className="text-sm font-bold font-mono text-sky-200">{localCount}件</span>
+                          </div>
+
+                          <div className="p-2.5 rounded-lg bg-purple-950/40 border border-purple-800/60 flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <div className="text-[11px] font-bold text-purple-300 flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-purple-400" />
+                                <span>外部教師 (Gemini)</span>
+                              </div>
+                              <div className="text-[9px] text-slate-400">抽象化弱点リクエスト</div>
+                            </div>
+                            <span className="text-sm font-bold font-mono text-purple-200">{teacherCount}件</span>
+                          </div>
+
+                          <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/60 flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <div className="text-[11px] font-bold text-emerald-300 flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                <span>合成データ工場 (自律練習)</span>
+                              </div>
+                              <div className="text-[9px] text-slate-400">通常プログラム確定正解</div>
+                            </div>
+                            <span className="text-sm font-bold font-mono text-emerald-200">{syntheticCount}件</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 合成教材工場・弱点集中生成状況カード */}
+                      <div className="p-3 rounded-lg bg-slate-900/90 border border-emerald-900/40 space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-emerald-300 flex items-center gap-1">
+                                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>弱点優先・自動練習問題パイプライン</span>
+                              </span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-900/60 text-emerald-200 border border-emerald-700/60 font-mono">
+                                最優先弱点: {weakness.targetCategory} (70%集中生成)
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 leading-tight">
+                              Qwenに正解を作らせず、通常プログラム（確定計算・JSONスキーマ・ツール選定・記憶調停）で確定正解を作成・機械検証します。
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={handleGenerateSyntheticBatch}
+                            disabled={isGeneratingSynthetic}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs flex items-center gap-1.5 font-bold transition-all shadow-md shrink-0"
+                            title="深い睡眠時を待たずに、現在の最優先弱点分野に対する練習問題バッチを即時作成・機械検証します"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingSynthetic ? 'animate-spin' : ''}`} />
+                            <span>{isGeneratingSynthetic ? '機械検証中...' : '🏭 弱点練習問題を即時生成'}</span>
+                          </button>
+                        </div>
+
+                        {syntheticMessage && (
+                          <div className="p-2 rounded bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs font-mono animate-in fade-in">
+                            {syntheticMessage}
+                          </div>
+                        )}
+
+                        {/* 合成教材カテゴリ別分布 */}
+                        {syntheticCount > 0 && (
+                          <div className="flex items-center gap-2 flex-wrap pt-1 text-[10px] text-slate-400">
+                            <span className="text-slate-300 font-semibold">合成教材内訳:</span>
+                            {Object.entries(synCats).map(([cat, cnt]) => (
+                              <span
+                                key={cat}
+                                className={`px-1.5 py-0.5 rounded border font-mono ${
+                                  cat === weakness.targetCategory ||
+                                  (weakness.targetCategory === 'json_transform' && cat === 'code') ||
+                                  (weakness.targetCategory === 'tool_selection' && cat === 'tool_use')
+                                    ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300 font-bold'
+                                    : 'bg-slate-800/80 border-slate-700 text-slate-300'
+                                }`}
+                              >
+                                {cat}: {cnt}件
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -3109,6 +3256,19 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                                 <span className="font-semibold text-slate-200 truncate max-w-xs">
                                   Q: {sample.instruction}
                                 </span>
+                                {sample.source === 'synthetic' ? (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 font-medium">
+                                    🏭 合成教材 (機械検証済)
+                                  </span>
+                                ) : sample.source === 'external_teacher' ? (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-950/80 text-purple-300 border border-purple-700/60 font-medium">
+                                    🎓 外部教師
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-sky-950/80 text-sky-300 border border-sky-700/60 font-medium">
+                                    💬 実会話/端末対話
+                                  </span>
+                                )}
                                 {sample.failureReason && (
                                   <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60 font-mono">
                                     {sample.failureReason.length > 25 ? `${sample.failureReason.substring(0, 25)}...` : sample.failureReason}

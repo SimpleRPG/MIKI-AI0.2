@@ -18,6 +18,7 @@ import { skillsService } from './skillsService';
 import { regressionBenchmarkService } from './regressionBenchmarkService';
 import { nativeLlmService } from './nativeLlmService';
 import { webLLMService } from './webLlmService';
+import { syntheticDataService } from './syntheticDataService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -396,6 +397,7 @@ export class BackgroundWorkerService {
     let regressionReport: RegressionSuiteRunReport | null = null;
     let deepSleepExecuted = false;
     let deepSleepSkippedReason: string | null = null;
+    let syntheticCreatedCount = 0;
 
     try {
       // ==========================================
@@ -560,6 +562,21 @@ export class BackgroundWorkerService {
         } catch (benchErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '自律回帰ベンチマーク実行中に例外が発生しました', benchErr);
         }
+
+        // Step 6.5: 端末内 合成教材生成パイプライン (設計思想 33節・53節 フェーズ7)
+        if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+        syntheticCreatedCount = 0;
+        try {
+          const synSummary = await syntheticDataService.runDeepSleepSyntheticCycle();
+          if (synSummary && synSummary.approvedCount > 0) {
+            syntheticCreatedCount = synSummary.approvedCount;
+            weaknessFound.push(
+              `[合成学習データ工場] 弱点「${synSummary.weaknessCategory}」に偏らせた練習問題を生成 ➔ ${synSummary.approvedCount}件の高品質教材を自動登録`
+            );
+          }
+        } catch (synErr: any) {
+          systemLogger.warn('SELF_IMPROVEMENT', '合成教材生成パイプライン実行中に例外が発生しました', synErr);
+        }
       }
 
       // Step 7: 学習教材の蓄積しきい値チェック
@@ -567,7 +584,7 @@ export class BackgroundWorkerService {
 
       const durationMs = Date.now() - startTime;
       const summaryText = deepSleepExecuted
-        ? `自律サイクル完了 [深い睡眠]: 記憶整理(${consolidatedCount}件), グラフ接続(+${graphLinksCreated}件), 弱点検証(${simulatedCount}件), スキル抽出(+${extractedSkillsCount}件)${regressionReport ? `, 回帰スコア(${regressionReport.overallScore}点)` : ''}`
+        ? `自律サイクル完了 [深い睡眠]: 記憶整理(${consolidatedCount}件), グラフ接続(+${graphLinksCreated}件), 弱点検証(${simulatedCount}件), スキル抽出(+${extractedSkillsCount}件)${syntheticCreatedCount ? `, 合成教材(+${syntheticCreatedCount}件)` : ''}${regressionReport ? `, 回帰スコア(${regressionReport.overallScore}点)` : ''}`
         : `自律サイクル完了 [浅い睡眠のみ]: 記憶整理(${consolidatedCount}件), グラフ接続(+${graphLinksCreated}件), スキル抽出(+${extractedSkillsCount}件) (※深い睡眠保留: ${deepSleepSkippedReason || '条件未達'})`;
 
       const logRecord: BackgroundTaskExecutionLog = {
@@ -595,6 +612,7 @@ export class BackgroundWorkerService {
           trainingThresholdReached: thresholdCheck.thresholdReached,
           trainingCurrentCount: thresholdCheck.currentCount,
           trainingTargetThreshold: thresholdCheck.threshold,
+          syntheticGeneratedCount: syntheticCreatedCount,
           weaknessFound,
         },
       };

@@ -317,7 +317,7 @@ export interface TrainingSampleJSONL {
   outputTarget: string;
   category: 'chat' | 'code' | 'vba' | 'retrieval' | 'correction' | 'tool_use';
   reliability: 'high' | 'medium' | 'low';
-  source?: 'local_user' | 'autonomous_cycle' | 'external_teacher' | 'benchmark_feedback' | string;
+  source?: 'local_user' | 'autonomous_cycle' | 'external_teacher' | 'synthetic' | 'benchmark_feedback' | string;
   approved: boolean;
   split?: 'train' | 'validation' | 'test'; // 設計思想 7: 学習・検証・テストの厳格なデータ分離 (リーク防止)
   originalFailureOutput?: string;
@@ -415,6 +415,47 @@ export interface TeacherUsageRecord {
   verifiedCount: number;
   success: boolean;
   notes?: string;
+}
+
+/**
+ * 端末内 合成教材生成パイプライン (設計思想 33節・53節 フェーズ7)
+ * データ状態遷移: GENERATED → VERIFIED → CANDIDATE → APPROVED / REJECTED
+ */
+export type SyntheticProblemStatus = 'GENERATED' | 'VERIFIED' | 'CANDIDATE' | 'APPROVED' | 'REJECTED';
+export type SyntheticProblemCategory = 'math' | 'json_transform' | 'string_manipulation' | 'tool_selection' | 'memory_conflict';
+
+export interface SyntheticProblem {
+  id: string;
+  category: SyntheticProblemCategory;
+  instruction: string;
+  inputContext?: string;
+  expectedOutput: string; // 通常プログラムで確定的に作成された模範正解 (Qwenには作らせない)
+  sampleCategory: 'chat' | 'code' | 'vba' | 'retrieval' | 'correction' | 'tool_use';
+  status: SyntheticProblemStatus;
+  generatorType: 'deterministic_program' | 'approved_reference';
+  verificationDetails?: {
+    method: string;
+    passed: boolean;
+    error?: string;
+    testedWithModel?: boolean;
+    modelAnswer?: string;
+  };
+  rejectionReason?: string;
+  createdAt: number;
+  verifiedAt?: number;
+}
+
+export interface SyntheticBatchSummary {
+  id: string;
+  timestamp: number;
+  weaknessCategory: string;
+  weaknessReason: string;
+  generatedCount: number;
+  verifiedCount: number;
+  candidateCount: number;
+  approvedCount: number;
+  durationMs: number;
+  problems: SyntheticProblem[];
 }
 
 /**
@@ -571,6 +612,7 @@ export interface BackgroundTaskExecutionLog {
     trainingThresholdReached?: boolean;
     trainingCurrentCount?: number;
     trainingTargetThreshold?: number;
+    syntheticGeneratedCount?: number;
     weaknessFound?: string[];
   };
 }
