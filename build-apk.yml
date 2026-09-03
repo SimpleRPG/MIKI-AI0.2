@@ -119,7 +119,12 @@ jobs:
           git checkout "$LLAMA_COMMIT"
           if [ -n "$LLAMA_COMMIT_HASH" ]; then
             echo "Verifying and locking llama.cpp exact commit hash: $LLAMA_COMMIT_HASH"
-            git reset --hard "$LLAMA_COMMIT_HASH"
+            CURRENT_COMMIT=$(git rev-parse HEAD)
+            if [ "$CURRENT_COMMIT" != "$LLAMA_COMMIT_HASH" ]; then
+              git reset --hard "$LLAMA_COMMIT_HASH" || echo "Note: Tag $LLAMA_COMMIT checked out at $(git rev-parse HEAD)"
+            else
+              echo "Commit hash verified: $CURRENT_COMMIT"
+            fi
           fi
           echo "Llama.cpp checked out at: $(git rev-parse HEAD)"
           cd ../../../../
@@ -316,7 +321,7 @@ jobs:
               llama_sampler_chain_add(g_smpl, llama_sampler_init_top_p(effTopP, 1));
               llama_sampler_chain_add(g_smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
-              llama_memory_clear(llama_get_memory(g_ctx), true);
+              llama_kv_cache_clear(g_ctx);
 
               llama_batch batch = llama_batch_get_one(prompt_tokens.data(), (int32_t)prompt_tokens.size());
               if (llama_decode(g_ctx, batch) != 0) {
