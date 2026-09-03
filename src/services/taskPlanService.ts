@@ -115,6 +115,34 @@ class TaskPlanService {
   }
 
   /**
+   * ゴール文字列から制約事項を抽出
+   */
+  private extractConstraints(goal: string): string[] {
+    const constraints: string[] = [];
+    const lines = goal.split('\n');
+    for (const line of lines) {
+      if (/制約|禁止|ただし|前提|条件|ルール/i.test(line)) {
+        constraints.push(line.replace(/^[・\-*\d.]\s*/, '').trim());
+      }
+    }
+    return constraints.slice(0, 5);
+  }
+
+  /**
+   * ゴール文字列から受け入れ条件を抽出
+   */
+  private extractAcceptanceConditions(goal: string): string[] {
+    const conditions: string[] = [];
+    const lines = goal.split('\n');
+    for (const line of lines) {
+      if (/受け入れ|完了条件|ゴール|要件|必須/i.test(line)) {
+        conditions.push(line.replace(/^[・\-*\d.]\s*/, '').trim());
+      }
+    }
+    return conditions.slice(0, 5);
+  }
+
+  /**
    * ゴールとコンテキストから多段推論タスク計画を立案・生成
    */
   public createPlan(goal: string, context?: PlanGenerationContext): TaskPlan {
@@ -129,6 +157,13 @@ class TaskPlanService {
       currentStepIndex: 0,
       totalSteps: steps.length,
       completedSteps: 0,
+      claimLedger: {
+        confirmed: [],
+        hypotheses: [],
+        unconfirmed: [],
+      },
+      constraints: this.extractConstraints(goal),
+      acceptanceConditions: this.extractAcceptanceConditions(goal),
       createdAt: Date.now(),
       updatedAt: Date.now(),
       checkpoint: {
@@ -297,7 +332,104 @@ class TaskPlanService {
   }
 
   /**
+   * claimLedgerを数行〜十数行のコンパクトな要約文字列にフォーマット
+   * 原文を毎回積まず、トークン消費の爆発を防ぐ核心部
+   */
+  public formatClaimLedger(ledger: TaskPlan['claimLedger']): string {
+    const confirmed = ledger.confirmed.length > 0
+      ? ledger.confirmed.map((c) => `  - [確定] ${c}`).join('\n')
+      : '  - (なし)';
+    const hypotheses = ledger.hypotheses.length > 0
+      ? ledger.hypotheses.map((h) => `  - [仮説] ${h}`).join('\n')
+      : '  - (なし)';
+    const unconfirmed = ledger.unconfirmed.length > 0
+      ? ledger.unconfirmed.map((u) => `  - [未確認] ${u}`).join('\n')
+      : '  - (なし)';
+
+    return `■ 確定事実 (Confirmed Claims):\n${confirmed}\n■ 仮説事項 (Hypotheses):\n${hypotheses}\n■ 未確認・要調査 (Unconfirmed):\n${unconfirmed}`;
+  }
+
+  /**
+   * LLMによる短縮論理抽出用のプロンプトを構築
+   */
+  public buildClaimExtractionPrompt(
+    stepTitle: string,
+    stepResultText: string,
+    actionType?: string
+  ): string {
+    return `【論理台帳の更新抽出】
+以下のステップ実行結果を分析し、
+1. 確定した事実 (confirmed): 明確に確認・成功・立証された事項
+2. 仮説段階 (hypotheses): まだ推測や推論段階のもの
+3. 未確認・要調査事項 (unconfirmed): 今後の確認や検証が必要な事項
+をそれぞれ1〜3行以内の簡潔な箇条書きで抽出してください。
+
+ステップ: ${stepTitle} (${actionType || 'analysis'})
+結果抜粋:
+${stepResultText.slice(0, 1000)}
+
+出力フォーマット (各行ハイフン始まり):
+[確定]
+- ...
+[仮説]
+- ...
+[未確認]
+- ...`;
+  }
+
+  /**
+   * テキストまたはLLM応答から確定事実・仮説・未確認事項をパース
+   */
+  public parseClaimsFromText(
+    rawText: string,
+    stepTitle: string,
+    success: boolean
+  ): { confirmed: string[]; hypotheses: string[]; unconfirmed: string[] } {
+    const confirmed: string[] = [];
+    const hypotheses: string[] = [];
+    const unconfirmed: string[] = [];
+
+    let currentSection: 'confirmed' | 'hypotheses' | 'unconfirmed' | null = null;
+    const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean);
+
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      if (line.includes('[確定]') || lower.includes('confirmed') || line.startsWith('確定:')) {
+        currentSection = 'confirmed';
+        continue;
+      } else if (line.includes('[仮説]') || lower.includes('hypotheses') || line.startsWith('仮説:')) {
+        currentSection = 'hypotheses';
+        continue;
+      } else if (line.includes('[未確認]') || lower.includes('unconfirmed') || line.startsWith('未確認:')) {
+        currentSection = 'unconfirmed';
+        continue;
+      }
+
+      if (line.startsWith('-') || line.startsWith('・') || line.startsWith('*') || /^\d+\./.test(line)) {
+        const clean = line.replace(/^[-・*\d.]\s*/, '').trim();
+        if (!clean) continue;
+        if (currentSection === 'confirmed') confirmed.push(clean);
+        else if (currentSection === 'hypotheses') hypotheses.push(clean);
+        else if (currentSection === 'unconfirmed') unconfirmed.push(clean);
+      }
+    }
+
+    // パースで1件も取れなかった場合の確実なフォールバック
+    if (confirmed.length === 0 && hypotheses.length === 0 && unconfirmed.length === 0) {
+      const summarySnippet = rawText.slice(0, 120).replace(/[\r\n]+/g, ' ').trim();
+      if (success) {
+        confirmed.push(`${stepTitle}: ${summarySnippet}`);
+      } else {
+        unconfirmed.push(`${stepTitle}で課題検知: ${summarySnippet}`);
+      }
+    }
+
+    return { confirmed, hypotheses, unconfirmed };
+  }
+
+  /**
    * 現在のステップを進行し、結果を記録して次のステップを準備
+   * claimLedger (確定事実・仮説・未確認事項) を更新
    */
   public advanceStep(
     plan: TaskPlan,
@@ -307,6 +439,11 @@ class TaskPlanService {
       error?: string;
       durationMs?: number;
       confidenceScore?: number;
+      extractedClaims?: {
+        confirmed?: string[];
+        hypotheses?: string[];
+        unconfirmed?: string[];
+      };
     }
   ): StepAdvanceResult {
     const updatedPlan: TaskPlan = JSON.parse(JSON.stringify(plan));
@@ -328,6 +465,50 @@ class TaskPlanService {
     currentStep.durationMs = stepResult.durationMs || 0;
     currentStep.confidenceScore = stepResult.confidenceScore;
 
+    // claimLedger の整合性保証
+    if (!updatedPlan.claimLedger) {
+      updatedPlan.claimLedger = {
+        confirmed: [],
+        hypotheses: [],
+        unconfirmed: [],
+      };
+    }
+
+    // claimLedger の更新 (LLM抽出結果 または ルールベース解析)
+    const claims = stepResult.extractedClaims || this.parseClaimsFromText(
+      stepResult.resultText,
+      currentStep.title,
+      stepResult.success
+    );
+
+    if (claims.confirmed && claims.confirmed.length > 0) {
+      for (const c of claims.confirmed) {
+        if (!updatedPlan.claimLedger.confirmed.includes(c)) {
+          updatedPlan.claimLedger.confirmed.push(c);
+        }
+      }
+    }
+    if (claims.hypotheses && claims.hypotheses.length > 0) {
+      for (const h of claims.hypotheses) {
+        if (!updatedPlan.claimLedger.hypotheses.includes(h)) {
+          updatedPlan.claimLedger.hypotheses.push(h);
+        }
+      }
+    }
+    if (claims.unconfirmed && claims.unconfirmed.length > 0) {
+      for (const u of claims.unconfirmed) {
+        if (!updatedPlan.claimLedger.unconfirmed.includes(u)) {
+          updatedPlan.claimLedger.unconfirmed.push(u);
+        }
+      }
+    }
+    // 確定した事実と重複・解決した未確認事項をクリーンアップ
+    if (claims.confirmed && claims.confirmed.length > 0) {
+      updatedPlan.claimLedger.unconfirmed = updatedPlan.claimLedger.unconfirmed.filter(
+        (u) => !claims.confirmed!.some((c) => c.includes(u) || u.includes(c))
+      );
+    }
+
     if (stepResult.success) {
       updatedPlan.completedSteps = updatedPlan.steps.filter((s) => s.status === 'completed').length;
     }
@@ -342,6 +523,7 @@ class TaskPlanService {
       stateData: {
         lastStepTitle: currentStep.title,
         lastResultSnippet: stepResult.resultText.slice(0, 100),
+        confirmedClaimsCount: updatedPlan.claimLedger.confirmed.length,
       },
     };
 
@@ -368,11 +550,16 @@ class TaskPlanService {
     systemLogger.step(
       currentIndex + 1,
       updatedPlan.totalSteps,
-      `タスクステップ進捗: [${currentStep.title}] -> ${currentStep.status}`,
+      `タスクステップ進捗: [${currentStep.title}] -> ${currentStep.status} (確定事実: ${updatedPlan.claimLedger.confirmed.length}件)`,
       {
         planId: updatedPlan.id,
         durationMs: currentStep.durationMs,
         isDone: !nextStep,
+        claimLedgerSummary: {
+          confirmed: updatedPlan.claimLedger.confirmed.length,
+          hypotheses: updatedPlan.claimLedger.hypotheses.length,
+          unconfirmed: updatedPlan.claimLedger.unconfirmed.length,
+        },
       }
     );
 
@@ -416,11 +603,13 @@ class TaskPlanService {
 
   /**
    * ステップ実行用のプロンプトを構築
+   * 前ステップの生のresult全文ではなくclaimLedgerの要約を渡し、
+   * トークン消費の爆発を防ぎ線形増加に抑える
    */
   public buildStepPrompt(
     plan: TaskPlan,
     step: TaskStep,
-    previousStepOutputs: { stepNumber: number; title: string; output: string }[]
+    previousStepOutputs?: { stepNumber: number; title: string; output: string }[]
   ): string {
     let prompt = `【多段推論タスク計画】
 目標: ${plan.goal}
@@ -429,15 +618,26 @@ class TaskPlanService {
 実行種別: ${step.actionType || 'analysis'}
 `;
 
-    if (previousStepOutputs.length > 0) {
-      prompt += `\n【これまでのステップ成果】:\n`;
-      previousStepOutputs.forEach((prev) => {
-        prompt += `--- [Step ${prev.stepNumber}: ${prev.title}] ---\n${prev.output.trim()}\n\n`;
-      });
+    if (plan.constraints && plan.constraints.length > 0) {
+      prompt += `\n【制約条件】:\n` + plan.constraints.map((c) => `・${c}`).join('\n') + '\n';
+    }
+    if (plan.acceptanceConditions && plan.acceptanceConditions.length > 0) {
+      prompt += `\n【受け入れ条件】:\n` + plan.acceptanceConditions.map((a) => `・${a}`).join('\n') + '\n';
     }
 
-    prompt += `\n【このステップの指示】:
-上記目標と過去成果を踏まえ、「${step.title}」を精密に実行してください。
+    // 生の過去出力を全て積むのではなく、論理台帳（claimLedger）の要約を渡す
+    prompt += `\n【これまでの論理台帳 (Claim Ledger)】:\n`;
+    prompt += this.formatClaimLedger(plan.claimLedger);
+
+    // 直前ステップのみ、補助としてタイトルと直近要点（3行以内）を添える
+    if (previousStepOutputs && previousStepOutputs.length > 0) {
+      const lastOutput = previousStepOutputs[previousStepOutputs.length - 1];
+      const snippet = lastOutput.output.slice(0, 160).replace(/[\r\n]+/g, ' ').trim();
+      prompt += `\n\n【直前ステップ概要】: [Step ${lastOutput.stepNumber}: ${lastOutput.title}] -> ${snippet}`;
+    }
+
+    prompt += `\n\n【このステップの指示】:
+上記目標と論理台帳の確定事項を踏まえ、「${step.title}」を精密に実行してください。
 不要な前置きを省き、要点を構造化して明確に記述してください。`;
 
     return prompt;
@@ -475,6 +675,109 @@ class TaskPlanService {
       console.warn('taskPlanService: loadCheckpoint failed', e);
       return null;
     }
+  }
+
+  /**
+   * 中断されたチェックポイントからタスク計画を復元して再開
+   * - storageServiceから該当planIdのチェックポイントとプラン本体を読み出す
+   * - currentStepIndexとclaimLedgerを復元し、そこからadvanceStepを再開できる状態で返す
+   * - 該当プランが見つからない、またはstatusが'completed'/'failed'の場合はnullを返す
+   */
+  public resumeFromCheckpoint(planId: string): TaskPlan | null {
+    const plan = this.loadCheckpoint(planId);
+    if (!plan) return null;
+
+    // 該当プランが見つからない、またはstatusが'completed'/'failed'の場合はnullを返す
+    if (plan.status === 'completed' || plan.status === 'failed') {
+      return null;
+    }
+
+    // claimLedgerの復元・整合性保証
+    if (!plan.claimLedger) {
+      plan.claimLedger = {
+        confirmed: [],
+        hypotheses: [],
+        unconfirmed: [],
+      };
+    }
+
+    // 未完了の最初のステップ（in_progress または pending）を再開対象に決定
+    const resumeIndex = plan.steps.findIndex(
+      (s) => s.status === 'in_progress' || s.status === 'pending'
+    );
+    if (resumeIndex === -1) {
+      return null;
+    }
+
+    plan.currentStepIndex = resumeIndex;
+    plan.steps[resumeIndex].status = 'in_progress';
+    plan.status = 'executing';
+    plan.updatedAt = Date.now();
+
+    this.saveCheckpoint(plan);
+
+    systemLogger.step(
+      resumeIndex + 1,
+      plan.totalSteps,
+      `タスク計画チェックポイントから再開: [${plan.steps[resumeIndex].title}] (確定事実: ${plan.claimLedger.confirmed.length}件)`,
+      {
+        planId: plan.id,
+        currentStepIndex: resumeIndex,
+        confirmedClaimsCount: plan.claimLedger.confirmed.length,
+      }
+    );
+
+    return plan;
+  }
+
+  /**
+   * 実行中の計画を一時中断(paused)状態にしてチェックポイント保存
+   */
+  public pausePlan(planId: string): TaskPlan | null {
+    const plan = this.loadCheckpoint(planId);
+    if (!plan) return null;
+    if (plan.status === 'completed' || plan.status === 'failed') return null;
+
+    plan.status = 'paused';
+    // 実行中ステップがあればpendingに戻して保存（再開時に清潔に再開可能）
+    if (plan.steps[plan.currentStepIndex]?.status === 'in_progress') {
+      plan.steps[plan.currentStepIndex].status = 'pending';
+    }
+    plan.updatedAt = Date.now();
+    this.saveCheckpoint(plan);
+
+    systemLogger.info('STEP', `タスク計画を一時停止(paused): [${planId}]`, {
+      currentStep: plan.currentStepIndex + 1,
+      totalSteps: plan.totalSteps,
+      claims: plan.claimLedger.confirmed.length,
+    });
+
+    return plan;
+  }
+
+  /**
+   * 再開可能なプランを検出 (paused または 未完了のexecuting)
+   */
+  public getResumablePlan(): TaskPlan | null {
+    const activeId = storageService.getItem(ACTIVE_PLAN_KEY);
+    if (activeId) {
+      const plan = this.loadCheckpoint(activeId);
+      if (plan && (plan.status === 'paused' || plan.status === 'executing')) {
+        const hasUnfinished = plan.steps.some(
+          (s) => s.status === 'pending' || s.status === 'in_progress'
+        );
+        if (hasUnfinished) return plan;
+      }
+    }
+
+    // 履歴からも探索
+    const history = this.listPlans();
+    const resumable = history.find(
+      (p) =>
+        (p.status === 'paused' || p.status === 'executing') &&
+        p.steps.some((s) => s.status === 'pending' || s.status === 'in_progress')
+    );
+    return resumable || null;
   }
 
   /**

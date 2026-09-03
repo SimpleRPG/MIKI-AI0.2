@@ -73,6 +73,7 @@ interface ChatPanelProps {
   onRejectToolExecution?: (requestId: string) => void;
   isMultiStepEnabled?: boolean;
   onToggleMultiStep?: () => void;
+  onResumeTaskPlan?: (planId: string) => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -101,6 +102,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onRejectToolExecution,
   isMultiStepEnabled = false,
   onToggleMultiStep,
+  onResumeTaskPlan,
 }) => {
   const [inputText, setInputText] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string; type: string; size: number }[]>([]);
@@ -820,7 +822,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   {/* Task Plan (Phase 3: Multi-step Reasoning) */}
                   {msg.taskPlan && (
                     <div className="mt-2.5">
-                      <TaskPlanCard plan={msg.taskPlan} />
+                      <TaskPlanCard plan={msg.taskPlan} onResume={onResumeTaskPlan} />
                     </div>
                   )}
 

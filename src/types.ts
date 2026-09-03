@@ -592,6 +592,12 @@ export interface TaskPlanCheckpoint {
   stateData?: Record<string, unknown>;
 }
 
+export interface TaskClaimLedger {
+  confirmed: string[];   // 確定した事実
+  hypotheses: string[];  // まだ仮説段階のもの
+  unconfirmed: string[]; // 未確認・要調査事項
+}
+
 export type TaskPlanStatus = 'planning' | 'executing' | 'completed' | 'failed' | 'paused';
 
 export interface TaskPlan {
@@ -600,6 +606,13 @@ export interface TaskPlan {
   status: TaskPlanStatus;
   steps: TaskStep[];
   currentStepIndex: number;
+  claimLedger: {
+    confirmed: string[];   // 確定した事実
+    hypotheses: string[];  // まだ仮説段階のもの
+    unconfirmed: string[]; // 未確認・要調査事項
+  };
+  constraints?: string[];
+  acceptanceConditions?: string[];
   checkpoint?: TaskPlanCheckpoint;
   totalSteps: number;
   completedSteps: number;

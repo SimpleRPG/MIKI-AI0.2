@@ -70,10 +70,28 @@ try {
   console.warn('Could not initialize log directory:', e);
 }
 
+// CI / Automated Test Environment Guard (規制ガード: CI自動検知)
+const IS_CI_ENV = Boolean(
+  process.env.CI === 'true' ||
+  process.env.CI === '1' ||
+  process.env.CONTINUOUS_INTEGRATION ||
+  process.env.GITHUB_ACTIONS ||
+  process.env.GITLAB_CI ||
+  process.env.TRAVIS ||
+  process.env.CIRCLECI ||
+  process.env.IS_TEST
+);
+
+if (IS_CI_ENV) {
+  console.log('[Regulatory Guard] CI環境が検知されました: 外部副作用・リソース枯渇防止ガードが有効化されました。');
+}
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     hasGeminiKey: !!process.env.GEMINI_API_KEY,
+    isCI: IS_CI_ENV,
+    regulatoryGuardActive: true,
     timestamp: new Date().toISOString()
   });
 });

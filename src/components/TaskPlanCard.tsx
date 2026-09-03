@@ -11,16 +11,21 @@ import {
   Code2,
   Wrench,
   FileText,
+  Play,
+  HelpCircle,
+  Lightbulb,
 } from 'lucide-react';
 import { TaskPlan, TaskStep, TaskStepStatus } from '../types';
 
 interface TaskPlanCardProps {
   plan: TaskPlan;
   onSelectStep?: (step: TaskStep) => void;
+  onResume?: (planId: string) => void;
 }
 
-export const TaskPlanCard: React.FC<TaskPlanCardProps> = ({ plan }) => {
+export const TaskPlanCard: React.FC<TaskPlanCardProps> = ({ plan, onResume }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
+  const [isLedgerExpanded, setIsLedgerExpanded] = useState<boolean>(false);
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
 
   const getStatusIcon = (status: TaskStepStatus) => {
@@ -87,6 +92,16 @@ export const TaskPlanCard: React.FC<TaskPlanCardProps> = ({ plan }) => {
   const progressPercent =
     plan.totalSteps > 0 ? Math.round((plan.completedSteps / plan.totalSteps) * 100) : 0;
 
+  const isPaused = plan.status === 'paused';
+  const hasIncompleteSteps = plan.steps.some(
+    (s) => s.status === 'pending' || s.status === 'in_progress'
+  );
+  const canResume = (isPaused || plan.status === 'executing') && hasIncompleteSteps && !!onResume;
+
+  const confirmedCount = plan.claimLedger?.confirmed?.length || 0;
+  const hypothesesCount = plan.claimLedger?.hypotheses?.length || 0;
+  const unconfirmedCount = plan.claimLedger?.unconfirmed?.length || 0;
+
   return (
     <div className="my-2.5 rounded-xl border border-indigo-100 dark:border-indigo-950/60 bg-gradient-to-b from-indigo-50/40 to-white dark:from-indigo-950/20 dark:to-neutral-900/60 p-3 shadow-xs">
       {/* Header */}
@@ -103,18 +118,36 @@ export const TaskPlanCard: React.FC<TaskPlanCardProps> = ({ plan }) => {
               <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
                 {plan.completedSteps}/{plan.totalSteps} 完了 ({progressPercent}%)
               </span>
+              {isPaused && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-medium">
+                  一時停止中
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 rounded transition-colors"
-          title={isExpanded ? '折りたたむ' : '展開する'}
-        >
-          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
+        <div className="flex items-center gap-1">
+          {canResume && (
+            <button
+              type="button"
+              onClick={() => onResume && onResume(plan.id)}
+              className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors"
+              title="中断されたタスク計画を再開"
+            >
+              <Play className="w-3 h-3 fill-current" />
+              続きから再開
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 rounded transition-colors"
+            title={isExpanded ? '折りたたむ' : '展開する'}
+          >
+            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
 
       {/* Progress Bar */}
@@ -124,6 +157,74 @@ export const TaskPlanCard: React.FC<TaskPlanCardProps> = ({ plan }) => {
           style={{ width: `${progressPercent}%` }}
         />
       </div>
+
+      {/* Claim Ledger Accordion */}
+      {plan.claimLedger && (confirmedCount > 0 || hypothesesCount > 0 || unconfirmedCount > 0) && (
+        <div className="mb-2 rounded-lg border border-neutral-200/60 dark:border-neutral-800/80 bg-neutral-50/70 dark:bg-neutral-900/50 p-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setIsLedgerExpanded(!isLedgerExpanded)}
+            className="w-full flex items-center justify-between text-left select-none text-neutral-700 dark:text-neutral-300"
+          >
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-medium text-[11px]">📋 論理台帳 (Claim Ledger):</span>
+              {confirmedCount > 0 && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono">
+                  <CheckCircle2 className="w-2.5 h-2.5" /> 確定 {confirmedCount}
+                </span>
+              )}
+              {hypothesesCount > 0 && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono">
+                  <Lightbulb className="w-2.5 h-2.5" /> 仮説 {hypothesesCount}
+                </span>
+              )}
+              {unconfirmedCount > 0 && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 font-mono">
+                  <HelpCircle className="w-2.5 h-2.5" /> 未確認 {unconfirmedCount}
+                </span>
+              )}
+            </div>
+            <div className="text-neutral-400 shrink-0 ml-1">
+              {isLedgerExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </div>
+          </button>
+
+          {isLedgerExpanded && (
+            <div className="mt-2 pt-2 border-t border-neutral-200/40 dark:border-neutral-800/60 space-y-2 text-[11px]">
+              {confirmedCount > 0 && (
+                <div>
+                  <div className="font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5">確定事実:</div>
+                  <ul className="list-disc pl-4 space-y-0.5 text-neutral-600 dark:text-neutral-300">
+                    {plan.claimLedger.confirmed.map((item, idx) => (
+                      <li key={`conf_${idx}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {hypothesesCount > 0 && (
+                <div>
+                  <div className="font-semibold text-amber-600 dark:text-amber-400 mb-0.5">仮説段階:</div>
+                  <ul className="list-disc pl-4 space-y-0.5 text-neutral-600 dark:text-neutral-300">
+                    {plan.claimLedger.hypotheses.map((item, idx) => (
+                      <li key={`hyp_${idx}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {unconfirmedCount > 0 && (
+                <div>
+                  <div className="font-semibold text-blue-600 dark:text-blue-400 mb-0.5">未確認・要調査:</div>
+                  <ul className="list-disc pl-4 space-y-0.5 text-neutral-600 dark:text-neutral-300">
+                    {plan.claimLedger.unconfirmed.map((item, idx) => (
+                      <li key={`unconf_${idx}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Steps List */}
       {isExpanded && (
@@ -217,3 +318,4 @@ export const TaskPlanCard: React.FC<TaskPlanCardProps> = ({ plan }) => {
     </div>
   );
 };
+

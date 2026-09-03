@@ -403,6 +403,278 @@ export default function App() {
     setIsLoading(false);
   };
 
+  /**
+   * Phase 3: 多段推論タスク計画の実行ループ (新規実行 & チェックポイント再開の共通エンジン)
+   */
+  const executePlanLoop = async (
+    plan: TaskPlan,
+    assistantId: string,
+    initialGoal: string,
+    attachedFiles?: { name: string; content: string; type: string }[]
+  ) => {
+    const stepOutputs: { stepNumber: number; title: string; output: string }[] = [];
+
+    // 既に完了しているステップの成果物を復元
+    plan.steps.forEach((s) => {
+      if (s.status === 'completed' && s.result) {
+        stepOutputs.push({
+          stepNumber: s.stepNumber,
+          title: s.title,
+          output: s.result,
+        });
+      }
+    });
+
+    const planStartTime = performance.now();
+    const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
+    const activeMemories = memories.filter((m) => m.active);
+    const relevantMemories = retrieveRelevantMemories(initialGoal, activeMemories, {
+      limit: 6,
+      alwaysIncludePinned: true,
+      traverseGraph: true,
+      onlyApprovedForFacts: true,
+    });
+
+    for (let i = plan.currentStepIndex; i < plan.steps.length; i++) {
+      if (abortControllerRef.current?.signal.aborted) {
+        taskPlanService.pausePlan(plan.id);
+        systemLogger.warn('STEP', `多段推論タスク計画が一時停止(paused)されました [${plan.id}]`);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId
+              ? {
+                  ...msg,
+                  content: msg.content + '\n\n*(⏸ タスク計画を一時停止しチェックポイントを保存しました)*',
+                  isStreaming: false,
+                  taskPlan: taskPlanService.loadCheckpoint(plan.id) || plan,
+                }
+              : msg
+          )
+        );
+        setIsGenerating(false);
+        setIsLoading(false);
+        return;
+      }
+
+      const currentStep = plan.steps[i];
+      if (currentStep.status === 'completed') continue;
+
+      currentStep.status = 'in_progress';
+      plan.currentStepIndex = i;
+
+      // UI更新 (進行中ステップ表示)
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantId
+            ? {
+                ...msg,
+                taskPlan: { ...plan },
+                content: `⏳ [Step ${currentStep.stepNumber}/${plan.totalSteps}] **${currentStep.title}** を実行中...\n${currentStep.description}`,
+              }
+            : msg
+        )
+      );
+
+      const stepStartTime = performance.now();
+      let stepSuccess = true;
+      let stepResultText = '';
+      let stepError: string | undefined = undefined;
+
+      try {
+        if (currentStep.actionType === 'tool_execution' && currentStep.toolCall) {
+          // ツール実行ステップ
+          const toolRes = await toolsService.executeTool(
+            currentStep.toolCall.toolId,
+            currentStep.toolCall.params || {},
+            {
+              workspaceFiles,
+              onUpdateWorkspaceFile: handleUpdateFileContent,
+              userNickname: persona.userNickname,
+            },
+            { userConfirmed: true }
+          );
+          stepSuccess = toolRes.success;
+          stepResultText = toolRes.outputSummary;
+          if (!toolRes.success) {
+            stepError = toolRes.error;
+          }
+        } else {
+          // 推論・分析・生成・検証ステップ
+          // 生の全過去出力ではなく、claimLedgerの要約を注入（トークン消費の線形抑制）
+          const stepPrompt = taskPlanService.buildStepPrompt(plan, currentStep, stepOutputs);
+
+          if (engineMode === 'gemini_cloud') {
+            const res = await sendChatMessage({
+              prompt: stepPrompt,
+              history: [],
+              persona,
+              memories: relevantMemories,
+              workspaceFiles,
+              useSearch: false,
+              signal: abortControllerRef.current?.signal,
+              engineMode: 'gemini_cloud',
+            });
+            stepResultText = res.text || 'ステップ完了';
+          } else if (engineMode === 'native_gpu' && nativeLlmService.getActiveModelId()) {
+            let chunkText = '';
+            for await (const chunk of nativeLlmService.streamNativeChat(
+              [
+                { role: 'system', content: `あなたは優秀なAI相棒「${persona.name}」です。論理的かつ的確に出力してください。` },
+                { role: 'user', content: stepPrompt },
+              ],
+              { max_tokens: 384, temperature: 0.3 }
+            )) {
+              if (abortControllerRef.current?.signal.aborted) break;
+              chunkText += chunk;
+            }
+            stepResultText = chunkText || 'ステップ完了';
+          } else if (engineMode === 'webgpu' && webLLMService.isLoaded()) {
+            let chunkText = '';
+            for await (const chunk of webLLMService.streamChat(
+              [
+                { role: 'system', content: `あなたは優秀なAI相棒「${persona.name}」です。論理的かつ的確に出力してください。` },
+                { role: 'user', content: stepPrompt },
+              ],
+              { max_tokens: 384, temperature: 0.3 }
+            )) {
+              if (abortControllerRef.current?.signal.aborted) break;
+              chunkText += chunk;
+            }
+            stepResultText = chunkText || 'ステップ完了';
+          } else {
+            // 自律ルールベース
+            const isCodeStep = currentStep.actionType === 'code_generation';
+            stepResultText = generateSmartCompanionReply(
+              `${currentStep.title}: ${initialGoal}`,
+              persona,
+              relevantMemories,
+              isCodeStep,
+              attachedFiles
+            );
+          }
+        }
+      } catch (stepErr: any) {
+        stepSuccess = false;
+        stepError = stepErr?.message || String(stepErr);
+        stepResultText = `⚠️ 実行時エラー: ${stepError}`;
+      }
+
+      const stepDuration = Math.round(performance.now() - stepStartTime);
+      stepOutputs.push({
+        stepNumber: currentStep.stepNumber,
+        title: currentStep.title,
+        output: stepResultText,
+      });
+
+      // advanceStep でステータス更新 & claimLedger (確定事実・仮説・未確認事項) を更新 & チェックポイント保存
+      taskPlanService.advanceStep(plan, {
+        success: stepSuccess,
+        resultText: stepResultText,
+        error: stepError,
+        durationMs: stepDuration,
+      });
+
+      // 進行状況のUI更新
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantId
+            ? {
+                ...msg,
+                taskPlan: { ...plan },
+              }
+            : msg
+        )
+      );
+    }
+
+    // 全ステップ完了判定 & 統合サマリー生成
+    const planJudgement = taskPlanService.judgeCompletion(plan);
+    const totalPlanDuration = Math.round(performance.now() - planStartTime);
+
+    // 最終メッセージ構築
+    const synthesisOutput = stepOutputs[stepOutputs.length - 1]?.output || '';
+    const combinedSummary = `${planJudgement.summary}\n\n${synthesisOutput}`;
+
+    systemLogger.step(10, 10, '🧭 多段推論タスク計画完了', {
+      planId: plan.id,
+      totalSteps: plan.totalSteps,
+      completedSteps: plan.completedSteps,
+      totalDurationMs: totalPlanDuration,
+      confirmedClaims: plan.claimLedger.confirmed.length,
+    });
+
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === assistantId
+          ? {
+              ...msg,
+              content: combinedSummary,
+              taskPlan: plan,
+              isStreaming: false,
+              executionSteps: systemLogger.getCurrentSessionSteps(),
+              metrics: {
+                engine: `多段推論タスク計画 (${plan.completedSteps}/${plan.totalSteps}ステップ)`,
+                tokens: Math.round(combinedSummary.length / 3),
+                tokensPerSec: 50,
+                ttftMs: 50,
+                totalDurationMs: totalPlanDuration,
+              },
+            }
+          : msg
+      )
+    );
+
+    setIsLoading(false);
+    setIsGenerating(false);
+
+    // コードブロックの自動反映
+    const codeBlocks = extractCodeBlocks(combinedSummary);
+    if (codeBlocks.length > 0) {
+      handleApplyCode(codeBlocks);
+    }
+  };
+
+  /**
+   * 中断されたチェックポイントからのタスク計画再開ハンドラー
+   */
+  const handleResumeTaskPlan = async (planId: string) => {
+    const resumed = taskPlanService.resumeFromCheckpoint(planId);
+    if (!resumed) {
+      systemLogger.warn('STEP', `チェックポイントからの再開に失敗: [${planId}]`);
+      return;
+    }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    setIsGenerating(true);
+    setIsLoading(true);
+
+    const assistantId = 'msg_asst_resume_' + Date.now();
+    currentAssistantIdRef.current = assistantId;
+    const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
+    const resumeStep = resumed.steps[resumed.currentStepIndex];
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: assistantId,
+        role: 'assistant',
+        content: `▶️ **チェックポイントからタスク計画を再開しました** (Step ${resumed.currentStepIndex + 1}/${resumed.totalSteps}: **${resumeStep?.title || ''}**)\n確定事実 ${resumed.claimLedger.confirmed.length}件・制約条件を引き継ぎ、後続ステップの実行を進めます...`,
+        timestamp: Date.now(),
+        speaker: activeSpeaker,
+        engineMode,
+        isStreaming: true,
+        taskPlan: resumed,
+        executionSteps: systemLogger.getCurrentSessionSteps(),
+      },
+    ]);
+
+    await executePlanLoop(resumed, assistantId, resumed.goal);
+  };
+
   // Handle Send Chat Message
   const handleSendMessage = async (
     text: string,
@@ -553,187 +825,7 @@ export default function App() {
           },
         ]);
 
-        const stepOutputs: { stepNumber: number; title: string; output: string }[] = [];
-        const planStartTime = performance.now();
-
-        for (let i = 0; i < plan.steps.length; i++) {
-          if (abortController.signal.aborted) {
-            handleAbortExit('多段計画中断');
-            return;
-          }
-
-          const currentStep = plan.steps[i];
-          currentStep.status = 'in_progress';
-          plan.currentStepIndex = i;
-
-          // UI更新
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantId
-                ? {
-                    ...msg,
-                    taskPlan: { ...plan },
-                    content: `⏳ [Step ${currentStep.stepNumber}/${plan.totalSteps}] **${currentStep.title}** を実行中...\n${currentStep.description}`,
-                  }
-                : msg
-            )
-          );
-
-          const stepStartTime = performance.now();
-          let stepSuccess = true;
-          let stepResultText = '';
-          let stepError: string | undefined = undefined;
-
-          try {
-            if (currentStep.actionType === 'tool_execution' && currentStep.toolCall) {
-              // ツール実行ステップ
-              const toolRes = await toolsService.executeTool(
-                currentStep.toolCall.toolId,
-                currentStep.toolCall.params || {},
-                {
-                  workspaceFiles,
-                  onUpdateWorkspaceFile: handleUpdateFileContent,
-                  userNickname: persona.userNickname,
-                },
-                { userConfirmed: true }
-              );
-              stepSuccess = toolRes.success;
-              stepResultText = toolRes.outputSummary;
-              if (!toolRes.success) {
-                stepError = toolRes.error;
-              }
-            } else {
-              // 推論・分析・生成・検証ステップ
-              const stepPrompt = taskPlanService.buildStepPrompt(plan, currentStep, stepOutputs);
-
-              if (engineMode === 'gemini_cloud') {
-                const res = await sendChatMessage({
-                  prompt: stepPrompt,
-                  history: [],
-                  persona,
-                  memories: relevantMemories,
-                  workspaceFiles,
-                  useSearch: false,
-                  signal: abortController.signal,
-                  engineMode: 'gemini_cloud',
-                });
-                stepResultText = res.text || 'ステップ完了';
-              } else if (engineMode === 'native_gpu' && nativeLlmService.getActiveModelId()) {
-                let chunkText = '';
-                for await (const chunk of nativeLlmService.streamNativeChat(
-                  [
-                    { role: 'system', content: `あなたは優秀なAI相棒「${persona.name}」です。論理的かつ的確に出力してください。` },
-                    { role: 'user', content: stepPrompt },
-                  ],
-                  { max_tokens: 384, temperature: 0.3 }
-                )) {
-                  if (abortController.signal.aborted) break;
-                  chunkText += chunk;
-                }
-                stepResultText = chunkText || 'ステップ完了';
-              } else if (engineMode === 'webgpu' && webLLMService.isLoaded()) {
-                let chunkText = '';
-                for await (const chunk of webLLMService.streamChat(
-                  [
-                    { role: 'system', content: `あなたは優秀なAI相棒「${persona.name}」です。論理的かつ的確に出力してください。` },
-                    { role: 'user', content: stepPrompt },
-                  ],
-                  { max_tokens: 384, temperature: 0.3 }
-                )) {
-                  if (abortController.signal.aborted) break;
-                  chunkText += chunk;
-                }
-                stepResultText = chunkText || 'ステップ完了';
-              } else {
-                // 自律ルールベース
-                const isCodeStep = currentStep.actionType === 'code_generation';
-                stepResultText = generateSmartCompanionReply(
-                  `${currentStep.title}: ${text}`,
-                  persona,
-                  relevantMemories,
-                  isCodeStep,
-                  attached
-                );
-              }
-            }
-          } catch (stepErr: any) {
-            stepSuccess = false;
-            stepError = stepErr?.message || String(stepErr);
-            stepResultText = `⚠️ 実行時エラー: ${stepError}`;
-          }
-
-          const stepDuration = Math.round(performance.now() - stepStartTime);
-          stepOutputs.push({
-            stepNumber: currentStep.stepNumber,
-            title: currentStep.title,
-            output: stepResultText,
-          });
-
-          // advanceStep でステータス更新 & チェックポイント保存
-          taskPlanService.advanceStep(plan, {
-            success: stepSuccess,
-            resultText: stepResultText,
-            error: stepError,
-            durationMs: stepDuration,
-          });
-
-          // 進行状況のUI更新
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantId
-                ? {
-                    ...msg,
-                    taskPlan: { ...plan },
-                  }
-                : msg
-            )
-          );
-        }
-
-        // 全ステップ完了判定 & 統合サマリー生成
-        const planJudgement = taskPlanService.judgeCompletion(plan);
-        const totalPlanDuration = Math.round(performance.now() - planStartTime);
-
-        // 最終メッセージ構築
-        const synthesisOutput = stepOutputs[stepOutputs.length - 1]?.output || '';
-        const combinedSummary = `${planJudgement.summary}\n\n${synthesisOutput}`;
-
-        systemLogger.step(10, 10, '🧭 多段推論タスク計画完了', {
-          planId: plan.id,
-          totalSteps: plan.totalSteps,
-          completedSteps: plan.completedSteps,
-          totalDurationMs: totalPlanDuration,
-        });
-
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantId
-              ? {
-                  ...msg,
-                  content: combinedSummary,
-                  taskPlan: plan,
-                  isStreaming: false,
-                  executionSteps: systemLogger.getCurrentSessionSteps(),
-                  metrics: {
-                    engine: `多段推論タスク計画 (${plan.completedSteps}/${plan.totalSteps}ステップ)`,
-                    tokens: Math.round(combinedSummary.length / 3),
-                    tokensPerSec: 50,
-                    ttftMs: 50,
-                    totalDurationMs: totalPlanDuration,
-                  },
-                }
-              : msg
-          )
-        );
-
-        setIsLoading(false);
-        setIsGenerating(false);
-
-        // コードブロックの自動反映
-        const codeBlocks = extractCodeBlocks(combinedSummary);
-        if (codeBlocks.length > 0) {
-          handleApplyCode(codeBlocks);
-        }
+        await executePlanLoop(plan, assistantId, text, attached);
         return;
       }
 
@@ -1768,6 +1860,7 @@ export default function App() {
                 setIsMultiStepExplicit(next);
                 storageService.setItem('miki_multistep_explicit_mode', String(next));
               }}
+              onResumeTaskPlan={handleResumeTaskPlan}
             />
           </div>
 
@@ -1850,6 +1943,7 @@ export default function App() {
                   setIsMultiStepExplicit(next);
                   storageService.setItem('miki_multistep_explicit_mode', String(next));
                 }}
+                onResumeTaskPlan={handleResumeTaskPlan}
               />
             )}
 
