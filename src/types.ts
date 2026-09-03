@@ -310,11 +310,14 @@ export interface ModelGeneration {
   modelName: string;
   baseModel: string;
   version: string;
-  branch: 'stable' | 'chat_specialized' | 'code_specialized' | 'ultra_light' | 'experimental';
+  branch: 'stable' | 'chat_specialized' | 'code_specialized' | 'ultra_light' | 'experimental' | 'memory_retrieval';
   loraRank?: number;
   trainingSamplesCount?: number;
   status: 'active' | 'shadow_testing' | 'archived' | 'deprecated';
   benchmarkScore?: number;
+  benchmarkReportId?: string; // どの回帰レポートに基づく昇格・実測か (設計思想 25)
+  promotedAt?: number;        // 安定版(stable)への昇格承認日時
+  promotionNotes?: string;    // 昇格検証の承認根拠
   notes?: string;
   createdAt: number;
 }
@@ -333,7 +336,7 @@ export interface WorkManagerConstraints {
 export interface BackgroundTaskExecutionLog {
   id: string;
   timestamp: number;
-  taskType: 'memory_consolidation' | 'self_dialogue_testing' | 'dataset_cleanup' | 'graph_link_builder';
+  taskType: 'memory_consolidation' | 'self_dialogue_testing' | 'dataset_cleanup' | 'graph_link_builder' | 'autonomous_cycle' | 'skill_discovery' | 'ab_prompt_testing' | 'regression_benchmark';
   status: 'running' | 'completed' | 'failed' | 'aborted_constraint';
   durationMs: number;
   batteryLevel?: number;
@@ -345,6 +348,16 @@ export interface BackgroundTaskExecutionLog {
     graphLinksCreatedCount?: number;
     simulatedDialoguesCount?: number;
     cleanedDatasetSamplesCount?: number;
+    cleanedDuplicatesCount?: number;
+    prunedLowQualityCount?: number;
+    skillsExtractedCount?: number;
+    skillsPromotedCount?: number;
+    abTestsRunCount?: number;
+    regressionBenchmarkScore?: number;
+    regressionReportId?: string;
+    trainingThresholdReached?: boolean;
+    trainingCurrentCount?: number;
+    trainingTargetThreshold?: number;
     weaknessFound?: string[];
   };
 }

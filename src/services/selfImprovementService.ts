@@ -10,10 +10,13 @@ import { nativeLlmService } from './nativeLlmService';
 import { webLLMService } from './webLlmService';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
+import { regressionBenchmarkService } from './regressionBenchmarkService';
 
 const RECORDS_STORAGE_KEY = 'miki_ai_self_improvement_records';
 const TRAINING_DATA_STORAGE_KEY = 'miki_ai_training_samples';
 const MODEL_GENERATIONS_KEY = 'miki_ai_model_generations';
+const TRAINING_THRESHOLD_KEY = 'miki_ai_training_threshold';
+const LAST_NOTIFIED_THRESHOLD_KEY = 'miki_ai_training_notified_count';
 
 /**
  * 初期モデル世代リスト (設計思想 18. 系統樹 & 25. 安全・品質境界)
@@ -289,12 +292,152 @@ class SelfImprovementService {
 
     this.trainingSamples.unshift(newSample);
     this.saveTrainingSamples();
+    this.checkTrainingThreshold();
     return newSample;
   }
 
   public deleteTrainingSample(id: string): void {
     this.trainingSamples = this.trainingSamples.filter((s) => s.id !== id);
     this.saveTrainingSamples();
+  }
+
+  /**
+   * 学習教材蓄積しきい値設定 (デフォルト: 25件)
+   * 設計思想 7: 一定量たまったら学習を自動トリガー・提示
+   */
+  public getTrainingThreshold(): number {
+    if (typeof storageService !== 'undefined') {
+      const val = storageService.getItem(TRAINING_THRESHOLD_KEY);
+      if (val) {
+        const num = Number(val);
+        if (!isNaN(num) && num > 0) return num;
+      }
+    }
+    return 25;
+  }
+
+  public setTrainingThreshold(threshold: number): void {
+    if (typeof storageService !== 'undefined') {
+      storageService.setItem(TRAINING_THRESHOLD_KEY, String(threshold));
+    }
+  }
+
+  /**
+   * 学習サンプル件数がしきい値に達したか判定
+   */
+  public checkTrainingThreshold(): {
+    thresholdReached: boolean;
+    currentCount: number;
+    threshold: number;
+    unnotified: boolean;
+  } {
+    const approvedCount = this.trainingSamples.filter((s) => s.approved).length;
+    const threshold = this.getTrainingThreshold();
+    const thresholdReached = approvedCount >= threshold;
+
+    let lastNotified = 0;
+    if (typeof storageService !== 'undefined') {
+      const stored = storageService.getItem(LAST_NOTIFIED_THRESHOLD_KEY);
+      if (stored) lastNotified = Number(stored) || 0;
+    }
+
+    const unnotified = thresholdReached && approvedCount >= lastNotified + threshold;
+
+    if (unnotified) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🎯 [学習トリガー] 承認済み学習データがしきい値(${approvedCount}/${threshold}件)に到達しました。Colab学習または新世代GGUFのインポートを推奨します。`
+      );
+    }
+
+    return {
+      thresholdReached,
+      currentCount: approvedCount,
+      threshold,
+      unnotified,
+    };
+  }
+
+  public markTrainingThresholdNotified(): void {
+    if (typeof storageService !== 'undefined') {
+      const approvedCount = this.trainingSamples.filter((s) => s.approved).length;
+      storageService.setItem(LAST_NOTIFIED_THRESHOLD_KEY, String(approvedCount));
+    }
+  }
+
+  /**
+   * DPO/LoRA学習サンプルの自動クリーンアップ・重複除去
+   * (名ばかりの空処理を排し、内容の正規化・重複排除・低品質サンプルの刈り込みを実際に実行)
+   * 設計思想 7. 学習データの改善 & 11. バックグラウンド自己対話
+   */
+  public cleanAndDeduplicateSamples(): {
+    beforeCount: number;
+    afterCount: number;
+    removedDuplicates: number;
+    prunedLowQuality: number;
+  } {
+    const beforeCount = this.trainingSamples.length;
+    const seenInstructions = new Map<string, TrainingSampleJSONL>();
+    let removedDuplicates = 0;
+    let prunedLowQuality = 0;
+
+    const cleaned: TrainingSampleJSONL[] = [];
+
+    for (const sample of this.trainingSamples) {
+      const normInst = (sample.instruction || '').trim().replace(/\s+/g, ' ');
+      const normOut = (sample.outputTarget || '').trim();
+
+      // 品質フィルタ: 空または極小(5文字未満)、または同一入出力の自己矛盾サンプルを刈り込み
+      if (!normInst || !normOut || normInst.length < 5 || normOut.length < 5) {
+        prunedLowQuality++;
+        continue;
+      }
+
+      if (normInst === normOut) {
+        prunedLowQuality++;
+        continue;
+      }
+
+      // 重複判定キー: 指示内容 + 入力コンテキスト
+      const dedupeKey = normInst + '|||' + (sample.inputContext || '').trim();
+
+      if (seenInstructions.has(dedupeKey)) {
+        const existing = seenInstructions.get(dedupeKey)!;
+        // 既存より信頼度が高いか、承認済みの場合は上書き
+        if (!existing.approved && sample.approved) {
+          seenInstructions.set(dedupeKey, {
+            ...sample,
+            instruction: normInst,
+            outputTarget: normOut,
+          });
+        }
+        removedDuplicates++;
+      } else {
+        const normalizedSample: TrainingSampleJSONL = {
+          ...sample,
+          instruction: normInst,
+          outputTarget: normOut,
+        };
+        seenInstructions.set(dedupeKey, normalizedSample);
+      }
+    }
+
+    this.trainingSamples = Array.from(seenInstructions.values());
+    this.saveTrainingSamples();
+
+    const afterCount = this.trainingSamples.length;
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🧹 [データセットクリーンアップ] 実行前: ${beforeCount}件 ➔ 実行後: ${afterCount}件 (重複除外: ${removedDuplicates}件, 低品質刈取: ${prunedLowQuality}件)`
+    );
+
+    return {
+      beforeCount,
+      afterCount,
+      removedDuplicates,
+      prunedLowQuality,
+    };
   }
 
   /**
@@ -434,15 +577,154 @@ print("🎉 学習とGGUF変換が完了しました！ 'miki_model_candidate_q4
 `;
   }
 
+  /**
+   * 回帰テストレポートが総合安定版(stable)への昇格基準を満たしているか検証
+   * 設計思想 25. 安全・品質境界 & 設計思想 9. ベンチマークと退行テスト
+   * - 全テストケース実行済み & 合格率100% (failedTests === 0)
+   * - 退行(Regression)ゼロ (regressionsCount === 0)
+   * - 総合スコア80点以上
+   */
+  public validatePromotionReport(reportId: string): {
+    valid: boolean;
+    report?: any;
+    error?: string;
+  } {
+    const reports = regressionBenchmarkService.getReports();
+    const report = reports.find((r) => r.id === reportId);
+    if (!report) {
+      return {
+        valid: false,
+        error: '指定された回帰テストレポートが存在しません。実機ベンチマークを実行してください。',
+      };
+    }
+
+    if (report.regressionsCount > 0) {
+      return {
+        valid: false,
+        report,
+        error: `退行(Regression)が${report.regressionsCount}件検出されているため、安定版への昇格は許可されません。`,
+      };
+    }
+
+    if (report.failedTests > 0) {
+      return {
+        valid: false,
+        report,
+        error: `不合格テストが${report.failedTests}件存在します。全テストケースの合格が必要です。`,
+      };
+    }
+
+    if (report.overallScore < 80) {
+      return {
+        valid: false,
+        report,
+        error: `総合スコア(${report.overallScore}点)が合格基準(80点)に達していません。`,
+      };
+    }
+
+    return {
+      valid: true,
+      report,
+    };
+  }
+
   public addGeneration(gen: Omit<ModelGeneration, 'generationId' | 'createdAt'>): ModelGeneration {
+    let finalBranch = gen.branch;
+    let finalScore = gen.benchmarkScore;
+    let finalReportId = gen.benchmarkReportId;
+    let promotedAt = gen.promotedAt;
+    let promotionNotes = gen.promotionNotes;
+
+    // stable指定時は回帰レポート検証を強制 (レポートなしの安定化を拒否)
+    if (finalBranch === 'stable') {
+      if (!finalReportId) {
+        throw new Error(
+          '総合安定版(stable)としての登録には、退行ゼロかつ全テスト合格の実機回帰ベンチマークレポートの選択が必須です。合格レポートを選択するか、候補ブランチ(chat_specialized/experimental等)として登録してください。'
+        );
+      }
+      const check = this.validatePromotionReport(finalReportId);
+      if (!check.valid) {
+        throw new Error(check.error || '回帰テスト合格基準を満たしていません。');
+      }
+      finalScore = check.report.overallScore;
+      promotedAt = Date.now();
+      promotionNotes = `回帰レポート[${finalReportId}]合格承認 (スコア: ${finalScore}点, 退行: 0件)`;
+    }
+
     const newGen: ModelGeneration = {
       ...gen,
+      branch: finalBranch,
+      benchmarkScore: finalScore,
+      benchmarkReportId: finalReportId,
+      promotedAt,
+      promotionNotes,
       generationId: 'gen_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       createdAt: Date.now(),
     };
+
+    // stableが新設された場合、既存のactive stableをarchivedに退避
+    if (newGen.branch === 'stable' && newGen.status === 'active') {
+      this.generations = this.generations.map((g) =>
+        g.branch === 'stable' && g.status === 'active'
+          ? { ...g, status: 'archived' }
+          : g
+      );
+    }
+
     this.generations.push(newGen);
     this.saveGenerations();
     return newGen;
+  }
+
+  /**
+   * 候補モデルを回帰レポートに基づいて総合安定版(stable)へ正式昇格させるガード関数
+   * (手入力での昇格を構造的に排除し、実測レポートのみを昇格根拠とする)
+   * 設計思想 25. 安全・品質境界
+   */
+  public promoteToStable(
+    generationId: string,
+    reportId: string
+  ): { success: boolean; error?: string; generation?: ModelGeneration } {
+    const targetGen = this.generations.find((g) => g.generationId === generationId);
+    if (!targetGen) {
+      return { success: false, error: '指定されたモデル世代が見つかりません。' };
+    }
+
+    // 基準検証
+    const check = this.validatePromotionReport(reportId);
+    if (!check.valid) {
+      return { success: false, error: check.error };
+    }
+
+    const report = check.report;
+
+    // 既存の稼働中stableモデルをアーカイブに退避
+    this.generations = this.generations.map((g) => {
+      if (g.branch === 'stable' && g.status === 'active' && g.generationId !== generationId) {
+        return {
+          ...g,
+          status: 'archived',
+        };
+      }
+      return g;
+    });
+
+    // 昇格
+    targetGen.branch = 'stable';
+    targetGen.status = 'active';
+    targetGen.benchmarkScore = report.overallScore;
+    targetGen.benchmarkReportId = report.id;
+    targetGen.promotedAt = Date.now();
+    targetGen.promotionNotes = `回帰レポート[${report.id}]合格により正式昇格 (総合スコア: ${report.overallScore}点, 合格: ${report.passedTests}/${report.totalTests}, 退行: 0件)`;
+
+    this.saveGenerations();
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🏆 [モデル昇格成功] 「${targetGen.modelName}」が回帰レポート[${report.id}]に基づいて総合安定版(stable)へ昇格しました (スコア: ${report.overallScore}点)`
+    );
+
+    return { success: true, generation: targetGen };
   }
 
   public deleteGeneration(generationId: string): void {

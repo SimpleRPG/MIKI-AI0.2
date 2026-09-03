@@ -223,6 +223,28 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     return storageService.getItem('miki_use_local_in_moe') !== 'false';
   });
 
+  // Gemini Cloud 外部送信確認 & プライバシー保護
+  const [showCloudConfirm, setShowCloudConfirm] = useState(false);
+  const [excludeSensitiveMemories, setExcludeSensitiveMemories] = useState<boolean>(() => {
+    return storageService.getItem('miki_cloud_exclude_sensitive_memories') !== 'false';
+  });
+
+  const handleSelectGeminiCloud = () => {
+    const hasConsented = storageService.getItem('miki_gemini_cloud_consent') === 'true';
+    if (!hasConsented) {
+      setShowCloudConfirm(true);
+    } else {
+      onSelectEngine('gemini_cloud');
+    }
+  };
+
+  const handleConfirmCloudSelection = () => {
+    storageService.setItem('miki_gemini_cloud_consent', 'true');
+    storageService.setItem('miki_cloud_exclude_sensitive_memories', String(excludeSensitiveMemories));
+    setShowCloudConfirm(false);
+    onSelectEngine('gemini_cloud');
+  };
+
   // External Local GPU (Ollama / LM Studio) Configuration
   const [externalLlmConfig, setExternalLlmConfig] = useState<ExternalLocalLlmConfig>(() => {
     try {
@@ -1397,7 +1419,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
 
               {/* Option 5: Gemini Cloud */}
               <button
-                onClick={() => onSelectEngine('gemini_cloud')}
+                onClick={handleSelectGeminiCloud}
                 className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all ${
                   engineMode === 'gemini_cloud'
                     ? 'bg-sky-950/60 border-sky-500 text-sky-200 shadow-md shadow-sky-500/20 ring-2 ring-sky-500'
@@ -1410,21 +1432,67 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                       <Sparkles className="w-4 h-4 text-sky-400" />
                       <span>⑤ ☁️ Gemini Cloud</span>
                     </span>
-                    {engineMode === 'gemini_cloud' && (
-                      <span className="text-[10px] bg-sky-500/30 text-sky-300 px-1.5 py-0.2 rounded font-bold border border-sky-400/40">
-                        選択中
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9.5px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded border border-amber-500/40 flex items-center gap-0.5 font-bold">
+                        <AlertTriangle className="w-2.5 h-2.5 text-amber-400" /> 外部送信
                       </span>
-                    )}
+                      {engineMode === 'gemini_cloud' && (
+                        <span className="text-[10px] bg-sky-500/30 text-sky-300 px-1.5 py-0.2 rounded font-bold border border-sky-400/40">
+                          選択中
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
-                    Google Cloudの最新Geminiで推論。高度な思考・大規模リファクタリングに対応。
+                    Google CloudのGeminiで推論。教材生成・コード診断・補助評価に適した外部エンジン。
                   </p>
                 </div>
-                <div className="text-[9.5px] text-sky-300 font-mono flex items-center gap-1 pt-1 border-t border-sky-500/20">
+                <div className="text-[9.5px] text-sky-300 font-mono flex items-center justify-between pt-1 border-t border-sky-500/20">
                   <span>☁️ 実行場所: クラウドAPI</span>
+                  <span className="text-amber-400 text-[9px]">※補助・評価用</span>
                 </div>
               </button>
             </div>
+
+            {/* Gemini Cloud Privacy & Transmission Panel if active */}
+            {engineMode === 'gemini_cloud' && (
+              <div className="p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/40 space-y-2.5 mt-3 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-sky-200 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-sky-400" />
+                    <span>Gemini Cloud 外部送信・プロンプト記憶保護</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
+                    ⚠️ 外部Googleサーバーへデータ送信
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  MIKI-AIの基本設計は「オンデバイスでの自律育成」です。日常の個人的な雑談や専属相棒としての学習には、端末本体GPU（⚡ 端末本体GPU / 🌐 WebGPU）の利用を推奨します。クラウドAPIは教材生成や評価支援などの補助用途に適しています。
+                </p>
+                <div className="pt-2 border-t border-sky-500/20">
+                  <label className="flex items-start gap-2.5 cursor-pointer bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 hover:border-sky-500/40 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={excludeSensitiveMemories}
+                      onChange={(e) => {
+                        setExcludeSensitiveMemories(e.target.checked);
+                        storageService.setItem('miki_cloud_exclude_sensitive_memories', String(e.target.checked));
+                      }}
+                      className="mt-0.5 rounded bg-slate-950 border-slate-700 text-sky-600 focus:ring-sky-500"
+                    />
+                    <div className="text-xs">
+                      <div className="font-semibold text-slate-100 flex items-center gap-1">
+                        <span>個人情報・関係性記憶 (profile / relationship) を外部送信から除外する</span>
+                        <span className="text-[10px] text-emerald-400 bg-emerald-950 px-1.5 py-0.2 rounded border border-emerald-800 font-bold">推奨</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        ONの場合、Googleサーバーへの送信プロンプトからプライベートな生年月日・関係性記憶を除外し、開発ナレッジやルールのみを参照させます。
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
 
             {/* External Local LLM Settings Panel if active */}
             {engineMode === 'external_gpu' && (
@@ -2800,6 +2868,74 @@ export const EngineModal: React.FC<EngineModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Gemini Cloud 外部送信確認ダイアログ */}
+      {showCloudConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/50 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95 duration-150 text-left">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <span>Gemini Cloud (外部送信) 利用の確認</span>
+                </h3>
+                <span className="text-[11px] text-amber-400 font-medium">
+                  ※ 設計思想: ローカル完結・段階的育成
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 text-xs text-slate-300 leading-relaxed bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
+              <p className="font-semibold text-amber-200">
+                ⚠️ 送信内容はGoogleのサーバーに送られます。会話の文脈として記憶 (<code>memories</code>) の内容も含めてプロンプトに載っています。
+              </p>
+              <p className="text-slate-400 text-[11.5px]">
+                MIKI-AIの基本設計では、日常の個人的な会話や専属相棒としての学習は「端末ローカル完結（⚡ 端末本体GPU / 🌐 WebGPU）」を前提としています。外部クラウドAPIは、教材生成や評価支援などの補助用途に適しています。
+              </p>
+            </div>
+
+            {/* Privacy toggle */}
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={excludeSensitiveMemories}
+                  onChange={(e) => setExcludeSensitiveMemories(e.target.checked)}
+                  className="mt-0.5 rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-sky-500"
+                />
+                <div className="text-xs">
+                  <div className="font-semibold text-slate-200 flex items-center gap-1.5">
+                    <span>個人情報・関係性記憶 (profile / relationship) を外部送信から除外する</span>
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950 px-1.5 py-0.2 rounded border border-emerald-800">推奨</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    有効にすると、Googleサーバーに送られるプロンプトからプライベートな個人プロファイルや関係性記憶を取り除きます。
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setShowCloudConfirm(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+              >
+                キャンセル (ローカルを維持)
+              </button>
+              <button
+                onClick={handleConfirmCloudSelection}
+                className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/30 transition-all flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>同意してGemini Cloudに切り替える</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

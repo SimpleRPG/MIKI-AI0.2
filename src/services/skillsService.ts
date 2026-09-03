@@ -273,6 +273,162 @@ class SkillsService {
       );
     }
   }
+
+  /**
+   * 全スキルの昇格・降格を一括再評価
+   */
+  public evaluateAllSkillsPromotion(): { promotedCount: number; changedCount: number } {
+    let changedCount = 0;
+    for (const skill of this.skills) {
+      const prev = skill.status;
+      this.evaluatePromotion(skill);
+      if (skill.status !== prev) changedCount++;
+    }
+    if (changedCount > 0) this.saveSkills();
+    return { promotedCount: changedCount, changedCount };
+  }
+
+  /**
+   * 会話履歴やコード修復履歴から再利用可能なスキルを自動抽出・構造化
+   * 設計思想 13. スキルライブラリ (暗黙知の明示化・手続き化)
+   */
+  public autoExtractSkillsFromHistory(
+    messages: Array<{ role: string; content: string; codeBlocks?: any[] }>,
+    existingSamples?: Array<{ instruction: string; outputTarget: string; category?: string }>
+  ): SkillItem[] {
+    const extractedSkills: SkillItem[] = [];
+    const allExistingTriggers = this.skills.map((s) => s.triggerCondition.toLowerCase());
+
+    // 1. 会話ログから成功した専門タスクパターンを走査
+    for (let i = 0; i < messages.length - 1; i++) {
+      const userMsg = messages[i];
+      const assistantMsg = messages[i + 1];
+
+      if (userMsg.role !== 'user' || assistantMsg.role !== 'assistant') continue;
+      const userText = userMsg.content.toLowerCase();
+      const assistantText = assistantMsg.content;
+
+      // パターンA: 正規表現やデータ変換の成功パターン
+      if (
+        (userText.includes('正規表現') || userText.includes('抽出') || userText.includes('パース') || userText.includes('regex')) &&
+        (assistantText.includes('RegExp') || assistantText.includes('match') || assistantText.includes('/^')) &&
+        assistantText.length > 80
+      ) {
+        const trigger = '正規表現, regex, パース, 抽出, regexp, 文字列抽出';
+        if (!allExistingTriggers.some((t) => t.includes('正規表現') || t.includes('regex'))) {
+          const newSkill: SkillItem = {
+            id: 'skill_auto_regex_' + Date.now(),
+            name: '正規表現パターン設計 & 文字列抽出パーサー',
+            category: 'coding',
+            description: '複雑な文字列仕様から安全でReDoS耐性のある正規表現を設計し、グループ抽出コードを生成します。',
+            triggerCondition: trigger,
+            requiredInputs: ['抽出対象のサンプルテキスト', 'マッチさせたい文字列の条件・境界規則'],
+            steps: [
+              '1. マッチ対象の前後の境界文字(Prefix/Suffix)を特定',
+              '2. カタストロフィックバックトラッキングを起こさない非貪欲(*?)または文字クラス([a-zA-Z0-9_-])の設計',
+              '3. キャプチャグループ()の割り当て',
+              '4. TypeScript / JS の RegExp.exec() または matchAll() での実装コード出力',
+            ],
+            usedTools: ['regexTester', 'codeParser'],
+            outputFormat: '正規表現リテラル + テストケース付きパース関数',
+            verificationMethod: '境界値テストケースでの実行検証',
+            status: 'candidate',
+            successCount: 1,
+            failureCount: 0,
+            version: '1.0.0',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          this.skills.push(newSkill);
+          extractedSkills.push(newSkill);
+          allExistingTriggers.push(trigger);
+        }
+      }
+
+      // パターンB: IndexedDB / WebStorage 永続化データ同期
+      if (
+        (userText.includes('保存') || userText.includes('localstorage') || userText.includes('indexeddb') || userText.includes('キャッシュ')) &&
+        (assistantText.includes('setItem') || assistantText.includes('getItem') || assistantText.includes('JSON.parse')) &&
+        assistantText.length > 80
+      ) {
+        const trigger = 'localstorage, indexeddb, 永続化, キャッシュ, 保存, 同期, ストレージ';
+        if (!allExistingTriggers.some((t) => t.includes('localstorage') || t.includes('indexeddb'))) {
+          const newSkill: SkillItem = {
+            id: 'skill_auto_storage_' + Date.now(),
+            name: 'LocalStorage / 構造化データ型安全キャッシュ永続化',
+            category: 'coding',
+            description: 'ブラウザストレージの容量制約やJSONパースエラーを防御しつつ、型安全に状態を同期します。',
+            triggerCondition: trigger,
+            requiredInputs: ['永続化対象のデータ型定義', '保存・読み込みのキー名'],
+            steps: [
+              '1. JSON.stringify / parse の try-catch 例外防壁を配置',
+              '2. クォータ超過(QuotaExceededError)発生時の古いLRUキャッシュ破棄処理',
+              '3. スキーマバージョン変更時のマイグレーション関数を定義',
+              '4. React useEffect / カスタムフックとの安全なバインド',
+            ],
+            usedTools: ['storageValidator', 'codeParser'],
+            outputFormat: '型安全なストレージアクセス関数 + マイグレーションハンドラ',
+            verificationMethod: 'モックストレージでのJSON破損・容量超過テスト',
+            status: 'candidate',
+            successCount: 1,
+            failureCount: 0,
+            version: '1.0.0',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          this.skills.push(newSkill);
+          extractedSkills.push(newSkill);
+          allExistingTriggers.push(trigger);
+        }
+      }
+
+      // パターンC: CSS flex/grid レスポンシブレイアウト崩れ修正
+      if (
+        (userText.includes('はみ出る') || userText.includes('レイアウト') || userText.includes('レスポンシブ') || userText.includes('スクロールできない')) &&
+        (assistantText.includes('overflow') || assistantText.includes('flex-1') || assistantText.includes('min-h-0') || assistantText.includes('grid'))
+      ) {
+        const trigger = 'レイアウト崩れ, はみ出る, 横スクロール, flex, grid, overflow, レスポンシブ';
+        if (!allExistingTriggers.some((t) => t.includes('レイアウト崩れ') || t.includes('overflow'))) {
+          const newSkill: SkillItem = {
+            id: 'skill_auto_css_layout_' + Date.now(),
+            name: 'Flexbox / Grid コンテナ溢れ & 最小寸法デバッグ',
+            category: 'debug',
+            description: 'Flexbox/Gridにおけるmin-width:0/min-height:0の欠落によるテキストあふれやスクロール停止を解消します。',
+            triggerCondition: trigger,
+            requiredInputs: ['崩れているJSX/CSS構造', '画面サイズ別の意図する表示挙動'],
+            steps: [
+              '1. 親要素の flex-direction と flex-1 (flex-grow:1) を確認',
+              '2. 子要素に min-w-0 / min-h-0 を付与して縮小を許可',
+              '3. 内部テキストに truncate または break-words を適用',
+              '4. スクロール領域に overflow-y-auto を明示し親の高さを制約',
+            ],
+            usedTools: ['cssAuditor', 'browserSandbox'],
+            outputFormat: 'Tailwindクラス修正差分 + 挙動解説',
+            verificationMethod: '極小幅(320px)〜ワイド幅(1920px)でのレンダリング確認',
+            status: 'candidate',
+            successCount: 1,
+            failureCount: 0,
+            version: '1.0.0',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          this.skills.push(newSkill);
+          extractedSkills.push(newSkill);
+          allExistingTriggers.push(trigger);
+        }
+      }
+    }
+
+    if (extractedSkills.length > 0) {
+      this.saveSkills();
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `💡 [スキル自律抽出] 対話履歴から新たに${extractedSkills.length}件の再利用可能スキル候補を抽出・登録しました: ${extractedSkills.map((s) => s.name).join(', ')}`
+      );
+    }
+
+    return extractedSkills;
+  }
 }
 
 export const skillsService = new SkillsService();

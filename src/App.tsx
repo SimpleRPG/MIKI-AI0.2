@@ -32,6 +32,7 @@ import { retrieveRelevantMemories, recordMemoryUsage, enrichMemoryMetadata } fro
 import { SPEAKER_PROFILES, SpeakerProfile } from './data/speakers';
 import { INITIAL_JAPANESE_MEMORIES } from './data/japaneseKnowledgeData';
 import { MASTER_EDUCATION_MEMORIES } from './data/masterEducationKnowledge';
+import { Capacitor } from '@capacitor/core';
 import { MessageCircle, Play, Code2, Github, Brain, Sparkles, Cpu } from 'lucide-react';
 
 const DEFAULT_PERSONA: PersonaConfig = {
@@ -116,7 +117,8 @@ export default function App() {
   const [engineMode, setEngineMode] = useState<EngineMode>(() => {
     const saved = storageService.getItem('miki_active_engine_mode') as EngineMode;
     const validModes: EngineMode[] = ['native_gpu', 'webgpu', 'external_gpu', 'autonomous_rule', 'gemini_cloud'];
-    return validModes.includes(saved) ? saved : 'native_gpu';
+    const defaultMode: EngineMode = Capacitor.isNativePlatform() ? 'native_gpu' : 'webgpu';
+    return validModes.includes(saved) ? saved : defaultMode;
   });
 
   const handleSelectEngine = (mode: EngineMode) => {
@@ -442,12 +444,29 @@ export default function App() {
       const activeMemories = memories.filter((m) => m.active);
       // 多層ベクトル検索 & 知識グラフ依存関係トラバーサルで、関連性の高い記憶のみを抽出 (設計思想 4 & 12)
       // 設計思想 25: profile/preferenceなどの事実性カテゴリは承認済み記憶のみに制限
-      const relevantMemories = retrieveRelevantMemories(text, activeMemories, {
+      let relevantMemories = retrieveRelevantMemories(text, activeMemories, {
         limit: 8,
         alwaysIncludePinned: true,
         traverseGraph: true,
         onlyApprovedForFacts: true,
       });
+
+      // Gemini Cloud利用時の外部送信保護: 個人情報・関係性記憶(profile/relationship)を除外する設定
+      if (engineMode === 'gemini_cloud') {
+        const excludeSensitive = storageService.getItem('miki_cloud_exclude_sensitive_memories') !== 'false';
+        if (excludeSensitive) {
+          const beforeCount = relevantMemories.length;
+          relevantMemories = relevantMemories.filter(
+            (m) => m.category !== 'profile' && m.category !== 'relationship'
+          );
+          if (beforeCount !== relevantMemories.length) {
+            systemLogger.info(
+              'NETWORK',
+              `🔒 [外部送信保護] Gemini Cloudプロンプトからプライベート記憶(${beforeCount - relevantMemories.length}件)を除外しました`
+            );
+          }
+        }
+      }
 
       // Step 2: Memory Retrieval & Context Association
       systemLogger.step(2, 10, '会話記憶 (Memory) 照合 & 親密度コンテキスト検索', {

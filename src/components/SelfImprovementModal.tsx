@@ -111,8 +111,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   const [newGenBranch, setNewGenBranch] = useState<ModelGeneration['branch']>('chat_specialized');
   const [newGenRank, setNewGenRank] = useState(16);
   const [newGenSamples, setNewGenSamples] = useState(100);
-  const [newGenScore, setNewGenScore] = useState<string>('');
+  const [newGenReportId, setNewGenReportId] = useState<string>('');
   const [newGenNotes, setNewGenNotes] = useState('');
+  const [promotionError, setPromotionError] = useState<string | null>(null);
+
+  // 安定版昇格モーダルステート
+  const [promotingGenId, setPromotingGenId] = useState<string | null>(null);
+  const [selectedPromoteReportId, setSelectedPromoteReportId] = useState<string>('');
+  const [promotionSuccessMsg, setPromotionSuccessMsg] = useState<string | null>(null);
+
+  // データセット・クリーンアップステート
+  const [cleanupMessage, setCleanupMessage] = useState<string | null>(null);
+  const [skillsMessage, setSkillsMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -221,24 +231,83 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   const handleCreateGeneration = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGenName.trim()) return;
+    setPromotionError(null);
 
-    selfImprovementService.addGeneration({
-      modelName: newGenName.trim(),
-      baseModel: 'Qwen/Qwen2.5-Coder-1.5B-Instruct',
-      version: newGenVersion.trim() || 'v1.1.0',
-      branch: newGenBranch,
-      loraRank: Number(newGenRank) || 16,
-      trainingSamplesCount: Number(newGenSamples) || 0,
-      status: 'shadow_testing',
-      benchmarkScore: newGenScore ? Number(newGenScore) : undefined,
-      notes: newGenNotes.trim() || 'ColabでLoRA学習・量子化した新世代モデル',
-    });
+    const linkedReport = benchmarkReports.find((r) => r.id === newGenReportId);
 
-    setGenerations(selfImprovementService.getGenerations());
-    setNewGenName('');
-    setNewGenNotes('');
-    setNewGenScore('');
-    setShowAddGen(false);
+    // 設計思想: stable ブランチへの直接登録は合格済みレポートが必須
+    if (newGenBranch === 'stable') {
+      if (!newGenReportId) {
+        setPromotionError('総合安定版(stable)への直接登録には、合格済みの回帰テストレポートの選択が必須です。');
+        return;
+      }
+      const val = selfImprovementService.validatePromotionReport(newGenReportId);
+      if (!val.valid) {
+        setPromotionError(`安定版の昇格基準を満たしていません: ${val.error}`);
+        return;
+      }
+    }
+
+    try {
+      selfImprovementService.addGeneration({
+        modelName: newGenName.trim(),
+        baseModel: 'Qwen/Qwen2.5-Coder-1.5B-Instruct',
+        version: newGenVersion.trim() || 'v1.1.0',
+        branch: newGenBranch,
+        loraRank: Number(newGenRank) || 16,
+        trainingSamplesCount: Number(newGenSamples) || 0,
+        status: newGenBranch === 'stable' ? 'active' : 'shadow_testing',
+        benchmarkScore: linkedReport ? linkedReport.overallScore : undefined,
+        benchmarkReportId: linkedReport?.id,
+        promotedAt: newGenBranch === 'stable' ? Date.now() : undefined,
+        promotionNotes: newGenBranch === 'stable' ? '全回帰テスト合格により直接承認' : undefined,
+        notes: newGenNotes.trim() || 'ColabでLoRA学習・量子化した新世代モデル',
+      });
+
+      setGenerations(selfImprovementService.getGenerations());
+      setNewGenName('');
+      setNewGenNotes('');
+      setNewGenReportId('');
+      setPromotionError(null);
+      setShowAddGen(false);
+    } catch (err: any) {
+      setPromotionError(err?.message || '世代登録に失敗しました');
+    }
+  };
+
+  const handlePromoteToStable = (generationId: string, reportId: string) => {
+    setPromotionError(null);
+    try {
+      selfImprovementService.promoteToStable(generationId, reportId);
+      setGenerations(selfImprovementService.getGenerations());
+      setPromotingGenId(null);
+      setSelectedPromoteReportId('');
+      setPromotionSuccessMsg('🎉 厳格な回帰ベンチマーク検証を通過し、総合安定版(stable)への昇格が完了しました！');
+      setTimeout(() => setPromotionSuccessMsg(null), 5000);
+    } catch (err: any) {
+      setPromotionError(err?.message || '昇格処理に失敗しました');
+    }
+  };
+
+  const handleCleanDataset = () => {
+    const res = selfImprovementService.cleanAndDeduplicateSamples();
+    setTrainingSamples(selfImprovementService.getTrainingSamples());
+    setCleanupMessage(
+      `✓ クリーンアップ完了: 重複除外 ${res.removedDuplicates}件, 低品質除外 ${res.prunedLowQuality}件 (現在有効データ: ${res.afterCount}件)`
+    );
+    setTimeout(() => setCleanupMessage(null), 5000);
+  };
+
+  const handleAutoExtractSkills = () => {
+    const newSkills = skillsService.autoExtractSkillsFromHistory(chatMessages);
+    skillsService.evaluateAllSkillsPromotion();
+    setSkills(skillsService.getAllSkills());
+    setSkillsMessage(
+      newSkills.length > 0
+        ? `✓ 会話ログから新たに ${newSkills.length} 件のスキル候補を自動抽出しました！`
+        : '会話ログを走査しました。新たな高頻度スキルパターンは検出されませんでした（既存スキル登録済み）。'
+    );
+    setTimeout(() => setSkillsMessage(null), 4000);
   };
 
   const handleDeleteGeneration = (id: string) => {
@@ -747,9 +816,14 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                       setIsWmRunning(true);
                       setWmMessage('⚡ バックグラウンド自律処理を実行中...');
                       try {
-                        const log = await backgroundWorkerService.runAutonomousBackgroundCycle('manual');
+                        const log = await backgroundWorkerService.runAutonomousBackgroundCycle('manual', {
+                          memories,
+                          messages: chatMessages,
+                        });
                         setWmLogs(backgroundWorkerService.getLogs());
                         setWmStatus(backgroundWorkerService.getStatus());
+                        setTrainingSamples(selfImprovementService.getTrainingSamples());
+                        setSkills(skillsService.getAllSkills());
                         setWmMessage(`✓ 自律処理が完了しました (${log.durationMs}ms)`);
                         setTimeout(() => setWmMessage(null), 4000);
                       } catch (err: any) {
@@ -1037,6 +1111,28 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                             ))}
                           </div>
                         )}
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] font-mono">
+                          {log.details.cleanedDuplicatesCount !== undefined && (
+                            <span className="px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-900/50">
+                              🧹 教材クリーン: -{log.details.cleanedDuplicatesCount}重複, -{log.details.prunedLowQualityCount ?? 0}低品質 (有効{log.details.cleanedDatasetSamplesCount ?? 0}件)
+                            </span>
+                          )}
+                          {log.details.skillsExtractedCount !== undefined && (
+                            <span className="px-2 py-0.5 rounded bg-sky-950/60 text-sky-300 border border-sky-900/50">
+                              🛠️ スキル抽出: +{log.details.skillsExtractedCount}件 (昇格{log.details.skillsPromotedCount ?? 0}件)
+                            </span>
+                          )}
+                          {log.details.trainingThresholdReached !== undefined && (
+                            <span className={`px-2 py-0.5 rounded border ${
+                              log.details.trainingThresholdReached
+                                ? 'bg-purple-950 text-purple-300 border-purple-700 font-bold'
+                                : 'bg-slate-900 text-slate-400 border-slate-800'
+                            }`}>
+                              🎯 蓄積: {log.details.trainingCurrentCount ?? '?'}/{log.details.trainingTargetThreshold ?? 50}件 ({log.details.trainingThresholdReached ? '閾値達成! LoRA推奨' : '学習待機'})
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1241,14 +1337,30 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                     成功した手順を再利用可能なスキルとして登録し、モデルの推論時に動的インジェクト
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowAddSkill(!showAddSkill)}
-                  className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 transition-all"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{showAddSkill ? '閉じる' : '新規スキル登録'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleAutoExtractSkills}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-800/60 rounded-lg text-xs flex items-center gap-1.5 font-semibold transition-all"
+                    title="会話ログを走査し成功した実装パターン（正規表現・UIレイアウト・データ保存など）からスキル候補を自動生成します"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
+                    <span>会話ログから自動抽出</span>
+                  </button>
+                  <button
+                    onClick={() => setShowAddSkill(!showAddSkill)}
+                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{showAddSkill ? '閉じる' : '新規スキル登録'}</span>
+                  </button>
+                </div>
               </div>
+
+              {skillsMessage && (
+                <div className="p-3 rounded-lg bg-sky-950/50 border border-sky-800 text-sky-200 text-xs animate-in fade-in">
+                  {skillsMessage}
+                </div>
+              )}
 
               {/* Add Skill Form */}
               {showAddSkill && (
@@ -1541,6 +1653,59 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                   <p className="text-slate-400">GGUFモデルマネージャーから読み込んで進化完了！</p>
                 </div>
               </div>
+
+              {/* Dataset Hygiene & Quality Management Card (設計思想 1 & 18) */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-amber-900/40 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="font-bold text-amber-300 text-xs flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>LoRA学習データセット品質管理 & 自動クリーンアップ</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      短文ゴミデータ・重複ログの排除、および品質基準を満たした有効サンプルの蓄積状況
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCleanDataset}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-700/60 rounded-lg text-xs flex items-center gap-1.5 font-semibold transition-all shrink-0"
+                    title="重複するプロンプト/応答や、短文・低品質サンプルを走査して自動排除します"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                    <span>重複排除 & クリーンアップ実行</span>
+                  </button>
+                </div>
+
+                {cleanupMessage && (
+                  <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800 text-emerald-300 text-xs animate-in fade-in font-mono">
+                    {cleanupMessage}
+                  </div>
+                )}
+
+                {(() => {
+                  const approvedCount = trainingSamples.filter((s) => s.approved).length;
+                  const threshold = 50;
+                  const pct = Math.min(100, Math.round((approvedCount / threshold) * 100));
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-300">
+                          有効学習サンプル数: <strong className="text-slate-100 font-mono">{trainingSamples.length}件</strong> (承認済み: <strong className="text-amber-300 font-mono">{approvedCount}件</strong> / 次期学習推奨閾値: <strong className="text-slate-200 font-mono">{threshold}件</strong>)
+                        </span>
+                        <span className={`text-[11px] font-bold ${approvedCount >= threshold ? 'text-emerald-400' : 'text-slate-400'}`}>
+                          {approvedCount >= threshold ? '🎉 閾値達成! 学習推奨' : `${pct}% 蓄積中`}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                        <div
+                          className={`h-full transition-all duration-300 ${approvedCount >= threshold ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           )}
 
@@ -1616,7 +1781,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                         <option value="chat_specialized">chat_specialized (会話・親友特化)</option>
                         <option value="code_specialized">code_specialized (コード修復特化)</option>
                         <option value="memory_retrieval">memory_retrieval (記憶検索特化)</option>
-                        <option value="stable">stable (総合安定版)</option>
+                        <option value="stable">stable (総合安定版 - ※合格レポート必須)</option>
                       </select>
                     </div>
                   </div>
@@ -1641,16 +1806,39 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-400 mb-1 text-[10px]">実機ベンチマーク点 (任意・空欄OK)</label>
-                      <input
-                        type="number"
-                        placeholder="未計測なら空欄"
-                        value={newGenScore}
-                        onChange={(e) => setNewGenScore(e.target.value)}
+                      <label className="block text-slate-400 mb-1 text-[10px]">
+                        紐付ける回帰テストレポート (stableは必須)
+                      </label>
+                      <select
+                        value={newGenReportId}
+                        onChange={(e) => setNewGenReportId(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs"
-                      />
+                      >
+                        <option value="">-- レポート未紐付け (測定待ち) --</option>
+                        {benchmarkReports.map((r) => {
+                          const passes = r.overallScore >= 80 && r.regressionsCount === 0 && r.failedTests === 0;
+                          return (
+                            <option key={r.id} value={r.id}>
+                              {passes ? '✅ 合格' : '⚠️ 不合格'}: {r.modelName} (スコア: {r.overallScore}点 / 退行: {r.regressionsCount}件 / 失敗: {r.failedTests}件)
+                            </option>
+                          );
+                        })}
+                      </select>
                     </div>
                   </div>
+
+                  {newGenBranch === 'stable' && (
+                    <div className="p-2.5 rounded-lg bg-amber-950/40 border border-amber-800/80 text-[11px] text-amber-200 leading-relaxed">
+                      ⚠️ <strong>設計原則: 自動昇格の禁止</strong><br />
+                      総合安定版(stable)への登録には、退行0件・失敗0件・スコア80点以上の合格レポートが必須です。未検証のモデルはまず『chat_specialized』等のブランチとして登録し、ベンチマーク実行後に昇格してください。
+                    </div>
+                  )}
+
+                  {promotionError && (
+                    <div className="p-2.5 rounded-lg bg-rose-950/50 border border-rose-800 text-rose-300 text-xs font-semibold animate-in fade-in">
+                      ❌ {promotionError}
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-slate-400 mb-1 text-[10px]">モデルの特徴・メモ</label>
@@ -1666,7 +1854,10 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => setShowAddGen(false)}
+                      onClick={() => {
+                        setShowAddGen(false);
+                        setPromotionError(null);
+                      }}
                       className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-lg text-xs"
                     >
                       キャンセル
@@ -1681,59 +1872,161 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                 </form>
               )}
 
+              {promotionSuccessMsg && (
+                <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-700 text-emerald-200 text-xs font-semibold animate-in fade-in">
+                  {promotionSuccessMsg}
+                </div>
+              )}
+
               {/* Generation Cards */}
               <div className="space-y-2.5">
-                {generations.map((gen) => (
-                  <div
-                    key={gen.generationId}
-                    className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition-colors space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
-                          gen.branch === 'stable'
-                            ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                            : gen.branch === 'chat_specialized'
-                            ? 'bg-pink-950 text-pink-300 border-pink-800'
-                            : 'bg-sky-950 text-sky-300 border-sky-800'
-                        }`}>
-                          {gen.branch}
-                        </span>
-                        <span className="font-bold text-slate-100 text-xs">{gen.modelName}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">Ver {gen.version}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 font-mono text-[10px]">
-                          {typeof gen.benchmarkScore === 'number'
-                            ? `実測スコア: ${gen.benchmarkScore}点`
-                            : '実測未実施 (測定待ち)'}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                          gen.status === 'active'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        }`}>
-                          {gen.status === 'active' ? '● 基準稼働中' : '◐ 候補モデル'}
-                        </span>
-                        {gen.branch !== 'stable' && (
-                          <button
-                            onClick={() => handleDeleteGeneration(gen.generationId)}
-                            className="text-slate-500 hover:text-rose-400 p-1"
-                            title="モデル登録を削除"
+                {generations.map((gen) => {
+                  const isPromotingThis = promotingGenId === gen.generationId;
+
+                  return (
+                    <div
+                      key={gen.generationId}
+                      className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition-colors space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                              gen.branch === 'stable'
+                                ? 'bg-emerald-950 text-emerald-300 border-emerald-800 font-bold'
+                                : gen.branch === 'chat_specialized'
+                                ? 'bg-pink-950 text-pink-300 border-pink-800'
+                                : 'bg-sky-950 text-sky-300 border-sky-800'
+                            }`}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                            {gen.branch}
+                          </span>
+                          <span className="font-bold text-slate-100 text-xs">{gen.modelName}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">Ver {gen.version}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 font-mono text-[10px]">
+                            {typeof gen.benchmarkScore === 'number'
+                              ? `実測スコア: ${gen.benchmarkScore}点`
+                              : '実測未実施 (測定待ち)'}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                              gen.status === 'active'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            }`}
+                          >
+                            {gen.status === 'active' ? '● 基準稼働中' : '◐ 候補モデル'}
+                          </span>
+
+                          {gen.branch !== 'stable' && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setPromotingGenId(isPromotingThis ? null : gen.generationId);
+                                  setSelectedPromoteReportId('');
+                                  setPromotionError(null);
+                                }}
+                                className="px-2.5 py-1 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-300 border border-emerald-700/60 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all"
+                                title="回帰テスト合格レポートを紐付けて総合安定版(stable)へ昇格"
+                              >
+                                <Award className="w-3 h-3 text-emerald-400" />
+                                <span>{isPromotingThis ? '閉じる' : '安定版へ昇格'}</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteGeneration(gen.generationId)}
+                                className="text-slate-500 hover:text-rose-400 p-1"
+                                title="モデル登録を削除"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-slate-300 text-[11px]">{gen.notes}</p>
+
+                      <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400 font-mono">
+                        <span>ベース: {gen.baseModel}</span>
+                        <span>LoRA Rank: {gen.loraRank || 'None'}</span>
+                        <span>教材数: {gen.trainingSamplesCount}件</span>
+                        {gen.benchmarkReportId && (
+                          <span className="text-sky-400">🔗 レポート: {gen.benchmarkReportId}</span>
+                        )}
+                        {gen.promotedAt && (
+                          <span className="text-emerald-400">
+                            🏆 昇格日: {new Date(gen.promotedAt).toLocaleDateString()}
+                          </span>
                         )}
                       </div>
+
+                      {/* Inline Promotion Workflow Box */}
+                      {isPromotingThis && (
+                        <div className="p-3 rounded-xl bg-slate-900 border border-emerald-600/60 space-y-3 animate-in fade-in">
+                          <div className="font-bold text-emerald-300 text-xs flex items-center gap-1.5">
+                            <Award className="w-4 h-4 text-emerald-400" />
+                            <span>「{gen.modelName}」を総合安定版 (stable) へ昇格</span>
+                          </div>
+
+                          <p className="text-[11px] text-slate-300 leading-relaxed">
+                            安定版への昇格には、<strong>「総合スコア80点以上」「退行(Regression) 0件」「失敗テスト 0件」</strong>を満たすベンチマークレポートの紐付けが必須です。
+                          </p>
+
+                          <div>
+                            <label className="block text-slate-400 mb-1 text-[10px]">
+                              合格済みの回帰ベンチマークレポートを選択
+                            </label>
+                            <select
+                              value={selectedPromoteReportId}
+                              onChange={(e) => setSelectedPromoteReportId(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs"
+                            >
+                              <option value="">-- レポートを選択してください --</option>
+                              {benchmarkReports.map((r) => {
+                                const passes =
+                                  r.overallScore >= 80 && r.regressionsCount === 0 && r.failedTests === 0;
+                                return (
+                                  <option key={r.id} value={r.id}>
+                                    {passes ? '✅ [合格]' : '❌ [不合格]'}: {r.modelName} (スコア: {r.overallScore}点 / 退行: {r.regressionsCount}件 / 失敗: {r.failedTests}件)
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+
+                          {promotionError && (
+                            <div className="p-2 rounded bg-rose-950/60 border border-rose-800 text-rose-300 text-[11px] font-semibold">
+                              ❌ {promotionError}
+                            </div>
+                          )}
+
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPromotingGenId(null);
+                                setPromotionError(null);
+                              }}
+                              className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-lg text-xs"
+                            >
+                              キャンセル
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!selectedPromoteReportId}
+                              onClick={() => handlePromoteToStable(gen.generationId, selectedPromoteReportId)}
+                              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-slate-950 font-bold rounded-lg text-xs shadow-md transition-all cursor-pointer"
+                            >
+                              昇格を確定
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-slate-300 text-[11px]">{gen.notes}</p>
-                    <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
-                      <span>ベース: {gen.baseModel}</span>
-                      <span>LoRA Rank: {gen.loraRank || 'None'}</span>
-                      <span>教材数: {gen.trainingSamplesCount}件</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
