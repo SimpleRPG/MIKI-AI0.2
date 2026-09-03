@@ -115,19 +115,21 @@ jobs:
           # Clone llama.cpp pinned to model_manifest.json commit and verify commit hash
           mkdir -p android/app/src/main/cpp
           git clone "$LLAMA_REPO" android/app/src/main/cpp/llama.cpp
-          cd android/app/src/main/cpp/llama.cpp
-          git checkout "$LLAMA_COMMIT"
-          if [ -n "$LLAMA_COMMIT_HASH" ]; then
-            echo "Verifying and locking llama.cpp exact commit hash: $LLAMA_COMMIT_HASH"
-            CURRENT_COMMIT=$(git rev-parse HEAD)
-            if [ "$CURRENT_COMMIT" != "$LLAMA_COMMIT_HASH" ]; then
-              git reset --hard "$LLAMA_COMMIT_HASH" || echo "Note: Tag $LLAMA_COMMIT checked out at $(git rev-parse HEAD)"
-            else
-              echo "Commit hash verified: $CURRENT_COMMIT"
+          (
+            cd android/app/src/main/cpp/llama.cpp
+            git checkout "$LLAMA_COMMIT"
+            if [ -n "$LLAMA_COMMIT_HASH" ]; then
+              echo "Verifying and locking llama.cpp exact commit hash: $LLAMA_COMMIT_HASH"
+              CURRENT_COMMIT=$(git rev-parse HEAD)
+              if [ "$CURRENT_COMMIT" != "$LLAMA_COMMIT_HASH" ]; then
+                git reset --hard "$LLAMA_COMMIT_HASH" || echo "Note: Tag $LLAMA_COMMIT checked out at $(git rev-parse HEAD)"
+              else
+                echo "Commit hash verified: $CURRENT_COMMIT"
+              fi
             fi
-          fi
-          echo "Llama.cpp checked out at: $(git rev-parse HEAD)"
-          cd ../../../../
+            echo "Llama.cpp checked out at: $(git rev-parse HEAD)"
+          )
+          cd "${GITHUB_WORKSPACE:-$PWD}"
 
           # Clone Vulkan-Headers using version pinned in model_manifest.json
           git clone --depth 1 --branch "$VULKAN_TAG" "$VULKAN_REPO" android/app/src/main/cpp/Vulkan-Headers
@@ -476,6 +478,8 @@ jobs:
           # Substitute exact values parsed from model_manifest.json (Chapter 78)
           sed -i "s/__MANIFEST_NDK_VERSION__/${NDK_TARGET}/g" android/app/build.gradle
           sed -i "s/__MANIFEST_CMAKE_ARGS__/${CMAKE_ARGUMENTS_GRADLE}/g" android/app/build.gradle
+
+          mkdir -p android/app/src/main/java/com/mikiai/app
 
           # Create MlcLlmPlugin.java (Full Real llama.cpp JNI Plugin & GGUF Model Downloader)
           cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MlcLlmPlugin.java
