@@ -1,4 +1,5 @@
 import type { MemoryItem } from '../types';
+import { storageService } from '../services/storageService';
 
 /**
  * 多層ベクトル検索 & 知識グラフ依存関係検索エンジン
@@ -360,6 +361,47 @@ export function retrieveScoredMemories(
   // 最終ソートと上限切り出し
   resultList.sort((a, b) => b.score - a.score);
   return resultList.slice(0, limit);
+}
+
+/** JS全件スキャンに切り替える閾値。これ未満ならFTS5を使わず今まで通り全件スコアリングする。 */
+export const FTS_PREFILTER_THRESHOLD = 300;
+
+/**
+ * retrieveScoredMemories のハイブリッド版。
+ * 記憶件数が FTS_PREFILTER_THRESHOLD 以上、かつ SQLite backend が使える場合のみ、
+ * 先に FTS5 で候補を絞り込んでから、その候補集合に対して既存のJS多層スコアリングを実行する。
+ * それ以外(件数が少ない/IndexedDB backend/FTS5失敗時)は、従来通り全件をJSスコアリングする。
+ */
+export async function retrieveScoredMemoriesHybrid(
+  currentUserMessage: string,
+  memories: MemoryItem[],
+  options: MemoryRetrievalOptions = {}
+): Promise<ScoredMemory[]> {
+  let candidateMemories = memories;
+
+  if (memories.length >= FTS_PREFILTER_THRESHOLD && storageService.supportsFTS()) {
+    const candidateIds = await storageService.searchMemoriesFTS(currentUserMessage, 200);
+    if (candidateIds && candidateIds.length > 0) {
+      const idSet = new Set(candidateIds);
+      // pinned(常時表示)な記憶はFTS5でヒットしなくても候補から落とさない
+      candidateMemories = memories.filter((m) => idSet.has(m.id) || m.pinned);
+    }
+    // candidateIds が null(FTS5失敗) or 空の場合は candidateMemories = memories のまま(フォールバック)
+  }
+
+  return retrieveScoredMemories(currentUserMessage, candidateMemories, options);
+}
+
+/**
+ * retrieveRelevantMemories のハイブリッド版。
+ */
+export async function retrieveRelevantMemoriesHybrid(
+  currentUserMessage: string,
+  memories: MemoryItem[],
+  options: MemoryRetrievalOptions = {}
+): Promise<MemoryItem[]> {
+  const scored = await retrieveScoredMemoriesHybrid(currentUserMessage, memories, options);
+  return scored.map((s) => s.memory);
 }
 
 /**

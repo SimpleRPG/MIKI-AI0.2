@@ -35,7 +35,12 @@ import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
 import { compressContextHistory } from './utils/contextCompression';
-import { retrieveRelevantMemories, recordMemoryUsage, enrichMemoryMetadata } from './utils/memoryRetrieval';
+import {
+  retrieveRelevantMemories,
+  retrieveRelevantMemoriesHybrid,
+  recordMemoryUsage,
+  enrichMemoryMetadata,
+} from './utils/memoryRetrieval';
 import { SPEAKER_PROFILES, SpeakerProfile } from './data/speakers';
 import { INITIAL_JAPANESE_MEMORIES } from './data/japaneseKnowledgeData';
 import { MASTER_EDUCATION_MEMORIES } from './data/masterEducationKnowledge';
@@ -434,7 +439,7 @@ export default function App() {
     const planStartTime = performance.now();
     const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
     const activeMemories = memories.filter((m) => m.active);
-    const relevantMemories = retrieveRelevantMemories(initialGoal, activeMemories, {
+    const relevantMemories = await retrieveRelevantMemoriesHybrid(initialGoal, activeMemories, {
       limit: 6,
       alwaysIncludePinned: true,
       traverseGraph: true,
@@ -766,7 +771,7 @@ export default function App() {
       const activeMemories = memories.filter((m) => m.active);
       // 多層ベクトル検索 & 知識グラフ依存関係トラバーサルで、関連性の高い記憶のみを抽出 (設計思想 4 & 12)
       // 設計思想 25: profile/preferenceなどの事実性カテゴリは承認済み記憶のみに制限
-      let relevantMemories = retrieveRelevantMemories(text, activeMemories, {
+      let relevantMemories = await retrieveRelevantMemoriesHybrid(text, activeMemories, {
         limit: 8,
         alwaysIncludePinned: true,
         traverseGraph: true,
@@ -1163,7 +1168,7 @@ export default function App() {
       const actionPrediction = worldModelService.predictAction(text, relevantMemories, persona);
       systemLogger.info('STEP', `世界モデル事前予測 [${actionPrediction.expectedIntent}] 期待トーン:${actionPrediction.expectedTone}, 予測記憶数:${actionPrediction.expectedMemoryUsage.predictedMemoryCount}`);
 
-      const promptBuildResult = buildExpertSystemPromptWithTracking(
+      const promptBuildResult = await buildExpertSystemPromptWithTracking(
         promptAnalysis.role,
         persona,
         relevantMemories,

@@ -1,7 +1,7 @@
 import { PersonaConfig, MemoryItem, WorkspaceFile, SkillItem, ToolRecommendation, ToolExecutionResult } from '../types';
 import { getNaturalJapanesePromptGuide } from '../data/japaneseKnowledgeData';
 import { getMasterEducationSystemPrompt } from '../data/masterEducationKnowledge';
-import { retrieveScoredMemories } from './memoryRetrieval';
+import { retrieveScoredMemories, retrieveScoredMemoriesHybrid } from './memoryRetrieval';
 import { skillsService } from '../services/skillsService';
 import { toolsService } from '../services/toolsService';
 
@@ -79,7 +79,7 @@ export interface PromptContextTrackingResult {
  * 設計思想 4. RAG・外部記憶 ＆ 5. 小型モデルの限界 ＆ 13. スキルライブラリ ＆ 14. ツール利用 (:feature:tools)
  * コンテキスト予算を考慮しながら、スコアリング記憶、適用可能スキル、および安全ツール実行結果を注入したシステムプロンプトを構築
  */
-export function buildExpertSystemPromptWithTracking(
+export async function buildExpertSystemPromptWithTracking(
   expertRole: 'code' | 'shader' | 'logic' | 'moe_chat',
   persona: PersonaConfig,
   memories: MemoryItem[],
@@ -91,11 +91,11 @@ export function buildExpertSystemPromptWithTracking(
     maxMemories?: number;
     toolResults?: ToolExecutionResult[];
   }
-): PromptContextTrackingResult {
+): Promise<PromptContextTrackingResult> {
   const maxMemories = options?.maxMemories || (options?.isLightweight ? 3 : 5);
 
-  // 1. 記憶のRAG検索 (バイグラム + 👍/👎 + 承認状態 + 重要度スコアリング)
-  const scoredMemories = retrieveScoredMemories(userMessage, memories, {
+  // 1. 記憶のRAG検索 (ハイブリッドFTS5 + バイグラム + 👍/👎 + 承認状態 + 重要度スコアリング)
+  const scoredMemories = await retrieveScoredMemoriesHybrid(userMessage, memories, {
     limit: maxMemories,
     alwaysIncludePinned: true,
     filterExpired: true,
@@ -236,14 +236,14 @@ ${filesContext}`;
 /**
  * 互換性のための従来ラッパー
  */
-export function buildExpertSystemPrompt(
+export async function buildExpertSystemPrompt(
   expertRole: 'code' | 'shader' | 'logic' | 'moe_chat',
   persona: PersonaConfig,
   memories: MemoryItem[],
   workspaceFiles: WorkspaceFile[],
   options?: { isLightweight?: boolean; includeFiles?: boolean }
-): string {
-  const result = buildExpertSystemPromptWithTracking(
+): Promise<string> {
+  const result = await buildExpertSystemPromptWithTracking(
     expertRole,
     persona,
     memories,

@@ -35,6 +35,7 @@ class StorageService {
   private dirtyKeys = new Set<string>();
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private backend: 'sqlite' | 'indexeddb' | 'memory' = 'memory';
+  private ftsAvailable: boolean = false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private sqlite: any = null; // SQLiteDBConnection (native only, loaded dynamically)
   private idb: IDBDatabase | null = null;
@@ -106,6 +107,21 @@ class StorageService {
         json_payload TEXT
       );`
     );
+    try {
+      await this.sqlite.execute(
+        `CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+          id UNINDEXED,
+          content,
+          tags,
+          content='${this.MEMORIES_STORE}',
+          content_rowid='rowid'
+        );`
+      );
+      this.ftsAvailable = true;
+    } catch (e) {
+      console.warn('storageService: FTS5 unavailable on this build, memory search will use JS fallback only', e);
+      this.ftsAvailable = false;
+    }
     const res = await this.sqlite.query(`SELECT key, value FROM ${this.STORE};`);
     for (const row of res.values || []) {
       this.cache.set(row.key, row.value);
@@ -203,11 +219,19 @@ class StorageService {
               val,
             ]);
 
-            // If updating memories, also sync structured SQLite table
+            // If updating memories, also sync structured SQLite table & FTS index
             if (key === 'gamecraft_memories') {
               try {
                 const memList: MemoryItem[] = JSON.parse(val);
                 if (Array.isArray(memList)) {
+                  await this.sqlite.run(`DELETE FROM ${this.MEMORIES_STORE};`);
+                  if (this.ftsAvailable) {
+                    try {
+                      await this.sqlite.run(`DELETE FROM memories_fts;`);
+                    } catch (ftsDelErr) {
+                      console.warn('storageService: memories_fts DELETE failed', ftsDelErr);
+                    }
+                  }
                   for (const mem of memList) {
                     await this.sqlite.run(
                       `INSERT OR REPLACE INTO ${this.MEMORIES_STORE} (id, category, memory_type, content, approved, source_ref, raw_excerpt, created_at, updated_at, json_payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
@@ -224,6 +248,16 @@ class StorageService {
                         JSON.stringify(mem),
                       ]
                     );
+                    if (this.ftsAvailable) {
+                      try {
+                        await this.sqlite.run(
+                          `INSERT INTO memories_fts (rowid, id, content, tags) VALUES ((SELECT rowid FROM ${this.MEMORIES_STORE} WHERE id = ?), ?, ?, ?);`,
+                          [mem.id, mem.id, mem.content, (mem.tags || []).join(' ')]
+                        );
+                      } catch (ftsInsErr) {
+                        console.warn('storageService: memories_fts INSERT failed', ftsInsErr);
+                      }
+                    }
                   }
                 }
               } catch (e) {
@@ -464,6 +498,39 @@ class StorageService {
       }
       return true;
     });
+  }
+
+  /**
+   * FTS5全文検索で候補となる記憶IDを関連度順に返す(ネイティブ/SQLite backendのみ)。
+   * IndexedDB/メモリのみのbackendでは常に null を返す
+   * (呼び出し側はnullなら従来のJS全件スキャンにフォールバックすること)。
+   */
+  public async searchMemoriesFTS(query: string, limit: number = 50): Promise<string[] | null> {
+    if (this.backend !== 'sqlite' || !this.sqlite || !this.ftsAvailable) return null;
+    try {
+      // FTS5のクエリ構文で危険な記号(",-,*など)をエスケープしつつトークン化
+      const sanitized = query
+        .replace(/["*]/g, ' ')
+        .trim()
+        .split(/\s+/)
+        .filter((t) => t.length > 0)
+        .map((t) => `"${t}"`)
+        .join(' OR ');
+      if (!sanitized) return null;
+      const res = await this.sqlite.query(
+        `SELECT id, rank FROM memories_fts WHERE memories_fts MATCH ? ORDER BY rank LIMIT ?;`,
+        [sanitized, limit]
+      );
+      return (res.values || []).map((r: any) => r.id);
+    } catch (e) {
+      console.warn('storageService: FTS5 search failed, caller should fall back to JS scan', e);
+      return null;
+    }
+  }
+
+  /** 現在のbackendがFTS5対応(SQLite)かどうか */
+  public supportsFTS(): boolean {
+    return this.backend === 'sqlite' && this.ftsAvailable;
   }
 }
 
