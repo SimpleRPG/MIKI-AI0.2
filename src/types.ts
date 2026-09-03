@@ -117,7 +117,12 @@ export interface SkillItem {
   usedTools: string[];       // 使用ツール (検索、計算、パーサーなど)
   outputFormat: string;      // 出力形式
   verificationMethod: string;// 検証方法
-  status: 'candidate' | 'tested' | 'official' | 'disabled';
+  status: 'candidate' | 'tested' | 'official' | 'official_matured' | 'disabled';
+  distinctContexts?: string[]; // 50章: 異なる文脈・トリガーパターンの記録 (最低3パターンの多様性検証)
+  promotedToOfficialAt?: number; // 正式運用(official)へ昇格した日時 (30日運用の判定基準)
+  graduatedToTrainingAt?: number; // 50章: LoRA教材候補・学習サンプルプールへ投入された日時
+  trainingSampleId?: string; // 連携された自己改善学習サンプルのID
+  diversityWarning?: string; // 単一文脈でのみ成功している場合の警告 (案件固有エピソード配置推奨)
   successCount: number;
   failureCount: number;
   version: string;

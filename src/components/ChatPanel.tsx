@@ -212,13 +212,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       });
     }
 
-    // 適用されたスキルの成功/失敗カウントを更新（候補スキル試験の判断材料）
-    if (msg.usedSkills && msg.usedSkills.length > 0) {
-      msg.usedSkills.forEach((s) => {
-        skillsService.recordExecutionResult(s.id, type === 'good');
-      });
-    }
-
     // 該当アシスタント応答の直前にあるユーザーメッセージを特定
     const msgIndex = messages.findIndex((m) => m.id === msg.id);
     let userPrompt = '直前の会話指示';
@@ -229,6 +222,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           break;
         }
       }
+    }
+
+    // 適用されたスキルの成功/失敗カウントを更新（50章: 文脈の多様性検証のためにuserPromptを連携）
+    if (msg.usedSkills && msg.usedSkills.length > 0) {
+      msg.usedSkills.forEach((s) => {
+        skillsService.recordExecutionResult(s.id, type === 'good', userPrompt);
+      });
     }
 
     // 学習データ / 自己改善データへ追加

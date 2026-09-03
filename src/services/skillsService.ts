@@ -1,12 +1,64 @@
 import { SkillItem } from '../types';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
+import { selfImprovementService } from './selfImprovementService';
 
 const SKILLS_STORAGE_KEY = 'miki_ai_skills_library';
 
 /**
+ * 50章: 文脈の多様性（別問題での再試験）判定ヘルパー
+ * 単に同じ質問・トリガー文言が繰り返されただけでは昇格させず、
+ * 異なる言い回しや目的（userGoal）が最低3パターン以上含まれているかを検証する。
+ */
+export function isDistinctSkillContext(newContext: string, existingContexts: string[] = []): boolean {
+  if (!newContext || typeof newContext !== 'string') return false;
+  const clean = newContext
+    .trim()
+    .toLowerCase()
+    .replace(/[、。！？\s\-_.,!?()[\]{}「」]/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  if (clean.length < 3) return false;
+
+  // 既存コンテキストとのトークン・バイグラム重複率チェック
+  const newTokens = new Set<string>();
+  for (let i = 0; i < clean.length - 1; i++) {
+    newTokens.add(clean.substring(i, i + 2));
+  }
+
+  for (const ex of existingContexts) {
+    const exClean = ex
+      .trim()
+      .toLowerCase()
+      .replace(/[、。！？\s\-_.,!?()[\]{}「」]/g, ' ')
+      .replace(/\s+/g, ' ');
+
+    if (clean === exClean) return false;
+
+    const exTokens = new Set<string>();
+    for (let i = 0; i < exClean.length - 1; i++) {
+      exTokens.add(exClean.substring(i, i + 2));
+    }
+
+    let intersection = 0;
+    for (const t of newTokens) {
+      if (exTokens.has(t)) intersection++;
+    }
+    const union = new Set([...newTokens, ...exTokens]).size;
+    const similarity = union > 0 ? intersection / union : 0;
+
+    // 類似度が65%を超える場合は「同一パターンの繰り返し」と判定し、新文脈としてカウントしない
+    if (similarity > 0.65) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * 初期提供される組み込みスキル定義
- * 設計思想 13. スキルライブラリ
+ * 設計思想 13. スキルライブラリ & 50. 技能の卒業制度
  */
 export const INITIAL_SKILLS: SkillItem[] = [
   {
@@ -27,10 +79,16 @@ export const INITIAL_SKILLS: SkillItem[] = [
     outputFormat: '解説付きTypeScript関数 + 入出力サンプル',
     verificationMethod: 'サンプルデータによるモック実行 & 型チェック',
     status: 'official',
+    distinctContexts: [
+      'VBAコード抜粋をTypeScriptに変換したい',
+      'ExcelマクロのRange/Cells操作を二次元配列JSON化したい',
+      '複雑なWorksheet_ChangeイベントをReact状態管理へリファクタリング',
+    ],
+    promotedToOfficialAt: Date.now() - 86400000 * 25,
     successCount: 12,
     failureCount: 0,
     version: '1.2.0',
-    createdAt: Date.now() - 86400000 * 10,
+    createdAt: Date.now() - 86400000 * 35,
     updatedAt: Date.now(),
   },
   {
@@ -50,10 +108,16 @@ export const INITIAL_SKILLS: SkillItem[] = [
     outputFormat: '差分修正コード + 原因と防止策の解説',
     verificationMethod: 'プレビュー実行でのフレームレートおよび衝突イベント発火確認',
     status: 'official',
+    distinctContexts: [
+      'requestAnimationFrameループが停止して画面が固まる',
+      'AABB矩形の当たり判定座標が画面拡大時にズレる',
+      'Canvas再描画時にメモリリークしてフレームレートが低下する',
+    ],
+    promotedToOfficialAt: Date.now() - 86400000 * 20,
     successCount: 28,
     failureCount: 1,
     version: '1.1.0',
-    createdAt: Date.now() - 86400000 * 20,
+    createdAt: Date.now() - 86400000 * 30,
     updatedAt: Date.now(),
   },
   {
@@ -73,10 +137,16 @@ export const INITIAL_SKILLS: SkillItem[] = [
     outputFormat: 'ステップ順タスク一覧 (チェックリスト形式)',
     verificationMethod: 'ユーザーによる着手順の合意確認',
     status: 'official',
+    distinctContexts: [
+      'Webアプリ全体の段階的タスク分解',
+      '複雑なバックエンドAPIのMVPスコープ整理',
+      'Canvasゲーム機能要件のJSON構造化計画',
+    ],
+    promotedToOfficialAt: Date.now() - 86400000 * 18,
     successCount: 19,
     failureCount: 0,
     version: '1.0.0',
-    createdAt: Date.now() - 86400000 * 15,
+    createdAt: Date.now() - 86400000 * 25,
     updatedAt: Date.now(),
   },
   {
@@ -95,10 +165,16 @@ export const INITIAL_SKILLS: SkillItem[] = [
     outputFormat: 'エラー箇所の行数 + 修正後コード',
     verificationMethod: '静的パースチェック',
     status: 'official',
-    successCount: 45,
+    distinctContexts: [
+      '閉じ括弧不足のSyntaxErrorを自己修復する',
+      'テンプレートリテラルのバッククォート閉合不整合を検査',
+      'TypeScriptのimportパス欠落および未定義変数を検出',
+    ],
+    promotedToOfficialAt: Date.now() - 86400000 * 35,
+    successCount: 48,
     failureCount: 2,
     version: '1.3.0',
-    createdAt: Date.now() - 86400000 * 30,
+    createdAt: Date.now() - 86400000 * 45,
     updatedAt: Date.now(),
   },
 ];
@@ -117,7 +193,16 @@ class SkillsService {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            this.skills = parsed;
+            // 50章対応: 既存の保存済みスキルにdistinctContextsとpromotedToOfficialAtを補完
+            this.skills = parsed.map((s: SkillItem) => ({
+              ...s,
+              distinctContexts: Array.isArray(s.distinctContexts) ? s.distinctContexts : [],
+              promotedToOfficialAt:
+                s.promotedToOfficialAt ||
+                (s.status === 'official' || (s.status as any) === 'official_matured'
+                  ? s.createdAt || Date.now() - 86400000 * 31
+                  : undefined),
+            }));
             return this.skills;
           }
         }
@@ -151,6 +236,8 @@ class SkillsService {
     const newSkill: SkillItem = {
       ...skill,
       id: 'skill_' + Date.now(),
+      distinctContexts: skill.distinctContexts || [],
+      promotedToOfficialAt: skill.status === 'official' ? Date.now() : undefined,
       successCount: 0,
       failureCount: 0,
       createdAt: Date.now(),
@@ -204,7 +291,8 @@ class SkillsService {
       }
 
       if (qLower.includes(skill.name.toLowerCase())) score += 10;
-      if (skill.status === 'official') score += 2;
+      if (skill.status === 'official_matured') score += 3;
+      else if (skill.status === 'official') score += 2;
 
       if (score > 0) {
         matched.push({ skill, score });
@@ -216,12 +304,11 @@ class SkillsService {
   }
 
   /**
-   * スキルの実行結果（成功・失敗）を記録し、蓄積データに基づいて
-   * 候補(candidate) → 試験済み(tested) → 正式(official) の自動昇格判定を行う。
-   * 失敗が続いた場合は降格もする(反証による自己修正)。
-   * 設計思想 13. スキルライブラリー & 16. 複数候補、反証、テスト
+   * スキルの実行結果（成功・失敗）と発火文脈を記録し、
+   * 候補(candidate) → 試験済み(tested) → 正式(official) → 卒業(official_matured) の自動昇格判定を行う。
+   * 50章: 文脈の多様性（別問題での再試験）およびLoRA教材化（卒業制度）を厳格に適用。
    */
-  public recordExecutionResult(id: string, success: boolean): void {
+  public recordExecutionResult(id: string, success: boolean, contextPrompt?: string): void {
     const skill = this.skills.find((s) => s.id === id);
     if (!skill) return;
 
@@ -230,6 +317,20 @@ class SkillsService {
     } else {
       skill.failureCount = (skill.failureCount || 0) + 1;
     }
+
+    // 50章: 実行時のトリガー文言・userGoalの文脈多様性を記録
+    if (contextPrompt) {
+      if (!Array.isArray(skill.distinctContexts)) {
+        skill.distinctContexts = [];
+      }
+      if (isDistinctSkillContext(contextPrompt, skill.distinctContexts)) {
+        skill.distinctContexts.push(contextPrompt.trim().slice(0, 120));
+        if (skill.distinctContexts.length > 10) {
+          skill.distinctContexts = skill.distinctContexts.slice(-10);
+        }
+      }
+    }
+
     skill.updatedAt = Date.now();
 
     this.evaluatePromotion(skill);
@@ -237,55 +338,147 @@ class SkillsService {
   }
 
   /**
-   * 蓄積された成功/失敗件数に基づく昇格・降格しきい値判定 (副作用: skill.status を書き換える)
+   * 蓄積された成功/失敗件数および文脈多様性に基づく昇格・降格しきい値判定 (副作用: skill.status を書き換える)
+   * 設計思想 50. 技能の卒業制度
    */
   private evaluatePromotion(skill: SkillItem): void {
     const total = (skill.successCount || 0) + (skill.failureCount || 0);
     if (total === 0) return;
     const successRate = (skill.successCount || 0) / total;
     const prevStatus = skill.status;
+    const distinctCount = skill.distinctContexts?.length || 0;
 
     if (skill.status === 'candidate') {
-      // candidate -> tested: 最低5回試され、成功率70%以上
+      // 50章: candidate -> tested の昇格条件
+      // 1. 最低5回試行
+      // 2. 成功率70%以上
+      // 3. 【重要】異なる文脈が最低3パターン以上含まれること (別問題での再試験)
       if (total >= 5 && successRate >= 0.7) {
-        skill.status = 'tested';
+        if (distinctCount >= 3) {
+          skill.status = 'tested';
+          skill.diversityWarning = undefined;
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            `🎉 [50章 技能昇格] スキル「${skill.name}」が異なる3パターン以上の文脈(${distinctCount}種)での再試験をクリアし tested に昇格しました (成功率 ${Math.round(successRate * 100)}%)`
+          );
+        } else {
+          // 文脈多様性が不足している場合: 単一文脈での連続成功に過ぎないため昇格保留
+          skill.diversityWarning = `文脈多様性未達 (${distinctCount}/3パターン): 同一または類似の聞き方でのみ成功しているため、一般スキルへの昇格を保留しています。`;
+          if (total >= 10 && distinctCount < 2) {
+            skill.diversityWarning = `【案件固有エピソード推奨】試行${total}回に対し文脈が1パターンのみです。汎用スキルではなく特定プロジェクトのエピソード記憶への配置を推奨します。`;
+          }
+        }
       }
     } else if (skill.status === 'tested') {
       // tested -> official: 最低15回試され、成功率85%以上の安定実績
       if (total >= 15 && successRate >= 0.85) {
         skill.status = 'official';
+        skill.promotedToOfficialAt = skill.promotedToOfficialAt || Date.now();
+        skill.diversityWarning = undefined;
       }
       // tested -> candidate に逆戻り: 十分な試行数があるのに成功率が悪化
       else if (total >= 8 && successRate < 0.5) {
         skill.status = 'candidate';
       }
     } else if (skill.status === 'official') {
+      // 50章: 技能の卒業制度 (Graduation to official_matured & LoRA training dataset)
+      // 条件:
+      // 1. 正式スキル(official)として運用開始から30日以上経過
+      // 2. 50回以上の成功実績
+      // 3. 成功率85%以上の高信頼性
+      const officialTimestamp = skill.promotedToOfficialAt || skill.createdAt || (Date.now() - 86400000 * 31);
+      const daysSinceOfficial = (Date.now() - officialTimestamp) / 86400000;
+      const isMaturedDuration = daysSinceOfficial >= 30;
+      const hasMaturedSuccessCount = (skill.successCount || 0) >= 50;
+
+      if (isMaturedDuration && hasMaturedSuccessCount && successRate >= 0.85) {
+        skill.status = 'official_matured';
+        this.graduateSkillToTrainingDataset(skill);
+      }
       // official でも成績が悪化し続けたら降格 (反証による自己修正)
-      if (total >= 10 && successRate < 0.6) {
+      else if (total >= 10 && successRate < 0.6) {
         skill.status = 'tested';
+      }
+    } else if (skill.status === 'official_matured') {
+      // official_matured のスキルでも、大幅な仕様変更等で失敗が連続した場合はofficialへ降格
+      if (total >= 20 && successRate < 0.7) {
+        skill.status = 'official';
       }
     }
 
     if (skill.status !== prevStatus) {
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `スキル「${skill.name}」のステータスが ${prevStatus} → ${skill.status} に変化 (成功率 ${Math.round(successRate * 100)}%, 試行 ${total}回)`
+        `スキル「${skill.name}」のステータスが ${prevStatus} → ${skill.status} に変化 (成功率 ${Math.round(successRate * 100)}%, 試行 ${total}回, 多様性文脈 ${distinctCount}パターン)`
       );
+    }
+  }
+
+  /**
+   * 50章: 技能の卒業 (official_matured → selfImprovementService.addTrainingSample への自動投入)
+   * 49章の保存先ルーターでいう「LoRA教材」区分へ正式に橋渡しする
+   */
+  public graduateSkillToTrainingDataset(skill: SkillItem): void {
+    if (skill.graduatedToTrainingAt) return; // すでに投入済みの場合は多重登録防止
+
+    try {
+      const representativeContexts =
+        skill.distinctContexts && skill.distinctContexts.length > 0
+          ? `\n【検証済み実行文脈】\n${skill.distinctContexts.slice(0, 3).map((c, idx) => `${idx + 1}. ${c}`).join('\n')}`
+          : '';
+
+      const instruction = `【自律獲得技能】${skill.name}\n${skill.description}${representativeContexts}`;
+      const inputContext = `適用トリガー: ${skill.triggerCondition}\n必要入力: ${skill.requiredInputs.join('、 ')}\n使用ツール: ${skill.usedTools.join('、 ')}`;
+      const outputTarget = `【実行手順】\n${skill.steps.map((st, i) => `${i + 1}. ${st.replace(/^\d+\.\s*/, '')}`).join('\n')}\n\n【出力形式】\n${skill.outputFormat}\n\n【検証方法】\n${skill.verificationMethod}`;
+
+      let cat: 'chat' | 'vba' | 'code' | 'retrieval' | 'correction' | 'tool_use' = 'tool_use';
+      if (skill.category === 'vba') cat = 'vba';
+      else if (skill.category === 'coding' || skill.category === 'debug') cat = 'code';
+      else if (skill.category === 'retrieval') cat = 'retrieval';
+
+      const sample = selfImprovementService.addTrainingSample({
+        instruction,
+        inputContext,
+        outputTarget,
+        category: cat,
+        reliability: 'high',
+        source: 'synthetic',
+        approved: true,
+        split: 'train',
+      });
+
+      skill.graduatedToTrainingAt = Date.now();
+      if (sample?.id) {
+        skill.trainingSampleId = sample.id;
+      }
+
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🎓 [50章 技能の卒業制度] 正式運用スキル「${skill.name}」が長期安定稼働(30日以上運用 & 成功${skill.successCount}回)を達成！ status: 'official_matured' へ卒業し、selfImprovementService (LoRA教材プール) へ自動投入しました (SampleID: ${sample?.id || 'registered'})`
+      );
+    } catch (err: any) {
+      console.warn('Failed to graduate skill to training dataset:', err);
     }
   }
 
   /**
    * 全スキルの昇格・降格を一括再評価
    */
-  public evaluateAllSkillsPromotion(): { promotedCount: number; changedCount: number } {
+  public evaluateAllSkillsPromotion(): { promotedCount: number; changedCount: number; graduatedCount: number } {
     let changedCount = 0;
+    let graduatedCount = 0;
     for (const skill of this.skills) {
       const prev = skill.status;
       this.evaluatePromotion(skill);
-      if (skill.status !== prev) changedCount++;
+      if (skill.status !== prev) {
+        changedCount++;
+        if (skill.status === 'official_matured') {
+          graduatedCount++;
+        }
+      }
     }
     if (changedCount > 0) this.saveSkills();
-    return { promotedCount: changedCount, changedCount };
+    return { promotedCount: changedCount, changedCount, graduatedCount };
   }
 
   /**
@@ -333,6 +526,7 @@ class SkillsService {
             outputFormat: '正規表現リテラル + テストケース付きパース関数',
             verificationMethod: '境界値テストケースでの実行検証',
             status: 'candidate',
+            distinctContexts: [userMsg.content.trim().slice(0, 100)],
             successCount: 1,
             failureCount: 0,
             version: '1.0.0',
@@ -370,6 +564,7 @@ class SkillsService {
             outputFormat: '型安全なストレージアクセス関数 + マイグレーションハンドラ',
             verificationMethod: 'モックストレージでのJSON破損・容量超過テスト',
             status: 'candidate',
+            distinctContexts: [userMsg.content.trim().slice(0, 100)],
             successCount: 1,
             failureCount: 0,
             version: '1.0.0',
@@ -406,6 +601,7 @@ class SkillsService {
             outputFormat: 'Tailwindクラス修正差分 + 挙動解説',
             verificationMethod: '極小幅(320px)〜ワイド幅(1920px)でのレンダリング確認',
             status: 'candidate',
+            distinctContexts: [userMsg.content.trim().slice(0, 100)],
             successCount: 1,
             failureCount: 0,
             version: '1.0.0',

@@ -505,6 +505,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
     setTimeout(() => setSkillsMessage(null), 4000);
   };
 
+  // 50章: 技能の卒業制度・多様性再試験の一括評価
+  const handleEvaluateSkillsPromotion = () => {
+    const res = skillsService.evaluateAllSkillsPromotion();
+    setSkills([...skillsService.getAllSkills()]);
+    setTrainingSamples([...selfImprovementService.getTrainingSamples()]);
+    setSplitStats(selfImprovementService.getSplitStats());
+    setSkillsMessage(
+      `✓ 50章 技能評価完了: ${res.changedCount}件の状態変化 (うち ${res.graduatedCount}件が長期安定稼働により「🎓 卒業(LoRA教材)」へ進学・自動登録)`
+    );
+    setTimeout(() => setSkillsMessage(null), 6000);
+  };
+
   const handleDeleteGeneration = (id: string) => {
     selfImprovementService.deleteGeneration(id);
     setGenerations(selfImprovementService.getGenerations());
@@ -2448,6 +2460,14 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={handleEvaluateSkillsPromotion}
+                    className="px-3 py-1.5 bg-purple-950 hover:bg-purple-900 text-purple-200 border border-purple-700/80 rounded-lg text-xs flex items-center gap-1.5 font-semibold transition-all shadow-sm"
+                    title="50章の昇格条件（3パターン以上の文脈多様性）および卒業条件（30日運用・成功50回）を一括再判定します"
+                  >
+                    <GraduationCap className="w-3.5 h-3.5 text-purple-400" />
+                    <span>50章 昇格・卒業判定を実行</span>
+                  </button>
+                  <button
                     onClick={handleAutoExtractSkills}
                     className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-800/60 rounded-lg text-xs flex items-center gap-1.5 font-semibold transition-all"
                     title="会話ログを走査し成功した実装パターン（正規表現・UIレイアウト・データ保存など）からスキル候補を自動生成します"
@@ -2547,16 +2567,22 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                 {skills.map((s) => (
                   <div
                     key={s.id}
-                    className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition-colors space-y-2"
+                    className={`p-3.5 rounded-xl border transition-colors space-y-2.5 ${
+                      s.status === 'official_matured'
+                        ? 'bg-purple-950/20 border-purple-800/70 hover:border-purple-600'
+                        : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-sky-950 text-sky-300 border border-sky-800">
                           {s.category}
                         </span>
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                            s.status === 'official'
+                            s.status === 'official_matured'
+                              ? 'bg-purple-900/70 text-purple-200 border-purple-600 shadow-sm'
+                              : s.status === 'official'
                               ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
                               : s.status === 'tested'
                               ? 'bg-amber-950 text-amber-300 border-amber-800'
@@ -2564,14 +2590,42 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                               ? 'bg-slate-900 text-slate-500 border-slate-700'
                               : 'bg-slate-800 text-slate-300 border-slate-600'
                           }`}
-                          title="候補(candidate) → 試験済み(tested) → 正式(official) は実行結果の蓄積に応じて自動昇格します"
+                          title="候補(文脈3種+5回試行) → 試験済み(15回試行+85%) → 正式(30日運用+50回成功) → 卒業(LoRA教材)"
                         >
-                          {s.status === 'official' ? '正式' : s.status === 'tested' ? '試験済み' : s.status === 'disabled' ? '無効' : '候補'}
+                          {s.status === 'official_matured'
+                            ? '🎓 卒業 (LoRA教材)'
+                            : s.status === 'official'
+                            ? '正式'
+                            : s.status === 'tested'
+                            ? '試験済み'
+                            : s.status === 'disabled'
+                            ? '無効'
+                            : '候補'}
                         </span>
                         <span className="font-bold text-slate-100 text-xs">{s.name}</span>
                         <span className="text-[10px] text-slate-500 font-mono">v{s.version}</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        {s.status === 'candidate' && (
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[9.5px] font-mono border ${
+                              (s.distinctContexts?.length || 0) >= 3
+                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                                : 'bg-amber-950/80 text-amber-300 border-amber-800'
+                            }`}
+                            title="50章要件: 異なる文脈が最低3パターン以上含まれること"
+                          >
+                            多様性: {s.distinctContexts?.length || 0}/3文脈
+                          </span>
+                        )}
+                        {s.status === 'official' && (
+                          <span
+                            className="px-1.5 py-0.5 rounded text-[9.5px] font-mono border bg-slate-900 text-sky-300 border-sky-800"
+                            title="50章卒業要件: 30日以上運用 & 50回以上成功でLoRA教材へ自動進学"
+                          >
+                            卒業要件: 成功{s.successCount}/50回
+                          </span>
+                        )}
                         <span className="text-[10px] text-emerald-400 font-mono">
                           成功: {s.successCount}回
                         </span>
@@ -2588,7 +2642,52 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                         </button>
                       </div>
                     </div>
+
                     <p className="text-slate-300 text-[11px]">{s.description}</p>
+
+                    {/* 50章: 卒業(official_matured) バナー */}
+                    {s.status === 'official_matured' && (
+                      <div className="p-2.5 rounded-lg bg-purple-950/40 border border-purple-800/60 text-[11px] text-purple-200 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <GraduationCap className="w-4 h-4 text-purple-400 shrink-0" />
+                          <span className="font-semibold">【50章 技能卒業】長期安定稼働を達成し、LoRA学習データプールへ自動投入済み</span>
+                        </div>
+                        {s.trainingSampleId && (
+                          <span className="text-[10px] font-mono text-purple-300 bg-purple-900/60 px-2 py-0.5 rounded border border-purple-700/60">
+                            Sample: {s.trainingSampleId.slice(0, 16)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 50章: 文脈多様性不足の警告バナー */}
+                    {s.diversityWarning && (
+                      <div className="p-2 rounded-lg bg-amber-950/40 border border-amber-800/60 text-[10.5px] text-amber-300 flex items-start gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                        <span>{s.diversityWarning}</span>
+                      </div>
+                    )}
+
+                    {/* 検証済み文脈パターン一覧 */}
+                    {s.distinctContexts && s.distinctContexts.length > 0 && (
+                      <div className="text-[10px] text-slate-400 space-y-1">
+                        <div className="text-slate-400 font-semibold flex items-center gap-1">
+                          <span>検証済み文脈パターン ({s.distinctContexts.length}種 / 昇格要件: 3種):</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {s.distinctContexts.map((ctx, cIdx) => (
+                            <span
+                              key={cIdx}
+                              className="px-2 py-0.5 bg-slate-900 text-slate-300 rounded border border-slate-800 truncate max-w-[320px]"
+                              title={ctx}
+                            >
+                              {ctx}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800/80 text-[10px] text-slate-400 space-y-1">
                       <div className="font-mono text-sky-400">適用トリガー: {s.triggerCondition}</div>
                       <div className="text-slate-300">
