@@ -11,6 +11,7 @@ import { webLLMService } from './webLlmService';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { regressionBenchmarkService } from './regressionBenchmarkService';
+import { nativeBackgroundService } from './nativeBackgroundService';
 
 const RECORDS_STORAGE_KEY = 'miki_ai_self_improvement_records';
 const TRAINING_DATA_STORAGE_KEY = 'miki_ai_training_samples';
@@ -348,6 +349,23 @@ class SelfImprovementService {
         'SELF_IMPROVEMENT',
         `🎯 [学習トリガー] 承認済み学習データがしきい値(${approvedCount}/${threshold}件)に到達しました。Colab学習または新世代GGUFのインポートを推奨します。`
       );
+
+      // 実機Android通知 / ローカル通知の発火 (設計思想 7. 一定量たまったら学習を提示 & 23. Android実機通知)
+      nativeBackgroundService
+        .sendLocalNotification({
+          id: 7001,
+          title: '🎯 みきの学習データが目標蓄積数に到達！',
+          body: `承認済み学習データが${approvedCount}件(${threshold}件目標)に達しました。タップしてLoRA学習スクリプトやエクスポートを確認しよう！`,
+          data: {
+            action: 'open_self_improvement',
+            tab: 'colab',
+          },
+        })
+        .catch((err) => {
+          console.warn('Failed to dispatch training threshold notification:', err);
+        });
+
+      this.markTrainingThresholdNotified();
     }
 
     return {

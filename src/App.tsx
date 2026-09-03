@@ -24,6 +24,7 @@ import { nativeLlmService } from './services/nativeLlmService';
 import { systemLogger } from './services/systemLogger';
 import { worldModelService } from './services/worldModelService';
 import { storageService } from './services/storageService';
+import { nativeBackgroundService } from './services/nativeBackgroundService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
@@ -152,6 +153,7 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isEngineModalOpen, setIsEngineModalOpen] = useState<boolean>(false);
   const [isSelfImprovementModalOpen, setIsSelfImprovementModalOpen] = useState<boolean>(false);
+  const [selfImprovementTab, setSelfImprovementTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'skills' | 'lab' | 'colab' | 'generations'>('diagnosis');
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
@@ -230,6 +232,37 @@ export default function App() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // 端末実機通知 / Web通知のタップイベント検知（学習しきい値到達通知など）
+  useEffect(() => {
+    const unsubscribe = nativeBackgroundService.addActionListener((data) => {
+      if (data?.action === 'open_self_improvement') {
+        if (data.tab) {
+          setSelfImprovementTab(data.tab as any);
+        }
+        setIsSelfImprovementModalOpen(true);
+      }
+    });
+
+    const handleCustomAction = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.action === 'open_self_improvement') {
+        if (customEvent.detail.tab) {
+          setSelfImprovementTab(customEvent.detail.tab as any);
+        }
+        setIsSelfImprovementModalOpen(true);
+      }
+    };
+    window.addEventListener('miki:notification-action', handleCustomAction);
+
+    // アプリ起動時に通知権限の許可状態をバックグラウンド確認
+    nativeBackgroundService.ensureNotificationPermission().catch(() => {});
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('miki:notification-action', handleCustomAction);
+    };
   }, []);
 
   // Heuristic memory auto extractor
@@ -1598,6 +1631,7 @@ export default function App() {
         onClose={() => setIsSelfImprovementModalOpen(false)}
         memories={memories}
         chatMessages={messages}
+        initialTab={selfImprovementTab}
       />
     </div>
   );

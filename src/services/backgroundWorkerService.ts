@@ -5,6 +5,7 @@ import {
   MemoryItem,
   ChatMessage,
   PersonaConfig,
+  RegressionSuiteRunReport,
 } from '../types';
 import { worldModelService } from './worldModelService';
 import { selfImprovementService } from './selfImprovementService';
@@ -14,6 +15,8 @@ import { nativeBackgroundService } from './nativeBackgroundService';
 import { storageService } from './storageService';
 import { skillsService } from './skillsService';
 import { regressionBenchmarkService } from './regressionBenchmarkService';
+import { nativeLlmService } from './nativeLlmService';
+import { webLLMService } from './webLlmService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -356,6 +359,30 @@ export class BackgroundWorkerService {
         // モデル未ロード時はスキップ
       }
 
+      // Step 5.5: アイドル時・自律回帰ベンチマーク評価 (設計思想 9. ベンチマークと退行テスト & 21. 自動回帰評価)
+      let regressionReport: RegressionSuiteRunReport | null = null;
+      try {
+        if (!regressionBenchmarkService.isBusy()) {
+          const isNativeReady = nativeLlmService.isNative() && !!nativeLlmService.getActiveModelId();
+          const isWebReady = webLLMService.isLoaded();
+          if (isNativeReady || isWebReady) {
+            const activeModelName = isNativeReady
+              ? (nativeLlmService.getActiveModelId() || 'Native GGUF')
+              : 'WebLLM Qwen';
+            regressionReport = await regressionBenchmarkService.runFullSuite(`Auto-Cycle: ${activeModelName}`);
+            if (regressionReport.regressionsCount > 0 || regressionReport.failedTests > 0) {
+              weaknessFound.push(
+                `[回帰劣化検知] 自律ベンチマークで退行${regressionReport.regressionsCount}件 / 失敗${regressionReport.failedTests}件を検出 (総合スコア: ${regressionReport.overallScore}点)`
+              );
+            }
+          } else {
+            systemLogger.info('SELF_IMPROVEMENT', '自律回帰テスト: 推論モデル未ロードのためスキップ');
+          }
+        }
+      } catch (benchErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '自律回帰ベンチマーク実行中に例外が発生しました', benchErr);
+      }
+
       // Step 6: 学習教材の蓄積しきい値チェック
       const thresholdCheck = selfImprovementService.checkTrainingThreshold();
 
@@ -369,7 +396,7 @@ export class BackgroundWorkerService {
         batteryLevel: this.batteryState.level,
         isCharging: this.batteryState.charging,
         isWifi: this.networkState.isWifi,
-        summary: `自律サイクル完了: 記憶整理(${consolidatedCount}件), グラフ接続(+${graphLinksCreated}件), 重複除外(${cleanupResult.removedDuplicates}件), 弱点対話・補正(${simulatedCount}件), 新規スキル(+${extractedSkillsCount}件)`,
+        summary: `自律サイクル完了: 記憶整理(${consolidatedCount}件), グラフ接続(+${graphLinksCreated}件), 重複除外(${cleanupResult.removedDuplicates}件), 弱点対話・補正(${simulatedCount}件), 新規スキル(+${extractedSkillsCount}件)${regressionReport ? `, 回帰評価(${regressionReport.overallScore}点/退行${regressionReport.regressionsCount}件)` : ''}`,
         details: {
           consolidatedMemoriesCount: consolidatedCount,
           graphLinksCreatedCount: graphLinksCreated,
@@ -380,6 +407,8 @@ export class BackgroundWorkerService {
           skillsExtractedCount: extractedSkillsCount,
           skillsPromotedCount: skillPromo.promotedCount,
           abTestsRunCount,
+          regressionBenchmarkScore: regressionReport ? regressionReport.overallScore : undefined,
+          regressionReportId: regressionReport ? regressionReport.id : undefined,
           trainingThresholdReached: thresholdCheck.thresholdReached,
           trainingCurrentCount: thresholdCheck.currentCount,
           trainingTargetThreshold: thresholdCheck.threshold,

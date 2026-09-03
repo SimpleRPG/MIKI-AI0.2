@@ -28,6 +28,7 @@ import {
   Clock,
   Play,
   Shield,
+  Bell,
 } from 'lucide-react';
 import {
   SelfImprovementRecord,
@@ -47,6 +48,7 @@ import { skillsService } from '../services/skillsService';
 import { worldModelService } from '../services/worldModelService';
 import { backgroundWorkerService } from '../services/backgroundWorkerService';
 import { regressionBenchmarkService } from '../services/regressionBenchmarkService';
+import { nativeBackgroundService } from '../services/nativeBackgroundService';
 import { retrieveScoredMemories } from '../utils/memoryRetrieval';
 
 export interface SelfImprovementModalProps {
@@ -54,6 +56,7 @@ export interface SelfImprovementModalProps {
   onClose: () => void;
   chatMessages: ChatMessage[];
   memories: MemoryItem[];
+  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'skills' | 'lab' | 'colab' | 'generations';
 }
 
 export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
@@ -61,9 +64,17 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   onClose,
   chatMessages,
   memories,
+  initialTab,
 }) => {
   const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'skills' | 'lab' | 'colab' | 'generations'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // ベンチマーク & 退行テストステート (設計思想 9)
   const [benchmarkReports, setBenchmarkReports] = useState<RegressionSuiteRunReport[]>([]);
@@ -123,6 +134,29 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   // データセット・クリーンアップステート
   const [cleanupMessage, setCleanupMessage] = useState<string | null>(null);
   const [skillsMessage, setSkillsMessage] = useState<string | null>(null);
+
+  const handleTestNotification = async () => {
+    setNotificationTestStatus('実機/Web通知を送信中...');
+    try {
+      const ok = await nativeBackgroundService.sendLocalNotification({
+        id: 7001,
+        title: '🎯 [通知テスト] 学習データ蓄積通知',
+        body: '承認済み学習サンプルが目標閾値に達した際の実機通知テストです。タップするとトレーニングタブが開きます。',
+        data: {
+          action: 'open_self_improvement',
+          tab: 'colab',
+        },
+      });
+      if (ok) {
+        setNotificationTestStatus('✓ 通知を発火しました！(通知をタップすると本画面が開きます)');
+      } else {
+        setNotificationTestStatus('⚠️ 通知権限が未許可、またはブラウザ/OSによりブロックされました');
+      }
+    } catch (e: any) {
+      setNotificationTestStatus(`❌ エラー: ${e?.message || '送信失敗'}`);
+    }
+    setTimeout(() => setNotificationTestStatus(null), 5000);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -1123,6 +1157,11 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                               🛠️ スキル抽出: +{log.details.skillsExtractedCount}件 (昇格{log.details.skillsPromotedCount ?? 0}件)
                             </span>
                           )}
+                          {log.details.regressionBenchmarkScore !== undefined && (
+                            <span className="px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-900/50">
+                              🧪 回帰評価: {log.details.regressionBenchmarkScore}点
+                            </span>
+                          )}
                           {log.details.trainingThresholdReached !== undefined && (
                             <span className={`px-2 py-0.5 rounded border ${
                               log.details.trainingThresholdReached
@@ -1666,15 +1705,32 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                       短文ゴミデータ・重複ログの排除、および品質基準を満たした有効サンプルの蓄積状況
                     </p>
                   </div>
-                  <button
-                    onClick={handleCleanDataset}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-700/60 rounded-lg text-xs flex items-center gap-1.5 font-semibold transition-all shrink-0"
-                    title="重複するプロンプト/応答や、短文・低品質サンプルを走査して自動排除します"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-                    <span>重複排除 & クリーンアップ実行</span>
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={handleTestNotification}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-700/60 rounded-lg text-xs flex items-center gap-1.5 font-semibold transition-all"
+                      title="Android実機通知 / Web通知の発火とタップ遷移（本画面オープン）をテストします"
+                    >
+                      <Bell className="w-3.5 h-3.5 text-sky-400" />
+                      <span>通知テスト送信</span>
+                    </button>
+                    <button
+                      onClick={handleCleanDataset}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-700/60 rounded-lg text-xs flex items-center gap-1.5 font-semibold transition-all"
+                      title="重複するプロンプト/応答や、短文・低品質サンプルを走査して自動排除します"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                      <span>重複排除 & クリーンアップ実行</span>
+                    </button>
+                  </div>
                 </div>
+
+                {notificationTestStatus && (
+                  <div className="p-2.5 rounded-lg bg-sky-950/50 border border-sky-800 text-sky-200 text-xs animate-in fade-in font-mono flex items-center gap-2">
+                    <Bell className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                    <span>{notificationTestStatus}</span>
+                  </div>
+                )}
 
                 {cleanupMessage && (
                   <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800 text-emerald-300 text-xs animate-in fade-in font-mono">
