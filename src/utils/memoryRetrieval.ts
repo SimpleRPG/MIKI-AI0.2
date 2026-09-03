@@ -1,5 +1,6 @@
 import type { MemoryItem } from '../types';
 import { storageService } from '../services/storageService';
+import { experienceRouterService } from '../services/experienceRouterService';
 
 /**
  * 多層ベクトル検索 & 知識グラフ依存関係検索エンジン
@@ -190,6 +191,8 @@ export function retrieveScoredMemories(
   const activeMemories = (memories || []).filter((m) => {
     if (m.active === false) return false;
     if (m.status === 'archived' || m.status === 'deprecated') return false;
+    // 49章: 隔離 (quarantine: 出典不明・未確定) と 破棄候補 (discard_candidate) はプロンプト注入から完全に除外
+    if (m.destination === 'quarantine' || m.destination === 'discard_candidate') return false;
     if (filterExpired && m.expiresAt && m.expiresAt < now) return false;
     if (onlyApproved && m.approved === false) return false;
     // 事実性の高いカテゴリ (profile, preference) は承認済みのみに制限 (設計思想 25. 未承認情報を確定事実として使わない)
@@ -524,20 +527,49 @@ export function enrichMemoryMetadata(
     }
   }
 
+  // 6. 49章 経験の保存先ルーターによる9分類判定 (destination)
+  let destination = item.destination;
+  let quarantineReason = item.quarantineReason;
+  let discardReason = item.discardReason;
+  let routingFactors = item.routingFactors;
+
+  if (!destination) {
+    const routingRes = experienceRouterService.routeExperience(
+      {
+        ...item,
+        content,
+        approved,
+        memoryType,
+        source: item.source || 'auto',
+      },
+      options.existingMemories || []
+    );
+    destination = routingRes.destination;
+    routingFactors = routingRes.factors;
+    if (destination === 'quarantine') {
+      quarantineReason = routingRes.reason;
+      approved = false; // 隔離は未承認扱い
+    } else if (destination === 'discard_candidate') {
+      discardReason = routingRes.reason;
+    }
+  }
+
+  const isActive = item.active ?? (destination !== 'quarantine' && destination !== 'discard_candidate');
+
   return {
     id: item.id || `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     category: item.category || 'preference',
     content,
-    importance: item.importance ?? (item.source === 'auto' ? 2 : 4),
+    importance: item.importance ?? (destination === 'quarantine' ? 1 : item.source === 'auto' ? 2 : 4),
     pinned: item.pinned ?? false,
-    active: item.active ?? true,
+    active: isActive,
     approved,
     memoryType,
     sourceRef,
     rawExcerpt,
     domainVector,
     semanticKeywords,
-    status: item.status || 'active',
+    status: item.status || (destination === 'quarantine' ? 'sleeping' : destination === 'discard_candidate' ? 'deprecated' : 'active'),
     conflictWith,
     createdAt: item.createdAt || now,
     updatedAt: item.updatedAt || now,
@@ -551,6 +583,12 @@ export function enrichMemoryMetadata(
     expiresAt: item.expiresAt,
     goodCount: item.goodCount ?? 0,
     badCount: item.badCount ?? 0,
+    destination,
+    projectScopeId: item.projectScopeId,
+    quarantineReason,
+    discardReason,
+    routingFactors,
+    routedAt: item.routedAt || now,
   };
 }
 

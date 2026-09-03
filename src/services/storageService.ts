@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import type { MemoryItem, MemoryType } from '../types';
+import type { MemoryItem, MemoryType, MemoryDestination } from '../types';
 
 /**
  * Synchronous-facade persistent storage, backed by:
@@ -381,16 +381,62 @@ class StorageService {
     return this.getMemories().filter((m) => m.memoryType === type);
   }
 
+  public getMemoriesByDestination(destination: MemoryDestination): MemoryItem[] {
+    return this.getMemories().filter((m) => m.destination === destination);
+  }
+
   public getApprovedMemories(): MemoryItem[] {
-    return this.getMemories().filter((m) => m.approved !== false && m.active !== false);
+    return this.getMemories().filter(
+      (m) =>
+        m.approved !== false &&
+        m.active !== false &&
+        m.destination !== 'quarantine' &&
+        m.destination !== 'discard_candidate'
+    );
   }
 
   public getUnapprovedMemories(): MemoryItem[] {
-    return this.getMemories().filter((m) => m.approved === false && m.active !== false);
+    return this.getMemories().filter(
+      (m) => m.approved === false && m.active !== false && m.destination !== 'quarantine' && m.destination !== 'discard_candidate'
+    );
+  }
+
+  /**
+   * 49章 隔離された記憶 (出典不明・正解未確認・未承認ハイリスク)
+   * プロンプト注入から完全に除外される
+   */
+  public getQuarantinedMemories(): MemoryItem[] {
+    return this.getMemories().filter((m) => m.destination === 'quarantine');
+  }
+
+  /**
+   * 49章 破棄候補の記憶 (重複・低評価・誤り判定)
+   * 自動削除ではなくユーザーの一括確認対象
+   */
+  public getDiscardCandidateMemories(): MemoryItem[] {
+    return this.getMemories().filter((m) => m.destination === 'discard_candidate');
+  }
+
+  /**
+   * 49章 プロジェクト記憶 (特定案件・ファイル限定)
+   */
+  public getProjectMemories(projectScopeId?: string): MemoryItem[] {
+    return this.getMemories().filter((m) => {
+      if (m.destination !== 'project_memory') return false;
+      if (projectScopeId && m.projectScopeId && m.projectScopeId !== projectScopeId) return false;
+      return true;
+    });
   }
 
   public getConflictedMemories(): MemoryItem[] {
     return this.getMemories().filter((m) => m.active !== false && Array.isArray(m.conflictWith) && m.conflictWith.length > 0);
+  }
+
+  public batchDeleteMemories(ids: string[]): void {
+    const idSet = new Set(ids);
+    const current = this.getMemories();
+    const filtered = current.filter((m) => !idSet.has(m.id));
+    this.setMemories(filtered);
   }
 
   public saveMemoryItem(item: MemoryItem): void {

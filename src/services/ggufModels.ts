@@ -1,8 +1,56 @@
+import modelManifest from '../../model_manifest.json';
+
 /**
- * GGUF Model Registry & Metadata
+ * GGUF Model Registry & Metadata (Chapter 78: Model Manifest Source of Truth)
  * Lists official GGUF quantization models compatible with llama.cpp native engine,
  * local llama-server, Ollama, and Web-based GGUF runners.
  */
+
+export interface ModelManifest {
+  manifestVersion: string;
+  generatedAt: string;
+  nativeEnvironment: {
+    engine: string;
+    pinnedCommit: string;
+    pinnedCommitHash: string;
+    repository: string;
+    vulkanHeaders: { repository: string; pinnedTag: string };
+    spirvHeaders: { repository: string; pinnedTag: string };
+    ndkVersion: string;
+    cmakeFlags: string[];
+  };
+  defaultConfig: {
+    nGpuLayers: number;
+    nCtx: number;
+    nThreads: number;
+    temperature: number;
+    topP: number;
+    maxTokens: number;
+    repetitionPenalty: number;
+  };
+  models: Array<{
+    id: string;
+    fileName: string;
+    sizeMB: number;
+    sha256?: string;
+    parameters: string;
+    quantization: string;
+    vramMB: number;
+    downloadUrl: string;
+  }>;
+}
+
+export function getModelManifest(): ModelManifest {
+  return modelManifest as ModelManifest;
+}
+
+export function getManifestDefaultConfig() {
+  return (modelManifest as ModelManifest).defaultConfig;
+}
+
+export function getManifestNativeEnv() {
+  return (modelManifest as ModelManifest).nativeEnvironment;
+}
 
 export interface GgufModelDefinition {
   id: string;

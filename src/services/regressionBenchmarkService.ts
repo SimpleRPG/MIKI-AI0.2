@@ -16,6 +16,7 @@ import { backgroundWorkerService } from './backgroundWorkerService';
 
 const REGRESSION_REPORTS_STORAGE_KEY = 'miki_ai_regression_reports';
 const COMPARISON_REPORTS_STORAGE_KEY = 'miki_ai_size_comparison_reports';
+const CUSTOM_TEST_CASES_STORAGE_KEY = 'miki_ai_custom_benchmark_cases';
 
 export const STANDARD_BENCHMARK_SUITE: BenchmarkTestCase[] = [
   {
@@ -178,6 +179,7 @@ export function evaluateComparisonVerdict(
 export class RegressionBenchmarkService {
   private reports: RegressionSuiteRunReport[] = [];
   private comparisonReports: ModelSizeComparisonReport[] = [];
+  private customTestCases: BenchmarkTestCase[] = [];
   private isRunning: boolean = false;
 
   constructor() {
@@ -192,8 +194,11 @@ export class RegressionBenchmarkService {
 
       const compData = storageService.getItem(COMPARISON_REPORTS_STORAGE_KEY);
       if (compData) this.comparisonReports = JSON.parse(compData);
+
+      const customData = storageService.getItem(CUSTOM_TEST_CASES_STORAGE_KEY);
+      if (customData) this.customTestCases = JSON.parse(customData);
     } catch (e) {
-      console.warn('Failed to load regression reports:', e);
+      console.warn('Failed to load regression reports or custom test cases:', e);
     }
   }
 
@@ -202,9 +207,40 @@ export class RegressionBenchmarkService {
     try {
       storageService.setItem(REGRESSION_REPORTS_STORAGE_KEY, JSON.stringify(this.reports.slice(-20)));
       storageService.setItem(COMPARISON_REPORTS_STORAGE_KEY, JSON.stringify(this.comparisonReports.slice(-20)));
+      storageService.setItem(CUSTOM_TEST_CASES_STORAGE_KEY, JSON.stringify(this.customTestCases));
     } catch (e) {
-      console.warn('Failed to save regression reports:', e);
+      console.warn('Failed to save regression reports or custom test cases:', e);
     }
+  }
+
+  /**
+   * 実運用・会話経験からテストケースを動的追加 (49章：評価セット連携)
+   */
+  public addCustomTestCase(testCase: BenchmarkTestCase): void {
+    const existingIdx = this.customTestCases.findIndex((tc) => tc.id === testCase.id);
+    if (existingIdx >= 0) {
+      this.customTestCases[existingIdx] = testCase;
+    } else {
+      this.customTestCases.push(testCase);
+    }
+    this.saveReports();
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🧪 [49章 評価セット] 回帰ベンチマークスイートに新規テストケース [${testCase.id}] を追加登録しました: ${testCase.title}`
+    );
+  }
+
+  public removeCustomTestCase(id: string): void {
+    this.customTestCases = this.customTestCases.filter((tc) => tc.id !== id);
+    this.saveReports();
+  }
+
+  public getCustomTestCases(): BenchmarkTestCase[] {
+    return [...this.customTestCases];
+  }
+
+  public getAllTestCases(): BenchmarkTestCase[] {
+    return [...STANDARD_BENCHMARK_SUITE, ...this.customTestCases];
   }
 
   /**
@@ -374,9 +410,10 @@ export class RegressionBenchmarkService {
 
     const results: BenchmarkTestResult[] = [];
     const categoryScores: Record<string, number> = {};
+    const testCasesToRun = this.getAllTestCases();
 
     try {
-      for (const tc of STANDARD_BENCHMARK_SUITE) {
+      for (const tc of testCasesToRun) {
         const res = await this.runSingleTestCase(tc);
         results.push(res);
         categoryScores[tc.category] = (categoryScores[tc.category] || 0) + res.score;
@@ -385,8 +422,8 @@ export class RegressionBenchmarkService {
       }
 
       // カテゴリスコア平均化
-      STANDARD_BENCHMARK_SUITE.forEach((tc) => {
-        const count = STANDARD_BENCHMARK_SUITE.filter((c) => c.category === tc.category).length;
+      testCasesToRun.forEach((tc) => {
+        const count = testCasesToRun.filter((c) => c.category === tc.category).length;
         if (count > 0 && categoryScores[tc.category]) {
           categoryScores[tc.category] = Math.round(categoryScores[tc.category] / count);
         }

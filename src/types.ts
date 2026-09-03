@@ -25,6 +25,46 @@ export type MemoryType =
   | 'meta'         // 6. メタ記憶: どの記憶をどう組み合わせて使うか
   | 'working';     // 7. 作業記憶: 現在の会話や案件だけで使う一時状態
 
+/**
+ * 経験の保存先9分類 (49章：経験の保存先ルーター)
+ * memoryType（7階層の性質）とは別軸として、経験を「どこへ振り分けるか」を決定する
+ */
+export type MemoryDestination =
+  | 'working_memory'      // 1. 作業記憶: 会話・セッション限定の一時状態
+  | 'long_term_memory'    // 2. 長期記憶: 確定した事実・普遍的なユーザー好み・継続ルール
+  | 'project_memory'      // 3. プロジェクト記憶: 特定案件・リポジトリ・VBA仕様限定の記憶
+  | 'skill'               // 4. スキル: 手順化・再利用可能な実行可能手順 (skillsService)
+  | 'search_policy'       // 5. 検索ポリシー: どの情報をどう検索・取得すべきかの方針
+  | 'evaluation_set'      // 6. 評価セット: 能力検証・回帰ベンチマークテストケース候補
+  | 'lora_dataset'        // 7. LoRA教材: モデル追加学習用の高品質instruction/outputペア
+  | 'quarantine'          // 8. 隔離: 出典・正解・利用条件が不明な情報 (プロンプト注入完全除外)
+  | 'discard_candidate';  // 9. 破棄候補: 重複・誤り・低価値・badCount超過 (一括確認対象)
+
+/**
+ * 49章の判断要素 (経験の保存先ルーター用)
+ */
+export interface ExperienceRoutingFactors {
+  updateFrequency?: 'high' | 'medium' | 'low';    // 更新頻度 (頻繁 / 中程度 / 恒久)
+  scope?: 'session' | 'project' | 'global';        // 適用範囲 (今回限定 / 特定案件限定 / 汎用)
+  reusability?: 'high' | 'medium' | 'low';        // 再利用可能性
+  machineVerifiable?: boolean;                    // 機械検証可能性 (テストや単体実行可能か)
+  sourceReliability?: 'high' | 'medium' | 'low' | 'unknown'; // 出典の信頼性
+  approvalStatus?: 'approved' | 'pending' | 'unconfirmed' | 'rejected'; // 承認状態
+  hasPII?: boolean;                               // 個人情報・秘匿情報の有無
+  isDuplicate?: boolean;                          // 既存情報との重複
+  impactRisk?: 'low' | 'medium' | 'high' | 'critical'; // 誤適用時の影響度
+  projectScopeId?: string;                        // 案件・プロジェクト識別子
+  notes?: string;
+}
+
+export interface ExperienceRoutingResult {
+  destination: MemoryDestination;
+  reason: string;
+  factors: ExperienceRoutingFactors;
+  riskScore: number; // 0 (安全) 〜 100 (極めて高リスク)
+  suggestedAction?: 'promote' | 'keep_quarantine' | 'discard' | 'export_skill' | 'export_benchmark';
+}
+
 export interface MemoryItem {
   id: string;
   category: 'chat' | 'relationship' | 'gamedev' | 'preference' | 'profile' | 'memory' | 'vba' | 'code';
@@ -47,6 +87,13 @@ export interface MemoryItem {
   expiresAt?: number;  // 有効期限 (作業記憶など一時的なもの)
   conflictWith?: string[]; // 競合・上書き関係にある記憶ID
   status?: 'active' | 'sleeping' | 'deprecated' | 'archived'; // 状態
+  // 49章: 経験の保存先ルーター用フィールド
+  destination?: MemoryDestination; // 保存先9分類
+  projectScopeId?: string;         // プロジェクト記憶用: 案件ID・リポジトリ名・対象ファイル
+  quarantineReason?: string;       // 隔離理由 (出典不明、利用条件未確定、リスク過多など)
+  discardReason?: string;          // 破棄候補理由 (重複、低評価、誤り判定など)
+  routingFactors?: ExperienceRoutingFactors; // ルーティング時の評価要素
+  routedAt?: number;               // 保存先決定日時
   // 知識グラフ & 依存関係 (設計思想 12. 知識グラフと関係性)
   parentMemoryId?: string;       // 親ノード (上位概念・大元の設定)
   relatedMemoryIds?: string[];   // 関連記憶ノードID (横のリンク)

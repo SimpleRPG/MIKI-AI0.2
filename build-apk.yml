@@ -67,10 +67,32 @@ jobs:
           npx cap add android
           npx cap sync android
 
-          # Detect NDK Directory
+          # Read native build specifications from model_manifest.json (Chapter 78: Model Manifest Source of Truth)
+          echo "Connecting build process to model_manifest.json..."
+          LLAMA_REPO=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.repository || 'https://github.com/ggml-org/llama.cpp.git');")
+          LLAMA_COMMIT=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.pinnedCommit || 'b4600');")
+          LLAMA_COMMIT_HASH=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.pinnedCommitHash || '');")
+          VULKAN_REPO=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.vulkanHeaders?.repository || 'https://github.com/KhronosGroup/Vulkan-Headers.git');")
+          VULKAN_TAG=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.vulkanHeaders?.pinnedTag || 'v1.3.296');")
+          SPIRV_REPO=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.spirvHeaders?.repository || 'https://github.com/KhronosGroup/SPIRV-Headers.git');")
+          SPIRV_TAG=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.spirvHeaders?.pinnedTag || 'vulkan-sdk-1.3.296.0');")
+          NDK_TARGET=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.ndkVersion || '26.1.10909125');")
+          CMAKE_ARGUMENTS_JSON=$(node -e "const m = require('./model_manifest.json'); console.log(JSON.stringify(m.nativeEnvironment?.cmakeFlags || []));")
+          CMAKE_ARGUMENTS_GRADLE=$(node -e "const m = require('./model_manifest.json'); console.log((m.nativeEnvironment?.cmakeFlags || []).map(f => '\"' + f + '\"').join(', '));")
+
+          echo "Manifest Target NDK: $NDK_TARGET"
+          echo "Manifest llama.cpp commit: $LLAMA_COMMIT ($LLAMA_COMMIT_HASH)"
+          echo "Manifest Vulkan-Headers: $VULKAN_TAG ($VULKAN_REPO)"
+          echo "Manifest SPIRV-Headers: $SPIRV_TAG ($SPIRV_REPO)"
+
+          # Copy model_manifest.json into android assets directory so the app can verify manifest at runtime
+          mkdir -p android/app/src/main/assets
+          cp model_manifest.json android/app/src/main/assets/model_manifest.json
+
+          # Detect NDK Directory based on target from manifest
           NDK_DIR=""
-          if [ -d "$ANDROID_SDK_ROOT/ndk/26.1.10909125" ]; then
-            NDK_DIR="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
+          if [ -d "$ANDROID_SDK_ROOT/ndk/$NDK_TARGET" ]; then
+            NDK_DIR="$ANDROID_SDK_ROOT/ndk/$NDK_TARGET"
           elif [ -n "$ANDROID_NDK_HOME" ] && [ -d "$ANDROID_NDK_HOME" ]; then
             NDK_DIR="$ANDROID_NDK_HOME"
           elif [ -d "$ANDROID_SDK_ROOT/ndk" ]; then
@@ -83,22 +105,23 @@ jobs:
             echo "ndk.dir=$NDK_DIR" >> android/local.properties
           fi
 
-          # Clone llama.cpp pinned to stable verified commit b4600 for reproducible NDK build
-          # NOTE: b4600 includes PR #10448 (host vulkan-shaders-gen cross-compilation)
+          # Clone llama.cpp pinned to model_manifest.json commit and verify commit hash
           mkdir -p android/app/src/main/cpp
-          git clone https://github.com/ggml-org/llama.cpp.git android/app/src/main/cpp/llama.cpp
-          cd android/app/src/main/cpp/llama.cpp && git checkout b4600 && cd ../../../../
+          git clone "$LLAMA_REPO" android/app/src/main/cpp/llama.cpp
+          cd android/app/src/main/cpp/llama.cpp
+          git checkout "$LLAMA_COMMIT"
+          if [ -n "$LLAMA_COMMIT_HASH" ]; then
+            echo "Verifying and locking llama.cpp exact commit hash: $LLAMA_COMMIT_HASH"
+            git reset --hard "$LLAMA_COMMIT_HASH"
+          fi
+          echo "Llama.cpp checked out at: $(git rev-parse HEAD)"
+          cd ../../../../
 
-          # Clone Vulkan-Headers (the Android NDK ships vulkan.h but not the vulkan.hpp
-          # C++ bindings that ggml-vulkan requires) for the on-device GPU backend
-          git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git android/app/src/main/cpp/Vulkan-Headers
+          # Clone Vulkan-Headers using version pinned in model_manifest.json
+          git clone --depth 1 --branch "$VULKAN_TAG" "$VULKAN_REPO" android/app/src/main/cpp/Vulkan-Headers
 
-          # ggml-vulkan also requires the SPIRV-Headers CMake *package* (a
-          # SPIRV-HeadersConfig.cmake file), which the apt "spirv-headers" package does
-          # not provide. Build+install it with the plain HOST cmake/compiler (it is a
-          # header-only interface library, so no Android toolchain is needed) so a
-          # real config file exists that find_package() can pick up.
-          git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git android/app/src/main/cpp/SPIRV-Headers
+          # Clone and install SPIRV-Headers using version pinned in model_manifest.json
+          git clone --depth 1 --branch "$SPIRV_TAG" "$SPIRV_REPO" android/app/src/main/cpp/SPIRV-Headers
           cmake -S android/app/src/main/cpp/SPIRV-Headers -B /tmp/spirv-headers-build \
                 -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/android/app/src/main/cpp/spirv-headers-install
           cmake --build /tmp/spirv-headers-build --target install
@@ -357,7 +380,7 @@ jobs:
           android {
               namespace "com.mikiai.app"
               compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 34
-              ndkVersion "26.1.10909125"
+              ndkVersion "__MANIFEST_NDK_VERSION__"
 
               defaultConfig {
                   applicationId "com.mikiai.app"
@@ -375,7 +398,7 @@ jobs:
                   externalNativeBuild {
                       cmake {
                           cppFlags "-O3 -fexceptions -frtti"
-                          arguments "-DGGML_OPENMP=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF", "-DBUILD_SHARED_LIBS=OFF", "-DGGML_VULKAN=ON", "-DANDROID_PLATFORM=28"
+                          arguments __MANIFEST_CMAKE_ARGS__
                       }
                   }
               }
@@ -437,6 +460,10 @@ jobs:
 
           apply from: 'capacitor.build.gradle'
           EOF
+
+          # Substitute exact values parsed from model_manifest.json (Chapter 78)
+          sed -i "s/__MANIFEST_NDK_VERSION__/${NDK_TARGET}/g" android/app/build.gradle
+          sed -i "s/__MANIFEST_CMAKE_ARGS__/${CMAKE_ARGUMENTS_GRADLE}/g" android/app/build.gradle
 
           # Create MlcLlmPlugin.java (Full Real llama.cpp JNI Plugin & GGUF Model Downloader)
           cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MlcLlmPlugin.java

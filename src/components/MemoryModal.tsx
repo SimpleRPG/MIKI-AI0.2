@@ -31,8 +31,12 @@ import {
   AlertTriangle,
   Ban,
   Filter,
+  ShieldAlert,
+  HelpCircle,
+  CheckCheck,
+  FolderGit2,
 } from 'lucide-react';
-import { MemoryItem, PersonaConfig, MemoryType } from '../types';
+import { MemoryItem, PersonaConfig, MemoryType, MemoryDestination } from '../types';
 import {
   JAPANESE_NATURAL_DIALOGUE_CORPUS,
   ANTI_ROBOTIC_JAPANESE_RULES,
@@ -50,6 +54,7 @@ import {
   dismissMemoryConflict,
 } from '../utils/memoryRetrieval';
 import { storageService } from '../services/storageService';
+import { experienceRouterService } from '../services/experienceRouterService';
 
 export interface MemoryModalProps {
   isOpen: boolean;
@@ -70,9 +75,9 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
 }) => {
   const [teachInput, setTeachInput] = useState('');
   const [selectedMemoryType, setSelectedMemoryType] = useState<MemoryType>('semantic');
-  const [activeSubTab, setActiveSubTab] = useState<'persona' | 'teach' | 'memory' | 'corpus' | 'graph'>('teach');
+  const [activeSubTab, setActiveSubTab] = useState<'persona' | 'teach' | 'memory' | 'corpus' | 'graph' | 'quarantine' | 'discard'>('teach');
   const [exportedStatus, setExportedStatus] = useState<string | null>(null);
-  const [memoryFilter, setMemoryFilter] = useState<'all' | 'approved' | 'unapproved' | 'conflicted' | MemoryType>('all');
+  const [memoryFilter, setMemoryFilter] = useState<'all' | 'approved' | 'unapproved' | 'conflicted' | MemoryType | MemoryDestination>('all');
   const [expandedConflictId, setExpandedConflictId] = useState<string | null>(null);
 
   // 知識グラフ & 多層ベクトル検索シミュレーター用ステート
@@ -203,6 +208,90 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
       (onUpdateMemories as any)(updated);
     }
     setExportedStatus('🤝 競合フラグを解除し、両方の記憶を保持しました');
+    setTimeout(() => setExportedStatus(null), 4000);
+  };
+
+  // 49章 経験の保存先ルーター操作ハンドラー
+  const handlePromoteQuarantine = (id: string, targetDest: MemoryDestination = 'long_term_memory') => {
+    const mem = memories.find((m) => m.id === id);
+    if (!mem) return;
+    const promoted = experienceRouterService.promoteFromQuarantine(mem, targetDest);
+    storageService.saveMemoryItem(promoted);
+    const updated = storageService.getMemories();
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+    setExportedStatus(`🔓 隔離を解除し【${targetDest === 'project_memory' ? 'プロジェクト記憶' : '長期記憶'}】へ昇格承認しました！`);
+    setTimeout(() => setExportedStatus(null), 3500);
+  };
+
+  const handleBatchPromoteQuarantine = (targetDest: MemoryDestination = 'long_term_memory') => {
+    const quarantined = storageService.getQuarantinedMemories();
+    if (quarantined.length === 0) return;
+    quarantined.forEach((m) => {
+      const promoted = experienceRouterService.promoteFromQuarantine(m, targetDest);
+      storageService.saveMemoryItem(promoted);
+    });
+    const updated = storageService.getMemories();
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+    setExportedStatus(`🔓 隔離中の ${quarantined.length} 件を一括昇格承認しました！`);
+    setTimeout(() => setExportedStatus(null), 3500);
+  };
+
+  const handleMarkDiscard = (id: string, reason: string = 'ユーザー操作による破棄候補マーク') => {
+    const mem = memories.find((m) => m.id === id);
+    if (!mem) return;
+    const marked = experienceRouterService.markForDiscard(mem, reason);
+    storageService.saveMemoryItem(marked);
+    const updated = storageService.getMemories();
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+    setExportedStatus('🗑️ 記憶を破棄候補へマークしました');
+    setTimeout(() => setExportedStatus(null), 3000);
+  };
+
+  const handleUnmarkDiscard = (id: string) => {
+    const mem = memories.find((m) => m.id === id);
+    if (!mem) return;
+    const restored = experienceRouterService.unmarkDiscard(mem);
+    storageService.saveMemoryItem(restored);
+    const updated = storageService.getMemories();
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+    setExportedStatus('♻️ 破棄候補から通常記憶へ復帰させました！');
+    setTimeout(() => setExportedStatus(null), 3000);
+  };
+
+  const handleBatchDeleteDiscards = () => {
+    const discards = storageService.getDiscardCandidateMemories();
+    if (discards.length === 0) return;
+    if (!window.confirm(`破棄候補の記憶 ${discards.length} 件を一括で完全に削除しますか？`)) return;
+    storageService.batchDeleteMemories(discards.map((d) => d.id));
+    const updated = storageService.getMemories();
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+    setExportedStatus(`🗑️ 破棄候補 ${discards.length} 件を完全削除しました`);
+    setTimeout(() => setExportedStatus(null), 3500);
+  };
+
+  const handleExportToBenchmark = (id: string) => {
+    const mem = memories.find((m) => m.id === id);
+    if (!mem) return;
+    const tc = experienceRouterService.exportToRegressionBenchmark(mem);
+    setExportedStatus(`🧪 回帰ベンチマークスイートへ新規テストケース [${tc.id}] を追加登録しました！`);
+    setTimeout(() => setExportedStatus(null), 4000);
+  };
+
+  const handleExportToSkill = (id: string) => {
+    const mem = memories.find((m) => m.id === id);
+    if (!mem) return;
+    const skill = experienceRouterService.exportToSkill(mem);
+    setExportedStatus(`🛠️ スキルライブラリへ「${skill.name}」を登録しました！`);
     setTimeout(() => setExportedStatus(null), 4000);
   };
 
@@ -426,6 +515,41 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
             <Network className="w-4 h-4 text-indigo-400" />
             <span>🕸️ 知識グラフ & 多層RAG</span>
           </button>
+
+          {/* 49章: 経験の保存先ルーター専用タブ */}
+          <button
+            onClick={() => setActiveSubTab('quarantine')}
+            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+              activeSubTab === 'quarantine'
+                ? 'border-amber-500 text-amber-300 bg-amber-950/20'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-amber-400" />
+            <span>🛡️ 隔離 (出典不明)</span>
+            {storageService.getQuarantinedMemories().length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-mono font-bold">
+                {storageService.getQuarantinedMemories().length}件
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('discard')}
+            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+              activeSubTab === 'discard'
+                ? 'border-slate-400 text-slate-200 bg-slate-900/60'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Trash2 className="w-4 h-4 text-slate-400" />
+            <span>🗑️ 破棄候補</span>
+            {storageService.getDiscardCandidateMemories().length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-[9px] font-mono font-bold">
+                {storageService.getDiscardCandidateMemories().length}件
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Body Content */}
@@ -569,14 +693,23 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
             const conflictedList = storageService.getConflictedMemories();
             const unapprovedList = storageService.getUnapprovedMemories();
             const approvedList = storageService.getApprovedMemories();
+            const projectMemoriesList = storageService.getProjectMemories();
 
             // storageService の各種クエリメソッドを活用した表示リストの決定
             const displayMemories = (() => {
               if (memoryFilter === 'approved') return approvedList;
               if (memoryFilter === 'unapproved') return unapprovedList;
               if (memoryFilter === 'conflicted') return conflictedList;
-              if (memoryFilter !== 'all') return storageService.getMemoriesByType(memoryFilter as MemoryType);
-              return memories;
+              if (memoryFilter === 'project_memory') return projectMemoriesList;
+              if (memoryFilter === 'evaluation_set') return storageService.getMemoriesByDestination('evaluation_set');
+              if (memoryFilter === 'skill') return storageService.getMemoriesByDestination('skill');
+              if (memoryFilter !== 'all') {
+                return storageService.getMemoriesByType(memoryFilter as MemoryType).filter(
+                  (m) => m.destination !== 'quarantine' && m.destination !== 'discard_candidate'
+                );
+              }
+              // 通常記憶一覧では、隔離と破棄候補を除いた稼働中記憶を表示
+              return memories.filter((m) => m.destination !== 'quarantine' && m.destination !== 'discard_candidate');
             })();
 
             return (
@@ -651,20 +784,27 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                       </button>
                     )}
 
-                    {/* 7-Tier MemoryType Filter */}
+                    {/* 7-Tier MemoryType & 9-Destination Filter */}
                     <select
                       value={['all', 'approved', 'unapproved', 'conflicted'].includes(memoryFilter) ? '' : memoryFilter}
-                      onChange={(e) => setMemoryFilter((e.target.value as MemoryType) || 'all')}
+                      onChange={(e) => setMemoryFilter((e.target.value as any) || 'all')}
                       className="bg-slate-900 border border-slate-800 text-slate-300 text-[11px] rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-500"
                     >
-                      <option value="">階層別絞り込み...</option>
-                      <option value="semantic">意味記憶 (semantic)</option>
-                      <option value="episodic">エピソード記憶 (episodic)</option>
-                      <option value="procedural">手続き記憶 (procedural)</option>
-                      <option value="structural">構造記憶 (structural)</option>
-                      <option value="associative">連想記憶 (associative)</option>
-                      <option value="core">コア記憶 (core)</option>
-                      <option value="emotional">感情記憶 (emotional)</option>
+                      <option value="">階層・保存先で絞り込み...</option>
+                      <optgroup label="7階層構造">
+                        <option value="semantic">意味記憶 (semantic)</option>
+                        <option value="episodic">エピソード記憶 (episodic)</option>
+                        <option value="procedural">手続き記憶 (procedural)</option>
+                        <option value="structural">構造記憶 (structural)</option>
+                        <option value="associative">連想記憶 (associative)</option>
+                        <option value="core">コア記憶 (core)</option>
+                        <option value="emotional">感情記憶 (emotional)</option>
+                      </optgroup>
+                      <optgroup label="49章 保存先分類">
+                        <option value="project_memory">プロジェクト記憶</option>
+                        <option value="evaluation_set">評価セット (回帰テスト)</option>
+                        <option value="skill">スキル (再利用コード)</option>
+                      </optgroup>
                     </select>
                   </div>
 
@@ -727,6 +867,40 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                               {mem.memoryType && (
                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-slate-900 text-slate-400 border border-slate-700 shrink-0">
                                   {mem.memoryType}
+                                </span>
+                              )}
+
+                              {mem.destination && (
+                                <span
+                                  className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono shrink-0 border ${
+                                    mem.destination === 'long_term_memory'
+                                      ? 'bg-sky-950/80 text-sky-300 border-sky-800'
+                                      : mem.destination === 'project_memory'
+                                      ? 'bg-indigo-950/80 text-indigo-300 border-indigo-800'
+                                      : mem.destination === 'skill'
+                                      ? 'bg-amber-950/80 text-amber-300 border-amber-800'
+                                      : mem.destination === 'evaluation_set'
+                                      ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                                      : mem.destination === 'search_policy'
+                                      ? 'bg-purple-950/80 text-purple-300 border-purple-800'
+                                      : mem.destination === 'lora_dataset'
+                                      ? 'bg-pink-950/80 text-pink-300 border-pink-800'
+                                      : 'bg-slate-900 text-slate-400 border-slate-700'
+                                  }`}
+                                >
+                                  {mem.destination === 'long_term_memory'
+                                    ? '長期記憶'
+                                    : mem.destination === 'project_memory'
+                                    ? 'プロジェクト記憶'
+                                    : mem.destination === 'skill'
+                                    ? 'スキル'
+                                    : mem.destination === 'evaluation_set'
+                                    ? '評価セット'
+                                    : mem.destination === 'search_policy'
+                                    ? '検索ポリシー'
+                                    : mem.destination === 'lora_dataset'
+                                    ? 'LoRA教材'
+                                    : mem.destination}
                                 </span>
                               )}
 
@@ -809,12 +983,43 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                 </button>
                               </div>
 
+                              {/* 49章 保存先別アクションボタン */}
+                              {mem.destination === 'evaluation_set' && (
+                                <button
+                                  onClick={() => handleExportToBenchmark(mem.id)}
+                                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900 transition-all flex items-center gap-1 shrink-0"
+                                  title="回帰ベンチマークスイートへ新規テストケースとして登録"
+                                >
+                                  <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
+                                  <span>回帰テスト登録</span>
+                                </button>
+                              )}
+
+                              {mem.destination === 'skill' && (
+                                <button
+                                  onClick={() => handleExportToSkill(mem.id)}
+                                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/40 hover:bg-amber-900 transition-all flex items-center gap-1 shrink-0"
+                                  title="スキルライブラリへ新規スキルとして登録"
+                                >
+                                  <Zap className="w-2.5 h-2.5 text-amber-400" />
+                                  <span>スキル登録</span>
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => handleMarkDiscard(mem.id)}
+                                className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/30 rounded-lg transition-colors shrink-0"
+                                title="破棄候補へマーク（破棄候補タブの一括確認リストへ送る）"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+
                               <button
                                 onClick={() => handleDelete(mem.id)}
                                 className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors shrink-0"
-                                title="記憶を削除"
+                                title="直ちに記憶を完全削除"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Ban className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
@@ -1363,6 +1568,263 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* TAB 6: Quarantine (隔離・出典不明・要検証) - 第49章 経験の保存先ルーター */}
+          {activeSubTab === 'quarantine' && (() => {
+            const quarantinedList = storageService.getQuarantinedMemories();
+            return (
+              <div className="space-y-4 text-xs">
+                {/* 隔離の解説・安全バナー */}
+                <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/50 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-bold text-amber-300 text-sm flex items-center gap-2">
+                          <span>🛡️ 隔離された経験・未確認記憶 ({quarantinedList.length}件)</span>
+                          <span className="px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800 text-[10px] font-mono">
+                            プロンプト注入から完全除外中
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                          出典不明、正解性・真偽が未確認、または外部非公式ソースから取得された情報は、
+                          <strong>LLMプロンプトへの自動注入から完全に隔離</strong>されています。
+                          内容を確認し、問題がなければ【長期記憶】や【プロジェクト記憶】へ昇格承認してください。
+                        </p>
+                      </div>
+                    </div>
+                    {quarantinedList.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
+                        <button
+                          onClick={() => handleBatchPromoteQuarantine('long_term_memory')}
+                          className="px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/50 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <CheckCheck className="w-3.5 h-3.5" />
+                          <span>全件を長期記憶へ昇格</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 隔離アイテム一覧 */}
+                {quarantinedList.length === 0 ? (
+                  <div className="p-12 text-center border border-dashed border-slate-800 rounded-xl space-y-2">
+                    <ShieldCheck className="w-8 h-8 text-emerald-400 mx-auto" />
+                    <div className="text-slate-300 font-bold text-sm">隔離された経験・記憶はありません</div>
+                    <p className="text-slate-500 text-xs">
+                      すべての記憶は安全に分類・承認されているか、通常記憶として管理されています。
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {quarantinedList.map((mem) => {
+                      const risk = mem.routingFactors?.impactRisk || 'medium';
+                      return (
+                        <div
+                          key={mem.id}
+                          className="p-3.5 rounded-xl bg-slate-900/90 border border-amber-500/30 hover:border-amber-500/50 transition-all space-y-2.5"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+                            <div className="space-y-1.5 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                                  <ShieldAlert className="w-3 h-3" />
+                                  <span>隔離中</span>
+                                </span>
+
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono border ${
+                                    risk === 'high'
+                                      ? 'bg-rose-950 text-rose-300 border-rose-800'
+                                      : risk === 'medium'
+                                      ? 'bg-amber-950 text-amber-300 border-amber-800'
+                                      : 'bg-slate-800 text-slate-300 border-slate-700'
+                                  }`}
+                                >
+                                  リスク: {risk}
+                                </span>
+
+                                {mem.quarantineReason && (
+                                  <span className="text-[11px] text-amber-200/90 font-medium">
+                                    理由: {mem.quarantineReason}
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-slate-100 text-xs font-medium leading-relaxed bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                                {mem.content}
+                              </p>
+
+                              <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400">
+                                <span>
+                                  カテゴリ: <strong className="text-slate-300">{mem.category}</strong>
+                                </span>
+                                {mem.sourceRef && (
+                                  <span>
+                                    参照元: <strong className="text-slate-300">{mem.sourceRef}</strong>
+                                  </span>
+                                )}
+                                {mem.routingFactors && (
+                                  <span>
+                                    再利用性: <strong className="text-slate-300">{mem.routingFactors.reusability || '中'}</strong> / 承認状態:{' '}
+                                    <strong className="text-slate-300">{mem.routingFactors.approvalStatus || '未確認'}</strong>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* アクションボタン群 */}
+                            <div className="flex flex-wrap sm:flex-col gap-1.5 shrink-0 self-start">
+                              <button
+                                onClick={() => handlePromoteQuarantine(mem.id, 'long_term_memory')}
+                                className="px-2.5 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/50 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                                title="安全を確認したため、長期記憶として承認しプロンプトで利用可能にします"
+                              >
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>長期記憶へ昇格</span>
+                              </button>
+
+                              <button
+                                onClick={() => handlePromoteQuarantine(mem.id, 'project_memory')}
+                                className="px-2.5 py-1.5 bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 border border-sky-500/50 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                                title="このプロジェクト限定の記憶として承認します"
+                              >
+                                <FolderGit2 className="w-3.5 h-3.5 text-sky-400" />
+                                <span>プロジェクト記憶へ</span>
+                              </button>
+
+                              <button
+                                onClick={() => handleMarkDiscard(mem.id, '隔離から破棄候補へ移行')}
+                                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+                                <span>破棄候補へ送る</span>
+                              </button>
+
+                              <button
+                                onClick={() => handleDelete(mem.id)}
+                                className="px-2.5 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                                title="直ちに完全削除します"
+                              >
+                                <span>完全に削除</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* TAB 7: Discard Candidates (破棄候補リスト) - 第49章 経験の保存先ルーター */}
+          {activeSubTab === 'discard' && (() => {
+            const discardList = storageService.getDiscardCandidateMemories();
+            return (
+              <div className="space-y-4 text-xs">
+                {/* 破棄候補の解説・一括確認バナー */}
+                <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <Trash2 className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-bold text-slate-200 text-sm flex items-center gap-2">
+                          <span>🗑️ 破棄候補リスト ({discardList.length}件)</span>
+                          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-mono">
+                            一括確認用リスト
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                          重複、低評価（badCount超過）、または誤りと判定された記憶の候補一覧です。
+                          <strong>勝手に自動削除されることはなく</strong>、ユーザーの一括確認を経て安全に削除または復帰できます。
+                        </p>
+                      </div>
+                    </div>
+                    {discardList.length > 0 && (
+                      <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                        <button
+                          onClick={handleBatchDeleteDiscards}
+                          className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-md shadow-rose-600/20 transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>破棄候補を一括完全削除 ({discardList.length}件)</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 破棄候補アイテム一覧 */}
+                {discardList.length === 0 ? (
+                  <div className="p-12 text-center border border-dashed border-slate-800 rounded-xl space-y-2">
+                    <CheckCircle2 className="w-8 h-8 text-slate-500 mx-auto" />
+                    <div className="text-slate-300 font-bold text-sm">破棄候補の記憶はありません</div>
+                    <p className="text-slate-500 text-xs">
+                      削除候補としてマークされた記憶はありません。クリーンな状態です。
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {discardList.map((mem) => (
+                      <div
+                        key={mem.id}
+                        className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-all space-y-2"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+                          <div className="space-y-1.5 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                                破棄候補
+                              </span>
+                              {mem.discardReason && (
+                                <span className="text-[11px] text-rose-300 font-medium">
+                                  理由: {mem.discardReason}
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="text-slate-300 text-xs line-through opacity-80 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
+                              {mem.content}
+                            </p>
+
+                            <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
+                              <span>カテゴリ: {mem.category}</span>
+                              <span>低評価数: {mem.badCount ?? 0}</span>
+                              <span>利用回数: {mem.useCount ?? 0}</span>
+                            </div>
+                          </div>
+
+                          {/* アクション */}
+                          <div className="flex sm:flex-col gap-1.5 shrink-0 self-start">
+                            <button
+                              onClick={() => handleUnmarkDiscard(mem.id)}
+                              className="px-2.5 py-1.5 bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 border border-sky-500/50 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                              title="破棄を取り消し、通常記憶として復帰させます"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
+                              <span>復帰する</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleDelete(mem.id)}
+                              className="px-2.5 py-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                              title="この記憶を完全に削除します"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>完全削除</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Footer */}

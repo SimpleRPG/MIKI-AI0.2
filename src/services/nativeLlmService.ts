@@ -2,7 +2,7 @@ import { registerPlugin, Capacitor } from '@capacitor/core';
 import { systemLogger } from './systemLogger';
 import { webLLMService } from './webLlmService';
 import { sendChatMessage } from './api';
-import { OFFICIAL_GGUF_MODELS } from './ggufModels';
+import { OFFICIAL_GGUF_MODELS, getManifestDefaultConfig, getManifestNativeEnv } from './ggufModels';
 import { storageService } from './storageService';
 
 export interface NativeGpuInfo {
@@ -507,12 +507,13 @@ export class NativeLlmService {
     }
 
     try {
+      const defCfg = getManifestDefaultConfig();
       const res = await NativeMlcPlugin.loadModel({
         modelId,
         fileName: actualFileName || `${modelId}.gguf`,
-        nGpuLayers: options?.nGpuLayers ?? 99,
-        nCtx: options?.nCtx ?? 2048,
-        nThreads: options?.nThreads ?? 4,
+        nGpuLayers: options?.nGpuLayers ?? defCfg.nGpuLayers ?? 99,
+        nCtx: options?.nCtx ?? defCfg.nCtx ?? 2048,
+        nThreads: options?.nThreads ?? defCfg.nThreads ?? 4,
       });
 
       this.activeModelId = modelId;
@@ -601,12 +602,13 @@ export class NativeLlmService {
       }
     });
 
+    const defCfg = getManifestDefaultConfig();
     const executionPromise = (NativeMlcPlugin as any).generateStream({
       messages,
-      temperature: (options as any)?.nativeConfig?.temperature ?? options?.temperature ?? 0.7,
-      topP: (options as any)?.nativeConfig?.topP ?? options?.top_p ?? 0.9,
-      maxTokens: (options as any)?.nativeConfig?.maxTokens ?? options?.max_tokens ?? 512,
-      repetitionPenalty: (options as any)?.nativeConfig?.repetitionPenalty ?? 1.15,
+      temperature: (options as any)?.nativeConfig?.temperature ?? options?.temperature ?? defCfg.temperature ?? 0.7,
+      topP: (options as any)?.nativeConfig?.topP ?? options?.top_p ?? defCfg.topP ?? 0.9,
+      maxTokens: (options as any)?.nativeConfig?.maxTokens ?? options?.max_tokens ?? defCfg.maxTokens ?? 512,
+      repetitionPenalty: (options as any)?.nativeConfig?.repetitionPenalty ?? defCfg.repetitionPenalty ?? 1.15,
       frequencyPenalty: 0.1,
       presencePenalty: 0.1,
       stopSequences: ['<|im_end|>', '<|endoftext|>', '<|end|>', 'User:', 'Assistant:'],
