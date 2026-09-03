@@ -314,15 +314,31 @@ export class BackgroundWorkerService {
 
           // 失敗事例から自動補正用トレーニングサンプルを学習プールへ注入
           if (err.predictionError.errorCategory === 'constraint_violation' || err.actualOutcome.hasToneViolation) {
-            selfImprovementService.addTrainingSample({
-              instruction: prompt,
-              outputTarget: 'うん、わかった！任せて！すぐに確認してやってみるね。',
-              category: 'chat',
-              reliability: 'high',
-              approved: true,
-              originalFailureOutput: err.actualOutcome.actualIntent || '敬語・ロボット的応答',
-              failureReason: 'ロボット的敬語の混入・制約逸脱に対する自己補正プロンプト',
+            // 設計思想 25 & 課題 3: 一過性ノイズの即サンプル化防止ガード (再現回数・頻度チェック)
+            const failureCheck = selfImprovementService.recordOrCheckFailureRecurrence({
+              prompt,
+              category: cat,
+              reason: 'ロボット的敬語の混入・制約逸脱',
             });
+
+            if (failureCheck.isActionable) {
+              // 2回以上再現された本物の弱点パターンのみ学習プールへ正式追加
+              selfImprovementService.addTrainingSample({
+                instruction: prompt,
+                outputTarget: 'うん、わかった！任せて！すぐに確認してやってみるね。',
+                category: 'chat',
+                reliability: 'high',
+                approved: true,
+                split: 'train',
+                originalFailureOutput: err.actualOutcome.actualIntent || '敬語・ロボット的応答',
+                failureReason: `[再現確認: ${failureCheck.recurrenceCount}回] ロボット的敬語の混入・制約逸脱に対する自己補正プロンプト`,
+              });
+              selfImprovementService.markFailurePromoted(failureCheck.patternKey);
+              weaknessFound.push(`[再発弱点昇格] 「${prompt.substring(0, 15)}...」が${failureCheck.recurrenceCount}回再現 ➔ 学習サンプルへ追加`);
+            } else {
+              // 初回・一過性失敗は学習データ汚染を防ぐためサンプル化を保留
+              weaknessFound.push(`[一過性失敗ガード] 「${prompt.substring(0, 15)}...」初回検知 (再現待機: ${failureCheck.recurrenceCount}/2回) ➔ サンプル追加保留`);
+            }
           }
         });
       } else {

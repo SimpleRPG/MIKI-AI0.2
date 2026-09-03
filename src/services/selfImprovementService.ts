@@ -1,6 +1,7 @@
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
+  TrainingDataSplitStats,
   ModelGeneration,
   MemoryItem,
   ChatMessage,
@@ -18,6 +19,18 @@ const TRAINING_DATA_STORAGE_KEY = 'miki_ai_training_samples';
 const MODEL_GENERATIONS_KEY = 'miki_ai_model_generations';
 const TRAINING_THRESHOLD_KEY = 'miki_ai_training_threshold';
 const LAST_NOTIFIED_THRESHOLD_KEY = 'miki_ai_training_notified_count';
+const FAILURE_RECURRENCES_KEY = 'miki_ai_failure_recurrences';
+
+export interface FailureRecurrenceEntry {
+  patternKey: string;
+  category: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  recurrenceCount: number;
+  samplePrompt: string;
+  promotedToTraining: boolean;
+  notes?: string;
+}
 
 /**
  * 初期モデル世代リスト (設計思想 18. 系統樹 & 25. 安全・品質境界)
@@ -43,6 +56,7 @@ class SelfImprovementService {
   private records: SelfImprovementRecord[] = [];
   private trainingSamples: TrainingSampleJSONL[] = [];
   private generations: ModelGeneration[] = [];
+  private failureRecurrences: Map<string, FailureRecurrenceEntry> = new Map();
 
   constructor() {
     this.loadAll();
@@ -55,7 +69,14 @@ class SelfImprovementService {
         if (rawRec) this.records = JSON.parse(rawRec);
 
         const rawTrain = storageService.getItem(TRAINING_DATA_STORAGE_KEY);
-        if (rawTrain) this.trainingSamples = JSON.parse(rawTrain);
+        if (rawTrain) {
+          const parsed: TrainingSampleJSONL[] = JSON.parse(rawTrain);
+          // 互換性担保: 既存サンプルに split がなければ 'train' をデフォルト設定
+          this.trainingSamples = parsed.map((s) => ({
+            ...s,
+            split: s.split || 'train',
+          }));
+        }
 
         const rawGen = storageService.getItem(MODEL_GENERATIONS_KEY);
         if (rawGen) {
@@ -63,6 +84,12 @@ class SelfImprovementService {
         } else {
           this.generations = [...INITIAL_GENERATIONS];
           this.saveGenerations();
+        }
+
+        const rawRecurrences = storageService.getItem(FAILURE_RECURRENCES_KEY);
+        if (rawRecurrences) {
+          const arr: FailureRecurrenceEntry[] = JSON.parse(rawRecurrences);
+          this.failureRecurrences = new Map(arr.map((e) => [e.patternKey, e]));
         }
       } catch (e) {
         console.warn('Failed to load self-improvement data:', e);
@@ -94,12 +121,28 @@ class SelfImprovementService {
     }
   }
 
+  public saveFailureRecurrences(): void {
+    if (typeof storageService !== 'undefined') {
+      try {
+        const arr = Array.from(this.failureRecurrences.values());
+        storageService.setItem(FAILURE_RECURRENCES_KEY, JSON.stringify(arr));
+      } catch (e) {}
+    }
+  }
+
   public getRecords(): SelfImprovementRecord[] {
     return this.records;
   }
 
-  public getTrainingSamples(): TrainingSampleJSONL[] {
-    return this.trainingSamples;
+  /**
+   * 学習サンプル一覧を取得 (スプリット別フィルタ対応)
+   * 設計思想 7. 学習データの改善 (train / validation / test 分離)
+   */
+  public getTrainingSamples(split?: 'train' | 'validation' | 'test' | 'all'): TrainingSampleJSONL[] {
+    if (!split || split === 'all') {
+      return this.trainingSamples;
+    }
+    return this.trainingSamples.filter((s) => (s.split || 'train') === split);
   }
 
   public getGenerations(): ModelGeneration[] {
@@ -266,7 +309,7 @@ class SelfImprovementService {
 
   /**
    * ユーザーからの👎フィードバックや会話の成功を学習用JSONLに追加
-   * 設計思想 7. 学習データの改善
+   * 設計思想 7. 学習データの改善 (train / validation / test 分離)
    */
   public addTrainingSample(sample: {
     instruction: string;
@@ -275,6 +318,7 @@ class SelfImprovementService {
     category?: TrainingSampleJSONL['category'];
     reliability?: TrainingSampleJSONL['reliability'];
     approved?: boolean;
+    split?: 'train' | 'validation' | 'test';
     originalFailureOutput?: string;
     failureReason?: string;
   }): TrainingSampleJSONL {
@@ -286,6 +330,7 @@ class SelfImprovementService {
       category: sample.category || 'chat',
       reliability: sample.reliability || 'high',
       approved: sample.approved ?? true,
+      split: sample.split || 'train',
       originalFailureOutput: sample.originalFailureOutput,
       failureReason: sample.failureReason,
       createdAt: Date.now(),
@@ -295,6 +340,183 @@ class SelfImprovementService {
     this.saveTrainingSamples();
     this.checkTrainingThreshold();
     return newSample;
+  }
+
+  /**
+   * 特定サンプルのデータスプリットを変更 (train / validation / test)
+   */
+  public updateSampleSplit(idOrIndex: string | number, split: 'train' | 'validation' | 'test'): boolean {
+    let sample: TrainingSampleJSONL | undefined;
+    if (typeof idOrIndex === 'number') {
+      sample = this.trainingSamples[idOrIndex];
+    } else {
+      sample = this.trainingSamples.find((s) => s.id === idOrIndex);
+    }
+    if (!sample) return false;
+    sample.split = split;
+    this.saveTrainingSamples();
+    return true;
+  }
+
+  /**
+   * 学習・検証・テストデータの分割統計を取得
+   * 設計思想 7. 学習データの改善 & 評価信頼性 (データリーク防止)
+   */
+  public getSplitStats(): TrainingDataSplitStats {
+    const approved = this.trainingSamples.filter((s) => s.approved);
+    const total = approved.length;
+    let train = 0;
+    let validation = 0;
+    let test = 0;
+    let unassigned = 0;
+
+    for (const s of approved) {
+      if (s.split === 'train') train++;
+      else if (s.split === 'validation') validation++;
+      else if (s.split === 'test') test++;
+      else unassigned++;
+    }
+
+    const effectiveTrain = train + unassigned;
+    const vRatio = total > 0 ? Math.round((validation / total) * 100) : 0;
+    return {
+      total,
+      train: effectiveTrain,
+      validation,
+      test,
+      unassigned,
+      trainRatio: total > 0 ? Math.round((effectiveTrain / total) * 100) : 0,
+      valRatio: vRatio,
+      validationRatio: vRatio,
+      testRatio: total > 0 ? Math.round((test / total) * 100) : 0,
+    };
+  }
+
+  /**
+   * 承認済み学習データを指定比率（デフォルト 8:1:1）で自動分割
+   * 設計思想 7. 学習データの改善 (Train 80% / Val 10% / Test 10%)
+   */
+  public autoAssignSplits(ratio: { train: number; val: number; test: number } = { train: 0.8, val: 0.1, test: 0.1 }): TrainingDataSplitStats {
+    const approved = this.trainingSamples.filter((s) => s.approved);
+    if (approved.length === 0) {
+      return this.getSplitStats();
+    }
+
+    // シャッフルして偏りを防ぐ
+    const shuffled = [...approved].sort(() => Math.random() - 0.5);
+    const total = shuffled.length;
+    const trainCount = Math.max(1, Math.round(total * ratio.train));
+    const valCount = Math.max(total > 2 ? 1 : 0, Math.round(total * ratio.val));
+
+    shuffled.forEach((sample, idx) => {
+      if (idx < trainCount) {
+        sample.split = 'train';
+      } else if (idx < trainCount + valCount) {
+        sample.split = 'validation';
+      } else {
+        sample.split = 'test';
+      }
+    });
+
+    this.saveTrainingSamples();
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `📊 [データ分割完了] 全${total}件を自動分配: Train ${trainCount}件, Val ${valCount}件, Test ${total - trainCount - valCount}件`
+    );
+    return this.getSplitStats();
+  }
+
+  /**
+   * 失敗パターンの再現性追跡 & 一過性ノイズ排除ガード
+   * 設計思想 9. ベンチマークと退行テスト & 25. 安全・品質境界
+   * 1回の偶発的な失敗で即サンプル化するのを防ぎ、同一パターンが2回以上再現された場合のみ昇格可能とする
+   */
+  public recordOrCheckFailureRecurrence(failure: {
+    prompt: string;
+    category: string;
+    reason?: string;
+  }): {
+    recurrenceCount: number;
+    isActionable: boolean;
+    patternKey: string;
+    entry: FailureRecurrenceEntry;
+  } {
+    // プロンプトの先頭とカテゴリから正規化キーを生成
+    const normPrompt = failure.prompt.trim().replace(/\s+/g, ' ').toLowerCase();
+    const shortPromptKey = normPrompt.slice(0, 40);
+    const patternKey = `${failure.category}:::${shortPromptKey}`;
+
+    let entry = this.failureRecurrences.get(patternKey);
+    const now = Date.now();
+
+    if (!entry) {
+      entry = {
+        patternKey,
+        category: failure.category,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        recurrenceCount: 1,
+        samplePrompt: failure.prompt,
+        promotedToTraining: false,
+        notes: failure.reason,
+      };
+      this.failureRecurrences.set(patternKey, entry);
+      this.saveFailureRecurrences();
+
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `⏳ [一過性失敗ガード] 初回失敗検知 (保留: 1/2回)。再発を待機します: 「${failure.prompt.slice(0, 25)}...」`
+      );
+
+      return {
+        recurrenceCount: 1,
+        isActionable: false,
+        patternKey,
+        entry,
+      };
+    } else {
+      entry.recurrenceCount += 1;
+      entry.lastSeenAt = now;
+      if (failure.reason) entry.notes = failure.reason;
+      this.saveFailureRecurrences();
+
+      // 2回以上再現し、かつ未昇格であればアクション可能（学習データ化を承認）
+      const isActionable = entry.recurrenceCount >= 2 && !entry.promotedToTraining;
+
+      if (isActionable) {
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `🚨 [再現性確認] 弱点パターンが再発しました (再現: ${entry.recurrenceCount}回) ➔ 学習プールへ昇格承認: 「${failure.prompt.slice(0, 25)}...」`
+        );
+      }
+
+      return {
+        recurrenceCount: entry.recurrenceCount,
+        isActionable,
+        patternKey,
+        entry,
+      };
+    }
+  }
+
+  /**
+   * 失敗パターンの学習データ昇格済みフラグを記録
+   */
+  public markFailurePromoted(patternKey: string): void {
+    const entry = this.failureRecurrences.get(patternKey);
+    if (entry) {
+      entry.promotedToTraining = true;
+      this.saveFailureRecurrences();
+    }
+  }
+
+  public getFailureRecurrences(): FailureRecurrenceEntry[] {
+    return Array.from(this.failureRecurrences.values());
+  }
+
+  public clearFailureRecurrences(): void {
+    this.failureRecurrences.clear();
+    this.saveFailureRecurrences();
   }
 
   public deleteTrainingSample(id: string): void {
@@ -459,12 +681,20 @@ class SelfImprovementService {
   }
 
   /**
-   * Colab / LoRA学習用のJSONLファイル出力
+   * Colab / LoRA学習用のJSONLファイル出力 (スプリット指定対応)
+   * 設計思想 7. 学習データの改善 (train / validation / test 分離 & リーク防止)
    */
-  public exportTrainingJSONL(filterOnlyApproved: boolean = true): string {
-    const pool = filterOnlyApproved
+  public exportTrainingJSONL(
+    filterOnlyApproved: boolean = true,
+    split?: 'train' | 'validation' | 'test' | 'all'
+  ): string {
+    let pool = filterOnlyApproved
       ? this.trainingSamples.filter((s) => s.approved)
       : this.trainingSamples;
+
+    if (split && split !== 'all') {
+      pool = pool.filter((s) => (s.split || 'train') === split);
+    }
 
     const jsonlRows = pool.map((item) => {
       const messages = [
@@ -495,6 +725,7 @@ class SelfImprovementService {
         id: item.id,
         category: item.category,
         reliability: item.reliability,
+        split: item.split || 'train',
         messages,
       });
     });
@@ -504,12 +735,12 @@ class SelfImprovementService {
 
   /**
    * Google Colab用のLoRA学習Pythonスクリプト(Unsloth / PEFT)を生成
-   * 設計思想 1. Colab、学習、量子化、GGUF変換
+   * 設計思想 1. Colab、学習、量子化、GGUF変換 & 7. 学習・検証・テスト分離
    */
   public generateColabTrainingScript(modelName: string = 'Qwen/Qwen2.5-Coder-1.5B-Instruct'): string {
     return `# ==============================================================================
 # MIKI-AI 自己進化 Colab LoRA Fine-Tuning & GGUF 量子化スクリプト
-# 設計思想 1. Colab、学習、量子化、GGUF変換 に基づく完全自動パイプライン
+# 設計思想 1. Colab、学習、量子化、GGUF変換 & 7. train / val / test 厳格分離
 # ==============================================================================
 
 # 1. 依存ライブラリのインストール (高速LoRA Unsloth / PEFT / llama.cpp)
@@ -547,24 +778,33 @@ model = FastLanguageModel.get_peft_model(
     random_state = 3407,
 )
 
-# 4. データセットの読み込み (アプリからエクスポートした dataset.jsonl をアップロード)
-dataset = load_dataset("json", data_files={"train": "miki_dataset.jsonl"}, split="train")
+# 4. train / validation / test 分離データセットの読み込み (データリーク完全防止)
+# アプリからエクスポートした train.jsonl / val.jsonl (または miki_dataset.jsonl) をアップロード
+import os
+if os.path.exists("train.jsonl") and os.path.exists("val.jsonl"):
+    dataset = load_dataset("json", data_files={"train": "train.jsonl", "validation": "val.jsonl"})
+else:
+    raw_dataset = load_dataset("json", data_files={"train": "miki_dataset.jsonl"})["train"]
+    dataset = raw_dataset.train_test_split(test_size=0.1, seed=3407)
+    dataset["validation"] = dataset.pop("test")
 
 def formatting_prompts_func(examples):
     convs = examples["messages"]
     texts = []
     for conv in convs:
-        text = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=False)
-        texts.append(text)
-    return { "text" : texts }
+        formatted = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=False)
+        texts.append(formatted)
+    return { "text": texts }
 
-dataset = dataset.map(formatting_prompts_func, batched = True)
+train_dataset = dataset["train"].map(formatting_prompts_func, batched=True)
+eval_dataset = dataset["validation"].map(formatting_prompts_func, batched=True)
 
-# 5. 学習実行 (SFTTrainer)
+# 5. SFT Trainer のセットアップ (Validation Lossのモニタリング)
 trainer = SFTTrainer(
     model = model,
     tokenizer = tokenizer,
-    train_dataset = dataset,
+    train_dataset = train_dataset,
+    eval_dataset = eval_dataset,
     dataset_text_field = "text",
     max_seq_length = max_seq_length,
     dataset_num_proc = 2,
@@ -578,6 +818,10 @@ trainer = SFTTrainer(
         fp16 = not torch.cuda.is_bf16_supported(),
         bf16 = torch.cuda.is_bf16_supported(),
         logging_steps = 1,
+        evaluation_strategy = "steps",
+        eval_steps = 10,
+        save_strategy = "steps",
+        save_steps = 30,
         optim = "adamw_8bit",
         weight_decay = 0.01,
         lr_scheduler_type = "linear",
@@ -586,12 +830,12 @@ trainer = SFTTrainer(
     ),
 )
 
-trainer.train()
+# 6. 学習実行
+trainer_stats = trainer.train()
 
-# 6. GGUF形式 (Q4_K_M) への直接変換 & 保存
-# 生成された GGUF ファイルを Galaxy S25 の internal/models/ へ配置すれば完了！
-model.save_pretrained_gguf("miki_model_candidate_q4", tokenizer, quantization_method = "q4_k_m")
-print("🎉 学習とGGUF変換が完了しました！ 'miki_model_candidate_q4-unsloth.Q4_K_M.gguf' をダウンロードして端末に転送してください。")
+# 7. GGUF形式 (q4_k_m) への自動量子化 & 保存 (Galaxy S25 実機最適)
+model.save_pretrained_gguf("miki_model_gguf", tokenizer, quantization_method="q4_k_m")
+print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf ディレクトリの .gguf ファイルをアプリにインポートしてください。")
 `;
   }
 

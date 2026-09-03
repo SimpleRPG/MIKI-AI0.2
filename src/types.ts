@@ -243,11 +243,24 @@ export interface TrainingSampleJSONL {
   category: 'chat' | 'code' | 'vba' | 'retrieval' | 'correction' | 'tool_use';
   reliability: 'high' | 'medium' | 'low';
   approved: boolean;
+  split?: 'train' | 'validation' | 'test'; // 設計思想 7: 学習・検証・テストの厳格なデータ分離 (リーク防止)
   originalFailureOutput?: string;
   failureReason?: string;
   correctionHistory?: string[];
   verificationResult?: string;
   createdAt: number;
+}
+
+export interface TrainingDataSplitStats {
+  total: number;
+  train: number;
+  validation: number;
+  test: number;
+  unassigned: number;
+  trainRatio: number;
+  valRatio: number;
+  validationRatio: number;
+  testRatio: number;
 }
 
 /**

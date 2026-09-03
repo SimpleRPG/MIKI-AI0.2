@@ -29,10 +29,14 @@ import {
   Play,
   Shield,
   Bell,
+  Database,
+  PieChart,
+  Filter,
 } from 'lucide-react';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
+  TrainingDataSplitStats,
   ModelGeneration,
   SkillItem,
   ChatMessage,
@@ -110,9 +114,14 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   const [abResult, setAbResult] = useState<any>(null);
   const [searchBenchmarkQuery, setSearchBenchmarkQuery] = useState('Canvas 当たり判定 バグ');
 
-  // Colab & 学習データ
+  // Colab & 学習データ (Train / Validation / Test 分割対応)
   const [trainingSamples, setTrainingSamples] = useState<TrainingSampleJSONL[]>([]);
   const [colabScript, setColabScript] = useState('');
+  const [splitMessage, setSplitMessage] = useState<string | null>(null);
+  const [selectedSplitFilter, setSelectedSplitFilter] = useState<'all' | 'train' | 'validation' | 'test'>('all');
+  const [splitStats, setSplitStats] = useState<TrainingDataSplitStats>(() =>
+    selfImprovementService.getSplitStats()
+  );
 
   // 世代管理ステート
   const [generations, setGenerations] = useState<ModelGeneration[]>([]);
@@ -162,6 +171,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
     if (isOpen) {
       setSkills(skillsService.getAllSkills());
       setTrainingSamples(selfImprovementService.getTrainingSamples());
+      setSplitStats(selfImprovementService.getSplitStats());
       setGenerations(selfImprovementService.getGenerations());
       setColabScript(selfImprovementService.generateColabTrainingScript());
       setWorldModelErrors(worldModelService.getErrorRecords());
@@ -354,13 +364,42 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
     setGenerations(selfImprovementService.getGenerations());
   };
 
-  const handleExportJSONLFile = () => {
-    const jsonl = selfImprovementService.exportTrainingJSONL(false);
+  // 学習データの Train / Validation / Test 自動分割
+  const handleAutoAssignSplits = () => {
+    const res = selfImprovementService.autoAssignSplits({ train: 0.8, val: 0.1, test: 0.1 });
+    setTrainingSamples(selfImprovementService.getTrainingSamples());
+    setSplitStats(selfImprovementService.getSplitStats());
+    setSplitMessage(
+      `✓ データセットを自動分割しました: Train ${res.train}件 (80%), Validation ${res.validation}件 (10%), Test ${res.test}件 (10%)`
+    );
+    setTimeout(() => setSplitMessage(null), 5000);
+  };
+
+  // サンプルの split 個別変更
+  const handleUpdateSampleSplit = (index: number, split: 'train' | 'validation' | 'test') => {
+    selfImprovementService.updateSampleSplit(index, split);
+    setTrainingSamples(selfImprovementService.getTrainingSamples());
+    setSplitStats(selfImprovementService.getSplitStats());
+  };
+
+  // サンプルの承認トグル
+  const handleToggleApproveSample = (index: number) => {
+    const samples = selfImprovementService.getTrainingSamples();
+    if (samples[index]) {
+      samples[index].approved = !samples[index].approved;
+      setTrainingSamples([...samples]);
+      setSplitStats(selfImprovementService.getSplitStats());
+    }
+  };
+
+  // JSONLエクスポート (全件 or 特定split)
+  const handleExportJSONLFile = (split?: 'train' | 'validation' | 'test') => {
+    const jsonl = selfImprovementService.exportTrainingJSONL(false, split);
     const blob = new Blob([jsonl], { type: 'application/jsonl' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `miki_lora_dataset_${Date.now()}.jsonl`;
+    a.download = `miki_lora_${split || 'all'}_dataset_${Date.now()}.jsonl`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1638,7 +1677,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                     <span>Google Colab LoRA Fine-Tuning & GGUF 自動変換 (設計思想 1 & 7)</span>
                   </div>
                   <button
-                    onClick={handleExportJSONLFile}
+                    onClick={() => handleExportJSONLFile()}
                     className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20"
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -1761,6 +1800,210 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                     </div>
                   );
                 })()}
+              </div>
+
+              {/* Train / Validation / Test 分離管理カード (設計思想 18・過学習防止 & 課題 2) */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-sky-900/40 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="font-bold text-sky-300 text-xs flex items-center gap-2">
+                      <Database className="w-4 h-4 text-sky-400" />
+                      <span>学習データ Train / Validation / Test 分割管理 (データ漏洩防止)</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      学習に使ったデータでモデルを自己評価する漏洩(Data Leakage)を防ぎ、未見データでの汎化性能を保証します。
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleAutoAssignSplits}
+                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs flex items-center gap-1.5 font-bold transition-all shadow-md shrink-0"
+                    title="現在のサンプル群を Train(80%) / Validation(10%) / Test(10%) にシャッフル自動分割"
+                  >
+                    <PieChart className="w-3.5 h-3.5" />
+                    <span>🎲 自動分割 (80:10:10)</span>
+                  </button>
+                </div>
+
+                {splitMessage && (
+                  <div className="p-2.5 rounded-lg bg-sky-950/60 border border-sky-700 text-sky-200 text-xs animate-in fade-in font-mono flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                    <span>{splitMessage}</span>
+                  </div>
+                )}
+
+                {/* 3-Column Split Breakdown Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3 rounded-xl bg-sky-950/30 border border-sky-800/60 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-sky-300">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-sky-400" />
+                        Train (学習用)
+                      </span>
+                      <span className="font-mono text-sky-200">{splitStats.trainRatio}%</span>
+                    </div>
+                    <div className="text-xl font-bold font-mono text-white">
+                      {splitStats.train} <span className="text-xs text-slate-400 font-normal">件</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      SFT / LoRA の重み更新パラメータ学習にのみ使用。
+                    </p>
+                    <button
+                      onClick={() => handleExportJSONLFile('train')}
+                      className="w-full mt-1.5 px-2 py-1 bg-sky-900/50 hover:bg-sky-800/60 text-sky-200 border border-sky-700/50 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>train.jsonl</span>
+                    </button>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/60 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                        Validation (検証用)
+                      </span>
+                      <span className="font-mono text-emerald-200">{splitStats.validationRatio}%</span>
+                    </div>
+                    <div className="text-xl font-bold font-mono text-white">
+                      {splitStats.validation} <span className="text-xs text-slate-400 font-normal">件</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      学習中の過学習検知 & eval_loss 最適停止判定に使用。
+                    </p>
+                    <button
+                      onClick={() => handleExportJSONLFile('validation')}
+                      className="w-full mt-1.5 px-2 py-1 bg-emerald-900/50 hover:bg-emerald-800/60 text-emerald-200 border border-emerald-700/50 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>validation.jsonl</span>
+                    </button>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-purple-950/30 border border-purple-800/60 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-purple-300">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-purple-400" />
+                        Test (未見評価用)
+                      </span>
+                      <span className="font-mono text-purple-200">{splitStats.testRatio}%</span>
+                    </div>
+                    <div className="text-xl font-bold font-mono text-white">
+                      {splitStats.test} <span className="text-xs text-slate-400 font-normal">件</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      学習には一切含めず、最終モデルの客観的性能判定に使用。
+                    </p>
+                    <button
+                      onClick={() => handleExportJSONLFile('test')}
+                      className="w-full mt-1.5 px-2 py-1 bg-purple-900/50 hover:bg-purple-800/60 text-purple-200 border border-purple-700/50 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>test.jsonl</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Samples Inspection & Split Assignment List */}
+                <div className="pt-2 border-t border-slate-800/80 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-300 font-semibold">
+                      <Filter className="w-3.5 h-3.5 text-slate-400" />
+                      <span>サンプル分割プレビュー & 手動割り当て</span>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+                      {(['all', 'train', 'validation', 'test'] as const).map((splitKey) => (
+                        <button
+                          key={splitKey}
+                          onClick={() => setSelectedSplitFilter(splitKey)}
+                          className={`px-2 py-0.5 rounded-md font-medium transition-colors ${
+                            selectedSplitFilter === splitKey
+                              ? 'bg-sky-600 text-white font-bold'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {splitKey === 'all'
+                            ? `全件 (${trainingSamples.length})`
+                            : splitKey === 'train'
+                            ? `Train (${splitStats.train})`
+                            : splitKey === 'validation'
+                            ? `Val (${splitStats.validation})`
+                            : `Test (${splitStats.test})`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                    {trainingSamples
+                      .map((sample, idx) => ({ sample, originalIdx: idx }))
+                      .filter(({ sample }) => {
+                        if (selectedSplitFilter === 'all') return true;
+                        return (sample.split || 'train') === selectedSplitFilter;
+                      })
+                      .slice(0, 15)
+                      .map(({ sample, originalIdx }) => (
+                        <div
+                          key={originalIdx}
+                          className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                        >
+                          <div className="flex items-start gap-2 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={sample.approved}
+                              onChange={() => handleToggleApproveSample(originalIdx)}
+                              className="mt-1 rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0 cursor-pointer"
+                              title="教材承認状態"
+                            />
+                            <div className="min-w-0 space-y-0.5 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-slate-200 truncate max-w-xs">
+                                  Q: {sample.instruction}
+                                </span>
+                                {sample.failureReason && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60 font-mono">
+                                    {sample.failureReason.length > 25 ? `${sample.failureReason.substring(0, 25)}...` : sample.failureReason}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-400 truncate max-w-md">
+                                A: {sample.outputTarget}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                            <select
+                              value={sample.split || 'train'}
+                              onChange={(e) =>
+                                handleUpdateSampleSplit(
+                                  originalIdx,
+                                  e.target.value as 'train' | 'validation' | 'test'
+                                )
+                              }
+                              className={`text-[11px] font-bold rounded-lg px-2 py-1 border cursor-pointer ${
+                                (sample.split || 'train') === 'train'
+                                  ? 'bg-sky-950/80 border-sky-700 text-sky-200'
+                                  : (sample.split || 'train') === 'validation'
+                                  ? 'bg-emerald-950/80 border-emerald-700 text-emerald-200'
+                                  : 'bg-purple-950/80 border-purple-700 text-purple-200'
+                              }`}
+                            >
+                              <option value="train">Train (学習)</option>
+                              <option value="validation">Validation (検証)</option>
+                              <option value="test">Test (未見評価)</option>
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+
+                    {trainingSamples.length === 0 && (
+                      <div className="text-center py-4 text-xs text-slate-500">
+                        学習サンプルがまだ蓄積されていません。会話や自己対話サイクルが進行すると自動登録されます。
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}

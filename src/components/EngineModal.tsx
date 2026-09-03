@@ -6,6 +6,7 @@ import { deviceBenchmarkService, DeviceSpecReport } from '../services/deviceBenc
 import { distillKnowledgeForLocalLLM, sendChatMessage } from '../services/api';
 import { systemLogger } from '../services/systemLogger';
 import { storageService } from '../services/storageService';
+import { selfImprovementService } from '../services/selfImprovementService';
 import { enrichMemoryMetadata } from '../utils/memoryRetrieval';
 import { VRAMMonitor } from './VRAMMonitor';
 import { GgufModelManager } from './GgufModelManager';
@@ -282,6 +283,10 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   const [testMetrics, setTestMetrics] = useState<{ speed: number; latency: number } | null>(null);
   const [activeLoadingModelId, setActiveLoadingModelId] = useState<string | null>(null);
   const [isBatchDownloading, setIsBatchDownloading] = useState(false);
+
+  // 個別モデル削除の保護ステート (使用中チェック・stable世代チェック・確認ダイアログ)
+  const [deleteConfirmModel, setDeleteConfirmModel] = useState<LocalLLMModel | null>(null);
+  const [deleteProtectionError, setDeleteProtectionError] = useState<string | null>(null);
   const [batchQueue, setBatchQueue] = useState<{ total: number; currentIdx: number; currentModelName: string } | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const cancelBatchRef = React.useRef(false);
@@ -784,8 +789,48 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     }
   };
 
-  // Real Delete Cache
-  const handleDeleteCache = async (modelId: string) => {
+  // 個別モデル削除の保護チェック & 確認ダイアログ要求
+  // 設計思想 25. 安全・品質境界 & 課題 1: 使用中チェック・stable世代チェック・確認ダイアログ
+  const handleRequestDelete = (model: LocalLLMModel) => {
+    setDeleteProtectionError(null);
+
+    // 1. 使用中チェック (WebLLMで現在ロード中 または テスト推論実行中 または Native LLMアクティブ)
+    const isCurrentlyLoaded = webLLMService.isLoaded() && webLLMService.getActiveModelId() === model.id;
+    const isCurrentlyTesting = testingModelId === model.id && isTestRunning;
+    const isNativeActive = nativeLlmService.isNative() && nativeLlmService.getActiveModelId() === model.id;
+
+    if (isCurrentlyLoaded || isCurrentlyTesting || isNativeActive) {
+      setDeleteProtectionError(
+        `【削除阻止】モデル「${model.name}」は現在メモリ上にロードされ稼働中です。モデルをアンロードするか、別の推論エンジンに切り替えてから削除してください。`
+      );
+      return;
+    }
+
+    // 2. 総合安定版 (stable) / アクティブ世代チェック
+    const generations = selfImprovementService.getGenerations();
+    const protectedGens = generations.filter(
+      (g) => g.branch === 'stable' || g.status === 'active'
+    );
+    const isProtectedStable = protectedGens.some((g) => {
+      const matchId = model.id.toLowerCase().includes(g.generationId.toLowerCase());
+      const matchName = model.name.toLowerCase().includes(g.modelName.toLowerCase());
+      const matchBase = g.baseModel && model.id.toLowerCase().includes(g.baseModel.toLowerCase());
+      return matchId || matchName || matchBase;
+    });
+
+    if (isProtectedStable) {
+      setDeleteProtectionError(
+        `【保護対象モデル】モデル「${model.name}」は自己改善システムにおいて『総合安定版 (stable)』または『アクティブ世代』として保護されています。安定版登録を解除するか、別モデルを昇格させてから削除してください。`
+      );
+      return;
+    }
+
+    // 3. 多層保護チェック合格 ➔ 確認ダイアログを開く
+    setDeleteConfirmModel(model);
+  };
+
+  // 確認ダイアログ承認後の実削除実行
+  const handleExecuteDeleteCache = async (modelId: string) => {
     try {
       await webLLMService.deleteModelCache(modelId);
       setLocalModels((prev) =>
@@ -805,8 +850,11 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         setTestingModelId(null);
         setTestOutput('');
       }
+      setDeleteConfirmModel(null);
+      setDeleteProtectionError(null);
     } catch (err: any) {
       console.error('Delete cache error:', err);
+      setDeleteProtectionError(`削除中にエラーが発生しました: ${err?.message || err}`);
     }
   };
 
@@ -1940,9 +1988,9 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                               )}
 
                               <button
-                                onClick={() => handleDeleteCache(model.id)}
+                                onClick={() => handleRequestDelete(model)}
                                 className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                                title="端末ストレージからモデルキャッシュを削除"
+                                title="端末ストレージからモデルキャッシュを削除 (保護チェック付き)"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -2147,6 +2195,81 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                   );
                 })}
               </div>
+
+              {/* 個別モデル削除の保護警告メッセージ */}
+              {deleteProtectionError && (
+                <div className="p-4 rounded-xl bg-rose-950/70 border border-rose-600/80 text-rose-200 text-xs flex items-start justify-between gap-3 animate-in fade-in shadow-lg">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <div className="font-bold text-sm text-rose-100 flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-rose-400" />
+                        <span>モデル削除保護セキュリティガード</span>
+                      </div>
+                      <p className="leading-relaxed text-rose-200/90">{deleteProtectionError}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDeleteProtectionError(null)}
+                    className="p-1 text-rose-400 hover:text-white hover:bg-rose-900/60 rounded-lg transition-colors shrink-0"
+                    title="閉じる"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* 個別モデル削除の確認ダイアログモーダル */}
+              {deleteConfirmModel && (
+                <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                  <div className="bg-slate-900 border border-rose-500/60 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95">
+                    <div className="flex items-center gap-3 text-rose-400">
+                      <div className="p-2.5 bg-rose-950/60 border border-rose-800 rounded-xl">
+                        <Trash2 className="w-6 h-6 text-rose-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-bold text-white">モデルキャッシュの削除確認</h4>
+                        <p className="text-xs text-slate-400">端末ストレージからの完全消去</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/80 border border-slate-800 p-3.5 rounded-xl space-y-2 text-xs">
+                      <div className="flex justify-between items-center text-slate-300">
+                        <span className="text-slate-400">対象モデル:</span>
+                        <span className="font-bold text-white text-right truncate max-w-[220px]">{deleteConfirmModel.name}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-300">
+                        <span className="text-slate-400">モデルID:</span>
+                        <span className="font-mono text-[11px] text-purple-300 truncate max-w-[220px]">{deleteConfirmModel.id}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-300">
+                        <span className="text-slate-400">解放ストレージ:</span>
+                        <span className="font-bold text-emerald-400">約 {deleteConfirmModel.sizeMB} MB</span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      このモデルのキャッシュを端末から削除します。削除後に再度利用する場合は、改めてモデルのダウンロード（通信）が必要となります。
+                    </p>
+
+                    <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+                      <button
+                        onClick={() => setDeleteConfirmModel(null)}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+                      >
+                        キャンセル
+                      </button>
+                      <button
+                        onClick={() => handleExecuteDeleteCache(deleteConfirmModel.id)}
+                        className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>キャッシュを削除する</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Interactive Test Inference Area */}
               {testingModelId && (
