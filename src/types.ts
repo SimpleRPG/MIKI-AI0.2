@@ -317,6 +317,7 @@ export interface TrainingSampleJSONL {
   outputTarget: string;
   category: 'chat' | 'code' | 'vba' | 'retrieval' | 'correction' | 'tool_use';
   reliability: 'high' | 'medium' | 'low';
+  source?: 'local_user' | 'autonomous_cycle' | 'external_teacher' | 'benchmark_feedback' | string;
   approved: boolean;
   split?: 'train' | 'validation' | 'test'; // 設計思想 7: 学習・検証・テストの厳格なデータ分離 (リーク防止)
   originalFailureOutput?: string;
@@ -326,6 +327,94 @@ export interface TrainingSampleJSONL {
   redacted?: boolean; // 個人情報伏字化([REDACTED])フラグ (設計思想 25. 安全・品質境界)
   redactedReasons?: string[];
   createdAt: number;
+}
+
+/**
+ * 失敗パターンの再現性追跡 (設計思想 9. 回帰テスト & 37. 外部教師パイプライン)
+ */
+export interface FailureRecurrenceEntry {
+  patternKey: string;
+  category: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  recurrenceCount: number;
+  samplePrompt: string;
+  promotedToTraining?: boolean;
+  promotedToSample?: boolean;
+  notes?: string;
+  reason?: string;
+}
+
+/**
+ * 外部教師リクエストパイプライン型定義 (設計思想 37〜39節 フェーズ8)
+ */
+export interface TeacherBudgetLimits {
+  dailyCalls: number;
+  monthlyCalls: number;
+}
+
+export interface TeacherBudgetUsage {
+  currentDate: string; // YYYY-MM-DD
+  currentMonth: string; // YYYY-MM
+  dailyCalls: number;
+  monthlyCalls: number;
+  dailyPromptTokens: number;
+  dailyOutputTokens: number;
+  monthlyPromptTokens: number;
+  monthlyOutputTokens: number;
+  totalGeneratedMaterials: number;
+  totalVerifiedPassed: number;
+}
+
+export interface TeacherBudgetStatus {
+  allowed: boolean;
+  reason?: string;
+  remaining: {
+    daily: number;
+    monthly: number;
+  };
+  usage: TeacherBudgetUsage;
+  limits: TeacherBudgetLimits;
+}
+
+export interface TeacherRequestPayload {
+  failureCategory: string;
+  abstractFailurePattern: string;
+  expectedCondition: string;
+  failureReason?: string;
+  suggestedFormat: {
+    instruction: string;
+    inputContext?: string;
+    idealOutput: string;
+    reasoningExplanation: string;
+    category: string;
+  };
+  privacyDeclaration: string;
+}
+
+export interface TeacherGeneratedMaterial {
+  title?: string;
+  instruction: string;
+  inputContext?: string;
+  outputTarget: string;
+  category: 'chat' | 'code' | 'vba' | 'retrieval' | 'correction' | 'tool_use';
+  reasoningExplanation?: string;
+  tokensUsed?: {
+    promptTokens: number;
+    outputTokens: number;
+  };
+}
+
+export interface TeacherUsageRecord {
+  id: string;
+  timestamp: number;
+  category: string;
+  promptTokens: number;
+  outputTokens: number;
+  generatedCount: number;
+  verifiedCount: number;
+  success: boolean;
+  notes?: string;
 }
 
 /**

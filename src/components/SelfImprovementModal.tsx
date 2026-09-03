@@ -34,7 +34,9 @@ import {
   Filter,
   AlertCircle,
   Scale,
+  GraduationCap,
 } from 'lucide-react';
+import { ExternalTeacherTab } from './ExternalTeacherTab';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
@@ -76,7 +78,7 @@ export interface SelfImprovementModalProps {
   chatMessages: ChatMessage[];
   memories: MemoryItem[];
   workspaceFiles?: WorkspaceFile[];
-  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations';
+  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations';
 }
 
 export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
@@ -87,7 +89,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   workspaceFiles = [],
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 
@@ -755,6 +757,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <Cpu className="w-4 h-4 text-amber-400" />
             <span>Colab連携 & LoRA教材</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('teacher')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'teacher'
+                ? 'border-emerald-500 text-emerald-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <GraduationCap className="w-4 h-4 text-emerald-400" />
+            <span>外部教師連携 (Gemini)</span>
           </button>
 
           <button
@@ -2795,6 +2809,11 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                 </div>
               </div>
             </div>
+          )}
+
+          {/* TAB: 外部教師リクエスト・パイプライン (設計思想 37〜39節 フェーズ8) */}
+          {activeTab === 'teacher' && (
+            <ExternalTeacherTab onJumpToColab={() => setActiveTab('colab')} />
           )}
 
           {/* TAB 4: Colab連携 & LoRA教材 (第4世代) */}

@@ -3,14 +3,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import JSZip from 'jszip';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3000;
@@ -470,6 +466,98 @@ JSONフォーマットのみを出力してください:
   } catch (error: any) {
     console.error('Error in /api/train-distill:', error);
     res.status(500).json({ success: false, error: error.message || 'Distillation error' });
+  }
+});
+
+// External Teacher Request Pipeline (設計思想 37〜39節 フェーズ8)
+app.post('/api/teacher-request', async (req, res) => {
+  try {
+    const { failureCategory, abstractFailurePattern, expectedCondition, failureReason } = req.body;
+    const ai = getAIClient();
+
+    if (!ai) {
+      // Offline fallback: generate a structured template sample
+      return res.json({
+        success: true,
+        material: {
+          instruction: abstractFailurePattern || '一般的な質問またはタスク指示',
+          inputContext: '',
+          outputTarget: `【模範回答】${abstractFailurePattern}に対する正確で論理的な応答例です。\n期待条件: ${expectedCondition || '論理的かつ安全な出力'}を満たすよう回答します。`,
+          category: failureCategory || 'chat',
+          reasoningExplanation: 'オフライン環境での自律テンプレート生成。Gemini API設定時は最高精度の外部教師回答に切り替わります。'
+        },
+        tokensUsed: { promptTokens: 35, outputTokens: 90 }
+      });
+    }
+
+    const prompt = `あなたはオンデバイス型AIアシスタント（Miki）を指導・育成する最上位マスター教師AI（Teacher AI）です。
+以下の「抽象化・匿名化された弱点パターン」を分析し、オンデバイスLLMが学習すべき高品質な学習用教材データ（JSON）を生成してください。
+
+【厳格なプライバシー・安全境界規則】
+- ユーザーの会話原文や個人情報は既に完全に除去・抽象化されています。
+- 一般化された技術的・論理的・対話的な正解教材のみを出力してください。
+- 危険・有害・自傷・ヘイト・違法行為の手順は絶対に含めないでください。
+
+【弱点カテゴリ】
+${failureCategory || 'chat'}
+
+【抽象化された課題パターン】
+${abstractFailurePattern || '一般的な対話またはコード'}
+
+【達成すべき期待条件】
+${expectedCondition || '自然で正確かつ論理的な応答/コード'}
+
+${failureReason ? `【失敗理由の参考】\n${failureReason}\n` : ''}
+以下のJSONフォーマットのみを返してください（マークダウンコードブロックや余計な前置きは禁止）:
+{
+  "instruction": "オンデバイスAIが学習すべき、一般化された明快な指示文（ユーザーの入力プロンプト相当）",
+  "inputContext": "指示を実行するために必要な文脈や前提条件（不要なら空文字）",
+  "outputTarget": "AIが回答すべき最高品質の模範解答（完全なコードまたは自然な対話テキスト）",
+  "category": "${failureCategory || 'chat'}",
+  "reasoningExplanation": "なぜこの模範解答が正解であり、AIが何を学習すべきかの解説（1〜2文）"
+}`;
+
+    const { response } = await generateContentWithFallback(ai, {
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.3
+      }
+    });
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(response.text || '{}');
+    } catch {
+      parsed = {
+        instruction: abstractFailurePattern,
+        inputContext: '',
+        outputTarget: response.text || '',
+        category: failureCategory || 'chat',
+        reasoningExplanation: '外部教師により生成された学習用教材データ'
+      };
+    }
+
+    const pTokens = Math.ceil(prompt.length / 4);
+    const oTokens = Math.ceil((response.text || '').length / 4);
+
+    res.json({
+      success: true,
+      material: {
+        instruction: parsed.instruction || abstractFailurePattern,
+        inputContext: parsed.inputContext || '',
+        outputTarget: parsed.outputTarget || '',
+        category: parsed.category || failureCategory || 'chat',
+        reasoningExplanation: parsed.reasoningExplanation || '外部教師AIによる模範解答'
+      },
+      tokensUsed: {
+        promptTokens: pTokens,
+        outputTokens: oTokens
+      }
+    });
+  } catch (error: any) {
+    console.error('Error in /api/teacher-request:', error);
+    res.status(500).json({ success: false, error: error.message || 'Teacher request error' });
   }
 });
 

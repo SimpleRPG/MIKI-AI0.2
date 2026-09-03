@@ -162,7 +162,7 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isEngineModalOpen, setIsEngineModalOpen] = useState<boolean>(false);
   const [isSelfImprovementModalOpen, setIsSelfImprovementModalOpen] = useState<boolean>(false);
-  const [selfImprovementTab, setSelfImprovementTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'skills' | 'lab' | 'colab' | 'generations'>('diagnosis');
+  const [selfImprovementTab, setSelfImprovementTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'lab' | 'colab' | 'generations'>('diagnosis');
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {

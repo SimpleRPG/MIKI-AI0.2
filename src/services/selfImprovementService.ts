@@ -10,7 +10,10 @@ import {
   RejectedTrainingSampleLog,
   ReviewQueueItem,
   ModelSizeComparisonReport,
+  FailureRecurrenceEntry,
 } from '../types';
+
+export type { FailureRecurrenceEntry };
 import { nativeLlmService } from './nativeLlmService';
 import { webLLMService } from './webLlmService';
 import { systemLogger } from './systemLogger';
@@ -27,17 +30,6 @@ const LAST_NOTIFIED_THRESHOLD_KEY = 'miki_ai_training_notified_count';
 const FAILURE_RECURRENCES_KEY = 'miki_ai_failure_recurrences';
 const REJECTED_SAMPLES_LOG_KEY = 'miki_ai_rejected_samples_log';
 const REVIEW_QUEUE_KEY = 'miki_ai_review_queue';
-
-export interface FailureRecurrenceEntry {
-  patternKey: string;
-  category: string;
-  firstSeenAt: number;
-  lastSeenAt: number;
-  recurrenceCount: number;
-  samplePrompt: string;
-  promotedToTraining: boolean;
-  notes?: string;
-}
 
 /**
  * 初期モデル世代リスト (設計思想 18. 系統樹 & 25. 安全・品質境界)
@@ -453,6 +445,7 @@ class SelfImprovementService {
     outputTarget: string;
     category?: TrainingSampleJSONL['category'];
     reliability?: TrainingSampleJSONL['reliability'];
+    source?: TrainingSampleJSONL['source'];
     approved?: boolean;
     split?: 'train' | 'validation' | 'test';
     originalFailureOutput?: string;
@@ -510,13 +503,21 @@ class SelfImprovementService {
     const finalOutputTarget = safety.redactedAssistantText ?? sample.outputTarget;
     const isRedacted = Boolean(safety.redacted);
 
+    // 外部教師(external_teacher)経由は無条件で正解とせず中信頼扱いとする (設計方針 39節)
+    const effectiveReliability: TrainingSampleJSONL['reliability'] = sample.reliability
+      ? sample.reliability
+      : sample.source === 'external_teacher'
+      ? 'medium'
+      : 'high';
+
     const newSample: TrainingSampleJSONL = {
       id: 'train_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       instruction: finalInstruction,
       inputContext: sample.inputContext,
       outputTarget: finalOutputTarget,
       category: sample.category || 'chat',
-      reliability: sample.reliability || 'high',
+      reliability: effectiveReliability,
+      source: sample.source || 'local_user',
       approved: sample.approved ?? true,
       split: sample.split || 'train',
       originalFailureOutput: sample.originalFailureOutput,
