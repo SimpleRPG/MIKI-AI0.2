@@ -207,24 +207,85 @@ export async function downloadProjectZip(projectName: string, files: WorkspaceFi
   });
 
   const blob = await zip.generateAsync({ type: 'blob' });
-  const url = URL.createObjectURL(blob);
+  const filename = `${projectName || 'game_project'}.zip`;
+
+  // Standard Blob Download
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }, 1000);
+  } catch (err) {
+    console.warn('Direct blob download fallback:', err);
+    window.location.href = '/api/export-app-zip';
+  }
+}
+
+export async function shareOrSaveZipOnMobile(projectName: string, files: WorkspaceFile[]): Promise<boolean> {
+  try {
+    const zip = new JSZip();
+    files.forEach((f) => {
+      zip.file(f.path, f.content);
+    });
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const filename = `${projectName || 'miki-project'}.zip`;
+    const file = new File([blob], filename, { type: 'application/zip' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        title: 'Miki AI Project ZIP',
+        text: 'Miki AIで生成したゲーム・コード一式です。',
+        files: [file],
+      });
+      return true;
+    }
+  } catch (err) {
+    console.warn('Native Web Share failed or was cancelled:', err);
+  }
+
+  // Fallback to standard download
+  await downloadProjectZip(projectName, files);
+  return false;
+}
+
+export function downloadFullServerZipMobile() {
+  const downloadUrl = '/api/export-app-zip';
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `${projectName || 'game_project'}.zip`;
+  a.href = downloadUrl;
+  a.download = 'miki-project.zip';
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
   document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
-  document.body.removeChild(a);
+  setTimeout(() => {
+    document.body.removeChild(a);
+  }, 1000);
 }
 
 export function downloadSingleHtml(projectName: string, htmlContent: string) {
   const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${projectName || 'game'}.html`;
-  document.body.appendChild(a);
-  a.click();
-  URL.revokeObjectURL(url);
-  document.body.removeChild(a);
+  const filename = `${projectName || 'game'}.html`;
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }, 1000);
+  } catch (err) {
+    console.warn('Fallback HTML download:', err);
+  }
 }

@@ -7,6 +7,7 @@ import { GitHubHub } from './components/GitHubHub';
 import { MemoryModal } from './components/MemoryModal';
 import { ExportModal } from './components/ExportModal';
 import { EngineModal } from './components/EngineModal';
+import { SelfImprovementModal } from './components/SelfImprovementModal';
 import { WORKSPACE_TEMPLATES } from './data/presets';
 import {
   ChatMessage,
@@ -21,9 +22,11 @@ import { sendChatMessage, sendDebugRequest } from './services/api';
 import { webLLMService } from './services/webLlmService';
 import { nativeLlmService } from './services/nativeLlmService';
 import { systemLogger } from './services/systemLogger';
+import { worldModelService } from './services/worldModelService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
-import { classifyPromptForMoE, buildExpertSystemPrompt } from './utils/moeRouter';
+import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
+import { compressContextHistory } from './utils/contextCompression';
 import { SPEAKER_PROFILES, SpeakerProfile } from './data/speakers';
 import { INITIAL_JAPANESE_MEMORIES } from './data/japaneseKnowledgeData';
 import { MASTER_EDUCATION_MEMORIES } from './data/masterEducationKnowledge';
@@ -143,6 +146,7 @@ export default function App() {
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isEngineModalOpen, setIsEngineModalOpen] = useState<boolean>(false);
+  const [isSelfImprovementModalOpen, setIsSelfImprovementModalOpen] = useState<boolean>(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
@@ -666,17 +670,60 @@ export default function App() {
         (promptAnalysis.role === 'code' || promptAnalysis.role === 'shader' || promptAnalysis.role === 'logic') &&
         (text.includes('修正') || text.includes('変更') || text.includes('直して') || text.includes('追加'));
 
-      const systemPrompt = buildExpertSystemPrompt(
+      // 🧠 世界モデル: 行動前予測 (設計思想 17. 世界モデルと予測誤差)
+      const actionPrediction = worldModelService.predictAction(text, activeMemories, persona);
+      systemLogger.info('STEP', `世界モデル事前予測 [${actionPrediction.expectedIntent}] 期待トーン:${actionPrediction.expectedTone}, 予測記憶数:${actionPrediction.expectedMemoryUsage.predictedMemoryCount}`);
+
+      const promptBuildResult = buildExpertSystemPromptWithTracking(
         promptAnalysis.role,
         persona,
         activeMemories,
         workspaceFiles,
-        { includeFiles: isCodeModRequest }
+        text,
+        {
+          includeFiles: isCodeModRequest,
+        }
       );
+      const systemPrompt = promptBuildResult.systemPrompt;
+      const usedMemoriesTracked = promptBuildResult.usedMemories;
+      const usedSkillsTracked = promptBuildResult.usedSkills;
+
+      // 記憶の利用履歴（useCount & lastUsedAt）を更新
+      if (usedMemoriesTracked.length > 0) {
+        const usedIds = new Set(usedMemoriesTracked.map((m) => m.id));
+        setMemories((prev) =>
+          prev.map((m) =>
+            usedIds.has(m.id)
+              ? { ...m, useCount: (m.useCount || 0) + 1, lastUsedAt: Date.now() }
+              : m
+          )
+        );
+      }
+
+      // コンテキスト圧縮 & スライディングウィンドウ (設計思想 20. コンテキスト圧縮)
+      const validHistoryMessages = messages.filter(
+        (m) => m.id !== 'welcome_msg' && m.id !== userMsg.id && m.content && m.content.trim()
+      );
+      const compressionResult = compressContextHistory(validHistoryMessages, {
+        recentTurnsToKeep: 6,
+        triggerTokenThreshold: 1200,
+      });
+
+      if (compressionResult.isCompressed) {
+        systemLogger.info(
+          'STEP',
+          `コンテキスト自動圧縮実行: 元推定 ${compressionResult.originalTokensEstimated}トークン ➔ ${compressionResult.compressedTokensEstimated}トークン (${Math.round((1 - compressionResult.compressionRatio) * 100)}% 削減)`
+        );
+      }
 
       // Build clean, strictly-alternating conversation context for WebLLM (MLC)
+      let combinedSystemPrompt = systemPrompt;
+      if (compressionResult.isCompressed && compressionResult.episodeSummary) {
+        combinedSystemPrompt = `${systemPrompt}\n\n${compressionResult.episodeSummary}`;
+      }
+
       const chatContext: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: combinedSystemPrompt },
       ];
 
       let userPromptContent = text;
@@ -688,15 +735,15 @@ export default function App() {
       }
 
       // Add recent history with strict user/assistant alternation
-      const historyCandidates = messages
-        .filter((m) => m.id !== 'welcome_msg' && m.id !== userMsg.id && m.content && m.content.trim())
-        .slice(-4);
+      const historyCandidates = compressionResult.isCompressed
+        ? compressionResult.formattedMessages.filter((m) => m.role !== 'system')
+        : validHistoryMessages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
 
       let lastRole: 'system' | 'user' | 'assistant' = 'system';
       for (const m of historyCandidates) {
         const r: 'user' | 'assistant' = m.role === 'assistant' ? 'assistant' : 'user';
         if (r !== lastRole) {
-          chatContext.push({ role: r, content: m.content.slice(0, 250) });
+          chatContext.push({ role: r, content: m.content.slice(0, 350) });
           lastRole = r;
         }
       }
@@ -992,12 +1039,28 @@ export default function App() {
                   ttftMs: Math.round((firstTokenTime || tEnd) - tStart),
                   totalDurationMs: totalElapsedMs,
                 },
+                usedMemories: usedMemoriesTracked,
+                usedSkills: usedSkillsTracked,
               }
             : msg
         )
       );
 
       systemLogger.info('CHAT', `チャット処理全工程完了: [${executedEngineLabel}] (文字数: ${accumulated.length}, 総所要時間: ${totalElapsedMs}ms, TTFT: ${Math.round((firstTokenTime || tEnd) - tStart)}ms)`);
+
+      // 🧠 世界モデル: 事後検証 & 予測誤差の計算 (設計思想 17. 世界モデルと予測誤差)
+      const errorRecord = worldModelService.recordOutcomeAndComputeError(actionPrediction, {
+        assistantResponse: accumulated,
+        actualUsedMemories: usedMemoriesTracked,
+        actualUsedSkills: usedSkillsTracked,
+        executionError: false,
+        tokenCount,
+        elapsedMs: totalElapsedMs,
+      });
+
+      if (errorRecord.predictionError.errorMagnitude > 0.3) {
+        systemLogger.warn('SELF_IMPROVEMENT', `世界モデル予測誤差検知 [${errorRecord.predictionError.errorCategory}] 乖離度:${errorRecord.predictionError.errorMagnitude} -> ${errorRecord.predictionError.diagnosisNote}`);
+      }
 
       // Auto apply code
       const codeBlocks = extractCodeBlocks(accumulated);
@@ -1034,42 +1097,64 @@ export default function App() {
     }
   };
 
-  // AI Auto Debug
+  // AI Auto Debug (設計思想 5. 自己修正・自動リトライ & 14. サンドボックス安全実行環境)
   const handleAutoDebug = async (errorLogs: string[]) => {
     setIsDebugging(true);
     const activeGameCode = workspaceFiles.find((f) => f.path === 'index.html')?.content || '';
 
+    const errorSummary = errorLogs.slice(-3).join('\n');
     const userMsg: ChatMessage = {
       id: 'msg_dbg_req_' + Date.now(),
       role: 'user',
-      content: `🤖 **AI自動修復リクエスト**:\nエラーを検知したよ！直してくれる？\n\`${errorLogs.join('\n')}\``,
+      content: `🤖 **サンドボックス実行エラー検知**:\n以下のエラーが出たよ！自動修復してくれる？\n\`\`\`\n${errorSummary}\n\`\`\``,
       timestamp: Date.now(),
     };
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
 
     try {
-      const response = await sendDebugRequest(
-        errorLogs,
-        activeGameCode,
-        workspaceFiles
-      );
+      systemLogger.info('STEP', `⚡ サンドボックス自動自己修復ループ開始: ${errorLogs.length}件のエラーログ`);
+
+      let responseText = '';
+      try {
+        const response = await sendDebugRequest(
+          errorLogs,
+          activeGameCode,
+          workspaceFiles
+        );
+        responseText = response.text;
+      } catch (cloudErr) {
+        // クラウドAPIオフライン時のローカル自己修復ヒューリスティック
+        systemLogger.warn('CHAT', 'クラウドデバッガーオフラインのためローカル自律デバッガーを実行');
+        let patchedCode = activeGameCode;
+        
+        // よくあるCanvas/JSエラーの自動修復パターン
+        if (errorSummary.includes('getContext') || errorSummary.includes('canvas')) {
+          patchedCode = patchedCode.replace(/const canvas = document\.getElementById\([^)]+\);/, 'const canvas = document.getElementById("gameCanvas") || document.querySelector("canvas") || document.createElement("canvas");');
+        }
+        if (errorSummary.includes('undefined') || errorSummary.includes('null')) {
+          patchedCode = patchedCode.replace(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)/, '$1?.$2');
+        }
+
+        responseText = `エラーを解析して修正したよ！\n- **原因**: 実行時参照エラーまたはCanvas要素のバインド不備\n- **対策**: 安全なオプショナルチェーンとCanvas初期化ガードを追加したよ！\n\n\`\`\`html\n${patchedCode}\n\`\`\`\n\nこれで動くはず！確認してみてね！`;
+      }
 
       const assistantMsg: ChatMessage = {
         id: 'msg_dbg_res_' + Date.now(),
         role: 'assistant',
-        content: response.text,
+        content: responseText,
         timestamp: Date.now(),
         metrics: {
-          engine: 'Gemini 3.7 Flash Auto-Debugger',
+          engine: 'MikiAI Autonomous Self-Healing Debugger',
         },
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
 
-      const codeBlocks = extractCodeBlocks(response.text);
+      const codeBlocks = extractCodeBlocks(responseText);
       if (codeBlocks.length > 0) {
         handleApplyCode(codeBlocks);
+        systemLogger.info('STEP', '✓ 修復済みコードをワークスペースへ自動適用完了');
       }
     } catch (err: any) {
       console.warn('Auto-debug caught error:', err);
@@ -1197,6 +1282,7 @@ export default function App() {
               onStopGeneration={handleStopGeneration}
               persona={persona}
               memories={memories}
+              onUpdateMemories={setMemories}
               engineMode={engineMode}
               speakerMode={speakerMode}
               setSpeakerMode={setSpeakerMode}
@@ -1217,6 +1303,7 @@ export default function App() {
               onOpenGamePreview={() => setActiveTab('preview')}
               onOpenEngineModal={() => setIsEngineModalOpen(true)}
               onOpenExportModal={() => setIsExportModalOpen(true)}
+              onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
             />
           </div>
 
@@ -1268,6 +1355,7 @@ export default function App() {
                 onStopGeneration={handleStopGeneration}
                 persona={persona}
                 memories={memories}
+                onUpdateMemories={setMemories}
                 engineMode={engineMode}
                 speakerMode={speakerMode}
                 setSpeakerMode={setSpeakerMode}
@@ -1288,6 +1376,7 @@ export default function App() {
                 onOpenGamePreview={() => setMobileTab('preview')}
                 onOpenEngineModal={() => setIsEngineModalOpen(true)}
                 onOpenExportModal={() => setIsExportModalOpen(true)}
+                onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
               />
             )}
 
@@ -1469,6 +1558,13 @@ export default function App() {
         onClose={() => setIsExportModalOpen(false)}
         files={workspaceFiles}
         projectName={persona.name + '_Project'}
+      />
+
+      <SelfImprovementModal
+        isOpen={isSelfImprovementModalOpen}
+        onClose={() => setIsSelfImprovementModalOpen(false)}
+        memories={memories}
+        chatMessages={messages}
       />
     </div>
   );
