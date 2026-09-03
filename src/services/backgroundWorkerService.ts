@@ -11,6 +11,7 @@ import { selfImprovementService } from './selfImprovementService';
 import { systemLogger } from './systemLogger';
 import { calculateDomainVector, calculateCosineSimilarity } from '../utils/memoryRetrieval';
 import { nativeBackgroundService } from './nativeBackgroundService';
+import { storageService } from './storageService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -68,15 +69,15 @@ export class BackgroundWorkerService {
   }
 
   private loadState(): void {
-    if (typeof localStorage === 'undefined') return;
+    if (typeof storageService === 'undefined') return;
     try {
-      const savedConstraints = localStorage.getItem(WORK_MANAGER_CONSTRAINTS_KEY);
+      const savedConstraints = storageService.getItem(WORK_MANAGER_CONSTRAINTS_KEY);
       if (savedConstraints) this.constraints = JSON.parse(savedConstraints);
 
-      const savedLogs = localStorage.getItem(WORK_MANAGER_LOGS_KEY);
+      const savedLogs = storageService.getItem(WORK_MANAGER_LOGS_KEY);
       if (savedLogs) this.executionLogs = JSON.parse(savedLogs);
 
-      const savedConfig = localStorage.getItem(WORK_MANAGER_CONFIG_KEY);
+      const savedConfig = storageService.getItem(WORK_MANAGER_CONFIG_KEY);
       if (savedConfig) {
         const parsed = JSON.parse(savedConfig);
         this.intervalMinutes = parsed.intervalMinutes || 360;
@@ -88,11 +89,11 @@ export class BackgroundWorkerService {
   }
 
   private saveState(): void {
-    if (typeof localStorage === 'undefined') return;
+    if (typeof storageService === 'undefined') return;
     try {
-      localStorage.setItem(WORK_MANAGER_CONSTRAINTS_KEY, JSON.stringify(this.constraints));
-      localStorage.setItem(WORK_MANAGER_LOGS_KEY, JSON.stringify(this.executionLogs.slice(-50)));
-      localStorage.setItem(
+      storageService.setItem(WORK_MANAGER_CONSTRAINTS_KEY, JSON.stringify(this.constraints));
+      storageService.setItem(WORK_MANAGER_LOGS_KEY, JSON.stringify(this.executionLogs.slice(-50)));
+      storageService.setItem(
         WORK_MANAGER_CONFIG_KEY,
         JSON.stringify({
           intervalMinutes: this.intervalMinutes,
@@ -470,7 +471,7 @@ class MikiAutonomousWorker(appContext: Context, workerParams: WorkerParameters) 
 
   public clearLogs(): void {
     this.executionLogs = [];
-    localStorage.removeItem(WORK_MANAGER_LOGS_KEY);
+    storageService.removeItem(WORK_MANAGER_LOGS_KEY);
   }
 }
 

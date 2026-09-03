@@ -3,6 +3,7 @@ import { systemLogger } from './systemLogger';
 import { webLLMService } from './webLlmService';
 import { sendChatMessage } from './api';
 import { OFFICIAL_GGUF_MODELS } from './ggufModels';
+import { storageService } from './storageService';
 
 export interface NativeGpuInfo {
   available: boolean;
@@ -207,9 +208,9 @@ export class NativeLlmService {
   }
 
   public getActiveModelId(): string | null {
-    if (!this.activeModelId && typeof localStorage !== 'undefined') {
+    if (!this.activeModelId && typeof storageService !== 'undefined') {
       try {
-        this.activeModelId = localStorage.getItem('miki_active_gguf_model') || null;
+        this.activeModelId = storageService.getItem('miki_active_gguf_model') || null;
       } catch (e) {}
     }
     return this.activeModelId;
@@ -248,7 +249,7 @@ export class NativeLlmService {
       if (available.length === 0) return false;
 
       // Prefer saved active model, or lightest model (e.g. 0.5B), or first available
-      const savedActiveId = typeof localStorage !== 'undefined' ? localStorage.getItem('miki_active_gguf_model') : null;
+      const savedActiveId = typeof storageService !== 'undefined' ? storageService.getItem('miki_active_gguf_model') : null;
       let target = available.find((m) => m.id === savedActiveId || m.fileName === savedActiveId);
       if (!target) {
         target = available.find((m) => m.id.includes('0.5b') || m.fileName.includes('0.5b')) || available[0];
@@ -321,8 +322,8 @@ export class NativeLlmService {
 
     let localFiles: NativeDownloadedFile[] = [];
     try {
-      if (typeof localStorage !== 'undefined') {
-        const raw = localStorage.getItem(GGUF_STORAGE_KEY);
+      if (typeof storageService !== 'undefined') {
+        const raw = storageService.getItem(GGUF_STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
@@ -365,8 +366,8 @@ export class NativeLlmService {
 
       // Persist in local storage
       try {
-        if (typeof localStorage !== 'undefined') {
-          const raw = localStorage.getItem(GGUF_STORAGE_KEY);
+        if (typeof storageService !== 'undefined') {
+          const raw = storageService.getItem(GGUF_STORAGE_KEY);
           const list: NativeDownloadedFile[] = raw ? JSON.parse(raw) : [];
           const filtered = Array.isArray(list) ? list.filter((f) => f && f.fileName !== fileName) : [];
           filtered.push({
@@ -374,7 +375,7 @@ export class NativeLlmService {
             sizeMB: targetSizeMB,
             lastModified: Date.now(),
           });
-          localStorage.setItem(GGUF_STORAGE_KEY, JSON.stringify(filtered));
+          storageService.setItem(GGUF_STORAGE_KEY, JSON.stringify(filtered));
         }
       } catch (e) {}
 
@@ -404,8 +405,8 @@ export class NativeLlmService {
 
       // Also persist record
       try {
-        if (typeof localStorage !== 'undefined') {
-          const raw = localStorage.getItem(GGUF_STORAGE_KEY);
+        if (typeof storageService !== 'undefined') {
+          const raw = storageService.getItem(GGUF_STORAGE_KEY);
           const list: NativeDownloadedFile[] = raw ? JSON.parse(raw) : [];
           const filtered = Array.isArray(list) ? list.filter((f) => f && f.fileName !== fileName) : [];
           filtered.push({
@@ -413,7 +414,7 @@ export class NativeLlmService {
             sizeMB: res?.sizeMB || targetSizeMB,
             lastModified: Date.now(),
           });
-          localStorage.setItem(GGUF_STORAGE_KEY, JSON.stringify(filtered));
+          storageService.setItem(GGUF_STORAGE_KEY, JSON.stringify(filtered));
         }
       } catch (e) {}
 
@@ -470,9 +471,9 @@ export class NativeLlmService {
 
       this.activeModelId = modelId;
       try {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('miki_active_gguf_model', modelId);
-          localStorage.setItem('miki_active_gguf_file', actualFileName || `${modelId}.gguf`);
+        if (typeof storageService !== 'undefined') {
+          storageService.setItem('miki_active_gguf_model', modelId);
+          storageService.setItem('miki_active_gguf_file', actualFileName || `${modelId}.gguf`);
         }
       } catch (e) {}
       systemLogger.info(
@@ -732,12 +733,12 @@ export class NativeLlmService {
     } catch (e) {}
 
     try {
-      if (typeof localStorage !== 'undefined') {
-        const raw = localStorage.getItem(GGUF_STORAGE_KEY);
+      if (typeof storageService !== 'undefined') {
+        const raw = storageService.getItem(GGUF_STORAGE_KEY);
         if (raw) {
           const list: NativeDownloadedFile[] = JSON.parse(raw);
           const filtered = Array.isArray(list) ? list.filter((f) => f && f.fileName !== fileName) : [];
-          localStorage.setItem(GGUF_STORAGE_KEY, JSON.stringify(filtered));
+          storageService.setItem(GGUF_STORAGE_KEY, JSON.stringify(filtered));
         }
       }
     } catch (e) {}

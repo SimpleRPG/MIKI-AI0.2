@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import type { MemoryItem, MemoryType } from '../types';
 
 /**
  * Synchronous-facade persistent storage, backed by:
@@ -13,7 +14,7 @@ import { Capacitor } from '@capacitor/core';
  *    normally be hit on a real device or browser.
  *
  * The rest of the app was written against localStorage's *synchronous*
- * getItem/setItem API across ~70 call sites. Rather than making every one of
+ * getItem/setItem API across call sites. Rather than making every one of
  * those call sites async (a large, risky rewrite touching React state
  * initializers, constructors, etc.), this service hydrates an in-memory
  * cache from the real backend once at startup (await `storageService.ready`
@@ -24,6 +25,10 @@ import { Capacitor } from '@capacitor/core';
  *
  * Any pre-existing localStorage data (from before this migration) is copied
  * in automatically, once, on first run.
+ *
+ * In addition to the generic key-value store, it supports 7-tier structured
+ * memory persistence (raw, structural, semantic, episodic, procedural, meta, working)
+ * with approved state, source reference, and metadata.
  */
 class StorageService {
   private cache = new Map<string, string>();
@@ -34,6 +39,7 @@ class StorageService {
   private sqlite: any = null; // SQLiteDBConnection (native only, loaded dynamically)
   private idb: IDBDatabase | null = null;
   private readonly STORE = 'kv_store';
+  private readonly MEMORIES_STORE = 'memories_store';
   private readonly DB_NAME = 'mikiai_kv';
 
   /** Resolves once the persistent backend has been hydrated into the cache. */
@@ -86,6 +92,20 @@ class StorageService {
     await this.sqlite.execute(
       `CREATE TABLE IF NOT EXISTS ${this.STORE} (key TEXT PRIMARY KEY NOT NULL, value TEXT);`
     );
+    await this.sqlite.execute(
+      `CREATE TABLE IF NOT EXISTS ${this.MEMORIES_STORE} (
+        id TEXT PRIMARY KEY NOT NULL,
+        category TEXT,
+        memory_type TEXT,
+        content TEXT,
+        approved INTEGER,
+        source_ref TEXT,
+        raw_excerpt TEXT,
+        created_at INTEGER,
+        updated_at INTEGER,
+        json_payload TEXT
+      );`
+    );
     const res = await this.sqlite.query(`SELECT key, value FROM ${this.STORE};`);
     for (const row of res.values || []) {
       this.cache.set(row.key, row.value);
@@ -98,10 +118,13 @@ class StorageService {
         reject(new Error('IndexedDB unavailable in this environment'));
         return;
       }
-      const req = indexedDB.open(this.DB_NAME, 1);
+      const req = indexedDB.open(this.DB_NAME, 2);
       req.onupgradeneeded = () => {
         if (!req.result.objectStoreNames.contains(this.STORE)) {
           req.result.createObjectStore(this.STORE);
+        }
+        if (!req.result.objectStoreNames.contains(this.MEMORIES_STORE)) {
+          req.result.createObjectStore(this.MEMORIES_STORE, { keyPath: 'id' });
         }
       };
       req.onsuccess = () => {
@@ -174,21 +197,72 @@ class StorageService {
       if (this.backend === 'sqlite' && this.sqlite) {
         for (const key of keys) {
           if (this.cache.has(key)) {
+            const val = this.cache.get(key)!;
             await this.sqlite.run(`INSERT OR REPLACE INTO ${this.STORE} (key, value) VALUES (?, ?);`, [
               key,
-              this.cache.get(key),
+              val,
             ]);
+
+            // If updating memories, also sync structured SQLite table
+            if (key === 'gamecraft_memories') {
+              try {
+                const memList: MemoryItem[] = JSON.parse(val);
+                if (Array.isArray(memList)) {
+                  for (const mem of memList) {
+                    await this.sqlite.run(
+                      `INSERT OR REPLACE INTO ${this.MEMORIES_STORE} (id, category, memory_type, content, approved, source_ref, raw_excerpt, created_at, updated_at, json_payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+                      [
+                        mem.id,
+                        mem.category || 'chat',
+                        mem.memoryType || 'semantic',
+                        mem.content,
+                        mem.approved ? 1 : 0,
+                        mem.sourceRef || '',
+                        mem.rawExcerpt || '',
+                        mem.createdAt || Date.now(),
+                        mem.updatedAt || Date.now(),
+                        JSON.stringify(mem),
+                      ]
+                    );
+                  }
+                }
+              } catch (e) {
+                console.warn('storageService: sqlite structured memories sync skipped', e);
+              }
+            }
           } else {
             await this.sqlite.run(`DELETE FROM ${this.STORE} WHERE key = ?;`, [key]);
           }
         }
       } else if (this.backend === 'indexeddb' && this.idb) {
         await new Promise<void>((resolve, reject) => {
-          const tx = this.idb!.transaction(this.STORE, 'readwrite');
+          const tx = this.idb!.transaction(
+            this.idb!.objectStoreNames.contains(this.MEMORIES_STORE)
+              ? [this.STORE, this.MEMORIES_STORE]
+              : [this.STORE],
+            'readwrite'
+          );
           const store = tx.objectStore(this.STORE);
+          const memoriesStore = this.idb!.objectStoreNames.contains(this.MEMORIES_STORE)
+            ? tx.objectStore(this.MEMORIES_STORE)
+            : null;
+
           for (const key of keys) {
             if (this.cache.has(key)) {
-              store.put(this.cache.get(key), key);
+              const val = this.cache.get(key)!;
+              store.put(val, key);
+
+              // If updating memories, sync structured IndexedDB store
+              if (key === 'gamecraft_memories' && memoriesStore) {
+                try {
+                  const memList: MemoryItem[] = JSON.parse(val);
+                  if (Array.isArray(memList)) {
+                    for (const mem of memList) {
+                      memoriesStore.put(mem);
+                    }
+                  }
+                } catch {}
+              }
             } else {
               store.delete(key);
             }
@@ -206,8 +280,6 @@ class StorageService {
   }
 
   // --- localStorage-compatible synchronous API ---
-  // Every existing call site can switch from `localStorage.x` to
-  // `storageService.x` with no other changes.
 
   public getItem(key: string): string | null {
     return this.cache.has(key) ? this.cache.get(key)! : null;
@@ -252,6 +324,44 @@ class StorageService {
 
   public getBackendName(): 'sqlite' | 'indexeddb' | 'memory' {
     return this.backend;
+  }
+
+  // --- 7-Tier Hierarchical Memory Dedicated Methods ---
+
+  public getMemories(): MemoryItem[] {
+    const raw = this.getItem('gamecraft_memories');
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public setMemories(memories: MemoryItem[]): void {
+    this.setItem('gamecraft_memories', JSON.stringify(memories));
+  }
+
+  public getMemoriesByType(type: MemoryType): MemoryItem[] {
+    return this.getMemories().filter((m) => m.memoryType === type);
+  }
+
+  public getApprovedMemories(): MemoryItem[] {
+    return this.getMemories().filter((m) => m.approved !== false && m.active !== false);
+  }
+
+  public saveMemoryItem(item: MemoryItem): void {
+    const current = this.getMemories();
+    const idx = current.findIndex((m) => m.id === item.id);
+    let next: MemoryItem[];
+    if (idx >= 0) {
+      next = [...current];
+      next[idx] = { ...next[idx], ...item, updatedAt: Date.now() };
+    } else {
+      next = [item, ...current];
+    }
+    this.setMemories(next);
   }
 }
 

@@ -368,3 +368,92 @@ export function recordMemoryUsage(
     return m;
   });
 }
+
+/**
+ * 記憶アイテムのメタデータ（7階層memoryType、承認状態、根拠、ベクトル等）を完全に補完・正規化する
+ */
+export function enrichMemoryMetadata(
+  item: Partial<MemoryItem> & { content: string },
+  options: {
+    rawUserText?: string;
+    sourceRef?: string;
+    existingMemories?: MemoryItem[];
+  } = {}
+): MemoryItem {
+  const content = item.content || '';
+  const now = Date.now();
+
+  // 1. memoryType (7階層) の自動判定
+  let memoryType = item.memoryType;
+  if (!memoryType) {
+    const category = item.category || 'chat';
+    if (category === 'code' || category === 'vba') {
+      memoryType = 'procedural';
+    } else if (category === 'gamedev') {
+      memoryType = content.includes('手順') || content.includes('ステップ') || content.includes('実装') ? 'procedural' : 'structural';
+    } else if (category === 'chat') {
+      memoryType = 'episodic';
+    } else if (category === 'relationship') {
+      memoryType = 'semantic';
+    } else if (category === 'preference' || category === 'profile') {
+      memoryType = 'semantic';
+    } else {
+      memoryType = 'semantic';
+    }
+  }
+
+  // 2. approved (承認状態) の補完
+  const approved = item.approved !== undefined
+    ? item.approved
+    : Boolean(item.pinned || (item.importance ?? 3) >= 4 || item.source === 'manual');
+
+  // 3. rawExcerpt (原文抜粋) と sourceRef (根拠参照)
+  const rawExcerpt = item.rawExcerpt || options.rawUserText?.slice(0, 150) || content.slice(0, 150);
+  const sourceRef = item.sourceRef || options.sourceRef || (item.source === 'auto' ? 'user_chat' : 'user_direct');
+
+  // 4. ドメインベクトル & キーワード
+  const domainVector = item.domainVector || calculateDomainVector(content);
+  const semanticKeywords = item.semanticKeywords || Array.from(extractQueryTokens(content)).slice(0, 10);
+
+  // 5. 既存記憶との競合・矛盾チェック (conflictWith)
+  const conflictWith: string[] = item.conflictWith ? [...item.conflictWith] : [];
+  if (options.existingMemories && options.existingMemories.length > 0) {
+    for (const existing of options.existingMemories) {
+      if (existing.id === item.id) continue;
+      if (item.category === 'profile' && existing.category === 'profile' && content.includes('名前') && existing.content.includes('名前')) {
+        conflictWith.push(existing.id);
+      } else if (item.category === 'preference' && existing.category === 'preference' && content.length >= 6 && existing.content.includes(content.slice(0, 6))) {
+        conflictWith.push(existing.id);
+      }
+    }
+  }
+
+  return {
+    id: item.id || `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    category: item.category || 'preference',
+    content,
+    importance: item.importance ?? 4,
+    pinned: item.pinned ?? false,
+    active: item.active ?? true,
+    approved,
+    memoryType,
+    sourceRef,
+    rawExcerpt,
+    domainVector,
+    semanticKeywords,
+    status: item.status || 'active',
+    conflictWith,
+    createdAt: item.createdAt || now,
+    updatedAt: item.updatedAt || now,
+    source: item.source || 'auto',
+    tags: item.tags || [item.category || 'memory'],
+    relatedMemoryIds: item.relatedMemoryIds || [],
+    prerequisiteMemoryIds: item.prerequisiteMemoryIds || [],
+    parentMemoryId: item.parentMemoryId,
+    useCount: item.useCount ?? 0,
+    lastUsedAt: item.lastUsedAt,
+    expiresAt: item.expiresAt,
+    goodCount: item.goodCount ?? 0,
+    badCount: item.badCount ?? 0,
+  };
+}

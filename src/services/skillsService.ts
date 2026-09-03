@@ -1,5 +1,6 @@
 import { SkillItem } from '../types';
 import { systemLogger } from './systemLogger';
+import { storageService } from './storageService';
 
 const SKILLS_STORAGE_KEY = 'miki_ai_skills_library';
 
@@ -110,9 +111,9 @@ class SkillsService {
   }
 
   public loadSkills(): SkillItem[] {
-    if (typeof localStorage !== 'undefined') {
+    if (typeof storageService !== 'undefined') {
       try {
-        const raw = localStorage.getItem(SKILLS_STORAGE_KEY);
+        const raw = storageService.getItem(SKILLS_STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -130,9 +131,9 @@ class SkillsService {
   }
 
   public saveSkills(): void {
-    if (typeof localStorage !== 'undefined') {
+    if (typeof storageService !== 'undefined') {
       try {
-        localStorage.setItem(SKILLS_STORAGE_KEY, JSON.stringify(this.skills));
+        storageService.setItem(SKILLS_STORAGE_KEY, JSON.stringify(this.skills));
       } catch (e) {
         console.warn('Failed to save skills to localStorage:', e);
       }

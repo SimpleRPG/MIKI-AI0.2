@@ -14,6 +14,8 @@ interface MikiBackgroundServicePluginInterface {
   start(): Promise<{ success: boolean; running: boolean }>;
   stop(): Promise<{ success: boolean; running: boolean }>;
   isRunning(): Promise<{ running: boolean }>;
+  checkNotificationPermission(): Promise<{ granted: boolean }>;
+  requestNotificationPermission(): Promise<{ granted: boolean }>;
 }
 
 const NativeBackgroundPlugin = registerPlugin<MikiBackgroundServicePluginInterface>('MikiBackgroundServicePlugin', {
@@ -27,6 +29,12 @@ const NativeBackgroundPlugin = registerPlugin<MikiBackgroundServicePluginInterfa
     async isRunning() {
       return { running: false };
     },
+    async checkNotificationPermission() {
+      return { granted: false };
+    },
+    async requestNotificationPermission() {
+      return { granted: false };
+    },
   }),
 });
 
@@ -36,11 +44,36 @@ class NativeBackgroundService {
   }
 
   /**
+   * Ensures the Android 13+ POST_NOTIFICATIONS permission is granted,
+   * prompting the user automatically if it has not been decided yet.
+   * A foreground service still runs without this permission, but its
+   * notification (and the "一時停止" action inside it) silently fails to
+   * show without it, which would make the running service invisible to the
+   * user. Safe to call on any platform/version — resolves true immediately
+   * where the permission does not apply (< Android 13, non-Android).
+   */
+  public async ensureNotificationPermission(): Promise<boolean> {
+    if (!this.isAndroidNative()) return false;
+    try {
+      const current = await NativeBackgroundPlugin.checkNotificationPermission();
+      if (current.granted) return true;
+      const requested = await NativeBackgroundPlugin.requestNotificationPermission();
+      return !!requested?.granted;
+    } catch (e) {
+      console.warn('NativeBackgroundService: notification permission check/request failed', e);
+      return false;
+    }
+  }
+
+  /**
    * Start the foreground keep-alive service. Safe to call repeatedly
    * (Android just re-delivers onStartCommand to the same running service).
+   * Requests the notification permission first (if not already decided) so
+   * the persistent "実行中" notification and its 一時停止 button are visible.
    */
   public async start(): Promise<boolean> {
     if (!this.isAndroidNative()) return false;
+    await this.ensureNotificationPermission();
     try {
       const res = await NativeBackgroundPlugin.start();
       return !!res?.running;

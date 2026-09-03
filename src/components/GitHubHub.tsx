@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { GitHubRepoData, PersonaConfig, WorkspaceFile } from '../types';
 import { apiService } from '../services/api';
+import { storageService } from '../services/storageService';
 
 export interface GitHubHubProps {
   onLoadRepoIntoWorkspace: (repoData: GitHubRepoData) => void;
@@ -31,7 +32,7 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
   workspaceFiles,
   persona,
 }) => {
-  const [token, setToken] = useState(() => localStorage.getItem('miki_github_pat') || '');
+  const [token, setToken] = useState(() => storageService.getItem('miki_github_pat') || '');
   const [repoUrl, setRepoUrl] = useState('');
   const [branch, setBranch] = useState('main');
   const [commitMessage, setCommitMessage] = useState('✨ Update via Miki AI Partner Studio');
@@ -42,7 +43,7 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
   const handleSaveToken = (val: string) => {
     setToken(val);
     try {
-      localStorage.setItem('miki_github_pat', val.trim());
+      storageService.setItem('miki_github_pat', val.trim());
     } catch (e) {}
   };
 

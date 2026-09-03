@@ -23,10 +23,12 @@ import { webLLMService } from './services/webLlmService';
 import { nativeLlmService } from './services/nativeLlmService';
 import { systemLogger } from './services/systemLogger';
 import { worldModelService } from './services/worldModelService';
+import { storageService } from './services/storageService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
 import { compressContextHistory } from './utils/contextCompression';
+import { retrieveRelevantMemories, recordMemoryUsage, enrichMemoryMetadata } from './utils/memoryRetrieval';
 import { SPEAKER_PROFILES, SpeakerProfile } from './data/speakers';
 import { INITIAL_JAPANESE_MEMORIES } from './data/japaneseKnowledgeData';
 import { MASTER_EDUCATION_MEMORIES } from './data/masterEducationKnowledge';
@@ -93,39 +95,40 @@ export default function App() {
   const [mobileTab, setMobileTab] = useState<'chat' | 'preview' | 'code' | 'github' | 'memory' | 'engine'>('chat');
 
   const [persona, setPersona] = useState<PersonaConfig>(() => {
-    const saved = localStorage.getItem('gamecraft_persona');
+    const saved = storageService.getItem('gamecraft_persona');
     return saved ? JSON.parse(saved) : DEFAULT_PERSONA;
   });
   const [memories, setMemories] = useState<MemoryItem[]>(() => {
-    const saved = localStorage.getItem('gamecraft_memories');
-    if (!saved) return INITIAL_MEMORIES;
+    const loaded = storageService.getMemories();
+    if (loaded.length === 0) {
+      return INITIAL_MEMORIES.map((m) => enrichMemoryMetadata(m));
+    }
     try {
-      const parsed: MemoryItem[] = JSON.parse(saved);
-      // Ensure master synthesized dataset memories exist
-      const existingIds = new Set(parsed.map((m) => m.id));
+      // Ensure master synthesized dataset memories exist and enrich all
+      const existingIds = new Set(loaded.map((m) => m.id));
       const missingMasterMemories = INITIAL_MEMORIES.filter((m) => !existingIds.has(m.id));
-      return [...parsed, ...missingMasterMemories];
+      return [...loaded, ...missingMasterMemories].map((m) => enrichMemoryMetadata(m));
     } catch {
-      return INITIAL_MEMORIES;
+      return INITIAL_MEMORIES.map((m) => enrichMemoryMetadata(m));
     }
   });
 
   const [engineMode, setEngineMode] = useState<EngineMode>(() => {
-    const saved = localStorage.getItem('miki_active_engine_mode') as EngineMode;
+    const saved = storageService.getItem('miki_active_engine_mode') as EngineMode;
     const validModes: EngineMode[] = ['native_gpu', 'webgpu', 'external_gpu', 'autonomous_rule', 'gemini_cloud'];
     return validModes.includes(saved) ? saved : 'native_gpu';
   });
 
   const handleSelectEngine = (mode: EngineMode) => {
     setEngineMode(mode);
-    localStorage.setItem('miki_active_engine_mode', mode);
+    storageService.setItem('miki_active_engine_mode', mode);
   };
 
   const [speakerMode, setSpeakerMode] = useState<string>('miki');
 
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>(() => {
     try {
-      const saved = localStorage.getItem('gamecraft_workspace_files');
+      const saved = storageService.getItem('gamecraft_workspace_files');
       return saved ? JSON.parse(saved) : WORKSPACE_TEMPLATES[0].files;
     } catch {
       return WORKSPACE_TEMPLATES[0].files;
@@ -150,7 +153,7 @@ export default function App() {
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
-      const saved = localStorage.getItem('gamecraft_chat_messages');
+      const saved = storageService.getItem('gamecraft_chat_messages');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -176,19 +179,19 @@ export default function App() {
     }
   }, []);
 
-  // Save Persona & Memories & Messages & Files to LocalStorage
+  // Save Persona & Memories & Messages & Files to storageService
   useEffect(() => {
-    localStorage.setItem('gamecraft_persona', JSON.stringify(persona));
+    storageService.setItem('gamecraft_persona', JSON.stringify(persona));
   }, [persona]);
 
   useEffect(() => {
-    localStorage.setItem('gamecraft_memories', JSON.stringify(memories));
+    storageService.setMemories(memories);
   }, [memories]);
 
   useEffect(() => {
     try {
       // Keep up to 60 most recent messages to prevent storage quota overflow
-      localStorage.setItem('gamecraft_chat_messages', JSON.stringify(messages.slice(-60)));
+      storageService.setItem('gamecraft_chat_messages', JSON.stringify(messages.slice(-60)));
     } catch (e) {
       console.warn('Storage quota limit reached for chat messages', e);
     }
@@ -196,14 +199,14 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('gamecraft_workspace_files', JSON.stringify(workspaceFiles));
+      storageService.setItem('gamecraft_workspace_files', JSON.stringify(workspaceFiles));
     } catch (e) {
       console.warn('Storage quota limit reached for workspace files', e);
     }
   }, [workspaceFiles]);
 
   useEffect(() => {
-    localStorage.setItem('gamecraft_engine_mode', engineMode);
+    storageService.setItem('gamecraft_engine_mode', engineMode);
   }, [engineMode]);
 
   // Listen to sandbox postMessage events (Console & FPS)
@@ -245,17 +248,23 @@ export default function App() {
           const finalContent = item.suffix ? raw + item.suffix : match[0].trim();
           const exists = memories.some((m) => m.content.includes(raw));
           if (!exists) {
-            const newMem: MemoryItem = {
-              id: 'mem_auto_' + Date.now(),
-              category: item.cat,
-              content: finalContent,
-              importance: 4,
-              pinned: false,
-              active: true,
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              source: 'auto',
-            };
+            const newMem = enrichMemoryMetadata(
+              {
+                id: 'mem_auto_' + Date.now(),
+                category: item.cat,
+                content: finalContent,
+                importance: 4,
+                pinned: false,
+                active: true,
+                source: 'auto',
+                tags: [item.cat, 'auto_extracted'],
+              },
+              {
+                rawUserText: text,
+                sourceRef: 'user_chat',
+                existingMemories: memories,
+              }
+            );
             setMemories((prev) => [newMem, ...prev]);
           }
         }
@@ -428,10 +437,17 @@ export default function App() {
     try {
       const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
       const activeMemories = memories.filter((m) => m.active);
+      // 多層ベクトル検索 & 知識グラフ依存関係トラバーサルで、関連性の高い記憶のみを抽出 (設計思想 4 & 12)
+      const relevantMemories = retrieveRelevantMemories(text, activeMemories, {
+        limit: 8,
+        alwaysIncludePinned: true,
+        traverseGraph: true,
+      });
 
       // Step 2: Memory Retrieval & Context Association
       systemLogger.step(2, 10, '会話記憶 (Memory) 照合 & 親密度コンテキスト検索', {
         activeMemoriesCount: activeMemories.length,
+        relevantMemoriesCount: relevantMemories.length,
         intimacyLevel: persona.intimacyLevel,
         intimacyExp: persona.intimacyExp,
         speaker: activeSpeaker.name,
@@ -450,7 +466,7 @@ export default function App() {
         const reply = generateSmartCompanionReply(
           text,
           persona,
-          activeMemories,
+          relevantMemories,
           isCode,
           attached
         );
@@ -671,13 +687,13 @@ export default function App() {
         (text.includes('修正') || text.includes('変更') || text.includes('直して') || text.includes('追加'));
 
       // 🧠 世界モデル: 行動前予測 (設計思想 17. 世界モデルと予測誤差)
-      const actionPrediction = worldModelService.predictAction(text, activeMemories, persona);
+      const actionPrediction = worldModelService.predictAction(text, relevantMemories, persona);
       systemLogger.info('STEP', `世界モデル事前予測 [${actionPrediction.expectedIntent}] 期待トーン:${actionPrediction.expectedTone}, 予測記憶数:${actionPrediction.expectedMemoryUsage.predictedMemoryCount}`);
 
       const promptBuildResult = buildExpertSystemPromptWithTracking(
         promptAnalysis.role,
         persona,
-        activeMemories,
+        relevantMemories,
         workspaceFiles,
         text,
         {
@@ -690,14 +706,7 @@ export default function App() {
 
       // 記憶の利用履歴（useCount & lastUsedAt）を更新
       if (usedMemoriesTracked.length > 0) {
-        const usedIds = new Set(usedMemoriesTracked.map((m) => m.id));
-        setMemories((prev) =>
-          prev.map((m) =>
-            usedIds.has(m.id)
-              ? { ...m, useCount: (m.useCount || 0) + 1, lastUsedAt: Date.now() }
-              : m
-          )
-        );
+        setMemories((prev) => recordMemoryUsage(usedMemoriesTracked.map((m) => m.id), prev));
       }
 
       // コンテキスト圧縮 & スライディングウィンドウ (設計思想 20. コンテキスト圧縮)
@@ -805,7 +814,7 @@ export default function App() {
         try {
           const extConfig = (() => {
             try {
-              const saved = localStorage.getItem('miki_external_llm_config');
+              const saved = storageService.getItem('miki_external_llm_config');
               if (saved) return JSON.parse(saved);
             } catch (e) {}
             return { endpoint: 'http://localhost:11434', model: 'qwen2.5:1.5b', type: 'ollama' as const };
@@ -933,7 +942,7 @@ export default function App() {
             workspaceFiles,
             attachedFiles: attached,
             persona,
-            memories: activeMemories,
+            memories: relevantMemories,
             signal: abortController.signal,
           });
 

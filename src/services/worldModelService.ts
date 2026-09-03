@@ -1,5 +1,6 @@
 import { ActionPrediction, PredictionErrorRecord, MemoryItem, PersonaConfig, SkillItem } from '../types';
 import { skillsService } from './skillsService';
+import { storageService } from './storageService';
 
 const WORLD_MODEL_PREDICTIONS_KEY = 'miki_ai_world_model_predictions';
 const PREDICTION_ERRORS_KEY = 'miki_ai_prediction_error_records';
@@ -25,10 +26,10 @@ export class WorldModelService {
 
   private loadState(): void {
     try {
-      const savedPreds = localStorage.getItem(WORLD_MODEL_PREDICTIONS_KEY);
+      const savedPreds = storageService.getItem(WORLD_MODEL_PREDICTIONS_KEY);
       if (savedPreds) this.predictions = JSON.parse(savedPreds);
 
-      const savedErrors = localStorage.getItem(PREDICTION_ERRORS_KEY);
+      const savedErrors = storageService.getItem(PREDICTION_ERRORS_KEY);
       if (savedErrors) this.errorRecords = JSON.parse(savedErrors);
     } catch (e) {
       console.warn('Failed to load WorldModel state:', e);
@@ -40,8 +41,8 @@ export class WorldModelService {
       // 直近100件を保持
       const trimmedPreds = this.predictions.slice(-100);
       const trimmedErrors = this.errorRecords.slice(-100);
-      localStorage.setItem(WORLD_MODEL_PREDICTIONS_KEY, JSON.stringify(trimmedPreds));
-      localStorage.setItem(PREDICTION_ERRORS_KEY, JSON.stringify(trimmedErrors));
+      storageService.setItem(WORLD_MODEL_PREDICTIONS_KEY, JSON.stringify(trimmedPreds));
+      storageService.setItem(PREDICTION_ERRORS_KEY, JSON.stringify(trimmedErrors));
     } catch (e) {
       console.warn('Failed to save WorldModel state:', e);
     }
@@ -291,8 +292,8 @@ export class WorldModelService {
   public clearRecords(): void {
     this.predictions = [];
     this.errorRecords = [];
-    localStorage.removeItem(WORLD_MODEL_PREDICTIONS_KEY);
-    localStorage.removeItem(PREDICTION_ERRORS_KEY);
+    storageService.removeItem(WORLD_MODEL_PREDICTIONS_KEY);
+    storageService.removeItem(PREDICTION_ERRORS_KEY);
   }
 
   /**

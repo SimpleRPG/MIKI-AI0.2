@@ -10,6 +10,7 @@ import {
 } from '@mlc-ai/web-llm';
 import { systemLogger } from './systemLogger';
 import { nativeLlmService } from './nativeLlmService';
+import { storageService } from './storageService';
 
 export interface VRAMSnapshot {
   timestamp: number;
@@ -530,19 +531,19 @@ class WebLLMService {
       // 1. Official WebLLM cache verification (authoritative, checks that all shards exist)
       const isCachedInWebLLM = await hasModelInCache(targetModelId, CUSTOM_APP_CONFIG);
       if (isCachedInWebLLM) {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(`miki_cached_model_${targetModelId}`, 'true');
+        if (typeof storageService !== 'undefined') {
+          storageService.setItem(`miki_cached_model_${targetModelId}`, 'true');
         }
         return true;
       } else {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem(`miki_cached_model_${targetModelId}`);
+        if (typeof storageService !== 'undefined') {
+          storageService.removeItem(`miki_cached_model_${targetModelId}`);
         }
         return false;
       }
     } catch (e) {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(`miki_cached_model_${targetModelId}`);
+      if (typeof storageService !== 'undefined') {
+        storageService.removeItem(`miki_cached_model_${targetModelId}`);
       }
       return false;
     }
@@ -615,8 +616,8 @@ class WebLLMService {
       if (this.activeModelId === modelId) {
         await this.cancelAndReset();
       }
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(`miki_cached_model_${modelId}`);
+      if (typeof storageService !== 'undefined') {
+        storageService.removeItem(`miki_cached_model_${modelId}`);
       }
 
       // 1. Call official MLC cleanup
@@ -677,8 +678,8 @@ class WebLLMService {
     if (this.activeModelId === modelId) {
       await this.cancelAndReset();
     }
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(`miki_cached_model_${modelId}`);
+    if (typeof storageService !== 'undefined') {
+      storageService.removeItem(`miki_cached_model_${modelId}`);
     }
     try {
       await deleteModelAllInfoInCache(modelId, CUSTOM_APP_CONFIG);
@@ -790,14 +791,14 @@ class WebLLMService {
     }
 
     // Check user preference in localStorage first
-    const userPref = localStorage.getItem('miki_preferred_local_model');
+    const userPref = storageService.getItem('miki_preferred_local_model');
     if (userPref && (await this.isModelCached(userPref))) {
       return userPref;
     }
 
     // Check models marked as cached or loaded in EngineModal state
     try {
-      const savedModels = localStorage.getItem('miki_local_llm_models_v2');
+      const savedModels = storageService.getItem('miki_local_llm_models_v2');
       if (savedModels) {
         const parsed = JSON.parse(savedModels);
         for (const item of parsed) {
@@ -829,15 +830,15 @@ class WebLLMService {
   }
 
   public getPreferredModelId(): string | null {
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('miki_preferred_local_model');
+    if (typeof storageService !== 'undefined') {
+      return storageService.getItem('miki_preferred_local_model');
     }
     return null;
   }
 
   public setPreferredModelId(modelId: string): void {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('miki_preferred_local_model', modelId);
+    if (typeof storageService !== 'undefined') {
+      storageService.setItem('miki_preferred_local_model', modelId);
     }
   }
 
@@ -1137,8 +1138,8 @@ class WebLLMService {
             this.activeModelId = targetModelId;
             this.setPreferredModelId(targetModelId);
 
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(`miki_cached_model_${targetModelId}`, 'true');
+            if (typeof storageService !== 'undefined') {
+              storageService.setItem(`miki_cached_model_${targetModelId}`, 'true');
             }
             if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
               navigator.storage.persist().catch(() => {});
@@ -1311,15 +1312,15 @@ class WebLLMService {
 
   public async clearAllCaches(): Promise<void> {
     await this.cancelAndReset();
-    if (typeof localStorage !== 'undefined') {
+    if (typeof storageService !== 'undefined') {
       try {
         for (const mId of KNOWN_MODEL_IDS) {
-          localStorage.removeItem(`miki_cached_model_${mId}`);
+          storageService.removeItem(`miki_cached_model_${mId}`);
         }
-        const keys = Object.keys(localStorage);
+        const keys = storageService.keys();
         for (const k of keys) {
           if (k.startsWith('miki_cached_model_')) {
-            localStorage.removeItem(k);
+            storageService.removeItem(k);
           }
         }
       } catch {}

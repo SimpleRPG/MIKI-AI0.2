@@ -9,6 +9,7 @@ import {
 import { nativeLlmService } from './nativeLlmService';
 import { webLLMService } from './webLlmService';
 import { systemLogger } from './systemLogger';
+import { storageService } from './storageService';
 
 const RECORDS_STORAGE_KEY = 'miki_ai_self_improvement_records';
 const TRAINING_DATA_STORAGE_KEY = 'miki_ai_training_samples';
@@ -44,15 +45,15 @@ class SelfImprovementService {
   }
 
   private loadAll(): void {
-    if (typeof localStorage !== 'undefined') {
+    if (typeof storageService !== 'undefined') {
       try {
-        const rawRec = localStorage.getItem(RECORDS_STORAGE_KEY);
+        const rawRec = storageService.getItem(RECORDS_STORAGE_KEY);
         if (rawRec) this.records = JSON.parse(rawRec);
 
-        const rawTrain = localStorage.getItem(TRAINING_DATA_STORAGE_KEY);
+        const rawTrain = storageService.getItem(TRAINING_DATA_STORAGE_KEY);
         if (rawTrain) this.trainingSamples = JSON.parse(rawTrain);
 
-        const rawGen = localStorage.getItem(MODEL_GENERATIONS_KEY);
+        const rawGen = storageService.getItem(MODEL_GENERATIONS_KEY);
         if (rawGen) {
           this.generations = JSON.parse(rawGen);
         } else {
@@ -66,25 +67,25 @@ class SelfImprovementService {
   }
 
   public saveRecords(): void {
-    if (typeof localStorage !== 'undefined') {
+    if (typeof storageService !== 'undefined') {
       try {
-        localStorage.setItem(RECORDS_STORAGE_KEY, JSON.stringify(this.records));
+        storageService.setItem(RECORDS_STORAGE_KEY, JSON.stringify(this.records));
       } catch (e) {}
     }
   }
 
   public saveTrainingSamples(): void {
-    if (typeof localStorage !== 'undefined') {
+    if (typeof storageService !== 'undefined') {
       try {
-        localStorage.setItem(TRAINING_DATA_STORAGE_KEY, JSON.stringify(this.trainingSamples));
+        storageService.setItem(TRAINING_DATA_STORAGE_KEY, JSON.stringify(this.trainingSamples));
       } catch (e) {}
     }
   }
 
   public saveGenerations(): void {
-    if (typeof localStorage !== 'undefined') {
+    if (typeof storageService !== 'undefined') {
       try {
-        localStorage.setItem(MODEL_GENERATIONS_KEY, JSON.stringify(this.generations));
+        storageService.setItem(MODEL_GENERATIONS_KEY, JSON.stringify(this.generations));
       } catch (e) {}
     }
   }

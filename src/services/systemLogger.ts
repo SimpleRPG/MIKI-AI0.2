@@ -1,3 +1,4 @@
+import { storageService } from './storageService';
 export interface SystemLogEntry {
   id: string;
   timestamp: string;
@@ -33,7 +34,7 @@ class SystemLogger {
   constructor() {
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem(this.storageKey);
+        const saved = storageService.getItem(this.storageKey);
         if (saved) {
           this.logs = JSON.parse(saved);
         }
@@ -85,7 +86,7 @@ class SystemLogger {
 
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(this.storageKey, JSON.stringify(this.logs.slice(-300)));
+        storageService.setItem(this.storageKey, JSON.stringify(this.logs.slice(-300)));
       } catch {}
 
       // Fire and forget server sync to persist in workspace log file
@@ -182,7 +183,7 @@ class SystemLogger {
   public clearLogs() {
     this.logs = [];
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(this.storageKey);
+      storageService.removeItem(this.storageKey);
     }
   }
 
@@ -276,22 +277,22 @@ class SystemLogger {
     const cachedFlags: string[] = [];
     const ggufFiles: string[] = [];
     let activeGgufModel = 'なし';
-    if (typeof localStorage !== 'undefined') {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
+    if (typeof storageService !== 'undefined') {
+      for (let i = 0; i < storageService.length; i++) {
+        const k = storageService.key(i);
         if (k && k.startsWith('miki_cached_model_')) {
           cachedFlags.push(k.replace('miki_cached_model_', ''));
         }
       }
       try {
-        const rawGguf = localStorage.getItem('miki_downloaded_gguf_files');
+        const rawGguf = storageService.getItem('miki_downloaded_gguf_files');
         if (rawGguf) {
           const list = JSON.parse(rawGguf);
           if (Array.isArray(list)) {
             ggufFiles.push(...list.map((f: any) => `${f.fileName || f.id} (${f.sizeMB || '?'}MB)`));
           }
         }
-        activeGgufModel = localStorage.getItem('miki_active_gguf_model') || 'なし';
+        activeGgufModel = storageService.getItem('miki_active_gguf_model') || 'なし';
       } catch (e) {}
     }
 

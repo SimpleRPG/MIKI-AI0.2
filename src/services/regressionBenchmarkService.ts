@@ -6,6 +6,7 @@ import {
 import { systemLogger } from './systemLogger';
 import { nativeLlmService } from './nativeLlmService';
 import { webLLMService } from './webLlmService';
+import { storageService } from './storageService';
 
 const REGRESSION_REPORTS_STORAGE_KEY = 'miki_ai_regression_reports';
 
@@ -78,9 +79,9 @@ export class RegressionBenchmarkService {
   }
 
   private loadReports(): void {
-    if (typeof localStorage === 'undefined') return;
+    if (typeof storageService === 'undefined') return;
     try {
-      const data = localStorage.getItem(REGRESSION_REPORTS_STORAGE_KEY);
+      const data = storageService.getItem(REGRESSION_REPORTS_STORAGE_KEY);
       if (data) this.reports = JSON.parse(data);
     } catch (e) {
       console.warn('Failed to load regression reports:', e);
@@ -88,9 +89,9 @@ export class RegressionBenchmarkService {
   }
 
   private saveReports(): void {
-    if (typeof localStorage === 'undefined') return;
+    if (typeof storageService === 'undefined') return;
     try {
-      localStorage.setItem(REGRESSION_REPORTS_STORAGE_KEY, JSON.stringify(this.reports.slice(-20)));
+      storageService.setItem(REGRESSION_REPORTS_STORAGE_KEY, JSON.stringify(this.reports.slice(-20)));
     } catch (e) {
       console.warn('Failed to save regression reports:', e);
     }
@@ -264,7 +265,7 @@ export class RegressionBenchmarkService {
 
   public clearReports(): void {
     this.reports = [];
-    localStorage.removeItem(REGRESSION_REPORTS_STORAGE_KEY);
+    storageService.removeItem(REGRESSION_REPORTS_STORAGE_KEY);
   }
 
   public isBusy(): boolean {

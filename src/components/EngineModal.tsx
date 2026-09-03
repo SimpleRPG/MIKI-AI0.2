@@ -5,6 +5,7 @@ import { nativeLlmService, NativeGpuInfo, ExternalLocalLlmConfig } from '../serv
 import { deviceBenchmarkService, DeviceSpecReport } from '../services/deviceBenchmarkService';
 import { distillKnowledgeForLocalLLM, sendChatMessage } from '../services/api';
 import { systemLogger } from '../services/systemLogger';
+import { storageService } from '../services/storageService';
 import { VRAMMonitor } from './VRAMMonitor';
 import { GgufModelManager } from './GgufModelManager';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -197,7 +198,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   // Local Models state
   const [localModels, setLocalModels] = useState<LocalLLMModel[]>(() => {
     try {
-      const saved = localStorage.getItem('miki_local_llm_models_v2');
+      const saved = storageService.getItem('miki_local_llm_models_v2');
       if (saved) {
         const parsed: LocalLLMModel[] = JSON.parse(saved);
         // Automatic migration of legacy model IDs (e.g. gemma-2-2b-jpn-it -> gemma-2-2b-it)
@@ -218,13 +219,13 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   });
 
   const [useLocalInMoE, setUseLocalInMoE] = useState<boolean>(() => {
-    return localStorage.getItem('miki_use_local_in_moe') !== 'false';
+    return storageService.getItem('miki_use_local_in_moe') !== 'false';
   });
 
   // External Local GPU (Ollama / LM Studio) Configuration
   const [externalLlmConfig, setExternalLlmConfig] = useState<ExternalLocalLlmConfig>(() => {
     try {
-      const saved = localStorage.getItem('miki_external_llm_config');
+      const saved = storageService.getItem('miki_external_llm_config');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
     return {
@@ -236,7 +237,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem('miki_external_llm_config', JSON.stringify(externalLlmConfig));
+      storageService.setItem('miki_external_llm_config', JSON.stringify(externalLlmConfig));
     } catch (e) {}
   }, [externalLlmConfig]);
 
@@ -265,15 +266,15 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   const [scanNotice, setScanNotice] = useState<string | null>(null);
   const [storageQuota, setStorageQuota] = useState<{ usedMB: number; quotaMB: number; percent: number } | null>(null);
 
-  // Save models to localStorage
+  // Save models to storageService
   useEffect(() => {
     try {
-      localStorage.setItem('miki_local_llm_models_v2', JSON.stringify(localModels));
+      storageService.setItem('miki_local_llm_models_v2', JSON.stringify(localModels));
     } catch (e) {}
   }, [localModels]);
 
   useEffect(() => {
-    localStorage.setItem('miki_use_local_in_moe', useLocalInMoE ? 'true' : 'false');
+    storageService.setItem('miki_use_local_in_moe', useLocalInMoE ? 'true' : 'false');
   }, [useLocalInMoE]);
 
   const refreshStorageEstimate = async () => {
@@ -1040,8 +1041,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     if (!distilledResult) return;
 
     try {
-      const savedMemoriesRaw = localStorage.getItem('gamecraft_memories');
-      const memoriesList: MemoryItem[] = savedMemoriesRaw ? JSON.parse(savedMemoriesRaw) : [];
+      const memoriesList: MemoryItem[] = storageService.getMemories();
 
       const newMemory: MemoryItem = {
         id: 'mem_distill_' + Date.now(),
@@ -1053,11 +1053,17 @@ export const EngineModal: React.FC<EngineModalProps> = ({
         source: 'manual',
         pinned: true,
         active: true,
+        approved: true,
+        memoryType: 'semantic',
+        sourceRef: 'gemini_distillation',
+        rawExcerpt: distilledResult.title,
+        status: 'active',
+        conflictWith: [],
         tags: ['distilled_llm_knowledge', distilledResult.category],
       };
 
       memoriesList.unshift(newMemory);
-      localStorage.setItem('gamecraft_memories', JSON.stringify(memoriesList));
+      storageService.setMemories(memoriesList);
       setDistillSuccessMsg(`✨ 知識カード「${distilledResult.title}」を端末記憶 (Memory) に保存しました！みきが次回以降の会話・ゲーム作成でこの知識を活用します。`);
     } catch (e) {
       alert('記憶の保存に失敗しました。');
