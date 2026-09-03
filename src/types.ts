@@ -85,6 +85,76 @@ export interface WorkspaceFile {
   isModified?: boolean;
 }
 
+/**
+ * ツール管理 (:feature:tools) & タスク計画とツール利用 (設計思想 13-14章, 22章)
+ */
+export type ToolPermissionLevel = 'read_only' | 'workspace_read' | 'workspace_write' | 'network' | 'system';
+
+export interface ToolParameterSchema {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  description: string;
+  required?: boolean;
+  defaultValue?: any;
+  options?: string[];
+}
+
+export interface ToolDefinition {
+  id: string;
+  name: string;
+  description: string;
+  category: 'math' | 'code' | 'workspace' | 'data' | 'system';
+  permission: ToolPermissionLevel;
+  requiresConfirmation: boolean;
+  parameters: ToolParameterSchema[];
+  linkedSkillIds?: string[]; // 連携するスキルID (設計思想 13章)
+  isAvailable: boolean;
+  executionCount?: number;
+  lastExecutedAt?: number;
+}
+
+export interface ToolExecutionRequest {
+  id: string;
+  toolId: string;
+  toolName: string;
+  params: Record<string, any>;
+  timestamp: number;
+  requiresConfirmation: boolean;
+  permission: ToolPermissionLevel;
+  reason?: string;
+}
+
+export interface ToolExecutionResult {
+  toolId: string;
+  toolName: string;
+  success: boolean;
+  result: any;
+  error?: string;
+  outputSummary: string;
+  executionTimeMs: number;
+  permission: ToolPermissionLevel;
+  requiresConfirmation?: boolean;
+  executedAt?: number;
+}
+
+export interface SafeMathResult {
+  result: number;
+  formatted: string;
+  expression: string;
+  success?: boolean;
+  error?: string;
+}
+
+export interface ToolRecommendation {
+  toolId: string;
+  name: string;
+  category: 'math' | 'code' | 'workspace' | 'data' | 'system';
+  reason: string;
+  suggestedParams?: Record<string, any>;
+  requiresConfirmation: boolean;
+  permission: ToolPermissionLevel;
+}
+
 export interface GroundingChunk {
   web?: {
     uri: string;
@@ -142,6 +212,10 @@ export interface ChatMessage {
   // 設計思想 24. 第1世代〜第3世代 追跡フィールド
   usedMemories?: Array<{ id: string; content: string; score?: number }>;
   usedSkills?: Array<{ id: string; name: string }>;
+  // ツール管理 (:feature:tools / 設計思想 14 & 22章)
+  suggestedTools?: ToolRecommendation[];
+  executedTools?: ToolExecutionResult[];
+  pendingToolConfirmation?: ToolExecutionRequest;
   userFeedback?: 'good' | 'bad' | null;
   feedbackNote?: string;
   fallbackDiagnostic?: {
@@ -426,6 +500,8 @@ export interface RegressionSuiteRunReport {
   id: string;
   timestamp: number;
   modelName: string;
+  modelId?: string;               // 実際にテストされた推論モデルの識別子 (GGUFファイル名またはWebLLMモデルID)
+  engineType?: 'native_gguf' | 'webllm' | 'none'; // 実行エンジン種別
   totalTests: number;
   passedTests: number;
   failedTests: number;

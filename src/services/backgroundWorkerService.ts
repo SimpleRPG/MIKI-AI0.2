@@ -382,10 +382,7 @@ export class BackgroundWorkerService {
           const isNativeReady = nativeLlmService.isNative() && !!nativeLlmService.getActiveModelId();
           const isWebReady = webLLMService.isLoaded();
           if (isNativeReady || isWebReady) {
-            const activeModelName = isNativeReady
-              ? (nativeLlmService.getActiveModelId() || 'Native GGUF')
-              : 'WebLLM Qwen';
-            regressionReport = await regressionBenchmarkService.runFullSuite(`Auto-Cycle: ${activeModelName}`);
+            regressionReport = await regressionBenchmarkService.runFullSuite();
             if (regressionReport.regressionsCount > 0 || regressionReport.failedTests > 0) {
               weaknessFound.push(
                 `[回帰劣化検知] 自律ベンチマークで退行${regressionReport.regressionsCount}件 / 失敗${regressionReport.failedTests}件を検出 (総合スコア: ${regressionReport.overallScore}点)`

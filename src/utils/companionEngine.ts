@@ -1,4 +1,5 @@
 import { PersonaConfig, MemoryItem } from '../types';
+import { toolsService } from '../services/toolsService';
 
 export function generateSmartCompanionReply(
   prompt: string,
@@ -27,6 +28,16 @@ export function generateSmartCompanionReply(
   const repeatMatch = p.match(/^([「『]?)(.+?)\1と(?:だけ)?(?:返して|言って|答えて|出力して)/);
   if (repeatMatch && repeatMatch[2]) {
     return repeatMatch[2].trim();
+  }
+
+  // 0.05 Safe Math Tool Execution (:feature:tools / 設計思想 14章 & 22章)
+  const candidateTools = toolsService.detectCandidateToolsForPrompt(p);
+  const mathTool = candidateTools.find((t) => t.toolId === 'tool_safe_calculator');
+  if (mathTool && mathTool.suggestedParams?.expression) {
+    const calc = toolsService.evaluateSafeMath(mathTool.suggestedParams.expression);
+    if (calc.success && typeof calc.result === 'number' && !isNaN(calc.result)) {
+      return `計算できたよ！🧮✨\n\n**計算式**: \`${calc.expression}\`\n**結果**: **${calc.result}**\n\n（※端末内オンデバイスの安全な数値演算ツール \`:feature:tools\` で計算したよ！eval/new Function不使用・ハルシネーションなしの100%正確な値だよ💡）`;
+    }
   }
 
   // 0.1 Self Introduction

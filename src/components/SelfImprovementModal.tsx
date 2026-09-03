@@ -32,6 +32,7 @@ import {
   Database,
   PieChart,
   Filter,
+  AlertCircle,
 } from 'lucide-react';
 import {
   SelfImprovementRecord,
@@ -46,6 +47,9 @@ import {
   WorkManagerStatus,
   BackgroundTaskExecutionLog,
   RegressionSuiteRunReport,
+  WorkspaceFile,
+  ToolDefinition,
+  ToolExecutionResult,
 } from '../types';
 import { selfImprovementService } from '../services/selfImprovementService';
 import { skillsService } from '../services/skillsService';
@@ -53,6 +57,7 @@ import { worldModelService } from '../services/worldModelService';
 import { backgroundWorkerService } from '../services/backgroundWorkerService';
 import { regressionBenchmarkService } from '../services/regressionBenchmarkService';
 import { nativeBackgroundService } from '../services/nativeBackgroundService';
+import { toolsService } from '../services/toolsService';
 import { retrieveScoredMemories } from '../utils/memoryRetrieval';
 
 export interface SelfImprovementModalProps {
@@ -60,7 +65,8 @@ export interface SelfImprovementModalProps {
   onClose: () => void;
   chatMessages: ChatMessage[];
   memories: MemoryItem[];
-  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'skills' | 'lab' | 'colab' | 'generations';
+  workspaceFiles?: WorkspaceFile[];
+  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations';
 }
 
 export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
@@ -68,9 +74,10 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   onClose,
   chatMessages,
   memories,
+  workspaceFiles = [],
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'skills' | 'lab' | 'colab' | 'generations'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 
@@ -84,6 +91,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   const [benchmarkReports, setBenchmarkReports] = useState<RegressionSuiteRunReport[]>([]);
   const [isBenchmarkRunning, setIsBenchmarkRunning] = useState(false);
   const [selectedReport, setSelectedReport] = useState<RegressionSuiteRunReport | null>(null);
+  const [benchmarkError, setBenchmarkError] = useState<string | null>(null);
 
   // 世界モデルステート (設計思想 17)
   const [worldModelErrors, setWorldModelErrors] = useState<PredictionErrorRecord[]>([]);
@@ -143,6 +151,62 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   // データセット・クリーンアップステート
   const [cleanupMessage, setCleanupMessage] = useState<string | null>(null);
   const [skillsMessage, setSkillsMessage] = useState<string | null>(null);
+
+  // ツール管理ステート (:feature:tools / 設計思想 14 & 22章)
+  const [toolsList] = useState<ToolDefinition[]>(() => toolsService.getAllTools());
+  const [selectedToolId, setSelectedToolId] = useState<string>('tool_safe_calculator');
+  const [toolTestInput, setToolTestInput] = useState<string>('1250 * 1.1 + 500');
+  const [toolExecutionResult, setToolExecutionResult] = useState<ToolExecutionResult | null>(null);
+  const [isToolExecuting, setIsToolExecuting] = useState(false);
+
+  const handleExecuteInteractiveTool = async () => {
+    setIsToolExecuting(true);
+    setToolExecutionResult(null);
+    try {
+      let params: Record<string, any> = {};
+      if (selectedToolId === 'tool_safe_calculator') {
+        params = { expression: toolTestInput };
+      } else if (selectedToolId === 'tool_code_syntax_audit') {
+        const file =
+          workspaceFiles.find(
+            (f) => f.path.endsWith('.html') || f.path.endsWith('.js') || f.path.endsWith('.ts')
+          ) || workspaceFiles[0];
+        params = {
+          code: toolTestInput || (file ? file.content : 'console.log("hello");'),
+          language: file ? file.language : 'javascript',
+        };
+      } else if (selectedToolId === 'tool_workspace_search') {
+        params = { query: toolTestInput || 'canvas' };
+      } else {
+        params = { path: 'test_tool.txt', content: toolTestInput };
+      }
+
+      const res = await toolsService.executeTool(
+        selectedToolId,
+        params,
+        {
+          workspaceFiles,
+          userNickname: 'ユーザー',
+        },
+        { userConfirmed: true }
+      );
+      setToolExecutionResult(res);
+    } catch (e: any) {
+      setToolExecutionResult({
+        toolId: selectedToolId,
+        toolName: selectedToolId,
+        permission: 'read_only',
+        executionTimeMs: 0,
+        success: false,
+        result: null,
+        error: e.message,
+        outputSummary: `エラー: ${e.message}`,
+        executedAt: Date.now(),
+      });
+    } finally {
+      setIsToolExecuting(false);
+    }
+  };
 
   const handleTestNotification = async () => {
     setNotificationTestStatus('実機/Web通知を送信中...');
@@ -279,13 +343,22 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
     const linkedReport = benchmarkReports.find((r) => r.id === newGenReportId);
 
-    // 設計思想: stable ブランチへの直接登録は合格済みレポートが必須
+    // 設計思想: stable ブランチへの直接登録は合格済みレポートが必須 & 対象モデル一致必須
     if (newGenBranch === 'stable') {
       if (!newGenReportId) {
         setPromotionError('総合安定版(stable)への直接登録には、合格済みの回帰テストレポートの選択が必須です。');
         return;
       }
-      const val = selfImprovementService.validatePromotionReport(newGenReportId);
+      const val = selfImprovementService.validatePromotionReport(newGenReportId, {
+        generationId: 'candidate_check',
+        modelName: newGenName.trim(),
+        baseModel: 'Qwen/Qwen2.5-Coder-1.5B-Instruct',
+        version: newGenVersion.trim() || 'v1.1.0',
+        branch: 'stable',
+        status: 'active',
+        createdAt: Date.now(),
+        notes: newGenNotes.trim(),
+      });
       if (!val.valid) {
         setPromotionError(`安定版の昇格基準を満たしていません: ${val.error}`);
         return;
@@ -322,7 +395,11 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   const handlePromoteToStable = (generationId: string, reportId: string) => {
     setPromotionError(null);
     try {
-      selfImprovementService.promoteToStable(generationId, reportId);
+      const res = selfImprovementService.promoteToStable(generationId, reportId);
+      if (!res.success) {
+        setPromotionError(res.error || '昇格処理に失敗しました');
+        return;
+      }
       setGenerations(selfImprovementService.getGenerations());
       setPromotingGenId(null);
       setSelectedPromoteReportId('');
@@ -406,13 +483,15 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
   const handleRunBenchmark = async () => {
     setIsBenchmarkRunning(true);
+    setBenchmarkError(null);
     try {
-      const report = await regressionBenchmarkService.runFullSuite('MikiAI Gen3-Integrated');
+      const report = await regressionBenchmarkService.runFullSuite();
       const updatedReports = regressionBenchmarkService.getReports();
       setBenchmarkReports(updatedReports);
       setSelectedReport(report);
     } catch (e: any) {
       console.warn('Benchmark suite execution failed:', e);
+      setBenchmarkError(e?.message || 'ベンチマーク実行に失敗しました');
     } finally {
       setIsBenchmarkRunning(false);
     }
@@ -515,6 +594,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <Wrench className="w-4 h-4 text-sky-400" />
             <span>スキルライブラリ ({skills.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tools')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'tools'
+                ? 'border-indigo-500 text-indigo-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Cpu className="w-4 h-4 text-indigo-400" />
+            <span>🛠️ ツール管理 (:feature:tools)</span>
           </button>
 
           <button
@@ -1240,7 +1331,25 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(() => {
+                      const activeInfo = regressionBenchmarkService.getActiveLoadedModelInfo();
+                      return (
+                        <div className="text-[11px] flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
+                          <span className="text-slate-400">現在ロード中モデル:</span>
+                          {activeInfo.isReady ? (
+                            <span className="font-mono font-bold text-emerald-400">
+                              {activeInfo.modelName} ({activeInfo.engineType === 'native_gguf' ? 'Native GGUF' : 'WebLLM'})
+                            </span>
+                          ) : (
+                            <span className="text-amber-400 font-semibold">
+                              ⚠️ 未ロード (端末ローカルLLM設定でロード必要)
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     <button
                       onClick={handleRunBenchmark}
                       disabled={isBenchmarkRunning}
@@ -1271,6 +1380,13 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {benchmarkError && (
+                <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-300 text-xs font-semibold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{benchmarkError}</span>
+                </div>
+              )}
 
               {/* Latest Run Overview */}
               {selectedReport ? (
@@ -1568,6 +1684,143 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: ツール管理モジュール (:feature:tools / 設計思想 14 & 22章) */}
+          {activeTab === 'tools' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-indigo-300 text-xs flex items-center gap-2">
+                    <Cpu className="w-4 h-4 text-indigo-400" />
+                    <span>APK内モジュール構成: :feature:tools (設計思想 14 & 22章)</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-950 text-indigo-300 border border-indigo-800">
+                    登録ツール: {toolsList.length}基
+                  </span>
+                </div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  端末オンデバイスAIが推論時に呼び出すツール群です。計算ツールは脆弱な<code className="text-rose-400 font-mono">eval</code>や<code className="text-rose-400 font-mono">new Function()</code>を一切使用せず、構文木（AST）に基づく再帰下降パーサーで安全に計算されます。また破壊的操作（ファイル書き換え等）はユーザーの明示的な承認ゲートを通過します。
+                </p>
+              </div>
+
+              {/* ツールカタログ */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {toolsList.map((tool) => (
+                  <div
+                    key={tool.id}
+                    onClick={() => {
+                      setSelectedToolId(tool.id);
+                      if (tool.id === 'tool_safe_calculator') setToolTestInput('1250 * 1.1 + 500');
+                      else if (tool.id === 'tool_code_syntax_audit') setToolTestInput('function test() { console.log("OK"); }');
+                      else if (tool.id === 'tool_workspace_search') setToolTestInput('canvas');
+                      else setToolTestInput('Hello from toolsService test');
+                    }}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer space-y-2 ${
+                      selectedToolId === tool.id
+                        ? 'bg-indigo-950/40 border-indigo-500 shadow-md'
+                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-slate-100 text-xs flex items-center gap-1.5">
+                        <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>{tool.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-mono border ${
+                          tool.permission === 'workspace_write'
+                            ? 'bg-amber-950/80 text-amber-300 border-amber-800'
+                            : 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                        }`}>
+                          {tool.permission}
+                        </span>
+                        {tool.requiresConfirmation && (
+                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono bg-rose-950/80 text-rose-300 border border-rose-800">
+                            要承認
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">{tool.description}</p>
+                    <div className="font-mono text-[9.5px] text-slate-500 bg-black/40 p-1.5 rounded border border-slate-800/80 flex items-center justify-between">
+                      <span>ID: {tool.id}</span>
+                      <span>安全度: {tool.permission === 'read_only' ? '高 (Read-Only)' : '要確認 (Write)'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 対話的ツールテスト実行環境 */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-slate-200 text-xs flex items-center gap-2">
+                    <Play className="w-4 h-4 text-indigo-400" />
+                    <span>ツール対話テスト実行環境</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    選択中: <strong className="text-indigo-300">{toolsList.find(t => t.id === selectedToolId)?.name}</strong>
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-300 block font-medium">
+                    {selectedToolId === 'tool_safe_calculator' && 'テスト数式 (例: 1250 * 1.1 + 500, sqrt(144) + sin(0.5)): '}
+                    {selectedToolId === 'tool_code_syntax_audit' && 'テスト対象コード (構文検証): '}
+                    {selectedToolId === 'tool_workspace_search' && 'ワークスペース内検索キーワード: '}
+                    {selectedToolId === 'tool_workspace_write' && 'テスト書き込み内容: '}
+                  </label>
+                  <textarea
+                    value={toolTestInput}
+                    onChange={(e) => setToolTestInput(e.target.value)}
+                    rows={selectedToolId === 'tool_code_syntax_audit' ? 4 : 2}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                    placeholder="入力パラメータ..."
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleExecuteInteractiveTool}
+                    disabled={isToolExecuting}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition-all"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>{isToolExecuting ? 'ツール実行中...' : 'ツールを実行テスト'}</span>
+                  </button>
+                </div>
+
+                {toolExecutionResult && (
+                  <div className={`p-3 rounded-xl border space-y-2 text-xs font-mono animate-fadeIn ${
+                    toolExecutionResult.success
+                      ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200'
+                      : 'bg-rose-950/40 border-rose-500/50 text-rose-200'
+                  }`}>
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="flex items-center gap-1.5">
+                        {toolExecutionResult.success ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-rose-400" />
+                        )}
+                        <span>{toolExecutionResult.toolName} - {toolExecutionResult.success ? '実行成功' : '実行失敗'}</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-sans">
+                        所要時間: {toolExecutionResult.executionTimeMs}ms
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-sans text-slate-200 bg-black/40 p-2 rounded-lg border border-slate-800">
+                      {toolExecutionResult.outputSummary}
+                    </div>
+                    {toolExecutionResult.result && (
+                      <pre className="text-[10px] p-2 bg-black/60 rounded border border-slate-800 overflow-x-auto text-slate-300">
+                        {JSON.stringify(toolExecutionResult.result, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -2116,9 +2369,19 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                         <option value="">-- レポート未紐付け (測定待ち) --</option>
                         {benchmarkReports.map((r) => {
                           const passes = r.overallScore >= 80 && r.regressionsCount === 0 && r.failedTests === 0;
+                          const isMatch = selfImprovementService.checkModelReportMatch(r, {
+                            generationId: 'candidate',
+                            modelName: newGenName.trim() || 'candidate',
+                            baseModel: 'Qwen/Qwen2.5-Coder-1.5B-Instruct',
+                            version: newGenVersion.trim() || 'v1.1.0',
+                            branch: newGenBranch,
+                            status: 'shadow_testing',
+                            createdAt: Date.now(),
+                            notes: newGenNotes.trim(),
+                          });
                           return (
                             <option key={r.id} value={r.id}>
-                              {passes ? '✅ 合格' : '⚠️ 不合格'}: {r.modelName} (スコア: {r.overallScore}点 / 退行: {r.regressionsCount}件 / 失敗: {r.failedTests}件)
+                              {passes ? (isMatch ? '✅ [合格・適合]' : '⚠️ [合格・他モデル]') : '❌ [不合格]'}: {r.modelName} (スコア: {r.overallScore}点 / 退行: {r.regressionsCount}件 / 失敗: {r.failedTests}件)
                             </option>
                           );
                         })}
@@ -2286,9 +2549,10 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                               {benchmarkReports.map((r) => {
                                 const passes =
                                   r.overallScore >= 80 && r.regressionsCount === 0 && r.failedTests === 0;
+                                const isMatch = selfImprovementService.checkModelReportMatch(r, gen);
                                 return (
                                   <option key={r.id} value={r.id}>
-                                    {passes ? '✅ [合格]' : '❌ [不合格]'}: {r.modelName} (スコア: {r.overallScore}点 / 退行: {r.regressionsCount}件 / 失敗: {r.failedTests}件)
+                                    {passes ? (isMatch ? '✅ [合格・適合]' : '⚠️ [合格・他モデル不適合]') : '❌ [不合格]'}: {r.modelName} (スコア: {r.overallScore}点 / 退行: {r.regressionsCount}件 / 失敗: {r.failedTests}件)
                                   </option>
                                 );
                               })}

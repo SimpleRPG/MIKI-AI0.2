@@ -6,6 +6,7 @@ import {
   MemoryItem,
   ChatMessage,
   SkillItem,
+  RegressionSuiteRunReport,
 } from '../types';
 import { nativeLlmService } from './nativeLlmService';
 import { webLLMService } from './webLlmService';
@@ -840,15 +841,96 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
   }
 
   /**
+   * 回帰テストレポートの測定対象モデルと、昇格対象のモデル世代が一致しているか判定
+   * 別のモデルで取得した合格レポートを使って異なるモデルを昇格させる「評価のすり替え」を阻止する
+   * 設計思想 25. 安全・品質境界 & 評価基準の改ざん防止
+   */
+  public checkModelReportMatch(
+    report: RegressionSuiteRunReport,
+    targetGen: ModelGeneration
+  ): boolean {
+    const normalize = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const normReportName = normalize(report.modelName);
+    const normReportId = normalize(report.modelId);
+    const normGenName = normalize(targetGen.modelName);
+    const normGenBase = normalize(targetGen.baseModel);
+    const normGenId = normalize(targetGen.generationId);
+    const normGenNotes = normalize(targetGen.notes);
+
+    // 1. 完全一致
+    if (normReportName && normGenName && (normReportName === normGenName || normReportId === normGenName)) {
+      return true;
+    }
+
+    // 2. 相互包含 (例: "miki_model_candidate_q4" と "miki_model_candidate_q4.gguf")
+    if (normReportName && normGenName && (normReportName.includes(normGenName) || normGenName.includes(normReportName))) {
+      return true;
+    }
+    if (normReportId && normGenName && (normReportId.includes(normGenName) || normGenName.includes(normReportId))) {
+      return true;
+    }
+
+    // 3. ベースモデルとの一致 (例: Qwen/Qwen2.5-Coder-1.5B-Instruct と Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC)
+    if (normGenBase && normReportName && (normReportName.includes(normGenBase) || normGenBase.includes(normReportName))) {
+      return true;
+    }
+    if (normGenBase && normReportId && (normReportId.includes(normGenBase) || normGenBase.includes(normReportId))) {
+      return true;
+    }
+
+    // 4. ノーツや世代IDに含まれているファイル名・モデル名
+    if (normGenNotes && ((normReportName && normGenNotes.includes(normReportName)) || (normReportId && normGenNotes.includes(normReportId)))) {
+      return true;
+    }
+    if (normGenId && (normReportName.includes(normGenId) || normReportId.includes(normGenId))) {
+      return true;
+    }
+
+    // 5. 主要モデルファミリ & パラメータサイズの共通トークン照合
+    const significantTokens = [
+      'qwen25coder15b',
+      'qwen25coder7b',
+      'qwen2505b',
+      'qwen2515b',
+      'qwen253b',
+      'qwen257b',
+      'llama321b',
+      'llama323b',
+      'gemma22b',
+      'gemma29b',
+      'phi35mini',
+      'smollm135m',
+      'smollm360m',
+      'smollm17b',
+    ];
+
+    for (const token of significantTokens) {
+      const inReport = normReportName.includes(token) || normReportId.includes(token);
+      const inGen = normGenName.includes(token) || normGenBase.includes(token) || normGenNotes.includes(token);
+      if (inReport && inGen) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * 回帰テストレポートが総合安定版(stable)への昇格基準を満たしているか検証
    * 設計思想 25. 安全・品質境界 & 設計思想 9. ベンチマークと退行テスト
    * - 全テストケース実行済み & 合格率100% (failedTests === 0)
    * - 退行(Regression)ゼロ (regressionsCount === 0)
    * - 総合スコア80点以上
+   * - 【必須】テスト対象モデルと昇格対象世代の同一性一致 (すり替え防止)
    */
-  public validatePromotionReport(reportId: string): {
+  public validatePromotionReport(
+    reportId: string,
+    targetGenOrId?: string | ModelGeneration
+  ): {
     valid: boolean;
-    report?: any;
+    report?: RegressionSuiteRunReport;
+    targetGen?: ModelGeneration;
     error?: string;
   } {
     const reports = regressionBenchmarkService.getReports();
@@ -884,9 +966,37 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
       };
     }
 
+    // 昇格対象モデル世代とテスト対象モデルの同一性チェック (設計思想 25)
+    let targetGen: ModelGeneration | undefined;
+    if (typeof targetGenOrId === 'string') {
+      targetGen = this.generations.find((g) => g.generationId === targetGenOrId);
+      if (!targetGen) {
+        return {
+          valid: false,
+          report,
+          error: `昇格対象のモデル世代(ID: ${targetGenOrId})が見つかりません。`,
+        };
+      }
+    } else if (targetGenOrId && typeof targetGenOrId === 'object') {
+      targetGen = targetGenOrId;
+    }
+
+    if (targetGen) {
+      const match = this.checkModelReportMatch(report, targetGen);
+      if (!match) {
+        return {
+          valid: false,
+          report,
+          targetGen,
+          error: `【テスト対象と昇格対象の不一致】選択されたレポート[${report.id}]のテスト対象モデルは「${report.modelName}」(${report.modelId || 'IDなし'})ですが、昇格対象の世代は「${targetGen.modelName}」(Base: ${targetGen.baseModel || '未指定'})です。別モデルで実施されたベンチマーク結果を流用して安定版へ昇格させることはできません。昇格対象モデルをロードした上で回帰テストを再実行してください。`,
+        };
+      }
+    }
+
     return {
       valid: true,
       report,
+      targetGen,
     };
   }
 
@@ -897,20 +1007,25 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
     let promotedAt = gen.promotedAt;
     let promotionNotes = gen.promotionNotes;
 
-    // stable指定時は回帰レポート検証を強制 (レポートなしの安定化を拒否)
+    // stable指定時は回帰レポート検証を強制 (レポートなしの安定化を拒否 & モデル同一性チェック)
     if (finalBranch === 'stable') {
       if (!finalReportId) {
         throw new Error(
           '総合安定版(stable)としての登録には、退行ゼロかつ全テスト合格の実機回帰ベンチマークレポートの選択が必須です。合格レポートを選択するか、候補ブランチ(chat_specialized/experimental等)として登録してください。'
         );
       }
-      const check = this.validatePromotionReport(finalReportId);
+      const tempGen: ModelGeneration = {
+        ...gen,
+        generationId: 'temp_validation',
+        createdAt: Date.now(),
+      };
+      const check = this.validatePromotionReport(finalReportId, tempGen);
       if (!check.valid) {
         throw new Error(check.error || '回帰テスト合格基準を満たしていません。');
       }
-      finalScore = check.report.overallScore;
+      finalScore = check.report!.overallScore;
       promotedAt = Date.now();
-      promotionNotes = `回帰レポート[${finalReportId}]合格承認 (スコア: ${finalScore}点, 退行: 0件)`;
+      promotionNotes = `回帰レポート[${finalReportId}]合格承認 (テスト対象「${check.report!.modelName}」一致確認済, スコア: ${finalScore}点, 退行: 0件)`;
     }
 
     const newGen: ModelGeneration = {
@@ -941,7 +1056,7 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
   /**
    * 候補モデルを回帰レポートに基づいて総合安定版(stable)へ正式昇格させるガード関数
    * (手入力での昇格を構造的に排除し、実測レポートのみを昇格根拠とする)
-   * 設計思想 25. 安全・品質境界
+   * 設計思想 25. 安全・品質境界 & 評価基準の改ざん防止 (テスト対象と昇格対象の同一性チェック)
    */
   public promoteToStable(
     generationId: string,
@@ -952,13 +1067,13 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
       return { success: false, error: '指定されたモデル世代が見つかりません。' };
     }
 
-    // 基準検証
-    const check = this.validatePromotionReport(reportId);
+    // 基準検証 (テスト品質 + テスト対象と昇格対象世代の同一性チェック)
+    const check = this.validatePromotionReport(reportId, targetGen);
     if (!check.valid) {
       return { success: false, error: check.error };
     }
 
-    const report = check.report;
+    const report = check.report!;
 
     // 既存の稼働中stableモデルをアーカイブに退避
     this.generations = this.generations.map((g) => {
@@ -977,13 +1092,13 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
     targetGen.benchmarkScore = report.overallScore;
     targetGen.benchmarkReportId = report.id;
     targetGen.promotedAt = Date.now();
-    targetGen.promotionNotes = `回帰レポート[${report.id}]合格により正式昇格 (総合スコア: ${report.overallScore}点, 合格: ${report.passedTests}/${report.totalTests}, 退行: 0件)`;
+    targetGen.promotionNotes = `回帰レポート[${report.id}]合格により正式昇格 (対象モデル「${report.modelName}」と一致確認済, 総合スコア: ${report.overallScore}点, 合格: ${report.passedTests}/${report.totalTests}, 退行: 0件)`;
 
     this.saveGenerations();
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🏆 [モデル昇格成功] 「${targetGen.modelName}」が回帰レポート[${report.id}]に基づいて総合安定版(stable)へ昇格しました (スコア: ${report.overallScore}点)`
+      `🏆 [モデル昇格成功] 「${targetGen.modelName}」が回帰レポート[${report.id}]（テスト対象: ${report.modelName}）に基づいて総合安定版(stable)へ昇格しました (スコア: ${report.overallScore}点)`
     );
 
     return { success: true, generation: targetGen };

@@ -4,7 +4,7 @@ export interface SystemLogEntry {
   timestamp: string;
   epoch: number;
   level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
-  category: 'WEBGPU' | 'NATIVE_GPU' | 'EXTERNAL_GPU' | 'INFERENCE' | 'NETWORK' | 'CACHE' | 'PERSISTENCE' | 'SERVER' | 'CHAT' | 'STEP' | 'SELF_IMPROVEMENT';
+  category: 'WEBGPU' | 'NATIVE_GPU' | 'EXTERNAL_GPU' | 'INFERENCE' | 'NETWORK' | 'CACHE' | 'PERSISTENCE' | 'SERVER' | 'CHAT' | 'STEP' | 'SELF_IMPROVEMENT' | 'TOOLS';
   message: string;
   details?: any;
   elapsedMs?: number;

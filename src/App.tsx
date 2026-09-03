@@ -17,7 +17,9 @@ import {
   ConsoleLogItem,
   GitHubRepoData,
   EngineMode,
+  ToolExecutionRequest,
 } from './types';
+import { toolsService } from './services/toolsService';
 import { sendChatMessage, sendDebugRequest } from './services/api';
 import { webLLMService } from './services/webLlmService';
 import { nativeLlmService } from './services/nativeLlmService';
@@ -534,6 +536,25 @@ export default function App() {
           totalElapsedMs: Math.round(performance.now() - sendStartTime),
         });
 
+        const cpuCandidateTools = toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles });
+        const cpuExecutedTools = [];
+        const cpuMath = cpuCandidateTools.find((t) => t.toolId === 'tool_safe_calculator');
+        if (cpuMath && cpuMath.suggestedParams?.expression) {
+          const calcRes = toolsService.evaluateSafeMath(cpuMath.suggestedParams.expression);
+          if (calcRes.success) {
+            cpuExecutedTools.push({
+              toolId: 'tool_safe_calculator',
+              toolName: '高精度・安全数値計算機',
+              permission: 'read_only' as const,
+              executionTimeMs: 1,
+              success: true,
+              result: calcRes,
+              outputSummary: `【精密計算結果】: ${calcRes.expression} = ${calcRes.result}`,
+              executedAt: Date.now(),
+            });
+          }
+        }
+
         const cpuMsg: ChatMessage = {
           id: assistantId,
           role: 'assistant',
@@ -543,6 +564,8 @@ export default function App() {
           engineMode: 'autonomous_rule',
           isStreaming: false,
           executionSteps: systemLogger.getCurrentSessionSteps(),
+          suggestedTools: cpuCandidateTools,
+          executedTools: cpuExecutedTools,
           metrics: {
             engine: `CPUルールベース (${activeSpeaker.name})`,
             tokens: Math.round(reply.length / 3),
@@ -569,8 +592,15 @@ export default function App() {
       // ==========================================
       // Step 3: Prompt classification (MoE intent detection)
       systemLogger.step(3, 10, 'MoE プロンプト意図分類 & パラメータ決定');
-      const promptAnalysis = classifyPromptForMoE(text);
-      systemLogger.info('INFERENCE', `プロンプト意図判定: [${promptAnalysis.role}] (Temp: ${promptAnalysis.temperature})`);
+      const promptAnalysis = classifyPromptForMoE(text, { workspaceFiles });
+      systemLogger.info(
+        'INFERENCE',
+        `プロンプト意図判定: [${promptAnalysis.role}] (Temp: ${promptAnalysis.temperature})${
+          promptAnalysis.recommendedTools.length > 0
+            ? `, 推奨ツール: [${promptAnalysis.recommendedTools.map((t) => t.name).join(', ')}]`
+            : ''
+        }`
+      );
 
       const activeGameCode = workspaceFiles.find((f) => f.path === 'index.html')?.content || '';
 
@@ -1107,6 +1137,8 @@ export default function App() {
                 },
                 usedMemories: usedMemoriesTracked,
                 usedSkills: usedSkillsTracked,
+                suggestedTools: promptBuildResult.recommendedTools,
+                executedTools: promptBuildResult.executedTools,
               }
             : msg
         )
@@ -1312,6 +1344,77 @@ export default function App() {
     }
   };
 
+  // ツール実行ハンドラー (:feature:tools / 設計思想 14 & 22章)
+  const handleExecuteTool = async (toolId: string, params: Record<string, any>, userConfirmed = false) => {
+    systemLogger.info('TOOLS', `手動/推奨ツール実行リクエスト: [${toolId}]`, params);
+    const result = await toolsService.executeTool(
+      toolId,
+      params,
+      {
+        workspaceFiles,
+        onUpdateWorkspaceFile: handleUpdateFileContent,
+        userNickname: persona.userNickname,
+      },
+      { userConfirmed }
+    );
+
+    // ツール実行結果メッセージをチャットに追加
+    const toolMsg: ChatMessage = {
+      id: 'tool_res_' + Date.now(),
+      role: 'assistant',
+      content: result.outputSummary,
+      timestamp: Date.now(),
+      speaker: {
+        id: 'tools_module',
+        name: 'ツール実行エンジン (:feature:tools)',
+        avatar: '🛠️',
+        roleName: 'System Tools',
+        color: '#0284c7',
+      },
+      executedTools: [result],
+      metrics: {
+        engine: `ToolsService (${result.toolName})`,
+        totalDurationMs: result.executionTimeMs,
+      },
+      pendingToolConfirmation:
+        result.requiresConfirmation && result.result?.pendingRequest
+          ? result.result.pendingRequest
+          : undefined,
+    };
+
+    setMessages((prev) => [...prev, toolMsg]);
+    return result;
+  };
+
+  const handleConfirmToolExecution = async (request: ToolExecutionRequest) => {
+    systemLogger.info('TOOLS', `ユーザーがツール破壊的操作を承認: [${request.toolName}]`);
+    // 承認待ち状態を解除
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.pendingToolConfirmation?.id === request.id
+          ? { ...msg, pendingToolConfirmation: undefined }
+          : msg
+      )
+    );
+    await handleExecuteTool(request.toolId, request.params, true);
+  };
+
+  const handleRejectToolExecution = (requestId: string) => {
+    systemLogger.warn('TOOLS', `ユーザーがツール操作を拒否/キャンセル: [${requestId}]`);
+    toolsService.rejectPendingRequest(requestId);
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.pendingToolConfirmation?.id === requestId
+          ? {
+              ...msg,
+              content: `${msg.content}\n\n🚫 **ツール実行はユーザーによりキャンセルされました。**`,
+              pendingToolConfirmation: undefined,
+            }
+          : msg
+      )
+    );
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
       {/* Top Main Navigation Header */}
@@ -1370,6 +1473,9 @@ export default function App() {
               onOpenEngineModal={() => setIsEngineModalOpen(true)}
               onOpenExportModal={() => setIsExportModalOpen(true)}
               onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
+              onExecuteTool={handleExecuteTool}
+              onConfirmToolExecution={handleConfirmToolExecution}
+              onRejectToolExecution={handleRejectToolExecution}
             />
           </div>
 
@@ -1443,6 +1549,9 @@ export default function App() {
                 onOpenEngineModal={() => setIsEngineModalOpen(true)}
                 onOpenExportModal={() => setIsExportModalOpen(true)}
                 onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
+                onExecuteTool={handleExecuteTool}
+                onConfirmToolExecution={handleConfirmToolExecution}
+                onRejectToolExecution={handleRejectToolExecution}
               />
             )}
 
@@ -1631,6 +1740,7 @@ export default function App() {
         onClose={() => setIsSelfImprovementModalOpen(false)}
         memories={memories}
         chatMessages={messages}
+        workspaceFiles={workspaceFiles}
         initialTab={selfImprovementTab}
       />
     </div>

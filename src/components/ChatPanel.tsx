@@ -66,6 +66,9 @@ interface ChatPanelProps {
   onOpenEngineModal?: () => void;
   onOpenExportModal?: () => void;
   onOpenSelfImprovementModal?: () => void;
+  onExecuteTool?: (toolId: string, params: Record<string, any>, userConfirmed?: boolean) => void;
+  onConfirmToolExecution?: (request: any) => void;
+  onRejectToolExecution?: (requestId: string) => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -89,6 +92,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onOpenEngineModal,
   onOpenExportModal,
   onOpenSelfImprovementModal,
+  onExecuteTool,
+  onConfirmToolExecution,
+  onRejectToolExecution,
 }) => {
   const [inputText, setInputText] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string; type: string; size: number }[]>([]);
@@ -585,6 +591,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         <span>スキル適用: {msg.usedSkills[0].name}</span>
                       </div>
                     )}
+
+                    {/* Executed Tools Badge (:feature:tools) */}
+                    {msg.executedTools && msg.executedTools.length > 0 && (
+                      <div className="flex items-center gap-1 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-lg text-[9.5px] text-emerald-300 font-mono" title={msg.executedTools.map((t) => `・${t.toolName}: ${t.outputSummary} (${t.executionTimeMs}ms)`).join('\n')}>
+                        <Cpu className="w-3 h-3 text-emerald-400" />
+                        <span>ツール実行 ({msg.executedTools.length}件)</span>
+                      </div>
+                    )}
+
+                    {/* Pending Tool Confirmation Badge (:feature:tools) */}
+                    {msg.pendingToolConfirmation && (
+                      <div className="flex items-center gap-1 bg-amber-950/80 border border-amber-500/70 px-2 py-0.5 rounded-lg text-[9.5px] text-amber-300 font-mono animate-pulse" title="破壊的操作の承認待ち">
+                        <AlertCircle className="w-3 h-3 text-amber-400" />
+                        <span>要承認ツール</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -736,6 +758,108 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                   {/* Message content text */}
                   <div className="whitespace-pre-wrap font-sans">{msg.content}</div>
+
+                  {/* Pending Tool Confirmation Card (:feature:tools / 破壊的操作の確認) */}
+                  {msg.pendingToolConfirmation && (
+                    <div className="mt-3 p-3 bg-amber-950/70 border-2 border-amber-500/80 rounded-xl space-y-2 text-xs shadow-lg animate-fadeIn">
+                      <div className="flex items-center gap-1.5 text-amber-300 font-bold">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>破壊的操作の承認リクエスト (:feature:tools)</span>
+                      </div>
+                      <p className="text-slate-200 text-[11px] leading-relaxed">
+                        ツール「<strong className="text-amber-200">{msg.pendingToolConfirmation.toolName}</strong>」を実行するにはユーザーの明示的な承認が必要です。
+                      </p>
+                      <div className="p-2 bg-black/50 rounded-lg border border-amber-900/60 font-mono text-[10px] text-amber-300 break-all space-y-1">
+                        <div><span className="text-slate-400">操作理由:</span> {msg.pendingToolConfirmation.reason || 'ワークスペースファイル変更'}</div>
+                        {msg.pendingToolConfirmation.params && (
+                          <div>
+                            <span className="text-slate-400">対象:</span> {msg.pendingToolConfirmation.params.path || 'ファイル'}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          onClick={() => onConfirmToolExecution?.(msg.pendingToolConfirmation)}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition-all"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>承認して実行</span>
+                        </button>
+                        <button
+                          onClick={() => onRejectToolExecution?.(msg.pendingToolConfirmation!.id)}
+                          className="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs transition-all"
+                        >
+                          <span>拒否 / キャンセル</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Executed Tools Summary Card (:feature:tools) */}
+                  {msg.executedTools && msg.executedTools.length > 0 && (
+                    <div className="mt-3 p-2.5 bg-slate-900/90 border border-emerald-500/30 rounded-xl space-y-2 text-xs">
+                      <div className="flex items-center justify-between text-emerald-300 font-bold text-[11px]">
+                        <span className="flex items-center gap-1.5">
+                          <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>ツール実行結果 (:feature:tools)</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {msg.executedTools.map((t) => `${t.executionTimeMs}ms`).join(', ')}
+                        </span>
+                      </div>
+                      {msg.executedTools.map((t, idx) => (
+                        <div key={idx} className="p-2 rounded-lg bg-black/40 border border-slate-800 text-[10.5px] space-y-1">
+                          <div className="flex items-center justify-between font-mono text-emerald-400 font-bold">
+                            <span>{t.toolName}</span>
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-emerald-950 border border-emerald-800 text-emerald-300">
+                              {t.permission}
+                            </span>
+                          </div>
+                          <div className="text-slate-300 font-sans leading-relaxed">{t.outputSummary}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Suggested Tools Quick Actions (:feature:tools) */}
+                  {!isUser && msg.suggestedTools && msg.suggestedTools.length > 0 && !msg.executedTools?.length && (
+                    <div className="mt-3 p-2.5 bg-slate-900/90 border border-sky-500/30 rounded-xl space-y-2 text-xs">
+                      <div className="flex items-center justify-between text-sky-300 font-bold text-[11px]">
+                        <span className="flex items-center gap-1.5">
+                          <Cpu className="w-3.5 h-3.5 text-sky-400" />
+                          <span>推奨ツール連携 (:feature:tools)</span>
+                        </span>
+                        <span className="text-[9.5px] text-slate-400 font-mono">第14・22章</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {msg.suggestedTools.map((tool, tIdx) => (
+                          <div key={tIdx} className="flex flex-wrap items-center justify-between gap-1.5 p-2 rounded-lg bg-black/40 border border-slate-800">
+                            <div className="flex-1 min-w-[160px]">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-200 text-[11px]">{tool.name}</span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-sky-950 border border-sky-700 text-sky-300 font-mono">
+                                  {tool.permission}
+                                </span>
+                                {tool.requiresConfirmation && (
+                                  <span className="text-[9px] px-1 py-0.2 rounded bg-amber-950 border border-amber-700 text-amber-300 font-mono">
+                                    要確認
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-0.5">{tool.reason}</p>
+                            </div>
+                            <button
+                              onClick={() => onExecuteTool?.(tool.toolId, tool.suggestedParams || {}, false)}
+                              className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow shrink-0"
+                            >
+                              <Play className="w-2.5 h-2.5 fill-current" />
+                              <span>実行</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Error & Quota Helper Action Buttons */}
                   {msg.isError && (

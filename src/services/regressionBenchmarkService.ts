@@ -192,18 +192,75 @@ export class RegressionBenchmarkService {
   }
 
   /**
-   * ベンチマークスイート全体を一括実行 (Run Full Regression Suite)
+   * 現在推論エンジンに実際にロードされているアクティブモデルの情報を取得
+   * 呼び出し元が自由なモデル名を名乗ることを防ぎ、実機状態との一致を保証する
+   * (設計思想 25. 安全・品質境界 & 評価基準の改ざん防止)
    */
-  public async runFullSuite(modelName: string = 'MikiAI Gen3-Local'): Promise<RegressionSuiteRunReport> {
+  public getActiveLoadedModelInfo(): {
+    isReady: boolean;
+    modelId: string | null;
+    modelName: string;
+    engineType: 'native_gguf' | 'webllm' | 'none';
+  } {
+    const isNativeReady = nativeLlmService.isNative() && !!nativeLlmService.getActiveModelId();
+    const isWebReady = webLLMService.isLoaded() && !!webLLMService.getActiveModelId();
+
+    if (isNativeReady) {
+      const activeId = nativeLlmService.getActiveModelId()!;
+      // ファイル名からクリーンな表示名を導出
+      const cleanName = activeId.replace(/\.gguf$/i, '');
+      return {
+        isReady: true,
+        modelId: activeId,
+        modelName: cleanName,
+        engineType: 'native_gguf',
+      };
+    }
+
+    if (isWebReady) {
+      const activeId = webLLMService.getActiveModelId()!;
+      return {
+        isReady: true,
+        modelId: activeId,
+        modelName: activeId,
+        engineType: 'webllm',
+      };
+    }
+
+    return {
+      isReady: false,
+      modelId: null,
+      modelName: '未ロード (推論モデルなし)',
+      engineType: 'none',
+    };
+  }
+
+  /**
+   * ベンチマークスイート全体を一括実行 (Run Full Regression Suite)
+   * 呼び出し元からの自由なmodelName引数は廃止され、推論エンジンに実際にロードされている
+   * アクティブモデル(Native GGUF または WebLLM)からモデルID・モデル名を強制的に取得・埋め込みます。
+   * (設計思想 25. 評価基準の改ざん防止・テスト対象と昇格対象の同一性保証)
+   */
+  public async runFullSuite(): Promise<RegressionSuiteRunReport> {
     if (this.isRunning) {
       throw new Error('ベンチマークスイートが既に実行中です');
+    }
+
+    const activeInfo = this.getActiveLoadedModelInfo();
+    if (!activeInfo.isReady || !activeInfo.modelId) {
+      throw new Error(
+        '【実行拒否】推論エンジンにモデルがロードされていません。端末ローカルLLM設定(Native GGUFまたはWebLLM)で評価対象モデルをロードしてから回帰テストを実行してください。'
+      );
     }
 
     this.isRunning = true;
     const startTime = Date.now();
     const reportId = 'reg_' + startTime + '_' + Math.random().toString(36).substring(2, 6);
 
-    systemLogger.info('SELF_IMPROVEMENT', `🧪 ベンチマーク＆退行テスト一括実行開始 [Model: ${modelName}]`);
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🧪 実機ベンチマーク＆退行テスト一括実行開始 [Target: ${activeInfo.modelName} (ID: ${activeInfo.modelId}, Engine: ${activeInfo.engineType})]`
+    );
 
     const results: BenchmarkTestResult[] = [];
     const categoryScores: Record<string, number> = {};
@@ -234,7 +291,9 @@ export class RegressionBenchmarkService {
       const report: RegressionSuiteRunReport = {
         id: reportId,
         timestamp: Date.now(),
-        modelName,
+        modelName: activeInfo.modelName,
+        modelId: activeInfo.modelId,
+        engineType: activeInfo.engineType,
         totalTests: results.length,
         passedTests,
         failedTests,
@@ -250,7 +309,7 @@ export class RegressionBenchmarkService {
 
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `✓ ベンチマーク完了: スコア ${overallScore}点 (合格: ${passedTests}/${results.length}, 退行: ${regressionsCount}件)`
+        `✓ ベンチマーク完了 [${activeInfo.modelName}]: スコア ${overallScore}点 (合格: ${passedTests}/${results.length}, 退行: ${regressionsCount}件)`
       );
 
       return report;

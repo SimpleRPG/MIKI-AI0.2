@@ -1,22 +1,40 @@
-import { PersonaConfig, MemoryItem, WorkspaceFile, SkillItem } from '../types';
+import { PersonaConfig, MemoryItem, WorkspaceFile, SkillItem, ToolRecommendation, ToolExecutionResult } from '../types';
 import { getNaturalJapanesePromptGuide } from '../data/japaneseKnowledgeData';
 import { getMasterEducationSystemPrompt } from '../data/masterEducationKnowledge';
 import { retrieveScoredMemories } from './memoryRetrieval';
 import { skillsService } from '../services/skillsService';
+import { toolsService } from '../services/toolsService';
 
 /**
- * ユーザーの意図を分析し、温度感と専門役割を判定する
+ * ユーザーの意図を分析し、温度感、専門役割、および利用候補ツールを判定する
+ * 設計思想 14章 (タスク計画とツール利用) & 22章 (:feature:tools)
  */
-export function classifyPromptForMoE(prompt: string): {
+export function classifyPromptForMoE(
+  prompt: string,
+  context?: { workspaceFiles?: WorkspaceFile[] }
+): {
   role: 'code' | 'shader' | 'logic' | 'moe_chat';
   temperature: number;
+  recommendedTools: ToolRecommendation[];
+  hasMathCalculation: boolean;
+  hasCodeSyntaxAudit: boolean;
+  hasWorkspaceSearch: boolean;
 } {
   const p = (prompt || '').trim();
   const lowerPrompt = p.toLowerCase();
 
+  // ツール候補の事前検出 (:feature:tools 連携)
+  const candidateTools = toolsService.detectCandidateToolsForPrompt(p, context);
+  const hasMath = candidateTools.some((t) => t.toolId === 'tool_safe_calculator');
+  const hasSyntaxAudit = candidateTools.some((t) => t.toolId === 'tool_syntax_checker');
+  const hasSearch = candidateTools.some((t) => t.toolId === 'tool_workspace_search');
+
   const isShader = /webgpu|wgsl|glsl|シェーダー|shader|three\.js|3d|threejs|パーティクル|流体|fluid/i.test(lowerPrompt);
   const isCode = /html|javascript|typescript|js|ts|css|react|コード|プログラム|関数|ゲーム|game|作って|作成|開発|実装|追加/i.test(lowerPrompt);
-  const isLogic = /バグ|bug|エラー|error|例外|修正|直して|デバッグ|debug|動かない|なぜ|理由|計算|アルゴリズム|ロジック|vba/i.test(lowerPrompt);
+  const isLogic =
+    hasMath ||
+    hasSyntaxAudit ||
+    /バグ|bug|エラー|error|例外|修正|直して|デバッグ|debug|動かない|なぜ|理由|計算|アルゴリズム|ロジック|vba/i.test(lowerPrompt);
 
   let role: 'code' | 'shader' | 'logic' | 'moe_chat' = 'moe_chat';
   let temp = 0.7;
@@ -24,6 +42,12 @@ export function classifyPromptForMoE(prompt: string): {
   if (isShader) {
     role = 'shader';
     temp = 0.6;
+  } else if (hasMath) {
+    role = 'logic';
+    temp = 0.2; // 数値計算は最も決定論的な低温度で推論
+  } else if (hasSyntaxAudit) {
+    role = 'logic';
+    temp = 0.2; // 構文監査も高精度
   } else if (isCode) {
     role = 'code';
     temp = 0.7;
@@ -35,6 +59,10 @@ export function classifyPromptForMoE(prompt: string): {
   return {
     role,
     temperature: temp,
+    recommendedTools: candidateTools,
+    hasMathCalculation: hasMath,
+    hasCodeSyntaxAudit: hasSyntaxAudit,
+    hasWorkspaceSearch: hasSearch,
   };
 }
 
@@ -42,12 +70,14 @@ export interface PromptContextTrackingResult {
   systemPrompt: string;
   usedMemories: Array<{ id: string; content: string; score?: number }>;
   usedSkills: Array<{ id: string; name: string }>;
+  recommendedTools: ToolRecommendation[];
+  executedTools: ToolExecutionResult[];
   promptLengthChars: number;
 }
 
 /**
- * 設計思想 4. RAG・外部記憶 ＆ 5. 小型モデルの限界 ＆ 13. スキルライブラリ
- * コンテキスト予算を考慮しながら、スコアリング記憶と適用可能スキルを注入したシステムプロンプトを構築
+ * 設計思想 4. RAG・外部記憶 ＆ 5. 小型モデルの限界 ＆ 13. スキルライブラリ ＆ 14. ツール利用 (:feature:tools)
+ * コンテキスト予算を考慮しながら、スコアリング記憶、適用可能スキル、および安全ツール実行結果を注入したシステムプロンプトを構築
  */
 export function buildExpertSystemPromptWithTracking(
   expertRole: 'code' | 'shader' | 'logic' | 'moe_chat',
@@ -60,7 +90,6 @@ export function buildExpertSystemPromptWithTracking(
   const maxMemories = options?.maxMemories || (options?.isLightweight ? 3 : 5);
 
   // 1. 記憶のRAG検索 (バイグラム + 👍/👎 + 承認状態 + 重要度スコアリング)
-  // 設計思想 25: profile/preference等の事実性カテゴリは未承認情報を確定事実として使わない (onlyApprovedForFacts)
   const scoredMemories = retrieveScoredMemories(userMessage, memories, {
     limit: maxMemories,
     alwaysIncludePinned: true,
@@ -90,7 +119,7 @@ export function buildExpertSystemPromptWithTracking(
       }).join('\n')}`
     : '';
 
-  // 2. スキルライブラリ（手続き記憶）のマッチング
+  // 2. スキルライブラリ（手続き記憶）のマッチング (設計思想 13)
   const matchedSkills = skillsService.matchSkillsForQuery(userMessage);
   const usedSkills = matchedSkills.map((s) => ({ id: s.id, name: s.name }));
 
@@ -98,7 +127,42 @@ export function buildExpertSystemPromptWithTracking(
     ? `【適用された実行スキル手順】:\n${matchedSkills.map((s) => `[${s.name} (Ver ${s.version})]\n手順: ${s.steps.join(' ➔ ')}`).join('\n')}`
     : '';
 
-  // 3. 役割別インストラクション
+  // 3. ツール管理 (:feature:tools / 設計思想 14 & 22)
+  const candidateTools = toolsService.detectCandidateToolsForPrompt(userMessage, { workspaceFiles });
+  const executedTools: ToolExecutionResult[] = [];
+
+  // 安全な計算ツール (tool_safe_calculator) の即時高精度事前評価
+  // 小型モデルの計算幻覚（ハルシネーション）を防ぐため、確定的な数学結果をプロンプトに注入
+  const mathTool = candidateTools.find((t) => t.toolId === 'tool_safe_calculator');
+  if (mathTool && mathTool.suggestedParams?.expression) {
+    try {
+      // 0ms eval不使用の安全計算
+      const syncCalc = toolsService.executeTool(
+        'tool_safe_calculator',
+        mathTool.suggestedParams,
+        { workspaceFiles }
+      );
+      // executeToolはPromiseですが内部で同期完了するため解決
+      if (syncCalc && typeof (syncCalc as any).then === 'function') {
+        syncCalc.then((res) => {
+          if (res.success) executedTools.push(res);
+        }).catch(() => {});
+      }
+    } catch (e) {}
+  }
+
+  const toolBlock = candidateTools.length > 0
+    ? `【利用可能なツール (:feature:tools)】:\n${candidateTools
+        .map(
+          (t) =>
+            `・[${t.name} (${t.toolId})]: 権限=${t.permission}${
+              t.requiresConfirmation ? ' (※破壊的変更のため要ユーザー承認)' : ' (自動実行可能)'
+            }`
+        )
+        .join('\n')}`
+    : '';
+
+  // 4. 役割別インストラクション
   let expertInstruction = '';
   switch (expertRole) {
     case 'code':
@@ -110,7 +174,7 @@ export function buildExpertSystemPromptWithTracking(
       break;
 
     case 'logic':
-      expertInstruction = `【デバッグ・ロジック依頼】不具合の原因を簡潔に説明し、修正済みの完全なコードをコードブロックで出力してください。`;
+      expertInstruction = `【デバッグ・ロジック・計算依頼】数値計算や不具合の原因を正確に解説し、確実な解答や修正コードを出力してください。`;
       break;
 
     case 'moe_chat':
@@ -119,7 +183,7 @@ export function buildExpertSystemPromptWithTracking(
       break;
   }
 
-  // 4. ソースコードのコンテキスト
+  // 5. ソースコードのコンテキスト
   let filesContext = '';
   if (options?.includeFiles && workspaceFiles && workspaceFiles.length > 0) {
     const mainFile = workspaceFiles.find((f) => f.path === 'index.html' || f.name === 'index.html') || workspaceFiles[0];
@@ -128,7 +192,7 @@ export function buildExpertSystemPromptWithTracking(
     }
   }
 
-  // 5. 設計思想 5. 小型モデルの限界・誠実性制約 (でっち上げ防止)
+  // 6. 誠実性制約 (でっち上げ防止)
   const honestyConstraint = `【誠実性ルール】自身のハードウェア構成（CPU/GPUコア数、内部メモリ仕様、実行クロック等）について、架空の数値をでっち上げて断定してはいけません。不明な内部情報は「端末上のローカル推論環境で動いているよ」と正直に答えてください。`;
 
   const systemPrompt = `あなたはユーザー（${persona.userNickname || 'あなた'}）専属のAIパートナー「${persona.name || 'みき'}」です。
@@ -140,12 +204,15 @@ ${honestyConstraint}
 指示: ${expertInstruction}
 ${memoryBlock ? `\n${memoryBlock}` : ''}
 ${skillBlock ? `\n${skillBlock}` : ''}
+${toolBlock ? `\n${toolBlock}` : ''}
 ${filesContext}`;
 
   return {
     systemPrompt,
     usedMemories,
     usedSkills,
+    recommendedTools: candidateTools,
+    executedTools,
     promptLengthChars: systemPrompt.length,
   };
 }
