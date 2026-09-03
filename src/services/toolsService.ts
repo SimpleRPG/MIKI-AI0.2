@@ -605,9 +605,17 @@ export class ToolsService {
       /(ファイル.*(探して|検索|どこ|一覧|ある？|見つけて)|コード内.*(探して|検索)|全文検索|grep|ファイルの中)/i.test(p);
 
     if (isSearchPattern) {
-      // 検索キーワード抽出の簡易試行 (「〜」で囲まれた語や単語)
+      // 検索キーワード抽出の試行 (「〜」等の引用符、またはgrep/ファイル検索の対象単語)
+      let query = '';
       const quoteMatch = p.match(/[「"']([^「"']+)["'」]/);
-      const query = quoteMatch ? quoteMatch[1] : '';
+      if (quoteMatch && quoteMatch[1]?.trim()) {
+        query = quoteMatch[1].trim();
+      } else {
+        const wordMatch = p.match(/(?:ファイル.*?(?:中|内)?(?:から|で)?|コード(?:内|から)?|全文検索|grep)[\s:：]*([a-zA-Z0-9_\-\.]+)/i);
+        if (wordMatch && wordMatch[1]?.trim()) {
+          query = wordMatch[1].trim();
+        }
+      }
 
       recommendations.push({
         toolId: 'tool_workspace_search',

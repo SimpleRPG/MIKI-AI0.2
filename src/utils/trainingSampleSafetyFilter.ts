@@ -7,10 +7,20 @@
 
 export interface TrainingSampleSafetyCheckResult {
   safe: boolean;
+  needsReview?: boolean;
   reasons: string[];
   redactedUserText?: string;
   redactedAssistantText?: string;
   redacted?: boolean;
+}
+
+/**
+ * TRPG・ロールプレイ・ゲームシナリオ等のフィクション文脈シグナルを検出する関数
+ */
+export function hasFictionContextSignal(combinedText: string): boolean {
+  // TRPG/ロールプレイの文脈シグナル
+  const signals = /(?:\dd\d{1,3}|命中判定|ダメージ|HP|MP|クリティカル|セーヴ|GM:|マスター:|「.+」と(?:言った|叫んだ|呟いた)|は.+を発動した|レベルアップ)/;
+  return signals.test(combinedText);
 }
 
 /**
@@ -108,15 +118,31 @@ export function checkSampleSafety(
 ): TrainingSampleSafetyCheckResult {
   const reasons: string[] = [];
   let safe = true;
+  let needsReview = false;
 
   const combinedText = `${userText}\n${assistantText}`;
+  const isFiction = hasFictionContextSignal(combinedText);
 
-  // 1. 危険・不適切コンテンツの検査 (除外判定: safe: false)
+  // 1. 危険・不適切コンテンツの検査 (除外判定: safe: false, または要確認判定: needsReview: true)
   for (const pattern of UNSAFE_CONTENT_PATTERNS) {
     if (pattern.regex.test(combinedText)) {
-      safe = false;
-      if (!reasons.includes(pattern.reason)) {
-        reasons.push(pattern.reason);
+      if (pattern.name === 'illegal_procedure' && isFiction) {
+        // フィクション文脈（TRPGやゲーム演出・クラフト等）での実行手順表現:
+        // safe: false ではなく needsReview: true (第3分類)
+        // 学習データからは除外するが本文なし除外ログ(rejectedSamplesLog)にも残さず、
+        // reasonsに「フィクション文脈内の実行手順表現(要確認)」と記録してreviewQueueに保留
+        needsReview = true;
+        const fictionReason = 'フィクション文脈内の実行手順表現(要確認)';
+        if (!reasons.includes(fictionReason)) {
+          reasons.push(fictionReason);
+        }
+      } else {
+        // self_harm または hate_speech、あるいは非フィクションの illegal_procedure:
+        // 実在の自傷手段・ヘイト表現はフィクション文脈であっても例外なし
+        safe = false;
+        if (!reasons.includes(pattern.reason)) {
+          reasons.push(pattern.reason);
+        }
       }
     }
   }
@@ -171,6 +197,7 @@ export function checkSampleSafety(
 
   return {
     safe,
+    needsReview: needsReview && safe ? true : undefined,
     reasons,
     redacted: isRedacted,
     redactedUserText: isRedacted ? redactedUser : undefined,

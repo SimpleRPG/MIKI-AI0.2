@@ -339,6 +339,20 @@ export interface RejectedTrainingSampleLog {
   category?: string;
 }
 
+/**
+ * フィクション文脈（TRPG/ロールプレイ等）で保留された確認待ちサンプル (設計思想 25. 安全・品質境界)
+ * 即除外(rejected)せず、別キューに保留して要確認とする第3分類
+ */
+export interface ReviewQueueItem {
+  id: string;
+  instruction: string;
+  inputContext?: string;
+  outputTarget: string;
+  category?: string;
+  reasons: string[];
+  createdAt: number;
+}
+
 export interface TrainingDataSplitStats {
   total: number;
   train: number;

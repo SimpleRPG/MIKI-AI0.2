@@ -50,6 +50,7 @@ import {
   WorkspaceFile,
   ToolDefinition,
   ToolExecutionResult,
+  ReviewQueueItem,
 } from '../types';
 import { selfImprovementService } from '../services/selfImprovementService';
 import { skillsService } from '../services/skillsService';
@@ -124,6 +125,9 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
   // Colab & 学習データ (Train / Validation / Test 分割対応)
   const [trainingSamples, setTrainingSamples] = useState<TrainingSampleJSONL[]>([]);
+  const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>(() =>
+    selfImprovementService.getReviewQueue()
+  );
   const [colabScript, setColabScript] = useState('');
   const [splitMessage, setSplitMessage] = useState<string | null>(null);
   const [selectedSplitFilter, setSelectedSplitFilter] = useState<'all' | 'train' | 'validation' | 'test'>('all');
@@ -235,6 +239,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
     if (isOpen) {
       setSkills(skillsService.getAllSkills());
       setTrainingSamples(selfImprovementService.getTrainingSamples());
+      setReviewQueue(selfImprovementService.getReviewQueue());
       setSplitStats(selfImprovementService.getSplitStats());
       setGenerations(selfImprovementService.getGenerations());
       setColabScript(selfImprovementService.generateColabTrainingScript());
@@ -467,6 +472,20 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
       setTrainingSamples([...samples]);
       setSplitStats(selfImprovementService.getSplitStats());
     }
+  };
+
+  // 保留中要確認キューの個別承認
+  const handleApproveReviewItem = (id: string) => {
+    selfImprovementService.approveReviewQueueItem(id);
+    setReviewQueue([...selfImprovementService.getReviewQueue()]);
+    setTrainingSamples([...selfImprovementService.getTrainingSamples()]);
+    setSplitStats(selfImprovementService.getSplitStats());
+  };
+
+  // 保留中要確認キューの個別却下
+  const handleDismissReviewItem = (id: string) => {
+    selfImprovementService.dismissReviewQueueItem(id);
+    setReviewQueue([...selfImprovementService.getReviewQueue()]);
   };
 
   // JSONLエクスポート (全件 or 特定split)
@@ -2258,6 +2277,62 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* 要確認キュー (第3分類: TRPG・フィクション文脈) */}
+              {reviewQueue.length > 0 && (
+                <div className="p-4 rounded-xl bg-slate-950/80 border border-amber-900/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-amber-300 text-xs flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-amber-400" />
+                      <span>📝 保留中の要確認キュー ({reviewQueue.length}件) - TRPG・フィクション文脈</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        selfImprovementService.clearReviewQueue();
+                        setReviewQueue([]);
+                      }}
+                      className="text-[10px] text-slate-400 hover:text-rose-400 transition-colors"
+                    >
+                      全て却下
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    TRPGのクラフト・ポーション調合やゲーム戦闘演出などの文脈シグナルを検知したため、即除外せず保留しています。
+                  </p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {reviewQueue.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-2.5 rounded-lg bg-slate-900 border border-amber-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="min-w-0 space-y-1 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800/50">
+                              {item.reasons.join(', ')}
+                            </span>
+                          </div>
+                          <p className="text-slate-200 font-semibold truncate">Q: {item.instruction}</p>
+                          <p className="text-slate-400 text-[11px] truncate">A: {item.outputTarget}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleApproveReviewItem(item.id)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-bold transition-all shadow-sm"
+                          >
+                            承認して追加
+                          </button>
+                          <button
+                            onClick={() => handleDismissReviewItem(item.id)}
+                            className="px-2.5 py-1 bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-300 rounded text-[11px] transition-all"
+                          >
+                            却下
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

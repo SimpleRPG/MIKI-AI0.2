@@ -18,6 +18,7 @@ import {
   GitHubRepoData,
   EngineMode,
   ToolExecutionRequest,
+  ToolExecutionResult,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { sendChatMessage, sendDebugRequest } from './services/api';
@@ -773,6 +774,66 @@ export default function App() {
         (promptAnalysis.role === 'code' || promptAnalysis.role === 'shader' || promptAnalysis.role === 'logic') &&
         (text.includes('修正') || text.includes('変更') || text.includes('直して') || text.includes('追加'));
 
+      // 🛠️ ツール検出 & 自動実行パイプライン (:feature:tools / 設計思想 14 & 22)
+      // 小型ローカルLLM (1.5B/0.5B等) のハルシネーションを防ぐため、プロンプト生成前にツールを安全評価
+      const candidateTools = toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles });
+      const executedTools: ToolExecutionResult[] = [];
+
+      for (const rec of candidateTools) {
+        if (!rec.requiresConfirmation) {
+          // read_only / workspace_read 等の安全なツールは即時自動実行
+          try {
+            const toolRes = await toolsService.executeTool(
+              rec.toolId,
+              rec.suggestedParams || {},
+              {
+                workspaceFiles,
+                onUpdateWorkspaceFile: handleUpdateFileContent,
+                userNickname: persona.userNickname,
+              }
+            );
+            if (toolRes.success) {
+              executedTools.push(toolRes);
+              systemLogger.info('TOOLS', `LLM前処理ツール自動実行成功: [${rec.name}]`, {
+                summary: toolRes.outputSummary,
+                durationMs: toolRes.executionTimeMs,
+              });
+            }
+          } catch (toolErr: any) {
+            systemLogger.warn('TOOLS', `LLM前処理ツール実行失敗 [${rec.name}]:`, toolErr?.message || toolErr);
+          }
+        } else {
+          // 破壊的操作 (ファイル書き換え等) の場合は確認キューに待機させ、チャット側にも通知
+          try {
+            const toolRes = await toolsService.executeTool(
+              rec.toolId,
+              rec.suggestedParams || {},
+              {
+                workspaceFiles,
+                onUpdateWorkspaceFile: handleUpdateFileContent,
+                userNickname: persona.userNickname,
+              },
+              { userConfirmed: false }
+            );
+            if (toolRes.requiresConfirmation && toolRes.result?.pendingRequest) {
+              systemLogger.info('TOOLS', `破壊的ツール確認待ちキュー登録: [${rec.name}]`, toolRes.result.pendingRequest);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        pendingToolConfirmation: toolRes.result.pendingRequest,
+                      }
+                    : m
+                )
+              );
+            }
+          } catch (toolErr: any) {
+            systemLogger.warn('TOOLS', `ツール確認キュー登録失敗 [${rec.name}]:`, toolErr?.message || toolErr);
+          }
+        }
+      }
+
       // 🧠 世界モデル: 行動前予測 (設計思想 17. 世界モデルと予測誤差)
       const actionPrediction = worldModelService.predictAction(text, relevantMemories, persona);
       systemLogger.info('STEP', `世界モデル事前予測 [${actionPrediction.expectedIntent}] 期待トーン:${actionPrediction.expectedTone}, 予測記憶数:${actionPrediction.expectedMemoryUsage.predictedMemoryCount}`);
@@ -785,6 +846,7 @@ export default function App() {
         text,
         {
           includeFiles: isCodeModRequest,
+          toolResults: executedTools,
         }
       );
       const systemPrompt = promptBuildResult.systemPrompt;

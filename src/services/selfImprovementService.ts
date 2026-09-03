@@ -8,6 +8,7 @@ import {
   SkillItem,
   RegressionSuiteRunReport,
   RejectedTrainingSampleLog,
+  ReviewQueueItem,
 } from '../types';
 import { nativeLlmService } from './nativeLlmService';
 import { webLLMService } from './webLlmService';
@@ -24,6 +25,7 @@ const TRAINING_THRESHOLD_KEY = 'miki_ai_training_threshold';
 const LAST_NOTIFIED_THRESHOLD_KEY = 'miki_ai_training_notified_count';
 const FAILURE_RECURRENCES_KEY = 'miki_ai_failure_recurrences';
 const REJECTED_SAMPLES_LOG_KEY = 'miki_ai_rejected_samples_log';
+const REVIEW_QUEUE_KEY = 'miki_ai_review_queue';
 
 export interface FailureRecurrenceEntry {
   patternKey: string;
@@ -62,6 +64,7 @@ class SelfImprovementService {
   private generations: ModelGeneration[] = [];
   private failureRecurrences: Map<string, FailureRecurrenceEntry> = new Map();
   private rejectedSamplesLog: RejectedTrainingSampleLog[] = [];
+  private reviewQueue: ReviewQueueItem[] = [];
 
   constructor() {
     this.loadAll();
@@ -101,6 +104,11 @@ class SelfImprovementService {
         if (rawRejected) {
           this.rejectedSamplesLog = JSON.parse(rawRejected);
         }
+
+        const rawReview = storageService.getItem(REVIEW_QUEUE_KEY);
+        if (rawReview) {
+          this.reviewQueue = JSON.parse(rawReview);
+        }
       } catch (e) {
         console.warn('Failed to load self-improvement data:', e);
       }
@@ -131,12 +139,74 @@ class SelfImprovementService {
     }
   }
 
+  public saveReviewQueue(): void {
+    if (typeof storageService !== 'undefined') {
+      try {
+        storageService.setItem(REVIEW_QUEUE_KEY, JSON.stringify(this.reviewQueue));
+      } catch (e) {}
+    }
+  }
+
   public getRejectedSamplesLog(): RejectedTrainingSampleLog[] {
     return this.rejectedSamplesLog;
   }
 
   public getRejectedSamplesCount(): number {
     return this.rejectedSamplesLog.length;
+  }
+
+  public getReviewQueue(): ReviewQueueItem[] {
+    return this.reviewQueue;
+  }
+
+  public getReviewQueueCount(): number {
+    return this.reviewQueue.length;
+  }
+
+  public approveReviewQueueItem(id: string): TrainingSampleJSONL | null {
+    const idx = this.reviewQueue.findIndex((item) => item.id === id);
+    if (idx === -1) return null;
+    const item = this.reviewQueue[idx];
+    this.reviewQueue.splice(idx, 1);
+    this.saveReviewQueue();
+
+    const newSample: TrainingSampleJSONL = {
+      id: 'train_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      instruction: item.instruction,
+      inputContext: item.inputContext,
+      outputTarget: item.outputTarget,
+      category: (item.category as any) || 'chat',
+      reliability: 'high',
+      approved: true,
+      split: 'train',
+      createdAt: Date.now(),
+    };
+    this.trainingSamples.unshift(newSample);
+    this.saveTrainingSamples();
+    this.checkTrainingThreshold();
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `✅ [要確認キュー承認] サンプルを学習データセットに追加しました (ID: ${item.id})`
+    );
+    return newSample;
+  }
+
+  public dismissReviewQueueItem(id: string): boolean {
+    const idx = this.reviewQueue.findIndex((item) => item.id === id);
+    if (idx === -1) return false;
+    this.reviewQueue.splice(idx, 1);
+    this.saveReviewQueue();
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🗑️ [要確認キュー却下] サンプルを保留キューから除外しました (ID: ${id})`
+    );
+    return true;
+  }
+
+  public clearReviewQueue(): void {
+    this.reviewQueue = [];
+    this.saveReviewQueue();
   }
 
   public getRedactedSamplesCount(): number {
@@ -377,6 +447,29 @@ class SelfImprovementService {
       systemLogger.warn(
         'SELF_IMPROVEMENT',
         `🛡️ [安全境界ガード] 危険/不適切コンテンツを検知したため教材追加を除外しました (理由: ${safety.reasons.join(', ')}, ハッシュ: ${excerptHash})`
+      );
+      return null;
+    }
+
+    if (safety.needsReview) {
+      // needsReview: true の場合: 第3分類 (TRPG等のフィクション文脈)
+      // 学習データ(trainingSamples)および除外ログ(rejectedSamplesLog)には含めず、
+      // 別の reviewQueue に振り分け
+      const reviewItem: ReviewQueueItem = {
+        id: 'rev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        instruction: safety.redactedUserText ?? sample.instruction,
+        inputContext: sample.inputContext,
+        outputTarget: safety.redactedAssistantText ?? sample.outputTarget,
+        category: sample.category || 'chat',
+        reasons: safety.reasons,
+        createdAt: Date.now(),
+      };
+      this.reviewQueue.unshift(reviewItem);
+      this.saveReviewQueue();
+
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `📝 [要確認キュー (第3分類)] フィクション文脈内の表現を検知したためreviewQueueに保留しました (理由: ${safety.reasons.join(', ')})`
       );
       return null;
     }
@@ -715,6 +808,21 @@ class SelfImprovementService {
         continue;
       }
 
+      if (safety.needsReview) {
+        // フィクション文脈での保留: reviewQueueに退避し、通常の学習サンプルからは除外
+        this.reviewQueue.unshift({
+          id: 'rev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+          instruction: safety.redactedUserText ?? sample.instruction,
+          inputContext: sample.inputContext,
+          outputTarget: safety.redactedAssistantText ?? sample.outputTarget,
+          category: sample.category || 'chat',
+          reasons: safety.reasons,
+          createdAt: Date.now(),
+        });
+        prunedUnsafe++;
+        continue;
+      }
+
       let currentInst = sample.instruction;
       let currentOut = sample.outputTarget;
       let isRedacted = sample.redacted || false;
@@ -772,6 +880,7 @@ class SelfImprovementService {
 
     if (prunedUnsafe > 0) {
       this.saveRejectedSamplesLog();
+      this.saveReviewQueue();
     }
 
     this.trainingSamples = Array.from(seenInstructions.values());

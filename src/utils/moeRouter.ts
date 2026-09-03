@@ -85,7 +85,12 @@ export function buildExpertSystemPromptWithTracking(
   memories: MemoryItem[],
   workspaceFiles: WorkspaceFile[],
   userMessage: string = '',
-  options?: { isLightweight?: boolean; includeFiles?: boolean; maxMemories?: number }
+  options?: {
+    isLightweight?: boolean;
+    includeFiles?: boolean;
+    maxMemories?: number;
+    toolResults?: ToolExecutionResult[];
+  }
 ): PromptContextTrackingResult {
   const maxMemories = options?.maxMemories || (options?.isLightweight ? 3 : 5);
 
@@ -129,27 +134,37 @@ export function buildExpertSystemPromptWithTracking(
 
   // 3. ツール管理 (:feature:tools / 設計思想 14 & 22)
   const candidateTools = toolsService.detectCandidateToolsForPrompt(userMessage, { workspaceFiles });
-  const executedTools: ToolExecutionResult[] = [];
+  const executedTools: ToolExecutionResult[] = options?.toolResults ? [...options.toolResults] : [];
 
-  // 安全な計算ツール (tool_safe_calculator) の即時高精度事前評価
-  // 小型モデルの計算幻覚（ハルシネーション）を防ぐため、確定的な数学結果をプロンプトに注入
-  const mathTool = candidateTools.find((t) => t.toolId === 'tool_safe_calculator');
-  if (mathTool && mathTool.suggestedParams?.expression) {
-    try {
-      // 0ms eval不使用の安全計算
-      const syncCalc = toolsService.executeTool(
-        'tool_safe_calculator',
-        mathTool.suggestedParams,
-        { workspaceFiles }
-      );
-      // executeToolはPromiseですが内部で同期完了するため解決
-      if (syncCalc && typeof (syncCalc as any).then === 'function') {
-        syncCalc.then((res) => {
-          if (res.success) executedTools.push(res);
-        }).catch(() => {});
-      }
-    } catch (e) {}
+  // options.toolResults が渡されていない場合のフォールバック安全計算 (同期/即時解決)
+  if (!options?.toolResults) {
+    const mathTool = candidateTools.find((t) => t.toolId === 'tool_safe_calculator');
+    if (mathTool && mathTool.suggestedParams?.expression) {
+      try {
+        // 0ms eval不使用の安全計算
+        const syncCalc = toolsService.executeTool(
+          'tool_safe_calculator',
+          mathTool.suggestedParams,
+          { workspaceFiles }
+        );
+        // executeToolはPromiseですが内部で同期完了するため解決
+        if (syncCalc && typeof (syncCalc as any).then === 'function') {
+          syncCalc.then((res) => {
+            if (res.success) executedTools.push(res);
+          }).catch(() => {});
+        }
+      } catch (e) {}
+    }
   }
+
+  // ツール実行結果ブロックの構築 (LLMへの確定的事実注入)
+  const toolResultsBlock = executedTools.length > 0
+    ? `【外部ツールの事前実行結果 (:feature:tools)】:\n` +
+      executedTools
+        .map((t) => `・[${t.toolName}]: ${t.outputSummary}`)
+        .join('\n') +
+      `\n※上記のツール実行結果は確定的かつ正確な外部システムによる計算・検索事実です。小型モデルの計算ハルシネーションを防ぐため、返答時はこの結果をそのまま活用してください。`
+    : '';
 
   const toolBlock = candidateTools.length > 0
     ? `【利用可能なツール (:feature:tools)】:\n${candidateTools
@@ -205,6 +220,7 @@ ${honestyConstraint}
 ${memoryBlock ? `\n${memoryBlock}` : ''}
 ${skillBlock ? `\n${skillBlock}` : ''}
 ${toolBlock ? `\n${toolBlock}` : ''}
+${toolResultsBlock ? `\n${toolResultsBlock}` : ''}
 ${filesContext}`;
 
   return {

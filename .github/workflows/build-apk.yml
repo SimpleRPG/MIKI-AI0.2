@@ -796,6 +796,14 @@ jobs:
                               }
                           );
 
+                          // ⚠️ CRITICAL - DO NOT REMOVE: この nativeGenerateToken の Error: チェックブロックを削除すると
+                          // C++側の初期化・デコード失敗などのエラーが握り潰され、空文字または正常終了として誤処理されます。
+                          // ファイル全体を再生成する場合も、このブロックだけは必ず引き継いでください。
+                          if (result != null && result.startsWith("Error:")) {
+                              call.reject(result);
+                              return;
+                          }
+
                           long duration = Math.max(1, System.currentTimeMillis() - startTime);
                           float tps = (float) tokenCount[0] / (duration / 1000.0f);
 
@@ -835,6 +843,205 @@ jobs:
           }
           EOF
 
+          # Create MikiKeepAliveService.java (Foreground Service: keeps the app process
+          # alive in the background so the JS-side autonomous self-improvement loop in
+          # backgroundWorkerService.ts is not killed by Android when the app is
+          # backgrounded. This service does no self-improvement logic itself — it only
+          # prevents the OS from killing the process. A persistent notification with a
+          # "一時停止" action lets the user stop it at any time (Android requires this
+          # for any foreground service to remain visible/legal).
+          cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MikiKeepAliveService.java
+          package com.mikiai.app;
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.os.Build;
+          import android.os.IBinder;
+
+          public class MikiKeepAliveService extends Service {
+              public static final String CHANNEL_ID = "miki_ai_keep_alive_channel";
+              public static final int NOTIFICATION_ID = 4201;
+              public static final String ACTION_STOP = "com.mikiai.app.action.STOP_KEEP_ALIVE";
+
+              public static volatile boolean isRunning = false;
+
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  createNotificationChannel();
+              }
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+                      isRunning = false;
+                      stopForeground(true);
+                      stopSelf();
+                      return START_NOT_STICKY;
+                  }
+
+                  startForeground(NOTIFICATION_ID, buildNotification());
+                  isRunning = true;
+                  // START_STICKY: best-effort only. If Android kills the process under
+                  // extreme memory pressure it will try to recreate the service, but no
+                  // background persistence guarantee is absolute on Android.
+                  return START_STICKY;
+              }
+
+              private Notification buildNotification() {
+                  Intent stopIntent = new Intent(this, MikiKeepAliveService.class);
+                  stopIntent.setAction(ACTION_STOP);
+                  int piFlags = PendingIntent.FLAG_UPDATE_CURRENT
+                      | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_IMMUTABLE : 0);
+                  PendingIntent stopPendingIntent = PendingIntent.getService(this, 0, stopIntent, piFlags);
+
+                  Notification.Builder builder;
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      builder = new Notification.Builder(this, CHANNEL_ID);
+                  } else {
+                      builder = new Notification.Builder(this);
+                  }
+
+                  return builder
+                      .setContentTitle("MikiAI 自己改善を実行中")
+                      .setContentText("記憶整理・スキル評価・学習データ生成をバックグラウンドで継続しています")
+                      .setSmallIcon(android.R.drawable.ic_popup_sync)
+                      .setOngoing(true)
+                      .addAction(android.R.drawable.ic_media_pause, "一時停止", stopPendingIntent)
+                      .build();
+              }
+
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          CHANNEL_ID,
+                          "MikiAI 自己改善バックグラウンド処理",
+                          NotificationManager.IMPORTANCE_LOW
+                      );
+                      channel.setDescription("記憶整理・スキル評価・学習データ生成の常時バックグラウンド実行状態を表示します");
+                      NotificationManager nm = getSystemService(NotificationManager.class);
+                      if (nm != null) nm.createNotificationChannel(channel);
+                  }
+              }
+
+              @Override
+              public void onDestroy() {
+                  isRunning = false;
+                  super.onDestroy();
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+          }
+          EOF
+
+          # Create MikiBackgroundServicePlugin.java (JS <-> Foreground Service bridge)
+          # Plugin name MUST match the string passed to registerPlugin() in
+          # src/services/nativeBackgroundService.ts ('MikiBackgroundServicePlugin').
+          # Also handles the Android 13+ (API 33+) POST_NOTIFICATIONS runtime
+          # permission, since a foreground service's notification silently fails to
+          # show without it — declaring the permission in the manifest alone is not
+          # enough, the user must be prompted at runtime.
+          cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MikiBackgroundServicePlugin.java
+          package com.mikiai.app;
+
+          import android.Manifest;
+          import android.content.Intent;
+          import android.os.Build;
+          import com.getcapacitor.JSObject;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.PermissionState;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+          import com.getcapacitor.annotation.Permission;
+          import com.getcapacitor.annotation.PermissionCallback;
+
+          @CapacitorPlugin(
+              name = "MikiBackgroundServicePlugin",
+              permissions = {
+                  @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "notifications")
+              }
+          )
+          public class MikiBackgroundServicePlugin extends Plugin {
+
+              @PluginMethod
+              public void start(PluginCall call) {
+                  Intent intent = new Intent(getContext(), MikiKeepAliveService.class);
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      getContext().startForegroundService(intent);
+                  } else {
+                      getContext().startService(intent);
+                  }
+                  JSObject ret = new JSObject();
+                  ret.put("success", true);
+                  ret.put("running", true);
+                  call.resolve(ret);
+              }
+
+              @PluginMethod
+              public void stop(PluginCall call) {
+                  Intent intent = new Intent(getContext(), MikiKeepAliveService.class);
+                  intent.setAction(MikiKeepAliveService.ACTION_STOP);
+                  getContext().startService(intent);
+                  JSObject ret = new JSObject();
+                  ret.put("success", true);
+                  ret.put("running", false);
+                  call.resolve(ret);
+              }
+
+              // Android < 13 has no runtime notification permission at all, so we
+              // always report granted there (there is nothing to request).
+              @PluginMethod
+              public void checkNotificationPermission(PluginCall call) {
+                  JSObject ret = new JSObject();
+                  if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                      ret.put("granted", true);
+                  } else {
+                      ret.put("granted", getPermissionState("notifications") == PermissionState.GRANTED);
+                  }
+                  call.resolve(ret);
+              }
+
+              @PluginMethod
+              public void requestNotificationPermission(PluginCall call) {
+                  if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                      JSObject ret = new JSObject();
+                      ret.put("granted", true);
+                      call.resolve(ret);
+                      return;
+                  }
+                  if (getPermissionState("notifications") == PermissionState.GRANTED) {
+                      JSObject ret = new JSObject();
+                      ret.put("granted", true);
+                      call.resolve(ret);
+                      return;
+                  }
+                  requestPermissionForAlias("notifications", call, "notificationPermsCallback");
+              }
+
+              @PermissionCallback
+              private void notificationPermsCallback(PluginCall call) {
+                  JSObject ret = new JSObject();
+                  ret.put("granted", getPermissionState("notifications") == PermissionState.GRANTED);
+                  call.resolve(ret);
+              }
+
+              @PluginMethod
+              public void isRunning(PluginCall call) {
+                  JSObject ret = new JSObject();
+                  ret.put("running", MikiKeepAliveService.isRunning);
+                  call.resolve(ret);
+              }
+          }
+          EOF
+
           # MainActivity.java binding
           cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MainActivity.java
           package com.mikiai.app;
@@ -846,14 +1053,32 @@ jobs:
               @Override
               public void onCreate(Bundle savedInstanceState) {
                   registerPlugin(MlcLlmPlugin.class);
+                  registerPlugin(MikiBackgroundServicePlugin.class);
                   super.onCreate(savedInstanceState);
               }
           }
           EOF
 
+          # ⚠️ CRITICAL - DO NOT REMOVE: この network_security_config 生成ブロックを削除すると
+          # Termux等のローカルLLMサーバー(http://localhost)への接続が全て失敗します。
+          # ファイル全体を再生成する場合も、このブロックだけは必ず引き継いでください。
+          mkdir -p android/app/src/main/res/xml
+          cat << 'EOF' > android/app/src/main/res/xml/network_security_config.xml
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
+EOF
+
           # AndroidManifest.xml
-          sed -i 's/<application/<application android:largeHeap="true" android:hardwareAccelerated="true" android:extractNativeLibs="true"/' android/app/src/main/AndroidManifest.xml
-          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<application android:networkSecurityConfig="@xml\/network_security_config" android:usesCleartextTraffic="true" android:largeHeap="true" android:hardwareAccelerated="true" android:extractNativeLibs="true"/' android/app/src/main/AndroidManifest.xml
+          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<\/application>/i \    <service android:name=".MikiKeepAliveService" android:foregroundServiceType="dataSync" android:exported="false" />' android/app/src/main/AndroidManifest.xml
 
           chmod +x android/gradlew
 
