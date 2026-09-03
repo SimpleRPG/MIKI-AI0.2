@@ -427,6 +427,7 @@ export interface ModelGeneration {
   baseModel: string;
   version: string;
   branch: 'stable' | 'chat_specialized' | 'code_specialized' | 'ultra_light' | 'experimental' | 'memory_retrieval';
+  parameterCount?: number;    // 概算パラメータ数 (例: 1.5e9, 3e9)
   loraRank?: number;
   trainingSamplesCount?: number;
   status: 'active' | 'shadow_testing' | 'archived' | 'deprecated';
@@ -516,12 +517,12 @@ export interface WorkManagerStatus {
  */
 export interface BenchmarkTestCase {
   id: string;
-  category: 'persona_tone' | 'vba_coding' | 'js_canvas' | 'stress_boundary' | 'japanese_corpus';
+  category: 'persona_tone' | 'vba_coding' | 'js_canvas' | 'stress_boundary' | 'japanese_corpus' | 'structured_json';
   title: string;
   prompt: string;
   expectedKeywords: string[];     // 含まれるべきキーワード
   forbiddenKeywords: string[];    // 含まれてはならない禁止語 (敬語など)
-  expectedCodeType?: 'vba' | 'javascript' | 'html';
+  expectedCodeType?: 'vba' | 'javascript' | 'html' | 'json';
   baselineScore: number;          // 前バージョン/ベースラインスコア (0-100)
 }
 
@@ -552,6 +553,47 @@ export interface RegressionSuiteRunReport {
   averageLatencyMs: number;
   categoryScores: Record<string, number>;
   results: BenchmarkTestResult[];
+}
+
+/**
+ * モデルサイズ比較ベンチマーク評価 (設計思想 44節 & 79節 フェーズ6)
+ * 1.5B vs 3B など、異なるベースモデル規模間での品質・速度・発熱・メモリ総合比較
+ */
+export interface BenchmarkScores {
+  overallScore: number;
+  accuracyScore: number;      // 正答率 (0-100)
+  groundingScore: number;     // 根拠率・キーワード一致率 (0-100)
+  categoryScores: Record<string, number>;
+  regressionsCount: number;
+  passedTests: number;
+  totalTests: number;
+}
+
+export interface ModelSizeProfile {
+  id: string;
+  name: string;
+  params: number;             // 概算パラメータ数 (例: 1.5e9, 3.0e9)
+  scores: BenchmarkScores;
+  avgTps: number;             // 生成速度 (tokens / sec)
+  avgFirstTokenMs: number;    // 初回トークンまでの時間 (ms)
+  estimatedMemoryMb: number;  // 実行時推定メモリ使用量 (MB)
+  thermalState?: 'normal' | 'warm' | 'hot' | 'critical'; // 端末温度状態
+  jsonSuccessRate: number;    // 構造化JSON出力成功率 (0.0 - 1.0)
+}
+
+export interface ModelSizeComparisonReport {
+  id: string;
+  timestamp: number;
+  modelA: ModelSizeProfile;
+  modelB: ModelSizeProfile;
+  verdict: 'ADOPT_B' | 'KEEP_A' | 'INCONCLUSIVE';
+  verdictReasons: string[];
+  metricsDelta?: {
+    scoreDelta: number;       // modelB.scores.overallScore - modelA.scores.overallScore
+    tpsChangePercent: number; // ((modelB.avgTps - modelA.avgTps) / modelA.avgTps) * 100
+    ttftChangePercent: number; // ((modelB.avgFirstTokenMs - modelA.avgFirstTokenMs) / modelA.avgFirstTokenMs) * 100
+    memoryIncreaseMb: number; // modelB.estimatedMemoryMb - modelA.estimatedMemoryMb
+  };
 }
 
 /**

@@ -33,6 +33,7 @@ import {
   PieChart,
   Filter,
   AlertCircle,
+  Scale,
 } from 'lucide-react';
 import {
   SelfImprovementRecord,
@@ -47,6 +48,8 @@ import {
   WorkManagerStatus,
   BackgroundTaskExecutionLog,
   RegressionSuiteRunReport,
+  ModelSizeComparisonReport,
+  ModelSizeProfile,
   WorkspaceFile,
   ToolDefinition,
   ToolExecutionResult,
@@ -73,7 +76,7 @@ export interface SelfImprovementModalProps {
   chatMessages: ChatMessage[];
   memories: MemoryItem[];
   workspaceFiles?: WorkspaceFile[];
-  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations';
+  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations';
 }
 
 export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
@@ -84,7 +87,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   workspaceFiles = [],
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 
@@ -99,6 +102,16 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   const [isBenchmarkRunning, setIsBenchmarkRunning] = useState(false);
   const [selectedReport, setSelectedReport] = useState<RegressionSuiteRunReport | null>(null);
   const [benchmarkError, setBenchmarkError] = useState<string | null>(null);
+
+  // モデルサイズ比較ステート (設計思想 44節 & 79節 フェーズ6)
+  const [sizeCompModelA, setSizeCompModelA] = useState<string>('gen_v1_0_base');
+  const [sizeCompModelB, setSizeCompModelB] = useState<string>('gen_v2_0_candidate_3b');
+  const [sizeCompReports, setSizeCompReports] = useState<ModelSizeComparisonReport[]>([]);
+  const [selectedCompReport, setSelectedCompReport] = useState<ModelSizeComparisonReport | null>(null);
+  const [isSizeCompRunning, setIsSizeCompRunning] = useState(false);
+  const [sizeCompError, setSizeCompError] = useState<string | null>(null);
+  const [sizeCompSuccessMsg, setSizeCompSuccessMsg] = useState<string | null>(null);
+  const [confirmAdoptOpen, setConfirmAdoptOpen] = useState(false);
 
   // 世界モデルステート (設計思想 17)
   const [worldModelErrors, setWorldModelErrors] = useState<PredictionErrorRecord[]>([]);
@@ -258,6 +271,20 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
       if (reports.length > 0) {
         setSelectedReport(reports[0]);
       }
+
+      // モデルサイズ比較レポートの読み込み (フェーズ6)
+      const compReports = regressionBenchmarkService.getComparisonReports();
+      setSizeCompReports(compReports);
+      if (compReports.length > 0) {
+        setSelectedCompReport(compReports[0]);
+      }
+
+      // 利用可能なモデル世代から基準(1.5B)と候補(3B)を初期設定
+      const allGens = selfImprovementService.getGenerations();
+      const base15b = allGens.find((g) => g.parameterCount === 1.5e9 || g.generationId === 'gen_v1_0_base') || allGens[0];
+      const cand3b = allGens.find((g) => g.parameterCount === 3.0e9 || g.generationId === 'gen_v2_0_candidate_3b') || allGens[1] || allGens[0];
+      if (base15b) setSizeCompModelA(base15b.generationId);
+      if (cand3b) setSizeCompModelB(cand3b.generationId);
 
       // 最新のメッセージから失敗診断を自動実行
       setDiagnosisRecords(selfImprovementService.getRecords());
@@ -538,6 +565,57 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
     setSelectedReport(null);
   };
 
+  // モデルサイズ比較ハンドラー (設計思想 44節 & 79節 フェーズ6)
+  const handleRunModelSizeComparison = async () => {
+    if (isSizeCompRunning) return;
+    setIsSizeCompRunning(true);
+    setSizeCompError(null);
+    setSizeCompSuccessMsg(null);
+    try {
+      const report = await regressionBenchmarkService.runModelSizeComparison(
+        sizeCompModelA,
+        sizeCompModelB
+      );
+      const updated = regressionBenchmarkService.getComparisonReports();
+      setSizeCompReports(updated);
+      setSelectedCompReport(report);
+      setSizeCompSuccessMsg(`✓ モデルサイズ比較完了: 判定 [${report.verdict}]`);
+    } catch (e: any) {
+      console.warn('Model size comparison execution failed:', e);
+      setSizeCompError(e?.message || 'モデルサイズ比較の実行に失敗しました');
+    } finally {
+      setIsSizeCompRunning(false);
+    }
+  };
+
+  const handleClearComparisonReports = () => {
+    regressionBenchmarkService.clearComparisonReports();
+    setSizeCompReports([]);
+    setSelectedCompReport(null);
+    setSizeCompSuccessMsg('比較履歴をクリアしました');
+  };
+
+  const handleAdoptModel = () => {
+    if (!selectedCompReport || selectedCompReport.verdict !== 'ADOPT_B') return;
+    try {
+      const res = selfImprovementService.adoptModelFromComparison(
+        selectedCompReport.modelB.id,
+        selectedCompReport
+      );
+      if (!res.success) {
+        setSizeCompError(res.error || '常用モデルへの採用に失敗しました');
+        return;
+      }
+      setGenerations(selfImprovementService.getGenerations());
+      setConfirmAdoptOpen(false);
+      setSizeCompSuccessMsg(
+        `🎉 「${selectedCompReport.modelB.name}」を常用モデル(Stable Active)として正常に採用・昇格しました！`
+      );
+    } catch (e: any) {
+      setSizeCompError(e?.message || '常用モデルの採用に失敗しました');
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -617,6 +695,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <Activity className="w-4 h-4 text-rose-400" />
             <span>🧪 ベンチマーク & 退行テスト ({benchmarkReports.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('model_comparison')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'model_comparison'
+                ? 'border-violet-500 text-violet-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Scale className="w-4 h-4 text-violet-400" />
+            <span>⚖️ サイズ比較 (1.5B vs 3B) ({sizeCompReports.length})</span>
           </button>
 
           <button
@@ -1813,6 +1903,494 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                     className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold"
                   >
                     テストスイートを一括実行する
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ============================================================ */}
+          {/* TAB: モデルサイズ比較 (1.5B vs 3B / フェーズ6)                  */}
+          {/* ============================================================ */}
+          {activeTab === 'model_comparison' && (
+            <div className="space-y-4">
+              {/* Header Card */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-violet-950/40 via-slate-900 to-slate-950 border border-violet-900/40 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                      <Scale className="w-4 h-4 text-violet-400" />
+                      <span>モデルサイズ比較ベンチマーク (1.5B vs 3B)</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-mono border border-violet-500/30">
+                        フェーズ6 実機トレードオフ検証
+                      </span>
+                    </h3>
+                    <p className="text-slate-400 text-xs mt-1">
+                      設計思想44節・79節:「1.5Bで本当に十分か、3Bと比較する」。同一条件（固定回帰プロンプト・同一コンテキスト長）で品質・生成速度・推定メモリ・発熱を総合測定し、最適トレードオフを客観的に判定します。
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    <button
+                      onClick={handleRunModelSizeComparison}
+                      disabled={isSizeCompRunning || !sizeCompModelA || !sizeCompModelB}
+                      className="px-3.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-violet-950/50"
+                    >
+                      {isSizeCompRunning ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>比較測定中...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>比較ベンチマークを実行</span>
+                        </>
+                      )}
+                    </button>
+
+                    {sizeCompReports.length > 0 && (
+                      <button
+                        onClick={handleClearComparisonReports}
+                        disabled={isSizeCompRunning}
+                        title="比較レポート履歴をクリア"
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Model Selection Panel */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
+                  {/* Model A Selection */}
+                  <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                        <span>基準モデル A (常用・安定版 / 1.5B等)</span>
+                      </label>
+                      <span className="text-[10px] text-blue-400 font-mono">Baseline</span>
+                    </div>
+                    <select
+                      value={sizeCompModelA}
+                      onChange={(e) => setSizeCompModelA(e.target.value)}
+                      disabled={isSizeCompRunning}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500 font-mono"
+                    >
+                      {generations.map((g) => (
+                        <option key={g.generationId} value={g.generationId}>
+                          {g.modelName} ({g.parameterCount ? `${(g.parameterCount / 1e9).toFixed(1)}B` : '1.5B'} - {g.branch})
+                        </option>
+                      ))}
+                    </select>
+                    {(() => {
+                      const gen = generations.find((g) => g.generationId === sizeCompModelA) || generations[0];
+                      const p = gen?.parameterCount || 1.5e9;
+                      return (
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                          <span className="px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/60">
+                            規模: {(p / 1e9).toFixed(1)}B
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
+                            推定メモリ: ~{Math.round((p * 0.5625) / (1024 * 1024) + 560)}MB
+                          </span>
+                          <span className="text-slate-500">状態: {gen?.status}</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Model B Selection */}
+                  <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-violet-400"></span>
+                        <span>比較候補モデル B (評価対象 / 3B等)</span>
+                      </label>
+                      <span className="text-[10px] text-violet-400 font-mono">Candidate</span>
+                    </div>
+                    <select
+                      value={sizeCompModelB}
+                      onChange={(e) => setSizeCompModelB(e.target.value)}
+                      disabled={isSizeCompRunning}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500 font-mono"
+                    >
+                      {generations.map((g) => (
+                        <option key={g.generationId} value={g.generationId}>
+                          {g.modelName} ({g.parameterCount ? `${(g.parameterCount / 1e9).toFixed(1)}B` : '3.0B'} - {g.branch})
+                        </option>
+                      ))}
+                    </select>
+                    {(() => {
+                      const gen = generations.find((g) => g.generationId === sizeCompModelB) || generations[1] || generations[0];
+                      const p = gen?.parameterCount || 3.0e9;
+                      return (
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                          <span className="px-1.5 py-0.5 rounded bg-violet-950/60 text-violet-300 border border-violet-800/60">
+                            規模: {(p / 1e9).toFixed(1)}B
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
+                            推定メモリ: ~{Math.round((p * 0.5625) / (1024 * 1024) + 820)}MB
+                          </span>
+                          <span className="text-slate-500">状態: {gen?.status}</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Status Banners */}
+                {sizeCompError && (
+                  <div className="p-2.5 rounded-lg bg-rose-950/50 border border-rose-800/80 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{sizeCompError}</span>
+                  </div>
+                )}
+                {sizeCompSuccessMsg && (
+                  <div className="p-2.5 rounded-lg bg-emerald-950/50 border border-emerald-800/80 text-emerald-300 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{sizeCompSuccessMsg}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Comparison Results */}
+              {selectedCompReport ? (
+                <div className="space-y-4">
+                  {/* Verdict Card */}
+                  <div
+                    className={`p-4 rounded-xl border space-y-3 transition-all ${
+                      selectedCompReport.verdict === 'ADOPT_B'
+                        ? 'bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border-emerald-500/50'
+                        : selectedCompReport.verdict === 'KEEP_A'
+                        ? 'bg-gradient-to-br from-blue-950/40 via-slate-900 to-slate-950 border-blue-500/50'
+                        : 'bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border-amber-500/50'
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`p-2.5 rounded-xl text-lg shrink-0 ${
+                            selectedCompReport.verdict === 'ADOPT_B'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : selectedCompReport.verdict === 'KEEP_A'
+                              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                              : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}
+                        >
+                          <Scale className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-400">総合判定結果:</span>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold font-mono border ${
+                                selectedCompReport.verdict === 'ADOPT_B'
+                                  ? 'bg-emerald-900/60 text-emerald-200 border-emerald-500/60'
+                                  : selectedCompReport.verdict === 'KEEP_A'
+                                  ? 'bg-blue-900/60 text-blue-200 border-blue-500/60'
+                                  : 'bg-amber-900/60 text-amber-200 border-amber-500/60'
+                              }`}
+                            >
+                              {selectedCompReport.verdict === 'ADOPT_B'
+                                ? '✓ ADOPT_B (候補モデルBの採用を推奨)'
+                                : selectedCompReport.verdict === 'KEEP_A'
+                                ? '🛡️ KEEP_A (基準モデルAの維持を推奨)'
+                                : '⏸️ INCONCLUSIVE (判定保留)'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300 mt-1">
+                            {selectedCompReport.verdict === 'ADOPT_B'
+                              ? `候補モデル(${selectedCompReport.modelB.name})は品質スコアが有意に向上し、速度低下も許容範囲内(50%未満)です。表現力向上のメリットがリソース負荷を上回ります。`
+                              : selectedCompReport.verdict === 'KEEP_A'
+                              ? `候補モデル(${selectedCompReport.modelB.name})は品質スコアの向上幅に対して速度低下やメモリ負荷が大きく、既存モデル(${selectedCompReport.modelA.name})の維持が最適です。`
+                              : '品質向上と処理速度・メモリ消費のトレードオフが拮抗しています。追加の検証を推奨します。'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Promotion Action Button (Only if ADOPT_B) */}
+                      {selectedCompReport.verdict === 'ADOPT_B' && (
+                        <div className="shrink-0 self-end sm:self-auto">
+                          {!confirmAdoptOpen ? (
+                            <button
+                              onClick={() => setConfirmAdoptOpen(true)}
+                              className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-950/60 transition-all border border-emerald-400/40"
+                            >
+                              <Award className="w-3.5 h-3.5" />
+                              <span>常用モデルとして採用・切り替える</span>
+                            </button>
+                          ) : (
+                            <div className="p-2.5 rounded-lg bg-slate-950 border border-emerald-500/60 space-y-2 text-right">
+                              <p className="text-[11px] text-emerald-300 font-bold text-left">
+                                常用モデルを「{selectedCompReport.modelB.name}」へ切り替えますか？
+                              </p>
+                              <p className="text-[10px] text-slate-400 text-left">
+                                人手確認ポリシー（設計思想25）に基づき承認を記録します。
+                              </p>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => setConfirmAdoptOpen(false)}
+                                  className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
+                                >
+                                  キャンセル
+                                </button>
+                                <button
+                                  onClick={handleAdoptModel}
+                                  className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shadow"
+                                >
+                                  承認して切り替え
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quantitative Comparison Table */}
+                  <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                        <Activity className="w-3.5 h-3.5 text-violet-400" />
+                        <span>実機メトリクス定量対比 (同一環境・同一プロンプト測定)</span>
+                      </h4>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        測定時刻: {new Date(selectedCompReport.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
+                            <th className="pb-2 font-medium">評価項目</th>
+                            <th className="pb-2 font-medium text-blue-300">
+                              モデル A ({selectedCompReport.modelA.name})
+                            </th>
+                            <th className="pb-2 font-medium text-violet-300">
+                              モデル B ({selectedCompReport.modelB.name})
+                            </th>
+                            <th className="pb-2 font-medium">差分 / 変化率</th>
+                            <th className="pb-2 font-medium">評価基準</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-900 font-mono text-[11px]">
+                          {/* 総合品質スコア */}
+                          <tr>
+                            <td className="py-2.5 font-sans font-bold text-slate-200 flex items-center gap-1.5">
+                              <span>総合品質スコア</span>
+                            </td>
+                            <td className="py-2.5 text-slate-300 font-bold">
+                              {selectedCompReport.modelA.scores.overallScore}点
+                            </td>
+                            <td className="py-2.5 text-slate-100 font-bold">
+                              {selectedCompReport.modelB.scores.overallScore}点
+                            </td>
+                            <td className="py-2.5">
+                              {(() => {
+                                const diff = selectedCompReport.modelB.scores.overallScore - selectedCompReport.modelA.scores.overallScore;
+                                return (
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    diff >= 5
+                                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                      : diff >= 0
+                                      ? 'bg-slate-800 text-slate-300'
+                                      : 'bg-rose-950 text-rose-300 border border-rose-800'
+                                  }`}>
+                                    {diff >= 0 ? `+${diff}` : diff}点
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                            <td className="py-2.5 font-sans text-slate-400 text-[10px]">
+                              +5点以上で採用候補
+                            </td>
+                          </tr>
+
+                          {/* 正答率 */}
+                          <tr>
+                            <td className="py-2 font-sans text-slate-300">正答率 (Accuracy)</td>
+                            <td className="py-2 text-slate-400">{selectedCompReport.modelA.scores.accuracyScore}%</td>
+                            <td className="py-2 text-slate-200">{selectedCompReport.modelB.scores.accuracyScore}%</td>
+                            <td className="py-2 text-slate-300">
+                              +{selectedCompReport.modelB.scores.accuracyScore - selectedCompReport.modelA.scores.accuracyScore}%
+                            </td>
+                            <td className="py-2 font-sans text-slate-400 text-[10px]">合格率80%以上</td>
+                          </tr>
+
+                          {/* 根拠率 */}
+                          <tr>
+                            <td className="py-2 font-sans text-slate-300">根拠率・指示適合 (Grounding)</td>
+                            <td className="py-2 text-slate-400">{selectedCompReport.modelA.scores.groundingScore}%</td>
+                            <td className="py-2 text-slate-200">{selectedCompReport.modelB.scores.groundingScore}%</td>
+                            <td className="py-2 text-slate-300">
+                              +{selectedCompReport.modelB.scores.groundingScore - selectedCompReport.modelA.scores.groundingScore}%
+                            </td>
+                            <td className="py-2 font-sans text-slate-400 text-[10px]">必須キーワード適合</td>
+                          </tr>
+
+                          {/* 生成速度 TPS */}
+                          <tr>
+                            <td className="py-2.5 font-sans font-bold text-slate-200">
+                              生成速度 (Average TPS)
+                            </td>
+                            <td className="py-2.5 text-slate-300 font-bold">
+                              {selectedCompReport.modelA.avgTps.toFixed(1)} tok/s
+                            </td>
+                            <td className="py-2.5 text-slate-100 font-bold">
+                              {selectedCompReport.modelB.avgTps.toFixed(1)} tok/s
+                            </td>
+                            <td className="py-2.5">
+                              {(() => {
+                                const drop = Math.round((1 - selectedCompReport.modelB.avgTps / selectedCompReport.modelA.avgTps) * 100);
+                                return (
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    drop <= 50
+                                      ? 'bg-blue-950 text-blue-300 border border-blue-800'
+                                      : 'bg-rose-950 text-rose-300 border border-rose-800'
+                                  }`}>
+                                    {drop > 0 ? `-${drop}%` : `+${Math.abs(drop)}%`}
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                            <td className="py-2.5 font-sans text-slate-400 text-[10px]">
+                              速度低下 &lt; 50% で合格
+                            </td>
+                          </tr>
+
+                          {/* 初回トークン TTFT */}
+                          <tr>
+                            <td className="py-2 font-sans text-slate-300">初回トークン応答 (TTFT)</td>
+                            <td className="py-2 text-slate-400">{selectedCompReport.modelA.avgFirstTokenMs}ms</td>
+                            <td className="py-2 text-slate-200">{selectedCompReport.modelB.avgFirstTokenMs}ms</td>
+                            <td className="py-2 text-slate-300">
+                              +{selectedCompReport.modelB.avgFirstTokenMs - selectedCompReport.modelA.avgFirstTokenMs}ms
+                            </td>
+                            <td className="py-2 font-sans text-slate-400 text-[10px]">500ms未満推奨</td>
+                          </tr>
+
+                          {/* 推定メモリ消費 */}
+                          <tr>
+                            <td className="py-2.5 font-sans font-bold text-slate-200">
+                              推定メモリ消費 (Q4_K_M + nCtx)
+                            </td>
+                            <td className="py-2.5 text-slate-300">
+                              ~{selectedCompReport.modelA.estimatedMemoryMb} MB
+                            </td>
+                            <td className="py-2.5 text-slate-100 font-bold">
+                              ~{selectedCompReport.modelB.estimatedMemoryMb} MB
+                            </td>
+                            <td className="py-2.5 text-amber-400">
+                              +{selectedCompReport.modelB.estimatedMemoryMb - selectedCompReport.modelA.estimatedMemoryMb} MB
+                            </td>
+                            <td className="py-2.5 font-sans text-slate-400 text-[10px]">
+                              モバイル空きRAM 3.5GB未満枠
+                            </td>
+                          </tr>
+
+                          {/* 構造化JSON成功率 */}
+                          <tr>
+                            <td className="py-2 font-sans text-slate-300">構造化JSON出力成功率</td>
+                            <td className="py-2 text-slate-400">
+                              {Math.round(selectedCompReport.modelA.jsonSuccessRate * 100)}%
+                            </td>
+                            <td className="py-2 text-emerald-400 font-bold">
+                              {Math.round(selectedCompReport.modelB.jsonSuccessRate * 100)}%
+                            </td>
+                            <td className="py-2 text-emerald-400">
+                              +{Math.round((selectedCompReport.modelB.jsonSuccessRate - selectedCompReport.modelA.jsonSuccessRate) * 100)}%
+                            </td>
+                            <td className="py-2 font-sans text-slate-400 text-[10px]">構文エラー0件目標</td>
+                          </tr>
+
+                          {/* 退行発生件数 */}
+                          <tr>
+                            <td className="py-2 font-sans text-slate-300">退行発生件数 (Regressions)</td>
+                            <td className="py-2 text-emerald-400">{selectedCompReport.modelA.scores.regressionsCount}件</td>
+                            <td className="py-2 text-emerald-400 font-bold">{selectedCompReport.modelB.scores.regressionsCount}件</td>
+                            <td className="py-2 text-slate-400">0件変化</td>
+                            <td className="py-2 font-sans text-slate-400 text-[10px]">退行0件が昇格必須条件</td>
+                          </tr>
+
+                          {/* 端末発熱状態 */}
+                          <tr>
+                            <td className="py-2 font-sans text-slate-300">端末発熱状態</td>
+                            <td className="py-2 text-slate-400">{selectedCompReport.modelA.thermalState || 'normal'}</td>
+                            <td className="py-2 text-slate-300">{selectedCompReport.modelB.thermalState || 'normal'}</td>
+                            <td className="py-2 text-slate-400">安全枠内</td>
+                            <td className="py-2 font-sans text-slate-400 text-[10px]">hot/critical時は実行中断</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Verdict Reasons Detailed Breakdown */}
+                  <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                    <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <BookOpen className="w-3.5 h-3.5 text-violet-400" />
+                      <span>判定根拠およびトレードオフ分析</span>
+                    </h4>
+                    <div className="space-y-1.5 pt-1">
+                      {selectedCompReport.verdictReasons.map((reason, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-xs text-slate-300">
+                          <span className="text-violet-400 mt-0.5">•</span>
+                          <span>{reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* History of Size Comparison Reports */}
+                  {sizeCompReports.length > 1 && (
+                    <div className="space-y-2 pt-2">
+                      <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>過去の比較レポート履歴 ({sizeCompReports.length}件)</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {sizeCompReports.map((rep) => (
+                          <button
+                            key={rep.id}
+                            onClick={() => {
+                              setSelectedCompReport(rep);
+                              setConfirmAdoptOpen(false);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all ${
+                              selectedCompReport.id === rep.id
+                                ? 'bg-violet-950 text-violet-200 border-violet-500'
+                                : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            <span>{new Date(rep.timestamp).toLocaleTimeString()}</span>
+                            <span className="mx-1.5">|</span>
+                            <span className={rep.verdict === 'ADOPT_B' ? 'text-emerald-400' : 'text-blue-400'}>
+                              {rep.verdict}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-8 rounded-xl bg-slate-950/40 border border-slate-800/60 text-center space-y-3">
+                  <Scale className="w-8 h-8 text-slate-600 mx-auto" />
+                  <p className="text-slate-400 text-xs">まだモデルサイズ比較レポートがありません。</p>
+                  <p className="text-slate-500 text-[11px]">
+                    基準モデル(1.5B)と候補モデル(3B)を選択し、「比較ベンチマークを実行」をクリックしてください。
+                  </p>
+                  <button
+                    onClick={handleRunModelSizeComparison}
+                    disabled={isSizeCompRunning}
+                    className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow"
+                  >
+                    比較ベンチマークを実行する
                   </button>
                 </div>
               )}

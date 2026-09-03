@@ -9,6 +9,7 @@ import {
   RegressionSuiteRunReport,
   RejectedTrainingSampleLog,
   ReviewQueueItem,
+  ModelSizeComparisonReport,
 } from '../types';
 import { nativeLlmService } from './nativeLlmService';
 import { webLLMService } from './webLlmService';
@@ -49,11 +50,26 @@ export const INITIAL_GENERATIONS: ModelGeneration[] = [
     baseModel: 'Qwen/Qwen2.5-Coder-1.5B-Instruct',
     version: 'v1.0.0',
     branch: 'stable',
+    parameterCount: 1.5e9, // 1.5B パラメータ
     loraRank: 0,
     trainingSamplesCount: 0,
     status: 'active',
     benchmarkScore: undefined, // 実測未実施
-    notes: '基準安定版（初期ベースモデル）。Colab等でLoRA学習・量子化した新世代モデルをインポートすると系統樹に追加されます。',
+    notes: '基準安定版（初期1.5Bベースモデル）。Colab等でLoRA学習・量子化した新世代モデルをインポートすると系統樹に追加されます。',
+    createdAt: Date.now(),
+  },
+  {
+    generationId: 'gen_v2_0_candidate_3b',
+    modelName: 'Qwen 2.5 Coder 3B (Candidate)',
+    baseModel: 'Qwen/Qwen2.5-Coder-3B-Instruct',
+    version: 'v2.0.0-candidate',
+    branch: 'experimental',
+    parameterCount: 3.0e9, // 3.0B パラメータ (フェーズ6 モデルサイズ比較対象)
+    loraRank: 0,
+    trainingSamplesCount: 0,
+    status: 'shadow_testing',
+    benchmarkScore: undefined,
+    notes: 'フェーズ6 モデルサイズ比較用 3B候補モデル。1.5Bとの品質・速度・発熱・メモリ総合検証対象。',
     createdAt: Date.now(),
   },
 ];
@@ -88,7 +104,22 @@ class SelfImprovementService {
 
         const rawGen = storageService.getItem(MODEL_GENERATIONS_KEY);
         if (rawGen) {
-          this.generations = JSON.parse(rawGen);
+          const parsedGen: ModelGeneration[] = JSON.parse(rawGen);
+          this.generations = parsedGen.map((g) => {
+            if (!g.parameterCount) {
+              const nameLower = (g.modelName + ' ' + g.baseModel).toLowerCase();
+              if (nameLower.includes('3b')) return { ...g, parameterCount: 3.0e9 };
+              if (nameLower.includes('0.5b')) return { ...g, parameterCount: 0.5e9 };
+              if (nameLower.includes('7b')) return { ...g, parameterCount: 7.0e9 };
+              return { ...g, parameterCount: 1.5e9 };
+            }
+            return g;
+          });
+          // 3B候補モデルが存在しない場合は追加
+          if (!this.generations.some((g) => g.parameterCount && g.parameterCount >= 2.5e9)) {
+            this.generations.push(INITIAL_GENERATIONS[1]);
+            this.saveGenerations();
+          }
         } else {
           this.generations = [...INITIAL_GENERATIONS];
           this.saveGenerations();
@@ -1321,6 +1352,54 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
     systemLogger.info(
       'SELF_IMPROVEMENT',
       `🏆 [モデル昇格成功] 「${targetGen.modelName}」が回帰レポート[${report.id}]（テスト対象: ${report.modelName}）に基づいて総合安定版(stable)へ昇格しました (スコア: ${report.overallScore}点)`
+    );
+
+    return { success: true, generation: targetGen };
+  }
+
+  /**
+   * モデルサイズ比較レポート (ADOPT_B) の人手承認に基づいて常用モデルへ昇格・切り替える
+   * (設計思想 25. 人の確認なしの自動昇格を避ける)
+   */
+  public adoptModelFromComparison(
+    candidateGenerationId: string,
+    comparisonReport: ModelSizeComparisonReport
+  ): { success: boolean; error?: string; generation?: ModelGeneration } {
+    if (comparisonReport.verdict !== 'ADOPT_B') {
+      return {
+        success: false,
+        error: `比較判定が「ADOPT_B」ではないため常用モデルへ昇格できません (現在の判定: ${comparisonReport.verdict})`,
+      };
+    }
+
+    const targetGen = this.generations.find((g) => g.generationId === candidateGenerationId);
+    if (!targetGen) {
+      return { success: false, error: '指定されたモデル世代が見つかりません。' };
+    }
+
+    // 既存の稼働中stableモデルをアーカイブに退避
+    this.generations = this.generations.map((g) => {
+      if (g.branch === 'stable' && g.status === 'active' && g.generationId !== candidateGenerationId) {
+        return {
+          ...g,
+          status: 'archived',
+        };
+      }
+      return g;
+    });
+
+    // 常用モデル (active stable) へ昇格
+    targetGen.branch = 'stable';
+    targetGen.status = 'active';
+    targetGen.benchmarkScore = comparisonReport.modelB.scores.overallScore;
+    targetGen.promotedAt = Date.now();
+    targetGen.promotionNotes = `モデルサイズ比較レポート[${comparisonReport.id}]承認により常用モデルに採用 (パラメータ: ${(comparisonReport.modelB.params / 1e9).toFixed(1)}B, スコア: ${comparisonReport.modelB.scores.overallScore}点, TPS: ${comparisonReport.modelB.avgTps} tok/s, 判定: ADOPT_B)`;
+
+    this.saveGenerations();
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `👑 [常用モデル昇格] モデルサイズ比較承認により「${targetGen.modelName}」を総合安定常用モデルに昇格しました`
     );
 
     return { success: true, generation: targetGen };
