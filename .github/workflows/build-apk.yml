@@ -27,10 +27,17 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Extract Environment Specs from Model Manifest (Chapter 78)
+        id: manifest
+        run: |
+          NDK_VER=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.ndkVersion || '26.1.10909125');")
+          echo "ndk_version=${NDK_VER}" >> $GITHUB_OUTPUT
+          echo "Manifest NDK version: ${NDK_VER}"
+
       - name: Install Android SDK Build-Tools, NDK & CMake
         run: |
           yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmake;3.22.1" "ndk;${{ steps.manifest.outputs.ndk_version }}"
           yes | sdkmanager --licenses || true
 
       - name: Install Vulkan Build Tools (glslc shader compiler for GGML_VULKAN)
@@ -67,10 +74,32 @@ jobs:
           npx cap add android
           npx cap sync android
 
-          # Detect NDK Directory
+          # Read native build specifications from model_manifest.json (Chapter 78: Model Manifest Source of Truth)
+          echo "Connecting build process to model_manifest.json..."
+          LLAMA_REPO=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.repository || 'https://github.com/ggml-org/llama.cpp.git');")
+          LLAMA_COMMIT=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.pinnedCommit || 'b4600');")
+          LLAMA_COMMIT_HASH=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.pinnedCommitHash || '');")
+          VULKAN_REPO=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.vulkanHeaders?.repository || 'https://github.com/KhronosGroup/Vulkan-Headers.git');")
+          VULKAN_TAG=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.vulkanHeaders?.pinnedTag || 'v1.3.296');")
+          SPIRV_REPO=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.spirvHeaders?.repository || 'https://github.com/KhronosGroup/SPIRV-Headers.git');")
+          SPIRV_TAG=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.spirvHeaders?.pinnedTag || 'vulkan-sdk-1.3.296.0');")
+          NDK_TARGET=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.ndkVersion || '26.1.10909125');")
+          CMAKE_ARGUMENTS_JSON=$(node -e "const m = require('./model_manifest.json'); console.log(JSON.stringify(m.nativeEnvironment?.cmakeFlags || []));")
+          CMAKE_ARGUMENTS_GRADLE=$(node -e "const m = require('./model_manifest.json'); console.log((m.nativeEnvironment?.cmakeFlags || []).map(f => '\"' + f + '\"').join(', '));")
+
+          echo "Manifest Target NDK: $NDK_TARGET"
+          echo "Manifest llama.cpp commit: $LLAMA_COMMIT ($LLAMA_COMMIT_HASH)"
+          echo "Manifest Vulkan-Headers: $VULKAN_TAG ($VULKAN_REPO)"
+          echo "Manifest SPIRV-Headers: $SPIRV_TAG ($SPIRV_REPO)"
+
+          # Copy model_manifest.json into android assets directory so the app can verify manifest at runtime
+          mkdir -p android/app/src/main/assets
+          cp model_manifest.json android/app/src/main/assets/model_manifest.json
+
+          # Detect NDK Directory based on target from manifest
           NDK_DIR=""
-          if [ -d "$ANDROID_SDK_ROOT/ndk/26.1.10909125" ]; then
-            NDK_DIR="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
+          if [ -d "$ANDROID_SDK_ROOT/ndk/$NDK_TARGET" ]; then
+            NDK_DIR="$ANDROID_SDK_ROOT/ndk/$NDK_TARGET"
           elif [ -n "$ANDROID_NDK_HOME" ] && [ -d "$ANDROID_NDK_HOME" ]; then
             NDK_DIR="$ANDROID_NDK_HOME"
           elif [ -d "$ANDROID_SDK_ROOT/ndk" ]; then
@@ -83,25 +112,23 @@ jobs:
             echo "ndk.dir=$NDK_DIR" >> android/local.properties
           fi
 
-          # Clone latest llama.cpp for native C++ Android NDK build.
-          # NOTE: must NOT pin an old tag like b4000 here - that predates upstream
-          # PR #10448 ("vulkan-shaders-gen needs to be built for the host, not the
-          # cross-compile target"), which is required for GGML_VULKAN to cross-compile
-          # for Android at all. Using an old tag reintroduces the
-          # "vulkan-shaders-gen: not found" build failure.
+          # Clone llama.cpp pinned to model_manifest.json commit and verify commit hash
           mkdir -p android/app/src/main/cpp
-          git clone --depth 1 https://github.com/ggml-org/llama.cpp.git android/app/src/main/cpp/llama.cpp
+          git clone "$LLAMA_REPO" android/app/src/main/cpp/llama.cpp
+          cd android/app/src/main/cpp/llama.cpp
+          git checkout "$LLAMA_COMMIT"
+          if [ -n "$LLAMA_COMMIT_HASH" ]; then
+            echo "Verifying and locking llama.cpp exact commit hash: $LLAMA_COMMIT_HASH"
+            git reset --hard "$LLAMA_COMMIT_HASH"
+          fi
+          echo "Llama.cpp checked out at: $(git rev-parse HEAD)"
+          cd ../../../../
 
-          # Clone Vulkan-Headers (the Android NDK ships vulkan.h but not the vulkan.hpp
-          # C++ bindings that ggml-vulkan requires) for the on-device GPU backend
-          git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git android/app/src/main/cpp/Vulkan-Headers
+          # Clone Vulkan-Headers using version pinned in model_manifest.json
+          git clone --depth 1 --branch "$VULKAN_TAG" "$VULKAN_REPO" android/app/src/main/cpp/Vulkan-Headers
 
-          # ggml-vulkan also requires the SPIRV-Headers CMake *package* (a
-          # SPIRV-HeadersConfig.cmake file), which the apt "spirv-headers" package does
-          # not provide. Build+install it with the plain HOST cmake/compiler (it is a
-          # header-only interface library, so no Android toolchain is needed) so a
-          # real config file exists that find_package() can pick up.
-          git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git android/app/src/main/cpp/SPIRV-Headers
+          # Clone and install SPIRV-Headers using version pinned in model_manifest.json
+          git clone --depth 1 --branch "$SPIRV_TAG" "$SPIRV_REPO" android/app/src/main/cpp/SPIRV-Headers
           cmake -S android/app/src/main/cpp/SPIRV-Headers -B /tmp/spirv-headers-build \
                 -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/android/app/src/main/cpp/spirv-headers-install
           cmake --build /tmp/spirv-headers-build --target install
@@ -188,7 +215,17 @@ jobs:
           Java_com_mikiai_app_MlcLlmPlugin_nativeInitModel(
               JNIEnv* env, jobject thiz, jstring jModelPath, jint nGpuLayers, jint nCtx, jint nThreads) {
 
+              if (!jModelPath) {
+                  LOGE("nativeInitModel: jModelPath is null");
+                  return JNI_FALSE;
+              }
+
               const char* modelPath = env->GetStringUTFChars(jModelPath, nullptr);
+              if (!modelPath) {
+                  LOGE("nativeInitModel: Failed to get modelPath string");
+                  return JNI_FALSE;
+              }
+
               LOGI("Loading GGUF model from %s (gpu_layers: %d, ctx: %d, threads: %d)", modelPath, nGpuLayers, nCtx, nThreads);
 
               if (g_ctx) {
@@ -211,12 +248,12 @@ jobs:
               model_params.n_gpu_layers = nGpuLayers;
 
               g_model = llama_model_load_from_file(modelPath, model_params);
-              env->ReleaseStringUTFChars(jModelPath, modelPath);
-
               if (!g_model) {
                   LOGE("Failed to load model from file: %s", modelPath);
+                  env->ReleaseStringUTFChars(jModelPath, modelPath);
                   return JNI_FALSE;
               }
+              env->ReleaseStringUTFChars(jModelPath, modelPath);
               g_vocab = llama_model_get_vocab(g_model);
 
               llama_context_params ctx_params = llama_context_default_params();
@@ -233,13 +270,7 @@ jobs:
                   return JNI_FALSE;
               }
 
-              llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
-              g_smpl = llama_sampler_chain_init(sparams);
-              llama_sampler_chain_add(g_smpl, llama_sampler_init_temp(0.7f));
-              llama_sampler_chain_add(g_smpl, llama_sampler_init_top_p(0.9f, 1));
-              llama_sampler_chain_add(g_smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
-
-              LOGI("GGUF model loaded successfully into native context!");
+              LOGI("GGUF model loaded successfully into native context (n_ctx: %d, threads: %d)!", ctx_params.n_ctx, ctx_params.n_threads);
               return JNI_TRUE;
           }
 
@@ -250,8 +281,15 @@ jobs:
               if (!g_ctx || !g_model) {
                   return env->NewStringUTF("Error: Native model is not loaded in memory");
               }
+              if (!jPrompt) {
+                  return env->NewStringUTF("Error: Prompt string is null");
+              }
 
               const char* prompt = env->GetStringUTFChars(jPrompt, nullptr);
+              if (!prompt) {
+                  return env->NewStringUTF("Error: Failed to obtain prompt UTF-8 characters");
+              }
+
               int n_prompt_neg = llama_tokenize(g_vocab, prompt, (int32_t)strlen(prompt), NULL, 0, true, true);
               int n_prompt = n_prompt_neg < 0 ? -n_prompt_neg : n_prompt_neg;
               if (n_prompt <= 0) n_prompt = 1;
@@ -264,6 +302,19 @@ jobs:
                   return env->NewStringUTF("Error: Tokenization failed");
               }
               prompt_tokens.resize(n_tokens);
+
+              // 構文サンプラーを実行時指定の temperature & topP で再構築
+              if (g_smpl) {
+                  llama_sampler_free(g_smpl);
+                  g_smpl = nullptr;
+              }
+              llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
+              g_smpl = llama_sampler_chain_init(sparams);
+              float effTemp = temp > 0.0f ? temp : 0.7f;
+              float effTopP = (topP > 0.0f && topP <= 1.0f) ? topP : 0.9f;
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_temp(effTemp));
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_top_p(effTopP, 1));
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
               llama_memory_clear(llama_get_memory(g_ctx), true);
 
@@ -336,7 +387,7 @@ jobs:
           android {
               namespace "com.mikiai.app"
               compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 34
-              ndkVersion "26.1.10909125"
+              ndkVersion "__MANIFEST_NDK_VERSION__"
 
               defaultConfig {
                   applicationId "com.mikiai.app"
@@ -354,7 +405,7 @@ jobs:
                   externalNativeBuild {
                       cmake {
                           cppFlags "-O3 -fexceptions -frtti"
-                          arguments "-DGGML_OPENMP=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_SERVER=OFF", "-DBUILD_SHARED_LIBS=OFF", "-DGGML_VULKAN=ON", "-DANDROID_PLATFORM=28"
+                          arguments __MANIFEST_CMAKE_ARGS__
                       }
                   }
               }
@@ -411,10 +462,15 @@ jobs:
 
               implementation 'com.squareup.okhttp3:okhttp:4.12.0'
               implementation 'com.google.code.gson:gson:2.10.1'
+              implementation 'androidx.work:work-runtime:2.9.0'
           }
 
           apply from: 'capacitor.build.gradle'
           EOF
+
+          # Substitute exact values parsed from model_manifest.json (Chapter 78)
+          sed -i "s/__MANIFEST_NDK_VERSION__/${NDK_TARGET}/g" android/app/build.gradle
+          sed -i "s/__MANIFEST_CMAKE_ARGS__/${CMAKE_ARGUMENTS_GRADLE}/g" android/app/build.gradle
 
           # Create MlcLlmPlugin.java (Full Real llama.cpp JNI Plugin & GGUF Model Downloader)
           cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MlcLlmPlugin.java
@@ -683,6 +739,9 @@ jobs:
               public void loadModel(PluginCall call) {
                   String fileName = call.getString("fileName");
                   String modelId = call.getString("modelId", fileName);
+                  int nGpuLayers = call.getInt("nGpuLayers", 99);
+                  int nCtx = call.getInt("nCtx", 2048);
+                  int nThreads = call.getInt("nThreads", 4);
 
                   if (fileName == null || fileName.isEmpty()) {
                       call.reject("fileName is required");
@@ -709,7 +768,7 @@ jobs:
                               notifyListeners("onProgress", p);
                           });
 
-                          boolean success = nativeInitModel(modelFile.getAbsolutePath(), 99, 2048, 4);
+                          boolean success = nativeInitModel(modelFile.getAbsolutePath(), nGpuLayers, nCtx, nThreads);
 
                           if (success) {
                               currentModelId = modelId;
@@ -839,6 +898,34 @@ jobs:
                   JSObject ret = new JSObject();
                   ret.put("success", true);
                   call.resolve(ret);
+              }
+
+              @PluginMethod
+              public void getMemoryInfo(PluginCall call) {
+                  try {
+                      ActivityManager actManager = (ActivityManager) getContext().getSystemService(Context.ACTIVITY_SERVICE);
+                      ActivityManager.MemoryInfo memInfo = new ActivityManager.MemoryInfo();
+                      if (actManager != null) {
+                          actManager.getMemoryInfo(memInfo);
+                      }
+
+                      StatFs stat = new StatFs(Environment.getDataDirectory().getPath());
+                      long bytesAvailable = stat.getBlockSizeLong() * stat.getAvailableBlocksLong();
+                      long bytesTotal = stat.getBlockSizeLong() * stat.getBlockCountLong();
+
+                      JSObject ret = new JSObject();
+                      ret.put("totalMemMB", Math.round((double) memInfo.totalMem / (1024.0 * 1024.0)));
+                      ret.put("availMemMB", Math.round((double) memInfo.availMem / (1024.0 * 1024.0)));
+                      ret.put("thresholdMB", Math.round((double) memInfo.threshold / (1024.0 * 1024.0)));
+                      ret.put("lowMemory", memInfo.lowMemory);
+                      ret.put("storageAvailMB", Math.round((double) bytesAvailable / (1024.0 * 1024.0)));
+                      ret.put("storageTotalMB", Math.round((double) bytesTotal / (1024.0 * 1024.0)));
+                      ret.put("cpuCores", Runtime.getRuntime().availableProcessors());
+                      ret.put("isMeasuredReal", true);
+                      call.resolve(ret);
+                  } catch (Exception e) {
+                      call.reject("Failed to get memory info: " + e.getMessage());
+                  }
               }
           }
           EOF
@@ -1042,6 +1129,114 @@ jobs:
           }
           EOF
 
+          # Create MikiMaintenanceWorker.java (Android WorkManager native background worker)
+          cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MikiMaintenanceWorker.java
+          package com.mikiai.app;
+
+          import android.content.Context;
+          import android.util.Log;
+          import androidx.annotation.NonNull;
+          import androidx.work.Worker;
+          import androidx.work.WorkerParameters;
+          import java.io.File;
+
+          public class MikiMaintenanceWorker extends Worker {
+              private static final String TAG = "MikiMaintenanceWorker";
+
+              public MikiMaintenanceWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
+                  super(context, workerParams);
+              }
+
+              @NonNull
+              @Override
+              public Result doWork() {
+                  Log.i(TAG, "Starting periodic MIKI-AI on-device maintenance work...");
+                  try {
+                      File cacheDir = getApplicationContext().getCacheDir();
+                      if (cacheDir != null && cacheDir.exists()) {
+                          File[] files = cacheDir.listFiles();
+                          if (files != null) {
+                              for (File f : files) {
+                                  if (f.getName().endsWith(".tmp") || f.getName().startsWith("temp_")) {
+                                      f.delete();
+                                  }
+                              }
+                          }
+                      }
+                      Log.i(TAG, "Periodic MIKI-AI maintenance work completed successfully.");
+                      return Result.success();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error executing maintenance work: " + e.getMessage());
+                      return Result.retry();
+                  }
+              }
+          }
+          EOF
+
+          # Create MikiWorkManagerPlugin.java (Capacitor plugin exposing native Android WorkManager)
+          cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MikiWorkManagerPlugin.java
+          package com.mikiai.app;
+
+          import android.util.Log;
+          import androidx.work.ExistingPeriodicWorkPolicy;
+          import androidx.work.PeriodicWorkRequest;
+          import androidx.work.WorkManager;
+          import com.getcapacitor.JSObject;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+          import java.util.concurrent.TimeUnit;
+
+          @CapacitorPlugin(name = "MikiWorkManagerPlugin")
+          public class MikiWorkManagerPlugin extends Plugin {
+              private static final String TAG = "MikiWorkManagerPlugin";
+              private static final String PERIODIC_WORK_NAME = "MikiPeriodicMaintenance";
+
+              @PluginMethod
+              public void schedulePeriodicWork(PluginCall call) {
+                  int intervalMinutes = call.getInt("intervalMinutes", 60);
+                  if (intervalMinutes < 15) intervalMinutes = 15; // Android WorkManager minimum is 15 minutes
+
+                  try {
+                      PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
+                              MikiMaintenanceWorker.class,
+                              intervalMinutes,
+                              TimeUnit.MINUTES
+                      ).build();
+
+                      WorkManager.getInstance(getContext()).enqueueUniquePeriodicWork(
+                              PERIODIC_WORK_NAME,
+                              ExistingPeriodicWorkPolicy.KEEP,
+                              workRequest
+                      );
+
+                      Log.i(TAG, "Scheduled native WorkManager periodic maintenance every " + intervalMinutes + " minutes");
+                      JSObject ret = new JSObject();
+                      ret.put("scheduled", true);
+                      ret.put("intervalMinutes", intervalMinutes);
+                      call.resolve(ret);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Failed to schedule WorkManager: " + e.getMessage());
+                      call.reject("Failed to schedule WorkManager: " + e.getMessage());
+                  }
+              }
+
+              @PluginMethod
+              public void cancelPeriodicWork(PluginCall call) {
+                  try {
+                      WorkManager.getInstance(getContext()).cancelUniqueWork(PERIODIC_WORK_NAME);
+                      Log.i(TAG, "Cancelled native WorkManager periodic maintenance");
+                      JSObject ret = new JSObject();
+                      ret.put("cancelled", true);
+                      call.resolve(ret);
+                  } catch (Exception e) {
+                      call.reject("Failed to cancel WorkManager: " + e.getMessage());
+                  }
+              }
+          }
+          EOF
+
           # MainActivity.java binding
           cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MainActivity.java
           package com.mikiai.app;
@@ -1054,6 +1249,7 @@ jobs:
               public void onCreate(Bundle savedInstanceState) {
                   registerPlugin(MlcLlmPlugin.class);
                   registerPlugin(MikiBackgroundServicePlugin.class);
+                  registerPlugin(MikiWorkManagerPlugin.class);
                   super.onCreate(savedInstanceState);
               }
           }

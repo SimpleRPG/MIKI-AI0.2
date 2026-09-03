@@ -27,10 +27,17 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Extract Environment Specs from Model Manifest (Chapter 78)
+        id: manifest
+        run: |
+          NDK_VER=$(node -e "const m = require('./model_manifest.json'); console.log(m.nativeEnvironment?.ndkVersion || '26.1.10909125');")
+          echo "ndk_version=${NDK_VER}" >> $GITHUB_OUTPUT
+          echo "Manifest NDK version: ${NDK_VER}"
+
       - name: Install Android SDK Build-Tools, NDK & CMake
         run: |
           yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmake;3.22.1" "ndk;${{ steps.manifest.outputs.ndk_version }}"
           yes | sdkmanager --licenses || true
 
       - name: Install Vulkan Build Tools (glslc shader compiler for GGML_VULKAN)

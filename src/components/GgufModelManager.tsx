@@ -13,8 +13,9 @@ import {
   RotateCcw,
   Sparkles,
   Smartphone,
+  ShieldCheck,
 } from 'lucide-react';
-import { OFFICIAL_GGUF_MODELS, GgufModelDefinition } from '../services/ggufModels';
+import { OFFICIAL_GGUF_MODELS, GgufModelDefinition, getModelManifest, getManifestNativeEnv } from '../services/ggufModels';
 import { nativeLlmService, NativeStorageInfo, NativeGpuInfo } from '../services/nativeLlmService';
 import { systemLogger } from '../services/systemLogger';
 
@@ -239,6 +240,27 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
             <span className="font-mono text-purple-300 font-bold">
               {freeDiskDisplay}
             </span>
+          </div>
+        </div>
+
+        {/* Chapter 78: Model Manifest Spec Banner */}
+        <div className="pt-2 border-t border-slate-800/80">
+          <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-[11px] space-y-1.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-bold text-slate-300">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>モデルマニフェスト (78章: ビルド仕様・単一情報源)</span>
+              </div>
+              <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
+                v{getModelManifest().manifestVersion} (CI/CDビルド連動)
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-slate-400 font-mono text-[10px]">
+              <div>llama.cpp: <span className="text-slate-200">{getManifestNativeEnv().pinnedCommit} ({getManifestNativeEnv().pinnedCommitHash.slice(0, 7)})</span></div>
+              <div>Target NDK: <span className="text-slate-200">{getManifestNativeEnv().ndkVersion}</span></div>
+              <div>Vulkan-Headers: <span className="text-slate-200">{getManifestNativeEnv().vulkanHeaders.pinnedTag}</span></div>
+              <div>SPIRV-Headers: <span className="text-slate-200">{getManifestNativeEnv().spirvHeaders.pinnedTag}</span></div>
+            </div>
           </div>
         </div>
       </div>

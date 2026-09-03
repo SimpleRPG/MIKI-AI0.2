@@ -35,6 +35,7 @@ export type MemoryDestination =
   | 'project_memory'      // 3. プロジェクト記憶: 特定案件・リポジトリ・VBA仕様限定の記憶
   | 'skill'               // 4. スキル: 手順化・再利用可能な実行可能手順 (skillsService)
   | 'search_policy'       // 5. 検索ポリシー: どの情報をどう検索・取得すべきかの方針
+  | 'retrieval_policy'    // 5. (検索ポリシー別名)
   | 'evaluation_set'      // 6. 評価セット: 能力検証・回帰ベンチマークテストケース候補
   | 'lora_dataset'        // 7. LoRA教材: モデル追加学習用の高品質instruction/outputペア
   | 'quarantine'          // 8. 隔離: 出典・正解・利用条件が不明な情報 (プロンプト注入完全除外)

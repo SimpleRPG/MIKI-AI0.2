@@ -1007,6 +1007,32 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                               )}
 
                               <button
+                                onClick={() => {
+                                  const quarantined = experienceRouterService.applyRoutingToMemory(
+                                    {
+                                      ...mem,
+                                      destination: 'quarantine',
+                                      quarantineReason: 'ユーザーによる手動隔離',
+                                      approved: false,
+                                      active: false,
+                                    },
+                                    memories
+                                  );
+                                  storageService.saveMemoryItem(quarantined);
+                                  const updated = storageService.getMemories();
+                                  if (typeof onUpdateMemories === 'function') {
+                                    (onUpdateMemories as any)(updated);
+                                  }
+                                  setExportedStatus('🛡️ 記憶を隔離しました（プロンプト注入から完全除外）');
+                                  setTimeout(() => setExportedStatus(null), 3000);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/30 rounded-lg transition-colors shrink-0"
+                                title="隔離へ送る（出典不明・要確認としてプロンプト注入から即座に除外）"
+                              >
+                                <ShieldAlert className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
                                 onClick={() => handleMarkDiscard(mem.id)}
                                 className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/30 rounded-lg transition-colors shrink-0"
                                 title="破棄候補へマーク（破棄候補タブの一括確認リストへ送る）"
