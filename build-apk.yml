@@ -37,7 +37,26 @@ jobs:
       - name: Install Android SDK Build-Tools, NDK & CMake
         run: |
           yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmake;3.22.1" "ndk;${{ steps.manifest.outputs.ndk_version }}"
+
+          # sdkmanager occasionally receives a truncated/corrupt zip from Google's
+          # SDK repository (network blip), which fails with "Error on ZipFile
+          # unknown archive." Retry with a clean slate a few times before giving up.
+          MAX_ATTEMPTS=4
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "sdkmanager install attempt ${attempt}/${MAX_ATTEMPTS}..."
+            if sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmake;3.22.1" "ndk;${{ steps.manifest.outputs.ndk_version }}"; then
+              echo "sdkmanager install succeeded."
+              break
+            fi
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "sdkmanager install failed after ${MAX_ATTEMPTS} attempts."
+              exit 1
+            fi
+            echo "sdkmanager install failed (likely a corrupt/truncated download) - clearing partial NDK package and retrying in $((attempt * 5))s..."
+            rm -rf "${ANDROID_SDK_ROOT}/ndk/${{ steps.manifest.outputs.ndk_version }}"
+            sleep $((attempt * 5))
+          done
+
           yes | sdkmanager --licenses || true
 
       - name: Install Vulkan Build Tools (glslc shader compiler for GGML_VULKAN)
@@ -323,7 +342,7 @@ jobs:
               llama_sampler_chain_add(g_smpl, llama_sampler_init_top_p(effTopP, 1));
               llama_sampler_chain_add(g_smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
-              llama_kv_cache_clear(g_ctx);
+              llama_memory_clear(llama_get_memory(g_ctx), true);
 
               llama_batch batch = llama_batch_get_one(prompt_tokens.data(), (int32_t)prompt_tokens.size());
               if (llama_decode(g_ctx, batch) != 0) {
