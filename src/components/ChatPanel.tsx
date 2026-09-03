@@ -38,13 +38,15 @@ import {
   FlaskConical,
   Layers,
 } from 'lucide-react';
-import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode } from '../types';
+import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode, CompletionEvaluation } from '../types';
 import { extractCodeBlocks } from '../utils/codeParser';
 import { SPEAKER_PROFILES } from '../data/speakers';
 import { systemLogger } from '../services/systemLogger';
 import { selfImprovementService } from '../services/selfImprovementService';
 import { skillsService } from '../services/skillsService';
 import { TaskPlanCard } from './TaskPlanCard';
+import { CompletionBadge } from './CompletionBadge';
+import { completionJudgeService } from '../services/completionJudgeService';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -74,6 +76,7 @@ interface ChatPanelProps {
   isMultiStepEnabled?: boolean;
   onToggleMultiStep?: () => void;
   onResumeTaskPlan?: (planId: string) => void;
+  onUpdateMessageEvaluation?: (messageId: string, evaluation: CompletionEvaluation) => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -103,6 +106,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   isMultiStepEnabled = false,
   onToggleMultiStep,
   onResumeTaskPlan,
+  onUpdateMessageEvaluation,
 }) => {
   const [inputText, setInputText] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string; type: string; size: number }[]>([]);
@@ -755,6 +759,29 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       )}
                     </div>
                   </div>
+                )}
+
+                {/* 48章 完成条件と完了判定器 (Completion Judge) バッジ & チェックリスト */}
+                {!isUser && msg.completionEvaluation && (
+                  <CompletionBadge
+                    evaluation={msg.completionEvaluation}
+                    onMarkCompleted={
+                      onUpdateMessageEvaluation
+                        ? () => {
+                            const updated = completionJudgeService.markAsCompleted(msg.completionEvaluation!);
+                            onUpdateMessageEvaluation(msg.id, updated);
+                          }
+                        : undefined
+                    }
+                    onMarkFailed={
+                      onUpdateMessageEvaluation
+                        ? (reason: string) => {
+                            const updated = completionJudgeService.markAsFailed(msg.completionEvaluation!, reason);
+                            onUpdateMessageEvaluation(msg.id, updated);
+                          }
+                        : undefined
+                    }
+                  />
                 )}
 
                 {/* Bubble */}

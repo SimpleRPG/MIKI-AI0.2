@@ -231,6 +231,8 @@ export interface ChatMessage {
     suggestedFixArea: 'memory' | 'retrieval' | 'prompt' | 'skill' | 'tool' | 'model' | 'no_change';
     verified: boolean;
   };
+  // 文書48章「完成条件と完了判定器」
+  completionEvaluation?: CompletionEvaluation;
 }
 
 export interface ConsoleLogItem {
@@ -806,6 +808,76 @@ export interface TaskPlan {
   createdAt: number;
   updatedAt: number;
 }
+
+// ==========================================
+// 文書48章「完成条件と完了判定器」関連型定義
+// ==========================================
+
+export type CompletionStatus =
+  | 'COMPLETE'                    // 依頼が完遂され、要求事項を満たし追加アクション不要
+  | 'PARTIAL'                     // 部分的達成、未解決事項や次回への繰り越しあり
+  | 'BLOCKED'                     // 外部リソース・権限・必須情報不足等で中断
+  | 'FAILED'                      // 意図した実行や生成が失敗
+  | 'CANCELLED'                   // ユーザーにより中断、または取り消し
+  | 'EXTERNAL_COMPILE_REQUIRED'   // VBA等の外部環境（Excel / VBE等）での構文チェック・コンパイル確認が必要
+  | 'RUNTIME_TEST_REQUIRED';      // 構文は通ったが、実際のデータや実機（実シート・API等）での動作テストが必要
+
+export interface CompletionChecklist {
+  // 1. 依頼の目的を満たしたか
+  goalSatisfaction: {
+    passed: boolean;
+    note: string;
+  };
+  // 2. 成果物の存在
+  artifactPresence: {
+    passed: boolean;
+    type?: 'code' | 'vba' | 'json' | 'plan' | 'text' | 'file';
+    summary?: string;
+  };
+  // 3. 必須項目の充足
+  requiredItems: {
+    passed: boolean;
+    fulfilled: string[];
+    missing: string[];
+  };
+  // 4. 検証結果の有無
+  verification: {
+    status: 'verified' | 'static_only' | 'unverified' | 'failed';
+    note: string;
+  };
+  // 5. 未解決事項の有無と明示
+  unresolvedIssues: {
+    hasIssues: boolean;
+    issues: string[];
+    explicitlyNoted: boolean;
+  };
+  // 6. 保存先とハッシュの記録
+  storageTracking: {
+    savedLocation?: string;
+    contentHash?: string;
+    filename?: string;
+  };
+  // 7. 次操作の要否
+  nextAction: {
+    required: boolean;
+    actionType: 'compile_in_excel' | 'run_test' | 'provide_info' | 'user_review' | 'none';
+    note: string;
+  };
+}
+
+export interface CompletionEvaluation {
+  status: CompletionStatus;
+  score: number; // 0 - 100
+  headline: string; // 簡潔な要約（例: "Excel構文確認待ち"）
+  reason: string; // 判定詳細理由
+  checklist: CompletionChecklist;
+  isCodeOrVba: boolean;
+  detectedCodeTypes: string[]; // 'vba', 'typescript', 'python' など
+  requiresExternalVerification: boolean;
+  evaluatedAt: number;
+  manuallyOverridden?: boolean;
+}
+
 
 
 

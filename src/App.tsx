@@ -20,6 +20,7 @@ import {
   ToolExecutionRequest,
   ToolExecutionResult,
   TaskPlan,
+  CompletionEvaluation,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
@@ -29,6 +30,7 @@ import { nativeLlmService } from './services/nativeLlmService';
 import { systemLogger } from './services/systemLogger';
 import { worldModelService } from './services/worldModelService';
 import { storageService } from './services/storageService';
+import { completionJudgeService } from './services/completionJudgeService';
 import { nativeBackgroundService } from './services/nativeBackgroundService';
 import { backgroundWorkerService } from './services/backgroundWorkerService';
 import { extractCodeBlocks } from './utils/codeParser';
@@ -402,6 +404,25 @@ export default function App() {
               ...msg,
               content,
               isStreaming: false,
+              completionEvaluation: {
+                status: 'CANCELLED',
+                score: 30,
+                headline: 'ユーザー操作による中断',
+                reason: 'ユーザーによって応答生成が手動中断されました。',
+                checklist: {
+                  goalSatisfaction: { passed: false, note: '生成途中で中断' },
+                  artifactPresence: { passed: false, summary: '未完成' },
+                  requiredItems: { passed: false, fulfilled: [], missing: ['生成中断'] },
+                  verification: { status: 'unverified', note: '検証前に中断' },
+                  unresolvedIssues: { hasIssues: true, issues: ['生成中断'], explicitlyNoted: true },
+                  storageTracking: {},
+                  nextAction: { required: true, actionType: 'provide_info', note: '必要に応じて再送信してください。' },
+                },
+                isCodeOrVba: false,
+                detectedCodeTypes: [],
+                requiresExternalVerification: false,
+                evaluatedAt: Date.now(),
+              },
             };
           }
           return msg;
@@ -412,6 +433,14 @@ export default function App() {
 
     setIsGenerating(false);
     setIsLoading(false);
+  };
+
+  // 文書48章: 完了状態の手動更新ハンドラー (例: Excelで動作確認完了ボタン押下時)
+  const handleUpdateMessageEvaluation = (messageId: string, evaluation: CompletionEvaluation) => {
+    setMessages((prev) =>
+      prev.map((msg) => (msg.id === messageId ? { ...msg, completionEvaluation: evaluation } : msg))
+    );
+    systemLogger.info('CHAT', `[完了判定更新] メッセージ [${messageId}] の完了判定を手動更新: ${evaluation.status} (${evaluation.headline})`);
   };
 
   /**
@@ -606,12 +635,21 @@ export default function App() {
     const synthesisOutput = stepOutputs[stepOutputs.length - 1]?.output || '';
     const combinedSummary = `${planJudgement.summary}\n\n${synthesisOutput}`;
 
+    // 文書48章: 完成条件と完了判定器による評価
+    const planEvaluation = completionJudgeService.evaluateCompletion({
+      userGoal: initialGoal,
+      assistantResponse: combinedSummary,
+      executionSteps: systemLogger.getCurrentSessionSteps(),
+      taskPlan: plan,
+    });
+
     systemLogger.step(10, 10, '🧭 多段推論タスク計画完了', {
       planId: plan.id,
       totalSteps: plan.totalSteps,
       completedSteps: plan.completedSteps,
       totalDurationMs: totalPlanDuration,
       confirmedClaims: plan.claimLedger.confirmed.length,
+      completionStatus: planEvaluation.status,
     });
 
     setMessages((prev) =>
@@ -622,6 +660,7 @@ export default function App() {
               content: combinedSummary,
               taskPlan: plan,
               isStreaming: false,
+              completionEvaluation: planEvaluation,
               executionSteps: systemLogger.getCurrentSessionSteps(),
               metrics: {
                 engine: `多段推論タスク計画 (${plan.completedSteps}/${plan.totalSteps}ステップ)`,
@@ -886,6 +925,14 @@ export default function App() {
           }
         }
 
+        // 文書48章: 完成条件と完了判定器による評価
+        const cpuEvaluation = completionJudgeService.evaluateCompletion({
+          userGoal: text,
+          assistantResponse: reply,
+          executionSteps: systemLogger.getCurrentSessionSteps(),
+          executedTools: cpuExecutedTools,
+        });
+
         const cpuMsg: ChatMessage = {
           id: assistantId,
           role: 'assistant',
@@ -894,6 +941,7 @@ export default function App() {
           speaker: activeSpeaker,
           engineMode: 'autonomous_rule',
           isStreaming: false,
+          completionEvaluation: cpuEvaluation,
           executionSteps: systemLogger.getCurrentSessionSteps(),
           suggestedTools: cpuCandidateTools,
           executedTools: cpuExecutedTools,
@@ -1510,6 +1558,22 @@ export default function App() {
         ttftMs: Math.round((firstTokenTime || tEnd) - tStart),
       });
 
+      // 文書48章: 完成条件と完了判定器による評価 (Checklist evaluation)
+      const streamEvaluation = completionJudgeService.evaluateCompletion({
+        userGoal: text,
+        assistantResponse: accumulated,
+        executionSteps: systemLogger.getCurrentSessionSteps(),
+        executedTools: promptBuildResult.executedTools,
+        files: workspaceFiles,
+      });
+
+      systemLogger.info('CHAT', `[完了判定器] 応答完了判定: [${streamEvaluation.status}] スコア:${streamEvaluation.score}% - ${streamEvaluation.headline}`, {
+        status: streamEvaluation.status,
+        score: streamEvaluation.score,
+        isCodeOrVba: streamEvaluation.isCodeOrVba,
+        requiresExternalVerification: streamEvaluation.requiresExternalVerification,
+      });
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantId
@@ -1518,6 +1582,7 @@ export default function App() {
                 content: accumulated,
                 speaker: activeSpeaker,
                 isStreaming: false,
+                completionEvaluation: streamEvaluation,
                 fallbackDiagnostic: diagnosticData,
                 executionSteps: systemLogger.getCurrentSessionSteps(),
                 metrics: {
@@ -1571,12 +1636,20 @@ export default function App() {
       }
 
       const errorText = err?.message || String(err);
+      const errorEvaluation = completionJudgeService.evaluateCompletion({
+        userGoal: text,
+        assistantResponse: errorText,
+        isError: true,
+        executionSteps: systemLogger.getCurrentSessionSteps(),
+      });
+
       const errorMsg: ChatMessage = {
         id: 'msg_err_' + Date.now(),
         role: 'assistant',
         content: `❌ **エラー**: ${errorText}\n\n**詳細**: ${err?.stack ? `\`\`\`\n${err.stack.slice(0, 300)}\n\`\`\`` : 'なし'}`,
         timestamp: Date.now(),
         isError: true,
+        completionEvaluation: errorEvaluation,
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
@@ -1629,11 +1702,19 @@ export default function App() {
         responseText = `エラーを解析して修正したよ！\n- **原因**: 実行時参照エラーまたはCanvas要素のバインド不備\n- **対策**: 安全なオプショナルチェーンとCanvas初期化ガードを追加したよ！\n\n\`\`\`html\n${patchedCode}\n\`\`\`\n\nこれで動くはず！確認してみてね！`;
       }
 
+      const debugEvaluation = completionJudgeService.evaluateCompletion({
+        userGoal: 'サンドボックス実行エラーの自動修復',
+        assistantResponse: responseText,
+        executionSteps: systemLogger.getCurrentSessionSteps(),
+        files: workspaceFiles,
+      });
+
       const assistantMsg: ChatMessage = {
         id: 'msg_dbg_res_' + Date.now(),
         role: 'assistant',
         content: responseText,
         timestamp: Date.now(),
+        completionEvaluation: debugEvaluation,
         metrics: {
           engine: 'MikiAI Autonomous Self-Healing Debugger',
         },
@@ -1875,6 +1956,7 @@ export default function App() {
                 storageService.setItem('miki_multistep_explicit_mode', String(next));
               }}
               onResumeTaskPlan={handleResumeTaskPlan}
+              onUpdateMessageEvaluation={handleUpdateMessageEvaluation}
             />
           </div>
 
@@ -1958,6 +2040,7 @@ export default function App() {
                   storageService.setItem('miki_multistep_explicit_mode', String(next));
                 }}
                 onResumeTaskPlan={handleResumeTaskPlan}
+                onUpdateMessageEvaluation={handleUpdateMessageEvaluation}
               />
             )}
 
