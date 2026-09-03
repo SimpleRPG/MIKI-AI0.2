@@ -202,19 +202,35 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       });
     }
 
+    // 該当アシスタント応答の直前にあるユーザーメッセージを特定
+    const msgIndex = messages.findIndex((m) => m.id === msg.id);
+    let userPrompt = '直前の会話指示';
+    if (msgIndex > 0) {
+      for (let i = msgIndex - 1; i >= 0; i--) {
+        if (messages[i].role === 'user') {
+          userPrompt = messages[i].content;
+          break;
+        }
+      }
+    }
+
     // 学習データ / 自己改善データへ追加
     if (type === 'good') {
-      selfImprovementService.addTrainingSample({
-        instruction: '直前の会話指示',
+      const added = selfImprovementService.addTrainingSample({
+        instruction: userPrompt,
         outputTarget: msg.content,
         category: msg.content.includes('```') ? 'code' : 'chat',
         reliability: 'high',
         approved: true,
       });
-      systemLogger.info('SELF_IMPROVEMENT', 'ユーザーから高評価(👍)を受信。Colab/LoRA用高品質教材に自動登録しました。');
+      if (added) {
+        systemLogger.info('SELF_IMPROVEMENT', 'ユーザーから高評価(👍)を受信。安全検査通過済みColab/LoRA用高品質教材に自動登録しました。');
+      } else {
+        systemLogger.warn('SELF_IMPROVEMENT', 'ユーザー高評価(👍)を受信しましたが、コンテンツ安全境界フィルタにより教材登録から除外・ログ記録されました。');
+      }
     } else {
       selfImprovementService.diagnoseFailure(
-        '直前の会話指示',
+        userPrompt,
         msg.content,
         reason || 'ユーザー低評価フィードバック',
         {

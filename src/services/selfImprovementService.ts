@@ -7,6 +7,7 @@ import {
   ChatMessage,
   SkillItem,
   RegressionSuiteRunReport,
+  RejectedTrainingSampleLog,
 } from '../types';
 import { nativeLlmService } from './nativeLlmService';
 import { webLLMService } from './webLlmService';
@@ -14,6 +15,7 @@ import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { regressionBenchmarkService } from './regressionBenchmarkService';
 import { nativeBackgroundService } from './nativeBackgroundService';
+import { checkSampleSafety, generateSafeExcerptHash } from '../utils/trainingSampleSafetyFilter';
 
 const RECORDS_STORAGE_KEY = 'miki_ai_self_improvement_records';
 const TRAINING_DATA_STORAGE_KEY = 'miki_ai_training_samples';
@@ -21,6 +23,7 @@ const MODEL_GENERATIONS_KEY = 'miki_ai_model_generations';
 const TRAINING_THRESHOLD_KEY = 'miki_ai_training_threshold';
 const LAST_NOTIFIED_THRESHOLD_KEY = 'miki_ai_training_notified_count';
 const FAILURE_RECURRENCES_KEY = 'miki_ai_failure_recurrences';
+const REJECTED_SAMPLES_LOG_KEY = 'miki_ai_rejected_samples_log';
 
 export interface FailureRecurrenceEntry {
   patternKey: string;
@@ -58,6 +61,7 @@ class SelfImprovementService {
   private trainingSamples: TrainingSampleJSONL[] = [];
   private generations: ModelGeneration[] = [];
   private failureRecurrences: Map<string, FailureRecurrenceEntry> = new Map();
+  private rejectedSamplesLog: RejectedTrainingSampleLog[] = [];
 
   constructor() {
     this.loadAll();
@@ -92,6 +96,11 @@ class SelfImprovementService {
           const arr: FailureRecurrenceEntry[] = JSON.parse(rawRecurrences);
           this.failureRecurrences = new Map(arr.map((e) => [e.patternKey, e]));
         }
+
+        const rawRejected = storageService.getItem(REJECTED_SAMPLES_LOG_KEY);
+        if (rawRejected) {
+          this.rejectedSamplesLog = JSON.parse(rawRejected);
+        }
       } catch (e) {
         console.warn('Failed to load self-improvement data:', e);
       }
@@ -112,6 +121,31 @@ class SelfImprovementService {
         storageService.setItem(TRAINING_DATA_STORAGE_KEY, JSON.stringify(this.trainingSamples));
       } catch (e) {}
     }
+  }
+
+  public saveRejectedSamplesLog(): void {
+    if (typeof storageService !== 'undefined') {
+      try {
+        storageService.setItem(REJECTED_SAMPLES_LOG_KEY, JSON.stringify(this.rejectedSamplesLog));
+      } catch (e) {}
+    }
+  }
+
+  public getRejectedSamplesLog(): RejectedTrainingSampleLog[] {
+    return this.rejectedSamplesLog;
+  }
+
+  public getRejectedSamplesCount(): number {
+    return this.rejectedSamplesLog.length;
+  }
+
+  public getRedactedSamplesCount(): number {
+    return this.trainingSamples.filter((s) => s.redacted).length;
+  }
+
+  public clearRejectedSamplesLog(): void {
+    this.rejectedSamplesLog = [];
+    this.saveRejectedSamplesLog();
   }
 
   public saveGenerations(): void {
@@ -310,7 +344,7 @@ class SelfImprovementService {
 
   /**
    * ユーザーからの👎フィードバックや会話の成功を学習用JSONLに追加
-   * 設計思想 7. 学習データの改善 (train / validation / test 分離)
+   * 設計思想 7. 学習データの改善 (train / validation / test 分離) & 25. 安全・品質境界
    */
   public addTrainingSample(sample: {
     instruction: string;
@@ -322,24 +356,63 @@ class SelfImprovementService {
     split?: 'train' | 'validation' | 'test';
     originalFailureOutput?: string;
     failureReason?: string;
-  }): TrainingSampleJSONL {
+  }): TrainingSampleJSONL | null {
+    // 1. コンテンツ安全境界チェック (設計思想 25. 安全・品質境界)
+    // 既存のcleanAndDeduplicateSamplesより前に必ず実行
+    const safety = checkSampleSafety(sample.instruction, sample.outputTarget);
+
+    if (!safety.safe) {
+      // safe: false の場合: 本文は保存せず理由とハッシュだけ記録
+      const excerptHash = generateSafeExcerptHash(sample.instruction + '|||' + sample.outputTarget);
+      const rejectedLog: RejectedTrainingSampleLog = {
+        id: 'rej_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        timestamp: Date.now(),
+        reasons: safety.reasons,
+        excerptHash,
+        category: sample.category || 'chat',
+      };
+      this.rejectedSamplesLog.unshift(rejectedLog);
+      this.saveRejectedSamplesLog();
+
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `🛡️ [安全境界ガード] 危険/不適切コンテンツを検知したため教材追加を除外しました (理由: ${safety.reasons.join(', ')}, ハッシュ: ${excerptHash})`
+      );
+      return null;
+    }
+
+    // 伏字化されたテキストがある場合は、伏字化後のテキストを保存
+    const finalInstruction = safety.redactedUserText ?? sample.instruction;
+    const finalOutputTarget = safety.redactedAssistantText ?? sample.outputTarget;
+    const isRedacted = Boolean(safety.redacted);
+
     const newSample: TrainingSampleJSONL = {
       id: 'train_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      instruction: sample.instruction,
+      instruction: finalInstruction,
       inputContext: sample.inputContext,
-      outputTarget: sample.outputTarget,
+      outputTarget: finalOutputTarget,
       category: sample.category || 'chat',
       reliability: sample.reliability || 'high',
       approved: sample.approved ?? true,
       split: sample.split || 'train',
       originalFailureOutput: sample.originalFailureOutput,
       failureReason: sample.failureReason,
+      redacted: isRedacted,
+      redactedReasons: isRedacted ? safety.reasons : undefined,
       createdAt: Date.now(),
     };
 
     this.trainingSamples.unshift(newSample);
     this.saveTrainingSamples();
     this.checkTrainingThreshold();
+
+    if (isRedacted) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🔒 [個人情報伏字化完了] 電話番号/メール/住所等の個人情報を [REDACTED] に置換して保存しました (理由: ${safety.reasons.join(', ')})`
+      );
+    }
+
     return newSample;
   }
 
@@ -616,17 +689,47 @@ class SelfImprovementService {
     afterCount: number;
     removedDuplicates: number;
     prunedLowQuality: number;
+    prunedUnsafe: number;
+    sanitizedRedacted: number;
   } {
     const beforeCount = this.trainingSamples.length;
     const seenInstructions = new Map<string, TrainingSampleJSONL>();
     let removedDuplicates = 0;
     let prunedLowQuality = 0;
-
-    const cleaned: TrainingSampleJSONL[] = [];
+    let prunedUnsafe = 0;
+    let sanitizedRedacted = 0;
 
     for (const sample of this.trainingSamples) {
-      const normInst = (sample.instruction || '').trim().replace(/\s+/g, ' ');
-      const normOut = (sample.outputTarget || '').trim();
+      // 0. 安全境界ガード: 既存サンプル内の危険・有害コンテンツ検知
+      const safety = checkSampleSafety(sample.instruction, sample.outputTarget);
+      if (!safety.safe) {
+        const excerptHash = generateSafeExcerptHash(sample.instruction + '|||' + sample.outputTarget);
+        this.rejectedSamplesLog.unshift({
+          id: 'rej_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+          timestamp: Date.now(),
+          reasons: safety.reasons,
+          excerptHash,
+          category: sample.category || 'chat',
+        });
+        prunedUnsafe++;
+        continue;
+      }
+
+      let currentInst = sample.instruction;
+      let currentOut = sample.outputTarget;
+      let isRedacted = sample.redacted || false;
+      let redactedReasons = sample.redactedReasons;
+
+      if (safety.redacted) {
+        currentInst = safety.redactedUserText ?? currentInst;
+        currentOut = safety.redactedAssistantText ?? currentOut;
+        isRedacted = true;
+        redactedReasons = safety.reasons;
+        sanitizedRedacted++;
+      }
+
+      const normInst = (currentInst || '').trim().replace(/\s+/g, ' ');
+      const normOut = (currentOut || '').trim();
 
       // 品質フィルタ: 空または極小(5文字未満)、または同一入出力の自己矛盾サンプルを刈り込み
       if (!normInst || !normOut || normInst.length < 5 || normOut.length < 5) {
@@ -650,6 +753,8 @@ class SelfImprovementService {
             ...sample,
             instruction: normInst,
             outputTarget: normOut,
+            redacted: isRedacted,
+            redactedReasons,
           });
         }
         removedDuplicates++;
@@ -658,9 +763,15 @@ class SelfImprovementService {
           ...sample,
           instruction: normInst,
           outputTarget: normOut,
+          redacted: isRedacted,
+          redactedReasons,
         };
         seenInstructions.set(dedupeKey, normalizedSample);
       }
+    }
+
+    if (prunedUnsafe > 0) {
+      this.saveRejectedSamplesLog();
     }
 
     this.trainingSamples = Array.from(seenInstructions.values());
@@ -670,7 +781,7 @@ class SelfImprovementService {
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🧹 [データセットクリーンアップ] 実行前: ${beforeCount}件 ➔ 実行後: ${afterCount}件 (重複除外: ${removedDuplicates}件, 低品質刈取: ${prunedLowQuality}件)`
+      `🧹 [データセットクリーンアップ] 実行前: ${beforeCount}件 ➔ 実行後: ${afterCount}件 (重複除外: ${removedDuplicates}件, 低品質刈取: ${prunedLowQuality}件, 安全除外: ${prunedUnsafe}件, 伏字化置換: ${sanitizedRedacted}件)`
     );
 
     return {
@@ -678,6 +789,8 @@ class SelfImprovementService {
       afterCount,
       removedDuplicates,
       prunedLowQuality,
+      prunedUnsafe,
+      sanitizedRedacted,
     };
   }
 

@@ -322,7 +322,21 @@ export interface TrainingSampleJSONL {
   failureReason?: string;
   correctionHistory?: string[];
   verificationResult?: string;
+  redacted?: boolean; // 個人情報伏字化([REDACTED])フラグ (設計思想 25. 安全・品質境界)
+  redactedReasons?: string[];
   createdAt: number;
+}
+
+/**
+ * 安全境界ガードにより除外されたサンプルのログ (設計思想 25. 安全・品質境界)
+ * 本文は一切保存せず、誤検知分析用の判定理由・ハッシュ・タイムスタンプのみを記録
+ */
+export interface RejectedTrainingSampleLog {
+  id: string;
+  timestamp: number;
+  reasons: string[];
+  excerptHash: string;
+  category?: string;
 }
 
 export interface TrainingDataSplitStats {
