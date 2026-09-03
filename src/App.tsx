@@ -21,6 +21,8 @@ import {
   ToolExecutionResult,
   TaskPlan,
   CompletionEvaluation,
+  CodeProposal,
+  VbaSafetyAssessment,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
@@ -31,6 +33,7 @@ import { systemLogger } from './services/systemLogger';
 import { worldModelService } from './services/worldModelService';
 import { storageService } from './services/storageService';
 import { completionJudgeService } from './services/completionJudgeService';
+import { schemaValidationService } from './services/schemaValidationService';
 import { nativeBackgroundService } from './services/nativeBackgroundService';
 import { backgroundWorkerService } from './services/backgroundWorkerService';
 import { extractCodeBlocks } from './utils/codeParser';
@@ -374,6 +377,46 @@ export default function App() {
 
     setActiveTab('preview');
     setMobileTab('preview');
+  };
+
+  // Apply Code Proposal after user confirmation (設計思想 ②: コード自動適用の確認ゲート)
+  const handleApplyCodeProposal = (proposal: CodeProposal) => {
+    handleApplyCode(proposal.files as any);
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.codeProposal?.id === proposal.id
+          ? {
+              ...m,
+              codeProposal: {
+                ...m.codeProposal,
+                status: 'applied',
+                appliedAt: Date.now(),
+              },
+            }
+          : m
+      )
+    );
+    systemLogger.info('TOOLS', `✅ ユーザー承認によりコード変更提案(${proposal.id})を適用しました`, {
+      files: proposal.files.map((f) => f.name),
+    });
+  };
+
+  // Reject Code Proposal (設計思想 ②: コード自動適用の確認ゲート)
+  const handleRejectCodeProposal = (proposalId: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.codeProposal?.id === proposalId
+          ? {
+              ...m,
+              codeProposal: {
+                ...m.codeProposal,
+                status: 'rejected',
+              },
+            }
+          : m
+      )
+    );
+    systemLogger.info('TOOLS', `❌ ユーザーによりコード変更提案(${proposalId})が却下されました`);
   };
 
   // Handle Stop Generation
@@ -1574,6 +1617,33 @@ export default function App() {
         requiresExternalVerification: streamEvaluation.requiresExternalVerification,
       });
 
+      // コードブロック抽出 & 生成と適用の分離 (設計思想 ②: コード自動適用の確認ゲート & ⑩: VBA準備ゲート)
+      const codeBlocks = extractCodeBlocks(accumulated);
+      let codeProposal: CodeProposal | undefined = undefined;
+      let vbaAssessment: VbaSafetyAssessment | undefined = undefined;
+
+      if (codeBlocks.length > 0) {
+        codeProposal = {
+          id: `proposal_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          files: codeBlocks.map((cb) => ({
+            path: cb.path,
+            name: cb.name,
+            content: cb.content,
+            language: cb.language,
+          })),
+          status: 'pending',
+          source: 'assistant',
+          createdAt: Date.now(),
+        };
+
+        const vbaBlock = codeBlocks.find(
+          (cb) => cb.language === 'vba' || cb.name.endsWith('.bas') || cb.content.toLowerCase().includes('sub ') || cb.content.toLowerCase().includes('dim ')
+        );
+        if (vbaBlock) {
+          vbaAssessment = schemaValidationService.evaluateVbaSafety(vbaBlock.content);
+        }
+      }
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantId
@@ -1585,6 +1655,8 @@ export default function App() {
                 completionEvaluation: streamEvaluation,
                 fallbackDiagnostic: diagnosticData,
                 executionSteps: systemLogger.getCurrentSessionSteps(),
+                codeProposal,
+                vbaAssessment,
                 metrics: {
                   engine: executedEngineLabel,
                   tokens: tokenCount,
@@ -1615,12 +1687,6 @@ export default function App() {
 
       if (errorRecord.predictionError.errorMagnitude > 0.3) {
         systemLogger.warn('SELF_IMPROVEMENT', `世界モデル予測誤差検知 [${errorRecord.predictionError.errorCategory}] 乖離度:${errorRecord.predictionError.errorMagnitude} -> ${errorRecord.predictionError.diagnosisNote}`);
-      }
-
-      // Auto apply code
-      const codeBlocks = extractCodeBlocks(accumulated);
-      if (codeBlocks.length > 0) {
-        handleApplyCode(codeBlocks);
       }
     } catch (err: any) {
       if (err?.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
@@ -1957,6 +2023,8 @@ export default function App() {
               }}
               onResumeTaskPlan={handleResumeTaskPlan}
               onUpdateMessageEvaluation={handleUpdateMessageEvaluation}
+              onApplyCodeProposal={handleApplyCodeProposal}
+              onRejectCodeProposal={handleRejectCodeProposal}
             />
           </div>
 
@@ -2041,6 +2109,8 @@ export default function App() {
                 }}
                 onResumeTaskPlan={handleResumeTaskPlan}
                 onUpdateMessageEvaluation={handleUpdateMessageEvaluation}
+                onApplyCodeProposal={handleApplyCodeProposal}
+                onRejectCodeProposal={handleRejectCodeProposal}
               />
             )}
 

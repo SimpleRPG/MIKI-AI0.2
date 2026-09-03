@@ -64,6 +64,16 @@ export interface NativeLlamaPluginInterface {
     engineType: string;
   }>;
   getHardwareSpecs(): Promise<NativeGpuInfo>;
+  getMemoryInfo?(): Promise<{
+    totalMemMB: number;
+    availMemMB: number;
+    thresholdMB: number;
+    lowMemory: boolean;
+    storageAvailMB: number;
+    storageTotalMB: number;
+    cpuCores: number;
+    isMeasuredReal: boolean;
+  }>;
   getStorageInfo(): Promise<NativeStorageInfo>;
   downloadModel(options: {
     modelId: string;
@@ -273,24 +283,60 @@ export class NativeLlmService {
 
     try {
       if (this.isNative()) {
-        const res = await Promise.race([
-          NativeMlcPlugin.getHardwareSpecs().catch(() => null),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 800)),
+        const [specsRes, memRes] = await Promise.all([
+          Promise.race([
+            NativeMlcPlugin.getHardwareSpecs().catch(() => null),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 800)),
+          ]),
+          Promise.race([
+            NativeMlcPlugin.getMemoryInfo ? NativeMlcPlugin.getMemoryInfo().catch(() => null) : Promise.resolve(null),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 800)),
+          ]),
         ]);
-        if (res && typeof res.backend === 'string') {
+
+        if (memRes && memRes.isMeasuredReal) {
+          const res: NativeGpuInfo = {
+            available: true,
+            backend: (specsRes?.backend as any) || 'Vulkan',
+            gpuVendor: specsRes?.gpuVendor || 'Qualcomm / ARM / MediaTek',
+            gpuRenderer: specsRes?.gpuRenderer || 'Vulkan Adreno / Mali Hardware Native',
+            totalMemoryMB: memRes.totalMemMB,
+            availableMemoryMB: memRes.availMemMB,
+            allocatedMemoryMB: this.activeModelId ? 950 : 0,
+            isNative: true,
+          };
           this.cachedHardwareSpecs = res;
           return res;
         }
+
+        if (specsRes && typeof specsRes.backend === 'string') {
+          this.cachedHardwareSpecs = specsRes;
+          return specsRes;
+        }
       }
     } catch (e) {}
+
+    // Web / WebView 実測フォールバック: performance.memory または navigator.deviceMemory から動的計測
+    let measuredTotalMB = 4096;
+    let measuredAvailMB = 2048;
+    if (typeof performance !== 'undefined' && (performance as any).memory) {
+      const mem = (performance as any).memory;
+      const heapLimitMB = Math.round(mem.jsHeapSizeLimit / (1024 * 1024));
+      const usedHeapMB = Math.round(mem.usedJSHeapSize / (1024 * 1024));
+      measuredTotalMB = heapLimitMB;
+      measuredAvailMB = Math.max(128, heapLimitMB - usedHeapMB);
+    } else if (typeof navigator !== 'undefined' && (navigator as any).deviceMemory) {
+      measuredTotalMB = Math.round((navigator as any).deviceMemory * 1024);
+      measuredAvailMB = Math.round(measuredTotalMB * 0.5);
+    }
 
     const defaultSpecs: NativeGpuInfo = {
       available: this.isNative(),
       backend: this.isNative() ? 'Vulkan' : 'WebGPU',
       gpuVendor: this.isNative() ? 'Qualcomm / ARM' : 'Web Browser GPU',
       gpuRenderer: this.isNative() ? 'Adreno / Mali Hardware Native' : 'Browser WebGPU Canvas',
-      totalMemoryMB: 8192,
-      availableMemoryMB: 4096,
+      totalMemoryMB: measuredTotalMB,
+      availableMemoryMB: measuredAvailMB,
       allocatedMemoryMB: this.activeModelId ? 950 : 0,
       isNative: this.isNative(),
     };
@@ -557,10 +603,10 @@ export class NativeLlmService {
 
     const executionPromise = (NativeMlcPlugin as any).generateStream({
       messages,
-      temperature: options?.temperature ?? 0.7,
-      topP: options?.top_p ?? 0.9,
-      maxTokens: options?.max_tokens ?? 512,
-      repetitionPenalty: 1.15,
+      temperature: (options as any)?.nativeConfig?.temperature ?? options?.temperature ?? 0.7,
+      topP: (options as any)?.nativeConfig?.topP ?? options?.top_p ?? 0.9,
+      maxTokens: (options as any)?.nativeConfig?.maxTokens ?? options?.max_tokens ?? 512,
+      repetitionPenalty: (options as any)?.nativeConfig?.repetitionPenalty ?? 1.15,
       frequencyPenalty: 0.1,
       presencePenalty: 0.1,
       stopSequences: ['<|im_end|>', '<|endoftext|>', '<|end|>', 'User:', 'Assistant:'],

@@ -86,6 +86,56 @@ export interface WorkspaceFile {
 }
 
 /**
+ * コード自動適用の確認ゲート用型定義 (設計思想 2. 生成と適用の分離)
+ */
+export interface ProposedCodeFile {
+  path: string;
+  name: string;
+  content: string;
+  language: string;
+  originalContent?: string;
+  isNewFile?: boolean;
+}
+
+export interface CodeProposal {
+  id: string;
+  messageId?: string;
+  files: ProposedCodeFile[];
+  status: 'pending' | 'applied' | 'rejected';
+  createdAt: number;
+  appliedAt?: number;
+  source: 'chat' | 'task_plan' | 'assistant' | 'teacher';
+  summary?: string;
+}
+
+/**
+ * Native llama.cpp 実行パラメータ設定 (設計思想 3. 実設定反映)
+ */
+export interface NativeLlamaConfig {
+  nGpuLayers: number;       // 0〜99 (0=純CPU, 99=全層GPUオフロード)
+  nCtx: number;             // コンテキスト長 (512, 1024, 2048, 4096, 8192)
+  nThreads: number;         // CPUスレッド数 (1〜16)
+  temperature: number;      // サンプリング温度 (0.1〜1.5)
+  topP: number;             // Top-P核サンプリング (0.1〜1.0)
+  maxTokens: number;        // 最大生成トークン数 (64〜2048)
+  repetitionPenalty: number;// 繰り返しペナルティ (1.0〜1.5)
+}
+
+/**
+ * VBA準備・安全ゲート検証結果 (設計思想 10. VBA準備ゲート)
+ */
+export interface VbaSafetyAssessment {
+  status: 'safe' | 'warning' | 'restricted' | 'blocked';
+  hasFileSystemAccess: boolean;
+  hasShellExecution: boolean;
+  hasNetworkCall: boolean;
+  hasAutoExecEvent: boolean;
+  warnings: string[];
+  reviewed: boolean;
+  targetApplication: 'Excel' | 'Access' | 'Word' | 'Other';
+}
+
+/**
  * ツール管理 (:feature:tools) & タスク計画とツール利用 (設計思想 13-14章, 22章)
  */
 export type ToolPermissionLevel = 'read_only' | 'workspace_read' | 'workspace_write' | 'network' | 'system';
@@ -233,6 +283,9 @@ export interface ChatMessage {
   };
   // 文書48章「完成条件と完了判定器」
   completionEvaluation?: CompletionEvaluation;
+  // コード適用確認ゲート & VBA準備ゲート
+  codeProposal?: CodeProposal;
+  vbaAssessment?: VbaSafetyAssessment;
 }
 
 export interface ConsoleLogItem {

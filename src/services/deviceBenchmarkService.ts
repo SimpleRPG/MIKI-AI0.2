@@ -1,4 +1,5 @@
 import { webLLMService } from './webLlmService';
+import { nativeLlmService } from './nativeLlmService';
 
 export interface DeviceSpecReport {
   gpuName: string;
@@ -12,6 +13,7 @@ export interface DeviceSpecReport {
   storageAvailableGB: number;
   storageTotalGB: number;
   gflops: number;
+  isRealMeasured?: boolean;
   performanceTier: 'ultra' | 'high' | 'medium' | 'entry';
   tierLabel: string;
   recommendedModelId: string;
@@ -144,22 +146,55 @@ class DeviceBenchmarkService {
       } catch (e) {}
     }
 
-    // 2. RAM & CPU Diagnostics
-    const deviceRamGB = (navigator as any).deviceMemory || 4; // defaults to 4GB if not exposed by browser
-    const cpuCores = navigator.hardwareConcurrency || 4;
+    let isRealMeasured = false;
 
-    // 3. Storage Diagnostics
+    // 2. RAM & CPU Diagnostics (実測値の取得: 設計思想 ⑥)
+    let deviceRamGB = 4;
+    let cpuCores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 4 : 4;
     let storageAvailableGB = 10;
     let storageTotalGB = 20;
-    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
+
+    if (nativeLlmService.isNative()) {
       try {
-        const estimate = await navigator.storage.estimate();
-        const total = (estimate.quota || 0) / (1024 * 1024 * 1024);
-        const used = (estimate.usage || 0) / (1024 * 1024 * 1024);
-        storageTotalGB = Number(total.toFixed(1));
-        storageAvailableGB = Number(Math.max(0, total - used).toFixed(1));
+        const [hw, storage] = await Promise.all([
+          nativeLlmService.getHardwareSpecs(),
+          nativeLlmService.getStorageInfo(),
+        ]);
+        if (hw) {
+          gpuName = hw.gpuRenderer || gpuName;
+          vendor = hw.gpuVendor || vendor;
+          architecture = hw.backend;
+          deviceRamGB = Number((hw.totalMemoryMB / 1024).toFixed(1));
+          isRealMeasured = true;
+        }
+        if (storage) {
+          storageAvailableGB = Number((storage.freeDiskMB / 1024).toFixed(1));
+          storageTotalGB = Number((storage.totalDiskMB / 1024).toFixed(1));
+        }
       } catch (e) {
-        console.warn('Storage estimate error:', e);
+        console.warn('Native hardware spec query error:', e);
+      }
+    } else {
+      // Browser environment: Web API実測
+      if (typeof performance !== 'undefined' && (performance as any).memory) {
+        const mem = (performance as any).memory;
+        deviceRamGB = Number((mem.jsHeapSizeLimit / (1024 * 1024 * 1024)).toFixed(1));
+        isRealMeasured = true;
+      } else if (typeof navigator !== 'undefined' && (navigator as any).deviceMemory) {
+        deviceRamGB = (navigator as any).deviceMemory;
+        isRealMeasured = true;
+      }
+
+      if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
+        try {
+          const estimate = await navigator.storage.estimate();
+          const total = (estimate.quota || 0) / (1024 * 1024 * 1024);
+          const used = (estimate.usage || 0) / (1024 * 1024 * 1024);
+          storageTotalGB = Number(total.toFixed(1));
+          storageAvailableGB = Number(Math.max(0, total - used).toFixed(1));
+        } catch (e) {
+          console.warn('Storage estimate error:', e);
+        }
       }
     }
 
@@ -274,6 +309,7 @@ class DeviceBenchmarkService {
       storageAvailableGB,
       storageTotalGB,
       gflops,
+      isRealMeasured,
       performanceTier,
       tierLabel,
       recommendedModelId,

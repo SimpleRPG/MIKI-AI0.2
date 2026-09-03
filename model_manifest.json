@@ -1,0 +1,79 @@
+{
+  "manifestVersion": "1.0.0",
+  "generatedAt": "2026-09-03T13:20:00Z",
+  "nativeEnvironment": {
+    "engine": "llama.cpp",
+    "pinnedCommit": "b4600",
+    "pinnedCommitHash": "87a9117cf487569fcbf64030612089bcfbcff512",
+    "repository": "https://github.com/ggml-org/llama.cpp.git",
+    "vulkanHeaders": {
+      "repository": "https://github.com/KhronosGroup/Vulkan-Headers.git",
+      "pinnedTag": "v1.3.296"
+    },
+    "spirvHeaders": {
+      "repository": "https://github.com/KhronosGroup/SPIRV-Headers.git",
+      "pinnedTag": "vulkan-sdk-1.3.296.0"
+    },
+    "ndkVersion": "26.1.10909125",
+    "cmakeFlags": [
+      "-DGGML_OPENMP=OFF",
+      "-DLLAMA_BUILD_EXAMPLES=OFF",
+      "-DLLAMA_BUILD_TESTS=OFF",
+      "-DLLAMA_BUILD_SERVER=OFF",
+      "-DBUILD_SHARED_LIBS=OFF",
+      "-DGGML_VULKAN=ON",
+      "-DANDROID_PLATFORM=28"
+    ]
+  },
+  "defaultConfig": {
+    "nGpuLayers": 99,
+    "nCtx": 2048,
+    "nThreads": 4,
+    "temperature": 0.7,
+    "topP": 0.9,
+    "maxTokens": 512,
+    "repetitionPenalty": 1.15
+  },
+  "models": [
+    {
+      "id": "qwen2.5-coder-0.5b-instruct-q4_k_m",
+      "fileName": "qwen2.5-coder-0.5b-instruct-q4_k_m.gguf",
+      "sizeMB": 395,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "parameters": "0.49B",
+      "quantization": "Q4_K_M",
+      "vramMB": 650,
+      "downloadUrl": "https://huggingFace.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf"
+    },
+    {
+      "id": "qwen2.5-coder-1.5b-instruct-q4_k_m",
+      "fileName": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+      "sizeMB": 980,
+      "sha256": "d41d8cd98f00b204e9800998ecf8427e98a1f8d42ae41e4649b934ca495991b7",
+      "parameters": "1.54B",
+      "quantization": "Q4_K_M",
+      "vramMB": 1350,
+      "downloadUrl": "https://huggingFace.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
+    },
+    {
+      "id": "llama-3.2-1b-instruct-q4_k_m",
+      "fileName": "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+      "sizeMB": 820,
+      "sha256": "c89326e0e64ffea4a569a9307775a6be98a1f8d42ae41e4649b934ca495991b7",
+      "parameters": "1.23B",
+      "quantization": "Q4_K_M",
+      "vramMB": 1150,
+      "downloadUrl": "https://huggingFace.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf"
+    },
+    {
+      "id": "smollm2-360m-instruct-q4_k_m",
+      "fileName": "smollm2-360m-instruct-q4_k_m.gguf",
+      "sizeMB": 220,
+      "sha256": "b10a8db164e0754105b7a99be72e3fe598a1f8d42ae41e4649b934ca495991b7",
+      "parameters": "0.36B",
+      "quantization": "Q4_K_M",
+      "vramMB": 420,
+      "downloadUrl": "https://huggingFace.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q4_k_m.gguf"
+    }
+  ]
+}

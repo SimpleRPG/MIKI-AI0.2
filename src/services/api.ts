@@ -88,7 +88,31 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     };
   }
 
-  // 2. Otherwise (Gemini Cloud or server fallback), fetch from /api/chat with timeout protection
+  // 2. Strict External Transmission Boundary Guard (設計思想 1. 外部送信境界の修正)
+  // ローカル推論 (webgpu, native_gpu, external_gpu 等) 指定時、勝手に外部クラウド (/api/chat / Gemini) に流れることを厳格に遮断。
+  // クラウド送信はユーザーが明示的に engineMode === 'gemini_cloud' を選択した場合のみ許可される。
+  if (params.engineMode && params.engineMode !== 'gemini_cloud') {
+    systemLogger.warn('CHAT', `[外部送信境界ガード] engineMode=${params.engineMode} のため、外部クラウド(/api/chat)への送信を完全遮断しました。端末内CPU自律ルールベースで安全に生成します。`);
+    const isCode =
+      params.prompt.includes('作って') ||
+      params.prompt.includes('ゲーム') ||
+      params.prompt.includes('開発') ||
+      params.prompt.includes('コード');
+    const localReply = generateSmartCompanionReply(
+      params.prompt,
+      params.persona,
+      params.memories,
+      isCode,
+      params.attachedFiles
+    );
+    return {
+      text: localReply,
+      engineMode: params.engineMode,
+      model: '端末内CPU自律ルールベース (外部送信完全遮断)',
+    };
+  }
+
+  // 3. Explicit Gemini Cloud Request (/api/chat) with timeout protection
   systemLogger.info('CHAT', `Sending chat request (prompt length: ${params.prompt.length})`, {
     engineMode: params.engineMode,
     speakerMode: params.speakerMode,

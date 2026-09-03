@@ -29,6 +29,7 @@ import {
   Activity,
   CheckCircle2,
   AlertCircle,
+  ShieldAlert,
   ListTree,
   Clock,
   ThumbsUp,
@@ -77,6 +78,8 @@ interface ChatPanelProps {
   onToggleMultiStep?: () => void;
   onResumeTaskPlan?: (planId: string) => void;
   onUpdateMessageEvaluation?: (messageId: string, evaluation: CompletionEvaluation) => void;
+  onApplyCodeProposal?: (proposal: any) => void;
+  onRejectCodeProposal?: (proposalId: string) => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -107,6 +110,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onToggleMultiStep,
   onResumeTaskPlan,
   onUpdateMessageEvaluation,
+  onApplyCodeProposal,
+  onRejectCodeProposal,
 }) => {
   const [inputText, setInputText] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string; type: string; size: number }[]>([]);
@@ -843,6 +848,88 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           <span>拒否 / キャンセル</span>
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Code Proposal Confirmation Gate (設計思想 ②: 生成と適用の分離 & ⑩: VBA準備ゲート) */}
+                  {msg.codeProposal && (
+                    <div className="mt-3 p-3 bg-slate-900/95 border-2 border-indigo-500/80 rounded-xl space-y-2.5 text-xs shadow-lg animate-fadeIn">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-indigo-300 font-bold text-[12px]">
+                          <FileCode className="w-4 h-4 text-indigo-400 shrink-0" />
+                          <span>コード変更提案 (確認ゲート: 設計思想 ②)</span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          msg.codeProposal.status === 'applied'
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                            : msg.codeProposal.status === 'rejected'
+                            ? 'bg-red-950 text-red-300 border border-red-800'
+                            : 'bg-indigo-950 text-indigo-300 border border-indigo-700'
+                        }`}>
+                          {msg.codeProposal.status === 'applied' ? '✅ 適用済み' : msg.codeProposal.status === 'rejected' ? '❌ 却下済み' : '⏳ 承認待ち'}
+                        </span>
+                      </div>
+
+                      <p className="text-slate-300 text-[11px] leading-relaxed">
+                        AIがコードファイルを生成しました。勝手な自動上書きを防ぐため、内容を確認して適用を承認してください。
+                      </p>
+
+                      {/* File targets list */}
+                      <div className="space-y-1">
+                        {msg.codeProposal.files.map((file, fIdx) => (
+                          <div key={fIdx} className="flex items-center justify-between p-1.5 bg-black/50 rounded-lg border border-slate-800 text-[11px] font-mono text-indigo-200">
+                            <span className="truncate">{file.path || file.name}</span>
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-indigo-900/60 text-indigo-300">{file.language}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* VBA Safety Assessment Gate (設計思想 ⑩) */}
+                      {msg.vbaAssessment && (
+                        <div className={`p-2.5 rounded-lg border text-[11px] space-y-1.5 ${
+                          msg.vbaAssessment.status === 'safe'
+                            ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-200'
+                            : msg.vbaAssessment.status === 'warning'
+                            ? 'bg-amber-950/60 border-amber-700/80 text-amber-200'
+                            : 'bg-red-950/70 border-red-700/90 text-red-200'
+                        }`}>
+                          <div className="flex items-center justify-between font-bold">
+                            <span className="flex items-center gap-1">
+                              <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                              <span>VBA安全評価ゲート ({msg.vbaAssessment.targetApplication || 'Excel'} マクロ)</span>
+                            </span>
+                            <span className="uppercase text-[10px] px-1.5 py-0.5 rounded font-mono bg-black/40">
+                              {msg.vbaAssessment.status === 'safe' ? '安全 (Safe)' : msg.vbaAssessment.status === 'warning' ? '注意 (Warning)' : '高リスク (Restricted)'}
+                            </span>
+                          </div>
+                          {msg.vbaAssessment.warnings.length > 0 && (
+                            <ul className="list-disc pl-4 space-y-0.5 text-[10.5px] text-amber-300/90">
+                              {msg.vbaAssessment.warnings.map((w, wIdx) => (
+                                <li key={wIdx}>{w}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Action buttons if still pending */}
+                      {msg.codeProposal.status === 'pending' && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            onClick={() => onApplyCodeProposal?.(msg.codeProposal)}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition-all"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>ワークスペースに適用</span>
+                          </button>
+                          <button
+                            onClick={() => onRejectCodeProposal?.(msg.codeProposal!.id)}
+                            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-lg text-xs transition-all"
+                          >
+                            <span>提案を却下</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 

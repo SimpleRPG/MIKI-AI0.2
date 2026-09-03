@@ -12,6 +12,8 @@ import { storageService } from './storageService';
 import { selfImprovementService } from './selfImprovementService';
 import { systemLogger } from './systemLogger';
 import { checkSampleSafety } from '../utils/trainingSampleSafetyFilter';
+import { completionJudgeService } from './completionJudgeService';
+import { schemaValidationService } from './schemaValidationService';
 
 const BUDGET_LIMITS_KEY = 'miki_ai_teacher_budget_limits';
 const BUDGET_USAGE_KEY = 'miki_ai_teacher_budget_usage';
@@ -470,7 +472,62 @@ export class TeacherRequestService {
         };
       }
 
-      // 3. 安全・品質検証合格 ➔ 中信頼(medium) & source: 'external_teacher' で保存
+      // (c) 完了判定器による独立検証 (設計思想 ⑨: 外部教師の独立検証 - 鵜呑みにしない)
+      const completionEval = completionJudgeService.evaluateCompletion({
+        userGoal: mat.instruction,
+        assistantResponse: mat.outputTarget,
+      });
+
+      if (completionEval.status === 'FAILED' || completionEval.status === 'BLOCKED' || completionEval.score < 60) {
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `🛡️ [外部教師教材 独立検証不合格] 完了判定器による評価スコア不足 (${completionEval.score}点, status: ${completionEval.status}): ${completionEval.headline}`
+        );
+        this.recordTeacherUsage({
+          promptTokens: tokensUsed.promptTokens,
+          outputTokens: tokensUsed.outputTokens,
+          generatedSamplesCount: 1,
+          verifiedPassedCount: 0,
+          category: payload.failureCategory,
+          success: true,
+          notes: `完了判定器による独立検証不合格: スコア${completionEval.score}点 (${completionEval.headline})`,
+        });
+        return {
+          success: false,
+          verifiedPassed: false,
+          material: mat,
+          error: `外部AIの生成教材がローカル完了判定器の基準を満たしていません (スコア: ${completionEval.score}点 / 100点)。`,
+        };
+      }
+
+      // (d) VBA安全性 & 構造化スキーマ検査 (設計思想 ⑧, ⑩)
+      if (mat.outputTarget.toLowerCase().includes('sub ') || mat.outputTarget.toLowerCase().includes('dim ')) {
+        const vbaEval = schemaValidationService.evaluateVbaSafety(mat.outputTarget);
+        if (vbaEval.status === 'restricted') {
+          systemLogger.warn(
+            'SELF_IMPROVEMENT',
+            `🛡️ [外部教師教材 棄却] 教材内のVBAマクロが高リスク操作(Restricted)と判定されました: ${vbaEval.warnings.join(', ')}`
+          );
+          this.recordTeacherUsage({
+            promptTokens: tokensUsed.promptTokens,
+            outputTokens: tokensUsed.outputTokens,
+            generatedSamplesCount: 1,
+            verifiedPassedCount: 0,
+            category: payload.failureCategory,
+            success: true,
+            notes: `高リスクVBAコード検出のため棄却: ${vbaEval.warnings.join(', ')}`,
+          });
+          return {
+            success: false,
+            verifiedPassed: false,
+            material: mat,
+            error: `教材内に安全基準を超える高リスクなVBAコードが含まれています (${vbaEval.warnings.join(', ')})。`,
+          };
+        }
+      }
+
+      // 3. 独立検証合格 ➔ 中信頼(medium) & source: 'external_teacher' で保存
+      // 勝手な自動マージを防止するため approved: false (ユーザーによる確認・承認待ち) とする
       const savedSample = selfImprovementService.addTrainingSample({
         instruction: safety.redactedUserText ?? mat.instruction,
         inputContext: mat.inputContext,
@@ -478,7 +535,7 @@ export class TeacherRequestService {
         category: (mat.category as any) || (payload.failureCategory as any) || 'chat',
         reliability: 'medium', // 中信頼扱い
         source: 'external_teacher',
-        approved: true,
+        approved: false, // 勝手な自動マージ防止: ユーザー確認待ち
         split: 'train',
         failureReason: payload.failureReason,
       });
@@ -496,12 +553,12 @@ export class TeacherRequestService {
         verifiedPassedCount: 1,
         category: payload.failureCategory,
         success: true,
-        notes: '安全・品質検証に合格し、中信頼教材として追加完了',
+        notes: `独立検証合格 (スコア: ${completionEval.score}点)・ユーザー確認待ちとして安全登録完了`,
       });
 
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `✅ [外部教師教材 登録完了] 教材を external_teacher (中信頼) として追加しました (ID: ${savedSample?.id || 'unknown'})`
+        `✅ [外部教師教材 独立検証合格] 教材を external_teacher (中信頼/承認待ち) として追加しました (ID: ${savedSample?.id || 'unknown'}, スコア: ${completionEval.score}点)`
       );
 
       return {

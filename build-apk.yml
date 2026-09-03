@@ -83,14 +83,11 @@ jobs:
             echo "ndk.dir=$NDK_DIR" >> android/local.properties
           fi
 
-          # Clone latest llama.cpp for native C++ Android NDK build.
-          # NOTE: must NOT pin an old tag like b4000 here - that predates upstream
-          # PR #10448 ("vulkan-shaders-gen needs to be built for the host, not the
-          # cross-compile target"), which is required for GGML_VULKAN to cross-compile
-          # for Android at all. Using an old tag reintroduces the
-          # "vulkan-shaders-gen: not found" build failure.
+          # Clone llama.cpp pinned to stable verified commit b4600 for reproducible NDK build
+          # NOTE: b4600 includes PR #10448 (host vulkan-shaders-gen cross-compilation)
           mkdir -p android/app/src/main/cpp
-          git clone --depth 1 https://github.com/ggml-org/llama.cpp.git android/app/src/main/cpp/llama.cpp
+          git clone https://github.com/ggml-org/llama.cpp.git android/app/src/main/cpp/llama.cpp
+          cd android/app/src/main/cpp/llama.cpp && git checkout b4600 && cd ../../../../
 
           # Clone Vulkan-Headers (the Android NDK ships vulkan.h but not the vulkan.hpp
           # C++ bindings that ggml-vulkan requires) for the on-device GPU backend
@@ -188,7 +185,17 @@ jobs:
           Java_com_mikiai_app_MlcLlmPlugin_nativeInitModel(
               JNIEnv* env, jobject thiz, jstring jModelPath, jint nGpuLayers, jint nCtx, jint nThreads) {
 
+              if (!jModelPath) {
+                  LOGE("nativeInitModel: jModelPath is null");
+                  return JNI_FALSE;
+              }
+
               const char* modelPath = env->GetStringUTFChars(jModelPath, nullptr);
+              if (!modelPath) {
+                  LOGE("nativeInitModel: Failed to get modelPath string");
+                  return JNI_FALSE;
+              }
+
               LOGI("Loading GGUF model from %s (gpu_layers: %d, ctx: %d, threads: %d)", modelPath, nGpuLayers, nCtx, nThreads);
 
               if (g_ctx) {
@@ -211,12 +218,12 @@ jobs:
               model_params.n_gpu_layers = nGpuLayers;
 
               g_model = llama_model_load_from_file(modelPath, model_params);
-              env->ReleaseStringUTFChars(jModelPath, modelPath);
-
               if (!g_model) {
                   LOGE("Failed to load model from file: %s", modelPath);
+                  env->ReleaseStringUTFChars(jModelPath, modelPath);
                   return JNI_FALSE;
               }
+              env->ReleaseStringUTFChars(jModelPath, modelPath);
               g_vocab = llama_model_get_vocab(g_model);
 
               llama_context_params ctx_params = llama_context_default_params();
@@ -233,13 +240,7 @@ jobs:
                   return JNI_FALSE;
               }
 
-              llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
-              g_smpl = llama_sampler_chain_init(sparams);
-              llama_sampler_chain_add(g_smpl, llama_sampler_init_temp(0.7f));
-              llama_sampler_chain_add(g_smpl, llama_sampler_init_top_p(0.9f, 1));
-              llama_sampler_chain_add(g_smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
-
-              LOGI("GGUF model loaded successfully into native context!");
+              LOGI("GGUF model loaded successfully into native context (n_ctx: %d, threads: %d)!", ctx_params.n_ctx, ctx_params.n_threads);
               return JNI_TRUE;
           }
 
@@ -250,8 +251,15 @@ jobs:
               if (!g_ctx || !g_model) {
                   return env->NewStringUTF("Error: Native model is not loaded in memory");
               }
+              if (!jPrompt) {
+                  return env->NewStringUTF("Error: Prompt string is null");
+              }
 
               const char* prompt = env->GetStringUTFChars(jPrompt, nullptr);
+              if (!prompt) {
+                  return env->NewStringUTF("Error: Failed to obtain prompt UTF-8 characters");
+              }
+
               int n_prompt_neg = llama_tokenize(g_vocab, prompt, (int32_t)strlen(prompt), NULL, 0, true, true);
               int n_prompt = n_prompt_neg < 0 ? -n_prompt_neg : n_prompt_neg;
               if (n_prompt <= 0) n_prompt = 1;
@@ -264,6 +272,19 @@ jobs:
                   return env->NewStringUTF("Error: Tokenization failed");
               }
               prompt_tokens.resize(n_tokens);
+
+              // 構文サンプラーを実行時指定の temperature & topP で再構築
+              if (g_smpl) {
+                  llama_sampler_free(g_smpl);
+                  g_smpl = nullptr;
+              }
+              llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
+              g_smpl = llama_sampler_chain_init(sparams);
+              float effTemp = temp > 0.0f ? temp : 0.7f;
+              float effTopP = (topP > 0.0f && topP <= 1.0f) ? topP : 0.9f;
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_temp(effTemp));
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_top_p(effTopP, 1));
+              llama_sampler_chain_add(g_smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
               llama_memory_clear(llama_get_memory(g_ctx), true);
 
@@ -411,6 +432,7 @@ jobs:
 
               implementation 'com.squareup.okhttp3:okhttp:4.12.0'
               implementation 'com.google.code.gson:gson:2.10.1'
+              implementation 'androidx.work:work-runtime:2.9.0'
           }
 
           apply from: 'capacitor.build.gradle'
@@ -683,6 +705,9 @@ jobs:
               public void loadModel(PluginCall call) {
                   String fileName = call.getString("fileName");
                   String modelId = call.getString("modelId", fileName);
+                  int nGpuLayers = call.getInt("nGpuLayers", 99);
+                  int nCtx = call.getInt("nCtx", 2048);
+                  int nThreads = call.getInt("nThreads", 4);
 
                   if (fileName == null || fileName.isEmpty()) {
                       call.reject("fileName is required");
@@ -709,7 +734,7 @@ jobs:
                               notifyListeners("onProgress", p);
                           });
 
-                          boolean success = nativeInitModel(modelFile.getAbsolutePath(), 99, 2048, 4);
+                          boolean success = nativeInitModel(modelFile.getAbsolutePath(), nGpuLayers, nCtx, nThreads);
 
                           if (success) {
                               currentModelId = modelId;
@@ -839,6 +864,34 @@ jobs:
                   JSObject ret = new JSObject();
                   ret.put("success", true);
                   call.resolve(ret);
+              }
+
+              @PluginMethod
+              public void getMemoryInfo(PluginCall call) {
+                  try {
+                      ActivityManager actManager = (ActivityManager) getContext().getSystemService(Context.ACTIVITY_SERVICE);
+                      ActivityManager.MemoryInfo memInfo = new ActivityManager.MemoryInfo();
+                      if (actManager != null) {
+                          actManager.getMemoryInfo(memInfo);
+                      }
+
+                      StatFs stat = new StatFs(Environment.getDataDirectory().getPath());
+                      long bytesAvailable = stat.getBlockSizeLong() * stat.getAvailableBlocksLong();
+                      long bytesTotal = stat.getBlockSizeLong() * stat.getBlockCountLong();
+
+                      JSObject ret = new JSObject();
+                      ret.put("totalMemMB", Math.round((double) memInfo.totalMem / (1024.0 * 1024.0)));
+                      ret.put("availMemMB", Math.round((double) memInfo.availMem / (1024.0 * 1024.0)));
+                      ret.put("thresholdMB", Math.round((double) memInfo.threshold / (1024.0 * 1024.0)));
+                      ret.put("lowMemory", memInfo.lowMemory);
+                      ret.put("storageAvailMB", Math.round((double) bytesAvailable / (1024.0 * 1024.0)));
+                      ret.put("storageTotalMB", Math.round((double) bytesTotal / (1024.0 * 1024.0)));
+                      ret.put("cpuCores", Runtime.getRuntime().availableProcessors());
+                      ret.put("isMeasuredReal", true);
+                      call.resolve(ret);
+                  } catch (Exception e) {
+                      call.reject("Failed to get memory info: " + e.getMessage());
+                  }
               }
           }
           EOF
@@ -1042,6 +1095,114 @@ jobs:
           }
           EOF
 
+          # Create MikiMaintenanceWorker.java (Android WorkManager native background worker)
+          cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MikiMaintenanceWorker.java
+          package com.mikiai.app;
+
+          import android.content.Context;
+          import android.util.Log;
+          import androidx.annotation.NonNull;
+          import androidx.work.Worker;
+          import androidx.work.WorkerParameters;
+          import java.io.File;
+
+          public class MikiMaintenanceWorker extends Worker {
+              private static final String TAG = "MikiMaintenanceWorker";
+
+              public MikiMaintenanceWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
+                  super(context, workerParams);
+              }
+
+              @NonNull
+              @Override
+              public Result doWork() {
+                  Log.i(TAG, "Starting periodic MIKI-AI on-device maintenance work...");
+                  try {
+                      File cacheDir = getApplicationContext().getCacheDir();
+                      if (cacheDir != null && cacheDir.exists()) {
+                          File[] files = cacheDir.listFiles();
+                          if (files != null) {
+                              for (File f : files) {
+                                  if (f.getName().endsWith(".tmp") || f.getName().startsWith("temp_")) {
+                                      f.delete();
+                                  }
+                              }
+                          }
+                      }
+                      Log.i(TAG, "Periodic MIKI-AI maintenance work completed successfully.");
+                      return Result.success();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error executing maintenance work: " + e.getMessage());
+                      return Result.retry();
+                  }
+              }
+          }
+          EOF
+
+          # Create MikiWorkManagerPlugin.java (Capacitor plugin exposing native Android WorkManager)
+          cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MikiWorkManagerPlugin.java
+          package com.mikiai.app;
+
+          import android.util.Log;
+          import androidx.work.ExistingPeriodicWorkPolicy;
+          import androidx.work.PeriodicWorkRequest;
+          import androidx.work.WorkManager;
+          import com.getcapacitor.JSObject;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+          import java.util.concurrent.TimeUnit;
+
+          @CapacitorPlugin(name = "MikiWorkManagerPlugin")
+          public class MikiWorkManagerPlugin extends Plugin {
+              private static final String TAG = "MikiWorkManagerPlugin";
+              private static final String PERIODIC_WORK_NAME = "MikiPeriodicMaintenance";
+
+              @PluginMethod
+              public void schedulePeriodicWork(PluginCall call) {
+                  int intervalMinutes = call.getInt("intervalMinutes", 60);
+                  if (intervalMinutes < 15) intervalMinutes = 15; // Android WorkManager minimum is 15 minutes
+
+                  try {
+                      PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
+                              MikiMaintenanceWorker.class,
+                              intervalMinutes,
+                              TimeUnit.MINUTES
+                      ).build();
+
+                      WorkManager.getInstance(getContext()).enqueueUniquePeriodicWork(
+                              PERIODIC_WORK_NAME,
+                              ExistingPeriodicWorkPolicy.KEEP,
+                              workRequest
+                      );
+
+                      Log.i(TAG, "Scheduled native WorkManager periodic maintenance every " + intervalMinutes + " minutes");
+                      JSObject ret = new JSObject();
+                      ret.put("scheduled", true);
+                      ret.put("intervalMinutes", intervalMinutes);
+                      call.resolve(ret);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Failed to schedule WorkManager: " + e.getMessage());
+                      call.reject("Failed to schedule WorkManager: " + e.getMessage());
+                  }
+              }
+
+              @PluginMethod
+              public void cancelPeriodicWork(PluginCall call) {
+                  try {
+                      WorkManager.getInstance(getContext()).cancelUniqueWork(PERIODIC_WORK_NAME);
+                      Log.i(TAG, "Cancelled native WorkManager periodic maintenance");
+                      JSObject ret = new JSObject();
+                      ret.put("cancelled", true);
+                      call.resolve(ret);
+                  } catch (Exception e) {
+                      call.reject("Failed to cancel WorkManager: " + e.getMessage());
+                  }
+              }
+          }
+          EOF
+
           # MainActivity.java binding
           cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MainActivity.java
           package com.mikiai.app;
@@ -1054,6 +1215,7 @@ jobs:
               public void onCreate(Bundle savedInstanceState) {
                   registerPlugin(MlcLlmPlugin.class);
                   registerPlugin(MikiBackgroundServicePlugin.class);
+                  registerPlugin(MikiWorkManagerPlugin.class);
                   super.onCreate(savedInstanceState);
               }
           }
