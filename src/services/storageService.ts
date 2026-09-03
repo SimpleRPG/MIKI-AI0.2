@@ -426,6 +426,45 @@ class StorageService {
     });
     this.setMemories(updated);
   }
+
+  /**
+   * クラウドAPI（Google Gemini）への送信に関する同意フラグ
+   */
+  public isCloudConsentAccepted(): boolean {
+    return this.getItem('miki_cloud_consent_accepted') === 'true';
+  }
+
+  public setCloudConsentAccepted(accepted: boolean): void {
+    this.setItem('miki_cloud_consent_accepted', accepted ? 'true' : 'false');
+  }
+
+  /**
+   * クラウド送信時に個人情報（profile / relationship）を除外するかどうか（デフォルト: true / 除外する）
+   */
+  public isCloudFilterPrivateMemories(): boolean {
+    return this.getItem('miki_cloud_filter_private_memories') !== 'false';
+  }
+
+  public setCloudFilterPrivateMemories(enabled: boolean): void {
+    this.setItem('miki_cloud_filter_private_memories', enabled ? 'true' : 'false');
+  }
+
+  /**
+   * クラウドAI（教師役Gemini）送信用の安全な記憶フィルタリング
+   * - フィルタが有効な場合、profile / relationship カテゴリを完全除外
+   * - 未承認（approved: false）やアーカイブ済み（active: false）も除外
+   */
+  public filterMemoriesForCloud(memories: MemoryItem[]): MemoryItem[] {
+    const filterPrivate = this.isCloudFilterPrivateMemories();
+    return memories.filter((m) => {
+      if (m.active === false) return false;
+      if (m.approved === false) return false;
+      if (filterPrivate && (m.category === 'profile' || m.category === 'relationship')) {
+        return false;
+      }
+      return true;
+    });
+  }
 }
 
 export const storageService = new StorageService();

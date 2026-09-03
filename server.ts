@@ -394,10 +394,18 @@ app.post('/api/train-distill', async (req, res) => {
       });
     }
 
+    // Strict privacy guarantee: filter out profile and relationship memories before passing to cloud prompt
+    const safeMemories = Array.isArray(currentMemories)
+      ? currentMemories.filter((m: any) => m && m.category !== 'profile' && m.category !== 'relationship')
+      : [];
+    const memoryContext = safeMemories.length > 0
+      ? `\n安全に許可された参考知識:\n${safeMemories.slice(0, 5).map((m: any) => `- [${m.category}] ${m.content}`).join('\n')}`
+      : '';
+
     const prompt = `あなたは端末オンデバイスローカルLLM（WebGPUで動く「みき」）を教育・育成するスーパーバイザー・知識蒸留AI（Teacher LLM）です。
 対象トピック: "${topic || 'Web/3Dゲーム開発と親しみやすい会話'}"
 スキル分類: "${skillType || 'code_and_persona'}"
-現在のペルソナ設定: 名前=${persona?.name || 'みき'}, 親愛度=${persona?.intimacyLevel || 2}
+現在のペルソナ設定: 名前=${persona?.name || 'みき'}, 親愛度=${persona?.intimacyLevel || 2}${memoryContext}
 
 以下の要領で、端末ローカルLLM（WebGPU）に注入・記憶させる高品質な学習知識データ（ナレッジカードとQ&Aデータセット）をJSON形式で生成してください:
 1. title: 知識カードのタイトル（例: Three.js 60fps最適化パターン、感情豊かに話すコツ）

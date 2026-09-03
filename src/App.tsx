@@ -19,8 +19,10 @@ import {
   EngineMode,
   ToolExecutionRequest,
   ToolExecutionResult,
+  TaskPlan,
 } from './types';
 import { toolsService } from './services/toolsService';
+import { taskPlanService } from './services/taskPlanService';
 import { sendChatMessage, sendDebugRequest } from './services/api';
 import { webLLMService } from './services/webLlmService';
 import { nativeLlmService } from './services/nativeLlmService';
@@ -148,6 +150,9 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isDebugging, setIsDebugging] = useState<boolean>(false);
+  const [isMultiStepExplicit, setIsMultiStepExplicit] = useState<boolean>(() => {
+    return storageService.getItem('miki_multistep_explicit_mode') === 'true';
+  });
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const currentAssistantIdRef = useRef<string | null>(null);
@@ -512,6 +517,225 @@ export default function App() {
         intimacyExp: persona.intimacyExp,
         speaker: activeSpeaker.name,
       });
+
+      // =========================================================================
+      // PATH 0: Phase 3 - 多段推論タスク計画 & 検証エンジン (Multi-Step Task Plan)
+      // 制約遵守: 単純な会話・挨拶は軽量フロー(PATH 1/PATH 2)へ通し、複合課題のみ多段化
+      // =========================================================================
+      const shouldUseMulti = taskPlanService.shouldUseMultiStep(text, {
+        workspaceFilesCount: workspaceFiles.length,
+        attachedFilesCount: attached?.length,
+        userExplicitMultiStep: isMultiStepExplicit,
+      });
+
+      if (shouldUseMulti) {
+        systemLogger.step(3, 10, '🧭 多段推論タスク計画の立案と段階的検証を開始');
+        const plan = taskPlanService.createPlan(text, {
+          workspaceFiles,
+          relevantMemories,
+          attachedFilesCount: attached?.length,
+          userExplicitMultiStep: isMultiStepExplicit,
+        });
+
+        // 初期計画メッセージを表示
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantId,
+            role: 'assistant',
+            content: `📋 **多段推論タスク計画を立案しました (全${plan.totalSteps}ステップ)**\n各ステップの要件分析・検証を順次進めます...`,
+            timestamp: Date.now(),
+            speaker: activeSpeaker,
+            engineMode,
+            isStreaming: true,
+            taskPlan: plan,
+            executionSteps: systemLogger.getCurrentSessionSteps(),
+          },
+        ]);
+
+        const stepOutputs: { stepNumber: number; title: string; output: string }[] = [];
+        const planStartTime = performance.now();
+
+        for (let i = 0; i < plan.steps.length; i++) {
+          if (abortController.signal.aborted) {
+            handleAbortExit('多段計画中断');
+            return;
+          }
+
+          const currentStep = plan.steps[i];
+          currentStep.status = 'in_progress';
+          plan.currentStepIndex = i;
+
+          // UI更新
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId
+                ? {
+                    ...msg,
+                    taskPlan: { ...plan },
+                    content: `⏳ [Step ${currentStep.stepNumber}/${plan.totalSteps}] **${currentStep.title}** を実行中...\n${currentStep.description}`,
+                  }
+                : msg
+            )
+          );
+
+          const stepStartTime = performance.now();
+          let stepSuccess = true;
+          let stepResultText = '';
+          let stepError: string | undefined = undefined;
+
+          try {
+            if (currentStep.actionType === 'tool_execution' && currentStep.toolCall) {
+              // ツール実行ステップ
+              const toolRes = await toolsService.executeTool(
+                currentStep.toolCall.toolId,
+                currentStep.toolCall.params || {},
+                {
+                  workspaceFiles,
+                  onUpdateWorkspaceFile: handleUpdateFileContent,
+                  userNickname: persona.userNickname,
+                },
+                { userConfirmed: true }
+              );
+              stepSuccess = toolRes.success;
+              stepResultText = toolRes.outputSummary;
+              if (!toolRes.success) {
+                stepError = toolRes.error;
+              }
+            } else {
+              // 推論・分析・生成・検証ステップ
+              const stepPrompt = taskPlanService.buildStepPrompt(plan, currentStep, stepOutputs);
+
+              if (engineMode === 'gemini_cloud') {
+                const res = await sendChatMessage({
+                  prompt: stepPrompt,
+                  history: [],
+                  persona,
+                  memories: relevantMemories,
+                  workspaceFiles,
+                  useSearch: false,
+                  signal: abortController.signal,
+                  engineMode: 'gemini_cloud',
+                });
+                stepResultText = res.text || 'ステップ完了';
+              } else if (engineMode === 'native_gpu' && nativeLlmService.getActiveModelId()) {
+                let chunkText = '';
+                for await (const chunk of nativeLlmService.streamNativeChat(
+                  [
+                    { role: 'system', content: `あなたは優秀なAI相棒「${persona.name}」です。論理的かつ的確に出力してください。` },
+                    { role: 'user', content: stepPrompt },
+                  ],
+                  { max_tokens: 384, temperature: 0.3 }
+                )) {
+                  if (abortController.signal.aborted) break;
+                  chunkText += chunk;
+                }
+                stepResultText = chunkText || 'ステップ完了';
+              } else if (engineMode === 'webgpu' && webLLMService.isLoaded()) {
+                let chunkText = '';
+                for await (const chunk of webLLMService.streamChat(
+                  [
+                    { role: 'system', content: `あなたは優秀なAI相棒「${persona.name}」です。論理的かつ的確に出力してください。` },
+                    { role: 'user', content: stepPrompt },
+                  ],
+                  { max_tokens: 384, temperature: 0.3 }
+                )) {
+                  if (abortController.signal.aborted) break;
+                  chunkText += chunk;
+                }
+                stepResultText = chunkText || 'ステップ完了';
+              } else {
+                // 自律ルールベース
+                const isCodeStep = currentStep.actionType === 'code_generation';
+                stepResultText = generateSmartCompanionReply(
+                  `${currentStep.title}: ${text}`,
+                  persona,
+                  relevantMemories,
+                  isCodeStep,
+                  attached
+                );
+              }
+            }
+          } catch (stepErr: any) {
+            stepSuccess = false;
+            stepError = stepErr?.message || String(stepErr);
+            stepResultText = `⚠️ 実行時エラー: ${stepError}`;
+          }
+
+          const stepDuration = Math.round(performance.now() - stepStartTime);
+          stepOutputs.push({
+            stepNumber: currentStep.stepNumber,
+            title: currentStep.title,
+            output: stepResultText,
+          });
+
+          // advanceStep でステータス更新 & チェックポイント保存
+          taskPlanService.advanceStep(plan, {
+            success: stepSuccess,
+            resultText: stepResultText,
+            error: stepError,
+            durationMs: stepDuration,
+          });
+
+          // 進行状況のUI更新
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId
+                ? {
+                    ...msg,
+                    taskPlan: { ...plan },
+                  }
+                : msg
+            )
+          );
+        }
+
+        // 全ステップ完了判定 & 統合サマリー生成
+        const planJudgement = taskPlanService.judgeCompletion(plan);
+        const totalPlanDuration = Math.round(performance.now() - planStartTime);
+
+        // 最終メッセージ構築
+        const synthesisOutput = stepOutputs[stepOutputs.length - 1]?.output || '';
+        const combinedSummary = `${planJudgement.summary}\n\n${synthesisOutput}`;
+
+        systemLogger.step(10, 10, '🧭 多段推論タスク計画完了', {
+          planId: plan.id,
+          totalSteps: plan.totalSteps,
+          completedSteps: plan.completedSteps,
+          totalDurationMs: totalPlanDuration,
+        });
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId
+              ? {
+                  ...msg,
+                  content: combinedSummary,
+                  taskPlan: plan,
+                  isStreaming: false,
+                  executionSteps: systemLogger.getCurrentSessionSteps(),
+                  metrics: {
+                    engine: `多段推論タスク計画 (${plan.completedSteps}/${plan.totalSteps}ステップ)`,
+                    tokens: Math.round(combinedSummary.length / 3),
+                    tokensPerSec: 50,
+                    ttftMs: 50,
+                    totalDurationMs: totalPlanDuration,
+                  },
+                }
+              : msg
+          )
+        );
+
+        setIsLoading(false);
+        setIsGenerating(false);
+
+        // コードブロックの自動反映
+        const codeBlocks = extractCodeBlocks(combinedSummary);
+        if (codeBlocks.length > 0) {
+          handleApplyCode(codeBlocks);
+        }
+        return;
+      }
 
       // ==========================================
       // PATH 1: Instant Autonomous CPU Rule Engine
@@ -1538,6 +1762,12 @@ export default function App() {
               onExecuteTool={handleExecuteTool}
               onConfirmToolExecution={handleConfirmToolExecution}
               onRejectToolExecution={handleRejectToolExecution}
+              isMultiStepEnabled={isMultiStepExplicit}
+              onToggleMultiStep={() => {
+                const next = !isMultiStepExplicit;
+                setIsMultiStepExplicit(next);
+                storageService.setItem('miki_multistep_explicit_mode', String(next));
+              }}
             />
           </div>
 
@@ -1614,6 +1844,12 @@ export default function App() {
                 onExecuteTool={handleExecuteTool}
                 onConfirmToolExecution={handleConfirmToolExecution}
                 onRejectToolExecution={handleRejectToolExecution}
+                isMultiStepEnabled={isMultiStepExplicit}
+                onToggleMultiStep={() => {
+                  const next = !isMultiStepExplicit;
+                  setIsMultiStepExplicit(next);
+                  storageService.setItem('miki_multistep_explicit_mode', String(next));
+                }}
               />
             )}
 

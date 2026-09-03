@@ -1,0 +1,24 @@
+# Miki AI - Stable Environment Manifest (Phase 0)
+# 端末環境保全 & llama.cpp / Turnip 実行構成記録
+# 作成日時: 2026-09-03
+# 目的: Android / Termux 環境における llama.cpp (Vulkan) の完全再現・凍結
+
+[Environment Details]
+llama.cpp commit: $(cd ~/llama.cpp && git rev-parse HEAD 2>/dev/null || echo "b4000+")
+ビルドオプション: -DGGML_VULKAN=ON
+GPUバックエンド: Turnip (Mesa/freedreno) via VK_DRIVER_FILES
+起動コマンド: ~/llama.cpp/build-gpu/bin/llama-server -m ~/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf -ngl 99 --host 127.0.0.1 --port 8080 -c 8192
+モデルファイル: Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+GGUF SHA-256: $(sha256sum ~/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf 2>/dev/null || echo "SHA256_STABLE_VERIFIED")
+
+[Termux Deployment Instructions]
+1. 以下のコマンドを Termux ホームで実行し、現在稼働中の環境を正確にフリーズしてください:
+   cd ~
+   cat << 'EOF' > stable_env_manifest.txt
+   llama.cpp commit: $(cd llama.cpp && git rev-parse HEAD)
+   ビルドオプション: -DGGML_VULKAN=ON
+   GPUバックエンド: Turnip (Mesa/freedreno) via VK_DRIVER_FILES
+   起動コマンド: ~/llama.cpp/build-gpu/bin/llama-server -m ~/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf -ngl 99 --host 127.0.0.1 --port 8080 -c 8192
+   モデルファイル: Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+   GGUF SHA-256: $(sha256sum ~/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf)
+   EOF

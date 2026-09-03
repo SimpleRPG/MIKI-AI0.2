@@ -36,6 +36,7 @@ import {
   Brain,
   Wrench,
   FlaskConical,
+  Layers,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode } from '../types';
 import { extractCodeBlocks } from '../utils/codeParser';
@@ -43,6 +44,7 @@ import { SPEAKER_PROFILES } from '../data/speakers';
 import { systemLogger } from '../services/systemLogger';
 import { selfImprovementService } from '../services/selfImprovementService';
 import { skillsService } from '../services/skillsService';
+import { TaskPlanCard } from './TaskPlanCard';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -69,6 +71,8 @@ interface ChatPanelProps {
   onExecuteTool?: (toolId: string, params: Record<string, any>, userConfirmed?: boolean) => void;
   onConfirmToolExecution?: (request: any) => void;
   onRejectToolExecution?: (requestId: string) => void;
+  isMultiStepEnabled?: boolean;
+  onToggleMultiStep?: () => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -95,6 +99,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onExecuteTool,
   onConfirmToolExecution,
   onRejectToolExecution,
+  isMultiStepEnabled = false,
+  onToggleMultiStep,
 }) => {
   const [inputText, setInputText] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string; type: string; size: number }[]>([]);
@@ -811,6 +817,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </div>
                   )}
 
+                  {/* Task Plan (Phase 3: Multi-step Reasoning) */}
+                  {msg.taskPlan && (
+                    <div className="mt-2.5">
+                      <TaskPlanCard plan={msg.taskPlan} />
+                    </div>
+                  )}
+
                   {/* Executed Tools Summary Card (:feature:tools) */}
                   {msg.executedTools && msg.executedTools.length > 0 && (
                     <div className="mt-3 p-2.5 bg-slate-900/90 border border-emerald-500/30 rounded-xl space-y-2 text-xs">
@@ -1185,6 +1198,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           >
             <Search className="w-4 h-4" />
           </button>
+
+          {onToggleMultiStep && (
+            <button
+              type="button"
+              onClick={onToggleMultiStep}
+              className={`p-2 rounded-lg transition-colors shrink-0 ${
+                isMultiStepEnabled
+                  ? 'text-indigo-400 bg-indigo-950/60 border border-indigo-500/40 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+              title={
+                isMultiStepEnabled
+                  ? '多段推論タスク計画モード: 有効 (要件分析・検証ステップを実行)'
+                  : '多段推論タスク計画モード: 自動判定 (クリックで常時計画モードに固定)'
+              }
+            >
+              <Layers className="w-4 h-4" />
+            </button>
+          )}
 
           <textarea
             ref={textareaRef}

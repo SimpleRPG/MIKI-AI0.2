@@ -216,6 +216,7 @@ export interface ChatMessage {
   suggestedTools?: ToolRecommendation[];
   executedTools?: ToolExecutionResult[];
   pendingToolConfirmation?: ToolExecutionRequest;
+  taskPlan?: TaskPlan; // フェーズ3: 多段推論・検証タスク計画
   userFeedback?: 'good' | 'bad' | null;
   feedbackNote?: string;
   fallbackDiagnostic?: {
@@ -553,6 +554,60 @@ export interface CompressedContextResult {
   episodeSummary: string;        // 過去ターンの要約蒸留テキスト
   formattedMessages: { role: 'user' | 'assistant' | 'system'; content: string }[];
 }
+
+/**
+ * フェーズ3: 多段推論・検証タスク計画 (設計思想 79節 実装フェーズ3)
+ */
+export type TaskStepStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
+
+export type TaskStepActionType =
+  | 'analysis'         // 要件整理・現状分析
+  | 'tool_execution'   // ツール実行（計算、検索、ファイル読み込み等）
+  | 'code_generation'  // コード・成果物生成
+  | 'verification'     // 整合性自己検証・エラーチェック
+  | 'synthesis';       // 最終統合・回答構築
+
+export interface TaskStep {
+  id: string;
+  stepNumber: number;
+  title: string;
+  description: string;
+  status: TaskStepStatus;
+  actionType?: TaskStepActionType;
+  toolCall?: {
+    toolId: string;
+    toolName?: string;
+    params?: Record<string, unknown>;
+  };
+  result?: string;
+  error?: string;
+  durationMs?: number;
+  confidenceScore?: number;
+}
+
+export interface TaskPlanCheckpoint {
+  lastCompletedStepId?: string;
+  snapshotTime: number;
+  completedStepCount: number;
+  stateData?: Record<string, unknown>;
+}
+
+export type TaskPlanStatus = 'planning' | 'executing' | 'completed' | 'failed' | 'paused';
+
+export interface TaskPlan {
+  id: string;
+  goal: string;
+  status: TaskPlanStatus;
+  steps: TaskStep[];
+  currentStepIndex: number;
+  checkpoint?: TaskPlanCheckpoint;
+  totalSteps: number;
+  completedSteps: number;
+  finalSummary?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 
 
 
