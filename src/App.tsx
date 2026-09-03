@@ -30,6 +30,7 @@ import { systemLogger } from './services/systemLogger';
 import { worldModelService } from './services/worldModelService';
 import { storageService } from './services/storageService';
 import { nativeBackgroundService } from './services/nativeBackgroundService';
+import { backgroundWorkerService } from './services/backgroundWorkerService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
@@ -220,6 +221,11 @@ export default function App() {
   useEffect(() => {
     storageService.setItem('gamecraft_engine_mode', engineMode);
   }, [engineMode]);
+
+  // バックグラウンド自律処理への会話割り込み防止同期 (設計思想: 会話中の割り込み防止 & 睡眠ゲート連携)
+  useEffect(() => {
+    backgroundWorkerService.setChatGenerating(isGenerating || isLoading);
+  }, [isGenerating, isLoading]);
 
   // Listen to sandbox postMessage events (Console & FPS)
   useEffect(() => {
@@ -681,6 +687,9 @@ export default function App() {
     attached?: { name: string; content: string; type: string }[]
   ) => {
     if (!text.trim() && (!attached || attached.length === 0)) return;
+
+    // ユーザーチャット操作を記録し、バックグラウンド重処理の割り込みを防止
+    backgroundWorkerService.recordUserActivity();
 
     if (abortControllerRef.current) {
       systemLogger.warn('CHAT', '前回の未完了リクエストが存在したため中断して新規リクエストを開始します');

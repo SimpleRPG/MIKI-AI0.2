@@ -441,6 +441,13 @@ export interface ModelGeneration {
 /**
  * Android WorkManager & バックグラウンド自律処理 (設計思想 11. バックグラウンド自己対話 & 23. Androidネイティブ)
  */
+export interface BackgroundExecutionConditions {
+  isCharging: boolean;
+  batteryLevel: number; // 0-1 (30% = 0.3)
+  isUserActive: boolean; // 直近数分以内にチャット操作があったか
+  thermalState: 'normal' | 'warm' | 'hot' | 'critical'; // Android Battery/Thermal APIから取得
+}
+
 export interface WorkManagerConstraints {
   requiresCharging: boolean;       // 充電中制約 (BatteryManager.BATTERY_STATUS_CHARGING)
   requiresDeviceIdle: boolean;     // 端末アイドル制約 (ユーザー無操作)
@@ -496,6 +503,12 @@ export interface WorkManagerStatus {
   };
   isIdle: boolean;
   isExecutingNow: boolean;
+  currentSleepState: 'idle' | 'shallow' | 'deep';
+  currentConditions: BackgroundExecutionConditions;
+  unmetReasons: {
+    shallow: string[];
+    deep: string[];
+  };
 }
 
 /**

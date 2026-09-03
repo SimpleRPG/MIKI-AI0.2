@@ -55,7 +55,13 @@ import {
 import { selfImprovementService } from '../services/selfImprovementService';
 import { skillsService } from '../services/skillsService';
 import { worldModelService } from '../services/worldModelService';
-import { backgroundWorkerService } from '../services/backgroundWorkerService';
+import {
+  backgroundWorkerService,
+  canRunShallowSleep,
+  canRunDeepSleep,
+  getDeepSleepUnmetReasons,
+  getShallowSleepUnmetReasons,
+} from '../services/backgroundWorkerService';
 import { regressionBenchmarkService } from '../services/regressionBenchmarkService';
 import { nativeBackgroundService } from '../services/nativeBackgroundService';
 import { toolsService } from '../services/toolsService';
@@ -282,6 +288,16 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
       }
     }
   }, [isOpen, chatMessages]);
+
+  // WorkManager ステータス & 睡眠判定の定期更新ポーリング
+  useEffect(() => {
+    if (!isOpen) return;
+    const interval = setInterval(() => {
+      setWmStatus(backgroundWorkerService.getStatus());
+      setWmLogs(backgroundWorkerService.getLogs());
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [isOpen]);
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -979,17 +995,17 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
             </div>
           )}
 
-          {/* TAB: ⚡ Android WorkManager & 自律バックグラウンド処理 (設計思想 11 & 23) */}
+          {/* TAB: ⚡ Android WorkManager & 自律バックグラウンド処理 (設計思想 11 & 23, 浅い睡眠 / 深い睡眠ゲート) */}
           {activeTab === 'workmanager' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                     <BatteryCharging className="w-4 h-4 text-amber-400" />
                     <span>Android WorkManager 自律バックグラウンド処理</span>
                   </h3>
                   <p className="text-slate-400 text-[11px]">
-                    設計思想 11 & 23: 会話中ではなく「深夜・充電中・Wi-Fi・アイドル時」に自律実行（記憶統合・弱点自己対話・LoRAデータセット生成）
+                    設計思想: 「浅い睡眠 / 深い睡眠」2段階ゲート制御。充電中・低温・バッテリー残量30%超・無操作時のみ重い推論（A/Bテスト・シャドー評価）を実行
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -997,7 +1013,35 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                     disabled={isWmRunning}
                     onClick={async () => {
                       setIsWmRunning(true);
-                      setWmMessage('⚡ バックグラウンド自律処理を実行中...');
+                      setWmMessage('⚡ バックグラウンド自律処理を実行中 (睡眠ゲート判定)...');
+                      try {
+                        const log = await backgroundWorkerService.runAutonomousBackgroundCycle('periodic_scheduled', {
+                          memories,
+                          messages: chatMessages,
+                        });
+                        setWmLogs(backgroundWorkerService.getLogs());
+                        setWmStatus(backgroundWorkerService.getStatus());
+                        setTrainingSamples(selfImprovementService.getTrainingSamples());
+                        setSkills(skillsService.getAllSkills());
+                        setWmMessage(`✓ 自律処理完了: ${log.summary}`);
+                        setTimeout(() => setWmMessage(null), 5000);
+                      } catch (err: any) {
+                        setWmMessage(`⚠️ 実行保留/中断: ${err?.message || '不明'}`);
+                      } finally {
+                        setIsWmRunning(false);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-md shadow-amber-950/40 transition-all"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>{isWmRunning ? '実行中...' : '自律サイクル実行 (ゲート判定検証)'}</span>
+                  </button>
+
+                  <button
+                    disabled={isWmRunning}
+                    onClick={async () => {
+                      setIsWmRunning(true);
+                      setWmMessage('⚡ 手動強制実行中 (条件無視フルサイクル)...');
                       try {
                         const log = await backgroundWorkerService.runAutonomousBackgroundCycle('manual', {
                           memories,
@@ -1007,118 +1051,354 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                         setWmStatus(backgroundWorkerService.getStatus());
                         setTrainingSamples(selfImprovementService.getTrainingSamples());
                         setSkills(skillsService.getAllSkills());
-                        setWmMessage(`✓ 自律処理が完了しました (${log.durationMs}ms)`);
-                        setTimeout(() => setWmMessage(null), 4000);
+                        setWmMessage(`✓ 手動フルサイクル完了 (${log.durationMs}ms)`);
+                        setTimeout(() => setWmMessage(null), 5000);
                       } catch (err: any) {
                         setWmMessage(`❌ 実行エラー: ${err?.message || '不明'}`);
                       } finally {
                         setIsWmRunning(false);
                       }
                     }}
-                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-md shadow-amber-950/40 transition-all"
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 font-medium rounded-lg text-xs flex items-center gap-1 border border-slate-700 transition-all"
+                    title="開発・テスト用に条件を無視して深い睡眠を含め即時実行します"
                   >
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    <span>{isWmRunning ? '実行中...' : '自律サイクル即時実行'}</span>
+                    <span>強制即時実行</span>
                   </button>
                 </div>
               </div>
 
               {wmMessage && (
-                <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-800 text-amber-200 text-xs font-semibold animate-fadeIn">
-                  {wmMessage}
+                <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-800 text-amber-200 text-xs font-semibold animate-fadeIn flex items-center justify-between">
+                  <span>{wmMessage}</span>
+                  <button onClick={() => setWmMessage(null)} className="text-amber-400 hover:text-amber-200 text-[11px] ml-2">閉じる</button>
                 </div>
               )}
 
-              {/* Pause / Resume — also starts/stops the native foreground keep-alive
-                  service on Android, so the scheduler above keeps ticking while
-                  backgrounded or the screen is off. */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Shield className={`w-4 h-4 ${wmStatus?.isRegistered ? 'text-emerald-400' : 'text-slate-500'}`} />
-                  <div>
-                    <div className="text-xs font-bold text-slate-200">
-                      バックグラウンド自己改善: {wmStatus?.isRegistered ? '稼働中' : '一時停止中'}
-                    </div>
-                    <div className="text-[10px] text-slate-400">
-                      チャット中も裏で回り続けます。一時停止するとバックグラウンド維持も止まります。
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    backgroundWorkerService.toggleRegistered(!(wmStatus?.isRegistered ?? true));
-                    setWmStatus(backgroundWorkerService.getStatus());
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
-                    wmStatus?.isRegistered
-                      ? 'bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-200'
-                      : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-200'
-                  }`}
-                >
-                  {wmStatus?.isRegistered ? '一時停止する' : '再開する'}
-                </button>
-              </div>
-
-              {/* Hardware Status & Constraint Evaluation Banner */}
+              {/* 睡眠モード可視化バナー (浅い睡眠中 / 深い睡眠中 / 待機中) */}
               {(() => {
-                const constraintCheck = backgroundWorkerService.evaluateConstraints();
+                const conditions = wmStatus?.currentConditions || backgroundWorkerService.getExecutionConditions();
+                const isShallowPossible = canRunShallowSleep(conditions);
+                const isDeepPossible = canRunDeepSleep(conditions);
+                const currentSleep = wmStatus?.currentSleepState || 'idle';
+                const unmetDeep = wmStatus?.unmetReasons?.deep || getDeepSleepUnmetReasons(conditions);
 
                 return (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
-                    {/* Battery status */}
-                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
-                      <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                        <BatteryCharging className="w-3.5 h-3.5 text-amber-400" />
-                        <span>バッテリー & 充電状態</span>
-                      </div>
-                      <div className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
-                        <span className={wmStatus?.currentBatteryState.charging ? 'text-emerald-400' : 'text-slate-300'}>
-                          {wmStatus?.currentBatteryState.charging ? '⚡ 充電中' : '放電中'}
-                        </span>
-                        <span className="text-xs font-mono text-slate-400">({wmStatus?.currentBatteryState.level || 100}%)</span>
-                      </div>
-                    </div>
-
-                    {/* Network status */}
-                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
-                      <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                        <Wifi className="w-3.5 h-3.5 text-sky-400" />
-                        <span>ネットワーク環境</span>
-                      </div>
-                      <div className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
-                        <span className={wmStatus?.currentNetworkState.isWifi ? 'text-sky-300' : 'text-amber-400'}>
-                          {wmStatus?.currentNetworkState.isWifi ? '✓ Wi-Fi (定額)' : 'モバイル従量制'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Idle state */}
-                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
-                      <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>端末アイドル判定</span>
-                      </div>
-                      <div className="text-sm font-bold text-slate-200">
-                        {wmStatus?.isIdle ? (
-                          <span className="text-emerald-400">✓ アイドル (無操作)</span>
+                  <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-900 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs font-bold text-slate-300">現在のバックグラウンド状態:</div>
+                        {currentSleep === 'deep' ? (
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1 animate-pulse">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>🌌 深い睡眠中 (Deep Sleep Active: A/Bテスト・シャドー評価)</span>
+                          </span>
+                        ) : currentSleep === 'shallow' ? (
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 animate-pulse">
+                            <Moon className="w-3.5 h-3.5" />
+                            <span>🌙 浅い睡眠中 (Shallow Sleep Active: 記憶整理・重複検出)</span>
+                          </span>
                         ) : (
-                          <span className="text-slate-400">ユーザー操作中</span>
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            <span>⏸️ 待機中 ({isDeepPossible ? '深い睡眠スタンバイ' : isShallowPossible ? '浅い睡眠スタンバイ' : '条件未達・待機'})</span>
+                          </span>
                         )}
                       </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            backgroundWorkerService.toggleRegistered(!(wmStatus?.isRegistered ?? true));
+                            setWmStatus(backgroundWorkerService.getStatus());
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                            wmStatus?.isRegistered
+                              ? 'bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-200'
+                              : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-200'
+                          }`}
+                        >
+                          {wmStatus?.isRegistered ? 'WorkManager 一時停止' : 'WorkManager 再開'}
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Constraint Verdict */}
-                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
-                      <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                        <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>自動起動トリガー判定</span>
+                    {/* 2段階ゲート判定状況 (Shallow Sleep vs Deep Sleep) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Shallow Sleep Gate Card */}
+                      <div className={`p-3 rounded-lg border ${isShallowPossible ? 'bg-amber-950/20 border-amber-800/40' : 'bg-slate-900/40 border-slate-800'}`}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-bold flex items-center gap-1 text-slate-200">
+                            <Moon className="w-3.5 h-3.5 text-amber-400" />
+                            <span>1. 浅い睡眠 (Shallow Sleep Gate)</span>
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isShallowPossible ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
+                            {isShallowPossible ? '✓ 実行可能' : '✕ 不可'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 space-y-0.5">
+                          <div>・対象: 記憶の統合、グラフリンク構築、LoRAサンプルの重複除去、スキル抽出</div>
+                          <div>・条件: ユーザー非操作 かつ 温度が危険域(critical)でないこと</div>
+                        </div>
                       </div>
-                      <div className="text-sm font-bold">
-                        {constraintCheck.passed ? (
-                          <span className="text-emerald-400">✓ 制約条件合致 (待機中)</span>
-                        ) : (
-                          <span className="text-amber-400 text-xs">制約未達 (待機中)</span>
-                        )}
+
+                      {/* Deep Sleep Gate Card */}
+                      <div className={`p-3 rounded-lg border ${isDeepPossible ? 'bg-indigo-950/20 border-indigo-800/40' : 'bg-slate-900/40 border-slate-800'}`}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-bold flex items-center gap-1 text-slate-200">
+                            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>2. 深い睡眠 (Deep Sleep Gate)</span>
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDeepPossible ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
+                            {isDeepPossible ? '✓ 実行可能' : '✕ 未達・保留'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 space-y-0.5">
+                          <div>・対象: 弱点自己対話シミュレーション、プロンプトA/Bテスト、回帰ベンチマーク評価</div>
+                          <div>・条件: <strong>充電中</strong> かつ <strong>バッテリー &gt; 30%</strong> かつ <strong>無操作</strong> かつ <strong>低温(normal/warm)</strong></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 条件未達の理由 (未達の場合のみ表示) */}
+                    {unmetDeep.length > 0 && (
+                      <div className="p-2.5 rounded-lg bg-slate-900/90 border border-amber-900/40 text-xs space-y-1">
+                        <div className="font-bold text-amber-300 flex items-center gap-1.5 text-[11px]">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span>深い睡眠が保留される理由 (外出中・低バッテリー・発熱・会話中の負荷防止):</span>
+                        </div>
+                        <ul className="list-disc list-inside text-slate-300 text-[11px] space-y-0.5 pl-1">
+                          {unmetDeep.map((reason, idx) => (
+                            <li key={idx} className="text-amber-200/90 font-medium">
+                              {reason}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Hardware Status & Interactive Test Simulator */}
+              {(() => {
+                const conditions = wmStatus?.currentConditions || backgroundWorkerService.getExecutionConditions();
+
+                return (
+                  <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                        <Cpu className="w-3.5 h-3.5 text-amber-400" />
+                        <span>実機環境モニタリング &amp; ゲートテストシミュレーター</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400">
+                        ※ボタンを押して条件を変更し、受け入れ基準の動作（電池20%で重処理停止など）をテストできます
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                      {/* 1. バッテリー & 充電 */}
+                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+                        <div className="text-[10px] text-slate-400 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <BatteryCharging className="w-3.5 h-3.5 text-amber-400" />
+                            <span>バッテリー & 充電</span>
+                          </span>
+                          <span className={`font-mono font-bold text-xs ${conditions.isCharging ? 'text-emerald-400' : 'text-slate-300'}`}>
+                            {conditions.isCharging ? '⚡充電中' : '放電中'} ({Math.round(conditions.batteryLevel * 100)}%)
+                          </span>
+                        </div>
+
+                        {/* モック切替ボタン */}
+                        <div className="space-y-1.5 pt-1">
+                          <button
+                            onClick={() => {
+                              backgroundWorkerService.setMockBattery(!conditions.isCharging, conditions.batteryLevel);
+                              setWmStatus(backgroundWorkerService.getStatus());
+                            }}
+                            className={`w-full py-1 px-2 rounded text-[11px] font-bold border transition-all ${
+                              conditions.isCharging
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                            }`}
+                          >
+                            {conditions.isCharging ? '⚡ 充電中 ➔ 放電へ切替' : '🔌 充電器に接続する'}
+                          </button>
+
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => {
+                                backgroundWorkerService.setMockBattery(conditions.isCharging, 0.2);
+                                setWmStatus(backgroundWorkerService.getStatus());
+                              }}
+                              className={`flex-1 py-1 rounded text-[10px] font-bold border transition-all ${
+                                Math.round(conditions.batteryLevel * 100) <= 20
+                                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/50'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+                              }`}
+                            >
+                              20% (低残量)
+                            </button>
+                            <button
+                              onClick={() => {
+                                backgroundWorkerService.setMockBattery(conditions.isCharging, 0.5);
+                                setWmStatus(backgroundWorkerService.getStatus());
+                              }}
+                              className={`flex-1 py-1 rounded text-[10px] font-bold border transition-all ${
+                                Math.round(conditions.batteryLevel * 100) === 50
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+                              }`}
+                            >
+                              50%
+                            </button>
+                            <button
+                              onClick={() => {
+                                backgroundWorkerService.setMockBattery(conditions.isCharging, 1.0);
+                                setWmStatus(backgroundWorkerService.getStatus());
+                              }}
+                              className={`flex-1 py-1 rounded text-[10px] font-bold border transition-all ${
+                                Math.round(conditions.batteryLevel * 100) >= 90
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+                              }`}
+                            >
+                              100%
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. サーマルステート (端末発熱) */}
+                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+                        <div className="text-[10px] text-slate-400 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Activity className="w-3.5 h-3.5 text-rose-400" />
+                            <span>端末発熱 (Thermal)</span>
+                          </span>
+                          <span className={`font-bold text-xs ${
+                            conditions.thermalState === 'normal'
+                              ? 'text-emerald-400'
+                              : conditions.thermalState === 'warm'
+                              ? 'text-amber-400'
+                              : 'text-rose-400'
+                          }`}>
+                            {conditions.thermalState.toUpperCase()}
+                          </span>
+                        </div>
+
+                        {/* サーマル切替ボタン */}
+                        <div className="grid grid-cols-2 gap-1 pt-1">
+                          <button
+                            onClick={() => {
+                              backgroundWorkerService.setThermalState('normal');
+                              setWmStatus(backgroundWorkerService.getStatus());
+                            }}
+                            className={`py-1 rounded text-[10px] font-bold border transition-all ${
+                              conditions.thermalState === 'normal'
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}
+                          >
+                            normal (正常)
+                          </button>
+                          <button
+                            onClick={() => {
+                              backgroundWorkerService.setThermalState('warm');
+                              setWmStatus(backgroundWorkerService.getStatus());
+                            }}
+                            className={`py-1 rounded text-[10px] font-bold border transition-all ${
+                              conditions.thermalState === 'warm'
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}
+                          >
+                            warm (微熱)
+                          </button>
+                          <button
+                            onClick={() => {
+                              backgroundWorkerService.setThermalState('hot');
+                              setWmStatus(backgroundWorkerService.getStatus());
+                            }}
+                            className={`py-1 rounded text-[10px] font-bold border transition-all ${
+                              conditions.thermalState === 'hot'
+                                ? 'bg-rose-500/20 text-rose-300 border-rose-500/50'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}
+                          >
+                            hot (高温)
+                          </button>
+                          <button
+                            onClick={() => {
+                              backgroundWorkerService.setThermalState('critical');
+                              setWmStatus(backgroundWorkerService.getStatus());
+                            }}
+                            className={`py-1 rounded text-[10px] font-bold border transition-all ${
+                              conditions.thermalState === 'critical'
+                                ? 'bg-rose-600/30 text-rose-200 border-rose-500'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}
+                          >
+                            critical (危険)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 3. ユーザーアクティビティ (会話割り込み防止) */}
+                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+                        <div className="text-[10px] text-slate-400 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>ユーザー操作判定</span>
+                          </span>
+                          <span className={`font-bold text-xs ${conditions.isUserActive ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            {conditions.isUserActive ? '操作中 / クールダウン' : '✓ アイドル (無操作)'}
+                          </span>
+                        </div>
+
+                        <div className="pt-1 space-y-1">
+                          <button
+                            onClick={() => {
+                              backgroundWorkerService.recordUserActivity();
+                              setWmStatus(backgroundWorkerService.getStatus());
+                              setWmMessage('💬 チャット操作をシミュレートしました (2分間のユーザーアクティブ待機モード)');
+                              setTimeout(() => setWmMessage(null), 3000);
+                            }}
+                            className="w-full py-1.5 px-2 rounded text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 transition-all"
+                          >
+                            💬 チャット操作発生をシミュレート
+                          </button>
+                          <div className="text-[9px] text-slate-500 text-center">
+                            操作中は深い睡眠を即時中断して応答速度を最優先
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 4. ネットワーク環境 */}
+                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+                        <div className="text-[10px] text-slate-400 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Wifi className="w-3.5 h-3.5 text-sky-400" />
+                            <span>ネットワーク環境</span>
+                          </span>
+                          <span className={`font-bold text-xs ${wmStatus?.currentNetworkState.isWifi ? 'text-sky-300' : 'text-amber-400'}`}>
+                            {wmStatus?.currentNetworkState.isWifi ? '✓ Wi-Fi (定額)' : 'モバイル従量制'}
+                          </span>
+                        </div>
+
+                        <div className="pt-1">
+                          <button
+                            onClick={() => {
+                              backgroundWorkerService.setMockWifi(!wmStatus?.currentNetworkState.isWifi);
+                              setWmStatus(backgroundWorkerService.getStatus());
+                            }}
+                            className="w-full py-1.5 px-2 rounded text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 transition-all"
+                          >
+                            {wmStatus?.currentNetworkState.isWifi ? 'モバイル回線へ切替' : 'Wi-Fiへ切替'}
+                          </button>
+                          <div className="text-[9px] text-slate-500 text-center mt-1">
+                            定期実行間隔: {wmStatus?.intervalMinutes || 360}分 (6時間)
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
