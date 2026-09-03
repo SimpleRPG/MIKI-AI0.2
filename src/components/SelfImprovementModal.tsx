@@ -28,6 +28,7 @@ import {
   Clock,
   Play,
   Shield,
+  ShieldAlert,
   Bell,
   Database,
   PieChart,
@@ -35,8 +36,13 @@ import {
   AlertCircle,
   Scale,
   GraduationCap,
+  Boxes,
+  Lock,
+  ShieldCheck,
+  Coins,
 } from 'lucide-react';
 import { ExternalTeacherTab } from './ExternalTeacherTab';
+import { PluginConsentDialog } from './PluginConsentDialog';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
@@ -56,9 +62,12 @@ import {
   ToolDefinition,
   ToolExecutionResult,
   ReviewQueueItem,
+  CapabilityPlugin,
+  PluginConsentRequest,
 } from '../types';
 import { selfImprovementService } from '../services/selfImprovementService';
 import { skillsService } from '../services/skillsService';
+import { capabilityPluginService } from '../services/capabilityPluginService';
 import { worldModelService } from '../services/worldModelService';
 import {
   backgroundWorkerService,
@@ -79,7 +88,7 @@ export interface SelfImprovementModalProps {
   chatMessages: ChatMessage[];
   memories: MemoryItem[];
   workspaceFiles?: WorkspaceFile[];
-  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations';
+  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'lab' | 'colab' | 'generations';
 }
 
 export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
@@ -90,7 +99,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   workspaceFiles = [],
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'lab' | 'colab' | 'generations'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'lab' | 'colab' | 'generations'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 
@@ -139,6 +148,15 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   const [newSkillTrigger, setNewSkillTrigger] = useState('');
   const [newSkillSteps, setNewSkillSteps] = useState('');
   const [newSkillDesc, setNewSkillDesc] = useState('');
+
+  // 能力プラグインステート (設計思想 46章: 能力プラグイン方式)
+  const [capabilityPlugins, setCapabilityPlugins] = useState<CapabilityPlugin[]>(() =>
+    capabilityPluginService.getAllPlugins()
+  );
+  const [selectedPlugin, setSelectedPlugin] = useState<CapabilityPlugin | null>(null);
+  const [consentRequestModal, setConsentRequestModal] = useState<PluginConsentRequest | null>(null);
+  const [pluginCategoryFilter, setPluginCategoryFilter] = useState<string>('all');
+  const [pluginMessage, setPluginMessage] = useState<string | null>(null);
 
   // 実験室 (A/Bテスト & 検索比較)
   const [abPromptInput, setAbPromptInput] = useState('タメ口でゲームのバグを直してほしい');
@@ -262,6 +280,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setSkills(skillsService.getAllSkills());
+      setCapabilityPlugins(capabilityPluginService.getAllPlugins());
       setTrainingSamples(selfImprovementService.getTrainingSamples());
       setReviewQueue(selfImprovementService.getReviewQueue());
       setSplitStats(selfImprovementService.getSplitStats());
@@ -517,6 +536,39 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
     setTimeout(() => setSkillsMessage(null), 6000);
   };
 
+  // 46章: 能力プラグイン方式 (Capability Plugins)
+  // 「プラグインが追加されても、端末内の正式権限を自動的に増やさない」原則のハンドラ
+  const handleTogglePluginActive = (plugin: CapabilityPlugin) => {
+    if (plugin.status === 'ACTIVE') {
+      capabilityPluginService.suspendOrRejectPlugin(plugin.plugin_id, 'ユーザーによる手動停止');
+      setCapabilityPlugins(capabilityPluginService.getAllPlugins());
+      setPluginMessage(`プラグイン「${plugin.name}」を一時停止 (SUSPENDED) にしました。端末権限の使用を停止しました。`);
+      setTimeout(() => setPluginMessage(null), 4000);
+    } else {
+      const res = capabilityPluginService.requestActivatePlugin(plugin.plugin_id);
+      if (res.needsUserConsent && res.consentRequest) {
+        // 未承認権限があるため、明示的な権限同意ダイアログを開く
+        setConsentRequestModal(res.consentRequest);
+      } else {
+        setCapabilityPlugins(capabilityPluginService.getAllPlugins());
+        setPluginMessage(res.message);
+        setTimeout(() => setPluginMessage(null), 4000);
+      }
+    }
+  };
+
+  const handlePluginConsentGranted = (updated: CapabilityPlugin) => {
+    setCapabilityPlugins(capabilityPluginService.getAllPlugins());
+    setPluginMessage(`✓ 権限承認完了: プラグイン「${updated.name}」を有効化 (ACTIVE) しました。`);
+    setTimeout(() => setPluginMessage(null), 5000);
+  };
+
+  const handlePluginConsentRejected = (updated: CapabilityPlugin) => {
+    setCapabilityPlugins(capabilityPluginService.getAllPlugins());
+    setPluginMessage(`ℹ 権限拒否: プラグイン「${updated.name}」は一時停止 (SUSPENDED) のまま維持されました。端末権限は追加されていません。`);
+    setTimeout(() => setPluginMessage(null), 5000);
+  };
+
   const handleDeleteGeneration = (id: string) => {
     selfImprovementService.deleteGeneration(id);
     setGenerations(selfImprovementService.getGenerations());
@@ -769,6 +821,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <Cpu className="w-4 h-4 text-indigo-400" />
             <span>🛠️ ツール管理 (:feature:tools)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('plugins')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'plugins'
+                ? 'border-amber-500 text-amber-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Boxes className="w-4 h-4 text-amber-400" />
+            <span>🧩 能力プラグイン方式 (46章) ({capabilityPlugins.length})</span>
           </button>
 
           <button
@@ -2839,6 +2903,316 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
             </div>
           )}
 
+          {/* TAB: 46章 能力プラグイン方式 (Capability Plugins) */}
+          {activeTab === 'plugins' && (
+            <div className="space-y-4">
+              {/* 設計思想 46章の解説バナー */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-amber-950/30 via-slate-900 to-slate-950 border border-amber-500/40 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+                    <Boxes className="w-5 h-5 text-amber-400" />
+                    <span>設計思想 46. 能力プラグイン方式 (Capability Plugin Architecture)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-amber-950 text-amber-300 border border-amber-700/60 font-semibold flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                      <span>端末権限保護ゲート有効</span>
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-sky-950 text-sky-300 border border-sky-800">
+                      47章 ワークフロー基盤
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-300 leading-relaxed space-y-1.5">
+                  <p>
+                    能力を単なるツールの集合ではなく、<strong className="text-amber-200">「必要入力・出力スキーマ・使用可能ツール・実行予算・タイムアウト・検証方法・代替経路」</strong>を厳密に定義したプラグインとしてカプセル化します。
+                  </p>
+                  <p className="text-amber-300/90 font-semibold flex items-center gap-1">
+                    <span>⚠️ 最重要原則:</span>
+                    <span className="text-slate-200 font-normal">
+                      プラグインが追加・登録されても、端末内の正式権限は自動的に増えません。<strong className="text-amber-300">ACTIVE（稼働）へ昇格する際に、必ず明示的なユーザー確認（同意ダイアログ）を要求</strong>し、承認された権限のみを行使します。
+                    </span>
+                  </p>
+                </div>
+
+                {pluginMessage && (
+                  <div className="p-2.5 rounded-lg bg-slate-900 border border-amber-500/40 text-xs text-amber-200 animate-in fade-in flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>{pluginMessage}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* フィルターバー */}
+              <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] text-slate-400 font-semibold mr-1">分類フィルタ:</span>
+                  {['all', 'web_search', 'vba_validation', 'code_analysis', 'math_calculation', 'workspace_manipulation'].map(
+                    (cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setPluginCategoryFilter(cat)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-all ${
+                          pluginCategoryFilter === cat
+                            ? 'bg-amber-600 text-white font-bold shadow-sm'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {cat === 'all' ? '全プラグイン' : cat}
+                      </button>
+                    )
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono">
+                  登録数: {capabilityPlugins.length}件 (稼働中: {capabilityPlugins.filter((p) => p.status === 'ACTIVE').length}件)
+                </div>
+              </div>
+
+              {/* プラグインカード一覧 */}
+              <div className="space-y-3">
+                {capabilityPlugins
+                  .filter((p) => pluginCategoryFilter === 'all' || p.category === pluginCategoryFilter)
+                  .map((plugin) => {
+                    const permCheck = capabilityPluginService.checkPermissions(plugin.plugin_id);
+                    const fallback = plugin.fallbackPluginId
+                      ? capabilityPluginService.getPlugin(plugin.fallbackPluginId)
+                      : undefined;
+                    const isActive = plugin.status === 'ACTIVE';
+
+                    return (
+                      <div
+                        key={plugin.plugin_id}
+                        className={`p-4 rounded-xl border transition-all space-y-3 ${
+                          isActive
+                            ? 'bg-slate-950/90 border-slate-700/80 hover:border-slate-600'
+                            : plugin.status === 'SUSPENDED'
+                            ? 'bg-rose-950/10 border-rose-900/40'
+                            : 'bg-slate-950/50 border-slate-800/80 opacity-90'
+                        }`}
+                      >
+                        {/* 上部ヘッダー */}
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className={`px-2.5 py-0.5 rounded text-[10.5px] font-bold font-mono border ${
+                                  isActive
+                                    ? 'bg-emerald-950 text-emerald-300 border-emerald-700 shadow-sm'
+                                    : plugin.status === 'TESTED'
+                                    ? 'bg-amber-950 text-amber-300 border-amber-700'
+                                    : plugin.status === 'CANDIDATE'
+                                    ? 'bg-slate-900 text-slate-400 border-slate-700'
+                                    : plugin.status === 'SUSPENDED'
+                                    ? 'bg-rose-950 text-rose-300 border-rose-800'
+                                    : 'bg-slate-900 text-slate-500 border-slate-800'
+                                }`}
+                              >
+                                {isActive
+                                  ? '● ACTIVE (稼働中)'
+                                  : plugin.status === 'TESTED'
+                                  ? '▲ TESTED (権限承認待ち)'
+                                  : plugin.status === 'CANDIDATE'
+                                  ? '○ CANDIDATE (候補)'
+                                  : plugin.status === 'SUSPENDED'
+                                  ? '■ SUSPENDED (一時停止)'
+                                  : 'DISABLED'}
+                              </span>
+                              <span className="font-bold text-slate-100 text-sm">{plugin.name}</span>
+                              <span className="text-[10px] text-slate-500 font-mono bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                                {plugin.plugin_id}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono">v{plugin.version}</span>
+                            </div>
+                            <p className="text-slate-300 text-xs leading-relaxed">{plugin.description}</p>
+                          </div>
+
+                          {/* アクションボタン */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePluginActive(plugin)}
+                              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
+                                isActive
+                                  ? 'bg-rose-950 hover:bg-rose-900 text-rose-200 border border-rose-700'
+                                  : 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white shadow-amber-900/30'
+                              }`}
+                              title={
+                                isActive
+                                  ? 'プラグインを一時停止し、端末権限の行使を止めます'
+                                  : 'プラグインを有効化します (未承認の権限がある場合は確認ダイアログが開きます)'
+                              }
+                            >
+                              {isActive ? (
+                                <>
+                                  <Lock className="w-3.5 h-3.5 text-rose-300" />
+                                  <span>一時停止 (SUSPEND)</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ShieldCheck className="w-3.5 h-3.5" />
+                                  <span>有効化 (ACTIVE)</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 詳細スペックグリッド */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                          {/* 左列: 入出力スキーマと使用可能ツール */}
+                          <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1.5">
+                            <div className="text-[11px] text-slate-400 font-semibold flex items-center justify-between">
+                              <span>必要入力 (requiredInputs):</span>
+                              <span className="text-sky-400 font-mono">{plugin.requiredInputs.length} 件</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {plugin.requiredInputs.map((inp, i) => (
+                                <span
+                                  key={i}
+                                  className="px-2 py-0.5 rounded bg-slate-950 text-slate-300 text-[10px] font-mono border border-slate-800"
+                                >
+                                  {inp}
+                                </span>
+                              ))}
+                            </div>
+
+                            <div className="text-[11px] text-slate-400 font-semibold pt-1">
+                              出力スキーマ (outputSchema):
+                            </div>
+                            <div className="text-[10.5px] text-slate-300 font-mono bg-slate-950 p-1.5 rounded border border-slate-800/80 truncate">
+                              {plugin.outputSchema}
+                            </div>
+
+                            <div className="text-[11px] text-indigo-300 font-semibold pt-1 flex items-center justify-between">
+                              <span>47章 連携: 使用可能ツール (allowed_tools):</span>
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {plugin.allowedTools.length} ツール
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {plugin.allowedTools.map((toolId) => (
+                                <span
+                                  key={toolId}
+                                  className="px-2 py-0.5 rounded bg-indigo-950/70 text-indigo-200 text-[10px] font-mono border border-indigo-800/60"
+                                >
+                                  {toolId}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* 右列: 権限、予算、検証方法、代替経路 */}
+                          <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-2">
+                            {/* 必要権限ステータス */}
+                            <div className="space-y-1">
+                              <div className="text-[11px] text-slate-400 font-semibold flex items-center justify-between">
+                                <span className="flex items-center gap-1">
+                                  <Lock className="w-3 h-3 text-amber-400" />
+                                  <span>必要権限 (requiredPermissions):</span>
+                                </span>
+                                <span
+                                  className={`text-[10px] font-mono ${
+                                    permCheck.hasAllPermissions ? 'text-emerald-400' : 'text-amber-400'
+                                  }`}
+                                >
+                                  {permCheck.hasAllPermissions ? '全権限承認済み' : `未承認 ${permCheck.missing.length}件`}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {plugin.requiredPermissions.length === 0 ? (
+                                  <span className="text-[10px] text-slate-500 italic">追加権限なし (安全)</span>
+                                ) : (
+                                  plugin.requiredPermissions.map((perm) => {
+                                    const isGranted = plugin.grantedPermissions?.includes(perm);
+                                    return (
+                                      <span
+                                        key={perm}
+                                        className={`px-2 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1 ${
+                                          isGranted
+                                            ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                                            : 'bg-amber-950/80 text-amber-300 border-amber-800'
+                                        }`}
+                                      >
+                                        {isGranted ? (
+                                          <Check className="w-3 h-3 text-emerald-400" />
+                                        ) : (
+                                          <AlertTriangle className="w-3 h-3 text-amber-400" />
+                                        )}
+                                        <span>{perm}</span>
+                                      </span>
+                                    );
+                                  })
+                                )}
+                              </div>
+                              {plugin.userConsentGrantedAt && (
+                                <div className="text-[9.5px] text-slate-500 font-mono">
+                                  ユーザー同意日時: {new Date(plugin.userConsentGrantedAt).toLocaleString('ja-JP')}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 実行予算 & タイムアウト */}
+                            <div className="grid grid-cols-3 gap-1 pt-1 border-t border-slate-800/80 text-[10px] font-mono text-slate-300">
+                              <div>
+                                <span className="text-slate-500 block">最大トークン:</span>
+                                <span className="font-bold text-sky-400">
+                                  {plugin.executionBudget.maxTokens || 4000} tok
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 block">タイムアウト:</span>
+                                <span className="font-bold text-amber-400">{plugin.timeoutMs / 1000} 秒</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 block">想定コスト:</span>
+                                <span className="font-bold text-emerald-400">
+                                  {plugin.executionBudget.costPerRun || 0} pts
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* 検証方法 & 失敗時代替経路 */}
+                            <div className="pt-1 border-t border-slate-800/80 space-y-1 text-[10.5px]">
+                              <div className="text-slate-400">
+                                <span className="text-slate-500">検証方法: </span>
+                                <span className="text-slate-300">{plugin.verificationMethod}</span>
+                              </div>
+                              <div className="text-slate-400 flex items-center gap-1">
+                                <span className="text-slate-500">代替経路: </span>
+                                {fallback ? (
+                                  <span className="text-sky-300 font-mono flex items-center gap-1 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">
+                                    <ArrowRight className="w-3 h-3" />
+                                    <span>{fallback.name} ({fallback.plugin_id})</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-500 italic">なし</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 下部ステータスバー: 実績 */}
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800/60 font-mono">
+                          <div className="flex items-center gap-3">
+                            <span className="text-emerald-400">成功: {plugin.successCount || 0} 回</span>
+                            <span className="text-rose-400">失敗: {plugin.failureCount || 0} 回</span>
+                            {plugin.lastExecutedAt && (
+                              <span className="text-slate-500">
+                                最終実行: {new Date(plugin.lastExecutedAt).toLocaleTimeString('ja-JP')}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-slate-500">依頼分類: {plugin.category}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
           {/* TAB 3: 実験室 & ベンチマーク (第3世代) */}
           {activeTab === 'lab' && (
             <div className="space-y-4">
@@ -3816,6 +4190,23 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* 46章: 能力プラグイン権限承認ダイアログ (正式権限を自動増加させない原則) */}
+      {consentRequestModal && (
+        <PluginConsentDialog
+          request={consentRequestModal}
+          isOpen={true}
+          onClose={() => setConsentRequestModal(null)}
+          onConsentGranted={(updatedPlugin) => {
+            handlePluginConsentGranted(updatedPlugin);
+            setConsentRequestModal(null);
+          }}
+          onConsentRejected={(updatedPlugin) => {
+            handlePluginConsentRejected(updatedPlugin);
+            setConsentRequestModal(null);
+          }}
+        />
+      )}
     </div>
   );
 };

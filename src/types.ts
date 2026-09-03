@@ -130,6 +130,61 @@ export interface SkillItem {
   updatedAt: number;
 }
 
+/**
+ * 設計思想 46. 能力プラグイン方式 (Capability Plugin System)
+ * 47章「自然言語からワークフローを作る機構」の allowed_tools の参照元となる能力定義基盤。
+ * プラグインが追加されても端末内の正式権限を自動的に増やさず、ACTIVE昇格時にユーザー同意を必須とする。
+ */
+export type CapabilityPluginStatus =
+  | 'DISABLED'   // 無効化中
+  | 'CANDIDATE'  // 候補（未テスト・未承認）
+  | 'TESTED'     // テスト完了（権限同意待ち、または試験合格）
+  | 'ACTIVE'     // 有効（ユーザーによる権限明示同意済み、稼働中）
+  | 'SUSPENDED'  // 一時停止（失敗多発またはユーザー手動停止）
+  | 'RETIRED';   // 引退（新バージョンまたは別能力へ移行済み）
+
+export interface CapabilityPluginExecutionBudget {
+  maxTokens?: number;       // 1回あたりの最大消費トークン
+  maxCalls?: number;        // セッションまたはタスク内最大呼び出し回数
+  costPerRun?: number;      // クラウド実行時等の想定コスト (Credits/USD等)
+  maxDurationMs?: number;   // 想定最大所要時間 (ミリ秒)
+}
+
+export interface CapabilityPlugin {
+  plugin_id: string;                      // プラグイン識別子 (例: plugin_web_search)
+  name: string;                           // 名称 (例: Web調査能力)
+  description: string;                    // 概要・説明
+  category: string;                       // 対応する依頼分類 (例: web_search, vba_validation, code_analysis)
+  requiredInputs: string[];               // 必要入力 (例: ['検索クエリ', '調査テーマ'])
+  outputSchema: string;                   // 出力スキーマ (例: 'Markdownレポート形式 (引用元URL・事実要約)')
+  allowedTools: string[];                 // 使用可能ツール (例: ['tool_gemini_cloud_search', 'tool_workspace_search'])
+  requiredPermissions: string[];          // 必要権限 (例: ['network_cloud', 'workspace_read'])
+  executionBudget: CapabilityPluginExecutionBudget; // 実行予算
+  timeoutMs: number;                      // タイムアウト (ミリ秒)
+  verificationMethod: string;             // 検証方法 (例: '事実整合性チェック & 参照URLのフォーマット検証')
+  fallbackPluginId?: string;              // 失敗時の代替経路 (例: 'plugin_local_code_analysis')
+  version: string;                        // 版 (例: '1.0.0')
+  status: CapabilityPluginStatus;         // 状態 (DISABLED, CANDIDATE, TESTED, ACTIVE, SUSPENDED, RETIRED)
+  
+  // 権限・同意管理 (プラグインが追加されても正式権限を自動追加しない原則)
+  userConsentGrantedAt?: number;          // ユーザー明示同意日時
+  grantedPermissions?: string[];          // ユーザーが明示的に承認した権限一覧
+  consentNotes?: string;                  // 同意時の特記事項
+
+  // 実行実績統計
+  successCount?: number;                  // 成功回数
+  failureCount?: number;                  // 失敗回数
+  lastExecutedAt?: number;                // 最終実行日時
+  createdAt: number;                      // 作成日時
+  updatedAt: number;                      // 更新日時
+}
+
+export interface PluginConsentRequest {
+  plugin: CapabilityPlugin;
+  missingPermissions: string[];
+  riskSummary: string;
+}
+
 export interface WorkspaceFile {
   path: string;
   name: string;
