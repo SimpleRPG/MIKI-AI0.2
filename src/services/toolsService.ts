@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
+import { capabilityPluginService } from './capabilityPluginService';
 
 const TOOLS_STATS_STORAGE_KEY = 'miki_ai_tools_stats';
 
@@ -667,6 +668,34 @@ export class ToolsService {
         outputSummary: `エラー: ツール [${toolId}] は未登録です。`,
         executionTimeMs: 0,
         permission: 'read_only',
+        result: null,
+      };
+    }
+
+    // 46章: 能力プラグインの権限ゲート (プラグインが ACTIVE でないツールは実行させない)
+    const permissionCheck = capabilityPluginService.isToolPermitted(toolId);
+    if (!permissionCheck.permitted && permissionCheck.plugin) {
+      const missingPermissions = permissionCheck.plugin.requiredPermissions.filter(
+        (p) => !(permissionCheck.plugin!.grantedPermissions || []).includes(p)
+      );
+      systemLogger.warn(
+        'TOOLS',
+        `⛔ ツール [${tool.name}] は能力プラグイン [${permissionCheck.plugin.name}] の権限未同意のため実行をブロックしました (状態: ${permissionCheck.plugin.status})`
+      );
+      return {
+        toolId,
+        toolName: tool.name,
+        success: false,
+        error: 'PLUGIN_CONSENT_REQUIRED',
+        outputSummary: `⚠️ [権限確認待ち] 「${permissionCheck.plugin.name}」の実行には権限の同意が必要です。${permissionCheck.reason}「自己改善ラボ → 能力プラグイン」から確認・承認してください。`,
+        executionTimeMs: 0,
+        permission: tool.permission,
+        requiresPluginConsent: true,
+        pluginConsentRequest: {
+          plugin: permissionCheck.plugin,
+          missingPermissions,
+          riskSummary: permissionCheck.reason || '',
+        },
         result: null,
       };
     }

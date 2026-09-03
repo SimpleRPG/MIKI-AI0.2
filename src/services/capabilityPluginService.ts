@@ -244,6 +244,47 @@ export class CapabilityPluginService {
   }
 
   /**
+   * 指定したツールIDがどの能力プラグインに属しているかを逆引きする。
+   * 該当するプラグインが1件もない場合は undefined を返す
+   * (= プラグイン管理下ではない素のツール。これは許可チェック対象外とする)。
+   */
+  public findPluginForTool(toolId: string): CapabilityPlugin | undefined {
+    return this.getAllPlugins().find((p) => p.allowedTools.includes(toolId));
+  }
+
+  /**
+   * 指定したツールIDが「今すぐ実行してよいか」を判定する。
+   * - 該当プラグインが無い(プラグイン管理下にないツール) → 許可
+   * - プラグインが ACTIVE → 許可
+   * - プラグインが ACTIVE 以外(CANDIDATE / TESTED / DISABLED / SUSPENDED / RETIRED) → 不許可
+   */
+  public isToolPermitted(toolId: string): {
+    permitted: boolean;
+    plugin?: CapabilityPlugin;
+    reason?: string;
+  } {
+    const plugin = this.findPluginForTool(toolId);
+    if (!plugin) {
+      return { permitted: true }; // プラグイン管理下にない素のツールは対象外
+    }
+    if (plugin.status === 'ACTIVE') {
+      return { permitted: true, plugin };
+    }
+    const reasonMap: Record<string, string> = {
+      CANDIDATE: '能力プラグインがまだ候補段階で、ユーザーの権限同意が済んでいません。',
+      TESTED: 'テストは完了していますが、まだユーザーの権限同意が済んでいません。',
+      DISABLED: 'この能力プラグインは無効化されています。',
+      SUSPENDED: 'この能力プラグインは失敗多発またはユーザー操作により一時停止中です。',
+      RETIRED: 'この能力プラグインは引退済みです。',
+    };
+    return {
+      permitted: false,
+      plugin,
+      reason: reasonMap[plugin.status] || '権限未確認のため実行できません。',
+    };
+  }
+
+  /**
    * 分類 (category) からプラグインを検索
    */
   public findPluginsByCategory(category: string): CapabilityPlugin[] {

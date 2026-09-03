@@ -1272,6 +1272,12 @@ export default function App() {
                 summary: toolRes.outputSummary,
                 durationMs: toolRes.executionTimeMs,
               });
+            } else if (toolRes.requiresPluginConsent) {
+              // 46章: 能力プラグイン権限未同意の場合はチャットで案内するため結果を格納
+              executedTools.push(toolRes);
+              systemLogger.warn('TOOLS', `LLM前処理ツールは能力プラグイン権限未同意のためブロック: [${rec.name}]`, {
+                plugin: toolRes.pluginConsentRequest?.plugin.name,
+              });
             }
           } catch (toolErr: any) {
             systemLogger.warn('TOOLS', `LLM前処理ツール実行失敗 [${rec.name}]:`, toolErr?.message || toolErr);

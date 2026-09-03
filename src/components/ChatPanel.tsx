@@ -960,14 +960,41 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         </span>
                       </div>
                       {msg.executedTools.map((t, idx) => (
-                        <div key={idx} className="p-2 rounded-lg bg-black/40 border border-slate-800 text-[10.5px] space-y-1">
-                          <div className="flex items-center justify-between font-mono text-emerald-400 font-bold">
-                            <span>{t.toolName}</span>
-                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-emerald-950 border border-emerald-800 text-emerald-300">
-                              {t.permission}
+                        <div
+                          key={idx}
+                          className={`p-2 rounded-lg border text-[10.5px] space-y-1 ${
+                            t.requiresPluginConsent
+                              ? 'bg-amber-950/20 border-amber-500/40'
+                              : 'bg-black/40 border-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between font-mono font-bold">
+                            <span className={t.requiresPluginConsent ? 'text-amber-400' : 'text-emerald-400'}>
+                              {t.toolName}
+                            </span>
+                            <span
+                              className={`text-[9.5px] px-1.5 py-0.2 rounded border ${
+                                t.requiresPluginConsent
+                                  ? 'bg-amber-950 border-amber-800 text-amber-300'
+                                  : 'bg-emerald-950 border-emerald-800 text-emerald-300'
+                              }`}
+                            >
+                              {t.requiresPluginConsent ? '権限同意待ち' : t.permission}
                             </span>
                           </div>
                           <div className="text-slate-300 font-sans leading-relaxed">{t.outputSummary}</div>
+                          {t.requiresPluginConsent && onOpenSelfImprovementModal && (
+                            <div className="pt-1 flex items-center justify-end">
+                              <button
+                                type="button"
+                                onClick={onOpenSelfImprovementModal}
+                                className="px-2 py-0.5 text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>能力プラグインを確認・承認する</span>
+                                <span>→</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

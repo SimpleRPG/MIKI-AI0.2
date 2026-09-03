@@ -292,6 +292,8 @@ export interface ToolExecutionResult {
   executionTimeMs: number;
   permission: ToolPermissionLevel;
   requiresConfirmation?: boolean;
+  requiresPluginConsent?: boolean;   // 46章: 能力プラグインの権限同意待ちで実行できなかった場合 true
+  pluginConsentRequest?: PluginConsentRequest; // 46章: 同意ダイアログにそのまま渡せる形の同意要求
   executedAt?: number;
 }
 
