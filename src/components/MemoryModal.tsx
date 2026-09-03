@@ -35,6 +35,10 @@ import {
   HelpCircle,
   CheckCheck,
   FolderGit2,
+  FileText,
+  Upload,
+  FileCode,
+  X,
 } from 'lucide-react';
 import { MemoryItem, PersonaConfig, MemoryType, MemoryDestination } from '../types';
 import {
@@ -84,6 +88,257 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   const [graphSearchQuery, setGraphSearchQuery] = useState('ゲームの脱ロボットとタメ口会話');
   const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(null);
   const [graphTraverseEnabled, setGraphTraverseEnabled] = useState(true);
+
+  // ============================================================================
+  // 設計思想 24章 第2世代-4: TXTファイル取込み機能 (未承認情報として安全に取り込む)
+  // ============================================================================
+  interface ImportChunkPreview {
+    id: string;
+    fileName: string;
+    index: number;
+    fullText: string;
+    summary: string;
+    category: MemoryItem['category'];
+    selected: boolean;
+    charCount: number;
+  }
+
+  const [importChunks, setImportChunks] = useState<ImportChunkPreview[]>([]);
+  const [isReadingFiles, setIsReadingFiles] = useState(false);
+  const [expandedPreviewId, setExpandedPreviewId] = useState<string | null>(null);
+
+  // テキストを空行2つ以上または800〜1500文字を目安に分割するヘルパー
+  const splitTextIntoChunks = (
+    text: string,
+    fileName: string
+  ): { fullText: string; summary: string; category: MemoryItem['category'] }[] => {
+    const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+    if (!normalized) return [];
+
+    // 空行2つ以上でブロック分割
+    const rawBlocks = normalized.split(/\n\s*\n\s*\n+/);
+    const intermediateBlocks: string[] = [];
+
+    for (const block of rawBlocks) {
+      const trimmed = block.trim();
+      if (!trimmed) continue;
+
+      // 1500文字を超える場合は行単位またはプロシージャ単位で分割
+      if (trimmed.length > 1500) {
+        const lines = trimmed.split('\n');
+        let currentSub = '';
+        for (const line of lines) {
+          if (
+            (currentSub.length + line.length + 1 > 1200 && currentSub.length >= 600) ||
+            (currentSub.length > 300 &&
+              /^(sub |function |private sub|public sub|end sub|end function|class )/i.test(line.trim()))
+          ) {
+            intermediateBlocks.push(currentSub.trim());
+            currentSub = line;
+          } else {
+            currentSub += (currentSub ? '\n' : '') + line;
+          }
+        }
+        if (currentSub.trim()) {
+          intermediateBlocks.push(currentSub.trim());
+        }
+      } else {
+        intermediateBlocks.push(trimmed);
+      }
+    }
+
+    // 800〜1400文字を目安に小さすぎるブロックを結合
+    const finalChunks: string[] = [];
+    let buffer = '';
+    for (const b of intermediateBlocks) {
+      if (!buffer) {
+        buffer = b;
+      } else if (buffer.length + b.length + 2 <= 1400) {
+        buffer += '\n\n' + b;
+      } else {
+        finalChunks.push(buffer);
+        buffer = b;
+      }
+    }
+    if (buffer) {
+      finalChunks.push(buffer);
+    }
+
+    return finalChunks.map((chunk) => {
+      // カテゴリデフォルト判定: .bas/.vbs/.cls または Sub / Function を含む場合は vba、コードらしき内容は code、それ以外は chat
+      let category: MemoryItem['category'] = 'chat';
+      const isVbaName = /\.(bas|vbs|cls)$/i.test(fileName);
+      const hasVbaKeywords = /\b(sub\s+\w+|function\s+\w+|dim\s+\w+|end\s+sub|end\s+function|set\s+\w+|msgbox|range\(|cells\()/i.test(
+        chunk
+      );
+      const hasCodeKeywords =
+        /[{};=>]|function\s*\(|class\s+\w+|def\s+\w+|import\s+|export\s+|<[a-z]+.*>/i.test(chunk);
+
+      if (isVbaName || hasVbaKeywords) {
+        category = 'vba';
+      } else if (hasCodeKeywords) {
+        category = 'code';
+      } else {
+        category = 'chat';
+      }
+
+      // チャンク要約: 最初の有意行または先頭150字程度
+      const nonCommentLines = chunk
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0 && !l.startsWith("'") && !l.startsWith('//') && !l.startsWith('rem '));
+      const firstLine = nonCommentLines[0] || '';
+      let summary = '';
+      if (firstLine && firstLine.length <= 100) {
+        const cleanBody = chunk.replace(/\s+/g, ' ').trim();
+        summary = cleanBody.length <= 150 ? cleanBody : `${firstLine}: ${cleanBody.slice(0, 120)}...`;
+      } else {
+        summary = chunk.replace(/\s+/g, ' ').slice(0, 150);
+      }
+
+      return {
+        fullText: chunk,
+        summary: summary.trim(),
+        category,
+      };
+    });
+  };
+
+  // ファイル読み込みハンドラー (FileReader.readAsText)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsReadingFiles(true);
+    const fileList = Array.from(files);
+    const newPreviews: ImportChunkPreview[] = [];
+    let completed = 0;
+
+    fileList.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = (event.target?.result as string) || '';
+        const chunks = splitTextIntoChunks(text, file.name);
+        chunks.forEach((c, idx) => {
+          newPreviews.push({
+            id: `chunk_${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${idx}`,
+            fileName: file.name,
+            index: idx + 1,
+            fullText: c.fullText,
+            summary: c.summary,
+            category: c.category,
+            selected: true,
+            charCount: c.fullText.length,
+          });
+        });
+
+        completed++;
+        if (completed === fileList.length) {
+          setImportChunks((prev) => [...prev, ...newPreviews]);
+          setIsReadingFiles(false);
+          setExportedStatus(`📄 ${fileList.length} ファイルから ${newPreviews.length} 個のチャンクを読み込みました`);
+          setTimeout(() => setExportedStatus(null), 3500);
+        }
+      };
+
+      reader.onerror = () => {
+        completed++;
+        if (completed === fileList.length) {
+          setIsReadingFiles(false);
+        }
+      };
+
+      reader.readAsText(file);
+    });
+
+    e.target.value = '';
+  };
+
+  // チャンク選択切替
+  const handleToggleChunkSelected = (id: string) => {
+    setImportChunks((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, selected: !c.selected } : c))
+    );
+  };
+
+  // 全選択 / 全解除
+  const handleToggleSelectAll = (select: boolean) => {
+    setImportChunks((prev) => prev.map((c) => ({ ...c, selected: select })));
+  };
+
+  // チャンクカテゴリ編集
+  const handleChangeChunkCategory = (id: string, category: MemoryItem['category']) => {
+    setImportChunks((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, category } : c))
+    );
+  };
+
+  // チャンク要約編集
+  const handleChangeChunkSummary = (id: string, summary: string) => {
+    setImportChunks((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, summary } : c))
+    );
+  };
+
+  // プレビュー削除
+  const handleRemoveChunkPreview = (id: string) => {
+    setImportChunks((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  // 全プレビュークリア
+  const handleClearImportChunks = () => {
+    setImportChunks([]);
+    setExpandedPreviewId(null);
+  };
+
+  // チャンク取り込み確定 (設計思想 24章 & 25章)
+  // 取り込んだ内容は未承認情報 (approved: false) として保存し、ユーザーが確認・承認するまで確定事実として使わない
+  const handleCommitImport = () => {
+    const selected = importChunks.filter((c) => c.selected);
+    if (selected.length === 0) {
+      alert('取り込むチャンクを1件以上選択してください。');
+      return;
+    }
+
+    const rawMemories = storageService.getMemories();
+    let importedCount = 0;
+
+    selected.forEach((chunk, index) => {
+      const newItem = enrichMemoryMetadata(
+        {
+          id: 'mem_import_' + Date.now() + '_' + index,
+          category: chunk.category, // 判定結果または編集後
+          content: chunk.summary || chunk.fullText.slice(0, 150), // チャンクの要約 or 先頭150字程度
+          importance: 3,
+          pinned: false,
+          active: true,
+          approved: false, // 必ずfalseで作成する (設計思想 25. 未承認情報を確定事実として使わない)
+          source: 'txt_import',
+          tags: ['ファイル取込み', chunk.fileName],
+        },
+        {
+          rawUserText: chunk.fullText,
+          sourceRef: `${chunk.fileName}#${chunk.index}`,
+          existingMemories: rawMemories,
+        }
+      );
+
+      storageService.saveMemoryItem(newItem);
+      importedCount++;
+    });
+
+    const updated = storageService.getMemories();
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+
+    setImportChunks([]);
+    setExpandedPreviewId(null);
+    setExportedStatus(
+      `📁 ファイル取込み完了！ ${importedCount} 件を「未承認」記憶として安全に保存しました（承認するまで確定事実としては使われません）`
+    );
+    setTimeout(() => setExportedStatus(null), 5000);
+  };
 
   // Auto classify category behind the scenes so user doesn't need to pick
   const detectCategory = (text: string): MemoryItem['category'] => {
@@ -619,6 +874,175 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                 </div>
               </form>
 
+              {/* 📁 TXT / VBA ファイル取込み (設計思想 24章 第2世代-4) */}
+              <div className="bg-slate-950/90 border border-sky-500/30 rounded-xl p-3.5 space-y-3 shadow-lg shadow-sky-950/20">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="space-y-0.5">
+                    <div className="font-bold text-sky-200 text-xs flex items-center gap-1.5">
+                      <FileCode className="w-4 h-4 text-sky-400" />
+                      <span>TXT / VBA ファイルから取り込む (設計思想 24章 第2世代-4)</span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-400 leading-relaxed">
+                      仕事用PCのVBAコード（.bas / .cls / .vbs）やメモ（.txt）を分割して記憶化します。取り込まれた内容は必ず<strong>未承認情報（approved: false）</strong>として保管され、ユーザーが確認・承認するまで確定事実として使いません。
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <label className="px-3 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-sky-600/20 transition-all cursor-pointer">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{isReadingFiles ? '読み込み中...' : 'ファイルを選択 (.txt, .bas, .cls, .vbs)'}</span>
+                      <input
+                        type="file"
+                        accept=".txt,.bas,.cls,.vbs,text/plain"
+                        multiple
+                        onChange={handleFileUpload}
+                        disabled={isReadingFiles}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* 取り込みプレビュー一覧 */}
+                {importChunks.length > 0 && (
+                  <div className="p-3 rounded-xl bg-slate-900/90 border border-sky-500/30 space-y-2.5 animate-in fade-in">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-sky-300">
+                          取り込みプレビュー ({importChunks.filter((c) => c.selected).length} / {importChunks.length} 件選択中)
+                        </span>
+                        <span className="text-[10px] text-slate-400">800〜1500文字で自動チャンク分割済み</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSelectAll(true)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] transition-colors"
+                        >
+                          全選択
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSelectAll(false)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] transition-colors"
+                        >
+                          全解除
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleClearImportChunks}
+                          className="px-2 py-0.5 rounded bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-800/40 text-[10px] transition-colors"
+                        >
+                          クリア
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                      {importChunks.map((chunk) => {
+                        const isExpanded = expandedPreviewId === chunk.id;
+                        return (
+                          <div
+                            key={chunk.id}
+                            className={`p-2.5 rounded-lg border transition-all ${
+                              chunk.selected
+                                ? 'bg-slate-950 border-sky-500/40'
+                                : 'bg-slate-950/50 border-slate-800 opacity-60'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={chunk.selected}
+                                  onChange={() => handleToggleChunkSelected(chunk.id)}
+                                  className="rounded border-slate-700 text-sky-500 focus:ring-sky-500 w-3.5 h-3.5"
+                                />
+                                <span className="text-[10px] font-mono text-sky-300 font-bold shrink-0">
+                                  {chunk.fileName}#{chunk.index}
+                                </span>
+                                <span className="text-[9.5px] font-mono text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 shrink-0">
+                                  {chunk.charCount}文字
+                                </span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="text-[10px] text-slate-400">カテゴリ:</span>
+                                  <select
+                                    value={chunk.category}
+                                    onChange={(e) =>
+                                      handleChangeChunkCategory(chunk.id, e.target.value as MemoryItem['category'])
+                                    }
+                                    className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-slate-200 focus:outline-none focus:border-sky-500"
+                                  >
+                                    <option value="vba">VBA</option>
+                                    <option value="code">Code</option>
+                                    <option value="chat">Chat</option>
+                                    <option value="gamedev">GameDev</option>
+                                    <option value="preference">Preference</option>
+                                    <option value="profile">Profile</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedPreviewId(isExpanded ? null : chunk.id)}
+                                  className="text-[10px] text-slate-400 hover:text-slate-200 px-1.5 py-0.5 rounded hover:bg-slate-800 transition-colors"
+                                >
+                                  {isExpanded ? '原文を閉じる' : '原文を表示'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveChunkPreview(chunk.id)}
+                                  className="p-1 text-slate-500 hover:text-rose-400 rounded hover:bg-rose-950/30 transition-colors"
+                                  title="このチャンクを除外"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* 要約編集フィールド (4章 原文と要約の分離: contentは要約) */}
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              <span className="text-[9.5px] text-slate-400 shrink-0">要約/見出し:</span>
+                              <input
+                                type="text"
+                                value={chunk.summary}
+                                onChange={(e) => handleChangeChunkSummary(chunk.id, e.target.value)}
+                                placeholder="チャンクの要約または要点を入力"
+                                className="flex-1 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[10.5px] text-slate-200 focus:outline-none focus:border-sky-500"
+                              />
+                            </div>
+
+                            {/* 原文スニペット (展開時) */}
+                            {isExpanded && (
+                              <div className="mt-2 p-2 rounded bg-slate-900/90 border border-slate-800 font-mono text-[10px] text-slate-300 max-h-40 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                                {chunk.fullText}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-800">
+                      <div className="text-[10.5px] text-amber-300 flex items-center gap-1">
+                        <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>取り込まれた記憶は未承認（approved: false）で保存され、承認するまで確定事実として使いません</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCommitImport}
+                        disabled={importChunks.filter((c) => c.selected).length === 0}
+                        className="px-4 py-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-sky-950/40 transition-all cursor-pointer"
+                      >
+                        <CheckCheck className="w-4 h-4" />
+                        <span>未承認として記憶に取り込む ({importChunks.filter((c) => c.selected).length} 件)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {exportedStatus && (
                 <div className="p-3 rounded-xl bg-amber-950/60 border border-amber-500/40 text-amber-200 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200">
                   <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
@@ -908,9 +1332,11 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                 <span className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono shrink-0 ${
                                   mem.source === 'manual'
                                     ? 'bg-indigo-950 text-indigo-300 border border-indigo-800'
+                                    : mem.source === 'txt_import'
+                                    ? 'bg-sky-950 text-sky-300 border border-sky-800'
                                     : 'bg-slate-900 text-slate-500 border border-slate-800'
                                 }`}>
-                                  {mem.source === 'manual' ? '手動' : '自動抽出'}
+                                  {mem.source === 'manual' ? '手動' : mem.source === 'txt_import' ? '📁 TXT取込み' : '自動抽出'}
                                 </span>
                               )}
 
@@ -1049,6 +1475,41 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                               </button>
                             </div>
                           </div>
+
+                          {/* Row 1.5: 出典参照 (sourceRef), タグ, 原文抜粋 (rawExcerpt) */}
+                          {(mem.sourceRef || mem.rawExcerpt || (mem.tags && mem.tags.length > 0)) && (
+                            <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[10px] text-slate-400 border-t border-slate-900">
+                              {mem.sourceRef && (
+                                <span
+                                  className="flex items-center gap-1 font-mono text-[9.5px] text-sky-300 bg-sky-950/50 px-1.5 py-0.5 rounded border border-sky-800/40"
+                                  title={`出典: ${mem.sourceRef}`}
+                                >
+                                  <FileText className="w-2.5 h-2.5" />
+                                  <span>出典: {mem.sourceRef}</span>
+                                </span>
+                              )}
+                              {mem.tags &&
+                                mem.tags.map((tag, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="font-mono text-[9px] text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800"
+                                  >
+                                    #{tag}
+                                  </span>
+                                ))}
+                              {mem.rawExcerpt && mem.rawExcerpt !== mem.content && (
+                                <details className="w-full mt-1 group">
+                                  <summary className="cursor-pointer text-[9.5px] text-slate-400 hover:text-slate-200 transition-colors list-none flex items-center gap-1 font-mono">
+                                    <span className="group-open:rotate-90 transition-transform text-[8px]">▶</span>
+                                    <span>原文抜粋を表示 (4章 原文と要約の分離)</span>
+                                  </summary>
+                                  <div className="mt-1 p-2 rounded bg-slate-900/80 border border-slate-800 font-mono text-[10px] text-slate-300 whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
+                                    {mem.rawExcerpt}
+                                  </div>
+                                </details>
+                              )}
+                            </div>
+                          )}
 
                           {/* Row 2: 競合解決フロー・インラインパネル (アコーディオン) */}
                           {hasConflict && isExpanded && (

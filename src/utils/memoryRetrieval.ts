@@ -463,6 +463,7 @@ export function enrichMemoryMetadata(
 
   // 2. approved (承認状態) の補完 (設計思想 25. 未承認情報を確定事実として使わない)
   // 自動抽出 (source === 'auto') の場合は、importance や pinned に関係なく必ず false とする。
+  // ファイル取込み (source === 'txt_import') も必ず未承認からスタートする。
   // ユーザー手動入力 (source === 'manual') や明示的承認 (approved === true) のみ承認とする。
   let approved = false;
   if (item.approved !== undefined) {
@@ -471,6 +472,8 @@ export function enrichMemoryMetadata(
     approved = true;
   } else if (item.source === 'auto') {
     approved = false;
+  } else if (item.source === 'txt_import') {
+    approved = false; // ファイル取込みは必ず未承認からスタート
   } else {
     approved = Boolean(item.pinned && (item.importance ?? 1) >= 5);
   }
