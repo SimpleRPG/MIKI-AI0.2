@@ -351,6 +351,14 @@ class StorageService {
     return this.getMemories().filter((m) => m.approved !== false && m.active !== false);
   }
 
+  public getUnapprovedMemories(): MemoryItem[] {
+    return this.getMemories().filter((m) => m.approved === false && m.active !== false);
+  }
+
+  public getConflictedMemories(): MemoryItem[] {
+    return this.getMemories().filter((m) => m.active !== false && Array.isArray(m.conflictWith) && m.conflictWith.length > 0);
+  }
+
   public saveMemoryItem(item: MemoryItem): void {
     const current = this.getMemories();
     const idx = current.findIndex((m) => m.id === item.id);
@@ -362,6 +370,61 @@ class StorageService {
       next = [item, ...current];
     }
     this.setMemories(next);
+  }
+
+  public deleteMemoryItem(id: string): void {
+    const current = this.getMemories();
+    const filtered = current.filter((m) => m.id !== id);
+    this.setMemories(filtered);
+  }
+
+  public resolveConflict(keepId: string, discardId: string): void {
+    const now = Date.now();
+    const current = this.getMemories();
+    const updated = current.map((m) => {
+      if (m.id === keepId) {
+        return {
+          ...m,
+          active: true,
+          approved: true,
+          conflictWith: (m.conflictWith || []).filter((cid) => cid !== discardId),
+          updatedAt: now,
+        };
+      }
+      if (m.id === discardId) {
+        return {
+          ...m,
+          active: false,
+          conflictWith: (m.conflictWith || []).filter((cid) => cid !== keepId),
+          updatedAt: now,
+        };
+      }
+      return m;
+    });
+    this.setMemories(updated);
+  }
+
+  public dismissConflict(idA: string, idB: string): void {
+    const now = Date.now();
+    const current = this.getMemories();
+    const updated = current.map((m) => {
+      if (m.id === idA) {
+        return {
+          ...m,
+          conflictWith: (m.conflictWith || []).filter((cid) => cid !== idB),
+          updatedAt: now,
+        };
+      }
+      if (m.id === idB) {
+        return {
+          ...m,
+          conflictWith: (m.conflictWith || []).filter((cid) => cid !== idA),
+          updatedAt: now,
+        };
+      }
+      return m;
+    });
+    this.setMemories(updated);
   }
 }
 

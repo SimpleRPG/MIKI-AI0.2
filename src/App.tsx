@@ -248,16 +248,18 @@ export default function App() {
           const finalContent = item.suffix ? raw + item.suffix : match[0].trim();
           const exists = memories.some((m) => m.content.includes(raw));
           if (!exists) {
+            // 設計思想 25: 自動抽出記憶は importance: 2、approved: false で生成し、自己承認ループを断つ
             const newMem = enrichMemoryMetadata(
               {
                 id: 'mem_auto_' + Date.now(),
                 category: item.cat,
                 content: finalContent,
-                importance: 4,
+                importance: 2,
                 pinned: false,
                 active: true,
+                approved: false,
                 source: 'auto',
-                tags: [item.cat, 'auto_extracted'],
+                tags: [item.cat, 'auto_extracted', 'unverified'],
               },
               {
                 rawUserText: text,
@@ -265,6 +267,7 @@ export default function App() {
                 existingMemories: memories,
               }
             );
+            storageService.saveMemoryItem(newMem);
             setMemories((prev) => [newMem, ...prev]);
           }
         }
@@ -438,10 +441,12 @@ export default function App() {
       const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
       const activeMemories = memories.filter((m) => m.active);
       // 多層ベクトル検索 & 知識グラフ依存関係トラバーサルで、関連性の高い記憶のみを抽出 (設計思想 4 & 12)
+      // 設計思想 25: profile/preferenceなどの事実性カテゴリは承認済み記憶のみに制限
       const relevantMemories = retrieveRelevantMemories(text, activeMemories, {
         limit: 8,
         alwaysIncludePinned: true,
         traverseGraph: true,
+        onlyApprovedForFacts: true,
       });
 
       // Step 2: Memory Retrieval & Context Association

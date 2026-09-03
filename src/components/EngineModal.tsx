@@ -6,6 +6,7 @@ import { deviceBenchmarkService, DeviceSpecReport } from '../services/deviceBenc
 import { distillKnowledgeForLocalLLM, sendChatMessage } from '../services/api';
 import { systemLogger } from '../services/systemLogger';
 import { storageService } from '../services/storageService';
+import { enrichMemoryMetadata } from '../utils/memoryRetrieval';
 import { VRAMMonitor } from './VRAMMonitor';
 import { GgufModelManager } from './GgufModelManager';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -1041,29 +1042,31 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     if (!distilledResult) return;
 
     try {
-      const memoriesList: MemoryItem[] = storageService.getMemories();
+      const existingMemories = storageService.getMemories();
 
-      const newMemory: MemoryItem = {
-        id: 'mem_distill_' + Date.now(),
-        category: 'gamedev',
-        content: `【知識カード: ${distilledResult.title}】\n${distilledResult.content}\n\nQ&A例:\n${(distilledResult.qaPairs || []).map((p: any) => `Q: ${p.q}\nA: ${p.a}`).join('\n')}`,
-        importance: 5,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        source: 'manual',
-        pinned: true,
-        active: true,
-        approved: true,
-        memoryType: 'semantic',
-        sourceRef: 'gemini_distillation',
-        rawExcerpt: distilledResult.title,
-        status: 'active',
-        conflictWith: [],
-        tags: ['distilled_llm_knowledge', distilledResult.category],
-      };
+      const newMemory = enrichMemoryMetadata(
+        {
+          id: 'mem_distill_' + Date.now(),
+          category: 'gamedev',
+          content: `【知識カード: ${distilledResult.title}】\n${distilledResult.content}\n\nQ&A例:\n${(distilledResult.qaPairs || []).map((p: any) => `Q: ${p.q}\nA: ${p.a}`).join('\n')}`,
+          importance: 5,
+          pinned: true,
+          active: true,
+          approved: true, // ユーザーによる手動確定保存のため承認
+          memoryType: 'semantic',
+          source: 'manual',
+          sourceRef: 'gemini_distillation',
+          rawExcerpt: distilledResult.title,
+          status: 'active',
+          tags: ['distilled_llm_knowledge', distilledResult.category],
+        },
+        {
+          existingMemories,
+          sourceRef: 'gemini_distillation',
+        }
+      );
 
-      memoriesList.unshift(newMemory);
-      storageService.setMemories(memoriesList);
+      storageService.saveMemoryItem(newMemory);
       setDistillSuccessMsg(`✨ 知識カード「${distilledResult.title}」を端末記憶 (Memory) に保存しました！みきが次回以降の会話・ゲーム作成でこの知識を活用します。`);
     } catch (e) {
       alert('記憶の保存に失敗しました。');

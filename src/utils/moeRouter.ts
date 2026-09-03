@@ -60,20 +60,34 @@ export function buildExpertSystemPromptWithTracking(
   const maxMemories = options?.maxMemories || (options?.isLightweight ? 3 : 5);
 
   // 1. 記憶のRAG検索 (バイグラム + 👍/👎 + 承認状態 + 重要度スコアリング)
+  // 設計思想 25: profile/preference等の事実性カテゴリは未承認情報を確定事実として使わない (onlyApprovedForFacts)
   const scoredMemories = retrieveScoredMemories(userMessage, memories, {
     limit: maxMemories,
     alwaysIncludePinned: true,
     filterExpired: true,
+    onlyApprovedForFacts: true,
   });
 
   const usedMemories = scoredMemories.map((sm) => ({
     id: sm.memory.id,
     content: sm.memory.content,
     score: Math.round(sm.score * 10) / 10,
+    approved: sm.memory.approved,
+    isUnverified: sm.memory.approved === false,
   }));
 
   const memoryBlock = scoredMemories.length > 0
-    ? `【参照された記憶・ユーザー情報 (RAG)】:\n${scoredMemories.map((sm) => `・${sm.memory.content}`).join('\n')}`
+    ? `【参照された記憶・ユーザー情報 (RAG)】:\n${scoredMemories.map((sm) => {
+        const isApproved = sm.memory.approved !== false;
+        const hasConflict = (sm.memory.conflictWith && sm.memory.conflictWith.length > 0);
+        let prefix = '・';
+        if (!isApproved) {
+          prefix = '・[※未検証・仮推論情報（確定事実として断定せず推測として扱うこと）]: ';
+        } else if (hasConflict) {
+          prefix = '・[⚠️別設定と競合あり（最新のユーザー指示を優先すること）]: ';
+        }
+        return `${prefix}${sm.memory.content}`;
+      }).join('\n')}`
     : '';
 
   // 2. スキルライブラリ（手続き記憶）のマッチング

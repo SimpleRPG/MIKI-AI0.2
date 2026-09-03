@@ -139,6 +139,7 @@ export interface MemoryRetrievalOptions {
   alwaysIncludePinned?: boolean;
   filterExpired?: boolean;
   onlyApproved?: boolean;
+  onlyApprovedForFacts?: boolean; // profileやpreference等の事実性カテゴリは承認済みのみに制限 (設計思想 25)
   traverseGraph?: boolean;       // 知識グラフ依存関係トラバーサルを有効化 (デフォルト: true)
   maxGraphHops?: number;         // 最大探索ホップ数 (デフォルト: 2)
 }
@@ -178,6 +179,7 @@ export function retrieveScoredMemories(
     alwaysIncludePinned = true,
     filterExpired = true,
     onlyApproved = false,
+    onlyApprovedForFacts = false,
     traverseGraph = true,
   } = options;
 
@@ -189,6 +191,10 @@ export function retrieveScoredMemories(
     if (m.status === 'archived' || m.status === 'deprecated') return false;
     if (filterExpired && m.expiresAt && m.expiresAt < now) return false;
     if (onlyApproved && m.approved === false) return false;
+    // 事実性の高いカテゴリ (profile, preference) は承認済みのみに制限 (設計思想 25. 未承認情報を確定事実として使わない)
+    if (onlyApprovedForFacts && (m.category === 'profile' || m.category === 'preference') && m.approved === false) {
+      return false;
+    }
     memoryMap.set(m.id, m);
     return true;
   });
@@ -226,7 +232,8 @@ export function retrieveScoredMemories(
     const importanceScore = (memory.importance ?? 1) * 1.5;
     const pinnedBonus = memory.pinned ? 8 : 0;
     const usageBonus = Math.min(memory.useCount ?? 0, 5) * 0.5;
-    const approvedBonus = memory.approved ? 4 : 0;
+    // 承認済み記憶はボーナス付与、未承認記憶は確証度ペナルティ (-2.5) を付与 (設計思想 25)
+    const approvedBonus = memory.approved ? 4 : -2.5;
 
     const good = memory.goodCount ?? 0;
     const bad = memory.badCount ?? 0;
@@ -244,6 +251,13 @@ export function retrieveScoredMemories(
       approvedBonus +
       feedbackScore +
       recencyScore;
+
+    if (memory.approved === false) {
+      matchReasons.push('※未確認・未承認記憶 (仮推論)');
+    }
+    if (memory.conflictWith && memory.conflictWith.length > 0) {
+      matchReasons.push('⚠️別記憶と競合あり');
+    }
 
     return {
       memory,
@@ -402,10 +416,19 @@ export function enrichMemoryMetadata(
     }
   }
 
-  // 2. approved (承認状態) の補完
-  const approved = item.approved !== undefined
-    ? item.approved
-    : Boolean(item.pinned || (item.importance ?? 3) >= 4 || item.source === 'manual');
+  // 2. approved (承認状態) の補完 (設計思想 25. 未承認情報を確定事実として使わない)
+  // 自動抽出 (source === 'auto') の場合は、importance や pinned に関係なく必ず false とする。
+  // ユーザー手動入力 (source === 'manual') や明示的承認 (approved === true) のみ承認とする。
+  let approved = false;
+  if (item.approved !== undefined) {
+    approved = item.approved;
+  } else if (item.source === 'manual') {
+    approved = true;
+  } else if (item.source === 'auto') {
+    approved = false;
+  } else {
+    approved = Boolean(item.pinned && (item.importance ?? 1) >= 5);
+  }
 
   // 3. rawExcerpt (原文抜粋) と sourceRef (根拠参照)
   const rawExcerpt = item.rawExcerpt || options.rawUserText?.slice(0, 150) || content.slice(0, 150);
@@ -418,12 +441,43 @@ export function enrichMemoryMetadata(
   // 5. 既存記憶との競合・矛盾チェック (conflictWith)
   const conflictWith: string[] = item.conflictWith ? [...item.conflictWith] : [];
   if (options.existingMemories && options.existingMemories.length > 0) {
+    const checkText = content.toLowerCase();
     for (const existing of options.existingMemories) {
       if (existing.id === item.id) continue;
-      if (item.category === 'profile' && existing.category === 'profile' && content.includes('名前') && existing.content.includes('名前')) {
-        conflictWith.push(existing.id);
-      } else if (item.category === 'preference' && existing.category === 'preference' && content.length >= 6 && existing.content.includes(content.slice(0, 6))) {
-        conflictWith.push(existing.id);
+      const existText = existing.content.toLowerCase();
+
+      // プロフィールの名前・呼び名の重複競合
+      if (item.category === 'profile' && existing.category === 'profile') {
+        if (
+          (checkText.includes('名前') || checkText.includes('呼んで') || checkText.includes('ニックネーム')) &&
+          (existText.includes('名前') || existText.includes('呼んで') || existText.includes('ニックネーム'))
+        ) {
+          if (!conflictWith.includes(existing.id)) conflictWith.push(existing.id);
+        }
+      }
+
+      // 好み・デザイン・スタイルの矛盾競合
+      if (item.category === 'preference' && existing.category === 'preference') {
+        const isStyleConflict =
+          (checkText.includes('配色') || checkText.includes('カラー') || checkText.includes('テーマ') || checkText.includes('背景')) &&
+          (existText.includes('配色') || existText.includes('カラー') || existText.includes('テーマ') || existText.includes('背景'));
+        const isSentimentConflict =
+          (checkText.includes('好き') && existText.includes('嫌い')) ||
+          (checkText.includes('嫌い') && existText.includes('好き'));
+
+        if (isStyleConflict || isSentimentConflict || (content.length >= 8 && existing.content.includes(content.slice(0, 8)))) {
+          if (!conflictWith.includes(existing.id)) conflictWith.push(existing.id);
+        }
+      }
+
+      // 開発仕様・ボタン・レイアウトの相反
+      if ((item.category === 'gamedev' || item.category === 'code') && (existing.category === 'gamedev' || existing.category === 'code')) {
+        if (
+          (checkText.includes('ボタン') || checkText.includes('角丸') || checkText.includes('サイズ') || checkText.includes('仕様')) &&
+          (existText.includes('ボタン') || existText.includes('角丸') || existText.includes('サイズ') || existText.includes('仕様'))
+        ) {
+          if (!conflictWith.includes(existing.id)) conflictWith.push(existing.id);
+        }
       }
     }
   }
@@ -432,7 +486,7 @@ export function enrichMemoryMetadata(
     id: item.id || `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     category: item.category || 'preference',
     content,
-    importance: item.importance ?? 4,
+    importance: item.importance ?? (item.source === 'auto' ? 2 : 4),
     pinned: item.pinned ?? false,
     active: item.active ?? true,
     approved,
@@ -456,4 +510,113 @@ export function enrichMemoryMetadata(
     goodCount: item.goodCount ?? 0,
     badCount: item.badCount ?? 0,
   };
+}
+
+/**
+ * 記憶配列全体の競合を双方向に検出し、相互に conflictWith を補完するヘルパー
+ */
+export function detectAndLinkConflicts(memories: MemoryItem[]): MemoryItem[] {
+  const result = memories.map((m) => ({
+    ...m,
+    conflictWith: m.conflictWith ? [...m.conflictWith] : [],
+  }));
+
+  for (let i = 0; i < result.length; i++) {
+    for (let j = i + 1; j < result.length; j++) {
+      const a = result[i];
+      const b = result[j];
+      if (a.active === false || b.active === false) continue;
+
+      let isConflict = false;
+      const textA = a.content.toLowerCase();
+      const textB = b.content.toLowerCase();
+
+      if (a.category === 'profile' && b.category === 'profile') {
+        if (
+          (textA.includes('名前') || textA.includes('呼んで') || textA.includes('ニックネーム')) &&
+          (textB.includes('名前') || textB.includes('呼んで') || textB.includes('ニックネーム'))
+        ) {
+          isConflict = true;
+        }
+      } else if (a.category === 'preference' && b.category === 'preference') {
+        const isStyleConflict =
+          (textA.includes('配色') || textA.includes('カラー') || textA.includes('テーマ') || textA.includes('背景')) &&
+          (textB.includes('配色') || textB.includes('カラー') || textB.includes('テーマ') || textB.includes('背景'));
+        const isSentimentConflict =
+          (textA.includes('好き') && textB.includes('嫌い')) ||
+          (textA.includes('嫌い') && textB.includes('好き'));
+        if (isStyleConflict || isSentimentConflict) {
+          isConflict = true;
+        }
+      }
+
+      if (isConflict) {
+        if (!a.conflictWith.includes(b.id)) a.conflictWith.push(b.id);
+        if (!b.conflictWith.includes(a.id)) b.conflictWith.push(a.id);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * 競合記憶の解決ヘルパー (設計思想 12 & 25)
+ * keepId を正（approved: true, active: true）とし、
+ * discardId を非アクティブ（active: false）にして相互の conflictWith を解決する
+ */
+export function resolveMemoryConflict(
+  keepId: string,
+  discardId: string,
+  memories: MemoryItem[]
+): MemoryItem[] {
+  const now = Date.now();
+  return memories.map((m) => {
+    if (m.id === keepId) {
+      return {
+        ...m,
+        active: true,
+        approved: true,
+        conflictWith: (m.conflictWith || []).filter((id) => id !== discardId),
+        updatedAt: now,
+      };
+    }
+    if (m.id === discardId) {
+      return {
+        ...m,
+        active: false,
+        conflictWith: (m.conflictWith || []).filter((id) => id !== keepId),
+        updatedAt: now,
+      };
+    }
+    return m;
+  });
+}
+
+/**
+ * 両方の記憶を生かしたまま、競合フラグを解除するヘルパー
+ */
+export function dismissMemoryConflict(
+  idA: string,
+  idB: string,
+  memories: MemoryItem[]
+): MemoryItem[] {
+  const now = Date.now();
+  return memories.map((m) => {
+    if (m.id === idA) {
+      return {
+        ...m,
+        conflictWith: (m.conflictWith || []).filter((id) => id !== idB),
+        updatedAt: now,
+      };
+    }
+    if (m.id === idB) {
+      return {
+        ...m,
+        conflictWith: (m.conflictWith || []).filter((id) => id !== idA),
+        updatedAt: now,
+      };
+    }
+    return m;
+  });
 }

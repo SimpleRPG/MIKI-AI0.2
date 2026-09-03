@@ -28,6 +28,9 @@ import {
   Search,
   Link,
   ChevronRight,
+  AlertTriangle,
+  Ban,
+  Filter,
 } from 'lucide-react';
 import { MemoryItem, PersonaConfig, MemoryType } from '../types';
 import {
@@ -36,7 +39,17 @@ import {
   INITIAL_JAPANESE_MEMORIES,
 } from '../data/japaneseKnowledgeData';
 import { MASTER_EDUCATION_MEMORIES } from '../data/masterEducationKnowledge';
-import { retrieveScoredMemories, ScoredMemory, calculateDomainVector, SEMANTIC_DOMAINS } from '../utils/memoryRetrieval';
+import {
+  retrieveScoredMemories,
+  ScoredMemory,
+  calculateDomainVector,
+  SEMANTIC_DOMAINS,
+  enrichMemoryMetadata,
+  detectAndLinkConflicts,
+  resolveMemoryConflict,
+  dismissMemoryConflict,
+} from '../utils/memoryRetrieval';
+import { storageService } from '../services/storageService';
 
 export interface MemoryModalProps {
   isOpen: boolean;
@@ -59,6 +72,8 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   const [selectedMemoryType, setSelectedMemoryType] = useState<MemoryType>('semantic');
   const [activeSubTab, setActiveSubTab] = useState<'persona' | 'teach' | 'memory' | 'corpus' | 'graph'>('teach');
   const [exportedStatus, setExportedStatus] = useState<string | null>(null);
+  const [memoryFilter, setMemoryFilter] = useState<'all' | 'approved' | 'unapproved' | 'conflicted' | MemoryType>('all');
+  const [expandedConflictId, setExpandedConflictId] = useState<string | null>(null);
 
   // 知識グラフ & 多層ベクトル検索シミュレーター用ステート
   const [graphSearchQuery, setGraphSearchQuery] = useState('ゲームの脱ロボットとタメ口会話');
@@ -90,28 +105,33 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
     if (!trimmed) return;
 
     const category = detectCategory(trimmed);
-    const newItem: MemoryItem = {
-      id: 'mem_teach_' + Date.now(),
-      category,
-      content: trimmed,
-      importance: 5,
-      pinned: true,
-      active: true,
-      approved: true, // ユーザー直接入力は初期承認
-      memoryType: selectedMemoryType,
-      goodCount: 1,
-      badCount: 0,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      source: 'manual',
-      tags: ['ユーザー直接教育', category],
-    };
+    const rawMemories = storageService.getMemories();
+    const newItem = enrichMemoryMetadata(
+      {
+        id: 'mem_teach_' + Date.now(),
+        category,
+        content: trimmed,
+        importance: 5,
+        pinned: true,
+        active: true,
+        approved: true, // ユーザー直接手動教育は承認
+        memoryType: selectedMemoryType,
+        goodCount: 1,
+        badCount: 0,
+        source: 'manual',
+        tags: ['ユーザー直接教育', category],
+      },
+      {
+        rawUserText: trimmed,
+        sourceRef: 'user_direct',
+        existingMemories: rawMemories,
+      }
+    );
 
+    storageService.saveMemoryItem(newItem);
+    const updated = storageService.getMemories();
     if (typeof onUpdateMemories === 'function') {
-      (onUpdateMemories as any)((prev: MemoryItem[]) => {
-        const list = Array.isArray(prev) ? prev : memories;
-        return [newItem, ...list];
-      });
+      (onUpdateMemories as any)(updated);
     }
 
     setTeachInput('');
@@ -120,31 +140,73 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   };
 
   const handleToggleApproved = (id: string) => {
+    const mem = memories.find((m) => m.id === id);
+    if (!mem) return;
+    const nextApproved = !mem.approved;
+    storageService.saveMemoryItem({ ...mem, approved: nextApproved, updatedAt: Date.now() });
+    const updated = storageService.getMemories();
     if (typeof onUpdateMemories === 'function') {
-      (onUpdateMemories as any)((prev: MemoryItem[]) => {
-        const list = Array.isArray(prev) ? prev : memories;
-        return list.map((m) => (m.id === id ? { ...m, approved: !m.approved, updatedAt: Date.now() } : m));
-      });
+      (onUpdateMemories as any)(updated);
     }
+    setExportedStatus(nextApproved ? '✅ 記憶を承認しました（推論で確定事実として利用）' : '⚠️ 記憶を未承認（仮推論情報）に設定しました');
+    setTimeout(() => setExportedStatus(null), 3000);
+  };
+
+  const handleApproveMemory = (id: string) => {
+    const mem = memories.find((m) => m.id === id);
+    if (!mem) return;
+    storageService.saveMemoryItem({ ...mem, approved: true, updatedAt: Date.now() });
+    const updated = storageService.getMemories();
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+    setExportedStatus('✅ 記憶を承認しました！');
+    setTimeout(() => setExportedStatus(null), 3000);
   };
 
   const handleAdjustFeedback = (id: string, delta: number) => {
+    const mem = memories.find((m) => m.id === id);
+    if (!mem) return;
+    const currentGood = mem.goodCount ?? 0;
+    const nextGood = Math.max(0, currentGood + delta);
+    storageService.saveMemoryItem({ ...mem, goodCount: nextGood, updatedAt: Date.now() });
+    const updated = storageService.getMemories();
     if (typeof onUpdateMemories === 'function') {
-      (onUpdateMemories as any)((prev: MemoryItem[]) => {
-        const list = Array.isArray(prev) ? prev : memories;
-        return list.map((m) => {
-          if (m.id === id) {
-            const currentGood = m.goodCount ?? 0;
-            const nextGood = Math.max(0, currentGood + delta);
-            return { ...m, goodCount: nextGood, updatedAt: Date.now() };
-          }
-          return m;
-        });
-      });
+      (onUpdateMemories as any)(updated);
     }
   };
 
-  // 重複記憶の自動統合・整理 (設計思想 12. 重複統合 & アイドル時整理)
+  const handleDelete = (id: string) => {
+    storageService.deleteMemoryItem(id);
+    const updated = storageService.getMemories();
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+  };
+
+  // 競合解決ハンドラー: keepId を正（approved: true, active: true）とし、discardId を無効化（active: false）
+  const handleResolveConflict = (keepId: string, discardId: string) => {
+    storageService.resolveConflict(keepId, discardId);
+    const updated = storageService.getMemories();
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+    setExportedStatus('✅ 記憶の競合を解決しました（選択した記憶を有効化・承認し、競合相手をアーカイブ）');
+    setTimeout(() => setExportedStatus(null), 4000);
+  };
+
+  // 競合解除ハンドラー: 両方を保持したまま相互の conflictWith を削除
+  const handleDismissConflict = (idA: string, idB: string) => {
+    storageService.dismissConflict(idA, idB);
+    const updated = storageService.getMemories();
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+    setExportedStatus('🤝 競合フラグを解除し、両方の記憶を保持しました');
+    setTimeout(() => setExportedStatus(null), 4000);
+  };
+
+  // 重複記憶の自動統合・整理 & 競合検出 (設計思想 12 & 25)
   const handleConsolidateMemories = () => {
     const seen = new Set<string>();
     const deduplicated: MemoryItem[] = [];
@@ -160,10 +222,14 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
       }
     }
 
+    // 競合関係の検出とリンク
+    const resolvedList = detectAndLinkConflicts(deduplicated);
+    storageService.setMemories(resolvedList);
+
     if (typeof onUpdateMemories === 'function') {
-      (onUpdateMemories as any)(deduplicated);
+      (onUpdateMemories as any)(resolvedList);
     }
-    setExportedStatus(`🧹 記憶の自動整理完了: ${mergedCount} 件の重複・類似エントリを統合しました！`);
+    setExportedStatus(`🧹 記憶の自動整理完了: ${mergedCount} 件の重複を統合し、競合関係を再計算しました！`);
     setTimeout(() => setExportedStatus(null), 4000);
   };
 
@@ -237,31 +303,22 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   };
 
   const handleSyncAllMasterKnowledge = () => {
-    if (typeof onUpdateMemories === 'function') {
-      (onUpdateMemories as any)((prev: MemoryItem[]) => {
-        const currentList = Array.isArray(prev) ? prev : memories;
-        const existingIds = new Set(currentList.map((m) => m.id));
-        const allMaster = [...INITIAL_JAPANESE_MEMORIES, ...MASTER_EDUCATION_MEMORIES];
-        const toAdd = allMaster.filter((m) => !existingIds.has(m.id));
-        if (toAdd.length === 0) {
-          setExportedStatus('✨ 全マスター教育データは既に記憶に完全同期されています！');
-          setTimeout(() => setExportedStatus(null), 4000);
-          return currentList;
-        }
-        setExportedStatus(`✅ ${toAdd.length} 件のマスター教育ナレッジを記憶に同期・適用しました！`);
-        setTimeout(() => setExportedStatus(null), 4000);
-        return [...toAdd, ...currentList];
-      });
+    const currentList = storageService.getMemories();
+    const existingIds = new Set(currentList.map((m) => m.id));
+    const allMaster = [...INITIAL_JAPANESE_MEMORIES, ...MASTER_EDUCATION_MEMORIES];
+    const toAdd = allMaster.filter((m) => !existingIds.has(m.id));
+    if (toAdd.length === 0) {
+      setExportedStatus('✨ 全マスター教育データは既に記憶に完全同期されています！');
+      setTimeout(() => setExportedStatus(null), 4000);
+      return;
     }
-  };
-
-  const handleDelete = (id: string) => {
+    const updated = [...toAdd, ...currentList];
+    storageService.setMemories(updated);
     if (typeof onUpdateMemories === 'function') {
-      (onUpdateMemories as any)((prev: MemoryItem[]) => {
-        if (Array.isArray(prev)) return prev.filter((m) => m.id !== id);
-        return memories.filter((m) => m.id !== id);
-      });
+      (onUpdateMemories as any)(updated);
     }
+    setExportedStatus(`✅ ${toAdd.length} 件のマスター教育ナレッジを記憶に同期・適用しました！`);
+    setTimeout(() => setExportedStatus(null), 4000);
   };
 
   if (!isOpen) return null;
@@ -321,6 +378,17 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
           >
             <Brain className="w-4 h-4" />
             <span>記憶・ナレッジ一覧 ({memories.length}件)</span>
+            {storageService.getConflictedMemories().length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[9px] font-mono flex items-center gap-0.5">
+                <AlertTriangle className="w-2.5 h-2.5" />
+                {storageService.getConflictedMemories().length}件競合
+              </span>
+            )}
+            {storageService.getUnapprovedMemories().length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-mono">
+                {storageService.getUnapprovedMemories().length}件未承認
+              </span>
+            )}
           </button>
 
           <button
@@ -497,111 +565,313 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
           )}
 
           {/* TAB 2: Long-Term Memory & Knowledge List */}
-          {activeSubTab === 'memory' && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className="font-bold text-slate-200">保持している知識・記憶一覧 ({memories.length}件)</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleConsolidateMemories}
-                    className="px-2.5 py-1 bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-500/40 rounded-lg text-[10.5px] font-bold flex items-center gap-1 transition-all"
-                    title="重複・類似記憶の検出と自動統合整理を実行"
-                  >
-                    <RefreshCw className="w-3 h-3 text-purple-400" />
-                    <span>重複統合・自動整理</span>
-                  </button>
-                  <span className="text-slate-400 text-[10.5px]">端末内永続保存中</span>
-                </div>
-              </div>
+          {activeSubTab === 'memory' && (() => {
+            const conflictedList = storageService.getConflictedMemories();
+            const unapprovedList = storageService.getUnapprovedMemories();
+            const approvedList = storageService.getApprovedMemories();
 
-              {/* Memory List */}
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                {memories.length === 0 ? (
-                  <div className="text-center py-6 text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-slate-800">
-                    保存された記憶はありません。「かんたんAI教育」タブから追加できます。
-                  </div>
-                ) : (
-                  memories.map((mem) => {
-                    const good = mem.goodCount ?? 0;
-                    const bad = mem.badCount ?? 0;
-                    return (
-                      <div
-                        key={mem.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800/90 text-xs hover:border-slate-700 transition-colors gap-2"
-                      >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className={`px-2 py-0.5 rounded text-[9.5px] font-mono shrink-0 ${
-                            mem.category === 'gamedev'
-                              ? 'bg-sky-950 text-sky-300 border border-sky-800'
-                              : mem.category === 'preference'
-                              ? 'bg-purple-950 text-purple-300 border border-purple-800'
-                              : mem.category === 'profile'
-                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                              : 'bg-slate-800 text-slate-300 border border-slate-700'
-                          }`}>
-                            {mem.category}
-                          </span>
+            // storageService の各種クエリメソッドを活用した表示リストの決定
+            const displayMemories = (() => {
+              if (memoryFilter === 'approved') return approvedList;
+              if (memoryFilter === 'unapproved') return unapprovedList;
+              if (memoryFilter === 'conflicted') return conflictedList;
+              if (memoryFilter !== 'all') return storageService.getMemoriesByType(memoryFilter as MemoryType);
+              return memories;
+            })();
 
-                          {mem.memoryType && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-slate-900 text-slate-400 border border-slate-700 shrink-0">
-                              {mem.memoryType}
-                            </span>
-                          )}
-
-                          <span className="text-slate-200 truncate flex-1">{mem.content}</span>
+            return (
+              <div className="space-y-4">
+                {/* 競合発生時の警告＆解決誘導バナー (設計思想 12 & 25) */}
+                {conflictedList.length > 0 && (
+                  <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in">
+                    <div className="flex items-start gap-2.5">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-bold text-amber-300">
+                          矛盾・競合する記憶が {conflictedList.length} 件検出されました
                         </div>
+                        <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                          設定やユーザープロフィールの不整合を防ぐため、優先する記憶を選択して解決してください。
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setMemoryFilter('conflicted')}
+                      className="px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/50 rounded-lg font-bold text-[11px] shrink-0 self-start sm:self-auto transition-all"
+                    >
+                      競合記憶のみ表示
+                    </button>
+                  </div>
+                )}
 
-                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                          {/* Approved Status Toggle */}
-                          <button
-                            onClick={() => handleToggleApproved(mem.id)}
-                            className={`px-2 py-0.5 rounded text-[10px] font-mono flex items-center gap-1 border transition-all ${
-                              mem.approved !== false
-                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
-                                : 'bg-slate-900 text-slate-500 border-slate-800'
-                            }`}
-                            title={mem.approved !== false ? '承認済み記憶 (RAG優先度UP)' : '未承認記憶'}
-                          >
-                            <ShieldCheck className="w-3 h-3" />
-                            <span>{mem.approved !== false ? '承認済' : '未検証'}</span>
-                          </button>
+                {/* Header & Filter Controls */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      onClick={() => setMemoryFilter('all')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                        memoryFilter === 'all'
+                          ? 'bg-sky-600 text-white shadow-sm'
+                          : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                      }`}
+                    >
+                      すべて ({memories.length})
+                    </button>
+                    <button
+                      onClick={() => setMemoryFilter('approved')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                        memoryFilter === 'approved'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                      }`}
+                    >
+                      承認済 ({approvedList.length})
+                    </button>
+                    <button
+                      onClick={() => setMemoryFilter('unapproved')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                        memoryFilter === 'unapproved'
+                          ? 'bg-amber-600 text-white shadow-sm'
+                          : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                      }`}
+                    >
+                      未検証 ({unapprovedList.length})
+                    </button>
+                    {conflictedList.length > 0 && (
+                      <button
+                        onClick={() => setMemoryFilter('conflicted')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all ${
+                          memoryFilter === 'conflicted'
+                            ? 'bg-rose-600 text-white shadow-sm'
+                            : 'bg-rose-950/50 text-rose-300 hover:bg-rose-950 border border-rose-800/60'
+                        }`}
+                      >
+                        <AlertTriangle className="w-3 h-3" />
+                        <span>競合中 ({conflictedList.length})</span>
+                      </button>
+                    )}
 
-                          {/* 👍 / 👎 Feedback Controls */}
-                          <div className="flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono">
-                            <button
-                              onClick={() => handleAdjustFeedback(mem.id, 1)}
-                              className="text-slate-400 hover:text-emerald-400 p-0.5"
-                              title="高評価を追加"
-                            >
-                              <ThumbsUp className="w-2.5 h-2.5" />
-                            </button>
-                            <span className={good > bad ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
-                              {good - bad}
-                            </span>
-                            <button
-                              onClick={() => handleAdjustFeedback(mem.id, -1)}
-                              className="text-slate-400 hover:text-rose-400 p-0.5"
-                              title="低評価を追加"
-                            >
-                              <ThumbsDown className="w-2.5 h-2.5" />
-                            </button>
+                    {/* 7-Tier MemoryType Filter */}
+                    <select
+                      value={['all', 'approved', 'unapproved', 'conflicted'].includes(memoryFilter) ? '' : memoryFilter}
+                      onChange={(e) => setMemoryFilter((e.target.value as MemoryType) || 'all')}
+                      className="bg-slate-900 border border-slate-800 text-slate-300 text-[11px] rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="">階層別絞り込み...</option>
+                      <option value="semantic">意味記憶 (semantic)</option>
+                      <option value="episodic">エピソード記憶 (episodic)</option>
+                      <option value="procedural">手続き記憶 (procedural)</option>
+                      <option value="structural">構造記憶 (structural)</option>
+                      <option value="associative">連想記憶 (associative)</option>
+                      <option value="core">コア記憶 (core)</option>
+                      <option value="emotional">感情記憶 (emotional)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleConsolidateMemories}
+                      className="px-2.5 py-1 bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-500/40 rounded-lg text-[10.5px] font-bold flex items-center gap-1 transition-all"
+                      title="重複の統合と競合の再検出を実行"
+                    >
+                      <RefreshCw className="w-3 h-3 text-purple-400" />
+                      <span>重複統合・競合再計算</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Memory List */}
+                <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                  {displayMemories.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-slate-800">
+                      条件に一致する記憶はありません。
+                    </div>
+                  ) : (
+                    displayMemories.map((mem) => {
+                      const good = mem.goodCount ?? 0;
+                      const bad = mem.badCount ?? 0;
+                      const hasConflict = Boolean(mem.active !== false && mem.conflictWith && mem.conflictWith.length > 0);
+                      const isExpanded = expandedConflictId === mem.id;
+
+                      // 競合相手の記憶オブジェクト群
+                      const conflictingOpponents = hasConflict
+                        ? (mem.conflictWith || []).map((cid) => memories.find((m) => m.id === cid)).filter(Boolean) as MemoryItem[]
+                        : [];
+
+                      return (
+                        <div
+                          key={mem.id}
+                          className={`flex flex-col p-3 rounded-xl transition-colors gap-2.5 border ${
+                            hasConflict
+                              ? 'bg-amber-950/20 border-amber-500/50 hover:border-amber-500'
+                              : mem.approved === false
+                              ? 'bg-slate-950/70 border-slate-800 hover:border-amber-500/30'
+                              : 'bg-slate-950/70 border-slate-800/90 hover:border-slate-700'
+                          } text-xs`}
+                        >
+                          {/* Row 1: Badges, Content & Action Buttons */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+                              <span className={`px-2 py-0.5 rounded text-[9.5px] font-mono shrink-0 ${
+                                mem.category === 'gamedev'
+                                  ? 'bg-sky-950 text-sky-300 border border-sky-800'
+                                  : mem.category === 'preference'
+                                  ? 'bg-purple-950 text-purple-300 border border-purple-800'
+                                  : mem.category === 'profile'
+                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                  : 'bg-slate-800 text-slate-300 border border-slate-700'
+                              }`}>
+                                {mem.category}
+                              </span>
+
+                              {mem.memoryType && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-slate-900 text-slate-400 border border-slate-700 shrink-0">
+                                  {mem.memoryType}
+                                </span>
+                              )}
+
+                              {mem.source && (
+                                <span className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono shrink-0 ${
+                                  mem.source === 'manual'
+                                    ? 'bg-indigo-950 text-indigo-300 border border-indigo-800'
+                                    : 'bg-slate-900 text-slate-500 border border-slate-800'
+                                }`}>
+                                  {mem.source === 'manual' ? '手動' : '自動抽出'}
+                                </span>
+                              )}
+
+                              {hasConflict && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 shrink-0 flex items-center gap-1 animate-pulse">
+                                  <AlertTriangle className="w-2.5 h-2.5" />
+                                  競合あり ({mem.conflictWith?.length}件)
+                                </span>
+                              )}
+
+                              <span className="text-slate-200 truncate flex-1 font-medium">{mem.content}</span>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                              {/* 競合解決アコーディオン展開ボタン */}
+                              {hasConflict && (
+                                <button
+                                  onClick={() => setExpandedConflictId(isExpanded ? null : mem.id)}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 border transition-all ${
+                                    isExpanded
+                                      ? 'bg-amber-600 text-white border-amber-500'
+                                      : 'bg-amber-950/80 text-amber-300 border-amber-500/50 hover:bg-amber-900'
+                                  }`}
+                                  title="競合相手の確認と解決フロー"
+                                >
+                                  <AlertTriangle className="w-3 h-3" />
+                                  <span>{isExpanded ? '解決を閉じる' : '競合を解決'}</span>
+                                </button>
+                              )}
+
+                              {/* 未検証時のクイック承認ボタン */}
+                              {mem.approved === false ? (
+                                <button
+                                  onClick={() => handleApproveMemory(mem.id)}
+                                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 flex items-center gap-1 transition-all"
+                                  title="この記憶を承認し、推論の確定事実として利用可能にします"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>承認する</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleToggleApproved(mem.id)}
+                                  className="px-2 py-0.5 rounded text-[10px] font-mono flex items-center gap-1 border bg-emerald-950/80 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60 transition-all"
+                                  title="クリックで未承認に切り替え"
+                                >
+                                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                  <span>承認済</span>
+                                </button>
+                              )}
+
+                              {/* 👍 / 👎 Feedback Controls */}
+                              <div className="flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono">
+                                <button
+                                  onClick={() => handleAdjustFeedback(mem.id, 1)}
+                                  className="text-slate-400 hover:text-emerald-400 p-0.5"
+                                  title="高評価を追加"
+                                >
+                                  <ThumbsUp className="w-2.5 h-2.5" />
+                                </button>
+                                <span className={good > bad ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
+                                  {good - bad}
+                                </span>
+                                <button
+                                  onClick={() => handleAdjustFeedback(mem.id, -1)}
+                                  className="text-slate-400 hover:text-rose-400 p-0.5"
+                                  title="低評価を追加"
+                                >
+                                  <ThumbsDown className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
+
+                              <button
+                                onClick={() => handleDelete(mem.id)}
+                                className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors shrink-0"
+                                title="記憶を削除"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
 
-                          <button
-                            onClick={() => handleDelete(mem.id)}
-                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors shrink-0"
-                            title="記憶を削除"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {/* Row 2: 競合解決フロー・インラインパネル (アコーディオン) */}
+                          {hasConflict && isExpanded && (
+                            <div className="p-3 mt-1 rounded-lg bg-slate-900/90 border border-amber-500/40 space-y-2.5 animate-in fade-in">
+                              <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                                <span>競合解決フロー: 矛盾する記憶のどちらを正としますか？</span>
+                              </div>
+
+                              <div className="space-y-2">
+                                {conflictingOpponents.map((opponent) => (
+                                  <div
+                                    key={opponent.id}
+                                    className="p-2.5 rounded-md bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                                  >
+                                    <div className="space-y-1 min-w-0 flex-1">
+                                      <div className="text-[10px] text-slate-400 font-mono">
+                                        相手の記憶 [{opponent.category}]:
+                                      </div>
+                                      <div className="text-slate-200 text-xs font-medium">
+                                        {opponent.content}
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <button
+                                        onClick={() => handleResolveConflict(mem.id, opponent.id)}
+                                        className="px-2.5 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 rounded-lg font-bold text-[10.5px] flex items-center gap-1 transition-all"
+                                        title="この記憶を採用し、相手の記憶を無効化（アーカイブ）します"
+                                      >
+                                        <Check className="w-3 h-3 text-emerald-300" />
+                                        <span>この記憶を採用（相手を無効化）</span>
+                                      </button>
+                                      <button
+                                        onClick={() => handleDismissConflict(mem.id, opponent.id)}
+                                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-[10.5px] transition-all"
+                                        title="両方の記憶を保持し、競合フラグを解除します"
+                                      >
+                                        両方保持
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* TAB 3: Persona Configuration */}
           {activeSubTab === 'persona' && (
