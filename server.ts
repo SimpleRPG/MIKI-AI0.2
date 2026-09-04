@@ -623,10 +623,10 @@ app.post('/api/github/import', async (req, res) => {
     }
     const treeData = await treeRes.json();
 
-    const allowedExts = ['.html', '.js', '.ts', '.css', '.json', '.txt', '.md', '.wgsl', '.glsl'];
+    const allowedExts = ['.html', '.js', '.jsx', '.ts', '.tsx', '.css', '.json', '.txt', '.md', '.wgsl', '.glsl'];
     const fileEntries = (treeData.tree || [])
       .filter((item: any) => item.type === 'blob' && allowedExts.some(ext => item.path.endsWith(ext)))
-      .slice(0, 30);
+      .slice(0, 150);
 
     const loadedFiles = await Promise.all(
       fileEntries.map(async (item: any) => {
