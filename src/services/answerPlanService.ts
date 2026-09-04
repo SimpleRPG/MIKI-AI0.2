@@ -248,6 +248,87 @@ class AnswerPlanService {
   }
 
   /**
+   * 設計思想 20章 & 9章:
+   * 教師の生成教材から「対策(回答骨格・修復パターン)」を抽出し、回答骨格として保存
+   */
+  public createSkeletonFromTeacherMaterial(params: {
+    instruction: string;
+    outputTarget: string;
+    reasoningExplanation?: string;
+    category?: string;
+  }): ResponseSkeleton {
+    const rawCategory = (params.category || 'chat').toLowerCase();
+    const isCorrection =
+      rawCategory.includes('correction') ||
+      params.instruction.includes('訂正') ||
+      params.instruction.includes('間違い') ||
+      params.instruction.includes('前提');
+    const isContradiction =
+      rawCategory.includes('contradiction') ||
+      params.instruction.includes('矛盾') ||
+      params.instruction.includes('食い違い');
+
+    // トリガーキーワードの自動抽出（instruction中の名詞・語句）
+    const extractedKeywords: string[] = [];
+    const words = params.instruction.split(/[\s,、。！？!?：:「」()（）]+/);
+    for (const w of words) {
+      if (w.length >= 3 && !['これ', 'それ', 'あれ', 'について', 'ください', '教えて', 'どう', 'どうす'].includes(w)) {
+        extractedKeywords.push(w);
+      }
+    }
+
+    // 重複除外＆上限6語
+    const triggerKeywords = Array.from(new Set(extractedKeywords)).slice(0, 6);
+    if (triggerKeywords.length === 0) {
+      triggerKeywords.push(params.instruction.slice(0, 15));
+    }
+
+    // 回答手順(response_plan)の作成
+    const plans: string[] = [];
+    if (isCorrection) {
+      plans.push('1. 訂正された前提を素直に更新し、古い前提を直ちに無効化する');
+      plans.push('2. 新前提に基づく影響範囲を洗い出して再判断する');
+      plans.push('3. 修正後の結論を直接先に回答する');
+    } else if (isContradiction) {
+      plans.push('1. 矛盾の指摘を受け止め、防衛的・言い訳にならず論点を修復する');
+      plans.push('2. 状況の差異または説明不足を素直に補正する');
+      plans.push('3. 整合した正確な確定結論を提示する');
+    } else {
+      plans.push('1. 質問に対する結論・直接回答を先に明示する');
+      if (params.reasoningExplanation) {
+        plans.push(`2. ${params.reasoningExplanation.replace(/\n+/g, ' ').slice(0, 40)}`);
+      } else {
+        plans.push('2. 理由・条件・注意点を簡潔に補足する');
+      }
+      plans.push('3. 不要な繰り返しや過剰な前置きを排除する');
+    }
+
+    const pattern_id = `PATTERN-TEACHER-${Date.now().toString(36).toUpperCase()}`;
+    const skeleton: Omit<ResponseSkeleton, 'usageCount' | 'successRate' | 'createdAt' | 'updatedAt'> = {
+      pattern_id,
+      situation: `外部教師教材より自動生成: ${params.instruction.slice(0, 35)}`,
+      triggerKeywords,
+      stage: isCorrection || isContradiction ? 'CORRECTION' : 'QUESTION',
+      response_plan: plans,
+      avoid: [
+        '古い前提を残す',
+        '不要な繰り返し・謝罪に終始する',
+        '結論を後回しにする',
+      ],
+      reuse_mode: 'PLAN_ONLY',
+      samplePrompt: params.instruction,
+      exampleResponseTemplate: params.outputTarget.slice(0, 120),
+    };
+
+    const saved = this.addSkeleton(skeleton);
+    systemLogger.info(
+      'ANSWER_PLAN',
+      `🎓 [20章 対策骨格生成] 教師教材から回答骨格 ${saved.pattern_id} を自動保存しました (${saved.situation})`
+    );
+    return saved;
+  }
+
+  /**
    * 9章 & 35章 第5段階: 状況を分類し、類似する回答骨格を検索して思考節約手順を生成
    */
   public matchSkeleton(

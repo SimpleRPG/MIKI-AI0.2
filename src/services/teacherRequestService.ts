@@ -8,6 +8,7 @@ import {
   FailureRecurrenceEntry,
   TrainingSampleJSONL,
   MemoryItem,
+  ResponseSkeleton,
 } from '../types';
 import { storageService } from './storageService';
 import { selfImprovementService } from './selfImprovementService';
@@ -16,6 +17,8 @@ import { checkSampleSafety } from '../utils/trainingSampleSafetyFilter';
 import { completionJudgeService } from './completionJudgeService';
 import { schemaValidationService } from './schemaValidationService';
 import { sendChatMessage } from './api';
+import { capabilityGapService } from './capabilityGapService';
+import { answerPlanService } from './answerPlanService';
 
 const BUDGET_LIMITS_KEY = 'miki_ai_teacher_budget_limits';
 const BUDGET_USAGE_KEY = 'miki_ai_teacher_budget_usage';
@@ -377,8 +380,10 @@ export class TeacherRequestService {
     error?: string;
     verifiedPassed?: boolean;
     savedSample?: TrainingSampleJSONL | null;
+    savedSkeleton?: ResponseSkeleton | null;
     verifiedEffective?: boolean;
     verificationNote?: string;
+    generalizationGapRecorded?: boolean;
   }> {
     // 1. 予算チェック
     const budget = this.checkBudget();
@@ -388,6 +393,39 @@ export class TeacherRequestService {
         verifiedPassed: false,
         error: budget.reason || '予算上限に達したため送信できません。',
       };
+    }
+
+    // 20章 改訂規定:
+    // 同一の能力について、対策を保存した後も類似の未知の言い回し(16.1)で再び本章の送信条件に該当した場合、
+    // 回答が正解でも「対策の汎化不足」として扱い、32章の不足能力レジストリへ記録する。
+    const targetCapabilityId = payload.failureCategory.toLowerCase().includes('vba')
+      ? 'cap_abstract_vba_design'
+      : payload.failureCategory.toLowerCase().includes('code')
+      ? 'cap_code_comprehension'
+      : payload.failureCategory.toLowerCase().includes('retrieval') || payload.failureCategory.toLowerCase().includes('memory')
+      ? 'cap_logical_priority'
+      : payload.failureCategory.toLowerCase().includes('contradiction')
+      ? 'cap_contradiction'
+      : 'cap_correction';
+
+    const existingProfile = capabilityGapService.getProfileById(targetCapabilityId);
+    let generalizationGapRecorded = false;
+    if (existingProfile && existingProfile.associatedSkeletons && existingProfile.associatedSkeletons.length > 0) {
+      capabilityGapService.recordGap({
+        description: `【20章 対策の汎化不足】${existingProfile.name}の対策骨格を保存済みだが、未知の言い回しにより再度教師要請が発生`,
+        gap_type: 'generalization_gap',
+        capabilityId: targetCapabilityId,
+        impact: 'MEDIUM',
+        current_workaround: '教師に対策を再要請し、骨格パターンを一般化',
+        candidate_solution: '骨格のトリガー語彙拡張、状況カテゴリ単位への抽象化、システムプロンプト強化',
+        samplePrompt: payload.anonymizedExample || payload.abstractFailurePattern,
+        associatedPatternId: existingProfile.associatedSkeletons[0],
+      });
+      generalizationGapRecorded = true;
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `⚠️ [20章&32章 対策の汎化不足検知] ${existingProfile.name}（既存骨格: ${existingProfile.associatedSkeletons.join(', ')}）において未知の言い回しによる教師要請が発生したため、32章不足能力レジストリへ汎化不足として自動記録しました`
+      );
     }
 
     systemLogger.info(
@@ -639,6 +677,17 @@ export class TeacherRequestService {
           'SELF_IMPROVEMENT',
           `対策の汎化不足(13章検証不合格): ${mat.category || payload.failureCategory} / 原文改善${originalImproved} 言い換え改善${paraphraseImproved}`
         );
+        // 32章 不足能力レジストリへの正式記録
+        capabilityGapService.recordGap({
+          description: `【13章 端末検証不合格】${payload.failureCategory}の外部教師教材を端末内モデルへ注入したが、改善基準(+10点)に達せず汎化不足を検出 [${verificationNote}]`,
+          gap_type: 'generalization_gap',
+          capabilityId: targetCapabilityId,
+          impact: 'MEDIUM',
+          current_workaround: '教師教材を承認待ちで保持しつつ、回答骨格の一般化および分解を検討',
+          candidate_solution: '回答骨格の適用条件を状況カテゴリ単位へ一般化、16.3仮想学習試験による検証',
+          samplePrompt: anonymizedPrompt,
+        });
+        generalizationGapRecorded = true;
       }
 
       // 3. 独立検証合格 ➔ 中信頼(medium) & source: 'external_teacher' で保存
@@ -662,6 +711,29 @@ export class TeacherRequestService {
         selfImprovementService.markFailurePromoted(patternKeyToPromote);
       }
 
+      // 20章 & 9章: 教師教材から「対策(回答骨格・修復パターン)」を生成・保存
+      // 教師はその場の返信のためではなく、対策を作らせて回答骨格として保存することが目的
+      let savedSkeleton: ResponseSkeleton | null = null;
+      try {
+        savedSkeleton = answerPlanService.createSkeletonFromTeacherMaterial({
+          instruction: mat.instruction,
+          outputTarget: mat.outputTarget,
+          reasoningExplanation: mat.reasoningExplanation,
+          category: mat.category || payload.failureCategory,
+        });
+
+        // 該当能力プロファイルの紐づき骨格リストに追加
+        const prof = capabilityGapService.getProfileById(targetCapabilityId);
+        if (prof && savedSkeleton) {
+          if (!prof.associatedSkeletons.includes(savedSkeleton.pattern_id)) {
+            prof.associatedSkeletons.push(savedSkeleton.pattern_id);
+            capabilityGapService.saveMasteryProfiles();
+          }
+        }
+      } catch (skErr) {
+        console.warn('Failed to auto-create answer plan skeleton from teacher material:', skErr);
+      }
+
       // 4. 実績記録
       this.recordTeacherUsage({
         promptTokens: tokensUsed.promptTokens,
@@ -670,12 +742,12 @@ export class TeacherRequestService {
         verifiedPassedCount: 1,
         category: payload.failureCategory,
         success: true,
-        notes: `独立検証合格 (スコア: ${completionEval.score}点, 端末検証: ${verifiedEffective ? '合格' : '汎化不足'} [${verificationNote}])・ユーザー確認待ちとして安全登録完了`,
+        notes: `独立検証合格 (スコア: ${completionEval.score}点, 端末検証: ${verifiedEffective ? '合格' : '汎化不足'} [${verificationNote}], 対策骨格: ${savedSkeleton?.pattern_id || 'なし'})・ユーザー確認待ちとして安全登録完了`,
       });
 
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `✅ [外部教師教材 独立検証合格] 教材を external_teacher (中信頼/承認待ち) として追加しました (ID: ${savedSample?.id || 'unknown'}, 品質スコア: ${completionEval.score}点, 端末効果検証: ${verifiedEffective ? '合格' : '汎化不足'})`
+        `✅ [外部教師教材 独立検証合格] 教材を external_teacher (中信頼/承認待ち) として追加しました (ID: ${savedSample?.id || 'unknown'}, 品質スコア: ${completionEval.score}点, 端末効果検証: ${verifiedEffective ? '合格' : '汎化不足'}, 対策骨格: ${savedSkeleton?.pattern_id || '未作成'})`
       );
 
       return {
@@ -683,8 +755,10 @@ export class TeacherRequestService {
         verifiedPassed: true,
         material: mat,
         savedSample,
+        savedSkeleton,
         verifiedEffective,
         verificationNote,
+        generalizationGapRecorded,
       };
     } catch (err: any) {
       const errMsg = err?.message || '通信例外が発生しました';

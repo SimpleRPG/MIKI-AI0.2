@@ -25,6 +25,7 @@ import {
   TeacherGeneratedMaterial,
   TeacherUsageRecord,
   TrainingSampleJSONL,
+  ResponseSkeleton,
 } from '../types';
 import { teacherRequestService } from '../services/teacherRequestService';
 import { selfImprovementService } from '../services/selfImprovementService';
@@ -54,8 +55,10 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
     error?: string;
     verifiedPassed?: boolean;
     savedSample?: TrainingSampleJSONL | null;
+    savedSkeleton?: ResponseSkeleton | null;
     verifiedEffective?: boolean;
     verificationNote?: string;
+    generalizationGapRecorded?: boolean;
   } | null>(null);
 
   // 予算設定エディタの開閉
@@ -637,6 +640,17 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
                 <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-300 rounded font-mono">
                   安全境界・品質フィルタ検証済
                 </span>
+                {requestResult.savedSkeleton && (
+                  <span className="px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 rounded font-mono flex items-center gap-1">
+                    <span>9章 対策骨格生成:</span>
+                    <strong className="text-white">{requestResult.savedSkeleton.pattern_id}</strong>
+                  </span>
+                )}
+                {requestResult.generalizationGapRecorded && (
+                  <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/40 rounded font-mono">
+                    ⚠️ 32章 不足能力レジストリ(汎化不足)に自動登録
+                  </span>
+                )}
                 {requestResult.verifiedEffective !== undefined && (
                   <span
                     className={`px-1.5 py-0.5 rounded font-mono ${
