@@ -1,9 +1,23 @@
-import { PersonaConfig, MemoryItem, WorkspaceFile, SkillItem, ToolRecommendation, ToolExecutionResult } from '../types';
+import {
+  PersonaConfig,
+  MemoryItem,
+  WorkspaceFile,
+  SkillItem,
+  ToolRecommendation,
+  ToolExecutionResult,
+  ChatMessage,
+} from '../types';
 import { getNaturalJapanesePromptGuide } from '../data/japaneseKnowledgeData';
 import { getMasterEducationSystemPrompt } from '../data/masterEducationKnowledge';
-import { retrieveScoredMemories, retrieveScoredMemoriesHybrid } from './memoryRetrieval';
+import {
+  retrieveScoredMemories,
+  retrieveScoredMemoriesHybrid,
+  type ScoredMemory,
+} from './memoryRetrieval';
 import { skillsService } from '../services/skillsService';
 import { toolsService } from '../services/toolsService';
+import { longTermMemoryService } from '../services/longTermMemoryService';
+import type { ConversationState } from '../types';
 
 /**
  * ユーザーの意図を分析し、温度感、専門役割、および利用候補ツールを判定する
@@ -90,17 +104,50 @@ export async function buildExpertSystemPromptWithTracking(
     includeFiles?: boolean;
     maxMemories?: number;
     toolResults?: ToolExecutionResult[];
+    conversationState?: ConversationState | null;
+    recentMessages?: ChatMessage[];
   }
 ): Promise<PromptContextTrackingResult> {
   const maxMemories = options?.maxMemories || (options?.isLightweight ? 3 : 5);
 
-  // 1. 記憶のRAG検索 (ハイブリッドFTS5 + バイグラム + 👍/👎 + 承認状態 + 重要度スコアリング)
-  const scoredMemories = await retrieveScoredMemoriesHybrid(userMessage, memories, {
-    limit: maxMemories,
-    alwaysIncludePinned: true,
-    filterExpired: true,
-    onlyApprovedForFacts: true,
-  });
+  // 1. 記憶の検索: 設計思想 8章 & 35章 第4段階 (7段階パイプライン: 会話状態・直近原文・完全一致・FTS・意味・再順位・原文再取得)
+  let scoredMemories: ScoredMemory[];
+  let memoryBlock = '';
+
+  if (options?.conversationState || options?.recentMessages) {
+    const pipelineResult = await longTermMemoryService.searchPipeline(
+      userMessage,
+      memories,
+      options.conversationState,
+      options.recentMessages || [],
+      {
+        limit: maxMemories,
+        onlyApprovedForFacts: true,
+      }
+    );
+    scoredMemories = pipelineResult.scoredMemories as ScoredMemory[];
+    memoryBlock = longTermMemoryService.formatMemoriesForPrompt(pipelineResult);
+  } else {
+    scoredMemories = await retrieveScoredMemoriesHybrid(userMessage, memories, {
+      limit: maxMemories,
+      alwaysIncludePinned: true,
+      filterExpired: true,
+      onlyApprovedForFacts: true,
+    });
+    memoryBlock = scoredMemories.length > 0
+      ? `【参照された記憶・ユーザー情報 (RAG)】:\n${scoredMemories.map((sm) => {
+          const isApproved = sm.memory.approved !== false;
+          const hasConflict = (sm.memory.conflictWith && sm.memory.conflictWith.length > 0);
+          let prefix = '・';
+          if (!isApproved) {
+            prefix = '・[※未検証・仮推論情報（確定事実として断定せず推測として扱うこと）]: ';
+          } else if (hasConflict) {
+            prefix = '・[⚠️別設定と競合あり（最新のユーザー指示を優先すること）]: ';
+          }
+          return `${prefix}${sm.memory.content}`;
+        }).join('\n')}`
+      : '';
+  }
 
   const usedMemories = scoredMemories.map((sm) => ({
     id: sm.memory.id,
@@ -109,20 +156,6 @@ export async function buildExpertSystemPromptWithTracking(
     approved: sm.memory.approved,
     isUnverified: sm.memory.approved === false,
   }));
-
-  const memoryBlock = scoredMemories.length > 0
-    ? `【参照された記憶・ユーザー情報 (RAG)】:\n${scoredMemories.map((sm) => {
-        const isApproved = sm.memory.approved !== false;
-        const hasConflict = (sm.memory.conflictWith && sm.memory.conflictWith.length > 0);
-        let prefix = '・';
-        if (!isApproved) {
-          prefix = '・[※未検証・仮推論情報（確定事実として断定せず推測として扱うこと）]: ';
-        } else if (hasConflict) {
-          prefix = '・[⚠️別設定と競合あり（最新のユーザー指示を優先すること）]: ';
-        }
-        return `${prefix}${sm.memory.content}`;
-      }).join('\n')}`
-    : '';
 
   // 2. スキルライブラリ（手続き記憶）のマッチング (設計思想 13)
   const matchedSkills = skillsService.matchSkillsForQuery(userMessage);

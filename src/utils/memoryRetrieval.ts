@@ -559,6 +559,52 @@ export function enrichMemoryMetadata(
 
   const isActive = item.active ?? (destination !== 'quarantine' && destination !== 'discard_candidate');
 
+  // 設計思想 8章: 記憶の種類・長期記憶・ライフサイクル状態
+  let lifecycleStatus = item.lifecycleStatus;
+  if (!lifecycleStatus) {
+    if (item.replacedBy) {
+      lifecycleStatus = 'SUPERSEDED';
+    } else if (destination === 'discard_candidate') {
+      lifecycleStatus = 'REJECTED';
+    } else if (item.expiresAt && item.expiresAt < now) {
+      lifecycleStatus = 'EXPIRED';
+    } else if (approved) {
+      lifecycleStatus = 'APPROVED';
+    } else {
+      lifecycleStatus = 'UNVERIFIED';
+    }
+  }
+
+  let memoryScope = item.memoryScope;
+  if (!memoryScope) {
+    if (memoryType === 'working') memoryScope = 'short_term';
+    else if (memoryType === 'raw') memoryScope = 'raw_archive';
+    else if (
+      item.category === 'preference' ||
+      item.category === 'profile' ||
+      item.pinned ||
+      (item.importance && item.importance >= 4)
+    ) {
+      memoryScope = 'long_term';
+    } else {
+      memoryScope = 'mid_term';
+    }
+  }
+
+  let longTermType = item.longTermType;
+  if (!longTermType && memoryScope === 'long_term') {
+    const c = content.toLowerCase();
+    if (c.includes('原則') || c.includes('設計') || c.includes('規約') || c.includes('禁止')) {
+      longTermType = 'design_principle';
+    } else if (c.includes('方針') || c.includes('戦略') || c.includes('常に')) {
+      longTermType = 'policy';
+    } else if (item.category === 'preference' || c.includes('好き') || c.includes('好み')) {
+      longTermType = 'preference';
+    } else {
+      longTermType = 'general_rule';
+    }
+  }
+
   return {
     id: item.id || `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     category: item.category || 'preference',
@@ -592,6 +638,16 @@ export function enrichMemoryMetadata(
     discardReason,
     routingFactors,
     routedAt: item.routedAt || now,
+    // 8章 & 35章 第4段階: 長期記憶・状態・置換関係
+    lifecycleStatus,
+    memoryScope,
+    longTermType,
+    replacedBy: item.replacedBy,
+    replacementReason: item.replacementReason,
+    supersededAt: item.supersededAt,
+    supersededFrom: item.supersededFrom,
+    rawSourceId: item.rawSourceId,
+    rawSourceType: item.rawSourceType,
   };
 }
 

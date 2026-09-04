@@ -101,6 +101,72 @@ export interface MemoryItem {
   prerequisiteMemoryIds?: string[]; // 前提条件となる記憶ID (依存先)
   domainVector?: number[];       // 多次元トピック重み疎ベクトル
   semanticKeywords?: string[];   // 抽出された意味的キーワード
+  // 設計思想 8章 & 35章 第4段階: 記憶管理・長期記憶・置換関係
+  memoryScope?: MemoryScope;
+  longTermType?: LongTermMemoryType;
+  lifecycleStatus?: MemoryLifecycleStatus;
+  replacedBy?: string;           // 置換先記憶ID (例: MEM-0047)
+  replacementReason?: string;    // 置換理由 (例: 固定回数ではなく無料予算で動的運用するため)
+  supersededAt?: number;         // 置換された日時
+  supersededFrom?: string;       // 置換元となった古い記憶ID
+  rawSourceId?: string;          // 紐づく原文メッセージID
+  rawSourceType?: 'chat' | 'teacher_response' | 'synthesis_process' | 'eval_result';
+}
+
+/**
+ * 設計思想 8章 & 35章 第4段階: 記憶の種類
+ */
+export type MemoryScope =
+  | 'short_term'    // 短期記憶: 直近数往復、現在の質問、現在の回答設計
+  | 'mid_term'      // 中期記憶: 現在進行中の話題、未解決事項、直近の決定
+  | 'long_term'     // 長期記憶: 継続的な好み、長期的な方針、確定した設計原則、一般ルール
+  | 'raw_archive';  // 原文保管: 会話全文、教師回答全文、教材生成過程、評価結果
+
+/**
+ * 設計思想 8.1 長期記憶の4大分類
+ */
+export type LongTermMemoryType =
+  | 'preference'        // 継続的な好み
+  | 'policy'            // 長期的な方針
+  | 'design_principle'  // 確定した設計原則
+  | 'general_rule';     // 繰り返し利用する一般ルール
+
+/**
+ * 設計思想 8.2 記憶の状態
+ */
+export type MemoryLifecycleStatus =
+  | 'ACTIVE'      // 有効
+  | 'SUPERSEDED'  // 置換済み（古い記憶だが置換関係を保持）
+  | 'REJECTED'    // 却下
+  | 'EXPIRED'     // 期限切れ
+  | 'UNVERIFIED'  // 未検証
+  | 'APPROVED';   // 承認済み
+
+/**
+ * 設計思想 8.3 検索方針: 7段階検索パイプライン結果
+ */
+export interface MemoryPipelineStepHit {
+  step: number;
+  name: string;
+  count: number;
+  description: string;
+  sampleIds?: string[];
+}
+
+export interface MemoryPipelineSearchResult {
+  scoredMemories: Array<{
+    memory: MemoryItem;
+    score: number;
+    matchStage?: string;
+  }>;
+  filteredOutCount: number;
+  steps: MemoryPipelineStepHit[];
+  retrievedRawExcerpts: Array<{
+    memoryId: string;
+    sourceRef: string;
+    rawExcerpt: string;
+    lifecycleStatus: MemoryLifecycleStatus;
+  }>;
 }
 
 /**
@@ -396,6 +462,50 @@ export interface ChatMessage {
   // コード適用確認ゲート & VBA準備ゲート
   codeProposal?: CodeProposal;
   vbaAssessment?: VbaSafetyAssessment;
+  // 設計思想 6章 & 第3段階: 回答品質・回答長・直接回答評価
+  responseQuality?: ResponseQualityEvaluation;
+}
+
+/**
+ * 設計思想 6章 & 7章 & 第3段階: 回答長・会話処理の三段階分離
+ */
+export type ResponseLength = 'short' | 'standard' | 'detailed';
+
+export interface ResponseQualityEvaluation {
+  directAnswerFirst: boolean;
+  lengthCategory: ResponseLength;
+  actualLengthChars: number;
+  lengthCompliant: boolean;
+  duplicatesRemovedCount: number;
+  unnaturalPhrasesFixed: number;
+  passed: boolean;
+  feedback: string[];
+}
+
+/**
+ * 設計思想 7章: 会話状態管理 (Conversation State Management)
+ */
+export type ConversationStage =
+  | 'QUESTION' | 'CLARIFICATION' | 'CORRECTION' | 'COMPARISON'
+  | 'DECISION' | 'FOLLOW_UP' | 'TOPIC_CHANGE' | 'CLOSING';
+
+export interface ConversationCorrectionEvent {
+  oldValue: string;
+  newValue: string;
+  affectedTopics: string[];
+  timestamp: number;
+}
+
+export interface ConversationState {
+  currentTopic: string;
+  topLevelGoal: string;
+  stage: ConversationStage;
+  confirmedFacts: string[];
+  corrections: ConversationCorrectionEvent[];
+  invalidatedAssumptions: string[];
+  pendingQuestions: string[];
+  expectedResponseLength: ResponseLength;
+  updatedAt: number;
 }
 
 export interface ConsoleLogItem {

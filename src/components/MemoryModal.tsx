@@ -39,8 +39,18 @@ import {
   Upload,
   FileCode,
   X,
+  BookmarkCheck,
+  History,
+  ArrowRightLeft,
 } from 'lucide-react';
-import { MemoryItem, PersonaConfig, MemoryType, MemoryDestination } from '../types';
+import {
+  MemoryItem,
+  PersonaConfig,
+  MemoryType,
+  MemoryDestination,
+  MemoryPipelineSearchResult,
+  LongTermMemoryType,
+} from '../types';
 import {
   JAPANESE_NATURAL_DIALOGUE_CORPUS,
   ANTI_ROBOTIC_JAPANESE_RULES,
@@ -59,6 +69,7 @@ import {
 } from '../utils/memoryRetrieval';
 import { storageService } from '../services/storageService';
 import { experienceRouterService } from '../services/experienceRouterService';
+import { longTermMemoryService } from '../services/longTermMemoryService';
 
 export interface MemoryModalProps {
   isOpen: boolean;
@@ -79,10 +90,62 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
 }) => {
   const [teachInput, setTeachInput] = useState('');
   const [selectedMemoryType, setSelectedMemoryType] = useState<MemoryType>('semantic');
-  const [activeSubTab, setActiveSubTab] = useState<'persona' | 'teach' | 'memory' | 'corpus' | 'graph' | 'quarantine' | 'discard'>('teach');
+  const [activeSubTab, setActiveSubTab] = useState<'persona' | 'teach' | 'memory' | 'corpus' | 'graph' | 'quarantine' | 'discard' | 'longterm'>('teach');
   const [exportedStatus, setExportedStatus] = useState<string | null>(null);
   const [memoryFilter, setMemoryFilter] = useState<'all' | 'approved' | 'unapproved' | 'conflicted' | MemoryType | MemoryDestination>('all');
   const [expandedConflictId, setExpandedConflictId] = useState<string | null>(null);
+
+  // 設計思想 8章 & 35章 第4段階: 長期記憶 & 7段階検索パイプラインシミュレータ用ステート
+  const [pipelineQuery, setPipelineQuery] = useState('タメ口とCanvasゲーム開発の設計原則');
+  const [pipelineResult, setPipelineResult] = useState<MemoryPipelineSearchResult | null>(null);
+  const [isSearchingPipeline, setIsSearchingPipeline] = useState(false);
+  const [longTermCategoryFilter, setLongTermCategoryFilter] = useState<'all' | LongTermMemoryType | 'superseded'>('all');
+  const [supersedeModalOldMemId, setSupersedeModalOldMemId] = useState<string | null>(null);
+  const [supersedeNewContent, setSupersedeNewContent] = useState('');
+  const [supersedeReason, setSupersedeReason] = useState('');
+
+  // 7段階検索パイプライン実行ハンドラ
+  const handleRunPipelineSearch = async () => {
+    if (!pipelineQuery.trim()) return;
+    setIsSearchingPipeline(true);
+    try {
+      const res = await longTermMemoryService.searchPipeline(
+        pipelineQuery,
+        memories,
+        null,
+        [],
+        { limit: 6, onlyApprovedForFacts: false }
+      );
+      setPipelineResult(res);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSearchingPipeline(false);
+    }
+  };
+
+  // 8.2 古い記憶の置換実行ハンドラ
+  const handleExecuteSupersede = () => {
+    if (!supersedeModalOldMemId || !supersedeNewContent.trim() || !supersedeReason.trim()) {
+      alert('置換後の新しい内容と置換理由を両方入力してください。');
+      return;
+    }
+    const { updatedMemories, newMemory } = longTermMemoryService.supersedeMemory(
+      memories,
+      supersedeModalOldMemId,
+      supersedeNewContent.trim(),
+      supersedeReason.trim()
+    );
+    storageService.setMemories(updatedMemories);
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updatedMemories);
+    }
+    setSupersedeModalOldMemId(null);
+    setSupersedeNewContent('');
+    setSupersedeReason('');
+    setExportedStatus(`✅ 記憶を安全に置換しました！古い記憶は SUPERSEDED（置換理由: ${supersedeReason}）として履歴保存されました。`);
+    setTimeout(() => setExportedStatus(null), 5000);
+  };
 
   // 知識グラフ & 多層ベクトル検索シミュレーター用ステート
   const [graphSearchQuery, setGraphSearchQuery] = useState('ゲームの脱ロボットとタメ口会話');
@@ -436,6 +499,17 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
     }
   };
 
+  const handleTogglePin = (id: string) => {
+    const mem = memories.find((m) => m.id === id);
+    if (!mem) return;
+    const nextPinned = !mem.pinned;
+    storageService.saveMemoryItem({ ...mem, pinned: nextPinned, updatedAt: Date.now() });
+    const updated = storageService.getMemories();
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+  };
+
   const handleDelete = (id: string) => {
     storageService.deleteMemoryItem(id);
     const updated = storageService.getMemories();
@@ -769,6 +843,24 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
           >
             <Network className="w-4 h-4 text-indigo-400" />
             <span>🕸️ 知識グラフ & 多層RAG</span>
+          </button>
+
+          {/* 8章 & 35章 第4段階: 長期記憶 & 7段階検索パイプラインタブ */}
+          <button
+            onClick={() => setActiveSubTab('longterm')}
+            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+              activeSubTab === 'longterm'
+                ? 'border-emerald-500 text-emerald-300 bg-emerald-950/20'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <BookmarkCheck className="w-4 h-4 text-emerald-400" />
+            <span>📚 長期記憶・7段階検索</span>
+            {memories.filter((m) => m.lifecycleStatus === 'SUPERSEDED').length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-mono">
+                {memories.filter((m) => m.lifecycleStatus === 'SUPERSEDED').length}件置換済
+              </span>
+            )}
           </button>
 
           {/* 49章: 経験の保存先ルーター専用タブ */}
@@ -2309,6 +2401,436 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                     ))}
                   </div>
                 )}
+              </div>
+            );
+          })()}
+
+          {/* TAB 8: 設計思想 8章 & 35章 第4段階: 長期記憶・置換履歴 & 7段階検索パイプライン */}
+          {activeSubTab === 'longterm' && (() => {
+            const supersededCount = memories.filter((m) => m.lifecycleStatus === 'SUPERSEDED' || Boolean(m.replacedBy)).length;
+            const designPrinciples = memories.filter((m) => m.longTermType === 'design_principle' && m.lifecycleStatus !== 'SUPERSEDED');
+            const policies = memories.filter((m) => m.longTermType === 'policy' && m.lifecycleStatus !== 'SUPERSEDED');
+            const preferences = memories.filter((m) => (m.longTermType === 'preference' || m.category === 'preference') && m.lifecycleStatus !== 'SUPERSEDED');
+            const generalRules = memories.filter((m) => m.longTermType === 'general_rule' && m.lifecycleStatus !== 'SUPERSEDED');
+
+            const filteredMemories = memories.filter((m) => {
+              if (longTermCategoryFilter === 'superseded') {
+                return m.lifecycleStatus === 'SUPERSEDED' || Boolean(m.replacedBy);
+              }
+              if (longTermCategoryFilter === 'all') {
+                return m.lifecycleStatus !== 'SUPERSEDED' && !m.replacedBy;
+              }
+              return m.longTermType === longTermCategoryFilter && m.lifecycleStatus !== 'SUPERSEDED' && !m.replacedBy;
+            });
+
+            const targetOldMemory = supersedeModalOldMemId ? memories.find((m) => m.id === supersedeModalOldMemId) : null;
+
+            return (
+              <div className="space-y-6 text-xs animate-in fade-in">
+                {/* 1. タイトル & 8章ガイダンス */}
+                <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-emerald-300 text-sm">
+                      <BookmarkCheck className="w-4 h-4 text-emerald-400" />
+                      <span>設計思想 8章 & 35章 第4段階: 長期記憶・置換管理・7段階検索パイプライン</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono border border-emerald-500/30">
+                      Phase 4 Active
+                    </span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">
+                    継続的な好み・長期方針・確定した設計原則・一般ルールを長期記憶として厳格管理します。
+                    訂正された古い原則は安易に消去せず「<strong className="text-amber-300">SUPERSEDED（置換済み）</strong>」として置換理由とともに保持し、
+                    7段階の検索パイプライン（会話状態 ➔ 直近原文 ➔ 完全一致 ➔ 全文検索 ➔ 意味検索 ➔ 再順位付け ➔ 原文再取得）でノイズ混入を防ぎます。
+                  </p>
+
+                  {/* 4大分類 & 置換履歴の統計バッジ */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+                    <div className="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-center">
+                      <div className="text-[10px] text-slate-400">確定設計原則</div>
+                      <div className="text-sm font-bold text-indigo-300">{designPrinciples.length}件</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-center">
+                      <div className="text-[10px] text-slate-400">長期的な方針</div>
+                      <div className="text-sm font-bold text-sky-300">{policies.length}件</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-center">
+                      <div className="text-[10px] text-slate-400">継続的な好み</div>
+                      <div className="text-sm font-bold text-pink-300">{preferences.length}件</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-center">
+                      <div className="text-[10px] text-slate-400">一般ルール</div>
+                      <div className="text-sm font-bold text-emerald-300">{generalRules.length}件</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-amber-950/30 border border-amber-500/30 text-center">
+                      <div className="text-[10px] text-amber-400">置換済み履歴</div>
+                      <div className="text-sm font-bold text-amber-300">{supersededCount}件</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. 7段階検索パイプライン シミュレータ */}
+                <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-700/70 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-200 flex items-center gap-2">
+                      <Search className="w-4 h-4 text-emerald-400" />
+                      8.3 検索方針: 7段階検索パイプライン シミュレーター
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      1.会話状態 ➔ 2.直近原文 ➔ 3.完全一致 ➔ 4.全文 ➔ 5.意味 ➔ 6.再順位 ➔ 7.原文再取得
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={pipelineQuery}
+                      onChange={(e) => setPipelineQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleRunPipelineSearch()}
+                      placeholder="検索クエリを入力 (例: タメ口とゲーム設計原則, Canvas, VBA)..."
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 placeholder-slate-500 text-xs focus:outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      onClick={handleRunPipelineSearch}
+                      disabled={isSearchingPipeline}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                    >
+                      {isSearchingPipeline ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Search className="w-3.5 h-3.5" />
+                      )}
+                      <span>パイプライン実行</span>
+                    </button>
+                  </div>
+
+                  {/* 実行結果の各ステップ進捗表示 */}
+                  {pipelineResult && (
+                    <div className="space-y-3 pt-2 border-t border-slate-800">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                        {pipelineResult.steps.map((step) => (
+                          <div
+                            key={step.step}
+                            className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] space-y-1"
+                          >
+                            <div className="flex items-center justify-between text-slate-300 font-bold">
+                              <span className="text-emerald-400">Step {step.step}</span>
+                              <span className="px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300 font-mono text-[10px]">
+                                {step.count}件ヒット
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-200 font-semibold">{step.name}</div>
+                            <div className="text-[9px] text-slate-400 leading-tight">{step.description}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 最終選定された記憶と原文抜粋 */}
+                      <div className="space-y-2 pt-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                          <span>厳選採用記憶 ({pipelineResult.scoredMemories.length}件) ＆ 原文再取得</span>
+                          <span className="text-[10px] text-slate-400">
+                            無関係・置換済み除外: {pipelineResult.filteredOutCount}件
+                          </span>
+                        </div>
+
+                        {pipelineResult.scoredMemories.length === 0 ? (
+                          <div className="p-4 text-center text-slate-500 bg-slate-950/50 rounded-lg">
+                            該当する高関連度記憶は見つかりませんでした（閾値未満のノイズ記憶は厳格に除外されました）。
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {pipelineResult.scoredMemories.map((sm, idx) => {
+                              const mem = sm.memory;
+                              const rawItem = pipelineResult.retrievedRawExcerpts.find((r) => r.memoryId === mem.id);
+                              return (
+                                <div
+                                  key={mem.id}
+                                  className="p-3 rounded-lg bg-slate-950/90 border border-emerald-500/30 space-y-1.5"
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold text-[10px]">
+                                        #{idx + 1} スコア: {sm.score}
+                                      </span>
+                                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">
+                                        判定: {sm.matchStage}
+                                      </span>
+                                      {mem.longTermType && (
+                                        <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px]">
+                                          {mem.longTermType === 'design_principle' ? '確定設計原則' : mem.longTermType === 'policy' ? '長期方針' : mem.longTermType === 'preference' ? '継続的好み' : '一般ルール'}
+                                        </span>
+                                      )}
+                                      <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 text-[10px] font-mono">
+                                        {mem.lifecycleStatus || (mem.approved ? 'APPROVED' : 'UNVERIFIED')}
+                                      </span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 font-mono">{mem.id}</span>
+                                  </div>
+                                  <p className="text-slate-200 text-xs font-medium leading-relaxed">{mem.content}</p>
+                                  {rawItem && (
+                                    <div className="p-2 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-400 space-y-0.5">
+                                      <div className="text-slate-500 font-bold flex items-center gap-1">
+                                        <FileText className="w-3 h-3 text-emerald-400" />
+                                        <span>再取得された原文根拠抜粋 ({rawItem.sourceRef}):</span>
+                                      </div>
+                                      <div className="text-slate-300 italic font-mono">{rawItem.rawExcerpt}</div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. 置換モーダル / インライン置換フォーム (8.2 置換関係の保存) */}
+                {supersedeModalOldMemId && targetOldMemory && (
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-amber-950/50 to-slate-900 border border-amber-500/60 space-y-3 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
+                        <ArrowRightLeft className="w-4 h-4 text-amber-400" />
+                        8.2 記憶の置換処理 (SUPERSEDED 置換関係の履歴保存)
+                      </span>
+                      <button
+                        onClick={() => {
+                          setSupersedeModalOldMemId(null);
+                          setSupersedeNewContent('');
+                          setSupersedeReason('');
+                        }}
+                        className="text-slate-400 hover:text-slate-200 p-1 rounded cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 space-y-1">
+                      <div className="text-[10px] text-amber-400 font-bold">置換される古い記憶 ({targetOldMemory.id}):</div>
+                      <div className="text-slate-300 line-through">{targetOldMemory.content}</div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-300">置換後の新しい内容 (確定原則・方針):</label>
+                      <textarea
+                        rows={2}
+                        value={supersedeNewContent}
+                        onChange={(e) => setSupersedeNewContent(e.target.value)}
+                        placeholder="例: 教師APIの呼び出しは固定回数ではなく、日次の無料予算上限をもとに動的最適化して運用する"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-100 text-xs focus:outline-none focus:border-amber-500 resize-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-300">置換理由 (なぜ訂正されたか・新方針の根拠):</label>
+                      <input
+                        type="text"
+                        value={supersedeReason}
+                        onChange={(e) => setSupersedeReason(e.target.value)}
+                        placeholder="例: 固定回数だとモデルサイズ別のコスト変動に対応できないため"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 text-xs focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        onClick={() => setSupersedeModalOldMemId(null)}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs cursor-pointer"
+                      >
+                        キャンセル
+                      </button>
+                      <button
+                        onClick={handleExecuteSupersede}
+                        className="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md"
+                      >
+                        <ArrowRightLeft className="w-3.5 h-3.5" />
+                        <span>置換を実行 (新旧リンク保存)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. 長期記憶・置換履歴一覧 */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <button
+                        onClick={() => setLongTermCategoryFilter('all')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          longTermCategoryFilter === 'all'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        有効長期記憶 ({memories.filter((m) => m.lifecycleStatus !== 'SUPERSEDED' && !m.replacedBy).length})
+                      </button>
+                      <button
+                        onClick={() => setLongTermCategoryFilter('design_principle')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          longTermCategoryFilter === 'design_principle'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        確定設計原則 ({designPrinciples.length})
+                      </button>
+                      <button
+                        onClick={() => setLongTermCategoryFilter('policy')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          longTermCategoryFilter === 'policy'
+                            ? 'bg-sky-600 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        長期方針 ({policies.length})
+                      </button>
+                      <button
+                        onClick={() => setLongTermCategoryFilter('preference')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          longTermCategoryFilter === 'preference'
+                            ? 'bg-pink-600 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        継続的好み ({preferences.length})
+                      </button>
+                      <button
+                        onClick={() => setLongTermCategoryFilter('superseded')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          longTermCategoryFilter === 'superseded'
+                            ? 'bg-amber-600 text-white'
+                            : 'bg-amber-950/40 text-amber-300 border border-amber-500/30 hover:bg-amber-900/50'
+                        }`}
+                      >
+                        <History className="w-3 h-3" />
+                        <span>置換済み履歴 ({supersededCount})</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {filteredMemories.length === 0 ? (
+                      <div className="p-6 text-center text-slate-500 bg-slate-950/40 rounded-xl border border-slate-800">
+                        該当する記憶項目はありません。
+                      </div>
+                    ) : (
+                      filteredMemories.map((mem) => {
+                        const isSuperseded = mem.lifecycleStatus === 'SUPERSEDED' || Boolean(mem.replacedBy);
+                        const isApproved = mem.approved !== false;
+
+                        return (
+                          <div
+                            key={mem.id}
+                            className={`p-3.5 rounded-xl border transition-all ${
+                              isSuperseded
+                                ? 'bg-amber-950/15 border-amber-500/30 opacity-80'
+                                : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="space-y-1.5 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {isSuperseded ? (
+                                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold flex items-center gap-1 border border-amber-500/40">
+                                      <History className="w-3 h-3" />
+                                      SUPERSEDED (置換済み)
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-500/30">
+                                      ACTIVE (有効)
+                                    </span>
+                                  )}
+
+                                  {mem.longTermType && (
+                                    <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] border border-indigo-500/30">
+                                      {mem.longTermType === 'design_principle' ? '確定設計原則' : mem.longTermType === 'policy' ? '長期方針' : mem.longTermType === 'preference' ? '継続的好み' : '一般ルール'}
+                                    </span>
+                                  )}
+
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono border ${
+                                      isApproved
+                                        ? 'bg-teal-500/20 text-teal-300 border-teal-500/30'
+                                        : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                    }`}
+                                  >
+                                    {isApproved ? 'APPROVED' : 'UNVERIFIED (未検証)'}
+                                  </span>
+
+                                  <span className="text-[10px] text-slate-500 font-mono">{mem.id}</span>
+                                </div>
+
+                                <p
+                                  className={`text-xs leading-relaxed ${
+                                    isSuperseded ? 'text-slate-400 line-through' : 'text-slate-100 font-medium'
+                                  }`}
+                                >
+                                  {mem.content}
+                                </p>
+
+                                {/* 置換先・置換理由の表示 */}
+                                {isSuperseded && (
+                                  <div className="p-2 rounded bg-amber-950/40 border border-amber-500/30 text-[10px] text-amber-200 space-y-1">
+                                    <div className="font-bold flex items-center gap-1">
+                                      <ArrowRightLeft className="w-3 h-3 text-amber-400" />
+                                      <span>置換先ID: {mem.replacedBy || '新記憶'}</span>
+                                    </div>
+                                    <div>置換理由: {mem.replacementReason || '新方針の適用に伴う更新'}</div>
+                                  </div>
+                                )}
+
+                                {/* 置換元となった古い記憶ID */}
+                                {mem.supersededFrom && (
+                                  <div className="text-[10px] text-emerald-400 flex items-center gap-1 font-mono">
+                                    <BookmarkCheck className="w-3 h-3" />
+                                    <span>旧記憶 ({mem.supersededFrom}) を置換して新設されました</span>
+                                  </div>
+                                )}
+
+                                {/* 根拠原文抜粋 */}
+                                {mem.rawExcerpt && (
+                                  <div className="text-[10px] text-slate-400 truncate">
+                                    根拠抜粋: {mem.rawExcerpt}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* 操作ボタン */}
+                              {!isSuperseded && (
+                                <div className="flex flex-col gap-1 shrink-0">
+                                  <button
+                                    onClick={() => {
+                                      setSupersedeModalOldMemId(mem.id);
+                                      setSupersedeNewContent('');
+                                      setSupersedeReason('');
+                                    }}
+                                    className="px-2.5 py-1 bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/40 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                                    title="この記憶を訂正・置換し、SUPERSEDEDとして新旧関係を保持します"
+                                  >
+                                    <ArrowRightLeft className="w-3 h-3" />
+                                    <span>置換する</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleTogglePin(mem.id)}
+                                    className={`px-2 py-1 rounded-lg text-[10px] transition-all cursor-pointer text-center ${
+                                      mem.pinned
+                                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                                    }`}
+                                  >
+                                    {mem.pinned ? '📌 ピン留め中' : 'ピン留め'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
               </div>
             );
           })()}

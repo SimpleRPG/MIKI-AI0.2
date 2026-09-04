@@ -38,6 +38,7 @@ import {
   Wrench,
   FlaskConical,
   Layers,
+  AlignLeft,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode, CompletionEvaluation } from '../types';
 import { extractCodeBlocks } from '../utils/codeParser';
@@ -680,6 +681,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       <div className="flex items-center gap-1 bg-amber-950/80 border border-amber-500/70 px-2 py-0.5 rounded-lg text-[9.5px] text-amber-300 font-mono animate-pulse" title="破壊的操作の承認待ち">
                         <AlertCircle className="w-3 h-3 text-amber-400" />
                         <span>要承認ツール</span>
+                      </div>
+                    )}
+
+                    {/* 設計思想 第3段階: 回答品質・回答長・直接回答バッジ */}
+                    {msg.responseQuality && (
+                      <div
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border ${
+                          msg.responseQuality.passed
+                            ? 'bg-teal-950/60 border-teal-800/60 text-teal-300'
+                            : 'bg-amber-950/60 border-amber-800/60 text-amber-300'
+                        }`}
+                        title={`【設計思想 第3段階: 回答品質・三段階分離】\n・選定回答長: ${msg.responseQuality.lengthCategory.toUpperCase()} (${msg.responseQuality.actualLengthChars}文字 / ${msg.responseQuality.lengthCompliant ? '文字数適合' : '文字数要調整'})\n・質問への直接回答: ${msg.responseQuality.directAnswerFirst ? '結論ファースト' : '前置きあり'}\n・重複文削除: ${msg.responseQuality.duplicatesRemovedCount}件\n・自然日本語化: ${msg.responseQuality.unnaturalPhrasesFixed}件\n${msg.responseQuality.feedback.length > 0 ? `・フィードバック: ${msg.responseQuality.feedback.join(' / ')}` : ''}`}
+                      >
+                        <AlignLeft className="w-3 h-3 text-teal-400" />
+                        <span>
+                          {msg.responseQuality.lengthCategory.toUpperCase()} ({msg.responseQuality.actualLengthChars}字)
+                          {msg.responseQuality.duplicatesRemovedCount > 0 && ` 重複-${msg.responseQuality.duplicatesRemovedCount}`}
+                        </span>
                       </div>
                     )}
                   </div>

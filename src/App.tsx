@@ -23,6 +23,7 @@ import {
   CompletionEvaluation,
   CodeProposal,
   VbaSafetyAssessment,
+  ConversationState,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
@@ -37,6 +38,15 @@ import { selfImprovementService } from './services/selfImprovementService';
 import { schemaValidationService } from './services/schemaValidationService';
 import { nativeBackgroundService } from './services/nativeBackgroundService';
 import { backgroundWorkerService } from './services/backgroundWorkerService';
+import {
+  CONVERSATION_STATE_INSTRUCTION,
+  formatConversationStateForPrompt,
+  extractConversationState,
+  defaultConversationState,
+  cleanStreamingVisibleText,
+} from './services/conversationStateService';
+import { responseDesignService } from './services/responseDesignService';
+import { longTermMemoryService } from './services/longTermMemoryService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
@@ -196,6 +206,17 @@ export default function App() {
     ];
   });
 
+  // 設計思想 7章: 会話状態管理 (Conversation State Management)
+  const [conversationState, setConversationState] = useState<ConversationState>(() => {
+    try {
+      const saved = storageService.getItem('miki_conversation_state');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      // Fallback
+    }
+    return defaultConversationState();
+  });
+
   // Request browser storage persistence so memories and models are never cleared by OS
   useEffect(() => {
     if (navigator.storage && navigator.storage.persist) {
@@ -211,6 +232,14 @@ export default function App() {
   useEffect(() => {
     storageService.setMemories(memories);
   }, [memories]);
+
+  useEffect(() => {
+    try {
+      storageService.setItem('miki_conversation_state', JSON.stringify(conversationState));
+    } catch (e) {
+      console.warn('Storage quota limit reached for conversation state', e);
+    }
+  }, [conversationState]);
 
   useEffect(() => {
     try {
@@ -878,14 +907,19 @@ export default function App() {
     try {
       const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
       const activeMemories = memories.filter((m) => m.active);
-      // 多層ベクトル検索 & 知識グラフ依存関係トラバーサルで、関連性の高い記憶のみを抽出 (設計思想 4 & 12)
+      // 設計思想 8章 & 35章 第4段階: 長期記憶・完全一致・全文検索・原文再取得の7段階パイプライン
       // 設計思想 25: profile/preferenceなどの事実性カテゴリは承認済み記憶のみに制限
-      let relevantMemories = await retrieveRelevantMemoriesHybrid(text, activeMemories, {
-        limit: 8,
-        alwaysIncludePinned: true,
-        traverseGraph: true,
-        onlyApprovedForFacts: true,
-      });
+      const memoryPipelineResult = await longTermMemoryService.searchPipeline(
+        text,
+        activeMemories,
+        conversationState,
+        messages,
+        {
+          limit: 8,
+          onlyApprovedForFacts: true,
+        }
+      );
+      let relevantMemories = memoryPipelineResult.scoredMemories.map((sm) => sm.memory);
 
       // Gemini Cloud利用時の外部送信保護: 個人情報・関係性記憶(profile/relationship)を除外する設定
       if (engineMode === 'gemini_cloud') {
@@ -904,10 +938,11 @@ export default function App() {
         }
       }
 
-      // Step 2: Memory Retrieval & Context Association
-      systemLogger.step(2, 10, '会話記憶 (Memory) 照合 & 親密度コンテキスト検索', {
+      // Step 2: Memory Retrieval & Context Association (設計思想 8章 7段階検索)
+      systemLogger.step(2, 10, '長期記憶・7段階検索パイプライン実行 (完全一致/全文/原文再取得)', {
         activeMemoriesCount: activeMemories.length,
         relevantMemoriesCount: relevantMemories.length,
+        pipelineSteps: memoryPipelineResult.steps.map((s) => `${s.step}.${s.name}:${s.count}件`).join(' | '),
         intimacyLevel: persona.intimacyLevel,
         intimacyExp: persona.intimacyExp,
         speaker: activeSpeaker.name,
@@ -1327,6 +1362,8 @@ export default function App() {
         {
           includeFiles: isCodeModRequest,
           toolResults: executedTools,
+          conversationState,
+          recentMessages: messages,
         }
       );
       const systemPrompt = promptBuildResult.systemPrompt;
@@ -1354,10 +1391,35 @@ export default function App() {
         );
       }
 
-      // Build clean, strictly-alternating conversation context for WebLLM (MLC)
+      // 設計思想 6章 & 35章 第3段階: 回答長選択と回答設計
+      const lengthSelection = responseDesignService.determineExpectedResponseLength(text, conversationState);
+      const activeExpectedLength = lengthSelection.length;
+      const responseDesignInstruction = responseDesignService.buildResponseDesignInstruction(
+        activeExpectedLength,
+        conversationState.stage
+      );
+
+      systemLogger.info(
+        'STEP',
+        `回答長選定: [${activeExpectedLength.toUpperCase()}] (${lengthSelection.reason}, 目安:${lengthSelection.targetRange})`
+      );
+
+      // 会話状態管理 (設計思想 7章) & 回答設計 (設計思想 6章・第3段階)
+      const currentConvStateWithLength = {
+        ...conversationState,
+        expectedResponseLength: activeExpectedLength,
+      };
+      const stateSummary = formatConversationStateForPrompt(currentConvStateWithLength);
+
       let combinedSystemPrompt = systemPrompt;
       if (compressionResult.isCompressed && compressionResult.episodeSummary) {
         combinedSystemPrompt = `${systemPrompt}\n\n${compressionResult.episodeSummary}`;
+      }
+
+      if (stateSummary) {
+        combinedSystemPrompt = `${combinedSystemPrompt}\n\n${stateSummary}\n\n${responseDesignInstruction}\n\n${CONVERSATION_STATE_INSTRUCTION}`;
+      } else {
+        combinedSystemPrompt = `${combinedSystemPrompt}\n\n${responseDesignInstruction}\n\n${CONVERSATION_STATE_INSTRUCTION}`;
       }
 
       const chatContext: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
@@ -1414,13 +1476,14 @@ export default function App() {
             if (firstTokenTime === null) firstTokenTime = performance.now();
             accumulated += chunk;
             tokenCount += chunk.length;
+            const liveVisible = cleanStreamingVisibleText(accumulated);
 
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === assistantId
                   ? {
                       ...msg,
-                      content: accumulated,
+                      content: liveVisible || msg.content,
                       isStreaming: true,
                       executionSteps: systemLogger.getCurrentSessionSteps(),
                     }
@@ -1456,13 +1519,14 @@ export default function App() {
             if (firstTokenTime === null) firstTokenTime = performance.now();
             accumulated += chunk;
             tokenCount++;
+            const liveVisible = cleanStreamingVisibleText(accumulated);
 
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === assistantId
                   ? {
                       ...msg,
-                      content: accumulated,
+                      content: liveVisible || msg.content,
                       isStreaming: true,
                       executionSteps: systemLogger.getCurrentSessionSteps(),
                     }
@@ -1504,13 +1568,14 @@ export default function App() {
                 }
                 accumulated += chunk;
                 tokenCount++;
+                const liveVisible = cleanStreamingVisibleText(accumulated);
 
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === assistantId
                       ? {
                           ...msg,
-                          content: accumulated,
+                          content: liveVisible || msg.content,
                           isStreaming: true,
                           executionSteps: systemLogger.getCurrentSessionSteps(),
                         }
@@ -1660,10 +1725,24 @@ export default function App() {
         ttftMs: Math.round((firstTokenTime || tEnd) - tStart),
       });
 
+      // 設計思想 7章: 会話状態管理 (会話状態の抽出 & 表示テキストの分離)
+      const { state: newConvState, visibleText: rawExtractedText } = extractConversationState(
+        accumulated,
+        conversationState
+      );
+      setConversationState(newConvState);
+
+      // 設計思想 6章 & 35章 第3段階: 回答設計・重複排除・自然な日本語化ポストプロセス
+      const targetLength = newConvState.expectedResponseLength || activeExpectedLength;
+      const { cleanedText: finalVisibleText, quality: responseQuality } = responseDesignService.processOutput(
+        rawExtractedText,
+        targetLength
+      );
+
       // 文書48章: 完成条件と完了判定器による評価 (Checklist evaluation)
       const streamEvaluation = completionJudgeService.evaluateCompletion({
         userGoal: text,
-        assistantResponse: accumulated,
+        assistantResponse: finalVisibleText,
         executionSteps: systemLogger.getCurrentSessionSteps(),
         executedTools: promptBuildResult.executedTools,
         files: workspaceFiles,
@@ -1680,7 +1759,7 @@ export default function App() {
       ) {
         selfImprovementService.diagnoseFailure(
           text,
-          accumulated,
+          finalVisibleText,
           `[自動検出] 完了判定: ${streamEvaluation.status} - ${streamEvaluation.reason}`,
           {
             memoriesUsedCount: (promptBuildResult.usedMemories || []).length,
@@ -1703,7 +1782,7 @@ export default function App() {
       });
 
       // コードブロック抽出 & 生成と適用の分離 (設計思想 ②: コード自動適用の確認ゲート & ⑩: VBA準備ゲート)
-      const codeBlocks = extractCodeBlocks(accumulated);
+      const codeBlocks = extractCodeBlocks(finalVisibleText);
       let codeProposal: CodeProposal | undefined = undefined;
       let vbaAssessment: VbaSafetyAssessment | undefined = undefined;
 
@@ -1734,10 +1813,11 @@ export default function App() {
           msg.id === assistantId
             ? {
                 ...msg,
-                content: accumulated,
+                content: finalVisibleText,
                 speaker: activeSpeaker,
                 isStreaming: false,
                 completionEvaluation: streamEvaluation,
+                responseQuality,
                 fallbackDiagnostic: diagnosticData,
                 executionSteps: systemLogger.getCurrentSessionSteps(),
                 codeProposal,
@@ -1758,11 +1838,14 @@ export default function App() {
         )
       );
 
-      systemLogger.info('CHAT', `チャット処理全工程完了: [${executedEngineLabel}] (文字数: ${accumulated.length}, 総所要時間: ${totalElapsedMs}ms, TTFT: ${Math.round((firstTokenTime || tEnd) - tStart)}ms)`);
+      systemLogger.info(
+        'CHAT',
+        `チャット処理全工程完了: [${executedEngineLabel}] (文字数: ${finalVisibleText.length}, 総所要時間: ${totalElapsedMs}ms, TTFT: ${Math.round((firstTokenTime || tEnd) - tStart)}ms) [第3段階 回答品質: 長さ=${responseQuality.lengthCategory}(${responseQuality.lengthCompliant ? 'OK' : '調整済'}) 結論先頭=${responseQuality.directAnswerFirst ? 'OK' : 'NG'} 重複除去=${responseQuality.duplicatesRemovedCount} 自然化置換=${responseQuality.unnaturalPhrasesFixed}]`
+      );
 
       // 🧠 世界モデル: 事後検証 & 予測誤差の計算 (設計思想 17. 世界モデルと予測誤差)
       const errorRecord = worldModelService.recordOutcomeAndComputeError(actionPrediction, {
-        assistantResponse: accumulated,
+        assistantResponse: finalVisibleText,
         actualUsedMemories: usedMemoriesTracked,
         actualUsedSkills: usedSkillsTracked,
         executionError: false,
@@ -2132,7 +2215,8 @@ export default function App() {
               speakerMode={speakerMode}
               setSpeakerMode={setSpeakerMode}
               onApplyCode={handleApplyCode}
-              onClearHistory={() =>
+              onClearHistory={() => {
+                setConversationState(defaultConversationState());
                 setMessages([
                   {
                     id: 'init_' + Date.now(),
@@ -2140,8 +2224,8 @@ export default function App() {
                     content: `会話履歴をリフレッシュしたよ✨ 記憶カンペ（${memories.length}件）と現在のコードは保持されているから安心してね！`,
                     timestamp: Date.now(),
                   },
-                ])
-              }
+                ]);
+              }}
               useSearch={useSearch}
               setUseSearch={setUseSearch}
               workspaceFiles={workspaceFiles}
@@ -2218,7 +2302,8 @@ export default function App() {
                 speakerMode={speakerMode}
                 setSpeakerMode={setSpeakerMode}
                 onApplyCode={handleApplyCode}
-                onClearHistory={() =>
+                onClearHistory={() => {
+                  setConversationState(defaultConversationState());
                   setMessages([
                     {
                       id: 'init_' + Date.now(),
@@ -2226,8 +2311,8 @@ export default function App() {
                       content: `会話履歴をリフレッシュしたよ✨`,
                       timestamp: Date.now(),
                     },
-                  ])
-                }
+                  ]);
+                }}
                 useSearch={useSearch}
                 setUseSearch={setUseSearch}
                 workspaceFiles={workspaceFiles}
