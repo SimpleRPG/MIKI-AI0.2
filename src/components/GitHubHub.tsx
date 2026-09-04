@@ -52,6 +52,7 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
       storageService.setItem('miki_api_base_url', val.trim());
     } catch (e) {}
   };
+  const handleSaveToken = (val: string) => {
     setToken(val);
     try {
       storageService.setItem('miki_github_pat', val.trim());
