@@ -1470,6 +1470,57 @@ export interface SystemFeatureFlags {
   LORA_TRAINING: FeatureFlagState; // 16.2の発動条件を満たすまで長期DISABLED固定
   CODE_UNDERSTANDING: FeatureFlagState;
   VBA_DESIGN_ASSISTANT: FeatureFlagState;
+  // 設計思想 49章 & 50章 機能フラグ
+  EXPERIENCE_ROUTER: FeatureFlagState;
+  SKILL_GRADUATION: FeatureFlagState;
+}
+
+/**
+ * 設計思想 50章: 技能の多様性再試験 (Cross-Context Retest) 結果
+ */
+export interface SkillDiversityTestCase {
+  contextId: string;
+  contextType: 'paraphrased' | 'different_domain' | 'edge_case' | 'complex_input';
+  prompt: string;
+  expectedBehavior: string;
+  executed: boolean;
+  passed: boolean;
+  confidenceScore: number;
+  reason: string;
+}
+
+export interface SkillDiversityTestResult {
+  skillId: string;
+  skillName: string;
+  evaluatedAt: number;
+  totalTests: number;
+  passedTests: number;
+  diversityScore: number; // 0.0 - 1.0 (多様な文脈での合格率)
+  distinctContextCount: number; // 異なる文脈パターン数 (目標: 3以上)
+  testCases: SkillDiversityTestCase[];
+  generalizationVerdict: 'HIGHLY_GENERALIZED' | 'MODERATE' | 'OVERFITTED_TO_SINGLE_CONTEXT';
+  recommendation: 'READY_FOR_OFFICIAL' | 'NEEDS_MORE_DIVERSITY' | 'CONVERT_TO_EPISODIC_MEMORY';
+}
+
+/**
+ * 設計思想 50章: 技能の卒業進捗情報 (Graduation Progress)
+ */
+export interface SkillGraduationProgress {
+  skillId: string;
+  skillName: string;
+  status: 'candidate' | 'tested' | 'official' | 'official_matured' | 'disabled';
+  // 卒業の4大要件
+  requirements: {
+    daysSinceOfficial: { current: number; required: number; met: boolean };
+    successCount: { current: number; required: number; met: boolean };
+    successRate: { current: number; required: number; met: boolean }; // 0.0 - 1.0
+    contextDiversity: { current: number; required: number; met: boolean }; // 種類数
+  };
+  overallGraduationReadiness: number; // 0 - 100%
+  isGraduated: boolean;
+  graduatedAt?: number;
+  trainingSampleId?: string;
+  nextMilestone: string;
 }
 
 

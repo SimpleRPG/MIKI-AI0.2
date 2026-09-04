@@ -17,6 +17,8 @@ export const DEFAULT_FEATURE_FLAGS: SystemFeatureFlags = {
   LORA_TRAINING: 'DISABLED', // 16.2の発動条件を満たすまで長期固定
   CODE_UNDERSTANDING: 'DEVELOPMENT',
   VBA_DESIGN_ASSISTANT: 'DEVELOPMENT',
+  EXPERIENCE_ROUTER: 'STABLE',
+  SKILL_GRADUATION: 'STABLE',
 };
 
 export const FEATURE_FLAG_DESCRIPTIONS: Record<keyof SystemFeatureFlags, { title: string; desc: string }> = {
@@ -55,6 +57,14 @@ export const FEATURE_FLAG_DESCRIPTIONS: Record<keyof SystemFeatureFlags, { title
   VBA_DESIGN_ASSISTANT: {
     title: '抽象VBA設計支援 (VBA Design Assistant)',
     desc: '抽象要件整理、決定表化、構成案、テストケース、外部Copilot用指示書生成（26章）。',
+  },
+  EXPERIENCE_ROUTER: {
+    title: '経験保存先ルーター (Experience Router)',
+    desc: '対話や生成結果を9分類（作業・長期・案件記憶・スキル・検索・評価・教材・隔離・破棄）へ自動仕分け（49章）。',
+  },
+  SKILL_GRADUATION: {
+    title: '技能卒業＆多様性再試験 (Skill Graduation)',
+    desc: '多文脈での再試験による過学習防止、長期安定稼働した技能のLoRA教材化とプロンプト卒業（50章）。',
   },
 };
 

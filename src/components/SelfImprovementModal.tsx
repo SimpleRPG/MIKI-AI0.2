@@ -53,6 +53,7 @@ import { CapabilityMasteryTab } from './self_improvement/CapabilityMasteryTab';
 import { FeatureFlagsTab } from './self_improvement/FeatureFlagsTab';
 import { CodeUnderstandingVbaTab } from './self_improvement/CodeUnderstandingVbaTab';
 import { ExperienceRouterTab } from './self_improvement/ExperienceRouterTab';
+import { SkillGraduationTab } from './self_improvement/SkillGraduationTab';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
@@ -105,7 +106,7 @@ export interface SelfImprovementModalProps {
   chatMessages: ChatMessage[];
   memories: MemoryItem[];
   workspaceFiles?: WorkspaceFile[];
-  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'experience_router';
+  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'experience_router' | 'skill_graduation';
 }
 
 export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
@@ -116,7 +117,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   workspaceFiles = [],
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags' | 'experience_router'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags' | 'experience_router' | 'skill_graduation'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 
@@ -994,6 +995,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <Compass className="w-4 h-4 text-purple-400" />
             <span>🧭 経験保存先ルーター (49章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('skill_graduation')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'skill_graduation'
+                ? 'border-indigo-500 text-indigo-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <GraduationCap className="w-4 h-4 text-indigo-400" />
+            <span>🎓 技能卒業 ＆ 多様性再試験 (50章)</span>
           </button>
         </div>
 
@@ -2637,12 +2650,20 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={() => setActiveTab('skill_graduation')}
+                    className="px-3 py-1.5 bg-indigo-950 hover:bg-indigo-900 text-indigo-200 border border-indigo-700/80 rounded-lg text-xs flex items-center gap-1.5 font-semibold transition-all shadow-sm"
+                    title="50章の多様性再試験スタジオと卒業基準ダッシュボードを開きます"
+                  >
+                    <GraduationCap className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>🎓 50章 卒業＆多様性試験</span>
+                  </button>
+                  <button
                     onClick={handleEvaluateSkillsPromotion}
                     className="px-3 py-1.5 bg-purple-950 hover:bg-purple-900 text-purple-200 border border-purple-700/80 rounded-lg text-xs flex items-center gap-1.5 font-semibold transition-all shadow-sm"
                     title="50章の昇格条件（3パターン以上の文脈多様性）および卒業条件（30日運用・成功50回）を一括再判定します"
                   >
-                    <GraduationCap className="w-3.5 h-3.5 text-purple-400" />
-                    <span>50章 昇格・卒業判定を実行</span>
+                    <RefreshCw className="w-3.5 h-3.5 text-purple-400" />
+                    <span>一括判定</span>
                   </button>
                   <button
                     onClick={handleAutoExtractSkills}
@@ -4842,6 +4863,9 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
           {/* TAB: 経験の保存先ルーター (49章: 9分類自律仕分け) */}
           {activeTab === 'experience_router' && <ExperienceRouterTab />}
+
+          {/* TAB: 技能卒業 & 多様性再試験 (50章) */}
+          {activeTab === 'skill_graduation' && <SkillGraduationTab />}
         </div>
 
         {/* Footer */}
