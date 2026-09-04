@@ -42,9 +42,16 @@ import {
   Coins,
   Workflow,
   SearchCheck,
+  Flag,
+  Target,
+  Code2,
 } from 'lucide-react';
 import { ExternalTeacherTab } from './ExternalTeacherTab';
 import { PluginConsentDialog } from './PluginConsentDialog';
+import { AnswerPlanTab } from './self_improvement/AnswerPlanTab';
+import { CapabilityMasteryTab } from './self_improvement/CapabilityMasteryTab';
+import { FeatureFlagsTab } from './self_improvement/FeatureFlagsTab';
+import { CodeUnderstandingVbaTab } from './self_improvement/CodeUnderstandingVbaTab';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
@@ -108,7 +115,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   workspaceFiles = [],
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 
@@ -926,6 +933,54 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <GitBranch className="w-4 h-4 text-pink-400" />
             <span>モデル世代 & 系統樹</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('answer_plans')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'answer_plans'
+                ? 'border-amber-500 text-amber-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-amber-400" />
+            <span>⚡ 回答骨格 (9章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('capabilities')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'capabilities'
+                ? 'border-indigo-500 text-indigo-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Target className="w-4 h-4 text-indigo-400" />
+            <span>🎯 能力習得 & 仮想訓練 (16, 21, 32章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('code_ir_vba')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'code_ir_vba'
+                ? 'border-cyan-500 text-cyan-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Code2 className="w-4 h-4 text-cyan-400" />
+            <span>🧩 コード読解IR & VBA仕様 (22-26章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('feature_flags')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'feature_flags'
+                ? 'border-purple-500 text-purple-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Flag className="w-4 h-4 text-purple-400" />
+            <span>🚩 機能フラグ (31章)</span>
           </button>
         </div>
 
@@ -4747,6 +4802,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* TAB: 回答骨格と思考節約 (9章) */}
+          {activeTab === 'answer_plans' && <AnswerPlanTab />}
+
+          {/* TAB: 能力習得・LoRA発動条件・仮想学習試験 (16, 21, 32章) */}
+          {activeTab === 'capabilities' && <CapabilityMasteryTab />}
+
+          {/* TAB: コード読解IR & 抽象VBA設計支援 (22〜26章) */}
+          {activeTab === 'code_ir_vba' && <CodeUnderstandingVbaTab />}
+
+          {/* TAB: システム機能フラグ管理 (31章) */}
+          {activeTab === 'feature_flags' && <FeatureFlagsTab />}
         </div>
 
         {/* Footer */}

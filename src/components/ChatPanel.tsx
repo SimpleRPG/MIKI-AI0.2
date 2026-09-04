@@ -42,6 +42,9 @@ import {
   ShieldCheck,
   SearchCheck,
   Workflow,
+  Code2,
+  Table,
+  AlertTriangle,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode, CompletionEvaluation } from '../types';
 import { extractCodeBlocks } from '../utils/codeParser';
@@ -126,6 +129,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [expandedStepsMsgId, setExpandedStepsMsgId] = useState<string | null>(null);
   const [feedbackFeedbackId, setFeedbackFeedbackId] = useState<string | null>(null);
   const [feedbackReasons, setFeedbackReasons] = useState<{ [msgId: string]: string }>({});
+  const [expandedAnswerPlanMsgId, setExpandedAnswerPlanMsgId] = useState<string | null>(null);
+  const [expandedCodeIrMsgId, setExpandedCodeIrMsgId] = useState<string | null>(null);
+  const [expandedVbaSpecMsgId, setExpandedVbaSpecMsgId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -750,6 +756,60 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         <span>{msg.synthesizedWorkflow.steps.length}段ワークフロー</span>
                       </div>
                     )}
+
+                    {/* 設計思想 9章: 回答骨格と思考節約バッジ */}
+                    {msg.answerPlan && msg.answerPlan.applied && msg.answerPlan.matchedSkeleton && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedAnswerPlanMsgId(expandedAnswerPlanMsgId === msg.id ? null : msg.id)}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border transition-all cursor-pointer ${
+                          expandedAnswerPlanMsgId === msg.id
+                            ? 'bg-amber-900/80 border-amber-500 text-amber-200 shadow'
+                            : 'bg-amber-950/60 border-amber-800/60 text-amber-300 hover:border-amber-600'
+                        }`}
+                        title={`【設計思想 9章: 回答骨格と思考節約】\n・骨格ID: ${msg.answerPlan.matchedSkeleton.pattern_id}\n・状況分類: ${msg.answerPlan.matchedSkeleton.situation}\n・理由: ${msg.answerPlan.reason}\n(クリックで骨格詳細を開閉)`}
+                      >
+                        <Zap className="w-3 h-3 text-amber-400" />
+                        <span>骨格: {msg.answerPlan.matchedSkeleton.pattern_id}</span>
+                      </button>
+                    )}
+
+                    {/* 設計思想 22〜25章: コード理解中間IRバッジ */}
+                    {msg.codeUnderstandingIR && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedCodeIrMsgId(expandedCodeIrMsgId === msg.id ? null : msg.id)}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border transition-all cursor-pointer ${
+                          msg.codeUnderstandingIR.commentCodeContradictions.length > 0
+                            ? 'bg-amber-950/70 border-amber-600/70 text-amber-300'
+                            : 'bg-sky-950/60 border-sky-800/60 text-sky-300'
+                        }`}
+                        title={`【設計思想 22〜25章: コード理解中間IR】\n・プロシージャ: ${msg.codeUnderstandingIR.procedures.length}個\n・コメント矛盾: ${msg.codeUnderstandingIR.commentCodeContradictions.length}件\n(クリックで中間IR・矛盾検出を開閉)`}
+                      >
+                        <Code2 className="w-3 h-3 text-sky-400" />
+                        <span>
+                          CodeIR ({msg.codeUnderstandingIR.procedures.length}Proc
+                          {msg.codeUnderstandingIR.commentCodeContradictions.length > 0 ? ` / 矛盾${msg.codeUnderstandingIR.commentCodeContradictions.length}` : ''})
+                        </span>
+                      </button>
+                    )}
+
+                    {/* 設計思想 26章: 抽象VBA設計仕様書バッジ */}
+                    {msg.vbaDesignSpecification && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedVbaSpecMsgId(expandedVbaSpecMsgId === msg.id ? null : msg.id)}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border transition-all cursor-pointer ${
+                          expandedVbaSpecMsgId === msg.id
+                            ? 'bg-indigo-900/80 border-indigo-500 text-indigo-200 shadow'
+                            : 'bg-indigo-950/60 border-indigo-800/60 text-indigo-300 hover:border-indigo-600'
+                        }`}
+                        title={`【設計思想 26章: 抽象VBA設計仕様書】\n・決定表ルール: ${msg.vbaDesignSpecification.decisionTable.rules.length}則\n・抽象プロシージャ: ${msg.vbaDesignSpecification.procedurePlans.length}件\n(クリックで決定表・Copilot指示書を開閉)`}
+                      >
+                        <Table className="w-3 h-3 text-indigo-400" />
+                        <span>決定表仕様書 ({msg.vbaDesignSpecification.decisionTable.rules.length}則)</span>
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1244,6 +1304,150 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             )}
                           </button>
                         </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 9章: 回答骨格と思考節約 詳細展開パネル */}
+                  {expandedAnswerPlanMsgId === msg.id && msg.answerPlan && msg.answerPlan.matchedSkeleton && (
+                    <div className="mt-3 p-3 bg-slate-950/95 border border-amber-500/50 rounded-xl space-y-2 text-xs shadow-lg animate-fadeIn">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                        <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5 text-amber-400" />
+                          <span>9章 回答骨格詳細: {msg.answerPlan.matchedSkeleton.pattern_id}</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {msg.answerPlan.matchedSkeleton.stage}
+                        </span>
+                      </div>
+                      <div className="text-slate-300 text-[11px] leading-relaxed">
+                        <strong className="text-amber-200">適合状況:</strong> {msg.answerPlan.matchedSkeleton.situation}
+                      </div>
+                      <div className="p-2 bg-black/40 rounded-lg border border-slate-800 space-y-1 text-[11px]">
+                        <div className="text-emerald-400 font-bold text-[10.5px]">推奨手順 (Plan):</div>
+                        <ol className="list-decimal list-inside space-y-0.5 text-slate-300">
+                          {msg.answerPlan.matchedSkeleton.response_plan.map((step, sIdx) => (
+                            <li key={sIdx}>{step.replace(/^\d+\.\s*/, '')}</li>
+                          ))}
+                        </ol>
+                      </div>
+                      {msg.answerPlan.matchedSkeleton.avoid.length > 0 && (
+                        <div className="p-2 bg-rose-950/20 rounded-lg border border-rose-900/30 text-[10.5px] space-y-0.5 text-rose-300">
+                          <div className="font-bold text-rose-400">禁止・回避事項:</div>
+                          <ul className="list-disc list-inside">
+                            {msg.answerPlan.matchedSkeleton.avoid.map((av, avIdx) => (
+                              <li key={avIdx}>{av}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 22〜25章: コード理解中間IR 詳細展開パネル */}
+                  {expandedCodeIrMsgId === msg.id && msg.codeUnderstandingIR && (
+                    <div className="mt-3 p-3 bg-slate-950/95 border border-sky-500/50 rounded-xl space-y-2.5 text-xs shadow-lg animate-fadeIn">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                        <span className="font-bold text-sky-300 flex items-center gap-1.5">
+                          <Code2 className="w-3.5 h-3.5 text-sky-400" />
+                          <span>22〜25章 コード理解中間IR ({msg.codeUnderstandingIR.sourceLanguage})</span>
+                        </span>
+                        <button
+                          onClick={() => handleCopy(JSON.stringify(msg.codeUnderstandingIR, null, 2), `ir_${msg.id}`)}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] flex items-center gap-1 border border-slate-700"
+                        >
+                          {copiedId === `ir_${msg.id}` ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                          <span>IR(JSON)コピー</span>
+                        </button>
+                      </div>
+                      <div className="text-slate-300 text-[11px] leading-relaxed bg-black/40 p-2 rounded border border-slate-800">
+                        {msg.codeUnderstandingIR.naturalJapaneseSummary}
+                      </div>
+
+                      {/* 矛盾警告 */}
+                      {msg.codeUnderstandingIR.commentCodeContradictions.length > 0 && (
+                        <div className="p-2 bg-amber-950/40 border border-amber-500/50 rounded text-amber-200 text-[10.5px] space-y-1">
+                          <div className="font-bold text-amber-300 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-amber-400" />
+                            <span>コメントと実装の矛盾検知 ({msg.codeUnderstandingIR.commentCodeContradictions.length}件)</span>
+                          </div>
+                          {msg.codeUnderstandingIR.commentCodeContradictions.map((c, cIdx) => (
+                            <div key={cIdx} className="border-t border-amber-800/40 pt-1">
+                              <div><span className="text-slate-400">コメント:</span> {c.commentClaim}</div>
+                              <div><span className="text-emerald-300">実際の実装:</span> {c.actualCodeBehavior}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* プロシージャ一覧 */}
+                      <div className="space-y-1 text-[10.5px]">
+                        <div className="font-bold text-slate-400">プロシージャ構成:</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {msg.codeUnderstandingIR.procedures.map((proc, prIdx) => (
+                            <div key={prIdx} className="p-1.5 bg-slate-900 rounded border border-slate-800 font-mono">
+                              <span className="text-sky-300 font-bold">{proc.procedureName}</span>
+                              <span className="text-slate-400 block text-[9.5px]">呼出: {proc.calls.join(', ') || 'なし'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 26章: 抽象VBA設計仕様書 詳細展開パネル */}
+                  {expandedVbaSpecMsgId === msg.id && msg.vbaDesignSpecification && (
+                    <div className="mt-3 p-3 bg-slate-950/95 border border-indigo-500/50 rounded-xl space-y-3 text-xs shadow-lg animate-fadeIn">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                        <span className="font-bold text-indigo-300 flex items-center gap-1.5">
+                          <Table className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>26章 抽象VBA設計仕様書: {msg.vbaDesignSpecification.title}</span>
+                        </span>
+                        <button
+                          onClick={() => handleCopy(msg.vbaDesignSpecification!.externalCopilotPrompt, `vba_${msg.id}`)}
+                          className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded text-[10px] flex items-center gap-1 shadow"
+                        >
+                          {copiedId === `vba_${msg.id}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                          <span>外部Copilot指示書をコピー</span>
+                        </button>
+                      </div>
+
+                      {/* 決定表ルール */}
+                      <div className="space-y-1">
+                        <div className="font-bold text-slate-300 text-[11px]">決定表 (Decision Table):</div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-[10px] font-mono border border-slate-800 rounded">
+                            <thead className="bg-slate-900 text-slate-400">
+                              <tr>
+                                <th className="p-1.5 text-left">ルール</th>
+                                <th className="p-1.5 text-left">条件</th>
+                                <th className="p-1.5 text-left">アクション</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800 bg-black/40">
+                              {msg.vbaDesignSpecification.decisionTable.rules.map((r) => (
+                                <tr key={r.ruleId}>
+                                  <td className="p-1.5 text-indigo-300 font-bold">{r.ruleId}</td>
+                                  <td className="p-1.5 text-slate-300">
+                                    {Object.entries(r.conditionValues).map(([k, v]) => `${k}=${v}`).join(' & ')}
+                                  </td>
+                                  <td className="p-1.5 text-emerald-300">
+                                    {Object.entries(r.actionValues).map(([k, v]) => `${k}=${v}`).join(', ')}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* 構成案 */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px]">
+                        {msg.vbaDesignSpecification.procedurePlans.map((pp, ppIdx) => (
+                          <div key={ppIdx} className="p-1.5 bg-slate-900 rounded border border-slate-800">
+                            <span className="font-mono font-bold text-indigo-300">{pp.name}</span>: {pp.role}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}

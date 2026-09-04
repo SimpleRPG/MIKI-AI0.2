@@ -27,6 +27,7 @@ import {
   ComprehensiveCodeVerification,
   FalsificationEvaluation,
   SynthesizedWorkflow,
+  AnswerPlanApplicationResult,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
@@ -53,6 +54,11 @@ import { longTermMemoryService } from './services/longTermMemoryService';
 import { codeVerificationService } from './services/codeVerificationService';
 import { falsificationService } from './services/falsificationService';
 import { workflowSynthesisService } from './services/workflowSynthesisService';
+import { answerPlanService } from './services/answerPlanService';
+import { capabilityGapService } from './services/capabilityGapService';
+import { codeUnderstandingService } from './services/codeUnderstandingService';
+import { vbaDesignAssistantService } from './services/vbaDesignAssistantService';
+import { featureFlagsService } from './services/featureFlagsService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
@@ -955,6 +961,26 @@ export default function App() {
       });
 
       // =========================================================================
+      // 設計思想 9章: 回答骨格と思考節約 (Answer Plan Matching)
+      // =========================================================================
+      const isAnswerPlanEnabled = featureFlagsService.isEnabled('ANSWER_PLAN_CACHE');
+      const answerPlanResult: AnswerPlanApplicationResult = isAnswerPlanEnabled
+        ? answerPlanService.matchSkeleton(text, conversationState)
+        : { applied: false, reason: '機能フラグANSWER_PLAN_CACHEが無効化されています' };
+
+      if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
+        systemLogger.info(
+          'CHAT',
+          `⚡ [9章 回答骨格適用] パターン: ${answerPlanResult.matchedSkeleton.pattern_id} (理由: ${answerPlanResult.reason})`,
+          {
+            situation: answerPlanResult.matchedSkeleton.situation,
+            plan: answerPlanResult.matchedSkeleton.response_plan,
+            avoid: answerPlanResult.matchedSkeleton.avoid,
+          }
+        );
+      }
+
+      // =========================================================================
       // PATH 0: Phase 3 - 多段推論タスク計画 & 検証エンジン (Multi-Step Task Plan)
       // 制約遵守: 単純な会話・挨拶は軽量フロー(PATH 1/PATH 2)へ通し、複合課題のみ多段化
       // =========================================================================
@@ -1438,6 +1464,12 @@ export default function App() {
         combinedSystemPrompt = `${combinedSystemPrompt}\n\n${responseDesignInstruction}\n\n${CONVERSATION_STATE_INSTRUCTION}`;
       }
 
+      // 設計思想 9章: 回答骨格のプロンプト注入
+      if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
+        const skeletonInstruction = answerPlanService.buildInstruction(answerPlanResult.matchedSkeleton);
+        combinedSystemPrompt = `${combinedSystemPrompt}\n\n${skeletonInstruction}`;
+      }
+
       const chatContext: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
         { role: 'system', content: combinedSystemPrompt },
       ];
@@ -1845,6 +1877,72 @@ export default function App() {
         `[15-16章 内的自己反証] 反証スコア=${falsificationReport.falsificationScore}点 合格=${falsificationReport.passed ? 'PASS' : 'WARN/FAIL'} 警告=${falsificationReport.falsificationWarnings.length}件`
       );
 
+      // =========================================================================
+      // 設計思想 22〜25章: コード理解中間IRの抽出 (CodeUnderstandingIR)
+      // =========================================================================
+      let codeUnderstandingIR = undefined;
+      if (featureFlagsService.isEnabled('CODE_UNDERSTANDING') && codeBlocks.length > 0) {
+        const targetBlock = codeBlocks[0];
+        codeUnderstandingIR = codeUnderstandingService.parseCodeToIR(
+          targetBlock.content,
+          (targetBlock.language as any) || 'vba',
+          targetBlock.name
+        );
+        systemLogger.info(
+          'CHAT',
+          `[22〜25章 CodeIR] プロシージャ数=${codeUnderstandingIR.procedures.length}, 矛盾検知=${codeUnderstandingIR.commentCodeContradictions.length}件`
+        );
+      }
+
+      // =========================================================================
+      // 設計思想 26章: 抽象VBA設計仕様書 & 決定表ゲート (VbaDesignSpecification)
+      // =========================================================================
+      let vbaDesignSpecification = undefined;
+      const isVbaRequest =
+        text.toLowerCase().includes('vba') ||
+        text.includes('マクロ') ||
+        text.includes('excel') ||
+        text.includes('エクセル') ||
+        codeBlocks.some((b) => b.language === 'vba' || b.name.endsWith('.bas'));
+
+      if (featureFlagsService.isEnabled('VBA_DESIGN_ASSISTANT') && isVbaRequest) {
+        vbaDesignSpecification = vbaDesignAssistantService.createSpecificationFromPrompt(text);
+        systemLogger.info(
+          'CHAT',
+          `[26章 抽象VBA設計仕様書] 決定表ルール=${vbaDesignSpecification.decisionTable.rules.length}則, 抽象プロシージャ=${vbaDesignSpecification.procedurePlans.length}件`
+        );
+      }
+
+      // =========================================================================
+      // 設計思想 21・32章: 不足能力・習得状態追跡 (Capability Gap & Mastery)
+      // =========================================================================
+      if (streamEvaluation.status === 'COMPLETE') {
+        if (isVbaRequest) {
+          capabilityGapService.recordSuccess('cap_abstract_vba_design');
+        }
+        if (codeBlocks.length > 0) {
+          capabilityGapService.recordSuccess('cap_code_comprehension');
+        }
+        if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
+          capabilityGapService.checkAndRecordGeneralizationGap({
+            capabilityId: 'cap_correction',
+            patternId: answerPlanResult.matchedSkeleton.pattern_id,
+            prompt: text,
+            isCorrectAnswer: true,
+          });
+        }
+      } else if (streamEvaluation.status === 'FAILED' || streamEvaluation.status === 'BLOCKED') {
+        capabilityGapService.recordGap({
+          description: `[完了判定${streamEvaluation.status}] ${streamEvaluation.reason || '目標要件未充足'}`,
+          gap_type: 'failure',
+          capabilityId: isVbaRequest ? 'cap_abstract_vba_design' : 'cap_logical_priority',
+          impact: 'HIGH',
+          current_workaround: '教師教材・決定表による再設計',
+          candidate_solution: '教師教材の生成、回答骨格の拡充',
+          samplePrompt: text,
+        });
+      }
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantId
@@ -1862,6 +1960,10 @@ export default function App() {
                 executionSteps: systemLogger.getCurrentSessionSteps(),
                 codeProposal,
                 vbaAssessment,
+                // 設計思想 Version 3.2 追加フィールド
+                answerPlan: answerPlanResult,
+                codeUnderstandingIR,
+                vbaDesignSpecification,
                 metrics: {
                   engine: executedEngineLabel,
                   tokens: tokenCount,

@@ -468,6 +468,10 @@ export interface ChatMessage {
   codeVerification?: ComprehensiveCodeVerification;
   falsificationReport?: FalsificationEvaluation;
   synthesizedWorkflow?: SynthesizedWorkflow;
+  // 設計思想 Version 3.2: 9章 回答骨格, 22-25章 コード理解IR, 26章 抽象VBA設計仕様
+  answerPlan?: AnswerPlanApplicationResult;
+  codeUnderstandingIR?: CodeUnderstandingIR;
+  vbaDesignSpecification?: VbaDesignSpecification;
 }
 
 /**
@@ -1236,6 +1240,233 @@ export interface CompletionEvaluation {
   autoDiagnosedAt?: number; // 48章: FAILED/BLOCKED自動検出で診断済みの場合に記録（手動👎時の二重登録防止）
   manuallyOverridden?: boolean;
 }
+
+// ============================================================
+// 設計思想 Version 3.2 統合改訂版 (9章, 16章, 20-26章, 31-32章) 型定義
+// ============================================================
+
+/**
+ * 設計思想 9章 & 35章 第5段階: 回答骨格と思考節約
+ */
+export type ResponseSkeletonReuseMode = 'EXACT_RESPONSE' | 'PLAN_ONLY' | 'SKILL_COMPOSITION';
+
+export interface ResponseSkeleton {
+  pattern_id: string; // 例: PATTERN-CORRECTION-01
+  situation: string;  // 適用状況（例: 以前の前提が明示的/遠回しに訂正された）
+  triggerKeywords: string[];
+  stage: ConversationStage;
+  response_plan: string[]; // 手順（例: 1.訂正認識 2.古い前提無効化 3.結論先行）
+  avoid: string[]; // 禁止・回避事項（例: 古い前提を残す、謝罪だけで終わる）
+  reuse_mode: ResponseSkeletonReuseMode;
+  samplePrompt: string;
+  exampleResponseTemplate: string;
+  usageCount: number;
+  successRate: number; // 0〜100
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AnswerPlanApplicationResult {
+  applied: boolean;
+  matchedSkeleton?: ResponseSkeleton;
+  differenceCheck?: string[];
+  savingsNote?: string;
+  stepsToExecute?: string[];
+  reason?: string;
+}
+
+/**
+ * 設計思想 21章: 能力の習得状態
+ */
+export type CapabilityMasteryState =
+  | 'UNASSESSED'
+  | 'WEAK'
+  | 'LEARNING'
+  | 'STABLE'
+  | 'SATURATED'
+  | 'REGRESSED';
+
+export interface CapabilityMasteryProfile {
+  capabilityId: string;
+  name: string;
+  category: string;
+  state: CapabilityMasteryState;
+  successCount: number;
+  failureCount: number;
+  paraphraseFailureCount: number;
+  generalizationGapCount: number;
+  associatedSkeletons: string[];
+  lastAssessedAt: number;
+  transitionHistory: Array<{
+    from: CapabilityMasteryState;
+    to: CapabilityMasteryState;
+    reason: string;
+    timestamp: number;
+  }>;
+}
+
+/**
+ * 設計思想 32章 & 20章: 不足能力レジストリ (汎化不足型含む)
+ */
+export type CapabilityGapType = 'failure' | 'generalization_gap';
+
+export interface CapabilityGapEntry {
+  gap_id: string; // 例: GAP-0012, GAP-0031
+  description: string;
+  gap_type: CapabilityGapType; // 20章: 'generalization_gap' = 対策骨格を保存済みだが類似の未知の言い回しで再発した汎化不足
+  capabilityId: string;
+  frequency: number;
+  impact: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  current_workaround: string;
+  candidate_solution: string;
+  status: 'OPEN' | 'MITIGATED' | 'RESOLVED';
+  firstSeenAt: number;
+  lastSeenAt: number;
+  samples: string[];
+  associatedPatternId?: string; // 紐づく回答骨格パターンID
+}
+
+/**
+ * 設計思想 16章: LoRA検討の発動条件と仮想学習試験
+ */
+export interface LoraTriggerAssessment {
+  triggered: boolean; // 16.2の発動条件を満たしたか
+  reasons: string[];
+  paraphraseFailureRepeated: boolean;
+  skeletonAddedButFailurePersists: boolean;
+  weakCapabilityStagnated: boolean;
+  recommendation: 'MAINTAIN_DISABLED' | 'RECOMMEND_VIRTUAL_TEST' | 'APPROVE_LORA_CANDIDATE';
+}
+
+export interface VirtualTrainingTrial {
+  trialId: string;
+  capabilityId: string;
+  testPrompt: string;
+  paraphrasePrompts: string[];
+  crossDomainPrompt: string;
+  step1_baselineOutput: string;
+  step2_retrievalInjectedOutput: string;
+  step3_sameProblemRetestPassed: boolean;
+  step4_paraphraseRetestPassed: boolean;
+  step5_crossDomainRetestPassed: boolean;
+  step6_regressionCheckPassed: boolean;
+  verdict: 'NO_LORA_NEEDED_SAVE_SKELETON' | 'LORA_CANDIDATE' | 'INCONCLUSIVE_TOO_DIFFICULT' | 'REJECT_REGRESSION';
+  verdictDetails: string;
+  timestamp: number;
+}
+
+/**
+ * 設計思想 22〜25章 & 35章 第10段階: コード理解AI (Code IR)
+ */
+export interface CodeProcedureIR {
+  procedureName: string;
+  visibility: 'PUBLIC' | 'PRIVATE' | 'FRIEND' | 'UNKNOWN';
+  purpose: string;
+  inputs: Array<{ name: string; type: string; optional?: boolean }>;
+  returns: string | null;
+  reads: string[];
+  writes: string[];
+  calls: string[];
+  conditions: string[];
+  loops: string[];
+  terminationConditions: string[];
+  errorHandling: string[];
+  side_effects: string[];
+  external_dependencies: string[];
+  unknown_dependencies: string[];
+  docComment?: string;
+}
+
+export interface CodeUnderstandingIR {
+  id: string;
+  sourceLanguage: string;
+  rawSnippet: string;
+  procedures: CodeProcedureIR[];
+  globalVariables: string[];
+  unresolvedDependencies: string[];
+  commentCodeContradictions: Array<{
+    location: string;
+    commentClaim: string;
+    actualCodeBehavior: string;
+    severity: 'warn' | 'conflict';
+  }>;
+  impactPredictions: Array<{
+    targetProcedure: string;
+    potentialBreakage: string;
+    affectedCallers: string[];
+    testCasesToRerun: string[];
+  }>;
+  comprehensionQA: Array<{
+    question: string;
+    answer: string;
+    criteria: string;
+  }>;
+  naturalJapaneseSummary: string;
+  createdAt: number;
+}
+
+/**
+ * 設計思想 26章 & 35章 第11段階: 抽象コード・VBA設計支援AI
+ */
+export interface DecisionTableRule {
+  ruleId: string;
+  conditionValues: Record<string, string | boolean>;
+  actionValues: Record<string, string | boolean>;
+  priority: number;
+  notes?: string;
+}
+
+export interface DecisionTable {
+  title: string;
+  conditions: Array<{ id: string; name: string; possibleValues: string[] }>;
+  actions: Array<{ id: string; name: string }>;
+  rules: DecisionTableRule[];
+}
+
+export interface AbstractProcedurePlan {
+  name: string; // 例: PROCESS_MAIN, FIND_HEADER, IS_TARGET_ROW
+  role: string;
+  abstractInputs: string[];
+  abstractOutputs: string[];
+  errorStrategy: string;
+}
+
+export interface AbstractTestCasePlan {
+  category: 'normal' | 'boundary' | 'exception';
+  scenario: string;
+  inputDescription: string;
+  expectedBehavior: string;
+}
+
+export interface VbaDesignSpecification {
+  specId: string;
+  title: string;
+  abstractRequirement: string;
+  decisionTable: DecisionTable;
+  procedurePlans: AbstractProcedurePlan[];
+  testCasePlans: AbstractTestCasePlan[];
+  externalCopilotPrompt: string; // 外部Copilot等へ渡す詳細指示書
+  dataCharacteristicsPreserved: string[]; // 例: 5桁の文字列、先頭ゼロを保持する、数値変換しない
+  createdAt: number;
+}
+
+/**
+ * 設計思想 31章: 機能フラグ
+ */
+export type FeatureFlagState = 'DISABLED' | 'DEVELOPMENT' | 'SHADOW' | 'LIMITED' | 'STABLE';
+
+export interface SystemFeatureFlags {
+  CHAT_CORE: FeatureFlagState;
+  SHORT_TERM_CONTEXT: FeatureFlagState;
+  LONG_TERM_RETRIEVAL: FeatureFlagState;
+  ANSWER_PLAN_CACHE: FeatureFlagState;
+  TEACHER_ROUTER: FeatureFlagState;
+  MULTI_STEP_REASONING: FeatureFlagState;
+  LORA_TRAINING: FeatureFlagState; // 16.2の発動条件を満たすまで長期DISABLED固定
+  CODE_UNDERSTANDING: FeatureFlagState;
+  VBA_DESIGN_ASSISTANT: FeatureFlagState;
+}
+
 
 
 

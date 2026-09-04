@@ -100,11 +100,45 @@ export class WorkflowSynthesisService {
         timeoutMs: 10000,
         status: 'pending',
       });
+
+      // 2b. 設計思想 22〜25章: コード理解中間IR & コメント-コード乖離検査
+      steps.push({
+        stepId: `wf_step_${Date.now()}_${stepCounter}`,
+        stepNumber: stepCounter++,
+        name: 'コード理解中間IR & コメント-実装乖離精査',
+        intent: '12段階の抽象IRに分解し、既存コードのプロシージャ呼出構造とコメントの嘘・矛盾を事前検知',
+        pluginId: 'plugin_code_understanding_ir',
+        assignedTool: 'tool_code_ir_extractor',
+        inputMapping: { analyzeContradictions: true, targetProcedures: 'all' },
+        expectedOutputSchema: 'CodeUnderstandingIR (プロシージャ構成、データフロー、矛盾検知リスト)',
+        requiresConsent: false,
+        requiredPermissions: ['workspace_read'],
+        timeoutMs: 8000,
+        status: 'pending',
+      });
     }
 
     // 3. コード・成果物生成
     const isVba = gLower.includes('vba') || gLower.includes('excel') || gLower.includes('マクロ');
     const isCanvas = gLower.includes('canvas') || gLower.includes('ゲーム') || gLower.includes('html');
+
+    // 3a. 設計思想 26章: 抽象VBA設計仕様書 & 決定表ゲート (いきなりコードを書かず仕様化)
+    if (isVba) {
+      steps.push({
+        stepId: `wf_step_${Date.now()}_${stepCounter}`,
+        stepNumber: stepCounter++,
+        name: '抽象VBA設計仕様書 & 決定表の策定',
+        intent: '設計思想26章に基づき、決定表(条件と動作)・抽象プロシージャ構成・外部Copilot指示書を事前設計',
+        pluginId: 'plugin_vba_design_spec',
+        assignedTool: 'tool_vba_spec_designer',
+        inputMapping: { goal, requireDecisionTable: true, requireTestCases: true },
+        expectedOutputSchema: 'VbaDesignSpecification (決定表+プロシージャ計画+外部Copilot用プロンプト)',
+        requiresConsent: false,
+        requiredPermissions: [],
+        timeoutMs: 12000,
+        status: 'pending',
+      });
+    }
     
     const genPlugin = allPlugins.find((p: CapabilityPlugin) => p.plugin_id === 'plugin_safe_computation') || {
       plugin_id: 'plugin_safe_computation',
@@ -116,9 +150,9 @@ export class WorkflowSynthesisService {
     steps.push({
       stepId: `wf_step_${Date.now()}_${stepCounter}`,
       stepNumber: stepCounter++,
-      name: isVba ? '安全なVBAコード生成' : isCanvas ? '自己完結Canvasゲーム生成' : 'ターゲット成果物生成',
+      name: isVba ? '安全なVBAコード生成 (仕様書準拠)' : isCanvas ? '自己完結Canvasゲーム生成' : 'ターゲット成果物生成',
       intent: isVba
-        ? 'Office 64bit互換・安全ガードを備えたExcel VBAマクロを生成'
+        ? '決定表仕様書に準拠し、Office 64bit互換・安全ガードを備えたExcel VBAマクロを実装'
         : 'HTML5/Canvas対応の単一自己完結型コードブロックを出力',
       pluginId: genPlugin.plugin_id,
       assignedTool: genPlugin.allowedTools[0] || 'tool_safe_math',
