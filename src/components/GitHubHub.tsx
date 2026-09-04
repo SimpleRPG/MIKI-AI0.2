@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Github,
   GitBranch,
@@ -33,18 +33,65 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
   persona,
 }) => {
   const [token, setToken] = useState(() => storageService.getItem('miki_github_pat') || '');
-  const [repoUrl, setRepoUrl] = useState('');
-  const [branch, setBranch] = useState('main');
-  const [commitMessage, setCommitMessage] = useState('✨ Update via Miki AI Partner Studio');
+  const [repoUrl, setRepoUrlState] = useState(() => storageService.getItem('miki_github_repo_url') || '');
+  const [branch, setBranchState] = useState(() => storageService.getItem('miki_github_branch') || 'main');
+  const [commitMessage, setCommitMessageState] = useState(
+    () => storageService.getItem('miki_github_commit_msg') || '✨ Update via Miki AI Partner Studio'
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [fetchedRepo, setFetchedRepo] = useState<GitHubRepoData | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(
+    () => new Set(workspaceFiles.map((f) => f.path))
+  );
 
   const handleSaveToken = (val: string) => {
     setToken(val);
     try {
       storageService.setItem('miki_github_pat', val.trim());
     } catch (e) {}
+  };
+
+  const setRepoUrl = (val: string) => {
+    setRepoUrlState(val);
+    try {
+      storageService.setItem('miki_github_repo_url', val);
+    } catch (e) {}
+  };
+
+  const setBranch = (val: string) => {
+    setBranchState(val);
+    try {
+      storageService.setItem('miki_github_branch', val);
+    } catch (e) {}
+  };
+
+  const setCommitMessage = (val: string) => {
+    setCommitMessageState(val);
+    try {
+      storageService.setItem('miki_github_commit_msg', val);
+    } catch (e) {}
+  };
+
+  // ワークスペースのファイルが増減したら選択状態を追従させる
+  useEffect(() => {
+    setSelectedPaths((prev) => {
+      const next = new Set(prev);
+      workspaceFiles.forEach((f) => next.add(f.path));
+      Array.from(next).forEach((p) => {
+        if (!workspaceFiles.some((f) => f.path === p)) next.delete(p);
+      });
+      return next;
+    });
+  }, [workspaceFiles]);
+
+  const toggleFile = (path: string) => {
+    setSelectedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
   };
 
   const handleImport = async () => {
@@ -99,6 +146,14 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
       return;
     }
 
+    if (selectedPaths.size === 0) {
+      setStatusMessage({
+        type: 'error',
+        text: 'プッシュするファイルを1件以上選択してください。',
+      });
+      return;
+    }
+
     setIsLoading(true);
     setStatusMessage(null);
 
@@ -108,7 +163,9 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
         repoUrl: repoUrl.trim(),
         branch: branch.trim() || 'main',
         commitMessage: commitMessage.trim() || 'Update via Miki AI Partner Studio',
-        files: workspaceFiles.map((f) => ({ path: f.path, content: f.content })),
+        files: workspaceFiles
+          .filter((f) => selectedPaths.has(f.path))
+          .map((f) => ({ path: f.path, content: f.content })),
       });
 
       if (res.success) {
@@ -254,8 +311,42 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
                 <span>GitHub にプッシュ (保存)</span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                現在のワークスペース ({workspaceFiles.length} ファイル) を GitHub にコミット＆プッシュします。
+                選択したファイル ({selectedPaths.size} / {workspaceFiles.length} 件) を GitHub にコミット＆プッシュします。
               </p>
+            </div>
+
+            <div className="max-h-40 overflow-y-auto space-y-1 bg-slate-950 border border-slate-800 rounded-xl p-2">
+              <div className="flex items-center justify-between px-1 pb-1">
+                <span className="text-[10px] text-slate-500">
+                  {selectedPaths.size} / {workspaceFiles.length} 件選択中
+                </span>
+                <button
+                  onClick={() =>
+                    setSelectedPaths(
+                      selectedPaths.size === workspaceFiles.length
+                        ? new Set()
+                        : new Set(workspaceFiles.map((f) => f.path))
+                    )
+                  }
+                  className="text-[10px] text-sky-400 hover:text-sky-300"
+                >
+                  {selectedPaths.size === workspaceFiles.length ? 'すべて解除' : 'すべて選択'}
+                </button>
+              </div>
+              {workspaceFiles.map((f) => (
+                <label
+                  key={f.path}
+                  className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-slate-900 cursor-pointer text-xs text-slate-300"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedPaths.has(f.path)}
+                    onChange={() => toggleFile(f.path)}
+                    className="accent-sky-500"
+                  />
+                  <span className="truncate">{f.path}</span>
+                </label>
+              ))}
             </div>
 
             <button
