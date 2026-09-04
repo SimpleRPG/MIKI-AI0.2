@@ -52,6 +52,7 @@ import { AnswerPlanTab } from './self_improvement/AnswerPlanTab';
 import { CapabilityMasteryTab } from './self_improvement/CapabilityMasteryTab';
 import { FeatureFlagsTab } from './self_improvement/FeatureFlagsTab';
 import { CodeUnderstandingVbaTab } from './self_improvement/CodeUnderstandingVbaTab';
+import { ExperienceRouterTab } from './self_improvement/ExperienceRouterTab';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
@@ -104,7 +105,7 @@ export interface SelfImprovementModalProps {
   chatMessages: ChatMessage[];
   memories: MemoryItem[];
   workspaceFiles?: WorkspaceFile[];
-  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations';
+  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'experience_router';
 }
 
 export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
@@ -115,7 +116,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   workspaceFiles = [],
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags' | 'experience_router'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 
@@ -981,6 +982,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <Flag className="w-4 h-4 text-purple-400" />
             <span>🚩 機能フラグ (31章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('experience_router')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'experience_router'
+                ? 'border-purple-500 text-purple-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Compass className="w-4 h-4 text-purple-400" />
+            <span>🧭 経験保存先ルーター (49章)</span>
           </button>
         </div>
 
@@ -4826,6 +4839,9 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
           {/* TAB: システム機能フラグ管理 (31章) */}
           {activeTab === 'feature_flags' && <FeatureFlagsTab />}
+
+          {/* TAB: 経験の保存先ルーター (49章: 9分類自律仕分け) */}
+          {activeTab === 'experience_router' && <ExperienceRouterTab />}
         </div>
 
         {/* Footer */}

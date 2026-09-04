@@ -21,6 +21,8 @@ import { storageService } from './storageService';
 import { regressionBenchmarkService } from './regressionBenchmarkService';
 import { nativeBackgroundService } from './nativeBackgroundService';
 import { checkSampleSafety, generateSafeExcerptHash } from '../utils/trainingSampleSafetyFilter';
+import { capabilityGapService } from './capabilityGapService';
+import { answerPlanService } from './answerPlanService';
 
 const RECORDS_STORAGE_KEY = 'miki_ai_self_improvement_records';
 const TRAINING_DATA_STORAGE_KEY = 'miki_ai_training_samples';
@@ -423,6 +425,27 @@ class SelfImprovementService {
     };
     this.records.unshift(record);
     this.saveRecords();
+
+    // 設計思想 32章: 不足能力レジストリへ失敗事象を自動登録
+    try {
+      const isCodeOrVba =
+        userMessage.toLowerCase().includes('vba') ||
+        userMessage.includes('マクロ') ||
+        userMessage.includes('コード') ||
+        assistantResponse.includes('```');
+
+      capabilityGapService.recordGap({
+        description: `[失敗診断] ${diagnosis.category}: ${diagnosis.rootCause}`,
+        gap_type: 'failure',
+        capabilityId: isCodeOrVba ? 'cap_abstract_vba_design' : 'cap_logical_priority',
+        impact: diagnosis.suggestedFixArea === 'model' ? 'HIGH' : 'MEDIUM',
+        current_workaround: diagnosis.recommendation,
+        candidate_solution: `修復領域: ${diagnosis.suggestedFixArea} (回答骨格/決定表/教師教材)`,
+        samplePrompt: userMessage,
+      });
+    } catch (gapErr) {
+      console.warn('Failed to record capability gap:', gapErr);
+    }
 
     return diagnosis;
   }

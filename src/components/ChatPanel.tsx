@@ -45,6 +45,7 @@ import {
   Code2,
   Table,
   AlertTriangle,
+  Compass,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode, CompletionEvaluation } from '../types';
 import { extractCodeBlocks } from '../utils/codeParser';
@@ -55,6 +56,8 @@ import { skillsService } from '../services/skillsService';
 import { TaskPlanCard } from './TaskPlanCard';
 import { CompletionBadge } from './CompletionBadge';
 import { completionJudgeService } from '../services/completionJudgeService';
+import { workflowSynthesisService } from '../services/workflowSynthesisService';
+import { experienceRouterService } from '../services/experienceRouterService';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -132,6 +135,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [expandedAnswerPlanMsgId, setExpandedAnswerPlanMsgId] = useState<string | null>(null);
   const [expandedCodeIrMsgId, setExpandedCodeIrMsgId] = useState<string | null>(null);
   const [expandedVbaSpecMsgId, setExpandedVbaSpecMsgId] = useState<string | null>(null);
+  const [expandedWorkflowMsgId, setExpandedWorkflowMsgId] = useState<string | null>(null);
+  const [executingWorkflowId, setExecutingWorkflowId] = useState<string | null>(null);
+  const [workflowStatusMessage, setWorkflowStatusMessage] = useState<{ [wfId: string]: string }>({});
+  const [experienceToast, setExperienceToast] = useState<{ msgId: string; text: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -277,6 +284,98 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
 
     setFeedbackFeedbackId(null);
+  };
+
+  // 設計思想 47章: ワークフロー自律実行ハンドラ
+  const handleExecuteWorkflow = async (workflowId: string) => {
+    if (executingWorkflowId) return;
+    setExecutingWorkflowId(workflowId);
+    setWorkflowStatusMessage((prev) => ({ ...prev, [workflowId]: '🚀 ワークフローを順次自律実行中...' }));
+
+    try {
+      const res = await workflowSynthesisService.executeAllSteps(workflowId, (updatedWf) => {
+        setWorkflowStatusMessage((prev) => ({
+          ...prev,
+          [workflowId]: `進捗: ${updatedWf.steps.filter((s) => s.status === 'completed').length}/${updatedWf.steps.length} 工程完了`,
+        }));
+      });
+
+      if (res && res.status === 'completed') {
+        setWorkflowStatusMessage((prev) => ({
+          ...prev,
+          [workflowId]: '🎉 全工程の自律ワークフローが安全に完了しました！',
+        }));
+      } else {
+        setWorkflowStatusMessage((prev) => ({
+          ...prev,
+          [workflowId]: '⚠️ 一部工程で確認または権限同意が必要です。',
+        }));
+      }
+    } catch (e: any) {
+      setWorkflowStatusMessage((prev) => ({
+        ...prev,
+        [workflowId]: `❌ 実行時エラー: ${e?.message || e}`,
+      }));
+    } finally {
+      setExecutingWorkflowId(null);
+    }
+  };
+
+  const handleExecuteWorkflowStep = async (workflowId: string, stepId: string) => {
+    try {
+      const res = await workflowSynthesisService.executeStep(workflowId, stepId);
+      if (res.success) {
+        setWorkflowStatusMessage((prev) => ({
+          ...prev,
+          [workflowId]: `✓ ステップが完了しました: ${res.resultExcerpt}`,
+        }));
+      } else if (res.requiresConsent) {
+        setWorkflowStatusMessage((prev) => ({
+          ...prev,
+          [workflowId]: `⚠️ 46章 権限ゲート: プラグインの実行権限同意が必要です (自己改善モーダル ➔ 能力プラグインから有効化できます)。`,
+        }));
+      } else {
+        setWorkflowStatusMessage((prev) => ({
+          ...prev,
+          [workflowId]: `❌ 失敗: ${res.error}`,
+        }));
+      }
+    } catch (e: any) {
+      setWorkflowStatusMessage((prev) => ({
+        ...prev,
+        [workflowId]: `❌ エラー: ${e?.message || e}`,
+      }));
+    }
+  };
+
+  // 設計思想 49章: メッセージを手動で経験保存先ルーターに判定・仕分けする
+  const handleRouteMessageExperience = (msg: ChatMessage) => {
+    const res = experienceRouterService.routeExperience(
+      {
+        content: msg.content,
+        source: 'conversation',
+        category: msg.content.includes('```') ? 'code' : 'chat',
+      },
+      memories
+    );
+
+    const destLabelMap: Record<string, string> = {
+      working_memory: '作業記憶',
+      long_term_memory: '長期記憶',
+      project_memory: 'プロジェクト記憶',
+      skill: 'スキル',
+      search_policy: '検索ポリシー',
+      evaluation_set: '評価セット',
+      lora_dataset: 'LoRA教材',
+      quarantine: '安全隔離',
+      discard_candidate: '破棄候補',
+    };
+
+    setExperienceToast({
+      msgId: msg.id,
+      text: `🧭 49章 判定結果: 【${destLabelMap[res.destination] || res.destination}】に仕分け推奨 (${res.reason})`,
+    });
+    setTimeout(() => setExperienceToast(null), 5000);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -748,12 +847,39 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                     {/* 設計思想 第5段階 (47章): 自然言語ワークフローバッジ */}
                     {msg.synthesizedWorkflow && (
-                      <div
-                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border bg-purple-950/60 border-purple-800/60 text-purple-300"
-                        title={`【設計思想 47章: 自律合成ワークフロー】\n・目的: ${msg.synthesizedWorkflow.userGoal}\n・構成ステップ: ${msg.synthesizedWorkflow.steps.length}工程\n・所要時間目安: ${Math.round(msg.synthesizedWorkflow.budgetEstimate.estimatedDurationMs / 1000)}秒\n・リスク区分: ${msg.synthesizedWorkflow.budgetEstimate.riskLevel}`}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedWorkflowMsgId(expandedWorkflowMsgId === msg.id ? null : msg.id)}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border transition-all cursor-pointer ${
+                          expandedWorkflowMsgId === msg.id
+                            ? 'bg-purple-900/80 border-purple-500 text-purple-200 shadow'
+                            : 'bg-purple-950/60 border-purple-800/60 text-purple-300 hover:border-purple-600'
+                        }`}
+                        title={`【設計思想 47章: 自律合成ワークフロー】\n・目的: ${msg.synthesizedWorkflow.userGoal}\n・構成ステップ: ${msg.synthesizedWorkflow.steps.length}工程\n・所要時間目安: ${Math.round(msg.synthesizedWorkflow.budgetEstimate.estimatedDurationMs / 1000)}秒\n・リスク区分: ${msg.synthesizedWorkflow.budgetEstimate.riskLevel}\n(クリックでワークフロー実行パネルを開閉)`}
                       >
                         <Workflow className="w-3 h-3 text-purple-400" />
                         <span>{msg.synthesizedWorkflow.steps.length}段ワークフロー</span>
+                      </button>
+                    )}
+
+                    {/* 設計思想 49章: 経験保存先ルーター自動判定バッジ */}
+                    {msg.experienceRouting && (
+                      <div
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border ${
+                          msg.experienceRouting.destination === 'quarantine'
+                            ? 'bg-rose-950/60 border-rose-800/60 text-rose-300'
+                            : msg.experienceRouting.destination === 'skill'
+                            ? 'bg-indigo-950/60 border-indigo-800/60 text-indigo-300'
+                            : msg.experienceRouting.destination === 'evaluation_set'
+                            ? 'bg-pink-950/60 border-pink-800/60 text-pink-300'
+                            : msg.experienceRouting.destination === 'discard_candidate'
+                            ? 'bg-slate-900/60 border-slate-700/60 text-slate-400'
+                            : 'bg-emerald-950/60 border-emerald-800/60 text-emerald-300'
+                        }`}
+                        title={`【設計思想 49章: 経験保存先ルーター判定】\n・判定先: ${msg.experienceRouting.destination}\n・理由: ${msg.experienceRouting.reason}\n・リスクスコア: ${msg.experienceRouting.riskScore}点\n・推奨アクション: ${msg.experienceRouting.suggestedAction || '保持'}`}
+                      >
+                        <Compass className="w-3 h-3 text-purple-400" />
+                        <span>49章: {msg.experienceRouting.destination}</span>
                       </div>
                     )}
 
@@ -1451,6 +1577,128 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* 47章: 自律合成ワークフロー 詳細展開パネル */}
+                  {expandedWorkflowMsgId === msg.id && msg.synthesizedWorkflow && (
+                    <div className="mt-3 p-3 bg-slate-950/95 border border-purple-500/50 rounded-xl space-y-3 text-xs shadow-lg animate-fadeIn">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            <Workflow className="w-3.5 h-3.5" />
+                          </span>
+                          <div>
+                            <span className="font-bold text-purple-300">
+                              47章 自律合成ワークフロー ({msg.synthesizedWorkflow.steps.length}工程)
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-mono">
+                              所要目安: ~{Math.round(msg.synthesizedWorkflow.budgetEstimate.estimatedDurationMs / 1000)}秒 | リスク: {msg.synthesizedWorkflow.budgetEstimate.riskLevel} | トークン予算: {msg.synthesizedWorkflow.budgetEstimate.estimatedTokens}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleExecuteWorkflow(msg.synthesizedWorkflow!.workflowId)}
+                          disabled={executingWorkflowId === msg.synthesizedWorkflow.workflowId}
+                          className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-lg text-[10.5px] flex items-center gap-1.5 shadow transition-all disabled:opacity-50"
+                        >
+                          {executingWorkflowId === msg.synthesizedWorkflow.workflowId ? (
+                            <>
+                              <RotateCw className="w-3 h-3 animate-spin" />
+                              <span>実行中...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-3 h-3 fill-current" />
+                              <span>全工程を一括自律実行</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* 実行状態・ログメッセージ */}
+                      {workflowStatusMessage[msg.synthesizedWorkflow.workflowId] && (
+                        <div className="p-2 bg-purple-950/40 border border-purple-800/60 rounded-lg text-[11px] text-purple-200">
+                          {workflowStatusMessage[msg.synthesizedWorkflow.workflowId]}
+                        </div>
+                      )}
+
+                      {/* 合成根拠 */}
+                      <div className="p-2 bg-black/40 rounded border border-slate-800 text-[10.5px] text-slate-300">
+                        <span className="text-purple-300 font-bold">分解根拠:</span> {msg.synthesizedWorkflow.synthesisRationale}
+                      </div>
+
+                      {/* ステップ一覧 */}
+                      <div className="space-y-2">
+                        <div className="font-bold text-slate-400 text-[10.5px] flex items-center justify-between">
+                          <span>パイプライン構成ステップ:</span>
+                          <span className="text-[9.5px] font-normal text-slate-500">※ 46章 原則: 未承認プラグインは権限同意なしに実行されません</span>
+                        </div>
+                        {msg.synthesizedWorkflow.steps.map((step) => (
+                          <div
+                            key={step.stepId}
+                            className="p-2 bg-slate-900/80 rounded-lg border border-slate-800 flex flex-col gap-1.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-slate-800 text-purple-300 flex items-center justify-center font-mono font-bold text-[10px]">
+                                  {step.stepNumber}
+                                </span>
+                                <span className="font-bold text-slate-200 text-[11px]">{step.name}</span>
+                                <span className="px-1.5 py-0.5 rounded text-[9px] bg-slate-800 text-slate-400 font-mono">
+                                  {step.assignedTool}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[9.5px] font-mono ${
+                                    step.status === 'completed'
+                                      ? 'bg-emerald-950 border border-emerald-800 text-emerald-300'
+                                      : step.status === 'running'
+                                      ? 'bg-amber-950 border border-amber-800 text-amber-300 animate-pulse'
+                                      : step.status === 'failed'
+                                      ? 'bg-rose-950 border border-rose-800 text-rose-300'
+                                      : 'bg-slate-800 text-slate-400'
+                                  }`}
+                                >
+                                  {step.status === 'completed'
+                                    ? '完了'
+                                    : step.status === 'running'
+                                    ? '実行中'
+                                    : step.status === 'failed'
+                                    ? '中断/失敗'
+                                    : '待機中'}
+                                </span>
+                                {step.status !== 'completed' && (
+                                  <button
+                                    onClick={() => handleExecuteWorkflowStep(msg.synthesizedWorkflow!.workflowId, step.stepId)}
+                                    className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[9.5px] transition-colors"
+                                  >
+                                    単体実行
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <p className="text-[10px] text-slate-400 pl-7">{step.intent}</p>
+
+                            {step.resultExcerpt && (
+                              <div className="ml-7 p-1.5 bg-black/50 border border-slate-800/80 rounded text-[9.5px] text-emerald-300 font-mono">
+                                {step.resultExcerpt}
+                              </div>
+                            )}
+
+                            {step.requiresConsent && (
+                              <div className="ml-7 text-[9px] text-amber-400 flex items-center gap-1">
+                                <AlertTriangle className="w-2.5 h-2.5" />
+                                <span>要明示同意 (46章 プラグイン権限)</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Message action buttons & Streaming Stop Button */}
@@ -1506,6 +1754,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             <ThumbsDown className="w-3 h-3" />
                           </button>
                         </div>
+
+                        {/* 設計思想 49章: 経験仕分け判定ボタン */}
+                        <span>•</span>
+                        <button
+                          onClick={() => handleRouteMessageExperience(msg)}
+                          className="hover:text-purple-300 flex items-center gap-1 transition-colors text-[10px]"
+                          title="49章 経験の保存先ルーターでこの応答を評価し、適切な記憶・スキル・教材へ仕分け判定"
+                        >
+                          <Compass className="w-3 h-3 text-purple-400" />
+                          <span>49章 仕分け</span>
+                        </button>
                       </div>
 
                       {msg.isStreaming && onStopGeneration && (
@@ -1518,6 +1777,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         </button>
                       )}
                     </div>
+
+                    {/* 49章 経験仕分け判定通知トースト */}
+                    {experienceToast && experienceToast.msgId === msg.id && (
+                      <div className="p-2 rounded-lg bg-purple-950/80 border border-purple-500/50 text-[10.5px] text-purple-200 animate-fadeIn flex items-center gap-1.5">
+                        <Compass className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                        <span>{experienceToast.text}</span>
+                      </div>
+                    )}
 
                     {/* Negative Feedback Reasoning Popover */}
                     {feedbackFeedbackId === msg.id && (

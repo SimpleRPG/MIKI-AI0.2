@@ -472,6 +472,8 @@ export interface ChatMessage {
   answerPlan?: AnswerPlanApplicationResult;
   codeUnderstandingIR?: CodeUnderstandingIR;
   vbaDesignSpecification?: VbaDesignSpecification;
+  // 設計思想 49章: 経験の保存先ルーター判定結果 (9分類仕分け)
+  experienceRouting?: ExperienceRoutingResult;
 }
 
 /**

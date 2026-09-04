@@ -53,6 +53,7 @@ import { responseDesignService } from './services/responseDesignService';
 import { longTermMemoryService } from './services/longTermMemoryService';
 import { codeVerificationService } from './services/codeVerificationService';
 import { falsificationService } from './services/falsificationService';
+import { experienceRouterService } from './services/experienceRouterService';
 import { workflowSynthesisService } from './services/workflowSynthesisService';
 import { answerPlanService } from './services/answerPlanService';
 import { capabilityGapService } from './services/capabilityGapService';
@@ -1096,6 +1097,83 @@ export default function App() {
           );
         }
 
+        // コードブロック抽出 & 生成と適用の分離 (設計思想 ②, ⑩, 22-25, 26)
+        const codeBlocks = extractCodeBlocks(reply);
+        let cpuCodeProposal: CodeProposal | undefined = undefined;
+        let cpuVbaAssessment: VbaSafetyAssessment | undefined = undefined;
+
+        if (codeBlocks.length > 0) {
+          cpuCodeProposal = {
+            id: `proposal_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            files: codeBlocks.map((cb) => ({
+              path: cb.path,
+              name: cb.name,
+              content: cb.content,
+              language: cb.language,
+            })),
+            status: 'pending',
+            source: 'assistant',
+            createdAt: Date.now(),
+          };
+
+          const vbaBlock = codeBlocks.find(
+            (cb) => cb.language === 'vba' || cb.name.endsWith('.bas') || cb.content.toLowerCase().includes('sub ') || cb.content.toLowerCase().includes('dim ')
+          );
+          if (vbaBlock) {
+            cpuVbaAssessment = schemaValidationService.evaluateVbaSafety(vbaBlock.content);
+          }
+        }
+
+        const cpuCodeVerification = codeVerificationService.verifyCode(reply);
+        const cpuFalsificationReport = falsificationService.evaluateFalsification({
+          userGoal: text,
+          assistantResponse: reply,
+          conversationState,
+          codeVerification: cpuCodeVerification,
+        });
+
+        let cpuCodeUnderstandingIR = undefined;
+        if (featureFlagsService.isEnabled('CODE_UNDERSTANDING')) {
+          if (codeBlocks.length > 0) {
+            const targetBlock = codeBlocks[0];
+            cpuCodeUnderstandingIR = codeUnderstandingService.parseCodeToIR(
+              targetBlock.content,
+              (targetBlock.language as any) || 'vba',
+              targetBlock.name
+            );
+          } else if (text.includes('Sub ') || text.includes('Function ') || text.includes('function ') || (attached && attached[0]?.content)) {
+            const raw = attached && attached[0]?.content ? attached[0].content : text;
+            cpuCodeUnderstandingIR = codeUnderstandingService.parseCodeToIR(raw, 'vba');
+          }
+        }
+
+        const isCpuVbaRequest =
+          text.toLowerCase().includes('vba') ||
+          text.includes('マクロ') ||
+          text.includes('excel') ||
+          text.includes('エクセル') ||
+          codeBlocks.some((b) => b.language === 'vba' || b.name.endsWith('.bas'));
+
+        let cpuVbaDesignSpecification = undefined;
+        if (featureFlagsService.isEnabled('VBA_DESIGN_ASSISTANT') && isCpuVbaRequest) {
+          cpuVbaDesignSpecification = vbaDesignAssistantService.createSpecificationFromPrompt(text);
+        }
+
+        let cpuSynthesizedWf: SynthesizedWorkflow | undefined = undefined;
+        if (workflowSynthesisService.shouldSynthesizeWorkflow(text)) {
+          cpuSynthesizedWf = workflowSynthesisService.synthesizeWorkflow(text);
+        }
+
+        // 設計思想 49章: 経験の保存先ルーターによる9分類自動仕分け
+        const cpuExperienceRouting = experienceRouterService.routeExperience(
+          {
+            content: reply,
+            source: 'conversation',
+            category: reply.includes('```') ? 'code' : 'chat',
+          },
+          memories
+        );
+
         const cpuMsg: ChatMessage = {
           id: assistantId,
           role: 'assistant',
@@ -1105,6 +1183,15 @@ export default function App() {
           engineMode: 'autonomous_rule',
           isStreaming: false,
           completionEvaluation: cpuEvaluation,
+          codeVerification: cpuCodeVerification,
+          falsificationReport: cpuFalsificationReport,
+          codeProposal: cpuCodeProposal,
+          vbaAssessment: cpuVbaAssessment,
+          synthesizedWorkflow: cpuSynthesizedWf,
+          answerPlan: answerPlanResult,
+          codeUnderstandingIR: cpuCodeUnderstandingIR,
+          vbaDesignSpecification: cpuVbaDesignSpecification,
+          experienceRouting: cpuExperienceRouting,
           executionSteps: systemLogger.getCurrentSessionSteps(),
           suggestedTools: cpuCandidateTools,
           executedTools: cpuExecutedTools,
@@ -1122,7 +1209,6 @@ export default function App() {
         setIsGenerating(false);
 
         // Auto apply code if generated
-        const codeBlocks = extractCodeBlocks(reply);
         if (codeBlocks.length > 0) {
           handleApplyCode(codeBlocks);
         }
@@ -1943,6 +2029,16 @@ export default function App() {
         });
       }
 
+      // 設計思想 49章: 経験の保存先ルーターによる9分類自動仕分け
+      const streamExperienceRouting = experienceRouterService.routeExperience(
+        {
+          content: finalVisibleText,
+          source: 'conversation',
+          category: finalVisibleText.includes('```') ? 'code' : 'chat',
+        },
+        memories
+      );
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantId
@@ -1964,6 +2060,7 @@ export default function App() {
                 answerPlan: answerPlanResult,
                 codeUnderstandingIR,
                 vbaDesignSpecification,
+                experienceRouting: streamExperienceRouting,
                 metrics: {
                   engine: executedEngineLabel,
                   tokens: tokenCount,

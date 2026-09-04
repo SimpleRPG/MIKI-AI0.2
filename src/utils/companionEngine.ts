@@ -1,5 +1,6 @@
 import { PersonaConfig, MemoryItem } from '../types';
 import { toolsService } from '../services/toolsService';
+import { codeUnderstandingService } from '../services/codeUnderstandingService';
 
 export function generateSmartCompanionReply(
   prompt: string,
@@ -689,6 +690,94 @@ ${name}はいつでも${nickname}の一番の味方だからね！
 </body>
 </html>
 \`\`\`\n\n右側の「ワークスペースに反映＆実行」ですぐに遊べるよ！🚀🎮✨`;
+  }
+
+  // 4.4b 複合指示・自律ワークフロー合成 (設計思想 47章 & 46章 能力プラグイン)
+  if (
+    lower.includes('ワークフロー') ||
+    lower.includes('パイプライン') ||
+    (lower.includes('手順') && lower.includes('自動化')) ||
+    (lower.includes('調査') && lower.includes('作成') && lower.includes('検証')) ||
+    (lower.includes('調べて') && (lower.includes('作って') || lower.includes('書いて')))
+  ) {
+    return `${nickname}、指示された複合タスクを【設計思想 47章 自律ワークフロー】として分解・合成したよ！⚡✨\n46章の能力プラグイン安全制約に基づき、未承認権限を勝手に拡大せず、明示的な確認ゲートを備えたパイプラインを構築しました。\n\n### 🔄 【合成された自律パイプライン】\n1. 🔍 **外部仕様・Web情報調査**: 公式ドキュメントや最新の構文ベストプラクティスを収集\n2. 📂 **ワークスペース解析**: 既存ソースコード・関連ファイルとの依存関係を特定\n3. 🧩 **中間IR・仕様化**: 決定表ルールや抽象プロシージャ構成を策定 (第22-26章)\n4. ⚙️ **安全な成果物生成**: 構文制約と安全ガードを満たす自己完結コードの実装\n5. 🛡️ **静的構文検査・完成判定**: 閉じタグ・破壊的コマンド検査・7項目チェックリストの合格判定 (第10・48章)\n\nメッセージ上の「**N段ワークフロー**」バッジを展開すると、各工程の進捗確認や「**全工程を一括自律実行**」ができるよ！確認して進めてみてね！😊🚀`;
+  }
+
+  // 4.5 VBA / Excel マクロ自動生成 (設計思想 26章: 抽象VBA設計仕様書 & 10章: VBA安全準備ゲート)
+  if (
+    lower.includes('vba') ||
+    lower.includes('マクロ') ||
+    (lower.includes('excel') && (lower.includes('集計') || lower.includes('自動化') || lower.includes('転記') || lower.includes('処理'))) ||
+    (lower.includes('エクセル') && (lower.includes('集計') || lower.includes('自動化') || lower.includes('転記') || lower.includes('処理')))
+  ) {
+    return `${nickname}、Excel VBAマクロの設計仕様書と安全なコードを作成したよ！📋✨\n設計思想（第26章 抽象VBA設計仕様書 & 第10章 安全準備ゲート）に基づき、**Option Explicitの明示・厳格な型宣言・エラーハンドリング・画面更新最適化**を徹底したよ！\n\n### 📊 【抽象設計・決定表ルール (Decision Table)】\n| 条件 (Condition) | 処理 (Action) | 安全配慮 |\n| :--- | :--- | :--- |\n| 対象シートが存在する | 最終行を動的取得してデータ処理 | ゼロ除算・空行スキップ |\n| 対象セルが空または無効 | ログ記録し次行へ継続 | 型エラー回避 (IsNumeric判定) |\n| 予期せぬ実行時エラー | ロールバック＆状態復元 | ScreenUpdating/Calculation 確実復元 |\n\n\`\`\`vba\nAttribute VB_Name = "Module_Automation"\nOption Explicit\n\n' ==============================================================================\n' プロシージャ名: ExecuteDataProcessing\n' 目的: 対象シートのデータ自動集計および安全な転記処理\n' 安全基準: Option Explicit強制、エラー捕捉、リソース解放\n' ==============================================================================\nPublic Sub ExecuteDataProcessing()\n    Dim wsSource As Worksheet\n    Dim lastRow As Long\n    Dim i As Long\n    Dim processedCount As Long\n    Dim successCount As Long\n    \n    ' エラーハンドラーの登録\n    On Error GoTo ErrorHandler\n    \n    ' 画面描画と自動計算を停止して高速化\n    Application.ScreenUpdating = False\n    Application.Calculation = xlCalculationManual\n    Application.EnableEvents = False\n    \n    ' ワークシート参照 (アクティブシート基準)\n    Set wsSource = ActiveSheet\n    \n    ' 最終行の動的特定 (A列基準)\n    lastRow = wsSource.Cells(wsSource.Rows.Count, "A").End(xlUp).Row\n    If lastRow < 2 Then\n        MsgBox "処理対象のデータ行が存在しません。", vbInformation, "みき VBAアシスタント"\n        GoTo CleanUp\n    End If\n    \n    processedCount = 0\n    successCount = 0\n    \n    ' データ走査ループ\n    For i = 2 To lastRow\n        ' 空セル・例外値の安全検査\n        If Not IsEmpty(wsSource.Cells(i, 1).Value) Then\n            ' 決定表ルールに基づく安全な計算・データ処理\n            If IsNumeric(wsSource.Cells(i, 2).Value) Then\n                wsSource.Cells(i, 3).Value = wsSource.Cells(i, 2).Value * 1.1 ' 税込計算例\n                successCount = successCount + 1\n            End If\n            processedCount = processedCount + 1\n        End If\n    Next i\n    \n    ' 完了通知\n    MsgBox "マクロ処理が安全に完了しました！" & vbCrLf & _\n           "対象件数: " & processedCount & " 件" & vbCrLf & _\n           "成功件数: " & successCount & " 件", vbInformation, "処理完了"\n\nCleanUp:\n    ' 画面描画・計算モードの確実な復元\n    Application.ScreenUpdating = True\n    Application.Calculation = xlCalculationAutomatic\n    Application.EnableEvents = True\n    Set wsSource = Nothing\n    Exit Sub\n\nErrorHandler:\n    ' 実行時エラーの捕捉とユーザー通知\n    MsgBox "実行時エラーが発生しました。" & vbCrLf & _\n           "エラー番号: " & Err.Number & vbCrLf & _\n           "詳細: " & Err.Description & vbCrLf & _\n           "発生行: " & Erl, vbCritical, "エラーハンドラー"\n    Resume CleanUp\nEnd Sub\n\`\`\`\n\nExcelのVBAエディタ（Alt + F11）を開いて、標準モジュールに貼り付けて使ってね！必要に応じて列番号や計算ルールをカスタマイズできるよ！😊💻`;
+  }
+
+  // 4.6 コード読解・解説・レビュー (設計思想 22〜25章: コード理解AI & コメント矛盾検出)
+  const codeInPrompt = p.match(/```(?:vba|vb|javascript|typescript|js|ts|python|py)?\s*([\s\S]*?)```/i);
+  const rawCandidateCode = codeInPrompt
+    ? codeInPrompt[1]
+    : attachedFiles && attachedFiles[0]?.content
+    ? attachedFiles[0].content
+    : p.includes('Sub ') || p.includes('Function ') || p.includes('function ')
+    ? p
+    : '';
+
+  if (
+    rawCandidateCode &&
+    rawCandidateCode.length > 20 &&
+    (lower.includes('読') ||
+      lower.includes('解析') ||
+      lower.includes('レビュー') ||
+      lower.includes('解説') ||
+      lower.includes('バグ') ||
+      lower.includes('矛盾') ||
+      lower.includes('どう動く') ||
+      lower.includes('説明'))
+  ) {
+    const lang =
+      lower.includes('vba') || lower.includes('sub ') || lower.includes('dim ')
+        ? 'vba'
+        : lower.includes('python') || lower.includes('def ')
+        ? 'python'
+        : 'javascript';
+    const ir = codeUnderstandingService.analyzeCode(rawCandidateCode, lang);
+
+    let replyText = `${nickname}、提供された【${lang.toUpperCase()}】コードを解析したよ！🔍✨\n\n`;
+    replyText += `### 📋 コード構造概要\n${ir.naturalJapaneseSummary}\n\n`;
+
+    if (ir.procedures.length > 0) {
+      replyText += `### ⚙️ プロシージャ一覧 (${ir.procedures.length}件)\n`;
+      ir.procedures.forEach((proc) => {
+        replyText += `- **\`${proc.procedureName}\`** [${proc.visibility}]: 入力引数 [${
+          proc.inputs.map((i) => i.name + (i.type ? ':' + i.type : '')).join(', ') || 'なし'
+        }] ➔ 呼出先: [${proc.calls.join(', ') || 'なし'}]\n`;
+      });
+      replyText += '\n';
+    }
+
+    if (ir.commentCodeContradictions.length > 0) {
+      replyText += `### ⚠️ コメントと実装の矛盾検知 (${ir.commentCodeContradictions.length}件)\n`;
+      ir.commentCodeContradictions.forEach((c) => {
+        replyText += `- 💬 **コメント主張**: 「${c.commentClaim}」\n  ⚡ **実際の実装**: 「${c.actualCodeBehavior}」\n  💡 *助言: コメントの意図とコードの動作が食い違っているため、修正時は仕様を確認してください。*\n`;
+      });
+      replyText += '\n';
+    } else {
+      replyText += `✓ **コメントと実装の整合性**: コメントとコード挙動の乖離は検出されませんでした。\n\n`;
+    }
+
+    if (ir.impactPredictions.length > 0) {
+      replyText += `### 🛡️ 変更時の影響範囲と推奨試験\n`;
+      const firstImpact = ir.impactPredictions[0];
+      replyText += `- **影響注意点**: ${firstImpact.potentialBreakage}\n`;
+      replyText += `- **必須テストケース**:\n`;
+      firstImpact.testCasesToRerun.forEach((tc) => {
+        replyText += `  - ${tc}\n`;
+      });
+    }
+
+    replyText += `\n上の「22〜25章 コード理解中間IR」バッジをクリックすると、抽出された詳細なJSON構造(IR)も確認できるよ！😊💻`;
+    return replyText;
   }
 
   // 5. Contextual natural answer

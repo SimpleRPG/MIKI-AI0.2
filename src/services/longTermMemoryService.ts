@@ -564,6 +564,63 @@ class LongTermMemoryService {
 
     return lines.join('\n');
   }
+
+  /**
+   * 設計思想 8章: 浅い睡眠における長期記憶の自律監査とライフサイクル整理
+   * 期限切れの検出、未検証記憶の分類、置換済み記憶の重複排除を実行
+   */
+  public auditAndConsolidateMemories(memories: MemoryItem[]): {
+    updatedMemories: MemoryItem[];
+    supersededCount: number;
+    expiredCount: number;
+    unverifiedCount: number;
+    longTermCount: number;
+  } {
+    const now = Date.now();
+    let supersededCount = 0;
+    let expiredCount = 0;
+    let unverifiedCount = 0;
+    let longTermCount = 0;
+
+    const updatedMemories = memories.map((mem) => {
+      const currentStatus = this.getLifecycleStatus(mem);
+      const scope = this.classifyMemoryScope(mem);
+      let newStatus = currentStatus;
+
+      if (scope === 'long_term') {
+        longTermCount++;
+      }
+
+      // 期限切れチェック
+      if (mem.expiresAt && mem.expiresAt < now && currentStatus !== 'EXPIRED') {
+        newStatus = 'EXPIRED';
+        expiredCount++;
+      } else if (currentStatus === 'SUPERSEDED') {
+        supersededCount++;
+      } else if (currentStatus === 'UNVERIFIED') {
+        unverifiedCount++;
+      }
+
+      const longTermType =
+        mem.longTermType ||
+        (scope === 'long_term' ? this.detectLongTermCategory(mem.content, mem.category) : undefined);
+
+      return {
+        ...mem,
+        lifecycleStatus: newStatus,
+        memoryScope: scope,
+        longTermType,
+      };
+    });
+
+    return {
+      updatedMemories,
+      supersededCount,
+      expiredCount,
+      unverifiedCount,
+      longTermCount,
+    };
+  }
 }
 
 export const longTermMemoryService = new LongTermMemoryService();

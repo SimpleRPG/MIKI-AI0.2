@@ -19,6 +19,11 @@ import { regressionBenchmarkService } from './regressionBenchmarkService';
 import { nativeLlmService } from './nativeLlmService';
 import { webLLMService } from './webLlmService';
 import { syntheticDataService } from './syntheticDataService';
+import { longTermMemoryService } from './longTermMemoryService';
+import { capabilityGapService } from './capabilityGapService';
+import { virtualTrainingService } from './virtualTrainingService';
+import { capabilityPluginService } from './capabilityPluginService';
+import { featureFlagsService } from './featureFlagsService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -410,8 +415,11 @@ export class BackgroundWorkerService {
         const mems = context.memories;
         const activeMems = mems.filter((m) => m.active !== false);
 
+        // 設計思想 8章: 長期記憶の自律監査とライフサイクル整理 (SUPERSEDED・EXPIRED・未検証の選別)
+        const memoryAudit = longTermMemoryService.auditAndConsolidateMemories(mems);
+
         context.onUpdateMemories((prev) => {
-          return prev.map((target) => {
+          return memoryAudit.updatedMemories.map((target) => {
             if (target.prerequisiteMemoryIds && target.prerequisiteMemoryIds.length > 0) {
               return target;
             }
@@ -437,6 +445,10 @@ export class BackgroundWorkerService {
           });
         });
         consolidatedCount = activeMems.length;
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `[8章 記憶監査] 長期記憶=${memoryAudit.longTermCount}件, 置換済み=${memoryAudit.supersededCount}件, 期限切れ=${memoryAudit.expiredCount}件, 未検証=${memoryAudit.unverifiedCount}件`
+        );
       }
 
       // Step 2: DPO / LoRA 学習サンプルの本格クリーンアップ・重複除去
@@ -450,9 +462,23 @@ export class BackgroundWorkerService {
       }
       const skillPromo = skillsService.evaluateAllSkillsPromotion();
 
+      // Step 3.5: 設計思想 32章 能力ギャップレジストリ監査
+      const capabilityGaps = capabilityGapService.getAllGaps();
+      const capabilityProfiles = capabilityGapService.getAllProfiles();
+      const weakCapabilities = capabilityProfiles.filter((p) => p.state === 'WEAK');
+
+      // Step 3.6: 設計思想 46章 能力プラグイン権限整合性監査 (自動権限拡大の防止)
+      const plugins = capabilityPluginService.getAllPlugins();
+      let unconsentedPluginsCount = 0;
+      plugins.forEach((p) => {
+        if (p.status === 'TESTED' || p.status === 'CANDIDATE') {
+          unconsentedPluginsCount++;
+        }
+      });
+
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `✓ [浅い睡眠完了] 記憶整理(${consolidatedCount}件), グラフ接続(+${graphLinksCreated}件), サンプル重複除外(${cleanupResult.removedDuplicates}件), スキル抽出(+${extractedSkillsCount}件)`
+        `✓ [浅い睡眠完了] 記憶整理(${consolidatedCount}件), グラフ接続(+${graphLinksCreated}件), サンプル重複除外(${cleanupResult.removedDuplicates}件), スキル抽出(+${extractedSkillsCount}件), 能力ギャップ(${capabilityGaps.length}件/WEAK:${weakCapabilities.length}件), プラグイン承認待ち(${unconsentedPluginsCount}件)`
       );
 
       // ==========================================
@@ -576,6 +602,27 @@ export class BackgroundWorkerService {
           }
         } catch (synErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '合成教材生成パイプライン実行中に例外が発生しました', synErr);
+        }
+
+        // Step 6.6: 設計思想 16章 仮想学習試験 & LoRA検討の発動条件判定
+        if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+        try {
+          const loraAssessment = virtualTrainingService.evaluateLoraTriggerCondition();
+          if (loraAssessment.triggered) {
+            weaknessFound.push(
+              `[16章 LoRA発動条件検知] 言い換え再発または能力停滞を検出 ➔ 仮想学習シミュレーションを実行`
+            );
+            // 仮想学習試験の実行 (LoRA不要判定を優先検証)
+            const trial = await virtualTrainingService.runVirtualTrainingTrial('cap_correction');
+            weaknessFound.push(`[仮想学習判定: ${trial.verdict}] ${trial.verdictDetails}`);
+          } else {
+            systemLogger.info(
+              'SELF_IMPROVEMENT',
+              `[16章 仮想学習監査] 回答骨格(9章)・検索(8章)で制御優位。LoRA発動条件未達(DISABLED維持)`
+            );
+          }
+        } catch (vtErr: any) {
+          systemLogger.warn('SELF_IMPROVEMENT', '仮想学習監査中に例外が発生しました', vtErr);
         }
       }
 
