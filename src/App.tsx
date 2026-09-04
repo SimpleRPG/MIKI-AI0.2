@@ -24,6 +24,9 @@ import {
   CodeProposal,
   VbaSafetyAssessment,
   ConversationState,
+  ComprehensiveCodeVerification,
+  FalsificationEvaluation,
+  SynthesizedWorkflow,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
@@ -47,6 +50,9 @@ import {
 } from './services/conversationStateService';
 import { responseDesignService } from './services/responseDesignService';
 import { longTermMemoryService } from './services/longTermMemoryService';
+import { codeVerificationService } from './services/codeVerificationService';
+import { falsificationService } from './services/falsificationService';
+import { workflowSynthesisService } from './services/workflowSynthesisService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
@@ -1399,6 +1405,16 @@ export default function App() {
         conversationState.stage
       );
 
+      // 設計思想 47章 & 35章 第5段階: 自然言語からの自律ワークフロー合成
+      let synthesizedWf: SynthesizedWorkflow | undefined = undefined;
+      if (workflowSynthesisService.shouldSynthesizeWorkflow(text)) {
+        synthesizedWf = workflowSynthesisService.synthesizeWorkflow(text);
+        systemLogger.info(
+          'STEP',
+          `⚡ [47章 ワークフロー合成] ${synthesizedWf.steps.length}段階のパイプラインを自動生成 (ID: ${synthesizedWf.workflowId})`
+        );
+      }
+
       systemLogger.info(
         'STEP',
         `回答長選定: [${activeExpectedLength.toUpperCase()}] (${lengthSelection.reason}, 目安:${lengthSelection.targetRange})`
@@ -1808,6 +1824,27 @@ export default function App() {
         }
       }
 
+      // 設計思想 10章 & 35章 第5段階: 総合コード・VBA安全準備ゲート検証
+      const codeVerification = codeVerificationService.verifyCode(finalVisibleText);
+      if (codeVerification.hasCode) {
+        systemLogger.info(
+          'CHAT',
+          `[10章 コード準備ゲート] 検証: 言語=[${codeVerification.languages.join(',')}] 安全度=${codeVerification.safetyLevel}(${codeVerification.safetyScore}点) 準備ステータス=${codeVerification.readiness} 構文エラー=${codeVerification.syntaxErrors.length}件 リスク=${codeVerification.risks.length}件`
+        );
+      }
+
+      // 設計思想 15-16章 & 35章 第5段階: 内的自己反証・エッジケース自己検証ループ
+      const falsificationReport = falsificationService.evaluateFalsification({
+        userGoal: text,
+        assistantResponse: finalVisibleText,
+        conversationState: newConvState,
+        codeVerification,
+      });
+      systemLogger.info(
+        'CHAT',
+        `[15-16章 内的自己反証] 反証スコア=${falsificationReport.falsificationScore}点 合格=${falsificationReport.passed ? 'PASS' : 'WARN/FAIL'} 警告=${falsificationReport.falsificationWarnings.length}件`
+      );
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantId
@@ -1818,6 +1855,9 @@ export default function App() {
                 isStreaming: false,
                 completionEvaluation: streamEvaluation,
                 responseQuality,
+                codeVerification,
+                falsificationReport,
+                synthesizedWorkflow: synthesizedWf,
                 fallbackDiagnostic: diagnosticData,
                 executionSteps: systemLogger.getCurrentSessionSteps(),
                 codeProposal,

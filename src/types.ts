@@ -464,6 +464,10 @@ export interface ChatMessage {
   vbaAssessment?: VbaSafetyAssessment;
   // 設計思想 6章 & 第3段階: 回答品質・回答長・直接回答評価
   responseQuality?: ResponseQualityEvaluation;
+  // 設計思想 10章, 15-16章, 47章 & 35章 第5段階
+  codeVerification?: ComprehensiveCodeVerification;
+  falsificationReport?: FalsificationEvaluation;
+  synthesizedWorkflow?: SynthesizedWorkflow;
 }
 
 /**
@@ -506,6 +510,87 @@ export interface ConversationState {
   pendingQuestions: string[];
   expectedResponseLength: ResponseLength;
   updatedAt: number;
+}
+
+/**
+ * 設計思想 10章 & 35章 第5段階: 総合コード・VBA安全準備ゲート検証結果
+ */
+export type CodeLanguageType = 'vba' | 'javascript' | 'html' | 'canvas' | 'python' | 'json' | 'sql' | 'other';
+export type CodeSafetyLevel = 'PASS_SAFE' | 'WARN_REVIEW_NEEDED' | 'BLOCKED_HIGH_RISK';
+export type CodeReadinessStatus = 'READY_FOR_PREVIEW' | 'EXTERNAL_TEST_REQUIRED' | 'RUNTIME_GUARD_NEEDED' | 'BLOCKED';
+
+export interface CodeSafetyRiskItem {
+  riskType: 'file_system' | 'shell_exec' | 'network' | 'auto_exec' | 'memory_leak' | 'infinite_loop' | 'privilege';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  lineSnippet?: string;
+}
+
+export interface ComprehensiveCodeVerification {
+  hasCode: boolean;
+  languages: CodeLanguageType[];
+  syntaxValid: boolean;
+  syntaxErrors: string[];
+  safetyLevel: CodeSafetyLevel;
+  safetyScore: number; // 0〜100
+  risks: CodeSafetyRiskItem[];
+  environmentRequirements: string[];
+  readiness: CodeReadinessStatus;
+  reviewedAt: number;
+}
+
+/**
+ * 設計思想 15-16章 & 35章 第5段階: 内的自己反証・エッジケース自己検証結果
+ */
+export interface FalsificationCheckItem {
+  aspect: 'boundary_edge_cases' | 'invalidated_assumptions' | 'self_contradiction' | 'persona_retention' | 'hallucination_guard';
+  title: string;
+  status: 'pass' | 'warn' | 'fail';
+  detail: string;
+  riskPoint?: string;
+}
+
+export interface FalsificationEvaluation {
+  falsificationScore: number; // 0〜100 (100 = 完全に堅牢・反証なし)
+  passed: boolean;
+  checks: FalsificationCheckItem[];
+  falsificationWarnings: string[];
+  suggestedMitigations: string[];
+  evaluatedAt: number;
+}
+
+/**
+ * 設計思想 47章 & 35章 第5段階: 自然言語からワークフローを作る機構 (Workflow Synthesis)
+ */
+export interface SynthesizedWorkflowStep {
+  stepId: string;
+  stepNumber: number;
+  name: string;
+  intent: string;
+  pluginId: string; // 46章 CapabilityPlugin
+  assignedTool: string;
+  inputMapping: Record<string, any>;
+  expectedOutputSchema: string;
+  requiresConsent: boolean;
+  requiredPermissions: string[];
+  timeoutMs: number;
+  status: 'pending' | 'ready' | 'running' | 'completed' | 'failed' | 'skipped';
+  resultExcerpt?: string;
+}
+
+export interface SynthesizedWorkflow {
+  workflowId: string;
+  userGoal: string;
+  steps: SynthesizedWorkflowStep[];
+  budgetEstimate: {
+    estimatedDurationMs: number;
+    estimatedTokens: number;
+    estimatedCostUnits: number;
+    riskLevel: 'low' | 'medium' | 'high';
+  };
+  synthesisRationale: string;
+  createdAt: number;
+  status: 'draft' | 'approved' | 'executing' | 'completed' | 'failed';
 }
 
 export interface ConsoleLogItem {

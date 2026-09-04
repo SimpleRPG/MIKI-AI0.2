@@ -40,6 +40,8 @@ import {
   Lock,
   ShieldCheck,
   Coins,
+  Workflow,
+  SearchCheck,
 } from 'lucide-react';
 import { ExternalTeacherTab } from './ExternalTeacherTab';
 import { PluginConsentDialog } from './PluginConsentDialog';
@@ -64,11 +66,18 @@ import {
   ReviewQueueItem,
   CapabilityPlugin,
   PluginConsentRequest,
+  SynthesizedWorkflow,
+  SynthesizedWorkflowStep,
+  ComprehensiveCodeVerification,
+  FalsificationEvaluation,
 } from '../types';
 import { selfImprovementService } from '../services/selfImprovementService';
 import { skillsService } from '../services/skillsService';
 import { capabilityPluginService } from '../services/capabilityPluginService';
 import { worldModelService } from '../services/worldModelService';
+import { workflowSynthesisService } from '../services/workflowSynthesisService';
+import { codeVerificationService } from '../services/codeVerificationService';
+import { falsificationService } from '../services/falsificationService';
 import {
   backgroundWorkerService,
   canRunShallowSleep,
@@ -88,7 +97,7 @@ export interface SelfImprovementModalProps {
   chatMessages: ChatMessage[];
   memories: MemoryItem[];
   workspaceFiles?: WorkspaceFile[];
-  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'lab' | 'colab' | 'generations';
+  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations';
 }
 
 export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
@@ -99,9 +108,26 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   workspaceFiles = [],
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'lab' | 'colab' | 'generations'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
+
+  // 第5段階 (47章, 10章, 15-16章) ステート
+  const [phase5Workflows, setPhase5Workflows] = useState<SynthesizedWorkflow[]>([]);
+  const [selectedWf, setSelectedWf] = useState<SynthesizedWorkflow | null>(null);
+  const [phase5PromptInput, setPhase5PromptInput] = useState<string>(
+    'Webで最新のOffice 64bit API仕様を調査し、安全なExcel VBAマクロを生成して構文検査・反証テストまで一括実行して'
+  );
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [testCodeInput, setTestCodeInput] = useState<string>(
+    `Sub TestDataProcessing()\n    Dim ws As Worksheet\n    Dim lastRow As Long\n    Dim i As Long\n    Set ws = ThisWorkbook.Sheets(1)\n    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row\n    \n    On Error GoTo ErrorHandler\n    For i = 2 To lastRow\n        If Trim(ws.Cells(i, 1).Value) <> "" Then\n            ws.Cells(i, 2).Value = UCase(Trim(ws.Cells(i, 1).Value))\n        End If\n    Next i\n    Exit Sub\n    \nErrorHandler:\n    MsgBox "Error: " & Err.Description, vbCritical\nEnd Sub`
+  );
+  const [codeVerResult, setCodeVerResult] = useState<ComprehensiveCodeVerification | null>(null);
+  const [testResponseGoal, setTestResponseGoal] = useState<string>('ExcelのA列を大文字に変換してB列に出力する安全なマクロを作って');
+  const [testResponseInput, setTestResponseInput] = useState<string>(
+    `任せて！A列の文字をトリムして大文字に変換し、B列に書き出す安全なExcel VBAマクロを作成したよ。空行やNull値のエラーハンドリング（On Error GoTo）も組み込んであるから、PCのExcelの標準モジュールに貼り付けて実行してみてね！`
+  );
+  const [falsificationResult, setFalsificationResult] = useState<FalsificationEvaluation | null>(null);
 
   useEffect(() => {
     if (isOpen && initialTab) {
@@ -301,6 +327,13 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
       setSizeCompReports(compReports);
       if (compReports.length > 0) {
         setSelectedCompReport(compReports[0]);
+      }
+
+      // 第5段階 ワークフローの読み込み (47章)
+      const wfs = workflowSynthesisService.getWorkflows();
+      setPhase5Workflows(wfs);
+      if (wfs.length > 0) {
+        setSelectedWf(wfs[0]);
       }
 
       // 利用可能なモデル世代から基準(1.5B)と候補(3B)を初期設定
@@ -833,6 +866,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <Boxes className="w-4 h-4 text-amber-400" />
             <span>🧩 能力プラグイン方式 (46章) ({capabilityPlugins.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('phase5')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'phase5'
+                ? 'border-cyan-500 text-cyan-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Workflow className="w-4 h-4 text-cyan-400" />
+            <span>⚡ ワークフロー合成＆検証ゲート (第5段階)</span>
           </button>
 
           <button
@@ -3209,6 +3254,530 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                       </div>
                     );
                   })}
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================ */}
+          {/* TAB: 第5段階 統合センター (47章 ワークフロー合成 ＆ 10章 コード準備ゲート ＆ 15-16章 反証検証) */}
+          {/* ============================================================ */}
+          {activeTab === 'phase5' && (
+            <div className="space-y-6">
+              {/* Header Banner */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-950 border border-cyan-800/40 space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <Workflow className="w-4 h-4 text-cyan-400" />
+                    <span>第5段階: ワークフロー合成 (47章) ＆ コード準備ゲート (10章) ＆ 反証検証 (15-16章)</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/30">
+                      Phase 5 Engine
+                    </span>
+                  </h3>
+                  <span className="text-xs text-cyan-400/80 font-mono">
+                    合成ワークフロー履歴: {phase5Workflows.length}件
+                  </span>
+                </div>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  複合指示を46章「能力プラグイン」と連動した自律実行パイプラインに分解し、生成コードの多層静的解析（VBA/Canvas/JS）と境界条件・無効化前提の内的自己反証テストを一括して検証します。
+                </p>
+              </div>
+
+              {/* ------------------------------------------------------------ */}
+              {/* Section 1: 47章 自然言語ワークフロー自動合成                   */}
+              {/* ------------------------------------------------------------ */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                      <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>【設計思想 47章】自然言語からワークフローを作る機構 (Workflow Synthesis)</span>
+                    </h4>
+                    <p className="text-slate-400 text-[11px] mt-0.5">
+                      46章の能力プラグインと登録ツールを元に、自然言語の指示を実行可能な多段ステップへ自動合成します。
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (!phase5PromptInput.trim()) return;
+                      setIsSynthesizing(true);
+                      setTimeout(() => {
+                        const wf = workflowSynthesisService.synthesizeWorkflow(phase5PromptInput.trim());
+                        setPhase5Workflows(workflowSynthesisService.getWorkflows());
+                        setSelectedWf(wf);
+                        setIsSynthesizing(false);
+                      }, 250);
+                    }}
+                    disabled={isSynthesizing || !phase5PromptInput.trim()}
+                    className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0"
+                  >
+                    <Workflow className="w-3.5 h-3.5" />
+                    <span>{isSynthesizing ? '合成中...' : 'ワークフローを自動合成'}</span>
+                  </button>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="space-y-1.5">
+                  <div className="text-[10px] text-slate-400 font-medium">プリセット依頼（クリックで反映）:</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      onClick={() =>
+                        setPhase5PromptInput(
+                          'Webで最新のOffice 64bit API仕様を調査し、安全なExcel VBAマクロを生成して構文検査・反証テストまで一括実行して'
+                        )
+                      }
+                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-cyan-300 rounded text-[10px] border border-slate-700 transition-colors"
+                    >
+                      📊 Excel VBA自動化パイプライン (64bit API + 構文検査)
+                    </button>
+                    <button
+                      onClick={() =>
+                        setPhase5PromptInput(
+                          'HTML5 Canvasでリサイズ対応のパーティクル背景アニメーションを実装し、メモリリークと無限ループを静的検査して'
+                        )
+                      }
+                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-teal-300 rounded text-[10px] border border-slate-700 transition-colors"
+                    >
+                      🎨 HTML5/Canvas アニメーション生成 & 静的検査
+                    </button>
+                    <button
+                      onClick={() =>
+                        setPhase5PromptInput(
+                          'プロジェクト既存コードを解析し、重複関数を排除して安全なリファクタリングパイプラインを組んで'
+                        )
+                      }
+                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-indigo-300 rounded text-[10px] border border-slate-700 transition-colors"
+                    >
+                      🧹 ワークスペース解析 ＆ リファクタリング
+                    </button>
+                  </div>
+                </div>
+
+                {/* Input Area */}
+                <div>
+                  <textarea
+                    rows={2}
+                    value={phase5PromptInput}
+                    onChange={(e) => setPhase5PromptInput(e.target.value)}
+                    placeholder="ユーザーの複合依頼を入力..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-sans"
+                  />
+                </div>
+
+                {/* Synthesized Workflow View */}
+                {selectedWf && (
+                  <div className="p-3.5 rounded-lg bg-slate-900/90 border border-cyan-900/50 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                      <div>
+                        <div className="text-xs font-bold text-cyan-300 flex items-center gap-1.5 font-mono">
+                          <span>WF ID: {selectedWf.workflowId}</span>
+                          <span className="px-2 py-0.5 rounded text-[9.5px] bg-cyan-950 text-cyan-400 border border-cyan-800">
+                            {selectedWf.status.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          {selectedWf.synthesisRationale}
+                        </div>
+                      </div>
+
+                      {/* Budget summary */}
+                      <div className="flex items-center gap-2 text-[10px] font-mono shrink-0">
+                        <span className="px-2 py-1 bg-slate-950 rounded border border-slate-800 text-slate-300">
+                          ⏱️ ~{Math.round(selectedWf.budgetEstimate.estimatedDurationMs / 1000)}秒
+                        </span>
+                        <span className="px-2 py-1 bg-slate-950 rounded border border-slate-800 text-slate-300">
+                          🪙 ~{selectedWf.budgetEstimate.estimatedTokens} tok
+                        </span>
+                        <span className={`px-2 py-1 rounded border ${
+                          selectedWf.budgetEstimate.riskLevel === 'low'
+                            ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
+                            : 'bg-amber-950/60 border-amber-800 text-amber-300'
+                        }`}>
+                          リスク: {selectedWf.budgetEstimate.riskLevel.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step Cards */}
+                    <div className="space-y-2">
+                      {selectedWf.steps.map((step) => (
+                        <div
+                          key={step.stepId}
+                          className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-5 h-5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-700/60 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                              {step.stepNumber}
+                            </div>
+                            <div className="space-y-0.5">
+                              <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                                <span>{step.name}</span>
+                                <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                                  {step.assignedTool}
+                                </span>
+                                {step.requiresConsent && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800">
+                                    要同意
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-400">{step.intent}</p>
+                              <div className="text-[10px] text-slate-500 font-mono">
+                                期待成果: {step.expectedOutputSchema}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Step status and actions */}
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[9.5px] font-mono border ${
+                                step.status === 'completed'
+                                  ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                                  : step.status === 'running'
+                                  ? 'bg-cyan-950 text-cyan-300 border-cyan-800 animate-pulse'
+                                  : 'bg-slate-900 text-slate-400 border-slate-800'
+                              }`}
+                            >
+                              {step.status}
+                            </span>
+                            {step.status !== 'completed' && (
+                              <button
+                                onClick={() => {
+                                  const updated = workflowSynthesisService.updateStepStatus(
+                                    selectedWf.workflowId,
+                                    step.stepId,
+                                    'completed',
+                                    '正常完了'
+                                  );
+                                  if (updated) {
+                                    setSelectedWf(updated);
+                                    setPhase5Workflows(workflowSynthesisService.getWorkflows());
+                                  }
+                                }}
+                                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded text-[10px] border border-slate-700"
+                              >
+                                完了
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ------------------------------------------------------------ */}
+              {/* Section 2: 10章 コード・VBA安全準備ゲート & 静的構文解析      */}
+              {/* ------------------------------------------------------------ */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>【設計思想 10章】コード・VBA安全準備ゲート & 静的構文検査 (Code Preparation Gate)</span>
+                    </h4>
+                    <p className="text-slate-400 text-[11px] mt-0.5">
+                      VBA / JavaScript / Canvas / HTML コードの構文整合性、破壊的API (Kill/Shell)、および64bit Office互換性を検査します。
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const res = codeVerificationService.verifyCode(testCodeInput);
+                      setCodeVerResult(res);
+                    }}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>安全ゲート検証を実行</span>
+                  </button>
+                </div>
+
+                {/* Presets */}
+                <div className="space-y-1.5">
+                  <div className="text-[10px] text-slate-400 font-medium">コード検証プリセット:</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      onClick={() => {
+                        const code = `Sub CleanDataMacro()\n    Dim ws As Worksheet\n    Dim i As Long\n    Set ws = ActiveSheet\n    On Error GoTo CatchErr\n    For i = 1 To 100\n        ws.Cells(i, 1).Value = "Processed "\n    Next i\n    Exit Sub\nCatchErr:\n    MsgBox "Err: " & Err.Description\nEnd Sub`;
+                        setTestCodeInput(code);
+                        setCodeVerResult(codeVerificationService.verifyCode(code));
+                      }}
+                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-emerald-300 rounded text-[10px] border border-slate-700"
+                    >
+                      ✓ 安全なVBAマクロ (パス例)
+                    </button>
+                    <button
+                      onClick={() => {
+                        const code = `Sub DangerousMacro()\n    Dim shellObj As Object\n    Set shellObj = CreateObject("WScript.Shell")\n    shellObj.Run "cmd.exe /c del C:\\temp\\*.*", 0, True\n    Kill "C:\\data\\secret.txt"\nEnd Sub`;
+                        setTestCodeInput(code);
+                        setCodeVerResult(codeVerificationService.verifyCode(code));
+                      }}
+                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-rose-300 rounded text-[10px] border border-slate-700"
+                    >
+                      ⚠️ 破壊的Shell・Killマクロ (遮断例)
+                    </button>
+                    <button
+                      onClick={() => {
+                        const code = `<!DOCTYPE html>\n<html>\n<body>\n<canvas id="c" width="400" height="300"></canvas>\n<script>\nconst c = document.getElementById('c');\nconst ctx = c.getContext('2d');\nctx.fillStyle = 'purple';\nctx.fillRect(10, 10, 80, 80);\n</script>\n</body>\n</html>`;
+                        setTestCodeInput(code);
+                        setCodeVerResult(codeVerificationService.verifyCode(code));
+                      }}
+                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-cyan-300 rounded text-[10px] border border-slate-700"
+                    >
+                      🎨 HTML5 Canvas 自己完結スクリプト (プレビュー可例)
+                    </button>
+                    <button
+                      onClick={() => {
+                        const code = `Sub InfiniteLoopMacro()\n    Dim x As Long\n    Do While True\n        x = x + 1\n    Loop\nEnd Sub`;
+                        setTestCodeInput(code);
+                        setCodeVerResult(codeVerificationService.verifyCode(code));
+                      }}
+                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-amber-300 rounded text-[10px] border border-slate-700"
+                    >
+                      ⏳ 無限ループ警告マクロ
+                    </button>
+                  </div>
+                </div>
+
+                {/* Code Textarea */}
+                <textarea
+                  rows={6}
+                  value={testCodeInput}
+                  onChange={(e) => setTestCodeInput(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs font-mono text-emerald-300 focus:outline-none focus:border-emerald-500 leading-relaxed"
+                />
+
+                {/* Code Verification Results */}
+                {codeVerResult && (
+                  <div className="p-3.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-200">検証結果サマリー:</span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${
+                            codeVerResult.safetyLevel === 'PASS_SAFE'
+                              ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                              : codeVerResult.safetyLevel === 'WARN_REVIEW_NEEDED'
+                              ? 'bg-amber-950 text-amber-300 border-amber-800'
+                              : 'bg-rose-950 text-rose-300 border-rose-800'
+                          }`}
+                        >
+                          {codeVerResult.safetyLevel} (安全スコア: {codeVerResult.safetyScore}点)
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-400">
+                        実行準備: <span className="text-sky-300 font-bold">{codeVerResult.readiness}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      {/* Left: Syntax & Env */}
+                      <div className="p-2.5 rounded bg-slate-950 border border-slate-800 space-y-1.5">
+                        <div className="text-[11px] font-bold text-slate-300">構文整合性:</div>
+                        {codeVerResult.syntaxValid ? (
+                          <div className="text-emerald-400 text-[11px] flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>構文エラーなし (ブロック・括弧対応OK)</span>
+                          </div>
+                        ) : (
+                          <ul className="text-rose-400 text-[11px] space-y-1 list-disc pl-4">
+                            {codeVerResult.syntaxErrors.map((err, idx) => (
+                              <li key={idx}>{err}</li>
+                            ))}
+                          </ul>
+                        )}
+
+                        <div className="text-[11px] font-bold text-slate-300 pt-1 border-t border-slate-900">
+                          動作環境・参照設定要件:
+                        </div>
+                        {codeVerResult.environmentRequirements.length > 0 ? (
+                          <ul className="text-sky-300 text-[11px] space-y-0.5 list-disc pl-4">
+                            {codeVerResult.environmentRequirements.map((req, idx) => (
+                              <li key={idx}>{req}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="text-slate-500 text-[11px]">特段の追加外部参照設定は不要です。</div>
+                        )}
+                      </div>
+
+                      {/* Right: Risks */}
+                      <div className="p-2.5 rounded bg-slate-950 border border-slate-800 space-y-1.5">
+                        <div className="text-[11px] font-bold text-slate-300">検知されたリスク ({codeVerResult.risks.length}件):</div>
+                        {codeVerResult.risks.length === 0 ? (
+                          <div className="text-emerald-400 text-[11px] flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>破壊的コマンド・不正通信は検出されませんでした。</span>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {codeVerResult.risks.map((risk, idx) => (
+                              <div
+                                key={idx}
+                                className={`p-1.5 rounded text-[10.5px] border ${
+                                  risk.severity === 'critical' || risk.severity === 'high'
+                                    ? 'bg-rose-950/40 border-rose-800/80 text-rose-200'
+                                    : 'bg-amber-950/40 border-amber-800/80 text-amber-200'
+                                }`}
+                              >
+                                <span className="font-bold uppercase font-mono mr-1">[{risk.riskType}]</span>
+                                <span>{risk.description}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ------------------------------------------------------------ */}
+              {/* Section 3: 15-16章 内的自己反証・エッジケース自己検証        */}
+              {/* ------------------------------------------------------------ */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                      <SearchCheck className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>【設計思想 15-16章】内的自己反証・エッジケース自己検証 (Falsification Loop)</span>
+                    </h4>
+                    <p className="text-slate-400 text-[11px] mt-0.5">
+                      境界値・Null、無効化された前提の混入、自己矛盾、および相棒ペルソナ退行（丁寧語ロボット化）を内的反証します。
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const res = falsificationService.evaluateFalsification({
+                        userGoal: testResponseGoal,
+                        assistantResponse: testResponseInput,
+                      });
+                      setFalsificationResult(res);
+                    }}
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0"
+                  >
+                    <SearchCheck className="w-3.5 h-3.5" />
+                    <span>5大観点で反証テスト実行</span>
+                  </button>
+                </div>
+
+                {/* Presets */}
+                <div className="space-y-1.5">
+                  <div className="text-[10px] text-slate-400 font-medium">反証テストプリセット:</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      onClick={() => {
+                        setTestResponseGoal('ExcelのA列を大文字に変換してB列に出力する安全なマクロを作って');
+                        const text = `任せて！A列の文字をトリムして大文字に変換し、B列に書き出す安全なExcel VBAマクロを作成したよ。空行やNull値のエラーハンドリング（On Error GoTo）も組み込んであるから、PCのExcelの標準モジュールに貼り付けて実行してみてね！`;
+                        setTestResponseInput(text);
+                        setFalsificationResult(falsificationService.evaluateFalsification({ userGoal: 'ExcelのA列を大文字に変換してB列に出力する安全なマクロを作って', assistantResponse: text }));
+                      }}
+                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-indigo-300 rounded text-[10px] border border-slate-700"
+                    >
+                      ✓ 堅牢な回答 (反証パス 100点例)
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTestResponseGoal('Pythonの計算スクリプト教えて');
+                        const text = `大変申し訳ございません。かしこまりました、ご提示させていただきます。計算スクリプトのご案内を申し上げますので、いかがでしょうか。`;
+                        setTestResponseInput(text);
+                        setFalsificationResult(falsificationService.evaluateFalsification({ userGoal: 'Pythonの計算スクリプト教えて', assistantResponse: text }));
+                      }}
+                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-rose-300 rounded text-[10px] border border-slate-700"
+                    >
+                      ⚠️ ロボット敬語・逃げ腰謝罪 (ペルソナ退行例)
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTestResponseGoal('メール送信とバックアップ');
+                        const text = `メールを送信完了しました。また、ExcelファイルをPCのCドライブに保存しました。`;
+                        setTestResponseInput(text);
+                        setFalsificationResult(falsificationService.evaluateFalsification({ userGoal: 'メール送信とバックアップ', assistantResponse: text }));
+                      }}
+                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-amber-300 rounded text-[10px] border border-slate-700"
+                    >
+                      ⚠️ 未実行外部操作の誇張 (ハルシネーション例)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Input Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1 text-[10px]">ユーザーの依頼目標</label>
+                    <input
+                      type="text"
+                      value={testResponseGoal}
+                      onChange={(e) => setTestResponseGoal(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1 text-[10px]">検証対象のAI応答文</label>
+                    <input
+                      type="text"
+                      value={testResponseInput}
+                      onChange={(e) => setTestResponseInput(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                    />
+                  </div>
+                </div>
+
+                {/* Falsification Results */}
+                {falsificationResult && (
+                  <div className="p-3.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                        <span>反証スコア:</span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold border ${
+                            falsificationResult.passed
+                              ? 'bg-indigo-950 text-indigo-300 border-indigo-800'
+                              : 'bg-amber-950 text-amber-300 border-amber-800'
+                          }`}
+                        >
+                          {falsificationResult.falsificationScore}点 ({falsificationResult.passed ? 'PASS / 堅牢' : 'WARN / 要改善'})
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        検査観点: 5項目全走査
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {falsificationResult.checks.map((c, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2 rounded bg-slate-950 border border-slate-800/80 flex items-start justify-between gap-2 text-xs"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="font-bold text-slate-200 flex items-center gap-1.5 text-[11px]">
+                              <span>{c.title}</span>
+                              <span
+                                className={`text-[9px] font-mono px-1.5 py-0.2 rounded uppercase border ${
+                                  c.status === 'pass'
+                                    ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800'
+                                    : c.status === 'warn'
+                                    ? 'bg-amber-950/60 text-amber-300 border-amber-800'
+                                    : 'bg-rose-950/60 text-rose-300 border-rose-800'
+                                }`}
+                              >
+                                {c.status}
+                              </span>
+                            </div>
+                            <p className="text-slate-400 text-[10.5px]">{c.detail}</p>
+                            {c.riskPoint && (
+                              <p className="text-amber-300/90 text-[10px] font-mono">
+                                改善指針: {c.riskPoint}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

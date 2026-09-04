@@ -39,6 +39,9 @@ import {
   FlaskConical,
   Layers,
   AlignLeft,
+  ShieldCheck,
+  SearchCheck,
+  Workflow,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode, CompletionEvaluation } from '../types';
 import { extractCodeBlocks } from '../utils/codeParser';
@@ -699,6 +702,52 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           {msg.responseQuality.lengthCategory.toUpperCase()} ({msg.responseQuality.actualLengthChars}字)
                           {msg.responseQuality.duplicatesRemovedCount > 0 && ` 重複-${msg.responseQuality.duplicatesRemovedCount}`}
                         </span>
+                      </div>
+                    )}
+
+                    {/* 設計思想 第5段階 (10章): コード・VBA安全準備ゲートバッジ */}
+                    {msg.codeVerification && msg.codeVerification.hasCode && (
+                      <div
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border ${
+                          msg.codeVerification.safetyLevel === 'PASS_SAFE'
+                            ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-300'
+                            : msg.codeVerification.safetyLevel === 'WARN_REVIEW_NEEDED'
+                            ? 'bg-amber-950/60 border-amber-800/60 text-amber-300'
+                            : 'bg-rose-950/60 border-rose-800/60 text-rose-300'
+                        }`}
+                        title={`【設計思想 10章: コード・VBA安全準備ゲート】\n・言語: ${msg.codeVerification.languages.join(', ') || 'コード'}\n・安全スコア: ${msg.codeVerification.safetyScore}点 (${msg.codeVerification.safetyLevel})\n・準備ステータス: ${msg.codeVerification.readiness}\n・構文整合性: ${msg.codeVerification.syntaxValid ? 'OK' : 'エラーあり'}${msg.codeVerification.syntaxErrors.length > 0 ? ` (${msg.codeVerification.syntaxErrors.join(' / ')})` : ''}\n・検知リスク: ${msg.codeVerification.risks.length > 0 ? msg.codeVerification.risks.map((r) => r.description).join(' / ') : 'なし'}\n・環境前提: ${msg.codeVerification.environmentRequirements.join(' / ') || 'なし'}`}
+                      >
+                        <ShieldCheck className={`w-3 h-3 ${msg.codeVerification.safetyLevel === 'PASS_SAFE' ? 'text-emerald-400' : 'text-amber-400'}`} />
+                        <span>
+                          {msg.codeVerification.languages[0]?.toUpperCase() || 'CODE'}安全 {msg.codeVerification.safetyScore}点
+                          {msg.codeVerification.readiness === 'EXTERNAL_TEST_REQUIRED' ? ' (外部検証要)' : ''}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* 設計思想 第5段階 (15-16章): 内的自己反証・エッジケース検証バッジ */}
+                    {msg.falsificationReport && (
+                      <div
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border ${
+                          msg.falsificationReport.passed
+                            ? 'bg-indigo-950/60 border-indigo-800/60 text-indigo-300'
+                            : 'bg-amber-950/60 border-amber-800/60 text-amber-300'
+                        }`}
+                        title={`【設計思想 15-16章: 内的自己反証テスト】\n・反証スコア: ${msg.falsificationReport.falsificationScore}点 (${msg.falsificationReport.passed ? '堅牢性合格' : '警告・改善点あり'})\n${msg.falsificationReport.checks.map((c) => `・${c.title}: [${c.status.toUpperCase()}] ${c.detail}`).join('\n')}\n${msg.falsificationReport.suggestedMitigations.length > 0 ? `・推奨緩和策: ${msg.falsificationReport.suggestedMitigations.join(' / ')}` : ''}`}
+                      >
+                        <SearchCheck className="w-3 h-3 text-indigo-400" />
+                        <span>反証 {msg.falsificationReport.falsificationScore}%</span>
+                      </div>
+                    )}
+
+                    {/* 設計思想 第5段階 (47章): 自然言語ワークフローバッジ */}
+                    {msg.synthesizedWorkflow && (
+                      <div
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border bg-purple-950/60 border-purple-800/60 text-purple-300"
+                        title={`【設計思想 47章: 自律合成ワークフロー】\n・目的: ${msg.synthesizedWorkflow.userGoal}\n・構成ステップ: ${msg.synthesizedWorkflow.steps.length}工程\n・所要時間目安: ${Math.round(msg.synthesizedWorkflow.budgetEstimate.estimatedDurationMs / 1000)}秒\n・リスク区分: ${msg.synthesizedWorkflow.budgetEstimate.riskLevel}`}
+                      >
+                        <Workflow className="w-3 h-3 text-purple-400" />
+                        <span>{msg.synthesizedWorkflow.steps.length}段ワークフロー</span>
                       </div>
                     )}
                   </div>
