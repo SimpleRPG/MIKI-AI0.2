@@ -45,6 +45,9 @@ import {
   Flag,
   Target,
   Code2,
+  MessageSquare,
+  HardDrive,
+  CheckSquare,
 } from 'lucide-react';
 import { ExternalTeacherTab } from './ExternalTeacherTab';
 import { PluginConsentDialog } from './PluginConsentDialog';
@@ -54,6 +57,10 @@ import { FeatureFlagsTab } from './self_improvement/FeatureFlagsTab';
 import { CodeUnderstandingVbaTab } from './self_improvement/CodeUnderstandingVbaTab';
 import { ExperienceRouterTab } from './self_improvement/ExperienceRouterTab';
 import { SkillGraduationTab } from './self_improvement/SkillGraduationTab';
+import { DialogueEvaluationTab } from './self_improvement/DialogueEvaluationTab';
+import { UncertaintyTeacherTab } from './self_improvement/UncertaintyTeacherTab';
+import { StorageCapacityPlanTab } from './self_improvement/StorageCapacityPlanTab';
+import { MinimalScopeTab } from './self_improvement/MinimalScopeTab';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
@@ -106,7 +113,8 @@ export interface SelfImprovementModalProps {
   chatMessages: ChatMessage[];
   memories: MemoryItem[];
   workspaceFiles?: WorkspaceFile[];
-  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'experience_router' | 'skill_graduation';
+  engineMode?: string;
+  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'experience_router' | 'skill_graduation' | 'dialogue_eval' | 'uncertainty_teacher' | 'storage_quota' | 'minimal_scope';
 }
 
 export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
@@ -115,9 +123,10 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   chatMessages,
   memories,
   workspaceFiles = [],
+  engineMode = 'webgpu',
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags' | 'experience_router' | 'skill_graduation'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags' | 'experience_router' | 'skill_graduation' | 'dialogue_eval' | 'uncertainty_teacher' | 'storage_quota' | 'minimal_scope'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 
@@ -1007,6 +1016,54 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <GraduationCap className="w-4 h-4 text-indigo-400" />
             <span>🎓 技能卒業 ＆ 多様性再試験 (50章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('dialogue_eval')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'dialogue_eval'
+                ? 'border-indigo-500 text-indigo-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 text-indigo-400" />
+            <span>🗣️ 会話評価 (18章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('uncertainty_teacher')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'uncertainty_teacher'
+                ? 'border-amber-500 text-amber-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Compass className="w-4 h-4 text-amber-400" />
+            <span>⚖️ 不確実性＆汎化不足 (20章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('storage_quota')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'storage_quota'
+                ? 'border-cyan-500 text-cyan-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <HardDrive className="w-4 h-4 text-cyan-400" />
+            <span>💾 60GB容量＆自動整理 (28, 29章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('minimal_scope')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'minimal_scope'
+                ? 'border-emerald-500 text-emerald-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <CheckSquare className="w-4 h-4 text-emerald-400" />
+            <span>🎯 最小完成範囲 (36章)</span>
           </button>
         </div>
 
@@ -4866,6 +4923,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
           {/* TAB: 技能卒業 & 多様性再試験 (50章) */}
           {activeTab === 'skill_graduation' && <SkillGraduationTab />}
+
+          {/* TAB: 会話評価 (18章: 固定12シナリオ & 動的評価) */}
+          {activeTab === 'dialogue_eval' && <DialogueEvaluationTab engineMode={engineMode} />}
+
+          {/* TAB: 不確実性駆動の教師利用 ＆ 対策の汎化不足検知 (20章) */}
+          {activeTab === 'uncertainty_teacher' && <UncertaintyTeacherTab />}
+
+          {/* TAB: 保存容量計画 60GB配分モニター ＆ 自動整理 (28, 29章) */}
+          {activeTab === 'storage_quota' && <StorageCapacityPlanTab />}
+
+          {/* TAB: 当面の最小完成範囲 会話AI v1 ＆ コード理解 v1 (36章) */}
+          {activeTab === 'minimal_scope' && <MinimalScopeTab />}
         </div>
 
         {/* Footer */}

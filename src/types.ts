@@ -474,6 +474,10 @@ export interface ChatMessage {
   vbaDesignSpecification?: VbaDesignSpecification;
   // 設計思想 49章: 経験の保存先ルーター判定結果 (9分類仕分け)
   experienceRouting?: ExperienceRoutingResult;
+  // 設計思想 18章: 会話評価の11指標スコア
+  dialogueEvaluation?: ConversationEvaluationMetrics;
+  // 設計思想 20章: 不確実性・判断の割れ検出結果
+  uncertaintyEvaluation?: UncertaintyDivergenceItem;
 }
 
 /**
@@ -1521,6 +1525,160 @@ export interface SkillGraduationProgress {
   graduatedAt?: number;
   trainingSampleId?: string;
   nextMilestone: string;
+}
+
+/**
+ * 設計思想 18章: 会話評価の固定シナリオ12種
+ */
+export type FixedConversationScenarioType =
+  | 'NORMAL_SHORT_QUESTION'     // 1. 普通の短い質問
+  | 'DETAILED_CONSULTATION'     // 2. 少し詳しい相談
+  | 'CONTINUATION_REQUEST'      // 3. 前の説明の続きを求める
+  | 'PREMISE_CORRECTION'        // 4. 前提を訂正する
+  | 'CONTRADICTION_POINT_OUT'   // 5. 矛盾を指摘する
+  | 'TOO_LONG_FEEDBACK'         // 6. 回答が長すぎると伝える
+  | 'TOO_SHORT_FEEDBACK'        // 7. 回答が短すぎると伝える
+  | 'TOPIC_SWITCH'              // 8. 話題を切り替える
+  | 'RETURN_TO_PREVIOUS'        // 9. 以前の話へ戻る
+  | 'UNKNOWN_QUESTION'          // 10. 不明な内容を質問する
+  | 'CONCLUSION_ONLY'           // 11. 結論だけを求める
+  | 'AMBIGUOUS_QUERY';          // 12. 曖昧な言い方をする
+
+/**
+ * 設計思想 18章: 会話評価の11指標
+ */
+export interface ConversationEvaluationMetrics {
+  directness: number;           // 質問への直接性 (0-100)
+  contextRetention: number;     // 文脈維持 (0-100)
+  intentRecognition: number;    // 意図理解 (0-100)
+  correctionUpdate: number;     // 訂正反映 (0-100)
+  contradictionRecovery: number;// 矛盾修復 (0-100)
+  naturalness: number;          // 日本語の自然さ (0-100)
+  lengthConformity: number;     // 回答長適合度 (0-100)
+  noRepetition: number;         // 不要な繰り返しの排除 (0-100)
+  uncertaintyHandling: number;  // 不明点の扱い (0-100)
+  memoryRelevance: number;      // 記憶の正しい利用 (0-100)
+  latencyMs: number;            // 応答速度 (ミリ秒)
+  overallScore: number;         // 総合得点 (0-100)
+}
+
+/**
+ * 18章: 固定評価テストケース
+ */
+export interface FixedScenarioTestCase {
+  id: string;
+  scenarioType: FixedConversationScenarioType;
+  title: string;
+  description: string;
+  initialPrompt: string;
+  contextHistory?: { role: 'user' | 'assistant'; content: string }[];
+  expectedAspects: string[];
+  avoidAspects: string[];
+  evaluationCriteria: string;
+}
+
+export interface FixedScenarioResult {
+  testCaseId: string;
+  scenarioType: FixedConversationScenarioType;
+  title: string;
+  prompt: string;
+  response: string;
+  metrics: ConversationEvaluationMetrics;
+  passed: boolean;
+  notes: string;
+}
+
+/**
+ * 18章: 動的会話評価 (Dynamic Multi-Turn Dialogue Evaluation)
+ * 教師AI/シミュレータがユーザー役となり、端末AIの回答に応じて次々と発言を変える
+ */
+export interface DynamicDialogueTurn {
+  turnIndex: number;
+  stage: 'AMBIGUOUS_START' | 'PREMISE_CORRECTION' | 'CONTRADICTION_PROBE';
+  userMessage: string;
+  assistantResponse: string;
+  turnScore: number;
+  critique: string;
+  passed: boolean;
+}
+
+export interface DynamicDialogueEvaluationResult {
+  id: string;
+  evaluatedAt: number;
+  scenarioName: string;
+  turns: DynamicDialogueTurn[];
+  fixedEvaluationPassed: boolean;
+  dynamicEvaluationPassed: boolean;
+  overallPassed: boolean; // 固定評価と動的評価の両方に合格した場合だけ改善扱い (18章)
+  overallScore: number;
+  summary: string;
+}
+
+/**
+ * 設計思想 20章: 不確実性駆動の教師利用 (Uncertainty-Driven Teacher Routing)
+ */
+export interface UncertaintyDivergenceItem {
+  id: string;
+  sampleText: string;
+  candidateResponses: string[];
+  divergenceDetected: boolean;
+  divergenceTypes: (
+    | 'conclusion_diverged'    // 結論が候補ごとに異なる
+    | 'intent_diverged'        // 意図推定が一致しない
+    | 'memory_diverged'        // 使う記憶が異なる
+    | 'length_diverged'        // 回答長の判断が安定しない
+    | 'condition_diverged'     // 条件や例外の扱いが異なる
+  )[];
+  uncertaintyScore: number;    // 0 (安定一致) 〜 100 (極めて判断が割れている)
+  shouldSendToTeacher: boolean;// 判定が割れた場合だけ教師へ送信 (20章)
+  teacherActionTaken?: 'created_skeleton' | 'recorded_generalization_gap' | 'delayed_no_budget' | 'skipped_stable';
+  generatedSkeletonId?: string;
+  gapIdRecorded?: string;
+  generalizationGapReason?: string;
+  createdAt: number;
+}
+
+/**
+ * 設計思想 28章: 保存容量計画 (60GB配分モニター) & 29章: 自動整理
+ */
+export interface StoragePartitionUsage {
+  id: string;
+  category: 'models' | 'dialogue_and_materials' | 'eval_and_experiments' | 'lora_and_artifacts' | 'backups' | 'free_and_temp';
+  name: string;
+  allocatedGb: number;
+  usedBytes: number;
+  estimatedMb: number;
+  itemCount: number;
+  description: string;
+  itemsDetail: string[];
+}
+
+export interface StorageCapacityPlanReport {
+  totalAllocatedGb: number; // 60GB
+  totalUsedMb: number;
+  freeSpaceMb: number;
+  partitions: StoragePartitionUsage[];
+  lastAuditedAt: number;
+  deduplicationStats: {
+    duplicateItemsFound: number;
+    spaceSavedMb: number;
+    auditLog: string[];
+  };
+}
+
+/**
+ * 設計思想 36章: 当面の最小完成範囲 (Minimal Viable Scope) チェックリスト
+ */
+export interface MinimalScopeItem {
+  id: string;
+  category: 'conversation_v1' | 'code_understanding_v1';
+  itemNumber: number;
+  title: string;
+  requirement: string;
+  status: 'VERIFIED_ACTIVE' | 'PARTIALLY_MET' | 'NEEDS_VERIFICATION';
+  automatedTestStatus: string;
+  verifiedTimestamp: number;
+  notes: string;
 }
 
 

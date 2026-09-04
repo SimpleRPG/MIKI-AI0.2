@@ -60,6 +60,10 @@ import { capabilityGapService } from './services/capabilityGapService';
 import { codeUnderstandingService } from './services/codeUnderstandingService';
 import { vbaDesignAssistantService } from './services/vbaDesignAssistantService';
 import { featureFlagsService } from './services/featureFlagsService';
+import { dialogueEvaluationService } from './services/dialogueEvaluationService';
+import { uncertaintyTeacherService } from './services/uncertaintyTeacherService';
+import { minimalScopeService } from './services/minimalScopeService';
+import { storagePlanningService } from './services/storagePlanningService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
@@ -1174,6 +1178,13 @@ export default function App() {
           memories
         );
 
+        // 設計思想 18章: 会話評価11指標の測定
+        const cpuDialogueEvaluation = dialogueEvaluationService.evaluateGeneralDialogue(
+          text,
+          reply,
+          Math.round(performance.now() - sendStartTime)
+        );
+
         const cpuMsg: ChatMessage = {
           id: assistantId,
           role: 'assistant',
@@ -1192,6 +1203,7 @@ export default function App() {
           codeUnderstandingIR: cpuCodeUnderstandingIR,
           vbaDesignSpecification: cpuVbaDesignSpecification,
           experienceRouting: cpuExperienceRouting,
+          dialogueEvaluation: cpuDialogueEvaluation,
           executionSteps: systemLogger.getCurrentSessionSteps(),
           suggestedTools: cpuCandidateTools,
           executedTools: cpuExecutedTools,
@@ -2039,6 +2051,52 @@ export default function App() {
         memories
       );
 
+      // 設計思想 18章: 会話評価11指標のリアルタイム測定
+      const streamDialogueEvaluation = dialogueEvaluationService.evaluateGeneralDialogue(
+        text,
+        finalVisibleText,
+        totalElapsedMs
+      );
+
+      // 設計思想 20章: 不確実性・判断ブレ検出 (条件該当時)
+      let streamUncertaintyEvaluation = undefined;
+      const isUncertaintyCandidate =
+        text.includes('どちら') ||
+        text.includes('比較') ||
+        text.includes('なぜ') ||
+        text.includes('どうすれば') ||
+        text.includes('どっち') ||
+        text.includes('理由') ||
+        text.includes('発熱') ||
+        text.includes('メモリ');
+
+      if (isUncertaintyCandidate) {
+        try {
+          streamUncertaintyEvaluation = await uncertaintyTeacherService.evaluateUncertainty(
+            text,
+            { targetCapabilityId: isVbaRequest ? 'cap_abstract_vba_design' : 'cap_conv_naturalness' }
+          );
+        } catch {
+          // ignore
+        }
+      }
+
+      // 設計思想 36章: 当面の最小完成範囲 リアルタイム達成追跡
+      if (streamDialogueEvaluation.directness >= 75) {
+        minimalScopeService.updateItemStatus('conv_7_direct_answer', 'VERIFIED_ACTIVE');
+      }
+      if (streamDialogueEvaluation.contextRetention >= 75) {
+        minimalScopeService.updateItemStatus('conv_2_recent_context', 'VERIFIED_ACTIVE');
+        minimalScopeService.updateItemStatus('conv_3_maintain_topic', 'VERIFIED_ACTIVE');
+      }
+      if (streamDialogueEvaluation.noRepetition >= 75) {
+        minimalScopeService.updateItemStatus('conv_6_choose_length', 'VERIFIED_ACTIVE');
+      }
+      if (codeBlocks.length > 0) {
+        minimalScopeService.updateItemStatus('code_1_split_procedures', 'VERIFIED_ACTIVE');
+        minimalScopeService.updateItemStatus('code_8_natural_flow_explanation', 'VERIFIED_ACTIVE');
+      }
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantId
@@ -2061,6 +2119,8 @@ export default function App() {
                 codeUnderstandingIR,
                 vbaDesignSpecification,
                 experienceRouting: streamExperienceRouting,
+                dialogueEvaluation: streamDialogueEvaluation,
+                uncertaintyEvaluation: streamUncertaintyEvaluation,
                 metrics: {
                   engine: executedEngineLabel,
                   tokens: tokenCount,
@@ -2761,6 +2821,7 @@ export default function App() {
         memories={memories}
         chatMessages={messages}
         workspaceFiles={workspaceFiles}
+        engineMode={engineMode}
         initialTab={selfImprovementTab}
       />
     </div>

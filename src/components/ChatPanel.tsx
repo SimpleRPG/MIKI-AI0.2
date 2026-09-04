@@ -46,6 +46,7 @@ import {
   Table,
   AlertTriangle,
   Compass,
+  MessageSquare,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode, CompletionEvaluation } from '../types';
 import { extractCodeBlocks } from '../utils/codeParser';
@@ -935,6 +936,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         <Table className="w-3 h-3 text-indigo-400" />
                         <span>決定表仕様書 ({msg.vbaDesignSpecification.decisionTable.rules.length}則)</span>
                       </button>
+                    )}
+
+                    {/* 設計思想 18章: 会話評価11指標バッジ */}
+                    {msg.dialogueEvaluation && (
+                      <div
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border ${
+                          msg.dialogueEvaluation.overallScore >= 75
+                            ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-300'
+                            : 'bg-amber-950/60 border-amber-800/60 text-amber-300'
+                        }`}
+                        title={`【設計思想 18章: 会話評価11指標】\n・総合スコア: ${msg.dialogueEvaluation.overallScore}点\n・直接性: ${msg.dialogueEvaluation.directness}点\n・文脈維持: ${msg.dialogueEvaluation.contextRetention}点\n・意図理解: ${msg.dialogueEvaluation.intentRecognition}点\n・訂正反映: ${msg.dialogueEvaluation.correctionUpdate}点\n・重複排除: ${msg.dialogueEvaluation.noRepetition}点\n・自然さ: ${msg.dialogueEvaluation.naturalness}点\n・不明点誠実性: ${msg.dialogueEvaluation.uncertaintyHandling}点\n・応答速度: ${msg.dialogueEvaluation.latencyMs}ms`}
+                      >
+                        <MessageSquare className="w-3 h-3 text-emerald-400" />
+                        <span>18章評価 {msg.dialogueEvaluation.overallScore}点</span>
+                      </div>
+                    )}
+
+                    {/* 設計思想 20章: 不確実性・判断ブレ判定バッジ */}
+                    {msg.uncertaintyEvaluation && (
+                      <div
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border ${
+                          msg.uncertaintyEvaluation.divergenceDetected
+                            ? 'bg-amber-950/70 border-amber-600/70 text-amber-300'
+                            : 'bg-slate-900/60 border-slate-700/60 text-slate-300'
+                        }`}
+                        title={`【設計思想 20章: 不確実性評価】\n・不確実性スコア: ${msg.uncertaintyEvaluation.uncertaintyScore}点\n・ブレ検知: ${msg.uncertaintyEvaluation.divergenceDetected ? '検知あり (外部教師要請推奨)' : '安定 (端末内完結)'}\n・ブレ項目: ${msg.uncertaintyEvaluation.divergenceTypes.join(', ') || 'なし'}\n・教師送信対象: ${msg.uncertaintyEvaluation.shouldSendToTeacher ? '送信要請対象' : '端末内完結'}`}
+                      >
+                        <Compass className="w-3 h-3 text-amber-400" />
+                        <span>20章不確実性 {msg.uncertaintyEvaluation.uncertaintyScore}点</span>
+                      </div>
                     )}
                   </div>
                 )}
