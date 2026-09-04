@@ -441,14 +441,24 @@ jobs:
                       version "3.22.1"
                   }
               }
+              signingConfigs {
+                  miki {
+                      storeFile file(System.getenv("MIKI_KEYSTORE_PATH") ?: "debug.keystore")
+                      storePassword System.getenv("MIKI_KEYSTORE_PASSWORD") ?: "android"
+                      keyAlias System.getenv("MIKI_KEY_ALIAS") ?: "androiddebugkey"
+                      keyPassword System.getenv("MIKI_KEY_PASSWORD") ?: "android"
+                  }
+              }
               buildTypes {
                   release {
                       minifyEnabled false
                       proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+                      signingConfig signingConfigs.miki
                   }
                   debug {
                       minifyEnabled false
                       debuggable true
+                      signingConfig signingConfigs.miki
                   }
               }
               packagingOptions {
@@ -1309,8 +1319,18 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Restore persistent signing keystore
+        working-directory: android
+        run: |
+          echo "${{ secrets.MIKI_KEYSTORE_BASE64 }}" | base64 -d > app/miki-ai-release.keystore
+
       - name: Build Android APK
         working-directory: android
+        env:
+          MIKI_KEYSTORE_PATH: ${{ github.workspace }}/android/app/miki-ai-release.keystore
+          MIKI_KEYSTORE_PASSWORD: ${{ secrets.MIKI_KEYSTORE_PASSWORD }}
+          MIKI_KEY_ALIAS: ${{ secrets.MIKI_KEY_ALIAS }}
+          MIKI_KEY_PASSWORD: ${{ secrets.MIKI_KEY_PASSWORD }}
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK Artifact
