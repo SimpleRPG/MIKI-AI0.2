@@ -98,7 +98,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
           {files.map((file) => {
             const isActive = file.path === activeFile?.path;
-            const isIndex = file.path.endsWith('index.html');
             return (
               <div
                 key={file.path}
@@ -114,7 +113,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   <span className="truncate">{file.name}</span>
                 </div>
 
-                {!isIndex && files.length > 1 && (
+                {files.length > 1 && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -122,7 +121,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                         onDeleteFile(file.path);
                       }
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-400 transition-opacity"
+                    className="opacity-70 group-hover:opacity-100 active:opacity-100 p-1.5 hover:text-rose-400 active:text-rose-400 transition-opacity"
                     title="削除"
                   >
                     <Trash2 className="w-3 h-3" />
