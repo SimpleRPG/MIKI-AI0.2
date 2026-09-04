@@ -45,7 +45,13 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
     () => new Set(workspaceFiles.map((f) => f.path))
   );
 
-  const handleSaveToken = (val: string) => {
+  const [apiBaseUrl, setApiBaseUrlState] = useState(() => storageService.getItem('miki_api_base_url') || '');
+  const setApiBaseUrl = (val: string) => {
+    setApiBaseUrlState(val);
+    try {
+      storageService.setItem('miki_api_base_url', val.trim());
+    } catch (e) {}
+  };
     setToken(val);
     try {
       storageService.setItem('miki_github_pat', val.trim());
@@ -231,6 +237,22 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
           </div>
 
           <div className="space-y-3 text-xs">
+            <div>
+              <label className="block text-slate-400 mb-1">
+                APIサーバーURL [本体GPU(APK)モードでTermuxのサーバーを使う時のみ入力]
+              </label>
+              <input
+                type="text"
+                value={apiBaseUrl}
+                onChange={(e) => setApiBaseUrl(e.target.value)}
+                placeholder="例: http://127.0.0.1:3000 (空欄ならこのアプリと同じサーバーを使う)"
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                GoogleAIStudioのプレビューやWeb版ではこの欄は空のままでOKです。APK版で「Unexpected token &lt;」エラーが出る場合は、Termuxで`npm run dev`を起動した上でこのURLを設定してください。
+              </p>
+            </div>
+
             <div>
               <label className="block text-slate-400 mb-1">GitHub Personal Access Token (PAT) [公開リポジトリは不要]</label>
               <input
