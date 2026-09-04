@@ -9,6 +9,15 @@ import {
 } from '../types';
 import { generateSmartCompanionReply } from '../utils/companionEngine';
 import { systemLogger } from './systemLogger';
+import { storageService } from './storageService';
+
+// APKなど「フロントエンドだけが単体で動くビルド」では server.ts (Express) が
+// 同一オリジンに存在しないため、Termux等で起動したサーバーのアドレスを
+// 明示的に指定できるようにする。未設定なら従来通り同一オリジン(相対パス)。
+function apiUrl(path: string): string {
+  const base = (storageService.getItem('miki_api_base_url') || '').trim().replace(/\/+$/, '');
+  return base ? `${base}${path}` : path;
+}
 
 export interface SendChatMessageParams {
   prompt: string;
@@ -236,7 +245,7 @@ export async function importGitHubRepo(
   branch?: string,
   githubToken?: string
 ): Promise<GitHubRepoData> {
-  const res = await fetch('/api/github/import', {
+  const res = await fetch(apiUrl('/api/github/import'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ repoUrl, branch, githubToken })
@@ -251,7 +260,7 @@ export async function importGitHubRepo(
 }
 
 export async function pushToGitHubRepo(params: GitHubPushParams): Promise<GitHubPushResult> {
-  const res = await fetch('/api/github/push', {
+  const res = await fetch(apiUrl('/api/github/push'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params)
