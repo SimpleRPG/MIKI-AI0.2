@@ -41,3 +41,47 @@
 ### 適用方法
 このフォルダの `src/` を既存プロジェクトの `src/` にマージ（上書き）してください。
 `App.tsx` 側の変更は不要です。
+
+## 実装内容: 教師教材の端末側効果検証ループ (設計思想13章 ステップ7〜9)
+
+外部教師（Gemini等）から教材（`TeacherGeneratedMaterial`）を受け取った後、
+端末モデル（3B/4B相当の端末内エンジン）へ一時注入して「実際に改善するか」を端末内で事前検証してから教材として保存する仕組みを追加。
+追加の教師API呼び出しは一切行わず（端末内完結）、無料枠を圧迫しない安全設計。
+
+### 設計思想への準拠
+- **13章 (ステップ7〜9 効果検証ループ)**: 教師の回答そのものの品質チェックだけでなく、端末側モデルに教材を与えて「うちの子が実際にうまく話せる・解けるようになるか」を検証。
+- **追加の教師API呼び出しゼロ**: 原文ベースライン・教材あり再回答・言い換え問題の生成および評価の全4パスを端末内処理（`autonomous_rule` / CPU自律ルールベース）で完結。
+- **安全境界の遵守 (25章・39節)**:
+  - 予算枠（`checkBudget` / `recordTeacherUsage`）を浪費しない。
+  - 検証に失敗（汎化不足）しても即座に教材を破棄せず、`systemLogger.warn` に記録してユーザー判断用として保持。
+  - `approved: false` によるユーザー確認待ちの原則は変更せず維持。
+
+### 実装ステップ
+1. **ベースライン回答の取得（材料なし）**: `payload.anonymizedExample`（匿名化済み原文）で端末内モデルの基準回答を取得。
+2. **材料ありの再回答**: 教材の `mat.outputTarget` / `mat.reasoningExplanation` を一時的な `MemoryItem`（`source: 'txt_import'`, `active: true`）として注入し再回答を取得。
+3. **言い換え問題の生成（1問）**: 端末内処理で「次の質問を意味を変えずに言い換えてください: {anonymizedExample}」を投げて言い換え文を1つ生成。
+4. **言い換え問題の回答取得（材料なし/あり）**: 生成した言い換え問題に対してもベースラインと教材注入後の2回答を取得。
+5. **改善判定**: `completionJudgeService.evaluateCompletion` を4つの回答（原文×材料なし/あり、言い換え×材料なし/あり）に適用してスコア化。
+   ```ts
+   const originalImproved = withMaterialScoreOriginal - baselineScoreOriginal >= 10;
+   const paraphraseImproved = withMaterialScoreParaphrase - baselineScoreParaphrase >= 10;
+   const verifiedEffective = originalImproved && paraphraseImproved;
+   ```
+6. **結果の反映**:
+   - `verifiedEffective === true`: 保存する `TrainingSampleJSONL` に `verifiedEffective: true` と検証スコア差分（例: `原文+18点 / 言い換え+22点`）を記録。
+   - `verifiedEffective === false`: 教材は保存しつつ、`systemLogger.warn('SELF_IMPROVEMENT', ...)` に「対策の汎化不足(13章検証不合格)」を明示的に記録。
+
+### 変更ファイル
+- `src/types.ts`:
+  - `TrainingSampleJSONL` に `verifiedEffective?: boolean;` および `verificationNote?: string;` を追加。
+  - `TeacherRequestPayload` に `anonymizedExample?: string;` を追加。
+- `src/services/teacherRequestService.ts`:
+  - `requestTeacherMaterial` 内の (d) VBA安全性チェック直後に (e) 端末側効果検証ループ（ステップ7〜9）を追加。
+  - `buildTeacherRequestPayload` に `anonymizedExample` の出力を追加。
+- `src/services/selfImprovementService.ts`:
+  - `addTrainingSample` で `verifiedEffective` および `verificationNote` を受け取り新規サンプルへ保存。
+- `src/utils/companionEngine.ts`:
+  - 端末内モデルにおいて言い換え生成プロンプトの解釈および一時注入教材（`【参照教材・解法指針】`）の解法適用に対応。
+- `src/components/ExternalTeacherTab.tsx` / `src/components/SelfImprovementModal.tsx`:
+  - 教材生成結果および学習サンプルカードでの効果検証結果（`🧪 13章検証済` / `⚠️ 汎化不足`）とスコア差分メモの表示に対応。
+

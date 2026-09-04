@@ -54,6 +54,8 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
     error?: string;
     verifiedPassed?: boolean;
     savedSample?: TrainingSampleJSONL | null;
+    verifiedEffective?: boolean;
+    verificationNote?: string;
   } | null>(null);
 
   // 予算設定エディタの開閉
@@ -635,6 +637,18 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
                 <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-300 rounded font-mono">
                   安全境界・品質フィルタ検証済
                 </span>
+                {requestResult.verifiedEffective !== undefined && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded font-mono ${
+                      requestResult.verifiedEffective
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    }`}
+                  >
+                    {requestResult.verifiedEffective ? '🧪 13章端末効果検証合格' : '⚠️ 汎化不足(要改善)'}
+                    {requestResult.verificationNote && ` [${requestResult.verificationNote}]`}
+                  </span>
+                )}
               </div>
 
               <div>

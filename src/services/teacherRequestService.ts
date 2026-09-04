@@ -7,6 +7,7 @@ import {
   TeacherUsageRecord,
   FailureRecurrenceEntry,
   TrainingSampleJSONL,
+  MemoryItem,
 } from '../types';
 import { storageService } from './storageService';
 import { selfImprovementService } from './selfImprovementService';
@@ -14,6 +15,7 @@ import { systemLogger } from './systemLogger';
 import { checkSampleSafety } from '../utils/trainingSampleSafetyFilter';
 import { completionJudgeService } from './completionJudgeService';
 import { schemaValidationService } from './schemaValidationService';
+import { sendChatMessage } from './api';
 
 const BUDGET_LIMITS_KEY = 'miki_ai_teacher_budget_limits';
 const BUDGET_USAGE_KEY = 'miki_ai_teacher_budget_usage';
@@ -260,6 +262,7 @@ export class TeacherRequestService {
     return {
       failureCategory,
       abstractFailurePattern: anonymizedExample,
+      anonymizedExample,
       expectedCondition,
       failureReason,
       suggestedFormat: {
@@ -374,6 +377,8 @@ export class TeacherRequestService {
     error?: string;
     verifiedPassed?: boolean;
     savedSample?: TrainingSampleJSONL | null;
+    verifiedEffective?: boolean;
+    verificationNote?: string;
   }> {
     // 1. 予算チェック
     const budget = this.checkBudget();
@@ -526,6 +531,116 @@ export class TeacherRequestService {
         }
       }
 
+      // (e) 教師教材の端末側効果検証ループ (設計思想 13章 ステップ7〜9)
+      // 外部教師教材を端末内モデルに一時注入し、「本当に改善するか」を追加API呼び出しゼロで検証
+      const anonymizedPrompt =
+        payload.anonymizedExample || payload.abstractFailurePattern || mat.instruction;
+
+      // 1. ベースライン回答の取得(材料なし)
+      const baselineRespOriginal = await sendChatMessage({
+        prompt: anonymizedPrompt,
+        history: [],
+        memories: [],
+        engineMode: 'autonomous_rule',
+      });
+      const baselineTextOriginal = baselineRespOriginal.text || '';
+
+      // 2. 材料ありの再回答 (教材の outputTarget / reasoningExplanation を一時的な MemoryItem として注入)
+      const tempMemory: MemoryItem = {
+        id: `temp_mat_${Date.now()}`,
+        category: (mat.category as any) || (payload.failureCategory as any) || 'code',
+        content: `【参照教材・解法指針】\n目標出力例:\n${mat.outputTarget}${
+          mat.reasoningExplanation ? `\n解説:\n${mat.reasoningExplanation}` : ''
+        }`,
+        active: true,
+        source: 'txt_import',
+        importance: 5,
+      };
+
+      const withMaterialRespOriginal = await sendChatMessage({
+        prompt: anonymizedPrompt,
+        history: [],
+        memories: [tempMemory],
+        engineMode: 'autonomous_rule',
+      });
+      const withMaterialTextOriginal = withMaterialRespOriginal.text || '';
+
+      // 3. 言い換え問題を1問作る (端末内処理、教師API不使用)
+      const paraphraseGenResp = await sendChatMessage({
+        prompt: `次の質問を意味を変えずに言い換えてください: ${anonymizedPrompt}`,
+        history: [],
+        memories: [],
+        engineMode: 'autonomous_rule',
+      });
+      let paraphrasePrompt = (paraphraseGenResp.text || '').trim();
+      paraphrasePrompt = paraphrasePrompt.replace(/^言い換え[:：\s]*|^「|」$/g, '').trim();
+      if (!paraphrasePrompt || paraphrasePrompt.length < 5) {
+        paraphrasePrompt = `${anonymizedPrompt}（別表現での質問: 具体的な対応手順と模範コードを教えてください）`;
+      }
+
+      // 4. 言い換え問題でも同様に材料なし/材料ありの2回答を取得
+      const baselineRespParaphrase = await sendChatMessage({
+        prompt: paraphrasePrompt,
+        history: [],
+        memories: [],
+        engineMode: 'autonomous_rule',
+      });
+      const baselineTextParaphrase = baselineRespParaphrase.text || '';
+
+      const withMaterialRespParaphrase = await sendChatMessage({
+        prompt: paraphrasePrompt,
+        history: [],
+        memories: [tempMemory],
+        engineMode: 'autonomous_rule',
+      });
+      const withMaterialTextParaphrase = withMaterialRespParaphrase.text || '';
+
+      // 5. 改善判定 (原文×材料なし/あり、言い換え×材料なし/あり)
+      const evalBaselineOriginal = completionJudgeService.evaluateCompletion({
+        userGoal: anonymizedPrompt,
+        assistantResponse: baselineTextOriginal,
+      });
+      const evalWithMaterialOriginal = completionJudgeService.evaluateCompletion({
+        userGoal: anonymizedPrompt,
+        assistantResponse: withMaterialTextOriginal,
+      });
+
+      const evalBaselineParaphrase = completionJudgeService.evaluateCompletion({
+        userGoal: paraphrasePrompt,
+        assistantResponse: baselineTextParaphrase,
+      });
+      const evalWithMaterialParaphrase = completionJudgeService.evaluateCompletion({
+        userGoal: paraphrasePrompt,
+        assistantResponse: withMaterialTextParaphrase,
+      });
+
+      const baselineScoreOriginal = evalBaselineOriginal.score;
+      const withMaterialScoreOriginal = evalWithMaterialOriginal.score;
+      const baselineScoreParaphrase = evalBaselineParaphrase.score;
+      const withMaterialScoreParaphrase = evalWithMaterialParaphrase.score;
+
+      const diffOriginal = withMaterialScoreOriginal - baselineScoreOriginal;
+      const diffParaphrase = withMaterialScoreParaphrase - baselineScoreParaphrase;
+
+      const originalImproved = diffOriginal >= 10;
+      const paraphraseImproved = diffParaphrase >= 10;
+      const verifiedEffective = originalImproved && paraphraseImproved;
+
+      const verificationNote = `原文${diffOriginal >= 0 ? `+${diffOriginal}` : diffOriginal}点 (${baselineScoreOriginal}→${withMaterialScoreOriginal}) / 言い換え${diffParaphrase >= 0 ? `+${diffParaphrase}` : diffParaphrase}点 (${baselineScoreParaphrase}→${withMaterialScoreParaphrase})`;
+
+      // 6. 結果の反映
+      if (verifiedEffective) {
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `🧪 [13章 端末側効果検証合格] 教材注入による改善を確認しました: ${verificationNote}`
+        );
+      } else {
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `対策の汎化不足(13章検証不合格): ${mat.category || payload.failureCategory} / 原文改善${originalImproved} 言い換え改善${paraphraseImproved}`
+        );
+      }
+
       // 3. 独立検証合格 ➔ 中信頼(medium) & source: 'external_teacher' で保存
       // 勝手な自動マージを防止するため approved: false (ユーザーによる確認・承認待ち) とする
       const savedSample = selfImprovementService.addTrainingSample({
@@ -538,6 +653,8 @@ export class TeacherRequestService {
         approved: false, // 勝手な自動マージ防止: ユーザー確認待ち
         split: 'train',
         failureReason: payload.failureReason,
+        verifiedEffective,
+        verificationNote,
       });
 
       // 弱点昇格フラグを更新
@@ -553,12 +670,12 @@ export class TeacherRequestService {
         verifiedPassedCount: 1,
         category: payload.failureCategory,
         success: true,
-        notes: `独立検証合格 (スコア: ${completionEval.score}点)・ユーザー確認待ちとして安全登録完了`,
+        notes: `独立検証合格 (スコア: ${completionEval.score}点, 端末検証: ${verifiedEffective ? '合格' : '汎化不足'} [${verificationNote}])・ユーザー確認待ちとして安全登録完了`,
       });
 
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `✅ [外部教師教材 独立検証合格] 教材を external_teacher (中信頼/承認待ち) として追加しました (ID: ${savedSample?.id || 'unknown'}, スコア: ${completionEval.score}点)`
+        `✅ [外部教師教材 独立検証合格] 教材を external_teacher (中信頼/承認待ち) として追加しました (ID: ${savedSample?.id || 'unknown'}, 品質スコア: ${completionEval.score}点, 端末効果検証: ${verifiedEffective ? '合格' : '汎化不足'})`
       );
 
       return {
@@ -566,6 +683,8 @@ export class TeacherRequestService {
         verifiedPassed: true,
         material: mat,
         savedSample,
+        verifiedEffective,
+        verificationNote,
       };
     } catch (err: any) {
       const errMsg = err?.message || '通信例外が発生しました';

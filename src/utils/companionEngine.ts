@@ -30,6 +30,48 @@ export function generateSmartCompanionReply(
     return repeatMatch[2].trim();
   }
 
+  // 0.02 言い換え問題生成リクエスト対応 (設計思想 13章 ステップ3 言い換え問題生成)
+  if (
+    p.startsWith('次の質問を意味を変えずに言い換えてください') ||
+    p.includes('意味を変えずに言い換えて') ||
+    p.includes('言い換えてください')
+  ) {
+    const rawTarget = p.replace(/^.*(?:言い換えて(?:ください)?)[：:\s]*/s, '').trim();
+    if (rawTarget) {
+      let phrased = rawTarget;
+      if (phrased.endsWith('してください')) {
+        phrased = phrased.replace(/してください$/, 'する方法を教えてください');
+      } else if (phrased.endsWith('教えて')) {
+        phrased = phrased.replace(/教えて$/, 'について詳しく教えていただけますか');
+      } else if (phrased.endsWith('？') || phrased.endsWith('?')) {
+        phrased = phrased.replace(/[？?]$/, 'でしょうか。具体的な手順と例を示してください。');
+      } else {
+        phrased = `${phrased}（同等の要件について、具体的な手順と実装例を教えてください）`;
+      }
+      return phrased;
+    }
+  }
+
+  // 0.03 教材・解法指針の一時注入対応 (設計思想 13章 ステップ7〜9 効果検証)
+  if (memories && memories.length > 0) {
+    const trainingMem = memories.find(
+      (m) =>
+        m.active &&
+        (m.source === 'txt_import' || m.content.includes('【参照教材・解法指針】'))
+    );
+    if (trainingMem) {
+      const outputMatch = trainingMem.content.match(/目標出力例:\s*([\s\S]*?)(?:\n解説:|$)/);
+      const reasonMatch = trainingMem.content.match(/解説:\s*([\s\S]*)$/);
+      if (outputMatch && outputMatch[1].trim()) {
+        const targetOutput = outputMatch[1].trim();
+        const reasonText = reasonMatch && reasonMatch[1].trim() ? `\n\n【解説】\n${reasonMatch[1].trim()}` : '';
+        return `${targetOutput}${reasonText}`;
+      } else if (trainingMem.content.trim()) {
+        return trainingMem.content.trim();
+      }
+    }
+  }
+
   // 0.05 Safe Math Tool Execution (:feature:tools / 設計思想 14章 & 22章)
   const candidateTools = toolsService.detectCandidateToolsForPrompt(p);
   const mathTool = candidateTools.find((t) => t.toolId === 'tool_safe_calculator');

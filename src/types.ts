@@ -688,6 +688,8 @@ export interface TrainingSampleJSONL {
   failureReason?: string;
   correctionHistory?: string[];
   verificationResult?: string;
+  verifiedEffective?: boolean;
+  verificationNote?: string; // 例: "原文+18点 / 言い換え+22点"
   redacted?: boolean; // 個人情報伏字化([REDACTED])フラグ (設計思想 25. 安全・品質境界)
   redactedReasons?: string[];
   createdAt: number;
@@ -744,6 +746,7 @@ export interface TeacherBudgetStatus {
 export interface TeacherRequestPayload {
   failureCategory: string;
   abstractFailurePattern: string;
+  anonymizedExample?: string;
   expectedCondition: string;
   failureReason?: string;
   suggestedFormat: {

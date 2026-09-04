@@ -4371,6 +4371,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                                     {sample.failureReason.length > 25 ? `${sample.failureReason.substring(0, 25)}...` : sample.failureReason}
                                   </span>
                                 )}
+                                {sample.verifiedEffective !== undefined && (
+                                  <span
+                                    className={`text-[9px] px-1.5 py-0.2 rounded font-mono border ${
+                                      sample.verifiedEffective
+                                        ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60'
+                                        : 'bg-amber-950/80 text-amber-300 border-amber-800/60'
+                                    }`}
+                                  >
+                                    {sample.verifiedEffective ? '🧪 13章検証済' : '⚠️ 汎化不足'}
+                                    {sample.verificationNote ? ` [${sample.verificationNote}]` : ''}
+                                  </span>
+                                )}
                               </div>
                               <p className="text-[11px] text-slate-400 truncate max-w-md">
                                 A: {sample.outputTarget}

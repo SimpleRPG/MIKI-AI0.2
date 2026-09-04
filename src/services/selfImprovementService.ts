@@ -462,6 +462,8 @@ class SelfImprovementService {
     split?: 'train' | 'validation' | 'test';
     originalFailureOutput?: string;
     failureReason?: string;
+    verifiedEffective?: boolean;
+    verificationNote?: string;
   }): TrainingSampleJSONL | null {
     // 1. コンテンツ安全境界チェック (設計思想 25. 安全・品質境界)
     // 既存のcleanAndDeduplicateSamplesより前に必ず実行
@@ -534,6 +536,8 @@ class SelfImprovementService {
       split: sample.split || 'train',
       originalFailureOutput: sample.originalFailureOutput,
       failureReason: sample.failureReason,
+      verifiedEffective: sample.verifiedEffective,
+      verificationNote: sample.verificationNote,
       redacted: isRedacted,
       redactedReasons: isRedacted ? safety.reasons : undefined,
       createdAt: Date.now(),
