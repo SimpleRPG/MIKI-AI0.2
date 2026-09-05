@@ -75,6 +75,8 @@ export interface NativeLlamaPluginInterface {
     isMeasuredReal: boolean;
   }>;
   getStorageInfo(): Promise<NativeStorageInfo>;
+  checkStorageAccess?(): Promise<{ granted: boolean }>;
+  requestStorageAccess?(): Promise<{ opened: boolean }>;
   downloadModel(options: {
     modelId: string;
     downloadUrl: string;
@@ -794,6 +796,33 @@ export class NativeLlmService {
     const data = await res.json();
     const models = Array.isArray(data?.data) ? data.data : [];
     return models.map((m: any) => m?.id).filter((n: any): n is string => !!n);
+  }
+
+  /**
+   * GGUFモデルの保存先(共有ストレージ Download/gguf-models)への
+   * 書き込み権限が許可されているか確認する。Android 11未満では常にtrue。
+   */
+  public async isSharedStorageAccessGranted(): Promise<boolean> {
+    try {
+      if (this.isNative() && NativeMlcPlugin?.checkStorageAccess) {
+        const res = await NativeMlcPlugin.checkStorageAccess();
+        return !!res?.granted;
+      }
+    } catch (e) {}
+    return true;
+  }
+
+  /**
+   * 「すべてのファイルへのアクセス」許可画面をOSに開かせる。
+   * Termux (~/storage/downloads/gguf-models) と同じ場所にアプリが
+   * 書き込めるようにするために必要。
+   */
+  public async requestSharedStorageAccess(): Promise<void> {
+    try {
+      if (this.isNative() && NativeMlcPlugin?.requestStorageAccess) {
+        await NativeMlcPlugin.requestStorageAccess();
+      }
+    } catch (e) {}
   }
 
   public async deleteDownloadedModel(fileName: string): Promise<void> {
