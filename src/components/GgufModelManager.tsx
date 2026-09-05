@@ -40,6 +40,7 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
 
   const [notification, setNotification] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<string | null>(null);
+  const [hasStorageAccess, setHasStorageAccess] = useState<boolean>(true);
 
   const showNotification = (type: 'info' | 'success' | 'error', message: string) => {
     setNotification({ type, message });
@@ -55,6 +56,8 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
       const specs = await nativeLlmService.getHardwareSpecs().catch(() => null);
       if (specs) setHardwareSpecs(specs);
       setActiveLoadedId(nativeLlmService.getActiveModelId());
+      const granted = await nativeLlmService.isSharedStorageAccessGranted().catch(() => true);
+      setHasStorageAccess(granted);
     } catch (e) {
       console.warn('Failed to refresh storage info:', e);
     }
@@ -186,6 +189,24 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
             className="text-[10px] px-2 py-0.5 rounded bg-black/40 hover:bg-black/60 font-semibold"
           >
             閉じる
+          </button>
+        </div>
+      )}
+
+      {/* Shared Storage Access Warning */}
+      {!hasStorageAccess && (
+        <div className="p-3.5 rounded-xl bg-amber-950/60 border border-amber-500/60 text-amber-100 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+          <div className="flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+            <span>
+              「すべてのファイルへのアクセス」が未許可のため、GGUFモデルは共有フォルダ (Download/gguf-models) に保存できません。Termux側から同じモデルを使うには許可が必要です。
+            </span>
+          </div>
+          <button
+            onClick={() => nativeLlmService.requestSharedStorageAccess()}
+            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold shrink-0 self-end sm:self-auto"
+          >
+            許可する
           </button>
         </div>
       )}
