@@ -138,6 +138,41 @@
 2. **型検査・ビルド検証**: `npm run lint` (`tsc --noEmit`), `npm run build` でビルド正常通過確認済み。
 3. **後方互換性**: 既存ストレージ内のキューアイテムに `priority` が存在しない場合でも `priority ?? 0` として安全にソート・実行されます。
 
+## MIKI-AI 統合設計思想指示書 v4.3 実装報告 (SECTION 7 追加改善 4件 & 拡張章)
+
+### 【実装内容】
+1. **[提案D・最優先] storageService.flushNow() の安全配線 (58章 中断・再開・回復能力 / SECTION 5 データを壊さない境界)**
+   - `src/main.tsx` において、`document.addEventListener('visibilitychange')` (`hidden` 遷移時)、`window.addEventListener('pagehide')`、`window.addEventListener('beforeunload')` を購読。
+   - バックグラウンド遷移時やアプリ終了時に `storageService.flushNow()` を即座に確定させ、400ms遅延バッチ書き込み待機中の直前データ（会話・記憶・教材・評価ログ）の消失リスクを解消。
+
+2. **[提案B] 端末温度状態の実測化・Androidブリッジ配線 (42章 バックグラウンド改善 / 59章 浅い睡眠と深い睡眠)**
+   - `src/services/backgroundWorkerService.ts` に、自作Android APK/WebViewの `JavaScriptInterface` (`AndroidThermalBridge` / `AndroidBridge`) および `android_thermal_changed` イベント通知を自動監視する機構を配線。
+   - 実測バッテリー温度（摂氏）から `normal (<38℃)` / `warm (38〜42℃)` / `hot (42〜46℃)` / `critical (>=46℃)` を自動判定する `updateFromTemperatureCelsius()` を実装。
+   - 発熱検知時には深い睡眠処理（WorkManager）を安全に即座中断。ブリッジ未接続環境ではテストUI手動シミュレーションに安全にフォールバック。
+
+3. **[提案A] 8章 5.意味検索の llama-server 実埋め込み化 (フォールバック原則維持)**
+   - `src/services/nativeLlmService.ts` に `checkEmbeddingAvailability()` および `getEmbedding()` を実装。Termux llama-server (`/embedding`, `/v1/embeddings`) および Ollama (`/api/embeddings`) から実埋め込みベクトルを取得可能に。
+   - `src/services/longTermMemoryService.ts` の 7段階検索パイプライン Step 5 (意味検索) において、実埋め込みベクトル（768/1024/1536次元等）を用いた高精度コサイン類似度計算を導入。
+   - モデル未起動・タイムアウト・未対応時は、既存の8次元ドメイン概念疎ベクトルへ例外なく自動フォールバック（SECTION 5 フォールバック原則・クラッシュ防止）。
+   - `MemoryItem` に `embeddingVector`, `embeddingModelId`, `embeddingDimensions` を追加し、`enrichMemoryEmbeddings()` によりバックグラウンドで未算出記憶を段階的にエンリッチ。
+
+4. **[提案C] 機能フラグ整合化 (31章)**
+   - `src/types.ts` および `src/services/featureFlagsService.ts` において、すでに実装済みの `EXPERIENCE_ROUTER` (49章), `SKILL_GRADUATION` (50章) に加え、`VBA_STATIC_VERIFIER` (63〜64章) を機能フラグとして正式定義。
+
+5. **63〜64章 VBA静的検証器 & 11章 教師API無料予算動的適応**
+   - 8大スキャナー（Parser, ProcedureScanner, BlockScanner, ForbiddenPatternScanner, DeclarationScanner, SignatureComparator, DependencyScanner, DeliveryVerifier）によるVBA静的解析およびSHA-256配送完全性保証。
+   - 11章教材価値指標式と予算残量4大Tier（FULL_EXPANSIVE / STANDARD_CRITIQUE / CONSERVATIVE_PRINCIPLES / WAITING_NEXT_BUDGET）の動的適応UI。
+
+### 【変更ファイル】
+- `src/main.tsx`: `flushOnHide` リスナー追加（`visibilitychange`, `pagehide`, `beforeunload`）
+- `src/services/backgroundWorkerService.ts`: Androidサーマルブリッジ監視、`updateFromTemperatureCelsius` 実装
+- `src/services/nativeLlmService.ts`: `checkEmbeddingAvailability`, `getEmbedding` 実装
+- `src/services/longTermMemoryService.ts`: Step 5 実埋め込みコサイン類似度化 + 8次元フォールバック、非同期エンリッチ
+- `src/types.ts`: `MemoryItem` 埋め込みフィールド追加、`SystemFeatureFlags` フラグ追加
+- `src/services/featureFlagsService.ts`: `VBA_STATIC_VERIFIER` 定義・解説追加
+- `README.md`: v4.3 実装仕様および検証記録の追記
+
+
 
 
 

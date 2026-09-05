@@ -852,6 +852,154 @@ export class NativeLlmService {
     } catch (e) {}
     this.activeModelId = null;
   }
+
+  /**
+   * 8章 & 57章 / 指示書 SECTION 7 [提案A]:
+   * 外部ローカルLLM設定の現在のアクティブ値を取得
+   */
+  public getActiveExternalConfig(): ExternalLocalLlmConfig {
+    try {
+      if (typeof storageService !== 'undefined') {
+        const saved = storageService.getItem('miki_external_llm_config');
+        if (saved) return JSON.parse(saved);
+      }
+    } catch (e) {}
+    return { endpoint: 'http://localhost:8080', model: 'default', type: 'openai_compatible' };
+  }
+
+  /**
+   * 8章 / 指示書 SECTION 7 [提案A]:
+   * llama-server / Ollama の埋め込み (/embedding または /v1/embeddings) エンドポイントが
+   * 有効かどうかを短時間 (1500msタイムアウト) で確認
+   */
+  public async checkEmbeddingAvailability(
+    overrideConfig?: ExternalLocalLlmConfig
+  ): Promise<{ available: boolean; endpoint: string; type: string; dimensions?: number }> {
+    const config = overrideConfig || this.getActiveExternalConfig();
+    const endpoint = config.endpoint.replace(/\/$/, '');
+
+    try {
+      const res = await this.getEmbedding('ping test', config, 1500);
+      if (res && Array.isArray(res.embedding) && res.embedding.length > 0) {
+        return {
+          available: true,
+          endpoint,
+          type: config.type,
+          dimensions: res.dimensions,
+        };
+      }
+    } catch (e) {}
+
+    return { available: false, endpoint, type: config.type };
+  }
+
+  /**
+   * 8章 / 指示書 SECTION 7 [提案A]:
+   * llama-server (Termux / PC) または Ollama から実テキスト埋め込みベクトルを取得。
+   * 利用不能・タイムアウト・未対応時は例外を投げず null を返却 (フォールバック原則)。
+   */
+  public async getEmbedding(
+    text: string,
+    overrideConfig?: ExternalLocalLlmConfig,
+    timeoutMs: number = 3000
+  ): Promise<{ embedding: number[]; modelId: string; dimensions: number } | null> {
+    if (!text || !text.trim()) return null;
+    const config = overrideConfig || this.getActiveExternalConfig();
+    const endpoint = config.endpoint.replace(/\/$/, '');
+    const modelId = config.model || 'default';
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+    try {
+      if (config.type === 'ollama') {
+        // Ollama native embeddings API: POST /api/embeddings
+        try {
+          const res = await fetch(`${endpoint}/api/embeddings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: modelId,
+              prompt: text,
+            }),
+            signal: controller?.signal,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data?.embedding) && data.embedding.length > 0) {
+              return {
+                embedding: data.embedding,
+                modelId,
+                dimensions: data.embedding.length,
+              };
+            }
+          }
+        } catch (err) {
+          // fallback to /v1/embeddings
+        }
+      }
+
+      // OpenAI互換 / llama-server: POST /v1/embeddings
+      try {
+        const res = await fetch(`${endpoint}/v1/embeddings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            input: text,
+            model: modelId,
+          }),
+          signal: controller?.signal,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const vec = data?.data?.[0]?.embedding;
+          if (Array.isArray(vec) && vec.length > 0) {
+            return {
+              embedding: vec,
+              modelId,
+              dimensions: vec.length,
+            };
+          }
+        }
+      } catch (err) {}
+
+      // llama.cpp native server endpoint: POST /embedding
+      try {
+        const res = await fetch(`${endpoint}/embedding`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: text,
+          }),
+          signal: controller?.signal,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          let vec: number[] | null = null;
+          if (Array.isArray(data?.embedding)) {
+            if (typeof data.embedding[0] === 'number') {
+              vec = data.embedding;
+            } else if (Array.isArray(data.embedding[0])) {
+              vec = data.embedding[0];
+            }
+          }
+          if (vec && vec.length > 0) {
+            return {
+              embedding: vec,
+              modelId,
+              dimensions: vec.length,
+            };
+          }
+        }
+      } catch (err) {}
+
+      return null;
+    } catch (e) {
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
 }
 
 export const nativeLlmService = new NativeLlmService();

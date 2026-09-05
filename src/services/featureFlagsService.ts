@@ -19,6 +19,7 @@ export const DEFAULT_FEATURE_FLAGS: SystemFeatureFlags = {
   VBA_DESIGN_ASSISTANT: 'DEVELOPMENT',
   EXPERIENCE_ROUTER: 'STABLE',
   SKILL_GRADUATION: 'STABLE',
+  VBA_STATIC_VERIFIER: 'STABLE',
 };
 
 export const FEATURE_FLAG_DESCRIPTIONS: Record<keyof SystemFeatureFlags, { title: string; desc: string }> = {
@@ -65,6 +66,10 @@ export const FEATURE_FLAG_DESCRIPTIONS: Record<keyof SystemFeatureFlags, { title
   SKILL_GRADUATION: {
     title: '技能卒業＆多様性再試験 (Skill Graduation)',
     desc: '多文脈での再試験による過学習防止、長期安定稼働した技能のLoRA教材化とプロンプト卒業（50章）。',
+  },
+  VBA_STATIC_VERIFIER: {
+    title: 'VBA静的検証器 (VBA Static Verifier)',
+    desc: '8大スキャナーによる構文・ブロック・禁止パターン(Goto/行ラベル/単行If)検査およびSHA-256配送完全性保証（63・64章）。',
   },
 };
 

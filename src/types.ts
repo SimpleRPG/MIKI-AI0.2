@@ -101,6 +101,10 @@ export interface MemoryItem {
   prerequisiteMemoryIds?: string[]; // 前提条件となる記憶ID (依存先)
   domainVector?: number[];       // 多次元トピック重み疎ベクトル
   semanticKeywords?: string[];   // 抽出された意味的キーワード
+  // 設計思想 8章 & 57章 / 指示書 SECTION 7 提案A: llama-server実埋め込みベクトル
+  embeddingVector?: number[];    // LLM実埋め込みベクトル (768/1024/1536/4096次元等)
+  embeddingModelId?: string;     // 算出に使用したモデルID (モデル切り替え時の無効化・再計算検知用)
+  embeddingDimensions?: number;  // ベクトル次元数
   // 設計思想 8章 & 35章 第4段階: 記憶管理・長期記憶・置換関係
   memoryScope?: MemoryScope;
   longTermType?: LongTermMemoryType;
@@ -1662,6 +1666,8 @@ export interface SystemFeatureFlags {
   // 設計思想 49章 & 50章 機能フラグ
   EXPERIENCE_ROUTER: FeatureFlagState;
   SKILL_GRADUATION: FeatureFlagState;
+  // 設計思想 63章 & 64章: VBA静的検証器 (8大スキャナー & SHA-256)
+  VBA_STATIC_VERIFIER: FeatureFlagState;
 }
 
 /**

@@ -232,6 +232,52 @@ export class BackgroundWorkerService {
         this.networkState.isWifi = conn.type === 'wifi' || conn.effectiveType === '4g' || !conn.saveData;
       }
     }
+
+    // 3. Thermal State Monitoring (設計思想 42章 & 59章 / 指示書 SECTION 7 提案B)
+    // Web標準ブラウザ環境では端末温度APIが直接露出していないため、
+    // 自作Android APK/WebViewのJavaScriptInterface (AndroidThermalBridge / AndroidBridge)、
+    // または window のカスタムイベント 'android_thermal_changed' / 'updateAndroidThermal' を通じて実温度を受け取ります。
+    // ブリッジが存在しない環境では、テストUIによる手動シミュレーションに安全にフォールバックします。
+    if (typeof window !== 'undefined') {
+      try {
+        const bridge = (window as any).AndroidThermalBridge || (window as any).AndroidBridge;
+        if (bridge && typeof bridge.getBatteryTemperature === 'function') {
+          const rawTemp = Number(bridge.getBatteryTemperature());
+          if (!isNaN(rawTemp) && rawTemp > 0) {
+            const celsius = rawTemp > 100 ? rawTemp / 10 : rawTemp;
+            this.updateFromTemperatureCelsius(celsius);
+          }
+        }
+      } catch (e) {}
+
+      // Androidネイティブ層またはテストスクリプトからのイベント通知リスナー
+      window.addEventListener('android_thermal_changed', (event: any) => {
+        const detail = event?.detail;
+        if (typeof detail === 'number') {
+          const celsius = detail > 100 ? detail / 10 : detail;
+          this.updateFromTemperatureCelsius(celsius);
+        } else if (typeof detail === 'string' && ['normal', 'warm', 'hot', 'critical'].includes(detail)) {
+          this.setThermalState(detail as any);
+        } else if (detail && typeof detail.temperature === 'number') {
+          const raw = detail.temperature;
+          const celsius = raw > 100 ? raw / 10 : raw;
+          this.updateFromTemperatureCelsius(celsius);
+        }
+      });
+
+      // グローバルブリッジ関数を公開 (Android WebView の evaluateJavascript から直接呼び出し可能)
+      (window as any).updateAndroidThermal = (tempOrState: number | string) => {
+        if (typeof tempOrState === 'number') {
+          const celsius = tempOrState > 100 ? tempOrState / 10 : tempOrState;
+          this.updateFromTemperatureCelsius(celsius);
+        } else if (typeof tempOrState === 'string' && ['normal', 'warm', 'hot', 'critical'].includes(tempOrState)) {
+          this.setThermalState(tempOrState as any);
+        }
+      };
+      (window as any).setThermalState = (state: 'normal' | 'warm' | 'hot' | 'critical') => {
+        this.setThermalState(state);
+      };
+    }
   }
 
   /**
@@ -832,6 +878,27 @@ class MikiAutonomousWorker(appContext: Context, workerParams: WorkerParameters) 
       'SELF_IMPROVEMENT',
       `[Mock] バッテリー状態変更 -> ${charging ? '充電中' : '放電中'}, 残量: ${this.batteryState.level}%`
     );
+  }
+
+  /**
+   * 実測バッテリー温度(摂氏)からサーマルステートを算出して反映 (提案B)
+   */
+  public updateFromTemperatureCelsius(celsius: number): void {
+    let state: 'normal' | 'warm' | 'hot' | 'critical' = 'normal';
+    if (celsius >= 46) {
+      state = 'critical';
+    } else if (celsius >= 42) {
+      state = 'hot';
+    } else if (celsius >= 38) {
+      state = 'warm';
+    } else {
+      state = 'normal';
+    }
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `[Android Bridge] バッテリー温度実測 ${celsius.toFixed(1)}℃ -> サーマルステート: ${state}`
+    );
+    this.setThermalState(state);
   }
 
   public setThermalState(state: 'normal' | 'warm' | 'hot' | 'critical'): void {
