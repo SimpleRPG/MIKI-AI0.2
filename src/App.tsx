@@ -2541,4 +2541,376 @@ export default function App() {
           : msg
       )
     );
-    await handleExecuteTo
+    await handleExecuteTool(request.toolId, request.params, true);
+  };
+
+  const handleRejectToolExecution = (requestId: string) => {
+    systemLogger.warn('TOOLS', `ユーザーがツール操作を拒否/キャンセル: [${requestId}]`);
+    toolsService.rejectPendingRequest(requestId);
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.pendingToolConfirmation?.id === requestId
+          ? {
+              ...msg,
+              content: `${msg.content}\n\n🚫 **ツール実行はユーザーによりキャンセルされました。**`,
+              pendingToolConfirmation: undefined,
+            }
+          : msg
+      )
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
+      {/* Top Main Navigation Header */}
+      <Header
+        activeTab={activeTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          setMobileTab(tab);
+        }}
+        persona={persona}
+        memories={memories}
+        engineMode={engineMode}
+        onOpenEngineModal={() => setIsEngineModalOpen(true)}
+        onRestartGame={handleRestartGame}
+        onOpenMemoryModal={() => setIsMemoryModalOpen(true)}
+        onOpenExportModal={() => setIsExportModalOpen(true)}
+        onNewBlankProject={handleNewBlankProject}
+        useSearch={useSearch}
+        setUseSearch={setUseSearch}
+        fps={fps}
+      />
+
+      {/* Main Responsive Layout */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* DESKTOP SPLIT VIEW (Visible on >= md) */}
+        <div className="hidden md:flex flex-1 overflow-hidden">
+          {/* Left Side: Chat Agent Panel */}
+          <div className="w-[380px] lg:w-[440px] xl:w-[480px] h-full shrink-0 flex flex-col">
+            <ChatPanel
+              messages={messages}
+              onSendMessage={handleSendMessage}
+              isLoading={isLoading}
+              isGenerating={isGenerating}
+              onStopGeneration={handleStopGeneration}
+              persona={persona}
+              memories={memories}
+              onUpdateMemories={setMemories}
+              engineMode={engineMode}
+              speakerMode={speakerMode}
+              setSpeakerMode={setSpeakerMode}
+              onApplyCode={handleApplyCode}
+              onClearHistory={() => {
+                setConversationState(defaultConversationState());
+                setMessages([
+                  {
+                    id: 'init_' + Date.now(),
+                    role: 'assistant',
+                    content: `会話履歴をリフレッシュしたよ✨ 記憶カンペ（${memories.length}件）と現在のコードは保持されているから安心してね！`,
+                    timestamp: Date.now(),
+                  },
+                ]);
+              }}
+              useSearch={useSearch}
+              setUseSearch={setUseSearch}
+              workspaceFiles={workspaceFiles}
+              onOpenGamePreview={() => setActiveTab('preview')}
+              onOpenEngineModal={() => setIsEngineModalOpen(true)}
+              onOpenExportModal={() => setIsExportModalOpen(true)}
+              onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
+              onExecuteTool={handleExecuteTool}
+              onConfirmToolExecution={handleConfirmToolExecution}
+              onRejectToolExecution={handleRejectToolExecution}
+              isMultiStepEnabled={isMultiStepExplicit}
+              onToggleMultiStep={() => {
+                const next = !isMultiStepExplicit;
+                setIsMultiStepExplicit(next);
+                storageService.setItem('miki_multistep_explicit_mode', String(next));
+              }}
+              onResumeTaskPlan={handleResumeTaskPlan}
+              onUpdateMessageEvaluation={handleUpdateMessageEvaluation}
+              onApplyCodeProposal={handleApplyCodeProposal}
+              onRejectCodeProposal={handleRejectCodeProposal}
+            />
+          </div>
+
+          {/* Right Side: Active Tab (Preview / Code / GitHub) */}
+          <div className="flex-1 h-full overflow-hidden flex flex-col">
+            {activeTab === 'preview' && (
+              <GamePreview
+                files={workspaceFiles}
+                consoleLogs={consoleLogs}
+                onClearLogs={() => setConsoleLogs([])}
+                onAutoDebug={handleAutoDebug}
+                isDebugging={isDebugging}
+                fps={fps}
+              />
+            )}
+
+            {activeTab === 'code' && (
+              <CodeEditor
+                files={workspaceFiles}
+                activeFilePath={activeFilePath}
+                onSelectFile={setActiveFilePath}
+                onUpdateFileContent={handleUpdateFileContent}
+                onCreateFile={handleCreateFile}
+                onDeleteFile={handleDeleteFile}
+                onApplySandbox={() => setActiveTab('preview')}
+              />
+            )}
+
+            {activeTab === 'github' && (
+              <GitHubHub
+                onLoadRepoIntoWorkspace={handleLoadRepoIntoWorkspace}
+                onAskAIAboutRepo={handleAskAIAboutRepo}
+                workspaceFiles={workspaceFiles}
+                persona={persona}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* MOBILE SINGLE VIEW (Visible on < md) */}
+        <div className="flex md:hidden flex-1 min-h-0 overflow-hidden flex-col">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {mobileTab === 'chat' && (
+              <ChatPanel
+                messages={messages}
+                onSendMessage={handleSendMessage}
+                isLoading={isLoading}
+                isGenerating={isGenerating}
+                onStopGeneration={handleStopGeneration}
+                persona={persona}
+                memories={memories}
+                onUpdateMemories={setMemories}
+                engineMode={engineMode}
+                speakerMode={speakerMode}
+                setSpeakerMode={setSpeakerMode}
+                onApplyCode={handleApplyCode}
+                onClearHistory={() => {
+                  setConversationState(defaultConversationState());
+                  setMessages([
+                    {
+                      id: 'init_' + Date.now(),
+                      role: 'assistant',
+                      content: `会話履歴をリフレッシュしたよ✨`,
+                      timestamp: Date.now(),
+                    },
+                  ]);
+                }}
+                useSearch={useSearch}
+                setUseSearch={setUseSearch}
+                workspaceFiles={workspaceFiles}
+                onOpenGamePreview={() => setMobileTab('preview')}
+                onOpenEngineModal={() => setIsEngineModalOpen(true)}
+                onOpenExportModal={() => setIsExportModalOpen(true)}
+                onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
+                onExecuteTool={handleExecuteTool}
+                onConfirmToolExecution={handleConfirmToolExecution}
+                onRejectToolExecution={handleRejectToolExecution}
+                isMultiStepEnabled={isMultiStepExplicit}
+                onToggleMultiStep={() => {
+                  const next = !isMultiStepExplicit;
+                  setIsMultiStepExplicit(next);
+                  storageService.setItem('miki_multistep_explicit_mode', String(next));
+                }}
+                onResumeTaskPlan={handleResumeTaskPlan}
+                onUpdateMessageEvaluation={handleUpdateMessageEvaluation}
+                onApplyCodeProposal={handleApplyCodeProposal}
+                onRejectCodeProposal={handleRejectCodeProposal}
+              />
+            )}
+
+            {mobileTab === 'preview' && (
+              <GamePreview
+                files={workspaceFiles}
+                consoleLogs={consoleLogs}
+                onClearLogs={() => setConsoleLogs([])}
+                onAutoDebug={handleAutoDebug}
+                isDebugging={isDebugging}
+                fps={fps}
+              />
+            )}
+
+            {mobileTab === 'code' && (
+              <CodeEditor
+                files={workspaceFiles}
+                activeFilePath={activeFilePath}
+                onSelectFile={setActiveFilePath}
+                onUpdateFileContent={handleUpdateFileContent}
+                onCreateFile={handleCreateFile}
+                onDeleteFile={handleDeleteFile}
+                onApplySandbox={() => setMobileTab('preview')}
+              />
+            )}
+
+            {mobileTab === 'github' && (
+              <GitHubHub
+                onLoadRepoIntoWorkspace={handleLoadRepoIntoWorkspace}
+                onAskAIAboutRepo={handleAskAIAboutRepo}
+                workspaceFiles={workspaceFiles}
+                persona={persona}
+              />
+            )}
+
+            {mobileTab === 'memory' && (
+              <div className="h-full overflow-y-auto p-4 bg-slate-900">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-sm text-pink-300 flex items-center gap-2">
+                    <span>{persona.avatar}</span>
+                    <span>{persona.name}の性格・記憶カンペ</span>
+                  </h3>
+                  <button
+                    onClick={() => setIsMemoryModalOpen(true)}
+                    className="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white rounded-lg text-xs font-bold shadow-md shadow-pink-600/30"
+                  >
+                    設定モーダルを開く
+                  </button>
+                </div>
+                <div className="space-y-3 text-xs">
+                  <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                    <div className="text-slate-400 font-semibold mb-1">現在の設定:</div>
+                    <div className="text-slate-200 font-bold mb-1">{persona.tagline}</div>
+                    <div className="text-slate-400 leading-relaxed">{persona.basePersonality}</div>
+                  </div>
+
+                  <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                    <div className="text-slate-400 font-semibold flex items-center justify-between">
+                      <span>覚えている記憶カンペ ({memories.length}件):</span>
+                    </div>
+                    {memories.map((m) => (
+                      <div
+                        key={m.id}
+                        className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-300 leading-relaxed text-[11px]"
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-[10px] text-pink-400 font-mono">[{m.category}]</span>
+                          {m.pinned && <span className="text-[10px] text-pink-400 font-bold">📌</span>}
+                        </div>
+                        <p>{m.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Bottom Navigation Bar - Exactly 6 tabs as in screenshots */}
+          <nav className="h-14 bg-slate-900/98 backdrop-blur-md border-t border-slate-800 flex items-center justify-around px-1 select-none z-30 shrink-0">
+            <button
+              onClick={() => setMobileTab('chat')}
+              className={`flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-xl transition-all ${
+                mobileTab === 'chat'
+                  ? 'text-pink-400 font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <div className="relative">
+                <MessageCircle className="w-5 h-5" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-pink-500 animate-pulse" />
+              </div>
+              <span className="text-[10px] leading-none">チャット</span>
+            </button>
+
+            <button
+              onClick={() => setMobileTab('preview')}
+              className={`flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-xl transition-all ${
+                mobileTab === 'preview'
+                  ? 'text-sky-400 font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Play className="w-5 h-5" />
+              <span className="text-[10px] leading-none">プレビュー</span>
+            </button>
+
+            <button
+              onClick={() => setMobileTab('code')}
+              className={`flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-xl transition-all ${
+                mobileTab === 'code'
+                  ? 'text-indigo-400 font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Code2 className="w-5 h-5" />
+              <span className="text-[10px] leading-none">コード</span>
+            </button>
+
+            <button
+              onClick={() => setMobileTab('github')}
+              className={`flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-xl transition-all ${
+                mobileTab === 'github'
+                  ? 'text-emerald-400 font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Github className="w-5 h-5" />
+              <span className="text-[10px] leading-none">GitHub</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileTab('memory');
+                setIsMemoryModalOpen(true);
+              }}
+              className={`flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-xl transition-all ${
+                mobileTab === 'memory'
+                  ? 'text-pink-400 font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Brain className="w-5 h-5" />
+              <span className="text-[10px] leading-none">記憶・Moe</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setIsEngineModalOpen(true);
+              }}
+              className="flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-xl text-sky-400 hover:text-sky-300 transition-all"
+            >
+              <Sparkles className="w-5 h-5" />
+              <span className="text-[10px] leading-none">AIモデル</span>
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      {/* Modals */}
+      <EngineModal
+        isOpen={isEngineModalOpen}
+        onClose={() => setIsEngineModalOpen(false)}
+        engineMode={engineMode}
+        onSelectEngine={handleSelectEngine}
+      />
+
+      <MemoryModal
+        isOpen={isMemoryModalOpen}
+        onClose={() => setIsMemoryModalOpen(false)}
+        persona={persona}
+        onUpdatePersona={setPersona}
+        memories={memories}
+        onUpdateMemories={setMemories}
+      />
+
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        files={workspaceFiles}
+        projectName={persona.name + '_Project'}
+      />
+
+      <SelfImprovementModal
+        isOpen={isSelfImprovementModalOpen}
+        onClose={() => setIsSelfImprovementModalOpen(false)}
+        memories={memories}
+        chatMessages={messages}
+        workspaceFiles={workspaceFiles}
+        engineMode={engineMode}
+        initialTab={selfImprovementTab}
+      />
+    </div>
+  );
+}
