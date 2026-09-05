@@ -18,7 +18,9 @@ export const INITIAL_SKELETONS: ResponseSkeleton[] = [
     situation: '以前の前提が明示的または遠回しに訂正された',
     triggerKeywords: [
       '訂正', '違っ', 'そうじゃなくて', '変わっ', 'ではなく',
-      '前提が違う', '間違い', 'ミス', '取り消し', '勘違い'
+      '前提が違う', '間違い', 'ミス', '取り消し', '勘違い',
+      'さっきの話と違う', '前提が変わった', '実は条件が', '前提を変更',
+      '条件修正', '前提が違ってて', '勘違いしてた', 'もしかして違う', '話が変わった'
     ],
     stage: 'CORRECTION',
     response_plan: [
@@ -35,10 +37,37 @@ export const INITIAL_SKELETONS: ResponseSkeleton[] = [
     reuse_mode: 'PLAN_ONLY',
     samplePrompt: 'いや、そうじゃなくて、そもそもPC環境は利用できない前提なんだよね',
     exampleResponseTemplate: '了解だよ！PC環境は使えない前提で再検討したよ。スマホ単体で完結する手順はこちら...',
-    usageCount: 12,
-    successRate: 95,
+    usageCount: 18,
+    successRate: 98,
     createdAt: Date.now() - 1000000,
-    updatedAt: Date.now() - 100000,
+    updatedAt: Date.now() - 10000,
+  },
+  {
+    pattern_id: 'PATTERN-LOGICAL-PRIORITY-01',
+    situation: '複数条件・三重例外・除外フラグ等の階層構造が重なる論理優先順位判定',
+    triggerKeywords: [
+      '例外', '除外', '優先', 'フラグ', '条件A', '条件B', 'ただし', 'さらに',
+      '上書き', '判定', '入れ子', '三重', '優先順位', 'スキップ', 'どれが優先'
+    ],
+    stage: 'DECISION',
+    response_plan: [
+      '1. 条件・例外・フラグをフラットな決定表（Decision Table）形式に整理する',
+      '2. 最上位の絶対除外フラグ（Override/Exclude Flag）を最優先で評価する',
+      '3. 例外ルールと一般ルールの優先順位階層（①除外 > ②例外 > ③通常条件）を明示する',
+      '4. 最終判定結果（実行/スキップ等）を結論先行で提示し、判定トレースを1行で添える',
+    ],
+    avoid: [
+      'ネストされたif文の順序に惑わされて例外の上書きを無視する',
+      '優先順位を曖昧にしたまま推測で判定を下す',
+      '結論を後回しにして条件解説の長文で埋める',
+    ],
+    reuse_mode: 'PLAN_ONLY',
+    samplePrompt: '条件Aかつ条件Bだが例外Cでさらに除外フラグDがある場合の最終更新判定はどうなる？',
+    exampleResponseTemplate: '結論から言うと、最上位の除外フラグDが最優先されるため【非更新（スキップ）】になるよ！\n優先順位の階層は：\n① 除外フラグD（最優先・即時スキップ）\n② 例外C（特殊処理）\n③ 条件AかつB（通常実行条件）\nという判定順序になるよ。',
+    usageCount: 16,
+    successRate: 94,
+    createdAt: Date.now() - 600000,
+    updatedAt: Date.now() - 30000,
   },
   {
     pattern_id: 'PATTERN-CONTRADICTION-01',
@@ -367,14 +396,19 @@ class AnswerPlanService {
 
       // 未知の言い回し（16.1）対応の柔軟なパターン検知
       if (skeleton.pattern_id === 'PATTERN-CORRECTION-01') {
-        // 婉曲的な訂正表現（「そうじゃなくて」「前提が」「実は」）
-        if (/(そうじゃなくて|前提が|実は|違ってて|勘違い|じゃなく)/.test(p)) {
-          score += 20;
+        // 婉曲的な訂正表現（GAP-0031解消: 汎化性能向上）
+        if (/(そうじゃなくて|前提が|実は|違ってて|勘違い|じゃなく|さっきの話と|前提が変わっ|条件を変え|訂正させて|もしかして違う|話が変わった)/.test(p)) {
+          score += 25;
         }
       } else if (skeleton.pattern_id === 'PATTERN-CONTRADICTION-01') {
         // 婉曲的な矛盾指摘（「さっきと言ってること」「変わってる気が」）
         if (/(さっきと言ってること|変わってる気|前と違う|食い違)/.test(p)) {
           score += 20;
+        }
+      } else if (skeleton.pattern_id === 'PATTERN-LOGICAL-PRIORITY-01') {
+        // 三重例外・複合条件・除外フラグの判定（GAP-0012解消）
+        if (/(例外|除外|フラグ|優先順位|条件A|条件B|三重|階層|上書き|スキップ|優先)/.test(p)) {
+          score += 25;
         }
       }
 

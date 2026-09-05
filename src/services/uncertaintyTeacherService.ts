@@ -216,6 +216,18 @@ export class UncertaintyTeacherService {
         answerPlanService.addSkeleton(skeleton);
         item.teacherActionTaken = 'created_skeleton';
         item.generatedSkeletonId = skeleton.pattern_id;
+
+        // 設計思想 11章 睡眠ゲート連携:
+        // 対話中のユーザーを待たせず、深夜の深い睡眠バッチ（充電＋Wi-Fi）で外部教師から高品質教材・高精度骨格を補完生成するための遅延キューへ自動登録
+        teacherRequestService.enqueueDelayedRequest({
+          source: 'uncertainty_divergence',
+          targetCapabilityId: targetCapId,
+          userPrompt: prompt,
+          failureCategory: targetCapId.includes('code') || targetCapId.includes('vba') ? 'vba' : 'chat',
+          divergenceTypes,
+          uncertaintyScore,
+          candidateResponses,
+        });
       }
     } else {
       item.teacherActionTaken = 'skipped_stable';

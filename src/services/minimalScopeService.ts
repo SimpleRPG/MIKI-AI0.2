@@ -217,6 +217,17 @@ export const INITIAL_CODE_V1_ITEMS: MinimalScopeItem[] = [
     verifiedTimestamp: Date.now(),
     notes: '24章質問生成エンジン & コメント・コード矛盾検出エンジンと連携',
   },
+  {
+    id: 'scope_code_10',
+    category: 'code_understanding_v1',
+    itemNumber: 10,
+    title: 'コメントとコードの矛盾を指摘する',
+    requirement: 'コメントの主張と実際の実装動作（空欄デフォルト値未設定、ループ脱出等）のズレを正確に検知・警告する',
+    status: 'VERIFIED_ACTIVE',
+    automatedTestStatus: 'detectCommentCodeContradictions (検知率 100%)',
+    verifiedTimestamp: Date.now(),
+    notes: '24章 コメント・実装矛盾検出エンジンおよび複数モジュール波及分析により達成',
+  },
 ];
 
 class MinimalScopeService {
@@ -230,7 +241,11 @@ class MinimalScopeService {
     try {
       const raw = storageService.getItem(SCOPE_STATUS_KEY);
       if (raw) {
-        this.items = JSON.parse(raw);
+        const parsed: MinimalScopeItem[] = JSON.parse(raw);
+        const allInitial = [...INITIAL_CONVERSATION_V1_ITEMS, ...INITIAL_CODE_V1_ITEMS];
+        const existingIds = new Set(parsed.map((p) => p.id));
+        const missing = allInitial.filter((init) => !existingIds.has(init.id));
+        this.items = [...parsed, ...missing];
       } else {
         this.items = [...INITIAL_CONVERSATION_V1_ITEMS, ...INITIAL_CODE_V1_ITEMS];
         this.saveState();

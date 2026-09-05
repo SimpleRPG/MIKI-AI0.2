@@ -24,6 +24,7 @@ import { capabilityGapService } from './capabilityGapService';
 import { virtualTrainingService } from './virtualTrainingService';
 import { capabilityPluginService } from './capabilityPluginService';
 import { featureFlagsService } from './featureFlagsService';
+import { teacherRequestService } from './teacherRequestService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -623,6 +624,29 @@ export class BackgroundWorkerService {
           }
         } catch (vtErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '仮想学習監査中に例外が発生しました', vtErr);
+        }
+
+        // Step 6.7: 設計思想 11章 睡眠ゲート ＆ 20章 遅延外部教師リクエストバッチ処理
+        if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+        let processedTeacherBatchCount = 0;
+        try {
+          const queue = teacherRequestService.getDelayedQueue();
+          const pendingItems = queue.filter((q) => q.status === 'PENDING');
+          if (pendingItems.length > 0) {
+            systemLogger.info(
+              'SELF_IMPROVEMENT',
+              `🌌 [11章 深い睡眠バッチ] 待機中の外部教師遅延要請 (${pendingItems.length}件) のバッチ処理を開始`
+            );
+            const batchResult = await teacherRequestService.processDelayedTeacherQueue(3);
+            processedTeacherBatchCount = batchResult.succeededCount;
+            if (batchResult.processedCount > 0) {
+              weaknessFound.push(
+                `[11章/20章 遅延教師バッチ] 待機要請${batchResult.processedCount}件処理 ➔ 成功${batchResult.succeededCount}件 / 失敗${batchResult.failedCount}件 (回答骨格・教材を自動反映)`
+              );
+            }
+          }
+        } catch (teacherBatchErr: any) {
+          systemLogger.warn('SELF_IMPROVEMENT', '遅延教師バッチ処理中に例外が発生しました', teacherBatchErr);
         }
       }
 

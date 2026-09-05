@@ -9,6 +9,7 @@ import {
   TrainingSampleJSONL,
   MemoryItem,
   ResponseSkeleton,
+  DelayedTeacherQueueItem,
 } from '../types';
 import { storageService } from './storageService';
 import { selfImprovementService } from './selfImprovementService';
@@ -23,6 +24,7 @@ import { answerPlanService } from './answerPlanService';
 const BUDGET_LIMITS_KEY = 'miki_ai_teacher_budget_limits';
 const BUDGET_USAGE_KEY = 'miki_ai_teacher_budget_usage';
 const USAGE_RECORDS_KEY = 'miki_ai_teacher_usage_records';
+const DELAYED_QUEUE_STORAGE_KEY = 'miki_ai_delayed_teacher_queue';
 
 const DEFAULT_LIMITS: TeacherBudgetLimits = {
   dailyCalls: 10,
@@ -52,6 +54,7 @@ export class TeacherRequestService {
   private limits: TeacherBudgetLimits = { ...DEFAULT_LIMITS };
   private usage: TeacherBudgetUsage;
   private usageRecords: TeacherUsageRecord[] = [];
+  private delayedQueue: DelayedTeacherQueueItem[] = [];
 
   constructor() {
     this.usage = {
@@ -100,6 +103,11 @@ export class TeacherRequestService {
       if (rawRecords) {
         this.usageRecords = JSON.parse(rawRecords);
       }
+
+      const rawQueue = storageService.getItem(DELAYED_QUEUE_STORAGE_KEY);
+      if (rawQueue) {
+        this.delayedQueue = JSON.parse(rawQueue);
+      }
     } catch (e) {
       console.warn('[TeacherRequestService] Failed to load budget state:', e);
     }
@@ -110,6 +118,7 @@ export class TeacherRequestService {
       storageService.setItem(BUDGET_LIMITS_KEY, JSON.stringify(this.limits));
       storageService.setItem(BUDGET_USAGE_KEY, JSON.stringify(this.usage));
       storageService.setItem(USAGE_RECORDS_KEY, JSON.stringify(this.usageRecords.slice(0, 100)));
+      storageService.setItem(DELAYED_QUEUE_STORAGE_KEY, JSON.stringify(this.delayedQueue.slice(0, 100)));
     } catch (e) {
       console.warn('[TeacherRequestService] Failed to save budget state:', e);
     }
@@ -820,6 +829,163 @@ export class TeacherRequestService {
     if (changed) {
       this.saveState();
     }
+  }
+
+  // =========================================================================
+  // オフライン遅延教師リクエストキュー管理 (設計思想 11章 睡眠ゲート ＆ 20章 不確実性連携)
+  // =========================================================================
+
+  public getDelayedQueue(): DelayedTeacherQueueItem[] {
+    return [...this.delayedQueue];
+  }
+
+  public enqueueDelayedRequest(params: {
+    source?: 'uncertainty_divergence' | 'failure_recurrence' | 'manual';
+    targetCapabilityId: string;
+    userPrompt: string;
+    failureCategory?: string;
+    divergenceTypes?: string[];
+    uncertaintyScore?: number;
+    candidateResponses?: string[];
+  }): DelayedTeacherQueueItem {
+    const anonymized = this.anonymizeFailureExample(params.userPrompt);
+    const item: DelayedTeacherQueueItem = {
+      id: `queue_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      source: params.source || 'uncertainty_divergence',
+      targetCapabilityId: params.targetCapabilityId,
+      userPrompt: params.userPrompt,
+      anonymizedPrompt: anonymized,
+      failureCategory: params.failureCategory || 'chat',
+      divergenceTypes: params.divergenceTypes || [],
+      uncertaintyScore: params.uncertaintyScore,
+      candidateResponses: params.candidateResponses,
+      enqueuedAt: Date.now(),
+      status: 'PENDING',
+      retryCount: 0,
+    };
+
+    this.delayedQueue = [item, ...this.delayedQueue.slice(0, 99)];
+    this.saveState();
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `📥 [11章/20章 遅延教師キュー追加] 深い睡眠バッチ待機キューへ追加しました: ${item.failureCategory} (対象: ${item.targetCapabilityId})`
+    );
+
+    return item;
+  }
+
+  public removeQueueItem(id: string): void {
+    this.delayedQueue = this.delayedQueue.filter((q) => q.id !== id);
+    this.saveState();
+  }
+
+  public clearDelayedQueue(): void {
+    this.delayedQueue = [];
+    this.saveState();
+  }
+
+  /**
+   * 深い睡眠 (Deep Sleep) または手動トリガー時に待機キューを一括処理
+   */
+  public async processDelayedTeacherQueue(maxBatchSize = 3): Promise<{
+    processedCount: number;
+    succeededCount: number;
+    failedCount: number;
+    results: Array<{ id: string; success: boolean; error?: string; skeletonId?: string }>;
+  }> {
+    const pendingItems = this.delayedQueue.filter((q) => q.status === 'PENDING');
+    if (pendingItems.length === 0) {
+      return { processedCount: 0, succeededCount: 0, failedCount: 0, results: [] };
+    }
+
+    const batch = pendingItems.slice(0, maxBatchSize);
+    let succeededCount = 0;
+    let failedCount = 0;
+    const results: Array<{ id: string; success: boolean; error?: string; skeletonId?: string }> = [];
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `⚡ [遅延教師キュー バッチ処理開始] 対象 ${batch.length}件の遅延要請を順次処理します`
+    );
+
+    for (const item of batch) {
+      // 予算チェック
+      const budget = this.checkBudget();
+      if (!budget.allowed) {
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `⚠️ [遅延教師キュー中断] 予算制限に到達したため以降のキュー処理を中断します: ${budget.reason}`
+        );
+        break;
+      }
+
+      // ステータスを PROCESSING に更新
+      item.status = 'PROCESSING';
+      this.saveState();
+
+      try {
+        const payload = this.buildTeacherRequestPayload(
+          item.anonymizedPrompt || item.userPrompt,
+          item.failureCategory || 'chat',
+          `20章 不確実性ブレ (スコア: ${item.uncertaintyScore ?? 0}点) / 乖離: ${item.divergenceTypes?.join(', ') || 'none'}`
+        );
+
+        const res = await this.requestTeacherMaterial(payload, item.targetCapabilityId);
+
+        item.processedAt = Date.now();
+        if (res.success) {
+          item.status = 'PROCESSED';
+          item.verificationPassed = res.verifiedEffective;
+          item.resultSkeletonId = res.savedSkeleton?.pattern_id;
+          item.resultMaterialId = res.savedSample?.id;
+          succeededCount++;
+          results.push({
+            id: item.id,
+            success: true,
+            skeletonId: res.savedSkeleton?.pattern_id,
+          });
+        } else {
+          item.retryCount += 1;
+          item.errorMessage = res.error || '不明なエラー';
+          if (item.retryCount >= 2) {
+            item.status = 'FAILED';
+          } else {
+            item.status = 'PENDING'; // リトライ待ち
+          }
+          failedCount++;
+          results.push({
+            id: item.id,
+            success: false,
+            error: res.error,
+          });
+        }
+      } catch (err: any) {
+        item.retryCount += 1;
+        item.errorMessage = err?.message || String(err);
+        item.status = item.retryCount >= 2 ? 'FAILED' : 'PENDING';
+        failedCount++;
+        results.push({
+          id: item.id,
+          success: false,
+          error: item.errorMessage,
+        });
+      }
+
+      this.saveState();
+    }
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `✓ [遅延教師キュー バッチ完了] 処理: ${batch.length}件 (成功: ${succeededCount}件, 失敗: ${failedCount}件)`
+    );
+
+    return {
+      processedCount: batch.length,
+      succeededCount,
+      failedCount,
+      results,
+    };
   }
 }
 

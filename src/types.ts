@@ -478,6 +478,10 @@ export interface ChatMessage {
   dialogueEvaluation?: ConversationEvaluationMetrics;
   // 設計思想 20章: 不確実性・判断の割れ検出結果
   uncertaintyEvaluation?: UncertaintyDivergenceItem;
+  // 設計思想 27章: セキュリティ境界・社内固有情報マスキング監査結果
+  securityBoundaryAudit?: SecurityBoundaryAuditResult;
+  // 設計思想 37章: 失敗再発検知・回帰パターン
+  failureRecurrence?: FailureRecurrencePattern;
 }
 
 /**
@@ -788,6 +792,32 @@ export interface TeacherUsageRecord {
   verifiedCount: number;
   success: boolean;
   notes?: string;
+}
+
+/**
+ * 設計思想 11章 睡眠ゲート ＆ 20章 不確実性ルーティング連携:
+ * 外部教師のオフライン遅延送信キュー (Delayed Teacher Request Queue)
+ */
+export type DelayedTeacherQueueStatus = 'PENDING' | 'PROCESSING' | 'PROCESSED' | 'FAILED' | 'REJECTED';
+
+export interface DelayedTeacherQueueItem {
+  id: string;
+  source: 'uncertainty_divergence' | 'failure_recurrence' | 'manual';
+  targetCapabilityId: string;
+  userPrompt: string;
+  anonymizedPrompt: string;
+  failureCategory: string;
+  divergenceTypes?: string[];
+  uncertaintyScore?: number;
+  candidateResponses?: string[];
+  enqueuedAt: number;
+  status: DelayedTeacherQueueStatus;
+  retryCount: number;
+  processedAt?: number;
+  errorMessage?: string;
+  resultSkeletonId?: string;
+  resultMaterialId?: string;
+  verificationPassed?: boolean;
 }
 
 /**
@@ -1415,6 +1445,57 @@ export interface CodeUnderstandingIR {
 }
 
 /**
+ * 設計思想 22〜25章: 複数モジュールVBAプロジェクト解析型定義
+ */
+export interface VbaModuleFile {
+  id: string;
+  name: string; // 例: "M_Main", "clsOrder", "Sheet1", "frmDialog"
+  type: 'standard' | 'class' | 'sheet' | 'userform';
+  code: string;
+}
+
+export interface CrossModuleCallEdge {
+  callerModule: string;
+  callerProcedure: string;
+  calleeModule: string;
+  calleeProcedure: string;
+  callType: 'explicit_module' | 'implicit_global' | 'method_call';
+}
+
+export interface CrossModuleImpactAnalysis {
+  targetModule: string;
+  targetProcedure: string;
+  directlyAffectedCallers: Array<{ module: string; procedure: string }>;
+  indirectlyAffectedCallers: Array<{ module: string; procedure: string }>;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+  recommendedTestCases: string[];
+}
+
+export interface MultiModuleAnalysisResult {
+  projectId: string;
+  modulesCount: number;
+  totalProceduresCount: number;
+  modules: Array<{
+    name: string;
+    type: string;
+    ir: CodeUnderstandingIR;
+  }>;
+  callGraph: CrossModuleCallEdge[];
+  circularCalls: Array<{
+    cycle: string[]; // 例: ["M_Main.RunAll", "M_Calc.Compute", "M_Main.RunAll"]
+    severity: 'warn' | 'error';
+    description: string;
+  }>;
+  crossModuleImpacts: CrossModuleImpactAnalysis[];
+  unresolvedExternalCalls: Array<{
+    callerModule: string;
+    callerProcedure: string;
+    unresolvedName: string;
+  }>;
+  analyzedAt: number;
+}
+
+/**
  * 設計思想 26章 & 35章 第11段階: 抽象コード・VBA設計支援AI
  */
 export interface DecisionTableRule {
@@ -1681,8 +1762,69 @@ export interface MinimalScopeItem {
   notes: string;
 }
 
+/**
+ * 設計思想 27章 & 35章 第12段階:
+ * 会社固有・環境固有情報の抽象化とセキュリティ境界 (Company & Environment Sanitization & Security Boundary)
+ */
+export type SanitizationMaskType =
+  | 'server_path'      // \\fileserver\share や /var/app/data などの内部パス
+  | 'unc_share'        // 内部UNC共有名
+  | 'ip_domain'        // 内部社内IP (10.x, 192.168.x, 172.16.x) や社内ドメイン (.corp, .local, .internal)
+  | 'credential'       // APIキー、パスワード、接続文字列、Basic認証ヘッダ
+  | 'table_sheet'      // 機密社内シート名、DBテーブル名、固有システム名
+  | 'personal_name'    // 社員氏名・個人名・メールアドレス
+  | 'corp_id';         // 社員番号、顧客コード、口座番号
 
+export interface SanitizedTokenMapping {
+  id: string;
+  original: string;
+  placeholder: string; // 例: <<<SERVER_PATH_1>>>, <<<CORP_SHEET_A>>>, <<<SECRET_CREDENTIAL_1>>>
+  maskType: SanitizationMaskType;
+  confidence: number; // 0.0 〜 1.0
+  detectedContext: string;
+}
 
+export interface SecurityBoundaryAuditResult {
+  isSafeForExternalSubmission: boolean; // 外部教師や外部AI送信、公開可能か
+  sanitizedText: string;                // 抽象化・マスキング後の安全なテキスト
+  mappings: SanitizedTokenMapping[];    // 逆展開用マッピング表（ローカル端末内限定保存）
+  detectedLeaksCount: number;
+  riskLevel: 'SAFE' | 'LOW' | 'MEDIUM' | 'CRITICAL';
+  boundaryViolationReasons: string[];
+  auditedAt: number;
+}
 
+export interface DeAnonymizationResult {
+  restoredText: string;
+  restoredCount: number;
+  unmatchedPlaceholders: string[];
+}
 
+/**
+ * 設計思想 37章 & 35章 第12段階:
+ * 失敗再発 (Failure Recurrence) 検知と自動再対策ループ
+ */
+export interface FailureRecurrencePattern {
+  id: string;
+  targetCapabilityId: string;
+  failureSignature: string;            // エラー・症状の正規化ハッシュ
+  failureTitle: string;
+  firstDetectedAt: number;
+  lastDetectedAt: number;
+  recurrenceCount: number;              // 再発カウント (>=2 で再発と認定)
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  triggerExamples: string[];            // 再発を誘発したユーザープロンプト例
+  associatedSkeletonIds: string[];      // 過去に試みた回答骨格ID
+  remediationStatus: 'NEW' | 'QUEUED_FOR_TEACHER' | 'REMEDIATED' | 'REGRESSED';
+  regressionTestStatus: 'PASSED' | 'FAILED' | 'PENDING';
+  notes?: string;
+}
 
+export interface FailureRecurrenceAuditReport {
+  totalPatterns: number;
+  activeRecurrencesCount: number;
+  highRiskRecurrences: FailureRecurrencePattern[];
+  autoEnqueuedTeacherCount: number;
+  regressedCapabilities: string[];
+  lastAuditedAt: number;
+}

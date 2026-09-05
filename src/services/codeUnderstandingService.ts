@@ -1,6 +1,10 @@
 import {
   CodeUnderstandingIR,
   CodeProcedureIR,
+  VbaModuleFile,
+  CrossModuleCallEdge,
+  CrossModuleImpactAnalysis,
+  MultiModuleAnalysisResult,
 } from '../types';
 import { systemLogger } from './systemLogger';
 
@@ -405,6 +409,244 @@ class CodeUnderstandingService {
     }
 
     return lines.join('\n');
+  }
+
+  /**
+   * 22〜25章: 複数モジュールVBAプロジェクト横断解析 (Cross-Module Call Graph & Impact Analysis)
+   *
+   * 1. 各モジュール (標準モジュール, クラス, シート, フォーム) を個別にCode IR解析
+   * 2. プロシージャシンボル表 (Symbol Table) の構築: Module -> Procedures, Public/Private スコープ
+   * 3. 呼び出し関係 (Call Graph) の解決:
+   *    - 明示的モジュール修飾呼び出し: Module2.Calc()
+   *    - 暗黙的Publicグローバル呼び出し: Calc() -> どのモジュールに定義されているか探索
+   * 4. 循環呼び出し (Circular Calls / 循環参照) の検出 (DFS サイクル検知)
+   * 5. 変更波及範囲解析 (Cross-Module Impact Analysis):
+   *    - プロシージャを変更した場合に影響を受ける直接/間接の呼出元一覧とリスク評価
+   * 6. 未解決外部呼び出しの検出 (Unresolved External Dependencies)
+   */
+  public analyzeMultiModuleProject(modules: VbaModuleFile[]): MultiModuleAnalysisResult {
+    const projectId = `vba_proj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    // 1. 各モジュールを CodeUnderstandingIR に変換
+    const moduleIRs = modules.map((mod) => ({
+      name: mod.name,
+      type: mod.type,
+      ir: this.analyzeCode(mod.code, 'vba'),
+    }));
+
+    // 2. シンボルテーブル構築
+    const symbolMap = new Map<string, Array<{ moduleName: string; proc: CodeProcedureIR }>>();
+    let totalProcedures = 0;
+
+    for (const m of moduleIRs) {
+      for (const p of m.ir.procedures) {
+        totalProcedures++;
+        const pNameLower = p.procedureName.toLowerCase();
+        if (!symbolMap.has(pNameLower)) {
+          symbolMap.set(pNameLower, []);
+        }
+        symbolMap.get(pNameLower)!.push({ moduleName: m.name, proc: p });
+      }
+    }
+
+    // 3. モジュール間コールグラフの解決
+    const callGraph: CrossModuleCallEdge[] = [];
+    const unresolvedCalls: Array<{ callerModule: string; callerProcedure: string; unresolvedName: string }> = [];
+
+    for (const m of moduleIRs) {
+      for (const p of m.ir.procedures) {
+        for (const rawCall of p.calls) {
+          // 明示的修飾呼び出し判定: ModuleName.ProcName
+          if (rawCall.includes('.')) {
+            const parts = rawCall.split('.');
+            const targetModName = parts[0];
+            const targetProcName = parts.slice(1).join('.');
+            const targetMod = moduleIRs.find((mod) => mod.name.toLowerCase() === targetModName.toLowerCase());
+
+            if (targetMod) {
+              callGraph.push({
+                callerModule: m.name,
+                callerProcedure: p.procedureName,
+                calleeModule: targetMod.name,
+                calleeProcedure: targetProcName,
+                callType: 'explicit_module',
+              });
+            } else {
+              // 外部COM/Excel組み込みオブジェクト (Worksheets, Range, Application, etc) は除外
+              if (!['worksheets', 'sheets', 'range', 'cells', 'application', 'thisworkbook', 'msgbox', 'activeworkbook'].includes(targetModName.toLowerCase())) {
+                unresolvedCalls.push({
+                  callerModule: m.name,
+                  callerProcedure: p.procedureName,
+                  unresolvedName: rawCall,
+                });
+              }
+            }
+          } else {
+            // 暗黙的グローバル呼び出し
+            const targets = symbolMap.get(rawCall.toLowerCase());
+            if (targets && targets.length > 0) {
+              // 同一モジュール優先、なければPublicな他モジュール
+              const sameMod = targets.find((t) => t.moduleName.toLowerCase() === m.name.toLowerCase());
+              if (sameMod) {
+                callGraph.push({
+                  callerModule: m.name,
+                  callerProcedure: p.procedureName,
+                  calleeModule: m.name,
+                  calleeProcedure: sameMod.proc.procedureName,
+                  callType: 'implicit_global',
+                });
+              } else {
+                const publicTarget = targets.find((t) => t.proc.visibility !== 'PRIVATE');
+                if (publicTarget) {
+                  callGraph.push({
+                    callerModule: m.name,
+                    callerProcedure: p.procedureName,
+                    calleeModule: publicTarget.moduleName,
+                    calleeProcedure: publicTarget.proc.procedureName,
+                    callType: 'implicit_global',
+                  });
+                }
+              }
+            } else {
+              // VBA組み込み関数でなければ未解決
+              const vbaBuiltins = new Set(['msgbox', 'inputbox', 'cstr', 'clng', 'cint', 'cdbl', 'cdate', 'trim', 'len', 'mid', 'left', 'right', 'replace', 'split', 'join', 'ubound', 'lbound', 'now', 'date', 'time', 'isnumeric', 'isempty', 'isnull', 'isdate', 'format', 'dir', 'instr']);
+              if (!vbaBuiltins.has(rawCall.toLowerCase())) {
+                unresolvedCalls.push({
+                  callerModule: m.name,
+                  callerProcedure: p.procedureName,
+                  unresolvedName: rawCall,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 4. 循環呼び出し (Circular Calls) の検出 (DFS)
+    const circularCalls: Array<{ cycle: string[]; severity: 'warn' | 'error'; description: string }> = [];
+    const adj = new Map<string, string[]>();
+
+    for (const edge of callGraph) {
+      const fromNode = `${edge.callerModule}.${edge.callerProcedure}`;
+      const toNode = `${edge.calleeModule}.${edge.calleeProcedure}`;
+      if (!adj.has(fromNode)) adj.set(fromNode, []);
+      adj.get(fromNode)!.push(toNode);
+    }
+
+    const visited = new Set<string>();
+    const recStack = new Set<string>();
+    const currentPath: string[] = [];
+
+    const detectCycles = (node: string) => {
+      visited.add(node);
+      recStack.add(node);
+      currentPath.push(node);
+
+      const neighbors = adj.get(node) || [];
+      for (const next of neighbors) {
+        if (!visited.has(next)) {
+          detectCycles(next);
+        } else if (recStack.has(next)) {
+          const cycleStart = currentPath.indexOf(next);
+          const cycleNodes = [...currentPath.slice(cycleStart), next];
+          circularCalls.push({
+            cycle: cycleNodes,
+            severity: 'error',
+            description: `循環呼び出しを検出: ${cycleNodes.join(' ➔ ')} (スタックオーバーフローまたは無限ループのリスク)`,
+          });
+        }
+      }
+
+      currentPath.pop();
+      recStack.delete(node);
+    };
+
+    for (const node of adj.keys()) {
+      if (!visited.has(node)) {
+        detectCycles(node);
+      }
+    }
+
+    // 5. 変更影響予測 (Cross-Module Impact Analysis)
+    const reverseCallMap = new Map<string, Array<{ module: string; procedure: string }>>();
+    for (const edge of callGraph) {
+      const calleeKey = `${edge.calleeModule}.${edge.calleeProcedure}`;
+      if (!reverseCallMap.has(calleeKey)) reverseCallMap.set(calleeKey, []);
+      reverseCallMap.get(calleeKey)!.push({
+        module: edge.callerModule,
+        procedure: edge.callerProcedure,
+      });
+    }
+
+    const crossModuleImpacts: CrossModuleImpactAnalysis[] = [];
+
+    for (const m of moduleIRs) {
+      for (const p of m.ir.procedures) {
+        const procKey = `${m.name}.${p.procedureName}`;
+        const direct = reverseCallMap.get(procKey) || [];
+
+        // 間接影響 (2ホップ以上)
+        const indirectSet = new Set<string>();
+        const queue = [...direct];
+        const visitedCallers = new Set<string>(direct.map((d) => `${d.module}.${d.procedure}`));
+
+        while (queue.length > 0) {
+          const cur = queue.shift()!;
+          const callersOfCur = reverseCallMap.get(`${cur.module}.${cur.procedure}`) || [];
+          for (const c of callersOfCur) {
+            const cKey = `${c.module}.${c.procedure}`;
+            if (!visitedCallers.has(cKey) && cKey !== procKey) {
+              visitedCallers.add(cKey);
+              indirectSet.add(cKey);
+              queue.push(c);
+            }
+          }
+        }
+
+        const indirect = Array.from(indirectSet).map((k) => {
+          const [mod, proc] = k.split('.');
+          return { module: mod, procedure: proc };
+        });
+
+        // リスク評価
+        const riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' =
+          direct.length >= 3 || indirect.length >= 2 || circularCalls.some((c) => c.cycle.includes(procKey))
+            ? 'HIGH'
+            : direct.length > 0
+            ? 'MEDIUM'
+            : 'LOW';
+
+        crossModuleImpacts.push({
+          targetModule: m.name,
+          targetProcedure: p.procedureName,
+          directlyAffectedCallers: direct,
+          indirectlyAffectedCallers: indirect,
+          riskLevel,
+          recommendedTestCases: [
+            `${m.name}.${p.procedureName} 単体テスト (正常系/異常系)`,
+            ...direct.map((d) => `${d.module}.${d.procedure} の統合回帰テスト`),
+          ],
+        });
+      }
+    }
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🧩 [22-25章 複数モジュールVBA解析] モジュール: ${modules.length}個, プロシージャ: ${totalProcedures}個, コールエッジ: ${callGraph.length}本, 循環呼出: ${circularCalls.length}件`
+    );
+
+    return {
+      projectId,
+      modulesCount: modules.length,
+      totalProceduresCount: totalProcedures,
+      modules: moduleIRs,
+      callGraph,
+      circularCalls,
+      crossModuleImpacts,
+      unresolvedExternalCalls: unresolvedCalls,
+      analyzedAt: Date.now(),
+    };
   }
 }
 

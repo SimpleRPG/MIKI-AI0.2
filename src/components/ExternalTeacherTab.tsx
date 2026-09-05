@@ -17,6 +17,11 @@ import {
   Check,
   Copy,
   Info,
+  Moon,
+  Trash2,
+  Play,
+  Zap,
+  Plus,
 } from 'lucide-react';
 import {
   FailureRecurrenceEntry,
@@ -26,6 +31,7 @@ import {
   TeacherUsageRecord,
   TrainingSampleJSONL,
   ResponseSkeleton,
+  DelayedTeacherQueueItem,
 } from '../types';
 import { teacherRequestService } from '../services/teacherRequestService';
 import { selfImprovementService } from '../services/selfImprovementService';
@@ -69,6 +75,11 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
   // コピー表示
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // 遅延送信キュー (11章 睡眠ゲート連携)
+  const [delayedQueue, setDelayedQueue] = useState<DelayedTeacherQueueItem[]>([]);
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+  const [batchNotice, setBatchNotice] = useState<string | null>(null);
+
   const refreshData = () => {
     const status = teacherRequestService.checkBudget();
     setBudgetStatus(status);
@@ -84,11 +95,52 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
     setExternalSamples(samples);
 
     setUsageRecords(teacherRequestService.getUsageRecords());
+    setDelayedQueue(teacherRequestService.getDelayedQueue());
   };
 
   useEffect(() => {
     refreshData();
   }, []);
+
+  const handleRunBatchNow = async () => {
+    setIsProcessingQueue(true);
+    setBatchNotice(null);
+    try {
+      const res = await teacherRequestService.processDelayedTeacherQueue(3);
+      setBatchNotice(
+        `バッチ処理完了: ${res.processedCount}件処理 (成功: ${res.succeededCount}件, 失敗: ${res.failedCount}件)`
+      );
+      refreshData();
+    } catch (e: any) {
+      setBatchNotice(`バッチエラー: ${e?.message || String(e)}`);
+    } finally {
+      setIsProcessingQueue(false);
+    }
+  };
+
+  const handleEnqueueSample = () => {
+    teacherRequestService.enqueueDelayedRequest({
+      source: 'manual',
+      targetCapabilityId: 'cap_logical_priority',
+      userPrompt: '「AとBを両方有効にして」と言われた場合、どちらの例外処理を最優先で適用すべきか解説して',
+      failureCategory: 'chat',
+      divergenceTypes: ['divergence_conclusion', 'divergence_priority'],
+      uncertaintyScore: 78,
+      candidateResponses: ['Aを優先すべきです', 'Bを最優先と判定します'],
+    });
+    setBatchNotice('テスト用の不確実性ブレ要請を遅延キューに追加しました。');
+    refreshData();
+  };
+
+  const handleRemoveQueueItem = (id: string) => {
+    teacherRequestService.removeQueueItem(id);
+    refreshData();
+  };
+
+  const handleClearQueue = () => {
+    teacherRequestService.clearDelayedQueue();
+    refreshData();
+  };
 
   // 弱点パターンを選択し、匿名化・ペイロードプレビューを生成
   const handleSelectPattern = (pattern: FailureRecurrenceEntry) => {
@@ -720,6 +772,175 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
           )}
         </div>
       )}
+
+      {/* 3.5. オフライン遅延送信キュー (設計思想 11章 睡眠ゲート ＆ 20章 不確実性連携) */}
+      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Moon className="w-4 h-4 text-cyan-400" />
+              <h4 className="text-sm font-bold text-slate-200">
+                オフライン遅延送信キュー (11章 睡眠ゲート ＆ 20章 不確実性連携)
+              </h4>
+              <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-full text-[10px] font-bold">
+                {delayedQueue.length} 件
+              </span>
+              {delayedQueue.filter((q) => q.status === 'PENDING').length > 0 && (
+                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full text-[10px] font-bold">
+                  待機中: {delayedQueue.filter((q) => q.status === 'PENDING').length} 件
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              会話中の判断ブレや未解決要請を一時退避し、深夜・充電中・Wi-Fi接続時（深い睡眠バッチ）に外部教師から対策骨格と教材を一括安全取得します
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleEnqueueSample}
+              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded text-xs flex items-center gap-1.5 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>テスト要請追加</span>
+            </button>
+            <button
+              onClick={handleRunBatchNow}
+              disabled={isProcessingQueue || delayedQueue.filter((q) => q.status === 'PENDING').length === 0}
+              className={`px-3 py-1.5 rounded text-xs flex items-center gap-1.5 font-medium transition-colors ${
+                isProcessingQueue || delayedQueue.filter((q) => q.status === 'PENDING').length === 0
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-800'
+                  : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm'
+              }`}
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span>{isProcessingQueue ? 'バッチ処理中...' : '今すぐバッチ実行'}</span>
+            </button>
+            {delayedQueue.length > 0 && (
+              <button
+                onClick={handleClearQueue}
+                title="キューを全件消去"
+                className="p-1.5 text-slate-400 hover:text-red-400 bg-slate-800/80 hover:bg-slate-800 rounded border border-slate-700 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {batchNotice && (
+          <div className="mb-3 px-3 py-2 bg-cyan-950/40 border border-cyan-500/30 rounded text-xs text-cyan-200 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span>{batchNotice}</span>
+          </div>
+        )}
+
+        {delayedQueue.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
+            現在待機中の遅延教師要請はありません。20章不確実性テストまたは上記ボタンから追加できます。
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            {delayedQueue.map((item) => (
+              <div
+                key={item.id}
+                className="p-3 bg-slate-950/60 border border-slate-800 rounded-lg flex flex-col gap-2 hover:border-slate-700 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        item.status === 'PENDING'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : item.status === 'PROCESSING'
+                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                          : item.status === 'PROCESSED'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                      }`}
+                    >
+                      {item.status === 'PENDING'
+                        ? '待機中 (深い睡眠待ち)'
+                        : item.status === 'PROCESSING'
+                        ? '処理中...'
+                        : item.status === 'PROCESSED'
+                        ? '完了 (骨格・教材反映済)'
+                        : '失敗'}
+                    </span>
+
+                    <span className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded font-mono text-[10px]">
+                      {item.source === 'uncertainty_divergence'
+                        ? '20章 不確実性ブレ'
+                        : item.source === 'failure_recurrence'
+                        ? '37章 失敗再発'
+                        : '手動追加'}
+                    </span>
+
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      対象: {item.targetCapabilityId}
+                    </span>
+
+                    {item.uncertaintyScore !== undefined && (
+                      <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded text-[10px]">
+                        ブレ度: {item.uncertaintyScore}点
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-500">
+                      {new Date(item.enqueuedAt).toLocaleTimeString()}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveQueueItem(item.id)}
+                      className="text-slate-500 hover:text-red-400 transition-colors p-1"
+                      title="この項目を削除"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-xs text-slate-200">
+                  {item.anonymizedPrompt || item.userPrompt}
+                </div>
+
+                {item.divergenceTypes && item.divergenceTypes.length > 0 && (
+                  <div className="flex flex-wrap gap-1 items-center text-[10px]">
+                    <span className="text-slate-500">検出乖離:</span>
+                    {item.divergenceTypes.map((dt) => (
+                      <span
+                        key={dt}
+                        className="px-1.5 py-0.2 bg-slate-800 text-amber-300/80 rounded border border-slate-700"
+                      >
+                        {dt}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {item.status === 'PROCESSED' && (
+                  <div className="flex items-center gap-3 text-[10px] text-emerald-400 bg-emerald-950/20 px-2 py-1 rounded border border-emerald-500/20">
+                    <span>✓ 処理完了: {new Date(item.processedAt || 0).toLocaleTimeString()}</span>
+                    {item.resultSkeletonId && <span>生成骨格: {item.resultSkeletonId}</span>}
+                    {item.verificationPassed !== undefined && (
+                      <span>
+                        13章端末検証: {item.verificationPassed ? '合格(効果確認)' : '汎化不足検知'}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {item.status === 'FAILED' && item.errorMessage && (
+                  <div className="text-[10px] text-red-400 bg-red-950/20 px-2 py-1 rounded border border-red-500/20">
+                    エラー: {item.errorMessage} (試行回数: {item.retryCount})
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* 4. 外部教師経由の蓄積教材リスト */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">

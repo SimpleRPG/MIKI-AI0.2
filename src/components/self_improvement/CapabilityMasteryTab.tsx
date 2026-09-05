@@ -305,15 +305,32 @@ export const CapabilityMasteryTab: React.FC = () => {
                   </span>
                   <span className="text-[10px] text-slate-400">頻度: {gap.frequency}回</span>
                 </div>
-                <span
-                  className={`text-[9.5px] px-2 py-0.5 rounded font-bold border ${
-                    gap.impact === 'CRITICAL' || gap.impact === 'HIGH'
-                      ? 'bg-rose-950 text-rose-300 border-rose-800'
-                      : 'bg-slate-900 text-slate-400 border-slate-700'
-                  }`}
-                >
-                  影響: {gap.impact}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[9.5px] px-2 py-0.5 rounded font-bold border ${
+                      gap.status === 'RESOLVED'
+                        ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
+                        : gap.status === 'MITIGATED'
+                        ? 'bg-sky-950 text-sky-300 border-sky-700'
+                        : 'bg-amber-950 text-amber-300 border-amber-700'
+                    }`}
+                  >
+                    {gap.status === 'RESOLVED'
+                      ? '✓ 解決済み (RESOLVED)'
+                      : gap.status === 'MITIGATED'
+                      ? '⚡ 緩和中 (MITIGATED)'
+                      : '● 未解決 (OPEN)'}
+                  </span>
+                  <span
+                    className={`text-[9.5px] px-2 py-0.5 rounded font-bold border ${
+                      gap.impact === 'CRITICAL' || gap.impact === 'HIGH'
+                        ? 'bg-rose-950 text-rose-300 border-rose-800'
+                        : 'bg-slate-900 text-slate-400 border-slate-700'
+                    }`}
+                  >
+                    影響: {gap.impact}
+                  </span>
+                </div>
               </div>
 
               <div className="font-medium text-slate-200">{gap.description}</div>
@@ -329,15 +346,42 @@ export const CapabilityMasteryTab: React.FC = () => {
                 </div>
               </div>
 
-              {gap.associatedPatternId && (
-                <div className="text-[10px] text-amber-300/90 flex items-center gap-1">
-                  <span>紐づく既存骨格:</span>
-                  <span className="font-mono bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-500/30">
-                    {gap.associatedPatternId}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                {gap.associatedPatternId ? (
+                  <div className="text-[10px] text-amber-300/90 flex items-center gap-1">
+                    <span>紐づく回答骨格:</span>
+                    <span className="font-mono bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-500/30">
+                      {gap.associatedPatternId}
+                    </span>
+                  </div>
+                ) : (
+                  <span />
+                )}
+
+                {gap.status !== 'RESOLVED' ? (
+                  <button
+                    onClick={() => {
+                      if (gap.gap_id === 'GAP-0012') {
+                        capabilityGapService.resolveGap0012();
+                      } else if (gap.gap_id === 'GAP-0031') {
+                        capabilityGapService.resolveGap0031();
+                      } else {
+                        capabilityGapService.updateGapStatus(gap.gap_id, 'RESOLVED');
+                      }
+                      refreshData();
+                    }}
+                    className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white rounded font-bold text-[10.5px] flex items-center gap-1 shadow transition-all cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>恒久対策を配備・解決済みに更新</span>
+                  </button>
+                ) : (
+                  <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>恒久対策配備済み</span>
                   </span>
-                  <span className="text-slate-400">(※この骨格があるにも関わらず別表現で再発)</span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ))}
         </div>

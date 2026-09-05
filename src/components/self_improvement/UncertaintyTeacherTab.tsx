@@ -11,6 +11,7 @@ import {
   ArrowRight,
   ShieldCheck,
   Cpu,
+  Moon,
 } from 'lucide-react';
 import { uncertaintyTeacherService } from '../../services/uncertaintyTeacherService';
 import { capabilityGapService } from '../../services/capabilityGapService';
@@ -121,9 +122,47 @@ export const UncertaintyTeacherTab: React.FC = () => {
         </div>
 
         <div className="space-y-2">
-          <label className="text-[11px] text-slate-400 block">
-            検証対象のプロンプト（未知の言い回しや判断が割れやすい質問）:
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] text-slate-400 block">
+              検証対象のプロンプト（未知の言い回しや判断が割れやすい質問）:
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+              <span className="text-slate-500">クイック検証:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputPrompt('条件Aかつ条件Bだが例外Cでさらに除外フラグDがある場合の最終更新判定はどうなる？');
+                  setSelectedCapId('cap_logical_priority');
+                }}
+                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-mono transition-colors"
+                title="GAP-0012: 三重例外と除外フラグの優先順位判定テスト"
+              >
+                🧪 GAP-0012 (三重例外)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputPrompt('「さっきと言ってること変わってる気がするんだけど、結局スマホ単体で動くの？」');
+                  setSelectedCapId('cap_correction');
+                }}
+                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-purple-300 font-mono transition-colors"
+                title="GAP-0031: 婉曲的な前提訂正・矛盾指摘テスト"
+              >
+                🧪 GAP-0031 (婉曲訂正)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputPrompt('Galaxy S25上で完全にオフラインかつファンレスで3Bモデルを2時間チャットし続けた場合、発熱とメモリ不足のどちらが先に致命的になりますか？');
+                  setSelectedCapId('cap_conv_naturalness');
+                }}
+                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-sky-300 font-mono transition-colors"
+                title="発熱 vs メモリ制約の不確実性評価"
+              >
+                🧪 発熱vsメモリ
+              </button>
+            </div>
+          </div>
           <textarea
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
@@ -141,6 +180,8 @@ export const UncertaintyTeacherTab: React.FC = () => {
               onChange={(e) => setSelectedCapId(e.target.value)}
               className="p-1.5 rounded bg-slate-950 border border-slate-800 text-xs text-slate-200"
             >
+              <option value="cap_logical_priority">複合条件・例外階層の論理統合 (cap_logical_priority)</option>
+              <option value="cap_correction">前提訂正・前提更新能力 (cap_correction)</option>
               <option value="cap_conv_naturalness">自然な会話の継続 (cap_conv_naturalness)</option>
               <option value="cap_premise_correction">前提訂正の即座反映 (cap_premise_correction)</option>
               <option value="cap_vba_split">VBAプロシージャ分割 (cap_vba_split)</option>
@@ -227,6 +268,10 @@ export const UncertaintyTeacherTab: React.FC = () => {
               <p className="text-[11px] text-indigo-200">
                 教師の対策として回答骨格 (<strong>{latestResult.generatedSkeletonId}</strong>) を登録しました。以後はゼロから推論せず回答骨格で思考を節約します。
               </p>
+              <div className="pt-1 flex items-center gap-1.5 text-[10px] text-cyan-300">
+                <Moon className="w-3.5 h-3.5" />
+                <span>【11章 睡眠ゲート連携】深夜の深い睡眠バッチ（充電＋Wi-Fi）用遅延キューへ自動登録されました</span>
+              </div>
             </div>
           )}
 
