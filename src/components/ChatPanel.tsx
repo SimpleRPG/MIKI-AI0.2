@@ -1063,33 +1063,45 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                 {/* Fallback & WebGPU Status info bar */}
                 {!isUser && msg.fallbackDiagnostic && (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 bg-amber-950/40 border border-amber-500/30 px-3 py-1.5 rounded-lg text-[11px] text-amber-200">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded font-bold text-[10px]">
-                        {msg.fallbackDiagnostic.category}
-                      </span>
-                      <span className="truncate text-slate-300">{msg.fallbackDiagnostic.cause}</span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                      <button
-                        onClick={async () => {
-                          await systemLogger.downloadDiagnosticsTxtFile();
-                        }}
-                        className="text-[10px] text-emerald-300 hover:text-emerald-200 flex items-center gap-1 bg-emerald-950/70 border border-emerald-500/40 px-2 py-0.5 rounded font-bold transition-all hover:bg-emerald-900"
-                        title="診断レポート(.txt)をダウンロードして原因を確認・共有できます"
-                      >
-                        <FileText className="w-3 h-3" />
-                        <span>📄 診断txt保存</span>
-                      </button>
-                      {onOpenEngineModal && (
+                  <div className="flex flex-col gap-1.5 bg-amber-950/40 border border-amber-500/30 px-3 py-1.5 rounded-lg text-[11px] text-amber-200">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded font-bold text-[10px]">
+                          {msg.fallbackDiagnostic.category}
+                        </span>
+                        <span className="truncate text-slate-300">{msg.fallbackDiagnostic.cause}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                         <button
-                          onClick={onOpenEngineModal}
-                          className="text-[10px] text-sky-400 hover:text-sky-300 underline font-medium transition-colors"
+                          onClick={async () => {
+                            await systemLogger.downloadDiagnosticsTxtFile();
+                          }}
+                          className="text-[10px] text-emerald-300 hover:text-emerald-200 flex items-center gap-1 bg-emerald-950/70 border border-emerald-500/40 px-2 py-0.5 rounded font-bold transition-all hover:bg-emerald-900"
+                          title="診断レポート(.txt)をダウンロードして原因を確認・共有できます"
                         >
-                          端末LLM設定
+                          <FileText className="w-3 h-3" />
+                          <span>📄 診断txt保存</span>
                         </button>
-                      )}
+                        {onOpenEngineModal && (
+                          <button
+                            onClick={onOpenEngineModal}
+                            className="text-[10px] text-sky-400 hover:text-sky-300 underline font-medium transition-colors"
+                          >
+                            端末LLM設定
+                          </button>
+                        )}
+                      </div>
                     </div>
+                    {msg.fallbackDiagnostic.rawErrorMessage && (
+                      <details className="text-[10px] text-slate-400 cursor-pointer pt-0.5 border-t border-amber-500/20">
+                        <summary className="hover:text-amber-300 transition-colors font-mono select-none">
+                          ▶ 生のエラーログ詳細を表示
+                        </summary>
+                        <div className="mt-1 p-1.5 bg-slate-950/80 border border-slate-800 rounded font-mono text-[9.5px] text-rose-300/90 whitespace-pre-wrap break-all max-h-24 overflow-y-auto">
+                          {msg.fallbackDiagnostic.rawErrorMessage}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 )}
 

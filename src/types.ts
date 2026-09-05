@@ -449,7 +449,8 @@ export interface ChatMessage {
     category: string;
     cause: string;
     tip: string;
-    modelId: string;
+    modelId?: string;
+    rawErrorMessage?: string | null;
   };
   failureClassification?: {
     category: string;
@@ -832,6 +833,7 @@ export interface DelayedTeacherQueueItem {
   divergenceTypes?: string[];
   uncertaintyScore?: number;
   candidateResponses?: string[];
+  priority: number; // 設計思想 12章: 加点・減点スコアリングによる優先度 (降順処理)
   enqueuedAt: number;
   status: DelayedTeacherQueueStatus;
   retryCount: number;

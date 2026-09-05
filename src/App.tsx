@@ -141,8 +141,13 @@ export default function App() {
   const [mobileTab, setMobileTab] = useState<'chat' | 'preview' | 'code' | 'github' | 'memory' | 'engine'>('chat');
 
   const [persona, setPersona] = useState<PersonaConfig>(() => {
-    const saved = storageService.getItem('gamecraft_persona');
-    return saved ? JSON.parse(saved) : DEFAULT_PERSONA;
+    try {
+      const saved = storageService.getItem('gamecraft_persona');
+      return saved ? JSON.parse(saved) : DEFAULT_PERSONA;
+    } catch (e) {
+      console.warn('Failed to load persona, falling back to default:', e);
+      return DEFAULT_PERSONA;
+    }
   });
   const [memories, setMemories] = useState<MemoryItem[]>(() => {
     const loaded = storageService.getMemories();
@@ -1649,15 +1654,15 @@ export default function App() {
         // 🖥️ External Local LLM Server Pipeline (Ollama)
         // ==========================================
         systemLogger.step(8, 10, '🖥️ 外部ローカルLLM (Ollama/LM Studio) 推論実行');
-        try {
-          const extConfig = (() => {
-            try {
-              const saved = storageService.getItem('miki_external_llm_config');
-              if (saved) return JSON.parse(saved);
-            } catch (e) {}
-            return { endpoint: 'http://localhost:11434', model: 'qwen2.5:1.5b', type: 'ollama' as const };
-          })();
+        const extConfig = (() => {
+          try {
+            const saved = storageService.getItem('miki_external_llm_config');
+            if (saved) return JSON.parse(saved);
+          } catch (e) {}
+          return { endpoint: 'http://localhost:11434', model: 'qwen2.5:1.5b', type: 'ollama' as const };
+        })();
 
+        try {
           for await (const chunk of nativeLlmService.streamExternalLocalLlm(extConfig, chatContext, {
             temperature: promptAnalysis.temperature,
           })) {
@@ -1846,8 +1851,8 @@ export default function App() {
             category: diagnosticCategory,
             cause: diagnosticCause,
             tip: diagnosticTip,
-            modelId: actualExternalModelId,
-            rawErrorMessage: webGpuErrorDetails,
+            modelId: actualExternalModelId || 'unknown',
+            rawErrorMessage: webGpuErrorDetails || undefined,
           };
           executedEngineLabel = '⚠️ 外部ローカルLLM接続失敗';
           systemLogger.warn('CHAT', `[外部LLM未応答診断] ${diagnosticCategory}: ${diagnosticCause} | 生のエラー: ${webGpuErrorDetails}`, diagnosticData);

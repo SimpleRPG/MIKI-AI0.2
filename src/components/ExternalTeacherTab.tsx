@@ -132,7 +132,7 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
   };
 
   const handleEnqueueSample = () => {
-    teacherRequestService.enqueueDelayedRequest({
+    const res = teacherRequestService.enqueueDelayedRequest({
       source: 'manual',
       targetCapabilityId: 'cap_logical_priority',
       userPrompt: '「AとBを両方有効にして」と言われた場合、どちらの例外処理を最優先で適用すべきか解説して',
@@ -141,7 +141,11 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
       uncertaintyScore: 78,
       candidateResponses: ['Aを優先すべきです', 'Bを最優先と判定します'],
     });
-    setBatchNotice('テスト用の不確実性ブレ要請を遅延キューに追加しました。');
+    if (res) {
+      setBatchNotice(`テスト用の不確実性ブレ要請を遅延キューに追加しました。(12章 優先度: ${res.priority}点)`);
+    } else {
+      setBatchNotice('12章優先度スコア不足のため遅延キューへの追加が却下されました。');
+    }
     refreshData();
   };
 
@@ -926,6 +930,10 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
 
                     <span className="text-[10px] text-slate-400 font-mono">
                       対象: {item.targetCapabilityId}
+                    </span>
+
+                    <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold">
+                      優先度: {item.priority ?? 0}点
                     </span>
 
                     {item.uncertaintyScore !== undefined && (

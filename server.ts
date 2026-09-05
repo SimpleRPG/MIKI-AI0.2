@@ -796,18 +796,103 @@ app.get(['/api/export-app-zip', '/api/download-zip', '/miki-project.zip', '/down
   }
 });
 
+// Companion Miki RPG Endpoints
+app.post('/api/miki/chat', async (req, res) => {
+  try {
+    const { message, character, worldState } = req.body;
+    const ai = getAIClient();
+    const charName = character?.name || '冒険者';
+    const locName = worldState?.name || '拠点';
+
+    if (!ai) {
+      return res.json({
+        reply: `${charName}、${locName}での探索順調？何があってもみきがついてるから安心して進もうね！🗡️✨`
+      });
+    }
+
+    const prompt = `あなたはゲームの相棒「みき」です。
+プレイヤー名: ${charName}
+現在地: ${locName}
+メッセージ: "${message}"
+親身で元気なタメ口で、冒険のアドバイスや励ましを1〜2文で答えてください。`;
+
+    const { response } = await generateContentWithFallback(ai, {
+      contents: prompt,
+      config: { temperature: 0.7 }
+    });
+
+    res.json({ reply: response.text || `${charName}、一緒に頑張ろうね！` });
+  } catch (err: any) {
+    res.json({ reply: `うんうん、しっかり聞いてるよ！どんな冒険でも一緒に乗り越えようね！` });
+  }
+});
+
+app.post('/api/miki/narrate', (req, res) => {
+  const { action, character, worldState } = req.body;
+  const charName = character?.name || '冒険者';
+  res.json({
+    data: {
+      narration: `${charName}は慎重に辺りを見回し、${action || '前進'}した。静寂の中にかすかな風の音が響く。`,
+      mikiComment: '気をつけて、何かの気配がするよ！',
+      suggestedActions: ['周囲を探索する', '武器を構えて進む', '一旦休憩する'],
+      hpDelta: 0,
+      mpDelta: 0,
+      goldDelta: 5,
+      xpDelta: 10
+    }
+  });
+});
+
+app.post('/api/miki/quest', (req, res) => {
+  const { setting, difficulty } = req.body;
+  res.json({
+    quest: {
+      id: 'q_' + Date.now(),
+      title: `${setting || '未知の迷宮'}の調査`,
+      description: `${setting || 'エリア'}を探索し、手がかりを収集してください。（難易度: ${difficulty || 'Normal'}）`,
+      reward: '150 Gold, 50 XP',
+      completed: false
+    }
+  });
+});
+
+app.post('/api/miki/combat', (req, res) => {
+  const { playerMove, character, monster } = req.body;
+  const pDamage = Math.floor(Math.random() * 15) + 10;
+  const mDamage = Math.floor(Math.random() * 8) + 3;
+  res.json({
+    data: {
+      narrative: `${character?.name || 'プレイヤー'}の「${playerMove || '攻撃'}」がヒット！ ${monster?.name || 'モンスター'}に${pDamage}のダメージ！`,
+      playerDamage: mDamage,
+      monsterDamage: pDamage,
+      isCritical: Math.random() > 0.8,
+      mikiComment: 'ナイス攻撃！この調子でたたみかけよう！'
+    }
+  });
+});
+
 // Setup Vite or Static Serving
 async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
 
+  // Listen on port 3000 FIRST so health checks and container ingress respond immediately
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Miki AI Partner & Autonomous Studio server running on http://0.0.0.0:${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use.`);
+      process.exit(1);
+    } else {
+      console.error('Server error:', err);
+    }
+  });
+
   if (!isProduction) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: {
-        middlewareMode: true,
-        host: '0.0.0.0',
-        port: PORT
-      },
+      server: { middlewareMode: true },
       appType: 'spa'
     });
 
@@ -819,10 +904,6 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Miki AI Partner & Autonomous Studio server running on http://0.0.0.0:${PORT}`);
-  });
 }
 
 startServer().catch(err => {

@@ -113,7 +113,10 @@ export class TeacherRequestService {
 
       const rawQueue = storageService.getItem(DELAYED_QUEUE_STORAGE_KEY);
       if (rawQueue) {
-        this.delayedQueue = JSON.parse(rawQueue);
+        const parsed = JSON.parse(rawQueue);
+        this.delayedQueue = Array.isArray(parsed)
+          ? parsed.map((q: any) => ({ ...q, priority: typeof q.priority === 'number' ? q.priority : 0 }))
+          : [];
       }
 
       const rawAutoRecords = storageService.getItem(AUTO_REQUEST_RECORDS_KEY);
@@ -858,6 +861,210 @@ export class TeacherRequestService {
     return [...this.delayedQueue];
   }
 
+  /**
+   * 設計思想 12章: 教材要求キュー優先度スコア計算式 (基準点0)
+   *
+   * 加点:
+   * ・ユーザーから明確に訂正された          +30
+   * ・以前の説明と矛盾した                  +20
+   * ・質問の意図を外した                    +20
+   * ・古い前提を使った                      +15
+   * ・複数条件を落とした                    +15
+   * ・同じ失敗を繰り返した(頻度に応じ加点) +5 × (frequency - 1)、上限+25
+   * ・日本語が不自然だった                  +10
+   * ・回答長が大きく不適切だった            +10
+   *
+   * 減点:
+   * ・実用効果を検証できない                -15
+   * ・単なる語尾の違い                      -20
+   * ・既存教材とほぼ同じ                    -30
+   * ・端末モデルが既に安定して正解する      -30
+   *
+   * 合計が0以下の要求はキューに追加しない(却下)。
+   * キュー処理時は合計スコアの高い順に処理する。
+   */
+  public calculateQueuePriority(params: {
+    userPrompt: string;
+    source?: 'uncertainty_divergence' | 'failure_recurrence' | 'manual';
+    failureCategory?: string;
+    divergenceTypes?: string[];
+    uncertaintyScore?: number;
+    candidateResponses?: string[];
+    recurrenceCount?: number;
+    failureReason?: string;
+    reasons?: string[];
+    userCorrection?: boolean;
+    contradictedPreviousExplanation?: boolean;
+    missedUserIntent?: boolean;
+    outdatedPremise?: boolean;
+    missedMultipleConditions?: boolean;
+    unnaturalJapanese?: boolean;
+    inappropriateResponseLength?: boolean;
+    unverifiableEffect?: boolean;
+    trivialEndingVariation?: boolean;
+    duplicateOfExistingSample?: boolean;
+    deviceModelStableCorrect?: boolean;
+  }): { priority: number; breakdown: string[] } {
+    let score = 0;
+    const breakdown: string[] = [];
+
+    const reasonText = (params.failureReason || params.reasons?.join(' ') || '').toLowerCase();
+    const promptText = (params.userPrompt || '').toLowerCase();
+    const divergences = params.divergenceTypes || [];
+
+    // 1. ユーザーから明確に訂正された (+30)
+    if (
+      params.userCorrection ||
+      reasonText.includes('訂正') ||
+      reasonText.includes('ユーザー指摘') ||
+      reasonText.includes('誤り指摘') ||
+      promptText.includes('違います') ||
+      promptText.includes('そうではなく') ||
+      promptText.includes('間違ってい')
+    ) {
+      score += 30;
+      breakdown.push('ユーザーから明確に訂正された (+30)');
+    }
+
+    // 2. 以前の説明と矛盾した (+20)
+    if (
+      params.contradictedPreviousExplanation ||
+      divergences.includes('divergence_conclusion') ||
+      reasonText.includes('矛盾') ||
+      reasonText.includes('以前の説明と異') ||
+      reasonText.includes('前言撤回')
+    ) {
+      score += 20;
+      breakdown.push('以前の説明と矛盾した (+20)');
+    }
+
+    // 3. 質問の意図を外した (+20)
+    if (
+      params.missedUserIntent ||
+      reasonText.includes('意図を外') ||
+      reasonText.includes('的外れ') ||
+      reasonText.includes('意図不一致') ||
+      reasonText.includes('質問の意図')
+    ) {
+      score += 20;
+      breakdown.push('質問の意図を外した (+20)');
+    }
+
+    // 4. 古い前提を使った (+15)
+    if (
+      params.outdatedPremise ||
+      reasonText.includes('古い前提') ||
+      reasonText.includes('前提の更新漏れ') ||
+      reasonText.includes('前提不一致')
+    ) {
+      score += 15;
+      breakdown.push('古い前提を使った (+15)');
+    }
+
+    // 5. 複数条件を落とした (+15)
+    if (
+      params.missedMultipleConditions ||
+      divergences.includes('divergence_priority') ||
+      reasonText.includes('複数条件') ||
+      reasonText.includes('条件落') ||
+      reasonText.includes('条件漏れ') ||
+      reasonText.includes('制約違反')
+    ) {
+      score += 15;
+      breakdown.push('複数条件を落とした (+15)');
+    }
+
+    // 6. 同じ失敗を繰り返した (頻度に応じ加点: +5 × (frequency - 1)、上限+25)
+    const frequency = params.recurrenceCount ?? (params.source === 'failure_recurrence' ? 2 : 1);
+    if (frequency > 1) {
+      const freqScore = Math.min(25, 5 * (frequency - 1));
+      score += freqScore;
+      breakdown.push(`同じ失敗を繰り返した (再発${frequency}回: +${freqScore})`);
+    }
+
+    // 7. 日本語が不自然だった (+10)
+    if (
+      params.unnaturalJapanese ||
+      reasonText.includes('日本語が不自然') ||
+      reasonText.includes('文法不自然') ||
+      reasonText.includes('不自然な表現')
+    ) {
+      score += 10;
+      breakdown.push('日本語が不自然だった (+10)');
+    }
+
+    // 8. 回答長が大きく不適切だった (+10)
+    if (
+      params.inappropriateResponseLength ||
+      reasonText.includes('回答長') ||
+      reasonText.includes('長すぎ') ||
+      reasonText.includes('短すぎ') ||
+      reasonText.includes('冗長')
+    ) {
+      score += 10;
+      breakdown.push('回答長が大きく不適切だった (+10)');
+    }
+
+    // 減点項目
+    // 9. 実用効果を検証できない (-15)
+    if (
+      params.unverifiableEffect ||
+      reasonText.includes('実用効果を検証できない') ||
+      reasonText.includes('検証不可') ||
+      reasonText.includes('効果未検証')
+    ) {
+      score -= 15;
+      breakdown.push('実用効果を検証できない (-15)');
+    }
+
+    // 10. 単なる語尾の違い (-20)
+    if (
+      params.trivialEndingVariation ||
+      reasonText.includes('単なる語尾の違い') ||
+      reasonText.includes('語尾の違いのみ') ||
+      reasonText.includes('文末表現のみ')
+    ) {
+      score -= 20;
+      breakdown.push('単なる語尾の違い (-20)');
+    }
+
+    // 11. 既存教材とほぼ同じ (-30)
+    if (
+      params.duplicateOfExistingSample ||
+      reasonText.includes('既存教材とほぼ同じ') ||
+      reasonText.includes('既存教材重複') ||
+      reasonText.includes('既存正解が存在')
+    ) {
+      score -= 30;
+      breakdown.push('既存教材とほぼ同じ (-30)');
+    }
+
+    // 12. 端末モデルが既に安定して正解する (-30)
+    if (
+      params.deviceModelStableCorrect ||
+      reasonText.includes('安定して正解') ||
+      reasonText.includes('端末内解決可能') ||
+      reasonText.includes('端末側で正解')
+    ) {
+      score -= 30;
+      breakdown.push('端末モデルが既に安定して正解する (-30)');
+    }
+
+    // 特例: 手動テスト要求で何のフラグも一致しなかった場合の初期点
+    if (params.source === 'manual' && score === 0 && breakdown.length === 0) {
+      score = 25;
+      breakdown.push('手動テスト要求 (基準テスト加点 +25)');
+    }
+
+    // 不確実性ブレで不確実性スコアが高い場合の補正
+    if (params.source === 'uncertainty_divergence' && score === 0 && (params.uncertaintyScore ?? 0) >= 60) {
+      score = 20;
+      breakdown.push(`高不確実性ブレ (不確実性スコア: ${params.uncertaintyScore}点 -> +20)`);
+    }
+
+    return { priority: score, breakdown };
+  }
+
   public enqueueDelayedRequest(params: {
     source?: 'uncertainty_divergence' | 'failure_recurrence' | 'manual';
     targetCapabilityId: string;
@@ -866,7 +1073,34 @@ export class TeacherRequestService {
     divergenceTypes?: string[];
     uncertaintyScore?: number;
     candidateResponses?: string[];
-  }): DelayedTeacherQueueItem {
+    recurrenceCount?: number;
+    failureReason?: string;
+    reasons?: string[];
+    userCorrection?: boolean;
+    contradictedPreviousExplanation?: boolean;
+    missedUserIntent?: boolean;
+    outdatedPremise?: boolean;
+    missedMultipleConditions?: boolean;
+    unnaturalJapanese?: boolean;
+    inappropriateResponseLength?: boolean;
+    unverifiableEffect?: boolean;
+    trivialEndingVariation?: boolean;
+    duplicateOfExistingSample?: boolean;
+    deviceModelStableCorrect?: boolean;
+  }): DelayedTeacherQueueItem | null {
+    // 12章: 優先度スコアを計算
+    const { priority, breakdown } = this.calculateQueuePriority(params);
+
+    if (priority <= 0) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🚫 [12章 教材要求キュー却下] 優先度不足のため遅延キューへの追加を却下しました (スコア: ${priority}点, 内訳: ${
+          breakdown.join(' / ') || '加点なし'
+        }): 「${params.userPrompt.slice(0, 40)}...」`
+      );
+      return null;
+    }
+
     const anonymized = this.anonymizeFailureExample(params.userPrompt);
     const item: DelayedTeacherQueueItem = {
       id: `queue_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -878,6 +1112,7 @@ export class TeacherRequestService {
       divergenceTypes: params.divergenceTypes || [],
       uncertaintyScore: params.uncertaintyScore,
       candidateResponses: params.candidateResponses,
+      priority,
       enqueuedAt: Date.now(),
       status: 'PENDING',
       retryCount: 0,
@@ -888,7 +1123,7 @@ export class TeacherRequestService {
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `📥 [11章/20章 遅延教師キュー追加] 深い睡眠バッチ待機キューへ追加しました: ${item.failureCategory} (対象: ${item.targetCapabilityId})`
+      `📥 [11章/12章/20章 遅延教師キュー追加] 深い睡眠バッチ待機キューへ追加しました (優先度: ${priority}点): ${item.failureCategory} (対象: ${item.targetCapabilityId}) [内訳: ${breakdown.join(', ')}]`
     );
 
     return item;
@@ -918,6 +1153,9 @@ export class TeacherRequestService {
       return { processedCount: 0, succeededCount: 0, failedCount: 0, results: [] };
     }
 
+    // 12章: 合計スコアの高い順 (降順) に並び替えて処理
+    pendingItems.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+
     const batch = pendingItems.slice(0, maxBatchSize);
     let succeededCount = 0;
     let failedCount = 0;
@@ -925,7 +1163,7 @@ export class TeacherRequestService {
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `⚡ [遅延教師キュー バッチ処理開始] 対象 ${batch.length}件の遅延要請を順次処理します`
+      `⚡ [遅延教師キュー バッチ処理開始] 対象 ${batch.length}件の遅延要請を優先度スコア順に順次処理します`
     );
 
     for (const item of batch) {
@@ -1131,12 +1369,26 @@ export class TeacherRequestService {
         failureCategory: recurrenceEntry.category,
         divergenceTypes: ['failure_recurrence'],
         candidateResponses: [],
+        recurrenceCount: recurrenceEntry.recurrenceCount,
+        failureReason: failureReason || recurrenceEntry.notes || recurrenceEntry.reason,
       });
+
+      if (!queuedItem) {
+        recurrenceEntry.autoRequested = false;
+        recurrenceEntry.autoRequestStatus = 'FAILED';
+        recurrenceEntry.autoRequestResult = '12章優先度スコア不足のため遅延キューへの追加が却下されました';
+        this.saveState();
+        return {
+          success: false,
+          action: 'SKIPPED',
+          reason: '12章優先度スコア不足のため遅延キューへの追加が却下されました (スコア0点以下)',
+        };
+      }
 
       recurrenceEntry.autoRequested = true;
       recurrenceEntry.autoRequestedAt = Date.now();
       recurrenceEntry.autoRequestStatus = 'QUEUED';
-      recurrenceEntry.autoRequestResult = `予算制限到達のため遅延キューへ自動退避 (キューID: ${queuedItem.id})`;
+      recurrenceEntry.autoRequestResult = `予算制限到達のため遅延キューへ自動退避 (優先度: ${queuedItem.priority}点, キューID: ${queuedItem.id})`;
 
       const autoRecord: AutoTeacherRequestRecord = {
         id: recordId,
@@ -1146,14 +1398,14 @@ export class TeacherRequestService {
         promptSnippet,
         requestedAt: Date.now(),
         status: 'QUEUED',
-        notes: `日次/月次予算上限に達したため睡眠バッチキューへ退避: ${budget.reason}`,
+        notes: `日次/月次予算上限に達したため睡眠バッチキューへ退避 (優先度: ${queuedItem.priority}点): ${budget.reason}`,
       };
       this.autoRequestRecords = [autoRecord, ...this.autoRequestRecords.slice(0, 99)];
       this.saveState();
 
       systemLogger.warn(
         'SELF_IMPROVEMENT',
-        `📥 [再発検知 外部教師キュー退避] 予算上限のため遅延睡眠キューへ退避しました (再現: ${recurrenceEntry.recurrenceCount}回): 「${promptSnippet}...」`
+        `📥 [再発検知 外部教師キュー退避] 予算上限のため遅延睡眠キューへ退避しました (優先度: ${queuedItem.priority}点, 再発: ${recurrenceEntry.recurrenceCount}回): 「${promptSnippet}...」`
       );
 
       return {
