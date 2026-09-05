@@ -11,6 +11,8 @@ import {
   ResponseSkeleton,
   DelayedTeacherQueueItem,
   AutoTeacherRequestRecord,
+  MaterialValueMetric,
+  TeacherBudgetTier,
 } from '../types';
 import { storageService } from './storageService';
 import { selfImprovementService } from './selfImprovementService';
@@ -331,9 +333,25 @@ export class TeacherRequestService {
       reason = `当月の外部教師リクエスト上限(${this.limits.monthlyCalls}件)に達しました。来月自動リセットされます。`;
     }
 
+    let tier: TeacherBudgetTier = 'WAITING_NEXT_BUDGET';
+    const remainingRatio = dailyRemaining / Math.max(1, this.limits.dailyCalls);
+
+    if (!allowed || dailyRemaining <= 0) {
+      tier = 'WAITING_NEXT_BUDGET';
+    } else if (remainingRatio > 0.6) {
+      tier = 'FULL_EXPANSIVE'; // 複数ターン会話・詳細批評・模範回答・反例・言い換え試験
+    } else if (remainingRatio >= 0.2) {
+      tier = 'STANDARD_CRITIQUE'; // 批評・模範回答・短縮推論
+    } else if (remainingRatio >= 0.05) {
+      tier = 'CONSERVATIVE_PRINCIPLES'; // 改善原則・回答骨格・採点規則
+    } else {
+      tier = 'WAITING_NEXT_BUDGET';
+    }
+
     return {
       allowed,
       reason,
+      tier,
       remaining: {
         daily: dailyRemaining,
         monthly: monthlyRemaining,
@@ -341,6 +359,43 @@ export class TeacherRequestService {
       usage: { ...this.usage },
       limits: { ...this.limits },
     };
+  }
+
+  /**
+   * 11章: 教材価値の設計指標算出
+   * 教材価値 = 失敗頻度 × 影響度 × 再利用可能性 × 検証可能性 ÷ 既存教材との重複度
+   */
+  public calculateMaterialValue(params: {
+    failureFrequency: number;
+    impactScore: number;
+    reusabilityScore: number;
+    verifiabilityScore: number;
+    duplicationScore: number;
+  }): MaterialValueMetric {
+    const freq = Math.max(1, params.failureFrequency || 1);
+    const impact = Math.max(1, params.impactScore || 1);
+    const reuse = Math.max(1, params.reusabilityScore || 1);
+    const verify = Math.max(1, params.verifiabilityScore || 1);
+    const dup = Math.max(1, params.duplicationScore || 1);
+
+    const calculatedValue = Math.round((freq * impact * reuse * verify) / dup);
+
+    return {
+      failureFrequency: freq,
+      impactScore: impact,
+      reusabilityScore: reuse,
+      verifiabilityScore: verify,
+      duplicationScore: dup,
+      calculatedValue,
+    };
+  }
+
+  /**
+   * 11章: 現在の予算残量階層 (TeacherBudgetTier) を取得
+   */
+  public getBudgetTier(): TeacherBudgetTier {
+    const status = this.checkBudget();
+    return status.tier || 'WAITING_NEXT_BUDGET';
   }
 
   /**

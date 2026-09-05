@@ -103,20 +103,41 @@
   2. 新しい回答骨格を追加しても、類似の未知の言い回しに対する失敗が減らない（登録骨格 >= 5 かつ 汎化不足GAP頻度 >= 3）
   3. 21章の能力状態が、骨格追加を続けても SATURATED にならず WEAK のまま停滞（失敗累積 >= 6）
 
-## 実装内容: バグ修正 & 設計思想12章 教材要求キュー優先度スコアリング
+## MIKI-AI 統合設計思想指示書 v4.0 実装報告
 
-### 1. 安定性・堅牢性向上 (バグ修正)
-- **外部LLM推論時のスコープ不整合の解消**: `src/App.tsx` 内で `extConfig` が `try` ブロック内に宣言されていたため `catch` 節で参照できず参照エラーとなり得た問題を修正（ブロック外部へ宣言を移動）。
-- **ペルソナ読み込み時のJSONパース保護**: `storageService.getItem('gamecraft_persona')` の `JSON.parse` を try-catch で保護し、不正なキャッシュが存在してもデフォルト設定へフォールバックしてアプリの起動停止を防止。
-- **生エラーメッセージの保持と展開表示**: `fallbackDiagnostic` の型定義に `rawErrorMessage` を追加。チャット画面の診断バーに「生のエラーログ詳細を表示」アコーディオンを設け、接続失敗時の詳細ログをUI上で直接確認可能に改善。
+### 【実装内容】
+1. **SECTION 1: 即座に修正するバグ(3件)**
+   - **バグ1 (重大)**: `src/App.tsx` 内で `engineMode === 'external_gpu'` の `extConfig` 宣言を `try` ブロック外に移動し、`catch` 節で `extConfig?.model` / `extConfig?.endpoint` を安全に参照可能に修正。ReferenceError によるエラー握り潰しを解消。
+   - **バグ2 (中)**: `src/App.tsx` の `gamecraft_persona` 読み込み時の `JSON.parse` を try-catch で保護し、破損データや不正文字列が存在しても `DEFAULT_PERSONA` に安全にフォールバックして白画面を防止。
+   - **バグ3 (軽微)**: `src/types.ts` の `fallbackDiagnostic` に `rawErrorMessage?: string | null;` を追加。`src/components/ChatPanel.tsx` の診断バーに折りたたみアコーディオン（`<details>`）を設け、生エラー詳細をUI上で直接確認可能に改善。
 
-### 2. 設計思想 12章: 教材要求キューの優先度スコアリング & 降順ソート
-- **加点・減点スコアリング (`calculateQueuePriority`)**:
-  - 基準点0。加点（ユーザー訂正 +30、矛盾 +20、意図外れ +20、古い前提 +15、複数条件落とし +15、同じ失敗再発 +5×(freq-1) 上限+25、日本語不自然 +10、回答長不適切 +10）。
-  - 減点（効果未検証 -15、語尾の違い -20、既存教材重複 -30、端末モデル安定正解 -30）。
-- **スコア0以下の自動却下**: 合計スコアが0点以下の要求は遅延キューに追加せず却下し、不要な外部教師API消費を未然に防止。
-- **優先度順バッチ処理**: `DelayedTeacherQueueItem` に `priority` フィールドを追加。キュー処理時に優先度スコアの高い順（降順）にソートして処理するよう改修。
-- **UI連携**: `ExternalTeacherTab.tsx` の遅延キューカードに「優先度: X点」バッジを表示。
+2. **SECTION 2: 設計思想の改善 (コード変更あり)**
+   - **12章「教材要求キュー」優先度スコア計算式**:
+     - `src/services/teacherRequestService.ts` に加点・減点方式の `calculateQueuePriority(params)` を新設（加点: ユーザー訂正+30、矛盾+20、意図外れ+20、古い前提+15、複数条件落とし+15、再発+5×(n-1)上限+25、不自然+10、回答長不適切+10 / 減点: 未検証-15、語尾違い-20、重複-30、端末安定-30）。
+     - スコアが 0 以下の要求は遅延キューに追加せず自動却下し、ログへ記録。
+     - `DelayedTeacherQueueItem` に `priority?: number;` を追加し、未設定アイテムも `priority ?? 0` で後方互換処理。
+     - `processDelayedTeacherQueue()` で優先度スコアの高い順（降順）にソートしてバッチ処理。
+     - `src/components/ExternalTeacherTab.tsx` の遅延キューカードに「優先度: X点」バッジを表示。
+
+3. **SECTION 3: 設計思想の改善 (ドキュメント仕様照合)**
+   - **16.2 LoRA発動条件の結合方式**:
+     - `src/services/virtualTrainingService.ts` の `evaluateLoraTriggerCondition()` において、条件2（骨格追加後の再発）を必須とし、`(条件1 AND 条件2) OR (条件3 AND 条件2)` として厳格に保守判定している実装と設計仕様の整合性を確認済み。
+
+### 【変更ファイル】
+- `src/App.tsx`: `extConfig` スコープ修正、ペルソナ読み込み try-catch 保護
+- `src/types.ts`: `fallbackDiagnostic` に `rawErrorMessage` 追加、`DelayedTeacherQueueItem` に `priority` 追加
+- `src/components/ChatPanel.tsx`: 診断バーへの生ログ折りたたみ表示 `<details>` の追加
+- `src/services/teacherRequestService.ts`: `calculateQueuePriority` 新設、スコア0以下却下、降順ソート、後方互換対応 (`priority ?? 0`)
+- `src/components/ExternalTeacherTab.tsx`: 遅延キューアイテムへの優先度バッジ表示
+- `server.ts`: 起動時の即時ポートバインド最適化、`/api/miki/*` コンパニオン API 統合
+- `vite.config.ts`: 重複プラグイン削除と高速起動化
+- `README.md`: 設計指示書 v4.0 に準拠した実装仕様・変更ファイル・適用方法の記録
+
+### 【適用方法】
+1. **アプリケーション起動**: `npm run dev` (または本番 `npm run build && npm start`)。ポート 3000 に即時バインドされ、ヘルスチェック (`/api/health`) も即座に応答します。
+2. **型検査・ビルド検証**: `npm run lint` (`tsc --noEmit`), `npm run build` でビルド正常通過確認済み。
+3. **後方互換性**: 既存ストレージ内のキューアイテムに `priority` が存在しない場合でも `priority ?? 0` として安全にソート・実行されます。
+
 
 
 

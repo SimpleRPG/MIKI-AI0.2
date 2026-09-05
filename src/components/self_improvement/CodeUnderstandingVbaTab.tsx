@@ -22,6 +22,8 @@ import {
   RefreshCw,
   Plus,
   Trash2,
+  ShieldCheck,
+  FileCheck,
 } from 'lucide-react';
 import {
   CodeUnderstandingIR,
@@ -29,9 +31,11 @@ import {
   VbaModuleFile,
   MultiModuleAnalysisResult,
   CrossModuleImpactAnalysis,
+  VbaStaticVerificationResult,
 } from '../../types';
 import { codeUnderstandingService } from '../../services/codeUnderstandingService';
 import { vbaDesignAssistantService } from '../../services/vbaDesignAssistantService';
+import { vbaStaticVerifierService } from '../../services/vbaStaticVerifierService';
 
 const DEFAULT_MODULES: VbaModuleFile[] = [
   {
@@ -120,7 +124,7 @@ End Sub`,
 ];
 
 export const CodeUnderstandingVbaTab: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<'code_ir' | 'multi_module' | 'vba_design'>('code_ir');
+  const [activeSection, setActiveSection] = useState<'code_ir' | 'multi_module' | 'vba_design' | 'vba_static_verifier'>('code_ir');
 
   // Multi-Module State (22-25章)
   const [modules, setModules] = useState<VbaModuleFile[]>(DEFAULT_MODULES);
@@ -165,6 +169,51 @@ End Sub`);
 例外として備考欄に「キャンセル予定」と書いてある行は除外してほしい。`
   );
   const [vbaSpecResult, setVbaSpecResult] = useState<VbaDesignSpecification | null>(null);
+
+  // 63-64章 VBA Static Verifier State
+  const [vbaVerifyCodeInput, setVbaVerifyCodeInput] = useState<string>(`Option Explicit
+
+' 63章・64章 準拠の構造化クリーンVBAサンプル
+Public Sub ProcessOrdersClean(ByVal targetSheetName As String)
+    On Error GoTo ErrorHandler
+
+    Dim wsSource As Worksheet
+    Dim wsTarget As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim orderAmount As Double
+
+    Set wsSource = ThisWorkbook.Sheets(targetSheetName)
+    Set wsTarget = ThisWorkbook.Sheets("HighValueOrders")
+    lastRow = wsSource.Cells(wsSource.Rows.Count, "A").End(xlUp).Row
+
+    For i = 2 To lastRow
+        orderAmount = CDbl(wsSource.Cells(i, 3).Value)
+        If orderAmount >= 100000 Then
+            wsTarget.Cells(i, 1).Value = "'" & CStr(wsSource.Cells(i, 1).Value)
+            wsTarget.Cells(i, 2).Value = wsSource.Cells(i, 2).Value
+            wsTarget.Cells(i, 3).Value = orderAmount
+        End If
+    Next i
+
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "エラーが発生しました: " & Err.Description, vbCritical
+End Sub
+
+Public Function ValidateSheetExists(ByVal sheetName As String) As Boolean
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Sheets(sheetName)
+    ValidateSheetExists = (Not ws Is Nothing)
+    On Error GoTo 0
+End Function`);
+
+  const [vbaBaselineCodeInput, setVbaBaselineCodeInput] = useState<string>('');
+  const [showBaselineCompare, setShowBaselineCompare] = useState<boolean>(false);
+  const [vbaVerificationResult, setVbaVerificationResult] = useState<VbaStaticVerificationResult | null>(null);
+  const [isVerifyingVba, setIsVerifyingVba] = useState<boolean>(false);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -237,6 +286,87 @@ End Sub`);
     setMultiModuleResult(null);
   };
 
+  const handleRunVbaVerification = async () => {
+    setIsVerifyingVba(true);
+    try {
+      const res = await vbaStaticVerifierService.verifyVbaCode(
+        vbaVerifyCodeInput,
+        showBaselineCompare && vbaBaselineCodeInput ? vbaBaselineCodeInput : undefined
+      );
+      setVbaVerificationResult(res);
+    } finally {
+      setIsVerifyingVba(false);
+    }
+  };
+
+  const handleLoadViolationSample = () => {
+    setVbaVerifyCodeInput(`' 63章 禁止パターン混入サンプル
+' 1. Option Explicit 宣言が欠落している
+
+Sub UnsafeProcedure()
+    Dim total As Long
+    
+    ' 2. 単行If文 (ブロックIfでない)
+    If total > 100 Then MsgBox "高額です"
+
+    ' 3. Goto と 行ラベル (On Error GoTo でない勝手なGoto)
+    If total = 0 Then Goto ErrorHandler
+    
+    For i = 1 To 10
+        total = total + i
+    ' 4. ブロック未終了 (Nextが欠落)
+    
+    ' 5. 省略記号・差分パッチ表記
+    ' ... 既存の計算処理をここに実装 ...
+    
+ErrorHandler:
+    Exit Sub
+End Sub`);
+    setVbaVerificationResult(null);
+  };
+
+  const handleLoadCleanSample = () => {
+    setVbaVerifyCodeInput(`Option Explicit
+
+' 63章・64章 準拠の構造化クリーンVBAサンプル
+Public Sub ProcessOrdersClean(ByVal targetSheetName As String)
+    On Error GoTo ErrorHandler
+
+    Dim wsSource As Worksheet
+    Dim wsTarget As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim orderAmount As Double
+
+    Set wsSource = ThisWorkbook.Sheets(targetSheetName)
+    Set wsTarget = ThisWorkbook.Sheets("HighValueOrders")
+    lastRow = wsSource.Cells(wsSource.Rows.Count, "A").End(xlUp).Row
+
+    For i = 2 To lastRow
+        orderAmount = CDbl(wsSource.Cells(i, 3).Value)
+        If orderAmount >= 100000 Then
+            wsTarget.Cells(i, 1).Value = "'" & CStr(wsSource.Cells(i, 1).Value)
+            wsTarget.Cells(i, 2).Value = wsSource.Cells(i, 2).Value
+            wsTarget.Cells(i, 3).Value = orderAmount
+        End If
+    Next i
+
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "エラーが発生しました: " & Err.Description, vbCritical
+End Sub
+
+Public Function ValidateSheetExists(ByVal sheetName As String) As Boolean
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Sheets(sheetName)
+    ValidateSheetExists = (Not ws Is Nothing)
+    On Error GoTo 0
+End Function`);
+    setVbaVerificationResult(null);
+  };
+
   return (
     <div className="p-4 sm:p-5 space-y-4 overflow-y-auto max-h-[calc(85vh-120px)] text-slate-200">
       {/* Navigation Sub-Tabs */}
@@ -274,6 +404,17 @@ End Sub`);
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>26章 抽象VBA設計支援AI (決定表)</span>
+          </button>
+          <button
+            onClick={() => setActiveSection('vba_static_verifier')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              activeSection === 'vba_static_verifier'
+                ? 'bg-rose-600 text-white shadow-md'
+                : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>63〜64章 VBA静的検証器 (8大スキャナー)</span>
           </button>
         </div>
       </div>
@@ -931,6 +1072,422 @@ End Sub`);
                   ))}
                 </ul>
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SECTION 4: 63章・64章 VBA静的検証器 (8大スキャナー) */}
+      {activeSection === 'vba_static_verifier' && (
+        <div className="space-y-4">
+          {/* Header Info */}
+          <div className="p-3.5 bg-slate-950/80 border border-rose-500/30 rounded-xl space-y-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30 text-[10.5px]">
+                設計思想 63章 & 64章
+              </span>
+              <h3 className="font-bold text-slate-100 text-xs">
+                VBA静的検証器 (8大スキャナー & 厳格生成規準 & SHA-256配送保証)
+              </h3>
+            </div>
+            <p className="text-[11.5px] text-slate-300 leading-relaxed">
+              PC環境のVBA実行・構文解析をエミュレートし、AIによるコード生成時の不具合・省略・構文崩れを8つの独立スキャナーで徹底的に事前遮断します。
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10.5px] text-slate-400 pt-1">
+              <div className="p-2 bg-slate-900/60 rounded border border-slate-800/80">
+                <span className="text-rose-300 font-bold">【63章 厳格生成規準】</span>
+                <ul className="list-disc list-inside mt-0.5 space-y-0.5">
+                  <li>修正対象プロシージャは全文生成 (省略・差分パッチ禁止)</li>
+                  <li>Goto と 行ラベル (Label:) の使用を全面禁止</li>
+                  <li>単行If禁止 (すべてブロックIf ... End If で記述)</li>
+                  <li>Option Explicit の明示的宣言必須</li>
+                  <li>既存Publicシグネチャの完全維持</li>
+                </ul>
+              </div>
+              <div className="p-2 bg-slate-900/60 rounded border border-slate-800/80">
+                <span className="text-sky-300 font-bold">【64章 8大スキャナー構成】</span>
+                <ol className="list-decimal list-inside mt-0.5 space-y-0.5">
+                  <li>Parser (文字列・コメント・継続行解析)</li>
+                  <li>ProcedureScanner (開始・終端・引数型)</li>
+                  <li>BlockScanner (If/For/Do/Select/Withネスト)</li>
+                  <li>ForbiddenPatternScanner (Goto/行ラベル/単行If)</li>
+                  <li>DeclarationScanner (Option Explicit/変数型)</li>
+                  <li>SignatureComparator (既存Public署名比較)</li>
+                  <li>DependencyScanner (Sheets/Range/API)</li>
+                  <li>DeliveryVerifier (完全性・SHA-256)</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+
+          {/* Controls & Sample Switcher */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-900/80 border border-slate-800 rounded-lg text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 font-semibold">プリセット:</span>
+              <button
+                onClick={handleLoadCleanSample}
+                className="px-2.5 py-1 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-600/40 hover:bg-emerald-900/60 transition-colors font-medium text-[11px]"
+              >
+                ✓ 規準適合クリーンコード
+              </button>
+              <button
+                onClick={handleLoadViolationSample}
+                className="px-2.5 py-1 rounded bg-rose-950/60 text-rose-300 border border-rose-600/40 hover:bg-rose-900/60 transition-colors font-medium text-[11px]"
+              >
+                ⚠️ 禁止パターン混入コード
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 select-none text-[11px]">
+                <input
+                  type="checkbox"
+                  checked={showBaselineCompare}
+                  onChange={(e) => setShowBaselineCompare(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-800 text-rose-500 focus:ring-0"
+                />
+                <span>既存Public署名と比較 (SignatureComparator)</span>
+              </label>
+
+              <button
+                onClick={handleRunVbaVerification}
+                disabled={isVerifyingVba || !vbaVerifyCodeInput.trim()}
+                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 shadow transition-all"
+              >
+                {isVerifyingVba ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>8大スキャン中...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>静的検証を実行 (8大スキャン)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Editors Grid */}
+          <div className={`grid grid-cols-1 ${showBaselineCompare ? 'md:grid-cols-2' : ''} gap-3`}>
+            {/* Target Code Editor */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-300 flex items-center gap-1">
+                  <FileCode2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>検証対象 VBAコード</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {vbaVerifyCodeInput.split(/\r?\n/).length} 行 / {vbaVerifyCodeInput.length} 文字
+                </span>
+              </div>
+              <textarea
+                value={vbaVerifyCodeInput}
+                onChange={(e) => setVbaVerifyCodeInput(e.target.value)}
+                rows={showBaselineCompare ? 14 : 12}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs text-slate-200 focus:outline-none focus:border-rose-500 resize-none leading-relaxed"
+                placeholder="ここに検証対象のVBAコードを入力してください..."
+              />
+            </div>
+
+            {/* Baseline Code Editor (Optional) */}
+            {showBaselineCompare && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-300 flex items-center gap-1">
+                    <FileCheck className="w-3.5 h-3.5 text-sky-400" />
+                    <span>既存ベースライン VBAコード (Publicシグネチャ比較用)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {vbaBaselineCodeInput.split(/\r?\n/).length} 行
+                  </span>
+                </div>
+                <textarea
+                  value={vbaBaselineCodeInput}
+                  onChange={(e) => setVbaBaselineCodeInput(e.target.value)}
+                  rows={14}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs text-slate-200 focus:outline-none focus:border-sky-500 resize-none leading-relaxed"
+                  placeholder="比較対象となる変更前の既存コードを入力してください (Publicプロシージャの型・引数の維持を検証)..."
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Verification Results */}
+          {vbaVerificationResult && (
+            <div className="space-y-3 pt-1">
+              {/* Verdict Banner */}
+              <div
+                className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${
+                  vbaVerificationResult.overallPassed
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                    : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                }`}
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    {vbaVerificationResult.overallPassed ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+                    )}
+                    <span className="font-bold text-sm">
+                      {vbaVerificationResult.overallPassed
+                        ? '63章 生成ルール 全適合 (合格)'
+                        : '63章 生成ルール 違反検出 (修正要請)'}
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                        vbaVerificationResult.overallPassed
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                      }`}
+                    >
+                      スコア: {vbaVerificationResult.verdictScore} / 100
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed pl-7">
+                    {vbaVerificationResult.summary}
+                  </p>
+                </div>
+
+                {/* SHA-256 Checksum Card */}
+                <div className="shrink-0 p-2.5 bg-black/50 border border-slate-800 rounded-lg text-[11px] font-mono space-y-1">
+                  <div className="text-slate-400 flex items-center justify-between gap-3 text-[10px]">
+                    <span>SHA-256 チェックサム (配送整合性)</span>
+                    <button
+                      onClick={() => handleCopy(vbaVerificationResult.deliveryVerification.sha256Checksum, 'vba_hash')}
+                      className="text-slate-300 hover:text-white flex items-center gap-1"
+                    >
+                      {copiedId === 'vba_hash' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedId === 'vba_hash' ? 'コピー済' : 'コピー'}</span>
+                    </button>
+                  </div>
+                  <div className="text-rose-300 font-bold break-all select-all text-[10px]">
+                    {vbaVerificationResult.deliveryVerification.sha256Checksum}
+                  </div>
+                </div>
+              </div>
+
+              {/* 8 Scanners Detailed Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* Card 1: 63章 厳格生成規準 */}
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2 text-xs">
+                  <div className="font-bold text-rose-300 flex items-center gap-1.5 text-[11.5px]">
+                    <ShieldCheck className="w-4 h-4 text-rose-400" />
+                    <span>63章 生成ルール検証</span>
+                  </div>
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Option Explicit:</span>
+                      <span
+                        className={`font-bold font-mono ${
+                          vbaVerificationResult.hasOptionExplicit ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
+                        {vbaVerificationResult.hasOptionExplicit ? '✓ 宣言あり' : '✕ 欠落 (違反)'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">全文生成 (省略なし):</span>
+                      <span
+                        className={`font-bold font-mono ${
+                          vbaVerificationResult.deliveryVerification.isCompleteCode ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
+                        {vbaVerificationResult.deliveryVerification.isCompleteCode ? '✓ 完全コード' : '✕ 省略記号あり'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">禁止パターン件数:</span>
+                      <span
+                        className={`font-bold font-mono ${
+                          vbaVerificationResult.forbiddenPatterns.length === 0 ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
+                        {vbaVerificationResult.forbiddenPatterns.length} 件
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 2: プロシージャ構造 */}
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2 text-xs">
+                  <div className="font-bold text-sky-300 flex items-center gap-1.5 text-[11.5px]">
+                    <Code2 className="w-4 h-4 text-sky-400" />
+                    <span>プロシージャ境界 (Scanner 2)</span>
+                  </div>
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">検出プロシージャ数:</span>
+                      <span className="font-bold font-mono text-slate-200">
+                        {vbaVerificationResult.procedures.length} 件
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">全プロシージャ終端:</span>
+                      <span
+                        className={`font-bold font-mono ${
+                          vbaVerificationResult.allProceduresFullyClosed ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
+                        {vbaVerificationResult.allProceduresFullyClosed ? '✓ End正常' : '✕ 終端欠落'}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">
+                      {vbaVerificationResult.procedures.map((p) => p.name).join(', ') || 'なし'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 3: 構文ブロック整合性 */}
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2 text-xs">
+                  <div className="font-bold text-amber-300 flex items-center gap-1.5 text-[11.5px]">
+                    <GitBranch className="w-4 h-4 text-amber-400" />
+                    <span>ブロックネスト (Scanner 3)</span>
+                  </div>
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">構文ブロック整合:</span>
+                      <span
+                        className={`font-bold font-mono ${
+                          vbaVerificationResult.blockNestingValid ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
+                        {vbaVerificationResult.blockNestingValid ? '✓ 整合' : '✕ 未終了あり'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">未解決ブロック数:</span>
+                      <span className="font-mono text-slate-200">
+                        {vbaVerificationResult.openBlocks.length} 件
+                      </span>
+                    </div>
+                    {vbaVerificationResult.openBlocks.length > 0 && (
+                      <div className="text-[10px] text-rose-300 font-mono">
+                        {vbaVerificationResult.openBlocks[0]}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card 4: 依存関係・外部呼出 */}
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2 text-xs">
+                  <div className="font-bold text-teal-300 flex items-center gap-1.5 text-[11.5px]">
+                    <Network className="w-4 h-4 text-teal-400" />
+                    <span>依存関係抽出 (Scanner 7)</span>
+                  </div>
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">対象シート:</span>
+                      <span className="font-bold font-mono text-slate-200 truncate max-w-[120px]">
+                        {vbaVerificationResult.dependencies.worksheets.join(', ') || 'なし'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">対象Range:</span>
+                      <span className="font-bold font-mono text-slate-200 truncate max-w-[120px]">
+                        {vbaVerificationResult.dependencies.ranges.join(', ') || 'なし'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Win32 API/イベント:</span>
+                      <span className="font-bold font-mono text-slate-200">
+                        {vbaVerificationResult.dependencies.events.length +
+                          vbaVerificationResult.dependencies.externalAPIs.length} 件
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Forbidden Patterns Details (If any) */}
+              {vbaVerificationResult.forbiddenPatterns.length > 0 && (
+                <div className="p-3 bg-rose-950/30 border border-rose-500/40 rounded-lg space-y-2 text-xs">
+                  <div className="font-bold text-rose-300 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    <span>検出された禁止パターン詳細 (修正必須)</span>
+                  </div>
+                  <div className="space-y-2">
+                    {vbaVerificationResult.forbiddenPatterns.map((pat, idx) => (
+                      <div key={idx} className="p-2 bg-black/40 rounded border border-rose-800/40 space-y-1 font-mono text-[11px]">
+                        <div className="flex items-center justify-between">
+                          <span className="px-1.5 py-0.5 rounded bg-rose-900/60 text-rose-200 font-bold text-[10px]">
+                            {pat.type} (行 {pat.line})
+                          </span>
+                          <span className="text-rose-400 font-sans text-[10px]">{pat.explanation}</span>
+                        </div>
+                        <div className="text-slate-300 bg-slate-950 px-2 py-1 rounded text-[10.5px]">
+                          {pat.codeSnippet}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Procedures & Signature List */}
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2 text-xs">
+                <div className="font-bold text-slate-200 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Workflow className="w-4 h-4 text-sky-400" />
+                    <span>解析済プロシージャ & シグネチャ定義</span>
+                  </span>
+                  <span className="text-[10.5px] text-slate-400">
+                    計 {vbaVerificationResult.procedures.length} プロシージャ
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {vbaVerificationResult.procedures.map((p, idx) => (
+                    <div key={idx} className="p-2.5 bg-black/40 border border-slate-800 rounded space-y-1 font-mono text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sky-300 font-bold">
+                          {p.visibility} {p.kind} {p.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {p.startLine}行目〜{p.endLine}行目
+                        </span>
+                      </div>
+                      <div className="text-slate-400 text-[10px]">
+                        引数: {p.parameters.length === 0 ? 'なし' : p.parameters.map((param) => `${param.isByVal ? 'ByVal ' : ''}${param.name} As ${param.type}`).join(', ')}
+                      </div>
+                      {p.returnType && (
+                        <div className="text-emerald-400 text-[10px]">
+                          戻り値型: As {p.returnType}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Signature Comparison (If requested) */}
+              {vbaVerificationResult.signatureComparison && (
+                <div
+                  className={`p-3 rounded-lg border text-xs space-y-1.5 ${
+                    vbaVerificationResult.signatureComparison.matched
+                      ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300'
+                      : 'bg-rose-950/30 border-rose-500/40 text-rose-300'
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5">
+                    <FileCheck className="w-4 h-4" />
+                    <span>64章 Scanner 6: 既存Publicシグネチャ比較結果</span>
+                  </div>
+                  <div className="text-[11px]">
+                    {vbaVerificationResult.signatureComparison.matched ? (
+                      <div>✓ 既存のPublicプロシージャ名・引数型・戻り値型はすべて完全に維持されています。</div>
+                    ) : (
+                      <ul className="list-disc list-inside space-y-0.5">
+                        {vbaVerificationResult.signatureComparison.differences.map((diff, dIdx) => (
+                          <li key={dIdx}>{diff}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

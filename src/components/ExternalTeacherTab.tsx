@@ -376,11 +376,38 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
               残り {budgetStatus.remaining.daily} 回
             </span>
           </div>
-          <div className="flex items-baseline gap-1.5 mt-1">
-            <span className="text-xl font-extrabold text-slate-100">
-              {budgetStatus.usage.dailyCalls}
-            </span>
-            <span className="text-xs text-slate-500">/ {budgetStatus.limits.dailyCalls} 回</span>
+          <div className="flex items-baseline justify-between gap-1.5 mt-1">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-extrabold text-slate-100">
+                {budgetStatus.usage.dailyCalls}
+              </span>
+              <span className="text-xs text-slate-500">/ {budgetStatus.limits.dailyCalls} 回</span>
+            </div>
+            {/* 11章: 予算残量階層 (Tier) バッジ */}
+            {budgetStatus.tier && (
+              <span
+                className={`text-[9.5px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                  budgetStatus.tier === 'FULL_EXPANSIVE'
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    : budgetStatus.tier === 'STANDARD_CRITIQUE'
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                    : budgetStatus.tier === 'CONSERVATIVE_PRINCIPLES'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                }`}
+                title={
+                  budgetStatus.tier === 'FULL_EXPANSIVE'
+                    ? '残量60%超: 複数ターン・詳細批評・模範回答・反例試験'
+                    : budgetStatus.tier === 'STANDARD_CRITIQUE'
+                    ? '残量20〜60%: 批評・模範回答・短縮推論'
+                    : budgetStatus.tier === 'CONSERVATIVE_PRINCIPLES'
+                    ? '残量5〜20%: 改善原則・回答骨格・採点規則'
+                    : '残量なし: 翌日自動延期 (WAITING_NEXT_BUDGET)'
+                }
+              >
+                11章: {budgetStatus.tier}
+              </span>
+            )}
           </div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2.5 overflow-hidden">
             <div

@@ -768,6 +768,7 @@ export interface TeacherBudgetUsage {
 export interface TeacherBudgetStatus {
   allowed: boolean;
   reason?: string;
+  tier?: TeacherBudgetTier;
   remaining: {
     daily: number;
     monthly: number;
@@ -1563,6 +1564,85 @@ export interface VbaDesignSpecification {
   dataCharacteristicsPreserved: string[]; // 例: 5桁の文字列、先頭ゼロを保持する、数値変換しない
   createdAt: number;
 }
+
+/**
+ * 設計思想 11章: 教材価値指標 & 教師API予算階層
+ */
+export interface MaterialValueMetric {
+  failureFrequency: number;
+  impactScore: number;
+  reusabilityScore: number;
+  verifiabilityScore: number;
+  duplicationScore: number;
+  calculatedValue: number; // failureFrequency * impactScore * reusabilityScore * verifiabilityScore / duplicationScore
+}
+
+export type TeacherBudgetTier =
+  | 'FULL_EXPANSIVE'       // 残量多 (>60%): 複数ターン会話・詳細批評・模範回答・反例・言い換え試験
+  | 'STANDARD_CRITIQUE'    // 残量中 (20-60%): 批評・模範回答・短縮推論
+  | 'CONSERVATIVE_PRINCIPLES' // 残量少 (5-20%): 改善原則・回答骨格・採点規則
+  | 'WAITING_NEXT_BUDGET'; // ほぼ無し (<5%): 翌日へ延期
+
+/**
+ * 設計思想 63章 & 64章: VBA静的検証器 (VBA Static Verifier) 8大スキャナー & 検証結果
+ */
+export interface VbaProcedureDeclaration {
+  name: string;
+  kind: 'Sub' | 'Function' | 'Property Get' | 'Property Let' | 'Property Set';
+  visibility: 'Public' | 'Private' | 'Friend' | 'Default';
+  parameters: Array<{ name: string; type: string; isByVal: boolean; isOptional: boolean }>;
+  returnType?: string;
+  startLine: number;
+  endLine: number;
+  isFullyClosed: boolean;
+}
+
+export interface VbaForbiddenPattern {
+  type: 'GOTO' | 'LINE_LABEL' | 'SINGLE_LINE_IF' | 'UNHANDLED_DIFF_OMISSION';
+  line: number;
+  codeSnippet: string;
+  explanation: string;
+}
+
+export interface VbaVariableDeclaration {
+  name: string;
+  scope: 'Dim' | 'Private' | 'Public' | 'Const' | 'Static';
+  type: string;
+  line: number;
+  isExplicitType: boolean;
+}
+
+export interface VbaStaticVerificationResult {
+  hasOptionExplicit: boolean; // 63章: Option Explicit 必須
+  procedures: VbaProcedureDeclaration[];
+  allProceduresFullyClosed: boolean;
+  blockNestingValid: boolean;
+  openBlocks: string[];
+  forbiddenPatterns: VbaForbiddenPattern[]; // Goto, 行ラベル, 単行If, 省略記号
+  declarations: VbaVariableDeclaration[];
+  dependencies: {
+    worksheets: string[];
+    ranges: string[];
+    events: string[];
+    externalAPIs: string[];
+  };
+  signatureComparison?: {
+    matched: boolean;
+    differences: string[];
+  };
+  deliveryVerification: {
+    isCompleteCode: boolean; // 省略・差分パッチ禁止
+    omissionDetected: boolean;
+    sha256Checksum: string;
+    lineCount: number;
+    charCount: number;
+  };
+  overallPassed: boolean; // 63章ルール全合格
+  verdictScore: number; // 0〜100
+  summary: string;
+  verifiedAt: number;
+}
+
 
 /**
  * 設計思想 31章: 機能フラグ
