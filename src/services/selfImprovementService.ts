@@ -447,6 +447,61 @@ class SelfImprovementService {
       console.warn('Failed to record capability gap:', gapErr);
     }
 
+    // 設計思想 64章 & 9章: 失敗パターンの再現性追跡 & 外部教師自動発火
+    try {
+      let recurrenceCategory = 'chat';
+      if (userMessage.toLowerCase().includes('vba') || userMessage.includes('マクロ')) {
+        recurrenceCategory = 'vba';
+      } else if (
+        userMessage.toLowerCase().includes('コード') ||
+        assistantResponse.includes('```') ||
+        diagnosis.suggestedFixArea === 'skill' ||
+        diagnosis.category.includes('コード')
+      ) {
+        recurrenceCategory = 'code';
+      } else if (diagnosis.suggestedFixArea === 'tool' || diagnosis.category.includes('ツール')) {
+        recurrenceCategory = 'tool_use';
+      } else if (diagnosis.suggestedFixArea === 'retrieval' || diagnosis.suggestedFixArea === 'memory') {
+        recurrenceCategory = 'retrieval';
+      } else if (diagnosis.category.includes('推論') || diagnosis.category.includes('論理')) {
+        recurrenceCategory = 'logic';
+      }
+
+      const recurrenceCheck = this.recordOrCheckFailureRecurrence({
+        prompt: userMessage,
+        category: recurrenceCategory,
+        reason: `${diagnosis.category}: ${diagnosis.rootCause}`,
+      });
+
+      // 2回以上再発し、かつ未昇格の場合 ➔ 外部教師自動発火パイプラインへ連携 (64章節約運用・自律改善ループ)
+      if (recurrenceCheck.isActionable) {
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `🚨 [再発失敗自動検知] 同種失敗が${recurrenceCheck.recurrenceCount}回再現しました。外部教師自動発火パイプラインを非同期起動します: 「${userMessage.slice(0, 30)}...」`
+        );
+
+        // 循環参照回避のため動的importで非同期呼び出し
+        import('./teacherRequestService')
+          .then(({ teacherRequestService }) => {
+            teacherRequestService
+              .handleRecurringFailureAutoRequest({
+                patternKey: recurrenceCheck.patternKey,
+                recurrenceEntry: recurrenceCheck.entry,
+                failureReason: `${diagnosis.category}: ${diagnosis.rootCause}`,
+                source: 'diagnoseFailure_recurrence',
+              })
+              .catch((err) => {
+                console.warn('[SelfImprovementService] Auto teacher request failed:', err);
+              });
+          })
+          .catch((importErr) => {
+            console.warn('[SelfImprovementService] Failed to load teacherRequestService dynamically:', importErr);
+          });
+      }
+    } catch (recurrenceErr) {
+      console.warn('Failed to check failure recurrence:', recurrenceErr);
+    }
+
     return diagnosis;
   }
 

@@ -719,6 +719,28 @@ export interface FailureRecurrenceEntry {
   promotedToSample?: boolean;
   notes?: string;
   reason?: string;
+  autoRequested?: boolean;
+  autoRequestedAt?: number;
+  autoRequestStatus?: 'PENDING' | 'IN_FLIGHT' | 'SUCCESS' | 'QUEUED' | 'FAILED';
+  autoRequestResult?: string;
+}
+
+/**
+ * 再発失敗検知による外部教師自動発火レコード (設計思想 64章/20章)
+ */
+export interface AutoTeacherRequestRecord {
+  id: string;
+  patternKey: string;
+  category: string;
+  recurrenceCount: number;
+  promptSnippet: string;
+  requestedAt: number;
+  status: 'IN_FLIGHT' | 'SUCCESS' | 'QUEUED' | 'FAILED';
+  verificationPassed?: boolean;
+  materialId?: string;
+  skeletonId?: string;
+  notes?: string;
+  error?: string;
 }
 
 /**

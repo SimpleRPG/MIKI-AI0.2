@@ -10,6 +10,7 @@ import {
   MemoryItem,
   ResponseSkeleton,
   DelayedTeacherQueueItem,
+  AutoTeacherRequestRecord,
 } from '../types';
 import { storageService } from './storageService';
 import { selfImprovementService } from './selfImprovementService';
@@ -25,6 +26,8 @@ const BUDGET_LIMITS_KEY = 'miki_ai_teacher_budget_limits';
 const BUDGET_USAGE_KEY = 'miki_ai_teacher_budget_usage';
 const USAGE_RECORDS_KEY = 'miki_ai_teacher_usage_records';
 const DELAYED_QUEUE_STORAGE_KEY = 'miki_ai_delayed_teacher_queue';
+const AUTO_REQUEST_RECORDS_KEY = 'miki_ai_auto_teacher_request_records';
+const AUTO_REQUEST_ENABLED_KEY = 'miki_ai_auto_teacher_request_enabled';
 
 const DEFAULT_LIMITS: TeacherBudgetLimits = {
   dailyCalls: 10,
@@ -42,19 +45,23 @@ function getCurrentMonthString(): string {
 }
 
 /**
- * 外部教師リクエストパイプラインサービス (設計思想 37〜39節 フェーズ8)
+ * 外部教師リクエストパイプラインサービス (設計思想 37〜39節 フェーズ8 & 64章)
  *
  * 1. 端末内解決不可の弱点パターンのみを判定ゲート(shouldRequestTeacher)で通過
  * 2. 生会話・固有名詞を徹底的に匿名化・抽象化(anonymizeFailureExample)
  * 3. 失敗例・期待条件・教材形式のみを構造化JSON化(buildTeacherRequestPayload)
  * 4. 日次/月次の厳格な予算・呼び出し上限管理(checkBudget)
- * 5. Gemini応答の安全・品質二重フィルタリング検証 & external_teacher中信頼保存
+ * 5. 再発する失敗検知時の自動発火(handleRecurringFailureAutoRequest) & 予算超過時の遅延キュー退避
+ * 6. Gemini応答の安全・品質二重フィルタリング検証 & external_teacher中信頼保存
  */
 export class TeacherRequestService {
   private limits: TeacherBudgetLimits = { ...DEFAULT_LIMITS };
   private usage: TeacherBudgetUsage;
   private usageRecords: TeacherUsageRecord[] = [];
   private delayedQueue: DelayedTeacherQueueItem[] = [];
+  private autoRequestRecords: AutoTeacherRequestRecord[] = [];
+  private autoRequestEnabled: boolean = true;
+  private inFlightPatternKeys: Set<string> = new Set();
 
   constructor() {
     this.usage = {
@@ -108,6 +115,16 @@ export class TeacherRequestService {
       if (rawQueue) {
         this.delayedQueue = JSON.parse(rawQueue);
       }
+
+      const rawAutoRecords = storageService.getItem(AUTO_REQUEST_RECORDS_KEY);
+      if (rawAutoRecords) {
+        this.autoRequestRecords = JSON.parse(rawAutoRecords);
+      }
+
+      const rawAutoEnabled = storageService.getItem(AUTO_REQUEST_ENABLED_KEY);
+      if (rawAutoEnabled !== null) {
+        this.autoRequestEnabled = rawAutoEnabled !== 'false';
+      }
     } catch (e) {
       console.warn('[TeacherRequestService] Failed to load budget state:', e);
     }
@@ -119,6 +136,8 @@ export class TeacherRequestService {
       storageService.setItem(BUDGET_USAGE_KEY, JSON.stringify(this.usage));
       storageService.setItem(USAGE_RECORDS_KEY, JSON.stringify(this.usageRecords.slice(0, 100)));
       storageService.setItem(DELAYED_QUEUE_STORAGE_KEY, JSON.stringify(this.delayedQueue.slice(0, 100)));
+      storageService.setItem(AUTO_REQUEST_RECORDS_KEY, JSON.stringify(this.autoRequestRecords.slice(0, 100)));
+      storageService.setItem(AUTO_REQUEST_ENABLED_KEY, String(this.autoRequestEnabled));
     } catch (e) {
       console.warn('[TeacherRequestService] Failed to save budget state:', e);
     }
@@ -986,6 +1005,270 @@ export class TeacherRequestService {
       failedCount,
       results,
     };
+  }
+
+  // =========================================================================
+  // 再発失敗検知・外部教師自動発火パイプライン (設計思想 64章/20章/32章)
+  // =========================================================================
+
+  public isAutoRequestEnabled(): boolean {
+    return this.autoRequestEnabled;
+  }
+
+  public setAutoRequestEnabled(enabled: boolean): void {
+    this.autoRequestEnabled = enabled;
+    this.saveState();
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `⚙️ [外部教師自動発火設定] 再発失敗時の自動要請を${enabled ? '【有効】' : '【無効】'}に切り替えました`
+    );
+  }
+
+  public getAutoRequestRecords(): AutoTeacherRequestRecord[] {
+    return [...this.autoRequestRecords];
+  }
+
+  public clearAutoRequestRecords(): void {
+    this.autoRequestRecords = [];
+    this.saveState();
+  }
+
+  public isInFlight(patternKey: string): boolean {
+    return this.inFlightPatternKeys.has(patternKey);
+  }
+
+  /**
+   * 再発する失敗を検知した際の外部教師自動発火パイプライン (設計思想 64章)
+   *
+   * 1. 「本当に外部教師が必要か」を shouldRequestTeacher() で厳格判定
+   *    (①同種失敗が2回以上再発 ②既存教材に同種の正解がない ③端末機械検証だけでは不足)
+   * 2. 重複呼び出し防止 (inFlightPatternKeys) & 昇格済み抑止
+   * 3. 予算上限時は「遅延キュー (深い睡眠バッチ)」へ自動退避
+   * 4. 予算内であれば即時に匿名化・構造化・独立検証・回答骨格生成を非同期実行
+   */
+  public async handleRecurringFailureAutoRequest(params: {
+    patternKey: string;
+    recurrenceEntry: FailureRecurrenceEntry;
+    failureReason?: string;
+    source?: string;
+  }): Promise<{
+    success: boolean;
+    action: 'REQUESTED' | 'QUEUED' | 'SKIPPED';
+    reason?: string;
+    recordId?: string;
+    skeletonId?: string;
+  }> {
+    const { patternKey, recurrenceEntry, failureReason, source } = params;
+
+    // 1. 自動発火機能の有効性チェック
+    if (!this.autoRequestEnabled) {
+      return {
+        success: false,
+        action: 'SKIPPED',
+        reason: '再発失敗時の外部教師自動発火が無効に設定されています',
+      };
+    }
+
+    // 2. 既に同一パターンのリクエストが処理中 (In-Flight) の場合は二重発火を防止
+    if (this.inFlightPatternKeys.has(patternKey)) {
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `⏳ [外部教師自動発火 スキップ] パターン「${patternKey}」は既に外部教師リクエスト処理中です`
+      );
+      return {
+        success: false,
+        action: 'SKIPPED',
+        reason: '同一パターンの外部教師リクエストが現在処理中です',
+      };
+    }
+
+    // 3. 既に学習データ昇格済みの場合は重複要請を防止
+    if (recurrenceEntry.promotedToTraining) {
+      return {
+        success: false,
+        action: 'SKIPPED',
+        reason: '該当パターンは既に教材化・学習データ昇格済みです',
+      };
+    }
+
+    // 4. 厳格判定ゲート: 「本当に外部教師が必要か？」(64章の3要件)
+    const shouldRequest = this.shouldRequestTeacher({
+      patternKey,
+      category: recurrenceEntry.category,
+      samplePrompt: recurrenceEntry.samplePrompt,
+      recurrenceCount: recurrenceEntry.recurrenceCount,
+      reason: failureReason || recurrenceEntry.notes || recurrenceEntry.reason,
+    });
+
+    if (!shouldRequest) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `ℹ️ [外部教師判定ゲート 却下] パターン「${patternKey}」は端末内解決可能または既存教材が存在するため外部要請をスキップしました`
+      );
+      return {
+        success: false,
+        action: 'SKIPPED',
+        reason: '端末内解決可能または既存正解教材が存在します',
+      };
+    }
+
+    const recordId = `autoreq_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const promptSnippet = recurrenceEntry.samplePrompt.slice(0, 60);
+
+    // 5. 予算チェック (日次/月次上限)
+    const budget = this.checkBudget();
+
+    // 予算上限オーバーの場合 ➔ 諦めず「深い睡眠待機キュー (11章/20章)」へ自動退避
+    if (!budget.allowed) {
+      const queuedItem = this.enqueueDelayedRequest({
+        source: 'failure_recurrence',
+        targetCapabilityId: recurrenceEntry.category.toLowerCase().includes('vba')
+          ? 'cap_abstract_vba_design'
+          : recurrenceEntry.category.toLowerCase().includes('code')
+          ? 'cap_code_comprehension'
+          : 'cap_logical_priority',
+        userPrompt: recurrenceEntry.samplePrompt,
+        failureCategory: recurrenceEntry.category,
+        divergenceTypes: ['failure_recurrence'],
+        candidateResponses: [],
+      });
+
+      recurrenceEntry.autoRequested = true;
+      recurrenceEntry.autoRequestedAt = Date.now();
+      recurrenceEntry.autoRequestStatus = 'QUEUED';
+      recurrenceEntry.autoRequestResult = `予算制限到達のため遅延キューへ自動退避 (キューID: ${queuedItem.id})`;
+
+      const autoRecord: AutoTeacherRequestRecord = {
+        id: recordId,
+        patternKey,
+        category: recurrenceEntry.category,
+        recurrenceCount: recurrenceEntry.recurrenceCount,
+        promptSnippet,
+        requestedAt: Date.now(),
+        status: 'QUEUED',
+        notes: `日次/月次予算上限に達したため睡眠バッチキューへ退避: ${budget.reason}`,
+      };
+      this.autoRequestRecords = [autoRecord, ...this.autoRequestRecords.slice(0, 99)];
+      this.saveState();
+
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `📥 [再発検知 外部教師キュー退避] 予算上限のため遅延睡眠キューへ退避しました (再現: ${recurrenceEntry.recurrenceCount}回): 「${promptSnippet}...」`
+      );
+
+      return {
+        success: true,
+        action: 'QUEUED',
+        recordId,
+        reason: budget.reason,
+      };
+    }
+
+    // 6. 予算内 ➔ 即時自動発火
+    this.inFlightPatternKeys.add(patternKey);
+    recurrenceEntry.autoRequested = true;
+    recurrenceEntry.autoRequestedAt = Date.now();
+    recurrenceEntry.autoRequestStatus = 'IN_FLIGHT';
+
+    const autoRecord: AutoTeacherRequestRecord = {
+      id: recordId,
+      patternKey,
+      category: recurrenceEntry.category,
+      recurrenceCount: recurrenceEntry.recurrenceCount,
+      promptSnippet,
+      requestedAt: Date.now(),
+      status: 'IN_FLIGHT',
+      notes: `同種失敗が${recurrenceEntry.recurrenceCount}回再発したため自動発火 (発火元: ${source || 'diagnoseFailure'})`,
+    };
+    this.autoRequestRecords = [autoRecord, ...this.autoRequestRecords.slice(0, 99)];
+    this.saveState();
+
+    systemLogger.warn(
+      'SELF_IMPROVEMENT',
+      `🚀 [再発検知 外部教師自動発火] 同種失敗が${recurrenceEntry.recurrenceCount}回再発したため外部教師へ教材作成を自動要請します: 「${promptSnippet}...」 (カテゴリ: ${recurrenceEntry.category})`
+    );
+
+    try {
+      // 匿名化と抽象化
+      const anonymized = this.anonymizeFailureExample(recurrenceEntry.samplePrompt);
+      const payload = this.buildTeacherRequestPayload(
+        anonymized,
+        recurrenceEntry.category,
+        failureReason || recurrenceEntry.notes || recurrenceEntry.reason
+      );
+
+      // 外部教師へのリクエスト & 独立検証 & 回答骨格生成
+      const res = await this.requestTeacherMaterial(payload, patternKey);
+
+      if (res.success && res.material) {
+        recurrenceEntry.autoRequestStatus = 'SUCCESS';
+        recurrenceEntry.autoRequestResult = `教材生成・独立検証合格 (骨格: ${res.savedSkeleton?.pattern_id || '未生成'}, 効果検証: ${res.verifiedEffective ? '合格' : '汎化不足'})`;
+        recurrenceEntry.promotedToTraining = true;
+
+        autoRecord.status = 'SUCCESS';
+        autoRecord.verificationPassed = res.verifiedEffective;
+        autoRecord.materialId = res.savedSample?.id;
+        autoRecord.skeletonId = res.savedSkeleton?.pattern_id;
+        autoRecord.notes = `外部教師リクエスト成功・教材追加完了 (骨格: ${res.savedSkeleton?.pattern_id || 'なし'}, 検証: ${res.verificationNote || '完了'})`;
+
+        this.saveState();
+
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `🎉 [外部教師自動発火 完了] 再発失敗に対する正解教材・回答骨格の獲得に成功しました (骨格ID: ${res.savedSkeleton?.pattern_id || 'なし'}): 「${promptSnippet}...」`
+        );
+
+        return {
+          success: true,
+          action: 'REQUESTED',
+          recordId,
+          skeletonId: res.savedSkeleton?.pattern_id,
+        };
+      } else {
+        recurrenceEntry.autoRequestStatus = 'FAILED';
+        recurrenceEntry.autoRequestResult = res.error || '教材検証不合格または通信失敗';
+
+        autoRecord.status = 'FAILED';
+        autoRecord.error = res.error || '教材検証不合格または通信失敗';
+
+        this.saveState();
+
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `⚠️ [外部教師自動発火 失敗] 教材生成または独立検証に合格しませんでした: ${res.error}`
+        );
+
+        return {
+          success: false,
+          action: 'REQUESTED',
+          recordId,
+          reason: res.error,
+        };
+      }
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      recurrenceEntry.autoRequestStatus = 'FAILED';
+      recurrenceEntry.autoRequestResult = errMsg;
+
+      autoRecord.status = 'FAILED';
+      autoRecord.error = errMsg;
+
+      this.saveState();
+
+      systemLogger.error(
+        'SELF_IMPROVEMENT',
+        `❌ [外部教師自動発火 例外] 自動要請パイプラインで例外が発生しました: ${errMsg}`
+      );
+
+      return {
+        success: false,
+        action: 'REQUESTED',
+        recordId,
+        reason: errMsg,
+      };
+    } finally {
+      this.inFlightPatternKeys.delete(patternKey);
+    }
   }
 }
 

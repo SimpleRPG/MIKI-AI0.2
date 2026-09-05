@@ -32,6 +32,7 @@ import {
   TrainingSampleJSONL,
   ResponseSkeleton,
   DelayedTeacherQueueItem,
+  AutoTeacherRequestRecord,
 } from '../types';
 import { teacherRequestService } from '../services/teacherRequestService';
 import { selfImprovementService } from '../services/selfImprovementService';
@@ -47,6 +48,10 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
   const [failurePatterns, setFailurePatterns] = useState<FailureRecurrenceEntry[]>([]);
   const [externalSamples, setExternalSamples] = useState<TrainingSampleJSONL[]>([]);
   const [usageRecords, setUsageRecords] = useState<TeacherUsageRecord[]>([]);
+  const [autoRecords, setAutoRecords] = useState<AutoTeacherRequestRecord[]>([]);
+  const [autoRequestEnabled, setAutoRequestEnabled] = useState<boolean>(() =>
+    teacherRequestService.isAutoRequestEnabled()
+  );
 
   // 選択・プレビュー中の弱点パターンとペイロード
   const [selectedPattern, setSelectedPattern] = useState<FailureRecurrenceEntry | null>(null);
@@ -96,6 +101,14 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
 
     setUsageRecords(teacherRequestService.getUsageRecords());
     setDelayedQueue(teacherRequestService.getDelayedQueue());
+    setAutoRecords(teacherRequestService.getAutoRequestRecords());
+    setAutoRequestEnabled(teacherRequestService.isAutoRequestEnabled());
+  };
+
+  const handleToggleAutoRequest = () => {
+    const next = !autoRequestEnabled;
+    teacherRequestService.setAutoRequestEnabled(next);
+    setAutoRequestEnabled(next);
   };
 
   useEffect(() => {
@@ -263,6 +276,18 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleToggleAutoRequest}
+              className={`px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-colors text-xs font-semibold ${
+                autoRequestEnabled
+                  ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/60'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+              }`}
+              title="同種失敗が2回再発した際に外部教師への教材作成を自動発火する機能の切り替え"
+            >
+              <Zap className={`w-3.5 h-3.5 ${autoRequestEnabled ? 'text-emerald-400 fill-emerald-400/30' : 'text-slate-500'}`} />
+              <span>再発自動要請: {autoRequestEnabled ? 'ON' : 'OFF'}</span>
+            </button>
             <button
               onClick={refreshData}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors text-xs"
@@ -500,14 +525,37 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded font-mono text-[10px] uppercase">
                           {pattern.category}
                         </span>
                         <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold">
                           再発 {pattern.recurrenceCount} 回
                         </span>
-                        {pattern.promotedToSample && (
+                        {pattern.autoRequestStatus === 'IN_FLIGHT' && (
+                          <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded text-[10px] flex items-center gap-1 animate-pulse">
+                            <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                            自動要請中
+                          </span>
+                        )}
+                        {pattern.autoRequestStatus === 'SUCCESS' && (
+                          <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[10px] flex items-center gap-1">
+                            <Check className="w-2.5 h-2.5" />
+                            自動要請済
+                          </span>
+                        )}
+                        {pattern.autoRequestStatus === 'QUEUED' && (
+                          <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded text-[10px] flex items-center gap-1">
+                            <Moon className="w-2.5 h-2.5" />
+                            睡眠キュー退避
+                          </span>
+                        )}
+                        {pattern.autoRequestStatus === 'FAILED' && (
+                          <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded text-[10px]">
+                            要請失敗
+                          </span>
+                        )}
+                        {pattern.promotedToSample && !pattern.autoRequestStatus && (
                           <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[10px]">
                             教材化済
                           </span>
@@ -1002,7 +1050,83 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
         )}
       </div>
 
-      {/* 5. 外部教師利用記録 (Teacher Usage Records) */}
+      {/* 5. 再発検知 自動要請アクティビティ履歴 (Auto Teacher Requests) */}
+      {autoRecords.length > 0 && (
+        <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-emerald-400" />
+              <span>再発失敗 自動要請パイプライン履歴 ({autoRecords.length} 件)</span>
+            </h4>
+            <span className="text-[10px] text-slate-500">
+              同種失敗が2回以上再発した際に自動発火した外部教師リクエストの全履歴
+            </span>
+          </div>
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1 text-xs">
+            {autoRecords.map((rec) => (
+              <div
+                key={rec.id}
+                className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-lg flex flex-col gap-1.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        rec.status === 'SUCCESS'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : rec.status === 'IN_FLIGHT'
+                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                          : rec.status === 'QUEUED'
+                          ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                      }`}
+                    >
+                      {rec.status === 'SUCCESS'
+                        ? '✓ 教材獲得・骨格生成完了'
+                        : rec.status === 'IN_FLIGHT'
+                        ? '⏳ リクエスト処理中'
+                        : rec.status === 'QUEUED'
+                        ? '📥 予算上限・睡眠キュー退避'
+                        : '❌ 要請失敗'}
+                    </span>
+                    <span className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded font-mono text-[10px] uppercase">
+                      {rec.category}
+                    </span>
+                    <span className="text-amber-300 font-bold text-[10px]">
+                      再発: {rec.recurrenceCount}回目
+                    </span>
+                    {rec.skeletonId && (
+                      <span className="text-emerald-400 font-mono text-[10px]">
+                        骨格: {rec.skeletonId}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    {new Date(rec.requestedAt).toLocaleTimeString()}
+                  </span>
+                </div>
+
+                <div className="text-slate-300 text-[11px] line-clamp-1 font-medium">
+                  プロンプト: 「{rec.promptSnippet}...」
+                </div>
+
+                {rec.notes && (
+                  <div className="text-[10px] text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded border border-slate-800/40">
+                    {rec.notes}
+                  </div>
+                )}
+                {rec.error && (
+                  <div className="text-[10px] text-rose-400 bg-rose-950/20 px-2 py-0.5 rounded border border-rose-500/20">
+                    エラー詳細: {rec.error}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 6. 外部教師利用記録 (Teacher Usage Records) */}
       {usageRecords.length > 0 && (
         <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4">
           <h4 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
