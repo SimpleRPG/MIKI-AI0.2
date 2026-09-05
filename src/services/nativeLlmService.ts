@@ -773,6 +773,29 @@ export class NativeLlmService {
     }
   }
 
+  /**
+   * External Local LLM (Ollama / LM Studio / llama-swap) の
+   * 稼働中モデル一覧を取得する。カードUIでの切替候補として使う。
+   */
+  public async listExternalModels(config: ExternalLocalLlmConfig): Promise<string[]> {
+    const endpoint = config.endpoint.replace(/\/$/, '');
+
+    if (config.type === 'ollama') {
+      const res = await fetch(`${endpoint}/api/tags`);
+      if (!res.ok) throw new Error(`Ollamaモデル一覧取得エラー (${res.status})`);
+      const data = await res.json();
+      const models = Array.isArray(data?.models) ? data.models : [];
+      return models.map((m: any) => m?.name).filter((n: any): n is string => !!n);
+    }
+
+    // OpenAI互換 (LM Studio / llama.cpp server / llama-swap)
+    const res = await fetch(`${endpoint}/v1/models`);
+    if (!res.ok) throw new Error(`モデル一覧取得エラー (${res.status})`);
+    const data = await res.json();
+    const models = Array.isArray(data?.data) ? data.data : [];
+    return models.map((m: any) => m?.id).filter((n: any): n is string => !!n);
+  }
+
   public async deleteDownloadedModel(fileName: string): Promise<void> {
     try {
       if (this.isNative() && NativeMlcPlugin) {
