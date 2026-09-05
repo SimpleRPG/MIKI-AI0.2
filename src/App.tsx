@@ -1685,6 +1685,7 @@ export default function App() {
         } catch (extErr: any) {
           systemLogger.warn('INFERENCE', 'External Local LLM error:', extErr);
           webGpuSuccess = false;
+          webGpuErrorDetails = extErr?.message || String(extErr);
         }
       } else if (engineMode === 'webgpu') {
         systemLogger.step(8, 10, 'WebGPU Transformer推論パイプライン実行 (Prefill & Decode)', {
@@ -1770,6 +1771,70 @@ export default function App() {
 
       // Fallback or Explicit Alternative Engines (CPU Rule-based or Gemini Cloud)
       if (!webGpuSuccess || accumulated.trim().length === 0) {
+        if (engineMode === 'external_gpu') {
+          // 外部ローカルLLM接続に失敗した場合、意味のない定型文で誤魔化さず、
+          // エラー診断（原因とヒント）をそのまま本文として表示する。
+          let diagnosticCategory = '外部ローカルLLM未応答';
+          let diagnosticCause = '外部ローカルLLMサーバーからの応答が得られませんでした。';
+          let diagnosticTip = '「外部ローカルLLMサーバー設定」でエンドポイントURLとモデル名を確認してください。';
+
+          if (webGpuErrorDetails) {
+            if (
+              webGpuErrorDetails.includes('Failed to fetch') ||
+              webGpuErrorDetails.includes('NetworkError') ||
+              webGpuErrorDetails.includes('ERR_CONNECTION') ||
+              webGpuErrorDetails.includes('refused')
+            ) {
+              diagnosticCategory = 'サーバー未起動/接続不可';
+              diagnosticCause = '指定したエンドポイントに接続できませんでした。llama-swap等が起動していないか、URL・ポートが間違っている可能性があります。';
+              diagnosticTip = 'Termux側で「curl http://127.0.0.1:8080/v1/models」を実行し、サーバーが応答するか確認してください。';
+            } else if (webGpuErrorDetails.includes('404')) {
+              diagnosticCategory = 'エンドポイント不一致 (404)';
+              diagnosticCause = '接続先のURLパスが見つかりませんでした。サーバー種別（Ollama/LM Studio・llama.cpp）の設定が実際のサーバーと一致していない可能性があります。';
+              diagnosticTip = '「サーバー種別」のプルダウンを、実際に起動しているサーバーの種類に合わせて選び直してください。';
+            } else if (
+              webGpuErrorDetails.includes('400') ||
+              webGpuErrorDetails.includes('422') ||
+              webGpuErrorDetails.includes('not found') ||
+              webGpuErrorDetails.includes('model')
+            ) {
+              diagnosticCategory = 'モデル名不一致';
+              diagnosticCause = '指定したモデル名がサーバー側に登録されていない可能性があります。';
+              diagnosticTip = '「稼働中サーバーのモデル一覧」から実際に稼働しているモデルを選び直してください。';
+            } else if (
+              webGpuErrorDetails.includes('500') ||
+              webGpuErrorDetails.includes('502') ||
+              webGpuErrorDetails.includes('503')
+            ) {
+              diagnosticCategory = 'サーバー内部エラー';
+              diagnosticCause = 'サーバー側（llama-swap/llama.cpp）内部でエラーが発生しました。モデルのロード失敗などが考えられます。';
+              diagnosticTip = 'Termux側のログ（例: ~/llama-swap.log）を確認してください。';
+            } else if (
+              webGpuErrorDetails.includes('timeout') ||
+              webGpuErrorDetails.includes('AbortError') ||
+              webGpuErrorDetails.includes('タイムアウト')
+            ) {
+              diagnosticCategory = '応答タイムアウト';
+              diagnosticCause = 'サーバーからの応答が時間内に返ってきませんでした。モデルの初回ロード中の可能性があります。';
+              diagnosticTip = '数十秒待ってから再度送信するか、モデルサイズを確認してください。';
+            } else {
+              diagnosticCause = `外部ローカルLLMサーバーでエラーが発生しました: ${webGpuErrorDetails}`;
+            }
+          }
+
+          diagnosticData = {
+            category: diagnosticCategory,
+            cause: diagnosticCause,
+            tip: diagnosticTip,
+            modelId: targetModelId,
+          };
+          executedEngineLabel = '⚠️ 外部ローカルLLM接続失敗';
+          systemLogger.warn('CHAT', `[外部LLM未応答診断] ${diagnosticCategory}: ${diagnosticCause}`, diagnosticData);
+
+          accumulated = `⚠️ ${diagnosticCategory}\n\n${diagnosticCause}\n\n💡 ${diagnosticTip}`;
+          tokenCount = Math.round(accumulated.length / 3);
+          firstTokenTime = performance.now();
+        } else {
         try {
           systemLogger.info('CHAT', 'WebGPU未応答またはフォールバック要求のため、即時エンジンを呼び出します');
           const apiRes = await sendChatMessage({
@@ -1854,6 +1919,7 @@ export default function App() {
           }
           systemLogger.error('CHAT', 'Fallback chat API notice:', apiErr);
           accumulated = `⚠️ 応答生成中にエラーが発生しました:\n・詳細: ${apiErr.message || '接続エラー'}`;
+        }
         }
       }
 
