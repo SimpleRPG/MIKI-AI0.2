@@ -265,6 +265,36 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     } catch (e) {}
   }, [externalLlmConfig]);
 
+  // External Local LLM: サーバーから稼働中モデル一覧を取得し、カードで切替できるようにする
+  const [externalModelList, setExternalModelList] = useState<string[]>([]);
+  const [isFetchingExternalModels, setIsFetchingExternalModels] = useState(false);
+  const [externalModelListError, setExternalModelListError] = useState<string | null>(null);
+
+  const refreshExternalModelList = async () => {
+    setIsFetchingExternalModels(true);
+    setExternalModelListError(null);
+    try {
+      const models = await nativeLlmService.listExternalModels(externalLlmConfig);
+      setExternalModelList(models);
+      if (models.length === 0) {
+        setExternalModelListError('サーバーからモデルが見つかりませんでした。');
+      }
+    } catch (err: any) {
+      setExternalModelList([]);
+      setExternalModelListError(err?.message || String(err));
+    } finally {
+      setIsFetchingExternalModels(false);
+    }
+  };
+
+  useEffect(() => {
+    if (engineMode === 'external_gpu') {
+      refreshExternalModelList();
+    }
+    // エンドポイント/種別を変えたら自動で再取得する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engineMode, externalLlmConfig.endpoint, externalLlmConfig.type]);
+
   // Native Hardware GPU Specs
   const [nativeSpecs, setNativeSpecs] = useState<NativeGpuInfo | null>(null);
   useEffect(() => {
@@ -1561,7 +1591,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-400 block mb-1">モデル名</label>
+                    <label className="text-[10px] text-slate-400 block mb-1">モデル名 (手入力も可)</label>
                     <input
                       type="text"
                       value={externalLlmConfig.model}
@@ -1578,9 +1608,54 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
                     >
                       <option value="ollama">Ollama (標準ポート 11434)</option>
-                      <option value="openai_compatible">LM Studio / llama.cpp (1234/v1)</option>
+                      <option value="openai_compatible">LM Studio / llama.cpp / llama-swap (1234, 8080等 /v1)</option>
                     </select>
                   </div>
+                </div>
+
+                {/* サーバーが公開しているモデル一覧をカードで表示し、タップで切替できるようにする */}
+                <div className="pt-2 border-t border-indigo-500/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-indigo-300">稼働中サーバーのモデル一覧 (タップで切替)</span>
+                    <button
+                      onClick={refreshExternalModelList}
+                      disabled={isFetchingExternalModels}
+                      className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-[10px] font-semibold transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isFetchingExternalModels ? 'animate-spin' : ''}`} />
+                      <span>{isFetchingExternalModels ? '取得中...' : '一覧を更新'}</span>
+                    </button>
+                  </div>
+
+                  {externalModelListError && (
+                    <div className="text-[10.5px] text-rose-300 bg-rose-950/40 border border-rose-500/30 rounded-lg px-2.5 py-1.5">
+                      {externalModelListError}
+                    </div>
+                  )}
+
+                  {externalModelList.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {externalModelList.map((modelId) => {
+                        const isActive = externalLlmConfig.model === modelId;
+                        return (
+                          <button
+                            key={modelId}
+                            onClick={() => setExternalLlmConfig({ ...externalLlmConfig, model: modelId })}
+                            className={`p-2.5 rounded-lg border text-left flex items-center justify-between gap-2 transition-all ${
+                              isActive
+                                ? 'bg-indigo-950/70 border-indigo-500 ring-1 ring-indigo-500/50'
+                                : 'bg-slate-900/80 border-slate-800 hover:border-slate-600'
+                            }`}
+                          >
+                            <span className={`text-xs font-mono truncate ${isActive ? 'text-indigo-200 font-bold' : 'text-slate-300'}`}>
+                              {modelId}
+                            </span>
+                            {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
