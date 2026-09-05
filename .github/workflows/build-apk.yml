@@ -571,13 +571,54 @@ jobs:
               private final AtomicBoolean isGenerating = new AtomicBoolean(false);
               private Call currentDownloadCall = null;
 
+              // 共有ストレージ (/storage/emulated/0/Download/gguf-models) に保存する。
+              // Termux からは ~/storage/downloads/gguf-models として同じ場所が見える。
+              // これにより Termux 側のスキャンスクリプトが、アプリでダウンロード/削除した
+              // ファイルをそのまま検知できるようになる。
               private File getModelsDirectory() {
-                  Context context = getContext();
-                  File dir = new File(context.getFilesDir(), "models");
+                  File dir = new File(Environment.getExternalStorageDirectory(), "Download/gguf-models");
                   if (!dir.exists()) {
                       dir.mkdirs();
                   }
                   return dir;
+              }
+
+              // Android 11 (API 30) 以降は「すべてのファイルへのアクセス」権限が
+              // 許可されていないと共有ストレージへの書き込みができない。
+              private boolean hasSharedStorageAccess() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                      return Environment.isExternalStorageManager();
+                  }
+                  return true;
+              }
+
+              @PluginMethod
+              public void checkStorageAccess(PluginCall call) {
+                  JSObject ret = new JSObject();
+                  ret.put("granted", hasSharedStorageAccess());
+                  call.resolve(ret);
+              }
+
+              @PluginMethod
+              public void requestStorageAccess(PluginCall call) {
+                  Context context = getContext();
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && context != null) {
+                      try {
+                          android.content.Intent intent = new android.content.Intent(
+                              android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                          intent.setData(android.net.Uri.parse("package:" + context.getPackageName()));
+                          intent.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                          context.startActivity(intent);
+                      } catch (Exception e) {
+                          android.content.Intent intent = new android.content.Intent(
+                              android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                          intent.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                          context.startActivity(intent);
+                      }
+                  }
+                  JSObject ret = new JSObject();
+                  ret.put("opened", true);
+                  call.resolve(ret);
               }
 
               @PluginMethod
@@ -1279,7 +1320,12 @@ jobs:
           cat << 'EOF' > android/app/src/main/java/com/mikiai/app/MainActivity.java
           package com.mikiai.app;
 
+          import android.content.Intent;
+          import android.net.Uri;
+          import android.os.Build;
           import android.os.Bundle;
+          import android.os.Environment;
+          import android.provider.Settings;
           import com.getcapacitor.BridgeActivity;
 
           public class MainActivity extends BridgeActivity {
@@ -1289,6 +1335,20 @@ jobs:
                   registerPlugin(MikiBackgroundServicePlugin.class);
                   registerPlugin(MikiWorkManagerPlugin.class);
                   super.onCreate(savedInstanceState);
+
+                  // GGUFモデルを共有ストレージ (Download/gguf-models) に保存するため、
+                  // Android 11以降で必要な「すべてのファイルへのアクセス」権限を
+                  // 未許可であれば初回起動時に設定画面へ案内する。
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+                      try {
+                          Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                          intent.setData(Uri.parse("package:" + getPackageName()));
+                          startActivity(intent);
+                      } catch (Exception e) {
+                          Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                          startActivity(intent);
+                      }
+                  }
               }
           }
           EOF
@@ -1311,7 +1371,9 @@ jobs:
 
           # AndroidManifest.xml
           sed -i 's/<application/<application android:networkSecurityConfig="@xml\/network_security_config" android:usesCleartextTraffic="true" android:largeHeap="true" android:hardwareAccelerated="true" android:extractNativeLibs="true"/' android/app/src/main/AndroidManifest.xml
-          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />' android/app/src/main/AndroidManifest.xml
+          # MANAGE_EXTERNAL_STORAGE には tools:ignore 属性が必要なため tools 名前空間を追加
+          sed -i '0,/<manifest /s//<manifest xmlns:tools="http:\/\/schemas.android.com\/tools" /' android/app/src/main/AndroidManifest.xml
           sed -i '/<\/application>/i \    <service android:name=".MikiKeepAliveService" android:foregroundServiceType="dataSync" android:exported="false" />' android/app/src/main/AndroidManifest.xml
 
           chmod +x android/gradlew
