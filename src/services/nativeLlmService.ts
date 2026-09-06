@@ -191,6 +191,9 @@ export class NativeLlmService {
   // TTLで自動アンロードされる仕様のため、これを基準にコールドスタートかどうかを判定し、
   // タイムアウト時間を自動調整する。
   private lastExternalLlmWarmAt: number = 0;
+  // 直近に観測した「初回チャンクまでの実測時間(TTFT)」。実測値をもとに
+  // 次回以降のタイムアウトを自動調整するために保持する(移動平均)。
+  private lastExternalLlmTtftMs: number | null = null;
 
   constructor() {
     this.checkPlatform();
@@ -706,14 +709,27 @@ export class NativeLlmService {
     systemLogger.info('EXTERNAL_GPU', `🖥️ 外部ローカルLLMサーバー (${endpoint}) に接続推論中 (TTL: ${activeTtlSeconds}s)...`);
 
     // 自動調整タイムアウト:
+    // ・実測TTFT(初回チャンクまでの時間)を学習しておき、次回以降はその実測値に
+    //   安全マージンを掛けた時間を初回タイムアウトとして使う(端末の実速度に自動追従)。
+    // ・実測データがまだ無い場合のみ、TTLベースのコールドスタート推定値を初期値にする。
     // ・llama-swap等はTTL経過でモデルをアンロードするため、前回の成功応答から
     //   activeTtlSeconds 以上経っている場合は「コールドスタート」とみなし、
-    //   モデル再ロード分の時間を見込んで長めのタイムアウトを設定する。
+    //   再ロード分の時間を上乗せする。
     // ・一度でも応答(チャンク)が来た後は、以後は「無応答が一定時間続いたら中断する」
     //   アイドルタイムアウトに切り替える。生成が正常に続いている限り中断されない。
-    const isColdStart = Date.now() - this.lastExternalLlmWarmAt > activeTtlSeconds * 1000;
-    const initialTimeoutMs = isColdStart ? 90000 : 20000;
+    const requestStartedAt = Date.now();
+    const isColdStart = requestStartedAt - this.lastExternalLlmWarmAt > activeTtlSeconds * 1000;
+    const learnedTtftMs = this.lastExternalLlmTtftMs;
+    let initialTimeoutMs: number;
+    if (learnedTtftMs != null) {
+      // 実測値の2倍 + コールドスタート時は再ロード分を追加。下限20秒。
+      initialTimeoutMs = Math.max(20000, Math.round(learnedTtftMs * 2) + (isColdStart ? 30000 : 0));
+    } else {
+      // まだ実測データが無い初回呼び出し用のフォールバック値
+      initialTimeoutMs = isColdStart ? 90000 : 30000;
+    }
     const idleTimeoutMs = 20000;
+    let firstChunkReceived = false;
 
     const timeoutController = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -731,6 +747,21 @@ export class NativeLlmService {
       }, ms);
     };
     armTimer(initialTimeoutMs, true);
+
+    // チャンク受信のたびに呼ぶ共通処理:
+    // ・ウォーム状態の記録
+    // ・初回チャンクのみ、実測TTFTを移動平均で学習(次回以降のタイムアウト精度が上がる)
+    // ・アイドルタイムアウトへの切り替え
+    const onChunkReceived = () => {
+      this.lastExternalLlmWarmAt = Date.now();
+      if (!firstChunkReceived) {
+        firstChunkReceived = true;
+        const observedTtftMs = Date.now() - requestStartedAt;
+        this.lastExternalLlmTtftMs =
+          learnedTtftMs != null ? Math.round((learnedTtftMs + observedTtftMs) / 2) : observedTtftMs;
+      }
+      armTimer(idleTimeoutMs, false);
+    };
 
     const onExternalAbort = () => timeoutController.abort();
     if (options?.signal) {
@@ -768,8 +799,7 @@ export class NativeLlmService {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          this.lastExternalLlmWarmAt = Date.now();
-          armTimer(idleTimeoutMs, false);
+          onChunkReceived();
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
@@ -840,7 +870,7 @@ export class NativeLlmService {
 
         const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('application/json') && !contentType.includes('event-stream')) {
-          this.lastExternalLlmWarmAt = Date.now();
+          onChunkReceived();
           const json = await response.json();
           const content = json.choices?.[0]?.message?.content || json.choices?.[0]?.text || '';
           if (content) yield content;
@@ -855,8 +885,7 @@ export class NativeLlmService {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          this.lastExternalLlmWarmAt = Date.now();
-          armTimer(idleTimeoutMs, false);
+          onChunkReceived();
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
