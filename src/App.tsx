@@ -1662,6 +1662,34 @@ export default function App() {
           return { endpoint: 'http://localhost:11434', model: 'qwen2.5:1.5b', type: 'ollama' as const };
         })();
 
+        // 設計思想 SECTION 5 (安全側に倒す): WebGPU用モデルID等、保存されている
+        // モデル名がサーバー側の稼働モデルと食い違っている状態で送信し続けると、
+        // 毎回「モデル名不一致」で失敗するだけになる。送信前に稼働中モデル一覧と
+        // 突き合わせ、含まれていなければ自動補正してから送る。
+        // (一覧取得自体に失敗した場合は、従来通り extConfig.model のまま送信する
+        //  フォールバックを維持する = 挙動を壊さない)
+        try {
+          const liveModels = await nativeLlmService.listExternalModels(extConfig);
+          if (liveModels.length > 0 && !liveModels.includes(extConfig.model)) {
+            const corrected = liveModels[0];
+            systemLogger.warn(
+              'EXTERNAL_GPU',
+              `保存されていたモデル名 "${extConfig.model}" は稼働中サーバーに存在しないため "${corrected}" へ自動補正しました。`,
+              { previousModel: extConfig.model, correctedModel: corrected, liveModels }
+            );
+            extConfig.model = corrected;
+            try {
+              storageService.setItem('miki_external_llm_config', JSON.stringify(extConfig));
+            } catch (e) {}
+          }
+        } catch (listErr) {
+          // 一覧取得に失敗しても致命的にはしない。この後の本送信で
+          // 従来通りの接続失敗診断(サーバー未起動/接続不可 等)に委ねる。
+          systemLogger.warn('EXTERNAL_GPU', 'モデル一覧取得に失敗したため、モデル名の自動補正をスキップします。', {
+            message: (listErr as any)?.message || String(listErr),
+          });
+        }
+
         try {
           for await (const chunk of nativeLlmService.streamExternalLocalLlm(extConfig, chatContext, {
             temperature: promptAnalysis.temperature,
