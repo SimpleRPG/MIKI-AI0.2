@@ -47,6 +47,7 @@ import {
   Key,
   Eye,
   EyeOff,
+  Save,
 } from 'lucide-react';
 import {
   getGeminiApiKey,
@@ -58,8 +59,14 @@ import {
   checkGeminiStatus,
   verifyGeminiApiKey,
   verifyAllGeminiApiKeys,
+  fetchServerEnvKeysInfo,
+  importServerEnvKeys,
+  saveKeysToServerEnv,
+  formatKeysAsDotEnv,
+  autoSyncServerEnvKeysIfEmpty,
   SavedGeminiKeyItem,
   GeminiStatusResult,
+  ServerEnvKeysInfo,
 } from '../services/api';
 
 interface EngineModalProps {
@@ -279,6 +286,91 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   const [apiVerifyMsg, setApiVerifyMsg] = useState('');
   const [showQuotaExplanation, setShowQuotaExplanation] = useState(true);
 
+  // Server Environment Variables (.env) Status for Local PC / Termux
+  const [serverEnvInfo, setServerEnvInfo] = useState<ServerEnvKeysInfo | null>(null);
+  const [isLoadingEnvInfo, setIsLoadingEnvInfo] = useState(false);
+  const [envSyncMsg, setEnvSyncMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [copiedEnvTemplate, setCopiedEnvTemplate] = useState(false);
+
+  const loadServerEnvInfo = async () => {
+    setIsLoadingEnvInfo(true);
+    try {
+      const info = await fetchServerEnvKeysInfo();
+      setServerEnvInfo(info);
+      const currentKeys = getGeminiApiKeyItems();
+      if (currentKeys.length === 0 && info && info.totalEnvKeys > 0) {
+        const synced = await autoSyncServerEnvKeysIfEmpty();
+        if (synced.length > 0) {
+          setGeminiKeyItems([...synced]);
+          setEnvSyncMsg({
+            type: 'success',
+            text: `サーバーの .env から ${synced.length} 件のキーを自動認識・同期しました！`,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load server env keys info:', e);
+    } finally {
+      setIsLoadingEnvInfo(false);
+    }
+  };
+
+  const handleImportFromEnv = async () => {
+    setIsLoadingEnvInfo(true);
+    setEnvSyncMsg({ type: 'info', text: 'サーバーの環境変数 (.env) からキーを取り込み中...' });
+    const res = await importServerEnvKeys();
+    setIsLoadingEnvInfo(false);
+    if (res.success && res.items.length > 0) {
+      const existing = getGeminiApiKeyItems();
+      const existingKeys = new Set(existing.map((x) => x.key));
+      const newlyAdded: SavedGeminiKeyItem[] = [];
+      res.items.forEach((item) => {
+        if (!existingKeys.has(item.key)) {
+          existingKeys.add(item.key);
+          newlyAdded.push(item);
+        }
+      });
+      const merged = [...existing, ...newlyAdded];
+      setGeminiApiKeyItems(merged);
+      setGeminiKeyItems(merged);
+      setEnvSyncMsg({
+        type: 'success',
+        text:
+          newlyAdded.length > 0
+            ? `${newlyAdded.length} 件の環境変数キーを新しく取り込みました！（合計: ${merged.length}件）`
+            : `既にすべての環境変数キー（${res.items.length}件）がアプリに登録されています。`,
+      });
+      refreshGeminiStatus();
+      loadServerEnvInfo();
+    } else {
+      setEnvSyncMsg({ type: 'error', text: res.message || '環境変数キーの取得に失敗しました。' });
+    }
+  };
+
+  const handleSaveToEnv = async () => {
+    if (geminiKeyItems.length === 0) return;
+    setIsLoadingEnvInfo(true);
+    setEnvSyncMsg({ type: 'info', text: 'サーバーの .env ファイルへ保存中...' });
+    const res = await saveKeysToServerEnv(geminiKeyItems);
+    setIsLoadingEnvInfo(false);
+    if (res.success) {
+      setEnvSyncMsg({
+        type: 'success',
+        text: `サーバーの .env に ${geminiKeyItems.length} 件のキーを保存しました（自動認識有効）！`,
+      });
+      loadServerEnvInfo();
+    } else {
+      setEnvSyncMsg({ type: 'error', text: res.message || '保存に失敗しました。' });
+    }
+  };
+
+  const handleCopyEnvTemplate = () => {
+    const template = formatKeysAsDotEnv(geminiKeyItems);
+    navigator.clipboard.writeText(template);
+    setCopiedEnvTemplate(true);
+    setTimeout(() => setCopiedEnvTemplate(false), 2500);
+  };
+
   const refreshGeminiStatus = async () => {
     try {
       const status = await checkGeminiStatus();
@@ -290,6 +382,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     if (isOpen) {
       setGeminiKeyItems(getGeminiApiKeyItems());
       refreshGeminiStatus();
+      loadServerEnvInfo();
     }
   }, [isOpen]);
 
@@ -2019,12 +2112,123 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                     </div>
                   )}
 
-                  <div className="text-[10px] text-slate-400 pt-0.5 space-y-1">
-                    <div>
-                      💡 <span className="font-semibold text-slate-300">サーバー側の設定方法:</span> ローカルPCやTermuxで動かす時は、プロジェクト直下の <code className="bg-slate-950 text-sky-300 px-1 py-0.5 rounded font-mono">.env</code> に <code className="text-amber-300 font-mono">GEMINI_API_KEY=AIzaSy...</code> またはカンマ区切り <code className="text-amber-300 font-mono">GEMINI_API_KEYS=key1,key2</code> と書くだけでも自動認識されます。
+                  {/* Environment Variables (.env) Support Card for Local PC / Termux */}
+                  <div className="mt-3 p-3 bg-slate-950/90 rounded-lg border border-emerald-500/30 space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
+                        <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>ローカルPC / Termux 環境変数 (.env) 自動認識連携</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={loadServerEnvInfo}
+                          disabled={isLoadingEnvInfo}
+                          className="px-2 py-0.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded text-[10.5px] font-medium transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          title=".env を再読込して状態を更新"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isLoadingEnvInfo ? 'animate-spin text-emerald-400' : 'text-slate-400'}`} />
+                          <span>{isLoadingEnvInfo ? '確認中...' : '.env再読込'}</span>
+                        </button>
+                        {serverEnvInfo && serverEnvInfo.totalEnvKeys > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleImportFromEnv}
+                            disabled={isLoadingEnvInfo}
+                            className="px-2 py-0.5 bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 rounded text-[10.5px] font-bold transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            title="環境変数のキーをアプリのキー一覧にインポート"
+                          >
+                            <ArrowDownToLine className="w-3 h-3 text-emerald-400" />
+                            <span>アプリへ同期 ({serverEnvInfo.totalEnvKeys}件)</span>
+                          </button>
+                        )}
+                        {geminiKeyItems.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleSaveToEnv}
+                            disabled={isLoadingEnvInfo}
+                            className="px-2 py-0.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-emerald-500/40 text-emerald-300 rounded text-[10.5px] font-medium transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            title="現在のアプリ登録キーをサーバーの .env に書き込む"
+                          >
+                            <Save className="w-3 h-3 text-emerald-400" />
+                            <span>.env に保存</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleCopyEnvTemplate}
+                          className="px-2 py-0.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded text-[10.5px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                          title=".env 記述用テンプレートをコピー"
+                        >
+                          {copiedEnvTemplate ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                          <span>{copiedEnvTemplate ? 'コピー完了!' : '.env書式コピー'}</span>
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      🔄 <span className="font-semibold text-slate-300">自動分散・フォールバック:</span> リクエスト毎にキーが自動ローテーションされ、429（クォータ上限）発生時は別プロジェクトのキーへ瞬時に切り替わります。
+
+                    {/* Detected Env Keys List or Helper Notice */}
+                    {serverEnvInfo && serverEnvInfo.totalEnvKeys > 0 ? (
+                      <div className="space-y-1.5">
+                        <div className="text-[11px] text-emerald-200/90 flex items-center gap-1.5 flex-wrap">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-500/40">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            .env 自動認識中 ({serverEnvInfo.totalEnvKeys}個のAPIキー)
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            ※UIで未登録でも、サーバーはこれらのキーで自動分散実行します
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {serverEnvInfo.keys.map((k) => (
+                            <div
+                              key={`${k.varName}-${k.index}`}
+                              className="px-2 py-1 bg-slate-900/90 border border-emerald-500/30 rounded text-[10.5px] font-mono text-slate-300 flex items-center gap-1.5"
+                            >
+                              <span className="text-emerald-400 font-semibold">{k.varName}:</span>
+                              <span className="text-slate-400">{k.preview}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-300 leading-relaxed bg-slate-900/60 p-2.5 rounded border border-slate-800 space-y-1.5">
+                        <div className="text-slate-200 font-medium">
+                          ローカルPCやTermuxで動かす際も、プロジェクト直下の <code className="text-emerald-300 font-mono bg-slate-950 px-1 py-0.5 rounded">.env</code> に以下のように記述するだけで自動認識されます：
+                        </div>
+                        <div className="bg-slate-950 p-2.5 rounded border border-slate-800 text-[10.5px] font-mono text-emerald-300/90 overflow-x-auto select-all leading-relaxed">
+                          <div><span className="text-slate-500"># カンマ区切りで複数キー一括指定 (自動ローテーション):</span></div>
+                          <div>GEMINI_API_KEYS=AIzaSy...Key1,AIzaSy...Key2</div>
+                          <div className="pt-1.5"><span className="text-slate-500"># または番号別指定 (プロジェクト別クォータ枠独立):</span></div>
+                          <div>GEMINI_API_KEY_1=AIzaSy...Key1</div>
+                          <div>GEMINI_API_KEY_2=AIzaSy...Key2</div>
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          ※記述後、アプリの再起動は不要です（APIリクエスト時または「.env再読込」で即座に動的反映されます）。
+                        </div>
+                      </div>
+                    )}
+
+                    {envSyncMsg && (
+                      <div
+                        className={`px-2.5 py-1.5 rounded text-[11px] flex items-center gap-1.5 ${
+                          envSyncMsg.type === 'success'
+                            ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/30'
+                            : envSyncMsg.type === 'error'
+                            ? 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                            : 'bg-sky-950/90 text-sky-300 border border-sky-500/30'
+                        }`}
+                      >
+                        {envSyncMsg.type === 'success' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />}
+                        {envSyncMsg.type === 'error' && <AlertTriangle className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />}
+                        {envSyncMsg.type === 'info' && <RefreshCw className="w-3.5 h-3.5 text-sky-400 animate-spin flex-shrink-0" />}
+                        <span>{envSyncMsg.text}</span>
+                      </div>
+                    )}
+
+                    <div className="text-[10px] text-slate-400 pt-0.5 space-y-1">
+                      <div>
+                        🔄 <span className="font-semibold text-slate-300">自動分散・フォールバック:</span> リクエスト毎にキーが自動ローテーションされ、429（クォータ上限）発生時は別プロジェクトのキーへ瞬時に切り替わります。
+                      </div>
                     </div>
                   </div>
                 </div>

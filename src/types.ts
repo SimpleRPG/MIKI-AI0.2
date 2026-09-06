@@ -2370,3 +2370,70 @@ export interface EmbeddingHealthCheckResult {
   timestamp: number;
 }
 
+// ==========================================
+// 第51章「失敗シグネチャ・カタログ」関連型定義
+// ==========================================
+
+export type FailureCategory =
+  | 'vba_syntax'
+  | 'performance_hang'
+  | 'assumption_drift'
+  | 'instruction_omission'
+  | 'unverified_claim'
+  | 'premature_completion'
+  | 'code_regressive'
+  | 'hallucinated_api'
+  | 'safety_violation'
+  | 'type_mismatch'
+  | 'security_boundary'
+  | 'logic_error'
+  | 'other';
+
+export type FailureSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export type FailureSignatureStatus = 'ACTIVE' | 'RESOLVED' | 'OBSOLETE' | 'TESTING' | 'MONITORING';
+
+export interface FailureSignature {
+  signatureId: string;
+  title: string;
+  category: FailureCategory;
+  triggerPatterns: string[];
+  antiPatternExcerpt: string;
+  correctedSolution: string;
+  rootCause: string;
+  avoidanceInstruction: string;
+  occurredCount: number;
+  preventedCount: number;
+  severity: FailureSeverity;
+  status: FailureSignatureStatus;
+  source: 'code_gate' | 'user_negative_rating' | 'self_reflection' | 'manual' | 'auto_eval' | 'completion_judge';
+  relatedCodeLanguage?: string;
+  lastDetectedAt: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AntiPatternMatchResult {
+  signatureId: string;
+  title: string;
+  category: FailureCategory;
+  severity: FailureSeverity;
+  matchedRule: string;
+  warningMessage: string;
+  suggestedFix?: string;
+  preventedAt?: number;
+  violated?: boolean;
+  avoidanceInstruction?: string;
+  correctedSolution?: string;
+}
+
+export interface FailureCatalogStats {
+  totalSignatures: number;
+  activeCount: number;
+  totalPrevented: number;
+  totalOccurred: number;
+  criticalCount: number;
+  categoryDistribution: Record<string, number>;
+}
+
+

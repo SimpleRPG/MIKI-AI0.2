@@ -35,9 +35,16 @@ let keyRoundRobinIndex = 0;
 
 function reloadDotenvIfPresent() {
   try {
-    const envPath = path.join(process.cwd(), '.env');
-    if (fs.existsSync(envPath)) {
-      dotenv.config({ path: envPath, override: true });
+    const candidates = [
+      path.join(process.cwd(), '.env'),
+      path.join(process.cwd(), '.env.local'),
+      path.join(__dirname, '.env'),
+      path.join(__dirname, '.env.local'),
+    ];
+    for (const envPath of candidates) {
+      if (fs.existsSync(envPath)) {
+        dotenv.config({ path: envPath, override: true });
+      }
     }
   } catch {}
 }
@@ -110,24 +117,47 @@ function extractAllApiKeys(req?: express.Request): ExtractedApiKey[] {
 
   // GEMINI_API_KEYS (comma or newline separated list of keys)
   if (process.env.GEMINI_API_KEYS) {
-    process.env.GEMINI_API_KEYS.split(/[,\n]/).forEach((k) => addKey(k, 'environment', 'GEMINI_API_KEYS'));
+    const parts = process.env.GEMINI_API_KEYS.split(/[,\n]/);
+    parts.forEach((k, idx) => {
+      const vName = parts.length > 1 ? `GEMINI_API_KEYS [#${idx + 1}]` : 'GEMINI_API_KEYS';
+      addKey(k, 'environment', vName);
+    });
   }
-  // GEMINI_API_KEY (single key or comma-separated)
+  // GEMINI_API_KEY (single key or comma-separated list of keys)
   if (process.env.GEMINI_API_KEY) {
-    process.env.GEMINI_API_KEY.split(/[,\n]/).forEach((k) => addKey(k, 'environment', 'GEMINI_API_KEY'));
+    const parts = process.env.GEMINI_API_KEY.split(/[,\n]/);
+    parts.forEach((k, idx) => {
+      const vName = parts.length > 1 ? `GEMINI_API_KEY [#${idx + 1}]` : 'GEMINI_API_KEY';
+      addKey(k, 'environment', vName);
+    });
   }
-  // GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_KEY_1, etc.
+  // Numbered or project-specific keys: GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_KEY_1, GOOGLE_API_KEY_1, etc.
   const envKeys = Object.keys(process.env).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   envKeys.forEach((envKey) => {
-    if (/^(GEMINI_API_KEY_\d+|GEMINI_KEY_\d+|GOOGLE_API_KEY_\d+)$/i.test(envKey)) {
-      addKey(process.env[envKey], 'environment', envKey);
+    if (/^(GEMINI_API_KEY_\d+|GEMINI_KEY_\d+|GOOGLE_API_KEY_\d+|GEMINI_PROJECT_\d+_KEY)$/i.test(envKey)) {
+      const val = process.env[envKey];
+      if (typeof val === 'string') {
+        const parts = val.split(/[,\n]/);
+        parts.forEach((k, idx) => {
+          const vName = parts.length > 1 ? `${envKey} [#${idx + 1}]` : envKey;
+          addKey(k, 'environment', vName);
+        });
+      }
     }
   });
   if (process.env.GOOGLE_API_KEY) {
-    process.env.GOOGLE_API_KEY.split(/[,\n]/).forEach((k) => addKey(k, 'environment', 'GOOGLE_API_KEY'));
+    const parts = process.env.GOOGLE_API_KEY.split(/[,\n]/);
+    parts.forEach((k, idx) => {
+      const vName = parts.length > 1 ? `GOOGLE_API_KEY [#${idx + 1}]` : 'GOOGLE_API_KEY';
+      addKey(k, 'environment', vName);
+    });
   }
   if (process.env.GOOGLE_API_KEYS) {
-    process.env.GOOGLE_API_KEYS.split(/[,\n]/).forEach((k) => addKey(k, 'environment', 'GOOGLE_API_KEYS'));
+    const parts = process.env.GOOGLE_API_KEYS.split(/[,\n]/);
+    parts.forEach((k, idx) => {
+      const vName = parts.length > 1 ? `GOOGLE_API_KEYS [#${idx + 1}]` : 'GOOGLE_API_KEYS';
+      addKey(k, 'environment', vName);
+    });
   }
 
   return result;

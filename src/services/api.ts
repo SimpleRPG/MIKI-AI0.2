@@ -291,6 +291,23 @@ export async function saveKeysToServerEnv(keys: SavedGeminiKeyItem[]): Promise<{
   }
 }
 
+export async function autoSyncServerEnvKeysIfEmpty(): Promise<SavedGeminiKeyItem[]> {
+  const current = getGeminiApiKeyItems();
+  if (current.length > 0) return current;
+
+  try {
+    const imported = await importServerEnvKeys();
+    if (imported.success && imported.items.length > 0) {
+      setGeminiApiKeyItems(imported.items);
+      systemLogger.info('SERVER', `🍃 サーバーの .env から ${imported.items.length} 件のAPIキーを自動認識・同期しました。`);
+      return imported.items;
+    }
+  } catch (e) {
+    console.warn('Auto sync server env keys notice:', e);
+  }
+  return [];
+}
+
 export function formatKeysAsDotEnv(keys: SavedGeminiKeyItem[]): string {
   if (keys.length === 0) {
     return '# .env\nGEMINI_API_KEY=\nGEMINI_API_KEYS=\n';
