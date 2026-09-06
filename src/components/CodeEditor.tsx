@@ -22,6 +22,12 @@ import {
   ListFilter,
   Sparkles,
   RefreshCw,
+  Edit2,
+  FolderPlus,
+  Search,
+  WrapText,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { WorkspaceFile } from '../types';
 import { extractFilesFromZip, ZipExtractionResult } from '../utils/codeParser';
@@ -34,6 +40,8 @@ interface CodeEditorProps {
   onCreateFile: (name: string) => void;
   onDeleteFile: (path: string) => void;
   onDeleteFolder?: (folderPath: string) => void;
+  onRenameFile?: (oldPath: string, newPath: string) => void;
+  onRenameFolder?: (oldFolderPath: string, newFolderPath: string) => void;
   onApplySandbox: () => void;
   onImportZip?: (importedFiles: WorkspaceFile[], projectName?: string) => void;
   onExportZip?: () => void;
@@ -56,17 +64,27 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onCreateFile,
   onDeleteFile,
   onDeleteFolder,
+  onRenameFile,
+  onRenameFolder,
   onApplySandbox,
   onImportZip,
   onExportZip,
 }) => {
   const [newFileName, setNewFileName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showLineNumbers, setShowLineNumbers] = useState(true);
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('sm');
+  const [wrapLines, setWrapLines] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
+
+  // コード内検索
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 削除確認モーダル状態 (誤削除防止・スマホフレンドリー)
   const [pendingDelete, setPendingDelete] = useState<{
@@ -74,6 +92,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     path: string;
     displayName: string;
     fileCount?: number;
+  } | null>(null);
+
+  // リネーム確認モーダル状態 (誤操作防止)
+  const [pendingRename, setPendingRename] = useState<{
+    type: 'file' | 'folder';
+    oldPath: string;
+    newPath: string;
   } | null>(null);
 
   // ZIPインポート関連状態
@@ -140,6 +165,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     setIsCreating(false);
   };
 
+  const handleCreateFolder = () => {
+    if (!newFolderName.trim()) return;
+    const cleanFolder = newFolderName.trim().replace(/\/+$/, '').replace(/^\/+/, '');
+    onCreateFile(`${cleanFolder}/.keep`);
+    setNewFolderName('');
+    setIsCreatingFolder(false);
+  };
+
   const handleCopy = () => {
     if (!activeFile) return;
     navigator.clipboard.writeText(activeFile.content);
@@ -168,6 +201,74 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       fileCount: containedFiles.length,
     });
   };
+
+  // リネームリクエスト (確認ダイアログを開く)
+  const requestRenameFile = (file: WorkspaceFile) => {
+    setPendingRename({
+      type: 'file',
+      oldPath: file.path,
+      newPath: file.path,
+    });
+  };
+
+  const requestRenameFolder = (folderPath: string) => {
+    setPendingRename({
+      type: 'folder',
+      oldPath: folderPath,
+      newPath: folderPath,
+    });
+  };
+
+  // リネーム確定実行
+  const confirmRename = () => {
+    if (!pendingRename) return;
+    const cleanNew = pendingRename.newPath.trim().replace(/^\/+/, '');
+    if (!cleanNew || cleanNew === pendingRename.oldPath) {
+      setPendingRename(null);
+      return;
+    }
+
+    if (pendingRename.type === 'file') {
+      if (onRenameFile) {
+        onRenameFile(pendingRename.oldPath, cleanNew);
+      }
+    } else {
+      if (onRenameFolder) {
+        onRenameFolder(pendingRename.oldPath, cleanNew);
+      }
+    }
+
+    setPendingRename(null);
+  };
+
+  // 検索ヒット箇所へのスクロール
+  const handleSearchNext = () => {
+    if (!searchQuery.trim() || !activeFile || !textareaRef.current) return;
+    const content = activeFile.content;
+    const startPos = textareaRef.current.selectionEnd || 0;
+    let nextPos = content.toLowerCase().indexOf(searchQuery.toLowerCase(), startPos);
+    if (nextPos === -1) {
+      // 最初からラップアラウンド
+      nextPos = content.toLowerCase().indexOf(searchQuery.toLowerCase(), 0);
+    }
+    if (nextPos !== -1) {
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(nextPos, nextPos + searchQuery.length);
+    }
+  };
+
+  const searchMatchCount = useMemo(() => {
+    if (!searchQuery.trim() || !activeFile) return 0;
+    const q = searchQuery.toLowerCase();
+    const content = activeFile.content.toLowerCase();
+    let count = 0;
+    let pos = 0;
+    while ((pos = content.indexOf(q, pos)) !== -1) {
+      count++;
+      pos += q.length;
+    }
+    return count;
+  }, [searchQuery, activeFile]);
 
   // 削除確定実行
   const confirmDelete = () => {
@@ -298,17 +399,29 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 <span className="font-medium truncate">{node.name}</span>
               </div>
 
-              {/* フォルダ削除ボタン */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  requestDeleteFolder(node.path);
-                }}
-                className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-400 rounded transition-opacity"
-                title={`フォルダ「${node.name}」を削除`}
-              >
-                <Trash2 className="w-3 h-3 text-slate-400 hover:text-rose-400" />
-              </button>
+              {/* フォルダ操作ボタン (リネーム & 削除) */}
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    requestRenameFolder(node.path);
+                  }}
+                  className="p-1 hover:text-sky-300 rounded text-slate-400"
+                  title={`フォルダ「${node.name}」の名前変更`}
+                >
+                  <Edit2 className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    requestDeleteFolder(node.path);
+                  }}
+                  className="p-1 hover:text-rose-400 rounded text-slate-400"
+                  title={`フォルダ「${node.name}」を削除`}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
             </div>
 
             {!isCollapsed && renderTreeNodes(node.children, depth + 1)}
@@ -338,18 +451,30 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             <span className="truncate">{file.name}</span>
           </div>
 
-          {files.length > 1 && (
+          <div className="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity">
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                requestDeleteFile(file);
+                requestRenameFile(file);
               }}
-              className="opacity-70 group-hover:opacity-100 p-1 hover:text-rose-400 rounded transition-opacity"
-              title={`ファイル「${file.name}」を削除`}
+              className="p-1 hover:text-sky-300 rounded text-slate-400"
+              title={`ファイル「${file.name}」の名前・パス変更`}
             >
-              <Trash2 className="w-3 h-3 text-slate-400 hover:text-rose-400" />
+              <Edit2 className="w-3 h-3" />
             </button>
-          )}
+            {files.length > 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  requestDeleteFile(file);
+                }}
+                className="p-1 hover:text-rose-400 rounded text-slate-400"
+                title={`ファイル「${file.name}」を削除`}
+              >
+                <Trash2 className="w-3 h-3 hover:text-rose-400" />
+              </button>
+            )}
+          </div>
         </div>
       );
     });

@@ -68,9 +68,19 @@ export function extractCodeBlocks(markdown: string): ExtractedCodeBlock[] {
 }
 
 export function buildSandboxHtml(files: WorkspaceFile[]): string {
-  const htmlFile = files.find((f) => f.path === 'index.html' || f.name.endsWith('.html'));
+  // 最適なHTMLエントリポイントを決定 (index.html > *.html)
+  const htmlFile =
+    files.find((f) => f.path === 'index.html') ||
+    files.find((f) => f.path.endsWith('/index.html')) ||
+    files.find((f) => f.path.endsWith('.html'));
+
   const cssFiles = files.filter((f) => f.path.endsWith('.css'));
-  const jsFiles = files.filter((f) => (f.path.endsWith('.js') || f.path.endsWith('.ts')) && f.path !== 'index.html');
+  const jsFiles = files.filter(
+    (f) =>
+      (f.path.endsWith('.js') || f.path.endsWith('.ts')) &&
+      !f.path.endsWith('.d.ts') &&
+      f.path !== 'index.html'
+  );
 
   let baseHtml = htmlFile
     ? htmlFile.content
@@ -89,9 +99,61 @@ export function buildSandboxHtml(files: WorkspaceFile[]): string {
     }
   }
 
-  // Inject CSS
-  if (cssFiles.length > 0) {
-    const combinedCss = cssFiles.map((c) => `<style>\n/* ${c.name} */\n${c.content}\n</style>`).join('\n');
+  // 追跡: HTML内で明示的に参照・インライン化されたファイル
+  const resolvedCssPaths = new Set<string>();
+  const resolvedJsPaths = new Set<string>();
+
+  // 1. <link rel="stylesheet" href="..."> をワークスペース内CSSでインライン置換
+  baseHtml = baseHtml.replace(
+    /<link\s+[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*>|<link\s+[^>]*href=["']([^"']+)["'][^>]*rel=["']stylesheet["'][^>]*>/gi,
+    (match, href1, href2) => {
+      const href = (href1 || href2 || '').trim();
+      if (!href || href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
+        return match; // 外部CDNリンクはそのまま保持
+      }
+
+      const cleanHref = href.replace(/^\.\//, '').replace(/^\//, '');
+      const matchedCss = cssFiles.find(
+        (c) => c.path === cleanHref || c.name === cleanHref || c.path.endsWith(`/${cleanHref}`)
+      );
+
+      if (matchedCss) {
+        resolvedCssPaths.add(matchedCss.path);
+        return `<style data-source="${matchedCss.path}">\n/* ${matchedCss.name} */\n${matchedCss.content}\n</style>`;
+      }
+
+      return match;
+    }
+  );
+
+  // 2. <script src="..."> をワークスペース内JSでインライン置換 (実行順序・HTML構造を完全保持)
+  baseHtml = baseHtml.replace(
+    /<script\s+[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi,
+    (match, src) => {
+      const cleanSrc = (src || '').trim().replace(/^\.\//, '').replace(/^\//, '');
+      if (!cleanSrc || cleanSrc.startsWith('http://') || cleanSrc.startsWith('https://') || cleanSrc.startsWith('//')) {
+        return match; // 外部CDNスクリプトはそのまま保持
+      }
+
+      const matchedJs = jsFiles.find(
+        (j) => j.path === cleanSrc || j.name === cleanSrc || j.path.endsWith(`/${cleanSrc}`)
+      );
+
+      if (matchedJs) {
+        resolvedJsPaths.add(matchedJs.path);
+        return `<script data-source="${matchedJs.path}">\n// ${matchedJs.name}\n${matchedJs.content}\n</script>`;
+      }
+
+      return match;
+    }
+  );
+
+  // 3. HTMLタグ内で未解決の残りのCSSファイルをヘッダーに注入
+  const remainingCssFiles = cssFiles.filter((c) => !resolvedCssPaths.has(c.path));
+  if (remainingCssFiles.length > 0) {
+    const combinedCss = remainingCssFiles
+      .map((c) => `<style data-injected="${c.path}">\n/* ${c.name} */\n${c.content}\n</style>`)
+      .join('\n');
     if (baseHtml.includes('</head>')) {
       baseHtml = baseHtml.replace('</head>', `${combinedCss}\n</head>`);
     } else {
@@ -99,9 +161,12 @@ export function buildSandboxHtml(files: WorkspaceFile[]): string {
     }
   }
 
-  // Inject JS
-  if (jsFiles.length > 0) {
-    const combinedJs = jsFiles.map((j) => `<script>\n// ${j.name}\n${j.content}\n</script>`).join('\n');
+  // 4. HTMLタグ内で未解決の残りのJSファイルをボディ末尾に注入
+  const remainingJsFiles = jsFiles.filter((j) => !resolvedJsPaths.has(j.path));
+  if (remainingJsFiles.length > 0) {
+    const combinedJs = remainingJsFiles
+      .map((j) => `<script data-injected="${j.path}">\n// ${j.name}\n${j.content}\n</script>`)
+      .join('\n');
     if (baseHtml.includes('</body>')) {
       baseHtml = baseHtml.replace('</body>', `${combinedJs}\n</body>`);
     } else {

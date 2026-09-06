@@ -2821,6 +2821,61 @@ export default function App() {
     }
   };
 
+  const handleRenameFile = (oldPath: string, newPath: string) => {
+    if (!newPath.trim() || oldPath === newPath) return;
+    const cleanNew = newPath.trim().replace(/^\/+/, '');
+    const newName = cleanNew.split('/').pop() || cleanNew;
+    const ext = newName.includes('.') ? newName.split('.').pop()?.toLowerCase() || '' : '';
+    let language = 'text';
+    if (ext === 'html' || ext === 'htm') language = 'html';
+    else if (ext === 'js' || ext === 'mjs' || ext === 'cjs') language = 'javascript';
+    else if (ext === 'ts' || ext === 'tsx') language = 'typescript';
+    else if (ext === 'css' || ext === 'scss') language = 'css';
+    else if (ext === 'json') language = 'json';
+    else if (ext === 'md') language = 'markdown';
+
+    setWorkspaceFiles((prev) =>
+      prev.map((f) =>
+        f.path === oldPath
+          ? {
+              ...f,
+              path: cleanNew,
+              name: newName,
+              language: f.language === 'image' || f.language === 'audio' ? f.language : language,
+            }
+          : f
+      )
+    );
+    if (activeFilePath === oldPath) {
+      setActiveFilePath(cleanNew);
+    }
+  };
+
+  const handleRenameFolder = (oldFolder: string, newFolder: string) => {
+    if (!newFolder.trim() || oldFolder === newFolder) return;
+    const cleanOld = oldFolder.replace(/\/+$/, '');
+    const cleanNew = newFolder.trim().replace(/\/+$/, '').replace(/^\/+/, '');
+    const oldPrefix = `${cleanOld}/`;
+    const newPrefix = `${cleanNew}/`;
+
+    setWorkspaceFiles((prev) =>
+      prev.map((f) => {
+        if (f.path.startsWith(oldPrefix)) {
+          const updatedPath = newPrefix + f.path.slice(oldPrefix.length);
+          return {
+            ...f,
+            path: updatedPath,
+            name: updatedPath.split('/').pop() || f.name,
+          };
+        }
+        return f;
+      })
+    );
+    if (activeFilePath.startsWith(oldPrefix)) {
+      setActiveFilePath(newPrefix + activeFilePath.slice(oldPrefix.length));
+    }
+  };
+
   const handleImportZipFiles = (importedFiles: WorkspaceFile[], projectName?: string) => {
     if (!importedFiles || importedFiles.length === 0) return;
     setWorkspaceFiles(importedFiles);
