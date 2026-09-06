@@ -79,8 +79,10 @@ import {
   retrieveRelevantMemories,
   retrieveRelevantMemoriesHybrid,
   recordMemoryUsage,
+  applyMemoryFeedback,
   enrichMemoryMetadata,
 } from './utils/memoryRetrieval';
+import { embeddingService } from './services/embeddingService';
 import { SPEAKER_PROFILES, SpeakerProfile } from './data/speakers';
 import { INITIAL_JAPANESE_MEMORIES } from './data/japaneseKnowledgeData';
 import { MASTER_EDUCATION_MEMORIES } from './data/masterEducationKnowledge';
@@ -390,6 +392,16 @@ export default function App() {
             );
             storageService.saveMemoryItem(newMem);
             setMemories((prev) => [newMem, ...prev]);
+
+            // 設計思想 Master v5.0 第14章: 新規記憶のLLM実埋め込みベクトルを非同期生成
+            embeddingService
+              .ensureMemoryEmbedding(newMem)
+              .then((embeddedMem) => {
+                if (embeddedMem.embeddingVector && embeddedMem.embeddingVector.length > 0) {
+                  setMemories((prev) => prev.map((m) => (m.id === embeddedMem.id ? embeddedMem : m)));
+                }
+              })
+              .catch(() => {});
           }
         }
       }
@@ -573,11 +585,13 @@ export default function App() {
     const planStartTime = performance.now();
     const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
     const activeMemories = memories.filter((m) => m.active);
+    const queryEmb = await embeddingService.getQueryEmbedding(initialGoal);
     const relevantMemories = await retrieveRelevantMemoriesHybrid(initialGoal, activeMemories, {
       limit: 6,
       alwaysIncludePinned: true,
       traverseGraph: true,
       onlyApprovedForFacts: true,
+      queryEmbedding: queryEmb || undefined,
     });
 
     for (let i = plan.currentStepIndex; i < plan.steps.length; i++) {
@@ -888,6 +902,28 @@ export default function App() {
       selectedEngineMode: engineMode,
       speakerMode,
     });
+
+    // 設計思想 Master v5.0 第2章2節: 前ターンで使われた記憶に対するユーザーフィードバック（感情価: 質）の自動反映
+    if (lastTurnUsedMemoryIdsRef.current && lastTurnUsedMemoryIdsRef.current.length > 0) {
+      const correctionKeywords = ['違う', 'そうじゃない', 'そうではない', '直して', '修正して', '間違', 'エラー', '動かない', 'ダメ', 'やり直し', '変わってない', '不満', 'バグ', '変だ'];
+      const isCorrection = correctionKeywords.some((kw) => text.includes(kw));
+      const feedbackType = isCorrection ? 'confusion' : 'useful';
+      const targetIds = [...lastTurnUsedMemoryIdsRef.current];
+
+      setMemories((prevMemories) => {
+        const updated = applyMemoryFeedback(targetIds, feedbackType, prevMemories);
+        const affectedIds = new Set(targetIds);
+        updated.filter((m) => affectedIds.has(m.id)).forEach((m) => storageService.saveMemoryItem(m));
+        return updated;
+      });
+
+      systemLogger.info(
+        'PERSISTENCE',
+        `🧠 [感情価更新] 前ターンの記憶(${targetIds.length}件)にフィードバック反映: [${feedbackType.toUpperCase()}] (${isCorrection ? 'ユーザーの訂正・問題指摘を検知' : '通常の受容・継続'})`,
+        { affectedMemoryIds: targetIds, feedbackType }
+      );
+      lastTurnUsedMemoryIdsRef.current = [];
+    }
 
     // Auto extract memory heuristics
     if (persona.autoExtractMemories && text.trim()) {

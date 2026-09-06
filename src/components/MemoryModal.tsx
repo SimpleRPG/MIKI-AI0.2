@@ -42,6 +42,7 @@ import {
   BookmarkCheck,
   History,
   ArrowRightLeft,
+  Cpu,
 } from 'lucide-react';
 import {
   MemoryItem,
@@ -70,6 +71,7 @@ import {
 import { storageService } from '../services/storageService';
 import { experienceRouterService } from '../services/experienceRouterService';
 import { longTermMemoryService } from '../services/longTermMemoryService';
+import { embeddingService, EmbeddingStats } from '../services/embeddingService';
 
 export interface MemoryModalProps {
   isOpen: boolean;
@@ -104,6 +106,46 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   const [supersedeNewContent, setSupersedeNewContent] = useState('');
   const [supersedeReason, setSupersedeReason] = useState('');
   const [selectedChainMemoryId, setSelectedChainMemoryId] = useState<string | null>(null);
+
+  // 設計思想 Master v5.0 第14章: 実埋め込みベクトル (Embedding API) 連携ステート
+  const [embeddingStats, setEmbeddingStats] = useState<EmbeddingStats | null>(null);
+  const [isSyncingEmbeddings, setIsSyncingEmbeddings] = useState(false);
+  const [embeddingSyncProgress, setEmbeddingSyncProgress] = useState<string | null>(null);
+
+  // モーダルオープン時または長期記憶タブ表示時に実埋め込み統計をロード
+  React.useEffect(() => {
+    if (isOpen && (activeSubTab === 'longterm' || activeSubTab === 'memory')) {
+      embeddingService.getStats(memories).then((stats) => {
+        setEmbeddingStats(stats);
+      }).catch(() => {});
+    }
+  }, [isOpen, activeSubTab, memories]);
+
+  const handleSyncAllEmbeddings = async () => {
+    setIsSyncingEmbeddings(true);
+    setEmbeddingSyncProgress('実埋め込みAPIに接続中...');
+    try {
+      const result = await embeddingService.syncMemoriesEmbeddings(
+        memories,
+        (current, total) => {
+          setEmbeddingSyncProgress(`埋め込み生成中: ${current} / ${total} 件`);
+        }
+      );
+      if (result.updatedCount > 0 && typeof onUpdateMemories === 'function') {
+        (onUpdateMemories as any)(result.memories);
+      }
+      const newStats = await embeddingService.getStats(result.memories);
+      setEmbeddingStats(newStats);
+      setExportedStatus(`✨ 実埋め込みベクトルを ${result.updatedCount} 件更新・同期しました！`);
+      setTimeout(() => setExportedStatus(null), 3500);
+    } catch (e: any) {
+      setExportedStatus(`⚠️ 実埋め込み同期失敗: ${e?.message || '接続エラー'}`);
+      setTimeout(() => setExportedStatus(null), 3500);
+    } finally {
+      setIsSyncingEmbeddings(false);
+      setEmbeddingSyncProgress(null);
+    }
+  };
 
   // 7段階検索パイプライン実行ハンドラ
   const handleRunPipelineSearch = async () => {
@@ -458,6 +500,19 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
       (onUpdateMemories as any)(updated);
     }
 
+    // 設計思想 Master v5.0 第14章: 手動教育記憶にも実埋め込みベクトルを非同期付与
+    embeddingService
+      .ensureMemoryEmbedding(newItem)
+      .then((embedded) => {
+        if (embedded.embeddingVector && embedded.embeddingVector.length > 0) {
+          const reloaded = storageService.getMemories();
+          if (typeof onUpdateMemories === 'function') {
+            (onUpdateMemories as any)(reloaded);
+          }
+        }
+      })
+      .catch(() => {});
+
     setTeachInput('');
     setExportedStatus(`✨ 「${trimmed.slice(0, 24)}${trimmed.length > 24 ? '...' : ''}」を教育完了！全LLMに即時自動反映されました！🌸`);
     setTimeout(() => setExportedStatus(null), 4000);
@@ -488,12 +543,33 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
     setTimeout(() => setExportedStatus(null), 3000);
   };
 
+  // 設計思想 Master v5.0 第2章2節: 感情価（質: useful / confusion / heat）の調整
   const handleAdjustFeedback = (id: string, delta: number) => {
     const mem = memories.find((m) => m.id === id);
     if (!mem) return;
-    const currentGood = mem.goodCount ?? 0;
-    const nextGood = Math.max(0, currentGood + delta);
-    storageService.saveMemoryItem({ ...mem, goodCount: nextGood, updatedAt: Date.now() });
+    if (delta > 0) {
+      const nextUseful = (mem.useful_count ?? mem.usefulCount ?? mem.goodCount ?? 0) + 1;
+      const nextHeat = Math.min(1.0, (mem.heat ?? 0.5) + 0.1);
+      storageService.saveMemoryItem({
+        ...mem,
+        useful_count: nextUseful,
+        usefulCount: nextUseful,
+        goodCount: (mem.goodCount ?? 0) + 1,
+        heat: Number(nextHeat.toFixed(2)),
+        updatedAt: Date.now(),
+      });
+    } else {
+      const nextConfusion = (mem.confusion_count ?? mem.confusionCount ?? mem.badCount ?? 0) + 1;
+      const nextHeat = Math.max(0.0, (mem.heat ?? 0.5) * 0.7);
+      storageService.saveMemoryItem({
+        ...mem,
+        confusion_count: nextConfusion,
+        confusionCount: nextConfusion,
+        badCount: (mem.badCount ?? 0) + 1,
+        heat: Number(nextHeat.toFixed(2)),
+        updatedAt: Date.now(),
+      });
+    }
     const updated = storageService.getMemories();
     if (typeof onUpdateMemories === 'function') {
       (onUpdateMemories as any)(updated);
@@ -1437,6 +1513,39 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 shrink-0 flex items-center gap-1 animate-pulse">
                                   <AlertTriangle className="w-2.5 h-2.5" />
                                   競合あり ({mem.conflictWith?.length}件)
+                                </span>
+                              )}
+
+                              {/* 設計思想 Master v5.0 第14章 実埋め込み有無バッジ */}
+                              {mem.embeddingVector && mem.embeddingVector.length > 0 && (
+                                <span
+                                  className="px-1.5 py-0.2 rounded text-[8.5px] font-mono shrink-0 bg-indigo-950 text-indigo-300 border border-indigo-700/60 flex items-center gap-0.5"
+                                  title={`高次元実埋め込みベクトル保有 (${mem.embeddingVector.length}次元)`}
+                                >
+                                  <Cpu className="w-2 h-2 text-indigo-400" />
+                                  <span>{mem.embeddingVector.length}d</span>
+                                </span>
+                              )}
+
+                              {/* 設計思想 Master v5.0 第2章2節 感情価 (有用・混乱・熱量) */}
+                              {Boolean((mem.useful_count ?? mem.usefulCount) || (mem.confusion_count ?? mem.confusionCount) || typeof mem.heat === 'number') && (
+                                <span className="px-1.5 py-0.2 rounded text-[8.5px] font-mono shrink-0 bg-slate-900 border border-slate-700/70 text-slate-300 flex items-center gap-1">
+                                  {Boolean(mem.useful_count ?? mem.usefulCount) && (
+                                    <span className="text-emerald-400 font-bold" title="役立った回数 (useful_count)">
+                                      +{mem.useful_count ?? mem.usefulCount}
+                                    </span>
+                                  )}
+                                  {Boolean(mem.confusion_count ?? mem.confusionCount) && (
+                                    <span className="text-rose-400 font-bold" title="混乱・訂正された回数 (confusion_count)">
+                                      -{mem.confusion_count ?? mem.confusionCount}
+                                    </span>
+                                  )}
+                                  {typeof mem.heat === 'number' && (
+                                    <span className="text-amber-400 flex items-center gap-0.5" title="熱量 (heat 0.0〜1.0)">
+                                      <Flame className="w-2 h-2 text-amber-400" />
+                                      {mem.heat}
+                                    </span>
+                                  )}
                                 </span>
                               )}
 
@@ -2466,6 +2575,49 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                     <div className="p-2 rounded-lg bg-amber-950/30 border border-amber-500/30 text-center">
                       <div className="text-[10px] text-amber-400">置換済み履歴</div>
                       <div className="text-sm font-bold text-amber-300">{supersededCount}件</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 1.5 実埋め込み (Embedding API) 連携 & 一括同期パネル (設計思想 Master v5.0 第14章) */}
+                <div className="p-4 rounded-xl bg-slate-900/90 border border-indigo-500/40 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 font-bold text-indigo-300 text-xs sm:text-sm">
+                        <Cpu className="w-4 h-4 text-indigo-400" />
+                        <span>実LLM埋め込みベクトル (Embedding API) 連携状況</span>
+                        {embeddingStats?.available ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[9px] border border-emerald-500/30 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            接続中 ({embeddingStats.endpoint})
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono text-[9px] border border-slate-700">
+                            未接続 (8次元疎ベクトルで代替フォールバック中)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        {embeddingStats
+                          ? `全 ${embeddingStats.totalMemoriesCount} 件中、${embeddingStats.embeddedMemoriesCount} 件 (${embeddingStats.totalMemoriesCount > 0 ? Math.round((embeddingStats.embeddedMemoriesCount / embeddingStats.totalMemoriesCount) * 100) : 0}%) に高次元実埋め込みベクトル (${embeddingStats.dimensions || 768}次元) が付与されています。`
+                          : '埋め込み統計を読込中...'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={handleSyncAllEmbeddings}
+                        disabled={isSyncingEmbeddings}
+                        className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                        title="外部LLMの/v1/embeddingsまたは/api/embeddingsを呼び出し、全記憶のベクトルを一括同期します"
+                      >
+                        {isSyncingEmbeddings ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" />
+                        )}
+                        <span>{embeddingSyncProgress || '実埋め込みを一括同期'}</span>
+                      </button>
                     </div>
                   </div>
                 </div>

@@ -85,6 +85,8 @@ export interface MemoryItem {
   heat?: number;             // 利用頻度・忘却曲線に基づく温度 (0.0〜1.0)
   useful_count?: number;     // 役立った回数 (訂正なく受容された回数)
   confusion_count?: number;  // 混乱を招いた・訂正された回数
+  usefulCount?: number;      // キャメルケース互換
+  confusionCount?: number;   // キャメルケース互換
   isDiagnostic?: boolean;    // エラー・診断メッセージの記憶汚染防止フラグ (第3章3節)
   approved?: boolean; // 人または機械検証で確定された承認状態
   sourceRef?: string; // 根拠となる原文参照・メッセージID・ファイル名
@@ -944,6 +946,8 @@ export interface TeacherRequestPayload {
   anonymizedExample?: string;
   expectedCondition: string;
   failureReason?: string;
+  idealResponseGuideline?: string;
+  contextSummary?: string;
   suggestedFormat: {
     instruction: string;
     inputContext?: string;

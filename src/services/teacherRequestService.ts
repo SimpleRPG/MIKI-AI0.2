@@ -518,7 +518,7 @@ export class TeacherRequestService {
     // 設計思想 Master v5.0 第11章 11.1節: セキュリティ境界・プライバシー監査
     const textToAudit = [
       payload.abstractFailurePattern,
-      payload.anonymizedExample,
+      payload.anonymizedExample || '',
       payload.idealResponseGuideline || '',
       payload.contextSummary || '',
     ].join('\n');
@@ -542,7 +542,7 @@ export class TeacherRequestService {
     // サニタイズされたテキストがある場合はペイロードを安全に置換
     const safePayload: TeacherRequestPayload = {
       ...payload,
-      anonymizedExample: auditResult.symbolReplacements && Object.keys(auditResult.symbolReplacements).length > 0
+      anonymizedExample: payload.anonymizedExample && auditResult.symbolReplacements && Object.keys(auditResult.symbolReplacements).length > 0
         ? payload.anonymizedExample.replace(new RegExp(Object.keys(auditResult.symbolReplacements).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g'), (m) => auditResult.symbolReplacements[m] || m)
         : payload.anonymizedExample,
     };

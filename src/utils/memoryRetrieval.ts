@@ -144,6 +144,7 @@ export interface MemoryRetrievalOptions {
   onlyApprovedForFacts?: boolean; // profileやpreference等の事実性カテゴリは承認済みのみに制限 (設計思想 25)
   traverseGraph?: boolean;       // 知識グラフ依存関係トラバーサルを有効化 (デフォルト: true)
   maxGraphHops?: number;         // 最大探索ホップ数 (デフォルト: 2)
+  queryEmbedding?: number[];     // llama-server / Ollama 実埋め込みベクトル (768〜4096次元)
 }
 
 export interface ScoredMemory {
@@ -226,34 +227,48 @@ export function retrieveScoredMemories(
       }
     });
 
-    // Tier 2: Semantic Domain Vector Cosine Similarity
-    const semanticSim = calculateCosineSimilarity(queryVector, memoryVector);
-    if (semanticSim > 0.4) {
-      matchReasons.push(`意味類似度: ${(semanticSim * 100).toFixed(0)}%`);
+    // Tier 2: Semantic Domain Vector Cosine Similarity (実LLM埋め込みがあれば優先適用)
+    let semanticSim = 0;
+    if (memory.embeddingVector && memory.embeddingVector.length > 0 && options.queryEmbedding && options.queryEmbedding.length === memory.embeddingVector.length) {
+      // llama-server / Ollama 実埋め込みベクトル (768〜4096次元)
+      semanticSim = calculateCosineSimilarity(options.queryEmbedding, memory.embeddingVector);
+      if (semanticSim > 0.3) {
+        matchReasons.push(`実埋め込み類似度: ${(semanticSim * 100).toFixed(0)}%`);
+      }
+    } else {
+      // 8次元ドメイン概念疎ベクトル
+      semanticSim = calculateCosineSimilarity(queryVector, memoryVector);
+      if (semanticSim > 0.4) {
+        matchReasons.push(`概念類似度: ${(semanticSim * 100).toFixed(0)}%`);
+      }
     }
 
-    // Tier 3: Metadata & Feedback & Recency
+    // Tier 3: Metadata & Feedback & Recency & Emotional Valence (設計思想 Master v5.0 第2章2節)
     const importanceScore = (memory.importance ?? 1) * 1.5;
     const pinnedBonus = memory.pinned ? 8 : 0;
     const usageBonus = Math.min(memory.useCount ?? 0, 5) * 0.5;
     // 承認済み記憶はボーナス付与、未承認記憶は確証度ペナルティ (-2.5) を付与 (設計思想 25)
     const approvedBonus = memory.approved ? 4 : -2.5;
 
-    const good = memory.goodCount ?? 0;
-    const bad = memory.badCount ?? 0;
-    const feedbackScore = Math.max(-6, Math.min(6, (good - bad) * 2));
+    // 感情価 (質: useful_count / confusion_count) と熱量 (heat)
+    const useful = (memory.useful_count ?? memory.usefulCount ?? memory.goodCount) || 0;
+    const confusion = (memory.confusion_count ?? memory.confusionCount ?? memory.badCount) || 0;
+    const valenceScore = useful * 1.5 - confusion * 3.0;
+
+    const heatScore = typeof memory.heat === 'number' ? memory.heat * 3.0 : 0;
 
     const recencyTimestamp = memory.lastUsedAt ?? memory.updatedAt ?? memory.createdAt ?? 0;
     const recencyScore = recencyTimestamp > 0 ? Math.min(recencyTimestamp / 1e13, 1) : 0;
 
     const totalScore =
       keywordMatches * 3.0 +
-      semanticSim * 6.0 + // 意味類似度ボーナス
+      semanticSim * 7.0 + // 意味類似度ボーナス
       importanceScore +
       pinnedBonus +
       usageBonus +
       approvedBonus +
-      feedbackScore +
+      valenceScore +
+      heatScore +
       recencyScore;
 
     if (memory.approved === false) {
@@ -423,6 +438,47 @@ export function recordMemoryUsage(
         useCount: (m.useCount ?? 0) + 1,
         lastUsedAt: now,
       };
+    }
+    return m;
+  });
+}
+
+/**
+ * 設計思想 Master v5.0 第2章2節:
+ * ユーザーフィードバック（受容 or 訂正）に基づき記憶の感情価（質）を更新するヘルパー
+ */
+export function applyMemoryFeedback(
+  memoryIds: string[],
+  type: 'useful' | 'confusion',
+  memories: MemoryItem[]
+): MemoryItem[] {
+  if (!memoryIds || memoryIds.length === 0) return memories;
+  const idSet = new Set(memoryIds);
+  return memories.map((m) => {
+    if (idSet.has(m.id)) {
+      if (type === 'useful') {
+        const prevUseful = (m.useful_count ?? m.usefulCount ?? 0) + 1;
+        const currentHeat = typeof m.heat === 'number' ? m.heat : 0.5;
+        const newHeat = Math.min(1.0, currentHeat + 0.1);
+        return {
+          ...m,
+          useful_count: prevUseful,
+          usefulCount: prevUseful,
+          heat: Number(newHeat.toFixed(2)),
+          goodCount: (m.goodCount ?? 0) + 1,
+        };
+      } else {
+        const prevConfusion = (m.confusion_count ?? m.confusionCount ?? 0) + 1;
+        const currentHeat = typeof m.heat === 'number' ? m.heat : 0.5;
+        const newHeat = Math.max(0.0, currentHeat * 0.7);
+        return {
+          ...m,
+          confusion_count: prevConfusion,
+          confusionCount: prevConfusion,
+          heat: Number(newHeat.toFixed(2)),
+          badCount: (m.badCount ?? 0) + 1,
+        };
+      }
     }
     return m;
   });

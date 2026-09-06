@@ -944,7 +944,38 @@ export class NativeLlmService {
         if (saved) return JSON.parse(saved);
       }
     } catch (e) {}
-    return { endpoint: 'http://localhost:8080', model: 'default', type: 'openai_compatible' };
+    // 設計思想 Master v5.0 第0章0.2節 & 第6章6.3節: ポート8080はバックエンドAPI、8081がllama-server/llama-swap
+    return { endpoint: 'http://127.0.0.1:8081', model: 'default', type: 'openai_compatible' };
+  }
+
+  /**
+   * 8章 / 指示書 SECTION 7 [提案A] & Master v5.0 第14章:
+   * 複数テキストの埋め込みベクトルを一括・並行取得するバッチヘルパー
+   */
+  public async getBatchEmbeddings(
+    texts: string[],
+    overrideConfig?: ExternalLocalLlmConfig,
+    concurrency: number = 3
+  ): Promise<Map<string, { embedding: number[]; dimensions: number }>> {
+    const results = new Map<string, { embedding: number[]; dimensions: number }>();
+    if (!texts || texts.length === 0) return results;
+
+    const queue = [...texts];
+    const workers = Array.from({ length: Math.min(concurrency, queue.length) }).map(async () => {
+      while (queue.length > 0) {
+        const text = queue.shift();
+        if (!text) break;
+        try {
+          const res = await this.getEmbedding(text, overrideConfig, 4000);
+          if (res && res.embedding) {
+            results.set(text, { embedding: res.embedding, dimensions: res.dimensions });
+          }
+        } catch (e) {}
+      }
+    });
+
+    await Promise.all(workers);
+    return results;
   }
 
   /**
