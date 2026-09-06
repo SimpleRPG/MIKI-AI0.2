@@ -34,7 +34,7 @@ import {
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
-import { sendChatMessage, sendDebugRequest } from './services/api';
+import { sendChatMessage, sendDebugRequest, autoSyncServerEnvKeysIfEmpty } from './services/api';
 import { webLLMService } from './services/webLlmService';
 import { nativeLlmService } from './services/nativeLlmService';
 import { systemLogger } from './services/systemLogger';
@@ -257,6 +257,12 @@ export default function App() {
     if (navigator.storage && navigator.storage.persist) {
       navigator.storage.persist().catch(() => {});
     }
+
+    // 第25章: Gemini API キー動的クォータ循環・環境変数自動認識 & アプリ双方向同期
+    // アプリ起動時にローカルストレージが空の場合、サーバーの .env / 環境変数からキーを自動同期
+    autoSyncServerEnvKeysIfEmpty().catch((err) => {
+      console.warn('Background autoSyncServerEnvKeys error:', err);
+    });
   }, []);
 
   // Save Persona & Memories & Messages & Files to storageService

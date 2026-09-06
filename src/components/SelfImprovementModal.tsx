@@ -1099,7 +1099,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
             }`}
           >
             <HardDrive className="w-4 h-4 text-cyan-400" />
-            <span>💾 60GB容量＆自動整理 (28, 29章)</span>
+            <span>💾 60GB容量＆モデル退役思考 (21, 24章)</span>
           </button>
 
           <button
