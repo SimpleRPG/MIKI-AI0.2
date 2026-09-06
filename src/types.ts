@@ -647,6 +647,9 @@ export interface ChatMessage {
   draftVerification?: DraftVerificationResult;
   // 設計思想 Master v5.0 第13章: 自律型Web検索＆能動学習結果
   autonomousSearch?: AutonomousSearchMessageMeta;
+  // 設計思想 Master v5.0 第11章 & 第16章: 送信ガードレール & VBA静的検証
+  privacyAudit?: PrivacyAuditResult;
+  vbaStaticVerification?: VbaStaticVerificationResult;
 }
 
 /**
@@ -716,6 +719,7 @@ export interface ComprehensiveCodeVerification {
   environmentRequirements: string[];
   readiness: CodeReadinessStatus;
   reviewedAt: number;
+  vbaStaticResult?: VbaStaticVerificationResult;
 }
 
 /**
@@ -1764,7 +1768,17 @@ export interface VbaProcedureDeclaration {
 }
 
 export interface VbaForbiddenPattern {
-  type: 'GOTO' | 'LINE_LABEL' | 'SINGLE_LINE_IF' | 'UNHANDLED_DIFF_OMISSION';
+  type:
+    | 'GOTO'
+    | 'LINE_LABEL'
+    | 'SINGLE_LINE_IF'
+    | 'UNHANDLED_DIFF_OMISSION'
+    | 'PTRSAFE_MISSING'
+    | 'ERROR_SWALLOW'
+    | 'IMPLICIT_ACTIVE_OBJECT'
+    | 'SELECT_ACTIVATE_ANTIPATTERN'
+    | 'HARDCODED_CREDENTIAL_PATH'
+    | 'RESOURCE_LEAK';
   line: number;
   codeSnippet: string;
   explanation: string;

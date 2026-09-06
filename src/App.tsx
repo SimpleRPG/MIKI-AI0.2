@@ -30,6 +30,7 @@ import {
   AnswerPlanApplicationResult,
   DraftVerificationResult,
   AutonomousSearchMessageMeta,
+  PrivacyAuditResult,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
@@ -63,6 +64,7 @@ import { codeUnderstandingService } from './services/codeUnderstandingService';
 import { vbaDesignAssistantService } from './services/vbaDesignAssistantService';
 import { featureFlagsService } from './services/featureFlagsService';
 import { dialogueEvaluationService } from './services/dialogueEvaluationService';
+import { privacyGuardrailService } from './services/privacyGuardrailService';
 import { uncertaintyTeacherService } from './services/uncertaintyTeacherService';
 import { minimalScopeService } from './services/minimalScopeService';
 import { storagePlanningService } from './services/storagePlanningService';
@@ -2021,6 +2023,8 @@ export default function App() {
         hasError: !webGpuSuccess,
       });
 
+      let latestPrivacyAudit: PrivacyAuditResult | undefined = undefined;
+
       // Fallback or Explicit Alternative Engines (CPU Rule-based or Gemini Cloud)
       if (!webGpuSuccess || accumulated.trim().length === 0) {
         if (engineMode === 'external_gpu') {
@@ -2116,6 +2120,7 @@ export default function App() {
             memories: relevantMemories,
             signal: abortController.signal,
           });
+          latestPrivacyAudit = apiRes.privacyAudit;
 
           if (abortController.signal.aborted) {
             handleAbortExit('フォールバック処理完了直後');
@@ -2462,6 +2467,11 @@ export default function App() {
         };
       }
 
+      // 設計思想 Master v5.0 第11章: 送信ガードレール＆プライバシー監査の保証
+      if (!latestPrivacyAudit) {
+        latestPrivacyAudit = privacyGuardrailService.auditOutboundContent(text, 'chat_engine');
+      }
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantId
@@ -2473,6 +2483,8 @@ export default function App() {
                 completionEvaluation: streamEvaluation,
                 responseQuality,
                 codeVerification,
+                vbaStaticVerification: codeVerification.vbaStaticResult,
+                privacyAudit: latestPrivacyAudit,
                 falsificationReport,
                 synthesizedWorkflow: synthesizedWf,
                 fallbackDiagnostic: diagnosticData,

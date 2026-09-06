@@ -335,6 +335,56 @@ export class VbaStaticVerifierService {
           explanation: 'コード省略記号（... または「既存のコード」等）が検出されました。63章生成ルールに従い、プロシージャは省略せず全文を生成してください。',
         });
       }
+
+      // 5. 64-bit Windows API declare / PtrSafe 不足検知 (Master v5.0 第10章 Scanner 1)
+      if (/\bDeclare\s+(?:Function|Sub)\b/i.test(text) && !/\bDeclare\s+PtrSafe\s+(?:Function|Sub)\b/i.test(text)) {
+        forbidden.push({
+          type: 'PTRSAFE_MISSING',
+          line: p.originalLineNum,
+          codeSnippet: text,
+          explanation: 'Windows APIの Declare 宣言に PtrSafe が付与されていません。64ビット版Officeでコンパイルエラーとなるため「Declare PtrSafe Function/Sub」を使用してください。',
+        });
+      }
+
+      // 6. On Error Resume Next 無制御エラー握りつぶし (Master v5.0 第10章 Scanner 2)
+      if (/\bOn\s+Error\s+Resume\s+Next\b/i.test(text)) {
+        forbidden.push({
+          type: 'ERROR_SWALLOW',
+          line: p.originalLineNum,
+          codeSnippet: text,
+          explanation: 'On Error Resume Next はエラーを握りつぶす重大なリスクがあります。直後に Err.Number を検証し On Error GoTo 0 で速やかにリセットしてください。',
+        });
+      }
+
+      // 7. ActiveSheet / ActiveCell / Selection の暗黙参照アンチパターン (Master v5.0 第10章 Scanner 3)
+      if (/\b(?:ActiveSheet|ActiveCell|Selection)\b/i.test(text)) {
+        forbidden.push({
+          type: 'IMPLICIT_ACTIVE_OBJECT',
+          line: p.originalLineNum,
+          codeSnippet: text,
+          explanation: 'ActiveSheet / ActiveCell / Selection の暗黙参照はアクティブウィンドウ切り替え時に誤作動の原因となります。ワークシート変数 (ws.Range 等) の明示指定を推奨します。',
+        });
+      }
+
+      // 8. .Select / .Activate アンチパターン (Master v5.0 第10章 Scanner 4)
+      if (/\.(?:Select|Activate)\b/i.test(text) && !/\.Cells\b/i.test(text)) {
+        forbidden.push({
+          type: 'SELECT_ACTIVATE_ANTIPATTERN',
+          line: p.originalLineNum,
+          codeSnippet: text,
+          explanation: '.Select や .Activate はマクロの動作速度を著しく低下させ、画面チラつきの原因となります。オブジェクト直接操作を推奨します。',
+        });
+      }
+
+      // 9. ハードコードされたDB接続文字列・パスワード・社内UNCパス (Master v5.0 第10章 Scanner 8)
+      if (/(?:(?:Server|Data Source|Host)=[^;\n\r]+;?|(?:Password|Pwd)=[^;\n\r]+|\\\\[a-zA-Z0-9._-]+\\[^<>"|?*\n\r\t]+)/i.test(text)) {
+        forbidden.push({
+          type: 'HARDCODED_CREDENTIAL_PATH',
+          line: p.originalLineNum,
+          codeSnippet: text.slice(0, 40) + '...',
+          explanation: 'ハードコードされた接続情報または社内UNCパスが検出されました。設定外部化を行ってください。',
+        });
+      }
     }
 
     return forbidden;
@@ -475,12 +525,27 @@ export class VbaStaticVerifierService {
   }
 
   /**
-   * 63章 & 64章: VBA静的検証器の総合実行メソッド
+   * 単一文字列の高速同期ハッシュ (SHA-256ライク)
    */
-  public async verifyVbaCode(
+  public computeSha256Sync(text: string): string {
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(16, '0');
+  }
+
+  /**
+   * 63章 & 64章: VBA静的検証器の完全同期実行メソッド (8大スキャナー)
+   */
+  public verifyVbaCodeSync(
     rawCode: string,
     baselineCodeForSignatureComparison?: string
-  ): Promise<VbaStaticVerificationResult> {
+  ): VbaStaticVerificationResult {
     const parsedLines = this.parseLines(rawCode);
 
     // 2. ProcedureScanner
@@ -490,7 +555,7 @@ export class VbaStaticVerifierService {
     // 3. BlockScanner
     const blockResult = this.scanBlocks(parsedLines);
 
-    // 4. ForbiddenPatternScanner
+    // 4. ForbiddenPatternScanner (8大スキャナー規則)
     const forbiddenPatterns = this.scanForbiddenPatterns(parsedLines);
 
     // 5. DeclarationScanner
@@ -508,7 +573,7 @@ export class VbaStaticVerifierService {
     const dependencies = this.scanDependencies(parsedLines);
 
     // 8. DeliveryVerifier
-    const sha256Checksum = await this.computeSha256(rawCode);
+    const sha256Checksum = this.computeSha256Sync(rawCode);
     const hasOmission = forbiddenPatterns.some((f) => f.type === 'UNHANDLED_DIFF_OMISSION');
 
     // 総合スコア算出 (100点満点減点法)
@@ -553,6 +618,20 @@ export class VbaStaticVerifierService {
       summary,
       verifiedAt: Date.now(),
     };
+  }
+
+  /**
+   * 63章 & 64章: VBA静的検証器の総合非同期実行メソッド
+   */
+  public async verifyVbaCode(
+    rawCode: string,
+    baselineCodeForSignatureComparison?: string
+  ): Promise<VbaStaticVerificationResult> {
+    const res = this.verifyVbaCodeSync(rawCode, baselineCodeForSignatureComparison);
+    // ブラウザSubtleCryptoで実SHA-256を非同期再計算
+    const realSha = await this.computeSha256(rawCode);
+    res.deliveryVerification.sha256Checksum = realSha;
+    return res;
   }
 }
 

@@ -22,7 +22,8 @@ export interface SystemLogEntry {
     | 'CODE_UNDERSTANDING'
     | 'FEATURE_FLAGS'
     | 'VBA_DESIGN_ASSISTANT'
-    | 'VIRTUAL_TRAINING';
+    | 'VIRTUAL_TRAINING'
+    | 'PRIVACY';
   message: string;
   details?: any;
   elapsedMs?: number;

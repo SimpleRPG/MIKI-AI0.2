@@ -5,11 +5,13 @@ import {
   WorkspaceFile,
   GroundingChunk,
   EngineMode,
-  GitHubRepoData
+  GitHubRepoData,
+  PrivacyAuditResult,
 } from '../types';
 import { generateSmartCompanionReply } from '../utils/companionEngine';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
+import { privacyGuardrailService } from './privacyGuardrailService';
 
 // APKなど「フロントエンドだけが単体で動くビルド」では server.ts (Express) が
 // 同一オリジンに存在しないため、Termux等で起動したサーバーのアドレスを
@@ -40,6 +42,7 @@ export interface ChatResponse {
   model?: string;
   groundingChunks?: GroundingChunk[];
   webSearchQueries?: string[];
+  privacyAudit?: PrivacyAuditResult;
 }
 
 export interface GitHubPushParams {
@@ -121,13 +124,48 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     };
   }
 
-  // 3. Explicit Gemini Cloud Request (/api/chat) with timeout protection
+  // 3. Explicit Gemini Cloud Request (/api/chat) with Outbound Privacy Guardrail (Master v5.0 第11章)
   systemLogger.info('CHAT', `Sending chat request (prompt length: ${params.prompt.length})`, {
     engineMode: params.engineMode,
     speakerMode: params.speakerMode,
     attachedFilesCount: params.attachedFiles?.length || 0,
     workspaceFilesCount: params.workspaceFiles?.length || 0,
   });
+
+  // 外部クラウド送信前プライバシー監査を実施 (Master v5.0 第11章)
+  const promptAudit = privacyGuardrailService.auditOutboundContent(
+    params.prompt,
+    'gemini_cloud',
+    { autoSanitize: true }
+  );
+
+  if (!promptAudit.allowed) {
+    systemLogger.warn('PRIVACY', `🔒 [外部送信ガードレール] 送信が遮断されました: ${promptAudit.blockedReason}`);
+    return {
+      text: `⚠️ 【プライバシー保護ガードレールによる外部送信遮断】\n\n送信内容に外部漏洩不可の機密情報が検出されたため、クラウドAPIへの送信を自動遮断しました。\n・遮断理由: ${promptAudit.blockedReason || '機密情報検知'}\n\n端末ローカル推論 (GGUF / WebGPU) または機密情報を抽象化したプロンプトをご利用ください。`,
+      engineMode: 'gemini_cloud',
+      model: 'Privacy Guardrail Interceptor',
+      privacyAudit: promptAudit,
+    };
+  }
+
+  // プロンプトおよび添付ファイルを安全にサニタイズ
+  const sanitizedPrompt = promptAudit.sanitizedText;
+  const sanitizedAttachedFiles = params.attachedFiles?.map((af) => {
+    const fileAudit = privacyGuardrailService.auditOutboundContent(af.content, `gemini_cloud_file_${af.name}`, { autoSanitize: true });
+    return { ...af, content: fileAudit.sanitizedText };
+  });
+  const sanitizedWorkspaceFiles = params.workspaceFiles?.map((wf) => {
+    const wfAudit = privacyGuardrailService.auditOutboundContent(wf.content, `gemini_cloud_ws_${wf.name}`, { autoSanitize: true });
+    return { ...wf, content: wfAudit.sanitizedText };
+  });
+
+  const outboundParams: SendChatMessageParams = {
+    ...params,
+    prompt: sanitizedPrompt,
+    attachedFiles: sanitizedAttachedFiles,
+    workspaceFiles: sanitizedWorkspaceFiles,
+  };
 
   try {
     // 10 second timeout protection so UI never hangs
@@ -143,7 +181,7 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
+      body: JSON.stringify(outboundParams),
       signal: timeoutController.signal,
     });
 
@@ -151,7 +189,8 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     params.signal?.removeEventListener('abort', onUserAbort);
 
     if (res.ok) {
-      const data = await res.json();
+      const data: ChatResponse = await res.json();
+      data.privacyAudit = promptAudit;
       systemLogger.info('CHAT', 'Chat response received from server API', { model: data.model });
       return data;
     } else {
@@ -180,7 +219,8 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
   return {
     text: reply,
     engineMode: params.engineMode || 'autonomous_rule',
-    model: 'Smart Companion Engine'
+    model: 'Smart Companion Engine',
+    privacyAudit: promptAudit,
   };
 }
 
@@ -200,11 +240,24 @@ export async function distillKnowledgeForLocalLLM(params: {
   };
   error?: string;
 }> {
+  // プライバシーガードレール監査 (蒸留要求の外部漏洩防止)
+  const audit = privacyGuardrailService.auditOutboundContent(
+    `${params.topic}\n${params.currentMemories?.map((m) => m.content).join('\n') || ''}`,
+    'teacher_distill',
+    { autoSanitize: true }
+  );
+  if (!audit.allowed) {
+    return {
+      success: false,
+      error: `プライバシー保護ガードレールにより遮断されました: ${audit.blockedReason}`,
+    };
+  }
+
   try {
     const res = await fetch('/api/train-distill', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
+      body: JSON.stringify({ ...params, topic: audit.sanitizedText }),
     });
     if (!res.ok) throw new Error(`Distillation failed with status ${res.status}`);
     return await res.json();
@@ -221,11 +274,27 @@ export async function sendDebugRequest(
   activeGameCode: string,
   workspaceFiles: WorkspaceFile[]
 ): Promise<{ text: string }> {
+  // 外部デバッグ送信前プライバシー監査
+  const audit = privacyGuardrailService.auditOutboundContent(
+    [...errorLogs, activeGameCode].join('\n'),
+    'external_debug',
+    { autoSanitize: true }
+  );
+  if (!audit.allowed) {
+    return {
+      text: `⚠️ 【プライバシー保護ガードレール】デバッグ対象コード/ログ内に機密情報が検出されたため、外部送信を遮断しました: ${audit.blockedReason}`,
+    };
+  }
+
   try {
     const res = await fetch('/api/debug', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ errorLogs, activeGameCode, workspaceFiles })
+      body: JSON.stringify({
+        errorLogs,
+        activeGameCode: audit.sanitizedText,
+        workspaceFiles,
+      })
     });
 
     if (!res.ok) {
@@ -260,6 +329,20 @@ export async function importGitHubRepo(
 }
 
 export async function pushToGitHubRepo(params: GitHubPushParams): Promise<GitHubPushResult> {
+  // 外部GitHubプッシュ前プライバシー監査 (認証情報・秘密鍵の誤コミット完全遮断)
+  for (const file of params.files) {
+    const fileAudit = privacyGuardrailService.auditOutboundContent(
+      file.content,
+      `github_push_${file.path}`,
+      { autoSanitize: false }
+    );
+    if (!fileAudit.allowed || fileAudit.violations.some((v) => v.severity === 'CRITICAL')) {
+      throw new Error(
+        `🔒 プライバシー保護ガードレール: ファイル "${file.path}" に機密認証情報 (${fileAudit.violations[0]?.message || '機密情報検知'}) が検出されたため、GitHubへのプッシュを緊急遮断しました。`
+      );
+    }
+  }
+
   const res = await fetch(apiUrl('/api/github/push'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

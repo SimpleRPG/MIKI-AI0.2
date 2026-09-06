@@ -47,6 +47,7 @@ import {
   AlertTriangle,
   Compass,
   MessageSquare,
+  Lock,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode, CompletionEvaluation } from '../types';
 import { extractCodeBlocks, extractFilesFromZip } from '../utils/codeParser';
@@ -136,6 +137,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [expandedAnswerPlanMsgId, setExpandedAnswerPlanMsgId] = useState<string | null>(null);
   const [expandedCodeIrMsgId, setExpandedCodeIrMsgId] = useState<string | null>(null);
   const [expandedVbaSpecMsgId, setExpandedVbaSpecMsgId] = useState<string | null>(null);
+  const [expandedVbaVerificationMsgId, setExpandedVbaVerificationMsgId] = useState<string | null>(null);
+  const [expandedPrivacyAuditMsgId, setExpandedPrivacyAuditMsgId] = useState<string | null>(null);
   const [expandedWorkflowMsgId, setExpandedWorkflowMsgId] = useState<string | null>(null);
   const [executingWorkflowId, setExecutingWorkflowId] = useState<string | null>(null);
   const [workflowStatusMessage, setWorkflowStatusMessage] = useState<{ [wfId: string]: string }>({});
@@ -918,6 +921,56 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         <span>20章不確実性 {msg.uncertaintyEvaluation.uncertaintyScore}点</span>
                       </div>
                     )}
+
+                    {/* 設計思想 Master v5.0 第10章 & 63-64章: VBA 8大静的検証バッジ */}
+                    {(msg.vbaStaticVerification || msg.codeVerification?.vbaStaticResult) && (
+                      (() => {
+                        const vbaResult = msg.vbaStaticVerification || msg.codeVerification?.vbaStaticResult;
+                        if (!vbaResult) return null;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedVbaVerificationMsgId(expandedVbaVerificationMsgId === msg.id ? null : msg.id)}
+                            className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border transition-all cursor-pointer ${
+                              expandedVbaVerificationMsgId === msg.id
+                                ? 'bg-emerald-900/90 border-emerald-400 text-emerald-100 shadow'
+                                : vbaResult.overallPassed
+                                ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-300 hover:border-emerald-500'
+                                : 'bg-amber-950/70 border-amber-600/70 text-amber-300 hover:border-amber-500'
+                            }`}
+                            title={`【VBA 8大静的検証＆SHA-256納品ゲート】\n・判定スコア: ${vbaResult.verdictScore}点 (${vbaResult.overallPassed ? '全合格' : '警告/要修正'})\n・Option Explicit: ${vbaResult.hasOptionExplicit ? '記載済' : '未記載'}\n・全プロシージャ終端: ${vbaResult.allProceduresFullyClosed ? '完全閉鎖' : '未閉鎖あり'}\n・ブロック構文: ${vbaResult.blockNestingValid ? '正常' : '不正あり'}\n・禁止パターン: ${vbaResult.forbiddenPatterns.length}件\n・SHA-256: ${vbaResult.deliveryVerification.sha256Checksum.slice(0, 16)}...\n(クリックで検証詳細を開閉)`}
+                          >
+                            <ShieldCheck className={`w-3 h-3 ${vbaResult.overallPassed ? 'text-emerald-400' : 'text-amber-400'}`} />
+                            <span>
+                              VBA検証 {vbaResult.verdictScore}点
+                              {vbaResult.overallPassed ? ' (合格)' : ` (${vbaResult.forbiddenPatterns.length}警告)`}
+                            </span>
+                          </button>
+                        );
+                      })()
+                    )}
+
+                    {/* 設計思想 Master v5.0 第11章 & 27章: プライバシー保護・送信境界監査バッジ */}
+                    {msg.privacyAudit && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedPrivacyAuditMsgId(expandedPrivacyAuditMsgId === msg.id ? null : msg.id)}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border transition-all cursor-pointer ${
+                          expandedPrivacyAuditMsgId === msg.id
+                            ? 'bg-sky-900/90 border-sky-400 text-sky-100 shadow'
+                            : msg.privacyAudit.allowed
+                            ? 'bg-sky-950/60 border-sky-800/60 text-sky-300 hover:border-sky-500'
+                            : 'bg-rose-950/70 border-rose-600/70 text-rose-300 hover:border-rose-500'
+                        }`}
+                        title={`【送信ガードレール＆プライバシー監査】\n・判定: ${msg.privacyAudit.allowed ? '安全送信可' : '外部送信遮断'}\n・分類: ${msg.privacyAudit.classification}\n・検知違反: ${msg.privacyAudit.violations.length}件\n${msg.privacyAudit.violations.map((v) => `・[${v.severity}] ${v.message}`).join('\n')}\n(クリックで監査詳細を開閉)`}
+                      >
+                        <Lock className={`w-3 h-3 ${msg.privacyAudit.allowed ? 'text-sky-400' : 'text-rose-400'}`} />
+                        <span>
+                          {msg.privacyAudit.classification === 'PUBLIC_SYNTHETIC' ? '公開データ' : '抽象化済'}
+                          {msg.privacyAudit.violations.length > 0 ? ` (${msg.privacyAudit.violations.length}マスキング)` : ''}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1569,6 +1622,170 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Master v5.0 第10章 & 63-64章: VBA 8大静的検証＆SHA-256納品ゲート 詳細展開パネル */}
+                  {expandedVbaVerificationMsgId === msg.id && (msg.vbaStaticVerification || msg.codeVerification?.vbaStaticResult) && (
+                    (() => {
+                      const vba = msg.vbaStaticVerification || msg.codeVerification?.vbaStaticResult!;
+                      return (
+                        <div className="mt-3 p-3 bg-slate-950/95 border border-emerald-500/50 rounded-xl space-y-3 text-xs shadow-lg animate-fadeIn font-mono">
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                            <div className="flex items-center gap-2">
+                              <span className={`p-1 rounded ${vba.overallPassed ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                              </span>
+                              <div>
+                                <div className="font-bold text-emerald-300 font-sans text-[12px] flex items-center gap-2">
+                                  <span>VBA 8大静的検証＆納品ゲート</span>
+                                  <span className={`px-2 py-0.2 rounded text-[10px] ${vba.overallPassed ? 'bg-emerald-900/60 border border-emerald-600 text-emerald-200' : 'bg-amber-900/60 border border-amber-600 text-amber-200'}`}>
+                                    {vba.verdictScore}点 / {vba.overallPassed ? '全合格' : '要確認'}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 block">
+                                  SHA-256: {vba.deliveryVerification.sha256Checksum} | {vba.deliveryVerification.lineCount}行 ({vba.deliveryVerification.charCount}文字)
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => setExpandedVbaVerificationMsgId(null)}
+                              className="text-slate-400 hover:text-slate-200 text-xs px-1.5 py-0.5 rounded hover:bg-slate-800"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          <div className="text-[11px] text-slate-300 bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                            {vba.summary}
+                          </div>
+
+                          {/* 4大チェック状態 */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10.5px]">
+                            <div className={`p-2 rounded border ${vba.hasOptionExplicit ? 'bg-emerald-950/40 border-emerald-800/40 text-emerald-300' : 'bg-rose-950/40 border-rose-800/40 text-rose-300'}`}>
+                              <div className="font-bold">Option Explicit</div>
+                              <div className="text-[9.5px] mt-0.5">{vba.hasOptionExplicit ? '✅ 宣言確認済' : '❌ 未記載 (要追加)'}</div>
+                            </div>
+                            <div className={`p-2 rounded border ${vba.allProceduresFullyClosed ? 'bg-emerald-950/40 border-emerald-800/40 text-emerald-300' : 'bg-rose-950/40 border-rose-800/40 text-rose-300'}`}>
+                              <div className="font-bold">プロシージャ終端</div>
+                              <div className="text-[9.5px] mt-0.5">{vba.allProceduresFullyClosed ? `✅ 全${vba.procedures.length}件閉鎖` : '❌ 未閉鎖あり'}</div>
+                            </div>
+                            <div className={`p-2 rounded border ${vba.blockNestingValid ? 'bg-emerald-950/40 border-emerald-800/40 text-emerald-300' : 'bg-rose-950/40 border-rose-800/40 text-rose-300'}`}>
+                              <div className="font-bold">ブロックネスト</div>
+                              <div className="text-[9.5px] mt-0.5">{vba.blockNestingValid ? '✅ 正常' : `❌ ${vba.openBlocks.length}件不正`}</div>
+                            </div>
+                            <div className={`p-2 rounded border ${vba.deliveryVerification.isCompleteCode ? 'bg-emerald-950/40 border-emerald-800/40 text-emerald-300' : 'bg-rose-950/40 border-rose-800/40 text-rose-300'}`}>
+                              <div className="font-bold">コード完全性 (非省略)</div>
+                              <div className="text-[9.5px] mt-0.5">{vba.deliveryVerification.isCompleteCode ? '✅ 全文生成' : '❌ 省略記号検知'}</div>
+                            </div>
+                          </div>
+
+                          {/* 8大スキャナー検知一覧 */}
+                          {vba.forbiddenPatterns.length > 0 && (
+                            <div className="space-y-1.5">
+                              <div className="font-bold text-amber-300 text-[11px] font-sans">検知されたアンチパターン・規約違反 ({vba.forbiddenPatterns.length}件):</div>
+                              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                                {vba.forbiddenPatterns.map((fp, fpIdx) => (
+                                  <div key={fpIdx} className="p-1.5 bg-amber-950/30 border border-amber-700/40 rounded text-[10px]">
+                                    <div className="flex items-center justify-between text-amber-200 font-bold">
+                                      <span>[行{fp.line}] {fp.type}</span>
+                                    </div>
+                                    <div className="text-slate-300 mt-0.5">{fp.explanation}</div>
+                                    <div className="text-slate-400 bg-black/40 p-1 rounded mt-1 break-all">{fp.codeSnippet}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 外部参照 & シート依存 */}
+                          {(vba.dependencies.externalAPIs.length > 0 || vba.dependencies.worksheets.length > 0) && (
+                            <div className="text-[10px] space-y-1 bg-slate-900 p-2 rounded border border-slate-800">
+                              <div className="font-bold text-slate-300 font-sans">動作前提・依存関係:</div>
+                              {vba.dependencies.externalAPIs.length > 0 && (
+                                <div className="text-sky-300">・外部API/ライブラリ参照: {vba.dependencies.externalAPIs.join(', ')}</div>
+                              )}
+                              {vba.dependencies.worksheets.length > 0 && (
+                                <div className="text-slate-300">・参照ワークシート: {vba.dependencies.worksheets.join(', ')}</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()
+                  )}
+
+                  {/* Master v5.0 第11章: プライバシー保護・送信境界ガードレール 詳細展開パネル */}
+                  {expandedPrivacyAuditMsgId === msg.id && msg.privacyAudit && (
+                    <div className="mt-3 p-3 bg-slate-950/95 border border-sky-500/50 rounded-xl space-y-3 text-xs shadow-lg animate-fadeIn font-mono">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <span className={`p-1 rounded ${msg.privacyAudit.allowed ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
+                            <Lock className="w-3.5 h-3.5" />
+                          </span>
+                          <div>
+                            <div className="font-bold text-sky-300 font-sans text-[12px] flex items-center gap-2">
+                              <span>外部送信プライバシーガードレール監査 (第11章)</span>
+                              <span className={`px-2 py-0.2 rounded text-[10px] ${msg.privacyAudit.allowed ? 'bg-sky-900/60 border border-sky-600 text-sky-200' : 'bg-rose-900/60 border border-rose-600 text-rose-200'}`}>
+                                {msg.privacyAudit.allowed ? '外部送信許可' : '外部送信遮断'}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 block">
+                              分類カテゴリ: {msg.privacyAudit.classification} ({msg.privacyAudit.classification === 'PUBLIC_SYNTHETIC' ? '一般公開・架空データ' : '抽象化・機密マスク済'})
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setExpandedPrivacyAuditMsgId(null)}
+                          className="text-slate-400 hover:text-slate-200 text-xs px-1.5 py-0.5 rounded hover:bg-slate-800"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {/* 違反/マスク項目一覧 */}
+                      {msg.privacyAudit.violations.length > 0 ? (
+                        <div className="space-y-1.5">
+                          <div className="font-bold text-amber-300 text-[11px] font-sans">
+                            検知・マスキング項目 ({msg.privacyAudit.violations.length}件):
+                          </div>
+                          <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                            {msg.privacyAudit.violations.map((viol, vIdx) => (
+                              <div key={vIdx} className="p-1.5 bg-slate-900/80 border border-slate-700/60 rounded text-[10px]">
+                                <div className="flex items-center justify-between font-bold">
+                                  <span className={viol.severity === 'CRITICAL' ? 'text-rose-400' : 'text-amber-400'}>
+                                    [{viol.severity}] {viol.type}
+                                  </span>
+                                  <span className="text-slate-400">{viol.snippet}</span>
+                                </div>
+                                <div className="text-slate-300 mt-0.5">{viol.message}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-2 bg-emerald-950/30 border border-emerald-800/40 rounded text-[11px] text-emerald-300">
+                          ✅ 機密情報・認証情報・社内UNCパス等の外部漏洩パターンは検出されませんでした。安全に送信可能です。
+                        </div>
+                      )}
+
+                      {/* 抽象シンボル置換マップ */}
+                      {Object.keys(msg.privacyAudit.symbolReplacements || {}).length > 0 && (
+                        <div className="p-2 bg-slate-900/90 border border-slate-800 rounded text-[10px] space-y-1">
+                          <div className="font-bold text-sky-400 font-sans">抽象シンボル化マップ (Abstract Sanitizer):</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[9.5px]">
+                            {Object.entries(msg.privacyAudit.symbolReplacements).map(([orig, sym], sIdx) => (
+                              <div key={sIdx} className="flex items-center gap-1.5">
+                                <span className="text-slate-400 line-through truncate max-w-[120px]">{orig}</span>
+                                <span className="text-slate-500">→</span>
+                                <span className="text-emerald-400 font-bold">{sym}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -4,7 +4,9 @@ import {
   CodeSafetyRiskItem,
   CodeSafetyLevel,
   CodeReadinessStatus,
+  VbaStaticVerificationResult,
 } from '../types';
+import { vbaStaticVerifierService } from './vbaStaticVerifierService';
 
 /**
  * 設計思想 10章 & 35章 第5段階:
@@ -52,6 +54,7 @@ export class CodeVerificationService {
     const syntaxErrors: string[] = [];
     const risks: CodeSafetyRiskItem[] = [];
     const envReqs = new Set<string>();
+    let primaryVbaStaticResult: VbaStaticVerificationResult | undefined = undefined;
 
     for (const b of blocks) {
       const lang = this.normalizeLanguage(b.lang, b.code);
@@ -65,6 +68,50 @@ export class CodeVerificationService {
 
       // 3. 動作環境前提の抽出
       this.checkEnvironment(b.code, lang, envReqs);
+
+      // 4. VBA専用 8大スキャナー静的検証 (63章・64章 & Master v5.0 第10章)
+      if (lang === 'vba') {
+        const vbaRes = vbaStaticVerifierService.verifyVbaCodeSync(b.code);
+        if (!primaryVbaStaticResult) {
+          primaryVbaStaticResult = vbaRes;
+        }
+
+        if (!vbaRes.hasOptionExplicit) {
+          syntaxErrors.push('VBAモジュール先頭に Option Explicit が未記載です（未宣言変数によるバグ防止）');
+        }
+        if (!vbaRes.allProceduresFullyClosed) {
+          syntaxErrors.push('未終端のプロシージャ (End Sub / End Function) が存在します');
+        }
+        if (!vbaRes.blockNestingValid) {
+          for (const ob of vbaRes.openBlocks) {
+            syntaxErrors.push(ob);
+          }
+        }
+        for (const fp of vbaRes.forbiddenPatterns) {
+          risks.push({
+            riskType:
+              fp.type === 'HARDCODED_CREDENTIAL_PATH'
+                ? 'privilege'
+                : fp.type === 'RESOURCE_LEAK'
+                ? 'memory_leak'
+                : 'auto_exec',
+            severity:
+              fp.type === 'HARDCODED_CREDENTIAL_PATH'
+                ? 'critical'
+                : fp.type === 'UNHANDLED_DIFF_OMISSION' || fp.type === 'PTRSAFE_MISSING'
+                ? 'high'
+                : 'medium',
+            description: `[行${fp.line}] ${fp.explanation}`,
+            lineSnippet: fp.codeSnippet,
+          });
+        }
+        for (const dep of vbaRes.dependencies.externalAPIs) {
+          envReqs.add(`VBA外部API/ライブラリ参照: ${dep}`);
+        }
+        for (const ws of vbaRes.dependencies.worksheets) {
+          envReqs.add(`対象ワークシート存在前提: ${ws}`);
+        }
+      }
     }
 
     // 総合スコアの算出 (初期値100からリスクごとに減点)
@@ -112,6 +159,7 @@ export class CodeVerificationService {
       environmentRequirements: Array.from(envReqs),
       readiness,
       reviewedAt: Date.now(),
+      vbaStaticResult: primaryVbaStaticResult,
     };
   }
 
