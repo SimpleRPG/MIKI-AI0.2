@@ -7,7 +7,7 @@ import { GitHubHub } from './components/GitHubHub';
 import { MemoryModal } from './components/MemoryModal';
 import { ExportModal } from './components/ExportModal';
 import { EngineModal } from './components/EngineModal';
-import { SelfImprovementModal } from './components/SelfImprovementModal';
+import { SelfImprovementModal, SelfImprovementTab } from './components/SelfImprovementModal';
 import { WORKSPACE_TEMPLATES } from './data/presets';
 import {
   ChatMessage,
@@ -218,7 +218,7 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isEngineModalOpen, setIsEngineModalOpen] = useState<boolean>(false);
   const [isSelfImprovementModalOpen, setIsSelfImprovementModalOpen] = useState<boolean>(false);
-  const [selfImprovementTab, setSelfImprovementTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'lab' | 'colab' | 'generations' | 'experience_router' | 'skill_graduation'>('diagnosis');
+  const [selfImprovementTab, setSelfImprovementTab] = useState<SelfImprovementTab>('diagnosis');
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {

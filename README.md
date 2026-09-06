@@ -172,6 +172,37 @@
 - `src/services/featureFlagsService.ts`: `VBA_STATIC_VERIFIER` 定義・解説追加
 - `README.md`: v4.3 実装仕様および検証記録の追記
 
+## MIKI-AI 統合設計思想指示書 v5.5 実装報告 (Master v5.5 完全統合 & 自律成長・不確実性駆動パイプライン)
+
+### 【実装内容】
+1. **第20章: 不確実性駆動の教師利用 ＆ 対策の汎化不足検知 (Uncertainty-Driven Routing & Generalization Gap)**
+   - `src/services/uncertaintyTeacherService.ts`: 複数候補マルチサンプリング（通常推論 vs 慎重要点推論）による5大不一致（結論、意図、記憶想起、回答長、条件漏れ）の自動判定。
+   - 判断の割れた不確実性課題のみを抽出して遅延教師要求キューへ高優先度配分。教師回答から「回答骨格（Response Skeleton）」を蒸留して永続化。
+   - 対策骨格習得後の同一能力カテゴリでの再発を検知し、「対策の汎化不足 (generalization_gap)」として不足能力レジストリへ自動蓄積、LoRA検討トリガーへ接続。
+   - `src/components/self_improvement/UncertaintyTeacherTab.tsx`: 20章専用UIによるサンプリング検証・不一致ログ可視化。
+
+2. **第21章: 保存容量配分 (Galaxy S25 60GB計画) ＆ 重複排除・自動クリーンアップ**
+   - `src/services/storagePlanningService.ts`: Galaxy S25端末の長期運用に耐えうる60GB配分（モデル20GB、記憶/教材12GB、評価8GB、LoRA8GB、バックアップ6GB、一時作業8GB）の動的監視。
+   - `runDeduplicationAndCleanup()`: 重複記憶のハッシュ統合、期限切れ一時バッファの安全回収。
+   - `src/components/self_improvement/StorageCapacityPlanTab.tsx`: 容量パーティションメーターと1タップ自動整理UI。
+
+3. **第22章: 当面の最小完成範囲 (Minimal Viable Scope v1.0) リアルタイム監査**
+   - `src/services/minimalScopeService.ts`: 会話AI v1.0 (15項目) および コード理解AI v1.0 (10項目) の計25項目の達成状況・自動検証ステータスを追跡。
+   - `src/components/self_improvement/MinimalScopeTab.tsx`: 達成項目進捗ダッシュボードおよび項目別再テストトリガー。
+
+4. **第23章: 放置型自律進化 (Autonomous Evolution) ＆ 技能卒業 (Skill Graduation)**
+   - `src/services/autonomousEvolutionService.ts`: アイドル時・深夜充電時の4大自律サイクル（反実仮想反省、定石蒸留、宿題自発考察、弱点ドリル反復）を完全実行。
+   - `src/components/self_improvement/SkillGraduationTab.tsx`: スキルの多様性再試験（Cross-Context Retest）および卒業ステータス管理。
+
+5. **送信境界プライバシーガードレール (第17章) UI配線 & バックグラウンド自律連携**
+   - `src/components/SelfImprovementModal.tsx`: `security_guardrail` タブ（`PrivacySecurityGuardrailTab`）のナビゲーションバー配線およびレンダリング統合。
+   - `src/services/backgroundWorkerService.ts`: 深い睡眠サイクルに第21章の容量重複排除・自動整理ステップを組み込み。
+
+### 【検証結果】
+- `npm run compile_applet` (tsc --noEmit & vite build) 正常完了。
+- 記憶・プライバシー・不確実性・容量・自律進化の全サービス層の整合性を検証済み。
+
+
 
 
 

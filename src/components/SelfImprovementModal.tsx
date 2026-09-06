@@ -111,6 +111,34 @@ import { toolsService } from '../services/toolsService';
 import { syntheticDataService } from '../services/syntheticDataService';
 import { retrieveScoredMemories } from '../utils/memoryRetrieval';
 
+export type SelfImprovementTab =
+  | 'diagnosis'
+  | 'world_model'
+  | 'workmanager'
+  | 'idle_evolution'
+  | 'benchmark'
+  | 'model_comparison'
+  | 'teacher'
+  | 'skills'
+  | 'tools'
+  | 'plugins'
+  | 'phase5'
+  | 'lab'
+  | 'colab'
+  | 'generations'
+  | 'answer_plans'
+  | 'capabilities'
+  | 'code_ir_vba'
+  | 'feature_flags'
+  | 'experience_router'
+  | 'skill_graduation'
+  | 'dialogue_eval'
+  | 'uncertainty_teacher'
+  | 'storage_quota'
+  | 'minimal_scope'
+  | 'autonomous_search'
+  | 'security_guardrail';
+
 export interface SelfImprovementModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -118,7 +146,7 @@ export interface SelfImprovementModalProps {
   memories: MemoryItem[];
   workspaceFiles?: WorkspaceFile[];
   engineMode?: string;
-  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'experience_router' | 'skill_graduation' | 'dialogue_eval' | 'uncertainty_teacher' | 'storage_quota' | 'minimal_scope' | 'autonomous_search' | 'security_guardrail';
+  initialTab?: SelfImprovementTab;
 }
 
 export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
@@ -130,7 +158,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   engineMode = 'webgpu',
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'idle_evolution' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags' | 'experience_router' | 'skill_graduation' | 'dialogue_eval' | 'uncertainty_teacher' | 'storage_quota' | 'minimal_scope' | 'autonomous_search' | 'security_guardrail'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<SelfImprovementTab>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 
@@ -1092,6 +1120,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <Globe className="w-4 h-4 text-sky-400" />
             <span>🌐 自律Web学習 (13章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('security_guardrail')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'security_guardrail'
+                ? 'border-emerald-500 text-emerald-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>🛡️ プライバシー＆セキュリティ (17章)</span>
           </button>
         </div>
 
@@ -4971,6 +5011,9 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
           {/* TAB: 自律型Web検索 ＆ 能動学習ループ (13章) */}
           {activeTab === 'autonomous_search' && <AutonomousSearchTab />}
+
+          {/* TAB: 送信境界プライバシーガードレール & 抽象シンボル化 (17章) */}
+          {activeTab === 'security_guardrail' && <PrivacySecurityGuardrailTab />}
         </div>
 
         {/* Footer */}

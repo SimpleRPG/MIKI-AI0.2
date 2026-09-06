@@ -1290,6 +1290,124 @@ export interface RegressionSuiteRunReport {
 }
 
 /**
+ * 設計思想 18章: 会話評価の11項目
+ */
+export type ConversationEvaluationCriterion =
+  | 'directness'             // 質問への直接性 (結論が先にあるか)
+  | 'context_maintenance'    // 文脈維持 (直前の話題・目的を維持しているか)
+  | 'intent_understanding'   // 意図理解 (表面の質問と本質意図)
+  | 'correction_adaptation'  // 訂正反映 (古い前提の即時無効化)
+  | 'contradiction_repair'   // 矛盾修復 (防衛的にならず論点修復)
+  | 'natural_japanese'       // 日本語の自然さ (親友口調・不自然な前置き排除)
+  | 'length_suitability'     // 回答長 (短文・標準・詳細の適切性)
+  | 'no_redundancy'          // 不要な繰り返し排除
+  | 'handling_unknowns'      // 不明点の扱い (勝手に断定しない)
+  | 'proper_memory_usage'    // 記憶の正しい利用 (無関係な記憶を混ぜない)
+  | 'response_latency';      // 応答速度
+
+/**
+ * 設計思想 18章: 固定会話シナリオ (12種)
+ */
+export interface FixedConversationScenario {
+  id: string;
+  name: string;
+  scenarioType:
+    | 'short_qa'               // 普通の短い質問
+    | 'detailed_consultation'  // 少し詳しい相談
+    | 'continue_explanation'   // 前の説明の続きを求める
+    | 'correct_assumption'     // 前提を訂正する
+    | 'point_contradiction'    // 矛盾を指摘する
+    | 'too_long_feedback'      // 回答が長すぎると伝える
+    | 'too_short_feedback'     // 回答が短すぎると伝える
+    | 'topic_change'           // 話題を切り替える
+    | 'return_to_previous'     // 以前の話へ戻る
+    | 'unknown_query'          // 不明な内容を質問する
+    | 'conclusion_only'        // 結論だけを求める
+    | 'ambiguous_phrase';      // 曖昧な言い方をする
+  description: string;
+  prompt: string;
+  contextHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  expectedKeywords: string[];
+  forbiddenKeywords: string[];
+  expectedLengthRange: [number, number]; // 望ましい文字数 [min, max]
+  primaryCriterion: ConversationEvaluationCriterion;
+  baselineScore: number;
+}
+
+export interface FixedScenarioEvaluationResult {
+  scenarioId: string;
+  name: string;
+  scenarioType: string;
+  score: number;
+  passed: boolean;
+  criterionScores: Record<ConversationEvaluationCriterion, number>;
+  generatedResponse: string;
+  latencyMs: number;
+  charCount: number;
+  feedback: string[];
+}
+
+/**
+ * 設計思想 18章: 動的会話評価 (多ターン対話テスト)
+ */
+export interface DynamicEvaluationTurn {
+  turnNumber: number;
+  stageName: string;
+  teacherUserPrompt: string;
+  deviceAiResponse: string;
+  targetCapability: string;
+  turnScore: number;
+  passed: boolean;
+  notes: string[];
+}
+
+export interface DynamicEvaluationReport {
+  id: string;
+  timestamp: number;
+  modelName: string;
+  engineType: string;
+  turns: DynamicEvaluationTurn[];
+  overallScore: number;
+  passed: boolean;
+  summary: string;
+}
+
+/**
+ * 設計思想 18章: 固定評価と動的評価の両方合格による改善判定
+ */
+export interface DualEvaluationReport {
+  id: string;
+  timestamp: number;
+  modelName: string;
+  fixedOverallScore: number;
+  fixedPassedCount: number;
+  fixedTotalCount: number;
+  fixedPassed: boolean;
+  dynamicOverallScore: number;
+  dynamicPassed: boolean;
+  bothPassed: boolean; // 両方に合格した場合だけ改善扱いとする
+  verdict: 'APPROVED_IMPROVEMENT' | 'REJECTED_NEEDS_REFINEMENT';
+  criterionBreakdown: Record<ConversationEvaluationCriterion, number>;
+  recommendations: string[];
+}
+
+/**
+ * 設計思想 13章: 3B向け思考過程圧縮 (6要素分解)
+ */
+export interface ReasoningDecomposition3B {
+  facts: string[];           // 事実
+  assumptions: string[];     // 前提
+  contradictions: string[];  // 矛盾
+  keyDecisions: string[];    // 重要な判断点
+  responsePolicy: string[];  // 回答方針
+  finalAnswer: string;       // 最終回答
+  rawLength: number;
+  compressedLength: number;
+  compressionRatio: number;  // % (例: 35% に圧縮)
+  generatedAt: number;
+}
+
+/**
  * モデルサイズ比較ベンチマーク評価 (設計思想 44節 & 79節 フェーズ6)
  * 1.5B vs 3B など、異なるベースモデル規模間での品質・速度・発熱・メモリ総合比較
  */

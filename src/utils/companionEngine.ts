@@ -792,3 +792,13 @@ ${name}はいつでも${nickname}の一番の味方だからね！
 
   return `うんうん！${nickname}のお話し、しっかり聞いてるよ〜！✨\n\n日頃の雑談やゲームのアイデア、何でも気軽に話してね！\n一緒にもっと面白いものを作ったり、楽しい時間を過ごそうね😊🌸`;
 }
+
+export const companionEngine = {
+  generateAutonomousResponse: (
+    prompt: string,
+    options?: { userName?: string; usePlanCache?: boolean }
+  ): string => {
+    return generateSmartCompanionReply(prompt);
+  },
+};
+
