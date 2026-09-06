@@ -5,8 +5,37 @@ import { storageService } from './storageService';
 const WORLD_MODEL_PREDICTIONS_KEY = 'miki_ai_world_model_predictions';
 const PREDICTION_ERRORS_KEY = 'miki_ai_prediction_error_records';
 
+// 記憶「未使用」判定のしきい値。文字2-gram重複率がこれ以上なら「使われた」とみなす。
+// (第52章 記憶利用ポリシー乖離判定の日本語対応 参照)
+const MEMORY_USAGE_BIGRAM_THRESHOLD = 0.12;
+
 /**
- * 世界モデル & 予測誤差エンジン (設計思想 17. 世界モデルと予測誤差)
+ * 日本語(分かち書き無し)でも機能する簡易類似度: 文字2-gram集合の重複率。
+ * 形態素解析器・埋め込みサーバーに依存しない同期処理で、
+ * 「記憶内容の断片が応答に反映されているか」を近似判定する。
+ */
+function charBigrams(text: string): Set<string> {
+  const cleaned = text.replace(/[\s、。,.!?！？「」『』()（）\-ー・]/g, '');
+  const grams = new Set<string>();
+  for (let i = 0; i < cleaned.length - 1; i++) {
+    grams.add(cleaned.slice(i, i + 2));
+  }
+  return grams;
+}
+
+function charBigramOverlapRatio(memoryContent: string, response: string): number {
+  const memGrams = charBigrams(memoryContent);
+  if (memGrams.size === 0) return 0;
+  const respGrams = charBigrams(response);
+  let overlap = 0;
+  for (const g of memGrams) {
+    if (respGrams.has(g)) overlap++;
+  }
+  return overlap / memGrams.size;
+}
+
+/**
+ * 世界モデル & 予測誤差エンジン (第52章 世界モデル & 予測誤差エンジン完全仕様 参照)
  * 
  * 核心原理:
  * 1. AIが行動（回答生成・ツール利用）する前に、結果を予測する。
@@ -163,7 +192,7 @@ export class WorldModelService {
 
   /**
    * 事後検証 & 予測誤差の計算 (Prediction Error / Surprisal Calculation)
-   * 設計思想 17: 「予測結果 → 実際の結果 → 差分の記録 → 次回の改善」
+   * 第52章: 「予測結果 → 実際の結果 → 差分の記録 → 次回の改善」
    */
   public recordOutcomeAndComputeError(
     prediction: ActionPrediction,
@@ -194,9 +223,13 @@ export class WorldModelService {
     } else if (!prediction.expectedMemoryUsage.needed && actualMemCount > 0) {
       memorySurprisal = 'over_retrieved';
     } else if (predMemCount > 0 && actualMemCount > 0) {
-      // 記憶は取得されたが、回答本文にその記憶のキーワードが全く反映されていないケース
-      const usedKeywordInResp = actual.actualUsedMemories.some((m) =>
-        m.content.split(/[ ,、。]+/).some((word) => word.length > 2 && resp.includes(word))
+      // 記憶は取得されたが、回答本文にその記憶の内容がほぼ反映されていないケース。
+      // 旧実装は日本語を想定せず「スペース/句読点分割」で単語を切り出していたが、
+      // 日本語は分かち書きしないため実質どの応答でも不一致判定になり、
+      // 誤差検知(memory_policy_mismatch)がほぼ常時発火する構造的バグがあった。
+      // → 形態素解析器を持たない環境でも動く文字2-gram重複率で近似する方式に修正(第52章参照)。
+      const usedKeywordInResp = actual.actualUsedMemories.some(
+        (m) => charBigramOverlapRatio(m.content, resp) >= MEMORY_USAGE_BIGRAM_THRESHOLD
       );
       if (!usedKeywordInResp) {
         memorySurprisal = 'retrieved_but_unused';
@@ -233,7 +266,7 @@ export class WorldModelService {
 
     if (memorySurprisal === 'retrieved_but_unused') {
       errorCategory = 'memory_policy_mismatch';
-      diagnosisNote = '【設計思想17典型例】記憶は取得されましたが回答で参照されませんでした。記憶不足ではなくプロンプト注入時の利用指示方針を強化する必要があります。';
+      diagnosisNote = '【第52章 記憶利用ポリシー乖離】記憶は取得されましたが回答で参照されませんでした。記憶不足ではなくプロンプト注入時の利用指示方針を強化する必要があります。';
       suggestedImprovement = 'update_memory_policy';
     } else if (hasToneViolation) {
       errorCategory = 'constraint_violation';
