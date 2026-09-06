@@ -81,6 +81,7 @@ import {
   recordMemoryUsage,
   applyMemoryFeedback,
   enrichMemoryMetadata,
+  extractQueryTokens,
 } from './utils/memoryRetrieval';
 import { embeddingService } from './services/embeddingService';
 import { SPEAKER_PROFILES, SpeakerProfile } from './data/speakers';
@@ -922,7 +923,93 @@ export default function App() {
         `🧠 [感情価更新] 前ターンの記憶(${targetIds.length}件)にフィードバック反映: [${feedbackType.toUpperCase()}] (${isCorrection ? 'ユーザーの訂正・問題指摘を検知' : '通常の受容・継続'})`,
         { affectedMemoryIds: targetIds, feedbackType }
       );
+
+      // 設計思想 Master v5.0 第3章2節: 訂正・上書きによる置換関係 (replaced_by) の自動追跡
+      const replaceKeywords = ['じゃなくて', 'ではなく', 'に変更', 'に上書き', 'じゃなく', 'じゃなくてこっち'];
+      const isExplicitReplace = replaceKeywords.some((kw) => text.includes(kw));
+      if (isExplicitReplace && targetIds.length > 0) {
+        const oldMemoryId = targetIds[0];
+        const oldMem = memories.find((m) => m.id === oldMemoryId);
+        if (oldMem && oldMem.active) {
+          let newContent = '';
+          for (const rk of replaceKeywords) {
+            if (text.includes(rk)) {
+              const parts = text.split(rk);
+              if (parts[1]?.trim()) {
+                newContent = parts[1].trim().replace(/[。！!？?]+$/, '');
+                break;
+              }
+            }
+          }
+          if (newContent && newContent.length >= 2) {
+            const replacementResult = longTermMemoryService.supersedeMemory(
+              memories,
+              oldMemoryId,
+              newContent,
+              `ユーザー会話による明示的訂正 (${text.slice(0, 30)})`
+            );
+            setMemories(replacementResult.updatedMemories);
+            storageService.saveMemoryItem(replacementResult.newMemory);
+            const oldUpdated = replacementResult.updatedMemories.find((m: MemoryItem) => m.id === oldMemoryId);
+            if (oldUpdated) storageService.saveMemoryItem(oldUpdated);
+
+            systemLogger.info(
+              'PERSISTENCE',
+              `🔄 [第3章2節 置換関係追跡] 古い記憶(${oldMemoryId})を置換(SUPERSEDED)し、新記憶(${replacementResult.newMemory.id})を作成: 「${newContent}」`,
+              { oldMemoryId, newMemoryId: replacementResult.newMemory.id }
+            );
+          }
+        }
+      }
+
       lastTurnUsedMemoryIdsRef.current = [];
+    }
+
+    // 設計思想 Master v5.0 第3章4節: ユーザー明示的削除の2段階反映 (即時ランタイム遮断 + 台帳アーカイブ)
+    const explicitForgetKeywords = ['忘れて', '消して', '記憶から削除', '記憶を削除', '前言撤回', 'なかったことにして'];
+    const isExplicitForget = explicitForgetKeywords.some((kw) => text.includes(kw));
+    if (isExplicitForget) {
+      const queryTokens = extractQueryTokens(text);
+      const targetMemories = memories.filter((m) => {
+        if (!m.active) return false;
+        const contentTokens = extractQueryTokens(m.content || '');
+        let overlap = 0;
+        queryTokens.forEach((t) => {
+          if (contentTokens.has(t) && t.length >= 2) overlap++;
+        });
+        return overlap >= 1;
+      });
+
+      if (targetMemories.length > 0) {
+        targetMemories.forEach((target) => {
+          // 第1段階: 即時ランタイム注入禁止ブラックリストに追加
+          longTermMemoryService.addToRuntimeBlacklist(target.id);
+
+          // 第2段階: 台帳永続化でアーカイブ／無効化コミット
+          const updatedItem: MemoryItem = {
+            ...target,
+            active: false,
+            lifecycleStatus: 'REJECTED',
+            status: 'archived',
+            discardReason: `ユーザーからの明示的削除要求 (${text.slice(0, 30)})`,
+            updatedAt: Date.now(),
+          };
+          storageService.saveMemoryItem(updatedItem);
+        });
+
+        setMemories((prev) =>
+          prev.map((m) => {
+            const hit = targetMemories.find((t) => t.id === m.id);
+            return hit ? { ...m, active: false, lifecycleStatus: 'REJECTED', status: 'archived' } : m;
+          })
+        );
+
+        systemLogger.info(
+          'PERSISTENCE',
+          `🗑️ [第3章4節 明示的削除] ${targetMemories.length}件の記憶をランタイムブラックリストへ即時追加 & 台帳アーカイブ`,
+          { deletedIds: targetMemories.map((t) => t.id) }
+        );
+      }
     }
 
     // Auto extract memory heuristics
@@ -2384,9 +2471,16 @@ export default function App() {
         timestamp: Date.now(),
         recall: {
           vector_seeds: (usedMemoriesTracked || []).map((m) => m.id),
-          link_expanded: [],
-          tag_matched: [],
+          link_expanded: (usedMemoriesTracked || []).filter((m) => {
+            const mem = memories.find((orig) => orig.id === m.id);
+            return mem?.relatedMemoryIds && mem.relatedMemoryIds.length > 0;
+          }).map((m) => m.id),
+          tag_matched: (usedMemoriesTracked || []).filter((m) => {
+            const mem = memories.find((orig) => orig.id === m.id);
+            return mem?.tags && mem.tags.length > 0;
+          }).map((m) => m.id),
           ratio_used: 'vector:0.5, link:0.3, tag:0.2',
+          contradiction_pairs_flagged: memoryPipelineResult?.scoredMemories?.filter((sm) => sm.contradictionWarning)?.length || 0,
         },
         context: {
           estimated_tokens_before: promptBuildResult.promptLengthChars ? Math.round(promptBuildResult.promptLengthChars / 3) : 0,

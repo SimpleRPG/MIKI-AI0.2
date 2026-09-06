@@ -457,26 +457,53 @@ export function applyMemoryFeedback(
   return memories.map((m) => {
     if (idSet.has(m.id)) {
       if (type === 'useful') {
-        const prevUseful = (m.useful_count ?? m.usefulCount ?? 0) + 1;
+        const nextUseful = (m.useful_count ?? m.usefulCount ?? 0) + 1;
         const currentHeat = typeof m.heat === 'number' ? m.heat : 0.5;
         const newHeat = Math.min(1.0, currentHeat + 0.1);
+        const confusion = m.confusion_count ?? m.confusionCount ?? 0;
+
+        // 設計思想 Master v5.0 第14章3節: useful_count >= 5 かつ confusion_count == 0 で長期記憶へ自動昇格
+        const shouldPromote = nextUseful >= 5 && confusion === 0 && m.memoryScope !== 'long_term';
+
         return {
           ...m,
-          useful_count: prevUseful,
-          usefulCount: prevUseful,
+          useful_count: nextUseful,
+          usefulCount: nextUseful,
           heat: Number(newHeat.toFixed(2)),
           goodCount: (m.goodCount ?? 0) + 1,
+          ...(shouldPromote
+            ? {
+                memoryScope: 'long_term' as const,
+                destination: 'long_term_memory' as const,
+                longTermType: 'general_rule' as const,
+                approved: true,
+                lifecycleStatus: 'APPROVED' as const,
+              }
+            : {}),
         };
       } else {
-        const prevConfusion = (m.confusion_count ?? m.confusionCount ?? 0) + 1;
+        const nextConfusion = (m.confusion_count ?? m.confusionCount ?? 0) + 1;
         const currentHeat = typeof m.heat === 'number' ? m.heat : 0.5;
         const newHeat = Math.max(0.0, currentHeat * 0.7);
+        const useful = m.useful_count ?? m.usefulCount ?? 0;
+
+        // 設計思想 Master v5.0 第14章3節: confusion_count >= 3 かつ useful_count == 0 で自動隔離
+        const shouldQuarantine = nextConfusion >= 3 && useful === 0;
+
         return {
           ...m,
-          confusion_count: prevConfusion,
-          confusionCount: prevConfusion,
+          confusion_count: nextConfusion,
+          confusionCount: nextConfusion,
           heat: Number(newHeat.toFixed(2)),
           badCount: (m.badCount ?? 0) + 1,
+          ...(shouldQuarantine
+            ? {
+                destination: 'quarantine' as const,
+                quarantineReason: 'ユーザーからの訂正・混乱が3回連続発生したため自動隔離',
+                active: false,
+                lifecycleStatus: 'REJECTED' as const,
+              }
+            : {}),
         };
       }
     }

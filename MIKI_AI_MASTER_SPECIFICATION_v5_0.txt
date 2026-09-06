@@ -550,5 +550,60 @@ Master v5.1 では、Termuxローカルの llama-server (ポート8081) や Olla
    - 手動 👍 / 👎 フィードバックボタン操作時も、useful_count / confusion_count / heat が完全連動。
 
 ======================================================================
-以上 (MIKI-AI Single Source of Truth - Master v5.1 改訂版)
+第15章 置換関係追跡・2段階削除反映・統合診断ログプロトコル (Master v5.2 追加仕様)
+======================================================================
+
+15.1 概要と目的
+本章では、第3章（記憶管理と更新原則）および第4章（コンテキスト長自動調整）で定義された原則を完全具現化し、ユーザーとの対話の中で発生する「前提の訂正・上書き」「記憶の明示的削除」「推論と想起プロセスの説明可能性（透明性）」を担保する。
+
+15.2 置換関係の自動追跡プロトコル (Superseded Memory Replacement)
+1. 訂正・上書き意図の自然言語検知:
+   - ユーザーの発言から「〜じゃなくて〇〇」「〜ではなく〇〇」「〇〇に変更」「〇〇に上書き」等の上書き意図を自動解析。
+   - 直前ターンで使用された記憶、または関連する古い記憶（oldMemoryId）を特定。
+2. 破壊的削除の禁止と置換リンク生成:
+   - 古い記憶は物理削除せず、以下のメタデータを付与して SUPERSEDED 状態へ移行:
+     * `active: false`
+     * `lifecycleStatus: 'SUPERSEDED'`
+     * `replacedBy: newMemoryId`
+     * `replacementReason: string`
+     * `supersededAt: timestamp`
+   - 新しい記憶（newMemory）を作成し、以下を付与:
+     * `supersededFrom: oldMemoryId`
+     * `active: true`
+     * `approved: true`
+     * `lifecycleStatus: 'ACTIVE'`
+3. 検索パイプラインでの最新版自動差替え:
+   - 7段階検索パイプライン Step 6 において、古い記憶がヒットした場合、`resolveLatestSupersededMemory` により置換チェーンを再帰走査（循環参照保護付き）し、常に最新有効な記憶へ自動的に差し替えてプロンプトへ注入する。
+
+15.3 ユーザー明示的削除の2段階反映アーキテクチャ (Two-Phase Forgetting)
+ユーザーから「忘れて」「消して」「記憶から削除して」「前言撤回」等の明示的削除が要求された場合、以下の2段階で確実に反映する。
+1. 第1段階 (即時ランタイム遮断 - Runtime Blacklist):
+   - 対象記憶IDを `longTermMemoryService.addToRuntimeBlacklist(id)` に即時登録。
+   - 同一ターン内およびそれ以降の検索パイプラインにおいて、ミリ秒単位でプロンプトへの混入を100%防止する。
+2. 第2段階 (台帳永続化 - Ledger Archive):
+   - 対象記憶のメタデータを `active: false`, `lifecycleStatus: 'REJECTED'`, `status: 'archived'` に変更。
+   - 削除理由（discardReason）を記録し、IndexedDB/ストレージへ永続コミットする。
+
+15.4 感情価に基づく自動記憶淘汰と昇格 (Autonomous Quarantine & Promotion)
+1. 自動隔離判定 (Quarantine):
+   - ユーザーからの訂正・問題指摘により `confusion_count >= 3` かつ `useful_count === 0` に達した記憶は、自動的に `destination: 'quarantine'`、`lifecycleStatus: 'REJECTED'`、`active: false` に移行。プロンプト検索から自動遮断する。
+2. 長期記憶自動昇格 (Promotion):
+   - 日常対話を通じて `useful_count >= 5` かつ `confusion_count === 0` を達成した有効な短期・中期記憶は、自動的に `destination: 'long_term_memory'`、`memoryScope: 'long_term'`、`longTermType: 'general_rule'`、`approved: true` へ自動昇格する。
+
+15.5 統合診断ログとコンテキスト長3層防御の可視化 (Explainability)
+1. ターン毎の Unified Diagnostic Log 記録:
+   - 想起シード記憶（vector_seeds, link_expanded, tag_matched, ratio_used, contradiction_pairs_flagged）
+   - コンテキスト長3層防御状態（A層 n_ctxティア, B層 live_budget, ペルソナ/記憶/履歴/余白トークン配分, スライディング圧縮発動有無）
+   - キャッシュ・レイテンシ（応答遅延ms, 可変TTL: 通常1800秒 vs 端末保護時300秒）
+2. EngineModal およびシステム診断画面でのUI可視化:
+   - 内部システム診断タブに専用カードを常設し、AIが「なぜその記憶を想起したか」「コンテキスト枠をどう配分したか」を開発者およびユーザーがいつでも検証可能にする。
+
+15.6 次期設計思想改善案 (Master v5.3 への展望)
+1. 改善案 ①: 関連記憶グラフの自動リンク拡張 (Semantic Link Expansion)
+   - 記憶作成時に意味的に近接した既存記憶のIDを `relatedMemoryIds` に双方向リンクし、想起時に1ホップのグラフ展開（GraphRAG）を軽量に行う仕組みの導入。
+2. 改善案 ②: プロンプトキャッシュ先頭ブロックの不変プレフィックス最適化
+   - llama.cpp のプロンプトキャッシュヒット率を95%以上に高めるため、システムプロンプトの不変部分（基本人格・出力規約）と動的挿入部分（記憶・履歴）の境界を静的トークン境界に厳格整列させる。
+
+======================================================================
+以上 (MIKI-AI Single Source of Truth - Master v5.2 改訂版)
 ======================================================================

@@ -8,6 +8,8 @@ import { systemLogger } from '../services/systemLogger';
 import { storageService } from '../services/storageService';
 import { selfImprovementService } from '../services/selfImprovementService';
 import { enrichMemoryMetadata } from '../utils/memoryRetrieval';
+import { contextBudgetEngineService } from '../services/contextBudgetEngineService';
+import { UnifiedDiagnosticLog } from '../types';
 import { VRAMMonitor } from './VRAMMonitor';
 import { GgufModelManager } from './GgufModelManager';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -167,6 +169,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   const [activeTab, setActiveTab] = useState<'downloader' | 'gguf' | 'vram' | 'training' | 'benchmark' | 'architecture' | 'logs'>('downloader');
   const [systemLogsText, setSystemLogsText] = useState<string>('');
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [unifiedLogs, setUnifiedLogs] = useState<UnifiedDiagnosticLog[]>([]);
 
   // LLM Training & Knowledge Distillation State
   const [trainingTopic, setTrainingTopic] = useState('Three.js 3Dゲーム開発とパフォーマンス最適化');
@@ -412,6 +415,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   const fetchDiagnosticsLogs = async () => {
     setIsLoadingLogs(true);
     try {
+      setUnifiedLogs(contextBudgetEngineService.getDiagnosticLogs());
       const fullReport = await systemLogger.generateFullDiagnosticReport();
       let serverLogs = '';
       try {
@@ -3249,6 +3253,87 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                     </button>
                   </div>
                 </div>
+
+                {/* 統合想起・コンテキスト3層防御診断ログ (設計思想 Master v5.0 第3章5節 & 第4章) */}
+                {unifiedLogs.length > 0 && (
+                  <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-sky-300">
+                        <Brain className="w-4 h-4 text-sky-400" />
+                        <span>🧠 統合想起 & 3層コンテキスト長自動調整 診断ログ (直近{unifiedLogs.length}ターン)</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        第3章5節 説明可能性・第4章 3層防御
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {unifiedLogs.slice(0, 5).map((uLog, idx) => (
+                        <div
+                          key={uLog.turn_id || idx}
+                          className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 text-[11px] space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between text-slate-400">
+                            <span className="font-mono text-slate-300 font-semibold">
+                              Turn: {uLog.turn_id.slice(-8)}
+                            </span>
+                            <span>{new Date(uLog.timestamp).toLocaleTimeString()}</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                            <div className="p-2 rounded bg-slate-900/60 border border-slate-800">
+                              <div className="text-[10px] text-purple-300 font-semibold mb-1">
+                                ① 想起内訳 (Recall)
+                              </div>
+                              <div className="text-slate-300">
+                                シード記憶: <span className="font-bold text-purple-400">{uLog.recall.vector_seeds.length}件</span>
+                              </div>
+                              <div className="text-slate-400 text-[10px]">
+                                配分比: {uLog.recall.ratio_used}
+                              </div>
+                              {uLog.recall.contradiction_pairs_flagged ? (
+                                <div className="text-amber-400 text-[10px] font-bold">
+                                  ⚠️ 矛盾ペア注意: {uLog.recall.contradiction_pairs_flagged}組
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="p-2 rounded bg-slate-900/60 border border-slate-800">
+                              <div className="text-[10px] text-sky-300 font-semibold mb-1">
+                                ② コンテキスト予算 (Budget)
+                              </div>
+                              <div className="text-slate-300">
+                                n_ctx: <span className="font-bold text-sky-400">{uLog.context.live_nctx}</span> tok
+                              </div>
+                              <div className="text-[10px] text-slate-400 flex flex-wrap gap-1 mt-0.5">
+                                <span className="px-1 rounded bg-slate-800">P:{uLog.context.budget_breakdown.persona}</span>
+                                <span className="px-1 rounded bg-slate-800">M:{uLog.context.budget_breakdown.memory}</span>
+                                <span className="px-1 rounded bg-slate-800">H:{uLog.context.budget_breakdown.history}</span>
+                              </div>
+                              {uLog.context.compression_triggered && (
+                                <div className="text-emerald-400 text-[10px] font-bold mt-0.5">
+                                  ⚡ スライディング圧縮発動済
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="p-2 rounded bg-slate-900/60 border border-slate-800">
+                              <div className="text-[10px] text-amber-300 font-semibold mb-1">
+                                ③ キャッシュ・推論 (Cache & Latency)
+                              </div>
+                              <div className="text-slate-300">
+                                応答遅延: <span className="font-bold text-amber-400">{uLog.cache.prompt_processing_ms}ms</span>
+                              </div>
+                              <div className="text-slate-400 text-[10px]">
+                                可変TTL: <span className="text-amber-300 font-mono">{uLog.cache.ttl_applied}秒</span> (端末保護)
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Log Text Box */}
                 <div className="relative">

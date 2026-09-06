@@ -317,6 +317,7 @@ export interface MemoryPipelineSearchResult {
     memory: MemoryItem;
     score: number;
     matchStage?: string;
+    contradictionWarning?: string;
   }>;
   filteredOutCount: number;
   steps: MemoryPipelineStepHit[];
