@@ -707,7 +707,7 @@ export type CodeSafetyLevel = 'PASS_SAFE' | 'WARN_REVIEW_NEEDED' | 'BLOCKED_HIGH
 export type CodeReadinessStatus = 'READY_FOR_PREVIEW' | 'EXTERNAL_TEST_REQUIRED' | 'RUNTIME_GUARD_NEEDED' | 'BLOCKED';
 
 export interface CodeSafetyRiskItem {
-  riskType: 'file_system' | 'shell_exec' | 'network' | 'auto_exec' | 'memory_leak' | 'infinite_loop' | 'privilege';
+  riskType: 'file_system' | 'shell_exec' | 'network' | 'auto_exec' | 'memory_leak' | 'infinite_loop' | 'privilege' | 'bad_practice';
   severity: 'low' | 'medium' | 'high' | 'critical';
   description: string;
   lineSnippet?: string;

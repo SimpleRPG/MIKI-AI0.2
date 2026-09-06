@@ -251,6 +251,21 @@ class FailureCatalogService {
   }
 
   /**
+   * コンテキストやプロンプトから該当するシグネチャを自動抽出し、プロンプト注入用の回避指示文ブロックを生成
+   */
+  public formatRulesForPrompt(context?: {
+    isCodeOrVba?: boolean;
+    language?: string;
+    userPrompt?: string;
+  }): string {
+    const matchedSigs = this.findRelevantSignatures(context?.userPrompt || '', {
+      isCodeOrVba: context?.isCodeOrVba,
+      language: context?.language,
+    });
+    return this.generateAvoidancePromptBlock(matchedSigs);
+  }
+
+  /**
    * 事後スキャン用: 生成された回答・コードをスキャンし、アンチパターン違反がないか検査
    */
   public scanForAntiPatterns(

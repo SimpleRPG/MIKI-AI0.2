@@ -19,6 +19,7 @@ import { toolsService } from '../services/toolsService';
 import { longTermMemoryService } from '../services/longTermMemoryService';
 import { workingAgendaService } from '../services/workingAgendaService';
 import { structuralMemoryService } from '../services/structuralMemoryService';
+import { failureCatalogService } from '../services/failureCatalogService';
 import type { ConversationState } from '../types';
 
 /**
@@ -266,12 +267,20 @@ ${toolBlock ? `${toolBlock}\n` : ''}指示: ${expertInstruction}`;
   const codeSymbolCandidates = userMessage.match(/[a-zA-Z_][a-zA-Z0-9_]{2,}/g) || [];
   const structuralBlock = structuralMemoryService.formatStructuralContextForPrompt(codeSymbolCandidates);
 
-  // 動的サフィックスの整列: [想起記憶] ➔ [中期記憶] ➔ [構造記憶] ➔ [スキル] ➔ [ツール実行結果] ➔ [ソースコード]
+  // 設計思想 第51章: 失敗シグネチャ・カタログによる事前アンチパターン回避ルール抽出
+  const isCodeOrVba = expertRole === 'code' || /vba|マクロ|excel|コード|関数|script|型|バグ/i.test(userMessage);
+  const failureRulesBlock = failureCatalogService.formatRulesForPrompt({
+    isCodeOrVba,
+    userPrompt: userMessage,
+  });
+
+  // 動的サフィックスの整列: [想起記憶] ➔ [中期記憶] ➔ [構造記憶] ➔ [スキル] ➔ [失敗回避ルール] ➔ [ツール実行結果] ➔ [ソースコード]
   const dynamicSuffixParts: string[] = [];
   if (memoryBlock) dynamicSuffixParts.push(memoryBlock);
   if (agendaBlock) dynamicSuffixParts.push(agendaBlock);
   if (structuralBlock) dynamicSuffixParts.push(structuralBlock);
   if (skillBlock) dynamicSuffixParts.push(skillBlock);
+  if (failureRulesBlock) dynamicSuffixParts.push(failureRulesBlock);
   if (toolResultsBlock) dynamicSuffixParts.push(toolResultsBlock);
   if (filesContext) dynamicSuffixParts.push(filesContext);
 

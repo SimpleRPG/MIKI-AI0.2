@@ -7,6 +7,7 @@ import {
   VbaStaticVerificationResult,
 } from '../types';
 import { vbaStaticVerifierService } from './vbaStaticVerifierService';
+import { failureCatalogService } from './failureCatalogService';
 
 /**
  * 設計思想 10章 & 35章 第5段階:
@@ -111,6 +112,20 @@ export class CodeVerificationService {
         for (const ws of vbaRes.dependencies.worksheets) {
           envReqs.add(`対象ワークシート存在前提: ${ws}`);
         }
+      }
+
+      // 5. 設計思想 第51章: 失敗シグネチャ・カタログ事後スキャン (アンチパターン抑止)
+      const failureMatches = failureCatalogService.scanForAntiPatterns(b.code, {
+        isCodeOrVba: lang === 'vba' || lang === 'javascript' || lang === 'python',
+        language: lang,
+      });
+      for (const fm of failureMatches) {
+        risks.push({
+          riskType: 'bad_practice',
+          severity: fm.severity === 'CRITICAL' ? 'critical' : fm.severity === 'HIGH' ? 'high' : 'medium',
+          description: `[第51章アンチパターン検知] ${fm.title}: ${fm.warningMessage}`,
+          lineSnippet: fm.matchedRule,
+        });
       }
     }
 

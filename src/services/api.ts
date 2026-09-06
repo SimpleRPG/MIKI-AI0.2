@@ -84,7 +84,7 @@ export function getGeminiApiKeyItems(): SavedGeminiKeyItem[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed
+        const existingList = parsed
           .map((item, idx) => {
             if (typeof item === 'string') {
               return {
@@ -102,13 +102,15 @@ export function getGeminiApiKeyItems(): SavedGeminiKeyItem[] {
             };
           })
           .filter((item) => Boolean(item.key));
+
+        return existingList;
       }
     }
   } catch (e) {
     console.warn('Error reading miki_custom_gemini_api_keys:', e);
   }
 
-  // Fallback to legacy single key
+  // Fallback to legacy single key from localStorage
   const legacyKey = (storageService.getItem('miki_custom_gemini_api_key') || '').trim();
   if (legacyKey) {
     const defaultItem: SavedGeminiKeyItem = {

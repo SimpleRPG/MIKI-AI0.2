@@ -291,6 +291,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   const [isLoadingEnvInfo, setIsLoadingEnvInfo] = useState(false);
   const [envSyncMsg, setEnvSyncMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [copiedEnvTemplate, setCopiedEnvTemplate] = useState(false);
+  const [autoSaveToEnvOnAdd, setAutoSaveToEnvOnAdd] = useState(true);
 
   const loadServerEnvInfo = async () => {
     setIsLoadingEnvInfo(true);
@@ -397,6 +398,18 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     setApiVerifyStatus('idle');
     setApiVerifyMsg(`APIキー（${label}）を追加しました。`);
     refreshGeminiStatus();
+
+    if (autoSaveToEnvOnAdd) {
+      saveKeysToServerEnv(updated).then((res) => {
+        if (res.success) {
+          loadServerEnvInfo();
+          setEnvSyncMsg({
+            type: 'success',
+            text: `キー「${label}」をアプリおよびサーバーの .env に保存しました！`,
+          });
+        }
+      });
+    }
   };
 
   const handleRemoveGeminiKey = (id: string, label: string) => {
@@ -405,6 +418,14 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     setApiVerifyStatus('idle');
     setApiVerifyMsg(`APIキー（${label}）を削除しました。`);
     refreshGeminiStatus();
+
+    if (autoSaveToEnvOnAdd) {
+      saveKeysToServerEnv(updated).then((res) => {
+        if (res.success) {
+          loadServerEnvInfo();
+        }
+      });
+    }
   };
 
   const handleTestSingleKey = async (item: SavedGeminiKeyItem) => {
@@ -2002,6 +2023,23 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                         <Plus className="w-3.5 h-3.5" />
                         <span>追加</span>
                       </button>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                      <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={autoSaveToEnvOnAdd}
+                          onChange={(e) => setAutoSaveToEnvOnAdd(e.target.checked)}
+                          className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-0 cursor-pointer"
+                        />
+                        <span className="text-emerald-300 font-medium">
+                          サーバーの .env にも自動保存する（Termux / ローカルPC起動時も自動認識）
+                        </span>
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        {autoSaveToEnvOnAdd ? '⚡ アプリと.envを自動同期' : '手動保存モード'}
+                      </span>
                     </div>
                   </div>
 
