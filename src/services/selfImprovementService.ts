@@ -23,6 +23,7 @@ import { nativeBackgroundService } from './nativeBackgroundService';
 import { checkSampleSafety, generateSafeExcerptHash } from '../utils/trainingSampleSafetyFilter';
 import { capabilityGapService } from './capabilityGapService';
 import { answerPlanService } from './answerPlanService';
+import { failureCatalogService } from './failureCatalogService';
 
 const RECORDS_STORAGE_KEY = 'miki_ai_self_improvement_records';
 const TRAINING_DATA_STORAGE_KEY = 'miki_ai_training_samples';
@@ -497,6 +498,29 @@ class SelfImprovementService {
           .catch((importErr) => {
             console.warn('[SelfImprovementService] Failed to load teacherRequestService dynamically:', importErr);
           });
+        // 設計思想 第51章 失敗シグネチャ・カタログへの再発防止ルール自動推薦
+        try {
+          const autoTitle = `[再発防止] ${diagnosis.category}: ${diagnosis.rootCause.slice(0, 40)}`;
+          let cat: any = 'general_logic';
+          if (recurrenceCategory === 'vba') cat = 'vba_syntax';
+          else if (recurrenceCategory === 'code') cat = 'code_syntax';
+          else if (recurrenceCategory === 'tool_use') cat = 'tool_parameter';
+          else if (diagnosis.category.includes('省略') || diagnosis.category.includes('途中')) cat = 'instruction_omission';
+
+          failureCatalogService.registerSignature({
+            title: autoTitle,
+            category: cat,
+            triggerPatterns: [userMessage.slice(0, 20)],
+            antiPatternExcerpt: assistantResponse.slice(0, 150),
+            correctedSolution: diagnosis.recommendation,
+            rootCause: diagnosis.rootCause,
+            avoidanceInstruction: `【再発防止ルール】「${userMessage.slice(0, 25)}」に関する要求では、以下のミスを回避すること: ${diagnosis.recommendation}`,
+            severity: 'HIGH',
+            source: 'user_negative_rating',
+          });
+        } catch (catErr) {
+          console.warn('[SelfImprovementService] Failed to auto-register failure signature:', catErr);
+        }
       }
     } catch (recurrenceErr) {
       console.warn('Failed to check failure recurrence:', recurrenceErr);
