@@ -26,6 +26,7 @@ import { capabilityPluginService } from './capabilityPluginService';
 import { featureFlagsService } from './featureFlagsService';
 import { teacherRequestService } from './teacherRequestService';
 import { workingAgendaService } from './workingAgendaService';
+import { autonomousSearchService } from './autonomousSearchService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -732,6 +733,26 @@ export class BackgroundWorkerService {
           }
         } catch (thoughtErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '自発思考モード実行中に例外が発生しました', thoughtErr);
+        }
+
+        // Step 6.9: 設計思想 Master v5.0 第13章2節 非会話時・深い睡眠時の自律Web検索能動学習
+        if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+        try {
+          const searchConfig = autonomousSearchService.getConfig();
+          if (searchConfig.enabled && searchConfig.idleSearchEnabled) {
+            systemLogger.info(
+              'SELF_IMPROVEMENT',
+              '🌐 [第13章 能動Web検索学習] 非会話時の自発的Web検索学習を開始します...'
+            );
+            const searchLearningResult = await autonomousSearchService.performIdleAutonomousLearning(abortSignal);
+            if (searchLearningResult.learnedCount > 0) {
+              weaknessFound.push(
+                `[自律Web学習] ${searchLearningResult.learnedCount}件の課題について最新知見を調査・長期記憶と教材データセットへ反映 (${searchLearningResult.queriesInvestigated.join(', ')})`
+              );
+            }
+          }
+        } catch (searchLearnErr: any) {
+          systemLogger.warn('SELF_IMPROVEMENT', '自律Web検索学習中に例外が発生しました', searchLearnErr);
         }
       }
 

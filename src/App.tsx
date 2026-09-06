@@ -29,6 +29,7 @@ import {
   SynthesizedWorkflow,
   AnswerPlanApplicationResult,
   DraftVerificationResult,
+  AutonomousSearchMessageMeta,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
@@ -2274,6 +2275,20 @@ export default function App() {
         }
       }
 
+      // 設計思想 Master v5.0 第13章: 自律型Web検索＆能動学習結果の抽出
+      const searchTool = executedTools.find((t) => t.toolId === 'tool_web_search');
+      let autonomousSearchData: AutonomousSearchMessageMeta | undefined = undefined;
+      if (searchTool && searchTool.success && searchTool.result) {
+        autonomousSearchData = {
+          query: searchTool.result.query,
+          results: searchTool.result.results || [],
+          summary: searchTool.result.summary,
+          learnedFacts: searchTool.result.learnedKnowledge || [],
+          searchTimeMs: searchTool.executionTimeMs,
+          provider: searchTool.result.provider,
+        };
+      }
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantId
@@ -2310,6 +2325,7 @@ export default function App() {
                 suggestedTools: promptBuildResult.recommendedTools,
                 executedTools: promptBuildResult.executedTools,
                 draftVerification: draftVerificationData,
+                autonomousSearch: autonomousSearchData,
               }
             : msg
         )

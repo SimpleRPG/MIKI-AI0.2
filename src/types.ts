@@ -237,6 +237,40 @@ export interface DraftVerificationResult {
 }
 
 /**
+ * 設計思想 Master v5.0 第13章: 自律型Web検索＆能動学習エンジン
+ */
+export interface WebSearchResultItem {
+  title: string;
+  snippet: string;
+  url: string;
+  source: string;
+  relevanceScore?: number;
+  publishedDate?: string;
+}
+
+export interface AutonomousSearchLearningRecord {
+  id: string;
+  query: string;
+  triggerType: 'in_conversation' | 'idle_autonomous' | 'working_agenda' | 'capability_gap';
+  timestamp: number;
+  results: WebSearchResultItem[];
+  summary?: string;
+  extractedKnowledge: string[];
+  integratedToMemory: boolean;
+  integratedToSyntheticData: boolean;
+  resolvedAgendaId?: string;
+}
+
+export interface AutonomousSearchMessageMeta {
+  query: string;
+  results: WebSearchResultItem[];
+  summary?: string;
+  learnedFacts?: string[];
+  searchTimeMs?: number;
+  provider?: string;
+}
+
+/**
  * 設計思想 8章 & 35章 第4段階: 記憶の種類
  */
 export type MemoryScope =
@@ -608,6 +642,8 @@ export interface ChatMessage {
   failureRecurrence?: FailureRecurrencePattern;
   // 設計思想 Master v5.0 第9章1節: 1.5B/3Bドラフト検証結果
   draftVerification?: DraftVerificationResult;
+  // 設計思想 Master v5.0 第13章: 自律型Web検索＆能動学習結果
+  autonomousSearch?: AutonomousSearchMessageMeta;
 }
 
 /**

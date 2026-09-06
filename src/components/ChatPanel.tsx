@@ -1772,6 +1772,54 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       )}
                     </div>
                   )}
+
+                  {/* 設計思想 Master v5.0 第13章: 自律型Web検索＆能動学習結果カード */}
+                  {msg.autonomousSearch && (
+                    <div className="mt-3 p-2.5 bg-slate-950/90 border border-sky-500/40 rounded-xl space-y-2 text-xs shadow-inner">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sky-300 flex items-center gap-1.5 text-[11px]">
+                          <Globe className="w-3.5 h-3.5 text-sky-400" />
+                          <span>13章 自律Web検索学習 ({msg.autonomousSearch.provider || 'API Search'})</span>
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-950 text-sky-300 border border-sky-700">
+                          {msg.autonomousSearch.searchTimeMs}ms • {msg.autonomousSearch.results.length}件調査
+                        </span>
+                      </div>
+                      <div className="text-[10.5px] text-slate-300 bg-black/40 p-2 rounded border border-slate-800 space-y-1.5">
+                        <div className="flex items-center gap-1 text-sky-400 font-semibold">
+                          <Search className="w-3 h-3" />
+                          <span>検索クエリ: 「{msg.autonomousSearch.query}」</span>
+                        </div>
+                        {msg.autonomousSearch.summary && (
+                          <div className="text-slate-300 pl-4 border-l-2 border-sky-500/60 leading-relaxed">
+                            {msg.autonomousSearch.summary}
+                          </div>
+                        )}
+                        {msg.autonomousSearch.learnedFacts && msg.autonomousSearch.learnedFacts.length > 0 && (
+                          <div className="pt-1 text-[10px] text-emerald-400 font-mono">
+                            ✓ 獲得した知識を長期記憶(意味記憶)および合成学習データセットへ自動定着しました
+                          </div>
+                        )}
+                      </div>
+                      {msg.autonomousSearch.results.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {msg.autonomousSearch.results.map((r, rIdx) => (
+                            <a
+                              key={rIdx}
+                              href={r.url}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="text-[10px] bg-slate-900 hover:bg-slate-800 text-sky-300 hover:text-sky-200 px-2 py-1 rounded border border-slate-800 inline-flex items-center gap-1 transition-colors"
+                              title={r.snippet}
+                            >
+                              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                              <span className="truncate max-w-[150px]">{r.title}</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Message action buttons & Streaming Stop Button */}

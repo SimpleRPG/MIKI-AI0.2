@@ -10,6 +10,7 @@ import {
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { capabilityPluginService } from './capabilityPluginService';
+import { autonomousSearchService } from './autonomousSearchService';
 
 const TOOLS_STATS_STORAGE_KEY = 'miki_ai_tools_stats';
 
@@ -464,6 +465,31 @@ export const BUILTIN_TOOLS: ToolDefinition[] = [
     linkedSkillIds: ['skill_task_decomposition'],
     isAvailable: true,
   },
+  {
+    id: 'tool_web_search',
+    name: '自律Web検索エンジン (Autonomous Web Search)',
+    description: '最新情報、技術仕様、公式ドキュメント、事実確認を自律的にWeb検索し、知識を抽出して多層記憶・学習教材に即座に還元します。',
+    category: 'data',
+    permission: 'read_only',
+    requiresConfirmation: false,
+    parameters: [
+      {
+        name: 'query',
+        type: 'string',
+        description: '検索するキーワードや調査対象 (例: "React 19 Server Actions 仕様", "VBA 64bit PtrSafe")',
+        required: true,
+      },
+      {
+        name: 'maxResults',
+        type: 'number',
+        description: '取得件数 (1〜5件)',
+        required: false,
+        defaultValue: 4,
+      },
+    ],
+    linkedSkillIds: ['skill_task_decomposition', 'skill_code_syntax_audit'],
+    isAvailable: true,
+  },
 ];
 
 /**
@@ -646,6 +672,21 @@ export class ToolsService {
       });
     }
 
+    // 5. 自律Web検索判定 (tool_web_search)
+    // 最新情報、ドキュメント、事実調査要求
+    const searchCheck = autonomousSearchService.detectNeedForSearch(p);
+    if (searchCheck.needsSearch && searchCheck.query) {
+      recommendations.push({
+        toolId: 'tool_web_search',
+        name: '自律Web検索エンジン',
+        category: 'data',
+        reason: searchCheck.reason || '最新情報・技術仕様の外部調査が必要です',
+        suggestedParams: { query: searchCheck.query, maxResults: 4 },
+        requiresConfirmation: false,
+        permission: 'read_only',
+      });
+    }
+
     return recommendations;
   }
 
@@ -812,6 +853,31 @@ export class ToolsService {
             isArray: Array.isArray(parsed),
           };
           outputSummary = `JSON検証・整形成功 (${execResult.keyCount} 項目)`;
+          break;
+        }
+
+        case 'tool_web_search': {
+          const query = String(params.query || '').trim();
+          if (!query) throw new Error('検索クエリが指定されていません');
+          const maxResults = params.maxResults ? Number(params.maxResults) : 4;
+          const searchRes = await autonomousSearchService.executeSearch(query, { maxResults });
+          // 能動学習の実行 (長期記憶・合成データセットへの還元)
+          const record = autonomousSearchService.learnFromSearch(
+            query,
+            searchRes.results,
+            searchRes.summary,
+            { triggerType: 'in_conversation' }
+          );
+          execResult = {
+            query,
+            results: searchRes.results,
+            summary: searchRes.summary,
+            provider: searchRes.provider,
+            learnedKnowledge: record.extractedKnowledge,
+          };
+          outputSummary = searchRes.summary
+            ? `🌐 Web検索完了 (${searchRes.provider}): ${searchRes.summary.slice(0, 80)}... (${searchRes.results.length}件のソースから知識抽出)`
+            : `🌐 Web検索完了: 「${query}」に関する${searchRes.results.length}件の情報を取得し学習定着しました`;
           break;
         }
 
