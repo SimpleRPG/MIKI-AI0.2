@@ -65,6 +65,8 @@ import { MinimalScopeTab } from './self_improvement/MinimalScopeTab';
 import { AutonomousSearchTab } from './self_improvement/AutonomousSearchTab';
 import { PrivacySecurityGuardrailTab } from './self_improvement/PrivacySecurityGuardrailTab';
 import { IdleEvolutionTab } from './self_improvement/IdleEvolutionTab';
+import { CompletionJudgeTab } from './self_improvement/CompletionJudgeTab';
+import { FailureCatalogTab } from './self_improvement/FailureCatalogTab';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
@@ -137,7 +139,9 @@ export type SelfImprovementTab =
   | 'storage_quota'
   | 'minimal_scope'
   | 'autonomous_search'
-  | 'security_guardrail';
+  | 'security_guardrail'
+  | 'completion_judge'
+  | 'failure_catalog';
 
 export interface SelfImprovementModalProps {
   isOpen: boolean;
@@ -1132,6 +1136,30 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <span>🛡️ プライバシー＆セキュリティ (17章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('completion_judge')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'completion_judge'
+                ? 'border-teal-500 text-teal-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4 text-teal-400" />
+            <span>⚖️ 完了判定器 7大条件 (48章)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('failure_catalog')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'failure_catalog'
+                ? 'border-rose-500 text-rose-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-rose-400" />
+            <span>🛡️ 失敗カタログ 二段階防御 (51章)</span>
           </button>
         </div>
 
@@ -5014,6 +5042,16 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
           {/* TAB: 送信境界プライバシーガードレール & 抽象シンボル化 (17章) */}
           {activeTab === 'security_guardrail' && <PrivacySecurityGuardrailTab />}
+
+          {/* TAB: 完成条件と完了判定器 (48章: 7大チェックリスト & 二段階検証) */}
+          {activeTab === 'completion_judge' && (
+            <CompletionJudgeTab onNotify={(msg) => setNotificationTestStatus(msg)} />
+          )}
+
+          {/* TAB: 失敗シグネチャ・カタログ (51章: 二段階防御 & 静的スキャナー) */}
+          {activeTab === 'failure_catalog' && (
+            <FailureCatalogTab onNotify={(msg) => setNotificationTestStatus(msg)} />
+          )}
         </div>
 
         {/* Footer */}

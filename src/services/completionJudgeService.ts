@@ -7,6 +7,7 @@ import {
   WorkspaceFile,
   TaskPlan,
 } from '../types';
+import { storageService } from './storageService';
 
 /**
  * 文字列の軽量ハッシュ計算 (FNV-1a 32-bit hex)
@@ -184,7 +185,7 @@ export class CompletionJudgeService {
     // スコア計算 (0〜100)
     const score = this.calculateCompletionScore(checklist, status);
 
-    return {
+    const evaluation: CompletionEvaluation = {
       status,
       score,
       headline,
@@ -196,6 +197,9 @@ export class CompletionJudgeService {
       evaluatedAt: Date.now(),
       manuallyOverridden: false,
     };
+
+    this.recordEvaluation(evaluation);
+    return evaluation;
   }
 
   /**
@@ -699,6 +703,98 @@ export class CompletionJudgeService {
           description: '判定待機中',
         };
     }
+  }
+
+  /**
+   * 判定履歴の取得
+   */
+  public getHistory(): CompletionEvaluation[] {
+    try {
+      const raw = storageService.getItem('miki_completion_judge_history');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse completion judge history:', e);
+    }
+    return [];
+  }
+
+  /**
+   * 判定結果を履歴に記録 (最大50件)
+   */
+  public recordEvaluation(evalResult: CompletionEvaluation): void {
+    try {
+      const history = this.getHistory();
+      const updated = [evalResult, ...history.filter((h) => h.evaluatedAt !== evalResult.evaluatedAt)].slice(0, 50);
+      storageService.setItem('miki_completion_judge_history', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Failed to record completion evaluation:', e);
+    }
+  }
+
+  /**
+   * 判定履歴の消去
+   */
+  public clearHistory(): void {
+    storageService.removeItem('miki_completion_judge_history');
+  }
+
+  /**
+   * 判定統計サマリーの取得
+   */
+  public getJudgeStats(): {
+    total: number;
+    complete: number;
+    externalCompile: number;
+    runtimeTest: number;
+    partial: number;
+    blocked: number;
+    failed: number;
+  } {
+    const history = this.getHistory();
+    let complete = 0;
+    let externalCompile = 0;
+    let runtimeTest = 0;
+    let partial = 0;
+    let blocked = 0;
+    let failed = 0;
+
+    for (const item of history) {
+      switch (item.status) {
+        case 'COMPLETE':
+          complete++;
+          break;
+        case 'EXTERNAL_COMPILE_REQUIRED':
+          externalCompile++;
+          break;
+        case 'RUNTIME_TEST_REQUIRED':
+          runtimeTest++;
+          break;
+        case 'PARTIAL':
+          partial++;
+          break;
+        case 'BLOCKED':
+          blocked++;
+          break;
+        case 'FAILED':
+          failed++;
+          break;
+      }
+    }
+
+    return {
+      total: history.length,
+      complete,
+      externalCompile,
+      runtimeTest,
+      partial,
+      blocked,
+      failed,
+    };
   }
 }
 
