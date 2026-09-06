@@ -23,6 +23,7 @@ import { schemaValidationService } from './schemaValidationService';
 import { sendChatMessage } from './api';
 import { capabilityGapService } from './capabilityGapService';
 import { answerPlanService } from './answerPlanService';
+import { privacyGuardrailService } from './privacyGuardrailService';
 
 const BUDGET_LIMITS_KEY = 'miki_ai_teacher_budget_limits';
 const BUDGET_USAGE_KEY = 'miki_ai_teacher_budget_usage';
@@ -514,16 +515,48 @@ export class TeacherRequestService {
       );
     }
 
+    // 設計思想 Master v5.0 第11章 11.1節: セキュリティ境界・プライバシー監査
+    const textToAudit = [
+      payload.abstractFailurePattern,
+      payload.anonymizedExample,
+      payload.idealResponseGuideline || '',
+      payload.contextSummary || '',
+    ].join('\n');
+
+    const auditResult = privacyGuardrailService.auditOutboundContent(
+      textToAudit,
+      'teacher_api',
+      { autoSanitize: true }
+    );
+
+    if (!auditResult.allowed) {
+      const blockMsg = `送信遮断: ${auditResult.blockedReason || '機密情報が検出されました'}`;
+      systemLogger.warn('SELF_IMPROVEMENT', `🚫 [外部教師送信遮断] ${blockMsg}`);
+      return {
+        success: false,
+        verifiedPassed: false,
+        error: blockMsg,
+      };
+    }
+
+    // サニタイズされたテキストがある場合はペイロードを安全に置換
+    const safePayload: TeacherRequestPayload = {
+      ...payload,
+      anonymizedExample: auditResult.symbolReplacements && Object.keys(auditResult.symbolReplacements).length > 0
+        ? payload.anonymizedExample.replace(new RegExp(Object.keys(auditResult.symbolReplacements).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g'), (m) => auditResult.symbolReplacements[m] || m)
+        : payload.anonymizedExample,
+    };
+
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🎓 [外部教師リクエスト開始] カテゴリ: ${payload.failureCategory}, パターン: 「${payload.abstractFailurePattern.slice(0, 30)}...」`
+      `🎓 [外部教師リクエスト開始] カテゴリ: ${safePayload.failureCategory}, 分類: ${auditResult.classification}, パターン: 「${safePayload.abstractFailurePattern.slice(0, 30)}...」`
     );
 
     try {
       const res = await fetch('/api/teacher-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(safePayload),
       });
 
       if (!res.ok) {

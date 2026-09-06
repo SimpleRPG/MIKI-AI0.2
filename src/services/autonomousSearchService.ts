@@ -9,6 +9,7 @@ import { systemLogger } from './systemLogger';
 import { workingAgendaService } from './workingAgendaService';
 import { selfImprovementService } from './selfImprovementService';
 import { capabilityGapService } from './capabilityGapService';
+import { privacyGuardrailService } from './privacyGuardrailService';
 
 const SEARCH_CONFIG_KEY = 'miki_ai_autonomous_search_config';
 const SEARCH_RECORDS_KEY = 'miki_ai_autonomous_search_records';
@@ -216,7 +217,15 @@ export class AutonomousSearchService {
     const cleanQuery = query.trim();
     if (!cleanQuery) return { results: [] };
 
-    const cacheKey = cleanQuery.toLowerCase();
+    // 設計思想 Master v5.0 第11章 11.1節: 送信前プライバシー・機密監査
+    const audit = privacyGuardrailService.auditOutboundContent(cleanQuery, 'web_search', { autoSanitize: true });
+    if (!audit.allowed) {
+      systemLogger.warn('SELF_IMPROVEMENT', `🚫 [Web検索遮断] 検索クエリに機密が含まれるため中断: ${cleanQuery}`);
+      return { results: [], summary: 'プライバシー保護のため検索を安全にスキップしました。' };
+    }
+    const safeQuery = audit.sanitizedText;
+
+    const cacheKey = safeQuery.toLowerCase();
     if (!options?.bypassCache && this.cache.has(cacheKey)) {
       const cached = this.cache.get(cacheKey)!;
       // 1時間有効
@@ -232,7 +241,7 @@ export class AutonomousSearchService {
       const res = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: cleanQuery, maxResults }),
+        body: JSON.stringify({ query: safeQuery, maxResults }),
         signal: AbortSignal.timeout(6000),
       });
 

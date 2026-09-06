@@ -63,6 +63,7 @@ import { UncertaintyTeacherTab } from './self_improvement/UncertaintyTeacherTab'
 import { StorageCapacityPlanTab } from './self_improvement/StorageCapacityPlanTab';
 import { MinimalScopeTab } from './self_improvement/MinimalScopeTab';
 import { AutonomousSearchTab } from './self_improvement/AutonomousSearchTab';
+import { PrivacySecurityGuardrailTab } from './self_improvement/PrivacySecurityGuardrailTab';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
@@ -116,7 +117,7 @@ export interface SelfImprovementModalProps {
   memories: MemoryItem[];
   workspaceFiles?: WorkspaceFile[];
   engineMode?: string;
-  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'experience_router' | 'skill_graduation' | 'dialogue_eval' | 'uncertainty_teacher' | 'storage_quota' | 'minimal_scope' | 'autonomous_search';
+  initialTab?: 'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'experience_router' | 'skill_graduation' | 'dialogue_eval' | 'uncertainty_teacher' | 'storage_quota' | 'minimal_scope' | 'autonomous_search' | 'security_guardrail';
 }
 
 export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
@@ -128,7 +129,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   engineMode = 'webgpu',
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags' | 'experience_router' | 'skill_graduation' | 'dialogue_eval' | 'uncertainty_teacher' | 'storage_quota' | 'minimal_scope' | 'autonomous_search'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags' | 'experience_router' | 'skill_graduation' | 'dialogue_eval' | 'uncertainty_teacher' | 'storage_quota' | 'minimal_scope' | 'autonomous_search' | 'security_guardrail'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 

@@ -1825,6 +1825,60 @@ export interface SystemFeatureFlags {
   SKILL_GRADUATION: FeatureFlagState;
   // 設計思想 63章 & 64章: VBA静的検証器 (8大スキャナー & SHA-256)
   VBA_STATIC_VERIFIER: FeatureFlagState;
+  // 設計思想 13章: 自律型Web検索＆能動学習エンジン
+  AUTONOMOUS_SEARCH: FeatureFlagState;
+  // 設計思想 11章: セキュリティ境界＆プライバシー監査ガードレール
+  PRIVACY_GUARDRAIL: FeatureFlagState;
+  // 設計思想 10章2節: 抽象シンボル自動サニタイザー
+  ABSTRACT_SANITIZER: FeatureFlagState;
+}
+
+/**
+ * 設計思想 11章: セキュリティ境界 (Security Boundary) 送信分類
+ */
+export type OutboundDataClassification = 'PUBLIC_SYNTHETIC' | 'ABSTRACTED' | 'BLOCKED_SENSITIVE';
+
+export type PrivacyViolationType =
+  | 'PII'                 // 個人情報 (氏名、電話番号、メール、マイナンバー、クレジットカード等)
+  | 'INTERNAL_PATH'       // 社内ファイルパス (C:\Users\..., \\fileserver\..., /home/...)
+  | 'CREDENTIAL'          // 認証情報 (APIキー、トークン、パスワード、秘密鍵)
+  | 'DB_CONNECTION'       // データベース接続情報 (Server=..., Data Source=..., mongodb://..., postgresql://...)
+  | 'INTERNAL_HOST'       // 社内ホスト名・プライベートIP (192.168.x.x, 10.x.x.x, *.corp, *.internal)
+  | 'UNCENSORED_CHAT'     // 未検査のローカル生会話履歴全文
+  | 'LOCAL_RAW_FILE';     // 実機ファイル・ローカルバイナリ
+
+export interface PrivacyViolationItem {
+  type: PrivacyViolationType;
+  snippet: string;
+  message: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
+}
+
+export interface PrivacyAuditResult {
+  allowed: boolean;
+  classification: OutboundDataClassification;
+  originalLength: number;
+  sanitizedText: string;
+  violations: PrivacyViolationItem[];
+  symbolReplacements: Record<string, string>; // 元実体名 -> 抽象シンボル名
+  auditedAt: number;
+  targetService?: string; // 'teacher_api' | 'web_search' | 'external_copilot' | 'cloud'
+  blockedReason?: string;
+}
+
+export interface PrivacyAuditLogEntry extends PrivacyAuditResult {
+  id: string;
+  summary: string;
+}
+
+/**
+ * 設計思想 10章2節: 抽象シンボル置換マッピング
+ */
+export interface AbstractSymbolMapping {
+  originalValue: string;
+  abstractSymbol: string;
+  category: 'worksheet' | 'supplier_or_entity' | 'procedure' | 'column' | 'path' | 'host' | 'credential' | 'person';
+  createdAt: number;
 }
 
 /**

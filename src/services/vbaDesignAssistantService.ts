@@ -5,6 +5,7 @@ import {
   AbstractTestCasePlan,
 } from '../types';
 import { systemLogger } from './systemLogger';
+import { abstractSanitizerService } from './abstractSanitizerService';
 
 class VbaDesignAssistantService {
   /**
@@ -16,23 +17,26 @@ class VbaDesignAssistantService {
     const raw = (requirement || '').trim();
     const specId = `vba_spec_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-    // 1. 会社固有・環境固有情報の抽象化チェック (26章 & 27章 ABSTRACTED / セキュリティ境界)
-    // 固有名詞やシート名を WORKSHEET_A, SOURCE_DATA 等へ抽象置換
+    // 1. 会社固有・環境固有情報の抽象化チェック (Master v5.0 第10章2節 & 第11章 ABSTRACTED / セキュリティ境界)
+    // 固有名詞、実ファイルパス、シート名、機密等を WORKSHEET_A, SUPPLIER_CODE_A 等へ自動抽象置換
+    const sanitizeRes = abstractSanitizerService.sanitizeText(raw);
+    const sanitizedReq = sanitizeRes.sanitized;
+
     let title = 'データ抽出・条件判定自動化マクロ設計仕様書';
-    if (raw.includes('大文字') || raw.includes('トリム')) {
+    if (sanitizedReq.includes('大文字') || sanitizedReq.includes('トリム')) {
       title = '文字列トリム・大文字変換バッチ処理仕様書';
-    } else if (raw.includes('重複') || raw.includes('突合')) {
+    } else if (sanitizedReq.includes('重複') || sanitizedReq.includes('突合')) {
       title = 'データ突合・重複除外照合バッチ仕様書';
     }
 
     // 2. 条件と例外の分離、優先順位の決定表 (Decision Table)
-    const decisionTable = this.buildDecisionTable(raw);
+    const decisionTable = this.buildDecisionTable(sanitizedReq);
 
     // 3. プロシージャ構成案 (抽象識別子)
-    const procedurePlans = this.buildProcedurePlans(raw);
+    const procedurePlans = this.buildProcedurePlans(sanitizedReq);
 
     // 4. テストケース案 (通常系、境界値、例外系)
-    const testCasePlans = this.buildTestCasePlans(raw);
+    const testCasePlans = this.buildTestCasePlans(sanitizedReq);
 
     // 5. データ特性の保持要件 (先頭ゼロ、文字数、型崩れ防止)
     const dataCharacteristics: string[] = [
@@ -45,7 +49,7 @@ class VbaDesignAssistantService {
     // 6. 外部Copilot・大型AI向けの詳細指示書 (Prompt Specification)
     const externalCopilotPrompt = this.generateExternalCopilotPrompt(
       title,
-      raw,
+      sanitizedReq,
       decisionTable,
       procedurePlans,
       testCasePlans,
@@ -55,7 +59,7 @@ class VbaDesignAssistantService {
     const spec: VbaDesignSpecification = {
       specId,
       title,
-      abstractRequirement: raw,
+      abstractRequirement: sanitizedReq,
       decisionTable,
       procedurePlans,
       testCasePlans,

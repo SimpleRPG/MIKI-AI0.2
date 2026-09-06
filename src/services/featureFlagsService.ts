@@ -20,6 +20,9 @@ export const DEFAULT_FEATURE_FLAGS: SystemFeatureFlags = {
   EXPERIENCE_ROUTER: 'STABLE',
   SKILL_GRADUATION: 'STABLE',
   VBA_STATIC_VERIFIER: 'STABLE',
+  AUTONOMOUS_SEARCH: 'STABLE',
+  PRIVACY_GUARDRAIL: 'STABLE',
+  ABSTRACT_SANITIZER: 'STABLE',
 };
 
 export const FEATURE_FLAG_DESCRIPTIONS: Record<keyof SystemFeatureFlags, { title: string; desc: string }> = {
@@ -70,6 +73,18 @@ export const FEATURE_FLAG_DESCRIPTIONS: Record<keyof SystemFeatureFlags, { title
   VBA_STATIC_VERIFIER: {
     title: 'VBA静的検証器 (VBA Static Verifier)',
     desc: '8大スキャナーによる構文・ブロック・禁止パターン(Goto/行ラベル/単行If)検査およびSHA-256配送完全性保証（63・64章）。',
+  },
+  AUTONOMOUS_SEARCH: {
+    title: '自律型Web検索＆能動学習 (Autonomous Web Search)',
+    desc: '最新情報・技術仕様のオンデマンドWeb検索、および非会話アイドル時の能動的自律調査と多層記憶・教材への還元（13章）。',
+  },
+  PRIVACY_GUARDRAIL: {
+    title: 'セキュリティ境界・プライバシー監査 (Privacy Guardrail)',
+    desc: '外部送信（教師API・Web検索・クラウド）前の個人情報・パス・認証情報のリアルタイム監査と遮断（11章）。',
+  },
+  ABSTRACT_SANITIZER: {
+    title: '抽象シンボル自動サニタイザー (Abstract Symbol Sanitizer)',
+    desc: '実在企業名・個人名・社内パス・本番SQL接続をWORKSHEET_AやPROCESS_MAIN等の抽象シンボルに自動置換（10章2節）。',
   },
 };
 
