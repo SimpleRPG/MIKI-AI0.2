@@ -60,6 +60,8 @@ import { CompletionBadge } from './CompletionBadge';
 import { completionJudgeService } from '../services/completionJudgeService';
 import { workflowSynthesisService } from '../services/workflowSynthesisService';
 import { experienceRouterService } from '../services/experienceRouterService';
+import { autonomousEvolutionService } from '../services/autonomousEvolutionService';
+import { AutonomousGrowthReport } from '../types';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -143,6 +145,38 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [executingWorkflowId, setExecutingWorkflowId] = useState<string | null>(null);
   const [workflowStatusMessage, setWorkflowStatusMessage] = useState<{ [wfId: string]: string }>({});
   const [experienceToast, setExperienceToast] = useState<{ msgId: string; text: string } | null>(null);
+
+  // 第19章: 放置型自律進化レポート状態
+  const [unviewedGrowthReport, setUnviewedGrowthReport] = useState<AutonomousGrowthReport | null>(null);
+  const [showGrowthDetail, setShowGrowthDetail] = useState(false);
+  const [isSimulatingEvolution, setIsSimulatingEvolution] = useState(false);
+
+  useEffect(() => {
+    // 未確認の自律成長レポートを取得
+    const rep = autonomousEvolutionService.getLatestUnviewedReport();
+    if (rep) {
+      setUnviewedGrowthReport(rep);
+    }
+  }, []);
+
+  const handleDismissGrowthReport = (reportId: string) => {
+    autonomousEvolutionService.markReportAsViewed(reportId);
+    setUnviewedGrowthReport(null);
+    setShowGrowthDetail(false);
+  };
+
+  const handleSimulateIdleEvolution = async () => {
+    setIsSimulatingEvolution(true);
+    try {
+      const rep = await autonomousEvolutionService.runIdleEvolutionCycle();
+      setUnviewedGrowthReport(rep);
+      setShowGrowthDetail(true);
+    } catch (e: any) {
+      console.warn('Simulate evolution failed', e);
+    } finally {
+      setIsSimulatingEvolution(false);
+    }
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -568,6 +602,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             </button>
           )}
 
+          {/* Idle Evolution Trigger Button */}
+          <button
+            onClick={handleSimulateIdleEvolution}
+            disabled={isSimulatingEvolution}
+            className={`px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1 transition-all ${
+              isSimulatingEvolution
+                ? 'bg-slate-800 text-slate-400 border-slate-700'
+                : 'bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-300 border-emerald-500/40 shadow-sm'
+            }`}
+            title="第19章 放置型自律進化（反省・定石蒸留・宿題調査・ドリル）を今すぐ実行"
+          >
+            {isSimulatingEvolution ? (
+              <RotateCw className="w-3 h-3 animate-spin text-emerald-400" />
+            ) : (
+              <Sparkles className="w-3 h-3 text-emerald-400" />
+            )}
+            <span>{isSimulatingEvolution ? '進化中...' : '放置進化'}</span>
+          </button>
+
           {/* Public Share URL Copy Button */}
           <button
             onClick={handleCopyPublicUrl}
@@ -617,6 +670,102 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           handleFileUpload(e.dataTransfer.files);
         }}
       >
+        {/* 第19章 放置型自律進化 お出迎え成長バナー */}
+        {unviewedGrowthReport && (
+          <div className="p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-teal-950/70 border border-emerald-500/40 shadow-lg text-slate-100 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+                  <Sparkles className="w-5 h-5 animate-pulse" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 border border-emerald-500/40">
+                      第19章 放置型自律進化成果
+                    </span>
+                    <span className="text-[10.5px] text-slate-400">
+                      {new Date(unviewedGrowthReport.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 完了
+                    </span>
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-100 mt-1">
+                    「{unviewedGrowthReport.welcomeGreetingCandidate}」
+                  </h4>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleDismissGrowthReport(unviewedGrowthReport.id)}
+                className="text-[11px] font-bold text-slate-400 hover:text-slate-200 px-2 py-1 rounded bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition-colors shrink-0"
+              >
+                了解！
+              </button>
+            </div>
+
+            {/* Growth Metrics Pills */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+              <div className="p-1.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block">反省・教訓</span>
+                <span className="font-bold text-rose-400">{unviewedGrowthReport.reflectionsCount} 件</span>
+              </div>
+              <div className="p-1.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block">蒸留された定石</span>
+                <span className="font-bold text-amber-400">{unviewedGrowthReport.distilledRulesCount} 件</span>
+              </div>
+              <div className="p-1.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block">解決した宿題</span>
+                <span className="font-bold text-sky-400">{unviewedGrowthReport.resolvedHomeworkCount} 件</span>
+              </div>
+              <div className="p-1.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block">ドリル熟達度</span>
+                <span className="font-bold text-emerald-400">{Math.round(unviewedGrowthReport.masteryScore * 100)}%</span>
+              </div>
+            </div>
+
+            {/* Expand / Collapse Details */}
+            <div className="pt-1 border-t border-slate-800/80 flex items-center justify-between">
+              <button
+                onClick={() => setShowGrowthDetail(!showGrowthDetail)}
+                className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
+              >
+                <span>{showGrowthDetail ? '成長詳細をたたむ' : '留守中に学んだ詳細を見る'}</span>
+                {showGrowthDetail ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+
+              {onOpenSelfImprovementModal && (
+                <button
+                  onClick={onOpenSelfImprovementModal}
+                  className="text-[10px] text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  自己改善研究所で全ログを確認 ➔
+                </button>
+              )}
+            </div>
+
+            {showGrowthDetail && (
+              <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-xs space-y-2.5 mt-2">
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 mb-1">自律進化ハイライト:</div>
+                  <ul className="space-y-1">
+                    {unviewedGrowthReport.growthHighlights.map((h, i) => (
+                      <li key={i} className="text-[11.5px] text-slate-300 flex items-start gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{h}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {unviewedGrowthReport.details?.resolvedTopics && unviewedGrowthReport.details.resolvedTopics.length > 0 && (
+                  <div className="pt-2 border-t border-slate-800/60">
+                    <span className="text-[10px] font-bold text-sky-400">解決完了した宿題: </span>
+                    <span className="text-slate-300">{unviewedGrowthReport.details.resolvedTopics.join(', ')}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {messages.map((msg) => {
           const isUser = msg.role === 'user';
           const codeBlocks = !isUser ? extractCodeBlocks(msg.content) : [];

@@ -27,6 +27,7 @@ import { featureFlagsService } from './featureFlagsService';
 import { teacherRequestService } from './teacherRequestService';
 import { workingAgendaService } from './workingAgendaService';
 import { autonomousSearchService } from './autonomousSearchService';
+import { autonomousEvolutionService } from './autonomousEvolutionService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -753,6 +754,18 @@ export class BackgroundWorkerService {
           }
         } catch (searchLearnErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '自律Web検索学習中に例外が発生しました', searchLearnErr);
+        }
+
+        // Step 6.10: 設計思想 Master v5.4 第19章 放置型自律進化エンジン (反省・知恵蒸留・宿題解決・弱点ドリル)
+        if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+        try {
+          systemLogger.info('SELF_IMPROVEMENT', '🌱 [第19章 放置型自律進化] 反省・定石蒸留・宿題解決パイプラインを実行中...');
+          const evolutionReport = await autonomousEvolutionService.runIdleEvolutionCycle(abortSignal);
+          if (evolutionReport.growthHighlights.length > 0) {
+            weaknessFound.push(...evolutionReport.growthHighlights);
+          }
+        } catch (evoErr: any) {
+          systemLogger.warn('SELF_IMPROVEMENT', '放置型自律進化サイクル実行中に例外が発生しました', evoErr);
         }
       }
 

@@ -2168,3 +2168,53 @@ export interface FailureRecurrenceAuditReport {
   regressedCapabilities: string[];
   lastAuditedAt: number;
 }
+
+/**
+ * 設計思想 Master v5.4 第19章: 放置型自律進化サイクル型定義
+ */
+
+// 1. 恒久知恵・定石 (Heuristic Rule)
+export interface HeuristicRuleItem {
+  id: string;
+  category: 'coding' | 'user_preference' | 'conversation' | 'safety' | 'domain';
+  title: string;
+  ruleText: string;
+  derivedFromEpisodes: string[]; // 元になったエピソード記憶IDまたはサマリー
+  confidence: number;            // 0.0 - 1.0
+  appliedCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// 2. 反実仮想反省ログ (Counterfactual Reflection)
+export interface CounterfactualReflectionItem {
+  id: string;
+  incidentPrompt: string;
+  flawedResponse: string;
+  rootCause: string;
+  idealResponse: string;
+  lessonLearned: string;
+  promotedToTrainingSample: boolean;
+  createdAt: number;
+}
+
+// 3. 自律成長レポート (Autonomous Growth Report)
+export interface AutonomousGrowthReport {
+  id: string;
+  timestamp: number;
+  durationMs: number;
+  reflectionsCount: number;
+  distilledRulesCount: number;
+  resolvedHomeworkCount: number;
+  masteryDrillsRun: number;
+  masteryScore: number;
+  growthHighlights: string[];
+  welcomeGreetingCandidate: string;
+  viewed: boolean;
+  details: {
+    reflections?: CounterfactualReflectionItem[];
+    distilledRules?: HeuristicRuleItem[];
+    resolvedTopics?: string[];
+    drillResults?: Array<{ topic: string; passed: boolean; score: number }>;
+  };
+}

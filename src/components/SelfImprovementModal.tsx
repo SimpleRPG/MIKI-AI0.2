@@ -64,6 +64,7 @@ import { StorageCapacityPlanTab } from './self_improvement/StorageCapacityPlanTa
 import { MinimalScopeTab } from './self_improvement/MinimalScopeTab';
 import { AutonomousSearchTab } from './self_improvement/AutonomousSearchTab';
 import { PrivacySecurityGuardrailTab } from './self_improvement/PrivacySecurityGuardrailTab';
+import { IdleEvolutionTab } from './self_improvement/IdleEvolutionTab';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
@@ -129,7 +130,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   engineMode = 'webgpu',
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags' | 'experience_router' | 'skill_graduation' | 'dialogue_eval' | 'uncertainty_teacher' | 'storage_quota' | 'minimal_scope' | 'autonomous_search' | 'security_guardrail'>('diagnosis');
+  const [activeTab, setActiveTab] = useState<'diagnosis' | 'world_model' | 'workmanager' | 'idle_evolution' | 'benchmark' | 'model_comparison' | 'teacher' | 'skills' | 'tools' | 'plugins' | 'phase5' | 'lab' | 'colab' | 'generations' | 'answer_plans' | 'capabilities' | 'code_ir_vba' | 'feature_flags' | 'experience_router' | 'skill_graduation' | 'dialogue_eval' | 'uncertainty_teacher' | 'storage_quota' | 'minimal_scope' | 'autonomous_search' | 'security_guardrail'>('diagnosis');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 
@@ -827,6 +828,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <BatteryCharging className="w-4 h-4 text-amber-400" />
             <span>⚡ WorkManager 自律処理</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('idle_evolution')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'idle_evolution'
+                ? 'border-emerald-500 text-emerald-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <span>🌱 放置型自律進化 (第19章)</span>
           </button>
 
           <button
@@ -2010,6 +2023,11 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* ============================================================ */}
+          {/* TAB: 🌱 放置型自律進化 (第19章)                               */}
+          {/* ============================================================ */}
+          {activeTab === 'idle_evolution' && <IdleEvolutionTab />}
 
           {/* ============================================================ */}
           {/* TAB: ベンチマーク & 退行テスト (設計思想 9)                     */}
