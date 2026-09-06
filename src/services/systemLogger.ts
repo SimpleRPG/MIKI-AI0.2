@@ -170,7 +170,14 @@ class SystemLogger {
 
   private async syncToServer(entry: SystemLogEntry) {
     try {
-      await fetch('/api/logs', {
+      // api.ts の apiUrl() と同じロジック。ここで api.ts から import すると
+      // api.ts -> systemLogger.ts -> api.ts の循環参照になるため、
+      // 同じ 'miki_api_base_url' を直接参照する軽量版をここに持つ。
+      // (APKなど server.ts が同一オリジンに存在しないビルドで、この
+      //  POSTがSPAのindex.htmlフォールバックに吸い込まれるのを防ぐ)
+      const base = (storageService.getItem('miki_api_base_url') || '').trim().replace(/\/+$/, '');
+      const url = base ? `${base}/api/logs` : '/api/logs';
+      await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry),
