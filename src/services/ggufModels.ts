@@ -66,9 +66,58 @@ export interface GgufModelDefinition {
   downloadUrl: string;
   huggingFaceRepo: string;
   recommendedFor: 'mobile_light' | 'mobile_balanced' | 'desktop' | 'code';
+  isProtected?: boolean; // 第24章 Qwen 3B等の不滅アンカー保護フラグ
+  protectedReason?: string;
+}
+
+/**
+ * 第24章 24.7: Qwen 3B中核アンカーモデルおよび絶対保護判定
+ */
+export function isModelProtected(modelId: string, modelName?: string): { isProtected: boolean; reason?: string } {
+  const lowerId = (modelId || '').toLowerCase();
+  const lowerName = (modelName || '').toLowerCase();
+
+  // Qwen 3B / Qwen 2.5 Coder 3B は不滅アンカーとして常時絶対保護
+  const isQwen3b =
+    (lowerId.includes('qwen') && (lowerId.includes('3b') || lowerId.includes('3-b') || lowerId.includes('3_b'))) ||
+    (lowerName.includes('qwen') && lowerName.includes('3b'));
+
+  if (isQwen3b) {
+    return {
+      isProtected: true,
+      reason: '【絶対保護：Qwen 3B】Draft-Verify検証器およびメイン推論頭脳として永続保護されています（削除厳禁）。',
+    };
+  }
+
+  const modelDef = OFFICIAL_GGUF_MODELS.find((m) => m.id.toLowerCase() === lowerId || m.fileName.toLowerCase() === lowerId);
+  if (modelDef?.isProtected) {
+    return {
+      isProtected: true,
+      reason: modelDef.protectedReason || 'システム保護モデルとして指定されています。',
+    };
+  }
+
+  return { isProtected: false };
 }
 
 export const OFFICIAL_GGUF_MODELS: GgufModelDefinition[] = [
+  {
+    id: 'qwen2.5-coder-3b-instruct-q4_k_m',
+    name: 'Qwen 2.5 Coder 3B (GGUF Q4_K_M)',
+    expertName: '👑 Qwen 2.5 Coder 3B (中核頭脳・VBA＆コード検証アンカー)',
+    icon: '👑',
+    fileName: 'qwen2.5-coder-3b-instruct-q4_k_m.gguf',
+    sizeMB: 2150,
+    parameters: '3.09B',
+    quantization: 'Q4_K_M (4-bit GGUF)',
+    vramMB: 2650,
+    description: '【不滅アンカー・常時保護】Galaxy S25上で動作する最高精度のコーディング・推論・検証アンカーモデル。Draft-VerifyのVerifyを担当。削除厳禁。',
+    downloadUrl: 'https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf',
+    huggingFaceRepo: 'Qwen/Qwen2.5-Coder-3B-Instruct-GGUF',
+    recommendedFor: 'code',
+    isProtected: true,
+    protectedReason: 'IMMUTABLE_ANCHOR: システム最重要中核頭脳・コード検証アンカーのため削除恒久禁止',
+  },
   {
     id: 'qwen2.5-coder-0.5b-instruct-q4_k_m',
     name: 'Qwen 2.5 Coder 0.5B (GGUF Q4_K_M)',

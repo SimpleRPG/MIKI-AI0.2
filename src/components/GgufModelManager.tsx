@@ -15,7 +15,7 @@ import {
   Smartphone,
   ShieldCheck,
 } from 'lucide-react';
-import { OFFICIAL_GGUF_MODELS, GgufModelDefinition, getModelManifest, getManifestNativeEnv } from '../services/ggufModels';
+import { OFFICIAL_GGUF_MODELS, GgufModelDefinition, getModelManifest, getManifestNativeEnv, isModelProtected } from '../services/ggufModels';
 import { nativeLlmService, NativeStorageInfo, NativeGpuInfo } from '../services/nativeLlmService';
 import { systemLogger } from '../services/systemLogger';
 
@@ -115,6 +115,13 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
   };
 
   const handleDeleteGguf = async (fileName: string) => {
+    const protection = isModelProtected(fileName);
+    if (protection.isProtected) {
+      showNotification('error', `【削除絶対阻止】${protection.reason || 'Qwen 3Bは不滅アンカーとして永続保護されています。'}`);
+      setDeleteConfirmTarget(null);
+      return;
+    }
+
     try {
       await nativeLlmService.deleteDownloadedModel(fileName);
       setDeleteConfirmTarget(null);
@@ -433,7 +440,15 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
                           </button>
                         )}
 
-                        {deleteConfirmTarget === model.fileName ? (
+                        {isModelProtected(model.id, model.name).isProtected ? (
+                          <div
+                            className="flex items-center gap-1 px-2 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-bold rounded-lg select-none"
+                            title="第24章24.7: Qwen 3Bは最重要中核頭脳・Draft-Verify検証器として永続保護されています（削除不可）"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span>不滅保護</span>
+                          </div>
+                        ) : deleteConfirmTarget === model.fileName ? (
                           <div className="flex items-center gap-1 bg-rose-950/90 border border-rose-600 px-2 py-1 rounded-lg animate-in fade-in duration-100">
                             <span className="text-[10px] text-rose-200 font-bold">削除?</span>
                             <button

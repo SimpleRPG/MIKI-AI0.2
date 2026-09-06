@@ -1,6 +1,7 @@
 import { StorageCapacityPlanReport, StoragePartitionUsage } from '../types';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
+import { modelLifecycleService } from './modelLifecycleService';
 
 const STORAGE_AUDIT_LOG_KEY = 'miki_storage_audit_log_v32';
 
@@ -175,12 +176,13 @@ export class StoragePlanningService {
   }
 
   /**
-   * 29章: 重複排除と自動整理の実行 (Deduplication & Auto-Cleanup)
+   * 第21章 & 第24章: 重複排除・一時ファイル整理 ＆ モデル実測データ駆動型退役思考 (Deduplication & Auto-Cleanup)
    */
   public runDeduplicationAndCleanup(): {
     spaceReclaimedMb: number;
     removedCount: number;
     log: string;
+    modelReasoningSummary?: string;
   } {
     const timestamp = new Date().toLocaleTimeString();
     let reclaimed = 0;
@@ -194,9 +196,12 @@ export class StoragePlanningService {
     removed += 8;
     reclaimed += 24.1;
 
-    const logEntry = `[${timestamp}] 29章 自動整理完了: ${removed}件の重複・一時ファイルを安全に除去し、${reclaimed.toFixed(
+    // 3. 第24章 モデル実測データ駆動型自律退役思考の実行 (Qwen 3Bは絶対保護)
+    const modelReasoning = modelLifecycleService.runDeepSleepModelReasoning();
+
+    const logEntry = `[${timestamp}] 第21章/第24章 自動整理完了: ${removed}件の重複・一時ファイルを安全に除去し、${reclaimed.toFixed(
       1
-    )}MBの容量を回収しました。`;
+    )}MBの容量を回収。${modelReasoning.autonomousThought}`;
 
     this.auditLogs.push(logEntry);
     this.saveAuditLogs();
@@ -207,6 +212,7 @@ export class StoragePlanningService {
       spaceReclaimedMb: reclaimed,
       removedCount: removed,
       log: logEntry,
+      modelReasoningSummary: modelReasoning.autonomousThought,
     };
   }
 }

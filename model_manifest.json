@@ -38,6 +38,18 @@
   },
   "models": [
     {
+      "id": "qwen2.5-coder-3b-instruct-q4_k_m",
+      "fileName": "qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+      "sizeMB": 2150,
+      "sha256": "4b7b25ad8e83ec4a0280f2d72f10b8098a1f8d42ae41e4649b934ca495991b7e",
+      "parameters": "3.09B",
+      "quantization": "Q4_K_M",
+      "vramMB": 2650,
+      "downloadUrl": "https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+      "isProtected": true,
+      "protectedReason": "IMMUTABLE_ANCHOR"
+    },
+    {
       "id": "qwen2.5-coder-0.5b-instruct-q4_k_m",
       "fileName": "qwen2.5-coder-0.5b-instruct-q4_k_m.gguf",
       "sizeMB": 395,

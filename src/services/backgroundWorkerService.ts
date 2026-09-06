@@ -802,18 +802,21 @@ export class BackgroundWorkerService {
         } catch (auditErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '記憶の間隔反復・鮮度再検証サイクル中に例外が発生しました', auditErr);
         }
-        // Step 6.12: 設計思想 Master v5.5 第21章 保存容量配分 (Galaxy S25 60GB計画) ＆ 重複排除・自動クリーンアップ
+        // Step 6.12: 設計思想 Master v5.5 第21章 保存容量配分 (Galaxy S25 60GB計画) ＆ 第24章 モデル実測データ駆動型退役思考 (Qwen 3B絶対保護)
         if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
         try {
-          systemLogger.info('SELF_IMPROVEMENT', '💾 [第21章 容量管理] 重複排除・期限切れ一時作業データ自動クリーンアップを実行中...');
+          systemLogger.info('SELF_IMPROVEMENT', '💾 [第21章/第24章] 容量管理・一時データ自動クリーンアップ ＆ モデル退役思考を実行中...');
           const cleanupResult = storagePlanningService.runDeduplicationAndCleanup();
           if (cleanupResult.removedCount > 0) {
             weaknessFound.push(
-              `[21章 容量管理] ${cleanupResult.removedCount}件の重複・一時ファイルを安全除去し、${cleanupResult.spaceReclaimedMb.toFixed(1)}MBの容量を回収`
+              `[21章/24章 容量・モデル管理] ${cleanupResult.removedCount}件の重複・一時ファイルを安全除去し、${cleanupResult.spaceReclaimedMb.toFixed(1)}MBの容量を回収`
             );
           }
+          if (cleanupResult.modelReasoningSummary) {
+            weaknessFound.push(`[24章 モデル自律退役思考] ${cleanupResult.modelReasoningSummary}`);
+          }
         } catch (cleanupErr: any) {
-          systemLogger.warn('SELF_IMPROVEMENT', '容量自動整理サイクル中に例外が発生しました', cleanupErr);
+          systemLogger.warn('SELF_IMPROVEMENT', '容量自動整理・モデル退役思考サイクル中に例外が発生しました', cleanupErr);
         }
       }
 

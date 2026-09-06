@@ -198,11 +198,13 @@
    - `src/components/SelfImprovementModal.tsx`: `security_guardrail` タブ（`PrivacySecurityGuardrailTab`）のナビゲーションバー配線およびレンダリング統合。
    - `src/services/backgroundWorkerService.ts`: 深い睡眠サイクルに第21章の容量重複排除・自動整理ステップを組み込み。
 
-6. **第24章: 端末リソース適応型モデル自律獲得・検証・動的配備仕様 (Autonomous Model Acquisition)**
+6. **第24章: 端末リソース適応型モデル自律獲得・検証・動的配備 ＆ パフォーマンス駆動型自律退役仕様 (Qwen 3B絶対保護原則)**
    - Galaxy S25端末のハードウェア余力（Snapdragon 8 Elite / RAM 12GB〜16GB）とタスク難易度・能力不足（`capabilityGapService`）を自律診断。
    - Wi-Fi接続・深夜充電中（`UNMETERED` / `isCharging` / バッテリー30%超 / 熱状態`normal` / 容量20GBクォータ順守）に限定した安全ダウンロードゲート。
    - SHA-256整合性検査および深夜深い睡眠でのシャドーベンチマーク（12固定シナリオ退行0件検証）を経て、`llama-swap` / WebGPUレジストリへ安全昇格。
-   - ユーザー設定に応じた「自律提案モード（1タップ承認）」と「完全放置進化モード（翌朝自発報告）」の2段構え仕様を完全定義。
+   - **実測データ駆動型モデル自律退役・削除思考 (24.6)**: 生成速度(tok/s)、初回遅延(TTFT)、直近14日利用実績、回帰品質スコア、発熱寄与度を自律思考し、不要・低速な一時モデルの退役・容量回収を提案・実行。
+   - **Qwen 3B中核アンカー絶対保護原則 (24.7)**: システム最重要中核頭脳・Draft-Verify検証器である `qwen2.5-3b` / `qwen2.5-coder-3b` を「不滅アンカー（IMMUTABLE_ANCHOR）」に指定。自動クリーンアップ・自律削除・UI手動削除の全経路で恒久的に削除を絶対阻止。
+
 
 ### 【検証結果】
 - `npm run compile_applet` (tsc --noEmit & vite build) 正常完了。

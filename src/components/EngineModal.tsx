@@ -13,6 +13,7 @@ import { UnifiedDiagnosticLog } from '../types';
 import { VRAMMonitor } from './VRAMMonitor';
 import { GgufModelManager } from './GgufModelManager';
 import { ErrorBoundary } from './ErrorBoundary';
+import { isModelProtected } from '../services/ggufModels';
 import {
   Cpu,
   Sparkles,
@@ -901,6 +902,15 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   // 設計思想 25. 安全・品質境界 & 課題 1: 使用中チェック・stable世代チェック・確認ダイアログ
   const handleRequestDelete = (model: LocalLLMModel) => {
     setDeleteProtectionError(null);
+
+    // 0. Qwen 3B 不滅アンカー保護ルール (設計思想 第24章 24.7)
+    const protectionCheck = isModelProtected(model.id, model.name);
+    if (protectionCheck.isProtected) {
+      setDeleteProtectionError(
+        `【削除絶対阻止】モデル「${model.name}」はシステム最重要の中核頭脳・Draft-Verify検証アンカー（Qwen 3B）として永続保護されています。設計思想第24章24.7に基づき、いかなる場合も削除することはできません。`
+      );
+      return;
+    }
 
     // 1. 使用中チェック (WebLLMで現在ロード中 または テスト推論実行中 または Native LLMアクティブ)
     const isCurrentlyLoaded = webLLMService.isLoaded() && webLLMService.getActiveModelId() === model.id;
