@@ -49,28 +49,33 @@ function summarizeOldTurns(messages: ChatMessage[]): string {
 }
 
 export interface ContextCompressionOptions {
-  maxContextTokens?: number;       // 例: 2048トークン
-  recentTurnsToKeep?: number;      // 直近残すターン数 (デフォルト: 4往復 = 8メッセージ)
-  triggerTokenThreshold?: number;  // 圧縮を開始する閾値 (デフォルト: 1400トークン)
+  maxContextTokens?: number;       // 例: live_budget または historyQuota (設計思想 Master v5.0 第4章 B層)
+  recentTurnsToKeep?: number;      // 直近残すターン数 (デフォルト: 4〜8往復)
+  triggerTokenThreshold?: number;  // 圧縮を開始する閾値
 }
 
 /**
  * コンテキスト圧縮 ＆ スライディングウィンドウ実行 (Context Compression Engine)
- * 設計思想 20. コンテキスト圧縮・スライディングウィンドウ
+ * 設計思想 Master v5.0 第4章 B層: ターン単位の動的予算配分
+ * live_budget (または historyQuota) を上限として、超過時は直近ターン数を安全に縮小しながらエピソード蒸留を実施
  */
 export function compressContextHistory(
   messages: ChatMessage[],
   options: ContextCompressionOptions = {}
 ): CompressedContextResult {
-  const recentTurnsToKeep = options.recentTurnsToKeep || 6;
-  const triggerTokenThreshold = options.triggerTokenThreshold || 1200;
+  // maxContextTokens が指定されている場合はそれを最優先トリガー閾値として採用 (第4章 B層 実配線)
+  const effectiveThreshold = options.maxContextTokens
+    ? Math.max(400, Math.floor(options.maxContextTokens * 0.9))
+    : options.triggerTokenThreshold || 1200;
+
+  let recentTurnsToKeep = options.recentTurnsToKeep || 6;
 
   // 全体トークン数推定
   const totalOriginalText = messages.map((m) => m.content).join('\n');
   const originalTokensEstimated = estimateTokens(totalOriginalText);
 
   // 閾値未満またはメッセージ数が少なければ圧縮不要
-  if (messages.length <= recentTurnsToKeep || originalTokensEstimated < triggerTokenThreshold) {
+  if (messages.length <= recentTurnsToKeep && originalTokensEstimated < effectiveThreshold) {
     return {
       isCompressed: false,
       originalTokensEstimated,
@@ -86,10 +91,19 @@ export function compressContextHistory(
     };
   }
 
-  // スライディングウィンドウ分割: 古いメッセージ vs 直近メッセージ
-  const splitIndex = messages.length - recentTurnsToKeep;
+  // もし直近ターンだけでも閾値を超える場合、recentTurnsToKeep を段階的に4〜2まで安全縮小
+  let splitIndex = Math.max(0, messages.length - recentTurnsToKeep);
+  let recentMessages = messages.slice(splitIndex);
+  let recentTokens = estimateTokens(recentMessages.map((m) => m.content).join('\n'));
+
+  while (recentTokens > effectiveThreshold && recentTurnsToKeep > 2) {
+    recentTurnsToKeep = Math.max(2, recentTurnsToKeep - 2);
+    splitIndex = Math.max(0, messages.length - recentTurnsToKeep);
+    recentMessages = messages.slice(splitIndex);
+    recentTokens = estimateTokens(recentMessages.map((m) => m.content).join('\n'));
+  }
+
   const oldMessages = messages.slice(0, splitIndex);
-  const recentMessages = messages.slice(splitIndex);
 
   // 要約生成
   const episodeSummary = summarizeOldTurns(oldMessages);

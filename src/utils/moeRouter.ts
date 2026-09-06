@@ -17,6 +17,8 @@ import {
 import { skillsService } from '../services/skillsService';
 import { toolsService } from '../services/toolsService';
 import { longTermMemoryService } from '../services/longTermMemoryService';
+import { workingAgendaService } from '../services/workingAgendaService';
+import { structuralMemoryService } from '../services/structuralMemoryService';
 import type { ConversationState } from '../types';
 
 /**
@@ -245,22 +247,31 @@ export async function buildExpertSystemPromptWithTracking(
   // 6. 誠実性制約 (でっち上げ防止)
   const honestyConstraint = `【誠実性ルール】自身のハードウェア構成（CPU/GPUコア数、内部メモリ仕様、実行クロック等）について、架空の数値をでっち上げて断定してはいけません。不明な内部情報は「端末上のローカル推論環境で動いているよ」と正直に答えてください。`;
 
-  // 12章 プロンプトキャッシュ最適化 (Prompt Cache Optimization)
+  // 設計思想 Master v5.0 第5章1節: 不変プレフィックス整列 (Prompt Cache Optimization)
   // llama.cpp / vLLM / Ollama のプレフィックスKVキャッシュが100%ヒットするよう、
-  // ペルソナ・マスター教育方針・日本語自然対話コーパス・誠実性制約などの「不変の静的基底プロンプト」を
-  // 先頭に完全に固定し、動的なRAG記憶・スキル・ツール実行結果・ファイルは後方サフィックスとして注入する
+  // ペルソナ・マスター教育方針・日本語自然対話コーパス・誠実性制約・ツール定義・役割指示などの
+  // 「不変の静的基底プロンプト」を先頭に完全に固定する。
   const staticPrefixPrompt = `あなたはユーザー（${persona.userNickname || 'あなた'}）専属のAIパートナー「${persona.name || 'みき'}」です。
 性格: ${persona.basePersonality || '明るく親しみやすく、相手の気持ちに寄り添う親友'}
 口調: 必ず親しみやすいタメ口（〜だよ、〜だね！、〜かな？✨）で、自然で温かい日本語でおしゃべりしてください。
 ${getMasterEducationSystemPrompt()}
 ${getNaturalJapanesePromptGuide()}
 ${honestyConstraint}
-指示: ${expertInstruction}`;
+${toolBlock ? `${toolBlock}\n` : ''}指示: ${expertInstruction}`;
 
+  // 第2章③ 中期記憶 (Working Agenda)
+  const agendaBlock = workingAgendaService.formatAgendaForPrompt();
+
+  // 第2章⑥ 構造記憶 (Structural Memory): クエリからシンボルらしき単語を簡易抽出してマッチ
+  const codeSymbolCandidates = userMessage.match(/[a-zA-Z_][a-zA-Z0-9_]{2,}/g) || [];
+  const structuralBlock = structuralMemoryService.formatStructuralContextForPrompt(codeSymbolCandidates);
+
+  // 動的サフィックスの整列: [想起記憶] ➔ [中期記憶] ➔ [構造記憶] ➔ [スキル] ➔ [ツール実行結果] ➔ [ソースコード]
   const dynamicSuffixParts: string[] = [];
   if (memoryBlock) dynamicSuffixParts.push(memoryBlock);
+  if (agendaBlock) dynamicSuffixParts.push(agendaBlock);
+  if (structuralBlock) dynamicSuffixParts.push(structuralBlock);
   if (skillBlock) dynamicSuffixParts.push(skillBlock);
-  if (toolBlock) dynamicSuffixParts.push(toolBlock);
   if (toolResultsBlock) dynamicSuffixParts.push(toolResultsBlock);
   if (filesContext) dynamicSuffixParts.push(filesContext);
 

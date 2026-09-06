@@ -1742,6 +1742,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* 設計思想 Master v5.0 第9章1節: 1.5B/3B ドラフト検算結果カード */}
+                  {msg.draftVerification && (
+                    <div className="mt-3 p-2.5 bg-slate-950/90 border border-teal-500/40 rounded-xl space-y-2 text-xs shadow-inner">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-teal-300 flex items-center gap-1.5 text-[11px]">
+                          <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+                          <span>9章1節 1.5Bドラフト/3B検算 ({msg.draftVerification.verifierModel})</span>
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          msg.draftVerification.agreed
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                            : 'bg-amber-950 text-amber-300 border border-amber-700'
+                        }`}>
+                          スコア: {msg.draftVerification.score}/100 {msg.draftVerification.agreed ? '✅ 検算合格' : '⚠️ 要修正'}
+                        </span>
+                      </div>
+                      {msg.draftVerification.critiqueNotes && msg.draftVerification.critiqueNotes.length > 0 && (
+                        <div className="text-[10.5px] text-slate-300 bg-black/40 p-2 rounded border border-slate-800">
+                          <span className="text-teal-400 font-semibold">3B講評: </span>
+                          {msg.draftVerification.critiqueNotes.join(' ')}
+                        </div>
+                      )}
+                      {msg.draftVerification.verifiedText && (
+                        <div className="text-[10px] text-teal-300/90 flex items-center gap-1">
+                          <span>※ 3Bモデルによる高精度な推敲・補正が適用されました</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Message action buttons & Streaming Stop Button */}

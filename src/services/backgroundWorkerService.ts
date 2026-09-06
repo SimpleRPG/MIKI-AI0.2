@@ -25,6 +25,7 @@ import { virtualTrainingService } from './virtualTrainingService';
 import { capabilityPluginService } from './capabilityPluginService';
 import { featureFlagsService } from './featureFlagsService';
 import { teacherRequestService } from './teacherRequestService';
+import { workingAgendaService } from './workingAgendaService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -693,6 +694,44 @@ export class BackgroundWorkerService {
           }
         } catch (teacherBatchErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '遅延教師バッチ処理中に例外が発生しました', teacherBatchErr);
+        }
+
+        // Step 6.8: 設計思想 Master v5.0 第2章③ & 第9章 自発思考モード (Autonomous Thought on Working Agenda)
+        if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+        try {
+          const homeworks = workingAgendaService.getHomeworkForAutonomousThought();
+          if (homeworks.length > 0) {
+            systemLogger.info(
+              'SELF_IMPROVEMENT',
+              `🧠 [第9章 自発思考モード] Working Agenda から${homeworks.length}件の未解決宿題を検知。自発考察を実行します。`
+            );
+            for (const hw of homeworks.slice(0, 2)) {
+              if (abortSignal.aborted) break;
+              const thoughtPrompt = `あなたは自律学習中のAI「みき」です。ユーザーとの会話で未解決・宿題となっている以下の課題について、最善の解決方針や知見を自発的に考察し、結論をまとめてください。\n\n【課題トピック】: ${hw.topic}\n【未解決事項】: ${hw.unresolvedQuestions.join(', ')}\n【これまでの合意】: ${hw.recentDecisions.join(', ')}`;
+              
+              let thoughtResult = '';
+              const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+                { role: 'user', content: thoughtPrompt },
+              ];
+              if (nativeLlmService.isNative() && nativeLlmService.getActiveModelId()) {
+                for await (const chunk of nativeLlmService.streamNativeChat(messages, { max_tokens: 256, temperature: 0.5 })) {
+                  thoughtResult += chunk;
+                }
+              } else if (webLLMService.isLoaded()) {
+                for await (const chunk of webLLMService.streamChat(messages, { max_tokens: 256, temperature: 0.5 })) {
+                  thoughtResult += chunk;
+                }
+              }
+
+              if (thoughtResult && thoughtResult.trim().length > 20) {
+                const decisionSummary = thoughtResult.slice(0, 80).replace(/[\n\r]/g, ' ');
+                workingAgendaService.resolveAgenda(hw.id, `自発思考による考察完了: ${decisionSummary}`);
+                weaknessFound.push(`[自発思考] 宿題「${hw.topic}」について自律考察し方針を確定・保存`);
+              }
+            }
+          }
+        } catch (thoughtErr: any) {
+          systemLogger.warn('SELF_IMPROVEMENT', '自発思考モード実行中に例外が発生しました', thoughtErr);
         }
       }
 

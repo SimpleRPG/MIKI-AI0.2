@@ -4,6 +4,7 @@ import { webLLMService } from './webLlmService';
 import { sendChatMessage } from './api';
 import { OFFICIAL_GGUF_MODELS, getManifestDefaultConfig, getManifestNativeEnv } from './ggufModels';
 import { storageService } from './storageService';
+import { contextBudgetEngineService } from './contextBudgetEngineService';
 
 export interface NativeGpuInfo {
   available: boolean;
@@ -693,10 +694,12 @@ export class NativeLlmService {
       signal?: AbortSignal;
       cachePrompt?: boolean;
       slotId?: number;
+      ttl?: number;
     }
   ): AsyncGenerator<string, void, unknown> {
     const endpoint = config.endpoint.replace(/\/$/, '');
-    systemLogger.info('EXTERNAL_GPU', `🖥️ 外部ローカルLLMサーバー (${endpoint}) に接続推論中...`);
+    const activeTtlSeconds = options?.ttl ?? contextBudgetEngineService.getVariableTtlSeconds();
+    systemLogger.info('EXTERNAL_GPU', `🖥️ 外部ローカルLLMサーバー (${endpoint}) に接続推論中 (TTL: ${activeTtlSeconds}s)...`);
 
     // 接続タイムアウト (25秒以内に接続または初回チャンクがない場合はエラー)
     const timeoutController = new AbortController();
@@ -720,6 +723,7 @@ export class NativeLlmService {
             model: config.model || 'qwen2.5:1.5b',
             messages,
             stream: true,
+            keep_alive: `${activeTtlSeconds}s`,
             options: {
               temperature: options?.temperature ?? 0.7,
               use_mmap: true,
@@ -756,7 +760,7 @@ export class NativeLlmService {
         }
       } else {
         // OpenAI Compatible (LM Studio / llama.cpp server / llama-swap)
-        // 12章: llama.cpp server の cache_prompt: true, id_slot: 0 (または指定スロット) を注入
+        // 設計思想 Master v5.0 第5章2節: 可変TTLと cache_prompt: true の送信
         const url = `${endpoint}/v1/chat/completions`;
         let response: Response;
 
@@ -766,6 +770,8 @@ export class NativeLlmService {
           stream: true,
           temperature: options?.temperature ?? 0.7,
           cache_prompt: options?.cachePrompt ?? true,
+          ttl: activeTtlSeconds,
+          keep_alive: `${activeTtlSeconds}s`,
         };
 
         if (typeof options?.slotId === 'number') {

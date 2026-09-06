@@ -61,6 +61,59 @@ function calculateVectorCosineSimilarity(vecA: number[], vecB: number[]): number
  * 7. 原文再取得 (根拠原文抜粋の再取得と出所担保)
  */
 class LongTermMemoryService {
+  // 設計思想 Master v5.0 第3章4節: ユーザー明示的削除の2段階反映用ランタイムブラックリスト
+  private runtimeBlacklistMemoryIds = new Set<string>();
+
+  /**
+   * 即時ランタイム注入禁止ブラックリストに記憶IDを追加 (第3章4節 第1段階)
+   */
+  public addToRuntimeBlacklist(memoryId: string): void {
+    this.runtimeBlacklistMemoryIds.add(memoryId);
+  }
+
+  /**
+   * ランタイムブラックリストから除外
+   */
+  public removeFromRuntimeBlacklist(memoryId: string): void {
+    this.runtimeBlacklistMemoryIds.delete(memoryId);
+  }
+
+  /**
+   * ランタイムブラックリストに含まれているか判定
+   */
+  public isBlacklisted(memoryId: string): boolean {
+    return this.runtimeBlacklistMemoryIds.has(memoryId);
+  }
+
+  /**
+   * ランタイムブラックリストの全クリア
+   */
+  public clearRuntimeBlacklist(): void {
+    this.runtimeBlacklistMemoryIds.clear();
+  }
+
+  /**
+   * 置換先を辿って最新の有効記憶を解決する (第3章2節: 最新版自動差替え)
+   */
+  public resolveLatestSupersededMemory(
+    oldMemory: MemoryItem,
+    allMemoriesMap: Map<string, MemoryItem>
+  ): MemoryItem | null {
+    let current: MemoryItem | undefined = oldMemory;
+    const visited = new Set<string>([oldMemory.id]);
+
+    while (current?.replacedBy && allMemoriesMap.has(current.replacedBy)) {
+      if (visited.has(current.replacedBy)) break; // 循環参照防止
+      visited.add(current.replacedBy);
+      current = allMemoriesMap.get(current.replacedBy);
+    }
+
+    if (current && current.id !== oldMemory.id && current.active !== false) {
+      return current;
+    }
+    return null;
+  }
+
   /**
    * 記憶アイテムのライフサイクル状態 (8.2) を正規化
    */
@@ -454,16 +507,36 @@ class LongTermMemoryService {
 
     // Step 6: 再順位付け (Rerank & Filtering: 状態・有効性・置換・出所確認)
     let filteredOutCount = 0;
-    const scoredList: Array<{ memory: MemoryItem; score: number; matchStage: string }> = [];
+    let supersededReplacedCount = 0;
+    const scoredList: Array<{ memory: MemoryItem; score: number; matchStage: string; contradictionWarning?: string }> = [];
+
+    // 高速アクセスマップ
+    const allMemoriesMap = new Map<string, MemoryItem>();
+    allMemories.forEach((m) => allMemoriesMap.set(m.id, m));
 
     const now = Date.now();
-    for (const memory of allMemories) {
-      const status = this.getLifecycleStatus(memory);
+    for (const rawMemory of allMemories) {
+      let memory = rawMemory;
+      let status = this.getLifecycleStatus(memory);
 
-      // 【除外ルール 1】置換済み (SUPERSEDED) 記憶は無効な古い前提のため完全除外
-      if (status === 'SUPERSEDED' || memory.replacedBy) {
+      // 【除外ルール 0】第3章4節: ユーザー明示的削除のランタイムブラックリスト
+      if (this.isBlacklisted(memory.id)) {
         filteredOutCount++;
         continue;
+      }
+
+      // 【除外ルール 1 ＆ 最新版自動差替え】置換済み (SUPERSEDED) 記憶の最新版解決 (第3章2節)
+      if (status === 'SUPERSEDED' || memory.replacedBy) {
+        const latestResolved = this.resolveLatestSupersededMemory(memory, allMemoriesMap);
+        if (latestResolved && !this.isBlacklisted(latestResolved.id)) {
+          // 古い記憶へのヒットを最新記憶に自動差替え
+          memory = latestResolved;
+          status = this.getLifecycleStatus(memory);
+          supersededReplacedCount++;
+        } else {
+          filteredOutCount++;
+          continue;
+        }
       }
 
       // 【除外ルール 2】却下 (REJECTED) または 期限切れ (EXPIRED) または 非アクティブ
@@ -498,44 +571,58 @@ class LongTermMemoryService {
         continue;
       }
 
+      // 重複登録防止 (置換差替え等で同一メモリが既に登録されている場合)
+      if (scoredList.some((item) => item.memory.id === memory.id)) {
+        continue;
+      }
+
       // スコア計算
       let score = 0;
       let primaryStage = 'semantic';
 
       // 1. 完全一致 (最優先 +25点)
-      if (exactMatchedIds.has(memory.id)) {
+      if (exactMatchedIds.has(memory.id) || exactMatchedIds.has(rawMemory.id)) {
         score += 25;
         primaryStage = 'exact_match';
       }
 
       // 2. 会話状態マッチ (+15点)
-      if (stateMatchedIds.has(memory.id)) {
+      if (stateMatchedIds.has(memory.id) || stateMatchedIds.has(rawMemory.id)) {
         score += 15;
         if (primaryStage !== 'exact_match') primaryStage = 'conversation_state';
       }
 
       // 3. 直近原文マッチ (+8点)
-      if (recentMatchedIds.has(memory.id)) {
+      if (recentMatchedIds.has(memory.id) || recentMatchedIds.has(rawMemory.id)) {
         score += 8;
         if (primaryStage === 'semantic') primaryStage = 'recent_raw';
       }
 
       // 4. 全文検索マッチ (+12点)
-      if (ftsMatchedIds.has(memory.id)) {
+      if (ftsMatchedIds.has(memory.id) || ftsMatchedIds.has(rawMemory.id)) {
         score += 12;
         if (primaryStage === 'semantic') primaryStage = 'full_text';
       }
 
       // 5. 意味的類似度スコア (最大 +15点)
-      const semSim = semanticScores.get(memory.id) || 0;
+      const semSim = Math.max(semanticScores.get(memory.id) || 0, semanticScores.get(rawMemory.id) || 0);
       score += semSim * 15;
 
       // メタデータボーナス
       if (memory.pinned) score += 20; // ピン留めは最優先
       if (status === 'APPROVED') score += 5; // 確定承認済み
       score += (memory.importance || 1) * 2; // 重要度 (1-5)
-      score += (memory.goodCount || 0) * 1.5; // 👍 フィードバック
-      score -= (memory.badCount || 0) * 3.0; // 👎 フィードバック
+
+      // 設計思想 Master v5.0 第2章2節: 感情価 (質: useful_count / confusion_count) と熱量 (heat)
+      const useful = (memory.useful_count ?? memory.goodCount) || 0;
+      const confusion = (memory.confusion_count ?? memory.badCount) || 0;
+      score += useful * 1.5; // 役立った回数ボーナス
+      score -= confusion * 3.0; // 混乱・訂正回数ペナルティ
+
+      // 熱量 (今いちばん熱い体験を優遇、0.0〜1.0)
+      if (typeof memory.heat === 'number') {
+        score += memory.heat * 4.0;
+      }
 
       // 時間減衰 (直近使われた記憶ほど優先)
       if (memory.lastUsedAt) {
@@ -563,13 +650,36 @@ class LongTermMemoryService {
 
     // スコア降順ソート
     scoredList.sort((a, b) => b.score - a.score);
-    const topScored = scoredList.slice(0, limit);
+
+    // 設計思想 Master v5.0 第3章2節: 矛盾ペア・置換競合の注記付与と枠数譲歩
+    let contradictionPairsFlagged = 0;
+    for (let i = 0; i < scoredList.length; i++) {
+      const itemA = scoredList[i];
+      for (let j = i + 1; j < scoredList.length; j++) {
+        const itemB = scoredList[j];
+        const isConflict =
+          (itemA.memory.conflictWith && itemA.memory.conflictWith.includes(itemB.memory.id)) ||
+          (itemB.memory.conflictWith && itemB.memory.conflictWith.includes(itemA.memory.id)) ||
+          itemA.memory.supersededFrom === itemB.memory.id ||
+          itemB.memory.supersededFrom === itemA.memory.id;
+
+        if (isConflict) {
+          contradictionPairsFlagged++;
+          itemA.contradictionWarning = `※前提が更新されている可能性があります (最新版を優先)`;
+          itemB.contradictionWarning = `※旧前提または競合設定の可能性があります`;
+        }
+      }
+    }
+
+    // 矛盾ペアが存在する場合、予算枠として1.5〜2枠相当を消費するため実効リミットを自動調整 (第3章2節)
+    const effectiveLimit = contradictionPairsFlagged > 0 ? Math.max(2, limit - Math.min(2, contradictionPairsFlagged)) : limit;
+    const topScored = scoredList.slice(0, effectiveLimit);
 
     steps.push({
       step: 6,
       name: '再順位付け & 厳格フィルタリング (Rerank & Filtering)',
       count: topScored.length,
-      description: `置換済み・期限切れ・低関連性(${filteredOutCount}件)を除外し、上位${topScored.length}件を厳選`,
+      description: `置換最新版差替え(${supersededReplacedCount}件)、除外(${filteredOutCount}件)、競合注記(${contradictionPairsFlagged}件)、上位${topScored.length}件を厳選`,
       sampleIds: topScored.map((s) => s.memory.id),
     });
 
@@ -607,7 +717,7 @@ class LongTermMemoryService {
   }
 
   /**
-   * プロンプト用に、7段階パイプラインで厳選された記憶をフォーマット
+   * プロンプト用に、7段階パイプラインで厳選された記憶をフォーマット (第3章2節 矛盾注記対応)
    */
   public formatMemoriesForPrompt(searchResult: MemoryPipelineSearchResult): string {
     if (searchResult.scoredMemories.length === 0) return '';
@@ -620,7 +730,9 @@ class LongTermMemoryService {
       const excerptInfo = searchResult.retrievedRawExcerpts.find((r) => r.memoryId === mem.id);
 
       let prefix = '・';
-      if (status === 'UNVERIFIED') {
+      if ((sm as any).contradictionWarning) {
+        prefix = `・[⚠️${(sm as any).contradictionWarning}]: `;
+      } else if (status === 'UNVERIFIED') {
         prefix = '・[※未検証・仮推論情報（断定せず推測として扱うこと）]: ';
       } else if (mem.longTermType === 'design_principle') {
         prefix = '・[確定設計原則]: ';
@@ -636,6 +748,51 @@ class LongTermMemoryService {
     }
 
     return lines.join('\n');
+  }
+
+  /**
+   * 設計思想 Master v5.0 第2章2節: 感情価 (質) と熱量の更新
+   * ターン終了後、想起した記憶についてユーザー訂正の有無をシグナルとして蓄積
+   */
+  public recordTurnFeedback(
+    memories: MemoryItem[],
+    usedMemoryIds: string[],
+    wasCorrectionReceived: boolean
+  ): MemoryItem[] {
+    if (!usedMemoryIds || usedMemoryIds.length === 0) return memories;
+    const targetSet = new Set(usedMemoryIds);
+    const now = Date.now();
+
+    return memories.map((mem) => {
+      if (!targetSet.has(mem.id)) return mem;
+
+      const currentUseful = (mem.useful_count ?? mem.goodCount) || 0;
+      const currentConfusion = (mem.confusion_count ?? mem.badCount) || 0;
+      const currentHeat = typeof mem.heat === 'number' ? mem.heat : 0.5;
+
+      if (wasCorrectionReceived) {
+        // ユーザーから訂正・矛盾指摘があった場合: 混乱回数を加算し熱量を冷却
+        return {
+          ...mem,
+          confusion_count: currentConfusion + 1,
+          badCount: currentConfusion + 1,
+          heat: Math.max(0.1, Number((currentHeat * 0.7).toFixed(2))),
+          lastUsedAt: now,
+          updatedAt: now,
+        };
+      } else {
+        // 訂正なく自然に受け入れられた場合: 有用回数を加算し熱量を適度に活性化 (実際に使われた分のみ)
+        return {
+          ...mem,
+          useful_count: currentUseful + 1,
+          goodCount: currentUseful + 1,
+          heat: Math.min(1.0, Number((currentHeat + 0.15).toFixed(2))),
+          useCount: (mem.useCount || 0) + 1,
+          lastUsedAt: now,
+          updatedAt: now,
+        };
+      }
+    });
   }
 
   /**

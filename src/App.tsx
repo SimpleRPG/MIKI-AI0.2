@@ -28,6 +28,7 @@ import {
   FalsificationEvaluation,
   SynthesizedWorkflow,
   AnswerPlanApplicationResult,
+  DraftVerificationResult,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
@@ -64,6 +65,11 @@ import { dialogueEvaluationService } from './services/dialogueEvaluationService'
 import { uncertaintyTeacherService } from './services/uncertaintyTeacherService';
 import { minimalScopeService } from './services/minimalScopeService';
 import { storagePlanningService } from './services/storagePlanningService';
+import { contextBudgetEngineService } from './services/contextBudgetEngineService';
+import { workingAgendaService } from './services/workingAgendaService';
+import { structuralMemoryService } from './services/structuralMemoryService';
+import { metaMemoryService } from './services/metaMemoryService';
+import { draftVerificationService } from './services/draftVerificationService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
@@ -200,6 +206,7 @@ export default function App() {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const currentAssistantIdRef = useRef<string | null>(null);
+  const lastTurnUsedMemoryIdsRef = useRef<string[]>([]);
 
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
@@ -275,6 +282,8 @@ export default function App() {
   useEffect(() => {
     try {
       storageService.setItem('gamecraft_workspace_files', JSON.stringify(workspaceFiles));
+      // 設計思想 Master v5.0 第2章⑥ 構造記憶 (Structural Memory) のシンボルグラフ自動同期
+      structuralMemoryService.syncFromWorkspaceFiles(workspaceFiles);
     } catch (e) {
       console.warn('Storage quota limit reached for workspace files', e);
     }
@@ -1235,6 +1244,24 @@ export default function App() {
       // ==========================================
       // PATH 2: WebGPU or Gemini Cloud Engine
       // ==========================================
+      // 設計思想 Master v5.0 第2章: 直前ターンで想起された記憶へのフィードバック反映 (有用性・熱量更新)
+      if (lastTurnUsedMemoryIdsRef.current.length > 0) {
+        const isUserDispleasedOrCorrecting =
+          text.includes('違う') ||
+          text.includes('そうじゃなくて') ||
+          text.includes('間違') ||
+          text.includes('ダメ') ||
+          text.includes('やり直') ||
+          text.includes('そうではなく');
+        setMemories((prev) =>
+          longTermMemoryService.recordTurnFeedback(
+            prev,
+            lastTurnUsedMemoryIdsRef.current,
+            isUserDispleasedOrCorrecting
+          )
+        );
+      }
+
       // Step 3: Prompt classification (MoE intent detection)
       systemLogger.step(3, 10, 'MoE プロンプト意図分類 & パラメータ決定');
       const promptAnalysis = classifyPromptForMoE(text, { workspaceFiles });
@@ -1510,13 +1537,22 @@ export default function App() {
         setMemories((prev) => recordMemoryUsage(usedMemoriesTracked.map((m) => m.id), prev));
       }
 
-      // コンテキスト圧縮 & スライディングウィンドウ (設計思想 20. コンテキスト圧縮)
+      // 設計思想 Master v5.0 第4章: 3層コンテキスト長自動調整エンジン (Context Budget Engine)
+      const isHeavyTask = isCodeModRequest || promptAnalysis.role !== 'moe_chat';
+      const budgetPlan = contextBudgetEngineService.calculateBudgetPlan(undefined, isHeavyTask);
+      systemLogger.info(
+        'INFERENCE',
+        `📊 動的コンテキスト予算計画: nCtx=${budgetPlan.tier}, LiveBudget=${budgetPlan.liveBudget}tok, 履歴配分=${budgetPlan.historyQuota}tok`
+      );
+
+      // コンテキスト圧縮 & スライディングウィンドウ (設計思想 Master v5.0 第4章 B層 動的予算配分)
       const validHistoryMessages = messages.filter(
         (m) => m.id !== 'welcome_msg' && m.id !== userMsg.id && m.content && m.content.trim()
       );
       const compressionResult = compressContextHistory(validHistoryMessages, {
-        recentTurnsToKeep: 6,
-        triggerTokenThreshold: 1200,
+        maxContextTokens: budgetPlan.historyQuota,
+        recentTurnsToKeep: budgetPlan.recentTurnsToKeep,
+        triggerTokenThreshold: Math.floor(budgetPlan.liveBudget * 0.8),
       });
 
       if (compressionResult.isCompressed) {
@@ -2002,7 +2038,7 @@ export default function App() {
 
       // 設計思想 6章 & 35章 第3段階: 回答設計・重複排除・自然な日本語化ポストプロセス
       const targetLength = newConvState.expectedResponseLength || activeExpectedLength;
-      const { cleanedText: finalVisibleText, quality: responseQuality } = responseDesignService.processOutput(
+      let { cleanedText: finalVisibleText, quality: responseQuality } = responseDesignService.processOutput(
         rawExtractedText,
         targetLength
       );
@@ -2219,6 +2255,25 @@ export default function App() {
         minimalScopeService.updateItemStatus('code_8_natural_flow_explanation', 'VERIFIED_ACTIVE');
       }
 
+      // 設計思想 Master v5.0 第9章1節: 1.5B/3Bドラフト検証パイプライン (有効時)
+      let draftVerificationData: DraftVerificationResult | undefined = undefined;
+      if (draftVerificationService.getConfig().enabled) {
+        try {
+          const savedExt = storageService.getItem('miki_external_llm_config');
+          const extCfg = savedExt ? JSON.parse(savedExt) : undefined;
+          draftVerificationData = await draftVerificationService.verifyDraftWith3B(
+            text,
+            finalVisibleText,
+            extCfg
+          );
+          if (draftVerificationData.verifiedText) {
+            finalVisibleText = draftVerificationData.verifiedText;
+          }
+        } catch (verErr) {
+          console.warn('Draft verification error:', verErr);
+        }
+      }
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantId
@@ -2254,6 +2309,7 @@ export default function App() {
                 usedSkills: usedSkillsTracked,
                 suggestedTools: promptBuildResult.recommendedTools,
                 executedTools: promptBuildResult.executedTools,
+                draftVerification: draftVerificationData,
               }
             : msg
         )
@@ -2263,6 +2319,40 @@ export default function App() {
         'CHAT',
         `チャット処理全工程完了: [${executedEngineLabel}] (文字数: ${finalVisibleText.length}, 総所要時間: ${totalElapsedMs}ms, TTFT: ${Math.round((firstTokenTime || tEnd) - tStart)}ms) [第3段階 回答品質: 長さ=${responseQuality.lengthCategory}(${responseQuality.lengthCompliant ? 'OK' : '調整済'}) 結論先頭=${responseQuality.directAnswerFirst ? 'OK' : 'NG'} 重複除去=${responseQuality.duplicatesRemovedCount} 自然化置換=${responseQuality.unnaturalPhrasesFixed}]`
       );
+
+      // 設計思想 Master v5.0 第2章: 今回使われた記憶IDを次ターンの感情価フィードバック用に記録
+      lastTurnUsedMemoryIdsRef.current = (usedMemoriesTracked || []).map((m) => m.id);
+
+      // 設計思想 Master v5.0 第2章③: 中期記憶 (Working Agenda) の動的更新
+      workingAgendaService.recordTurnAgenda(text, finalVisibleText);
+
+      // 設計思想 Master v5.0 第3章5節: 統合診断ログ (Unified Diagnostic Log) 記録
+      contextBudgetEngineService.recordDiagnosticLog({
+        turn_id: assistantId,
+        timestamp: Date.now(),
+        recall: {
+          vector_seeds: (usedMemoriesTracked || []).map((m) => m.id),
+          link_expanded: [],
+          tag_matched: [],
+          ratio_used: 'vector:0.5, link:0.3, tag:0.2',
+        },
+        context: {
+          estimated_tokens_before: promptBuildResult.promptLengthChars ? Math.round(promptBuildResult.promptLengthChars / 3) : 0,
+          live_nctx: budgetPlan.tier,
+          compression_triggered: compressionResult.isCompressed,
+          budget_breakdown: {
+            persona: budgetPlan.personaQuota,
+            memory: budgetPlan.memoryRecallQuota,
+            history: budgetPlan.historyQuota,
+            headroom: budgetPlan.headroomTokens,
+          },
+        },
+        cache: {
+          cache_hit_tokens: 0,
+          prompt_processing_ms: Math.round((firstTokenTime || tEnd) - tStart),
+          ttl_applied: contextBudgetEngineService.getVariableTtlSeconds(),
+        },
+      });
 
       // 🧠 世界モデル: 事後検証 & 予測誤差の計算 (設計思想 17. 世界モデルと予測誤差)
       const errorRecord = worldModelService.recordOutcomeAndComputeError(actionPrediction, {

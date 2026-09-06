@@ -81,6 +81,11 @@ export interface MemoryItem {
   useCount?: number;
   goodCount?: number; // ユーザーが「役に立った」と評価した回数
   badCount?: number;  // ユーザーが「見当違い/不要」と評価した回数
+  // 設計思想 Master v5.0 第2章2節: 感情価 (質) と熱量
+  heat?: number;             // 利用頻度・忘却曲線に基づく温度 (0.0〜1.0)
+  useful_count?: number;     // 役立った回数 (訂正なく受容された回数)
+  confusion_count?: number;  // 混乱を招いた・訂正された回数
+  isDiagnostic?: boolean;    // エラー・診断メッセージの記憶汚染防止フラグ (第3章3節)
   approved?: boolean; // 人または機械検証で確定された承認状態
   sourceRef?: string; // 根拠となる原文参照・メッセージID・ファイル名
   rawExcerpt?: string; // 原文抜粋
@@ -115,6 +120,120 @@ export interface MemoryItem {
   supersededFrom?: string;       // 置換元となった古い記憶ID
   rawSourceId?: string;          // 紐づく原文メッセージID
   rawSourceType?: 'chat' | 'teacher_response' | 'synthesis_process' | 'eval_result';
+}
+
+/**
+ * 設計思想 Master v5.0 第2章: 全8層完全記憶階層構造
+ */
+export type CompleteMemoryLayer =
+  | 'episodic_buffer'   // ① 直近体験バッファ (追記専用・熱量忘却曲線)
+  | 'short_term'        // ② 短期記憶 (会話履歴・直近原文保護)
+  | 'working_agenda'    // ③ 中期記憶 (Working Agenda: 進行中話題・未解決事項・直近決定)
+  | 'episodic'          // ④ エピソード記憶 (時系列記録・意味+リンク検索)
+  | 'semantic_core'     // ⑤ 統合記憶 (Semantic Core / 人格の骨格・長期方針)
+  | 'structural'        // ⑥ 構造記憶 (シンボル、プロシージャ、依存関係グラフ)
+  | 'procedural'        // ⑦ 手続き記憶 (スキル・成功手順のfew-shot)
+  | 'meta_memory';      // ⑧ メタ記憶 (想起比率の状況適応学習層)
+
+/**
+ * 設計思想 Master v5.0 第2章③: 中期記憶 (Working Agenda) アイテム
+ */
+export interface WorkingAgendaItem {
+  id: string;
+  topic: string;
+  status: 'in_progress' | 'pending_decision' | 'resolved' | 'abandoned';
+  unresolvedQuestions: string[];
+  recentDecisions: string[];
+  lastActiveTurn: number;
+  priority: 'high' | 'normal' | 'low';
+  assignedToAutonomousThought?: boolean; // 自発思考モードの宿題対象
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * 設計思想 Master v5.0 第2章⑥: 構造記憶 (Structural Memory) アイテム
+ */
+export interface StructuralMemoryItem {
+  id: string;
+  symbolName: string;
+  kind: 'function' | 'sub' | 'class' | 'module' | 'variable' | 'file';
+  filePath: string;
+  language: string;
+  parameters?: string[];
+  returnType?: string;
+  dependencies: string[];    // 呼び出しているシンボル
+  dependents: string[];      // 呼び出されているシンボル
+  sideEffects?: string[];    // セル更新、ファイルIO、画面更新など
+  hash: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * 設計思想 Master v5.0 第4章: コンテキスト長3層自動調整エンジン
+ */
+export type ContextTier = 4096 | 8192 | 16384 | 32768;
+
+export interface ContextBudgetPlan {
+  tier: ContextTier;
+  liveBudget: number;
+  personaQuota: number;
+  episodicBufferQuota: number;
+  memoryRecallQuota: number;
+  historyQuota: number;
+  headroomTokens: number;
+  thermalReductionRatio: number;
+  batteryReducedDepth: number; // リンク展開深さ (1〜3)
+  recentTurnsToKeep: number;
+}
+
+/**
+ * 設計思想 Master v5.0 第3章5節: 統合診断ログ (説明可能性)
+ */
+export interface UnifiedDiagnosticLog {
+  turn_id: string;
+  timestamp: number;
+  recall: {
+    vector_seeds: string[];
+    link_expanded: string[];
+    tag_matched: string[];
+    ratio_used: string;
+    superseded_replaced_count?: number;
+    contradiction_pairs_flagged?: number;
+  };
+  context: {
+    estimated_tokens_before: number;
+    live_nctx: number;
+    compression_triggered: boolean;
+    budget_breakdown: {
+      persona: number;
+      memory: number;
+      history: number;
+      headroom: number;
+    };
+  };
+  cache: {
+    cache_hit_tokens: number;
+    prompt_processing_ms: number;
+    ttl_applied: number;
+  };
+}
+
+/**
+ * 設計思想 Master v5.0 第9章1節: 1.5B/3B同時常駐・ドラフト検証結果
+ */
+export interface DraftVerificationResult {
+  draftText: string;
+  verifiedText?: string;
+  draftModel: string;
+  verifierModel: string;
+  agreed: boolean;
+  score: number; // 0〜100
+  critiqueNotes?: string[];
+  escalatedToTeacher: boolean;
+  escalationReason?: string;
+  verificationLatencyMs: number;
 }
 
 /**
@@ -487,6 +606,8 @@ export interface ChatMessage {
   securityBoundaryAudit?: SecurityBoundaryAuditResult;
   // 設計思想 37章: 失敗再発検知・回帰パターン
   failureRecurrence?: FailureRecurrencePattern;
+  // 設計思想 Master v5.0 第9章1節: 1.5B/3Bドラフト検証結果
+  draftVerification?: DraftVerificationResult;
 }
 
 /**
