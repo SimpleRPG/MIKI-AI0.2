@@ -685,92 +685,146 @@ export class NativeLlmService {
   public async *streamExternalLocalLlm(
     config: ExternalLocalLlmConfig,
     messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-    options?: { temperature?: number }
+    options?: { temperature?: number; signal?: AbortSignal }
   ): AsyncGenerator<string, void, unknown> {
     const endpoint = config.endpoint.replace(/\/$/, '');
     systemLogger.info('EXTERNAL_GPU', `🖥️ 外部ローカルLLMサーバー (${endpoint}) に接続推論中...`);
 
-    if (config.type === 'ollama') {
-      const url = `${endpoint}/api/chat`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: config.model || 'qwen2.5:1.5b',
-          messages,
-          stream: true,
-          options: { temperature: options?.temperature ?? 0.7 },
-        }),
-      });
+    // 接続タイムアウト (25秒以内に接続または初回チャンクがない場合はエラー)
+    const timeoutController = new AbortController();
+    const timer = setTimeout(() => {
+      timeoutController.abort(new Error('外部LLMサーバーの応答がタイムアウトしました(25秒)。Termux側でサーバーが起動しているか確認してください。'));
+    }, 25000);
 
-      if (!response.ok) {
-        throw new Error(`Ollamaサーバー接続エラー (${response.status}): ${response.statusText}`);
-      }
+    const onExternalAbort = () => timeoutController.abort();
+    if (options?.signal) {
+      options.signal.addEventListener('abort', onExternalAbort, { once: true });
+    }
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('Response body is null');
-      const decoder = new TextDecoder();
-      let buffer = '';
+    try {
+      if (config.type === 'ollama') {
+        const url = `${endpoint}/api/chat`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: timeoutController.signal,
+          body: JSON.stringify({
+            model: config.model || 'qwen2.5:1.5b',
+            messages,
+            stream: true,
+            options: { temperature: options?.temperature ?? 0.7 },
+          }),
+        });
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const data = JSON.parse(line);
-            if (data.message?.content) {
-              yield data.message.content;
-            }
-          } catch (e) {}
+        if (!response.ok) {
+          throw new Error(`Ollamaサーバー接続エラー (${response.status}): ${response.statusText}`);
         }
-      }
-    } else {
-      // OpenAI Compatible (LM Studio / llama.cpp server)
-      const url = `${endpoint}/v1/chat/completions`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: config.model || 'default',
-          messages,
-          stream: true,
-          temperature: options?.temperature ?? 0.7,
-        }),
-      });
 
-      if (!response.ok) {
-        throw new Error(`LM Studio / Local API 接続エラー (${response.status})`);
-      }
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('Response body is null');
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('Response body is null');
-      const decoder = new TextDecoder();
-      let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          clearTimeout(timer);
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('data: ')) {
-            const jsonStr = trimmed.slice(6);
-            if (jsonStr === '[DONE]') break;
+          for (const line of lines) {
+            if (!line.trim()) continue;
             try {
-              const data = JSON.parse(jsonStr);
-              const delta = data.choices?.[0]?.delta?.content;
-              if (delta) yield delta;
+              const data = JSON.parse(line);
+              if (data.message?.content) {
+                yield data.message.content;
+              }
             } catch (e) {}
           }
         }
+      } else {
+        // OpenAI Compatible (LM Studio / llama.cpp server / llama-swap)
+        const url = `${endpoint}/v1/chat/completions`;
+        let response: Response;
+
+        try {
+          response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'text/event-stream, application/json',
+            },
+            signal: timeoutController.signal,
+            body: JSON.stringify({
+              model: config.model || 'default',
+              messages,
+              stream: true,
+              temperature: options?.temperature ?? 0.7,
+            }),
+          });
+        } catch (fetchErr: any) {
+          const rawMsg = fetchErr?.message || String(fetchErr);
+          throw new Error(
+            `外部LLM (${url}) へのリクエストに失敗しました: ${rawMsg}。Termuxでサーバーが起動しているか確認してください。`
+          );
+        }
+
+        if (!response.ok) {
+          let errBody = '';
+          try {
+            errBody = await response.text();
+          } catch (e) {}
+
+          let parsedErrorMsg = '';
+          try {
+            const jsonErr = JSON.parse(errBody);
+            parsedErrorMsg = jsonErr?.error?.message || jsonErr?.error || jsonErr?.message || '';
+          } catch (e) {}
+
+          const details = parsedErrorMsg || errBody.slice(0, 300) || `Status ${response.status}`;
+          throw new Error(`外部LLMエラー (${response.status}): ${details} [モデル: ${config.model || 'default'}]`);
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json') && !contentType.includes('event-stream')) {
+          const json = await response.json();
+          const content = json.choices?.[0]?.message?.content || json.choices?.[0]?.text || '';
+          if (content) yield content;
+          return;
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('Response body is null');
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          clearTimeout(timer);
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              const jsonStr = trimmed.slice(6);
+              if (jsonStr === '[DONE]') break;
+              try {
+                const data = JSON.parse(jsonStr);
+                const delta = data.choices?.[0]?.delta?.content;
+                if (delta) yield delta;
+              } catch (e) {}
+            }
+          }
+        }
+      }
+    } finally {
+      clearTimeout(timer);
+      if (options?.signal) {
+        options.signal.removeEventListener('abort', onExternalAbort);
       }
     }
   }

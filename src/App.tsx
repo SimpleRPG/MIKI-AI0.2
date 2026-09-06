@@ -1693,6 +1693,7 @@ export default function App() {
         try {
           for await (const chunk of nativeLlmService.streamExternalLocalLlm(extConfig, chatContext, {
             temperature: promptAnalysis.temperature,
+            signal: abortController.signal,
           })) {
             if (abortController.signal.aborted) break;
             if (firstTokenTime === null) firstTokenTime = performance.now();
@@ -1825,9 +1826,9 @@ export default function App() {
               webGpuErrorDetails.includes('ERR_CONNECTION') ||
               webGpuErrorDetails.includes('refused')
             ) {
-              diagnosticCategory = 'サーバー未起動/接続不可';
-              diagnosticCause = '指定したエンドポイントに接続できませんでした。llama-swap等が起動していないか、URL・ポートが間違っている可能性があります。';
-              diagnosticTip = 'Termux側で「curl http://127.0.0.1:8080/v1/models」を実行し、サーバーが応答するか確認してください。';
+              diagnosticCategory = 'サーバー未応答または通信制限 (Failed to fetch)';
+              diagnosticCause = `指定したエンドポイントへの接続に失敗しました。\n生のエラー: ${webGpuErrorDetails}\n\n考えられる原因:\n1. 選択したモデル（3B等）の初回ロード中、またはTermux側でプロセスが停止した\n2. ブラウザ・WebViewからのローカルホスト（127.0.0.1）通信制限（CORS / Private Network Access）\n3. Termux上で実際に稼働中のモデル名と選択中のモデル名（3B）の不一致`;
+              diagnosticTip = '「設定」の稼働中モデル一覧で「qwen2-5-1-5b-instruct-q4-k-m」を選択してみるか、Termuxでサーバーログを確認してください。';
             } else if (webGpuErrorDetails.includes('404')) {
               diagnosticCategory = 'エンドポイント不一致 (404)';
               diagnosticCause = '接続先のURLパスが見つかりませんでした。サーバー種別（Ollama/LM Studio・llama.cpp）の設定が実際のサーバーと一致していない可能性があります。';

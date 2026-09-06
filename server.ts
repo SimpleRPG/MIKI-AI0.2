@@ -122,6 +122,18 @@ app.get('/api/logs', (req, res) => {
   }
 });
 
+// Master Specification Document Download Endpoint
+app.get('/api/master-spec', (req, res) => {
+  const specPath = path.join(process.cwd(), 'MIKI_AI_MASTER_SPECIFICATION_v5_0.txt');
+  if (fs.existsSync(specPath)) {
+    res.setHeader('Content-Disposition', 'attachment; filename="MIKI_AI_MASTER_SPECIFICATION_v5_0.txt"');
+    res.type('text/plain; charset=utf-8');
+    res.sendFile(specPath);
+  } else {
+    res.status(404).send('Master specification file not found.');
+  }
+});
+
 // Assistant Chat (Gemini 3.7/3.6 with Smart Fallback)
 app.post('/api/chat', async (req, res) => {
   try {
@@ -875,20 +887,6 @@ app.post('/api/miki/combat', (req, res) => {
 async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
 
-  // Listen on port 3000 FIRST so health checks and container ingress respond immediately
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Miki AI Partner & Autonomous Studio server running on http://0.0.0.0:${PORT}`);
-  });
-
-  server.on('error', (err: any) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`Port ${PORT} is already in use.`);
-      process.exit(1);
-    } else {
-      console.error('Server error:', err);
-    }
-  });
-
   if (!isProduction) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -904,6 +902,19 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Miki AI Partner & Autonomous Studio server running on http://0.0.0.0:${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use.`);
+      process.exit(1);
+    } else {
+      console.error('Server error:', err);
+    }
+  });
 }
 
 startServer().catch(err => {

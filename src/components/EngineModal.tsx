@@ -270,6 +270,75 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   const [isFetchingExternalModels, setIsFetchingExternalModels] = useState(false);
   const [externalModelListError, setExternalModelListError] = useState<string | null>(null);
 
+  // Termux / 外部LLM 診断テスト結果・ガイド開閉状態
+  const [externalTestResult, setExternalTestResult] = useState<{
+    success: boolean;
+    latencyMs?: number;
+    modelsCount?: number;
+    hasEmbedding?: boolean;
+    embeddingDim?: number;
+    message?: string;
+  } | null>(null);
+  const [isTestingExternal, setIsTestingExternal] = useState(false);
+  const [showTermuxGuide, setShowTermuxGuide] = useState(false);
+
+  const applyExternalPreset = (preset: 'termux' | 'ollama' | 'lmstudio') => {
+    setExternalTestResult(null);
+    setExternalModelListError(null);
+    if (preset === 'termux') {
+      setExternalLlmConfig({
+        endpoint: 'http://127.0.0.1:8080',
+        model: 'default',
+        type: 'openai_compatible',
+      });
+    } else if (preset === 'ollama') {
+      setExternalLlmConfig({
+        endpoint: 'http://localhost:11434',
+        model: 'qwen2.5:1.5b',
+        type: 'ollama',
+      });
+    } else if (preset === 'lmstudio') {
+      setExternalLlmConfig({
+        endpoint: 'http://localhost:1234',
+        model: 'default',
+        type: 'openai_compatible',
+      });
+    }
+  };
+
+  const runExternalTest = async () => {
+    setIsTestingExternal(true);
+    setExternalTestResult(null);
+    setExternalModelListError(null);
+    const start = performance.now();
+    try {
+      const models = await nativeLlmService.listExternalModels(externalLlmConfig);
+      const latency = Math.round(performance.now() - start);
+      setExternalModelList(models);
+
+      // 埋め込みAPIの疎通確認
+      const embCheck = await nativeLlmService.checkEmbeddingAvailability(externalLlmConfig).catch(() => ({ available: false }));
+
+      setExternalTestResult({
+        success: true,
+        latencyMs: latency,
+        modelsCount: models.length,
+        hasEmbedding: embCheck.available,
+        embeddingDim: (embCheck as any).dimensions,
+      });
+      if (models.length > 0 && (!externalLlmConfig.model || externalLlmConfig.model === 'default')) {
+        setExternalLlmConfig((prev) => ({ ...prev, model: models[0] }));
+      }
+    } catch (err: any) {
+      setExternalTestResult({
+        success: false,
+        message: err?.message || 'サーバーから応答がありません。Termux / PC側でサーバーが起動しているか確認してください。',
+      });
+    } finally {
+      setIsTestingExternal(false);
+    }
+  };
+
   const refreshExternalModelList = async () => {
     setIsFetchingExternalModels(true);
     setExternalModelListError(null);
@@ -1440,7 +1509,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                 </div>
               </button>
 
-              {/* Option 3: External Local GPU Server (Ollama / LM Studio) */}
+              {/* Option 3: External Local GPU Server (Termux / llama-swap / Ollama / LM Studio) */}
               <button
                 onClick={() => onSelectEngine('external_gpu')}
                 className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all ${
@@ -1453,7 +1522,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
                       <HardDrive className="w-4 h-4 text-indigo-400" />
-                      <span>③ 🖥️ 外部ローカルLLM</span>
+                      <span>③ 🖥️ 外部・TermuxローカルLLM</span>
                     </span>
                     {engineMode === 'external_gpu' && (
                       <span className="text-[10px] bg-indigo-500/30 text-indigo-300 px-1.5 py-0.2 rounded font-bold border border-indigo-400/40">
@@ -1462,11 +1531,11 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                     )}
                   </div>
                   <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
-                    PCで起動中の Ollama / LM Studio (localhost:11434) のGPU/VRAMと直接通信。
+                    Termux (llama-swap / llama.cpp: 8080) や PC (Ollama / LM Studio) と直接ローカル通信。
                   </p>
                 </div>
                 <div className="text-[9.5px] text-indigo-300 font-mono flex items-center gap-1 pt-1 border-t border-indigo-500/20">
-                  <span>🖥️ 実行場所: PC GPU (CUDA / ROCm)</span>
+                  <span>🖥️ 実行場所: Termux (Galaxy S25 Swap/CPU/GPU) または PC</span>
                 </div>
               </button>
 
@@ -1580,10 +1649,50 @@ export const EngineModal: React.FC<EngineModalProps> = ({
             {/* External Local LLM Settings Panel if active */}
             {engineMode === 'external_gpu' && (
               <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/40 space-y-3 mt-3 animate-in fade-in duration-150">
-                <div className="text-xs font-bold text-indigo-200 flex items-center gap-2">
-                  <HardDrive className="w-4 h-4 text-indigo-400" />
-                  <span>外部ローカルLLMサーバー設定</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="text-xs font-bold text-indigo-200 flex items-center gap-2">
+                    <HardDrive className="w-4 h-4 text-indigo-400" />
+                    <span>外部ローカルLLM / Termuxサーバー設定</span>
+                  </div>
+                  {/* ワンクリック・プリセット */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] text-slate-400 font-semibold">プリセット:</span>
+                    <button
+                      type="button"
+                      onClick={() => applyExternalPreset('termux')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${
+                        externalLlmConfig.endpoint.includes('8080')
+                          ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/40'
+                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                      }`}
+                    >
+                      📱 Termux (8080)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyExternalPreset('ollama')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${
+                        externalLlmConfig.endpoint.includes('11434')
+                          ? 'bg-indigo-950/80 border-indigo-500 text-indigo-300 ring-1 ring-indigo-500/40'
+                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                      }`}
+                    >
+                      🦙 Ollama (11434)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyExternalPreset('lmstudio')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${
+                        externalLlmConfig.endpoint.includes('1234')
+                          ? 'bg-purple-950/80 border-purple-500 text-purple-300 ring-1 ring-purple-500/40'
+                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                      }`}
+                    >
+                      🧪 LM Studio (1234)
+                    </button>
+                  </div>
                 </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
                     <label className="text-[10px] text-slate-400 block mb-1">エンドポイントURL</label>
@@ -1591,7 +1700,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                       type="text"
                       value={externalLlmConfig.endpoint}
                       onChange={(e) => setExternalLlmConfig({ ...externalLlmConfig, endpoint: e.target.value })}
-                      placeholder="http://localhost:11434"
+                      placeholder="http://127.0.0.1:8080"
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"
                     />
                   </div>
@@ -1601,7 +1710,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                       type="text"
                       value={externalLlmConfig.model}
                       onChange={(e) => setExternalLlmConfig({ ...externalLlmConfig, model: e.target.value })}
-                      placeholder="qwen2.5:1.5b"
+                      placeholder="default または qwen2.5:1.5b"
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"
                     />
                   </div>
@@ -1612,17 +1721,111 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                       onChange={(e) => setExternalLlmConfig({ ...externalLlmConfig, type: e.target.value as any })}
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
                     >
+                      <option value="openai_compatible">OpenAI互換 (Termux / llama-swap / llama.cpp / LM Studio)</option>
                       <option value="ollama">Ollama (標準ポート 11434)</option>
-                      <option value="openai_compatible">LM Studio / llama.cpp / llama-swap (1234, 8080等 /v1)</option>
                     </select>
                   </div>
                 </div>
+
+                {/* 接続テスト実行ボタン & 結果診断バナー */}
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  <button
+                    type="button"
+                    onClick={runExternalTest}
+                    disabled={isTestingExternal}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-sm shadow-indigo-600/30"
+                  >
+                    <Activity className={`w-3.5 h-3.5 ${isTestingExternal ? 'animate-spin' : ''}`} />
+                    <span>{isTestingExternal ? '接続診断中...' : '📡 接続テスト & 診断'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowTermuxGuide(!showTermuxGuide)}
+                    className="text-[11px] text-indigo-300 hover:text-indigo-100 flex items-center gap-1 underline underline-offset-2 ml-auto"
+                  >
+                    <Terminal className="w-3 h-3 text-emerald-400" />
+                    <span>{showTermuxGuide ? 'Termuxガイドを閉じる' : 'Termux+Swap 起動ガイドを開く'}</span>
+                  </button>
+                </div>
+
+                {/* テスト結果表示 */}
+                {externalTestResult && (
+                  <div
+                    className={`p-2.5 rounded-lg border text-xs leading-relaxed animate-in fade-in duration-150 ${
+                      externalTestResult.success
+                        ? 'bg-emerald-950/50 border-emerald-500/50 text-emerald-200'
+                        : 'bg-rose-950/50 border-rose-500/50 text-rose-200'
+                    }`}
+                  >
+                    {externalTestResult.success ? (
+                      <div className="space-y-1">
+                        <div className="font-bold flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>接続成功！サーバー応答を確認しました（Ping: {externalTestResult.latencyMs}ms）</span>
+                        </div>
+                        <div className="text-[11px] text-emerald-300/90 flex items-center gap-3 flex-wrap">
+                          <span>利用可能モデル数: <strong>{externalTestResult.modelsCount}</strong> 件</span>
+                          <span>
+                            埋め込み(Embedding)API:{' '}
+                            {externalTestResult.hasEmbedding ? (
+                              <strong className="text-emerald-300">利用可能 ({externalTestResult.embeddingDim || '実'}次元)</strong>
+                            ) : (
+                              <span className="text-amber-300">未検出（8次元概念疎ベクトルへ自動フォールバック）</span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="font-bold">接続失敗</div>
+                          <div className="text-[11px] text-rose-300/90 mt-0.5">{externalTestResult.message}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Termux + Swap (llama-swap / llama-server) 設定ガイド */}
+                {showTermuxGuide && (
+                  <div className="p-3.5 rounded-xl bg-slate-900/90 border border-emerald-500/40 text-xs text-slate-300 space-y-2.5 animate-in fade-in duration-150">
+                    <div className="font-bold text-emerald-300 flex items-center gap-2">
+                      <Smartphone className="w-4 h-4 text-emerald-400" />
+                      <span>Galaxy S25 / Android + Termux Swap運用手順</span>
+                    </div>
+                    <div className="space-y-2 text-[11px] text-slate-300 leading-relaxed">
+                      <p>
+                        Termux内で <strong>llama-swap</strong> または <strong>llama-server</strong> を起動することで、スマホ単体で完全オフライン・通信量ゼロのLLM推論が可能になります。
+                      </p>
+                      <div className="p-2.5 rounded bg-slate-950 border border-slate-800 space-y-1.5 font-mono text-[10.5px]">
+                        <div className="text-slate-400 font-sans font-semibold">① スワップメモリの作成（LMK強制終了防止・推奨4GB）:</div>
+                        <code className="text-emerald-300 block select-all bg-slate-900 p-1.5 rounded">
+                          fallocate -l 4G ~/swapfile && chmod 600 ~/swapfile && mkswap ~/swapfile && swapon ~/swapfile
+                        </code>
+                        <div className="text-slate-400 font-sans font-semibold pt-1">② llama-swap の起動（複数モデル自動切替）:</div>
+                        <code className="text-sky-300 block select-all bg-slate-900 p-1.5 rounded">
+                          llama-swap --listen 127.0.0.1:8080 --config config.yaml
+                        </code>
+                        <div className="text-slate-400 font-sans font-semibold pt-1">③ または llama-server 直接起動:</div>
+                        <code className="text-amber-300 block select-all bg-slate-900 p-1.5 rounded">
+                          llama-server -m ~/storage/downloads/gguf-models/model.gguf --host 127.0.0.1 --port 8080 -c 2048 --mmap --embedding
+                        </code>
+                      </div>
+                      <div className="text-[10.5px] text-emerald-300/80">
+                        💡 <strong>接続設定</strong>: エンドポイントURLに <code>http://127.0.0.1:8080</code>、サーバー種別に「OpenAI互換」を選択し、「接続テスト」を実行してください。
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* サーバーが公開しているモデル一覧をカードで表示し、タップで切替できるようにする */}
                 <div className="pt-2 border-t border-indigo-500/20 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-indigo-300">稼働中サーバーのモデル一覧 (タップで切替)</span>
                     <button
+                      type="button"
                       onClick={refreshExternalModelList}
                       disabled={isFetchingExternalModels}
                       className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-[10px] font-semibold transition-colors disabled:opacity-50"
@@ -1645,6 +1848,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                         return (
                           <button
                             key={modelId}
+                            type="button"
                             onClick={() => setExternalLlmConfig({ ...externalLlmConfig, model: modelId })}
                             className={`p-2.5 rounded-lg border text-left flex items-center justify-between gap-2 transition-all ${
                               isActive
