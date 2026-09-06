@@ -187,6 +187,10 @@ export class NativeLlmService {
   private activeModelId: string | null = null;
   private isModelLoading: boolean = false;
   private cachedHardwareSpecs: NativeGpuInfo | null = null;
+  // 外部ローカルLLM(llama-swap等)から最後に応答があった時刻。
+  // TTLで自動アンロードされる仕様のため、これを基準にコールドスタートかどうかを判定し、
+  // タイムアウト時間を自動調整する。
+  private lastExternalLlmWarmAt: number = 0;
 
   constructor() {
     this.checkPlatform();
@@ -701,11 +705,32 @@ export class NativeLlmService {
     const activeTtlSeconds = options?.ttl ?? contextBudgetEngineService.getVariableTtlSeconds();
     systemLogger.info('EXTERNAL_GPU', `🖥️ 外部ローカルLLMサーバー (${endpoint}) に接続推論中 (TTL: ${activeTtlSeconds}s)...`);
 
-    // 接続タイムアウト (25秒以内に接続または初回チャンクがない場合はエラー)
+    // 自動調整タイムアウト:
+    // ・llama-swap等はTTL経過でモデルをアンロードするため、前回の成功応答から
+    //   activeTtlSeconds 以上経っている場合は「コールドスタート」とみなし、
+    //   モデル再ロード分の時間を見込んで長めのタイムアウトを設定する。
+    // ・一度でも応答(チャンク)が来た後は、以後は「無応答が一定時間続いたら中断する」
+    //   アイドルタイムアウトに切り替える。生成が正常に続いている限り中断されない。
+    const isColdStart = Date.now() - this.lastExternalLlmWarmAt > activeTtlSeconds * 1000;
+    const initialTimeoutMs = isColdStart ? 90000 : 20000;
+    const idleTimeoutMs = 20000;
+
     const timeoutController = new AbortController();
-    const timer = setTimeout(() => {
-      timeoutController.abort(new Error('外部LLMサーバーの応答がタイムアウトしました(25秒)。Termux側でサーバーが起動しているか確認してください。'));
-    }, 25000);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const armTimer = (ms: number, isFirstChunkPhase: boolean) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const sec = Math.round(ms / 1000);
+        timeoutController.abort(
+          new Error(
+            isFirstChunkPhase
+              ? `外部LLMサーバーの応答がタイムアウトしました(${sec}秒、コールドスタート想定)。Termux側でサーバーが起動しているか確認してください。`
+              : `外部LLMサーバーの応答が${sec}秒間止まったため中断しました。`
+          )
+        );
+      }, ms);
+    };
+    armTimer(initialTimeoutMs, true);
 
     const onExternalAbort = () => timeoutController.abort();
     if (options?.signal) {
@@ -743,7 +768,8 @@ export class NativeLlmService {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          clearTimeout(timer);
+          this.lastExternalLlmWarmAt = Date.now();
+          armTimer(idleTimeoutMs, false);
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
@@ -814,6 +840,7 @@ export class NativeLlmService {
 
         const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('application/json') && !contentType.includes('event-stream')) {
+          this.lastExternalLlmWarmAt = Date.now();
           const json = await response.json();
           const content = json.choices?.[0]?.message?.content || json.choices?.[0]?.text || '';
           if (content) yield content;
@@ -828,7 +855,8 @@ export class NativeLlmService {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          clearTimeout(timer);
+          this.lastExternalLlmWarmAt = Date.now();
+          armTimer(idleTimeoutMs, false);
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
