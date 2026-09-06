@@ -271,9 +271,10 @@ class EmbeddingService {
       );
 
       try {
+        const activeEndpoint = (overrideConfig ?? nativeLlmService.getActiveExternalConfig()).endpoint;
         await nativeBackgroundService.sendLocalNotification({
           title: '🧠 MikiAI 記憶検索の精度低下警告',
-          body: '実埋め込みサーバーがオフラインのため、記憶検索が簡易フォールバック状態です。Termux (8081) の稼働状態をご確認ください。',
+          body: `実埋め込みサーバーがオフラインのため、記憶検索が簡易フォールバック状態です。Termux (${activeEndpoint}) の稼働状態をご確認ください。`,
           data: { tab: 'memory' },
         });
         userNotified = true;
