@@ -49,7 +49,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode, CompletionEvaluation } from '../types';
-import { extractCodeBlocks } from '../utils/codeParser';
+import { extractCodeBlocks, extractFilesFromZip } from '../utils/codeParser';
 import { SPEAKER_PROFILES } from '../data/speakers';
 import { systemLogger } from '../services/systemLogger';
 import { selfImprovementService } from '../services/selfImprovementService';
@@ -393,90 +393,41 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     Array.from(files).forEach(async (file) => {
       if (file.name.toLowerCase().endsWith('.zip')) {
         try {
-          const zip = new JSZip();
-          const zipData = await zip.loadAsync(file);
-
-          // ワークスペースに展開しないパス(依存パッケージ・ビルド成果物など)の除外ルール
-          const EXCLUDED_PATH_SEGMENTS = ['node_modules/', '.git/', 'dist/', 'build/', '.next/', '__pycache__/'];
-          const EXCLUDED_EXTENSIONS = [
-            '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.bmp',
-            '.woff', '.woff2', '.ttf', '.eot', '.otf',
-            '.mp3', '.mp4', '.wav', '.ogg', '.mov',
-            '.zip', '.gz', '.tar', '.rar', '.7z',
-            '.exe', '.dll', '.so', '.class', '.jar', '.gguf', '.bin', '.pyc', '.lock',
-          ];
-          const MAX_FILE_BYTES = 500 * 1024; // 500KB超のファイルは自動展開の対象外
-
-          const getLanguageFromPath = (p: string): string => {
-            const ext = p.slice(p.lastIndexOf('.')).toLowerCase();
-            const map: Record<string, string> = {
-              '.ts': 'typescript', '.tsx': 'typescript', '.js': 'javascript', '.jsx': 'javascript',
-              '.html': 'html', '.css': 'css', '.json': 'json', '.md': 'markdown',
-              '.py': 'python', '.java': 'java', '.c': 'c', '.cpp': 'cpp', '.h': 'cpp',
-              '.vba': 'vba', '.bas': 'vba', '.cls': 'vba', '.yml': 'yaml', '.yaml': 'yaml',
-              '.sh': 'bash', '.txt': 'text', '.xml': 'xml', '.sql': 'sql',
-            };
-            return map[ext] || 'text';
-          };
-
-          const fileNames: string[] = [];
-          const extractedFiles: { path: string; name: string; content: string; language: string }[] = [];
-          let skippedCount = 0;
-
-          for (const [relativePath, zipEntry] of Object.entries(zipData.files)) {
-            if (zipEntry.dir) continue;
-            fileNames.push(relativePath);
-
-            const isExcludedPath = EXCLUDED_PATH_SEGMENTS.some((seg) => relativePath.includes(seg));
-            const ext = relativePath.slice(relativePath.lastIndexOf('.')).toLowerCase();
-            const isExcludedExt = EXCLUDED_EXTENSIONS.includes(ext);
-
-            if (isExcludedPath || isExcludedExt) {
-              skippedCount++;
-              continue;
+          const result = await extractFilesFromZip(file);
+          if (result.success && result.files.length > 0) {
+            // フォルダ構造(path)を保持したままワークスペースへ展開
+            if (onApplyCode) {
+              onApplyCode(
+                result.files.map((f) => ({
+                  path: f.path,
+                  name: f.name,
+                  content: f.content,
+                  language: f.language || 'text',
+                }))
+              );
             }
 
-            try {
-              const text = await zipEntry.async('string');
-              if (new Blob([text]).size > MAX_FILE_BYTES) {
-                skippedCount++;
-                continue;
-              }
-              const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
-              extractedFiles.push({
-                path: cleanPath,
-                name: cleanPath.split('/').pop() || cleanPath,
-                content: text,
-                language: getLanguageFromPath(cleanPath),
-              });
-            } catch {
-              skippedCount++;
-            }
+            const summary = `📦 ZIP アーカイブ「${file.name}」から ${result.files.length} 件のファイルをワークスペースに解凍・展開しました（フォルダ数: ${result.folders.length}個${result.rootPrefix ? `, ルートプレフィックス: ${result.rootPrefix}` : ''}）。\n\n展開したファイル構造:\n${result.files.slice(0, 30).map((f) => `• ${f.path}`).join('\n')}${result.files.length > 30 ? `\n...他 ${result.files.length - 30} 件` : ''}\n\nコードタブやプレビューで即座に動作確認できます。`;
+
+            setAttachedFiles((prev) => [
+              ...prev,
+              {
+                name: file.name,
+                content: summary,
+                type: 'application/zip',
+                size: file.size,
+              },
+            ]);
+          } else {
+            throw new Error(result.error || '解凍可能なファイルが見つかりませんでした');
           }
-
-          // フォルダ構造(path)を保持したままワークスペースへ展開
-          if (extractedFiles.length > 0 && onApplyCode) {
-            onApplyCode(extractedFiles);
-          }
-
-          const summary = `ZIP アーカイブ「${file.name}」から ${extractedFiles.length} 件のファイルをワークスペースに展開しました${skippedCount > 0 ? `(${skippedCount} 件はバイナリ/大容量/除外対象のためスキップ)` : ''}。\n\n展開したファイル:\n${extractedFiles.slice(0, 30).map((f) => f.path).join('\n')}${extractedFiles.length > 30 ? `\n...他 ${extractedFiles.length - 30} 件` : ''}\n\nGitHubへ反映する場合は「GitHubクラウド同期」タブから内容を確認のうえプッシュしてください(自動プッシュはしません)。`;
-
-          setAttachedFiles((prev) => [
-            ...prev,
-            {
-              name: file.name,
-              content: summary,
-              type: 'application/zip',
-              size: file.size,
-            },
-          ]);
-        } catch (zipErr) {
+        } catch (zipErr: any) {
           console.warn('ZIP parse error:', zipErr);
           setAttachedFiles((prev) => [
             ...prev,
             {
               name: file.name,
-              content: `ZIP アーカイブ (${file.name}, ${Math.round(file.size / 1024)} KB)`,
+              content: `ZIP アーカイブ (${file.name}, ${Math.round(file.size / 1024)} KB) の展開に失敗しました: ${zipErr?.message || 'エラー'}`,
               type: 'application/zip',
               size: file.size,
             },
@@ -2018,7 +1969,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           multiple
           onChange={(e) => handleFileUpload(e.target.files)}
           className="hidden"
-          accept=".html,.js,.ts,.json,.css,.txt,.md,.png,.jpg,.jpeg,.svg,.glsl,.wgsl"
+          accept=".html,.js,.ts,.json,.css,.txt,.md,.png,.jpg,.jpeg,.svg,.glsl,.wgsl,.zip,application/zip"
         />
 
         <div className="flex items-end gap-1.5 sm:gap-2 bg-slate-950 border border-slate-700/80 focus-within:border-pink-500/80 rounded-xl p-1 sm:p-1.5 transition-colors shadow-inner">

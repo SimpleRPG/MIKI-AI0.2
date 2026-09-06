@@ -2810,6 +2810,35 @@ export default function App() {
     }
   };
 
+  const handleDeleteFolder = (folderPath: string) => {
+    const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+    setWorkspaceFiles((prev) =>
+      prev.filter((f) => !(f.path === folderPath || f.path.startsWith(prefix)))
+    );
+    if (activeFilePath === folderPath || activeFilePath.startsWith(prefix)) {
+      const remaining = workspaceFiles.filter((f) => !(f.path === folderPath || f.path.startsWith(prefix)));
+      if (remaining.length > 0) setActiveFilePath(remaining[0].path);
+    }
+  };
+
+  const handleImportZipFiles = (importedFiles: WorkspaceFile[], projectName?: string) => {
+    if (!importedFiles || importedFiles.length === 0) return;
+    setWorkspaceFiles(importedFiles);
+    setActiveFilePath(importedFiles[0].path);
+
+    // AIアシスタントへZIP展開完了を通知してコンテキスト同期
+    const summaryMsg = `📦 アプリのZIP「${projectName || 'game_project'}」を解凍・展開しました（ファイル数: ${importedFiles.length}件）。コードタブおよびプレビューにフォルダ構造ごと反映されています。`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `sys-zip-${Date.now()}`,
+        role: 'system',
+        content: summaryMsg,
+        timestamp: Date.now(),
+      },
+    ]);
+  };
+
   // ツール実行ハンドラー (:feature:tools / 設計思想 14 & 22章)
   const handleExecuteTool = async (toolId: string, params: Record<string, any>, userConfirmed = false) => {
     systemLogger.info('TOOLS', `手動/推奨ツール実行リクエスト: [${toolId}]`, params);
@@ -2977,7 +3006,10 @@ export default function App() {
                 onUpdateFileContent={handleUpdateFileContent}
                 onCreateFile={handleCreateFile}
                 onDeleteFile={handleDeleteFile}
+                onDeleteFolder={handleDeleteFolder}
                 onApplySandbox={() => setActiveTab('preview')}
+                onImportZip={handleImportZipFiles}
+                onExportZip={() => setIsExportModalOpen(true)}
               />
             )}
 
@@ -3062,7 +3094,10 @@ export default function App() {
                 onUpdateFileContent={handleUpdateFileContent}
                 onCreateFile={handleCreateFile}
                 onDeleteFile={handleDeleteFile}
+                onDeleteFolder={handleDeleteFolder}
                 onApplySandbox={() => setMobileTab('preview')}
+                onImportZip={handleImportZipFiles}
+                onExportZip={() => setIsExportModalOpen(true)}
               />
             )}
 
