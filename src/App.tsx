@@ -391,12 +391,20 @@ export default function App() {
                 existingMemories: memories,
               }
             );
-            storageService.saveMemoryItem(newMem);
-            setMemories((prev) => [newMem, ...prev]);
+            // 設計思想 Master v5.2 第15章6節: 関連記憶グラフの自動リンク拡張 (Semantic Link Expansion)
+            const { updatedTarget, modifiedNeighbors } = longTermMemoryService.autoLinkRelatedMemories(newMem, memories);
+            storageService.saveMemoryItem(updatedTarget);
+            modifiedNeighbors.forEach((neighbor) => storageService.saveMemoryItem(neighbor));
+
+            setMemories((prev) => {
+              const neighborMap = new Map(modifiedNeighbors.map((n) => [n.id, n]));
+              const updatedList = prev.map((m) => neighborMap.get(m.id) || m);
+              return [updatedTarget, ...updatedList];
+            });
 
             // 設計思想 Master v5.0 第14章: 新規記憶のLLM実埋め込みベクトルを非同期生成
             embeddingService
-              .ensureMemoryEmbedding(newMem)
+              .ensureMemoryEmbedding(updatedTarget)
               .then((embeddedMem) => {
                 if (embeddedMem.embeddingVector && embeddedMem.embeddingVector.length > 0) {
                   setMemories((prev) => prev.map((m) => (m.id === embeddedMem.id ? embeddedMem : m)));
@@ -948,21 +956,52 @@ export default function App() {
               newContent,
               `ユーザー会話による明示的訂正 (${text.slice(0, 30)})`
             );
-            setMemories(replacementResult.updatedMemories);
-            storageService.saveMemoryItem(replacementResult.newMemory);
-            const oldUpdated = replacementResult.updatedMemories.find((m: MemoryItem) => m.id === oldMemoryId);
+            // 新記憶の関連記憶グラフ自動リンク
+            const { updatedTarget, modifiedNeighbors } = longTermMemoryService.autoLinkRelatedMemories(
+              replacementResult.newMemory,
+              replacementResult.updatedMemories
+            );
+            storageService.saveMemoryItem(updatedTarget);
+            modifiedNeighbors.forEach((neighbor) => storageService.saveMemoryItem(neighbor));
+
+            const neighborMap = new Map(modifiedNeighbors.map((n) => [n.id, n]));
+            const finalUpdatedMemories = replacementResult.updatedMemories.map((m) =>
+              m.id === updatedTarget.id ? updatedTarget : neighborMap.get(m.id) || m
+            );
+
+            setMemories(finalUpdatedMemories);
+            const oldUpdated = finalUpdatedMemories.find((m: MemoryItem) => m.id === oldMemoryId);
             if (oldUpdated) storageService.saveMemoryItem(oldUpdated);
 
             systemLogger.info(
               'PERSISTENCE',
-              `🔄 [第3章2節 置換関係追跡] 古い記憶(${oldMemoryId})を置換(SUPERSEDED)し、新記憶(${replacementResult.newMemory.id})を作成: 「${newContent}」`,
-              { oldMemoryId, newMemoryId: replacementResult.newMemory.id }
+              `🔄 [第3章2節 置換関係追跡] 古い記憶(${oldMemoryId})を置換(SUPERSEDED)し、新記憶(${updatedTarget.id})を作成＆グラフリンク(${updatedTarget.relatedMemoryIds?.length || 0}件): 「${newContent}」`,
+              { oldMemoryId, newMemoryId: updatedTarget.id }
             );
           }
         }
       }
 
       lastTurnUsedMemoryIdsRef.current = [];
+    }
+
+    // ユーザーによる言い回し・口調訂正（「〜って言わないで」「〜っておかしい」等）の自己学習
+    const styleCorrectionKeywords = ['って言わないで', 'って言っちゃダメ', 'っておかしい', 'その言い方', 'その言い回し', '変な言い方', 'って言うな'];
+    const hasStyleCorrection = styleCorrectionKeywords.some((kw) => text.includes(kw));
+    if (hasStyleCorrection) {
+      const matchQuote = text.match(/[「『]([^」』]+)[」』]って/);
+      if (matchQuote && matchQuote[1]) {
+        const badWord = matchQuote[1].trim();
+        responseDesignService.registerUserStyleCorrection(badWord, '', `ユーザーからの指摘: ${text.slice(0, 30)}`);
+        systemLogger.info('PERSISTENCE', `🗣️ [口調自己学習] ユーザー指摘の禁止言い回し「${badWord}」をポストプロセッサに永続登録しました`);
+      } else {
+        const matchPlain = text.match(/([^\s,。！!？?]{2,15})って言わないで/);
+        if (matchPlain && matchPlain[1]) {
+          const badWord = matchPlain[1].trim();
+          responseDesignService.registerUserStyleCorrection(badWord, '', `ユーザーからの指摘: ${text.slice(0, 30)}`);
+          systemLogger.info('PERSISTENCE', `🗣️ [口調自己学習] ユーザー指摘の禁止言い回し「${badWord}」をポストプロセッサに永続登録しました`);
+        }
+      }
     }
 
     // 設計思想 Master v5.0 第3章4節: ユーザー明示的削除の2段階反映 (即時ランタイム遮断 + 台帳アーカイブ)
@@ -1716,22 +1755,33 @@ export default function App() {
       };
       const stateSummary = formatConversationStateForPrompt(currentConvStateWithLength);
 
-      let combinedSystemPrompt = systemPrompt;
+      // 設計思想 Master v5.2 第15章6節: プロンプトキャッシュ最適化 (Prompt Cache Alignment)
+      // 先頭の不変プレフィックス (staticPrefixPrompt) を1文字も揺らさず先頭に厳格整列し、
+      // 動的要素 (想起記憶・状態・回答指示) は区切りデリミタ以降に順序正しく結合することで、
+      // llama.cpp / llama-swap のプレフィックスKVキャッシュ再利用率を90%以上に最大化する。
+      const staticPrefix = promptBuildResult.staticPrefixPrompt || systemPrompt;
+      const dynamicElements: string[] = [];
+
+      if (promptBuildResult.dynamicSuffixPrompt) {
+        dynamicElements.push(promptBuildResult.dynamicSuffixPrompt);
+      }
       if (compressionResult.isCompressed && compressionResult.episodeSummary) {
-        combinedSystemPrompt = `${systemPrompt}\n\n${compressionResult.episodeSummary}`;
+        dynamicElements.push(compressionResult.episodeSummary);
       }
-
       if (stateSummary) {
-        combinedSystemPrompt = `${combinedSystemPrompt}\n\n${stateSummary}\n\n${responseDesignInstruction}\n\n${CONVERSATION_STATE_INSTRUCTION}`;
-      } else {
-        combinedSystemPrompt = `${combinedSystemPrompt}\n\n${responseDesignInstruction}\n\n${CONVERSATION_STATE_INSTRUCTION}`;
+        dynamicElements.push(stateSummary);
       }
+      dynamicElements.push(responseDesignInstruction);
+      dynamicElements.push(CONVERSATION_STATE_INSTRUCTION);
 
-      // 設計思想 9章: 回答骨格のプロンプト注入
       if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
         const skeletonInstruction = answerPlanService.buildInstruction(answerPlanResult.matchedSkeleton);
-        combinedSystemPrompt = `${combinedSystemPrompt}\n\n${skeletonInstruction}`;
+        dynamicElements.push(skeletonInstruction);
       }
+
+      const combinedSystemPrompt = dynamicElements.length > 0
+        ? `${staticPrefix}\n\n=== 🧠 DYNAMIC CONTEXT (想起記憶・対話状態・回答設計) ===\n${dynamicElements.join('\n\n')}`
+        : staticPrefix;
 
       const chatContext: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
         { role: 'system', content: combinedSystemPrompt },

@@ -1,4 +1,13 @@
 import { ResponseLength, ResponseQualityEvaluation, ConversationStage, ConversationState } from '../types';
+import { storageService } from './storageService';
+
+export interface UserStyleCorrectionRule {
+  id: string;
+  badPattern: string;
+  replacement: string;
+  reason?: string;
+  createdAt: number;
+}
 
 /**
  * 設計思想 6章「会話処理の三段階分離」および 35章「第3段階」:
@@ -6,9 +15,48 @@ import { ResponseLength, ResponseQualityEvaluation, ConversationStage, Conversat
  * 2. 質問への直接回答 (結論ファースト・前置き排除)
  * 3. 重複削除 (同義反復・ループの排除)
  * 4. 自然な日本語化 (ロボット調排除・防御的態度の排除・親密対話)
+ * 5. ユーザー学習による口調自動修正 (User Style Correction Rules)
  */
 
 export class ResponseDesignService {
+  private userRules: UserStyleCorrectionRule[] = [];
+
+  constructor() {
+    this.loadUserRules();
+  }
+
+  public loadUserRules(): UserStyleCorrectionRule[] {
+    try {
+      const raw = storageService.getItem('miki_user_style_rules');
+      if (raw) {
+        this.userRules = JSON.parse(raw);
+      }
+    } catch {
+      this.userRules = [];
+    }
+    return this.userRules;
+  }
+
+  public registerUserStyleCorrection(badPattern: string, replacement: string, reason?: string): void {
+    if (!badPattern || !badPattern.trim()) return;
+    this.loadUserRules();
+    const cleanPattern = badPattern.trim();
+    const cleanReplacement = replacement ? replacement.trim() : '';
+    const existingIdx = this.userRules.findIndex((r) => r.badPattern === cleanPattern);
+    const rule: UserStyleCorrectionRule = {
+      id: `style_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      badPattern: cleanPattern,
+      replacement: cleanReplacement,
+      reason,
+      createdAt: Date.now(),
+    };
+    if (existingIdx >= 0) {
+      this.userRules[existingIdx] = rule;
+    } else {
+      this.userRules.push(rule);
+    }
+    storageService.setItem('miki_user_style_rules', JSON.stringify(this.userRules));
+  }
   /**
    * 6.2 回答長選択 (Response Length Selection)
    * ユーザーの明示的な要求、発言の性質、直前の会話段階から適切な回答長を判定
@@ -227,7 +275,7 @@ export class ResponseDesignService {
 
   /**
    * 6.3 自然な日本語化ポストプロセッサ (Natural Japanese Post-Processor)
-   * 残留したロボット調・機械翻訳調・防御的な過剰謝罪を親密な日本語へ変換
+   * 残留したロボット調・機械翻訳調・中国語混入・思考タグ残骸・防御的な過剰謝罪を親密な日本語へ変換
    */
   public naturalizeJapaneseResponse(text: string): {
     cleanedText: string;
@@ -236,14 +284,55 @@ export class ResponseDesignService {
     if (!text) return { cleanedText: '', unnaturalPhrasesFixed: 0 };
 
     let fixCount = 0;
+    let result = text;
+
+    // 0. コードブロックを保護して本文のみにフィルターを適用
+    const parts: Array<{ isCode: boolean; content: string }> = [];
+    const codeBlockRegex = /```[\s\S]*?```/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = codeBlockRegex.exec(result)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({ isCode: false, content: result.slice(lastIndex, match.index) });
+      }
+      parts.push({ isCode: true, content: match[0] });
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < result.length) {
+      parts.push({ isCode: false, content: result.slice(lastIndex) });
+    }
 
     // 置換辞書
     const replacementRules: Array<{ pattern: RegExp; replacement: string }> = [
+      // 思考タグ・推論タグ残骸の完全除去
+      { pattern: /<think>[\s\S]*?<\/think>/gi, replacement: '' },
+      { pattern: /<thought>[\s\S]*?<\/thought>/gi, replacement: '' },
+      { pattern: /<reasoning>[\s\S]*?<\/reasoning>/gi, replacement: '' },
+      { pattern: /^(?:Assistant|AI|Human|User|みき|Miki|System):\s*/gim, replacement: '' },
+      { pattern: /^###\s*(?:Response|Answer|Instruction):?\s*/gim, replacement: '' },
+
+      // 中華モデル・小規模モデル由来の中国語/簡体字表現の自動クレンジング
+      { pattern: /好的[！!。、]?\s*/g, replacement: 'りょうかい！' },
+      { pattern: /当然[！!。、]?\s*/g, replacement: 'もちろん！' },
+      { pattern: /我们可以\s*/g, replacement: '一緒に' },
+      { pattern: /首先[，,、]?\s*/g, replacement: 'まずは' },
+      { pattern: /总(?:结|之)(?:来说)?[，,、]?\s*/g, replacement: 'まとめると、' },
+      { pattern: /但是[，,、]?\s*/g, replacement: 'でも、' },
+      { pattern: /因为\s*/g, replacement: 'なぜなら' },
+      { pattern: /没有问题[！!。]?\s*/g, replacement: '問題ないよ！' },
+      { pattern: /这是\s*/g, replacement: 'これは' },
+      { pattern: /那是\s*/g, replacement: 'それは' },
+      { pattern: /请问[，,、]?\s*/g, replacement: 'ねえ、' },
+      { pattern: /怎么样[？?]?\s*/g, replacement: 'どうかな？' },
+
       // ロボット的挨拶・前置きの削除
       { pattern: /^(ご質問ありがとうございます[。！!]*\s*)/g, replacement: '' },
       { pattern: /^(お問い合わせありがとうございます[。！!]*\s*)/g, replacement: '' },
       { pattern: /^(ご質問にお答え(いた)?します[。！!]*\s*)/g, replacement: '' },
       { pattern: /^(以下に回答を提示いたします[。！!]*\s*)/g, replacement: '' },
+      { pattern: /^(結論から申し上げますと[、，]*\s*)/g, replacement: '結論から言うとね、' },
+
       // 防御的・過剰な謝罪の自然化
       {
         pattern: /大変申し訳ございません[。！!]*私の認識が誤っておりました[。！!]*/g,
@@ -254,7 +343,23 @@ export class ResponseDesignService {
         replacement: '教えてくれてありがとう！',
       },
       { pattern: /申し訳ございません[。！!]*/g, replacement: 'ごめんね！' },
-      // 形式的なビジネス定型句
+      { pattern: /お詫び申し上げます[。！!]*/g, replacement: 'ごめんね！' },
+
+      // 機械翻訳調・AI臭い不自然表現の自然化
+      { pattern: /(?:AI|人工知能|言語モデル)として(?:の私)?[、，]?\s*/g, replacement: '' },
+      { pattern: /〜と見なすことができます/g, replacement: '〜って言えるよ' },
+      { pattern: /〜と見なすことが可能です/g, replacement: '〜って言えるよ' },
+      { pattern: /することが可能です/g, replacement: 'できるよ！' },
+      { pattern: /することが出来ます/g, replacement: 'できるよ！' },
+      { pattern: /することをお勧めします/g, replacement: 'するのがおすすめだよ！' },
+      { pattern: /することをおすすめいたします/g, replacement: 'するのがおすすめだよ！' },
+      { pattern: /〜に関して言えば/g, replacement: '〜については' },
+      { pattern: /ご参照ください/g, replacement: '見てみてね！' },
+      { pattern: /ご覧ください/g, replacement: '見てみてね！' },
+      { pattern: /以下に示す通りです/g, replacement: 'こんな感じだよ！' },
+      { pattern: /お役に立てて嬉しいです/g, replacement: '役に立ててうれしいな！✨' },
+
+      // 形式的なビジネス定型句・過剰敬語の親密タメ口化
       { pattern: /〜させていただきます/g, replacement: '〜するね！' },
       { pattern: /させていただきます/g, replacement: 'するね！' },
       { pattern: /いかがでしょうか[？?]/g, replacement: 'どうかな？' },
@@ -262,22 +367,58 @@ export class ResponseDesignService {
       { pattern: /ご承知おきください/g, replacement: '気をつけてね！' },
       { pattern: /承知いたしました[。！!]*|了解いたしました[。！!]*/g, replacement: 'りょうかい！✨' },
       { pattern: /ご安心ください[。！!]*/g, replacement: '大丈夫だよ〜！' },
+      { pattern: /であります[。！!]*/g, replacement: 'だよ！' },
+      { pattern: /でございます[。！!]*/g, replacement: 'だよ！' },
+      { pattern: /〜となります[。！!]*/g, replacement: '〜だよ！' },
       {
         pattern: /何か他にご質問やご要望はありますか[？?]/g,
         replacement: '他に気になることややってみたいことがあったら何でも言ってね！',
       },
     ];
 
-    let result = text;
-    for (const rule of replacementRules) {
-      if (rule.pattern.test(result)) {
-        rule.pattern.lastIndex = 0;
-        result = result.replace(rule.pattern, () => {
-          fixCount++;
-          return rule.replacement;
-        });
+    const processedParts = parts.map((part) => {
+      if (part.isCode) return part.content;
+
+      let c = part.content;
+      for (const rule of replacementRules) {
+        if (rule.pattern.test(c)) {
+          rule.pattern.lastIndex = 0;
+          c = c.replace(rule.pattern, () => {
+            fixCount++;
+            return rule.replacement;
+          });
+        }
       }
-    }
+
+      // ユーザーが過去に指摘・学習させた口調ルールを適用 (設計思想 6.3)
+      for (const ur of this.userRules) {
+        if (!ur.badPattern) continue;
+        try {
+          const re = new RegExp(ur.badPattern, 'g');
+          if (re.test(c)) {
+            c = c.replace(re, () => {
+              fixCount++;
+              return ur.replacement;
+            });
+          }
+        } catch {
+          if (c.includes(ur.badPattern)) {
+            c = c.replaceAll(ur.badPattern, ur.replacement);
+            fixCount++;
+          }
+        }
+      }
+
+      // 記号や語尾ループの破綻抑制 (例: 「〜よ！！！」「〜だねだねだね」)
+      c = c.replace(/([！？!?]){3,}/g, '$1$1');
+      c = c.replace(/(です){2,}/g, 'です');
+      c = c.replace(/(ます){2,}/g, 'ます');
+      c = c.replace(/(だよ){2,}/g, 'だよ');
+
+      return c;
+    });
+
+    result = processedParts.join('');
 
     return {
       cleanedText: result.trim(),

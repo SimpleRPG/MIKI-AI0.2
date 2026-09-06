@@ -505,7 +505,36 @@ class LongTermMemoryService {
       sampleIds: Array.from(semanticScores.keys()).slice(0, 3),
     });
 
-    // Step 6: 再順位付け (Rerank & Filtering: 状態・有効性・置換・出所確認)
+    // Step 5.5: 関連記憶グラフリンク展開 (Semantic Link Expansion / GraphRAG 1ホップ展開: 第15章6節)
+    const graphLinkedIds = new Set<string>();
+    const seedMemoryIds = new Set<string>([
+      ...Array.from(exactMatchedIds),
+      ...Array.from(stateMatchedIds),
+      ...Array.from(recentMatchedIds),
+      ...Array.from(ftsMatchedIds),
+      ...Array.from(semanticScores.keys()),
+    ]);
+
+    for (const sId of seedMemoryIds) {
+      const seedMem = allMemories.find((m) => m.id === sId);
+      if (seedMem?.relatedMemoryIds && Array.isArray(seedMem.relatedMemoryIds)) {
+        for (const relId of seedMem.relatedMemoryIds) {
+          if (!seedMemoryIds.has(relId) && !this.isBlacklisted(relId)) {
+            graphLinkedIds.add(relId);
+          }
+        }
+      }
+    }
+
+    steps.push({
+      step: 6,
+      name: 'グラフリンク展開 (GraphRAG 1-Hop Expansion)',
+      count: graphLinkedIds.size,
+      description: 'シード想起記憶の関連ノード(relatedMemoryIds)を1ホップ自動展開して連鎖想起',
+      sampleIds: Array.from(graphLinkedIds).slice(0, 3),
+    });
+
+    // Step 7: 再順位付け (Rerank & Filtering: 状態・有効性・置換・出所確認)
     let filteredOutCount = 0;
     let supersededReplacedCount = 0;
     const scoredList: Array<{ memory: MemoryItem; score: number; matchStage: string; contradictionWarning?: string }> = [];
@@ -608,6 +637,12 @@ class LongTermMemoryService {
       const semSim = Math.max(semanticScores.get(memory.id) || 0, semanticScores.get(rawMemory.id) || 0);
       score += semSim * 15;
 
+      // 6. グラフリンク展開マッチ (+10点: 1ホップ連鎖想起 - 第15章6節)
+      if (graphLinkedIds.has(memory.id) || graphLinkedIds.has(rawMemory.id)) {
+        score += 10;
+        if (primaryStage === 'semantic') primaryStage = 'graph_link_expansion';
+      }
+
       // メタデータボーナス
       if (memory.pinned) score += 20; // ピン留めは最優先
       if (status === 'APPROVED') score += 5; // 確定承認済み
@@ -676,14 +711,14 @@ class LongTermMemoryService {
     const topScored = scoredList.slice(0, effectiveLimit);
 
     steps.push({
-      step: 6,
+      step: 7,
       name: '再順位付け & 厳格フィルタリング (Rerank & Filtering)',
       count: topScored.length,
       description: `置換最新版差替え(${supersededReplacedCount}件)、除外(${filteredOutCount}件)、競合注記(${contradictionPairsFlagged}件)、上位${topScored.length}件を厳選`,
       sampleIds: topScored.map((s) => s.memory.id),
     });
 
-    // Step 7: 原文再取得 (Raw Excerpt Re-acquisition)
+    // Step 8: 原文再取得 (Raw Excerpt Re-acquisition)
     const retrievedRawExcerpts = topScored.map((sm) => {
       const mem = sm.memory;
       const status = this.getLifecycleStatus(mem);
@@ -967,6 +1002,84 @@ class LongTermMemoryService {
       } catch (e) {}
     }
     return enriched;
+  }
+
+  /**
+   * 設計思想 Master v5.2 第15章6節: 関連記憶グラフの自動リンク拡張 (Semantic Link Expansion)
+   * 新規作成・更新された記憶について、既存の記憶群と意味的類似度・共通タグ・共有カテゴリを照合し、
+   * 関連性の高い記憶ノードIDを relatedMemoryIds に双方向で自動リンクする。
+   */
+  public autoLinkRelatedMemories(
+    targetMemory: MemoryItem,
+    allMemories: MemoryItem[],
+    maxLinks = 3
+  ): { updatedTarget: MemoryItem; modifiedNeighbors: MemoryItem[] } {
+    if (!targetMemory || !targetMemory.content) {
+      return { updatedTarget: targetMemory, modifiedNeighbors: [] };
+    }
+
+    const targetTokens = extractQueryTokens(targetMemory.content);
+    const targetVector = targetMemory.embeddingVector || targetMemory.domainVector || calculateDomainVector(targetMemory.content);
+    const targetId = targetMemory.id;
+    const existingLinks = new Set<string>(targetMemory.relatedMemoryIds || []);
+    const modifiedNeighbors: MemoryItem[] = [];
+
+    interface CandidateScore {
+      memory: MemoryItem;
+      score: number;
+    }
+    const candidates: CandidateScore[] = [];
+
+    for (const other of allMemories) {
+      if (other.id === targetId || other.active === false || other.lifecycleStatus === 'SUPERSEDED') continue;
+
+      let linkScore = 0;
+
+      // 1. 同一カテゴリ・ドメイン (+2点)
+      if (other.category === targetMemory.category) linkScore += 2;
+      if (other.memoryScope === targetMemory.memoryScope) linkScore += 1;
+
+      // 2. 共通キーワード・トークン重複 (1単語あたり +3点)
+      const otherTokens = extractQueryTokens(other.content || '');
+      let tokenOverlap = 0;
+      for (const tok of targetTokens) {
+        if (otherTokens.has(tok)) tokenOverlap++;
+      }
+      linkScore += tokenOverlap * 3;
+
+      // 3. 意味ベクトル類似度
+      if (targetMemory.embeddingVector && other.embeddingVector && targetMemory.embeddingVector.length === other.embeddingVector.length) {
+        const sim = calculateVectorCosineSimilarity(targetMemory.embeddingVector, other.embeddingVector);
+        if (sim > 0.6) linkScore += sim * 10;
+      } else {
+        const otherVec = other.domainVector || calculateDomainVector(other.content || '');
+        const sim = calculateCosineSimilarity(targetVector, otherVec);
+        if (sim > 0.5) linkScore += sim * 6;
+      }
+
+      if (linkScore >= 5) {
+        candidates.push({ memory: other, score: linkScore });
+      }
+    }
+
+    candidates.sort((a, b) => b.score - a.score);
+    const topCandidates = candidates.slice(0, maxLinks);
+
+    for (const cand of topCandidates) {
+      existingLinks.add(cand.memory.id);
+
+      // 相手側の記憶にも双方向で targetId を追加
+      const neighborLinks = new Set<string>(cand.memory.relatedMemoryIds || []);
+      if (!neighborLinks.has(targetId)) {
+        neighborLinks.add(targetId);
+        cand.memory.relatedMemoryIds = Array.from(neighborLinks);
+        cand.memory.updatedAt = Date.now();
+        modifiedNeighbors.push(cand.memory);
+      }
+    }
+
+    targetMemory.relatedMemoryIds = Array.from(existingLinks);
+    return { updatedTarget: targetMemory, modifiedNeighbors };
   }
 }
 

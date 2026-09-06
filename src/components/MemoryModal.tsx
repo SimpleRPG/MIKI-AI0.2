@@ -1527,6 +1527,17 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                 </span>
                               )}
 
+                              {/* 設計思想 Master v5.2 第15章6節: 関連記憶グラフリンクバッジ */}
+                              {mem.relatedMemoryIds && mem.relatedMemoryIds.length > 0 && (
+                                <span
+                                  className="px-1.5 py-0.2 rounded text-[8.5px] font-mono shrink-0 bg-teal-950 text-teal-300 border border-teal-700/60 flex items-center gap-0.5"
+                                  title={`関連記憶グラフ (${mem.relatedMemoryIds.length}ノードと自動リンク・GraphRAG展開対象)`}
+                                >
+                                  <Link className="w-2 h-2 text-teal-400" />
+                                  <span>リンク {mem.relatedMemoryIds.length}</span>
+                                </span>
+                              )}
+
                               {/* 設計思想 Master v5.0 第2章2節 感情価 (有用・混乱・熱量) */}
                               {Boolean((mem.useful_count ?? mem.usefulCount) || (mem.confusion_count ?? mem.confusionCount) || typeof mem.heat === 'number') && (
                                 <span className="px-1.5 py-0.2 rounded text-[8.5px] font-mono shrink-0 bg-slate-900 border border-slate-700/70 text-slate-300 flex items-center gap-1">
@@ -1710,6 +1721,28 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                   </div>
                                 </details>
                               )}
+                            </div>
+                          )}
+
+                          {/* Row 1.7: 関連記憶グラフリンク (第15章6節 Semantic Link Expansion) */}
+                          {mem.relatedMemoryIds && mem.relatedMemoryIds.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1 pt-1 text-[10px] text-teal-400 border-t border-slate-900">
+                              <span className="flex items-center gap-1 font-mono text-[9px] text-teal-300 bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-800/50">
+                                <Link className="w-2.5 h-2.5" />
+                                <span>関連記憶 ({mem.relatedMemoryIds.length}件):</span>
+                              </span>
+                              {mem.relatedMemoryIds.map((relId) => {
+                                const relMem = memories.find((m) => m.id === relId);
+                                return (
+                                  <span
+                                    key={relId}
+                                    className="font-mono text-[9px] text-teal-200 bg-slate-900 px-1.5 py-0.5 rounded border border-teal-900/60 max-w-[220px] truncate"
+                                    title={relMem ? relMem.content : relId}
+                                  >
+                                    🔗 {relMem ? relMem.content.slice(0, 20) + (relMem.content.length > 20 ? '...' : '') : relId.slice(0, 8)}
+                                  </span>
+                                );
+                              })}
                             </div>
                           )}
 
