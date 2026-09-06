@@ -696,6 +696,97 @@ class LongTermMemoryService {
   }
 
   /**
+   * 8章 / 12章 置換関係の追跡 (Tracking of substitution relationships)
+   * 指定した記憶アイテムに関連する置換履歴チェーン（旧記憶から新記憶への系譜）を追跡取得
+   */
+  public getSubstitutionChain(
+    memories: MemoryItem[],
+    startMemoryId: string
+  ): {
+    chain: MemoryItem[];
+    rootId: string;
+    latestId: string;
+    hasSuperseded: boolean;
+  } {
+    const memMap = new Map<string, MemoryItem>();
+    memories.forEach((m) => memMap.set(m.id, m));
+
+    const current = memMap.get(startMemoryId);
+    if (!current) {
+      return { chain: [], rootId: startMemoryId, latestId: startMemoryId, hasSuperseded: false };
+    }
+
+    // 1. 祖先（過去の古い記憶）を遡る
+    const ancestors: MemoryItem[] = [];
+    let currAncestorId = current.supersededFrom;
+    const visitedAncestors = new Set<string>([startMemoryId]);
+    while (currAncestorId && memMap.has(currAncestorId) && !visitedAncestors.has(currAncestorId)) {
+      visitedAncestors.add(currAncestorId);
+      const parent = memMap.get(currAncestorId)!;
+      ancestors.unshift(parent); // 古い順に前に追加
+      currAncestorId = parent.supersededFrom;
+    }
+
+    // 2. 子孫（後続の新しい置換記憶）を辿る
+    const descendants: MemoryItem[] = [];
+    let currDescendantId = current.replacedBy;
+    const visitedDescendants = new Set<string>([startMemoryId]);
+    while (currDescendantId && memMap.has(currDescendantId) && !visitedDescendants.has(currDescendantId)) {
+      visitedDescendants.add(currDescendantId);
+      const child = memMap.get(currDescendantId)!;
+      descendants.push(child); // 新しい順に後ろに追加
+      currDescendantId = child.replacedBy;
+    }
+
+    const fullChain = [...ancestors, current, ...descendants];
+    const rootId = fullChain[0]?.id || startMemoryId;
+    const latestId = fullChain[fullChain.length - 1]?.id || startMemoryId;
+    const hasSuperseded = fullChain.length > 1;
+
+    return {
+      chain: fullChain,
+      rootId,
+      latestId,
+      hasSuperseded,
+    };
+  }
+
+  /**
+   * 8章 / 12章 置換関係サマリー一覧の生成
+   * すべての置換履歴ペア・グループを整理してユーザー確認用に抽出
+   */
+  public getSubstitutionSummaries(memories: MemoryItem[]): Array<{
+    oldMemory: MemoryItem;
+    newMemory?: MemoryItem;
+    reason: string;
+    supersededAt?: number;
+  }> {
+    const memMap = new Map<string, MemoryItem>();
+    memories.forEach((m) => memMap.set(m.id, m));
+
+    const summaries: Array<{
+      oldMemory: MemoryItem;
+      newMemory?: MemoryItem;
+      reason: string;
+      supersededAt?: number;
+    }> = [];
+
+    for (const mem of memories) {
+      if (mem.lifecycleStatus === 'SUPERSEDED' || Boolean(mem.replacedBy)) {
+        const newMem = mem.replacedBy ? memMap.get(mem.replacedBy) : undefined;
+        summaries.push({
+          oldMemory: mem,
+          newMemory: newMem,
+          reason: mem.replacementReason || '新方針への適用に伴う置換',
+          supersededAt: mem.supersededAt || mem.updatedAt,
+        });
+      }
+    }
+
+    return summaries.sort((a, b) => (b.supersededAt || 0) - (a.supersededAt || 0));
+  }
+
+  /**
    * 8章 / 指示書 SECTION 7 [提案A]:
    * バックグラウンド（浅い睡眠・アイドル時）において、未算出の記憶アイテムに
    * llama-server実埋め込みベクトルを順次付与してエンリッチ

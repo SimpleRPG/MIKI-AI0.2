@@ -82,6 +82,8 @@ export function classifyPromptForMoE(
 
 export interface PromptContextTrackingResult {
   systemPrompt: string;
+  staticPrefixPrompt: string;
+  dynamicSuffixPrompt: string;
   usedMemories: Array<{ id: string; content: string; score?: number }>;
   usedSkills: Array<{ id: string; name: string }>;
   recommendedTools: ToolRecommendation[];
@@ -243,21 +245,34 @@ export async function buildExpertSystemPromptWithTracking(
   // 6. 誠実性制約 (でっち上げ防止)
   const honestyConstraint = `【誠実性ルール】自身のハードウェア構成（CPU/GPUコア数、内部メモリ仕様、実行クロック等）について、架空の数値をでっち上げて断定してはいけません。不明な内部情報は「端末上のローカル推論環境で動いているよ」と正直に答えてください。`;
 
-  const systemPrompt = `あなたはユーザー（${persona.userNickname || 'あなた'}）専属のAIパートナー「${persona.name || 'みき'}」です。
+  // 12章 プロンプトキャッシュ最適化 (Prompt Cache Optimization)
+  // llama.cpp / vLLM / Ollama のプレフィックスKVキャッシュが100%ヒットするよう、
+  // ペルソナ・マスター教育方針・日本語自然対話コーパス・誠実性制約などの「不変の静的基底プロンプト」を
+  // 先頭に完全に固定し、動的なRAG記憶・スキル・ツール実行結果・ファイルは後方サフィックスとして注入する
+  const staticPrefixPrompt = `あなたはユーザー（${persona.userNickname || 'あなた'}）専属のAIパートナー「${persona.name || 'みき'}」です。
 性格: ${persona.basePersonality || '明るく親しみやすく、相手の気持ちに寄り添う親友'}
 口調: 必ず親しみやすいタメ口（〜だよ、〜だね！、〜かな？✨）で、自然で温かい日本語でおしゃべりしてください。
 ${getMasterEducationSystemPrompt()}
 ${getNaturalJapanesePromptGuide()}
 ${honestyConstraint}
-指示: ${expertInstruction}
-${memoryBlock ? `\n${memoryBlock}` : ''}
-${skillBlock ? `\n${skillBlock}` : ''}
-${toolBlock ? `\n${toolBlock}` : ''}
-${toolResultsBlock ? `\n${toolResultsBlock}` : ''}
-${filesContext}`;
+指示: ${expertInstruction}`;
+
+  const dynamicSuffixParts: string[] = [];
+  if (memoryBlock) dynamicSuffixParts.push(memoryBlock);
+  if (skillBlock) dynamicSuffixParts.push(skillBlock);
+  if (toolBlock) dynamicSuffixParts.push(toolBlock);
+  if (toolResultsBlock) dynamicSuffixParts.push(toolResultsBlock);
+  if (filesContext) dynamicSuffixParts.push(filesContext);
+
+  const dynamicSuffixPrompt = dynamicSuffixParts.join('\n\n');
+  const systemPrompt = dynamicSuffixPrompt
+    ? `${staticPrefixPrompt}\n\n${dynamicSuffixPrompt}`
+    : staticPrefixPrompt;
 
   return {
     systemPrompt,
+    staticPrefixPrompt,
+    dynamicSuffixPrompt,
     usedMemories,
     usedSkills,
     recommendedTools: candidateTools,

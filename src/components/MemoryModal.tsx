@@ -103,6 +103,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   const [supersedeModalOldMemId, setSupersedeModalOldMemId] = useState<string | null>(null);
   const [supersedeNewContent, setSupersedeNewContent] = useState('');
   const [supersedeReason, setSupersedeReason] = useState('');
+  const [selectedChainMemoryId, setSelectedChainMemoryId] = useState<string | null>(null);
 
   // 7段階検索パイプライン実行ハンドラ
   const handleRunPipelineSearch = async () => {
@@ -2798,38 +2799,117 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                               </div>
 
                               {/* 操作ボタン */}
-                              {!isSuperseded && (
-                                <div className="flex flex-col gap-1 shrink-0">
+                              <div className="flex flex-col gap-1 shrink-0">
+                                {(Boolean(mem.supersededFrom) || Boolean(mem.replacedBy) || isSuperseded) && (
                                   <button
-                                    onClick={() => {
-                                      setSupersedeModalOldMemId(mem.id);
-                                      setSupersedeNewContent('');
-                                      setSupersedeReason('');
-                                    }}
-                                    className="px-2.5 py-1 bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/40 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                                    title="この記憶を訂正・置換し、SUPERSEDEDとして新旧関係を保持します"
+                                    onClick={() => setSelectedChainMemoryId(mem.id)}
+                                    className="px-2 py-1 bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                                    title="この記憶に関連する新旧置換関係の全系譜（チェーン）を表示します"
                                   >
-                                    <ArrowRightLeft className="w-3 h-3" />
-                                    <span>置換する</span>
+                                    <GitBranch className="w-3 h-3 text-amber-400" />
+                                    <span>系譜</span>
                                   </button>
-                                  <button
-                                    onClick={() => handleTogglePin(mem.id)}
-                                    className={`px-2 py-1 rounded-lg text-[10px] transition-all cursor-pointer text-center ${
-                                      mem.pinned
-                                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                                    }`}
-                                  >
-                                    {mem.pinned ? '📌 ピン留め中' : 'ピン留め'}
-                                  </button>
-                                </div>
-                              )}
+                                )}
+
+                                {!isSuperseded && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setSupersedeModalOldMemId(mem.id);
+                                        setSupersedeNewContent('');
+                                        setSupersedeReason('');
+                                      }}
+                                      className="px-2.5 py-1 bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/40 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                                      title="この記憶を訂正・置換し、SUPERSEDEDとして新旧関係を保持します"
+                                    >
+                                      <ArrowRightLeft className="w-3 h-3" />
+                                      <span>置換する</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleTogglePin(mem.id)}
+                                      className={`px-2 py-1 rounded-lg text-[10px] transition-all cursor-pointer text-center ${
+                                        mem.pinned
+                                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                          : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                                      }`}
+                                    >
+                                      {mem.pinned ? '📌 ピン留め中' : 'ピン留め'}
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
                       })
                     )}
                   </div>
+
+                  {/* 12章 置換関係の追跡系譜 (Genealogy Chain Drawer) */}
+                  {selectedChainMemoryId && (() => {
+                    const chainInfo = longTermMemoryService.getSubstitutionChain(memories, selectedChainMemoryId);
+                    return (
+                      <div className="p-4 rounded-xl bg-slate-900 border border-amber-500/40 space-y-3 mt-4 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <GitBranch className="w-4 h-4 text-amber-400" />
+                            <h4 className="text-xs font-bold text-amber-300">
+                              置換関係の追跡系譜 (全 {chainInfo.chain.length} 件の履歴チェーン)
+                            </h4>
+                          </div>
+                          <button
+                            onClick={() => setSelectedChainMemoryId(null)}
+                            className="text-xs text-slate-400 hover:text-slate-200 px-2 py-0.5 rounded bg-slate-800 cursor-pointer"
+                          >
+                            閉じる
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          古い確定情報から最新方針への変遷を時系列（古い順 ➔ 新しい順）で追跡できます。
+                        </p>
+                        <div className="space-y-2 border-l-2 border-amber-500/40 ml-2 pl-3 py-1">
+                          {chainInfo.chain.map((chainMem, idx) => {
+                            const isSelected = chainMem.id === selectedChainMemoryId;
+                            const isOld = chainMem.lifecycleStatus === 'SUPERSEDED';
+                            return (
+                              <div
+                                key={chainMem.id}
+                                className={`p-2.5 rounded-lg border text-xs relative transition-all ${
+                                  isSelected
+                                    ? 'bg-amber-950/40 border-amber-400 shadow-sm'
+                                    : isOld
+                                    ? 'bg-slate-950/60 border-slate-800 opacity-75'
+                                    : 'bg-emerald-950/30 border-emerald-500/40'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <span className="font-mono text-[10px] text-slate-500">#{idx + 1}</span>
+                                  <span
+                                    className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${
+                                      isOld
+                                        ? 'bg-amber-500/20 text-amber-300'
+                                        : 'bg-emerald-500/20 text-emerald-300'
+                                    }`}
+                                  >
+                                    {isOld ? 'SUPERSEDED (置換済み旧記憶)' : 'ACTIVE (最新有効記憶)'}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-mono">{chainMem.id}</span>
+                                </div>
+                                <div className={isOld ? 'text-slate-400 line-through' : 'text-slate-100 font-medium'}>
+                                  {chainMem.content}
+                                </div>
+                                {chainMem.replacementReason && (
+                                  <div className="text-[10px] text-amber-300/80 mt-1">
+                                    置換理由: {chainMem.replacementReason}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             );

@@ -1694,6 +1694,7 @@ export default function App() {
           for await (const chunk of nativeLlmService.streamExternalLocalLlm(extConfig, chatContext, {
             temperature: promptAnalysis.temperature,
             signal: abortController.signal,
+            cachePrompt: true,
           })) {
             if (abortController.signal.aborted) break;
             if (firstTokenTime === null) firstTokenTime = performance.now();

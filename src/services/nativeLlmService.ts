@@ -681,11 +681,19 @@ export class NativeLlmService {
 
   /**
    * External Local LLM (Ollama / LM Studio) Stream Bridge
+   * 12章 プロンプトキャッシュ最適化 (Prompt Cache Optimization):
+   * llama.cpp server / llama-swap のプロンプトキャッシュ機能 (cache_prompt: true, slot_id, id_slot) を
+   * リクエストペイロードに明示的に含めることで、静的プロンプトプレフィックスのKVキャッシュ再利用を最大化。
    */
   public async *streamExternalLocalLlm(
     config: ExternalLocalLlmConfig,
     messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-    options?: { temperature?: number; signal?: AbortSignal }
+    options?: {
+      temperature?: number;
+      signal?: AbortSignal;
+      cachePrompt?: boolean;
+      slotId?: number;
+    }
   ): AsyncGenerator<string, void, unknown> {
     const endpoint = config.endpoint.replace(/\/$/, '');
     systemLogger.info('EXTERNAL_GPU', `🖥️ 外部ローカルLLMサーバー (${endpoint}) に接続推論中...`);
@@ -712,7 +720,10 @@ export class NativeLlmService {
             model: config.model || 'qwen2.5:1.5b',
             messages,
             stream: true,
-            options: { temperature: options?.temperature ?? 0.7 },
+            options: {
+              temperature: options?.temperature ?? 0.7,
+              use_mmap: true,
+            },
           }),
         });
 
@@ -745,8 +756,22 @@ export class NativeLlmService {
         }
       } else {
         // OpenAI Compatible (LM Studio / llama.cpp server / llama-swap)
+        // 12章: llama.cpp server の cache_prompt: true, id_slot: 0 (または指定スロット) を注入
         const url = `${endpoint}/v1/chat/completions`;
         let response: Response;
+
+        const requestBody: Record<string, any> = {
+          model: config.model || 'default',
+          messages,
+          stream: true,
+          temperature: options?.temperature ?? 0.7,
+          cache_prompt: options?.cachePrompt ?? true,
+        };
+
+        if (typeof options?.slotId === 'number') {
+          requestBody.id_slot = options.slotId;
+          requestBody.slot_id = options.slotId;
+        }
 
         try {
           response = await fetch(url, {
@@ -756,12 +781,7 @@ export class NativeLlmService {
               Accept: 'text/event-stream, application/json',
             },
             signal: timeoutController.signal,
-            body: JSON.stringify({
-              model: config.model || 'default',
-              messages,
-              stream: true,
-              temperature: options?.temperature ?? 0.7,
-            }),
+            body: JSON.stringify(requestBody),
           });
         } catch (fetchErr: any) {
           const rawMsg = fetchErr?.message || String(fetchErr);

@@ -484,6 +484,59 @@ class StorageService {
     this.setMemories(updated);
   }
 
+  /**
+   * 8.2 / 12章 記憶の置換 (SUPERSEDED 置換関係の履歴保存)
+   */
+  public supersedeMemory(
+    oldMemoryId: string,
+    newContent: string,
+    reason: string,
+    customProps?: Partial<MemoryItem>
+  ): { updatedMemories: MemoryItem[]; newMemory: MemoryItem } {
+    const now = Date.now();
+    const newMemoryId = `mem_long_${now}_${Math.random().toString(36).slice(2, 6)}`;
+    const current = this.getMemories();
+    const oldMemory = current.find((m) => m.id === oldMemoryId);
+
+    const newMemory: MemoryItem = {
+      id: newMemoryId,
+      category: customProps?.category || oldMemory?.category || 'preference',
+      content: newContent,
+      importance: customProps?.importance ?? oldMemory?.importance ?? 4,
+      pinned: customProps?.pinned ?? oldMemory?.pinned ?? false,
+      active: true,
+      approved: true,
+      lifecycleStatus: 'ACTIVE',
+      memoryScope: 'long_term',
+      longTermType: customProps?.longTermType || oldMemory?.longTermType || 'preference',
+      supersededFrom: oldMemoryId,
+      sourceRef: customProps?.sourceRef || `superseded_from_${oldMemoryId}`,
+      rawExcerpt: customProps?.rawExcerpt || newContent,
+      createdAt: now,
+      updatedAt: now,
+      useCount: 0,
+    };
+
+    const updatedMemories = current.map((m) => {
+      if (m.id === oldMemoryId) {
+        return {
+          ...m,
+          active: false,
+          lifecycleStatus: 'SUPERSEDED' as const,
+          replacedBy: newMemoryId,
+          replacementReason: reason,
+          supersededAt: now,
+          updatedAt: now,
+        };
+      }
+      return m;
+    });
+
+    updatedMemories.unshift(newMemory);
+    this.setMemories(updatedMemories);
+    return { updatedMemories, newMemory };
+  }
+
   public dismissConflict(idA: string, idB: string): void {
     const now = Date.now();
     const current = this.getMemories();
