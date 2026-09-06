@@ -1001,8 +1001,11 @@ export class NativeLlmService {
         if (saved) return JSON.parse(saved);
       }
     } catch (e) {}
-    // 設計思想 Master v5.0 第0章0.2節 & 第6章6.3節: ポート8080はバックエンドAPI、8081がllama-server/llama-swap
-    return { endpoint: 'http://127.0.0.1:8081', model: 'default', type: 'openai_compatible' };
+    // 実機検証(2026-09-06)により、EngineModal.tsxのオンボーディング手順・
+    // ユーザーの実運用ともに llama-swap / llama-server は単一ポート8080に
+    // 統一されていることを確認済み(旧仕様書が想定した8081分離は実態と不一致だったため廃止)。
+    // 詳細はマスター仕様書チャプター0.2「ポートの住み分け(訂正版)」を参照。
+    return { endpoint: 'http://127.0.0.1:8080', model: 'default', type: 'openai_compatible' };
   }
 
   /**
