@@ -48,7 +48,19 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { getGeminiApiKey, setGeminiApiKey, checkGeminiStatus, verifyGeminiApiKey } from '../services/api';
+import {
+  getGeminiApiKey,
+  setGeminiApiKey,
+  getGeminiApiKeyItems,
+  setGeminiApiKeyItems,
+  addGeminiApiKey,
+  removeGeminiApiKey,
+  checkGeminiStatus,
+  verifyGeminiApiKey,
+  verifyAllGeminiApiKeys,
+  SavedGeminiKeyItem,
+  GeminiStatusResult,
+} from '../services/api';
 
 interface EngineModalProps {
   isOpen: boolean;
@@ -254,12 +266,18 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     onSelectEngine('gemini_cloud');
   };
 
-  // Gemini API Key 設定 (ローカル実行 / Termux / PC用)
-  const [customGeminiApiKey, setCustomGeminiApiKey] = useState<string>(() => getGeminiApiKey());
-  const [showApiKeyText, setShowApiKeyText] = useState(false);
-  const [geminiStatus, setGeminiStatus] = useState<{ configured: boolean; source: string; activeModel: string; preview?: string } | null>(null);
+  // Gemini API Key 設定 (複数プロジェクト & ローカル実行 / Termux / PC用)
+  const [geminiKeyItems, setGeminiKeyItems] = useState<SavedGeminiKeyItem[]>(() => getGeminiApiKeyItems());
+  const [newKeyInput, setNewKeyInput] = useState('');
+  const [newKeyLabel, setNewKeyLabel] = useState('');
+  const [showNewKeyText, setShowNewKeyText] = useState(false);
+  const [showKeyTextMap, setShowKeyTextMap] = useState<Record<string, boolean>>({});
+  const [geminiStatus, setGeminiStatus] = useState<GeminiStatusResult | null>(null);
+  const [keyVerifyStatusMap, setKeyVerifyStatusMap] = useState<Record<string, { status: 'idle' | 'testing' | 'success' | 'error'; message?: string }>>({});
+  const [isTestingAllKeys, setIsTestingAllKeys] = useState(false);
   const [apiVerifyStatus, setApiVerifyStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [apiVerifyMsg, setApiVerifyMsg] = useState('');
+  const [showQuotaExplanation, setShowQuotaExplanation] = useState(true);
 
   const refreshGeminiStatus = async () => {
     try {
@@ -270,31 +288,88 @@ export const EngineModal: React.FC<EngineModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setGeminiKeyItems(getGeminiApiKeyItems());
       refreshGeminiStatus();
     }
   }, [isOpen]);
 
-  const handleSaveGeminiKey = (key: string) => {
-    const trimmed = key.trim();
-    setCustomGeminiApiKey(trimmed);
-    setGeminiApiKey(trimmed);
-    refreshGeminiStatus();
+  const handleAddGeminiKey = () => {
+    const trimmedKey = newKeyInput.trim();
+    if (!trimmedKey) return;
+    const label = newKeyLabel.trim() || `プロジェクト ${geminiKeyItems.length + 1}`;
+    const updated = addGeminiApiKey(trimmedKey, label);
+    setGeminiKeyItems([...updated]);
+    setNewKeyInput('');
+    setNewKeyLabel('');
     setApiVerifyStatus('idle');
-    setApiVerifyMsg(trimmed ? 'APIキーを端末ローカルに保存しました。' : 'APIキーを消去しました。');
+    setApiVerifyMsg(`APIキー（${label}）を追加しました。`);
+    refreshGeminiStatus();
   };
 
-  const handleTestGeminiConnection = async () => {
+  const handleRemoveGeminiKey = (id: string, label: string) => {
+    const updated = removeGeminiApiKey(id);
+    setGeminiKeyItems([...updated]);
+    setApiVerifyStatus('idle');
+    setApiVerifyMsg(`APIキー（${label}）を削除しました。`);
+    refreshGeminiStatus();
+  };
+
+  const handleTestSingleKey = async (item: SavedGeminiKeyItem) => {
+    setKeyVerifyStatusMap((prev) => ({
+      ...prev,
+      [item.id]: { status: 'testing', message: '検証中...' },
+    }));
+    const res = await verifyGeminiApiKey(item.key);
+    if (res.valid) {
+      setKeyVerifyStatusMap((prev) => ({
+        ...prev,
+        [item.id]: { status: 'success', message: `${res.model || '接続成功'} (OK)` },
+      }));
+    } else {
+      setKeyVerifyStatusMap((prev) => ({
+        ...prev,
+        [item.id]: {
+          status: 'error',
+          message: res.isQuotaExceeded ? 'クォータ超過 (429)' : (res.error || 'エラー'),
+        },
+      }));
+    }
+    refreshGeminiStatus();
+  };
+
+  const handleTestAllKeys = async () => {
+    if (geminiKeyItems.length === 0) return;
+    setIsTestingAllKeys(true);
     setApiVerifyStatus('testing');
-    setApiVerifyMsg('Gemini 3.8 Flash へ通信テスト中...');
-    const res = await verifyGeminiApiKey(customGeminiApiKey);
+    setApiVerifyMsg('登録されている全APIキーの接続・クォータ状態を一括テスト中...');
+
+    const res = await verifyAllGeminiApiKeys(geminiKeyItems.map((k) => k.key));
+    setIsTestingAllKeys(false);
+
     if (res.valid) {
       setApiVerifyStatus('success');
-      setApiVerifyMsg(`接続成功！ (${res.model || 'Gemini 3.8 Flash'} から応答を確認しました)`);
-      refreshGeminiStatus();
+      setApiVerifyMsg(`全キー検証完了: ${res.successCount} / ${res.totalCount} 個のキーが利用可能です！`);
     } else {
       setApiVerifyStatus('error');
-      setApiVerifyMsg(res.error || '接続テストに失敗しました。キーやネットワークを確認してください。');
+      setApiVerifyMsg(`検証エラー: 有効なキーが確認できませんでした。`);
     }
+
+    const newStatusMap: Record<string, { status: 'idle' | 'testing' | 'success' | 'error'; message?: string }> = {};
+    geminiKeyItems.forEach((item) => {
+      const match = res.results.find((r) => r.key === item.key);
+      if (match) {
+        newStatusMap[item.id] = {
+          status: match.valid ? 'success' : 'error',
+          message: match.valid
+            ? '接続成功'
+            : match.isQuotaExceeded
+            ? 'クォータ超過 (429)'
+            : match.error || 'エラー',
+        };
+      }
+    });
+    setKeyVerifyStatusMap(newStatusMap);
+    refreshGeminiStatus();
   };
 
   // External Local GPU (Ollama / LM Studio) Configuration
@@ -1663,9 +1738,9 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                 <div className="text-[9.5px] text-sky-300 font-mono flex items-center justify-between pt-1 border-t border-sky-500/20">
                   <span>☁️ 実行場所: クラウドAPI (Gemini 3.8 Flash)</span>
                   <div className="flex items-center gap-1.5">
-                    {geminiStatus?.source === 'custom' ? (
+                    {geminiKeyItems.length > 0 ? (
                       <span className="text-[9px] text-emerald-300 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/40 font-bold flex items-center gap-0.5">
-                        <Key className="w-2.5 h-2.5 text-amber-400" /> キー保存済
+                        <Key className="w-2.5 h-2.5 text-amber-400" /> {geminiKeyItems.length}個のキー登録済
                       </span>
                     ) : geminiStatus?.source === 'environment' ? (
                       <span className="text-[9px] text-sky-300 bg-sky-950/80 px-1.5 py-0.2 rounded border border-sky-500/40 font-bold">
@@ -1682,26 +1757,26 @@ export const EngineModal: React.FC<EngineModalProps> = ({
               </button>
             </div>
 
-            {/* Gemini Cloud Privacy & API Key Settings Panel */}
-            {(engineMode === 'gemini_cloud' || customGeminiApiKey) && (
+            {/* Gemini Cloud Privacy & Multi API Key Settings Panel */}
+            {(engineMode === 'gemini_cloud' || geminiKeyItems.length > 0) && (
               <div className="p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/40 space-y-3 mt-3 animate-in fade-in duration-150">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                   <div className="text-xs font-bold text-sky-200 flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-sky-400" />
-                    <span>Gemini Cloud (3.8 Flash) 外部教師 &amp; ローカル呼出設定</span>
+                    <span>Gemini Cloud (3.8 Flash) 外部教師 &amp; マルチAPIキー設定</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {geminiStatus?.source === 'custom' && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {geminiKeyItems.length > 0 && (
                       <span className="text-[10px] text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-500/40 font-bold flex items-center gap-1">
-                        <Key className="w-3 h-3 text-amber-400" /> カスタムキー有効 ({geminiStatus.preview})
+                        <Key className="w-3 h-3 text-amber-400" /> {geminiKeyItems.length}個のプロジェクトキー登録済
                       </span>
                     )}
                     {geminiStatus?.source === 'environment' && (
                       <span className="text-[10px] text-sky-300 bg-sky-950 px-2 py-0.5 rounded-full border border-sky-500/40 font-bold">
-                        ☁️ AI Studio プレビュー環境キー有効
+                        ☁️ プレビュー環境変数有効
                       </span>
                     )}
-                    {geminiStatus?.source === 'none' && (
+                    {geminiKeyItems.length === 0 && geminiStatus?.source !== 'environment' && (
                       <span className="text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-700">
                         ⚪ 未設定 (オフライン動作)
                       </span>
@@ -1713,79 +1788,223 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                   MIKI-AIの日常対話やゲーム開発は「端末ローカルLLM（オンデバイス）」で完結しますが、難問の教材生成やWeb検索の要約、高度コード診断時には、最高峰知能 **Gemini 3.8 Flash** を外部教師として呼び出せます。
                 </p>
 
+                {/* Quota & Multiple Projects Explanation Box (User Query Clarification) */}
+                <div className="p-3 bg-gradient-to-r from-sky-950/70 via-slate-900 to-indigo-950/70 rounded-lg border border-sky-500/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-bold text-sky-200 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>【解説】別プロジェクトなら1日のトークン制限は別枠？（複数キー活用法）</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowQuotaExplanation(!showQuotaExplanation)}
+                      className="text-[10.5px] text-sky-400 hover:text-sky-300 font-semibold underline cursor-pointer"
+                    >
+                      {showQuotaExplanation ? '説明を隠す ▲' : '詳しく読む ▼'}
+                    </button>
+                  </div>
+
+                  {showQuotaExplanation && (
+                    <div className="text-[11px] text-slate-300 leading-relaxed space-y-2 pt-1 border-t border-sky-500/20">
+                      <p>
+                        <strong className="text-emerald-300 font-bold">👉 結論：はい、本当です！トークン制限（クォータ）は完全に別枠になります。</strong><br />
+                        Google AI Studio / Google Cloud の制限（1分あたりのリクエスト数・1日のトークン制限）は、APIキー毎ではなく、そのキーが紐づいている <span className="text-amber-300 font-mono bg-slate-950 px-1 py-0.5 rounded border border-amber-500/30">Google Cloud Project ID</span> 単位で合算集計されます。
+                      </p>
+                      <p>
+                        そのため、<strong className="text-white">別のプロジェクト（または別のアカウント）で発行したAPIキーを複数登録</strong>しておくと、プロジェクト数に応じて1日のトークン枠が倍増します。
+                      </p>
+                      <div className="p-2 bg-slate-950/80 rounded border border-sky-500/30 text-[10.5px] text-sky-200 space-y-1">
+                        <div className="font-semibold text-white flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-amber-400" />
+                          <span>MIKI-AIの自動ローテーション &amp; クォータフォールバック機能:</span>
+                        </div>
+                        <p className="text-slate-300">
+                          登録された複数のキーにリクエストを自動分散するだけでなく、いずれかのキーが上限エラー（<code className="text-rose-300 font-mono">429 Too Many Requests / RESOURCE_EXHAUSTED</code>）を起こした際は、<strong>同じリクエスト内で即座に次のプロジェクトキーへ自動切り替え</strong>して処理を続行します！
+                        </p>
+                      </div>
+                      <div className="text-[10px] text-amber-200/90 bg-amber-950/40 p-2 rounded border border-amber-500/30 flex items-start gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <span>
+                          <strong>重要（注意点）:</strong> 同一のGoogle Cloudプロジェクト内で複数のAPIキーを作成しても、1つのプロジェクト制限枠を分け合うだけです。上限枠を増やしたい場合は、AI Studioの画面左上から必ず「<span className="underline font-bold text-amber-100">Create new project (新規プロジェクト)</span>」を作成し、別プロジェクトのキーを発行して登録してください。
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* API Key Configuration Block */}
-                <div className="p-3 bg-slate-900/90 rounded-lg border border-sky-500/30 space-y-2.5">
+                <div className="p-3 bg-slate-900/90 rounded-lg border border-sky-500/30 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                       <Key className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Google AI Studio API Key (ローカル・Termux・PC実行用)</span>
+                      <span>Google AI Studio APIキー一覧 ({geminiKeyItems.length}件登録中)</span>
                     </div>
-                    <a
-                      href="https://aistudio.google.com/apikey"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10.5px] text-sky-400 hover:text-sky-300 underline font-medium flex items-center gap-1"
-                    >
-                      無料キーを発行 ↗
-                    </a>
+                    <div className="flex items-center gap-2">
+                      {geminiKeyItems.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleTestAllKeys}
+                          disabled={isTestingAllKeys}
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sky-300 rounded-md text-[11px] font-bold transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                          title="全キーの接続状況とクォータを一括検証"
+                        >
+                          {isTestingAllKeys ? <RefreshCw className="w-3 h-3 animate-spin text-sky-400" /> : <Zap className="w-3 h-3 text-amber-400" />}
+                          <span>{isTestingAllKeys ? '一括検証中...' : '全キー一括テスト'}</span>
+                        </button>
+                      )}
+                      <a
+                        href="https://aistudio.google.com/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10.5px] text-sky-400 hover:text-sky-300 underline font-medium flex items-center gap-1"
+                      >
+                        無料キー発行 ↗
+                      </a>
+                    </div>
                   </div>
 
-                  <p className="text-[10.5px] text-slate-400 leading-relaxed">
-                    プレビューだけでなく、自分のPCやスマホ（Termux）でローカル実行する際にGeminiを呼び出すには、AI Studioで発行したAPIキーをここに保存してください。
-                  </p>
-
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
+                  {/* Add New Key Form */}
+                  <div className="bg-slate-950/90 p-2.5 rounded-lg border border-slate-800 space-y-2">
+                    <div className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+                      <Plus className="w-3.5 h-3.5 text-sky-400" />
+                      <span>新しいプロジェクトのAPIキーを追加</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
-                        type={showApiKeyText ? 'text' : 'password'}
-                        value={customGeminiApiKey}
-                        onChange={(e) => setCustomGeminiApiKey(e.target.value)}
-                        placeholder="AIzaSy... (Google AI Studio API Key)"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-sky-500 pr-9"
+                        type="text"
+                        value={newKeyLabel}
+                        onChange={(e) => setNewKeyLabel(e.target.value)}
+                        placeholder="プロジェクト名 (例: Project A / 予備)"
+                        className="sm:w-1/3 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500"
                       />
+                      <div className="relative flex-1">
+                        <input
+                          type={showNewKeyText ? 'text' : 'password'}
+                          value={newKeyInput}
+                          onChange={(e) => setNewKeyInput(e.target.value)}
+                          placeholder="AIzaSy... (API Key)"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono placeholder-slate-500 focus:outline-none focus:border-sky-500 pr-8"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddGeminiKey();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewKeyText(!showNewKeyText)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
+                          title={showNewKeyText ? 'キーを隠す' : 'キーを表示'}
+                        >
+                          {showNewKeyText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => setShowApiKeyText(!showApiKeyText)}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-                        title={showApiKeyText ? 'キーを隠す' : 'キーを表示'}
+                        onClick={handleAddGeminiKey}
+                        disabled={!newKeyInput.trim()}
+                        className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:hover:bg-sky-600 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer"
                       >
-                        {showApiKeyText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>追加</span>
                       </button>
                     </div>
+                  </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleSaveGeminiKey(customGeminiApiKey)}
-                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold transition-colors whitespace-nowrap"
-                    >
-                      保存
-                    </button>
+                  {/* Registered Keys List */}
+                  <div className="space-y-2">
+                    {geminiKeyItems.length === 0 ? (
+                      <div className="p-3 rounded-lg bg-slate-950/40 border border-dashed border-slate-800 text-center text-xs text-slate-400">
+                        まだカスタムAPIキーが登録されていません。上の入力欄からプロジェクトキーを追加してください。<br />
+                        <span className="text-[10px] text-slate-500">※未登録時もAI Studioプレビュー環境キーまたはオフライン知能で動作可能です。</span>
+                      </div>
+                    ) : (
+                      geminiKeyItems.map((item, idx) => {
+                        const isVisible = Boolean(showKeyTextMap[item.id]);
+                        const keyStatus = keyVerifyStatusMap[item.id];
+                        return (
+                          <div
+                            key={item.id}
+                            className="p-2.5 bg-slate-950/90 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-5 h-5 rounded-full bg-slate-800 text-sky-400 text-[11px] font-mono font-bold flex items-center justify-center flex-shrink-0">
+                                {idx + 1}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="text-xs font-semibold text-slate-200 flex items-center gap-1.5 flex-wrap">
+                                  <span className="truncate max-w-[180px]">{item.label}</span>
+                                  {idx === 0 && (
+                                    <span className="text-[9px] text-sky-400 bg-sky-950/80 px-1.5 py-0.2 rounded border border-sky-800 font-medium">
+                                      プライマリ
+                                    </span>
+                                  )}
+                                  {keyStatus?.status === 'success' && (
+                                    <span className="text-[10px] text-emerald-300 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/40 font-bold flex items-center gap-0.5">
+                                      <CheckCircle2 className="w-2.5 h-2.5" /> 接続OK
+                                    </span>
+                                  )}
+                                  {keyStatus?.status === 'error' && (
+                                    <span className="text-[10px] text-rose-300 bg-rose-950/80 px-1.5 py-0.2 rounded border border-rose-500/40 font-bold flex items-center gap-0.5">
+                                      <AlertTriangle className="w-2.5 h-2.5" /> {keyStatus.message || 'エラー'}
+                                    </span>
+                                  )}
+                                  {keyStatus?.status === 'testing' && (
+                                    <span className="text-[10px] text-sky-300 bg-sky-950/80 px-1.5 py-0.2 rounded border border-sky-500/40 font-bold flex items-center gap-0.5">
+                                      <RefreshCw className="w-2.5 h-2.5 animate-spin" /> テスト中
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                  <span className="select-all">
+                                    {isVisible
+                                      ? item.key
+                                      : `${item.key.slice(0, 6)}••••••••••••${item.key.slice(-4)}`}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setShowKeyTextMap((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                                    }
+                                    className="text-slate-500 hover:text-slate-300 cursor-pointer"
+                                    title={isVisible ? 'キーを隠す' : 'キーを表示'}
+                                  >
+                                    {isVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
 
-                    <button
-                      type="button"
-                      onClick={handleTestGeminiConnection}
-                      disabled={apiVerifyStatus === 'testing'}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sky-300 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 whitespace-nowrap disabled:opacity-50"
-                    >
-                      <Zap className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{apiVerifyStatus === 'testing' ? '確認中...' : '接続テスト'}</span>
-                    </button>
-
-                    {customGeminiApiKey && (
-                      <button
-                        type="button"
-                        onClick={() => handleSaveGeminiKey('')}
-                        className="px-2.5 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800 text-rose-300 rounded-lg text-xs font-medium transition-colors"
-                        title="キーを消去"
-                      >
-                        消去
-                      </button>
+                            <div className="flex items-center gap-1.5 flex-shrink-0 self-end sm:self-center">
+                              <button
+                                type="button"
+                                onClick={() => handleTestSingleKey(item)}
+                                disabled={keyStatus?.status === 'testing'}
+                                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sky-300 rounded text-[11px] font-medium transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                              >
+                                <Zap className="w-3 h-3 text-amber-400" />
+                                <span>{keyStatus?.status === 'testing' ? '検証中' : 'テスト'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveGeminiKey(item.id, item.label)}
+                                className="px-2.5 py-1 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/80 text-rose-300 rounded text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                                title="このキーを削除"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>削除</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
 
                   {apiVerifyMsg && (
                     <div
-                      className={`p-2 rounded text-xs flex items-center gap-2 ${
+                      className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
                         apiVerifyStatus === 'success'
                           ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
                           : apiVerifyStatus === 'error'
@@ -1800,8 +2019,13 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                     </div>
                   )}
 
-                  <div className="text-[10px] text-slate-400 pt-0.5">
-                    💡 <span className="font-semibold text-slate-300">サーバー側の設定方法:</span> ローカルPCやTermuxで動かす時は、プロジェクト直下に <code className="bg-slate-950 text-sky-300 px-1 py-0.5 rounded font-mono">.env</code> を作成し <code className="text-amber-300 font-mono">GEMINI_API_KEY=AIzaSy...</code> と書くだけでも自動認識されます。
+                  <div className="text-[10px] text-slate-400 pt-0.5 space-y-1">
+                    <div>
+                      💡 <span className="font-semibold text-slate-300">サーバー側の設定方法:</span> ローカルPCやTermuxで動かす時は、プロジェクト直下の <code className="bg-slate-950 text-sky-300 px-1 py-0.5 rounded font-mono">.env</code> に <code className="text-amber-300 font-mono">GEMINI_API_KEY=AIzaSy...</code> またはカンマ区切り <code className="text-amber-300 font-mono">GEMINI_API_KEYS=key1,key2</code> と書くだけでも自動認識されます。
+                    </div>
+                    <div>
+                      🔄 <span className="font-semibold text-slate-300">自動分散・フォールバック:</span> リクエスト毎にキーが自動ローテーションされ、429（クォータ上限）発生時は別プロジェクトのキーへ瞬時に切り替わります。
+                    </div>
                   </div>
                 </div>
 

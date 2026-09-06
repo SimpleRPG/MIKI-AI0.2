@@ -21,27 +21,302 @@ export function apiUrl(path: string): string {
   return base ? `${base}${path}` : path;
 }
 
+export interface SavedGeminiKeyItem {
+  id: string;
+  key: string;
+  label: string;
+  createdAt: number;
+}
+
+// Vite client-side environment variable detection (VITE_GEMINI_API_KEYS, VITE_GEMINI_API_KEY, etc.)
+export function getViteEnvApiKeys(): SavedGeminiKeyItem[] {
+  const items: SavedGeminiKeyItem[] = [];
+  try {
+    const metaEnv: any = (import.meta as any).env;
+    if (metaEnv) {
+      if (typeof metaEnv.VITE_GEMINI_API_KEYS === 'string' && metaEnv.VITE_GEMINI_API_KEYS) {
+        metaEnv.VITE_GEMINI_API_KEYS.split(/[,\n]/).forEach((k: string, idx: number) => {
+          const trimmed = k.trim().replace(/^["']|["']$/g, '');
+          if (trimmed) {
+            items.push({
+              id: `env_vite_keys_${idx}`,
+              key: trimmed,
+              label: `Vite環境変数 (VITE_GEMINI_API_KEYS #${idx + 1})`,
+              createdAt: Date.now(),
+            });
+          }
+        });
+      }
+      if (typeof metaEnv.VITE_GEMINI_API_KEY === 'string' && metaEnv.VITE_GEMINI_API_KEY) {
+        const trimmed = metaEnv.VITE_GEMINI_API_KEY.trim().replace(/^["']|["']$/g, '');
+        if (trimmed && !items.some((i) => i.key === trimmed)) {
+          items.push({
+            id: 'env_vite_key_primary',
+            key: trimmed,
+            label: 'Vite環境変数 (VITE_GEMINI_API_KEY)',
+            createdAt: Date.now(),
+          });
+        }
+      }
+      Object.keys(metaEnv).forEach((k) => {
+        if (/^VITE_GEMINI_API_KEY_\d+$/i.test(k) && typeof metaEnv[k] === 'string') {
+          const trimmed = (metaEnv[k] as string).trim().replace(/^["']|["']$/g, '');
+          if (trimmed && !items.some((i) => i.key === trimmed)) {
+            items.push({
+              id: `env_${k.toLowerCase()}`,
+              key: trimmed,
+              label: `Vite環境変数 (${k})`,
+              createdAt: Date.now(),
+            });
+          }
+        }
+      });
+    }
+  } catch (e) {
+    console.warn('Vite env detection error:', e);
+  }
+  return items;
+}
+
+export function getGeminiApiKeyItems(): SavedGeminiKeyItem[] {
+  try {
+    const raw = storageService.getItem('miki_custom_gemini_api_keys');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+          .map((item, idx) => {
+            if (typeof item === 'string') {
+              return {
+                id: `key_${idx}_${Date.now()}`,
+                key: item.trim(),
+                label: `プロジェクト ${idx + 1}`,
+                createdAt: Date.now(),
+              };
+            }
+            return {
+              id: item.id || `key_${idx}_${Date.now()}`,
+              key: (item.key || '').trim(),
+              label: item.label || `プロジェクト ${idx + 1}`,
+              createdAt: item.createdAt || Date.now(),
+            };
+          })
+          .filter((item) => Boolean(item.key));
+      }
+    }
+  } catch (e) {
+    console.warn('Error reading miki_custom_gemini_api_keys:', e);
+  }
+
+  // Fallback to legacy single key
+  const legacyKey = (storageService.getItem('miki_custom_gemini_api_key') || '').trim();
+  if (legacyKey) {
+    const defaultItem: SavedGeminiKeyItem = {
+      id: 'key_primary_legacy',
+      key: legacyKey,
+      label: 'メインプロジェクト',
+      createdAt: Date.now(),
+    };
+    storageService.setItem('miki_custom_gemini_api_keys', JSON.stringify([defaultItem]));
+    return [defaultItem];
+  }
+
+  // Check Vite client-side environment variables if not yet configured in localStorage
+  const viteKeys = getViteEnvApiKeys();
+  if (viteKeys.length > 0) {
+    storageService.setItem('miki_custom_gemini_api_keys', JSON.stringify(viteKeys));
+    return viteKeys;
+  }
+
+  return [];
+}
+
+export function setGeminiApiKeyItems(items: SavedGeminiKeyItem[]): void {
+  const cleanItems = items
+    .map((i) => ({
+      id: i.id || `key_${Math.random().toString(36).substring(2, 9)}`,
+      key: i.key.trim(),
+      label: (i.label || '').trim() || 'プロジェクト',
+      createdAt: i.createdAt || Date.now(),
+    }))
+    .filter((i) => Boolean(i.key));
+
+  storageService.setItem('miki_custom_gemini_api_keys', JSON.stringify(cleanItems));
+  // Keep legacy key in sync for backwards compatibility
+  if (cleanItems.length > 0) {
+    storageService.setItem('miki_custom_gemini_api_key', cleanItems[0].key);
+  } else {
+    storageService.removeItem('miki_custom_gemini_api_key');
+  }
+}
+
+export function getGeminiApiKeys(): string[] {
+  return getGeminiApiKeyItems().map((item) => item.key);
+}
+
 export function getGeminiApiKey(): string {
-  return (storageService.getItem('miki_custom_gemini_api_key') || '').trim();
+  const keys = getGeminiApiKeys();
+  return keys[0] || '';
 }
 
 export function setGeminiApiKey(key: string): void {
-  storageService.setItem('miki_custom_gemini_api_key', key.trim());
+  const trimmed = key.trim();
+  if (!trimmed) {
+    setGeminiApiKeyItems([]);
+    return;
+  }
+  const items = getGeminiApiKeyItems();
+  if (items.length === 0) {
+    setGeminiApiKeyItems([
+      { id: `key_${Date.now()}`, key: trimmed, label: 'メインプロジェクト', createdAt: Date.now() },
+    ]);
+  } else {
+    items[0].key = trimmed;
+    setGeminiApiKeyItems(items);
+  }
+}
+
+export function addGeminiApiKey(key: string, label?: string): SavedGeminiKeyItem[] {
+  const trimmed = key.trim();
+  if (!trimmed) return getGeminiApiKeyItems();
+  const items = getGeminiApiKeyItems();
+  const existingIdx = items.findIndex((i) => i.key === trimmed);
+  if (existingIdx >= 0) {
+    if (label) items[existingIdx].label = label.trim();
+  } else {
+    items.push({
+      id: `key_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      key: trimmed,
+      label: (label || '').trim() || `プロジェクト ${items.length + 1}`,
+      createdAt: Date.now(),
+    });
+  }
+  setGeminiApiKeyItems(items);
+  return items;
+}
+
+export function removeGeminiApiKey(idOrKey: string): SavedGeminiKeyItem[] {
+  const items = getGeminiApiKeyItems().filter((i) => i.id !== idOrKey && i.key !== idOrKey);
+  setGeminiApiKeyItems(items);
+  return items;
 }
 
 export function getCustomApiHeaders(extraHeaders?: Record<string, string>): Record<string, string> {
-  const key = getGeminiApiKey();
+  const keys = getGeminiApiKeys();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(extraHeaders || {}),
   };
-  if (key) {
-    headers['x-gemini-api-key'] = key;
+  if (keys.length > 0) {
+    headers['x-gemini-api-key'] = keys[0];
+    headers['x-gemini-api-keys'] = keys.join(',');
   }
   return headers;
 }
 
-export async function checkGeminiStatus(): Promise<{ configured: boolean; source: string; activeModel: string; preview?: string }> {
+export interface GeminiStatusResult {
+  configured: boolean;
+  totalKeys?: number;
+  activeKeysCount?: number;
+  source: string;
+  sources?: string[];
+  activeModel: string;
+  preview?: string;
+  keys?: Array<{
+    index: number;
+    preview: string;
+    source: string;
+    varName?: string;
+    status: 'active' | 'exhausted';
+    exhaustedUntil?: number;
+    successCount?: number;
+    failureCount?: number;
+  }>;
+}
+
+export interface ServerEnvKeysInfo {
+  envFileExists: boolean;
+  envFilePath: string;
+  keys: Array<{
+    index: number;
+    varName: string;
+    preview: string;
+    length: number;
+  }>;
+  totalEnvKeys: number;
+}
+
+export async function fetchServerEnvKeysInfo(): Promise<ServerEnvKeysInfo | null> {
+  try {
+    const res = await fetch(apiUrl('/api/gemini/env-keys'));
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.warn('Failed to fetch server env keys info:', e);
+  }
+  return null;
+}
+
+export async function importServerEnvKeys(): Promise<{ success: boolean; message: string; items: SavedGeminiKeyItem[] }> {
+  try {
+    const res = await fetch(apiUrl('/api/gemini/import-env-keys'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await res.json();
+    if (res.ok && data.success && Array.isArray(data.items)) {
+      return { success: true, message: data.message, items: data.items };
+    }
+    return { success: false, message: data.message || '環境変数キーを取得できませんでした。', items: [] };
+  } catch (err: any) {
+    return { success: false, message: err?.message || 'サーバーとの通信に失敗しました。', items: [] };
+  }
+}
+
+export async function saveKeysToServerEnv(keys: SavedGeminiKeyItem[]): Promise<{ success: boolean; message: string; envFilePath?: string }> {
+  try {
+    const res = await fetch(apiUrl('/api/gemini/save-env'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keys }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return { success: true, message: data.message, envFilePath: data.envFilePath };
+    }
+    return { success: false, message: data.error || 'サーバーの .env 保存に失敗しました。' };
+  } catch (err: any) {
+    return { success: false, message: err?.message || 'サーバーとの通信に失敗しました。' };
+  }
+}
+
+export function formatKeysAsDotEnv(keys: SavedGeminiKeyItem[]): string {
+  if (keys.length === 0) {
+    return '# .env\nGEMINI_API_KEY=\nGEMINI_API_KEYS=\n';
+  }
+  const lines: string[] = [
+    '# MIKI-AI Gemini Multi-Key Configuration for Local PC / Termux',
+    `# 生成日時: ${new Date().toLocaleString('ja-JP')}`,
+    '',
+    `# 1. カンマ区切り一括指定 (GEMINI_API_KEYS)`,
+    `GEMINI_API_KEYS=${keys.map((k) => k.key).join(',')}`,
+    '',
+    `# 2. プライマリキー`,
+    `GEMINI_API_KEY=${keys[0].key}`,
+    '',
+    `# 3. 個別プロジェクトキー (プロジェクト毎に1日のトークン枠が独立)`,
+  ];
+
+  keys.forEach((k, idx) => {
+    lines.push(`# プロジェクト: ${k.label || `Project ${idx + 1}`}`);
+    lines.push(`GEMINI_API_KEY_${idx + 1}=${k.key}`);
+  });
+
+  return lines.join('\n');
+}
+
+export async function checkGeminiStatus(): Promise<GeminiStatusResult> {
   try {
     const res = await fetch(apiUrl('/api/gemini/status'), {
       headers: getCustomApiHeaders(),
@@ -52,16 +327,29 @@ export async function checkGeminiStatus(): Promise<{ configured: boolean; source
   } catch {
     // fallback to local status check
   }
-  const localKey = getGeminiApiKey();
+  const localItems = getGeminiApiKeyItems();
+  const count = localItems.length;
   return {
-    configured: !!localKey,
-    source: localKey ? 'custom' : 'none',
+    configured: count > 0,
+    totalKeys: count,
+    activeKeysCount: count,
+    source: count > 0 ? 'custom' : 'none',
     activeModel: 'gemini-3.8-flash',
-    preview: localKey ? `${localKey.slice(0, 6)}...${localKey.slice(-4)}` : '未設定'
+    preview: count === 0 ? '未設定' : count === 1 ? `${localItems[0].key.slice(0, 6)}...${localItems[0].key.slice(-4)}` : `${count}個のAPIキー設定済み`
   };
 }
 
-export async function verifyGeminiApiKey(keyToTest?: string): Promise<{ valid: boolean; error?: string; reply?: string; model?: string }> {
+export interface VerifyKeyResultItem {
+  key?: string;
+  preview?: string;
+  valid: boolean;
+  model?: string;
+  reply?: string;
+  error?: string;
+  isQuotaExceeded?: boolean;
+}
+
+export async function verifyGeminiApiKey(keyToTest?: string): Promise<{ valid: boolean; error?: string; reply?: string; model?: string; isQuotaExceeded?: boolean }> {
   try {
     const key = keyToTest !== undefined ? keyToTest.trim() : getGeminiApiKey();
     const res = await fetch(apiUrl('/api/gemini/verify-key'), {
@@ -73,6 +361,31 @@ export async function verifyGeminiApiKey(keyToTest?: string): Promise<{ valid: b
     return data;
   } catch (err: any) {
     return { valid: false, error: err?.message || 'サーバーとの通信に失敗しました。' };
+  }
+}
+
+export async function verifyAllGeminiApiKeys(keysToTest?: string[]): Promise<{
+  valid: boolean;
+  totalCount: number;
+  successCount: number;
+  results: VerifyKeyResultItem[];
+  reply?: string;
+}> {
+  try {
+    const keys = keysToTest || getGeminiApiKeys();
+    const res = await fetch(apiUrl('/api/gemini/verify-key'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKeys: keys }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return {
+      valid: false,
+      totalCount: 0,
+      successCount: 0,
+      results: [{ valid: false, error: err?.message || '通信エラー' }]
+    };
   }
 }
 

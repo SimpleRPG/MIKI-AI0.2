@@ -14,59 +14,275 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Lazy Google GenAI Client with Custom / Local API Key Support
-let defaultAiClient: GoogleGenAI | null = null;
+// Multi-Key Pool & Rotation Manager with Quota Fallback (設計思想: 複数プロジェクト対応)
+interface ExtractedApiKey {
+  key: string;
+  source: 'custom' | 'environment';
+  preview: string;
+  varName?: string;
+}
+
+interface KeyUsageState {
+  exhaustedUntil: number;
+  lastUsed: number;
+  failureCount: number;
+  successCount: number;
+  lastError?: string;
+}
+
+const keyStateMap = new Map<string, KeyUsageState>();
+let keyRoundRobinIndex = 0;
+
+function reloadDotenvIfPresent() {
+  try {
+    const envPath = path.join(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      dotenv.config({ path: envPath, override: true });
+    }
+  } catch {}
+}
+
+function isRateLimitOrQuotaError(err: any): boolean {
+  const status = err?.status || err?.statusCode || err?.code;
+  const msg = String(err?.message || err || '');
+  return (
+    status === 429 ||
+    status === 'RESOURCE_EXHAUSTED' ||
+    msg.includes('429') ||
+    msg.includes('RESOURCE_EXHAUSTED') ||
+    msg.includes('quota') ||
+    msg.includes('Quota') ||
+    msg.includes('rate limit') ||
+    msg.includes('Rate limit') ||
+    msg.includes('Too Many Requests')
+  );
+}
+
+function extractAllApiKeys(req?: express.Request): ExtractedApiKey[] {
+  const result: ExtractedApiKey[] = [];
+  const seen = new Set<string>();
+
+  const addKey = (k: any, source: 'custom' | 'environment', varName?: string) => {
+    if (typeof k !== 'string') return;
+    const trimmed = k.replace(/^["']|["']$/g, '').trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    const preview = trimmed.length > 10 ? `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}` : '***';
+    result.push({ key: trimmed, source, preview, varName });
+  };
+
+  // 1. Headers (custom keys sent by frontend)
+  if (req) {
+    const multiHeaders = req.headers['x-gemini-api-keys'];
+    if (multiHeaders && typeof multiHeaders === 'string') {
+      try {
+        if (multiHeaders.trim().startsWith('[')) {
+          const parsed = JSON.parse(multiHeaders);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((k: any) => addKey(k, 'custom'));
+          }
+        } else {
+          multiHeaders.split(',').forEach((k) => addKey(k, 'custom'));
+        }
+      } catch {
+        multiHeaders.split(',').forEach((k) => addKey(k, 'custom'));
+      }
+    }
+
+    const singleHeader = req.headers['x-gemini-api-key'];
+    if (singleHeader && typeof singleHeader === 'string') {
+      singleHeader.split(',').forEach((k) => addKey(k, 'custom'));
+    }
+
+    // 2. Request body
+    if (Array.isArray(req.body?.apiKeys)) {
+      req.body.apiKeys.forEach((k: any) => addKey(k, 'custom'));
+    } else if (typeof req.body?.apiKeys === 'string') {
+      req.body.apiKeys.split(',').forEach((k: any) => addKey(k, 'custom'));
+    }
+    if (typeof req.body?.apiKey === 'string') {
+      req.body.apiKey.split(',').forEach((k: any) => addKey(k, 'custom'));
+    }
+  }
+
+  // 3. Environment variables (auto-reload .env if file is present/updated)
+  reloadDotenvIfPresent();
+
+  // GEMINI_API_KEYS (comma or newline separated list of keys)
+  if (process.env.GEMINI_API_KEYS) {
+    process.env.GEMINI_API_KEYS.split(/[,\n]/).forEach((k) => addKey(k, 'environment', 'GEMINI_API_KEYS'));
+  }
+  // GEMINI_API_KEY (single key or comma-separated)
+  if (process.env.GEMINI_API_KEY) {
+    process.env.GEMINI_API_KEY.split(/[,\n]/).forEach((k) => addKey(k, 'environment', 'GEMINI_API_KEY'));
+  }
+  // GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_KEY_1, etc.
+  const envKeys = Object.keys(process.env).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  envKeys.forEach((envKey) => {
+    if (/^(GEMINI_API_KEY_\d+|GEMINI_KEY_\d+|GOOGLE_API_KEY_\d+)$/i.test(envKey)) {
+      addKey(process.env[envKey], 'environment', envKey);
+    }
+  });
+  if (process.env.GOOGLE_API_KEY) {
+    process.env.GOOGLE_API_KEY.split(/[,\n]/).forEach((k) => addKey(k, 'environment', 'GOOGLE_API_KEY'));
+  }
+  if (process.env.GOOGLE_API_KEYS) {
+    process.env.GOOGLE_API_KEYS.split(/[,\n]/).forEach((k) => addKey(k, 'environment', 'GOOGLE_API_KEYS'));
+  }
+
+  return result;
+}
 
 function extractApiKey(req?: express.Request): string | undefined {
-  if (!req) return undefined;
-  const headerKey = req.headers['x-gemini-api-key'] as string;
-  if (headerKey && typeof headerKey === 'string' && headerKey.trim()) {
-    return headerKey.trim();
-  }
-  const bodyKey = req.body?.apiKey as string;
-  if (bodyKey && typeof bodyKey === 'string' && bodyKey.trim()) {
-    return bodyKey.trim();
-  }
-  return undefined;
+  const keys = extractAllApiKeys(req);
+  return keys[0]?.key;
 }
 
 function getAIClient(req?: express.Request): GoogleGenAI | null {
-  const customKey = extractApiKey(req);
-  if (customKey) {
-    return new GoogleGenAI({ apiKey: customKey });
-  }
-  if (!defaultAiClient && process.env.GEMINI_API_KEY) {
-    defaultAiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  }
-  return defaultAiClient;
+  const keys = extractAllApiKeys(req);
+  if (keys.length === 0) return null;
+  const now = Date.now();
+  const available = keys.filter((k) => {
+    const s = keyStateMap.get(k.key);
+    return !s || s.exhaustedUntil < now;
+  });
+  const chosen = available.length > 0 ? available[0] : keys[0];
+  return new GoogleGenAI({ apiKey: chosen.key });
 }
 
 // Multi-model resilient Gemini caller with active modern models from Google GenAI SDK
 const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash'];
 
-async function generateContentWithFallback(ai: GoogleGenAI, request: { contents: any; config?: any }) {
-  let lastError: any = null;
-  for (const model of GEMINI_MODELS) {
-    try {
-      const callPromise = ai.models.generateContent({
-        model,
-        contents: request.contents,
-        config: request.config
-      });
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`Model ${model} timeout`)), 7000)
-      );
-      const response: any = await Promise.race([callPromise, timeoutPromise]);
-      if (response && response.text) {
-        return { response, modelUsed: model };
+async function generateContentWithFallback(
+  reqOrAi: express.Request | GoogleGenAI | ExtractedApiKey[],
+  request: { contents: any; config?: any }
+): Promise<{ response: any; modelUsed: string; keyPreview?: string; rotatedKeyCount?: number }> {
+  let keysToTry: ExtractedApiKey[] = [];
+
+  if (Array.isArray(reqOrAi)) {
+    keysToTry = reqOrAi;
+  } else if (reqOrAi && typeof (reqOrAi as any).headers !== 'undefined') {
+    keysToTry = extractAllApiKeys(reqOrAi as express.Request);
+  } else if (reqOrAi && typeof (reqOrAi as any).models?.generateContent === 'function') {
+    // Single client passed directly
+    const aiInstance = reqOrAi as GoogleGenAI;
+    let lastErr: any = null;
+    for (const model of GEMINI_MODELS) {
+      try {
+        const callPromise = aiInstance.models.generateContent({
+          model,
+          contents: request.contents,
+          config: request.config,
+        });
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Model ${model} timeout`)), 8000)
+        );
+        const response: any = await Promise.race([callPromise, timeoutPromise]);
+        if (response && response.text) {
+          return { response, modelUsed: model };
+        }
+      } catch (err: any) {
+        lastErr = err;
       }
-    } catch (err: any) {
-      const errMsg = String(err?.message || err);
-      console.warn(`[Gemini Server] Model ${model} notice:`, errMsg);
-      lastError = err;
+    }
+    throw lastErr || new Error('All Gemini models failed');
+  } else {
+    keysToTry = extractAllApiKeys();
+  }
+
+  if (keysToTry.length === 0) {
+    throw new Error('Gemini API Key が設定されていません。');
+  }
+
+  // Prioritize keys that are not exhausted
+  const now = Date.now();
+  const activeKeys = keysToTry.filter((k) => {
+    const s = keyStateMap.get(k.key);
+    return !s || s.exhaustedUntil < now;
+  });
+  const candidateKeys = activeKeys.length > 0 ? activeKeys : keysToTry;
+
+  // Rotate starting index for fair distribution
+  const startIndex = candidateKeys.length > 0 ? keyRoundRobinIndex % candidateKeys.length : 0;
+  const orderedKeys = [
+    ...candidateKeys.slice(startIndex),
+    ...candidateKeys.slice(0, startIndex),
+  ];
+
+  let lastError: any = null;
+  let rotatedCount = 0;
+
+  for (let kIdx = 0; kIdx < orderedKeys.length; kIdx++) {
+    const keyItem = orderedKeys[kIdx];
+    const ai = new GoogleGenAI({ apiKey: keyItem.key });
+
+    let keyFailedWithQuota = false;
+
+    for (const model of GEMINI_MODELS) {
+      try {
+        const callPromise = ai.models.generateContent({
+          model,
+          contents: request.contents,
+          config: request.config,
+        });
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Model ${model} timeout`)), 8000)
+        );
+        const response: any = await Promise.race([callPromise, timeoutPromise]);
+        if (response && response.text) {
+          // Record success in pool state
+          const s = keyStateMap.get(keyItem.key) || {
+            exhaustedUntil: 0,
+            lastUsed: 0,
+            failureCount: 0,
+            successCount: 0,
+          };
+          s.successCount++;
+          s.lastUsed = Date.now();
+          keyStateMap.set(keyItem.key, s);
+
+          keyRoundRobinIndex++;
+          return {
+            response,
+            modelUsed: model,
+            keyPreview: keyItem.preview,
+            rotatedKeyCount: rotatedCount,
+          };
+        }
+      } catch (err: any) {
+        const errMsg = String(err?.message || err);
+        console.warn(
+          `[Gemini Server] Key ${keyItem.preview} with model ${model} notice:`,
+          errMsg
+        );
+        lastError = err;
+
+        if (isRateLimitOrQuotaError(err)) {
+          console.warn(
+            `[Gemini Key Pool] Key ${keyItem.preview} reached rate/quota limit (429/RESOURCE_EXHAUSTED). Cooling down for 60s and rotating to next key...`
+          );
+          const s = keyStateMap.get(keyItem.key) || {
+            exhaustedUntil: 0,
+            lastUsed: 0,
+            failureCount: 0,
+            successCount: 0,
+          };
+          s.failureCount++;
+          s.exhaustedUntil = Date.now() + 60_000;
+          s.lastError = errMsg;
+          keyStateMap.set(keyItem.key, s);
+          keyFailedWithQuota = true;
+          break; // Immediately break model loop and switch to NEXT candidate key!
+        }
+      }
+    }
+
+    if (keyFailedWithQuota) {
+      rotatedCount++;
     }
   }
-  throw lastError || new Error('All Gemini models failed');
+
+  throw lastError || new Error('All Gemini API keys and models failed');
 }
 
 // Health check endpoint
@@ -101,11 +317,12 @@ if (IS_CI_ENV) {
 }
 
 app.get('/api/health', (req, res) => {
-  const customKey = extractApiKey(req);
+  const keys = extractAllApiKeys(req);
   res.json({
     status: 'ok',
-    hasGeminiKey: !!process.env.GEMINI_API_KEY || !!customKey,
-    hasCustomGeminiKey: !!customKey,
+    hasGeminiKey: keys.length > 0,
+    geminiKeyCount: keys.length,
+    hasCustomGeminiKey: keys.some((k) => k.source === 'custom'),
     isCI: IS_CI_ENV,
     regulatoryGuardActive: true,
     timestamp: new Date().toISOString()
@@ -114,31 +331,220 @@ app.get('/api/health', (req, res) => {
 
 // Gemini Status & Key Verification for Local/Termux/Custom execution
 app.get('/api/gemini/status', (req, res) => {
-  const customKey = extractApiKey(req);
-  const hasEnvKey = !!process.env.GEMINI_API_KEY;
-  const hasCustomKey = !!customKey;
-  res.json({
-    configured: hasEnvKey || hasCustomKey,
-    source: hasCustomKey ? 'custom' : hasEnvKey ? 'environment' : 'none',
-    activeModel: 'gemini-3.8-flash',
-    preview: hasCustomKey ? `${customKey.slice(0, 6)}...${customKey.slice(-4)}` : hasEnvKey ? 'システム環境変数 (GEMINI_API_KEY)' : '未設定'
+  const keys = extractAllApiKeys(req);
+  const now = Date.now();
+  const totalKeys = keys.length;
+  const activeKeys = keys.filter((k) => {
+    const s = keyStateMap.get(k.key);
+    return !s || s.exhaustedUntil < now;
   });
+
+  const sources = Array.from(new Set(keys.map((k) => k.source)));
+  const primarySource = keys.some((k) => k.source === 'custom')
+    ? 'custom'
+    : keys.some((k) => k.source === 'environment')
+    ? 'environment'
+    : 'none';
+
+  let previewText = '未設定';
+  if (totalKeys === 1) {
+    previewText = `${keys[0].preview} (${keys[0].source === 'custom' ? 'カスタムキー' : '環境変数'})`;
+  } else if (totalKeys > 1) {
+    previewText = `${totalKeys}個のAPIキーが設定済 (稼働可能: ${activeKeys.length}/${totalKeys}, 自動分散ローテーション有効)`;
+  }
+
+  res.json({
+    configured: totalKeys > 0,
+    totalKeys,
+    activeKeysCount: activeKeys.length,
+    source: primarySource,
+    sources,
+    activeModel: 'gemini-3.8-flash',
+    preview: previewText,
+    keys: keys.map((k, idx) => {
+      const s = keyStateMap.get(k.key);
+      const isExhausted = Boolean(s && s.exhaustedUntil > now);
+      return {
+        index: idx,
+        preview: k.preview,
+        source: k.source,
+        varName: k.varName,
+        status: isExhausted ? 'exhausted' : 'active',
+        exhaustedUntil: isExhausted ? s!.exhaustedUntil : undefined,
+        successCount: s?.successCount || 0,
+        failureCount: s?.failureCount || 0,
+      };
+    })
+  });
+});
+
+// Environment Variables Inspection for Local/Termux
+app.get('/api/gemini/env-keys', (req, res) => {
+  reloadDotenvIfPresent();
+  const envPath = path.join(process.cwd(), '.env');
+  const envFileExists = fs.existsSync(envPath);
+
+  const allKeys = extractAllApiKeys();
+  const envKeys = allKeys.filter((k) => k.source === 'environment');
+
+  res.json({
+    envFileExists,
+    envFilePath: envPath,
+    keys: envKeys.map((k, idx) => ({
+      index: idx,
+      varName: k.varName || `GEMINI_API_KEY_${idx + 1}`,
+      preview: k.preview,
+      length: k.key.length,
+    })),
+    totalEnvKeys: envKeys.length,
+  });
+});
+
+// Import environment keys into app client format
+app.post('/api/gemini/import-env-keys', (req, res) => {
+  reloadDotenvIfPresent();
+  const allKeys = extractAllApiKeys();
+  const envKeys = allKeys.filter((k) => k.source === 'environment');
+
+  if (envKeys.length === 0) {
+    return res.status(404).json({
+      success: false,
+      message: 'サーバーの環境変数または .env から Gemini API キーが見つかりませんでした。',
+      items: [],
+    });
+  }
+
+  const items = envKeys.map((k, idx) => ({
+    id: `env_import_${idx}_${Date.now()}`,
+    key: k.key,
+    label: k.varName ? `環境変数 (${k.varName})` : `環境変数 プロジェクト ${idx + 1}`,
+    createdAt: Date.now(),
+  }));
+
+  res.json({
+    success: true,
+    message: `${items.length}件の環境変数キーを検出・インポート可能にしました。`,
+    items,
+  });
+});
+
+// Save keys directly to .env file on Local PC / Termux
+app.post('/api/gemini/save-env', (req, res) => {
+  try {
+    const { keys } = req.body;
+    if (!Array.isArray(keys) || keys.length === 0) {
+      return res.status(400).json({ success: false, error: '書き込むAPIキーが指定されていません。' });
+    }
+
+    const envPath = path.join(process.cwd(), '.env');
+    const cleanKeys = keys
+      .map((k: any) => ({
+        key: String(k.key || k).trim().replace(/^["']|["']$/g, ''),
+        label: String(k.label || '').trim(),
+      }))
+      .filter((k) => Boolean(k.key));
+
+    if (cleanKeys.length === 0) {
+      return res.status(400).json({ success: false, error: '有効なAPIキーがありません。' });
+    }
+
+    const lines: string[] = [
+      '# MIKI-AI Environment Configuration',
+      `# Updated via App Settings: ${new Date().toLocaleString('ja-JP')}`,
+      '',
+      `# Primary API Key`,
+      `GEMINI_API_KEY=${cleanKeys[0].key}`,
+      '',
+      `# Multi-Key Rotation Pool (comma-separated for quota rotation)`,
+      `GEMINI_API_KEYS=${cleanKeys.map((k) => k.key).join(',')}`,
+      '',
+      '# Individual Project Keys (distinct project IDs provide separate daily token quotas)',
+    ];
+
+    cleanKeys.forEach((k, idx) => {
+      lines.push(`# ${k.label || `Project ${idx + 1}`}`);
+      lines.push(`GEMINI_API_KEY_${idx + 1}=${k.key}`);
+    });
+    lines.push('');
+
+    fs.writeFileSync(envPath, lines.join('\n'), 'utf8');
+
+    // Reload dotenv into process.env immediately
+    dotenv.config({ path: envPath, override: true });
+
+    return res.json({
+      success: true,
+      message: `.env ファイルに ${cleanKeys.length} 個のキーを保存しました！ローカル/Termux再起動なしで即座に反映されます。`,
+      envFilePath: envPath,
+      count: cleanKeys.length,
+    });
+  } catch (err: any) {
+    console.error('Error saving .env:', err);
+    return res.status(500).json({
+      success: false,
+      error: err?.message || '.env への書き込みに失敗しました。ファイル権限を確認してください。',
+    });
+  }
 });
 
 app.post('/api/gemini/verify-key', async (req, res) => {
   try {
-    const keyToTest = extractApiKey(req) || process.env.GEMINI_API_KEY;
-    if (!keyToTest) {
-      return res.status(400).json({ valid: false, error: 'APIキーが指定されていません。' });
+    const rawKeys: string[] = [];
+    if (req.body?.apiKey && typeof req.body.apiKey === 'string') {
+      req.body.apiKey.split(',').forEach((k: string) => {
+        if (k.trim()) rawKeys.push(k.trim());
+      });
     }
-    const testAi = new GoogleGenAI({ apiKey: keyToTest });
-    const result = await testAi.models.generateContent({
+    if (Array.isArray(req.body?.apiKeys)) {
+      req.body.apiKeys.forEach((k: any) => {
+        if (typeof k === 'string' && k.trim()) rawKeys.push(k.trim());
+      });
+    }
+    if (rawKeys.length === 0) {
+      const extracted = extractAllApiKeys(req);
+      rawKeys.push(...extracted.map((k) => k.key));
+    }
+
+    if (rawKeys.length === 0) {
+      return res.status(400).json({ valid: false, error: '検証するAPIキーが指定されていません。' });
+    }
+
+    const uniqueKeys = Array.from(new Set(rawKeys));
+    const results = await Promise.all(
+      uniqueKeys.map(async (key) => {
+        const preview = key.length > 10 ? `${key.slice(0, 6)}...${key.slice(-4)}` : '***';
+        try {
+          const testAi = new GoogleGenAI({ apiKey: key });
+          const result = await testAi.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: 'Ping: 日本語で「接続成功」とだけ返答してください。',
+            config: { maxOutputTokens: 20 }
+          });
+          const reply = result.text?.trim() || '接続成功';
+          return { key, preview, valid: true, model: 'gemini-3.8-flash', reply };
+        } catch (err: any) {
+          const errMsg = err?.message || '接続テストに失敗しました';
+          const isQuota = isRateLimitOrQuotaError(err);
+          return {
+            key,
+            preview,
+            valid: false,
+            error: errMsg,
+            isQuotaExceeded: isQuota
+          };
+        }
+      })
+    );
+
+    const validCount = results.filter((r) => r.valid).length;
+    res.json({
+      valid: validCount > 0,
+      totalCount: results.length,
+      successCount: validCount,
+      results,
       model: 'gemini-3.8-flash',
-      contents: 'Ping: 日本語で「接続成功」とだけ返答してください。',
-      config: { maxOutputTokens: 20 }
+      reply: results.find((r) => r.valid)?.reply || ''
     });
-    const reply = result.text || '接続成功';
-    res.json({ valid: true, model: 'gemini-3.8-flash', reply: reply.trim() });
   } catch (err: any) {
     res.status(400).json({ valid: false, error: err?.message || 'APIキーの検証に失敗しました' });
   }
@@ -264,8 +670,7 @@ app.post('/api/search', async (req, res) => {
       try {
         const snippetsCombined = results.map(r => `・[${r.title}] ${r.snippet}`).join('\n');
         const summaryPrompt = `あなたはAI「みき」の知識抽出エンジンです。以下のWeb検索結果から、トピック「${cleanQuery}」に関する最も重要な要点・事実・知見を、日本語2〜3文で簡潔に要約してください。\n\n${snippetsCombined}`;
-        const genRes = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+        const { response: genRes } = await generateContentWithFallback(req, {
           contents: summaryPrompt,
           config: { maxOutputTokens: 250, temperature: 0.3 }
         });
@@ -529,7 +934,7 @@ ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedS
       config.tools = [{ googleSearch: {} }];
     }
 
-    const { response, modelUsed } = await generateContentWithFallback(ai, {
+    const { response, modelUsed, keyPreview } = await generateContentWithFallback(req, {
       contents,
       config
     });
@@ -555,6 +960,7 @@ ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedS
     res.json({
       text,
       model: modelUsed,
+      keyPreview,
       engineMode: engineMode || 'gemini',
       durationMs: Date.now() - tStart,
       groundingChunks: groundingChunks.length > 0 ? groundingChunks : undefined
@@ -628,7 +1034,7 @@ JSONフォーマットのみを出力してください:
   "summary": "この知識によってローカルLLMのみきがどう賢くなるかの解説（1〜2文）"
 }`;
 
-    const { response } = await generateContentWithFallback(ai, {
+    const { response } = await generateContentWithFallback(req, {
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -707,7 +1113,7 @@ ${failureReason ? `【失敗理由の参考】\n${failureReason}\n` : ''}
   "reasoningExplanation": "なぜこの模範解答が正解であり、AIが何を学習すべきかの解説（1〜2文）"
 }`;
 
-    const { response } = await generateContentWithFallback(ai, {
+    const { response } = await generateContentWithFallback(req, {
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -773,7 +1179,7 @@ ${activeGameCode}
 
 エラーの原因を特定し、親切に1〜2文で解説した上で、完全にバグを修正した動くHTMLコードを \`\`\`html で囲んで出力してください。`;
 
-    const { response } = await generateContentWithFallback(ai, {
+    const { response } = await generateContentWithFallback(req, {
       contents: prompt,
       config: { temperature: 0.2 }
     });
