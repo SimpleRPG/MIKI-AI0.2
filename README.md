@@ -198,6 +198,12 @@
    - `src/components/SelfImprovementModal.tsx`: `security_guardrail` タブ（`PrivacySecurityGuardrailTab`）のナビゲーションバー配線およびレンダリング統合。
    - `src/services/backgroundWorkerService.ts`: 深い睡眠サイクルに第21章の容量重複排除・自動整理ステップを組み込み。
 
+6. **第24章: 端末リソース適応型モデル自律獲得・検証・動的配備仕様 (Autonomous Model Acquisition)**
+   - Galaxy S25端末のハードウェア余力（Snapdragon 8 Elite / RAM 12GB〜16GB）とタスク難易度・能力不足（`capabilityGapService`）を自律診断。
+   - Wi-Fi接続・深夜充電中（`UNMETERED` / `isCharging` / バッテリー30%超 / 熱状態`normal` / 容量20GBクォータ順守）に限定した安全ダウンロードゲート。
+   - SHA-256整合性検査および深夜深い睡眠でのシャドーベンチマーク（12固定シナリオ退行0件検証）を経て、`llama-swap` / WebGPUレジストリへ安全昇格。
+   - ユーザー設定に応じた「自律提案モード（1タップ承認）」と「完全放置進化モード（翌朝自発報告）」の2段構え仕様を完全定義。
+
 ### 【検証結果】
 - `npm run compile_applet` (tsc --noEmit & vite build) 正常完了。
 - 記憶・プライバシー・不確実性・容量・自律進化の全サービス層の整合性を検証済み。
