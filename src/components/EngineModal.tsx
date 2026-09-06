@@ -346,7 +346,12 @@ export const EngineModal: React.FC<EngineModalProps> = ({
       const fullReport = await systemLogger.generateFullDiagnosticReport();
       let serverLogs = '';
       try {
-        const res = await fetch('/api/logs');
+        // api.ts の apiUrl() と同じ 'miki_api_base_url' を参照する。
+        // これが無いと、APK単体ビルドではExpressサーバーではなくSPAの
+        // index.htmlフォールバックにリクエストが吸い込まれ、診断レポートの
+        // 「サーバー・バックエンドログ」欄がHTMLソースそのものになってしまう。
+        const base = (storageService.getItem('miki_api_base_url') || '').trim().replace(/\/+$/, '');
+        const res = await fetch(base ? `${base}/api/logs` : '/api/logs');
         if (res.ok) {
           serverLogs = await res.text();
         }
