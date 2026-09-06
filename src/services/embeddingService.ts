@@ -1,7 +1,8 @@
 import { nativeLlmService, ExternalLocalLlmConfig } from './nativeLlmService';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
-import type { MemoryItem } from '../types';
+import { nativeBackgroundService } from './nativeBackgroundService';
+import type { MemoryItem, EmbeddingHealthStatus, EmbeddingHealthCheckResult } from '../types';
 
 export interface EmbeddingStats {
   available: boolean;
@@ -11,6 +12,8 @@ export interface EmbeddingStats {
   totalMemoriesCount: number;
   embeddedMemoriesCount: number;
   lastSyncTimestamp?: number;
+  healthStatus?: EmbeddingHealthStatus;
+  consecutiveDegradedCount?: number;
 }
 
 /**
@@ -24,6 +27,10 @@ class EmbeddingService {
   private queryEmbeddingCache = new Map<string, { embedding: number[]; timestamp: number }>();
   private isSyncing = false;
   private lastCheckResult: { available: boolean; timestamp: number } | null = null;
+  // 設計思想 Master v5.4 第19.4項: 埋め込み健全性監視
+  private consecutiveDegradedCount = 0;
+  private lastDegradedNotificationTimestamp = 0;
+  private healthStatus: EmbeddingHealthStatus = 'available';
 
   /**
    * 埋め込みベクトルのコサイン類似度を計算 (-1.0 〜 1.0 -> 0.0 〜 1.0 に正規化)
@@ -212,7 +219,126 @@ class EmbeddingService {
       totalMemoriesCount: (memories || []).length,
       embeddedMemoriesCount: embedded.length,
       lastSyncTimestamp: Date.now(),
+      healthStatus: this.healthStatus,
+      consecutiveDegradedCount: this.consecutiveDegradedCount,
     };
+  }
+
+  /**
+   * 設計思想 Master v5.4 第19.4項:
+   * 埋め込み健全性監視 (Embedding Health Guard)
+   * 深い睡眠フェーズ冒頭 (PHASE 1 開始直後) 等で呼び出され、疎通確認と連続縮退を監視
+   */
+  public async checkHealth(
+    overrideConfig?: ExternalLocalLlmConfig
+  ): Promise<EmbeddingHealthCheckResult> {
+    const memories = storageService.getMemories();
+    const totalCount = memories.length;
+    const actualEmbeddedCount = memories.filter(
+      (m) => m.embeddingVector && m.embeddingVector.length > 0
+    ).length;
+    const fallbackCount = totalCount - actualEmbeddedCount;
+
+    let status: EmbeddingHealthStatus = 'available';
+    let userNotified = false;
+
+    try {
+      const avail = await this.checkAvailability(overrideConfig);
+      if (!avail.available) {
+        status = 'degraded_fallback';
+        this.consecutiveDegradedCount++;
+      } else {
+        status = 'available';
+        this.consecutiveDegradedCount = 0;
+      }
+    } catch {
+      status = 'unavailable';
+      this.consecutiveDegradedCount++;
+    }
+
+    this.healthStatus = status;
+
+    // 既定3回連続サイクル以上継続した場合、警告ログ＆ローカル通知を送信 (1日1回上限)
+    const now = Date.now();
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    if (
+      this.consecutiveDegradedCount >= 3 &&
+      now - this.lastDegradedNotificationTimestamp > ONE_DAY_MS
+    ) {
+      systemLogger.warn(
+        'INFERENCE',
+        `【第19章 埋め込み健全性警告】実埋め込みサーバーが3回連続でオフラインです (${this.consecutiveDegradedCount}回)。8次元手作り疎ベクトルフォールバックが継続しています。`
+      );
+
+      try {
+        await nativeBackgroundService.sendLocalNotification({
+          title: '🧠 MikiAI 記憶検索の精度低下警告',
+          body: '実埋め込みサーバーがオフラインのため、記憶検索が簡易フォールバック状態です。Termux (8081) の稼働状態をご確認ください。',
+          data: { tab: 'memory' },
+        });
+        userNotified = true;
+        this.lastDegradedNotificationTimestamp = now;
+      } catch (err) {
+        systemLogger.warn('INFERENCE', `健全性通知送信エラー: ${(err as any)?.message}`);
+      }
+    }
+
+    return {
+      status,
+      consecutiveDegradedCount: this.consecutiveDegradedCount,
+      userNotified,
+      actualEmbeddingCount: actualEmbeddedCount,
+      fallbackCount,
+      timestamp: now,
+    };
+  }
+
+  /**
+   * 設計思想 Master v5.4 第19.4項 & 第18.1項:
+   * 復帰時または深い睡眠時の段階的再埋め込みバッチ処理 (4〜8件単位、50msクールダウン)
+   */
+  public async performReindexingBatch(
+    maxBatchSize = 6,
+    signal?: AbortSignal
+  ): Promise<{ reindexed: number }> {
+    const avail = await this.checkAvailability();
+    if (!avail.available) {
+      return { reindexed: 0 };
+    }
+
+    const memories = storageService.getMemories();
+    // actualEmbedding を持たず手作り疎ベクトルのみの記憶を優先抽出
+    const unindexed = memories.filter(
+      (m) => m.active !== false && (!m.embeddingVector || m.embeddingVector.length === 0)
+    );
+
+    if (unindexed.length === 0) {
+      return { reindexed: 0 };
+    }
+
+    const batch = unindexed.slice(0, Math.min(maxBatchSize, 8));
+    let reindexed = 0;
+
+    for (const mem of batch) {
+      if (signal?.aborted) break;
+
+      const updated = await this.ensureMemoryEmbedding(mem);
+      if (updated.embeddingVector && updated.embeddingVector.length > 0) {
+        reindexed++;
+      }
+
+      // 第18.1項 Galaxy S25 熱対策: 50msクールダウン
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    if (reindexed > 0) {
+      systemLogger.info(
+        'INFERENCE',
+        `【第19章 埋め込み復旧バッチ】${reindexed}件の記憶に実埋め込みを付与しました (残り ${unindexed.length - reindexed} 件)`
+      );
+    }
+
+    return { reindexed };
   }
 }
 

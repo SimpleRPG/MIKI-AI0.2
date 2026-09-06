@@ -215,6 +215,43 @@ class LongTermMemoryService {
   }
 
   /**
+   * 設計思想 Master v5.4 第19.3項:
+   * 記憶の揮発性 (volatility) を推定・付与
+   * - high: 価格・月額・役職・組織・バージョン番号・時事等 (時間経過で陳腐化しやすい)
+   * - low: 恒久的ルール・普遍的構文・個人の長期的嗜好等
+   */
+  public detectVolatility(content: string, category?: string): 'high' | 'low' {
+    const text = (content || '').toLowerCase();
+
+    // 時事性・変動可能性が高いキーワード
+    const highVolatilityPatterns = [
+      /\d+(?:円|ドル|ユーロ|\$|¥)/,
+      /(?:価格|料金|月額|年額|費用|コスト|定価|割引|キャンペーン|セール)/,
+      /(?:代表取締役|社長|ceo|役員|担当者|人事|配属|就任|組織図)/,
+      /(?:v\d+\.|\d+\.\d+\.\d+|バージョン|最新版|新機能|リリースノート|アップデート)/i,
+      /(?:202[3-9]年|\d+月\d+日|今年|来年|締切|期限|予定日|スケジュール|時事|速報|ニュース)/,
+    ];
+
+    for (const pattern of highVolatilityPatterns) {
+      if (pattern.test(text)) {
+        return 'high';
+      }
+    }
+
+    // 恒久的なカテゴリや普遍ルールは low
+    if (
+      category === 'preference' ||
+      category === 'profile' ||
+      text.includes('原則') ||
+      text.includes('定石')
+    ) {
+      return 'low';
+    }
+
+    return 'low';
+  }
+
+  /**
    * 設計思想 8.2: 古い記憶の置換処理 (置換関係の永続保存)
    * 訂正された古い記憶は削除せず、SUPERSEDED 状態に変更して置換理由と置換先IDを記録する。
    */

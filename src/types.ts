@@ -122,6 +122,11 @@ export interface MemoryItem {
   supersededFrom?: string;       // 置換元となった古い記憶ID
   rawSourceId?: string;          // 紐づく原文メッセージID
   rawSourceType?: 'chat' | 'teacher_response' | 'synthesis_process' | 'eval_result';
+  // 設計思想 Master v5.4 第19章: 記憶の間隔反復・鮮度再検証・埋め込み健全性
+  reinforcementCount?: number;      // 19.2 間隔反復による記憶定着回数
+  volatility?: 'high' | 'low';      // 19.3 揮発性・時事性フラグ (価格/バージョン/組織等 vs 恒久ルール)
+  lastVerifiedAt?: number;          // 19.3 外部Web検索等による最終鮮度検証日時
+  pendingVerificationDiff?: string; // 19.3 鮮度再検証で検知された差分 (ユーザー確認待ち)
 }
 
 /**
@@ -2218,3 +2223,32 @@ export interface AutonomousGrowthReport {
     drillResults?: Array<{ topic: string; passed: boolean; score: number }>;
   };
 }
+
+/**
+ * 設計思想 Master v5.4 第19章: 記憶の間隔反復・鮮度再検証・埋め込み健全性監視
+ */
+export type EmbeddingHealthStatus = 'available' | 'degraded_fallback' | 'unavailable';
+
+export interface SpacedRecallAuditResult {
+  dormantMemoriesChecked: number;
+  reinforcedCount: number;
+  contradictionsFlagged: number;
+  reinforcedMemoryIds: string[];
+}
+
+export interface FreshnessRevalidationResult {
+  memoriesChecked: number;
+  verifiedCount: number;
+  diffsDetected: number;
+  flaggedMemoryIds: string[];
+}
+
+export interface EmbeddingHealthCheckResult {
+  status: EmbeddingHealthStatus;
+  consecutiveDegradedCount: number;
+  userNotified: boolean;
+  actualEmbeddingCount: number;
+  fallbackCount: number;
+  timestamp: number;
+}
+

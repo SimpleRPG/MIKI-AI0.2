@@ -72,6 +72,7 @@ import { storageService } from '../services/storageService';
 import { experienceRouterService } from '../services/experienceRouterService';
 import { longTermMemoryService } from '../services/longTermMemoryService';
 import { embeddingService, EmbeddingStats } from '../services/embeddingService';
+import { memoryAuditService, MemoryAuditCycleRecord } from '../services/memoryAuditService';
 
 export interface MemoryModalProps {
   isOpen: boolean;
@@ -112,6 +113,11 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   const [isSyncingEmbeddings, setIsSyncingEmbeddings] = useState(false);
   const [embeddingSyncProgress, setEmbeddingSyncProgress] = useState<string | null>(null);
 
+  // 設計思想 Master v5.4 第19章: 記憶監査ステート
+  const [isAuditingMemories, setIsAuditingMemories] = useState(false);
+  const [auditProgressMessage, setAuditProgressMessage] = useState<string | null>(null);
+  const [lastAuditRecord, setLastAuditRecord] = useState<MemoryAuditCycleRecord | null>(null);
+
   // モーダルオープン時または長期記憶タブ表示時に実埋め込み統計をロード
   React.useEffect(() => {
     if (isOpen && (activeSubTab === 'longterm' || activeSubTab === 'memory')) {
@@ -145,6 +151,82 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
       setIsSyncingEmbeddings(false);
       setEmbeddingSyncProgress(null);
     }
+  };
+
+  // 設計思想 Master v5.4 第19章: 記憶監査サイクル (間隔反復・鮮度再検証・埋め込み健全性) 手動実行
+  const handleRunMemoryAudit = async () => {
+    setIsAuditingMemories(true);
+    setAuditProgressMessage('記憶監査・間隔反復・鮮度検証を実行中...');
+    try {
+      const record = await memoryAuditService.runFullAuditCycle();
+      setLastAuditRecord(record);
+
+      // 記憶リストを更新
+      const updatedMemories = storageService.getMemories();
+      if (typeof onUpdateMemories === 'function') {
+        (onUpdateMemories as any)(updatedMemories);
+      }
+
+      setExportedStatus(
+        `✨ 第19章記憶監査完了: 間隔反復定着 ${record.spacedRecall.reinforcedCount}件 / 鮮度検証差分検知 ${record.freshness.diffsDetected}件`
+      );
+      setTimeout(() => setExportedStatus(null), 4000);
+    } catch (e: any) {
+      setExportedStatus(`⚠️ 記憶監査失敗: ${e?.message || '実行エラー'}`);
+      setTimeout(() => setExportedStatus(null), 3500);
+    } finally {
+      setIsAuditingMemories(false);
+      setAuditProgressMessage(null);
+    }
+  };
+
+  // 鮮度再検証差分の承認・置換反映ハンドラ
+  const handleApplyVerificationDiff = (targetMem: MemoryItem) => {
+    if (!targetMem.pendingVerificationDiff) return;
+    const diffClean = targetMem.pendingVerificationDiff.replace(/^【.*?】/, '').trim();
+    const newContent = `${targetMem.content}\n（最新改定: ${diffClean}）`;
+
+    const result = longTermMemoryService.supersedeMemory(
+      memories,
+      targetMem.id,
+      newContent,
+      'Web検索による鮮度再検証の反映',
+      {
+        volatility: targetMem.volatility,
+        lastVerifiedAt: Date.now(),
+        pendingVerificationDiff: undefined,
+      }
+    );
+
+    storageService.setMemories(result.updatedMemories);
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(result.updatedMemories);
+    }
+
+    setExportedStatus(`✅ 記憶 [${targetMem.id}] を最新調査差分で置換・更新しました`);
+    setTimeout(() => setExportedStatus(null), 3000);
+  };
+
+  // 鮮度再検証差分の却下ハンドラ (現状維持)
+  const handleDismissVerificationDiff = (targetMem: MemoryItem) => {
+    const updated = memories.map((m) =>
+      m.id === targetMem.id
+        ? {
+            ...m,
+            pendingVerificationDiff: undefined,
+            lastVerifiedAt: Date.now(),
+            updatedAt: Date.now(),
+          }
+        : m
+    );
+
+    storageService.setMemories(updated);
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+
+    setExportedStatus(`保留していた差分を破棄し、既存記憶を維持しました`);
+    setTimeout(() => setExportedStatus(null), 2500);
   };
 
   // 7段階検索パイプライン実行ハンドラ
@@ -2655,6 +2737,56 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                   </div>
                 </div>
 
+                {/* 1.6 設計思想 Master v5.4 第19章: 記憶監査 (間隔反復・鮮度再検証・埋め込み健全性) パネル */}
+                <div className="p-4 rounded-xl bg-gradient-to-r from-teal-950/40 via-slate-900 to-slate-950 border border-teal-500/30 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 font-bold text-teal-300 text-xs sm:text-sm">
+                        <ShieldCheck className="w-4 h-4 text-teal-400" />
+                        <span>設計思想 Master v5.4 第19章: 記憶の間隔反復定着 & 鮮度再検証パイプライン</span>
+                        {embeddingStats?.consecutiveDegradedCount && embeddingStats.consecutiveDegradedCount > 0 ? (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[9px] border border-amber-500/40">
+                            縮退中 ({embeddingStats.consecutiveDegradedCount}回)
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        休眠重要記憶を自律再想起して定着を補強し、価格・バージョン・組織などの揮発性記憶（volatility）をWeb検索で裏取り検証します。
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={handleRunMemoryAudit}
+                        disabled={isAuditingMemories}
+                        className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                        title="間隔反復定着・鮮度再検証・埋め込み健全性チェックを一括実行します"
+                      >
+                        {isAuditingMemories ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        )}
+                        <span>{auditProgressMessage || '第19章 記憶監査を実行'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {lastAuditRecord && (
+                    <div className="p-2.5 rounded-lg bg-slate-950/80 border border-teal-500/20 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                      <div className="text-slate-300">
+                        <span className="text-teal-400 font-bold">間隔反復定着:</span> {lastAuditRecord.spacedRecall.reinforcedCount} 件 (休眠対象: {lastAuditRecord.spacedRecall.dormantMemoriesChecked}件)
+                      </div>
+                      <div className="text-slate-300">
+                        <span className="text-sky-400 font-bold">鮮度再検証:</span> 完了 {lastAuditRecord.freshness.verifiedCount} 件 / 差分検知 {lastAuditRecord.freshness.diffsDetected} 件
+                      </div>
+                      <div className="text-slate-300">
+                        <span className="text-indigo-400 font-bold">埋め込み健全性:</span> {lastAuditRecord.embeddingHealth.status} ({lastAuditRecord.embeddingHealth.actualEmbeddingCount}件)
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* 2. 7段階検索パイプライン シミュレータ */}
                 <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-700/70 space-y-3">
                   <div className="flex items-center justify-between">
@@ -2945,6 +3077,30 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                     {isApproved ? 'APPROVED' : 'UNVERIFIED (未検証)'}
                                   </span>
 
+                                  {mem.reinforcementCount && mem.reinforcementCount > 0 ? (
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] border border-emerald-500/30 flex items-center gap-1">
+                                      🔄 定着{mem.reinforcementCount}回
+                                    </span>
+                                  ) : null}
+
+                                  {mem.volatility ? (
+                                    mem.volatility === 'high' ? (
+                                      <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] border border-amber-500/30 flex items-center gap-1">
+                                        ⚡ 揮発性(時事)
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[10px] border border-slate-700">
+                                        🛡️ 恒久原則
+                                      </span>
+                                    )
+                                  ) : null}
+
+                                  {mem.lastVerifiedAt ? (
+                                    <span className="text-[9px] text-slate-500 font-mono">
+                                      検証: {new Date(mem.lastVerifiedAt).toLocaleDateString()}
+                                    </span>
+                                  ) : null}
+
                                   <span className="text-[10px] text-slate-500 font-mono">{mem.id}</span>
                                 </div>
 
@@ -2955,6 +3111,35 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                 >
                                   {mem.content}
                                 </p>
+
+                                {/* 設計思想 Master v5.4 第19.3項: 鮮度再検証の検出差分 */}
+                                {mem.pendingVerificationDiff && (
+                                  <div className="p-2.5 rounded-lg bg-teal-950/40 border border-teal-500/40 text-[11px] text-teal-200 space-y-2">
+                                    <div className="font-bold flex items-center gap-1.5 text-teal-300">
+                                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                                      <span>【第19.3項 鮮度再検証】最新Web調査による更新差分が検出されています</span>
+                                    </div>
+                                    <div className="text-slate-300 text-[10px] leading-relaxed">
+                                      {mem.pendingVerificationDiff}
+                                    </div>
+                                    <div className="flex items-center gap-2 pt-1">
+                                      <button
+                                        onClick={() => handleApplyVerificationDiff(mem)}
+                                        className="px-2.5 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-all"
+                                      >
+                                        <Check className="w-3 h-3" />
+                                        <span>差分を承認して置換反映</span>
+                                      </button>
+                                      <button
+                                        onClick={() => handleDismissVerificationDiff(mem)}
+                                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] cursor-pointer transition-all"
+                                      >
+                                        <X className="w-3 h-3" />
+                                        <span>破棄 (現状維持)</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
 
                                 {/* 置換先・置換理由の表示 */}
                                 {isSuperseded && (

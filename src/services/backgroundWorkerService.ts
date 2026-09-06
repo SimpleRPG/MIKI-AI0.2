@@ -28,6 +28,8 @@ import { teacherRequestService } from './teacherRequestService';
 import { workingAgendaService } from './workingAgendaService';
 import { autonomousSearchService } from './autonomousSearchService';
 import { autonomousEvolutionService } from './autonomousEvolutionService';
+import { memoryAuditService } from './memoryAuditService';
+import { embeddingService } from './embeddingService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -103,7 +105,7 @@ export class BackgroundWorkerService {
   private constraints: WorkManagerConstraints = {
     requiresCharging: true,
     requiresDeviceIdle: false, // 睡眠判定で厳格に制御
-    requiresUnmeteredWifi: true,
+    requiresUnmeteredWifi: false, // 設計思想 Master v5.4 第19.6項: モバイル回線時も自律学習を許可 (既定false)
     batteryNotLow: true,
     nightTimeOnly: false,
   };
@@ -139,8 +141,8 @@ export class BackgroundWorkerService {
   private isUserIdle: boolean = false;
   private schedulerTimer: any = null;
 
-  // チャット操作後のクールダウン時間 (直近2分間はユーザーアクティブとみなす)
-  private readonly USER_ACTIVE_COOLDOWN_MS = 2 * 60 * 1000;
+  // チャット操作後のクールダウン時間 (設計思想 Master v5.4 第19.6項: 2分から1分へ短縮)
+  private readonly USER_ACTIVE_COOLDOWN_MS = 1 * 60 * 1000;
 
   constructor() {
     this.loadState();
@@ -460,6 +462,19 @@ export class BackgroundWorkerService {
       // ==========================================
       systemLogger.info('SELF_IMPROVEMENT', '🌙 [浅い睡眠] 記憶整理 & 重複除去 & スキル抽出を開始');
 
+      // Step 0: 設計思想 Master v5.4 第19.4項 埋め込み健全性軽量チェック
+      try {
+        const embeddingHealth = await embeddingService.checkHealth();
+        if (embeddingHealth.status === 'degraded_fallback') {
+          systemLogger.warn(
+            'SELF_IMPROVEMENT',
+            `[19.4項 埋め込み縮退検知] 連続${embeddingHealth.consecutiveDegradedCount}回オフライン。疎ベクトルフォールバック中`
+          );
+        }
+      } catch (healthErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '埋め込みヘルスチェック中に例外が発生しました', healthErr);
+      }
+
       // Step 1: 記憶の統合・整理 & 知識グラフリンク構築
       if (context?.memories && context?.onUpdateMemories) {
         const mems = context.memories;
@@ -766,6 +781,25 @@ export class BackgroundWorkerService {
           }
         } catch (evoErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '放置型自律進化サイクル実行中に例外が発生しました', evoErr);
+        }
+
+        // Step 6.11: 設計思想 Master v5.4 第19章 記憶の間隔反復定着・鮮度再検証・埋め込み健全性監視
+        if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+        try {
+          systemLogger.info('SELF_IMPROVEMENT', '🧠 [第19章 記憶監査] 間隔反復定着・鮮度再検証・埋め込み復旧バッチを実行中...');
+          const auditRecord = await memoryAuditService.runFullAuditCycle(abortSignal);
+          if (auditRecord.spacedRecall.reinforcedCount > 0) {
+            weaknessFound.push(
+              `[19.2 間隔反復] ${auditRecord.spacedRecall.reinforcedCount}件の休眠重要記憶を自律再想起・定着補強`
+            );
+          }
+          if (auditRecord.freshness.diffsDetected > 0) {
+            weaknessFound.push(
+              `[19.3 鮮度再検証] ${auditRecord.freshness.diffsDetected}件の記憶に最新Web調査差分を検知し更新候補を保持`
+            );
+          }
+        } catch (auditErr: any) {
+          systemLogger.warn('SELF_IMPROVEMENT', '記憶の間隔反復・鮮度再検証サイクル中に例外が発生しました', auditErr);
         }
       }
 
