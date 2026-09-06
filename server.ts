@@ -14,17 +14,35 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Lazy Google GenAI Client
-let aiClient: GoogleGenAI | null = null;
-function getAIClient(): GoogleGenAI | null {
-  if (!aiClient && process.env.GEMINI_API_KEY) {
-    aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Lazy Google GenAI Client with Custom / Local API Key Support
+let defaultAiClient: GoogleGenAI | null = null;
+
+function extractApiKey(req?: express.Request): string | undefined {
+  if (!req) return undefined;
+  const headerKey = req.headers['x-gemini-api-key'] as string;
+  if (headerKey && typeof headerKey === 'string' && headerKey.trim()) {
+    return headerKey.trim();
   }
-  return aiClient;
+  const bodyKey = req.body?.apiKey as string;
+  if (bodyKey && typeof bodyKey === 'string' && bodyKey.trim()) {
+    return bodyKey.trim();
+  }
+  return undefined;
+}
+
+function getAIClient(req?: express.Request): GoogleGenAI | null {
+  const customKey = extractApiKey(req);
+  if (customKey) {
+    return new GoogleGenAI({ apiKey: customKey });
+  }
+  if (!defaultAiClient && process.env.GEMINI_API_KEY) {
+    defaultAiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+  return defaultAiClient;
 }
 
 // Multi-model resilient Gemini caller with active modern models from Google GenAI SDK
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash'];
 
 async function generateContentWithFallback(ai: GoogleGenAI, request: { contents: any; config?: any }) {
   let lastError: any = null;
@@ -83,13 +101,47 @@ if (IS_CI_ENV) {
 }
 
 app.get('/api/health', (req, res) => {
+  const customKey = extractApiKey(req);
   res.json({
     status: 'ok',
-    hasGeminiKey: !!process.env.GEMINI_API_KEY,
+    hasGeminiKey: !!process.env.GEMINI_API_KEY || !!customKey,
+    hasCustomGeminiKey: !!customKey,
     isCI: IS_CI_ENV,
     regulatoryGuardActive: true,
     timestamp: new Date().toISOString()
   });
+});
+
+// Gemini Status & Key Verification for Local/Termux/Custom execution
+app.get('/api/gemini/status', (req, res) => {
+  const customKey = extractApiKey(req);
+  const hasEnvKey = !!process.env.GEMINI_API_KEY;
+  const hasCustomKey = !!customKey;
+  res.json({
+    configured: hasEnvKey || hasCustomKey,
+    source: hasCustomKey ? 'custom' : hasEnvKey ? 'environment' : 'none',
+    activeModel: 'gemini-3.8-flash',
+    preview: hasCustomKey ? `${customKey.slice(0, 6)}...${customKey.slice(-4)}` : hasEnvKey ? 'システム環境変数 (GEMINI_API_KEY)' : '未設定'
+  });
+});
+
+app.post('/api/gemini/verify-key', async (req, res) => {
+  try {
+    const keyToTest = extractApiKey(req) || process.env.GEMINI_API_KEY;
+    if (!keyToTest) {
+      return res.status(400).json({ valid: false, error: 'APIキーが指定されていません。' });
+    }
+    const testAi = new GoogleGenAI({ apiKey: keyToTest });
+    const result = await testAi.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: 'Ping: 日本語で「接続成功」とだけ返答してください。',
+      config: { maxOutputTokens: 20 }
+    });
+    const reply = result.text || '接続成功';
+    res.json({ valid: true, model: 'gemini-3.8-flash', reply: reply.trim() });
+  } catch (err: any) {
+    res.status(400).json({ valid: false, error: err?.message || 'APIキーの検証に失敗しました' });
+  }
 });
 
 // Detailed Diagnostics Logger Endpoint
@@ -207,13 +259,13 @@ app.post('/api/search', async (req, res) => {
     }
 
     // 3. もし Gemini API が利用可能で、結果を推敲・要約する場合
-    const ai = getAIClient();
+    const ai = getAIClient(req);
     if (ai && results.length > 0) {
       try {
         const snippetsCombined = results.map(r => `・[${r.title}] ${r.snippet}`).join('\n');
         const summaryPrompt = `あなたはAI「みき」の知識抽出エンジンです。以下のWeb検索結果から、トピック「${cleanQuery}」に関する最も重要な要点・事実・知見を、日本語2〜3文で簡潔に要約してください。\n\n${snippetsCombined}`;
         const genRes = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.8-flash',
           contents: summaryPrompt,
           config: { maxOutputTokens: 250, temperature: 0.3 }
         });
@@ -278,7 +330,7 @@ app.post('/api/chat', async (req, res) => {
     } = req.body;
 
     const tStart = Date.now();
-    const ai = getAIClient();
+    const ai = getAIClient(req);
 
     if (!ai) {
       // Local dynamic fallback reply with attached files parsing
@@ -537,7 +589,7 @@ ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedS
 app.post('/api/train-distill', async (req, res) => {
   try {
     const { topic, skillType, currentMemories, persona } = req.body;
-    const ai = getAIClient();
+    const ai = getAIClient(req);
 
     if (!ai) {
       return res.json({
@@ -611,7 +663,7 @@ JSONフォーマットのみを出力してください:
 app.post('/api/teacher-request', async (req, res) => {
   try {
     const { failureCategory, abstractFailurePattern, expectedCondition, failureReason } = req.body;
-    const ai = getAIClient();
+    const ai = getAIClient(req);
 
     if (!ai) {
       // Offline fallback: generate a structured template sample
@@ -703,7 +755,7 @@ ${failureReason ? `【失敗理由の参考】\n${failureReason}\n` : ''}
 app.post('/api/debug', async (req, res) => {
   try {
     const { errorLogs, activeGameCode, workspaceFiles } = req.body;
-    const ai = getAIClient();
+    const ai = getAIClient(req);
 
     if (!ai) {
       return res.json({
@@ -938,7 +990,7 @@ app.get(['/api/export-app-zip', '/api/download-zip', '/miki-project.zip', '/down
 app.post('/api/miki/chat', async (req, res) => {
   try {
     const { message, character, worldState } = req.body;
-    const ai = getAIClient();
+    const ai = getAIClient(req);
     const charName = character?.name || '冒険者';
     const locName = worldState?.name || '拠点';
 

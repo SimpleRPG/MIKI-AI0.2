@@ -16,9 +16,64 @@ import { privacyGuardrailService } from './privacyGuardrailService';
 // APKなど「フロントエンドだけが単体で動くビルド」では server.ts (Express) が
 // 同一オリジンに存在しないため、Termux等で起動したサーバーのアドレスを
 // 明示的に指定できるようにする。未設定なら従来通り同一オリジン(相対パス)。
-function apiUrl(path: string): string {
+export function apiUrl(path: string): string {
   const base = (storageService.getItem('miki_api_base_url') || '').trim().replace(/\/+$/, '');
   return base ? `${base}${path}` : path;
+}
+
+export function getGeminiApiKey(): string {
+  return (storageService.getItem('miki_custom_gemini_api_key') || '').trim();
+}
+
+export function setGeminiApiKey(key: string): void {
+  storageService.setItem('miki_custom_gemini_api_key', key.trim());
+}
+
+export function getCustomApiHeaders(extraHeaders?: Record<string, string>): Record<string, string> {
+  const key = getGeminiApiKey();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(extraHeaders || {}),
+  };
+  if (key) {
+    headers['x-gemini-api-key'] = key;
+  }
+  return headers;
+}
+
+export async function checkGeminiStatus(): Promise<{ configured: boolean; source: string; activeModel: string; preview?: string }> {
+  try {
+    const res = await fetch(apiUrl('/api/gemini/status'), {
+      headers: getCustomApiHeaders(),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch {
+    // fallback to local status check
+  }
+  const localKey = getGeminiApiKey();
+  return {
+    configured: !!localKey,
+    source: localKey ? 'custom' : 'none',
+    activeModel: 'gemini-3.8-flash',
+    preview: localKey ? `${localKey.slice(0, 6)}...${localKey.slice(-4)}` : '未設定'
+  };
+}
+
+export async function verifyGeminiApiKey(keyToTest?: string): Promise<{ valid: boolean; error?: string; reply?: string; model?: string }> {
+  try {
+    const key = keyToTest !== undefined ? keyToTest.trim() : getGeminiApiKey();
+    const res = await fetch(apiUrl('/api/gemini/verify-key'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: key }),
+    });
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return { valid: false, error: err?.message || 'サーバーとの通信に失敗しました。' };
+  }
 }
 
 export interface SendChatMessageParams {
@@ -178,9 +233,9 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     };
     params.signal?.addEventListener('abort', onUserAbort);
 
-    const res = await fetch('/api/chat', {
+    const res = await fetch(apiUrl('/api/chat'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getCustomApiHeaders(),
       body: JSON.stringify(outboundParams),
       signal: timeoutController.signal,
     });
@@ -254,9 +309,9 @@ export async function distillKnowledgeForLocalLLM(params: {
   }
 
   try {
-    const res = await fetch('/api/train-distill', {
+    const res = await fetch(apiUrl('/api/train-distill'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getCustomApiHeaders(),
       body: JSON.stringify({ ...params, topic: audit.sanitizedText }),
     });
     if (!res.ok) throw new Error(`Distillation failed with status ${res.status}`);
@@ -287,9 +342,9 @@ export async function sendDebugRequest(
   }
 
   try {
-    const res = await fetch('/api/debug', {
+    const res = await fetch(apiUrl('/api/debug'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getCustomApiHeaders(),
       body: JSON.stringify({
         errorLogs,
         activeGameCode: audit.sanitizedText,

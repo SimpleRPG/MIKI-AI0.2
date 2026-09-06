@@ -10,6 +10,7 @@ import { workingAgendaService } from './workingAgendaService';
 import { selfImprovementService } from './selfImprovementService';
 import { capabilityGapService } from './capabilityGapService';
 import { privacyGuardrailService } from './privacyGuardrailService';
+import { apiUrl, getCustomApiHeaders } from './api';
 
 const SEARCH_CONFIG_KEY = 'miki_ai_autonomous_search_config';
 const SEARCH_RECORDS_KEY = 'miki_ai_autonomous_search_records';
@@ -238,9 +239,9 @@ export class AutonomousSearchService {
 
     try {
       // 1. Expressバックエンド /api/search へリクエスト
-      const res = await fetch('/api/search', {
+      const res = await fetch(apiUrl('/api/search'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCustomApiHeaders(),
         body: JSON.stringify({ query: safeQuery, maxResults }),
         signal: AbortSignal.timeout(6000),
       });

@@ -44,7 +44,11 @@ import {
   Copy,
   Sliders,
   FileText,
+  Key,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+import { getGeminiApiKey, setGeminiApiKey, checkGeminiStatus, verifyGeminiApiKey } from '../services/api';
 
 interface EngineModalProps {
   isOpen: boolean;
@@ -248,6 +252,49 @@ export const EngineModal: React.FC<EngineModalProps> = ({
     storageService.setItem('miki_cloud_exclude_sensitive_memories', String(excludeSensitiveMemories));
     setShowCloudConfirm(false);
     onSelectEngine('gemini_cloud');
+  };
+
+  // Gemini API Key 設定 (ローカル実行 / Termux / PC用)
+  const [customGeminiApiKey, setCustomGeminiApiKey] = useState<string>(() => getGeminiApiKey());
+  const [showApiKeyText, setShowApiKeyText] = useState(false);
+  const [geminiStatus, setGeminiStatus] = useState<{ configured: boolean; source: string; activeModel: string; preview?: string } | null>(null);
+  const [apiVerifyStatus, setApiVerifyStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [apiVerifyMsg, setApiVerifyMsg] = useState('');
+
+  const refreshGeminiStatus = async () => {
+    try {
+      const status = await checkGeminiStatus();
+      setGeminiStatus(status);
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      refreshGeminiStatus();
+    }
+  }, [isOpen]);
+
+  const handleSaveGeminiKey = (key: string) => {
+    const trimmed = key.trim();
+    setCustomGeminiApiKey(trimmed);
+    setGeminiApiKey(trimmed);
+    refreshGeminiStatus();
+    setApiVerifyStatus('idle');
+    setApiVerifyMsg(trimmed ? 'APIキーを端末ローカルに保存しました。' : 'APIキーを消去しました。');
+  };
+
+  const handleTestGeminiConnection = async () => {
+    setApiVerifyStatus('testing');
+    setApiVerifyMsg('Gemini 3.8 Flash へ通信テスト中...');
+    const res = await verifyGeminiApiKey(customGeminiApiKey);
+    if (res.valid) {
+      setApiVerifyStatus('success');
+      setApiVerifyMsg(`接続成功！ (${res.model || 'Gemini 3.8 Flash'} から応答を確認しました)`);
+      refreshGeminiStatus();
+    } else {
+      setApiVerifyStatus('error');
+      setApiVerifyMsg(res.error || '接続テストに失敗しました。キーやネットワークを確認してください。');
+    }
   };
 
   // External Local GPU (Ollama / LM Studio) Configuration
@@ -1596,7 +1643,7 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
                       <Sparkles className="w-4 h-4 text-sky-400" />
-                      <span>⑤ ☁️ Gemini Cloud</span>
+                      <span>⑤ ☁️ Gemini Cloud (3.8 Flash)</span>
                     </span>
                     <div className="flex items-center gap-1">
                       <span className="text-[9.5px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded border border-amber-500/40 flex items-center gap-0.5 font-bold">
@@ -1610,31 +1657,154 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                     </div>
                   </div>
                   <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
-                    Google CloudのGeminiで推論。教材生成・コード診断・補助評価に適した外部エンジン。
+                    Google CloudのGemini 3.8 Flashで推論。教材生成・コード診断・補助評価に適した外部教師エンジン。
                   </p>
                 </div>
                 <div className="text-[9.5px] text-sky-300 font-mono flex items-center justify-between pt-1 border-t border-sky-500/20">
-                  <span>☁️ 実行場所: クラウドAPI</span>
-                  <span className="text-amber-400 text-[9px]">※補助・評価用</span>
+                  <span>☁️ 実行場所: クラウドAPI (Gemini 3.8 Flash)</span>
+                  <div className="flex items-center gap-1.5">
+                    {geminiStatus?.source === 'custom' ? (
+                      <span className="text-[9px] text-emerald-300 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/40 font-bold flex items-center gap-0.5">
+                        <Key className="w-2.5 h-2.5 text-amber-400" /> キー保存済
+                      </span>
+                    ) : geminiStatus?.source === 'environment' ? (
+                      <span className="text-[9px] text-sky-300 bg-sky-950/80 px-1.5 py-0.2 rounded border border-sky-500/40 font-bold">
+                        ☁️ プレビューキー
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-amber-300/80 bg-slate-950 px-1.5 py-0.2 rounded border border-amber-500/30">
+                        ⚪ キー未設定
+                      </span>
+                    )}
+                    <span className="text-amber-400 text-[9px]">※補助・評価用</span>
+                  </div>
                 </div>
               </button>
             </div>
 
-            {/* Gemini Cloud Privacy & Transmission Panel if active */}
-            {engineMode === 'gemini_cloud' && (
-              <div className="p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/40 space-y-2.5 mt-3 animate-in fade-in duration-150">
+            {/* Gemini Cloud Privacy & API Key Settings Panel */}
+            {(engineMode === 'gemini_cloud' || customGeminiApiKey) && (
+              <div className="p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/40 space-y-3 mt-3 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between">
                   <div className="text-xs font-bold text-sky-200 flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-sky-400" />
-                    <span>Gemini Cloud 外部送信・プロンプト記憶保護</span>
+                    <span>Gemini Cloud (3.8 Flash) 外部教師 &amp; ローカル呼出設定</span>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
-                    ⚠️ 外部Googleサーバーへデータ送信
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {geminiStatus?.source === 'custom' && (
+                      <span className="text-[10px] text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-500/40 font-bold flex items-center gap-1">
+                        <Key className="w-3 h-3 text-amber-400" /> カスタムキー有効 ({geminiStatus.preview})
+                      </span>
+                    )}
+                    {geminiStatus?.source === 'environment' && (
+                      <span className="text-[10px] text-sky-300 bg-sky-950 px-2 py-0.5 rounded-full border border-sky-500/40 font-bold">
+                        ☁️ AI Studio プレビュー環境キー有効
+                      </span>
+                    )}
+                    {geminiStatus?.source === 'none' && (
+                      <span className="text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-700">
+                        ⚪ 未設定 (オフライン動作)
+                      </span>
+                    )}
+                  </div>
                 </div>
+
                 <p className="text-[11px] text-slate-300 leading-relaxed">
-                  MIKI-AIの基本設計は「オンデバイスでの自律育成」です。日常の個人的な雑談や専属相棒としての学習には、端末本体GPU（⚡ 端末本体GPU / 🌐 WebGPU）の利用を推奨します。クラウドAPIは教材生成や評価支援などの補助用途に適しています。
+                  MIKI-AIの日常対話やゲーム開発は「端末ローカルLLM（オンデバイス）」で完結しますが、難問の教材生成やWeb検索の要約、高度コード診断時には、最高峰知能 **Gemini 3.8 Flash** を外部教師として呼び出せます。
                 </p>
+
+                {/* API Key Configuration Block */}
+                <div className="p-3 bg-slate-900/90 rounded-lg border border-sky-500/30 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Google AI Studio API Key (ローカル・Termux・PC実行用)</span>
+                    </div>
+                    <a
+                      href="https://aistudio.google.com/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10.5px] text-sky-400 hover:text-sky-300 underline font-medium flex items-center gap-1"
+                    >
+                      無料キーを発行 ↗
+                    </a>
+                  </div>
+
+                  <p className="text-[10.5px] text-slate-400 leading-relaxed">
+                    プレビューだけでなく、自分のPCやスマホ（Termux）でローカル実行する際にGeminiを呼び出すには、AI Studioで発行したAPIキーをここに保存してください。
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type={showApiKeyText ? 'text' : 'password'}
+                        value={customGeminiApiKey}
+                        onChange={(e) => setCustomGeminiApiKey(e.target.value)}
+                        placeholder="AIzaSy... (Google AI Studio API Key)"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-sky-500 pr-9"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKeyText(!showApiKeyText)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                        title={showApiKeyText ? 'キーを隠す' : 'キーを表示'}
+                      >
+                        {showApiKeyText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSaveGeminiKey(customGeminiApiKey)}
+                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold transition-colors whitespace-nowrap"
+                    >
+                      保存
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleTestGeminiConnection}
+                      disabled={apiVerifyStatus === 'testing'}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sky-300 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 whitespace-nowrap disabled:opacity-50"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{apiVerifyStatus === 'testing' ? '確認中...' : '接続テスト'}</span>
+                    </button>
+
+                    {customGeminiApiKey && (
+                      <button
+                        type="button"
+                        onClick={() => handleSaveGeminiKey('')}
+                        className="px-2.5 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800 text-rose-300 rounded-lg text-xs font-medium transition-colors"
+                        title="キーを消去"
+                      >
+                        消去
+                      </button>
+                    )}
+                  </div>
+
+                  {apiVerifyMsg && (
+                    <div
+                      className={`p-2 rounded text-xs flex items-center gap-2 ${
+                        apiVerifyStatus === 'success'
+                          ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
+                          : apiVerifyStatus === 'error'
+                          ? 'bg-rose-950/80 text-rose-300 border border-rose-500/40'
+                          : 'bg-sky-950/80 text-sky-300 border border-sky-500/40'
+                      }`}
+                    >
+                      {apiVerifyStatus === 'success' && <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />}
+                      {apiVerifyStatus === 'error' && <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400" />}
+                      {apiVerifyStatus === 'testing' && <RefreshCw className="w-4 h-4 flex-shrink-0 text-sky-400 animate-spin" />}
+                      <span>{apiVerifyMsg}</span>
+                    </div>
+                  )}
+
+                  <div className="text-[10px] text-slate-400 pt-0.5">
+                    💡 <span className="font-semibold text-slate-300">サーバー側の設定方法:</span> ローカルPCやTermuxで動かす時は、プロジェクト直下に <code className="bg-slate-950 text-sky-300 px-1 py-0.5 rounded font-mono">.env</code> を作成し <code className="text-amber-300 font-mono">GEMINI_API_KEY=AIzaSy...</code> と書くだけでも自動認識されます。
+                  </div>
+                </div>
+
                 <div className="pt-2 border-t border-sky-500/20">
                   <label className="flex items-start gap-2.5 cursor-pointer bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 hover:border-sky-500/40 transition-colors">
                     <input

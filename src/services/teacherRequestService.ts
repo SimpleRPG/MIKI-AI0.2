@@ -20,7 +20,7 @@ import { systemLogger } from './systemLogger';
 import { checkSampleSafety } from '../utils/trainingSampleSafetyFilter';
 import { completionJudgeService } from './completionJudgeService';
 import { schemaValidationService } from './schemaValidationService';
-import { sendChatMessage } from './api';
+import { sendChatMessage, apiUrl, getCustomApiHeaders } from './api';
 import { capabilityGapService } from './capabilityGapService';
 import { answerPlanService } from './answerPlanService';
 import { privacyGuardrailService } from './privacyGuardrailService';
@@ -553,9 +553,9 @@ export class TeacherRequestService {
     );
 
     try {
-      const res = await fetch('/api/teacher-request', {
+      const res = await fetch(apiUrl('/api/teacher-request'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCustomApiHeaders(),
         body: JSON.stringify(safePayload),
       });
 
