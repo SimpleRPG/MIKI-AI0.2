@@ -41,11 +41,12 @@ import {
   AiderCommitRecord,
 } from '../../services/aiderEngineService';
 import { SuperchargerToolsSubView } from './SuperchargerToolsSubView';
+import { UltraSelfEvolverSubView } from './UltraSelfEvolverSubView';
 
 export const AdvancedSelfCodeSuiteView: React.FC = () => {
   const [selectedSubTool, setSelectedSubTool] = useState<
-    'dry_run' | 'benchmark' | 'failure_synthesis' | 'canary' | 'pair_programming' | 'aider_engine' | 'supercharger'
-  >('supercharger');
+    'dry_run' | 'benchmark' | 'failure_synthesis' | 'canary' | 'pair_programming' | 'aider_engine' | 'supercharger' | 'ultra_evolver'
+  >('ultra_evolver');
 
   // Aider Engine Sub-tabs
   const [aiderSubTab, setAiderSubTab] = useState<'repo_map' | 'search_replace' | 'auto_heal' | 'commits'>('repo_map');
@@ -339,14 +340,26 @@ export class SafeDataProcessor implements DataProcessor {
 
         <button
           onClick={() => setSelectedSubTool('supercharger')}
-          className={`px-3 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all col-span-2 md:col-span-3 lg:col-span-6 ${
+          className={`px-3 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all col-span-2 md:col-span-3 ${
             selectedSubTool === 'supercharger'
               ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20'
               : 'text-purple-300 hover:text-white bg-purple-950/40 border border-purple-800/50 hover:bg-purple-900/50'
           }`}
         >
           <Sparkles className="w-3.5 h-3.5 text-pink-300" />
-          🚀 超進化5大エンジン (評議会 / TDDテスト / ナレッジ / 不要コード掃討 / Prompt-to-Patch)
+          🚀 超進化5大エンジン (評議会/TDD/知見/掃討/Patch)
+        </button>
+
+        <button
+          onClick={() => setSelectedSubTool('ultra_evolver')}
+          className={`px-3 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all col-span-2 md:col-span-3 ${
+            selectedSubTool === 'ultra_evolver'
+              ? 'bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white shadow-lg shadow-rose-500/20'
+              : 'text-rose-300 hover:text-white bg-rose-950/40 border border-rose-800/50 hover:bg-rose-900/50'
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5 text-rose-300" />
+          🧬 超神化5大コア (変異テスト/Reflexion/複雑度/Big-O/自己治癒)
         </button>
       </div>
 
@@ -1050,6 +1063,9 @@ export class SafeDataProcessor implements DataProcessor {
 
       {/* ── 7. 超進化5大ツール ── */}
       {selectedSubTool === 'supercharger' && <SuperchargerToolsSubView />}
+
+      {/* ── 8. 超神化5大コア ── */}
+      {selectedSubTool === 'ultra_evolver' && <UltraSelfEvolverSubView />}
     </div>
   );
 };
