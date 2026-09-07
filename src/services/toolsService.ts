@@ -11,6 +11,10 @@ import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { capabilityPluginService } from './capabilityPluginService';
 import { autonomousSearchService } from './autonomousSearchService';
+import { selfCodeArchitectService } from './selfCodeArchitectService';
+import { cognitiveDebuggerService } from './cognitiveDebuggerService';
+import { digitalResearchNoteService } from './digitalResearchNoteService';
+import { codebaseReflectionService } from './codebaseReflectionService';
 
 const TOOLS_STATS_STORAGE_KEY = 'miki_ai_tools_stats';
 
@@ -490,6 +494,87 @@ export const BUILTIN_TOOLS: ToolDefinition[] = [
     linkedSkillIds: ['skill_task_decomposition', 'skill_code_syntax_audit'],
     isAvailable: true,
   },
+  {
+    id: 'tool_self_code_audit',
+    name: '自己コード監査 & 仕様書整合性チェッカー (Self-Code Auditor)',
+    description: '全170章の設計思想仕様書と現在のソースコード実装の整合性、未実装要件、仕様ドリフト、不変条件（Qwen 3B保護・プライバシー等）を静的監査します。',
+    category: 'system',
+    permission: 'read_only',
+    requiresConfirmation: false,
+    parameters: [],
+    linkedSkillIds: ['skill_task_decomposition'],
+    isAvailable: true,
+  },
+  {
+    id: 'tool_autonomous_self_improvement',
+    name: 'みき自律アプリ改善エンジン (Autonomous Self-Improvement Engine)',
+    description: 'みき自身が設計思想仕様書に基づき、未実装要件に対する変更契約（Change Contract）を自動策定し、不変条件の厳密検証・シャドーテストを経て、アプリの仕様適合と自己改善を安全に実行・反映します。',
+    category: 'system',
+    permission: 'read_only',
+    requiresConfirmation: false,
+    parameters: [
+      {
+        name: 'targetChapter',
+        type: 'number',
+        description: '改善対象の仕様書章番号 (省略時は最優先の未実装章を自動選定)',
+        required: false,
+      },
+      {
+        name: 'batchCount',
+        type: 'number',
+        description: '連続自律改善する章数 (デフォルト1、まとめて改善時は2〜5)',
+        required: false,
+      },
+    ],
+    linkedSkillIds: ['skill_task_decomposition'],
+    isAvailable: true,
+  },
+  {
+    id: 'tool_cognitive_debugger',
+    name: '第155章 認知デバッガ (Cognitive Reasoning Trace)',
+    description: 'みきの最新発話や判断における推論トレース（意図分類・8層記憶想起寄与・定石ルール・不変条件ゲート・失敗経路診断）を可視化・分析します。',
+    category: 'system',
+    permission: 'read_only',
+    requiresConfirmation: false,
+    parameters: [],
+    linkedSkillIds: ['skill_task_decomposition'],
+    isAvailable: true,
+  },
+  {
+    id: 'tool_digital_research_note',
+    name: '第57章 デジタル研究ノート (Digital Research Note)',
+    description: '自己実験、改善仮説、対話観察結果、確立された知見ルールを論理体系化されたノートとして参照・記録します。',
+    category: 'system',
+    permission: 'read_only',
+    requiresConfirmation: false,
+    parameters: [],
+    linkedSkillIds: ['skill_task_decomposition'],
+    isAvailable: true,
+  },
+  {
+    id: 'tool_codebase_reflection',
+    name: 'コード自己理解・改善レシピ (Codebase Reflection & Recipe)',
+    description: 'みき自身の全ソースコード構造、ファイル責務、アーキテクチャレイヤー、未実装章の安全改善レシピを検索・参照します。',
+    category: 'system',
+    permission: 'read_only',
+    requiresConfirmation: false,
+    parameters: [
+      {
+        name: 'query',
+        type: 'string',
+        description: '検索キーワード (例: "記憶", "VBA", "App.tsx", "推論")',
+        required: false,
+      },
+      {
+        name: 'chapterNumber',
+        type: 'number',
+        description: '自律改善レシピを取得したい仕様書章番号 (例: 33, 35, 69)',
+        required: false,
+      },
+    ],
+    linkedSkillIds: ['skill_task_decomposition'],
+    isAvailable: true,
+  },
 ];
 
 /**
@@ -687,6 +772,83 @@ export class ToolsService {
       });
     }
 
+    // 6. 自己コード監査・仕様整合性チェック (tool_self_code_audit)
+    const isSelfAudit =
+      /(コード監査|仕様.*監査|ドリフト.*検知|不変条件.*(確認|チェック)|仕様.*実装.*整合性|設計思想.*チェック)/i.test(p);
+    if (isSelfAudit) {
+      recommendations.push({
+        toolId: 'tool_self_code_audit',
+        name: '自己コード監査チェッカー',
+        category: 'system',
+        reason: '設計思想仕様書とソースコードの整合性・不変条件の監査が求められています',
+        suggestedParams: {},
+        requiresConfirmation: false,
+        permission: 'read_only',
+      });
+    }
+
+    // 7. みき自律アプリ改善エンジン (tool_autonomous_self_improvement)
+    const isBatchImprovement = /(さらに|もっと|続けて|まとめて|一括で).*(進めて|改善|やって)/i.test(p);
+    const isSelfImprovement =
+      isBatchImprovement ||
+      /(自分で.*(改善|直して|進めて|アプリ)|アプリ.*(改善|自己改善)|仕様書.*(実装|適合|進めて)|自律.*改善|未実装.*(実装|改善)|自己改善して|さらに進めて|もっと進めて)/i.test(p);
+    if (isSelfImprovement) {
+      recommendations.push({
+        toolId: 'tool_autonomous_self_improvement',
+        name: 'みき自律アプリ改善エンジン',
+        category: 'system',
+        reason: 'みき自身によるアプリの自律改善・仕様書適合サイクルが求められています',
+        suggestedParams: isBatchImprovement ? { batchCount: 3 } : {},
+        requiresConfirmation: false,
+        permission: 'read_only',
+      });
+    }
+
+    // 8. 第155章 認知デバッガ (tool_cognitive_debugger)
+    const isCognitiveDebugger =
+      /(認知デバッガ|推論トレース|推論過程|なぜその回答|思考プロセス|失敗経路|思考理由.*(見せて|表示|教えて))/i.test(p);
+    if (isCognitiveDebugger) {
+      recommendations.push({
+        toolId: 'tool_cognitive_debugger',
+        name: '第155章 認知デバッガ',
+        category: 'system',
+        reason: '思考・推論過程のトレースや失敗経路診断の表示が求められています',
+        suggestedParams: {},
+        requiresConfirmation: false,
+        permission: 'read_only',
+      });
+    }
+
+    // 9. 第57章 デジタル研究ノート (tool_digital_research_note)
+    const isResearchNote =
+      /(研究ノート|実験ノート|自己実験|仮説検証|定着知見|自律研究)/i.test(p);
+    if (isResearchNote) {
+      recommendations.push({
+        toolId: 'tool_digital_research_note',
+        name: '第57章 デジタル研究ノート',
+        category: 'system',
+        reason: '自己実験ログや仮説検証ノートの閲覧・確認が求められています',
+        suggestedParams: {},
+        requiresConfirmation: false,
+        permission: 'read_only',
+      });
+    }
+
+    // 10. コード自己理解・改善レシピ (tool_codebase_reflection)
+    const isCodebaseReflection =
+      /(コード.*理解|コード.*構造|自分のコード|アーキテクチャ|ファイル構造|どう改善|改善レシピ|モジュール|設計思想.*コード)/i.test(p);
+    if (isCodebaseReflection) {
+      recommendations.push({
+        toolId: 'tool_codebase_reflection',
+        name: 'コード自己理解・改善レシピ',
+        category: 'system',
+        reason: '自分自身のコードベース構造や自律改善レシピの確認が求められています',
+        suggestedParams: {},
+        requiresConfirmation: false,
+        permission: 'read_only',
+      });
+    }
+
     return recommendations;
   }
 
@@ -878,6 +1040,78 @@ export class ToolsService {
           outputSummary = searchRes.summary
             ? `🌐 Web検索完了 (${searchRes.provider}): ${searchRes.summary.slice(0, 80)}... (${searchRes.results.length}件のソースから知識抽出)`
             : `🌐 Web検索完了: 「${query}」に関する${searchRes.results.length}件の情報を取得し学習定着しました`;
+          break;
+        }
+
+        case 'tool_self_code_audit': {
+          const auditRes = selfCodeArchitectService.runSelfCodeAudit();
+          execResult = auditRes;
+          outputSummary = `📋 自己コード監査完了: 適合スコア ${auditRes.complianceScore}点 (実装済: ${auditRes.completedChapters}/${auditRes.totalChapters}章, 不変条件: ${auditRes.invariantsAudit.allPassed ? '全5項目クリア' : '警告あり'})`;
+          break;
+        }
+
+        case 'tool_autonomous_self_improvement': {
+          const batchCount = typeof params.batchCount === 'number' ? params.batchCount : 1;
+          if (batchCount > 1) {
+            const batchRes = selfCodeArchitectService.runBatchAutonomousImprovement(batchCount);
+            execResult = batchRes;
+            outputSummary = `✨ 連続自律改善完了: ${batchRes.completedCount}章を一括適合 (スコア: ${batchRes.initialScore}点 ➔ ${batchRes.finalScore}点)`;
+          } else {
+            const targetChapter = typeof params.targetChapter === 'number' ? params.targetChapter : undefined;
+            const improveRes = selfCodeArchitectService.runAutonomousImprovementCycle(targetChapter);
+            execResult = improveRes;
+            outputSummary = improveRes.success
+              ? `✨ 自律アプリ改善完了: 第${improveRes.targetChapter.chapterNumber}章『${improveRes.targetChapter.title}』を安全に改善・反映しました (スコア: ${improveRes.auditResult.complianceScore}点)`
+              : `⚠️ 自律改善保留: ${improveRes.summary}`;
+          }
+          break;
+        }
+
+        case 'tool_cognitive_debugger': {
+          const traces = cognitiveDebuggerService.getAllTraces();
+          const latestTrace = cognitiveDebuggerService.getLatestTrace();
+          execResult = {
+            latestTrace,
+            totalTraces: traces.length,
+            recentTraces: traces.slice(0, 5),
+          };
+          outputSummary = latestTrace
+            ? `🧠 認知デバッガ: 最新推論トレース [${latestTrace.intentCategory}] 応答${latestTrace.totalLatencyMs}ms (${latestTrace.traceSteps.length}ステップ・想起記憶層: ${latestTrace.recalledMemoryLayers.join(', ')})`
+            : `🧠 認知デバッガ: トレース準備完了 (推論ステップは正常にモニタリングされています)`;
+          break;
+        }
+
+        case 'tool_digital_research_note': {
+          const stats = digitalResearchNoteService.getStats();
+          const experiments = digitalResearchNoteService.getAllExperiments();
+          execResult = {
+            stats,
+            latestExperiments: experiments.slice(0, 5),
+          };
+          outputSummary = `📓 デジタル研究ノート: 累積実験${stats.totalExperiments}件 (立証済仮説: ${stats.verifiedHypotheses}件, 定着知見: ${stats.settledRulesCount}件)`;
+          break;
+        }
+
+        case 'tool_codebase_reflection': {
+          const query = typeof params.query === 'string' ? params.query : '';
+          const chapterNumber = typeof params.chapterNumber === 'number' ? params.chapterNumber : undefined;
+
+          if (chapterNumber !== undefined) {
+            const recipe = selfCodeArchitectService.getRecipeForChapter(chapterNumber);
+            execResult = { recipe };
+            outputSummary = recipe
+              ? `🧩 第${chapterNumber}章『${recipe.chapterTitle}』の改善レシピ合成完了: 対象モジュール [${recipe.targetModules.join(', ')}]、リスク度: ${recipe.regressionRisk}`
+              : `⚠️ 第${chapterNumber}章の仕様書が見つかりませんでした。`;
+          } else {
+            const modules = selfCodeArchitectService.getModules(query);
+            const layers = selfCodeArchitectService.getArchitectureOverview();
+            execResult = {
+              layers,
+              matchingModules: modules.slice(0, 8),
+              totalModulesRegistered: codebaseReflectionService.getAllModules().length,
+            };
+            outputSummary = `🏛️ コードベース自己理解: 全5大アーキテクチャ層、登録モジュール${codebaseReflectionService.getAllModules().length}件、検索ヒット${modules.length}件`;
+          }
           break;
         }
 

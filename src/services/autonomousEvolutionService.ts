@@ -11,6 +11,8 @@ import { selfImprovementService } from './selfImprovementService';
 import { workingAgendaService } from './workingAgendaService';
 import { autonomousSearchService } from './autonomousSearchService';
 import { syntheticDataService } from './syntheticDataService';
+import { selfCodeArchitectService } from './selfCodeArchitectService';
+import { SelfImprovementProposal } from '../types';
 
 const HEURISTIC_RULES_KEY = 'miki_heuristic_rules';
 const REFLECTIONS_KEY = 'miki_counterfactual_reflections';
@@ -162,6 +164,26 @@ export class AutonomousEvolutionService {
       }
 
       // ----------------------------------------------------
+      // サブシステム 5: 設計思想 第29章 & 第123章 自律自己コード・仕様適合改善
+      // ----------------------------------------------------
+      if (signal?.aborted) throw new Error('ユーザー割り込みにより中断');
+      let selfCodeImprovementRun = 0;
+      let selfCodeImprovementSummaryText: string | undefined = undefined;
+      const appliedProposals: SelfImprovementProposal[] = [];
+
+      try {
+        const autoImprovementResult = selfCodeArchitectService.runAutonomousImprovementCycle();
+        if (autoImprovementResult.success && autoImprovementResult.proposal) {
+          selfCodeImprovementRun = 1;
+          selfCodeImprovementSummaryText = `第${autoImprovementResult.targetChapter.chapterNumber}章「${autoImprovementResult.targetChapter.title}」の仕様適合（スコア${autoImprovementResult.auditResult.complianceScore}点へ改善）`;
+          appliedProposals.push(autoImprovementResult.proposal);
+          highlights.push(`【自律アプリ改善】みき自身が第${autoImprovementResult.targetChapter.chapterNumber}章『${autoImprovementResult.targetChapter.title}』の仕様適合と安全変更契約を締結・正式反映`);
+        }
+      } catch (archErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '自律コード改善サイクルスキップ:', archErr?.message || archErr);
+      }
+
+      // ----------------------------------------------------
       // お出迎えメッセージ (Welcome Greeting Candidate) の生成
       // ----------------------------------------------------
       const welcomeGreeting = this.generateWelcomeGreeting({
@@ -169,6 +191,7 @@ export class AutonomousEvolutionService {
         newRules,
         resolvedTopics,
         drillSummary,
+        selfCodeImprovementSummaryText,
       });
 
       const report: AutonomousGrowthReport = {
@@ -180,6 +203,8 @@ export class AutonomousEvolutionService {
         resolvedHomeworkCount: resolvedTopics.length,
         masteryDrillsRun: drillSummary.totalDrills,
         masteryScore: drillSummary.score,
+        selfCodeImprovementsRun: selfCodeImprovementRun,
+        selfCodeImprovementSummary: selfCodeImprovementSummaryText,
         growthHighlights: highlights,
         welcomeGreetingCandidate: welcomeGreeting,
         viewed: false,
@@ -188,6 +213,7 @@ export class AutonomousEvolutionService {
           distilledRules: newRules,
           resolvedTopics,
           drillResults: drillSummary.results,
+          appliedProposals,
         },
       };
 
@@ -196,7 +222,7 @@ export class AutonomousEvolutionService {
 
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `✨ [第19章 放置型自律進化完了] ${report.durationMs}ms - 反省:${newReflections.length}件, 知恵蒸留:${newRules.length}件, 宿題解決:${resolvedTopics.length}件, ドリル熟達:${Math.round(drillSummary.score * 100)}%`
+        `✨ [第19章 放置型自律進化完了] ${report.durationMs}ms - 反省:${newReflections.length}件, 知恵蒸留:${newRules.length}件, 宿題解決:${resolvedTopics.length}件, 自律アプリ改善:${selfCodeImprovementRun}件, ドリル熟達:${Math.round(drillSummary.score * 100)}%`
       );
 
       return report;
@@ -425,7 +451,11 @@ export class AutonomousEvolutionService {
     newRules: HeuristicRuleItem[];
     resolvedTopics: string[];
     drillSummary: { category: string; totalDrills: number; score: number };
+    selfCodeImprovementSummaryText?: string;
   }): string {
+    if (data.selfCodeImprovementSummaryText) {
+      return `おかえり！留守の間に、アプリの自己改善を進めておいたよ！✨（${data.selfCodeImprovementSummaryText}）不変条件を守って安全に適用できたよ！`;
+    }
     if (data.resolvedTopics.length > 0) {
       return `おかえり！留守の間に、前回の宿題「${data.resolvedTopics[0]}」について調べてまとめておいたよ！いつでも続きを聞いてね！`;
     }

@@ -23,6 +23,7 @@ export interface SystemLogEntry {
     | 'FEATURE_FLAGS'
     | 'VBA_DESIGN_ASSISTANT'
     | 'VIRTUAL_TRAINING'
+    | 'TASK_PLAN'
     | 'PRIVACY';
   message: string;
   details?: any;
@@ -49,6 +50,8 @@ class SystemLogger {
   private sessionStartTime: number = 0;
   private lastStepTimestamp: number = 0;
   private currentSessionSteps: StepExecutionSnapshot[] = [];
+  private logListeners: Set<(entry: SystemLogEntry) => void> = new Set();
+  private stepListeners: Set<(step: StepExecutionSnapshot, allSteps: StepExecutionSnapshot[]) => void> = new Set();
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -112,6 +115,15 @@ class SystemLogger {
       this.syncToServer(entry).catch(() => {});
     }
 
+    // Notify real-time listeners
+    this.logListeners.forEach((listener) => {
+      try {
+        listener(entry);
+      } catch (err) {
+        console.warn('SystemLogger listener error:', err);
+      }
+    });
+
     // Console output with elapsed time indicators
     const timingPrefix = elapsedMs !== undefined ? `[+${elapsedMs}ms]` : '';
     const formatted = `[${entry.timestamp}] ${timingPrefix} [${entry.level.padEnd(5)}] [${entry.category.padEnd(9)}] ${entry.message}`;
@@ -153,6 +165,16 @@ class SystemLogger {
     };
 
     this.currentSessionSteps.push(stepSnapshot);
+
+    // Notify real-time step listeners
+    this.stepListeners.forEach((listener) => {
+      try {
+        listener(stepSnapshot, [...this.currentSessionSteps]);
+      } catch (err) {
+        console.warn('SystemLogger stepListener error:', err);
+      }
+    });
+
     return stepSnapshot;
   }
 
@@ -204,6 +226,28 @@ class SystemLogger {
 
   public getLogs(): SystemLogEntry[] {
     return [...this.logs];
+  }
+
+  /**
+   * リアルタイムログ購読 (UIが今何をしているかをリアルタイム監視するためのPub/Sub)
+   */
+  public subscribeLog(listener: (entry: SystemLogEntry) => void): () => void {
+    this.logListeners.add(listener);
+    return () => {
+      this.logListeners.delete(listener);
+    };
+  }
+
+  /**
+   * リアルタイム推論工程・自律改善ステップ購読
+   */
+  public subscribeStep(
+    listener: (step: StepExecutionSnapshot, allSteps: StepExecutionSnapshot[]) => void
+  ): () => void {
+    this.stepListeners.add(listener);
+    return () => {
+      this.stepListeners.delete(listener);
+    };
   }
 
   public clearLogs() {

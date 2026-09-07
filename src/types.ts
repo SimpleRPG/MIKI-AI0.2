@@ -572,6 +572,7 @@ export interface ExecutionStep {
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
+  sender?: string;
   content: string;
   timestamp: number;
   speaker?: {
@@ -1625,6 +1626,8 @@ export interface ResponseSkeleton {
 
 export interface AnswerPlanApplicationResult {
   applied: boolean;
+  planType?: string;
+  coreFocus?: string;
   matchedSkeleton?: ResponseSkeleton;
   differenceCheck?: string[];
   savingsNote?: string;
@@ -2420,6 +2423,8 @@ export interface AutonomousGrowthReport {
   resolvedHomeworkCount: number;
   masteryDrillsRun: number;
   masteryScore: number;
+  selfCodeImprovementsRun?: number;
+  selfCodeImprovementSummary?: string;
   growthHighlights: string[];
   welcomeGreetingCandidate: string;
   viewed: boolean;
@@ -2428,6 +2433,7 @@ export interface AutonomousGrowthReport {
     distilledRules?: HeuristicRuleItem[];
     resolvedTopics?: string[];
     drillResults?: Array<{ topic: string; passed: boolean; score: number }>;
+    appliedProposals?: SelfImprovementProposal[];
   };
 }
 
@@ -2744,3 +2750,5 @@ export interface ConversationTaskCard {
 export type ProactiveSuggestionLevel = 'OFF' | 'MODEST' | 'STANDARD' | 'ACTIVE';
 
 export type ManualExplanationOverride = 'AUTO' | 'CONCISE' | 'STANDARD' | 'DETAILED' | 'TUTORIAL';
+
+export type Message = ChatMessage;

@@ -1,6 +1,7 @@
 import { PersonaConfig, MemoryItem } from '../types';
 import { toolsService } from '../services/toolsService';
 import { codeUnderstandingService } from '../services/codeUnderstandingService';
+import { selfCodeArchitectService } from '../services/selfCodeArchitectService';
 
 export function generateSmartCompanionReply(
   prompt: string,
@@ -81,6 +82,28 @@ export function generateSmartCompanionReply(
     if (calc.success && typeof calc.result === 'number' && !isNaN(calc.result)) {
       return `計算できたよ！🧮✨\n\n**計算式**: \`${calc.expression}\`\n**結果**: **${calc.result}**\n\n（※端末内オンデバイスの安全な数値演算ツール \`:feature:tools\` で計算したよ！eval/new Function不使用・ハルシネーションなしの100%正確な値だよ💡）`;
     }
+  }
+
+  // 0.06 設計思想 第29章 & 第123章: みき自律アプリ改善リクエスト (Autonomous Self-Improvement)
+  const isSelfImprovementIntent =
+    /(自分で.*(改善|直して|進めて|アプリ)|アプリ.*(改善|自己改善)|仕様書.*(実装|適合|進めて)|自律.*改善|未実装.*(実装|改善)|自己改善して)/i.test(p);
+  if (isSelfImprovementIntent) {
+    const result = selfCodeArchitectService.runAutonomousImprovementCycle();
+    return `うん、わかった！私が自分でアプリの改善を進めたよ！任せて！🛠️✨\n\n${result.summary}\n\nこれからも仕様書の未実装要件やドリフトを自律的に見つけて、Qwen 3B保護やプライバシーなどの不変条件を100%守りながら安全に自己改善していくね！😊💪`;
+  }
+
+  // 0.07 設計思想 第29章: 自己コード監査・仕様整合性チェック
+  const isSelfAuditIntent =
+    /(コード監査|仕様.*監査|ドリフト.*検知|不変条件.*(確認|チェック)|仕様.*実装.*整合性|設計思想.*チェック)/i.test(p);
+  if (isSelfAuditIntent) {
+    const audit = selfCodeArchitectService.runSelfCodeAudit();
+    const invStatus = audit.invariantsAudit.allPassed ? '✅ オールクリア (5項目保護中)' : '⚠️ 警告あり';
+    return `自己コード監査を実行したよ！📋✨\n\n` +
+      `・**設計思想仕様書**: 全${audit.totalChapters}章中、**${audit.completedChapters}章が実装完了**\n` +
+      `・**仕様適合スコア**: **${audit.complianceScore}点** / 100点\n` +
+      `・**不変条件エンジン**: ${invStatus}\n` +
+      `・**検出ドリフト**: ${audit.drifts.length}件 (最優先: 第${audit.drifts[0]?.chapterNumber ?? 31}章)\n\n` +
+      `「自己改善ラボ → 自己コード改善」タブで詳細な変更契約や監査ログを確認できるよ！改善を進めたい時は「自分でアプリの改善を進めて」と声かけてね！😊`;
   }
 
   // 0.1 Self Introduction

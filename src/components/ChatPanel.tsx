@@ -51,6 +51,7 @@ import {
   GitBranch,
   CheckSquare,
   HelpCircle,
+  Activity,
 } from 'lucide-react';
 import {
   ChatMessage,
@@ -68,7 +69,7 @@ import {
 } from '../types';
 import { extractCodeBlocks, extractFilesFromZip } from '../utils/codeParser';
 import { SPEAKER_PROFILES } from '../data/speakers';
-import { systemLogger } from '../services/systemLogger';
+import { systemLogger, StepExecutionSnapshot } from '../services/systemLogger';
 import { selfImprovementService } from '../services/selfImprovementService';
 import { skillsService } from '../services/skillsService';
 import { TaskPlanCard } from './TaskPlanCard';
@@ -83,9 +84,11 @@ import { conversationBranchService } from '../services/conversationBranchService
 import { liveConversationRepairService } from '../services/liveConversationRepairService';
 import { whyAnswerInspectorService } from '../services/whyAnswerInspectorService';
 import { conversationTaskboardService } from '../services/conversationTaskboardService';
+import { proactiveContextOsService } from '../services/proactiveContextOsService';
 import { WhyAnswerInspectorModal } from './chat/WhyAnswerInspectorModal';
 import { ConversationBranchModal } from './chat/ConversationBranchModal';
 import { ConversationTaskboardModal } from './chat/ConversationTaskboardModal';
+import { RealtimeActivityMonitorModal } from './RealtimeActivityMonitorModal';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -189,6 +192,28 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
   const [liveRepairAlert, setLiveRepairAlert] = useState<{ trigger: string; advice: string } | null>(null);
 
+  // リアルタイム行動・思考モニター状態 (ユーザー要望: リアルタイムに今何をしているか可視化)
+  const [isActivityMonitorOpen, setIsActivityMonitorOpen] = useState(false);
+  const [latestLiveStep, setLatestLiveStep] = useState<StepExecutionSnapshot | null>(null);
+  const [liveLogMessage, setLiveLogMessage] = useState<string>('');
+
+  useEffect(() => {
+    // リアルタイム行動ログ＆ステップのPub/Subリスナー登録
+    const unsubStep = systemLogger.subscribeStep((step) => {
+      setLatestLiveStep(step);
+    });
+    const unsubLog = systemLogger.subscribeLog((entry) => {
+      if (entry.category === 'STEP' || entry.category === 'INFERENCE' || entry.category === 'SELF_IMPROVEMENT') {
+        setLiveLogMessage(entry.message.replace(/^▶\s*/, ''));
+      }
+    });
+
+    return () => {
+      unsubStep();
+      unsubLog();
+    };
+  }, []);
+
   useEffect(() => {
     // 未確認の自律成長レポートを取得
     const rep = autonomousEvolutionService.getLatestUnviewedReport();
@@ -263,6 +288,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     // 設計思想 第28章 28.4: ユーザー理解度追従型・専門用語出現頻度をドメイン別解析
     if (textToSend) {
       userProficiencyService.analyzeUserUtterance(textToSend);
+      // 設計思想 第35/54章: 能動知覚OS・作業コンテキスト＆認知疲労状態の同期
+      proactiveContextOsService.perceiveCurrentContext(textToSend);
     }
 
     // 設計思想 第31章 31.1: ライブ会話リペアトリガー検知 (違う/長い/結論は？等の即時修復)
@@ -270,7 +297,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if (textToSend) {
       const repairCheck = liveConversationRepairService.detectRepairTrigger(textToSend);
       if (repairCheck.isRepair && repairCheck.triggerType) {
-        const lastAiMsg = [...messages].reverse().find((m) => m.sender === 'ai' || m.sender === 'assistant');
+        const lastAiMsg = [...messages].reverse().find((m) => m.role === 'assistant' || m.sender === 'ai' || m.sender === 'assistant');
         if (lastAiMsg) {
           const repairDirective = liveConversationRepairService.generateRepairSystemPrompt(
             repairCheck.triggerType,
@@ -315,7 +342,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if (messages.length >= 2) {
       const last = messages[messages.length - 1];
       const prev = messages[messages.length - 2];
-      if ((last.sender === 'ai' || last.sender === 'assistant') && (prev.sender === 'user')) {
+      if (
+        (last.role === 'assistant' || last.sender === 'ai' || last.sender === 'assistant') &&
+        (prev.role === 'user' || prev.sender === 'user')
+      ) {
         const extracted = conversationTaskboardService.extractTasksFromTurn(prev.content, last.content, last.id);
         if (extracted.length > 0) {
           setTasks(conversationTaskboardService.getAllTasks());
@@ -818,6 +848,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           >
             <CheckSquare className="w-3 h-3 text-emerald-400" />
             <span>タスク ({tasks.filter((t) => t.status !== 'COMPLETED').length})</span>
+          </button>
+
+          {/* リアルタイム行動モニターボタン (ユーザー要望: リアルタイムに今何をしているか可視化) */}
+          <button
+            onClick={() => setIsActivityMonitorOpen(true)}
+            className={`px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1.5 transition-all shadow-sm ${
+              isLoading || isGenerating
+                ? 'bg-gradient-to-r from-pink-600 to-indigo-600 text-white border-pink-400/80 animate-pulse'
+                : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700/80'
+            }`}
+            title="みきが今リアルタイムに何をしているか（推論工程・記憶検索・自己改善）を秒単位でライブ監視"
+          >
+            <Activity className={`w-3 h-3 ${isLoading || isGenerating ? 'animate-spin text-pink-200' : 'text-indigo-400'}`} />
+            <span>
+              {isLoading || isGenerating ? 'リアルタイム実行中...' : 'リアルタイム行動'}
+            </span>
           </button>
 
           {/* Self Improvement Lab Button */}
@@ -2539,17 +2585,54 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   </button>
                 )}
               </div>
-              <div className="space-y-1 text-[10.5px] text-slate-400">
-                <div className="flex items-center gap-1.5 text-pink-300">
-                  <Heart className="w-3 h-3" />
-                  <span>あなたとの会話＆記憶を読み込み中...</span>
-                </div>
+              <div className="space-y-1.5 text-[10.5px] text-slate-400">
+                {/* リアルタイム実行ステップバッジ */}
+                {latestLiveStep ? (
+                  <div className="p-2 bg-slate-950/70 rounded-lg border border-indigo-500/30 text-indigo-200 flex flex-col gap-1">
+                    <div className="flex items-center justify-between text-[10px] font-mono">
+                      <span className="text-pink-300 font-bold flex items-center gap-1">
+                        <Activity className="w-3 h-3 animate-spin text-pink-400" />
+                        工程 {latestLiveStep.stepNumber}/{latestLiveStep.totalSteps}:
+                      </span>
+                      <span className="text-slate-400">+{latestLiveStep.elapsedMs}ms</span>
+                    </div>
+                    <div className="font-sans font-semibold text-slate-100 text-[11px] truncate">
+                      {latestLiveStep.title}
+                    </div>
+                    {/* プログレスバー */}
+                    <div className="w-full bg-slate-800 rounded-full h-1 overflow-hidden mt-0.5">
+                      <div
+                        className="bg-gradient-to-r from-pink-500 via-indigo-500 to-emerald-400 h-1 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min(100, Math.max(10, (latestLiveStep.stepNumber / latestLiveStep.totalSteps) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-pink-300">
+                    <Heart className="w-3 h-3" />
+                    <span>あなたとの会話＆記憶を読み込み中...</span>
+                  </div>
+                )}
+
                 {useSearch && (
                   <div className="flex items-center gap-1.5 text-emerald-400 animate-pulse">
                     <Search className="w-3 h-3" />
                     <span>Google Search で最新情報を検索中...</span>
                   </div>
                 )}
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsActivityMonitorOpen(true)}
+                    className="text-[10px] text-indigo-300 hover:text-indigo-200 underline flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <span>⚡ リアルタイム思考モニターを開く</span>
+                    <span>→</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2755,6 +2838,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         onAddTask={handleAddTask}
         onSetProactiveLevel={handleSetProactiveLevel}
         onSetExplanationOverride={handleSetExplanationOverride}
+      />
+
+      {/* リアルタイム行動・思考モニターモーダル (ユーザー要望: リアルタイムに今何をしているか可視化) */}
+      <RealtimeActivityMonitorModal
+        isOpen={isActivityMonitorOpen}
+        onClose={() => setIsActivityMonitorOpen(false)}
+        isLoading={isLoading}
+        isGenerating={isGenerating}
       />
     </div>
   );

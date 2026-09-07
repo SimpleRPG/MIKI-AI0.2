@@ -22,6 +22,8 @@ import {
 } from '../../types';
 import { autonomousEvolutionService } from '../../services/autonomousEvolutionService';
 import { workingAgendaService } from '../../services/workingAgendaService';
+import { selfCodeArchitectService } from '../../services/selfCodeArchitectService';
+import { Code2 } from 'lucide-react';
 
 export const IdleEvolutionTab: React.FC = () => {
   const [reports, setReports] = useState<AutonomousGrowthReport[]>([]);
@@ -116,8 +118,8 @@ export const IdleEvolutionTab: React.FC = () => {
         )}
       </div>
 
-      {/* 4 Core Pillars Overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* 5 Core Pillars Overview */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between">
           <div className="flex items-center gap-2 text-rose-400 text-xs font-bold">
             <Brain className="w-4 h-4" />
@@ -156,6 +158,17 @@ export const IdleEvolutionTab: React.FC = () => {
             {selectedReport ? `${Math.round(selectedReport.masteryScore * 100)}%` : '未実施'}
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5">自己生成問題の自動採点</div>
+        </div>
+
+        <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between col-span-2 sm:col-span-1">
+          <div className="flex items-center gap-2 text-purple-400 text-xs font-bold">
+            <Code2 className="w-4 h-4" />
+            <span>⑤ 自律コード改善</span>
+          </div>
+          <div className="mt-2 text-xl font-bold text-purple-300">
+            {selfCodeArchitectService.getProposals().filter((p) => p.status === 'APPLIED').length}件
+          </div>
+          <div className="text-[10px] text-slate-400 mt-0.5">仕様書適合・変更契約適用</div>
         </div>
       </div>
 
@@ -300,6 +313,19 @@ export const IdleEvolutionTab: React.FC = () => {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Self-Code Improvements (第29章・第123章) */}
+                  {selectedReport.selfCodeImprovementSummary && (
+                    <div className="p-3 rounded-xl bg-purple-950/30 border border-purple-500/40">
+                      <div className="text-[10px] font-bold text-purple-400 uppercase flex items-center gap-1.5">
+                        <Code2 className="w-3.5 h-3.5" />
+                        <span>自律コード改善 & 仕様書適合</span>
+                      </div>
+                      <p className="text-xs text-purple-200 mt-1 font-medium">
+                        {selectedReport.selfCodeImprovementSummary}
+                      </p>
                     </div>
                   )}
                 </div>
