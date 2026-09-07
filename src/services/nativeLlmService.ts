@@ -5,6 +5,7 @@ import { sendChatMessage } from './api';
 import { OFFICIAL_GGUF_MODELS, getManifestDefaultConfig, getManifestNativeEnv } from './ggufModels';
 import { storageService } from './storageService';
 import { contextBudgetEngineService } from './contextBudgetEngineService';
+import { samplingTuningService } from './samplingTuningService';
 
 export interface NativeGpuInfo {
   available: boolean;
@@ -613,14 +614,20 @@ export class NativeLlmService {
     });
 
     const defCfg = getManifestDefaultConfig();
+    const tunedCfg = samplingTuningService.getSamplingConfig();
+    const nativeCfg = (options as any)?.nativeConfig;
     const executionPromise = (NativeMlcPlugin as any).generateStream({
       messages,
-      temperature: (options as any)?.nativeConfig?.temperature ?? options?.temperature ?? defCfg.temperature ?? 0.7,
-      topP: (options as any)?.nativeConfig?.topP ?? options?.top_p ?? defCfg.topP ?? 0.9,
-      maxTokens: (options as any)?.nativeConfig?.maxTokens ?? options?.max_tokens ?? defCfg.maxTokens ?? 512,
-      repetitionPenalty: (options as any)?.nativeConfig?.repetitionPenalty ?? defCfg.repetitionPenalty ?? 1.15,
-      frequencyPenalty: 0.1,
-      presencePenalty: 0.1,
+      temperature: nativeCfg?.temperature ?? options?.temperature ?? tunedCfg.temperature ?? defCfg.temperature ?? 0.7,
+      topP: nativeCfg?.topP ?? options?.top_p ?? tunedCfg.topP ?? defCfg.topP ?? 0.9,
+      topK: nativeCfg?.topK ?? tunedCfg.topK,
+      minP: nativeCfg?.minP ?? tunedCfg.minP,
+      maxTokens: nativeCfg?.maxTokens ?? options?.max_tokens ?? defCfg.maxTokens ?? 512,
+      repetitionPenalty: nativeCfg?.repetitionPenalty ?? defCfg.repetitionPenalty ?? 1.15,
+      frequencyPenalty: nativeCfg?.frequencyPenalty ?? tunedCfg.frequencyPenalty ?? 0.1,
+      presencePenalty: nativeCfg?.presencePenalty ?? tunedCfg.presencePenalty ?? 0.1,
+      repeatLastN: nativeCfg?.repeatLastN ?? tunedCfg.repeatLastN,
+      noRepeatNgramSize: nativeCfg?.noRepeatNgramSize ?? tunedCfg.noRepeatNgramSize,
       stopSequences: ['<|im_end|>', '<|endoftext|>', '<|end|>', 'User:', 'Assistant:'],
     })
       .then((res: any) => {
@@ -655,6 +662,7 @@ export class NativeLlmService {
             const matches = generatedFullText.split(tail).length - 1;
             if (matches >= 4) {
               systemLogger.warn('NATIVE_GPU', '⚠️ トークンループを検知したためストリームを安全に早期終了しました。');
+              samplingTuningService.recordLoopDetection({ text: tail });
               break;
             }
           }

@@ -67,6 +67,7 @@ import { PrivacySecurityGuardrailTab } from './self_improvement/PrivacySecurityG
 import { IdleEvolutionTab } from './self_improvement/IdleEvolutionTab';
 import { CompletionJudgeTab } from './self_improvement/CompletionJudgeTab';
 import { FailureCatalogTab } from './self_improvement/FailureCatalogTab';
+import { SelfCodeArchitectTab } from './self_improvement/SelfCodeArchitectTab';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
@@ -114,6 +115,7 @@ import { syntheticDataService } from '../services/syntheticDataService';
 import { retrieveScoredMemories } from '../utils/memoryRetrieval';
 
 export type SelfImprovementTab =
+  | 'spec_architect'
   | 'diagnosis'
   | 'world_model'
   | 'workmanager'
@@ -162,7 +164,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   engineMode = 'webgpu',
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<SelfImprovementTab>('diagnosis');
+  const [activeTab, setActiveTab] = useState<SelfImprovementTab>(initialTab || 'spec_architect');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notificationTestStatus, setNotificationTestStatus] = useState<string | null>(null);
 
@@ -827,6 +829,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
         {/* Tab Navigation */}
         <div className="flex border-b border-slate-800 bg-slate-950/50 px-4 gap-1.5 shrink-0 overflow-x-auto">
           <button
+            onClick={() => setActiveTab('spec_architect')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'spec_architect'
+                ? 'border-indigo-500 text-indigo-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Compass className="w-4 h-4 text-indigo-400" />
+            <span>📐 設計思想 & 自己コード改善 (29-30章)</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('diagnosis')}
             className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
               activeTab === 'diagnosis'
@@ -1165,6 +1179,9 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
         {/* Content Area */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+          {/* TAB 0: 設計思想指示書 & 自己コード改善エンジン (第29-30章, 第53章) */}
+          {activeTab === 'spec_architect' && <SelfCodeArchitectTab />}
+
           {/* TAB 1: 失敗診断 & 改善ルーター (第3世代) */}
           {activeTab === 'diagnosis' && (
             <div className="space-y-4">

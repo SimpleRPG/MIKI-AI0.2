@@ -43,13 +43,29 @@ import {
   SearchCheck,
   Workflow,
   Code2,
+  Compass,
   Table,
   AlertTriangle,
-  Compass,
   MessageSquare,
   Lock,
+  GitBranch,
+  CheckSquare,
+  HelpCircle,
 } from 'lucide-react';
-import { ChatMessage, PersonaConfig, MemoryItem, WorkspaceFile, EngineMode, CompletionEvaluation } from '../types';
+import {
+  ChatMessage,
+  PersonaConfig,
+  MemoryItem,
+  WorkspaceFile,
+  EngineMode,
+  CompletionEvaluation,
+  AutonomousGrowthReport,
+  ConversationBranch,
+  WhyAnswerInspection,
+  ConversationTaskCard,
+  ProactiveSuggestionLevel,
+  ManualExplanationOverride,
+} from '../types';
 import { extractCodeBlocks, extractFilesFromZip } from '../utils/codeParser';
 import { SPEAKER_PROFILES } from '../data/speakers';
 import { systemLogger } from '../services/systemLogger';
@@ -61,7 +77,15 @@ import { completionJudgeService } from '../services/completionJudgeService';
 import { workflowSynthesisService } from '../services/workflowSynthesisService';
 import { experienceRouterService } from '../services/experienceRouterService';
 import { autonomousEvolutionService } from '../services/autonomousEvolutionService';
-import { AutonomousGrowthReport } from '../types';
+import { userProficiencyService } from '../services/userProficiencyService';
+import { codeSkeletonService } from '../services/codeSkeletonService';
+import { conversationBranchService } from '../services/conversationBranchService';
+import { liveConversationRepairService } from '../services/liveConversationRepairService';
+import { whyAnswerInspectorService } from '../services/whyAnswerInspectorService';
+import { conversationTaskboardService } from '../services/conversationTaskboardService';
+import { WhyAnswerInspectorModal } from './chat/WhyAnswerInspectorModal';
+import { ConversationBranchModal } from './chat/ConversationBranchModal';
+import { ConversationTaskboardModal } from './chat/ConversationTaskboardModal';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -151,12 +175,32 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [showGrowthDetail, setShowGrowthDetail] = useState(false);
   const [isSimulatingEvolution, setIsSimulatingEvolution] = useState(false);
 
+  // 第31章: 会話・コード理解を伸ばす新機能パッケージ 状態管理
+  const [branches, setBranches] = useState<ConversationBranch[]>([]);
+  const [activeBranchId, setActiveBranchId] = useState<string>('branch_main');
+  const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+
+  const [tasks, setTasks] = useState<ConversationTaskCard[]>([]);
+  const [proactiveLevel, setProactiveLevel] = useState<ProactiveSuggestionLevel>('STANDARD');
+  const [explanationOverride, setExplanationOverride] = useState<ManualExplanationOverride>('AUTO');
+  const [isTaskboardModalOpen, setIsTaskboardModalOpen] = useState(false);
+
+  const [selectedInspection, setSelectedInspection] = useState<WhyAnswerInspection | null>(null);
+  const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
+  const [liveRepairAlert, setLiveRepairAlert] = useState<{ trigger: string; advice: string } | null>(null);
+
   useEffect(() => {
     // 未確認の自律成長レポートを取得
     const rep = autonomousEvolutionService.getLatestUnviewedReport();
     if (rep) {
       setUnviewedGrowthReport(rep);
     }
+    // 第31章 状態初期化
+    setBranches(conversationBranchService.getAllBranches());
+    setActiveBranchId(conversationBranchService.getActiveBranchId());
+    setTasks(conversationTaskboardService.getAllTasks());
+    setProactiveLevel(conversationTaskboardService.getProactiveLevel());
+    setExplanationOverride(conversationTaskboardService.getExplanationOverride());
   }, []);
 
   const handleDismissGrowthReport = (reportId: string) => {
@@ -215,6 +259,42 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if ((!textToSend && attachedFiles.length === 0) || isLoading || isGenerating) return;
 
     lastSendTimeRef.current = now;
+
+    // 設計思想 第28章 28.4: ユーザー理解度追従型・専門用語出現頻度をドメイン別解析
+    if (textToSend) {
+      userProficiencyService.analyzeUserUtterance(textToSend);
+    }
+
+    // 設計思想 第31章 31.1: ライブ会話リペアトリガー検知 (違う/長い/結論は？等の即時修復)
+    let augmentedText = textToSend;
+    if (textToSend) {
+      const repairCheck = liveConversationRepairService.detectRepairTrigger(textToSend);
+      if (repairCheck.isRepair && repairCheck.triggerType) {
+        const lastAiMsg = [...messages].reverse().find((m) => m.sender === 'ai' || m.sender === 'assistant');
+        if (lastAiMsg) {
+          const repairDirective = liveConversationRepairService.generateRepairSystemPrompt(
+            repairCheck.triggerType,
+            lastAiMsg.content,
+            textToSend
+          );
+          augmentedText = `${textToSend}\n${repairDirective}`;
+          liveConversationRepairService.recordRepair(
+            lastAiMsg.id,
+            textToSend,
+            repairCheck.triggerType,
+            lastAiMsg.content,
+            '修正回答生成中...',
+            repairCheck.intentAdvice || '意図再推定'
+          );
+          setLiveRepairAlert({
+            trigger: repairCheck.triggerType,
+            advice: repairCheck.intentAdvice || '意図を再計算して修正回答を導出中',
+          });
+          setTimeout(() => setLiveRepairAlert(null), 6000);
+        }
+      }
+    }
+
     systemLogger.info('CHAT', `[UIイベント] チャット送信トリガー発火 (文字数: ${textToSend.length}, 添付: ${attachedFiles.length}件, モード: ${engineMode})`, {
       textSnippet: textToSend.slice(0, 80),
       attachedFiles: attachedFiles.map((a) => ({ name: a.name, size: a.size })),
@@ -222,12 +302,128 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       engineMode,
     });
 
-    onSendMessage(textToSend, attachedFiles.length > 0 ? attachedFiles : undefined);
+    onSendMessage(augmentedText, attachedFiles.length > 0 ? attachedFiles : undefined);
     setInputText('');
     if (textareaRef.current) {
       textareaRef.current.value = '';
     }
     setAttachedFiles([]);
+  };
+
+  // メッセージ更新時の自動タスク抽出 (31.10) とインスペクター自動生成 (31.3)
+  useEffect(() => {
+    if (messages.length >= 2) {
+      const last = messages[messages.length - 1];
+      const prev = messages[messages.length - 2];
+      if ((last.sender === 'ai' || last.sender === 'assistant') && (prev.sender === 'user')) {
+        const extracted = conversationTaskboardService.extractTasksFromTurn(prev.content, last.content, last.id);
+        if (extracted.length > 0) {
+          setTasks(conversationTaskboardService.getAllTasks());
+        }
+        // インスペクションレコードの事前生成
+        whyAnswerInspectorService.generateAndSaveInspection({
+          turnId: last.id,
+          userPrompt: prev.content,
+          aiResponse: last.content,
+          answerPlanType: last.answerPlan ? `${last.answerPlan.planType} (${last.answerPlan.coreFocus})` : undefined,
+          activeMemories: last.usedMemories?.map((m) => ({ id: m.id, content: m.content })),
+          usedTools: last.executedTools?.map((t) => t.toolName),
+          explanationLevel: userProficiencyService.getExplanationAdvice('general').recommendedLevel,
+        });
+      }
+    }
+    conversationBranchService.syncCurrentBranchMessages(messages);
+  }, [messages]);
+
+  // 第31章 31.2: ブランチ操作ハンドラー
+  const handleForkFromMessage = (msgId: string) => {
+    const targetMsg = messages.find((m) => m.id === msgId);
+    const snippet = targetMsg?.content?.slice(0, 20) || '指定地点';
+    const newBranch = conversationBranchService.forkBranch(
+      activeBranchId,
+      msgId,
+      messages,
+      `分岐: ${snippet}...`,
+      `メッセージ [${msgId}] から分岐した仮説検討`
+    );
+    setBranches(conversationBranchService.getAllBranches());
+    setActiveBranchId(newBranch.id);
+    setIsBranchModalOpen(true);
+  };
+
+  const handleSwitchBranch = (branchId: string) => {
+    const target = conversationBranchService.switchBranch(branchId);
+    if (target) {
+      setActiveBranchId(branchId);
+      setBranches(conversationBranchService.getAllBranches());
+    }
+  };
+
+  const handleMergeBranch = (sourceBranchId: string) => {
+    const res = conversationBranchService.mergeIntoMain(sourceBranchId);
+    if (res.success) {
+      setActiveBranchId('branch_main');
+      setBranches(conversationBranchService.getAllBranches());
+    }
+  };
+
+  const handleDeleteBranch = (branchId: string) => {
+    conversationBranchService.deleteBranch(branchId);
+    setBranches(conversationBranchService.getAllBranches());
+    setActiveBranchId(conversationBranchService.getActiveBranchId());
+  };
+
+  const handleCreateBranch = (name: string, note?: string) => {
+    const latestId = messages.length > 0 ? messages[messages.length - 1].id : 'root';
+    const newBranch = conversationBranchService.forkBranch(activeBranchId, latestId, messages, name, note);
+    setBranches(conversationBranchService.getAllBranches());
+    setActiveBranchId(newBranch.id);
+  };
+
+  // 第31章 31.10 / 31.14 / 31.15: タスクボード＆設定ハンドラー
+  const handleUpdateTaskStatus = (taskId: string, status: 'BACKLOG' | 'IN_PROGRESS' | 'COMPLETED') => {
+    conversationTaskboardService.updateTaskStatus(taskId, status);
+    setTasks(conversationTaskboardService.getAllTasks());
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    conversationTaskboardService.deleteTask(taskId);
+    setTasks(conversationTaskboardService.getAllTasks());
+  };
+
+  const handleAddTask = (params: any) => {
+    conversationTaskboardService.addTask(params);
+    setTasks(conversationTaskboardService.getAllTasks());
+  };
+
+  const handleSetProactiveLevel = (lvl: ProactiveSuggestionLevel) => {
+    conversationTaskboardService.setProactiveLevel(lvl);
+    setProactiveLevel(lvl);
+  };
+
+  const handleSetExplanationOverride = (ov: ManualExplanationOverride) => {
+    conversationTaskboardService.setExplanationOverride(ov);
+    setExplanationOverride(ov);
+  };
+
+  // 第31章 31.3: なぜこの回答？インスペクター表示ハンドラー
+  const handleOpenWhyInspector = (msg: ChatMessage) => {
+    let ins = whyAnswerInspectorService.getInspection(msg.id);
+    if (!ins) {
+      const idx = messages.findIndex((m) => m.id === msg.id);
+      const prevUser = idx > 0 ? messages[idx - 1].content : 'ユーザーの質問';
+      ins = whyAnswerInspectorService.generateAndSaveInspection({
+        turnId: msg.id,
+        userPrompt: prevUser,
+        aiResponse: msg.content,
+        answerPlanType: msg.answerPlan ? `${msg.answerPlan.planType} (${msg.answerPlan.coreFocus})` : undefined,
+        activeMemories: msg.usedMemories?.map((m) => ({ id: m.id, content: m.content })),
+        usedTools: msg.executedTools?.map((t) => t.toolName),
+        explanationLevel: userProficiencyService.getExplanationAdvice('general').recommendedLevel,
+      });
+    }
+    setSelectedInspection(ins);
+    setIsInspectionModalOpen(true);
   };
 
   const handleSafeStop = (e?: React.MouseEvent | React.TouchEvent) => {
@@ -297,6 +493,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       });
       if (added) {
         systemLogger.info('SELF_IMPROVEMENT', 'ユーザーから高評価(👍)を受信。安全検査通過済みColab/LoRA用高品質教材に自動登録しました。');
+
+        // 設計思想 第28章 28.3: コード骨格の実績テンプレート化連携
+        if (msg.content.includes('```')) {
+          const codeBlocks = extractCodeBlocks(msg.content);
+          if (codeBlocks.length > 0) {
+            const firstBlock = codeBlocks[0];
+            const lang = (firstBlock.language || 'typescript').toLowerCase();
+            if (['vba', 'typescript', 'python', 'sql'].includes(lang)) {
+              systemLogger.info('SELF_IMPROVEMENT', `[第28.3章 実績コード骨格候補] ${lang.toUpperCase()} コードを高評価骨格テンプレート候補として記録しました。`);
+            }
+          }
+        }
       } else {
         systemLogger.warn('SELF_IMPROVEMENT', 'ユーザー高評価(👍)を受信しましたが、コンテンツ安全境界フィルタにより教材登録から除外・ログ記録されました。');
       }
@@ -590,15 +798,37 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* 第31.2章 会話ブランチボタン */}
+          <button
+            onClick={() => setIsBranchModalOpen(true)}
+            className="px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1 transition-all bg-violet-950/80 hover:bg-violet-900 text-violet-300 border-violet-500/50 shadow-sm"
+            title="第31.2章 会話分岐・巻き戻し (仮説ブランチ並列検証)"
+          >
+            <GitBranch className="w-3 h-3 text-violet-400" />
+            <span className="truncate max-w-[90px]">
+              {branches.find((b) => b.id === activeBranchId)?.name || '本線'}
+            </span>
+          </button>
+
+          {/* 第31.10章 タスクボードボタン */}
+          <button
+            onClick={() => setIsTaskboardModalOpen(true)}
+            className="px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1 transition-all bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border-emerald-500/50 shadow-sm"
+            title="第31.10章 会話タスクボード & 31.14/31.15章設定"
+          >
+            <CheckSquare className="w-3 h-3 text-emerald-400" />
+            <span>タスク ({tasks.filter((t) => t.status !== 'COMPLETED').length})</span>
+          </button>
+
           {/* Self Improvement Lab Button */}
           {onOpenSelfImprovementModal && (
             <button
               onClick={onOpenSelfImprovementModal}
-              className="px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1 transition-all bg-purple-950/70 hover:bg-purple-900/90 text-purple-300 border-purple-500/40 shadow-sm"
-              title="自己改善研究所 (失敗診断・スキルライブラリ・Colab LoRA学習教材・系統樹)"
+              className="px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1 transition-all bg-indigo-950/80 hover:bg-indigo-900 text-indigo-200 border-indigo-500/50 shadow-sm"
+              title="設計思想指示書 & 自己コード改善研究所 (第29-30章, 第53章 自己コード監査・プロポーザル・シャドウテスト・不変条件)"
             >
-              <FlaskConical className="w-3 h-3 text-purple-400" />
-              <span>自己改善</span>
+              <Compass className="w-3 h-3 text-indigo-400" />
+              <span>📐 設計思想 & 自己改善</span>
             </button>
           )}
 
@@ -2203,6 +2433,28 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           <Compass className="w-3 h-3 text-purple-400" />
                           <span>49章 仕分け</span>
                         </button>
+
+                        {/* 設計思想 第31.3章: なぜこの回答？説明パネル */}
+                        <span>•</span>
+                        <button
+                          onClick={() => handleOpenWhyInspector(msg)}
+                          className="hover:text-indigo-300 flex items-center gap-1 transition-colors text-[10px] text-indigo-400/90 font-medium"
+                          title="第31.3章 なぜこの回答？ 内部推論・使用記憶・回答骨格・長さ理由をインスペクト"
+                        >
+                          <HelpCircle className="w-3 h-3 text-indigo-400" />
+                          <span>なぜこの回答？</span>
+                        </button>
+
+                        {/* 設計思想 第31.2章: ここから分岐 (Fork Branch) */}
+                        <span>•</span>
+                        <button
+                          onClick={() => handleForkFromMessage(msg.id)}
+                          className="hover:text-violet-300 flex items-center gap-1 transition-colors text-[10px] text-violet-400/90 font-medium"
+                          title="第31.2章 このメッセージ地点から新しい仮説ブランチを作成して並列検討"
+                        >
+                          <GitBranch className="w-3 h-3 text-violet-400" />
+                          <span>ここから分岐</span>
+                        </button>
                       </div>
 
                       {msg.isStreaming && onStopGeneration && (
@@ -2453,6 +2705,57 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           )}
         </div>
       </div>
+
+      {/* 第31.1章 ライブ会話リペア発火通知バナー */}
+      {liveRepairAlert && (
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-40 bg-amber-950/90 border border-amber-500/60 text-amber-200 px-4 py-2 rounded-xl shadow-xl backdrop-blur-sm flex items-center gap-2.5 text-xs animate-in fade-in slide-in-from-top-2 duration-200">
+          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+          <div>
+            <span className="font-bold text-amber-300">[第31.1章 ライブリペア]</span>{' '}
+            指摘トリガー「{liveRepairAlert.trigger}」を検知。
+            <span className="text-amber-100/90 ml-1">{liveRepairAlert.advice}</span>
+          </div>
+          <button
+            onClick={() => setLiveRepairAlert(null)}
+            className="text-amber-400 hover:text-white ml-2 text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* 第31.2章 会話ブランチ・巻き戻しモーダル */}
+      <ConversationBranchModal
+        isOpen={isBranchModalOpen}
+        onClose={() => setIsBranchModalOpen(false)}
+        branches={branches}
+        activeBranchId={activeBranchId}
+        onSwitchBranch={handleSwitchBranch}
+        onMergeIntoMain={handleMergeBranch}
+        onDeleteBranch={handleDeleteBranch}
+        onCreateNewBranch={handleCreateBranch}
+      />
+
+      {/* 第31.3章 なぜこの回答？説明パネルモーダル */}
+      <WhyAnswerInspectorModal
+        isOpen={isInspectionModalOpen}
+        onClose={() => setIsInspectionModalOpen(false)}
+        inspection={selectedInspection}
+      />
+
+      {/* 第31.10 / 31.14 / 31.15章 会話タスクボード＆設定モーダル */}
+      <ConversationTaskboardModal
+        isOpen={isTaskboardModalOpen}
+        onClose={() => setIsTaskboardModalOpen(false)}
+        tasks={tasks}
+        proactiveLevel={proactiveLevel}
+        explanationOverride={explanationOverride}
+        onUpdateStatus={handleUpdateTaskStatus}
+        onDeleteTask={handleDeleteTask}
+        onAddTask={handleAddTask}
+        onSetProactiveLevel={handleSetProactiveLevel}
+        onSetExplanationOverride={handleSetExplanationOverride}
+      />
     </div>
   );
 };

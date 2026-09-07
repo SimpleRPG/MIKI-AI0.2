@@ -71,6 +71,20 @@ export class AutonomousEvolutionService {
     return [...this.heuristicRules];
   }
 
+  /**
+   * 第27.2章/第27.3章: 知恵の卒業ステータス更新または書き戻し
+   */
+  public updateHeuristicRule(rule: HeuristicRuleItem): void {
+    this.loadState();
+    const index = this.heuristicRules.findIndex((r) => r.id === rule.id);
+    if (index >= 0) {
+      this.heuristicRules[index] = { ...this.heuristicRules[index], ...rule, updatedAt: Date.now() };
+    } else {
+      this.heuristicRules.unshift({ ...rule, createdAt: rule.createdAt || Date.now(), updatedAt: Date.now() });
+    }
+    this.saveState();
+  }
+
   public getReflections(): CounterfactualReflectionItem[] {
     this.loadState();
     return [...this.reflections];
@@ -263,6 +277,8 @@ export class AutonomousEvolutionService {
         const rule: HeuristicRuleItem = {
           id: 'rule_vba_best_practices',
           category: 'coding',
+          domain: 'vba',
+          graduationStatus: 'PENDING',
           title: 'VBA品質・堅牢性に関する恒久定石',
           ruleText: 'VBA生成時は常にOption Explicitを宣言し、エラー処理（On Error GoTo）を明確化し、Select/Activateを排除して直接オブジェクト参照を行う。',
           derivedFromEpisodes: vbaEpisodes.map((e: MemoryItem) => e.id),
@@ -297,6 +313,8 @@ export class AutonomousEvolutionService {
         const rule: HeuristicRuleItem = {
           id: 'rule_friendly_tone',
           category: 'user_preference',
+          domain: 'conversation',
+          graduationStatus: 'PENDING',
           title: 'ユーザーとの自然な親友関係維持ルール',
           ruleText: 'ユーザーは形式的な敬語ではなく、明るく親しみやすいタメ口での即応・前向きなサポートを好む。',
           derivedFromEpisodes: prefEpisodes.map((e: MemoryItem) => e.id),

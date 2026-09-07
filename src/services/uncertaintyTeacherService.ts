@@ -8,6 +8,7 @@ import { answerPlanService } from './answerPlanService';
 import { cleanStreamingVisibleText } from './conversationStateService';
 
 const UNCERTAINTY_LOG_KEY = 'miki_uncertainty_divergence_log_v32';
+const UNCERTAINTY_THRESHOLDS_KEY = 'miki_uncertainty_domain_thresholds_v1';
 
 /**
  * 設計思想 20章: 不確実性駆動の教師利用 (Uncertainty-Driven Teacher Routing)
@@ -15,9 +16,11 @@ const UNCERTAINTY_LOG_KEY = 'miki_uncertainty_divergence_log_v32';
  */
 export class UncertaintyTeacherService {
   private logItems: UncertaintyDivergenceItem[] = [];
+  private domainThresholds: Record<string, number> = {};
 
   constructor() {
     this.loadLog();
+    this.loadThresholds();
   }
 
   private loadLog(): void {
@@ -29,11 +32,28 @@ export class UncertaintyTeacherService {
     }
   }
 
+  private loadThresholds(): void {
+    try {
+      const raw = storageService.getItem(UNCERTAINTY_THRESHOLDS_KEY);
+      if (raw) this.domainThresholds = JSON.parse(raw);
+    } catch (e) {
+      console.warn('Failed to load uncertainty domain thresholds:', e);
+    }
+  }
+
   private saveLog(): void {
     try {
       storageService.setItem(UNCERTAINTY_LOG_KEY, JSON.stringify(this.logItems.slice(-30)));
     } catch (e) {
       console.warn('Failed to save uncertainty log:', e);
+    }
+  }
+
+  private saveThresholds(): void {
+    try {
+      storageService.setItem(UNCERTAINTY_THRESHOLDS_KEY, JSON.stringify(this.domainThresholds));
+    } catch (e) {
+      console.warn('Failed to save uncertainty domain thresholds:', e);
     }
   }
 
@@ -44,6 +64,33 @@ export class UncertaintyTeacherService {
   public clearHistory(): void {
     this.logItems = [];
     this.saveLog();
+  }
+
+  /**
+   * 第27.4章: ドメイン別の不確実性しきい値を取得 (既定45点)
+   */
+  public getThresholdForDomain(domain: string = 'general'): number {
+    return this.domainThresholds[domain] ?? 45;
+  }
+
+  /**
+   * 第27.4章: ドメイン別の不確実性しきい値を設定・保存
+   */
+  public setThresholdForDomain(domain: string, threshold: number): void {
+    this.domainThresholds[domain] = Math.max(20, Math.min(80, threshold));
+    this.saveThresholds();
+  }
+
+  /**
+   * 第27.4章: 不確実性「低」判定だったが事後的に誤りと判明したケースにフラグ付け
+   */
+  public markLaterConfirmedIncorrect(id: string): void {
+    const item = this.logItems.find((it) => it.id === id);
+    if (item) {
+      item.laterConfirmedIncorrect = true;
+      this.saveLog();
+      systemLogger.info('SELF_IMPROVEMENT', `[第27.4章 キャリブレーション] ログID ${id} を「事後誤り確認済み」としてマークしました。`);
+    }
   }
 
   /**
@@ -138,8 +185,10 @@ export class UncertaintyTeacherService {
     if (divergenceTypes.includes('conclusion_diverged')) uncertaintyScore += 30;
     uncertaintyScore = Math.min(100, uncertaintyScore);
 
+    const domain = options?.category || 'general';
+    const domainThreshold = this.getThresholdForDomain(domain);
     const divergenceDetected = divergenceTypes.length > 0;
-    const shouldSendToTeacher = uncertaintyScore >= 45;
+    const shouldSendToTeacher = uncertaintyScore >= domainThreshold;
 
     const item: UncertaintyDivergenceItem = {
       id,
@@ -150,6 +199,7 @@ export class UncertaintyTeacherService {
       uncertaintyScore,
       shouldSendToTeacher,
       createdAt: Date.now(),
+      domain,
     };
 
     const targetCapId = options?.targetCapabilityId || 'cap_conv_naturalness';

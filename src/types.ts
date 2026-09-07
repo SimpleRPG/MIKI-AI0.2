@@ -2180,6 +2180,8 @@ export interface UncertaintyDivergenceItem {
   gapIdRecorded?: string;
   generalizationGapReason?: string;
   createdAt: number;
+  domain?: string;             // ドメインタグ (例: 'vba', 'conversation', 'code', 'general')
+  laterConfirmedIncorrect?: boolean; // 事後的に誤りと判明したか (キャリブレーションドリフト算出用)
 }
 
 /**
@@ -2307,6 +2309,93 @@ export interface HeuristicRuleItem {
   appliedCount: number;
   createdAt: number;
   updatedAt: number;
+  // 第27.2章: 知恵の卒業試験 & 第27.3章: 知識転移
+  graduationStatus?: 'PENDING' | 'TRIAL' | 'GRADUATED' | 'REJECTED';
+  graduationTrialResults?: Array<{
+    trialAt: number;
+    scenarioId: string;
+    withRuleScore: number;
+    withoutRuleScore: number;
+    scoreDelta: number;
+    passed: boolean;
+    context: string;
+  }>;
+  domain?: string;              // ドメインタグ (例: 'vba', 'conversation', 'code', 'general')
+  transferredFrom?: string;     // 知識転移元となったルールID (第27.3章)
+}
+
+/**
+ * 設計思想 第22章: サンプリングパラメータの自律チューニング
+ */
+export interface SamplingConfig {
+  temperature: number;
+  topP: number;
+  topK?: number;
+  minP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  repeatLastN?: number;
+  noRepeatNgramSize?: number;
+}
+
+export interface SamplingTuningTrialResult {
+  id: string;
+  timestamp: number;
+  domain: string;
+  config: SamplingConfig;
+  loopDetected: boolean;
+  repetitionScore: number; // 0.0 (繰り返しなし) 〜 1.0 (重度の繰り返し)
+  diversityScore: number;  // 多様性スコア
+  coherenceScore: number;  // 一貫性・論理性スコア
+  success: boolean;
+  notes?: string;
+}
+
+export interface SamplingTuningStats {
+  currentConfig: SamplingConfig;
+  domainConfigs: Record<string, SamplingConfig>;
+  totalTrials: number;
+  loopDetectionsCount: number;
+  lastTunedAt: number;
+  tuningHistory: SamplingTuningTrialResult[];
+}
+
+/**
+ * 設計思想 第28.2章: 教師モデルの劣化・挙動変化検知 (Teacher Drift Monitoring)
+ */
+export interface TeacherDriftProbeResult {
+  id: string;
+  promptId: string;
+  prompt: string;
+  responseHash: string;
+  responseSummary: string;
+  embeddingVector?: number[];
+  timestamp: number;
+  baselineSimilarity: number; // 過去のベースラインとの類似度 (0.0 - 1.0)
+  driftDetected: boolean;     // 類似度が0.7を下回ったか
+}
+
+export interface TeacherDriftReport {
+  lastCheckedAt: number;
+  totalProbes: number;
+  driftDetected: boolean;
+  averageSimilarity: number;
+  probes: TeacherDriftProbeResult[];
+  budgetDiscountRate: number; // 挙動変化検知時の消費判定・信頼度割引率 (例: 0.20)
+  notes?: string;
+}
+
+/**
+ * 設計思想 第28.4章: ユーザー理解度追従型・説明レベル自動調整 (User Proficiency-Adaptive Explanation Depth)
+ */
+export interface UserProficiencyRecord {
+  domain: string; // 'vba' | 'python' | 'architecture' | 'general' 等
+  userProficiencyScore: number; // 0 - 100
+  technicalTermsCount: number;
+  totalInteractions: number;
+  explanationLevel: 'beginner' | 'intermediate' | 'expert'; // 30未満=beginner, 70超=expert, 30〜70=intermediate
+  recentScores: number[]; // 平滑化用 (直近10回の移動平均)
+  lastUpdated: number;
 }
 
 // 2. 反実仮想反省ログ (Counterfactual Reflection)
@@ -2436,4 +2525,222 @@ export interface FailureCatalogStats {
   categoryDistribution: Record<string, number>;
 }
 
+/**
+ * 設計思想 第29章, 第30章, 第53章, 第123-128章:
+ * 設計思想仕様書メタデータ & 自己コード改善 (Self-Code Architect) 型定義
+ */
+export type ChapterImplementationStatus = 'COMPLETED' | 'IN_PROGRESS' | 'UNIMPLEMENTED';
 
+export type ChapterCategory =
+  | 'CORE_FOUNDATION'       // 第0章〜第13章: 中核基盤・記憶・コンテキスト
+  | 'ROBUSTNESS_SAFETY'     // 第14章〜第26章: 埋め込み・VBA・プライバシー・熱対策・モデル保護・評価
+  | 'WISDOM_IMPROVEMENT'    // 第27章〜第32章: 卒業試験・自己監査・ダッシュボード
+  | 'DEEP_COGNITION'        // 第33章〜第52章: 認知・世界モデル・完了判定・シミュレーター
+  | 'PERCEPTION_STUDIO'     // 第53章〜第68章: ドリフト検知・能動知覚・制約ソルバー・研究ノート
+  | 'INTEGRATED_OS'         // 第69章〜第90章: 統合認知・ソフトウェア工場・技能コンパイラ
+  | 'SPEC_SYNTHESIS'        // 第91章〜第122章: 仕様駆動合成・自己進化OS・認知メトリクス
+  | 'SELF_APP_CONTROL'      // 第123章〜第154章: 自己アプリ改善コントロールプレーン・因果追跡
+  | 'FORMAL_REASONING';     // 第155章〜第169章: 認知デバッガ・形式証明・自律未知探索
+
+export interface SpecificationChapterMeta {
+  chapterNumber: number;
+  id: string;
+  title: string;
+  category: ChapterCategory;
+  status: ChapterImplementationStatus;
+  versionAdded: string;
+  summary: string;
+  keyRequirements: string[];
+  responsibleServices?: string[];
+  responsibleComponents?: string[];
+  invariantGuarantees?: string[]; // 破ってはならない不変条件
+}
+
+export interface InvariantCheckItem {
+  id: string;
+  name: string;
+  rule: string;
+  passed: boolean;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
+  details: string;
+  checkedAt: number;
+}
+
+export interface SpecificationDriftItem {
+  chapterNumber: number;
+  chapterTitle: string;
+  driftType: 'UNIMPLEMENTED_SPEC' | 'PARTIAL_IMPLEMENTATION' | 'TYPE_MISMATCH' | 'MISSING_TEST';
+  description: string;
+  suggestedAction: string;
+  priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
+export interface SelfCodeAuditResult {
+  auditId: string;
+  timestamp: number;
+  totalChapters: number;
+  completedChapters: number;
+  unimplementedChapters: number;
+  complianceScore: number; // 0 - 100
+  invariantsAudit: {
+    allPassed: boolean;
+    checks: InvariantCheckItem[];
+  };
+  drifts: SpecificationDriftItem[];
+  architectSummary: string;
+}
+
+export interface ChangeContract {
+  changeId: string;
+  objective: string;
+  targetChapterNumber: number;
+  allowedFiles: string[];
+  forbiddenFiles: string[];
+  mustPreserve: string[];
+  invariants: string[];
+  rollbackPlan: string;
+}
+
+export interface SelfImprovementProposal {
+  id: string;
+  createdAt: number;
+  targetChapterNumber: number;
+  title: string;
+  contract: ChangeContract;
+  proposalLayer: 'CONFIG' | 'CONVERSATION_SKELETON' | 'CODE_ARCHITECTURE' | 'SPEC_SYNC';
+  description: string;
+  dslCommands?: string[];
+  expectedScoreImprovement: number;
+  invariantsCheckPassed: boolean;
+  status: 'PROPOSED' | 'SIMULATED' | 'APPLIED' | 'REJECTED' | 'ROLLED_BACK';
+  simulatedDelta?: {
+    complianceDelta: number;
+    safetyPreserved: boolean;
+    details: string;
+  };
+}
+
+// ==========================================
+// 第28章「教師モニタリング・コード骨格テンプレート・説明レベル適応」
+// ==========================================
+
+export interface TeacherDriftCheckResult {
+  id: string;
+  timestamp: number;
+  teacherModel: string;
+  baselineComparisonScore: number; // 0 - 1.0 (コサイン類似度/一貫性)
+  isDriftDetected: boolean;
+  warningIssued: boolean;
+  sampleResponses: {
+    promptId: string;
+    promptText: string;
+    responseHash: string;
+    similarityToBaseline: number;
+  }[];
+  confidencePenaltyWeight: number; // ドリフト時既定0.8 (20%引き下げ)
+}
+
+export interface CodeSkeletonTemplate {
+  id: string;
+  name: string;
+  language: 'vba' | 'typescript' | 'python' | 'sql' | 'other';
+  taskCategory: string; // 例: 'excel_sheet_aggregate', 'api_fetch_cache', 'dom_event_listen'
+  abstractTemplate: string; // パラメータ化プレースホルダーを含むコード
+  parameters: {
+    key: string;
+    description: string;
+    defaultValue?: string;
+  }[];
+  userRatingLikes: number;
+  successCount: number;
+  embeddingVector?: number[];
+  verifiedSafe: boolean;
+  createdAt: number;
+  lastUsedAt: number;
+}
+
+export type ProficiencyDomain = 'vba' | 'typescript' | 'general_programming' | 'ai_terminology' | 'general';
+
+export interface UserProficiencyScore {
+  domain: ProficiencyDomain;
+  score: number; // 0 - 100 (移動平均)
+  interactionCount: number;
+  technicalTermMatches: string[];
+  lastCalculatedAt: number;
+}
+
+export type ExplanationLevel = 'BEGINNER_DETAILED' | 'INTERMEDIATE_STANDARD' | 'EXPERT_CONCISE';
+
+export interface ExplanationAdjustmentAdvice {
+  domain: ProficiencyDomain;
+  proficiencyScore: number;
+  recommendedLevel: ExplanationLevel;
+  skipPreamble: boolean;
+  addConcreteExamples: boolean;
+  simplifiedTerminology: boolean;
+  reason: string;
+}
+
+// ──【第31章: 会話・コード理解を伸ばす新機能パッケージ】──
+
+export type LiveRepairTriggerType = 'DISAGREE' | 'WRONG_PREMISE' | 'TOO_LONG' | 'WANT_CONCLUSION' | 'INCORRECT_CODE' | 'OTHER';
+
+export interface LiveRepairRecord {
+  id: string;
+  turnId: string;
+  userCorrectionText: string;
+  triggerType: LiveRepairTriggerType;
+  originalAnswer: string;
+  revisedAnswer: string;
+  intentDelta: string;
+  lengthDeltaWords: number;
+  learningCandidateId?: string;
+  timestamp: number;
+}
+
+export interface ConversationBranch {
+  id: string;
+  name: string;
+  parentBranchId?: string;
+  forkMessageId: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: any[]; // Message[]
+  isCurrent: boolean;
+  hypothesisNote?: string;
+}
+
+export interface WhyAnswerInspection {
+  turnId: string;
+  timestamp: number;
+  understoodQuestion: string;
+  estimatedGoal: string;
+  usedMemories: { id: string; snippet: string; category?: string }[];
+  suppressedMemories: { id: string; snippet: string; reason: string }[];
+  selectedAnswerPlan: string;
+  toolsOrSearchUsed: string[];
+  unconfirmedAssumptions: string[];
+  lengthReason: string;
+  explanationDepth: string;
+}
+
+export type ConversationTaskCategory = 'INVESTIGATE_LATER' | 'UNRESOLVED' | 'NEXT_IMPLEMENT' | 'ON_HOLD';
+
+export interface ConversationTaskCard {
+  id: string;
+  title: string;
+  goal: string;
+  category: ConversationTaskCategory;
+  requiredInfo?: string;
+  completionCriteria: string;
+  sourceTurnId?: string;
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  status: 'BACKLOG' | 'IN_PROGRESS' | 'COMPLETED';
+  completionJudgePassed?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type ProactiveSuggestionLevel = 'OFF' | 'MODEST' | 'STANDARD' | 'ACTIVE';
+
+export type ManualExplanationOverride = 'AUTO' | 'CONCISE' | 'STANDARD' | 'DETAILED' | 'TUTORIAL';

@@ -218,7 +218,7 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isEngineModalOpen, setIsEngineModalOpen] = useState<boolean>(false);
   const [isSelfImprovementModalOpen, setIsSelfImprovementModalOpen] = useState<boolean>(false);
-  const [selfImprovementTab, setSelfImprovementTab] = useState<SelfImprovementTab>('diagnosis');
+  const [selfImprovementTab, setSelfImprovementTab] = useState<SelfImprovementTab>('spec_architect');
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
