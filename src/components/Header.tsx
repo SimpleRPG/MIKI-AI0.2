@@ -62,18 +62,18 @@ export const Header: React.FC<HeaderProps> = ({
     setTimeout(() => setUrlCopied(false), 2500);
   };
   return (
-    <header className="h-12 sm:h-14 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-2.5 sm:px-4 flex items-center justify-between gap-2 select-none z-30 shrink-0">
+    <header className="h-13 sm:h-14 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-4 flex items-center justify-between gap-3 select-none z-30 shrink-0">
       {/* Brand & Persona Identity */}
-      <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {/* Logo / Partner Avatar */}
         <button
           onClick={onOpenMemoryModal}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 text-xs transition-all text-slate-200 hover:text-pink-300 group shrink-0"
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 text-xs transition-all text-slate-200 hover:text-pink-300 group shrink-0 shadow-xs"
           title="みきの性格設定＆記憶カンペ"
         >
-          <span className="text-base">{persona.avatar}</span>
-          <span className="font-bold text-slate-100 text-xs sm:text-sm">{persona.name}</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-pink-500/25 text-pink-400 font-bold border border-pink-500/30">
+          <span className="text-base leading-none">{persona.avatar}</span>
+          <span className="font-bold text-slate-100 text-xs sm:text-sm tracking-tight">{persona.name}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-pink-500/15 text-pink-400 font-semibold border border-pink-500/30">
             Lv.{persona.intimacyLevel}
           </span>
           <Brain className="w-3.5 h-3.5 text-pink-400 group-hover:scale-110 transition-transform hidden sm:inline" />
@@ -82,16 +82,16 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Engine Switcher Quick Button */}
         <button
           onClick={onOpenEngineModal}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all shadow-xs ${
             engineMode === 'native_gpu'
-              ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-200 hover:bg-emerald-500/30 ring-1 ring-emerald-500/40'
+              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/50'
               : engineMode === 'webgpu'
-              ? 'bg-purple-500/20 border-purple-500/60 text-purple-200 hover:bg-purple-500/30 ring-1 ring-purple-500/30'
+              ? 'bg-purple-950/40 border-purple-500/40 text-purple-300 hover:bg-purple-900/50'
               : engineMode === 'external_gpu'
-              ? 'bg-indigo-500/20 border-indigo-500/60 text-indigo-200 hover:bg-indigo-500/30 ring-1 ring-indigo-500/30'
+              ? 'bg-indigo-950/40 border-indigo-500/40 text-indigo-300 hover:bg-indigo-900/50'
               : engineMode === 'gemini_cloud'
-              ? 'bg-sky-500/20 border-sky-500/60 text-sky-200 hover:bg-sky-500/30 ring-1 ring-sky-500/30'
-              : 'bg-amber-500/20 border-amber-500/60 text-amber-200 hover:bg-amber-500/30 ring-1 ring-amber-500/30'
+              ? 'bg-sky-950/40 border-sky-500/40 text-sky-300 hover:bg-sky-900/50'
+              : 'bg-amber-950/40 border-amber-500/40 text-amber-300 hover:bg-amber-900/50'
           }`}
           title={
             engineMode === 'native_gpu'
@@ -107,36 +107,36 @@ export const Header: React.FC<HeaderProps> = ({
         >
           {engineMode === 'native_gpu' ? (
             <>
-              <Zap className="w-3.5 h-3.5 text-emerald-300" />
-              <span className="hidden sm:inline">⚡ 本体GPU直結</span>
+              <Zap className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">本体GPU直結</span>
               <span className="sm:hidden">本体GPU</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
             </>
           ) : engineMode === 'webgpu' ? (
             <>
-              <Cpu className="w-3.5 h-3.5 text-purple-300" />
-              <span className="hidden sm:inline">🌐 WebGPU (ブラウザ)</span>
+              <Cpu className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden sm:inline">WebGPU (ブラウザ)</span>
               <span className="sm:hidden">WebGPU</span>
               <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
             </>
           ) : engineMode === 'external_gpu' ? (
             <>
-              <Cpu className="w-3.5 h-3.5 text-indigo-300" />
-              <span className="hidden sm:inline">🖥️ 外部ローカルLLM</span>
+              <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden sm:inline">外部ローカルLLM</span>
               <span className="sm:hidden">外部LLM</span>
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
             </>
           ) : engineMode === 'gemini_cloud' ? (
             <>
-              <Sparkles className="w-3.5 h-3.5 text-sky-300" />
-              <span className="hidden sm:inline">☁️ Gemini Cloud</span>
+              <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+              <span className="hidden sm:inline">Gemini Cloud</span>
               <span className="sm:hidden">Gemini</span>
               <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
             </>
           ) : (
             <>
-              <Zap className="w-3.5 h-3.5 text-amber-300" />
-              <span className="hidden sm:inline">⚙️ CPUルール</span>
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">CPUルール</span>
               <span className="sm:hidden">CPU</span>
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
             </>
@@ -145,19 +145,19 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Center: Main View Switcher (Desktop Only, on mobile handled by bottom bar) */}
-      <div className="hidden md:flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+      <div className="hidden md:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800/80 shadow-xs">
         <button
           onClick={() => setActiveTab('preview')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
             activeTab === 'preview'
-              ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/25'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              ? 'bg-slate-800 text-slate-100 shadow-xs border border-slate-700/70 font-semibold'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
           }`}
         >
-          <Play className="w-3.5 h-3.5" />
+          <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/20" />
           <span>プレビュー</span>
           {fps > 0 && activeTab === 'preview' && (
-            <span className="text-[10px] px-1.5 py-0.2 bg-black/40 rounded text-emerald-400 font-mono">
+            <span className="text-[10px] px-1.5 py-0.5 bg-slate-950/80 rounded-md text-emerald-400 font-mono border border-slate-800">
               {fps} FPS
             </span>
           )}
@@ -165,48 +165,48 @@ export const Header: React.FC<HeaderProps> = ({
 
         <button
           onClick={() => setActiveTab('code')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
             activeTab === 'code'
-              ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/25'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              ? 'bg-slate-800 text-slate-100 shadow-xs border border-slate-700/70 font-semibold'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
           }`}
         >
-          <Code2 className="w-3.5 h-3.5" />
+          <Code2 className="w-3.5 h-3.5 text-sky-400" />
           <span>コード</span>
         </button>
 
         <button
           onClick={() => setActiveTab('github')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
             activeTab === 'github'
-              ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/25'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              ? 'bg-slate-800 text-slate-100 shadow-xs border border-slate-700/70 font-semibold'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
           }`}
         >
-          <Github className="w-3.5 h-3.5" />
+          <Github className="w-3.5 h-3.5 text-purple-400" />
           <span>GitHub</span>
         </button>
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {/* New / Reset Canvas */}
         <button
           onClick={onNewBlankProject}
-          className="flex items-center gap-1 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs text-slate-200 transition-colors"
+          className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:text-white transition-all shadow-xs"
           title="キャンバスをクリア・新規作成"
         >
           <Plus className="w-3.5 h-3.5 text-sky-400" />
-          <span className="hidden sm:inline">新規</span>
+          <span className="hidden sm:inline font-medium">新規</span>
         </button>
 
         {/* Google Search Grounding Toggle */}
         <button
           onClick={() => setUseSearch(!useSearch)}
-          className={`flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all shadow-xs ${
             useSearch
-              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-500/10'
-              : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:text-slate-200'
+              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
           }`}
           title="Google検索グラウンディング (最新情報を検索)"
         >
@@ -214,7 +214,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="hidden sm:inline">Web検索</span>
           <span
             className={`w-1.5 h-1.5 rounded-full ${
-              useSearch ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+              useSearch ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
             }`}
           />
         </button>
@@ -222,7 +222,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Restart View */}
         <button
           onClick={onRestartGame}
-          className="p-1.5 text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 rounded-lg text-xs transition-colors"
+          className="p-1.5 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-lg text-xs transition-all shadow-xs"
           title="プレビューをリロード"
         >
           <RotateCcw className="w-3.5 h-3.5" />
@@ -231,7 +231,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Export Button */}
         <button
           onClick={onOpenExportModal}
-          className="p-1.5 sm:px-2.5 sm:py-1.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md shadow-sky-500/20 transition-all flex items-center gap-1"
+          className="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold shadow-sm hover:shadow-sky-500/20 transition-all flex items-center gap-1.5 active:scale-95"
           title="HTML/ZIPエクスポート"
         >
           <Download className="w-3.5 h-3.5" />
@@ -241,15 +241,15 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Public Share URL Button */}
         <button
           onClick={handleCopyPublicUrl}
-          className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 shadow-xs active:scale-95 ${
             urlCopied
-              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-              : 'bg-slate-800/80 hover:bg-slate-800 text-sky-300 border-slate-700 hover:text-sky-200'
+              ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/50 font-semibold'
+              : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-800 hover:border-slate-700'
           }`}
           title="スマホや外部ブラウザから誰でも開ける公開URL (ais-pre) をコピー"
         >
           {urlCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 text-sky-400" />}
-          <span className="hidden md:inline">{urlCopied ? 'コピー完了!' : '公開URL'}</span>
+          <span className="hidden md:inline">{urlCopied ? 'コピー完了!' : '共有URL'}</span>
         </button>
       </div>
     </header>

@@ -2849,11 +2849,25 @@ export default function App() {
   };
 
   const handleDeleteFile = (path: string) => {
-    setWorkspaceFiles((prev) => prev.filter((f) => f.path !== path));
-    if (activeFilePath === path) {
-      const remaining = workspaceFiles.filter((f) => f.path !== path);
-      if (remaining.length > 0) setActiveFilePath(remaining[0].path);
-    }
+    setWorkspaceFiles((prev) => {
+      const remaining = prev.filter((f) => f.path !== path);
+      if (remaining.length === 0) {
+        const blank = WORKSPACE_TEMPLATES.find((t) => t.id === 'blank-slate')?.files || [
+          {
+            path: 'index.html',
+            name: 'index.html',
+            content: '<!DOCTYPE html>\n<html lang="ja">\n<head>\n  <meta charset="UTF-8">\n  <title>New App</title>\n</head>\n<body>\n</body>\n</html>',
+            language: 'html',
+          },
+        ];
+        setActiveFilePath(blank[0].path);
+        return blank;
+      }
+      if (activeFilePath === path) {
+        setActiveFilePath(remaining[0].path);
+      }
+      return remaining;
+    });
   };
 
   const handleDeleteFolder = (folderPath: string) => {
@@ -3011,6 +3025,10 @@ export default function App() {
     );
   };
 
+  const handleDeleteMessage = (messageId: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
       {/* Top Main Navigation Header */}
@@ -3083,6 +3101,7 @@ export default function App() {
               onUpdateMessageEvaluation={handleUpdateMessageEvaluation}
               onApplyCodeProposal={handleApplyCodeProposal}
               onRejectCodeProposal={handleRejectCodeProposal}
+              onDeleteMessage={handleDeleteMessage}
             />
           </div>
 
@@ -3111,6 +3130,7 @@ export default function App() {
                 onApplySandbox={() => setActiveTab('preview')}
                 onImportZip={handleImportZipFiles}
                 onExportZip={() => setIsExportModalOpen(true)}
+                onResetProject={handleNewBlankProject}
               />
             )}
 
@@ -3173,6 +3193,7 @@ export default function App() {
                 onUpdateMessageEvaluation={handleUpdateMessageEvaluation}
                 onApplyCodeProposal={handleApplyCodeProposal}
                 onRejectCodeProposal={handleRejectCodeProposal}
+                onDeleteMessage={handleDeleteMessage}
               />
             )}
 
@@ -3199,6 +3220,7 @@ export default function App() {
                 onApplySandbox={() => setMobileTab('preview')}
                 onImportZip={handleImportZipFiles}
                 onExportZip={() => setIsExportModalOpen(true)}
+                onResetProject={handleNewBlankProject}
               />
             )}
 

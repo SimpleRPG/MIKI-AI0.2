@@ -28,6 +28,7 @@ import {
   WrapText,
   ArrowUp,
   ArrowDown,
+  RotateCcw,
 } from 'lucide-react';
 import { WorkspaceFile } from '../types';
 import { extractFilesFromZip, ZipExtractionResult } from '../utils/codeParser';
@@ -45,6 +46,7 @@ interface CodeEditorProps {
   onApplySandbox: () => void;
   onImportZip?: (importedFiles: WorkspaceFile[], projectName?: string) => void;
   onExportZip?: () => void;
+  onResetProject?: () => void;
 }
 
 // フォルダツリー構造の型定義
@@ -69,6 +71,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onApplySandbox,
   onImportZip,
   onExportZip,
+  onResetProject,
 }) => {
   const [newFileName, setNewFileName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -80,6 +83,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const [wrapLines, setWrapLines] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   // コード内検索
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -462,18 +466,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             >
               <Edit2 className="w-3 h-3" />
             </button>
-            {files.length > 1 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  requestDeleteFile(file);
-                }}
-                className="p-1 hover:text-rose-400 rounded text-slate-400"
-                title={`ファイル「${file.name}」を削除`}
-              >
-                <Trash2 className="w-3 h-3 hover:text-rose-400" />
-              </button>
-            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                requestDeleteFile(file);
+              }}
+              className="p-1 hover:text-rose-400 rounded text-slate-400 transition-colors"
+              title={`ファイル「${file.name}」を削除`}
+            >
+              <Trash2 className="w-3 h-3 hover:text-rose-400" />
+            </button>
           </div>
         </div>
       );
@@ -543,24 +545,52 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       </div>
 
       {/* モバイル用 横スクロール ファイルピルバー */}
-      <div className="md:hidden flex items-center gap-1.5 px-3 py-1.5 bg-slate-950 border-b border-slate-800/80 overflow-x-auto shrink-0 scrollbar-none">
-        {files.map((file) => {
-          const isActive = file.path === activeFile?.path;
-          return (
-            <button
-              key={file.path}
-              onClick={() => onSelectFile(file.path)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono whitespace-nowrap shrink-0 transition-all ${
-                isActive
-                  ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40 shadow-sm'
-                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-              }`}
-            >
-              {getFileIcon(file.name, file.language)}
-              <span className="max-w-[120px] truncate">{file.name}</span>
-            </button>
-          );
-        })}
+      <div className="md:hidden flex items-center justify-between gap-1.5 px-3 py-1.5 bg-slate-950 border-b border-slate-800/80 shrink-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 py-0.5">
+          {files.map((file) => {
+            const isActive = file.path === activeFile?.path;
+            return (
+              <div
+                key={file.path}
+                className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-mono whitespace-nowrap shrink-0 transition-all ${
+                  isActive
+                    ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40 shadow-xs'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                <button
+                  onClick={() => onSelectFile(file.path)}
+                  className="flex items-center gap-1.5 cursor-pointer"
+                >
+                  {getFileIcon(file.name, file.language)}
+                  <span className="max-w-[110px] truncate">{file.name}</span>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    requestDeleteFile(file);
+                  }}
+                  className="p-1 hover:bg-rose-950/60 hover:text-rose-400 rounded-full text-slate-500 transition-colors cursor-pointer"
+                  title={`${file.name} を削除`}
+                  aria-label={`${file.name} を削除`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {onResetProject && (
+          <button
+            onClick={() => setIsResetConfirmOpen(true)}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 hover:bg-rose-950/50 text-slate-400 hover:text-rose-300 border border-slate-800 hover:border-rose-500/30 text-[11px] shrink-0 transition-colors cursor-pointer"
+            title="コードをすべて消去して白紙初期化"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span className="text-[10px]">クリア</span>
+          </button>
+        )}
       </div>
 
       {/* ======================================================== */}
@@ -665,6 +695,17 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 <span>ZIPでエクスポート</span>
               </button>
             )}
+
+            {onResetProject && (
+              <button
+                onClick={() => setIsResetConfirmOpen(true)}
+                className="w-full flex items-center justify-center gap-1.5 bg-slate-800/80 hover:bg-rose-950/50 text-slate-400 hover:text-rose-300 font-medium py-1.5 px-3 rounded-lg text-xs border border-slate-800 hover:border-rose-500/40 transition-colors cursor-pointer"
+                title="全コードをクリアして白紙初期化"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
+                <span>コードを全消去（初期化）</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -715,12 +756,25 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             {/* コピーボタン */}
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1 text-xs text-slate-300 hover:text-white px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
+              className="flex items-center gap-1 text-xs text-slate-300 hover:text-white px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
               title="コードをコピー"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span className="hidden sm:inline">{copied ? '完了' : 'コピー'}</span>
             </button>
+
+            {/* 削除ボタン: エディタヘッダーに常にわかりやすく配置 */}
+            {activeFile && (
+              <button
+                onClick={() => requestDeleteFile(activeFile)}
+                className="flex items-center gap-1 text-xs text-rose-400 hover:text-rose-200 px-2 py-1 rounded bg-slate-800 hover:bg-rose-950/70 border border-slate-700 hover:border-rose-500/50 transition-colors active:scale-95 cursor-pointer"
+                title={files.length === 1 ? `「${activeFile.name}」を削除・初期化` : `「${activeFile.name}」を削除`}
+                aria-label="ファイルを削除"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span className="text-[11px] font-medium">削除</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -768,7 +822,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 <h3 className="text-sm font-bold text-slate-100">
                   {pendingDelete.type === 'folder' ? 'フォルダの削除確認' : 'ファイルの削除確認'}
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">この操作は取り消せません。</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {pendingDelete.type === 'file' && files.length === 1
+                    ? '最後のファイルのため、削除するとファイル内容が白紙に初期化されます。'
+                    : 'この操作は取り消せません。'}
+                </p>
               </div>
             </div>
 
@@ -782,21 +840,68 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   ※フォルダ内の全 {pendingDelete.fileCount} 個のファイルが削除されます。
                 </div>
               )}
+              {pendingDelete.type === 'file' && files.length === 1 && (
+                <div className="text-amber-400 text-[11px] pt-1 leading-relaxed">
+                  ※ワークスペースが空にならないよう、削除後は空の新規ファイルとしてリセットされます。
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 onClick={() => setPendingDelete(null)}
-                className="px-4 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="px-4 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
               >
                 キャンセル
               </button>
               <button
                 onClick={confirmDelete}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 active:scale-95 shadow-md shadow-rose-900/30 transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 active:scale-95 shadow-md shadow-rose-900/30 transition-all cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>削除する</span>
+                <span>{pendingDelete.type === 'file' && files.length === 1 ? '削除・初期化する' : '削除する'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* プロジェクト初期化・全クリア確認モーダル */}
+      {/* ======================================================== */}
+      {isResetConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-rose-950/80 border border-rose-500/50 flex items-center justify-center text-rose-400 shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">コードの全消去・初期化</h3>
+                <p className="text-xs text-slate-400 mt-0.5">ワークスペース内のコードをすべてクリアします。</p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed">
+              現在のすべてのファイル（全{files.length}件）を消去し、白紙の新規プロジェクトから作り直します。よろしいですか？
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                onClick={() => setIsResetConfirmOpen(false)}
+                className="px-4 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => {
+                  setIsResetConfirmOpen(false);
+                  if (onResetProject) onResetProject();
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 active:scale-95 shadow-md shadow-rose-900/30 transition-all cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>すべて消去して白紙に戻す</span>
               </button>
             </div>
           </div>

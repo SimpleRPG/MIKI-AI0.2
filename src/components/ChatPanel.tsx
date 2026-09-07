@@ -51,7 +51,7 @@ import {
   GitBranch,
   CheckSquare,
   HelpCircle,
-  Activity,
+  MoreHorizontal,
 } from 'lucide-react';
 import {
   ChatMessage,
@@ -121,6 +121,7 @@ interface ChatPanelProps {
   onUpdateMessageEvaluation?: (messageId: string, evaluation: CompletionEvaluation) => void;
   onApplyCodeProposal?: (proposal: any) => void;
   onRejectCodeProposal?: (proposalId: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -153,6 +154,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onUpdateMessageEvaluation,
   onApplyCodeProposal,
   onRejectCodeProposal,
+  onDeleteMessage,
 }) => {
   const [inputText, setInputText] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string; type: string; size: number }[]>([]);
@@ -172,6 +174,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [executingWorkflowId, setExecutingWorkflowId] = useState<string | null>(null);
   const [workflowStatusMessage, setWorkflowStatusMessage] = useState<{ [wfId: string]: string }>({});
   const [experienceToast, setExperienceToast] = useState<{ msgId: string; text: string } | null>(null);
+  const [activeMoreMenuMsgId, setActiveMoreMenuMsgId] = useState<string | null>(null);
+  const [showToolsRow, setShowToolsRow] = useState(false);
 
   // 第19章: 放置型自律進化レポート状態
   const [unviewedGrowthReport, setUnviewedGrowthReport] = useState<AutonomousGrowthReport | null>(null);
@@ -776,66 +780,84 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 relative select-text">
-      {/* Chat Header Subbar */}
-      <div className="px-3 py-2 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 shrink-0">
-        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-          <span className="flex h-2 w-2 relative shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
-          </span>
-          <span className="font-semibold text-slate-300">相棒AI:</span>
+      {/* Chat Header Toolbar */}
+      <div className="bg-slate-950/80 border-b border-slate-800/80 shrink-0">
+        {/* Row 1: Assistant Personality Focus & Streamlined Actions */}
+        <div className="px-3 py-2 flex items-center justify-between gap-2 text-xs text-slate-400">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="flex h-2 w-2 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
+            </span>
 
-          {/* Model / Personality Focus Selector */}
-          <select
-            value={speakerMode}
-            onChange={(e) => setSpeakerMode(e.target.value)}
-            className="bg-slate-950 border border-slate-700 text-pink-300 text-[11px] font-bold rounded-lg px-2 py-1 focus:outline-none focus:border-pink-500 transition-colors"
-          >
-            <option value="miki">🌸 みき (通常・全対話)</option>
-            <option value="qwen_coder">💻 みき (コード・開発モード)</option>
-            <option value="deepseek_logic">🧩 みき (原因分析・ロジックモード)</option>
-            <option value="gpu_shader">⚡ みき (WebGPU・シェーダーモード)</option>
-          </select>
+            {/* Model / Personality Focus Selector */}
+            <select
+              value={speakerMode}
+              onChange={(e) => setSpeakerMode(e.target.value)}
+              className="bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-medium rounded-lg px-2.5 py-1 focus:outline-none focus:border-indigo-500/60 transition-colors cursor-pointer"
+            >
+              <option value="miki">🌸 通常・総合対話</option>
+              <option value="qwen_coder">💻 コード開発</option>
+              <option value="deepseek_logic">🧩 原因分析・推論</option>
+              <option value="gpu_shader">⚡ WebGPU・シェーダー</option>
+            </select>
+          </div>
 
-          <button
-            onClick={onOpenEngineModal}
-            className={`text-[10px] px-2 py-0.5 rounded font-mono transition-colors inline-flex items-center gap-1 border ${
-              engineMode === 'webgpu'
-                ? 'bg-purple-950/80 text-purple-300 hover:bg-purple-900 border-purple-500/50'
-                : engineMode === 'gemini_cloud'
-                ? 'bg-sky-950/80 text-sky-300 hover:bg-sky-900 border-sky-500/50'
-                : 'bg-amber-950/80 text-amber-300 hover:bg-amber-900 border-amber-500/50'
-            }`}
-            title="推論エンジン設定（WebGPU / CPUルールベース / Gemini Cloud を選択）"
-          >
-            {engineMode === 'webgpu' ? (
-              <>
-                <Cpu className="w-2.5 h-2.5 text-purple-400" />
-                <span>WebGPU (GPU推論)</span>
-              </>
-            ) : engineMode === 'gemini_cloud' ? (
-              <>
-                <Sparkles className="w-2.5 h-2.5 text-sky-400" />
-                <span>Gemini Cloud</span>
-              </>
-            ) : (
-              <>
-                <Zap className="w-2.5 h-2.5 text-amber-400" />
-                <span>CPUルールベース</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Tools drawer toggle */}
+            <button
+              onClick={() => setShowToolsRow(!showToolsRow)}
+              className={`px-2 py-1 rounded-lg border text-xs font-medium flex items-center gap-1 transition-all ${
+                showToolsRow
+                  ? 'bg-indigo-950/60 text-indigo-300 border-indigo-500/40 shadow-xs'
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border-slate-800'
+              }`}
+              title="詳細ツール・ブランチ・タスクを展開"
+            >
+              <Wrench className="w-3 h-3" />
+              <span>ツール</span>
+              {showToolsRow ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+            </button>
+
+            {/* Voice toggle button */}
+            <button
+              onClick={() => {
+                setVoiceEnabled(!voiceEnabled);
+                if (!voiceEnabled) speakText('音声読み上げをオンにしたよ！何でも話してね✨');
+                else window.speechSynthesis?.cancel();
+              }}
+              className={`p-1.5 rounded-lg border transition-all shadow-xs ${
+                voiceEnabled
+                  ? 'bg-pink-500/20 text-pink-300 border-pink-500/40'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+              }`}
+              title="音声読み上げ (TTS)"
+            >
+              {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Clear history */}
+            <button
+              onClick={onClearHistory}
+              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-slate-700 transition-all shadow-xs"
+              title="会話履歴をクリア"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Row 2: Clean Studio Tool Chips (Collapsible to save mobile screen space) */}
+        {showToolsRow && (
+          <div className="px-3 pb-2 pt-0.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar border-t border-slate-800/40 animate-in fade-in">
           {/* 第31.2章 会話ブランチボタン */}
           <button
             onClick={() => setIsBranchModalOpen(true)}
-            className="px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1 transition-all bg-violet-950/80 hover:bg-violet-900 text-violet-300 border-violet-500/50 shadow-sm"
+            className="px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all bg-slate-900 hover:bg-slate-800/90 text-slate-300 hover:text-white border-slate-800 hover:border-slate-700 shrink-0 shadow-xs"
             title="第31.2章 会話分岐・巻き戻し (仮説ブランチ並列検証)"
           >
             <GitBranch className="w-3 h-3 text-violet-400" />
-            <span className="truncate max-w-[90px]">
+            <span className="truncate max-w-[80px]">
               {branches.find((b) => b.id === activeBranchId)?.name || '本線'}
             </span>
           </button>
@@ -843,38 +865,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           {/* 第31.10章 タスクボードボタン */}
           <button
             onClick={() => setIsTaskboardModalOpen(true)}
-            className="px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1 transition-all bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border-emerald-500/50 shadow-sm"
+            className="px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all bg-slate-900 hover:bg-slate-800/90 text-slate-300 hover:text-white border-slate-800 hover:border-slate-700 shrink-0 shadow-xs"
             title="第31.10章 会話タスクボード & 31.14/31.15章設定"
           >
             <CheckSquare className="w-3 h-3 text-emerald-400" />
             <span>タスク ({tasks.filter((t) => t.status !== 'COMPLETED').length})</span>
           </button>
 
-          {/* リアルタイム行動モニターボタン (ユーザー要望: リアルタイムに今何をしているか可視化) */}
+          {/* リアルタイム行動モニターボタン */}
           <button
             onClick={() => setIsActivityMonitorOpen(true)}
-            className={`px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1.5 transition-all shadow-sm ${
+            className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all shrink-0 shadow-xs ${
               isLoading || isGenerating
-                ? 'bg-gradient-to-r from-pink-600 to-indigo-600 text-white border-pink-400/80 animate-pulse'
-                : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700/80'
+                ? 'bg-pink-950/40 text-pink-200 border-pink-500/40 animate-pulse'
+                : 'bg-slate-900 hover:bg-slate-800/90 text-slate-300 hover:text-white border-slate-800 hover:border-slate-700'
             }`}
             title="みきが今リアルタイムに何をしているか（推論工程・記憶検索・自己改善）を秒単位でライブ監視"
           >
-            <Activity className={`w-3 h-3 ${isLoading || isGenerating ? 'animate-spin text-pink-200' : 'text-indigo-400'}`} />
-            <span>
-              {isLoading || isGenerating ? 'リアルタイム実行中...' : 'リアルタイム行動'}
-            </span>
+            <Activity className={`w-3 h-3 ${isLoading || isGenerating ? 'animate-spin text-pink-400' : 'text-indigo-400'}`} />
+            <span>{isLoading || isGenerating ? '推論実行中...' : 'リアルタイム行動'}</span>
           </button>
 
           {/* Self Improvement Lab Button */}
           {onOpenSelfImprovementModal && (
             <button
               onClick={onOpenSelfImprovementModal}
-              className="px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1 transition-all bg-indigo-950/80 hover:bg-indigo-900 text-indigo-200 border-indigo-500/50 shadow-sm"
-              title="設計思想指示書 & 自己コード改善研究所 (第29-30章, 第53章 自己コード監査・プロポーザル・シャドウテスト・不変条件)"
+              className="px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all bg-slate-900 hover:bg-slate-800/90 text-slate-300 hover:text-white border-slate-800 hover:border-slate-700 shrink-0 shadow-xs"
+              title="設計思想指示書 & 自己コード改善研究所"
             >
               <Compass className="w-3 h-3 text-indigo-400" />
-              <span>📐 設計思想 & 自己改善</span>
+              <span>自己コード改善</span>
             </button>
           )}
 
@@ -882,10 +902,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <button
             onClick={handleSimulateIdleEvolution}
             disabled={isSimulatingEvolution}
-            className={`px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1 transition-all ${
+            className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all shrink-0 shadow-xs ${
               isSimulatingEvolution
-                ? 'bg-slate-800 text-slate-400 border-slate-700'
-                : 'bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-300 border-emerald-500/40 shadow-sm'
+                ? 'bg-slate-900 text-slate-500 border-slate-800'
+                : 'bg-slate-900 hover:bg-slate-800/90 text-slate-300 hover:text-white border-slate-800 hover:border-slate-700'
             }`}
             title="第19章 放置型自律進化（反省・定石蒸留・宿題調査・ドリル）を今すぐ実行"
           >
@@ -894,47 +914,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             ) : (
               <Sparkles className="w-3 h-3 text-emerald-400" />
             )}
-            <span>{isSimulatingEvolution ? '進化中...' : '放置進化'}</span>
-          </button>
-
-          {/* Public Share URL Copy Button */}
-          <button
-            onClick={handleCopyPublicUrl}
-            className={`px-2 py-1 rounded-lg border text-[10.5px] font-bold flex items-center gap-1 transition-all ${
-              urlCopied
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-                : 'bg-slate-800 text-sky-300 hover:text-sky-200 border-slate-700 hover:bg-slate-700'
-            }`}
-            title="スマホや外部ブラウザから誰でも直接開ける公開URL (ais-pre) をコピー"
-          >
-            <Share2 className="w-3 h-3" />
-            <span>{urlCopied ? 'URLコピー完了!' : '公開URL'}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setVoiceEnabled(!voiceEnabled);
-              if (!voiceEnabled) speakText('音声読み上げをオンにしたよ！何でも話してね✨');
-              else window.speechSynthesis?.cancel();
-            }}
-            className={`p-1.5 rounded-lg border transition-colors ${
-              voiceEnabled
-                ? 'bg-pink-500/20 text-pink-300 border-pink-500/40'
-                : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
-            }`}
-            title="音声読み上げ (TTS)"
-          >
-            {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-          </button>
-
-          <button
-            onClick={onClearHistory}
-            className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors"
-            title="会話履歴をクリア (記憶は保持)"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
+            <span>{isSimulatingEvolution ? '進化中...' : '自律進化'}</span>
           </button>
         </div>
+        )}
       </div>
 
       {/* Messages Scroll Area */}
@@ -1559,10 +1542,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                 {/* Bubble */}
                 <div
-                  className={`p-3 sm:p-3.5 rounded-2xl text-xs sm:text-xs leading-relaxed break-words relative shadow-md ${
+                  className={`p-3.5 sm:p-4 rounded-2xl text-[13px] leading-relaxed break-words relative shadow-xs ${
                     isUser
-                      ? 'bg-gradient-to-r from-sky-600 to-indigo-600 text-white rounded-tr-sm'
-                      : 'bg-slate-800/90 text-slate-200 border border-slate-700/80 rounded-tl-sm'
+                      ? 'bg-indigo-600 text-white rounded-tr-sm'
+                      : 'bg-slate-900/95 text-slate-100 border border-slate-800/80 rounded-tl-sm'
                   }`}
                 >
                   {/* Attached files if any */}
@@ -2415,101 +2398,144 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   )}
                 </div>
 
-                {/* Message action buttons & Streaming Stop Button */}
+                {/* Clean, minimalist message actions toolbar - strictly no vertical wrapping */}
                 {!isUser && (
                   <div className="flex flex-col gap-1.5 w-full">
-                    <div className="flex items-center justify-between px-1 text-[10px] text-slate-500">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2 px-1 text-slate-500 select-none">
+                      <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+                        {/* Voice read */}
                         <button
+                          type="button"
                           onClick={() => speakText(msg.content)}
-                          className="hover:text-pink-400 flex items-center gap-1 transition-colors"
+                          className="p-1 rounded-md text-slate-500 hover:text-pink-400 hover:bg-slate-800/80 transition-colors"
+                          title="音声で読み上げ"
+                          aria-label="音声読み上げ"
                         >
-                          <Volume2 className="w-3 h-3" />
-                          <span>音声</span>
+                          <Volume2 className="w-3.5 h-3.5" />
                         </button>
-                        <span>•</span>
+
+                        {/* Copy */}
                         <button
+                          type="button"
                           onClick={() => handleCopy(msg.content, msg.id)}
-                          className="hover:text-slate-300 flex items-center gap-1 transition-colors"
+                          className="p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-800/80 transition-colors"
+                          title="コピー"
+                          aria-label="コピー"
                         >
-                          <Copy className="w-3 h-3" />
-                          <span>コピー</span>
+                          {copiedId === msg.id ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
                         </button>
 
-                        {/* Inline Feedback Rating (設計思想 24. 第1世代) */}
-                        <span>•</span>
-                        <div className="flex items-center gap-1">
+                        {/* Inline Feedback Rating */}
+                        <button
+                          type="button"
+                          onClick={() => handleFeedback(msg, 'good')}
+                          className={`p-1 rounded-md transition-colors ${
+                            msg.userFeedback === 'good'
+                              ? 'text-emerald-400 bg-emerald-950/60 border border-emerald-500/30'
+                              : 'text-slate-500 hover:text-emerald-400 hover:bg-slate-800/80'
+                          }`}
+                          title="良い回答 (高評価)"
+                          aria-label="高評価"
+                        >
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (msg.userFeedback === 'bad') {
+                              handleFeedback(msg, 'bad');
+                            } else {
+                              setFeedbackFeedbackId(feedbackFeedbackId === msg.id ? null : msg.id);
+                            }
+                          }}
+                          className={`p-1 rounded-md transition-colors ${
+                            msg.userFeedback === 'bad'
+                              ? 'text-rose-400 bg-rose-950/60 border border-rose-500/30'
+                              : 'text-slate-500 hover:text-rose-400 hover:bg-slate-800/80'
+                          }`}
+                          title="改善が必要 (低評価)"
+                          aria-label="低評価"
+                        >
+                          <ThumbsDown className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* More options dropdown: なぜこの回答・分岐・仕分けなどを格納して常時露出を排除 */}
+                        <div className="relative">
                           <button
-                            onClick={() => handleFeedback(msg, 'good')}
-                            className={`p-1 rounded transition-all ${
-                              msg.userFeedback === 'good'
-                                ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
-                                : 'hover:text-emerald-400 text-slate-500'
-                            }`}
-                            title="役に立った (記憶スコア+ / LoRA教材に登録)"
+                            type="button"
+                            onClick={() => setActiveMoreMenuMsgId(activeMoreMenuMsgId === msg.id ? null : msg.id)}
+                            className="p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-800/80 transition-colors"
+                            title="その他の機能"
+                            aria-label="その他"
                           >
-                            <ThumbsUp className="w-3 h-3" />
+                            <MoreHorizontal className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => {
-                              if (msg.userFeedback === 'bad') {
-                                handleFeedback(msg, 'bad');
-                              } else {
-                                setFeedbackFeedbackId(feedbackFeedbackId === msg.id ? null : msg.id);
-                              }
-                            }}
-                            className={`p-1 rounded transition-all ${
-                              msg.userFeedback === 'bad'
-                                ? 'bg-rose-950 text-rose-300 border border-rose-500/40'
-                                : 'hover:text-rose-400 text-slate-500'
-                            }`}
-                            title="見当違い・改善が必要 (改善ルーターに送信)"
-                          >
-                            <ThumbsDown className="w-3 h-3" />
-                          </button>
+
+                          {activeMoreMenuMsgId === msg.id && (
+                            <div className="absolute left-0 bottom-full mb-1.5 z-30 w-48 bg-slate-950 border border-slate-800 rounded-xl p-1 shadow-2xl text-xs space-y-0.5 whitespace-nowrap animate-in fade-in">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleOpenWhyInspector(msg);
+                                  setActiveMoreMenuMsgId(null);
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
+                              >
+                                <HelpCircle className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                <span>なぜこの回答？ (思考ログ)</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleForkFromMessage(msg.id);
+                                  setActiveMoreMenuMsgId(null);
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
+                              >
+                                <GitBranch className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                                <span>ここから会話を分岐</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleRouteMessageExperience(msg);
+                                  setActiveMoreMenuMsgId(null);
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
+                              >
+                                <Compass className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                                <span>記憶・スキルの仕分け</span>
+                              </button>
+                              {onDeleteMessage && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onDeleteMessage(msg.id);
+                                    setActiveMoreMenuMsgId(null);
+                                  }}
+                                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-rose-950/50 text-rose-400 hover:text-rose-300 flex items-center gap-2 transition-colors cursor-pointer border-t border-slate-800/80 mt-0.5 pt-1.5"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                                  <span>この発言を削除</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
-
-                        {/* 設計思想 49章: 経験仕分け判定ボタン */}
-                        <span>•</span>
-                        <button
-                          onClick={() => handleRouteMessageExperience(msg)}
-                          className="hover:text-purple-300 flex items-center gap-1 transition-colors text-[10px]"
-                          title="49章 経験の保存先ルーターでこの応答を評価し、適切な記憶・スキル・教材へ仕分け判定"
-                        >
-                          <Compass className="w-3 h-3 text-purple-400" />
-                          <span>49章 仕分け</span>
-                        </button>
-
-                        {/* 設計思想 第31.3章: なぜこの回答？説明パネル */}
-                        <span>•</span>
-                        <button
-                          onClick={() => handleOpenWhyInspector(msg)}
-                          className="hover:text-indigo-300 flex items-center gap-1 transition-colors text-[10px] text-indigo-400/90 font-medium"
-                          title="第31.3章 なぜこの回答？ 内部推論・使用記憶・回答骨格・長さ理由をインスペクト"
-                        >
-                          <HelpCircle className="w-3 h-3 text-indigo-400" />
-                          <span>なぜこの回答？</span>
-                        </button>
-
-                        {/* 設計思想 第31.2章: ここから分岐 (Fork Branch) */}
-                        <span>•</span>
-                        <button
-                          onClick={() => handleForkFromMessage(msg.id)}
-                          className="hover:text-violet-300 flex items-center gap-1 transition-colors text-[10px] text-violet-400/90 font-medium"
-                          title="第31.2章 このメッセージ地点から新しい仮説ブランチを作成して並列検討"
-                        >
-                          <GitBranch className="w-3 h-3 text-violet-400" />
-                          <span>ここから分岐</span>
-                        </button>
                       </div>
 
                       {msg.isStreaming && onStopGeneration && (
                         <button
+                          type="button"
                           onClick={onStopGeneration}
-                          className="flex items-center gap-1 px-2 py-0.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 hover:text-rose-100 rounded text-[10.5px] font-semibold transition-all shadow-sm active:scale-95"
+                          className="flex items-center gap-1 px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 hover:text-rose-100 rounded-lg text-xs font-semibold transition-all shrink-0 whitespace-nowrap active:scale-95 cursor-pointer"
                         >
                           <Square className="w-2.5 h-2.5 fill-current" />
-                          <span>生成を停止</span>
+                          <span>停止</span>
                         </button>
                       )}
                     </div>
@@ -2673,11 +2699,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           accept=".html,.js,.ts,.json,.css,.txt,.md,.png,.jpg,.jpeg,.svg,.glsl,.wgsl,.zip,application/zip"
         />
 
-        <div className="flex items-end gap-1.5 sm:gap-2 bg-slate-950 border border-slate-700/80 focus-within:border-pink-500/80 rounded-xl p-1 sm:p-1.5 transition-colors shadow-inner">
+        <div className="flex items-end gap-1.5 sm:gap-2 bg-slate-950 border border-slate-800 focus-within:border-indigo-500/60 focus-within:ring-1 focus-within:ring-indigo-500/20 rounded-xl p-1 sm:p-1.5 transition-all shadow-xs">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-slate-400 hover:text-pink-400 hover:bg-slate-800 rounded-lg transition-colors shrink-0"
+            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900 rounded-lg transition-colors shrink-0"
             title="画像・ファイル・コードを添付"
           >
             <Paperclip className="w-4 h-4" />
@@ -2688,8 +2714,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             onClick={() => setUseSearch(!useSearch)}
             className={`p-2 rounded-lg transition-colors shrink-0 ${
               useSearch
-                ? 'text-emerald-400 bg-emerald-950/60 border border-emerald-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'text-emerald-400 bg-emerald-950/60 border border-emerald-500/40'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
             }`}
             title="Google検索グラウンディング"
           >
@@ -2703,7 +2729,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               className={`p-2 rounded-lg transition-colors shrink-0 ${
                 isMultiStepEnabled
                   ? 'text-indigo-400 bg-indigo-950/60 border border-indigo-500/40 shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
               title={
                 isMultiStepEnabled
@@ -2744,7 +2770,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               if (val !== inputText) setInputText(val);
             }}
             onKeyDown={handleKeyDown}
-            placeholder={`${persona.name}に指示（端末WebGPU・トークン消費0・ゲーム制作や雑談など）`}
+            placeholder={`${persona.name}にメッセージを入力...`}
             rows={1}
             className="flex-1 bg-transparent border-none outline-none text-xs text-slate-100 placeholder-slate-500 resize-none py-2 px-1 leading-relaxed max-h-24"
           />
@@ -2753,17 +2779,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <button
               type="button"
               onClick={handleSafeStop}
-              className="px-3 py-2 min-h-[40px] rounded-lg flex items-center gap-1.5 font-bold transition-all shrink-0 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-md shadow-rose-600/30 animate-pulse active:scale-95 cursor-pointer touch-manipulation"
+              className="px-3 py-2 min-h-[38px] rounded-lg flex items-center gap-1.5 font-semibold transition-all shrink-0 bg-rose-600 hover:bg-rose-500 text-white shadow-xs animate-pulse active:scale-95 cursor-pointer touch-manipulation text-xs"
               title="生成を中断する"
             >
               <Square className="w-3.5 h-3.5 fill-current" />
-              <span className="text-xs">停止</span>
+              <span>停止</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={handleSend}
-              className="p-2 sm:p-2.5 min-w-[40px] min-h-[40px] rounded-lg flex items-center justify-center font-bold transition-all shrink-0 cursor-pointer touch-manipulation bg-gradient-to-r from-pink-500 via-rose-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 active:scale-90 text-white shadow-md shadow-pink-500/30 ring-1 ring-white/20"
+              className="p-2 sm:p-2.5 min-w-[38px] min-h-[38px] rounded-lg flex items-center justify-center font-bold transition-all shrink-0 cursor-pointer touch-manipulation bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white shadow-xs"
               title="メッセージを送信"
               aria-label="送信"
             >
@@ -2772,18 +2798,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           )}
         </div>
 
-        {/* Zero Cloud Token Guarantee Bar */}
-        <div className="mt-1.5 px-1 flex items-center justify-between text-[10.5px] text-slate-400 select-none">
-          <div className="flex items-center gap-1.5 text-emerald-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <span className="font-semibold">端末ローカルWebGPU実行中（クラウドトークン消費: 0 / 完全無料）</span>
+        {/* Engine status indicator */}
+        <div className="mt-1 px-1 flex items-center justify-between text-[10px] text-slate-500 select-none">
+          <div className="flex items-center gap-1.5 text-emerald-400/90 truncate">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+            <span className="truncate">WebGPUローカル実行（完全無料）</span>
           </div>
           {onOpenEngineModal && (
             <button
               onClick={onOpenEngineModal}
-              className="text-purple-300 hover:text-purple-200 underline font-medium"
+              className="text-slate-400 hover:text-slate-200 text-[10px] shrink-0"
             >
-              モデル管理
+              設定
             </button>
           )}
         </div>
