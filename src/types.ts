@@ -189,6 +189,7 @@ export interface ContextBudgetPlan {
   episodicBufferQuota: number;
   memoryRecallQuota: number;
   historyQuota: number;
+  codeQuota?: number; // Qwenカタログ等のコンテキスト予算に基づくコード改善用トークン枠
   headroomTokens: number;
   thermalReductionRatio: number;
   batteryReducedDepth: number; // リンク展開深さ (1〜3)

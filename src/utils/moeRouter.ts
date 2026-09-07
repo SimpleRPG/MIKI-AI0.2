@@ -20,6 +20,7 @@ import { longTermMemoryService } from '../services/longTermMemoryService';
 import { workingAgendaService } from '../services/workingAgendaService';
 import { structuralMemoryService } from '../services/structuralMemoryService';
 import { failureCatalogService } from '../services/failureCatalogService';
+import { extractSmartCodeForImprovement } from './codeUnderstanding';
 import type { ConversationState } from '../types';
 
 /**
@@ -111,6 +112,8 @@ export async function buildExpertSystemPromptWithTracking(
     toolResults?: ToolExecutionResult[];
     conversationState?: ConversationState | null;
     recentMessages?: ChatMessage[];
+    activeFilePath?: string;
+    codeQuotaTokens?: number;
   }
 ): Promise<PromptContextTrackingResult> {
   const maxMemories = options?.maxMemories || (options?.isLightweight ? 3 : 5);
@@ -219,7 +222,7 @@ export async function buildExpertSystemPromptWithTracking(
   let expertInstruction = '';
   switch (expertRole) {
     case 'code':
-      expertInstruction = `【開発依頼】HTML5/Canvas/JavaScriptで動く完全なコードを \`\`\`html のコードブロックで提供してください。`;
+      expertInstruction = `【開発・コード改善依頼】HTML5/Canvas/JavaScriptで動く完全なコードを \`\`\`html または \`\`\`js のコードブロックで提供してください。不具合の修正、機能の追加、デザイン改善などユーザーの要望を的確に反映し、そのまま動作する完全版コードを出力してください。`;
       break;
 
     case 'shader':
@@ -236,12 +239,40 @@ export async function buildExpertSystemPromptWithTracking(
       break;
   }
 
-  // 5. ソースコードのコンテキスト
+  // 5. ソースコードのコンテキスト (Qwen等のモデルカタログ予算 & スマート要約抽出)
   let filesContext = '';
   if (options?.includeFiles && workspaceFiles && workspaceFiles.length > 0) {
-    const mainFile = workspaceFiles.find((f) => f.path === 'index.html' || f.name === 'index.html') || workspaceFiles[0];
-    if (mainFile && mainFile.content) {
-      filesContext = `\n【現在のソースコード】:\n\`\`\`${mainFile.language || 'html'}\n${mainFile.content.slice(0, 600)}\n\`\`\``;
+    const targetFile =
+      (options?.activeFilePath && workspaceFiles.find((f) => f.path === options.activeFilePath)) ||
+      workspaceFiles.find((f) => f.path === 'index.html' || f.name === 'index.html') ||
+      workspaceFiles[0];
+
+    if (targetFile && targetFile.content) {
+      // Qwen等のモデルカタログのコンテキスト予算（codeQuotaTokens）に基づく文字数制限の動的計算
+      // トークン数 × 2.8文字 (日本語・コード混合平均)
+      let charLimit = 28000;
+      if (options?.codeQuotaTokens && options.codeQuotaTokens > 0) {
+        charLimit = Math.max(8000, Math.min(Math.floor(options.codeQuotaTokens * 2.8), 65000));
+      } else if (options?.isLightweight) {
+        charLimit = 12000;
+      }
+
+      // スマート抽出: 巨大ファイル（数万〜15万文字など）でも、ファイル全体の行マップ＋注目関数＋骨格を抽出
+      const smartResult = extractSmartCodeForImprovement(
+        targetFile.content,
+        userMessage,
+        charLimit,
+        targetFile.language || 'html'
+      );
+
+      const fileListStr =
+        workspaceFiles.length > 1
+          ? `【プロジェクト内ファイル】: ${workspaceFiles.map((f) => `${f.path} (${Math.round((f.content?.length || 0) / 1024 * 10) / 10}KB)`).join(', ')}\n`
+          : '';
+
+      const outlinePart = smartResult.outlineText ? `${smartResult.outlineText}\n` : '';
+
+      filesContext = `\n【現在編集中のコード (${targetFile.path} - 計${targetFile.content.length}文字${smartResult.isSmartExtracted ? '・スマート要約版' : '・ノーカット'})】:\n${fileListStr}${outlinePart}\`\`\`${targetFile.language || 'html'}\n${smartResult.codeSlice}\n\`\`\`\n※ユーザーからの改善要望・修正・追加機能には、上記のコード構造や関数名・変数名を正確に活かし、そのまま動作する完全コード（または対象ファイルの完全版コード）を \`\`\`${targetFile.language || 'html'} ブロックで提示してください。`;
     }
   }
 

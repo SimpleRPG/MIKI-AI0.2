@@ -76,6 +76,7 @@ import { draftVerificationService } from './services/draftVerificationService';
 import { cognitiveDebuggerService } from './services/cognitiveDebuggerService';
 import { proactiveContextOsService } from './services/proactiveContextOsService';
 import { extractCodeBlocks } from './utils/codeParser';
+import { smartMergeCodeBlock } from './utils/codeMergeService';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
 import { compressContextHistory } from './utils/contextCompression';
@@ -1614,9 +1615,17 @@ export default function App() {
         isGpuUsable,
       });
       const tStart = performance.now();
+      const hasCodeInWorkspace = workspaceFiles.some(
+        (f) => f.content && f.content.trim().length > 20
+      );
       const isCodeModRequest =
-        (promptAnalysis.role === 'code' || promptAnalysis.role === 'shader' || promptAnalysis.role === 'logic') &&
-        (text.includes('修正') || text.includes('変更') || text.includes('直して') || text.includes('追加'));
+        hasCodeInWorkspace &&
+        (
+          promptAnalysis.role === 'code' ||
+          promptAnalysis.role === 'shader' ||
+          promptAnalysis.role === 'logic' ||
+          /(修正|変更|直して|追加|改善|バグ|エラー|動かない|動くように|リファクタ|機能|もっと|コード|css|html|js|script|style|デザイン|色|スピード|ボタン|動き|調整|最適化|高速化|直せる|みて|見て)/i.test(text)
+        );
 
       // 🛠️ ツール検出 & 自動実行パイプライン (:feature:tools / 設計思想 14 & 22)
       // 小型ローカルLLM (1.5B/0.5B等) のハルシネーションを防ぐため、プロンプト生成前にツールを安全評価
@@ -1688,6 +1697,14 @@ export default function App() {
       const actionPrediction = worldModelService.predictAction(text, relevantMemories, persona);
       systemLogger.info('STEP', `世界モデル事前予測 [${actionPrediction.expectedIntent}] 期待トーン:${actionPrediction.expectedTone}, 予測記憶数:${actionPrediction.expectedMemoryUsage.predictedMemoryCount}`);
 
+      // 設計思想 Master v5.0 第4章: 3層コンテキスト長自動調整エンジン (Qwen等のモデルカタログ仕様に連動)
+      const isHeavyTask = isCodeModRequest || promptAnalysis.role !== 'moe_chat';
+      const budgetPlan = contextBudgetEngineService.calculateBudgetPlan(undefined, isHeavyTask, isCodeModRequest);
+      systemLogger.info(
+        'INFERENCE',
+        `📊 動的コンテキスト予算計画: nCtx=${budgetPlan.tier}, LiveBudget=${budgetPlan.liveBudget}tok, 履歴配分=${budgetPlan.historyQuota}tok, コード配分=${budgetPlan.codeQuota || 0}tok`
+      );
+
       const promptBuildResult = await buildExpertSystemPromptWithTracking(
         promptAnalysis.role,
         persona,
@@ -1696,6 +1713,8 @@ export default function App() {
         text,
         {
           includeFiles: isCodeModRequest,
+          activeFilePath,
+          codeQuotaTokens: budgetPlan.codeQuota,
           toolResults: executedTools,
           conversationState,
           recentMessages: messages,
@@ -1709,14 +1728,6 @@ export default function App() {
       if (usedMemoriesTracked.length > 0) {
         setMemories((prev) => recordMemoryUsage(usedMemoriesTracked.map((m) => m.id), prev));
       }
-
-      // 設計思想 Master v5.0 第4章: 3層コンテキスト長自動調整エンジン (Context Budget Engine)
-      const isHeavyTask = isCodeModRequest || promptAnalysis.role !== 'moe_chat';
-      const budgetPlan = contextBudgetEngineService.calculateBudgetPlan(undefined, isHeavyTask);
-      systemLogger.info(
-        'INFERENCE',
-        `📊 動的コンテキスト予算計画: nCtx=${budgetPlan.tier}, LiveBudget=${budgetPlan.liveBudget}tok, 履歴配分=${budgetPlan.historyQuota}tok`
-      );
 
       // コンテキスト圧縮 & スライディングウィンドウ (設計思想 Master v5.0 第4章 B層 動的予算配分)
       const validHistoryMessages = messages.filter(
@@ -2676,13 +2687,17 @@ export default function App() {
   // AI Auto Debug (設計思想 5. 自己修正・自動リトライ & 14. サンドボックス安全実行環境)
   const handleAutoDebug = async (errorLogs: string[]) => {
     setIsDebugging(true);
-    const activeGameCode = workspaceFiles.find((f) => f.path === 'index.html')?.content || '';
+    const targetFile =
+      workspaceFiles.find((f) => f.path === activeFilePath) ||
+      workspaceFiles.find((f) => f.path === 'index.html') ||
+      workspaceFiles[0];
+    const activeGameCode = targetFile?.content || '';
 
     const errorSummary = errorLogs.slice(-3).join('\n');
     const userMsg: ChatMessage = {
       id: 'msg_dbg_req_' + Date.now(),
       role: 'user',
-      content: `🤖 **サンドボックス実行エラー検知**:\n以下のエラーが出たよ！自動修復してくれる？\n\`\`\`\n${errorSummary}\n\`\`\``,
+      content: `🤖 **サンドボックス実行エラー検知** (${targetFile?.path || 'コード'}):\n以下のエラーが出たよ！自動修復してくれる？\n\`\`\`\n${errorSummary}\n\`\`\``,
       timestamp: Date.now(),
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -2782,6 +2797,17 @@ export default function App() {
       setIsDebugging(false);
       setIsLoading(false);
     }
+  };
+
+  // エディタからの「✨ みきに改善を頼む」リクエストハンドラー
+  const handleRequestAiCodeImprovement = (prompt: string, targetFilePath?: string) => {
+    if (targetFilePath && targetFilePath !== activeFilePath) {
+      setActiveFilePath(targetFilePath);
+    }
+    // モバイル環境ならチャットタブに切り替えて返信を見えるようにする
+    setMobileTab('chat');
+    // メッセージ送信実行
+    handleSendMessage(prompt);
   };
 
   // GitHub Load Repo Into Workspace
@@ -3131,6 +3157,7 @@ export default function App() {
                 onImportZip={handleImportZipFiles}
                 onExportZip={() => setIsExportModalOpen(true)}
                 onResetProject={handleNewBlankProject}
+                onRequestAiImprovement={handleRequestAiCodeImprovement}
               />
             )}
 
@@ -3221,6 +3248,7 @@ export default function App() {
                 onImportZip={handleImportZipFiles}
                 onExportZip={() => setIsExportModalOpen(true)}
                 onResetProject={handleNewBlankProject}
+                onRequestAiImprovement={handleRequestAiCodeImprovement}
               />
             )}
 

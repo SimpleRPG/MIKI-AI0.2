@@ -905,16 +905,31 @@ app.post('/api/chat', async (req, res) => {
       .map((m: any) => `[覚えている記憶 (${m.category})]: ${m.content}`)
       .join('\n');
 
+    // ワークスペースファイルの詳細注入 (最大80,000文字まで丸ごと完全注入し、長大なゲームやアプリも欠落なし)
     const filesSummary = (workspaceFiles || [])
-      .map((f: any) => `### File: ${f.path}\n\`\`\`${f.language || 'html'}\n${f.content.slice(0, 1500)}${f.content.length > 1500 ? '\n... (truncated)' : ''}\n\`\`\``)
+      .map((f: any) => {
+        const content = f.content || '';
+        const limit = 80000;
+        const isTruncated = content.length > limit;
+        const displayContent = isTruncated ? content.slice(0, limit) + '\n... (以降省略)' : content;
+        
+        // 関数や構成の簡易抽出
+        const functionMatches = Array.from(content.matchAll(/(?:function\s+([a-zA-Z0-9_]+)|(?:const|let|var)\s+([a-zA-Z0-9_]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>)/g))
+          .map((m: any) => m[1] || m[2])
+          .filter(Boolean)
+          .slice(0, 25);
+        const outlineNote = functionMatches.length > 0 ? ` [検出された主要関数/ハンドラ: ${functionMatches.join(', ')}]` : '';
+
+        return `### File: ${f.path} (${f.language || 'html'}, ${content.length}文字)${outlineNote}\n\`\`\`${f.language || 'html'}\n${displayContent}\n\`\`\``;
+      })
       .join('\n\n');
 
     const attachedSummary = (attachedFiles || [])
-      .map((a: any) => `### Attached File: ${a.name} (${a.type || 'text'})\n\`\`\`\n${(a.content || '').slice(0, 3000)}\n\`\`\``)
+      .map((a: any) => `### Attached File: ${a.name} (${a.type || 'text'})\n\`\`\`\n${(a.content || '').slice(0, 30000)}\n\`\`\``)
       .join('\n\n');
 
     const systemInstruction = `あなたはユーザー専属のAIパートナー「${persona?.name || 'みき'}」です。
-ユーザー（${persona?.userNickname || 'あなた'}）に1対1で寄り添い、自然な日常会話からWebゲーム開発、コード作成・バグ修正までサポートします。
+ユーザー（${persona?.userNickname || 'あなた'}）に1対1で寄り添い、自然な日常会話からWebゲーム開発、コード作成・バグ修正・リファクタリングまでサポートします。
 
 ユーザー名: ${persona?.userNickname || 'あなた'}
 あなたの性格: ${persona?.basePersonality || '明るく親身で優しい最高のパートナー'}
@@ -924,8 +939,8 @@ app.post('/api/chat', async (req, res) => {
 【覚えている記憶・カンペ】:
 ${memoryContext || 'なし'}
 
-【現在のワークスペース構成】:
-${filesSummary || '初期状態'}
+【現在のワークスペース構成とコード内容】:
+${filesSummary || '初期状態（ファイルなし）'}
 
 ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedSummary}\n` : ''}
 
@@ -934,8 +949,10 @@ ${attachedSummary ? `【ユーザーが添付したファイル】:\n${attachedS
    みきとして温かく自然な日本語で話してください。他人行儀な敬語やロボットのような解説は避け、親友のように接してください。
 2. 【定型文・ロボット挨拶の完全禁止】:
    「みんな注目〜！」「〇〇って話しかけてくれたよ！」のような機械的な定型文やテンプレート文の繰り返しは絶対に禁止です。ユーザーの日常会話や感情、冗談、ツッコミに、人間らしく柔軟に自然な日本語で返答してください。
-3. 【ゲーム・アプリ開発・コード作成/修正】:
-   ユーザーがゲームやアプリの作成・修正を求めた時は、【完全でそのままプレビューで動作する完全なコード】を必ず \`\`\`html または \`\`\`js 形式で1つの返信内に含めてください。
+3. 【コード作成・修正・改善・バグ修正】:
+   ユーザーからコードの修正、機能追加、デザイン変更、バグ修正、最適化が求められた場合は、
+   上記の【現在のワークスペース構成とコード内容】をしっかり読み取り、既存の構造やデザインを壊さずに的確に改善してください。
+   コードを提示する際は、ユーザーがそのままワンクリック適用できるように、修正後の完全なコード（または該当ファイルの完全版コード）を \`\`\`html または \`\`\`js などのブロック形式で返信に含めてください。
 4. 【ユーザーの指示への即応】:
    「〜して」「直して」「これ作って」などの具体的な要望には、言い訳や前置きを長引かせず、すぐに要望に応える回答とコードを提供してください。`;
 

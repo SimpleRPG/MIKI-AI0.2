@@ -29,6 +29,12 @@ import {
   ArrowUp,
   ArrowDown,
   RotateCcw,
+  Bug,
+  Zap,
+  Wand2,
+  Lightbulb,
+  Palette,
+  Send,
 } from 'lucide-react';
 import { WorkspaceFile } from '../types';
 import { extractFilesFromZip, ZipExtractionResult } from '../utils/codeParser';
@@ -47,6 +53,7 @@ interface CodeEditorProps {
   onImportZip?: (importedFiles: WorkspaceFile[], projectName?: string) => void;
   onExportZip?: () => void;
   onResetProject?: () => void;
+  onRequestAiImprovement?: (prompt: string, targetFilePath?: string) => void;
 }
 
 // フォルダツリー構造の型定義
@@ -72,6 +79,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onImportZip,
   onExportZip,
   onResetProject,
+  onRequestAiImprovement,
 }) => {
   const [newFileName, setNewFileName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -84,6 +92,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+
+  // みきへのコード改善依頼モーダル状態
+  const [isAiImproveModalOpen, setIsAiImproveModalOpen] = useState(false);
+  const [customImprovePrompt, setCustomImprovePrompt] = useState('');
 
   // コード内検索
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -525,6 +537,18 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         </button>
 
         <div className="flex items-center gap-1.5">
+          {/* モバイル用 みきに改善を頼むボタン */}
+          {onRequestAiImprovement && activeFile && (
+            <button
+              onClick={() => setIsAiImproveModalOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-xs font-bold shadow-xs active:scale-95 transition-all"
+              title="みきにコード改善を依頼"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+              <span>改善</span>
+            </button>
+          )}
+
           <button
             onClick={() => zipInputRef.current?.click()}
             className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold border border-slate-700 active:scale-95 transition-all"
@@ -752,6 +776,20 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               <Type className="w-3 h-3 inline mr-0.5" />
               {fontSize.toUpperCase()}
             </button>
+
+            {/* ✨ みきに改善を頼むボタン */}
+            {onRequestAiImprovement && activeFile && (
+              <button
+                type="button"
+                onClick={() => setIsAiImproveModalOpen(true)}
+                className="flex items-center gap-1.5 text-xs text-purple-200 hover:text-white px-2.5 py-1 rounded bg-gradient-to-r from-purple-600/90 to-indigo-600/90 hover:from-purple-500 hover:to-indigo-500 border border-purple-400/40 shadow-xs shadow-purple-500/20 active:scale-95 transition-all cursor-pointer font-medium"
+                title={`「${activeFile.name}」の改善・修正・機能追加をみきに依頼`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
+                <span className="hidden sm:inline">みきに改善を頼む</span>
+                <span className="sm:hidden">改善</span>
+              </button>
+            )}
 
             {/* コピーボタン */}
             <button
@@ -987,6 +1025,214 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>全置換でインポート</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* ✨ みきにコード改善を依頼 モーダル */}
+      {/* ======================================================== */}
+      {isAiImproveModalOpen && activeFile && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-purple-500/40 rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
+            {/* ヘッダー */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20">
+                  <Sparkles className="w-4 h-4 text-yellow-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    みきにコード改善を頼む
+                    <span className="text-[11px] font-normal text-purple-300 bg-purple-950/60 border border-purple-800/60 px-2 py-0.5 rounded-full">
+                      AIアシスト
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    対象: <code className="text-sky-300 font-mono font-semibold">{activeFile.path}</code>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAiImproveModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="閉じる"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* クイックアクション一覧 (スクロール可能) */}
+            <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                ワンクリックで改善を依頼
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {/* 1. バグ修正 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onRequestAiImprovement) {
+                      setIsAiImproveModalOpen(false);
+                      onRequestAiImprovement(
+                        `現在のコード「${activeFile.name}」にエラーやバグ、動かない箇所がないかチェックして、確実に動くように直して！`,
+                        activeFile.path
+                      );
+                    }
+                  }}
+                  className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-800/80 hover:bg-purple-950/40 border border-slate-700/80 hover:border-purple-500/50 text-left transition-all group cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 group-hover:bg-rose-500/20 shrink-0">
+                    <Bug className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-200 group-hover:text-purple-200">
+                      🐛 バグ・不具合の修正
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                      エラーや動かない原因を特定して動くように直します
+                    </div>
+                  </div>
+                </button>
+
+                {/* 2. リファクタリング */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onRequestAiImprovement) {
+                      setIsAiImproveModalOpen(false);
+                      onRequestAiImprovement(
+                        `現在のコード「${activeFile.name}」をリファクタリングして、無駄な処理や変数を整理し、読みやすくスムーズに動くよう最適化して！`,
+                        activeFile.path
+                      );
+                    }
+                  }}
+                  className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-800/80 hover:bg-purple-950/40 border border-slate-700/80 hover:border-purple-500/50 text-left transition-all group cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 shrink-0">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-200 group-hover:text-purple-200">
+                      ⚡ 処理の最適化・整理
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                      冗長な処理を整理し、動作を軽量・高速化します
+                    </div>
+                  </div>
+                </button>
+
+                {/* 3. デザイン・UIモダン化 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onRequestAiImprovement) {
+                      setIsAiImproveModalOpen(false);
+                      onRequestAiImprovement(
+                        `現在のコード「${activeFile.name}」の見た目やUI・アニメーションを、今風でおしゃれな綺麗なデザインに改善して！`,
+                        activeFile.path
+                      );
+                    }
+                  }}
+                  className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-800/80 hover:bg-purple-950/40 border border-slate-700/80 hover:border-purple-500/50 text-left transition-all group cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-sky-500/10 text-sky-400 group-hover:bg-sky-500/20 shrink-0">
+                    <Palette className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-200 group-hover:text-purple-200">
+                      🎨 見た目・デザイン改善
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                      配色・アニメーション・UIを今風に綺麗にします
+                    </div>
+                  </div>
+                </button>
+
+                {/* 4. 新機能・演出追加 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onRequestAiImprovement) {
+                      setIsAiImproveModalOpen(false);
+                      onRequestAiImprovement(
+                        `現在のコード「${activeFile.name}」に、スコア表示や効果音、パーティクル演出などの面白い新機能を追加して！`,
+                        activeFile.path
+                      );
+                    }
+                  }}
+                  className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-800/80 hover:bg-purple-950/40 border border-slate-700/80 hover:border-purple-500/50 text-left transition-all group cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20 shrink-0">
+                    <Wand2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-200 group-hover:text-purple-200">
+                      ✨ 新機能・演出の追加
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                      エフェクトやスコアなどの新要素を追加します
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* 5. 自由入力エリア */}
+              <div className="pt-2 border-t border-slate-800 space-y-2">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  <span>自由に改善内容を入力</span>
+                  <span className="text-[10px] text-purple-400 font-normal">みきに直接相談</span>
+                </div>
+                <div className="relative">
+                  <textarea
+                    rows={2}
+                    value={customImprovePrompt}
+                    onChange={(e) => setCustomImprovePrompt(e.target.value)}
+                    placeholder={`例: 「プレイヤーのジャンプ力を高めて」「背景をもっと幻想的にして」「${activeFile.name}の解説をして」`}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-purple-500 resize-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey && customImprovePrompt.trim()) {
+                        e.preventDefault();
+                        if (onRequestAiImprovement) {
+                          setIsAiImproveModalOpen(false);
+                          onRequestAiImprovement(customImprovePrompt.trim(), activeFile.path);
+                          setCustomImprovePrompt('');
+                        }
+                      }
+                    }}
+                  />
+                  <div className="flex justify-end mt-1.5">
+                    <button
+                      type="button"
+                      disabled={!customImprovePrompt.trim()}
+                      onClick={() => {
+                        if (onRequestAiImprovement && customImprovePrompt.trim()) {
+                          setIsAiImproveModalOpen(false);
+                          onRequestAiImprovement(customImprovePrompt.trim(), activeFile.path);
+                          setCustomImprovePrompt('');
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-40 text-white rounded-lg text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
+                    >
+                      <Send className="w-3 h-3" />
+                      <span>みきに送信</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* フッター */}
+            <div className="pt-2 border-t border-slate-800/80 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsAiImproveModalOpen(false)}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                キャンセル
               </button>
             </div>
           </div>

@@ -90,11 +90,13 @@ class ContextBudgetEngineService {
 
   /**
    * B層 & C層: ターン単位の予算配分計画を計算
-   * live_budget = nCtx - maxTokens(512) - 安全マージン
+   * Qwen/Llama等のモデルカタログ仕様 (nCtx: 4096〜32768) に基づき、
+   * 会話履歴(チャット)とコード改善用コンテキスト(codeQuota)を一元的に調和配分
    */
   public calculateBudgetPlan(
     nCtxOverride?: number,
-    isComplexTask: boolean = false
+    isComplexTask: boolean = false,
+    isCodeTask: boolean = false
   ): ContextBudgetPlan {
     const baseCtx = nCtxOverride || this.currentTier;
     const maxGenerationTokens = 512;
@@ -117,22 +119,27 @@ class ContextBudgetEngineService {
       thermalReductionRatio = Math.min(thermalReductionRatio, 0.75);
     }
 
-    // 実効利用可能予算
+    // 実効利用可能予算 (Qwen等のカタログ仕様に連動)
     const rawBudget = Math.max(1024, baseCtx - maxGenerationTokens - safetyMarginTokens);
     const liveBudget = Math.floor(rawBudget * thermalReductionRatio);
 
-    // 配分優先度:
-    // ① 統合記憶 (Semantic Core / ペルソナ)
-    // ② 熱い体験 (Episodic Buffer)
-    // ③ 想起記憶 (RAG)
-    // ④ 会話履歴 (History)
-    const personaQuota = Math.floor(liveBudget * 0.25);
-    const episodicBufferQuota = Math.floor(liveBudget * 0.15);
-    const memoryRecallQuota = Math.floor(liveBudget * 0.25);
-    const historyQuota = liveBudget - personaQuota - episodicBufferQuota - memoryRecallQuota;
+    let personaQuota = Math.floor(liveBudget * 0.25);
+    let episodicBufferQuota = Math.floor(liveBudget * 0.15);
+    let memoryRecallQuota = Math.floor(liveBudget * 0.25);
+    let historyQuota = liveBudget - personaQuota - episodicBufferQuota - memoryRecallQuota;
+    let codeQuota = 0;
 
-    // 雑談時は最大8往復、重厚タスク時は4往復まで安全に縮小 (第4章1節)
-    const recentTurnsToKeep = isComplexTask || thermalReductionRatio < 0.8 ? 4 : 8;
+    if (isCodeTask) {
+      // コード改善・開発時: チャット履歴は直近ターンに圧縮し、コンテキスト枠の約50%をコード用枠に割り当て
+      codeQuota = Math.floor(liveBudget * 0.50);
+      personaQuota = Math.floor(liveBudget * 0.15);
+      episodicBufferQuota = Math.floor(liveBudget * 0.08);
+      memoryRecallQuota = Math.floor(liveBudget * 0.12);
+      historyQuota = Math.max(256, liveBudget - codeQuota - personaQuota - episodicBufferQuota - memoryRecallQuota);
+    }
+
+    // 雑談時は最大8往復、重厚タスク時は4往復、コード改善時は直近2〜3往復
+    const recentTurnsToKeep = isCodeTask ? 3 : isComplexTask || thermalReductionRatio < 0.8 ? 4 : 8;
 
     return {
       tier: this.currentTier,
@@ -141,6 +148,7 @@ class ContextBudgetEngineService {
       episodicBufferQuota,
       memoryRecallQuota,
       historyQuota,
+      codeQuota,
       headroomTokens: maxGenerationTokens + safetyMarginTokens,
       thermalReductionRatio,
       batteryReducedDepth,
