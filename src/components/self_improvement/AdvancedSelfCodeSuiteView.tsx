@@ -19,6 +19,11 @@ import {
   TrendingUp,
   Flame,
   Terminal,
+  GitBranch,
+  Map,
+  History,
+  Scissors,
+  Stethoscope,
 } from 'lucide-react';
 import {
   selfImprovementSuiteService,
@@ -29,11 +34,44 @@ import {
   PairProgrammingReview,
 } from '../../services/selfImprovementSuiteService';
 import { cognitiveDebuggerService } from '../../services/cognitiveDebuggerService';
+import {
+  aiderEngineService,
+  RepoMapResponse,
+  AutoHealResult,
+  AiderCommitRecord,
+} from '../../services/aiderEngineService';
+import { SuperchargerToolsSubView } from './SuperchargerToolsSubView';
 
 export const AdvancedSelfCodeSuiteView: React.FC = () => {
   const [selectedSubTool, setSelectedSubTool] = useState<
-    'dry_run' | 'benchmark' | 'failure_synthesis' | 'canary' | 'pair_programming'
-  >('dry_run');
+    'dry_run' | 'benchmark' | 'failure_synthesis' | 'canary' | 'pair_programming' | 'aider_engine' | 'supercharger'
+  >('supercharger');
+
+  // Aider Engine Sub-tabs
+  const [aiderSubTab, setAiderSubTab] = useState<'repo_map' | 'search_replace' | 'auto_heal' | 'commits'>('repo_map');
+  const [repoMapData, setRepoMapData] = useState<RepoMapResponse | null>(null);
+  const [isLoadingRepoMap, setIsLoadingRepoMap] = useState(false);
+
+  // Search/Replace state
+  const [searchTargetFile, setSearchTargetFile] = useState('src/autonomous_modules/chapter_31_collocation_ast_refactor.ts');
+  const [searchBlockText, setSearchBlockText] = useState(`  public evaluateCollocation(text: string): CollocationMatch[] {`);
+  const [replaceBlockText, setSearchReplaceBlockText] = useState(`  public evaluateCollocation(text: string): CollocationMatch[] {
+    // Aider-style surgical replacement verified`);
+  const [searchReplaceNotice, setSearchReplaceNotice] = useState<string | null>(null);
+  const [isApplyingDiff, setIsApplyingDiff] = useState(false);
+
+  // Auto-Heal state
+  const [autoHealInput, setAutoHealInput] = useState(`export class BrokenModule {
+  public testMethod() {
+    const value = 42;
+    // Missing closing brace`);
+  const [autoHealResult, setAutoHealResult] = useState<AutoHealResult | null>(null);
+  const [isHealing, setIsHealing] = useState(false);
+
+  // Commits & Rollback state
+  const [commitsList, setCommitsList] = useState<AiderCommitRecord[]>([]);
+  const [commitMsgInput, setCommitMsgInput] = useState('feat(autonomous): apply invariant-verified patch');
+  const [rollbackNotice, setRollbackNotice] = useState<string | null>(null);
 
   // 1. Dry Run state
   const [dryRunCode, setDryRunCode] = useState<string>(`export interface DataProcessor {
@@ -154,10 +192,79 @@ export class SafeDataProcessor implements DataProcessor {
     setTimeout(() => setReviewStatusNotice(null), 5000);
   };
 
+  // Aider Engine Handlers
+  const handleFetchRepoMap = async () => {
+    setIsLoadingRepoMap(true);
+    try {
+      const data = await aiderEngineService.fetchRepoMap();
+      setRepoMapData(data);
+    } finally {
+      setIsLoadingRepoMap(false);
+    }
+  };
+
+  const handleApplySearchReplace = async () => {
+    setIsApplyingDiff(true);
+    try {
+      const res = await aiderEngineService.applySearchReplace(searchTargetFile, searchBlockText, replaceBlockText);
+      if (res.success) {
+        setSearchReplaceNotice(`✅ ${res.diffSummary}`);
+        await handleFetchCommits();
+      } else {
+        setSearchReplaceNotice(`❌ エラー: ${res.error}`);
+      }
+    } finally {
+      setIsApplyingDiff(false);
+      setTimeout(() => setSearchReplaceNotice(null), 6000);
+    }
+  };
+
+  const handleRunAutoHeal = async () => {
+    setIsHealing(true);
+    try {
+      const res = await aiderEngineService.autoHealCode(autoHealInput, 'auto_heal_test.ts');
+      setAutoHealResult(res);
+      if (res.healed) {
+        setAutoHealInput(res.cleanCode);
+      }
+    } finally {
+      setIsHealing(false);
+    }
+  };
+
+  const handleFetchCommits = async () => {
+    const list = await aiderEngineService.fetchCommits();
+    setCommitsList(list);
+  };
+
+  const handleCreateCommit = async () => {
+    if (!commitMsgInput.trim()) return;
+    const res = await aiderEngineService.createCommit(commitMsgInput, [searchTargetFile]);
+    if (res) {
+      await handleFetchCommits();
+      setRollbackNotice(`コミット [${res.hash}] を安全に記録しました。`);
+      setTimeout(() => setRollbackNotice(null), 4000);
+    }
+  };
+
+  const handleRollbackCommit = async (hash: string) => {
+    const res = await aiderEngineService.rollbackCommit(hash);
+    setRollbackNotice(res.message);
+    await handleFetchCommits();
+    setTimeout(() => setRollbackNotice(null), 5000);
+  };
+
+  useEffect(() => {
+    if (selectedSubTool === 'aider_engine') {
+      if (!repoMapData) handleFetchRepoMap();
+      handleFetchCommits();
+    }
+  }, [selectedSubTool]);
+
   return (
     <div className="space-y-6">
-      {/* 5大機能切り替えタブバー */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 p-1.5 bg-slate-950/80 border border-slate-800 rounded-2xl">
+      {/* 6大機能切り替えタブバー (Aider統合) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 p-1.5 bg-slate-950/80 border border-slate-800 rounded-2xl">
         <button
           onClick={() => setSelectedSubTool('dry_run')}
           className={`px-3 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all ${
@@ -167,7 +274,7 @@ export class SafeDataProcessor implements DataProcessor {
           }`}
         >
           <Code2 className="w-3.5 h-3.5 text-indigo-300" />
-          1. Dry-Run 構文検証
+          1. Dry-Run 検証
         </button>
 
         <button
@@ -179,7 +286,7 @@ export class SafeDataProcessor implements DataProcessor {
           }`}
         >
           <Gauge className="w-3.5 h-3.5 text-amber-300" />
-          2. 性能ベンチマーク
+          2. 性能ベンチ
         </button>
 
         <button
@@ -191,7 +298,7 @@ export class SafeDataProcessor implements DataProcessor {
           }`}
         >
           <Zap className="w-3.5 h-3.5 text-rose-300" />
-          3. 弱点克服コード生成
+          3. 弱点克服生成
         </button>
 
         <button
@@ -203,7 +310,7 @@ export class SafeDataProcessor implements DataProcessor {
           }`}
         >
           <ShieldCheck className="w-3.5 h-3.5 text-cyan-300" />
-          4. カナリア段階配備
+          4. カナリア配備
         </button>
 
         <button
@@ -215,7 +322,31 @@ export class SafeDataProcessor implements DataProcessor {
           }`}
         >
           <MessageSquare className="w-3.5 h-3.5 text-purple-300" />
-          5. 対話ペアプロ相談
+          5. 対話ペアプロ
+        </button>
+
+        <button
+          onClick={() => setSelectedSubTool('aider_engine')}
+          className={`px-3 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all ${
+            selectedSubTool === 'aider_engine'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+          }`}
+        >
+          <GitBranch className="w-3.5 h-3.5 text-teal-300" />
+          6. Aider 統合
+        </button>
+
+        <button
+          onClick={() => setSelectedSubTool('supercharger')}
+          className={`px-3 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all col-span-2 md:col-span-3 lg:col-span-6 ${
+            selectedSubTool === 'supercharger'
+              ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20'
+              : 'text-purple-300 hover:text-white bg-purple-950/40 border border-purple-800/50 hover:bg-purple-900/50'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-pink-300" />
+          🚀 超進化5大エンジン (評議会 / TDDテスト / ナレッジ / 不要コード掃討 / Prompt-to-Patch)
         </button>
       </div>
 
@@ -663,6 +794,262 @@ export class SafeDataProcessor implements DataProcessor {
           </div>
         </div>
       )}
+
+      {/* ── 6. Aider 統合エンジン (Repo Map / 差分置換 / 自動修復 / Gitコミット) ── */}
+      {selectedSubTool === 'aider_engine' && (
+        <div className="p-5 bg-slate-900/60 border border-slate-800 rounded-2xl space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <GitBranch className="w-4 h-4 text-teal-400" />
+                Aider 統合エンジン（Repo Map / 差分置換 / 自動自己修復 / Gitコミット）
+              </h3>
+              <p className="text-xs text-slate-400">
+                世界最高峰のAIペアプログラミング「Aider」のコア機構（AST構文地図・Search/Replace差分・エラー自動修復・アトミックコミット）をみきの自己改善OSへ完全統合。
+              </p>
+            </div>
+
+            {/* Aider内部サブタブ */}
+            <div className="flex items-center gap-1 bg-slate-950 p-1 border border-slate-800 rounded-xl text-xs">
+              <button
+                onClick={() => setAiderSubTab('repo_map')}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                  aiderSubTab === 'repo_map' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🗺️ Repo Map
+              </button>
+              <button
+                onClick={() => setAiderSubTab('search_replace')}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                  aiderSubTab === 'search_replace' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                ✂️ 差分置換 (Diff)
+              </button>
+              <button
+                onClick={() => setAiderSubTab('auto_heal')}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                  aiderSubTab === 'auto_heal' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🩺 自己修復ループ
+              </button>
+              <button
+                onClick={() => setAiderSubTab('commits')}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                  aiderSubTab === 'commits' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                📜 Git履歴 &amp; 復元
+              </button>
+            </div>
+          </div>
+
+          {rollbackNotice && (
+            <div className="p-3 bg-teal-950/60 border border-teal-500/50 rounded-xl text-teal-300 text-xs font-bold">
+              {rollbackNotice}
+            </div>
+          )}
+
+          {/* 6-1: Repo Map */}
+          {aiderSubTab === 'repo_map' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300 font-semibold">
+                  AST走査結果: {repoMapData ? `${repoMapData.scannedFilesCount} ファイル / ${repoMapData.totalSymbolsCount} シンボル抽出` : '走査待機中'}
+                </span>
+                <button
+                  onClick={handleFetchRepoMap}
+                  disabled={isLoadingRepoMap}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl flex items-center gap-1.5 transition-all"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isLoadingRepoMap ? 'animate-spin' : ''}`} />
+                  <span>Repo Map 再走査</span>
+                </button>
+              </div>
+
+              <pre className="p-4 bg-slate-950 border border-slate-800 rounded-xl font-mono text-[11px] text-teal-300 max-h-96 overflow-y-auto leading-relaxed">
+                {repoMapData ? repoMapData.formattedRepoMap : 'Repo Map を読み込み中...'}
+              </pre>
+            </div>
+          )}
+
+          {/* 6-2: Search/Replace ブロック差分置換 */}
+          {aiderSubTab === 'search_replace' && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">対象ファイルパス:</label>
+                <input
+                  type="text"
+                  value={searchTargetFile}
+                  onChange={(e) => setSearchTargetFile(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 font-mono focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-rose-300 font-mono">&lt;&lt;&lt;&lt;&lt;&lt;&lt; SEARCH (置換対象の既存行)</label>
+                  <textarea
+                    value={searchBlockText}
+                    onChange={(e) => setSearchBlockText(e.target.value)}
+                    className="w-full h-44 p-3 bg-slate-950 font-mono text-xs text-rose-300 border border-slate-800 rounded-xl focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-emerald-300 font-mono">======= REPLACE (新しい置換行)</label>
+                  <textarea
+                    value={replaceBlockText}
+                    onChange={(e) => setSearchReplaceBlockText(e.target.value)}
+                    className="w-full h-44 p-3 bg-slate-950 font-mono text-xs text-emerald-300 border border-slate-800 rounded-xl focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {searchReplaceNotice && (
+                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-slate-200">
+                  {searchReplaceNotice}
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleApplySearchReplace}
+                  disabled={isApplyingDiff}
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                >
+                  <Scissors className="w-3.5 h-3.5" />
+                  <span>Aider Search/Replace を適用</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 6-3: 自動エラー自己修復ループ */}
+          {aiderSubTab === 'auto_heal' && (
+            <div className="space-y-3">
+              <p className="text-xs text-slate-400">
+                コード生成時に構文エラーや閉じ括弧漏れを検知した場合、Aiderのようにエラーメッセージを読み解き、最大3回自動で修復ループを回します。
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">エラーを含む可能性のあるコード:</label>
+                  <textarea
+                    value={autoHealInput}
+                    onChange={(e) => setAutoHealInput(e.target.value)}
+                    className="w-full h-52 p-3 bg-slate-950 font-mono text-xs text-amber-300 border border-slate-800 rounded-xl focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">自己修復ループの実行ログ:</label>
+                  <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl h-52 overflow-y-auto space-y-2 text-xs font-mono">
+                    {autoHealResult ? (
+                      <div>
+                        <div className="text-emerald-400 font-bold mb-2">
+                          {autoHealResult.healed ? '🎉 自己修復ループ成功 (構文エラー 0件に補正完了)' : '⚠️ 修復完了できませんでした'}
+                        </div>
+                        {autoHealResult.repairHistory.map((h, idx) => (
+                          <div key={idx} className="p-2 bg-slate-900 rounded mb-1 text-[11px]">
+                            <div className="text-rose-400">試行 {h.attempt}: {h.error}</div>
+                            <div className="text-cyan-300 mt-0.5">↳ 適用補正: {h.fixApplied}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-slate-500 text-center pt-16">
+                        「自己修復ループを実行」を押すと、診断と自動補正の履歴が表示されます。
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleRunAutoHeal}
+                  disabled={isHealing}
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                >
+                  <Stethoscope className="w-3.5 h-3.5" />
+                  <span>自己修復ループを実行</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 6-4: Gitコミット履歴 & ロールバック */}
+          {aiderSubTab === 'commits' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
+                <div className="text-xs font-bold text-slate-200">新規アトミックGitコミットの作成</div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={commitMsgInput}
+                    onChange={(e) => setCommitMsgInput(e.target.value)}
+                    placeholder="コミットメッセージを入力"
+                    className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleCreateCommit}
+                    className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl shadow active:scale-95 transition-all"
+                  >
+                    コミット記録
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-slate-300">コミット履歴タイムライン (Aider Timeline):</div>
+                {commitsList.length > 0 ? (
+                  <div className="divide-y divide-slate-800 border border-slate-800 bg-slate-950 rounded-xl">
+                    {commitsList.map((c) => (
+                      <div key={c.hash} className="p-3 flex items-center justify-between text-xs">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 bg-teal-950 border border-teal-800 text-teal-300 font-mono text-[10px] rounded">
+                              {c.hash}
+                            </span>
+                            <span className="font-semibold text-slate-200">{c.message}</span>
+                            {c.status === 'ROLLED_BACK' && (
+                              <span className="px-2 py-0.5 bg-rose-950 border border-rose-800 text-rose-300 text-[10px] rounded">
+                                ロールバック済み
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-500">
+                            {new Date(c.timestamp).toLocaleString()} | 対象: {c.files.join(', ')}
+                          </div>
+                        </div>
+
+                        {c.status !== 'ROLLED_BACK' && (
+                          <button
+                            onClick={() => handleRollbackCommit(c.hash)}
+                            className="px-3 py-1 bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 text-xs font-semibold rounded-lg flex items-center gap-1 transition-all"
+                          >
+                            <Undo2 className="w-3 h-3" />
+                            <span>1秒ロールバック</span>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-slate-500 text-xs border border-slate-800 bg-slate-950 rounded-xl">
+                    コミット履歴はまだありません。「コミット記録」または差分置換を行うと自動で記録されます。
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 7. 超進化5大ツール ── */}
+      {selectedSubTool === 'supercharger' && <SuperchargerToolsSubView />}
     </div>
   );
 };

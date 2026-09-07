@@ -696,6 +696,18 @@ export const chapter${chapterNumber}AutonomousInstance = new Chapter${chapterNum
 
       if (res.ok) {
         systemLogger.info('SELF_IMPROVEMENT', `📁 [実体コード物理保存] src/autonomous_modules/chapter_${chapterNumber}.ts をプロジェクトに書き込みました。ZIPエクスポートに同梱されます。`);
+        try {
+          await fetch('/api/aider/commit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: `feat(autonomous): 第${chapterNumber}章『${title}』実体モジュール自動生成`,
+              files: [`src/autonomous_modules/chapter_${chapterNumber}.ts`],
+            }),
+          });
+        } catch {
+          // Aider commit optional fail-open
+        }
         return true;
       }
       return false;
