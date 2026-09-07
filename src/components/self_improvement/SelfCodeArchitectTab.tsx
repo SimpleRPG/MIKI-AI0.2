@@ -52,6 +52,7 @@ import { proactiveContextOsService } from '../../services/proactiveContextOsServ
 import { digitalResearchNoteService } from '../../services/digitalResearchNoteService';
 import { cognitiveDebuggerService } from '../../services/cognitiveDebuggerService';
 import { codebaseReflectionService, ImprovementRecipe } from '../../services/codebaseReflectionService';
+import { AdvancedSelfCodeSuiteView } from './AdvancedSelfCodeSuiteView';
 
 export interface LiveLogItem {
   id: string;
@@ -76,7 +77,7 @@ export interface LiveDiffPreview {
 
 export const SelfCodeArchitectTab: React.FC = () => {
   const [activeView, setActiveView] = useState<
-    'roadmap' | 'completed' | 'proposals' | 'invariants' | 'chap28' | 'advanced_services' | 'code_reflection'
+    'roadmap' | 'completed' | 'proposals' | 'invariants' | 'chap28' | 'advanced_services' | 'code_reflection' | 'advanced_suite'
   >('roadmap');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -814,6 +815,17 @@ export const SelfCodeArchitectTab: React.FC = () => {
           >
             <Layers className="w-3.5 h-3.5 text-indigo-300" />
             コード自己理解＆改善レシピ
+          </button>
+          <button
+            onClick={() => setActiveView('advanced_suite')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+              activeView === 'advanced_suite'
+                ? 'bg-gradient-to-r from-pink-600 to-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-pink-300" />
+            自律進化5大ツール群 (DryRun/ベンチ/弱点克服/カナリア/ペアプロ)
           </button>
         </div>
 
@@ -1961,6 +1973,9 @@ export const SelfCodeArchitectTab: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ── 設計思想 自律進化5大ツール群 (DryRun/ベンチ/弱点克服/カナリア/ペアプロ) ── */}
+      {activeView === 'advanced_suite' && <AdvancedSelfCodeSuiteView />}
     </div>
   );
 };

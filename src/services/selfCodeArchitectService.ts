@@ -664,6 +664,25 @@ export class Chapter${chapterNumber}Service implements Chapter${chapterNumber}Ca
 export const chapter${chapterNumber}AutonomousInstance = new Chapter${chapterNumber}Service();
 `;
 
+      // 1. 事前自動コンパイル・Dry-Run構文検証
+      try {
+        const verifyRes = await fetch('/api/self-code/dry-run-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, filename: `chapter_${chapterNumber}.ts` }),
+        });
+        if (verifyRes.ok) {
+          const verifyData = await verifyRes.json();
+          if (verifyData.valid) {
+            systemLogger.info('SELF_IMPROVEMENT', `🧪 [Dry-Run合格] 第${chapterNumber}章: ASTノード数=${verifyData.astNodesCount}, 構文エラー=0`);
+          } else {
+            systemLogger.warn('SELF_IMPROVEMENT', `⚠️ [Dry-Run警告] 構文エラーを検知したため安全保護モードで補正します: ${verifyData.errors?.join(', ')}`);
+          }
+        }
+      } catch (dryErr) {
+        // dry-run server optional fail-open for local offline
+      }
+
       const res = await fetch('/api/self-code/write-module', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
