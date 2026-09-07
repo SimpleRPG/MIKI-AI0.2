@@ -120,6 +120,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
   const [liveDiff, setLiveDiff] = useState<LiveDiffPreview | null>(null);
   const [liveActiveChapter, setLiveActiveChapter] = useState<SpecificationChapterMeta | null>(null);
   const liveLogsEndRef = useRef<HTMLDivElement | null>(null);
+  const stopBatchRef = useRef<boolean>(false);
 
   // 第28章 サブシステム用ステート
   const [driftResult, setDriftResult] = useState<TeacherDriftCheckResult | null>(() =>
@@ -364,27 +365,41 @@ export const SelfCodeArchitectTab: React.FC = () => {
     runRealtimeChapterCycle(nextChapter);
   };
 
-  const handleBatchImprovement = async (count: number = 3) => {
-    const targets = unimplementedChapters.slice(0, count);
+  const handleBatchImprovement = async (count?: number) => {
+    const targets = count ? unimplementedChapters.slice(0, count) : [...unimplementedChapters];
     if (targets.length === 0) {
-      setActionNotice('すべての仕様書章が完全実装済みです！');
+      setActionNotice('すべての設計思想指示書が完全実装済みです！');
       setTimeout(() => setActionNotice(null), 4000);
       return;
     }
+    stopBatchRef.current = false;
     setIsAutoImproving(true);
     setIsLiveMonitorOpen(true);
-    addLiveLog(`🔥 【連続自律改善開始】最優先 ${targets.length} 章のリアルタイム連続改善を執行します`, 'purple');
+    const label = count ? `${count}章連続改善` : `全${targets.length}章一括完遂`;
+    addLiveLog(`🔥 【自律改善パイプライン始動: ${label}】全170章適合に向けて自律改善を開始します`, 'purple');
+
+    let completedInRun = 0;
     for (let i = 0; i < targets.length; i++) {
+      if (stopBatchRef.current) {
+        addLiveLog(`⏸️ [一時停止] ユーザーにより自律改善が安全に中断されました (${completedInRun}/${targets.length}章完了)`, 'warn');
+        break;
+      }
       const t = targets[i];
-      addLiveLog(`▶️ [バッチ進行 ${i + 1}/${targets.length}] 第${t.chapterNumber}章『${t.title}』に着手`, 'info');
+      addLiveLog(`▶️ [進行 ${i + 1}/${targets.length}] 第${t.chapterNumber}章『${t.title}』に着手`, 'info');
       await runRealtimeChapterCycle(t);
-      if (i < targets.length - 1) {
-        await new Promise((r) => setTimeout(r, 800));
+      completedInRun++;
+      if (i < targets.length - 1 && !stopBatchRef.current) {
+        await new Promise((r) => setTimeout(r, 600));
       }
     }
     const finalAudit = selfCodeArchitectService.getLatestAudit()!;
-    addLiveLog(`🏁 [全バッチ改善完了] ${targets.length}章の適用が正常終了しました (最終適合率: ${finalAudit.complianceScore.toFixed(1)}%)`, 'success');
+    addLiveLog(`🏁 [自律改善セッション終了] ${completedInRun}章の適用が正常完了しました (最新仕様適合率: ${finalAudit.complianceScore.toFixed(1)}%)`, 'success');
     setIsAutoImproving(false);
+  };
+
+  const handleStopBatch = () => {
+    stopBatchRef.current = true;
+    addLiveLog('🛑 [中断要求] 自律改善の停止シグナルを受け付けました。現在の章が完了次第安全に停止します...', 'warn');
   };
 
   return (
@@ -801,16 +816,39 @@ export const SelfCodeArchitectTab: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleBatchImprovement(3)}
-            disabled={isAutoImproving || isAuditing}
-            className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
-            title="未実装の最優先章を3章まとめて連続自律改善し、仕様適合率を大幅に引き上げます"
-          >
-            <Zap className={`w-3.5 h-3.5 ${isAutoImproving ? 'animate-bounce' : ''}`} />
-            3章まとめて改善
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {isAutoImproving ? (
+            <button
+              onClick={handleStopBatch}
+              className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-1.5 transition-all active:scale-95 animate-pulse"
+              title="実行中の章が完了次第、自律改善ループを安全に一時停止します"
+            >
+              <Pause className="w-3.5 h-3.5 text-white" />
+              自律改善を一時停止
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => handleBatchImprovement()}
+                disabled={isAuditing || unimplementedChapters.length === 0}
+                className="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+                title="未実装のすべての仕様書章を全自動で順番に自律改善し、100%完全適合を目指します"
+              >
+                <Layers className="w-3.5 h-3.5 text-purple-200" />
+                全章フル自律完遂 ({unimplementedChapters.length}章)
+              </button>
+
+              <button
+                onClick={() => handleBatchImprovement(3)}
+                disabled={isAuditing || unimplementedChapters.length === 0}
+                className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+                title="未実装の最優先章を3章まとめて連続自律改善し、仕様適合率を大幅に引き上げます"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                3章まとめて改善
+              </button>
+            </>
+          )}
 
           <button
             onClick={handleAutonomousMikiImprovement}
