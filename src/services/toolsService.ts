@@ -1127,12 +1127,12 @@ export class ToolsService {
         case 'tool_autonomous_self_improvement': {
           const batchCount = typeof params.batchCount === 'number' ? params.batchCount : 1;
           if (batchCount > 1) {
-            const batchRes = selfCodeArchitectService.runBatchAutonomousImprovement(batchCount);
+            const batchRes = await selfCodeArchitectService.runBatchAutonomousImprovement(batchCount);
             execResult = batchRes;
             outputSummary = `✨ 連続自律改善完了: ${batchRes.completedCount}章を一括適合 (スコア: ${batchRes.initialScore}点 ➔ ${batchRes.finalScore}点)`;
           } else {
             const targetChapter = typeof params.targetChapter === 'number' ? params.targetChapter : undefined;
-            const improveRes = selfCodeArchitectService.runAutonomousImprovementCycle(targetChapter);
+            const improveRes = await selfCodeArchitectService.runAutonomousImprovementCycle(targetChapter);
             execResult = improveRes;
             outputSummary = improveRes.success
               ? `✨ 自律アプリ改善完了: 第${improveRes.targetChapter.chapterNumber}章『${improveRes.targetChapter.title}』を安全に改善・反映しました (スコア: ${improveRes.auditResult.complianceScore}点)`

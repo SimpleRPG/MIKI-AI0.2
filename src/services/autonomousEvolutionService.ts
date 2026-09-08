@@ -172,7 +172,7 @@ export class AutonomousEvolutionService {
       const appliedProposals: SelfImprovementProposal[] = [];
 
       try {
-        const autoImprovementResult = selfCodeArchitectService.runAutonomousImprovementCycle();
+        const autoImprovementResult = await selfCodeArchitectService.runAutonomousImprovementCycle();
         if (autoImprovementResult.success && autoImprovementResult.proposal) {
           selfCodeImprovementRun = 1;
           selfCodeImprovementSummaryText = `第${autoImprovementResult.targetChapter.chapterNumber}章「${autoImprovementResult.targetChapter.title}」の仕様適合（スコア${autoImprovementResult.auditResult.complianceScore}点へ改善）`;

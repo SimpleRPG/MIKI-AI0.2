@@ -2712,6 +2712,15 @@ export interface SelfImprovementProposal {
     safetyPreserved: boolean;
     details: string;
   };
+  prompt?: string;
+  targetFile?: string;
+  appliedResult?: {
+    success: boolean;
+    commitHash?: string;
+    linesCount?: number;
+    isRequirementImplemented?: boolean;
+    generationMethod?: string;
+  };
 }
 
 // ==========================================

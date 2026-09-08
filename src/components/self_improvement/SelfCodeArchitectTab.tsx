@@ -30,6 +30,7 @@ import {
   Radio,
   ChevronDown,
   ChevronUp,
+  Loader2,
 } from 'lucide-react';
 import {
   SpecificationChapterMeta,
@@ -95,6 +96,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
   const [selectedChapter, setSelectedChapter] = useState<SpecificationChapterMeta | null>(null);
   const [isAuditing, setIsAuditing] = useState(false);
   const [isAutoImproving, setIsAutoImproving] = useState(false);
+  const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   // ── リアルタイム自己コード改善 ライブモニター用ステート ──
@@ -270,21 +272,40 @@ export const SelfCodeArchitectTab: React.FC = () => {
   };
 
   const handleApply = async (proposalId: string) => {
-    const prop = selfCodeArchitectService.getProposals().find((p) => p.id === proposalId);
-    const success = selfCodeArchitectService.applyProposal(proposalId);
-    if (success) {
-      if (prop) {
-        await selfCodeArchitectService.saveModuleFileToServer(
-          prop.targetChapterNumber,
-          prop.codeSnippet,
-          prop.invariantsCheckPassed,
-          prop.expectedScoreImprovement
-        );
+    setApplyingProposalId(proposalId);
+    setActionNotice(`改善提案 [${proposalId}] の本実装・適用パイプラインを実行中... (本体ローカルLLM優先 / 教師支援)`);
+    try {
+      const prop = selfCodeArchitectService.getProposals().find((p) => p.id === proposalId);
+      const success = await selfCodeArchitectService.applyProposal(proposalId);
+      if (success) {
+        if (prop) {
+          await selfCodeArchitectService.saveModuleFileToServer(
+            prop.targetChapterNumber,
+            prop.codeSnippet,
+            prop.invariantsCheckPassed,
+            prop.expectedScoreImprovement
+          );
+        }
+        setProposals([...selfCodeArchitectService.getProposals()]);
+        setAuditResult(selfCodeArchitectService.getLatestAudit()!);
+        const updatedProp = selfCodeArchitectService.getProposals().find((p) => p.id === proposalId);
+        const methodDesc =
+          updatedProp?.generationMethod === 'llm_local'
+            ? '本体ローカルLLM自力実装'
+            : updatedProp?.generationMethod === 'teacher_assisted_template'
+            ? '教師支援テンプレート獲得 (本体実装待ち)'
+            : updatedProp?.generationMethod === 'fallback_template'
+            ? '雛形スタブ合成'
+            : '適用完了';
+        setActionNotice(`改善提案 [${proposalId}] を適用しました (${methodDesc})。`);
+      } else {
+        setActionNotice(`改善提案 [${proposalId}] の適用が保留または安全チェックにより見送られました。`);
       }
-      setProposals([...selfCodeArchitectService.getProposals()]);
-      setAuditResult(selfCodeArchitectService.getLatestAudit()!);
-      setActionNotice(`改善提案 [${proposalId}] を適用し、実体モジュールを同期しました。`);
-      setTimeout(() => setActionNotice(null), 4000);
+    } catch (e: any) {
+      setActionNotice(`適用エラー: ${e?.message || '不明なエラー'}`);
+    } finally {
+      setApplyingProposalId(null);
+      setTimeout(() => setActionNotice(null), 5000);
     }
   };
 
@@ -1236,19 +1257,40 @@ export const SelfCodeArchitectTab: React.FC = () => {
                       </span>
                       <h4 className="font-bold text-slate-100 text-sm">{prop.title}</h4>
                     </div>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        prop.status === 'APPLIED'
-                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                          : prop.status === 'SIMULATED'
-                          ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
-                          : prop.status === 'ROLLED_BACK'
-                          ? 'bg-rose-950 text-rose-300 border border-rose-800'
-                          : 'bg-amber-950 text-amber-300 border border-amber-800'
-                      }`}
-                    >
-                      {prop.status}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {prop.generationMethod && (
+                        <span
+                          className={`px-2 py-0.5 rounded text-[9px] font-bold border flex items-center gap-1 ${
+                            prop.generationMethod === 'llm_local'
+                              ? 'bg-purple-950/80 text-purple-300 border-purple-800'
+                              : prop.generationMethod === 'teacher_assisted_template'
+                              ? 'bg-amber-950/80 text-amber-300 border-amber-800'
+                              : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          {prop.generationMethod === 'llm_local' && <Brain className="w-2.5 h-2.5 text-purple-400" />}
+                          {prop.generationMethod === 'teacher_assisted_template' && <GraduationCap className="w-2.5 h-2.5 text-amber-400" />}
+                          {prop.generationMethod === 'llm_local'
+                            ? '本体ローカルLLM'
+                            : prop.generationMethod === 'teacher_assisted_template'
+                            ? '教師支援テンプレート'
+                            : '雛形スタブ'}
+                        </span>
+                      )}
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          prop.status === 'APPLIED'
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                            : prop.status === 'SIMULATED'
+                            ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                            : prop.status === 'ROLLED_BACK'
+                            ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                            : 'bg-amber-950 text-amber-300 border border-amber-800'
+                        }`}
+                      >
+                        {prop.status}
+                      </span>
+                    </div>
                   </div>
 
                   <p className="text-xs text-slate-300 leading-relaxed">{prop.description || prop.contract.objective}</p>
@@ -1351,21 +1393,38 @@ export const SelfCodeArchitectTab: React.FC = () => {
                     {prop.status === 'SIMULATED' && (
                       <button
                         onClick={() => handleApply(prop.id)}
-                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+                        disabled={applyingProposalId === prop.id}
+                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800/60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95"
                       >
-                        <Check className="w-3.5 h-3.5" />
-                        安全合格: 正式反映を適用
+                        {applyingProposalId === prop.id ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            実装パイプライン実行中...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            安全合格: 正式反映を適用
+                          </>
+                        )}
                       </button>
                     )}
 
                     {prop.status === 'APPLIED' && (
-                      <button
-                        onClick={() => handleRollback(prop.id)}
-                        className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        ロールバック実行
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {prop.appliedResult?.commitHash && (
+                          <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                            commit: {prop.appliedResult.commitHash}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => handleRollback(prop.id)}
+                          className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          ロールバック実行
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2007,19 +2066,36 @@ export const SelfCodeArchitectTab: React.FC = () => {
                   </div>
 
                   <button
-                    onClick={() => {
-                      const res = selfCodeArchitectService.runAutonomousImprovementCycle(activeRecipe.chapterNumber);
-                      setAuditResult(res.auditResult);
-                      setProposals(selfCodeArchitectService.getProposals());
-                      handleSynthesizeRecipe(activeRecipe.chapterNumber);
-                      setActionNotice(res.summary);
-                      setTimeout(() => setActionNotice(null), 6000);
+                    onClick={async () => {
+                      setIsAutoImproving(true);
+                      setActionNotice(`第${activeRecipe.chapterNumber}章の自律改善サイクルを実行中...`);
+                      try {
+                        const res = await selfCodeArchitectService.runAutonomousImprovementCycle(activeRecipe.chapterNumber);
+                        setAuditResult(res.auditResult);
+                        setProposals(selfCodeArchitectService.getProposals());
+                        handleSynthesizeRecipe(activeRecipe.chapterNumber);
+                        setActionNotice(res.summary);
+                      } catch (err: any) {
+                        setActionNotice(`自律改善エラー: ${err?.message || '不明なエラー'}`);
+                      } finally {
+                        setIsAutoImproving(false);
+                        setTimeout(() => setActionNotice(null), 6000);
+                      }
                     }}
                     disabled={isAutoImproving}
                     className="w-full py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    このレシピで自律改善を実行＆同期
+                    {isAutoImproving ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        自律改善を実行中...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        このレシピで自律改善を実行＆同期
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

@@ -34,6 +34,7 @@ import { specAstParserService } from './specAstParserService';
 import { formalProofService, SkillContract } from './formalProofService';
 import { sandboxPermissionService } from './sandboxPermissionService';
 import { privacyGuardrailService } from './privacyGuardrailService';
+import { mikiSelfCodingSuperchargerService } from './mikiSelfCodingSuperchargerService';
 
 
 import { FULL_SPECIFICATION_REGISTRY } from '../data/specificationRegistryData';
@@ -377,12 +378,23 @@ export class SelfCodeArchitectService {
     const chapter = this.getChapterByNumber(targetChapterNum);
     const changeId = `chg_${targetChapterNum}_${Date.now().toString(36)}`;
 
+    // 第5回指示書: 対象章のkeyRequirementsからrunAutonomousImplementationに渡すプロンプトと対象ファイル候補を組み立て
+    const reqList = chapter?.keyRequirements && chapter.keyRequirements.length > 0
+      ? chapter.keyRequirements.join(' / ')
+      : (chapter?.summary || '仕様適合モジュール構築');
+    const implementationPrompt = `第${targetChapterNum}章『${chapter?.title ?? '自律コード改善'}』の仕様要件適合モジュール構築: ${reqList}`;
+    const targetFileHint =
+      (chapter?.responsibleServices && chapter.responsibleServices[0]) ||
+      (chapter?.responsibleComponents && chapter.responsibleComponents[0]) ||
+      `src/autonomous_modules/chapter_${targetChapterNum}.ts`;
+
     // 変更契約（Change Contract）
     const contract: ChangeContract = {
       changeId,
       objective: `第${targetChapterNum}章 (${chapter?.title ?? '指定章'}) の仕様書要件に適合させるための安全な自己改善。`,
       targetChapterNumber: targetChapterNum,
       allowedFiles: [
+        targetFileHint,
         'src/services/userProficiencyService.ts',
         'src/services/samplingTuningService.ts',
         'src/services/conversationStateService.ts',
@@ -410,7 +422,7 @@ export class SelfCodeArchitectService {
       targetChapterNumber: targetChapterNum,
       title: `[第${targetChapterNum}章] ${chapter?.title ?? '自律コード改善'} の仕様適合提案`,
       contract,
-      proposalLayer: targetChapterNum === 28 ? 'CONVERSATION_SKELETON' : 'CONFIG',
+      proposalLayer: targetChapterNum === 28 ? 'CONVERSATION_SKELETON' : 'CODE_ARCHITECTURE',
       description: `設計思想指示書 第${targetChapterNum}章の要件を満たすため、安全な変更契約に基づきパラメータおよび処理パイプラインのチューニングを実施します。不変条件5項目に違反がないことを検証済みです。`,
       dslCommands: [
         'VERIFY_INVARIANTS_STRICT',
@@ -421,6 +433,8 @@ export class SelfCodeArchitectService {
       expectedScoreImprovement: Math.max(1, Math.round((1 / SPECIFICATION_REGISTRY.length) * 100)),
       invariantsCheckPassed: invariants.allPassed,
       status: 'PROPOSED',
+      prompt: implementationPrompt,
+      targetFile: targetFileHint,
       simulatedDelta: {
         complianceDelta: Math.max(1, Math.round((1 / SPECIFICATION_REGISTRY.length) * 100)),
         safetyPreserved: invariants.allPassed,
@@ -466,9 +480,9 @@ export class SelfCodeArchitectService {
   }
 
   /**
-   * 改善提案を正式反映（正式反映 - 第29.2章・第29.4章）
+   * 改善提案を正式反映（正式反映 - 第29.2章・第29.4章 & 第5回指示書: 共通実装パイプラインへ接続）
    */
-  public applyProposal(proposalId: string): boolean {
+  public async applyProposal(proposalId: string): Promise<boolean> {
     const proposal = this.proposals.find((p) => p.id === proposalId);
     if (!proposal) return false;
 
@@ -477,12 +491,62 @@ export class SelfCodeArchitectService {
       return false;
     }
 
+    // ── 第5回指示書: 共通実装パイプライン (mikiSelfCodingSuperchargerService.runAutonomousImplementation) ──
+    const targetChapter = this.getChapterByNumber(proposal.targetChapterNumber);
+    const prompt =
+      proposal.prompt ||
+      `第${proposal.targetChapterNumber}章『${targetChapter?.title ?? '自律コード改善'}』の仕様要件適合モジュール構築: ${targetChapter?.keyRequirements?.join(' / ') || targetChapter?.summary || '仕様要件実装'}`;
+    const targetFileHint =
+      proposal.targetFile ||
+      (targetChapter?.responsibleServices && targetChapter.responsibleServices[0]) ||
+      (targetChapter?.responsibleComponents && targetChapter.responsibleComponents[0]) ||
+      `src/autonomous_modules/chapter_${proposal.targetChapterNumber}.ts`;
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `[個別提案適用パイプライン開始] 第${proposal.targetChapterNumber}章: ${prompt.slice(0, 60)} -> ${targetFileHint}`
+    );
+
+    let implResult;
+    try {
+      implResult = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
+        prompt,
+        targetFileHint,
+        true // 物理書き込み & コミットを実行
+      );
+    } catch (implErr: any) {
+      systemLogger.error('SELF_IMPROVEMENT', `[個別提案適用エラー] 実装パイプライン実行例外: ${implErr?.message}`);
+      return false;
+    }
+
+    // 返ってきた SelfImplementationResult の各フィールドを proposal に反映
+    proposal.generationMethod = implResult.generationMethod as any;
+    if (implResult.teacherAssisted) {
+      proposal.teacherAssisted = {
+        templateAcquired: implResult.teacherAssisted.templateAcquired,
+        skillId: implResult.teacherAssisted.skillId,
+        rules: implResult.teacherAssisted.rules,
+        skeletonTemplate: implResult.teacherAssisted.skeletonTemplate,
+      };
+    }
+    proposal.codeSnippet = implResult.code;
+    proposal.appliedResult = {
+      success: implResult.applied,
+      commitHash: implResult.commitHash,
+      linesCount: implResult.linesCount,
+      isRequirementImplemented: implResult.isRequirementImplemented,
+      generationMethod: implResult.generationMethod,
+    };
+
     proposal.status = 'APPLIED';
     
-    // 対象章のステータスを進行（第3回・第4回指示書: COMPLETEDは本体ローカルLLMまたは明示的overrideのみ）
+    // 対象章のステータスを進行（第3回・第4回・第5回指示書: COMPLETEDは本体ローカルLLMまたは明示的overrideのみ）
     const targetMeta = SPECIFICATION_REGISTRY.find((c) => c.chapterNumber === proposal.targetChapterNumber);
     if (targetMeta && targetMeta.status !== 'COMPLETED') {
-      const isLocalOrOverride = proposal.generationMethod === 'llm_local' || proposal.generationMethod === 'override';
+      const isLocalOrOverride =
+        (proposal.generationMethod === 'llm_local' || proposal.generationMethod === 'override') &&
+        (implResult.isRequirementImplemented ?? false);
+
       if (isLocalOrOverride) {
         targetMeta.status = 'COMPLETED';
       } else if (proposal.generationMethod === 'teacher_assisted_template' || proposal.teacherAssisted?.templateAcquired) {
@@ -502,7 +566,7 @@ export class SelfCodeArchitectService {
     }
 
     // 各章に応じた実体処理を実行（機能・パラメータの最適化と記録）
-    this.executeConcreteChapterImprovement(proposal.targetChapterNumber, proposal);
+    await this.executeConcreteChapterImprovement(proposal.targetChapterNumber, proposal);
 
     this.saveCompletedChapters();
     this.saveProposals();
@@ -510,7 +574,10 @@ export class SelfCodeArchitectService {
     // 監査を再実行してスコアを更新
     this.runSelfCodeAudit();
 
-    systemLogger.info('SELF_IMPROVEMENT', `🎉 [第29章 正式反映] 提案 ${proposal.title} が自己改善コントロールプレーンにより安全に適用されました。`);
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🎉 [第29章 正式反映] 提案 ${proposal.title} が自己改善コントロールプレーンにより安全に適用されました (Method: ${proposal.generationMethod || 'unknown'}, Status: ${targetMeta?.status || 'N/A'}, Commit: ${implResult.commitHash || 'N/A'})。`
+    );
     return true;
   }
 
@@ -519,13 +586,13 @@ export class SelfCodeArchitectService {
    * みき自身が仕様書とコードの差分（ドリフト）を監査し、不変条件を守りながら
    * 改善提案の策定・シミュレーション・安全適用までを一貫して自律実行する。
    */
-  public runAutonomousImprovementCycle(targetChapterNum?: number): {
+  public async runAutonomousImprovementCycle(targetChapterNum?: number): Promise<{
     success: boolean;
     proposal?: SelfImprovementProposal;
     auditResult: SelfCodeAuditResult;
     summary: string;
     targetChapter: SpecificationChapterMeta;
-  } {
+  }> {
     systemLogger.info('SELF_IMPROVEMENT', '🤖 [自律自己改善] みきによる自律コード・仕様適合サイクルを開始します');
 
     // 1. 監査を実行して現状を把握
@@ -581,8 +648,8 @@ export class SelfCodeArchitectService {
       };
     }
 
-    // 6. 正式適用 (内部で executeConcreteChapterImprovement を実行)
-    const applied = this.applyProposal(proposal.id);
+    // 6. 正式適用 (内部で mikiSelfCodingSuperchargerService.runAutonomousImplementation を実行)
+    const applied = await this.applyProposal(proposal.id);
 
     // 7. 最新の監査結果を取得
     const updatedAudit = this.runSelfCodeAudit();
@@ -951,13 +1018,13 @@ export const chapter${chapterNumber}AutonomousInstance = new Chapter${chapterNum
    * みき連続自律改善（Streak / Batch Autonomous Improvement）
    * 複数の未実装章を順次自律改善し、不変条件を守りながら仕様書適合率を一気に引き上げる。
    */
-  public runBatchAutonomousImprovement(maxCount: number = 3): {
+  public async runBatchAutonomousImprovement(maxCount: number = 3): Promise<{
     completedCount: number;
     improvedChapters: SpecificationChapterMeta[];
     initialScore: number;
     finalScore: number;
     summary: string;
-  } {
+  }> {
     const initialAudit = this.runSelfCodeAudit();
     const initialScore = initialAudit.complianceScore;
     const improvedChapters: SpecificationChapterMeta[] = [];
@@ -969,7 +1036,7 @@ export const chapter${chapterNumber}AutonomousInstance = new Chapter${chapterNum
 
       const target = SPECIFICATION_REGISTRY.find((c) => c.chapterNumber === chapNum && c.status !== 'COMPLETED');
       if (target) {
-        const result = this.runAutonomousImprovementCycle(chapNum);
+        const result = await this.runAutonomousImprovementCycle(chapNum);
         if (result.success) {
           improvedChapters.push(target);
         }
@@ -981,7 +1048,7 @@ export const chapter${chapterNumber}AutonomousInstance = new Chapter${chapterNum
       const remainingUnimplemented = this.getUnimplementedChapters();
       for (const target of remainingUnimplemented) {
         if (improvedChapters.length >= maxCount) break;
-        const result = this.runAutonomousImprovementCycle(target.chapterNumber);
+        const result = await this.runAutonomousImprovementCycle(target.chapterNumber);
         if (result.success) {
           improvedChapters.push(target);
         }

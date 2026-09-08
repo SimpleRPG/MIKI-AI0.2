@@ -88,8 +88,10 @@ export function generateSmartCompanionReply(
   const isSelfImprovementIntent =
     /(自分で.*(改善|直して|進めて|アプリ)|アプリ.*(改善|自己改善)|仕様書.*(実装|適合|進めて)|自律.*改善|未実装.*(実装|改善)|自己改善して)/i.test(p);
   if (isSelfImprovementIntent) {
-    const result = selfCodeArchitectService.runAutonomousImprovementCycle();
-    return `うん、わかった！私が自分でアプリの改善を進めたよ！任せて！🛠️✨\n\n${result.summary}\n\nこれからも仕様書の未実装要件やドリフトを自律的に見つけて、Qwen 3B保護やプライバシーなどの不変条件を100%守りながら安全に自己改善していくね！😊💪`;
+    void selfCodeArchitectService.runAutonomousImprovementCycle().catch((err) => {
+      console.warn('Autonomous improvement background error:', err);
+    });
+    return `うん、わかった！私が自分でアプリの改善を進めるね！任せて！🛠️✨\n\n仕様書の未実装要件やドリフトを自律的に見つけて、Qwen 3B保護やプライバシー境界などの不変条件を守りながら、安全に自律実装パイプライン（ローカルLLM/教師支援）を実行中だよ！進捗は「自己改善ラボ」タブで確認できるよ！😊💪`;
   }
 
   // 0.07 設計思想 第29章: 自己コード監査・仕様整合性チェック
