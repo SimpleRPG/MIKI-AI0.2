@@ -141,10 +141,10 @@ export interface SelfImplementationResult {
   commitHash: string;
   applied: boolean;
   syntaxCheckPassed: boolean;
-  syntaxError: string | null;
+  syntaxError?: string | null;
   reasoning: string;
   code: string;
-  generationMethod?: 'llm_local' | 'llm_gemini' | 'teacher_assisted_template' | 'fallback_template' | 'override' | 'llm';
+  generationMethod?: 'llm_local' | 'llm_gemini' | 'teacher_assisted_template' | 'fallback_template' | 'override' | 'llm' | 'virtual_sandbox';
   isRequirementImplemented?: boolean;
   teacherAssisted?: {
     templateAcquired: boolean;

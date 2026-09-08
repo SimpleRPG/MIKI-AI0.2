@@ -60,6 +60,7 @@ import {
   History,
   RefreshCw,
   Bot,
+  Terminal,
 } from 'lucide-react';
 import {
   ChatMessage,
@@ -236,6 +237,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isSelfImplementLauncherOpen, setIsSelfImplementLauncherOpen] = useState(false);
   const [isAutonomousImprovementModalOpen, setIsAutonomousImprovementModalOpen] = useState(false);
   const [autonomousVerifications, setAutonomousVerifications] = useState<Record<string, AutonomousVerificationData>>({});
+  const [expandedExternalDiagMsgId, setExpandedExternalDiagMsgId] = useState<string | null>(null);
 
   // 設計思想 第35/54章: みきの先回りインサイト・気配りバー状態
   const [proactiveInsights, setProactiveInsights] = useState<ProactiveInsightItem[]>(() =>
@@ -1261,6 +1263,38 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       </button>
                     )}
 
+                    {/* 外部ローカルLLM 推論遅延・TTFT・キャッシュ診断バッジ */}
+                    {msg.externalLlmDiagnostic && (
+                      <button
+                        onClick={() =>
+                          setExpandedExternalDiagMsgId(
+                            expandedExternalDiagMsgId === msg.id ? null : msg.id
+                          )
+                        }
+                        className={`text-[10px] px-2 py-0.5 rounded-lg font-mono flex items-center gap-1 transition-all border ${
+                          expandedExternalDiagMsgId === msg.id
+                            ? 'bg-indigo-900 text-indigo-100 border-indigo-400 shadow-sm'
+                            : msg.externalLlmDiagnostic.comparisonWithPrevious?.verdict === 'cache_hit'
+                            ? 'bg-emerald-950/90 hover:bg-emerald-900 text-emerald-300 border-emerald-700/80'
+                            : msg.externalLlmDiagnostic.comparisonWithPrevious?.verdict === 'no_cache'
+                            ? 'bg-rose-950/90 hover:bg-rose-900 text-rose-300 border-rose-700/80'
+                            : 'bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border-indigo-800/80'
+                        }`}
+                        title="外部LLMのStage A〜E遅延細分化、TTFT実測、KVキャッシュ判定を展開"
+                      >
+                        <Terminal className="w-3 h-3 text-indigo-400" />
+                        <span>
+                          外部LLM診断 (TTFT: {msg.externalLlmDiagnostic.observedTtftMs}ms
+                          {msg.externalLlmDiagnostic.comparisonWithPrevious?.verdict === 'cache_hit' ? ' / ⚡Hit' : ''})
+                        </span>
+                        {expandedExternalDiagMsgId === msg.id ? (
+                          <ChevronUp className="w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3" />
+                        )}
+                      </button>
+                    )}
+
                     {/* Used Memories (RAG) Badge */}
                     {msg.usedMemories && msg.usedMemories.length > 0 && (
                       <div className="flex items-center gap-1 bg-purple-950/60 border border-purple-800/60 px-2 py-0.5 rounded-lg text-[9.5px] text-purple-300 font-mono" title={msg.usedMemories.map((m) => `・${m.content}`).join('\n')}>
@@ -1607,6 +1641,145 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 外部ローカルLLM Stage A〜E 遅延細分化＆TTFT診断ドロワー */}
+                {!isUser && expandedExternalDiagMsgId === msg.id && msg.externalLlmDiagnostic && (
+                  <div className="w-full bg-slate-950/95 border border-indigo-500/40 rounded-xl p-3 my-1.5 text-xs space-y-3 shadow-xl animate-fadeIn">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-indigo-900/40 text-[11px]">
+                      <div className="flex items-center gap-1.5 text-indigo-200 font-bold">
+                        <Terminal className="w-4 h-4 text-indigo-400" />
+                        <span>外部ローカルLLM 推論遅延細分化・TTFT・KVキャッシュ診断</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-950 border border-indigo-800 text-indigo-300">
+                          #{msg.externalLlmDiagnostic.queryNumber}回目
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 font-mono text-[10px]">
+                        <span className="text-slate-400">
+                          {msg.externalLlmDiagnostic.model} ({msg.externalLlmDiagnostic.endpoint})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const diag = msg.externalLlmDiagnostic!;
+                            const textSummary = `【外部ローカルLLM推論遅延 診断結果】
+実行回数: #${diag.queryNumber} (${diag.timestamp})
+モデル: ${diag.model} (${diag.endpoint})
+スロットID: ${diag.slotId !== undefined ? diag.slotId : '自動'}
+・Stage A (MIKI-AI内部処理): ${diag.stageTimings.stageA_preFetchMs}ms
+・Stage B (HTTP接続応答): ${diag.stageTimings.stageB_httpConnectMs}ms
+・Stage C/D (実測TTFT初回トークン): ${diag.observedTtftMs}ms (Prefillのみ: ${diag.stageTimings.stageD_prefillOnlyMs}ms)
+・Stage E (ストリーミング生成): ${diag.stageTimings.stageE_streamMs}ms (${diag.tokensGenerated} tok, ${diag.tokensPerSec} tok/s)
+・総所要時間: ${diag.stageTimings.totalElapsedMs}ms
+【プロンプト構成】
+・全体: ${diag.promptStats.charsTotal}文字 (~${diag.promptStats.estimatedTokens}トークン)
+・Systemプロンプト: ${diag.promptStats.charsCombinedSystem}文字 (静的: ${diag.promptStats.charsStaticPrefix}文字, 動的: ${diag.promptStats.charsDynamicContext}文字 / ${diag.promptStats.dynamicElementsCount}要素)
+・履歴: ${diag.promptStats.charsHistory}文字 (${diag.promptStats.historyMessageCount}件)
+・ユーザー入力: ${diag.promptStats.charsUser}文字
+【タイムアウト・コールドスタート】
+・初回タイムアウト: ${diag.timeoutStats.initialTimeoutMs}ms (前回学習TTFT: ${diag.timeoutStats.learnedTtftBeforeMs ?? 'なし'}, コールド判定: ${diag.timeoutStats.isColdStart})
+${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comparisonWithPrevious.explanation}` : ''}`;
+                            navigator.clipboard.writeText(textSummary);
+                            alert('外部LLM診断サマリーをクリップボードにコピーしました！');
+                          }}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded flex items-center gap-1 border border-slate-700"
+                        >
+                          <Copy className="w-2.5 h-2.5" />
+                          <span>診断コピー</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Stage A〜E 遅延ブレークダウン */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 font-mono text-[11px]">
+                      <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                        <div className="text-[9.5px] text-slate-400">Stage A (内部処理)</div>
+                        <div className="text-sm font-bold text-sky-400">+{msg.externalLlmDiagnostic.stageTimings.stageA_preFetchMs}ms</div>
+                        <div className="text-[9px] text-slate-500 truncate">想起・状態・骨格</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                        <div className="text-[9.5px] text-slate-400">Stage B (HTTP接続)</div>
+                        <div className="text-sm font-bold text-indigo-400">+{msg.externalLlmDiagnostic.stageTimings.stageB_httpConnectMs}ms</div>
+                        <div className="text-[9px] text-slate-500 truncate">HTTP 200受信</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-900 border border-indigo-700/60 bg-indigo-950/30">
+                        <div className="text-[9.5px] text-indigo-300 font-bold">Stage C/D (TTFT)</div>
+                        <div className="text-base font-bold text-amber-300">{msg.externalLlmDiagnostic.observedTtftMs}ms</div>
+                        <div className="text-[9px] text-amber-400/80">Prefill: +{msg.externalLlmDiagnostic.stageTimings.stageD_prefillOnlyMs}ms</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                        <div className="text-[9.5px] text-slate-400">Stage E (ストリーム)</div>
+                        <div className="text-sm font-bold text-emerald-400">+{msg.externalLlmDiagnostic.stageTimings.stageE_streamMs}ms</div>
+                        <div className="text-[9px] text-slate-500">{msg.externalLlmDiagnostic.tokensGenerated}tok ({msg.externalLlmDiagnostic.tokensPerSec} t/s)</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 col-span-2 sm:col-span-1">
+                        <div className="text-[9.5px] text-slate-400">Total (全工程)</div>
+                        <div className="text-sm font-bold text-slate-200">{msg.externalLlmDiagnostic.stageTimings.totalElapsedMs}ms</div>
+                        <div className="text-[9px] text-slate-500">スロット: {msg.externalLlmDiagnostic.slotId !== undefined ? `Slot ${msg.externalLlmDiagnostic.slotId}` : '自動'}</div>
+                      </div>
+                    </div>
+
+                    {/* 連続実行TTFT比較判定結果バナー (2回目のキャッシュ短縮確認) */}
+                    {msg.externalLlmDiagnostic.comparisonWithPrevious && (
+                      <div
+                        className={`p-2.5 rounded-lg border text-xs leading-relaxed ${
+                          msg.externalLlmDiagnostic.comparisonWithPrevious.verdict === 'cache_hit'
+                            ? 'bg-emerald-950/60 border-emerald-500/60 text-emerald-200'
+                            : msg.externalLlmDiagnostic.comparisonWithPrevious.verdict === 'no_cache'
+                            ? 'bg-rose-950/60 border-rose-500/60 text-rose-200'
+                            : 'bg-indigo-950/60 border-indigo-500/60 text-indigo-200'
+                        }`}
+                      >
+                        <div className="font-bold flex items-center gap-1.5 text-[11px] mb-1">
+                          {msg.externalLlmDiagnostic.comparisonWithPrevious.verdict === 'cache_hit' ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                          )}
+                          <span>連続実行TTFT比較診断 (#1 ➔ #{msg.externalLlmDiagnostic.queryNumber})</span>
+                        </div>
+                        <p className="text-[11px] font-sans">
+                          {msg.externalLlmDiagnostic.comparisonWithPrevious.explanation}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* プロンプト文字数・トークン詳細内訳 */}
+                    <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1.5 font-mono text-[10.5px]">
+                      <div className="font-sans font-bold text-slate-300 text-[11px] flex items-center justify-between">
+                        <span>📝 送信プロンプト (chatContext) の詳細構造</span>
+                        <span className="text-indigo-300">
+                          全体: {msg.externalLlmDiagnostic.promptStats.charsTotal}文字 (~{msg.externalLlmDiagnostic.promptStats.estimatedTokens} トークン)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-slate-300">
+                        <div className="bg-slate-950 p-2 rounded border border-slate-800/80">
+                          <div className="text-[10px] text-slate-400">Systemプロンプト</div>
+                          <div className="font-bold text-sky-300">{msg.externalLlmDiagnostic.promptStats.charsCombinedSystem} 文字</div>
+                          <div className="text-[9px] text-slate-500">静的: {msg.externalLlmDiagnostic.promptStats.charsStaticPrefix}字 / 動的: {msg.externalLlmDiagnostic.promptStats.charsDynamicContext}字 ({msg.externalLlmDiagnostic.promptStats.dynamicElementsCount}要素)</div>
+                        </div>
+                        <div className="bg-slate-950 p-2 rounded border border-slate-800/80">
+                          <div className="text-[10px] text-slate-400">会話履歴コンテキスト</div>
+                          <div className="font-bold text-amber-300">{msg.externalLlmDiagnostic.promptStats.charsHistory} 文字</div>
+                          <div className="text-[9px] text-slate-500">{msg.externalLlmDiagnostic.promptStats.historyMessageCount} 件の対話ターン</div>
+                        </div>
+                        <div className="bg-slate-950 p-2 rounded border border-slate-800/80">
+                          <div className="text-[10px] text-slate-400">今回ユーザー入力</div>
+                          <div className="font-bold text-emerald-300">{msg.externalLlmDiagnostic.promptStats.charsUser} 文字</div>
+                          <div className="text-[9px] text-slate-500">直近プロンプト (添付含)</div>
+                        </div>
+                      </div>
+                      <div className="pt-1 text-[10px] text-slate-400 font-sans flex items-center justify-between flex-wrap gap-1">
+                        <span>
+                          ⏱️ 初回タイムアウト: <strong>{msg.externalLlmDiagnostic.timeoutStats.initialTimeoutMs}ms</strong>
+                          {msg.externalLlmDiagnostic.timeoutStats.learnedTtftBeforeMs != null ? ` (前回学習TTFT: ${msg.externalLlmDiagnostic.timeoutStats.learnedTtftBeforeMs}ms)` : ' (初回デフォルト)'}
+                        </span>
+                        <span>
+                          コールドスタート判定: <strong className={msg.externalLlmDiagnostic.timeoutStats.isColdStart ? 'text-amber-400' : 'text-emerald-400'}>{msg.externalLlmDiagnostic.timeoutStats.isColdStart ? 'あり (モデル再ロード待機)' : 'なし (ウォーム状態)'}</strong>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}

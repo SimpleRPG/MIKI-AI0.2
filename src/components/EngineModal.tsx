@@ -2425,6 +2425,22 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                       <option value="ollama">Ollama (標準ポート 11434)</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">
+                      スロット固定 (KVキャッシュ維持)
+                    </label>
+                    <select
+                      value={externalLlmConfig.slotId !== undefined ? externalLlmConfig.slotId : 0}
+                      onChange={(e) => setExternalLlmConfig({ ...externalLlmConfig, slotId: Number(e.target.value) })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                    >
+                      <option value={0}>Slot 0 (推奨: キャッシュ分散を防ぎ25s遅延を解消)</option>
+                      <option value={1}>Slot 1</option>
+                      <option value={2}>Slot 2</option>
+                      <option value={3}>Slot 3</option>
+                      <option value={-1}>自動割当 (スロット指定なし)</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* 接続テスト実行ボタン & 結果診断バナー */}
@@ -2437,6 +2453,22 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                   >
                     <Activity className={`w-3.5 h-3.5 ${isTestingExternal ? 'animate-spin' : ''}`} />
                     <span>{isTestingExternal ? '接続診断中...' : '📡 接続テスト & 診断'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      nativeLlmService.resetDiagnostics();
+                      systemLogger.resetAllDiagnostics();
+                      setExternalTestResult({
+                        success: true,
+                        message: '外部LLM診断・学習TTFT・キャッシュ判定ログをリセットしました。次回は完全初期状態から計測されます。',
+                      });
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                    <span>診断・TTFT学習リセット</span>
                   </button>
 
                   <button

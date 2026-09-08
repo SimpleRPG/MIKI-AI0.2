@@ -1919,12 +1919,47 @@ export default function App() {
       }
       chatContext.push({ role: 'user', content: userPromptContent });
 
+      // 作業指示1: chatContext全体の文字数・推定トークン数・System/履歴/ユーザーの内訳を送信直前に詳細ログ出力
+      const charsCombinedSystem = combinedSystemPrompt.length;
+      const charsStaticPrefix = staticPrefix.length;
+      const charsDynamicContext = dynamicElements.length > 0 ? dynamicElements.join('\n\n').length : 0;
+      const charsHistory = historyCandidates.reduce((acc, m) => acc + (m.content?.length || 0), 0);
+      const charsUser = userPromptContent.length;
+      const charsTotal = chatContext.reduce((acc, m) => acc + (m.content?.length || 0), 0);
+      const estimatedTokens = Math.round(charsTotal / 1.5);
+
+      const promptStats = {
+        charsTotal,
+        charsCombinedSystem,
+        charsStaticPrefix,
+        charsDynamicContext,
+        dynamicElementsCount: dynamicElements.length,
+        charsHistory,
+        historyMessageCount: historyCandidates.length,
+        charsUser,
+        estimatedTokens,
+      };
+
+      systemLogger.info(
+        'EXTERNAL_GPU',
+        `🔍 [chatContext 送信直前サイズ解析] 全体: ${charsTotal}文字 (~${estimatedTokens} tok) | System: ${charsCombinedSystem}字 (静的: ${charsStaticPrefix}字, 動的: ${charsDynamicContext}字) | 履歴: ${historyCandidates.length}件 (${charsHistory}字) | ユーザー: ${charsUser}字`,
+        {
+          promptStats,
+          systemBreakdown: {
+            staticPrefixLength: charsStaticPrefix,
+            dynamicElementsCount: dynamicElements.length,
+            dynamicPreview: dynamicElements.map((el, i) => `[#${i + 1}] ${el.slice(0, 50)}... (${el.length}字)`),
+          },
+        }
+      );
+
       let accumulated = '';
       let tokenCount = 0;
       let firstTokenTime: number | null = null;
       let webGpuSuccess = false;
       let webGpuErrorDetails: string | null = null;
       let diagnosticData: ChatMessage['fallbackDiagnostic'] = undefined;
+      let capturedExternalDiag: any = undefined;
       let executedEngineLabel = 'CPUルールベース';
 
       // Step 8: Hardware GPU / WebGPU / External LLM Execution
@@ -2006,10 +2041,27 @@ export default function App() {
         }
 
         try {
+          const stageA_preFetchMs = Math.round(performance.now() - tStart);
           for await (const chunk of nativeLlmService.streamExternalLocalLlm(extConfig, chatContext, {
             temperature: promptAnalysis.temperature,
             signal: abortController.signal,
             cachePrompt: true,
+            slotId: extConfig.slotId ?? 0,
+            stageA_preFetchMs,
+            promptStats,
+            onDiagnosticRecorded: (diag) => {
+              capturedExternalDiag = diag;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantId
+                    ? {
+                        ...msg,
+                        externalLlmDiagnostic: diag,
+                      }
+                    : msg
+                )
+              );
+            },
           })) {
             if (abortController.signal.aborted) break;
             if (firstTokenTime === null) firstTokenTime = performance.now();
@@ -2618,6 +2670,7 @@ export default function App() {
                 executedTools: promptBuildResult.executedTools,
                 draftVerification: draftVerificationData,
                 autonomousSearch: autonomousSearchData,
+                externalLlmDiagnostic: capturedExternalDiag,
               }
             : msg
         )

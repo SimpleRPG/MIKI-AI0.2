@@ -6,6 +6,7 @@ import { OFFICIAL_GGUF_MODELS, getManifestDefaultConfig, getManifestNativeEnv } 
 import { storageService } from './storageService';
 import { contextBudgetEngineService } from './contextBudgetEngineService';
 import { samplingTuningService } from './samplingTuningService';
+import { ExternalLlmRunDiagnostic } from '../types';
 
 export interface NativeGpuInfo {
   available: boolean;
@@ -38,6 +39,7 @@ export interface ExternalLocalLlmConfig {
   endpoint: string; // e.g. http://localhost:11434 (Ollama) or http://localhost:1234/v1 (LM Studio)
   model: string;
   type: 'ollama' | 'openai_compatible';
+  slotId?: number; // 明示的スロットID (0..n)。固定することでn_slots>1環境でのキャッシュ分散を防止 (-1はサーバー自動割当)
 }
 
 export interface NativeLlmProgressEvent {
@@ -195,9 +197,57 @@ export class NativeLlmService {
   // 直近に観測した「初回チャンクまでの実測時間(TTFT)」。実測値をもとに
   // 次回以降のタイムアウトを自動調整するために保持する(移動平均)。
   private lastExternalLlmTtftMs: number | null = null;
+  // 外部ローカルLLMの実行履歴（直近20件）。同一セッション内での1回目・2回目のTTFT比較やKVキャッシュ効果判定に使用。
+  private externalLlmRunHistory: ExternalLlmRunDiagnostic[] = [];
+  private sessionQueryCounter: number = 0;
 
   constructor() {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedHistory = storageService.getItem('miki_external_llm_run_history');
+        if (savedHistory) {
+          this.externalLlmRunHistory = JSON.parse(savedHistory);
+        }
+      } catch {
+        this.externalLlmRunHistory = [];
+      }
+    }
     this.checkPlatform();
+  }
+
+  /**
+   * 外部ローカルLLM診断の実行履歴を取得する
+   */
+  public getExternalLlmRunHistory(): ExternalLlmRunDiagnostic[] {
+    return [...this.externalLlmRunHistory];
+  }
+
+  /**
+   * 直近の外部ローカルLLM実行診断結果を取得する
+   */
+  public getLastExternalLlmRun(): ExternalLlmRunDiagnostic | null {
+    return this.externalLlmRunHistory.length > 0
+      ? this.externalLlmRunHistory[this.externalLlmRunHistory.length - 1]
+      : null;
+  }
+
+  /**
+   * 診断ログ・学習TTFT・キャッシュ履歴を新品状態にリセットする
+   */
+  public resetDiagnostics(): void {
+    this.lastExternalLlmWarmAt = 0;
+    this.lastExternalLlmTtftMs = null;
+    this.sessionQueryCounter = 0;
+    this.externalLlmRunHistory = [];
+    if (typeof window !== 'undefined') {
+      try {
+        storageService.removeItem('miki_external_llm_run_history');
+      } catch {}
+    }
+    systemLogger.info(
+      'EXTERNAL_GPU',
+      '🧹 [外部LLM診断リセット完了] TTFT学習値・キャッシュ履歴・ステージ計測データを新品状態に初期化しました。次回送信はコールドスタート・初回計測として扱われます。'
+    );
   }
 
   private async checkPlatform(): Promise<boolean> {
@@ -550,6 +600,22 @@ export class NativeLlmService {
     }
   }
 
+  public async *chatStream(
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+    options?: { temperature?: number; top_p?: number; max_tokens?: number }
+  ): AsyncGenerator<string, void, unknown> {
+    const extConfig = this.getActiveExternalConfig();
+    if (extConfig && extConfig.endpoint) {
+      for await (const chunk of this.streamExternalLocalLlm(extConfig, messages, options)) {
+        yield chunk;
+      }
+    } else {
+      for await (const chunk of this.streamNativeChat(messages, options)) {
+        yield chunk;
+      }
+    }
+  }
+
   public async *streamNativeChat(
     messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
     options?: { temperature?: number; top_p?: number; max_tokens?: number }
@@ -710,21 +776,42 @@ export class NativeLlmService {
       cachePrompt?: boolean;
       slotId?: number;
       ttl?: number;
+      stageA_preFetchMs?: number;
+      promptStats?: ExternalLlmRunDiagnostic['promptStats'];
+      onDiagnosticRecorded?: (diag: ExternalLlmRunDiagnostic) => void;
     }
   ): AsyncGenerator<string, void, unknown> {
     const endpoint = config.endpoint.replace(/\/$/, '');
     const activeTtlSeconds = options?.ttl ?? contextBudgetEngineService.getVariableTtlSeconds();
-    systemLogger.info('EXTERNAL_GPU', `🖥️ 外部ローカルLLMサーバー (${endpoint}) に接続推論中 (TTL: ${activeTtlSeconds}s)...`);
 
-    // 自動調整タイムアウト:
-    // ・実測TTFT(初回チャンクまでの時間)を学習しておき、次回以降はその実測値に
-    //   安全マージンを掛けた時間を初回タイムアウトとして使う(端末の実速度に自動追従)。
+    // 1. プロンプト統計 (文字数・推定トークン数) の算出と事前ログ出力
+    const promptStats: ExternalLlmRunDiagnostic['promptStats'] = options?.promptStats || (() => {
+      const sys = messages.find((m) => m.role === 'system')?.content || '';
+      const hist = messages.filter((m, i) => m.role !== 'system' && i < messages.length - 1);
+      const user = messages[messages.length - 1]?.role === 'user' ? messages[messages.length - 1].content : '';
+      const charsTotal = messages.reduce((sum, m) => sum + (m.content?.length || 0), 0);
+      return {
+        charsTotal,
+        charsCombinedSystem: sys.length,
+        charsStaticPrefix: sys.length,
+        charsDynamicContext: 0,
+        dynamicElementsCount: 0,
+        charsHistory: hist.reduce((sum, m) => sum + m.content.length, 0),
+        historyMessageCount: hist.length,
+        charsUser: user.length,
+        estimatedTokens: Math.round(charsTotal / 1.5),
+      };
+    })();
+
+    systemLogger.info(
+      'EXTERNAL_GPU',
+      `🔍 [外部LLM 送信プロンプト詳細診断] 全体: ${promptStats.charsTotal}文字 (~${promptStats.estimatedTokens}トークン) | System: ${promptStats.charsCombinedSystem}字, 履歴: ${promptStats.historyMessageCount}件 (${promptStats.charsHistory}字), User: ${promptStats.charsUser}字`,
+      { promptStats, targetEndpoint: endpoint, model: config.model }
+    );
+
+    // 2. 自動調整タイムアウト:
+    // ・実測TTFT(初回チャンクまでの時間)を学習しておき、次回以降はその実測値に安全マージンを掛けた時間を初回タイムアウトとして使う。
     // ・実測データがまだ無い場合のみ、TTLベースのコールドスタート推定値を初期値にする。
-    // ・llama-swap等はTTL経過でモデルをアンロードするため、前回の成功応答から
-    //   activeTtlSeconds 以上経っている場合は「コールドスタート」とみなし、
-    //   再ロード分の時間を上乗せする。
-    // ・一度でも応答(チャンク)が来た後は、以後は「無応答が一定時間続いたら中断する」
-    //   アイドルタイムアウトに切り替える。生成が正常に続いている限り中断されない。
     const requestStartedAt = Date.now();
     const isColdStart = requestStartedAt - this.lastExternalLlmWarmAt > activeTtlSeconds * 1000;
     const learnedTtftMs = this.lastExternalLlmTtftMs;
@@ -736,8 +823,21 @@ export class NativeLlmService {
       // まだ実測データが無い初回呼び出し用のフォールバック値
       initialTimeoutMs = isColdStart ? 90000 : 30000;
     }
+
+    systemLogger.info(
+      'EXTERNAL_GPU',
+      `⏱️ [外部LLM タイムアウト学習状態] 初回タイムアウト: ${initialTimeoutMs}ms (前回実測学習TTFT: ${learnedTtftMs != null ? `${learnedTtftMs}ms` : '未学習(初回/リセット済)'} | コールドスタート判定: ${isColdStart ? 'はい (再ロード猶予+30s)' : 'いいえ (ウォーム維持)'})`
+    );
+
     const idleTimeoutMs = 20000;
     let firstChunkReceived = false;
+    let tFetchStart = performance.now();
+    let tResponseHeader = performance.now();
+    let tFirstChunk = 0;
+    let stageB_httpConnectMs = 0;
+    let stageD_prefillOnlyMs = 0;
+    let observedTtftMs = 0;
+    let totalTokensGenerated = 0;
 
     const timeoutController = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -757,16 +857,21 @@ export class NativeLlmService {
     armTimer(initialTimeoutMs, true);
 
     // チャンク受信のたびに呼ぶ共通処理:
-    // ・ウォーム状態の記録
-    // ・初回チャンクのみ、実測TTFTを移動平均で学習(次回以降のタイムアウト精度が上がる)
-    // ・アイドルタイムアウトへの切り替え
     const onChunkReceived = () => {
       this.lastExternalLlmWarmAt = Date.now();
       if (!firstChunkReceived) {
         firstChunkReceived = true;
-        const observedTtftMs = Date.now() - requestStartedAt;
+        tFirstChunk = performance.now();
+        observedTtftMs = Math.round(tFirstChunk - tFetchStart);
+        stageD_prefillOnlyMs = Math.round(tFirstChunk - tResponseHeader);
+        const prevLearned = this.lastExternalLlmTtftMs;
         this.lastExternalLlmTtftMs =
           learnedTtftMs != null ? Math.round((learnedTtftMs + observedTtftMs) / 2) : observedTtftMs;
+
+        systemLogger.info(
+          'EXTERNAL_GPU',
+          `🎯 [Stage C/D: TTFT初回トークン到達] 実測TTFT: ${observedTtftMs}ms (接続: ${stageB_httpConnectMs}ms, llama.cpp Prefill/生成: ${stageD_prefillOnlyMs}ms) | 旧学習値: ${prevLearned ?? 'なし'}ms ➔ 新学習値: ${this.lastExternalLlmTtftMs}ms`
+        );
       }
       armTimer(idleTimeoutMs, false);
     };
@@ -776,9 +881,20 @@ export class NativeLlmService {
       options.signal.addEventListener('abort', onExternalAbort, { once: true });
     }
 
+    // 3. スロットIDの明示固定判定
+    // サーバーが n_slots=4 等で稼働している場合、未指定だとリクエストごとにスロットが分散され
+    // 各スロットでKVキャッシュが毎回消滅・再計算されて25秒遅延の原因となる。
+    // options.slotId または config.slotId が指定されているか、openai_compatible の場合はデフォルトで 0 を固定。
+    const targetSlotId = options?.slotId !== undefined
+      ? options.slotId
+      : config.slotId !== undefined
+      ? config.slotId
+      : (config.type === 'openai_compatible' ? 0 : undefined);
+
     try {
       if (config.type === 'ollama') {
         const url = `${endpoint}/api/chat`;
+        tFetchStart = performance.now();
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -794,6 +910,8 @@ export class NativeLlmService {
             },
           }),
         });
+        tResponseHeader = performance.now();
+        stageB_httpConnectMs = Math.round(tResponseHeader - tFetchStart);
 
         if (!response.ok) {
           throw new Error(`Ollamaサーバー接続エラー (${response.status}): ${response.statusText}`);
@@ -817,6 +935,7 @@ export class NativeLlmService {
             try {
               const data = JSON.parse(line);
               if (data.message?.content) {
+                totalTokensGenerated++;
                 yield data.message.content;
               }
             } catch (e) {}
@@ -824,7 +943,6 @@ export class NativeLlmService {
         }
       } else {
         // OpenAI Compatible (LM Studio / llama.cpp server / llama-swap)
-        // 設計思想 Master v5.0 第5章2節: 可変TTLと cache_prompt: true の送信
         const url = `${endpoint}/v1/chat/completions`;
         let response: Response;
 
@@ -838,11 +956,18 @@ export class NativeLlmService {
           keep_alive: `${activeTtlSeconds}s`,
         };
 
-        if (typeof options?.slotId === 'number') {
-          requestBody.id_slot = options.slotId;
-          requestBody.slot_id = options.slotId;
+        if (typeof targetSlotId === 'number' && targetSlotId >= 0) {
+          requestBody.id_slot = targetSlotId;
+          requestBody.slot_id = targetSlotId;
+          systemLogger.info(
+            'EXTERNAL_GPU',
+            `📌 [スロット固定] slot_id: ${targetSlotId} / id_slot: ${targetSlotId} を指定してリクエスト (スロット分散によるキャッシュ無効化を完全抑止)`
+          );
+        } else if (targetSlotId === -1) {
+          systemLogger.info('EXTERNAL_GPU', '📌 [スロット自動] slot_idは未指定で送信 (サーバー側の自動割当に委譲)');
         }
 
+        tFetchStart = performance.now();
         try {
           response = await fetch(url, {
             method: 'POST',
@@ -859,6 +984,13 @@ export class NativeLlmService {
             `外部LLM (${url}) へのリクエストに失敗しました: ${rawMsg}。Termuxでサーバーが起動しているか確認してください。`
           );
         }
+
+        tResponseHeader = performance.now();
+        stageB_httpConnectMs = Math.round(tResponseHeader - tFetchStart);
+        systemLogger.info(
+          'EXTERNAL_GPU',
+          `⚡ [Stage B: HTTP接続応答] ステータス ${response.status} 受信完了 (+${stageB_httpConnectMs}ms)`
+        );
 
         if (!response.ok) {
           let errBody = '';
@@ -881,7 +1013,10 @@ export class NativeLlmService {
           onChunkReceived();
           const json = await response.json();
           const content = json.choices?.[0]?.message?.content || json.choices?.[0]?.text || '';
-          if (content) yield content;
+          if (content) {
+            totalTokensGenerated++;
+            yield content;
+          }
           return;
         }
 
@@ -906,12 +1041,114 @@ export class NativeLlmService {
               try {
                 const data = JSON.parse(jsonStr);
                 const delta = data.choices?.[0]?.delta?.content;
-                if (delta) yield delta;
+                if (delta) {
+                  totalTokensGenerated++;
+                  yield delta;
+                }
               } catch (e) {}
             }
           }
         }
       }
+
+      // 4. ストリーミング終了後のステージ別遅延分析・連続実行TTFT比較診断
+      const tStreamEnd = performance.now();
+      const stageE_streamMs = tFirstChunk > 0 ? Math.round(tStreamEnd - tFirstChunk) : 0;
+      const totalElapsedMs = (options?.stageA_preFetchMs ?? 0) + Math.round(tStreamEnd - tFetchStart);
+      const tokensPerSec = stageE_streamMs > 0 ? Number(((totalTokensGenerated / stageE_streamMs) * 1000).toFixed(1)) : 0;
+
+      this.sessionQueryCounter++;
+      const queryNumber = this.sessionQueryCounter;
+
+      const prevRun = this.externalLlmRunHistory.length > 0
+        ? this.externalLlmRunHistory[this.externalLlmRunHistory.length - 1]
+        : undefined;
+
+      let comparisonWithPrevious: ExternalLlmRunDiagnostic['comparisonWithPrevious'] = undefined;
+
+      if (prevRun) {
+        const diffMs = observedTtftMs - prevRun.observedTtftMs;
+        const speedupRatio = Number((prevRun.observedTtftMs / Math.max(1, observedTtftMs)).toFixed(2));
+        let verdict: 'cache_hit' | 'no_cache' | 'inconclusive' = 'inconclusive';
+        let explanation = '';
+
+        if (diffMs < -2000 || speedupRatio >= 1.5) {
+          verdict = 'cache_hit';
+          explanation = `🟢 プレフィックスKVキャッシュが有効に機能しています（前回: ${prevRun.observedTtftMs}ms ➔ 今回: ${observedTtftMs}ms、短縮: ${Math.abs(diffMs)}ms、${speedupRatio}倍高速化）。初回遅延はコールドスタートまたは初回プロンプト評価（Prefill）によるものです。`;
+        } else if (Math.abs(diffMs) <= 2000 && observedTtftMs > 10000) {
+          verdict = 'no_cache';
+          explanation = `🔴 プレフィックスKVキャッシュが無効化されているか、毎回フル再計算されています（1回目: ${prevRun.observedTtftMs}ms ➔ 2回目: ${observedTtftMs}ms）。動的コンテキストの変動、スロット分散、またはllama.cpp側のcache_prompt無効が疑われます。`;
+        } else if (diffMs > 2000) {
+          verdict = 'no_cache';
+          explanation = `⚠️ 2回目のほうが遅延しました（前回: ${prevRun.observedTtftMs}ms ➔ 今回: ${observedTtftMs}ms、差分: +${diffMs}ms）。スロット競合またはシステム負荷を再確認してください。`;
+        } else {
+          verdict = 'inconclusive';
+          explanation = `ℹ️ 比較結果: 前回 ${prevRun.observedTtftMs}ms ➔ 今回 ${observedTtftMs}ms (差分: ${diffMs}ms)`;
+        }
+
+        comparisonWithPrevious = {
+          prevRunId: prevRun.runId,
+          prevQueryNumber: prevRun.queryNumber,
+          prevTtftMs: prevRun.observedTtftMs,
+          diffMs,
+          speedupRatio,
+          verdict,
+          explanation,
+        };
+
+        systemLogger.info('EXTERNAL_GPU', `📊 [外部LLM 連続実行TTFT比較判定] ${explanation}`, {
+          comparison: comparisonWithPrevious,
+        });
+      }
+
+      const diagnosticRecord: ExternalLlmRunDiagnostic = {
+        runId: `run_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        queryNumber,
+        timestamp: new Date().toISOString(),
+        endpoint,
+        model: config.model || 'default',
+        slotId: targetSlotId,
+        promptStats,
+        timeoutStats: {
+          initialTimeoutMs,
+          learnedTtftBeforeMs: learnedTtftMs,
+          isColdStart,
+        },
+        stageTimings: {
+          stageA_preFetchMs: options?.stageA_preFetchMs ?? 0,
+          stageB_httpConnectMs,
+          stageC_D_ttftMs: observedTtftMs,
+          stageD_prefillOnlyMs,
+          stageE_streamMs,
+          totalElapsedMs,
+        },
+        observedTtftMs,
+        tokensGenerated: totalTokensGenerated,
+        tokensPerSec,
+        comparisonWithPrevious,
+      };
+
+      this.externalLlmRunHistory.push(diagnosticRecord);
+      if (this.externalLlmRunHistory.length > 20) {
+        this.externalLlmRunHistory.shift();
+      }
+      if (typeof window !== 'undefined') {
+        try {
+          storageService.setItem('miki_external_llm_run_history', JSON.stringify(this.externalLlmRunHistory.slice(-10)));
+        } catch {}
+      }
+
+      options?.onDiagnosticRecorded?.(diagnosticRecord);
+
+      systemLogger.info('EXTERNAL_GPU', `🏁 [Stage A〜E 遅延細分化サマリー]`, {
+        stageA_preFetch: `${options?.stageA_preFetchMs ?? 0}ms (MIKI-AI内部処理: プロンプト・想起・状態)`,
+        stageB_httpConnect: `${stageB_httpConnectMs}ms (HTTP接続・ヘッダー応答)`,
+        stageC_D_ttft: `${observedTtftMs}ms (TTFT初回トークン到達)`,
+        stageD_prefillOnly: `${stageD_prefillOnlyMs}ms (llama.cpp Prefill/初回生成)`,
+        stageE_stream: `${stageE_streamMs}ms (トークン生成: ${totalTokensGenerated}tok, ${tokensPerSec} tok/s)`,
+        totalElapsed: `${totalElapsedMs}ms`,
+        comparison: comparisonWithPrevious?.explanation,
+      });
     } finally {
       clearTimeout(timer);
       if (options?.signal) {

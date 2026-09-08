@@ -3444,7 +3444,7 @@ async function searchHumanWisdomCode(rawPrompt: string, language = 'typescript')
     sourceTask: cleanQuery,
     createdAt: Date.now(),
     usageCount: 1,
-    sourceType: bestSnippet.sourceType,
+    sourceType: bestSnippet.sourceType === 'web' ? 'human_wisdom_web' : (bestSnippet.sourceType as any),
     sourceUrl: bestSnippet.sourceUrl,
     sourceTitle: bestSnippet.title,
   };

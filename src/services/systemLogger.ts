@@ -257,6 +257,19 @@ class SystemLogger {
     }
   }
 
+  /**
+   * 診断ログ、推論ステップ履歴、セッションタイマーを全初期化
+   */
+  public resetAllDiagnostics() {
+    this.logs = [];
+    this.currentSessionSteps = [];
+    this.sessionStartTime = 0;
+    this.lastStepTimestamp = 0;
+    if (typeof window !== 'undefined') {
+      storageService.removeItem(this.storageKey);
+    }
+  }
+
   public exportAsFormattedText(): string {
     return this.logs
       .map((l) => {

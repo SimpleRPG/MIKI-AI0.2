@@ -729,6 +729,53 @@ export interface ChatMessage {
   // 設計思想 Master v5.0 第11章 & 第16章: 送信ガードレール & VBA静的検証
   privacyAudit?: PrivacyAuditResult;
   vbaStaticVerification?: VbaStaticVerificationResult;
+  // 外部ローカルLLM (llama.cpp / llama-swap) TTFT実測・プロンプトキャッシュ・ステージ別遅延診断
+  externalLlmDiagnostic?: ExternalLlmRunDiagnostic;
+}
+
+export interface ExternalLlmRunDiagnostic {
+  runId: string;
+  queryNumber: number; // 同一セッション内での通番 (1回目, 2回目, ...)
+  timestamp: string;
+  endpoint: string;
+  model: string;
+  slotId?: number;
+  promptStats: {
+    charsTotal: number;
+    charsCombinedSystem: number;
+    charsStaticPrefix: number;
+    charsDynamicContext: number;
+    dynamicElementsCount: number;
+    charsHistory: number;
+    historyMessageCount: number;
+    charsUser: number;
+    estimatedTokens: number;
+  };
+  timeoutStats: {
+    initialTimeoutMs: number;
+    learnedTtftBeforeMs: number | null;
+    isColdStart: boolean;
+  };
+  stageTimings: {
+    stageA_preFetchMs: number; // MIKI-AI 内部処理 (プロンプト生成・想起・状態管理)
+    stageB_httpConnectMs: number; // fetch開始から response.ok (HTTP 200) 受信まで
+    stageC_D_ttftMs: number; // fetch開始から初回チャンク受信まで (llama-swapモデルロード + llama.cpp prefill/TTFT)
+    stageD_prefillOnlyMs: number; // HTTP 200受信から初回チャンクまで (純粋なllama.cppプロンプト評価時間)
+    stageE_streamMs: number; // 初回チャンク受信からストリーム完了まで
+    totalElapsedMs: number;
+  };
+  observedTtftMs: number;
+  tokensGenerated: number;
+  tokensPerSec: number;
+  comparisonWithPrevious?: {
+    prevRunId: string;
+    prevQueryNumber: number;
+    prevTtftMs: number;
+    diffMs: number;
+    speedupRatio: number;
+    verdict: 'cache_hit' | 'no_cache' | 'inconclusive';
+    explanation: string;
+  };
 }
 
 /**
