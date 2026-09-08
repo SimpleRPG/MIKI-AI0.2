@@ -95,7 +95,7 @@ import { conversationBranchService } from '../services/conversationBranchService
 import { liveConversationRepairService } from '../services/liveConversationRepairService';
 import { whyAnswerInspectorService } from '../services/whyAnswerInspectorService';
 import { conversationTaskboardService } from '../services/conversationTaskboardService';
-import { proactiveContextOsService } from '../services/proactiveContextOsService';
+import { proactiveContextOsService, ProactiveInsightItem } from '../services/proactiveContextOsService';
 import { WhyAnswerInspectorModal } from './chat/WhyAnswerInspectorModal';
 import { ConversationBranchModal } from './chat/ConversationBranchModal';
 import { ConversationTaskboardModal } from './chat/ConversationTaskboardModal';
@@ -236,6 +236,31 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isSelfImplementLauncherOpen, setIsSelfImplementLauncherOpen] = useState(false);
   const [isAutonomousImprovementModalOpen, setIsAutonomousImprovementModalOpen] = useState(false);
   const [autonomousVerifications, setAutonomousVerifications] = useState<Record<string, AutonomousVerificationData>>({});
+
+  // 設計思想 第35/54章: みきの先回りインサイト・気配りバー状態
+  const [proactiveInsights, setProactiveInsights] = useState<ProactiveInsightItem[]>(() =>
+    proactiveContextOsService.getActiveInsights()
+  );
+  const [isProactiveBarDismissed, setIsProactiveBarDismissed] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = proactiveContextOsService.subscribe((_snap, insights) => {
+      setProactiveInsights(insights);
+    });
+    return unsub;
+  }, []);
+
+  const handleApplyInsight = (insight: ProactiveInsightItem) => {
+    if (insight.actionType === 'INSERT_PROMPT' && insight.suggestedPrompt) {
+      setInputText(insight.suggestedPrompt);
+      if (textareaRef.current) {
+        textareaRef.current.value = insight.suggestedPrompt;
+        textareaRef.current.focus();
+      }
+    } else if (insight.actionType === 'OPEN_VITALS' || insight.actionType === 'OPEN_EVOLUTION') {
+      setIsAutonomousImprovementModalOpen(true);
+    }
+  };
 
   // みき自律自動検証パイプライン: アシスタントからコードが生成されたら全自動でTDDテスト・構文検査・依存関係スキャンを実行
   useEffect(() => {
@@ -3025,6 +3050,53 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           className="hidden"
           accept=".html,.js,.ts,.json,.css,.txt,.md,.png,.jpg,.jpeg,.svg,.glsl,.wgsl,.zip,application/zip"
         />
+
+        {/* 設計思想 第35/54章: みきの先回りインサイト・気配りバー */}
+        {proactiveInsights.length > 0 && !isProactiveBarDismissed && (
+          <div className="mb-2 p-2 rounded-xl bg-slate-950/90 border border-purple-900/40 backdrop-blur-xs shadow-xs animate-in fade-in slide-in-from-bottom-1">
+            <div className="flex items-center justify-between gap-2 mb-1.5 px-1">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300">
+                <Sparkles className="w-3.5 h-3.5 text-pink-400 animate-pulse" />
+                <span>みきの先回り気配り・おすすめアクション</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsProactiveBarDismissed(true)}
+                className="text-slate-500 hover:text-slate-300 text-xs px-1 py-0.5 rounded transition-colors"
+                title="閉じる"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-slate-800">
+              {proactiveInsights.map((insight) => {
+                const colorMap: Record<string, string> = {
+                  CARE: 'bg-pink-950/40 border-pink-800/50 text-pink-200 hover:bg-pink-900/50',
+                  TIP: 'bg-indigo-950/40 border-indigo-800/50 text-indigo-200 hover:bg-indigo-900/50',
+                  SHORTCUT: 'bg-emerald-950/40 border-emerald-800/50 text-emerald-200 hover:bg-emerald-900/50',
+                  EVOLUTION: 'bg-cyan-950/40 border-cyan-800/50 text-cyan-200 hover:bg-cyan-900/50',
+                };
+                const borderClass = colorMap[insight.type] || 'bg-slate-900 border-slate-700 text-slate-200';
+
+                return (
+                  <button
+                    key={insight.id}
+                    type="button"
+                    onClick={() => handleApplyInsight(insight)}
+                    className={`shrink-0 px-2.5 py-1.5 rounded-lg border text-left text-xs transition-all flex items-center gap-2 cursor-pointer ${borderClass}`}
+                  >
+                    <span className="text-sm shrink-0">{insight.emoji}</span>
+                    <div className="max-w-[200px] sm:max-w-[260px] truncate">
+                      <div className="font-bold truncate text-[11px]">{insight.title}</div>
+                      <div className="text-[10px] opacity-80 truncate">{insight.description}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="flex items-end gap-1.5 sm:gap-2 bg-slate-950 border border-slate-800 focus-within:border-indigo-500/60 focus-within:ring-1 focus-within:ring-indigo-500/20 rounded-xl p-1 sm:p-1.5 transition-all shadow-xs">
           <button

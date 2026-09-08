@@ -33,6 +33,10 @@ import {
   BookMarked,
   Smile,
   Wrench,
+  HardDriveDownload,
+  UploadCloud,
+  FileJson,
+  Archive,
 } from 'lucide-react';
 import {
   autonomousContinuousEvolutionService,
@@ -54,6 +58,11 @@ import {
   mikiIntrospectionJournalService,
   IntrospectionEntry,
 } from '../../services/mikiIntrospectionJournalService';
+import {
+  mikiBrainCapsuleService,
+  MikiBrainCapsule,
+  CapsuleRestoreResult,
+} from '../../services/mikiBrainCapsuleService';
 import { SpecificationChapterMeta } from '../../types';
 
 interface AutonomousSelfImprovementModalProps {
@@ -84,7 +93,7 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
   const [stepsFeed, setStepsFeed] = useState<AutonomousEvolutionStepEvent[]>([]);
   const [selectedChapterNum, setSelectedChapterNum] = useState<number | 'AUTO'>('AUTO');
   const [customPromptInput, setCustomPromptInput] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'live' | 'backlog' | 'vitals' | 'journal' | 'history' | 'config'>('live');
+  const [activeTab, setActiveTab] = useState<'live' | 'backlog' | 'vitals' | 'journal' | 'history' | 'capsule' | 'config'>('live');
   const [notice, setNotice] = useState<string | null>(null);
   const [rollbackSuccessId, setRollbackSuccessId] = useState<string | null>(null);
   const [backlogSearch, setBacklogSearch] = useState<string>('');
@@ -100,6 +109,14 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
   const [isHealing, setIsHealing] = useState<boolean>(false);
   const [isIntrospecting, setIsIntrospecting] = useState<boolean>(false);
   const [introspectionPrompt, setIntrospectionPrompt] = useState<string>('');
+
+  // ブレイン・カプセル用State
+  const [capsuleNote, setCapsuleNote] = useState<string>('');
+  const [restoreMode, setRestoreMode] = useState<'MERGE' | 'REPLACE'>('MERGE');
+  const [importText, setImportText] = useState<string>('');
+  const [importPreview, setImportPreview] = useState<MikiBrainCapsule | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState<boolean>(false);
 
   const [backlog, setBacklog] = useState<ImprovementBacklogItem[]>(() =>
     autonomousContinuousEvolutionService.getImprovementBacklog()
@@ -174,6 +191,96 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
     } finally {
       setIsIntrospecting(false);
       setTimeout(() => setNotice(null), 5000);
+    }
+  };
+
+  const handleDownloadCapsule = () => {
+    try {
+      mikiBrainCapsuleService.downloadCapsuleFile(capsuleNote.trim() || undefined);
+      setNotice('📦 みきブレイン・カプセル (.json) をダウンロード保存しました！');
+    } catch (err: any) {
+      setNotice(`⚠️ エクスポート失敗: ${err?.message}`);
+    } finally {
+      setTimeout(() => setNotice(null), 5000);
+    }
+  };
+
+  const handleCopyCapsuleJson = () => {
+    try {
+      const capsule = mikiBrainCapsuleService.generateCapsule(capsuleNote.trim() || undefined);
+      navigator.clipboard.writeText(JSON.stringify(capsule, null, 2));
+      setNotice('📋 ブレイン・カプセルのJSONデータをクリップボードにコピーしました！');
+    } catch (err: any) {
+      setNotice(`⚠️ コピー失敗: ${err?.message}`);
+    } finally {
+      setTimeout(() => setNotice(null), 5000);
+    }
+  };
+
+  const handleFileDrop = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        setImportText(text);
+        const parsed = JSON.parse(text);
+        const validation = mikiBrainCapsuleService.validateCapsule(parsed);
+        if (validation.valid) {
+          setImportPreview(parsed);
+          setImportError(null);
+        } else {
+          setImportPreview(null);
+          setImportError(validation.error || '無効なカプセルファイルです');
+        }
+      } catch {
+        setImportPreview(null);
+        setImportError('JSONファイルの構文解析に失敗しました');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleTextChange = (text: string) => {
+    setImportText(text);
+    if (!text.trim()) {
+      setImportPreview(null);
+      setImportError(null);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(text);
+      const validation = mikiBrainCapsuleService.validateCapsule(parsed);
+      if (validation.valid) {
+        setImportPreview(parsed);
+        setImportError(null);
+      } else {
+        setImportPreview(null);
+        setImportError(validation.error || '無効な形式です');
+      }
+    } catch {
+      setImportPreview(null);
+      setImportError('JSONの構文が正しくありません');
+    }
+  };
+
+  const handleExecuteRestore = () => {
+    if (!importPreview) return;
+    try {
+      setIsRestoring(true);
+      const res = mikiBrainCapsuleService.restoreCapsule(importPreview, restoreMode);
+      setNotice(res.message);
+      setHistory(autonomousContinuousEvolutionService.getHistory());
+      setJournalEntries(mikiIntrospectionJournalService.getEntries());
+      setVitals(mikiCognitiveVitalsService.getSnapshot());
+      setImportPreview(null);
+      setImportText('');
+    } catch (err: any) {
+      setNotice(`⚠️ 復元失敗: ${err?.message}`);
+    } finally {
+      setIsRestoring(false);
+      setTimeout(() => setNotice(null), 6000);
     }
   };
 
@@ -414,6 +521,15 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
               }`}
             >
               改善履歴 ({history.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('capsule')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                activeTab === 'capsule' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Archive className="w-3 h-3 text-cyan-400" />
+              ブレイン・カプセル
             </button>
             <button
               onClick={() => setActiveTab('config')}
@@ -1115,6 +1231,222 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
                   </div>
                 ))
               )}
+            </div>
+          )}
+
+          {activeTab === 'capsule' && (
+            <div className="space-y-4">
+              {/* Header Card */}
+              <div className="bg-gradient-to-r from-slate-950 via-cyan-950/30 to-slate-950 border border-cyan-500/30 rounded-2xl p-5 shadow-lg space-y-2">
+                <div className="flex items-center gap-2">
+                  <Archive className="w-5 h-5 text-cyan-400" />
+                  <h3 className="text-base font-bold text-white">
+                    みきブレイン・カプセル (Miki Cognitive Brain Capsule)
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                    設計思想 第174章
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
+                  みきがユーザーさんと育んできた「7層構造化記憶」「内省日誌ノート」「自律改善コード」「動的創成ツール」「全170章仕様適合データ」を単一の安全な暗号化カプセル（.json）としてエクスポート＆完全復元できます。ブラウザ移行時やバックアップに活用できます。
+                </p>
+              </div>
+
+              {/* Grid: Export & Import */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* 1. Export Card */}
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                        <HardDriveDownload className="w-4 h-4 text-cyan-400" />
+                        カプセルのエクスポート（バックアップ保存）
+                      </h4>
+                      <span className="text-[11px] text-slate-500">JSON形式</span>
+                    </div>
+
+                    {/* Snapshot Summary Stats */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                      <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">記憶・コンテキスト</span>
+                        <span className="text-sm font-bold text-white">
+                          {(() => {
+                            try {
+                              const r = localStorage.getItem('miki_ai_chat_memories');
+                              return r ? JSON.parse(r).length : 0;
+                            } catch {
+                              return 0;
+                            }
+                          })()} 件
+                        </span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">内省日誌</span>
+                        <span className="text-sm font-bold text-amber-300">{journalEntries.length} 篇</span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">自律改善サイクル</span>
+                        <span className="text-sm font-bold text-purple-300">{history.length} 回</span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">仕様書適合章</span>
+                        <span className="text-sm font-bold text-emerald-300">
+                          {selfCodeArchitectService.getCompletedChapters().length} / 170章
+                        </span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 col-span-2 sm:col-span-2">
+                        <span className="text-slate-400 block text-[10px]">認知ヘルス状態</span>
+                        <span className="text-xs font-bold text-pink-300">
+                          スコア {vitals.overallHealthScore}点 ({vitals.status})
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">カプセルへのひとことメモ（任意）:</label>
+                      <input
+                        type="text"
+                        value={capsuleNote}
+                        onChange={(e) => setCapsuleNote(e.target.value)}
+                        placeholder="例: 第170章実装完了記念バックアップ"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-cyan-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      id="btn-download-capsule"
+                      onClick={handleDownloadCapsule}
+                      className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all"
+                    >
+                      <HardDriveDownload className="w-4 h-4" />
+                      カプセルをダウンロード保存 (.json)
+                    </button>
+                    <button
+                      onClick={handleCopyCapsuleJson}
+                      className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-xs flex items-center gap-1.5 border border-slate-700 transition-all"
+                      title="クリップボードにJSONをコピー"
+                    >
+                      <FileJson className="w-4 h-4" />
+                      コピー
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Import & Restore Card */}
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                        <UploadCloud className="w-4 h-4 text-emerald-400" />
+                        カプセルのインポート＆復元
+                      </h4>
+                      <span className="text-[11px] text-slate-500">JSON読み込み</span>
+                    </div>
+
+                    {/* File Upload Input */}
+                    <div className="border-2 border-dashed border-slate-800 hover:border-slate-700 rounded-xl p-3 text-center transition-all bg-slate-900/40">
+                      <input
+                        type="file"
+                        accept=".json,application/json"
+                        onChange={handleFileDrop}
+                        className="hidden"
+                        id="capsule-file-input"
+                      />
+                      <label
+                        htmlFor="capsule-file-input"
+                        className="cursor-pointer text-xs text-slate-400 hover:text-cyan-300 flex flex-col items-center gap-1.5 py-1"
+                      >
+                        <UploadCloud className="w-5 h-5 text-cyan-400" />
+                        <span>クリックしてカプセルファイルを選択、またはドラッグ＆ドロップ</span>
+                      </label>
+                    </div>
+
+                    {/* Or Paste JSON */}
+                    <div>
+                      <textarea
+                        value={importText}
+                        onChange={(e) => handleTextChange(e.target.value)}
+                        placeholder="またはカプセルJSONテキストをここに直接貼り付け..."
+                        rows={3}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-[11px] font-mono text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-cyan-500"
+                      />
+                    </div>
+
+                    {/* Error Message */}
+                    {importError && (
+                      <div className="p-2 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex items-center gap-2">
+                        <Bug className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>{importError}</span>
+                      </div>
+                    )}
+
+                    {/* Capsule Preview Card */}
+                    {importPreview && (
+                      <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/60 text-xs space-y-1.5 animate-in fade-in">
+                        <div className="flex items-center justify-between text-emerald-300 font-bold">
+                          <span className="flex items-center gap-1.5">
+                            <Check className="w-4 h-4" />
+                            有効なカプセルを認識しました
+                          </span>
+                          <span>{importPreview.meta?.generation}</span>
+                        </div>
+                        <div className="text-slate-300 text-[11.5px] grid grid-cols-2 gap-1 pt-1">
+                          <div>記憶: {importPreview.payload?.memories?.length ?? 0}件</div>
+                          <div>内省日誌: {importPreview.payload?.introspectionJournal?.length ?? 0}篇</div>
+                          <div>進化サイクル: {importPreview.payload?.evolutionHistory?.length ?? 0}回</div>
+                          <div>適合仕様書: {importPreview.payload?.completedChapters?.length ?? 0}章</div>
+                        </div>
+                        {importPreview.meta?.authorNote && (
+                          <div className="text-[11px] text-slate-400 italic pt-1 border-t border-emerald-900/40">
+                            メモ: 「{importPreview.meta.authorNote}」
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Restore Mode Selector */}
+                    {importPreview && (
+                      <div className="flex items-center gap-3 pt-1 text-xs text-slate-300">
+                        <span className="font-medium text-slate-400">復元方式:</span>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="restoreMode"
+                            checked={restoreMode === 'MERGE'}
+                            onChange={() => setRestoreMode('MERGE')}
+                            className="text-cyan-600 focus:ring-0"
+                          />
+                          <span>マージ追記（安全）</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="restoreMode"
+                            checked={restoreMode === 'REPLACE'}
+                            onChange={() => setRestoreMode('REPLACE')}
+                            className="text-cyan-600 focus:ring-0"
+                          />
+                          <span>完全置換（上書き）</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      id="btn-execute-restore"
+                      onClick={handleExecuteRestore}
+                      disabled={!importPreview || isRestoring}
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Check className="w-4 h-4" />
+                      {isRestoring ? 'カプセル復元処理中...' : '⚡ カプセルデータをみきに復元適用'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

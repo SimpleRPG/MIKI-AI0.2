@@ -22,6 +22,16 @@ export interface ContextAwarenessSnapshot {
   recommendedAction?: string;
 }
 
+export interface ProactiveInsightItem {
+  id: string;
+  type: 'CARE' | 'TIP' | 'SHORTCUT' | 'EVOLUTION';
+  emoji: string;
+  title: string;
+  description: string;
+  suggestedPrompt?: string;
+  actionType?: 'INSERT_PROMPT' | 'OPEN_VITALS' | 'RUN_DEFRAG' | 'OPEN_EVOLUTION';
+}
+
 export interface PersonaAnchorState {
   coreName: string; // "みき"
   pronoun: string; // "わたし" / "みき"
@@ -139,6 +149,7 @@ export class ProactiveContextOsService {
     };
 
     this.saveState();
+    this.notify();
     return this.currentSnapshot;
   }
 
@@ -184,6 +195,90 @@ export class ProactiveContextOsService {
       fixesApplied,
       passed: !isDrifting,
     };
+  }
+
+  private listeners: Set<(snapshot: ContextAwarenessSnapshot, insights: ProactiveInsightItem[]) => void> = new Set();
+  private cachedInsights: ProactiveInsightItem[] = [];
+
+  public subscribe(listener: (snapshot: ContextAwarenessSnapshot, insights: ProactiveInsightItem[]) => void): () => void {
+    this.listeners.add(listener);
+    listener(this.currentSnapshot, this.getActiveInsights());
+    return () => this.listeners.delete(listener);
+  }
+
+  private notify(): void {
+    const insights = this.generateActiveInsights();
+    this.listeners.forEach((l) => {
+      try {
+        l(this.currentSnapshot, insights);
+      } catch (err) {
+        console.error('Proactive listener error:', err);
+      }
+    });
+  }
+
+  public getActiveInsights(): ProactiveInsightItem[] {
+    if (this.cachedInsights.length === 0) {
+      this.cachedInsights = this.generateActiveInsights();
+    }
+    return this.cachedInsights;
+  }
+
+  /**
+   * 現在のコンテキストと対話状態から、先回りインサイトカードを動的生成
+   */
+  public generateActiveInsights(inputText?: string): ProactiveInsightItem[] {
+    const items: ProactiveInsightItem[] = [];
+    const snap = this.currentSnapshot;
+
+    // 1. 気配り・疲労インサイト
+    if (snap.cognitiveFatigueDetected || snap.timeOfDay === 'LATE_NIGHT') {
+      items.push({
+        id: 'care_late_night',
+        type: 'CARE',
+        emoji: '🍵',
+        title: '深夜の集中お疲れ様！',
+        description: '無理せず一息いれてね。大事なポイントは要約していつでも復元できるよ。',
+        suggestedPrompt: 'これまでの要点をまとめて、次回すぐに再開できるように要約して！',
+        actionType: 'INSERT_PROMPT',
+      });
+    }
+
+    // 2. 開発・技術インサイト
+    if (snap.detectedUserMode === 'VBA_DEVELOPMENT' || (inputText && /vba|excel|マクロ/i.test(inputText))) {
+      items.push({
+        id: 'tip_vba_opt',
+        type: 'TIP',
+        emoji: '⚡',
+        title: 'VBA高速化＆安全ガード',
+        description: 'ScreenUpdating停止と未宣言変数防止（Option Explicit）の自動チェックができるよ！',
+        suggestedPrompt: 'このVBAコードのエラー処理とScreenUpdating最適化を適用して！',
+        actionType: 'INSERT_PROMPT',
+      });
+    } else {
+      items.push({
+        id: 'shortcut_deep_dive',
+        type: 'SHORTCUT',
+        emoji: '🔍',
+        title: 'なぜなぜ深掘り分析',
+        description: '根本原因を5段階で徹底分析する「なぜなぜインスペクター」も使えるよ。',
+        suggestedPrompt: 'この事象について「なぜなぜ分析」で根本原因を多角的に分解して！',
+        actionType: 'INSERT_PROMPT',
+      });
+    }
+
+    // 3. 自律進化・健全化インサイト
+    items.push({
+      id: 'evo_vitals_check',
+      type: 'EVOLUTION',
+      emoji: '💖',
+      title: 'みきの認知ヘルス確認',
+      description: 'バイタル健全度や6大防壁の堅持状況をいつでもチェック＆自律修復できるよ！',
+      actionType: 'OPEN_VITALS',
+    });
+
+    this.cachedInsights = items;
+    return items;
   }
 
   public getSnapshot(): ContextAwarenessSnapshot {
