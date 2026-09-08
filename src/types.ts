@@ -699,6 +699,8 @@ export interface ChatMessage {
   codeProposal?: CodeProposal;
   // みき自律検証＆自動テスト自己修復レポート
   autonomousVerification?: AutonomousVerificationData;
+  // みき自律自己改善・オートパイロット進化レコード
+  autonomousEvolution?: any;
   vbaAssessment?: VbaSafetyAssessment;
   // 設計思想 6章 & 第3段階: 回答品質・回答長・直接回答評価
   responseQuality?: ResponseQualityEvaluation;

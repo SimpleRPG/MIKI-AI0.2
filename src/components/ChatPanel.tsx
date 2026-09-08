@@ -57,6 +57,8 @@ import {
   Bug,
   Network,
   History,
+  RefreshCw,
+  Bot,
 } from 'lucide-react';
 import {
   ChatMessage,
@@ -71,6 +73,7 @@ import {
   ConversationTaskCard,
   ProactiveSuggestionLevel,
   ManualExplanationOverride,
+  AutonomousVerificationData,
 } from '../types';
 import { extractCodeBlocks, extractFilesFromZip } from '../utils/codeParser';
 import { SPEAKER_PROFILES } from '../data/speakers';
@@ -83,6 +86,8 @@ import { completionJudgeService } from '../services/completionJudgeService';
 import { workflowSynthesisService } from '../services/workflowSynthesisService';
 import { experienceRouterService } from '../services/experienceRouterService';
 import { autonomousEvolutionService } from '../services/autonomousEvolutionService';
+import { mikiSelfCodingSuperchargerService } from '../services/mikiSelfCodingSuperchargerService';
+import { autonomousContinuousEvolutionService } from '../services/autonomousContinuousEvolutionService';
 import { userProficiencyService } from '../services/userProficiencyService';
 import { codeSkeletonService } from '../services/codeSkeletonService';
 import { conversationBranchService } from '../services/conversationBranchService';
@@ -98,6 +103,8 @@ import { DiffPreviewModal } from './chat/DiffPreviewModal';
 import { UnitTestStudioModal } from './chat/UnitTestStudioModal';
 import { DependencyGraphModal } from './chat/DependencyGraphModal';
 import { SnapshotTimeMachineModal } from './chat/SnapshotTimeMachineModal';
+import { AutonomousSelfImprovementModal } from './chat/AutonomousSelfImprovementModal';
+import { AutonomousEvolutionCard } from './chat/AutonomousEvolutionCard';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -226,6 +233,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isDependencyGraphModalOpen, setIsDependencyGraphModalOpen] = useState(false);
   const [isTimeMachineOpen, setIsTimeMachineOpen] = useState(false);
   const [isSelfImplementLauncherOpen, setIsSelfImplementLauncherOpen] = useState(false);
+  const [isAutonomousImprovementModalOpen, setIsAutonomousImprovementModalOpen] = useState(false);
   const [autonomousVerifications, setAutonomousVerifications] = useState<Record<string, AutonomousVerificationData>>({});
 
   // みき自律自動検証パイプライン: アシスタントからコードが生成されたら全自動でTDDテスト・構文検査・依存関係スキャンを実行
@@ -248,7 +256,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const targetBlock = blocks[0];
       mikiSelfCodingSuperchargerService
         .runAutonomousVerificationPipeline(targetBlock.content, targetBlock.name, workspaceFiles)
-        .then((result) => {
+        .then((result: any) => {
           setAutonomousVerifications((prev) => ({
             ...prev,
             [msg.id]: result.verification,
@@ -2561,6 +2569,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       )}
                     </div>
                   )}
+
+                  {/* みき自律自己改善・オートパイロット結果カード */}
+                  {msg.autonomousEvolution && (
+                    <div className="mt-3">
+                      <AutonomousEvolutionCard
+                        record={msg.autonomousEvolution}
+                        onApplyRestoredCode={(filePath, content) => {
+                          const fileName = filePath.split('/').pop() || filePath;
+                          onApplyCode([
+                            {
+                              name: fileName,
+                              path: filePath,
+                              content,
+                              language: 'typescript',
+                            },
+                          ]);
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Clean, minimalist message actions toolbar - strictly no vertical wrapping */}
@@ -2949,6 +2977,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <span className="truncate">⏱️ タイムマシン (自動退避から即時復元)</span>
               </button>
 
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSelfImplementLauncherOpen(false);
+                  setIsAutonomousImprovementModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 p-2 bg-gradient-to-r from-emerald-950/80 to-teal-950/80 hover:from-emerald-900/90 hover:to-teal-900/90 border border-emerald-500/50 rounded-lg text-emerald-200 text-left transition-all cursor-pointer"
+              >
+                <Bot className="w-3.5 h-3.5 text-emerald-300 shrink-0 animate-pulse" />
+                <span className="truncate font-semibold">🤖 自律コード巡回・オートパイロット</span>
+              </button>
+
               {onOpenSelfImprovementModal && (
                 <button
                   type="button"
@@ -2996,6 +3036,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             title="みき自己実装・自律コード改善ランチャー"
           >
             <Rocket className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsAutonomousImprovementModalOpen(true)}
+            className="p-2 rounded-lg transition-colors shrink-0 text-slate-400 hover:text-emerald-300 hover:bg-slate-900"
+            title="みき自律コード改善・オートパイロット"
+          >
+            <Bot className="w-4 h-4" />
           </button>
 
           <button
@@ -3227,6 +3276,39 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               name: fileName,
               path: filePath,
               content: restoredContent,
+              language: 'typescript',
+            },
+          ]);
+        }}
+      />
+
+      {/* 🤖 みき自律コード自動巡回・オートパイロット＆自己改善スタジオモーダル */}
+      <AutonomousSelfImprovementModal
+        isOpen={isAutonomousImprovementModalOpen}
+        onClose={() => setIsAutonomousImprovementModalOpen(false)}
+        onOpenDiff={(fileName, oldCode, newCode, filePath) => {
+          setDiffModalState({
+            isOpen: true,
+            fileName,
+            oldCode,
+            newCode,
+            filePath,
+          });
+        }}
+        onOpenUnitTest={(block) => {
+          setTestModalState({
+            isOpen: true,
+            fileName: block.name,
+            code: block.content,
+          });
+        }}
+        onApplyRestoredCode={(filePath, content) => {
+          const fileName = filePath.split('/').pop() || filePath;
+          onApplyCode([
+            {
+              name: fileName,
+              path: filePath,
+              content,
               language: 'typescript',
             },
           ]);

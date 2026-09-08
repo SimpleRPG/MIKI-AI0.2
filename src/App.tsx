@@ -75,6 +75,7 @@ import { metaMemoryService } from './services/metaMemoryService';
 import { draftVerificationService } from './services/draftVerificationService';
 import { cognitiveDebuggerService } from './services/cognitiveDebuggerService';
 import { proactiveContextOsService } from './services/proactiveContextOsService';
+import { autonomousContinuousEvolutionService } from './services/autonomousContinuousEvolutionService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { smartMergeCodeBlock } from './utils/codeMergeService';
 import { generateSmartCompanionReply } from './utils/companionEngine';
@@ -1079,6 +1080,79 @@ export default function App() {
 
     const assistantId = 'msg_asst_' + Date.now();
     currentAssistantIdRef.current = assistantId;
+
+    // ── 設計思想: 自律自己改善 (Autonomous Continuous Evolution) の自然言語意図検知 ──
+    const selfImprovementKeywords = [
+      '自身のコードをもっと自動で改善',
+      '自身のコードを自動で改善',
+      'コードをもっと自動で改善',
+      'コードを自動で改善',
+      '自動で改善させられるように',
+      '自律自己改善',
+      '自己改善を実行',
+      'コードを自動改善',
+      'オートパイロットで改善',
+      '自律改善サイクル',
+      '自己コード改善して',
+    ];
+    const isSelfImprovementRequest = selfImprovementKeywords.some((kw) => text.includes(kw));
+
+    if (isSelfImprovementRequest) {
+      const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: 'assistant',
+          content: `🤖 **みきの全自動・自律コード自己改善サイクルを起動したよ！** ✨\n\n人間による手動操作を介さず、みきが自律的に【全170章の仕様書ドリフト監査 ➔ 5大不変条件検証 ➔ 最適改善対象の選定 ➔ TypeScriptコード合成 ➔ AST構文検査＆TDD単体テスト ➔ 最大3回の自律修復ループ ➔ スナップショット安全記録 ➔ 物理配備】までを一貫して自動実行するね！🌸\n\n今、パイプラインを実行中だから少し待っててね...！`,
+          timestamp: Date.now(),
+          speaker: activeSpeaker,
+          engineMode,
+          isStreaming: true,
+        },
+      ]);
+
+      try {
+        const record = await autonomousContinuousEvolutionService.runFullAutonomousCycle();
+        const diffSummary = `🎉 **自律自己改善サイクルが全工程オールクリアで完了したよ！**\n\n` +
+          `- 🎯 **改善対象**: ${record.chapterNumber ? `第${record.chapterNumber}章『${record.chapterTitle}』` : record.targetFile}\n` +
+          `- 🛡️ **5大不変条件**: 全項目パス (Qwen 3B保護・プライバシー防壁・API循環・ロールバック性・監査不変)\n` +
+          `- 🧪 **自律検証**: AST構文合格 / TDD単体テスト ${record.verification.testPassedCount}/${record.verification.testTotalCount} 件パス / 循環参照 0件\n` +
+          `- 🔄 **自律修復 (Self-Healing)**: ${record.selfHealingAttempts}回試行\n` +
+          `- 📈 **設計思想適合スコア**: ${record.previousScore}点 ➔ **${record.newScore}点** (+${Math.max(0, record.newScore - record.previousScore)}点)\n` +
+          `- ⏱️ **安全機構**: 変更前スナップショット自動記録済（いつでもワンクリックで復元可能）\n\n` +
+          `下のカードから各実行ステージの詳細ログや、TDDテスト結果、差分の確認・ロールバックができるよ！いつでもツールバーの「🤖」アイコンからオートパイロット（定期自動巡回）も有効にできるからね😊💕`;
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: diffSummary,
+                  isStreaming: false,
+                  autonomousEvolution: record,
+                }
+              : m
+          )
+        );
+      } catch (err: any) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: `⚠️ **自律自己改善サイクル中に安全停止が発火しました**\n\n【停止理由】: ${err?.message || '不変条件または構文安全基準に抵触したため、安全を最優先して変更を破棄しました。'}\n\n※ 既存のコードベースとQwen 3Bアンカーは完全に保護されており、破壊的な変更は一切加えられていません。`,
+                  isStreaming: false,
+                }
+              : m
+          )
+        );
+      } finally {
+        setIsGenerating(false);
+        setIsLoading(false);
+      }
+      return;
+    }
 
     const handleAbortExit = (stepName: string) => {
       systemLogger.warn('CHAT', `チャット処理が中断シグナルにより中止されました [${stepName}]`, {

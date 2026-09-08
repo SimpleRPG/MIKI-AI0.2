@@ -2894,6 +2894,7 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
       syntaxError: syntaxCheckPassed ? null : syntaxError,
       reasoning,
       code: generatedCode,
+      originalContent: originalContent || '',
       linesCount: generatedCode.split('\n').length,
       lesson: {
         title: `自律実装: ${prompt.slice(0, 30)}`,
