@@ -211,10 +211,22 @@ export const UltraSelfEvolverSubView: React.FC = () => {
     const stepTimer3 = setTimeout(() => setImplementStep(4), 2200); // 4: 構文検証・適用
 
     try {
+      const extConfig = (() => {
+        try {
+          const raw = storageService.getItem('miki_external_llm_config');
+          return raw ? JSON.parse(raw) : null;
+        } catch {
+          return null;
+        }
+      })();
+
       const res = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
         implementPrompt,
         targetFileHint.trim() || undefined,
-        true
+        true,
+        undefined,
+        extConfig?.endpoint,
+        extConfig?.model
       );
       clearTimeout(stepTimer1);
       clearTimeout(stepTimer2);

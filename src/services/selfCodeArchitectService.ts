@@ -35,6 +35,7 @@ import { formalProofService, SkillContract } from './formalProofService';
 import { sandboxPermissionService } from './sandboxPermissionService';
 import { privacyGuardrailService } from './privacyGuardrailService';
 import { mikiSelfCodingSuperchargerService } from './mikiSelfCodingSuperchargerService';
+import { apiUrl, getCustomApiHeaders } from './api';
 
 
 import { FULL_SPECIFICATION_REGISTRY } from '../data/specificationRegistryData';
@@ -509,10 +510,22 @@ export class SelfCodeArchitectService {
 
     let implResult;
     try {
+      const extConfig = (() => {
+        try {
+          const raw = storageService.getItem('miki_external_llm_config');
+          return raw ? JSON.parse(raw) : null;
+        } catch {
+          return null;
+        }
+      })();
+
       implResult = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
         prompt,
         targetFileHint,
-        true // 物理書き込み & コミットを実行
+        true, // 物理書き込み & コミットを実行
+        undefined,
+        extConfig?.endpoint,
+        extConfig?.model
       );
     } catch (implErr: any) {
       systemLogger.error('SELF_IMPROVEMENT', `[個別提案適用エラー] 実装パイプライン実行例外: ${implErr?.message}`);
@@ -926,9 +939,9 @@ export class SelfCodeArchitectService {
 
       // 1. 事前自動コンパイル・Dry-Run構文検証
       try {
-        const verifyRes = await fetch('/api/self-code/dry-run-verify', {
+        const verifyRes = await fetch(apiUrl('/api/self-code/dry-run-verify'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getCustomApiHeaders(),
           body: JSON.stringify({ code, filename: `chapter_${chapterNumber}.ts` }),
         });
         if (verifyRes.ok) {
@@ -943,9 +956,9 @@ export class SelfCodeArchitectService {
         // dry-run server optional fail-open for local offline
       }
 
-      const res = await fetch('/api/self-code/write-module', {
+      const res = await fetch(apiUrl('/api/self-code/write-module'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCustomApiHeaders(),
         body: JSON.stringify({
           chapterNumber,
           title,
@@ -957,9 +970,9 @@ export class SelfCodeArchitectService {
       if (res.ok) {
         systemLogger.info('SELF_IMPROVEMENT', `📁 [実体コード物理保存] src/autonomous_modules/chapter_${chapterNumber}.ts をプロジェクトに書き込みました。ZIPエクスポートに同梱されます。`);
         try {
-          await fetch('/api/aider/commit', {
+          await fetch(apiUrl('/api/aider/commit'), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getCustomApiHeaders(),
             body: JSON.stringify({
               message: `feat(autonomous): 第${chapterNumber}章『${title}』実体モジュール自動生成`,
               files: [`src/autonomous_modules/chapter_${chapterNumber}.ts`],

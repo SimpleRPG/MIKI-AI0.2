@@ -63,6 +63,7 @@ import {
   MikiBrainCapsule,
   CapsuleRestoreResult,
 } from '../../services/mikiBrainCapsuleService';
+import { mikiSelfCodingSuperchargerService } from '../../services/mikiSelfCodingSuperchargerService';
 import { SpecificationChapterMeta } from '../../types';
 
 interface AutonomousSelfImprovementModalProps {
@@ -337,12 +338,7 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
       return;
     }
     try {
-      const res = await fetch('/api/self-code/rollback-snapshot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshotId: record.snapshotId }),
-      });
-      const data = await res.json();
+      const data = await mikiSelfCodingSuperchargerService.rollbackSnapshot(record.snapshotId);
       if (data.success) {
         setRollbackSuccessId(record.id);
         setNotice(`⏪ スナップショットから ${record.targetFile} を安全に復元しました！`);
@@ -350,7 +346,7 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
           onApplyRestoredCode(record.targetFile, data.restoredContent || '');
         }
       } else {
-        alert(data.error || 'ロールバックに失敗しました');
+        alert('ロールバックに失敗しました');
       }
     } catch (err: any) {
       alert(`ロールバック通信エラー: ${err?.message}`);

@@ -6,6 +6,8 @@
  * 失敗時は正直に offline / failure を返し、UI側で「未測定・オフライン」として扱う。
  */
 
+import { getCustomApiHeaders, apiUrl } from './api';
+
 export interface ApiFailureResult {
   success: false;
   offline: boolean;
@@ -25,15 +27,13 @@ export async function callSelfCodeApi<T>(
     const fullUrl =
       url.startsWith('http://') || url.startsWith('https://')
         ? url
-        : typeof window !== 'undefined'
-        ? url
-        : `http://localhost:3000${url.startsWith('/') ? '' : '/'}${url}`;
+        : apiUrl(url);
 
     const method = options?.method || (options?.body ? 'POST' : 'GET');
     const res = await fetch(fullUrl, {
       method,
       headers: {
-        'Content-Type': 'application/json',
+        ...getCustomApiHeaders(),
         ...(options?.headers || {}),
       },
       body: options?.body ? JSON.stringify(options.body) : undefined,

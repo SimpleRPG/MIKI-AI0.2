@@ -9,6 +9,7 @@
 
 import { WebCodeSearchResult, WebCodeSnippet } from '../types';
 import { systemLogger } from './systemLogger';
+import { apiUrl, getCustomApiHeaders } from './api';
 
 export interface CodeSearchOptions {
   language?: string;
@@ -33,9 +34,9 @@ export class CodeSearchService {
     systemLogger.info('SELF_IMPROVEMENT', `[第171章 コード発掘] ネットの海から「${cleanQuery}」のコードを探索中...`);
 
     try {
-      const res = await fetch('/api/self-code/search-web-code', {
+      const res = await fetch(apiUrl('/api/self-code/search-web-code'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCustomApiHeaders(),
         body: JSON.stringify({
           query: cleanQuery,
           language,

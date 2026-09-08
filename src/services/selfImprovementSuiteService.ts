@@ -10,6 +10,7 @@
 
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
+import { apiUrl, getCustomApiHeaders } from './api';
 
 export interface DryRunVerificationResult {
   valid: boolean;
@@ -105,9 +106,9 @@ export class SelfImprovementSuiteService {
    */
   public async verifyCodeDryRun(code: string, filename?: string): Promise<DryRunVerificationResult> {
     try {
-      const res = await fetch('/api/self-code/dry-run-verify', {
+      const res = await fetch(apiUrl('/api/self-code/dry-run-verify'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCustomApiHeaders(),
         body: JSON.stringify({ code, filename }),
       });
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
@@ -132,9 +133,9 @@ export class SelfImprovementSuiteService {
    */
   public async runBenchmark(chapterNumber: number, iterations: number = 1000): Promise<BenchmarkMetrics> {
     try {
-      const res = await fetch('/api/self-code/benchmark', {
+      const res = await fetch(apiUrl('/api/self-code/benchmark'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCustomApiHeaders(),
         body: JSON.stringify({ chapterNumber, iterations }),
       });
       if (!res.ok) throw new Error(`Benchmark failed with status ${res.status}`);
@@ -173,9 +174,9 @@ export class SelfImprovementSuiteService {
     errorCategory: string = 'REASONING_DRIFT'
   ): Promise<FailureSynthesisResult> {
     try {
-      const res = await fetch('/api/self-code/synthesize-failure-fix', {
+      const res = await fetch(apiUrl('/api/self-code/synthesize-failure-fix'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCustomApiHeaders(),
         body: JSON.stringify({ failureContext, userQuery, errorCategory }),
       });
       if (!res.ok) throw new Error(`Synthesis failed with status ${res.status}`);
@@ -192,9 +193,9 @@ export class SelfImprovementSuiteService {
    */
   public async runCanaryTrial(proposalId: string, chapterNumber: number, codeSnippet?: string): Promise<CanaryTrialResult> {
     try {
-      const res = await fetch('/api/self-code/canary-run', {
+      const res = await fetch(apiUrl('/api/self-code/canary-run'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCustomApiHeaders(),
         body: JSON.stringify({ proposalId, chapterNumber, code: codeSnippet }),
       });
       if (!res.ok) throw new Error(`Canary failed with status ${res.status}`);

@@ -361,11 +361,20 @@ class MikiSelfCodingSuperchargerService {
     prompt: string,
     targetFileHint?: string,
     autoApply: boolean = true,
-    codeOverride?: string
+    codeOverride?: string,
+    localLlmEndpoint?: string,
+    localLlmModel?: string
   ): Promise<SelfImplementationResult> {
     const res = await callSelfCodeApi<SelfImplementationResult>('/api/self-code/autonomous-implement', {
       method: 'POST',
-      body: { prompt, targetFileHint, autoApply, codeOverride },
+      body: {
+        prompt,
+        targetFileHint,
+        autoApply,
+        codeOverride,
+        localLlmEndpoint,
+        localLlmModel,
+      },
     });
     if (isApiFailure(res)) {
       systemLogger.warn('SELF_IMPROVEMENT', `自律自己実装失敗: ${res.reason}`);
@@ -412,22 +421,36 @@ class MikiSelfCodingSuperchargerService {
   /**
    * 8. スナップショットからの1-Clickロールバック
    */
-  public async rollbackSnapshot(snapshotId: string): Promise<{ success: boolean; message: string }> {
-    const res = await callSelfCodeApi<{ success: boolean; message?: string; error?: string }>(
-      '/api/self-code/rollback-snapshot',
-      {
-        method: 'POST',
-        body: { snapshotId },
-      }
-    );
+  public async rollbackSnapshot(snapshotId: string): Promise<{
+    success: boolean;
+    message: string;
+    restoredFile?: string;
+    restoredContent?: string;
+    error?: string;
+  }> {
+    const res = await callSelfCodeApi<{
+      success: boolean;
+      message?: string;
+      restoredFile?: string;
+      restoredContent?: string;
+      error?: string;
+    }>('/api/self-code/rollback-snapshot', {
+      method: 'POST',
+      body: { snapshotId },
+    });
     if (isApiFailure(res)) {
-      return { success: false, message: res.reason };
+      return { success: false, message: res.reason, error: res.reason };
     }
     if (!res.success) {
-      return { success: false, message: res.error || 'ロールバック失敗' };
+      return { success: false, message: res.error || 'ロールバック失敗', error: res.error };
     }
     systemLogger.info('SELF_IMPROVEMENT', `[ロールバック完了] ${res.message}`);
-    return { success: true, message: res.message || 'ロールバック完了' };
+    return {
+      success: true,
+      message: res.message || 'ロールバック完了',
+      restoredFile: res.restoredFile,
+      restoredContent: res.restoredContent,
+    };
   }
 
   /**

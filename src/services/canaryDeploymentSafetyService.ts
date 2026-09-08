@@ -8,6 +8,7 @@
  */
 
 import { systemLogger } from './systemLogger';
+import { apiUrl, getCustomApiHeaders } from './api';
 
 export interface CanaryDeploymentState {
   proposalId: string;
@@ -57,9 +58,9 @@ class CanaryDeploymentSafetyService {
     }
 
     try {
-      const res = await fetch('/api/self-code/canary-run', {
+      const res = await fetch(apiUrl('/api/self-code/canary-run'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCustomApiHeaders(),
         body: JSON.stringify({
           proposalId,
           chapterNumber: targetChapter,

@@ -52,12 +52,7 @@ export const AutonomousEvolutionCard: React.FC<AutonomousEvolutionCardProps> = (
     }
     setRollbackLoading(true);
     try {
-      const res = await fetch('/api/self-code/rollback-snapshot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshotId: record.snapshotId }),
-      });
-      const data = await res.json();
+      const data = await mikiSelfCodingSuperchargerService.rollbackSnapshot(record.snapshotId);
       if (data.success) {
         setIsRollbackDone(true);
         if (onApplyRestoredCode) {
