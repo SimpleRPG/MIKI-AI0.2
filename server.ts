@@ -185,10 +185,126 @@ function getAIClient(req?: express.Request): GoogleGenAI | null {
 // Multi-model resilient Gemini caller with active modern models from Google GenAI SDK
 const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash'];
 
+// ============================================================================
+// ローカルLLM(llama-server/llama-swap)フォールバック
+// 第9章・第52章 抜本改善(2026-09-06発見の根本問題への対応):
+// 従来、generateContentWithFallback はGemini APIキーが無い/枯渇した場合に
+// 即座にthrowし、呼び出し元(/api/self-code/autonomous-implement等)がそれを
+// catchして「プロンプト文字列からクラス名を作るだけ」の決定論的テンプレートを
+// 返していた。これは"自律改善"と名乗りながら実際には一切AIが関与していない
+// 状態であり、みき自身が持つローカルLLM(Qwen等 / llama-server)への経路が
+// server.ts側に存在しないことが根本原因だった。
+// 本関数は、Geminiが使えない場合の最終手段として、実機で稼働している
+// ローカルLLM(既定 http://127.0.0.1:8080、フロントの「外部ローカルLLM設定」と
+// 同じ値を環境変数 LOCAL_LLM_ENDPOINT / LOCAL_LLM_MODEL、またはリクエストボディの
+// localLlmEndpoint / localLlmModel で上書き可能)を呼び出し、本物の推論結果を返す。
+// ============================================================================
+async function callLocalLlmChat(
+  promptText: string,
+  config?: { temperature?: number; maxOutputTokens?: number },
+  overrideEndpoint?: string,
+  overrideModel?: string
+): Promise<{ text: string; modelUsed: string } | null> {
+  const endpoint = (overrideEndpoint || process.env.LOCAL_LLM_ENDPOINT || 'http://127.0.0.1:8080').replace(/\/$/, '');
+  const model = overrideModel || process.env.LOCAL_LLM_MODEL || 'default';
+  const url = `${endpoint}/v1/chat/completions`;
+
+  const controller = new AbortController();
+  // ローカルLLMはコールドスタート(モデル再ロード)で数十秒かかることがあるため、
+  // Gemini呼び出し(8秒)より大幅に長いタイムアウトを取る。
+  const timer = setTimeout(() => controller.abort(), 90_000);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: promptText }],
+        temperature: config?.temperature ?? 0.2,
+        max_tokens: config?.maxOutputTokens ?? 1500,
+        stream: false,
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      console.warn(`[Local LLM Fallback] HTTP ${res.status} from ${url}`);
+      return null;
+    }
+    const json: any = await res.json();
+    const text = json?.choices?.[0]?.message?.content || '';
+    if (!text) return null;
+    console.warn(`[Local LLM Fallback] Geminiが使用不可のため ${endpoint} (model: ${model}) にフォールバックし応答を取得しました。`);
+    return { text, modelUsed: `local:${model}` };
+  } catch (err: any) {
+    console.warn(`[Local LLM Fallback] ${url} への接続に失敗:`, err?.message || err);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// generateContentWithFallbackの戻り値と同じ形(.text getterと.candidates構造の両方)を
+// 持つオブジェクトを作る。既存の全呼び出し元が response.text / response.candidates[0]...
+// のどちらでアクセスしても透過的に動作するようにするため。
+function makeGeminiCompatibleResponse(text: string) {
+  return {
+    text,
+    candidates: [{ content: { parts: [{ text }] } }],
+  };
+}
+
+// 自己改善系エンドポイント(autonomous-implement / reflexion / big-o-optimize等)専用。
+// 方針(2026-09-06 ユーザー指示): 「自律改善」の推論にGeminiは一切使わない。
+// Geminiはこのアプリでは第8章の教師API(train-distill / teacher-request)、つまり
+// "学習教材の生成・配信"用途に限定し、みき自身の日常的なコード改善はローカルLLM
+// (実機のQwen等 / llama-server)だけで完結させる。Geminiキーの有無すら確認しない
+// (=Geminiキーが設定されていても、この経路では絶対に呼ばれない)。
+async function generateWithLocalLlmOnly(
+  request: { contents: any; config?: any },
+  overrideEndpoint?: string,
+  overrideModel?: string
+): Promise<{ response: any; modelUsed: string }> {
+  const promptText = typeof request.contents === 'string' ? request.contents : JSON.stringify(request.contents);
+  const local = await callLocalLlmChat(promptText, request.config, overrideEndpoint, overrideModel);
+  if (!local) {
+    throw new Error(
+      'ローカルLLM(llama-server)に接続できませんでした。Termux側でサーバーが起動しているか確認してください。' +
+      '(この自己改善用エンドポイントはGeminiへフォールバックしない設計です)'
+    );
+  }
+  return { response: makeGeminiCompatibleResponse(local.text), modelUsed: local.modelUsed };
+}
+
 async function generateContentWithFallback(
   reqOrAi: express.Request | GoogleGenAI | ExtractedApiKey[],
   request: { contents: any; config?: any }
 ): Promise<{ response: any; modelUsed: string; keyPreview?: string; rotatedKeyCount?: number }> {
+  // リクエストボディからローカルLLMの明示的な上書き設定を拾う(フロントの
+  // nativeLlmService.getActiveExternalConfig()の値を渡すことを想定)。
+  const localOverride =
+    !Array.isArray(reqOrAi) && reqOrAi && typeof (reqOrAi as any).headers !== 'undefined'
+      ? {
+          endpoint: (reqOrAi as express.Request).body?.localLlmEndpoint as string | undefined,
+          model: (reqOrAi as express.Request).body?.localLlmModel as string | undefined,
+        }
+      : {};
+
+  const promptTextForLocalLlm =
+    typeof request.contents === 'string' ? request.contents : JSON.stringify(request.contents);
+
+  const tryLocalLlmThenThrow = async (priorError: any): Promise<{ response: any; modelUsed: string }> => {
+    const local = await callLocalLlmChat(
+      promptTextForLocalLlm,
+      request.config,
+      localOverride.endpoint,
+      localOverride.model
+    );
+    if (local) {
+      return { response: makeGeminiCompatibleResponse(local.text), modelUsed: local.modelUsed };
+    }
+    throw priorError;
+  };
+
   let keysToTry: ExtractedApiKey[] = [];
 
   if (Array.isArray(reqOrAi)) {
@@ -217,13 +333,13 @@ async function generateContentWithFallback(
         lastErr = err;
       }
     }
-    throw lastErr || new Error('All Gemini models failed');
+    return tryLocalLlmThenThrow(lastErr || new Error('All Gemini models failed'));
   } else {
     keysToTry = extractAllApiKeys();
   }
 
   if (keysToTry.length === 0) {
-    throw new Error('Gemini API Key が設定されていません。');
+    return tryLocalLlmThenThrow(new Error('Gemini API Key が設定されていません。'));
   }
 
   // Prioritize keys that are not exhausted
@@ -314,7 +430,7 @@ async function generateContentWithFallback(
     }
   }
 
-  throw lastError || new Error('All Gemini API keys and models failed');
+  return tryLocalLlmThenThrow(lastError || new Error('All Gemini API keys and models failed'));
 }
 
 // Health check endpoint
@@ -2822,7 +2938,7 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
       });
     }
 
-    // 3. コード生成 (Gemini優先、失敗時フォールバック)
+    // 3. コード生成 (ローカルLLM専用。Geminiはここでは使わない — 学習/教師用途専用のため)
     let generatedCode = '';
     let reasoning = '';
 
@@ -2836,22 +2952,27 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
 - any型の使用を避け、インターフェースを明確に定義する
 - 単体テストしやすい構造にする`;
 
-      const genRes = await generateContentWithFallback(req, {
-        contents: aiPrompt,
-        config: { temperature: 0.2 },
-      });
+      const genRes = await generateWithLocalLlmOnly(
+        { contents: aiPrompt, config: { temperature: 0.2 } },
+        req.body?.localLlmEndpoint,
+        req.body?.localLlmModel
+      );
 
       const text = genRes.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
       const match = text.match(/```(?:typescript|ts)?([\s\S]*?)```/);
       if (match && match[1]) {
         generatedCode = match[1].trim();
-        reasoning = `Gemini (${genRes.modelUsed}) が要求『${prompt.slice(0, 40)}』を解析し、完全なTypeScriptモジュールを生成しました。`;
+        reasoning = `みき自身のローカルLLM (${genRes.modelUsed.replace('local:', '')}) が要求『${prompt.slice(0, 40)}』を解析し、完全なTypeScriptモジュールを生成しました。`;
       }
     } catch (aiErr: any) {
-      console.warn('Gemini auto-implement fallback:', aiErr?.message);
+      console.warn('Local LLM auto-implement failed:', aiErr?.message);
     }
 
-    // フォールバック生成
+    // 最終フォールバック: ローカルLLMが使用不可だった場合のみ実行される、
+    // AIを一切使わない決定論的な文字列テンプレート生成。
+    // (2026-09-06 方針決定: 自己改善系エンドポイントはGeminiを一切使わない。
+    //  Geminiは教師API(train-distill/teacher-request、第8章)の学習教材生成専用とする。
+    //  ここに到達するのはローカルLLM(llama-server)サーバーが本当に利用不可能な場合のみ。)
     if (!generatedCode) {
       const className = prompt
         .split(/[\s_]+/)
@@ -2926,7 +3047,7 @@ export class ${className} {
 
 export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${className}();
 `;
-      reasoning = `決定論的ASTジェネレーターが要求『${prompt.slice(0, 40)}』から型安全なシングルトンサービスクラス [${className}] を構築しました。`;
+      reasoning = `⚠️ ローカルLLM(${process.env.LOCAL_LLM_ENDPOINT || 'http://127.0.0.1:8080'})に接続できなかったため、AIを一切使わない固定テンプレートから要求『${prompt.slice(0, 40)}』を元にシングルトンサービスクラス [${className}] の雛形のみを生成しました。中身は実装されていないため、Termux側のllama-serverが復旧次第このファイルを本実装に置き換えることを推奨します。`;
     }
 
     // 4. 構文検証 (TypeScript Transpilation Check)
@@ -3115,9 +3236,10 @@ app.post('/api/self-code/reflexion', async (req, res) => {
       }
     }
 
-    // 1. LLM利用可能時は失敗理由とコードを渡して真の自己批判と反省パッチを推論
-    const ai = getAIClient(req);
-    if (ai) {
+    // 1. ローカルLLMに失敗理由とコードを渡して真の自己批判と反省パッチを推論
+    //    (Geminiは使わない方針。Gemini必須の getAIClient(req) ゲートは撤廃した — 撤廃前は
+    //     Geminiキー未設定時にこの分岐自体が丸ごとスキップされ、ローカルLLMすら試されなかった)
+    {
       try {
         const prompt = `あなたはMIKI-AIの自己反省（Reflexion）認知エンジンです。以下の自己改善試行における失敗情報を分析し、厳密な根本原因特定と修正パッチをJSONのみで生成してください。
 【対象ファイル】: ${targetFile}
@@ -3135,10 +3257,11 @@ ${targetCode || '（コード未指定）'}
   "generatedPatch": "修正コード（TypeScript）",
   "confidenceScore": 88
 }`;
-        const { response } = await generateContentWithFallback(req, {
-          contents: prompt,
-          config: { temperature: 0.2, maxOutputTokens: 1000 },
-        });
+        const { response } = await generateWithLocalLlmOnly(
+          { contents: prompt, config: { temperature: 0.2, maxOutputTokens: 1000 } },
+          req.body?.localLlmEndpoint,
+          req.body?.localLlmModel
+        );
         const text = response?.text?.trim() || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
@@ -3157,11 +3280,11 @@ ${targetCode || '（コード未指定）'}
           });
         }
       } catch (llmErr) {
-        console.warn('[Reflexion API] LLM execution notice:', llmErr);
+        console.warn('[Reflexion API] Local LLM execution notice:', llmErr);
       }
     }
 
-    // 2. LLM未接続時の決定論的分析（固定ダミーではなく、実引数 failureReason と targetFile に基づく厳格解析）
+    // 2. ローカルLLM未接続時の決定論的分析（固定ダミーではなく、実引数 failureReason と targetFile に基づく厳格解析）
     const isBoundary = /boundary|null|undefined|range|negative|out of/i.test(failureReason);
     const isTypeOrSyntax = /syntax|type|cannot read|is not a function/i.test(failureReason);
     const isInvariant = /invariant|rule|contract|forbidden|security|key/i.test(failureReason);
@@ -3311,9 +3434,8 @@ app.post('/api/self-code/big-o-optimize', async (req, res) => {
       return res.status(400).json({ error: 'Code is required' });
     }
 
-    // 1. LLM利用可能時は入力コードそのものを解析し、本物の最適化パッチを生成
-    const ai = getAIClient(req);
-    if (ai) {
+    // 1. ローカルLLMで入力コードそのものを解析し、本物の最適化パッチを生成 (Geminiは使わない方針)
+    {
       try {
         const prompt = `あなたはMIKI-AIの計算量・アルゴリズム最適化エンジンです。
 以下のTypeScriptコードの時間計算量・空間計算量を解析し、計算量を改善したコードと差分をJSON形式のみで出力してください。
@@ -3330,10 +3452,11 @@ ${code.slice(0, 3000)}
   "optimizedCode": "入力コードを実際に書き直した完全な最適化コード",
   "patchDiff": "SEARCH/REPLACE形式の差分"
 }`;
-        const { response } = await generateContentWithFallback(req, {
-          contents: prompt,
-          config: { temperature: 0.1, maxOutputTokens: 1500 },
-        });
+        const { response } = await generateWithLocalLlmOnly(
+          { contents: prompt, config: { temperature: 0.1, maxOutputTokens: 1500 } },
+          req.body?.localLlmEndpoint,
+          req.body?.localLlmModel
+        );
         const text = response?.text?.trim() || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
