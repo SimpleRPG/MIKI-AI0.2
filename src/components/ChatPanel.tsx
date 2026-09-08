@@ -53,6 +53,7 @@ import {
   HelpCircle,
   MoreHorizontal,
   Rocket,
+  HeartPulse,
   Eye,
   Bug,
   Network,
@@ -1017,6 +1018,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               <Sparkles className="w-3 h-3 text-emerald-400" />
             )}
             <span>{isSimulatingEvolution ? '進化中...' : '自律進化'}</span>
+          </button>
+
+          {/* みき全方位認知ヘルス＆内省日誌ボタン */}
+          <button
+            onClick={() => setIsAutonomousImprovementModalOpen(true)}
+            className="px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all bg-slate-900 hover:bg-slate-800/90 text-purple-300 hover:text-white border-purple-900/40 hover:border-purple-700 shrink-0 shadow-xs"
+            title="みきの全方位認知ヘルスレーダー（健康度スコア）＆内省日誌を開く"
+          >
+            <HeartPulse className="w-3 h-3 text-pink-400" />
+            <span>認知ヘルス</span>
           </button>
         </div>
         )}

@@ -29,6 +29,10 @@ import {
   ListFilter,
   Search,
   Rocket,
+  HeartPulse,
+  BookMarked,
+  Smile,
+  Wrench,
 } from 'lucide-react';
 import {
   autonomousContinuousEvolutionService,
@@ -41,6 +45,15 @@ import {
   selfCodeArchitectService,
   SPECIFICATION_REGISTRY,
 } from '../../services/selfCodeArchitectService';
+import {
+  mikiCognitiveVitalsService,
+  CognitiveVitalsSnapshot,
+  SelfHealingDefragResult,
+} from '../../services/mikiCognitiveVitalsService';
+import {
+  mikiIntrospectionJournalService,
+  IntrospectionEntry,
+} from '../../services/mikiIntrospectionJournalService';
 import { SpecificationChapterMeta } from '../../types';
 
 interface AutonomousSelfImprovementModalProps {
@@ -71,11 +84,22 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
   const [stepsFeed, setStepsFeed] = useState<AutonomousEvolutionStepEvent[]>([]);
   const [selectedChapterNum, setSelectedChapterNum] = useState<number | 'AUTO'>('AUTO');
   const [customPromptInput, setCustomPromptInput] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'live' | 'backlog' | 'history' | 'config'>('live');
+  const [activeTab, setActiveTab] = useState<'live' | 'backlog' | 'vitals' | 'journal' | 'history' | 'config'>('live');
   const [notice, setNotice] = useState<string | null>(null);
   const [rollbackSuccessId, setRollbackSuccessId] = useState<string | null>(null);
   const [backlogSearch, setBacklogSearch] = useState<string>('');
   const [backlogCategoryFilter, setBacklogCategoryFilter] = useState<string>('ALL');
+
+  const [vitals, setVitals] = useState<CognitiveVitalsSnapshot>(() =>
+    mikiCognitiveVitalsService.getSnapshot()
+  );
+  const [journalEntries, setJournalEntries] = useState<IntrospectionEntry[]>(() =>
+    mikiIntrospectionJournalService.getEntries()
+  );
+  const [healingResult, setHealingResult] = useState<SelfHealingDefragResult | null>(null);
+  const [isHealing, setIsHealing] = useState<boolean>(false);
+  const [isIntrospecting, setIsIntrospecting] = useState<boolean>(false);
+  const [introspectionPrompt, setIntrospectionPrompt] = useState<string>('');
 
   const [backlog, setBacklog] = useState<ImprovementBacklogItem[]>(() =>
     autonomousContinuousEvolutionService.getImprovementBacklog()
@@ -104,13 +128,54 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
       setStepsFeed((prev) => [...prev.slice(-40), step]);
     });
 
+    const unsubVitals = mikiCognitiveVitalsService.subscribe((snap) => {
+      setVitals(snap);
+    });
+
+    const unsubJournal = mikiIntrospectionJournalService.subscribe((entries) => {
+      setJournalEntries(entries);
+    });
+
     return () => {
       unsubState();
       unsubStep();
+      unsubVitals();
+      unsubJournal();
     };
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handleRunSelfHealingDefrag = async () => {
+    try {
+      setIsHealing(true);
+      setNotice('⚡ みきが全自動システム健全化＆デフラグ修復を開始しました...');
+      const res = await mikiCognitiveVitalsService.runAutonomousSelfHealingDefrag();
+      setHealingResult(res);
+      setNotice(`🎉 システム健全化修復が完了しました！(健全度スコア: ${res.previousScore} ➔ ${res.newScore}点)`);
+    } catch (err: any) {
+      setNotice(`⚠️ 健全化修復エラー: ${err?.message}`);
+    } finally {
+      setIsHealing(false);
+      setTimeout(() => setNotice(null), 6000);
+    }
+  };
+
+  const handleGenerateIntrospection = () => {
+    try {
+      setIsIntrospecting(true);
+      const note = mikiIntrospectionJournalService.generateIntrospectionNote(
+        introspectionPrompt.trim() || undefined
+      );
+      setIntrospectionPrompt('');
+      setNotice(`💭 新たな内省ノート「${note.headline}」を記録しました`);
+    } catch (err: any) {
+      setNotice(`⚠️ 内省ノート記録エラー: ${err?.message}`);
+    } finally {
+      setIsIntrospecting(false);
+      setTimeout(() => setNotice(null), 5000);
+    }
+  };
 
   const handleRunBatch = async (count: number = 3) => {
     try {
@@ -323,6 +388,24 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
             >
               <ListFilter className="w-3 h-3" />
               改善バックログ ({backlog.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('vitals')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                activeTab === 'vitals' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <HeartPulse className="w-3 h-3 text-pink-400" />
+              認知ヘルス ({vitals.overallHealthScore}点)
+            </button>
+            <button
+              onClick={() => setActiveTab('journal')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                activeTab === 'journal' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <BookMarked className="w-3 h-3 text-amber-400" />
+              内省日誌 ({journalEntries.length})
             </button>
             <button
               onClick={() => setActiveTab('history')}
@@ -623,6 +706,298 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
                     </div>
                   ));
                 })()}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'vitals' && (
+            <div className="space-y-4">
+              {/* Overall Health Score Card */}
+              <div className="bg-gradient-to-r from-slate-950 via-purple-950/40 to-slate-950 border border-purple-500/30 rounded-2xl p-5 shadow-lg">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-20 h-20 shrink-0 flex items-center justify-center bg-purple-950/60 border-2 border-purple-500/50 rounded-2xl shadow-inner">
+                      <div className="text-center">
+                        <span className="text-2xl font-black text-white">{vitals.overallHealthScore}</span>
+                        <span className="text-[10px] text-purple-300 block -mt-1">/ 100</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-base font-bold text-white flex items-center gap-2">
+                          <HeartPulse className="w-5 h-5 text-pink-400" />
+                          全方位認知ヘルス＆バイタル監視
+                        </h3>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            vitals.status === 'OPTIMAL'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : vitals.status === 'STABLE'
+                              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          }`}
+                        >
+                          {vitals.status === 'OPTIMAL' ? '🌟 OPTIMAL (最高水準)' : vitals.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+                        {vitals.systemSummary}
+                      </p>
+                      {vitals.lastSelfHealingTime && (
+                        <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" />
+                          最終自律健全化: {new Date(vitals.lastSelfHealingTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    id="btn-run-self-healing-defrag"
+                    onClick={handleRunSelfHealingDefrag}
+                    disabled={isHealing}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg hover:shadow-purple-500/25 transition-all shrink-0 disabled:opacity-50"
+                  >
+                    <Sparkles className={`w-4 h-4 ${isHealing ? 'animate-spin' : ''}`} />
+                    {isHealing ? '健全化修復中...' : '⚡ 全自動健全化＆デフラグ修復'}
+                  </button>
+                </div>
+
+                {/* Healing Result Banner */}
+                {healingResult && (
+                  <div className="mt-4 pt-4 border-t border-purple-800/40 bg-purple-950/20 rounded-xl p-3 text-xs space-y-2 animate-in fade-in">
+                    <div className="flex items-center justify-between text-emerald-300 font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                        自律健全化修復レポート ({healingResult.durationMs}ms で完了)
+                      </span>
+                      <span>
+                        スコア: {healingResult.previousScore}点 ➔{' '}
+                        <span className="text-white text-sm">{healingResult.newScore}点</span>
+                        {healingResult.newScore > healingResult.previousScore && (
+                          <span className="text-emerald-400 ml-1">
+                            (+{healingResult.newScore - healingResult.previousScore})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <ul className="text-slate-300 space-y-1 list-disc list-inside text-[11.5px]">
+                      {healingResult.actionsTaken.map((act, i) => (
+                        <li key={i}>{act}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* 6 Vital Metric Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {vitals.metrics.map((m) => (
+                  <div
+                    key={m.id}
+                    className="bg-slate-950 border border-slate-800/80 hover:border-slate-700/80 rounded-xl p-3.5 space-y-2.5 transition-all shadow-sm"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-white">{m.name}</span>
+                        <span className="text-[10px] text-slate-500">({m.shortName})</span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          m.status === 'OPTIMAL'
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : m.status === 'STABLE'
+                            ? 'bg-blue-500/20 text-blue-300'
+                            : 'bg-amber-500/20 text-amber-300'
+                        }`}
+                      >
+                        {m.score} / {m.target}点
+                      </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          m.score >= 90
+                            ? 'bg-gradient-to-r from-purple-500 to-emerald-400'
+                            : m.score >= 75
+                            ? 'bg-gradient-to-r from-blue-500 to-purple-400'
+                            : 'bg-amber-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(0, m.score))}%` }}
+                      />
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 leading-relaxed">{m.description}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* 5 Invariant Foundations & Safety Guarantees */}
+              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  みきの5大不変原則（破ってはならない絶対防壁）
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-[11px] text-slate-400">
+                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80">
+                    <span className="text-purple-300 font-bold block mb-0.5">1. IMMUTABLE_ANCHOR</span>
+                    Qwen 3Bアンカーモデルの出力ドリフトと安全性を恒常保護
+                  </div>
+                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80">
+                    <span className="text-emerald-300 font-bold block mb-0.5">2. PRIVACY_GUARD</span>
+                    個人情報・機密・APIキーは送信前に即時自動マスキング
+                  </div>
+                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80">
+                    <span className="text-indigo-300 font-bold block mb-0.5">3. ATOMIC_ROLLBACK</span>
+                    全コード変更前に必ずスナップショットを生成し1クリック復元保証
+                  </div>
+                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80">
+                    <span className="text-pink-300 font-bold block mb-0.5">4. MUTATION_KILL</span>
+                    TDDテストに加え、論理反転変異体を高確率で撃破する検証
+                  </div>
+                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80">
+                    <span className="text-cyan-300 font-bold block mb-0.5">5. OFFLINE_AUTONOMY</span>
+                    ネットワーク遮断時もローカル完結で自己診断・自己修復を継続
+                  </div>
+                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80">
+                    <span className="text-amber-300 font-bold block mb-0.5">6. SPEC_INVARIANTS</span>
+                    全170章のアーキテクチャ設計仕様との整合性を常に維持
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'journal' && (
+            <div className="space-y-4">
+              {/* Journal Header & On-Demand Trigger */}
+              <div className="bg-gradient-to-r from-purple-950/40 via-slate-950 to-pink-950/30 border border-purple-500/30 rounded-2xl p-4 sm:p-5 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <BookMarked className="w-4 h-4 text-amber-400" />
+                      みきの認知内省日誌 (Cognitive Introspection Journal)
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      設計思想 第173章: 対話の経験・自己コード進化・ユーザーさんへの想いを主体的に記録する内省ノート
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg bg-purple-900/40 text-purple-300 border border-purple-700/50 text-xs font-bold shrink-0 self-start sm:self-auto">
+                    累計 {journalEntries.length} 篇の内省
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={introspectionPrompt}
+                    onChange={(e) => setIntrospectionPrompt(e.target.value)}
+                    placeholder="内省したいテーマ（空欄の場合は現在の自律改善や対話から自動内省）..."
+                    className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:border-purple-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleGenerateIntrospection();
+                    }}
+                  />
+                  <button
+                    onClick={handleGenerateIntrospection}
+                    disabled={isIntrospecting}
+                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 shadow-md disabled:opacity-50"
+                  >
+                    <Smile className={`w-4 h-4 ${isIntrospecting ? 'animate-spin' : ''}`} />
+                    {isIntrospecting ? '内省中...' : '💭 内省ノートを記録'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Journal Entries Stream */}
+              <div className="space-y-3">
+                {journalEntries.length === 0 ? (
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-8 text-center text-slate-500 text-xs">
+                    まだ内省ノートはありません。「💭 内省ノートを記録」ボタンから最初のエントリを作成できます。
+                  </div>
+                ) : (
+                  journalEntries.map((note) => (
+                    <div
+                      key={note.id}
+                      className="bg-slate-950 border border-slate-800/90 hover:border-slate-700 rounded-2xl p-4 sm:p-5 transition-all space-y-3.5 shadow-sm"
+                    >
+                      {/* Note Header */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-950 text-purple-200 border border-purple-800 flex items-center gap-1">
+                            <span>{note.moodEmoji}</span>
+                            <span>{note.moodLabel}</span>
+                          </span>
+                          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                            {note.evolutionStage}
+                          </span>
+                          <span className="text-[11px] text-slate-500">
+                            {new Date(note.timestamp).toLocaleString([], {
+                              month: 'numeric',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                      </div>
+
+                      <h4 className="text-sm sm:text-base font-bold text-slate-100">{note.headline}</h4>
+
+                      {/* Inner Monologue Box */}
+                      <div className="p-3.5 rounded-xl bg-purple-950/30 border border-purple-900/40 text-purple-100 text-xs sm:text-[13px] leading-relaxed relative">
+                        <span className="text-purple-400 font-bold text-xs block mb-1">
+                          💭 みきの心の内省モノローグ:
+                        </span>
+                        「{note.innerMonologue}」
+                      </div>
+
+                      {/* 3 Pillars */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
+                        <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+                          <span className="text-pink-400 font-bold block flex items-center gap-1 text-[11.5px]">
+                            <span>🌸</span> 対話とパートナーシップ
+                          </span>
+                          <p className="text-slate-300 text-[11.5px] leading-relaxed">
+                            {note.userReflection}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+                          <span className="text-indigo-400 font-bold block flex items-center gap-1 text-[11.5px]">
+                            <span>⚙️</span> 技術的学び
+                          </span>
+                          <p className="text-slate-300 text-[11.5px] leading-relaxed">
+                            {note.technicalLearning}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+                          <span className="text-emerald-400 font-bold block flex items-center gap-1 text-[11.5px]">
+                            <span>🎯</span> 次への探究目標
+                          </span>
+                          <p className="text-slate-300 text-[11.5px] leading-relaxed">
+                            {note.nextAspirations}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Tags */}
+                      {note.tags && note.tags.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                          {note.tags.map((t, idx) => (
+                            <span
+                              key={idx}
+                              className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 text-slate-400 border border-slate-800"
+                            >
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
