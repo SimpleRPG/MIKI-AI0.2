@@ -374,7 +374,15 @@ export class AutonomousContinuousEvolutionService {
 
       let currentCode = implResult.code;
       const isFallbackTemplate = implResult.generationMethod === 'fallback_template';
-      if (isFallbackTemplate) {
+      const isTeacherAssistedTemplate = implResult.generationMethod === 'teacher_assisted_template';
+      if (isTeacherAssistedTemplate) {
+        logStep(
+          'SYNTHESIS',
+          '教師支援テンプレート獲得 (本体実装待ち)',
+          `📘 教師モデル(Gemini)より汎用設計テンプレートおよびSkill IRを獲得しました。第3回・第4回指示書に基づき、本体ローカルLLMによる本実装が未完のため、要件実装は保留されます。`,
+          'WARNING'
+        );
+      } else if (isFallbackTemplate) {
         logStep(
           'SYNTHESIS',
           '雛形スタブ合成 (ローカルLLMオフライン)',
@@ -382,7 +390,7 @@ export class AutonomousContinuousEvolutionService {
           'WARNING'
         );
       } else {
-        logStep('SYNTHESIS', 'コード合成完了', `${implResult.linesCount}行のTypeScriptコードを合成しました`, 'SUCCESS');
+        logStep('SYNTHESIS', 'コード合成完了', `${implResult.linesCount}行のTypeScriptコードを合成しました (${implResult.generationMethod === 'llm_local' ? '本体ローカルLLM自力実装' : '検証済コード'})`, 'SUCCESS');
       }
 
       // ── Step 5: AST構文検査 & TDD単体テスト & 循環参照自動検証 ──
@@ -481,10 +489,29 @@ export class AutonomousContinuousEvolutionService {
       );
 
       // ── Step 9: 仕様書レジストリと適合スコアの同期 ──
-      const isFullRequirementMet = !isFallbackTemplate && (finalApply.isRequirementImplemented ?? true);
+      // 【第3回・第4回指示書 厳格遵守】:
+      // 章が COMPLETED になれるのは、mikiSelfCodingSuperchargerService.runAutonomousImplementation() の結果が
+      // applied === true かつ generationMethod === 'llm_local' (または override) の場合のみ。
+      // 教師モデル(Gemini)による設計テンプレート・Skill IR取得時は、直接コード採用ではなく
+      // 「TEACHER_ASSISTED_PENDING（教師支援済・本体実装待ち）」として保持する。
+      const isFullRequirementMet =
+        !isFallbackTemplate &&
+        !isTeacherAssistedTemplate &&
+        (finalApply.generationMethod === 'llm_local' || finalApply.generationMethod === 'override') &&
+        (finalApply.isRequirementImplemented ?? false);
+
       if (targetInfo.chapter) {
         if (isFullRequirementMet) {
           targetInfo.chapter.status = 'COMPLETED';
+        } else if (isTeacherAssistedTemplate || finalApply.teacherAssisted?.templateAcquired) {
+          targetInfo.chapter.status = 'TEACHER_ASSISTED_PENDING';
+          targetInfo.chapter.teacherAssisted = {
+            templateAcquired: true,
+            skillId: finalApply.teacherAssisted?.skillId,
+            rules: finalApply.teacherAssisted?.rules,
+            templateSnippet: finalApply.teacherAssisted?.skeletonTemplate?.slice(0, 300),
+            timestamp: Date.now(),
+          };
         } else {
           targetInfo.chapter.status = 'IN_PROGRESS';
         }
@@ -498,7 +525,14 @@ export class AutonomousContinuousEvolutionService {
         logStep(
           'COMPLETED',
           '自律自己改善完了 🎉',
-          `適合スコア: ${previousScore}点 ➔ ${newScore}点 (+${Math.max(0, newScore - previousScore)}点)。全工程および仕様要件の実装を安全に完遂しました。`,
+          `適合スコア: ${previousScore}点 ➔ ${newScore}点 (+${Math.max(0, newScore - previousScore)}点)。本体ローカルLLMによる全工程および仕様要件の本実装を安全に完遂しました。`,
+          'SUCCESS'
+        );
+      } else if (isTeacherAssistedTemplate || finalApply.teacherAssisted?.templateAcquired) {
+        logStep(
+          'COMPLETED',
+          '教師支援テンプレート配備完了 (本体実装待ち) 📘',
+          `適合スコア: ${previousScore}点 (変化なし)。教師モデル(Gemini)より汎用設計原則・Skill IR・抽象骨格を獲得し蓄積しました。第${targetInfo.chapter?.chapterNumber}章は「教師支援済・本体実装待ち (TEACHER_ASSISTED_PENDING)」として保持されます。`,
           'SUCCESS'
         );
       } else {

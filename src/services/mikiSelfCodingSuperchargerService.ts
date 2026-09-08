@@ -1,6 +1,7 @@
 import { systemLogger } from './systemLogger';
 import { AutonomousVerificationData } from '../types';
 import { callSelfCodeApi, isApiFailure } from './selfCodeApiClient';
+import { skillIrCompilerService } from './skillIrCompilerService';
 
 export interface CouncilCheckItem {
   label: string;
@@ -142,8 +143,15 @@ export interface SelfImplementationResult {
   syntaxError: string | null;
   reasoning: string;
   code: string;
-  generationMethod?: 'llm_local' | 'llm_gemini' | 'fallback_template' | 'override' | 'llm';
+  generationMethod?: 'llm_local' | 'llm_gemini' | 'teacher_assisted_template' | 'fallback_template' | 'override' | 'llm';
   isRequirementImplemented?: boolean;
+  teacherAssisted?: {
+    templateAcquired: boolean;
+    skillId?: string;
+    category?: string;
+    rules?: string[];
+    skeletonTemplate?: string;
+  } | null;
   qualityGatePassed?: boolean;
   qualityGateScore?: number;
   originalContent?: string;
@@ -376,7 +384,19 @@ class MikiSelfCodingSuperchargerService {
         linesCount: 0,
       };
     }
-    systemLogger.info('SELF_IMPROVEMENT', `[自律自己実装] ${res.targetFile} へ適用完了 (Commit: ${res.commitHash || 'N/A'})`);
+    if (res.teacherAssisted?.templateAcquired && res.teacherAssisted.rules && res.teacherAssisted.rules.length > 0) {
+      try {
+        skillIrCompilerService.compileTeacherGuidanceToIR(
+          res.teacherAssisted.category || 'general_architecture',
+          `教師設計原則 (${res.targetFile.split('/').pop() || 'Module'})`,
+          res.teacherAssisted.rules,
+          res.teacherAssisted.skeletonTemplate
+        );
+      } catch (e) {
+        console.warn('Skill IR compilation warning:', e);
+      }
+    }
+    systemLogger.info('SELF_IMPROVEMENT', `[自律自己実装] ${res.targetFile} へ適用完了 (Commit: ${res.commitHash || 'N/A'}, Method: ${res.generationMethod || 'unknown'})`);
     return res;
   }
 

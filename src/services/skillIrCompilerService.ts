@@ -32,6 +32,8 @@ export interface CompiledSkillIR {
   outputSignature: string;
   instructions: SkillInstruction[];
   compiledAt: string;
+  category?: string;
+  skeletonTemplate?: string;
 }
 
 export interface SkillVmExecutionResult {
@@ -100,6 +102,57 @@ class SkillIrCompilerService {
 
     this.irRegistry.set(skillId, compiled);
     systemLogger.info('SELF_IMPROVEMENT', `[第83章 技能コンパイラ] スキル「${skillName}」をSkill IR (${instructions.length}命令)へコンパイル完了`);
+    return compiled;
+  }
+
+  /**
+   * 第4回指示書: 教師（Gemini）から教わった汎用設計テンプレート・チェックリストを
+   * 再利用可能なSkill IRとしてコンパイル・登録
+   */
+  public compileTeacherGuidanceToIR(
+    category: string,
+    skillName: string,
+    rules: string[],
+    skeletonTemplate?: string
+  ): CompiledSkillIR {
+    const skillId = `skill_ir_${category}_${Date.now()}`;
+    const instructions: SkillInstruction[] = [
+      { opcode: 'OP_ASSERT_PRECONDITION', operands: ['System Invariants Clear', `Domain: ${category}`], comment: '不変条件およびドメイン契約確認' },
+    ];
+
+    for (const rule of rules) {
+      instructions.push({
+        opcode: 'OP_TRANSFORM',
+        operands: [rule],
+        comment: `教師設計原則: ${rule.slice(0, 40)}`,
+      });
+    }
+
+    if (skeletonTemplate) {
+      instructions.push({
+        opcode: 'OP_RECALL_MEMORY',
+        operands: [`SkeletonTemplateRef:${skeletonTemplate.slice(0, 50)}...`],
+        comment: '抽象設計骨格の想起',
+      });
+    }
+
+    instructions.push({ opcode: 'OP_VALIDATE_POSTCONDITION', operands: ['Output Non-Null and Safe', 'No Mock Stubs'] });
+    instructions.push({ opcode: 'OP_RETURN_RESULT', operands: ['ConcreteImplementationContext'] });
+
+    const compiled: CompiledSkillIR = {
+      skillId,
+      skillName,
+      version: '1.0.0',
+      category,
+      skeletonTemplate,
+      inputSignature: ['taskPrompt: string', 'targetFile: string'],
+      outputSignature: 'VerifiedTypeScriptCode',
+      instructions,
+      compiledAt: new Date().toISOString(),
+    };
+
+    this.irRegistry.set(skillId, compiled);
+    systemLogger.info('SELF_IMPROVEMENT', `[第83章 技能コンパイラ] 教師設計原則「${skillName}」(${rules.length}原則)をSkill IRへコンパイル・蓄積完了`);
     return compiled;
   }
 

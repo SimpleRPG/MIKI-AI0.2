@@ -3076,6 +3076,51 @@ app.get('/api/self-code/gap-recommendations', (req, res) => {
   return res.json({ success: true, recommendations });
 });
 
+// ── 第4回指示書: 教師（Gemini）設計テンプレート・汎用原則蓄積ストレージ ──
+interface TeacherSkillRecord {
+  id: string;
+  category: string;
+  tags: string[];
+  rules: string[];
+  skeletonTemplate: string;
+  sourceTask: string;
+  createdAt: number;
+  usageCount: number;
+}
+
+const TEACHER_SKILLS_FILE = path.join(process.cwd(), '.miki_teacher_skills.json');
+
+function loadTeacherSkills(): TeacherSkillRecord[] {
+  try {
+    if (fs.existsSync(TEACHER_SKILLS_FILE)) {
+      return JSON.parse(fs.readFileSync(TEACHER_SKILLS_FILE, 'utf-8'));
+    }
+  } catch {}
+  return [];
+}
+
+function saveTeacherSkill(record: TeacherSkillRecord) {
+  try {
+    const list = loadTeacherSkills();
+    list.unshift(record);
+    fs.writeFileSync(TEACHER_SKILLS_FILE, JSON.stringify(list.slice(0, 50), null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('Teacher skill save error:', e);
+  }
+}
+
+function findRelevantTeacherSkills(prompt: string): TeacherSkillRecord[] {
+  const skills = loadTeacherSkills();
+  if (skills.length === 0) return [];
+  const lower = prompt.toLowerCase();
+  return skills.filter(s => s.tags.some(t => lower.includes(t.toLowerCase())) || lower.includes(s.category.toLowerCase())).slice(0, 2);
+}
+
+app.get('/api/self-code/teacher-skills', (req, res) => {
+  const skills = loadTeacherSkills();
+  res.json({ success: true, skills });
+});
+
 // 自律自己実装パイプライン (Prompt -> AST Plan -> Snapshot -> Verify -> Apply -> Commit)
 app.post('/api/self-code/autonomous-implement', async (req, res) => {
   try {
@@ -3121,50 +3166,229 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
     // 3. コード生成 (または直接指定された検証済みコードの採用)
     let generatedCode = '';
     let reasoning = '';
-    let generationMethod: 'llm_local' | 'llm_gemini' | 'fallback_template' | 'override' = 'fallback_template';
+    let generationMethod: 'llm_local' | 'llm_gemini' | 'teacher_assisted_template' | 'fallback_template' | 'override' = 'fallback_template';
+    let teacherAssistedData: {
+      templateAcquired: boolean;
+      skillId?: string;
+      category?: string;
+      rules?: string[];
+      skeletonTemplate?: string;
+    } | null = null;
 
     if (req.body.codeOverride && typeof req.body.codeOverride === 'string') {
       generatedCode = req.body.codeOverride;
       reasoning = req.body.reasoning || `自律検証・自己修復パイプラインを通過したコードを採用しました。`;
       generationMethod = 'override';
     } else {
-      try {
-        const aiPrompt = `あなたは自律型AIエンジニア「みき」です。以下の要求を満たす本番対応の高品質なTypeScriptコード（モジュールまたはパッチ）を1ファイル分、完全なコードとして生成してください。
+      // 1. まず関連する既存の教師Skill IR (汎用原則・設計テンプレート) があれば取得
+      const relevantSkills = findRelevantTeacherSkills(prompt);
+      let skillGuidancePrompt = '';
+      if (relevantSkills.length > 0) {
+        skillGuidancePrompt = relevantSkills
+          .map(
+            (s, idx) =>
+              `【蓄積された教師原則 ${idx + 1}: ${s.category}】\n` +
+              s.rules.map((r) => `- ${r}`).join('\n')
+          )
+          .join('\n\n');
+      }
+
+      // 2. 本体ローカルLLM (Qwen / llama-server) による自力実装を最優先試行
+      // 【第3回・第4回指示書: 自律改善の推論にGeminiは一切使わない。本体コード生成はローカルLLMのみ】
+      const localLlmPrompt = `あなたは自律型AIエンジニア「みき」です。以下の要求を満たす本番対応の高品質なTypeScriptコード（モジュールまたはパッチ）を1ファイル分、完全なコードとして自力で生成してください。
 【要求】: ${prompt}
 【対象ファイル】: ${targetFile}
+${skillGuidancePrompt ? `\n【参考: 教師モデルから教わった汎用設計原則・Skill IR】:\n${skillGuidancePrompt}\n` : ''}
 【要件】:
 - 完全なTypeScriptコードを出力（Markdownのコードブロック \`\`\`typescript ... \`\`\` で囲む）
 - エラーハンドリング、厳格な型定義、不変条件チェックを含める
 - any型の使用を避け、インターフェースを明確に定義する
 - 単体テストしやすい構造にする`;
 
-        const genRes = await generateWithLocalOrGeminiFallback(
-          req,
-          { contents: aiPrompt, config: { temperature: 0.2 } },
+      let localSucceeded = false;
+      try {
+        const local = await callLocalLlmChat(
+          localLlmPrompt,
+          { temperature: 0.2 },
           req.body?.localLlmEndpoint,
           req.body?.localLlmModel
         );
-
-        const text = genRes.response?.candidates?.[0]?.content?.parts?.[0]?.text || genRes.response?.text || '';
-        const match = text.match(/```(?:typescript|ts)?([\s\S]*?)```/);
-        const extracted = match && match[1] ? match[1].trim() : text.trim();
-        if (extracted && (extracted.includes('export') || extracted.includes('class') || extracted.includes('function') || extracted.includes('interface'))) {
-          generatedCode = extracted;
-          if (genRes.isLocal) {
+        if (local && local.text && local.text.trim().length > 0) {
+          const match = local.text.match(/```(?:typescript|ts)?([\s\S]*?)```/);
+          const extracted = match && match[1] ? match[1].trim() : local.text.trim();
+          if (
+            extracted &&
+            (extracted.includes('export') ||
+              extracted.includes('class') ||
+              extracted.includes('function') ||
+              extracted.includes('interface'))
+          ) {
+            generatedCode = extracted;
             generationMethod = 'llm_local';
-            reasoning = `みきローカルLLM (${genRes.modelUsed.replace('local:', '')}) が要求『${prompt.slice(0, 40)}』を解析し、完全なTypeScriptモジュールを自律生成しました。`;
-          } else {
-            generationMethod = 'llm_gemini';
-            reasoning = `Gemini (${genRes.modelUsed}) が要求『${prompt.slice(0, 40)}』を解析し、本番TypeScriptモジュールを自律生成しました。`;
+            reasoning = `みきローカルLLM (${local.modelUsed.replace('local:', '')}) が要求『${prompt.slice(0, 40)}』を自力で解析し、本番TypeScriptモジュールを自律生成しました。`;
+            localSucceeded = true;
           }
         }
-      } catch (aiErr: any) {
-        console.warn('Autonomous implement LLM generation failed:', aiErr?.message);
+      } catch (localErr: any) {
+        console.warn('[Self-Code] Local LLM attempt notice:', localErr?.message);
+      }
+
+      // 3. ローカルLLMがオフラインまたは生成失敗した場合:
+      // 【第4回指示書: Geminiに教わって良いのは「書き方・テンプレート」まで。直接の答え（完成コード）はNG】
+      // Geminiにタスクの直接の完成コードを書かせるのではなく、
+      // (a) 抽象的な汎用設計テンプレート（骨格・型インターフェース）
+      // (b) TypeScript設計原則・チェックリスト（箇条書き）
+      // を教師（シニアアーキテクト）として教わり、Skill IRとして蓄積する。
+      if (!localSucceeded) {
+        try {
+          const teacherPrompt = `あなたはAI「みき」の教師（シニアソフトウェアアーキテクト）です。
+みき（本体ローカルLLM）が自力でコードを設計・実装できるように、以下の機能領域に関する【汎用設計テンプレート（抽象骨格コード）】および【守るべきTypeScript設計原則・チェックリスト】を提示してください。
+
+【機能カテゴリ/要求】: ${prompt}
+【対象モジュール想定】: ${targetFile}
+
+⚠️ 【絶対厳守ルール（第4回指示書）】:
+1. 特定タスクに対する完成コード（直接の答え）を出力してはなりません。具体的な業務ロジックは書かず、プレースホルダーやTODOとしてください。
+2. 出力すべきは、同種のモジュール全般で再利用可能な【抽象インターフェース、クラスの型骨格、エラーハンドリング構造】です。
+3. 箇条書きで【守るべきTypeScript設計原則・よくある落とし穴（アンチパターン）】を3〜5項目提示してください。
+
+回答フォーマット:
+### [設計原則・チェックリスト]
+- 原則1: ...
+- 原則2: ...
+- 原則3: ...
+
+### [汎用骨格テンプレート]
+\`\`\`typescript
+// 再利用可能な抽象骨格コード
+\`\`\`
+`;
+
+          const teacherRes = await generateContentWithFallback(req, {
+            contents: teacherPrompt,
+            config: { temperature: 0.2 },
+          });
+
+          const teacherText =
+            teacherRes.response?.candidates?.[0]?.content?.parts?.[0]?.text ||
+            teacherRes.response?.text ||
+            '';
+
+          if (teacherText) {
+            // ルールとテンプレートの抽出
+            const rules: string[] = [];
+            const lines = teacherText.split('\n');
+            let inRules = false;
+            for (const line of lines) {
+              if (line.includes('[設計原則') || line.includes('チェックリスト')) {
+                inRules = true;
+                continue;
+              }
+              if (inRules) {
+                if (line.startsWith('###') || line.startsWith('```')) {
+                  inRules = false;
+                } else {
+                  const trimmed = line.replace(/^[-*•\d.]\s*/, '').trim();
+                  if (trimmed.length > 5) {
+                    rules.push(trimmed);
+                  }
+                }
+              }
+            }
+
+            const codeMatch = teacherText.match(/```(?:typescript|ts)?([\s\S]*?)```/);
+            const rawTemplate = codeMatch && codeMatch[1] ? codeMatch[1].trim() : '';
+
+            // 汎用カテゴリタグの決定
+            const categoryMatch = prompt.match(/(キャッシュ|通信|安全|不変|検証|記憶|同期|キュー|監視|AST)/);
+            const categoryTag = categoryMatch ? `pattern_${categoryMatch[1]}` : 'generic_resilient_service';
+            const skillId = `skill_teacher_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+
+            const teacherSkillRecord: TeacherSkillRecord = {
+              id: skillId,
+              category: categoryTag,
+              tags: [categoryTag, 'typescript', 'architecture_template', 'invariant_safe'],
+              rules: rules.length > 0 ? rules : ['型定義を厳格に保持しanyを排除する', '不変条件の事前/事後アサーションを実施する', '例外安全と非同期リソース解放を徹底する'],
+              skeletonTemplate: rawTemplate,
+              sourceTask: prompt.slice(0, 80),
+              createdAt: Date.now(),
+              usageCount: 1,
+            };
+
+            // 蓄積ストレージへ保存（第4回指示書: タスクに依存しない再利用可能な技能として保存）
+            saveTeacherSkill(teacherSkillRecord);
+
+            teacherAssistedData = {
+              templateAcquired: true,
+              skillId: teacherSkillRecord.id,
+              category: teacherSkillRecord.category,
+              rules: teacherSkillRecord.rules,
+              skeletonTemplate: teacherSkillRecord.skeletonTemplate,
+            };
+
+            // 教師テンプレートと原則をローカルLLMに渡して再試行
+            try {
+              const retryLocalPrompt = `あなたはAI「みき」です。教師モデル（Gemini）から以下の汎用設計原則と骨格テンプレートを教わりました。これを参考にして、要求『${prompt}』を満たす具体的な業務ロジックを含む完全なTypeScriptコードを自力で実装してください。
+【教わった汎用設計原則】:
+${teacherSkillRecord.rules.map((r) => `- ${r}`).join('\n')}
+【汎用骨格テンプレート】:
+\`\`\`typescript
+${teacherSkillRecord.skeletonTemplate}
+\`\`\`
+【対象ファイル】: ${targetFile}`;
+
+              const retryLocal = await callLocalLlmChat(
+                retryLocalPrompt,
+                { temperature: 0.2 },
+                req.body?.localLlmEndpoint,
+                req.body?.localLlmModel
+              );
+              if (retryLocal && retryLocal.text && retryLocal.text.trim().length > 0) {
+                const match = retryLocal.text.match(/```(?:typescript|ts)?([\s\S]*?)```/);
+                const extracted = match && match[1] ? match[1].trim() : retryLocal.text.trim();
+                if (
+                  extracted &&
+                  (extracted.includes('export') ||
+                    extracted.includes('class') ||
+                    extracted.includes('function') ||
+                    extracted.includes('interface'))
+                ) {
+                  generatedCode = extracted;
+                  generationMethod = 'llm_local';
+                  reasoning = `みきローカルLLM (${retryLocal.modelUsed.replace('local:', '')}) が教師モデル(Gemini)の汎用設計テンプレートおよびSkill IR原則を参考に、本番TypeScriptモジュールを自力で実装・生成しました。`;
+                  localSucceeded = true;
+                }
+              }
+            } catch (retryErr: any) {
+              console.warn('[Self-Code] Retry local LLM with teacher scaffolding notice:', retryErr?.message);
+            }
+
+            // ローカルLLMが依然としてオフラインまたは失敗した場合:
+            // 【第3回・第4回指示書 核心】
+            // Geminiに直接コードを書かせて確定させてはならない。
+            // 抽象テンプレートを未実装スタブとして配置し、isRequirementImplemented: false とする。
+            if (!localSucceeded && rawTemplate) {
+              generatedCode = `/**
+ * MIKI-AI 自律生成モジュール (教師支援抽象テンプレート・本体実装待ち): ${prompt}
+ * 生成時刻: ${new Date().toISOString()}
+ * ⚠️ 注意: 教師モデル（Gemini）から汎用設計テンプレート・Skill IR (${skillId}) を取得しましたが、
+ * 第3回・第4回指示書に基づき、本体ローカルLLMによる本実装が完了していません。
+ * 本要件は「教師支援済・本体実装待ち (TEACHER_ASSISTED_PENDING)」として保持され、COMPLETED昇格は行われません。
+ */
+
+${rawTemplate}
+`;
+              generationMethod = 'teacher_assisted_template';
+              reasoning = `教師モデル(Gemini)より汎用設計テンプレートおよびSkill IRルール (${teacherSkillRecord.rules.length}項目) を獲得・蓄積しましたが、本体ローカルLLMによる本実装が未完のため、COMPLETED昇格は行わずスタブとして安全に保持しました。`;
+            }
+          }
+        } catch (geminiTeacherErr: any) {
+          console.warn('[Self-Code] Teacher assistance via Gemini notice:', geminiTeacherErr?.message);
+        }
       }
     }
 
-    // 最終フォールバック: ローカルLLMが使用不可だった場合のみ実行される、
-    // AIを一切使わない決定論的な文字列テンプレート生成。
+    // 最終フォールバック: ローカルLLMおよび教師モデルのいずれも利用不可だった場合
     if (!generatedCode) {
       generationMethod = 'fallback_template';
       let rawName = prompt
@@ -3181,8 +3405,8 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
       generatedCode = `/**
  * MIKI-AI 自律生成モジュール (未実装雛形スタブ): ${prompt}
  * 生成時刻: ${new Date().toISOString()}
- * ⚠️ 注意: ローカルLLMおよびGemini APIに接続できなかったため、要求仕様の型骨格スタブ (isStub: true) のみ生成されました。
- * 本要件の完全実装とCOMPLETED昇格には、オンライン推論リソース（Gemini APIまたはローカルLLM）有効時に再実行が必要です。
+ * ⚠️ 注意: ローカルLLMおよび教師モデルに接続できなかったため、要求仕様の型骨格スタブ (isStub: true) のみ生成されました。
+ * 本要件の完全実装とCOMPLETED昇格には、本体ローカルLLMによる本実装が必要です。
  */
 
 export interface ${className}Options {
@@ -3220,7 +3444,6 @@ export class ${className} {
     if (!this.options.enabled) {
       return { success: false, error: 'Module disabled', timestamp: Date.now() };
     }
-    // ⚠️ 未実装雛形スタブ: 実際の業務ロジックはLLM推論による本実装が必要です
     return {
       success: false,
       error: 'Unimplemented stub: requires real LLM implementation',
@@ -3249,7 +3472,7 @@ export class ${className} {
 
 export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${className}();
 `;
-      reasoning = `⚠️ ローカルLLMおよびGemini APIのいずれにも接続できなかったため、要求仕様『${prompt.slice(0, 40)}』の型骨格スタブ [${className}] (isStub: true) のみを生成しました。要件適合およびCOMPLETEDへの昇格には本実装が必要です。`;
+      reasoning = `⚠️ ローカルLLMおよび教師モデルのいずれにも接続できなかったため、要求仕様『${prompt.slice(0, 40)}』の型骨格スタブ [${className}] (isStub: true) のみを生成しました。要件適合およびCOMPLETEDへの昇格には本実装が必要です。`;
     }
 
     // 4. 構文検証 (TypeScript Transpilation Check)
@@ -3266,17 +3489,14 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
     }
 
     // 4.5 品質・安全ゲート (Council Review)
-    // 【不変原則】構文が壊れていないだけでは適用してはならない。
-    // セキュリティ (eval/機密平文保存/XSS)・クリーンコード・QA観点の自動レビューに
-    // 合格した場合のみ自動適用する。生成コードを検証なしに書き込むことは、
-    // このサーバー自身が council-review エンドポイントで課している基準への違反となる。
     const qualityGate = evaluateCouncilReview(generatedCode);
     const qualityGatePassed = qualityGate.unanimousApproval;
 
     // 5. 実際のファイル書き込み（autoApply が true かつ構文検証・品質ゲートの両方をパス時のみ）
     let applied = false;
     let commitHash = '';
-    const isReal = generationMethod === 'llm_local' || generationMethod === 'llm_gemini' || generationMethod === 'override';
+    // 【第3回・第4回指示書: COMPLETED/実装完了と認めるのは llm_local または override のみ】
+    const isReal = generationMethod === 'llm_local' || generationMethod === 'override';
 
     if (autoApply && syntaxCheckPassed && qualityGatePassed) {
       const targetDir = path.dirname(fullPath);
@@ -3290,15 +3510,23 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
       // コミット履歴に追加 (実スナップショット紐付け)
       try {
         const commits = fs.existsSync(COMMITS_FILE) ? JSON.parse(fs.readFileSync(COMMITS_FILE, 'utf-8')) : [];
+        const commitMsg = isReal
+          ? `feat(self-implement): ${prompt.slice(0, 60)} [${commitHash}]`
+          : generationMethod === 'teacher_assisted_template'
+          ? `stub(teacher-template): ${prompt.slice(0, 50)} [${commitHash}]`
+          : `stub(self-implement): ${prompt.slice(0, 60)} [${commitHash}]`;
+
         commits.unshift({
           hash: commitHash,
-          message: `${isReal ? 'feat(self-implement)' : 'stub(self-implement)'}: ${prompt.slice(0, 60)} [${commitHash}]`,
+          message: commitMsg,
           timestamp: Date.now(),
           files: [targetFile],
           status: 'COMMITTED',
           snapshots: [{ filePath: targetFile, snapshotId: isNewFile ? null : snapshotId }],
           isStub: !isReal,
-          engine: 'file_snapshot_change_tracker',
+          engine: generationMethod === 'llm_local' ? 'llm_local' : generationMethod === 'teacher_assisted_template' ? 'teacher_template' : 'fallback_template',
+          isTeacherAssisted: generationMethod === 'teacher_assisted_template' || !!teacherAssistedData?.templateAcquired,
+          skillId: teacherAssistedData?.skillId,
         });
         fs.writeFileSync(COMMITS_FILE, JSON.stringify(commits.slice(0, 50), null, 2), 'utf-8');
       } catch {}
@@ -3323,12 +3551,13 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
       code: generatedCode,
       generationMethod,
       isRequirementImplemented: isReal,
+      teacherAssisted: teacherAssistedData,
       originalContent: originalContent || '',
       linesCount: generatedCode.split('\n').length,
       lesson: {
         title: `自律実装: ${prompt.slice(0, 30)}`,
         rule: applied
-          ? `${targetFile} に${isReal ? '新機能本実装' : '型骨格スタブ'}を安全に書き込み、構文検証と品質ゲートを通過しました。`
+          ? `${targetFile} に${isReal ? '新機能本実装' : generationMethod === 'teacher_assisted_template' ? '教師設計テンプレート・スタブ' : '型骨格スタブ'}を安全に書き込み、構文検証と品質ゲートを通過しました。`
           : `${targetFile} 向けにコードを生成しましたが、検証または安全ゲート未達のため自動適用は行いませんでした。`,
       },
     });

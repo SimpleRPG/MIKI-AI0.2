@@ -56,6 +56,8 @@ export interface AiderCommitRecord {
   isStub?: boolean;
   engine?: string;
   author?: string;
+  isTeacherAssisted?: boolean;
+  skillId?: string;
 }
 
 export class AiderEngineService {

@@ -68,6 +68,17 @@ export class SelfCodeArchitectService {
           if (chap) chap.status = 'COMPLETED';
         }
       }
+      const rawTeacher = storageService.getItem('miki_teacher_assisted_chapters_v1');
+      if (rawTeacher) {
+        const list: Array<{ chapterNumber: number; teacherAssisted: any }> = JSON.parse(rawTeacher);
+        for (const item of list) {
+          const chap = SPECIFICATION_REGISTRY.find((c) => c.chapterNumber === item.chapterNumber);
+          if (chap && chap.status !== 'COMPLETED') {
+            chap.status = 'TEACHER_ASSISTED_PENDING';
+            chap.teacherAssisted = item.teacherAssisted;
+          }
+        }
+      }
     } catch (e) {
       console.warn('Failed to load completed chapters from storage:', e);
     }
@@ -77,6 +88,11 @@ export class SelfCodeArchitectService {
     try {
       const completedNums = SPECIFICATION_REGISTRY.filter((c) => c.status === 'COMPLETED').map((c) => c.chapterNumber);
       storageService.setItem(COMPLETED_CHAPTERS_KEY, JSON.stringify(completedNums));
+
+      const teacherAssisted = SPECIFICATION_REGISTRY
+        .filter((c) => c.status === 'TEACHER_ASSISTED_PENDING')
+        .map((c) => ({ chapterNumber: c.chapterNumber, teacherAssisted: c.teacherAssisted }));
+      storageService.setItem('miki_teacher_assisted_chapters_v1', JSON.stringify(teacherAssisted));
     } catch (e) {
       console.warn('Failed to save completed chapters:', e);
     }
@@ -463,10 +479,26 @@ export class SelfCodeArchitectService {
 
     proposal.status = 'APPLIED';
     
-    // 対象章のステータスを進行
+    // 対象章のステータスを進行（第3回・第4回指示書: COMPLETEDは本体ローカルLLMまたは明示的overrideのみ）
     const targetMeta = SPECIFICATION_REGISTRY.find((c) => c.chapterNumber === proposal.targetChapterNumber);
     if (targetMeta && targetMeta.status !== 'COMPLETED') {
-      targetMeta.status = 'COMPLETED';
+      const isLocalOrOverride = proposal.generationMethod === 'llm_local' || proposal.generationMethod === 'override';
+      if (isLocalOrOverride) {
+        targetMeta.status = 'COMPLETED';
+      } else if (proposal.generationMethod === 'teacher_assisted_template' || proposal.teacherAssisted?.templateAcquired) {
+        targetMeta.status = 'TEACHER_ASSISTED_PENDING';
+        if (proposal.teacherAssisted) {
+          targetMeta.teacherAssisted = {
+            templateAcquired: true,
+            skillId: proposal.teacherAssisted.skillId,
+            rules: proposal.teacherAssisted.rules,
+            templateSnippet: proposal.teacherAssisted.skeletonTemplate?.slice(0, 300),
+            timestamp: Date.now(),
+          };
+        }
+      } else {
+        targetMeta.status = 'IN_PROGRESS';
+      }
     }
 
     // 各章に応じた実体処理を実行（機能・パラメータの最適化と記録）

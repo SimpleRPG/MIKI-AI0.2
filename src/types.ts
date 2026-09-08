@@ -2608,7 +2608,7 @@ export interface FailureCatalogStats {
  * 設計思想 第29章, 第30章, 第53章, 第123-128章:
  * 設計思想仕様書メタデータ & 自己コード改善 (Self-Code Architect) 型定義
  */
-export type ChapterImplementationStatus = 'COMPLETED' | 'IN_PROGRESS' | 'UNIMPLEMENTED';
+export type ChapterImplementationStatus = 'COMPLETED' | 'IN_PROGRESS' | 'TEACHER_ASSISTED_PENDING' | 'UNIMPLEMENTED';
 
 export type ChapterCategory =
   | 'CORE_FOUNDATION'       // 第0章〜第13章: 中核基盤・記憶・コンテキスト
@@ -2633,6 +2633,13 @@ export interface SpecificationChapterMeta {
   responsibleServices?: string[];
   responsibleComponents?: string[];
   invariantGuarantees?: string[]; // 破ってはならない不変条件
+  teacherAssisted?: {
+    templateAcquired: boolean;
+    skillId?: string;
+    rules?: string[];
+    templateSnippet?: string;
+    timestamp: number;
+  };
 }
 
 export interface InvariantCheckItem {
@@ -2693,6 +2700,13 @@ export interface SelfImprovementProposal {
   expectedScoreImprovement: number;
   invariantsCheckPassed: boolean;
   status: 'PROPOSED' | 'SIMULATED' | 'APPLIED' | 'REJECTED' | 'ROLLED_BACK';
+  generationMethod?: 'llm_local' | 'llm_gemini' | 'teacher_assisted_template' | 'fallback_template' | 'override';
+  teacherAssisted?: {
+    templateAcquired: boolean;
+    skillId?: string;
+    rules?: string[];
+    skeletonTemplate?: string;
+  };
   simulatedDelta?: {
     complianceDelta: number;
     safetyPreserved: boolean;
