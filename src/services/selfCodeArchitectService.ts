@@ -31,7 +31,7 @@ import { autonomousSoftwareFactoryService } from './autonomousSoftwareFactorySer
 import { skillIrCompilerService } from './skillIrCompilerService';
 import { canaryDeploymentSafetyService } from './canaryDeploymentSafetyService';
 import { specAstParserService } from './specAstParserService';
-import { formalProofService } from './formalProofService';
+import { formalProofService, SkillContract } from './formalProofService';
 import { sandboxPermissionService } from './sandboxPermissionService';
 import { privacyGuardrailService } from './privacyGuardrailService';
 
@@ -519,13 +519,10 @@ export class SelfCodeArchitectService {
       };
     }
 
-    // 6. 各章に応じた実体処理の実行（実際の機能・パラメータの最適化）
-    this.executeConcreteChapterImprovement(targetChapter.chapterNumber, proposal);
-
-    // 7. 正式適用
+    // 6. 正式適用 (内部で executeConcreteChapterImprovement を実行)
     const applied = this.applyProposal(proposal.id);
 
-    // 8. 最新の監査結果を取得
+    // 7. 最新の監査結果を取得
     const updatedAudit = this.runSelfCodeAudit();
 
     const summary = applied
@@ -548,45 +545,56 @@ export class SelfCodeArchitectService {
   /**
    * 章ごとの具体的な実体改善処理
    */
-  private executeConcreteChapterImprovement(chapterNumber: number, proposal?: SelfImprovementProposal): void {
+  private async executeConcreteChapterImprovement(chapterNumber: number, proposal?: SelfImprovementProposal): Promise<void> {
     try {
+      // 提案データが渡されていない場合、提案ストレージから該当章の最新提案を取得
+      const resolvedProposal = proposal ?? this.proposals.find((p) => p.targetChapterNumber === chapterNumber);
+
       if (chapterNumber === 31) {
         // 第31章: 会話・コード理解を伸ばす新機能パッケージ
         systemLogger.info('SELF_IMPROVEMENT', '[第31章 実体改善] ライブリペア・会話タスクボード・思考理由説明器の連携パラメータを最適化しました');
       } else if (chapterNumber === 33) {
         // 第33章: 自律会話研究・能力境界
+        const boundaryTopic = resolvedProposal?.title ? `境界学習: ${resolvedProposal.title}` : (resolvedProposal?.description || `第${chapterNumber}章 能力境界学習`);
+        const confidence = resolvedProposal?.expectedScoreImprovement ? Math.min(1.0, 0.7 + resolvedProposal.expectedScoreImprovement * 0.03) : 0.88;
+        const objective = resolvedProposal?.contract?.objective || resolvedProposal?.description || '自律改善サイクルによる能力境界特定と学習カリキュラム編成';
         autonomousCurriculumService.registerOrUpdateBoundary(
-          proposal?.title ? `境界学習: ${proposal.title}` : 'VBA Win32API 64bit互換性とメモリ整合性',
+          boundaryTopic,
           'VBA_SYSTEM',
-          proposal?.expectedScoreImprovement ? Math.min(1.0, 0.7 + proposal.expectedScoreImprovement * 0.03) : 0.88,
-          proposal?.contract?.objective || '自律改善サイクルによる能力境界特定と学習カリキュラム編成'
+          confidence,
+          objective
         );
-        systemLogger.info('SELF_IMPROVEMENT', '[第33章 実体改善] 未知領域境界判定と自律学習カリキュラムの定義を同期しました');
+        systemLogger.info('SELF_IMPROVEMENT', `[第33章 実体改善] 未知領域境界判定と自律学習カリキュラム(${boundaryTopic})を同期しました`);
       } else if (chapterNumber === 34) {
         // 第34章: 技能圧縮 & 学習資産継承
-        const rulesToCompress = (proposal?.dslCommands && proposal.dslCommands.length > 0)
-          ? proposal.dslCommands
-          : [
-              'Range反復を禁止し2次元配列一括代入',
-              'Declare PtrSafeとLongPtrによる64bit整合',
-              'エラーハンドラと画面更新停止の確実な復帰',
-            ];
-        autonomousCurriculumService.compressKnowledge(proposal?.title || '獲得技能圧縮ルール', rulesToCompress);
-        systemLogger.info('SELF_IMPROVEMENT', '[第34章 実体改善] 獲得定石をSkill IR高密度マイクロルールへロスレス圧縮しました');
+        const rulesToCompress = (resolvedProposal?.dslCommands && resolvedProposal.dslCommands.length > 0)
+          ? resolvedProposal.dslCommands
+          : (resolvedProposal?.description ? [resolvedProposal.description] : null);
+        if (!rulesToCompress) {
+          systemLogger.warn('SELF_IMPROVEMENT', `[第34章] 圧縮対象のルール・知見が提案に含まれていないためスキップしました`);
+        } else {
+          autonomousCurriculumService.compressKnowledge(resolvedProposal?.title || `第${chapterNumber}章獲得技能`, rulesToCompress);
+          systemLogger.info('SELF_IMPROVEMENT', `[第34章 実体改善] 獲得知見(${rulesToCompress.length}件)をSkill IRへ圧縮しました`);
+        }
       } else if (chapterNumber === 35 || chapterNumber === 54) {
         // 第35章 & 第54章: 能動知覚OS & 先行予測支援
-        proactiveContextOsService.perceiveCurrentContext(proposal?.contract?.objective || proposal?.title || '自律改善状況認識');
-        systemLogger.info('SELF_IMPROVEMENT', `[第${chapterNumber}章 実体改善] 状況認識センサー・先行予測サジェスト・疲労検知ガードを同期しました`);
+        const contextGoal = resolvedProposal?.contract?.objective || resolvedProposal?.description || resolvedProposal?.title;
+        if (!contextGoal) {
+          systemLogger.warn('SELF_IMPROVEMENT', `[第${chapterNumber}章] 能動知覚コンテキスト対象が未指定のためスキップしました`);
+        } else {
+          proactiveContextOsService.perceiveCurrentContext(contextGoal);
+          systemLogger.info('SELF_IMPROVEMENT', `[第${chapterNumber}章 実体改善] 状況認識センサー・先行予測サジェスト(${contextGoal})を同期しました`);
+        }
       } else if (chapterNumber === 57) {
         // 第57章: デジタル研究ノート (優先度1: 失敗・退行も誠実に記録)
-        const simulated = proposal?.simulatedDelta;
-        const invariantsPassed = proposal?.invariantsCheckPassed ?? true;
-        const isSuccess = invariantsPassed && (simulated?.complianceDelta ?? 0) >= 0 && proposal?.status !== 'REJECTED';
+        const simulated = resolvedProposal?.simulatedDelta;
+        const invariantsPassed = resolvedProposal?.invariantsCheckPassed ?? true;
+        const isSuccess = invariantsPassed && (simulated?.complianceDelta ?? 0) >= 0 && resolvedProposal?.status !== 'REJECTED';
 
         if (!isSuccess) {
           // 不変条件違反や退行がある場合は正直に「失敗試行」として記録
           digitalResearchNoteService.recordExperiment(
-            `[失敗・退行検知実験] ${proposal?.title || '自律改善試行における不変条件抵触'}`,
+            `[失敗・退行検知実験] ${resolvedProposal?.title || '自律改善試行における不変条件抵触'}`,
             'CODE_ARCHITECTURE',
             '仕様適合において不変条件違反またはスコア退行が検出された場合、直ちにロールバック隔離されることを確認する。',
             `シャドーシミュレーション実行結果: 不変条件合格=${invariantsPassed}, 適合度デルタ=${simulated?.complianceDelta ?? 0}`,
@@ -599,10 +607,10 @@ export class SelfCodeArchitectService {
         } else {
           const delta = simulated?.complianceDelta ?? 5;
           digitalResearchNoteService.recordExperiment(
-            `[実証実験] 第${proposal?.targetChapterNumber ?? 57}章: ${proposal?.title || '仕様書適合サイクル'}`,
+            `[実証実験] 第${resolvedProposal?.targetChapterNumber ?? 57}章: ${resolvedProposal?.title || '仕様書適合サイクル'}`,
             'CODE_ARCHITECTURE',
-            `提案[${proposal?.id || 'id'}]による仕様適合と不変条件維持の同時成立実証。`,
-            `契約[${proposal?.contract?.changeId || 'N/A'}]に基づくシミュレーション検証。`,
+            `提案[${resolvedProposal?.id || 'id'}]による仕様適合と不変条件維持の同時成立実証。`,
+            `契約[${resolvedProposal?.contract?.changeId || 'N/A'}]に基づくシミュレーション検証。`,
             `不変条件5項目維持=${invariantsPassed}、適合度デルタ=+${delta}点。${simulated?.details || ''}`,
             '不変条件ゲートと変更契約が自律改善の決定論的安全性を保証した。',
             '変更契約の許可ファイル制限(allowedFiles)を維持・拡大すること。',
@@ -610,28 +618,85 @@ export class SelfCodeArchitectService {
           );
           systemLogger.info('SELF_IMPROVEMENT', '[第57章 実体改善] デジタル研究ノートに実験記録を実測データで記録しました');
         }
+      } else if (chapterNumber === 59) {
+        // 第59章: CSP制約ソルバー
+        const contract = resolvedProposal?.contract;
+        const cspResult = formalConstraintSolverService.solveCSP({
+          targetFiles: contract?.allowedFiles ?? ['UNKNOWN'],
+          forbiddenFiles: contract?.forbiddenFiles ?? [],
+          mustPreserve: contract?.mustPreserve ?? [],
+        });
+        systemLogger.info('SELF_IMPROVEMENT', `[第59章] 実変更契約のCSP検証: 充足=${cspResult.isSatisfied}`);
       } else if (chapterNumber === 69) {
         // 第69章: 永続人格・多重アンカー復旧システム
-        proactiveContextOsService.verifyAndRestorePersona(proposal?.contract?.objective || 'みきはいつでも力になるよ！一緒に頑張ろうね！');
-        systemLogger.info('SELF_IMPROVEMENT', '[第69章 実体改善] 多重人格アンカー（口調・親愛スタンス・禁止語句遮断）を同期固定しました');
+        const personaAnchor = resolvedProposal?.contract?.objective || resolvedProposal?.description || 'みきはいつでも力になるよ！一緒に頑張ろうね！';
+        proactiveContextOsService.verifyAndRestorePersona(personaAnchor);
+        systemLogger.info('SELF_IMPROVEMENT', `[第69章 実体改善] 多重人格アンカー(${personaAnchor.slice(0, 30)})を同期固定しました`);
+      } else if (chapterNumber === 80) {
+        // 第80章: 自律ソフトウェア工場
+        const factoryReport = autonomousSoftwareFactoryService.executePipeline({
+          featureName: resolvedProposal?.title || `Chapter${chapterNumber}Patch`,
+          specificationChapter: chapterNumber,
+          targetLanguage: 'typescript',
+          requirements: resolvedProposal?.description ? [resolvedProposal.description] : ['要件未指定'],
+        });
+        systemLogger.info('SELF_IMPROVEMENT', `[第80章 実体改善] 自律ソフトウェア工場パイプライン実行: ${factoryReport.featureName} (${factoryReport.status})`);
+      } else if (chapterNumber === 83) {
+        // 第83章: Skill IRコンパイラ
+        const rules = resolvedProposal?.dslCommands?.length
+          ? resolvedProposal.dslCommands
+          : resolvedProposal?.codeSnippet
+          ? [resolvedProposal.codeSnippet.slice(0, 200)]
+          : null;
+        if (!rules) {
+          systemLogger.warn('SELF_IMPROVEMENT', `[第83章] コンパイル対象のルール/コードが提案に含まれていないためスキップしました`);
+        } else {
+          skillIrCompilerService.compileToIR(resolvedProposal?.title || 'UnnamedSkill', rules);
+          systemLogger.info('SELF_IMPROVEMENT', `[第83章] 実提案ルール(${rules.length}件)をSkill IRへコンパイル完了`);
+        }
+      } else if (chapterNumber === 127) {
+        // 第127章: 改善オペレーター保護・再認証・段階配備
+        const proposalId = resolvedProposal?.id || `chap_${chapterNumber}_proposal`;
+        const codeSnippet = resolvedProposal?.codeSnippet;
+        canaryDeploymentSafetyService.startCanaryRelease(proposalId, 127, codeSnippet).then((canaryState) => {
+          if (canaryState.healthStatus === 'HEALTHY') {
+            canaryDeploymentSafetyService.promoteToFullRelease(canaryState.proposalId);
+            systemLogger.info('SELF_IMPROVEMENT', '[第127章 実体改善] カナリア段階配備（10%➔100%）および自動ロールバック監視を完了しました');
+          } else {
+            canaryDeploymentSafetyService.triggerImmediateRollback(canaryState.proposalId, canaryState.evaluationDetails || 'カナリア試行不合格');
+            systemLogger.warn('SELF_IMPROVEMENT', `[第127章 実体改善] カナリア実実行で異常または未検証を検知したため自動ロールバックを発動: ${canaryState.healthStatus}`);
+          }
+        }).catch((err) => {
+          systemLogger.error('SELF_IMPROVEMENT', '[第127章 実体改善] カナリア実実行監視エラー', err);
+        });
+      } else if (chapterNumber === 130) {
+        // 第130章: 指示書ASTパーサー
+        const chapter = SPECIFICATION_REGISTRY.find((c) => c.chapterNumber === chapterNumber);
+        const specText = chapter?.keyRequirements?.join('\n') || resolvedProposal?.description || '';
+        if (specText) {
+          specAstParserService.parseSpecificationText(chapterNumber, specText);
+          systemLogger.info('SELF_IMPROVEMENT', `[第130章] 実仕様書要件テキスト(${specText.split('\n').length}行)をASTにパースしました`);
+        } else {
+          systemLogger.warn('SELF_IMPROVEMENT', `[第130章] パース対象の要件テキストが存在しないためスキップしました`);
+        }
       } else if (chapterNumber === 155) {
         // 第155章: 認知デバッガUI・失敗経路診断 (優先度2: 実検査結果を反映)
         const invariants = this.checkInvariants();
-        const hasContract = Boolean(proposal?.contract);
-        const hasProposal = Boolean(proposal);
+        const hasContract = Boolean(resolvedProposal?.contract);
+        const hasProposal = Boolean(resolvedProposal);
 
         const steps = [
           {
             stepName: '1. ドリフト検知',
             durationMs: 14,
             status: hasProposal ? ('SUCCESS' as const) : ('CAUTION' as const),
-            details: hasProposal ? `第${proposal?.targetChapterNumber ?? 155}章の仕様差分を抽出` : '改善対象が未特定',
+            details: hasProposal ? `第${resolvedProposal?.targetChapterNumber ?? 155}章の仕様差分を抽出` : '改善対象が未特定',
           },
           {
             stepName: '2. 変更契約立案',
             durationMs: 22,
             status: hasContract ? ('SUCCESS' as const) : ('CAUTION' as const),
-            details: hasContract ? `許可ファイル${proposal?.contract.allowedFiles.length}件、不変条件${proposal?.contract.invariants.length}件を定義` : '変更契約の策定に失敗',
+            details: hasContract ? `許可ファイル${resolvedProposal?.contract.allowedFiles.length}件、不変条件${resolvedProposal?.contract.invariants.length}件を定義` : '変更契約の策定に失敗',
           },
           {
             stepName: '3. 不変条件検査',
@@ -642,7 +707,7 @@ export class SelfCodeArchitectService {
           {
             stepName: '4. 正式配備',
             durationMs: 31,
-            status: (invariants.allPassed && (proposal?.invariantsCheckPassed ?? true)) ? ('SUCCESS' as const) : ('CAUTION' as const),
+            status: (invariants.allPassed && (resolvedProposal?.invariantsCheckPassed ?? true)) ? ('SUCCESS' as const) : ('CAUTION' as const),
             details: invariants.allPassed ? '実体サービスおよび安全境界同期完了' : '安全不変条件不合格のため配備中止',
           },
         ];
@@ -650,115 +715,57 @@ export class SelfCodeArchitectService {
         const passedSteps = steps.filter((s) => s.status === 'SUCCESS').length;
         const healthScore = Math.round((passedSteps / steps.length) * 100);
         const diagnosis = invariants.allPassed
-          ? `推論トレース健全: 不変条件5項目遵守率100%。目標[${proposal?.contract?.objective || '仕様適合'}]へ安全に到達しました。`
+          ? `推論トレース健全: 不変条件5項目遵守率100%。目標[${resolvedProposal?.contract?.objective || '仕様適合'}]へ安全に到達しました。`
           : '⚠️ 認知デバッガ警告: 不変条件違反を検知。推論パスを遮断し安全隔離を行いました。';
 
         cognitiveDebuggerService.recordTrace(
-          `自律改善サイクル[${proposal?.title || '第155章'}]の推論健全性診断`,
-          proposal?.contract?.objective || '仕様書適合と安全境界を両立した自己改善を実行',
+          `自律改善サイクル[${resolvedProposal?.title || '第155章'}]の推論健全性診断`,
+          resolvedProposal?.contract?.objective || '仕様書適合と安全境界を両立した自己改善を実行',
           'SELF_IMPROVEMENT_REASONING',
           ['第7層: メタ記憶', '第8層: 自己認識記憶'],
-          proposal?.contract?.invariants.map((inv) => `[Rule] ${inv}`) || ['[Rule-29] 変更契約外変更の絶対禁止'],
-          proposal?.contract?.changeId || 'SELF_CODE_ARCHITECT_CONTRACT',
+          resolvedProposal?.contract?.invariants.map((inv) => `[Rule] ${inv}`) || ['[Rule-29] 変更契約外変更の絶対禁止'],
+          resolvedProposal?.contract?.changeId || 'SELF_CODE_ARCHITECT_CONTRACT',
           steps,
           healthScore,
           diagnosis
         );
         systemLogger.info('SELF_IMPROVEMENT', `[第155章 実体改善] 認知デバッガに実測トレースを記録 (健全度スコア=${healthScore}点)`);
-      } else if (chapterNumber === 59) {
-        // 第59章: 形式知識・制約ソルバー (優先度3: proposal.contractから抽出)
-        const contract = proposal?.contract;
-        const mustPreserveQwen = contract?.mustPreserve?.some((m) => m.includes('Qwen')) ?? true;
-        const privacyStrict = contract?.forbiddenFiles?.some((f) => f.includes('privacy')) ?? true;
-
-        const cspResult = formalConstraintSolverService.solveCSP({
-          targetModel: mustPreserveQwen ? ['Qwen-3B-Base'] : ['General-LLM'],
-          activeWeights: contract?.invariants || ['INV_01_QWEN3B_PROTECTION', 'INV_02_PRIVACY_BOUNDARY'],
-          dataPrivacyLevel: privacyStrict ? ['CONFIDENTIAL'] : ['PUBLIC'],
-          networkDestination: ['INTERNAL_SECURE'],
-        });
-        systemLogger.info('SELF_IMPROVEMENT', `[第59章 実体改善] 契約[${contract?.changeId || 'N/A'}]の実制約に基づきCSP求解を実行 (無矛盾充足=${cspResult.isSatisfied})`);
-      } else if (chapterNumber === 80) {
-        // 第80章: 自律ソフトウェア工場 (優先度4: proposal.title と description から抽出)
-        const featureName = proposal?.title || 'Chapter80Patch';
-        const targetChapter = this.getChapterByNumber(proposal?.targetChapterNumber ?? 80);
-        const requirements = proposal?.contract?.objective
-          ? [proposal.contract.objective, ...(targetChapter?.keyRequirements.slice(0, 2) || [])]
-          : (targetChapter?.keyRequirements || ['E2Eコード生成', 'テスト自動実行', '自己修復ループ']);
-
-        const factoryReport = autonomousSoftwareFactoryService.executePipeline({
-          featureName,
-          specificationChapter: proposal?.targetChapterNumber ?? 80,
-          targetLanguage: 'typescript',
-          requirements,
-        });
-        systemLogger.info('SELF_IMPROVEMENT', `[第80章 実体改善] 自律ソフトウェア工場パイプライン実行: ${featureName} (${factoryReport.status})`);
-      } else if (chapterNumber === 83) {
-        // 第83章: 汎用技能コンパイラ・Skill IR (優先度5: proposal.dslCommands または codeSnippet をコンパイル)
-        const skillName = proposal?.title ? `IR_${proposal.title.replace(/[^a-zA-Z0-9_\u3040-\u30ff\u4e00-\u9faf]/g, '')}` : '自律改善適合スキル';
-        const dslInputs = (proposal?.dslCommands && proposal.dslCommands.length > 0)
-          ? proposal.dslCommands
-          : proposal?.codeSnippet
-          ? proposal.codeSnippet.split('\n').map((l) => l.trim()).filter((l) => l.length > 0).slice(0, 5)
-          : [
-              `TARGET_CHAPTER_${proposal?.targetChapterNumber ?? 83}`,
-              'VERIFY_INVARIANTS_STRICT',
-              'SYNC_DRIFT_REGISTRY',
-            ];
-
-        skillIrCompilerService.compileToIR(skillName, dslInputs);
-        systemLogger.info('SELF_IMPROVEMENT', `[第83章 実体改善] 提案DSL(${dslInputs.length}命令)をSkill IRへコンパイルしました`);
-      } else if (chapterNumber === 127) {
-        // 第127章: 改善オペレーター保護・再認証・段階配備
-        const proposalId = proposal?.id || `chap_${chapterNumber}_proposal`;
-        const codeSnippet = proposal?.codeSnippet;
-        canaryDeploymentSafetyService.startCanaryRelease(proposalId, 127, codeSnippet).then((canaryState) => {
-          if (canaryState.healthStatus === 'HEALTHY') {
-            canaryDeploymentSafetyService.promoteToFullRelease(canaryState.proposalId);
-            systemLogger.info('SELF_IMPROVEMENT', '[第127章 実体改善] カナリア段階配備（10%➔100%）および1秒自動ロールバック監視を初期化しました');
-          } else {
-            canaryDeploymentSafetyService.triggerImmediateRollback(canaryState.proposalId, canaryState.evaluationDetails || 'カナリア試行不合格');
-            systemLogger.warn('SELF_IMPROVEMENT', `[第127章 実体改善] カナリア実実行で異常または未検証を検知したため自動ロールバックを発動: ${canaryState.healthStatus}`);
-          }
-        }).catch((err) => {
-          systemLogger.error('SELF_IMPROVEMENT', '[第127章 実体改善] カナリア実実行監視エラー', err);
-        });
-      } else if (chapterNumber === 130) {
-        // 第130章: 設計思想指示書コンパイラ・規範優先順位
-        const specText = proposal?.description
-          ? `第${chapterNumber}章: ${proposal.title}\n${proposal.description}\n目標: ${proposal.contract?.objective || ''}`
-          : '設計思想指示書ASTパース\n不変安全原則の最上位強制\nユーザー意図の優先解決';
-        specAstParserService.parseSpecificationText(chapterNumber, specText);
-        systemLogger.info('SELF_IMPROVEMENT', '[第130章 実体改善] 指示書テキスト(提案実データ)をASTにパースしました');
       } else if (chapterNumber === 167) {
-        // 第167章: 能力合成形式証明・安全な技能連結 (優先度6: スキル連結契約が含まれている場合のみ証明)
-        const dsls = proposal?.dslCommands || [];
-        const hasSkillChain = dsls.some((d) => d.includes('SKILL') || d.includes('COMPOSE') || d.includes('CHAIN'));
-        if (hasSkillChain) {
-          const proofResult = formalProofService.verifySkillChainComposition([
-            { skillId: 'skill_invariants', name: '不変条件照合', preconditions: ['ANY'], postconditions: ['InvariantsVerified'] },
-            { skillId: 'skill_patch', name: 'パッチ安全適用', preconditions: ['InvariantsVerified'], postconditions: ['SafeOutputGenerated'] },
-          ]);
-          systemLogger.info('SELF_IMPROVEMENT', `[第167章 実体改善] 技能連結のホーア論理形式証明を完了しました (証明=${proofResult.isProvablySafe})`);
+        // 第167章: 技能連結の形式証明
+        const relevantSkills = resolvedProposal?.dslCommands; // 例: ['skill_recall:reason'] のような連結指定を想定
+        if (!relevantSkills || relevantSkills.length < 2) {
+          systemLogger.info('SELF_IMPROVEMENT', `[第167章] この提案には検証対象のスキル連結情報が含まれないため対象外としました`);
         } else {
-          systemLogger.info('SELF_IMPROVEMENT', `[第167章 実体改善] 対象提案[${proposal?.title || ''}]にはスキル連結要件が含まれていないため形式証明は対象外（スキップ）と記録しました`);
+          // relevantSkills をパースしてSkillContract[]に変換してから渡す
+          const contracts: SkillContract[] = relevantSkills.map((cmd, idx) => {
+            const parts = cmd.split(':');
+            const skillId = parts[0]?.trim() || `skill_${idx}`;
+            const name = parts[1]?.trim() || skillId;
+            return {
+              skillId,
+              name,
+              preconditions: idx === 0 ? ['ANY'] : [`output_of_${relevantSkills[idx - 1].split(':')[0]?.trim()}`],
+              postconditions: [`output_of_${skillId}`],
+            };
+          });
+          const proofResult = formalProofService.verifySkillChainComposition(contracts);
+          systemLogger.info('SELF_IMPROVEMENT', `[第167章] 技能連結(${contracts.length}件)の形式証明完了: 安全=${proofResult.isProvablySafe}`);
         }
       } else if (chapterNumber === 169) {
-        // 第169章: 未知環境安全探索・段階権限昇格 (優先度7: 実際のツールIDと保存結果を渡す)
-        const toolId = proposal?.id ? `patcher_${proposal.id.slice(0, 16)}` : `tool_ch${chapterNumber}`;
+        // 第169章: サンドボックス段階昇格
+        const toolId = resolvedProposal?.id || `chap_${chapterNumber}`;
         sandboxPermissionService.registerTool(toolId);
-        this.saveModuleFileToServer(chapterNumber).then((saved) => {
-          sandboxPermissionService.recordExecution(toolId, saved);
-          systemLogger.info('SELF_IMPROVEMENT', `[第169章 実体改善] サンドボックスツール[${toolId}]の実行記録を更新 (成否=${saved})`);
-        });
+        const saveSucceeded = await this.saveModuleFileToServer(chapterNumber); // 戻り値を使う
+        sandboxPermissionService.recordExecution(toolId, !saveSucceeded); // 失敗時はhadViolation=true
+        systemLogger.info('SELF_IMPROVEMENT', `[第169章] サンドボックスツール[${toolId}]の実行記録を更新 (保存成否=${saveSucceeded})`);
       } else {
-        // 優先度9: 未対応の章は正直にwarnログを記録
-        systemLogger.warn('SELF_IMPROVEMENT', `[第${chapterNumber}章 実体改善] 固有の実体処理ルーチンが未定義の章です（汎用モジュール保存のみ実施）`);
+        // 未対応の章番号
+        systemLogger.warn('SELF_IMPROVEMENT', `[第${chapterNumber}章] この章に対応する実体改善ロジックが未実装です。設定同期のみ行いました`);
       }
 
       // 物理TypeScriptコードファイルをサーバーのディスク上に書き込み (src/autonomous_modules/chapter_XX.ts)
       if (chapterNumber !== 169) {
-        this.saveModuleFileToServer(chapterNumber);
+        await this.saveModuleFileToServer(chapterNumber);
       }
     } catch (err) {
       console.warn('executeConcreteChapterImprovement error:', err);

@@ -74,7 +74,13 @@ class AutonomousSoftwareFactoryService {
     let repairAttempts = 0;
     let status: 'SUCCESS' | 'REPAIRED' | 'FAILED' = 'SUCCESS';
 
-    if (!syntaxOk) {
+    const hasValidRequirements = request.requirements.length > 0 && request.requirements[0] !== '要件未指定';
+    if (!hasValidRequirements) {
+      status = 'FAILED';
+      tests[0].passed = false;
+      tests[0].errorMessage = '要件が指定されていないためパイプラインを中断しました (要件未指定)';
+      systemLogger.warn('SELF_IMPROVEMENT', `[第80章 自律工場] 要件未指定のためパイプライン実行を失敗として停止しました`);
+    } else if (!syntaxOk) {
       repairAttempts++;
       systemLogger.info('SELF_IMPROVEMENT', `[第80章 自律工場] 構文不備を検知。自己修復ループを実行中... (試行 ${repairAttempts}/3)`);
       status = 'REPAIRED';
