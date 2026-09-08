@@ -168,6 +168,61 @@ export const SelfCodeArchitectTab: React.FC = () => {
 
   useEffect(() => {
     setProposals(selfCodeArchitectService.getProposals());
+
+    const unsubSteps = autonomousContinuousEvolutionService.subscribeSteps((step) => {
+      const levelMap: Record<string, 'info' | 'warn' | 'success' | 'cyan' | 'purple'> = {
+        AUDIT: 'cyan',
+        INVARIANTS: step.status === 'FAILED' ? 'warn' : 'purple',
+        TARGET: 'info',
+        SYNTHESIS: step.status === 'WARNING' ? 'warn' : 'cyan',
+        SYNTAX_CHECK: 'info',
+        SELF_HEALING: 'warn',
+        TDD_TEST: 'success',
+        MUTATION_TEST: step.status === 'WARNING' ? 'warn' : 'purple',
+        SNAPSHOT: 'info',
+        DEPLOY: 'success',
+        COMPLETED: step.status === 'WARNING' ? 'cyan' : 'success',
+        FAILED: 'warn',
+      };
+      addLiveLog(`[${step.phase}] ${step.title}: ${step.detail}`, levelMap[step.phase] || 'info');
+
+      if (step.phase === 'AUDIT') {
+        setLiveStage('repo_map');
+        setLiveProgress(15);
+      } else if (step.phase === 'INVARIANTS') {
+        setLiveStage('invariants');
+        setLiveProgress(30);
+      } else if (step.phase === 'SYNTHESIS') {
+        setLiveStage('gap_analysis');
+        setLiveProgress(50);
+      } else if (step.phase === 'SYNTAX_CHECK' || step.phase === 'SELF_HEALING') {
+        setLiveStage('dry_run');
+        setLiveProgress(65);
+      } else if (step.phase === 'TDD_TEST') {
+        setLiveStage('benchmark');
+        setLiveProgress(75);
+      } else if (step.phase === 'MUTATION_TEST') {
+        setLiveStage('canary');
+        setLiveProgress(85);
+      } else if (step.phase === 'SNAPSHOT' || step.phase === 'DEPLOY') {
+        setLiveStage('patching');
+        setLiveProgress(95);
+      } else if (step.phase === 'COMPLETED') {
+        setLiveStage('completed');
+        setLiveProgress(100);
+      }
+    });
+
+    const unsubState = autonomousContinuousEvolutionService.subscribe((record, isRunning) => {
+      if (isRunning) {
+        setIsAutoImproving(true);
+      }
+    });
+
+    return () => {
+      unsubSteps();
+      unsubState();
+    };
   }, []);
 
   const completedChapters = SPECIFICATION_REGISTRY.filter((c) => c.status === 'COMPLETED');

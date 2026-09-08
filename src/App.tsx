@@ -8,6 +8,7 @@ import { MemoryModal } from './components/MemoryModal';
 import { ExportModal } from './components/ExportModal';
 import { EngineModal } from './components/EngineModal';
 import { SelfImprovementModal, SelfImprovementTab } from './components/SelfImprovementModal';
+import { RealtimeActivityMonitorModal } from './components/RealtimeActivityMonitorModal';
 import { WORKSPACE_TEMPLATES } from './data/presets';
 import {
   ChatMessage,
@@ -223,6 +224,15 @@ export default function App() {
   const [isEngineModalOpen, setIsEngineModalOpen] = useState<boolean>(false);
   const [isSelfImprovementModalOpen, setIsSelfImprovementModalOpen] = useState<boolean>(false);
   const [selfImprovementTab, setSelfImprovementTab] = useState<SelfImprovementTab>('spec_architect');
+  const [isGlobalActivityMonitorOpen, setIsGlobalActivityMonitorOpen] = useState<boolean>(false);
+  const [isEvolutionRunning, setIsEvolutionRunning] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = autonomousContinuousEvolutionService.subscribe((_, isRunning) => {
+      setIsEvolutionRunning(isRunning);
+    });
+    return () => unsub();
+  }, []);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
@@ -3149,6 +3159,8 @@ export default function App() {
         useSearch={useSearch}
         setUseSearch={setUseSearch}
         fps={fps}
+        onOpenActivityMonitor={() => setIsGlobalActivityMonitorOpen(true)}
+        isWorking={isLoading || isGenerating || isEvolutionRunning}
       />
 
       {/* Main Responsive Layout */}
@@ -3491,6 +3503,13 @@ export default function App() {
         workspaceFiles={workspaceFiles}
         engineMode={engineMode}
         initialTab={selfImprovementTab}
+      />
+
+      <RealtimeActivityMonitorModal
+        isOpen={isGlobalActivityMonitorOpen}
+        onClose={() => setIsGlobalActivityMonitorOpen(false)}
+        isLoading={isLoading}
+        isGenerating={isGenerating}
       />
     </div>
   );

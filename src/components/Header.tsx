@@ -31,6 +31,8 @@ interface HeaderProps {
   useSearch: boolean;
   setUseSearch: (val: boolean) => void;
   fps: number;
+  onOpenActivityMonitor?: () => void;
+  isWorking?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -47,6 +49,8 @@ export const Header: React.FC<HeaderProps> = ({
   useSearch,
   setUseSearch,
   fps,
+  onOpenActivityMonitor,
+  isWorking = false,
 }) => {
   const [urlCopied, setUrlCopied] = useState(false);
   const getPublicUrl = () => {
@@ -142,6 +146,28 @@ export const Header: React.FC<HeaderProps> = ({
             </>
           )}
         </button>
+
+        {/* リアルタイム思考・行動モニターボタン */}
+        {onOpenActivityMonitor && (
+          <button
+            onClick={onOpenActivityMonitor}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all shadow-xs ${
+              isWorking
+                ? 'bg-emerald-950/70 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900/80 shadow-emerald-500/20'
+                : 'bg-slate-900/90 border-slate-800 hover:border-indigo-500/50 text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            title="みきのリアルタイム思考・行動・自律改善モニターを開く"
+          >
+            <Activity className={`w-3.5 h-3.5 ${isWorking ? 'text-emerald-400 animate-spin' : 'text-indigo-400'}`} />
+            <span className="hidden sm:inline font-bold">行動モニター</span>
+            <span className="sm:hidden font-bold">モニター</span>
+            {isWorking ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+            ) : (
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/80" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Center: Main View Switcher (Desktop Only, on mobile handled by bottom bar) */}

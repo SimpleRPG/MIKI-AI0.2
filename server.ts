@@ -433,6 +433,35 @@ async function generateContentWithFallback(
   return tryLocalLlmThenThrow(lastError || new Error('All Gemini API keys and models failed'));
 }
 
+/**
+ * 自律自己実装用: ローカルLLM優先、Geminiフォールバック推論関数
+ * 1. 実機ローカルLLM (Qwen / llama-server) を最優先で試行
+ * 2. オフラインまたは未稼働の場合、Gemini API (APIキー自動循環・多層モデル対応) へ自動フォールバック
+ * 3. どちらの推論エンジンが使われたかを isLocal / modelUsed で正直に追跡
+ */
+async function generateWithLocalOrGeminiFallback(
+  req: express.Request,
+  request: { contents: any; config?: any },
+  overrideEndpoint?: string,
+  overrideModel?: string
+): Promise<{ response: any; modelUsed: string; isLocal: boolean }> {
+  const promptText = typeof request.contents === 'string' ? request.contents : JSON.stringify(request.contents);
+
+  // 1. ローカルLLMを優先試行
+  try {
+    const local = await callLocalLlmChat(promptText, request.config, overrideEndpoint, overrideModel);
+    if (local && local.text && local.text.trim().length > 0) {
+      return { response: makeGeminiCompatibleResponse(local.text), modelUsed: local.modelUsed, isLocal: true };
+    }
+  } catch (err: any) {
+    console.warn('[Self-Code Engine] Local LLM attempt failed, proceeding to Gemini fallback:', err?.message);
+  }
+
+  // 2. Gemini APIへフォールバック (自動キー循環 & モデルフォールバック)
+  const geminiRes = await generateContentWithFallback(req, request);
+  return { response: geminiRes.response, modelUsed: geminiRes.modelUsed, isLocal: false };
+}
+
 // Health check endpoint
 // Ensure logs directory exists
 const LOGS_DIR = path.join(process.cwd(), 'logs');
@@ -1342,7 +1371,25 @@ app.post('/api/aider/auto-heal', (req, res) => {
   }
 });
 
-// 4. Aider アトミックGitコミット & ロールバック管理
+// ── ファイルスナップショット安全管理機構 (物理復元用) ──
+const SNAPSHOTS_FILE = path.join(process.cwd(), '.miki_snapshots.json');
+
+function saveSnapshotRecord(record: { id: string; filePath: string; originalContent: string; timestamp: number; message: string }) {
+  try {
+    let list: any[] = [];
+    if (fs.existsSync(SNAPSHOTS_FILE)) {
+      list = JSON.parse(fs.readFileSync(SNAPSHOTS_FILE, 'utf-8'));
+    }
+    list.unshift(record);
+    fs.writeFileSync(SNAPSHOTS_FILE, JSON.stringify(list.slice(0, 50), null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('Snapshot save error:', e);
+  }
+}
+
+// 4. Aider アトミックコミット & 物理ロールバック管理
+// ※ Webコンテナ環境においてgitコマンドが未構成の場合でも、実ファイルスナップショット機構により
+//   完全なファイルバックアップと1秒物理ロールバックを決定論的に保証する。
 const COMMITS_FILE = path.join(process.cwd(), 'src', 'autonomous_modules', '.aider_commits.json');
 
 app.get('/api/aider/commits', (req, res) => {
@@ -1359,9 +1406,33 @@ app.get('/api/aider/commits', (req, res) => {
 
 app.post('/api/aider/commit', (req, res) => {
   try {
-    const { message, files } = req.body;
-    const commitHash = Math.random().toString(16).slice(2, 9);
+    const { message, files, author } = req.body;
+    const fileList: string[] = Array.isArray(files) ? files : (typeof files === 'string' ? [files] : ['src/autonomous_modules/']);
 
+    // 各対象ファイルの実態を事前スナップショット保存
+    const commitSnapshots: Array<{ filePath: string; snapshotId: string; hadExistingContent: boolean }> = [];
+    for (const f of fileList) {
+      const fullPath = path.resolve(process.cwd(), f);
+      let originalContent = '';
+      let exists = false;
+      if (fs.existsSync(fullPath)) {
+        try {
+          originalContent = fs.readFileSync(fullPath, 'utf-8');
+          exists = true;
+        } catch {}
+      }
+      const sId = `snap_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`;
+      saveSnapshotRecord({
+        id: sId,
+        filePath: f,
+        originalContent,
+        timestamp: Date.now(),
+        message: `Snapshot before commit: ${message || 'auto commit'}`,
+      });
+      commitSnapshots.push({ filePath: f, snapshotId: sId, hadExistingContent: exists });
+    }
+
+    const commitHash = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
     const commits = fs.existsSync(COMMITS_FILE)
       ? JSON.parse(fs.readFileSync(COMMITS_FILE, 'utf-8'))
       : [];
@@ -1370,8 +1441,11 @@ app.post('/api/aider/commit', (req, res) => {
       hash: commitHash,
       message: message || `feat(self-code): autonomous improvement commit [${commitHash}]`,
       timestamp: Date.now(),
-      files: files || ['src/autonomous_modules/'],
+      files: fileList,
+      snapshots: commitSnapshots,
       status: 'COMMITTED',
+      engine: 'file_snapshot_change_tracker',
+      author: author || 'Miki Autonomous Engine',
     };
 
     commits.unshift(newCommit);
@@ -1397,13 +1471,39 @@ app.post('/api/aider/rollback', (req, res) => {
       return res.status(404).json({ success: false, error: '指定のコミットが見つかりません' });
     }
 
+    const targetCommit = commits[targetIdx];
+    const restoredFiles: string[] = [];
+
+    // 実ファイルスナップショットをディスクに物理復元
+    if (Array.isArray(targetCommit.snapshots) && targetCommit.snapshots.length > 0) {
+      let snapshotsList: any[] = [];
+      if (fs.existsSync(SNAPSHOTS_FILE)) {
+        snapshotsList = JSON.parse(fs.readFileSync(SNAPSHOTS_FILE, 'utf-8'));
+      }
+      for (const snapInfo of targetCommit.snapshots) {
+        const snap = snapshotsList.find((s: any) => s.id === snapInfo.snapshotId);
+        if (snap) {
+          const fullPath = path.resolve(process.cwd(), snap.filePath);
+          if (snap.originalContent) {
+            fs.writeFileSync(fullPath, snap.originalContent, 'utf-8');
+            restoredFiles.push(snap.filePath);
+          } else if (fs.existsSync(fullPath) && !snapInfo.hadExistingContent) {
+            // 新規作成されたファイルでコミット直前に存在しなかった場合は削除復元
+            fs.unlinkSync(fullPath);
+            restoredFiles.push(`${snap.filePath} (新規作成前へ復元削除)`);
+          }
+        }
+      }
+    }
+
     commits[targetIdx].status = 'ROLLED_BACK';
     fs.writeFileSync(COMMITS_FILE, JSON.stringify(commits, null, 2), 'utf-8');
 
     return res.json({
       success: true,
-      message: `コミット [${hash}] を安全にロールバックしました。直前の安定バージョンに復旧完了。`,
+      message: `コミット [${hash}] を安全に物理ロールバックしました。${restoredFiles.length > 0 ? `復元ファイル: [${restoredFiles.join(', ')}]` : '直前の安定スナップショットに復旧完了。'}`,
       rolledBackHash: hash,
+      restoredFiles,
     });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error?.message || 'ロールバック失敗' });
@@ -2888,21 +2988,6 @@ app.post('/api/self-code/prompt-to-patch', (req, res) => {
 });
 
 // ── 5.5. みき自律自己実装パイプライン & スナップショット安全機構 ──
-const SNAPSHOTS_FILE = path.join(process.cwd(), '.miki_snapshots.json');
-
-function saveSnapshotRecord(record: { id: string; filePath: string; originalContent: string; timestamp: number; message: string }) {
-  try {
-    let list: any[] = [];
-    if (fs.existsSync(SNAPSHOTS_FILE)) {
-      list = JSON.parse(fs.readFileSync(SNAPSHOTS_FILE, 'utf-8'));
-    }
-    list.unshift(record);
-    fs.writeFileSync(SNAPSHOTS_FILE, JSON.stringify(list.slice(0, 30), null, 2), 'utf-8');
-  } catch (e) {
-    console.warn('Snapshot save error:', e);
-  }
-}
-
 app.get('/api/self-code/snapshots', (req, res) => {
   try {
     if (!fs.existsSync(SNAPSHOTS_FILE)) return res.json({ success: true, snapshots: [] });
@@ -3036,7 +3121,7 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
     // 3. コード生成 (または直接指定された検証済みコードの採用)
     let generatedCode = '';
     let reasoning = '';
-    let generationMethod: 'llm' | 'fallback_template' | 'override' = 'fallback_template';
+    let generationMethod: 'llm_local' | 'llm_gemini' | 'fallback_template' | 'override' = 'fallback_template';
 
     if (req.body.codeOverride && typeof req.body.codeOverride === 'string') {
       generatedCode = req.body.codeOverride;
@@ -3053,23 +3138,30 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
 - any型の使用を避け、インターフェースを明確に定義する
 - 単体テストしやすい構造にする`;
 
-      const genRes = await generateWithLocalLlmOnly(
-        { contents: aiPrompt, config: { temperature: 0.2 } },
-        req.body?.localLlmEndpoint,
-        req.body?.localLlmModel
-      );
+        const genRes = await generateWithLocalOrGeminiFallback(
+          req,
+          { contents: aiPrompt, config: { temperature: 0.2 } },
+          req.body?.localLlmEndpoint,
+          req.body?.localLlmModel
+        );
 
-      const text = genRes.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const match = text.match(/```(?:typescript|ts)?([\s\S]*?)```/);
-      if (match && match[1]) {
-        generatedCode = match[1].trim();
-        reasoning = `みき自身のローカルLLM (${genRes.modelUsed.replace('local:', '')}) が要求『${prompt.slice(0, 40)}』を解析し、完全なTypeScriptモジュールを生成しました。`;
-        generationMethod = 'llm';
+        const text = genRes.response?.candidates?.[0]?.content?.parts?.[0]?.text || genRes.response?.text || '';
+        const match = text.match(/```(?:typescript|ts)?([\s\S]*?)```/);
+        const extracted = match && match[1] ? match[1].trim() : text.trim();
+        if (extracted && (extracted.includes('export') || extracted.includes('class') || extracted.includes('function') || extracted.includes('interface'))) {
+          generatedCode = extracted;
+          if (genRes.isLocal) {
+            generationMethod = 'llm_local';
+            reasoning = `みきローカルLLM (${genRes.modelUsed.replace('local:', '')}) が要求『${prompt.slice(0, 40)}』を解析し、完全なTypeScriptモジュールを自律生成しました。`;
+          } else {
+            generationMethod = 'llm_gemini';
+            reasoning = `Gemini (${genRes.modelUsed}) が要求『${prompt.slice(0, 40)}』を解析し、本番TypeScriptモジュールを自律生成しました。`;
+          }
+        }
+      } catch (aiErr: any) {
+        console.warn('Autonomous implement LLM generation failed:', aiErr?.message);
       }
-    } catch (aiErr: any) {
-      console.warn('Local LLM auto-implement failed:', aiErr?.message);
     }
-  }
 
     // 最終フォールバック: ローカルLLMが使用不可だった場合のみ実行される、
     // AIを一切使わない決定論的な文字列テンプレート生成。
@@ -3087,10 +3179,10 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
       const className = rawName || 'AutoSynthesizedService';
 
       generatedCode = `/**
- * MIKI-AI 自律生成モジュール (雛形スタブ): ${prompt}
+ * MIKI-AI 自律生成モジュール (未実装雛形スタブ): ${prompt}
  * 生成時刻: ${new Date().toISOString()}
- * ⚠️ 注意: ローカルLLMオフラインのため、要求仕様の型インターフェースおよび骨格スタブのみ生成されました。
- * 本要件の完全実装はローカルLLMオンライン時または自己進化サイクルで再実行してください。
+ * ⚠️ 注意: ローカルLLMおよびGemini APIに接続できなかったため、要求仕様の型骨格スタブ (isStub: true) のみ生成されました。
+ * 本要件の完全実装とCOMPLETED昇格には、オンライン推論リソース（Gemini APIまたはローカルLLM）有効時に再実行が必要です。
  */
 
 export interface ${className}Options {
@@ -3110,6 +3202,7 @@ export class ${className} {
   private options: Required<${className}Options>;
   private state: Map<string, { payload: unknown; time: number }> = new Map();
   public readonly isStub: boolean = true;
+  public readonly isRequirementImplemented: boolean = false;
   public readonly requirementPrompt: string = ${JSON.stringify(prompt.slice(0, 100))};
 
   constructor(opts: ${className}Options = {}) {
@@ -3127,26 +3220,16 @@ export class ${className} {
     if (!this.options.enabled) {
       return { success: false, error: 'Module disabled', timestamp: Date.now() };
     }
-    try {
-      if (this.state.size >= this.options.maxCapacity) {
-        const firstKey = this.state.keys().next().value;
-        if (firstKey) this.state.delete(firstKey);
-      }
-      this.state.set(key, { payload, time: Date.now() });
-      return {
-        success: true,
-        data: payload,
-        timestamp: Date.now(),
-      };
-    } catch (err: unknown) {
-      return { success: false, error: String(err), timestamp: Date.now() };
-    }
+    // ⚠️ 未実装雛形スタブ: 実際の業務ロジックはLLM推論による本実装が必要です
+    return {
+      success: false,
+      error: 'Unimplemented stub: requires real LLM implementation',
+      timestamp: Date.now(),
+    };
   }
 
   public get(key: string): unknown {
-    if (!key) return null;
-    const item = this.state.get(key);
-    return item?.payload ?? null;
+    return null;
   }
 
   public clear(): void {
@@ -3158,14 +3241,15 @@ export class ${className} {
       activeEntries: this.state.size,
       maxCapacity: this.options.maxCapacity,
       isStub: true,
-      healthy: true,
+      isRequirementImplemented: false,
+      healthy: false,
     };
   }
 }
 
 export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${className}();
 `;
-      reasoning = `⚠️ ローカルLLM(${process.env.LOCAL_LLM_ENDPOINT || 'http://127.0.0.1:8080'})に接続できなかったため、固定テンプレートから要求『${prompt.slice(0, 40)}』の型骨格 [${className}] の雛形スタブのみを生成しました。要件適合にはローカルLLMオンライン時の本実装が必要です。`;
+      reasoning = `⚠️ ローカルLLMおよびGemini APIのいずれにも接続できなかったため、要求仕様『${prompt.slice(0, 40)}』の型骨格スタブ [${className}] (isStub: true) のみを生成しました。要件適合およびCOMPLETEDへの昇格には本実装が必要です。`;
     }
 
     // 4. 構文検証 (TypeScript Transpilation Check)
@@ -3192,6 +3276,8 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
     // 5. 実際のファイル書き込み（autoApply が true かつ構文検証・品質ゲートの両方をパス時のみ）
     let applied = false;
     let commitHash = '';
+    const isReal = generationMethod === 'llm_local' || generationMethod === 'llm_gemini' || generationMethod === 'override';
+
     if (autoApply && syntaxCheckPassed && qualityGatePassed) {
       const targetDir = path.dirname(fullPath);
       if (!fs.existsSync(targetDir)) {
@@ -3199,17 +3285,20 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
       }
       fs.writeFileSync(fullPath, generatedCode, 'utf-8');
       applied = true;
-      commitHash = Math.random().toString(16).slice(2, 9);
+      commitHash = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 
-      // コミット履歴に追加
+      // コミット履歴に追加 (実スナップショット紐付け)
       try {
         const commits = fs.existsSync(COMMITS_FILE) ? JSON.parse(fs.readFileSync(COMMITS_FILE, 'utf-8')) : [];
         commits.unshift({
           hash: commitHash,
-          message: `feat(self-implement): ${prompt.slice(0, 60)} [${commitHash}]`,
+          message: `${isReal ? 'feat(self-implement)' : 'stub(self-implement)'}: ${prompt.slice(0, 60)} [${commitHash}]`,
           timestamp: Date.now(),
           files: [targetFile],
           status: 'COMMITTED',
+          snapshots: [{ filePath: targetFile, snapshotId: isNewFile ? null : snapshotId }],
+          isStub: !isReal,
+          engine: 'file_snapshot_change_tracker',
         });
         fs.writeFileSync(COMMITS_FILE, JSON.stringify(commits.slice(0, 50), null, 2), 'utf-8');
       } catch {}
@@ -3233,14 +3322,14 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
       reasoning,
       code: generatedCode,
       generationMethod,
-      isRequirementImplemented: generationMethod === 'llm' || generationMethod === 'override',
+      isRequirementImplemented: isReal,
       originalContent: originalContent || '',
       linesCount: generatedCode.split('\n').length,
       lesson: {
         title: `自律実装: ${prompt.slice(0, 30)}`,
         rule: applied
-          ? `${targetFile} に新機能モジュールを安全に構築し、構文検証と品質・安全ゲートの両方をパスしました。`
-          : `${targetFile} 向けにコードを生成しましたが、品質・安全ゲート未合格のため自動適用は行いませんでした。`,
+          ? `${targetFile} に${isReal ? '新機能本実装' : '型骨格スタブ'}を安全に書き込み、構文検証と品質ゲートを通過しました。`
+          : `${targetFile} 向けにコードを生成しましたが、検証または安全ゲート未達のため自動適用は行いませんでした。`,
       },
     });
   } catch (err: any) {

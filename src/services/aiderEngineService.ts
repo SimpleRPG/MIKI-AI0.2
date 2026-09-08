@@ -52,6 +52,10 @@ export interface AiderCommitRecord {
   timestamp: number;
   files: string[];
   status: 'COMMITTED' | 'ROLLED_BACK';
+  snapshots?: Array<{ filePath: string; snapshotId?: string }>;
+  isStub?: boolean;
+  engine?: string;
+  author?: string;
 }
 
 export class AiderEngineService {
@@ -154,7 +158,7 @@ export class AiderEngineService {
     }
   }
 
-  public async rollbackCommit(hash: string): Promise<{ success: boolean; message: string }> {
+  public async rollbackCommit(hash: string): Promise<{ success: boolean; message: string; restoredFiles?: string[] }> {
     try {
       const res = await fetch('/api/aider/rollback', {
         method: 'POST',
@@ -162,8 +166,8 @@ export class AiderEngineService {
         body: JSON.stringify({ hash }),
       });
       const data = await res.json();
-      systemLogger.info('SELF_IMPROVEMENT', `[Aider Rollback] コミット [${hash}] を巻き戻しました`);
-      return { success: data.success, message: data.message || data.error };
+      systemLogger.info('SELF_IMPROVEMENT', `[Aider Rollback] コミット [${hash}] を物理復元しました: ${data.message}`);
+      return { success: data.success, message: data.message || data.error, restoredFiles: data.restoredFiles };
     } catch (err: any) {
       return { success: false, message: err.message || 'ロールバック通信エラー' };
     }

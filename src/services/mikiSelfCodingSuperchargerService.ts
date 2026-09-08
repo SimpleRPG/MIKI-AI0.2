@@ -142,7 +142,7 @@ export interface SelfImplementationResult {
   syntaxError: string | null;
   reasoning: string;
   code: string;
-  generationMethod?: 'llm' | 'fallback_template' | 'override';
+  generationMethod?: 'llm_local' | 'llm_gemini' | 'fallback_template' | 'override' | 'llm';
   isRequirementImplemented?: boolean;
   qualityGatePassed?: boolean;
   qualityGateScore?: number;
