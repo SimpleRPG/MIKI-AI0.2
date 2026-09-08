@@ -38,10 +38,16 @@ import {
   ShieldCheck,
   Rocket,
   Eye,
+  FlaskConical,
+  Network,
+  History,
 } from 'lucide-react';
 import { WorkspaceFile } from '../types';
 import { extractFilesFromZip, ZipExtractionResult } from '../utils/codeParser';
 import { DiffPreviewModal } from './chat/DiffPreviewModal';
+import { UnitTestStudioModal } from './chat/UnitTestStudioModal';
+import { DependencyGraphModal } from './chat/DependencyGraphModal';
+import { SnapshotTimeMachineModal } from './chat/SnapshotTimeMachineModal';
 import { mikiSelfCodingSuperchargerService } from '../services/mikiSelfCodingSuperchargerService';
 
 interface CodeEditorProps {
@@ -140,6 +146,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   } | null>(null);
   const [isSelfHealing, setIsSelfHealing] = useState(false);
   const [selfHealNotice, setSelfHealNotice] = useState<string | null>(null);
+
+  // 単体テストスタジオ & 依存関係インスペクター & タイムマシンモーダル状態
+  const [isUnitTestModalOpen, setIsUnitTestModalOpen] = useState(false);
+  const [isDependencyGraphModalOpen, setIsDependencyGraphModalOpen] = useState(false);
+  const [isTimeMachineOpen, setIsTimeMachineOpen] = useState(false);
 
   // リアルタイム構文検証
   const syntaxCheck = useMemo(() => {
@@ -865,6 +876,41 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               </button>
             )}
 
+            {/* 🧪 TDD ユニットテスト自動合成＆実行ボタン */}
+            {activeFile && (
+              <button
+                type="button"
+                onClick={() => setIsUnitTestModalOpen(true)}
+                className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-slate-800/80 hover:bg-indigo-950/80 border border-slate-700 hover:border-indigo-500/60 text-indigo-300 hover:text-white transition-all cursor-pointer"
+                title={`「${activeFile.name}」の単体テストを自動合成して実行・カバレッジ検証`}
+              >
+                <FlaskConical className="w-3 h-3 text-indigo-400" />
+                <span className="hidden sm:inline">テスト</span>
+              </button>
+            )}
+
+            {/* 🕸️ 依存関係＆循環参照インスペクターボタン */}
+            <button
+              type="button"
+              onClick={() => setIsDependencyGraphModalOpen(true)}
+              className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-slate-800/80 hover:bg-teal-950/80 border border-slate-700 hover:border-teal-500/60 text-teal-300 hover:text-white transition-all cursor-pointer"
+              title="プロジェクト全体のimport依存関係と循環参照(Cycle)を静的検査"
+            >
+              <Network className="w-3 h-3 text-teal-400" />
+              <span className="hidden sm:inline">依存関係</span>
+            </button>
+
+            {/* ⏱️ みき自律スナップショット タイムマシンボタン */}
+            <button
+              type="button"
+              onClick={() => setIsTimeMachineOpen(true)}
+              className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-slate-800/80 hover:bg-fuchsia-950/80 border border-slate-700 hover:border-fuchsia-500/60 text-fuchsia-300 hover:text-white transition-all cursor-pointer"
+              title="みきが自動変更したコードの退避スナップショット一覧からいつでも1クリック復元"
+            >
+              <History className="w-3 h-3 text-fuchsia-400" />
+              <span className="hidden sm:inline">タイムマシン</span>
+            </button>
+
             {/* ✨ みきに改善を頼むボタン */}
             {onRequestAiImprovement && activeFile && (
               <button
@@ -1349,7 +1395,62 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           }}
         />
       )}
+
+      {/* 🧪 TDD ユニットテスト自動合成＆検証スタジオモーダル */}
+      {activeFile && (
+        <UnitTestStudioModal
+          isOpen={isUnitTestModalOpen}
+          onClose={() => setIsUnitTestModalOpen(false)}
+          fileName={activeFile.name}
+          code={activeFile.content}
+          onSaveTestFile={(testFileName, testContent) => {
+            const existing = files.find((f) => f.name === testFileName);
+            if (existing) {
+              onUpdateFileContent(existing.path, testContent);
+            } else {
+              onCreateFile(testFileName);
+              // 次フレームで内容更新
+              setTimeout(() => {
+                const target = files.find((f) => f.name === testFileName);
+                if (target) onUpdateFileContent(target.path, testContent);
+              }, 150);
+            }
+          }}
+          onRequestFix={(failInfo) => {
+            if (onRequestAiImprovement && activeFile) {
+              onRequestAiImprovement(`【単体テスト駆動修復】以下のテスト失敗を解決するようにコードを修正してください：\n${failInfo}`);
+            }
+          }}
+        />
+      )}
+
+      {/* 🕸️ 依存関係＆循環参照インスペクターモーダル */}
+      <DependencyGraphModal
+        isOpen={isDependencyGraphModalOpen}
+        onClose={() => setIsDependencyGraphModalOpen(false)}
+        files={files}
+        onSelectFile={(path) => {
+          onSelectFile(path);
+          setIsDependencyGraphModalOpen(false);
+        }}
+        onRequestRefactor={(prompt) => {
+          if (onRequestAiImprovement && activeFile) {
+            onRequestAiImprovement(prompt);
+          }
+        }}
+      />
+
+      {/* ⏱️ みき自律スナップショット タイムマシンモーダル */}
+      <SnapshotTimeMachineModal
+        isOpen={isTimeMachineOpen}
+        onClose={() => setIsTimeMachineOpen(false)}
+        onRollbackComplete={(filePath, restoredContent) => {
+          onUpdateFileContent(filePath, restoredContent);
+        }}
+      />
     </div>
   );
 };
+
+
 

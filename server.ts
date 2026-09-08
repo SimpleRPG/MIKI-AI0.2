@@ -2615,6 +2615,7 @@ app.get('/api/self-code/snapshots', (req, res) => {
       filePath: s.filePath,
       timestamp: s.timestamp,
       message: s.message,
+      originalContent: s.originalContent || '',
       sizeBytes: s.originalContent ? s.originalContent.length : 0,
     }));
     return res.json({ success: true, snapshots: safeList });
@@ -2643,6 +2644,7 @@ app.post('/api/self-code/rollback-snapshot', (req, res) => {
       success: true,
       message: `スナップショット [${snapshotId}] から ${target.filePath} を安全に復元しました`,
       restoredFile: target.filePath,
+      restoredContent: target.originalContent,
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || 'ロールバック失敗' });

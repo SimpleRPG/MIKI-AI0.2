@@ -55,6 +55,8 @@ import {
   Rocket,
   Eye,
   Bug,
+  Network,
+  History,
 } from 'lucide-react';
 import {
   ChatMessage,
@@ -93,6 +95,9 @@ import { ConversationBranchModal } from './chat/ConversationBranchModal';
 import { ConversationTaskboardModal } from './chat/ConversationTaskboardModal';
 import { RealtimeActivityMonitorModal } from './RealtimeActivityMonitorModal';
 import { DiffPreviewModal } from './chat/DiffPreviewModal';
+import { UnitTestStudioModal } from './chat/UnitTestStudioModal';
+import { DependencyGraphModal } from './chat/DependencyGraphModal';
+import { SnapshotTimeMachineModal } from './chat/SnapshotTimeMachineModal';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -213,7 +218,53 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     newCode: string;
     filePath: string;
   } | null>(null);
+  const [testModalState, setTestModalState] = useState<{
+    isOpen: boolean;
+    fileName: string;
+    code: string;
+  } | null>(null);
+  const [isDependencyGraphModalOpen, setIsDependencyGraphModalOpen] = useState(false);
+  const [isTimeMachineOpen, setIsTimeMachineOpen] = useState(false);
   const [isSelfImplementLauncherOpen, setIsSelfImplementLauncherOpen] = useState(false);
+  const [autonomousVerifications, setAutonomousVerifications] = useState<Record<string, AutonomousVerificationData>>({});
+
+  // みき自律自動検証パイプライン: アシスタントからコードが生成されたら全自動でTDDテスト・構文検査・依存関係スキャンを実行
+  useEffect(() => {
+    const assistantMsgsWithCode = messages.filter(
+      (m) =>
+        m.role === 'assistant' &&
+        !m.isStreaming &&
+        (m.content.includes('```typescript') ||
+          m.content.includes('```ts') ||
+          m.content.includes('```javascript') ||
+          m.content.includes('```tsx') ||
+          m.content.includes('```jsx'))
+    );
+    assistantMsgsWithCode.forEach((msg) => {
+      if (autonomousVerifications[msg.id]) return;
+      const blocks = extractCodeBlocks(msg.content);
+      if (blocks.length === 0) return;
+
+      const targetBlock = blocks[0];
+      mikiSelfCodingSuperchargerService
+        .runAutonomousVerificationPipeline(targetBlock.content, targetBlock.name, workspaceFiles)
+        .then((result) => {
+          setAutonomousVerifications((prev) => ({
+            ...prev,
+            [msg.id]: result.verification,
+          }));
+        })
+        .catch(() => {});
+    });
+  }, [messages, workspaceFiles, autonomousVerifications]);
+
+  const handleOpenUnitTest = (codeBlock: { name: string; content: string }) => {
+    setTestModalState({
+      isOpen: true,
+      fileName: codeBlock.name,
+      code: codeBlock.content,
+    });
+  };
 
   const handleOpenDiffPreview = (codeBlock: { name: string; content: string; language: string }) => {
     const existing = workspaceFiles.find(
@@ -1898,6 +1949,55 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           </span>
                         </div>
 
+                        {/* みき自律自動検証バッジ (自律TDD・構文・循環参照の事前合格状況) */}
+                        {autonomousVerifications[msg.id] ? (
+                          <div className="mb-2 p-1.5 bg-slate-900/90 border border-emerald-500/30 rounded-lg flex flex-wrap items-center justify-between gap-1.5 text-[10px]">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-emerald-400 flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                <span>みき自律検証済</span>
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded font-mono ${
+                                  autonomousVerifications[msg.id].syntaxPassed
+                                    ? 'bg-emerald-950 text-emerald-300'
+                                    : 'bg-rose-950 text-rose-300'
+                                }`}
+                              >
+                                構文: {autonomousVerifications[msg.id].syntaxPassed ? 'PASS' : 'FAIL'}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 font-mono">
+                                TDD: {autonomousVerifications[msg.id].testPassedCount}/
+                                {autonomousVerifications[msg.id].testTotalCount} 合格 (
+                                {autonomousVerifications[msg.id].coverageOverall}%)
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded font-mono ${
+                                  autonomousVerifications[msg.id].cyclesFound === 0
+                                    ? 'bg-slate-800 text-slate-300'
+                                    : 'bg-rose-950 text-rose-300'
+                                }`}
+                              >
+                                循環参照:{' '}
+                                {autonomousVerifications[msg.id].cyclesFound === 0
+                                  ? 'なし'
+                                  : `${autonomousVerifications[msg.id].cyclesFound}件検知`}
+                              </span>
+                            </div>
+                            {autonomousVerifications[msg.id].autoHealed && (
+                              <span className="text-amber-300 text-[10px] flex items-center gap-0.5">
+                                <Zap className="w-3 h-3 text-amber-400" />
+                                <span>自律補完済</span>
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="mb-1.5 px-2 py-1 bg-slate-900/50 rounded flex items-center gap-1.5 text-[10px] text-slate-400">
+                            <RefreshCw className="w-2.5 h-2.5 animate-spin text-sky-400" />
+                            <span>みきがコードの単体テスト＆依存関係を自律検証中...</span>
+                          </div>
+                        )}
+
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleApplyBlocks(msg.content, msg.id)}
@@ -1924,6 +2024,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             >
                               <Eye className="w-3.5 h-3.5 text-purple-400" />
                               <span className="hidden sm:inline">差分確認</span>
+                            </button>
+                          )}
+
+                          {codeBlocks.length > 0 && (
+                            <button
+                              onClick={() => handleOpenUnitTest(codeBlocks[0])}
+                              className="flex items-center gap-1 px-2.5 py-1.5 sm:py-2 bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/60 rounded-lg text-indigo-300 hover:text-white text-xs font-bold transition-all shrink-0 cursor-pointer"
+                              title="生成コードの単体テストを自動合成して実行・検証"
+                            >
+                              <FlaskConical className="w-3.5 h-3.5 text-indigo-400" />
+                              <span className="hidden sm:inline">テスト</span>
                             </button>
                           )}
 
@@ -2801,6 +2912,43 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <span className="truncate">🗺️ ASTシンボル構造＆ギャップ診断</span>
               </button>
 
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSelfImplementLauncherOpen(false);
+                  setIsDependencyGraphModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-teal-950/60 border border-slate-800 hover:border-teal-500/40 rounded-lg text-slate-300 hover:text-teal-200 text-left transition-colors cursor-pointer"
+              >
+                <Network className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                <span className="truncate">🕸️ 依存関係＆循環参照インスペクター</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInputText('【TDD単体テスト生成＆検証】主要モジュールの正常系・境界値・不変条件テストスイートを自動合成し、全テストPassを確認してください。');
+                  setIsSelfImplementLauncherOpen(false);
+                  textareaRef.current?.focus();
+                }}
+                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-indigo-950/60 border border-slate-800 hover:border-indigo-500/40 rounded-lg text-slate-300 hover:text-indigo-200 text-left transition-colors cursor-pointer"
+              >
+                <FlaskConical className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <span className="truncate">🧪 TDD単体テスト自動合成＆検証</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSelfImplementLauncherOpen(false);
+                  setIsTimeMachineOpen(true);
+                }}
+                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-fuchsia-950/60 border border-slate-800 hover:border-fuchsia-500/40 rounded-lg text-slate-300 hover:text-fuchsia-200 text-left transition-colors cursor-pointer"
+              >
+                <History className="w-3.5 h-3.5 text-fuchsia-400 shrink-0" />
+                <span className="truncate">⏱️ タイムマシン (自動退避から即時復元)</span>
+              </button>
+
               {onOpenSelfImprovementModal && (
                 <button
                   type="button"
@@ -3026,6 +3174,66 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           onApply={handleApplyDiffCode}
         />
       )}
+
+      {/* 🧪 TDD ユニットテスト自動合成＆検証スタジオモーダル */}
+      {testModalState && (
+        <UnitTestStudioModal
+          isOpen={testModalState.isOpen}
+          onClose={() => setTestModalState(null)}
+          fileName={testModalState.fileName}
+          code={testModalState.code}
+          onSaveTestFile={(testFileName, testContent) => {
+            onApplyCode([
+              {
+                name: testFileName,
+                path: testFileName.startsWith('src/') ? testFileName : `src/${testFileName}`,
+                content: testContent,
+                language: 'typescript',
+              },
+            ]);
+            setTestModalState(null);
+          }}
+          onRequestFix={(failInfo) => {
+            setInputText(`【単体テスト駆動修復】以下のテスト失敗を解決するようにコードを修正してください：\n${failInfo}`);
+            textareaRef.current?.focus();
+            setTestModalState(null);
+          }}
+        />
+      )}
+
+      {/* 🕸️ 依存関係＆循環参照インスペクターモーダル */}
+      <DependencyGraphModal
+        isOpen={isDependencyGraphModalOpen}
+        onClose={() => setIsDependencyGraphModalOpen(false)}
+        files={workspaceFiles}
+        onSelectFile={(path) => {
+          setIsDependencyGraphModalOpen(false);
+        }}
+        onRequestRefactor={(prompt) => {
+          setInputText(prompt);
+          textareaRef.current?.focus();
+          setIsDependencyGraphModalOpen(false);
+        }}
+      />
+
+      {/* ⏱️ みき自律コード スナップショット・タイムマシンモーダル */}
+      <SnapshotTimeMachineModal
+        isOpen={isTimeMachineOpen}
+        onClose={() => setIsTimeMachineOpen(false)}
+        onRollbackComplete={(filePath, restoredContent) => {
+          const fileName = filePath.split('/').pop() || filePath;
+          onApplyCode([
+            {
+              name: fileName,
+              path: filePath,
+              content: restoredContent,
+              language: 'typescript',
+            },
+          ]);
+        }}
+      />
     </div>
   );
 };
+
+

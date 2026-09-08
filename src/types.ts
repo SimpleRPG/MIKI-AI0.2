@@ -624,6 +624,20 @@ export interface ExecutionStep {
   details?: any;
 }
 
+export interface AutonomousVerificationData {
+  syntaxPassed: boolean;
+  syntaxError?: string | null;
+  testsPassed: boolean;
+  testPassedCount: number;
+  testTotalCount: number;
+  coverageOverall: number;
+  cyclesFound: number;
+  cyclesDescription?: string;
+  autoHealed?: boolean;
+  healedDetails?: string;
+  verifiedAt: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -683,6 +697,8 @@ export interface ChatMessage {
   completionEvaluation?: CompletionEvaluation;
   // コード適用確認ゲート & VBA準備ゲート
   codeProposal?: CodeProposal;
+  // みき自律検証＆自動テスト自己修復レポート
+  autonomousVerification?: AutonomousVerificationData;
   vbaAssessment?: VbaSafetyAssessment;
   // 設計思想 6章 & 第3段階: 回答品質・回答長・直接回答評価
   responseQuality?: ResponseQualityEvaluation;
