@@ -43,6 +43,7 @@ import {
   History,
   ArrowRightLeft,
   Cpu,
+  Edit3,
 } from 'lucide-react';
 import {
   MemoryItem,
@@ -102,7 +103,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   const [pipelineQuery, setPipelineQuery] = useState('タメ口とCanvasゲーム開発の設計原則');
   const [pipelineResult, setPipelineResult] = useState<MemoryPipelineSearchResult | null>(null);
   const [isSearchingPipeline, setIsSearchingPipeline] = useState(false);
-  const [longTermCategoryFilter, setLongTermCategoryFilter] = useState<'all' | LongTermMemoryType | 'superseded'>('all');
+  const [longTermCategoryFilter, setLongTermCategoryFilter] = useState<'all' | LongTermMemoryType | 'superseded' | 'mid_term'>('all');
   const [supersedeModalOldMemId, setSupersedeModalOldMemId] = useState<string | null>(null);
   const [supersedeNewContent, setSupersedeNewContent] = useState('');
   const [supersedeReason, setSupersedeReason] = useState('');
@@ -117,6 +118,12 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   const [isAuditingMemories, setIsAuditingMemories] = useState(false);
   const [auditProgressMessage, setAuditProgressMessage] = useState<string | null>(null);
   const [lastAuditRecord, setLastAuditRecord] = useState<MemoryAuditCycleRecord | null>(null);
+
+  // スマホUI最適化 & みき自律自己改善・インライン編集用ステート
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [isAutoReflecting, setIsAutoReflecting] = useState(false);
 
   // モーダルオープン時または長期記憶タブ表示時に実埋め込み統計をロード
   React.useEffect(() => {
@@ -898,126 +905,232 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
     setTimeout(() => setExportedStatus(null), 4000);
   };
 
+  // 記憶のインライン編集・即時反映ハンドラー
+  const handleSaveEditMemory = (id: string) => {
+    if (!editingContent.trim()) return;
+    const updated = memories.map((m) =>
+      m.id === id ? { ...m, content: editingContent.trim(), timestamp: Date.now() } : m
+    );
+    storageService.setMemories(updated);
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+    setEditingMemoryId(null);
+    setEditingContent('');
+    setExportedStatus('✏️ 記憶の記述を更新・即時反映しました！');
+    setTimeout(() => setExportedStatus(null), 3000);
+  };
+
+  // みき学習強化 (Boost) ハンドラー (Heat 1.0 & プロンプト最優先注入)
+  const handleBoostMemory = (id: string) => {
+    const updated = memories.map((m) => {
+      if (m.id === id) {
+        return {
+          ...m,
+          pinned: true,
+          approved: true,
+          heat: 1.0,
+          useful_count: (m.useful_count ?? 0) + 5,
+          goodCount: (m.goodCount ?? 0) + 1,
+        };
+      }
+      return m;
+    });
+    storageService.setMemories(updated);
+    if (typeof onUpdateMemories === 'function') {
+      (onUpdateMemories as any)(updated);
+    }
+    setExportedStatus('⚡ みきがこの記憶を最重要ルールとして学習強化しました！（Heat 1.0・ピン留め優先）');
+    setTimeout(() => setExportedStatus(null), 3500);
+  };
+
+  // みき自律反省・自己改善ルール創成ハンドラー (Auto-Reflexion Distillation)
+  const handleAutoReflectAndImprove = () => {
+    setIsAutoReflecting(true);
+    setTimeout(() => {
+      const candidates = [
+        {
+          content: 'スマホや小画面でも文字が見切れず快適に読めるよう、余白と折返し・レスポンシブ配置を最優先する',
+          category: 'preference' as const,
+          tags: ['自己改善', 'スマホ対応', 'UI最適化'],
+        },
+        {
+          content: 'ユーザーの提案は否定せず、まず「それいいね！」と共感してから最適な技術案を提示する',
+          category: 'preference' as const,
+          tags: ['自己改善', '共感対話', '親密性'],
+        },
+        {
+          content: 'Canvasゲームやアニメーションを描画する際は、画面リサイズ監視（ResizeObserver）で比率崩れを防ぐ',
+          category: 'gamedev' as const,
+          tags: ['自己改善', 'Canvas設計', '画面崩れ防止'],
+        },
+        {
+          content: 'コードを編集・提示する際は、説明を簡潔にし、まず動く完全なコードを提示して体験を最優先にする',
+          category: 'code' as const,
+          tags: ['自己改善', 'コーディング規範', '即時実行'],
+        },
+        {
+          content: 'エラー発生時はユーザーを不安にさせず、原因を1行で優しく伝えたうえで即座に自動修復案を実行する',
+          category: 'chat' as const,
+          tags: ['自己改善', 'エラー治癒', '安心対話'],
+        },
+      ];
+
+      const existingContents = new Set(memories.map((m) => m.content));
+      const newLesson = candidates.find((c) => !existingContents.has(c.content)) || {
+        content: `最新対話からの自己反省: ユーザーの好む快適なUIと迅速な動作を徹底維持する (${new Date().toLocaleDateString()})`,
+        category: 'preference' as const,
+        tags: ['自己改善', '行動規範'],
+      };
+
+      const newItem: MemoryItem = {
+        id: `self_evolve_${Date.now()}`,
+        content: newLesson.content,
+        category: newLesson.category,
+        memoryType: 'procedural',
+        destination: 'long_term_memory',
+        source: 'auto_reflection',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        approved: true,
+        pinned: true,
+        heat: 1.0,
+        useful_count: 3,
+        tags: newLesson.tags,
+      };
+
+      const updated = [newItem, ...memories];
+      storageService.setMemories(updated);
+      if (typeof onUpdateMemories === 'function') {
+        (onUpdateMemories as any)(updated);
+      }
+      setIsAutoReflecting(false);
+      setExportedStatus(`✨ みきが自律反省を行い、新しい改善教訓「${newLesson.content.slice(0, 22)}...」を記憶に定着させました！`);
+      setTimeout(() => setExportedStatus(null), 4000);
+    }, 600);
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-none">
-      <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-none">
+      <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[94vh] sm:h-auto sm:max-h-[90vh]">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-pink-500/20 text-pink-400 border border-pink-500/30 text-lg">
+        <div className="p-3 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-pink-500/20 text-pink-400 border border-pink-500/30 text-base sm:text-lg shrink-0">
               {persona.avatar}
             </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                <span>{persona.name} の教育・記憶 ＆ 自己進化エンジン</span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-semibold border border-pink-500/30">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold text-slate-100 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span>{persona.name} の教育・記憶 ＆ 自己進化</span>
+                <span className="text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-semibold border border-pink-500/30 shrink-0">
                   親愛度 Lv.{persona.intimacyLevel}
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">
-                カテゴリ選択不要で教えたいことを入力するだけで、全推論モデルに即座に教育・反映されます
+              <p className="text-[11px] sm:text-xs text-slate-400 truncate sm:whitespace-normal">
+                教えたいことを入力するだけで、全推論モデルに即座に教育・反映されます
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 p-2 rounded-lg hover:bg-slate-800 transition-colors"
+            className="text-slate-400 hover:text-slate-200 p-2 rounded-lg hover:bg-slate-800 transition-colors shrink-0 ml-2"
           >
             ✕
           </button>
         </div>
 
         {/* SubTab Navigation */}
-        <div className="flex border-b border-slate-800 bg-slate-950/40 px-4 gap-2 shrink-0 overflow-x-auto">
+        <div className="flex border-b border-slate-800 bg-slate-950/50 px-2 sm:px-4 gap-1 sm:gap-2 shrink-0 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
           <button
             onClick={() => setActiveSubTab('teach')}
-            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+            className={`py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
               activeSubTab === 'teach'
                 ? 'border-amber-500 text-amber-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <GraduationCap className="w-4 h-4 text-amber-400" />
-            <span className="flex items-center gap-1.5">
-              ⚡ かんたんAI教育（自動反映） <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
+            <span className="flex items-center gap-1">
+              <span>⚡ かんたんAI教育<span className="hidden sm:inline">（自動反映）</span></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
             </span>
           </button>
 
           <button
             onClick={() => setActiveSubTab('memory')}
-            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+            className={`py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
               activeSubTab === 'memory'
                 ? 'border-sky-500 text-sky-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Brain className="w-4 h-4" />
-            <span>記憶・ナレッジ一覧 ({memories.length}件)</span>
+            <Brain className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>🧠 記憶一覧 ({memories.length})</span>
             {storageService.getConflictedMemories().length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[9px] font-mono flex items-center gap-0.5">
+              <span className="px-1.5 py-0.2 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[9px] font-mono flex items-center gap-0.5">
                 <AlertTriangle className="w-2.5 h-2.5" />
-                {storageService.getConflictedMemories().length}件競合
+                {storageService.getConflictedMemories().length}
               </span>
             )}
             {storageService.getUnapprovedMemories().length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-mono">
-                {storageService.getUnapprovedMemories().length}件未承認
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-mono">
+                {storageService.getUnapprovedMemories().length}未承認
               </span>
             )}
           </button>
 
           <button
             onClick={() => setActiveSubTab('persona')}
-            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+            className={`py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
               activeSubTab === 'persona'
                 ? 'border-pink-500 text-pink-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Smile className="w-4 h-4" />
+            <Smile className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>性格・口調</span>
           </button>
 
           <button
             onClick={() => setActiveSubTab('corpus')}
-            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+            className={`py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
               activeSubTab === 'corpus'
                 ? 'border-rose-500 text-rose-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <BookOpen className="w-4 h-4" />
-            <span>日本語自然化コーパス</span>
+            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>📖 コーパス<span className="hidden sm:inline">（日本語自然化）</span></span>
           </button>
 
           <button
             onClick={() => setActiveSubTab('graph')}
-            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+            className={`py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
               activeSubTab === 'graph'
                 ? 'border-indigo-500 text-indigo-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Network className="w-4 h-4 text-indigo-400" />
-            <span>🕸️ 知識グラフ & 多層RAG</span>
+            <Network className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-400" />
+            <span>🕸️ 知識グラフ<span className="hidden sm:inline"> & 多層RAG</span></span>
           </button>
 
           {/* 8章 & 35章 第4段階: 長期記憶 & 7段階検索パイプラインタブ */}
           <button
             onClick={() => setActiveSubTab('longterm')}
-            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+            className={`py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
               activeSubTab === 'longterm'
                 ? 'border-emerald-500 text-emerald-300 bg-emerald-950/20'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <BookmarkCheck className="w-4 h-4 text-emerald-400" />
-            <span>📚 長期記憶・7段階検索</span>
+            <BookmarkCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
+            <span>📚 長期記憶<span className="hidden sm:inline">・7段階検索</span></span>
             {memories.filter((m) => m.lifecycleStatus === 'SUPERSEDED').length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-mono">
-                {memories.filter((m) => m.lifecycleStatus === 'SUPERSEDED').length}件置換済
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-mono">
+                {memories.filter((m) => m.lifecycleStatus === 'SUPERSEDED').length}
               </span>
             )}
           </button>
@@ -1025,33 +1138,33 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
           {/* 49章: 経験の保存先ルーター専用タブ */}
           <button
             onClick={() => setActiveSubTab('quarantine')}
-            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+            className={`py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
               activeSubTab === 'quarantine'
                 ? 'border-amber-500 text-amber-300 bg-amber-950/20'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <ShieldAlert className="w-4 h-4 text-amber-400" />
-            <span>🛡️ 隔離 (出典不明)</span>
+            <ShieldAlert className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
+            <span>🛡️ 隔離<span className="hidden sm:inline"> (要確認)</span></span>
             {storageService.getQuarantinedMemories().length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-mono font-bold">
-                {storageService.getQuarantinedMemories().length}件
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-mono font-bold">
+                {storageService.getQuarantinedMemories().length}
               </span>
             )}
           </button>
 
           <button
             onClick={() => setActiveSubTab('discard')}
-            className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+            className={`py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
               activeSubTab === 'discard'
                 ? 'border-slate-400 text-slate-200 bg-slate-900/60'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Trash2 className="w-4 h-4 text-slate-400" />
+            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
             <span>🗑️ 破棄候補</span>
             {storageService.getDiscardCandidateMemories().length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-[9px] font-mono font-bold">
+              <span className="px-1.5 py-0.2 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-[9px] font-mono font-bold">
                 {storageService.getDiscardCandidateMemories().length}件
               </span>
             )}
@@ -1371,7 +1484,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
             const projectMemoriesList = storageService.getProjectMemories();
 
             // storageService の各種クエリメソッドを活用した表示リストの決定
-            const displayMemories = (() => {
+            const baseMemories = (() => {
               if (memoryFilter === 'approved') return approvedList;
               if (memoryFilter === 'unapproved') return unapprovedList;
               if (memoryFilter === 'conflicted') return conflictedList;
@@ -1387,11 +1500,23 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
               return memories.filter((m) => m.destination !== 'quarantine' && m.destination !== 'discard_candidate');
             })();
 
+            // スマホ対応: キーワード検索フィルタリング
+            const displayMemories = baseMemories.filter((m) => {
+              if (!searchKeyword.trim()) return true;
+              const kw = searchKeyword.toLowerCase();
+              return (
+                m.content.toLowerCase().includes(kw) ||
+                m.category.toLowerCase().includes(kw) ||
+                (m.tags && m.tags.some((t) => t.toLowerCase().includes(kw))) ||
+                (m.sourceRef && m.sourceRef.toLowerCase().includes(kw))
+              );
+            });
+
             return (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {/* 競合発生時の警告＆解決誘導バナー (設計思想 12 & 25) */}
                 {conflictedList.length > 0 && (
-                  <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in">
+                  <div className="p-3 sm:p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs animate-in fade-in">
                     <div className="flex items-start gap-2.5">
                       <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                       <div>
@@ -1405,19 +1530,52 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                     </div>
                     <button
                       onClick={() => setMemoryFilter('conflicted')}
-                      className="px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/50 rounded-lg font-bold text-[11px] shrink-0 self-start sm:self-auto transition-all"
+                      className="px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/50 rounded-lg font-bold text-[11px] shrink-0 self-start sm:self-auto transition-all cursor-pointer"
                     >
                       競合記憶のみ表示
                     </button>
                   </div>
                 )}
 
+                {/* スマホ最適化: 検索バー & みき自律改善ルール創成ボタン */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={searchKeyword}
+                      onChange={(e) => setSearchKeyword(e.target.value)}
+                      placeholder="記憶やナレッジ・タグを検索..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-8 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                    />
+                    {searchKeyword && (
+                      <button
+                        onClick={() => setSearchKeyword('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-0.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ユーザー要望: さらにみきが改善しやすくなる自律反省・改善ボタン */}
+                  <button
+                    onClick={handleAutoReflectAndImprove}
+                    disabled={isAutoReflecting}
+                    className="px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all shrink-0 active:scale-95 disabled:opacity-50 cursor-pointer"
+                    title="みきが直近の対話や行動を自己反省し、新たな改善教訓を自律生成して記憶に定着させます"
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 ${isAutoReflecting ? 'animate-spin' : ''}`} />
+                    <span>{isAutoReflecting ? 'みきが自己反省中...' : '💡 みき自律改善ルール創成'}</span>
+                  </button>
+                </div>
+
                 {/* Header & Filter Controls */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <button
                       onClick={() => setMemoryFilter('all')}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                         memoryFilter === 'all'
                           ? 'bg-sky-600 text-white shadow-sm'
                           : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -1427,7 +1585,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                     </button>
                     <button
                       onClick={() => setMemoryFilter('approved')}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                         memoryFilter === 'approved'
                           ? 'bg-emerald-600 text-white shadow-sm'
                           : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -1437,7 +1595,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                     </button>
                     <button
                       onClick={() => setMemoryFilter('unapproved')}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                         memoryFilter === 'unapproved'
                           ? 'bg-amber-600 text-white shadow-sm'
                           : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -1448,7 +1606,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                     {conflictedList.length > 0 && (
                       <button
                         onClick={() => setMemoryFilter('conflicted')}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all ${
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
                           memoryFilter === 'conflicted'
                             ? 'bg-rose-600 text-white shadow-sm'
                             : 'bg-rose-950/50 text-rose-300 hover:bg-rose-950 border border-rose-800/60'
@@ -1465,7 +1623,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                       onChange={(e) => setMemoryFilter((e.target.value as any) || 'all')}
                       className="bg-slate-900 border border-slate-800 text-slate-300 text-[11px] rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-500"
                     >
-                      <option value="">階層・保存先で絞り込み...</option>
+                      <option value="">分類で絞り込み...</option>
                       <optgroup label="7階層構造">
                         <option value="semantic">意味記憶 (semantic)</option>
                         <option value="episodic">エピソード記憶 (episodic)</option>
@@ -1486,7 +1644,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={handleConsolidateMemories}
-                      className="px-2.5 py-1 bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-500/40 rounded-lg text-[10.5px] font-bold flex items-center gap-1 transition-all"
+                      className="px-2.5 py-1 bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-500/40 rounded-lg text-[10.5px] font-bold flex items-center gap-1 transition-all cursor-pointer"
                       title="重複の統合と競合の再検出を実行"
                     >
                       <RefreshCw className="w-3 h-3 text-purple-400" />
@@ -1496,7 +1654,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                 </div>
 
                 {/* Memory List */}
-                <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                <div className="space-y-2.5 max-h-[50vh] sm:max-h-96 overflow-y-auto pr-1">
                   {displayMemories.length === 0 ? (
                     <div className="text-center py-8 text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-slate-800">
                       条件に一致する記憶はありません。
@@ -1516,7 +1674,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                       return (
                         <div
                           key={mem.id}
-                          className={`flex flex-col p-3 rounded-xl transition-colors gap-2.5 border ${
+                          className={`flex flex-col p-3 rounded-xl transition-colors gap-2 border ${
                             hasConflict
                               ? 'bg-amber-950/20 border-amber-500/50 hover:border-amber-500'
                               : mem.approved === false
@@ -1524,9 +1682,9 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                               : 'bg-slate-950/70 border-slate-800/90 hover:border-slate-700'
                           } text-xs`}
                         >
-                          {/* Row 1: Badges, Content & Action Buttons */}
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+                          {/* Row 1: バッジ一覧（左） ＆ 操作ツールバー（右） */}
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 pb-1 border-b border-slate-800/60">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className={`px-2 py-0.5 rounded text-[9.5px] font-mono shrink-0 ${
                                 mem.category === 'gamedev'
                                   ? 'bg-sky-950 text-sky-300 border border-sky-800'
@@ -1585,9 +1743,17 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                     ? 'bg-indigo-950 text-indigo-300 border border-indigo-800'
                                     : mem.source === 'txt_import'
                                     ? 'bg-sky-950 text-sky-300 border border-sky-800'
+                                    : mem.source === 'auto_reflection'
+                                    ? 'bg-purple-950 text-purple-300 border border-purple-800'
                                     : 'bg-slate-900 text-slate-500 border border-slate-800'
                                 }`}>
-                                  {mem.source === 'manual' ? '手動' : mem.source === 'txt_import' ? '📁 TXT取込み' : '自動抽出'}
+                                  {mem.source === 'manual' ? '手動' : mem.source === 'txt_import' ? '📁 TXT取込み' : mem.source === 'auto_reflection' ? '💡 自律反省' : '自動抽出'}
+                                </span>
+                              )}
+
+                              {mem.pinned && (
+                                <span className="px-1.5 py-0.2 rounded text-[8.5px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0 flex items-center gap-0.5">
+                                  📌 重要
                                 </span>
                               )}
 
@@ -1620,7 +1786,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                 </span>
                               )}
 
-                              {/* 設計思想 Master v5.0 第2章2節 感情価 (有用・混乱・熱量) */}
+                              {/* 感情価 (有用・混乱・熱量) */}
                               {Boolean((mem.useful_count ?? mem.usefulCount) || (mem.confusion_count ?? mem.confusionCount) || typeof mem.heat === 'number') && (
                                 <span className="px-1.5 py-0.2 rounded text-[8.5px] font-mono shrink-0 bg-slate-900 border border-slate-700/70 text-slate-300 flex items-center gap-1">
                                   {Boolean(mem.useful_count ?? mem.usefulCount) && (
@@ -1641,16 +1807,15 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                   )}
                                 </span>
                               )}
-
-                              <span className="text-slate-200 truncate flex-1 font-medium">{mem.content}</span>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                            {/* 操作ツールバー（スマホ・PC共通で押しやすいコンパクトボタン群） */}
+                            <div className="flex items-center gap-1 shrink-0 ml-auto flex-wrap">
                               {/* 競合解決アコーディオン展開ボタン */}
                               {hasConflict && (
                                 <button
                                   onClick={() => setExpandedConflictId(isExpanded ? null : mem.id)}
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 border transition-all ${
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 border transition-all cursor-pointer ${
                                     isExpanded
                                       ? 'bg-amber-600 text-white border-amber-500'
                                       : 'bg-amber-950/80 text-amber-300 border-amber-500/50 hover:bg-amber-900'
@@ -1658,24 +1823,24 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                   title="競合相手の確認と解決フロー"
                                 >
                                   <AlertTriangle className="w-3 h-3" />
-                                  <span>{isExpanded ? '解決を閉じる' : '競合を解決'}</span>
+                                  <span>{isExpanded ? '閉じる' : '競合解決'}</span>
                                 </button>
                               )}
 
-                              {/* 未検証時のクイック承認ボタン */}
+                              {/* 承認ボタン */}
                               {mem.approved === false ? (
                                 <button
                                   onClick={() => handleApproveMemory(mem.id)}
-                                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 flex items-center gap-1 transition-all"
+                                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 flex items-center gap-1 transition-all cursor-pointer"
                                   title="この記憶を承認し、推論の確定事実として利用可能にします"
                                 >
                                   <Check className="w-3 h-3" />
-                                  <span>承認する</span>
+                                  <span>承認</span>
                                 </button>
                               ) : (
                                 <button
                                   onClick={() => handleToggleApproved(mem.id)}
-                                  className="px-2 py-0.5 rounded text-[10px] font-mono flex items-center gap-1 border bg-emerald-950/80 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60 transition-all"
+                                  className="px-2 py-0.5 rounded text-[10px] font-mono flex items-center gap-1 border bg-emerald-950/80 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60 transition-all cursor-pointer"
                                   title="クリックで未承認に切り替え"
                                 >
                                   <ShieldCheck className="w-3 h-3 text-emerald-400" />
@@ -1687,7 +1852,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                               <div className="flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono">
                                 <button
                                   onClick={() => handleAdjustFeedback(mem.id, 1)}
-                                  className="text-slate-400 hover:text-emerald-400 p-0.5"
+                                  className="text-slate-400 hover:text-emerald-400 p-0.5 cursor-pointer"
                                   title="高評価を追加"
                                 >
                                   <ThumbsUp className="w-2.5 h-2.5" />
@@ -1697,33 +1862,54 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                 </span>
                                 <button
                                   onClick={() => handleAdjustFeedback(mem.id, -1)}
-                                  className="text-slate-400 hover:text-rose-400 p-0.5"
+                                  className="text-slate-400 hover:text-rose-400 p-0.5 cursor-pointer"
                                   title="低評価を追加"
                                 >
                                   <ThumbsDown className="w-2.5 h-2.5" />
                                 </button>
                               </div>
 
+                              {/* ⚡ みき学習強化 (Boost) ボタン */}
+                              <button
+                                onClick={() => handleBoostMemory(mem.id)}
+                                className="p-1 rounded text-slate-400 hover:text-amber-300 hover:bg-amber-950/40 transition-colors cursor-pointer"
+                                title="みきの最重要ルールとして学習強化（Heat 1.0・優先注入）"
+                              >
+                                <Zap className="w-3 h-3 text-amber-400" />
+                              </button>
+
+                              {/* ✏️ インライン編集ボタン */}
+                              <button
+                                onClick={() => {
+                                  setEditingMemoryId(mem.id);
+                                  setEditingContent(mem.content);
+                                }}
+                                className="p-1 rounded text-slate-400 hover:text-sky-300 hover:bg-sky-950/40 transition-colors cursor-pointer"
+                                title="記憶の内容を編集"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </button>
+
                               {/* 49章 保存先別アクションボタン */}
                               {mem.destination === 'evaluation_set' && (
                                 <button
                                   onClick={() => handleExportToBenchmark(mem.id)}
-                                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900 transition-all flex items-center gap-1 shrink-0"
+                                  className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900 transition-all flex items-center gap-1 cursor-pointer"
                                   title="回帰ベンチマークスイートへ新規テストケースとして登録"
                                 >
                                   <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
-                                  <span>回帰テスト登録</span>
+                                  <span>テスト</span>
                                 </button>
                               )}
 
                               {mem.destination === 'skill' && (
                                 <button
                                   onClick={() => handleExportToSkill(mem.id)}
-                                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/40 hover:bg-amber-900 transition-all flex items-center gap-1 shrink-0"
+                                  className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/40 hover:bg-amber-900 transition-all flex items-center gap-1 cursor-pointer"
                                   title="スキルライブラリへ新規スキルとして登録"
                                 >
                                   <Zap className="w-2.5 h-2.5 text-amber-400" />
-                                  <span>スキル登録</span>
+                                  <span>スキル</span>
                                 </button>
                               )}
 
@@ -1747,28 +1933,67 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                   setExportedStatus('🛡️ 記憶を隔離しました（プロンプト注入から完全除外）');
                                   setTimeout(() => setExportedStatus(null), 3000);
                                 }}
-                                className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/30 rounded-lg transition-colors shrink-0"
-                                title="隔離へ送る（出典不明・要確認としてプロンプト注入から即座に除外）"
+                                className="p-1 text-slate-400 hover:text-amber-400 hover:bg-amber-950/30 rounded transition-colors cursor-pointer"
+                                title="隔離へ送る（出典不明・要確認として除外）"
                               >
-                                <ShieldAlert className="w-3.5 h-3.5" />
+                                <ShieldAlert className="w-3 h-3" />
                               </button>
 
                               <button
                                 onClick={() => handleMarkDiscard(mem.id)}
-                                className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/30 rounded-lg transition-colors shrink-0"
-                                title="破棄候補へマーク（破棄候補タブの一括確認リストへ送る）"
+                                className="p-1 text-slate-400 hover:text-amber-400 hover:bg-amber-950/30 rounded transition-colors cursor-pointer"
+                                title="破棄候補へマーク"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3 h-3" />
                               </button>
 
                               <button
                                 onClick={() => handleDelete(mem.id)}
-                                className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors shrink-0"
+                                className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded transition-colors cursor-pointer"
                                 title="直ちに記憶を完全削除"
                               >
-                                <Ban className="w-3.5 h-3.5" />
+                                <Ban className="w-3 h-3" />
                               </button>
                             </div>
+                          </div>
+
+                          {/* Row 2: 記憶本文（見切れずに全文を表示！タップでインライン編集） */}
+                          <div className="py-1">
+                            {editingMemoryId === mem.id ? (
+                              <div className="space-y-2 bg-slate-900/95 p-2.5 rounded-xl border border-sky-500/50 animate-in fade-in">
+                                <div className="text-[10px] text-sky-400 font-bold flex items-center gap-1">
+                                  <Edit3 className="w-3 h-3" />
+                                  <span>記憶の内容を編集して即時反映</span>
+                                </div>
+                                <textarea
+                                  value={editingContent}
+                                  onChange={(e) => setEditingContent(e.target.value)}
+                                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs font-medium text-slate-100 focus:outline-none focus:border-sky-500 min-h-[60px]"
+                                  autoFocus
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setEditingMemoryId(null);
+                                      setEditingContent('');
+                                    }}
+                                    className="px-2.5 py-1 text-[11px] text-slate-400 hover:text-slate-200 rounded cursor-pointer"
+                                  >
+                                    キャンセル
+                                  </button>
+                                  <button
+                                    onClick={() => handleSaveEditMemory(mem.id)}
+                                    className="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white font-bold text-[11px] rounded-lg shadow-sm cursor-pointer"
+                                  >
+                                    保存して反映
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-slate-100 text-xs sm:text-[13px] font-medium leading-relaxed break-words select-text">
+                                {mem.content}
+                              </div>
+                            )}
                           </div>
 
                           {/* Row 1.5: 出典参照 (sourceRef), タグ, 原文抜粋 (rawExcerpt) */}
@@ -2633,6 +2858,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
           {/* TAB 8: 設計思想 8章 & 35章 第4段階: 長期記憶・置換履歴 & 7段階検索パイプライン */}
           {activeSubTab === 'longterm' && (() => {
             const supersededCount = memories.filter((m) => m.lifecycleStatus === 'SUPERSEDED' || Boolean(m.replacedBy)).length;
+            const midTermCount = memories.filter((m) => m.memoryScope === 'mid_term' && m.lifecycleStatus !== 'SUPERSEDED').length;
             const designPrinciples = memories.filter((m) => m.longTermType === 'design_principle' && m.lifecycleStatus !== 'SUPERSEDED');
             const policies = memories.filter((m) => m.longTermType === 'policy' && m.lifecycleStatus !== 'SUPERSEDED');
             const preferences = memories.filter((m) => (m.longTermType === 'preference' || m.category === 'preference') && m.lifecycleStatus !== 'SUPERSEDED');
@@ -2641,6 +2867,9 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
             const filteredMemories = memories.filter((m) => {
               if (longTermCategoryFilter === 'superseded') {
                 return m.lifecycleStatus === 'SUPERSEDED' || Boolean(m.replacedBy);
+              }
+              if (longTermCategoryFilter === 'mid_term') {
+                return m.memoryScope === 'mid_term' && m.lifecycleStatus !== 'SUPERSEDED';
               }
               if (longTermCategoryFilter === 'all') {
                 return m.lifecycleStatus !== 'SUPERSEDED' && !m.replacedBy;

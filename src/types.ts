@@ -75,18 +75,19 @@ export interface MemoryItem {
   active?: boolean;
   createdAt?: number;
   updatedAt?: number;
-  source?: 'auto' | 'manual' | 'txt_import' | 'conversation' | 'code_review' | 'file';
+  source?: 'auto' | 'manual' | 'txt_import' | 'conversation' | 'code_review' | 'file' | 'auto_reflection';
   tags?: string[];
   lastUsedAt?: number;
   useCount?: number;
+  usefulCount?: number; // 2章2節 感情価 (質): 役立った回数 (想起後のターンで訂正が起きなかった正のシグナル)
+  confusionCount?: number; // 2章2節 感情価 (質): 混乱を招いた・訂正された回数 (ユーザーからの訂正シグナル)
+  emotionalValence?: number; // 感情価スコア (質 = usefulCount - confusionCount 等)
   goodCount?: number; // ユーザーが「役に立った」と評価した回数
   badCount?: number;  // ユーザーが「見当違い/不要」と評価した回数
   // 設計思想 Master v5.0 第2章2節: 感情価 (質) と熱量
   heat?: number;             // 利用頻度・忘却曲線に基づく温度 (0.0〜1.0)
   useful_count?: number;     // 役立った回数 (訂正なく受容された回数)
   confusion_count?: number;  // 混乱を招いた・訂正された回数
-  usefulCount?: number;      // キャメルケース互換
-  confusionCount?: number;   // キャメルケース互換
   isDiagnostic?: boolean;    // エラー・診断メッセージの記憶汚染防止フラグ (第3章3節)
   approved?: boolean; // 人または機械検証で確定された承認状態
   sourceRef?: string; // 根拠となる原文参照・メッセージID・ファイル名
@@ -501,6 +502,59 @@ export interface ToolDefinition {
   isAvailable: boolean;
   executionCount?: number;
   lastExecutedAt?: number;
+  // 第171章: Qwen 3B 自律動的ツール拡張
+  isDynamic?: boolean;
+  dynamicCode?: string;
+  dynamicSandboxLevel?: 'LEVEL_0_ISOLATED_READ_ONLY' | 'LEVEL_1_LOCAL_SCRATCHPAD' | 'LEVEL_2_OUTBOUND_CONFIRMED' | 'LEVEL_3_FULL_INTEGRATION';
+  createdBy?: 'QWEN_3B' | 'GEMINI' | 'USER' | 'AUTONOMOUS_FACTORY';
+  sourceWebReference?: string;
+  createdAt?: number;
+}
+
+export interface WebCodeSnippet {
+  id: string;
+  title: string;
+  language: string;
+  code: string;
+  sourceUrl: string;
+  sourceType: 'github' | 'npm' | 'tech_docs' | 'web';
+  stars?: number;
+  description?: string;
+}
+
+export interface WebCodeSearchResult {
+  query: string;
+  language?: string;
+  snippets: WebCodeSnippet[];
+  suggestedTools?: Array<{
+    name: string;
+    description: string;
+    targetProblem: string;
+  }>;
+  summary: string;
+  searchedAt: number;
+}
+
+export interface DynamicToolSynthesisRequest {
+  featureName: string;
+  description: string;
+  targetProblem: string;
+  inputParameters: ToolParameterSchema[];
+  suggestedCodePattern?: string;
+  sourceReference?: string;
+}
+
+export interface DynamicToolSynthesisResponse {
+  success: boolean;
+  tool: ToolDefinition;
+  generatedCode: string;
+  sandboxTestResult: {
+    passed: boolean;
+    output?: any;
+    durationMs: number;
+    error?: string;
+  };
+  synthesisLog: string;
 }
 
 export interface ToolExecutionRequest {

@@ -52,6 +52,9 @@ import {
   CheckSquare,
   HelpCircle,
   MoreHorizontal,
+  Rocket,
+  Eye,
+  Bug,
 } from 'lucide-react';
 import {
   ChatMessage,
@@ -89,6 +92,7 @@ import { WhyAnswerInspectorModal } from './chat/WhyAnswerInspectorModal';
 import { ConversationBranchModal } from './chat/ConversationBranchModal';
 import { ConversationTaskboardModal } from './chat/ConversationTaskboardModal';
 import { RealtimeActivityMonitorModal } from './RealtimeActivityMonitorModal';
+import { DiffPreviewModal } from './chat/DiffPreviewModal';
 import JSZip from 'jszip';
 
 interface ChatPanelProps {
@@ -200,6 +204,45 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isActivityMonitorOpen, setIsActivityMonitorOpen] = useState(false);
   const [latestLiveStep, setLatestLiveStep] = useState<StepExecutionSnapshot | null>(null);
   const [liveLogMessage, setLiveLogMessage] = useState<string>('');
+
+  // 差分プレビュー & 自律自己実装ランチャー状態
+  const [diffModalState, setDiffModalState] = useState<{
+    isOpen: boolean;
+    fileName: string;
+    oldCode: string;
+    newCode: string;
+    filePath: string;
+  } | null>(null);
+  const [isSelfImplementLauncherOpen, setIsSelfImplementLauncherOpen] = useState(false);
+
+  const handleOpenDiffPreview = (codeBlock: { name: string; content: string; language: string }) => {
+    const existing = workspaceFiles.find(
+      (f) => f.name === codeBlock.name || f.path === codeBlock.name || f.path.endsWith('/' + codeBlock.name)
+    );
+    const oldCode = existing ? existing.content : '';
+    const filePath = existing ? existing.path : (codeBlock.name.startsWith('src/') ? codeBlock.name : `src/${codeBlock.name}`);
+    setDiffModalState({
+      isOpen: true,
+      fileName: codeBlock.name,
+      oldCode,
+      newCode: codeBlock.content,
+      filePath,
+    });
+  };
+
+  const handleApplyDiffCode = (appliedCode: string) => {
+    if (!diffModalState) return;
+    onApplyCode([
+      {
+        name: diffModalState.fileName,
+        path: diffModalState.filePath,
+        content: appliedCode,
+        language: 'typescript',
+      },
+    ]);
+    if (onOpenGamePreview) onOpenGamePreview();
+    setDiffModalState(null);
+  };
 
   useEffect(() => {
     // リアルタイム行動ログ＆ステップのPub/Subリスナー登録
@@ -1873,6 +1916,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             )}
                           </button>
 
+                          {codeBlocks.length > 0 && (
+                            <button
+                              onClick={() => handleOpenDiffPreview(codeBlocks[0])}
+                              className="flex items-center gap-1 px-2.5 py-1.5 sm:py-2 bg-purple-950/80 hover:bg-purple-900 border border-purple-700/60 rounded-lg text-purple-300 hover:text-white text-xs font-bold transition-all shrink-0 cursor-pointer"
+                              title="既存ファイルとの変更行（差分）を確認して安全に適用"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-purple-400" />
+                              <span className="hidden sm:inline">差分確認</span>
+                            </button>
+                          )}
+
                           <button
                             onClick={() => handleCopy(msg.content, msg.id)}
                             className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors"
@@ -2690,6 +2744,80 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
       {/* Input Form Footer */}
       <div className="p-2 sm:p-3 bg-slate-900 border-t border-slate-800 shrink-0">
+        {/* みき自律改善クイックランチャートレイ */}
+        {isSelfImplementLauncherOpen && (
+          <div className="mb-2 p-2.5 bg-slate-950/95 border border-fuchsia-500/40 rounded-xl space-y-1.5 text-xs shadow-xl animate-in slide-in-from-bottom-2">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+              <span className="font-bold text-fuchsia-300 flex items-center gap-1.5">
+                <Rocket className="w-3.5 h-3.5 text-fuchsia-400" />
+                <span>みき自律コード改善＆自己実装ランチャー</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsSelfImplementLauncherOpen(false)}
+                className="text-slate-400 hover:text-white p-0.5 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setInputText('【自律バグ修復】現在のコードベース内の構文エラーや実行時例外、不整合を自己診断し、直ちに修正差分を作成して適用してください。');
+                  setIsSelfImplementLauncherOpen(false);
+                  textareaRef.current?.focus();
+                }}
+                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-fuchsia-950/60 border border-slate-800 hover:border-fuchsia-500/40 rounded-lg text-slate-300 hover:text-fuchsia-200 text-left transition-colors cursor-pointer"
+              >
+                <Bug className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span className="truncate">🐛 構文＆例外の自己診断・自律修復</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInputText('【自律リファクタリング】不要なデッドコード、重複処理を排除し、最新のTypeScriptベストプラクティスに従ってコードを最適化してください。');
+                  setIsSelfImplementLauncherOpen(false);
+                  textareaRef.current?.focus();
+                }}
+                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-fuchsia-950/60 border border-slate-800 hover:border-fuchsia-500/40 rounded-lg text-slate-300 hover:text-fuchsia-200 text-left transition-colors cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="truncate">⚡ デッドコード排除・最適化</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInputText('【ASTシンボル＆未実装分析】リポジトリ内の関数・クラス・エクスポートをスキャンし、まだ実装されていない機能ギャップを特定して実装計画を立ててください。');
+                  setIsSelfImplementLauncherOpen(false);
+                  textareaRef.current?.focus();
+                }}
+                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-fuchsia-950/60 border border-slate-800 hover:border-fuchsia-500/40 rounded-lg text-slate-300 hover:text-fuchsia-200 text-left transition-colors cursor-pointer"
+              >
+                <ListTree className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                <span className="truncate">🗺️ ASTシンボル構造＆ギャップ診断</span>
+              </button>
+
+              {onOpenSelfImprovementModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSelfImplementLauncherOpen(false);
+                    onOpenSelfImprovementModal();
+                  }}
+                  className="flex items-center gap-1.5 p-2 bg-gradient-to-r from-fuchsia-950/80 to-indigo-950/80 hover:from-fuchsia-900/90 hover:to-indigo-900/90 border border-fuchsia-500/50 rounded-lg text-fuchsia-200 text-left transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-300 shrink-0" />
+                  <span className="truncate">🛠️ 自己改善スタジオを開く</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <input
           type="file"
           ref={fileInputRef}
@@ -2707,6 +2835,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             title="画像・ファイル・コードを添付"
           >
             <Paperclip className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsSelfImplementLauncherOpen(!isSelfImplementLauncherOpen)}
+            className={`p-2 rounded-lg transition-colors shrink-0 ${
+              isSelfImplementLauncherOpen
+                ? 'text-fuchsia-300 bg-fuchsia-950/80 border border-fuchsia-500/50 shadow-xs'
+                : 'text-slate-400 hover:text-fuchsia-300 hover:bg-slate-900'
+            }`}
+            title="みき自己実装・自律コード改善ランチャー"
+          >
+            <Rocket className="w-4 h-4" />
           </button>
 
           <button
@@ -2873,6 +3014,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         isLoading={isLoading}
         isGenerating={isGenerating}
       />
+
+      {/* 差分プレビュー & 安全適用モーダル */}
+      {diffModalState && (
+        <DiffPreviewModal
+          isOpen={diffModalState.isOpen}
+          onClose={() => setDiffModalState(null)}
+          fileName={diffModalState.fileName}
+          oldCode={diffModalState.oldCode}
+          newCode={diffModalState.newCode}
+          onApply={handleApplyDiffCode}
+        />
+      )}
     </div>
   );
 };

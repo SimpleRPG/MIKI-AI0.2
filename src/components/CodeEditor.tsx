@@ -35,9 +35,14 @@ import {
   Lightbulb,
   Palette,
   Send,
+  ShieldCheck,
+  Rocket,
+  Eye,
 } from 'lucide-react';
 import { WorkspaceFile } from '../types';
 import { extractFilesFromZip, ZipExtractionResult } from '../utils/codeParser';
+import { DiffPreviewModal } from './chat/DiffPreviewModal';
+import { mikiSelfCodingSuperchargerService } from '../services/mikiSelfCodingSuperchargerService';
 
 interface CodeEditorProps {
   files: WorkspaceFile[];
@@ -124,6 +129,59 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const zipInputRef = useRef<HTMLInputElement>(null);
 
   const activeFile = files.find((f) => f.path === activeFilePath) || files[0];
+
+  // 差分プレビューモーダル状態
+  const [diffPreviewState, setDiffPreviewState] = useState<{
+    isOpen: boolean;
+    fileName: string;
+    oldCode: string;
+    newCode: string;
+    filePath: string;
+  } | null>(null);
+  const [isSelfHealing, setIsSelfHealing] = useState(false);
+  const [selfHealNotice, setSelfHealNotice] = useState<string | null>(null);
+
+  // リアルタイム構文検証
+  const syntaxCheck = useMemo(() => {
+    if (!activeFile) return { valid: true, error: null };
+    return mikiSelfCodingSuperchargerService.checkCodeSyntax(activeFile.content, activeFile.name);
+  }, [activeFile?.content, activeFile?.name]);
+
+  const handleTriggerSelfHeal = async () => {
+    if (!activeFile) return;
+    setIsSelfHealing(true);
+    setSelfHealNotice('みきがコードを解析し、最適な修正差分を生成中...');
+    try {
+      const prompt = syntaxCheck.valid
+        ? `ファイル「${activeFile.name}」のコード品質を向上させ、不要な処理をリファクタリングして堅牢化する`
+        : `ファイル「${activeFile.name}」の構文エラー「${syntaxCheck.error}」を修正し、正常に動作するように直す`;
+
+      const result = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
+        prompt,
+        activeFile.path,
+        false
+      );
+
+      if (result && result.code) {
+        setDiffPreviewState({
+          isOpen: true,
+          fileName: activeFile.name,
+          oldCode: activeFile.content,
+          newCode: result.code,
+          filePath: activeFile.path,
+        });
+        setSelfHealNotice(null);
+      } else {
+        setSelfHealNotice('修復候補コードの生成に失敗しました。');
+        setTimeout(() => setSelfHealNotice(null), 3000);
+      }
+    } catch (err: any) {
+      setSelfHealNotice(`エラー: ${err?.message || '自動修復失敗'}`);
+      setTimeout(() => setSelfHealNotice(null), 3000);
+    } finally {
+      setIsSelfHealing(false);
+    }
+  };
 
   // フォルダツリー構造の自動構築
   const fileTree = useMemo(() => {
@@ -777,6 +835,36 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               {fontSize.toUpperCase()}
             </button>
 
+            {/* リアルタイム構文検証バッジ & 1-Click修復 */}
+            {activeFile && (
+              <button
+                type="button"
+                onClick={handleTriggerSelfHeal}
+                disabled={isSelfHealing}
+                className={`flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded border transition-all cursor-pointer ${
+                  !syntaxCheck.valid
+                    ? 'bg-rose-950/80 border-rose-600 text-rose-300 hover:bg-rose-900 animate-pulse'
+                    : 'bg-slate-800/80 border-slate-700 text-emerald-400 hover:bg-slate-700'
+                }`}
+                title={
+                  !syntaxCheck.valid
+                    ? `構文エラー検知: ${syntaxCheck.error}\n(クリックでみきが自動修復差分を生成)`
+                    : '構文正常 (クリックでみきが品質向上・最適化差分を生成)'
+                }
+              >
+                {isSelfHealing ? (
+                  <RefreshCw className="w-3 h-3 animate-spin text-purple-400" />
+                ) : !syntaxCheck.valid ? (
+                  <AlertTriangle className="w-3 h-3 text-rose-400" />
+                ) : (
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                )}
+                <span className="hidden sm:inline">
+                  {!syntaxCheck.valid ? '⚠️ 構文修復' : '✓ 構文OK'}
+                </span>
+              </button>
+            )}
+
             {/* ✨ みきに改善を頼むボタン */}
             {onRequestAiImprovement && activeFile && (
               <button
@@ -1237,6 +1325,29 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* 自動修復通知トースト */}
+      {selfHealNotice && (
+        <div className="fixed bottom-4 right-4 z-50 bg-slate-900 border border-purple-500/50 text-purple-200 px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs animate-in slide-in-from-bottom-2">
+          <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
+          <span>{selfHealNotice}</span>
+        </div>
+      )}
+
+      {/* 差分プレビュー & 安全適用モーダル */}
+      {diffPreviewState && (
+        <DiffPreviewModal
+          isOpen={diffPreviewState.isOpen}
+          onClose={() => setDiffPreviewState(null)}
+          fileName={diffPreviewState.fileName}
+          oldCode={diffPreviewState.oldCode}
+          newCode={diffPreviewState.newCode}
+          onApply={(appliedCode) => {
+            onUpdateFileContent(diffPreviewState.filePath, appliedCode);
+            setDiffPreviewState(null);
+          }}
+        />
       )}
     </div>
   );

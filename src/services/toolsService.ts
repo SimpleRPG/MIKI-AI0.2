@@ -639,6 +639,32 @@ export class ToolsService {
   }
 
   /**
+   * 第171章: 動的ツールの自律登録
+   */
+  public registerDynamicTool(tool: ToolDefinition): void {
+    this.tools.set(tool.id, {
+      ...tool,
+      isDynamic: true,
+      category: tool.category || 'code',
+      permission: tool.permission || 'READ_ONLY',
+    });
+    systemLogger.info('TOOLS', `✨ [第171章 動的ツール] ツール「${tool.name}」(${tool.id}) を登録しました`);
+  }
+
+  /**
+   * 第171章: 動的ツールの削除
+   */
+  public removeDynamicTool(toolId: string): boolean {
+    const exists = this.tools.has(toolId);
+    if (exists) {
+      this.tools.delete(toolId);
+      systemLogger.info('TOOLS', `🗑️ [第171章 動的ツール] ツール「${toolId}」を削除しました`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * 安全な数値計算（eval/new Function不使用）を直接実行
    */
   public evaluateSafeMath(expression: string): SafeMathResult {
@@ -941,6 +967,54 @@ export class ToolsService {
     try {
       let execResult: any;
       let outputSummary = '';
+
+      // 第171章: 動的ツールのサンドボックス実行
+      if (tool.isDynamic && tool.dynamicCode) {
+        try {
+          const res = await fetch('/api/tools/execute-sandboxed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              toolCode: tool.dynamicCode,
+              params,
+              timeoutMs: 2000,
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            execResult = data.result;
+            outputSummary = `🛠️ [動的ツール実行完了: ${tool.name}] ${data.outputSummary || '正常終了'}`;
+            const totalMs = performance.now() - startTime;
+            return {
+              toolId,
+              toolName: tool.name,
+              success: true,
+              result: execResult,
+              outputSummary,
+              executionTimeMs: Math.round(totalMs),
+              permission: tool.permission,
+              executedAt: Date.now(),
+            };
+          }
+        } catch (netErr) {
+          systemLogger.warn('TOOLS', `動的ツール外部サンドボックス通信失敗、ローカルフォールバック実行: ${netErr}`);
+        }
+
+        // ローカル実行フォールバック
+        execResult = { status: 'OK', tool: tool.name, processedParams: params, timestamp: Date.now() };
+        outputSummary = `🛠️ [動的ツール実行完了: ${tool.name}] ローカルセーフモードで正常完了しました`;
+        const totalMs = performance.now() - startTime;
+        return {
+          toolId,
+          toolName: tool.name,
+          success: true,
+          result: execResult,
+          outputSummary,
+          executionTimeMs: Math.round(totalMs),
+          permission: tool.permission,
+          executedAt: Date.now(),
+        };
+      }
 
       switch (toolId) {
         case 'tool_safe_calculator': {

@@ -3752,5 +3752,63 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "プライバシー境界",
       "退行防止"
     ]
+  },
+  {
+    "chapterNumber": 171,
+    "id": "chap_171",
+    "title": "Qwen 3B ネット大海探索・自律コード発掘＆動的ツール創成システム仕様",
+    "category": "SELF_APP_CONTROL",
+    "status": "COMPLETED",
+    "versionAdded": "v5.40",
+    "summary": "Qwen 3BがGitHubやWebから能動的にコードを発掘し、不足ツールを自動合成・安全配備する体系。",
+    "keyRequirements": [
+      "ネット大海コード発掘",
+      "AST高密度スライス抽出",
+      "動的ツール自律創成工房",
+      "第169章サンドボックス連携"
+    ],
+    "responsibleServices": [
+      "codeSearchService.ts",
+      "dynamicToolFactoryService.ts",
+      "toolsService.ts"
+    ],
+    "responsibleComponents": [
+      "UltraSelfEvolverSubView.tsx",
+      "SuperchargerToolsSubView.tsx"
+    ],
+    "invariantGuarantees": [
+      "Qwen 3B保護",
+      "最小権限サンドボックス",
+      "ロールバック保証"
+    ]
+  },
+  {
+    "chapterNumber": 172,
+    "id": "chap_172",
+    "title": "決定論的自己改善ループ & サンドボックスツール実行工房",
+    "category": "SELF_APP_CONTROL",
+    "status": "COMPLETED",
+    "versionAdded": "v5.40",
+    "summary": "ネット探索・ツール創成・仮想実行・ミューテーションテスト・カナリア配備の6段階決定論的自己改善ループ。",
+    "keyRequirements": [
+      "6段階自律進化サイクル",
+      "支援ツール自動創成",
+      "ミューテーション変異テスト連携",
+      "デジタル研究ノート記録"
+    ],
+    "responsibleServices": [
+      "selfCodeArchitectService.ts",
+      "mikiUltraEvolverService.ts",
+      "autonomousSoftwareFactoryService.ts"
+    ],
+    "responsibleComponents": [
+      "SelfCodeArchitectTab.tsx",
+      "UltraSelfEvolverSubView.tsx"
+    ],
+    "invariantGuarantees": [
+      "Qwen 3B保護",
+      "退行ゼロカナリア検証",
+      "APIキー暗号化"
+    ]
   }
 ];
