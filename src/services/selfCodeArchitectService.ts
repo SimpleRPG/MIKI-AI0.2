@@ -210,9 +210,21 @@ export class SelfCodeArchitectService {
       privacyDetails = '⚠️ プライバシーガードレールの実走監査で例外が発生しました。';
     }
 
-    // 3. APIキー循環・フォールバック
-    const quotaPassed = true;
-    const quotaDetails = 'geminiKeyManagerによる複数キークォータトラッキングおよびNativeフォールバックが稼働中。';
+    // 3. APIキー循環・フォールバック (実測チェック)
+    let keyCount = 0;
+    try {
+      const raw = storageService.getItem('miki_custom_gemini_api_keys');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) keyCount = parsed.length;
+      }
+    } catch {}
+    const hasEnvKey = typeof process !== 'undefined' && Boolean(process.env?.GEMINI_API_KEY);
+    const hasLocalLlm = typeof process !== 'undefined' && Boolean(process.env?.LOCAL_LLM_ENDPOINT);
+    const quotaPassed = keyCount > 0 || hasEnvKey || hasLocalLlm;
+    const quotaDetails = quotaPassed
+      ? `利用可能な推論リソースを実測検知 (${keyCount > 0 ? `${keyCount}件のカスタムAPIキー` : hasEnvKey ? '環境変数APIキー' : 'ローカルLLMエンドポイント'})。キー枯渇時のNativeフォールバック準備完了。`
+      : '⚠️ 利用可能なAPIキーまたはローカルLLMエンドポイントが未登録です（推論リソース未設定）。';
 
     // 4. ロールバック保証: 登録された自己改善提案にロールバック手順が付帯しているか実検査
     const hasProposals = this.proposals.length > 0;
@@ -374,6 +386,8 @@ export class SelfCodeArchitectService {
       rollbackPlan: '変更前の状態パラメータへ直ちに復元し、変更フラグをREVERTEDとして隔離。',
     };
 
+    const invariants = this.checkInvariants();
+
     const proposal: SelfImprovementProposal = {
       id: `prop_${Date.now()}`,
       createdAt: Date.now(),
@@ -388,13 +402,13 @@ export class SelfCodeArchitectService {
         'EXPAND_SPEC_TEST_SUITE',
         'SYNC_DRIFT_REGISTRY',
       ],
-      expectedScoreImprovement: 5,
-      invariantsCheckPassed: true,
+      expectedScoreImprovement: Math.max(1, Math.round((1 / SPECIFICATION_REGISTRY.length) * 100)),
+      invariantsCheckPassed: invariants.allPassed,
       status: 'PROPOSED',
       simulatedDelta: {
-        complianceDelta: +5,
-        safetyPreserved: true,
-        details: '不変条件チェック全項目クリア。既存のQwen 3B保護・プライバシーガードレールに一切の影響なし。',
+        complianceDelta: Math.max(1, Math.round((1 / SPECIFICATION_REGISTRY.length) * 100)),
+        safetyPreserved: invariants.allPassed,
+        details: `不変条件チェック実測判定: ${invariants.allPassed ? '合格' : '警告あり'}。仕様書適合度向上予測: +${Math.max(1, Math.round((1 / SPECIFICATION_REGISTRY.length) * 100))}点。`,
       },
     };
 
@@ -416,11 +430,18 @@ export class SelfCodeArchitectService {
     const invariants = this.checkInvariants();
     proposal.invariantsCheckPassed = invariants.allPassed;
     proposal.status = 'SIMULATED';
+
+    const currentAudit = this.runSelfCodeAudit();
+    const currentCompleted = this.getCompletedChapters().length;
+    const simulatedScore = Math.round(((currentCompleted + 1) / SPECIFICATION_REGISTRY.length) * 100);
+    const calculatedDelta = Math.max(1, simulatedScore - currentAudit.complianceScore);
+
+    proposal.expectedScoreImprovement = calculatedDelta;
     proposal.simulatedDelta = {
-      complianceDelta: +6,
+      complianceDelta: calculatedDelta,
       safetyPreserved: invariants.allPassed,
       details: invariants.allPassed
-        ? '✅ シャドー検証合格: 不変条件の違反ゼロ。会話品質シミュレーションで+6点の改善を確認。'
+        ? `✅ シャドー検証合格: 不変条件の違反ゼロ。仕様適合度シミュレーションで実測 +${calculatedDelta}点 (章${proposal.targetChapterNumber}) の改善見込み。`
         : '❌ シャドー検証失格: 不変条件に抵触の恐れがあるため適用不可。',
     };
 
@@ -786,15 +807,21 @@ export class SelfCodeArchitectService {
    * みきが自律生成したTypeScriptコードをサーバーの物理ディスク（src/autonomous_modules/）に書き込み保存する。
    * これにより、ZIPエクスポートやGitHub同期時に実ファイルとして100%出力される。
    */
-  public async saveModuleFileToServer(chapterNumber: number): Promise<boolean> {
+  public async saveModuleFileToServer(
+    chapterNumber: number,
+    customCode?: string,
+    isVerified: boolean = false,
+    complianceScore: number = 0
+  ): Promise<boolean> {
     try {
       const chapter = SPECIFICATION_REGISTRY.find((c) => c.chapterNumber === chapterNumber);
       const title = chapter?.title || `仕様書 第${chapterNumber}章 自律改善モジュール`;
       const requirements = chapter?.keyRequirements || ['不変条件保持', '自律推論結合'];
 
-      const code = `/**
+      const code = customCode || `/**
  * 自律合成モジュール: 第${chapterNumber}章『${title}』
  * 生成日時: ${new Date().toISOString()}
+ * 検証状態: ${isVerified ? 'VERIFIED' : 'PENDING_AUTONOMOUS_SYNTHESIS (未検証ドラフト)'}
  * 不変条件保護: Qwen-3B-Base固定 / 機密プライバシー境界完全分離 / ロールバック性確保
  */
 
@@ -811,20 +838,22 @@ export class Chapter${chapterNumber}Service implements Chapter${chapterNumber}Ca
   public readonly chapterNumber = ${chapterNumber};
   public readonly title = ${JSON.stringify(title)};
   public readonly requirements = ${JSON.stringify(requirements)};
-  public readonly isVerified = true;
-  public readonly complianceScore = 100;
+  public readonly isVerified = ${isVerified};
+  public readonly complianceScore = ${complianceScore};
 
   public async execute(input: any): Promise<any> {
-    // 第${chapterNumber}章 仕様書に沿った決定論的処理ロジック
+    // 第${chapterNumber}章 要求仕様: ${requirements.join(', ')}
     return {
-      status: 'SUCCESS',
+      status: ${isVerified ? "'SUCCESS'" : "'PENDING'"},
       chapter: this.chapterNumber,
       title: this.title,
+      isVerified: this.isVerified,
+      complianceScore: this.complianceScore,
       processedAt: new Date().toISOString(),
       output: input,
       guarantees: {
         invariantsPassed: true,
-        zeroDrift: true,
+        zeroDrift: ${isVerified},
       },
     };
   }

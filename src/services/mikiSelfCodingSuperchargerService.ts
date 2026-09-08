@@ -142,6 +142,10 @@ export interface SelfImplementationResult {
   syntaxError: string | null;
   reasoning: string;
   code: string;
+  generationMethod?: 'llm' | 'fallback_template' | 'override';
+  isRequirementImplemented?: boolean;
+  qualityGatePassed?: boolean;
+  qualityGateScore?: number;
   originalContent?: string;
   linesCount: number;
   lesson?: {

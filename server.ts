@@ -2580,7 +2580,7 @@ app.post('/api/self-code/unit-test-run', (req, res) => {
     const tests: Array<{ id: string; title: string; assertion: string; passed: boolean; durationMs: number; note: string }> = [
       {
         id: 'test-1',
-        title: '正常系: モジュールの実行とエクスポート存在確認',
+        title: '【構造健全性確認】モジュールの実行とエクスポート存在確認 (※要件適合検証ではありません)',
         assertion: `expect(typeof ${moduleName}).not.toBe('undefined')`,
         passed: test1Passed,
         durationMs: 1.2,
@@ -2593,6 +2593,7 @@ app.post('/api/self-code/unit-test-run', (req, res) => {
     // test-2: 主要エクスポート (クラス/関数) の初期化・呼び出しを実際に試行 (実測)
     let instantiationOk = false;
     let instantiationNote = '実行可能なクラス/関数エクスポートが見つかりませんでした';
+    let primaryCandidate: any = null;
     if (!executionError) {
       for (const name of exportedNames) {
         const candidate = moduleExports[name];
@@ -2606,6 +2607,7 @@ app.post('/api/self-code/unit-test-run', (req, res) => {
             candidate();
           }
           instantiationOk = true;
+          primaryCandidate = candidate;
           instantiationNote = `${name} の初期化・呼び出しに成功しました`;
           break;
         } catch (instErr: any) {
@@ -2615,21 +2617,48 @@ app.post('/api/self-code/unit-test-run', (req, res) => {
     }
     tests.push({
       id: 'test-2',
-      title: '境界値: 主要エクスポートの初期化・呼び出し試行',
+      title: '【構造健全性確認】主要エクスポートの初期化・呼び出し試行 (※要件適合検証ではありません)',
       assertion: `expect(() => new ${moduleName}()).not.toThrow()`,
       passed: instantiationOk,
       durationMs: 2.1,
       note: instantiationNote,
     });
 
-    // test-3: 実行時例外なくロードできたか (不変条件の一次近似。詳細は council-review 側の静的解析が担う)
+    // test-3: 実行時例外なくロードできたか (不変条件の一次近似)
     tests.push({
       id: 'test-3',
-      title: '不変条件: サンドボックス実行時に例外が発生しないこと',
+      title: '【構造健全性確認】サンドボックス実行時に例外が発生しないこと (※要件適合検証ではありません)',
       assertion: `expect(loadError).toBeNull()`,
       passed: !executionError,
       durationMs: 0.8,
       note: executionError ? '実行に失敗したため不変条件を確認できませんでした' : '実行時エラーなし',
+    });
+
+    // test-4: 仕様要件（業務ロジック）メソッド適合性検査
+    let domainSpecificMethodsFound = false;
+    let domainRequirementNote = '';
+    if (primaryCandidate && primaryCandidate.prototype) {
+      const propNames = Object.getOwnPropertyNames(primaryCandidate.prototype).filter(
+        (p) => !['constructor', 'get', 'execute', 'clear', 'getDiagnostics'].includes(p)
+      );
+      if (propNames.length > 0) {
+        domainSpecificMethodsFound = true;
+        domainRequirementNote = `章固有の業務メソッド [${propNames.join(', ')}] を検出・実測しました`;
+      } else {
+        domainSpecificMethodsFound = false;
+        domainRequirementNote = '汎用雛形メソッド(get/execute等)のみ検出。章固有の仕様要件に特化したメソッドは未検出です（雛形スタブ状態）。';
+      }
+    } else {
+      domainRequirementNote = '主要クラスのプロトタイプを検証できませんでした';
+    }
+
+    tests.push({
+      id: 'test-4',
+      title: '【仕様要件適合検証】章固有の業務メソッド・プロパティの実装確認',
+      assertion: `expect(hasDomainSpecificMethods).toBe(true)`,
+      passed: domainSpecificMethodsFound,
+      durationMs: 1.5,
+      note: domainRequirementNote,
     });
 
     const passedCount = tests.filter((t) => t.passed).length;
@@ -2642,7 +2671,11 @@ app.post('/api/self-code/unit-test-run', (req, res) => {
       allPassed: passedCount === totalCount,
       passedCount,
       totalCount,
-      measured: true, // このテスト結果が実行に基づく実測であることを明示するフラグ
+      measured: true,
+      scope: 'STRUCTURAL_AND_REQUIREMENTS_CHECK',
+      structuralHealthy: test1Passed && instantiationOk && !executionError,
+      requirementVerified: domainSpecificMethodsFound,
+      disclaimer: 'test-1〜3は構文・実行時の構造健全性を確認するものであり、仕様書要件の完全適合を保証するものではありません。要件充足はtest-4の実装判定に基づきます。',
       executionError: executionError || null,
       coverage: {
         lines: totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0,
@@ -3003,10 +3036,12 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
     // 3. コード生成 (または直接指定された検証済みコードの採用)
     let generatedCode = '';
     let reasoning = '';
+    let generationMethod: 'llm' | 'fallback_template' | 'override' = 'fallback_template';
 
     if (req.body.codeOverride && typeof req.body.codeOverride === 'string') {
       generatedCode = req.body.codeOverride;
       reasoning = req.body.reasoning || `自律検証・自己修復パイプラインを通過したコードを採用しました。`;
+      generationMethod = 'override';
     } else {
       try {
         const aiPrompt = `あなたは自律型AIエンジニア「みき」です。以下の要求を満たす本番対応の高品質なTypeScriptコード（モジュールまたはパッチ）を1ファイル分、完全なコードとして生成してください。
@@ -3029,6 +3064,7 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
       if (match && match[1]) {
         generatedCode = match[1].trim();
         reasoning = `みき自身のローカルLLM (${genRes.modelUsed.replace('local:', '')}) が要求『${prompt.slice(0, 40)}』を解析し、完全なTypeScriptモジュールを生成しました。`;
+        generationMethod = 'llm';
       }
     } catch (aiErr: any) {
       console.warn('Local LLM auto-implement failed:', aiErr?.message);
@@ -3037,10 +3073,8 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
 
     // 最終フォールバック: ローカルLLMが使用不可だった場合のみ実行される、
     // AIを一切使わない決定論的な文字列テンプレート生成。
-    // (2026-09-06 方針決定: 自己改善系エンドポイントはGeminiを一切使わない。
-    //  Geminiは教師API(train-distill/teacher-request、第8章)の学習教材生成専用とする。
-    //  ここに到達するのはローカルLLM(llama-server)サーバーが本当に利用不可能な場合のみ。)
     if (!generatedCode) {
+      generationMethod = 'fallback_template';
       let rawName = prompt
         .split(/[\s_]+/)
         .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
@@ -3053,9 +3087,10 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
       const className = rawName || 'AutoSynthesizedService';
 
       generatedCode = `/**
- * MIKI-AI 自律生成モジュール: ${prompt}
+ * MIKI-AI 自律生成モジュール (雛形スタブ): ${prompt}
  * 生成時刻: ${new Date().toISOString()}
- * 目的: ユーザーおよびみきの自律実装サイクルにより安全に生成されました。
+ * ⚠️ 注意: ローカルLLMオフラインのため、要求仕様の型インターフェースおよび骨格スタブのみ生成されました。
+ * 本要件の完全実装はローカルLLMオンライン時または自己進化サイクルで再実行してください。
  */
 
 export interface ${className}Options {
@@ -3074,6 +3109,8 @@ export interface ${className}Result<T = unknown> {
 export class ${className} {
   private options: Required<${className}Options>;
   private state: Map<string, { payload: unknown; time: number }> = new Map();
+  public readonly isStub: boolean = true;
+  public readonly requirementPrompt: string = ${JSON.stringify(prompt.slice(0, 100))};
 
   constructor(opts: ${className}Options = {}) {
     this.options = {
@@ -3120,6 +3157,7 @@ export class ${className} {
     return {
       activeEntries: this.state.size,
       maxCapacity: this.options.maxCapacity,
+      isStub: true,
       healthy: true,
     };
   }
@@ -3127,7 +3165,7 @@ export class ${className} {
 
 export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${className}();
 `;
-      reasoning = `⚠️ ローカルLLM(${process.env.LOCAL_LLM_ENDPOINT || 'http://127.0.0.1:8080'})に接続できなかったため、AIを一切使わない固定テンプレートから要求『${prompt.slice(0, 40)}』を元にシングルトンサービスクラス [${className}] の雛形のみを生成しました。中身は実装されていないため、Termux側のllama-serverが復旧次第このファイルを本実装に置き換えることを推奨します。`;
+      reasoning = `⚠️ ローカルLLM(${process.env.LOCAL_LLM_ENDPOINT || 'http://127.0.0.1:8080'})に接続できなかったため、固定テンプレートから要求『${prompt.slice(0, 40)}』の型骨格 [${className}] の雛形スタブのみを生成しました。要件適合にはローカルLLMオンライン時の本実装が必要です。`;
     }
 
     // 4. 構文検証 (TypeScript Transpilation Check)
@@ -3194,6 +3232,8 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
       qualityGateReport: qualityGate,
       reasoning,
       code: generatedCode,
+      generationMethod,
+      isRequirementImplemented: generationMethod === 'llm' || generationMethod === 'override',
       originalContent: originalContent || '',
       linesCount: generatedCode.split('\n').length,
       lesson: {
@@ -3243,17 +3283,106 @@ app.post('/api/self-code/mutation-test', async (req, res) => {
     for (const op of mutationOperators) {
       if (op.pattern.test(code)) {
         // マッチする実際のコード行を探す
-        const matchedLine = lines.find((l) => op.pattern.test(l));
-        if (matchedLine && mutants.length < 6) {
+        const matchedLineIndex = lines.findIndex((l) => op.pattern.test(l));
+        if (matchedLineIndex !== -1 && mutants.length < 6) {
+          const matchedLine = lines[matchedLineIndex];
           const originalSnippet = matchedLine.trim().slice(0, 120);
           const mutatedSnippet = originalSnippet.replace(op.pattern, op.replacement);
 
-          // 実際のコードがガード節、不変条件チェック、例外スロー、厳格アサーションを含んでいるかを検査
-          const hasSafetyGuard =
-            /\b(throw|Error|invariant|reject|null|undefined|return false|assert|guard)\b/i.test(matchedLine) ||
-            /\b(throw|Error|invariant|reject|assert)\b/i.test(code);
+          // 実際に変異コードを合成
+          const mutatedLines = [...lines];
+          mutatedLines[matchedLineIndex] = matchedLine.replace(op.pattern, op.replacement);
+          const mutatedCode = mutatedLines.join('\n');
 
-          const isKilled = hasSafetyGuard;
+          // 実測検証: 変異体をVMサンドボックスで実際にトランスパイル・実行してテスト
+          let isKilled = false;
+          let killedReason = '';
+
+          try {
+            // 1. トランスパイル検査
+            const transpileRes = ts.transpileModule(mutatedCode, {
+              compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+              reportDiagnostics: true,
+            });
+
+            if (transpileRes.diagnostics && transpileRes.diagnostics.length > 0) {
+              isKilled = true;
+              killedReason = 'TypeScriptコンパイラ: 変異による型・構文エラーを検知して遮断';
+            } else {
+              // 2. サンドボックス実行とアサーション
+              const sandbox = {
+                exports: {} as any,
+                module: { exports: {} as any },
+                console: { log: () => {}, warn: () => {}, error: () => {} },
+                setTimeout,
+                clearTimeout,
+                Date,
+                Math,
+                Map,
+                Set,
+                Array,
+                Object,
+                String,
+                Number,
+                Boolean,
+                Error,
+                TypeError,
+                RangeError,
+              };
+              const ctx = vm.createContext(sandbox);
+              const script = new vm.Script(transpileRes.outputText);
+              script.runInContext(ctx, { timeout: 1000 });
+
+              const mod = sandbox.module.exports || sandbox.exports;
+              const expKeys = Object.keys(mod || {});
+              let classOrFn: any = null;
+              for (const k of expKeys) {
+                if (typeof mod[k] === 'function') {
+                  classOrFn = mod[k];
+                  break;
+                }
+              }
+
+              if (classOrFn) {
+                const looksLikeClass = Boolean(classOrFn.prototype) && Object.getOwnPropertyNames(classOrFn.prototype).length > 1;
+                const instance = looksLikeClass ? new classOrFn() : null;
+                const target = instance || classOrFn;
+
+                // テストアサーションを実行: 通常呼び出しと境界値呼び出しで変異の影響を実測
+                if (target.execute && typeof target.execute === 'function') {
+                  const resNormal = target.execute('testKey', { data: 123 });
+                  let caughtInvalid = false;
+                  try {
+                    const resInvalid = target.execute('', { data: 0 });
+                    if (resInvalid && resInvalid.success === false) caughtInvalid = true;
+                  } catch {
+                    caughtInvalid = true;
+                  }
+
+                  if (!resNormal || !resNormal.success) {
+                    isKilled = true;
+                    killedReason = '単体テスト正常系実行: 変異によりメソッド実行が異常終了/失敗';
+                  } else if (!caughtInvalid) {
+                    isKilled = false; // 変異体が境界値チェックをすり抜けた
+                    killedReason = 'NONE (境界値アサーションまたは例外ガードの追加が必要です)';
+                  } else {
+                    isKilled = true;
+                    killedReason = '単体テスト境界値アサーション: 演算子変異による論理破綻を検知・即時遮断';
+                  }
+                } else {
+                  isKilled = false;
+                  killedReason = 'NONE (変異体の個別メソッド挙動を検証するアサーションが不足しています)';
+                }
+              } else {
+                isKilled = true;
+                killedReason = 'モジュールロードテスト: 変異により有効なエクスポートが失われました';
+              }
+            }
+          } catch (execErr: any) {
+            isKilled = true;
+            killedReason = `実行時テスト例外検知: ${execErr?.message || '変異による実行時クラッシュ'}`;
+          }
+
           mutants.push({
             id: `MUT-${mutantIndex++}`,
             operator: op.name,
@@ -3261,9 +3390,7 @@ app.post('/api/self-code/mutation-test', async (req, res) => {
             originalSnippet,
             mutatedSnippet,
             status: isKilled ? 'KILLED' : 'SURVIVED',
-            killedByTest: isKilled
-              ? 'InvariantGuardian: 変異による事前条件・防壁アサーション違反を検知・即時遮断'
-              : 'NONE (境界値アサーションまたは例外ガードの追加が必要です)',
+            killedByTest: killedReason,
           });
         }
       }

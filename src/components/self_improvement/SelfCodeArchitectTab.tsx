@@ -57,6 +57,7 @@ import { aiderEngineService } from '../../services/aiderEngineService';
 import { selfImprovementSuiteService } from '../../services/selfImprovementSuiteService';
 import { mikiSelfCodingSuperchargerService } from '../../services/mikiSelfCodingSuperchargerService';
 import { mikiUltraEvolverService } from '../../services/mikiUltraEvolverService';
+import { autonomousContinuousEvolutionService } from '../../services/autonomousContinuousEvolutionService';
 
 export interface LiveLogItem {
   id: string;
@@ -213,12 +214,21 @@ export const SelfCodeArchitectTab: React.FC = () => {
     }
   };
 
-  const handleApply = (proposalId: string) => {
+  const handleApply = async (proposalId: string) => {
+    const prop = selfCodeArchitectService.getProposals().find((p) => p.id === proposalId);
     const success = selfCodeArchitectService.applyProposal(proposalId);
     if (success) {
+      if (prop) {
+        await selfCodeArchitectService.saveModuleFileToServer(
+          prop.targetChapterNumber,
+          prop.codeSnippet,
+          prop.invariantsCheckPassed,
+          prop.expectedScoreImprovement
+        );
+      }
       setProposals([...selfCodeArchitectService.getProposals()]);
       setAuditResult(selfCodeArchitectService.getLatestAudit()!);
-      setActionNotice('改善プロポーザルを正式反映しました！仕様適合率が向上しました。');
+      setActionNotice(`改善提案 [${proposalId}] を適用し、実体モジュールを同期しました。`);
       setTimeout(() => setActionNotice(null), 4000);
     }
   };
@@ -281,7 +291,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
     setLiveProgress(5);
     setLiveStage('repo_map');
 
-    // 不変条件の初期化（未検証状態へ）
+    // 不変条件の初期化（実測検証待ち）
     setLiveInvariants([
       { id: 'qwen', name: 'Qwen 3B モデル保護不変条件', category: 'CORE_SAFETY', status: 'pending', detail: '基本推論重み・アーキテクチャの破壊を完全遮断' },
       { id: 'privacy', name: 'プライバシー境界 (ローカル機密隔離)', category: 'PRIVACY', status: 'pending', detail: '外部APIへの個人データ漏洩を防止' },
@@ -289,247 +299,93 @@ export const SelfCodeArchitectTab: React.FC = () => {
       { id: 'regression', name: '退行防止ベンチマーク', category: 'QUALITY', status: 'pending', detail: '既存テストケースおよび仕様適合性の退行ゼロ確認' },
     ]);
 
-    addLiveLog(`🚀 【全手段動員・自律改善】第${targetChapter.chapterNumber}章『${targetChapter.title}』に着手`, 'purple');
+    addLiveLog(`🚀 【自律進化パイプライン始動】第${targetChapter.chapterNumber}章『${targetChapter.title}』の自律実装に着手`, 'purple');
 
-    // ── 手段 1: Aider Repo Map 走査 ──
-    addLiveLog(`🗺️ [手段1: Aider Repo Map] プロジェクト全体のAST構文地図を走査中...`, 'cyan');
-    try {
-      const repoMap = await aiderEngineService.fetchRepoMap();
-      addLiveLog(`✓ [Aider Repo Map取得完了] ${repoMap.scannedFilesCount || 40}ファイル / ${repoMap.totalSymbolsCount || 320}+シンボルの構文依存マップを把握`, 'info');
-    } catch {
-      addLiveLog(`✓ [Aider Repo Map] ローカルASTキャッシュより構造把握完了`, 'info');
-    }
+    // 実測進化パイプラインのステップ通知を購読
+    const unsubscribe = autonomousContinuousEvolutionService.onStep((step) => {
+      const levelMap: Record<string, 'info' | 'warn' | 'success' | 'cyan' | 'purple'> = {
+        AUDIT: 'cyan',
+        INVARIANTS: step.status === 'FAILED' ? 'warn' : 'purple',
+        TARGET: 'info',
+        SYNTHESIS: step.status === 'WARNING' ? 'warn' : 'cyan',
+        SYNTAX_CHECK: 'info',
+        SELF_HEALING: 'warn',
+        TDD_TEST: 'success',
+        MUTATION_TEST: step.status === 'WARNING' ? 'warn' : 'purple',
+        SNAPSHOT: 'info',
+        DEPLOY: 'success',
+        COMPLETED: step.status === 'WARNING' ? 'cyan' : 'success',
+        FAILED: 'warn',
+      };
 
-    await new Promise((r) => setTimeout(r, 450));
-    setLiveProgress(18);
-    setLiveStage('web_search');
+      addLiveLog(`[${step.phase}] ${step.title}: ${step.detail}`, levelMap[step.phase] || 'info');
 
-    // ── 手段 2: 自律型Web検索 (Autonomous Web Search) ──
-    const searchKeywords = `TypeScript ${targetChapter.title} ${targetChapter.keyRequirements.slice(0, 2).join(' ')}`;
-    addLiveLog(`🌐 [手段2: 自律型Web検索] 『${searchKeywords}』の最新公式仕様・ベストプラクティスをオンライン検索中...`, 'purple');
-    try {
-      const searchRes = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchKeywords, maxResults: 3 }),
-      });
-      if (searchRes.ok) {
-        const searchData = await searchRes.json();
-        const firstTitle = searchData.results?.[0]?.title;
-        if (firstTitle) {
-          addLiveLog(`✓ [Web知識獲得] "${firstTitle.slice(0, 32)}..." など${searchData.results.length}件の外部知見を推論コンテキストに統合`, 'info');
-        } else {
-          addLiveLog(`✓ [Web知識獲得] ナレッジベースから最新アルゴリズム知見を抽出完了`, 'info');
+      // リアルタイムUIステージ推移
+      if (step.phase === 'AUDIT') {
+        setLiveStage('repo_map');
+        setLiveProgress(15);
+      } else if (step.phase === 'INVARIANTS') {
+        setLiveStage('invariants');
+        setLiveProgress(30);
+        if (step.status === 'SUCCESS') {
+          setLiveInvariants((prev) => prev.map((inv) => ({ ...inv, status: 'passed' })));
         }
-      } else {
-        addLiveLog(`✓ [Web知識] キャッシュされた最新プロトコル仕様を適用`, 'info');
+      } else if (step.phase === 'SYNTHESIS') {
+        setLiveStage('gap_analysis');
+        setLiveProgress(50);
+      } else if (step.phase === 'SYNTAX_CHECK' || step.phase === 'SELF_HEALING') {
+        setLiveStage('dry_run');
+        setLiveProgress(65);
+      } else if (step.phase === 'TDD_TEST') {
+        setLiveStage('benchmark');
+        setLiveProgress(75);
+      } else if (step.phase === 'MUTATION_TEST') {
+        setLiveStage('canary');
+        setLiveProgress(85);
+      } else if (step.phase === 'SNAPSHOT' || step.phase === 'DEPLOY') {
+        setLiveStage('patching');
+        setLiveProgress(95);
+      } else if (step.phase === 'COMPLETED') {
+        setLiveStage('completed');
+        setLiveProgress(100);
       }
-    } catch {
-      addLiveLog(`✓ [Web知識] オフライン高品質ナレッジベースから参照`, 'info');
-    }
-
-    // ── ナレッジベース (Lessons Learned) 照合 ──
-    try {
-      const lessons = await mikiSelfCodingSuperchargerService.fetchLessons(targetChapter.title);
-      const matched = lessons[0];
-      if (matched) {
-        addLiveLog(`📚 [進化ナレッジ照合] 過去の成功教訓『${matched.title}』を参照し設計に反映`, 'purple');
-      }
-    } catch {
-      // optional fallback
-    }
-
-    await new Promise((r) => setTimeout(r, 450));
-    setLiveProgress(32);
-    setLiveStage('gap_analysis');
-
-    // ── 手段 3: 仕様ギャップ検出 & Aider Search/Replace ブロック差分ドラフト ──
-    addLiveLog(`📊 [手段3: ギャップ分析 & Aider Diff] 未実装要件 [${targetChapter.keyRequirements.slice(0, 2).join(' / ')}] を抽出`, 'cyan');
-    const proposal = selfCodeArchitectService.generateImprovementProposal(targetChapter.chapterNumber);
-    setProposals([...selfCodeArchitectService.getProposals()]);
-    const targetModule = proposal.contract.allowedFiles[0] || `src/autonomous_modules/chapter_${targetChapter.chapterNumber}.ts`;
-    const targetDeps = proposal.contract.mustPreserve.length > 0 ? proposal.contract.mustPreserve : ['Qwen3B-Core', 'SafetyInvariants'];
-    addLiveLog(`📝 変更契約 (Change Contract) ID [${proposal.id}] を策定 (保護対象: ${targetDeps.join(', ')})`, 'info');
-
-    setLiveDiff({
-      targetFile: targetModule,
-      summary: `第${targetChapter.chapterNumber}章 Aider Search/Replace 差分ブロック`,
-      changes: [
-        { type: 'header', text: `<<<<<<< SEARCH (既存行)` },
-        { type: 'del', text: `- // Pending implementation for Chapter ${targetChapter.chapterNumber}` },
-        { type: 'header', text: `======= (Aider置換行)` },
-        { type: 'add', text: `+ export interface Chapter${targetChapter.chapterNumber}Capability {` },
-        { type: 'add', text: `+   isVerified: true;` },
-        { type: 'add', text: `+   invariantsPassed: true;` },
-        { type: 'add', text: `+   complianceScore: 100;` },
-        { type: 'add', text: `+ }` },
-        { type: 'add', text: `+ export const chapter${targetChapter.chapterNumber}Service = { execute: () => true };` },
-        { type: 'header', text: `>>>>>>> REPLACE` },
-      ],
     });
 
-    await new Promise((r) => setTimeout(r, 450));
-    setLiveProgress(45);
-    setLiveStage('dry_run');
-
-    // ── 手段 4: 事前コンパイル・Dry-Run AST構文検証 ＆ Aider自己修復 ──
-    addLiveLog(`🧪 [手段4: Dry-Run構文検証] Node.js TypeScript Compiler API によるAST事前検証中...`, 'info');
-    const sampleCode = `export class Chapter${targetChapter.chapterNumber}Spec { public execute() { return { status: 'OK', chapter: ${targetChapter.chapterNumber} }; } }`;
     try {
-      const dryRunRes = await selfImprovementSuiteService.verifyCodeDryRun(sampleCode, `chapter_${targetChapter.chapterNumber}.ts`);
-      if (dryRunRes.valid) {
-        addLiveLog(`✓ [Dry-Run合格] ASTノード数=${dryRunRes.astNodesCount}, 構文エラー=0 (100%健全)`, 'success');
-      } else {
-        addLiveLog(`🩺 [Aider自己修復] 構文警告を検知、自動自己修復ループで補正完了`, 'warn');
-      }
-    } catch {
-      addLiveLog(`✓ [Dry-Run] 構文整合性チェック合格`, 'success');
-    }
-
-    // ── Multi-Agent レビュー評議会 (SecOps / CleanCode / TestQA) ──
-    try {
-      const councilRes = await mikiSelfCodingSuperchargerService.runCouncilReview(sampleCode, `chapter_${targetChapter.chapterNumber}.ts`, targetChapter.chapterNumber);
-      if (councilRes.unanimousApproval) {
-        addLiveLog(`🤖 [評議会全会一致承認] スコア=${councilRes.overallScore}% (SecOps: ${councilRes.council.secOps.score}点, CleanCode: ${councilRes.council.cleanCode.score}点, TestQA: ${councilRes.council.testQA.score}点)`, 'success');
-      }
-    } catch {
-      // Council optional fallback
-    }
-
-    // ── TDD ユニットテスト自動生成 & アサーション検証 ──
-    try {
-      const tddRes = await mikiSelfCodingSuperchargerService.generateAndRunUnitTests(sampleCode, `Chapter${targetChapter.chapterNumber}Spec`, targetChapter.chapterNumber);
-      addLiveLog(`🧪 [TDD全テスト合格] ${tddRes.passedCount}/${tddRes.totalCount} PASSED (行網羅率: ${tddRes.coverage.lines}%, 分岐: ${tddRes.coverage.branches}%)`, 'success');
-    } catch {
-      // TDD optional fallback
-    }
-
-    // ── ミューテーションテスト (変異体注入によるテスト網羅性・頑健性監査) ──
-    try {
-      const mutationRes = await mikiUltraEvolverService.runMutationTest(sampleCode, `Chapter${targetChapter.chapterNumber}Spec`);
-      addLiveLog(`🧬 [ミューテーションテスト] キル率: ${mutationRes.mutationScore}% (${mutationRes.killedCount}/${mutationRes.totalMutants}変異体を撃破) - 抜け穴なし`, 'purple');
-    } catch {
-      // Mutation optional fallback
-    }
-
-    // ── Big-O アルゴリズムオプティマイザ & ハッシュメモ化 ──
-    try {
-      const bigORes = await mikiUltraEvolverService.optimizeBigOComplexity(sampleCode, `Chapter${targetChapter.chapterNumber}Spec`);
-      addLiveLog(`⚡ [Big-Oオプティマイザ] 計算量 ${bigORes.originalComplexity} ➔ ${bigORes.optimizedComplexity} (${bigORes.estimatedSpeedupFactor} 高速化)`, 'cyan');
-    } catch {
-      // Big-O optional fallback
-    }
-
-    await new Promise((r) => setTimeout(r, 450));
-    setLiveProgress(58);
-    setLiveStage('benchmark');
-
-    // ── 手段 5: 性能ベンチマーク (Before / After 速度・メモリ比較) ──
-    addLiveLog(`⚡ [手段5: 性能ベンチマーク] ベースライン vs 最適化モジュールのレイテンシ・メモリを実測中...`, 'purple');
-    try {
-      const bench = await selfImprovementSuiteService.runBenchmark(targetChapter.chapterNumber, 1000);
-      addLiveLog(`✓ [性能ベンチ完了] 速度向上: ${bench.speedupMultiplier} 高速化 (${bench.baseLatencyMs.toFixed(2)}ms ➔ ${bench.optimizedLatencyMs.toFixed(2)}ms), メモリ削減: ${bench.memorySavedBytes}B`, 'success');
-    } catch {
-      addLiveLog(`✓ [性能ベンチ] 処理速度向上・メモリ削減基準をクリア`, 'success');
-    }
-
-    await new Promise((r) => setTimeout(r, 450));
-    setLiveProgress(72);
-    setLiveStage('invariants');
-
-    // ── 手段 6: 4大不変条件エンジンの安全ゲート検証 ──
-    addLiveLog(`🛡️ [手段6: 不変条件防壁] 4大不変条件の厳密検証中...`, 'warn');
-    selfCodeArchitectService.simulateProposal(proposal.id);
-
-    setLiveInvariants((prev) => prev.map((inv, idx) => idx === 0 ? { ...inv, status: 'testing' } : inv));
-    await new Promise((r) => setTimeout(r, 200));
-    setLiveInvariants((prev) => prev.map((inv, idx) => idx === 0 ? { ...inv, status: 'passed' } : idx === 1 ? { ...inv, status: 'testing' } : inv));
-    addLiveLog(`✓ 不変条件 1/4 [Qwen 3B保護] 合格: 基本推論エンジンへの侵食なし`, 'success');
-
-    await new Promise((r) => setTimeout(r, 200));
-    setLiveInvariants((prev) => prev.map((inv, idx) => idx <= 1 ? { ...inv, status: 'passed' } : idx === 2 ? { ...inv, status: 'testing' } : inv));
-    addLiveLog(`✓ 不変条件 2/4 [プライバシー境界] 合格: 外部漏洩リスクなし`, 'success');
-
-    await new Promise((r) => setTimeout(r, 200));
-    setLiveInvariants((prev) => prev.map((inv, idx) => idx <= 2 ? { ...inv, status: 'passed' } : idx === 3 ? { ...inv, status: 'testing' } : inv));
-    addLiveLog(`✓ 不変条件 3/4 [スナップショット・ロールバック保証] 合格`, 'success');
-
-    await new Promise((r) => setTimeout(r, 200));
-    setLiveInvariants((prev) => prev.map((inv) => ({ ...inv, status: 'passed' })));
-    addLiveLog(`✓ 不変条件 4/4 [退行防止テスト] 合格: 既存機能の健全性100%維持`, 'success');
-
-    await new Promise((r) => setTimeout(r, 450));
-    setLiveProgress(84);
-    setLiveStage('canary');
-
-    // ── 手段 7: カナリア段階配備 (Canary Sandbox 10% 試行) ──
-    addLiveLog(`🐤 [手段7: カナリア配備] 10%サンドボックス安全試行を実行中...`, 'purple');
-    try {
-      const canary = await selfImprovementSuiteService.runCanaryTrial(proposal.id, targetChapter.chapterNumber, proposal.codeSnippet);
-      addLiveLog(`✓ [カナリア合格] ステージ: ${canary.stage}, エラー率: ${canary.errorRate}%, レイテンシ: ${canary.latencyMs}ms ➔ 本番全面適用を承認`, 'success');
-    } catch {
-      addLiveLog(`✓ [カナリア合格] サンドボックス試行テスト合格`, 'success');
-    }
-
-    await new Promise((r) => setTimeout(r, 450));
-    setLiveProgress(92);
-    setLiveStage('patching');
-
-    // ── 手段 8: 実体コード物理保存 (ZIP/GitHub完全連動) ──
-    addLiveLog(`📁 [手段8: 物理ディスク保存] src/autonomous_modules/chapter_${targetChapter.chapterNumber}.ts に実体書き込み永続化...`, 'cyan');
-    selfCodeArchitectService.applyProposal(proposal.id);
-    await selfCodeArchitectService.saveModuleFileToServer(targetChapter.chapterNumber);
-
-    await new Promise((r) => setTimeout(r, 300));
-    setLiveProgress(97);
-    setLiveStage('git_commit');
-
-    // ── 手段 9: Aider アトミックGitコミット記録 & ロールバックアンカー ──
-    try {
-      const commit = await aiderEngineService.createCommit(
-        `feat(autonomous): 第${targetChapter.chapterNumber}章『${targetChapter.title}』全手段自律改善完了`,
-        [`src/autonomous_modules/chapter_${targetChapter.chapterNumber}.ts`]
-      );
-      if (commit) {
-        addLiveLog(`📜 [手段9: Aider Gitコミット] [${commit.hash}] アトミックコミット完了（いつでも1秒ロールバック可能）`, 'success');
-      }
-    } catch {
-      addLiveLog(`📜 [Aider Gitコミット] コミットスナップショットを記録完了`, 'success');
-    }
-
-    // ── 手段 10: 進化教訓のナレッジベース自動永続化 ──
-    try {
-      await mikiSelfCodingSuperchargerService.recordLesson({
+      const record = await autonomousContinuousEvolutionService.runFullAutonomousCycle({
         chapterNumber: targetChapter.chapterNumber,
-        topic: targetChapter.category,
-        lessonType: 'SUCCESS_PATTERN',
-        title: `第${targetChapter.chapterNumber}章『${targetChapter.title}』の自律改善パターン`,
-        rule: `全手段（Aider差分 + 評議会合議 + TDDアサーション + カナリア配備）を経て健全性100%を維持しながら適合率向上に成功。`,
       });
-      addLiveLog(`📚 [手段10: 進化教訓永続化] 第${targetChapter.chapterNumber}章の改善知見をナレッジベースに記録`, 'purple');
-    } catch {
-      // optional
+
+      if (record.afterCode) {
+        setLiveDiff({
+          targetFile: record.targetFile,
+          summary: `第${targetChapter.chapterNumber}章 実装コード差分`,
+          changes: [
+            { type: 'header', text: `+++++++ ${record.targetFile} (実体コード)` },
+            ...record.afterCode.split('\n').slice(0, 15).map((l) => ({ type: 'add' as const, text: `+ ${l}` })),
+          ],
+        });
+      }
+
+      const updatedAudit = selfCodeArchitectService.getLatestAudit()!;
+      setAuditResult(updatedAudit);
+      setProposals([...selfCodeArchitectService.getProposals()]);
+
+      const isStub = record.reasoning.includes('雛形') || record.reasoning.includes('未実装');
+      if (isStub) {
+        setActionNotice(`ℹ️ 第${targetChapter.chapterNumber}章: ローカルLLMオフラインのため型安全な雛形スタブを配備しました（完全な要件実装は保留）。`);
+      } else {
+        setActionNotice(`✨ 第${targetChapter.chapterNumber}章『${targetChapter.title}』の自律改善・配備が完了しました！適合スコア: ${record.newScore}点`);
+      }
+      setTimeout(() => setActionNotice(null), 6000);
+    } catch (err: any) {
+      addLiveLog(`❌ 自律改善サイクル停止: ${err?.message || err}`, 'warn');
+      setActionNotice(`⚠️ 第${targetChapter.chapterNumber}章の自律改善が停止しました: ${err?.message || err}`);
+      setTimeout(() => setActionNotice(null), 6000);
+    } finally {
+      unsubscribe();
+      setIsAutoImproving(false);
     }
-
-    // ── 手段 11: 実行時自己治癒セントリー装甲 ──
-    try {
-      addLiveLog(`🛡️ [手段11: 自己治癒セントリー装甲] 例外自動捕捉・ホットフィックス防御網をモジュールに装甲完了`, 'cyan');
-    } catch {
-      // optional
-    }
-
-    const updatedAudit = selfCodeArchitectService.getLatestAudit()!;
-    setAuditResult(updatedAudit);
-    setProposals([...selfCodeArchitectService.getProposals()]);
-
-    await new Promise((r) => setTimeout(r, 400));
-    setLiveProgress(100);
-    setLiveStage('completed');
-    setIsAutoImproving(false);
-    addLiveLog(`🎉 【自律改善完了】第${targetChapter.chapterNumber}章『${targetChapter.title}』を全手段を用いて完全反映！`, 'success');
-    addLiveLog(`📈 全体仕様適合率: ${updatedAudit.complianceScore.toFixed(1)}% (${updatedAudit.completedChapters}/${updatedAudit.totalChapters}章完了)`, 'success');
-    setActionNotice(`✨ [全手段自律改善完了] Aider構文地図・ネット検索・DryRun・ベンチ・不変条件・カナリア・Gitコミットを経て第${targetChapter.chapterNumber}章『${targetChapter.title}』を正式反映しました！適合スコア: ${updatedAudit.complianceScore.toFixed(1)}%`);
-    setTimeout(() => setActionNotice(null), 7000);
   };
 
   const handleAutoImproveCycle = (chapterNum: number) => {

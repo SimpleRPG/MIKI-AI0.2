@@ -195,6 +195,10 @@ export class AutonomousContinuousEvolutionService {
     };
   }
 
+  public onStep(fn: (step: AutonomousEvolutionStepEvent) => void): () => void {
+    return this.subscribeSteps(fn);
+  }
+
   private emitStep(step: AutonomousEvolutionStepEvent): void {
     this.stepListeners.forEach((fn) => {
       try {
@@ -369,10 +373,20 @@ export class AutonomousContinuousEvolutionService {
       );
 
       let currentCode = implResult.code;
-      logStep('SYNTHESIS', 'コード合成完了', `${implResult.linesCount}行のTypeScriptコードを合成しました`, 'SUCCESS');
+      const isFallbackTemplate = implResult.generationMethod === 'fallback_template';
+      if (isFallbackTemplate) {
+        logStep(
+          'SYNTHESIS',
+          '雛形スタブ合成 (ローカルLLMオフライン)',
+          `⚠️ ローカルLLMオフラインのため要求仕様の型・骨格スタブ (${implResult.linesCount}行) を生成しました。本要件の完全実装は保留されます。`,
+          'WARNING'
+        );
+      } else {
+        logStep('SYNTHESIS', 'コード合成完了', `${implResult.linesCount}行のTypeScriptコードを合成しました`, 'SUCCESS');
+      }
 
       // ── Step 5: AST構文検査 & TDD単体テスト & 循環参照自動検証 ──
-      logStep('SYNTAX_CHECK', 'AST構文 & TDDテスト自動検証', '構文検査とVitest単体テストスイートを自動生成して実行中...');
+      logStep('SYNTAX_CHECK', 'AST構文 & 構造健全性テスト実行', '構文検査およびモジュールのサンドボックス実行テストを実行中...');
       let verificationPipeline = await mikiSelfCodingSuperchargerService.runAutonomousVerificationPipeline(
         currentCode,
         targetInfo.targetFile.split('/').pop() || 'GeneratedModule.ts'
@@ -467,20 +481,34 @@ export class AutonomousContinuousEvolutionService {
       );
 
       // ── Step 9: 仕様書レジストリと適合スコアの同期 ──
+      const isFullRequirementMet = !isFallbackTemplate && (finalApply.isRequirementImplemented ?? true);
       if (targetInfo.chapter) {
-        targetInfo.chapter.status = 'COMPLETED';
+        if (isFullRequirementMet) {
+          targetInfo.chapter.status = 'COMPLETED';
+        } else {
+          targetInfo.chapter.status = 'IN_PROGRESS';
+        }
         selfCodeArchitectService.saveCompletedChapters();
       }
 
       const postAudit = selfCodeArchitectService.runSelfCodeAudit();
       const newScore = postAudit.complianceScore;
 
-      logStep(
-        'COMPLETED',
-        '自律自己改善完了 🎉',
-        `適合スコア: ${previousScore}点 ➔ ${newScore}点 (+${Math.max(0, newScore - previousScore)}点)。全工程を安全に完遂しました。`,
-        'SUCCESS'
-      );
+      if (isFullRequirementMet) {
+        logStep(
+          'COMPLETED',
+          '自律自己改善完了 🎉',
+          `適合スコア: ${previousScore}点 ➔ ${newScore}点 (+${Math.max(0, newScore - previousScore)}点)。全工程および仕様要件の実装を安全に完遂しました。`,
+          'SUCCESS'
+        );
+      } else {
+        logStep(
+          'COMPLETED',
+          '雛形モジュール配備完了 (要件実装は保留) ℹ️',
+          `適合スコア: ${previousScore}点 (変化なし)。ローカルLLMオフラインのため雛形スタブを配備しました。第${targetInfo.chapter?.chapterNumber}章は「着手中 (IN_PROGRESS)」として保持されます。`,
+          'WARNING'
+        );
+      }
 
       const record: AutonomousEvolutionRecord = {
         id: recordId,
