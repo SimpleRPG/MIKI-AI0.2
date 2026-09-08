@@ -388,7 +388,9 @@ class MikiSelfCodingSuperchargerService {
         applied: false,
         syntaxCheckPassed: false,
         syntaxError: res.reason,
-        reasoning: `実装サーバーと通信できなかったため、コード生成・適用を中断しました（オフライン保護）。`,
+        reasoning: res.offline
+          ? `実装サーバーと通信できなかったため、コード生成・適用を中断しました（オフライン保護）。`
+          : `実装サーバー応答エラー: ${res.error || res.reason}`,
         code: '',
         linesCount: 0,
       };
