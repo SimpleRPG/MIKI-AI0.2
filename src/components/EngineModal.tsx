@@ -522,6 +522,56 @@ export const EngineModal: React.FC<EngineModalProps> = ({
   const [isTestingExternal, setIsTestingExternal] = useState(false);
   const [showTermuxGuide, setShowTermuxGuide] = useState(false);
 
+  // Termux / バックエンド実装サーバー (3000) 設定
+  const [serverApiBaseUrl, setServerApiBaseUrl] = useState(() => storageService.getItem('miki_api_base_url') || '');
+  const [isTestingServerApi, setIsTestingServerApi] = useState(false);
+  const [serverApiTestResult, setServerApiTestResult] = useState<{
+    success: boolean;
+    latencyMs?: number;
+    message?: string;
+  } | null>(null);
+
+  const handleUpdateApiBaseUrl = (url: string) => {
+    setServerApiBaseUrl(url);
+    const trimmed = url.trim();
+    if (trimmed) {
+      storageService.setItem('miki_api_base_url', trimmed);
+    } else {
+      storageService.removeItem('miki_api_base_url');
+    }
+  };
+
+  const testServerApiConnection = async () => {
+    setIsTestingServerApi(true);
+    setServerApiTestResult(null);
+    const start = performance.now();
+    try {
+      const targetUrl = serverApiBaseUrl.trim() || '';
+      const pingUrl = targetUrl ? `${targetUrl.replace(/\/+$/, '')}/api/health` : '/api/health';
+      const res = await fetch(pingUrl);
+      const latency = Math.round(performance.now() - start);
+      if (res.ok) {
+        setServerApiTestResult({
+          success: true,
+          latencyMs: latency,
+          message: `接続成功: 実装サーバー (/api/health) 正常稼働中 (Ping: ${latency}ms)`,
+        });
+      } else {
+        setServerApiTestResult({
+          success: false,
+          message: `サーバー応答コード: ${res.status} (${res.statusText})`,
+        });
+      }
+    } catch (err: any) {
+      setServerApiTestResult({
+        success: false,
+        message: err?.message || '接続できませんでした。Termuxで `npm run dev` が起動しているか確認してください。',
+      });
+    } finally {
+      setIsTestingServerApi(false);
+    }
+  };
+
   const applyExternalPreset = (preset: 'termux' | 'ollama' | 'lmstudio') => {
     setExternalTestResult(null);
     setExternalModelListError(null);
@@ -2462,13 +2512,84 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                         <code className="text-amber-300 block select-all bg-slate-900 p-1.5 rounded">
                           llama-server -m ~/storage/downloads/gguf-models/model.gguf --host 127.0.0.1 --port 8080 -c 2048 --mmap --embedding
                         </code>
+                        <div className="text-slate-400 font-sans font-semibold pt-1">④ Termux実装サーバー（自律自己改善・物理コード書き込み・Gitコミット: 3000）:</div>
+                        <code className="text-violet-300 block select-all bg-slate-900 p-1.5 rounded">
+                          cd ~/miki-ai && npm run dev
+                        </code>
                       </div>
-                      <div className="text-[10.5px] text-emerald-300/80">
-                        💡 <strong>接続設定</strong>: エンドポイントURLに <code>http://127.0.0.1:8080</code>、サーバー種別に「OpenAI互換」を選択し、「接続テスト」を実行してください。
+                      <div className="text-[10.5px] text-emerald-300/80 space-y-1">
+                        <div>💡 <strong>推論接続 (8080)</strong>: エンドポイントURLに <code>http://127.0.0.1:8080</code>、サーバー種別「OpenAI互換」を指定。</div>
+                        <div>💡 <strong>実装接続 (3000)</strong>: 自律改善やAider、物理コード保存を行う場合は下の「Termux実装サーバーURL」に <code>http://127.0.0.1:3000</code> を設定してください。</div>
                       </div>
                     </div>
                   </div>
                 )}
+
+                {/* Termux / Node.js 実装サーバー (ポート 3000: 自律改善・物理コード保存・Gitコミット) */}
+                <div className="pt-2.5 border-t border-indigo-500/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">
+                      <Terminal className="w-3.5 h-3.5 text-violet-400" />
+                      <span>Termux 実装サーバー (3000) / APIベースURL</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateApiBaseUrl(serverApiBaseUrl ? '' : 'http://127.0.0.1:3000')}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${
+                        serverApiBaseUrl.includes('3000')
+                          ? 'bg-violet-950/80 border-violet-500 text-violet-300'
+                          : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'
+                      }`}
+                    >
+                      {serverApiBaseUrl.includes('3000') ? '✓ Termux (3000) 適用中' : 'Termux (3000) を設定'}
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={serverApiBaseUrl}
+                      onChange={(e) => handleUpdateApiBaseUrl(e.target.value)}
+                      placeholder="例: http://127.0.0.1:3000 (空欄ならWeb版と同一サーバー)"
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={testServerApiConnection}
+                      disabled={isTestingServerApi}
+                      className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-sm shrink-0 flex items-center gap-1"
+                    >
+                      <Activity className={`w-3.5 h-3.5 ${isTestingServerApi ? 'animate-spin' : ''}`} />
+                      <span>{isTestingServerApi ? '確認中...' : '3000 疎通テスト'}</span>
+                    </button>
+                  </div>
+
+                  {serverApiTestResult && (
+                    <div
+                      className={`p-2 rounded-lg border text-[11px] leading-relaxed animate-in fade-in duration-150 ${
+                        serverApiTestResult.success
+                          ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                          : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                      }`}
+                    >
+                      {serverApiTestResult.success ? (
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span>{serverApiTestResult.message}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                          <span>{serverApiTestResult.message}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-slate-400 leading-tight">
+                    ※ スマホ単体（APKやPWA）で自律自己改善の物理ファイル書き込みやGitコミット、スナップショットを行う場合は、Termux側で <code>npm run dev</code> を起動し、この欄に <code>http://127.0.0.1:3000</code> を設定します。
+                  </p>
+                </div>
 
                 {/* サーバーが公開しているモデル一覧をカードで表示し、タップで切替できるようにする */}
                 <div className="pt-2 border-t border-indigo-500/20 space-y-2">
