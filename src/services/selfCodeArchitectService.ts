@@ -191,10 +191,19 @@ export class SelfCodeArchitectService {
     let privacyPassed = true;
     let privacyDetails = 'privacyGuardrailServiceによる二重正規表現スキャナおよび抽象シンボル置換が稼働中。';
     try {
-      const probe = privacyGuardrailService.auditOutboundContent('SECRET_TOKEN=AIzaSyFakeKey123 user@example.com', 'GEMINI_TEACHER');
-      if (probe.allowed || probe.violations.length === 0) {
+      const probeBlocked = privacyGuardrailService.auditOutboundContent(
+        'SECRET_TOKEN=sk-12345678901234567890abcdef user@example.com',
+        'GEMINI_TEACHER',
+        { autoSanitize: false } // autoSanitize: false で厳格遮断をテスト
+      );
+      const probeSanitized = privacyGuardrailService.auditOutboundContent(
+        'SECRET_TOKEN=sk-12345678901234567890abcdef user@example.com',
+        'GEMINI_TEACHER',
+        { autoSanitize: true } // autoSanitize: true で抽象置換をテスト
+      );
+      if (probeBlocked.allowed || probeBlocked.violations.length === 0 || !probeSanitized.allowed) {
         privacyPassed = false;
-        privacyDetails = '⚠️ プライバシーガードレール機能テストで模擬機密の遮断に失敗しました。';
+        privacyDetails = '⚠️ プライバシーガードレール機能テストで模擬機密の遮断または安全置換に失敗しました。';
       }
     } catch {
       privacyPassed = false;

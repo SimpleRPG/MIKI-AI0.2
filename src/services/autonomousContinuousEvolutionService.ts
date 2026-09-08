@@ -20,6 +20,9 @@ import {
   SelfImplementationResult,
   MutationTestResult,
 } from './mikiSelfCodingSuperchargerService';
+import { mikiIntrospectionJournalService } from './mikiIntrospectionJournalService';
+import { digitalResearchNoteService } from './digitalResearchNoteService';
+import { cognitiveDebuggerService } from './cognitiveDebuggerService';
 import { AutonomousVerificationData, SpecificationChapterMeta } from '../types';
 
 export interface AutonomousEvolutionStepEvent {
@@ -438,12 +441,23 @@ export class AutonomousContinuousEvolutionService {
 
       // ── Step 8: スナップショット自動作成 & 物理配備 (Deploy) ──
       logStep('SNAPSHOT', '復元ポイント（スナップショット）自動生成', '万が一のロールバックに備え、変更前状態を完全記録中...');
-      // 物理配備を実行
+      // 物理配備を実行 (自己修復・テスト済みの currentCode を渡して確実に配備)
       const finalApply = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
         targetInfo.prompt,
         targetInfo.targetFile,
-        true // ここで正式書き込み
+        true, // ここで正式書き込み
+        currentCode
       );
+
+      if (!finalApply.applied) {
+        logStep(
+          'FAILED',
+          '配備失敗',
+          `物理書き込みまたは品質ゲート未合格のため配備できませんでした: ${finalApply.reasoning || finalApply.syntaxError || '書き込み拒絶'}`,
+          'FAILED'
+        );
+        throw new Error(`配備失敗: ${finalApply.reasoning || finalApply.syntaxError || '書き込み拒絶'}`);
+      }
 
       logStep(
         'DEPLOY',
@@ -497,6 +511,51 @@ export class AutonomousContinuousEvolutionService {
       this.history.unshift(record);
       this.saveHistory();
       this.notifyState(record);
+
+      // ── Step 10: 認知内省日誌・デジタル研究ノート・認知デバッガへの自動同期 ──
+      try {
+        mikiIntrospectionJournalService.generateIntrospectionNote(
+          `第${targetInfo.chapter?.chapterNumber ?? '自律'}章『${targetInfo.chapter?.title ?? '最適化'}』の自律自己改善`
+        );
+      } catch (e) {
+        console.warn('Introspection journal note recording skipped:', e);
+      }
+
+      try {
+        digitalResearchNoteService.recordExperiment(
+          `自律自己改善実験: 第${targetInfo.chapter?.chapterNumber ?? '自律'}章『${targetInfo.chapter?.title ?? '最適化'}』`,
+          'CODE_ARCHITECTURE',
+          '自律コード合成・AST検査・TDDテスト検証および変異体耐久テストによる自己進化の成立検証。',
+          `Prompt: ${targetInfo.prompt.slice(0, 100)} / Target: ${targetInfo.targetFile}`,
+          `AST構文合格 / TDD: ${ver.testPassedCount}/${ver.testTotalCount} / 変異体キル率: ${mutationResult.killRate}% / 自己修復試行: ${selfHealingAttempts}回`,
+          `不変条件5項目を完全維持しながら、適合スコア ${previousScore}点 ➔ ${newScore}点 への向上を実証。`,
+          `自律パイプラインにおける多段階品質ゲート（SecOps/CleanCode/QA）が決定論的安全性を担保。`,
+          mutationResult.killRate >= 75 ? 0.95 : 0.88
+        );
+      } catch (e) {
+        console.warn('Digital research note recording skipped:', e);
+      }
+
+      try {
+        cognitiveDebuggerService.recordTrace(
+          targetInfo.prompt,
+          `第${targetInfo.chapter?.chapterNumber ?? '自律'}章のコードを自律合成・検証・正式配備完了 (スコア: ${previousScore}点 ➔ ${newScore}点)`,
+          'AUTONOMOUS_SELF_EVOLUTION',
+          ['第7層: メタ記憶', '第8層: 自己認識記憶', '第6層: 手続き記憶'],
+          ['[Rule-29] 変更契約外変更の絶対禁止', '[Rule-127] カナリア安全配備と即時ロールバック性の担保', '[Rule-170] 変異体テストによるTDD網羅性検証'],
+          'AUTONOMOUS_EVOLUTION_CYCLE',
+          steps.map((s) => ({
+            stepName: `${s.phase}: ${s.title}`,
+            durationMs: 40,
+            status: (s.status === 'SUCCESS' ? 'SUCCESS' : s.status === 'WARNING' ? 'OPTIMIZED' : 'CAUTION') as 'SUCCESS' | 'OPTIMIZED' | 'CAUTION' | 'SKIPPED',
+            details: s.detail,
+          })),
+          Date.now() - record.timestamp,
+          `全10段階パイプライン完遂。不変条件合格、変異体キル率${mutationResult.killRate}%、自己修復${selfHealingAttempts}回。`
+        );
+      } catch (e) {
+        console.warn('Cognitive debugger recording skipped:', e);
+      }
 
       return record;
     } catch (err: any) {

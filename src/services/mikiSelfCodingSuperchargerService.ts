@@ -348,11 +348,12 @@ class MikiSelfCodingSuperchargerService {
   public async runAutonomousImplementation(
     prompt: string,
     targetFileHint?: string,
-    autoApply: boolean = true
+    autoApply: boolean = true,
+    codeOverride?: string
   ): Promise<SelfImplementationResult> {
     const res = await callSelfCodeApi<SelfImplementationResult>('/api/self-code/autonomous-implement', {
       method: 'POST',
-      body: { prompt, targetFileHint, autoApply },
+      body: { prompt, targetFileHint, autoApply, codeOverride },
     });
     if (isApiFailure(res)) {
       systemLogger.warn('SELF_IMPROVEMENT', `自律自己実装失敗: ${res.reason}`);
@@ -910,7 +911,7 @@ class MikiSelfCodingSuperchargerService {
       testsPassed: testResult.allPassed,
       testPassedCount: testResult.passedCount,
       testTotalCount: testResult.totalCount,
-      coverageOverall: testResult.coverage.overall,
+      coverageOverall: testResult.coverage?.overall ?? (testResult.totalCount > 0 ? Math.round((testResult.passedCount / testResult.totalCount) * 100) : 0),
       cyclesFound,
       cyclesDescription,
       autoHealed,

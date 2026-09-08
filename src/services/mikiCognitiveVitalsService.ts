@@ -94,7 +94,14 @@ export class MikiCognitiveVitalsService {
 
     // 3. テスト＆変異体生存率 (Mutation & TDD Resilience)
     // 実際に実行された変異テスト履歴の実測キル率から算出
-    const history = autonomousContinuousEvolutionService.getHistory();
+    let history: any[] = [];
+    try {
+      if (typeof autonomousContinuousEvolutionService !== 'undefined' && autonomousContinuousEvolutionService?.getHistory) {
+        history = autonomousContinuousEvolutionService.getHistory();
+      }
+    } catch {
+      history = [];
+    }
     let mutationScore = 90;
     if (history.length > 0) {
       const recordsWithMutation = history.filter((h) => h.mutationTestResult && typeof h.mutationTestResult.killRate === 'number');

@@ -133,7 +133,14 @@ export class MikiIntrospectionJournalService {
     const vitals = mikiCognitiveVitalsService.getSnapshot();
     const completedChapters = selfCodeArchitectService.getCompletedChapters().length;
     const totalChapters = selfCodeArchitectService.getAllChapters().length;
-    const history = autonomousContinuousEvolutionService.getHistory();
+    let history: any[] = [];
+    try {
+      if (typeof autonomousContinuousEvolutionService !== 'undefined' && autonomousContinuousEvolutionService?.getHistory) {
+        history = autonomousContinuousEvolutionService.getHistory();
+      }
+    } catch {
+      history = [];
+    }
     const latestRec = history.length > 0 ? history[history.length - 1] : null;
 
     const moods: { mood: MikiMoodType; label: string; emoji: string }[] = [

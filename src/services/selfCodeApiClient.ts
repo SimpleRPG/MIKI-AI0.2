@@ -22,8 +22,15 @@ export async function callSelfCodeApi<T>(
   }
 ): Promise<T | ApiFailureResult> {
   try {
+    const fullUrl =
+      url.startsWith('http://') || url.startsWith('https://')
+        ? url
+        : typeof window !== 'undefined'
+        ? url
+        : `http://localhost:3000${url.startsWith('/') ? '' : '/'}${url}`;
+
     const method = options?.method || (options?.body ? 'POST' : 'GET');
-    const res = await fetch(url, {
+    const res = await fetch(fullUrl, {
       method,
       headers: {
         'Content-Type': 'application/json',
