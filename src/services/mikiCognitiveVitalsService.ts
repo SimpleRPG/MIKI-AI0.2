@@ -13,6 +13,7 @@ import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { selfCodeArchitectService } from './selfCodeArchitectService';
 import { autonomousContinuousEvolutionService } from './autonomousContinuousEvolutionService';
+import { proactiveContextOsService } from './proactiveContextOsService';
 
 export interface VitalMetric {
   id: string;
@@ -77,32 +78,43 @@ export class MikiCognitiveVitalsService {
     const now = Date.now();
 
     // 1. アンカーモデル安定度 (Qwen 3B Anchor Model Stability)
-    const anchorScore = 98;
+    // proactiveContextOsService のペルソナアンカードリフト実測値から計算
+    const personaAnchors = proactiveContextOsService.getPersonaAnchors();
+    let anchorScore = 100;
+    if (personaAnchors && typeof personaAnchors.driftScore === 'number') {
+      anchorScore = Math.max(0, Math.min(100, Math.round((1.0 - personaAnchors.driftScore) * 100)));
+    }
 
     // 2. 不変条件堅持率 (Invariant Barrier Integrity)
-    // 5大不変条件: APIキー秘匿, オフライン自律性, 監査不変, ロールバック保証, ユーザー同意
-    const invariantScore = 100;
+    // selfCodeArchitectService.checkInvariants() の実検査結果から直接計算
+    const invariantResult = selfCodeArchitectService.checkInvariants();
+    const passedCount = invariantResult.checks.filter((c) => c.passed).length;
+    const totalChecks = invariantResult.checks.length;
+    const invariantScore = totalChecks > 0 ? Math.round((passedCount / totalChecks) * 100) : 100;
 
     // 3. テスト＆変異体生存率 (Mutation & TDD Resilience)
+    // 実際に実行された変異テスト履歴の実測キル率から算出
     const history = autonomousContinuousEvolutionService.getHistory();
-    let mutationScore = 95;
+    let mutationScore = 90;
     if (history.length > 0) {
-      const latest = history[history.length - 1];
-      if (latest.mutationTestResult) {
-        mutationScore = Math.min(100, Math.max(70, latest.mutationTestResult.killRate));
+      const recordsWithMutation = history.filter((h) => h.mutationTestResult && typeof h.mutationTestResult.killRate === 'number');
+      if (recordsWithMutation.length > 0) {
+        const latest = recordsWithMutation[recordsWithMutation.length - 1];
+        mutationScore = Math.min(100, Math.max(0, latest.mutationTestResult!.killRate));
       }
     }
 
     // 4. 記憶・コンテキスト予算健全度 (Memory & Context Budget Health)
-    let memoryScore = 92;
+    let memoryScore = 95;
     try {
       const rawMem = storageService.getItem('miki_ai_chat_memories');
       if (rawMem) {
         const mems = JSON.parse(rawMem);
         if (Array.isArray(mems)) {
           // メモリ件数が多すぎる場合の断片化補正
-          if (mems.length > 300) memoryScore = 85;
-          else if (mems.length > 150) memoryScore = 90;
+          if (mems.length > 300) memoryScore = 80;
+          else if (mems.length > 150) memoryScore = 88;
+          else memoryScore = 95;
         }
       }
     } catch {
@@ -110,7 +122,17 @@ export class MikiCognitiveVitalsService {
     }
 
     // 5. 自己修復・回復力 (Self-Healing Agility)
-    const healingScore = 96;
+    // 実際に発動したロールバック、カナリア自動復帰、安全適用の実績から計算
+    const proposals = selfCodeArchitectService.getProposals();
+    let healingScore = 100;
+    let healingDesc = 'AST構文エラーや例外からの自律生還・リカバリー能力';
+    if (proposals.length > 0) {
+      const safeRecoveryCount = proposals.filter((p) => p.status === 'APPLIED' || p.status === 'ROLLED_BACK').length;
+      healingScore = Math.min(100, Math.round((safeRecoveryCount / proposals.length) * 100));
+      healingDesc = `自己改善提案 ${proposals.length}件中 ${safeRecoveryCount}件が安全配備または健全ロールバック完了`;
+    } else {
+      healingDesc = '自己修復ガード待機中（未適用・安全境界正常）';
+    }
 
     // 6. 全170章仕様アーキテクチャ適合率 (Specification Coverage)
     const completedChapters = selfCodeArchitectService.getCompletedChapters().length;
@@ -124,7 +146,7 @@ export class MikiCognitiveVitalsService {
         shortName: 'アンカー',
         score: anchorScore,
         target: 95,
-        status: anchorScore >= 90 ? 'OPTIMAL' : 'STABLE',
+        status: anchorScore >= 90 ? 'OPTIMAL' : anchorScore >= 75 ? 'STABLE' : 'WARNING',
         description: 'Qwen 3Bアンカーモデルの出力ドリフト抑制と保護健全性',
         lastChecked: now,
       },
@@ -134,8 +156,8 @@ export class MikiCognitiveVitalsService {
         shortName: '不変条件',
         score: invariantScore,
         target: 100,
-        status: invariantScore === 100 ? 'OPTIMAL' : 'WARNING',
-        description: 'プライバシー・APIキー秘匿・ロールバック5大不変原則の遵守率',
+        status: invariantScore === 100 ? 'OPTIMAL' : invariantScore >= 80 ? 'WARNING' : 'CRITICAL',
+        description: `プライバシー・APIキー秘匿・ロールバック5大不変原則の遵守率 (${passedCount}/${totalChecks}クリア)`,
         lastChecked: now,
       },
       {
@@ -164,8 +186,8 @@ export class MikiCognitiveVitalsService {
         shortName: '自己修復',
         score: healingScore,
         target: 90,
-        status: healingScore >= 90 ? 'OPTIMAL' : 'STABLE',
-        description: 'AST構文エラーや例外からの自律生還・リカバリー能力',
+        status: healingScore >= 90 ? 'OPTIMAL' : healingScore >= 75 ? 'STABLE' : 'WARNING',
+        description: healingDesc,
         lastChecked: now,
       },
       {
@@ -191,7 +213,7 @@ export class MikiCognitiveVitalsService {
     );
 
     let status: CognitiveVitalsSnapshot['status'] = 'OPTIMAL';
-    if (overallScore < 65) status = 'DEGRADED';
+    if (invariantScore < 100 || overallScore < 65) status = 'DEGRADED';
     else if (overallScore < 75) status = 'ATTENTION';
     else if (overallScore < 88) status = 'STABLE';
 
@@ -201,6 +223,15 @@ export class MikiCognitiveVitalsService {
 
     const activeAnomalies = metrics.filter((m) => m.status === 'WARNING' || m.status === 'CRITICAL').length;
 
+    let summaryText = '🌟 みきの全認知バイタルは極めて良好です。不変条件ガード・変異耐性ともに最高水準を維持しています。';
+    if (invariantScore < 100) {
+      summaryText = `🚨 警告: 不変条件防壁で違反が検知されました (${totalChecks - passedCount}件)。自律改善・外部通信を制限してください。`;
+    } else if (status === 'STABLE') {
+      summaryText = '🟢 安定稼働中。一部のメモリ統合や最適化の余地がありますが、対話と自己進化に支障ありません。';
+    } else if (status === 'ATTENTION' || status === 'DEGRADED') {
+      summaryText = '⚠️ 認知バイタルに軽微な注意が必要です。自律健全化修復を実行することを推奨します。';
+    }
+
     const snapshot: CognitiveVitalsSnapshot = {
       overallHealthScore: overallScore,
       status,
@@ -208,12 +239,7 @@ export class MikiCognitiveVitalsService {
       metrics,
       activeAnomaliesCount: activeAnomalies,
       lastSelfHealingTime: lastHealing,
-      systemSummary:
-        status === 'OPTIMAL'
-          ? '🌟 みきの全認知バイタルは極めて良好です。不変条件ガード・変異耐性ともに最高水準を維持しています。'
-          : status === 'STABLE'
-          ? '🟢 安定稼働中。一部のメモリ統合や最適化の余地がありますが、対話と自己進化に支障ありません。'
-          : '⚠️ 認知バイタルに軽微な注意が必要です。自律健全化修復を実行することを推奨します。',
+      systemSummary: summaryText,
     };
 
     this.notify(snapshot);

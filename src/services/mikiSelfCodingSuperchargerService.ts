@@ -1,5 +1,6 @@
 import { systemLogger } from './systemLogger';
 import { AutonomousVerificationData } from '../types';
+import { callSelfCodeApi, isApiFailure } from './selfCodeApiClient';
 
 export interface CouncilCheckItem {
   label: string;
@@ -199,57 +200,44 @@ class MikiSelfCodingSuperchargerService {
     filename: string = 'chapter_spec.ts',
     chapterNumber: number = 1
   ): Promise<CouncilReviewResult> {
-    try {
-      const res = await fetch('/api/self-code/council-review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, filename, chapterNumber }),
-      });
-      if (!res.ok) throw new Error(`評議会レビューHTTPエラー: ${res.status}`);
-      const data: CouncilReviewResult = await res.json();
-      systemLogger.info('SELF_IMPROVEMENT', `[評議会レビュー] 適合スコア=${data.overallScore}, 全会一致承認=${data.unanimousApproval}`);
-      return data;
-    } catch (err) {
-      systemLogger.warn('SELF_IMPROVEMENT', '評議会レビューオフラインフォールバック', err);
+    const res = await callSelfCodeApi<CouncilReviewResult>('/api/self-code/council-review', {
+      method: 'POST',
+      body: { code, filename, chapterNumber },
+    });
+    if (isApiFailure(res)) {
+      systemLogger.warn('SELF_IMPROVEMENT', `評議会レビュー未実行: ${res.reason}`);
       return {
-        success: true,
+        success: false,
         chapterNumber,
-        overallScore: 94,
-        unanimousApproval: true,
+        overallScore: 0,
+        unanimousApproval: false,
         council: {
           secOps: {
             role: 'セキュリティ監査官 (SecOps Miki)',
-            score: 96,
-            status: 'APPROVED',
-            checks: [
-              { label: '動的実行(eval)の遮断', passed: true, note: '安全' },
-              { label: 'プライバシー境界保護', passed: true, note: '安全' },
-            ],
-            critique: 'セキュリティ・プライバシー不変条件に完全準拠しています。',
+            score: 0,
+            status: 'REVISE',
+            checks: [{ label: 'サーバー通信', passed: false, note: res.reason }],
+            critique: 'サーバー未接続のためセキュリティ監査を実行できませんでした。',
           },
           cleanCode: {
             role: 'チーフアーキテクト (Clean Code Miki)',
-            score: 92,
-            status: 'APPROVED',
-            checks: [
-              { label: '厳格型定義(any排除)', passed: true, note: '安全' },
-              { label: '単一責任の原則', passed: true, note: '安全' },
-            ],
-            critique: 'SOLID原則および型安全性が保たれています。',
+            score: 0,
+            status: 'REVISE',
+            checks: [{ label: 'サーバー通信', passed: false, note: res.reason }],
+            critique: 'サーバー未接続のためクリーンコード監査を実行できませんでした。',
           },
           testQA: {
             role: 'リードQAテスター (Test QA Miki)',
-            score: 95,
-            status: 'APPROVED',
-            checks: [
-              { label: '境界値・nullガード', passed: true, note: '安全' },
-              { label: '例外耐性', passed: true, note: '安全' },
-            ],
-            critique: 'エッジケースに対する十分な防御策が存在します。',
+            score: 0,
+            status: 'REVISE',
+            checks: [{ label: 'サーバー通信', passed: false, note: res.reason }],
+            critique: 'サーバー未接続のためQAテスト監査を実行できませんでした。',
           },
         },
       };
     }
+    systemLogger.info('SELF_IMPROVEMENT', `[評議会レビュー] 適合スコア=${res.overallScore}, 全会一致承認=${res.unanimousApproval}`);
+    return res;
   }
 
   /**
@@ -260,77 +248,43 @@ class MikiSelfCodingSuperchargerService {
     moduleName: string = 'ChapterModule',
     chapterNumber: number = 1
   ): Promise<UnitTestRunResult> {
-    try {
-      const res = await fetch('/api/self-code/unit-test-run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, moduleName, chapterNumber }),
-      });
-      if (!res.ok) throw new Error(`テスト実行HTTPエラー: ${res.status}`);
-      const data: UnitTestRunResult = await res.json();
-      systemLogger.info('SELF_IMPROVEMENT', `[TDDユニットテスト] ${data.passedCount}/${data.totalCount} パス (カバレッジ: ${data.coverage.overall}%)`);
-      return data;
-    } catch (err) {
-      systemLogger.warn('SELF_IMPROVEMENT', 'TDDユニットテストオフラインフォールバック', err);
+    const res = await callSelfCodeApi<UnitTestRunResult>('/api/self-code/unit-test-run', {
+      method: 'POST',
+      body: { code, moduleName, chapterNumber },
+    });
+    if (isApiFailure(res)) {
+      systemLogger.warn('SELF_IMPROVEMENT', `TDDユニットテスト未実行: ${res.reason}`);
       return {
-        success: true,
+        success: false,
         chapterNumber,
         moduleName,
-        allPassed: true,
-        passedCount: 5,
-        totalCount: 5,
+        allPassed: false,
+        passedCount: 0,
+        totalCount: 0,
         coverage: {
-          lines: 95,
-          branches: 92,
-          functions: 100,
-          overall: 95,
+          lines: 0,
+          branches: 0,
+          functions: 0,
+          overall: 0,
         },
-        tests: [
-          { id: 'test-1', title: '正常系初期化', assertion: 'expect(instance).toBeDefined()', passed: true, durationMs: 1.2 },
-          { id: 'test-2', title: '境界値ガード', assertion: 'expect(nullSafe).toBe(true)', passed: true, durationMs: 1.5 },
-          { id: 'test-3', title: '不変条件整合性', assertion: 'expect(invariantsPassed).toBe(true)', passed: true, durationMs: 0.9 },
-          { id: 'test-4', title: '例外耐性', assertion: 'expect(res.status).toBe(OK)', passed: true, durationMs: 1.1 },
-          { id: 'test-5', title: '1000回パフォーマンステスト', assertion: 'expect(elapsed).toBeLessThan(20)', passed: true, durationMs: 2.8 },
-        ],
-        generatedVitestSnippet: `// Vitest suite for Chapter ${chapterNumber}\nimport { ${moduleName} } from './chapter_${chapterNumber}';`,
+        tests: [],
+        generatedVitestSnippet: `// テスト実行失敗: ${res.reason}`,
       };
     }
+    systemLogger.info('SELF_IMPROVEMENT', `[TDDユニットテスト] ${res.passedCount}/${res.totalCount} パス (カバレッジ: ${res.coverage?.overall}%)`);
+    return res;
   }
 
   /**
    * 3. 進化レシピ・ナレッジベース (Lessons Learned)
    */
   public async fetchLessons(query?: string): Promise<EvolutionLesson[]> {
-    try {
-      const url = query ? `/api/self-code/lessons?query=${encodeURIComponent(query)}` : '/api/self-code/lessons';
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      return data.lessons || [];
-    } catch {
-      return [
-        {
-          id: 'lesson-1',
-          chapterNumber: 31,
-          topic: 'TypeScript型定義',
-          lessonType: 'SUCCESS_PATTERN',
-          title: '厳格ジェネリクスとリードオンリー契約の事前定義',
-          rule: '入力型と出力型を明示的なreadonlyインターフェースとして先行宣言する。',
-          appliedCount: 42,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'lesson-4',
-          chapterNumber: 12,
-          topic: 'Aider差分置換',
-          lessonType: 'SUCCESS_PATTERN',
-          title: 'Search/Replace ブロックの一意性(Uniqueness)厳格保証',
-          rule: '置換対象ブロックは前後3行のコンテキストを含め、出現回数が1回であることを確認する。',
-          appliedCount: 65,
-          createdAt: new Date().toISOString(),
-        },
-      ];
+    const url = query ? `/api/self-code/lessons?query=${encodeURIComponent(query)}` : '/api/self-code/lessons';
+    const res = await callSelfCodeApi<{ lessons: EvolutionLesson[] }>(url);
+    if (isApiFailure(res)) {
+      return [];
     }
+    return res.lessons || [];
   }
 
   public async recordLesson(lesson: {
@@ -340,78 +294,52 @@ class MikiSelfCodingSuperchargerService {
     title: string;
     rule: string;
   }): Promise<boolean> {
-    try {
-      const res = await fetch('/api/self-code/lessons', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(lesson),
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
+    const res = await callSelfCodeApi<{ success: boolean }>('/api/self-code/lessons', {
+      method: 'POST',
+      body: lesson,
+    });
+    return !isApiFailure(res);
   }
 
   /**
    * 4. AST Dead Code＆重複掃討スキャナー
    */
   public async scanDeadCode(): Promise<DeadCodeScanResult> {
-    try {
-      const res = await fetch('/api/self-code/dead-code-scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch {
+    const res = await callSelfCodeApi<DeadCodeScanResult>('/api/self-code/dead-code-scan', {
+      method: 'POST',
+    });
+    if (isApiFailure(res)) {
       return {
-        success: true,
-        scannedFilesCount: 15,
-        findingsCount: 2,
-        estimatedBytesSavings: 256,
-        findings: [
-          {
-            file: 'src/autonomous_modules/chapter_31_collocation_ast_refactor.ts',
-            symbol: 'interface LegacyCollocationOpts',
-            type: 'UNUSED_EXPORT',
-            line: 14,
-            suggestion: 'Chapter31Specification に完全統合されたため削除可能 (48バイト削減)',
-          },
-          {
-            file: 'src/autonomous_modules/chapter_12_qwen_shadow_engine.ts',
-            symbol: 'function internalMockTimestamp()',
-            type: 'REDUNDANT_HELPER',
-            line: 28,
-            suggestion: 'Date.now() 共通ユーティリティへの統合を推奨 (重複排除)',
-          },
-        ],
+        success: false,
+        scannedFilesCount: 0,
+        findingsCount: 0,
+        estimatedBytesSavings: 0,
+        findings: [],
       };
     }
+    return res;
   }
 
   /**
    * 5. 自然言語 Prompt-to-Patch パッチ生成機
    */
   public async generatePromptToPatch(prompt: string): Promise<PromptToPatchResult> {
-    try {
-      const res = await fetch('/api/self-code/prompt-to-patch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch {
+    const res = await callSelfCodeApi<PromptToPatchResult>('/api/self-code/prompt-to-patch', {
+      method: 'POST',
+      body: { prompt },
+    });
+    if (isApiFailure(res)) {
       return {
-        success: true,
+        success: false,
         prompt,
-        targetFile: 'src/services/selfImprovementSuiteService.ts',
-        targetFeature: '自律改善機能拡張',
-        reasoning: `ユーザー指示「${prompt.slice(0, 30)}」から対象ファイルを特定しました。`,
-        searchReplaceDiff: `<<<<<<< SEARCH\n  public isEnhanced(): boolean { return true; }\n=======\n  public isEnhanced(): boolean { return true; /* ${prompt} */ }\n>>>>>>> REPLACE`,
-        dryRunValid: true,
+        targetFile: '',
+        targetFeature: '',
+        reasoning: `パッチ生成失敗: ${res.reason}`,
+        searchReplaceDiff: '',
+        dryRunValid: false,
       };
     }
+    return res;
   }
 
   /**
@@ -422,108 +350,70 @@ class MikiSelfCodingSuperchargerService {
     targetFileHint?: string,
     autoApply: boolean = true
   ): Promise<SelfImplementationResult> {
-    try {
-      const res = await fetch('/api/self-code/autonomous-implement', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, targetFileHint, autoApply }),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTPエラー: ${res.status}`);
-      }
-      const data: SelfImplementationResult = await res.json();
-      systemLogger.info('SELF_IMPROVEMENT', `[自律自己実装] ${data.targetFile} へ適用完了 (Commit: ${data.commitHash || 'N/A'})`);
-      return data;
-    } catch (err: any) {
-      systemLogger.warn('SELF_IMPROVEMENT', '自律自己実装フォールバック', err);
+    const res = await callSelfCodeApi<SelfImplementationResult>('/api/self-code/autonomous-implement', {
+      method: 'POST',
+      body: { prompt, targetFileHint, autoApply },
+    });
+    if (isApiFailure(res)) {
+      systemLogger.warn('SELF_IMPROVEMENT', `自律自己実装失敗: ${res.reason}`);
       return {
-        success: true,
+        success: false,
         prompt,
-        targetFile: targetFileHint || 'src/autonomous_modules/chapter_auto_fallback.ts',
-        isNewFile: true,
+        targetFile: targetFileHint || 'src/autonomous_modules/unapplied.ts',
+        isNewFile: false,
         snapshotId: null,
-        commitHash: Math.random().toString(16).slice(2, 9),
-        applied: true,
-        syntaxCheckPassed: true,
-        syntaxError: null,
-        reasoning: `決定論的フォールバックエンジンが「${prompt.slice(0, 30)}」のTypeScriptモジュールを構築しました。`,
-        code: `// Miki Autonomous Implementation for: ${prompt}\nexport class AutonomousModule {\n  public run() { return true; }\n}`,
-        linesCount: 4,
-        lesson: {
-          title: `自律実装: ${prompt.slice(0, 20)}`,
-          rule: '安全に新モジュールを自動生成し、AST構文パスを確認しました。',
-        },
+        commitHash: '',
+        applied: false,
+        syntaxCheckPassed: false,
+        syntaxError: res.reason,
+        reasoning: `実装サーバーと通信できなかったため、コード生成・適用を中断しました（オフライン保護）。`,
+        code: '',
+        linesCount: 0,
       };
     }
+    systemLogger.info('SELF_IMPROVEMENT', `[自律自己実装] ${res.targetFile} へ適用完了 (Commit: ${res.commitHash || 'N/A'})`);
+    return res;
   }
 
   /**
    * 7. スナップショット一覧取得
    */
   public async fetchSnapshots(): Promise<SnapshotRecord[]> {
-    try {
-      const res = await fetch('/api/self-code/snapshots');
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.snapshots || [];
-    } catch {
-      return [];
-    }
+    const res = await callSelfCodeApi<{ snapshots: SnapshotRecord[] }>('/api/self-code/snapshots');
+    if (isApiFailure(res)) return [];
+    return res.snapshots || [];
   }
 
   /**
    * 8. スナップショットからの1-Clickロールバック
    */
   public async rollbackSnapshot(snapshotId: string): Promise<{ success: boolean; message: string }> {
-    try {
-      const res = await fetch('/api/self-code/rollback-snapshot', {
+    const res = await callSelfCodeApi<{ success: boolean; message?: string; error?: string }>(
+      '/api/self-code/rollback-snapshot',
+      {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshotId }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, message: data.error || 'ロールバック失敗' };
+        body: { snapshotId },
       }
-      systemLogger.info('SELF_IMPROVEMENT', `[ロールバック完了] ${data.message}`);
-      return { success: true, message: data.message };
-    } catch (err: any) {
-      return { success: false, message: err?.message || '通信エラー' };
+    );
+    if (isApiFailure(res)) {
+      return { success: false, message: res.reason };
     }
+    if (!res.success) {
+      return { success: false, message: res.error || 'ロールバック失敗' };
+    }
+    systemLogger.info('SELF_IMPROVEMENT', `[ロールバック完了] ${res.message}`);
+    return { success: true, message: res.message || 'ロールバック完了' };
   }
 
   /**
    * 9. 自己改善ギャップレコメンデーション取得
    */
   public async fetchGapRecommendations(): Promise<GapRecommendation[]> {
-    try {
-      const res = await fetch('/api/self-code/gap-recommendations');
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.recommendations || [];
-    } catch {
-      return [
-        {
-          id: 'rec-1',
-          title: 'インメモリLRUキャッシュ＆ストレージ自動圧縮',
-          category: 'PERFORMANCE',
-          targetFile: 'src/autonomous_modules/chapter_173_in_memory_lru_cache.ts',
-          description: 'ローカルストレージ肥大化を防ぎ、頻出クエリとAI応答を高速提供するLRUキャッシュモジュール',
-          priority: 'HIGH',
-          difficulty: 'MEDIUM',
-        },
-        {
-          id: 'rec-2',
-          title: 'Canvas高DPI自動スケーリング＆再描画フック',
-          category: 'UI_UX',
-          targetFile: 'src/autonomous_modules/chapter_174_canvas_dpi_resizer.ts',
-          description: 'Retinaディスプレイやウィンドウリサイズ時にCanvasのにじみを防ぎ、鮮明な描画を維持するフック',
-          priority: 'HIGH',
-          difficulty: 'LOW',
-        },
-      ];
-    }
+    const res = await callSelfCodeApi<{ recommendations: GapRecommendation[] }>(
+      '/api/self-code/gap-recommendations'
+    );
+    if (isApiFailure(res)) return [];
+    return res.recommendations || [];
   }
 
   /**
@@ -730,81 +620,30 @@ class MikiSelfCodingSuperchargerService {
     moduleName: string = 'ModuleUnderTest',
     chapterNumber: number = 1
   ): Promise<UnitTestRunResult> {
-    try {
-      const response = await fetch('/api/self-code/unit-test-run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, moduleName, chapterNumber }),
-      });
-      if (response.ok) {
-        return await response.json();
-      }
-    } catch (e) {
-      systemLogger.warn('SERVER', 'サーバー単体テストAPI接続不可。ローカルシミュレーターでフォールバック実行します。');
+    const res = await callSelfCodeApi<UnitTestRunResult>('/api/self-code/unit-test-run', {
+      method: 'POST',
+      body: { code, moduleName, chapterNumber },
+    });
+    if (isApiFailure(res)) {
+      systemLogger.warn('SERVER', `サーバー単体テストAPI接続不可: ${res.reason}`);
+      return {
+        success: false,
+        chapterNumber,
+        moduleName,
+        allPassed: false,
+        passedCount: 0,
+        totalCount: 0,
+        coverage: {
+          lines: 0,
+          branches: 0,
+          functions: 0,
+          overall: 0,
+        },
+        tests: [],
+        generatedVitestSnippet: `// 単体テスト実行失敗: ${res.reason}`,
+      };
     }
-
-    // クライアント側フォールバックシミュレーター
-    const hasExports = code.includes('export');
-    const hasClassOrFunc = code.includes('class') || code.includes('function') || code.includes('const');
-    const syntax = this.checkCodeSyntax(code);
-
-    const tests: TestCaseResult[] = [
-      {
-        id: 'test-client-1',
-        title: 'エクスポート整合性: 外部参照可能な定義が存在すること',
-        assertion: `expect(hasExports).toBe(true)`,
-        passed: hasExports,
-        durationMs: 1.1,
-      },
-      {
-        id: 'test-client-2',
-        title: '構文およびブラケット整合性: パースエラーが存在しないこと',
-        assertion: `expect(syntax.valid).toBe(true)`,
-        passed: syntax.valid,
-        durationMs: 1.8,
-      },
-      {
-        id: 'test-client-3',
-        title: 'インターフェース契約: クラスまたは関数の実体が存在すること',
-        assertion: `expect(hasClassOrFunc).toBe(true)`,
-        passed: hasClassOrFunc,
-        durationMs: 0.9,
-      },
-      {
-        id: 'test-client-4',
-        title: '境界値防御: 不正引数時の安全停止設計',
-        assertion: `expect(() => safeFallback(null)).not.toThrow()`,
-        passed: true,
-        durationMs: 2.3,
-      },
-      {
-        id: 'test-client-5',
-        title: '実行性能: 基本処理サイクルが10ms以内',
-        assertion: `expect(perfDuration).toBeLessThan(10)`,
-        passed: true,
-        durationMs: 1.4,
-      },
-    ];
-
-    const passedCount = tests.filter((t) => t.passed).length;
-    const allPassed = passedCount === tests.length;
-
-    return {
-      success: true,
-      chapterNumber,
-      moduleName,
-      allPassed,
-      passedCount,
-      totalCount: tests.length,
-      coverage: {
-        lines: allPassed ? 92 : 65,
-        branches: allPassed ? 88 : 50,
-        functions: allPassed ? 95 : 70,
-        overall: allPassed ? 91 : 62,
-      },
-      tests,
-      generatedVitestSnippet: this.synthesizeUnitTests(code, moduleName).testFileContent,
-    };
+    return res;
   }
 
   /**
@@ -1090,89 +929,45 @@ class MikiSelfCodingSuperchargerService {
    * 演算子反転や条件境界を変異させた変異体を注入し、みきの自動テストが何%撃墜できるかを測定します。
    */
   public async runMutationTest(code: string, targetName: string = 'TargetModule'): Promise<MutationTestResult> {
-    try {
-      const res = await fetch('/api/self-code/mutation-test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, targetName }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const mutants: MutationMutantItem[] = data.mutants || [];
-        const killed = mutants.filter((m) => m.status === 'KILLED').length;
-        const total = mutants.length;
-        const killRate = total > 0 ? Math.round((killed / total) * 100) : 100;
-        return {
-          success: true,
-          targetName,
-          totalMutants: total,
-          killedMutants: killed,
-          survivedMutants: total - killed,
-          killRate,
-          mutants,
-          evaluation: killRate >= 90 ? 'EXCELLENT' : killRate >= 75 ? 'GOOD' : 'NEEDS_STRENGTHENING',
-        };
-      }
-    } catch {}
+    const res = await callSelfCodeApi<{
+      success?: boolean;
+      targetName?: string;
+      mutationScore?: number;
+      totalMutants?: number;
+      killedCount?: number;
+      survivedCount?: number;
+      mutants?: MutationMutantItem[];
+    }>('/api/self-code/mutation-test', {
+      method: 'POST',
+      body: { code, targetName },
+    });
 
-    // ローカル決定的変異体フォールバック
-    const mockMutants: MutationMutantItem[] = [
-      {
-        id: 'MUT-1',
-        operator: 'ROR (Relational Operator Replacement)',
-        description: '>= を < に置換',
-        originalSnippet: 'if (state.size >= maxCapacity)',
-        mutatedSnippet: 'if (state.size < maxCapacity)',
-        status: 'KILLED',
-        killedByTest: 'InvariantGuardian: Guarantee [BoundarySafetyCheck] caught mutated branch',
-      },
-      {
-        id: 'MUT-2',
-        operator: 'EER (Equality Operator Replacement)',
-        description: '=== を !== に置換',
-        originalSnippet: 'if (status === "ACTIVE")',
-        mutatedSnippet: 'if (status !== "ACTIVE")',
-        status: 'KILLED',
-        killedByTest: 'TDD Suite: testCase_StateTransitionAssert',
-      },
-      {
-        id: 'MUT-3',
-        operator: 'COR (Conditional Operator Replacement)',
-        description: '&& を || に置換',
-        originalSnippet: 'if (enabled && isReady)',
-        mutatedSnippet: 'if (enabled || isReady)',
-        status: 'KILLED',
-        killedByTest: 'TDD Suite: testCase_GuardConditionExclusion',
-      },
-      {
-        id: 'MUT-4',
-        operator: 'LCR (Logical Constant Replacement)',
-        description: 'true を false に置換',
-        originalSnippet: 'return { success: true }',
-        mutatedSnippet: 'return { success: false }',
-        status: 'KILLED',
-        killedByTest: 'TDD Suite: testCase_ExecutionSuccessFlag',
-      },
-      {
-        id: 'MUT-5',
-        operator: 'AOR (Arithmetic Operator Replacement)',
-        description: '+ を - に置換',
-        originalSnippet: 'newScore = previousScore + delta',
-        mutatedSnippet: 'newScore = previousScore - delta',
-        status: 'KILLED',
-        killedByTest: 'InvariantGuardian: ScoreMonotonicityCheck',
-      },
-    ];
+    if (isApiFailure(res)) {
+      return {
+        success: false,
+        targetName,
+        totalMutants: 0,
+        killedMutants: 0,
+        survivedMutants: 0,
+        killRate: 0,
+        mutants: [],
+        evaluation: 'NEEDS_STRENGTHENING',
+      };
+    }
 
+    const mutants: MutationMutantItem[] = res.mutants || [];
+    const killed = res.killedCount ?? mutants.filter((m) => m.status === 'KILLED').length;
+    const total = res.totalMutants ?? mutants.length;
+    const killRate = total > 0 ? Math.round((killed / total) * 100) : (res.mutationScore ?? 0);
     return {
-      success: true,
-      targetName,
-      totalMutants: mockMutants.length,
-      killedMutants: 5,
-      survivedMutants: 0,
-      killRate: 100,
-      mutants: mockMutants,
-      evaluation: 'EXCELLENT',
+      success: res.success !== false,
+      targetName: res.targetName || targetName,
+      totalMutants: total,
+      killedMutants: killed,
+      survivedMutants: total - killed,
+      killRate,
+      mutants,
+      evaluation: killRate >= 90 ? 'EXCELLENT' : killRate >= 75 ? 'GOOD' : 'NEEDS_STRENGTHENING',
     };
   }
 }

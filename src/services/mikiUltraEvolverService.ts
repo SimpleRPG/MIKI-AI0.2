@@ -9,6 +9,8 @@
  * 5. 🛡️ 実行時自己治癒セントリー (Runtime Self-Healing Sentry / ホットフィックス自動生成)
  */
 
+import { callSelfCodeApi, isApiFailure } from './selfCodeApiClient';
+
 export interface MutantItem {
   id: string;
   operator: string;
@@ -107,64 +109,23 @@ class MikiUltraEvolverService {
    * 1. ミューテーションテスト実行
    */
   public async runMutationTest(code: string, targetName = 'TargetModule'): Promise<MutationTestResult> {
-    try {
-      const res = await fetch('/api/self-code/mutation-test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, targetName }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch {
-      // フォールバック
+    const res = await callSelfCodeApi<MutationTestResult>('/api/self-code/mutation-test', {
+      method: 'POST',
+      body: { code, targetName },
+    });
+    if (isApiFailure(res)) {
       return {
-        success: true,
+        success: false,
         targetName,
-        mutationScore: 85,
-        totalMutants: 4,
-        killedCount: 3,
-        survivedCount: 1,
-        assessment: '🌟 極めて強固なテスト網羅性: ほとんどの論理変異・バグを自動検知・撃破',
-        mutants: [
-          {
-            id: 'MUT-1',
-            operator: 'EER (Equality)',
-            description: '=== を !== に置換',
-            originalSnippet: 'input.text === ""',
-            mutatedSnippet: 'input.text !== ""',
-            status: 'KILLED',
-            killedByTest: 'TestQA: Null/Empty string assertion triggered exception',
-          },
-          {
-            id: 'MUT-2',
-            operator: 'ROR (Relational)',
-            description: 'delayMs < 0 を delayMs >= 0 に置換',
-            originalSnippet: 'delayMs < 0',
-            mutatedSnippet: 'delayMs >= 0',
-            status: 'KILLED',
-            killedByTest: 'TDD: negative delay boundary assertion passed',
-          },
-          {
-            id: 'MUT-3',
-            operator: 'LCR (Boolean)',
-            description: 'return true を return false に置換',
-            originalSnippet: 'return true;',
-            mutatedSnippet: 'return false;',
-            status: 'KILLED',
-            killedByTest: 'SecOps: Contract invariant verification check #3',
-          },
-          {
-            id: 'MUT-4',
-            operator: 'COR (Logical)',
-            description: '&& を || に置換',
-            originalSnippet: 'isValid && isReady',
-            mutatedSnippet: 'isValid || isReady',
-            status: 'SURVIVED',
-            killedByTest: 'NONE (抜け穴: isReady=false時の複合テストケースが未網羅)',
-          },
-        ],
+        mutationScore: 0,
+        totalMutants: 0,
+        killedCount: 0,
+        survivedCount: 0,
+        assessment: `⚠️ テスト未実行: ${res.reason}`,
+        mutants: [],
       };
     }
+    return res;
   }
 
   /**
@@ -176,133 +137,66 @@ class MikiUltraEvolverService {
     chapterNumber: number,
     targetFile: string
   ): Promise<ReflexionResult> {
-    try {
-      const res = await fetch('/api/self-code/reflexion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ failureReason, attemptCount, chapterNumber, targetFile }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch {
+    const res = await callSelfCodeApi<ReflexionResult>('/api/self-code/reflexion', {
+      method: 'POST',
+      body: { failureReason, attemptCount, chapterNumber, targetFile },
+    });
+    if (isApiFailure(res)) {
       return {
-        success: true,
+        success: false,
         chapterNumber,
         targetFile,
         reflectionCycle: attemptCount,
-        rootCause: '境界値（負数・空文字・未定義値）の事前バリデーションが抜けており、不変条件防壁のStrictGuardに抵触した。',
-        selfCritique: '前回の差分生成でメインロジックの最適化に集中するあまり、入力不変条件の早期リターンを簡略化してしまった。',
-        resolutionStrategy: '関数の先頭にガード節 (Guard Clause) を強制配置し、例外系をO(1)で早期リターンさせる構造に再設計する。',
-        generatedPatch: `// [Reflexion Auto-Remedy applied at Attempt #${attemptCount + 1}]\nif (delayMs < 0 || !id) {\n  return false;\n}`,
-        confidenceScore: 96,
-        readyToRetry: true,
+        rootCause: `未測定: ${res.reason}`,
+        selfCritique: '反省エンジンの実行サーバーと通信できませんでした。',
+        resolutionStrategy: 'サーバー接続を確認後に再試行してください。',
+        generatedPatch: '',
+        confidenceScore: 0,
+        readyToRetry: false,
       };
     }
+    return res;
   }
 
   /**
    * 3. コードスメル＆循環的複雑度ヒートマップ取得
    */
   public async fetchComplexityHeatmap(): Promise<ComplexityHeatmapResult> {
-    try {
-      const res = await fetch('/api/self-code/complexity-heatmap');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch {
+    const res = await callSelfCodeApi<ComplexityHeatmapResult>('/api/self-code/complexity-heatmap');
+    if (isApiFailure(res)) {
       return {
-        success: true,
+        success: false,
         scannedAt: new Date().toISOString(),
-        totalFiles: 8,
-        highUrgencyCount: 2,
-        heatmap: [
-          {
-            id: 'HEAT-1',
-            file: 'services/mikiAutonomousBrain.ts',
-            category: 'BRAIN',
-            lineCount: 1240,
-            cyclomaticComplexity: 38,
-            maxNestingDepth: 4,
-            urgencyScore: 88,
-            urgencyLevel: 'HIGH',
-            recommendedAction: 'モジュール分割・関数抽出・ガード節によるネスト平坦化',
-          },
-          {
-            id: 'HEAT-2',
-            file: 'components/self_improvement/SelfCodeArchitectTab.tsx',
-            category: 'UI_TAB',
-            lineCount: 2150,
-            cyclomaticComplexity: 45,
-            maxNestingDepth: 4,
-            urgencyScore: 84,
-            urgencyLevel: 'HIGH',
-            recommendedAction: 'サブビューコンポーネントへの分割継続とカスタムフック分離',
-          },
-          {
-            id: 'HEAT-3',
-            file: 'services/aiderEngineService.ts',
-            category: 'AIDER',
-            lineCount: 680,
-            cyclomaticComplexity: 22,
-            maxNestingDepth: 3,
-            urgencyScore: 56,
-            urgencyLevel: 'MEDIUM',
-            recommendedAction: '差分パーサー処理の独立ユーティリティ化',
-          },
-          {
-            id: 'HEAT-4',
-            file: 'services/selfImprovementSuiteService.ts',
-            category: 'SELF_IMPROVE',
-            lineCount: 820,
-            cyclomaticComplexity: 24,
-            maxNestingDepth: 3,
-            urgencyScore: 52,
-            urgencyLevel: 'MEDIUM',
-            recommendedAction: 'ベンチマーク実行ロジックのキャッシュ化',
-          },
-        ],
+        totalFiles: 0,
+        highUrgencyCount: 0,
+        heatmap: [],
       };
     }
+    return res;
   }
 
   /**
    * 4. 計算量オプティマイザ (Big-O & Auto-Memoize)
    */
   public async optimizeBigOComplexity(code: string, targetName = 'HeavyAlgorithm'): Promise<BigOOptimizeResult> {
-    try {
-      const res = await fetch('/api/self-code/big-o-optimize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, targetName }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch {
+    const res = await callSelfCodeApi<BigOOptimizeResult>('/api/self-code/big-o-optimize', {
+      method: 'POST',
+      body: { code, targetName },
+    });
+    if (isApiFailure(res)) {
       return {
-        success: true,
+        success: false,
         targetName,
-        detectedIssue: '二重 for ループによる O(N²) の総当たり走査',
-        originalComplexity: 'O(N²)',
-        optimizedComplexity: 'O(N)',
-        estimatedSpeedupFactor: '14.2x 〜 42.0x',
-        memoryImpact: '+1.2KB (ハッシュインデックス用テーブル)',
-        optimizedCode: `// [Big-O Auto-Memoize Optimizer by Miki]
-const _cacheMap = new Map<string, any>();
-
-export function ${targetName}Optimized(items: Array<{ id: string; val: any }>) {
-  const indexMap = new Map<string, any>(items.map(it => [it.id, it.val]));
-  return {
-    lookup: (id: string) => {
-      if (_cacheMap.has(id)) return _cacheMap.get(id);
-      const res = indexMap.get(id);
-      _cacheMap.set(id, res);
-      return res;
-    },
-    size: indexMap.size
-  };
-}`,
-        patchDiff: `<<<<<<< SEARCH\nfor (let i = 0; i < items.length; i++) {\n  for (let j = 0; j < items.length; j++) {\n=======\nconst indexMap = new Map(items.map(x => [x.id, x]));\n>>>>>>> REPLACE`,
+        detectedIssue: `最適化未実行: ${res.reason}`,
+        originalComplexity: '未測定',
+        optimizedComplexity: '未測定',
+        estimatedSpeedupFactor: '0x',
+        memoryImpact: '未計測',
+        optimizedCode: code,
+        patchDiff: '',
       };
     }
+    return res;
   }
 
   /**
@@ -313,27 +207,24 @@ export function ${targetName}Optimized(items: Array<{ id: string; val: any }>) {
     stackTrace: string,
     componentOrFile: string
   ): Promise<RuntimeSentryResult> {
-    try {
-      const res = await fetch('/api/self-code/runtime-sentry/heal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ errorMessage, stackTrace, componentOrFile }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch {
+    const res = await callSelfCodeApi<RuntimeSentryResult>('/api/self-code/runtime-sentry/heal', {
+      method: 'POST',
+      body: { errorMessage, stackTrace, componentOrFile },
+    });
+    if (isApiFailure(res)) {
       return {
-        success: true,
-        resolvedFile: componentOrFile || 'scheduler.ts',
-        resolvedLine: 14,
-        diagnosedFault: 'Null/Undefined 安全アクセス違反 (Optional Chaining & Array Check 欠落)',
-        hotfixStrategy: '防御的配列初期化とオプショナルチェーンガード節を自動注入',
-        searchReplacePatch: `<<<<<<< SEARCH\n    const ready = this.queue.filter(q => q.runAt <= now);\n=======\n    if (!Array.isArray(this.queue)) { this.queue = []; return 0; }\n    const ready = (this.queue || []).filter(q => q && q.runAt <= now);\n>>>>>>> REPLACE`,
-        instantAutoApplied: true,
-        recoveryStatus: 'HEALED',
-        preventedCrashesCount: 1,
+        success: false,
+        resolvedFile: componentOrFile || 'unknown',
+        resolvedLine: 0,
+        diagnosedFault: `未修復: ${res.reason}`,
+        hotfixStrategy: '手動確認が必要です',
+        searchReplacePatch: '',
+        instantAutoApplied: false,
+        recoveryStatus: 'FAILED',
+        preventedCrashesCount: 0,
       };
     }
+    return res;
   }
 
   /**
@@ -343,56 +234,22 @@ export function ${targetName}Optimized(items: Array<{ id: string; val: any }>) {
     topic = '高速ASTパースと自律検証ツール',
     targetChapter = 171
   ): Promise<AutonomousWebEvolveResult> {
-    try {
-      const res = await fetch('/api/self-code/autonomous-web-evolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, targetChapter }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch {
+    const res = await callSelfCodeApi<AutonomousWebEvolveResult>('/api/self-code/autonomous-web-evolve', {
+      method: 'POST',
+      body: { topic, targetChapter },
+    });
+    if (isApiFailure(res)) {
       return {
-        success: true,
+        success: false,
         topic,
         targetChapter,
-        steps: [
-          {
-            step: '1. ネット大海コード発掘',
-            status: 'SUCCESS',
-            detail: `「${topic}」に関するGitHub・NPMパッケージのASTスライスを抽出完了`,
-          },
-          {
-            step: '2. 支援ツール自律創成',
-            status: 'SUCCESS',
-            detail: `ツール「Dyn${topic.replace(/[^a-zA-Z0-9]/g, '') || 'Optimizer'}」を第169章サンドボックスで合成・テスト検証 (合格)`,
-          },
-          {
-            step: '3. Aiderパッチ生成',
-            status: 'SUCCESS',
-            detail: `Search/Replace差分パッチを生成 (不変条件チェック合格)`,
-          },
-          {
-            step: '4. 変異体キル検証',
-            status: 'SUCCESS',
-            detail: `変異体スコア100%達成。論理欠陥がないことを証明`,
-          },
-          {
-            step: '5. カナリア配備 & レッスン永続化',
-            status: 'SUCCESS',
-            detail: `カナリア検証合格、デジタル研究ノートへ教訓を恒久定着`,
-          },
-        ],
-        createdTool: {
-          name: `Dyn${topic.replace(/[^a-zA-Z0-9]/g, '') || 'Optimizer'}`,
-          category: 'code',
-          status: 'ACTIVE',
-        },
-        patchPreview: `<<<<<<< SEARCH\n    return this.queue.filter(q => q.runAt <= now);\n=======\n    // [第171章 Web進化パッチ: ${topic}]\n    if (!Array.isArray(this.queue)) this.queue = [];\n    const ready = this.queue.filter(q => q && q.runAt <= now);\n>>>>>>> REPLACE`,
+        steps: [{ step: '自律進化パイプライン起動', status: 'SKIPPED', detail: `接続不能: ${res.reason}` }],
+        patchPreview: '',
         completedAt: new Date().toISOString(),
-        summary: `🎉 Qwen 3B ネット大海探索・自律ツール創成・自己改善サイクルが正常完了しました！`,
+        summary: `自律進化を実行できませんでした（オフライン）。`,
       };
     }
+    return res;
   }
 }
 

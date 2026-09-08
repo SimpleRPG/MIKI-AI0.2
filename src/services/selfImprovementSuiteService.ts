@@ -144,20 +144,19 @@ export class SelfImprovementSuiteService {
       systemLogger.info('SELF_IMPROVEMENT', `[ベンチマーク] 第${chapterNumber}章: 速度向上=${data.speedupMultiplier}, レイテンシ=${data.optimizedLatencyMs}ms`);
       return data;
     } catch (err: any) {
-      const fallback: BenchmarkMetrics = {
+      systemLogger.warn('SELF_IMPROVEMENT', `ベンチマーク実行不可 (オフラインまたはエラー): ${err?.message}`);
+      const failureResult: BenchmarkMetrics = {
         chapterNumber,
         iterations,
-        baseLatencyMs: 24.5,
-        optimizedLatencyMs: 1.2,
-        speedupMultiplier: '20.4x',
-        memorySavedBytes: 1048576,
-        throughputPerSec: 833333,
-        verified: true,
+        baseLatencyMs: 0,
+        optimizedLatencyMs: 0,
+        speedupMultiplier: '0x (未測定)',
+        memorySavedBytes: 0,
+        throughputPerSec: 0,
+        verified: false,
         timestamp: Date.now(),
       };
-      this.benchmarks.unshift(fallback);
-      this.saveState();
-      return fallback;
+      return failureResult;
     }
   }
 
