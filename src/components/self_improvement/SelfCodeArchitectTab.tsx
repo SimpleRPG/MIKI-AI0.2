@@ -278,14 +278,6 @@ export const SelfCodeArchitectTab: React.FC = () => {
       const prop = selfCodeArchitectService.getProposals().find((p) => p.id === proposalId);
       const success = await selfCodeArchitectService.applyProposal(proposalId);
       if (success) {
-        if (prop) {
-          await selfCodeArchitectService.saveModuleFileToServer(
-            prop.targetChapterNumber,
-            prop.codeSnippet,
-            prop.invariantsCheckPassed,
-            prop.expectedScoreImprovement
-          );
-        }
         setProposals([...selfCodeArchitectService.getProposals()]);
         setAuditResult(selfCodeArchitectService.getLatestAudit()!);
         const updatedProp = selfCodeArchitectService.getProposals().find((p) => p.id === proposalId);

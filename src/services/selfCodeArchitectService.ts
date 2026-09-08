@@ -884,18 +884,16 @@ export class SelfCodeArchitectService {
         // 第169章: サンドボックス段階昇格
         const toolId = resolvedProposal?.id || `chap_${chapterNumber}`;
         sandboxPermissionService.registerTool(toolId);
-        const saveSucceeded = await this.saveModuleFileToServer(chapterNumber); // 戻り値を使う
-        sandboxPermissionService.recordExecution(toolId, !saveSucceeded); // 失敗時はhadViolation=true
-        systemLogger.info('SELF_IMPROVEMENT', `[第169章] サンドボックスツール[${toolId}]の実行記録を更新 (保存成否=${saveSucceeded})`);
+        const isApplied = resolvedProposal?.appliedResult?.success ?? true;
+        sandboxPermissionService.recordExecution(toolId, !isApplied);
+        systemLogger.info('SELF_IMPROVEMENT', `[第169章] サンドボックスツール[${toolId}]の実行記録を更新 (適用成否=${isApplied})`);
       } else {
         // 未対応の章番号
         systemLogger.warn('SELF_IMPROVEMENT', `[第${chapterNumber}章] この章に対応する実体改善ロジックが未実装です。設定同期のみ行いました`);
       }
 
-      // 物理TypeScriptコードファイルをサーバーのディスク上に書き込み (src/autonomous_modules/chapter_XX.ts)
-      if (chapterNumber !== 169) {
-        await this.saveModuleFileToServer(chapterNumber);
-      }
+      // 注意: 物理TypeScriptコードファイルは applyProposal 内の mikiSelfCodingSuperchargerService.runAutonomousImplementation
+      // によって検証済みの本物コードのみが書き込まれます。未検証テンプレートの無条件上書きは完全廃止済み。
     } catch (err) {
       console.warn('executeConcreteChapterImprovement error:', err);
     }
@@ -905,6 +903,7 @@ export class SelfCodeArchitectService {
    * 設計思想 第29章 & 第123章:
    * みきが自律生成したTypeScriptコードをサーバーの物理ディスク（src/autonomous_modules/）に書き込み保存する。
    * これにより、ZIPエクスポートやGitHub同期時に実ファイルとして100%出力される。
+   * 【重要方針】中身のない架空の雛形テンプレート生成は完全廃止。customCodeが渡された場合のみ実体を保存する。
    */
   public async saveModuleFileToServer(
     chapterNumber: number,
@@ -913,53 +912,17 @@ export class SelfCodeArchitectService {
     complianceScore: number = 0
   ): Promise<boolean> {
     try {
+      if (!customCode || !customCode.trim()) {
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `[第${chapterNumber}章] 実装コード (customCode) が指定されていないため、物理ファイル書き込みをスキップしました (架空のテンプレート生成は廃止されました)。`
+        );
+        return false;
+      }
+
       const chapter = SPECIFICATION_REGISTRY.find((c) => c.chapterNumber === chapterNumber);
       const title = chapter?.title || `仕様書 第${chapterNumber}章 自律改善モジュール`;
-      const requirements = chapter?.keyRequirements || ['不変条件保持', '自律推論結合'];
-
-      const code = customCode || `/**
- * 自律合成モジュール: 第${chapterNumber}章『${title}』
- * 生成日時: ${new Date().toISOString()}
- * 検証状態: ${isVerified ? 'VERIFIED' : 'PENDING_AUTONOMOUS_SYNTHESIS (未検証ドラフト)'}
- * 不変条件保護: Qwen-3B-Base固定 / 機密プライバシー境界完全分離 / ロールバック性確保
- */
-
-export interface Chapter${chapterNumber}Capability {
-  chapterNumber: number;
-  title: string;
-  requirements: string[];
-  isVerified: boolean;
-  complianceScore: number;
-  execute: (input: any) => Promise<any>;
-}
-
-export class Chapter${chapterNumber}Service implements Chapter${chapterNumber}Capability {
-  public readonly chapterNumber = ${chapterNumber};
-  public readonly title = ${JSON.stringify(title)};
-  public readonly requirements = ${JSON.stringify(requirements)};
-  public readonly isVerified = ${isVerified};
-  public readonly complianceScore = ${complianceScore};
-
-  public async execute(input: any): Promise<any> {
-    // 第${chapterNumber}章 要求仕様: ${requirements.join(', ')}
-    return {
-      status: ${isVerified ? "'SUCCESS'" : "'PENDING'"},
-      chapter: this.chapterNumber,
-      title: this.title,
-      isVerified: this.isVerified,
-      complianceScore: this.complianceScore,
-      processedAt: new Date().toISOString(),
-      output: input,
-      guarantees: {
-        invariantsPassed: true,
-        zeroDrift: ${isVerified},
-      },
-    };
-  }
-}
-
-export const chapter${chapterNumber}AutonomousInstance = new Chapter${chapterNumber}Service();
-`;
+      const code = customCode;
 
       // 1. 事前自動コンパイル・Dry-Run構文検証
       try {
