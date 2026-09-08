@@ -886,39 +886,125 @@ export const failureRecoveryInstance_${timestamp} = new FailureRecoveryEngine_${
 });
 
 // 4. カナリア段階配備（安全な1回お試し実行・自動ロールバック評価）
-app.post('/api/self-code/canary-run', (req, res) => {
+app.post('/api/self-code/canary-run', async (req, res) => {
   try {
-    const { proposalId, chapterNumber, trafficRatio = 0.1 } = req.body;
+    const { proposalId, chapterNumber, code, trafficRatio = 0.1 } = req.body;
 
-    // テストベクターを用いたサンドボックス試行
+    // 候補コードが未提供の場合はDEGRADED（未検証）として返却
+    if (!code || typeof code !== 'string' || !code.trim()) {
+      return res.json({
+        proposalId,
+        chapterNumber,
+        stage: 'STAGING',
+        trafficRatio,
+        testCount: 0,
+        passedTests: 0,
+        latencyMs: 0,
+        healthStatus: 'DEGRADED',
+        errorRate: 0.5,
+        rollbackAvailable: true,
+        evaluatedAt: Date.now(),
+        decision: '候補コードが未指定のため、サンドボックス実実行をスキップ（DEGRADED / 未検証）',
+        error: 'Candidate code is required for sandbox verification',
+      });
+    }
+
     const sandboxStart = performance.now();
-    const testVectors = [
-      { input: 'VBA高速化', expectedValid: true },
-      { input: 'メモリ解放ガード', expectedValid: true },
-      { input: '安全不変条件確認', expectedValid: true },
-    ];
+    let transpilePassed = true;
+    let jsCode = '';
+    let transpileError = '';
 
-    let passedTests = 0;
-    for (const vec of testVectors) {
-      if (vec.expectedValid && vec.input.length > 0) passedTests++;
+    // 1. TypeScriptトランスパイル検証 (TS -> JS CommonJS)
+    try {
+      const transpileResult = ts.transpileModule(code, {
+        compilerOptions: {
+          module: ts.ModuleKind.CommonJS,
+          target: ts.ScriptTarget.ES2022,
+          noImplicitAny: false,
+        },
+      });
+      jsCode = transpileResult.outputText;
+    } catch (tErr: any) {
+      transpilePassed = false;
+      transpileError = tErr?.message || 'TypeScript transpile error';
+    }
+
+    if (!transpilePassed) {
+      const duration = performance.now() - sandboxStart;
+      return res.json({
+        proposalId,
+        chapterNumber,
+        stage: 'ROLLED_BACK',
+        trafficRatio: 0.0,
+        testCount: 1,
+        passedTests: 0,
+        latencyMs: Number(duration.toFixed(2)),
+        healthStatus: 'CRITICAL',
+        errorRate: 1.0,
+        rollbackAvailable: true,
+        evaluatedAt: Date.now(),
+        decision: `構文・トランスパイルエラーを検知したため即座に自動ロールバックを発動しました: ${transpileError}`,
+        error: transpileError,
+      });
+    }
+
+    // 2. 隔離Node.js vm.Scriptサンドボックスでの実実行検証
+    let vmPassed = false;
+    let vmError = '';
+    let sandboxOutput: any = null;
+
+    try {
+      const exportsObj = {};
+      const moduleObj = { exports: exportsObj };
+      const sandbox = {
+        console: { log: () => {}, warn: () => {}, error: () => {} },
+        Math,
+        Date,
+        JSON,
+        String,
+        Number,
+        Array,
+        Object,
+        Boolean,
+        RegExp,
+        parseInt,
+        parseFloat,
+        isNaN,
+        isFinite,
+        exports: exportsObj,
+        module: moduleObj,
+        require: (id: string) => ({ id, mock: true }),
+      };
+
+      const script = new vm.Script(jsCode);
+      const ctx = vm.createContext(sandbox);
+      sandboxOutput = script.runInContext(ctx, { timeout: 1500 });
+      vmPassed = true;
+    } catch (vErr: any) {
+      vmPassed = false;
+      vmError = vErr?.message || 'Sandbox execution runtime exception';
     }
 
     const duration = performance.now() - sandboxStart;
-    const isHealthy = passedTests === testVectors.length && duration < 100;
+    const isHealthy = vmPassed && duration < 2000;
 
     return res.json({
       proposalId,
       chapterNumber,
       stage: isHealthy ? 'CANARY_10' : 'ROLLED_BACK',
-      trafficRatio,
-      testCount: testVectors.length,
-      passedTests,
+      trafficRatio: isHealthy ? trafficRatio : 0.0,
+      testCount: 1,
+      passedTests: isHealthy ? 1 : 0,
       latencyMs: Number(duration.toFixed(2)),
       healthStatus: isHealthy ? 'HEALTHY' : 'CRITICAL',
       errorRate: isHealthy ? 0.0 : 1.0,
       rollbackAvailable: true,
       evaluatedAt: Date.now(),
-      decision: isHealthy ? 'カナリア試行に合格しました。段階昇格が可能です。' : '異常を検知したため即座にロールバックを実行しました。',
+      decision: isHealthy
+        ? `サンドボックス実実行検証（VM隔離評価: ${duration.toFixed(1)}ms）に合格しました。段階昇格が可能です。`
+        : `サンドボックス実実行で例外を検知したため即座に自動ロールバックを発動しました: ${vmError}`,
+      error: vmError || undefined,
+      outputPreview: sandboxOutput !== undefined ? String(sandboxOutput).slice(0, 100) : undefined,
     });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error?.message || 'カナリア実行失敗' });

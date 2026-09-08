@@ -18,29 +18,113 @@ export interface CanaryDeploymentState {
   healthStatus: 'HEALTHY' | 'DEGRADED' | 'CRITICAL';
   rollbackAvailable: boolean;
   deployedAt: string;
+  candidateCodeSnippet?: string;
+  latencyMs?: number;
+  evaluationDetails?: string;
 }
 
 class CanaryDeploymentSafetyService {
   private activeDeployments: Map<string, CanaryDeploymentState> = new Map();
 
   /**
-   * カナリア配備を開始
+   * カナリア配備を開始（サーバーサンドボックスで実実行検証）
    */
-  public startCanaryRelease(proposalId: string, targetChapter: number): CanaryDeploymentState {
-    const state: CanaryDeploymentState = {
-      proposalId,
-      targetChapter,
-      stage: 'CANARY_10',
-      trafficRatio: 0.1,
-      errorRate: 0.0,
-      healthStatus: 'HEALTHY',
-      rollbackAvailable: true,
-      deployedAt: new Date().toISOString(),
-    };
+  public async startCanaryRelease(
+    proposalId: string,
+    targetChapter: number,
+    codeSnippet?: string
+  ): Promise<CanaryDeploymentState> {
+    // 候補コードが未提供の場合はDEGRADED（未検証）として記録
+    if (!codeSnippet || !codeSnippet.trim()) {
+      const degradedState: CanaryDeploymentState = {
+        proposalId,
+        targetChapter,
+        stage: 'STAGING',
+        trafficRatio: 0.1,
+        errorRate: 0.5,
+        healthStatus: 'DEGRADED',
+        rollbackAvailable: true,
+        deployedAt: new Date().toISOString(),
+        candidateCodeSnippet: codeSnippet,
+        evaluationDetails: '候補コードが未提供のため、サンドボックス実実行をスキップ（DEGRADED / 未検証）',
+      };
+      this.activeDeployments.set(proposalId, degradedState);
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `[第127章 段階配備] 提案 ${proposalId} は候補コードが未提供のため未検証(DEGRADED)として記録しました`
+      );
+      return degradedState;
+    }
 
-    this.activeDeployments.set(proposalId, state);
-    systemLogger.info('SELF_IMPROVEMENT', `[第127章 段階配備] 提案 ${proposalId} のカナリア配備を開始 (トラフィック 10%)`);
-    return state;
+    try {
+      const res = await fetch('/api/self-code/canary-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposalId,
+          chapterNumber: targetChapter,
+          code: codeSnippet,
+          trafficRatio: 0.1,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      const isHealthy = data.healthStatus === 'HEALTHY';
+
+      const state: CanaryDeploymentState = {
+        proposalId,
+        targetChapter,
+        stage: data.stage || (isHealthy ? 'CANARY_10' : 'ROLLED_BACK'),
+        trafficRatio: data.trafficRatio ?? (isHealthy ? 0.1 : 0.0),
+        errorRate: data.errorRate ?? (isHealthy ? 0.0 : 1.0),
+        healthStatus: data.healthStatus || (isHealthy ? 'HEALTHY' : 'CRITICAL'),
+        rollbackAvailable: data.rollbackAvailable ?? true,
+        deployedAt: new Date().toISOString(),
+        candidateCodeSnippet: codeSnippet,
+        latencyMs: data.latencyMs,
+        evaluationDetails: data.decision || data.error,
+      };
+
+      this.activeDeployments.set(proposalId, state);
+
+      if (state.healthStatus === 'HEALTHY') {
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `[第127章 段階配備] 提案 ${proposalId} の実コードカナリア検証に合格しました (VM実行: ${state.latencyMs}ms, トラフィック 10%)`
+        );
+      } else {
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `🚨 [第127章 段階配備] 提案 ${proposalId} のカナリア実実行で異常を検知: ${state.evaluationDetails}`
+        );
+      }
+
+      return state;
+    } catch (err: any) {
+      const failedState: CanaryDeploymentState = {
+        proposalId,
+        targetChapter,
+        stage: 'ROLLED_BACK',
+        trafficRatio: 0.0,
+        errorRate: 1.0,
+        healthStatus: 'CRITICAL',
+        rollbackAvailable: true,
+        deployedAt: new Date().toISOString(),
+        candidateCodeSnippet: codeSnippet,
+        evaluationDetails: `カナリア実実行API通信失敗: ${err?.message || err}`,
+      };
+
+      this.activeDeployments.set(proposalId, failedState);
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `🚨 [第127章 段階配備] 提案 ${proposalId} の検証通信失敗により即時ロールバック`
+      );
+      return failedState;
+    }
   }
 
   /**

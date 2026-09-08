@@ -384,7 +384,7 @@ export class SelfCodeArchitectService {
     }
 
     // 各章に応じた実体処理を実行（機能・パラメータの最適化と記録）
-    this.executeConcreteChapterImprovement(proposal.targetChapterNumber);
+    this.executeConcreteChapterImprovement(proposal.targetChapterNumber, proposal);
 
     this.saveCompletedChapters();
     this.saveProposals();
@@ -464,7 +464,7 @@ export class SelfCodeArchitectService {
     }
 
     // 6. 各章に応じた実体処理の実行（実際の機能・パラメータの最適化）
-    this.executeConcreteChapterImprovement(targetChapter.chapterNumber);
+    this.executeConcreteChapterImprovement(targetChapter.chapterNumber, proposal);
 
     // 7. 正式適用
     const applied = this.applyProposal(proposal.id);
@@ -492,7 +492,7 @@ export class SelfCodeArchitectService {
   /**
    * 章ごとの具体的な実体改善処理
    */
-  private executeConcreteChapterImprovement(chapterNumber: number): void {
+  private executeConcreteChapterImprovement(chapterNumber: number, proposal?: SelfImprovementProposal): void {
     try {
       if (chapterNumber === 31) {
         // 第31章: 会話・コード理解を伸ばす新機能パッケージ
@@ -582,9 +582,19 @@ export class SelfCodeArchitectService {
         systemLogger.info('SELF_IMPROVEMENT', '[第83章 実体改善] 技能を抽象中間表現（Skill IR）へコンパイルし、決定論的VMに登録しました');
       } else if (chapterNumber === 127) {
         // 第127章: 改善オペレーター保護・再認証・段階配備
-        const canaryState = canaryDeploymentSafetyService.startCanaryRelease(`chap_${chapterNumber}_proposal`, 127);
-        canaryDeploymentSafetyService.promoteToFullRelease(canaryState.proposalId);
-        systemLogger.info('SELF_IMPROVEMENT', '[第127章 実体改善] カナリア段階配備（10%➔100%）および1秒自動ロールバック監視を初期化しました');
+        const proposalId = proposal?.id || `chap_${chapterNumber}_proposal`;
+        const codeSnippet = proposal?.codeSnippet;
+        canaryDeploymentSafetyService.startCanaryRelease(proposalId, 127, codeSnippet).then((canaryState) => {
+          if (canaryState.healthStatus === 'HEALTHY') {
+            canaryDeploymentSafetyService.promoteToFullRelease(canaryState.proposalId);
+            systemLogger.info('SELF_IMPROVEMENT', '[第127章 実体改善] カナリア段階配備（10%➔100%）および1秒自動ロールバック監視を初期化しました');
+          } else {
+            canaryDeploymentSafetyService.triggerImmediateRollback(canaryState.proposalId, canaryState.evaluationDetails || 'カナリア試行不合格');
+            systemLogger.warn('SELF_IMPROVEMENT', `[第127章 実体改善] カナリア実実行で異常または未検証を検知したため自動ロールバックを発動: ${canaryState.healthStatus}`);
+          }
+        }).catch((err) => {
+          systemLogger.error('SELF_IMPROVEMENT', '[第127章 実体改善] カナリア実実行監視エラー', err);
+        });
       } else if (chapterNumber === 130) {
         // 第130章: 設計思想指示書コンパイラ・規範優先順位
         specAstParserService.parseSpecificationText(130, '設計思想指示書ASTパース\n不変安全原則の最上位強制\nユーザー意図の優先解決');

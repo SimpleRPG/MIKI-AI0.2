@@ -465,7 +465,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
     // ── 手段 7: カナリア段階配備 (Canary Sandbox 10% 試行) ──
     addLiveLog(`🐤 [手段7: カナリア配備] 10%サンドボックス安全試行を実行中...`, 'purple');
     try {
-      const canary = await selfImprovementSuiteService.runCanaryTrial(proposal.id, targetChapter.chapterNumber);
+      const canary = await selfImprovementSuiteService.runCanaryTrial(proposal.id, targetChapter.chapterNumber, proposal.codeSnippet);
       addLiveLog(`✓ [カナリア合格] ステージ: ${canary.stage}, エラー率: ${canary.errorRate}%, レイテンシ: ${canary.latencyMs}ms ➔ 本番全面適用を承認`, 'success');
     } catch {
       addLiveLog(`✓ [カナリア合格] サンドボックス試行テスト合格`, 'success');

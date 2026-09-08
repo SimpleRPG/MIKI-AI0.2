@@ -2688,6 +2688,7 @@ export interface SelfImprovementProposal {
   contract: ChangeContract;
   proposalLayer: 'CONFIG' | 'CONVERSATION_SKELETON' | 'CODE_ARCHITECTURE' | 'SPEC_SYNC';
   description: string;
+  codeSnippet?: string;
   dslCommands?: string[];
   expectedScoreImprovement: number;
   invariantsCheckPassed: boolean;

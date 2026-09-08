@@ -191,12 +191,12 @@ export class SelfImprovementSuiteService {
   /**
    * 4. カナリア段階配備（1回お試し実行・自動ロールバック）
    */
-  public async runCanaryTrial(proposalId: string, chapterNumber: number): Promise<CanaryTrialResult> {
+  public async runCanaryTrial(proposalId: string, chapterNumber: number, codeSnippet?: string): Promise<CanaryTrialResult> {
     try {
       const res = await fetch('/api/self-code/canary-run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proposalId, chapterNumber }),
+        body: JSON.stringify({ proposalId, chapterNumber, code: codeSnippet }),
       });
       if (!res.ok) throw new Error(`Canary failed with status ${res.status}`);
       const data: CanaryTrialResult = await res.json();
@@ -206,15 +206,15 @@ export class SelfImprovementSuiteService {
       return {
         proposalId,
         chapterNumber,
-        stage: 'CANARY_10',
-        trafficRatio: 0.1,
-        testCount: 3,
-        passedTests: 3,
-        latencyMs: 1.4,
-        healthStatus: 'HEALTHY',
-        errorRate: 0.0,
+        stage: 'ROLLED_BACK',
+        trafficRatio: 0.0,
+        testCount: 1,
+        passedTests: 0,
+        latencyMs: 0,
+        healthStatus: 'CRITICAL',
+        errorRate: 1.0,
         rollbackAvailable: true,
-        decision: 'カナリア試行合格（オフライン安全サンドボックス検証）',
+        decision: `カナリア実実行エラー: ${err?.message || '通信失敗'}`,
         evaluatedAt: Date.now(),
       };
     }
