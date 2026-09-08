@@ -2397,6 +2397,122 @@ const INITIAL_LESSONS = [
 ];
 
 // 1. Multi-Agent レビュー評議会
+// ── 自己コード品質・安全ゲート (Council Review) の共通評価ロジック ──
+// council-review エンドポイントと autonomous-implement の自動適用ゲートの両方から
+// 同一の基準で呼び出す。判定基準を二重管理しないための単一情報源。
+function evaluateCouncilReview(codeText: string) {
+  // --- SecOps Miki 評価 ---
+  const secOpsChecks: Array<{ label: string; passed: boolean; note: string }> = [];
+  let secScore = 100;
+
+  const hasEval = /\beval\s*\(/.test(codeText) || /\bFunction\s*\(/.test(codeText);
+  secOpsChecks.push({
+    label: '危険な動的実行 (eval / Function) の遮断',
+    passed: !hasEval,
+    note: hasEval ? '危険な動的コード実行を検出しました' : '動的コード実行なし (安全)',
+  });
+  if (hasEval) secScore -= 40;
+
+  const hasRawStorage = /localStorage\.setItem\s*\(\s*['"][^'"]*token/i.test(codeText);
+  secOpsChecks.push({
+    label: '認証情報・機密平文保存の防止',
+    passed: !hasRawStorage,
+    note: hasRawStorage ? 'ローカルストレージへの直接平文保存を警告' : 'プライバシー隔離チェック合格',
+  });
+  if (hasRawStorage) secScore -= 30;
+
+  const hasSanitizedInput = !/innerHTML\s*=/.test(codeText);
+  secOpsChecks.push({
+    label: 'XSS脆弱性 (innerHTML等) の不使用',
+    passed: hasSanitizedInput,
+    note: hasSanitizedInput ? 'DOM直接挿入リスクなし' : 'innerHTMLによる直接挿入リスクを検出',
+  });
+  if (!hasSanitizedInput) secScore -= 25;
+
+  // --- Clean Code Miki 評価 ---
+  const cleanChecks: Array<{ label: string; passed: boolean; note: string }> = [];
+  let cleanScore = 100;
+
+  const hasAnyType = /:\s*any\b/.test(codeText);
+  cleanChecks.push({
+    label: '厳格型定義 (any型の完全排除)',
+    passed: !hasAnyType,
+    note: hasAnyType ? 'any型の使用を検出。具体的な型またはunknownへの変更を推奨' : '厳格型安全（anyゼロ）達成',
+  });
+  if (hasAnyType) cleanScore -= 20;
+
+  const hasExplicitExports = /export\s+(class|interface|type|const|function)\b/.test(codeText);
+  cleanChecks.push({
+    label: 'モジュール明確性 (明示的なエクスポート)',
+    passed: hasExplicitExports,
+    note: hasExplicitExports ? 'パブリックインターフェースが明瞭に定義されています' : 'エクスポート宣言が不足しています',
+  });
+  if (!hasExplicitExports) cleanScore -= 25;
+
+  const lineCount = codeText.split('\n').length;
+  const isAppropriateLength = lineCount <= 350;
+  cleanChecks.push({
+    label: '単一責任の原則 (凝集度の維持)',
+    passed: isAppropriateLength,
+    note: isAppropriateLength ? `モジュール行数 (${lineCount}行) は適切です` : `行数が${lineCount}行と肥大化しています。分割を検討してください`,
+  });
+  if (!isAppropriateLength) cleanScore -= 15;
+
+  // --- Test QA Miki 評価 ---
+  const qaChecks: Array<{ label: string; passed: boolean; note: string }> = [];
+  let qaScore = 100;
+
+  const hasErrorHandling = /try\s*\{/.test(codeText) || /throw\s+new\b/.test(codeText) || /return\s+false\b/.test(codeText);
+  qaChecks.push({
+    label: '例外・異常系の防御ハンドリング',
+    passed: hasErrorHandling,
+    note: hasErrorHandling ? 'フォールバックまたは例外処理が存在します' : '異常系入力に対するガードが不足しています',
+  });
+  if (!hasErrorHandling) qaScore -= 25;
+
+  const hasParameterGuards = /if\s*\(![a-zA-Z0-9_]+\)/.test(codeText) || /typeof\s+[a-zA-Z0-9_]+\s*!==/.test(codeText) || /\?\./.test(codeText);
+  qaChecks.push({
+    label: '境界値・null/undefined ガード',
+    passed: hasParameterGuards,
+    note: hasParameterGuards ? 'オプショナルチェーンまたはnullガード完備' : '引数の境界値検証を強化してください',
+  });
+  if (!hasParameterGuards) qaScore -= 20;
+
+  const secPassed = secScore >= 80;
+  const cleanPassed = cleanScore >= 80;
+  const qaPassed = qaScore >= 80;
+  const overallScore = Math.round((secScore + cleanScore + qaScore) / 3);
+  const unanimousApproval = secPassed && cleanPassed && qaPassed;
+
+  return {
+    overallScore,
+    unanimousApproval,
+    council: {
+      secOps: {
+        role: 'セキュリティ監査官 (SecOps Miki)',
+        score: Math.max(0, secScore),
+        status: secPassed ? 'APPROVED' : 'REVISE',
+        checks: secOpsChecks,
+        critique: secPassed ? 'セキュリティ・プライバシー不変条件を完全順守しています。' : '機密保護または安全性の向上余地があります。',
+      },
+      cleanCode: {
+        role: 'チーフアーキテクト (Clean Code Miki)',
+        score: Math.max(0, cleanScore),
+        status: cleanPassed ? 'APPROVED' : 'REVISE',
+        checks: cleanChecks,
+        critique: cleanPassed ? 'SOLID原則・厳格な型安全性を維持した美しい設計です。' : '型宣言の具体化またはモジュール凝集度の改善を推奨します。',
+      },
+      testQA: {
+        role: 'リードQAテスター (Test QA Miki)',
+        score: Math.max(0, qaScore),
+        status: qaPassed ? 'APPROVED' : 'REVISE',
+        checks: qaChecks,
+        critique: qaPassed ? 'エッジケース・異常系のフェイルセーフが組み込まれています。' : '引数境界値（null/空値）へのフェイルセーフ追加を推奨します。',
+      },
+    },
+  };
+}
+
 app.post('/api/self-code/council-review', (req, res) => {
   try {
     const { code, filename = 'autonomous_spec.ts', chapterNumber = 1 } = req.body;
@@ -2404,120 +2520,14 @@ app.post('/api/self-code/council-review', (req, res) => {
       return res.status(400).json({ error: 'コードが指定されていません' });
     }
 
-    const sourceFile = ts.createSourceFile(filename, code, ts.ScriptTarget.ES2022, true);
-    const codeText = code;
-
-    // --- SecOps Miki 評価 ---
-    const secOpsChecks: Array<{ label: string; passed: boolean; note: string }> = [];
-    let secScore = 100;
-
-    const hasEval = /\beval\s*\(/.test(codeText) || /\bFunction\s*\(/.test(codeText);
-    secOpsChecks.push({
-      label: '危険な動的実行 (eval / Function) の遮断',
-      passed: !hasEval,
-      note: hasEval ? '危険な動的コード実行を検出しました' : '動的コード実行なし (安全)',
-    });
-    if (hasEval) secScore -= 40;
-
-    const hasRawStorage = /localStorage\.setItem\s*\(\s*['"][^'"]*token/i.test(codeText);
-    secOpsChecks.push({
-      label: '認証情報・機密平文保存の防止',
-      passed: !hasRawStorage,
-      note: hasRawStorage ? 'ローカルストレージへの直接平文保存を警告' : 'プライバシー隔離チェック合格',
-    });
-    if (hasRawStorage) secScore -= 30;
-
-    const hasSanitizedInput = !/innerHTML\s*=/.test(codeText);
-    secOpsChecks.push({
-      label: 'XSS脆弱性 (innerHTML等) の不使用',
-      passed: hasSanitizedInput,
-      note: hasSanitizedInput ? 'DOM直接挿入リスクなし' : 'innerHTMLによる直接挿入リスクを検出',
-    });
-    if (!hasSanitizedInput) secScore -= 25;
-
-    // --- Clean Code Miki 評価 ---
-    const cleanChecks: Array<{ label: string; passed: boolean; note: string }> = [];
-    let cleanScore = 100;
-
-    const hasAnyType = /:\s*any\b/.test(codeText);
-    cleanChecks.push({
-      label: '厳格型定義 (any型の完全排除)',
-      passed: !hasAnyType,
-      note: hasAnyType ? 'any型の使用を検出。具体的な型またはunknownへの変更を推奨' : '厳格型安全（anyゼロ）達成',
-    });
-    if (hasAnyType) cleanScore -= 20;
-
-    const hasExplicitExports = /export\s+(class|interface|type|const|function)\b/.test(codeText);
-    cleanChecks.push({
-      label: 'モジュール明確性 (明示的なエクスポート)',
-      passed: hasExplicitExports,
-      note: hasExplicitExports ? 'パブリックインターフェースが明瞭に定義されています' : 'エクスポート宣言が不足しています',
-    });
-    if (!hasExplicitExports) cleanScore -= 25;
-
-    const lineCount = codeText.split('\n').length;
-    const isAppropriateLength = lineCount <= 350;
-    cleanChecks.push({
-      label: '単一責任の原則 (凝集度の維持)',
-      passed: isAppropriateLength,
-      note: isAppropriateLength ? `モジュール行数 (${lineCount}行) は適切です` : `行数が${lineCount}行と肥大化しています。分割を検討してください`,
-    });
-    if (!isAppropriateLength) cleanScore -= 15;
-
-    // --- Test QA Miki 評価 ---
-    const qaChecks: Array<{ label: string; passed: boolean; note: string }> = [];
-    let qaScore = 100;
-
-    const hasErrorHandling = /try\s*\{/.test(codeText) || /throw\s+new\b/.test(codeText) || /return\s+false\b/.test(codeText);
-    qaChecks.push({
-      label: '例外・異常系の防御ハンドリング',
-      passed: hasErrorHandling,
-      note: hasErrorHandling ? 'フォールバックまたは例外処理が存在します' : '異常系入力に対するガードが不足しています',
-    });
-    if (!hasErrorHandling) qaScore -= 25;
-
-    const hasParameterGuards = /if\s*\(![a-zA-Z0-9_]+\)/.test(codeText) || /typeof\s+[a-zA-Z0-9_]+\s*!==/.test(codeText) || /\?\./.test(codeText);
-    qaChecks.push({
-      label: '境界値・null/undefined ガード',
-      passed: hasParameterGuards,
-      note: hasParameterGuards ? 'オプショナルチェーンまたはnullガード完備' : '引数の境界値検証を強化してください',
-    });
-    if (!hasParameterGuards) qaScore -= 20;
-
-    const secPassed = secScore >= 80;
-    const cleanPassed = cleanScore >= 80;
-    const qaPassed = qaScore >= 80;
-    const overallScore = Math.round((secScore + cleanScore + qaScore) / 3);
-    const unanimousApproval = secPassed && cleanPassed && qaPassed;
+    const review = evaluateCouncilReview(code);
 
     return res.json({
       success: true,
       chapterNumber,
-      overallScore,
-      unanimousApproval,
-      council: {
-        secOps: {
-          role: 'セキュリティ監査官 (SecOps Miki)',
-          score: Math.max(0, secScore),
-          status: secPassed ? 'APPROVED' : 'REVISE',
-          checks: secOpsChecks,
-          critique: secPassed ? 'セキュリティ・プライバシー不変条件を完全順守しています。' : '機密保護または安全性の向上余地があります。',
-        },
-        cleanCode: {
-          role: 'チーフアーキテクト (Clean Code Miki)',
-          score: Math.max(0, cleanScore),
-          status: cleanPassed ? 'APPROVED' : 'REVISE',
-          checks: cleanChecks,
-          critique: cleanPassed ? 'SOLID原則・厳格な型安全性を維持した美しい設計です。' : '型宣言の具体化またはモジュール凝集度の改善を推奨します。',
-        },
-        testQA: {
-          role: 'リードQAテスター (Test QA Miki)',
-          score: Math.max(0, qaScore),
-          status: qaPassed ? 'APPROVED' : 'REVISE',
-          checks: qaChecks,
-          critique: qaPassed ? 'エッジケース・異常系のフェイルセーフが組み込まれています。' : '引数境界値（null/空値）へのフェイルセーフ追加を推奨します。',
-        },
-      },
+      overallScore: review.overallScore,
+      unanimousApproval: review.unanimousApproval,
+      council: review.council,
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || '評議会レビュー失敗' });
@@ -2529,51 +2539,101 @@ app.post('/api/self-code/unit-test-run', (req, res) => {
   try {
     const { code, moduleName = 'ChapterModule', chapterNumber = 1 } = req.body;
     const codeText = code || '';
+    if (!codeText) {
+      return res.status(400).json({ success: false, error: 'コードが指定されていません' });
+    }
 
-    // テストケースの動的シミュレーション評価
-    const tests = [
+    // 【不変原則】渡されたコードを実際に実行せずに合格を返してはならない。
+    // 以下、実コードをサンドボックス実行し、実測できた範囲のみ passed を判定する。
+    let executionError = '';
+    let moduleExports: Record<string, any> = {};
+
+    try {
+      const jsCode = ts.transpileModule(codeText, {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+      }).outputText;
+
+      const exportsObj: Record<string, any> = {};
+      const moduleObj = { exports: exportsObj };
+      const sandbox = {
+        console: { log: () => {}, warn: () => {}, error: () => {} },
+        Math, Date, JSON, String, Number, Array, Object, Boolean, RegExp, Map, Set,
+        parseInt, parseFloat, isNaN, isFinite,
+        exports: exportsObj,
+        module: moduleObj,
+        require: (id: string) => {
+          throw new Error(`外部依存 '${id}' はサンドボックス内では解決できないため、単体テストの対象外とします`);
+        },
+      };
+      const script = new vm.Script(jsCode, { filename: 'candidate_under_test.js' });
+      const ctx = vm.createContext(sandbox);
+      script.runInContext(ctx, { timeout: 1500 });
+      moduleExports = moduleObj.exports || exportsObj;
+    } catch (execErr: any) {
+      executionError = execErr?.message || '実行時エラーが発生しました';
+    }
+
+    const exportedNames = Object.keys(moduleExports || {});
+
+    // test-1: モジュールが実際にロード・実行でき、何らかのエクスポートが存在するか (実測)
+    const test1Passed = !executionError && exportedNames.length > 0;
+    const tests: Array<{ id: string; title: string; assertion: string; passed: boolean; durationMs: number; note: string }> = [
       {
         id: 'test-1',
-        title: '正常系: モジュール初期化と主要エクスポート確認',
+        title: '正常系: モジュールの実行とエクスポート存在確認',
         assertion: `expect(typeof ${moduleName}).not.toBe('undefined')`,
-        passed: codeText.length > 20,
+        passed: test1Passed,
         durationMs: 1.2,
-      },
-      {
-        id: 'test-2',
-        title: '境界値: 空引数/null入力時のフェイルセーフ動作',
-        assertion: `expect(() => ${moduleName}.execute(null)).not.toThrow()`,
-        passed: true,
-        durationMs: 2.1,
-      },
-      {
-        id: 'test-3',
-        title: '不変条件: Qwen 3Bコアおよび安全性契約の整合性',
-        assertion: `expect(invariantsPassed).toBe(true)`,
-        passed: true,
-        durationMs: 0.8,
-      },
-      {
-        id: 'test-4',
-        title: '例外処理: 意図しない入力に対する堅牢性',
-        assertion: `expect(result.status).toMatch(/OK|PASS/)`,
-        passed: true,
-        durationMs: 1.5,
-      },
-      {
-        id: 'test-5',
-        title: '性能ベンチマーク: 1000回反復実行が20ms以内',
-        assertion: `expect(elapsedTime).toBeLessThan(20)`,
-        passed: true,
-        durationMs: 3.4,
+        note: executionError
+          ? `実行エラー: ${executionError}`
+          : `検出されたエクスポート: ${exportedNames.join(', ') || 'なし'}`,
       },
     ];
 
+    // test-2: 主要エクスポート (クラス/関数) の初期化・呼び出しを実際に試行 (実測)
+    let instantiationOk = false;
+    let instantiationNote = '実行可能なクラス/関数エクスポートが見つかりませんでした';
+    if (!executionError) {
+      for (const name of exportedNames) {
+        const candidate = moduleExports[name];
+        if (typeof candidate !== 'function') continue;
+        try {
+          const looksLikeClass = Boolean(candidate.prototype) && Object.getOwnPropertyNames(candidate.prototype).length > 1;
+          if (looksLikeClass) {
+            // eslint-disable-next-line new-cap
+            new candidate();
+          } else {
+            candidate();
+          }
+          instantiationOk = true;
+          instantiationNote = `${name} の初期化・呼び出しに成功しました`;
+          break;
+        } catch (instErr: any) {
+          instantiationNote = `${name} の初期化・呼び出し中にエラー: ${instErr?.message || instErr}`;
+        }
+      }
+    }
+    tests.push({
+      id: 'test-2',
+      title: '境界値: 主要エクスポートの初期化・呼び出し試行',
+      assertion: `expect(() => new ${moduleName}()).not.toThrow()`,
+      passed: instantiationOk,
+      durationMs: 2.1,
+      note: instantiationNote,
+    });
+
+    // test-3: 実行時例外なくロードできたか (不変条件の一次近似。詳細は council-review 側の静的解析が担う)
+    tests.push({
+      id: 'test-3',
+      title: '不変条件: サンドボックス実行時に例外が発生しないこと',
+      assertion: `expect(loadError).toBeNull()`,
+      passed: !executionError,
+      durationMs: 0.8,
+      note: executionError ? '実行に失敗したため不変条件を確認できませんでした' : '実行時エラーなし',
+    });
+
     const passedCount = tests.filter((t) => t.passed).length;
     const totalCount = tests.length;
-    const lineCoverage = 94.8;
-    const branchCoverage = 91.2;
-    const functionCoverage = 100.0;
 
     return res.json({
       success: true,
@@ -2582,12 +2642,10 @@ app.post('/api/self-code/unit-test-run', (req, res) => {
       allPassed: passedCount === totalCount,
       passedCount,
       totalCount,
-      coverage: {
-        lines: lineCoverage,
-        branches: branchCoverage,
-        functions: functionCoverage,
-        overall: Math.round((lineCoverage + branchCoverage + functionCoverage) / 3),
-      },
+      measured: true, // このテスト結果が実行に基づく実測であることを明示するフラグ
+      executionError: executionError || null,
+      // カバレッジは行トレース計測を実装していないため、架空の数値を返さず null とする。
+      coverage: null,
       tests,
       generatedVitestSnippet: `import { describe, it, expect } from 'vitest';\nimport { ${moduleName} } from './chapter_${chapterNumber}';\n\ndescribe('第${chapterNumber}章 ${moduleName} TDD仕様適合テスト', () => {\n  it('正常に初期化され、不変条件を満たすこと', () => {\n    const instance = new ${moduleName}();\n    expect(instance).toBeDefined();\n  });\n});`,
     });
@@ -3063,10 +3121,18 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
       syntaxError = tErr?.message || 'TypeScript構文エラー';
     }
 
-    // 5. 実際のファイル書き込み（autoApply が true かつ構文検証パス時）
+    // 4.5 品質・安全ゲート (Council Review)
+    // 【不変原則】構文が壊れていないだけでは適用してはならない。
+    // セキュリティ (eval/機密平文保存/XSS)・クリーンコード・QA観点の自動レビューに
+    // 合格した場合のみ自動適用する。生成コードを検証なしに書き込むことは、
+    // このサーバー自身が council-review エンドポイントで課している基準への違反となる。
+    const qualityGate = evaluateCouncilReview(generatedCode);
+    const qualityGatePassed = qualityGate.unanimousApproval;
+
+    // 5. 実際のファイル書き込み（autoApply が true かつ構文検証・品質ゲートの両方をパス時のみ）
     let applied = false;
     let commitHash = '';
-    if (autoApply && syntaxCheckPassed) {
+    if (autoApply && syntaxCheckPassed && qualityGatePassed) {
       const targetDir = path.dirname(fullPath);
       if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
@@ -3087,6 +3153,8 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
         });
         fs.writeFileSync(COMMITS_FILE, JSON.stringify(commits.slice(0, 50), null, 2), 'utf-8');
       } catch {}
+    } else if (autoApply && syntaxCheckPassed && !qualityGatePassed) {
+      reasoning += ` ⚠️ 品質・安全ゲート未合格のため自動適用を中止しました (総合スコア: ${qualityGate.overallScore}点)。生成コードは確認用としてのみ返却します。`;
     }
 
     return res.json({
@@ -3099,13 +3167,18 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
       applied,
       syntaxCheckPassed,
       syntaxError: syntaxCheckPassed ? null : syntaxError,
+      qualityGatePassed,
+      qualityGateScore: qualityGate.overallScore,
+      qualityGateReport: qualityGate,
       reasoning,
       code: generatedCode,
       originalContent: originalContent || '',
       linesCount: generatedCode.split('\n').length,
       lesson: {
         title: `自律実装: ${prompt.slice(0, 30)}`,
-        rule: `${targetFile} に新機能モジュールを安全に構築し、構文検証をパスしました。`,
+        rule: applied
+          ? `${targetFile} に新機能モジュールを安全に構築し、構文検証と品質・安全ゲートの両方をパスしました。`
+          : `${targetFile} 向けにコードを生成しましたが、品質・安全ゲート未合格のため自動適用は行いませんでした。`,
       },
     });
   } catch (err: any) {
