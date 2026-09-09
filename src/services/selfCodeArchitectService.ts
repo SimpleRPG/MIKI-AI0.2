@@ -35,6 +35,9 @@ import { formalProofService, SkillContract } from './formalProofService';
 import { sandboxPermissionService } from './sandboxPermissionService';
 import { privacyGuardrailService } from './privacyGuardrailService';
 import { mikiSelfCodingSuperchargerService } from './mikiSelfCodingSuperchargerService';
+import { counterfactualReasoningService } from './counterfactualReasoningService';
+import { latentIntentMiningService } from './latentIntentMiningService';
+import { metacognitiveCalibrationService } from './metacognitiveCalibrationService';
 import { apiUrl, getCustomApiHeaders } from './api';
 
 
@@ -619,7 +622,7 @@ export class SelfCodeArchitectService {
 
     if (!targetChapter) {
       // ドリフトまたは未実装から優先度順に探索
-      const priorityOrder = [31, 33, 54, 27, 51, 57, 59, 69, 80, 83, 125, 155, 167, 169];
+      const priorityOrder = [38, 37, 36, 31, 33, 54, 27, 51, 57, 59, 69, 80, 83, 125, 155, 167, 169];
       for (const chapNum of priorityOrder) {
         const found = SPECIFICATION_REGISTRY.find((c) => c.chapterNumber === chapNum && c.status !== 'COMPLETED');
         if (found) {
@@ -727,6 +730,27 @@ export class SelfCodeArchitectService {
           proactiveContextOsService.perceiveCurrentContext(contextGoal);
           systemLogger.info('SELF_IMPROVEMENT', `[第${chapterNumber}章 実体改善] 状況認識センサー・先行予測サジェスト(${contextGoal})を同期しました`);
         }
+      } else if (chapterNumber === 36) {
+        // 第36章: 反実仮想推論・もしものシミュレーション
+        const topic = resolvedProposal?.title || '自律改善決定における反実仮想シミュレーション';
+        const factual = resolvedProposal?.contract?.objective || '標準パイプラインによる自己コード改善';
+        const context = resolvedProposal?.description || '変更契約に基づくパラメータおよび処理パイプラインのチューニング';
+        const simResult = counterfactualReasoningService.simulateBranchReasoning(topic, factual, context);
+        systemLogger.info('SELF_IMPROVEMENT', `[第36章 実体改善] 反実仮想推論・分岐シミュレーションを実走記録しました: ${simResult.conclusion}`);
+      } else if (chapterNumber === 37) {
+        // 第37章: 多段意図推定・潜在欲求マイニング
+        const sampleInput = resolvedProposal?.contract?.objective || resolvedProposal?.description || 'ユーザーの潜在ゴールとマルチターン意図追跡';
+        const trace = latentIntentMiningService.trackMultiTurnIntent(sampleInput);
+        systemLogger.info('SELF_IMPROVEMENT', `[第37章 実体改善] 多段意図推定・潜在ゴールマイニングを実走同期しました: ${trace.latentGoal}`);
+      } else if (chapterNumber === 38) {
+        // 第38章: メタ認知モニタリング・自己確信度較正
+        const sampleClaim = resolvedProposal?.contract?.objective || resolvedProposal?.description || '提案コードの確信度と過信抑制キャリブレーション';
+        const calib = metacognitiveCalibrationService.calibrateConfidence(
+          resolvedProposal?.title || '自律改善決定',
+          sampleClaim,
+          { domain: 'typescript', hasTestRun: true }
+        );
+        systemLogger.info('SELF_IMPROVEMENT', `[第38章 実体改善] メタ認知モニタリング・自己確信度較正を実走同期しました: 較正後確信度=${calib.calibratedConfidence}% (${calib.calibrationAction})`);
       } else if (chapterNumber === 57) {
         // 第57章: デジタル研究ノート (優先度1: 失敗・退行も誠実に記録)
         const simulated = resolvedProposal?.simulatedDelta;
@@ -1005,7 +1029,7 @@ export class SelfCodeArchitectService {
     const initialScore = initialAudit.complianceScore;
     const improvedChapters: SpecificationChapterMeta[] = [];
 
-    const priorityOrder = [31, 33, 34, 35, 54, 57, 69, 155, 59, 80, 83, 127, 130, 167, 169];
+    const priorityOrder = [38, 37, 36, 31, 33, 34, 35, 54, 57, 69, 155, 59, 80, 83, 127, 130, 167, 169];
 
     for (const chapNum of priorityOrder) {
       if (improvedChapters.length >= maxCount) break;

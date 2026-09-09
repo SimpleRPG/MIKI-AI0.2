@@ -229,8 +229,10 @@ export class BackgroundWorkerService {
     // 2. Network Information
     if (typeof navigator !== 'undefined') {
       this.networkState.isOnline = navigator.onLine;
-      window.addEventListener('online', () => (this.networkState.isOnline = true));
-      window.addEventListener('offline', () => (this.networkState.isOnline = false));
+      if (typeof window !== 'undefined') {
+        window.addEventListener('online', () => (this.networkState.isOnline = true));
+        window.addEventListener('offline', () => (this.networkState.isOnline = false));
+      }
 
       const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
       if (conn) {

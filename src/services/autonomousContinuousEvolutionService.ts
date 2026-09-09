@@ -263,7 +263,7 @@ export class AutonomousContinuousEvolutionService {
   } {
     // 1. 仕様書の未実装章または優先章から選定
     const unimplemented = selfCodeArchitectService.getUnimplementedChapters();
-    const priorityChapters = [31, 33, 34, 35, 54, 57, 69, 155, 59, 80, 83, 127, 130, 167, 169];
+    const priorityChapters = [38, 37, 36, 31, 33, 34, 35, 54, 57, 69, 155, 59, 80, 83, 127, 130, 167, 169];
 
     for (const num of priorityChapters) {
       const match = unimplemented.find((u) => u.chapterNumber === num);

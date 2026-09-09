@@ -679,7 +679,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
     "id": "chap_36",
     "title": "反実仮想推論・もしものシミュレーション",
     "category": "DEEP_COGNITION",
-    "status": "UNIMPLEMENTED",
+    "status": "COMPLETED",
     "versionAdded": "v5.0",
     "summary": "過去の会話やコード決定における「もし別の選択をしていたら」の反実仮想検証。",
     "keyRequirements": [
@@ -687,7 +687,9 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "分岐推論シミュレーション"
     ],
     "responsibleServices": [
-      "selfCodeArchitectService.ts"
+      "selfCodeArchitectService.ts",
+      "counterfactualReasoningService.ts",
+      "chapter_36.ts"
     ],
     "responsibleComponents": [
       "SelfCodeArchitectTab.tsx"
@@ -703,7 +705,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
     "id": "chap_37",
     "title": "多段意図推定・潜在欲求マイニング",
     "category": "DEEP_COGNITION",
-    "status": "UNIMPLEMENTED",
+    "status": "COMPLETED",
     "versionAdded": "v5.0",
     "summary": "ユーザーの曖昧な発話から真の目的や背後の課題を掘り下げて推論する。",
     "keyRequirements": [
@@ -711,7 +713,9 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "マルチターン意図追跡"
     ],
     "responsibleServices": [
-      "selfCodeArchitectService.ts"
+      "selfCodeArchitectService.ts",
+      "latentIntentMiningService.ts",
+      "chapter_37.ts"
     ],
     "responsibleComponents": [
       "SelfCodeArchitectTab.tsx"
@@ -727,7 +731,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
     "id": "chap_38",
     "title": "メタ認知モニタリング・自己確信度較正",
     "category": "DEEP_COGNITION",
-    "status": "UNIMPLEMENTED",
+    "status": "COMPLETED",
     "versionAdded": "v5.0",
     "summary": "回答や推論に対する自信度を自己測定し、過信やハルシネーションを自己抑制。",
     "keyRequirements": [
@@ -735,7 +739,9 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "過信防止キャリブレーション"
     ],
     "responsibleServices": [
-      "selfCodeArchitectService.ts"
+      "selfCodeArchitectService.ts",
+      "metacognitiveCalibrationService.ts",
+      "chapter_38.ts"
     ],
     "responsibleComponents": [
       "SelfCodeArchitectTab.tsx"

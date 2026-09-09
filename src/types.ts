@@ -2533,6 +2533,97 @@ export interface CounterfactualReflectionItem {
   createdAt: number;
 }
 
+/**
+ * 設計思想 第36章: 反実仮想推論・もしものシミュレーション
+ */
+export interface CounterfactualScenario {
+  id: string;
+  name: string;
+  condition: string; // "もし〜だったら"
+  alternativeChoice: string;
+  hypothesis: string;
+}
+
+export interface CounterfactualEvaluationResult {
+  scenarioId: string;
+  scenarioName: string;
+  factualOutcome: string;
+  counterfactualOutcome: string;
+  safetyScore: number; // 0-100
+  performanceScore: number; // 0-100
+  accuracyScore: number; // 0-100
+  overallDeltaScore: number; // -100 to +100 (反実仮想の相対改善度)
+  recommendation: 'ADOPT_COUNTERFACTUAL' | 'MAINTAIN_FACTUAL' | 'INCONCLUSIVE';
+  reasoning: string;
+  invariantsPassed: boolean;
+}
+
+export interface BranchReasoningSimulation {
+  id: string;
+  timestamp: number;
+  topic: string;
+  contextSummary: string;
+  factualDecision: string;
+  scenarios: CounterfactualScenario[];
+  evaluations: CounterfactualEvaluationResult[];
+  bestAlternative?: CounterfactualEvaluationResult;
+  conclusion: string;
+}
+
+/**
+ * 設計思想 第37章: 多段意図推定・潜在欲求マイニング
+ */
+export interface LatentGoalInference {
+  surfaceIntent: string;
+  latentGoal: string;
+  unexpressedNeeds: string[];
+  confidenceScore: number; // 0-100
+  urgencyLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+  suggestedProactiveAction: string;
+}
+
+export interface MultiTurnIntentTrace {
+  turnIndex: number;
+  utterance: string;
+  inferredIntent: string;
+  latentGoal: string;
+  intentShiftDetected: boolean;
+  shiftReason?: string;
+  clarityScore: number; // 0-100
+  timestamp: number;
+}
+
+export interface MultiTurnIntentSession {
+  id: string;
+  topic: string;
+  traces: MultiTurnIntentTrace[];
+  overallLatentGoal: string;
+  resolvedNeeds: string[];
+  pendingNeeds: string[];
+  updatedAt: number;
+}
+
+/**
+ * 設計思想 第38章: メタ認知モニタリング・自己確信度較正
+ */
+export interface MetacognitiveCalibrationResult {
+  id: string;
+  timestamp: number;
+  topic: string;
+  rawConfidence: number; // 0-100
+  calibratedConfidence: number; // 0-100 (過信抑制ペナルティ適用後)
+  overconfidenceRisk: 'LOW' | 'MEDIUM' | 'HIGH';
+  calibrationAction: 'PROCEED' | 'ATTACH_HEDGE' | 'REQUEST_VERIFICATION' | 'FALLBACK_TO_SAFE';
+  calibrationPenalty: number;
+  factors: {
+    factualGroundingScore: number;
+    syntaxValidityScore: number;
+    constraintSatisfactionScore: number;
+    domainFamiliarityScore: number;
+  };
+  humilityNotes: string[];
+}
+
 // 3. 自律成長レポート (Autonomous Growth Report)
 export interface AutonomousGrowthReport {
   id: string;
