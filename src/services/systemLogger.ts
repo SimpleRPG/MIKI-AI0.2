@@ -24,6 +24,7 @@ export interface SystemLogEntry {
     | 'VBA_DESIGN_ASSISTANT'
     | 'VIRTUAL_TRAINING'
     | 'TASK_PLAN'
+    | 'STATE_EXTRACTION'
     | 'PRIVACY';
   message: string;
   details?: any;

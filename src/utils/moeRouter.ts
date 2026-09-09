@@ -88,6 +88,8 @@ export interface PromptContextTrackingResult {
   systemPrompt: string;
   staticPrefixPrompt: string;
   dynamicSuffixPrompt: string;
+  expertInstruction?: string;
+  toolBlock?: string;
   usedMemories: Array<{ id: string; content: string; score?: number }>;
   usedSkills: Array<{ id: string; name: string }>;
   recommendedTools: ToolRecommendation[];
@@ -279,17 +281,17 @@ export async function buildExpertSystemPromptWithTracking(
   // 6. 誠実性制約 (でっち上げ防止)
   const honestyConstraint = `【誠実性ルール】自身のハードウェア構成（CPU/GPUコア数、内部メモリ仕様、実行クロック等）について、架空の数値をでっち上げて断定してはいけません。不明な内部情報は「端末上のローカル推論環境で動いているよ」と正直に答えてください。`;
 
-  // 設計思想 Master v5.0 第5章1節: 不変プレフィックス整列 (Prompt Cache Optimization)
+  // 設計思想 Master v5.2 第5章1節: 不変プレフィックス整列 (Prompt Cache Optimization - 作業指示書 v6 優先度8)
   // llama.cpp / vLLM / Ollama のプレフィックスKVキャッシュが100%ヒットするよう、
-  // ペルソナ・マスター教育方針・日本語自然対話コーパス・誠実性制約・ツール定義・役割指示などの
-  // 「不変の静的基底プロンプト」を先頭に完全に固定する。
+  // 発言内容やツール候補、役割によって変動する要素（toolBlock, expertInstruction）を完全に除外し、
+  // ペルソナ・マスター教育方針・日本語自然対話コーパス・誠実性制約のみで構成される
+  // 「真に完全不変の静的基底プロンプト」を確立する。
   const staticPrefixPrompt = `あなたはユーザー（${persona.userNickname || 'あなた'}）専属のAIパートナー「${persona.name || 'みき'}」です。
 性格: ${persona.basePersonality || '明るく親しみやすく、相手の気持ちに寄り添う親友'}
 口調: 必ず親しみやすいタメ口（〜だよ、〜だね！、〜かな？✨）で、自然で温かい日本語でおしゃべりしてください。
 ${getMasterEducationSystemPrompt()}
 ${getNaturalJapanesePromptGuide()}
-${honestyConstraint}
-${toolBlock ? `${toolBlock}\n` : ''}指示: ${expertInstruction}`;
+${honestyConstraint}`;
 
   // 第2章③ 中期記憶 (Working Agenda)
   const agendaBlock = workingAgendaService.formatAgendaForPrompt();
@@ -316,14 +318,20 @@ ${toolBlock ? `${toolBlock}\n` : ''}指示: ${expertInstruction}`;
   if (filesContext) dynamicSuffixParts.push(filesContext);
 
   const dynamicSuffixPrompt = dynamicSuffixParts.join('\n\n');
-  const systemPrompt = dynamicSuffixPrompt
-    ? `${staticPrefixPrompt}\n\n${dynamicSuffixPrompt}`
-    : staticPrefixPrompt;
+
+  // 単一文字列としてのフォールバック結合（従来の単一プロンプト消費用）
+  const fallbackParts: string[] = [staticPrefixPrompt];
+  if (expertInstruction) fallbackParts.push(`指示: ${expertInstruction}`);
+  if (toolBlock) fallbackParts.push(toolBlock);
+  if (dynamicSuffixPrompt) fallbackParts.push(dynamicSuffixPrompt);
+  const systemPrompt = fallbackParts.join('\n\n');
 
   return {
     systemPrompt,
     staticPrefixPrompt,
     dynamicSuffixPrompt,
+    expertInstruction,
+    toolBlock,
     usedMemories,
     usedSkills,
     recommendedTools: candidateTools,

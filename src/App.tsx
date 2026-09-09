@@ -1860,15 +1860,17 @@ export default function App() {
       };
       const stateSummary = formatConversationStateForPrompt(currentConvStateWithLength);
 
-      // 設計思想 Master v5.2 第15章6節: プロンプトキャッシュ最適化 (Prompt Cache Alignment - 作業指示書 v5 是正版)
+      // 設計思想 Master v5.2 第15章6節: プロンプトキャッシュ最適化 (Prompt Cache Alignment - 作業指示書 v6 優先度8 & 優先度1 是正版)
       // DYNAMIC CONTEXTの要素を「不変度が高い順」に厳格整列する:
-      // 1. 静的プレフィックス (staticPrefixPrompt) - 完全固定
-      // 2. 会話状態JSON指示 (CONVERSATION_STATE_INSTRUCTION) - 完全固定なので最優先
+      // 1. 静的プレフィックス (staticPrefixPrompt) - 完全固定（発言内容・ツール・役割に依存しない純粋な基底ペルソナ・ガイド・誠実性制約）
+      // 2. 会話状態JSON指示 (CONVERSATION_STATE_INSTRUCTION) - 完全固定（軽量版JSON指示）
       // 3. 回答設計の原則 (responseDesignInstruction) - 準動的(6パターン)。直前ターンと同じlength/stageならキャッシュがここまで延長
-      // 4. 想起記憶 (promptBuildResult.dynamicSuffixPrompt) - 動的
-      // 5. エピソード要約 (compressionResult.episodeSummary) - 動的
-      // 6. 会話状態サマリー (stateSummary) - 動的
-      // 7. 骨格指示 (skeletonInstruction) - 状況依存
+      // 4. 役割別指示 (promptBuildResult.expertInstruction) - 準動的(4パターン)。同一カテゴリの相談が続く限りキャッシュが延長
+      // 5. 利用可能ツール (promptBuildResult.toolBlock) - 準動的〜動的
+      // 6. 想起記憶 (promptBuildResult.dynamicSuffixPrompt) - 動的 (RAG・中期記憶・構造記憶・スキル・失敗回避・ソースコード等)
+      // 7. エピソード要約 (compressionResult.episodeSummary) - 動的
+      // 8. 会話状態サマリー (stateSummary) - 動的
+      // 9. 骨格指示 (skeletonInstruction) - 状況依存
       const staticPrefix = promptBuildResult.staticPrefixPrompt || systemPrompt;
       const dynamicElements: string[] = [];
 
@@ -1878,22 +1880,32 @@ export default function App() {
       // 2. 準動的 (length 3種 × stage 2種の6パターン): 回答設計の原則
       dynamicElements.push(responseDesignInstruction);
 
-      // 3. 動的: 想起記憶
+      // 3. 準動的 (expertRole 4パターン): 役割別指示
+      if (promptBuildResult.expertInstruction) {
+        dynamicElements.push(`指示: ${promptBuildResult.expertInstruction}`);
+      }
+
+      // 4. 準動的〜動的: 利用可能ツール
+      if (promptBuildResult.toolBlock) {
+        dynamicElements.push(promptBuildResult.toolBlock);
+      }
+
+      // 5. 動的: 想起記憶 (RAG, アジェンダ, 構造記憶, スキル, 失敗回避, ツール実行結果, ソースコード)
       if (promptBuildResult.dynamicSuffixPrompt) {
         dynamicElements.push(promptBuildResult.dynamicSuffixPrompt);
       }
 
-      // 4. 動的: エピソード要約
+      // 6. 動的: エピソード要約
       if (compressionResult.isCompressed && compressionResult.episodeSummary) {
         dynamicElements.push(compressionResult.episodeSummary);
       }
 
-      // 5. 動的: 会話状態サマリー
+      // 7. 動的: 会話状態サマリー
       if (stateSummary) {
         dynamicElements.push(stateSummary);
       }
 
-      // 6. 動的: 骨格指示
+      // 8. 動的: 骨格指示
       if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
         const skeletonInstruction = answerPlanService.buildInstruction(answerPlanResult.matchedSkeleton);
         dynamicElements.push(skeletonInstruction);
@@ -1990,6 +2002,9 @@ export default function App() {
       let accumulated = '';
       let tokenCount = 0;
       let firstTokenTime: number | null = null;
+      let stateStartTime: number | null = null;
+      let stateEndTime: number | null = null;
+      let stateDurationMs: number | null = null;
       let webGpuSuccess = false;
       let webGpuErrorDetails: string | null = null;
       let diagnosticData: ChatMessage['fallbackDiagnostic'] = undefined;
@@ -2008,9 +2023,16 @@ export default function App() {
             max_tokens: 384,
           })) {
             if (abortController.signal.aborted) break;
-            if (firstTokenTime === null) firstTokenTime = performance.now();
+            if (firstTokenTime === null) {
+              firstTokenTime = performance.now();
+              stateStartTime = firstTokenTime;
+            }
             accumulated += chunk;
             tokenCount += chunk.length;
+            if (stateStartTime !== null && stateEndTime === null && accumulated.includes('</state>')) {
+              stateEndTime = performance.now();
+              stateDurationMs = Math.round(stateEndTime - stateStartTime);
+            }
             const liveVisible = cleanStreamingVisibleText(accumulated);
 
             setMessages((prev) =>
@@ -2098,9 +2120,16 @@ export default function App() {
             },
           })) {
             if (abortController.signal.aborted) break;
-            if (firstTokenTime === null) firstTokenTime = performance.now();
+            if (firstTokenTime === null) {
+              firstTokenTime = performance.now();
+              stateStartTime = firstTokenTime;
+            }
             accumulated += chunk;
             tokenCount++;
+            if (stateStartTime !== null && stateEndTime === null && accumulated.includes('</state>')) {
+              stateEndTime = performance.now();
+              stateDurationMs = Math.round(stateEndTime - stateStartTime);
+            }
             const liveVisible = cleanStreamingVisibleText(accumulated);
 
             setMessages((prev) =>
@@ -2153,11 +2182,16 @@ export default function App() {
                 }
                 if (firstTokenTime === null) {
                   firstTokenTime = performance.now();
+                  stateStartTime = firstTokenTime;
                   const ttft = Math.round(firstTokenTime - tStart);
                   systemLogger.info('INFERENCE', `WebGPU 初回トークン到達 (TTFT: ${ttft}ms)`);
                 }
                 accumulated += chunk;
                 tokenCount++;
+                if (stateStartTime !== null && stateEndTime === null && accumulated.includes('</state>')) {
+                  stateEndTime = performance.now();
+                  stateDurationMs = Math.round(stateEndTime - stateStartTime);
+                }
                 const liveVisible = cleanStreamingVisibleText(accumulated);
 
                 setMessages((prev) =>
@@ -2389,20 +2423,26 @@ export default function App() {
       const durationSec = (tEnd - (firstTokenTime || tStart)) / 1000;
       const tokPerSec = Number((tokenCount / Math.max(0.05, durationSec)).toFixed(1));
 
+      // 設計思想 7章: 会話状態管理 (会話状態の抽出 & 表示テキストの分離 - 作業指示書 v6 優先度9)
+      const { state: newConvState, visibleText: rawExtractedText, stats: stateStats } = extractConversationState(
+        accumulated,
+        conversationState,
+        {
+          userPrompt: text,
+          inferredExpectedLength: activeExpectedLength,
+          stateDurationMs: stateDurationMs ?? undefined,
+        }
+      );
+      setConversationState(newConvState);
+
       systemLogger.step(10, 10, '応答確定・UIレンダリング & ワークスペース同期', {
         executedEngineLabel,
         tokenCount,
         tokPerSec,
         totalElapsedMs,
         ttftMs: Math.round((firstTokenTime || tEnd) - tStart),
+        stateStats,
       });
-
-      // 設計思想 7章: 会話状態管理 (会話状態の抽出 & 表示テキストの分離)
-      const { state: newConvState, visibleText: rawExtractedText } = extractConversationState(
-        accumulated,
-        conversationState
-      );
-      setConversationState(newConvState);
 
       // 設計思想 6章 & 35章 第3段階: 回答設計・重複排除・自然な日本語化ポストプロセス
       const targetLength = newConvState.expectedResponseLength || activeExpectedLength;
