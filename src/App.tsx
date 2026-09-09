@@ -81,7 +81,7 @@ import { extractCodeBlocks } from './utils/codeParser';
 import { smartMergeCodeBlock } from './utils/codeMergeService';
 import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
-import { compressContextHistory } from './utils/contextCompression';
+import { compressContextHistory, truncateTextBySentence } from './utils/contextCompression';
 import {
   retrieveRelevantMemories,
   retrieveRelevantMemoriesHybrid,
@@ -1860,25 +1860,40 @@ export default function App() {
       };
       const stateSummary = formatConversationStateForPrompt(currentConvStateWithLength);
 
-      // 設計思想 Master v5.2 第15章6節: プロンプトキャッシュ最適化 (Prompt Cache Alignment)
-      // 先頭の不変プレフィックス (staticPrefixPrompt) を1文字も揺らさず先頭に厳格整列し、
-      // 動的要素 (想起記憶・状態・回答指示) は区切りデリミタ以降に順序正しく結合することで、
-      // llama.cpp / llama-swap のプレフィックスKVキャッシュ再利用率を90%以上に最大化する。
+      // 設計思想 Master v5.2 第15章6節: プロンプトキャッシュ最適化 (Prompt Cache Alignment - 作業指示書 v5 是正版)
+      // DYNAMIC CONTEXTの要素を「不変度が高い順」に厳格整列する:
+      // 1. 静的プレフィックス (staticPrefixPrompt) - 完全固定
+      // 2. 会話状態JSON指示 (CONVERSATION_STATE_INSTRUCTION) - 完全固定なので最優先
+      // 3. 回答設計の原則 (responseDesignInstruction) - 準動的(6パターン)。直前ターンと同じlength/stageならキャッシュがここまで延長
+      // 4. 想起記憶 (promptBuildResult.dynamicSuffixPrompt) - 動的
+      // 5. エピソード要約 (compressionResult.episodeSummary) - 動的
+      // 6. 会話状態サマリー (stateSummary) - 動的
+      // 7. 骨格指示 (skeletonInstruction) - 状況依存
       const staticPrefix = promptBuildResult.staticPrefixPrompt || systemPrompt;
       const dynamicElements: string[] = [];
 
+      // 1. 完全固定: 会話状態JSON指示 (最優先でキャッシュに乗せる)
+      dynamicElements.push(CONVERSATION_STATE_INSTRUCTION);
+
+      // 2. 準動的 (length 3種 × stage 2種の6パターン): 回答設計の原則
+      dynamicElements.push(responseDesignInstruction);
+
+      // 3. 動的: 想起記憶
       if (promptBuildResult.dynamicSuffixPrompt) {
         dynamicElements.push(promptBuildResult.dynamicSuffixPrompt);
       }
+
+      // 4. 動的: エピソード要約
       if (compressionResult.isCompressed && compressionResult.episodeSummary) {
         dynamicElements.push(compressionResult.episodeSummary);
       }
+
+      // 5. 動的: 会話状態サマリー
       if (stateSummary) {
         dynamicElements.push(stateSummary);
       }
-      dynamicElements.push(responseDesignInstruction);
-      dynamicElements.push(CONVERSATION_STATE_INSTRUCTION);
 
+      // 6. 動的: 骨格指示
       if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
         const skeletonInstruction = answerPlanService.buildInstruction(answerPlanResult.matchedSkeleton);
         dynamicElements.push(skeletonInstruction);
@@ -1900,16 +1915,25 @@ export default function App() {
         userPromptContent = `${attachedDesc}\n\n${text}`;
       }
 
-      // Add recent history with strict user/assistant alternation
+      // 作業指示書 v5 優先度7: 会話履歴(chatContext)の送信トークン量削減
+      // 1. 直近履歴保持件数を6件から4件に減らしトークン消費を抑制
+      // 2. 文単位で切り詰めるtruncateTextBySentenceを採用し、文の途中で不自然に切れる問題を解消
+      // 3. 直近1〜2件（会話の核心部）は最大350文字、それ以前（古い履歴）は最大160文字に段階的縮小
       const historyCandidates = compressionResult.isCompressed
-        ? compressionResult.formattedMessages.filter((m) => m.role !== 'system')
-        : validHistoryMessages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+        ? compressionResult.formattedMessages.filter((m) => m.role !== 'system').slice(-4)
+        : validHistoryMessages.slice(-4).map((m) => ({ role: m.role, content: m.content }));
 
       let lastRole: 'system' | 'user' | 'assistant' = 'system';
-      for (const m of historyCandidates) {
+      const historyLen = historyCandidates.length;
+      for (let i = 0; i < historyLen; i++) {
+        const m = historyCandidates[i];
         const r: 'user' | 'assistant' = m.role === 'assistant' ? 'assistant' : 'user';
         if (r !== lastRole) {
-          chatContext.push({ role: r, content: m.content.slice(0, 350) });
+          // 直近1〜2件（最新に近い）は最大350文字、古い履歴（3〜4件目）は最大160文字に段階的縮小
+          const distFromEnd = historyLen - 1 - i;
+          const maxLimit = distFromEnd < 2 ? 350 : 160;
+          const truncated = truncateTextBySentence(m.content || '', maxLimit);
+          chatContext.push({ role: r, content: truncated });
           lastRole = r;
         }
       }
@@ -1919,14 +1943,18 @@ export default function App() {
       }
       chatContext.push({ role: 'user', content: userPromptContent });
 
-      // 作業指示1: chatContext全体の文字数・推定トークン数・System/履歴/ユーザーの内訳を送信直前に詳細ログ出力
+      // 作業指示書 v5 計測要件: chatContext全体の文字数・推定トークン数・System/履歴/ユーザーの内訳、
+      // および実際に選ばれたlength（short/standard/detailed）とstage（CORRECTIONか否か）を送信直前ログに詳細記録
       const charsCombinedSystem = combinedSystemPrompt.length;
       const charsStaticPrefix = staticPrefix.length;
       const charsDynamicContext = dynamicElements.length > 0 ? dynamicElements.join('\n\n').length : 0;
-      const charsHistory = historyCandidates.reduce((acc, m) => acc + (m.content?.length || 0), 0);
+      // 実際にchatContextに積まれた履歴（先頭systemと末尾userを除外）
+      const actualHistoryMessages = chatContext.slice(1, -1);
+      const charsHistory = actualHistoryMessages.reduce((acc, m) => acc + (m.content?.length || 0), 0);
       const charsUser = userPromptContent.length;
       const charsTotal = chatContext.reduce((acc, m) => acc + (m.content?.length || 0), 0);
       const estimatedTokens = Math.round(charsTotal / 1.5);
+      const isCorrectionStage = conversationState.stage === 'CORRECTION';
 
       const promptStats = {
         charsTotal,
@@ -1935,20 +1963,26 @@ export default function App() {
         charsDynamicContext,
         dynamicElementsCount: dynamicElements.length,
         charsHistory,
-        historyMessageCount: historyCandidates.length,
+        historyMessageCount: actualHistoryMessages.length,
         charsUser,
         estimatedTokens,
+        expectedLength: activeExpectedLength,
+        stage: conversationState.stage,
+        isCorrectionStage,
       };
 
       systemLogger.info(
         'EXTERNAL_GPU',
-        `🔍 [chatContext 送信直前サイズ解析] 全体: ${charsTotal}文字 (~${estimatedTokens} tok) | System: ${charsCombinedSystem}字 (静的: ${charsStaticPrefix}字, 動的: ${charsDynamicContext}字) | 履歴: ${historyCandidates.length}件 (${charsHistory}字) | ユーザー: ${charsUser}字`,
+        `🔍 [chatContext 送信直前サイズ解析] 全体: ${charsTotal}文字 (~${estimatedTokens} tok) | System: ${charsCombinedSystem}字 (静的: ${charsStaticPrefix}字, 動的: ${charsDynamicContext}字) | 履歴: ${actualHistoryMessages.length}件 (${charsHistory}字) | ユーザー: ${charsUser}字 | 回答設計: length=${activeExpectedLength}, stage=${conversationState.stage} (isCorrection=${isCorrectionStage})`,
         {
           promptStats,
           systemBreakdown: {
             staticPrefixLength: charsStaticPrefix,
             dynamicElementsCount: dynamicElements.length,
             dynamicPreview: dynamicElements.map((el, i) => `[#${i + 1}] ${el.slice(0, 50)}... (${el.length}字)`),
+            expectedLength: activeExpectedLength,
+            stage: conversationState.stage,
+            isCorrectionStage,
           },
         }
       );

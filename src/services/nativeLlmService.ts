@@ -1045,6 +1045,16 @@ export class NativeLlmService {
                   totalTokensGenerated++;
                   yield delta;
                 }
+                // llama.cpp / llama-swap の timings / cache_n レスポンスを検出して記録
+                if (data.timings || data.usage) {
+                  const timings = data.timings || {};
+                  const cacheN = timings.cache_n ?? timings.n_cache ?? data.usage?.prompt_tokens_details?.cached_tokens;
+                  systemLogger.info(
+                    'EXTERNAL_GPU',
+                    `📊 [外部LLM timings/cache診断] cache_n: ${cacheN ?? '未返却'} | prompt_n: ${timings.prompt_n ?? data.usage?.prompt_tokens ?? '未返却'} | prompt_ms: ${timings.prompt_ms ?? 'N/A'}ms | predicted_n: ${timings.predicted_n ?? data.usage?.completion_tokens ?? 'N/A'}`,
+                    { timings, usage: data.usage }
+                  );
+                }
               } catch (e) {}
             }
           }

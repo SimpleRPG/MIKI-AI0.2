@@ -135,3 +135,33 @@ export function compressContextHistory(
     formattedMessages,
   };
 }
+
+/**
+ * 文単位で最大文字数以内に収まるよう安全に切り詰めるヘルパー (作業指示書 v5 優先度7)
+ * 文の途中で切れて不自然な文脈になるのを防ぐため、句点(。)や改行(\n)等の文境界を優先検出して切り詰める。
+ */
+export function truncateTextBySentence(text: string, maxChars: number): string {
+  if (!text || text.length <= maxChars) return text || '';
+
+  const sub = text.slice(0, maxChars);
+
+  // 句点・改行・感嘆符・疑問符・英語ピリオドのインデックスを探索
+  const lastPeriod = sub.lastIndexOf('。');
+  const lastNewline = sub.lastIndexOf('\n');
+  const lastExcl = Math.max(sub.lastIndexOf('！'), sub.lastIndexOf('!'));
+  const lastQuest = Math.max(sub.lastIndexOf('？'), sub.lastIndexOf('?'));
+  const lastDot = sub.lastIndexOf('. ');
+
+  const delimiterIndices = [lastPeriod, lastNewline, lastExcl, lastQuest, lastDot].filter((idx) => idx >= 0);
+
+  if (delimiterIndices.length > 0) {
+    const bestDelimiter = Math.max(...delimiterIndices);
+    // 区切り位置が上限の35%以上残っている場合は、文の境界で自然に切る
+    if (bestDelimiter >= Math.floor(maxChars * 0.35)) {
+      return sub.slice(0, bestDelimiter + 1).trimEnd();
+    }
+  }
+
+  // 境界が手前に存在しない場合は、上限文字数で切る
+  return sub.trimEnd();
+}
