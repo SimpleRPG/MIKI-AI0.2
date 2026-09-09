@@ -829,7 +829,8 @@ export class NativeLlmService {
       `⏱️ [外部LLM タイムアウト学習状態] 初回タイムアウト: ${initialTimeoutMs}ms (前回実測学習TTFT: ${learnedTtftMs != null ? `${learnedTtftMs}ms` : '未学習(初回/リセット済)'} | コールドスタート判定: ${isColdStart ? 'はい (再ロード猶予+30s)' : 'いいえ (ウォーム維持)'})`
     );
 
-    const idleTimeoutMs = 20000;
+    // 設計思想 Master v5.2: トークン生成間無応答タイムアウト（Termux/ローカルLLMの長考・重負荷Prefillを考慮し60秒に緩和）
+    const idleTimeoutMs = 60000;
     let firstChunkReceived = false;
     let tFetchStart = performance.now();
     let tResponseHeader = performance.now();
