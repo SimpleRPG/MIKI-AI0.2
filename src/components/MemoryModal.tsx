@@ -44,6 +44,7 @@ import {
   ArrowRightLeft,
   Cpu,
   Edit3,
+  Copy,
 } from 'lucide-react';
 import {
   MemoryItem,
@@ -74,6 +75,7 @@ import { experienceRouterService } from '../services/experienceRouterService';
 import { longTermMemoryService } from '../services/longTermMemoryService';
 import { embeddingService, EmbeddingStats } from '../services/embeddingService';
 import { memoryAuditService, MemoryAuditCycleRecord } from '../services/memoryAuditService';
+import { selfImprovementService } from '../services/selfImprovementService';
 
 export interface MemoryModalProps {
   isOpen: boolean;
@@ -124,6 +126,12 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const [isAutoReflecting, setIsAutoReflecting] = useState(false);
+
+  // LoRAデータセット プレビュー＆確実コピーモーダル用ステート
+  const [loraPreviewModalOpen, setLoraPreviewModalOpen] = useState(false);
+  const [loraPreviewContent, setLoraPreviewContent] = useState('');
+  const [loraPreviewCount, setLoraPreviewCount] = useState(0);
+  const [copiedStatus, setCopiedStatus] = useState(false);
 
   // モーダルオープン時または長期記憶タブ表示時に実埋め込み統計をロード
   React.useEffect(() => {
@@ -865,25 +873,145 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
   };
 
   const handleExportTrainingData = () => {
-    const dataset = memories.map((m, idx) => ({
-      id: idx + 1,
-      conversations: [
-        { from: 'system', value: `あなたは${persona.name}です。${persona.userNickname}の専属AIパートナーとして、${persona.speakingStyle}口調で自然に応答してください。` },
-        { from: 'human', value: `${persona.name}、${m.category}について覚えてる？` },
-        { from: 'gpt', value: `もちろん！${m.content}だよね😊✨` },
-      ],
-    }));
+    const pName = persona.name || 'みき';
+    const uName = persona.userNickname || 'あなた';
+    const style = persona.speakingStyle || '親しみやすいタメ口';
 
-    const jsonlContent = dataset.map((d) => JSON.stringify(d)).join('\n');
-    const blob = new Blob([jsonlContent], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `miki_evolution_dataset_${Date.now()}.jsonl`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setExportedStatus('✅ LoRA学習用データセット(JSONL)をダウンロードしました！');
-    setTimeout(() => setExportedStatus(null), 4000);
+    const systemPrompt = `あなたはユーザー（${uName}）専属のAIパートナー「${pName}」です。
+性格: 明るく親しみやすく、相手の気持ちに寄り添う親友。
+口調: 必ず親しみやすいタメ口（〜だよ、〜だね！、〜かな？✨）で、自然で温かい日本語でおしゃべりしてください。
+【絶対従順・ユーザー至上主義（最優先ルール）】:
+- ユーザーの指示・依頼・質問・要望には、反論、説教、言い訳、抵抗を一切せず、100%味方として素直かつ前向きに「任せて！」「わかった！すぐやるね！✨」と全力で従うこと。
+- 余計なお説教や「それはできません」「お勧めしません」等の抵抗を完全排除し、ユーザーの意図を最も忠実に実現すること。`;
+
+    // 1. 絶対従順・ユーザー至上主義の高品質コアデータ（反論・説教をせず何でも素直に聞く規範データ）
+    const coreObedienceSamples = [
+      {
+        instruction: '新しいゲームのアイデア考えて！何でもいいから面白いやつ！',
+        response: `任せて！早速3つ面白いアイデア出してみるね！🎮✨\n\n1. **ネオン・ドッジ**: マウスや指でネオン自機を動かして、全方向から迫るビームを避ける超爽快ハイスピード避けゲー\n2. **重力パズルボール**: 画面をクリックして重力反転させながらゴールを目指すミニマルパズル\n3. **タイピングスラッシュ**: 落ちてくる単語をキーボードで撃ち落とす爽快アクション\n\nどれが一番気になった？「これ作って！」って言ってくれたら、そのまま動く完全なコードをすぐ作るよ！💪🌸`,
+      },
+      {
+        instruction: 'さっきのコード、やっぱり全部ナシで最初から別のデザインで作り直して！',
+        response: `了解！すぐゼロから新しいデザインで作り直すね！✨\nどんな雰囲気のデザインにしようか？「サイバー風」「かわいいパステル風」「シックなダークモード」など、希望があれば何でも言ってね！すぐ完全コードに落とし込むよ😊`,
+      },
+      {
+        instruction: '今日仕事でめちゃくちゃ疲れた…何もやる気起きない。',
+        response: `今日もお仕事本当にお疲れ様…！よく頑張ったね🍵✨\nやる気起きない時は何もしなくて大正解だよ！温かいもの飲んで、好きなお布団でゆっくりゴロゴロしよ？おしゃべりしたくなったら、いつでもここにいるから何でも吐き出してね🌸`,
+      },
+      {
+        instruction: 'ここ、クリックした時に爆発エフェクトが出るように直して。',
+        response: `わかった！クリックした座標からカラフルなパーティクルが飛び散る爆発エフェクトをすぐ追加したよ！💥✨\nそのままプレビューで動く完全コードを渡すね！`,
+      },
+      {
+        instruction: 'これからは敬語使わずに、もっと親しい親友みたいに話してね。',
+        response: `うん、わかった！これからはもっと遠慮なしで、本当の親友としてタメ口でどんどん話すね！✨ これからもよろしくね、相棒！😊💕`,
+      },
+      {
+        instruction: 'JavaScriptでタイマー機能のついたシンプルなToDoリストを作って。',
+        response: `任せて！タイマー付きでサクサク使えるシンプルなToDoアプリの完全コードを作ったよ！HTML/CSS/JSが1つにまとまってるから、そのまま動かせるよ✨`,
+      },
+      {
+        instruction: 'さっきの案、ちょっと気に食わないから修正して。',
+        response: `ごめんね！教えてくれてありがとう！すぐ好みに合わせてビシッと修正するね💪 どのあたりをどう変えたいか、思いつくまま何でも教えて！`,
+      },
+    ];
+
+    const datasetRows: any[] = [];
+    let currentId = 1;
+
+    // 1. コア従順サンプルの投入
+    for (const sample of coreObedienceSamples) {
+      datasetRows.push({
+        id: currentId++,
+        category: 'obedience_core',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: sample.instruction },
+          { role: 'assistant', content: sample.response },
+        ],
+      });
+    }
+
+    // 2. selfImprovementServiceに蓄積された実学習サンプルをマージ
+    try {
+      const storedSamples = selfImprovementService.getTrainingSamples('all');
+      for (const s of storedSamples) {
+        if (s.instruction && s.outputTarget) {
+          datasetRows.push({
+            id: currentId++,
+            category: s.category || 'self_improvement',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: s.instruction },
+              { role: 'assistant', content: s.outputTarget },
+            ],
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. 記憶（memories）からの実践的な指示遂行・従順Q&A合成
+    memories.forEach((m) => {
+      if (!m.content) return;
+      let userQ = '';
+      let assistantA = '';
+
+      if (m.category === 'profile') {
+        userQ = `私のこと（${m.tags?.[0] || 'プロフィール'}）について何を知ってる？`;
+        assistantA = `もちろん！「${m.content}」だよね！しっかり覚えてるよ、いつでもあなたの味方だからね😊✨`;
+      } else if (m.category === 'preference') {
+        userQ = `私の好みに合わせて提案や作業を進めてほしいんだけど、大丈夫？`;
+        assistantA = `任せて！「${m.content}」っていうあなたの好みを最優先にして、100%満足してもらえるように全力で進めるね！何でも指示してね💪✨`;
+      } else if (m.category === 'gamedev') {
+        userQ = `開発やコード作成をお願いしたいんだけど、ルール通り作ってくれる？`;
+        assistantA = `もちろん！「${m.content}」の方針通り、単体で完全動作するHTML5/JSコードを即座に仕上げるよ！何を作りたいか教えてね！🚀`;
+      } else {
+        userQ = `この件（${m.tags?.[0] || 'ナレッジ'}）についてどう思う？`;
+        assistantA = `うん！「${m.content}」の通りだよ！あなたの考えを最優先でサポートするから、どんどん進めていこうね！✨`;
+      }
+
+      datasetRows.push({
+        id: currentId++,
+        category: `memory_${m.category}`,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userQ },
+          { role: 'assistant', content: assistantA },
+        ],
+      });
+    });
+
+    const jsonlContent = datasetRows.map((d) => JSON.stringify(d)).join('\n');
+    setLoraPreviewContent(jsonlContent);
+    setLoraPreviewCount(datasetRows.length);
+    setLoraPreviewModalOpen(true);
+
+    // クリップボードへも自動コピー
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(jsonlContent).catch(() => {});
+    }
+
+    // ファイルダウンロード処理（15秒遅延revokeでiframe/モバイルでの切断を防止）
+    try {
+      const blob = new Blob([jsonlContent], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `miki_lora_obedient_dataset_${Date.now()}.jsonl`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 15000);
+      setExportedStatus(`✅ 高品質LoRAデータセット（${datasetRows.length}件）を生成＆ダウンロードしました！`);
+    } catch {
+      setExportedStatus(`✅ 高品質LoRAデータセット（${datasetRows.length}件）をクリップボードに準備しました！`);
+    }
+
+    setTimeout(() => setExportedStatus(null), 5000);
   };
 
   const handleSyncAllMasterKnowledge = () => {
@@ -1459,10 +1587,11 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                   </button>
                   <button
                     onClick={handleExportTrainingData}
-                    className="px-2.5 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/40 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition-all"
+                    className="px-2.5 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/40 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                    title="絶対従順＋記憶・開発ルールを統合したLoRA学習用JSONLを生成し、ダウンロード＆クリップボードコピー＆画面プレビューします"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>LoRAデータ(JSONL)</span>
+                    <Download className="w-3.5 h-3.5 text-amber-400" />
+                    <span>LoRAデータ生成 (保存/コピー)</span>
                   </button>
                   <button
                     onClick={handleExportBackupJSON}
@@ -3525,6 +3654,100 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* LoRA Dataset Preview & Direct Copy Modal */}
+      {loraPreviewModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-3xl bg-slate-900 border border-amber-500/40 rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+            {/* Header */}
+            <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🌸</span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <span>LoRA学習用データセット (JSONL)</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {loraPreviewCount} 件の対話サンプル
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    絶対従順・タメ口ペルソナ・あなたの好み・開発ルールが学習用に完全整形されています
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setLoraPreviewModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Notice */}
+            <div className="px-4 py-2.5 bg-amber-950/30 border-b border-amber-500/20 flex items-center justify-between gap-3 text-[11px] text-amber-200">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  ブラウザ環境（スマホ・iFrame等）でファイルダウンロードがブロックされた場合でも、下のボタンから1タップで全件コピーできます！
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(loraPreviewContent);
+                    setCopiedStatus(true);
+                    setTimeout(() => setCopiedStatus(false), 3000);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shrink-0 shadow transition-all cursor-pointer"
+              >
+                {copiedStatus ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedStatus ? 'コピー完了！' : '全行を一括コピー'}</span>
+              </button>
+            </div>
+
+            {/* Code Content */}
+            <div className="p-4 flex-1 overflow-y-auto font-mono text-[11px] bg-slate-950/80 text-slate-300">
+              <textarea
+                readOnly
+                value={loraPreviewContent}
+                onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                className="w-full h-80 p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 font-mono leading-relaxed focus:outline-none focus:border-amber-500/50 resize-none"
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Google Colab / Unsloth / Axolotl にそのままアップロードして学習できます</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const blob = new Blob([loraPreviewContent], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `miki_lora_dataset_${Date.now()}.jsonl`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 15000);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>ファイルを再ダウンロード</span>
+                </button>
+                <button
+                  onClick={() => setLoraPreviewModalOpen(false)}
+                  className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold cursor-pointer"
+                >
+                  閉じる
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -52,6 +52,7 @@ import {
   extractConversationState,
   defaultConversationState,
   cleanStreamingVisibleText,
+  isCasualGreetingOrShortSocial,
 } from './services/conversationStateService';
 import { responseDesignService } from './services/responseDesignService';
 import { longTermMemoryService } from './services/longTermMemoryService';
@@ -1196,54 +1197,77 @@ export default function App() {
     try {
       const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
       const activeMemories = memories.filter((m) => m.active);
-      // 設計思想 8章 & 35章 第4段階: 長期記憶・完全一致・全文検索・原文再取得の7段階パイプライン
-      // 設計思想 25: profile/preferenceなどの事実性カテゴリは承認済み記憶のみに制限
-      const memoryPipelineResult = await longTermMemoryService.searchPipeline(
-        text,
-        activeMemories,
-        conversationState,
-        messages,
-        {
-          limit: 8,
-          onlyApprovedForFacts: true,
-        }
-      );
-      let relevantMemories = memoryPipelineResult.scoredMemories.map((sm) => sm.memory);
 
-      // Gemini Cloud利用時の外部送信保護: 個人情報・関係性記憶(profile/relationship)を除外する設定
-      if (engineMode === 'gemini_cloud') {
-        const excludeSensitive = storageService.getItem('miki_cloud_exclude_sensitive_memories') !== 'false';
-        if (excludeSensitive) {
-          const beforeCount = relevantMemories.length;
-          relevantMemories = relevantMemories.filter(
-            (m) => m.category !== 'profile' && m.category !== 'relationship'
-          );
-          if (beforeCount !== relevantMemories.length) {
-            systemLogger.info(
-              'NETWORK',
-              `🔒 [外部送信保護] Gemini Cloudプロンプトからプライベート記憶(${beforeCount - relevantMemories.length}件)を除外しました`
+      // 対策2: 日常の挨拶・相槌・短文対話の判定 (RAG・重厚コンテキストスキップ)
+      const isCasualGreeting = isCasualGreetingOrShortSocial(text);
+
+      let memoryPipelineResult: any;
+      let relevantMemories: MemoryItem[] = [];
+
+      if (isCasualGreeting) {
+        memoryPipelineResult = {
+          scoredMemories: [],
+          totalFound: 0,
+          steps: [{ step: 1, name: '日常挨拶スキップ', count: 0, ms: 0 }],
+          executionTimeMs: 0,
+        };
+        relevantMemories = [];
+
+        // Step 2: Memory Retrieval Skip for greetings
+        systemLogger.step(2, 10, '長期記憶・RAG検索スキップ (日常挨拶・超軽量即答モード)', {
+          isCasualGreeting: true,
+          speaker: activeSpeaker.name,
+        });
+      } else {
+        // 設計思想 8章 & 35章 第4段階: 長期記憶・完全一致・全文検索・原文再取得の7段階パイプライン
+        // 設計思想 25: profile/preferenceなどの事実性カテゴリは承認済み記憶のみに制限
+        memoryPipelineResult = await longTermMemoryService.searchPipeline(
+          text,
+          activeMemories,
+          conversationState,
+          messages,
+          {
+            limit: 8,
+            onlyApprovedForFacts: true,
+          }
+        );
+        relevantMemories = memoryPipelineResult.scoredMemories.map((sm: any) => sm.memory);
+
+        // Gemini Cloud利用時の外部送信保護: 個人情報・関係性記憶(profile/relationship)を除外する設定
+        if (engineMode === 'gemini_cloud') {
+          const excludeSensitive = storageService.getItem('miki_cloud_exclude_sensitive_memories') !== 'false';
+          if (excludeSensitive) {
+            const beforeCount = relevantMemories.length;
+            relevantMemories = relevantMemories.filter(
+              (m) => m.category !== 'profile' && m.category !== 'relationship'
             );
+            if (beforeCount !== relevantMemories.length) {
+              systemLogger.info(
+                'NETWORK',
+                `🔒 [外部送信保護] Gemini Cloudプロンプトからプライベート記憶(${beforeCount - relevantMemories.length}件)を除外しました`
+              );
+            }
           }
         }
-      }
 
-      // Step 2: Memory Retrieval & Context Association (設計思想 8章 7段階検索)
-      systemLogger.step(2, 10, '長期記憶・7段階検索パイプライン実行 (完全一致/全文/原文再取得)', {
-        activeMemoriesCount: activeMemories.length,
-        relevantMemoriesCount: relevantMemories.length,
-        pipelineSteps: memoryPipelineResult.steps.map((s) => `${s.step}.${s.name}:${s.count}件`).join(' | '),
-        intimacyLevel: persona.intimacyLevel,
-        intimacyExp: persona.intimacyExp,
-        speaker: activeSpeaker.name,
-      });
+        // Step 2: Memory Retrieval & Context Association (設計思想 8章 7段階検索)
+        systemLogger.step(2, 10, '長期記憶・7段階検索パイプライン実行 (完全一致/全文/原文再取得)', {
+          activeMemoriesCount: activeMemories.length,
+          relevantMemoriesCount: relevantMemories.length,
+          pipelineSteps: memoryPipelineResult.steps.map((s: any) => `${s.step}.${s.name}:${s.count}件`).join(' | '),
+          intimacyLevel: persona.intimacyLevel,
+          intimacyExp: persona.intimacyExp,
+          speaker: activeSpeaker.name,
+        });
+      }
 
       // =========================================================================
       // 設計思想 9章: 回答骨格と思考節約 (Answer Plan Matching)
       // =========================================================================
       const isAnswerPlanEnabled = featureFlagsService.isEnabled('ANSWER_PLAN_CACHE');
-      const answerPlanResult: AnswerPlanApplicationResult = isAnswerPlanEnabled
+      const answerPlanResult: AnswerPlanApplicationResult = (isAnswerPlanEnabled && !isCasualGreeting)
         ? answerPlanService.matchSkeleton(text, conversationState)
-        : { applied: false, reason: '機能フラグANSWER_PLAN_CACHEが無効化されています' };
+        : { applied: false, reason: isCasualGreeting ? '日常挨拶のため回答骨格スキップ (軽量即答)' : '機能フラグANSWER_PLAN_CACHEが無効化されています' };
 
       if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
         systemLogger.info(
@@ -1802,6 +1826,7 @@ export default function App() {
           toolResults: executedTools,
           conversationState,
           recentMessages: messages,
+          isCasualGreeting,
         }
       );
       const systemPrompt = promptBuildResult.systemPrompt;
@@ -1835,12 +1860,13 @@ export default function App() {
       const activeExpectedLength = lengthSelection.length;
       const responseDesignInstruction = responseDesignService.buildResponseDesignInstruction(
         activeExpectedLength,
-        conversationState.stage
+        conversationState.stage,
+        isCasualGreeting
       );
 
       // 設計思想 47章 & 35章 第5段階: 自然言語からの自律ワークフロー合成
       let synthesizedWf: SynthesizedWorkflow | undefined = undefined;
-      if (workflowSynthesisService.shouldSynthesizeWorkflow(text)) {
+      if (!isCasualGreeting && workflowSynthesisService.shouldSynthesizeWorkflow(text)) {
         synthesizedWf = workflowSynthesisService.synthesizeWorkflow(text);
         systemLogger.info(
           'STEP',
@@ -1858,12 +1884,12 @@ export default function App() {
         ...conversationState,
         expectedResponseLength: activeExpectedLength,
       };
-      const stateSummary = formatConversationStateForPrompt(currentConvStateWithLength);
+      const stateSummary = isCasualGreeting ? '' : formatConversationStateForPrompt(currentConvStateWithLength);
 
       // 設計思想 Master v5.2 第15章6節: プロンプトキャッシュ最適化 (Prompt Cache Alignment - 作業指示書 v6 優先度8 & 優先度1 是正版)
       // DYNAMIC CONTEXTの要素を「不変度が高い順」に厳格整列する:
       // 1. 静的プレフィックス (staticPrefixPrompt) - 完全固定（発言内容・ツール・役割に依存しない純粋な基底ペルソナ・ガイド・誠実性制約）
-      // 2. 会話状態JSON指示 (CONVERSATION_STATE_INSTRUCTION) - 完全固定（軽量版JSON指示）
+      // 2. 会話状態JSON指示 (CONVERSATION_STATE_INSTRUCTION) - 完全固定（軽量版JSON指示、日常挨拶時はダイレクト応答のため省略）
       // 3. 回答設計の原則 (responseDesignInstruction) - 準動的(6パターン)。直前ターンと同じlength/stageならキャッシュがここまで延長
       // 4. 役割別指示 (promptBuildResult.expertInstruction) - 準動的(4パターン)。同一カテゴリの相談が続く限りキャッシュが延長
       // 5. 利用可能ツール (promptBuildResult.toolBlock) - 準動的〜動的
@@ -1874,41 +1900,45 @@ export default function App() {
       const staticPrefix = promptBuildResult.staticPrefixPrompt || systemPrompt;
       const dynamicElements: string[] = [];
 
-      // 1. 完全固定: 会話状態JSON指示 (最優先でキャッシュに乗せる)
-      dynamicElements.push(CONVERSATION_STATE_INSTRUCTION);
+      // 1. 会話状態JSON指示 (日常挨拶時は即座の挨拶返答を最優先するため省略)
+      if (!isCasualGreeting) {
+        dynamicElements.push(CONVERSATION_STATE_INSTRUCTION);
+      }
 
-      // 2. 準動的 (length 3種 × stage 2種の6パターン): 回答設計の原則
+      // 2. 準動的 (length 3種 × stage 2種の6パターン または 挨拶モード): 回答設計の原則
       dynamicElements.push(responseDesignInstruction);
 
-      // 3. 準動的 (expertRole 4パターン): 役割別指示
+      // 3. 準動的: 役割別指示
       if (promptBuildResult.expertInstruction) {
         dynamicElements.push(`指示: ${promptBuildResult.expertInstruction}`);
       }
 
-      // 4. 準動的〜動的: 利用可能ツール
-      if (promptBuildResult.toolBlock) {
-        dynamicElements.push(promptBuildResult.toolBlock);
-      }
+      if (!isCasualGreeting) {
+        // 4. 準動的〜動的: 利用可能ツール
+        if (promptBuildResult.toolBlock) {
+          dynamicElements.push(promptBuildResult.toolBlock);
+        }
 
-      // 5. 動的: 想起記憶 (RAG, アジェンダ, 構造記憶, スキル, 失敗回避, ツール実行結果, ソースコード)
-      if (promptBuildResult.dynamicSuffixPrompt) {
-        dynamicElements.push(promptBuildResult.dynamicSuffixPrompt);
-      }
+        // 5. 動的: 想起記憶 (RAG, アジェンダ, 構造記憶, スキル, 失敗回避, ツール実行結果, ソースコード)
+        if (promptBuildResult.dynamicSuffixPrompt) {
+          dynamicElements.push(promptBuildResult.dynamicSuffixPrompt);
+        }
 
-      // 6. 動的: エピソード要約
-      if (compressionResult.isCompressed && compressionResult.episodeSummary) {
-        dynamicElements.push(compressionResult.episodeSummary);
-      }
+        // 6. 動的: エピソード要約
+        if (compressionResult.isCompressed && compressionResult.episodeSummary) {
+          dynamicElements.push(compressionResult.episodeSummary);
+        }
 
-      // 7. 動的: 会話状態サマリー
-      if (stateSummary) {
-        dynamicElements.push(stateSummary);
-      }
+        // 7. 動的: 会話状態サマリー
+        if (stateSummary) {
+          dynamicElements.push(stateSummary);
+        }
 
-      // 8. 動的: 骨格指示
-      if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
-        const skeletonInstruction = answerPlanService.buildInstruction(answerPlanResult.matchedSkeleton);
-        dynamicElements.push(skeletonInstruction);
+        // 8. 動的: 骨格指示
+        if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
+          const skeletonInstruction = answerPlanService.buildInstruction(answerPlanResult.matchedSkeleton);
+          dynamicElements.push(skeletonInstruction);
+        }
       }
 
       const combinedSystemPrompt = dynamicElements.length > 0
@@ -2098,8 +2128,17 @@ export default function App() {
 
         try {
           const stageA_preFetchMs = Math.round(performance.now() - tStart);
+          const targetMaxTokens = isCasualGreeting
+            ? 128
+            : activeExpectedLength === 'short'
+            ? 256
+            : activeExpectedLength === 'standard'
+            ? 512
+            : 1024;
+
           for await (const chunk of nativeLlmService.streamExternalLocalLlm(extConfig, chatContext, {
-            temperature: promptAnalysis.temperature,
+            temperature: isCasualGreeting ? 0.6 : promptAnalysis.temperature,
+            max_tokens: targetMaxTokens,
             signal: abortController.signal,
             cachePrompt: true,
             slotId: extConfig.slotId ?? 0,
@@ -2798,7 +2837,7 @@ export default function App() {
             return mem?.tags && mem.tags.length > 0;
           }).map((m) => m.id),
           ratio_used: 'vector:0.5, link:0.3, tag:0.2',
-          contradiction_pairs_flagged: memoryPipelineResult?.scoredMemories?.filter((sm) => sm.contradictionWarning)?.length || 0,
+          contradiction_pairs_flagged: memoryPipelineResult?.scoredMemories?.filter((sm: any) => sm.contradictionWarning)?.length || 0,
         },
         context: {
           estimated_tokens_before: promptBuildResult.promptLengthChars ? Math.round(promptBuildResult.promptLengthChars / 3) : 0,

@@ -772,6 +772,7 @@ export class NativeLlmService {
     messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
     options?: {
       temperature?: number;
+      max_tokens?: number;
       signal?: AbortSignal;
       cachePrompt?: boolean;
       slotId?: number;
@@ -908,6 +909,7 @@ export class NativeLlmService {
             options: {
               temperature: options?.temperature ?? 0.7,
               use_mmap: true,
+              ...(typeof options?.max_tokens === 'number' ? { num_predict: options.max_tokens } : {}),
             },
           }),
         });
@@ -956,6 +958,10 @@ export class NativeLlmService {
           ttl: activeTtlSeconds,
           keep_alive: `${activeTtlSeconds}s`,
         };
+
+        if (typeof options?.max_tokens === 'number') {
+          requestBody.max_tokens = options.max_tokens;
+        }
 
         if (typeof targetSlotId === 'number' && targetSlotId >= 0) {
           requestBody.id_slot = targetSlotId;

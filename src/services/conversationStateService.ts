@@ -13,6 +13,37 @@ export const CONVERSATION_STATE_INSTRUCTION = `回答前に会話状態を最小
 出力後、すぐに自然な日本語で回答を続けてください。`;
 
 /**
+ * 日常の挨拶・短い相槌・声かけの検出ヘルパー (対策2: RAGスキップ・軽量対話モード)
+ * 「ただいま」「おはよう」「うん」などの挨拶・相槌・声かけを検出し、
+ * 重いRAG検索や不要な骨格注入、スキル誤爆を完全に防止する。
+ */
+export function isCasualGreetingOrShortSocial(prompt: string): boolean {
+  if (!prompt) return false;
+  const p = prompt.trim();
+  if (p.length === 0 || p.length > 25) return false;
+
+  // 開発・コード・質問・指示のキーワードが含まれる場合は挨拶判定しない
+  if (
+    /コード|エラー|バグ|動かない|作って|実装|開発|修正|直し|教えて|どう|なぜ|何|いくら|関数|プログラム|vba|sql|api|css|html|python|typescript|javascript|react/i.test(
+      p
+    )
+  ) {
+    return false;
+  }
+
+  // 疑問符で終わる、または疑問詞がある場合は質問の可能性が高い（「元気？」等の単なる挨拶を除く）
+  if (/[?？]$/.test(p) && !/^(元気|調子どう|いかが)[?？]$/.test(p)) {
+    return false;
+  }
+
+  // 代表的な日常の挨拶・相槌・声かけ
+  const greetingPattern =
+    /^(ただいま|ただいまー|ただいま〜|お帰り|おかえり|おかえりー|おはよう|おはよー|おはようございます|おやすみ|おやすみー|おやすみなさい|こんにちは|こんちは|こんばんは|こんばんわ|いってきます|行ってきます|行ってきまーす|いってらっしゃい|行ってらっしゃい|やっほー|ヤッホー|やあ|ハロー|hello|hi|バイバイ|またね|じゃあね|さようなら|お疲れ|お疲れ様|おつかれ|おつかれさま|ありがとう|ありがと|ありがとー|サンキュー|どうも|感謝|うん|ううん|はい|いいえ|そうだね|そうそう|なるほど|了解|りょ|りょうかい|わかった|ok|オッケー|おっけー|みき|みきちゃん|ねえ|ねえねえ|元気[？?]?)$/i;
+
+  return greetingPattern.test(p);
+}
+
+/**
  * 作業指示書 v6 優先度9-3: ルールベースの会話ステージ(stage)推定
  * ユーザー発言のキーワードパターンから会話段階を高精度に推定する。
  * モデルの不可視JSON生成負荷を軽減し、モデルがステージを省略・未出力にした場合でも適切に補完する。
@@ -23,6 +54,11 @@ export function inferConversationStage(
 ): ConversationStage {
   if (!userPrompt || !userPrompt.trim()) return prevStage;
   const text = userPrompt.trim();
+
+  // 0. 日常の挨拶・相槌（クロージング/親密対話ステージとして扱う）
+  if (isCasualGreetingOrShortSocial(text)) {
+    return 'CLOSING';
+  }
 
   // 1. 訂正・エラー指摘 (最優先)
   if (

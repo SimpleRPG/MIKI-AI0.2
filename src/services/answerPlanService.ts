@@ -6,6 +6,7 @@ import {
 } from '../types';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
+import { isCasualGreetingOrShortSocial } from './conversationStateService';
 
 const SKELETONS_STORAGE_KEY = 'miki_response_skeletons_v32';
 
@@ -367,17 +368,20 @@ class AnswerPlanService {
     const p = (prompt || '').trim();
     const pLower = p.toLowerCase();
 
+    // 0. 日常の挨拶・短文・相槌の判定 (対策2: RAGスキップ・軽量即答モード)
+    if (isCasualGreetingOrShortSocial(p)) {
+      return {
+        applied: false,
+        reason: '日常の挨拶・相槌・短文のため回答骨格適用をスキップ (軽量即答モード)',
+      };
+    }
+
     // 1. 会話段階 (state.stage) および 未知の言い回し・キーワード照合
     let bestSkeleton: ResponseSkeleton | undefined;
     let highestScore = 0;
 
     for (const skeleton of this.skeletons) {
       let score = 0;
-
-      // 会話段階の一致
-      if (state && state.stage === skeleton.stage) {
-        score += 30;
-      }
 
       // 訂正イベントの存在
       if (
@@ -391,6 +395,16 @@ class AnswerPlanService {
       for (const kw of skeleton.triggerKeywords) {
         if (pLower.includes(kw.toLowerCase())) {
           score += 15;
+        }
+      }
+
+      // 会話段階の一致
+      // ※ QUESTION段階は全クエリのデフォルト値であるため、トリガーキーワード等の適合(score > 0)がある場合にのみ加算（無条件加算による誤爆防止）
+      if (state && state.stage === skeleton.stage) {
+        if (skeleton.stage === 'QUESTION') {
+          if (score > 0) score += 15;
+        } else {
+          score += 25;
         }
       }
 

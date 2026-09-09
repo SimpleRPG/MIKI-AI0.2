@@ -713,13 +713,28 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   // JSONLエクスポート (全件 or 特定split)
   const handleExportJSONLFile = (split?: 'train' | 'validation' | 'test') => {
     const jsonl = selfImprovementService.exportTrainingJSONL(false, split);
-    const blob = new Blob([jsonl], { type: 'application/jsonl' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `miki_lora_${split || 'all'}_dataset_${Date.now()}.jsonl`;
-    a.click();
-    URL.revokeObjectURL(url);
+    
+    // クリップボードへも自動コピー
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(jsonl).catch(() => {});
+    }
+
+    try {
+      const blob = new Blob([jsonl], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `miki_lora_${split || 'all'}_dataset_${Date.now()}.jsonl`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 15000);
+      setNotificationTestStatus(`✅ LoRA学習データ (${split || '全件'}) をダウンロード＆クリップボードにコピーしました！`);
+      setTimeout(() => setNotificationTestStatus(null), 5000);
+    } catch (e: any) {
+      setNotificationTestStatus(`📋 LoRA学習データをクリップボードにコピーしました！メモ帳等に貼り付けてご活用ください。`);
+      setTimeout(() => setNotificationTestStatus(null), 5000);
+    }
   };
 
   const handleRunBenchmark = async () => {

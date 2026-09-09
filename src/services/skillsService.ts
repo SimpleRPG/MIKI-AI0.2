@@ -2,6 +2,7 @@ import { SkillItem, SkillDiversityTestResult, SkillDiversityTestCase, SkillGradu
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { selfImprovementService } from './selfImprovementService';
+import { isCasualGreetingOrShortSocial } from './conversationStateService';
 
 const SKILLS_STORAGE_KEY = 'miki_ai_skills_library';
 
@@ -275,7 +276,7 @@ class SkillsService {
    * ユーザーの発言からマッチするスキルを検索
    */
   public matchSkillsForQuery(query: string): SkillItem[] {
-    if (!query) return [];
+    if (!query || isCasualGreetingOrShortSocial(query)) return [];
     const qLower = query.toLowerCase();
     const activeSkills = this.skills.filter((s) => s.status !== 'disabled');
 
@@ -291,10 +292,12 @@ class SkillsService {
       }
 
       if (qLower.includes(skill.name.toLowerCase())) score += 10;
-      if (skill.status === 'official_matured') score += 3;
-      else if (skill.status === 'official') score += 2;
 
+      // 適合度ボーナスは、トリガーまたはスキル名で既に適合した場合(score > 0)にのみ付与
+      // (※トリガー不一致の全スキルがステータス加点で誤爆するのを防止)
       if (score > 0) {
+        if (skill.status === 'official_matured') score += 3;
+        else if (skill.status === 'official') score += 2;
         matched.push({ skill, score });
       }
     }

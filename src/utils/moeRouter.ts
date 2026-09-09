@@ -116,47 +116,52 @@ export async function buildExpertSystemPromptWithTracking(
     recentMessages?: ChatMessage[];
     activeFilePath?: string;
     codeQuotaTokens?: number;
+    isCasualGreeting?: boolean;
   }
 ): Promise<PromptContextTrackingResult> {
+  const isCasualGreeting = options?.isCasualGreeting ?? false;
   const maxMemories = options?.maxMemories || (options?.isLightweight ? 3 : 5);
 
   // 1. 記憶の検索: 設計思想 8章 & 35章 第4段階 (7段階パイプライン: 会話状態・直近原文・完全一致・FTS・意味・再順位・原文再取得)
-  let scoredMemories: ScoredMemory[];
+  // ※ 日常の挨拶・短文対話(isCasualGreeting)の場合は、プロンプト肥大化防止のためRAGを完全スキップ
+  let scoredMemories: ScoredMemory[] = [];
   let memoryBlock = '';
 
-  if (options?.conversationState || options?.recentMessages) {
-    const pipelineResult = await longTermMemoryService.searchPipeline(
-      userMessage,
-      memories,
-      options.conversationState,
-      options.recentMessages || [],
-      {
+  if (!isCasualGreeting) {
+    if (options?.conversationState || options?.recentMessages) {
+      const pipelineResult = await longTermMemoryService.searchPipeline(
+        userMessage,
+        memories,
+        options.conversationState,
+        options.recentMessages || [],
+        {
+          limit: maxMemories,
+          onlyApprovedForFacts: true,
+        }
+      );
+      scoredMemories = pipelineResult.scoredMemories as ScoredMemory[];
+      memoryBlock = longTermMemoryService.formatMemoriesForPrompt(pipelineResult);
+    } else {
+      scoredMemories = await retrieveScoredMemoriesHybrid(userMessage, memories, {
         limit: maxMemories,
+        alwaysIncludePinned: true,
+        filterExpired: true,
         onlyApprovedForFacts: true,
-      }
-    );
-    scoredMemories = pipelineResult.scoredMemories as ScoredMemory[];
-    memoryBlock = longTermMemoryService.formatMemoriesForPrompt(pipelineResult);
-  } else {
-    scoredMemories = await retrieveScoredMemoriesHybrid(userMessage, memories, {
-      limit: maxMemories,
-      alwaysIncludePinned: true,
-      filterExpired: true,
-      onlyApprovedForFacts: true,
-    });
-    memoryBlock = scoredMemories.length > 0
-      ? `【参照された記憶・ユーザー情報 (RAG)】:\n${scoredMemories.map((sm) => {
-          const isApproved = sm.memory.approved !== false;
-          const hasConflict = (sm.memory.conflictWith && sm.memory.conflictWith.length > 0);
-          let prefix = '・';
-          if (!isApproved) {
-            prefix = '・[※未検証・仮推論情報（確定事実として断定せず推測として扱うこと）]: ';
-          } else if (hasConflict) {
-            prefix = '・[⚠️別設定と競合あり（最新のユーザー指示を優先すること）]: ';
-          }
-          return `${prefix}${sm.memory.content}`;
-        }).join('\n')}`
-      : '';
+      });
+      memoryBlock = scoredMemories.length > 0
+        ? `【参照された記憶・ユーザー情報 (RAG)】:\n${scoredMemories.map((sm) => {
+            const isApproved = sm.memory.approved !== false;
+            const hasConflict = (sm.memory.conflictWith && sm.memory.conflictWith.length > 0);
+            let prefix = '・';
+            if (!isApproved) {
+              prefix = '・[※未検証・仮推論情報（確定事実として断定せず推測として扱うこと）]: ';
+            } else if (hasConflict) {
+              prefix = '・[⚠️別設定と競合あり（最新のユーザー指示を優先すること）]: ';
+            }
+            return `${prefix}${sm.memory.content}`;
+          }).join('\n')}`
+        : '';
+    }
   }
 
   const usedMemories = scoredMemories.map((sm) => ({
@@ -168,7 +173,8 @@ export async function buildExpertSystemPromptWithTracking(
   }));
 
   // 2. スキルライブラリ（手続き記憶）のマッチング (設計思想 13)
-  const matchedSkills = skillsService.matchSkillsForQuery(userMessage);
+  // ※ 日常の挨拶・短文対話の場合はスキルマッチングをスキップ
+  const matchedSkills = isCasualGreeting ? [] : skillsService.matchSkillsForQuery(userMessage);
   const usedSkills = matchedSkills.map((s) => ({ id: s.id, name: s.name }));
 
   const skillBlock = matchedSkills.length > 0
@@ -176,11 +182,11 @@ export async function buildExpertSystemPromptWithTracking(
     : '';
 
   // 3. ツール管理 (:feature:tools / 設計思想 14 & 22)
-  const candidateTools = toolsService.detectCandidateToolsForPrompt(userMessage, { workspaceFiles });
+  const candidateTools = isCasualGreeting ? [] : toolsService.detectCandidateToolsForPrompt(userMessage, { workspaceFiles });
   const executedTools: ToolExecutionResult[] = options?.toolResults ? [...options.toolResults] : [];
 
   // options.toolResults が渡されていない場合のフォールバック安全計算 (同期/即時解決)
-  if (!options?.toolResults) {
+  if (!isCasualGreeting && !options?.toolResults) {
     const mathTool = candidateTools.find((t) => t.toolId === 'tool_safe_calculator');
     if (mathTool && mathTool.suggestedParams?.expression) {
       try {
@@ -222,28 +228,32 @@ export async function buildExpertSystemPromptWithTracking(
 
   // 4. 役割別インストラクション
   let expertInstruction = '';
-  switch (expertRole) {
-    case 'code':
-      expertInstruction = `【開発・コード改善依頼】HTML5/Canvas/JavaScriptで動く完全なコードを \`\`\`html または \`\`\`js のコードブロックで提供してください。不具合の修正、機能の追加、デザイン改善などユーザーの要望を的確に反映し、そのまま動作する完全版コードを出力してください。`;
-      break;
+  if (isCasualGreeting) {
+    expertInstruction = '親しいパートナーとして、明るく自然なタメ口で温かく返答してください。';
+  } else {
+    switch (expertRole) {
+      case 'code':
+        expertInstruction = `【開発・コード改善依頼】HTML5/Canvas/JavaScriptで動く完全なコードを \`\`\`html または \`\`\`js のコードブロックで提供してください。不具合の修正、機能の追加、デザイン改善などユーザーの要望を的確に反映し、そのまま動作する完全版コードを出力してください。`;
+        break;
 
-    case 'shader':
-      expertInstruction = `【グラフィック依頼】WebGPU/Canvasを用いた描画コードを \`\`\`html のコードブロックで提供してください。`;
-      break;
+      case 'shader':
+        expertInstruction = `【グラフィック依頼】WebGPU/Canvasを用いた描画コードを \`\`\`html のコードブロックで提供してください。`;
+        break;
 
-    case 'logic':
-      expertInstruction = `【デバッグ・ロジック・計算依頼】数値計算や不具合の原因を正確に解説し、確実な解答や修正コードを出力してください。`;
-      break;
+      case 'logic':
+        expertInstruction = `【デバッグ・ロジック・計算依頼】数値計算や不具合の原因を正確に解説し、確実な解答や修正コードを出力してください。`;
+        break;
 
-    case 'moe_chat':
-    default:
-      expertInstruction = `親しみやすく温かいタメ口（〜だよ、〜だね！✨）で自然に返答してください。`;
-      break;
+      case 'moe_chat':
+      default:
+        expertInstruction = `親しみやすく温かいタメ口（〜だよ、〜だね！✨）で自然に返答してください。`;
+        break;
+    }
   }
 
   // 5. ソースコードのコンテキスト (Qwen等のモデルカタログ予算 & スマート要約抽出)
   let filesContext = '';
-  if (options?.includeFiles && workspaceFiles && workspaceFiles.length > 0) {
+  if (!isCasualGreeting && options?.includeFiles && workspaceFiles && workspaceFiles.length > 0) {
     const targetFile =
       (options?.activeFilePath && workspaceFiles.find((f) => f.path === options.activeFilePath)) ||
       workspaceFiles.find((f) => f.path === 'index.html' || f.name === 'index.html') ||
@@ -294,15 +304,15 @@ ${getNaturalJapanesePromptGuide()}
 ${honestyConstraint}`;
 
   // 第2章③ 中期記憶 (Working Agenda)
-  const agendaBlock = workingAgendaService.formatAgendaForPrompt();
+  const agendaBlock = isCasualGreeting ? '' : workingAgendaService.formatAgendaForPrompt();
 
   // 第2章⑥ 構造記憶 (Structural Memory): クエリからシンボルらしき単語を簡易抽出してマッチ
-  const codeSymbolCandidates = userMessage.match(/[a-zA-Z_][a-zA-Z0-9_]{2,}/g) || [];
-  const structuralBlock = structuralMemoryService.formatStructuralContextForPrompt(codeSymbolCandidates);
+  const codeSymbolCandidates = isCasualGreeting ? [] : (userMessage.match(/[a-zA-Z_][a-zA-Z0-9_]{2,}/g) || []);
+  const structuralBlock = isCasualGreeting ? '' : structuralMemoryService.formatStructuralContextForPrompt(codeSymbolCandidates);
 
   // 設計思想 第51章: 失敗シグネチャ・カタログによる事前アンチパターン回避ルール抽出
-  const isCodeOrVba = expertRole === 'code' || /vba|マクロ|excel|コード|関数|script|型|バグ/i.test(userMessage);
-  const failureRulesBlock = failureCatalogService.formatRulesForPrompt({
+  const isCodeOrVba = !isCasualGreeting && (expertRole === 'code' || /vba|マクロ|excel|コード|関数|script|型|バグ/i.test(userMessage));
+  const failureRulesBlock = isCasualGreeting ? '' : failureCatalogService.formatRulesForPrompt({
     isCodeOrVba,
     userPrompt: userMessage,
   });

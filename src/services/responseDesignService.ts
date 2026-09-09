@@ -1,5 +1,6 @@
 import { ResponseLength, ResponseQualityEvaluation, ConversationStage, ConversationState } from '../types';
 import { storageService } from './storageService';
+import { isCasualGreetingOrShortSocial } from './conversationStateService';
 
 export interface UserStyleCorrectionRule {
   id: string;
@@ -68,6 +69,15 @@ export class ResponseDesignService {
     const p = (prompt || '').trim();
     const lower = p.toLowerCase();
 
+    // 0. 日常の挨拶・単純な相槌・短い同意 (対策2: RAGスキップ・軽量即答モード)
+    if (isCasualGreetingOrShortSocial(p)) {
+      return {
+        length: 'short',
+        reason: '日常の挨拶または相槌に対する自然な即答',
+        targetRange: '1〜2文（20〜60文字程度）',
+      };
+    }
+
     // 1. ユーザーによる明示的な短文指定
     if (
       /短く|簡潔に|一言で|ひとことで|要点だけ|結論だけ|手短に|サクッと|さくっと|1行で|3行で|シンプルに/i.test(p)
@@ -93,14 +103,14 @@ export class ResponseDesignService {
     // 3. 挨拶・単純な相槌・短い同意 (15文字以下)
     if (
       p.length <= 15 &&
-      /^(おはよう|こんにちは|こんばんは|お疲れ様|おつかれ|やっほー|ありがとう|サンキュー|うん|はい|了解|りょうかい|オッケー|ok|バイバイ|またね|よろしく)/i.test(
+      /^(ただいま|ただいまー|お帰り|おかえり|おはよう|こんにちは|こんばんは|お疲れ様|おつかれ|やっほー|ありがとう|サンキュー|うん|はい|了解|りょうかい|オッケー|ok|バイバイ|またね|よろしく)/i.test(
         p
       )
     ) {
       return {
         length: 'short',
         reason: '短い挨拶または相槌に対する自然な即答',
-        targetRange: '1〜2文（30〜80文字程度）',
+        targetRange: '1〜2文（20〜60文字程度）',
       };
     }
 
@@ -145,8 +155,19 @@ export class ResponseDesignService {
    */
   public buildResponseDesignInstruction(
     length: ResponseLength,
-    stage?: ConversationStage
+    stage?: ConversationStage,
+    isCasualGreeting?: boolean
   ): string {
+    if (isCasualGreeting) {
+      return `【回答設計: 日常の挨拶・親密対話 (Fast Greeting Mode)】
+1. 【親密で自然な即答】
+   ・ユーザーからの日常の挨拶（「ただいま」「おはよう」「お疲れ様」等）や呼びかけに対し、明るく親しみやすいタメ口で1〜2文（20〜60文字程度）で自然に即答してください。
+   ・（例: 「おかえりなさい！今日もお疲れ様〜！✨」「おはよう！今日もよろしくね！」「うん、どうしたの？」「どういたしまして！」）
+2. 【余計な前置き・質問探しの排除】
+   ・「質問への答え」を探したり、Yes/Noで無理に回答しようとしないでください。
+   ・無関係な過去の話や長文解説、不必要な確認質問は挟まないでください。`;
+    }
+
     let lengthDirective = '';
     switch (length) {
       case 'short':
