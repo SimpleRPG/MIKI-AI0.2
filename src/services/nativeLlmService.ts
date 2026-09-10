@@ -409,10 +409,12 @@ export class NativeLlmService {
   public async getStorageInfo(): Promise<NativeStorageInfo> {
     if (this.isNative()) {
       try {
-        const res = await Promise.race([
-          NativeMlcPlugin.getStorageInfo().catch(() => null),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 800)),
-        ]);
+        // 800msの競争タイムアウトは、Download/gguf-models配下に大きい(数GB)
+        // モデルが複数あるとネイティブ側のスキャンが間に合わず、本物の結果を
+        // 無視してローカル記録側のフォールバックに落ちてしまう原因だったため撤廃。
+        // ネイティブ呼び出しが失敗した場合は catch(() => null) でnullになり、
+        // 下のフォールバック処理へ正しく進む。
+        const res = await NativeMlcPlugin.getStorageInfo().catch(() => null);
         if (res && Array.isArray(res.files)) {
           return {
             totalDiskMB: res.totalDiskMB || 10240,
