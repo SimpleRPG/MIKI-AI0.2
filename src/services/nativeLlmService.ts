@@ -35,6 +35,22 @@ export interface NativeStorageInfo {
   files: NativeDownloadedFile[];
 }
 
+export interface NativeLoraFile {
+  fileName: string;
+  sizeMB: number;
+  lastModified: number;
+  isApplied?: boolean;
+  scale?: number;
+}
+
+export interface NativeLoraStorageInfo {
+  usedByLoraMB: number;
+  loraDir: string;
+  files: NativeLoraFile[];
+  activeLoraFileName?: string | null;
+  activeLoraScale?: number;
+}
+
 export interface ExternalLocalLlmConfig {
   endpoint: string; // e.g. http://localhost:11434 (Ollama) or http://localhost:1234/v1 (LM Studio)
   model: string;
@@ -79,6 +95,13 @@ export interface NativeLlamaPluginInterface {
     isMeasuredReal: boolean;
   }>;
   getStorageInfo(): Promise<NativeStorageInfo>;
+  getLoraStorageInfo?(): Promise<NativeLoraStorageInfo>;
+  applyLora?(options: {
+    loraFileName: string;
+    scale?: number;
+  }): Promise<{ success: boolean; loraFileName: string; scale: number }>;
+  removeLora?(): Promise<{ success: boolean }>;
+  deleteLora?(options: { fileName: string }): Promise<{ success: boolean }>;
   checkStorageAccess?(): Promise<{ granted: boolean }>;
   requestStorageAccess?(): Promise<{ opened: boolean }>;
   downloadModel(options: {
@@ -161,6 +184,61 @@ export const NativeMlcPlugin = registerPlugin<NativeLlamaPluginInterface>('MlcLl
         files: [],
       };
     },
+    async getLoraStorageInfo() {
+      let localLoraFiles: NativeLoraFile[] = [];
+      try {
+        if (typeof storageService !== 'undefined') {
+          const raw = storageService.getItem('miki_downloaded_lora_files');
+          if (raw) localLoraFiles = JSON.parse(raw);
+        }
+      } catch (e) {}
+      const activeLora = typeof storageService !== 'undefined' ? storageService.getItem('miki_active_lora_file') : null;
+      const activeScale = typeof storageService !== 'undefined' ? Number(storageService.getItem('miki_active_lora_scale') || '1.0') : 1.0;
+      const totalMB = localLoraFiles.reduce((acc, f) => acc + (f.sizeMB || 0), 0);
+      return {
+        usedByLoraMB: Math.round(totalMB * 10) / 10,
+        loraDir: 'Download/lora-adapters',
+        files: localLoraFiles.map(f => ({
+          ...f,
+          isApplied: f.fileName === activeLora,
+          scale: f.fileName === activeLora ? activeScale : 1.0
+        })),
+        activeLoraFileName: activeLora,
+        activeLoraScale: activeScale
+      };
+    },
+    async applyLora(options: { loraFileName: string; scale?: number }) {
+      if (typeof storageService !== 'undefined') {
+        storageService.setItem('miki_active_lora_file', options.loraFileName);
+        storageService.setItem('miki_active_lora_scale', String(options.scale ?? 1.0));
+      }
+      return { success: true, loraFileName: options.loraFileName, scale: options.scale ?? 1.0 };
+    },
+    async removeLora() {
+      if (typeof storageService !== 'undefined') {
+        storageService.removeItem('miki_active_lora_file');
+        storageService.removeItem('miki_active_lora_scale');
+      }
+      return { success: true };
+    },
+    async deleteLora(options: { fileName: string }) {
+      try {
+        if (typeof storageService !== 'undefined') {
+          const raw = storageService.getItem('miki_downloaded_lora_files');
+          if (raw) {
+            const list: NativeLoraFile[] = JSON.parse(raw);
+            const filtered = list.filter(f => f && f.fileName !== options.fileName);
+            storageService.setItem('miki_downloaded_lora_files', JSON.stringify(filtered));
+          }
+          const active = storageService.getItem('miki_active_lora_file');
+          if (active === options.fileName) {
+            storageService.removeItem('miki_active_lora_file');
+            storageService.removeItem('miki_active_lora_scale');
+          }
+        }
+      } catch (e) {}
+      return { success: true };
+    },
     async downloadModel() {
       throw new Error('GGUF native download is only available in the Android APK native runtime.');
     },
@@ -188,6 +266,8 @@ export class NativeLlmService {
   private isNativePlatform: boolean = false;
   private isAvailableOnDevice: boolean = false;
   private activeModelId: string | null = null;
+  private activeLoraFileName: string | null = null;
+  private activeLoraScale: number = 1.0;
   private isModelLoading: boolean = false;
   private cachedHardwareSpecs: NativeGpuInfo | null = null;
   // 外部ローカルLLM(llama-swap等)から最後に応答があった時刻。
@@ -210,6 +290,15 @@ export class NativeLlmService {
         }
       } catch {
         this.externalLlmRunHistory = [];
+      }
+      try {
+        if (typeof storageService !== 'undefined') {
+          this.activeLoraFileName = storageService.getItem('miki_active_lora_file') || null;
+          this.activeLoraScale = Number(storageService.getItem('miki_active_lora_scale') || '1.0');
+        }
+      } catch {
+        this.activeLoraFileName = null;
+        this.activeLoraScale = 1.0;
       }
     }
     this.checkPlatform();
@@ -684,6 +773,11 @@ export class NativeLlmService {
     const defCfg = getManifestDefaultConfig();
     const tunedCfg = samplingTuningService.getSamplingConfig();
     const nativeCfg = (options as any)?.nativeConfig;
+    const loraInfo = this.getActiveLoraInfo();
+    systemLogger.info(
+      'NATIVE_GPU',
+      `⚡ llama.cpp C++ JNI ネイティブ推論を開始: ${this.activeModelId}${loraInfo.fileName ? ` [LoRA適用: ${loraInfo.fileName} (scale: ${loraInfo.scale})]` : ''}`
+    );
     const executionPromise = (NativeMlcPlugin as any).generateStream({
       messages,
       temperature: nativeCfg?.temperature ?? options?.temperature ?? tunedCfg.temperature ?? defCfg.temperature ?? 0.7,
@@ -1252,6 +1346,200 @@ export class NativeLlmService {
       }
     } catch (e) {}
     this.activeModelId = null;
+    this.activeLoraFileName = null;
+    this.activeLoraScale = 1.0;
+    try {
+      if (typeof storageService !== 'undefined') {
+        storageService.removeItem('miki_active_lora_file');
+        storageService.removeItem('miki_active_lora_scale');
+      }
+    } catch {}
+  }
+
+  /**
+   * 現在適用中のLoRAアダプター情報を取得
+   */
+  public getActiveLoraInfo(): { fileName: string | null; scale: number } {
+    return {
+      fileName: this.activeLoraFileName,
+      scale: this.activeLoraScale,
+    };
+  }
+
+  /**
+   * 共有ストレージ (Download/lora-adapters) 内のLoRAアダプターファイル一覧・空き容量を取得
+   */
+  public async getLoraStorageInfo(): Promise<NativeLoraStorageInfo> {
+    if (this.isNative() && NativeMlcPlugin.getLoraStorageInfo) {
+      try {
+        const info = await NativeMlcPlugin.getLoraStorageInfo();
+        if (info && info.activeLoraFileName !== undefined) {
+          this.activeLoraFileName = info.activeLoraFileName;
+          this.activeLoraScale = info.activeLoraScale ?? 1.0;
+        }
+        return info;
+      } catch (err) {
+        systemLogger.warn('NATIVE_GPU', `LoRAストレージ取得失敗: ${err}`);
+      }
+    }
+
+    // Web環境またはフォールバック
+    let localLoraFiles: NativeLoraFile[] = [];
+    try {
+      if (typeof storageService !== 'undefined') {
+        const raw = storageService.getItem('miki_downloaded_lora_files');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            localLoraFiles = parsed.filter((f) => f && typeof f.fileName === 'string');
+          }
+        }
+      }
+    } catch (e) {}
+
+    const usedMB = localLoraFiles.reduce((sum, f) => sum + (f.sizeMB || 0), 0);
+    return {
+      usedByLoraMB: Math.round(usedMB * 10) / 10,
+      loraDir: 'Download/lora-adapters',
+      files: localLoraFiles.map((f) => ({
+        ...f,
+        isApplied: f.fileName === this.activeLoraFileName,
+        scale: f.fileName === this.activeLoraFileName ? this.activeLoraScale : 1.0,
+      })),
+      activeLoraFileName: this.activeLoraFileName,
+      activeLoraScale: this.activeLoraScale,
+    };
+  }
+
+  /**
+   * GGUFベースモデルに対してLoRAアダプターをロード・適用
+   */
+  public async applyLoraAdapter(
+    fileName: string,
+    scale: number = 1.0
+  ): Promise<{ success: boolean; message: string }> {
+    if (!this.activeModelId) {
+      return {
+        success: false,
+        message: 'ベースモデルがロードされていません。先にGGUFベースモデルをロードしてください。',
+      };
+    }
+
+    const effScale = scale > 0 ? scale : 1.0;
+
+    if (this.isNative() && NativeMlcPlugin.applyLora) {
+      try {
+        systemLogger.info('NATIVE_GPU', `🔄 llama.cpp LoRAアダプター適用処理開始: ${fileName} (scale: ${effScale})`);
+        const res = await NativeMlcPlugin.applyLora({ loraFileName: fileName, scale: effScale });
+        if (res && res.success) {
+          this.activeLoraFileName = fileName;
+          this.activeLoraScale = effScale;
+          try {
+            if (typeof storageService !== 'undefined') {
+              storageService.setItem('miki_active_lora_file', fileName);
+              storageService.setItem('miki_active_lora_scale', String(effScale));
+            }
+          } catch {}
+          systemLogger.info('NATIVE_GPU', `✨ LoRAアダプター適用完了: ${fileName} (scale: ${effScale})`);
+          return { success: true, message: `LoRAアダプター「${fileName}」を適用しました (Scale: ${effScale})` };
+        }
+      } catch (err: any) {
+        systemLogger.error('NATIVE_GPU', `❌ LoRAアダプター適用失敗: ${err?.message || err}`);
+        return { success: false, message: `LoRA適用失敗: ${err?.message || err}` };
+      }
+    }
+
+    // Web環境フォールバック
+    this.activeLoraFileName = fileName;
+    this.activeLoraScale = effScale;
+    try {
+      if (typeof storageService !== 'undefined') {
+        storageService.setItem('miki_active_lora_file', fileName);
+        storageService.setItem('miki_active_lora_scale', String(effScale));
+      }
+    } catch {}
+    systemLogger.info('NATIVE_GPU', `✨ [Webプレビュー] LoRAアダプター仮想適用完了: ${fileName} (scale: ${effScale})`);
+    return { success: true, message: `[Webプレビュー] LoRAアダプター「${fileName}」を適用しました (Scale: ${effScale})` };
+  }
+
+  /**
+   * 現在適用中のLoRAアダプターを解除 (ベースモデルはそのまま維持)
+   */
+  public async removeLoraAdapter(): Promise<{ success: boolean; message: string }> {
+    if (this.isNative() && NativeMlcPlugin.removeLora) {
+      try {
+        await NativeMlcPlugin.removeLora();
+      } catch (err: any) {
+        systemLogger.warn('NATIVE_GPU', `LoRA解除エラー: ${err?.message || err}`);
+      }
+    }
+    const prev = this.activeLoraFileName;
+    this.activeLoraFileName = null;
+    this.activeLoraScale = 1.0;
+    try {
+      if (typeof storageService !== 'undefined') {
+        storageService.removeItem('miki_active_lora_file');
+        storageService.removeItem('miki_active_lora_scale');
+      }
+    } catch {}
+    systemLogger.info('NATIVE_GPU', `🧹 LoRAアダプターを解除しました (以前: ${prev || 'なし'})`);
+    return { success: true, message: 'LoRAアダプターを解除しました' };
+  }
+
+  /**
+   * 共有ストレージ (Download/lora-adapters) からLoRAファイルを削除
+   */
+  public async deleteLoraFile(fileName: string): Promise<boolean> {
+    if (this.isNative() && NativeMlcPlugin.deleteLora) {
+      try {
+        const res = await NativeMlcPlugin.deleteLora({ fileName });
+        if (res?.success) {
+          if (this.activeLoraFileName === fileName) {
+            this.activeLoraFileName = null;
+            this.activeLoraScale = 1.0;
+          }
+          return true;
+        }
+      } catch (err) {
+        systemLogger.warn('NATIVE_GPU', `LoRAファイル削除失敗: ${err}`);
+      }
+    }
+
+    // Web環境フォールバック
+    try {
+      if (typeof storageService !== 'undefined') {
+        const raw = storageService.getItem('miki_downloaded_lora_files');
+        if (raw) {
+          const list: NativeLoraFile[] = JSON.parse(raw);
+          const filtered = list.filter((f) => f && f.fileName !== fileName);
+          storageService.setItem('miki_downloaded_lora_files', JSON.stringify(filtered));
+        }
+        if (this.activeLoraFileName === fileName) {
+          this.activeLoraFileName = null;
+          this.activeLoraScale = 1.0;
+          storageService.removeItem('miki_active_lora_file');
+          storageService.removeItem('miki_active_lora_scale');
+        }
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * テスト検証用: ローカル環境でLoRAファイルを登録
+   */
+  public registerLocalLoraFile(file: NativeLoraFile): void {
+    try {
+      if (typeof storageService !== 'undefined') {
+        const raw = storageService.getItem('miki_downloaded_lora_files');
+        const list: NativeLoraFile[] = raw ? JSON.parse(raw) : [];
+        const filtered = list.filter((f) => f && f.fileName !== file.fileName);
+        filtered.push(file);
+        storageService.setItem('miki_downloaded_lora_files', JSON.stringify(filtered));
+      }
+    } catch (e) {}
   }
 
   /**

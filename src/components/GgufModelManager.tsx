@@ -14,9 +14,18 @@ import {
   Sparkles,
   Smartphone,
   ShieldCheck,
+  Layers,
+  Sliders,
+  Plus,
 } from 'lucide-react';
 import { OFFICIAL_GGUF_MODELS, GgufModelDefinition, getModelManifest, getManifestNativeEnv, isModelProtected } from '../services/ggufModels';
-import { nativeLlmService, NativeStorageInfo, NativeGpuInfo } from '../services/nativeLlmService';
+import {
+  nativeLlmService,
+  NativeStorageInfo,
+  NativeGpuInfo,
+  NativeLoraStorageInfo,
+  NativeLoraFile,
+} from '../services/nativeLlmService';
 import { systemLogger } from '../services/systemLogger';
 
 interface GgufModelManagerProps {
@@ -28,6 +37,14 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
   const [models] = useState<GgufModelDefinition[]>(OFFICIAL_GGUF_MODELS);
   const [storageInfo, setStorageInfo] = useState<NativeStorageInfo | null>(null);
   const [hardwareSpecs, setHardwareSpecs] = useState<NativeGpuInfo | null>(null);
+  const [loraStorageInfo, setLoraStorageInfo] = useState<NativeLoraStorageInfo | null>(null);
+  const [activeLoraInfo, setActiveLoraInfo] = useState<{ fileName: string | null; scale: number }>({
+    fileName: null,
+    scale: 1.0,
+  });
+  const [loraScaleInputs, setLoraScaleInputs] = useState<Record<string, number>>({});
+  const [applyingLoraFile, setApplyingLoraFile] = useState<string | null>(null);
+
   const [downloadingModelId, setDownloadingModelId] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [downloadStatusText, setDownloadStatusText] = useState<string>('');
@@ -40,6 +57,7 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
 
   const [notification, setNotification] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<string | null>(null);
+  const [deleteConfirmLoraTarget, setDeleteConfirmLoraTarget] = useState<string | null>(null);
   const [hasStorageAccess, setHasStorageAccess] = useState<boolean>(true);
 
   const showNotification = (type: 'info' | 'success' | 'error', message: string) => {
@@ -51,11 +69,18 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
 
   const refreshStorage = async () => {
     try {
-      const info = await nativeLlmService.getStorageInfo().catch(() => null);
+      const [info, specs, loraInfo] = await Promise.all([
+        nativeLlmService.getStorageInfo().catch(() => null),
+        nativeLlmService.getHardwareSpecs().catch(() => null),
+        nativeLlmService.getLoraStorageInfo().catch(() => null),
+      ]);
       if (info) setStorageInfo(info);
-      const specs = await nativeLlmService.getHardwareSpecs().catch(() => null);
       if (specs) setHardwareSpecs(specs);
+      if (loraInfo) setLoraStorageInfo(loraInfo);
+
       setActiveLoadedId(nativeLlmService.getActiveModelId());
+      setActiveLoraInfo(nativeLlmService.getActiveLoraInfo());
+
       const granted = await nativeLlmService.isSharedStorageAccessGranted().catch(() => true);
       setHasStorageAccess(granted);
     } catch (e) {
@@ -132,9 +157,77 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
     }
   };
 
+  const handleApplyLora = async (fileName: string) => {
+    if (!activeLoadedId) {
+      showNotification('error', '⚠️ ベースモデルが未ロードです。先にGGUFベースモデルをVRAMにロードしてください。');
+      return;
+    }
+
+    const scale = loraScaleInputs[fileName] ?? 1.0;
+    setApplyingLoraFile(fileName);
+
+    try {
+      showNotification('info', `LoRAアダプター「${fileName}」を適用中... (Scale: ${scale})`);
+      const res = await nativeLlmService.applyLoraAdapter(fileName, scale);
+      if (res.success) {
+        showNotification('success', res.message);
+      } else {
+        showNotification('error', res.message);
+      }
+      await refreshStorage();
+    } catch (err: any) {
+      showNotification('error', `LoRA適用失敗: ${err?.message || err}`);
+    } finally {
+      setApplyingLoraFile(null);
+    }
+  };
+
+  const handleRemoveLora = async () => {
+    try {
+      const res = await nativeLlmService.removeLoraAdapter();
+      showNotification('info', res.message);
+      await refreshStorage();
+    } catch (err: any) {
+      showNotification('error', `LoRA解除エラー: ${err?.message || err}`);
+    }
+  };
+
+  const handleDeleteLora = async (fileName: string) => {
+    try {
+      const ok = await nativeLlmService.deleteLoraFile(fileName);
+      setDeleteConfirmLoraTarget(null);
+      if (ok) {
+        showNotification('info', `LoRAアダプター「${fileName}」を削除しました。`);
+      } else {
+        showNotification('error', `LoRAファイル「${fileName}」の削除に失敗しました。`);
+      }
+      await refreshStorage();
+    } catch (err: any) {
+      showNotification('error', `削除エラー: ${err?.message || err}`);
+    }
+  };
+
+  const handleCreateDemoLora = async () => {
+    const demoFileName = `miki-persona-v1-q4.gguf`;
+    nativeLlmService.registerLocalLoraFile({
+      fileName: demoFileName,
+      sizeMB: 48.5,
+      lastModified: Date.now(),
+      scale: 1.0,
+    });
+    showNotification('success', `検証用LoRA「${demoFileName}」を登録しました。`);
+    await refreshStorage();
+  };
+
   const handleRunGgufTest = async (model: GgufModelDefinition) => {
     setIsTestRunning(true);
-    setTestOutput(`🚀 [GGUF llama.cpp Native] ${model.name} で推論テストを開始...\n\n`);
+    const loraInfo = nativeLlmService.getActiveLoraInfo();
+    const loraHeader = loraInfo.fileName
+      ? `\n✨ 【適用中のLoRAアダプター】: ${loraInfo.fileName} (Scale: ${loraInfo.scale})\n`
+      : '\nℹ️ 【LoRAアダプター】: 未適用 (ベースモデル単体)\n';
+    setTestOutput(
+      `🚀 [GGUF llama.cpp Native] ${model.name} で推論テストを開始...\nファイル: ${model.fileName}${loraHeader}----------------------------------------\n`
+    );
 
     try {
       const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
@@ -577,6 +670,207 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
           </div>
         );
       })()}
+
+      {/* LoRA Adapter Manager Section */}
+      <div className="p-4 rounded-xl bg-slate-900/90 border border-purple-500/40 space-y-4 shadow-md">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-100">LoRAアダプター管理 (Vulkan / C++ JNI)</h3>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono font-semibold">
+                  llama.cpp LoRA
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                ベースモデル（Qwen/Llama等）にLoRAアダプターを重ねがけし、ペルソナ・専門知識を動的切り替えします。
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              onClick={refreshStorage}
+              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs flex items-center gap-1 transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>更新</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Base Model Status Banner */}
+        <div
+          className={`p-3 rounded-lg border text-xs flex items-center justify-between gap-2 ${
+            activeLoadedId
+              ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200'
+              : 'bg-amber-950/40 border-amber-500/50 text-amber-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 shrink-0" />
+            <span>
+              {activeLoadedId
+                ? `ベースモデル展開中: 「${activeLoadedId}」 (LoRA適用可能)`
+                : 'ベースモデルが未ロードです。LoRAを適用するには、上のモデル一覧からベースモデルを先に「VRAMロード」してください。'}
+            </span>
+          </div>
+          {activeLoraInfo.fileName && (
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/30 border border-purple-400/50 text-purple-100 font-bold">
+                適用中: {activeLoraInfo.fileName} (x{activeLoraInfo.scale})
+              </span>
+              <button
+                onClick={handleRemoveLora}
+                className="text-[11px] px-2 py-0.5 rounded bg-rose-900/60 hover:bg-rose-800/80 text-rose-200 border border-rose-700 font-semibold"
+              >
+                解除
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Directory & Capacity Info */}
+        <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2 border-b border-slate-800/80 pb-2">
+          <div>
+            保存先: <code className="text-purple-300 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">Download/lora-adapters</code>
+            <span className="ml-2 text-slate-500">(Termux: ~/storage/downloads/lora-adapters)</span>
+          </div>
+          <div>
+            LoRA使用容量: <strong className="text-slate-200">{loraStorageInfo?.usedByLoraMB ?? 0} MB</strong>
+          </div>
+        </div>
+
+        {/* LoRA Files List */}
+        {loraStorageInfo?.files && loraStorageInfo.files.length > 0 ? (
+          <div className="space-y-2.5">
+            {loraStorageInfo.files.map((file) => {
+              const isApplied = activeLoraInfo.fileName === file.fileName;
+              const currentScale = loraScaleInputs[file.fileName] ?? file.scale ?? 1.0;
+              const isApplying = applyingLoraFile === file.fileName;
+
+              return (
+                <div
+                  key={file.fileName}
+                  className={`p-3 rounded-lg border transition-all ${
+                    isApplied
+                      ? 'bg-purple-950/40 border-purple-500/70 shadow-sm'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="p-2 rounded bg-slate-800/80 text-purple-300 border border-slate-700 shrink-0">
+                        <Sliders className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center flex-wrap gap-2">
+                          <span className="font-mono font-bold text-xs text-slate-200 break-all">
+                            {file.fileName}
+                          </span>
+                          {isApplied && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-500/40 font-bold flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-purple-300" />
+                              適用中 (Scale: {activeLoraInfo.scale})
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-3">
+                          <span>容量: <strong className="text-slate-300">{Math.round(file.sizeMB || 0)} MB</strong></span>
+                          <span>形式: <span className="font-mono text-slate-300">GGUF LoRA Adapter</span></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center flex-wrap gap-2 self-end sm:self-auto shrink-0">
+                      {/* Scale Input */}
+                      <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2 py-1 rounded text-xs">
+                        <span className="text-slate-400 text-[11px]">Scale:</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0.1"
+                          max="2.0"
+                          value={currentScale}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 1.0;
+                            setLoraScaleInputs((prev) => ({ ...prev, [file.fileName]: val }));
+                          }}
+                          className="w-12 bg-transparent text-right font-mono text-purple-200 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Apply / Remove Button */}
+                      {!isApplied ? (
+                        <button
+                          onClick={() => handleApplyLora(file.fileName)}
+                          disabled={!activeLoadedId || isApplying}
+                          className="px-3 py-1 bg-purple-600/30 hover:bg-purple-600/50 disabled:opacity-50 text-purple-200 border border-purple-500/50 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>{isApplying ? '適用中...' : 'LoRA適用'}</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleRemoveLora}
+                          className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition-colors"
+                        >
+                          解除
+                        </button>
+                      )}
+
+                      {/* Delete Button */}
+                      {deleteConfirmLoraTarget === file.fileName ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleDeleteLora(file.fileName)}
+                            className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-[11px] font-bold"
+                          >
+                            削除実行
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirmLoraTarget(null)}
+                            className="px-1.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px]"
+                          >
+                            取消
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirmLoraTarget(file.fileName)}
+                          className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors"
+                          title="LoRAファイルを削除"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-4 rounded-lg bg-slate-950/40 border border-dashed border-slate-800 text-center space-y-2">
+            <p className="text-xs text-slate-400">
+              <code>Download/lora-adapters</code> 内にLoRAアダプターファイルが見つかりません。
+            </p>
+            <p className="text-[11px] text-slate-500">
+              PCまたはTermuxから共有ストレージ（<code>/storage/emulated/0/Download/lora-adapters</code>）にアダプターファイル（.gguf）を配置すると自動検知されます。
+            </p>
+            <button
+              onClick={handleCreateDemoLora}
+              className="mt-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>検証用サンプルLoRA（miki-persona-v1-q4.gguf）を登録</span>
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Test Output Box */}
       {testOutput && (

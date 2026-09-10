@@ -234,6 +234,8 @@ jobs:
           static const llama_vocab* g_vocab = nullptr;
           static llama_context* g_ctx = nullptr;
           static llama_sampler* g_smpl = nullptr;
+          static llama_adapter_lora* g_lora = nullptr;
+          static std::string g_current_lora_path = "";
 
           extern "C" {
 
@@ -261,6 +263,11 @@ jobs:
               if (g_smpl) {
                   llama_sampler_free(g_smpl);
                   g_smpl = nullptr;
+              }
+              if (g_lora) {
+                  llama_adapter_lora_free(g_lora);
+                  g_lora = nullptr;
+                  g_current_lora_path = "";
               }
               if (g_model) {
                   llama_model_free(g_model);
@@ -390,6 +397,14 @@ jobs:
                   llama_sampler_free(g_smpl);
                   g_smpl = nullptr;
               }
+              if (g_lora) {
+                  if (g_ctx) {
+                      llama_set_adapters_lora(g_ctx, nullptr, 0, nullptr);
+                  }
+                  llama_adapter_lora_free(g_lora);
+                  g_lora = nullptr;
+                  g_current_lora_path = "";
+              }
               if (g_ctx) {
                   llama_free(g_ctx);
                   g_ctx = nullptr;
@@ -401,6 +416,71 @@ jobs:
               }
               llama_backend_free();
               LOGI("Native model freed from memory");
+          }
+
+          JNIEXPORT jboolean JNICALL
+          Java_com_mikiai_app_MlcLlmPlugin_nativeApplyLora(
+              JNIEnv* env, jobject thiz, jstring jLoraPath, jfloat scale) {
+
+              if (!g_model || !g_ctx) {
+                  LOGE("nativeApplyLora: Model or Context is not initialized");
+                  return JNI_FALSE;
+              }
+              if (!jLoraPath) {
+                  LOGE("nativeApplyLora: jLoraPath is null");
+                  return JNI_FALSE;
+              }
+
+              const char* loraPath = env->GetStringUTFChars(jLoraPath, nullptr);
+              if (!loraPath) {
+                  LOGE("nativeApplyLora: Failed to get loraPath UTF string");
+                  return JNI_FALSE;
+              }
+
+              LOGI("Applying LoRA adapter from %s (scale: %.2f)", loraPath, scale);
+
+              // 既存のアダプタがあれば解除・解放
+              if (g_lora) {
+                  llama_set_adapters_lora(g_ctx, nullptr, 0, nullptr);
+                  llama_adapter_lora_free(g_lora);
+                  g_lora = nullptr;
+                  g_current_lora_path = "";
+              }
+
+              g_lora = llama_adapter_lora_init(g_model, loraPath);
+              if (!g_lora) {
+                  LOGE("Failed to init LoRA adapter from %s", loraPath);
+                  env->ReleaseStringUTFChars(jLoraPath, loraPath);
+                  return JNI_FALSE;
+              }
+
+              float effScale = scale > 0.0f ? scale : 1.0f;
+              int32_t ret = llama_set_adapters_lora(g_ctx, &g_lora, 1, &effScale);
+              env->ReleaseStringUTFChars(jLoraPath, loraPath);
+
+              if (ret != 0) {
+                  LOGE("Failed to set LoRA adapter on context (ret: %d)", ret);
+                  llama_adapter_lora_free(g_lora);
+                  g_lora = nullptr;
+                  return JNI_FALSE;
+              }
+
+              g_current_lora_path = loraPath;
+              LOGI("LoRA adapter applied successfully! (scale: %.2f)", effScale);
+              return JNI_TRUE;
+          }
+
+          JNIEXPORT jboolean JNICALL
+          Java_com_mikiai_app_MlcLlmPlugin_nativeRemoveLora(JNIEnv* env, jobject thiz) {
+              if (g_lora && g_ctx) {
+                  LOGI("Removing LoRA adapter: %s", g_current_lora_path.c_str());
+                  llama_set_adapters_lora(g_ctx, nullptr, 0, nullptr);
+                  llama_adapter_lora_free(g_lora);
+                  g_lora = nullptr;
+                  g_current_lora_path = "";
+                  LOGI("LoRA adapter removed successfully");
+              }
+              return JNI_TRUE;
           }
 
           }
@@ -556,6 +636,8 @@ jobs:
               public native boolean nativeInitModel(String modelPath, int nGpuLayers, int nCtx, int nThreads);
               public native String nativeGenerateToken(String prompt, float temp, float topP, int maxTokens, TokenCallback callback);
               public native void nativeFreeModel();
+              public native boolean nativeApplyLora(String loraPath, float scale);
+              public native boolean nativeRemoveLora();
 
               public interface TokenCallback {
                   boolean onChunk(String chunk);
@@ -568,6 +650,8 @@ jobs:
               private String currentModelId = null;
               private String currentModelPath = null;
               private boolean isModelLoaded = false;
+              private String currentLoraFileName = null;
+              private float currentLoraScale = 1.0f;
               private final AtomicBoolean isGenerating = new AtomicBoolean(false);
               private Call currentDownloadCall = null;
 
@@ -577,6 +661,16 @@ jobs:
               // ファイルをそのまま検知できるようになる。
               private File getModelsDirectory() {
                   File dir = new File(Environment.getExternalStorageDirectory(), "Download/gguf-models");
+                  if (!dir.exists()) {
+                      dir.mkdirs();
+                  }
+                  return dir;
+              }
+
+              // 共有ストレージ配下のLoRAアダプター専用ディレクトリ (/storage/emulated/0/Download/lora-adapters)
+              // Termux からは ~/storage/downloads/lora-adapters として共有される。
+              private File getLoraDirectory() {
+                  File dir = new File(Environment.getExternalStorageDirectory(), "Download/lora-adapters");
                   if (!dir.exists()) {
                       dir.mkdirs();
                   }
@@ -969,6 +1063,8 @@ jobs:
                   isModelLoaded = false;
                   currentModelId = null;
                   currentModelPath = null;
+                  currentLoraFileName = null;
+                  currentLoraScale = 1.0f;
               }
 
               @PluginMethod
@@ -977,6 +1073,127 @@ jobs:
                   JSObject ret = new JSObject();
                   ret.put("success", true);
                   call.resolve(ret);
+              }
+
+              @PluginMethod
+              public void getLoraStorageInfo(PluginCall call) {
+                  File dir = getLoraDirectory();
+                  File[] files = dir.listFiles();
+                  long totalSize = 0;
+                  JSArray fileList = new JSArray();
+
+                  if (files != null) {
+                      for (File f : files) {
+                          if (f.isFile() && (f.getName().endsWith(".gguf") || f.getName().endsWith(".bin"))) {
+                              totalSize += f.length();
+                              JSObject fo = new JSObject();
+                              fo.put("fileName", f.getName());
+                              fo.put("sizeMB", Math.round((double) f.length() / (1024.0 * 1024.0) * 10.0) / 10.0);
+                              fo.put("lastModified", f.lastModified());
+                              fo.put("isApplied", currentLoraFileName != null && currentLoraFileName.equals(f.getName()));
+                              fo.put("scale", currentLoraFileName != null && currentLoraFileName.equals(f.getName()) ? currentLoraScale : 1.0f);
+                              fileList.put(fo);
+                          }
+                      }
+                  }
+
+                  JSObject ret = new JSObject();
+                  ret.put("usedByLoraMB", Math.round((double) totalSize / (1024.0 * 1024.0) * 10.0) / 10.0);
+                  ret.put("loraDir", dir.getAbsolutePath());
+                  ret.put("files", fileList);
+                  ret.put("activeLoraFileName", currentLoraFileName);
+                  ret.put("activeLoraScale", currentLoraScale);
+                  call.resolve(ret);
+              }
+
+              @PluginMethod
+              public void applyLora(PluginCall call) {
+                  String loraFileName = call.getString("loraFileName");
+                  double scaleDouble = call.getDouble("scale", 1.0);
+                  float scale = (float) scaleDouble;
+
+                  if (loraFileName == null || loraFileName.isEmpty()) {
+                      call.reject("loraFileName is required");
+                      return;
+                  }
+
+                  if (!isModelLoaded || !isNativeLibLoaded) {
+                      call.reject("ベースモデルがVRAM/RAMにロードされていません。先にGGUFベースモデルをロードしてください。");
+                      return;
+                  }
+
+                  File loraFile = new File(getLoraDirectory(), loraFileName);
+                  if (!loraFile.exists()) {
+                      call.reject("LoRAファイル (" + loraFileName + ") が Download/lora-adapters に存在しません。");
+                      return;
+                  }
+
+                  executor.execute(() -> {
+                      try {
+                          boolean ok = nativeApplyLora(loraFile.getAbsolutePath(), scale);
+                          if (ok) {
+                              currentLoraFileName = loraFileName;
+                              currentLoraScale = scale;
+                              JSObject ret = new JSObject();
+                              ret.put("success", true);
+                              ret.put("loraFileName", loraFileName);
+                              ret.put("scale", scale);
+                              call.resolve(ret);
+                          } else {
+                              call.reject("LoRAアダプターの適用に失敗しました (llama_adapter_lora_init または llama_set_adapters_lora エラー)。ベースモデルとアーキテクチャが一致しているか確認してください。");
+                          }
+                      } catch (Exception e) {
+                          call.reject("applyLora error: " + e.getMessage());
+                      }
+                  });
+              }
+
+              @PluginMethod
+              public void removeLora(PluginCall call) {
+                  if (!isNativeLibLoaded) {
+                      call.reject("Native library is not loaded");
+                      return;
+                  }
+                  executor.execute(() -> {
+                      try {
+                          nativeRemoveLora();
+                          currentLoraFileName = null;
+                          currentLoraScale = 1.0f;
+                          JSObject ret = new JSObject();
+                          ret.put("success", true);
+                          call.resolve(ret);
+                      } catch (Exception e) {
+                          call.reject("removeLora error: " + e.getMessage());
+                      }
+                  });
+              }
+
+              @PluginMethod
+              public void deleteLora(PluginCall call) {
+                  String fileName = call.getString("fileName");
+                  if (fileName == null || fileName.isEmpty()) {
+                      call.reject("fileName is required");
+                      return;
+                  }
+                  File target = new File(getLoraDirectory(), fileName);
+                  if (target.exists()) {
+                      if (currentLoraFileName != null && currentLoraFileName.equals(fileName)) {
+                          try {
+                              nativeRemoveLora();
+                          } catch (Exception ignored) {}
+                          currentLoraFileName = null;
+                          currentLoraScale = 1.0f;
+                      }
+                      boolean deleted = target.delete();
+                      JSObject ret = new JSObject();
+                      ret.put("success", deleted);
+                      call.resolve(ret);
+                  } else {
+                      JSObject ret = new JSObject();
+                      ret.put("success", false);
+                      ret.put("message", "File not found");
+                      call.resolve(ret);
+                  }
               }
 
               @PluginMethod
