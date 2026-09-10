@@ -16,7 +16,6 @@ import {
   ShieldCheck,
   Layers,
   Sliders,
-  Plus,
 } from 'lucide-react';
 import { OFFICIAL_GGUF_MODELS, GgufModelDefinition, getModelManifest, getManifestNativeEnv, isModelProtected } from '../services/ggufModels';
 import {
@@ -205,18 +204,6 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
     } catch (err: any) {
       showNotification('error', `削除エラー: ${err?.message || err}`);
     }
-  };
-
-  const handleCreateDemoLora = async () => {
-    const demoFileName = `miki-persona-v1-q4.gguf`;
-    nativeLlmService.registerLocalLoraFile({
-      fileName: demoFileName,
-      sizeMB: 48.5,
-      lastModified: Date.now(),
-      scale: 1.0,
-    });
-    showNotification('success', `検証用LoRA「${demoFileName}」を登録しました。`);
-    await refreshStorage();
   };
 
   const handleRunGgufTest = async (model: GgufModelDefinition) => {
@@ -854,20 +841,13 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
             })}
           </div>
         ) : (
-          <div className="p-4 rounded-lg bg-slate-950/40 border border-dashed border-slate-800 text-center space-y-2">
+          <div className="p-4 rounded-lg bg-slate-950/40 border border-dashed border-slate-800 text-center space-y-1.5">
             <p className="text-xs text-slate-400">
               <code>Download/lora-adapters</code> 内にLoRAアダプターファイルが見つかりません。
             </p>
             <p className="text-[11px] text-slate-500">
               PCまたはTermuxから共有ストレージ（<code>/storage/emulated/0/Download/lora-adapters</code>）にアダプターファイル（.gguf）を配置すると自動検知されます。
             </p>
-            <button
-              onClick={handleCreateDemoLora}
-              className="mt-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>検証用サンプルLoRA（miki-persona-v1-q4.gguf）を登録</span>
-            </button>
           </div>
         )}
       </div>

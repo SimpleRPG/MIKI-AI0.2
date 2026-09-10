@@ -433,15 +433,12 @@ export class NativeLlmService {
 
     try {
       if (this.isNative()) {
+        // getStorageInfo()と同様、800msの競争タイムアウトは端末の負荷や初期化時に
+        // ネイティブ側の取得が間に合わずフォールバックに落ちてしまう原因となるため撤廃。
+        // ネイティブ呼び出しが失敗した場合は catch(() => null) でnullになり、安全に処理される。
         const [specsRes, memRes] = await Promise.all([
-          Promise.race([
-            NativeMlcPlugin.getHardwareSpecs().catch(() => null),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 800)),
-          ]),
-          Promise.race([
-            NativeMlcPlugin.getMemoryInfo ? NativeMlcPlugin.getMemoryInfo().catch(() => null) : Promise.resolve(null),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 800)),
-          ]),
+          NativeMlcPlugin.getHardwareSpecs().catch(() => null),
+          NativeMlcPlugin.getMemoryInfo ? NativeMlcPlugin.getMemoryInfo().catch(() => null) : Promise.resolve(null),
         ]);
 
         if (memRes && memRes.isMeasuredReal) {
@@ -1525,21 +1522,6 @@ export class NativeLlmService {
     } catch {
       return false;
     }
-  }
-
-  /**
-   * テスト検証用: ローカル環境でLoRAファイルを登録
-   */
-  public registerLocalLoraFile(file: NativeLoraFile): void {
-    try {
-      if (typeof storageService !== 'undefined') {
-        const raw = storageService.getItem('miki_downloaded_lora_files');
-        const list: NativeLoraFile[] = raw ? JSON.parse(raw) : [];
-        const filtered = list.filter((f) => f && f.fileName !== file.fileName);
-        filtered.push(file);
-        storageService.setItem('miki_downloaded_lora_files', JSON.stringify(filtered));
-      }
-    } catch (e) {}
   }
 
   /**
