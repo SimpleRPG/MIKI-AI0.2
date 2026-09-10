@@ -483,6 +483,101 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
         </div>
       </div>
 
+      {/* Custom Detected GGUF Files (端末に実在するが公式7モデル一覧には無いファイル) */}
+      {(() => {
+        const officialFileNames = new Set(models.map((m) => m.fileName.toLowerCase()));
+        const customFiles = (storageInfo?.files || []).filter(
+          (f) => f && typeof f.fileName === 'string' && !officialFileNames.has(f.fileName.toLowerCase())
+        );
+        if (customFiles.length === 0) return null;
+
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
+              <div className="flex items-center gap-2">
+                <span>検出されたカスタムGGUFファイル (公式一覧外)</span>
+                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-[10px]">
+                  {customFiles.length} 件
+                </span>
+              </div>
+            </div>
+            {customFiles.map((f) => {
+              const customModel: GgufModelDefinition = {
+                id: `custom_${f.fileName}`,
+                name: f.fileName,
+                expertName: 'カスタム',
+                icon: '📦',
+                fileName: f.fileName,
+                sizeMB: f.sizeMB || 0,
+                parameters: '不明',
+                quantization: '不明',
+                vramMB: Math.round((f.sizeMB || 0) * 1.3),
+                description: '公式登録リストには無いが、端末(Download/gguf-models)に保存済みのGGUFファイル。',
+                downloadUrl: '',
+                huggingFaceRepo: '',
+                recommendedFor: 'mobile_balanced',
+              };
+              const isLoaded = activeLoadedId === customModel.id;
+
+              return (
+                <div
+                  key={customModel.id}
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLoaded
+                      ? 'bg-emerald-950/30 border-emerald-500/80 ring-1 ring-emerald-500/40'
+                      : 'bg-slate-900/90 border-slate-700 hover:border-slate-600'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl p-2 rounded-xl bg-slate-800/80 border border-slate-700/80 shrink-0">
+                        📦
+                      </span>
+                      <div>
+                        <div className="flex items-center flex-wrap gap-2">
+                          <h3 className="font-bold text-sm text-slate-100 break-all">{f.fileName}</h3>
+                          {isLoaded && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 font-bold">
+                              <CheckCircle2 className="w-3 h-3" /> VRAM常駐中 (高速推論可)
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 mt-2">
+                          <span>
+                            容量: <strong className="text-slate-300">{Math.round(f.sizeMB || 0)} MB</strong>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      {!isLoaded ? (
+                        <button
+                          onClick={() => handleLoadGguf(customModel)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold transition-colors"
+                        >
+                          <Cpu className="w-3.5 h-3.5" />
+                          <span>VRAMロード</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleRunGgufTest(customModel)}
+                          disabled={isTestRunning}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/40 rounded-lg text-xs font-bold transition-colors"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                          <span>{isTestRunning ? '推論中...' : 'テスト推論'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Test Output Box */}
       {testOutput && (
         <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-2">
