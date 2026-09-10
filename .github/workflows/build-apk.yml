@@ -766,7 +766,7 @@ jobs:
                           if (f.isFile() && f.getName().endsWith(".gguf")) {
                               totalSize += f.length();
                               JSObject fo = new JSObject();
-                              fo.put("name", f.getName());
+                              fo.put("fileName", f.getName());
                               fo.put("sizeMB", Math.round((double) f.length() / (1024.0 * 1024.0) * 10.0) / 10.0);
                               fo.put("lastModified", f.lastModified());
                               fileList.put(fo);
