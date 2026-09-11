@@ -38,8 +38,27 @@ export interface NonLlmPipelineExecutionResult {
  */
 export class NonLlmHardwarePipelineService {
   private static instance: NonLlmHardwarePipelineService;
+  private readonly latentCache = new Map<string, ReturnType<typeof latentIntentMiningService.inferLatentGoal>>();
+  private readonly claimCache = new Map<string, ReturnType<typeof claimDatabaseService.findBestMatchingClaim>>();
+  private readonly cacheLimit = 64;
 
   private constructor() {}
+
+  private getCached<T>(cache: Map<string, T>, key: string, factory: () => T): T {
+    const hit = cache.get(key);
+    if (hit !== undefined) {
+      cache.delete(key);
+      cache.set(key, hit);
+      return hit;
+    }
+    const value = factory();
+    cache.set(key, value);
+    if (cache.size > this.cacheLimit) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+    return value;
+  }
 
   public static getInstance(): NonLlmHardwarePipelineService {
     if (!NonLlmHardwarePipelineService.instance) {
@@ -114,11 +133,16 @@ export class NonLlmHardwarePipelineService {
     const gpuStart = performance.now();
     const gpuTasks: string[] = ['GPU未使用（将来の任意Provider用予約領域）'];
 
-    // 潜在意図プロファイル
-    const latentProfile = latentIntentMiningService.inferLatentGoal(prompt);
+    // 潜在意図・主張照会は短期LRUキャッシュで重複計算を抑える。
+    // 感情力動はターン状態を持つためキャッシュしない。
+    const cacheKey = normalizedPrompt.toLowerCase();
+    const latentProfile = this.getCached(this.latentCache, cacheKey, () =>
+      latentIntentMiningService.inferLatentGoal(prompt)
+    );
 
-    // 主張DB検索 (GPU高速類似度フィルタ後、CPUが正確照合)
-    const claimMatch = claimDatabaseService.findBestMatchingClaim(prompt);
+    const claimMatch = this.getCached(this.claimCache, cacheKey, () =>
+      claimDatabaseService.findBestMatchingClaim(prompt)
+    );
     const matchedClaims = claimMatch.hasMatch && claimMatch.bestClaim ? [claimMatch.bestClaim] : [];
 
     const gpuElapsed = performance.now() - gpuStart;
