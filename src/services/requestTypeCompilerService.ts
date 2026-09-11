@@ -32,7 +32,15 @@ export class RequestTypeCompilerService {
     const rawText = userInput.trim();
     const lower = rawText.toLowerCase();
 
-    const requestId = `REQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    // 要求ID自体も再現可能にする。時刻・乱数を混ぜると同一入力の比較試験が壊れるため、
+    // 入力と会話状態の安定表現からFNV-1aを算出する。
+    const requestFingerprint = `${rawText}|${conversationState?.currentTopic || ''}|${conversationState?.topLevelGoal || ''}`;
+    let requestHash = 2166136261;
+    for (let i = 0; i < requestFingerprint.length; i++) {
+      requestHash ^= requestFingerprint.charCodeAt(i);
+      requestHash = Math.imul(requestHash, 16777619);
+    }
+    const requestId = `REQ-${(requestHash >>> 0).toString(16).toUpperCase().padStart(8, '0')}`;
 
     // 1. GOAL (目的・ゴール) の抽出
     let goal = '一般的な問い合わせ・対話処理';
@@ -132,8 +140,10 @@ export class RequestTypeCompilerService {
     const rollbackRequirement = sideEffectClass !== 'READ_ONLY';
 
     // 12. 決定論的実行可否 (非LLM部品レジストリで完結可能か)
+    // 「どっち」だけでは比較結果を決められない。決定論的実行可否は、
+    // 実際に既知の処理規則へ落とせる領域に限定する。
     const canExecuteDeterministically =
-      /vba|マクロ|重複|転記|シート|正規化|挨拶|お疲れ|ありがとう|どっち/i.test(rawText);
+      /vba|マクロ|重複|転記|シート|正規化|挨拶|お疲れ|ありがとう/i.test(rawText);
 
     const compiled: CompiledRequestType = {
       requestId,
