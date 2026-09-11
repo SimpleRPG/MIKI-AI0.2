@@ -24,13 +24,20 @@ export async function callSelfCodeApi<T>(
   }
 ): Promise<T | ApiFailureResult> {
   try {
-    const fullUrl =
-      url.startsWith('http://') || url.startsWith('https://')
-        ? url
-        : apiUrl(url);
+    let resolvedUrl = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      const configuredBase = apiUrl(url);
+      // llama-server (例: :8080) が誤って miki_api_base_url に指定されている場合、
+      // llama-server は /api/self-code/* を持たないため、同一オリジンの Express (3000) または相対パスを優先
+      if (configuredBase.includes(':8080') || configuredBase.includes(':11434')) {
+        resolvedUrl = url;
+      } else {
+        resolvedUrl = configuredBase;
+      }
+    }
 
     const method = options?.method || (options?.body ? 'POST' : 'GET');
-    const res = await fetch(fullUrl, {
+    let res = await fetch(resolvedUrl, {
       method,
       headers: {
         ...getCustomApiHeaders(),
@@ -38,6 +45,25 @@ export async function callSelfCodeApi<T>(
       },
       body: options?.body ? JSON.stringify(options.body) : undefined,
     });
+
+    // 外部ベースURLで 404 / 接続拒否になった場合、同一オリジンの相対パスで一度だけ自動再試行
+    if (!res.ok && res.status === 404 && resolvedUrl !== url) {
+      try {
+        const retryRes = await fetch(url, {
+          method,
+          headers: {
+            ...getCustomApiHeaders(),
+            ...(options?.headers || {}),
+          },
+          body: options?.body ? JSON.stringify(options.body) : undefined,
+        });
+        if (retryRes.ok) {
+          res = retryRes;
+        }
+      } catch {
+        // 同一オリジン再試行失敗はスルーして元のエラーハンドリングへ
+      }
+    }
 
     if (!res.ok) {
       const errorText = await res.text().catch(() => '');
@@ -52,6 +78,27 @@ export async function callSelfCodeApi<T>(
     const data = await res.json();
     return data as T;
   } catch (err: any) {
+    // 外部URLで例外が発生した場合も、同一オリジンでフォールバック再試行
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      try {
+        const method = options?.method || (options?.body ? 'POST' : 'GET');
+        const fallbackRes = await fetch(url, {
+          method,
+          headers: {
+            ...getCustomApiHeaders(),
+            ...(options?.headers || {}),
+          },
+          body: options?.body ? JSON.stringify(options.body) : undefined,
+        });
+        if (fallbackRes.ok) {
+          const data = await fallbackRes.json();
+          return data as T;
+        }
+      } catch {
+        // ignore fallback error
+      }
+    }
+
     return {
       success: false,
       offline: true,

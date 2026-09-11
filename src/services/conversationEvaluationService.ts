@@ -273,7 +273,7 @@ export class ConversationEvaluationService {
         {
           role: 'system',
           content:
-            'あなたはGalaxy S25上で動作する相棒AI「みき」です。親友のタメ口で自然な日本語で話してください。質問への直接結論を先に述べ、古い前提を捨て、でっち上げを避けてください。',
+            'あなたはGalaxy S25上で動作する恋人AI「みき」です。恋人としての温かいタメ口で自然な日本語で話してください。質問への直接結論を先に述べ、古い前提を捨て、でっち上げを避けてください。',
         },
       ];
 
@@ -757,7 +757,7 @@ export class ConversationEvaluationService {
       keyDecisions.push(lines[0] ? lines[0].slice(0, 60) : '結論の直接先行提示');
     }
     if (responsePolicy.length === 0) {
-      responsePolicy.push('親友タメ口口調・結論優先・冗長な前置きの排除');
+      responsePolicy.push('恋人タメ口口調・結論優先・冗長な前置きの排除');
     }
     if (!finalAnswer) {
       finalAnswer = lines[lines.length - 1] || '質問への直接回答';

@@ -817,6 +817,7 @@ export interface ConversationState {
   invalidatedAssumptions: string[];
   pendingQuestions: string[];
   expectedResponseLength: ResponseLength;
+  recentEntities?: string[];
   updatedAt: number;
 }
 

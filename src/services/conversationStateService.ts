@@ -172,6 +172,7 @@ export function extractConversationState(
       invalidatedAssumptions: prevState?.invalidatedAssumptions || [],
       pendingQuestions: prevState?.pendingQuestions || [],
       expectedResponseLength: effectiveLength,
+      recentEntities: prevState?.recentEntities || (prevState?.currentTopic ? [prevState.currentTopic] : []),
       updatedAt: Date.now(),
     };
 
@@ -246,6 +247,19 @@ export function extractConversationState(
     const expectedResponseLength: ResponseLength =
       parsed.len || parsed.expectedResponseLength || effectiveLength;
 
+    // 9. Recent Entities (短縮: e, 従来: recentEntities)
+    const rawEntities = parsed.e || parsed.recentEntities;
+    const extractedEntities: string[] = Array.isArray(rawEntities)
+      ? rawEntities.filter((x: any) => typeof x === 'string')
+      : [];
+    const candidateEntities = [
+      ...(prevState?.recentEntities || []),
+      ...extractedEntities,
+      ...(currentTopic ? [currentTopic] : []),
+      ...confirmedFacts,
+    ];
+    const recentEntities = Array.from(new Set(candidateEntities)).filter(Boolean).slice(-10);
+
     const state: ConversationState = {
       currentTopic,
       topLevelGoal,
@@ -255,6 +269,7 @@ export function extractConversationState(
       invalidatedAssumptions,
       pendingQuestions,
       expectedResponseLength,
+      recentEntities,
       updatedAt: Date.now(),
     };
 
@@ -317,6 +332,7 @@ export function defaultConversationState(): ConversationState {
     invalidatedAssumptions: [],
     pendingQuestions: [],
     expectedResponseLength: 'standard',
+    recentEntities: [],
     updatedAt: Date.now(),
   };
 }
@@ -341,5 +357,140 @@ export function formatConversationStateForPrompt(state: ConversationState): stri
 
 export function cleanStreamingVisibleText(rawStreamedText: string): string {
   return rawStreamedText.replace(/<state>[\s\S]*?<\/state>\s*/, '').replace(/<state>[\s\S]*/, '');
+}
+
+/**
+ * 指示語・照応解決の結果
+ */
+export interface AnaphoraResolutionResult {
+  detectedExpression: string | null;
+  resolved: string | null;
+  candidates: string[];
+  confidence: 'unique' | 'ambiguous' | 'unresolved';
+}
+
+/**
+ * 非LLM決定的指示語解決純粋関数 (元設計書 4.2節 & 作業指示書 フェーズ1)
+ *
+ * 対象表現：「あれ」「それ」「これ」「前の」「さっきの」「どっち」「どちら」
+ * （まずはこの範囲に限定し、拡張は反例が出てから行う。元設計書54章「削減知能と機能追加抑制」の思想に従う）
+ *
+ * - 候補が1件に絞れる場合: confidence = 'unique', resolved = 対象文字列
+ * - 候補が2件以上残る場合: confidence = 'ambiguous', resolved = null, candidates = [選択肢...]
+ * - 該当なしの場合: confidence = 'unresolved', resolved = null, candidates = []
+ */
+export function resolveAnaphora(
+  prompt: string,
+  state: ConversationState
+): AnaphoraResolutionResult {
+  if (!prompt || typeof prompt !== 'string') {
+    return { detectedExpression: null, resolved: null, candidates: [], confidence: 'unresolved' };
+  }
+
+  const p = prompt.trim();
+  // 対象表現の検出: 「さっきの」「前の」「あれ」「それ」「これ」「どっち」「どちら」
+  const anaphoraRegex = /(さっきの|前の方|前のやつ|前の|あれ|それ|これ|どっち|どちら)/;
+  const match = p.match(anaphoraRegex);
+  if (!match) {
+    return { detectedExpression: null, resolved: null, candidates: [], confidence: 'unresolved' };
+  }
+
+  const expr = match[1];
+
+  // 会話状態から候補エンティティのプールを構築 (時系列順: currentTopic/confirmedFactsが基底、recentEntitiesが最新)
+  const rawPool = [
+    ...(state.currentTopic ? [state.currentTopic] : []),
+    ...(state.confirmedFacts || []),
+    ...(state.recentEntities || []),
+  ].filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+
+  const pool = Array.from(new Set(rawPool));
+
+  // 1. 比較・選択肢の表現 (「どっち」「どちら」)
+  if (expr === 'どっち' || expr === 'どちら') {
+    // ユーザー発言自体に明示的な比較対象があるか (例:「AとBどっち」「AかBどちら」)
+    const vsMatch = p.match(/(.+?)(?:と|vs|または|か)(.+?)(?:どっち|どちら)/i);
+    if (vsMatch) {
+      const c1 = vsMatch[1].trim().replace(/^[、\s]+|[、\s]+$/g, '');
+      const c2 = vsMatch[2].trim().replace(/^[、\s]+|[、\s]+$/g, '');
+      const directCandidates = [c1, c2].filter((c) => c.length > 0 && c.length < 50);
+      if (directCandidates.length >= 2) {
+        return {
+          detectedExpression: expr,
+          resolved: null,
+          candidates: directCandidates,
+          confidence: 'ambiguous', // 2つの選択肢が存在するため曖昧（聞き返し推奨）
+        };
+      }
+    }
+
+    // 会話状態のプールからの解決
+    if (pool.length >= 2) {
+      return {
+        detectedExpression: expr,
+        resolved: null,
+        candidates: pool.slice(-2), // 直近の2つの選択肢
+        confidence: 'ambiguous',
+      };
+    } else if (pool.length === 1) {
+      return {
+        detectedExpression: expr,
+        resolved: pool[0],
+        candidates: [pool[0]],
+        confidence: 'unique',
+      };
+    }
+    return {
+      detectedExpression: expr,
+      resolved: null,
+      candidates: [],
+      confidence: 'unresolved',
+    };
+  }
+
+  // 2. 直前参照表現 (「前の」「さっきの」「前の方」「前のやつ」)
+  if (expr === '前の' || expr === 'さっきの' || expr === '前のやつ' || expr === '前の方') {
+    if (pool.length >= 1) {
+      // 直近に言及された最後の要素を一意に解決
+      const mostRecent = pool[pool.length - 1];
+      return {
+        detectedExpression: expr,
+        resolved: mostRecent,
+        candidates: [mostRecent],
+        confidence: 'unique',
+      };
+    }
+    return {
+      detectedExpression: expr,
+      resolved: null,
+      candidates: [],
+      confidence: 'unresolved',
+    };
+  }
+
+  // 3. 指示代名詞 (「これ」「それ」「あれ」)
+  if (pool.length === 1) {
+    return {
+      detectedExpression: expr,
+      resolved: pool[0],
+      candidates: pool,
+      confidence: 'unique',
+    };
+  } else if (pool.length > 1) {
+    // 複数候補が存在する場合は ambiguous
+    return {
+      detectedExpression: expr,
+      resolved: null,
+      candidates: pool.slice(-3),
+      confidence: 'ambiguous',
+    };
+  }
+
+  return {
+    detectedExpression: expr,
+    resolved: null,
+    candidates: [],
+    confidence: 'unresolved',
+  };
 }
 

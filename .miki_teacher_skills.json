@@ -1,0 +1,48 @@
+[
+  {
+    "id": "skill_hw_mtwf6aws_px6x",
+    "category": "human_wisdom_____________",
+    "tags": [
+      "human_wisdom",
+      "oss_pattern",
+      "typescript",
+      "typescript",
+      "指示語解決純粋関数の実装"
+    ],
+    "rules": [
+      "先行OSSの実装パターン（人類の知恵）を直接取り込み、車輪の再発明を避ける",
+      "型安全・エラーハンドリング・不変条件チェックを確実に保持する",
+      "非同期リソース解放とメモリリーク防止を徹底する"
+    ],
+    "skeletonTemplate": "// NPM Package: @ablogcms/pdf\n// Description: PDF to image rendering engine and admin PDF preview controller for a-blog cms\nexport interface _ablogcms_pdfConfig {\n  enabled?: boolean;\n}\n\nexport class _ablogcms_pdfService {\n  constructor(private config: _ablogcms_pdfConfig = {}) {}\n  public async execute(payload: unknown): Promise<{ success: boolean; data: any }> {\n    return { success: true, data: payload };\n  }\n}",
+    "sourceTask": "指示語解決純粋関数の実装",
+    "createdAt": 1789098703804,
+    "usageCount": 1,
+    "sourceType": "npm",
+    "sourceUrl": "https://www.npmjs.com/package/@ablogcms/pdf",
+    "sourceTitle": "NPM: @ablogcms/pdf (v3.2.34)"
+  },
+  {
+    "id": "skill_hw_mtwf5ub9_2t8a",
+    "category": "human_wisdom______",
+    "tags": [
+      "human_wisdom",
+      "oss_pattern",
+      "typescript",
+      "typescript",
+      "テスト実装"
+    ],
+    "rules": [
+      "先行OSSの実装パターン（人類の知恵）を直接取り込み、車輪の再発明を避ける",
+      "型安全・エラーハンドリング・不変条件チェックを確実に保持する",
+      "非同期リソース解放とメモリリーク防止を徹底する"
+    ],
+    "skeletonTemplate": "// GitHub: XeicuLy/how-to-coding-vitest-for-nuxt\n// Description: Vitestを使用したNuxt3用のテスト実装サンプルプロジェクト\n// Stars: 1\nimport { describe, expect, test } from 'vitest';\nimport { mountSuspendedComponent } from '@/helpers/test';\n\ndescribe('test/target', () => {\n  test('テスト内容', async () => {});\n});",
+    "sourceTask": "テスト実装",
+    "createdAt": 1789098682293,
+    "usageCount": 1,
+    "sourceType": "github",
+    "sourceUrl": "https://github.com/XeicuLy/how-to-coding-vitest-for-nuxt",
+    "sourceTitle": "GitHub: XeicuLy/how-to-coding-vitest-for-nuxt"
+  }
+]

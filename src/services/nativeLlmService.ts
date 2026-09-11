@@ -911,20 +911,20 @@ export class NativeLlmService {
     const learnedTtftMs = this.lastExternalLlmTtftMs;
     let initialTimeoutMs: number;
     if (learnedTtftMs != null) {
-      // 実測値の2倍 + コールドスタート時は再ロード分を追加。下限20秒。
-      initialTimeoutMs = Math.max(20000, Math.round(learnedTtftMs * 2) + (isColdStart ? 30000 : 0));
+      // 実測値の2倍 + コールドスタート時は再ロード分を追加。下限90秒 (Termux/GPUヘビーPrefill・長考対応)。
+      initialTimeoutMs = Math.max(90000, Math.round(learnedTtftMs * 2) + (isColdStart ? 45000 : 0));
     } else {
-      // まだ実測データが無い初回呼び出し用のフォールバック値
-      initialTimeoutMs = isColdStart ? 90000 : 30000;
+      // まだ実測データが無い初回呼び出し用のフォールバック値 (コールドスタート時は120秒、通常90秒)
+      initialTimeoutMs = isColdStart ? 120000 : 90000;
     }
 
     systemLogger.info(
       'EXTERNAL_GPU',
-      `⏱️ [外部LLM タイムアウト学習状態] 初回タイムアウト: ${initialTimeoutMs}ms (前回実測学習TTFT: ${learnedTtftMs != null ? `${learnedTtftMs}ms` : '未学習(初回/リセット済)'} | コールドスタート判定: ${isColdStart ? 'はい (再ロード猶予+30s)' : 'いいえ (ウォーム維持)'})`
+      `⏱️ [外部LLM タイムアウト学習状態] 初回タイムアウト: ${initialTimeoutMs}ms (前回実測学習TTFT: ${learnedTtftMs != null ? `${learnedTtftMs}ms` : '未学習(初回/リセット済)'} | コールドスタート判定: ${isColdStart ? 'はい (再ロード猶予+45s)' : 'いいえ (ウォーム維持)'})`
     );
 
-    // 設計思想 Master v5.2: トークン生成間無応答タイムアウト（Termux/ローカルLLMの長考・重負荷Prefillを考慮し60秒に緩和）
-    const idleTimeoutMs = 60000;
+    // 設計思想 Master v5.2: トークン生成間無応答タイムアウト（Termux/ローカルLLMの長考・重負荷Prefillを考慮し90秒に緩和）
+    const idleTimeoutMs = 90000;
     let firstChunkReceived = false;
     let tFetchStart = performance.now();
     let tResponseHeader = performance.now();

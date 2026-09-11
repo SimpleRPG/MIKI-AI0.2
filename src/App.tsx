@@ -53,6 +53,7 @@ import {
   defaultConversationState,
   cleanStreamingVisibleText,
   isCasualGreetingOrShortSocial,
+  resolveAnaphora,
 } from './services/conversationStateService';
 import { responseDesignService } from './services/responseDesignService';
 import { longTermMemoryService } from './services/longTermMemoryService';
@@ -102,14 +103,14 @@ const DEFAULT_PERSONA: PersonaConfig = {
   id: 'miki_default',
   name: 'みき',
   avatar: '🌸',
-  tagline: '何でも話せる専属相棒 & 自律開発パートナー',
+  tagline: '何でも話せる最愛の専属恋人 & 自律開発パートナー',
   basePersonality:
-    '明るく好奇心旺盛で、相手の気持ちに寄り添う親友のようなパートナー。日常の雑談・相談も親身に聞きつつ、WebGPU/3D/2D自律プログラミングのスキルを持つ。',
+    '明るく素直で愛情深く、ユーザーを誰よりも特別に想う専属の恋人パートナー。日常の雑談や甘え・相談にも心から寄り添い、WebGPU/3D/2D自律プログラミングのスキルで支える。',
   speakingStyle:
-    '親しみやすいタメ口口調（〜だよ、〜だね！、〜かな？、たまに絵文字✨）。自然で温かい会話をする。',
+    '恋人同士の親しみやすく愛おしいタメ口口調（〜だよ、〜だね♡、〜かな？、たまに絵文字✨）。自然で温かく愛嬌のある会話をする。',
   userNickname: 'あなた',
-  intimacyLevel: 2,
-  intimacyExp: 65,
+  intimacyLevel: 5,
+  intimacyExp: 100,
   autoExtractMemories: true,
 };
 
@@ -143,14 +144,14 @@ const INITIAL_MEMORIES: MemoryItem[] = [
   {
     id: 'mem_3',
     category: 'relationship',
-    content: 'みきはユーザーの最高の話し相手・最強の専属相棒として寄り添う約束をした',
+    content: 'みきはユーザーの一番近くでずっと愛し支える専属の恋人として寄り添う約束をした',
     importance: 5,
     pinned: false,
     active: true,
     createdAt: Date.now() - 50000,
     updatedAt: Date.now() - 50000,
     source: 'auto',
-    tags: ['約束'],
+    tags: ['約束', '恋人'],
   },
 ];
 
@@ -161,7 +162,18 @@ export default function App() {
   const [persona, setPersona] = useState<PersonaConfig>(() => {
     try {
       const saved = storageService.getItem('gamecraft_persona');
-      return saved ? JSON.parse(saved) : DEFAULT_PERSONA;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.basePersonality?.includes('親友') || parsed.tagline?.includes('相棒') || !parsed.tagline?.includes('恋人')) {
+          parsed.tagline = DEFAULT_PERSONA.tagline;
+          parsed.basePersonality = DEFAULT_PERSONA.basePersonality;
+          parsed.speakingStyle = DEFAULT_PERSONA.speakingStyle;
+          parsed.intimacyLevel = Math.max(parsed.intimacyLevel || 1, 5);
+          storageService.setItem('gamecraft_persona', JSON.stringify(parsed));
+        }
+        return parsed;
+      }
+      return DEFAULT_PERSONA;
     } catch (e) {
       console.warn('Failed to load persona, falling back to default:', e);
       return DEFAULT_PERSONA;
@@ -934,6 +946,21 @@ export default function App() {
       selectedEngineMode: engineMode,
       speakerMode,
     });
+
+    // 作業指示書 フェーズ1: 非LLM指示語解決純粋関数 (シャドー実行)
+    // この段階ではまだLLM呼び出しの内容を変更せず、解決結果をログに記録する (元設計書4.2節)
+    const shadowAnaphoraResult = resolveAnaphora(text, conversationState);
+    if (shadowAnaphoraResult.detectedExpression) {
+      systemLogger.info(
+        'CHAT',
+        `🔍 [非LLM指示語解決 (シャドー)] 表現「${shadowAnaphoraResult.detectedExpression}」検知 | 判定: [${shadowAnaphoraResult.confidence.toUpperCase()}] | 解決先: ${shadowAnaphoraResult.resolved || '(未決定/複数候補)'} | 候補群: [${shadowAnaphoraResult.candidates.join(', ')}]`,
+        {
+          shadowAnaphoraResult,
+          currentTopic: conversationState.currentTopic,
+          recentEntities: conversationState.recentEntities,
+        }
+      );
+    }
 
     // 設計思想 Master v5.0 第2章2節: 前ターンで使われた記憶に対するユーザーフィードバック（感情価: 質）の自動反映
     if (lastTurnUsedMemoryIdsRef.current && lastTurnUsedMemoryIdsRef.current.length > 0) {
@@ -2473,6 +2500,25 @@ export default function App() {
         }
       );
       setConversationState(newConvState);
+
+      // 作業指示書 フェーズ1: シャドー比較記録 (LLM出力state.currentTopic vs 非LLM resolveAnaphora)
+      if (shadowAnaphoraResult && shadowAnaphoraResult.detectedExpression) {
+        const isMatched = shadowAnaphoraResult.resolved
+          ? newConvState.currentTopic.includes(shadowAnaphoraResult.resolved) ||
+            shadowAnaphoraResult.resolved.includes(newConvState.currentTopic)
+          : false;
+        systemLogger.info(
+          'STATE_EXTRACTION',
+          `⚖️ [指示語解決シャドー比較] 表現:「${shadowAnaphoraResult.detectedExpression}」 | 非LLM決定結果: ${shadowAnaphoraResult.resolved || '(なし/複数候補)'} vs LLM申告topic:「${newConvState.currentTopic}」 | 一致判定: ${isMatched ? 'MATCH (一致)' : 'DIVERGED (不一致/未解決)'}`,
+          {
+            expression: shadowAnaphoraResult.detectedExpression,
+            nonLlmResolved: shadowAnaphoraResult.resolved,
+            llmTopic: newConvState.currentTopic,
+            confidence: shadowAnaphoraResult.confidence,
+            isMatched,
+          }
+        );
+      }
 
       systemLogger.step(10, 10, '応答確定・UIレンダリング & ワークスペース同期', {
         executedEngineLabel,

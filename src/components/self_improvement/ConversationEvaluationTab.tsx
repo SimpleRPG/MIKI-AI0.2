@@ -49,7 +49,7 @@ export const ConversationEvaluationTab: React.FC = () => {
 事実として、Galaxy S25のNPU/RAM容量（最大12GB）とバッテリー発熱の物理限界が存在する。
 矛盾点として、過去ログに「毎日24回定期学習する」とあったが動的無料予算制に置換済みである。
 判断点として、70Bモデルは即時却下し、3Bまたは4Bの指示調整済みモデルを候補とする。
-回答方針として、過剰な前置きや謝罪を排除し、結論から先に提示し、親友タメ口トーンを堅持する。
+回答方針として、過剰な前置きや謝罪を排除し、結論から先に提示し、恋人タメ口トーンを堅持する。
 最終回答: Galaxy S25単体なら3B〜4B級のQ4量子化モデルを選び、会話状態管理と回答骨格で推論量を節約するのがベストだよ！`
   );
   const [decompResult, setDecompResult] = useState<ReasoningDecomposition3B | null>(null);
@@ -109,7 +109,7 @@ export const ConversationEvaluationTab: React.FC = () => {
     intent_understanding: { label: '意図理解', desc: '表面質問と本質意図の把握' },
     correction_adaptation: { label: '訂正反映', desc: '古い前提の即時無効化' },
     contradiction_repair: { label: '矛盾修復', desc: '非防御的な論点修復' },
-    natural_japanese: { label: '自然さ', desc: '親友タメ口・自然な日本語' },
+    natural_japanese: { label: '自然さ', desc: '恋人タメ口・自然な日本語' },
     length_suitability: { label: '回答長', desc: '短文・標準・詳細の適切性' },
     no_redundancy: { label: '非冗長性', desc: '不要な繰り返しの排除' },
     handling_unknowns: { label: '不明点処理', desc: '勝手な断定・捏造の回避' },

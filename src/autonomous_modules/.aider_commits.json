@@ -1,5 +1,24 @@
 [
   {
+    "hash": "c_mtwf6axb_545w",
+    "message": "stub(teacher-template): 指示語解決純粋関数の実装 [c_mtwf6axb_545w]",
+    "timestamp": 1789098703823,
+    "files": [
+      "src/autonomous_modules/anaphora_resolver_sample.ts"
+    ],
+    "status": "COMMITTED",
+    "snapshots": [
+      {
+        "filePath": "src/autonomous_modules/anaphora_resolver_sample.ts",
+        "snapshotId": null
+      }
+    ],
+    "isStub": true,
+    "engine": "teacher_template",
+    "isTeacherAssisted": true,
+    "skillId": "skill_hw_mtwf6aws_px6x"
+  },
+  {
     "hash": "1dd062b",
     "message": "feat(self-implement): 設計思想 第59章『形式知識・制約ソルバー』の仕様に適合するモジュール実装。主要要件: 制約ソルバー連携 / 論理矛盾検 [1dd062b]",
     "timestamp": 1788857668164,
