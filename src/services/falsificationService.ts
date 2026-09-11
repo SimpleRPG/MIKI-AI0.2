@@ -35,7 +35,7 @@ export function classifyClaimEpistemology(text: string): EpistemicClaimClassific
   // 1. 創作・架空・ロールプレイマーカー (優先度最高)
   const fictionalPatterns = [
     { regex: /物語|ストーリー|小説|童話|神話/g, label: '創作・物語表現' },
-    { regex: /架空の|フィクション|ファンタジー|異世界/g, label: '架空・ファンタジー標識' },
+    { regex: /架空の|架空の話|フィクション|ファンタジー|異世界|妄想/g, label: '架空・ファンタジー標識' },
     { regex: /設定として|という設定|キャラ設定|裏設定/g, label: '設定規定表現' },
     { regex: /ごっこ|ロールプレイ|演じて|なりきって/g, label: 'ごっこ遊び・ロールプレイ' },
     { regex: /創作して|オリジナルの|作ってみて|書いてみて/g, label: '創作生成依頼' },
@@ -124,10 +124,10 @@ export function classifyClaimEpistemology(text: string): EpistemicClaimClassific
   // 4. 事実・確定・検証済みマーカー (優先度第4)
   const confirmedPatterns = [
     { regex: /である|であります|でした/g, label: '客観断定文末' },
-    { regex: /確定した|決定した|合意した/g, label: '決定・合意標識' },
-    { regex: /リリースされた|公開された|実装した|配備された/g, label: '完了・存在実証' },
-    { regex: /判明した|確認された|立証された|検証済み/g, label: '検証・立証標識' },
-    { regex: /動作した|動いた|成功した/g, label: '実働検証' },
+    { regex: /(?:確定|決定|合意)(?:した|しました)/g, label: '決定・合意標識' },
+    { regex: /(?:リリース|公開|配備)(?:された|されました)|(?:実装)(?:した|しました)/g, label: '完了・存在実証' },
+    { regex: /(?:判明|確認|立証)(?:された|されました)|検証済み/g, label: '検証・立証標識' },
+    { regex: /(?:動作|成功)(?:した|しました)|動いた|動きました/g, label: '実働検証' },
   ];
 
   for (const p of confirmedPatterns) {

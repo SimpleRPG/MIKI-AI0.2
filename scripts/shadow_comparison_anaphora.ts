@@ -138,7 +138,32 @@ const scenarios: TurnScenario[] = [
     // 意図的な不一致テストケース: 非LLMは「フレームワーク選定」と解決するが、
     // LLMが文脈を読み飛ばして全く無関係なトピック「天気と雑談」を出力したシミュレーション
     simulatedLlmResponse: '<state>{"t":"天気と雑談","g":"プロジェクト作成開始"}</state>了解！npm create vite@latest でサクッと始めよう！',
-    description: '意図的不一致テスト: 指示語「さっきの」に対してLLMが逸脱トピックを出力',
+    description: '意図的不一致テスト1: 指示語「さっきの」に対してLLMが逸脱トピックを出力',
+  },
+  {
+    turn: 21,
+    userInput: 'やっぱりNext.jsも試したい。さっきのDockerのコンテナで動かせる？',
+    simulatedLlmResponse: '<state>{"t":"Docker","g":"Next.jsコンテナ実行"}</state>はい、DockerfileでNode.js環境を用意すれば問題なく動かせます！',
+    description: '追加シナリオ1: 「さっきの[既存名詞]」による過去プールのエンティティ一意解決',
+  },
+  {
+    turn: 22,
+    userInput: 'さっきの認証トークンの有効期限が切れたエラーが出た',
+    simulatedLlmResponse: '<state>{"t":"認証エラー","g":"トークン再発行"}</state>APIキーまたはJWTトークンの失効が原因です。再取得しましょう。',
+    description: '追加シナリオ2: 「さっきの[初出名詞]」によるプール未存在名詞の安全なunresolvedフォールバック（誤バインド防止）',
+  },
+  {
+    turn: 23,
+    userInput: 'それの再取得コマンドを実行してみる',
+    simulatedLlmResponse: '<state>{"t":"認証エラー","g":"トークン再取得実行"}</state>curlコマンドでエンドポイントへPOSTリクエストを送信してください。',
+    description: '追加シナリオ3: 「それ」による直前単一エンティティの一意解決',
+  },
+  {
+    turn: 24,
+    userInput: 'さっきのやつ、本番サーバーに反映させて！',
+    // 意図的な不一致テストケース2: 非LLMは「認証エラー」を一意解決するが、LLMが話題急変で「音楽再生」を出力
+    simulatedLlmResponse: '<state>{"t":"音楽再生とBGM","g":"作業用BGM選定"}</state>お疲れ様です！リラックスできる音楽をかけましょうか？',
+    description: '追加シナリオ4（意図的反例2）: 指示語「さっきの」に対してLLMが古い話題へ正しく不一致を起こす反例',
   },
 ];
 
@@ -239,6 +264,7 @@ async function runShadowComparison() {
   console.log(`・一意解決一致率 (Match Rate): ${matchRate}% (${matchesCount} / ${evaluatedCount})`);
   console.log(`・指示語カバー率 (Coverage Rate: MATCH + AMBIGUOUS): ${coverageRate}%`);
   console.log('================================================================');
+  process.exit(0);
 }
 
 runShadowComparison();

@@ -1037,6 +1037,7 @@ export default function App() {
     );
 
     // 3. 技能IR仮想マシン検証 (skillIrCompilerService)
+    const isVbaRequest = /vba|excel|マクロ/i.test(text);
     if (isVbaRequest || text.includes('配列') || text.includes('高速化') || text.includes('VBA')) {
       const shadowVmResult = skillIrCompilerService.executeIR('skill_vba_batch_array', {
         sheetName: 'Sheet1',

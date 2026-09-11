@@ -397,14 +397,25 @@ export function resolveAnaphora(
 
   const expr = match[1];
 
-  // 会話状態から候補エンティティのプールを構築 (時系列順: currentTopic/confirmedFactsが基底、recentEntitiesが最新)
-  const rawPool = [
-    ...(state.currentTopic ? [state.currentTopic] : []),
-    ...(state.confirmedFacts || []),
-    ...(state.recentEntities || []),
-  ].filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  // 直近1〜2ターンのエンティティを優先する候補プール構築 (設計思想: 最新ターン優先・一定ターン以前の過剰遡及防止)
+  const recentSlice = (state.recentEntities || []).slice(-3);
+  const factsSlice = (state.confirmedFacts || []).slice(-2);
+  const topicList = state.currentTopic ? [state.currentTopic] : [];
 
-  const pool = Array.from(new Set(rawPool));
+  // 時系列順: 確定事実 -> 直近エンティティ -> 現在トピック (末尾が最新)
+  const ordered = [...factsSlice, ...recentSlice, ...topicList]
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+
+  // 重複排除: 最新の出現順 (末尾) を優先保持
+  const seen = new Set<string>();
+  const pool: string[] = [];
+  for (let i = ordered.length - 1; i >= 0; i--) {
+    const item = ordered[i];
+    if (!seen.has(item)) {
+      seen.add(item);
+      pool.unshift(item);
+    }
+  }
 
   // 1. 比較・選択肢の表現 (「どっち」「どちら」)
   if (expr === 'どっち' || expr === 'どちら') {
@@ -450,8 +461,46 @@ export function resolveAnaphora(
 
   // 2. 直前参照表現 (「前の」「さっきの」「前の方」「前のやつ」)
   if (expr === '前の' || expr === 'さっきの' || expr === '前のやつ' || expr === '前の方') {
+    // 「さっきの〜」で後続名詞が存在する場合の特定判定 (例:「さっきのユーティリティ型」)
+    const modifierMatch = p.match(/(?:さっきの|前の)(.+?)(?:と|で|を|に|が|は|も|の|！|？|、|\s|$)/);
+    const targetNoun = modifierMatch ? modifierMatch[1].trim() : '';
+
+    if (targetNoun && targetNoun !== 'やつ' && targetNoun !== '方') {
+      // 後続名詞に合致するエンティティをプールから検索
+      const matchedEntity = pool.find(
+        (item) => item.includes(targetNoun) || targetNoun.includes(item)
+      );
+      if (matchedEntity) {
+        return {
+          detectedExpression: expr,
+          resolved: matchedEntity,
+          candidates: [matchedEntity],
+          confidence: 'unique',
+        };
+      }
+      // プール内に該当名詞が存在しない場合 (例:「さっきのエラーログ」でエラーログが初出)
+      // 無関係な直前トピックに誤バインドせず unresolved とする
+      return {
+        detectedExpression: expr,
+        resolved: null,
+        candidates: [],
+        confidence: 'unresolved',
+      };
+    }
+
+    // 「前のやつ」「前の」で現在トピックとの対比である場合、1つ前のエンティティを優先
+    if ((expr === '前のやつ' || expr === '前の' || expr === '前の方') && pool.length >= 2) {
+      const priorEntity = pool[pool.length - 2];
+      return {
+        detectedExpression: expr,
+        resolved: priorEntity,
+        candidates: [priorEntity],
+        confidence: 'unique',
+      };
+    }
+
     if (pool.length >= 1) {
-      // 直近に言及された最後の要素を一意に解決
+      // 直近の要素を一意解決
       const mostRecent = pool[pool.length - 1];
       return {
         detectedExpression: expr,
