@@ -7,7 +7,6 @@ import { capabilityPluginService } from './capabilityPluginService';
 import { toolsService } from './toolsService';
 import { systemLogger } from './systemLogger';
 import { codeSkeletonService } from './codeSkeletonService';
-import { codeSearchService } from './codeSearchService';
 import { codeVerificationService } from './codeVerificationService';
 
 const WORKFLOW_STORAGE_KEY = 'miki_synthesized_workflows';
@@ -29,9 +28,9 @@ export class WorkflowSynthesisService {
    */
   public shouldSynthesizeWorkflow(prompt: string): boolean {
     const p = (prompt || '').trim();
-    if (p.length < 25) return false;
+    if (p.length < 30) return false;
 
-    // ワークフロー要求キーワード
+    // ワークフロー要求キーワード（複合パイプライン・多段工程指示の厳格検知）
     const workflowSignals = [
       /(?:調査|検索).*して.*(?:コード|作成|生成|修正).*して.*(?:検証|保存|出力)/i,
       /(?:ステップ|工程|段階).*で(?:進めて|実行して|作って)/i,
@@ -40,7 +39,7 @@ export class WorkflowSynthesisService {
       /パイプライン/,
       /自動化.*手順/,
       /(?:ファイル|データ).*を(?:読み込んで|解析して).*変換.*して.*出力/,
-      /(?:web|ネット).*調べ.*(?:vba|コード).*作成/i,
+      /(?:web|ネット).*(?:で|から)?(?:調べ|調査して).*(?:vba|コード|マクロ).*(?:作[成っ]|実装|生成)/i,
     ];
 
     return workflowSignals.some((regex) => regex.test(p));

@@ -34,6 +34,42 @@ async function runWorkflowSynthesisTests() {
   console.log(`  多段複合指示: "${workflowPrompt.slice(0, 35)}..." ➔ shouldSynthesize=${shouldSynth}`);
   assert('多段複合指示でワークフロー合成が正常にトリガーされること', shouldSynth === true);
 
+  // ── 1b. 誤トリガー（False Positive）防止 回帰テストスイート（最低15件） ──
+  console.log('\n【1b. 誤トリガー(False Positive)防止 回帰テスト (日常会話・単発質問・境界文字数)】');
+  const falsePositiveSamples: { text: string; category: string; len: number }[] = [
+    { text: 'こんにちは！今日の東京の天気を教えていただけますか？傘は必要でしょうか？', category: '雑談・天気', len: 37 },
+    { text: 'ReactのuseEffectとuseCallbackの違いについて初心者向けに分かりやすく教えて', category: '単発技術質問', len: 42 },
+    { text: 'TypeScriptでユニオン型から特定の型を抽出する方法ってどう書けばいいの？', category: '単発コード質問', len: 39 },
+    { text: '昨日のサッカーの試合結果はどうだった？ハイライトの要約を聞きたいな', category: '雑談・ニュース', len: 34 },
+    { text: 'カレーライスの美味しい作り方と隠し味のスパイスを教えてください', category: '日常会話・料理', len: 32 },
+    { text: 'ポート3000が既に使用されていますというエラーが出て困っています', category: 'エラー相談', len: 33 },
+    { text: 'Pythonのリスト内包表記の基本的な書き方と使用例をいくつか教えて', category: '単発コード質問', len: 34 },
+    { text: 'Gitのコミットメッセージを直前の一つだけ修正したい時のコマンドは何？', category: '単発コマンド質問', len: 36 },
+    { text: 'SQLのINNER JOINとLEFT JOINの違いを図解っぽく説明してほしい', category: '概念比較質問', len: 38 },
+    { text: '最近おすすめのSF映画やアニメがあれば3つほど紹介してくれますか？', category: '雑談・推薦', len: 34 },
+    { text: 'Dockerコンテナをバックグラウンドで起動するためのコマンドオプションは何？', category: '単発ツール質問', len: 39 },
+    { text: 'VBAでActiveSheetのA1セルの値をメッセージボックスに表示したい', category: '単発VBA質問', len: 37 },
+    { text: 'Webサイトのパフォーマンスを改善するための一般的な施策を箇条書きで教えて', category: 'Web単発質問', len: 37 },
+    { text: '明日の朝9時にアラームを設定したいんだけど、どうすればいいかな？', category: '日常生活質問', len: 33 },
+    { text: 'コードの可読性を高めるための変数名の付け方のベストプラクティスを教えて', category: '設計単発質問', len: 36 },
+    { text: 'こんにちは！今日も一日お仕事頑張りましょうね！', category: '境界文字数(25字付近)', len: 24 },
+    { text: 'Reactでカウンターコンポーネントを作る基本の書き方は？', category: '境界文字数(28字)', len: 28 },
+    { text: 'Webサイトで調べたエラーなんだけど、このコードの理由を教えて', category: 'Web・調べ・コード含む質問', len: 31 },
+  ];
+
+  let fpCount = 0;
+  for (const sample of falsePositiveSamples) {
+    const isFp = workflowSynthesisService.shouldSynthesizeWorkflow(sample.text);
+    if (isFp) {
+      fpCount++;
+      console.error(`  ❌ 誤トリガー検知: [${sample.category}] "${sample.text}" (len=${sample.len})`);
+    } else {
+      console.log(`  ✓ 正常拒絶: [${sample.category}] (len=${sample.len}) "${sample.text.slice(0, 24)}..." ➔ false`);
+    }
+    assert(`誤判定なし: [${sample.category}] がfalseを返すこと`, isFp === false);
+  }
+  console.log(`  誤トリガー防止テスト完了: ${falsePositiveSamples.length - fpCount}/${falsePositiveSamples.length} 件 正常拒絶`);
+
   // ── 2. ワークフロー合成 (synthesizeWorkflow) とDAG/ステップ構成の検証 ──
   console.log('\n【2. 複合指示からのDAG/パイプライン合成 (synthesizeWorkflow)】');
   const wf = workflowSynthesisService.synthesizeWorkflow(workflowPrompt);

@@ -38,6 +38,27 @@
   多段複合指示: "まず最新の公式仕様をWebで調査して、既存のExcel VBAマクロを..." ➔ shouldSynthesize=true
 ✅ [PASS] 多段複合指示でワークフロー合成が正常にトリガーされること
 
+【1b. 誤トリガー(False Positive)防止 回帰テスト (日常会話・単発質問・境界文字数)】
+  - 雑談・天気 (len=37): false ➔ ✅ PASS
+  - 単発技術質問 (len=42): false ➔ ✅ PASS
+  - 単発コード質問 (len=39): false ➔ ✅ PASS
+  - 雑談・ニュース (len=34): false ➔ ✅ PASS
+  - 日常会話・料理 (len=32): false ➔ ✅ PASS
+  - エラー相談 (len=33): false ➔ ✅ PASS
+  - 単発コード質問 (len=34): false ➔ ✅ PASS
+  - 単発コマンド質問 (len=36): false ➔ ✅ PASS
+  - 概念比較質問 (len=38): false ➔ ✅ PASS
+  - 雑談・推薦 (len=34): false ➔ ✅ PASS
+  - 単発ツール質問 (len=39): false ➔ ✅ PASS
+  - 単発VBA質問 (len=37): false ➔ ✅ PASS
+  - Web単発質問 (len=37): false ➔ ✅ PASS
+  - 日常生活質問 (len=33): false ➔ ✅ PASS
+  - 設計単発質問 (len=36): false ➔ ✅ PASS
+  - 境界文字数(25字付近, len=24): false ➔ ✅ PASS
+  - 境界文字数(28字, len=28): false ➔ ✅ PASS
+  - Web・調べ・コード含む質問 (len=31): false ➔ ✅ PASS
+  誤トリガー防止テスト完了: 18/18 件 正常拒絶
+
 【2. 複合指示からのDAG/パイプライン合成 (synthesizeWorkflow)】
   ワークフローID: wf_...
   総ステップ数: 8
@@ -66,15 +87,33 @@
 ✅ [PASS] VBA静的検査が正常にパスすること
 
 ================================================================
-📊 テスト結果: 19 / 19 通過 (100%)
+📊 テスト結果: 37 / 37 通過 (100%)
 ================================================================
 ```
 
 ---
 
-## 4. 結論
+## 4. 既存資産調査と結合設計（4ファイルの責務整理）
 
-- **自然言語解析による自動DAG生成**: 単発会話と多段ワークフロー要求を正確に識別し、8段階の実行可能ステップへ分解可能。
+| 対象ファイル | 公開メソッド / 役割 | 呼出元 | 結合判定 | 理由・重複排除方針 |
+|:---|:---|:---|:---:|:---|
+| `workflowSynthesisService.ts` | `shouldSynthesizeWorkflow`, `synthesizeWorkflow`, `executeAllSteps`, `executeStep`, `getWorkflows` | `App.tsx` (1579行目, 1985行目), `SelfCodeArchitectTab.tsx`, `test_workflow_synthesis.ts` | **COMPOSE** | 各種独立サービス（Web検索、骨格、検証、IR）を1つのDAGパイプラインに有機的に束ねるオーケストレータ。 |
+| `codeSkeletonService.ts` | `getAllTemplates`, `findTemplates`, `instantiateSkeleton`, `recordSuccess` | `workflowSynthesisService.ts` (ステップ4), `SelfCodeArchitectTab.tsx` | **REUSE** | 実績骨格テンプレートの取得・パラメータ置換ロジックをそのまま再利用。コード重複なし。 |
+| `codeSearchService.ts` | `searchCode` | `SelfCodeArchitectTab.tsx` | **INDEPENDENT** | 第171章自律コード発掘専用。ワークフロー合成では不要のためインポートを削除済み。 |
+| `codeVerificationService.ts` | `verifyCode` | `workflowSynthesisService.ts` (ステップ7), `App.tsx`, `ChatPanel.tsx` | **REUSE** | 構文検証・Office PtrSafe・危険コマンド多層検査ロジックをそのまま再利用。コード重複なし。 |
+
+---
+
+## 5. 本番接続状況の訂正
+
+ロードマップの初期表記では「フェーズ5：未着手」と記載されていたが、コードベース精査の結果、以前から `src/App.tsx`（1579行目・1985行目）にてLLMストリーミング前判定および回答ストリーミング時のワークフロー合成トリガーとして本番導線に接続されていたことが確認された。  
+したがって、ステータスは「未着手」ではなく、**「本番稼働中（App.tsx既存導線あり・誤トリガー防止テスト完了）」** に正式改定する。
+
+---
+
+## 6. 結論
+
+- **自然言語解析による自動DAG生成**: 単発会話と多段ワークフロー要求を正確に識別（誤トリガー防止回帰テスト18件で100%拒絶）し、8段階の実行可能ステップへ分解可能。
 - **事前予算見積もり**: 所要時間・トークン数・リスクレベル（ネットワーク権限の有無）の事前算定が正常に動作。
 - **安全同意ゲート遵守**: 第46章の「正式権限の自動増加防止」に基づき、未承認プラグインを含む処理は中断し、ユーザー明示承認後に安全に再開・完遂されることを実証。
 - **コード骨格・静的検証連携**: `codeSkeletonService` の実績テンプレート適用と `codeVerificationService` の構文・セキュリティ静的検査がパイプライン内で統合稼働することを確認。
