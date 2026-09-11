@@ -528,8 +528,8 @@ export function resolveAnaphora(
   const factsSlice = (state.confirmedFacts || []).slice(-2);
   const topicList = state.currentTopic ? [state.currentTopic] : [];
 
-  // 時系列順: 確定事実 -> 直近エンティティ -> 現在トピック (末尾が最新)
-  const ordered = [...factsSlice, ...recentSlice, ...topicList]
+  // 時系列順: 現在トピック -> 確定事実 -> 直近エンティティ (末尾が最新)
+  const ordered = [...topicList, ...factsSlice, ...recentSlice]
     .filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
 
   // 重複排除: 最新の出現順 (末尾) を優先保持

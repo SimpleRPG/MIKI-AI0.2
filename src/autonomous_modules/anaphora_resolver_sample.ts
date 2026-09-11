@@ -87,30 +87,60 @@ export function resolveAnaphoraPure(
     }
   }
 
-  // 2. 「前のやつ」「前の」: 1つ前の話題
+  // 2. 「前のやつ」「前の」: 直近の話題・エンティティに一意照応
   if (expr === '前のやつ' || expr === '前の' || expr === '前の方') {
-    if (cleanPool.length >= 2) {
-      const target = cleanPool[cleanPool.length - 2];
+    if (cleanPool.length > 0) {
+      const target = cleanPool[cleanPool.length - 1];
       return {
         detectedExpression: expr,
         resolved: target,
         candidates: [target],
         confidence: 'unique',
-        reasoning: `直前2番目の話題『${target}』に一意照応`,
+        reasoning: `直近の話題・成果物『${target}』に一意照応`,
       };
     }
+  }
+
+  // 3. 「さっきの」など修飾語を伴う表現 (例:「さっきのコードを見せて」)
+  if (expr === 'さっきの' || expr === '前の') {
+    const modifierMatch = p.match(/(?:さっきの|前の)(.+?)(?:と|で|を|に|が|は|も|の|！|？|、|\s|$)/);
+    const targetNoun = modifierMatch ? modifierMatch[1].trim() : '';
+    if (targetNoun && targetNoun !== 'やつ' && targetNoun !== '方') {
+      const matched = cleanPool.find((item) => item.includes(targetNoun) || targetNoun.includes(item));
+      if (matched) {
+        return {
+          detectedExpression: expr,
+          resolved: matched,
+          candidates: [matched],
+          confidence: 'unique',
+          reasoning: `後続名詞「${targetNoun}」に合致するエンティティ『${matched}』に一意照応`,
+        };
+      }
+    }
+  }
+
+  // 4. 指示代名詞 (「これ」「それ」「あれ」): 候補が単一ならunique、複数ならambiguous
+  if (expr === 'これ' || expr === 'それ' || expr === 'あれ') {
     if (cleanPool.length === 1) {
       return {
         detectedExpression: expr,
         resolved: cleanPool[0],
         candidates: cleanPool,
         confidence: 'unique',
-        reasoning: `保持されている唯一の話題『${cleanPool[0]}』に照応`,
+        reasoning: `単一候補『${cleanPool[0]}』に一意照応`,
+      };
+    } else if (cleanPool.length > 1) {
+      return {
+        detectedExpression: expr,
+        resolved: null,
+        candidates: cleanPool.slice(-3),
+        confidence: 'ambiguous',
+        reasoning: `指示代名詞「${expr}」に対し複数候補 [${cleanPool.slice(-3).join(', ')}] が存在するため曖昧`,
       };
     }
   }
 
-  // 3. 「さっきの」「それ」「これ」「あれ」: 最新の話題
+  // 5. その他の直近解決 (さっきの単独など)
   if (cleanPool.length > 0) {
     const latest = cleanPool[cleanPool.length - 1];
     return {

@@ -50,6 +50,7 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
   const [downloadSpeed, setDownloadSpeed] = useState<number | undefined>(undefined);
   const [etaSeconds, setEtaSeconds] = useState<number | undefined>(undefined);
   const [activeLoadedId, setActiveLoadedId] = useState<string | null>(null);
+  const [loadingModelId, setLoadingModelId] = useState<string | null>(null);
   const [isTestRunning, setIsTestRunning] = useState(false);
   const [testOutput, setTestOutput] = useState<string>('');
   const [customFilePickerOpen, setCustomFilePickerOpen] = useState(false);
@@ -125,6 +126,11 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
   };
 
   const handleLoadGguf = async (model: GgufModelDefinition) => {
+    if (loadingModelId || nativeLlmService.isLoadingModel()) {
+      showNotification('info', `モデル展開処理が進行中です。完了までお待ちください。`);
+      return;
+    }
+    setLoadingModelId(model.id);
     try {
       systemLogger.info('NATIVE_GPU', `GGUFモデルをVRAM/RAMへロード: ${model.name}`);
       showNotification('info', `GGUFモデル「${model.name}」を展開中...`);
@@ -135,6 +141,8 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
     } catch (err: any) {
       systemLogger.error('NATIVE_GPU', `GGUFモデルロード失敗: ${err?.message || err}`);
       showNotification('error', `ロード失敗: ${err?.message || err}`);
+    } finally {
+      setLoadingModelId(null);
     }
   };
 
@@ -504,10 +512,11 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
                         {!isLoaded ? (
                           <button
                             onClick={() => handleLoadGguf(model)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold transition-colors"
+                            disabled={!!loadingModelId}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <Cpu className="w-3.5 h-3.5" />
-                            <span>VRAMロード</span>
+                            <Cpu className={`w-3.5 h-3.5 ${loadingModelId === model.id ? 'animate-spin' : ''}`} />
+                            <span>{loadingModelId === model.id ? 'VRAM展開中...' : 'VRAMロード'}</span>
                           </button>
                         ) : (
                           <button
@@ -634,10 +643,11 @@ export const GgufModelManager: React.FC<GgufModelManagerProps> = () => {
                       {!isLoaded ? (
                         <button
                           onClick={() => handleLoadGguf(customModel)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold transition-colors"
+                          disabled={!!loadingModelId}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Cpu className="w-3.5 h-3.5" />
-                          <span>VRAMロード</span>
+                          <Cpu className={`w-3.5 h-3.5 ${loadingModelId === customModel.id ? 'animate-spin' : ''}`} />
+                          <span>{loadingModelId === customModel.id ? 'VRAM展開中...' : 'VRAMロード'}</span>
                         </button>
                       ) : (
                         <button

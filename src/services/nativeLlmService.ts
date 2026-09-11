@@ -376,6 +376,10 @@ export class NativeLlmService {
     return this.activeModelId;
   }
 
+  public isLoadingModel(): boolean {
+    return this.isModelLoading;
+  }
+
   public async getAvailableGgufModels(): Promise<Array<{ id: string; fileName: string; name: string; sizeMB: number }>> {
     const storage = await this.getStorageInfo();
     const result: Array<{ id: string; fileName: string; name: string; sizeMB: number }> = [];
@@ -403,6 +407,12 @@ export class NativeLlmService {
     onProgress?: (report: { progress: number; text: string }) => void
   ): Promise<boolean> {
     if (this.activeModelId) return true;
+    if (this.isModelLoading) {
+      while (this.isModelLoading) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      return !!this.activeModelId;
+    }
 
     try {
       const available = await this.getAvailableGgufModels();
@@ -631,14 +641,38 @@ export class NativeLlmService {
     const actualFileName = typeof fileNameOrProgress === 'string' ? fileNameOrProgress : undefined;
     const actualOnProgress = typeof fileNameOrProgress === 'function' ? fileNameOrProgress : onProgress;
 
-    if (!this.isNative()) {
-      systemLogger.info('NATIVE_GPU', `🚀 [Web環境] GGUFモデル仮想ロード: ${modelId}`);
-      if (actualOnProgress) {
-        actualOnProgress({ progress: 50, text: 'GGUFモデルをVRAMにマッピング中...' });
-        await new Promise((r) => setTimeout(r, 300));
-        actualOnProgress({ progress: 100, text: 'ロード完了 (即時推論可能)' });
+    // 既に同じモデルがVRAMにロード済みなら二重ロードをスキップ
+    if (this.activeModelId === modelId) {
+      systemLogger.info('NATIVE_GPU', `ℹ️ モデル「${modelId}」は既にVRAMにロード済みのためスキップします。`);
+      return;
+    }
+
+    // 既にロード処理が進行中なら完了まで待機
+    if (this.isModelLoading) {
+      systemLogger.warn('NATIVE_GPU', `⏳ モデルロード処理が既に進行中のため待機します (待機対象: ${modelId})`);
+      while (this.isModelLoading) {
+        await new Promise((r) => setTimeout(r, 100));
       }
-      this.activeModelId = modelId;
+      // 先行ロード完了後に同じモデルがロード済みになっていればスキップ
+      if (this.activeModelId === modelId) {
+        systemLogger.info('NATIVE_GPU', `ℹ️ 先行ロードの完了によりモデル「${modelId}」が展開されたためスキップします。`);
+        return;
+      }
+    }
+
+    if (!this.isNative()) {
+      this.isModelLoading = true;
+      try {
+        systemLogger.info('NATIVE_GPU', `🚀 [Web環境] GGUFモデル仮想ロード: ${modelId}`);
+        if (actualOnProgress) {
+          actualOnProgress({ progress: 50, text: 'GGUFモデルをVRAMにマッピング中...' });
+          await new Promise((r) => setTimeout(r, 300));
+          actualOnProgress({ progress: 100, text: 'ロード完了 (即時推論可能)' });
+        }
+        this.activeModelId = modelId;
+      } finally {
+        this.isModelLoading = false;
+      }
       return;
     }
 
