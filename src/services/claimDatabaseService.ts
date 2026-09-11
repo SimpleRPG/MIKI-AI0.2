@@ -268,10 +268,15 @@ export class ClaimDatabaseService {
       const existingStmt = existing.statement.toLowerCase();
       const isOppositeCondition =
         (candStmt.includes('発生する') && existingStmt.includes('発生しない')) ||
+        (candStmt.includes('発生しない') && existingStmt.includes('発生する')) ||
         (candStmt.includes('できない') && existingStmt.includes('できる')) ||
+        (candStmt.includes('できる') && existingStmt.includes('できない')) ||
         (candStmt.includes('高速化する') && existingStmt.includes('低速化する')) ||
+        (candStmt.includes('低速化する') && existingStmt.includes('高速化する')) ||
         (candStmt.includes('推奨') && existingStmt.includes('非推奨')) ||
-        (candStmt.includes('真') && existingStmt.includes('偽'));
+        (candStmt.includes('非推奨') && existingStmt.includes('推奨')) ||
+        (candStmt.includes('真') && existingStmt.includes('偽')) ||
+        (candStmt.includes('偽') && existingStmt.includes('真'));
 
       if (isOppositeCondition) {
         // スコープが完全重複しているか確認

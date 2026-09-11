@@ -902,25 +902,27 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
   {
     "chapterNumber": 45,
     "id": "chap_45",
-    "title": "知識矛盾自己解決・記憶整合性ガード",
+    "title": "知識矛盾自己解決・主張(claim)DB整合性ガード (統合版 第6章)",
     "category": "DEEP_COGNITION",
-    "status": "UNIMPLEMENTED",
+    "status": "COMPLETED",
     "versionAdded": "v5.0",
-    "summary": "新たに得た情報と過去の長期記憶の矛盾を検出し、整合性を調停・統合。",
+    "summary": "事実DBではなく主張(claim)DBとして、世界区分(REAL/FICTION/HYPOTHETICAL)・性質・検証状態・独立クラスター・成熟度を管理し、自己証明禁止や非LLM矛盾検出・改訂上書きを統制。",
     "keyRequirements": [
-      "矛盾検出アラート",
-      "記憶調停アルゴリズム"
+      "主張(claim)DB構造化",
+      "6.7 自己証明禁止ガード",
+      "世界区分(REAL/FICTION)分離",
+      "非LLM矛盾検出・上書き改訂"
     ],
     "responsibleServices": [
-      "selfCodeArchitectService.ts"
+      "claimDatabaseService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "NonLlmArchitectureTab.tsx"
     ],
     "invariantGuarantees": [
       "Qwen 3B保護",
-      "プライバシー境界",
-      "退行防止"
+      "自己生成情報自己証明禁止",
+      "非破壊的上書き履歴保持"
     ]
   },
   {
@@ -1042,18 +1044,28 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
   {
     "chapterNumber": 52,
     "id": "chap_52",
-    "title": "世界モデル & 予測誤差エンジン完全仕様",
+    "title": "世界モデル & 予測誤差エンジン完全仕様 (統合版 第7.1〜7.2節)",
     "category": "DEEP_COGNITION",
     "status": "COMPLETED",
     "versionAdded": "v5.10",
-    "summary": "ユーザーの発話意図と感情遷移を予測し、実際の応答との誤差から自己の推論方針を即座に修正。",
+    "summary": "ユーザーの発話意図と感情遷移を行動前に予測し、実際の応答との誤差(Surprisal・文字2-gram近似)から自己の推論方針を即座に修正。",
     "keyRequirements": [
-      "発話予測シミュレータ",
+      "発話前予測シミュレータ",
       "予測誤差スコアリング",
-      "方針動的補正"
+      "脱ロボット口調検知",
+      "文字2-gram記憶利用判定"
     ],
     "responsibleServices": [
-      "worldModelPredictionEngine.ts"
+      "worldModelService.ts"
+    ],
+    "responsibleComponents": [
+      "AutonomousSelfImprovementModal.tsx",
+      "NonLlmArchitectureTab.tsx"
+    ],
+    "invariantGuarantees": [
+      "Qwen 3B保護",
+      "形態素解析非依存",
+      "完全同期軽量実行"
     ]
   },
   {
@@ -1182,17 +1194,26 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
   {
     "chapterNumber": 59,
     "id": "chap_59",
-    "title": "形式知識・制約ソルバー",
+    "title": "形式知識・制約ソルバー (統合版 第10.2節・不変保護)",
     "category": "PERCEPTION_STUDIO",
-    "status": "UNIMPLEMENTED",
+    "status": "COMPLETED",
     "versionAdded": "v5.20",
-    "summary": "数理論理学や制約充足問題（CSP）を活用し、矛盾のない厳密なスケジュールやコードを生成。",
+    "summary": "数理論理学や制約充足問題（CSP/AC-3風ドメイン削減）を活用し、矛盾のない厳密なスケジュールやコード合成、Qwen 3B保護不変条件を検証。",
     "keyRequirements": [
-      "制約ソルバー連携",
-      "論理矛盾検出"
+      "制約ソルバー連携 (CSP)",
+      "論理矛盾検出 (UNSAT)",
+      "Qwen 3B重み不変検証"
     ],
     "responsibleServices": [
       "formalConstraintSolverService.ts"
+    ],
+    "responsibleComponents": [
+      "FormalConstraintSolverSubView.tsx"
+    ],
+    "invariantGuarantees": [
+      "Qwen 3B保護",
+      "不変条件絶対遵守",
+      "決定論的SAT判定"
     ]
   },
   {
@@ -1921,25 +1942,27 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
   {
     "chapterNumber": 91,
     "id": "chap_91",
-    "title": "自然言語仕様AST変換・要件セマンティクス抽出",
+    "title": "自然言語仕様AST変換・要求型コンパイラ (統合版 第10.1節)",
     "category": "SPEC_SYNTHESIS",
-    "status": "UNIMPLEMENTED",
+    "status": "COMPLETED",
     "versionAdded": "v5.0",
-    "summary": "設計思想指示書の自然言語テキストから直接構文木（AST）を自動導出。",
+    "summary": "自然言語の曖昧な指示を機械検査可能な確定要求型（CompiledRequestType: GOAL/TARGET/制約/禁止事項/受入基準/副作用クラス/決定論的実行可否）へ決定論的にコンパイル。",
     "keyRequirements": [
-      "自然言語ASTパーサー",
-      "要件ノード抽出"
+      "CompiledRequestType型確定",
+      "12分類セマンティクス抽出",
+      "Option Explicit等禁止事項抽出",
+      "決定論的実行可否判定"
     ],
     "responsibleServices": [
-      "selfCodeArchitectService.ts"
+      "requestTypeCompilerService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "NonLlmArchitectureTab.tsx"
     ],
     "invariantGuarantees": [
       "Qwen 3B保護",
-      "プライバシー境界",
-      "退行防止"
+      "確率的補完の禁止",
+      "安全境界値の適用"
     ]
   },
   {
@@ -3701,25 +3724,27 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
   {
     "chapterNumber": 168,
     "id": "chap_168",
-    "title": "形式検証済みコンポーネントライブラリ",
+    "title": "形式検証済みコンポーネントライブラリ・部品レジストリ (統合版 第9章)",
     "category": "FORMAL_REASONING",
-    "status": "UNIMPLEMENTED",
+    "status": "COMPLETED",
     "versionAdded": "v5.0",
-    "summary": "数学的にバグが存在しないことが証明された高品質モジュール集の構築。",
+    "summary": "TXT部品パッケージ(component/implementation/tests/validation/sources/history)を物理正本とし、重複抑止(完全一致/正規化ハッシュ)・状態遷移(COLLECTED〜VERIFIED)・決定論的コード合成を統制。",
     "keyRequirements": [
-      "形式証明付きコンポーネント",
-      "ゼロディフェクト保証"
+      "TXT部品パッケージ完全構造",
+      "重複抑止・ハッシュ検査",
+      "COLLECTED〜VERIFIED状態遷移",
+      "決定論的コード合成エンジン"
     ],
     "responsibleServices": [
-      "selfCodeArchitectService.ts"
+      "componentRegistryService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "NonLlmArchitectureTab.tsx"
     ],
     "invariantGuarantees": [
       "Qwen 3B保護",
-      "プライバシー境界",
-      "退行防止"
+      "改ざん検知SHA256ハッシュ",
+      "検証前コード実行抑止"
     ]
   },
   {
