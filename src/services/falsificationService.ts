@@ -11,13 +11,18 @@ import {
  * 非LLM化 フェーズ2: 主張・証拠の認識論的分類（現実/創作/仮定の混同防止）純粋関数
  * 
  * 入力テキスト内の言語的マーカー、構文パターン、文末表現を静的解析し、
- * 主張を以下の4ステータスに非LLM・決定論的に分類する：
- * - 'fictional': 創作・架空設定・物語・ロールプレイ
+ * 主張を以下の5区分に非LLM・決定論的に分類する：
+ * - 'contradictory': 矛盾・対立・前言不一致・前提混同
+ * - 'fictional': 創作・架空設定・物語・ロールプレイ・仮定空想
+ * - 'user_hypothesis': ユーザーの仮説・個人的見立て・推論仮説
  * - 'hypothetical': 仮定・反実仮想・思考実験・条件付き前提
  * - 'unverified': 未検証・推測・伝聞・主観的所感
  * - 'confirmed': 客観的事実・確定事項・検証済み事実
  */
-export function classifyClaimEpistemology(text: string): EpistemicClaimClassification {
+export function classifyClaimEpistemology(
+  text: string,
+  context?: { previousFactStatus?: ClaimFactStatus }
+): EpistemicClaimClassification {
   const trimmed = (text || '').trim();
   if (!trimmed) {
     return {
@@ -32,7 +37,73 @@ export function classifyClaimEpistemology(text: string): EpistemicClaimClassific
   const detectedMarkers: string[] = [];
   const reasons: string[] = [];
 
-  // 1. 創作・架空・ロールプレイマーカー (優先度最高)
+  // 0. コンテキスト依存の混同・矛盾検出 (前文脈がfictionalで今回確定事実として扱おうとした場合)
+  if (context?.previousFactStatus === 'fictional' || context?.previousFactStatus === 'hypothetical') {
+    const treatedAsConfirmedRegex = /実在する|公式(?:に|の)|実際に存在|確定事実|現実の|公文書|現住所|本名で/g;
+    const matches = trimmed.match(treatedAsConfirmedRegex);
+    if (matches) {
+      return {
+        status: 'contradictory',
+        confidence: 0.9,
+        reasons: ['先行する創作・仮定(fictional)の前提を現実の確定事実(confirmed)として混同'],
+        detectedMarkers: matches,
+        sourceText: trimmed,
+      };
+    }
+  }
+
+  // 1. 矛盾・対立マーカー (最優先)
+  const contradictoryPatterns = [
+    { regex: /矛盾(?:している|だ|が生じる)|相反する|両立しない/g, label: '論理的矛盾表現' },
+    { regex: /前言(?:を)?撤回|さっきと言ってることが逆|正反対だ/g, label: '主張の対立・撤回' },
+    { regex: /事実無根|あり得ない|嘘だ|デタラメ/g, label: '事実否定・対立' },
+  ];
+
+  for (const p of contradictoryPatterns) {
+    const matches = trimmed.match(p.regex);
+    if (matches) {
+      detectedMarkers.push(...matches);
+      reasons.push(p.label);
+    }
+  }
+
+  if (detectedMarkers.length > 0) {
+    return {
+      status: 'contradictory',
+      confidence: Math.min(1.0, 0.8 + detectedMarkers.length * 0.1),
+      reasons,
+      detectedMarkers,
+      sourceText: trimmed,
+    };
+  }
+
+  // 2. ユーザーの仮説マーカー (user_hypothesis)
+  const userHypothesisPatterns = [
+    { regex: /(?:私|自分)(?:の|側の)?(?:仮説|推論|見立て|仮定)(?:では|としては)?/g, label: 'ユーザーの仮説標識' },
+    { regex: /仮説を立て(?:ている|てみた|る)|仮説検証/g, label: '仮説提示動作' },
+    { regex: /という見解を持ってい(?:る|ます)|持論だが/g, label: '個人的見解・仮説' },
+    { regex: /ではないかという仮説|という説を考えている/g, label: '仮説的思考' },
+  ];
+
+  for (const p of userHypothesisPatterns) {
+    const matches = trimmed.match(p.regex);
+    if (matches) {
+      detectedMarkers.push(...matches);
+      reasons.push(p.label);
+    }
+  }
+
+  if (detectedMarkers.length > 0) {
+    return {
+      status: 'user_hypothesis',
+      confidence: Math.min(1.0, 0.8 + detectedMarkers.length * 0.1),
+      reasons,
+      detectedMarkers,
+      sourceText: trimmed,
+    };
+  }
+
+  // 3. 創作・架空・ロールプレイマーカー
   const fictionalPatterns = [
     { regex: /物語|ストーリー|小説|童話|神話/g, label: '創作・物語表現' },
     { regex: /架空の|架空の話|フィクション|ファンタジー|異世界|妄想/g, label: '架空・ファンタジー標識' },
@@ -59,7 +130,7 @@ export function classifyClaimEpistemology(text: string): EpistemicClaimClassific
     };
   }
 
-  // 2. 仮定・条件付き思考・反実仮想マーカー (優先度第2)
+  // 4. 仮定・条件付き思考・反実仮想マーカー (hypothetical)
   const hypotheticalPatterns = [
     { regex: /もし(?:も)?(?:.*?)(?:なら|たら|とすれば|と仮定)/g, label: '「もし〜なら」仮定構文' },
     { regex: /仮に(?:.*?)(?:としたら|とすれば|と考えると)/g, label: '「仮に〜としたら」仮想構文' },
@@ -93,7 +164,7 @@ export function classifyClaimEpistemology(text: string): EpistemicClaimClassific
     };
   }
 
-  // 3. 未検証・推測・伝聞マーカー (優先度第3)
+  // 5. 未検証・推測・伝聞マーカー
   const unverifiedPatterns = [
     { regex: /らしい(?:です)?|っぽい(?:です)?/g, label: '伝聞・様態接尾辞' },
     { regex: /かもしれない|かも知れない|かも(?:ね)?/g, label: '不確定推量「かも」' },
@@ -121,7 +192,7 @@ export function classifyClaimEpistemology(text: string): EpistemicClaimClassific
     };
   }
 
-  // 4. 事実・確定・検証済みマーカー (優先度第4)
+  // 6. 事実・確定・検証済みマーカー (confirmed)
   const confirmedPatterns = [
     { regex: /である|であります|でした/g, label: '客観断定文末' },
     { regex: /(?:確定|決定|合意)(?:した|しました)/g, label: '決定・合意標識' },
@@ -156,6 +227,33 @@ export function classifyClaimEpistemology(text: string): EpistemicClaimClassific
     detectedMarkers: [],
     sourceText: trimmed,
   };
+}
+
+/**
+ * 創作(fictional)または仮定(hypothetical)のコンテキストにおいて、
+ * 後続発話が確定事実(confirmed)として扱おうとする混同・誤認を検出する
+ */
+export function detectFictionalConfirmedConfusion(
+  previousStatus: ClaimFactStatus,
+  currentText: string,
+  modelStatus?: ClaimFactStatus
+): { hasConfusion: boolean; warning?: string; resolution: 'PRESERVE_FICTIONAL' | 'PASS' } {
+  if (previousStatus === 'fictional' || previousStatus === 'hypothetical') {
+    // ユーザーまたはモデルが、実在・公的確定事項として扱っているか判定
+    const currentClassification = classifyClaimEpistemology(currentText, { previousFactStatus: previousStatus });
+    if (
+      currentClassification.status === 'confirmed' ||
+      currentClassification.status === 'contradictory' ||
+      modelStatus === 'confirmed'
+    ) {
+      return {
+        hasConfusion: true,
+        warning: `先行する仮定・創作コンテキスト(${previousStatus})が確定事実(confirmed)として混同されています。`,
+        resolution: 'PRESERVE_FICTIONAL',
+      };
+    }
+  }
+  return { hasConfusion: false, resolution: 'PASS' };
 }
 
 /**

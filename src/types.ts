@@ -135,7 +135,13 @@ export interface MemoryItem {
 /**
  * 非LLM化 フェーズ2: 主張・言明の認識論的分類ステータス
  */
-export type ClaimFactStatus = 'confirmed' | 'hypothetical' | 'fictional' | 'unverified';
+export type ClaimFactStatus =
+  | 'confirmed'
+  | 'hypothetical'
+  | 'fictional'
+  | 'unverified'
+  | 'user_hypothesis'
+  | 'contradictory';
 
 /**
  * 主張・言明の認識論的分類結果

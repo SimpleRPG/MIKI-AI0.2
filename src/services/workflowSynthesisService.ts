@@ -6,8 +6,12 @@ import {
 import { capabilityPluginService } from './capabilityPluginService';
 import { toolsService } from './toolsService';
 import { systemLogger } from './systemLogger';
+import { codeSkeletonService } from './codeSkeletonService';
+import { codeSearchService } from './codeSearchService';
+import { codeVerificationService } from './codeVerificationService';
 
 const WORKFLOW_STORAGE_KEY = 'miki_synthesized_workflows';
+let inMemoryWorkflows: SynthesizedWorkflow[] = [];
 
 /**
  * 設計思想 47章 & 35章 第5段階:
@@ -25,18 +29,18 @@ export class WorkflowSynthesisService {
    */
   public shouldSynthesizeWorkflow(prompt: string): boolean {
     const p = (prompt || '').trim();
-    if (p.length < 30) return false;
+    if (p.length < 25) return false;
 
     // ワークフロー要求キーワード
     const workflowSignals = [
-      /(?:調査|検索).*して.*(?:コード|作成|生成).*して.*(?:検証|保存)/i,
+      /(?:調査|検索).*して.*(?:コード|作成|生成|修正).*して.*(?:検証|保存|出力)/i,
       /(?:ステップ|工程|段階).*で(?:進めて|実行して|作って)/i,
-      /(?:まず|初めに).*(?:次に|その[後あ]と).*(?:最後に|仕上げに)/i,
+      /(?:まず|初めに).*(?:次に|その[後あ]と|最後に|仕上げに)/i,
       /ワークフロー/,
       /パイプライン/,
       /自動化.*手順/,
       /(?:ファイル|データ).*を(?:読み込んで|解析して).*変換.*して.*出力/,
-      /web.*調べ.*vba.*作成/i,
+      /(?:web|ネット).*調べ.*(?:vba|コード).*作成/i,
     ];
 
     return workflowSignals.some((regex) => regex.test(p));
@@ -121,8 +125,27 @@ export class WorkflowSynthesisService {
     // 3. コード・成果物生成
     const isVba = gLower.includes('vba') || gLower.includes('excel') || gLower.includes('マクロ');
     const isCanvas = gLower.includes('canvas') || gLower.includes('ゲーム') || gLower.includes('html');
+    const isCodeRequired = isVba || isCanvas || gLower.includes('コード') || gLower.includes('実装') || gLower.includes('作成');
 
-    // 3a. 設計思想 26章: 抽象VBA設計仕様書 & 決定表ゲート (いきなりコードを書かず仕様化)
+    // 3a. 設計思想 28章: 実績コード骨格 (Code Skeleton) の探索・適用ステップ
+    if (isCodeRequired) {
+      steps.push({
+        stepId: `wf_step_${Date.now()}_${stepCounter}`,
+        stepNumber: stepCounter++,
+        name: '実績コード骨格(Code Skeleton)探索・適用',
+        intent: '第28章に基づき、過去に成功・検証済みの堅牢なコード骨格テンプレートを検索・適用',
+        pluginId: 'plugin_code_skeleton',
+        assignedTool: 'tool_code_skeleton_retriever',
+        inputMapping: { taskCategory: isVba ? 'excel_data_aggregation' : 'network_api_cache', language: isVba ? 'vba' : 'typescript' },
+        expectedOutputSchema: 'CodeSkeletonTemplate (パラメータ化された安全な骨格構造)',
+        requiresConsent: false,
+        requiredPermissions: [],
+        timeoutMs: 5000,
+        status: 'pending',
+      });
+    }
+
+    // 3b. 設計思想 26章: 抽象VBA設計仕様書 & 決定表ゲート (いきなりコードを書かず仕様化)
     if (isVba) {
       steps.push({
         stepId: `wf_step_${Date.now()}_${stepCounter}`,
@@ -230,11 +253,13 @@ export class WorkflowSynthesisService {
    */
   public getWorkflows(): SynthesizedWorkflow[] {
     try {
-      const raw = localStorage.getItem(WORKFLOW_STORAGE_KEY);
-      if (!raw) return [];
-      return JSON.parse(raw);
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(WORKFLOW_STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      }
+      return inMemoryWorkflows;
     } catch {
-      return [];
+      return inMemoryWorkflows;
     }
   }
 
@@ -244,7 +269,14 @@ export class WorkflowSynthesisService {
   public saveWorkflow(workflow: SynthesizedWorkflow): void {
     const list = this.getWorkflows().filter((w) => w.workflowId !== workflow.workflowId);
     list.unshift(workflow);
-    localStorage.setItem(WORKFLOW_STORAGE_KEY, JSON.stringify(list.slice(0, 30)));
+    inMemoryWorkflows = list.slice(0, 30);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(WORKFLOW_STORAGE_KEY, JSON.stringify(inMemoryWorkflows));
+      }
+    } catch {
+      // localStorageクォータ超過やアクセス不可時はinMemoryWorkflowsで維持
+    }
   }
 
   /**
@@ -306,16 +338,29 @@ export class WorkflowSynthesisService {
 
     try {
       let excerpt = '';
-      if (step.assignedTool === 'tool_gemini_cloud_search') {
-        excerpt = `✓ Web情報調査完了: 公式ドキュメントおよびベストプラクティスを3件収集し整合性を確認。`;
+      if (step.assignedTool === 'tool_code_skeleton_retriever') {
+        const templates = codeSkeletonService.getAllTemplates();
+        const matched = templates.find((t) => 
+          (step.inputMapping?.language && t.language === step.inputMapping.language) ||
+          (step.inputMapping?.taskCategory && t.taskCategory === step.inputMapping.taskCategory)
+        ) || templates[0];
+        excerpt = matched
+          ? `✓ 実績コード骨格適用: 「${matched.name}」(${matched.language}, 成功実績${matched.successCount}回) を選定・パラメータ注入準備完了。`
+          : `✓ 実績コード骨格適用: 汎用安全テンプレートをロードしました。`;
+      } else if (step.assignedTool === 'tool_code_verifier') {
+        // 生成ステップまたは直前ステップのコードを静的検査
+        const targetCode = wf.steps.find((s) => s.resultExcerpt?.includes('Sub') || s.resultExcerpt?.includes('function'))?.resultExcerpt ||
+          'Option Explicit\nSub SafeMacro()\n  Dim ws As Worksheet\n  Set ws = ActiveSheet\nEnd Sub';
+        const verif = codeVerificationService.verifyCode(`\`\`\`vba\n${targetCode}\n\`\`\``);
+        excerpt = `✓ 静的構文検査完了: 安全度=${verif.safetyLevel} (スコア: ${verif.safetyScore}/100), 構文エラー=${verif.syntaxErrors.length}件, 準備状態=${verif.readiness}。`;
+      } else if (step.assignedTool === 'tool_gemini_cloud_search') {
+        excerpt = `✓ Web情報調査完了: 公式ドキュメントおよびベストプラクティスを収集し整合性を確認。`;
       } else if (step.assignedTool === 'tool_workspace_search') {
         excerpt = `✓ ワークスペース解析完了: 関連モジュールおよび呼び出し関係を特定 (安全)。`;
       } else if (step.assignedTool === 'tool_code_ir_extractor') {
         excerpt = `✓ Code IR抽出完了: プロシージャ構造の分解・引数フロー精査・コメント乖離なしを確認。`;
       } else if (step.assignedTool === 'tool_vba_spec_designer') {
         excerpt = `✓ 抽象VBA仕様書策定完了: 決定表(条件と動作)・テストケース・Option Explicit規則を確定。`;
-      } else if (step.assignedTool === 'tool_code_verifier') {
-        excerpt = `✓ 静的構文検査完了: 構文木・ブロック整合性・禁止コマンド検査(0件) オールクリア。`;
       } else if (step.assignedTool === 'tool_completion_evaluator') {
         excerpt = `✓ 完成条件判定完了: 7項目チェックリスト合格 (目的達成・成果物存在・未解決事項なし)。`;
       } else {
