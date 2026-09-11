@@ -214,7 +214,7 @@ export default function App() {
   const [engineMode, setEngineMode] = useState<EngineMode>(() => {
     const saved = storageService.getItem('miki_active_engine_mode') as EngineMode;
     const validModes: EngineMode[] = ['native_gpu', 'webgpu', 'external_gpu', 'autonomous_rule', 'gemini_cloud'];
-    const defaultMode: EngineMode = Capacitor.isNativePlatform() ? 'native_gpu' : 'webgpu';
+    const defaultMode: EngineMode = 'autonomous_rule';
     return validModes.includes(saved) ? saved : defaultMode;
   });
 
@@ -347,7 +347,7 @@ export default function App() {
   }, [workspaceFiles]);
 
   useEffect(() => {
-    storageService.setItem('gamecraft_engine_mode', engineMode);
+    storageService.setItem('miki_active_engine_mode', engineMode);
   }, [engineMode]);
 
   // バックグラウンド自律処理への会話割り込み防止同期 (設計思想: 会話中の割り込み防止 & 睡眠ゲート連携)
@@ -1719,7 +1719,7 @@ export default function App() {
       // PATH 0: Phase 3 - 多段推論タスク計画 & 検証エンジン (Multi-Step Task Plan)
       // 制約遵守: 単純な会話・挨拶は軽量フロー(PATH 1/PATH 2)へ通し、複合課題のみ多段化
       // =========================================================================
-      const shouldUseMulti = taskPlanService.shouldUseMultiStep(text, {
+      const shouldUseMulti = engineMode !== 'autonomous_rule' && taskPlanService.shouldUseMultiStep(text, {
         workspaceFilesCount: workspaceFiles.length,
         attachedFilesCount: attached?.length,
         userExplicitMultiStep: isMultiStepExplicit,
