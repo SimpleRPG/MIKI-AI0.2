@@ -64,6 +64,9 @@ import { experienceRouterService } from './services/experienceRouterService';
 import { workflowSynthesisService } from './services/workflowSynthesisService';
 import { answerPlanService } from './services/answerPlanService';
 import { capabilityGapService } from './services/capabilityGapService';
+import { skillIrCompilerService } from './services/skillIrCompilerService';
+import { formalConstraintSolverService } from './services/formalConstraintSolverService';
+import { capabilityPluginService } from './services/capabilityPluginService';
 import { codeUnderstandingService } from './services/codeUnderstandingService';
 import { vbaDesignAssistantService } from './services/vbaDesignAssistantService';
 import { featureFlagsService } from './services/featureFlagsService';
@@ -1004,6 +1007,46 @@ export default function App() {
         'CHAT',
         `🔀 [反実仮想・判断推論シャドー] トピック: 『${topic}』 | 比較対象: [${options.join(', ')}] | 最良代替案: ${shadowSimulation.bestAlternative?.scenarioName || '(なし)'} (Δ=${shadowSimulation.bestAlternative?.overallDeltaScore ?? 0}点) | 結論: ${shadowSimulation.conclusion}`,
         { shadowSimulation }
+      );
+    }
+
+    // 作業指示書 フェーズ4: 要求型と計画（要求コンパイラ・能力契約・制約ソルバー）シャドー実行
+    // 1. 能力契約プラグイン探索 (capabilityPluginService)
+    const shadowBestPlugin = capabilityPluginService.findBestPluginForTask(text);
+    if (shadowBestPlugin) {
+      const permCheck = capabilityPluginService.checkPermissions(shadowBestPlugin.plugin_id);
+      systemLogger.info(
+        'TOOLS',
+        `🧩 [フェーズ4 能力契約プラグイン照合] 適合プラグイン: 『${shadowBestPlugin.name}』 (${shadowBestPlugin.plugin_id}) | 状態: ${shadowBestPlugin.status} | 権限充足: ${permCheck.hasAllPermissions ? 'ALL_GRANTED' : `不足: ${permCheck.missing.join(', ')}`}`,
+        { shadowBestPlugin, permCheck }
+      );
+    }
+
+    // 2. 形式制約ソルバー検証 (formalConstraintSolverService)
+    const shadowVariables: Record<string, unknown[]> = {
+      targetModel: ['Qwen-3B-Base'],
+      activeWeights: ['IMMUTABLE'],
+      dataPrivacyLevel: text.includes('パスワード') || text.includes('秘密') ? ['CONFIDENTIAL'] : ['LOCAL'],
+      networkDestination: ['INTERNAL', 'EXTERNAL_ENCRYPTED'],
+    };
+    const shadowCspResult = formalConstraintSolverService.solveCSP(shadowVariables);
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `⚖️ [フェーズ4 形式制約充足検証] 充足状態: ${shadowCspResult.isSatisfied ? 'SAT (充足)' : 'UNSAT (制約矛盾)'} | 矛盾数: ${shadowCspResult.contradictionsFound.length} | 反復数: ${shadowCspResult.iterations}`,
+      { shadowCspResult }
+    );
+
+    // 3. 技能IR仮想マシン検証 (skillIrCompilerService)
+    if (isVbaRequest || text.includes('配列') || text.includes('高速化') || text.includes('VBA')) {
+      const shadowVmResult = skillIrCompilerService.executeIR('skill_vba_batch_array', {
+        sheetName: 'Sheet1',
+        rangeAddress: 'A1:Z100',
+        sourceCode: text,
+      });
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `⚙️ [フェーズ4 技能IR仮想マシン実行] スキルID: skill_vba_batch_array | 検証結果: ${shadowVmResult.success ? 'PASS (決定論的充足)' : 'FAILED (前提違反)'} | 実行命令数: ${shadowVmResult.instructionsExecuted}`,
+        { shadowVmResult }
       );
     }
 
@@ -2745,7 +2788,7 @@ export default function App() {
           });
         }
       } else if (streamEvaluation.status === 'FAILED' || streamEvaluation.status === 'BLOCKED') {
-        capabilityGapService.recordGap({
+        const gapEntry = capabilityGapService.recordGap({
           description: `[完了判定${streamEvaluation.status}] ${streamEvaluation.reason || '目標要件未充足'}`,
           gap_type: 'failure',
           capabilityId: isVbaRequest ? 'cap_abstract_vba_design' : 'cap_logical_priority',
@@ -2754,6 +2797,19 @@ export default function App() {
           candidate_solution: '教師教材の生成、回答骨格の拡充',
           samplePrompt: text,
         });
+
+        // フェーズ4: 不足能力発生時の形式制約検査 & 代替能力プラグイン探索
+        const relatedPlugin = capabilityPluginService.findBestPluginForTask(text);
+        const cspCheck = formalConstraintSolverService.solveCSP({
+          targetModel: ['Qwen-3B-Base'],
+          activeWeights: ['IMMUTABLE'],
+          dataPrivacyLevel: ['LOCAL'],
+          networkDestination: ['INTERNAL'],
+        });
+        systemLogger.info(
+          'CAPABILITY_GAP',
+          `🔍 [フェーズ4 ギャップ連動検証] ギャップID: ${gapEntry.gap_id} | 不足能力: ${gapEntry.capabilityId} | 代替プラグイン: ${relatedPlugin?.name || '(なし)'} (${relatedPlugin?.status || 'N/A'}) | 制約充足: ${cspCheck.isSatisfied ? 'SAT' : 'UNSAT'}`
+        );
       }
 
       // 設計思想 49章: 経験の保存先ルーターによる9分類自動仕分け
