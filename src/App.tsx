@@ -58,7 +58,7 @@ import {
 import { responseDesignService } from './services/responseDesignService';
 import { longTermMemoryService } from './services/longTermMemoryService';
 import { codeVerificationService } from './services/codeVerificationService';
-import { falsificationService } from './services/falsificationService';
+import { falsificationService, classifyClaimEpistemology } from './services/falsificationService';
 import { experienceRouterService } from './services/experienceRouterService';
 import { workflowSynthesisService } from './services/workflowSynthesisService';
 import { answerPlanService } from './services/answerPlanService';
@@ -961,6 +961,14 @@ export default function App() {
         }
       );
     }
+
+    // 作業指示書 フェーズ2: 主張・証拠の認識論的分類 (現実/創作/仮定の混同防止シャドー実行)
+    const shadowUserEpistemic = classifyClaimEpistemology(text);
+    systemLogger.info(
+      'CHAT',
+      `⚖️ [認識論的分類シャドー (ユーザー入力)] 判定: [${shadowUserEpistemic.status.toUpperCase()}] (確信度: ${Math.round(shadowUserEpistemic.confidence * 100)}%) | マーカー: [${shadowUserEpistemic.detectedMarkers.join(', ') || 'なし'}] | 理由: ${shadowUserEpistemic.reasons.join(', ')}`,
+      { shadowUserEpistemic }
+    );
 
     // 設計思想 Master v5.0 第2章2節: 前ターンで使われた記憶に対するユーザーフィードバック（感情価: 質）の自動反映
     if (lastTurnUsedMemoryIdsRef.current && lastTurnUsedMemoryIdsRef.current.length > 0) {
@@ -2519,6 +2527,21 @@ export default function App() {
           }
         );
       }
+
+      // 作業指示書 フェーズ2: モデル応答の認識論的分類シャドー記録 (現実/創作/仮定の混同防止)
+      const shadowResponseEpistemic = classifyClaimEpistemology(rawExtractedText);
+      systemLogger.info(
+        'STATE_EXTRACTION',
+        `⚖️ [認識論的分類シャドー (モデル応答)] 判定: [${shadowResponseEpistemic.status.toUpperCase()}] (確信度: ${Math.round(shadowResponseEpistemic.confidence * 100)}%) | マーカー: [${shadowResponseEpistemic.detectedMarkers.join(', ') || 'なし'}] | 理由: ${shadowResponseEpistemic.reasons.join(', ')}`,
+        {
+          shadowResponseEpistemic,
+          userInputStatus: shadowUserEpistemic.status,
+          isConsistencyPreserved:
+            shadowUserEpistemic.status === 'fictional'
+              ? shadowResponseEpistemic.status === 'fictional' || shadowResponseEpistemic.status === 'unverified'
+              : true,
+        }
+      );
 
       systemLogger.step(10, 10, '応答確定・UIレンダリング & ワークスペース同期', {
         executedEngineLabel,

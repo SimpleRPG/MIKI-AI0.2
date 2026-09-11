@@ -3,14 +3,26 @@ import { systemLogger } from './systemLogger';
 import { longTermMemoryService } from './longTermMemoryService';
 import { embeddingService } from './embeddingService';
 import { autonomousSearchService } from './autonomousSearchService';
+import { classifyClaimEpistemology } from './falsificationService';
 import type {
   MemoryItem,
   SpacedRecallAuditResult,
   FreshnessRevalidationResult,
   EmbeddingHealthCheckResult,
+  ClaimFactStatus,
 } from '../types';
 
 const AUDIT_LOGS_KEY = 'miki_memory_audit_logs';
+
+export interface EpistemicStatusAuditResult {
+  auditedCount: number;
+  confirmedCount: number;
+  hypotheticalCount: number;
+  fictionalCount: number;
+  unverifiedCount: number;
+  fictionalMisclassifiedAsConfirmed: number;
+  flaggedMemoryIds: string[];
+}
 
 export interface MemoryAuditCycleRecord {
   id: string;
@@ -19,6 +31,7 @@ export interface MemoryAuditCycleRecord {
   spacedRecall: SpacedRecallAuditResult;
   freshness: FreshnessRevalidationResult;
   embeddingHealth: EmbeddingHealthCheckResult;
+  epistemicAudit?: EpistemicStatusAuditResult;
 }
 
 /**
@@ -260,12 +273,87 @@ class MemoryAuditService {
   }
 
   /**
+   * 非LLM化 フェーズ2: 主張・証拠の認識論的監査 (現実/創作/仮定の混同防止監査)
+   * 記憶内容の認識論的ステータスを非LLMで監査し、創作や仮定が「確定事実」として混同保存されるのを防止
+   */
+  public auditEpistemicStatuses(
+    abortSignal?: AbortSignal,
+    maxItems = 20
+  ): EpistemicStatusAuditResult {
+    const memories = storageService.getMemories();
+    let auditedCount = 0;
+    let confirmedCount = 0;
+    let hypotheticalCount = 0;
+    let fictionalCount = 0;
+    let unverifiedCount = 0;
+    let fictionalMisclassifiedAsConfirmed = 0;
+    const flaggedMemoryIds: string[] = [];
+
+    const targets = memories.slice(0, maxItems);
+
+    for (const mem of targets) {
+      if (abortSignal?.aborted) break;
+      if (mem.active === false) continue;
+
+      auditedCount++;
+      const classification = classifyClaimEpistemology(mem.content);
+      const currentStatus = mem.factStatus;
+
+      // 1. 未分類の記憶には認識論的ステータスを自動付与
+      if (!currentStatus) {
+        storageService.saveMemoryItem({
+          ...mem,
+          factStatus: classification.status,
+          updatedAt: Date.now(),
+        });
+      }
+
+      // 2. 確定事実（confirmed）として保存されているが、非LLM判定で創作（fictional）と判明した場合の混同検知・是正
+      if (currentStatus === 'confirmed' && classification.status === 'fictional') {
+        fictionalMisclassifiedAsConfirmed++;
+        flaggedMemoryIds.push(mem.id);
+        storageService.saveMemoryItem({
+          ...mem,
+          factStatus: 'fictional',
+          quarantineReason: `【認識論的監査】創作・架空表現が確定事実として混同されていたため是正しました: [${classification.detectedMarkers.join(', ')}]`,
+          updatedAt: Date.now(),
+        });
+      }
+
+      // 統計カウント
+      const effectiveStatus = currentStatus || classification.status;
+      if (effectiveStatus === 'confirmed') confirmedCount++;
+      else if (effectiveStatus === 'hypothetical') hypotheticalCount++;
+      else if (effectiveStatus === 'fictional') fictionalCount++;
+      else unverifiedCount++;
+    }
+
+    if (fictionalMisclassifiedAsConfirmed > 0) {
+      systemLogger.warn(
+        'PERSISTENCE',
+        `【認識論的監査】${fictionalMisclassifiedAsConfirmed}件の創作・仮定記憶が確定事実と混同されていたため是正しました`,
+        { flaggedMemoryIds }
+      );
+    }
+
+    return {
+      auditedCount,
+      confirmedCount,
+      hypotheticalCount,
+      fictionalCount,
+      unverifiedCount,
+      fictionalMisclassifiedAsConfirmed,
+      flaggedMemoryIds,
+    };
+  }
+
+  /**
    * 設計思想 Master v5.4 第19章 総合実行パイプライン
    * バックグラウンド深い睡眠サイクルから呼び出される総合実行メソッド
    */
   public async runFullAuditCycle(abortSignal?: AbortSignal): Promise<MemoryAuditCycleRecord> {
     const startTime = Date.now();
-    systemLogger.info('SELF_IMPROVEMENT', '【第19章】記憶の間隔反復・鮮度再検証・埋め込み健全性サイクルを開始します');
+    systemLogger.info('SELF_IMPROVEMENT', '【第19章】記憶の間隔反復・鮮度再検証・埋め込み健全性・認識論的監査サイクルを開始します');
 
     // 1. 埋め込み健全性監視 (19.4)
     const embeddingHealth = await embeddingService.checkHealth();
@@ -281,6 +369,9 @@ class MemoryAuditService {
     // 4. 記憶の鮮度再検証 (19.3)
     const freshness = await this.performFreshnessRevalidation(abortSignal);
 
+    // 5. 非LLM化 フェーズ2: 主張・証拠の認識論的監査 (現実/創作/仮定の混同防止)
+    const epistemicAudit = this.auditEpistemicStatuses(abortSignal);
+
     const record: MemoryAuditCycleRecord = {
       id: `audit_${Date.now()}`,
       timestamp: Date.now(),
@@ -288,6 +379,7 @@ class MemoryAuditService {
       spacedRecall,
       freshness,
       embeddingHealth,
+      epistemicAudit,
     };
 
     this.auditHistory.push(record);
@@ -295,7 +387,7 @@ class MemoryAuditService {
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `【第19章】サイクル完了 (${record.durationMs}ms): 間隔反復定着 ${spacedRecall.reinforcedCount}件 / 鮮度差分検知 ${freshness.diffsDetected}件 / 埋め込み状態: ${embeddingHealth.status}`
+      `【第19章】サイクル完了 (${record.durationMs}ms): 間隔反復 ${spacedRecall.reinforcedCount}件 / 鮮度差分 ${freshness.diffsDetected}件 / 認識論監査 監査${epistemicAudit.auditedCount}件(混同是正${epistemicAudit.fictionalMisclassifiedAsConfirmed}件) / 埋め込み: ${embeddingHealth.status}`
     );
 
     return record;

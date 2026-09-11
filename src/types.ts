@@ -128,6 +128,24 @@ export interface MemoryItem {
   volatility?: 'high' | 'low';      // 19.3 揮発性・時事性フラグ (価格/バージョン/組織等 vs 恒久ルール)
   lastVerifiedAt?: number;          // 19.3 外部Web検索等による最終鮮度検証日時
   pendingVerificationDiff?: string; // 19.3 鮮度再検証で検知された差分 (ユーザー確認待ち)
+  // 非LLM化 フェーズ2: 主張・証拠の区別 (現実/創作/仮定の混同防止)
+  factStatus?: ClaimFactStatus;     // 認識論的主張状態 ('confirmed' | 'hypothetical' | 'fictional' | 'unverified')
+}
+
+/**
+ * 非LLM化 フェーズ2: 主張・言明の認識論的分類ステータス
+ */
+export type ClaimFactStatus = 'confirmed' | 'hypothetical' | 'fictional' | 'unverified';
+
+/**
+ * 主張・言明の認識論的分類結果
+ */
+export interface EpistemicClaimClassification {
+  status: ClaimFactStatus;
+  confidence: number;
+  reasons: string[];
+  detectedMarkers: string[];
+  sourceText: string;
 }
 
 /**

@@ -1,5 +1,24 @@
 [
   {
+    "hash": "c_mtwkp7m5_tn9h",
+    "message": "stub(teacher-template): 指示語・文脈照応の履歴スタック管理クラスの実装 [c_mtwkp7m5_tn9h]",
+    "timestamp": 1789107984078,
+    "files": [
+      "src/autonomous_modules/anaphora_history_stack.ts"
+    ],
+    "status": "COMMITTED",
+    "snapshots": [
+      {
+        "filePath": "src/autonomous_modules/anaphora_history_stack.ts",
+        "snapshotId": null
+      }
+    ],
+    "isStub": true,
+    "engine": "teacher_template",
+    "isTeacherAssisted": true,
+    "skillId": "skill_hw_mtwkp7id_jlqo"
+  },
+  {
     "hash": "c_mtwf6axb_545w",
     "message": "stub(teacher-template): 指示語解決純粋関数の実装 [c_mtwf6axb_545w]",
     "timestamp": 1789098703823,

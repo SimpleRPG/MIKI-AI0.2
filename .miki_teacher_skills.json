@@ -1,5 +1,28 @@
 [
   {
+    "id": "skill_hw_mtwkp7id_jlqo",
+    "category": "human_wisdom_____________________",
+    "tags": [
+      "human_wisdom",
+      "oss_pattern",
+      "typescript",
+      "typescript",
+      "指示語・文脈照応の履歴スタック管理クラスの実装"
+    ],
+    "rules": [
+      "先行OSSの実装パターン（人類の知恵）を直接取り込み、車輪の再発明を避ける",
+      "型安全・エラーハンドリング・不変条件チェックを確実に保持する",
+      "非同期リソース解放とメモリリーク防止を徹底する"
+    ],
+    "skeletonTemplate": "// NPM Package: remark-cjk-friendly-gfm-strikethrough\n// Description: remark plugin to make Markdown strikethrough (`~~`) in GFM more friendly with Chinese, Japanese, and Korean (CJK)\nexport interface remark_cjk_friendly_gfm_strikethroughConfig {\n  enabled?: boolean;\n}\n\nexport class remark_cjk_friendly_gfm_strikethroughService {\n  constructor(private config: remark_cjk_friendly_gfm_strikethroughConfig = {}) {}\n  public async execute(payload: unknown): Promise<{ success: boolean; data: any }> {\n    return { success: true, data: payload };\n  }\n}",
+    "sourceTask": "指示語・文脈照応の履歴スタック管理クラスの実装",
+    "createdAt": 1789107983941,
+    "usageCount": 1,
+    "sourceType": "npm",
+    "sourceUrl": "https://www.npmjs.com/package/remark-cjk-friendly-gfm-strikethrough",
+    "sourceTitle": "NPM: remark-cjk-friendly-gfm-strikethrough (v2.3.1)"
+  },
+  {
     "id": "skill_hw_mtwf6aws_px6x",
     "category": "human_wisdom_____________",
     "tags": [

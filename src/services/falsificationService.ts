@@ -3,7 +3,160 @@ import {
   FalsificationCheckItem,
   ConversationState,
   ComprehensiveCodeVerification,
+  EpistemicClaimClassification,
+  ClaimFactStatus,
 } from '../types';
+
+/**
+ * 非LLM化 フェーズ2: 主張・証拠の認識論的分類（現実/創作/仮定の混同防止）純粋関数
+ * 
+ * 入力テキスト内の言語的マーカー、構文パターン、文末表現を静的解析し、
+ * 主張を以下の4ステータスに非LLM・決定論的に分類する：
+ * - 'fictional': 創作・架空設定・物語・ロールプレイ
+ * - 'hypothetical': 仮定・反実仮想・思考実験・条件付き前提
+ * - 'unverified': 未検証・推測・伝聞・主観的所感
+ * - 'confirmed': 客観的事実・確定事項・検証済み事実
+ */
+export function classifyClaimEpistemology(text: string): EpistemicClaimClassification {
+  const trimmed = (text || '').trim();
+  if (!trimmed) {
+    return {
+      status: 'unverified',
+      confidence: 0.0,
+      reasons: ['空文字または無効な入力です'],
+      detectedMarkers: [],
+      sourceText: text,
+    };
+  }
+
+  const detectedMarkers: string[] = [];
+  const reasons: string[] = [];
+
+  // 1. 創作・架空・ロールプレイマーカー (優先度最高)
+  const fictionalPatterns = [
+    { regex: /物語|ストーリー|小説|童話|神話/g, label: '創作・物語表現' },
+    { regex: /架空の|フィクション|ファンタジー|異世界/g, label: '架空・ファンタジー標識' },
+    { regex: /設定として|という設定|キャラ設定|裏設定/g, label: '設定規定表現' },
+    { regex: /ごっこ|ロールプレイ|演じて|なりきって/g, label: 'ごっこ遊び・ロールプレイ' },
+    { regex: /創作して|オリジナルの|作ってみて|書いてみて/g, label: '創作生成依頼' },
+  ];
+
+  for (const p of fictionalPatterns) {
+    const matches = trimmed.match(p.regex);
+    if (matches) {
+      detectedMarkers.push(...matches);
+      reasons.push(p.label);
+    }
+  }
+
+  if (detectedMarkers.length > 0) {
+    return {
+      status: 'fictional',
+      confidence: Math.min(1.0, 0.75 + detectedMarkers.length * 0.1),
+      reasons,
+      detectedMarkers,
+      sourceText: trimmed,
+    };
+  }
+
+  // 2. 仮定・条件付き思考・反実仮想マーカー (優先度第2)
+  const hypotheticalPatterns = [
+    { regex: /もし(?:も)?(?:.*?)(?:なら|たら|とすれば|と仮定)/g, label: '「もし〜なら」仮定構文' },
+    { regex: /仮に(?:.*?)(?:としたら|とすれば|と考えると)/g, label: '「仮に〜としたら」仮想構文' },
+    { regex: /仮定して|想定して|シミュレーションして/g, label: '仮定・想定指示' },
+    { regex: /〜の場合(?:はどうなる|とする)/g, label: '条件付き思考' },
+    { regex: /(?:だ|であっ)たとしたら|(?:だ|であっ)たら/g, label: '反実仮想助動詞' },
+    { regex: /仮想的(?:に)?/g, label: '仮想標識' },
+  ];
+
+  for (const p of hypotheticalPatterns) {
+    const matches = trimmed.match(p.regex);
+    if (matches) {
+      detectedMarkers.push(...matches);
+      reasons.push(p.label);
+    }
+  }
+
+  // 短い単語での仮定判定
+  if (/^もし|^仮に|と仮定すると|とした場合/.test(trimmed)) {
+    detectedMarkers.push('仮定導入部');
+    reasons.push('文頭・文中の仮定導入語');
+  }
+
+  if (detectedMarkers.length > 0) {
+    return {
+      status: 'hypothetical',
+      confidence: Math.min(1.0, 0.7 + detectedMarkers.length * 0.1),
+      reasons,
+      detectedMarkers,
+      sourceText: trimmed,
+    };
+  }
+
+  // 3. 未検証・推測・伝聞マーカー (優先度第3)
+  const unverifiedPatterns = [
+    { regex: /らしい(?:です)?|っぽい(?:です)?/g, label: '伝聞・様態接尾辞' },
+    { regex: /かもしれない|かも知れない|かも(?:ね)?/g, label: '不確定推量「かも」' },
+    { regex: /と思われる|と思われます|と考えられる/g, label: '主観的思索' },
+    { regex: /だと思う|だと考える|気がする/g, label: '主観的所感' },
+    { regex: /噂では|聞いた話では|ネットで見た/g, label: '未確認伝聞出処' },
+    { regex: /はずだ|はずです|だろう|でしょう/g, label: '推量助動詞' },
+  ];
+
+  for (const p of unverifiedPatterns) {
+    const matches = trimmed.match(p.regex);
+    if (matches) {
+      detectedMarkers.push(...matches);
+      reasons.push(p.label);
+    }
+  }
+
+  if (detectedMarkers.length > 0) {
+    return {
+      status: 'unverified',
+      confidence: Math.min(1.0, 0.65 + detectedMarkers.length * 0.1),
+      reasons,
+      detectedMarkers,
+      sourceText: trimmed,
+    };
+  }
+
+  // 4. 事実・確定・検証済みマーカー (優先度第4)
+  const confirmedPatterns = [
+    { regex: /である|であります|でした/g, label: '客観断定文末' },
+    { regex: /確定した|決定した|合意した/g, label: '決定・合意標識' },
+    { regex: /リリースされた|公開された|実装した|配備された/g, label: '完了・存在実証' },
+    { regex: /判明した|確認された|立証された|検証済み/g, label: '検証・立証標識' },
+    { regex: /動作した|動いた|成功した/g, label: '実働検証' },
+  ];
+
+  for (const p of confirmedPatterns) {
+    const matches = trimmed.match(p.regex);
+    if (matches) {
+      detectedMarkers.push(...matches);
+      reasons.push(p.label);
+    }
+  }
+
+  if (detectedMarkers.length > 0) {
+    return {
+      status: 'confirmed',
+      confidence: Math.min(1.0, 0.7 + detectedMarkers.length * 0.1),
+      reasons,
+      detectedMarkers,
+      sourceText: trimmed,
+    };
+  }
+
+  // いずれにも強く合致しない中立文（質問文、挨拶等）は安全側に 'unverified'
+  return {
+    status: 'unverified',
+    confidence: 0.5,
+    reasons: ['客観的根拠マーカーおよび仮定/創作マーカーのない中立表現'],
+    detectedMarkers: [],
+    sourceText: trimmed,
+  };
+}
 
 /**
  * 設計思想 15-16章 & 35章 第5段階:
@@ -312,6 +465,14 @@ export class FalsificationService {
       status: 'pass',
       detail: '実環境の制約と役割分担に沿った適切な案内です。',
     };
+  }
+
+  /**
+   * 非LLM化 フェーズ2: 主張・証拠の認識論的分類（現実/創作/仮定の混同防止）
+   * 純粋関数 classifyClaimEpistemology のインスタンスメソッド版
+   */
+  public classifyClaimEpistemology(text: string): EpistemicClaimClassification {
+    return classifyClaimEpistemology(text);
   }
 }
 
