@@ -5,7 +5,7 @@ import { MemoryItem } from '../src/types';
 
 function runEpistemicClassificationTests() {
   console.log('================================================================');
-  console.log('🧪 フェーズ2: 主張・証拠の認識論的分類 (現実/創作/仮定) 実機検証');
+  console.log('🧪 フェーズ2: 主張・証拠の認識論的分類 (現実/創作/仮定) ロジック単体テスト');
   console.log('================================================================\n');
 
   let passed = 0;

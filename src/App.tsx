@@ -59,6 +59,7 @@ import { responseDesignService } from './services/responseDesignService';
 import { longTermMemoryService } from './services/longTermMemoryService';
 import { codeVerificationService } from './services/codeVerificationService';
 import { falsificationService, classifyClaimEpistemology } from './services/falsificationService';
+import { counterfactualReasoningService } from './services/counterfactualReasoningService';
 import { experienceRouterService } from './services/experienceRouterService';
 import { workflowSynthesisService } from './services/workflowSynthesisService';
 import { answerPlanService } from './services/answerPlanService';
@@ -969,6 +970,42 @@ export default function App() {
       `⚖️ [認識論的分類シャドー (ユーザー入力)] 判定: [${shadowUserEpistemic.status.toUpperCase()}] (確信度: ${Math.round(shadowUserEpistemic.confidence * 100)}%) | マーカー: [${shadowUserEpistemic.detectedMarkers.join(', ') || 'なし'}] | 理由: ${shadowUserEpistemic.reasons.join(', ')}`,
       { shadowUserEpistemic }
     );
+
+    // 作業指示書 フェーズ3: 判断・反事実推論 (シャドー実行)
+    // 比較・判断を求める発言を検知し、フェーズ1の候補抽出 (shadowAnaphoraResult.candidates) と
+    // 組み合わせて counterfactualReasoningService による分岐推論シミュレーションをシャドー実行
+    const isJudgmentOrComparison =
+      shadowAnaphoraResult.detectedExpression === 'どっち' ||
+      shadowAnaphoraResult.detectedExpression === 'どちら' ||
+      /どっち|どちら|比較|選ぶ|選びたい|どっちがいい|どちらが良い|メリット.*デメリット/.test(text);
+
+    if (isJudgmentOrComparison) {
+      const topic = conversationState.currentTopic || '判断・比較';
+      const options = shadowAnaphoraResult.candidates.length >= 2
+        ? shadowAnaphoraResult.candidates
+        : ['選択肢A', '選択肢B'];
+
+      const candidateScenarios = options.map((opt, idx) => ({
+        id: `cf_cand_${idx}_${Date.now()}`,
+        name: `選択肢『${opt}』の採用`,
+        condition: `もし『${opt}』を選択した場合`,
+        alternativeChoice: `${opt} を主軸に選定`,
+        hypothesis: `${opt} の特性を活かした設計と運用への移行`,
+      }));
+
+      const shadowSimulation = counterfactualReasoningService.simulateBranchReasoning(
+        topic,
+        options[0] || '現状維持',
+        `ユーザーの判断要請: "${text.slice(0, 60)}"`,
+        candidateScenarios
+      );
+
+      systemLogger.info(
+        'CHAT',
+        `🔀 [反実仮想・判断推論シャドー] トピック: 『${topic}』 | 比較対象: [${options.join(', ')}] | 最良代替案: ${shadowSimulation.bestAlternative?.scenarioName || '(なし)'} (Δ=${shadowSimulation.bestAlternative?.overallDeltaScore ?? 0}点) | 結論: ${shadowSimulation.conclusion}`,
+        { shadowSimulation }
+      );
+    }
 
     // 設計思想 Master v5.0 第2章2節: 前ターンで使われた記憶に対するユーザーフィードバック（感情価: 質）の自動反映
     if (lastTurnUsedMemoryIdsRef.current && lastTurnUsedMemoryIdsRef.current.length > 0) {

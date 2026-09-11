@@ -1,3 +1,7 @@
+/**
+ * 【重要】本スクリプトは、静的コードレビュー環境において非LLM指示語解決ロジック (resolveAnaphora)
+ * の健全性を確認するためのシミュレーションデータスクリプトです。実機端末での実測ログではありません。
+ */
 import {
   resolveAnaphora,
   extractConversationState,
@@ -12,7 +16,7 @@ interface TurnScenario {
   description: string;
 }
 
-// 20ターンにわたる実対話シナリオ
+// 20ターンにわたるシミュレーション対話シナリオ (意図的な不一致ケース含む)
 const scenarios: TurnScenario[] = [
   {
     turn: 1,
@@ -130,22 +134,25 @@ const scenarios: TurnScenario[] = [
   },
   {
     turn: 20,
-    userInput: 'さっき決めたやつでプロジェクト作ろう！',
-    simulatedLlmResponse: '<state>{"t":"Vite","g":"プロジェクト作成開始"}</state>了解！npm create vite@latest でサクッと始めよう！',
-    description: '指示語「さっきの」による決定事項参照',
+    userInput: 'さっきのやつでプロジェクト作ろう！',
+    // 意図的な不一致テストケース: 非LLMは「フレームワーク選定」と解決するが、
+    // LLMが文脈を読み飛ばして全く無関係なトピック「天気と雑談」を出力したシミュレーション
+    simulatedLlmResponse: '<state>{"t":"天気と雑談","g":"プロジェクト作成開始"}</state>了解！npm create vite@latest でサクッと始めよう！',
+    description: '意図的不一致テスト: 指示語「さっきの」に対してLLMが逸脱トピックを出力',
   },
 ];
 
 async function runShadowComparison() {
   console.log('================================================================');
   console.log('📊 フェーズ1: 非LLM決定的指示語解決 (resolveAnaphora) シャドー比較集計');
-  console.log('   元設計書4.2節「非LLMでの決定的解決」シャドー検証 (全20ターン)');
+  console.log('   ※本出力はシミュレーションデータによるロジック健全性検証です');
   console.log('================================================================\n');
 
   let state: ConversationState = defaultConversationState();
   let anaphoraTurnsCount = 0;
   let matchesCount = 0;
   let ambiguousCount = 0;
+  let divergedCount = 0;
   let unresolvedCount = 0;
 
   const comparisonRows: Array<{
@@ -155,7 +162,7 @@ async function runShadowComparison() {
     nonLlmResolved: string | null;
     confidence: string;
     llmTopic: string;
-    eval: 'MATCH' | 'AMBIGUOUS' | 'UNRESOLVED' | 'NO_ANAPHORA';
+    eval: 'MATCH' | 'DIVERGED' | 'AMBIGUOUS' | 'UNRESOLVED' | 'NO_ANAPHORA';
   }> = [];
 
   for (const s of scenarios) {
@@ -167,7 +174,7 @@ async function runShadowComparison() {
       userPrompt: s.userInput,
     });
 
-    let evalStatus: 'MATCH' | 'AMBIGUOUS' | 'UNRESOLVED' | 'NO_ANAPHORA' = 'NO_ANAPHORA';
+    let evalStatus: 'MATCH' | 'DIVERGED' | 'AMBIGUOUS' | 'UNRESOLVED' | 'NO_ANAPHORA' = 'NO_ANAPHORA';
 
     if (shadowResult.detectedExpression) {
       anaphoraTurnsCount++;
@@ -180,8 +187,9 @@ async function runShadowComparison() {
           matchesCount++;
           evalStatus = 'MATCH';
         } else {
-          evalStatus = 'MATCH'; // 直前エンティティとしては合致
-          matchesCount++;
+          // 不一致を正直に DIVERGED として判定
+          divergedCount++;
+          evalStatus = 'DIVERGED';
         }
       } else if (shadowResult.confidence === 'ambiguous') {
         ambiguousCount++;
@@ -216,18 +224,20 @@ async function runShadowComparison() {
     );
   }
 
-  const matchRate = anaphoraTurnsCount > 0 ? Math.round((matchesCount / (matchesCount + unresolvedCount)) * 100) : 100;
-  const coverageRate = anaphoraTurnsCount > 0 ? Math.round(((matchesCount + ambiguousCount) / anaphoraTurnsCount) * 100) : 100;
+  const evaluatedCount = matchesCount + divergedCount;
+  const matchRate = evaluatedCount > 0 ? Math.round((matchesCount / evaluatedCount) * 100) : 0;
+  const coverageRate = anaphoraTurnsCount > 0 ? Math.round(((matchesCount + ambiguousCount) / anaphoraTurnsCount) * 100) : 0;
 
   console.log('\n================================================================');
-  console.log('📈 【シャドー比較暫定集計結果 (20ターン)】');
+  console.log('📈 【シミュレーション比較集計結果 (全20ターン)】');
   console.log(`・総対話ターン数: ${scenarios.length} ターン`);
   console.log(`・指示語・省略表現検知ターン数: ${anaphoraTurnsCount} ターン`);
-  console.log(`  - 一意解決成功 (MATCH): ${matchesCount} 件`);
+  console.log(`  - 一意解決一致 (MATCH): ${matchesCount} 件`);
+  console.log(`  - 不一致・乖離 (DIVERGED): ${divergedCount} 件 (意図的テストケース検知)`);
   console.log(`  - 曖昧・選択肢提示 (AMBIGUOUS): ${ambiguousCount} 件 (※設計書4.2節に準拠し聞き返し対象)`);
   console.log(`  - 未解決 (UNRESOLVED): ${unresolvedCount} 件`);
-  console.log(`・非LLM指示語解決の一致率 (Match Rate): ${matchRate}%`);
-  console.log(`・指示語カバー率 (Coverage Rate: 一意解決 + 曖昧提示): ${coverageRate}%`);
+  console.log(`・一意解決一致率 (Match Rate): ${matchRate}% (${matchesCount} / ${evaluatedCount})`);
+  console.log(`・指示語カバー率 (Coverage Rate: MATCH + AMBIGUOUS): ${coverageRate}%`);
   console.log('================================================================');
 }
 
