@@ -1,8 +1,3 @@
-import {
-  CompiledRequestType,
-  AffectionDynamicState,
-  ComponentTxtPackage,
-} from '../types';
 import { claimDatabaseService } from './claimDatabaseService';
 import { componentRegistryService } from './componentRegistryService';
 import { requestTypeCompilerService } from './requestTypeCompilerService';
@@ -87,18 +82,14 @@ export class NonLlmHardwarePipelineService {
 
     // 要求型コンパイラ (第10.1節)
     const compiledRequest = requestTypeCompilerService.compile(prompt);
-    cpuTasks.push(`要求型コンパイル: [${compiledRequest.requestType}]`);
+    cpuTasks.push(`要求型コンパイル: [${compiledRequest.category || compiledRequest.goal}]`);
     const cpuElapsed1 = performance.now() - cpuStart;
 
     // ============================================================
-    // STAGE 2: NPU [発言意図分類 & 感情力動評価 & 意味ベクトル] (約2〜7ms)
+    // STAGE 2: 軽量分類 [CPU上の決定論的ルール]。NPUは任意の将来Provider。
     // ============================================================
     const npuStart = performance.now();
-    const npuTasks = [
-      '意味埋め込みベクトル (128d) 生成',
-      '発言意図ニューラル分類 (Intent Classification)',
-      '親愛トランスファー・感情力動ベクトル更新 (第39章)',
-    ];
+    const npuTasks: string[] = ['NPU未使用（将来の任意Provider用予約領域）'];
 
     // 発言意図分類
     let intentCategory = 'chat_casual';
@@ -113,27 +104,22 @@ export class NonLlmHardwarePipelineService {
     // 感情力動評価 (第39章)
     const affectionEval = affectionDynamicsService.evaluateAndTransfer(prompt);
     const affectionState = affectionDynamicsService.getCurrentState();
-    npuTasks.push(`感情力動: スコア${affectionState.affectionScore}点 (${affectionState.toneStance})`);
+    cpuTasks.push(`感情力動: スコア${affectionState.affectionScore}点 (${affectionState.toneStance})`);
 
     const npuElapsed = performance.now() - npuStart;
 
     // ============================================================
-    // STAGE 3: GPU [並列類似度マトリクス照合 & 潜在意図トポロジー] (約3〜8ms)
+    // STAGE 3: 高速検索 [CPU上の決定論的検索]。GPUは任意の将来Provider。
     // ============================================================
     const gpuStart = performance.now();
-    const gpuTasks = [
-      'WebGPU 並列コサイン類似度マトリクス走査',
-      '潜在意図トポロジー幾何マッピング (第32章)',
-      '部品候補・主張ベクトルの並列Top-Kフィルタリング',
-    ];
+    const gpuTasks: string[] = ['GPU未使用（将来の任意Provider用予約領域）'];
 
     // 潜在意図プロファイル
     const latentProfile = latentIntentMiningService.inferLatentGoal(prompt);
-    gpuTasks.push(`潜在意図マッピング: [${latentProfile.latentGoal}]`);
 
     // 主張DB検索 (GPU高速類似度フィルタ後、CPUが正確照合)
-    const matchedClaims = claimDatabaseService.searchClaims(prompt);
-    gpuTasks.push(`並列スキャン完了: 該当主張 ${matchedClaims.length}件`);
+    const claimMatch = claimDatabaseService.findBestMatchingClaim(prompt);
+    const matchedClaims = claimMatch.hasMatch && claimMatch.bestClaim ? [claimMatch.bestClaim] : [];
 
     const gpuElapsed = performance.now() - gpuStart;
 
@@ -184,11 +170,11 @@ export class NonLlmHardwarePipelineService {
     // 回答文の組立 (Answer Assembly)
     // ============================================================
     let replyText = '';
-    const nameGreeting = params.persona ? `${params.persona}としてお答えします！` : 'ミキです！';
+    const nameGreeting = params.persona ? `${params.persona}としてお答えします！` : 'みきです！';
 
     if (isCodeGoal && assembledCode) {
       replyText = `${nameGreeting}
-非LLM自律統合中核（CPU・NPU・GPU全機駆動）により、検証済み部品から決定論的に安全なVBAコードを合成しました。外部通信ゼロ・30ms以内で即時生成しています。
+非LLM自律統合中核により、検証済み部品から決定論的にVBAコードを合成しました。外部通信は行っていません。
 
 ### 🛠️ 合成された安全なVBAコード
 \`\`\`vba
@@ -197,28 +183,32 @@ ${assembledCode}
 
 ### ⚡ ハードウェア協調処理サマリー:
 - **CPU [構文・部品合成・CSP]**: ${cpuElapsedTotal}ms (${cpuTasks.length}タスク)
-- **NPU [意図・感情力動]**: ${Math.round(npuElapsed)}ms (${npuTasks.length}タスク)
-- **GPU [並列類似度照合]**: ${Math.round(gpuElapsed)}ms (${gpuTasks.length}タスク)
+- **NPU**: ${Math.round(npuElapsed)}ms（未使用・将来Provider予約）
+- **GPU**: ${Math.round(gpuElapsed)}ms（未使用・将来Provider予約）
 - **使用部品**: \`${usedComponents.join(', ') || '検証済み標準部品'}\`
 - **安全不変条件**: セル反復ループ禁止、先頭ゼロ保護、動的見出し検索を満たしています。`;
     } else {
       replyText = `${nameGreeting}
-「${normalizedPrompt}」について、端末内の非LLM知識ベース（CPU/NPU/GPU全機駆動）で安全に解析しました。
+「${normalizedPrompt}」について、端末内の非LLM知識ベース（CPU上の決定論的処理）で解析しました。
 
-${matchedClaims.length > 0 ? `### 📚 照合された知識主張 (${matchedClaims.length}件):\n` + matchedClaims.slice(0, 2).map((c) => `- **${c.claimText}** (確信度: ${Math.round(c.confidence * 100)}%)`).join('\n') + '\n\n' : ''}### 💡 解析結果:
-- 要求型: \`${compiledRequest.requestType}\`
-- 潜在意図: ${latentProfile.primaryGoal}
-- 感情力動: ${affectionState.currentZone} (親愛度: ${affectionState.affectionScore}点)
+${matchedClaims.length > 0 ? `### 📚 照合された知識主張 (${matchedClaims.length}件):\n` + matchedClaims.slice(0, 2).map((c) => `- **${c.statement}** (状態: ${c.status})`).join('\n') + '\n\n' : ''}### 💡 解析結果:
+- 要求型: \`${compiledRequest.category || compiledRequest.goal}\`
+- 潜在意図: ${latentProfile.latentGoal}
+- 感情力動: ${affectionState.toneStance} (親愛度: ${affectionState.affectionScore}点)
 
-外部クラウドへの送信は一切行われず、すべて端末ローカルのハードウェア資源のみで完結しています。`;
+外部クラウドへの送信は一切行われず、すべて端末ローカルの決定論的処理で完結しています。`;
     }
 
     const totalMs = Math.round(performance.now() - startTime);
 
     // ハッシュ計算 (決定論性の証明)
-    const deterministicHash = `0x${Math.abs(
-      (prompt.length * 31 + usedComponents.length * 17 + totalMs) ^ 0xabcdef
-    ).toString(16).padStart(8, '0')}`;
+    let hash = 2166136261;
+    const hashInput = `${normalizedPrompt}|${compiledRequest.category || compiledRequest.goal}|${usedComponents.join(',')}`;
+    for (let i = 0; i < hashInput.length; i++) {
+      hash ^= hashInput.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    const deterministicHash = `0x${(hash >>> 0).toString(16).padStart(8, '0')}`;
 
     const telemetry: HardwareTelemetry = {
       cpuMs: cpuElapsedTotal,
