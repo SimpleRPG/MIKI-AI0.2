@@ -44,6 +44,10 @@ import {
   ConstraintSolveResult,
 } from '../../services/formalConstraintSolverService';
 import {
+  autonomousContinuousEvolutionService,
+  AutonomousEvolutionRecord,
+} from '../../services/autonomousContinuousEvolutionService';
+import {
   chapter31Service,
   CollocationMatch,
   AstRefactorProposal,
@@ -69,6 +73,10 @@ import {
   AnswerSkeletonType,
 } from '../../types';
 import { requestTypeCompilerService } from '../../services/requestTypeCompilerService';
+import { LlmMigrationSubView } from './non_llm_views/LlmMigrationSubView';
+import { AutonomousHardeningSubView } from './non_llm_views/AutonomousHardeningSubView';
+import { CloudGatewaySubView } from './non_llm_views/CloudGatewaySubView';
+import { HardwarePipelineSubView } from './non_llm_views/HardwarePipelineSubView';
 import {
   GitBranch,
   Sparkles,
@@ -76,10 +84,14 @@ import {
   Heart,
   Layers,
   Cpu,
+  GitMerge,
+  ShieldAlert,
+  Cloud,
 } from 'lucide-react';
 
 export const NonLlmArchitectureTab: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<
+    | 'hardware_pipeline'
     | 'claims'
     | 'decisions'
     | 'components'
@@ -90,7 +102,10 @@ export const NonLlmArchitectureTab: React.FC = () => {
     | 'metacognitive'
     | 'affection_dynamics'
     | 'formal_csp'
-  >('claims');
+    | 'llm_migration'
+    | 'autonomous_hardening'
+    | 'cloud_gateway'
+  >('hardware_pipeline');
 
   // --- Claim DB State ---
   const [claims, setClaims] = useState<ClaimRecord[]>(() => claimDatabaseService.getAllClaims());
@@ -180,6 +195,25 @@ export const NonLlmArchitectureTab: React.FC = () => {
   const [cspForbiddenFiles, setCspForbiddenFiles] = useState('.env, /weights/qwen_3b.bin');
   const [cspMustPreserve, setCspMustPreserve] = useState('Qwen-3B-Base, IMMUTABLE');
   const [cspSolveResult, setCspSolveResult] = useState<ConstraintSolveResult | null>(null);
+
+  // --- Autonomous Evolution State (Chapter 13) ---
+  const [isEvolutionRunning, setIsEvolutionRunning] = useState(false);
+  const [evolutionRecord, setEvolutionRecord] = useState<AutonomousEvolutionRecord | null>(null);
+  const [evolutionError, setEvolutionError] = useState<string | null>(null);
+
+  const handleRunAutonomousEvolution = async () => {
+    setIsEvolutionRunning(true);
+    setEvolutionError(null);
+    try {
+      const record = await autonomousContinuousEvolutionService.runFullAutonomousCycle();
+      setEvolutionRecord(record);
+      refreshAll();
+    } catch (err: any) {
+      setEvolutionError(err?.message || '自律自己改善サイクルの実行中にエラーが発生しました');
+    } finally {
+      setIsEvolutionRunning(false);
+    }
+  };
 
   // Refresh data
   const refreshAll = () => {
@@ -338,17 +372,87 @@ export const NonLlmArchitectureTab: React.FC = () => {
             LLMの不確定性に依存せず、事実性(主張DB)・過剰機能抑制(削減知能)・検証済みTXT部品合成・意味保持検査を決定論的ルールで担保
           </p>
         </div>
-        <button
-          onClick={refreshAll}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-medium transition"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          最新状態に更新
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRunAutonomousEvolution}
+            disabled={isEvolutionRunning}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition ${
+              isEvolutionRunning
+                ? 'bg-purple-900/50 text-purple-300 border border-purple-500/40 cursor-wait'
+                : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white'
+            }`}
+            title="全不変条件・AST構文・TDDテスト検証を伴う自律自己改善サイクルを一貫実行"
+          >
+            <Zap className={`w-3.5 h-3.5 ${isEvolutionRunning ? 'animate-spin text-purple-300' : 'text-emerald-200'}`} />
+            <span>{isEvolutionRunning ? '自律改善サイクル実行中...' : '🤖 第13章 自律自己改善サイクル実行'}</span>
+          </button>
+          <button
+            onClick={refreshAll}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-medium transition"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            最新状態に更新
+          </button>
+        </div>
       </div>
+
+      {/* Autonomous Evolution Result Card (if any) */}
+      {evolutionRecord && (
+        <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/50 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>自律自己改善サイクルが正常完了しました！ (+{Math.max(0, evolutionRecord.newScore - evolutionRecord.previousScore)}点)</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
+              Score: {evolutionRecord.previousScore} ➔ {evolutionRecord.newScore}
+            </span>
+          </div>
+          <div className="text-xs text-slate-300 grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+            <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+              <span className="text-slate-400 block text-[10px]">改善対象仕様</span>
+              <span className="font-semibold text-slate-200">
+                {evolutionRecord.chapterNumber ? `第${evolutionRecord.chapterNumber}章『${evolutionRecord.chapterTitle}』` : evolutionRecord.targetFile}
+              </span>
+            </div>
+            <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+              <span className="text-slate-400 block text-[10px]">検証 (AST & TDD)</span>
+              <span className="font-semibold text-emerald-300">
+                TDD {evolutionRecord.verification.testPassedCount}/{evolutionRecord.verification.testTotalCount} 合格 / 循環 0件
+              </span>
+            </div>
+            <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+              <span className="text-slate-400 block text-[10px]">不変条件 & 安全機構</span>
+              <span className="font-semibold text-teal-300">5大不変条件パス / スナップショット保存済</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {evolutionError && (
+        <div className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          <span>{evolutionError}</span>
+        </div>
+      )}
 
       {/* Sub tabs */}
       <div className="flex border-b border-slate-700/80 gap-2 overflow-x-auto pb-1 scrollbar-thin">
+        <button
+          onClick={() => setActiveSubTab('hardware_pipeline')}
+          className={`flex items-center gap-2 px-3 py-2 text-xs md:text-sm font-bold border-b-2 whitespace-nowrap transition ${
+            activeSubTab === 'hardware_pipeline'
+              ? 'border-emerald-500 text-emerald-300 bg-emerald-950/30'
+              : 'border-transparent text-emerald-400/70 hover:text-emerald-300'
+          }`}
+        >
+          <Cpu className="w-4 h-4 text-emerald-400" />
+          ⚡ 第14章: 全機駆動 (CPU+NPU+GPU)
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+            30ms
+          </span>
+        </button>
+
         <button
           onClick={() => setActiveSubTab('claims')}
           className={`flex items-center gap-2 px-3 py-2 text-xs md:text-sm font-medium border-b-2 whitespace-nowrap transition ${
@@ -480,7 +584,49 @@ export const NonLlmArchitectureTab: React.FC = () => {
           <Cpu className="w-4 h-4" />
           第59章: CSP形式制約ソルバー
         </button>
+
+        <button
+          onClick={() => setActiveSubTab('llm_migration')}
+          className={`flex items-center gap-2 px-3 py-2 text-xs md:text-sm font-medium border-b-2 whitespace-nowrap transition ${
+            activeSubTab === 'llm_migration'
+              ? 'border-amber-500 text-amber-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <GitMerge className="w-4 h-4" />
+          第13.3節: LLM移管判定
+          <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            シャドー
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('autonomous_hardening')}
+          className={`flex items-center gap-2 px-3 py-2 text-xs md:text-sm font-medium border-b-2 whitespace-nowrap transition ${
+            activeSubTab === 'autonomous_hardening'
+              ? 'border-teal-500 text-teal-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4" />
+          第7.3節: 自律的賢化・レッドチーム
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('cloud_gateway')}
+          className={`flex items-center gap-2 px-3 py-2 text-xs md:text-sm font-medium border-b-2 whitespace-nowrap transition ${
+            activeSubTab === 'cloud_gateway'
+              ? 'border-sky-500 text-sky-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Cloud className="w-4 h-4" />
+          第11章: クラウド限定連携 & 監査
+        </button>
       </div>
+
+      {/* --- Tab 0: Chapter 14 Hardware Pipeline (CPU / NPU / GPU 全機協調駆動) --- */}
+      {activeSubTab === 'hardware_pipeline' && <HardwarePipelineSubView />}
 
       {/* --- Tab 1: Claims DB --- */}
       {activeSubTab === 'claims' && (
@@ -1768,6 +1914,15 @@ export const NonLlmArchitectureTab: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* --- Tab 11: LLM Migration Protocol (第13.3節) --- */}
+      {activeSubTab === 'llm_migration' && <LlmMigrationSubView />}
+
+      {/* --- Tab 12: Autonomous Hardening & Red Teaming (第7.3節) --- */}
+      {activeSubTab === 'autonomous_hardening' && <AutonomousHardeningSubView />}
+
+      {/* --- Tab 13: Cloud Gateway & Privacy Audit (第11章) --- */}
+      {activeSubTab === 'cloud_gateway' && <CloudGatewaySubView />}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Scale,
   Code2,
   Github,
   Search,
@@ -32,6 +33,7 @@ interface HeaderProps {
   setUseSearch: (val: boolean) => void;
   fps: number;
   onOpenActivityMonitor?: () => void;
+  onOpenSelfImprovementModal?: () => void;
   isWorking?: boolean;
 }
 
@@ -50,6 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
   setUseSearch,
   fps,
   onOpenActivityMonitor,
+  onOpenSelfImprovementModal,
   isWorking = false,
 }) => {
   const [urlCopied, setUrlCopied] = useState(false);
@@ -95,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
               ? 'bg-indigo-950/40 border-indigo-500/40 text-indigo-300 hover:bg-indigo-900/50'
               : engineMode === 'gemini_cloud'
               ? 'bg-sky-950/40 border-sky-500/40 text-sky-300 hover:bg-sky-900/50'
-              : 'bg-amber-950/40 border-amber-500/40 text-amber-300 hover:bg-amber-900/50'
+              : 'bg-emerald-950/60 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900/60 shadow-emerald-500/20'
           }`}
           title={
             engineMode === 'native_gpu'
@@ -106,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({
               ? '【外部ローカルLLM】Ollama / LM Studio (localhost:11434)'
               : engineMode === 'gemini_cloud'
               ? '【Gemini Cloud】Google Gemini 高性能クラウドAI'
-              : '【CPUルールベース】GPU不要の軽量バックアッププログラム'
+              : '【⚡ 非LLM自律統合モード】第14章準拠・外部送信完全遮断。CPU(構文/DB/CSP) + NPU(意図/感情) + GPU(並列照合) 全機協調駆動'
           }
         >
           {engineMode === 'native_gpu' ? (
@@ -139,10 +142,10 @@ export const Header: React.FC<HeaderProps> = ({
             </>
           ) : (
             <>
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline">CPUルール</span>
-              <span className="sm:hidden">CPU</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline font-bold">非LLM (CPU+NPU+GPU)</span>
+              <span className="sm:hidden font-bold">非LLM全機</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
             </>
           )}
         </button>
@@ -166,6 +169,20 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/80" />
             )}
+          </button>
+        )}
+
+        {/* 非LLM設計思想 (主張DB・判断・部品合成) ボタン */}
+        {onOpenSelfImprovementModal && (
+          <button
+            onClick={onOpenSelfImprovementModal}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border bg-slate-900/90 border-slate-800 hover:border-emerald-500/50 text-slate-300 hover:text-emerald-300 hover:bg-slate-800 transition-all shadow-xs"
+            title="非LLM中心・自己成長型AIコンパニオン 設計思想ダッシュボード (主張DB・判断・部品合成・自律進化)"
+          >
+            <Scale className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline font-bold">非LLM設計思想</span>
+            <span className="sm:hidden font-bold">設計思想</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/80" />
           </button>
         )}
       </div>

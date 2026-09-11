@@ -116,14 +116,18 @@ class SystemLogger {
       this.syncToServer(entry).catch(() => {});
     }
 
-    // Notify real-time listeners
-    this.logListeners.forEach((listener) => {
-      try {
-        listener(entry);
-      } catch (err) {
-        console.warn('SystemLogger listener error:', err);
-      }
-    });
+    // Notify real-time listeners asynchronously to prevent React cross-component update errors
+    if (this.logListeners.size > 0) {
+      setTimeout(() => {
+        this.logListeners.forEach((listener) => {
+          try {
+            listener(entry);
+          } catch (err) {
+            console.warn('SystemLogger listener error:', err);
+          }
+        });
+      }, 0);
+    }
 
     // Console output with elapsed time indicators
     const timingPrefix = elapsedMs !== undefined ? `[+${elapsedMs}ms]` : '';
@@ -167,14 +171,18 @@ class SystemLogger {
 
     this.currentSessionSteps.push(stepSnapshot);
 
-    // Notify real-time step listeners
-    this.stepListeners.forEach((listener) => {
-      try {
-        listener(stepSnapshot, [...this.currentSessionSteps]);
-      } catch (err) {
-        console.warn('SystemLogger stepListener error:', err);
-      }
-    });
+    // Notify real-time step listeners asynchronously to prevent React cross-component update errors
+    if (this.stepListeners.size > 0) {
+      setTimeout(() => {
+        this.stepListeners.forEach((listener) => {
+          try {
+            listener(stepSnapshot, [...this.currentSessionSteps]);
+          } catch (err) {
+            console.warn('SystemLogger stepListener error:', err);
+          }
+        });
+      }, 0);
+    }
 
     return stepSnapshot;
   }

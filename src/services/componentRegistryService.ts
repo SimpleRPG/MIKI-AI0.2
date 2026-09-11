@@ -591,6 +591,16 @@ ${outputComp.implementation_txt}
     return Array.from(this.components.values());
   }
 
+  public getComponentById(componentId: string): ComponentTxtPackage | undefined {
+    return this.components.get(componentId);
+  }
+
+  public registerComponent(pkg: ComponentTxtPackage): void {
+    this.components.set(pkg.component_id, pkg);
+    this.saveToStorage();
+    systemLogger.info('TOOLS', `📦 [第9章 部品登録] ${pkg.component_id} (Ver ${pkg.version}) を登録しました`);
+  }
+
   private loadFromStorage(): void {
     try {
       const raw = storageService.getItem(COMPONENT_REGISTRY_STORAGE_KEY);

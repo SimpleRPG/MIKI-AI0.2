@@ -88,7 +88,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [auditResult, setAuditResult] = useState<SelfCodeAuditResult>(() =>
-    selfCodeArchitectService.getLatestAudit() ?? selfCodeArchitectService.runSelfCodeAudit()
+    selfCodeArchitectService.getLatestAudit({ silent: true }) ?? selfCodeArchitectService.runSelfCodeAudit({ silent: true })
   );
   const [proposals, setProposals] = useState<SelfImprovementProposal[]>(() =>
     selfCodeArchitectService.getProposals()
@@ -156,7 +156,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
   // コード自己理解・自律改善レシピ用ステート
   const [recipeChapter, setRecipeChapter] = useState<number>(33);
   const [activeRecipe, setActiveRecipe] = useState<ImprovementRecipe | null>(() =>
-    selfCodeArchitectService.getRecipeForChapter(33)
+    selfCodeArchitectService.getRecipeForChapter(33, { silent: true })
   );
   const [moduleSearch, setModuleSearch] = useState('');
 

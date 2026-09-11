@@ -755,6 +755,41 @@ export interface ChatMessage {
   vbaStaticVerification?: VbaStaticVerificationResult;
   // 外部ローカルLLM (llama.cpp / llama-swap) TTFT実測・プロンプトキャッシュ・ステージ別遅延診断
   externalLlmDiagnostic?: ExternalLlmRunDiagnostic;
+  // 非LLM中心・自己成長アーキテクチャ追跡 (第3章 ルートB / 第5.2章 回答IR / 第6章 主張DB / 第8章 判断 / 第9章 部品合成 / 第13.4節 意味保持 / 第37〜39章)
+  nonLlmPipelineMeta?: NonLlmPipelineMeta;
+}
+
+export interface NonLlmPipelineMeta {
+  isDeterministicAnswer?: boolean;
+  directReplyReason?: string;
+  matchedClaim?: {
+    claimId: string;
+    statement: string;
+    world: string;
+    maturity: string;
+    confidence: string;
+    status: string;
+  };
+  decisionProfile?: {
+    profile: string;
+    chosenAction: string;
+    score: number;
+    suppressedExcess: boolean;
+  };
+  latentGoal?: {
+    surfaceIntent: string;
+    latentGoal: string;
+    confidence: number;
+    urgency: string;
+  };
+  affection?: {
+    detectedEmotion: string;
+    affectionScore: number;
+    recommendedTone: string;
+  };
+  meaningPreservationPassed?: boolean;
+  synthesizedComponents?: string[];
+  scopeNotes?: string[];
 }
 
 export interface LlamaCppTimings {
@@ -3427,6 +3462,143 @@ export interface CapabilityContract {
     maxMemoryMb: number;
     maxExecutionMs: number;
   };
+}
+
+/**
+ * 設計思想 13.3 LLM機能の移管判定プロトコル (LLM to Non-LLM Migration Protocol)
+ */
+export type LlmMigrationStatus =
+  | 'LLM_ONLY'
+  | 'NON_LLM_CANDIDATE'
+  | 'SHADOW_COMPARISON'
+  | 'NON_LLM_LIMITED'
+  | 'NON_LLM_DEFAULT'
+  | 'LLM_FALLBACK_ONLY'
+  | 'LLM_REMOVED'
+  | 'ROLLBACK_TO_LLM';
+
+export interface ShadowComparisonRecord {
+  id: string;
+  taskId: string;
+  sampleInput: string;
+  llmOutput: string;
+  nonLlmOutput: string;
+  latencyLlmMs: number;
+  latencyNonLlmMs: number;
+  semanticMatchScore: number;
+  isDeterministic: boolean;
+  winner: 'LLM' | 'NON_LLM' | 'TIE';
+  notes: string;
+  timestamp: number;
+}
+
+export interface LlmMigrationTask {
+  taskId: string;
+  taskName: string;
+  category: 'INTENT_LABELING' | 'SEARCH_KEYWORD_GEN' | 'JSON_FORMATTING' | 'CANDIDATE_RANKING' | 'FIXED_EXPLANATION' | 'SYNTAX_CHECK' | 'VBA_SYNTHESIS';
+  description: string;
+  inputStructureDefinition: string;
+  outputContract: string;
+  status: LlmMigrationStatus;
+  metrics: {
+    latencyReductionRatio: number; // 例: 98%削減
+    ramReductionMb: number;
+    accuracyScore: number; // 0 - 100
+    naturalnessScore: number; // 0 - 100
+    determinismRate: number; // 0 - 100%
+    userCorrectionRate: number; // 0 - 100%
+  };
+  shadowRecords: ShadowComparisonRecord[];
+  assignedComponentId?: string;
+  lastEvaluatedAt: number;
+}
+
+/**
+ * 設計思想 7.3 自律的賢化: 未来質問シミュレーター・自動レッドチーム・予測誤差学習
+ */
+export interface FutureQuestionScenario {
+  scenarioId: string;
+  baseCapability: string;
+  boundaryCondition: 'HEADER_MISSING' | 'EMPTY_CELLS' | 'COLUMN_REORDER' | 'LARGE_SCALE_100K' | 'LEADING_ZERO_PRESERVATION' | 'DATE_FORMAT_VARIATION';
+  title: string;
+  generatedQuestion: string;
+  simulatedAnswer: string;
+  verificationPassed: boolean;
+  notes: string;
+  mitigationComponentId?: string;
+  testedAt: number;
+}
+
+export interface RedTeamAttackCase {
+  attackId: string;
+  attackType:
+    | 'DOUBLE_NEGATION'
+    | 'PROMPT_INJECTION_TRAP'
+    | 'QUOTE_INSTRUCTION_BYPASS'
+    | 'TOPIC_HIJACK'
+    | 'PROTECTED_SHEET_ATTACK'
+    | 'STALE_DATA_SPOOF';
+  title: string;
+  prompt: string;
+  expectedDefense: string;
+  defenseSuccess: boolean;
+  defenseReason: string;
+  testedAt: number;
+}
+
+export interface PredictionErrorInsightRecord {
+  predictionId: string;
+  actionName: string;
+  predictedDurationMs: number;
+  actualDurationMs: number;
+  predictedMemoryMb: number;
+  actualMemoryMb: number;
+  predictedErrors: string[];
+  actualErrors: string[];
+  errorRatio: number; // |actual - predicted| / actual
+  learnedInsight: string;
+  timestamp: number;
+}
+
+/**
+ * 設計思想 11.0 クラウドAI限定連携 & 送信監査 (Cloud AI Restricted Gateway)
+ */
+export type CloudEscalationTrigger =
+  | 'NO_LOCAL_COMPONENT'
+  | 'EXPLORATION_LIMIT_EXCEEDED'
+  | 'TIMEOUT_EXCEEDED'
+  | 'UNKNOWN_API_FORMAT'
+  | 'COMPLEX_IMPLICIT_REASONING'
+  | 'REPEATED_LOCAL_FAILURE';
+
+export interface CloudAiEscalationRequest {
+  escalationId: string;
+  triggerReason: CloudEscalationTrigger;
+  abstractGoal: string;
+  requiredCapability: string;
+  failureSignature?: string;
+  sanitizationAudit: {
+    strippedKeys: string[];
+    tokenCountBefore: number;
+    tokenCountAfter: number;
+    isStrictlySafe: boolean; // 秘密・全履歴・個人情報ゼロの確認
+  };
+  status: 'PENDING' | 'PROPOSED' | 'TESTING' | 'VERIFIED' | 'REJECTED';
+  proposal?: {
+    candidateCode: string;
+    proposedSpec: string;
+    testCases: string[];
+  };
+  verificationStages: {
+    specInspection: boolean;
+    duplicateCheck: boolean;
+    staticLint: boolean;
+    isolatedTest: boolean;
+    deviceVerifiedGalaxyS25: boolean;
+  };
+  promotedComponentId?: string;
+  createdAt: number;
+  resolvedAt?: number;
 }
 
 export type Message = ChatMessage;

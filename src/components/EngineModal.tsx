@@ -1839,33 +1839,34 @@ export const EngineModal: React.FC<EngineModalProps> = ({
                 </div>
               </button>
 
-              {/* Option 4: Autonomous Rule-based (CPU / Backup) */}
+              {/* Option 4: Non-LLM Autonomous Integrated Mode (CPU / NPU / GPU 全機協調駆動) */}
               <button
                 onClick={() => onSelectEngine('autonomous_rule')}
                 className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all ${
                   engineMode === 'autonomous_rule'
-                    ? 'bg-amber-950/60 border-amber-500 text-amber-200 shadow-md shadow-amber-500/20 ring-2 ring-amber-500'
+                    ? 'bg-emerald-950/70 border-emerald-500 text-emerald-200 shadow-md shadow-emerald-500/20 ring-2 ring-emerald-500'
                     : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
                 }`}
               >
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
-                      <Sliders className="w-4 h-4 text-amber-400" />
-                      <span>④ ⚙️ CPUルールベース</span>
+                      <Cpu className="w-4 h-4 text-emerald-400" />
+                      <span>④ ⚡ 非LLM自律統合モード (CPU/NPU/GPU全機駆動)</span>
                     </span>
                     {engineMode === 'autonomous_rule' && (
-                      <span className="text-[10px] bg-amber-500/30 text-amber-300 px-1.5 py-0.2 rounded font-bold border border-amber-400/40">
-                        選択中
+                      <span className="text-[10px] bg-emerald-500/30 text-emerald-300 px-1.5 py-0.2 rounded font-bold border border-emerald-400/40 animate-pulse">
+                        全機協調稼働中
                       </span>
                     )}
                   </div>
                   <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
-                    GPU非対応環境用。モデルDL不要でTypeScript自律プログラムが即答。
+                    【設計思想 第14章】外部送信ゼロ・トークン消費ゼロ。CPU(構文/DB/CSP)・NPU(意図/感情)・GPU(並列類似度照合)を総動員して30ms以内で決定論的に即答。
                   </p>
                 </div>
-                <div className="text-[9.5px] text-amber-300 font-mono flex items-center gap-1 pt-1 border-t border-amber-500/20">
-                  <span>⚙️ 実行場所: CPU (軽量ロジック)</span>
+                <div className="text-[9.5px] text-emerald-300 font-mono flex items-center justify-between pt-1 border-t border-emerald-500/20">
+                  <span>⚡ 実行場所: CPU (構文) + NPU (意図) + GPU (並列照合)</span>
+                  <span className="text-slate-400">遅延 ~25ms</span>
                 </div>
               </button>
 

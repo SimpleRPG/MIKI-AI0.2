@@ -326,7 +326,7 @@ export class SelfCodeArchitectService {
   /**
    * 設計思想仕様書と現在のソースコード実装の整合性を監査・ドリフト検知
    */
-  public runSelfCodeAudit(): SelfCodeAuditResult {
+  public runSelfCodeAudit(options?: { silent?: boolean }): SelfCodeAuditResult {
     const totalChapters = SPECIFICATION_REGISTRY.length;
     const completedChapters = this.getCompletedChapters().length;
     const unimplementedChapters = this.getUnimplementedChapters().length;
@@ -371,7 +371,9 @@ export class SelfCodeArchitectService {
     this.auditHistory.unshift(auditResult);
     this.saveHistory();
 
-    systemLogger.info('SELF_IMPROVEMENT', `[第29章 自己コード監査完了] 適合スコア: ${complianceScore}点 (実装済: ${completedChapters}/${totalChapters})`);
+    if (!options?.silent) {
+      systemLogger.info('SELF_IMPROVEMENT', `[第29章 自己コード監査完了] 適合スコア: ${complianceScore}点 (実装済: ${completedChapters}/${totalChapters})`);
+    }
     return auditResult;
   }
 
@@ -1119,20 +1121,21 @@ export class SelfCodeArchitectService {
     return this.proposals;
   }
 
-  public getLatestAudit(): SelfCodeAuditResult | undefined {
-    return this.auditHistory[0] ?? this.runSelfCodeAudit();
+  public getLatestAudit(options?: { silent?: boolean }): SelfCodeAuditResult | undefined {
+    return this.auditHistory[0] ?? this.runSelfCodeAudit(options);
   }
 
   /**
    * 指定章の自律改善レシピを取得・合成
    */
-  public getRecipeForChapter(chapterNumber: number): ImprovementRecipe | null {
+  public getRecipeForChapter(chapterNumber: number, options?: { silent?: boolean }): ImprovementRecipe | null {
     const chap = SPECIFICATION_REGISTRY.find((c) => c.chapterNumber === chapterNumber);
     if (!chap) return null;
     return codebaseReflectionService.synthesizeImprovementRecipe(
       chap.chapterNumber,
       chap.title,
-      chap.keyRequirements
+      chap.keyRequirements,
+      options
     );
   }
 

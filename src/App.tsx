@@ -33,6 +33,7 @@ import {
   AutonomousSearchMessageMeta,
   PrivacyAuditResult,
   AnswerContentIR,
+  NonLlmPipelineMeta,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
@@ -57,6 +58,7 @@ import {
   resolveAnaphora,
 } from './services/conversationStateService';
 import { responseDesignService } from './services/responseDesignService';
+import { nonLlmHardwarePipelineService } from './services/nonLlmHardwarePipelineService';
 import { longTermMemoryService } from './services/longTermMemoryService';
 import { codeVerificationService } from './services/codeVerificationService';
 import { falsificationService, classifyClaimEpistemology } from './services/falsificationService';
@@ -1106,7 +1108,7 @@ export default function App() {
     const detectedProfile = unifiedDecisionEngineService.inferContextProfile(text);
     unifiedDecisionEngineService.setActiveProfile(detectedProfile);
 
-    unifiedDecisionEngineService.makeDecision({
+    const decisionRecord = unifiedDecisionEngineService.makeDecision({
       topic: text.slice(0, 60),
       options: [
         { name: 'DIRECT_ANSWER', score: 85, pros: ['直接的・簡潔な回答', '既存検証済み部品の活用'], cons: [] },
@@ -1119,6 +1121,7 @@ export default function App() {
     });
 
     // 3. [第9章 検証済みTXT部品レジストリ] コード/VBA要求時の非LLM部品検索と決定論的合成
+    let usedSynthesizedComponentIds: string[] = [];
     if (isVbaRequest || text.includes('VBA') || text.includes('マクロ') || text.includes('重複')) {
       const registrySearch = componentRegistryService.searchComponents(text, { verifiedOnly: true });
       if (registrySearch.length > 0) {
@@ -1135,6 +1138,7 @@ export default function App() {
           destSheetName: 'UniqueOutput',
         });
         if (vbaSynthesis.success) {
+          usedSynthesizedComponentIds = vbaSynthesis.usedComponents;
           systemLogger.info(
             'TOOLS',
             `⚡ [9.9 検証済み部品からのVBA合成] 部品 [${vbaSynthesis.usedComponents.join(', ')}] から決定論的にマクロを合成完了 (チェックリスト: ${vbaSynthesis.verificationChecklist.length}項目合致)`
@@ -1142,6 +1146,29 @@ export default function App() {
         }
       }
     }
+
+    // 非LLM追跡メタデータ構造体の初期化
+    const currentNonLlmMeta: NonLlmPipelineMeta = {
+      isDeterministicAnswer: false,
+      decisionProfile: {
+        profile: detectedProfile,
+        chosenAction: decisionRecord.chosen_option || 'DIRECT_ANSWER',
+        score: decisionRecord.evaluation_scores[decisionRecord.chosen_option] ?? 85,
+        suppressedExcess: decisionRecord.reasons.some((r) => r.includes('REJECT') || r.includes('USE_EXISTING') || r.includes('DOCUMENT_ONLY')),
+      },
+      latentGoal: {
+        surfaceIntent: latentGoalInference.surfaceIntent,
+        latentGoal: latentGoalInference.latentGoal,
+        confidence: latentGoalInference.confidenceScore,
+        urgency: latentGoalInference.urgencyLevel,
+      },
+      affection: {
+        detectedEmotion: affectionEvaluation.detectedEmotion,
+        affectionScore: affectionEvaluation.newAffectionScore,
+        recommendedTone: affectionEvaluation.recommendedTone,
+      },
+      synthesizedComponents: usedSynthesizedComponentIds.length > 0 ? usedSynthesizedComponentIds : undefined,
+    };
 
     // 4. [第5.2節 回答内容IR構築] 何を言うか (回答内容IR) とどう言うか (表層表現) の分離
     const combinedConditions = [
@@ -1604,9 +1631,58 @@ export default function App() {
         }
       }
 
+      // 4. 知識・事実の質問 (QUESTION / REQUEST_EXPLANATION / 第3章 ルートB / 第6章 主張DB)
+      if (!deterministicDirectReply && (dialogueAct === 'QUESTION' || dialogueAct === 'REQUEST_EXPLANATION' || /どういう|なぜ|何|どんな|教えて|理由|原因|どうして|本当|事実|設定/i.test(text))) {
+        const claimMatch = claimDatabaseService.findBestMatchingClaim(text);
+        if (claimMatch.hasMatch && claimMatch.bestClaim && claimMatch.suggestedAction === 'DIRECT_ANSWER') {
+          const claim = claimMatch.bestClaim;
+          const worldLabel = claim.world === 'FICTION' ? '【創作世界の設定】' : claim.world === 'HYPOTHETICAL' ? '【仮定・シミュレーション】' : '【現実の検証済み事実】';
+          const reasonsList = [
+            `出典・検証区分: ${claim.source} (${claim.status})`,
+            `成熟度ランク: ${claim.maturity} (${claim.self_provenance})`,
+          ];
+          if (claimMatch.scopeNotes.length > 0) {
+            reasonsList.push(...claimMatch.scopeNotes);
+          }
+
+          const factIr = answerContentIrService.buildAnswerIR({
+            conclusion: `${worldLabel} ${claim.statement}`,
+            reasons: reasonsList,
+            conditions: claimMatch.scopeNotes,
+            exceptions: claim.contradicted_by && claim.contradicted_by.length > 0
+              ? [`既存の異論・矛盾主張 [${claim.contradicted_by.join(', ')}] が記録されています`]
+              : undefined,
+            certainty: claimMatch.confidence === 'CERTAIN' ? 'HIGH_CONFIDENCE' : claimMatch.confidence === 'HYPOTHETICAL' ? 'HYPOTHETICAL' : 'CONDITIONAL',
+            target: claim.scope.runtime || claim.scope.device || claim.scope.environment || '主張DB命題',
+            detailLevel: 'STANDARD',
+            worldScope: claim.world,
+          });
+
+          const surfaceResult = answerContentIrService.generateSurfaceTextFromIR(factIr, 'GENERAL_ANSWER');
+          currentNonLlmMeta.matchedClaim = {
+            claimId: claim.claim_id,
+            statement: claim.statement,
+            world: claim.world,
+            maturity: claim.maturity,
+            confidence: claimMatch.confidence,
+            status: claim.status,
+          };
+          currentNonLlmMeta.scopeNotes = claimMatch.scopeNotes;
+          currentNonLlmMeta.meaningPreservationPassed = surfaceResult.inspection.isPreserved;
+
+          deterministicDirectReply = {
+            content: surfaceResult.surfaceText,
+            reason: `第6章 主張DB照会成功 (${claim.claim_id}: ${claim.world}/${claim.maturity})`,
+            skeleton: 'GENERAL_ANSWER',
+          };
+        }
+      }
+
       // 非LLM即答が確定した場合、LLM生成をバイパスして0.1秒で即時回答を確定・表示する
       if (deterministicDirectReply) {
         systemLogger.step(3, 10, `⚡ [非LLM決定論的即答] ${deterministicDirectReply.reason}`);
+        currentNonLlmMeta.isDeterministicAnswer = true;
+        currentNonLlmMeta.directReplyReason = deterministicDirectReply.reason;
         
         // メタ認知キャリブレーションの適用
         const calibration = metacognitiveCalibrationService.calibrateConfidence(
@@ -1628,6 +1704,7 @@ export default function App() {
                   content: finalDirectContent,
                   isStreaming: false,
                   executionSteps: systemLogger.getCurrentSessionSteps(),
+                  nonLlmPipelineMeta: currentNonLlmMeta,
                 }
               : msg
           )
@@ -1678,27 +1755,24 @@ export default function App() {
       }
 
       // ==========================================
-      // PATH 1: Instant Autonomous CPU Rule Engine
+      // PATH 1: Instant Non-LLM Hardware Pipeline (CPU / NPU / GPU 全機協調駆動)
       // ==========================================
       if (engineMode === 'autonomous_rule') {
-        systemLogger.step(3, 10, 'CPU自律ルールベースエンジンで即時応答生成');
-        const isCode =
-          text.includes('作って') ||
-          text.includes('ゲーム') ||
-          text.includes('開発') ||
-          text.includes('コード');
-        const reply = generateSmartCompanionReply(
-          text,
-          persona,
-          relevantMemories,
-          isCode,
-          attached
-        );
+        systemLogger.step(3, 10, '⚡ 非LLM自律統合パイプライン稼働 (CPU/NPU/GPU全機駆動)');
+        const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
+          prompt: text,
+          persona: persona?.name,
+          attachedFiles: attached,
+        });
+        const reply = pipelineRes.replyText;
 
-        systemLogger.step(10, 10, 'CPU自律ルールベース応答完了', {
+        systemLogger.step(10, 10, '非LLM自律統合パイプライン処理完了', {
           responseLength: reply.length,
           snippet: reply.slice(0, 100),
-          totalElapsedMs: Math.round(performance.now() - sendStartTime),
+          totalElapsedMs: pipelineRes.telemetry.totalMs,
+          cpuMs: pipelineRes.telemetry.cpuMs,
+          npuMs: pipelineRes.telemetry.npuMs,
+          gpuMs: pipelineRes.telemetry.gpuMs,
         });
 
         const cpuCandidateTools = toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles });
@@ -1860,12 +1934,13 @@ export default function App() {
           executionSteps: systemLogger.getCurrentSessionSteps(),
           suggestedTools: cpuCandidateTools,
           executedTools: cpuExecutedTools,
+          model: `非LLM自律統合中核 (CPU: ${pipelineRes.telemetry.cpuMs}ms | NPU: ${pipelineRes.telemetry.npuMs}ms | GPU: ${pipelineRes.telemetry.gpuMs}ms)`,
           metrics: {
-            engine: `CPUルールベース (${activeSpeaker.name})`,
-            tokens: Math.round(reply.length / 3),
-            tokensPerSec: 100,
-            ttftMs: 1,
-            totalDurationMs: Math.round(performance.now() - sendStartTime),
+            engine: `⚡ 非LLM全機駆動 (CPU: ${pipelineRes.telemetry.cpuMs}ms | NPU: ${pipelineRes.telemetry.npuMs}ms | GPU: ${pipelineRes.telemetry.gpuMs}ms)`,
+            tokens: 0, // 設計思想: トークン消費ゼロ
+            tokensPerSec: 0,
+            ttftMs: pipelineRes.telemetry.totalMs,
+            totalDurationMs: pipelineRes.telemetry.totalMs,
           },
         };
 
@@ -3234,6 +3309,7 @@ export default function App() {
                 draftVerification: draftVerificationData,
                 autonomousSearch: autonomousSearchData,
                 externalLlmDiagnostic: capturedExternalDiag,
+                nonLlmPipelineMeta: currentNonLlmMeta,
               }
             : msg
         )
@@ -3776,6 +3852,7 @@ export default function App() {
         setUseSearch={setUseSearch}
         fps={fps}
         onOpenActivityMonitor={() => setIsGlobalActivityMonitorOpen(true)}
+        onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
         isWorking={isLoading || isGenerating || isEvolutionRunning}
       />
 

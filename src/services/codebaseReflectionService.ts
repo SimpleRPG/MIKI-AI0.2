@@ -351,7 +351,8 @@ class CodebaseReflectionService {
   public synthesizeImprovementRecipe(
     chapterNumber: number,
     chapterTitle: string,
-    keyRequirements: string[] = []
+    keyRequirements: string[] = [],
+    options?: { silent?: boolean }
   ): ImprovementRecipe {
     const linkedMods = this.getModulesByChapter(chapterNumber);
     const targetModulePaths = linkedMods.length > 0
@@ -403,10 +404,12 @@ class CodebaseReflectionService {
       ],
     };
 
-    systemLogger.info(
-      'SELF_IMPROVEMENT',
-      `🧩 [コードベース自己反映] 第${chapterNumber}章の自律改善レシピを合成しました (リスク度: ${recipe.regressionRisk})`
-    );
+    if (!options?.silent) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🧩 [コードベース自己反映] 第${chapterNumber}章の自律改善レシピを合成しました (リスク度: ${recipe.regressionRisk})`
+      );
+    }
 
     return recipe;
   }

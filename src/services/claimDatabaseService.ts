@@ -394,6 +394,114 @@ export class ClaimDatabaseService {
     return list.sort((a, b) => b.updated_at - a.updated_at);
   }
 
+  /**
+   * 自然言語の問いかけから主張DB内の最適な主張を照合・抽出
+   * 設計思想指示書 第3章 ルートB / 第6章 / 第7章
+   */
+  public findBestMatchingClaim(query: string): {
+    hasMatch: boolean;
+    bestClaim?: ClaimRecord;
+    supportingClaims: ClaimRecord[];
+    contradictingClaims: ClaimRecord[];
+    confidence: 'CERTAIN' | 'PROBABLE' | 'HYPOTHETICAL' | 'UNVERIFIED';
+    world: ClaimWorld;
+    scopeNotes: string[];
+    suggestedAction: 'DIRECT_ANSWER' | 'TRIGGER_WEB_SEARCH' | 'ESCALATE_TO_TEACHER';
+    unmetReason?: string;
+  } {
+    const qLower = query.toLowerCase();
+    const activeClaims = Array.from(this.claims.values()).filter(
+      (c) => c.status !== 'SUPERSEDED' && c.status !== 'FALSE'
+    );
+
+    // 1. スコアリング (キーワード一致、重要語、成熟度、検証状態)
+    const scored = activeClaims.map((claim) => {
+      let score = 0;
+      const stmtLower = claim.statement.toLowerCase();
+
+      // トークン分割マッチング
+      const words = qLower.split(/[\s,、。？！?!\-_/]+/i).filter((w) => w.length >= 2);
+      for (const w of words) {
+        if (stmtLower.includes(w)) {
+          score += 15;
+        }
+      }
+
+      // ドメイン・スコープキーワードの一致
+      if (claim.scope) {
+        for (const val of Object.values(claim.scope)) {
+          if (typeof val === 'string' && val.length >= 2 && qLower.includes(val.toLowerCase())) {
+            score += 20;
+          }
+        }
+      }
+
+      // 成熟度加点
+      if (claim.maturity === 'MATURE') score += 15;
+      else if (claim.maturity === 'REPRODUCED' || claim.maturity === 'TRANSFERRED') score += 10;
+      else if (claim.maturity === 'APPLIED') score += 5;
+
+      // 検証状態加点
+      if (claim.status === 'DEVICE_VERIFIED') score += 20;
+      else if (claim.status === 'SUPPORTED') score += 15;
+      else if (claim.status === 'DISPUTED' || claim.status === 'CONTRADICTED') score -= 20;
+      else if (claim.status === 'UNVERIFIED') score -= 5;
+
+      return { claim, score };
+    });
+
+    // スコア順にソート
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored[0];
+
+    // マッチ判定のしきい値
+    if (!top || top.score < 20) {
+      return {
+        hasMatch: false,
+        supportingClaims: [],
+        contradictingClaims: [],
+        confidence: 'UNVERIFIED',
+        world: 'UNKNOWN_CONTEXT',
+        scopeNotes: [],
+        suggestedAction: 'TRIGGER_WEB_SEARCH',
+        unmetReason: '主張DB内に十分な確信度を持つ該当主張が存在しないため、第7章 自律Web調査が必要です',
+      };
+    }
+
+    const bestClaim = top.claim;
+    const scopeNotes: string[] = [];
+    if (bestClaim.scope.device) scopeNotes.push(`対象デバイス: ${bestClaim.scope.device}`);
+    if (bestClaim.scope.environment) scopeNotes.push(`実行環境: ${bestClaim.scope.environment}`);
+    if (bestClaim.scope.backend) scopeNotes.push(`バックエンド: ${bestClaim.scope.backend}`);
+    if (bestClaim.scope.runtime) scopeNotes.push(`ランタイム: ${bestClaim.scope.runtime}`);
+
+    // 確信度の算出
+    let confidence: 'CERTAIN' | 'PROBABLE' | 'HYPOTHETICAL' | 'UNVERIFIED' = 'PROBABLE';
+    if (bestClaim.status === 'DEVICE_VERIFIED' && (bestClaim.maturity === 'MATURE' || bestClaim.maturity === 'REPRODUCED')) {
+      confidence = 'CERTAIN';
+    } else if (bestClaim.world === 'FICTION' || bestClaim.world === 'HYPOTHETICAL') {
+      confidence = 'HYPOTHETICAL';
+    } else if (bestClaim.status === 'UNVERIFIED') {
+      confidence = 'UNVERIFIED';
+    }
+
+    // 矛盾主張の取得
+    const contradictingClaims = (bestClaim.contradicted_by || [])
+      .map((id) => this.claims.get(id))
+      .filter((c): c is ClaimRecord => !!c);
+
+    return {
+      hasMatch: true,
+      bestClaim,
+      supportingClaims: [bestClaim],
+      contradictingClaims,
+      confidence,
+      world: bestClaim.world,
+      scopeNotes,
+      suggestedAction: confidence === 'UNVERIFIED' ? 'TRIGGER_WEB_SEARCH' : 'DIRECT_ANSWER',
+    };
+  }
+
   public getClaim(claim_id: string): ClaimRecord | undefined {
     return this.claims.get(claim_id);
   }

@@ -12,6 +12,10 @@ import { generateSmartCompanionReply } from '../utils/companionEngine';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { privacyGuardrailService } from './privacyGuardrailService';
+import {
+  nonLlmHardwarePipelineService,
+  HardwareTelemetry,
+} from './nonLlmHardwarePipelineService';
 
 // APKなど「フロントエンドだけが単体で動くビルド」では server.ts (Express) が
 // 同一オリジンに存在しないため、Termux等で起動したサーバーのアドレスを
@@ -430,6 +434,7 @@ export interface ChatResponse {
   groundingChunks?: GroundingChunk[];
   webSearchQueries?: string[];
   privacyAudit?: PrivacyAuditResult;
+  hardwareTelemetry?: HardwareTelemetry;
 }
 
 export interface GitHubPushParams {
@@ -465,25 +470,22 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     throw new DOMException('Aborted', 'AbortError');
   }
 
-  // 1. If CPU rule-based mode is chosen, execute INSTANTLY on client without any server/network delay!
+  // 1. If Non-LLM autonomous mode (autonomous_rule) is chosen, execute via CPU+NPU+GPU hardware pipeline!
   if (params.engineMode === 'autonomous_rule') {
-    const isCode =
-      params.prompt.includes('作って') ||
-      params.prompt.includes('ゲーム') ||
-      params.prompt.includes('開発') ||
-      params.prompt.includes('コード');
-    const reply = generateSmartCompanionReply(
-      params.prompt,
-      params.persona,
-      params.memories,
-      isCode,
-      params.attachedFiles
-    );
-    systemLogger.info('CHAT', 'Instant client-side CPU rule-based response generated', { isCode });
+    const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
+      prompt: params.prompt,
+      persona: params.persona?.name,
+      attachedFiles: params.attachedFiles,
+    });
+    systemLogger.info('CHAT', `⚡ 非LLM全機協調処理完了: ${pipelineRes.telemetry.totalMs}ms (CPU: ${pipelineRes.telemetry.cpuMs}ms, NPU: ${pipelineRes.telemetry.npuMs}ms, GPU: ${pipelineRes.telemetry.gpuMs}ms)`, {
+      usedComponents: pipelineRes.usedComponents,
+      affectionScore: pipelineRes.affectionScore,
+    });
     return {
-      text: reply,
+      text: pipelineRes.replyText,
       engineMode: 'autonomous_rule',
-      model: 'CPUルールベース自律エンジン',
+      model: `非LLM自律統合中核 (CPU: ${pipelineRes.telemetry.cpuMs}ms | NPU: ${pipelineRes.telemetry.npuMs}ms | GPU: ${pipelineRes.telemetry.gpuMs}ms)`,
+      hardwareTelemetry: pipelineRes.telemetry,
     };
   }
 
@@ -491,23 +493,17 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
   // ローカル推論 (webgpu, native_gpu, external_gpu 等) 指定時、勝手に外部クラウド (/api/chat / Gemini) に流れることを厳格に遮断。
   // クラウド送信はユーザーが明示的に engineMode === 'gemini_cloud' を選択した場合のみ許可される。
   if (params.engineMode && params.engineMode !== 'gemini_cloud') {
-    systemLogger.warn('CHAT', `[外部送信境界ガード] engineMode=${params.engineMode} のため、外部クラウド(/api/chat)への送信を完全遮断しました。端末内CPU自律ルールベースで安全に生成します。`);
-    const isCode =
-      params.prompt.includes('作って') ||
-      params.prompt.includes('ゲーム') ||
-      params.prompt.includes('開発') ||
-      params.prompt.includes('コード');
-    const localReply = generateSmartCompanionReply(
-      params.prompt,
-      params.persona,
-      params.memories,
-      isCode,
-      params.attachedFiles
-    );
+    systemLogger.warn('CHAT', `[外部送信境界ガード] engineMode=${params.engineMode} のため、外部クラウド(/api/chat)への送信を完全遮断しました。非LLM自律統合パイプラインで安全に生成します。`);
+    const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
+      prompt: params.prompt,
+      persona: params.persona?.name,
+      attachedFiles: params.attachedFiles,
+    });
     return {
-      text: localReply,
+      text: pipelineRes.replyText,
       engineMode: params.engineMode,
-      model: '端末内CPU自律ルールベース (外部送信完全遮断)',
+      model: `非LLM自律統合中核 (CPU: ${pipelineRes.telemetry.cpuMs}ms | NPU: ${pipelineRes.telemetry.npuMs}ms | GPU: ${pipelineRes.telemetry.gpuMs}ms - 外部送信完全遮断)`,
+      hardwareTelemetry: pipelineRes.telemetry,
     };
   }
 
