@@ -58,7 +58,7 @@ import {
   resolveAnaphora,
 } from './services/conversationStateService';
 import { responseDesignService } from './services/responseDesignService';
-import { nonLlmHardwarePipelineService } from './services/nonLlmHardwarePipelineService';
+import { nonLlmCoreService } from './services/nonLlmCoreService';
 import { longTermMemoryService } from './services/longTermMemoryService';
 import { codeVerificationService } from './services/codeVerificationService';
 import { falsificationService, classifyClaimEpistemology } from './services/falsificationService';
@@ -965,6 +965,8 @@ export default function App() {
       speakerMode,
     });
 
+    const activeMemories = memories.filter((m) => m.active);
+
     // 非LLMモードでは、旧来のシャドー解析群を実行しない。
     // それらはLLM経路の比較・観測用であり、通常の非LLM応答には不要なため、
     // 1メッセージあたりのCPU処理・DB照会・ログ量を大幅に削減する。
@@ -993,13 +995,20 @@ export default function App() {
 
       try {
         systemLogger.step(2, 10, '⚡ 非LLM高速経路: シャドー解析をスキップ');
-        const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
+        const pipelineRes = await nonLlmCoreService.execute({
           prompt: text,
           persona: persona?.name,
           attachedFiles: attached,
+          conversationState,
+          memories: activeMemories,
+          recentMessages: messages,
         });
+        setConversationState(pipelineRes.nextConversationState);
 
-        const cpuCandidateTools = toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles });
+        const needsToolPass = /計算|計算して|\d+[+*\-/]\d+|VBA|Excel|コード|マクロ|集計|重複/u.test(text);
+        const cpuCandidateTools = needsToolPass
+          ? toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles })
+          : [];
         const cpuExecutedTools: any[] = [];
         const cpuMath = cpuCandidateTools.find((t) => t.toolId === 'tool_safe_calculator');
         if (cpuMath && cpuMath.suggestedParams?.expression) {
@@ -1018,12 +1027,14 @@ export default function App() {
           }
         }
 
-        const cpuEvaluation = completionJudgeService.evaluateCompletion({
-          userGoal: text,
-          assistantResponse: pipelineRes.replyText,
-          executionSteps: systemLogger.getCurrentSessionSteps(),
-          executedTools: cpuExecutedTools,
-        });
+        const cpuEvaluation = needsToolPass
+          ? completionJudgeService.evaluateCompletion({
+              userGoal: text,
+              assistantResponse: pipelineRes.replyText,
+              executionSteps: systemLogger.getCurrentSessionSteps(),
+              executedTools: cpuExecutedTools,
+            })
+          : { status: 'COMPLETED' as const };
 
         const fastMeta: NonLlmPipelineMeta = {
           isDeterministicAnswer: true,
@@ -1863,10 +1874,13 @@ export default function App() {
       // ==========================================
       if (engineMode === 'autonomous_rule') {
         systemLogger.step(3, 10, '⚡ 非LLM自律統合パイプライン稼働 (CPU/NPU/GPU全機駆動)');
-        const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
+        const pipelineRes = await nonLlmCoreService.execute({
           prompt: text,
           persona: persona?.name,
           attachedFiles: attached,
+          conversationState,
+          memories: activeMemories,
+          recentMessages: messages,
         });
         const reply = pipelineRes.replyText;
 
