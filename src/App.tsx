@@ -32,6 +32,7 @@ import {
   DraftVerificationResult,
   AutonomousSearchMessageMeta,
   PrivacyAuditResult,
+  AnswerContentIR,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
@@ -83,6 +84,10 @@ import { draftVerificationService } from './services/draftVerificationService';
 import { cognitiveDebuggerService } from './services/cognitiveDebuggerService';
 import { proactiveContextOsService } from './services/proactiveContextOsService';
 import { autonomousContinuousEvolutionService } from './services/autonomousContinuousEvolutionService';
+import { claimDatabaseService } from './services/claimDatabaseService';
+import { unifiedDecisionEngineService } from './services/unifiedDecisionEngineService';
+import { componentRegistryService } from './services/componentRegistryService';
+import { answerContentIrService } from './services/answerContentIrService';
 import { extractCodeBlocks } from './utils/codeParser';
 import { smartMergeCodeBlock } from './utils/codeMergeService';
 import { generateSmartCompanionReply } from './utils/companionEngine';
@@ -235,6 +240,7 @@ export default function App() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const currentAssistantIdRef = useRef<string | null>(null);
   const lastTurnUsedMemoryIdsRef = useRef<string[]>([]);
+  const currentAnswerIrRef = useRef<AnswerContentIR | null>(null);
 
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
@@ -1050,6 +1056,83 @@ export default function App() {
         { shadowVmResult }
       );
     }
+
+    // =========================================================================
+    // 非LLM中心・自己成長型AIコンパニオン 設計思想指示書 (統合版) パイプライン統合
+    // 第6章: 主張DB (Claim DB) & 認識論的検証
+    // 第8章: 統合判断エンジン & 削減知能 (Reduction Intelligence)
+    // 第9章: 検証済みTXT部品レジストリ (Component Registry)
+    // 第5.2節: 回答内容IR (Answer Content IR) 構築
+    // =========================================================================
+
+    // 1. [第6章 主張DB] 既存の検証済み知見の検索
+    const matchedClaims = claimDatabaseService.queryClaims({
+      keyword: isVbaRequest ? 'VBA' : (text.length > 4 ? text.slice(0, 10) : undefined),
+      excludeSuperseded: true,
+    });
+    if (matchedClaims.length > 0) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `📚 [6章 主張DB照会] ユーザー発話に関連する主張を ${matchedClaims.length} 件検出 (最優先: ${matchedClaims[0].claim_id}「${matchedClaims[0].statement}」)`
+      );
+    }
+
+    // 2. [第8章 判断エンジン & 削減知能] コンテキストプロファイル適合と機能過剰追加の抑制評価
+    const detectedProfile = isVbaRequest || isCodeModRequest
+      ? 'WORK_EFFICIENCY'
+      : (shadowUserEpistemic.status === 'fictional' ? 'CREATIVE_EXPLORATION' : 'CASUAL_CHAT');
+    unifiedDecisionEngineService.setActiveProfile(detectedProfile);
+
+    unifiedDecisionEngineService.evaluateDecision({
+      topic: text.slice(0, 60),
+      options: [
+        { optionId: 'DIRECT_ANSWER', label: '直接的・簡潔な回答/既存検証済み部品の活用', complexityWeight: 0.2, auditRiskWeight: 0.1 },
+        { optionId: 'ELABORATE_EXPAND', label: '追加機能の自発的提案や複雑な拡張', complexityWeight: 0.8, auditRiskWeight: 0.7 },
+      ],
+      userContextType: detectedProfile,
+      proposedComplexityScore: text.length > 100 ? 0.6 : 0.2,
+      proposedNovelFeatureCount: isCodeModRequest ? 1 : 0,
+      knownSupportedBenefit: true,
+    });
+
+    // 3. [第9章 検証済みTXT部品レジストリ] コード/VBA要求時の非LLM部品検索と決定論的合成
+    if (isVbaRequest || text.includes('VBA') || text.includes('マクロ') || text.includes('重複')) {
+      const registrySearch = componentRegistryService.searchComponents(text, { verifiedOnly: true });
+      if (registrySearch.length > 0) {
+        systemLogger.info(
+          'TOOLS',
+          `🧩 [9章 部品レジストリ検索] 適合するVERIFIED部品を ${registrySearch.length} 件発見: [${registrySearch.map((c) => c.component_id).join(', ')}]`
+        );
+      }
+      if (text.includes('重複') || text.includes('まとめ') || text.includes('抽出')) {
+        const vbaSynthesis = componentRegistryService.synthesizeVbaMacro({
+          macroName: 'FilterAndExtractUniqueRows',
+          sourceSheetName: 'Sheet1',
+          headerKeyName: 'ID',
+          destSheetName: 'UniqueOutput',
+        });
+        if (vbaSynthesis.success) {
+          systemLogger.info(
+            'TOOLS',
+            `⚡ [9.9 検証済み部品からのVBA合成] 部品 [${vbaSynthesis.usedComponents.join(', ')}] から決定論的にマクロを合成完了 (チェックリスト: ${vbaSynthesis.verificationChecklist.length}項目合致)`
+          );
+        }
+      }
+    }
+
+    // 4. [第5.2節 回答内容IR構築] 何を言うか (回答内容IR) とどう言うか (表層表現) の分離
+    const shadowAnswerIr = answerContentIrService.buildAnswerIR({
+      conclusion: isVbaRequest
+        ? '検証済み部品によるOption Explicit/配列一括処理/型安全なVBAコードの提供'
+        : `ユーザーの意図「${text.slice(0, 30)}」に対する的確かつ不要な過剰拡張を排した回答`,
+      reasons: ['非LLM検証済み部品レジストリの活用', '削減知能による無駄な複雑化抑制'],
+      conditions: isVbaRequest ? ['Excel 2016以降またはMicrosoft 365環境であること'] : [],
+      certainty: shadowUserEpistemic.status === 'hypothetical' ? 'HYPOTHETICAL' : 'HIGH_CONFIDENCE',
+      target: 'USER_QUERY',
+      detailLevel: detectedProfile === 'WORK_EFFICIENCY' ? 'STANDARD' : 'BRIEF',
+      worldScope: shadowUserEpistemic.status === 'fictional' ? 'FICTION' : 'REAL',
+    });
+    currentAnswerIrRef.current = shadowAnswerIr;
 
     // 設計思想 Master v5.0 第2章2節: 前ターンで使われた記憶に対するユーザーフィードバック（感情価: 質）の自動反映
     if (lastTurnUsedMemoryIdsRef.current && lastTurnUsedMemoryIdsRef.current.length > 0) {
@@ -2623,6 +2706,23 @@ export default function App() {
               : true,
         }
       );
+
+      // 第13.4節: 意味保持検査 (Semantic Preservation Check)
+      // 回答内容IRで定めた条件・否定・確実性・世界スコープが表層文で歪曲・脱落していないかを決定論的に検査
+      if (currentAnswerIrRef.current) {
+        const preservationCheck = answerContentIrService.verifySemanticPreservation(
+          currentAnswerIrRef.current,
+          rawExtractedText
+        );
+        systemLogger.info(
+          'ANSWER_PLAN',
+          `🔍 [13.4 意味保持検査] 結果: ${preservationCheck.isPreserved ? 'PASSED (完全維持)' : 'VIOLATIONS_DETECTED (脱落・歪曲検知)'}`,
+          {
+            preservationCheck,
+            irId: currentAnswerIrRef.current.ir_id,
+          }
+        );
+      }
 
       systemLogger.step(10, 10, '応答確定・UIレンダリング & ワークスペース同期', {
         executedEngineLabel,

@@ -3011,4 +3011,268 @@ export type ProactiveSuggestionLevel = 'OFF' | 'MODEST' | 'STANDARD' | 'ACTIVE';
 
 export type ManualExplanationOverride = 'AUTO' | 'CONCISE' | 'STANDARD' | 'DETAILED' | 'TUTORIAL';
 
+// ──【非LLM中心・自己成長型AIコンパニオン 設計思想指示書(統合版) 関連型定義】──
+
+/** 6.2 主張DB: 世界の区分 */
+export type ClaimWorld = 'REAL' | 'FICTION' | 'HYPOTHETICAL' | 'UNKNOWN_CONTEXT';
+
+/** 6.2 主張DB: 情報の性質 */
+export type ClaimKind =
+  | 'OBSERVATION'
+  | 'FACT_CLAIM'
+  | 'OPINION'
+  | 'HYPOTHESIS'
+  | 'PREDICTION'
+  | 'INSTRUCTION'
+  | 'QUOTE'
+  | 'FICTIONAL_STATEMENT'
+  | 'JOKE_OR_IRONY'
+  | 'CORRECTION';
+
+/** 6.2 主張DB: 検証状態 */
+export type ClaimVerificationStatus =
+  | 'UNVERIFIED'
+  | 'SUPPORTED'
+  | 'DEVICE_VERIFIED'
+  | 'CONTRADICTED'
+  | 'DISPUTED'
+  | 'FALSE'
+  | 'SUPERSEDED'
+  | 'CONTEXT_ONLY'
+  | 'UNRESOLVED';
+
+/** 6.8 知識の成熟度 */
+export type ClaimMaturity =
+  | 'DISCOVERED'
+  | 'DEFINED'
+  | 'CONNECTED'
+  | 'APPLIED'
+  | 'REPRODUCED'
+  | 'TRANSFERRED'
+  | 'MATURE'
+  | 'RESTRICTED';
+
+/** 6.7 自己生成情報による自己証明の禁止 */
+export type ClaimSelfProvenance =
+  | 'SELF_SUPPORTED'
+  | 'INDEPENDENTLY_SUPPORTED'
+  | 'EXECUTION_CONFIRMED'
+  | 'USER_CONFIRMED';
+
+/** 6.5 開世界管理 (検索で見つからない ≠ 存在しない) */
+export type ClaimOpenWorldStatus =
+  | 'FOUND_SUPPORTED'
+  | 'NOT_FOUND_IN_SEARCH_SCOPE'
+  | 'NONEXISTENCE_SUPPORTED'
+  | 'SEARCH_INCOMPLETE'
+  | 'SOURCE_UNAVAILABLE';
+
+/** 6.2 主張の適用スコープ */
+export interface ClaimScope {
+  device?: string;
+  environment?: string;
+  backend?: string;
+  model?: string;
+  runtime?: string;
+  conditions?: Record<string, string>;
+}
+
+/** 6.2 主張(claim)レコード */
+export interface ClaimRecord {
+  claim_id: string; // CLM-000001
+  statement: string;
+  world: ClaimWorld;
+  kind: ClaimKind;
+  status: ClaimVerificationStatus;
+  scope: ClaimScope;
+  source: string;
+  origin_source_id?: string;
+  derived_from?: string[];
+  independence_cluster_id?: string;
+  maturity: ClaimMaturity;
+  self_provenance: ClaimSelfProvenance;
+  open_world_status?: ClaimOpenWorldStatus;
+  superseded_by?: string;
+  superseded_from?: string;
+  contradicted_by?: string[];
+  created_at: number;
+  updated_at: number;
+}
+
+/** 8.2 状況別ユーザー優先順位プロファイル区分 */
+export type UserContextProfileType =
+  | 'casual_chat'
+  | 'technical_research'
+  | 'code_design'
+  | 'code_delivery'
+  | 'background_learning'
+  | 'troubleshooting'
+  | 'data_migration'
+  | 'emergency_recovery';
+
+/** 8.2 状況別ユーザー優先順位プロファイル */
+export interface UserContextProfile {
+  profileType: UserContextProfileType;
+  name: string;
+  priorities: {
+    safetyFirst: number; // 0-100
+    speedPriority: number; // 0-100
+    verbosity: 'concise' | 'balanced' | 'detailed';
+    askConfirmationPolicy: 'ask_only_when_blocking' | 'always_confirm' | 'autonomous';
+    preferLocalExecution: boolean;
+  };
+}
+
+/** 8.5 削減知能(機能追加抑制) 判定区分 */
+export type ReductionIntelligenceCategory =
+  | 'IMPLEMENT'
+  | 'COMPOSE_EXISTING'
+  | 'MERGE'
+  | 'DOCUMENT_ONLY'
+  | 'WAIT_FOR_EVIDENCE'
+  | 'REJECT_COMPLEXITY'
+  | 'NO_CHANGE';
+
+/** 8.4 判断結果の遅延評価チェックポイント */
+export type DecisionDelayCheckpoint =
+  | 'IMMEDIATE'
+  | 'SESSION_END'
+  | 'NEXT_USE'
+  | 'SHORT_TERM'
+  | 'LONG_TERM';
+
+/** 8.4 判断結果の失敗分類 */
+export type DecisionFailureCause =
+  | 'DECISION_ERROR'
+  | 'INFORMATION_GAP'
+  | 'ENVIRONMENT_DRIFT'
+  | 'PREFERENCE_CHANGE'
+  | 'IMPLEMENTATION_ERROR'
+  | 'COMPOSITION_ERROR'
+  | 'TEST_GAP';
+
+/** 8.1 意思決定レコード */
+export interface UnifiedDecisionRecord {
+  decision_id: string;
+  topic: string;
+  chosen_option: string;
+  alternative_options: string[];
+  evaluation_scores: Record<string, number>;
+  applied_profile: UserContextProfileType;
+  reasons: string[];
+  conditions_for_change: string[];
+  reduction_verdict: ReductionIntelligenceCategory;
+  evaluations: Partial<Record<DecisionDelayCheckpoint, {
+    outcome: 'SUCCESS' | 'SUBOPTIMAL' | 'FAILURE' | 'PENDING';
+    cause?: DecisionFailureCause;
+    feedback?: string;
+    evaluated_at: number;
+  }>>;
+  created_at: number;
+}
+
+/** 9.3 部品の状態遷移 */
+export type ComponentStatus =
+  | 'COLLECTED'
+  | 'CANDIDATE'
+  | 'ANALYZED'
+  | 'CLOUD_TESTED'
+  | 'DEVICE_TESTED'
+  | 'VERIFIED'
+  | 'DEPRECATED'
+  | 'SUPERSEDED'
+  | 'REJECTED';
+
+/** 9.2 部品のセキュリティクラス */
+export type ComponentSecurityClass =
+  | 'READ_ONLY'
+  | 'LOCAL_WRITE'
+  | 'NETWORK'
+  | 'PROCESS_EXECUTION'
+  | 'PRIVILEGED';
+
+/** 9.4 重複判定・新規作成前の判定 */
+export type ComponentCreationDecision =
+  | 'REUSE'
+  | 'COMPOSE'
+  | 'EXTEND'
+  | 'NEW'
+  | 'DUPLICATE'
+  | 'REJECT';
+
+/** 9.5 テスト区分 */
+export type ComponentTestCategory =
+  | 'NORMAL'
+  | 'BOUNDARY'
+  | 'EMPTY'
+  | 'INVALID'
+  | 'MISSING_DEPENDENCY'
+  | 'PERMISSION'
+  | 'TIMEOUT'
+  | 'INTERRUPTION'
+  | 'LARGE_INPUT'
+  | 'DUPLICATE'
+  | 'REGRESSION';
+
+/** 9.1 部品(コンポーネント)TXT正本パッケージ */
+export interface ComponentTxtPackage {
+  component_id: string;
+  version: string;
+  status: ComponentStatus;
+  purpose: string;
+  inputs: { name: string; type: string; description: string }[];
+  outputs: { name: string; type: string; description: string }[];
+  preconditions: string[];
+  postconditions: string[];
+  side_effects: string[];
+  dependencies: string[];
+  supported_environments: string[];
+  entry_point: string;
+  failure_behavior: string;
+  security_class: ComponentSecurityClass;
+  idempotent: boolean;
+  deterministic: boolean;
+  // 物理正本ファイル内容
+  component_txt: string;
+  implementation_txt: string;
+  tests_txt: string;
+  validation_txt: string;
+  sources_txt?: string;
+  history_txt?: string;
+  // ハッシュ整合性
+  implementation_hash: string;
+  validation_hash: string;
+  success_count: number;
+  failure_count: number;
+  created_at: number;
+  updated_at: number;
+}
+
+/** 3 & 5.2 回答内容IR (Answer Content IR) */
+export interface AnswerContentIR {
+  ir_id: string;
+  conclusion: string;
+  reasons: string[];
+  conditions: string[];
+  exceptions: string[];
+  certainty: 'CERTAIN' | 'HIGH_CONFIDENCE' | 'CONDITIONAL' | 'HYPOTHETICAL' | 'UNKNOWN';
+  target: string;
+  next_actions: string[];
+  detail_level: 'BRIEF' | 'STANDARD' | 'DETAILED';
+  interaction_mode: 'NORMAL' | 'CODE_DELIVERY' | 'TROUBLESHOOTING' | 'SAFETY_GATE';
+  world_scope: ClaimWorld;
+}
+
+/** 13.4 意味保持検査 (Semantic Preservation Inspection) */
+export interface SemanticPreservationInspection {
+  isPreserved: boolean;
+  checkedElements: {
+    conditionsPreserved: boolean;
+    negationPreserved: boolean;
+    certaintyPreserved: boolean;
+    worldScopePreserved: boolean;
+  };
+  missingOrDistortedElements: string[];
+}
+
 export type Message = ChatMessage;

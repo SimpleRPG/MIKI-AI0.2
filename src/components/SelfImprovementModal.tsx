@@ -68,6 +68,7 @@ import { IdleEvolutionTab } from './self_improvement/IdleEvolutionTab';
 import { CompletionJudgeTab } from './self_improvement/CompletionJudgeTab';
 import { FailureCatalogTab } from './self_improvement/FailureCatalogTab';
 import { SelfCodeArchitectTab } from './self_improvement/SelfCodeArchitectTab';
+import { NonLlmArchitectureTab } from './self_improvement/NonLlmArchitectureTab';
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
@@ -143,7 +144,8 @@ export type SelfImprovementTab =
   | 'autonomous_search'
   | 'security_guardrail'
   | 'completion_judge'
-  | 'failure_catalog';
+  | 'failure_catalog'
+  | 'non_llm_architecture';
 
 export interface SelfImprovementModalProps {
   isOpen: boolean;
@@ -844,6 +846,18 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
         {/* Tab Navigation */}
         <div className="flex border-b border-slate-800 bg-slate-950/50 px-4 gap-1.5 shrink-0 overflow-x-auto">
           <button
+            onClick={() => setActiveTab('non_llm_architecture')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
+              activeTab === 'non_llm_architecture'
+                ? 'border-emerald-500 text-emerald-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>⚖️ 非LLM主張DB・判断・部品合成 (6,8,9章)</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('spec_architect')}
             className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
               activeTab === 'spec_architect'
@@ -1194,6 +1208,9 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
         {/* Content Area */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+          {/* TAB: 非LLM中心設計思想・主張DB・判断・部品合成 (第6, 8, 9章, 第5.2, 13.4節) */}
+          {activeTab === 'non_llm_architecture' && <NonLlmArchitectureTab />}
+
           {/* TAB 0: 設計思想指示書 & 自己コード改善エンジン (第29-30章, 第53章) */}
           {activeTab === 'spec_architect' && <SelfCodeArchitectTab />}
 
