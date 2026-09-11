@@ -15,6 +15,7 @@ import { selfCodeArchitectService } from './selfCodeArchitectService';
 import { cognitiveDebuggerService } from './cognitiveDebuggerService';
 import { digitalResearchNoteService } from './digitalResearchNoteService';
 import { codebaseReflectionService } from './codebaseReflectionService';
+import { apiUrl } from './api';
 
 const TOOLS_STATS_STORAGE_KEY = 'miki_ai_tools_stats';
 
@@ -971,7 +972,7 @@ export class ToolsService {
       // 第171章: 動的ツールのサンドボックス実行
       if (tool.isDynamic && tool.dynamicCode) {
         try {
-          const res = await fetch('/api/tools/execute-sandboxed', {
+          const res = await fetch(apiUrl('/api/tools/execute-sandboxed'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

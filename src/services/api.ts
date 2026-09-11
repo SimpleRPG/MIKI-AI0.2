@@ -452,7 +452,7 @@ export interface GitHubPushResult {
 
 export async function checkServerHealth(): Promise<{ status: string }> {
   try {
-    const res = await fetch('/api/health');
+    const res = await fetch(apiUrl('/api/health'));
     if (!res.ok) throw new Error('Health check failed');
     return await res.json();
   } catch {

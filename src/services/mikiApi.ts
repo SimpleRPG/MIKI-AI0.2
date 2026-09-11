@@ -1,4 +1,5 @@
 import { Character, WorldLocation, StoryEntry, Monster, Quest } from '../types/rpg';
+import { apiUrl } from './api';
 
 export interface NarrateResponse {
   narration: string;
@@ -27,7 +28,7 @@ export async function requestNarration(
   recentHistory: StoryEntry[],
   rollResult?: { dice: number; mod: number; total: number }
 ): Promise<NarrateResponse> {
-  const res = await fetch('/api/miki/narrate', {
+  const res = await fetch(apiUrl('/api/miki/narrate'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -52,7 +53,7 @@ export async function generateAIQuest(
   setting: string,
   difficulty: string
 ): Promise<Quest> {
-  const res = await fetch('/api/miki/quest', {
+  const res = await fetch(apiUrl('/api/miki/quest'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ character, setting, difficulty })
@@ -72,7 +73,7 @@ export async function resolveCombatTurn(
   monster: Monster,
   rollResult?: { dice: number; mod: number; total: number }
 ): Promise<CombatResponse> {
-  const res = await fetch('/api/miki/combat', {
+  const res = await fetch(apiUrl('/api/miki/combat'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ playerMove, character, monster, rollResult })
@@ -91,7 +92,7 @@ export async function talkToMiki(
   character: Character,
   worldState: WorldLocation
 ): Promise<string> {
-  const res = await fetch('/api/miki/chat', {
+  const res = await fetch(apiUrl('/api/miki/chat'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, character, worldState })

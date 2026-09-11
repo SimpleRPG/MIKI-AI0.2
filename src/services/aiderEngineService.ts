@@ -9,6 +9,7 @@
  */
 
 import { systemLogger } from './systemLogger';
+import { apiUrl } from './api';
 
 export interface RepoMapSymbol {
   kind: string;
@@ -66,7 +67,7 @@ export class AiderEngineService {
    */
   public async fetchRepoMap(): Promise<RepoMapResponse> {
     try {
-      const res = await fetch('/api/aider/repo-map');
+      const res = await fetch(apiUrl('/api/aider/repo-map'));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: RepoMapResponse = await res.json();
       systemLogger.info('SELF_IMPROVEMENT', `[Aider Repo Map] ${data.scannedFilesCount} ファイル / ${data.totalSymbolsCount} シンボル走査完了`);
@@ -89,7 +90,7 @@ export class AiderEngineService {
    */
   public async applySearchReplace(filePath: string, searchBlock: string, replaceBlock: string): Promise<SearchReplaceResult> {
     try {
-      const res = await fetch('/api/aider/search-replace', {
+      const res = await fetch(apiUrl('/api/aider/search-replace'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filePath, searchBlock, replaceBlock }),
@@ -110,7 +111,7 @@ export class AiderEngineService {
    */
   public async autoHealCode(code: string, filename: string = 'module.ts'): Promise<AutoHealResult> {
     try {
-      const res = await fetch('/api/aider/auto-heal', {
+      const res = await fetch(apiUrl('/api/aider/auto-heal'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, filename }),
@@ -135,7 +136,7 @@ export class AiderEngineService {
    */
   public async fetchCommits(): Promise<AiderCommitRecord[]> {
     try {
-      const res = await fetch('/api/aider/commits');
+      const res = await fetch(apiUrl('/api/aider/commits'));
       if (!res.ok) return [];
       const data = await res.json();
       return data.commits || [];
@@ -146,7 +147,7 @@ export class AiderEngineService {
 
   public async createCommit(message: string, files?: string[]): Promise<AiderCommitRecord | null> {
     try {
-      const res = await fetch('/api/aider/commit', {
+      const res = await fetch(apiUrl('/api/aider/commit'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, files }),
@@ -162,7 +163,7 @@ export class AiderEngineService {
 
   public async rollbackCommit(hash: string): Promise<{ success: boolean; message: string; restoredFiles?: string[] }> {
     try {
-      const res = await fetch('/api/aider/rollback', {
+      const res = await fetch(apiUrl('/api/aider/rollback'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hash }),

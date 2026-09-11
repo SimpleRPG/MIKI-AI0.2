@@ -16,6 +16,7 @@ import { systemLogger } from './systemLogger';
 import { sandboxPermissionService } from './sandboxPermissionService';
 import { toolsService } from './toolsService';
 import { storageService } from './storageService';
+import { apiUrl } from './api';
 
 const DYNAMIC_TOOLS_STORAGE_KEY = 'miki_ai_dynamic_tools_v1';
 
@@ -64,7 +65,7 @@ export class DynamicToolFactoryService {
     systemLogger.info('SELF_IMPROVEMENT', `[第171章 ツール工房] 新ツール「${request.featureName}」の自律合成を開始`);
 
     try {
-      const res = await fetch('/api/tools/synthesize', {
+      const res = await fetch(apiUrl('/api/tools/synthesize'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
