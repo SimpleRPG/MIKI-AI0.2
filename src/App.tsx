@@ -965,6 +965,110 @@ export default function App() {
       speakerMode,
     });
 
+    // 非LLMモードでは、旧来のシャドー解析群を実行しない。
+    // それらはLLM経路の比較・観測用であり、通常の非LLM応答には不要なため、
+    // 1メッセージあたりのCPU処理・DB照会・ログ量を大幅に削減する。
+    if (engineMode === 'autonomous_rule') {
+      const fastUserId = 'msg_user_' + Date.now();
+      const fastAssistantId = 'msg_asst_' + Date.now();
+      currentAssistantIdRef.current = fastAssistantId;
+      const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
+
+      const userMsg: ChatMessage = {
+        id: fastUserId,
+        role: 'user',
+        content: text,
+        timestamp: Date.now(),
+        attachedFiles: attached?.map((a) => ({ name: a.name, size: a.content.length, type: a.type })),
+      };
+      setMessages((prev) => [...prev, userMsg, {
+        id: fastAssistantId,
+        role: 'assistant',
+        content: '⚡ 非LLMコアで処理中…',
+        timestamp: Date.now(),
+        speaker: activeSpeaker,
+        engineMode: 'autonomous_rule',
+        isStreaming: true,
+      }]);
+
+      try {
+        systemLogger.step(2, 10, '⚡ 非LLM高速経路: シャドー解析をスキップ');
+        const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
+          prompt: text,
+          persona: persona?.name,
+          attachedFiles: attached,
+        });
+
+        const cpuCandidateTools = toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles });
+        const cpuExecutedTools: any[] = [];
+        const cpuMath = cpuCandidateTools.find((t) => t.toolId === 'tool_safe_calculator');
+        if (cpuMath && cpuMath.suggestedParams?.expression) {
+          const calcRes = toolsService.evaluateSafeMath(cpuMath.suggestedParams.expression);
+          if (calcRes.success) {
+            cpuExecutedTools.push({
+              toolId: 'tool_safe_calculator',
+              toolName: '高精度・安全数値計算機',
+              permission: 'read_only' as const,
+              executionTimeMs: 1,
+              success: true,
+              result: calcRes,
+              outputSummary: `【精密計算結果】: ${calcRes.expression} = ${calcRes.result}`,
+              executedAt: Date.now(),
+            });
+          }
+        }
+
+        const cpuEvaluation = completionJudgeService.evaluateCompletion({
+          userGoal: text,
+          assistantResponse: pipelineRes.replyText,
+          executionSteps: systemLogger.getCurrentSessionSteps(),
+          executedTools: cpuExecutedTools,
+        });
+
+        const fastMeta: NonLlmPipelineMeta = {
+          isDeterministicAnswer: true,
+          directReplyReason: '非LLM高速経路',
+          decisionProfile: {
+            profile: 'general',
+            chosenAction: 'DIRECT_ANSWER',
+            score: 100,
+            suppressedExcess: true,
+          },
+          synthesizedComponents: pipelineRes.usedComponents.length > 0 ? pipelineRes.usedComponents : undefined,
+        };
+
+        const finalContent = cpuExecutedTools.length > 0
+          ? `${pipelineRes.replyText}\n\n${cpuExecutedTools.map((t) => t.outputSummary).join('\n')}`
+          : pipelineRes.replyText;
+
+        setMessages((prev) => prev.map((msg) => msg.id === fastAssistantId ? {
+          ...msg,
+          content: finalContent,
+          isStreaming: false,
+          executionSteps: systemLogger.getCurrentSessionSteps(),
+          nonLlmPipelineMeta: fastMeta,
+        } : msg));
+
+        systemLogger.step(10, 10, '⚡ 非LLM高速経路完了', {
+          totalElapsedMs: pipelineRes.telemetry.totalMs,
+          completionStatus: cpuEvaluation.status,
+          responseLength: finalContent.length,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        systemLogger.error('CHAT', `非LLM高速経路エラー: ${message}`);
+        setMessages((prev) => prev.map((msg) => msg.id === fastAssistantId ? {
+          ...msg,
+          content: `非LLM処理でエラーが発生しました。\n\n${message}`,
+          isStreaming: false,
+        } : msg));
+      } finally {
+        setIsGenerating(false);
+        setIsLoading(false);
+      }
+      return;
+    }
+
     // 作業指示書 フェーズ1: 非LLM指示語解決純粋関数 (シャドー実行)
     // この段階ではまだLLM呼び出しの内容を変更せず、解決結果をログに記録する (元設計書4.2節)
     const shadowAnaphoraResult = resolveAnaphora(text, conversationState);
