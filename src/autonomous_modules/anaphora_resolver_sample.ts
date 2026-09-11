@@ -1,62 +1,132 @@
 /**
- * MIKI-AI 自律生成モジュール (人類の知恵・先行OSSパターン採用): 指示語解決純粋関数の実装
+ * MIKI-AI 自律モジュール: 指示語解決純粋関数の実装
  * 対象ファイル: src/autonomous_modules/anaphora_resolver_sample.ts
- * 生成時刻: 2026-09-11T03:51:43.811Z
- * 
- * 💡 本モジュールは、ネット大海（GitHub/NPM/技術ドキュメント）より人類が先行して
- * 開発した設計パターンおよび実装コードを自律発掘し、型安全な本番モジュールとして適合・配備されたものです。
+ *
+ * 【主要要件】
+ * 1. 入力プロンプトおよびコンテキストプールからの決定論的照応解決
+ * 2. 指示語パターン（「これ」「それ」「あれ」「さっきの」「前のやつ」「どっち」「どちら」）
+ * 3. 曖昧検知（ambiguous）と安全委譲（unresolved）の厳格判定
  */
 
-// NPM Package: @ablogcms/pdf
-// Description: PDF to image rendering engine and admin PDF preview controller for a-blog cms
-export interface _ablogcms_pdfConfig {
-  enabled?: boolean;
+export interface PureAnaphoraResolutionResult {
+  detectedExpression: string | null;
+  resolved: string | null;
+  candidates: string[];
+  confidence: 'unique' | 'ambiguous' | 'unresolved';
+  reasoning: string;
 }
 
-export class _ablogcms_pdfService {
-  constructor(private config: _ablogcms_pdfConfig = {}) {}
-  public async execute(payload: unknown): Promise<{ success: boolean; data: any }> {
-    return { success: true, data: payload };
-  }
-}
-
-// ── 要求仕様『指示語解決純粋関数の実装』統合アダプター ──
-export interface ModuleOptions {
-  enabled?: boolean;
-  debugMode?: boolean;
-}
-
-export class Module {
-  private initialized = false;
-  private metadata = {
-    createdAt: Date.now(),
-    targetTask: "指示語解決純粋関数の実装",
-  };
-
-  constructor(private options: ModuleOptions = { enabled: true }) {
-    this.initialized = true;
+/**
+ * 副作用のない純粋関数による指示語・文脈照応解決
+ */
+export function resolveAnaphoraPure(
+  prompt: string,
+  candidatePool: string[]
+): PureAnaphoraResolutionResult {
+  if (!prompt || typeof prompt !== 'string') {
+    return {
+      detectedExpression: null,
+      resolved: null,
+      candidates: [],
+      confidence: 'unresolved',
+      reasoning: '入力プロンプトが空です',
+    };
   }
 
-  public async execute(payload?: unknown): Promise<{ success: boolean; data: unknown; timestamp: number }> {
-    try {
-      // 人類の知恵に基づく高速処理
+  const p = prompt.trim();
+  const anaphoraRegex = /(さっきの|前の方|前のやつ|前の|あれ|それ|これ|どっち|どちら)/;
+  const match = p.match(anaphoraRegex);
+  if (!match) {
+    return {
+      detectedExpression: null,
+      resolved: null,
+      candidates: [],
+      confidence: 'unresolved',
+      reasoning: '指示語・照応表現は検出されませんでした',
+    };
+  }
+
+  const expr = match[1];
+  const cleanPool = (candidatePool || []).filter((c) => typeof c === 'string' && c.trim().length > 0);
+
+  // 1. 比較・二者択一表現 (「どっち」「どちら」)
+  if (expr === 'どっち' || expr === 'どちら') {
+    const vsMatch = p.match(/(.+?)(?:と|vs|または|か)(.+?)(?:どっち|どちら)/i);
+    if (vsMatch) {
+      const c1 = vsMatch[1].trim().replace(/^[、\s]+|[、\s]+$/g, '');
+      const c2 = vsMatch[2].trim().replace(/^[、\s]+|[、\s]+$/g, '');
+      const directCandidates = [c1, c2].filter((c) => c.length > 0 && c.length < 50);
+      if (directCandidates.length >= 2) {
+        return {
+          detectedExpression: expr,
+          resolved: null,
+          candidates: directCandidates,
+          confidence: 'ambiguous',
+          reasoning: `明示的比較選択肢 [${directCandidates.join(', ')}] を抽出 (曖昧・ユーザー確認推奨)`,
+        };
+      }
+    }
+
+    if (cleanPool.length >= 2) {
       return {
-        success: true,
-        data: payload !== undefined ? payload : { status: 'ok', task: this.metadata.targetTask },
-        timestamp: Date.now(),
+        detectedExpression: expr,
+        resolved: null,
+        candidates: cleanPool.slice(-2),
+        confidence: 'ambiguous',
+        reasoning: `文脈プールから最新2候補 [${cleanPool.slice(-2).join(', ')}] を照応`,
       };
-    } catch (error) {
+    }
+    if (cleanPool.length === 1) {
       return {
-        success: false,
-        data: error instanceof Error ? error.message : String(error),
-        timestamp: Date.now(),
+        detectedExpression: expr,
+        resolved: cleanPool[0],
+        candidates: cleanPool,
+        confidence: 'unique',
+        reasoning: `単一候補『${cleanPool[0]}』に一意決定`,
       };
     }
   }
 
-  public getStatus(): { initialized: boolean; task: string } {
-    return { initialized: this.initialized, task: this.metadata.targetTask };
+  // 2. 「前のやつ」「前の」: 1つ前の話題
+  if (expr === '前のやつ' || expr === '前の' || expr === '前の方') {
+    if (cleanPool.length >= 2) {
+      const target = cleanPool[cleanPool.length - 2];
+      return {
+        detectedExpression: expr,
+        resolved: target,
+        candidates: [target],
+        confidence: 'unique',
+        reasoning: `直前2番目の話題『${target}』に一意照応`,
+      };
+    }
+    if (cleanPool.length === 1) {
+      return {
+        detectedExpression: expr,
+        resolved: cleanPool[0],
+        candidates: cleanPool,
+        confidence: 'unique',
+        reasoning: `保持されている唯一の話題『${cleanPool[0]}』に照応`,
+      };
+    }
   }
-}
 
-export const module = new Module();
+  // 3. 「さっきの」「それ」「これ」「あれ」: 最新の話題
+  if (cleanPool.length > 0) {
+    const latest = cleanPool[cleanPool.length - 1];
+    return {
+      detectedExpression: expr,
+      resolved: latest,
+      candidates: [latest],
+      confidence: 'unique',
+      reasoning: `最新のコンテキスト『${latest}』に一意照応`,
+    };
+  }
+
+  return {
+    detectedExpression: expr,
+    resolved: null,
+    candidates: [],
+    confidence: 'unresolved',
+    reasoning: `指示語「${expr}」を検出しましたが、有効なコンテキストプールが存在しません`,
+  };
+}

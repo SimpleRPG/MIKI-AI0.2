@@ -1,5 +1,7 @@
-import { ConversationState, ConversationStage, ResponseLength } from '../types';
+import { ConversationState, ConversationStage, ResponseLength, DialogueAct, FeedbackStage } from '../types';
 import { systemLogger } from './systemLogger';
+import { anaphoraHistoryStack } from '../autonomous_modules/anaphora_history_stack';
+import { resolveAnaphoraPure } from '../autonomous_modules/anaphora_resolver_sample';
 
 /**
  * 作業指示書 v6 優先度9: 会話状態JSON指示 (超軽量版)
@@ -123,6 +125,130 @@ export function inferConversationStage(
 
   // 8. デフォルト: 質問
   return 'QUESTION';
+}
+
+/**
+ * 設計思想 4.2 対話行為の分類 (Dialogue Acts) 12区分判定エンジン
+ */
+export function classifyDialogueAct(userPrompt: string): DialogueAct {
+  if (!userPrompt || !userPrompt.trim()) return 'QUESTION';
+  const text = userPrompt.trim();
+
+  // 1. 雑談・挨拶・相槌
+  if (isCasualGreetingOrShortSocial(text)) {
+    return 'CASUAL_CHAT';
+  }
+
+  // 2. 訂正・指摘
+  if (/違う|そうじゃない|ではなくて|じゃなくて|修正して|訂正|直して|バグ|間違い/i.test(text)) {
+    return 'CORRECTION';
+  }
+
+  // 3. 成果物・コード生成依頼
+  if (/コード|マクロ|vba|スクリプト|プログラム|書いて|作って|実装して|生成して|出して/i.test(text)) {
+    return 'REQUEST_ARTIFACT';
+  }
+
+  // 4. 推薦・比較の依頼
+  if (/どっち|どちら|おすすめ|比較|違いは|選ぶなら|ベストは/i.test(text)) {
+    return 'REQUEST_RECOMMENDATION';
+  }
+
+  // 5. 原理・理由の説明依頼
+  if (/なぜ|どうして|仕組み|原理|どういうこと|詳しく教えて|解説して/i.test(text)) {
+    return 'REQUEST_EXPLANATION';
+  }
+
+  // 6. 拒絶・否定
+  if (/やめて|不要|いらない|結構です|やらない|使わない/i.test(text)) {
+    return 'REJECTION';
+  }
+
+  // 7. 確認・念押し
+  if (/本当|合ってる|大丈夫|確実|確認して|いいの|ですか/i.test(text) && /？|\?/.test(text)) {
+    return 'CONFIRMATION';
+  }
+
+  // 8. 話題転換
+  if (/別の話|ところで|話変わる|話題変え|関係ないけど|次の質問/i.test(text)) {
+    return 'TOPIC_SHIFT';
+  }
+
+  // 9. 継続・追質問
+  if (/あと|それと|さらに|追加で|もう1点|続き/i.test(text)) {
+    return 'CONTINUATION';
+  }
+
+  // 10. フィードバック・評価
+  if (/長い|短すぎる|固い|わかりやすい|助かった|変|不自然|良い|ダメ/i.test(text)) {
+    return 'FEEDBACK';
+  }
+
+  // 11. 一般作業依頼
+  if (/して|やって|お願い|実行/i.test(text)) {
+    return 'REQUEST';
+  }
+
+  return 'QUESTION';
+}
+
+/**
+ * 設計思想 4.4 フィードバックの段階的状態管理
+ * 単語単体で直ちに全体設定を変更せず、文脈・意図の強さに応じて段階化する
+ * MENTIONED → POSSIBLE_FEEDBACK → DIRECT_FEEDBACK → ADJUSTMENT_REQUEST → CONFIRMED_PREFERENCE
+ */
+export function evaluateFeedbackStage(
+  userPrompt: string,
+  currentPreference?: string
+): { stage: FeedbackStage; targetAttribute?: string; reason: string } {
+  const text = userPrompt.trim();
+
+  // 明示的な恒久確定要求
+  if (/いつも|今後は常に|デフォルトで|恒久的に|これからは全部/i.test(text) && /短く|長く|丁寧に|簡潔に|結論から/i.test(text)) {
+    return {
+      stage: 'CONFIRMED_PREFERENCE',
+      targetAttribute: /短く|簡潔/i.test(text) ? 'VERBOSITY_CONCISE' : 'VERBOSITY_DETAILED',
+      reason: 'ユーザーによる恒久的設定の明示指定',
+    };
+  }
+
+  // 今回・当面の変更要求
+  if (/もっと短く|もっと簡潔に|長すぎるから端折って|結論だけ言って|丁寧に言って/i.test(text)) {
+    return {
+      stage: 'ADJUSTMENT_REQUEST',
+      targetAttribute: /短く|簡潔|端折って/i.test(text) ? 'VERBOSITY_CONCISE' : 'POLITENESS_HIGH',
+      reason: '直接的な回答スタイル変更要求',
+    };
+  }
+
+  // 直前回答への直接的評価
+  if (/回答が長い|今の説明固い|ちょっとわかりにくい|助かったよ/i.test(text)) {
+    return {
+      stage: 'DIRECT_FEEDBACK',
+      reason: '直前回答に対する客観的評価の提示',
+    };
+  }
+
+  // 文脈から評価の可能性がある発言
+  if (/長文|固い言葉|変な感じ/i.test(text)) {
+    return {
+      stage: 'POSSIBLE_FEEDBACK',
+      reason: '評価キーワードを含むが変更指示は伴わない',
+    };
+  }
+
+  // 単に単語が含まれているだけ
+  if (/「長い」|長い歴史|固い岩/i.test(text)) {
+    return {
+      stage: 'MENTIONED',
+      reason: '評価語が別文脈・引用として言及されただけ',
+    };
+  }
+
+  return {
+    stage: 'MENTIONED',
+    reason: '該当なし',
+  };
 }
 
 export interface ExtractConversationStateOptions {
@@ -415,6 +541,26 @@ export function resolveAnaphora(
       seen.add(item);
       pool.unshift(item);
     }
+  }
+
+  // 自律モジュール anaphoraHistoryStack への同期
+  try {
+    for (const item of pool) {
+      anaphoraHistoryStack.push(item, 'ENTITY', 1);
+    }
+  } catch (e) {
+    console.warn('Failed to sync with anaphoraHistoryStack:', e);
+  }
+
+  // 自律モジュール resolveAnaphoraPure を用いた純粋関数解決
+  const pureResult = resolveAnaphoraPure(p, pool);
+  if (pureResult.detectedExpression && pureResult.confidence !== 'unresolved') {
+    return {
+      detectedExpression: pureResult.detectedExpression,
+      resolved: pureResult.resolved,
+      candidates: pureResult.candidates,
+      confidence: pureResult.confidence,
+    };
   }
 
   // 1. 比較・選択肢の表現 (「どっち」「どちら」)

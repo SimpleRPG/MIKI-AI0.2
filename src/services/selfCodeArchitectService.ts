@@ -38,6 +38,8 @@ import { mikiSelfCodingSuperchargerService } from './mikiSelfCodingSuperchargerS
 import { counterfactualReasoningService } from './counterfactualReasoningService';
 import { latentIntentMiningService } from './latentIntentMiningService';
 import { metacognitiveCalibrationService } from './metacognitiveCalibrationService';
+import { affectionDynamicsService } from './affectionDynamicsService';
+import { chapter31Service } from '../autonomous_modules/chapter_31_collocation_ast_refactor';
 import { apiUrl, getCustomApiHeaders } from './api';
 
 
@@ -696,8 +698,16 @@ export class SelfCodeArchitectService {
       const resolvedProposal = proposal ?? this.proposals.find((p) => p.targetChapterNumber === chapterNumber);
 
       if (chapterNumber === 31) {
-        // 第31章: 会話・コード理解を伸ばす新機能パッケージ
-        systemLogger.info('SELF_IMPROVEMENT', '[第31章 実体改善] ライブリペア・会話タスクボード・思考理由説明器の連携パラメータを最適化しました');
+        // 第31章: 会話・コード理解を伸ばす新機能パッケージ (日本語コロケーション・AST安全リファクタリング)
+        const sampleText = resolvedProposal?.title || '画面更新を停止してエラーが発生しました';
+        const collocations = chapter31Service.evaluateCollocation(sampleText);
+        const sampleCode = resolvedProposal?.codeSnippet || resolvedProposal?.description || 'For i = 1 To 100: Cells(i, 1).Value = arr(i): Next i';
+        const refactorProposals = chapter31Service.proposeSafeAstRefactoring(sampleCode);
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `[第31章 実体改善] コロケーション共起検出(${collocations.length}件) & AST安全リファクタリング提案(${refactorProposals.length}件)を実走連携しました`,
+          { collocations, refactorProposals }
+        );
       } else if (chapterNumber === 33) {
         // 第33章: 自律会話研究・能力境界
         const boundaryTopic = resolvedProposal?.title ? `境界学習: ${resolvedProposal.title}` : (resolvedProposal?.description || `第${chapterNumber}章 能力境界学習`);
@@ -751,6 +761,14 @@ export class SelfCodeArchitectService {
           { domain: 'typescript', hasTestRun: true }
         );
         systemLogger.info('SELF_IMPROVEMENT', `[第38章 実体改善] メタ認知モニタリング・自己確信度較正を実走同期しました: 較正後確信度=${calib.calibratedConfidence}% (${calib.calibrationAction})`);
+      } else if (chapterNumber === 39) {
+        // 第39章: 感情共感力動・親愛度連続トランスファー
+        const sampleUtterance = resolvedProposal?.contract?.objective || resolvedProposal?.title || 'いつも助けてくれてありがとう！';
+        const affectionRes = affectionDynamicsService.evaluateAndTransfer(sampleUtterance);
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `[第39章 実体改善] 感情共感力動・親愛度連続トランスファー実走同期: 感情=${affectionRes.detectedEmotion} / 親愛度=${affectionRes.newAffectionScore}点 (${affectionRes.recommendedTone})`
+        );
       } else if (chapterNumber === 57) {
         // 第57章: デジタル研究ノート (優先度1: 失敗・退行も誠実に記録)
         const simulated = resolvedProposal?.simulatedDelta;

@@ -1,62 +1,89 @@
 /**
- * MIKI-AI 自律生成モジュール (人類の知恵・先行OSSパターン採用): 指示語・文脈照応の履歴スタック管理クラスの実装
+ * MIKI-AI 自律モジュール: 指示語・文脈照応の履歴スタック管理クラスの実装
  * 対象ファイル: src/autonomous_modules/anaphora_history_stack.ts
- * 生成時刻: 2026-09-11T06:26:23.973Z
- * 
- * 💡 本モジュールは、ネット大海（GitHub/NPM/技術ドキュメント）より人類が先行して
- * 開発した設計パターンおよび実装コードを自律発掘し、型安全な本番モジュールとして適合・配備されたものです。
+ *
+ * 【主要要件】
+ * 1. 直近エンティティ・話題の時系列スタック管理 (LIFO/FIFO併用)
+ * 2. 時間減衰 (Turn Decay) による古い話題の自動退行防止
+ * 3. 曖昧候補・複数エンティティの重複排除と優先度ソート
  */
 
-// NPM Package: remark-cjk-friendly-gfm-strikethrough
-// Description: remark plugin to make Markdown strikethrough (`~~`) in GFM more friendly with Chinese, Japanese, and Korean (CJK)
-export interface remark_cjk_friendly_gfm_strikethroughConfig {
-  enabled?: boolean;
+export interface AnaphoraStackItem {
+  id: string;
+  topicOrEntity: string;
+  category: 'TOPIC' | 'ENTITY' | 'FACT';
+  turn: number;
+  timestamp: number;
 }
 
-export class remark_cjk_friendly_gfm_strikethroughService {
-  constructor(private config: remark_cjk_friendly_gfm_strikethroughConfig = {}) {}
-  public async execute(payload: unknown): Promise<{ success: boolean; data: any }> {
-    return { success: true, data: payload };
-  }
-}
+export class AnaphoraHistoryStack {
+  private stack: AnaphoraStackItem[] = [];
+  private maxItems: number;
+  private decayTurnLimit: number;
 
-// ── 要求仕様『指示語・文脈照応の履歴スタック管理クラスの実装』統合アダプター ──
-export interface ModuleOptions {
-  enabled?: boolean;
-  debugMode?: boolean;
-}
-
-export class Module {
-  private initialized = false;
-  private metadata = {
-    createdAt: Date.now(),
-    targetTask: "指示語・文脈照応の履歴スタック管理クラスの実装",
-  };
-
-  constructor(private options: ModuleOptions = { enabled: true }) {
-    this.initialized = true;
+  constructor(maxItems = 15, decayTurnLimit = 8) {
+    this.maxItems = maxItems;
+    this.decayTurnLimit = decayTurnLimit;
   }
 
-  public async execute(payload?: unknown): Promise<{ success: boolean; data: unknown; timestamp: number }> {
-    try {
-      // 人類の知恵に基づく高速処理
-      return {
-        success: true,
-        data: payload !== undefined ? payload : { status: 'ok', task: this.metadata.targetTask },
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      return {
-        success: false,
-        data: error instanceof Error ? error.message : String(error),
-        timestamp: Date.now(),
-      };
+  /**
+   * エンティティまたはトピックをスタックに追加
+   */
+  public push(topicOrEntity: string, category: 'TOPIC' | 'ENTITY' | 'FACT' = 'ENTITY', currentTurn = 1): void {
+    if (!topicOrEntity || !topicOrEntity.trim()) return;
+    const text = topicOrEntity.trim();
+
+    // 既存の同一項目を削除して最新位置へ移動
+    this.stack = this.stack.filter((item) => item.topicOrEntity !== text);
+
+    this.stack.push({
+      id: `anaphora_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      topicOrEntity: text,
+      category,
+      turn: currentTurn,
+      timestamp: Date.now(),
+    });
+
+    if (this.stack.length > this.maxItems) {
+      this.stack.shift();
     }
   }
 
-  public getStatus(): { initialized: boolean; task: string } {
-    return { initialized: this.initialized, task: this.metadata.targetTask };
+  /**
+   * 現在ターンに基づいて時間減衰した候補プールを取得 (最新順)
+   */
+  public getActivePool(currentTurn = 1): string[] {
+    const validItems = this.stack.filter((item) => {
+      const turnDiff = Math.abs(currentTurn - item.turn);
+      return turnDiff <= this.decayTurnLimit;
+    });
+
+    // 最新のものを末尾に保ちつつ返す
+    return validItems.map((item) => item.topicOrEntity);
+  }
+
+  /**
+   * 直近のN件の候補を取得
+   */
+  public getRecent(n = 3): string[] {
+    return this.stack.slice(-n).map((i) => i.topicOrEntity);
+  }
+
+  /**
+   * スタックをクリア
+   */
+  public clear(): void {
+    this.stack = [];
+  }
+
+  public getDiagnostics() {
+    return {
+      size: this.stack.length,
+      maxItems: this.maxItems,
+      decayTurnLimit: this.decayTurnLimit,
+      latestItem: this.stack.length > 0 ? this.stack[this.stack.length - 1] : null,
+    };
   }
 }
 
-export const module = new Module();
+export const anaphoraHistoryStack = new AnaphoraHistoryStack();

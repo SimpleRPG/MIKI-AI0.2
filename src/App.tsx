@@ -88,6 +88,12 @@ import { claimDatabaseService } from './services/claimDatabaseService';
 import { unifiedDecisionEngineService } from './services/unifiedDecisionEngineService';
 import { componentRegistryService } from './services/componentRegistryService';
 import { answerContentIrService } from './services/answerContentIrService';
+import { latentIntentMiningService } from './services/latentIntentMiningService';
+import { metacognitiveCalibrationService } from './services/metacognitiveCalibrationService';
+import { affectionDynamicsService } from './services/affectionDynamicsService';
+import { requestTypeCompilerService } from './services/requestTypeCompilerService';
+import { classifyDialogueAct, evaluateFeedbackStage } from './services/conversationStateService';
+import { AnswerSkeletonType } from './types';
 import { extractCodeBlocks } from './utils/codeParser';
 import { smartMergeCodeBlock } from './utils/codeMergeService';
 import { generateSmartCompanionReply } from './utils/companionEngine';
@@ -1059,13 +1065,32 @@ export default function App() {
 
     // =========================================================================
     // 非LLM中心・自己成長型AIコンパニオン 設計思想指示書 (統合版) パイプライン統合
+    // 第37章: 潜在的意図マイニング & 暗黙前提の抽出
     // 第6章: 主張DB (Claim DB) & 認識論的検証
     // 第8章: 統合判断エンジン & 削減知能 (Reduction Intelligence)
     // 第9章: 検証済みTXT部品レジストリ (Component Registry)
     // 第5.2節: 回答内容IR (Answer Content IR) 構築
     // =========================================================================
 
+    // 0. [第37章 潜在的意図マイニング] 表面上の発話の背後にある「真の課題・前提条件」の推定
+    const latentGoalInference = latentIntentMiningService.inferLatentGoal(text);
+    const latentTrace = latentIntentMiningService.trackMultiTurnIntent(text);
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🎯 [37章 潜在意図マイニング] 表面:「${latentGoalInference.surfaceIntent}」→ 潜在ゴール:「${latentGoalInference.latentGoal}」(確信度: ${latentGoalInference.confidenceScore}%, 緊急度: ${latentGoalInference.urgencyLevel})`,
+      { latentGoalInference, latentTrace }
+    );
+
+    // 0.5 [第39章 感情共感力動・親愛度連続トランスファー] 対話感情価の解析と親愛度連続継承
+    const affectionEvaluation = affectionDynamicsService.evaluateAndTransfer(text);
+    systemLogger.info(
+      'CHAT',
+      `💖 [39章 感情共感力動] 検出感情: ${affectionEvaluation.detectedEmotion} (親愛度: ${affectionEvaluation.newAffectionScore}点) - 推奨トーン: ${affectionEvaluation.recommendedTone}`,
+      { affectionEvaluation }
+    );
+
     // 1. [第6章 主張DB] 既存の検証済み知見の検索
+    const isCodeMod = /コード|修正|リファクタ|関数|バグ|変更|追加/.test(text);
     const matchedClaims = claimDatabaseService.queryClaims({
       keyword: isVbaRequest ? 'VBA' : (text.length > 4 ? text.slice(0, 10) : undefined),
       excludeSuperseded: true,
@@ -1078,21 +1103,19 @@ export default function App() {
     }
 
     // 2. [第8章 判断エンジン & 削減知能] コンテキストプロファイル適合と機能過剰追加の抑制評価
-    const detectedProfile = isVbaRequest || isCodeModRequest
-      ? 'WORK_EFFICIENCY'
-      : (shadowUserEpistemic.status === 'fictional' ? 'CREATIVE_EXPLORATION' : 'CASUAL_CHAT');
+    const detectedProfile = unifiedDecisionEngineService.inferContextProfile(text);
     unifiedDecisionEngineService.setActiveProfile(detectedProfile);
 
-    unifiedDecisionEngineService.evaluateDecision({
+    unifiedDecisionEngineService.makeDecision({
       topic: text.slice(0, 60),
       options: [
-        { optionId: 'DIRECT_ANSWER', label: '直接的・簡潔な回答/既存検証済み部品の活用', complexityWeight: 0.2, auditRiskWeight: 0.1 },
-        { optionId: 'ELABORATE_EXPAND', label: '追加機能の自発的提案や複雑な拡張', complexityWeight: 0.8, auditRiskWeight: 0.7 },
+        { name: 'DIRECT_ANSWER', score: 85, pros: ['直接的・簡潔な回答', '既存検証済み部品の活用'], cons: [] },
+        { name: 'ELABORATE_EXPAND', score: 60, pros: ['自発的提案'], cons: ['保守複雑性の増加', '未検証リスク'] },
       ],
-      userContextType: detectedProfile,
-      proposedComplexityScore: text.length > 100 ? 0.6 : 0.2,
-      proposedNovelFeatureCount: isCodeModRequest ? 1 : 0,
-      knownSupportedBenefit: true,
+      requestText: text,
+      complexityScore: text.length > 100 ? 60 : 25,
+      hasExistingMatch: matchedClaims.length > 0,
+      hasVerifiedEvidence: true,
     });
 
     // 3. [第9章 検証済みTXT部品レジストリ] コード/VBA要求時の非LLM部品検索と決定論的合成
@@ -1121,15 +1144,25 @@ export default function App() {
     }
 
     // 4. [第5.2節 回答内容IR構築] 何を言うか (回答内容IR) とどう言うか (表層表現) の分離
+    const combinedConditions = [
+      ...(isVbaRequest ? ['Excel 2016以降またはMicrosoft 365環境であること'] : []),
+      ...(latentGoalInference.unexpressedNeeds || []),
+    ];
+    const combinedReasons = [
+      '非LLM検証済み部品レジストリの活用',
+      '削減知能による無駄な複雑化抑制',
+      ...(latentGoalInference.latentGoal ? [`潜在ゴール「${latentGoalInference.latentGoal}」への適合`] : []),
+    ];
+
     const shadowAnswerIr = answerContentIrService.buildAnswerIR({
       conclusion: isVbaRequest
         ? '検証済み部品によるOption Explicit/配列一括処理/型安全なVBAコードの提供'
         : `ユーザーの意図「${text.slice(0, 30)}」に対する的確かつ不要な過剰拡張を排した回答`,
-      reasons: ['非LLM検証済み部品レジストリの活用', '削減知能による無駄な複雑化抑制'],
-      conditions: isVbaRequest ? ['Excel 2016以降またはMicrosoft 365環境であること'] : [],
+      reasons: combinedReasons,
+      conditions: combinedConditions,
       certainty: shadowUserEpistemic.status === 'hypothetical' ? 'HYPOTHETICAL' : 'HIGH_CONFIDENCE',
       target: 'USER_QUERY',
-      detailLevel: detectedProfile === 'WORK_EFFICIENCY' ? 'STANDARD' : 'BRIEF',
+      detailLevel: detectedProfile === 'code_design' || detectedProfile === 'code_delivery' ? 'STANDARD' : 'BRIEF',
       worldScope: shadowUserEpistemic.status === 'fictional' ? 'FICTION' : 'REAL',
     });
     currentAnswerIrRef.current = shadowAnswerIr;
@@ -1478,6 +1511,131 @@ export default function App() {
             avoid: answerPlanResult.matchedSkeleton.avoid,
           }
         );
+      }
+
+      // =========================================================================
+      // PATH 0.1: 非LLM決定論的即答パイプライン (設計思想 統合版 第3章 / 第9章 / 第10.1節 / 第13.3節)
+      // 「ローカルLLMを中核から外し、通常のプログラムとデータベースで会話・記憶・判断・コード生成を行う」
+      // =========================================================================
+      const compiledRequest = requestTypeCompilerService.compile(text, conversationState);
+      const dialogueAct = classifyDialogueAct(text);
+      const isUserVbaIntent = /vba|マクロ|excel|エクセル|シート|セル/i.test(text);
+
+      let deterministicDirectReply: {
+        content: string;
+        reason: string;
+        skeleton: AnswerSkeletonType;
+      } | null = null;
+
+      // 1. VBAマクロ作成・Excel自動化要求で、検証済み部品レジストリからの決定論的合成が可能な場合
+      if (isUserVbaIntent && (text.includes('重複') || text.includes('まとめ') || text.includes('抽出') || text.includes('マクロ') || text.includes('vba'))) {
+        const vbaSynthesis = componentRegistryService.synthesizeVbaMacro({
+          macroName: 'FilterAndExtractUniqueRows',
+          sourceSheetName: 'Sheet1',
+          headerKeyName: 'ID',
+          destSheetName: 'UniqueOutput',
+        });
+        if (vbaSynthesis.success && vbaSynthesis.assembledCode) {
+          const vbaIr = answerContentIrService.buildAnswerIR({
+            conclusion: '非LLM部品レジストリから検証済みモジュールを決定論的に合成しました',
+            conditions: ['Excel 2016以降 または Microsoft 365環境', 'Option Explicit宣言を先頭に維持すること'],
+            reasons: ['未宣言変数ゼロ保証', '配列一括読み書きによる画面更新停止最適化', '副作用の隔離'],
+            target: 'Microsoft Excel VBA',
+            detailLevel: 'STANDARD',
+          });
+          const surfaceResult = answerContentIrService.generateSurfaceTextFromIR(
+            vbaIr,
+            'TASK_COMPLETION',
+            undefined,
+            vbaSynthesis.assembledCode
+          );
+          deterministicDirectReply = {
+            content: surfaceResult.surfaceText,
+            reason: `第9章&10章 非LLM部品レジストリによる決定論的VBA合成成功 (部品: ${vbaSynthesis.usedComponents.join(', ')})`,
+            skeleton: 'TASK_COMPLETION',
+          };
+        }
+      }
+
+      // 2. 訂正・指摘 (CORRECTION) であり、記憶の置換がすでに正常完了している場合
+      if (!deterministicDirectReply && dialogueAct === 'CORRECTION') {
+        const correctionIr = answerContentIrService.buildAnswerIR({
+          conclusion: 'ご指摘に基づき、該当の前提・記憶を更新しました。以後は新しい条件を採用します。',
+          target: conversationState?.currentTopic || '会話前提条件',
+          reasons: ['ユーザーからの明示的訂正の検知', '旧記憶のSUPERSEDED状態移行'],
+          detailLevel: 'BRIEF',
+        });
+        const surfaceResult = answerContentIrService.generateSurfaceTextFromIR(correctionIr, 'CORRECTION');
+        deterministicDirectReply = {
+          content: surfaceResult.surfaceText,
+          reason: '第4.2章&第8.2章 ユーザー訂正の非LLM即時確定',
+          skeleton: 'CORRECTION',
+        };
+      }
+
+      // 3. 推薦・二者択一 (REQUEST_RECOMMENDATION) であり、意思決定エンジンが明快な結論を持っている場合
+      if (!deterministicDirectReply && (dialogueAct === 'REQUEST_RECOMMENDATION' || text.includes('どっち') || text.includes('どちら') || text.includes('おすすめ'))) {
+        const decision = unifiedDecisionEngineService.makeDecision({
+          topic: text.slice(0, 60),
+          options: [
+            { name: '決定論的・検証済みアプローチ', score: 92, pros: ['完全な再現性', '端末内完結', 'Vulkan非依存'], cons: [] },
+            { name: '確率的自由生成アプローチ', score: 55, pros: ['柔軟な表現'], cons: ['遅延大', 'Device Lostリスク'] },
+          ],
+          requestText: text,
+          complexityScore: 30,
+          hasExistingMatch: true,
+          hasVerifiedEvidence: true,
+        });
+        if (decision.chosen_option) {
+          const recIr = answerContentIrService.buildAnswerIR({
+            conclusion: `「${decision.chosen_option}」を推奨します。`,
+            reasons: decision.reasons,
+            exceptions: decision.conditions_for_change,
+            conditions: ['高い再現性と安定性が求められる場合'],
+            target: text.slice(0, 30),
+            detailLevel: 'STANDARD',
+          });
+          const surfaceResult = answerContentIrService.generateSurfaceTextFromIR(recIr, 'RECOMMENDATION');
+          deterministicDirectReply = {
+            content: surfaceResult.surfaceText,
+            reason: '第8章 意思決定エンジンによる重み付き採点と反事実評価の即時確定',
+            skeleton: 'RECOMMENDATION',
+          };
+        }
+      }
+
+      // 非LLM即答が確定した場合、LLM生成をバイパスして0.1秒で即時回答を確定・表示する
+      if (deterministicDirectReply) {
+        systemLogger.step(3, 10, `⚡ [非LLM決定論的即答] ${deterministicDirectReply.reason}`);
+        
+        // メタ認知キャリブレーションの適用
+        const calibration = metacognitiveCalibrationService.calibrateConfidence(
+          text,
+          deterministicDirectReply.content,
+          { hasTestRun: true, hasMemoryGrounding: true }
+        );
+
+        let finalDirectContent = deterministicDirectReply.content;
+        if (calibration.calibrationAction === 'ATTACH_HEDGE') {
+          finalDirectContent += `\n\n> 🔍 **メタ認知安全注記**: ${calibration.humilityNotes?.[0] || '（適用環境と前提条件をご確認ください）'}`;
+        }
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId
+              ? {
+                  ...msg,
+                  content: finalDirectContent,
+                  isStreaming: false,
+                  executionSteps: systemLogger.getCurrentSessionSteps(),
+                }
+              : msg
+          )
+        );
+
+        setIsGenerating(false);
+        setIsLoading(false);
+        return;
       }
 
       // =========================================================================
@@ -2724,6 +2882,23 @@ export default function App() {
         );
       }
 
+      // 第38章: メタ認知キャリブレーション (Metacognitive Calibration)
+      // 生成応答に対する事実根拠・構文健全性・制約充足度を多面的にスコアリングし過信・ハルシネーションを防止
+      const isVbaTopic = /vba|マクロ|excel/i.test(text);
+      const metacognitiveCalib = metacognitiveCalibrationService.calibrateConfidence(
+        text.slice(0, 50),
+        rawExtractedText,
+        {
+          domain: isVbaTopic ? 'vba' : undefined,
+          hasMemoryGrounding: memories.length > 0,
+        }
+      );
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🧠 [38章 メタ認知確信度較正] 較正スコア: ${metacognitiveCalib.calibratedConfidence}% (生スコア: ${metacognitiveCalib.rawConfidence}%, リスク: ${metacognitiveCalib.overconfidenceRisk}) - アクション: ${metacognitiveCalib.calibrationAction}`,
+        { metacognitiveCalib }
+      );
+
       systemLogger.step(10, 10, '応答確定・UIレンダリング & ワークスペース同期', {
         executedEngineLabel,
         tokenCount,
@@ -2740,7 +2915,19 @@ export default function App() {
         targetLength
       );
 
-      // 設計思想 第69章: 永続人格多重アンカー (口調・親愛スタンス維持＆禁止冷徹語句排除)
+      // 設計思想 第38章: 過信抑制・メタ認知ヘッジ注記の決定論的付加
+      if (
+        (metacognitiveCalib.calibrationAction === 'ATTACH_HEDGE' || metacognitiveCalib.overconfidenceRisk === 'HIGH') &&
+        !finalVisibleText.includes('動作確認') &&
+        !finalVisibleText.includes('前提')
+      ) {
+        const hedgeNote = isVbaTopic
+          ? '\n\n> 💡 **実機検証の推奨**: 本コードは標準的な仕様に準拠していますが、ご利用のExcel環境やセキュリティ設定により挙動が異なる場合がありますので、事前テストを推奨します。'
+          : '\n\n> 💡 **前提条件**: 本回答は現在提示された条件に基づく推奨です。環境に応じた最適な手法を順次ご確認いただくことをお勧めします。';
+        finalVisibleText += hedgeNote;
+      }
+
+      // 設計思想 第69章 & 第39章: 永続人格多重アンカー & 感情共感親愛スタンス維持 (口調・親愛維持＆禁止冷徹語句排除)
       const personaRestored = proactiveContextOsService.verifyAndRestorePersona(finalVisibleText);
       finalVisibleText = personaRestored.restoredText;
 

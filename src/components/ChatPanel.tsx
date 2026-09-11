@@ -1264,36 +1264,50 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     )}
 
                     {/* 外部ローカルLLM 推論遅延・TTFT・キャッシュ診断バッジ */}
-                    {msg.externalLlmDiagnostic && (
-                      <button
-                        onClick={() =>
-                          setExpandedExternalDiagMsgId(
-                            expandedExternalDiagMsgId === msg.id ? null : msg.id
-                          )
-                        }
-                        className={`text-[10px] px-2 py-0.5 rounded-lg font-mono flex items-center gap-1 transition-all border ${
-                          expandedExternalDiagMsgId === msg.id
-                            ? 'bg-indigo-900 text-indigo-100 border-indigo-400 shadow-sm'
-                            : msg.externalLlmDiagnostic.comparisonWithPrevious?.verdict === 'cache_hit'
-                            ? 'bg-emerald-950/90 hover:bg-emerald-900 text-emerald-300 border-emerald-700/80'
-                            : msg.externalLlmDiagnostic.comparisonWithPrevious?.verdict === 'no_cache'
-                            ? 'bg-rose-950/90 hover:bg-rose-900 text-rose-300 border-rose-700/80'
-                            : 'bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border-indigo-800/80'
-                        }`}
-                        title="外部LLMのStage A〜E遅延細分化、TTFT実測、KVキャッシュ判定を展開"
-                      >
-                        <Terminal className="w-3 h-3 text-indigo-400" />
-                        <span>
-                          外部LLM診断 (TTFT: {msg.externalLlmDiagnostic.observedTtftMs}ms
-                          {msg.externalLlmDiagnostic.comparisonWithPrevious?.verdict === 'cache_hit' ? ' / ⚡Hit' : ''})
-                        </span>
-                        {expandedExternalDiagMsgId === msg.id ? (
-                          <ChevronUp className="w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="w-3 h-3" />
-                        )}
-                      </button>
-                    )}
+                    {msg.externalLlmDiagnostic && (() => {
+                      const diag = msg.externalLlmDiagnostic;
+                      const verdict = diag.comparisonWithPrevious?.verdict;
+                      const hasTimings = diag.llamaTimings?.cache_n !== undefined;
+                      const isCacheHit = verdict === 'cache_hit' || (diag.llamaTimings?.cache_n ?? 0) >= 20;
+                      const isNoCache = verdict === 'no_cache';
+                      const isSimilar = verdict === 'similar';
+
+                      let badgeClass = 'bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border-indigo-800/80';
+                      if (isCacheHit) {
+                        badgeClass = 'bg-emerald-950/90 hover:bg-emerald-900 text-emerald-300 border-emerald-700/80';
+                      } else if (isNoCache) {
+                        badgeClass = 'bg-rose-950/90 hover:bg-rose-900 text-rose-300 border-rose-700/80';
+                      } else if (isSimilar) {
+                        badgeClass = 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700';
+                      }
+
+                      return (
+                        <button
+                          onClick={() =>
+                            setExpandedExternalDiagMsgId(
+                              expandedExternalDiagMsgId === msg.id ? null : msg.id
+                            )
+                          }
+                          className={`text-[10px] px-2 py-0.5 rounded-lg font-mono flex items-center gap-1 transition-all border ${
+                            expandedExternalDiagMsgId === msg.id
+                              ? 'bg-indigo-900 text-indigo-100 border-indigo-400 shadow-sm'
+                              : badgeClass
+                          }`}
+                          title="外部LLMのStage A〜E遅延細分化、実測timings(cache_n/prompt_n)、KVキャッシュ判定を展開"
+                        >
+                          <Terminal className="w-3 h-3 text-indigo-400" />
+                          <span>
+                            外部LLM (TTFT: {diag.observedTtftMs}ms
+                            {hasTimings ? ` / 評価:${diag.llamaTimings?.prompt_n ?? 0} / ⚡流用:${diag.llamaTimings?.cache_n ?? 0}` : isCacheHit ? ' / ⚡Hit' : isSimilar ? ' / ⚖️同等' : ''})
+                          </span>
+                          {expandedExternalDiagMsgId === msg.id ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          )}
+                        </button>
+                      );
+                    })()}
 
                     {/* Used Memories (RAG) Badge */}
                     {msg.usedMemories && msg.usedMemories.length > 0 && (

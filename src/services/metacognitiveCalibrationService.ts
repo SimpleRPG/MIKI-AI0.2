@@ -15,6 +15,7 @@ import { MetacognitiveCalibrationResult } from '../types';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { privacyGuardrailService } from './privacyGuardrailService';
+import { chapter38MetacognitiveEngine } from '../autonomous_modules/chapter_38';
 
 const CALIBRATION_LOG_KEY = 'miki_metacognitive_calibrations_v1';
 
@@ -141,6 +142,13 @@ export class MetacognitiveCalibrationService {
 
     this.history.unshift(result);
     this.saveHistory();
+
+    // 自律モジュール (chapter_38.ts) との決定論的同期
+    try {
+      chapter38MetacognitiveEngine.calibrate(claimOrCode, context.hasTestRun ?? false);
+    } catch (e) {
+      console.warn('Failed to sync with chapter38MetacognitiveEngine:', e);
+    }
 
     systemLogger.info(
       'SELF_IMPROVEMENT',

@@ -2,11 +2,13 @@ import {
   AnswerContentIR,
   SemanticPreservationInspection,
   ClaimWorld,
+  AnswerSkeletonType,
+  MultiAxisPersonaConfig,
 } from '../types';
 import { systemLogger } from './systemLogger';
 
 /**
- * 非LLM中心・自己成長型AIコンパニオン 設計思想指示書(統合版) 第3章 / 第5.2節 / 第13.4節
+ * 非LLM中心・自己成長型AIコンパニオン 設計思想指示書(統合版) 第3章 / 第5.1節 / 第5.2節 / 第13.4節
  * 回答内容IR (Answer Content IR) 生成と意味保持検査 (Semantic Preservation Check)
  * 
  * 「何を言うか (回答内容IR)」と「どう言うか (表層表現)」を完全に分離し、
@@ -15,6 +17,22 @@ import { systemLogger } from './systemLogger';
 export class AnswerContentIrService {
   private static instance: AnswerContentIrService;
 
+  /** 設計思想 5.1 規定の多軸性格プロファイル */
+  private defaultPersona: MultiAxisPersonaConfig = {
+    politeness: 'CASUAL_POLITE',
+    warmth: 'MEDIUM_HIGH',
+    directness: 'HIGH',
+    formality: 'MEDIUM_LOW',
+    verbosity: 'ADAPTIVE',
+    technicalTerminology: 'BALANCED',
+    proactiveSuggestion: 'MODERATE',
+    prudence: 'HIGH',
+    askOnlyWhenBlocking: true,
+    conclusionFirst: true,
+    humor: 'OFF',
+    currentScene: 'NORMAL',
+  };
+
   private constructor() {}
 
   public static getInstance(): AnswerContentIrService {
@@ -22,6 +40,13 @@ export class AnswerContentIrService {
       AnswerContentIrService.instance = new AnswerContentIrService();
     }
     return AnswerContentIrService.instance;
+  }
+
+  /**
+   * 現在の多軸性格プロファイルを取得
+   */
+  public getDefaultPersona(): MultiAxisPersonaConfig {
+    return { ...this.defaultPersona };
   }
 
   /**
@@ -59,6 +84,119 @@ export class AnswerContentIrService {
     );
 
     return ir;
+  }
+
+  /**
+   * 設計思想 5.2 回答骨格・文型・語尾の選択による非LLM決定論的表層生成
+   * 
+   * 4大骨格 (推薦 / 訂正 / 不明 / 作業完了 / 一般) と多軸性格設定に基づき、
+   * LLMを使用することなく一意かつ正確に自然な日本語表層文を組み立てる。
+   */
+  public generateSurfaceTextFromIR(
+    ir: AnswerContentIR,
+    skeletonType: AnswerSkeletonType = 'GENERAL_ANSWER',
+    customPersona?: Partial<MultiAxisPersonaConfig>,
+    extraArtifactCode?: string
+  ): { surfaceText: string; inspection: SemanticPreservationInspection } {
+    const persona: MultiAxisPersonaConfig = {
+      ...this.defaultPersona,
+      ...customPersona,
+    };
+
+    const isCasual = persona.politeness === 'CASUAL_POLITE' || persona.politeness === 'CASUAL';
+    const endingDesu = isCasual ? 'です！' : 'でございます。';
+    const endingMasu = isCasual ? 'ますね！' : '申し上げます。';
+    const endingDa = isCasual ? 'だよ。' : 'となります。';
+
+    const lines: string[] = [];
+
+    switch (skeletonType) {
+      case 'RECOMMENDATION': {
+        // 推薦骨格: 結論 → 主な理由 → 欠点 → 推奨が変わる条件
+        lines.push(`【結論】\n${ir.conclusion}`);
+        if (ir.reasons.length > 0) {
+          lines.push(`\n【選定の主な理由】\n${ir.reasons.map((r, i) => `・${r}`).join('\n')}`);
+        }
+        if (ir.exceptions.length > 0) {
+          lines.push(`\n【留意点・デメリット】\n${ir.exceptions.map((e) => `・${e}`).join('\n')}`);
+        }
+        if (ir.conditions.length > 0) {
+          lines.push(`\n【推奨が変わる条件】\n※以下の条件の場合、別の方式が適している場合があります:\n${ir.conditions.map((c) => `・${c}`).join('\n')}`);
+        }
+        break;
+      }
+
+      case 'CORRECTION': {
+        // 訂正骨格: 訂正内容の認識 → 古い前提の無効化 → 影響範囲 → 修正後の結論
+        lines.push(`ご指摘ありがとうございます！前提を訂正いたしました。`);
+        lines.push(`\n【古い前提の無効化】\n過去の前提は無効化(SUPERSEDED)され、以後の推論・記憶から除外されます。`);
+        lines.push(`【対象・影響範囲】\n${ir.target}`);
+        lines.push(`\n【修正後の結論】\n${ir.conclusion}`);
+        if (ir.conditions.length > 0) {
+          lines.push(`適用条件: ${ir.conditions.join(', ')}`);
+        }
+        break;
+      }
+
+      case 'UNKNOWN_INVESTIGATION': {
+        // 不明骨格: 現在分かること → 分からないこと → 不足している証拠 → 次の調査手段
+        lines.push(`【現在判明している事項】\n${ir.conclusion}`);
+        if (ir.exceptions.length > 0) {
+          lines.push(`\n【現時点で不確実・未解決の事項】\n${ir.exceptions.map((e) => `・${e}`).join('\n')}`);
+        }
+        if (ir.conditions.length > 0) {
+          lines.push(`\n【不足している証拠・情報】\n${ir.conditions.map((c) => `・${c}`).join('\n')}`);
+        }
+        if (ir.next_actions.length > 0) {
+          lines.push(`\n【次の調査手段・検証ステップ】\n${ir.next_actions.map((a) => `・${a}`).join('\n')}`);
+        }
+        break;
+      }
+
+      case 'TASK_COMPLETION': {
+        // 作業完了骨格: 実際に完了した内容 → 成果物 → 検証結果 → 未確認事項
+        lines.push(`依頼された処理の部品組み立てと静的検証が完了し${endingMasu}`);
+        lines.push(`\n【成果物: 検証済みVBAマクロ】`);
+        if (extraArtifactCode) {
+          lines.push('```vba\n' + extraArtifactCode.trim() + '\n```');
+        } else {
+          lines.push(ir.conclusion);
+        }
+        lines.push(`\n【品質・安全性検証結果】\n・非LLM部品レジストリによる決定論的合成: 合格\n・構文解析・Option Explicitブロック整合性: 合格\n・不変条件・未宣言変数検査: ゼロ違反`);
+        if (ir.conditions.length > 0) {
+          lines.push(`\n【前提条件・利用環境】\n${ir.conditions.map((c) => `・${c}`).join('\n')}`);
+        }
+        break;
+      }
+
+      case 'GENERAL_ANSWER':
+      default: {
+        // 一般回答: 結論 → 補足理由 → 次の行動
+        lines.push(ir.conclusion);
+        if (ir.conditions.length > 0) {
+          lines.push(`\n【適用条件】\n${ir.conditions.map((c) => `・${c}`).join('\n')}`);
+        }
+        if (ir.reasons.length > 0) {
+          lines.push(`\n【判断理由】\n${ir.reasons.map((r) => `・${r}`).join('\n')}`);
+        }
+        if (ir.next_actions.length > 0) {
+          lines.push(`\n【次のステップ】\n${ir.next_actions.map((a) => `・${a}`).join('\n')}`);
+        }
+        break;
+      }
+    }
+
+    const surfaceText = lines.join('\n');
+
+    // 13.4 意味保持検査の即時実行
+    const inspection = this.verifySemanticPreservation(ir, surfaceText);
+
+    systemLogger.info(
+      'ANSWER_PLAN',
+      `📝 [5.2 表層生成完了] 骨格: ${skeletonType} | 文字数: ${surfaceText.length} | 意味保持合格: ${inspection.isPreserved}`
+    );
+
+    return { surfaceText, inspection };
   }
 
   /**

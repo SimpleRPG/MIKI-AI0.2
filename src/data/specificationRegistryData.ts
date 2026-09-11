@@ -757,7 +757,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
     "id": "chap_39",
     "title": "感情共感力動・親愛度連続トランスファー",
     "category": "DEEP_COGNITION",
-    "status": "UNIMPLEMENTED",
+    "status": "COMPLETED",
     "versionAdded": "v5.0",
     "summary": "対話を通じた感情価の連続的蓄積と親愛トーンの自然なグラデーション制御。",
     "keyRequirements": [
@@ -765,9 +765,12 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "親愛スタンス維持"
     ],
     "responsibleServices": [
+      "affectionDynamicsService.ts",
+      "chapter_39.ts",
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
+      "NonLlmArchitectureTab.tsx",
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [

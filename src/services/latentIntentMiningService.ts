@@ -19,6 +19,7 @@ import {
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { privacyGuardrailService } from './privacyGuardrailService';
+import { chapter37IntentMiningEngine } from '../autonomous_modules/chapter_37';
 
 const INTENT_SESSIONS_STORAGE_KEY = 'miki_latent_intent_sessions_v1';
 
@@ -173,6 +174,14 @@ export class LatentIntentMiningService {
     }
 
     this.saveSessions();
+
+    // 自律モジュール (chapter_37.ts) との決定論的同期
+    try {
+      chapter37IntentMiningEngine.trackTurn(utterance);
+    } catch (e) {
+      console.warn('Failed to sync with chapter37IntentMiningEngine:', e);
+    }
+
     systemLogger.info('SELF_IMPROVEMENT', `[第37章 意図推定] Turn #${turnIndex}: 表面「${inference.surfaceIntent}」 / 潜在「${inference.latentGoal}」 (シフト: ${intentShiftDetected ? '検知' : 'なし'})`);
 
     return trace;

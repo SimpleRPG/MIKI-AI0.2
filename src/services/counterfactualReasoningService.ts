@@ -19,6 +19,7 @@ import {
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { privacyGuardrailService } from './privacyGuardrailService';
+import { chapter36CounterfactualEngine } from '../autonomous_modules/chapter_36';
 
 const SIMULATION_HISTORY_KEY = 'miki_counterfactual_simulations_v1';
 
@@ -188,6 +189,23 @@ export class CounterfactualReasoningService {
 
     this.simulations.unshift(simulationRecord);
     this.saveHistory();
+
+    // 自律モジュール (chapter_36.ts) との決定論的同期
+    try {
+      chapter36CounterfactualEngine.runSimulation(
+        topic,
+        factualDecision,
+        scenarios.map((s) => ({
+          id: s.id,
+          name: s.name,
+          condition: s.condition,
+          alternativeChoice: s.alternativeChoice,
+          hypothesis: s.hypothesis,
+        }))
+      );
+    } catch (e) {
+      console.warn('Failed to sync with chapter36CounterfactualEngine:', e);
+    }
 
     systemLogger.info('SELF_IMPROVEMENT', `[第36章 反実仮想推論] 『${topic}』の分岐推論シミュレーション完了 (結論: ${conclusion.slice(0, 60)}...)`);
 

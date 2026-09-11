@@ -757,6 +757,18 @@ export interface ChatMessage {
   externalLlmDiagnostic?: ExternalLlmRunDiagnostic;
 }
 
+export interface LlamaCppTimings {
+  cache_n?: number; // トークンキャッシュヒット数
+  prompt_n?: number; // 新規評価が必要だったプロンプトトークン数
+  predicted_n?: number; // 生成トークン数
+  prompt_ms?: number; // プロンプト評価ミリ秒
+  predicted_ms?: number; // 生成ミリ秒
+  prompt_per_second?: number; // プロンプト評価速度 (tok/s)
+  predicted_per_second?: number; // 生成速度 (tok/s)
+  prompt_per_token_ms?: number;
+  predicted_per_token_ms?: number;
+}
+
 export interface ExternalLlmRunDiagnostic {
   runId: string;
   queryNumber: number; // 同一セッション内での通番 (1回目, 2回目, ...)
@@ -791,13 +803,14 @@ export interface ExternalLlmRunDiagnostic {
   observedTtftMs: number;
   tokensGenerated: number;
   tokensPerSec: number;
+  llamaTimings?: LlamaCppTimings; // llama.cpp / llama-swap のレスポンスに含まれる実測 timings (cache_n / prompt_n 等)
   comparisonWithPrevious?: {
     prevRunId: string;
     prevQueryNumber: number;
     prevTtftMs: number;
     diffMs: number;
     speedupRatio: number;
-    verdict: 'cache_hit' | 'no_cache' | 'inconclusive';
+    verdict: 'cache_hit' | 'no_cache' | 'similar' | 'slower' | 'model_mismatch' | 'inconclusive';
     explanation: string;
   };
 }
@@ -2649,6 +2662,36 @@ export interface MetacognitiveCalibrationResult {
   humilityNotes: string[];
 }
 
+/**
+ * 設計思想 第39章: 感情共感力動・親愛度連続トランスファー
+ */
+export type UserEmotionalValenceType =
+  | 'JOY'
+  | 'ACCOMPLISHMENT'
+  | 'CONFUSION'
+  | 'FRUSTRATION'
+  | 'GRATITUDE'
+  | 'NEUTRAL';
+
+export interface AffectionDynamicState {
+  affectionScore: number; // 0 - 100 (連続蓄積親愛度)
+  empathyLevel: number;   // 0 - 100 (共感度)
+  valence: UserEmotionalValenceType;
+  toneStance: 'RESPECTFUL_WARM' | 'INTIMATE_PARTNER' | 'CHEERFUL_SUPPORTER' | 'CALM_PROFESSIONAL';
+  sessionTransferCount: number;
+  lastUpdated: number;
+  historySummary: string;
+}
+
+export interface AffectionEvaluationResult {
+  detectedEmotion: UserEmotionalValenceType;
+  emotionalScoreDelta: number;
+  newAffectionScore: number;
+  recommendedTone: string;
+  transferActive: boolean;
+  empathyGuidance: string;
+}
+
 // 3. 自律成長レポート (Autonomous Growth Report)
 export interface AutonomousGrowthReport {
   id: string;
@@ -3275,4 +3318,116 @@ export interface SemanticPreservationInspection {
   missingOrDistortedElements: string[];
 }
 
+/**
+ * 設計思想 4.2 対話行為の分類 (Dialogue Acts)
+ */
+export type DialogueAct =
+  | 'QUESTION'                // 一般質問
+  | 'REQUEST'                 // 作業依頼・指示
+  | 'CORRECTION'              // 訂正・指摘
+  | 'CONFIRMATION'            // 確認・念押し
+  | 'REJECTION'               // 拒絶・否定
+  | 'TOPIC_SHIFT'             // 話題転換
+  | 'CONTINUATION'            // 継続・追質問
+  | 'FEEDBACK'                // 評価・フィードバック
+  | 'CASUAL_CHAT'             // 雑談・挨拶・相槌
+  | 'REQUEST_RECOMMENDATION'  // 推奨・比較の依頼
+  | 'REQUEST_EXPLANATION'     // 理由・原理の説明依頼
+  | 'REQUEST_ARTIFACT';       // コード・成果物の生成依頼
+
+/**
+ * 設計思想 4.4 フィードバックの段階的状態管理
+ * 単語単体で直ちに全体設定を変更せず、文脈・意図の強さに応じて段階化する
+ */
+export type FeedbackStage =
+  | 'MENTIONED'              // 評価語が単に発言中に言及されただけ
+  | 'POSSIBLE_FEEDBACK'      // フィードバックの可能性がある文脈
+  | 'DIRECT_FEEDBACK'        // 回答や振る舞いに対する直接的な評価
+  | 'ADJUSTMENT_REQUEST'     // 「もっと短くして」等の明示的な変更要求
+  | 'CONFIRMED_PREFERENCE';  // ユーザーが恒久的な好みとして確定した設定
+
+/**
+ * 設計思想 5.1 性格の多軸管理プロファイル
+ * 単一の形容詞ではなく、複数軸に分解して場面（シーン）別に動的調整する
+ */
+export interface MultiAxisPersonaConfig {
+  politeness: 'CASUAL_POLITE' | 'VERY_POLITE' | 'CASUAL' | 'FORMAL';
+  warmth: 'LOW' | 'MEDIUM' | 'MEDIUM_HIGH' | 'HIGH';
+  directness: 'LOW' | 'MEDIUM' | 'HIGH';
+  formality: 'LOW' | 'MEDIUM_LOW' | 'MEDIUM' | 'HIGH';
+  verbosity: 'CONCISE' | 'ADAPTIVE' | 'DETAILED';
+  technicalTerminology: 'MINIMAL' | 'BALANCED' | 'RIGOROUS';
+  proactiveSuggestion: 'PASSIVE' | 'MODERATE' | 'ACTIVE';
+  prudence: 'STANDARD' | 'HIGH' | 'VERY_HIGH';
+  askOnlyWhenBlocking: boolean;
+  conclusionFirst: boolean;
+  humor: 'OFF' | 'LIGHT' | 'MODERATE';
+  currentScene:
+    | 'NORMAL'              // 通常会話
+    | 'TECHNICAL_RESEARCH'  // 技術調査
+    | 'CODE_DELIVERY'       // 正式納品
+    | 'ERROR_REPORT'        // エラー報告
+    | 'DISASTER_RECOVERY'   // 障害復旧
+    | 'SHORT_MODE'          // 短文モード
+    | 'DETAILED_MODE';      // 詳細説明モード
+}
+
+/**
+ * 設計思想 5.2 回答骨格タイプ
+ */
+export type AnswerSkeletonType =
+  | 'RECOMMENDATION'      // 結論 → 主な理由 → 欠点 → 推奨が変わる条件
+  | 'CORRECTION'          // 訂正内容の認識 → 古い前提の無効化 → 影響範囲 → 修正後の結論
+  | 'UNKNOWN_INVESTIGATION' // 現在分かること → 分からないこと → 不足している証拠 → 次の調査手段
+  | 'TASK_COMPLETION'     // 実際に完了した内容 → 成果物 → 検証結果 → 未確認事項
+  | 'GENERAL_ANSWER';     // 結論 → 補足理由 → 次の行動
+
+/**
+ * 設計思想 10.1 要求型コンパイラ (Compiled Request Type)
+ * 自然言語をそのまま実行せず、機械検査可能な要求型へ変換する
+ */
+export interface CompiledRequestType {
+  requestId: string;
+  compiled_id?: string;
+  goal: string;
+  target: string;
+  targetEntity?: string;
+  category?: string;
+  domain?: string;
+  expectedDeliverable?: string;
+  certaintyRequirement?: string;
+  resolvedAnaphora?: any[];
+  deliverables: string[];
+  constraints: string[];
+  prohibitions: string[];
+  acceptanceCriteria: string[];
+  privacyClass: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'STRICTLY_SECRET';
+  sideEffectClass: 'READ_ONLY' | 'LOCAL_WRITE' | 'NETWORK' | 'PROCESS_EXECUTION' | 'PRIVILEGED';
+  approvalClass: 'AUTOMATIC' | 'CONFIRM_IF_BRANCH' | 'EXPLICIT_USER_APPROVAL_REQUIRED';
+  unresolvedQuestions: string[];
+  rollbackRequirement: boolean;
+  canExecuteDeterministically: boolean;
+  compiledAt: number;
+}
+
+/**
+ * 設計思想 10.2 計画・能力合成エンジン契約 (Capability Contract)
+ */
+export interface CapabilityContract {
+  capabilityId: string;
+  name: string;
+  inputTypes: string[];
+  outputTypes: string[];
+  preconditions: string[];
+  postconditions: string[];
+  invariants: string[];
+  permissions: string[];
+  rollbackCapability?: string;
+  resourceBounds: {
+    maxMemoryMb: number;
+    maxExecutionMs: number;
+  };
+}
+
 export type Message = ChatMessage;
+

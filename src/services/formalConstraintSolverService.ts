@@ -9,6 +9,7 @@
  */
 
 import { systemLogger } from './systemLogger';
+import { module59typescript } from '../autonomous_modules/chapter_59';
 
 export interface ConstraintVariable<T = unknown> {
   name: string;
@@ -106,6 +107,17 @@ class FormalConstraintSolverService {
     }
 
     const isSatisfied = contradictions.length === 0;
+
+    // 自律モジュール (chapter_59.ts) への検証キャッシュ登録と状態同期
+    try {
+      module59typescript.execute(`csp_${Date.now()}`, {
+        isSatisfied,
+        contradictions,
+        assigned,
+      });
+    } catch (e) {
+      console.warn('Failed to cache in module59typescript:', e);
+    }
 
     systemLogger.info('SELF_IMPROVEMENT', `[第59章 制約ソルバー] CSP形式検証完了: ${isSatisfied ? '充足 (SAT)' : '矛盾あり (UNSAT)'}`, {
       contradictions,
