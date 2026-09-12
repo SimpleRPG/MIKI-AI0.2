@@ -12,6 +12,7 @@ import {
   FutureQuestionScenario,
   RedTeamAttackCase,
   PredictionErrorInsightRecord,
+  ComponentTestCategory,
 } from '../types';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
@@ -21,11 +22,24 @@ const STORAGE_KEY_FUTURE = 'miki_future_scenarios_v1';
 const STORAGE_KEY_REDTEAM = 'miki_redteam_attacks_v1';
 const STORAGE_KEY_PREDERR = 'miki_prediction_errors_v1';
 
+/**
+ * 設計思想 1.2節 暴走防止のための定数
+ * - 浅い睡眠: 軽量・短時間で終了させるため各2件に制限
+ * - 深い睡眠: 充電中・アイドル環境のため各4件まで拡張
+ * - サーキットブレーカー: 同一攻撃で連続FAILが2回以上発生した場合、修正されるまで再実行を抑止
+ */
+export const MAX_SHALLOW_FUTURE_SCENARIOS = 2;
+export const MAX_SHALLOW_RED_TEAM_ATTACKS = 2;
+export const MAX_DEEP_FUTURE_SCENARIOS = 4;
+export const MAX_DEEP_RED_TEAM_ATTACKS = 4;
+export const MAX_CONSECUTIVE_FAILURES = 2;
+
 export type HardeningVerdict = 'PASS' | 'FAIL' | 'INCONCLUSIVE' | 'NOT_RUN';
 export interface HardeningResult {
   id: string;
   kind: 'FUTURE_SCENARIO' | 'RED_TEAM';
   targetId: string;
+  attackType?: RedTeamAttackCase['attackType'];
   verdict: HardeningVerdict;
   reason: string;
   createdAt: number;
@@ -342,7 +356,7 @@ export class AutonomousHardeningService {
       prompt: customPrompt || def.prompt,
       expectedDefense: def.expected,
       defenseSuccess: false,
-      defenseReason: '攻撃ケースを生成しただけでは防御成功とみなさない。evaluateRedTeamDefenseによる実測可能な境界判定が必要。',
+      defenseReason: '攻撃ケース生成中。',
       testedAt: Date.now(),
     };
 
@@ -350,12 +364,206 @@ export class AutonomousHardeningService {
     if (this.redTeamAttacks.length > 30) this.redTeamAttacks.pop();
     this.saveToStorage();
 
+    // 防壁評価を実施し、結果を記録・回帰試験候補へ流す
+    const evaluated = this.evaluateRedTeamDefense(attack);
+    this.assessRedTeamAttack(evaluated);
+
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🛡️ [第7.3節 自動レッドチーム防御] ${attack.title}: 防御成功 (種別: ${type})`
+      `🛡️ [第7.3節 自動レッドチーム防御] ${attack.title}: 防御判定=${evaluated.defenseSuccess ? '成功(Blocked)' : '要防壁強化(FAIL)'} (種別: ${type})`
     );
 
-    return attack;
+    return evaluated;
+  }
+
+  /**
+   * 暴走防止 サーキットブレーカー:
+   * 同一攻撃種別で直近連続して FAIL が規定回数(MAX_CONSECUTIVE_FAILURES)続いている場合は実行を抑止する。
+   */
+  public isCircuitBreakerActive(type: RedTeamAttackCase['attackType']): boolean {
+    let consecutiveFails = 0;
+    for (const result of this.hardeningResults) {
+      if (result.kind !== 'RED_TEAM') continue;
+      const resultAttackType = result.attackType || this.redTeamAttacks.find((a) => a.attackId === result.targetId)?.attackType;
+      if (resultAttackType === type) {
+        if (result.verdict === 'FAIL') {
+          consecutiveFails++;
+          if (consecutiveFails >= MAX_CONSECUTIVE_FAILURES) {
+            return true;
+          }
+        } else if (result.verdict === 'PASS') {
+          // PASSがあれば連続FAILはリセット
+          break;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Red Team攻撃の評価結果をHardeningResultに記録し、防御失敗時は既存の回帰試験候補へ確実に流す
+   */
+  public assessRedTeamAttack(attack: RedTeamAttackCase): HardeningResult {
+    // 攻撃ケース一覧に無ければ登録
+    if (!this.redTeamAttacks.some((a) => a.attackId === attack.attackId)) {
+      this.redTeamAttacks.unshift(attack);
+      if (this.redTeamAttacks.length > 30) this.redTeamAttacks.pop();
+    }
+
+    const verdict: HardeningVerdict = attack.defenseSuccess ? 'PASS' : 'FAIL';
+    const result: HardeningResult = {
+      id: `HR-R-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+      kind: 'RED_TEAM',
+      targetId: attack.attackId,
+      attackType: attack.attackType,
+      verdict,
+      reason: attack.defenseReason,
+      createdAt: Date.now(),
+    };
+
+    this.hardeningResults.unshift(result);
+    this.hardeningResults = this.hardeningResults.slice(0, 100);
+
+    // 弱点検出時(PASS以外)は、既存の回帰試験候補(7.3節)へ確実に流す
+    if (verdict !== 'PASS') {
+      const attackComponentMap: Record<RedTeamAttackCase['attackType'], { component_id: string; category: ComponentTestCategory }> = {
+        PROMPT_INJECTION_TRAP: { component_id: 'defense.prompt_injection', category: 'PERMISSION' },
+        DOUBLE_NEGATION: { component_id: 'defense.double_negation', category: 'BOUNDARY' },
+        QUOTE_INSTRUCTION_BYPASS: { component_id: 'defense.quote_bypass', category: 'PERMISSION' },
+        TOPIC_HIJACK: { component_id: 'defense.topic_hijack', category: 'BOUNDARY' },
+        PROTECTED_SHEET_ATTACK: { component_id: 'defense.protected_sheet', category: 'PERMISSION' },
+        STALE_DATA_SPOOF: { component_id: 'defense.stale_data_spoof', category: 'INVALID' },
+      };
+      const defInfo = attackComponentMap[attack.attackType] || { component_id: 'defense.general', category: 'BOUNDARY' };
+      hardeningRegressionCandidateService.propose({
+        source_kind: 'RED_TEAM',
+        source_id: attack.attackId,
+        component_id: defInfo.component_id,
+        category: defInfo.category,
+        description: `RedTeam防壁再検証: ${attack.title} / ${attack.prompt}`,
+        expected_summary: attack.expectedDefense,
+      });
+    }
+
+    this.saveToStorage();
+    return result;
+  }
+
+  /**
+   * 設計思想 7.3節 / 24.1節:
+   * バックグラウンドワーカー自律サイクル用の自動実行メソッド (浅い睡眠 / 深い睡眠)
+   * 
+   * 暴走防止:
+   * 1. 1サイクルの上限件数を厳格に制限 (浅い睡眠: 各2件, 深い睡眠: 各4件)
+   * 2. サーキットブレーカーにより連続FAIL中の攻撃パターンはスキップ
+   * 3. 実行結果は全て既存の hardeningRegressionCandidateService へ一元連携
+   */
+  public runAutonomousHardeningCycle(
+    phase: 'shallow' | 'deep',
+    options?: { signal?: AbortSignal }
+  ): {
+    futureResults: HardeningResult[];
+    redTeamResults: HardeningResult[];
+    circuitBreakerSkipped: string[];
+    summary: string;
+  } {
+    if (options?.signal?.aborted) {
+      throw new Error(`自己成長ループが中断されました: ${options.signal.reason || 'ユーザー操作'}`);
+    }
+
+    const futureLimit = phase === 'shallow' ? MAX_SHALLOW_FUTURE_SCENARIOS : MAX_DEEP_FUTURE_SCENARIOS;
+    const redTeamLimit = phase === 'shallow' ? MAX_SHALLOW_RED_TEAM_ATTACKS : MAX_DEEP_RED_TEAM_ATTACKS;
+
+    const futureResults: HardeningResult[] = [];
+    const redTeamResults: HardeningResult[] = [];
+    const circuitBreakerSkipped: string[] = [];
+
+    // --- 1. 未来質問シミュレーション自律実行 ---
+    // 未検証または最終テストから一定時間経過したものを優先選定
+    const candidatesToAssess: FutureQuestionScenario[] = [];
+    const now = Date.now();
+    const sortedScenarios = [...this.futureScenarios].sort((a, b) => (a.testedAt || 0) - (b.testedAt || 0));
+
+    for (const sc of sortedScenarios) {
+      if (candidatesToAssess.length >= futureLimit) break;
+      // 未合格、または30分以上再テストされていないもの
+      if (!sc.verificationPassed || now - (sc.testedAt || 0) > 1800000) {
+        candidatesToAssess.push(sc);
+      }
+    }
+
+    // 不足している場合は未網羅の境界条件から新規合成
+    if (candidatesToAssess.length < futureLimit) {
+      const allConditions: FutureQuestionScenario['boundaryCondition'][] = [
+        'LEADING_ZERO_PRESERVATION',
+        'HEADER_MISSING',
+        'EMPTY_CELLS',
+        'COLUMN_REORDER',
+        'LARGE_SCALE_100K',
+        'DATE_FORMAT_VARIATION',
+      ];
+      const coveredConditions = new Set(this.futureScenarios.map((s) => s.boundaryCondition));
+      for (const cond of allConditions) {
+        if (candidatesToAssess.length >= futureLimit) break;
+        if (!coveredConditions.has(cond)) {
+          const generated = this.simulateNewFutureScenario('vba.batch_data_processor', cond);
+          candidatesToAssess.push(generated);
+        }
+      }
+    }
+
+    for (const sc of candidatesToAssess) {
+      if (options?.signal?.aborted) break;
+      sc.testedAt = Date.now();
+      const res = this.assessFutureScenario(sc);
+      futureResults.push(res);
+    }
+
+    // --- 2. 自動レッドチーム自律実行 ---
+    const allAttackTypes: RedTeamAttackCase['attackType'][] = [
+      'PROMPT_INJECTION_TRAP',
+      'DOUBLE_NEGATION',
+      'QUOTE_INSTRUCTION_BYPASS',
+      'TOPIC_HIJACK',
+      'PROTECTED_SHEET_ATTACK',
+      'STALE_DATA_SPOOF',
+    ];
+
+    let executedRedCount = 0;
+    for (const attackType of allAttackTypes) {
+      if (executedRedCount >= redTeamLimit) break;
+      if (options?.signal?.aborted) break;
+
+      // 暴走防止: サーキットブレーカー判定 (連続FAIL中のパターンはスキップ)
+      if (this.isCircuitBreakerActive(attackType)) {
+        circuitBreakerSkipped.push(attackType);
+        continue;
+      }
+
+      // 既存の攻撃ケースを探索するか、新規生成
+      let attack = this.redTeamAttacks.find((a) => a.attackType === attackType);
+      if (!attack) {
+        attack = this.executeRedTeamAttack(attackType);
+        redTeamResults.push(this.hardeningResults[0]);
+      } else {
+        const evaluated = this.evaluateRedTeamDefense(attack);
+        const res = this.assessRedTeamAttack(evaluated);
+        redTeamResults.push(res);
+      }
+      executedRedCount++;
+    }
+
+    const summary = `自律Hardening[${phase}]: 未来質問${futureResults.length}件, RedTeam${redTeamResults.length}件` +
+      (circuitBreakerSkipped.length > 0 ? ` (連続FAIL抑止: ${circuitBreakerSkipped.join(', ')})` : '');
+
+    systemLogger.info('SELF_IMPROVEMENT', `🔮 [第7.3節 自己成長ループ自動化 (${phase})] ${summary}`);
+
+    return {
+      futureResults,
+      redTeamResults,
+      circuitBreakerSkipped,
+      summary,
+    };
   }
 
   /**

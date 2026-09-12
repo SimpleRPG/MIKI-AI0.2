@@ -73,6 +73,7 @@ import { selfImprovementControllerService } from './services/selfImprovementCont
 import { selfImprovementMetricsService } from './services/selfImprovementMetricsService';
 import { memoryPromotionService } from './services/memoryPromotionService';
 import { improvementRegressionCoordinatorService } from './services/improvementRegressionCoordinatorService';
+import { autonomousHardeningService } from './services/autonomousHardeningService';
 import { resourceGovernanceService } from './services/resourceGovernanceService';
 import { situationalAwarenessService } from './services/situationalAwarenessService';
 import { automationStudioService } from './services/automationStudioService';
@@ -290,7 +291,8 @@ export default function App() {
     capabilityLearningService.initialize();
     initializeChapter69to90();
     componentArtifactStoreService.reconcile(componentRegistryService.getAllComponents());
-  resourceGovernanceService.initialize();
+    autonomousHardeningService.reconcileHardeningResults();
+    resourceGovernanceService.initialize();
   situationalAwarenessService.initialize();
   void automationStudioService;
   void causalInvestigationService;

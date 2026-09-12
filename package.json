@@ -27,7 +27,8 @@
     "test:v13-surface-and-persona": "tsx scripts/verify_v13_surface_and_persona.ts",
     "test:v14-surface-variation": "tsx scripts/verify_v14_surface_variation.ts",
     "test:simple-rpg-recovery-v61": "node scripts/test_simple_rpg_recovery_v61.mjs",
-    "test:simple-rpg-auto-learning-v63": "node scripts/test_simple_rpg_auto_learning_v63.mjs"
+    "test:simple-rpg-auto-learning-v63": "node scripts/test_simple_rpg_auto_learning_v63.mjs",
+    "test:autonomous-hardening": "tsx scripts/verify_autonomous_hardening_wiring.ts"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.0",
