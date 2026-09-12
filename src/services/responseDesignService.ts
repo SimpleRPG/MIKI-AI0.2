@@ -263,7 +263,10 @@ export class ResponseDesignService {
         for (const sent of sentences) {
           const sTrim = sent.trim();
           if (!sTrim) continue;
-          if (sTrim === prevSent) {
+          // リストマーカー（・、- など）を除去して実質的な文内容で比較
+          const sNormalized = sTrim.replace(/^[・\-\*\s]+/, '');
+          const prevNormalized = prevSent.replace(/^[・\-\*\s]+/, '');
+          if (sNormalized && sNormalized === prevNormalized) {
             duplicatesCount++;
             continue;
           }

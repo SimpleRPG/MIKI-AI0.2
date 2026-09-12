@@ -7,6 +7,8 @@ import {
 } from '../types';
 import { systemLogger } from './systemLogger';
 import { responseSurfacePolicyService } from './responseSurfacePolicyService';
+import { responseDesignService } from './responseDesignService';
+import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
 
 /**
  * 非LLM中心・自己成長型AIコンパニオン 設計思想指示書(統合版) 第3章 / 第5.1節 / 第5.2節 / 第13.4節
@@ -105,66 +107,112 @@ export class AnswerContentIrService {
       ir.detail_level === 'BRIEF' ? 'short' : ir.detail_level === 'DETAILED' ? 'detailed' : 'standard',
       persona,
     );
+    const headings = surfaceGrammarAndStyleService.getSectionHeadings(skeletonType, persona.currentScene);
     const lines: string[] = [];
-    const addList = (title: string, values: string[]) => {
-      if (values.length > 0) lines.push(`\n【${title}】\n${values.map(v => `・${v}`).join('\n')}`);
+
+    const formatItem = (text: string): string => {
+      return surfaceGrammarAndStyleService.applyTerminologyLevel(text, persona.technicalTerminology);
     };
+
+    const addList = (title: string, values: string[]) => {
+      if (values.length > 0) {
+        lines.push(`\n${title}\n${values.map(v => `・${formatItem(v)}`).join('\n')}`);
+      }
+    };
+
+    const formattedConclusion = formatItem(ir.conclusion);
 
     // 5.2: 骨格は内容IRを並べ替えるだけ。条件・確実性・世界スコープを生成し直さない。
     switch (skeletonType) {
       case 'RECOMMENDATION':
-        lines.push(`【結論】\n${ir.conclusion}`);
-        if (policy.resolution !== 'BRIEF') addList('選定の主な理由', ir.reasons);
-        if (policy.resolution === 'DETAILED') addList('留意点・例外', ir.exceptions);
-        if (policy.resolution !== 'BRIEF') addList('推奨が変わる条件', ir.conditions);
+        lines.push(`${headings.conclusion}\n${formattedConclusion}`);
+        if (policy.resolution !== 'BRIEF') addList(headings.reasons, ir.reasons);
+        if (policy.resolution === 'DETAILED') addList(headings.exceptions, ir.exceptions);
+        if (policy.resolution !== 'BRIEF') addList(headings.conditions, ir.conditions);
         break;
       case 'CORRECTION':
-        lines.push(`【訂正後の結論】\n${ir.conclusion}`);
+        lines.push(`${headings.conclusion}\n${formattedConclusion}`);
         if (policy.resolution !== 'BRIEF') {
-          addList('訂正に関係する条件', ir.conditions);
-          addList('影響・例外', ir.exceptions);
+          addList(headings.conditions, ir.conditions);
+          addList(headings.exceptions, ir.exceptions);
         }
         break;
       case 'UNKNOWN_INVESTIGATION':
-        lines.push(`【現在判明している事項】\n${ir.conclusion}`);
+        lines.push(`${headings.conclusion}\n${formattedConclusion}`);
         if (policy.resolution !== 'BRIEF') {
-          addList('現時点で不確実・未解決の事項', ir.exceptions);
-          addList('不足している証拠・情報', ir.conditions);
+          addList(headings.exceptions, ir.exceptions);
+          addList(headings.conditions, ir.conditions);
         }
-        addList('次の調査・検証', ir.next_actions);
+        addList(headings.nextActions, ir.next_actions);
         break;
       case 'TASK_COMPLETION':
-        lines.push(`【実施結果】\n${ir.conclusion}`);
+        lines.push(`${headings.conclusion}\n${formattedConclusion}`);
         if (extraArtifactCode && policy.resolution !== 'BRIEF') {
           lines.push(`\n【成果物】\n\`\`\`vba\n${extraArtifactCode.trim()}\n\`\`\``);
         }
-        addList('検証・成立条件', ir.conditions);
-        if (policy.resolution === 'DETAILED') addList('未確認・例外', ir.exceptions);
-        addList('次の確認事項', ir.next_actions);
+        addList(headings.conditions, ir.conditions);
+        if (policy.resolution === 'DETAILED') addList(headings.exceptions, ir.exceptions);
+        addList(headings.nextActions, ir.next_actions);
         break;
       case 'GENERAL_ANSWER':
       default:
-        lines.push(ir.conclusion);
-        if (policy.resolution !== 'BRIEF') addList('適用条件', ir.conditions);
-        if (policy.resolution === 'DETAILED') addList('補足・例外', ir.exceptions);
-        if (policy.resolution !== 'BRIEF') addList('判断理由', ir.reasons);
-        addList('次のステップ', ir.next_actions);
+        lines.push(formattedConclusion);
+        if (policy.resolution !== 'BRIEF') addList(headings.conditions, ir.conditions);
+        if (policy.resolution === 'DETAILED') addList(headings.exceptions, ir.exceptions);
+        if (policy.resolution !== 'BRIEF') addList(headings.reasons, ir.reasons);
+        addList(headings.nextActions, ir.next_actions);
         break;
     }
 
-    // 結論先行・冗長な定型挨拶を避け、接続表現は内容ではなく表層だけに使用する。
-    if (lines.length > 1 && policy.connector && !lines[1].startsWith('\n【')) {
-      lines[1] = `\n${policy.connector}、${lines[1].trimStart()}`;
+    // 接続表現の適用 (currentScene と directness に最適化)
+    const activeConnector = surfaceGrammarAndStyleService.getSceneConnector(persona.currentScene, persona.directness) || policy.connector;
+    if (lines.length > 1 && activeConnector && !lines[1].startsWith('\n【')) {
+      lines[1] = `\n${activeConnector}、${lines[1].trimStart()}`;
+    }
+
+    // 慎重さ (prudence) の注記付加
+    const prudenceNote = surfaceGrammarAndStyleService.applyPrudenceNote(persona.prudence, persona.currentScene);
+    if (prudenceNote) {
+      lines.push(`\n${prudenceNote}`);
+    }
+
+    // 積極的提案 (proactiveSuggestion) の付加
+    const proactiveNote = surfaceGrammarAndStyleService.applyProactiveSuggestion(persona.proactiveSuggestion, persona.currentScene);
+    if (proactiveNote && policy.resolution !== 'BRIEF') {
+      lines.push(`\n${proactiveNote}`);
     }
 
     let surfaceText = lines.join('\n').trim();
-    // 語尾は既存の文を無理に書き換えず、空の断片にのみ適用する。意味保持を優先する。
-    if (!surfaceText) surfaceText = (ir.conclusion || '現時点では回答を確定できません。').trim();
+    if (!surfaceText) surfaceText = (formattedConclusion || '現時点では回答を確定できません。').trim();
+
+    // 温かみ (warmth) とユーモア (humor) の適用
+    surfaceText = surfaceGrammarAndStyleService.applyWarmthAndHumor(surfaceText, persona);
+
+    // 活用規則・助詞選択規則の破綻検査と修復
+    const grammarInspection = surfaceGrammarAndStyleService.validateGrammarAndParticles(surfaceText);
+    if (grammarInspection.hasConjugationError || grammarInspection.hasParticleError) {
+      systemLogger.warn(
+        'ANSWER_PLAN',
+        `文法/助詞の破綻を検出し修復しました: ${[...grammarInspection.conjugationIssues, ...grammarInspection.particleIssues].join(', ')}`
+      );
+      surfaceText = grammarInspection.repairedText;
+    }
+
+    // 2.1 最優先: 重複除去エンジンの接続 (surfaceText → deduplicateResponse → 最終出力)
+    const dedup = responseDesignService.deduplicateResponse(surfaceText);
+    if (dedup.duplicatesRemovedCount > 0) {
+      systemLogger.info(
+        'ANSWER_PLAN',
+        `[重複除去] duplicatesRemovedCount: ${dedup.duplicatesRemovedCount}件の重複文/行/ループ句を排除しました`,
+        { duplicatesRemovedCount: dedup.duplicatesRemovedCount }
+      );
+    }
+    surfaceText = dedup.cleanedText;
 
     const inspection = this.verifySemanticPreservation(ir, surfaceText);
     systemLogger.info(
       'ANSWER_PLAN',
-      `📝 [5.2 表層生成完了] 骨格: ${skeletonType} | 解像度: ${policy.resolution} | 文字数: ${surfaceText.length} | 意味保持合格: ${inspection.isPreserved}`
+      `📝 [5.2 表層生成完了] 骨格: ${skeletonType} | 解像度: ${policy.resolution} | 文字数: ${surfaceText.length} | 重複除去: ${dedup.duplicatesRemovedCount}件 | 意味保持合格: ${inspection.isPreserved}`
     );
     return { surfaceText, inspection };
   }
