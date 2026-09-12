@@ -7,6 +7,7 @@ import {
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { evidenceBasedPromotionGateService } from './evidenceBasedPromotionGateService';
+import { unknownTaskDecompositionService } from './unknownTaskDecompositionService';
 
 const GAPS_STORAGE_KEY = 'miki_capability_gaps_v32';
 const MASTERY_PROFILES_KEY = 'miki_capability_mastery_profiles_v32';
@@ -278,6 +279,14 @@ class CapabilityGapService {
     this.gaps.unshift(newEntry);
     this.saveGaps();
     this.updateMasteryOnFailure(entry.capabilityId, entry.gap_type === 'generalization_gap');
+
+    // 第162章 & 設計思想7.1節: 新規ギャップ発生時に未知タスクを安全に分解し調査経路へ送る
+    try {
+      const taskPrompt = entry.samplePrompt || entry.description;
+      unknownTaskDecompositionService.decomposeAndDispatch(taskPrompt, 2);
+    } catch (e) {
+      systemLogger.warn('CAPABILITY_GAP', `未知タスク分解への連携失敗: ${String(e)}`);
+    }
 
     systemLogger.warn(
       'CAPABILITY_GAP',

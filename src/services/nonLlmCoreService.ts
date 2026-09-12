@@ -33,6 +33,8 @@ import { unifiedMikiExperienceService } from './unifiedMikiExperienceService';
 import { mikiUnifiedLearningContinuumService } from './mikiUnifiedLearningContinuumService';
 import { verifiedKnowledgePromotionService } from './verifiedKnowledgePromotionService';
 import { verifiedCapabilityPromotionService } from './verifiedCapabilityPromotionService';
+import { unknownTaskDecompositionService } from './unknownTaskDecompositionService';
+import { causalMemoryLedgerService } from './causalMemoryLedgerService';
 
 export interface NonLlmCoreResult {
   replyText: string;
@@ -404,6 +406,15 @@ export class NonLlmCoreService {
       (ir as any).__knowledgeGapId = gap.id;
       (ir as any).__researchPerformed = researchPerformed;
       (ir as any).__researchEvidenceCount = researchEvidenceCount;
+
+      // 第162章: 未知・未解決タスクを既存能力へ安全に分解し、未知要素を自律調査・Working Agendaへ引き渡す
+      if (status !== 'RESOLVED') {
+        try {
+          unknownTaskDecompositionService.decomposeAndDispatch(prompt, 2);
+        } catch (e) {
+          systemLogger.warn('SELF_IMPROVEMENT', `未知タスク分解への引き渡し失敗: ${String(e)}`);
+        }
+      }
     }
 
     if (decisionText && status === 'RESOLVED') ir.conclusion = decisionText;
@@ -441,6 +452,20 @@ export class NonLlmCoreService {
     if (unifiedBefore.length > 0 || sharedConcepts.length > 0) {
       reason += `; unified_experience=${sharedConcepts.map(x => x.concept).join(',') || unifiedBefore.map(x => x.domain).join(',')}`;
     }
+
+    // 設計思想 第160章 & 15.1節: 意図判断と結果の因果鎖を記録し、訂正や後悔学習へ接続
+    try {
+      causalMemoryLedgerService.linkDecisionResult(
+        compiled.requestId,
+        `${dialogueAct}:${compiled.target || 'general'}`,
+        status === 'RESOLVED' ? 'SUCCESS' : status === 'NEEDS_CONFIRMATION' ? 'INCONCLUSIVE' : 'FAILURE',
+        status === 'RESOLVED'
+      );
+      if (dialogueAct === 'CORRECTION') {
+        causalMemoryLedgerService.recordCorrection(compiled.requestId, prompt, true);
+      }
+    } catch { /* best effort */ }
+
     systemLogger.info('CHAT', `🧠 [非LLM Core/Unified] ${status} / ${reason} / ${totalMs}ms / intent=${dialogueAct}`);
 
     return {

@@ -1,7 +1,7 @@
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { mikiUnifiedLearningContinuumService } from './mikiUnifiedLearningContinuumService';
-import { capabilityGapService } from './capabilityGapService';
+import { workingAgendaService } from './workingAgendaService';
 
 export type DecompositionStatus = 'PROPOSED' | 'VALIDATED' | 'BLOCKED';
 export interface TaskDecompositionStep {
@@ -28,9 +28,57 @@ export interface UnknownTaskDecomposition {
 class UnknownTaskDecompositionService {
   private readonly key = 'miki_unknown_task_decomposition_v1';
   private records: UnknownTaskDecomposition[] = [];
+  private cycleCount = 0;
+  private readonly MAX_DECOMPOSITIONS_PER_CYCLE = 2;
+
   constructor() { this.load(); }
 
+  /** 暴走防止カウンタのリセット */
+  public resetCycleBudget(): void {
+    this.cycleCount = 0;
+  }
+
+  /**
+   * 未知タスクを分解し、未知部分(unknowns)を既存の調査・宿題経路(Working Agenda)へ引き渡す。
+   */
+  public decomposeAndDispatch(task: string, maxDispatchUnknowns = 2): UnknownTaskDecomposition {
+    const decomposition = this.decompose(task);
+    if (decomposition.unknowns.length > 0) {
+      const targets = decomposition.unknowns.slice(0, Math.max(1, maxDispatchUnknowns));
+      try {
+        workingAgendaService.addOrUpdateAgenda(
+          `未知タスク調査: ${decomposition.task.slice(0, 40)}`,
+          targets,
+          [`分解ID: ${decomposition.decompositionId}`, `既存能力候補: ${decomposition.steps.flatMap(s => s.requiredCapabilityIds).join(', ') || 'なし'}`],
+          0,
+          'normal'
+        );
+        systemLogger.info('SELF_IMPROVEMENT', `📋 [UnknownTaskDecomposition] 調査経路(Working Agenda)へ引き渡し完了: ${targets.length}件 (${targets.join(', ')})`);
+      } catch (e) {
+        systemLogger.warn('SELF_IMPROVEMENT', `Working Agendaへの引き渡し失敗: ${String(e)}`);
+      }
+    }
+    return decomposition;
+  }
+
   decompose(task: string): UnknownTaskDecomposition {
+    if (this.cycleCount >= this.MAX_DECOMPOSITIONS_PER_CYCLE) {
+      systemLogger.warn('SELF_IMPROVEMENT', `[UnknownTaskDecomposition] サイクル上限(${this.MAX_DECOMPOSITIONS_PER_CYCLE}件)に達したため分解を抑制`);
+      const fallbackId = `UTD-THROTTLED-${this.hash(task)}`;
+      return {
+        decompositionId: fallbackId,
+        task,
+        steps: [],
+        unknowns: [task],
+        status: 'BLOCKED',
+        confidence: 0.2,
+        reason: '1サイクルの分解上限に達したため安全に保留しました。',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+    }
+    this.cycleCount++;
+
     const normalized = task.replace(/\s+/g, ' ').trim();
     const id = `UTD-${this.hash(normalized)}`;
     const existing = this.records.find(r => r.decompositionId === id);

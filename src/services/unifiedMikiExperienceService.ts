@@ -1,5 +1,6 @@
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
+import { causalMemoryLedgerService } from './causalMemoryLedgerService';
 
 /**
  * Miki Unified Experience Core
@@ -144,6 +145,19 @@ export class UnifiedMikiExperienceService {
     this.state.conceptCounts = Object.fromEntries(conceptEntries);
     this.state.lastUpdatedAt = timestamp;
     this.save();
+
+    // 設計思想 第160章: 経験を因果記憶レジャーへ記録し、判断→結果の因果鎖を同一Mikiで共有
+    try {
+      causalMemoryLedgerService.append({
+        experienceId: experience.id,
+        kind: 'DECISION',
+        subject: `${input.domain}:${input.action}`,
+        outcome: outcome === 'SUCCESS' ? 'SUCCESS' : outcome === 'FAILURE' ? 'FAILURE' : 'INCONCLUSIVE',
+        verified: experience.verified,
+        source: input.domain,
+      });
+    } catch { /* best effort */ }
+
     return experience;
   }
 
