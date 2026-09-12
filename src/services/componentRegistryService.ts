@@ -9,6 +9,11 @@ import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { componentArtifactStoreService } from './componentArtifactStoreService';
 import { componentVersionHistoryService } from './componentVersionHistoryService';
+import {
+  evidenceBasedPromotionGateService,
+  PromotionEvidenceInput,
+  PromotionEvaluationResult,
+} from './evidenceBasedPromotionGateService';
 
 const COMPONENT_REGISTRY_STORAGE_KEY = 'miki_component_registry_v1';
 
@@ -470,12 +475,14 @@ VERIFICATION_NOTE: 設計例であり実機検証未実施`,
   /**
    * 9.3 部品の状態遷移 (COLLECTED → CANDIDATE → ANALYZED → CLOUD_TESTED → DEVICE_TESTED → VERIFIED)
    * ※ 状態を飛ばしてVERIFIEDへ昇格させることは禁止
+   * ※ VERIFIED昇格時は7.4/9.3節のエビデンス駆動昇格ゲート(4大客観基準)の通過が必須
    */
   public advanceComponentStatus(
     componentId: string,
     targetStatus: ComponentStatus,
-    verificationLog: string
-  ): { success: boolean; message: string } {
+    verificationLog: string,
+    promotionEvidence?: PromotionEvidenceInput
+  ): { success: boolean; message: string; evaluation?: PromotionEvaluationResult } {
     const comp = this.components.get(componentId);
     if (!comp) {
       return { success: false, message: `部品ID ${componentId} が存在しません` };
@@ -510,9 +517,38 @@ VERIFICATION_NOTE: 設計例であり実機検証未実施`,
       };
     }
 
+    // 7.4 & 9.3 客観的エビデンスに基づく正式昇格ゲート (VERIFIED昇格時のみ厳格検証)
+    let evaluationResult: PromotionEvaluationResult | undefined;
+    if (targetStatus === 'VERIFIED') {
+      const defaultEvidence: PromotionEvidenceInput = {
+        recordCount: comp.success_count + comp.failure_count,
+        accuracyScore:
+          comp.success_count + comp.failure_count > 0
+            ? (comp.success_count / (comp.success_count + comp.failure_count)) * 100
+            : 0,
+        determinismRate: comp.deterministic ? 100 : 0,
+        userCorrectionRate:
+          comp.success_count + comp.failure_count > 0
+            ? (comp.failure_count / (comp.success_count + comp.failure_count)) * 100
+            : 0,
+      };
+
+      const finalEvidence = promotionEvidence || defaultEvidence;
+      evaluationResult = evidenceBasedPromotionGateService.evaluatePromotionReadiness(finalEvidence);
+
+      if (!evaluationResult.ready) {
+        return {
+          success: false,
+          message: `正式昇格ゲート却下: ${comp.component_id} の実測証拠が不足しています [${evaluationResult.missingRequirements.join('; ')}]`,
+          evaluation: evaluationResult,
+        };
+      }
+    }
+
     const prev = comp.status;
     comp.status = targetStatus;
-    comp.validation_txt += `\n[${new Date().toISOString()}] ${prev} -> ${targetStatus}: ${verificationLog}`;
+    const gateLog = evaluationResult ? ` [EvidenceGate: ${evaluationResult.summary}]` : '';
+    comp.validation_txt += `\n[${new Date().toISOString()}] ${prev} -> ${targetStatus}: ${verificationLog}${gateLog}`;
     comp.validation_hash = computeCodeHash(comp.validation_txt);
     comp.updated_at = Date.now();
     componentVersionHistoryService.updateStatus(
@@ -520,13 +556,17 @@ VERIFICATION_NOTE: 設計例であり実機検証未実施`,
       comp.version,
       comp.implementation_hash,
       targetStatus,
-      verificationLog,
+      `${verificationLog}${gateLog}`,
     );
 
     this.saveToStorage();
-    systemLogger.info('TOOLS', `🚀 [9.3 部品状態遷移] ${componentId}: ${prev} ➔ ${targetStatus}`);
+    systemLogger.info('TOOLS', `🚀 [9.3 部品状態遷移] ${componentId}: ${prev} ➔ ${targetStatus}${gateLog}`);
 
-    return { success: true, message: `${componentId} の状態を ${prev} から ${targetStatus} へ更新しました` };
+    return {
+      success: true,
+      message: `${componentId} の状態を ${prev} から ${targetStatus} へ更新しました`,
+      evaluation: evaluationResult,
+    };
   }
 
   /**

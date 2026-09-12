@@ -6,6 +6,7 @@ import {
 } from '../types';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
+import { evidenceBasedPromotionGateService } from './evidenceBasedPromotionGateService';
 
 const GAPS_STORAGE_KEY = 'miki_capability_gaps_v32';
 const MASTERY_PROFILES_KEY = 'miki_capability_mastery_profiles_v32';
@@ -390,11 +391,16 @@ class CapabilityGapService {
         prof.state = 'STABLE';
       }
     } else if (prof.state === 'STABLE') {
-      if (prof.successCount >= 30 && prof.failureCount <= 2) {
+      const masteryGate = evidenceBasedPromotionGateService.evaluateMasteryPromotion({
+        successCount: prof.successCount,
+        failureCount: prof.failureCount,
+        determinismRate: 100, // 決定論的回答骨格配備済み
+      });
+      if (prof.successCount >= 30 && prof.failureCount <= 2 && masteryGate.ready) {
         prof.transitionHistory.push({
           from: 'STABLE',
           to: 'SATURATED',
-          reason: '長期安定稼働により飽和(SATURATED)達成。通常教材生成を休止し回帰試験のみ維持',
+          reason: `長期安定稼働・品質保証ゲート合格 (${masteryGate.summary}) により飽和(SATURATED)達成。通常教材生成を休止し回帰試験のみ維持`,
           timestamp: Date.now(),
         });
         prof.state = 'SATURATED';

@@ -89,7 +89,7 @@ export class ComponentPromotionService {
     const previousStatus = component.status;
     if (previousStatus !== 'DEVICE_TESTED') return { componentId: baseComponentId, accepted: false, previousStatus, suiteId: suite.suite_id, reason: `Canary後の正式昇格対象状態=${previousStatus}。DEVICE_TESTEDが必要です。` };
     const changed = componentRegistryService.advanceComponentStatus(component.component_id, 'VERIFIED', 'LIMITED/Canary実利用を通過し、Regression Evidenceと実装hashが一致');
-    if (!changed) return { componentId: baseComponentId, accepted: false, previousStatus, suiteId: suite.suite_id, reason: 'Canary後のRegistry正式昇格に失敗しました。' };
+    if (!changed || !changed.success) return { componentId: baseComponentId, accepted: false, previousStatus, suiteId: suite.suite_id, reason: changed?.message || 'Canary後のRegistry正式昇格に失敗しました。' };
     evidenceService.recordExecutionEvidence({
       title: `Canary promotion: ${component.component_id}`,
       snippet: `Canary run=${runId} PASSED; Regression Suite=${suite.suite_id}; implementation_hash=${suite.implementation_hash}; DEVICE_TESTED -> VERIFIED`,
