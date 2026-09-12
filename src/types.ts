@@ -1825,6 +1825,11 @@ export interface ResponseSkeleton {
   successRate: number; // 0〜100
   createdAt: number;
   updatedAt: number;
+  // v18 縦の自動成長用フィールド
+  status?: 'CANDIDATE' | 'VERIFIED';
+  sourceType?: 'TEACHER_MATERIAL' | 'UNRESOLVED_CONVERSATION' | 'PRESET';
+  observedCount?: number;
+  patternSignature?: string;
 }
 
 export interface AnswerPlanApplicationResult {

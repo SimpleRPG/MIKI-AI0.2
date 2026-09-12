@@ -8,6 +8,8 @@ import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { isCasualGreetingOrShortSocial } from './conversationStateService';
 import { surfaceVariationService } from './surfaceVariationService';
+import { unknownTaskDecompositionService } from './unknownTaskDecompositionService';
+import { capabilityGapService } from './capabilityGapService';
 
 const SKELETONS_STORAGE_KEY = 'miki_response_skeletons_v32';
 
@@ -208,14 +210,24 @@ class AnswerPlanService {
           // 既存IDのSetでマージ
           const existingIds = new Set(parsed.map((s: ResponseSkeleton) => s.pattern_id));
           const missing = INITIAL_SKELETONS.filter((s) => !existingIds.has(s.pattern_id));
-          this.skeletons = [...parsed, ...missing];
+          this.skeletons = [...parsed, ...missing].map((s) => ({
+            ...s,
+            status: s.status || 'VERIFIED',
+            sourceType: s.sourceType || 'PRESET',
+            observedCount: s.observedCount ?? (s.status === 'CANDIDATE' ? 1 : 3),
+          }));
           return;
         }
       }
     } catch (e) {
       console.warn('Failed to load response skeletons from storage:', e);
     }
-    this.skeletons = [...INITIAL_SKELETONS];
+    this.skeletons = INITIAL_SKELETONS.map((s) => ({
+      ...s,
+      status: 'VERIFIED',
+      sourceType: 'PRESET',
+      observedCount: 3,
+    }));
     this.saveSkeletons();
   }
 
@@ -291,14 +303,29 @@ class AnswerPlanService {
   }
 
   /**
-   * 設計思想 20章 & 9章:
-   * 教師の生成教材から「対策(回答骨格・修復パターン)」を抽出し、回答骨格として保存
+   * 縦(骨格)のシグネチャ正規化
+   * キーワードとステージから同一構造を同定するためのハッシュ的シグネチャを生成
    */
-  public createSkeletonFromTeacherMaterial(params: {
+  private normalizePatternSignature(triggerKeywords: string[], stage: ConversationStage): string {
+    const sorted = [...triggerKeywords]
+      .map((k) => k.toLowerCase().trim())
+      .filter((k) => k.length >= 2)
+      .sort()
+      .slice(0, 4)
+      .join('|');
+    return `SIG:${stage}:${sorted}`;
+  }
+
+  /**
+   * 設計思想 9章・16章・20章 縦(骨格)の自律成長パイプライン
+   * 教師教材および実会話の未対応ログから骨格候補を登録し、3回以上観測された場合にVERIFIEDへ正式昇格する。
+   */
+  public registerSkeletonCandidate(params: {
     instruction: string;
-    outputTarget: string;
+    outputTarget?: string;
     reasoningExplanation?: string;
     category?: string;
+    sourceType: 'TEACHER_MATERIAL' | 'UNRESOLVED_CONVERSATION';
   }): ResponseSkeleton {
     const rawCategory = (params.category || 'chat').toLowerCase();
     const isCorrection =
@@ -326,6 +353,39 @@ class AnswerPlanService {
       triggerKeywords.push(params.instruction.slice(0, 15));
     }
 
+    const stage: ConversationStage = isCorrection || isContradiction ? 'CORRECTION' : 'QUESTION';
+    const patternSignature = this.normalizePatternSignature(triggerKeywords, stage);
+
+    // 既存候補の中からシグネチャ一致、またはトリガーキーワードの重複率が高いものを検索
+    const existing = this.skeletons.find((s) => {
+      if (s.patternSignature && s.patternSignature === patternSignature) return true;
+      const common = s.triggerKeywords.filter((k) => triggerKeywords.includes(k));
+      return common.length >= 2 && s.stage === stage;
+    });
+
+    if (existing) {
+      existing.observedCount = (existing.observedCount || 1) + 1;
+      existing.updatedAt = Date.now();
+
+      // 設計思想 16章「削減知能」強制ルール:
+      // 同じ構造のログが複数回（3回以上）確認されて初めてVERIFIEDへ正式昇格
+      if ((existing.observedCount || 0) >= 3 && existing.status === 'CANDIDATE') {
+        existing.status = 'VERIFIED';
+        systemLogger.info(
+          'ANSWER_PLAN',
+          `🏆 [骨格正式化 (VERIFIED)] 観測回数3回に達したため回答骨格 ${existing.pattern_id} を正式化しました (${existing.situation}, sourceType: ${existing.sourceType})`
+        );
+      } else {
+        systemLogger.info(
+          'ANSWER_PLAN',
+          `📝 [骨格候補観測] 候補 ${existing.pattern_id} の出現回数を更新: ${existing.observedCount}/3回 (status: ${existing.status})`
+        );
+      }
+
+      this.saveSkeletons();
+      return existing;
+    }
+
     // 回答手順(response_plan)の作成
     const plans: string[] = [];
     if (isCorrection) {
@@ -346,12 +406,17 @@ class AnswerPlanService {
       plans.push('3. 不要な繰り返しや過剰な前置きを排除する');
     }
 
-    const pattern_id = `PATTERN-TEACHER-${Date.now().toString(36).toUpperCase()}`;
-    const skeleton: Omit<ResponseSkeleton, 'usageCount' | 'successRate' | 'createdAt' | 'updatedAt'> = {
+    const prefix = params.sourceType === 'TEACHER_MATERIAL' ? 'TEACHER' : 'UNRESOLVED';
+    const pattern_id = `PATTERN-${prefix}-${Date.now().toString(36).toUpperCase()}`;
+    const situation = params.sourceType === 'TEACHER_MATERIAL'
+      ? `外部教師教材より生成: ${params.instruction.slice(0, 35)}`
+      : `未対応対話ログより生成: ${params.instruction.slice(0, 35)}`;
+
+    const newCandidate: ResponseSkeleton = {
       pattern_id,
-      situation: `外部教師教材より自動生成: ${params.instruction.slice(0, 35)}`,
+      situation,
       triggerKeywords,
-      stage: isCorrection || isContradiction ? 'CORRECTION' : 'QUESTION',
+      stage,
       response_plan: plans,
       avoid: [
         '古い前提を残す',
@@ -360,15 +425,110 @@ class AnswerPlanService {
       ],
       reuse_mode: 'PLAN_ONLY',
       samplePrompt: params.instruction,
-      exampleResponseTemplate: params.outputTarget.slice(0, 120),
+      exampleResponseTemplate: (params.outputTarget || '').slice(0, 120) || '了解だよ！要点を整理して回答するね。',
+      usageCount: 0,
+      successRate: 100,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      // 初回は必ず CANDIDATE 状態で保存 (3回観測強制ルール)
+      status: 'CANDIDATE',
+      sourceType: params.sourceType,
+      observedCount: 1,
+      patternSignature,
     };
 
-    const saved = this.addSkeleton(skeleton);
+    this.skeletons.unshift(newCandidate);
+    this.saveSkeletons();
+
     systemLogger.info(
       'ANSWER_PLAN',
-      `🎓 [20章 対策骨格生成] 教師教材から回答骨格 ${saved.pattern_id} を自動保存しました (${saved.situation})`
+      `🌱 [骨格候補登録 (CANDIDATE)] 新規骨格候補 ${newCandidate.pattern_id} を保存しました (1/3回観測, ${newCandidate.situation})`
     );
-    return saved;
+    return newCandidate;
+  }
+
+  /**
+   * 設計思想 20章 & 9章:
+   * 教師の生成教材から「対策(回答骨格・修復パターン)」を抽出し、回答骨格候補として保存
+   */
+  public createSkeletonFromTeacherMaterial(params: {
+    instruction: string;
+    outputTarget: string;
+    reasoningExplanation?: string;
+    category?: string;
+  }): ResponseSkeleton {
+    return this.registerSkeletonCandidate({
+      ...params,
+      sourceType: 'TEACHER_MATERIAL',
+    });
+  }
+
+  /**
+   * 実会話の未対応ログ（unknownTaskDecompositionService & capabilityGapService）から
+   * 新しい骨格候補を自動抽出し、観測・昇格パイプラインを回す
+   */
+  public processUnresolvedConversationsForSkeletonGrowth(limit: number = 2): {
+    processedCount: number;
+    promotedCount: number;
+    items: Array<{ id: string; status: string; observedCount: number; signature: string }>;
+  } {
+    const gapRecords = capabilityGapService.getAllGaps().filter((g) => g.status === 'OPEN');
+    const taskRecords = unknownTaskDecompositionService.list(50).filter(
+      (r) => r.status === 'PROPOSED' || r.status === 'BLOCKED'
+    );
+
+    const candidateInputs: Array<{ text: string; category?: string }> = [];
+
+    for (const g of gapRecords) {
+      if (g.description && g.description.length >= 6) {
+        candidateInputs.push({ text: g.description, category: g.gap_type });
+      }
+    }
+    for (const t of taskRecords) {
+      if (t.task && t.task.length >= 6) {
+        candidateInputs.push({ text: t.task, category: 'unresolved_task' });
+      }
+    }
+
+    // 重複除去
+    const uniqueInputs: Array<{ text: string; category?: string }> = [];
+    const seen = new Set<string>();
+    for (const item of candidateInputs) {
+      const norm = item.text.trim().toLowerCase();
+      if (!seen.has(norm)) {
+        seen.add(norm);
+        uniqueInputs.push(item);
+      }
+    }
+
+    const targets = uniqueInputs.slice(0, limit);
+    let promotedCount = 0;
+    const items: Array<{ id: string; status: string; observedCount: number; signature: string }> = [];
+
+    for (const target of targets) {
+      const res = this.registerSkeletonCandidate({
+        instruction: target.text,
+        sourceType: 'UNRESOLVED_CONVERSATION',
+        category: target.category,
+      });
+
+      if (res.status === 'VERIFIED') {
+        promotedCount++;
+      }
+
+      items.push({
+        id: res.pattern_id,
+        status: res.status || 'CANDIDATE',
+        observedCount: res.observedCount || 1,
+        signature: res.patternSignature || '',
+      });
+    }
+
+    return {
+      processedCount: targets.length,
+      promotedCount,
+      items,
+    };
   }
 
   /**
@@ -413,6 +573,14 @@ class AnswerPlanService {
     });
   }
 
+  public getCandidateSkeletons(): ResponseSkeleton[] {
+    return this.skeletons.filter((s) => s.status === 'CANDIDATE');
+  }
+
+  public getVerifiedSkeletons(): ResponseSkeleton[] {
+    return this.skeletons.filter((s) => s.status !== 'CANDIDATE');
+  }
+
   /**
    * 9章 & 35章 第5段階: 状況を分類し、類似する回答骨格を検索して思考節約手順を生成
    */
@@ -436,6 +604,10 @@ class AnswerPlanService {
     let highestScore = 0;
 
     for (const skeleton of this.skeletons) {
+      // 設計思想 16章「削減知能」強制ルール:
+      // CANDIDATE 状態の骨格は 3回以上確認されて VERIFIED に昇格するまで実会話適用から除外
+      if (skeleton.status === 'CANDIDATE') continue;
+
       let score = 0;
 
       // 訂正イベントの存在

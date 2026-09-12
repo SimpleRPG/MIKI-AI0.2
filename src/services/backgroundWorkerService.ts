@@ -42,6 +42,8 @@ import { specContractCompilerService } from './specContractCompilerService';
 import { knowledgeHalfLifeService } from './knowledgeHalfLifeService';
 import { frontierGovernanceService } from './frontierGovernanceService';
 import { autonomousHardeningService } from './autonomousHardeningService';
+import { answerPlanService } from './answerPlanService';
+import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -1031,6 +1033,30 @@ export class BackgroundWorkerService {
         }
       } catch (governanceErr: any) {
         systemLogger.warn('SELF_IMPROVEMENT', '認知多様性・評価ガバナンス・最上位安全監査をスキップしました', governanceErr);
+      }
+
+      // Step 6.12.12: 設計思想 9章/16章/19.2節/20章 縦(骨格)・横(言い回し)の自律成長ループ
+      if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+      try {
+        systemLogger.info('SELF_IMPROVEMENT', '📐 [縦横自律成長] 骨格候補の未解決ログ観測 ＆ 表層バリエーションの弱点補強サイクルを実行中...');
+
+        // 縦の成長: 未解決対話ログからの骨格候補抽出 (上限2件、3回観測強制ルールでVERIFIED昇格)
+        const skeletonGrowth = answerPlanService.processUnresolvedConversationsForSkeletonGrowth(2);
+        if (skeletonGrowth.processedCount > 0) {
+          weaknessFound.push(
+            `[縦(骨格)自律成長] 未対応対話ログから${skeletonGrowth.processedCount}件の骨格候補を観測処理 (正式昇格: ${skeletonGrowth.promotedCount}件)`
+          );
+        }
+
+        // 横の成長: RecentUsageCacheの弱点検出 -> 変種生成 -> 意味保持検査 -> CANDIDATE->VERIFIED昇格 (上限2件)
+        const variationGrowth = surfaceVariationGrowthService.runAutonomousVariationGrowthCycle(2);
+        if (variationGrowth.promotedCount > 0 || variationGrowth.totalGenerated > 0) {
+          weaknessFound.push(
+            `[横(言い回し)自律成長] 弱点検出カテゴリ${variationGrowth.weaknessDetected.length}件に対し、候補${variationGrowth.totalGenerated}件生成 (合格:${variationGrowth.passedCount}件, 破棄:${variationGrowth.rejectedCount}件, 正式昇格:${variationGrowth.promotedCount}件)`
+          );
+        }
+      } catch (growthErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '縦横自律成長サイクルの実行中に例外が発生しました', growthErr);
       }
 
       // Step 6.13: 自律成長司令塔

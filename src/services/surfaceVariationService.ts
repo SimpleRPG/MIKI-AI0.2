@@ -17,6 +17,7 @@ import { AnswerSkeletonType, MultiAxisPersonaConfig } from '../types';
 export class RecentUsageCache {
   private static instance: RecentUsageCache;
   private history: Map<string, string[]> = new Map();
+  private cumulativeCounts: Map<string, number> = new Map();
 
   public static getInstance(): RecentUsageCache {
     if (!RecentUsageCache.instance) {
@@ -39,6 +40,11 @@ export class RecentUsageCache {
     if (!items || items.length === 0) {
       throw new Error(`[RecentUsageCache] Empty variation pool for key: ${categoryKey}`);
     }
+
+    // 累積使用回数のカウントアップ
+    const currentCount = this.cumulativeCounts.get(categoryKey) || 0;
+    this.cumulativeCounts.set(categoryKey, currentCount + 1);
+
     if (items.length === 1) return items[0];
 
     const recent = this.history.get(categoryKey) || [];
@@ -65,17 +71,42 @@ export class RecentUsageCache {
   /** 履歴リセット (テスト・新規セッション用) */
   public clearHistory(): void {
     this.history.clear();
+    this.cumulativeCounts.clear();
   }
 
   /** 特定カテゴリの直近選択履歴取得 */
   public getHistory(categoryKey: string): string[] {
     return [...(this.history.get(categoryKey) || [])];
   }
+
+  /** 特定カテゴリの累積使用回数取得 */
+  public getUsageCount(categoryKey: string): number {
+    return this.cumulativeCounts.get(categoryKey) || 0;
+  }
+
+  /** 全追跡中カテゴリキーの取得 */
+  public getAllCategoryKeys(): string[] {
+    const keys = new Set<string>([
+      ...Array.from(this.history.keys()),
+      ...Array.from(this.cumulativeCounts.keys()),
+    ]);
+    return Array.from(keys);
+  }
+
+  /** 手動での使用記録 */
+  public recordUsage(categoryKey: string, itemId: string): void {
+    const currentCount = this.cumulativeCounts.get(categoryKey) || 0;
+    this.cumulativeCounts.set(categoryKey, currentCount + 1);
+    const recent = this.history.get(categoryKey) || [];
+    const updated = [...recent.filter((id) => id !== itemId), itemId].slice(-10);
+    this.history.set(categoryKey, updated);
+  }
 }
 
 export class SurfaceVariationService {
   private static instance: SurfaceVariationService;
   private cache: RecentUsageCache;
+  private dynamicVariations: Map<string, VariationItem[]> = new Map();
 
   constructor() {
     this.cache = RecentUsageCache.getInstance();
@@ -86,6 +117,36 @@ export class SurfaceVariationService {
       SurfaceVariationService.instance = new SurfaceVariationService();
     }
     return SurfaceVariationService.instance;
+  }
+
+  /**
+   * 使用履歴の記録（キャッシュへの委譲）
+   */
+  public recordUsage(categoryKey: string, itemId: string): void {
+    this.cache.recordUsage(categoryKey, itemId);
+  }
+
+  /**
+   * 動的バリエーション（VERIFIED昇格済み）の登録
+   */
+  public registerDynamicVariant(categoryKey: string, item: VariationItem): void {
+    const list = this.dynamicVariations.get(categoryKey) || [];
+    if (!list.some((x) => x.id === item.id || x.text === item.text)) {
+      list.push(item);
+      this.dynamicVariations.set(categoryKey, list);
+    }
+  }
+
+  /** 動的バリエーションの取得 */
+  public getDynamicVariants(categoryKey: string): VariationItem[] {
+    return [...(this.dynamicVariations.get(categoryKey) || [])];
+  }
+
+  /** 静的＋動的のマージプール取得 */
+  public getMergedPool(categoryKey: string, staticPool: VariationItem[]): VariationItem[] {
+    const dynamic = this.dynamicVariations.get(categoryKey) || [];
+    if (dynamic.length === 0) return staticPool;
+    return [...staticPool, ...dynamic];
   }
 
   /**
@@ -103,8 +164,10 @@ export class SurfaceVariationService {
     else if (directness === 'HIGH') key = 'HIGH_DIRECTNESS';
     else if (directness === 'LOW') key = 'LOW_DIRECTNESS';
 
-    const pool = SCENE_CONNECTORS_DATA[key] || SCENE_CONNECTORS_DATA.DEFAULT;
-    return this.cache.selectNonRepeating(`connector:${key}`, pool);
+    const categoryKey = `connector:${key}`;
+    const base = SCENE_CONNECTORS_DATA[key] || SCENE_CONNECTORS_DATA.DEFAULT;
+    const pool = this.getMergedPool(categoryKey, base);
+    return this.cache.selectNonRepeating(categoryKey, pool);
   }
 
   /**
@@ -116,10 +179,14 @@ export class SurfaceVariationService {
   ): VariationItem | null {
     if (scene === 'SHORT_MODE') return null;
     if (prudence === 'VERY_HIGH') {
-      return this.cache.selectNonRepeating('prudence:VERY_HIGH', PRUDENCE_NOTES_DATA.VERY_HIGH);
+      const categoryKey = 'prudence:VERY_HIGH';
+      const pool = this.getMergedPool(categoryKey, PRUDENCE_NOTES_DATA.VERY_HIGH);
+      return this.cache.selectNonRepeating(categoryKey, pool);
     }
     if (prudence === 'HIGH') {
-      return this.cache.selectNonRepeating('prudence:HIGH', PRUDENCE_NOTES_DATA.HIGH);
+      const categoryKey = 'prudence:HIGH';
+      const pool = this.getMergedPool(categoryKey, PRUDENCE_NOTES_DATA.HIGH);
+      return this.cache.selectNonRepeating(categoryKey, pool);
     }
     return null;
   }
@@ -135,10 +202,14 @@ export class SurfaceVariationService {
       return null;
     }
     if (proactive === 'ACTIVE') {
-      return this.cache.selectNonRepeating('proactive:ACTIVE', PROACTIVE_SUGGESTIONS_DATA.ACTIVE);
+      const categoryKey = 'proactive:ACTIVE';
+      const pool = this.getMergedPool(categoryKey, PROACTIVE_SUGGESTIONS_DATA.ACTIVE);
+      return this.cache.selectNonRepeating(categoryKey, pool);
     }
     if (proactive === 'MODERATE') {
-      return this.cache.selectNonRepeating('proactive:MODERATE', PROACTIVE_SUGGESTIONS_DATA.MODERATE);
+      const categoryKey = 'proactive:MODERATE';
+      const pool = this.getMergedPool(categoryKey, PROACTIVE_SUGGESTIONS_DATA.MODERATE);
+      return this.cache.selectNonRepeating(categoryKey, pool);
     }
     return null;
   }
@@ -148,24 +219,32 @@ export class SurfaceVariationService {
    */
   public getHumorLine(humor: MultiAxisPersonaConfig['humor']): VariationItem | null {
     if (humor === 'MODERATE') {
-      return this.cache.selectNonRepeating('humor:MODERATE', WARMTH_AND_HUMOR_DATA.HUMOR_MODERATE);
+      const categoryKey = 'humor:MODERATE';
+      const pool = this.getMergedPool(categoryKey, WARMTH_AND_HUMOR_DATA.HUMOR_MODERATE);
+      return this.cache.selectNonRepeating(categoryKey, pool);
     }
     if (humor === 'LIGHT') {
-      return this.cache.selectNonRepeating('humor:LIGHT', WARMTH_AND_HUMOR_DATA.HUMOR_LIGHT);
+      const categoryKey = 'humor:LIGHT';
+      const pool = this.getMergedPool(categoryKey, WARMTH_AND_HUMOR_DATA.HUMOR_LIGHT);
+      return this.cache.selectNonRepeating(categoryKey, pool);
     }
     return null;
   }
 
   public getWarmthClosing(politeness: MultiAxisPersonaConfig['politeness']): VariationItem {
     if (politeness === 'CASUAL') {
-      return this.cache.selectNonRepeating('warmth:HIGH_CASUAL', WARMTH_AND_HUMOR_DATA.WARMTH_HIGH_CASUAL);
+      const categoryKey = 'warmth:HIGH_CASUAL';
+      const pool = this.getMergedPool(categoryKey, WARMTH_AND_HUMOR_DATA.WARMTH_HIGH_CASUAL);
+      return this.cache.selectNonRepeating(categoryKey, pool);
     }
-    return this.cache.selectNonRepeating('warmth:HIGH_POLITE', WARMTH_AND_HUMOR_DATA.WARMTH_HIGH_POLITE);
+    const categoryKey = 'warmth:HIGH_POLITE';
+    const pool = this.getMergedPool(categoryKey, WARMTH_AND_HUMOR_DATA.WARMTH_HIGH_POLITE);
+    return this.cache.selectNonRepeating(categoryKey, pool);
   }
 
   /**
    * 5. 見出しラベルの選択 (デフォルト分岐 5キー × 各30種以上から非重複選択)
-   * ※ 4つのシーン別見出しは次回以降のスコープ外
+   * ※ 4つのシーン別見出しは規定の固定見出しを優先 (指示書 1.1 より)
    */
   public getSectionHeadings(
     skeleton: AnswerSkeletonType,
@@ -177,7 +256,6 @@ export class SurfaceVariationService {
     exceptions: string;
     nextActions: string;
   } {
-    // 4つのシーン別見出し (DISASTER_RECOVERY等) は規定の固定見出しを優先 (指示書 1.1 より)
     if (scene === 'DISASTER_RECOVERY') {
       return {
         conclusion: '【緊急対処手順】',
@@ -215,26 +293,31 @@ export class SurfaceVariationService {
       };
     }
 
-    // デフォルト分岐 (NORMAL, SHORT_MODE, DETAILED_MODE): 30種以上のプールから非重複選択
+    // デフォルト分岐: 30種以上のプールから非重複選択（動的変種を合算）
+    const cKey = `heading:conclusion:${skeleton}`;
     const cItem = this.cache.selectNonRepeating(
-      `heading:conclusion:${skeleton}`,
-      SECTION_HEADINGS_DEFAULT_DATA.conclusion
+      cKey,
+      this.getMergedPool(cKey, SECTION_HEADINGS_DEFAULT_DATA.conclusion)
     );
+    const rKey = `heading:reasons:${skeleton}`;
     const rItem = this.cache.selectNonRepeating(
-      `heading:reasons:${skeleton}`,
-      SECTION_HEADINGS_DEFAULT_DATA.reasons
+      rKey,
+      this.getMergedPool(rKey, SECTION_HEADINGS_DEFAULT_DATA.reasons)
     );
+    const cdKey = `heading:conditions:${skeleton}`;
     const cdItem = this.cache.selectNonRepeating(
-      `heading:conditions:${skeleton}`,
-      SECTION_HEADINGS_DEFAULT_DATA.conditions
+      cdKey,
+      this.getMergedPool(cdKey, SECTION_HEADINGS_DEFAULT_DATA.conditions)
     );
+    const exKey = `heading:exceptions:${skeleton}`;
     const exItem = this.cache.selectNonRepeating(
-      `heading:exceptions:${skeleton}`,
-      SECTION_HEADINGS_DEFAULT_DATA.exceptions
+      exKey,
+      this.getMergedPool(exKey, SECTION_HEADINGS_DEFAULT_DATA.exceptions)
     );
+    const naKey = `heading:nextActions:${skeleton}`;
     const naItem = this.cache.selectNonRepeating(
-      `heading:nextActions:${skeleton}`,
-      SECTION_HEADINGS_DEFAULT_DATA.nextActions
+      naKey,
+      this.getMergedPool(naKey, SECTION_HEADINGS_DEFAULT_DATA.nextActions)
     );
 
     return {
@@ -250,9 +333,92 @@ export class SurfaceVariationService {
    * 6. INITIAL_SKELETONS 7パターンのバリエーション選択 (各30種以上から非重複選択)
    */
   public getSkeletonResponseTemplate(patternId: string): VariationItem | null {
-    const pool = SKELETON_VARIATIONS_DATA[patternId];
-    if (!pool || pool.length === 0) return null;
-    return this.cache.selectNonRepeating(`skeleton:${patternId}`, pool);
+    const base = SKELETON_VARIATIONS_DATA[patternId];
+    if (!base || base.length === 0) return null;
+    const categoryKey = `skeleton:${patternId}`;
+    const pool = this.getMergedPool(categoryKey, base);
+    return this.cache.selectNonRepeating(categoryKey, pool);
+  }
+
+  /** 全プールの状態（静的件数、動的件数、累積使用件数等）を一覧化 */
+  public getAllCategoriesSummary(): Array<{
+    categoryKey: string;
+    staticCount: number;
+    dynamicCount: number;
+    totalCount: number;
+    usageCount: number;
+    samplePool: VariationItem[];
+  }> {
+    const results: Array<{
+      categoryKey: string;
+      staticCount: number;
+      dynamicCount: number;
+      totalCount: number;
+      usageCount: number;
+      samplePool: VariationItem[];
+    }> = [];
+
+    // 1. connectors
+    for (const key of Object.keys(SCENE_CONNECTORS_DATA)) {
+      const cat = `connector:${key}`;
+      const staticPool = SCENE_CONNECTORS_DATA[key] || [];
+      const dynamic = this.dynamicVariations.get(cat) || [];
+      results.push({
+        categoryKey: cat,
+        staticCount: staticPool.length,
+        dynamicCount: dynamic.length,
+        totalCount: staticPool.length + dynamic.length,
+        usageCount: this.cache.getUsageCount(cat),
+        samplePool: staticPool,
+      });
+    }
+
+    // 2. prudence
+    for (const key of Object.keys(PRUDENCE_NOTES_DATA)) {
+      const cat = `prudence:${key}`;
+      const staticPool = (PRUDENCE_NOTES_DATA as any)[key] || [];
+      const dynamic = this.dynamicVariations.get(cat) || [];
+      results.push({
+        categoryKey: cat,
+        staticCount: staticPool.length,
+        dynamicCount: dynamic.length,
+        totalCount: staticPool.length + dynamic.length,
+        usageCount: this.cache.getUsageCount(cat),
+        samplePool: staticPool,
+      });
+    }
+
+    // 3. proactive
+    for (const key of Object.keys(PROACTIVE_SUGGESTIONS_DATA)) {
+      const cat = `proactive:${key}`;
+      const staticPool = (PROACTIVE_SUGGESTIONS_DATA as any)[key] || [];
+      const dynamic = this.dynamicVariations.get(cat) || [];
+      results.push({
+        categoryKey: cat,
+        staticCount: staticPool.length,
+        dynamicCount: dynamic.length,
+        totalCount: staticPool.length + dynamic.length,
+        usageCount: this.cache.getUsageCount(cat),
+        samplePool: staticPool,
+      });
+    }
+
+    // 4. skeletons
+    for (const key of Object.keys(SKELETON_VARIATIONS_DATA)) {
+      const cat = `skeleton:${key}`;
+      const staticPool = SKELETON_VARIATIONS_DATA[key] || [];
+      const dynamic = this.dynamicVariations.get(cat) || [];
+      results.push({
+        categoryKey: cat,
+        staticCount: staticPool.length,
+        dynamicCount: dynamic.length,
+        totalCount: staticPool.length + dynamic.length,
+        usageCount: this.cache.getUsageCount(cat),
+        samplePool: staticPool,
+      });
+    }
+
+    return results;
   }
 
   public getCache(): RecentUsageCache {
