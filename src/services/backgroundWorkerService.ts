@@ -14,6 +14,7 @@ import { selfImprovementControllerService } from './selfImprovementControllerSer
 import { systemLogger } from './systemLogger';
 import { calculateDomainVector, calculateCosineSimilarity } from '../utils/memoryRetrieval';
 import { nativeBackgroundService } from './nativeBackgroundService';
+import { nativeWorkManagerService } from './nativeWorkManagerService';
 import { storageService } from './storageService';
 import { skillsService } from './skillsService';
 import { regressionBenchmarkService } from './regressionBenchmarkService';
@@ -159,8 +160,63 @@ export class BackgroundWorkerService {
     this.initHardwareMonitors();
     this.initIdleDetector();
     this.scheduleNextRun();
+    this.initNativeWorkManager();
     if (this.isRegistered) {
       nativeBackgroundService.start().catch(() => {});
+    }
+  }
+
+  /**
+   * Android WorkManager ネイティブブリッジ初期化
+   * - ヘッドレスWebView / evaluateJavascript 用のグローバル受け口を登録
+   * - Capacitor プラグインのイベントリスナーを接続
+   * - Android環境ならWorkManagerに初期ジョブを登録
+   */
+  private initNativeWorkManager(): void {
+    if (typeof window !== 'undefined') {
+      // 1. グローバル受け口 (Headless WebView / evaluateJavascript)
+      (window as any).mikiRunBackgroundCycle = async (
+        triggerSource: 'manual' | 'periodic_scheduled' | 'android_intent' = 'android_intent'
+      ) => {
+        return this.runAutonomousBackgroundCycle(triggerSource);
+      };
+
+      // 2. Capacitor Plugin イベントリスナー経由のトリガー
+      nativeWorkManagerService.setupTriggerListener(async (source) => {
+        if (this.isExecutingNow) {
+          systemLogger.info('SELF_IMPROVEMENT', 'WorkManager: Background cycle already executing, skipping trigger.');
+          return;
+        }
+        systemLogger.info('SELF_IMPROVEMENT', `WorkManager: Triggered by native intent [${source}]`);
+        // ネイティブ側から起動された場合、JS側のsetIntervalポーリング判定タイマーを再スケジュールして二重実行を防止
+        this.scheduleNextRun();
+        try {
+          await this.runAutonomousBackgroundCycle(source);
+        } catch (e) {
+          console.warn('WorkManager autonomous cycle failed:', e);
+        }
+      });
+    }
+
+    // 3. Android ネイティブ環境であれば WorkManager ジョブを同期
+    if (this.isRegistered && nativeWorkManagerService.isAndroidNative()) {
+      this.syncNativeWorkManagerSchedule();
+    }
+  }
+
+  /**
+   * WorkManager へのスケジュール同期
+   */
+  public async syncNativeWorkManagerSchedule(): Promise<void> {
+    if (!nativeWorkManagerService.isAndroidNative()) return;
+    try {
+      if (this.isRegistered) {
+        await nativeWorkManagerService.schedule(this.intervalMinutes, this.constraints);
+      } else {
+        await nativeWorkManagerService.cancel();
+      }
+    } catch (e) {
+      console.warn('Failed to sync WorkManager schedule with native layer:', e);
     }
   }
 
@@ -382,10 +438,23 @@ export class BackgroundWorkerService {
   }
 
   /**
-   * 定期ジョブの実行条件判定
+   * 定期ジョブの実行条件判定 (JS側 setInterval)
+   * ネイティブ側 WorkManager との二重実行を防止
    */
-  private checkAndTriggerScheduledWork(): void {
+  private async checkAndTriggerScheduledWork(): Promise<void> {
     if (!this.isRegistered || this.isExecutingNow) return;
+
+    // ネイティブ側 Worker が既に稼働中か確認し、二重実行を排他
+    if (nativeWorkManagerService.isAndroidNative()) {
+      try {
+        const nativeStatus = await nativeWorkManagerService.getStatus();
+        if (nativeStatus.isWorkerExecuting) {
+          systemLogger.info('SELF_IMPROVEMENT', 'Native WorkManager is currently executing. Pausing JS setInterval trigger.');
+          this.scheduleNextRun();
+          return;
+        }
+      } catch (e) {}
+    }
 
     const now = Date.now();
     const isDue = now >= this.nextScheduledRunTimestamp;
@@ -400,7 +469,9 @@ export class BackgroundWorkerService {
       return; // 実行条件未達のため延期
     }
 
-    this.runAutonomousBackgroundCycle('periodic_scheduled');
+    this.runAutonomousBackgroundCycle('periodic_scheduled').catch((err) => {
+      console.warn('Scheduled autonomous cycle failed:', err);
+    });
   }
 
   /**
@@ -1088,17 +1159,20 @@ class MikiAutonomousWorker(appContext: Context, workerParams: WorkerParameters) 
   public updateConstraints(newConstraints: Partial<WorkManagerConstraints>): void {
     this.constraints = { ...this.constraints, ...newConstraints };
     this.saveState();
+    this.syncNativeWorkManagerSchedule();
   }
 
   public updateInterval(minutes: number): void {
     this.intervalMinutes = Math.max(15, minutes);
     this.scheduleNextRun();
     this.saveState();
+    this.syncNativeWorkManagerSchedule();
   }
 
   public toggleRegistered(registered: boolean): void {
     this.isRegistered = registered;
     this.saveState();
+    this.syncNativeWorkManagerSchedule();
     if (registered) {
       nativeBackgroundService.start().catch(() => {});
     } else {

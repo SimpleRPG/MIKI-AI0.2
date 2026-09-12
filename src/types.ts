@@ -1441,6 +1441,13 @@ export interface WorkManagerStatus {
     shallow: string[];
     deep: string[];
   };
+  nativeStatus?: {
+    registered: boolean;
+    state: string;
+    id?: string;
+    batteryLevel?: number;
+    isWorkerExecuting?: boolean;
+  };
 }
 
 /**
