@@ -7,7 +7,6 @@ import { verifiedCapabilityPromotionService } from './verifiedCapabilityPromotio
 import { mikiUnifiedLearningContinuumService } from './mikiUnifiedLearningContinuumService';
 import { researchToRemediationService } from './researchToRemediationService';
 import { ExecutionEnvironment } from './executionRunnerService';
-import { ExecutionEnvironment } from './executionRunnerService';
 
 export interface FailureUnderstandingRecord {
   id: string;

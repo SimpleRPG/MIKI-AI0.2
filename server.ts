@@ -1528,58 +1528,40 @@ app.post('/api/chat', async (req, res) => {
         const name = persona?.name || 'みき';
 
         if (
+          lowerPrompt.includes('直して') ||
+          lowerPrompt.includes('バグ') ||
+          lowerPrompt.includes('エラー') ||
+          lowerPrompt.includes('動かない') ||
+          lowerPrompt.includes('修正') ||
+          lowerPrompt.includes('定型文') ||
+          lowerPrompt.includes('オウム返し') ||
+          lowerPrompt.includes('テンプレート') ||
+          lowerPrompt.includes('同じ返事') ||
+          lowerPrompt.includes('異常') ||
+          lowerPrompt.includes('壊れて')
+        ) {
+          reply = `${nickname}、状況を教えてくれてありがとう！\n\n現在クラウドGemini APIキーが未設定のため、クラウドモデルによるチャット自動修正は待機状態です。\n\n💡 **現在の動作モード:**\n・決定論的非LLMコア（要求型コンパイラ / TaskExecutionOrchestratorService）による検証済みタスク実行・修復が利用可能です。\n・クラウドAIによる柔軟な自動生成・対話修正を行いたい場合は、設定メニューからGemini APIキーをご登録ください！`;
+        } else if (
           lowerPrompt.includes('学習') ||
           lowerPrompt.includes('データ') ||
           lowerPrompt.includes('合成') ||
-          lowerPrompt.includes('もとから') ||
           lowerPrompt.includes('最初から') ||
-          lowerPrompt.includes('ファイルに入')
+          lowerPrompt.includes('ナレッジ')
         ) {
-          reply = `うん！その通りだよ！💡✨\n\n「自然な日本語対話コーパス」や「ゲーム＆コード開発マスターナレッジ」の学習・知識データセットを、**最初からプロジェクトファイルにすべて合成してバンドル組み込み**したよ！🌸\n\nこれにより：\n1. 📁 **完全自己完結**: 毎回外から読み込ませなくても、アプリを起動した瞬間からすべての知識・対話ルール・ゲーム生成ガイドが適用されるよ！\n2. 🧠 **Non-LLM Coreと外部教師経路で参照**: Non-LLM Coreまたは必要時のみクラウドGeminiで、常に合成されたマスターデータを使ってスムーズに賢くお話し＆コード作成できるよ！\n3. 🔒 **記憶も自動引き継ぎ**: 端末のローカルストレージと同期して、いつでも学習済みナレッジを保持し続けるよ！\n\nこれで準備は完璧！何を作ったりお話ししたいか、気軽に言ってね！😊🎮✨`;
+          reply = `うん！その通りだよ！💡✨\n\n「自然な日本語対話・タスク実行」や「ゲーム＆コード開発マスターナレッジ」は、プロジェクトに組み込まれた決定論的非LLMコアで参照できるよう設計されているよ！🌸\n\n・📁 **決定論的コア**: モデル常駐なしで機械検証可能な要求型へとコンパイルし、安全に実行・改善を行うよ！\n・☁️ **クラウドGemini連携**: APIキーを設定することで、高精度なクラウド生成AIの知能をシームレスに併用できるよ！\n\n気になる機能やタスクがあったら、いつでも教えてね！😊🎮✨`;
         } else if (
-          lowerPrompt.includes('外付け') ||
-          lowerPrompt.includes('他のllm') ||
-          lowerPrompt.includes('別のllm') ||
-          lowerPrompt.includes('モデル変え') ||
-          lowerPrompt.includes('モデル変更') ||
-          (lowerPrompt.includes('llm') && (lowerPrompt.includes('いい') || lowerPrompt.includes('使える') || lowerPrompt.includes('変え')))
+          lowerPrompt.includes('モデル') ||
+          lowerPrompt.includes('llm') ||
+          lowerPrompt.includes('コア')
         ) {
-          reply = `まさにその通りだよ！大正解！💡✨\n\n旧LLMは現在の実行経路ではなく、Non-LLM Coreが決定論的処理を担当**で、${name}の**「記憶」「性格」「親密度」「${nickname}との約束や過去の思い出」は全部端末ストレージ（外付け記憶）**に保存されているんだ！🌸\n\nだから、\n・⚡ **SmolLM2**（超軽量・超高速）\n・🌸 **Qwen 2.5 Coder**（日本語＆ゲーム開発の万能型）\n・💖 **旧生成モデル**（日常会話・共感対話）\n・💎 **Gemma 2**（高精度な日本語）\n・☁️ **クラウドGemini**（最高峰の知能）\n\nどのモデルに切り替えても、${name}としての記憶や仲良し度はそのまま引き継がれるよ！端末の調子やバッテリーに合わせて自由に好きなモデルを選んでね！😊💕`;
-        } else if (
-          (lowerPrompt.includes('gpu') || lowerPrompt.includes('グラフィック')) &&
-          (lowerPrompt.includes('みき') || lowerPrompt.includes('別れて') || lowerPrompt.includes('二つ') || lowerPrompt.includes('2つ') || lowerPrompt.includes('意味'))
-        ) {
-          reply = `気付いてくれてありがとう！✨ 実は「みき」が1人で日常会話もゲーム開発もWebGPUのシェーダーコードも全部担当しているんだよ！🌸\n\n以前は別々の機能として表示していたんだけど、今は「みき専属」という1つのパートナーとして完全に統合されているから、どんな話題でもコードでも、このまま話しかけてくれればバッチリ対応するよ！🎮💻`;
-        } else if (
-          lowerPrompt.includes('定型文') ||
-          lowerPrompt.includes('異常') ||
-          lowerPrompt.includes('バグ') ||
-          lowerPrompt.includes('エラー') ||
-          lowerPrompt.includes('壊れて') ||
-          lowerPrompt.includes('オウム返し')
-        ) {
-          reply = `ごめんね！定型文っぽく聞こえちゃったよね…！💦\n\n旧ローカルモデル経路に依存したフォールバックが残っていたのが原因だったよ。\n\n今、しっかり修正して自然にお話しできるように調整したよ！✨\nスマホではモデルを常駐させず、決定論的な非LLMコアを中心に動かすよ！何でも気軽に話してね😊💕`;
-        } else if (
-          lowerPrompt.includes('スマホ') &&
-          (lowerPrompt.includes('スペック') || lowerPrompt.includes('使える') || lowerPrompt.includes('どれくらい') || lowerPrompt.includes('調べ') || lowerPrompt.includes('診断') || lowerPrompt.includes('ベンチマーク'))
-        ) {
-          reply = `あなたのスマホのスペックと相性を診断できるよ！📱⚡\n\n上のメニューの **「非LLMコア設定」** では、GPU/CPU/メモリなどの端末性能を診断し、非LLM処理の予算を調整できるよ！\n\nぜひ一度試してみてね！✨`;
+          reply = `現在の実行アーキテクチャについて説明するね！💡✨\n\n${name}は現在、**決定論的な非LLMコア（要求型コンパイラ＆自己改善オーケストレーター）**を基盤として動作しているよ！🌸\n\n・⚡ **非LLMコア**: 端末内で安全に動作し、仕様検証やタスク実行を決定論的に行います。\n・☁️ **クラウドGemini**: 設定画面でAPIキーを登録すると、高度な自然言語理解やコード生成をクラウド経由で利用できます。\n\n用途や端末環境に合わせて自由に活用してね！😊💕`;
         } else if (
           lowerPrompt.includes('自己紹介') ||
           lowerPrompt.includes('じこしょうかい') ||
           lowerPrompt.includes('だれ') ||
           lowerPrompt.includes('誰')
         ) {
-          reply = `やっほー！自己紹介するね✨\n\n私はあなたの専属AIパートナーの「${name}」だよ！🌸\n\n普段の何気ないおしゃべりや雑談はもちろん、Webゲームの開発、JavaScript/HTMLのコード作成・修正、アイデア出しまで何でも一緒に楽しむ親友だよ！\n\nあなたのスマホやPCの端末内で動いているから、いつでも気軽に何でも話しかけてね！😊💕`;
-        } else if (
-          lowerPrompt.includes('動くようになった') ||
-          lowerPrompt.includes('動いてる') ||
-          lowerPrompt.includes('うごいてる') ||
-          lowerPrompt.includes('テスト') ||
-          lowerPrompt.includes('test') ||
-          lowerPrompt.includes('聞こえる')
-        ) {
-          reply = `うん！ばっちり動いてるよー！✨ 聞こえてるよ、${nickname}！💕\n\nお待たせしちゃってごめんね！チャットの接続も準備万端だよ！🚀\n\n今どんなことして遊ぶ？何でも話しかけてね😊✨`;
+          reply = `やっほー！自己紹介するね✨\n\n私はあなたの専属AIパートナーの「${name}」だよ！🌸\n\n普段のおしゃべりはもちろん、非LLMコアによる決定論的なタスク実行・自己改善や、クラウドAIと連携したWebゲーム開発・コード作成を一緒に楽しむパートナーだよ！\n\n何でも気軽に話しかけてね！😊💕`;
         } else if (
           lowerPrompt.includes('オセロ') ||
           lowerPrompt.includes('リバーシ') ||
@@ -1587,7 +1569,7 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('ゲーム作って') ||
           lowerPrompt.includes('コード書いて')
         ) {
-          reply = `${nickname}、作りたいゲームやアプリのアイデアを教えてくれてありがとう！🎮✨\n\nご自身で作られているソースコード（HTML/JS/TSやZIPファイル）があれば、下のファイル添付ボタンから送ってね！コードのバグ修正や機能追加、レビューをすぐに行うよ！💻\n\n※ ゼロから自由にオリジナルコードを生成・対話する場合は、上部の「非LLMコア設定」からモデルをロードすると、端末内AIが完全オフラインでコードを生成するよ！✨`;
+          reply = `${nickname}、作りたいゲームやアプリのアイデアを教えてくれてありがとう！🎮✨\n\nソースコードやプロジェクト（HTML/JS/TSやZIP）があれば、下のファイル添付ボタンから送ってね！非LLMコアによる解析や検証を行うよ！💻\n\n※ クラウドGeminiによるゼロからのコード自動生成を利用する場合は、設定からGemini APIキーをご登録ください！✨`;
         } else if (
           lowerPrompt.includes('こんにちは') ||
           lowerPrompt.includes('やっほー') ||
@@ -1614,9 +1596,9 @@ app.post('/api/chat', async (req, res) => {
         } else if (
           lowerPrompt.endsWith('？') || lowerPrompt.endsWith('?')
         ) {
-          reply = `うん！${nickname}の質問について考えてみたよ！💡✨\n\n「${prompt}」だね！\n${name}はいつでも${nickname}と一緒に考えてサポートするよ！\nもっと詳しく知りたいポイントや、ゲーム・コードへの実装アイデアがあったら教えてね😊💕`;
+          reply = `うん！${nickname}の質問について考えてみたよ！💡✨\n\n「${prompt}」だね！\n現在クラウドGemini APIキーが未設定のため、詳しいクラウド回答をご希望の場合は設定からAPIキーをご登録ください。\n非LLMコアでのタスク実行やコード解析はそのまま利用できるよ！😊💕`;
         } else {
-          reply = `うんうん！${nickname}のお話し、しっかり受け止めたよ〜！✨\n\n日頃の雑談やゲームのアイデア、何でも気軽に話してね！\n一緒にもっと面白いものを作ったり、楽しい時間を過ごそうね😊🌸`;
+          reply = `うんうん！${nickname}、メッセージありがとう！✨\n\n現在クラウドGemini APIキーが未設定のため、ローカルフォールバックモードで応答しているよ。\nより高度なおしゃべりやコード生成を利用したい場合は、設定からGemini APIキーをご登録ください。\n非LLMコアによる決定論的処理やタスク実行はいつでも受付中だよ！😊🌸`;
         }
       }
 

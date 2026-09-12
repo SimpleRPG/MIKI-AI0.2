@@ -225,9 +225,10 @@ class JapaneseAnalysisService {
     const source = normalize(input);
     const lemma = normalize(target);
     if (!source || !lemma) return false;
-    japaneseDictionaryService.addPersonal({
-      surface: source, normalized: source.normalize('NFKC').toLowerCase(), lemma,
-      reading: undefined, pos: 'PERSONAL_CORRECTION', source: 'PERSONAL', priority: 100,
+    japaneseDictionaryService.addPersonal(source, {
+      lemma,
+      reading: undefined,
+      pos: 'UNKNOWN',
       semanticIds: ['personal:correction']
     });
     return true;

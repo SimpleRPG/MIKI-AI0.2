@@ -2275,14 +2275,8 @@ improvementCanaryRollbackService.initialize();
       // Clean placeholder message based on selected engineMode
       const placeholderText =
         engineMode === 'autonomous_rule'
-          ? `⚡ llama.cpp GGUF (${targetModelId.split(' ')[0]}) で直接推論中...`
-          : engineMode === 'autonomous_rule'
-          ? `🖥️ 外部教師 (外部教師サーバー/外部教師サーバー) で推論中...`
-          : engineMode === 'gemini_cloud'
-          ? `☁️ Gemini Cloud で生成中...`
-          : nonLlmRuntimeService.isLoaded()
-          ? `⚡ オンデバイス (${targetModelId.split('-')[0]}) で推論中...`
-          : `🔄 端末内モデル (${targetModelId.split('-')[0]}) を準備中... (トークン消費: 0)`;
+          ? `⚙️ Non-LLM 決定論的コアで実行中...`
+          : `☁️ Gemini Cloud で生成中...`;
 
       const placeholderMsg: ChatMessage = {
         id: assistantId,
@@ -2296,24 +2290,15 @@ improvementCanaryRollbackService.initialize();
         metrics: {
           engine:
             engineMode === 'autonomous_rule'
-              ? `llama.cpp GGUF (${targetModelId.split(' ')[0]})`
-              : engineMode === 'autonomous_rule'
-              ? 'External Local LLM (外部教師サーバー)'
-              : engineMode === 'gemini_cloud'
-              ? 'Gemini Cloud'
-              : `On-Device (${targetModelId.split('-')[0]})`,
+              ? 'Non-LLM Core'
+              : 'Gemini Cloud',
         },
       };
       setMessages((prev) => [...prev, placeholderMsg]);
 
-      // Step 6: Model Load / VRAM Binding
-      let isModelReady = engineMode === 'autonomous_rule' ? !!nonLlmRuntimeService.getActiveModelId() : nonLlmRuntimeService.isModelLoaded(targetModelId);
-      const isTargetCached = engineMode === 'autonomous_rule'
-        ? true
-        : await Promise.race([
-            nonLlmRuntimeService.isModelCached(targetModelId).catch(() => false),
-            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
-          ]);
+      // Step 6: Model Readiness Check
+      let isModelReady = true;
+      const isTargetCached = true;
 
       systemLogger.step(6, 10, 'モデル重み & VRAM展開 (必要な場合)', {
         targetModelId,
@@ -2741,235 +2726,6 @@ improvementCanaryRollbackService.initialize();
             )
           );
         }
-      } else if (engineMode === 'autonomous_rule') {
-        // ==========================================
-        // ⚡ Native Hardware GPU Direct Pipeline
-        // ==========================================
-        systemLogger.step(8, 10, '⚡ 端末本体の物理GPU (OpenCL / Vulkan / Direct Shader) で直接推論実行');
-        try {
-          for await (const chunk of nonLlmRuntimeService.streamDeterministicChat(chatContext, {
-            temperature: promptAnalysis.temperature,
-            max_tokens: 384,
-          })) {
-            if (abortController.signal.aborted) break;
-            if (firstTokenTime === null) {
-              firstTokenTime = performance.now();
-              stateStartTime = firstTokenTime;
-            }
-            accumulated += chunk;
-            tokenCount += chunk.length;
-            if (stateStartTime !== null && stateEndTime === null && accumulated.includes('</state>')) {
-              stateEndTime = performance.now();
-              stateDurationMs = Math.round(stateEndTime - stateStartTime);
-            }
-            const liveVisible = cleanStreamingVisibleText(accumulated);
-
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantId
-                  ? {
-                      ...msg,
-                      content: liveVisible || msg.content,
-                      isStreaming: true,
-                      executionSteps: systemLogger.getCurrentSessionSteps(),
-                    }
-                  : msg
-              )
-            );
-          }
-          webGpuSuccess = accumulated.trim().length > 0;
-          executedEngineLabel = `⚙️ Non-LLM Core`;
-        } catch (natErr: any) {
-          systemLogger.warn('INFERENCE', 'Native GPU execution error:', natErr?.message || natErr);
-          webGpuSuccess = false;
-          webGpuErrorDetails = natErr?.message || String(natErr);
-        }
-      } else if (engineMode === 'autonomous_rule') {
-        // ==========================================
-        // 🖥️ External Local LLM Server Pipeline (外部教師サーバー)
-        // ==========================================
-        systemLogger.step(8, 10, '🖥️ 外部教師 (外部教師サーバー/外部教師サーバー) 推論実行');
-        const extConfig = (() => {
-          try {
-            const saved = storageService.getItem('miki_external_llm_config');
-            if (saved) return JSON.parse(saved);
-          } catch (e) {}
-          return { endpoint: '', model: '', type: 'non_llm_core' as const };
-        })();
-
-        // 設計思想 SECTION 5 (安全側に倒す): WebGPU用モデルID等、保存されている
-        // モデル名がサーバー側の稼働モデルと食い違っている状態で送信し続けると、
-        // 毎回「モデル名不一致」で失敗するだけになる。送信前に稼働中モデル一覧と
-        // 突き合わせ、含まれていなければ自動補正してから送る。
-        // (一覧取得自体に失敗した場合は、従来通り extConfig.model のまま送信する
-        //  フォールバックを維持する = 挙動を壊さない)
-        try {
-          const liveModels = await nonLlmRuntimeService.listExternalModels(extConfig);
-          if (liveModels.length > 0 && !liveModels.includes(extConfig.model)) {
-            const corrected = liveModels[0];
-            systemLogger.warn(
-              'EXTERNAL_GPU',
-              `保存されていたモデル名 "${extConfig.model}" は稼働中サーバーに存在しないため "${corrected}" へ自動補正しました。`,
-              { previousModel: extConfig.model, correctedModel: corrected, liveModels }
-            );
-            extConfig.model = corrected;
-            try {
-              storageService.setItem('miki_external_llm_config', JSON.stringify(extConfig));
-            } catch (e) {}
-          }
-        } catch (listErr) {
-          // 一覧取得に失敗しても致命的にはしない。この後の本送信で
-          // 従来通りの接続失敗診断(サーバー未起動/接続不可 等)に委ねる。
-          systemLogger.warn('EXTERNAL_GPU', 'モデル一覧取得に失敗したため、モデル名の自動補正をスキップします。', {
-            message: (listErr as any)?.message || String(listErr),
-          });
-        }
-
-        try {
-          const stageA_preFetchMs = Math.round(performance.now() - tStart);
-          const targetMaxTokens = isCasualGreeting
-            ? 128
-            : activeExpectedLength === 'short'
-            ? 256
-            : activeExpectedLength === 'standard'
-            ? 512
-            : 1024;
-
-          for await (const chunk of nonLlmRuntimeService.streamDeterministicChat(extConfig, chatContext, {
-            temperature: isCasualGreeting ? 0.6 : promptAnalysis.temperature,
-            max_tokens: targetMaxTokens,
-            signal: abortController.signal,
-            cachePrompt: true,
-            slotId: extConfig.slotId ?? 0,
-            stageA_preFetchMs,
-            promptStats,
-            onDiagnosticRecorded: (diag: any) => {
-              capturedExternalDiag = diag;
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantId
-                    ? {
-                        ...msg,
-                        externalLlmDiagnostic: diag,
-                      }
-                    : msg
-                )
-              );
-            },
-          })) {
-            if (abortController.signal.aborted) break;
-            if (firstTokenTime === null) {
-              firstTokenTime = performance.now();
-              stateStartTime = firstTokenTime;
-            }
-            accumulated += chunk;
-            tokenCount++;
-            if (stateStartTime !== null && stateEndTime === null && accumulated.includes('</state>')) {
-              stateEndTime = performance.now();
-              stateDurationMs = Math.round(stateEndTime - stateStartTime);
-            }
-            const liveVisible = cleanStreamingVisibleText(accumulated);
-
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantId
-                  ? {
-                      ...msg,
-                      content: liveVisible || msg.content,
-                      isStreaming: true,
-                      executionSteps: systemLogger.getCurrentSessionSteps(),
-                    }
-                  : msg
-              )
-            );
-          }
-          webGpuSuccess = accumulated.trim().length > 0;
-          executedEngineLabel = `🖥️ 外部教師 (${extConfig.model})`;
-        } catch (extErr: any) {
-          const rawMessage = extErr?.message || String(extErr);
-          systemLogger.warn('INFERENCE', 'External Local LLM error:', {
-            message: rawMessage,
-            name: extErr?.name,
-            stack: extErr?.stack,
-            requestedModel: extConfig?.model,
-            endpoint: extConfig?.endpoint,
-          });
-          webGpuSuccess = false;
-          webGpuErrorDetails = rawMessage;
-        }
-      } else if (engineMode === 'autonomous_rule') {
-        systemLogger.step(8, 10, 'WebGPU Transformer推論パイプライン実行 (Prefill & Decode)', {
-          isModelReady,
-          isGpuUsable,
-          targetModelId,
-          promptChars: userPromptContent.length,
-          contextMessageCount: chatContext.length,
-        });
-
-        if (isModelReady && isGpuUsable) {
-          try {
-            systemLogger.info('INFERENCE', `WebGPU ストリーミング推論開始 (${targetModelId})`);
-            const streamPromise = (async () => {
-              for await (const chunk of nonLlmRuntimeService.streamChat(chatContext, {
-                temperature: promptAnalysis.temperature,
-                max_tokens: 256,
-                fallbackModelId: targetModelId,
-              })) {
-                if (abortController.signal.aborted) {
-                  break;
-                }
-                if (firstTokenTime === null) {
-                  firstTokenTime = performance.now();
-                  stateStartTime = firstTokenTime;
-                  const ttft = Math.round(firstTokenTime - tStart);
-                  systemLogger.info('INFERENCE', `WebGPU 初回トークン到達 (TTFT: ${ttft}ms)`);
-                }
-                accumulated += chunk;
-                tokenCount++;
-                if (stateStartTime !== null && stateEndTime === null && accumulated.includes('</state>')) {
-                  stateEndTime = performance.now();
-                  stateDurationMs = Math.round(stateEndTime - stateStartTime);
-                }
-                const liveVisible = cleanStreamingVisibleText(accumulated);
-
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantId
-                      ? {
-                          ...msg,
-                          content: liveVisible || msg.content,
-                          isStreaming: true,
-                          executionSteps: systemLogger.getCurrentSessionSteps(),
-                        }
-                      : msg
-                  )
-                );
-              }
-            })();
-
-            const streamTimeout = new Promise<void>((_, reject) =>
-              setTimeout(() => reject(new Error('WebGPU推論待機タイムアウト (30秒無応答)')), 30000)
-            );
-
-            await Promise.race([streamPromise, streamTimeout]);
-            webGpuSuccess = accumulated.trim().length > 0;
-            if (webGpuSuccess) {
-              executedEngineLabel = `On-Device WebGPU (${targetModelId.split('-')[0]})`;
-              systemLogger.info('INFERENCE', `WebGPU推論成功: 生成トークン数 ${tokenCount} (所要時間: ${Math.round(performance.now() - tStart)}ms)`);
-            }
-          } catch (gpuErr: any) {
-            webGpuErrorDetails = gpuErr?.message || String(gpuErr);
-            systemLogger.warn('INFERENCE', 'WebGPU execution error caught:', webGpuErrorDetails);
-            webGpuSuccess = false;
-          }
-        } else {
-          webGpuErrorDetails = !isGpuUsable
-            ? 'WebGPU非対応または無効 (ブラウザ設定または端末制限)'
-            : isTargetCached
-            ? 'モデルのVRAMロード待機中'
-            : 'モデル未ダウンロード (Non-LLM Core設定でダウンロード可能)';
-          systemLogger.warn('INFERENCE', `WebGPU実行不可の理由: ${webGpuErrorDetails}`);
-        }
       }
 
       if (abortController.signal.aborted) {
@@ -2986,93 +2742,15 @@ improvementCanaryRollbackService.initialize();
 
       let latestPrivacyAudit: PrivacyAuditResult | undefined = undefined;
 
-      // Fallback or Explicit Alternative Engines (CPU Rule-based or Gemini Cloud)
-      if (!webGpuSuccess || accumulated.trim().length === 0) {
-        if (engineMode === 'autonomous_rule') {
-          // 外部教師接続に失敗した場合、意味のない定型文で誤魔化さず、
-          // エラー診断（原因とヒント）をそのまま本文として表示する。
-          let diagnosticCategory = '外部教師未応答';
-          let diagnosticCause = '外部教師サーバーからの応答が得られませんでした。';
-          let diagnosticTip = '「外部教師サーバー設定」でエンドポイントURLとモデル名を確認してください。';
-
-          if (webGpuErrorDetails) {
-            if (
-              webGpuErrorDetails.includes('Failed to fetch') ||
-              webGpuErrorDetails.includes('NetworkError') ||
-              webGpuErrorDetails.includes('ERR_CONNECTION') ||
-              webGpuErrorDetails.includes('refused')
-            ) {
-              diagnosticCategory = 'サーバー未応答または通信制限 (Failed to fetch)';
-              diagnosticCause = `指定したエンドポイントへの接続に失敗しました。\n生のエラー: ${webGpuErrorDetails}\n\n考えられる原因:\n1. 選択したモデル（3B等）の初回ロード中、またはTermux側でプロセスが停止した\n2. ブラウザ・WebViewからのローカルホスト（127.0.0.1）通信制限（CORS / Private Network Access）\n3. Termux上で実際に稼働中のモデル名と選択中のモデル名（3B）の不一致`;
-              diagnosticTip = '「設定」の稼働中モデル一覧で「qwen2-5-1-5b-instruct-q4-k-m」を選択してみるか、Termuxでサーバーログを確認してください。';
-            } else if (webGpuErrorDetails.includes('404')) {
-              diagnosticCategory = 'エンドポイント不一致 (404)';
-              diagnosticCause = '外部教師の接続先URLが見つかりませんでした。外部教師設定を確認してください。';
-              diagnosticTip = '「サーバー種別」のプルダウンを、実際に起動しているサーバーの種類に合わせて選び直してください。';
-            } else if (
-              /model[^a-zA-Z]*(not found|unknown|does not exist|no such)/i.test(webGpuErrorDetails) ||
-              /(unknown|invalid) model/i.test(webGpuErrorDetails)
-            ) {
-              diagnosticCategory = 'モデル名不一致';
-              diagnosticCause = '指定したモデル名がサーバー側に登録されていない可能性があります。';
-              diagnosticTip = '「稼働中サーバーのモデル一覧」から実際に稼働しているモデルを選び直してください。';
-            } else if (
-              webGpuErrorDetails.includes('400') ||
-              webGpuErrorDetails.includes('422')
-            ) {
-              diagnosticCategory = 'リクエスト不正 (400/422)';
-              diagnosticCause = `サーバーがリクエストを拒否しました。生のエラー: ${webGpuErrorDetails}`;
-              diagnosticTip = '診断txtの「生のエラー」欄を確認してください。モデル名以外(リクエスト形式など)が原因の可能性があります。';
-            } else if (
-              webGpuErrorDetails.includes('500') ||
-              webGpuErrorDetails.includes('502') ||
-              webGpuErrorDetails.includes('503')
-            ) {
-              diagnosticCategory = 'サーバー内部エラー';
-              diagnosticCause = '外部教師側でエラーが発生しました。接続設定と応答形式を確認してください。';
-              diagnosticTip = 'Termux側のログ（例: ~/旧ローカル生成ランタイム.log）を確認してください。';
-            } else if (
-              webGpuErrorDetails.includes('timeout') ||
-              webGpuErrorDetails.includes('AbortError') ||
-              webGpuErrorDetails.includes('タイムアウト')
-            ) {
-              diagnosticCategory = '応答タイムアウト';
-              diagnosticCause = 'サーバーからの応答が時間内に返ってきませんでした。モデルの初回ロード中の可能性があります。';
-              diagnosticTip = '数十秒待ってから再度送信するか、モデルサイズを確認してください。';
-            } else {
-              diagnosticCause = `外部教師サーバーでエラーが発生しました: ${webGpuErrorDetails}`;
-            }
-          }
-
-          const actualExternalModelId = (() => {
-            try {
-              const saved = storageService.getItem('miki_external_llm_config');
-              if (saved) return JSON.parse(saved)?.model;
-            } catch (e) {}
-            return undefined;
-          })();
-
-          diagnosticData = {
-            category: diagnosticCategory,
-            cause: diagnosticCause,
-            tip: diagnosticTip,
-            modelId: actualExternalModelId || 'unknown',
-            rawErrorMessage: webGpuErrorDetails || undefined,
-          };
-          executedEngineLabel = '⚠️ 外部教師接続失敗';
-          systemLogger.warn('CHAT', `[外部LLM未応答診断] ${diagnosticCategory}: ${diagnosticCause} | 生のエラー: ${webGpuErrorDetails}`, diagnosticData);
-
-          accumulated = `⚠️ ${diagnosticCategory}\n\n${diagnosticCause}\n\n💡 ${diagnosticTip}`;
-          tokenCount = Math.round(accumulated.length / 3);
-          firstTokenTime = performance.now();
-        } else {
+      // Cloud Gemini Engine (if engineMode === 'gemini_cloud')
+      if (engineMode === 'gemini_cloud') {
         try {
-          systemLogger.info('CHAT', 'WebGPU未応答またはフォールバック要求のため、即時エンジンを呼び出します');
+          systemLogger.info('CHAT', 'Cloud Gemini API を呼び出します');
           const apiRes = await sendChatMessage({
             prompt: text,
             history: messages,
-            useSearch: engineMode === 'gemini_cloud' ? useSearch : false,
-            engineMode: engineMode,
+            useSearch: useSearch,
+            engineMode: 'gemini_cloud',
             speakerMode,
             cachedModels: cachedModelsList,
             workspaceFiles,
@@ -3084,74 +2762,21 @@ improvementCanaryRollbackService.initialize();
           latestPrivacyAudit = apiRes.privacyAudit;
 
           if (abortController.signal.aborted) {
-            handleAbortExit('フォールバック処理完了直後');
+            handleAbortExit('Cloud Gemini 処理完了直後');
             return;
           }
 
-          if (engineMode === 'autonomous_rule') {
-            let diagnosticCategory = 'CPUルールベース切替';
-            let diagnosticCause = 'WebGPUモデル未ロードのため、CPUルールベースで即座に返信しました。';
-            let diagnosticTip = '完全GPU推論を行う場合は「Non-LLM Core設定」からモデルをロードしてください。';
-
-            if (webGpuErrorDetails) {
-              if (webGpuErrorDetails.includes('Quota') || webGpuErrorDetails.includes('quota') || webGpuErrorDetails.includes('容量')) {
-                diagnosticCategory = '端末保存容量上限 (Quota exceeded)';
-                diagnosticCause = 'ブラウザのキャッシュ保存容量上限に達しました。';
-                diagnosticTip = '「Non-LLM Core設定」で全キャッシュ消去を行うか、旧生成モデル をお試しください。';
-              } else if (webGpuErrorDetails.includes('mapAsync') || webGpuErrorDetails.includes('unmapped') || webGpuErrorDetails.includes('GPUBuffer')) {
-                diagnosticCategory = 'GPUバッファ最適化';
-                diagnosticCause = 'Android/Adreno GPU のバッファマッピング非同期処理を調整中';
-                diagnosticTip = 'Non-LLM Coreの決定論的診断を実行し、失敗した構造化処理を確認してください。';
-              } else if (webGpuErrorDetails.includes('Model not loaded') || webGpuErrorDetails.includes('reload')) {
-                diagnosticCategory = 'VRAM未バインド';
-                diagnosticCause = 'WebGPUエンジン内部でモデルインスタンスのリロード待機状態';
-                diagnosticTip = '「Non-LLM Core設定」で対象モデルの「テスト推論」を1度実行してVRAMをウォームアップしてください。';
-              } else if (webGpuErrorDetails.includes('device') || webGpuErrorDetails.includes('lost') || webGpuErrorDetails.includes('VK_ERROR') || webGpuErrorDetails.includes('OutOfMemory')) {
-                diagnosticCategory = 'GPUメモリ不足 (OOM)';
-                diagnosticCause = '端末のVRAM（GPUメモリ）不足、またはブラウザのWebGPUタイムアウト';
-                diagnosticTip = 'より軽量な360M/0.5Bモデルへの切り替え、またはブラウザタブの再読み込みをお試しください。';
-              } else if (
-                webGpuErrorDetails.includes('Failed to fetch') ||
-                webGpuErrorDetails.includes('NetworkError') ||
-                webGpuErrorDetails.includes('fetch') ||
-                webGpuErrorDetails.includes('通信エラー') ||
-                webGpuErrorDetails.includes('404')
-              ) {
-                diagnosticCategory = 'ダウンロード通信エラー (Failed to fetch)';
-                diagnosticCause = 'HuggingFace/GitHub CDNからの重みダウンロード中に通信が切断またはタイムアウト';
-                diagnosticTip = '安定したWi-Fi環境で「Non-LLM Core設定」から「再接続」または「修復&再DL」をお試しください。';
-              } else if (webGpuErrorDetails.includes('未ダウンロード')) {
-                diagnosticCategory = 'モデル未ダウンロード';
-                diagnosticCause = '対象モデルの重みファイルが端末キャッシュに未保存です。';
-                diagnosticTip = '「Non-LLM Core設定」からワンクリックでダウンロード（100%）できます。';
-              }
-            }
-
-            diagnosticData = {
-              category: diagnosticCategory,
-              cause: diagnosticCause,
-              tip: diagnosticTip,
-              modelId: targetModelId,
-            };
-            executedEngineLabel = `CPUルールベース (${activeSpeaker.name})`;
-            systemLogger.warn('CHAT', `[GPULLM未応答診断] ${diagnosticCategory}: ${diagnosticCause}`, diagnosticData);
-          } else if (engineMode === 'gemini_cloud') {
-            executedEngineLabel = 'Gemini 2.5 Flash (Cloud)';
-          } else {
-            executedEngineLabel = `CPUルールベース (${activeSpeaker.name})`;
-          }
-
+          executedEngineLabel = 'Gemini 2.5 Flash (Cloud)';
           accumulated = apiRes.text || '返答の生成が完了しました！';
           tokenCount = Math.round(accumulated.length / 3);
           firstTokenTime = performance.now();
         } catch (apiErr: any) {
           if (apiErr?.name === 'AbortError' || abortController.signal.aborted) {
-            handleAbortExit('フォールバックAPI例外捕捉');
+            handleAbortExit('Cloud Gemini API例外捕捉');
             return;
           }
-          systemLogger.error('CHAT', 'Fallback chat API notice:', apiErr);
+          systemLogger.error('CHAT', 'Cloud Gemini API notice:', apiErr);
           accumulated = `⚠️ 応答生成中にエラーが発生しました:\n・詳細: ${apiErr.message || '接続エラー'}`;
-        }
         }
       }
 
