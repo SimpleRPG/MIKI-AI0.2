@@ -66,7 +66,7 @@ class EmbeddingService {
       return {
         available: this.lastCheckResult.available,
         endpoint: cfg.endpoint,
-        type: cfg.type,
+        type: cfg.type || 'deterministic',
       };
     }
 
@@ -213,7 +213,7 @@ class EmbeddingService {
 
     return {
       available: avail.available,
-      modelId: config.model,
+      modelId: config.model || 'deterministic',
       endpoint: config.endpoint,
       dimensions: sampleDimensions || avail.dimensions,
       totalMemoriesCount: (memories || []).length,

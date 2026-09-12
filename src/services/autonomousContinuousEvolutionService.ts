@@ -464,7 +464,6 @@ export default ${fallbackClassName};
             generationMethod: 'teacher_assisted_template',
           };
         }
-      }
 
       let currentCode = implResult.code;
       const isFallbackTemplate = implResult.generationMethod === 'fallback_template';

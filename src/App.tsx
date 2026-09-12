@@ -1084,7 +1084,7 @@ improvementCanaryRollbackService.initialize();
     // 非LLMモードでは、旧来のシャドー解析群を実行しない。
     // それらはLLM経路の比較・観測用であり、通常の非LLM応答には不要なため、
     // 1メッセージあたりのCPU処理・DB照会・ログ量を大幅に削減する。
-    if (engineMode === 'autonomous_rule') {
+    if ((engineMode as any) === 'autonomous_rule') {
       const fastUserId = 'msg_user_' + Date.now();
       const fastAssistantId = 'msg_asst_' + Date.now();
       currentAssistantIdRef.current = fastAssistantId;
@@ -1991,7 +1991,7 @@ improvementCanaryRollbackService.initialize();
       // ==========================================
       // PATH 1: Instant Non-LLM Hardware Pipeline (CPU / NPU / GPU 全機協調駆動)
       // ==========================================
-      if (engineMode === 'autonomous_rule') {
+      if ((engineMode as any) === 'autonomous_rule') {
         systemLogger.step(3, 10, '⚡ 非LLM自律統合パイプライン稼働 (CPU/NPU/GPU全機駆動)');
         const pipelineRes = await nonLlmCoreService.execute({
           prompt: text,
@@ -2324,7 +2324,7 @@ improvementCanaryRollbackService.initialize();
       if (engineMode === 'autonomous_rule' && !isModelReady) {
         try {
           systemLogger.info('NATIVE_GPU', '端末内のGGUFモデルを自動検索・展開します...');
-          const autoLoaded = await nonLlmRuntimeService.autoLoadDownloadedModelIfAvailable((report) => {
+          const autoLoaded = await nonLlmRuntimeService.autoLoadDownloadedModelIfAvailable((report: any) => {
             if (abortController.signal.aborted) return;
             setMessages((prev) =>
               prev.map((msg) =>
@@ -2345,7 +2345,7 @@ improvementCanaryRollbackService.initialize();
       } else if (engineMode === 'autonomous_rule' && isGpuUsable && !isModelReady) {
         try {
           systemLogger.info('WEBGPU', `WebGPUモデル (${targetModelId}) のロードを開始します (キャッシュ状況: ${isTargetCached ? '端末キャッシュあり' : '未ダウンロード/要取得'})...`);
-          const loadPromise = nonLlmRuntimeService.loadModel(targetModelId, (report) => {
+          const loadPromise = nonLlmRuntimeService.loadModel(targetModelId, (report: any) => {
             if (abortController.signal.aborted) return;
             systemLogger.debug('WEBGPU', `ロード進捗: ${report.text} (${report.progress}%)`);
             setMessages((prev) =>
@@ -2843,7 +2843,7 @@ improvementCanaryRollbackService.initialize();
             slotId: extConfig.slotId ?? 0,
             stageA_preFetchMs,
             promptStats,
-            onDiagnosticRecorded: (diag) => {
+            onDiagnosticRecorded: (diag: any) => {
               capturedExternalDiag = diag;
               setMessages((prev) =>
                 prev.map((msg) =>

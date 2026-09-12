@@ -5,7 +5,7 @@
  * 通常経路は完全NON_LLM_ONLY。外部Geminiは教師/証拠経路としてのみ別サービスから利用する。
  */
 import { integratedCognitionControllerService, CognitiveDecision } from './chapter69_90PlatformServices';
-import { unifiedMikiExperienceService } from './unifiedMikiExperienceService';
+import { unifiedMikiExperienceService, UnifiedExperienceDomain } from './unifiedMikiExperienceService';
 import { mikiUnifiedLearningContinuumService } from './mikiUnifiedLearningContinuumService';
 import { operationalConformanceService } from './operationalConformanceService';
 
@@ -51,12 +51,14 @@ class MikiCognitiveKernelService {
     });
 
     let recordedExperience = false;
+    const unifiedDomain: UnifiedExperienceDomain =
+      input.domain === 'data' || input.domain === 'task' ? 'execution' : input.domain;
     try {
       unifiedMikiExperienceService.observe({
-        domain: input.domain,
+        domain: unifiedDomain,
         action: 'cognitive_cycle',
         input: input.input.slice(0, 500),
-        outcome: uncertainty.action === 'EXECUTE' ? 'ROUTED' : 'GATED',
+        outcome: uncertainty.action === 'EXECUTE' ? 'SUCCESS' : 'BLOCKED',
         verified: false,
         capabilityIds: input.capabilityIds ?? [],
         lesson: `共通認知カーネル: ${decision.route.join('→')}; uncertainty=${uncertainty.action}`,
@@ -67,10 +69,10 @@ class MikiCognitiveKernelService {
     if (recordedExperience) {
       try {
         mikiUnifiedLearningContinuumService.observe({
-          domain: input.domain,
+          domain: unifiedDomain,
           action: 'cognitive_cycle',
           input: input.input.slice(0, 500),
-          outcome: 'ROUTED', verified: false,
+          outcome: 'SUCCESS', verified: false,
           capabilityIds: input.capabilityIds ?? [],
           lesson: `同一Miki認知ループ: ${decision.route.join(',')}`,
         });

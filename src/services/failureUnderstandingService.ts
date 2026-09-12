@@ -6,6 +6,8 @@ import { verifiedKnowledgePromotionService } from './verifiedKnowledgePromotionS
 import { verifiedCapabilityPromotionService } from './verifiedCapabilityPromotionService';
 import { mikiUnifiedLearningContinuumService } from './mikiUnifiedLearningContinuumService';
 import { researchToRemediationService } from './researchToRemediationService';
+import { ExecutionEnvironment } from './executionRunnerService';
+import { ExecutionEnvironment } from './executionRunnerService';
 
 export interface FailureUnderstandingRecord {
   id: string;
@@ -80,7 +82,7 @@ export class FailureUnderstandingService {
         }
         // Knowledge-only promotion is not enough: feed the verified research result
         // into the existing safe Research→Remediation boundary as well.
-        researchToRemediationService.process(gap, result, event.environment);
+        researchToRemediationService.process(gap, result, event.environment as ExecutionEnvironment);
       }
       this.records.unshift({
         id: `FAIL-UNDERSTAND-${this.hash(`${event.event_id}|${gap.id}`)}`,

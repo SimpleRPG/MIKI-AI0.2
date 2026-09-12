@@ -8,6 +8,7 @@ import { ResearchResult } from './researchService';
 import { KnowledgeGap } from './knowledgeGapService';
 import { mikiUnifiedLearningContinuumService } from './mikiUnifiedLearningContinuumService';
 import { capabilityConfidenceService } from './capabilityConfidenceService';
+import { ExecutionEnvironment } from './executionRunnerService';
 
 export type RemediationStatus = 'KNOWLEDGE_CONFIRMED' | 'VALIDATION_QUEUED' | 'VALIDATION_PASSED' | 'VALIDATION_FAILED' | 'QUARANTINED';
 
@@ -35,7 +36,7 @@ export class ResearchToRemediationService {
   private records: RemediationRecord[] = [];
   constructor() { this.load(); }
 
-  public process(gap: KnowledgeGap, result: ResearchResult, environment = 'ANDROID'): RemediationRecord | undefined {
+  public process(gap: KnowledgeGap, result: ResearchResult, environment: ExecutionEnvironment = 'ANDROID'): RemediationRecord | undefined {
     const promoted = (result.verification || []).filter(v => v.promoted);
     if (!result.resolved || promoted.length === 0) return undefined;
 

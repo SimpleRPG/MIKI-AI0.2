@@ -9,6 +9,8 @@ import { verifiedCapabilityPromotionService } from './verifiedCapabilityPromotio
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { counterexampleContractRefinementService } from './counterexampleContractRefinementService';
+import { claimDatabaseService } from './claimDatabaseService';
+import { ExecutionEnvironment } from './executionRunnerService';
 
 export type RecoveryStatus = 'RESEARCHING' | 'REQUEUED' | 'KNOWLEDGE_ONLY' | 'QUARANTINED' | 'BLOCKED';
 
@@ -172,16 +174,18 @@ export class RemediationFailureRecoveryService {
     }
 
     const promotedClaimIds = (result.verification || []).filter(v => v.promoted).map(v => v.claimId);
+    const promotedV = (result.verification || []).find(v => v.promoted);
+    const verifiedStatement = promotedV ? claimDatabaseService.getClaim(promotedV.claimId)?.statement : undefined;
     counterexampleContractRefinementService.refine({
       sourceFailureId: base.recoveryId,
       componentId: event.component_id,
       environment: event.environment,
       counterexample: `${event.error_message || event.output_summary || 'execution_failed'} / ${gap.query}`,
       claimIds: promotedClaimIds,
-      verifiedStatement: (result.verification || []).find(v => v.promoted)?.statement,
+      verifiedStatement,
     });
 
-    const remediation = researchToRemediationService.process(gap, result, event.environment);
+    const remediation = researchToRemediationService.process(gap, result, event.environment as ExecutionEnvironment);
     if (!remediation) {
       return this.update(base.recoveryId, {
         status: 'KNOWLEDGE_ONLY',

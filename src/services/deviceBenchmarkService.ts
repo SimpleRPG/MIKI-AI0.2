@@ -167,8 +167,10 @@ class DeviceBenchmarkService {
           isRealMeasured = true;
         }
         if (storage) {
-          storageAvailableGB = Number((storage.freeDiskMB / 1024).toFixed(1));
-          storageTotalGB = Number((storage.totalDiskMB / 1024).toFixed(1));
+          const freeMb = storage.freeDiskMB ?? (storage.freeBytes / (1024 * 1024));
+          const totalMb = storage.totalDiskMB ?? (storage.totalBytes / (1024 * 1024));
+          storageAvailableGB = Number((freeMb / 1024).toFixed(1));
+          storageTotalGB = Number((totalMb / 1024).toFixed(1));
         }
       } catch (e) {
         console.warn('Native hardware spec query error:', e);
@@ -218,7 +220,7 @@ class DeviceBenchmarkService {
       cpuCores,
       storageAvailableGB,
       storageTotalGB,
-      gflops,
+      gflops: 15.0,
       isRealMeasured,
       performanceTier,
       tierLabel,

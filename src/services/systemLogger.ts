@@ -25,6 +25,8 @@ export interface SystemLogEntry {
     | 'VIRTUAL_TRAINING'
     | 'TASK_PLAN'
     | 'STATE_EXTRACTION'
+    | 'RESOURCE_GOVERNANCE'
+    | 'PERCEPTION'
     | 'PRIVACY';
   message: string;
   details?: any;

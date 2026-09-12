@@ -41,7 +41,7 @@ export class ResearchStrategyService {
       .map(route => ({ route, score: this.score(type, route) }))
       .sort((a, b) => b.score - a.score);
     const selected = ranked[0].route;
-    const stat = this.getStats(type, selected);
+    const stat = this.getRouteStats(type, selected);
     const reason = stat.attempts > 0
       ? `過去実績 ${stat.successes}/${stat.attempts} 成功、平均 ${Math.round(stat.totalDurationMs / stat.attempts)}ms を基に選択しました。`
       : `このKnowledge Gap種別の初期Research経路として ${selected} を選択しました。`;
@@ -86,7 +86,7 @@ export class ResearchStrategyService {
   }
 
   private score(type: KnowledgeGapType, route: ResearchRoute): number {
-    const stat = this.getStats(type, route);
+    const stat = this.getRouteStats(type, route);
     const successRate = stat.attempts ? stat.successes / stat.attempts : 0;
     const explorationBonus = stat.attempts === 0 ? 0.15 : 0;
     const speedBonus = stat.attempts ? 1 / (1 + stat.totalDurationMs / stat.attempts / 5000) : 0;
@@ -94,7 +94,7 @@ export class ResearchStrategyService {
     return successRate * 2 + speedBonus + explorationBonus + defaultBonus;
   }
 
-  private getStats(type: KnowledgeGapType, route: ResearchRoute): RouteStats {
+  private getRouteStats(type: KnowledgeGapType, route: ResearchRoute): RouteStats {
     return this.stats[this.key(type, route)] || { attempts: 0, successes: 0, totalDurationMs: 0, lastUsedAt: 0 };
   }
 

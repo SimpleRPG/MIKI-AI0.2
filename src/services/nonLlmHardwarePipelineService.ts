@@ -92,7 +92,8 @@ export class NonLlmHardwarePipelineService {
 
     // 要求型コンパイラ (第10.1節)
     const compiledRequest = requestTypeCompilerService.compile(prompt);
-    cpuTasks.push(`要求型コンパイル: [${compiledRequest.requestType}]`);
+    const resolvedRequestType = compiledRequest.requestType || compiledRequest.category || 'GENERAL';
+    cpuTasks.push(`要求型コンパイル: [${resolvedRequestType}]`);
     const cpuElapsed1 = performance.now() - cpuStart;
 
     // ============================================================
@@ -204,10 +205,10 @@ ${assembledCode}
       replyText = `${nameGreeting}
 「${normalizedPrompt}」について、端末内の非LLM知識ベース（CPU決定論的経路）で安全に解析しました。
 
-${matchedClaims.length > 0 ? `### 📚 照合された知識主張 (${matchedClaims.length}件):\n` + matchedClaims.slice(0, 2).map((c) => `- **${c.claimText}** (確信度: ${Math.round(c.confidence * 100)}%)`).join('\n') + '\n\n' : ''}### 💡 解析結果:
-- 要求型: \`${compiledRequest.requestType}\`
-- 潜在意図: ${latentProfile.primaryGoal}
-- 感情力動: ${affectionState.currentZone} (親愛度: ${affectionState.affectionScore}点)
+${matchedClaims.length > 0 ? `### 📚 照合された知識主張 (${matchedClaims.length}件):\n` + matchedClaims.slice(0, 2).map((c: any) => `- **${c.claimText || c.statement}** (確信度: ${Math.round((c.confidence ?? c.confidence_score ?? 0.9) * 100)}%)`).join('\n') + '\n\n' : ''}### 💡 解析結果:
+- 要求型: \`${resolvedRequestType}\`
+- 潜在意図: ${latentProfile.primaryGoal || latentProfile.latentGoal}
+- 感情力動: ${affectionState.currentZone || affectionState.toneStance} (親愛度: ${affectionState.affectionScore}点)
 
 外部クラウドへの送信は一切行わず、端末内の決定論的経路だけで処理しました。`;
     }
@@ -217,7 +218,7 @@ ${matchedClaims.length > 0 ? `### 📚 照合された知識主張 (${matchedCla
     // 決定論性の証跡。時間やランダム値をハッシュへ混ぜない。
     const hashInput = JSON.stringify({
       prompt: normalizedPrompt,
-      requestType: compiledRequest.requestType,
+      requestType: resolvedRequestType,
       intentCategory,
       claims: matchedClaims.map((c: any) => c.claimId || c.id || c.claimText || '').slice(0, 20),
       components: usedComponents,

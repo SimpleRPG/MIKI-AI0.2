@@ -51,6 +51,7 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+const LOG_FILE = path.join(process.cwd(), 'server_debug.log');
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -2340,7 +2341,7 @@ app.get('/api/miki/execution-evidence',(_req,res)=>res.json({records:cognitiveEx
 app.post('/api/miki/execution-evidence/ingest',(req,res)=>{try{res.json(cognitiveExecutionEvidenceService.ingest(req.body));}catch(e:any){res.status(400).json({error:e?.message||String(e)});}});
 app.get('/api/miki/resources',(_req,res)=>res.json(resourceGovernanceService.getSnapshot()));
 app.post('/api/miki/resources/refresh',async(_req,res)=>res.json(await resourceGovernanceService.refresh()));
-app.get('/api/miki/resources/budget',(req,res)=>res.json(resourceGovernanceService.budgetFor(req.query.tier||'LIGHT',req.query.critical==='true')));
+app.get('/api/miki/resources/budget',(req,res)=>res.json(resourceGovernanceService.budgetFor((String(req.query.tier||'LIGHT')) as any,req.query.critical==='true')));
 
 app.post('/api/miki/attention/error', (req,res)=>res.json(frontierGovernanceService.observePrediction(String(req.body?.key||''),req.body?.errorClass,Number(req.body?.magnitude||0),Number(req.body?.impact||0),Number(req.body?.frequency||1),Number(req.body?.unknownCause||0.5))));
 app.get('/api/miki/attention', (_req,res)=>res.json({plan:frontierGovernanceService.attentionPlan()}));

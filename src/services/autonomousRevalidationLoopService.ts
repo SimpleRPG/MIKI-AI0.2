@@ -7,6 +7,7 @@ import { verifiedKnowledgePromotionService } from './verifiedKnowledgePromotionS
 import { verifiedCapabilityPromotionService } from './verifiedCapabilityPromotionService';
 import { mikiUnifiedLearningContinuumService } from './mikiUnifiedLearningContinuumService';
 import { researchToRemediationService } from './researchToRemediationService';
+import { ExecutionEnvironment } from './executionRunnerService';
 
 export interface RevalidationRun {
   runId: string;
@@ -44,7 +45,7 @@ export class AutonomousRevalidationLoopService {
   public isRunning(): boolean { return this.running; }
   public list(limit = 20): RevalidationRun[] { return this.history.slice(0, Math.max(1, limit)).map(r => ({ ...r, staleCapabilities: [...r.staleCapabilities], gapsProcessed: [...r.gapsProcessed], notes: [...r.notes] })); }
 
-  public async run(options?: { limit?: number; environment?: string; signal?: AbortSignal }): Promise<RevalidationRun> {
+  public async run(options?: { limit?: number; environment?: ExecutionEnvironment; signal?: AbortSignal }): Promise<RevalidationRun> {
     if (this.running) throw new Error('revalidation loop is already running');
     this.running = true;
     const startedAt = Date.now();

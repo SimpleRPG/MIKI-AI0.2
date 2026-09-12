@@ -29,6 +29,7 @@ export interface ComponentPlan {
   component_ids: string[];
   score: number;
   verified: boolean;
+  environment?: string;
   composable: boolean;
   reasons: string[];
 }

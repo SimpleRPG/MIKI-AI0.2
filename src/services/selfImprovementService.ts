@@ -1236,58 +1236,8 @@ class SelfImprovementService {
     };
   }
 
-  public addGeneration(gen: Omit<ModelGeneration, 'generationId' | 'createdAt'>): ModelGeneration {
-    throw new Error('Model generation registration is retired; update deterministic capabilities instead.')
-    let finalBranch = gen.branch;
-    let finalScore = gen.benchmarkScore;
-    let finalReportId = gen.benchmarkReportId;
-    let promotedAt = gen.promotedAt;
-    let promotionNotes = gen.promotionNotes;
-
-    // stable指定時は回帰レポート検証を強制 (レポートなしの安定化を拒否 & モデル同一性チェック)
-    if (finalBranch === 'stable') {
-      if (!finalReportId) {
-        throw new Error(
-          '総合安定版(stable)としての登録には、退行ゼロかつ全テスト合格の実機回帰ベンチマークレポートの選択が必須です。合格レポートを選択するか、候補ブランチ(chat_specialized/experimental等)として登録してください。'
-        );
-      }
-      const tempGen: ModelGeneration = {
-        ...gen,
-        generationId: 'temp_validation',
-        createdAt: Date.now(),
-      };
-      const check = this.validatePromotionReport(finalReportId, tempGen);
-      if (!check.valid) {
-        throw new Error(check.error || '回帰テスト合格基準を満たしていません。');
-      }
-      finalScore = check.report!.overallScore;
-      promotedAt = Date.now();
-      promotionNotes = `回帰レポート[${finalReportId}]合格承認 (テスト対象「${check.report!.modelName}」一致確認済, スコア: ${finalScore}点, 退行: 0件)`;
-    }
-
-    const newGen: ModelGeneration = {
-      ...gen,
-      branch: finalBranch,
-      benchmarkScore: finalScore,
-      benchmarkReportId: finalReportId,
-      promotedAt,
-      promotionNotes,
-      generationId: 'gen_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      createdAt: Date.now(),
-    };
-
-    // stableが新設された場合、既存のactive stableをarchivedに退避
-    if (newGen.branch === 'stable' && newGen.status === 'active') {
-      this.generations = this.generations.map((g) =>
-        g.branch === 'stable' && g.status === 'active'
-          ? { ...g, status: 'archived' }
-          : g
-      );
-    }
-
-    this.generations.push(newGen);
-    this.saveGenerations();
-    return newGen;
+  public addGeneration(_gen: Omit<ModelGeneration, 'generationId' | 'createdAt'>): ModelGeneration {
+    throw new Error('Model generation registration is retired; update deterministic capabilities instead.');
   }
 
   /**
@@ -1296,50 +1246,10 @@ class SelfImprovementService {
    * 設計思想 25. 安全・品質境界 & 評価基準の改ざん防止 (テスト対象と昇格対象の同一性チェック)
    */
   public promoteToStable(
-    generationId: string,
-    reportId: string
+    _generationId: string,
+    _reportId: string
   ): { success: boolean; error?: string; generation?: ModelGeneration } {
     return { success: false, error: 'Model promotion is retired; Non-LLM Core has no model generations.' };
-    const targetGen = this.generations.find((g) => g.generationId === generationId);
-    if (!targetGen) {
-      return { success: false, error: '指定されたモデル世代が見つかりません。' };
-    }
-
-    // 基準検証 (テスト品質 + テスト対象と昇格対象世代の同一性チェック)
-    const check = this.validatePromotionReport(reportId, targetGen);
-    if (!check.valid) {
-      return { success: false, error: check.error };
-    }
-
-    const report = check.report!;
-
-    // 既存の稼働中stableモデルをアーカイブに退避
-    this.generations = this.generations.map((g) => {
-      if (g.branch === 'stable' && g.status === 'active' && g.generationId !== generationId) {
-        return {
-          ...g,
-          status: 'archived',
-        };
-      }
-      return g;
-    });
-
-    // 昇格
-    targetGen.branch = 'stable';
-    targetGen.status = 'active';
-    targetGen.benchmarkScore = report.overallScore;
-    targetGen.benchmarkReportId = report.id;
-    targetGen.promotedAt = Date.now();
-    targetGen.promotionNotes = `回帰レポート[${report.id}]合格により正式昇格 (対象モデル「${report.modelName}」と一致確認済, 総合スコア: ${report.overallScore}点, 合格: ${report.passedTests}/${report.totalTests}, 退行: 0件)`;
-
-    this.saveGenerations();
-
-    systemLogger.info(
-      'SELF_IMPROVEMENT',
-      `🏆 [モデル昇格成功] 「${targetGen.modelName}」が回帰レポート[${report.id}]（テスト対象: ${report.modelName}）に基づいて総合安定版(stable)へ昇格しました (スコア: ${report.overallScore}点)`
-    );
-
-    return { success: true, generation: targetGen };
   }
 
   /**
@@ -1347,48 +1257,10 @@ class SelfImprovementService {
    * (設計思想 25. 人の確認なしの自動昇格を避ける)
    */
   public adoptModelFromComparison(
-    candidateGenerationId: string,
-    comparisonReport: ModelSizeComparisonReport
+    _candidateGenerationId: string,
+    _comparisonReport: ModelSizeComparisonReport
   ): { success: boolean; error?: string; generation?: ModelGeneration } {
     return { success: false, error: 'Model adoption is retired; Non-LLM Core has no model generations.' };
-    if (comparisonReport.verdict !== 'ADOPT_B') {
-      return {
-        success: false,
-        error: `比較判定が「ADOPT_B」ではないため常用モデルへ昇格できません (現在の判定: ${comparisonReport.verdict})`,
-      };
-    }
-
-    const targetGen = this.generations.find((g) => g.generationId === candidateGenerationId);
-    if (!targetGen) {
-      return { success: false, error: '指定されたモデル世代が見つかりません。' };
-    }
-
-    // 既存の稼働中stableモデルをアーカイブに退避
-    this.generations = this.generations.map((g) => {
-      if (g.branch === 'stable' && g.status === 'active' && g.generationId !== candidateGenerationId) {
-        return {
-          ...g,
-          status: 'archived',
-        };
-      }
-      return g;
-    });
-
-    // 常用モデル (active stable) へ昇格
-    targetGen.branch = 'stable';
-    targetGen.status = 'active';
-    targetGen.benchmarkScore = comparisonReport.modelB.scores.overallScore;
-    targetGen.promotedAt = Date.now();
-    targetGen.promotionNotes = `モデルサイズ比較レポート[${comparisonReport.id}]承認により常用モデルに採用 (パラメータ: ${(comparisonReport.modelB.params / 1e9).toFixed(1)}B, スコア: ${comparisonReport.modelB.scores.overallScore}点, TPS: ${comparisonReport.modelB.avgTps} tok/s, 判定: ADOPT_B)`;
-
-    this.saveGenerations();
-
-    systemLogger.info(
-      'SELF_IMPROVEMENT',
-      `👑 [常用モデル昇格] モデルサイズ比較承認により「${targetGen.modelName}」を総合安定常用モデルに昇格しました`
-    );
-
-    return { success: true, generation: targetGen };
   }
 
   public deleteGeneration(generationId: string): void {

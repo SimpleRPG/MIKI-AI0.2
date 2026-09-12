@@ -7,9 +7,17 @@ export interface NativeGpuInfo {
   totalMemoryMB: number;
   freeMemoryMB: number;
   computeUnits: number;
+  gpuRenderer?: string;
+  gpuVendor?: string;
 }
 export interface NativeDownloadedFile { fileName: string; size: number; path?: string; }
-export interface NativeStorageInfo { totalBytes: number; freeBytes: number; usedBytes: number; }
+export interface NativeStorageInfo {
+  totalBytes: number;
+  freeBytes: number;
+  usedBytes: number;
+  freeDiskMB?: number;
+  totalDiskMB?: number;
+}
 export interface NativeLoraFile { fileName: string; size: number; }
 export interface NativeLoraStorageInfo { totalBytes: number; freeBytes: number; usedBytes: number; files: NativeLoraFile[]; }
 export interface NonLlmTeacherConfig { endpoint: string; model?: string; apiKey?: string; type?: string; slotId?: number; [key: string]: any; }
@@ -65,10 +73,10 @@ export const nonLlmRuntimeService = {
   removeLoraAdapter: async (..._args: any[]) => ({ success: true }),
   deleteLoraFile: async (..._args: any[]) => false,
   autoLoadDownloadedModelIfAvailable: async (..._args: any[]) => false,
-  streamDeterministicChat: (first: ChatMessage[] | NonLlmTeacherConfig | any[], second?: ChatMessage[] | any[], _options?: any) =>
-    deterministicStream(Array.isArray(first) ? first : (second || [])),
-  chatStream: (messages: ChatMessage[] | any[], _options?: any) => deterministicStream(messages),
-  streamChat: (messages: ChatMessage[] | any[], _options?: any) => deterministicStream(messages),
+  streamDeterministicChat: (first: any, second?: any, _options?: any) =>
+    deterministicStream(Array.isArray(first) ? first : (Array.isArray(second) ? second : [])),
+  chatStream: (messages: any, _options?: any) => deterministicStream(Array.isArray(messages) ? messages : []),
+  streamChat: (messages: any, _options?: any) => deterministicStream(Array.isArray(messages) ? messages : []),
   isWebGPUSupported: async (..._args: any[]) => ({ supported: false, adapterInfo: { description: 'Non-LLM Core', vendor: 'Deterministic', architecture: 'CPU', maxBufferSize: 0, maxComputeInvocations: 0 }, error: 'WebGPU model runtime is retired.' }),
   isLoaded: () => false,
   isModelLoaded: (_modelId?: string) => false,

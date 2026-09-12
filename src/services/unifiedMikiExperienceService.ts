@@ -112,11 +112,11 @@ export class UnifiedMikiExperienceService {
     lesson?: string;
     timestamp?: number;
   }): UnifiedExperience {
-    const concepts = tokenize(`${input || ''} ${input ? '' : input || ''} ${input || ''}`);
+    const concepts = tokenize(`${input.input || ''} ${input.lesson || ''}`);
     // actionも概念として残す。会話とゲームで同じ概念を共有できるようにする。
-    const actionTokens = tokenize(input ? `${input} ${input}` : input || '');
-    const mergedConcepts = Array.from(new Set([...concepts, ...actionTokens, ...tokenize(input || ''), ...tokenize(input || '')])).slice(0, 24);
-    const outcome = input?.trim() ? (input.outcome || 'UNKNOWN') : (input.outcome || 'UNKNOWN');
+    const actionTokens = tokenize(input.action || '');
+    const mergedConcepts = Array.from(new Set([...concepts, ...actionTokens])).slice(0, 24);
+    const outcome = input.outcome || 'UNKNOWN';
     const timestamp = input.timestamp || Date.now();
     const fingerprint = stableHash(`${input.domain}|${input.action}|${input.input || ''}|${input.sourceFingerprint || ''}`);
     const id = `EXP-${stableHash(`${timestamp}|${fingerprint}|${this.state.totalExperiences}`)}`;

@@ -71,14 +71,18 @@ export class MikiUnifiedLearningContinuumService {
 
   public observe(input: {
     domain: UnifiedExperienceDomain;
-    key: string;
+    key?: string;
+    action?: string;
+    input?: string;
     outcome: UnifiedOutcome;
     verified: boolean;
     capabilityIds?: string[];
     concepts?: string[];
+    lesson?: string;
   }) {
     const now = Date.now();
-    const keys = Array.from(new Set([normalizeKey(input.key), ...(input.concepts || []).map(normalizeKey).filter(Boolean)])).filter(Boolean).slice(0, 20);
+    const effectiveKey = input.key || input.action || input.input || 'general';
+    const keys = Array.from(new Set([normalizeKey(effectiveKey), ...(input.concepts || []).map(normalizeKey).filter(Boolean)])).filter(Boolean).slice(0, 20);
     for (const key of keys) {
       const current = this.profiles.get(key) || { key, uses: 0, successes: 0, failures: 0, verified: 0, lastObservedAt: 0, confidence: 0, domains: domains() };
       current.uses += 1;

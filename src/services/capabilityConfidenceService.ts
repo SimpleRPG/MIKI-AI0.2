@@ -55,12 +55,12 @@ export class CapabilityConfidenceService {
     const observedHash = latest?.implementation_hash;
     const hashCurrent = !!currentHash && !!observedHash && currentHash === observedHash;
     const hashScore = !latest ? 50 : hashCurrent ? 100 : 0;
-    const verificationScore = component?.status === 'VERIFIED' ? 100 : component?.status === 'DEVICE_VERIFIED' ? 90 : 0;
+    const verificationScore = component?.status === 'VERIFIED' ? 100 : (component?.status as string) === 'DEVICE_VERIFIED' ? 90 : 0;
     const environmentScore = environment
       ? (samples.length > 0 ? 100 : events.length > 0 ? 20 : 50)
       : 100;
     const risk = environment && component
-      ? failureMemoryService.assessRisk(componentId, environment, currentHash).risk_score
+      ? failureMemoryService.assessRisk(componentId, environment, currentHash || '').risk_score
       : 0;
 
     // Weighted confidence is intentionally conservative: verification alone

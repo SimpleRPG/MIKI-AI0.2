@@ -537,6 +537,27 @@ export class ClaimDatabaseService {
     return this.claims.get(claim_id);
   }
 
+  public searchClaims(query: string, limit = 5): Array<ClaimRecord & { claimText?: string; confidence?: number }> {
+    const qLower = query.toLowerCase();
+    const tokens = qLower.split(/[^\p{L}\p{N}_-]+/u).filter((t: string) => t.length >= 2);
+    const active = Array.from(this.claims.values()).filter((c) => c.status !== 'SUPERSEDED');
+    const scored = active.map((c) => {
+      const text = c.statement.toLowerCase();
+      let matches = 0;
+      for (const t of tokens) {
+        if (text.includes(t)) matches++;
+      }
+      return {
+        ...c,
+        claimText: c.statement,
+        confidence: c.confidence_score,
+        _score: matches,
+      };
+    }).filter((c) => c._score > 0 || tokens.length === 0)
+      .sort((a, b) => b._score - a._score || (b.confidence_score ?? 0) - (a.confidence_score ?? 0));
+    return scored.slice(0, limit);
+  }
+
   public getAllClaims(): ClaimRecord[] {
     return Array.from(this.claims.values());
   }

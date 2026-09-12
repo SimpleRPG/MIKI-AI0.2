@@ -1411,6 +1411,9 @@ export interface BackgroundTaskExecutionLog {
     trainingTargetThreshold?: number;
     syntheticGeneratedCount?: number;
     weaknessFound?: string[];
+    autonomousGrowthCycleId?: string;
+    autonomousGrowthSourceChanged?: boolean;
+    autonomousGrowthGapCount?: number;
   };
 }
 
@@ -2649,6 +2652,7 @@ export interface BranchReasoningSimulation {
 export interface LatentGoalInference {
   surfaceIntent: string;
   latentGoal: string;
+  primaryGoal?: string;
   unexpressedNeeds: string[];
   confidenceScore: number; // 0-100
   urgencyLevel: 'LOW' | 'MEDIUM' | 'HIGH';
@@ -2711,6 +2715,7 @@ export type UserEmotionalValenceType =
 export interface AffectionDynamicState {
   affectionScore: number; // 0 - 100 (連続蓄積親愛度)
   empathyLevel: number;   // 0 - 100 (共感度)
+  currentZone?: string;
   valence: UserEmotionalValenceType;
   toneStance: 'RESPECTFUL_WARM' | 'INTIMATE_PARTNER' | 'CHEERFUL_SUPPORTER' | 'CALM_PROFESSIONAL';
   sessionTransferCount: number;
@@ -3132,6 +3137,8 @@ export type ClaimMaturity =
 
 /** 6.7 自己生成情報による自己証明の禁止 */
 export type ClaimSelfProvenance =
+  | 'NONE'
+  | 'SELF_GENERATED'
   | 'SELF_SUPPORTED'
   | 'INDEPENDENTLY_SUPPORTED'
   | 'EXECUTION_CONFIRMED'
@@ -3173,6 +3180,7 @@ export interface ClaimRecord {
   superseded_by?: string;
   superseded_from?: string;
   contradicted_by?: string[];
+  confidence_score?: number;
   created_at: number;
   updated_at: number;
 }
@@ -3427,6 +3435,7 @@ export interface CompiledRequestType {
   goal: string;
   target: string;
   targetEntity?: string;
+  requestType?: string;
   category?: string;
   domain?: string;
   /** 実行先環境。要求コンパイル時に確定し、Graph/Task/Runnerへ引き継ぐ。 */
