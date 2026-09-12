@@ -77,6 +77,7 @@ import { PromotionGateSubView } from './non_llm_views/PromotionGateSubView';
 import { AutonomousHardeningSubView } from './non_llm_views/AutonomousHardeningSubView';
 import { CloudGatewaySubView } from './non_llm_views/CloudGatewaySubView';
 import { HardwarePipelineSubView } from './non_llm_views/HardwarePipelineSubView';
+import { LlmMigrationSubView } from './non_llm_views/LlmMigrationSubView';
 import {
   GitBranch,
   Sparkles,
@@ -85,7 +86,6 @@ import {
   Layers,
   Cpu,
   GitMerge,
-  ShieldCheck,
   ShieldAlert,
   Cloud,
 } from 'lucide-react';
@@ -103,6 +103,7 @@ export const NonLlmArchitectureTab: React.FC = () => {
     | 'metacognitive'
     | 'affection_dynamics'
     | 'formal_csp'
+    | 'llm_migration'
     | 'promotion_gate'
     | 'autonomous_hardening'
     | 'cloud_gateway'
