@@ -7,6 +7,7 @@ import {
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { isCasualGreetingOrShortSocial } from './conversationStateService';
+import { surfaceVariationService } from './surfaceVariationService';
 
 const SKELETONS_STORAGE_KEY = 'miki_response_skeletons_v32';
 
@@ -232,6 +233,18 @@ class AnswerPlanService {
 
   public getSkeletonById(patternId: string): ResponseSkeleton | undefined {
     return this.skeletons.find((s) => s.pattern_id === patternId);
+  }
+
+  /**
+   * 設計思想 19.2節: 回答骨格の言い回しバリエーション取得 (各30種以上から非重複選択)
+   */
+  public getSkeletonTemplateVariation(patternId: string): string {
+    const variation = surfaceVariationService.getSkeletonResponseTemplate(patternId);
+    if (variation) {
+      return variation.text;
+    }
+    const skeleton = this.getSkeletonById(patternId);
+    return skeleton?.exampleResponseTemplate || '';
   }
 
   public addSkeleton(skeleton: Omit<ResponseSkeleton, 'usageCount' | 'successRate' | 'createdAt' | 'updatedAt'>): ResponseSkeleton {

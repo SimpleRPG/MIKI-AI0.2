@@ -25,6 +25,7 @@
     "test:non-llm-pipeline-v58": "node scripts/test_non_llm_pipeline_v58.mjs",
     "test:deterministic-execution-v59": "node scripts/test_deterministic_capability_execution_v59.mjs",
     "test:v13-surface-and-persona": "tsx scripts/verify_v13_surface_and_persona.ts",
+    "test:v14-surface-variation": "tsx scripts/verify_v14_surface_variation.ts",
     "test:simple-rpg-recovery-v61": "node scripts/test_simple_rpg_recovery_v61.mjs",
     "test:simple-rpg-auto-learning-v63": "node scripts/test_simple_rpg_auto_learning_v63.mjs"
   },

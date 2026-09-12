@@ -4,6 +4,7 @@ import {
   ResponseLength,
 } from '../types';
 import { systemLogger } from './systemLogger';
+import { surfaceVariationService } from './surfaceVariationService';
 
 /**
  * 設計思想 5.2節「11部品」の表層文法・性格・文末表現エンジン
@@ -79,6 +80,7 @@ export class SurfaceGrammarAndStyleService {
 
   /**
    * 2. シーン別見出しの生成 (currentScene)
+   * 設計思想 19.2節: 30種類以上のプールから非重複選択 (4大シーンは固定)
    */
   public getSectionHeadings(
     skeleton: AnswerSkeletonType,
@@ -90,143 +92,41 @@ export class SurfaceGrammarAndStyleService {
     exceptions: string;
     nextActions: string;
   } {
-    if (scene === 'DISASTER_RECOVERY') {
-      return {
-        conclusion: '【緊急対処手順】',
-        reasons: '【障害の直接要因】',
-        conditions: '【復旧の成立条件】',
-        exceptions: '【現時点で確認済みの影響・二次被害】',
-        nextActions: '【直ちに実行すべき復旧確認】',
-      };
-    }
-    if (scene === 'ERROR_REPORT') {
-      return {
-        conclusion: '【エラー診断結果】',
-        reasons: '【エラー発生原因】',
-        conditions: '【再現・回避条件】',
-        exceptions: '【例外的な発生パターン】',
-        nextActions: '【推奨する解消ステップ】',
-      };
-    }
-    if (scene === 'TECHNICAL_RESEARCH') {
-      return {
-        conclusion: '【技術調査結論】',
-        reasons: '【技術的根拠・仕様】',
-        conditions: '【適用制約・依存環境】',
-        exceptions: '【技術的例外・未検証事項】',
-        nextActions: '【次の検証・ベンチマーク】',
-      };
-    }
-    if (scene === 'CODE_DELIVERY') {
-      return {
-        conclusion: '【納品仕様・実装概要】',
-        reasons: '【設計採用理由】',
-        conditions: '【稼働環境および前提条件】',
-        exceptions: '【仕様上の制限事項】',
-        nextActions: '【納品後の確認・受入れテスト】',
-      };
-    }
-
-    // デフォルト (NORMAL, SHORT_MODE, DETAILED_MODE)
-    switch (skeleton) {
-      case 'RECOMMENDATION':
-        return {
-          conclusion: '【結論】',
-          reasons: '【選定の主な理由】',
-          conditions: '【推奨が変わる条件】',
-          exceptions: '【留意点・例外】',
-          nextActions: '【次のアクション】',
-        };
-      case 'CORRECTION':
-        return {
-          conclusion: '【訂正後の結論】',
-          reasons: '【訂正理由】',
-          conditions: '【訂正に関係する条件】',
-          exceptions: '【影響・例外】',
-          nextActions: '【修正後の確認】',
-        };
-      case 'UNKNOWN_INVESTIGATION':
-        return {
-          conclusion: '【現在判明している事項】',
-          reasons: '【調査経緯】',
-          conditions: '【不足している証拠・情報】',
-          exceptions: '【現時点で不確実・未解決の事項】',
-          nextActions: '【次の調査・検証】',
-        };
-      case 'TASK_COMPLETION':
-        return {
-          conclusion: '【実施結果】',
-          reasons: '【実施根拠】',
-          conditions: '【検証・成立条件】',
-          exceptions: '【未確認・例外】',
-          nextActions: '【次の確認事項】',
-        };
-      case 'GENERAL_ANSWER':
-      default:
-        return {
-          conclusion: '【結論】',
-          reasons: '【判断理由】',
-          conditions: '【適用条件】',
-          exceptions: '【補足・例外】',
-          nextActions: '【次のステップ】',
-        };
-    }
+    return surfaceVariationService.getSectionHeadings(skeleton, scene);
   }
 
   /**
-   * 3. シーンとダイレクトネスに応じた接続詞の取得
+   * 3. シーンとダイレクトネスに応じた接続詞の取得 (30種以上から非重複選択)
    */
   public getSceneConnector(
     scene: MultiAxisPersonaConfig['currentScene'],
     directness: MultiAxisPersonaConfig['directness']
   ): string {
-    if (scene === 'DISASTER_RECOVERY') return '至急確認';
-    if (scene === 'ERROR_REPORT') return '原因として';
-    if (scene === 'TECHNICAL_RESEARCH') return '技術的検証により';
-    if (scene === 'CODE_DELIVERY') return '仕様に基づき';
-    if (directness === 'HIGH') return '結論として';
-    if (directness === 'LOW') return '背景として';
-    return 'まず';
+    return surfaceVariationService.getConnector(scene, directness).text;
   }
 
   /**
-   * 4. 慎重さ (prudence) の適用: リスク警告や検証前提の付加
+   * 4. 慎重さ (prudence) の適用: リスク警告や検証前提の付加 (30種以上から非重複選択)
    */
   public applyPrudenceNote(
     prudence: MultiAxisPersonaConfig['prudence'],
     scene: MultiAxisPersonaConfig['currentScene']
   ): string | null {
-    if (scene === 'SHORT_MODE') return null;
-    if (prudence === 'VERY_HIGH') {
-      return '※本判定は現行前提に基づくため、実機・本番環境での事前バックアップおよび厳密な動作検証を推奨します。';
-    }
-    if (prudence === 'HIGH') {
-      return '※環境依存のリスクがあるため、実行前の事前検証を推奨します。';
-    }
-    return null;
+    return surfaceVariationService.getPrudenceNote(prudence, scene)?.text || null;
   }
 
   /**
-   * 5. 積極的提案 (proactiveSuggestion) の適用
+   * 5. 積極的提案 (proactiveSuggestion) の適用 (30種以上から非重複選択)
    */
   public applyProactiveSuggestion(
     proactiveSuggestion: MultiAxisPersonaConfig['proactiveSuggestion'],
     scene: MultiAxisPersonaConfig['currentScene']
   ): string | null {
-    if (scene === 'SHORT_MODE' || scene === 'DISASTER_RECOVERY' || scene === 'ERROR_REPORT') {
-      return null;
-    }
-    if (proactiveSuggestion === 'ACTIVE') {
-      return '【次のアクション提案】上記ステップが完了次第、続けて次の自動化・検証に進めることができます。いつでもお声がけください！';
-    }
-    if (proactiveSuggestion === 'MODERATE') {
-      return '【次のステップ】必要に応じて上記の次アクションを進めていきましょう。';
-    }
-    return null;
+    return surfaceVariationService.getProactiveSuggestion(proactiveSuggestion, scene)?.text || null;
   }
 
   /**
-   * 6. 温かみ (warmth) とユーモア (humor) による結び表現の適用
+   * 6. 温かみ (warmth) とユーモア (humor) による結び表現の適用 (30種以上から非重複選択)
    */
   public applyWarmthAndHumor(
     baseText: string,
@@ -237,21 +137,19 @@ export class SurfaceGrammarAndStyleService {
     // 災害復旧やエラー報告シーンでは、ユーモアや過度な感情語は自動抑制（安全設計）
     const isCriticalScene = persona.currentScene === 'DISASTER_RECOVERY' || persona.currentScene === 'ERROR_REPORT';
 
-    // 6.1 ユーモア (humor) の付加
+    // 6.1 ユーモア (humor) の付加 (30種以上から選択)
     if (!isCriticalScene && persona.humor !== 'OFF') {
-      if (persona.humor === 'MODERATE') {
-        result += '\n\n肩の力を抜いてサクッとクリアしていこう！順調に進んでいるよ。';
-      } else if (persona.humor === 'LIGHT') {
-        result += '\n\n焦らず一歩ずつ確実に進めていこう。';
+      const humorItem = surfaceVariationService.getHumorLine(persona.humor);
+      if (humorItem) {
+        result += `\n\n${humorItem.text}`;
       }
     }
 
-    // 6.2 温かみ (warmth) の付加
+    // 6.2 温かみ (warmth) の付加 (30種以上から選択)
     if (!isCriticalScene) {
       if (persona.warmth === 'HIGH') {
-        if (!result.endsWith('！') && !result.endsWith('だね！') && !result.endsWith('進んでいるよ。')) {
-          result += persona.politeness === 'CASUAL' ? ' いつでも頼ってね！' : ' お力になれれば幸いです！';
-        }
+        const closingItem = surfaceVariationService.getWarmthClosing(persona.politeness);
+        result += ` ${closingItem.text}`;
       } else if (persona.warmth === 'LOW') {
         // LOWの場合は感嘆符や親密語尾を抑制し、端正な句点に整える
         result = result.replace(/！+/g, '。').replace(/いつでも頼ってね[！。]?/g, '');
