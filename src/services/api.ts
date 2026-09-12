@@ -470,21 +470,21 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     throw new DOMException('Aborted', 'AbortError');
   }
 
-  // 1. If Non-LLM autonomous mode (autonomous_rule) is chosen, execute via CPU+NPU+GPU hardware pipeline!
+  // 1. Non-LLM autonomous mode: deterministic CPU-first pipeline. Accelerators are optional and only reported when actually connected.
   if (params.engineMode === 'autonomous_rule') {
     const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
       prompt: params.prompt,
       persona: params.persona?.name,
       attachedFiles: params.attachedFiles,
     });
-    systemLogger.info('CHAT', `⚡ 非LLM全機協調処理完了: ${pipelineRes.telemetry.totalMs}ms (CPU: ${pipelineRes.telemetry.cpuMs}ms, NPU: ${pipelineRes.telemetry.npuMs}ms, GPU: ${pipelineRes.telemetry.gpuMs}ms)`, {
+    systemLogger.info('CHAT', `[非LLM決定論的処理完了] ${pipelineRes.telemetry.totalMs}ms (CPU: ${pipelineRes.telemetry.cpuMs}ms, 実行: ${pipelineRes.telemetry.executedBackends.join(',')})`, {
       usedComponents: pipelineRes.usedComponents,
       affectionScore: pipelineRes.affectionScore,
     });
     return {
       text: pipelineRes.replyText,
       engineMode: 'autonomous_rule',
-      model: `非LLM自律統合中核 (CPU: ${pipelineRes.telemetry.cpuMs}ms | NPU: ${pipelineRes.telemetry.npuMs}ms | GPU: ${pipelineRes.telemetry.gpuMs}ms)`,
+      model: `非LLM自律統合中核 (${pipelineRes.telemetry.executedBackends.join('+')})`,
       hardwareTelemetry: pipelineRes.telemetry,
     };
   }
@@ -502,7 +502,7 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     return {
       text: pipelineRes.replyText,
       engineMode: params.engineMode,
-      model: `非LLM自律統合中核 (CPU: ${pipelineRes.telemetry.cpuMs}ms | NPU: ${pipelineRes.telemetry.npuMs}ms | GPU: ${pipelineRes.telemetry.gpuMs}ms - 外部送信完全遮断)`,
+      model: `非LLM自律統合中核 (${pipelineRes.telemetry.executedBackends.join('+')} / 外部送信完全遮断)`,
       hardwareTelemetry: pipelineRes.telemetry,
     };
   }
@@ -525,7 +525,7 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
   if (!promptAudit.allowed) {
     systemLogger.warn('PRIVACY', `🔒 [外部送信ガードレール] 送信が遮断されました: ${promptAudit.blockedReason}`);
     return {
-      text: `⚠️ 【プライバシー保護ガードレールによる外部送信遮断】\n\n送信内容に外部漏洩不可の機密情報が検出されたため、クラウドAPIへの送信を自動遮断しました。\n・遮断理由: ${promptAudit.blockedReason || '機密情報検知'}\n\n端末ローカル推論 (GGUF / WebGPU) または機密情報を抽象化したプロンプトをご利用ください。`,
+      text: `⚠️ 【プライバシー保護ガードレールによる外部送信遮断】\n\n送信内容に外部漏洩不可の機密情報が検出されたため、クラウドAPIへの送信を自動遮断しました。\n・遮断理由: ${promptAudit.blockedReason || '機密情報検知'}\n\n端末内のNon-LLM Coreで処理するか、機密情報を抽象化してから外部教師へ送信してください。`,
       engineMode: 'gemini_cloud',
       model: 'Privacy Guardrail Interceptor',
       privacyAudit: promptAudit,

@@ -21,7 +21,7 @@ import {
   MutationTestResult,
 } from './mikiSelfCodingSuperchargerService';
 import { codeSearchService } from './codeSearchService';
-import { nativeLlmService } from './nativeLlmService';
+import { nonLlmRuntimeService } from './nonLlmRuntimeService';
 import { mikiIntrospectionJournalService } from './mikiIntrospectionJournalService';
 import { digitalResearchNoteService } from './digitalResearchNoteService';
 import { cognitiveDebuggerService } from './cognitiveDebuggerService';
@@ -333,13 +333,13 @@ export class AutonomousContinuousEvolutionService {
       logStep('AUDIT', '監査完了', `現在の適合スコア: ${previousScore}点 (未実装: ${preAudit.unimplementedChapters}章)`, 'SUCCESS');
 
       // ── Step 2: 不変条件厳密検査 (Invariants Check) ──
-      logStep('INVARIANTS', '不変条件エンジン事前検証', 'Qwen 3B保護・プライバシー境界・API循環・ロールバック性の5項目を検査中...');
+      logStep('INVARIANTS', '不変条件エンジン事前検証', 'モデル重み不変性・プライバシー境界・API循環・ロールバック性の5項目を検査中...');
       const invariants = selfCodeArchitectService.checkInvariants();
       if (!invariants.allPassed) {
         logStep('INVARIANTS', '不変条件チェック失格', '不変条件に抵触の恐れがあるため自律改善を安全停止しました', 'FAILED');
         throw new Error('不変条件チェック失格: 安全境界を破る変更は自己改善エンジンにより拒絶されます。');
       }
-      logStep('INVARIANTS', '不変条件オールクリア', '全5項目パス。Qwen 3Bアンカーおよびプライバシー境界の完全保護を確認', 'SUCCESS');
+      logStep('INVARIANTS', '不変条件オールクリア', '全5項目パス。モデル重み不変性およびプライバシー境界の完全保護を確認', 'SUCCESS');
 
       // ── Step 3: 対象特定 (Target Selection) ──
       let targetInfo = this.selectNextTarget();
@@ -390,10 +390,10 @@ export class AutonomousContinuousEvolutionService {
         // オフライン時も静かにフォールバック
       }
 
-      const activeLlm = nativeLlmService.getActiveExternalConfig();
+      const activeLlm = nonLlmRuntimeService.getActiveExternalConfig();
 
       // ── Step 4: コード合成 (Code Synthesis) ──
-      logStep('SYNTHESIS', 'TypeScriptモジュール自律合成', `「${targetInfo.prompt.slice(0, 40)}」に基づく型安全コードを生成中 (ローカルLLM優先 + 人類の先行知恵)...`);
+      logStep('SYNTHESIS', 'TypeScriptモジュール自律合成', `「${targetInfo.prompt.slice(0, 40)}」に基づく型安全コードを生成中 (決定論的テンプレート + 検証済み部品)...`);
       let implResult: SelfImplementationResult = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
         targetInfo.prompt,
         targetInfo.targetFile,
@@ -403,53 +403,7 @@ export class AutonomousContinuousEvolutionService {
         activeLlm.model
       );
 
-      // 実装サーバーが 404 またはオフラインで、コードが 0 行だった場合のダイレクトローカルLLM (Port 8080) バイパス
-      if (!implResult.success || !implResult.code || implResult.code.trim().length === 0) {
-        logStep(
-          'SYNTHESIS',
-          '稼働中ローカルLLM直結バイパス始動',
-          `実装サーバー(Port 3000)が未応答/404のため、稼働中のローカルLLM (${activeLlm.endpoint || 'http://127.0.0.1:8080'}) へクライアントから直接自律生成要求を送信します...`,
-          'WARNING'
-        );
-
-        let directCode = '';
-        try {
-          const directPrompt = `あなたはAI「みき」です。以下の機能要求を満たす完全で型安全なTypeScriptコードを実装してください。
-【機能要件】: ${targetInfo.prompt}
-【対象ファイル】: ${targetInfo.targetFile}
-【守るべき原則】: 型安全、適切なexport、例外ハンドリング、不変条件保護
-必ず \`\`\`typescript ... \`\`\` で囲んでコードを出力してください。`;
-
-          const directStream = nativeLlmService.chatStream(
-            [{ role: 'user', content: directPrompt }],
-            { temperature: 0.2 }
-          );
-          for await (const chunk of directStream) {
-            directCode += chunk;
-          }
-
-          const match = directCode.match(/```(?:typescript|ts)?([\s\S]*?)```/);
-          const extracted = match && match[1] ? match[1].trim() : directCode.trim();
-          if (extracted && (extracted.includes('export') || extracted.includes('class') || extracted.includes('function') || extracted.includes('interface'))) {
-            implResult = {
-              success: true,
-              prompt: targetInfo.prompt,
-              targetFile: targetInfo.targetFile,
-              isNewFile: true,
-              snapshotId: `client_snap_${Date.now()}`,
-              commitHash: `c_${Math.random().toString(36).slice(2, 9)}`,
-              applied: false,
-              syntaxCheckPassed: true,
-              reasoning: `ローカルLLM (${activeLlm.model || 'Qwen 3B'}) に直接接続し、クライアントサイドで型安全モジュールを自律実装しました。`,
-              code: extracted,
-              linesCount: extracted.split('\n').length,
-              generationMethod: 'llm_local',
-            };
-          }
-        } catch (directErr: any) {
-          console.warn('[Direct Local LLM Fallback Notice]', directErr);
-        }
-
+      // v85: 旧ローカルLLMへの直接接続は廃止。失敗時は決定論的テンプレート経路へ進む。
         // それでも生成できない場合は、人類の先行知恵から即座に型安全モジュールを合成
         if (!implResult.code || implResult.code.trim().length === 0) {
           const fallbackClassName = targetInfo.targetFile.split('/').pop()?.replace(/\.tsx?$/, '') || 'ResilientModule';
@@ -525,12 +479,12 @@ export default ${fallbackClassName};
       } else if (isFallbackTemplate) {
         logStep(
           'SYNTHESIS',
-          '雛形スタブ合成 (ローカルLLMオフライン)',
+          '雛形スタブ合成 (旧ローカル生成ランタイムオフライン)',
           `⚠️ 要求仕様の型・骨格スタブ (${implResult.linesCount}行) を生成しました。`,
           'WARNING'
         );
       } else {
-        logStep('SYNTHESIS', 'コード合成完了', `${implResult.linesCount}行のTypeScriptコードを合成しました (${implResult.generationMethod === 'llm_local' ? '本体ローカルLLM自力実装 (人類の先行知恵結合)' : '検証済コード'})`, 'SUCCESS');
+        logStep('SYNTHESIS', 'コード合成完了', `${implResult.linesCount}行のTypeScriptコードを合成しました (${implResult.generationMethod === 'teacher_assisted_template' ? '教師支援テンプレート' : '検証済コード'})`, 'SUCCESS');
       }
 
       // ── Step 5: AST構文検査 & TDD単体テスト & 循環参照自動検証 ──
@@ -671,14 +625,13 @@ export default ${fallbackClassName};
 
       // ── Step 9: 仕様書レジストリと適合スコアの同期 ──
       // 【第3回・第4回指示書 厳格遵守】:
-      // 章が COMPLETED になれるのは、mikiSelfCodingSuperchargerService.runAutonomousImplementation() の結果が
-      // applied === true かつ generationMethod === 'llm_local' (または override) の場合のみ。
+      // 章の完了は検証済み実装 + 本番適用の証拠が揃った場合のみ。
       // 教師モデル(Gemini)による設計テンプレート・Skill IR取得時は、直接コード採用ではなく
       // 「TEACHER_ASSISTED_PENDING（教師支援済・本体実装待ち）」として保持する。
       const isFullRequirementMet =
         !isFallbackTemplate &&
         !isTeacherAssistedTemplate &&
-        (finalApply.generationMethod === 'llm_local' || finalApply.generationMethod === 'override') &&
+        (finalApply.generationMethod === 'override') &&
         (finalApply.isRequirementImplemented ?? false);
 
       if (targetInfo.chapter) {
@@ -706,7 +659,7 @@ export default ${fallbackClassName};
         logStep(
           'COMPLETED',
           '自律自己改善完了 🎉',
-          `適合スコア: ${previousScore}点 ➔ ${newScore}点 (+${Math.max(0, newScore - previousScore)}点)。本体ローカルLLMによる全工程および仕様要件の本実装を安全に完遂しました。`,
+          `適合スコア: ${previousScore}点 ➔ ${newScore}点 (+${Math.max(0, newScore - previousScore)}点)。本体旧ローカル生成ランタイムによる全工程および仕様要件の本実装を安全に完遂しました。`,
           'SUCCESS'
         );
       } else if (isTeacherAssistedTemplate || finalApply.teacherAssisted?.templateAcquired) {
@@ -720,7 +673,7 @@ export default ${fallbackClassName};
         logStep(
           'COMPLETED',
           '雛形モジュール配備完了 (要件実装は保留) ℹ️',
-          `適合スコア: ${previousScore}点 (変化なし)。ローカルLLMオフラインのため雛形スタブを配備しました。第${targetInfo.chapter?.chapterNumber}章は「着手中 (IN_PROGRESS)」として保持されます。`,
+          `適合スコア: ${previousScore}点 (変化なし)。旧ローカル生成ランタイムオフラインのため雛形スタブを配備しました。第${targetInfo.chapter?.chapterNumber}章は「着手中 (IN_PROGRESS)」として保持されます。`,
           'WARNING'
         );
       }

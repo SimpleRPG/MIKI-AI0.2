@@ -12,8 +12,7 @@ import { regressionBenchmarkService } from './regressionBenchmarkService';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { checkSampleSafety } from '../utils/trainingSampleSafetyFilter';
-import { nativeLlmService } from './nativeLlmService';
-import { webLLMService } from './webLlmService';
+import { nonLlmRuntimeService } from './nonLlmRuntimeService';
 
 const SYNTHETIC_BATCHES_STORAGE_KEY = 'miki_ai_synthetic_batches';
 
@@ -639,8 +638,8 @@ export class SyntheticDataService {
 
       if (options.testWithLocalModel) {
         try {
-          const isNativeReady = nativeLlmService.isNative() && !!nativeLlmService.getActiveModelId();
-          const isWebReady = webLLMService.isLoaded();
+          const isNativeReady = nonLlmRuntimeService.isNative() && !!nonLlmRuntimeService.getActiveModelId();
+          const isWebReady = nonLlmRuntimeService.isLoaded();
 
           if (isNativeReady || isWebReady) {
             testedWithModel = true;
@@ -654,8 +653,8 @@ export class SyntheticDataService {
             ];
 
             const stream = isNativeReady
-              ? nativeLlmService.streamNativeChat(messages, { temperature: 0.5, max_tokens: 256 })
-              : webLLMService.streamChat(messages, { temperature: 0.5, max_tokens: 256 });
+              ? nonLlmRuntimeService.streamDeterministicChat(messages, { temperature: 0.5, max_tokens: 256 })
+              : nonLlmRuntimeService.streamChat(messages, { temperature: 0.5, max_tokens: 256 });
 
             let streamedText = '';
             for await (const chunk of stream) {

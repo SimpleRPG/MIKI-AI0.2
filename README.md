@@ -198,12 +198,12 @@
    - `src/components/SelfImprovementModal.tsx`: `security_guardrail` タブ（`PrivacySecurityGuardrailTab`）のナビゲーションバー配線およびレンダリング統合。
    - `src/services/backgroundWorkerService.ts`: 深い睡眠サイクルに第21章の容量重複排除・自動整理ステップを組み込み。
 
-6. **第24章: 端末リソース適応型モデル自律獲得・検証・動的配備 ＆ パフォーマンス駆動型自律退役仕様 (Qwen 3B絶対保護原則)**
+6. **第24章: 端末リソース適応型モデル自律獲得・検証・動的配備 ＆ パフォーマンス駆動型自律退役仕様 (モデル生成系ランタイム絶対保護原則)**
    - Galaxy S25端末のハードウェア余力（Snapdragon 8 Elite / RAM 12GB〜16GB）とタスク難易度・能力不足（`capabilityGapService`）を自律診断。
    - Wi-Fi接続・深夜充電中（`UNMETERED` / `isCharging` / バッテリー30%超 / 熱状態`normal` / 容量20GBクォータ順守）に限定した安全ダウンロードゲート。
    - SHA-256整合性検査および深夜深い睡眠でのシャドーベンチマーク（12固定シナリオ退行0件検証）を経て、`llama-swap` / WebGPUレジストリへ安全昇格。
    - **実測データ駆動型モデル自律退役・削除思考 (24.6)**: 生成速度(tok/s)、初回遅延(TTFT)、直近14日利用実績、回帰品質スコア、発熱寄与度を自律思考し、不要・低速な一時モデルの退役・容量回収を提案・実行。
-   - **Qwen 3B中核アンカー絶対保護原則 (24.7)**: システム最重要中核頭脳・Draft-Verify検証器である `qwen2.5-3b` / `qwen2.5-coder-3b` を「不滅アンカー（IMMUTABLE_ANCHOR）」に指定。自動クリーンアップ・自律削除・UI手動削除の全経路で恒久的に削除を絶対阻止。
+   - **モデル生成系ランタイム中核アンカー絶対保護原則 (24.7)**: システム最重要中核頭脳・Draft-Verify検証器である `qwen2.5-3b` / `qwen2.5-coder-3b` を「不滅アンカー（IMMUTABLE_ANCHOR）」に指定。自動クリーンアップ・自律削除・UI手動削除の全経路で恒久的に削除を絶対阻止。
 
 
 ### 【検証結果】
@@ -215,3 +215,42 @@
 
 
 
+
+## Memory Promotion Layer v1
+
+- `src/services/memoryPromotionService.ts`
+- 3回以上の同一 goal / environment / component 構成で成功した `STABLE` Task Case のみ、長期記憶候補へ昇格。
+- 実行成功を世界知識へ変換せず、`procedural` / `general_rule` の再利用手順として保存。
+- 実装 hash はケース記録を参照し、部品変更後の再検証を要求する。
+- 単発成功 (`OBSERVED` / `REUSABLE`) は自動昇格しない。
+
+## Self-Improvement Controller v1
+
+`selfImprovementControllerService` is the bounded controller for autonomous improvement. It observes execution outcomes and chooses only safe existing actions: promote a stable task case to long-term procedural memory, research the highest-priority open Knowledge Gap, or remain idle. It does not execute arbitrary code, decide factual truth, or promote Components to VERIFIED.
+
+## Android Native Runner
+
+RegressionのAndroid本体実行はTermux/localhost経路ではなく、Capacitor Native Plugin `MIKINativeRunner` を使用します。
+
+```text
+Regression Coordinator
+  -> ExecutionRunnerService
+  -> AndroidNativeRunnerAdapterService
+  -> MIKINativeRunner (Capacitor)
+  -> registered native test adapter
+  -> result
+  -> Verification / Regression / Promotion Gate
+```
+
+任意コードの直接実行は行わず、Native側の登録済み安全Adapterだけを実行する契約です。詳細は `docs/ANDROID_NATIVE_RUNNER.md`。
+
+### Termux
+
+Termux Runnerは移行用の旧経路として扱い、本番の実行経路から外します。過去データ互換のため `TERMUX` 環境値そのものは当面型として残します。
+
+## v49: 第13.3節 移管証拠ゲート強化
+
+`llmMigrationProtocolService` のシャドー比較履歴を実測証拠として扱う精度を強化しました。
+ユーザー訂正率を履歴全体から集計し、自然さ評価は実測値が提供された場合のみ記録します。
+また `evaluatePromotion()` により、`NON_LLM_LIMITED` / `NON_LLM_DEFAULT` へ進むための不足証拠を明示できます。
+この判定は自動昇格ではなく、証拠不足のままLLM機能を非LLM既定へ移すことを防ぎます。

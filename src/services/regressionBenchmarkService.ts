@@ -8,8 +8,7 @@ import {
   ModelGeneration,
 } from '../types';
 import { systemLogger } from './systemLogger';
-import { nativeLlmService } from './nativeLlmService';
-import { webLLMService } from './webLlmService';
+import { nonLlmRuntimeService } from './nonLlmRuntimeService';
 import { storageService } from './storageService';
 import { selfImprovementService } from './selfImprovementService';
 import { backgroundWorkerService } from './backgroundWorkerService';
@@ -89,17 +88,12 @@ export const STANDARD_BENCHMARK_SUITE: BenchmarkTestCase[] = [
 ];
 
 /**
- * モデルサイズに応じた実行時推定メモリ使用量 (MB) を計算
- * GGUF Q4_K_M (約4.5 bits/param) + KV Cache (nCtx) + ランタイムバッファ
+ * 決定論的実行予算。生成モデルの重み/KVキャッシュを仮定せず、
+ * 入力構造の複雑さだけを監査する。
  */
-export function estimateModelMemoryMb(params: number, nCtx: number = 2048): number {
-  const effectiveParams = params > 0 ? params : 1.5e9;
-  // Q4_K_M: 約 0.5625 bytes / param
-  const weightMb = (effectiveParams * 0.5625) / (1024 * 1024);
-  const isLarge = effectiveParams >= 2.5e9;
-  const kvCacheMb = isLarge ? (nCtx / 2048) * 560 : (nCtx / 2048) * 380;
-  const runtimeMb = isLarge ? 260 : 180;
-  return Math.round(weightMb + kvCacheMb + runtimeMb);
+export function estimateModelMemoryMb(params: number, structuralBudget: number = 2048): number {
+  const structuralUnits = Math.max(1, Math.round((params || 0) / 1000));
+  return Math.max(32, Math.min(512, Math.round(structuralUnits * 0.02 + structuralBudget * 0.01)));
 }
 
 /**
@@ -254,12 +248,12 @@ export class RegressionBenchmarkService {
     let generatedResponse = '';
     let modelUnavailable = false;
 
-    const isNativeReady = nativeLlmService.isNative() && !!nativeLlmService.getActiveModelId();
-    const isWebReady = webLLMService.isLoaded();
+    const isNativeReady = nonLlmRuntimeService.isNative() && !!nonLlmRuntimeService.getActiveModelId();
+    const isWebReady = nonLlmRuntimeService.isLoaded();
 
     if (!isNativeReady && !isWebReady) {
       modelUnavailable = true;
-      generatedResponse = '⚠️ モデルが未ロードのため回帰テストを実行できませんでした。「端末ローカルLLM設定」でモデルをロードしてから再実行してください。';
+      generatedResponse = '⚠️ モデルが未ロードのため回帰テストを実行できませんでした。「Non-LLM Core設定」でモデルをロードしてから再実行してください。';
     } else {
       try {
         const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
@@ -271,8 +265,8 @@ export class RegressionBenchmarkService {
         ];
 
         const stream = isNativeReady
-          ? nativeLlmService.streamNativeChat(messages, { temperature: 0.7, max_tokens: 512 })
-          : webLLMService.streamChat(messages, { temperature: 0.7, max_tokens: 512 });
+          ? nonLlmRuntimeService.streamDeterministicChat(messages, { temperature: 0.7, max_tokens: 512 })
+          : nonLlmRuntimeService.streamChat(messages, { temperature: 0.7, max_tokens: 512 });
 
         for await (const chunk of stream) {
           generatedResponse += chunk;
@@ -348,11 +342,11 @@ export class RegressionBenchmarkService {
     modelName: string;
     engineType: 'native_gguf' | 'webllm' | 'none';
   } {
-    const isNativeReady = nativeLlmService.isNative() && !!nativeLlmService.getActiveModelId();
-    const isWebReady = webLLMService.isLoaded() && !!webLLMService.getActiveModelId();
+    const isNativeReady = nonLlmRuntimeService.isNative() && !!nonLlmRuntimeService.getActiveModelId();
+    const isWebReady = nonLlmRuntimeService.isLoaded() && !!nonLlmRuntimeService.getActiveModelId();
 
     if (isNativeReady) {
-      const activeId = nativeLlmService.getActiveModelId()!;
+      const activeId = nonLlmRuntimeService.getActiveModelId()!;
       // ファイル名からクリーンな表示名を導出
       const cleanName = activeId.replace(/\.gguf$/i, '');
       return {
@@ -364,7 +358,7 @@ export class RegressionBenchmarkService {
     }
 
     if (isWebReady) {
-      const activeId = webLLMService.getActiveModelId()!;
+      const activeId = nonLlmRuntimeService.getActiveModelId()!;
       return {
         isReady: true,
         modelId: activeId,
@@ -384,7 +378,7 @@ export class RegressionBenchmarkService {
   /**
    * ベンチマークスイート全体を一括実行 (Run Full Regression Suite)
    * 呼び出し元からの自由なmodelName引数は廃止され、推論エンジンに実際にロードされている
-   * アクティブモデル(Native GGUF または WebLLM)からモデルID・モデル名を強制的に取得・埋め込みます。
+   * アクティブモデル(退役ローカル生成器 または 退役Web生成器)からモデルID・モデル名を強制的に取得・埋め込みます。
    * (設計思想 25. 評価基準の改ざん防止・テスト対象と昇格対象の同一性保証)
    */
   public async runFullSuite(): Promise<RegressionSuiteRunReport> {
@@ -395,7 +389,7 @@ export class RegressionBenchmarkService {
     const activeInfo = this.getActiveLoadedModelInfo();
     if (!activeInfo.isReady || !activeInfo.modelId) {
       throw new Error(
-        '【実行拒否】推論エンジンにモデルがロードされていません。端末ローカルLLM設定(Native GGUFまたはWebLLM)で評価対象モデルをロードしてから回帰テストを実行してください。'
+        '【実行拒否】推論エンジンにモデルがロードされていません。Non-LLM Core設定(退役ローカル生成器または退役Web生成器)で評価対象モデルをロードしてから回帰テストを実行してください。'
       );
     }
 
@@ -498,12 +492,12 @@ export class RegressionBenchmarkService {
     modelId: string,
     name: string,
     params: number,
-    nCtx: number,
+    structuralBudget: number,
     thermalState: 'normal' | 'warm' | 'hot' | 'critical',
     activeLoaded: { isReady: boolean; modelId: string | null; modelName: string; engineType: string },
     runLiveEvaluation?: boolean
   ): Promise<ModelSizeProfile> {
-    const memoryMb = estimateModelMemoryMb(params, nCtx);
+    const memoryMb = estimateModelMemoryMb(params, structuralBudget);
     const is3B = params >= 2.5e9;
 
     // 1. 過去の実機ベンチマークレポート（同一モデル）が存在するか検索
@@ -572,7 +566,7 @@ export class RegressionBenchmarkService {
       const estTokens = 160;
       avgTps = Number((estTokens / Math.max(1, matchedReport.averageLatencyMs / 1000)).toFixed(1));
     } else {
-      // 実機パラメータ規模に基づく標準ベンチマーク値 (同一端末・Q4_K_M・nCtx=2048)
+      // 実機パラメータ規模に基づく標準ベンチマーク値 (同一端末・構造予算ベース)
       if (is3B) {
         // 3Bモデル: 表現力・推論精度が向上、速度低下は許容域、JSON構造化はほぼ完全
         scores = {
@@ -639,19 +633,19 @@ export class RegressionBenchmarkService {
   public async runModelSizeComparison(
     modelAId: string,
     modelBId: string,
-    options?: { nCtx?: number; runLiveEvaluation?: boolean }
+    options?: { structuralBudget?: number; runLiveEvaluation?: boolean }
   ): Promise<ModelSizeComparisonReport> {
     if (this.isRunning) {
       throw new Error('ベンチマーク評価が既に実行中です');
     }
 
     this.isRunning = true;
-    const nCtx = options?.nCtx || 2048;
+    const structuralBudget = options?.structuralBudget || 2048;
 
     try {
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `⚖️ モデルサイズ比較ベンチマーク開始 [Model A: ${modelAId} vs Model B: ${modelBId}] (nCtx: ${nCtx})`
+        `⚖️ モデルサイズ比較ベンチマーク開始 [Model A: ${modelAId} vs Model B: ${modelBId}] (structuralBudget: ${structuralBudget})`
       );
 
       // 世代情報からモデル情報解決
@@ -678,7 +672,7 @@ export class RegressionBenchmarkService {
         modelAId,
         nameA,
         paramsA,
-        nCtx,
+        structuralBudget,
         currentThermal,
         activeLoaded,
         options?.runLiveEvaluation
@@ -688,7 +682,7 @@ export class RegressionBenchmarkService {
         modelBId,
         nameB,
         paramsB,
-        nCtx,
+        structuralBudget,
         currentThermal,
         activeLoaded,
         options?.runLiveEvaluation

@@ -3718,7 +3718,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
 
             {/* Footer */}
             <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-              <span>Google Colab / Unsloth / Axolotl にそのままアップロードして学習できます</span>
+              <span>決定論的な改善レコードとして検証・保存できます</span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {

@@ -8,8 +8,7 @@ import {
   ConversationEvaluationCriterion,
 } from '../types';
 import { systemLogger } from './systemLogger';
-import { nativeLlmService } from './nativeLlmService';
-import { webLLMService } from './webLlmService';
+import { nonLlmRuntimeService } from './nonLlmRuntimeService';
 import { storageService } from './storageService';
 import { companionEngine } from '../utils/companionEngine';
 
@@ -257,8 +256,8 @@ export class ConversationEvaluationService {
     prompt: string,
     history?: Array<{ role: 'user' | 'assistant'; content: string }>
   ): Promise<string> {
-    const isNativeReady = nativeLlmService.isNative() && !!nativeLlmService.getActiveModelId();
-    const isWebReady = webLLMService.isLoaded();
+    const isNativeReady = nonLlmRuntimeService.isNative() && !!nonLlmRuntimeService.getActiveModelId();
+    const isWebReady = nonLlmRuntimeService.isLoaded();
 
     if (!isNativeReady && !isWebReady) {
       // モデル未ロード時はコンパニオン自律ルールベースで応答を生成（テスト可能状態の担保）
@@ -283,8 +282,8 @@ export class ConversationEvaluationService {
       messages.push({ role: 'user', content: prompt });
 
       const stream = isNativeReady
-        ? nativeLlmService.streamNativeChat(messages, { temperature: 0.6, max_tokens: 380 })
-        : webLLMService.streamChat(messages, { temperature: 0.6, max_tokens: 380 });
+        ? nonLlmRuntimeService.streamDeterministicChat(messages, { temperature: 0.6, max_tokens: 380 })
+        : nonLlmRuntimeService.streamChat(messages, { temperature: 0.6, max_tokens: 380 });
 
       let fullText = '';
       for await (const chunk of stream) {
@@ -592,8 +591,8 @@ export class ConversationEvaluationService {
       const report: DynamicEvaluationReport = {
         id: `dyn_${Date.now()}`,
         timestamp: Date.now(),
-        modelName: nativeLlmService.getActiveModelId() || 'Galaxy S25 Companion Core',
-        engineType: nativeLlmService.isNative() ? 'Native GGUF' : 'WebLLM / Local Rule',
+        modelName: nonLlmRuntimeService.getActiveModelId() || 'Galaxy S25 Companion Core',
+        engineType: nonLlmRuntimeService.isNative() ? '退役生成ランタイム' : 'Non-LLM Core',
         turns,
         overallScore: avgScore,
         passed,
@@ -680,7 +679,7 @@ export class ConversationEvaluationService {
     const report: DualEvaluationReport = {
       id: `dual_${Date.now()}`,
       timestamp: Date.now(),
-      modelName: nativeLlmService.getActiveModelId() || 'Galaxy S25 Companion Core',
+      modelName: nonLlmRuntimeService.getActiveModelId() || 'Galaxy S25 Companion Core',
       fixedOverallScore,
       fixedPassedCount,
       fixedTotalCount,

@@ -6,6 +6,8 @@ import {
   Sparkles,
   Volume2,
   VolumeX,
+  Mic,
+  MicOff,
   Copy,
   Check,
   Play,
@@ -78,6 +80,7 @@ import {
   AutonomousVerificationData,
 } from '../types';
 import { extractCodeBlocks, extractFilesFromZip } from '../utils/codeParser';
+import { speechRecognitionService } from '../services/speechRecognitionService';
 import { SPEAKER_PROFILES } from '../data/speakers';
 import { systemLogger, StepExecutionSnapshot } from '../services/systemLogger';
 import { selfImprovementService } from '../services/selfImprovementService';
@@ -179,6 +182,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [appliedId, setAppliedId] = useState<string | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
   const [urlCopied, setUrlCopied] = useState(false);
   const [expandedStepsMsgId, setExpandedStepsMsgId] = useState<string | null>(null);
   const [feedbackFeedbackId, setFeedbackFeedbackId] = useState<string | null>(null);
@@ -687,7 +692,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           {
             memoriesUsedCount: (msg.usedMemories || []).length,
             promptLengthChars: 1200,
-            engineMode: msg.engineMode || 'native_gpu',
+            engineMode: msg.engineMode || 'autonomous_rule',
           }
         );
         systemLogger.warn('SELF_IMPROVEMENT', `ユーザーから低評価(👎)を受信 (理由: ${reason || '未指定'})。改善ルーターに記録しました。`);
@@ -1272,7 +1277,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       </button>
                     )}
 
-                    {/* 外部ローカルLLM 推論遅延・TTFT・キャッシュ診断バッジ */}
+                    {/* 外部教師 推論遅延・TTFT・キャッシュ診断バッジ */}
                     {msg.externalLlmDiagnostic && (() => {
                       const diag = msg.externalLlmDiagnostic;
                       const verdict = diag.comparisonWithPrevious?.verdict;
@@ -1690,13 +1695,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   </div>
                 )}
 
-                {/* 外部ローカルLLM Stage A〜E 遅延細分化＆TTFT診断ドロワー */}
+                {/* 外部教師 Stage A〜E 遅延細分化＆TTFT診断ドロワー */}
                 {!isUser && expandedExternalDiagMsgId === msg.id && msg.externalLlmDiagnostic && (
                   <div className="w-full bg-slate-950/95 border border-indigo-500/40 rounded-xl p-3 my-1.5 text-xs space-y-3 shadow-xl animate-fadeIn">
                     <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-indigo-900/40 text-[11px]">
                       <div className="flex items-center gap-1.5 text-indigo-200 font-bold">
                         <Terminal className="w-4 h-4 text-indigo-400" />
-                        <span>外部ローカルLLM 推論遅延細分化・TTFT・KVキャッシュ診断</span>
+                        <span>外部教師 推論遅延細分化・TTFT・KVキャッシュ診断</span>
                         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-950 border border-indigo-800 text-indigo-300">
                           #{msg.externalLlmDiagnostic.queryNumber}回目
                         </span>
@@ -1709,7 +1714,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           type="button"
                           onClick={() => {
                             const diag = msg.externalLlmDiagnostic!;
-                            const textSummary = `【外部ローカルLLM推論遅延 診断結果】
+                            const textSummary = `【外部教師推論遅延 診断結果】
 実行回数: #${diag.queryNumber} (${diag.timestamp})
 モデル: ${diag.model} (${diag.endpoint})
 スロットID: ${diag.slotId !== undefined ? diag.slotId : '自動'}
@@ -3231,7 +3236,7 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                 <div className="flex items-center gap-2">
                   <RotateCw className="w-3.5 h-3.5 animate-spin" />
                   <span>
-                    {engineMode === 'webgpu'
+                    {engineMode === 'autonomous_rule'
                       ? 'オンデバイス GPU で応答を生成中...'
                       : `${persona.name}が思考中...`}
                   </span>
@@ -3568,6 +3573,39 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
             </button>
           )}
 
+          <button
+            type="button"
+            disabled={isLoading || isGenerating || isListening}
+            onClick={async () => {
+              setVoiceStatus(null);
+              setIsListening(true);
+              try {
+                const result = await speechRecognitionService.start({ language: 'ja-JP', maxResults: 3 });
+                if (result?.recognized && result.text.trim()) {
+                  setInputText(result.text.trim());
+                  if (textareaRef.current) {
+                    textareaRef.current.value = result.text.trim();
+                    textareaRef.current.focus();
+                  }
+                  setVoiceStatus('音声を入力しました');
+                } else {
+                  setVoiceStatus('音声を認識できませんでした');
+                }
+              } finally {
+                setIsListening(false);
+              }
+            }}
+            className={`p-2 min-w-[38px] min-h-[38px] rounded-lg flex items-center justify-center border transition-all shrink-0 ${
+              isListening
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+            }`}
+            title="音声入力（ユーザー操作時のみ）"
+            aria-label="音声入力"
+          >
+            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+
           <textarea
             ref={textareaRef}
             value={inputText}
@@ -3624,6 +3662,10 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
             </button>
           )}
         </div>
+
+        {voiceStatus && (
+          <div className="mt-1 px-1 text-[10px] text-slate-500">{voiceStatus}</div>
+        )}
 
         {/* Engine status indicator */}
         <div className="mt-1 px-1 flex items-center justify-between text-[10px] text-slate-500 select-none">

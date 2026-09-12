@@ -1372,7 +1372,7 @@ export const UltraSelfEvolverSubView: React.FC = () => {
                   ネット大海探索・自律コード発掘 (第171章)
                 </div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
-                  Qwen 3B が GitHub、NPM、技術Wikiからアルゴリズム・型定義を発掘し、高密度ASTスライスに整形します
+                  モデル生成系ランタイム が GitHub、NPM、技術Wikiからアルゴリズム・型定義を発掘し、高密度ASTスライスに整形します
                 </div>
               </div>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 rounded-lg">
@@ -1564,7 +1564,7 @@ export const UltraSelfEvolverSubView: React.FC = () => {
                   自律動的ツール創成工房 (第171章)
                 </div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
-                  Qwen 3B が機能要件から安全な動的ツールコードを合成し、第169章サンドボックスで即座に配備します
+                  モデル生成系ランタイム が機能要件から安全な動的ツールコードを合成し、第169章サンドボックスで即座に配備します
                 </div>
               </div>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 rounded-lg">
@@ -1614,7 +1614,7 @@ export const UltraSelfEvolverSubView: React.FC = () => {
                 className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
               >
                 <Sparkles className={`w-3.5 h-3.5 ${isSynthesizingTool ? 'animate-spin' : ''}`} />
-                {isSynthesizingTool ? '安全合成・サンドボックス検証中...' : 'Qwen 3B で動的ツールを自動創成'}
+                {isSynthesizingTool ? '安全合成・サンドボックス検証中...' : 'モデル生成系ランタイム で動的ツールを自動創成'}
               </button>
             </div>
 
@@ -1645,7 +1645,7 @@ export const UltraSelfEvolverSubView: React.FC = () => {
 
               {dynamicToolsList.length === 0 ? (
                 <div className="p-6 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-xl">
-                  現在登録されている動的ツールはありません。「Qwen 3B で動的ツールを自動創成」または「ネット大海発掘」から作成できます。
+                  現在登録されている動的ツールはありません。「モデル生成系ランタイム で動的ツールを自動創成」または「ネット大海発掘」から作成できます。
                 </div>
               ) : (
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">

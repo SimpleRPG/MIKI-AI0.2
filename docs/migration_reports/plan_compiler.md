@@ -73,10 +73,10 @@
   [2-1 SAT判定]: isSatisfied=true, 矛盾数=0
 ✅ [PASS] 正当な変数ドメインにおいて CSP が SAT (充足) と判定されること
 [2026-09-11T07:02:01.096Z]  [INFO ] [SELF_IMPROVEMENT] [第59章 制約ソルバー] CSP形式検証完了: 矛盾あり (UNSAT) {
-  contradictions: [ '変数 [targetModel] と [activeWeights] の間で制約違反: Qwen 3Bモデル重み不変保護制約' ],
+  contradictions: [ '変数 [targetModel] と [activeWeights] の間で制約違反: モデル生成系ランタイムモデル重み不変保護制約' ],
   iterations: 2
 }
-  [2-2 UNSAT Qwen重み保護違反]: isSatisfied=false, 矛盾=[変数 [targetModel] と [activeWeights] の間で制約違反: Qwen 3Bモデル重み不変保護制約]
+  [2-2 UNSAT Qwen重み保護違反]: isSatisfied=false, 矛盾=[変数 [targetModel] と [activeWeights] の間で制約違反: モデル生成系ランタイムモデル重み不変保護制約]
 ✅ [PASS] モデル重み保護制約に違反した場合に UNSAT (矛盾) と判定されること
 [2026-09-11T07:02:01.097Z]  [INFO ] [SELF_IMPROVEMENT] [第59章 制約ソルバー] CSP形式検証完了: 矛盾あり (UNSAT) {
   contradictions: [

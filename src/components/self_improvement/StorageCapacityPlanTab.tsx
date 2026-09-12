@@ -83,7 +83,7 @@ export const StorageCapacityPlanTab: React.FC = () => {
           Galaxy S25の本体ストレージのうち約60GBをAI専用領域として厳格に予算管理します。
           「モデル関係: 18GB」「会話・教材データ: 12GB」「評価・実験: 8GB」「LoRA・候補成果物: 8GB」「バックアップ: 6GB」「空き・一時領域: 8GB」に配分し、
           第21章の規定に従い<strong>同一ハッシュ教材の重複排除と監査ログ付き定期クリーンアップ</strong>を自動執行するとともに、
-          第24章の<strong>モデル自律退役思考（Qwen 3B絶対保護）</strong>によりストレージを健全に保ちます。
+          第24章の<strong>モデル自律退役思考（モデル重み不変性）</strong>によりストレージを健全に保ちます。
         </p>
 
         {/* 60GB 全体ゲージ */}
@@ -218,7 +218,7 @@ export const StorageCapacityPlanTab: React.FC = () => {
         </div>
       </div>
 
-      {/* 第24章 実測データ駆動型モデル自律退役思考 ＆ Qwen 3B絶対保護モニター */}
+      {/* 第24章 実測データ駆動型モデル自律退役思考 ＆ モデル重み不変性モニター */}
       <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-950 border border-indigo-500/40 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-indigo-500/20">
           <div className="flex items-center gap-2">
@@ -227,7 +227,7 @@ export const StorageCapacityPlanTab: React.FC = () => {
               <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                 <span>第24章: 端末リソース適応型モデル自律獲得・検証 ＆ 退役思考</span>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
-                  Qwen 3B絶対保護
+                  モデル重み不変性
                 </span>
               </h4>
               <p className="text-[11px] text-slate-400">

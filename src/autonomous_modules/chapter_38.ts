@@ -5,7 +5,7 @@
  * 主要要件:
  * 1. 確信度スコアリング (Confidence Scoring)
  * 2. 過信防止キャリブレーション (Overconfidence Prevention Calibration)
- * 3. 不変条件保護 (Qwen 3Bアンカー保護、プライバシー境界担保)
+ * 3. 不変条件保護 (モデル生成系ランタイムアンカー保護、プライバシー境界担保)
  */
 
 export interface Chapter38CalibrationOutput {

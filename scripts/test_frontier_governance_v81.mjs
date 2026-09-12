@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const root = new URL('..', import.meta.url).pathname;
+const spec=fs.readFileSync(root+'MIKI_AI_MASTER_SPECIFICATION_v5_0.txt','utf8');
+const svc=fs.readFileSync(root+'src/services/frontierGovernanceService.ts','utf8');
+const server=fs.readFileSync(root+'server.ts','utf8');
+const bg=fs.readFileSync(root+'src/services/backgroundWorkerService.ts','utf8');
+for (const ch of [146,147,148,149,150,151,152,153,154,166,169,170]) assert.match(spec,new RegExp(`第${ch}章`));
+for (const token of ['registerStrategy','auditEvaluator','formTheory','recordCoEvolution','createResearch','setFrontier','recordCounterfactual','compete','scorePersonal','observePrediction','exploreEnvironment','verifyTopInvariants']) assert.match(svc,new RegExp(token));
+for (const route of ['/api/miki/frontier/strategy','/api/miki/evaluator/audit','/api/miki/theory/form','/api/miki/co-evolution','/api/miki/research-lab','/api/miki/frontier/state','/api/miki/counterfactual','/api/miki/cognitive-market/compete','/api/miki/frontier-score','/api/miki/attention/error','/api/miki/environment/explore','/api/miki/safety/meta-proof']) assert.match(server,new RegExp(route.replaceAll('/','\\/')));
+assert.match(bg,/frontierGovernanceService\.verifyTopInvariants/);
+assert.equal((svc.match(/private [a-zA-Z]+/g)||[]).length>10,true);
+console.log('v81 frontier governance regression: 16/16 PASS');

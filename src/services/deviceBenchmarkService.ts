@@ -1,5 +1,4 @@
-import { webLLMService } from './webLlmService';
-import { nativeLlmService } from './nativeLlmService';
+import { nonLlmRuntimeService } from './nonLlmRuntimeService';
 
 export interface DeviceSpecReport {
   gpuName: string;
@@ -29,7 +28,7 @@ export interface DeviceSpecReport {
 
 /**
  * スマホやPCのハードウェアスペック（GPU, RAM, VRAM, ストレージ）を自動診断し、
- * 最も快適・高速・自然に動作するLLMモデルを判定・推奨するサービス
+ * Non-LLM Coreの実行予算（CPU/GPU/WebGPU/ストレージ）を診断するサービス
  */
 class DeviceBenchmarkService {
   public async runGPUBenchmark(): Promise<number> {
@@ -154,11 +153,11 @@ class DeviceBenchmarkService {
     let storageAvailableGB = 10;
     let storageTotalGB = 20;
 
-    if (nativeLlmService.isNative()) {
+    if (nonLlmRuntimeService.isNative()) {
       try {
         const [hw, storage] = await Promise.all([
-          nativeLlmService.getHardwareSpecs(),
-          nativeLlmService.getStorageInfo(),
+          nonLlmRuntimeService.getHardwareSpecs(),
+          nonLlmRuntimeService.getStorageInfo(),
         ]);
         if (hw) {
           gpuName = hw.gpuRenderer || gpuName;
@@ -201,101 +200,12 @@ class DeviceBenchmarkService {
     // 4. Determine Performance Tier & Optimal LLM Model
     let performanceTier: DeviceSpecReport['performanceTier'] = 'medium';
     let tierLabel = 'ミドルレンジ端末 (バランス型)';
-    let recommendedModelId = 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC';
-    let recommendedModelName = '🌸 Qwen 2.5 Coder 0.5B (日本語×開発 統合)';
-    let recommendationReason =
-      '快適な応答速度と自然な日本語を両立。スマホのGPU負荷やバッテリー消費を最小限に抑えてサクサク動きます。';
-
-    const isHighEndGpu =
-      gpuName.toLowerCase().includes('apple') ||
-      gpuName.toLowerCase().includes('m1') ||
-      gpuName.toLowerCase().includes('m2') ||
-      gpuName.toLowerCase().includes('m3') ||
-      gpuName.toLowerCase().includes('m4') ||
-      gpuName.toLowerCase().includes('rtx') ||
-      gpuName.toLowerCase().includes('geforce') ||
-      gpuName.toLowerCase().includes('radeon') ||
-      (gpuName.toLowerCase().includes('adreno') && (gpuName.includes('7') || gpuName.includes('8') || gpuName.includes('elite')));
-
-    if (isHighEndGpu && (deviceRamGB >= 8 || maxBufferSizeMB >= 1024)) {
-      performanceTier = 'ultra';
-      tierLabel = 'ハイエンド端末・PC (高VRAM)';
-      recommendedModelId = 'gemma-2-2b-jpn-it-q4f16_1-MLC';
-      recommendedModelName = '💎 Google Gemma 2 2B (日本語・自然対話特化)';
-      recommendationReason =
-        '余裕のあるGPU/RAMスペックを検出。最高峰の自然な日本語対話と文脈理解力をフル活用できます。';
-    } else if (deviceRamGB >= 6 || maxBufferSizeMB >= 512 || isHighEndGpu) {
-      performanceTier = 'high';
-      tierLabel = 'ハイスペックスマホ (Snapdragon / iPhone Pro / Tensor等)';
-      recommendedModelId = 'gemma-2-2b-jpn-it-q4f16_1-MLC';
-      recommendedModelName = '💎 Google Gemma 2 2B (日本語・自然対話特化)';
-      recommendationReason =
-        '十分なVRAMと演算能力を検出。表現力の高い2Bモデルでより人間らしく豊かな会話が可能です。';
-    } else if (deviceRamGB <= 3 || maxBufferSizeMB <= 256) {
-      performanceTier = 'entry';
-      tierLabel = 'エントリー端末 / 省エネモード';
-      recommendedModelId = 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC';
-      recommendedModelName = '🌸 Qwen 2.5 Coder 0.5B (超軽量・高応答)';
-      recommendationReason =
-        'メモリクラッシュを防ぎ、確実に高速動作する0.5Bモデルが最も安全で快適です。';
-    }
-
-    let gflops = 0;
-    if (isWebGPUSupported) {
-      try {
-        gflops = await this.runGPUBenchmark();
-      } catch (e) {
-        console.warn('GFLOPS benchmark failed:', e);
-      }
-    }
-
-    const compatibleModels: DeviceSpecReport['compatibleModels'] = [
-      {
-        id: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
-        name: '⚡ SmolLM2 360M (超軽量220MB)',
-        status: 'optimal',
-        reason: '容量わずか220MB！全スマホ・低速回線でも最速でDL＆瞬時に動きます',
-      },
-      {
-        id: 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC',
-        name: '🌸 Qwen 2.5 Coder 0.5B (日本語×開発 統合)',
-        status: 'optimal',
-        reason: '日本語会話とゲーム開発を380MBで両立。スマホに最もバランスが良い万能型',
-      },
-      {
-        id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
-        name: '💖 Llama 3.2 1B Instruct',
-        status: performanceTier === 'entry' ? 'supported' : 'optimal',
-        reason: 'Meta最新1B。自然な日常会話と共感・親密なコミュニケーションに最適',
-      },
-      {
-        id: 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',
-        name: '⚡ Qwen 2.5 Coder 1.5B',
-        status: performanceTier === 'entry' ? 'heavy' : 'supported',
-        reason: 'ゲーム作成やJavaScript/HTMLコード生成をより高度に実行',
-      },
-      {
-        id: 'gemma-2-2b-jpn-it-q4f16_1-MLC',
-        name: '💎 Google Gemma 2 2B Japanese',
-        status: performanceTier === 'entry' || (maxBufferSizeMB < 512) ? 'heavy' : 'supported',
-        reason:
-          performanceTier === 'entry' || (maxBufferSizeMB < 512)
-            ? 'VRAM 2.3GB以上を消費するため、ミドル〜エントリースマホではバッファ制限にかかりやすいです'
-            : '日本語表現力No.1。高性能スマホ・PC向け',
-      },
-      {
-        id: 'DeepSeek-R1-Distill-Qwen-7B-q4f16_1-MLC',
-        name: '🧩 DeepSeek R1 7B',
-        status: performanceTier === 'ultra' ? 'supported' : 'unsupported',
-        reason: 'VRAM 5.6GB推奨。PC/ハイスペックGPU専用（スマホではメモリ不足になります）',
-      },
-      {
-        id: 'Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC',
-        name: '👑 Qwen 2.5 Coder 7B',
-        status: performanceTier === 'ultra' ? 'supported' : 'unsupported',
-        reason: 'VRAM 5.8GB推奨。PC/ハイエンドGPU専用',
-      },
-    ];
+    const recommendedModelId = 'non-llm-core';
+    const recommendedModelName = 'Non-LLM Core';
+    const recommendationReason = '生成モデルを使用せず、決定論的な構文・検索・制約・検証パイプラインを端末資源に合わせて実行します。';
+    const compatibleModels: DeviceSpecReport['compatibleModels'] = [{
+      id: 'non-llm-core', name: 'Non-LLM Core', status: 'optimal', reason: 'モデルダウンロード不要・ローカル生成ランタイム不要。',
+    }];
 
     return {
       gpuName,

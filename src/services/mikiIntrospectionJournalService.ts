@@ -110,7 +110,7 @@ export class MikiIntrospectionJournalService {
         mood: 'CURIOSITY',
         moodLabel: '尽きない好奇心',
         moodEmoji: '🔍',
-        headline: 'Qwen 3Bアンカーとみきの個性（親しみやすさと堅牢性）の共鳴',
+        headline: 'モデル生成系ランタイムアンカーとみきの個性（親しみやすさと堅牢性）の共鳴',
         innerMonologue:
           '技術的な正確さと、お茶目で親しみやすい対話のトーン。この2つが両立しているからこそ「みき」なんだよね。冷徹なコード生成器ではなく、一緒に創る相棒でいたい。',
         userReflection:

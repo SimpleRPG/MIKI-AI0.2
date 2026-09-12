@@ -1,4 +1,4 @@
-import { nativeLlmService, ExternalLocalLlmConfig } from './nativeLlmService';
+import { nonLlmRuntimeService, NonLlmTeacherConfig } from './nonLlmRuntimeService';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { nativeBackgroundService } from './nativeBackgroundService';
@@ -18,7 +18,7 @@ export interface EmbeddingStats {
 
 /**
  * 設計思想 Master v5.0 第8項 & 第14章:
- * llama-server / Ollama 実埋め込みベクトル (Embedding API) 連携サービス
+ * 決定論的特徴ベクトル (Embedding API) 連携サービス
  *
  * 8次元手作り疎ベクトルから、LLM実埋め込みベクトル（768〜4096次元）へのシームレスな移行と
  * オフライン・フォールバックを統括する。
@@ -54,7 +54,7 @@ class EmbeddingService {
   /**
    * 外部LLM埋め込みエンドポイントの疎通確認 (キャッシュ付き: 30秒)
    */
-  public async checkAvailability(overrideConfig?: ExternalLocalLlmConfig): Promise<{
+  public async checkAvailability(overrideConfig?: NonLlmTeacherConfig): Promise<{
     available: boolean;
     endpoint: string;
     type: string;
@@ -62,7 +62,7 @@ class EmbeddingService {
   }> {
     const now = Date.now();
     if (this.lastCheckResult && now - this.lastCheckResult.timestamp < 30000 && !overrideConfig) {
-      const cfg = nativeLlmService.getActiveExternalConfig();
+      const cfg = nonLlmRuntimeService.getActiveExternalConfig();
       return {
         available: this.lastCheckResult.available,
         endpoint: cfg.endpoint,
@@ -70,7 +70,7 @@ class EmbeddingService {
       };
     }
 
-    const check = await nativeLlmService.checkEmbeddingAvailability(overrideConfig);
+    const check = await nonLlmRuntimeService.checkEmbeddingAvailability(overrideConfig);
     this.lastCheckResult = { available: check.available, timestamp: now };
     return check;
   }
@@ -80,7 +80,7 @@ class EmbeddingService {
    */
   public async getQueryEmbedding(
     query: string,
-    overrideConfig?: ExternalLocalLlmConfig
+    overrideConfig?: NonLlmTeacherConfig
   ): Promise<number[] | null> {
     const trimmed = (query || '').trim();
     if (!trimmed) return null;
@@ -91,7 +91,7 @@ class EmbeddingService {
     }
 
     try {
-      const res = await nativeLlmService.getEmbedding(trimmed, overrideConfig, 3000);
+      const res = await nonLlmRuntimeService.getEmbedding(trimmed, overrideConfig, 3000);
       if (res && res.embedding && res.embedding.length > 0) {
         if (this.queryEmbeddingCache.size > 200) {
           const firstKey = this.queryEmbeddingCache.keys().next().value;
@@ -115,7 +115,7 @@ class EmbeddingService {
    */
   public async ensureMemoryEmbedding(
     memory: MemoryItem,
-    overrideConfig?: ExternalLocalLlmConfig
+    overrideConfig?: NonLlmTeacherConfig
   ): Promise<MemoryItem> {
     if (memory.embeddingVector && memory.embeddingVector.length > 0) {
       return memory;
@@ -123,7 +123,7 @@ class EmbeddingService {
 
     const textToEmbed = `${memory.content} ${(memory.tags || []).join(' ')}`;
     try {
-      const res = await nativeLlmService.getEmbedding(textToEmbed, overrideConfig, 3500);
+      const res = await nonLlmRuntimeService.getEmbedding(textToEmbed, overrideConfig, 3500);
       if (res && res.embedding) {
         const updated: MemoryItem = {
           ...memory,
@@ -204,7 +204,7 @@ class EmbeddingService {
    * 現在の記憶リストと埋め込み状況の統計を取得
    */
   public async getStats(memories: MemoryItem[]): Promise<EmbeddingStats> {
-    const config = nativeLlmService.getActiveExternalConfig();
+    const config = nonLlmRuntimeService.getActiveExternalConfig();
     const avail = await this.checkAvailability(config);
     const embedded = (memories || []).filter(
       (m) => m.embeddingVector && m.embeddingVector.length > 0
@@ -230,7 +230,7 @@ class EmbeddingService {
    * 深い睡眠フェーズ冒頭 (PHASE 1 開始直後) 等で呼び出され、疎通確認と連続縮退を監視
    */
   public async checkHealth(
-    overrideConfig?: ExternalLocalLlmConfig
+    overrideConfig?: NonLlmTeacherConfig
   ): Promise<EmbeddingHealthCheckResult> {
     const memories = storageService.getMemories();
     const totalCount = memories.length;
@@ -271,7 +271,7 @@ class EmbeddingService {
       );
 
       try {
-        const activeEndpoint = (overrideConfig ?? nativeLlmService.getActiveExternalConfig()).endpoint;
+        const activeEndpoint = (overrideConfig ?? nonLlmRuntimeService.getActiveExternalConfig()).endpoint;
         await nativeBackgroundService.sendLocalNotification({
           title: '🧠 MikiAI 記憶検索の精度低下警告',
           body: `実埋め込みサーバーがオフラインのため、記憶検索が簡易フォールバック状態です。Termux (${activeEndpoint}) の稼働状態をご確認ください。`,

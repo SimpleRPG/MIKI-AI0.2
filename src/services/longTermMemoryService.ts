@@ -9,7 +9,7 @@ import type {
   ConversationState,
 } from '../types';
 import { storageService } from './storageService';
-import { nativeLlmService } from './nativeLlmService';
+import { nonLlmRuntimeService } from './nonLlmRuntimeService';
 import {
   calculateDomainVector,
   calculateCosineSimilarity,
@@ -291,8 +291,8 @@ class LongTermMemoryService {
       useCount: 0,
     };
 
-    // 提案A: 外部ローカルLLM / llama-serverから実埋め込みベクトルを非同期取得して保存
-    nativeLlmService
+    // 提案A: 外部ローカルLLM / 旧ローカル生成ランタイムから実埋め込みベクトルを非同期取得して保存
+    nonLlmRuntimeService
       .getEmbedding(newContent, undefined, 2500)
       .then((emb) => {
         if (emb) {
@@ -479,16 +479,16 @@ class LongTermMemoryService {
       sampleIds: Array.from(ftsMatchedIds).slice(0, 3),
     });
 
-    // Step 5: 意味検索 (Semantic Search: llama-server 実埋め込みベクトル + 8次元ドメインフォールバック)
+    // Step 5: 意味検索 (Semantic Search: 旧ローカル生成ランタイム 実埋め込みベクトル + 8次元ドメインフォールバック)
     // 【設計思想 8章 & 指示書 SECTION 7 提案A】
     const semanticScores = new Map<string, number>();
     let usedRealEmbedding = false;
     let embeddingDimensions = 0;
 
-    // 1. llama-server / Ollama からの実埋め込み取得を試行 (タイムアウト1500msで高速安全判定)
+    // 1. 決定論的特徴ベクトルの取得を試行 (タイムアウト1500msで高速安全判定)
     let queryEmbeddingResult: { embedding: number[]; modelId: string; dimensions: number } | null = null;
     try {
-      queryEmbeddingResult = await nativeLlmService.getEmbedding(query, undefined, 1500);
+      queryEmbeddingResult = await nonLlmRuntimeService.getEmbedding(query, undefined, 1500);
     } catch (e) {
       queryEmbeddingResult = null;
     }
@@ -522,7 +522,7 @@ class LongTermMemoryService {
         }
       }
     } else {
-      // llama-server未起動または埋め込み未対応時の安全なフォールバック (SECTION 5 フォールバック原則)
+      // 決定論的特徴ベクトルが利用できる通常経路 (SECTION 5 フォールバック原則)
       for (const m of allMemories) {
         const memVector = m.domainVector || calculateDomainVector(m.content || '');
         const sim = calculateCosineSimilarity(fallbackQueryVector, memVector);
@@ -537,7 +537,7 @@ class LongTermMemoryService {
       name: '意味検索 (Semantic Search)',
       count: semanticScores.size,
       description: usedRealEmbedding
-        ? `llama-server実埋め込みベクトル (${embeddingDimensions}次元) + コサイン類似度 (一部8次元フォールバック)`
+        ? `決定論的特徴ベクトル (${embeddingDimensions}次元) + コサイン類似度 (一部8次元フォールバック)`
         : '8次元ドメイン概念疎ベクトル + コサイン類似度 (実埋め込み未検出時フォールバック)',
       sampleIds: Array.from(semanticScores.keys()).slice(0, 3),
     });
@@ -1018,7 +1018,7 @@ class LongTermMemoryService {
   /**
    * 8章 / 指示書 SECTION 7 [提案A]:
    * バックグラウンド（浅い睡眠・アイドル時）において、未算出の記憶アイテムに
-   * llama-server実埋め込みベクトルを順次付与してエンリッチ
+   * 決定論的特徴ベクトルを順次付与してエンリッチ
    */
   public async enrichMemoryEmbeddings(memories: MemoryItem[], maxItems = 5): Promise<boolean> {
     const targets = memories
@@ -1029,7 +1029,7 @@ class LongTermMemoryService {
     let enriched = false;
     for (const mem of targets) {
       try {
-        const emb = await nativeLlmService.getEmbedding(mem.content, undefined, 2000);
+        const emb = await nonLlmRuntimeService.getEmbedding(mem.content, undefined, 2000);
         if (emb) {
           mem.embeddingVector = emb.embedding;
           mem.embeddingModelId = emb.modelId;

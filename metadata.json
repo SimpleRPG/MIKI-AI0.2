@@ -1,8 +1,10 @@
 {
   "name": "MIKI-AI Game Studio",
-  "description": "Miki AI Partner & Autonomous WebGPU Studio with on-device MoE (Mixture of Experts), WebLLM local execution, interactive game/app sandbox, and GitHub integration.",
+  "description": "Miki AI Partner & deterministic non-LLM autonomous software system with local-first state, memory, planning, verification, code composition, and optional external teacher integration.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  ],
+  "version": "1.0.4-nonllm-v52",
+  "runtimePolicy": "NON_LLM_ONLY"
 }

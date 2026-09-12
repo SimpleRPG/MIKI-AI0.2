@@ -6,6 +6,7 @@ import {
   MultiAxisPersonaConfig,
 } from '../types';
 import { systemLogger } from './systemLogger';
+import { responseSurfacePolicyService } from './responseSurfacePolicyService';
 
 /**
  * 非LLM中心・自己成長型AIコンパニオン 設計思想指示書(統合版) 第3章 / 第5.1節 / 第5.2節 / 第13.4節
@@ -98,104 +99,73 @@ export class AnswerContentIrService {
     customPersona?: Partial<MultiAxisPersonaConfig>,
     extraArtifactCode?: string
   ): { surfaceText: string; inspection: SemanticPreservationInspection } {
-    const persona: MultiAxisPersonaConfig = {
-      ...this.defaultPersona,
-      ...customPersona,
+    const persona: MultiAxisPersonaConfig = { ...this.defaultPersona, ...customPersona };
+    const policy = responseSurfacePolicyService.choosePolicy(
+      skeletonType,
+      ir.detail_level === 'BRIEF' ? 'short' : ir.detail_level === 'DETAILED' ? 'detailed' : 'standard',
+      persona,
+    );
+    const lines: string[] = [];
+    const addList = (title: string, values: string[]) => {
+      if (values.length > 0) lines.push(`\n【${title}】\n${values.map(v => `・${v}`).join('\n')}`);
     };
 
-    const isCasual = persona.politeness === 'CASUAL_POLITE' || persona.politeness === 'CASUAL';
-    const endingDesu = isCasual ? 'です！' : 'でございます。';
-    const endingMasu = isCasual ? 'ますね！' : '申し上げます。';
-    const endingDa = isCasual ? 'だよ。' : 'となります。';
-
-    const lines: string[] = [];
-
+    // 5.2: 骨格は内容IRを並べ替えるだけ。条件・確実性・世界スコープを生成し直さない。
     switch (skeletonType) {
-      case 'RECOMMENDATION': {
-        // 推薦骨格: 結論 → 主な理由 → 欠点 → 推奨が変わる条件
+      case 'RECOMMENDATION':
         lines.push(`【結論】\n${ir.conclusion}`);
-        if (ir.reasons.length > 0) {
-          lines.push(`\n【選定の主な理由】\n${ir.reasons.map((r, i) => `・${r}`).join('\n')}`);
-        }
-        if (ir.exceptions.length > 0) {
-          lines.push(`\n【留意点・デメリット】\n${ir.exceptions.map((e) => `・${e}`).join('\n')}`);
-        }
-        if (ir.conditions.length > 0) {
-          lines.push(`\n【推奨が変わる条件】\n※以下の条件の場合、別の方式が適している場合があります:\n${ir.conditions.map((c) => `・${c}`).join('\n')}`);
+        if (policy.resolution !== 'BRIEF') addList('選定の主な理由', ir.reasons);
+        if (policy.resolution === 'DETAILED') addList('留意点・例外', ir.exceptions);
+        if (policy.resolution !== 'BRIEF') addList('推奨が変わる条件', ir.conditions);
+        break;
+      case 'CORRECTION':
+        lines.push(`【訂正後の結論】\n${ir.conclusion}`);
+        if (policy.resolution !== 'BRIEF') {
+          addList('訂正に関係する条件', ir.conditions);
+          addList('影響・例外', ir.exceptions);
         }
         break;
-      }
-
-      case 'CORRECTION': {
-        // 訂正骨格: 訂正内容の認識 → 古い前提の無効化 → 影響範囲 → 修正後の結論
-        lines.push(`ご指摘ありがとうございます！前提を訂正いたしました。`);
-        lines.push(`\n【古い前提の無効化】\n過去の前提は無効化(SUPERSEDED)され、以後の推論・記憶から除外されます。`);
-        lines.push(`【対象・影響範囲】\n${ir.target}`);
-        lines.push(`\n【修正後の結論】\n${ir.conclusion}`);
-        if (ir.conditions.length > 0) {
-          lines.push(`適用条件: ${ir.conditions.join(', ')}`);
-        }
-        break;
-      }
-
-      case 'UNKNOWN_INVESTIGATION': {
-        // 不明骨格: 現在分かること → 分からないこと → 不足している証拠 → 次の調査手段
+      case 'UNKNOWN_INVESTIGATION':
         lines.push(`【現在判明している事項】\n${ir.conclusion}`);
-        if (ir.exceptions.length > 0) {
-          lines.push(`\n【現時点で不確実・未解決の事項】\n${ir.exceptions.map((e) => `・${e}`).join('\n')}`);
+        if (policy.resolution !== 'BRIEF') {
+          addList('現時点で不確実・未解決の事項', ir.exceptions);
+          addList('不足している証拠・情報', ir.conditions);
         }
-        if (ir.conditions.length > 0) {
-          lines.push(`\n【不足している証拠・情報】\n${ir.conditions.map((c) => `・${c}`).join('\n')}`);
-        }
-        if (ir.next_actions.length > 0) {
-          lines.push(`\n【次の調査手段・検証ステップ】\n${ir.next_actions.map((a) => `・${a}`).join('\n')}`);
-        }
+        addList('次の調査・検証', ir.next_actions);
         break;
-      }
-
-      case 'TASK_COMPLETION': {
-        // 作業完了骨格: 実際に完了した内容 → 成果物 → 検証結果 → 未確認事項
-        lines.push(`依頼された処理の部品組み立てと静的検証が完了し${endingMasu}`);
-        lines.push(`\n【成果物: 検証済みVBAマクロ】`);
-        if (extraArtifactCode) {
-          lines.push('```vba\n' + extraArtifactCode.trim() + '\n```');
-        } else {
-          lines.push(ir.conclusion);
+      case 'TASK_COMPLETION':
+        lines.push(`【実施結果】\n${ir.conclusion}`);
+        if (extraArtifactCode && policy.resolution !== 'BRIEF') {
+          lines.push(`\n【成果物】\n\`\`\`vba\n${extraArtifactCode.trim()}\n\`\`\``);
         }
-        lines.push(`\n【品質・安全性検証結果】\n・非LLM部品レジストリによる決定論的合成: 合格\n・構文解析・Option Explicitブロック整合性: 合格\n・不変条件・未宣言変数検査: ゼロ違反`);
-        if (ir.conditions.length > 0) {
-          lines.push(`\n【前提条件・利用環境】\n${ir.conditions.map((c) => `・${c}`).join('\n')}`);
-        }
+        addList('検証・成立条件', ir.conditions);
+        if (policy.resolution === 'DETAILED') addList('未確認・例外', ir.exceptions);
+        addList('次の確認事項', ir.next_actions);
         break;
-      }
-
       case 'GENERAL_ANSWER':
-      default: {
-        // 一般回答: 結論 → 補足理由 → 次の行動
+      default:
         lines.push(ir.conclusion);
-        if (ir.conditions.length > 0) {
-          lines.push(`\n【適用条件】\n${ir.conditions.map((c) => `・${c}`).join('\n')}`);
-        }
-        if (ir.reasons.length > 0) {
-          lines.push(`\n【判断理由】\n${ir.reasons.map((r) => `・${r}`).join('\n')}`);
-        }
-        if (ir.next_actions.length > 0) {
-          lines.push(`\n【次のステップ】\n${ir.next_actions.map((a) => `・${a}`).join('\n')}`);
-        }
+        if (policy.resolution !== 'BRIEF') addList('適用条件', ir.conditions);
+        if (policy.resolution === 'DETAILED') addList('補足・例外', ir.exceptions);
+        if (policy.resolution !== 'BRIEF') addList('判断理由', ir.reasons);
+        addList('次のステップ', ir.next_actions);
         break;
-      }
     }
 
-    const surfaceText = lines.join('\n');
+    // 結論先行・冗長な定型挨拶を避け、接続表現は内容ではなく表層だけに使用する。
+    if (lines.length > 1 && policy.connector && !lines[1].startsWith('\n【')) {
+      lines[1] = `\n${policy.connector}、${lines[1].trimStart()}`;
+    }
 
-    // 13.4 意味保持検査の即時実行
+    let surfaceText = lines.join('\n').trim();
+    // 語尾は既存の文を無理に書き換えず、空の断片にのみ適用する。意味保持を優先する。
+    if (!surfaceText) surfaceText = (ir.conclusion || '現時点では回答を確定できません。').trim();
+
     const inspection = this.verifySemanticPreservation(ir, surfaceText);
-
     systemLogger.info(
       'ANSWER_PLAN',
-      `📝 [5.2 表層生成完了] 骨格: ${skeletonType} | 文字数: ${surfaceText.length} | 意味保持合格: ${inspection.isPreserved}`
+      `📝 [5.2 表層生成完了] 骨格: ${skeletonType} | 解像度: ${policy.resolution} | 文字数: ${surfaceText.length} | 意味保持合格: ${inspection.isPreserved}`
     );
-
     return { surfaceText, inspection };
   }
 

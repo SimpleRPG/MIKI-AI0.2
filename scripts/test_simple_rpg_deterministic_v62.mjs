@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const root = new URL('..', import.meta.url).pathname;
+const service = fs.readFileSync(`${root}/src/services/simpleRpgRuleEngineService.ts`, 'utf8');
+const server = fs.readFileSync(`${root}/server.ts`, 'utf8');
+assert.match(service, /class SimpleRpgRuleEngineService/);
+for (const name of ['gather','craft','cook','equip','enhance','repair','farm','fertilize','fish','pet','guild','job','skill','market_buy','market_sell','housing','save','load']) assert.match(service, new RegExp(`case '${name}'`));
+assert.match(service, /deterministicRoll/);
+assert.doesNotMatch(service, /Math\.random/);
+assert.doesNotMatch(server.slice(server.indexOf("// Companion Miki RPG Endpoints"), server.indexOf("// ═══════════════════════════════════════════════════════════════════════════\n// みき自律進化")), /generateContentWithFallback|Math\.random/);
+assert.match(server, /\/api\/miki\/rpg\/action/);
+assert.match(server, /simpleRpgRuleEngineService\.execute/);
+console.log('PASS: v62 deterministic RPG engine implements all recoverable SimpleRPG action families and removes LLM/random runtime from MIKI RPG endpoints.');

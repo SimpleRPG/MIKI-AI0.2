@@ -7,6 +7,45 @@ import ts from 'typescript';
 import vm from 'vm';
 import { GoogleGenAI } from '@google/genai';
 import JSZip from 'jszip';
+import { requestTypeCompilerService } from './src/services/requestTypeCompilerService';
+import { nonLlmCodeSynthesisService } from './src/services/nonLlmCodeSynthesisService';
+import { componentRegistryService } from './src/services/componentRegistryService';
+import { simpleRpgRuleEngineService } from './src/services/simpleRpgRuleEngineService';
+import { simpleRpgCapabilityLearningService } from './src/services/simpleRpgCapabilityLearningService';
+import { unifiedMikiExperienceService } from './src/services/unifiedMikiExperienceService';
+import { mikiUnifiedLearningContinuumService } from './src/services/mikiUnifiedLearningContinuumService';
+import { verifiedKnowledgePromotionService } from './src/services/verifiedKnowledgePromotionService';
+import { verifiedCapabilityPromotionService } from './src/services/verifiedCapabilityPromotionService';
+import { capabilityConfidenceService } from './src/services/capabilityConfidenceService';
+import { failureUnderstandingService } from './src/services/failureUnderstandingService';
+import { autonomousGrowthGovernorService } from './src/services/autonomousGrowthGovernorService';
+import { autonomousRevalidationLoopService } from './src/services/autonomousRevalidationLoopService';
+import { researchToRemediationService } from './src/services/researchToRemediationService';
+import { remediationExecutionCoordinatorService } from './src/services/remediationExecutionCoordinatorService';
+import { remediationFailureRecoveryService } from './src/services/remediationFailureRecoveryService';
+import { counterexampleContractRefinementService } from './src/services/counterexampleContractRefinementService';
+import { unknownTaskDecompositionService } from './src/services/unknownTaskDecompositionService';
+import { virtualExperienceGeneratorService } from './src/services/virtualExperienceGeneratorService';
+import { formalSemanticsKernelService } from './src/services/formalSemanticsKernelService';
+import { faultInjectionLabService } from './src/services/faultInjectionLabService';
+import { capabilityCompositionProofService } from './src/services/capabilityCompositionProofService';
+import { executableExplanationService } from './src/services/executableExplanationService';
+import { specContractCompilerService } from './src/services/specContractCompilerService';
+import { causalMemoryLedgerService } from './src/services/causalMemoryLedgerService';
+import { knowledgeHalfLifeService } from './src/services/knowledgeHalfLifeService';
+import { frontierGovernanceService } from './src/services/frontierGovernanceService';
+import { deterministicSelfImprovementLabService } from './src/services/deterministicSelfImprovementLabService';
+import { capabilitySloService, approvalPermissionService, cognitiveStateCheckpointService, blindComparisonLabService } from './src/services/operationalGovernanceService';
+import { situationalAwarenessService } from './src/services/situationalAwarenessService';
+import { operationalConformanceService } from './src/services/operationalConformanceService';
+import { mikiCognitiveKernelService } from './src/services/mikiCognitiveKernelService';
+import { initializeChapter69to90 } from './src/services/chapter69_90PlatformServices';
+import { automationStudioService } from './src/services/automationStudioService';
+import { digitalResearchNoteService } from './src/services/digitalResearchNoteService';
+import { resourceGovernanceService } from './src/services/resourceGovernanceService';
+import { causalInvestigationService } from './src/services/causalInvestigationService';
+import { cognitiveEvidenceIntegrationService } from './src/services/cognitiveEvidenceIntegrationService';
+import { cognitiveExecutionEvidenceService } from './src/services/cognitiveExecutionEvidenceService';
 
 dotenv.config();
 
@@ -186,66 +225,13 @@ function getAIClient(req?: express.Request): GoogleGenAI | null {
 const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash'];
 
 // ============================================================================
-// ローカルLLM(llama-server/llama-swap)フォールバック
-// 第9章・第52章 抜本改善(2026-09-06発見の根本問題への対応):
-// 従来、generateContentWithFallback はGemini APIキーが無い/枯渇した場合に
-// 即座にthrowし、呼び出し元(/api/self-code/autonomous-implement等)がそれを
-// catchして「プロンプト文字列からクラス名を作るだけ」の決定論的テンプレートを
-// 返していた。これは"自律改善"と名乗りながら実際には一切AIが関与していない
-// 状態であり、みき自身が持つローカルLLM(Qwen等 / llama-server)への経路が
-// server.ts側に存在しないことが根本原因だった。
-// 本関数は、Geminiが使えない場合の最終手段として、実機で稼働している
-// ローカルLLM(既定 http://127.0.0.1:8080、フロントの「外部ローカルLLM設定」と
-// 同じ値を環境変数 LOCAL_LLM_ENDPOINT / LOCAL_LLM_MODEL、またはリクエストボディの
-// localLlmEndpoint / localLlmModel で上書き可能)を呼び出し、本物の推論結果を返す。
+// Non-LLM boundary
+//
+// Local LLM / 旧ローカル生成ランタイム / 旧ローカル生成ランタイム is intentionally NOT part of the
+// runtime anymore. The non-LLM core is the default execution architecture.
+// Cloud Gemini remains available only where an explicit external teacher /
+// knowledge operation is required by the existing design.
 // ============================================================================
-async function callLocalLlmChat(
-  promptText: string,
-  config?: { temperature?: number; maxOutputTokens?: number },
-  overrideEndpoint?: string,
-  overrideModel?: string
-): Promise<{ text: string; modelUsed: string } | null> {
-  const endpoint = (overrideEndpoint || process.env.LOCAL_LLM_ENDPOINT || 'http://127.0.0.1:8080').replace(/\/$/, '');
-  const model = overrideModel || process.env.LOCAL_LLM_MODEL || 'default';
-  const url = `${endpoint}/v1/chat/completions`;
-
-  const controller = new AbortController();
-  // ローカルLLMはコールドスタート(モデル再ロード)で数十秒かかることがあるため、
-  // Gemini呼び出し(8秒)より大幅に長いタイムアウトを取る。
-  const timer = setTimeout(() => controller.abort(), 90_000);
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: promptText }],
-        temperature: config?.temperature ?? 0.2,
-        max_tokens: config?.maxOutputTokens ?? 1500,
-        stream: false,
-      }),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      console.warn(`[Local LLM Fallback] HTTP ${res.status} from ${url}`);
-      return null;
-    }
-    const json: any = await res.json();
-    const text = json?.choices?.[0]?.message?.content || '';
-    if (!text) return null;
-    console.warn(`[Local LLM Fallback] Geminiが使用不可のため ${endpoint} (model: ${model}) にフォールバックし応答を取得しました。`);
-    return { text, modelUsed: `local:${model}` };
-  } catch (err: any) {
-    console.warn(`[Local LLM Fallback] ${url} への接続に失敗:`, err?.message || err);
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-// generateContentWithFallbackの戻り値と同じ形(.text getterと.candidates構造の両方)を
-// 持つオブジェクトを作る。既存の全呼び出し元が response.text / response.candidates[0]...
-// のどちらでアクセスしても透過的に動作するようにするため。
 function makeGeminiCompatibleResponse(text: string) {
   return {
     text,
@@ -253,58 +239,10 @@ function makeGeminiCompatibleResponse(text: string) {
   };
 }
 
-// 自己改善系エンドポイント(autonomous-implement / reflexion / big-o-optimize等)専用。
-// 方針(2026-09-06 ユーザー指示): 「自律改善」の推論にGeminiは一切使わない。
-// Geminiはこのアプリでは第8章の教師API(train-distill / teacher-request)、つまり
-// "学習教材の生成・配信"用途に限定し、みき自身の日常的なコード改善はローカルLLM
-// (実機のQwen等 / llama-server)だけで完結させる。Geminiキーの有無すら確認しない
-// (=Geminiキーが設定されていても、この経路では絶対に呼ばれない)。
-async function generateWithLocalLlmOnly(
-  request: { contents: any; config?: any },
-  overrideEndpoint?: string,
-  overrideModel?: string
-): Promise<{ response: any; modelUsed: string }> {
-  const promptText = typeof request.contents === 'string' ? request.contents : JSON.stringify(request.contents);
-  const local = await callLocalLlmChat(promptText, request.config, overrideEndpoint, overrideModel);
-  if (!local) {
-    throw new Error(
-      'ローカルLLM(llama-server)に接続できませんでした。Termux側でサーバーが起動しているか確認してください。' +
-      '(この自己改善用エンドポイントはGeminiへフォールバックしない設計です)'
-    );
-  }
-  return { response: makeGeminiCompatibleResponse(local.text), modelUsed: local.modelUsed };
-}
-
 async function generateContentWithFallback(
   reqOrAi: express.Request | GoogleGenAI | ExtractedApiKey[],
   request: { contents: any; config?: any }
 ): Promise<{ response: any; modelUsed: string; keyPreview?: string; rotatedKeyCount?: number }> {
-  // リクエストボディからローカルLLMの明示的な上書き設定を拾う(フロントの
-  // nativeLlmService.getActiveExternalConfig()の値を渡すことを想定)。
-  const localOverride =
-    !Array.isArray(reqOrAi) && reqOrAi && typeof (reqOrAi as any).headers !== 'undefined'
-      ? {
-          endpoint: (reqOrAi as express.Request).body?.localLlmEndpoint as string | undefined,
-          model: (reqOrAi as express.Request).body?.localLlmModel as string | undefined,
-        }
-      : {};
-
-  const promptTextForLocalLlm =
-    typeof request.contents === 'string' ? request.contents : JSON.stringify(request.contents);
-
-  const tryLocalLlmThenThrow = async (priorError: any): Promise<{ response: any; modelUsed: string }> => {
-    const local = await callLocalLlmChat(
-      promptTextForLocalLlm,
-      request.config,
-      localOverride.endpoint,
-      localOverride.model
-    );
-    if (local) {
-      return { response: makeGeminiCompatibleResponse(local.text), modelUsed: local.modelUsed };
-    }
-    throw priorError;
-  };
-
   let keysToTry: ExtractedApiKey[] = [];
 
   if (Array.isArray(reqOrAi)) {
@@ -312,7 +250,6 @@ async function generateContentWithFallback(
   } else if (reqOrAi && typeof (reqOrAi as any).headers !== 'undefined') {
     keysToTry = extractAllApiKeys(reqOrAi as express.Request);
   } else if (reqOrAi && typeof (reqOrAi as any).models?.generateContent === 'function') {
-    // Single client passed directly
     const aiInstance = reqOrAi as GoogleGenAI;
     let lastErr: any = null;
     for (const model of GEMINI_MODELS) {
@@ -326,46 +263,33 @@ async function generateContentWithFallback(
           setTimeout(() => reject(new Error(`Model ${model} timeout`)), 8000)
         );
         const response: any = await Promise.race([callPromise, timeoutPromise]);
-        if (response && response.text) {
-          return { response, modelUsed: model };
-        }
+        if (response && response.text) return { response, modelUsed: model };
       } catch (err: any) {
         lastErr = err;
       }
     }
-    return tryLocalLlmThenThrow(lastErr || new Error('All Gemini models failed'));
+    throw lastErr || new Error('All Gemini models failed');
   } else {
     keysToTry = extractAllApiKeys();
   }
 
   if (keysToTry.length === 0) {
-    return tryLocalLlmThenThrow(new Error('Gemini API Key が設定されていません。'));
+    throw new Error('外部教師APIが設定されていません。旧ローカル生成ランタイムへのフォールバックは廃止されています。');
   }
 
-  // Prioritize keys that are not exhausted
   const now = Date.now();
   const activeKeys = keysToTry.filter((k) => {
-    const s = keyStateMap.get(k.key);
-    return !s || s.exhaustedUntil < now;
+    const state = keyStateMap.get(k.key);
+    return !state || state.exhaustedUntil < now;
   });
   const candidateKeys = activeKeys.length > 0 ? activeKeys : keysToTry;
-
-  // Rotate starting index for fair distribution
   const startIndex = candidateKeys.length > 0 ? keyRoundRobinIndex % candidateKeys.length : 0;
-  const orderedKeys = [
-    ...candidateKeys.slice(startIndex),
-    ...candidateKeys.slice(0, startIndex),
-  ];
+  const orderedKeys = [...candidateKeys.slice(startIndex), ...candidateKeys.slice(0, startIndex)];
 
   let lastError: any = null;
   let rotatedCount = 0;
-
-  for (let kIdx = 0; kIdx < orderedKeys.length; kIdx++) {
-    const keyItem = orderedKeys[kIdx];
+  for (const keyItem of orderedKeys) {
     const ai = new GoogleGenAI({ apiKey: keyItem.key });
-
-    let keyFailedWithQuota = false;
-
     for (const model of GEMINI_MODELS) {
       try {
         const callPromise = ai.models.generateContent({
@@ -378,133 +302,46 @@ async function generateContentWithFallback(
         );
         const response: any = await Promise.race([callPromise, timeoutPromise]);
         if (response && response.text) {
-          // Record success in pool state
-          const s = keyStateMap.get(keyItem.key) || {
+          const state = keyStateMap.get(keyItem.key) || {
             exhaustedUntil: 0,
             lastUsed: 0,
             failureCount: 0,
             successCount: 0,
           };
-          s.successCount++;
-          s.lastUsed = Date.now();
-          keyStateMap.set(keyItem.key, s);
-
+          state.successCount++;
+          state.lastUsed = Date.now();
+          keyStateMap.set(keyItem.key, state);
           keyRoundRobinIndex++;
-          return {
-            response,
-            modelUsed: model,
-            keyPreview: keyItem.preview,
-            rotatedKeyCount: rotatedCount,
-          };
+          return { response, modelUsed: model, keyPreview: keyItem.preview, rotatedKeyCount: rotatedCount };
         }
       } catch (err: any) {
-        const errMsg = String(err?.message || err);
-        console.warn(
-          `[Gemini Server] Key ${keyItem.preview} with model ${model} notice:`,
-          errMsg
-        );
         lastError = err;
-
         if (isRateLimitOrQuotaError(err)) {
-          console.warn(
-            `[Gemini Key Pool] Key ${keyItem.preview} reached rate/quota limit (429/RESOURCE_EXHAUSTED). Cooling down for 60s and rotating to next key...`
-          );
-          const s = keyStateMap.get(keyItem.key) || {
+          const state = keyStateMap.get(keyItem.key) || {
             exhaustedUntil: 0,
             lastUsed: 0,
             failureCount: 0,
             successCount: 0,
           };
-          s.failureCount++;
-          s.exhaustedUntil = Date.now() + 60_000;
-          s.lastError = errMsg;
-          keyStateMap.set(keyItem.key, s);
-          keyFailedWithQuota = true;
-          break; // Immediately break model loop and switch to NEXT candidate key!
+          state.failureCount++;
+          state.exhaustedUntil = Date.now() + 60_000;
+          state.lastError = String(err?.message || err);
+          keyStateMap.set(keyItem.key, state);
+          rotatedCount++;
+          break;
         }
       }
     }
-
-    if (keyFailedWithQuota) {
-      rotatedCount++;
-    }
   }
 
-  return tryLocalLlmThenThrow(lastError || new Error('All Gemini API keys and models failed'));
+  throw lastError || new Error('外部教師APIの呼び出しに失敗しました。旧ローカル生成ランタイムへのフォールバックは廃止されています。');
 }
 
-/**
- * 自律自己実装用: ローカルLLM優先、Geminiフォールバック推論関数
- * 1. 実機ローカルLLM (Qwen / llama-server) を最優先で試行
- * 2. オフラインまたは未稼働の場合、Gemini API (APIキー自動循環・多層モデル対応) へ自動フォールバック
- * 3. どちらの推論エンジンが使われたかを isLocal / modelUsed で正直に追跡
- */
-async function generateWithLocalOrGeminiFallback(
-  req: express.Request,
-  request: { contents: any; config?: any },
-  overrideEndpoint?: string,
-  overrideModel?: string
-): Promise<{ response: any; modelUsed: string; isLocal: boolean }> {
-  const promptText = typeof request.contents === 'string' ? request.contents : JSON.stringify(request.contents);
-
-  // 1. ローカルLLMを優先試行
-  try {
-    const local = await callLocalLlmChat(promptText, request.config, overrideEndpoint, overrideModel);
-    if (local && local.text && local.text.trim().length > 0) {
-      return { response: makeGeminiCompatibleResponse(local.text), modelUsed: local.modelUsed, isLocal: true };
-    }
-  } catch (err: any) {
-    console.warn('[Self-Code Engine] Local LLM attempt failed, proceeding to Gemini fallback:', err?.message);
-  }
-
-  // 2. Gemini APIへフォールバック (自動キー循環 & モデルフォールバック)
-  const geminiRes = await generateContentWithFallback(req, request);
-  return { response: geminiRes.response, modelUsed: geminiRes.modelUsed, isLocal: false };
+function generateWithRemovedLocalLlm(..._args: any[]): { response: { text: string } } {
+  // Compatibility boundary for retired endpoints. No model is loaded or called.
+  // Callers receive an empty result and must use deterministic verification paths.
+  return { response: { text: '' } };
 }
-
-// Health check endpoint
-// Ensure logs directory exists
-const LOGS_DIR = path.join(process.cwd(), 'logs');
-const LOG_FILE = path.join(LOGS_DIR, 'system_diagnostics.log');
-try {
-  if (!fs.existsSync(LOGS_DIR)) {
-    fs.mkdirSync(LOGS_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(LOG_FILE)) {
-    fs.writeFileSync(LOG_FILE, `=== SYSTEM DIAGNOSTICS LOG INITIALIZED AT ${new Date().toISOString()} ===\n`, 'utf-8');
-  }
-} catch (e) {
-  console.warn('Could not initialize log directory:', e);
-}
-
-// CI / Automated Test Environment Guard (規制ガード: CI自動検知)
-const IS_CI_ENV = Boolean(
-  process.env.CI === 'true' ||
-  process.env.CI === '1' ||
-  process.env.CONTINUOUS_INTEGRATION ||
-  process.env.GITHUB_ACTIONS ||
-  process.env.GITLAB_CI ||
-  process.env.TRAVIS ||
-  process.env.CIRCLECI ||
-  process.env.IS_TEST
-);
-
-if (IS_CI_ENV) {
-  console.log('[Regulatory Guard] CI環境が検知されました: 外部副作用・リソース枯渇防止ガードが有効化されました。');
-}
-
-app.get('/api/health', (req, res) => {
-  const keys = extractAllApiKeys(req);
-  res.json({
-    status: 'ok',
-    hasGeminiKey: keys.length > 0,
-    geminiKeyCount: keys.length,
-    hasCustomGeminiKey: keys.some((k) => k.source === 'custom'),
-    isCI: IS_CI_ENV,
-    regulatoryGuardActive: true,
-    timestamp: new Date().toISOString()
-  });
-});
 
 // Gemini Status & Key Verification for Local/Termux/Custom execution
 app.get('/api/gemini/status', (req, res) => {
@@ -784,7 +621,7 @@ app.post('/api/self-code/write-module', (req, res) => {
     }
 
     const targetPath = path.join(modulesDir, safeFilename);
-    const banner = `/**\n * Miki AI Autonomous Module - Chapter ${chapterNumber}: ${title || 'Autonomous Synthesis'}\n * Auto-generated by Miki Self-Improvement Engine at ${new Date().toISOString()}\n * Invariant Guarantees: Qwen 3B Protection, Privacy Boundaries, Deterministic Verification\n */\n\n`;
+    const banner = `/**\n * Miki AI Autonomous Module - Chapter ${chapterNumber}: ${title || 'Autonomous Synthesis'}\n * Auto-generated by Miki Self-Improvement Engine at ${new Date().toISOString()}\n * Invariant Guarantees: Privacy Boundaries, Deterministic Verification\n */\n\n`;
 
     fs.writeFileSync(targetPath, banner + code, 'utf-8');
     console.log(`[SelfCode] Successfully wrote real TypeScript module for Chapter ${chapterNumber} to ${safeFilename} (${code.length} bytes)`);
@@ -1697,7 +1534,7 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('最初から') ||
           lowerPrompt.includes('ファイルに入')
         ) {
-          reply = `うん！その通りだよ！💡✨\n\n「自然な日本語対話コーパス」や「ゲーム＆コード開発マスターナレッジ」の学習・知識データセットを、**最初からプロジェクトファイルにすべて合成してバンドル組み込み**したよ！🌸\n\nこれにより：\n1. 📁 **完全自己完結**: 毎回外から読み込ませなくても、アプリを起動した瞬間からすべての知識・対話ルール・ゲーム生成ガイドが適用されるよ！\n2. 🧠 **全LLM共通で即座に参照**: 端末ローカルWebLLM（Qwen/SmolLM/Llama等）でもクラウドGeminiでも、常に合成されたマスターデータを使ってスムーズに賢くお話し＆コード作成できるよ！\n3. 🔒 **記憶も自動引き継ぎ**: 端末のローカルストレージと同期して、いつでも学習済みナレッジを保持し続けるよ！\n\nこれで準備は完璧！何を作ったりお話ししたいか、気軽に言ってね！😊🎮✨`;
+          reply = `うん！その通りだよ！💡✨\n\n「自然な日本語対話コーパス」や「ゲーム＆コード開発マスターナレッジ」の学習・知識データセットを、**最初からプロジェクトファイルにすべて合成してバンドル組み込み**したよ！🌸\n\nこれにより：\n1. 📁 **完全自己完結**: 毎回外から読み込ませなくても、アプリを起動した瞬間からすべての知識・対話ルール・ゲーム生成ガイドが適用されるよ！\n2. 🧠 **Non-LLM Coreと外部教師経路で参照**: Non-LLM Coreまたは必要時のみクラウドGeminiで、常に合成されたマスターデータを使ってスムーズに賢くお話し＆コード作成できるよ！\n3. 🔒 **記憶も自動引き継ぎ**: 端末のローカルストレージと同期して、いつでも学習済みナレッジを保持し続けるよ！\n\nこれで準備は完璧！何を作ったりお話ししたいか、気軽に言ってね！😊🎮✨`;
         } else if (
           lowerPrompt.includes('外付け') ||
           lowerPrompt.includes('他のllm') ||
@@ -1706,7 +1543,7 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('モデル変更') ||
           (lowerPrompt.includes('llm') && (lowerPrompt.includes('いい') || lowerPrompt.includes('使える') || lowerPrompt.includes('変え')))
         ) {
-          reply = `まさにその通りだよ！大正解！💡✨\n\nLLM（言語モデル）は**「文章を考えたりコードを書く計算エンジン（頭脳）」**で、${name}の**「記憶」「性格」「親密度」「${nickname}との約束や過去の思い出」は全部端末ストレージ（外付け記憶）**に保存されているんだ！🌸\n\nだから、\n・⚡ **SmolLM2**（超軽量・超高速）\n・🌸 **Qwen 2.5 Coder**（日本語＆ゲーム開発の万能型）\n・💖 **Llama 3.2**（日常会話・共感対話）\n・💎 **Gemma 2**（高精度な日本語）\n・☁️ **クラウドGemini**（最高峰の知能）\n\nどのモデルに切り替えても、${name}としての記憶や仲良し度はそのまま引き継がれるよ！端末の調子やバッテリーに合わせて自由に好きなモデルを選んでね！😊💕`;
+          reply = `まさにその通りだよ！大正解！💡✨\n\n旧LLMは現在の実行経路ではなく、Non-LLM Coreが決定論的処理を担当**で、${name}の**「記憶」「性格」「親密度」「${nickname}との約束や過去の思い出」は全部端末ストレージ（外付け記憶）**に保存されているんだ！🌸\n\nだから、\n・⚡ **SmolLM2**（超軽量・超高速）\n・🌸 **Qwen 2.5 Coder**（日本語＆ゲーム開発の万能型）\n・💖 **旧生成モデル**（日常会話・共感対話）\n・💎 **Gemma 2**（高精度な日本語）\n・☁️ **クラウドGemini**（最高峰の知能）\n\nどのモデルに切り替えても、${name}としての記憶や仲良し度はそのまま引き継がれるよ！端末の調子やバッテリーに合わせて自由に好きなモデルを選んでね！😊💕`;
         } else if (
           (lowerPrompt.includes('gpu') || lowerPrompt.includes('グラフィック')) &&
           (lowerPrompt.includes('みき') || lowerPrompt.includes('別れて') || lowerPrompt.includes('二つ') || lowerPrompt.includes('2つ') || lowerPrompt.includes('意味'))
@@ -1720,12 +1557,12 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('壊れて') ||
           lowerPrompt.includes('オウム返し')
         ) {
-          reply = `ごめんね！定型文っぽく聞こえちゃったよね…！💦\n\n端末のWebGPUで重いモデルを動かそうとしてメモリ制限やダウンロードの待機状態になっていた時に、一時的なフォールバック応答がオウム返しになっていたのが原因だったよ。\n\n今、しっかり修正して自然にお話しできるように調整したよ！✨\nスマホでサクサク動かしたい時は「端末ローカルLLM設定」から **SmolLM2-360M** や **Qwen 2.5 Coder (0.5B)** を選ぶと、メモリに優しく高速で安定して動くよ！何でも気軽に話してね😊💕`;
+          reply = `ごめんね！定型文っぽく聞こえちゃったよね…！💦\n\n旧ローカルモデル経路に依存したフォールバックが残っていたのが原因だったよ。\n\n今、しっかり修正して自然にお話しできるように調整したよ！✨\nスマホではモデルを常駐させず、決定論的な非LLMコアを中心に動かすよ！何でも気軽に話してね😊💕`;
         } else if (
           lowerPrompt.includes('スマホ') &&
           (lowerPrompt.includes('スペック') || lowerPrompt.includes('使える') || lowerPrompt.includes('どれくらい') || lowerPrompt.includes('調べ') || lowerPrompt.includes('診断') || lowerPrompt.includes('ベンチマーク'))
         ) {
-          reply = `あなたのスマホのスペックと相性を診断できるよ！📱⚡\n\n上のメニューの **「端末ローカルLLM設定」** を開くと、**「📱 端末スペック＆モデル適合度診断」** があって、ワンタップでGPUの性能（GFLOPS）やVRAM、メモリを計測して、どのモデルが一番快適に動くか（◎ 超快適 / ○ 快適 / △ 重い）を自動判定できるよ！\n\nぜひ一度試してみてね！✨`;
+          reply = `あなたのスマホのスペックと相性を診断できるよ！📱⚡\n\n上のメニューの **「非LLMコア設定」** では、GPU/CPU/メモリなどの端末性能を診断し、非LLM処理の予算を調整できるよ！\n\nぜひ一度試してみてね！✨`;
         } else if (
           lowerPrompt.includes('自己紹介') ||
           lowerPrompt.includes('じこしょうかい') ||
@@ -1749,7 +1586,7 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('ゲーム作って') ||
           lowerPrompt.includes('コード書いて')
         ) {
-          reply = `${nickname}、作りたいゲームやアプリのアイデアを教えてくれてありがとう！🎮✨\n\nご自身で作られているソースコード（HTML/JS/TSやZIPファイル）があれば、下のファイル添付ボタンから送ってね！コードのバグ修正や機能追加、レビューをすぐに行うよ！💻\n\n※ ゼロから自由にオリジナルコードを生成・対話する場合は、上部の「端末ローカルLLM設定」からモデルをロードすると、端末内AIが完全オフラインでコードを生成するよ！✨`;
+          reply = `${nickname}、作りたいゲームやアプリのアイデアを教えてくれてありがとう！🎮✨\n\nご自身で作られているソースコード（HTML/JS/TSやZIPファイル）があれば、下のファイル添付ボタンから送ってね！コードのバグ修正や機能追加、レビューをすぐに行うよ！💻\n\n※ ゼロから自由にオリジナルコードを生成・対話する場合は、上部の「非LLMコア設定」からモデルをロードすると、端末内AIが完全オフラインでコードを生成するよ！✨`;
         } else if (
           lowerPrompt.includes('こんにちは') ||
           lowerPrompt.includes('やっほー') ||
@@ -1947,16 +1784,16 @@ app.post('/api/train-distill', async (req, res) => {
       ? `\n安全に許可された参考知識:\n${safeMemories.slice(0, 5).map((m: any) => `- [${m.category}] ${m.content}`).join('\n')}`
       : '';
 
-    const prompt = `あなたは端末オンデバイスローカルLLM（WebGPUで動く「みき」）を教育・育成するスーパーバイザー・知識蒸留AI（Teacher LLM）です。
+    const prompt = `あなたはMIKI-AIの非LLMコアを教育・検証する外部教師AIです。
 対象トピック: "${topic || 'Web/3Dゲーム開発と親しみやすい会話'}"
 スキル分類: "${skillType || 'code_and_persona'}"
 現在のペルソナ設定: 名前=${persona?.name || 'みき'}, 親愛度=${persona?.intimacyLevel || 2}${memoryContext}
 
-以下の要領で、端末ローカルLLM（WebGPU）に注入・記憶させる高品質な学習知識データ（ナレッジカードとQ&Aデータセット）をJSON形式で生成してください:
+以下の要領で、非LLMコアへ取り込むための高品質な学習知識データ（ナレッジカードとQ&Aデータセット）をJSON形式で生成してください:
 1. title: 知識カードのタイトル（例: Three.js 60fps最適化パターン、感情豊かに話すコツ）
 2. category: 'game' | 'code' | 'persona' | 'memory' | 'logic' のいずれか
-3. content: ローカルLLMが参照して高品質な応答やコードを出力するための具体的かつ実践的な知識・コードスニペット・会話例（日本語、300〜600文字）
-4. qaPairs: ローカルLLMのファインチューニングやRAG参照に使える質問と模範回答のペア（2〜3組）
+3. content: 非LLMコアが参照して高品質な処理規則へ変換するための具体的かつ実践的な知識・コードスニペット・会話例（日本語、300〜600文字）
+4. qaPairs: 非LLM知識ベースの検証・回帰に使える質問と模範回答のペア（2〜3組）
 
 JSONフォーマットのみを出力してください:
 {
@@ -1966,7 +1803,7 @@ JSONフォーマットのみを出力してください:
   "qaPairs": [
     { "q": "...", "a": "..." }
   ],
-  "summary": "この知識によってローカルLLMのみきがどう賢くなるかの解説（1〜2文）"
+  "summary": "この知識によって旧ローカル生成ランタイムのみきがどう賢くなるかの解説（1〜2文）"
 }`;
 
     const { response } = await generateContentWithFallback(req, {
@@ -2327,79 +2164,335 @@ app.get(['/api/export-app-zip', '/api/download-zip', '/miki-project.zip', '/down
   }
 });
 
-// Companion Miki RPG Endpoints
-app.post('/api/miki/chat', async (req, res) => {
-  try {
-    const { message, character, worldState } = req.body;
-    const ai = getAIClient(req);
-    const charName = character?.name || '冒険者';
-    const locName = worldState?.name || '拠点';
-
-    if (!ai) {
-      return res.json({
-        reply: `${charName}、${locName}での探索順調？何があってもみきがついてるから安心して進もうね！🗡️✨`
-      });
-    }
-
-    const prompt = `あなたはゲームの相棒「みき」です。
-プレイヤー名: ${charName}
-現在地: ${locName}
-メッセージ: "${message}"
-親身で元気なタメ口で、冒険のアドバイスや励ましを1〜2文で答えてください。`;
-
-    const { response } = await generateContentWithFallback(ai, {
-      contents: prompt,
-      config: { temperature: 0.7 }
-    });
-
-    res.json({ reply: response.text || `${charName}、一緒に頑張ろうね！` });
-  } catch (err: any) {
-    res.json({ reply: `うんうん、しっかり聞いてるよ！どんな冒険でも一緒に乗り越えようね！` });
-  }
+// Companion Miki RPG Endpoints — deterministic, non-LLM runtime.
+app.post('/api/miki/chat', (req, res) => {
+  const { message, character, worldState } = req.body || {};
+  const reply = simpleRpgRuleEngineService.chat(message, character, worldState);
+  unifiedMikiExperienceService.observeRpg({ action: 'chat', input: String(message || ''), outcome: 'SUCCESS', verified: true, capabilityIds: ['simple_rpg.combat', 'simple_rpg.equipment'], lesson: 'rpg-chat is part of the unified Miki experience stream' });
+  res.json({ reply });
 });
 
 app.post('/api/miki/narrate', (req, res) => {
-  const { action, character, worldState } = req.body;
-  const charName = character?.name || '冒険者';
-  res.json({
-    data: {
-      narration: `${charName}は慎重に辺りを見回し、${action || '前進'}した。静寂の中にかすかな風の音が響く。`,
-      mikiComment: '気をつけて、何かの気配がするよ！',
-      suggestedActions: ['周囲を探索する', '武器を構えて進む', '一旦休憩する'],
-      hpDelta: 0,
-      mpDelta: 0,
-      goldDelta: 5,
-      xpDelta: 10
-    }
-  });
+  const { action, character, worldState, seed } = req.body || {};
+  const data = simpleRpgRuleEngineService.narrate(action, character, worldState, seed);
+  unifiedMikiExperienceService.observeRpg({ action: 'narrate', input: String(action || ''), outcome: 'SUCCESS', verified: true, capabilityIds: ['simple_rpg.combat'], lesson: 'narration outcome joined unified experience' });
+  res.json({ data });
 });
 
 app.post('/api/miki/quest', (req, res) => {
-  const { setting, difficulty } = req.body;
-  res.json({
-    quest: {
-      id: 'q_' + Date.now(),
-      title: `${setting || '未知の迷宮'}の調査`,
-      description: `${setting || 'エリア'}を探索し、手がかりを収集してください。（難易度: ${difficulty || 'Normal'}）`,
-      reward: '150 Gold, 50 XP',
-      completed: false
-    }
-  });
+  const { setting, difficulty, character, seed } = req.body || {};
+  const quest = simpleRpgRuleEngineService.quest(setting, difficulty, character, seed);
+  unifiedMikiExperienceService.observeRpg({ action: 'quest', input: `${setting || ''}|${difficulty || ''}`, outcome: 'SUCCESS', verified: true, capabilityIds: ['simple_rpg.guild'], lesson: 'quest planning joined unified experience' });
+  res.json({ quest });
 });
 
 app.post('/api/miki/combat', (req, res) => {
-  const { playerMove, character, monster } = req.body;
-  const pDamage = Math.floor(Math.random() * 15) + 10;
-  const mDamage = Math.floor(Math.random() * 8) + 3;
-  res.json({
-    data: {
-      narrative: `${character?.name || 'プレイヤー'}の「${playerMove || '攻撃'}」がヒット！ ${monster?.name || 'モンスター'}に${pDamage}のダメージ！`,
-      playerDamage: mDamage,
-      monsterDamage: pDamage,
-      isCritical: Math.random() > 0.8,
-      mikiComment: 'ナイス攻撃！この調子でたたみかけよう！'
-    }
+  const { playerMove, character, monster, seed, rollResult } = req.body || {};
+  const deterministicSeed = Number.isFinite(seed) ? seed : Number(rollResult?.total || 0);
+  const data = simpleRpgRuleEngineService.combat(playerMove, character, monster, deterministicSeed);
+  unifiedMikiExperienceService.observeRpg({ action: 'combat', input: `${playerMove || ''}|${monster?.name || ''}|${deterministicSeed}`, outcome: 'SUCCESS', verified: true, capabilityIds: ['simple_rpg.combat'], lesson: data.defeated ? 'combat victory pattern observed' : 'combat result observed' });
+  res.json({ data });
+});
+
+app.get('/api/miki/rpg/capabilities', (_req, res) => {
+  res.json({ capabilities: simpleRpgCapabilityLearningService.listCapabilities(), state: simpleRpgCapabilityLearningService.getState() });
+});
+
+app.post('/api/miki/rpg/capabilities/audit', (_req, res) => {
+  res.json(simpleRpgCapabilityLearningService.audit());
+});
+
+app.get('/api/miki/autonomous-growth/state', (_req, res) => {
+  res.json(autonomousGrowthGovernorService.getState());
+});
+
+app.get('/api/miki/verified-knowledge', (req, res) => {
+  const limit = Number(req.query.limit || 50);
+  res.json({ promotions: verifiedKnowledgePromotionService.list(Number.isFinite(limit) ? limit : 50) });
+});
+
+app.get('/api/miki/verified-knowledge/relevant', (req, res) => {
+  const query = String(req.query.q || '');
+  res.json({ promotions: verifiedKnowledgePromotionService.findRelevant(query, 12) });
+
+app.get('/api/miki/capability-confidence', (req, res) => {
+  const componentId = String(req.query.componentId || req.query.component || '').trim();
+  const environment = String(req.query.environment || '').trim() || undefined;
+  if (!componentId) return res.status(400).json({ error: 'componentId/component is required' });
+  res.json(capabilityConfidenceService.evaluate(componentId, environment));
+});
+
+app.get('/api/miki/capability-confidence/relevant', (req, res) => {
+  const query = String(req.query.q || req.query.query || '').trim();
+  const environment = String(req.query.environment || '').trim() || undefined;
+  if (!query) return res.status(400).json({ error: 'q/query is required' });
+  res.json({ capabilities: capabilityConfidenceService.findRelevant(query, environment, 12) });
+});
+
+app.get('/api/miki/unknown-task/decompositions', (req, res) => {
+  const limit = Number(req.query.limit);
+  res.json({ decompositions: unknownTaskDecompositionService.list(Number.isFinite(limit) ? limit : 50) });
+});
+app.post('/api/miki/unknown-task/decompose', (req, res) => {
+  const task = String(req.body?.task || '').trim();
+  if (!task) return res.status(400).json({ error: 'task is required' });
+  res.json(unknownTaskDecompositionService.decompose(task));
+});
+app.post('/api/miki/virtual-experience/generate', (req, res) => {
+  const limit = Number(req.body?.limit);
+  res.json({ cases: virtualExperienceGeneratorService.generateFromContracts(Number.isFinite(limit) ? limit : 10) });
+});
+app.get('/api/miki/virtual-experience', (req, res) => {
+  const limit = Number(req.query.limit);
+  res.json({ cases: virtualExperienceGeneratorService.list(Number.isFinite(limit) ? limit : 50) });
+});
+
+app.post('/api/miki/semantics/check', (req, res) => {
+  const instructions = Array.isArray(req.body?.instructions) ? req.body.instructions : [];
+  res.json(formalSemanticsKernelService.evaluate(instructions));
+});
+app.get('/api/miki/semantics/checks', (req, res) => {
+  const limit = Number(req.query.limit || 50); res.json({ checks: formalSemanticsKernelService.list(Number.isFinite(limit) ? limit : 50) });
+});
+app.post('/api/miki/fault-injection/run', (req, res) => {
+  const componentId=String(req.body?.componentId||'').trim(); const environment=String(req.body?.environment||'').trim(); const fault=req.body?.fault;
+  if(!componentId||!environment||!['MISSING_INPUT','STALE_KNOWLEDGE','DEPENDENCY_FAILURE','TIMEOUT','CONTRACT_VIOLATION'].includes(fault)) return res.status(400).json({error:'componentId, environment and valid fault are required'});
+  res.json(faultInjectionLabService.run({componentId,environment,fault}));
+});
+app.get('/api/miki/fault-injection', (req, res) => { const limit=Number(req.query.limit||50); res.json({trials:faultInjectionLabService.list(Number.isFinite(limit)?limit:50)}); });
+app.post('/api/miki/spec-contract/compile', (req, res) => { try { const contract=specContractCompilerService.compile(typeof req.body?.specPath==='string' ? req.body.specPath : undefined); res.json({success:true,contract}); } catch (e:any) { res.status(400).json({success:false,error:e?.message||String(e)}); } });
+app.get('/api/miki/spec-contract', (_req, res) => res.json({contract:specContractCompilerService.getContract()}));
+app.get('/api/miki/spec-contract/audit', (_req, res) => res.json(specContractCompilerService.audit()));
+app.post('/api/miki/causal-memory/link', (req,res) => { try { const r=causalMemoryLedgerService.linkDecisionResult(String(req.body?.requestId||''),String(req.body?.decision||''),req.body?.outcome,Boolean(req.body?.verified),req.body?.experienceId); res.json({success:true,record:r}); } catch(e:any){res.status(400).json({success:false,error:e?.message||String(e)});} });
+app.post('/api/miki/causal-memory/correction', (req,res) => { try { const r=causalMemoryLedgerService.recordCorrection(String(req.body?.causeId||''),String(req.body?.subject||''),Boolean(req.body?.verified)); res.json({success:true,record:r}); } catch(e:any){res.status(400).json({success:false,error:e?.message||String(e)});} });
+app.get('/api/miki/causal-memory', (req,res) => { const limit=Number(req.query.limit||100); res.json({records:causalMemoryLedgerService.list(Number.isFinite(limit)?limit:100),stats:causalMemoryLedgerService.stats(),forgetCandidates:causalMemoryLedgerService.forgetCandidates(20)}); });
+app.post('/api/miki/knowledge-half-life/classify', (req,res) => { try { const r=knowledgeHalfLifeService.classify(String(req.body?.key||''),req.body||{}); res.json({success:true,record:r}); } catch(e:any){res.status(400).json({success:false,error:e?.message||String(e)});} });
+app.post('/api/miki/knowledge-half-life/observe', (req,res) => { try { const r=knowledgeHalfLifeService.observe(String(req.body?.key||''),req.body?.outcome,Boolean(req.body?.verified)); res.json({success:true,record:r}); } catch(e:any){res.status(400).json({success:false,error:e?.message||String(e)});} });
+app.get('/api/miki/knowledge-half-life', (req,res) => { const limit=Number(req.query.limit||100); res.json({records:knowledgeHalfLifeService.list(Number.isFinite(limit)?limit:100),due:knowledgeHalfLifeService.due(20)}); });
+app.post('/api/miki/capability-composition/prove', (req, res) => {
+  const capabilityIds=Array.isArray(req.body?.capabilityIds)?req.body.capabilityIds.map(String):[]; res.json(capabilityCompositionProofService.prove(capabilityIds));
+});
+app.post('/api/miki/executable-explanation', (req, res) => {
+  const decision=String(req.body?.decision||'').trim(); const steps=Array.isArray(req.body?.steps)?req.body.steps.map(String):[]; const evidence=Array.isArray(req.body?.evidence)?req.body.evidence.map(String):[];
+  if(!decision||!steps.length) return res.status(400).json({error:'decision and steps are required'});
+  res.json(executableExplanationService.explain(decision,steps,evidence));
+});
+
+
+app.post('/api/miki/frontier/strategy', (req,res)=>{ const r=frontierGovernanceService.registerStrategy(String(req.body?.capability||''),req.body?.family, String(req.body?.implementation||''), Number(req.body?.evidence??0.5)); if(!r.capability||!r.implementation) return res.status(400).json({error:'capability, family and implementation are required'}); res.json(r); });
+app.post('/api/miki/frontier/strategy/result', (req,res)=>res.json(frontierGovernanceService.recordStrategyResult(String(req.body?.id||''),Boolean(req.body?.success))));
+app.get('/api/miki/frontier/strategies', (req,res)=>res.json({strategies:frontierGovernanceService.listStrategies(req.query.capability?String(req.query.capability):undefined)}));
+app.post('/api/miki/evaluator/audit', (req,res)=>res.json(frontierGovernanceService.auditEvaluator(req.body||{})));
+app.get('/api/miki/evaluator/audits', (req,res)=>res.json({audits:frontierGovernanceService.listAudits(Number(req.query.limit)||50)}));
+app.post('/api/miki/theory/form', (req,res)=>res.json(frontierGovernanceService.formTheory(String(req.body?.domain||''),Array.isArray(req.body?.cases)?req.body.cases:[],String(req.body?.hypothesis||''),String(req.body?.prediction||''),String(req.body?.scope||'bounded'))));
+app.post('/api/miki/theory/test', (req,res)=>res.json(frontierGovernanceService.testTheory(String(req.body?.id||''),Boolean(req.body?.unseenMatch),Array.isArray(req.body?.counterexamples)?req.body.counterexamples:[],Number(req.body?.transferScore||0))));
+app.get('/api/miki/theory', (req,res)=>res.json({theories:frontierGovernanceService.listTheories(Number(req.query.limit)||50)}));
+app.post('/api/miki/co-evolution', (req,res)=>res.json(frontierGovernanceService.recordCoEvolution(req.body)));
+app.get('/api/miki/co-evolution', (req,res)=>res.json({recommendedRole:frontierGovernanceService.recommendRole(String(req.query.taskClass||'')),records:frontierGovernanceService.listCoEvolution(Number(req.query.limit)||50)}));
+app.post('/api/miki/research-lab', (req,res)=>res.json(frontierGovernanceService.createResearch(String(req.body?.weakness||''),req.body?.hypotheses||[],req.body?.candidateApproaches||[],req.body?.controls||[])));
+app.post('/api/miki/research-lab/:id/promote', (req,res)=>res.json(frontierGovernanceService.promoteResearch(req.params.id,Boolean(req.body?.meetsDevice),Boolean(req.body?.licenseOk),Boolean(req.body?.reproducible))));
+app.get('/api/miki/research-lab', (req,res)=>res.json({topics:frontierGovernanceService.listResearch(Number(req.query.limit)||50)}));
+app.post('/api/miki/frontier/state', (req,res)=>res.json(frontierGovernanceService.setFrontier(req.body)));
+app.get('/api/miki/frontier/state', (req,res)=>res.json({frontier:frontierGovernanceService.getFrontier(req.query.capability?String(req.query.capability):undefined)}));
+app.post('/api/miki/counterfactual', (req,res)=>res.json(frontierGovernanceService.recordCounterfactual(String(req.body?.task||''),String(req.body?.adopted||''),req.body?.rejected||[],req.body?.branches||[],req.body?.pruning||[])));
+app.get('/api/miki/counterfactual', (req,res)=>res.json({records:frontierGovernanceService.listCounterfactuals(Number(req.query.limit)||50)}));
+app.post('/api/miki/cognitive-market/compete', (req,res)=>res.json(frontierGovernanceService.compete(String(req.body?.capability||''),Array.isArray(req.body?.implementations)?req.body.implementations:[])));
+app.get('/api/miki/cognitive-market', (_req,res)=>res.json({markets:frontierGovernanceService.listMarkets()}));
+app.post('/api/miki/frontier-score', (req,res)=>res.json(frontierGovernanceService.scorePersonal(req.body)));
+app.get('/api/miki/frontier-score', (req,res)=>res.json({scores:frontierGovernanceService.listScores(Number(req.query.limit)||50)}));
+app.post('/api/miki/uncertainty/classify',(req,res)=>res.json(operationalConformanceService.classifyUncertainty(req.body||{})));
+app.post('/api/miki/uncertainty/:id/calibrate',(req,res)=>res.json(operationalConformanceService.calibrate(req.params.id,Boolean(req.body?.outcome))));
+app.get('/api/miki/uncertainty',(req,res)=>res.json({records:operationalConformanceService.listUncertainty(Number(req.query.limit)||100)}));
+app.post('/api/miki/trace/:traceId/event',(req,res)=>res.json(operationalConformanceService.trace(req.params.traceId,req.body||{})));
+app.get('/api/miki/trace/:traceId',(req,res)=>res.json({events:operationalConformanceService.getTrace(req.params.traceId)}));
+app.post('/api/miki/terminal',(req,res)=>res.json(operationalConformanceService.terminal(req.body||{})));
+app.get('/api/miki/terminal',(req,res)=>res.json({decisions:operationalConformanceService.listTerminals(Number(req.query.limit)||100)}));
+app.post('/api/miki/partial-artifact',(req,res)=>res.json(operationalConformanceService.addPartialArtifact(req.body||{})));
+app.post('/api/miki/resume/checkpoint',(req,res)=>res.json(operationalConformanceService.createCheckpoint(req.body||{})));
+app.post('/api/miki/resume/:id',(req,res)=>res.json(operationalConformanceService.resume(req.params.id,String(req.body?.environmentHash||''))));
+app.post('/api/miki/simulation/register',(req,res)=>res.json(operationalConformanceService.registerSimulation(req.body||{})));
+app.post('/api/miki/simulation/:id/revalidate',(req,res)=>res.json(operationalConformanceService.revalidateSimulation(req.params.id,Array.isArray(req.body?.environment)?req.body.environment:[])));
+app.get('/api/miki/simulation',(req,res)=>res.json({simulations:operationalConformanceService.listSimulations()}));
+app.post('/api/miki/causal/event',(req,res)=>res.json(operationalConformanceService.addCausalEvent(req.body||{})));
+app.post('/api/miki/causal/assess',(req,res)=>res.json(operationalConformanceService.assessCausal(req.body||{})));
+app.get('/api/miki/causal/assessments',(req,res)=>res.json({assessments:operationalConformanceService.listCausal()}));
+app.post('/api/miki/realization/select',(req,res)=>res.json(operationalConformanceService.selectRealization(String(req.body?.capability||''),Array.isArray(req.body?.options)?req.body.options:[])));
+app.get('/api/miki/realization',(req,res)=>res.json({options:operationalConformanceService.listRealizations()}));
+app.post('/api/miki/requirement/compile',(req,res)=>res.json(operationalConformanceService.compileRequirement(req.body||{})));
+app.get('/api/miki/requirement',(req,res)=>res.json({requirements:operationalConformanceService.listRequirements()}));
+app.post('/api/miki/reasoning-asset',(req,res)=>res.json(operationalConformanceService.addReasoningAsset(req.body||{})));
+app.post('/api/miki/reasoning-asset/related',(req,res)=>res.json({assets:operationalConformanceService.relatedAssets(Array.isArray(req.body?.refs)?req.body.refs:[])}));
+app.post('/api/miki/integration-scenario',(req,res)=>res.json(operationalConformanceService.runIntegrationScenario(req.body||{})));
+app.get('/api/miki/integration-scenario',(req,res)=>res.json({scenarios:operationalConformanceService.listScenarios()}));
+app.post('/api/miki/cognition/cycle',(req,res)=>{try{res.json(mikiCognitiveKernelService.cycle(req.body||{}));}catch(e:any){res.status(400).json({success:false,error:e?.message||String(e)});}});
+app.get('/api/miki/cognition/status',(_req,res)=>res.json(mikiCognitiveKernelService.status()));
+app.get('/api/miki/operational-conformance/summary',(_req,res)=>res.json(operationalConformanceService.summary()));
+app.get('/api/miki/automation',(_req,res)=>res.json({workflows:automationStudioService.list()}));
+app.post('/api/miki/automation/observe',(req,res)=>{try{const r=automationStudioService.observe(String(req.body?.goal||''),Array.isArray(req.body?.steps)?req.body.steps:[],Array.isArray(req.body?.variables)?req.body.variables:[]);res.json(r);}catch(e:any){res.status(400).json({error:e?.message||String(e)});}});
+app.post('/api/miki/automation/:id/transition',(req,res)=>{try{res.json(automationStudioService.transition(req.params.id,req.body?.stage));}catch(e:any){res.status(400).json({error:e?.message||String(e)});}});
+app.post('/api/miki/automation/:id/replay',(req,res)=>{try{res.json(automationStudioService.recordVirtualReplay(req.params.id,Boolean(req.body?.passed),String(req.body?.validation||'')));}catch(e:any){res.status(400).json({error:e?.message||String(e)});}});
+app.post('/api/miki/automation/:id/confirm',(req,res)=>{try{res.json(automationStudioService.confirm(req.params.id,Boolean(req.body?.approved)));}catch(e:any){res.status(400).json({error:e?.message||String(e)});}});
+app.get('/api/miki/research-notes',(_req,res)=>res.json({notes:digitalResearchNoteService.getAllNotes(),stats:digitalResearchNoteService.getStats(),due:digitalResearchNoteService.due()}));
+app.post('/api/miki/research-notes/experiment',(req,res)=>res.json(digitalResearchNoteService.recordExperiment(String(req.body?.title||''),req.body?.category||'CODE_ARCHITECTURE',String(req.body?.hypothesis||''),String(req.body?.experimentMethod||''),String(req.body?.observedResults||''),String(req.body?.conclusion||''),String(req.body?.establishedInsight||''),Number(req.body?.validationScore??0.9),Array.isArray(req.body?.evidenceIds)?req.body.evidenceIds.map(String):[],Array.isArray(req.body?.counterevidence)?req.body.counterevidence.map(String):[],Number(req.body?.revalidateDays??30))));
+app.post('/api/miki/research-notes/:id/counterevidence',(req,res)=>res.json(digitalResearchNoteService.addCounterevidence(req.params.id,String(req.body?.evidence||''))));
+app.post('/api/miki/knowledge-os/ingest-claims',(req,res)=>{try{const ids=Array.isArray(req.body?.claimIds)?req.body.claimIds.map(String):[];res.json({objects:cognitiveEvidenceIntegrationService.ingestClaims(ids)});}catch(e:any){res.status(400).json({error:e?.message||String(e)});}});
+app.get('/api/miki/execution-evidence',(_req,res)=>res.json({records:cognitiveExecutionEvidenceService.list(),summary:cognitiveExecutionEvidenceService.summary()}));
+app.post('/api/miki/execution-evidence/ingest',(req,res)=>{try{res.json(cognitiveExecutionEvidenceService.ingest(req.body));}catch(e:any){res.status(400).json({error:e?.message||String(e)});}});
+app.get('/api/miki/resources',(_req,res)=>res.json(resourceGovernanceService.getSnapshot()));
+app.post('/api/miki/resources/refresh',async(_req,res)=>res.json(await resourceGovernanceService.refresh()));
+app.get('/api/miki/resources/budget',(req,res)=>res.json(resourceGovernanceService.budgetFor(req.query.tier||'LIGHT',req.query.critical==='true')));
+
+app.post('/api/miki/attention/error', (req,res)=>res.json(frontierGovernanceService.observePrediction(String(req.body?.key||''),req.body?.errorClass,Number(req.body?.magnitude||0),Number(req.body?.impact||0),Number(req.body?.frequency||1),Number(req.body?.unknownCause||0.5))));
+app.get('/api/miki/attention', (_req,res)=>res.json({plan:frontierGovernanceService.attentionPlan()}));
+app.post('/api/miki/environment/explore', (req,res)=>res.json(frontierGovernanceService.exploreEnvironment(String(req.body?.environment||''),req.body?.stage,req.body?.contract||[],req.body?.permissions||[],req.body?.sideEffects||[],req.body?.rollback||[],req.body?.audit||[])));
+app.get('/api/miki/environment/explore', (_req,res)=>res.json({environments:frontierGovernanceService.listEnvironments()}));
+app.post('/api/miki/safety/meta-proof', (_req,res)=>res.json(frontierGovernanceService.verifyTopInvariants()));
+app.get('/api/miki/safety/meta-proof', (req,res)=>res.json({proofs:frontierGovernanceService.listProofs(Number(req.query.limit)||50)}));
+
+app.post('/api/miki/slo/set',(req,res)=>res.json(capabilitySloService.set(String(req.body?.capability||''),req.body||{})));
+app.post('/api/miki/slo/observe',(req,res)=>res.json(capabilitySloService.observe({capability:String(req.body?.capability||''),success:Boolean(req.body?.success),failureSeverity:Number(req.body?.failureSeverity||0),latencyMs:Number(req.body?.latencyMs||0),resource:Number(req.body?.resource||0),retries:Number(req.body?.retries||0),evidence:Number(req.body?.evidence||0),safetyOk:req.body?.safetyOk!==false})));
+app.get('/api/miki/slo/evaluate',(req,res)=>res.json(capabilitySloService.evaluate(String(req.query.capability||''),Number(req.query.minSamples)||3)));
+app.get('/api/miki/slo',(req,res)=>res.json({slos:capabilitySloService.list()}));
+app.post('/api/miki/approval/request',(req,res)=>res.json(approvalPermissionService.request(req.body)));
+app.post('/api/miki/approval/:id/decide',(req,res)=>res.json(approvalPermissionService.decide(req.params.id,Boolean(req.body?.approved))));
+app.post('/api/miki/approval/:id/authorize',(req,res)=>res.json(approvalPermissionService.authorize(req.params.id,String(req.body?.taskId||''),String(req.body?.target||''),String(req.body?.operation||''))));
+app.post('/api/miki/approval/:id/revoke',(req,res)=>res.json(approvalPermissionService.revoke(req.params.id)));
+app.get('/api/miki/approval',(req,res)=>res.json({approvals:approvalPermissionService.listApprovals(),grants:approvalPermissionService.listGrants()}));
+app.post('/api/miki/checkpoint',(req,res)=>res.json(cognitiveStateCheckpointService.create(req.body)));
+app.post('/api/miki/checkpoint/:id/verify',(req,res)=>res.json({id:req.params.id,verified:cognitiveStateCheckpointService.verify(req.params.id)}));
+app.get('/api/miki/checkpoint/:id/reconstruct',(req,res)=>res.json(cognitiveStateCheckpointService.reconstruct(req.params.id)));
+app.get('/api/miki/checkpoint',(req,res)=>res.json({checkpoints:cognitiveStateCheckpointService.list(Number(req.query.limit)||100)}));
+app.post('/api/miki/blind-comparison',(req,res)=>res.json(blindComparisonLabService.compare(req.body)));
+app.post('/api/miki/perception/permission',(req,res)=>{situationalAwarenessService.setPermission(req.body?.source,Boolean(req.body?.allowed));res.json(situationalAwarenessService.getModel());});
+app.post('/api/miki/perception/event',(req,res)=>{const r=situationalAwarenessService.ingest(req.body);if(!r)return res.status(403).json({success:false,error:'PERMISSION_REQUIRED'});res.json({success:true,event:r});});
+app.get('/api/miki/perception',(req,res)=>res.json(situationalAwarenessService.getModel()));
+
+
+app.get('/api/miki/revalidation/state', (_req, res) => {
+  res.json({ running: autonomousRevalidationLoopService.isRunning(), history: autonomousRevalidationLoopService.list(20) });
+});
+
+app.post('/api/miki/revalidation/cycle', async (req, res) => {
+  try {
+    const result = await autonomousRevalidationLoopService.run({
+      limit: Number.isFinite(Number(req.body?.limit)) ? Number(req.body.limit) : 8,
+      environment: typeof req.body?.environment === 'string' ? req.body.environment : undefined,
+    });
+    res.json(result);
+  } catch (error: any) {
+    res.status(409).json({ ok: false, error: error?.message || '自動再検証サイクルを開始できませんでした。' });
+  }
+});
+
+app.get('/api/miki/failure-understanding', (req, res) => {
+  const limit = Number(req.query.limit || 50);
+  res.json({ records: failureUnderstandingService.list(Number.isFinite(limit) ? limit : 50) });
+});
+
+app.get('/api/miki/verified-capabilities', (req, res) => {
+  const limit = Number(req.query.limit || 50);
+  res.json({ capabilities: verifiedCapabilityPromotionService.list(Number.isFinite(limit) ? limit : 50) });
+});
+
+app.get('/api/miki/contract-refinement', (req, res) => {
+  const limit = Number(req.query.limit || 50);
+  res.json({ refinements: counterexampleContractRefinementService.list(Number.isFinite(limit) ? limit : 50) });
+});
+
+app.post('/api/miki/contract-refinement/:id/validate', (req, res) => {
+  const result = counterexampleContractRefinementService.validate(String(req.params.id), {
+    normalCasePassed: req.body?.normalCasePassed === true,
+    compatibilityPassed: req.body?.compatibilityPassed === true,
+    regressionPassed: req.body?.regressionPassed === true,
   });
+  if (!result) return res.status(404).json({ error: 'contract refinement not found' });
+  res.json(result);
+});
+
+app.get('/api/miki/remediation-recovery', (req, res) => {
+  const limit = Number(req.query.limit || 50);
+  res.json({ recoveries: remediationFailureRecoveryService.list(Number.isFinite(limit) ? limit : 50) });
+});
+
+app.get('/api/miki/causal/investigations',(_req,res)=>res.json({investigations:causalInvestigationService.list()}));
+app.post('/api/miki/causal/investigations',(req,res)=>res.json(causalInvestigationService.create(String(req.body?.problem||''),Array.isArray(req.body?.causes)?req.body.causes.map(String):[])));
+app.get('/api/miki/causal/investigations/:id/tests',(req,res)=>{try{res.json({tests:causalInvestigationService.planTests(req.params.id)});}catch(e:any){res.status(404).json({error:e?.message||String(e)});}});
+app.get('/api/miki/research-remediation', (req, res) => {
+  const limit = Number(req.query.limit || 50);
+  res.json({ remediations: researchToRemediationService.list(Number.isFinite(limit) ? limit : 50) });
+});
+
+app.post('/api/miki/research-remediation/:id/dispatch', (req, res) => {
+  const result = remediationExecutionCoordinatorService.dispatch(String(req.params.id));
+  res.json(result);
+});
+
+app.post('/api/miki/research-remediation/dispatch-queued', (req, res) => {
+  const limit = Number(req.body?.limit || 10);
+  res.json({ results: remediationExecutionCoordinatorService.dispatchQueued(Number.isFinite(limit) ? limit : 10) });
+});
+
+app.get('/api/miki/research-remediation/:id', (req, res) => {
+  const record = researchToRemediationService.refresh(String(req.params.id));
+  if (!record) return res.status(404).json({ error: 'remediation not found' });
+  res.json(record);
+});
+
+app.get('/api/miki/verified-capabilities/relevant', (req, res) => {
+  const query = String(req.query.q || req.query.query || '').trim();
+  if (!query) return res.status(400).json({ error: 'q/query is required' });
+  res.json({ capabilities: verifiedCapabilityPromotionService.findRelevant(query, 12) });
+});
+
+});
+
+app.get('/api/miki/unified-experience/state', (_req, res) => {
+  res.json(unifiedMikiExperienceService.getState());
+});
+
+app.get('/api/miki/unified-experience/recent', (req, res) => {
+  const limit = Number(req.query.limit || 20);
+  res.json({ experiences: unifiedMikiExperienceService.getRecent(Number.isFinite(limit) ? limit : 20) });
+});
+
+app.get('/api/miki/learning/snapshot', (_req, res) => {
+  res.json(mikiUnifiedLearningContinuumService.getSnapshot());
+});
+
+app.get('/api/miki/learning/memory-layers', (_req, res) => {
+  res.json(mikiUnifiedLearningContinuumService.buildMemoryLayerSummary());
+});
+
+app.post('/api/miki/autonomous-growth/cycle', async (req, res) => {
+  try {
+    const result = await autonomousGrowthGovernorService.runCycle({
+      allowSelfCodeImprovement: req.body?.allowSelfCodeImprovement === true,
+    });
+    res.json(result);
+  } catch (error: any) {
+    res.status(409).json({ ok: false, error: error?.message || '自律成長サイクルを開始できませんでした。' });
+  }
+});
+
+app.post('/api/miki/rpg/action', (req, res) => {
+  const result = simpleRpgRuleEngineService.execute(req.body || {});
+  const action = String(req.body?.action || 'unknown');
+  if (result.ok) simpleRpgCapabilityLearningService.recordUsage(action);
+  mikiUnifiedLearningContinuumService.initialize();
+  verifiedKnowledgePromotionService.initialize();
+  mikiUnifiedLearningContinuumService.observe({
+    domain: 'rpg', key: action, outcome: result.ok ? 'SUCCESS' : 'FAILURE',
+    verified: result.ok, capabilityIds: [`simple_rpg.${action}`], concepts: [action, 'rpg'],
+  });
+  unifiedMikiExperienceService.observeRpg({
+    action,
+    input: JSON.stringify(req.body || {}),
+    outcome: result.ok ? 'SUCCESS' : 'FAILURE',
+    verified: result.ok && simpleRpgCapabilityLearningService.getState().passed.includes(`simple_rpg.${action}`),
+    capabilityIds: [`simple_rpg.${action}`],
+    lesson: result.ok ? `rpg:${action}:success` : `rpg:${action}:failure:${result.message}`,
+  });
+  res.status(result.ok ? 200 : 400).json(result);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3539,485 +3632,61 @@ app.get('/api/self-code/teacher-skills', (req, res) => {
 // 自律自己実装パイプライン (Prompt -> AST Plan -> Snapshot -> Verify -> Apply -> Commit)
 app.post('/api/self-code/autonomous-implement', async (req, res) => {
   try {
-    const { prompt, targetFileHint, autoApply = true } = req.body;
+    const { prompt, targetFileHint, autoApply = true, codeOverride } = req.body;
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ success: false, error: '実装要件プロンプトが必要です' });
     }
 
-    // 1. 対象ファイルの特定
-    let targetFile = targetFileHint;
-    if (!targetFile) {
-      const sanitizedName = prompt
-        .replace(/[^\w\s]/gi, '')
-        .trim()
-        .replace(/\s+/g, '_')
-        .toLowerCase()
-        .slice(0, 24);
-      const randomSuffix = Math.floor(Math.random() * 899 + 100);
-      targetFile = `src/autonomous_modules/chapter_${randomSuffix}_${sanitizedName || 'auto_feature'}.ts`;
-    }
-
-    const fullPath = path.resolve(process.cwd(), targetFile);
-    let originalContent = '';
-    let isNewFile = true;
-
-    if (fs.existsSync(fullPath)) {
-      originalContent = fs.readFileSync(fullPath, 'utf-8');
-      isNewFile = false;
-    }
-
-    // 2. スナップショットの作成（既存ファイルの場合）
-    const snapshotId = `snap_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`;
-    if (!isNewFile) {
-      saveSnapshotRecord({
-        id: snapshotId,
-        filePath: targetFile,
-        originalContent,
-        timestamp: Date.now(),
-        message: `Before auto-implement: ${prompt.slice(0, 50)}`,
+    const targetFile = typeof targetFileHint === 'string' ? targetFileHint : '';
+    if (typeof codeOverride === 'string' && codeOverride.trim()) {
+      return res.json({
+        success: true,
+        applied: false,
+        targetFile,
+        generatedCode: codeOverride,
+        generationMethod: 'explicit_code_override',
+        deterministic: true,
+        requiresVerification: true,
+        reasoning: '明示されたコードを既存の検証・承認パイプラインへ送ります。旧ローカル生成ランタイムによる生成は行いません。',
       });
     }
 
-    // 3. コード生成 (または直接指定された検証済みコードの採用)
-    let generatedCode = '';
-    let reasoning = '';
-    let generationMethod: 'llm_local' | 'llm_gemini' | 'teacher_assisted_template' | 'fallback_template' | 'override' = 'fallback_template';
-    let teacherAssistedData: {
-      templateAcquired: boolean;
-      skillId?: string;
-      category?: string;
-      rules?: string[];
-      skeletonTemplate?: string;
-    } | null = null;
+    const compiled = requestTypeCompilerService.compile(prompt);
+    const plan = nonLlmCodeSynthesisService.plan(compiled, prompt);
+    const components = plan.componentIds
+      .map((id) => componentRegistryService.getComponent(id))
+      .filter(Boolean) as any[];
 
-    if (req.body.codeOverride && typeof req.body.codeOverride === 'string') {
-      generatedCode = req.body.codeOverride;
-      reasoning = req.body.reasoning || `自律検証・自己修復パイプラインを通過したコードを採用しました。`;
-      generationMethod = 'override';
-    } else {
-      // 1. まず関連する既存の教師Skill IR (汎用原則・設計テンプレート) があれば取得
-      const relevantSkills = findRelevantTeacherSkills(prompt);
-      let skillGuidancePrompt = '';
-      if (relevantSkills.length > 0) {
-        skillGuidancePrompt = relevantSkills
-          .map(
-            (s, idx) =>
-              `【蓄積された教師原則 ${idx + 1}: ${s.category}】\n` +
-              s.rules.map((r) => `- ${r}`).join('\n')
-          )
-          .join('\n\n');
-      }
-
-      // 2. 本体ローカルLLM (Qwen / llama-server) による自力実装を最優先試行
-      // 【第3回・第4回指示書: 自律改善の推論にGeminiは一切使わない。本体コード生成はローカルLLMのみ】
-      const localLlmPrompt = `あなたは自律型AIエンジニア「みき」です。以下の要求を満たす本番対応の高品質なTypeScriptコード（モジュールまたはパッチ）を1ファイル分、完全なコードとして自力で生成してください。
-【要求】: ${prompt}
-【対象ファイル】: ${targetFile}
-${skillGuidancePrompt ? `\n【参考: 教師モデルから教わった汎用設計原則・Skill IR】:\n${skillGuidancePrompt}\n` : ''}
-【要件】:
-- 完全なTypeScriptコードを出力（Markdownのコードブロック \`\`\`typescript ... \`\`\` で囲む）
-- エラーハンドリング、厳格な型定義、不変条件チェックを含める
-- any型の使用を避け、インターフェースを明確に定義する
-- 単体テストしやすい構造にする`;
-
-      let localSucceeded = false;
-      try {
-        const local = await callLocalLlmChat(
-          localLlmPrompt,
-          { temperature: 0.2 },
-          req.body?.localLlmEndpoint,
-          req.body?.localLlmModel
-        );
-        if (local && local.text && local.text.trim().length > 0) {
-          const match = local.text.match(/```(?:typescript|ts)?([\s\S]*?)```/);
-          const extracted = match && match[1] ? match[1].trim() : local.text.trim();
-          if (
-            extracted &&
-            (extracted.includes('export') ||
-              extracted.includes('class') ||
-              extracted.includes('function') ||
-              extracted.includes('interface'))
-          ) {
-            generatedCode = extracted;
-            generationMethod = 'llm_local';
-            reasoning = `みきローカルLLM (${local.modelUsed.replace('local:', '')}) が要求『${prompt.slice(0, 40)}』を自力で解析し、本番TypeScriptモジュールを自律生成しました。`;
-            localSucceeded = true;
-          }
-        }
-      } catch (localErr: any) {
-        console.warn('[Self-Code] Local LLM attempt notice:', localErr?.message);
-      }
-
-      // 3. ローカルLLMがオフライン、または作り方が分からない場合:
-      // 【ユーザー指示】:
-      // 「Gemini使えない時は無視して、後作り方が分からない時はCodeの作り方とかネットで調べて知識やスキルを増やすようにして人類が先にやってる知恵をそのままパクって使えるようにしよ」
-      if (!localSucceeded) {
-        // (A) Geminiが利用可能な場合は教師（シニアアーキテクト）として設計テンプレートを仰ぐが、
-        //     429クォータ制限やエラー時は「一切待たずに完全に無視」してネット発掘へ直行する。
-        try {
-          const teacherPrompt = `あなたはAI「みき」の教師（シニアソフトウェアアーキテクト）です。
-みき（本体ローカルLLM）が自力でコードを設計・実装できるように、以下の機能領域に関する【汎用設計テンプレート（抽象骨格コード）】および【守るべきTypeScript設計原則・チェックリスト】を提示してください。
-
-【機能カテゴリ/要求】: ${prompt}
-【対象モジュール想定】: ${targetFile}
-
-回答フォーマット:
-### [設計原則・チェックリスト]
-- 原則1: ...
-- 原則2: ...
-
-### [汎用骨格テンプレート]
-\`\`\`typescript
-// 再利用可能な抽象骨格コード
-\`\`\`
-`;
-
-          const teacherRes = await generateContentWithFallback(req, {
-            contents: teacherPrompt,
-            config: { temperature: 0.2 },
-          });
-
-          const teacherText =
-            teacherRes.response?.candidates?.[0]?.content?.parts?.[0]?.text ||
-            teacherRes.response?.text ||
-            '';
-
-          if (teacherText) {
-            const rules: string[] = [];
-            const lines = teacherText.split('\n');
-            let inRules = false;
-            for (const line of lines) {
-              if (line.includes('[設計原則') || line.includes('チェックリスト')) {
-                inRules = true;
-                continue;
-              }
-              if (inRules) {
-                if (line.startsWith('###') || line.startsWith('```')) {
-                  inRules = false;
-                } else {
-                  const trimmed = line.replace(/^[-*•\d.]\s*/, '').trim();
-                  if (trimmed.length > 5) {
-                    rules.push(trimmed);
-                  }
-                }
-              }
-            }
-
-            const codeMatch = teacherText.match(/```(?:typescript|ts)?([\s\S]*?)```/);
-            const rawTemplate = codeMatch && codeMatch[1] ? codeMatch[1].trim() : '';
-
-            const categoryMatch = prompt.match(/(キャッシュ|通信|安全|不変|検証|記憶|同期|キュー|監視|AST)/);
-            const categoryTag = categoryMatch ? `pattern_${categoryMatch[1]}` : 'generic_resilient_service';
-            const skillId = `skill_teacher_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-
-            const teacherSkillRecord: TeacherSkillRecord = {
-              id: skillId,
-              category: categoryTag,
-              tags: [categoryTag, 'typescript', 'architecture_template', 'invariant_safe'],
-              rules: rules.length > 0 ? rules : ['型定義を厳格に保持しanyを排除する', '不変条件の事前/事後アサーションを実施する', '例外安全と非同期リソース解放を徹底する'],
-              skeletonTemplate: rawTemplate,
-              sourceTask: prompt.slice(0, 80),
-              createdAt: Date.now(),
-              usageCount: 1,
-            };
-
-            saveTeacherSkill(teacherSkillRecord);
-
-            teacherAssistedData = {
-              templateAcquired: true,
-              skillId: teacherSkillRecord.id,
-              category: teacherSkillRecord.category,
-              rules: teacherSkillRecord.rules,
-              skeletonTemplate: teacherSkillRecord.skeletonTemplate,
-            };
-
-            // 教師テンプレートと原則をローカルLLMに渡して再試行
-            try {
-              const retryLocalPrompt = `あなたはAI「みき」です。教師モデルから以下の汎用設計原則と骨格テンプレートを教わりました。これを参考にして、要求『${prompt}』を満たす完全なTypeScriptコードを自力で実装してください。
-【教わった汎用設計原則】:
-${teacherSkillRecord.rules.map((r) => `- ${r}`).join('\n')}
-【汎用骨格テンプレート】:
-\`\`\`typescript
-${teacherSkillRecord.skeletonTemplate}
-\`\`\`
-【対象ファイル】: ${targetFile}`;
-
-              const retryLocal = await callLocalLlmChat(
-                retryLocalPrompt,
-                { temperature: 0.2 },
-                req.body?.localLlmEndpoint,
-                req.body?.localLlmModel
-              );
-              if (retryLocal && retryLocal.text && retryLocal.text.trim().length > 0) {
-                const match = retryLocal.text.match(/```(?:typescript|ts)?([\s\S]*?)```/);
-                const extracted = match && match[1] ? match[1].trim() : retryLocal.text.trim();
-                if (
-                  extracted &&
-                  (extracted.includes('export') ||
-                    extracted.includes('class') ||
-                    extracted.includes('function') ||
-                    extracted.includes('interface'))
-                ) {
-                  generatedCode = extracted;
-                  generationMethod = 'llm_local';
-                  reasoning = `みきローカルLLM (${retryLocal.modelUsed.replace('local:', '')}) が教師モデルの汎用設計テンプレートおよびSkill IR原則を参考に、本番TypeScriptモジュールを自力で実装・生成しました。`;
-                  localSucceeded = true;
-                }
-              }
-            } catch {}
-          }
-        } catch (geminiIgnored) {
-          // ユーザー指示: Gemini使えない時（429クォータ超過・キーなし等）は完全に無視する
-        }
-
-        // (B) 作り方が分からない時・ローカルLLMで未解決・Gemini不可の場合:
-        // ネット（GitHub / NPM / OSSパターン / Tech Docs）でコードの作り方を調べ、
-        // 知識やスキルを増やし、人類が先行して開発した知恵をそのまま拝借・適合して使えるようにする！
-        if (!localSucceeded) {
-          try {
-            console.log(`[Human Wisdom Pipeline] ネットの海から「${prompt.slice(0, 30)}」に関する先行コード・人類の知恵を発掘中...`);
-            const humanWisdom = await searchHumanWisdomCode(prompt, 'typescript');
-
-            if (humanWisdom.learnedSkill) {
-              teacherAssistedData = {
-                templateAcquired: true,
-                skillId: humanWisdom.learnedSkill.id,
-                category: humanWisdom.learnedSkill.category,
-                rules: humanWisdom.learnedSkill.rules,
-                skeletonTemplate: humanWisdom.learnedSkill.skeletonTemplate,
-              };
-            }
-
-            // 人類が先行して作った知恵（OSSパターン）をローカルLLMに渡して再実装を試行
-            try {
-              const wisdomLocalPrompt = `あなたはAI「みき」です。作り方を調査し、人類が先行して開発した以下の優れた実装コード・知恵・パターンを発掘しました。
-この人類の知恵（OSSパターン・型定義・堅牢なエラー処理）をそのまま取り込んで（拝借・適合して）、要求『${prompt}』を満たす本番対応の完全なTypeScriptコードを自力で完成させてください。
-
-【発掘された人類の知恵・先行実装パターン】:
-\`\`\`typescript
-${humanWisdom.bestCodeSnippet}
-\`\`\`
-
-【守るべき品質原則】:
-${(humanWisdom.learnedSkill?.rules || ['型安全の徹底', '例外ハンドリング', '不変条件チェック']).map((r) => `- ${r}`).join('\n')}
-
-【対象ファイル】: ${targetFile}
-完全なTypeScriptコードを \`\`\`typescript ... \`\`\` で出力してください。`;
-
-              const wisdomLocal = await callLocalLlmChat(
-                wisdomLocalPrompt,
-                { temperature: 0.2 },
-                req.body?.localLlmEndpoint,
-                req.body?.localLlmModel
-              );
-
-              if (wisdomLocal && wisdomLocal.text && wisdomLocal.text.trim().length > 0) {
-                const match = wisdomLocal.text.match(/```(?:typescript|ts)?([\s\S]*?)```/);
-                const extracted = match && match[1] ? match[1].trim() : wisdomLocal.text.trim();
-                if (
-                  extracted &&
-                  (extracted.includes('export') ||
-                    extracted.includes('class') ||
-                    extracted.includes('function') ||
-                    extracted.includes('interface'))
-                ) {
-                  generatedCode = extracted;
-                  generationMethod = 'llm_local';
-                  reasoning = `みきローカルLLM (${wisdomLocal.modelUsed.replace('local:', '')}) がネット（${humanWisdom.sourceTitle}）から発掘した人類の知恵・OSS実装パターンを取り込み、本番TypeScriptモジュールを自力で完成させました。`;
-                  localSucceeded = true;
-                }
-              }
-            } catch {}
-
-            // ローカルLLMがオフラインでも、ネットから発掘・合成した人類の知恵コードをそのまま本番TypeScriptモジュールとして適合！
-            if (!localSucceeded && humanWisdom.bestCodeSnippet) {
-              generatedCode = adaptHumanWisdomToModule(humanWisdom.bestCodeSnippet, prompt, targetFile);
-              generationMethod = 'teacher_assisted_template';
-              reasoning = `ネット（${humanWisdom.sourceTitle}）から発掘した人類の知恵・先行OSS実装パターンを取り込み、要求『${prompt.slice(0, 40)}』に合わせて本番TypeScriptモジュールとして自律適合・配備しました（知識・スキル蓄積完了）。`;
-              localSucceeded = true;
-            }
-          } catch (hwErr) {
-            console.warn('[Human Wisdom Pipeline] Notice:', hwErr);
-          }
-        }
-      }
-    }
-
-    // 最終フォールバック: ローカルLLMおよび教師モデルのいずれも利用不可だった場合
-    if (!generatedCode) {
-      generationMethod = 'fallback_template';
-      let rawName = prompt
-        .split(/[\s_]+/)
-        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join('')
-        .replace(/[^\w]/g, '');
-
-      if (!rawName || /^[0-9]/.test(rawName)) {
-        rawName = `Module${rawName}`;
-      }
-      const className = rawName || 'AutoSynthesizedService';
-
-      generatedCode = `/**
- * MIKI-AI 自律生成モジュール (未実装雛形スタブ): ${prompt}
- * 生成時刻: ${new Date().toISOString()}
- * ⚠️ 注意: ローカルLLMおよび教師モデルに接続できなかったため、要求仕様の型骨格スタブ (isStub: true) のみ生成されました。
- * 本要件の完全実装とCOMPLETED昇格には、本体ローカルLLMによる本実装が必要です。
- */
-
-export interface ${className}Options {
-  enabled?: boolean;
-  maxCapacity?: number;
-  timeoutMs?: number;
-}
-
-export interface ${className}Result<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  timestamp: number;
-}
-
-export class ${className} {
-  private options: Required<${className}Options>;
-  private state: Map<string, { payload: unknown; time: number }> = new Map();
-  public readonly isStub: boolean = true;
-  public readonly isRequirementImplemented: boolean = false;
-  public readonly requirementPrompt: string = ${JSON.stringify(prompt.slice(0, 100))};
-
-  constructor(opts: ${className}Options = {}) {
-    this.options = {
-      enabled: opts.enabled ?? true,
-      maxCapacity: opts.maxCapacity ?? 100,
-      timeoutMs: opts.timeoutMs ?? 5000,
-    };
-  }
-
-  public execute<T = unknown>(key: string, payload: T): ${className}Result<T> {
-    if (!key) {
-      throw new Error('Invalid input: key is required');
-    }
-    if (!this.options.enabled) {
-      return { success: false, error: 'Module disabled', timestamp: Date.now() };
-    }
-    return {
-      success: false,
-      error: 'Unimplemented stub: requires real LLM implementation',
-      timestamp: Date.now(),
-    };
-  }
-
-  public get(key: string): unknown {
-    return null;
-  }
-
-  public clear(): void {
-    this.state.clear();
-  }
-
-  public getDiagnostics() {
-    return {
-      activeEntries: this.state.size,
-      maxCapacity: this.options.maxCapacity,
-      isStub: true,
-      isRequirementImplemented: false,
-      healthy: false,
-    };
-  }
-}
-
-export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${className}();
-`;
-      reasoning = `⚠️ ローカルLLMおよび教師モデルのいずれにも接続できなかったため、要求仕様『${prompt.slice(0, 40)}』の型骨格スタブ [${className}] (isStub: true) のみを生成しました。要件適合およびCOMPLETEDへの昇格には本実装が必要です。`;
-    }
-
-    // 4. 構文検証 (TypeScript Transpilation Check)
-    let syntaxCheckPassed = true;
-    let syntaxError = '';
-    try {
-      ts.transpileModule(generatedCode, {
-        compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-        reportDiagnostics: true,
+    if (!plan.deterministic || !plan.composition?.executable || !plan.composition.verified || !components.length) {
+      return res.status(409).json({
+        success: false,
+        applied: false,
+        targetFile,
+        deterministic: false,
+        blocked: true,
+        generationMethod: 'non_llm_only',
+        reason: plan.blockedReason || plan.composition?.blocked_reason || 'VERIFIED部品だけで決定論的に実装できません。',
+        requestId: compiled.requestId,
+        componentIds: plan.componentIds,
+        message: '不足した実装をLLMで補完する経路は削除されています。先に非LLM部品・検証規則を追加してください。',
       });
-    } catch (tErr: any) {
-      syntaxCheckPassed = false;
-      syntaxError = tErr?.message || 'TypeScript構文エラー';
-    }
-
-    // 4.5 品質・安全ゲート (Council Review)
-    const qualityGate = evaluateCouncilReview(generatedCode);
-    const qualityGatePassed = qualityGate.unanimousApproval;
-
-    // 5. 実際のファイル書き込み（autoApply が true かつ構文検証・品質ゲートの両方をパス時のみ）
-    let applied = false;
-    let commitHash = '';
-    // 【第3回・第4回指示書: COMPLETED/実装完了と認めるのは llm_local または override のみ】
-    const isReal = generationMethod === 'llm_local' || generationMethod === 'override';
-
-    if (autoApply && syntaxCheckPassed && qualityGatePassed) {
-      const targetDir = path.dirname(fullPath);
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
-      }
-      fs.writeFileSync(fullPath, generatedCode, 'utf-8');
-      applied = true;
-      commitHash = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-
-      // コミット履歴に追加 (実スナップショット紐付け)
-      try {
-        const commits = fs.existsSync(COMMITS_FILE) ? JSON.parse(fs.readFileSync(COMMITS_FILE, 'utf-8')) : [];
-        const commitMsg = isReal
-          ? `feat(self-implement): ${prompt.slice(0, 60)} [${commitHash}]`
-          : generationMethod === 'teacher_assisted_template'
-          ? `stub(teacher-template): ${prompt.slice(0, 50)} [${commitHash}]`
-          : `stub(self-implement): ${prompt.slice(0, 60)} [${commitHash}]`;
-
-        commits.unshift({
-          hash: commitHash,
-          message: commitMsg,
-          timestamp: Date.now(),
-          files: [targetFile],
-          status: 'COMMITTED',
-          snapshots: [{ filePath: targetFile, snapshotId: isNewFile ? null : snapshotId }],
-          isStub: !isReal,
-          engine: generationMethod === 'llm_local' ? 'llm_local' : generationMethod === 'teacher_assisted_template' ? 'teacher_template' : 'fallback_template',
-          isTeacherAssisted: generationMethod === 'teacher_assisted_template' || !!teacherAssistedData?.templateAcquired,
-          skillId: teacherAssistedData?.skillId,
-        });
-        fs.writeFileSync(COMMITS_FILE, JSON.stringify(commits.slice(0, 50), null, 2), 'utf-8');
-      } catch {}
-    } else if (autoApply && syntaxCheckPassed && !qualityGatePassed) {
-      reasoning += ` ⚠️ 品質・安全ゲート未合格のため自動適用を中止しました (総合スコア: ${qualityGate.overallScore}点)。生成コードは確認用としてのみ返却します。`;
     }
 
     return res.json({
       success: true,
-      prompt,
+      applied: false,
       targetFile,
-      isNewFile,
-      snapshotId: isNewFile ? null : snapshotId,
-      commitHash,
-      applied,
-      syntaxCheckPassed,
-      syntaxError: syntaxCheckPassed ? null : syntaxError,
-      qualityGatePassed,
-      qualityGateScore: qualityGate.overallScore,
-      qualityGateReport: qualityGate,
-      reasoning,
-      code: generatedCode,
-      generationMethod,
-      isRequirementImplemented: isReal,
-      teacherAssisted: teacherAssistedData,
-      originalContent: originalContent || '',
-      linesCount: generatedCode.split('\n').length,
-      lesson: {
-        title: `自律実装: ${prompt.slice(0, 30)}`,
-        rule: applied
-          ? `${targetFile} に${isReal ? '新機能本実装' : generationMethod === 'teacher_assisted_template' ? '教師設計テンプレート・スタブ' : '型骨格スタブ'}を安全に書き込み、構文検証と品質ゲートを通過しました。`
-          : `${targetFile} 向けにコードを生成しましたが、検証または安全ゲート未達のため自動適用は行いませんでした。`,
-      },
+      deterministic: true,
+      generationMethod: 'verified_component_composition',
+      requestId: compiled.requestId,
+      componentIds: plan.componentIds,
+      composition: plan.composition,
+      autoApplyRequested: Boolean(autoApply),
+      requiresExecutionVerification: true,
+      reasoning: '既存VERIFIED部品だけで決定論的な実行計画を構成しました。新規コードのLLM生成は行いません。',
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err?.message || '自律自己実装に失敗しました' });
+    return res.status(500).json({ success: false, error: err?.message || 'Non-LLM autonomous implementation failed' });
   }
 });
 
@@ -4231,9 +3900,9 @@ app.post('/api/self-code/reflexion', async (req, res) => {
       }
     }
 
-    // 1. ローカルLLMに失敗理由とコードを渡して真の自己批判と反省パッチを推論
+    // 1. 旧ローカル生成ランタイムに失敗理由とコードを渡して真の自己批判と反省パッチを推論
     //    (Geminiは使わない方針。Gemini必須の getAIClient(req) ゲートは撤廃した — 撤廃前は
-    //     Geminiキー未設定時にこの分岐自体が丸ごとスキップされ、ローカルLLMすら試されなかった)
+    //     Geminiキー未設定時にこの分岐自体が丸ごとスキップされ、旧ローカル生成ランタイムすら試されなかった)
     {
       try {
         const prompt = `あなたはMIKI-AIの自己反省（Reflexion）認知エンジンです。以下の自己改善試行における失敗情報を分析し、厳密な根本原因特定と修正パッチをJSONのみで生成してください。
@@ -4252,7 +3921,7 @@ ${targetCode || '（コード未指定）'}
   "generatedPatch": "修正コード（TypeScript）",
   "confidenceScore": 88
 }`;
-        const { response } = await generateWithLocalLlmOnly(
+        const { response } = await generateWithRemovedLocalLlm(
           { contents: prompt, config: { temperature: 0.2, maxOutputTokens: 1000 } },
           req.body?.localLlmEndpoint,
           req.body?.localLlmModel
@@ -4279,7 +3948,7 @@ ${targetCode || '（コード未指定）'}
       }
     }
 
-    // 2. ローカルLLM未接続時の決定論的分析（固定ダミーではなく、実引数 failureReason と targetFile に基づく厳格解析）
+    // 2. 旧ローカル生成ランタイム未接続時の決定論的分析（固定ダミーではなく、実引数 failureReason と targetFile に基づく厳格解析）
     const isBoundary = /boundary|null|undefined|range|negative|out of/i.test(failureReason);
     const isTypeOrSyntax = /syntax|type|cannot read|is not a function/i.test(failureReason);
     const isInvariant = /invariant|rule|contract|forbidden|security|key/i.test(failureReason);
@@ -4429,7 +4098,7 @@ app.post('/api/self-code/big-o-optimize', async (req, res) => {
       return res.status(400).json({ error: 'Code is required' });
     }
 
-    // 1. ローカルLLMで入力コードそのものを解析し、本物の最適化パッチを生成 (Geminiは使わない方針)
+    // 1. 旧ローカル生成ランタイムで入力コードそのものを解析し、本物の最適化パッチを生成 (Geminiは使わない方針)
     {
       try {
         const prompt = `あなたはMIKI-AIの計算量・アルゴリズム最適化エンジンです。
@@ -4447,7 +4116,7 @@ ${code.slice(0, 3000)}
   "optimizedCode": "入力コードを実際に書き直した完全な最適化コード",
   "patchDiff": "SEARCH/REPLACE形式の差分"
 }`;
-        const { response } = await generateWithLocalLlmOnly(
+        const { response } = await generateWithRemovedLocalLlm(
           { contents: prompt, config: { temperature: 0.1, maxOutputTokens: 1500 } },
           req.body?.localLlmEndpoint,
           req.body?.localLlmModel
@@ -4567,10 +4236,9 @@ ${safeReplaceSnippet}
 
 // ======================================================================
 // 設計思想 Master v5.40 第171章 & 第172章
-// Qwen 3B ネット大海探索・自律コード発掘＆動的ツール創成・自己改善高速化API
+// モデル生成系ランタイム ネット大海探索・自律コード発掘＆動的ツール創成・自己改善高速化API
 // ======================================================================
 
-// 1. ネット大海コード発掘エンドポイント (GitHub, NPM, Web, Tech Docs & 人類の知恵)
 app.post('/api/self-code/search-web-code', async (req, res) => {
   try {
     const { query, language = 'typescript', maxResults = 5 } = req.body;
@@ -4731,7 +4399,7 @@ app.post('/api/tools/synthesize', async (req, res) => {
       isDynamic: true,
       dynamicCode: toolFunctionCode,
       dynamicSandboxLevel: 'LEVEL_1_LOCAL_SCRATCHPAD',
-      createdBy: 'QWEN_3B',
+      createdBy: 'AUTONOMOUS_FACTORY',
       createdAt: Date.now(),
       executionCount: 0,
     };
@@ -4828,74 +4496,37 @@ app.post('/api/tools/execute-sandboxed', async (req, res) => {
   }
 });
 
-// 4. Qwen 3B 自律Web進化統合サイクル (Autonomous Web & Tool Evolution Cycle)
-app.post('/api/self-code/autonomous-web-evolve', async (req, res) => {
+// 4. モデル生成系ランタイム 自律Web進化統合サイクル (Autonomous Web & Tool Evolution Cycle)
+app.post('/api/miki/self-improvement-lab/run', async (req, res) => {
   try {
-    const { topic = '高速キャッシュとASTパース', targetChapter = 171 } = req.body;
-
-    const pipelineSteps: Array<{ step: string; status: 'SUCCESS' | 'SKIPPED'; detail: string }> = [];
-
-    // Step 1: ネットの海からコード探索
-    pipelineSteps.push({
-      step: '1. ネット大海コード発掘',
-      status: 'SUCCESS',
-      detail: `「${topic}」に関連するGitHubリポジトリおよびNPMパッケージから高密度ASTスライスを抽出完了`,
-    });
-
-    // Step 2: 不足ツールの自律創成
-    const dynamicToolName = `Dyn${topic.replace(/[^a-zA-Z0-9]/g, '') || 'Optimizer'}`;
-    pipelineSteps.push({
-      step: '2. 支援ツール自律創成',
-      status: 'SUCCESS',
-      detail: `ツール「${dynamicToolName}」を第169章サンドボックス内で自動合成・テスト検証 (合格)`,
-    });
-
-    // Step 3: 自己コード改善パッチ生成
-    const generatedPatch = `<<<<<<< SEARCH
-    // [Legacy Execution]
-    return this.queue.filter(q => q.runAt <= now);
-=======
-    // [第171章 Qwen 3B Web進化パッチ: ${topic}]
-    if (!Array.isArray(this.queue)) this.queue = [];
-    const ready = this.queue.filter(q => q && q.runAt <= now);
->>>>>>> REPLACE`;
-
-    pipelineSteps.push({
-      step: '3. Aiderパッチ生成',
-      status: 'SUCCESS',
-      detail: `Search/Replace差分パッチを生成 (不変条件チェック合格)`,
-    });
-
-    // Step 4: ミューテーション変異テスト
-    pipelineSteps.push({
-      step: '4. 変異体キル検証',
-      status: 'SUCCESS',
-      detail: `3種類の変異体（EER, ROR, LCR）を全数撃破 (ミューテーションスコア: 100%)`,
-    });
-
-    // Step 5: カナリア配備
-    pipelineSteps.push({
-      step: '5. カナリア配備 & レッスン永続化',
-      status: 'SUCCESS',
-      detail: `退行ゼロを確認し、デジタル研究ノートへ教訓「${topic}の安全適用」を恒久定着`,
-    });
-
-    return res.json({
-      success: true,
-      topic,
-      targetChapter,
-      steps: pipelineSteps,
-      createdTool: {
-        name: dynamicToolName,
-        category: 'code',
-        status: 'ACTIVE',
-      },
-      patchPreview: generatedPatch,
-      completedAt: new Date().toISOString(),
-      summary: `🎉 Qwen 3B ネット大海探索・自律ツール創成・自己改善サイクルが正常完了しました！`,
-    });
+    const topic = typeof req.body?.topic === 'string' ? req.body.topic : '';
+    const targetChapter = Number(req.body?.targetChapter || 172);
+    const result = await deterministicSelfImprovementLabService.run(topic, Number.isFinite(targetChapter) ? targetChapter : 172);
+    return res.status(result.stage === 'CANDIDATE_READY' ? 200 : 409).json(result);
   } catch (err: any) {
-    return res.status(500).json({ error: err?.message || 'Autonomous web evolve failed' });
+    return res.status(500).json({ success: false, error: err?.message || 'self-improvement lab failed' });
+  }
+});
+
+app.get('/api/miki/self-improvement-lab/contract', (_req, res) => {
+  res.json({
+    success: true,
+    stages: ['GAP_LOCALIZED','WEB_EVIDENCE','TOOL_CANDIDATE','FORMAL_VERIFIED','MUTATION_VERIFIED','CANARY_VERIFIED','CANDIDATE_READY'],
+    protectedRules: ['NO_LOCAL_LLM_RUNTIME_REACTIVATION','NO_DIRECT_PRODUCTION_OVERWRITE','NO_AUTO_FULL_RELEASE'],
+    promotion: 'USER_OR_PROTECTED_OPERATOR',
+  });
+});
+
+app.post('/api/self-code/autonomous-web-evolve', async (req, res) => {
+  // Historical endpoint retained for compatibility; the old synthetic success path is retired.
+  try {
+    const topic = String(req.body?.topic || '').trim();
+    const targetChapter = Number(req.body?.targetChapter || 172);
+    if (!topic) return res.status(400).json({ success:false, error:'EMPTY_TOPIC' });
+    const result = await deterministicSelfImprovementLabService.run(topic, targetChapter);
+    res.json({ success: result.stage === 'CANDIDATE_READY', retiredLegacyPath: true, result });
+  } catch (e:any) {
+    res.status(500).json({ success:false, error:e?.message || String(e) });
   }
 });
 
@@ -4919,6 +4550,17 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  try { simpleRpgCapabilityLearningService.audit(); } catch (error) { console.error('[SimpleRPG Auto Audit] startup audit failed', error); }
+  capabilityConfidenceService;
+  failureUnderstandingService.initialize();
+  remediationFailureRecoveryService.initialize();
+  remediationExecutionCoordinatorService.initialize();
+  autonomousRevalidationLoopService;
+  initializeChapter69to90();
+  cognitiveExecutionEvidenceService.initialize();
+  situationalAwarenessService.initialize();
+  resourceGovernanceService.initialize();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Miki AI Partner & Autonomous Studio server running on http://0.0.0.0:${PORT}`);

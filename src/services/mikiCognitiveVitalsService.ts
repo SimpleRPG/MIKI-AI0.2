@@ -77,7 +77,7 @@ export class MikiCognitiveVitalsService {
   public refreshVitals(): CognitiveVitalsSnapshot {
     const now = Date.now();
 
-    // 1. アンカーモデル安定度 (Qwen 3B Anchor Model Stability)
+    // 1. アンカーモデル安定度 (モデル生成系ランタイム Anchor Model Stability)
     // proactiveContextOsService のペルソナアンカードリフト実測値から計算
     const personaAnchors = proactiveContextOsService.getPersonaAnchors();
     let anchorScore = 100;
@@ -154,7 +154,7 @@ export class MikiCognitiveVitalsService {
         score: anchorScore,
         target: 95,
         status: anchorScore >= 90 ? 'OPTIMAL' : anchorScore >= 75 ? 'STABLE' : 'WARNING',
-        description: 'Qwen 3Bアンカーモデルの出力ドリフト抑制と保護健全性',
+        description: 'モデル生成系ランタイムアンカーモデルの出力ドリフト抑制と保護健全性',
         lastChecked: now,
       },
       {

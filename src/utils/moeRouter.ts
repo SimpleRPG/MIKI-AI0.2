@@ -292,7 +292,7 @@ export async function buildExpertSystemPromptWithTracking(
   const honestyConstraint = `【誠実性ルール】自身のハードウェア構成（CPU/GPUコア数、内部メモリ仕様、実行クロック等）について、架空の数値をでっち上げて断定してはいけません。不明な内部情報は「端末上のローカル推論環境で動いているよ」と正直に答えてください。`;
 
   // 設計思想 Master v5.2 第5章1節: 不変プレフィックス整列 (Prompt Cache Optimization - 作業指示書 v6 優先度8)
-  // llama.cpp / vLLM / Ollama のプレフィックスKVキャッシュが100%ヒットするよう、
+  // llama.cpp / vLLM / 外部教師サーバー のプレフィックスKVキャッシュが100%ヒットするよう、
   // 発言内容やツール候補、役割によって変動する要素（toolBlock, expertInstruction）を完全に除外し、
   // ペルソナ・マスター教育方針・日本語自然対話コーパス・誠実性制約のみで構成される
   // 「真に完全不変の静的基底プロンプト」を確立する。

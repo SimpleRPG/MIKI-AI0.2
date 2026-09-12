@@ -112,7 +112,7 @@ export class UncertaintyTeacherService {
       const r1 = await sendChatMessage({
         prompt,
         history: [],
-        engineMode: 'webgpu',
+        engineMode: 'autonomous_rule',
         speakerMode: 'miki',
         useSearch: false,
       });
@@ -127,7 +127,7 @@ export class UncertaintyTeacherService {
       const r2 = await sendChatMessage({
         prompt: `${prompt}\n(※要点と根拠を明確に意識して回答してください)`,
         history: [],
-        engineMode: 'webgpu',
+        engineMode: 'autonomous_rule',
         speakerMode: 'miki',
         useSearch: false,
       });

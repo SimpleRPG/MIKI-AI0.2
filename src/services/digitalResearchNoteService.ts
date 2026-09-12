@@ -24,6 +24,10 @@ export interface ResearchNoteEntry {
   establishedInsight: string;
   validationScore: number; // 0.0 - 1.0
   status: 'HYPOTHESIZED' | 'IN_EXPERIMENT' | 'PROVEN' | 'REFUTED';
+  version: number;
+  evidenceIds: string[];
+  counterevidence: string[];
+  revalidateAt?: number;
 }
 
 const RESEARCH_NOTES_KEY = 'miki_digital_research_notes_v1';
@@ -69,6 +73,7 @@ export class DigitalResearchNoteService {
         establishedInsight: '長文VBAコードはモジュール分割を促しつつ、ゼロ省略宣言を骨格に組み込むこと。',
         validationScore: 0.96,
         status: 'PROVEN',
+        version: 1, evidenceIds: [], counterevidence: [], revalidateAt: Date.now()+86400000*30,
       },
       {
         id: 'note_exp_2',
@@ -82,6 +87,7 @@ export class DigitalResearchNoteService {
         establishedInsight: '共感フェーズが完了するまで解決策の長文解説は行わない。',
         validationScore: 0.94,
         status: 'PROVEN',
+        version: 1, evidenceIds: [], counterevidence: [], revalidateAt: Date.now()+86400000*30,
       },
     ];
     this.saveNotes();
@@ -98,10 +104,13 @@ export class DigitalResearchNoteService {
     observedResults: string,
     conclusion: string,
     establishedInsight: string,
-    validationScore: number = 0.9
+    validationScore: number = 0.9,
+    evidenceIds: string[] = [],
+    counterevidence: string[] = [],
+    revalidateDays = 30
   ): ResearchNoteEntry {
     const newNote: ResearchNoteEntry = {
-      id: `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      id: `note_${Date.now()}_${this.notes.length + 1}`,
       timestamp: Date.now(),
       title,
       category,
@@ -111,7 +120,9 @@ export class DigitalResearchNoteService {
       conclusion,
       establishedInsight,
       validationScore,
-      status: validationScore >= 0.85 ? 'PROVEN' : 'IN_EXPERIMENT',
+      status: validationScore >= 0.85 && counterevidence.length===0 ? 'PROVEN' : 'IN_EXPERIMENT',
+      version: 1, evidenceIds: [...evidenceIds], counterevidence: [...counterevidence],
+      revalidateAt: Date.now()+Math.max(1,revalidateDays)*86400000,
     };
 
     this.notes.unshift(newNote);
@@ -128,6 +139,12 @@ export class DigitalResearchNoteService {
   public getAllExperiments(): ResearchNoteEntry[] {
     return this.notes;
   }
+
+  public addCounterevidence(id:string, evidence:string): ResearchNoteEntry | undefined {
+    const n=this.notes.find(x=>x.id===id); if(!n)return undefined; n.counterevidence.push(evidence); n.version++; n.status='IN_EXPERIMENT'; n.revalidateAt=Date.now(); this.saveNotes(); return n;
+  }
+
+  public due(now=Date.now()): ResearchNoteEntry[] { return this.notes.filter(n=>typeof n.revalidateAt==='number'&&n.revalidateAt<=now); }
 
   public getStats(): { totalExperiments: number; verifiedHypotheses: number; settledRulesCount: number } {
     const verified = this.notes.filter((n) => n.status === 'PROVEN').length;

@@ -163,7 +163,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   chatMessages,
   memories,
   workspaceFiles = [],
-  engineMode = 'webgpu',
+  engineMode = 'autonomous_rule',
   initialTab,
 }) => {
   const [activeTab, setActiveTab] = useState<SelfImprovementTab>(initialTab || 'spec_architect');
@@ -369,7 +369,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
       setReviewQueue(selfImprovementService.getReviewQueue());
       setSplitStats(selfImprovementService.getSplitStats());
       setGenerations(selfImprovementService.getGenerations());
-      setColabScript(selfImprovementService.generateColabTrainingScript());
+      setColabScript(selfImprovementService.generateDeterministicCapabilityReport());
       setWorldModelErrors(worldModelService.getErrorRecords());
       setWorldModelStats(worldModelService.getStats());
       setWmStatus(backgroundWorkerService.getStatus());
@@ -416,7 +416,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           {
             memoriesUsedCount: (lastFailedMsg.usedMemories || []).length,
             promptLengthChars: 1500,
-            engineMode: lastFailedMsg.engineMode || 'native_gpu',
+            engineMode: lastFailedMsg.engineMode || 'autonomous_rule',
           }
         );
         setDiagnosedIssue(diag);
@@ -515,7 +515,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
       const val = selfImprovementService.validatePromotionReport(newGenReportId, {
         generationId: 'candidate_check',
         modelName: newGenName.trim(),
-        baseModel: 'Qwen/Qwen2.5-Coder-1.5B-Instruct',
+        baseModel: 'deterministic-core',
         version: newGenVersion.trim() || 'v1.1.0',
         branch: 'stable',
         status: 'active',
@@ -531,7 +531,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
     try {
       selfImprovementService.addGeneration({
         modelName: newGenName.trim(),
-        baseModel: 'Qwen/Qwen2.5-Coder-1.5B-Instruct',
+        baseModel: 'deterministic-core',
         version: newGenVersion.trim() || 'v1.1.0',
         branch: newGenBranch,
         loraRank: Number(newGenRank) || 16,
@@ -2175,11 +2175,11 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                           <span className="text-slate-400">現在ロード中モデル:</span>
                           {activeInfo.isReady ? (
                             <span className="font-mono font-bold text-emerald-400">
-                              {activeInfo.modelName} ({activeInfo.engineType === 'native_gguf' ? 'Native GGUF' : 'WebLLM'})
+                              {activeInfo.modelName} ({activeInfo.engineType === 'native_gguf' ? '退役ローカル生成器' : '退役Web生成器'})
                             </span>
                           ) : (
                             <span className="text-amber-400 font-semibold">
-                              ⚠️ 未ロード (端末ローカルLLM設定でロード必要)
+                              ⚠️ 未ロード (Non-LLM Core設定でロード必要)
                             </span>
                           )}
                         </div>
@@ -2724,7 +2724,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                           {/* 推定メモリ消費 */}
                           <tr>
                             <td className="py-2.5 font-sans font-bold text-slate-200">
-                              推定メモリ消費 (Q4_K_M + nCtx)
+                              推定メモリ消費 (旧量子化方式 + nCtx)
                             </td>
                             <td className="py-2.5 text-slate-300">
                               ~{selectedCompReport.modelA.estimatedMemoryMb} MB
@@ -4197,7 +4197,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                 </div>
                 <p className="text-slate-300 text-[11px] leading-relaxed">
                   端末内で蓄積された高品質な会話・修復成功パターンを<strong>SFT/LoRA学習用JSONL</strong>としてエクスポート。
-                  Colab上の無料T4 GPUで10分でファインチューニングし、GGUF(Q4_K_M)に量子化してGalaxy S25へ即座に取り込めます。
+                  Colab上の無料T4 GPUで10分でファインチューニングし、GGUF(旧量子化方式)に量子化してGalaxy S25へ即座に取り込めます。
                 </p>
               </div>
 
@@ -4205,7 +4205,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-[11px] text-amber-300">
-                    📄 Colab用 Python学習スクリプト (Unsloth / PEFT 自動量子化)
+                    📄 Colab用 Python学習スクリプト (外部学習基盤（退役） / 重み学習方式（退役） 自動量子化)
                   </span>
                   <button
                     onClick={() => handleCopy(colabScript, 'colabScript')}
@@ -4235,7 +4235,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
                   <div className="font-bold text-purple-300">Step 3. GGUF出力</div>
-                  <p className="text-slate-400">スクリプトが自動でQ4_K_M GGUFへ量子化変換</p>
+                  <p className="text-slate-400">スクリプトが自動で旧量子化方式 GGUFへ量子化変換</p>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
                   <div className="font-bold text-emerald-300">Step 4. 端末へ転送</div>
@@ -4834,7 +4834,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                           const isMatch = selfImprovementService.checkModelReportMatch(r, {
                             generationId: 'candidate',
                             modelName: newGenName.trim() || 'candidate',
-                            baseModel: 'Qwen/Qwen2.5-Coder-1.5B-Instruct',
+                            baseModel: 'deterministic-core',
                             version: newGenVersion.trim() || 'v1.1.0',
                             branch: newGenBranch,
                             status: 'shadow_testing',

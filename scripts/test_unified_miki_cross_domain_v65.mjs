@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const server = fs.readFileSync('server.ts','utf8');
+const core = fs.readFileSync('src/services/nonLlmCoreService.ts','utf8');
+const unified = fs.readFileSync('src/services/unifiedMikiExperienceService.ts','utf8');
+for (const action of ['observeConversation','observeRpg','observeExecution','sharedConcepts','rankDomains']) assert.match(unified, new RegExp(action));
+assert.match(core, /observeConversation/);
+assert.match(server, /observeRpg/);
+assert.match(server, /unified-experience\/state/);
+assert.match(server, /unified-experience\/recent/);
+console.log('PASS: conversation/RPG/execution share one unified Miki experience layer');

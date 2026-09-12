@@ -8,6 +8,7 @@ import { toolsService } from './toolsService';
 import { systemLogger } from './systemLogger';
 import { codeSkeletonService } from './codeSkeletonService';
 import { codeVerificationService } from './codeVerificationService';
+import { storageService } from './storageService';
 
 const WORKFLOW_STORAGE_KEY = 'miki_synthesized_workflows';
 let inMemoryWorkflows: SynthesizedWorkflow[] = [];
@@ -252,10 +253,8 @@ export class WorkflowSynthesisService {
    */
   public getWorkflows(): SynthesizedWorkflow[] {
     try {
-      if (typeof localStorage !== 'undefined') {
-        const raw = localStorage.getItem(WORKFLOW_STORAGE_KEY);
-        if (raw) return JSON.parse(raw);
-      }
+      const raw = storageService.getItem(WORKFLOW_STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
       return inMemoryWorkflows;
     } catch {
       return inMemoryWorkflows;
@@ -270,9 +269,7 @@ export class WorkflowSynthesisService {
     list.unshift(workflow);
     inMemoryWorkflows = list.slice(0, 30);
     try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(WORKFLOW_STORAGE_KEY, JSON.stringify(inMemoryWorkflows));
-      }
+      storageService.setItem(WORKFLOW_STORAGE_KEY, JSON.stringify(inMemoryWorkflows));
     } catch {
       // localStorageクォータ超過やアクセス不可時はinMemoryWorkflowsで維持
     }

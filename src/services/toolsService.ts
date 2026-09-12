@@ -498,7 +498,7 @@ export const BUILTIN_TOOLS: ToolDefinition[] = [
   {
     id: 'tool_self_code_audit',
     name: '自己コード監査 & 仕様書整合性チェッカー (Self-Code Auditor)',
-    description: '全170章の設計思想仕様書と現在のソースコード実装の整合性、未実装要件、仕様ドリフト、不変条件（Qwen 3B保護・プライバシー等）を静的監査します。',
+    description: '全170章の設計思想仕様書と現在のソースコード実装の整合性、未実装要件、仕様ドリフト、不変条件（モデル生成系ランタイム保護・プライバシー等）を静的監査します。',
     category: 'system',
     permission: 'read_only',
     requiresConfirmation: false,

@@ -291,8 +291,8 @@ export class UnifiedDecisionEngineService {
       reduction_verdict: reduction.verdict,
       evaluations: {
         IMMEDIATE: {
-          outcome: 'SUCCESS',
-          feedback: '初期判断を正常に確定',
+          outcome: 'PENDING',
+          feedback: '判断を確定したが、結果はまだ評価していない',
           evaluated_at: Date.now(),
         },
       },

@@ -1,0 +1,22 @@
+import fs from 'fs';
+const root = new URL('..', import.meta.url).pathname;
+const checks = [];
+function ok(name, value){ checks.push([name, !!value]); }
+const loop = fs.readFileSync(root+'src/services/autonomousRevalidationLoopService.ts','utf8');
+const bus = fs.readFileSync(root+'src/services/executionEventBusService.ts','utf8');
+const bg = fs.readFileSync(root+'src/services/backgroundWorkerService.ts','utf8');
+const server = fs.readFileSync(root+'server.ts','utf8');
+ok('revalidation service exists', loop.includes('class AutonomousRevalidationLoopService'));
+ok('forces web research', loop.includes("forceRoute: 'WEB_SEARCH'"));
+ok('uses knowledge gaps', loop.includes('knowledgeGapService.detect'));
+ok('keeps verifier boundary', loop.includes('Evidence→Claim→Verifier'));
+ok('does not promote VERIFIED', !/status\s*=\s*['"]VERIFIED/.test(loop));
+ok('no eval', !/\beval\s*\(/.test(loop));
+ok('no new Function', !/new\s+Function/.test(loop));
+ok('no Math.random in new service', !/Math\.random/.test(loop));
+ok('event IDs deterministic', !/Math\.random/.test(bus));
+ok('background wired', bg.includes('autonomousRevalidationLoopService.run'));
+ok('API state', server.includes('/api/miki/revalidation/state'));
+ok('API cycle', server.includes('/api/miki/revalidation/cycle'));
+for (const [n,v] of checks) if(!v) throw new Error('FAIL: '+n);
+console.log(`v72 autonomous revalidation regression PASS (${checks.length} checks)`);

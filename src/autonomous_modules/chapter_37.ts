@@ -5,7 +5,7 @@
  * 主要要件:
  * 1. 潜在ゴール推論 (Latent Goal Inference)
  * 2. マルチターン意図追跡 (Multi-turn Intent Tracking)
- * 3. 不変条件保証 (Qwen 3Bアンカー絶対保護、プライバシー境界遵守)
+ * 3. 不変条件保証 (モデル生成系ランタイムアンカー絶対保護、プライバシー境界遵守)
  */
 
 export interface Chapter37IntentResult {

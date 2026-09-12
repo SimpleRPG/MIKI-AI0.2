@@ -14,8 +14,7 @@ import {
 } from '../types';
 
 export type { FailureRecurrenceEntry };
-import { nativeLlmService } from './nativeLlmService';
-import { webLLMService } from './webLlmService';
+import { nonLlmRuntimeService } from './nonLlmRuntimeService';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { regressionBenchmarkService } from './regressionBenchmarkService';
@@ -24,6 +23,7 @@ import { checkSampleSafety, generateSafeExcerptHash } from '../utils/trainingSam
 import { capabilityGapService } from './capabilityGapService';
 import { answerPlanService } from './answerPlanService';
 import { failureCatalogService } from './failureCatalogService';
+import { deterministicCapabilityEvolutionService } from './deterministicCapabilityEvolutionService';
 
 const RECORDS_STORAGE_KEY = 'miki_ai_self_improvement_records';
 const TRAINING_DATA_STORAGE_KEY = 'miki_ai_training_samples';
@@ -38,36 +38,7 @@ const REVIEW_QUEUE_KEY = 'miki_ai_review_queue';
  * 初期モデル世代リスト (設計思想 18. 系統樹 & 25. 安全・品質境界)
  * フェイク数値を排し、基準ベースモデルのみの初期状態からスタートします。
  */
-export const INITIAL_GENERATIONS: ModelGeneration[] = [
-  {
-    generationId: 'gen_v1_0_base',
-    modelName: 'Qwen 2.5 Coder 1.5B (Base Stable)',
-    baseModel: 'Qwen/Qwen2.5-Coder-1.5B-Instruct',
-    version: 'v1.0.0',
-    branch: 'stable',
-    parameterCount: 1.5e9, // 1.5B パラメータ
-    loraRank: 0,
-    trainingSamplesCount: 0,
-    status: 'active',
-    benchmarkScore: undefined, // 実測未実施
-    notes: '基準安定版（初期1.5Bベースモデル）。Colab等でLoRA学習・量子化した新世代モデルをインポートすると系統樹に追加されます。',
-    createdAt: Date.now(),
-  },
-  {
-    generationId: 'gen_v2_0_candidate_3b',
-    modelName: 'Qwen 2.5 Coder 3B (Candidate)',
-    baseModel: 'Qwen/Qwen2.5-Coder-3B-Instruct',
-    version: 'v2.0.0-candidate',
-    branch: 'experimental',
-    parameterCount: 3.0e9, // 3.0B パラメータ (フェーズ6 モデルサイズ比較対象)
-    loraRank: 0,
-    trainingSamplesCount: 0,
-    status: 'shadow_testing',
-    benchmarkScore: undefined,
-    notes: 'フェーズ6 モデルサイズ比較用 3B候補モデル。1.5Bとの品質・速度・発熱・メモリ総合検証対象。',
-    createdAt: Date.now(),
-  },
-];
+export const INITIAL_GENERATIONS: ModelGeneration[] = [];
 
 class SelfImprovementService {
   private records: SelfImprovementRecord[] = [];
@@ -97,28 +68,9 @@ class SelfImprovementService {
           }));
         }
 
-        const rawGen = storageService.getItem(MODEL_GENERATIONS_KEY);
-        if (rawGen) {
-          const parsedGen: ModelGeneration[] = JSON.parse(rawGen);
-          this.generations = parsedGen.map((g) => {
-            if (!g.parameterCount) {
-              const nameLower = (g.modelName + ' ' + g.baseModel).toLowerCase();
-              if (nameLower.includes('3b')) return { ...g, parameterCount: 3.0e9 };
-              if (nameLower.includes('0.5b')) return { ...g, parameterCount: 0.5e9 };
-              if (nameLower.includes('7b')) return { ...g, parameterCount: 7.0e9 };
-              return { ...g, parameterCount: 1.5e9 };
-            }
-            return g;
-          });
-          // 3B候補モデルが存在しない場合は追加
-          if (!this.generations.some((g) => g.parameterCount && g.parameterCount >= 2.5e9)) {
-            this.generations.push(INITIAL_GENERATIONS[1]);
-            this.saveGenerations();
-          }
-        } else {
-          this.generations = [...INITIAL_GENERATIONS];
-          this.saveGenerations();
-        }
+        // Model-generation persistence is retired. Never resurrect historical model candidates.
+        this.generations = [];
+        this.saveGenerations();
 
         const rawRecurrences = storageService.getItem(FAILURE_RECURRENCES_KEY);
         if (rawRecurrences) {
@@ -209,6 +161,11 @@ class SelfImprovementService {
     };
     this.trainingSamples.unshift(newSample);
     this.saveTrainingSamples();
+    if (newSample.approved && newSample.verifiedEffective === true) {
+      deterministicCapabilityEvolutionService.compileVerifiedSample(newSample);
+    } else if (newSample.failureReason) {
+      deterministicCapabilityEvolutionService.recordFailure(newSample);
+    }
     this.checkTrainingThreshold();
 
     systemLogger.info(
@@ -647,6 +604,11 @@ class SelfImprovementService {
 
     this.trainingSamples.unshift(newSample);
     this.saveTrainingSamples();
+    if (newSample.approved && newSample.verifiedEffective === true) {
+      deterministicCapabilityEvolutionService.compileVerifiedSample(newSample);
+    } else if (newSample.failureReason) {
+      deterministicCapabilityEvolutionService.recordFailure(newSample);
+    }
     this.checkTrainingThreshold();
 
     if (isRedacted) {
@@ -886,7 +848,7 @@ class SelfImprovementService {
     if (unnotified) {
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `🎯 [学習トリガー] 承認済み学習データがしきい値(${approvedCount}/${threshold}件)に到達しました。Colab学習または新世代GGUFのインポートを推奨します。`
+        `🎯 [学習トリガー] 承認済み改善データがしきい値(${approvedCount}/${threshold}件)に到達しました。検証済み能力パッチへのコンパイルを推奨します。`
       );
 
       // 実機Android通知 / ローカル通知の発火 (設計思想 7. 一定量たまったら学習を提示 & 23. Android実機通知)
@@ -894,7 +856,7 @@ class SelfImprovementService {
         .sendLocalNotification({
           id: 7001,
           title: '🎯 みきの学習データが目標蓄積数に到達！',
-          body: `承認済み学習データが${approvedCount}件(${threshold}件目標)に達しました。タップしてLoRA学習スクリプトやエクスポートを確認しよう！`,
+          body: `承認済み改善データが${approvedCount}件(${threshold}件目標)に達しました。検証済みの能力・規則・回答骨格への反映を確認できます。`,
           data: {
             action: 'open_self_improvement',
             tab: 'colab',
@@ -1107,109 +1069,11 @@ class SelfImprovementService {
   }
 
   /**
-   * Google Colab用のLoRA学習Pythonスクリプト(Unsloth / PEFT)を生成
-   * 設計思想 1. Colab、学習、量子化、GGUF変換 & 7. 学習・検証・テスト分離
+   * 決定論的能力改善レポートを生成
+   * Non-LLM能力更新の検証・テスト分離
    */
-  public generateColabTrainingScript(modelName: string = 'Qwen/Qwen2.5-Coder-1.5B-Instruct'): string {
-    return `# ==============================================================================
-# MIKI-AI 自己進化 Colab LoRA Fine-Tuning & GGUF 量子化スクリプト
-# 設計思想 1. Colab、学習、量子化、GGUF変換 & 7. train / val / test 厳格分離
-# ==============================================================================
-
-# 1. 依存ライブラリのインストール (高速LoRA Unsloth / PEFT / llama.cpp)
-!pip install --no-deps unsloth
-!pip install --no-deps "xformers<0.0.29" "trl<0.9.0" peft accelerate bitsandbytes
-!pip install datasets torch
-
-import torch
-from unsloth import FastLanguageModel
-from trl import SFTTrainer
-from transformers import TrainingArguments
-from datasets import load_dataset
-
-# 2. ベースモデルの設定 (Galaxy S25推奨: 1.5B Q4_K_M)
-max_seq_length = 2048
-dtype = None # Auto detection
-load_in_4bit = True # 4bit 量子化ベース
-
-model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "${modelName}",
-    max_seq_length = max_seq_length,
-    dtype = dtype,
-    load_in_4bit = load_in_4bit,
-)
-
-# 3. LoRA アダプターの設定 (Rank 16-32)
-model = FastLanguageModel.get_peft_model(
-    model,
-    r = 16,
-    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-    lora_alpha = 16,
-    lora_dropout = 0,
-    bias = "none",
-    use_gradient_checkpointing = "unsloth",
-    random_state = 3407,
-)
-
-# 4. train / validation / test 分離データセットの読み込み (データリーク完全防止)
-# アプリからエクスポートした train.jsonl / val.jsonl (または miki_dataset.jsonl) をアップロード
-import os
-if os.path.exists("train.jsonl") and os.path.exists("val.jsonl"):
-    dataset = load_dataset("json", data_files={"train": "train.jsonl", "validation": "val.jsonl"})
-else:
-    raw_dataset = load_dataset("json", data_files={"train": "miki_dataset.jsonl"})["train"]
-    dataset = raw_dataset.train_test_split(test_size=0.1, seed=3407)
-    dataset["validation"] = dataset.pop("test")
-
-def formatting_prompts_func(examples):
-    convs = examples["messages"]
-    texts = []
-    for conv in convs:
-        formatted = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=False)
-        texts.append(formatted)
-    return { "text": texts }
-
-train_dataset = dataset["train"].map(formatting_prompts_func, batched=True)
-eval_dataset = dataset["validation"].map(formatting_prompts_func, batched=True)
-
-# 5. SFT Trainer のセットアップ (Validation Lossのモニタリング)
-trainer = SFTTrainer(
-    model = model,
-    tokenizer = tokenizer,
-    train_dataset = train_dataset,
-    eval_dataset = eval_dataset,
-    dataset_text_field = "text",
-    max_seq_length = max_seq_length,
-    dataset_num_proc = 2,
-    packing = False,
-    args = TrainingArguments(
-        per_device_train_batch_size = 2,
-        gradient_accumulation_steps = 4,
-        warmup_steps = 5,
-        max_steps = 60,
-        learning_rate = 2e-4,
-        fp16 = not torch.cuda.is_bf16_supported(),
-        bf16 = torch.cuda.is_bf16_supported(),
-        logging_steps = 1,
-        evaluation_strategy = "steps",
-        eval_steps = 10,
-        save_strategy = "steps",
-        save_steps = 30,
-        optim = "adamw_8bit",
-        weight_decay = 0.01,
-        lr_scheduler_type = "linear",
-        seed = 3407,
-        output_dir = "outputs",
-    ),
-)
-
-# 6. 学習実行
-trainer_stats = trainer.train()
-
-# 7. GGUF形式 (q4_k_m) への自動量子化 & 保存 (Galaxy S25 実機最適)
-model.save_pretrained_gguf("miki_model_gguf", tokenizer, quantization_method="q4_k_m")
-print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf ディレクトリの .gguf ファイルをアプリにインポートしてください。")
-`;
+  public generateDeterministicCapabilityReport(_modelName?: string): string {
+    throw new Error('Model training/export is retired. Use deterministic skill, rule, knowledge, and verified component updates instead.');
   }
 
   /**
@@ -1243,7 +1107,7 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
       return true;
     }
 
-    // 3. ベースモデルとの一致 (例: Qwen/Qwen2.5-Coder-1.5B-Instruct と Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC)
+    // 3. ベースモデルとの一致 (例: deterministic-core と deterministic-core)
     if (normGenBase && normReportName && (normReportName.includes(normGenBase) || normGenBase.includes(normReportName))) {
       return true;
     }
@@ -1373,6 +1237,7 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
   }
 
   public addGeneration(gen: Omit<ModelGeneration, 'generationId' | 'createdAt'>): ModelGeneration {
+    throw new Error('Model generation registration is retired; update deterministic capabilities instead.')
     let finalBranch = gen.branch;
     let finalScore = gen.benchmarkScore;
     let finalReportId = gen.benchmarkReportId;
@@ -1434,6 +1299,7 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
     generationId: string,
     reportId: string
   ): { success: boolean; error?: string; generation?: ModelGeneration } {
+    return { success: false, error: 'Model promotion is retired; Non-LLM Core has no model generations.' };
     const targetGen = this.generations.find((g) => g.generationId === generationId);
     if (!targetGen) {
       return { success: false, error: '指定されたモデル世代が見つかりません。' };
@@ -1484,6 +1350,7 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
     candidateGenerationId: string,
     comparisonReport: ModelSizeComparisonReport
   ): { success: boolean; error?: string; generation?: ModelGeneration } {
+    return { success: false, error: 'Model adoption is retired; Non-LLM Core has no model generations.' };
     if (comparisonReport.verdict !== 'ADOPT_B') {
       return {
         success: false,
@@ -1559,8 +1426,8 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
     analysis: string;
     isSimulation: boolean;
   }> {
-    const isNativeReady = nativeLlmService.isNative() && !!nativeLlmService.getActiveModelId();
-    const isWebReady = webLLMService.isLoaded();
+    const isNativeReady = nonLlmRuntimeService.isNative() && !!nonLlmRuntimeService.getActiveModelId();
+    const isWebReady = nonLlmRuntimeService.isLoaded();
 
     if (!isNativeReady && !isWebReady) {
       return {
@@ -1569,7 +1436,7 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
         scoreB: 0,
         responseA: '',
         responseB: '',
-        analysis: '⚠️ モデルが未ロードのためA/Bテストを実行できませんでした。「端末ローカルLLM設定」でモデルをロードしてから再実行してください。',
+        analysis: '⚠️ モデルが未ロードのためA/Bテストを実行できませんでした。「Non-LLM Core設定」でモデルをロードしてから再実行してください。',
         isSimulation: true,
       };
     }
@@ -1582,8 +1449,8 @@ print("✅ LoRA学習とQ4_K_M GGUF変換が完了しました！miki_model_gguf
       let out = '';
       try {
         const stream = isNativeReady
-          ? nativeLlmService.streamNativeChat(messages, { temperature: 0.7, max_tokens: 400 })
-          : webLLMService.streamChat(messages, { temperature: 0.7, max_tokens: 400 });
+          ? nonLlmRuntimeService.streamDeterministicChat(messages, { temperature: 0.7, max_tokens: 400 })
+          : nonLlmRuntimeService.streamChat(messages, { temperature: 0.7, max_tokens: 400 });
         for await (const chunk of stream) {
           out += chunk;
         }

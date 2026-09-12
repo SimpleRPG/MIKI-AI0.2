@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "source": "JMdict",
+  "version": "fixture-not-production-data",
+  "dictionaryName": "MIKI Japanese dictionary adapter fixture",
+  "entries": [
+    {"surface":"人工知能","normalized":"人工知能","lemma":"人工知能","reading":"ジンコウチノウ","pos":"TECHNICAL","priority":70,"gloss":"artificial intelligence"},
+    {"surface":"実装","normalized":"実装","lemma":"実装","reading":"ジッソウ","pos":"NOUN","priority":70,"gloss":"implementation"}
+  ]
+}

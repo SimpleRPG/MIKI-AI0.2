@@ -1,9 +1,9 @@
 import { DraftVerificationResult } from '../types';
-import { nativeLlmService, ExternalLocalLlmConfig } from './nativeLlmService';
+import { nonLlmRuntimeService, NonLlmTeacherConfig } from './nonLlmRuntimeService';
 import { systemLogger } from './systemLogger';
 
 export interface DraftVerificationConfig {
-  draftModel: string;      // 例: 'qwen2.5:1.5b' または 'llama-3.2-1b'
+  draftModel: string;      // 例: 'deterministic-core'
   verifierModel: string;   // 例: 'qwen2.5:3b' または 'phi-3.5-mini'
   acceptanceScoreThreshold: number; // 判定閾値 (デフォルト: 75点)
   enabled: boolean;
@@ -39,7 +39,7 @@ class DraftVerificationService {
   public async verifyDraftWith3B(
     prompt: string,
     draftAnswer: string,
-    externalConfig?: ExternalLocalLlmConfig,
+    externalConfig?: NonLlmTeacherConfig,
     options?: { signal?: AbortSignal }
   ): Promise<DraftVerificationResult> {
     const t0 = performance.now();
@@ -66,12 +66,12 @@ ${draftAnswer}
     try {
       if (externalConfig) {
         // 外部LLM経由で 3B モデルを呼び出し
-        const verifyConfig: ExternalLocalLlmConfig = {
+        const verifyConfig: NonLlmTeacherConfig = {
           ...externalConfig,
           model: verifierModel,
         };
 
-        const stream = nativeLlmService.streamExternalLocalLlm(
+        const stream = nonLlmRuntimeService.streamDeterministicChat(
           verifyConfig,
           [
             { role: 'system', content: 'あなたは的確で厳格なコードおよび論理の検算担当です。' },

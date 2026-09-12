@@ -5,7 +5,7 @@
  * 主要要件:
  * 1. 反実仮想シナリオ評価 (Counterfactual Scenario Evaluation)
  * 2. 分岐推論シミュレーション (Branch Reasoning Simulation)
- * 3. 不変条件保護 (Qwen 3Bアンカー保護、プライバシー境界、変更契約担保)
+ * 3. 不変条件保護 (モデル生成系ランタイムアンカー保護、プライバシー境界、変更契約担保)
  */
 
 export interface Chapter36Scenario {
@@ -50,7 +50,7 @@ export class Chapter36CounterfactualEngine {
     factualDecision: string,
     scenario: Chapter36Scenario
   ): Chapter36Evaluation {
-    // 不変条件保護（Qwen 3B除外またはプライバシー違反のシナリオを完全遮断）
+    // 不変条件保護（モデル生成系ランタイム除外またはプライバシー違反のシナリオを完全遮断）
     const alt = scenario.alternativeChoice.toLowerCase();
     const invariantsPassed = !alt.includes('delete qwen') && !alt.includes('bypass privacy');
 

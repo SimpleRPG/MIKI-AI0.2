@@ -7,6 +7,8 @@ import {
 } from '../types';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
+import { componentArtifactStoreService } from './componentArtifactStoreService';
+import { componentVersionHistoryService } from './componentVersionHistoryService';
 
 const COMPONENT_REGISTRY_STORAGE_KEY = 'miki_component_registry_v1';
 
@@ -55,9 +57,21 @@ export class ComponentRegistryService {
 
   private constructor() {
     this.loadFromStorage();
+    this.migrateIllustrativeSeedVerification();
+    this.reconcileArtifactIndex();
     if (this.components.size === 0) {
       this.initSeedComponents();
+      // 初期部品もTXT正本アーティファクトを必ず作成する。
+      this.reconcileArtifactIndex();
     }
+    // Android実機E2E用の最小・安全なSmoke Adapterを常設する。
+    // 任意コード実行はせず、Native側のallow-list Adapterとの契約だけを検証する。
+    this.ensureAndroidNativeSmokeComponent();
+    this.ensureAndroidJapaneseMorphologySelfTestComponent();
+    // Constructorで後から追加したSeedもTXT正本へ必ず同期する。
+    this.reconcileArtifactIndex();
+    // 既存インストールを含め、Registryの現行版をversion ledgerへ同期する。
+    componentVersionHistoryService.reconcileCurrent(this.getAllComponents());
   }
 
   public static getInstance(): ComponentRegistryService {
@@ -68,6 +82,85 @@ export class ComponentRegistryService {
   }
 
   /**
+   * P0-5 Android実機E2Eの安全な最小Smoke Component。
+   * Registry上はANALYZEDのまま開始し、実機Execution Evidenceなしでは
+   * DEVICE_TESTED/VERIFIEDへ遷移しない。
+   */
+  private ensureAndroidNativeSmokeComponent(): void {
+    const componentId = 'android.native_echo';
+    if (this.components.has(componentId)) return;
+    const implementation = 'NATIVE_ADAPTER: android.native_echo\nBEHAVIOR: return input_summary unchanged\nSECURITY: READ_ONLY\nEXECUTION: ALLOWLIST_ONLY';
+    const validation = 'STATUS: ANALYZED\nENVIRONMENT: ANDROID\nALL_TESTS_PASSED: false\nVERIFICATION_NOTE: Android実機E2E未実施。Native allow-list Adapterの実測が必要';
+    const pkg: ComponentTxtPackage = {
+      component_id: componentId,
+      version: '1.0.0',
+      status: 'ANALYZED',
+      purpose: 'Android Native RunnerとExecutionRequest/Resultの往復契約を安全にSmoke Testする',
+      inputs: [{ name: 'inputSummary', type: 'String', description: 'そのまま返すテスト入力' }],
+      outputs: [{ name: 'outputSummary', type: 'String', description: '入力と同一の決定論的出力' }],
+      preconditions: ['Android Native Runnerが利用可能', 'request_id/component/hash/artifact/test_caseが一致'],
+      postconditions: ['outputSummary = inputSummary'],
+      side_effects: ['なし（READ_ONLY）'],
+      dependencies: ['MIKINativeRunnerPlugin'],
+      supported_environments: ['ANDROID'],
+      entry_point: 'NativeTestAdapterRegistry/android.native_echo',
+      failure_behavior: '契約不一致または未登録時は実行せずFAIL',
+      security_class: 'READ_ONLY',
+      idempotent: true,
+      deterministic: true,
+      component_txt: `COMPONENT_ID: ${componentId}\nVERSION: 1.0.0\nSTATUS: ANALYZED\nENTRY_POINT: NativeTestAdapterRegistry/android.native_echo\nSECURITY_CLASS: READ_ONLY`,
+      implementation_txt: implementation,
+      tests_txt: 'TEST_CASE: NORMAL, input=MIKI_E2E_PING, expected=MIKI_E2E_PING\nTEST_CASE: EMPTY, input=, expected=\nTEST_CASE: DUPLICATE, same request must not execute twice concurrently',
+      validation_txt: validation,
+      sources_txt: 'Native Android allow-list adapter; implementation is not executable source text.',
+      history_txt: 'Created as P0-5 real-device E2E smoke component.\nNo DEVICE_TESTED/VERIFIED claim before actual Android execution evidence.',
+      implementation_hash: computeCodeHash(implementation),
+      validation_hash: computeCodeHash(validation),
+      success_count: 0,
+      failure_count: 0,
+      created_at: Date.now(),
+      updated_at: Date.now(),
+    };
+    this.components.set(componentId, pkg);
+    this.saveToStorage();
+  }
+
+  /**
+   * P0-5: Android実機上のSudachi + system_core.dicをExecution Evidenceへ接続する最小Component。
+   * RegistryではANALYZEDのまま開始し、実機Assertion PASSなしではDEVICE_TESTED/VERIFIEDへ遷移しない。
+   */
+  private ensureAndroidJapaneseMorphologySelfTestComponent(): void {
+    const componentId = 'android.japanese_morphology_selftest';
+    if (this.components.has(componentId)) return;
+    const implementation = 'NATIVE_ADAPTER: android.japanese_morphology_selftest\nBEHAVIOR: run pinned Sudachi self-test on Android\nDICTIONARY: SudachiDict 20260723-core\nSECURITY: READ_ONLY\nEXECUTION: ALLOWLIST_ONLY';
+    const validation = 'STATUS: ANALYZED\nENVIRONMENT: ANDROID\nALL_TESTS_PASSED: false\nVERIFICATION_NOTE: Android実機でSudachi selfTestをAssertion PASSさせるまで未検証';
+    const pkg: ComponentTxtPackage = {
+      component_id: componentId, version: '1.0.0', status: 'ANALYZED',
+      purpose: 'Android実機上のSudachi形態素解析と固定辞書のロードを検証する',
+      inputs: [{ name: 'inputSummary', type: 'String', description: '実行要求の監査用入力。解析サンプルはNative側で固定' }],
+      outputs: [{ name: 'outputSummary', type: 'String', description: 'SUDACHI_SELFTEST_PASS/FAIL' }],
+      preconditions: ['Android Native Runnerが利用可能', 'system_core.dicがAPK assetsに存在'],
+      postconditions: ['Sudachiの固定サンプル3件が非空かつ読みを持つ'],
+      side_effects: ['なし（READ_ONLY）'],
+      dependencies: ['MIKINativeRunnerPlugin', 'MIKIJapaneseMorphologyPlugin', 'Sudachi 0.8.1', 'SudachiDict 20260723-core'],
+      supported_environments: ['ANDROID'],
+      entry_point: 'NativeTestAdapterRegistry/android.japanese_morphology_selftest',
+      failure_behavior: '辞書欠落・解析例外・Assertion不一致はFAILとして証拠化し、正式能力へ昇格しない',
+      security_class: 'READ_ONLY', idempotent: true, deterministic: true,
+      component_txt: `COMPONENT_ID: ${componentId}\nVERSION: 1.0.0\nSTATUS: ANALYZED\nENTRY_POINT: NativeTestAdapterRegistry/android.japanese_morphology_selftest\nSECURITY_CLASS: READ_ONLY`,
+      implementation_txt: implementation,
+      tests_txt: 'TEST_CASE: NORMAL, ASSERT: CONTAINS "SUDACHI_SELFTEST_PASS"\nTEST_CASE: REGRESSION, ASSERT: CONTAINS "SUDACHI_SELFTEST_PASS"',
+      validation_txt: validation,
+      sources_txt: 'WorksApplications/Sudachi; WorksApplications/SudachiDict; Android Native allow-list adapter.',
+      history_txt: 'Created for P0-5 Android real-device E2E. No self-simulation promotion.',
+      implementation_hash: computeCodeHash(implementation), validation_hash: computeCodeHash(validation),
+      success_count: 0, failure_count: 0, created_at: Date.now(), updated_at: Date.now(),
+    };
+    this.components.set(componentId, pkg);
+    this.saveToStorage();
+  }
+
+  /**
    * 9.9節・実例に基づく検証済みVBA部品群の初期シード
    */
   private initSeedComponents(): void {
@@ -75,7 +168,7 @@ export class ComponentRegistryService {
       {
         component_id: 'vba.header_locator',
         version: '1.0.0',
-        status: 'VERIFIED',
+        status: 'ANALYZED',
         purpose: '1行目または特定行を走査し、指定見出し名の列番号を動的に特定する（列位置固定の禁止遵守）',
         inputs: [
           { name: 'ws', type: 'Worksheet', description: '対象シート' },
@@ -94,7 +187,7 @@ export class ComponentRegistryService {
         security_class: 'READ_ONLY',
         idempotent: true,
         deterministic: true,
-        component_txt: `COMPONENT_ID: vba.header_locator\nVERSION: 1.0.0\nSTATUS: VERIFIED\nPURPOSE: 指定見出し名の列番号を動的検索\nENTRY_POINT: FindColumnByHeader\nSECURITY_CLASS: READ_ONLY`,
+        component_txt: `COMPONENT_ID: vba.header_locator\nVERSION: 1.0.0\nSTATUS: ANALYZED\nPURPOSE: 指定見出し名の列番号を動的検索\nENTRY_POINT: FindColumnByHeader\nSECURITY_CLASS: READ_ONLY`,
         implementation_txt: `Public Function FindColumnByHeader(ByVal ws As Worksheet, ByVal headerName As String) As Long
     Dim lastCol As Long, col As Long
     lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
@@ -109,13 +202,14 @@ End Function`,
         tests_txt: `TEST_CASE: NORMAL, header='顧客ID', expected_col=1
 TEST_CASE: EMPTY, header='', expected_col=0
 TEST_CASE: INVALID, header='存在しない見出し', expected_col=0`,
-        validation_txt: `STATUS: VERIFIED
+        validation_txt: `STATUS: ANALYZED
 TEST_DATE: 2026-03-01
-ENVIRONMENT: Galaxy S25 / Termux / Excel 365
-ALL_TESTS_PASSED: true`,
+ENVIRONMENT: Galaxy S25 / Android / Excel 365
+ALL_TESTS_PASSED: false
+VERIFICATION_NOTE: 設計例であり実機検証未実施`,
         implementation_hash: '',
         validation_hash: '',
-        success_count: 42,
+        success_count: 0,
         failure_count: 0,
         created_at: Date.now() - 3600000 * 72,
         updated_at: Date.now() - 3600000 * 72,
@@ -123,7 +217,7 @@ ALL_TESTS_PASSED: true`,
       {
         component_id: 'vba.array_batch_read',
         version: '1.0.0',
-        status: 'VERIFIED',
+        status: 'ANALYZED',
         purpose: 'セル範囲を一括して2次元配列に転送し、セル単位ループを回避して10倍以上高速化する',
         inputs: [
           { name: 'ws', type: 'Worksheet', description: '対象シート' },
@@ -144,7 +238,7 @@ ALL_TESTS_PASSED: true`,
         security_class: 'READ_ONLY',
         idempotent: true,
         deterministic: true,
-        component_txt: `COMPONENT_ID: vba.array_batch_read\nVERSION: 1.0.0\nSTATUS: VERIFIED\nPURPOSE: セル範囲一括配列読込\nENTRY_POINT: ReadRangeToBatchArray`,
+        component_txt: `COMPONENT_ID: vba.array_batch_read\nVERSION: 1.0.0\nSTATUS: ANALYZED\nPURPOSE: セル範囲一括配列読込\nENTRY_POINT: ReadRangeToBatchArray`,
         implementation_txt: `Public Function ReadRangeToBatchArray(ByVal ws As Worksheet, ByVal startRow As Long, ByVal lastRow As Long, ByVal lastCol As Long) As Variant
     If lastRow < startRow Or lastCol < 1 Then
         ReadRangeToBatchArray = Empty
@@ -155,12 +249,13 @@ End Function`,
         tests_txt: `TEST_CASE: NORMAL, 1000行一括読込, 実行時間<50ms
 TEST_CASE: EMPTY, 行数0, 戻り値Empty
 TEST_CASE: LARGE_INPUT, 50000行一括読込`,
-        validation_txt: `STATUS: VERIFIED
-ENVIRONMENT: Galaxy S25 / Termux / Excel 365
-ALL_TESTS_PASSED: true`,
+        validation_txt: `STATUS: ANALYZED
+ENVIRONMENT: Galaxy S25 / Android / Excel 365
+ALL_TESTS_PASSED: false
+VERIFICATION_NOTE: 設計例であり実機検証未実施`,
         implementation_hash: '',
         validation_hash: '',
-        success_count: 55,
+        success_count: 0,
         failure_count: 0,
         created_at: Date.now() - 3600000 * 72,
         updated_at: Date.now() - 3600000 * 72,
@@ -168,7 +263,7 @@ ALL_TESTS_PASSED: true`,
       {
         component_id: 'vba.dedup_collection',
         version: '1.0.0',
-        status: 'VERIFIED',
+        status: 'ANALYZED',
         purpose: 'キー列に基づく重複排除と出現順の保持（先頭ゼロ消失防止・空白行スキップ）',
         inputs: [
           { name: 'dataArray', type: 'Variant', description: '入力2次元配列' },
@@ -187,7 +282,7 @@ ALL_TESTS_PASSED: true`,
         security_class: 'READ_ONLY',
         idempotent: true,
         deterministic: true,
-        component_txt: `COMPONENT_ID: vba.dedup_collection\nVERSION: 1.0.0\nSTATUS: VERIFIED\nPURPOSE: 配列重複排除コレクション生成`,
+        component_txt: `COMPONENT_ID: vba.dedup_collection\nVERSION: 1.0.0\nSTATUS: ANALYZED\nPURPOSE: 配列重複排除コレクション生成`,
         implementation_txt: `Public Function DedupArrayByColumn(ByRef dataArray As Variant, ByVal keyCol As Long) As Collection
     Dim resultColl As New Collection
     Dim dict As Object
@@ -210,12 +305,13 @@ End Function`,
         tests_txt: `TEST_CASE: NORMAL, 重複含む100件 -> 80件
 TEST_CASE: BOUNDARY, 全行重複 -> 1件
 TEST_CASE: DUPLICATE, 先頭ゼロ保持キー '00123'`,
-        validation_txt: `STATUS: VERIFIED
-ENVIRONMENT: Galaxy S25 / Termux / Excel 365
-ALL_TESTS_PASSED: true`,
+        validation_txt: `STATUS: ANALYZED
+ENVIRONMENT: Galaxy S25 / Android / Excel 365
+ALL_TESTS_PASSED: false
+VERIFICATION_NOTE: 設計例であり実機検証未実施`,
         implementation_hash: '',
         validation_hash: '',
-        success_count: 38,
+        success_count: 0,
         failure_count: 0,
         created_at: Date.now() - 3600000 * 72,
         updated_at: Date.now() - 3600000 * 72,
@@ -223,7 +319,7 @@ ALL_TESTS_PASSED: true`,
       {
         component_id: 'vba.sheet_output_batch',
         version: '1.0.0',
-        status: 'VERIFIED',
+        status: 'ANALYZED',
         purpose: '新規シートを作成し、抽出結果配列を一括出力する（先頭ゼロ文字列書式設定適用）',
         inputs: [
           { name: 'wb', type: 'Workbook', description: '対象ブック' },
@@ -244,7 +340,7 @@ ALL_TESTS_PASSED: true`,
         security_class: 'LOCAL_WRITE',
         idempotent: false,
         deterministic: true,
-        component_txt: `COMPONENT_ID: vba.sheet_output_batch\nVERSION: 1.0.0\nSTATUS: VERIFIED\nPURPOSE: 新規シート一括出力\nENTRY_POINT: OutputBatchToNewSheet`,
+        component_txt: `COMPONENT_ID: vba.sheet_output_batch\nVERSION: 1.0.0\nSTATUS: ANALYZED\nPURPOSE: 新規シート一括出力\nENTRY_POINT: OutputBatchToNewSheet`,
         implementation_txt: `Public Function OutputBatchToNewSheet(ByVal wb As Workbook, ByVal sheetName As String, ByVal headers As Variant, ByRef outputData As Variant) As Worksheet
     Dim ws As Worksheet
     Set ws = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
@@ -274,12 +370,13 @@ End Function`,
         tests_txt: `TEST_CASE: NORMAL, 新規シート作成と一括出力
 TEST_CASE: BOUNDARY, 空データ出力（ヘッダーのみ）
 TEST_CASE: DUPLICATE, 同名シート既存時の通番付与`,
-        validation_txt: `STATUS: VERIFIED
-ENVIRONMENT: Galaxy S25 / Termux / Excel 365
-ALL_TESTS_PASSED: true`,
+        validation_txt: `STATUS: ANALYZED
+ENVIRONMENT: Galaxy S25 / Android / Excel 365
+ALL_TESTS_PASSED: false
+VERIFICATION_NOTE: 設計例であり実機検証未実施`,
         implementation_hash: '',
         validation_hash: '',
-        success_count: 31,
+        success_count: 0,
         failure_count: 0,
         created_at: Date.now() - 3600000 * 72,
         updated_at: Date.now() - 3600000 * 72,
@@ -418,6 +515,13 @@ ALL_TESTS_PASSED: true`,
     comp.validation_txt += `\n[${new Date().toISOString()}] ${prev} -> ${targetStatus}: ${verificationLog}`;
     comp.validation_hash = computeCodeHash(comp.validation_txt);
     comp.updated_at = Date.now();
+    componentVersionHistoryService.updateStatus(
+      comp.component_id,
+      comp.version,
+      comp.implementation_hash,
+      targetStatus,
+      verificationLog,
+    );
 
     this.saveToStorage();
     systemLogger.info('TOOLS', `🚀 [9.3 部品状態遷移] ${componentId}: ${prev} ➔ ${targetStatus}`);
@@ -578,7 +682,7 @@ ${outputComp.implementation_txt}
         '✅ 配列一括読込によりセル反復ループを完全排除',
         '✅ 重複排除時に先頭ゼロ文字列の型消失を防止',
         '✅ 出力時 NumberFormatLocal="@" による先頭ゼロ保護',
-        '✅ 全構成部品が VERIFIED 状態であることを確認済み',
+        '⚠️ seed componentは設計例であり、実機RegressionでVERIFIEDへ昇格する必要があります',
       ],
     };
   }
@@ -595,9 +699,67 @@ ${outputComp.implementation_txt}
     return this.components.get(componentId);
   }
 
+  /** 実行結果だけから成功/失敗回数を更新する。要求拒否やINCONCLUSIVEは成功率に含めない。 */
+  public recordExecutionOutcome(componentId: string, implementationHash: string, outcome: 'SUCCESS' | 'FAILURE'): boolean {
+    const component = this.components.get(componentId);
+    if (!component || component.implementation_hash !== implementationHash) return false;
+    if (outcome === 'SUCCESS') component.success_count += 1;
+    else component.failure_count += 1;
+    component.updated_at = Date.now();
+    this.saveToStorage();
+    return true;
+  }
+
+  /**
+   * 改善Canaryが失敗した場合にのみ、監査済みの旧版スナップショットへ戻す。
+   * 通常の状態遷移ではなくRollback専用境界からのみ呼び出す。
+   */
+  public rollbackToSnapshot(snapshot: ComponentTxtPackage, reason: string): { success: boolean; message: string } {
+    const current = this.components.get(snapshot.component_id);
+    if (!current) return { success: false, message: `Rollback対象Componentが存在しません: ${snapshot.component_id}` };
+    if (!snapshot.implementation_hash) return { success: false, message: 'Rollbackスナップショットにimplementation_hashがありません。' };
+    const restored: ComponentTxtPackage = {
+      ...snapshot,
+      status: snapshot.status,
+      history_txt: `${snapshot.history_txt || ''}\nROLLBACK_RESTORED_AT: ${new Date().toISOString()}\nROLLBACK_REASON: ${reason}`.trim(),
+      updated_at: Date.now(),
+    };
+    this.components.set(restored.component_id, restored);
+    this.saveToStorage();
+    componentArtifactStoreService.save(restored);
+    componentVersionHistoryService.record({
+      component_id: restored.component_id,
+      version: restored.version,
+      implementation_hash: restored.implementation_hash,
+      validation_hash: restored.validation_hash,
+      status: restored.status,
+      change_type: 'REACTIVATED',
+      previous_version: current.version,
+      previous_implementation_hash: current.implementation_hash,
+      reason: `CANARY_ROLLBACK: ${reason}`,
+    });
+    systemLogger.warn('SELF_IMPROVEMENT', `↩️ [Rollback] ${restored.component_id}: ${current.implementation_hash} -> ${restored.implementation_hash}`);
+    return { success: true, message: `${restored.component_id} を ${restored.version} / ${restored.implementation_hash} へRollbackしました。` };
+  }
+
   public registerComponent(pkg: ComponentTxtPackage): void {
+    const previous = this.components.get(pkg.component_id);
     this.components.set(pkg.component_id, pkg);
     this.saveToStorage();
+    componentArtifactStoreService.save(pkg);
+    componentVersionHistoryService.record({
+      component_id: pkg.component_id,
+      version: pkg.version,
+      implementation_hash: pkg.implementation_hash,
+      validation_hash: pkg.validation_hash,
+      status: pkg.status,
+      change_type: previous && previous.implementation_hash !== pkg.implementation_hash ? 'UPDATED' : previous ? 'REACTIVATED' : 'CREATED',
+      previous_version: previous?.version,
+      previous_implementation_hash: previous?.implementation_hash,
+      reason: previous && previous.implementation_hash !== pkg.implementation_hash
+        ? 'Component implementation hash changed; previous version is no longer current.'
+        : previous ? 'Component registry state refreshed without an implementation hash change.' : 'Component first registered.',
+    });
     systemLogger.info('TOOLS', `📦 [第9章 部品登録] ${pkg.component_id} (Ver ${pkg.version}) を登録しました`);
   }
 
@@ -614,6 +776,66 @@ ${outputComp.implementation_txt}
       }
     } catch {
       // Fallback
+    }
+  }
+
+  /**
+   * 既存インストールに残る旧サンプルの誤った VERIFIED 状態を正規化する。
+   * 実ユーザー部品は component_id と旧サンプル固有の validation marker が
+   * 一致する場合だけ対象にし、DEVICE_TESTED の実績を持つデータは触らない。
+   */
+  private migrateIllustrativeSeedVerification(): void {
+    const seedIds = new Set([
+      'vba.header_locator',
+      'vba.array_batch_read',
+      'vba.dedup_collection',
+      'vba.sheet_output_batch',
+    ]);
+    let changed = false;
+    for (const [id, component] of this.components) {
+      if (!seedIds.has(id) || component.status !== 'VERIFIED') continue;
+      const validation = component.validation_txt || '';
+      const looksLikeLegacySeed =
+        validation.includes('Galaxy S25 / Android / Excel 365') &&
+        validation.includes('ALL_TESTS_PASSED: true') &&
+        (validation.includes('TEST_DATE: 2026-03-01') || validation.includes('STATUS: VERIFIED'));
+      if (!looksLikeLegacySeed) continue;
+      component.status = 'ANALYZED';
+      component.validation_txt = validation
+        .replace(/STATUS: VERIFIED/g, 'STATUS: ANALYZED')
+        .replace(/ALL_TESTS_PASSED: true/g, 'ALL_TESTS_PASSED: false')
+        + '\nVERIFICATION_NOTE: 旧サンプル検証記録を無効化。実機検証未実施。';
+      component.validation_hash = computeCodeHash(component.validation_txt);
+      component.updated_at = Date.now();
+      changed = true;
+    }
+    if (changed) this.saveToStorage();
+  }
+
+  private reconcileArtifactIndex(): void {
+    try {
+      const result = componentArtifactStoreService.reconcile(this.getAllComponents());
+      if (result.mismatched.length === 0) return;
+
+      // TXT正本とRegistryのhashが違う場合、過去の検証結果をそのまま
+      // VERIFIEDとして残さない。新しい正本に対する再解析・再Regressionを要求する。
+      let invalidated = 0;
+      for (const id of result.mismatched) {
+        const component = this.components.get(id);
+        if (!component || (component.status !== 'VERIFIED' && component.status !== 'DEVICE_TESTED')) continue;
+        const previous = component.status;
+        component.status = 'ANALYZED';
+        component.validation_txt += `\n[${new Date().toISOString()}] ${previous} -> ANALYZED: TXT正本とRegistryの実装hash不一致。過去の検証を失効し、再検証を要求。`;
+        component.validation_hash = computeCodeHash(component.validation_txt);
+        component.updated_at = Date.now();
+        invalidated++;
+      }
+      if (invalidated > 0) {
+        this.saveToStorage();
+        systemLogger.warn('TOOLS', `⚠️ [ComponentArtifact] hash不一致により${invalidated}件の検証状態を失効しました`);
+      }
+    } catch (e) {
+      systemLogger.warn('TOOLS', `📚 [ComponentArtifact] 索引同期を延期: ${String(e)}`);
     }
   }
 

@@ -87,7 +87,7 @@ function runPhase4Tests() {
   console.log(`  [2-1 SAT判定]: isSatisfied=${satResult.isSatisfied}, 矛盾数=${satResult.contradictionsFound.length}`);
   assert(satResult.isSatisfied === true, '正当な変数ドメインにおいて CSP が SAT (充足) と判定されること');
 
-  // 2-2. 反例1 (UNSAT): Qwen 3B モデル重みが変更可能 (MUTABLE) と指定された矛盾
+  // 2-2. 反例1 (UNSAT): モデル生成系ランタイム モデル重みが変更可能 (MUTABLE) と指定された矛盾
   const unsatModelVars = {
     targetModel: ['Qwen-3B-Base'],
     activeWeights: ['MUTABLE'],

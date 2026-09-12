@@ -47,7 +47,7 @@ class MemoryAuditService {
 
   private loadHistory(): void {
     try {
-      const raw = localStorage.getItem(AUDIT_LOGS_KEY);
+      const raw = storageService.getItem(AUDIT_LOGS_KEY);
       if (raw) {
         this.auditHistory = JSON.parse(raw);
       }
@@ -58,7 +58,7 @@ class MemoryAuditService {
 
   private saveHistory(): void {
     try {
-      localStorage.setItem(AUDIT_LOGS_KEY, JSON.stringify(this.auditHistory.slice(-20)));
+      storageService.setItem(AUDIT_LOGS_KEY, JSON.stringify(this.auditHistory.slice(-20)));
     } catch {}
   }
 

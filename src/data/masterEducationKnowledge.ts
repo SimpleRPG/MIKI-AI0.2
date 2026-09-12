@@ -4,7 +4,7 @@ import { MemoryItem } from '../types';
  * ==============================================================================
  * マスター教育データ (Master Education & Knowledge Corpus)
  * ==============================================================================
- * 端末ローカルLLM（WebGPU）があらかじめ「コードの作り方」「自然な日本語対話」
+ * 端末旧ローカル生成ランタイム（WebGPU）があらかじめ「コードの作り方」「自然な日本語対話」
  * を完璧に理解・実践できるように統合されたマスターナレッジファイルです。
  */
 
@@ -167,7 +167,7 @@ export const MASTER_EDUCATION_MEMORIES: MemoryItem[] = [
 ];
 
 /**
- * 統合されたマスタープロンプト（WebLLM・Gemini共通で注入）
+ * 統合されたマスタープロンプト（退役Web生成器・Gemini共通で注入）
  */
 export function getMasterEducationSystemPrompt(): string {
   return `【マスター教育ナレッジ（最優先遵守事項）】

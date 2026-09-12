@@ -59,7 +59,7 @@ export class RequestTypeCompilerService {
     if (/excel|vba|シート|セル|行|列/i.test(rawText)) {
       target = 'Microsoft Excel / VBA 環境';
     } else if (/android|termux|galaxy/i.test(rawText)) {
-      target = 'Galaxy S25 / Android / Termux 環境';
+      target = 'Galaxy S25 / Android 環境';
     } else if (/python|typescript|react/i.test(rawText)) {
       target = 'TypeScript / React / Python ソフトウェア基盤';
     }
@@ -145,6 +145,12 @@ export class RequestTypeCompilerService {
     const canExecuteDeterministically =
       /vba|マクロ|重複|転記|シート|正規化|挨拶|お疲れ|ありがとう/i.test(rawText);
 
+    // 実行環境は要求から決定論的に抽出する。Termuxは新規要求の実行先にはしない。
+    let environment: CompiledRequestType['environment'];
+    if (/excel|vba/i.test(rawText)) environment = /mac|macos/i.test(rawText) ? 'EXCEL_MAC' : 'EXCEL_WINDOWS';
+    else if (/android|galaxy|apk|capacitor/i.test(rawText)) environment = 'ANDROID';
+    else if (/github actions|external runner|外部runner/i.test(rawText)) environment = 'EXTERNAL_RUNNER';
+
     const compiled: CompiledRequestType = {
       requestId,
       compiled_id: requestId,
@@ -156,10 +162,11 @@ export class RequestTypeCompilerService {
         : /教えて|どう|なぜ|何/i.test(rawText)
         ? 'FACT_INQUIRY'
         : 'GENERAL_REQUEST',
+      environment,
       domain: /vba|excel/i.test(rawText)
         ? 'EXCEL_VBA'
         : /android|termux/i.test(rawText)
-        ? 'ANDROID_TERMUX'
+        ? 'ANDROID'
         : 'SOFTWARE_GENERAL',
       expectedDeliverable: deliverables[0] || '回答テキスト',
       certaintyRequirement: canExecuteDeterministically ? 'CERTAIN' : 'CONDITIONAL',

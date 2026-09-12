@@ -7,6 +7,9 @@ import {
   MultiModuleAnalysisResult,
 } from '../types';
 import { systemLogger } from './systemLogger';
+import { codeMapService, CodeMap } from './codeMapService';
+import { changeImpactSimulatorService, ChangeImpactSimulation } from './changeImpactSimulatorService';
+import { codeComprehensionQuizService, CodeComprehensionQuiz } from './codeComprehensionQuizService';
 
 class CodeUnderstandingService {
   /**
@@ -71,6 +74,19 @@ class CodeUnderstandingService {
 
   public parseCodeToIR(snippet: string, languageHint = 'vba', _name?: string): CodeUnderstandingIR {
     return this.analyzeCode(snippet, languageHint);
+  }
+
+  /** 第31.6〜31.8章: 静的IRからコード地図・変更影響・読解クイズを派生生成する。 */
+  public buildCodeMap(ir: CodeUnderstandingIR, focusTerms: string[] = []): CodeMap {
+    return codeMapService.build(ir, focusTerms);
+  }
+
+  public simulateChangeImpact(ir: CodeUnderstandingIR, targetProcedure: string, changeKind?: string): ChangeImpactSimulation {
+    return changeImpactSimulatorService.simulate(ir, targetProcedure, changeKind);
+  }
+
+  public generateComprehensionQuiz(ir: CodeUnderstandingIR, limit = 10): CodeComprehensionQuiz[] {
+    return codeComprehensionQuizService.generate(ir, limit);
   }
 
   private extractProcedures(raw: string, lang: string): CodeProcedureIR[] {

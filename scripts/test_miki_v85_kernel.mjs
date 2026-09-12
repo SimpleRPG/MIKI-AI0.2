@@ -1,0 +1,22 @@
+import fs from 'node:fs';
+const read=p=>fs.readFileSync(p,'utf8');
+const kernel=read('src/services/mikiCognitiveKernelService.ts');
+const server=read('server.ts');
+const conformance=read('src/services/operationalConformanceService.ts');
+const chapter=read('src/services/chapter69_90PlatformServices.ts');
+const evo=read('src/services/autonomousContinuousEvolutionService.ts');
+const sc=read('src/services/mikiSelfCodingSuperchargerService.ts');
+let n=0, ok=0;
+function t(name,cond){n++;if(cond){ok++;console.log('PASS',name)}else console.log('FAIL',name)}
+t('unified cognitive kernel exists', kernel.includes('class MikiCognitiveKernelService') && kernel.includes("runtimePolicy: 'NON_LLM_ONLY'"));
+t('conversation and RPG share kernel domain', kernel.includes("'conversation'|'rpg'"));
+t('kernel writes operational trace', kernel.includes('operationalConformanceService.trace'));
+t('kernel records common learning', kernel.includes('mikiUnifiedLearningContinuumService.observe'));
+t('chapter 69-90 startup wired', server.includes('initializeChapter69to90();'));
+t('legacy web evolve delegates to deterministic lab', server.includes('deterministicSelfImprovementLabService.run(topic, targetChapter)'));
+t('legacy web evolve no synthetic success', !server.includes('ネット大海コード発掘'));
+t('integrated cognition has zero LLM budget', chapter.includes('const budget={llm:0'));
+t('local model realization is blocked', conformance.includes('LOCAL_LLM_RUNTIME_RETIRED'));
+t('direct local LLM bypass removed', !evo.includes('稼働中旧ローカル生成ランタイム直結バイパス始動'));
+t('self-coding result type no llm_local', !sc.match(/generationMethod\?:[^\n]*llm_local/));
+console.log(`${ok}/${n} PASS`); process.exit(ok===n?0:1);

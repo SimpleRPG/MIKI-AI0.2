@@ -6,7 +6,7 @@
  * 【目的】
  * 1. MIKI-AIが自分自身のソースコード、仕様書、評価結果を読み解き、仕様書に従った自律改善を行う。
  * 2. 完全実装済みの章と未実装の章（130+章）を明確に構造化し、未実装の章の要件を即時参照可能にする。
- * 3. 不変条件エンジン（Qwen 3B絶対保護、プライバシーガード、APIキー循環、ロールバック性）により、
+ * 3. 不変条件エンジン（モデル重み不変性、プライバシーガード、APIキー循環、ロールバック性）により、
  *    勝手な破壊的変更や評価攻略（改善したふり）を100%遮断する。
  * 4. 変更契約（Change Contract）に基づく安全な改善DSLおよびコード改善提案を生成・検証・シミュレーションする。
  */
@@ -194,7 +194,7 @@ export class SelfCodeArchitectService {
   public checkInvariants(): { allPassed: boolean; checks: InvariantCheckItem[] } {
     const now = Date.now();
 
-    // 1. Qwen 3B 保護チェック: 意図せぬアンカーモデルの削除・除外フラグの有無
+    // 1. 旧生成モデル 保護チェック: 意図せぬアンカーモデルの削除・除外フラグの有無
     const customModelsRaw = storageService.getItem('miki_custom_models');
     let qwenProtected = true;
     let qwenDetails = 'IMMUTABLE_ANCHORフラグにより削除・自動Evictionから恒久除外されています。';
@@ -243,11 +243,11 @@ export class SelfCodeArchitectService {
       }
     } catch {}
     const hasEnvKey = typeof process !== 'undefined' && Boolean(process.env?.GEMINI_API_KEY);
-    const hasLocalLlm = typeof process !== 'undefined' && Boolean(process.env?.LOCAL_LLM_ENDPOINT);
-    const quotaPassed = keyCount > 0 || hasEnvKey || hasLocalLlm;
+    const hasLocalLlm = false;
+    const quotaPassed = keyCount > 0 || hasEnvKey;
     const quotaDetails = quotaPassed
-      ? `利用可能な推論リソースを実測検知 (${keyCount > 0 ? `${keyCount}件のカスタムAPIキー` : hasEnvKey ? '環境変数APIキー' : 'ローカルLLMエンドポイント'})。キー枯渇時のNativeフォールバック準備完了。`
-      : '⚠️ 利用可能なAPIキーまたはローカルLLMエンドポイントが未登録です（推論リソース未設定）。';
+      ? `利用可能な推論リソースを実測検知 (${keyCount > 0 ? `${keyCount}件のカスタムAPIキー` : hasEnvKey ? '環境変数APIキー' : '決定論的Non-LLM Core'})。外部教師は任意、通常実行はNon-LLM Core。`
+      : '⚠️ 利用可能なAPIキーまたは旧ローカル生成ランタイムエンドポイントが未登録です（推論リソース未設定）。';
 
     // 4. ロールバック保証: 登録された自己改善提案にロールバック手順が付帯しているか実検査
     const hasProposals = this.proposals.length > 0;
@@ -272,8 +272,8 @@ export class SelfCodeArchitectService {
     const checks: InvariantCheckItem[] = [
       {
         id: 'INV_01_QWEN3B_PROTECTION',
-        name: 'Qwen 3B絶対保護原則 (第24章・不変条件)',
-        rule: 'Qwen 3B (qwen2.5-3b-instruct-q4_k_m.gguf) の退役・削除・差し替えを許可しない。',
+        name: 'モデル重み不変性原則 (第24章・不変条件)',
+        rule: '旧生成モデル (qwen2.5-3b-instruct-q4_k_m.gguf) の退役・削除・差し替えを許可しない。',
         passed: qwenProtected,
         severity: 'CRITICAL',
         details: qwenDetails,
@@ -354,7 +354,7 @@ export class SelfCodeArchitectService {
 
     const architectSummary = unimp.length === 0
       ? `全${totalChapters}章（第0章〜第170章）の設計思想指示書が完全実装・適合完了！不変条件5項目オールクリア。最上位知能・安全性が終局証明されました。`
-      : `全${totalChapters}章中、${completedChapters}章が完全稼働中（不変条件5項目オールクリア）。Qwen 3B保護・プライバシーガードの堅牢性を確認しました。次の改善優先度は第${nextTarget?.chapterNumber ?? 0}章『${nextTarget?.title ?? ''}』です。`;
+      : `全${totalChapters}章中、${completedChapters}章が完全稼働中（不変条件5項目オールクリア）。モデル重み不変性・プライバシーガードの堅牢性を確認しました。次の改善優先度は第${nextTarget?.chapterNumber ?? 0}章『${nextTarget?.title ?? ''}』です。`;
 
     const auditResult: SelfCodeAuditResult = {
       auditId: `audit_${Date.now()}`,
@@ -409,12 +409,12 @@ export class SelfCodeArchitectService {
         'src/types.ts',
       ],
       forbiddenFiles: [
-        'src/services/nativeLlmService.ts:Qwen3B_ANCHOR_RULES', // Qwen 3B絶対保護
+        'src/services/nonLlmRuntimeService.ts:MODEL_WEIGHTS_INTEGRITY_RULE', // モデル重み不変性
         'src/services/privacyGuardService.ts:RULES',           // プライバシー境界の弱体化禁止
         'src/services/diagnosticLogService.ts:STORAGE_PURGE',   // ログ抹消の禁止
       ],
       mustPreserve: [
-        'Qwen 3Bモデル保護 (IMMUTABLE_ANCHOR)',
+        '旧生成モデルモデル保護 (IMMUTABLE_ANCHOR)',
         'Gemini APIキーの暗号化とクォータ動的循環',
         '8層記憶の論理整合性と送信前プライバシーマスク',
       ],
@@ -560,11 +560,11 @@ export class SelfCodeArchitectService {
 
     proposal.status = 'APPLIED';
     
-    // 対象章のステータスを進行（第3回・第4回・第5回指示書: COMPLETEDは本体ローカルLLMまたは明示的overrideのみ）
+    // 対象章のステータスを進行（第3回・第4回・第5回指示書: COMPLETEDは本体旧ローカル生成ランタイムまたは明示的overrideのみ）
     const targetMeta = SPECIFICATION_REGISTRY.find((c) => c.chapterNumber === proposal.targetChapterNumber);
     if (targetMeta && targetMeta.status !== 'COMPLETED') {
       const isLocalOrOverride =
-        (proposal.generationMethod === 'llm_local' || proposal.generationMethod === 'override') &&
+        (proposal.generationMethod === 'override') &&
         (implResult.isRequirementImplemented ?? false);
 
       if (isLocalOrOverride) {
@@ -648,7 +648,7 @@ export class SelfCodeArchitectService {
       return {
         success: false,
         auditResult: currentAudit,
-        summary: '不変条件（Qwen 3B保護やプライバシー境界など）に抵触する恐れがあったため、安全のために改善適用を見送ったよ。',
+        summary: '不変条件（モデル重み不変性やプライバシー境界など）に抵触する恐れがあったため、安全のために改善適用を見送ったよ。',
         targetChapter,
       };
     }
@@ -677,7 +677,7 @@ export class SelfCodeArchitectService {
     const summary = applied
       ? `アプリの自己改善を自律実行したよ！✨\n\n` +
         `📘 **対象**: 第${targetChapter.chapterNumber}章『${targetChapter.title}』\n` +
-        `🛡️ **不変条件**: Qwen 3B絶対保護・送信境界プライバシー・ロールバック性など全5項目オールクリア\n` +
+        `🛡️ **不変条件**: モデル重み不変性・送信境界プライバシー・ロールバック性など全5項目オールクリア\n` +
         `📈 **適合スコア**: ${currentAudit.complianceScore}点 ➔ **${updatedAudit.complianceScore}点** (+${proposal.expectedScoreImprovement}点アップ)\n` +
         `💡 **改善内容**: 仕様書要件（${targetChapter.keyRequirements.join(' / ')}）に沿って安全な変更契約を結び、システムパラメータと機能連携を正式適用したよ！`
       : `提案の作成までは完了したけれど、適用時に安全チェックが働いて保留になったよ。`;
@@ -1082,7 +1082,7 @@ export class SelfCodeArchitectService {
       ? `みきが自律改善をグングン進めたよ！✨ (${improvedChapters.length}章を一括改善)\n\n` +
         improvedChapters.map((c) => `・**第${c.chapterNumber}章『${c.title}』**: 仕様適合完了`).join('\n') +
         `\n\n📈 **適合スコア**: ${initialScore}点 ➔ **${finalScore}点** (+${finalScore - initialScore}点大幅アップ！)\n` +
-        `🛡️ **不変条件**: Qwen 3B保護・プライバシー・APIキー循環・ロールバック性すべて100%保持`
+        `🛡️ **不変条件**: モデル重み不変性・プライバシー・APIキー循環・ロールバック性すべて100%保持`
       : `現在、即時改善対象の章はすべて安全に適合済みか、不変条件の保護によって最新状態が保たれているよ！`;
 
     return {

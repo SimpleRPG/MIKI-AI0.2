@@ -94,7 +94,7 @@ class WorkingAgendaService {
     }
 
     const newItem: WorkingAgendaItem = {
-      id: `agenda_${now}_${Math.random().toString(36).substring(2, 7)}`,
+      id: `agenda_${this.stableId(`${topic}|${turnNumber}|${now}`)}`,
       topic,
       status: 'in_progress',
       unresolvedQuestions,
@@ -138,6 +138,12 @@ class WorkingAgendaService {
     const priority = combined.includes('急ぎ') || combined.includes('エラー') || combined.includes('不具合') ? 'high' : 'normal';
 
     return this.addOrUpdateAgenda(topic, unresolved, decisions, turnNumber, priority);
+  }
+
+  private stableId(raw: string): string {
+    let h = 2166136261;
+    for (let i = 0; i < raw.length; i++) { h ^= raw.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(16).padStart(8, '0');
   }
 
   public resolveAgenda(id: string, resolutionNote?: string): boolean {

@@ -47,7 +47,7 @@ export const HardwarePipelineSubView: React.FC = () => {
               <Cpu className="w-4 h-4" />
             </span>
             <h4 className="text-sm font-bold text-emerald-300">
-              第14章: ハードウェア・資源の使い分け (CPU / NPU / GPU 全機協調駆動)
+              第14章: ハードウェア・資源の使い分け (CPU-first / NPU・GPU optional)
             </h4>
           </div>
           <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded font-mono font-bold">
@@ -55,7 +55,7 @@ export const HardwarePipelineSubView: React.FC = () => {
           </span>
         </div>
         <p className="text-xs text-slate-300 leading-relaxed">
-          LLMに頼らず、端末内の <strong>CPU (構文/DB/CSP)</strong>、<strong>NPU (意図/感情)</strong>、<strong>GPU (並列類似度照合)</strong> を完全協調させて超高速・決定論的に回答およびVBAコードを合成します。
+          LLMに頼らず、端末内の <strong>CPU (構文/DB/CSP)</strong> を既定経路として回答します。NPU/GPUは実装済み・実測済みのプロバイダーが接続された場合だけ補助的に使用します。
         </p>
       </div>
 
@@ -104,29 +104,29 @@ export const HardwarePipelineSubView: React.FC = () => {
               <span>2. NPU (意味・意図・感情)</span>
             </span>
             <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-500/40 font-mono">
-              Neural Unit
+              Optional Accelerator
             </span>
           </div>
           <ul className="text-[10.5px] text-slate-300 space-y-1">
             <li className="flex items-start gap-1.5">
               <span className="text-purple-400 font-bold">•</span>
-              <span>128次元 意味埋め込みベクトル生成</span>
+              <span>意味埋め込み（プロバイダー接続時のみ）</span>
             </li>
             <li className="flex items-start gap-1.5">
               <span className="text-purple-400 font-bold">•</span>
-              <span>発言意図分類 (Intent Classification)</span>
+              <span>意図分類（未接続時はCPU規則）</span>
             </li>
             <li className="flex items-start gap-1.5">
               <span className="text-purple-400 font-bold">•</span>
-              <span>第39章 親愛トランスファー & 感情力動</span>
+              <span>感情力動（CPUフォールバック）</span>
             </li>
             <li className="flex items-start gap-1.5">
               <span className="text-purple-400 font-bold">•</span>
-              <span>候補部品のTop-Kニューラル順位付け</span>
+              <span>候補順位付け（CPUフォールバック）</span>
             </li>
             <li className="flex items-start gap-1.5">
               <span className="text-purple-400 font-bold">•</span>
-              <span>多値曖昧性の高速スコアリング</span>
+              <span>アクセラレーター利用可能性を実測して選択</span>
             </li>
           </ul>
         </div>
@@ -139,29 +139,29 @@ export const HardwarePipelineSubView: React.FC = () => {
               <span>3. GPU (並列類似度照合)</span>
             </span>
             <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-mono">
-              WebGPU
+              Optional GPU provider
             </span>
           </div>
           <ul className="text-[10.5px] text-slate-300 space-y-1">
             <li className="flex items-start gap-1.5">
               <span className="text-emerald-400 font-bold">•</span>
-              <span>WebGPU 並列コサイン類似度マトリクス</span>
+              <span>Optional GPU provider 並列コサイン類似度マトリクス</span>
             </li>
             <li className="flex items-start gap-1.5">
               <span className="text-emerald-400 font-bold">•</span>
-              <span>第32章 潜在意図トポロジー幾何計算</span>
+              <span>潜在意図計算（CPUフォールバック）</span>
             </li>
             <li className="flex items-start gap-1.5">
               <span className="text-emerald-400 font-bold">•</span>
-              <span>部品・主張DBの並列一括スキャン</span>
+              <span>部品・主張検索（CPU既定）</span>
             </li>
             <li className="flex items-start gap-1.5">
               <span className="text-emerald-400 font-bold">•</span>
-              <span>Galaxy S25 Adreno GPU シェーダー支援</span>
+              <span>GPU実装・実機検証後に有効化</span>
             </li>
             <li className="flex items-start gap-1.5">
               <span className="text-emerald-400 font-bold">•</span>
-              <span>超低遅延テンソルマトリクス演算</span>
+              <span>未接続時は実行しない</span>
             </li>
           </ul>
         </div>
@@ -172,7 +172,7 @@ export const HardwarePipelineSubView: React.FC = () => {
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
             <Workflow className="w-4 h-4 text-emerald-400" />
-            <span>全機協調パイプライン テストベンチ (CPU ➔ NPU ➔ GPU ➔ CPU)</span>
+            <span>非LLM決定論的パイプライン テストベンチ (CPU-first / accelerator optional)</span>
           </span>
           <button
             onClick={handleRunPipeline}
@@ -180,7 +180,7 @@ export const HardwarePipelineSubView: React.FC = () => {
             className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-semibold shadow transition flex items-center gap-1.5 disabled:opacity-50"
           >
             <Play className="w-3.5 h-3.5 fill-white" />
-            <span>{isExecuting ? '協調処理中...' : '全機協調処理を実行'}</span>
+            <span>{isExecuting ? '協調処理中...' : 'CPU-first 非LLM処理を実行'}</span>
           </button>
         </div>
 
@@ -206,21 +206,21 @@ export const HardwarePipelineSubView: React.FC = () => {
                 <span className="text-[9px] text-slate-500 block">構文/CSP/部品合成</span>
               </div>
               <div className="p-2.5 bg-slate-900/80 border border-purple-500/30 rounded-lg text-center">
-                <span className="text-[10px] text-purple-400 block font-semibold">NPU 所要時間</span>
+                <span className="text-[10px] text-purple-400 block font-semibold">NPU（未接続）</span>
                 <span className="text-base font-bold text-purple-300 font-mono">
                   {lastResult.telemetry.npuMs} ms
                 </span>
                 <span className="text-[9px] text-slate-500 block">意図/感情/意味ベクトル</span>
               </div>
               <div className="p-2.5 bg-slate-900/80 border border-emerald-500/30 rounded-lg text-center">
-                <span className="text-[10px] text-emerald-400 block font-semibold">GPU 所要時間</span>
+                <span className="text-[10px] text-emerald-400 block font-semibold">GPU（未接続）</span>
                 <span className="text-base font-bold text-emerald-300 font-mono">
                   {lastResult.telemetry.gpuMs} ms
                 </span>
                 <span className="text-[9px] text-slate-500 block">並列類似度マトリクス</span>
               </div>
               <div className="p-2.5 bg-emerald-950/60 border border-emerald-500/50 rounded-lg text-center">
-                <span className="text-[10px] text-emerald-300 block font-bold">総処理時間 (Total)</span>
+                <span className="text-[10px] text-emerald-300 block font-bold">総処理時間</span>
                 <span className="text-base font-bold text-emerald-400 font-mono">
                   {lastResult.telemetry.totalMs} ms
                 </span>
@@ -235,19 +235,19 @@ export const HardwarePipelineSubView: React.FC = () => {
                 <div className="p-2 bg-slate-950 rounded border border-sky-900/40 space-y-1">
                   <span className="font-bold text-sky-300">CPU タスク:</span>
                   {lastResult.telemetry.cpuTasks.map((t, idx) => (
-                    <div key={idx} className="text-slate-400 truncate">✓ {t}</div>
+                    <div key={idx} className="text-slate-400 truncate">• {t}</div>
                   ))}
                 </div>
                 <div className="p-2 bg-slate-950 rounded border border-purple-900/40 space-y-1">
                   <span className="font-bold text-purple-300">NPU タスク:</span>
                   {lastResult.telemetry.npuTasks.map((t, idx) => (
-                    <div key={idx} className="text-slate-400 truncate">✓ {t}</div>
+                    <div key={idx} className="text-slate-400 truncate">• {t}</div>
                   ))}
                 </div>
                 <div className="p-2 bg-slate-950 rounded border border-emerald-900/40 space-y-1">
                   <span className="font-bold text-emerald-300">GPU タスク:</span>
                   {lastResult.telemetry.gpuTasks.map((t, idx) => (
-                    <div key={idx} className="text-slate-400 truncate">✓ {t}</div>
+                    <div key={idx} className="text-slate-400 truncate">• {t}</div>
                   ))}
                 </div>
               </div>

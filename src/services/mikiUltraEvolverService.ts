@@ -228,7 +228,7 @@ class MikiUltraEvolverService {
   }
 
   /**
-   * 6. Qwen 3B ネット大海探索・自律ツール創成・自己改善統合サイクル (第171章 & 第172章)
+   * 6. モデル生成系ランタイム ネット大海探索・自律ツール創成・自己改善統合サイクル (第171章 & 第172章)
    */
   public async runAutonomousWebEvolve(
     topic = '高速ASTパースと自律検証ツール',

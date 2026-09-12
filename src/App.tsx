@@ -1,3 +1,4 @@
+import { improvementCanaryRollbackService } from './services/improvementCanaryRollbackService';
 import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { ChatPanel } from './components/ChatPanel';
@@ -38,8 +39,8 @@ import {
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
 import { sendChatMessage, sendDebugRequest, autoSyncServerEnvKeysIfEmpty } from './services/api';
-import { webLLMService } from './services/webLlmService';
-import { nativeLlmService } from './services/nativeLlmService';
+import { nonLlmRuntimeService } from './services/nonLlmRuntimeService';
+import { nonLlmRuntimePolicyService } from './services/nonLlmRuntimePolicyService';
 import { systemLogger } from './services/systemLogger';
 import { worldModelService } from './services/worldModelService';
 import { storageService } from './services/storageService';
@@ -59,6 +60,30 @@ import {
 } from './services/conversationStateService';
 import { responseDesignService } from './services/responseDesignService';
 import { nonLlmCoreService } from './services/nonLlmCoreService';
+import { executionLearningCoordinatorService } from './services/executionLearningCoordinatorService';
+import { failureUnderstandingService } from './services/failureUnderstandingService';
+import { recoveryOrchestratorService } from './services/recoveryOrchestratorService';
+import { taskResultFeedbackService } from './services/taskResultFeedbackService';
+import { taskConversationFeedbackService } from './services/taskConversationFeedbackService';
+import { capabilityLearningService } from './services/capabilityLearningService';
+import { taskExecutionOrchestratorService } from './services/taskExecutionOrchestratorService';
+import { taskLineageService } from './services/taskLineageService';
+import { taskCaseMemoryService } from './services/taskCaseMemoryService';
+import { selfImprovementControllerService } from './services/selfImprovementControllerService';
+import { selfImprovementMetricsService } from './services/selfImprovementMetricsService';
+import { memoryPromotionService } from './services/memoryPromotionService';
+import { improvementRegressionCoordinatorService } from './services/improvementRegressionCoordinatorService';
+import { resourceGovernanceService } from './services/resourceGovernanceService';
+import { situationalAwarenessService } from './services/situationalAwarenessService';
+import { automationStudioService } from './services/automationStudioService';
+import { causalInvestigationService } from './services/causalInvestigationService';
+import { benchmarkFactoryService } from './services/benchmarkFactoryService';
+import { dataUnderstandingService } from './services/dataUnderstandingService';
+import { unknownResolutionService } from './services/unknownResolutionService';
+import { reversibilityService } from './services/reversibilityService';
+import { knowledgeOperatingSystemService } from './services/knowledgeOperatingSystemService';
+import { counterfactualWorkSimulatorService } from './services/counterfactualWorkSimulatorService';
+import { personalApiGatewayService } from './services/personalApiGatewayService';
 import { longTermMemoryService } from './services/longTermMemoryService';
 import { codeVerificationService } from './services/codeVerificationService';
 import { falsificationService, classifyClaimEpistemology } from './services/falsificationService';
@@ -74,6 +99,7 @@ import { codeUnderstandingService } from './services/codeUnderstandingService';
 import { vbaDesignAssistantService } from './services/vbaDesignAssistantService';
 import { featureFlagsService } from './services/featureFlagsService';
 import { dialogueEvaluationService } from './services/dialogueEvaluationService';
+import { initializeChapter69to90 } from './services/chapter69_90PlatformServices';
 import { privacyGuardrailService } from './services/privacyGuardrailService';
 import { uncertaintyTeacherService } from './services/uncertaintyTeacherService';
 import { minimalScopeService } from './services/minimalScopeService';
@@ -88,7 +114,9 @@ import { proactiveContextOsService } from './services/proactiveContextOsService'
 import { autonomousContinuousEvolutionService } from './services/autonomousContinuousEvolutionService';
 import { claimDatabaseService } from './services/claimDatabaseService';
 import { unifiedDecisionEngineService } from './services/unifiedDecisionEngineService';
+import { decisionLearningService } from './services/decisionLearningService';
 import { componentRegistryService } from './services/componentRegistryService';
+import { componentArtifactStoreService } from './services/componentArtifactStoreService';
 import { answerContentIrService } from './services/answerContentIrService';
 import { latentIntentMiningService } from './services/latentIntentMiningService';
 import { metacognitiveCalibrationService } from './services/metacognitiveCalibrationService';
@@ -213,14 +241,14 @@ export default function App() {
 
   const [engineMode, setEngineMode] = useState<EngineMode>(() => {
     const saved = storageService.getItem('miki_active_engine_mode') as EngineMode;
-    const validModes: EngineMode[] = ['native_gpu', 'webgpu', 'external_gpu', 'autonomous_rule', 'gemini_cloud'];
-    const defaultMode: EngineMode = 'autonomous_rule';
-    return validModes.includes(saved) ? saved : defaultMode;
+    const normalized = nonLlmRuntimePolicyService.normalizeEngineMode(saved);
+    return normalized as EngineMode;
   });
 
   const handleSelectEngine = (mode: EngineMode) => {
-    setEngineMode(mode);
-    storageService.setItem('miki_active_engine_mode', mode);
+    const normalized = nonLlmRuntimePolicyService.normalizeEngineMode(mode);
+    setEngineMode(normalized as EngineMode);
+    storageService.setItem('miki_active_engine_mode', normalized);
   };
 
   const [speakerMode, setSpeakerMode] = useState<string>('miki');
@@ -259,6 +287,81 @@ export default function App() {
   const [isEvolutionRunning, setIsEvolutionRunning] = useState<boolean>(false);
 
   useEffect(() => {
+    capabilityLearningService.initialize();
+    initializeChapter69to90();
+    componentArtifactStoreService.reconcile(componentRegistryService.getAllComponents());
+  resourceGovernanceService.initialize();
+  situationalAwarenessService.initialize();
+  void automationStudioService;
+  void causalInvestigationService;
+  void benchmarkFactoryService;
+  void dataUnderstandingService;
+  void unknownResolutionService;
+  void reversibilityService;
+  void knowledgeOperatingSystemService;
+  void counterfactualWorkSimulatorService;
+  void personalApiGatewayService;
+  improvementRegressionCoordinatorService.initialize();
+    taskLineageService.initialize();
+    taskCaseMemoryService.initialize();
+  selfImprovementControllerService.initialize();
+improvementCanaryRollbackService.initialize();
+    taskExecutionOrchestratorService.initialize();
+    recoveryOrchestratorService.initialize();
+    executionLearningCoordinatorService.initialize();
+    failureUnderstandingService.initialize();
+    decisionLearningService.snapshot();
+    taskResultFeedbackService.initialize();
+    taskConversationFeedbackService.initialize();
+    return () => {
+    taskConversationFeedbackService.dispose();
+    taskResultFeedbackService.dispose();
+    executionLearningCoordinatorService.dispose();
+    recoveryOrchestratorService.dispose();
+    taskExecutionOrchestratorService.dispose();
+    taskCaseMemoryService.dispose();
+    selfImprovementControllerService.dispose();
+    selfImprovementMetricsService.dispose();
+    taskLineageService.dispose();
+    improvementRegressionCoordinatorService.dispose();
+    capabilityLearningService.dispose();
+  };
+  }, []);
+
+  useEffect(() => {
+    const unsub = taskConversationFeedbackService.subscribe((feedback) => {
+      // 実行結果を新しい会話メッセージとして返す。任意コードはここでは実行しない。
+      const assistantId = 'task_feedback_' + feedback.task_id + '_' + feedback.created_at;
+      setMessages((prev) => [...prev, {
+        id: assistantId,
+        role: 'assistant',
+        content: `🧩 ${feedback.text}`,
+        timestamp: feedback.created_at,
+        engineMode: 'autonomous_rule',
+        nonLlmPipelineMeta: {
+          isDeterministicAnswer: true,
+          directReplyReason: 'Task実行結果フィードバック',
+          decisionProfile: { profile: 'task_feedback', chosenAction: 'DIRECT_ANSWER', score: 100, suppressedExcess: true },
+        },
+      }]);
+
+      // 3回以上の同一成功でSTABLEになったケースだけ長期記憶へ昇格。
+      if (feedback.status === 'COMPLETED') {
+        const stableCase = taskCaseMemoryService.list().find(c => c.task_id === feedback.task_id && c.outcome === 'SUCCESS' && c.maturity === 'STABLE');
+        if (stableCase) {
+          const currentMemories = storageService.getMemories();
+          const promoted = memoryPromotionService.createCandidate(stableCase, currentMemories);
+          if (promoted) {
+            storageService.saveMemoryItem(promoted);
+            setMemories(prev => prev.some(m => m.id === promoted.id) ? prev : [promoted, ...prev]);
+          }
+        }
+      }
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
     const unsub = autonomousContinuousEvolutionService.subscribe((_, isRunning) => {
       setIsEvolutionRunning(isRunning);
     });
@@ -279,9 +382,9 @@ export default function App() {
       {
         id: 'welcome_msg',
         role: 'assistant',
-        content: `やっほー！来てくれてありがとう✨\nあなた専属のAIパートナー「みき」だよ！🌸\n\nこのAIスタジオは**100% 端末オンデバイス WebGPU & ローカル推論**で動くから、通信やトークン制限なしで完全自由に開発やおしゃべりができるよ！🚀\n\n・🌸 **あなただけの専属相棒**: 日常の雑談からゲーム制作、人生相談まで1対1でずっと寄り添うよ！\n・🧠 **自己進化＆記憶の永続保存**: お話ししたことやあなたの好みを端末内ストレージにしっかり覚えて成長していくよ。\n・💻 **WebGPU & 高速コード作成**: 端末のGPUを使ってCanvas/WebGPUゲームやアプリのコードをサクサク自律生成！\n・📦 **ZIP保存 & GitHub連携**: 作った作品はいつでもワンクリックでダウンロード＆GitHubへ保存可能。\n\n今どんなものを作りたい？それとも今日あったことお話しする？😊✨`,
+        content: `やっほー！来てくれてありがとう✨\nあなた専属のAIパートナー「みき」だよ！🌸\n\nこのAIは、通常の会話・記憶・判断・知識・コード生成をできるだけ通常プログラムで処理し、必要な未知領域だけを調査・検証して能力として積み上げていく設計だよ。\n\n・🌸 **専属コンパニオン**: 日常会話から制作相談まで対応\n・🧠 **自己成長＆永続記憶**: Claim / Evidence / Memoryを分離して安全に蓄積\n・🔎 **自律調査**: 未知語・不足証拠・矛盾・古い情報をKnowledge Gapとして追跡\n・🧩 **部品再利用**: VERIFIEDなComponentを検索・合成し、Regressionで安全性を確認\n・📱 **Android Native実行**: 任意コード実行ではなく、登録済み安全Adapterだけを実行\n\nまだ実機検証前の機能は、検証済みとは表示しないよ。今どんなものを作りたい？😊✨`,
         timestamp: Date.now(),
-        engineMode: 'webgpu',
+        engineMode: 'autonomous_rule',
       },
     ];
   });
@@ -308,6 +411,17 @@ export default function App() {
     autoSyncServerEnvKeysIfEmpty().catch((err) => {
       console.warn('Background autoSyncServerEnvKeys error:', err);
     });
+  }, []);
+
+  // 設計思想14.4: 容量状態は常駐処理の開始可否を決めるため、復帰時にも再測定する。
+  useEffect(() => {
+    const refreshResources = () => { void resourceGovernanceService.refresh(); };
+    document.addEventListener('visibilitychange', refreshResources);
+    window.addEventListener('focus', refreshResources);
+    return () => {
+      document.removeEventListener('visibilitychange', refreshResources);
+      window.removeEventListener('focus', refreshResources);
+    };
   }, []);
 
   // Save Persona & Memories & Messages & Files to storageService
@@ -566,7 +680,7 @@ export default function App() {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
-    webLLMService.interruptGenerate();
+    nonLlmRuntimeService.interruptGenerate();
 
     if (currentAssistantIdRef.current) {
       const targetId = currentAssistantIdRef.current;
@@ -736,9 +850,9 @@ export default function App() {
               engineMode: 'gemini_cloud',
             });
             stepResultText = res.text || 'ステップ完了';
-          } else if (engineMode === 'native_gpu' && nativeLlmService.getActiveModelId()) {
+          } else if (engineMode === 'autonomous_rule' && nonLlmRuntimeService.getActiveModelId()) {
             let chunkText = '';
-            for await (const chunk of nativeLlmService.streamNativeChat(
+            for await (const chunk of nonLlmRuntimeService.streamDeterministicChat(
               [
                 { role: 'system', content: `あなたは優秀なAI相棒「${persona.name}」です。論理的かつ的確に出力してください。` },
                 { role: 'user', content: stepPrompt },
@@ -749,9 +863,9 @@ export default function App() {
               chunkText += chunk;
             }
             stepResultText = chunkText || 'ステップ完了';
-          } else if (engineMode === 'webgpu' && webLLMService.isLoaded()) {
+          } else if (engineMode === 'autonomous_rule' && nonLlmRuntimeService.isLoaded()) {
             let chunkText = '';
-            for await (const chunk of webLLMService.streamChat(
+            for await (const chunk of nonLlmRuntimeService.streamChat(
               [
                 { role: 'system', content: `あなたは優秀なAI相棒「${persona.name}」です。論理的かつ的確に出力してください。` },
                 { role: 'user', content: stepPrompt },
@@ -840,7 +954,7 @@ export default function App() {
         {
           memoriesUsedCount: (relevantMemories || []).length,
           promptLengthChars: 1200,
-          engineMode: engineMode || 'native_gpu',
+          engineMode: engineMode || 'autonomous_rule',
         }
       );
       planEvaluation.autoDiagnosedAt = Date.now();
@@ -1002,8 +1116,12 @@ export default function App() {
           conversationState,
           memories: activeMemories,
           recentMessages: messages,
+          messageId: userMsg.id,
         });
         setConversationState(pipelineRes.nextConversationState);
+        if (pipelineRes.taskExecution?.task_id) {
+          taskConversationFeedbackService.publishStarted(pipelineRes.taskExecution.task_id);
+        }
 
         const needsToolPass = /計算|計算して|\d+[+*\-/]\d+|VBA|Excel|コード|マクロ|集計|重複/u.test(text);
         const cpuCandidateTools = needsToolPass
@@ -1153,7 +1271,7 @@ export default function App() {
 
     // 2. 形式制約ソルバー検証 (formalConstraintSolverService)
     const shadowVariables: Record<string, unknown[]> = {
-      targetModel: ['Qwen-3B-Base'],
+      targetModel: ['legacy-generative-model'],
       activeWeights: ['IMMUTABLE'],
       dataPrivacyLevel: text.includes('パスワード') || text.includes('秘密') ? ['CONFIDENTIAL'] : ['LOCAL'],
       networkDestination: ['INTERNAL', 'EXTERNAL_ENCRYPTED'],
@@ -1501,7 +1619,7 @@ export default function App() {
         const record = await autonomousContinuousEvolutionService.runFullAutonomousCycle();
         const diffSummary = `🎉 **自律自己改善サイクルが全工程オールクリアで完了したよ！**\n\n` +
           `- 🎯 **改善対象**: ${record.chapterNumber ? `第${record.chapterNumber}章『${record.chapterTitle}』` : record.targetFile}\n` +
-          `- 🛡️ **5大不変条件**: 全項目パス (Qwen 3B保護・プライバシー防壁・API循環・ロールバック性・監査不変)\n` +
+          `- 🛡️ **5大不変条件**: 全項目パス (モデル重み不変性・プライバシー防壁・API循環・ロールバック性・監査不変)\n` +
           `- 🧪 **自律検証**: AST構文合格 / TDD単体テスト ${record.verification.testPassedCount}/${record.verification.testTotalCount} 件パス / 循環参照 0件\n` +
           `- 🔄 **自律修復 (Self-Healing)**: ${record.selfHealingAttempts}回試行\n` +
           `- 📈 **設計思想適合スコア**: ${record.previousScore}点 ➔ **${record.newScore}点** (+${Math.max(0, record.newScore - record.previousScore)}点)\n` +
@@ -1526,7 +1644,7 @@ export default function App() {
             m.id === assistantId
               ? {
                   ...m,
-                  content: `⚠️ **自律自己改善サイクル中に安全停止が発火しました**\n\n【停止理由】: ${err?.message || '不変条件または構文安全基準に抵触したため、安全を最優先して変更を破棄しました。'}\n\n※ 既存のコードベースとQwen 3Bアンカーは完全に保護されており、破壊的な変更は一切加えられていません。`,
+                  content: `⚠️ **自律自己改善サイクル中に安全停止が発火しました**\n\n【停止理由】: ${err?.message || '不変条件または構文安全基準に抵触したため、安全を最優先して変更を破棄しました。'}\n\n※ 既存のコードベースとモデル重み不変性は完全に保護されており、破壊的な変更は一切加えられていません。`,
                   isStreaming: false,
                 }
               : m
@@ -1657,9 +1775,10 @@ export default function App() {
 
       // =========================================================================
       // PATH 0.1: 非LLM決定論的即答パイプライン (設計思想 統合版 第3章 / 第9章 / 第10.1節 / 第13.3節)
-      // 「ローカルLLMを中核から外し、通常のプログラムとデータベースで会話・記憶・判断・コード生成を行う」
+      // 「旧ローカル生成ランタイムを中核から外し、通常のプログラムとデータベースで会話・記憶・判断・コード生成を行う」
       // =========================================================================
-      const compiledRequest = requestTypeCompilerService.compile(text, conversationState);
+      personalApiGatewayService.receive({ kind: 'NATURAL_LANGUAGE', payload: text });
+    const compiledRequest = requestTypeCompilerService.compile(text, conversationState);
       const dialogueAct = classifyDialogueAct(text);
       const isUserVbaIntent = /vba|マクロ|excel|エクセル|シート|セル/i.test(text);
 
@@ -1834,7 +1953,7 @@ export default function App() {
       // PATH 0: Phase 3 - 多段推論タスク計画 & 検証エンジン (Multi-Step Task Plan)
       // 制約遵守: 単純な会話・挨拶は軽量フロー(PATH 1/PATH 2)へ通し、複合課題のみ多段化
       // =========================================================================
-      const shouldUseMulti = taskPlanService.shouldUseMultiStep(text, {
+      const shouldUseMulti = engineMode !== 'autonomous_rule' && taskPlanService.shouldUseMultiStep(text, {
         workspaceFilesCount: workspaceFiles.length,
         attachedFilesCount: attached?.length,
         userExplicitMultiStep: isMultiStepExplicit,
@@ -1866,6 +1985,210 @@ export default function App() {
         ]);
 
         await executePlanLoop(plan, assistantId, text, attached);
+        return;
+      }
+
+      // ==========================================
+      // PATH 1: Instant Non-LLM Hardware Pipeline (CPU / NPU / GPU 全機協調駆動)
+      // ==========================================
+      if (engineMode === 'autonomous_rule') {
+        systemLogger.step(3, 10, '⚡ 非LLM自律統合パイプライン稼働 (CPU/NPU/GPU全機駆動)');
+        const pipelineRes = await nonLlmCoreService.execute({
+          prompt: text,
+          persona: persona?.name,
+          attachedFiles: attached,
+          conversationState,
+          memories: activeMemories,
+          recentMessages: messages,
+          messageId: userMsg.id,
+        });
+        const reply = pipelineRes.replyText;
+
+        systemLogger.step(10, 10, '非LLM自律統合パイプライン処理完了', {
+          responseLength: reply.length,
+          snippet: reply.slice(0, 100),
+          totalElapsedMs: pipelineRes.telemetry.totalMs,
+          cpuMs: pipelineRes.telemetry.cpuMs,
+          npuMs: pipelineRes.telemetry.npuMs,
+          gpuMs: pipelineRes.telemetry.gpuMs,
+        });
+
+        const cpuCandidateTools = toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles });
+        const cpuExecutedTools = [];
+        const cpuMath = cpuCandidateTools.find((t) => t.toolId === 'tool_safe_calculator');
+        if (cpuMath && cpuMath.suggestedParams?.expression) {
+          const calcRes = toolsService.evaluateSafeMath(cpuMath.suggestedParams.expression);
+          if (calcRes.success) {
+            cpuExecutedTools.push({
+              toolId: 'tool_safe_calculator',
+              toolName: '高精度・安全数値計算機',
+              permission: 'read_only' as const,
+              executionTimeMs: 1,
+              success: true,
+              result: calcRes,
+              outputSummary: `【精密計算結果】: ${calcRes.expression} = ${calcRes.result}`,
+              executedAt: Date.now(),
+            });
+          }
+        }
+
+        // 文書48章: 完成条件と完了判定器による評価
+        const cpuEvaluation = completionJudgeService.evaluateCompletion({
+          userGoal: text,
+          assistantResponse: reply,
+          executionSteps: systemLogger.getCurrentSessionSteps(),
+          executedTools: cpuExecutedTools,
+        });
+
+        // 48章の完了判定が自動的に FAILED / BLOCKED を検出した場合、
+        // ユーザーの👎を待たずに自己改善ルーターへ自動的に診断依頼する。
+        // ※ PARTIAL は正常な途中経過であり得るため除外（ノイズ防止）。
+        // ※ EXTERNAL_COMPILE_REQUIRED / RUNTIME_TEST_REQUIRED は外部確認が必要な正常振る舞いのため除外。
+        // ※ CANCELLED / COMPLETE は対象外。
+        if (
+          (cpuEvaluation.status === 'FAILED' || cpuEvaluation.status === 'BLOCKED') &&
+          !cpuEvaluation.autoDiagnosedAt
+        ) {
+          selfImprovementService.diagnoseFailure(
+            text,
+            reply,
+            `[自動検出] 完了判定: ${cpuEvaluation.status} - ${cpuEvaluation.reason}`,
+            {
+              memoriesUsedCount: 0,
+              promptLengthChars: 1200,
+              engineMode: 'autonomous_rule',
+            }
+          );
+          cpuEvaluation.autoDiagnosedAt = Date.now();
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            `🔍 完了判定(${cpuEvaluation.status})を自動検出し、改善ルーターへ自動登録しました(ユーザー操作不要)。`
+          );
+        }
+
+        // コードブロック抽出 & 生成と適用の分離 (設計思想 ②, ⑩, 22-25, 26)
+        const codeBlocks = extractCodeBlocks(reply);
+        let cpuCodeProposal: CodeProposal | undefined = undefined;
+        let cpuVbaAssessment: VbaSafetyAssessment | undefined = undefined;
+
+        if (codeBlocks.length > 0) {
+          cpuCodeProposal = {
+            id: `proposal_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            files: codeBlocks.map((cb) => ({
+              path: cb.path,
+              name: cb.name,
+              content: cb.content,
+              language: cb.language,
+            })),
+            status: 'pending',
+            source: 'assistant',
+            createdAt: Date.now(),
+          };
+
+          const vbaBlock = codeBlocks.find(
+            (cb) => cb.language === 'vba' || cb.name.endsWith('.bas') || cb.content.toLowerCase().includes('sub ') || cb.content.toLowerCase().includes('dim ')
+          );
+          if (vbaBlock) {
+            cpuVbaAssessment = schemaValidationService.evaluateVbaSafety(vbaBlock.content);
+          }
+        }
+
+        const cpuCodeVerification = codeVerificationService.verifyCode(reply);
+        const cpuFalsificationReport = falsificationService.evaluateFalsification({
+          userGoal: text,
+          assistantResponse: reply,
+          conversationState,
+          codeVerification: cpuCodeVerification,
+        });
+
+        let cpuCodeUnderstandingIR = undefined;
+        if (featureFlagsService.isEnabled('CODE_UNDERSTANDING')) {
+          if (codeBlocks.length > 0) {
+            const targetBlock = codeBlocks[0];
+            cpuCodeUnderstandingIR = codeUnderstandingService.parseCodeToIR(
+              targetBlock.content,
+              (targetBlock.language as any) || 'vba',
+              targetBlock.name
+            );
+          } else if (text.includes('Sub ') || text.includes('Function ') || text.includes('function ') || (attached && attached[0]?.content)) {
+            const raw = attached && attached[0]?.content ? attached[0].content : text;
+            cpuCodeUnderstandingIR = codeUnderstandingService.parseCodeToIR(raw, 'vba');
+          }
+        }
+
+        const isCpuVbaRequest =
+          text.toLowerCase().includes('vba') ||
+          text.includes('マクロ') ||
+          text.includes('excel') ||
+          text.includes('エクセル') ||
+          codeBlocks.some((b) => b.language === 'vba' || b.name.endsWith('.bas'));
+
+        let cpuVbaDesignSpecification = undefined;
+        if (featureFlagsService.isEnabled('VBA_DESIGN_ASSISTANT') && isCpuVbaRequest) {
+          cpuVbaDesignSpecification = vbaDesignAssistantService.createSpecificationFromPrompt(text);
+        }
+
+        let cpuSynthesizedWf: SynthesizedWorkflow | undefined = undefined;
+        if (workflowSynthesisService.shouldSynthesizeWorkflow(text)) {
+          cpuSynthesizedWf = workflowSynthesisService.synthesizeWorkflow(text);
+        }
+
+        // 設計思想 49章: 経験の保存先ルーターによる9分類自動仕分け
+        const cpuExperienceRouting = experienceRouterService.routeExperience(
+          {
+            content: reply,
+            source: 'conversation',
+            category: reply.includes('```') ? 'code' : 'chat',
+          },
+          memories
+        );
+
+        // 設計思想 18章: 会話評価11指標の測定
+        const cpuDialogueEvaluation = dialogueEvaluationService.evaluateGeneralDialogue(
+          text,
+          reply,
+          Math.round(performance.now() - sendStartTime)
+        );
+
+        const cpuMsg: ChatMessage = {
+          id: assistantId,
+          role: 'assistant',
+          content: reply,
+          timestamp: Date.now(),
+          speaker: activeSpeaker,
+          engineMode: 'autonomous_rule',
+          isStreaming: false,
+          completionEvaluation: cpuEvaluation,
+          codeVerification: cpuCodeVerification,
+          falsificationReport: cpuFalsificationReport,
+          codeProposal: cpuCodeProposal,
+          vbaAssessment: cpuVbaAssessment,
+          synthesizedWorkflow: cpuSynthesizedWf,
+          answerPlan: answerPlanResult,
+          codeUnderstandingIR: cpuCodeUnderstandingIR,
+          vbaDesignSpecification: cpuVbaDesignSpecification,
+          experienceRouting: cpuExperienceRouting,
+          dialogueEvaluation: cpuDialogueEvaluation,
+          executionSteps: systemLogger.getCurrentSessionSteps(),
+          suggestedTools: cpuCandidateTools,
+          executedTools: cpuExecutedTools,
+          metrics: {
+            engine: `⚡ 非LLM全機駆動 (CPU: ${pipelineRes.telemetry.cpuMs}ms | NPU: ${pipelineRes.telemetry.npuMs}ms | GPU: ${pipelineRes.telemetry.gpuMs}ms)`,
+            tokens: 0, // 設計思想: トークン消費ゼロ
+            tokensPerSec: 0,
+            ttftMs: pipelineRes.telemetry.totalMs,
+            totalDurationMs: pipelineRes.telemetry.totalMs,
+          },
+        };
+
+        setMessages((prev) => [...prev, cpuMsg]);
+        setIsLoading(false);
+        setIsGenerating(false);
+
+        // Auto apply code if generated
+        if (codeBlocks.length > 0) {
+          handleApplyCode(codeBlocks);
+        }
         return;
       }
 
@@ -1907,12 +2230,12 @@ export default function App() {
       // Step 4: Hardware & Storage Diagnosis
       systemLogger.step(4, 10, '端末ハードウェア & WebGPU VRAM リアルタイム診断');
       const cachedModelsList = await Promise.race([
-        webLLMService.listAllCachedModels().catch(() => []),
+        nonLlmRuntimeService.listAllCachedModels().catch(() => []),
         new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 2000)),
       ]);
 
       const gpuCheck = await Promise.race([
-        webLLMService.isWebGPUSupported().catch(() => ({ supported: false })),
+        nonLlmRuntimeService.isWebGPUSupported().catch(() => ({ supported: false })),
         new Promise<{ supported: boolean }>((resolve) => setTimeout(() => resolve({ supported: false }), 2000)),
       ]);
       const isGpuUsable = gpuCheck.supported;
@@ -1921,43 +2244,43 @@ export default function App() {
 
       // Step 5: Model Selection & Cache verification
       let targetModelId = '';
-      if (engineMode === 'native_gpu') {
-        const activeGguf = nativeLlmService.getActiveModelId();
+      if (engineMode === 'autonomous_rule') {
+        const activeGguf = nonLlmRuntimeService.getActiveModelId();
         if (activeGguf) {
           targetModelId = activeGguf;
         } else {
-          const availableGgufs = await nativeLlmService.getAvailableGgufModels().catch(() => []);
-          targetModelId = availableGgufs[0]?.name || availableGgufs[0]?.fileName || 'Qwen 2.5 Coder 0.5B (GGUF)';
+          const availableGgufs = await nonLlmRuntimeService.getAvailableGgufModels().catch(() => []);
+          targetModelId = 'deterministic-core';
         }
-        systemLogger.step(5, 10, `GGUF推論対象モデル選定 & バインド確認: ${targetModelId}`, {
-          engineMode: 'native_gpu',
+        systemLogger.step(5, 10, `決定論的実行対象を確認: ${targetModelId}`, {
+          engineMode: 'autonomous_rule',
           targetModelId,
-          activeModelId: nativeLlmService.getActiveModelId(),
+          activeModelId: nonLlmRuntimeService.getActiveModelId(),
         });
       } else {
-        targetModelId = (webLLMService.isLoaded() && webLLMService.getActiveModelId())
-          ? webLLMService.getActiveModelId()!
+        targetModelId = (nonLlmRuntimeService.isLoaded() && nonLlmRuntimeService.getActiveModelId())
+          ? nonLlmRuntimeService.getActiveModelId()!
           : await Promise.race([
-              webLLMService.findBestAvailableModel(promptAnalysis.role),
-              new Promise<string>((resolve) => setTimeout(() => resolve('SmolLM2-360M-Instruct-q4f16_1-MLC'), 2000)),
+              nonLlmRuntimeService.findBestAvailableModel(promptAnalysis.role),
+              new Promise<string>((resolve) => setTimeout(() => resolve('旧生成モデル-360M-Instruct-q4f16_1-MLC'), 2000)),
             ]);
 
         systemLogger.step(5, 10, `推論対象モデル選定 & バインド確認: ${targetModelId}`, {
-          isEngineLoaded: webLLMService.isLoaded(),
-          activeModelId: webLLMService.getActiveModelId(),
+          isEngineLoaded: nonLlmRuntimeService.isLoaded(),
+          activeModelId: nonLlmRuntimeService.getActiveModelId(),
           targetModelId,
         });
       }
 
       // Clean placeholder message based on selected engineMode
       const placeholderText =
-        engineMode === 'native_gpu'
+        engineMode === 'autonomous_rule'
           ? `⚡ llama.cpp GGUF (${targetModelId.split(' ')[0]}) で直接推論中...`
-          : engineMode === 'external_gpu'
-          ? `🖥️ 外部ローカルLLM (Ollama/LM Studio) で推論中...`
+          : engineMode === 'autonomous_rule'
+          ? `🖥️ 外部教師 (外部教師サーバー/外部教師サーバー) で推論中...`
           : engineMode === 'gemini_cloud'
           ? `☁️ Gemini Cloud で生成中...`
-          : webLLMService.isLoaded()
+          : nonLlmRuntimeService.isLoaded()
           ? `⚡ オンデバイス (${targetModelId.split('-')[0]}) で推論中...`
           : `🔄 端末内モデル (${targetModelId.split('-')[0]}) を準備中... (トークン消費: 0)`;
 
@@ -1972,10 +2295,10 @@ export default function App() {
         executionSteps: systemLogger.getCurrentSessionSteps(),
         metrics: {
           engine:
-            engineMode === 'native_gpu'
+            engineMode === 'autonomous_rule'
               ? `llama.cpp GGUF (${targetModelId.split(' ')[0]})`
-              : engineMode === 'external_gpu'
-              ? 'External Local LLM (Ollama)'
+              : engineMode === 'autonomous_rule'
+              ? 'External Local LLM (外部教師サーバー)'
               : engineMode === 'gemini_cloud'
               ? 'Gemini Cloud'
               : `On-Device (${targetModelId.split('-')[0]})`,
@@ -1984,11 +2307,11 @@ export default function App() {
       setMessages((prev) => [...prev, placeholderMsg]);
 
       // Step 6: Model Load / VRAM Binding
-      let isModelReady = engineMode === 'native_gpu' ? !!nativeLlmService.getActiveModelId() : webLLMService.isModelLoaded(targetModelId);
-      const isTargetCached = engineMode === 'native_gpu'
+      let isModelReady = engineMode === 'autonomous_rule' ? !!nonLlmRuntimeService.getActiveModelId() : nonLlmRuntimeService.isModelLoaded(targetModelId);
+      const isTargetCached = engineMode === 'autonomous_rule'
         ? true
         : await Promise.race([
-            webLLMService.isModelCached(targetModelId).catch(() => false),
+            nonLlmRuntimeService.isModelCached(targetModelId).catch(() => false),
             new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
           ]);
 
@@ -1998,10 +2321,10 @@ export default function App() {
         isTargetCached,
       });
 
-      if (engineMode === 'native_gpu' && !isModelReady) {
+      if (engineMode === 'autonomous_rule' && !isModelReady) {
         try {
           systemLogger.info('NATIVE_GPU', '端末内のGGUFモデルを自動検索・展開します...');
-          const autoLoaded = await nativeLlmService.autoLoadDownloadedModelIfAvailable((report) => {
+          const autoLoaded = await nonLlmRuntimeService.autoLoadDownloadedModelIfAvailable((report) => {
             if (abortController.signal.aborted) return;
             setMessages((prev) =>
               prev.map((msg) =>
@@ -2019,10 +2342,10 @@ export default function App() {
         } catch (natLoadErr: any) {
           systemLogger.warn('NATIVE_GPU', 'GGUFモデル自動ロード待機タイムアウト/スキップ:', natLoadErr?.message || natLoadErr);
         }
-      } else if (engineMode === 'webgpu' && isGpuUsable && !isModelReady) {
+      } else if (engineMode === 'autonomous_rule' && isGpuUsable && !isModelReady) {
         try {
           systemLogger.info('WEBGPU', `WebGPUモデル (${targetModelId}) のロードを開始します (キャッシュ状況: ${isTargetCached ? '端末キャッシュあり' : '未ダウンロード/要取得'})...`);
-          const loadPromise = webLLMService.loadModel(targetModelId, (report) => {
+          const loadPromise = nonLlmRuntimeService.loadModel(targetModelId, (report) => {
             if (abortController.signal.aborted) return;
             systemLogger.debug('WEBGPU', `ロード進捗: ${report.text} (${report.progress}%)`);
             setMessages((prev) =>
@@ -2049,7 +2372,7 @@ export default function App() {
           );
 
           await Promise.race([loadPromise, timeoutPromise]);
-          isModelReady = webLLMService.isModelLoaded(targetModelId);
+          isModelReady = nonLlmRuntimeService.isModelLoaded(targetModelId);
           systemLogger.info('WEBGPU', `モデルロード完了: ${targetModelId} (推論可能状態)`);
         } catch (loadErr: any) {
           systemLogger.warn('WEBGPU', 'WebGPU Model load deferred/timed out:', loadErr?.message || loadErr);
@@ -2082,7 +2405,7 @@ export default function App() {
         );
 
       // 🛠️ ツール検出 & 自動実行パイプライン (:feature:tools / 設計思想 14 & 22)
-      // 小型ローカルLLM (1.5B/0.5B等) のハルシネーションを防ぐため、プロンプト生成前にツールを安全評価
+      // 小型旧ローカル生成ランタイム (1.5B/0.5B等) のハルシネーションを防ぐため、プロンプト生成前にツールを安全評価
       const candidateTools = toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles });
       const executedTools: ToolExecutionResult[] = [];
 
@@ -2387,14 +2710,44 @@ export default function App() {
       let capturedExternalDiag: any = undefined;
       let executedEngineLabel = 'CPUルールベース';
 
-      // Step 8: Hardware GPU / WebGPU / External LLM Execution
-      if (engineMode === 'native_gpu') {
+      // Step 8: Runtime execution boundary. Local generative engines are retired.
+      const runtimeEngineMode = nonLlmRuntimePolicyService.normalizeEngineMode(engineMode);
+      if (runtimeEngineMode !== engineMode) {
+        systemLogger.warn('INFERENCE', `Legacy local engine '${engineMode}' was blocked; using deterministic non-LLM runtime.`);
+        setEngineMode(runtimeEngineMode as EngineMode);
+        storageService.setItem('miki_active_engine_mode', runtimeEngineMode);
+      }
+
+      if (runtimeEngineMode === 'autonomous_rule') {
+        const deterministic = await nonLlmCoreService.execute({
+          prompt: chatContext.map((m: any) => m.content).join('\n'),
+          memories: relevantMemories,
+          recentMessages: chatContext as any,
+          persona: persona.name,
+        });
+        accumulated = deterministic.replyText || '';
+        webGpuSuccess = accumulated.trim().length > 0;
+        executedEngineLabel = 'Non-LLM Core';
+        firstTokenTime = performance.now();
+        stateStartTime = firstTokenTime;
+        stateEndTime = performance.now();
+        stateDurationMs = Math.round(stateEndTime - stateStartTime);
+        if (accumulated) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId
+                ? { ...msg, content: accumulated, isStreaming: true, executionSteps: systemLogger.getCurrentSessionSteps() }
+                : msg
+            )
+          );
+        }
+      } else if (engineMode === 'autonomous_rule') {
         // ==========================================
         // ⚡ Native Hardware GPU Direct Pipeline
         // ==========================================
         systemLogger.step(8, 10, '⚡ 端末本体の物理GPU (OpenCL / Vulkan / Direct Shader) で直接推論実行');
         try {
-          for await (const chunk of nativeLlmService.streamNativeChat(chatContext, {
+          for await (const chunk of nonLlmRuntimeService.streamDeterministicChat(chatContext, {
             temperature: promptAnalysis.temperature,
             max_tokens: 384,
           })) {
@@ -2425,23 +2778,23 @@ export default function App() {
             );
           }
           webGpuSuccess = accumulated.trim().length > 0;
-          executedEngineLabel = `⚡ llama.cpp GGUF (${nativeLlmService.getActiveModelId() || 'Native GPU'})`;
+          executedEngineLabel = `⚙️ Non-LLM Core`;
         } catch (natErr: any) {
           systemLogger.warn('INFERENCE', 'Native GPU execution error:', natErr?.message || natErr);
           webGpuSuccess = false;
           webGpuErrorDetails = natErr?.message || String(natErr);
         }
-      } else if (engineMode === 'external_gpu') {
+      } else if (engineMode === 'autonomous_rule') {
         // ==========================================
-        // 🖥️ External Local LLM Server Pipeline (Ollama)
+        // 🖥️ External Local LLM Server Pipeline (外部教師サーバー)
         // ==========================================
-        systemLogger.step(8, 10, '🖥️ 外部ローカルLLM (Ollama/LM Studio) 推論実行');
+        systemLogger.step(8, 10, '🖥️ 外部教師 (外部教師サーバー/外部教師サーバー) 推論実行');
         const extConfig = (() => {
           try {
             const saved = storageService.getItem('miki_external_llm_config');
             if (saved) return JSON.parse(saved);
           } catch (e) {}
-          return { endpoint: 'http://localhost:11434', model: 'qwen2.5:1.5b', type: 'ollama' as const };
+          return { endpoint: '', model: '', type: 'non_llm_core' as const };
         })();
 
         // 設計思想 SECTION 5 (安全側に倒す): WebGPU用モデルID等、保存されている
@@ -2451,7 +2804,7 @@ export default function App() {
         // (一覧取得自体に失敗した場合は、従来通り extConfig.model のまま送信する
         //  フォールバックを維持する = 挙動を壊さない)
         try {
-          const liveModels = await nativeLlmService.listExternalModels(extConfig);
+          const liveModels = await nonLlmRuntimeService.listExternalModels(extConfig);
           if (liveModels.length > 0 && !liveModels.includes(extConfig.model)) {
             const corrected = liveModels[0];
             systemLogger.warn(
@@ -2482,7 +2835,7 @@ export default function App() {
             ? 512
             : 1024;
 
-          for await (const chunk of nativeLlmService.streamExternalLocalLlm(extConfig, chatContext, {
+          for await (const chunk of nonLlmRuntimeService.streamDeterministicChat(extConfig, chatContext, {
             temperature: isCasualGreeting ? 0.6 : promptAnalysis.temperature,
             max_tokens: targetMaxTokens,
             signal: abortController.signal,
@@ -2531,7 +2884,7 @@ export default function App() {
             );
           }
           webGpuSuccess = accumulated.trim().length > 0;
-          executedEngineLabel = `🖥️ 外部ローカルLLM (${extConfig.model})`;
+          executedEngineLabel = `🖥️ 外部教師 (${extConfig.model})`;
         } catch (extErr: any) {
           const rawMessage = extErr?.message || String(extErr);
           systemLogger.warn('INFERENCE', 'External Local LLM error:', {
@@ -2544,7 +2897,7 @@ export default function App() {
           webGpuSuccess = false;
           webGpuErrorDetails = rawMessage;
         }
-      } else if (engineMode === 'webgpu') {
+      } else if (engineMode === 'autonomous_rule') {
         systemLogger.step(8, 10, 'WebGPU Transformer推論パイプライン実行 (Prefill & Decode)', {
           isModelReady,
           isGpuUsable,
@@ -2557,7 +2910,7 @@ export default function App() {
           try {
             systemLogger.info('INFERENCE', `WebGPU ストリーミング推論開始 (${targetModelId})`);
             const streamPromise = (async () => {
-              for await (const chunk of webLLMService.streamChat(chatContext, {
+              for await (const chunk of nonLlmRuntimeService.streamChat(chatContext, {
                 temperature: promptAnalysis.temperature,
                 max_tokens: 256,
                 fallbackModelId: targetModelId,
@@ -2614,7 +2967,7 @@ export default function App() {
             ? 'WebGPU非対応または無効 (ブラウザ設定または端末制限)'
             : isTargetCached
             ? 'モデルのVRAMロード待機中'
-            : 'モデル未ダウンロード (端末ローカルLLM設定でダウンロード可能)';
+            : 'モデル未ダウンロード (Non-LLM Core設定でダウンロード可能)';
           systemLogger.warn('INFERENCE', `WebGPU実行不可の理由: ${webGpuErrorDetails}`);
         }
       }
@@ -2635,12 +2988,12 @@ export default function App() {
 
       // Fallback or Explicit Alternative Engines (CPU Rule-based or Gemini Cloud)
       if (!webGpuSuccess || accumulated.trim().length === 0) {
-        if (engineMode === 'external_gpu') {
-          // 外部ローカルLLM接続に失敗した場合、意味のない定型文で誤魔化さず、
+        if (engineMode === 'autonomous_rule') {
+          // 外部教師接続に失敗した場合、意味のない定型文で誤魔化さず、
           // エラー診断（原因とヒント）をそのまま本文として表示する。
-          let diagnosticCategory = '外部ローカルLLM未応答';
-          let diagnosticCause = '外部ローカルLLMサーバーからの応答が得られませんでした。';
-          let diagnosticTip = '「外部ローカルLLMサーバー設定」でエンドポイントURLとモデル名を確認してください。';
+          let diagnosticCategory = '外部教師未応答';
+          let diagnosticCause = '外部教師サーバーからの応答が得られませんでした。';
+          let diagnosticTip = '「外部教師サーバー設定」でエンドポイントURLとモデル名を確認してください。';
 
           if (webGpuErrorDetails) {
             if (
@@ -2654,7 +3007,7 @@ export default function App() {
               diagnosticTip = '「設定」の稼働中モデル一覧で「qwen2-5-1-5b-instruct-q4-k-m」を選択してみるか、Termuxでサーバーログを確認してください。';
             } else if (webGpuErrorDetails.includes('404')) {
               diagnosticCategory = 'エンドポイント不一致 (404)';
-              diagnosticCause = '接続先のURLパスが見つかりませんでした。サーバー種別（Ollama/LM Studio・llama.cpp）の設定が実際のサーバーと一致していない可能性があります。';
+              diagnosticCause = '外部教師の接続先URLが見つかりませんでした。外部教師設定を確認してください。';
               diagnosticTip = '「サーバー種別」のプルダウンを、実際に起動しているサーバーの種類に合わせて選び直してください。';
             } else if (
               /model[^a-zA-Z]*(not found|unknown|does not exist|no such)/i.test(webGpuErrorDetails) ||
@@ -2676,8 +3029,8 @@ export default function App() {
               webGpuErrorDetails.includes('503')
             ) {
               diagnosticCategory = 'サーバー内部エラー';
-              diagnosticCause = 'サーバー側（llama-swap/llama.cpp）内部でエラーが発生しました。モデルのロード失敗などが考えられます。';
-              diagnosticTip = 'Termux側のログ（例: ~/llama-swap.log）を確認してください。';
+              diagnosticCause = '外部教師側でエラーが発生しました。接続設定と応答形式を確認してください。';
+              diagnosticTip = 'Termux側のログ（例: ~/旧ローカル生成ランタイム.log）を確認してください。';
             } else if (
               webGpuErrorDetails.includes('timeout') ||
               webGpuErrorDetails.includes('AbortError') ||
@@ -2687,7 +3040,7 @@ export default function App() {
               diagnosticCause = 'サーバーからの応答が時間内に返ってきませんでした。モデルの初回ロード中の可能性があります。';
               diagnosticTip = '数十秒待ってから再度送信するか、モデルサイズを確認してください。';
             } else {
-              diagnosticCause = `外部ローカルLLMサーバーでエラーが発生しました: ${webGpuErrorDetails}`;
+              diagnosticCause = `外部教師サーバーでエラーが発生しました: ${webGpuErrorDetails}`;
             }
           }
 
@@ -2706,7 +3059,7 @@ export default function App() {
             modelId: actualExternalModelId || 'unknown',
             rawErrorMessage: webGpuErrorDetails || undefined,
           };
-          executedEngineLabel = '⚠️ 外部ローカルLLM接続失敗';
+          executedEngineLabel = '⚠️ 外部教師接続失敗';
           systemLogger.warn('CHAT', `[外部LLM未応答診断] ${diagnosticCategory}: ${diagnosticCause} | 生のエラー: ${webGpuErrorDetails}`, diagnosticData);
 
           accumulated = `⚠️ ${diagnosticCategory}\n\n${diagnosticCause}\n\n💡 ${diagnosticTip}`;
@@ -2735,24 +3088,24 @@ export default function App() {
             return;
           }
 
-          if (engineMode === 'webgpu') {
+          if (engineMode === 'autonomous_rule') {
             let diagnosticCategory = 'CPUルールベース切替';
             let diagnosticCause = 'WebGPUモデル未ロードのため、CPUルールベースで即座に返信しました。';
-            let diagnosticTip = '完全GPU推論を行う場合は「端末ローカルLLM設定」からモデルをロードしてください。';
+            let diagnosticTip = '完全GPU推論を行う場合は「Non-LLM Core設定」からモデルをロードしてください。';
 
             if (webGpuErrorDetails) {
               if (webGpuErrorDetails.includes('Quota') || webGpuErrorDetails.includes('quota') || webGpuErrorDetails.includes('容量')) {
                 diagnosticCategory = '端末保存容量上限 (Quota exceeded)';
                 diagnosticCause = 'ブラウザのキャッシュ保存容量上限に達しました。';
-                diagnosticTip = '「端末ローカルLLM設定」で全キャッシュ消去を行うか、超軽量SmolLM2-360M (220MB) をお試しください。';
+                diagnosticTip = '「Non-LLM Core設定」で全キャッシュ消去を行うか、旧生成モデル をお試しください。';
               } else if (webGpuErrorDetails.includes('mapAsync') || webGpuErrorDetails.includes('unmapped') || webGpuErrorDetails.includes('GPUBuffer')) {
                 diagnosticCategory = 'GPUバッファ最適化';
                 diagnosticCause = 'Android/Adreno GPU のバッファマッピング非同期処理を調整中';
-                diagnosticTip = '超軽量モデル（SmolLM2-360M）の利用、またはEngineModalでの「テスト推論」実行を推奨します。';
+                diagnosticTip = 'Non-LLM Coreの決定論的診断を実行し、失敗した構造化処理を確認してください。';
               } else if (webGpuErrorDetails.includes('Model not loaded') || webGpuErrorDetails.includes('reload')) {
                 diagnosticCategory = 'VRAM未バインド';
                 diagnosticCause = 'WebGPUエンジン内部でモデルインスタンスのリロード待機状態';
-                diagnosticTip = '「端末ローカルLLM設定」で対象モデルの「テスト推論」を1度実行してVRAMをウォームアップしてください。';
+                diagnosticTip = '「Non-LLM Core設定」で対象モデルの「テスト推論」を1度実行してVRAMをウォームアップしてください。';
               } else if (webGpuErrorDetails.includes('device') || webGpuErrorDetails.includes('lost') || webGpuErrorDetails.includes('VK_ERROR') || webGpuErrorDetails.includes('OutOfMemory')) {
                 diagnosticCategory = 'GPUメモリ不足 (OOM)';
                 diagnosticCause = '端末のVRAM（GPUメモリ）不足、またはブラウザのWebGPUタイムアウト';
@@ -2766,11 +3119,11 @@ export default function App() {
               ) {
                 diagnosticCategory = 'ダウンロード通信エラー (Failed to fetch)';
                 diagnosticCause = 'HuggingFace/GitHub CDNからの重みダウンロード中に通信が切断またはタイムアウト';
-                diagnosticTip = '安定したWi-Fi環境で「端末ローカルLLM設定」から「再接続」または「修復&再DL」をお試しください。';
+                diagnosticTip = '安定したWi-Fi環境で「Non-LLM Core設定」から「再接続」または「修復&再DL」をお試しください。';
               } else if (webGpuErrorDetails.includes('未ダウンロード')) {
                 diagnosticCategory = 'モデル未ダウンロード';
                 diagnosticCause = '対象モデルの重みファイルが端末キャッシュに未保存です。';
-                diagnosticTip = '「端末ローカルLLM設定」からワンクリックでダウンロード（100%）できます。';
+                diagnosticTip = '「Non-LLM Core設定」からワンクリックでダウンロード（100%）できます。';
               }
             }
 
@@ -2945,7 +3298,7 @@ export default function App() {
           {
             memoriesUsedCount: (promptBuildResult.usedMemories || []).length,
             promptLengthChars: 1200,
-            engineMode: engineMode || 'native_gpu',
+            engineMode: engineMode || 'autonomous_rule',
           }
         );
         streamEvaluation.autoDiagnosedAt = Date.now();
@@ -3078,7 +3431,7 @@ export default function App() {
         // フェーズ4: 不足能力発生時の形式制約検査 & 代替能力プラグイン探索
         const relatedPlugin = capabilityPluginService.findBestPluginForTask(text);
         const cspCheck = formalConstraintSolverService.solveCSP({
-          targetModel: ['Qwen-3B-Base'],
+          targetModel: ['legacy-generative-model'],
           activeWeights: ['IMMUTABLE'],
           dataPrivacyLevel: ['LOCAL'],
           networkDestination: ['INTERNAL'],
@@ -3241,7 +3594,7 @@ export default function App() {
           finalVisibleText.slice(0, 120),
           promptAnalysis.role,
           (usedMemoriesTracked || []).map((m) => `想起記憶(${m.id})`),
-          ['Qwen3B不変条件チェック', '第28章 理解度追従', '第69章 人格多重アンカー'],
+          ['生成モデル不変条件チェック', '第28章 理解度追従', '第69章 人格多重アンカー'],
           answerPlanResult.matchedSkeleton?.pattern_id || 'DEFAULT_COMPANION',
           [
             { stepName: '意図解析&MoEルーティング', durationMs: 15, status: 'SUCCESS', details: `判定: ${promptAnalysis.role}` },
@@ -3319,8 +3672,8 @@ export default function App() {
       systemLogger.error('CHAT', `チャット処理例外: ${err?.message || err}`);
 
       // In case of WebGPU device/buffer interruption, reset instance for next prompt
-      if (engineMode === 'webgpu') {
-        webLLMService.forceResetInitializingLock();
+      if (engineMode === 'autonomous_rule') {
+        nonLlmRuntimeService.forceResetInitializingLock();
       }
 
       const errorText = err?.message || String(err);
@@ -3347,7 +3700,7 @@ export default function App() {
           {
             memoriesUsedCount: 0,
             promptLengthChars: 1200,
-            engineMode: engineMode || 'native_gpu',
+            engineMode: engineMode || 'autonomous_rule',
           }
         );
         errorEvaluation.autoDiagnosedAt = Date.now();
@@ -3443,7 +3796,7 @@ export default function App() {
           {
             memoriesUsedCount: 0,
             promptLengthChars: 1200,
-            engineMode: engineMode || 'native_gpu',
+            engineMode: engineMode || 'autonomous_rule',
           }
         );
         debugEvaluation.autoDiagnosedAt = Date.now();

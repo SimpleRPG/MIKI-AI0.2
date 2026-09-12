@@ -90,46 +90,46 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onOpenEngineModal}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all shadow-xs ${
-            engineMode === 'native_gpu'
+            engineMode === 'autonomous_rule'
               ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/50'
-              : engineMode === 'webgpu'
+              : engineMode === 'autonomous_rule'
               ? 'bg-purple-950/40 border-purple-500/40 text-purple-300 hover:bg-purple-900/50'
-              : engineMode === 'external_gpu'
+              : engineMode === 'autonomous_rule'
               ? 'bg-indigo-950/40 border-indigo-500/40 text-indigo-300 hover:bg-indigo-900/50'
               : engineMode === 'gemini_cloud'
               ? 'bg-sky-950/40 border-sky-500/40 text-sky-300 hover:bg-sky-900/50'
               : 'bg-emerald-950/60 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900/60 shadow-emerald-500/20'
           }`}
           title={
-            engineMode === 'native_gpu'
+            engineMode === 'autonomous_rule'
               ? '【本体GPU直結】スマホ・PC物理GPU (Vulkan / OpenCL / NPU) ダイレクト推論'
-              : engineMode === 'webgpu'
+              : engineMode === 'autonomous_rule'
               ? '【WebGPU】ブラウザ標準オンデバイスLLM（GPUニューラルネットワーク推論）'
-              : engineMode === 'external_gpu'
-              ? '【外部ローカルLLM】Ollama / LM Studio (localhost:11434)'
+              : engineMode === 'autonomous_rule'
+              ? '【外部教師】外部教師（非実行） (localhost:11434)'
               : engineMode === 'gemini_cloud'
               ? '【Gemini Cloud】Google Gemini 高性能クラウドAI'
               : '【⚡ 非LLM自律統合モード】第14章準拠・外部送信完全遮断。CPU(構文/DB/CSP) + NPU(意図/感情) + GPU(並列照合) 全機協調駆動'
           }
         >
-          {engineMode === 'native_gpu' ? (
+          {engineMode === 'autonomous_rule' ? (
             <>
               <Zap className="w-3.5 h-3.5 text-emerald-400" />
               <span className="hidden sm:inline">本体GPU直結</span>
               <span className="sm:hidden">本体GPU</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
             </>
-          ) : engineMode === 'webgpu' ? (
+          ) : engineMode === 'autonomous_rule' ? (
             <>
               <Cpu className="w-3.5 h-3.5 text-purple-400" />
               <span className="hidden sm:inline">WebGPU (ブラウザ)</span>
               <span className="sm:hidden">WebGPU</span>
               <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
             </>
-          ) : engineMode === 'external_gpu' ? (
+          ) : engineMode === 'autonomous_rule' ? (
             <>
               <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="hidden sm:inline">外部ローカルLLM</span>
+              <span className="hidden sm:inline">外部教師</span>
               <span className="sm:hidden">外部LLM</span>
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
             </>

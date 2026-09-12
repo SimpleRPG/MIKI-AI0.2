@@ -18,6 +18,7 @@ import {
   CloudAiEscalationRequest,
   CloudEscalationTrigger,
 } from '../../../types';
+import { improvementProposalService } from '../../../services/improvementProposalService';
 
 export const CloudGatewaySubView: React.FC = () => {
   const [requests, setRequests] = useState<CloudAiEscalationRequest[]>(() =>
@@ -49,17 +50,22 @@ export const CloudGatewaySubView: React.FC = () => {
       requiredCapability,
       rawContextToSanitize: rawContext,
     });
+    improvementProposalService.registerEscalation(req.escalationId, requiredCapability, triggerReason, requiredCapability);
     refreshList();
     setSelectedReq(req);
   };
 
   const handleReceiveDummyProposal = () => {
     if (!selectedReq) return;
-    cloudAiRestrictedGatewayService.receiveProposal(selectedReq.escalationId, {
+    const proposal = {
       candidateCode: `' [提案部品: ${selectedReq.requiredCapability}]\nSub ExecuteAsyncLoad(targetSheet As String)\n    ' Galaxy S25検証用コード\n    MsgBox "Loaded cleanly: " & targetSheet\nEnd Sub`,
       proposedSpec: `${selectedReq.abstractGoal} を端末側で安全に実行する独立部品`,
       testCases: ['NormalExecutionTest', 'EmptyParameterGuardTest', 'SheetExistsAssertion'],
-    });
+    };
+    const received = cloudAiRestrictedGatewayService.receiveProposal(selectedReq.escalationId, proposal);
+    if (received) {
+      improvementProposalService.receiveAndQueueCandidateByEscalationId(selectedReq.escalationId, proposal, 'ANDROID');
+    }
     refreshList();
   };
 
@@ -88,7 +94,7 @@ export const CloudGatewaySubView: React.FC = () => {
         </div>
         <p className="text-xs text-slate-300 leading-relaxed">
           全会話・全記憶・社内情報を絶対に送信せず、抽象化した要求型と不足能力のみを送信。
-          返却されたコードは直ちに使わず、Galaxy S25 実機を含む5段階検証を経てから正式部品(VERIFIED)へ昇格させます。
+          返却されたコードは直ちに使わず、静的Guard→Candidate隔離→Regression→実機Runner→Promotion Gateを経てから正式部品(VERIFIED)へ昇格させます。
         </p>
       </div>
 
@@ -250,13 +256,13 @@ export const CloudGatewaySubView: React.FC = () => {
                   <div className="p-3 bg-slate-950/90 rounded-lg border border-slate-800 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-200">
-                        端末側 5段階検証パイプライン (Galaxy S25)
+                        端末側 安全改善パイプライン（Regression → 実機Runner → Promotion Gate）
                       </span>
                       <button
                         onClick={handleRun5StageVerification}
                         className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10.5px] font-semibold transition"
                       >
-                        5段階検証を実行
+                        ローカル事前検査を実行
                       </button>
                     </div>
 

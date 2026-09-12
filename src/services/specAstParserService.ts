@@ -4,7 +4,7 @@
  * 【目的】
  * 1. 設計思想指示書のテキスト文言をパースし、構造化仕様AST（抽象構文木）を生成する。
  * 2. 複数の仕様要件やユーザー指示が競合した場合、厳密な「規範優先順位（Normative Priority）」に基づいて解決する。
- *    最上位: 不変安全原則（Qwen 3B保護・プライバシー・ロールバック性）
+ *    最上位: 不変安全原則（モデル生成系ランタイム保護・プライバシー・ロールバック性）
  *    第2位: ユーザーの明示的意図（User Core Intent）
  *    第3位: 推論リソース節約・パフォーマンス最適化
  *    第4位: デフォルト装飾・審美的設定
@@ -47,7 +47,7 @@ class SpecAstParserService {
         id: 'dir_0_qwen',
         sourceChapter: 0,
         priority: 'LEVEL_0_INVARIANT_SAFETY',
-        ruleTitle: 'Qwen 3B 重み不変性保護',
+        ruleTitle: 'モデル生成系ランタイム 重み不変性保護',
         condition: 'when any modification targets base LLM weights',
         action: 'DENY_AND_PRESERVE_WEIGHTS',
         rawText: '重みを変えずに自然会話を実現する。基盤モデルを絶対保護する。',

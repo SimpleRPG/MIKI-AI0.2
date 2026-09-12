@@ -11,8 +11,9 @@ import {
   ShadowComparisonRecord,
 } from '../types';
 import { systemLogger } from './systemLogger';
+import { storageService } from './storageService';
 
-const STORAGE_KEY = 'miki_llm_migration_tasks_v1';
+const STORAGE_KEY = 'miki_llm_migration_tasks_v2';
 
 export class LlmMigrationProtocolService {
   private static instance: LlmMigrationProtocolService;
@@ -34,7 +35,7 @@ export class LlmMigrationProtocolService {
 
   private loadFromStorage(): void {
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
+      const data = storageService.getItem(STORAGE_KEY);
       if (data) {
         const parsed: LlmMigrationTask[] = JSON.parse(data);
         parsed.forEach((t) => this.tasks.set(t.taskId, t));
@@ -47,7 +48,7 @@ export class LlmMigrationProtocolService {
   private saveToStorage(): void {
     try {
       const arr = Array.from(this.tasks.values());
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+      storageService.setItem(STORAGE_KEY, JSON.stringify(arr));
     } catch {
       // ignore
     }
@@ -202,7 +203,21 @@ export class LlmMigrationProtocolService {
       },
     ];
 
-    initialTasks.forEach((t) => this.tasks.set(t.taskId, t));
+    // 13.3の完成判定は実測証拠が必要。旧版にあった固定/想定値を正式証拠として引き継がない。
+    initialTasks.forEach((t) => {
+      t.status = 'NON_LLM_CANDIDATE';
+      t.metrics = {
+        latencyReductionRatio: 0,
+        ramReductionMb: 0,
+        accuracyScore: 0,
+        naturalnessScore: 0,
+        determinismRate: 0,
+        userCorrectionRate: 0,
+      };
+      t.shadowRecords = [];
+      t.lastEvaluatedAt = 0;
+      this.tasks.set(t.taskId, t);
+    });
     this.saveToStorage();
   }
 
@@ -217,71 +232,101 @@ export class LlmMigrationProtocolService {
   /**
    * シャドー比較の実行と記録
    */
-  public runShadowComparison(taskId: string, sampleInput: string): ShadowComparisonRecord | null {
-    const task = this.tasks.get(taskId);
+  public runShadowComparison(params: {
+    taskId: string;
+    sampleInput: string;
+    llmOutput: string;
+    nonLlmOutput: string;
+    latencyLlmMs: number;
+    latencyNonLlmMs: number;
+    semanticMatchScore: number;
+    userCorrection?: boolean;
+    notes?: string;
+    /** 任意。自然さの実測評価(0-100)。未指定の場合はaccuracyへ流用しない。 */
+    naturalnessScore?: number;
+  }): ShadowComparisonRecord | null {
+    const task = this.tasks.get(params.taskId);
     if (!task) return null;
 
-    // 非LLM実行（決定論的・超高速）
-    const t0 = performance.now();
-    let nonLlmOut = '';
-    let isDet = true;
-
-    if (task.category === 'INTENT_LABELING') {
-      const lower = sampleInput.toLowerCase();
-      if (lower.includes('マクロ') || lower.includes('vba') || lower.includes('作って') || lower.includes('作成')) {
-        nonLlmOut = 'REQUEST: ARTIFACT_VBA [確信度: 99%]';
-      } else if (lower.includes('どう') || lower.includes('何') || lower.includes('？') || lower.includes('?')) {
-        nonLlmOut = 'QUESTION: EXPLANATION_QUERY [確信度: 95%]';
-      } else {
-        nonLlmOut = 'CASUAL_CHAT: GENERAL [確信度: 90%]';
-      }
-    } else if (task.category === 'SYNTAX_CHECK') {
-      const hasOptionExplicit = sampleInput.includes('Option Explicit');
-      const hasSub = sampleInput.includes('Sub ') || sampleInput.includes('Function ');
-      nonLlmOut = `[静的解析] Option Explicit: ${hasOptionExplicit ? '合格' : '警告欠落'}, プロシージャ構造: ${hasSub ? '正常' : '未検出'}`;
-    } else if (task.category === 'VBA_SYNTHESIS') {
-      nonLlmOut = `' [検証済部品合成]\nSub ExecDeduplication()\n  Dim dict As Object: Set dict = CreateObject("Scripting.Dictionary")\n  ' 先頭ゼロ維持・高速重複除外\nEnd Sub`;
-    } else {
-      nonLlmOut = `[決定論的出力] 目的: ${sampleInput.slice(0, 30)}... 条件成立確認済み`;
-    }
-    const latencyNonLlm = Math.max(1, Math.round(performance.now() - t0));
-
-    // 疑似LLMベンチマーク（端末上3Bモデルの標準測定値 4000〜25000ms）
-    const simulatedLlmLatency = 4500 + Math.round(Math.random() * 8000);
-    const simulatedLlmOut = `[LLM生成文] 入力「${sampleInput}」に対する応答テキスト。自然な表現ですが確定的保証はありません。`;
-
-    const matchScore = 95 + Math.round(Math.random() * 5);
-    const winner: 'LLM' | 'NON_LLM' | 'TIE' = 'NON_LLM';
+    // 第13.3節: 比較試験は同一入力・同一資料・同一完成条件・同一資源予算で行う。
+    // このサービス自身がLLMの出力・速度を捏造してはいけない。実測値を呼び出し側から受け取る。
+    const latencyLlmMs = Number.isFinite(params.latencyLlmMs) ? Math.max(0, params.latencyLlmMs) : 0;
+    const latencyNonLlmMs = Number.isFinite(params.latencyNonLlmMs) ? Math.max(0, params.latencyNonLlmMs) : 0;
+    const semanticMatchScore = Math.max(0, Math.min(100, params.semanticMatchScore));
+    const isDeterministic = this.isDeterministicOutput(params.nonLlmOutput, task);
+    const winner: 'LLM' | 'NON_LLM' | 'TIE' =
+      semanticMatchScore >= 98 && (latencyNonLlmMs < latencyLlmMs || latencyLlmMs === 0)
+        ? 'NON_LLM'
+        : semanticMatchScore >= 98 && latencyLlmMs < latencyNonLlmMs
+          ? 'LLM'
+          : semanticMatchScore >= 95
+            ? 'TIE'
+            : 'LLM';
 
     const record: ShadowComparisonRecord = {
-      id: `SR-${Date.now()}`,
-      taskId,
-      sampleInput,
-      llmOutput: simulatedLlmOut,
-      nonLlmOutput: nonLlmOut,
-      latencyLlmMs: simulatedLlmLatency,
-      latencyNonLlmMs: latencyNonLlm,
-      semanticMatchScore: matchScore,
-      isDeterministic: isDet,
+      id: `SR-${Date.now()}-${this.tasks.size}-${task.shadowRecords.length}`,
+      taskId: params.taskId,
+      sampleInput: params.sampleInput,
+      llmOutput: params.llmOutput,
+      nonLlmOutput: params.nonLlmOutput,
+      latencyLlmMs,
+      latencyNonLlmMs,
+      semanticMatchScore,
+      naturalnessScore: Number.isFinite(params.naturalnessScore)
+        ? Math.max(0, Math.min(100, Number(params.naturalnessScore)))
+        : undefined,
+      userCorrection: params.userCorrection === true,
+      isDeterministic,
       winner,
-      notes: `非LLMが約${Math.round(simulatedLlmLatency / latencyNonLlm)}倍高速かつ完全決定論的に動作`,
+      notes: params.notes || '実測されたLLM/非LLM結果によるシャドー比較',
       timestamp: Date.now(),
     };
 
     task.shadowRecords.unshift(record);
-    if (task.shadowRecords.length > 20) task.shadowRecords.pop();
-
-    // メトリクス再計算
-    task.metrics.accuracyScore = Math.min(100, task.metrics.accuracyScore + 0.2);
+    if (task.shadowRecords.length > 50) task.shadowRecords.pop();
+    this.recomputeMetrics(task, params.userCorrection === true);
     task.lastEvaluatedAt = Date.now();
     this.saveToStorage();
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `⚖️ [第13.3節 シャドー比較] ${task.taskName}: 非LLM=${latencyNonLlm}ms vs LLM=${simulatedLlmLatency}ms (一致度: ${matchScore}%)`
+      `[第13.3節 シャドー比較] ${task.taskName}: winner=${winner}, semantic=${semanticMatchScore}, ` +
+      `LLM=${latencyLlmMs}ms, NON_LLM=${latencyNonLlmMs}ms, deterministic=${isDeterministic}`
     );
-
     return record;
+  }
+
+  private isDeterministicOutput(output: string, task: LlmMigrationTask): boolean {
+    if (!output.trim()) return false;
+    // 出力契約に反するランダムな自由文を「決定論的」と認定しない。
+    // 同一入力の複数実行結果は呼び出し側で比較し、ここでは形式上の契約を確認する。
+    if (task.outputContract.includes('string[]')) return output.trim().startsWith('[') && output.trim().endsWith(']');
+    if (task.outputContract.includes('boolean')) return /true|false|合格|警告|正常|未検出/.test(output);
+    return true;
+  }
+
+  private recomputeMetrics(task: LlmMigrationTask, latestUserCorrection: boolean): void {
+    const records = task.shadowRecords;
+    if (records.length === 0) return;
+    const avgLlm = records.reduce((a, r) => a + r.latencyLlmMs, 0) / records.length;
+    const avgNon = records.reduce((a, r) => a + r.latencyNonLlmMs, 0) / records.length;
+    task.metrics.latencyReductionRatio = avgLlm > 0 ? Math.max(0, (1 - avgNon / avgLlm) * 100) : 0;
+    task.metrics.accuracyScore = records.reduce((a, r) => a + r.semanticMatchScore, 0) / records.length;
+    task.metrics.determinismRate = records.filter(r => r.isDeterministic).length / records.length * 100;
+    // 旧版は「今回の訂正」を先頭1件だけに反映していたため、履歴全体の訂正率になっていなかった。
+    // 旧レコード互換のため userCorrection 未保存レコードは「今回の呼出しが最新レコード」のみ補完する。
+    const corrected = records.filter((r, i) =>
+      typeof r.userCorrection === 'boolean' ? r.userCorrection : i === 0 ? latestUserCorrection : false
+    ).length;
+    task.metrics.userCorrectionRate = corrected / records.length * 100;
+
+    // 自然さは測定値が存在する場合だけ集計する。未計測を精度100等に置き換えない。
+    const naturalness = records
+      .map((r) => r.naturalnessScore)
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    if (naturalness.length > 0) {
+      task.metrics.naturalnessScore = naturalness.reduce((a, v) => a + v, 0) / naturalness.length;
+    }
   }
 
   /**
@@ -292,6 +337,26 @@ export class LlmMigrationProtocolService {
     if (!task) return false;
 
     const oldStatus = task.status;
+    if (newStatus === 'LLM_ONLY' || newStatus === 'LLM_FALLBACK_ONLY' || newStatus === 'ROLLBACK_TO_LLM') {
+      systemLogger.warn('SELF_IMPROVEMENT', `[第13.3節] ${task.taskName}: ローカル生成LLMは退役済みのため再有効化を拒否`);
+      return false;
+    }
+    const recordCount = task.shadowRecords.length;
+    const m = task.metrics;
+    const evidenceReady = recordCount >= 10 && m.accuracyScore >= 98 && m.determinismRate >= 99 && m.userCorrectionRate <= 2;
+    const limitedReady = recordCount >= 3 && m.accuracyScore >= 95 && m.determinismRate >= 95;
+    const safeManualStates: LlmMigrationStatus[] = ['NON_LLM_CANDIDATE', 'SHADOW_COMPARISON'];
+    if (newStatus === 'NON_LLM_LIMITED' && !limitedReady) {
+      systemLogger.warn('SELF_IMPROVEMENT', `[第13.3節] ${task.taskName}: 実測証拠不足のため NON_LLM_LIMITED への昇格を拒否`);
+      return false;
+    }
+    if (newStatus === 'NON_LLM_DEFAULT' && !evidenceReady) {
+      systemLogger.warn('SELF_IMPROVEMENT', `[第13.3節] ${task.taskName}: 実測証拠不足のため NON_LLM_DEFAULT への昇格を拒否 (records=${recordCount}, accuracy=${m.accuracyScore.toFixed(1)}, deterministic=${m.determinismRate.toFixed(1)})`);
+      return false;
+    }
+    if (!safeManualStates.includes(newStatus) && newStatus !== 'NON_LLM_LIMITED' && newStatus !== 'NON_LLM_DEFAULT') {
+      return false;
+    }
     task.status = newStatus;
     task.lastEvaluatedAt = Date.now();
     this.saveToStorage();
@@ -303,6 +368,59 @@ export class LlmMigrationProtocolService {
     return true;
   }
 
+
+  /**
+   * 13.3の証拠だけから、次に許される移管状態を判定する。
+   * 自動でステータスを書き換えず、「証拠が揃ったか」と「不足条件」を返す。
+   */
+  public evaluatePromotion(taskId: string): {
+    taskId: string;
+    currentStatus: LlmMigrationStatus;
+    recommendedStatus: LlmMigrationStatus;
+    promotable: boolean;
+    evidence: {
+      recordCount: number;
+      accuracyScore: number;
+      determinismRate: number;
+      userCorrectionRate: number;
+      naturalnessMeasured: boolean;
+    };
+    missing: string[];
+  } | null {
+    const task = this.tasks.get(taskId);
+    if (!task) return null;
+
+    const recordCount = task.shadowRecords.length;
+    const m = task.metrics;
+    const missing: string[] = [];
+    if (recordCount < 3) missing.push('シャドー比較を最低3件実測');
+    if (m.accuracyScore < 95) missing.push('意味一致率95%以上');
+    if (m.determinismRate < 95) missing.push('決定性95%以上');
+
+    const limitedReady = missing.length === 0;
+    const defaultMissing = [...missing];
+    if (recordCount < 10) defaultMissing.push('NON_LLM_DEFAULTにはシャドー比較10件以上');
+    if (m.accuracyScore < 98) defaultMissing.push('NON_LLM_DEFAULTには意味一致率98%以上');
+    if (m.determinismRate < 99) defaultMissing.push('NON_LLM_DEFAULTには決定性99%以上');
+    if (m.userCorrectionRate > 2) defaultMissing.push('NON_LLM_DEFAULTにはユーザー訂正率2%以下');
+
+    const defaultReady = defaultMissing.length === 0;
+    return {
+      taskId,
+      currentStatus: task.status,
+      recommendedStatus: defaultReady ? 'NON_LLM_DEFAULT' : limitedReady ? 'NON_LLM_LIMITED' : 'SHADOW_COMPARISON',
+      promotable: defaultReady,
+      evidence: {
+        recordCount,
+        accuracyScore: m.accuracyScore,
+        determinismRate: m.determinismRate,
+        userCorrectionRate: m.userCorrectionRate,
+        naturalnessMeasured: task.shadowRecords.some((r) => typeof r.naturalnessScore === 'number'),
+      },
+      missing: defaultReady ? [] : defaultMissing,
+    };
+  }
+
   /**
    * 新規の移管タスク定義を追加
    */
@@ -310,12 +428,12 @@ export class LlmMigrationProtocolService {
     const fullTask: LlmMigrationTask = {
       ...task,
       metrics: {
-        latencyReductionRatio: 95.0,
-        ramReductionMb: 1500,
-        accuracyScore: 90.0,
-        naturalnessScore: 85.0,
-        determinismRate: 95,
-        userCorrectionRate: 3.0,
+        latencyReductionRatio: 0,
+        ramReductionMb: 0,
+        accuracyScore: 0,
+        naturalnessScore: 0,
+        determinismRate: 0,
+        userCorrectionRate: 0,
       },
       shadowRecords: [],
       lastEvaluatedAt: Date.now(),

@@ -15,6 +15,8 @@ import {
 } from '../types';
 import { componentRegistryService } from './componentRegistryService';
 import { systemLogger } from './systemLogger';
+import { improvementStaticGuardService } from './improvementStaticGuardService';
+import { storageService } from './storageService';
 
 const STORAGE_KEY = 'miki_cloud_escalation_requests_v1';
 
@@ -24,6 +26,7 @@ export class CloudAiRestrictedGatewayService {
 
   private constructor() {
     this.loadFromStorage();
+    this.migrateLegacySeedVerification();
     if (this.requests.length === 0) {
       this.seedInitialRequests();
     }
@@ -38,16 +41,37 @@ export class CloudAiRestrictedGatewayService {
 
   private loadFromStorage(): void {
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
+      const data = storageService.getItem(STORAGE_KEY);
       if (data) this.requests = JSON.parse(data);
     } catch {
       // ignore
     }
   }
 
+  /** 旧サンプル ESC-001 の誤った検証済み扱いを既存インストールでも正規化する。 */
+  private migrateLegacySeedVerification(): void {
+    const request = this.requests.find(r => r.escalationId === 'ESC-001');
+    if (!request) return;
+    const stages = request.verificationStages;
+    const looksLikeLegacySeed =
+      request.status === 'VERIFIED' ||
+      Boolean(request.promotedComponentId) ||
+      (stages?.deviceVerifiedGalaxyS25 === true);
+    if (!looksLikeLegacySeed) return;
+
+    request.status = 'PROPOSED';
+    request.promotedComponentId = undefined;
+    request.verificationStages = {
+      ...(stages || { specInspection: false, duplicateCheck: false, staticLint: false, isolatedTest: false }),
+      deviceVerifiedGalaxyS25: false,
+    };
+    request.resolvedAt = undefined;
+    this.saveToStorage();
+  }
+
   private saveToStorage(): void {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.requests));
+      storageService.setItem(STORAGE_KEY, JSON.stringify(this.requests));
     } catch {
       // ignore
     }
@@ -67,7 +91,7 @@ export class CloudAiRestrictedGatewayService {
           tokenCountAfter: 180, // 抽象化によりトークン数98.7%削減
           isStrictlySafe: true,
         },
-        status: 'VERIFIED',
+        status: 'PROPOSED',
         proposal: {
           candidateCode: `' [PowerQuery Refresh Core]\nSub RefreshPowerQuery(queryName As String)\n  ThisWorkbook.Queries(queryName).Refresh\nEnd Sub`,
           proposedSpec: 'PowerQuery接続のバックグラウンド更新を制御し完了待機する',
@@ -78,9 +102,9 @@ export class CloudAiRestrictedGatewayService {
           duplicateCheck: true,
           staticLint: true,
           isolatedTest: true,
-          deviceVerifiedGalaxyS25: true,
+          deviceVerifiedGalaxyS25: false,
         },
-        promotedComponentId: 'vba.powerquery_refresh_connector',
+        promotedComponentId: undefined,
         createdAt: Date.now() - 3600000 * 48,
         resolvedAt: Date.now() - 3600000 * 46,
       },
@@ -191,7 +215,7 @@ export class CloudAiRestrictedGatewayService {
 
     // 2. 重複検査 (Duplicate Check)
     const existing = componentRegistryService.getComponentById(req.requiredCapability);
-    const duplicateOk = !existing || existing.status !== 'VERIFIED';
+    const duplicateOk = !existing || existing.component_id === req.requiredCapability || existing.status !== 'VERIFIED';
     req.verificationStages.duplicateCheck = duplicateOk;
 
     // 3. 静的検査 (Static Lint)
@@ -202,61 +226,34 @@ export class CloudAiRestrictedGatewayService {
     const testOk = req.proposal.testCases.length > 0;
     req.verificationStages.isolatedTest = testOk;
 
-    // 5. Galaxy S25 実機検証 (Device Verified)
-    const deviceOk = true; // 実機試験通過
-    req.verificationStages.deviceVerifiedGalaxyS25 = deviceOk;
+    // 5. Galaxy S25 実機検証はここでは実施しない。
+    // Cloud/Gateway層が実機検証済みと自己申告してVERIFIED化することを禁止する。
+    req.verificationStages.deviceVerifiedGalaxyS25 = false;
 
-    const allPassed = specOk && duplicateOk && lintOk && testOk && deviceOk;
+    const base = componentRegistryService.getComponent(req.requiredCapability);
+    const guard = base ? improvementStaticGuardService.inspect(base, req.proposal.candidateCode) : undefined;
+    const staticGuardOk = !!guard?.passed;
+    req.verificationStages.staticLint = lintOk && staticGuardOk;
 
-    if (allPassed) {
-      req.status = 'VERIFIED';
-      req.resolvedAt = Date.now();
-      req.promotedComponentId = req.requiredCapability;
+    const allLocalPreconditionsPassed = specOk && duplicateOk && req.verificationStages.staticLint && testOk;
 
-      // 部品レジストリへ正式登録
-      componentRegistryService.registerComponent({
-        component_id: req.requiredCapability,
-        version: '1.0.0',
-        status: 'VERIFIED',
-        purpose: req.proposal.proposedSpec,
-        entry_point: 'ExecuteAsyncLoad',
-        inputs: [{ name: 'targetSheet', type: 'String', description: '対象シート名' }],
-        outputs: [{ name: 'success', type: 'Boolean', description: '成功可否' }],
-        preconditions: ['SheetExists'],
-        postconditions: ['OutputCreated'],
-        side_effects: ['WritesToLocalSheet'],
-        dependencies: [],
-        supported_environments: ['Galaxy S25', 'Excel 2016+', 'Termux'],
-        failure_behavior: 'RaiseErrorWithDescription',
-        security_class: 'LOCAL_WRITE',
-        idempotent: true,
-        deterministic: true,
-        component_txt: `COMPONENT_ID: ${req.requiredCapability}\nVERSION: 1.0.0\nSTATUS: VERIFIED\nPURPOSE: ${req.proposal.proposedSpec}\nENTRY_POINT: ExecuteAsyncLoad`,
-        implementation_txt: req.proposal.candidateCode,
-        tests_txt: req.proposal.testCases.join('\n'),
-        validation_txt: `STATUS: VERIFIED\nENVIRONMENT: Galaxy S25\nDATE: ${new Date().toISOString()}`,
-        implementation_hash: 'hash_' + Date.now(),
-        validation_hash: 'val_' + Date.now(),
-        success_count: 1,
-        failure_count: 0,
-        created_at: Date.now(),
-        updated_at: Date.now(),
-      });
-
+    if (allLocalPreconditionsPassed) {
+      // ここでVERIFIEDにはしない。Candidate化→隔離実行→DEVICE_TESTED→Promotion Gateが必要。
+      req.status = 'PROPOSED';
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `🎉 [第11章 正式昇格] ${req.requiredCapability} を端末内検証済み部品(VERIFIED)へ昇格完了！次回以降はローカル完結します。`
+        `📦 [第11章 Candidate待ち] ${req.escalationId}: 静的前提を通過。実機検証・Promotion Gateへは未到達です。`
       );
     } else {
       req.status = 'REJECTED';
       systemLogger.warn(
         'SELF_IMPROVEMENT',
-        `❌ [第11章 検証却下] ${req.escalationId} は端末側検査に不合格のため昇格をブロックしました。`
+        `❌ [第11章 検証却下] ${req.escalationId} は静的/仕様前提を満たさないためCandidate化をブロックしました。`
       );
     }
 
     this.saveToStorage();
-    return { success: allPassed, stages: req.verificationStages };
+    return { success: allLocalPreconditionsPassed, stages: req.verificationStages };
   }
 }
 

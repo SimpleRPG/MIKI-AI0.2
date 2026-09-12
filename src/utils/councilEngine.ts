@@ -87,7 +87,7 @@ export function generateCouncilDeliberation(
 </head>
 <body>
   <h1>🌸 エキスパート合議オセロ対戦 🎮</h1>
-  <div class="council-badge">👥 Qwen × DeepSeek × WebGPU × みき 共同設計</div>
+  <div class="council-badge">👥 Non-LLM Core × みき 共同設計</div>
   <div class="status" id="status">黒（あなた）の番です</div>
   <div class="board" id="board"></div>
   <div class="controls"><button onclick="initGame()">リセット</button></div>

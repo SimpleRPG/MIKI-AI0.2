@@ -110,7 +110,7 @@ export class DynamicToolFactoryService {
         isDynamic: true,
         dynamicCode: `(async function(params) { return { status: 'OK', tool: '${request.featureName}', output: params }; })`,
         dynamicSandboxLevel: 'LEVEL_1_LOCAL_SCRATCHPAD',
-        createdBy: 'QWEN_3B',
+        createdBy: 'AUTONOMOUS_FACTORY',
         createdAt: Date.now(),
         executionCount: 0,
       };

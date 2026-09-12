@@ -10,7 +10,7 @@
 ### 根本原則
 1. **非LLM中心 (Deterministic First):**
    推論・状態管理・制約検証・コード合成は決定論的TypeScriptロジック（CSP、AST解析、部品結合）で行い、ローカルLLM（Qwen2.5-3B）は自然言語解釈と最終表現の形成のみに限定する。
-2. **Qwen 3B保護不変則:**
+2. **モデル生成系ランタイム保護不変則:**
    ローカルモデルの重みパラメータは完全不変（IMMUTABLE）とし、オンライン書き換えを形式制約（CSP）で物理的に遮断する。
 3. **幽霊実装の完全排除:**
    すべてのサービスコードは仕様書の章（`responsibleServices`）に正確に紐付けられ、テストスクリプトで実体動作が保証されなければならない。
@@ -48,7 +48,7 @@
 | `requestTypeCompilerService.ts` | 第10.1節 | 第91章 | • 自然言語から CompiledRequestType への確定コンパイル<br>• GOAL, TARGET, 成果物の抽出<br>• Option Explicit / 上書き禁止等の制約・禁止事項抽出<br>• 副作用・承認クラス判定<br>• 決定論的実行可否 (canExecuteDeterministically) 判定 | `scripts/test_unified_philosophy_services.ts`<br>(項目2 パス) |
 | `componentRegistryService.ts` | 第9章 | 第168章 | • TXT部品パッケージ正本管理<br>• 完全一致 & 正規化コードハッシュ重複検査<br>• COLLECTED 〜 VERIFIED 状態遷移<br>• 決定論的VBAマクロ合成エンジン (synthesizeVbaMacro) | `scripts/test_unified_philosophy_services.ts`<br>(項目3-1〜3-2 パス) |
 | `worldModelService.ts` | 第7.1〜7.2節 | 第52章 | • 行動前予測 (predictAction: 意図/トーン/記憶/リスク)<br>• 行動後差分計算 (recordOutcomeAndComputeError)<br>• Surprisal & 誤差強度スコア算出<br>• 文字2-gram近似による日本語記憶利用乖離判定 | `scripts/test_unified_philosophy_services.ts`<br>(項目4 パス) |
-| `formalConstraintSolverService.ts` | 第8章, 第10.2節 | 第59章 | • CSP二項制約充足判定 (AC-3風ドメイン削減)<br>• Qwen 3Bモデル重み不変保護制約 (UNSAT検出)<br>• プライバシー境界・ローカル隔離検証 | `scripts/test_unified_philosophy_services.ts`<br>(項目5-1〜5-2 パス) |
+| `formalConstraintSolverService.ts` | 第8章, 第10.2節 | 第59章 | • CSP二項制約充足判定 (AC-3風ドメイン削減)<br>• モデル生成系ランタイムモデル重み不変保護制約 (UNSAT検出)<br>• プライバシー境界・ローカル隔離検証 | `scripts/test_unified_philosophy_services.ts`<br>(項目5-1〜5-2 パス) |
 | `anaphora_resolver_sample.ts` | 第3章 | 第5章 | • 日本語照応解決 (さっきの/前のやつ/これ/それ/あれ)<br>• トピック → 事実 → 直近エンティティ優先順位 | `scripts/test_anaphora_resolution.ts`<br>(全10ケース 100% パス) |
 
 ---

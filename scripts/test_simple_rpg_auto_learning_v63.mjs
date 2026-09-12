@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const root = new URL('..', import.meta.url).pathname;
+const engine = fs.readFileSync(new URL('../src/services/simpleRpgRuleEngineService.ts', import.meta.url), 'utf8');
+const learner = fs.readFileSync(new URL('../src/services/simpleRpgCapabilityLearningService.ts', import.meta.url), 'utf8');
+assert.doesNotMatch(engine, /\beval\s*\(|new\s+Function\s*\(|Math\.random\s*\(/);
+assert.match(learner, /sourceFingerprint/);
+assert.match(learner, /registerVerified/);
+assert.match(learner, /registerAnalyzed/);
+assert.match(learner, /AUTO_AUDIT/);
+const ref = new URL('../reference/simple-rpg/', import.meta.url).pathname;
+assert.ok(fs.existsSync(ref));
+console.log('v63 auto-learning boundary test PASS');

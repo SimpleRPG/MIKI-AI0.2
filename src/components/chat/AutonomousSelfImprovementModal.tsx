@@ -955,7 +955,7 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-[11px] text-slate-400">
                   <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80">
                     <span className="text-purple-300 font-bold block mb-0.5">1. IMMUTABLE_ANCHOR</span>
-                    Qwen 3Bアンカーモデルの出力ドリフトと安全性を恒常保護
+                    モデル生成系ランタイムアンカーモデルの出力ドリフトと安全性を恒常保護
                   </div>
                   <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80">
                     <span className="text-emerald-300 font-bold block mb-0.5">2. PRIVACY_GUARD</span>
@@ -1508,7 +1508,7 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
                 <div className="pt-2 border-t border-slate-800">
                   <div className="text-xs text-slate-300 font-semibold mb-2">安全保証ポリシー</div>
                   <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside">
-                    <li>Qwen 3Bアンカーモデルの保護 (IMMUTABLE_ANCHOR)</li>
+                    <li>モデル生成系ランタイムアンカーモデルの保護 (IMMUTABLE_ANCHOR)</li>
                     <li>送信前プライバシーマスクと機密データの遮断</li>
                     <li>全変更に対する1-Clickスナップショットの事前自動保存</li>
                   </ul>

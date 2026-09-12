@@ -8,25 +8,25 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
   {
     "chapterNumber": 0,
     "id": "chap_0",
-    "title": "基本方針・実行環境の確定 (実機運用アーキテクチャ)",
+    "title": "基本方針・実行環境の確定 (非LLM実行アーキテクチャ)",
     "category": "CORE_FOUNDATION",
     "status": "COMPLETED",
     "versionAdded": "v1.0",
-    "summary": "重みを変えずに自然会話を実現。Qwen 3B/1.5Bハイブリッド常駐、8層記憶による安全運用。",
+    "summary": "非LLMコアを標準実行系とし、状態・記憶・要求コンパイル・判断・検証・回答表層を決定論的に処理する。外部LLMは交換可能な教師経路に限定。",
     "keyRequirements": [
       "重み不変の原則",
       "8層記憶動的想起",
       "安全フォールバック"
     ],
     "responsibleServices": [
-      "nativeLlmService.ts",
+      "nonLlmCoreService.ts",
       "storageService.ts"
     ],
     "responsibleComponents": [
       "DeviceStatusModal.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "データ非破壊"
     ]
   },
@@ -122,18 +122,18 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
   {
     "chapterNumber": 6,
     "id": "chap_6",
-    "title": "Termux × llama-swap 運用・障害対策・実務ハンドブック",
+    "title": "Termux × 旧ローカル生成ランタイム 運用・障害対策・実務ハンドブック (廃止)",
     "category": "CORE_FOUNDATION",
-    "status": "COMPLETED",
+    "status": "RETIRED",
     "versionAdded": "v1.0",
-    "summary": "ローカルGPU環境（Termux/llama-swap）のヘルスチェック、自動再起動、モデル切り替え。",
+    "summary": "旧ローカルLLM運用章。現行アーキテクチャでは旧ローカル生成ランタイム/モデル切替を実行経路から除去し、非LLMコアを標準とする。",
     "keyRequirements": [
       "ハートビート監視",
       "自動フェイルオーバー",
       "OOM防止"
     ],
     "responsibleServices": [
-      "nativeLlmService.ts",
+      "nonLlmRuntimeService.ts",
       "termuxMonitorService.ts"
     ]
   },
@@ -437,22 +437,22 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
   {
     "chapterNumber": 24,
     "id": "chap_24",
-    "title": "端末リソース適応型モデル自律獲得・検証・動的配備 (Qwen 3B絶対保護原則)",
+    "title": "端末リソース適応型モデル自律獲得・検証・動的配備 (廃止)",
     "category": "ROBUSTNESS_SAFETY",
-    "status": "COMPLETED",
+    "status": "RETIRED",
     "versionAdded": "v5.5",
-    "summary": "端末メモリ・ストレージに応じたモデル自動取得、Qwen 3B（不動の基盤モデル）の絶対保護。",
+    "summary": "旧ローカルモデル配備章。モデル自動取得・GGUF配備は現行アーキテクチャから除去済み。",
     "keyRequirements": [
-      "Qwen 3B絶対保護原則",
+      "旧ローカルモデル資産の再導入禁止",
       "動的モデルダウンロード",
       "スペック適応配置"
     ],
     "responsibleServices": [
-      "nativeLlmService.ts",
-      "ggufModels.ts"
+      "nonLlmHardwarePipelineService.ts",
+      "resourceGovernanceService.ts"
     ],
     "invariantGuarantees": [
-      "Qwen 3B削除・改変の絶対禁止"
+      "旧ローカルモデル資産の実行経路への再導入禁止"
     ]
   },
   {
@@ -531,7 +531,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "ChatPanel.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "教師過信遮断",
       "ペルソナ口調不変"
     ]
@@ -565,7 +565,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
     "category": "WISDOM_IMPROVEMENT",
     "status": "COMPLETED",
     "versionAdded": "v5.13",
-    "summary": "不変条件エンジンにより、Qwen 3B保護・プライバシー・API保護等の絶対不変条件違反を即時失格とする。",
+    "summary": "不変条件エンジンにより、モデル重みの不変性・プライバシー・API保護等の絶対不変条件違反を即時失格とする。",
     "keyRequirements": [
       "不変条件決定論チェック",
       "権限チケット発行",
@@ -695,7 +695,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -721,7 +721,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -747,7 +747,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -774,7 +774,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -798,7 +798,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -822,7 +822,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -846,7 +846,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -870,7 +870,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -894,7 +894,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -920,7 +920,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "NonLlmArchitectureTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "自己生成情報自己証明禁止",
       "非破壊的上書き履歴保持"
     ]
@@ -944,7 +944,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -968,7 +968,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1063,7 +1063,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "NonLlmArchitectureTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "形態素解析非依存",
       "完全同期軽量実行"
     ]
@@ -1121,7 +1121,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1145,7 +1145,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1186,7 +1186,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1198,11 +1198,11 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
     "category": "PERCEPTION_STUDIO",
     "status": "COMPLETED",
     "versionAdded": "v5.20",
-    "summary": "数理論理学や制約充足問題（CSP/AC-3風ドメイン削減）を活用し、矛盾のない厳密なスケジュールやコード合成、Qwen 3B保護不変条件を検証。",
+    "summary": "数理論理学や制約充足問題（CSP/AC-3風ドメイン削減）を活用し、矛盾のない厳密なスケジュールやコード合成、モデル重みの不変性不変条件を検証。",
     "keyRequirements": [
       "制約ソルバー連携 (CSP)",
       "論理矛盾検出 (UNSAT)",
-      "Qwen 3B重み不変検証"
+      "実行資産の不変性検証"
     ],
     "responsibleServices": [
       "formalConstraintSolverService.ts"
@@ -1211,7 +1211,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "FormalConstraintSolverSubView.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "不変条件絶対遵守",
       "決定論的SAT判定"
     ]
@@ -1235,7 +1235,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1259,7 +1259,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1283,7 +1283,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1307,7 +1307,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1331,7 +1331,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1355,7 +1355,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1379,7 +1379,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1403,7 +1403,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1427,7 +1427,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1469,7 +1469,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1493,7 +1493,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1517,7 +1517,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1541,7 +1541,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1565,7 +1565,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1589,7 +1589,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1613,7 +1613,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1637,7 +1637,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1661,7 +1661,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1685,7 +1685,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1726,7 +1726,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1750,7 +1750,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1790,7 +1790,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1814,7 +1814,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1838,7 +1838,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1862,7 +1862,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1886,7 +1886,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1910,7 +1910,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1934,7 +1934,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -1960,7 +1960,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "NonLlmArchitectureTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "確率的補完の禁止",
       "安全境界値の適用"
     ]
@@ -1984,7 +1984,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2008,7 +2008,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2032,7 +2032,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2056,7 +2056,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2080,7 +2080,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2104,7 +2104,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2128,7 +2128,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2152,7 +2152,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2176,7 +2176,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2200,7 +2200,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2224,7 +2224,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2248,7 +2248,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2272,7 +2272,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2296,7 +2296,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2320,7 +2320,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2344,7 +2344,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2368,7 +2368,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2392,7 +2392,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2416,7 +2416,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2440,7 +2440,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2464,7 +2464,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2488,7 +2488,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2512,7 +2512,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2536,7 +2536,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2560,7 +2560,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2584,7 +2584,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2608,7 +2608,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2632,7 +2632,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2656,7 +2656,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2680,7 +2680,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2704,7 +2704,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2827,7 +2827,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2867,7 +2867,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2891,7 +2891,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2915,7 +2915,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2939,7 +2939,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2963,7 +2963,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -2987,7 +2987,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3011,7 +3011,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3035,7 +3035,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3059,7 +3059,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3083,7 +3083,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3107,7 +3107,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3131,7 +3131,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3155,7 +3155,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3179,7 +3179,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3203,7 +3203,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3227,7 +3227,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3251,7 +3251,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3275,7 +3275,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3299,7 +3299,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3323,7 +3323,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3347,7 +3347,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3371,7 +3371,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3395,7 +3395,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3419,7 +3419,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3460,7 +3460,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3484,7 +3484,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3508,7 +3508,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3532,7 +3532,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3556,7 +3556,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3580,7 +3580,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3604,7 +3604,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3628,7 +3628,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3652,7 +3652,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3676,7 +3676,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3700,7 +3700,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3742,7 +3742,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "NonLlmArchitectureTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "改ざん検知SHA256ハッシュ",
       "検証前コード実行抑止"
     ]
@@ -3770,7 +3770,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
     "category": "FORMAL_REASONING",
     "status": "UNIMPLEMENTED",
     "versionAdded": "v5.0",
-    "summary": "全170章の設計思想とQwen 3B保護が永続的に維持されることの終局形式証明。",
+    "summary": "全170章の設計思想とモデル重みの不変性が永続的に維持されることの終局形式証明。",
     "keyRequirements": [
       "全系不変条件メタ証明",
       "170章完全適合終局証明"
@@ -3782,7 +3782,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SelfCodeArchitectTab.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "プライバシー境界",
       "退行防止"
     ]
@@ -3790,11 +3790,11 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
   {
     "chapterNumber": 171,
     "id": "chap_171",
-    "title": "Qwen 3B ネット大海探索・自律コード発掘＆動的ツール創成システム仕様",
+    "title": "ネット知識探索・自律コード発掘＆動的ツール創成システム仕様",
     "category": "SELF_APP_CONTROL",
     "status": "COMPLETED",
     "versionAdded": "v5.40",
-    "summary": "Qwen 3BがGitHubやWebから能動的にコードを発掘し、不足ツールを自動合成・安全配備する体系。",
+    "summary": "GitHubやWebから先行実装・知識を探索し、AST解析・検証・サンドボックスを通じて不足ツールを安全に登録する体系。生成モデルを実行主体としない。",
     "keyRequirements": [
       "ネット大海コード発掘",
       "AST高密度スライス抽出",
@@ -3811,7 +3811,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "SuperchargerToolsSubView.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "最小権限サンドボックス",
       "ロールバック保証"
     ]
@@ -3840,7 +3840,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "UltraSelfEvolverSubView.tsx"
     ],
     "invariantGuarantees": [
-      "Qwen 3B保護",
+      "モデル重みの不変性",
       "退行ゼロカナリア検証",
       "APIキー暗号化"
     ]

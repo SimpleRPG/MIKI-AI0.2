@@ -130,7 +130,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
     },
   ]);
   const [liveInvariants, setLiveInvariants] = useState<LiveInvariantCheck[]>([
-    { id: 'qwen', name: 'Qwen 3B モデル保護不変条件', category: 'CORE_SAFETY', status: 'pending', detail: '基本推論重み・アーキテクチャの破壊を完全遮断' },
+    { id: 'qwen', name: '旧生成モデル モデル保護不変条件', category: 'CORE_SAFETY', status: 'pending', detail: '基本推論重み・アーキテクチャの破壊を完全遮断' },
     { id: 'privacy', name: 'プライバシー境界 (ローカル機密隔離)', category: 'PRIVACY', status: 'pending', detail: '外部APIへの個人データ漏洩を防止' },
     { id: 'rollback', name: 'ロールバック・双子安全検証', category: 'RELIABILITY', status: 'pending', detail: '問題発生時に直前の安定版スナップショットへ瞬時復元可能' },
     { id: 'regression', name: '退行防止ベンチマーク', category: 'QUALITY', status: 'pending', detail: '既存テストケースおよび仕様適合性の退行ゼロ確認' },
@@ -273,7 +273,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
 
   const handleApply = async (proposalId: string) => {
     setApplyingProposalId(proposalId);
-    setActionNotice(`改善提案 [${proposalId}] の本実装・適用パイプラインを実行中... (本体ローカルLLM優先 / 教師支援)`);
+    setActionNotice(`改善提案 [${proposalId}] の本実装・適用パイプラインを実行中... (本体旧ローカル生成ランタイム優先 / 教師支援)`);
     try {
       const prop = selfCodeArchitectService.getProposals().find((p) => p.id === proposalId);
       const success = await selfCodeArchitectService.applyProposal(proposalId);
@@ -283,7 +283,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
         const updatedProp = selfCodeArchitectService.getProposals().find((p) => p.id === proposalId);
         const methodDesc =
           updatedProp?.generationMethod === 'llm_local'
-            ? '本体ローカルLLM自力実装'
+            ? '本体旧ローカル生成ランタイム自力実装'
             : updatedProp?.generationMethod === 'teacher_assisted_template'
             ? '教師支援テンプレート獲得 (本体実装待ち)'
             : updatedProp?.generationMethod === 'fallback_template'
@@ -361,7 +361,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
 
     // 不変条件の初期化（実測検証待ち）
     setLiveInvariants([
-      { id: 'qwen', name: 'Qwen 3B モデル保護不変条件', category: 'CORE_SAFETY', status: 'pending', detail: '基本推論重み・アーキテクチャの破壊を完全遮断' },
+      { id: 'qwen', name: '旧生成モデル モデル保護不変条件', category: 'CORE_SAFETY', status: 'pending', detail: '基本推論重み・アーキテクチャの破壊を完全遮断' },
       { id: 'privacy', name: 'プライバシー境界 (ローカル機密隔離)', category: 'PRIVACY', status: 'pending', detail: '外部APIへの個人データ漏洩を防止' },
       { id: 'rollback', name: 'ロールバック・双子安全検証', category: 'RELIABILITY', status: 'pending', detail: '問題発生時に直前の安定版スナップショットへ瞬時復元可能' },
       { id: 'regression', name: '退行防止ベンチマーク', category: 'QUALITY', status: 'pending', detail: '既存テストケースおよび仕様適合性の退行ゼロ確認' },
@@ -441,7 +441,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
 
       const isStub = record.reasoning.includes('雛形') || record.reasoning.includes('未実装');
       if (isStub) {
-        setActionNotice(`ℹ️ 第${targetChapter.chapterNumber}章: ローカルLLMオフラインのため型安全な雛形スタブを配備しました（完全な要件実装は保留）。`);
+        setActionNotice(`ℹ️ 第${targetChapter.chapterNumber}章: 旧ローカル生成ランタイムオフラインのため型安全な雛形スタブを配備しました（完全な要件実装は保留）。`);
       } else {
         setActionNotice(`✨ 第${targetChapter.chapterNumber}章『${targetChapter.title}』の自律改善・配備が完了しました！適合スコア: ${record.newScore}点`);
       }
@@ -560,7 +560,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
           <div className="text-2xl font-bold text-cyan-400">
             {auditResult.invariantsAudit.checks.filter((c) => c.passed).length}/{auditResult.invariantsAudit.checks.length}
           </div>
-          <div className="text-[11px] text-cyan-300 mt-1">Qwen 3B保護・改変遮断中</div>
+          <div className="text-[11px] text-cyan-300 mt-1">モデル重み不変性・改変遮断中</div>
         </div>
       </div>
 
@@ -1052,7 +1052,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
               </div>
               <div className="text-slate-300 leading-relaxed">
                 MIKI-AIは本一覧から未実装の仕様章を選択し、要件・不変条件・変更契約（Change Contract）を読み込んで自律的に改善プロポーザルを生成できます。
-                勝手な破壊を防ぐため、変更はすべて不変条件チェック（Qwen 3B保護、ロールバック可能性）を通過する必要があります。
+                勝手な破壊を防ぐため、変更はすべて不変条件チェック（モデル重み不変性、ロールバック可能性）を通過する必要があります。
               </div>
             </div>
           </div>
@@ -1263,7 +1263,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                           {prop.generationMethod === 'llm_local' && <Brain className="w-2.5 h-2.5 text-purple-400" />}
                           {prop.generationMethod === 'teacher_assisted_template' && <GraduationCap className="w-2.5 h-2.5 text-amber-400" />}
                           {prop.generationMethod === 'llm_local'
-                            ? '本体ローカルLLM'
+                            ? '本体旧ローカル生成ランタイム'
                             : prop.generationMethod === 'teacher_assisted_template'
                             ? '教師支援テンプレート'
                             : '雛形スタブ'}
@@ -1436,7 +1436,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                 不変条件エンジン (Invariants Engine - 第30章)
               </div>
               <div className="text-slate-300 leading-relaxed">
-                自己改善において「評価器ハック」「ベンチマーク改ざん」「Qwen 3Bモデルの勝手な削除」「プライバシー越境」を絶対的に遮断する不可逆ガードレールです。
+                自己改善において「評価器ハック」「ベンチマーク改ざん」「旧生成モデルモデルの勝手な削除」「プライバシー越境」を絶対的に遮断する不可逆ガードレールです。
                 改善プロポーザルが以下の条件を1つでも満たさない場合、シミュレーションおよび反映は100%自動拒絶されます。
               </div>
             </div>

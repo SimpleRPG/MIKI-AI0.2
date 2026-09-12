@@ -38,6 +38,7 @@ export class ClaimDatabaseService {
 
   private constructor() {
     this.loadFromStorage();
+    this.migrateLegacySeedVerification();
     if (this.claims.size === 0) {
       this.initSeedClaims();
     }
@@ -60,14 +61,14 @@ export class ClaimDatabaseService {
         statement: '特定条件で長い入力時にDevice Lostが発生する',
         world: 'REAL',
         kind: 'OBSERVATION',
-        status: 'DEVICE_VERIFIED',
+        status: 'UNVERIFIED',
         scope: { device: 'Galaxy S25', environment: 'Termux', backend: 'Vulkan' },
         source: 'user_observation',
         origin_source_id: 'src_log_vulkan_crash',
         independence_cluster_id: 'cluster_local_device',
         maturity: 'REPRODUCED',
-        self_provenance: 'EXECUTION_CONFIRMED',
-        open_world_status: 'FOUND_SUPPORTED',
+        self_provenance: 'NONE',
+        open_world_status: 'SEARCH_INCOMPLETE',
         created_at: Date.now() - 3600000 * 24,
         updated_at: Date.now() - 3600000 * 24,
       },
@@ -76,14 +77,14 @@ export class ClaimDatabaseService {
         statement: 'VBAでセルを1つずつループ処理すると実行速度が著しく低下する',
         world: 'REAL',
         kind: 'FACT_CLAIM',
-        status: 'DEVICE_VERIFIED',
+        status: 'UNVERIFIED',
         scope: { environment: 'Excel', runtime: 'VBA' },
         source: 'technical_benchmark',
         origin_source_id: 'ms_docs_vba_performance',
         independence_cluster_id: 'cluster_ms_official',
         maturity: 'MATURE',
-        self_provenance: 'INDEPENDENTLY_SUPPORTED',
-        open_world_status: 'FOUND_SUPPORTED',
+        self_provenance: 'NONE',
+        open_world_status: 'SEARCH_INCOMPLETE',
         created_at: Date.now() - 3600000 * 48,
         updated_at: Date.now() - 3600000 * 48,
       },
@@ -92,14 +93,14 @@ export class ClaimDatabaseService {
         statement: '配列に一括代入してメモリ上で処理すると10倍以上高速化する',
         world: 'REAL',
         kind: 'FACT_CLAIM',
-        status: 'DEVICE_VERIFIED',
+        status: 'UNVERIFIED',
         scope: { environment: 'Excel', runtime: 'VBA' },
         source: 'technical_benchmark',
         origin_source_id: 'ms_docs_vba_performance',
         independence_cluster_id: 'cluster_ms_official',
         maturity: 'MATURE',
-        self_provenance: 'INDEPENDENTLY_SUPPORTED',
-        open_world_status: 'FOUND_SUPPORTED',
+        self_provenance: 'NONE',
+        open_world_status: 'SEARCH_INCOMPLETE',
         created_at: Date.now() - 3600000 * 48,
         updated_at: Date.now() - 3600000 * 48,
       },
@@ -502,6 +503,36 @@ export class ClaimDatabaseService {
     };
   }
 
+  /**
+   * 検証状態の変更はVerifierService等の明示的な検証経路からのみ行う。
+   * AI自己生成だけではSUPPORTED/DEVICE_VERIFIEDへ昇格できない。
+   */
+  public setVerificationStatus(
+    claimId: string,
+    status: ClaimVerificationStatus,
+    reason: string
+  ): boolean {
+    const claim = this.claims.get(claimId);
+    if (!claim) return false;
+
+    if ((status === 'SUPPORTED' || status === 'DEVICE_VERIFIED') && claim.self_provenance === 'SELF_SUPPORTED') {
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `⚠️ [6.7 自己証明禁止] ${claimId} は自己生成由来のため ${status} に昇格できません。`
+      );
+      return false;
+    }
+
+    claim.status = status;
+    claim.updated_at = Date.now();
+    this.saveToStorage();
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🔐 [検証状態変更] ${claimId}: ${status} (理由: ${reason})`
+    );
+    return true;
+  }
+
   public getClaim(claim_id: string): ClaimRecord | undefined {
     return this.claims.get(claim_id);
   }
@@ -577,6 +608,31 @@ export class ClaimDatabaseService {
     } catch {
       // Fallback
     }
+  }
+
+  /**
+   * 旧版のサンプル主張に残る自己検証済み状態を既存インストールでも無効化。
+   * 実ユーザーの主張を巻き込まないよう、既知のIDかつ旧seed由来の特徴だけを対象にする。
+   */
+  private migrateLegacySeedVerification(): void {
+    const markers: Record<string, string> = {
+      'CLM-000001': 'src_log_vulkan_crash',
+      'CLM-000002': 'ms_docs_vba_performance',
+      'CLM-000003': 'ms_docs_vba_performance',
+    };
+    let changed = false;
+    for (const [id, origin] of Object.entries(markers)) {
+      const claim = this.claims.get(id);
+      if (!claim || claim.origin_source_id !== origin) continue;
+      const wasSeedVerified = claim.status === 'DEVICE_VERIFIED' || claim.self_provenance === 'SELF_GENERATED';
+      if (!wasSeedVerified) continue;
+      claim.status = 'UNVERIFIED';
+      claim.self_provenance = 'NONE';
+      claim.open_world_status = 'SEARCH_INCOMPLETE';
+      claim.updated_at = Date.now();
+      changed = true;
+    }
+    if (changed) this.saveToStorage();
   }
 
   private saveToStorage(): void {

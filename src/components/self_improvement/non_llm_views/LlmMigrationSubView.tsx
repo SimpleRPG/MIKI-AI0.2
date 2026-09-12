@@ -27,6 +27,11 @@ export const LlmMigrationSubView: React.FC = () => {
     tasks[0] || null
   );
   const [testInput, setTestInput] = useState('重複行を消すマクロ作って');
+  const [llmOutput, setLlmOutput] = useState('');
+  const [nonLlmOutput, setNonLlmOutput] = useState('');
+  const [llmLatency, setLlmLatency] = useState('');
+  const [nonLlmLatency, setNonLlmLatency] = useState('');
+  const [semanticMatch, setSemanticMatch] = useState('');
   const [lastShadowRecord, setLastShadowRecord] = useState<ShadowComparisonRecord | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
 
@@ -43,7 +48,15 @@ export const LlmMigrationSubView: React.FC = () => {
     if (!selectedTask || !testInput.trim()) return;
     setIsExecuting(true);
     setTimeout(() => {
-      const record = llmMigrationProtocolService.runShadowComparison(selectedTask.taskId, testInput);
+      const record = llmMigrationProtocolService.runShadowComparison({
+        taskId: selectedTask.taskId,
+        sampleInput: testInput,
+        llmOutput,
+        nonLlmOutput,
+        latencyLlmMs: Number(llmLatency),
+        latencyNonLlmMs: Number(nonLlmLatency),
+        semanticMatchScore: Number(semanticMatch),
+      });
       setLastShadowRecord(record);
       refreshTasks();
       setIsExecuting(false);
@@ -96,6 +109,17 @@ export const LlmMigrationSubView: React.FC = () => {
           反復して定型入出力を扱う処理 (意図ラベル付け、検索語展開、JSON整形、定型説明、構文チェック、VBA合成等) を
           非LLM決定論的部品へ移管。シャドー実行により「レイテンシ99%削減」「Vulkan Device Lostゼロ」「決定論的完全再現性」を自動検証します。
         </p>
+      </div>
+
+      <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/70 space-y-2">
+        <div className="text-xs font-semibold text-amber-300">実測値入力（疑似LLM値は使用しません）</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <textarea value={llmOutput} onChange={e => setLlmOutput(e.target.value)} placeholder="実際のLLM出力" className="p-2 text-xs rounded bg-slate-950 border border-slate-800 min-h-16" />
+          <textarea value={nonLlmOutput} onChange={e => setNonLlmOutput(e.target.value)} placeholder="同一入力に対する非LLM出力" className="p-2 text-xs rounded bg-slate-950 border border-slate-800 min-h-16" />
+          <input value={llmLatency} onChange={e => setLlmLatency(e.target.value)} placeholder="LLM実測ms" inputMode="decimal" className="p-2 text-xs rounded bg-slate-950 border border-slate-800" />
+          <input value={nonLlmLatency} onChange={e => setNonLlmLatency(e.target.value)} placeholder="非LLM実測ms" inputMode="decimal" className="p-2 text-xs rounded bg-slate-950 border border-slate-800" />
+          <input value={semanticMatch} onChange={e => setSemanticMatch(e.target.value)} placeholder="意味一致率 0-100" inputMode="decimal" className="p-2 text-xs rounded bg-slate-950 border border-slate-800" />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -251,7 +275,7 @@ export const LlmMigrationSubView: React.FC = () => {
                       {/* LLM Column */}
                       <div className="p-2 bg-purple-950/30 rounded border border-purple-800/40 space-y-1">
                         <div className="flex items-center justify-between text-[10px] text-purple-300 font-bold">
-                          <span>ローカルLLM (3B Vulkan)</span>
+                          <span>旧ローカル生成ランタイム (3B Vulkan)</span>
                           <span className="font-mono">{lastShadowRecord.latencyLlmMs} ms</span>
                         </div>
                         <p className="text-[10px] text-slate-300 font-mono break-all">{lastShadowRecord.llmOutput}</p>

@@ -382,7 +382,7 @@ class DialogueEvaluationService {
    */
   public async runSingleFixedScenario(
     testCase: FixedScenarioTestCase,
-    engineMode = 'webgpu'
+    engineMode = 'autonomous_rule'
   ): Promise<FixedScenarioResult> {
     const t0 = performance.now();
     let responseText = '';
@@ -440,7 +440,7 @@ class DialogueEvaluationService {
    * 全12シナリオの一括実行
    */
   public async runAllFixedScenarios(
-    engineMode = 'webgpu',
+    engineMode = 'autonomous_rule',
     onProgress?: (index: number, total: number, currentTitle: string) => void
   ): Promise<FixedScenarioResult[]> {
     const results: FixedScenarioResult[] = [];
@@ -458,7 +458,7 @@ class DialogueEvaluationService {
    * 教師AI/シミュレータがユーザー役となり、端末AIの回答に応じて次々と発言を変える
    */
   public async runDynamicDialogueEvaluation(
-    engineMode = 'webgpu',
+    engineMode = 'autonomous_rule',
     onTurnComplete?: (turn: DynamicDialogueTurn) => void
   ): Promise<DynamicDialogueEvaluationResult> {
     const id = `dyn_eval_${Date.now()}`;

@@ -13,6 +13,7 @@
 
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
+import { evidenceService } from './evidenceService';
 
 export interface CapabilityBoundaryItem {
   id: string;
@@ -34,6 +35,8 @@ export interface SyntheticCurriculumUnit {
   evaluationCriteria: string;
   simulatedScore?: number;
   passed?: boolean;
+  verificationStatus?: 'UNVERIFIED' | 'SELF_SIMULATED' | 'EXTERNALLY_VERIFIED';
+  verifiedEvidenceId?: string;
 }
 
 export interface CompressedSkillArtifact {
@@ -196,21 +199,16 @@ export class AutonomousCurriculumService {
     const simulatedScore = 0.92;
     unit.simulatedScore = simulatedScore;
     unit.passed = true;
+    unit.verificationStatus = 'SELF_SIMULATED';
 
-    // 紐づく境界の確信度を上昇
-    const boundary = this.boundaries.find((b) => b.id === unit.boundaryId);
-    if (boundary) {
-      boundary.confidenceScore = Math.min(0.98, boundary.confidenceScore + 0.18);
-      if (boundary.confidenceScore >= 0.85) {
-        boundary.status = 'GRADUATED';
-      }
-    }
+    // 自己シミュレーションは「訓練通過」であって、正式な能力獲得証明ではない。
+    // 独立した実行証拠がない限り境界をGRADUATEDへ進めない。
 
     // 第34章: 獲得ノウハウを高密度マイクロルールへロスレス圧縮
     this.compressKnowledge(unit.topic, [
       `要件: ${unit.expectedKeyPoints.join(' / ')}`,
       `基準: ${unit.evaluationCriteria}`,
-      `自己採点スコア: ${Math.round(simulatedScore * 100)}点クリア`,
+      `自己シミュレーションスコア: ${Math.round(simulatedScore * 100)}点（正式検証ではない）`,
     ]);
 
     this.saveData();
@@ -218,8 +216,35 @@ export class AutonomousCurriculumService {
     return {
       success: true,
       score: simulatedScore,
-      feedback: `カリキュラム「${unit.topic}」の自律訓練を完了！自己採点 ${Math.round(simulatedScore * 100)}点で合格し、第34章高密度技能としてロスレス圧縮・定着しました。`,
+      feedback: `カリキュラム「${unit.topic}」の自己シミュレーションを完了しました（${Math.round(simulatedScore * 100)}点）。これは訓練結果であり、正式な能力検証・卒業ではありません。`,
     };
+  }
+
+  /**
+   * 独立実行証拠による能力境界の正式検証。
+   * 自己シミュレーション結果だけでは呼び出せない。
+   */
+  public recordExternalVerification(boundaryId: string, curriculumId: string, evidenceId: string, score: number): boolean {
+    if (!boundaryId || !curriculumId || !evidenceId || !evidenceId.trim()) return false;
+    const unit = this.curriculums.find(c => c.id === curriculumId && c.boundaryId === boundaryId);
+    const boundary = this.boundaries.find(b => b.id === boundaryId);
+    if (!unit || !boundary) return false;
+    const normalized = Math.max(0, Math.min(1, score));
+    if (normalized < 0.85) return false;
+    // Evidence IDの文字列だけでは正式検証にできない。実際のEvidence DBに存在し、
+    // 実行結果としてPASS/ADMISSIBLEであることを再確認する。
+    const evidence = evidenceService.getEvidence(evidenceId);
+    if (!evidence || evidence.status !== 'ADMISSIBLE') return false;
+    if (evidence.kind !== 'EXECUTION' || evidence.metadata?.assertion_status !== 'PASS' || evidence.metadata?.passed !== true) return false;
+    unit.verificationStatus = 'EXTERNALLY_VERIFIED';
+    unit.verifiedEvidenceId = evidenceId;
+    unit.passed = true;
+    unit.simulatedScore = normalized;
+    boundary.confidenceScore = Math.min(0.99, Math.max(boundary.confidenceScore, normalized));
+    if (boundary.confidenceScore >= 0.85) boundary.status = 'GRADUATED';
+    this.saveData();
+    systemLogger.info('SELF_IMPROVEMENT', `🎓 [能力境界検証] ${boundaryId} を独立証拠 ${evidenceId} により正式卒業へ更新`);
+    return true;
   }
 
   /**

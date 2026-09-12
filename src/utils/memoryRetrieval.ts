@@ -1,6 +1,7 @@
 import type { MemoryItem } from '../types';
 import { storageService } from '../services/storageService';
 import { experienceRouterService } from '../services/experienceRouterService';
+import { japaneseAnalysisService } from '../services/japaneseAnalysisService';
 
 /**
  * 多層ベクトル検索 & 知識グラフ依存関係検索エンジン
@@ -119,18 +120,22 @@ export function extractQueryTokens(text: string): Set<string> {
   const tokens = new Set<string>();
   if (!text) return tokens;
 
-  // 記号・空白で分割した単語トークン
+  // 日本語解析基盤をTier 1へ接続。Intl.Segmenter→決定論的fallbackの結果を使う。
+  const analysis = japaneseAnalysisService.analyze(text);
+  analysis.contentTokens.forEach((w) => {
+    if (w.length >= 1 && !STOPWORDS.has(w)) tokens.add(w);
+  });
+
+  // Latin系の従来分割も併用して互換性を維持する。
   const words = text
     .toLowerCase()
     .split(/[\s、。,.!?！？「」『』()（）\[\]【】\/\\・:：;；~〜\-]+/)
     .filter((w) => w.length >= 2 && !STOPWORDS.has(w));
   words.forEach((w) => tokens.add(w));
 
-  // 日本語文字バイグラム（2文字ずつのスライディング）
-  const cleaned = text.replace(/[\s、。,.!?！？「」『』()（）\[\]【】\/\\・:：;；~〜\-]+/g, '');
-  for (let i = 0; i < cleaned.length - 1; i++) {
-    const bigram = cleaned.slice(i, i + 2).toLowerCase();
-    if (!STOPWORDS.has(bigram)) tokens.add(bigram);
+  // 日本語文字バイグラム（形態素境界を越える照合も補完）
+  for (const bigram of analysis.bigrams) {
+    if (!STOPWORDS.has(bigram)) tokens.add(bigram.toLowerCase());
   }
 
   return tokens;
@@ -144,7 +149,7 @@ export interface MemoryRetrievalOptions {
   onlyApprovedForFacts?: boolean; // profileやpreference等の事実性カテゴリは承認済みのみに制限 (設計思想 25)
   traverseGraph?: boolean;       // 知識グラフ依存関係トラバーサルを有効化 (デフォルト: true)
   maxGraphHops?: number;         // 最大探索ホップ数 (デフォルト: 2)
-  queryEmbedding?: number[];     // llama-server / Ollama 実埋め込みベクトル (768〜4096次元)
+  queryEmbedding?: number[];     // 決定論的特徴ベクトル (768〜4096次元)
 }
 
 export interface ScoredMemory {
@@ -230,7 +235,7 @@ export function retrieveScoredMemories(
     // Tier 2: Semantic Domain Vector Cosine Similarity (実LLM埋め込みがあれば優先適用)
     let semanticSim = 0;
     if (memory.embeddingVector && memory.embeddingVector.length > 0 && options.queryEmbedding && options.queryEmbedding.length === memory.embeddingVector.length) {
-      // llama-server / Ollama 実埋め込みベクトル (768〜4096次元)
+      // 決定論的特徴ベクトル (768〜4096次元)
       semanticSim = calculateCosineSimilarity(options.queryEmbedding, memory.embeddingVector);
       if (semanticSim > 0.3) {
         matchReasons.push(`実埋め込み類似度: ${(semanticSim * 100).toFixed(0)}%`);

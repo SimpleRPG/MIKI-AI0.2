@@ -144,7 +144,7 @@ export interface SelfImplementationResult {
   syntaxError?: string | null;
   reasoning: string;
   code: string;
-  generationMethod?: 'llm_local' | 'llm_gemini' | 'teacher_assisted_template' | 'fallback_template' | 'override' | 'llm' | 'virtual_sandbox';
+  generationMethod?: 'llm_gemini' | 'teacher_assisted_template' | 'fallback_template' | 'override' | 'llm' | 'virtual_sandbox';
   isRequirementImplemented?: boolean;
   teacherAssisted?: {
     templateAcquired: boolean;

@@ -116,7 +116,7 @@ export class WhyAnswerInspectorService {
           }))
         : [],
       selectedAnswerPlan: answerPlanType || 'PLAN_DIRECT_ANSWER (直接結論型)',
-      toolsOrSearchUsed: usedTools.length > 0 ? usedTools : ['内部LLMネイティブ推論 (外部検索なし)'],
+      toolsOrSearchUsed: usedTools.length > 0 ? usedTools : ['内部Non-LLM決定論的処理 (外部検索なし)'],
       unconfirmedAssumptions: unconfirmedAssumptions.length > 0 ? unconfirmedAssumptions : ['重大な未確認前提なし'],
       lengthReason,
       explanationDepth: explanationLevel || 'INTERMEDIATE_STANDARD',

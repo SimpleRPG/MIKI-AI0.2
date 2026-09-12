@@ -75,7 +75,7 @@ export class CognitiveDebuggerService {
         recalledMemoryLayers: ['第2層: 短期記憶', '第4層: エピソード記憶', '第6層: 手続き記憶 (Dictionary重複除外)'],
         firedHeuristicRules: ['[Rule-12] VBAではRange個別アクセスを避け配列一括転送を使用', '[Rule-08] 変数宣言強制(Option Explicit)付与'],
         appliedSkeletonType: 'CODE_EXPLANATION_DUAL_STAGE',
-        guardrailsChecked: ['Qwen 3B重み不変条件', '個人情報漏洩ゼロ検証', 'ゼロ省略デリバリー検証'],
+        guardrailsChecked: ['モデル生成系ランタイム重み不変条件', '個人情報漏洩ゼロ検証', 'ゼロ省略デリバリー検証'],
         totalLatencyMs: 340,
         traceSteps: [
           { stepName: '1. 意図解析 & 状況認識', durationMs: 15, status: 'SUCCESS', details: 'VBAマクロ作成意図・データ重複処理を特定' },
@@ -113,7 +113,7 @@ export class CognitiveDebuggerService {
       recalledMemoryLayers: recalledLayers,
       firedHeuristicRules: rules,
       appliedSkeletonType: skeleton,
-      guardrailsChecked: ['Qwen 3B保護', 'プライバシー送信境界', '不変条件オールクリア'],
+      guardrailsChecked: ['モデル生成系ランタイム保護', 'プライバシー送信境界', '不変条件オールクリア'],
       totalLatencyMs,
       traceSteps: steps,
       diagnosticInsight: insight || '推論経路の健全性を確認。不変条件および品質ゲートに適合しています。',

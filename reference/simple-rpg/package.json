@@ -1,0 +1,19 @@
+{
+  "name": "simple-rpg-market-server",
+  "version": "1.0.0",
+  "description": "Simple RPG online market server using Socket.IO",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "echo 'Build complete'",
+    "lint": "node --check server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.0",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -34,7 +34,7 @@ const DOMAIN_TECHNICAL_KEYWORDS: Record<ProficiencyDomain, string[]> = {
     '非同期', 'トランザクション', '正規表現', 'デッドロック', 'リグレッション',
   ],
   ai_terminology: [
-    'lora', 'qwen', 'llama-swap', 'gguf', '量子化', 'コンテキスト長', '埋め込み', 'コサイン類似度',
+    'lora', 'qwen', '旧ローカル生成ランタイム', 'gguf', '量子化', 'コンテキスト長', '埋め込み', 'コサイン類似度',
     'パープレキシティ', 'トークン', 'ファインチューニング', '推論時間', 'ハルシネーション',
   ],
   general: [],

@@ -5,7 +5,7 @@
  * 主要要件:
  * 1. 日本語コロケーション・共起頻度評価エンジン
  * 2. VBA/TypeScript AST安全リファクタリング推薦器
- * 3. 不変条件保証: Qwen 3B保護・構文破壊ゼロ
+ * 3. 不変条件保証: モデル生成系ランタイム保護・構文破壊ゼロ
  */
 
 export interface CollocationMatch {

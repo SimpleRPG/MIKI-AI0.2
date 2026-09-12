@@ -1,4 +1,4 @@
-export type EngineMode = 'native_gpu' | 'webgpu' | 'external_gpu' | 'autonomous_rule' | 'gemini_cloud';
+export type EngineMode = 'autonomous_rule' | 'gemini_cloud';
 
 export interface PersonaConfig {
   id: string;
@@ -109,7 +109,7 @@ export interface MemoryItem {
   prerequisiteMemoryIds?: string[]; // 前提条件となる記憶ID (依存先)
   domainVector?: number[];       // 多次元トピック重み疎ベクトル
   semanticKeywords?: string[];   // 抽出された意味的キーワード
-  // 設計思想 8章 & 57章 / 指示書 SECTION 7 提案A: llama-server実埋め込みベクトル
+  // 設計思想 8章 & 57章 / 指示書 SECTION 7 提案A: 決定論的特徴ベクトル
   embeddingVector?: number[];    // LLM実埋め込みベクトル (768/1024/1536/4096次元等)
   embeddingModelId?: string;     // 算出に使用したモデルID (モデル切り替え時の無効化・再計算検知用)
   embeddingDimensions?: number;  // ベクトル次元数
@@ -214,7 +214,7 @@ export interface ContextBudgetPlan {
   episodicBufferQuota: number;
   memoryRecallQuota: number;
   historyQuota: number;
-  codeQuota?: number; // Qwenカタログ等のコンテキスト予算に基づくコード改善用トークン枠
+  codeQuota?: number; // コード改善用の決定論的処理予算
   headroomTokens: number;
   thermalReductionRatio: number;
   batteryReducedDepth: number; // リンク展開深さ (1〜3)
@@ -474,7 +474,7 @@ export interface CodeProposal {
 }
 
 /**
- * Native llama.cpp 実行パラメータ設定 (設計思想 3. 実設定反映)
+ * 旧ローカル生成ランタイム設定（退役） (設計思想 3. 実設定反映)
  */
 export interface NativeLlamaConfig {
   nGpuLayers: number;       // 0〜99 (0=純CPU, 99=全層GPUオフロード)
@@ -526,7 +526,7 @@ export interface ToolDefinition {
   isAvailable: boolean;
   executionCount?: number;
   lastExecutedAt?: number;
-  // 第171章: Qwen 3B 自律動的ツール拡張
+  // 第171章: 自律動的ツール拡張
   isDynamic?: boolean;
   dynamicCode?: string;
   dynamicSandboxLevel?: 'LEVEL_0_ISOLATED_READ_ONLY' | 'LEVEL_1_LOCAL_SCRATCHPAD' | 'LEVEL_2_OUTBOUND_CONFIRMED' | 'LEVEL_3_FULL_INTEGRATION';
@@ -753,7 +753,7 @@ export interface ChatMessage {
   // 設計思想 Master v5.0 第11章 & 第16章: 送信ガードレール & VBA静的検証
   privacyAudit?: PrivacyAuditResult;
   vbaStaticVerification?: VbaStaticVerificationResult;
-  // 外部ローカルLLM (llama.cpp / llama-swap) TTFT実測・プロンプトキャッシュ・ステージ別遅延診断
+  // 旧ローカル生成ランタイムのTTFT診断（退役）
   externalLlmDiagnostic?: ExternalLlmRunDiagnostic;
   // 非LLM中心・自己成長アーキテクチャ追跡 (第3章 ルートB / 第5.2章 回答IR / 第6章 主張DB / 第8章 判断 / 第9章 部品合成 / 第13.4節 意味保持 / 第37〜39章)
   nonLlmPipelineMeta?: NonLlmPipelineMeta;
@@ -830,15 +830,15 @@ export interface ExternalLlmRunDiagnostic {
   stageTimings: {
     stageA_preFetchMs: number; // MIKI-AI 内部処理 (プロンプト生成・想起・状態管理)
     stageB_httpConnectMs: number; // fetch開始から response.ok (HTTP 200) 受信まで
-    stageC_D_ttftMs: number; // fetch開始から初回チャンク受信まで (llama-swapモデルロード + llama.cpp prefill/TTFT)
-    stageD_prefillOnlyMs: number; // HTTP 200受信から初回チャンクまで (純粋なllama.cppプロンプト評価時間)
+    stageC_D_ttftMs: number; // fetch開始から初回チャンク受信まで (旧ランタイムモデルロード + prefill/TTFT（退役）)
+    stageD_prefillOnlyMs: number; // HTTP 200受信から初回チャンクまで (旧ランタイムプロンプト評価時間)
     stageE_streamMs: number; // 初回チャンク受信からストリーム完了まで
     totalElapsedMs: number;
   };
   observedTtftMs: number;
   tokensGenerated: number;
   tokensPerSec: number;
-  llamaTimings?: LlamaCppTimings; // llama.cpp / llama-swap のレスポンスに含まれる実測 timings (cache_n / prompt_n 等)
+  llamaTimings?: LlamaCppTimings; // 旧ランタイムのレスポンスに含まれる実測 timings (cache_n / prompt_n 等)
   comparisonWithPrevious?: {
     prevRunId: string;
     prevQueryNumber: number;
@@ -994,7 +994,7 @@ export interface GitHubRepoData {
   branch: string;
 }
 
-export interface LocalLLMModel {
+export interface RuntimeCapabilityModel {
   id: string;
   name: string;
   expertRole: 'code' | 'shader' | 'logic' | 'moe_chat' | 'general';
@@ -1226,7 +1226,7 @@ export interface SyntheticProblem {
   category: SyntheticProblemCategory;
   instruction: string;
   inputContext?: string;
-  expectedOutput: string; // 通常プログラムで確定的に作成された模範正解 (Qwenには作らせない)
+  expectedOutput: string; // 通常プログラムで確定的に作成された模範正解
   sampleCategory: 'chat' | 'code' | 'vba' | 'retrieval' | 'correction' | 'tool_use';
   status: SyntheticProblemStatus;
   generatorType: 'deterministic_program' | 'approved_reference';
@@ -1471,7 +1471,7 @@ export interface RegressionSuiteRunReport {
   id: string;
   timestamp: number;
   modelName: string;
-  modelId?: string;               // 実際にテストされた推論モデルの識別子 (GGUFファイル名またはWebLLMモデルID)
+  modelId?: string;               // 実際にテストされた実行器の識別子
   engineType?: 'native_gguf' | 'webllm' | 'none'; // 実行エンジン種別
   totalTests: number;
   passedTests: number;
@@ -2849,7 +2849,7 @@ export interface FailureCatalogStats {
  * 設計思想 第29章, 第30章, 第53章, 第123-128章:
  * 設計思想仕様書メタデータ & 自己コード改善 (Self-Code Architect) 型定義
  */
-export type ChapterImplementationStatus = 'COMPLETED' | 'IN_PROGRESS' | 'TEACHER_ASSISTED_PENDING' | 'UNIMPLEMENTED';
+export type ChapterImplementationStatus = 'COMPLETED' | 'IN_PROGRESS' | 'TEACHER_ASSISTED_PENDING' | 'UNIMPLEMENTED' | 'RETIRED';
 
 export type ChapterCategory =
   | 'CORE_FOUNDATION'       // 第0章〜第13章: 中核基盤・記憶・コンテキスト
@@ -3429,6 +3429,8 @@ export interface CompiledRequestType {
   targetEntity?: string;
   category?: string;
   domain?: string;
+  /** 実行先環境。要求コンパイル時に確定し、Graph/Task/Runnerへ引き継ぐ。 */
+  environment?: 'ANDROID' | 'EXCEL_WINDOWS' | 'EXCEL_MAC' | 'EXTERNAL_RUNNER';
   expectedDeliverable?: string;
   certaintyRequirement?: string;
   resolvedAnaphora?: any[];
@@ -3486,6 +3488,10 @@ export interface ShadowComparisonRecord {
   latencyLlmMs: number;
   latencyNonLlmMs: number;
   semanticMatchScore: number;
+  /** 任意。人間評価または固定評価器による実測自然さ。未計測なら未指定。 */
+  naturalnessScore?: number;
+  /** 任意。比較実行時に観測したユーザー訂正の有無。 */
+  userCorrection?: boolean;
   isDeterministic: boolean;
   winner: 'LLM' | 'NON_LLM' | 'TIE';
   notes: string;

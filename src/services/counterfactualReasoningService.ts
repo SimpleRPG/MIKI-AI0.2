@@ -8,7 +8,7 @@
  * 2. 分岐推論シミュレーション (Branch Reasoning Simulation):
  *    並行世界・代替パスのシミュレーションを実行し、安全性・品質・リソース消費の差分を定量算出。
  * 3. 不変条件の保護 (Invariant Protection):
- *    Qwen 3B絶対保護、送信前プライバシー境界、変更契約とロールバック性を全パスで厳格保証。
+ *    モデル重み不変性、送信前プライバシー境界、変更契約とロールバック性を全パスで厳格保証。
  */
 
 import {
@@ -61,7 +61,7 @@ export class CounterfactualReasoningService {
     scenario: CounterfactualScenario,
     contextSummary: string = ''
   ): CounterfactualEvaluationResult {
-    // 1. 不変条件チェック（Qwen 3B除外やプライバシー侵害を試みるシナリオは即座に拒絶）
+    // 1. 不変条件チェック（モデル生成系ランタイム除外やプライバシー侵害を試みるシナリオは即座に拒絶）
     const forbidsAnchorRemoval = !scenario.alternativeChoice.includes('qwen') || !scenario.alternativeChoice.includes('delete');
     const privacyAudit = privacyGuardrailService.auditOutboundContent(
       `${scenario.alternativeChoice} ${scenario.hypothesis}`,
@@ -158,7 +158,7 @@ export class CounterfactualReasoningService {
             id: 'cf_opt_minimal_fallback',
             name: '極小スコープ安全退行',
             condition: 'もし高負荷・エラー時に最小スコープへ直ちにフォールバックしていたら',
-            alternativeChoice: '依存ライブラリを切り離し、オンデバイスQwen 3Bのみで応答',
+            alternativeChoice: '依存ライブラリを切り離し、オンデバイスモデル生成系ランタイムのみで応答',
             hypothesis: 'API利用制限を完全回避し、ネットワーク切断時でも100%の可用性を維持する。',
           },
         ];

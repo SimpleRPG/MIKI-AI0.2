@@ -313,7 +313,7 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
                   <span>全5大不変条件ガード稼働中</span>
                 </div>
                 <div className="text-[10px] text-slate-400 truncate">
-                  Qwen 3B保護 / プライバシー漏洩ゼロ / 物理ロールバック
+                  モデル重み不変性 / プライバシー漏洩ゼロ / 物理ロールバック
                 </div>
               </div>
             </div>

@@ -1,0 +1,11 @@
+{
+  "version": "v55",
+  "runtimePolicy": "NON_LLM_ONLY",
+  "localGenerativeRuntime": false,
+  "modelGenerationLifecycle": "RETIRED",
+  "modelTrainingLifecycle": "RETIRED",
+  "primaryExecution": "deterministic_non_llm_core",
+  "externalTeacher": "gemini_cloud_only",
+  "forbiddenReintroduction": ["local model loading", "GGUF runtime", "WebLLM", "llama.cpp", "Ollama local inference", "LoRA weight updates", "model-generation promotion"],
+  "replacementDirection": ["structured request compilation", "deterministic state and memory", "formal constraints", "verified component composition", "deterministic answer IR", "external teacher evidence ingestion"]
+}

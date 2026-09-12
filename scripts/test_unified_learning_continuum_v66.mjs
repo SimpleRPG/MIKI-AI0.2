@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const root = process.cwd();
+const svc = fs.readFileSync(`${root}/src/services/mikiUnifiedLearningContinuumService.ts`, 'utf8');
+const core = fs.readFileSync(`${root}/src/services/nonLlmCoreService.ts`, 'utf8');
+const task = fs.readFileSync(`${root}/src/services/taskExecutionOrchestratorService.ts`, 'utf8');
+assert.match(svc, /Miki Unified Learning Continuum/);
+assert.match(svc, /episodic_buffer/);
+assert.match(svc, /procedural/);
+assert.match(svc, /meta_memory/);
+assert.match(svc, /rankCapabilities/);
+assert.match(core, /rankCapabilities\(/);
+assert.match(task, /observeExecution\(/);
+assert.match(task, /domain: 'execution'/);
+assert.doesNotMatch(svc, /\beval\s*\(|new\s+Function\s*\(|Math\.random\s*\(/);
+console.log('PASS: unified learning continuum v66');

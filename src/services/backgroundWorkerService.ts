@@ -10,14 +10,14 @@ import {
 } from '../types';
 import { worldModelService } from './worldModelService';
 import { selfImprovementService } from './selfImprovementService';
+import { selfImprovementControllerService } from './selfImprovementControllerService';
 import { systemLogger } from './systemLogger';
 import { calculateDomainVector, calculateCosineSimilarity } from '../utils/memoryRetrieval';
 import { nativeBackgroundService } from './nativeBackgroundService';
 import { storageService } from './storageService';
 import { skillsService } from './skillsService';
 import { regressionBenchmarkService } from './regressionBenchmarkService';
-import { nativeLlmService } from './nativeLlmService';
-import { webLLMService } from './webLlmService';
+import { nonLlmRuntimeService } from './nonLlmRuntimeService';
 import { syntheticDataService } from './syntheticDataService';
 import { longTermMemoryService } from './longTermMemoryService';
 import { capabilityGapService } from './capabilityGapService';
@@ -31,6 +31,15 @@ import { autonomousEvolutionService } from './autonomousEvolutionService';
 import { memoryAuditService } from './memoryAuditService';
 import { embeddingService } from './embeddingService';
 import { storagePlanningService } from './storagePlanningService';
+import { autonomousGrowthGovernorService } from './autonomousGrowthGovernorService';
+import { autonomousRevalidationLoopService } from './autonomousRevalidationLoopService';
+import { remediationExecutionCoordinatorService } from './remediationExecutionCoordinatorService';
+import { remediationFailureRecoveryService } from './remediationFailureRecoveryService';
+import { virtualExperienceGeneratorService } from './virtualExperienceGeneratorService';
+import { faultInjectionLabService } from './faultInjectionLabService';
+import { specContractCompilerService } from './specContractCompilerService';
+import { knowledgeHalfLifeService } from './knowledgeHalfLifeService';
+import { frontierGovernanceService } from './frontierGovernanceService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -640,8 +649,8 @@ export class BackgroundWorkerService {
         if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
         try {
           if (!regressionBenchmarkService.isBusy()) {
-            const isNativeReady = nativeLlmService.isNative() && !!nativeLlmService.getActiveModelId();
-            const isWebReady = webLLMService.isLoaded();
+            const isNativeReady = nonLlmRuntimeService.isNative() && !!nonLlmRuntimeService.getActiveModelId();
+            const isWebReady = nonLlmRuntimeService.isLoaded();
             if (isNativeReady || isWebReady) {
               regressionReport = await regressionBenchmarkService.runFullSuite();
               if (regressionReport.regressionsCount > 0 || regressionReport.failedTests > 0) {
@@ -733,12 +742,12 @@ export class BackgroundWorkerService {
               const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
                 { role: 'user', content: thoughtPrompt },
               ];
-              if (nativeLlmService.isNative() && nativeLlmService.getActiveModelId()) {
-                for await (const chunk of nativeLlmService.streamNativeChat(messages, { max_tokens: 256, temperature: 0.5 })) {
+              if (nonLlmRuntimeService.isNative() && nonLlmRuntimeService.getActiveModelId()) {
+                for await (const chunk of nonLlmRuntimeService.streamDeterministicChat(messages, { max_tokens: 256, temperature: 0.5 })) {
                   thoughtResult += chunk;
                 }
-              } else if (webLLMService.isLoaded()) {
-                for await (const chunk of webLLMService.streamChat(messages, { max_tokens: 256, temperature: 0.5 })) {
+              } else if (nonLlmRuntimeService.isLoaded()) {
+                for await (const chunk of nonLlmRuntimeService.streamChat(messages, { max_tokens: 256, temperature: 0.5 })) {
                   thoughtResult += chunk;
                 }
               }
@@ -804,7 +813,7 @@ export class BackgroundWorkerService {
         } catch (auditErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '記憶の間隔反復・鮮度再検証サイクル中に例外が発生しました', auditErr);
         }
-        // Step 6.12: 設計思想 Master v5.5 第21章 保存容量配分 (Galaxy S25 60GB計画) ＆ 第24章 モデル実測データ駆動型退役思考 (Qwen 3B絶対保護)
+        // Step 6.12: 設計思想 Master v5.5 第21章 保存容量配分 (Galaxy S25 60GB計画) ＆ 第24章 モデル実測データ駆動型退役思考 (モデル重み不変性)
         if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
         try {
           systemLogger.info('SELF_IMPROVEMENT', '💾 [第21章/第24章] 容量管理・一時データ自動クリーンアップ ＆ モデル退役思考を実行中...');
@@ -820,6 +829,91 @@ export class BackgroundWorkerService {
         } catch (cleanupErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '容量自動整理・モデル退役思考サイクル中に例外が発生しました', cleanupErr);
         }
+      }
+
+      // Step 6.12.5: 失敗・陳腐化した能力の自動再検証
+      if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+      try {
+        const revalidation = await autonomousRevalidationLoopService.run({ limit: deepSleepExecuted ? 8 : 3, signal: abortSignal });
+        // Step 6.12.6: 失敗したRemediationを再調査へ戻すサービスはEventBus常駐。
+        // dispatchQueuedは既存Runner境界を維持し、ここでは再投入待ちを進める。
+        void remediationFailureRecoveryService;
+        const remediationDispatch = remediationExecutionCoordinatorService.dispatchQueued(deepSleepExecuted ? 8 : 3);
+        const remediationSubmitted = remediationDispatch.reduce((n, r) => n + r.submitted.length, 0);
+        if (remediationSubmitted) systemLogger.info('TOOLS', `[自動Remediation実行投入] ${remediationSubmitted}件をExternal RunnerへSUBMITTED`);
+        if (revalidation.staleCapabilities.length > 0) {
+          weaknessFound.push(`[自動再検証] 陳腐化/低信頼能力${revalidation.staleCapabilities.length}件を再調査 → Web研究${revalidation.researched}件 / 解決${revalidation.resolved}件`);
+        }
+      } catch (revalidationErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '自動再検証サイクルをスキップしました', revalidationErr);
+      }
+
+      // Step 6.12.8: 第145章 仮想経験生成（実環境・実コードへ昇格しない）
+      if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+      try {
+        const virtualCases = virtualExperienceGeneratorService.generateFromContracts(deepSleepExecuted ? 10 : 4);
+        if (virtualCases.length) weaknessFound.push(`[仮想経験] ${virtualCases.length}件を生成。実Regressionへの自動昇格はしません。`);
+      } catch (virtualErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '仮想経験生成をスキップしました', virtualErr);
+      }
+
+      // Step 6.12.9: 第157章 故障注入・回復力実証（仮想失敗のみ）
+      if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+      try {
+        if (deepSleepExecuted) {
+          const candidates = ['general.deterministic.execution','general.decision.analysis'];
+          for (const componentId of candidates) {
+            faultInjectionLabService.run({ componentId, environment: 'deterministic-runtime', fault: 'STALE_KNOWLEDGE' });
+          }
+          weaknessFound.push('[故障注入] 仮想失敗モデルで回復経路を検査');
+        }
+      } catch (faultErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '故障注入ラボをスキップしました', faultErr);
+      }
+
+      // Step 6.12.10: 第159/161章 仕様契約・知識半減期監査
+      if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+      try {
+        const specAudit = specContractCompilerService.audit();
+        if (specAudit.invalidated) {
+          specContractCompilerService.compile();
+          weaknessFound.push(`[仕様契約] 指示書変更を検知し、追跡可能な最小契約を再コンパイル`);
+        }
+        const due = knowledgeHalfLifeService.due(deepSleepExecuted ? 20 : 8);
+        if (due.length) weaknessFound.push(`[知識半減期] ${due.length}件を再検証候補として優先付け`);
+      } catch (specErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '仕様契約・知識半減期監査をスキップしました', specErr);
+      }
+
+      // Step 6.12.11: 第146/147/148/149/150/151/152/153/154/166/169/170 統合ガバナンス監査
+      if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+      try {
+        frontierGovernanceService.verifyTopInvariants();
+        frontierGovernanceService.attentionPlan();
+        // 未知環境は最初から実操作へ進めず、現在の能力境界を再確認する。
+        frontierGovernanceService.listEnvironments();
+        if (deepSleepExecuted) {
+          frontierGovernanceService.auditEvaluator({ subject: 'miki-autonomous-regression', freshness: 0.8, reproducibility: 0.9, representativeness: 0.7 });
+        }
+      } catch (governanceErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '認知多様性・評価ガバナンス・最上位安全監査をスキップしました', governanceErr);
+      }
+
+      // Step 6.13: 自律成長司令塔
+      // 現行ソース/能力/仕様を再監査し、PASSしたものだけを次の成長段階へ送る。
+      let growthGovernorResult: Awaited<ReturnType<typeof autonomousGrowthGovernorService.runCycle>> | null = null;
+      if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+      try {
+        growthGovernorResult = await autonomousGrowthGovernorService.runCycle({
+          allowSelfCodeImprovement: deepSleepExecuted,
+          signal: abortSignal,
+        });
+        weaknessFound.push(...growthGovernorResult.actions.map(a => `[自律成長司令塔] ${a}`));
+        if (growthGovernorResult.blockedActions.length) {
+          weaknessFound.push(...growthGovernorResult.blockedActions.map(a => `[自律成長保留] ${a}`));
+        }
+      } catch (growthErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '自律成長司令塔をスキップしました', growthErr);
       }
 
       // Step 7: 学習教材の蓄積しきい値チェック
@@ -857,6 +951,9 @@ export class BackgroundWorkerService {
           trainingTargetThreshold: thresholdCheck.threshold,
           syntheticGeneratedCount: syntheticCreatedCount,
           weaknessFound,
+          autonomousGrowthCycleId: growthGovernorResult?.cycleId,
+          autonomousGrowthSourceChanged: growthGovernorResult?.sourceChanged,
+          autonomousGrowthGapCount: growthGovernorResult?.gapsObserved,
         },
       };
 
@@ -865,6 +962,19 @@ export class BackgroundWorkerService {
       this.nextScheduledRunTimestamp = Date.now() + this.intervalMinutes * 60 * 1000;
       this.saveState();
 
+      // 安全な自己改善司令塔を1サイクルだけ進める。
+      // ここでは自己コード生成を直接許可せず、Knowledge Gap / Stable Case /
+      // Regression候補など、既存の安全境界を持つ改善経路だけを選択する。
+      try {
+        const improvementRun = await selfImprovementControllerService.runOnce(`background:${triggerSource}`);
+        if (improvementRun.decision.action !== 'IDLE') {
+          weaknessFound.push(`[安全な自己改善] ${improvementRun.decision.action}: ${improvementRun.result || '実行'}`);
+        }
+      } catch (improvementErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '安全な自己改善サイクルをスキップしました', improvementErr);
+      }
+
+      logRecord.details.weaknessFound = weaknessFound;
       systemLogger.info('SELF_IMPROVEMENT', `✓ WorkManager 自律処理完了 (${durationMs}ms)`);
       return logRecord;
     } catch (err: any) {

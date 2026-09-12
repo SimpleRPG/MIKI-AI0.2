@@ -159,8 +159,8 @@ export const INITIAL_SKELETONS: ResponseSkeleton[] = [
       '網羅しすぎて論点をぼかす',
     ],
     reuse_mode: 'SKILL_COMPOSITION',
-    samplePrompt: 'WebLLMとNative llama.cppの長所と短所を比較して',
-    exampleResponseTemplate: '結論として、手軽さならWebLLM、最高速度とRAM効率ならNative llama.cppがおすすめだよ！比較すると...',
+    samplePrompt: '方式Aと方式Bの長所と短所を比較して',
+    exampleResponseTemplate: '結論として、目的に対して検証可能な方式を推奨するよ！比較すると...',
     usageCount: 14,
     successRate: 94,
     createdAt: Date.now() - 600000,
@@ -356,6 +356,48 @@ class AnswerPlanService {
       `🎓 [20章 対策骨格生成] 教師教材から回答骨格 ${saved.pattern_id} を自動保存しました (${saved.situation})`
     );
     return saved;
+  }
+
+  /**
+   * Non-LLM能力パッチを実行時に使える回答骨格へ登録する。
+   * 外部生成物をそのまま採用せず、検証済みパッチだけを受け付ける。
+   */
+  public installDeterministicCapabilityPatch(params: {
+    patternId: string;
+    capabilityId: string;
+    triggerKeywords: string[];
+    rule: string;
+    samplePrompt: string;
+    outputTarget: string;
+    category: string;
+  }): ResponseSkeleton | null {
+    if (!params.patternId || !params.capabilityId || params.triggerKeywords.length === 0) return null;
+    if (this.getSkeletonById(params.patternId)) return this.getSkeletonById(params.patternId) || null;
+
+    const stage: ConversationStage =
+      params.category === 'correction' ? 'CORRECTION' :
+      params.category === 'tool_use' ? 'DECISION' : 'QUESTION';
+
+    return this.addSkeleton({
+      pattern_id: params.patternId,
+      situation: `検証済みNon-LLM能力パッチ: ${params.capabilityId}`,
+      triggerKeywords: params.triggerKeywords.slice(0, 12),
+      stage,
+      response_plan: [
+        `1. 能力 ${params.capabilityId} の決定論的規則を適用する`,
+        ...params.rule.split(/\n+/).filter(Boolean).slice(0, 4).map((line) => `2. ${line}`),
+        '3. 検証済みの結果だけを採用し、不確実な推測を追加しない',
+        '4. 受入条件を満たさない場合は未確定として停止する',
+      ],
+      avoid: [
+        '未検証の推測による補完',
+        '外部生成モデルへのフォールバック',
+        '検証前の能力パッチの再利用',
+      ],
+      reuse_mode: 'SKILL_COMPOSITION',
+      samplePrompt: params.samplePrompt,
+      exampleResponseTemplate: params.outputTarget.slice(0, 240),
+    });
   }
 
   /**

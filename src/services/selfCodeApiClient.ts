@@ -27,8 +27,8 @@ export async function callSelfCodeApi<T>(
     let resolvedUrl = url;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       const configuredBase = apiUrl(url);
-      // llama-server (例: :8080) が誤って miki_api_base_url に指定されている場合、
-      // llama-server は /api/self-code/* を持たないため、同一オリジンの Express (3000) または相対パスを優先
+      // 旧ローカル生成ランタイム (例: :8080) が誤って miki_api_base_url に指定されている場合、
+      // 旧ローカル生成ランタイム は /api/self-code/* を持たないため、同一オリジンの Express (3000) または相対パスを優先
       if (configuredBase.includes(':8080') || configuredBase.includes(':11434')) {
         resolvedUrl = url;
       } else {
