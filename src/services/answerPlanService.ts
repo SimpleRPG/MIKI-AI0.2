@@ -3,6 +3,7 @@ import {
   AnswerPlanApplicationResult,
   ConversationState,
   ConversationStage,
+  WebFetchMethod,
 } from '../types';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
@@ -335,6 +336,7 @@ class AnswerPlanService {
       extractedAt?: number;
       fragment?: string;
       provider?: string;
+      fetchMethod?: WebFetchMethod;
     };
     responsePlanOverride?: string[];
     triggerKeywordsOverride?: string[];
@@ -588,6 +590,7 @@ class AnswerPlanService {
     extractedAt: number;
     originalFragment: string;
     provider?: string;
+    fetchMethod?: WebFetchMethod;
   }): ResponseSkeleton | null {
     // 作業指示書 v21 第2.2節: プロバイダが実データ由来でない場合は候補化せずに破棄
     if (!isRealDataProvider(params.provider)) {
@@ -609,6 +612,7 @@ class AnswerPlanService {
         extractedAt: params.extractedAt,
         fragment: params.originalFragment,
         provider: params.provider,
+        fetchMethod: params.fetchMethod,
       },
       responsePlanOverride: params.responseSteps,
       triggerKeywordsOverride: params.sampleTriggerWords,

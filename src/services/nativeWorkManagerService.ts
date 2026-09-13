@@ -21,6 +21,12 @@ export interface NativeWorkManagerPluginInterface {
     isWorkerExecuting?: boolean;
   }>;
 
+  fetchRenderedPage(options: {
+    url: string;
+    timeoutMs?: number;
+    renderWaitMs?: number;
+  }): Promise<{ success: boolean; text: string; url: string; length?: number }>;
+
   addListener(
     eventName: 'autonomousCycleTriggered',
     listenerFunc: (data: { triggerSource: string; timestamp: number }) => void
@@ -39,6 +45,25 @@ const NativeWorkManagerPlugin = registerPlugin<NativeWorkManagerPluginInterface>
       },
       async getStatus() {
         return { registered: false, state: 'WEB_PLATFORM' };
+      },
+      async fetchRenderedPage(options: { url: string; timeoutMs?: number; renderWaitMs?: number }) {
+        try {
+          const res = await fetch(options.url, { signal: AbortSignal.timeout(options.timeoutMs || 10000) });
+          const html = await res.text();
+          const text = html
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/\s+/g, ' ')
+            .trim();
+          return { success: true, text, url: options.url, length: text.length };
+        } catch (e: any) {
+          return { success: false, text: '', url: options.url, length: 0 };
+        }
       },
       async addListener() {
         return { remove: async () => {} };
@@ -133,6 +158,72 @@ class NativeWorkManagerService {
       );
     } catch (e) {
       console.warn('NativeWorkManagerService: setupTriggerListener failed', e);
+    }
+  }
+
+  /**
+   * 指示1: ヘッドレスWebViewによるページレンダリングとテキスト抽出
+   * - Android Native: MikiWorkManagerPlugin.fetchRenderedPage (onPageFinished + SPA待機 + 順次破棄)
+   * - Web/Node: fetch + テキストパースでフォールバック
+   */
+  public async fetchRenderedPage(
+    url: string,
+    options?: { timeoutMs?: number; renderWaitMs?: number }
+  ): Promise<{ success: boolean; text: string; url: string; length: number; error?: string }> {
+    const timeoutMs = options?.timeoutMs ?? 10000;
+    const renderWaitMs = options?.renderWaitMs ?? 1500;
+
+    if (this.isAndroidNative()) {
+      try {
+        const res = await NativeWorkManagerPlugin.fetchRenderedPage({
+          url,
+          timeoutMs,
+          renderWaitMs,
+        });
+        return {
+          success: res.success,
+          text: res.text || '',
+          url: res.url || url,
+          length: res.text ? res.text.length : 0,
+        };
+      } catch (e: any) {
+        console.warn('NativeWorkManagerService.fetchRenderedPage native error:', e);
+        return {
+          success: false,
+          text: '',
+          url,
+          length: 0,
+          error: e?.message || String(e),
+        };
+      }
+    }
+
+    // Web / Node フォールバック
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      if (!res.ok) {
+        return { success: false, text: '', url, length: 0, error: `HTTP ${res.status}` };
+      }
+      const html = await res.text();
+      const text = html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return { success: true, text, url, length: text.length };
+    } catch (e: any) {
+      return {
+        success: false,
+        text: '',
+        url,
+        length: 0,
+        error: e?.message || String(e),
+      };
     }
   }
 }

@@ -29,6 +29,7 @@
     "test:simple-rpg-recovery-v61": "node scripts/test_simple_rpg_recovery_v61.mjs",
     "test:simple-rpg-auto-learning-v63": "node scripts/test_simple_rpg_auto_learning_v63.mjs",
     "test:searxng-pipeline": "tsx scripts/verify_searxng_pipeline.ts",
+    "test:headless-pipeline": "tsx scripts/verify_headless_webview_pipeline.ts",
     "test:autonomous-hardening": "tsx scripts/verify_autonomous_hardening_wiring.ts"
   },
   "dependencies": {

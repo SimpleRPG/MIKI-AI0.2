@@ -15,6 +15,7 @@ import { WebMaterialPatternExtractor } from './webMaterialPatternExtractor';
 import { answerPlanService } from './answerPlanService';
 import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
 import { getJinaApiKeyItem } from './api';
+import { nativeWorkManagerService } from './nativeWorkManagerService';
 
 /**
  * Jina Reader検索レスポンス (JSON固定・Markdownフォールバック) のパーサー
@@ -699,6 +700,7 @@ export class AutonomousSearchService {
           sourceQuery: query,
           sourceUrl: r.url,
           provider: itemProvider,
+          fetchMethod: 'api',
         });
 
         if (skeletonCand) {
@@ -728,6 +730,7 @@ export class AutonomousSearchService {
           sourceQuery: query,
           sourceUrl: results[0]?.url || '',
           provider: topProvider,
+          fetchMethod: 'api',
         });
 
         if (surfacePatterns.length > 0) {
@@ -835,6 +838,79 @@ export class AutonomousSearchService {
       learnedCount,
       queriesInvestigated: investigated,
       details,
+    };
+  }
+
+  /**
+   * 指示1 & 指示5: ネイティブ(またはフォールバック)のヘッドレスWebViewを用いて
+   * 指定URLを完全レンダリングし、innerTextを抽出・自律学習パターン化する
+   */
+  public async fetchRenderedPage(url: string, options?: { timeoutMs?: number; renderWaitMs?: number; query?: string }): Promise<{
+    success: boolean;
+    text: string;
+    url: string;
+    length: number;
+    patternsCount: number;
+    error?: string;
+  }> {
+    systemLogger.info('SELF_IMPROVEMENT', `🌐 [HeadlessWebView] ページ取得開始: ${url}`);
+    const result = await nativeWorkManagerService.fetchRenderedPage(url, options);
+    if (!result.success || !result.text) {
+      systemLogger.warn('SELF_IMPROVEMENT', `⚠️ [HeadlessWebView] ページ取得失敗: ${url} (${result.error || '空データ'})`);
+      return { ...result, patternsCount: 0 };
+    }
+
+    const text = result.text;
+    const query = options?.query || url;
+    let patternsCount = 0;
+
+    // 縦(骨格)の抽出・登録
+    try {
+      const skeleton = WebMaterialPatternExtractor.extractSkeletonStructuresFromWebText({
+        title: text.slice(0, 50),
+        snippet: text.slice(0, 300),
+        summary: text.slice(0, 150),
+        sourceQuery: query,
+        sourceUrl: url,
+        provider: 'headless_webview',
+        fetchMethod: 'headless_webview',
+      });
+      if (skeleton) {
+        answerPlanService.registerSkeletonFromWebObservation(skeleton);
+        patternsCount++;
+      }
+    } catch (e) {
+      console.warn('Failed to extract skeleton from headless webview page:', e);
+    }
+
+    // 横(言い回し)の抽出・登録
+    try {
+      const surfacePatterns = WebMaterialPatternExtractor.extractSurfacePatternsFromWebText({
+        text: text.slice(0, 1500),
+        sourceQuery: query,
+        sourceUrl: url,
+        provider: 'headless_webview',
+        fetchMethod: 'headless_webview',
+      });
+      if (surfacePatterns.length > 0) {
+        surfaceVariationGrowthService.processWebMaterialForVariationGrowth(surfacePatterns, 1);
+        patternsCount += surfacePatterns.length;
+      }
+    } catch (e) {
+      console.warn('Failed to extract surface patterns from headless webview page:', e);
+    }
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `✅ [HeadlessWebView] ページ取得完了: ${url} (${result.length}文字, ${patternsCount}個のパターン/骨格を抽出, fetchMethod: headless_webview)`
+    );
+
+    return {
+      success: true,
+      text,
+      url,
+      length: result.length,
+      patternsCount,
     };
   }
 }

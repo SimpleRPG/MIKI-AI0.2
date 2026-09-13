@@ -34,6 +34,7 @@ import {
   BannedTopicsConfig,
 } from '../../services/bannedTopicsConfigService';
 import { getJinaApiKeyItem, setJinaApiKeyItem, getSearxngBaseUrlItem, setSearxngBaseUrlItem } from '../../services/api';
+import { nativeWorkManagerService } from '../../services/nativeWorkManagerService';
 
 export const AutonomousSearchTab: React.FC = () => {
   const [config, setConfig] = useState<AutonomousSearchConfig>(() => autonomousSearchService.getConfig());
@@ -66,6 +67,18 @@ export const AutonomousSearchTab: React.FC = () => {
     learnedCount: number;
     queriesInvestigated: string[];
     details: string[];
+  } | null>(null);
+
+  // 指示1 & 指示5: ヘッドレスWebViewレンダリング・テキスト抽出テスト用
+  const [headlessUrl, setHeadlessUrl] = useState('https://ja.wikipedia.org/wiki/React');
+  const [isFetchingHeadless, setIsFetchingHeadless] = useState(false);
+  const [headlessOutput, setHeadlessOutput] = useState<{
+    success: boolean;
+    text: string;
+    url: string;
+    length: number;
+    patternsCount: number;
+    error?: string;
   } | null>(null);
 
   // 禁止トピック手動設定 (設計思想 21.2 & 作業指示書 v19)
@@ -175,6 +188,32 @@ export const AutonomousSearchTab: React.FC = () => {
       console.error('Idle learning error:', e);
     } finally {
       setIsIdleRunning(false);
+    }
+  };
+
+  const handleFetchHeadlessPage = async () => {
+    if (!headlessUrl.trim() || isFetchingHeadless) return;
+    setIsFetchingHeadless(true);
+    setHeadlessOutput(null);
+    try {
+      const res = await autonomousSearchService.fetchRenderedPage(headlessUrl.trim(), {
+        timeoutMs: 12000,
+        renderWaitMs: 1500,
+      });
+      setHeadlessOutput(res);
+      refreshData();
+    } catch (e: any) {
+      console.error('Headless webview fetch error:', e);
+      setHeadlessOutput({
+        success: false,
+        text: '',
+        url: headlessUrl,
+        length: 0,
+        patternsCount: 0,
+        error: e?.message || String(e),
+      });
+    } finally {
+      setIsFetchingHeadless(false);
     }
   };
 
@@ -686,6 +725,97 @@ export const AutonomousSearchTab: React.FC = () => {
                 <li key={i}>{d}</li>
               ))}
             </ul>
+          </div>
+        )}
+      </div>
+
+      {/* 指示1 & 指示5: ヘッドレスWebViewレンダリング＆テキスト抽出テスト */}
+      <div className="p-4 bg-slate-950/70 border border-purple-900/50 rounded-2xl space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Globe className="w-3.5 h-3.5 text-purple-400" />
+            <span>ヘッドレスWebView ページレンダリング ＆ テキスト抽出テスト</span>
+          </h4>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded font-mono border ${
+              nativeWorkManagerService.isAndroidNative()
+                ? 'bg-purple-950/80 text-purple-300 border-purple-600'
+                : 'bg-slate-900 text-slate-400 border-slate-700'
+            }`}
+          >
+            {nativeWorkManagerService.isAndroidNative()
+              ? '🤖 Android Native (MikiWorkManagerPlugin.kt)'
+              : '💻 Web環境 (HTML fetch & parse フォールバック)'}
+          </span>
+        </div>
+
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          SPAや動的JS生成ページから確実にテキストを抽出するためのヘッドレスレンダリング機能です。
+          Android実機ではネイティブの非表示WebViewで描画待機（SPAレンダリング完了）後に
+          <code className="text-purple-300 px-1 font-mono">document.body.innerText</code> を抽出し、
+          縦（回答骨格）および横（言い回し）の自律学習素材として安全に還元します（fetchMethod: headless_webview）。
+        </p>
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={headlessUrl}
+            onChange={(e) => setHeadlessUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleFetchHeadlessPage()}
+            placeholder="レンダリング対象のURL (例: https://ja.wikipedia.org/wiki/React)"
+            className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500 font-mono"
+          />
+          <button
+            onClick={handleFetchHeadlessPage}
+            disabled={isFetchingHeadless || !headlessUrl.trim()}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all shrink-0"
+          >
+            {isFetchingHeadless ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Globe className="w-3.5 h-3.5" />
+            )}
+            <span>レンダリング取得</span>
+          </button>
+        </div>
+
+        {headlessOutput && (
+          <div className="p-3 bg-slate-900/90 border border-purple-500/40 rounded-xl space-y-2 text-xs">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold border ${
+                  headlessOutput.success
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
+                    : 'bg-rose-950 text-rose-300 border-rose-700'
+                }`}>
+                  {headlessOutput.success ? '✓ 取得成功' : '✕ 取得失敗'}
+                </span>
+                <span className="text-[10.5px] font-mono text-purple-300 bg-purple-950/70 border border-purple-700/50 px-2 py-0.5 rounded">
+                  fetchMethod: headless_webview
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {headlessOutput.length}文字
+                </span>
+              </div>
+              {headlessOutput.patternsCount > 0 && (
+                <span className="text-[10px] text-emerald-400 font-mono">
+                  ✓ {headlessOutput.patternsCount}件の自律学習パターン/骨格を還元
+                </span>
+              )}
+            </div>
+
+            {headlessOutput.error && (
+              <div className="p-2 bg-rose-950/30 border border-rose-800/40 text-rose-300 text-[11px] rounded">
+                エラー: {headlessOutput.error}
+              </div>
+            )}
+
+            {headlessOutput.text && (
+              <div className="p-2.5 bg-black/50 border border-slate-800 rounded-lg text-slate-300 font-mono text-[10.5px] max-h-36 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                {headlessOutput.text.slice(0, 600)}
+                {headlessOutput.text.length > 600 && '... (省略)'}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -11,6 +11,7 @@
  */
 
 import { bannedTopicsConfigService } from './bannedTopicsConfigService';
+import { WebFetchMethod } from '../types';
 
 /**
  * 実データ由来プロバイダの検証（作業指示書 v21 第2.2節: 捏造・モックデータの排除）
@@ -24,6 +25,8 @@ export const VALID_WEB_REAL_DATA_PROVIDERS = [
   'duckduckgo',
   'searxng',
   'gemini_grounding',
+  'headless_webview',
+  'rss_feed',
 ] as const;
 
 export function isRealDataProvider(provider?: string): boolean {
@@ -44,6 +47,7 @@ export interface WebExtractedSurfacePattern {
   sourceUrl: string;
   extractedAt: number;
   provider?: string;
+  fetchMethod?: WebFetchMethod;
 }
 
 export interface WebExtractedSkeletonPattern {
@@ -55,6 +59,7 @@ export interface WebExtractedSkeletonPattern {
   extractedAt: number;
   originalFragment: string;
   provider?: string;
+  fetchMethod?: WebFetchMethod;
 }
 
 export class WebMaterialPatternExtractor {
@@ -108,8 +113,9 @@ export class WebMaterialPatternExtractor {
     sourceQuery: string;
     sourceUrl: string;
     provider?: string;
+    fetchMethod?: WebFetchMethod;
   }): WebExtractedSurfacePattern[] {
-    const { text, sourceQuery, sourceUrl, provider } = params;
+    const { text, sourceQuery, sourceUrl, provider, fetchMethod } = params;
 
     // 禁止トピック検査
     if (bannedTopicsConfigService.checkBanned(text).isBanned || bannedTopicsConfigService.checkBanned(sourceQuery).isBanned) {
@@ -163,6 +169,7 @@ export class WebMaterialPatternExtractor {
         sourceUrl: sourceUrl || 'https://web-search-knowledge.local',
         extractedAt: Date.now(),
         provider,
+        fetchMethod,
       });
 
       if (patterns.length >= 4) break; // 1件の検索結果から最大4パターンまで
@@ -181,8 +188,9 @@ export class WebMaterialPatternExtractor {
     sourceQuery: string;
     sourceUrl: string;
     provider?: string;
+    fetchMethod?: WebFetchMethod;
   }): WebExtractedSkeletonPattern | null {
-    const { title, snippet, summary, sourceQuery, sourceUrl, provider } = params;
+    const { title, snippet, summary, sourceQuery, sourceUrl, provider, fetchMethod } = params;
     const combined = `${title} ${snippet} ${summary || ''}`;
 
     // 禁止トピック検査
@@ -246,6 +254,7 @@ export class WebMaterialPatternExtractor {
       extractedAt: Date.now(),
       originalFragment: snippet.slice(0, 120),
       provider,
+      fetchMethod,
     };
   }
 }

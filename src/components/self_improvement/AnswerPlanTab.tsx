@@ -303,6 +303,24 @@ export const AnswerPlanTab: React.FC = () => {
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
                       {s.stage}
                     </span>
+                    {s.status && (
+                      <span className={`text-[9.5px] px-1.5 py-0.2 rounded font-semibold border ${
+                        s.status === 'VERIFIED'
+                          ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
+                          : 'bg-amber-950/60 border-amber-500/40 text-amber-300'
+                      }`}>
+                        {s.status === 'VERIFIED' ? '正式化 (VERIFIED)' : `候補 (${s.observedCount || 1}/3回)`}
+                      </span>
+                    )}
+                    {s.sourceProvenance?.fetchMethod && (
+                      <span className={`text-[9.5px] px-1.5 py-0.2 rounded font-mono border ${
+                        s.sourceProvenance.fetchMethod === 'headless_webview'
+                          ? 'bg-purple-950/60 border-purple-500/40 text-purple-300'
+                          : 'bg-sky-950/60 border-sky-500/40 text-sky-300'
+                      }`}>
+                        {s.sourceProvenance.fetchMethod === 'headless_webview' ? '🌐 Headless WebView' : `⚡ ${s.sourceProvenance.fetchMethod.toUpperCase()}`}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-[10.5px] font-mono text-slate-400 shrink-0">
                     <span>適用 {s.usageCount}回</span>
@@ -413,6 +431,33 @@ export const AnswerPlanTab: React.FC = () => {
                       <div className="text-emerald-200/90 font-mono bg-slate-900 p-1.5 rounded mt-0.5 border border-slate-800 whitespace-pre-wrap">
                         {s.exampleResponseTemplate}
                       </div>
+                    </div>
+                  )}
+                  {s.sourceProvenance && (
+                    <div className="p-2 bg-slate-900/90 rounded border border-slate-800 space-y-1 text-[10px] font-mono">
+                      <div className="text-sky-300 font-bold flex items-center gap-1">
+                        <span>🔍 取得元プロビナンス (Source Provenance)</span>
+                      </div>
+                      {s.sourceProvenance.provider && (
+                        <div className="text-slate-400">
+                          プロバイダ: <span className="text-slate-200">{s.sourceProvenance.provider}</span>
+                        </div>
+                      )}
+                      {s.sourceProvenance.fetchMethod && (
+                        <div className="text-slate-400">
+                          取得方式: <span className="text-amber-300 font-bold">{s.sourceProvenance.fetchMethod}</span>
+                        </div>
+                      )}
+                      {s.sourceProvenance.url && (
+                        <div className="text-slate-400 truncate">
+                          URL: <a href={s.sourceProvenance.url} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">{s.sourceProvenance.url}</a>
+                        </div>
+                      )}
+                      {s.sourceProvenance.query && (
+                        <div className="text-slate-400">
+                          検索クエリ: <span className="text-slate-300">{s.sourceProvenance.query}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

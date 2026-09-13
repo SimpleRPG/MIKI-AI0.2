@@ -1811,6 +1811,8 @@ export interface CompletionEvaluation {
  */
 export type ResponseSkeletonReuseMode = 'EXACT_RESPONSE' | 'PLAN_ONLY' | 'SKILL_COMPOSITION';
 
+export type WebFetchMethod = 'api' | 'headless_webview' | 'rss';
+
 export interface ResponseSkeleton {
   pattern_id: string; // 例: PATTERN-CORRECTION-01
   situation: string;  // 適用状況（例: 以前の前提が明示的/遠回しに訂正された）
@@ -1836,6 +1838,7 @@ export interface ResponseSkeleton {
     extractedAt?: number;
     fragment?: string;
     provider?: string;
+    fetchMethod?: WebFetchMethod;
   };
 }
 
