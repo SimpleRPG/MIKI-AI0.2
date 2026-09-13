@@ -58,6 +58,7 @@ import { digitalResearchNoteService } from '../../services/digitalResearchNoteSe
 import { cognitiveDebuggerService } from '../../services/cognitiveDebuggerService';
 import { codebaseReflectionService, ImprovementRecipe } from '../../services/codebaseReflectionService';
 import { AdvancedSelfCodeSuiteView } from './AdvancedSelfCodeSuiteView';
+import { EvidenceBasedLoopSubView } from './EvidenceBasedLoopSubView';
 import { aiderEngineService } from '../../services/aiderEngineService';
 import { selfImprovementSuiteService } from '../../services/selfImprovementSuiteService';
 import { mikiSelfCodingSuperchargerService } from '../../services/mikiSelfCodingSuperchargerService';
@@ -87,8 +88,8 @@ export interface LiveDiffPreview {
 
 export const SelfCodeArchitectTab: React.FC = () => {
   const [activeView, setActiveView] = useState<
-    'roadmap' | 'completed' | 'proposals' | 'invariants' | 'chap28' | 'advanced_services' | 'code_reflection' | 'advanced_suite' | 'git_integration'
-  >('roadmap');
+    'roadmap' | 'completed' | 'proposals' | 'invariants' | 'chap28' | 'advanced_services' | 'code_reflection' | 'advanced_suite' | 'git_integration' | 'evidence_loop'
+  >('evidence_loop');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [auditResult, setAuditResult] = useState<SelfCodeAuditResult>(() =>
@@ -1071,6 +1072,17 @@ export const SelfCodeArchitectTab: React.FC = () => {
           >
             <Sparkles className="w-3.5 h-3.5 text-pink-300" />
             自律進化6大ツール群 (DryRun/ベンチ/弱点克服/カナリア/ペアプロ/Aider統合)
+          </button>
+          <button
+            onClick={() => setActiveView('evidence_loop')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+              activeView === 'evidence_loop'
+                ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
+            証拠ベース自律改善＆指示書取込 (14要件)
           </button>
           <button
             onClick={() => setActiveView('git_integration')}
@@ -2299,6 +2311,9 @@ export const SelfCodeArchitectTab: React.FC = () => {
 
       {/* ── 実Git・GitHub連携ハブ (Termux / 本番Push) (第2.4節) ── */}
       {activeView === 'git_integration' && <GitIntegrationView />}
+
+      {/* ── 証拠ベース自己改善ループ＆作業指示書取込 (14要件 Canonical Architecture) ── */}
+      {activeView === 'evidence_loop' && <EvidenceBasedLoopSubView />}
     </div>
   );
 };
