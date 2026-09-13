@@ -369,7 +369,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
       setReviewQueue(selfImprovementService.getReviewQueue());
       setSplitStats(selfImprovementService.getSplitStats());
       setGenerations(selfImprovementService.getGenerations());
-      setColabScript(selfImprovementService.generateDeterministicCapabilityReport());
+      setColabScript('Model training/export is retired. Use deterministic skill, rule, knowledge, and verified component updates instead.');
       setWorldModelErrors(worldModelService.getErrorRecords());
       setWorldModelStats(worldModelService.getStats());
       setWmStatus(backgroundWorkerService.getStatus());
@@ -4201,26 +4201,29 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                 </p>
               </div>
 
-              {/* Colab Script Code Box */}
+              {/* Colab Script / Retired Feature Notification Box */}
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[11px] text-amber-300">
-                    📄 Colab用 Python学習スクリプト (外部学習基盤（退役） / 重み学習方式（退役） 自動量子化)
+                  <span className="font-mono text-[11px] text-amber-300 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Colab外部学習基盤 & モデル学習・エクスポート機能（退役）</span>
                   </span>
                   <button
                     onClick={() => handleCopy(colabScript, 'colabScript')}
                     className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[10px] font-bold flex items-center gap-1"
                   >
                     {copiedText === 'colabScript' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedText === 'colabScript' ? 'コピー完了！' : 'スクリプトをコピー'}</span>
+                    <span>{copiedText === 'colabScript' ? 'コピー完了！' : '案内文をコピー'}</span>
                   </button>
                 </div>
-                <textarea
-                  readOnly
-                  rows={8}
-                  value={colabScript}
-                  className="w-full bg-slate-900/90 border border-slate-800 rounded-lg p-3 text-slate-300 font-mono text-[10px] leading-relaxed"
-                />
+                <div className="p-3 bg-amber-950/20 border border-amber-800/40 rounded-lg text-amber-200/90 text-xs leading-relaxed font-sans">
+                  <p className="font-semibold text-amber-300 mb-1">
+                    【機能移行のお知らせ】
+                  </p>
+                  <p>
+                    {colabScript}
+                  </p>
+                </div>
               </div>
 
               {/* 4-Step Guide */}

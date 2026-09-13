@@ -15,6 +15,9 @@ import { answerContentIrService } from './answerContentIrService';
 import { AnswerContentIR } from '../types';
 import { bannedTopicsConfigService } from './bannedTopicsConfigService';
 import { WebExtractedSurfacePattern, isRealDataProvider } from './webMaterialPatternExtractor';
+import { teacherRequestService } from './teacherRequestService';
+import { privacyGuardrailService } from './privacyGuardrailService';
+import { apiUrl, getCustomApiHeaders } from './api';
 
 export interface VariationCandidateRecord {
   id: string;
@@ -27,7 +30,8 @@ export interface VariationCandidateRecord {
     | 'POLITENESS_FLIP'
     | 'WORD_ORDER_SHIFT'
     | 'DEFECTIVE_PROBE'
-    | 'WEB_DERIVED';
+    | 'WEB_DERIVED'
+    | 'GEMINI_GENERATED';
   status: 'CANDIDATE' | 'VERIFIED' | 'REJECTED';
   verification: {
     semanticPreserved: boolean;
@@ -41,6 +45,8 @@ export interface VariationCandidateRecord {
     url?: string;
     extractedAt?: number;
     fragment?: string;
+    provider?: string;
+    seedText?: string;
   };
   createdAt: number;
 }
@@ -282,15 +288,117 @@ export class SurfaceVariationGrowthService {
   }
 
   /**
-   * 4. 自律サイクル実行
-   * 弱点検出 -> 候補生成 -> 検証 -> CANDIDATE -> VERIFIED 昇格 -> 正式プール登録
-   * @param maxPromotions 1サイクルの最大昇格数 (暴走防止: デフォルト2)
+   * 作業B: 外部教師(Gemini)による言い回し部品生成 (第3の供給源)
+   *
+   * 設計原則:
+   * 1. 返信をその場で生成させるのではなく、部品(言い回し変種)のみを依頼
+   * 2. 既存の teacherRequestService.checkBudget() で日次/月次予算枠を厳格共有
+   * 3. privacyGuardrailService による送信前プライバシー監査
+   * 4. 生成された候補は必ず既存の verifyCandidate() (意味保持・文法検査) を経由
    */
-  public runAutonomousVariationGrowthCycle(maxPromotions: number = 2): VariationGrowthReport {
+  public async generateGeminiCandidates(
+    categoryKey: string,
+    seedItem: VariationItem,
+    count: number = 3
+  ): Promise<Array<{ candidateText: string; mutationType: 'GEMINI_GENERATED' }>> {
+    if (!seedItem || !seedItem.text) return [];
+
+    // 1. 予算チェック (既存の外部教師予算と共有)
+    const budget = teacherRequestService.checkBudget();
+    if (!budget.allowed) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `ℹ️ [Gemini言い回し生成スキップ] 外部教師予算の上限に達しているためスキップします (理由: ${budget.reason})`
+      );
+      return [];
+    }
+
+    // 2. プライバシー監査・サニタイズ
+    const auditResult = privacyGuardrailService.auditOutboundContent(
+      seedItem.text,
+      'teacher_api',
+      { autoSanitize: true }
+    );
+    if (!auditResult.allowed) {
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `🚫 [Gemini言い回し生成遮断] シード文「${seedItem.text}」がプライバシー監査に抵触しました: ${auditResult.blockedReason}`
+      );
+      return [];
+    }
+
+    const safeSeedText =
+      auditResult.symbolReplacements && Object.keys(auditResult.symbolReplacements).length > 0
+        ? seedItem.text.replace(
+            new RegExp(
+              Object.keys(auditResult.symbolReplacements)
+                .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                .join('|'),
+              'g'
+            ),
+            (m) => auditResult.symbolReplacements![m] || m
+          )
+        : seedItem.text;
+
+    try {
+      const res = await fetch(apiUrl('/api/teacher-variation'), {
+        method: 'POST',
+        headers: getCustomApiHeaders(),
+        body: JSON.stringify({
+          categoryKey,
+          seedText: safeSeedText,
+          count,
+        }),
+      });
+
+      if (!res.ok) {
+        return [];
+      }
+
+      const data = await res.json();
+      if (!data.success || !Array.isArray(data.candidates) || data.candidates.length === 0) {
+        return [];
+      }
+
+      const candidates: string[] = data.candidates;
+      const tokensUsed = data.tokensUsed || { promptTokens: 0, outputTokens: 0 };
+
+      // 利用実績を既存の教師予算台帳に記録 (日次/月次枠を消費)
+      teacherRequestService.recordTeacherUsage({
+        promptTokens: tokensUsed.promptTokens,
+        outputTokens: tokensUsed.outputTokens,
+        generatedSamplesCount: candidates.length,
+        verifiedPassedCount: 0,
+        category: categoryKey,
+        success: true,
+        notes: `Gemini言い回し生成 (GEMINI_GENERATED): ${candidates.length}件取得`,
+      });
+
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🤖 [Gemini言い回し生成] カテゴリ: ${categoryKey}, 元文: 「${seedItem.text}」 -> ${candidates.length}件の候補を取得`
+      );
+
+      return candidates.map((candidateText) => ({
+        candidateText,
+        mutationType: 'GEMINI_GENERATED' as const,
+      }));
+    } catch (err: any) {
+      systemLogger.warn('SELF_IMPROVEMENT', `⚠️ [Gemini言い回し生成失敗] ${err?.message || err}`);
+      return [];
+    }
+  }
+
+  /**
+   * 4. 自律サイクル実行
+   * 弱点検出 -> 候補生成 (機械変異 + Gemini生成) -> 検証 -> CANDIDATE -> VERIFIED 昇格 -> 正式プール登録
+   * @param maxPromotions 1サイクルの最大昇格数 (デフォルト5)
+   */
+  public async runAutonomousVariationGrowthCycle(maxPromotions: number = 5): Promise<VariationGrowthReport> {
     const cycleId = `growth-${Date.now()}`;
     systemLogger.info('SELF_IMPROVEMENT', `[${cycleId}] 🎨 横(言い回し)の自律成長サイクルを開始します...`);
 
-    const weaknesses = this.detectWeaknessCategories(2);
+    const weaknesses = this.detectWeaknessCategories(5);
     const weaknessLabels = weaknesses.map((w) => `${w.categoryKey} (${w.reason})`);
 
     let totalGenerated = 0;
@@ -313,15 +421,50 @@ export class SurfaceVariationGrowthService {
       const seedIndex = Math.floor(Math.random() * catInfo.samplePool.length);
       const seedItem = catInfo.samplePool[seedIndex];
 
-      // 候補を生成
+      // 候補を生成: 機械変異 + Gemini供給源
       const mutations = this.generateMutations(weakness.categoryKey, seedItem);
-      totalGenerated += mutations.length;
+      const geminiMutations = await this.generateGeminiCandidates(weakness.categoryKey, seedItem, 2);
+      const allCandidates = [...mutations, ...geminiMutations];
+      totalGenerated += allCandidates.length;
 
-      for (const mut of mutations) {
-        // 検証実行
+      for (const mut of allCandidates) {
+        const candidateId = mut.mutationType === 'GEMINI_GENERATED'
+          ? `VAR-GEMINI-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+          : `VAR-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+        // 作業C: 禁止トピック事前チェック (Gemini生成候補にも確実に適用)
+        const bannedCheck = bannedTopicsConfigService.checkBanned(mut.candidateText);
+        if (bannedCheck.isBanned) {
+          rejectedCount++;
+          const reason = `禁止トピック「${bannedCheck.matchedTopic}」に抵触`;
+          rejectionReasons.push({ candidateText: mut.candidateText, reason });
+          this.candidateRecords.unshift({
+            id: candidateId,
+            categoryKey: weakness.categoryKey,
+            seedText: seedItem.text,
+            candidateText: mut.candidateText,
+            mutationType: mut.mutationType,
+            status: 'REJECTED',
+            verification: {
+              semanticPreserved: false,
+              missingOrDistorted: [reason],
+              grammarClean: true,
+              grammarIssues: [],
+              rejectionReason: reason,
+            },
+            sourceProvenance: mut.mutationType === 'GEMINI_GENERATED' ? {
+              provider: 'gemini_teacher',
+              seedText: seedItem.text,
+              extractedAt: Date.now(),
+            } : undefined,
+            createdAt: Date.now(),
+          });
+          continue;
+        }
+
+        // 検証実行 (意味保持・文法検査) - Gemini生成でも既存パイプラインを必ず通過
         const vResult = this.verifyCandidate(seedItem.text, mut.candidateText);
 
-        const candidateId = `VAR-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
         const record: VariationCandidateRecord = {
           id: candidateId,
           categoryKey: weakness.categoryKey,
@@ -336,6 +479,11 @@ export class SurfaceVariationGrowthService {
             grammarIssues: vResult.grammarIssues,
             rejectionReason: vResult.rejectionReason,
           },
+          sourceProvenance: mut.mutationType === 'GEMINI_GENERATED' ? {
+            provider: 'gemini_teacher',
+            seedText: seedItem.text,
+            extractedAt: Date.now(),
+          } : undefined,
           createdAt: Date.now(),
         };
 
@@ -349,6 +497,8 @@ export class SurfaceVariationGrowthService {
             surfaceVariationService.registerDynamicVariant(weakness.categoryKey, {
               id: candidateId,
               text: mut.candidateText,
+              sourceType: mut.mutationType === 'GEMINI_GENERATED' ? 'GEMINI_GENERATED' : 'MUTATION',
+              sourceProvenance: record.sourceProvenance,
             });
 
             promotedCount++;
@@ -360,7 +510,7 @@ export class SurfaceVariationGrowthService {
 
             systemLogger.info(
               'SELF_IMPROVEMENT',
-              `✨ [言い回し正式昇格] ${weakness.categoryKey} に新変種を採用 (id:${candidateId}): 「${mut.candidateText}」`
+              `✨ [言い回し正式昇格(${mut.mutationType})] ${weakness.categoryKey} に新変種を採用 (id:${candidateId}): 「${mut.candidateText}」`
             );
           }
         } else {
@@ -372,7 +522,7 @@ export class SurfaceVariationGrowthService {
 
           systemLogger.info(
             'SELF_IMPROVEMENT',
-            `🛡️ [言い回し破棄] 意味・文法不適格により候補を破棄: 「${mut.candidateText}」 (理由: ${vResult.rejectionReason})`
+            `🛡️ [言い回し破棄(${mut.mutationType})] 意味・文法不適格により候補を破棄: 「${mut.candidateText}」 (理由: ${vResult.rejectionReason})`
           );
         }
 
@@ -572,6 +722,37 @@ export class SurfaceVariationGrowthService {
   /** 全監査台帳の取得 */
   public getCandidateRecords(): VariationCandidateRecord[] {
     return [...this.candidateRecords];
+  }
+
+  /**
+   * 作業C: 供給源別（機械変異・Web由来・Gemini生成）の生成・合格・昇格集計
+   */
+  public getSourceBreakdown(): {
+    mechanical: { total: number; verified: number; candidate: number; rejected: number };
+    web: { total: number; verified: number; candidate: number; rejected: number };
+    gemini: { total: number; verified: number; candidate: number; rejected: number };
+  } {
+    const stats = {
+      mechanical: { total: 0, verified: 0, candidate: 0, rejected: 0 },
+      web: { total: 0, verified: 0, candidate: 0, rejected: 0 },
+      gemini: { total: 0, verified: 0, candidate: 0, rejected: 0 },
+    };
+
+    for (const r of this.candidateRecords) {
+      const group =
+        r.mutationType === 'GEMINI_GENERATED'
+          ? stats.gemini
+          : r.mutationType === 'WEB_DERIVED'
+          ? stats.web
+          : stats.mechanical;
+
+      group.total++;
+      if (r.status === 'VERIFIED') group.verified++;
+      else if (r.status === 'CANDIDATE') group.candidate++;
+      else if (r.status === 'REJECTED') group.rejected++;
+    }
+
+    return stats;
   }
 }
 

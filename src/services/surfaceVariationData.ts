@@ -6,12 +6,14 @@
 export interface VariationItem {
   id: string;
   text: string;
-  sourceType?: 'PRESET' | 'MUTATION' | 'WEB_OBSERVED';
+  sourceType?: 'PRESET' | 'MUTATION' | 'WEB_OBSERVED' | 'GEMINI_GENERATED';
   sourceProvenance?: {
     query?: string;
     url?: string;
     extractedAt?: number;
     fragment?: string;
+    provider?: string;
+    seedText?: string;
   };
 }
 

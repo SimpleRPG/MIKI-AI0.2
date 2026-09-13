@@ -30,8 +30,20 @@ import { formalSemanticsKernelService } from './src/services/formalSemanticsKern
 import { faultInjectionLabService } from './src/services/faultInjectionLabService';
 import { capabilityCompositionProofService } from './src/services/capabilityCompositionProofService';
 import { executableExplanationService } from './src/services/executableExplanationService';
-import { specContractCompilerService } from './src/services/specContractCompilerService';
+import { specContractCompilerService, setSpecFileReader } from './src/services/specContractCompilerService';
 import { causalMemoryLedgerService } from './src/services/causalMemoryLedgerService';
+
+setSpecFileReader((specPath: string) => {
+  try {
+    const resolved = path.isAbsolute(specPath) ? specPath : path.resolve(process.cwd(), specPath);
+    if (fs.existsSync(resolved)) {
+      return fs.readFileSync(resolved, 'utf8');
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+});
 import { knowledgeHalfLifeService } from './src/services/knowledgeHalfLifeService';
 import { frontierGovernanceService } from './src/services/frontierGovernanceService';
 import { deterministicSelfImprovementLabService } from './src/services/deterministicSelfImprovementLabService';
@@ -1909,6 +1921,80 @@ ${failureReason ? `【失敗理由の参考】\n${failureReason}\n` : ''}
   } catch (error: any) {
     console.error('Error in /api/teacher-request:', error);
     res.status(500).json({ success: false, error: error.message || 'Teacher request error' });
+  }
+});
+
+// External Teacher Variation Pipeline (語彙・言い回し部品生成 - 作業B)
+app.post('/api/teacher-variation', async (req, res) => {
+  try {
+    const { categoryKey, seedText, count = 3 } = req.body;
+    const ai = getAIClient(req);
+
+    if (!seedText || typeof seedText !== 'string') {
+      return res.status(400).json({ success: false, error: 'seedText is required' });
+    }
+
+    if (!ai) {
+      // Offline fallback: no external AI available
+      return res.json({
+        success: true,
+        candidates: [],
+        offline: true,
+        tokensUsed: { promptTokens: 0, outputTokens: 0 },
+      });
+    }
+
+    const requestedCount = Math.min(Math.max(1, Number(count) || 3), 5);
+    const prompt = `あなたは日本語表現・言い回しのバリエーション抽出エキスパートです。
+以下の「元の文」について、意味・丁寧さの度合い・条件や否定・ニュアンスを一切変えずに、表現・語彙だけが自然に異なる同義の言い換え表現を${requestedCount}個提案してください。
+
+【厳格な規則】
+- 固有名詞、具体的な数値、個人情報は絶対に含めないでください。
+- 否定の意味を肯定に変えたり、断定の強さを勝手に変えたりしないでください。
+- 元の文が敬語なら敬語、親しみやすい文体なら親しみやすい文体を維持してください。
+- 出力はJSON文字列配列のみ（例: ["言い換え1", "言い換え2"]）とし、余計な解説・マークダウンコードブロック・前置きは一切出力しないでください。
+
+【カテゴリ】: ${categoryKey || 'general'}
+【元の文】: 『${seedText.trim()}』`;
+
+    const { response } = await generateContentWithFallback(req, {
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.3,
+      },
+    });
+
+    let candidates: string[] = [];
+    try {
+      const parsed = JSON.parse(response.text || '[]');
+      if (Array.isArray(parsed)) {
+        candidates = parsed
+          .filter((item) => typeof item === 'string' && item.trim().length > 0)
+          .map((s) => s.trim());
+      }
+    } catch {
+      const lines = (response.text || '')
+        .split('\n')
+        .map((l: string) => l.replace(/^[-*•\d.\s"']+|["',]+$/g, '').trim())
+        .filter((l: string) => l.length > 2);
+      candidates = lines.slice(0, requestedCount);
+    }
+
+    const pTokens = Math.ceil(prompt.length / 4);
+    const oTokens = Math.ceil((response.text || '').length / 4);
+
+    res.json({
+      success: true,
+      candidates: candidates.slice(0, requestedCount),
+      tokensUsed: {
+        promptTokens: pTokens,
+        outputTokens: oTokens,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error in /api/teacher-variation:', error);
+    res.status(500).json({ success: false, error: error.message || 'Teacher variation error' });
   }
 });
 

@@ -2,7 +2,7 @@ import { answerPlanService } from '../src/services/answerPlanService';
 import { surfaceVariationGrowthService } from '../src/services/surfaceVariationGrowthService';
 import { surfaceVariationService } from '../src/services/surfaceVariationService';
 
-function runTests() {
+async function runTests() {
   console.log('================================================================');
   console.log('🧪 Miki AI 縦(骨格)・横(言い回し) 自律成長パイプライン検証テスト');
   console.log('================================================================\n');
@@ -127,7 +127,7 @@ function runTests() {
   surfaceVariationService.recordUsage('greeting_casual', 'GREET-01');
   surfaceVariationService.recordUsage('greeting_casual', 'GREET-01');
 
-  const growthReport = surfaceVariationGrowthService.runAutonomousVariationGrowthCycle(2);
+  const growthReport = await surfaceVariationGrowthService.runAutonomousVariationGrowthCycle(2);
   console.log(`[自律サイクル実行結果] 生成: ${growthReport.totalGenerated}, 合格: ${growthReport.passedCount}, 破棄: ${growthReport.rejectedCount}, 昇格: ${growthReport.promotedCount}`);
   if (growthReport.promotedCount > 2) {
     console.error(`❌ FAIL: 1サイクルの昇格数が上限(2件)を超過しました: ${growthReport.promotedCount}`);
@@ -135,6 +135,10 @@ function runTests() {
   } else {
     console.log(`✅ PASS: 昇格上限ガード(maxPromotions=2)が正常に機能しています (昇格数: ${growthReport.promotedCount})`);
   }
+
+  // 供給源別ブレイクダウンの確認
+  const breakdown = surfaceVariationGrowthService.getSourceBreakdown();
+  console.log(`[供給源集計] 機械変異: ${breakdown.mechanical.total}, Web由来: ${breakdown.web.total}, Gemini: ${breakdown.gemini.total}`);
 
   console.log('\n================================================================');
   if (passedAll) {

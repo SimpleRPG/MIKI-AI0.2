@@ -126,7 +126,7 @@ export class BackgroundWorkerService {
     nightTimeOnly: false,
   };
 
-  private intervalMinutes: number = 360; // 6時間ごと
+  private intervalMinutes: number = 60; // 変更前: 360 (Termux/PC常時運用向けに1時間ごとに緩和)
   private executionLogs: BackgroundTaskExecutionLog[] = [];
   private isRegistered: boolean = true;
   private isExecutingNow: boolean = false;
@@ -1042,62 +1042,77 @@ export class BackgroundWorkerService {
       try {
         systemLogger.info('SELF_IMPROVEMENT', '📐 [縦横自律成長] 骨格候補の未解決ログ観測 ＆ 表層バリエーションの弱点補強サイクルを実行中...');
 
-        // 縦の成長: 未解決対話ログからの骨格候補抽出 (上限2件、3回観測強制ルールでVERIFIED昇格)
-        const skeletonGrowth = answerPlanService.processUnresolvedConversationsForSkeletonGrowth(2);
+        // 縦の成長: 未解決対話ログからの骨格候補抽出 (上限5件、3回観測強制ルールでVERIFIED昇格)
+        const skeletonGrowth = answerPlanService.processUnresolvedConversationsForSkeletonGrowth(5);
         if (skeletonGrowth.processedCount > 0) {
           weaknessFound.push(
             `[縦(骨格)自律成長] 未対応対話ログから${skeletonGrowth.processedCount}件の骨格候補を観測処理 (正式昇格: ${skeletonGrowth.promotedCount}件)`
           );
         }
 
-        // 横の成長: RecentUsageCacheの弱点検出 -> 変種生成 -> 意味保持検査 -> CANDIDATE->VERIFIED昇格 (上限2件)
-        const variationGrowth = surfaceVariationGrowthService.runAutonomousVariationGrowthCycle(2);
+        // 横の成長: RecentUsageCacheの弱点検出 -> 変種生成 (機械変異 + Gemini) -> 意味保持検査 -> CANDIDATE->VERIFIED昇格 (上限5件)
+        const variationGrowth = await surfaceVariationGrowthService.runAutonomousVariationGrowthCycle(5);
         if (variationGrowth.promotedCount > 0 || variationGrowth.totalGenerated > 0) {
           weaknessFound.push(
             `[横(言い回し)自律成長] 弱点検出カテゴリ${variationGrowth.weaknessDetected.length}件に対し、候補${variationGrowth.totalGenerated}件生成 (合格:${variationGrowth.passedCount}件, 破棄:${variationGrowth.rejectedCount}件, 正式昇格:${variationGrowth.promotedCount}件)`
           );
         }
 
-        // --- 作業指示書 v20: Web検索自律学習素材による縦(骨格)・横(言い回し)の自律成長ループ配線 ---
-        // 歯止め: 1サイクルあたりの自律Web検索回数上限 (上限1クエリ, 最大3件取得)
+        // --- 作業指示書 v20 & 自動成長強化: Web検索自律学習素材による縦(骨格)・横(言い回し)の自律成長ループ配線 ---
+        // 歯止め緩和: 1サイクルあたりの自律Web検索 (弱点カテゴリに応じた複数クエリ・最大8件取得)
         const searchConfig = autonomousSearchService.getConfig();
         if (searchConfig.enabled && !abortSignal.aborted) {
-          // 弱点カテゴリまたは未対応課題から検索トピックを特定
-          let webTopic = '';
-          const weaknesses = surfaceVariationGrowthService.detectWeaknessCategories(3);
+          // 弱点カテゴリまたは未対応課題から検索トピックを特定 (最大3カテゴリからクエリ生成)
+          const weaknesses = surfaceVariationGrowthService.detectWeaknessCategories(5);
+          const topicsToSearch: string[] = [];
+
           if (weaknesses.length > 0) {
-            const topWeakness = weaknesses[0].categoryKey;
-            if (topWeakness.includes('disaster') || topWeakness.includes('error')) {
-              webTopic = 'トラブルシューティング 障害対応 手順';
-            } else if (topWeakness.includes('lead') || topWeakness.includes('step')) {
-              webTopic = '手順 説明 構成 ベストプラクティス';
-            } else {
-              webTopic = '対話 受け答え 丁寧な説明 手順';
-            }
-          } else {
-            const gaps = capabilityGapService.getAllGaps().filter((g) => g.status === 'OPEN');
-            if (gaps.length > 0) {
-              webTopic = `${gaps[0].capabilityId} 手順 ガイド`.slice(0, 40);
-            } else {
-              webTopic = 'トラブルシューティング 手順 ガイド';
+            for (const w of weaknesses.slice(0, 3)) {
+              let t = '';
+              if (w.categoryKey.includes('disaster') || w.categoryKey.includes('error')) {
+                t = 'トラブルシューティング 障害対応 手順';
+              } else if (w.categoryKey.includes('lead') || w.categoryKey.includes('step')) {
+                t = '手順 説明 構成 ベストプラクティス';
+              } else if (w.categoryKey.includes('greeting') || w.categoryKey.includes('polite')) {
+                t = '丁寧な受け答え 会話 挨拶 マナー';
+              } else {
+                t = '対話 受け答え 丁寧な説明 手順';
+              }
+              if (!topicsToSearch.includes(t)) {
+                topicsToSearch.push(t);
+              }
             }
           }
 
-          // 1. 禁止トピック手動設定による事前チェック
-          const bannedCheck = bannedTopicsConfigService.checkBanned(webTopic);
-          if (bannedCheck.isBanned) {
-            systemLogger.warn(
-              'SELF_IMPROVEMENT',
-              `🚫 [Web自律成長除外] クエリ「${webTopic}」は禁止トピック「${bannedCheck.matchedTopic}」に抵触するため検索をスキップしました`
-            );
-          } else {
+          if (topicsToSearch.length === 0) {
+            const gaps = capabilityGapService.getAllGaps().filter((g) => g.status === 'OPEN');
+            if (gaps.length > 0) {
+              topicsToSearch.push(`${gaps[0].capabilityId} 手順 ガイド`.slice(0, 40));
+            } else {
+              topicsToSearch.push('トラブルシューティング 手順 ガイド');
+            }
+          }
+
+          for (const webTopic of topicsToSearch.slice(0, 2)) {
+            if (abortSignal.aborted) break;
+
+            // 1. 禁止トピック手動設定による事前チェック
+            const bannedCheck = bannedTopicsConfigService.checkBanned(webTopic);
+            if (bannedCheck.isBanned) {
+              systemLogger.warn(
+                'SELF_IMPROVEMENT',
+                `🚫 [Web自律成長除外] クエリ「${webTopic}」は禁止トピック「${bannedCheck.matchedTopic}」に抵触するため検索をスキップしました`
+              );
+              continue;
+            }
+
             systemLogger.info(
               'SELF_IMPROVEMENT',
-              `🌐 [Web自律成長検索] クエリ「${webTopic}」で自律学習素材を取得中... (歯止め: 1検索/サイクル上限)`
+              `🌐 [Web自律成長検索] クエリ「${webTopic}」で自律学習素材を取得中... (歯止め緩和: 最大8件取得)`
             );
 
-            // 2. Web検索実行 (最大3件取得)
-            const searchRes = await autonomousSearchService.executeSearch(webTopic, { maxResults: 3 });
+            // 2. Web検索実行 (最大8件取得)
+            const searchRes = await autonomousSearchService.executeSearch(webTopic, { maxResults: 8 });
             const searchResults = searchRes.results || [];
 
             systemLogger.info(
@@ -1109,7 +1124,7 @@ export class BackgroundWorkerService {
               // 3. 縦(骨格)への還元: 検索結果から構造抽出 -> registerSkeletonFromWebObservation (WEB_OBSERVED, 3回観測昇格制)
               let webSkeletonProcessed = 0;
               let webSkeletonPromoted = 0;
-              for (const r of searchResults.slice(0, 2)) {
+              for (const r of searchResults.slice(0, 4)) {
                 const skeletonCand = WebMaterialPatternExtractor.extractSkeletonStructuresFromWebText({
                   title: r.title,
                   snippet: r.snippet,
@@ -1143,7 +1158,7 @@ export class BackgroundWorkerService {
                 });
 
                 if (surfacePatterns.length > 0) {
-                  webVarResult = surfaceVariationGrowthService.processWebMaterialForVariationGrowth(surfacePatterns, 1);
+                  webVarResult = surfaceVariationGrowthService.processWebMaterialForVariationGrowth(surfacePatterns, 3);
                 }
               }
 

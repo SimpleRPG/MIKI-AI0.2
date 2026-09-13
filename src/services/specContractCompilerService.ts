@@ -3,8 +3,6 @@
  * 原文を削除せず、実行時に必要な「追跡可能な最小契約」へ射影する。
  * 生成モデルには依存しない。spec hash が変われば契約は自動的に無効化される。
  */
-import fs from 'fs';
-import path from 'path';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 
@@ -32,8 +30,16 @@ export interface SpecContract {
   clauses: SpecContractClause[];
 }
 
+export type SpecFileReader = (specPath: string) => string | null;
+
+let customFileReader: SpecFileReader | null = null;
+
+export function setSpecFileReader(reader: SpecFileReader | null) {
+  customFileReader = reader;
+}
+
 const KEY = 'miki_spec_contract_v1';
-const DEFAULT_SPEC = path.resolve(process.cwd(), 'MIKI_AI_MASTER_SPECIFICATION_v5_0.txt');
+const DEFAULT_SPEC = 'MIKI_AI_MASTER_SPECIFICATION_v5_0.txt';
 
 function hash(raw: string): string { let h = 2166136261; for (let i=0;i<raw.length;i++){h ^= raw.charCodeAt(i); h=Math.imul(h,16777619);} return (h>>>0).toString(16).padStart(8,'0'); }
 function normOf(text: string): Norm {
@@ -53,9 +59,12 @@ export class SpecContractCompilerService {
   private load() { try { const raw = storageService.getItem(KEY); if (raw) this.contract = JSON.parse(raw); } catch { this.contract = null; } }
   private save() { try { storageService.setItem(KEY, JSON.stringify(this.contract)); } catch {} }
 
-  public compile(specPath = DEFAULT_SPEC): SpecContract {
-    const source = fs.existsSync(specPath) ? fs.readFileSync(specPath, 'utf8') : '';
-    if (!source) throw new Error(`specification source not found: ${specPath}`);
+  public compile(specPath = DEFAULT_SPEC, explicitSource?: string): SpecContract {
+    const source = explicitSource || (customFileReader ? customFileReader(specPath) : '') || '';
+    if (!source) {
+      if (this.contract && this.contract.status === 'VALID') return this.contract;
+      throw new Error(`specification source not found: ${specPath}`);
+    }
     const sourceHash = hash(source);
     if (this.contract && this.contract.sourceHash === sourceHash && this.contract.status === 'VALID') return this.contract;
     const lines = source.split(/\r?\n/);
@@ -79,8 +88,9 @@ export class SpecContractCompilerService {
   private acceptance(text:string):string[] { const a:string[]=[]; if (/検証|テスト|回帰|証拠|再現/i.test(text)) a.push('deterministic verification evidence'); if (/禁止|保護/i.test(text)) a.push('negative/prohibition check'); if (!a.length) a.push('source traceability + regression check'); return a; }
   public getContract(): SpecContract | null { return this.contract ? JSON.parse(JSON.stringify(this.contract)) : null; }
   public audit(specPath = DEFAULT_SPEC): { valid:boolean; currentHash:string|null; contractHash:string|null; invalidated:boolean; clauseCount:number } {
-    if (!fs.existsSync(specPath)) return {valid:false,currentHash:null,contractHash:this.contract?.sourceHash||null,invalidated:false,clauseCount:this.contract?.clauses.length||0};
-    const currentHash=hash(fs.readFileSync(specPath,'utf8')); const invalidated=!!this.contract && this.contract.sourceHash!==currentHash;
+    const source = customFileReader ? customFileReader(specPath) : null;
+    if (!source) return {valid:this.contract ? this.contract.status === 'VALID' : true, currentHash:null, contractHash:this.contract?.sourceHash||null, invalidated:false, clauseCount:this.contract?.clauses.length||0};
+    const currentHash = hash(source); const invalidated = !!this.contract && this.contract.sourceHash !== currentHash;
     if (invalidated && this.contract) { this.contract.status='INVALIDATED'; this.save(); }
     return {valid:!invalidated, currentHash, contractHash:this.contract?.sourceHash||null, invalidated, clauseCount:this.contract?.clauses.length||0};
   }
