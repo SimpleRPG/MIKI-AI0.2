@@ -41,6 +41,7 @@ import { mikiAutonomousDevStudioService } from './mikiAutonomousDevStudioService
 import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
 import { mikiReasoningTemplateService, ReasoningMatchResult } from './mikiReasoningTemplateService';
 import { mikiConversationLearningService } from './mikiConversationLearningService';
+import { conversationComponentCompositionService } from './conversationComponentCompositionService';
 import { normalizeKey } from './mikiUnifiedLearningContinuumService';
 
 export interface NonLlmCoreResult {
@@ -77,7 +78,9 @@ export interface NonLlmCoreResult {
 export class NonLlmCoreService {
   private static instance: NonLlmCoreService;
 
-  private constructor() {}
+  private constructor() {
+    conversationComponentCompositionService.initialize();
+  }
 
   public static getInstance(): NonLlmCoreService {
     if (!NonLlmCoreService.instance) NonLlmCoreService.instance = new NonLlmCoreService();

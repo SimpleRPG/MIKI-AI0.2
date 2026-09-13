@@ -1,6 +1,7 @@
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { unifiedMikiExperienceService, UnifiedExperienceDomain, UnifiedOutcome } from './unifiedMikiExperienceService';
+import { conversationComponentCompositionService } from './conversationComponentCompositionService';
 
 /**
  * Miki Unified Learning Continuum
@@ -26,6 +27,10 @@ export interface MikiLearningSnapshot {
   profiles: LearningProfile[];
   crossDomainLinks: Array<{ concept: string; domains: UnifiedExperienceDomain[]; strength: number }>;
   recommendedCapabilities: Array<{ capabilityId: string; score: number; reason: string }>;
+  // 成長速度の可視化 (掛け算式合成メトリクス)
+  conversationComponentsCount: number;
+  theoreticalCompositionsCount: number;
+  verifiedCompositionsCount: number;
 }
 
 const KEY = 'miki_unified_learning_continuum_v1';
@@ -144,7 +149,19 @@ export class MikiUnifiedLearningContinuumService {
       .filter(x => x.domains.length >= 2).sort((a, b) => b.strength - a.strength).slice(0, 100);
     const caps = all.filter(p => p.key.startsWith('capability:')).sort((a, b) => b.confidence - a.confidence).slice(0, 50)
       .map(p => ({ capabilityId: p.key.slice('capability:'.length), score: p.confidence, reason: `uses=${p.uses}; success=${p.successes}; verified=${p.verified}` }));
-    return { version: 1, updatedAt: Date.now(), profiles: all.slice(0, MAX_PROFILES), crossDomainLinks: links, recommendedCapabilities: caps };
+    
+    const convStats = conversationComponentCompositionService.getStats();
+
+    return {
+      version: 1,
+      updatedAt: Date.now(),
+      profiles: all.slice(0, MAX_PROFILES),
+      crossDomainLinks: links,
+      recommendedCapabilities: caps,
+      conversationComponentsCount: convStats.conversationComponentsCount,
+      theoreticalCompositionsCount: convStats.theoreticalCompositionsCount,
+      verifiedCompositionsCount: convStats.verifiedCompositionsCount,
+    };
   }
 
   public syncFromUnifiedExperience() {

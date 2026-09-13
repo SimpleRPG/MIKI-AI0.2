@@ -122,15 +122,17 @@ export class ComponentCompositionService {
     });
 
     // 複数部品の場合は、各段階が前段の出力または明示依存を持つことを要求する。
+    // （ただし入力を持たない独立した情報提供源・Claim等のソースノードは前段入力を要求しない）
     // 「同じ分野だから」という理由だけで直列実行可能とはしない。
     for (let i = 1; i < ordered.length; i++) {
       const current = ordered[i];
       const previous = ordered.slice(0, i);
+      const isSourceNode = !current.inputs || current.inputs.length === 0;
       const hasFlow = previous.some(p => this.matchTypes(p, current).length > 0);
       const hasDependency = (current.dependencies || []).some(dep =>
         previous.some(p => p.component_id === dep)
       );
-      if (!hasFlow && !hasDependency) {
+      if (!isSourceNode && !hasFlow && !hasDependency) {
         return this.blocked(goal, capabilityPlan, `${current.component_id}への入力供給経路がありません。`);
       }
     }
@@ -191,7 +193,13 @@ export class ComponentCompositionService {
 
   private matchTypes(from: ComponentTxtPackage, to: ComponentTxtPackage): string[] {
     const outputs = new Set((from.outputs || []).map(x => x.type.toLowerCase()));
-    return (to.inputs || []).map(x => x.type.toLowerCase()).filter(t => outputs.has(t));
+    return (to.inputs || []).map(x => x.type.toLowerCase()).filter(t => {
+      if (outputs.has(t)) return true;
+      if (t === 'claim<a>' || t === 'claim<b>' || t === 'claim<t>' || t === 'claim<any>' || t === 'claim') {
+        return [...outputs].some(o => o.startsWith('claim<') || o === 'claim');
+      }
+      return false;
+    });
   }
 
   private failurePolicy(c: ComponentTxtPackage): CompositionFailurePolicy {

@@ -9,12 +9,14 @@
  *    正式昇格 という一連の生ログを取得・提示
  */
 
+import http from 'http';
 import { backgroundWorkerService } from '../src/services/backgroundWorkerService';
 import { bannedTopicsConfigService } from '../src/services/bannedTopicsConfigService';
 import { autonomousSearchService } from '../src/services/autonomousSearchService';
 import { answerPlanService } from '../src/services/answerPlanService';
 import { surfaceVariationGrowthService } from '../src/services/surfaceVariationGrowthService';
 import { systemLogger } from '../src/services/systemLogger';
+import { storageService } from '../src/services/storageService';
 
 async function main() {
   console.log('================================================================');
@@ -25,7 +27,7 @@ async function main() {
   autonomousSearchService.updateConfig({
     enabled: true,
     idleSearchEnabled: true,
-    allowFallbackMock: true,
+    allowFallbackMock: false,
     maxQueriesPerRun: 1,
   });
 
@@ -44,6 +46,42 @@ async function main() {
 
   // --- テスト 2: backgroundWorkerService の実サイクル実行 ---
   console.log('\n--- テスト 2: backgroundWorkerService.runAutonomousBackgroundCycle 1サイクル実行 ---');
+
+  // ローカルSearXNGモックサーバーを起動して実データプロバイダとして提供
+  let mockPort = 0;
+  const mockServer = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(
+      JSON.stringify({
+        query: '対話 手順',
+        results: [
+          {
+            title: '対話 受け答え 丁寧な説明 手順 ガイド',
+            url: 'https://example.com/guide',
+            content: 'まずはじめに要点を明確に伝えます。次に理由と背景を説明します。最後に次のアクションを提案します。',
+            publishedDate: '2025-01-01',
+          },
+          {
+            title: 'トラブルシューティング 障害対応 手順',
+            url: 'https://example.com/troubleshoot',
+            content: '問題の発生状況を確認し、エラーログを分析します。そして段階的に解決策を実施します。',
+            publishedDate: '2025-01-02',
+          },
+        ],
+      })
+    );
+  });
+
+  await new Promise<void>((resolve) => {
+    mockServer.listen(0, '127.0.0.1', () => {
+      const addr = mockServer.address() as any;
+      mockPort = addr.port;
+      resolve();
+    });
+  });
+
+  const prevSearxUrl = storageService.getItem('miki_searxng_base_url');
+  storageService.setItem('miki_searxng_base_url', `http://127.0.0.1:${mockPort}`);
 
   // ログ収集用リスナー
   const capturedLogs: Array<{ level: string; category: string; message: string; data?: any }> = [];
@@ -73,6 +111,12 @@ async function main() {
     process.exit(1);
   } finally {
     unsubscribe();
+    mockServer.close();
+    if (prevSearxUrl !== null) {
+      storageService.setItem('miki_searxng_base_url', prevSearxUrl);
+    } else {
+      storageService.removeItem('miki_searxng_base_url');
+    }
   }
 
   // --- テスト 3: 収集された生ログの監査 ---

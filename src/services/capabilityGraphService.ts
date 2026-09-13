@@ -210,7 +210,13 @@ export class CapabilityGraphService {
 
   private matchOutputsToInputs(from: ComponentTxtPackage, to: ComponentTxtPackage): string[] {
     const out = new Set((from.outputs || []).map(x => x.type.toLowerCase()));
-    return (to.inputs || []).map(x => x.type.toLowerCase()).filter(t => out.has(t));
+    return (to.inputs || []).map(x => x.type.toLowerCase()).filter(t => {
+      if (out.has(t)) return true;
+      if (t === 'claim<a>' || t === 'claim<b>' || t === 'claim<t>' || t === 'claim<any>' || t === 'claim') {
+        return [...out].some(o => o.startsWith('claim<') || o === 'claim');
+      }
+      return false;
+    });
   }
 
   private domainOverlap(list: ComponentTxtPackage[], c: ComponentTxtPackage): boolean {

@@ -81,6 +81,7 @@ async function runWebMaterialVerification() {
     sourceUrl: 'https://docs.example.org/init',
     extractedAt: Date.now(),
     originalFragment: '新規ライブラリの初期化と例外ハンドリング手順',
+    provider: 'duckduckgo_direct',
   };
 
   const reg1 = answerPlanService.registerSkeletonFromWebObservation(safeWebMaterial);
@@ -115,6 +116,7 @@ async function runWebMaterialVerification() {
       sourceQuery: '報告 言い回し',
       sourceUrl: 'https://example.com/phrases',
       extractedAt: Date.now(),
+      provider: 'duckduckgo_direct',
     },
   ];
 
@@ -135,7 +137,7 @@ async function runWebMaterialVerification() {
       title: '最新のベストプラクティス設計ガイド',
       url: 'https://example.com/guide2',
       snippet: 'まず最初に環境変数を設定します。次にビルドを実行します。最後に動作確認を行います。',
-      source: 'MockSearch',
+      source: 'Wikipedia (Direct)',
     },
   ];
 
@@ -143,7 +145,7 @@ async function runWebMaterialVerification() {
     'ベストプラクティス 手順',
     mockResults,
     '設計手順のガイドライン',
-    { triggerType: 'in_conversation' }
+    { triggerType: 'in_conversation', provider: 'wikipedia_direct' }
   );
 
   if (learnedRecord && learnedRecord.query === 'ベストプラクティス 手順') {
