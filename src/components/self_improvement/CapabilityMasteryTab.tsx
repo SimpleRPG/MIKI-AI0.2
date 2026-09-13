@@ -13,15 +13,20 @@ import {
   HelpCircle,
   Activity,
   Layers,
+  Link2,
+  GitBranch,
+  Tag,
 } from 'lucide-react';
 import {
   CapabilityMasteryProfile,
   CapabilityGapEntry,
   VirtualTrainingTrial,
   LoraTriggerAssessment,
+  ExperienceLink,
 } from '../../types';
 import { capabilityGapService } from '../../services/capabilityGapService';
 import { virtualTrainingService } from '../../services/virtualTrainingService';
+import { experienceLinkService } from '../../services/experienceLinkService';
 
 export const CapabilityMasteryTab: React.FC = () => {
   const [profiles, setProfiles] = useState<CapabilityMasteryProfile[]>(() =>
@@ -36,6 +41,9 @@ export const CapabilityMasteryTab: React.FC = () => {
   const [assessment, setAssessment] = useState<LoraTriggerAssessment>(() =>
     virtualTrainingService.evaluateLoraTriggerCondition()
   );
+  const [experienceLinks, setExperienceLinks] = useState<ExperienceLink[]>(() =>
+    experienceLinkService.getAllLinks()
+  );
 
   const [isRunningTrial, setIsRunningTrial] = useState(false);
   const [selectedTrial, setSelectedTrial] = useState<VirtualTrainingTrial | null>(null);
@@ -46,6 +54,7 @@ export const CapabilityMasteryTab: React.FC = () => {
     setGaps([...capabilityGapService.getAllGaps()]);
     setTrials([...virtualTrainingService.getAllTrials()]);
     setAssessment(virtualTrainingService.evaluateLoraTriggerCondition());
+    setExperienceLinks([...experienceLinkService.getAllLinks()]);
   };
 
   const handleRunVirtualTrial = async (capId: string) => {
@@ -194,6 +203,20 @@ export const CapabilityMasteryTab: React.FC = () => {
                     <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-slate-400 font-mono">
                       {p.category}
                     </span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.2 rounded font-mono border ${
+                        p.source === 'seeded'
+                          ? 'bg-slate-900 text-slate-400 border-slate-750'
+                          : 'bg-emerald-950/70 text-emerald-300 border-emerald-600/50'
+                      }`}
+                    >
+                      {p.source === 'seeded' ? '初期定義' : '実測観察'}
+                    </span>
+                    {p.evidenceIds && p.evidenceIds.length > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-700/40 font-mono">
+                        証拠 {p.evidenceIds.length}件
+                      </span>
+                    )}
                   </div>
                   <span className={`text-[10px] px-2 py-0.5 rounded font-bold border font-mono ${stateColors}`}>
                     {p.state}
@@ -303,6 +326,21 @@ export const CapabilityMasteryTab: React.FC = () => {
                       ? '🧠 汎化不足型 (20章)'
                       : '⚠️ 単体失敗型'}
                   </span>
+                  <span
+                    className={`text-[9px] px-1.5 py-0.2 rounded font-mono border ${
+                      gap.source === 'seeded'
+                        ? 'bg-slate-900 text-slate-400 border-slate-750'
+                        : 'bg-emerald-950/70 text-emerald-300 border-emerald-600/50'
+                    }`}
+                  >
+                    {gap.source === 'seeded' ? '初期定義' : '実測観察'}
+                  </span>
+                  {gap.experienceId && (
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-sky-950/70 text-sky-300 border border-sky-600/40 font-mono flex items-center gap-1">
+                      <Link2 className="w-2.5 h-2.5" />
+                      <span>{gap.experienceId.slice(0, 16)}...</span>
+                    </span>
+                  )}
                   <span className="text-[10px] text-slate-400">頻度: {gap.frequency}回</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -473,6 +511,97 @@ export const CapabilityMasteryTab: React.FC = () => {
 
                 <div className="text-[11px] text-slate-300 bg-slate-900/80 p-2 rounded border border-slate-800/80">
                   {tr.verdictDetails}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 相互連携化: 共通experienceIdによる学習・改善系譜レジストリ (優先度B - 2.1) */}
+      <div className="space-y-2.5 pt-3 border-t border-slate-900">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+            <Link2 className="w-3.5 h-3.5 text-sky-400" />
+            <span>学習・改善 相互連携系譜レジストリ (Experience Lineage Tracker)</span>
+          </h4>
+          <span className="text-[10px] text-slate-400 font-mono">
+            {experienceLinks.length}件の経験系譜
+          </span>
+        </div>
+
+        <div className="text-[11px] text-slate-400">
+          失敗事象・反省・学習サンプル・能力ギャップ・定石ルール・自己改善コード提案を共通の <span className="text-sky-300 font-mono">experienceId</span> で串刺し追跡します。
+        </div>
+
+        {experienceLinks.length === 0 ? (
+          <div className="p-4 bg-slate-950/60 border border-slate-800/80 rounded-xl text-center text-xs text-slate-400">
+            まだ記録された経験系譜はありません。失敗診断や自律反省サイクルが実行されると、横断的な系譜が自動登録されます。
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {experienceLinks.slice(0, 8).map((link) => (
+              <div
+                key={link.experienceId}
+                className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2 text-xs hover:border-slate-700 transition-all"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-sky-300 bg-sky-950/80 border border-sky-500/40 px-2 py-0.5 rounded text-[10.5px] flex items-center gap-1">
+                      <Link2 className="w-3 h-3" />
+                      {link.experienceId}
+                    </span>
+                    <span className="text-[9.5px] px-1.5 py-0.2 rounded font-mono bg-slate-900 border border-slate-800 text-slate-400">
+                      起点: {link.source}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    {new Date(link.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+
+                {/* 紐づくエンティティバッジ */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {link.failureLogId && (
+                    <span className="text-[9.5px] px-2 py-0.5 rounded font-mono bg-rose-950/60 text-rose-300 border border-rose-600/40">
+                      🚨 失敗ログ: {link.failureLogId}
+                    </span>
+                  )}
+                  {link.relatedReflectionIds && link.relatedReflectionIds.length > 0 && (
+                    <span className="text-[9.5px] px-2 py-0.5 rounded font-mono bg-amber-950/60 text-amber-300 border border-amber-600/40">
+                      💭 反実反省: {link.relatedReflectionIds.length}件
+                    </span>
+                  )}
+                  {link.relatedTrainingSampleIds && link.relatedTrainingSampleIds.length > 0 && (
+                    <span className="text-[9.5px] px-2 py-0.5 rounded font-mono bg-emerald-950/60 text-emerald-300 border border-emerald-600/40">
+                      📚 教材サンプル: {link.relatedTrainingSampleIds.length}件
+                    </span>
+                  )}
+                  {link.relatedCapabilityGapIds && link.relatedCapabilityGapIds.length > 0 && (
+                    <span className="text-[9.5px] px-2 py-0.5 rounded font-mono bg-purple-950/60 text-purple-300 border border-purple-600/40">
+                      🎯 能力ギャップ: {link.relatedCapabilityGapIds.length}件
+                    </span>
+                  )}
+                  {link.relatedHeuristicRuleIds && link.relatedHeuristicRuleIds.length > 0 && (
+                    <span className="text-[9.5px] px-2 py-0.5 rounded font-mono bg-indigo-950/60 text-indigo-300 border border-indigo-600/40">
+                      📜 定石ルール: {link.relatedHeuristicRuleIds.length}件
+                    </span>
+                  )}
+                  {link.relatedSelfCodeProposalIds && link.relatedSelfCodeProposalIds.length > 0 && (
+                    <span className="text-[9.5px] px-2 py-0.5 rounded font-mono bg-cyan-950/60 text-cyan-300 border border-cyan-600/40">
+                      💻 コード改善: {link.relatedSelfCodeProposalIds.length}件
+                    </span>
+                  )}
+                  {link.relatedResponseSkeletonIds && link.relatedResponseSkeletonIds.length > 0 && (
+                    <span className="text-[9.5px] px-2 py-0.5 rounded font-mono bg-teal-950/60 text-teal-300 border border-teal-600/40">
+                      🦴 回答骨格: {link.relatedResponseSkeletonIds.length}件
+                    </span>
+                  )}
+                  {link.evidenceIds && link.evidenceIds.length > 0 && (
+                    <span className="text-[9.5px] px-2 py-0.5 rounded font-mono bg-slate-900 text-slate-400 border border-slate-800">
+                      🔎 根拠証拠: {link.evidenceIds.length}件
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

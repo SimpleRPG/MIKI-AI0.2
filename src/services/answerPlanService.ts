@@ -17,7 +17,7 @@ import { isRealDataProvider } from './webMaterialPatternExtractor';
 const SKELETONS_STORAGE_KEY = 'miki_response_skeletons_v32';
 
 /**
- * 初期プリセット回答骨格 (設計思想 9章: 回答骨格と思考節約)
+ * 初期プリセット回答骨格 (設計思想 9章: 回答骨格と思考節約 & 優先度A - 1.2: 初期データへの客観的根拠明記)
  */
 export const INITIAL_SKELETONS: ResponseSkeleton[] = [
   {
@@ -46,6 +46,9 @@ export const INITIAL_SKELETONS: ResponseSkeleton[] = [
     exampleResponseTemplate: '了解だよ！PC環境は使えない前提で再検討したよ。スマホ単体で完結する手順はこちら...',
     usageCount: 18,
     successRate: 98,
+    status: 'VERIFIED',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_pattern_correction'],
     createdAt: Date.now() - 1000000,
     updatedAt: Date.now() - 10000,
   },
@@ -73,6 +76,9 @@ export const INITIAL_SKELETONS: ResponseSkeleton[] = [
     exampleResponseTemplate: '結論から言うと、最上位の除外フラグDが最優先されるため【非更新（スキップ）】になるよ！\n優先順位の階層は：\n① 除外フラグD（最優先・即時スキップ）\n② 例外C（特殊処理）\n③ 条件AかつB（通常実行条件）\nという判定順序になるよ。',
     usageCount: 16,
     successRate: 94,
+    status: 'VERIFIED',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_pattern_logical_priority'],
     createdAt: Date.now() - 600000,
     updatedAt: Date.now() - 30000,
   },
@@ -99,6 +105,9 @@ export const INITIAL_SKELETONS: ResponseSkeleton[] = [
     exampleResponseTemplate: 'ごめんね、説明が混乱させちゃった！正しくは【〇〇】だよ。理由は...',
     usageCount: 8,
     successRate: 90,
+    status: 'VERIFIED',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_pattern_contradiction'],
     createdAt: Date.now() - 900000,
     updatedAt: Date.now() - 150000,
   },
@@ -122,6 +131,9 @@ export const INITIAL_SKELETONS: ResponseSkeleton[] = [
     exampleResponseTemplate: '足りるよ！この設定なら約1.8GBの消費で収まるから、S25のRAM制限内だよ。',
     usageCount: 25,
     successRate: 98,
+    status: 'VERIFIED',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_pattern_direct_short'],
     createdAt: Date.now() - 800000,
     updatedAt: Date.now() - 50000,
   },
@@ -145,6 +157,9 @@ export const INITIAL_SKELETONS: ResponseSkeleton[] = [
     exampleResponseTemplate: '基本的には〇〇がおすすめだよ！ただ、もし端末オフライン実行が必須なら△△になるよ。どちらの用途を想定してる？',
     usageCount: 15,
     successRate: 92,
+    status: 'VERIFIED',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_pattern_clarification'],
     createdAt: Date.now() - 700000,
     updatedAt: Date.now() - 80000,
   },
@@ -169,6 +184,9 @@ export const INITIAL_SKELETONS: ResponseSkeleton[] = [
     exampleResponseTemplate: '結論として、目的に対して検証可能な方式を推奨するよ！比較すると...',
     usageCount: 14,
     successRate: 94,
+    status: 'VERIFIED',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_pattern_comparison'],
     createdAt: Date.now() - 600000,
     updatedAt: Date.now() - 90000,
   },
@@ -192,6 +210,9 @@ export const INITIAL_SKELETONS: ResponseSkeleton[] = [
     exampleResponseTemplate: 'うん！さっきの「対象行を判定して更新する」処理だね。On Error GoToを使った安全なエラー処理はこちらだよ...',
     usageCount: 9,
     successRate: 96,
+    status: 'VERIFIED',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_pattern_topic_resume'],
     createdAt: Date.now() - 500000,
     updatedAt: Date.now() - 120000,
   },
@@ -399,13 +420,18 @@ class AnswerPlanService {
         existing.sourceProvenance = params.sourceProvenance;
       }
 
-      // 設計思想 16章「削減知能」強制ルール:
+      // 設計思想 16章「削減知能」強制ルール & 優先度A - 1.2:
       // 同じ構造のログが複数回（3回以上）確認されて初めてVERIFIEDへ正式昇格
       if ((existing.observedCount || 0) >= 3 && existing.status === 'CANDIDATE') {
         existing.status = 'VERIFIED';
+        existing.source = existing.sourceType === 'TEACHER_MATERIAL' ? 'verified_from_teacher' : 'observed';
+        existing.evidenceIds = [
+          `observed_${existing.observedCount}_times`,
+          ...(existing.evidenceIds || []),
+        ];
         systemLogger.info(
           'ANSWER_PLAN',
-          `🏆 [骨格正式化 (VERIFIED)] 観測回数3回に達したため回答骨格 ${existing.pattern_id} を正式化しました (${existing.situation}, sourceType: ${existing.sourceType})`
+          `🏆 [骨格正式化 (VERIFIED)] 観測回数3回に達したため回答骨格 ${existing.pattern_id} を正式化しました (${existing.situation}, source: ${existing.source}, sourceType: ${existing.sourceType})`
         );
       } else {
         systemLogger.info(
@@ -474,6 +500,8 @@ class AnswerPlanService {
       // 初回は必ず CANDIDATE 状態で保存 (3回観測強制ルール)
       status: 'CANDIDATE',
       sourceType: params.sourceType,
+      source: params.sourceType === 'TEACHER_MATERIAL' ? 'external_teacher_proposed' : 'observed',
+      evidenceIds: params.sourceProvenance?.url ? [`url_${params.sourceProvenance.url}`] : [`source_${params.sourceType}`],
       observedCount: 1,
       patternSignature,
       sourceProvenance: params.sourceProvenance,

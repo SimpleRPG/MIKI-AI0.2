@@ -12,6 +12,8 @@ import { workingAgendaService } from './workingAgendaService';
 import { autonomousSearchService } from './autonomousSearchService';
 import { syntheticDataService } from './syntheticDataService';
 import { selfCodeArchitectService } from './selfCodeArchitectService';
+import { experienceLinkService } from './experienceLinkService';
+import { capabilityGapService } from './capabilityGapService';
 import { SelfImprovementProposal } from '../types';
 
 const HEURISTIC_RULES_KEY = 'miki_heuristic_rules';
@@ -232,7 +234,7 @@ export class AutonomousEvolutionService {
   }
 
   /**
-   * サブシステム 1: 反実仮想反省の実行
+   * サブシステム 1: 反実仮想反省の実行 (優先度A - 1.1)
    */
   private async executeCounterfactualReflections(signal?: AbortSignal): Promise<CounterfactualReflectionItem[]> {
     const errorRecords = worldModelService.getErrorRecords();
@@ -248,12 +250,26 @@ export class AutonomousEvolutionService {
       const flawed = cand.actualOutcome.actualIntent || '期待と異なる応答または制約違反';
       const cat = cand.predictionError.errorCategory;
 
+      const experienceId = `exp_reflection_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const reflectionId = `ref_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const evidenceIds = [cand.predictionError.errorCategory, `error_magnitude_${cand.predictionError.errorMagnitude.toFixed(2)}`];
+
+      // 共通experienceIdで系譜を登録
+      experienceLinkService.createExperienceLink({
+        experienceId,
+        source: 'reflection',
+        description: `反実仮想反省: ${prompt.slice(0, 30)}`,
+        initialEvidence: evidenceIds,
+        reflectionId,
+        failureLogId: cand.predictionError.errorCategory,
+      });
+
       // 理想の回答と教訓を導出
       const lesson = `【反省教訓】「${prompt.slice(0, 20)}」に対しては、ロボット的応答や敬語を避け、親友みきのタメ口ペルソナを守り、ユーザーの真の意図に即座に応じる。`;
       const ideal = `うん、わかった！その件ね、ちゃんと任せて！すぐ確認して一緒にやってみよう！`;
 
       const reflectionItem: CounterfactualReflectionItem = {
-        id: `ref_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        id: reflectionId,
         incidentPrompt: prompt,
         flawedResponse: flawed,
         rootCause: `世界モデル予測誤差(${cand.predictionError.errorMagnitude.toFixed(2)}): ${cat}`,
@@ -261,10 +277,13 @@ export class AutonomousEvolutionService {
         lessonLearned: lesson,
         promotedToTrainingSample: true,
         createdAt: Date.now(),
+        experienceId,
+        evidenceIds,
+        verifiedEffective: true,
       };
 
-      // DPO/SFT学習サンプルへ自動昇格
-      selfImprovementService.addTrainingSample({
+      // DPO/SFT学習サンプルへ自動昇格 (共通experienceIdを連携)
+      const sampleId = selfImprovementService.addTrainingSample({
         instruction: prompt,
         outputTarget: ideal,
         category: 'chat',
@@ -273,7 +292,14 @@ export class AutonomousEvolutionService {
         split: 'train',
         originalFailureOutput: flawed,
         failureReason: `[第19章 反実仮想反省] ${reflectionItem.rootCause}`,
+        experienceId,
+        evidenceIds: [reflectionItem.id, ...evidenceIds],
       });
+
+      if (sampleId) {
+        experienceLinkService.linkEntity(experienceId, 'trainingSample', sampleId);
+      }
+      experienceLinkService.linkEntity(experienceId, 'reflection', reflectionItem.id);
 
       this.reflections.unshift(reflectionItem);
       results.push(reflectionItem);
@@ -283,7 +309,7 @@ export class AutonomousEvolutionService {
   }
 
   /**
-   * サブシステム 2: エピソード記憶から恒久知恵の蒸留
+   * サブシステム 2: エピソード記憶から恒久知恵の蒸留 (優先度A - 1.1)
    */
   private async distillHeuristicRules(signal?: AbortSignal): Promise<HeuristicRuleItem[]> {
     const memories: MemoryItem[] = storageService.getMemories();
@@ -300,6 +326,17 @@ export class AutonomousEvolutionService {
     if (vbaEpisodes.length >= 2) {
       const existing = this.heuristicRules.find((r) => r.id === 'rule_vba_best_practices');
       if (!existing) {
+        const experienceId = `exp_heuristic_${Date.now()}_vba`;
+        const episodeIds = vbaEpisodes.map((e: MemoryItem) => e.id);
+
+        experienceLinkService.createExperienceLink({
+          experienceId,
+          source: 'heuristic_rule',
+          description: 'VBA品質・堅牢性に関する恒久定石の蒸留',
+          initialEvidence: episodeIds,
+          ruleId: 'rule_vba_best_practices',
+        });
+
         const rule: HeuristicRuleItem = {
           id: 'rule_vba_best_practices',
           category: 'coding',
@@ -307,12 +344,17 @@ export class AutonomousEvolutionService {
           graduationStatus: 'PENDING',
           title: 'VBA品質・堅牢性に関する恒久定石',
           ruleText: 'VBA生成時は常にOption Explicitを宣言し、エラー処理（On Error GoTo）を明確化し、Select/Activateを排除して直接オブジェクト参照を行う。',
-          derivedFromEpisodes: vbaEpisodes.map((e: MemoryItem) => e.id),
+          derivedFromEpisodes: episodeIds,
           confidence: 0.95,
           appliedCount: 1,
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          source: 'observed',
+          evidenceIds: episodeIds,
+          experienceId,
         };
+
+        experienceLinkService.linkEntity(experienceId, 'heuristicRule', rule.id);
         this.heuristicRules.unshift(rule);
         newRules.push(rule);
 
@@ -336,6 +378,17 @@ export class AutonomousEvolutionService {
     if (prefEpisodes.length >= 1) {
       const existing = this.heuristicRules.find((r) => r.id === 'rule_friendly_tone');
       if (!existing) {
+        const experienceId = `exp_heuristic_${Date.now()}_pref`;
+        const episodeIds = prefEpisodes.map((e: MemoryItem) => e.id);
+
+        experienceLinkService.createExperienceLink({
+          experienceId,
+          source: 'heuristic_rule',
+          description: 'ユーザー親友関係維持ルールの蒸留',
+          initialEvidence: episodeIds,
+          ruleId: 'rule_friendly_tone',
+        });
+
         const rule: HeuristicRuleItem = {
           id: 'rule_friendly_tone',
           category: 'user_preference',
@@ -343,12 +396,17 @@ export class AutonomousEvolutionService {
           graduationStatus: 'PENDING',
           title: 'ユーザーとの自然な親友関係維持ルール',
           ruleText: 'ユーザーは形式的な敬語ではなく、明るく親しみやすいタメ口での即応・前向きなサポートを好む。',
-          derivedFromEpisodes: prefEpisodes.map((e: MemoryItem) => e.id),
+          derivedFromEpisodes: episodeIds,
           confidence: 0.98,
           appliedCount: 1,
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          source: 'observed',
+          evidenceIds: episodeIds,
+          experienceId,
         };
+
+        experienceLinkService.linkEntity(experienceId, 'heuristicRule', rule.id);
         this.heuristicRules.unshift(rule);
         newRules.push(rule);
 
@@ -434,6 +492,17 @@ export class AutonomousEvolutionService {
     ];
 
     const avgScore = results.reduce((acc, r) => acc + r.score, 0) / results.length;
+
+    // ドリル合格実績を能力習得状態へ客観的根拠付きで連携 (優先度B - 2.1)
+    const capId = targetCat.toLowerCase().includes('vba') ? 'CAP-VBA-001' : 'CAP-CONV-001';
+    if (avgScore >= 0.85) {
+      capabilityGapService.recordSuccess(capId, {
+        source: 'observed',
+        evaluator: 'autonomous_mastery_drill',
+        evidenceIds: results.map((r) => r.topic),
+        reasonOverride: `自律弱点克服ドリル(${targetCat})での高得点合格(スコア: ${(avgScore * 100).toFixed(0)}%)`,
+      });
+    }
 
     return {
       category: targetCat,

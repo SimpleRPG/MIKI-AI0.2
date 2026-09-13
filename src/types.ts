@@ -1062,6 +1062,8 @@ export interface SelfImprovementRecord {
     speedDeltaMs?: number;
     tokenDelta?: number;
   };
+  experienceId?: string;
+  evidenceIds?: string[];
 }
 
 /**
@@ -1086,6 +1088,8 @@ export interface TrainingSampleJSONL {
   redacted?: boolean; // 個人情報伏字化([REDACTED])フラグ (設計思想 25. 安全・品質境界)
   redactedReasons?: string[];
   createdAt: number;
+  experienceId?: string;
+  evidenceIds?: string[];
 }
 
 /**
@@ -1294,6 +1298,11 @@ export interface ReviewQueueItem {
   category?: string;
   reasons: string[];
   createdAt: number;
+  verifiedEffective?: boolean;
+  verificationNote?: string;
+  failureReason?: string;
+  experienceId?: string;
+  evidenceIds?: string[];
 }
 
 export interface TrainingDataSplitStats {
@@ -1855,6 +1864,9 @@ export interface ResponseSkeleton {
     provider?: string;
     fetchMethod?: WebFetchMethod;
   };
+  source?: 'observed' | 'external_teacher_proposed' | 'verified_from_teacher' | 'seeded' | 'migrated';
+  evidenceIds?: string[];
+  experienceId?: string;
 }
 
 export interface AnswerPlanApplicationResult {
@@ -1879,6 +1891,18 @@ export type CapabilityMasteryState =
   | 'SATURATED'
   | 'REGRESSED';
 
+export interface MasteryHistoryEntry {
+  from: CapabilityMasteryState;
+  to: CapabilityMasteryState;
+  reason: string;
+  timestamp: number;
+  source: 'observed' | 'seeded' | 'migrated' | 'imported';
+  evidenceIds?: string[];   // observedの場合、根拠となるTrainingSample/RegressionResult等のID配列
+  verifiedAt?: number;
+  evaluator?: string;       // 'self' | 'user' | 'regression_test' 等
+  experienceId?: string;
+}
+
 export interface CapabilityMasteryProfile {
   capabilityId: string;
   name: string;
@@ -1890,12 +1914,9 @@ export interface CapabilityMasteryProfile {
   generalizationGapCount: number;
   associatedSkeletons: string[];
   lastAssessedAt: number;
-  transitionHistory: Array<{
-    from: CapabilityMasteryState;
-    to: CapabilityMasteryState;
-    reason: string;
-    timestamp: number;
-  }>;
+  transitionHistory: MasteryHistoryEntry[];
+  hasSeededData?: boolean;
+  experienceId?: string;
 }
 
 /**
@@ -1917,6 +1938,9 @@ export interface CapabilityGapEntry {
   lastSeenAt: number;
   samples: string[];
   associatedPatternId?: string; // 紐づく回答骨格パターンID
+  source?: 'observed' | 'seeded' | 'migrated' | 'imported';
+  evidenceIds?: string[];
+  experienceId?: string;
 }
 
 /**
@@ -2558,6 +2582,9 @@ export interface HeuristicRuleItem {
   }>;
   domain?: string;              // ドメインタグ (例: 'vba', 'conversation', 'code', 'general')
   transferredFrom?: string;     // 知識転移元となったルールID (第27.3章)
+  source?: 'observed' | 'external_teacher_proposed' | 'verified_from_teacher' | 'seeded' | 'migrated';
+  evidenceIds?: string[];
+  experienceId?: string;
 }
 
 /**
@@ -2644,6 +2671,9 @@ export interface CounterfactualReflectionItem {
   lessonLearned: string;
   promotedToTrainingSample: boolean;
   createdAt: number;
+  evidenceIds?: string[];
+  experienceId?: string;
+  verifiedEffective?: boolean;
 }
 
 /**
@@ -2784,6 +2814,7 @@ export interface AutonomousGrowthReport {
   growthHighlights: string[];
   welcomeGreetingCandidate: string;
   viewed: boolean;
+  experienceId?: string;
   details: {
     reflections?: CounterfactualReflectionItem[];
     distilledRules?: HeuristicRuleItem[];
@@ -2968,6 +2999,7 @@ export interface ChangeContract {
   mustPreserve: string[];
   invariants: string[];
   rollbackPlan: string;
+  experienceId?: string;
 }
 
 export interface SelfImprovementProposal {
@@ -2997,12 +3029,53 @@ export interface SelfImprovementProposal {
   };
   prompt?: string;
   targetFile?: string;
+  experienceId?: string;
   appliedResult?: {
     success: boolean;
     commitHash?: string;
     linesCount?: number;
     isRequirementImplemented?: boolean;
     generationMethod?: string;
+  };
+}
+
+/**
+ * 学習・改善 相互連携化 作業指示書 v1:
+ * 共通ID (experienceId) による横断的紐付け基盤 (ExperienceLink)
+ */
+export interface ExperienceLink {
+  experienceId: string;
+  timestamp: number;
+  source: 'conversation' | 'failure' | 'user_correction' | 'investigation' | 'code_improvement' | 'external_teacher' | string;
+  description?: string;
+  relatedTrainingSampleIds?: string[];
+  relatedCapabilityGapIds?: string[];
+  relatedHeuristicRuleIds?: string[];
+  relatedSelfCodeProposalIds?: string[];
+  relatedRegressionResultIds?: string[];
+  relatedResponseSkeletonIds?: string[];
+  relatedReflectionIds?: string[];
+}
+
+export interface CodeImprovementExperiencePayload {
+  experienceId: string;
+  sourceProposalId: string;
+  outcome: 'success' | 'failure' | 'rolled_back';
+  regressionSummary: {
+    syntaxPassed?: boolean;
+    testsPassed?: boolean;
+    testSummary?: string;
+    scoreDelta?: number;
+    verdict?: string;
+  };
+  relatedCapabilityGapId?: string;
+  details?: {
+    chapterNumber?: number;
+    title?: string;
+    targetFile?: string;
+    linesCount?: number;
+    commitHash?: string;
+    error?: string;
   };
 }
 

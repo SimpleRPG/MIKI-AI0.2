@@ -8,12 +8,14 @@ import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { evidenceBasedPromotionGateService } from './evidenceBasedPromotionGateService';
 import { unknownTaskDecompositionService } from './unknownTaskDecompositionService';
+import { experienceLinkService } from './experienceLinkService';
 
 const GAPS_STORAGE_KEY = 'miki_capability_gaps_v32';
 const MASTERY_PROFILES_KEY = 'miki_capability_mastery_profiles_v32';
 
 /**
  * 初期不足能力レジストリ (設計思想 32章 & 20章)
+ * 優先度A - 1.2: source: 'seeded', status: 'RESOLVED', evidenceIds 明記
  */
 export const INITIAL_GAPS: CapabilityGapEntry[] = [
   {
@@ -26,6 +28,8 @@ export const INITIAL_GAPS: CapabilityGapEntry[] = [
     current_workaround: '決定表へ変換して分岐を整理',
     candidate_solution: '回答骨格PATTERN-LOGICAL-PRIORITY-01 (決定表フラット化・最上位除外フラグ優先判定) 配備完了',
     status: 'RESOLVED',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_gap_0012'],
     firstSeenAt: Date.now() - 5000000,
     lastSeenAt: Date.now() - 10000,
     samples: [
@@ -43,6 +47,8 @@ export const INITIAL_GAPS: CapabilityGapEntry[] = [
     current_workaround: '教師に再度対策を作らせ骨格を追加',
     candidate_solution: '骨格PATTERN-CORRECTION-01の婉曲的訂正表現の正規表現拡張とカテゴリ一般化完了',
     status: 'RESOLVED',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_gap_0031'],
     firstSeenAt: Date.now() - 3000000,
     lastSeenAt: Date.now() - 5000,
     samples: [
@@ -55,6 +61,7 @@ export const INITIAL_GAPS: CapabilityGapEntry[] = [
 
 /**
  * 初期能力習得状態 (設計思想 21章)
+ * 優先度A - 1.2: 初期データへの客観的根拠(source: 'seeded', evidenceIds)の明記
  */
 export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
   {
@@ -62,6 +69,8 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     name: '前提訂正・前提更新能力',
     category: 'conversation',
     state: 'SATURATED',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_initial_mastery_correction'],
     successCount: 38,
     failureCount: 1,
     paraphraseFailureCount: 0,
@@ -69,9 +78,9 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     associatedSkeletons: ['PATTERN-CORRECTION-01'],
     lastAssessedAt: Date.now() - 5000,
     transitionHistory: [
-      { from: 'UNASSESSED', to: 'LEARNING', reason: '初期教材投入', timestamp: Date.now() - 4000000 },
-      { from: 'LEARNING', to: 'STABLE', reason: '骨格PATTERN-CORRECTION-01導入により合格率90%超達成', timestamp: Date.now() - 1000000 },
-      { from: 'STABLE', to: 'SATURATED', reason: '婉曲的・間接的な訂正表現の正規表現拡張とカテゴリ一般化によりGAP-0031を完全解消', timestamp: Date.now() - 5000 },
+      { from: 'UNASSESSED', to: 'LEARNING', reason: '初期教材投入', timestamp: Date.now() - 4000000, source: 'seeded', evidenceIds: ['spec_seed_history_1'] },
+      { from: 'LEARNING', to: 'STABLE', reason: '骨格PATTERN-CORRECTION-01導入により合格率90%超達成', timestamp: Date.now() - 1000000, source: 'seeded', evidenceIds: ['spec_seed_history_2'] },
+      { from: 'STABLE', to: 'SATURATED', reason: '婉曲的・間接的な訂正表現の正規表現拡張とカテゴリ一般化によりGAP-0031を完全解消', timestamp: Date.now() - 5000, source: 'seeded', evidenceIds: ['spec_seed_history_3'] },
     ],
   },
   {
@@ -79,6 +88,8 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     name: '矛盾修復・非防衛的態度能力',
     category: 'conversation',
     state: 'STABLE',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_initial_mastery_contradiction'],
     successCount: 18,
     failureCount: 1,
     paraphraseFailureCount: 0,
@@ -86,8 +97,8 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     associatedSkeletons: ['PATTERN-CONTRADICTION-01'],
     lastAssessedAt: Date.now() - 120000,
     transitionHistory: [
-      { from: 'UNASSESSED', to: 'LEARNING', reason: '矛盾指摘テスト開始', timestamp: Date.now() - 3000000 },
-      { from: 'LEARNING', to: 'STABLE', reason: '回答骨格PATTERN-CONTRADICTION-01適用で修復率向上', timestamp: Date.now() - 800000 },
+      { from: 'UNASSESSED', to: 'LEARNING', reason: '矛盾指摘テスト開始', timestamp: Date.now() - 3000000, source: 'seeded', evidenceIds: ['spec_seed_history_4'] },
+      { from: 'LEARNING', to: 'STABLE', reason: '回答骨格PATTERN-CONTRADICTION-01適用で修復率向上', timestamp: Date.now() - 800000, source: 'seeded', evidenceIds: ['spec_seed_history_5'] },
     ],
   },
   {
@@ -95,6 +106,8 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     name: '質問への直接回答・結論先行能力',
     category: 'conversation',
     state: 'SATURATED',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_initial_mastery_direct_answer'],
     successCount: 42,
     failureCount: 1,
     paraphraseFailureCount: 0,
@@ -102,8 +115,8 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     associatedSkeletons: ['PATTERN-DIRECT-SHORT-01'],
     lastAssessedAt: Date.now() - 50000,
     transitionHistory: [
-      { from: 'LEARNING', to: 'STABLE', reason: '直接回答ルール注入で安定', timestamp: Date.now() - 2000000 },
-      { from: 'STABLE', to: 'SATURATED', reason: '連続40回以上直接回答に成功。通常教材生成を休止し回帰監視のみに移行', timestamp: Date.now() - 300000 },
+      { from: 'LEARNING', to: 'STABLE', reason: '直接回答ルール注入で安定', timestamp: Date.now() - 2000000, source: 'seeded', evidenceIds: ['spec_seed_history_6'] },
+      { from: 'STABLE', to: 'SATURATED', reason: '連続40回以上直接回答に成功。通常教材生成を休止し回帰監視のみに移行', timestamp: Date.now() - 300000, source: 'seeded', evidenceIds: ['spec_seed_history_7'] },
     ],
   },
   {
@@ -111,6 +124,8 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     name: '複合条件・例外階層の論理統合',
     category: 'reasoning',
     state: 'STABLE',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_initial_mastery_logical_priority'],
     successCount: 18,
     failureCount: 2,
     paraphraseFailureCount: 0,
@@ -118,8 +133,8 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     associatedSkeletons: ['PATTERN-LOGICAL-PRIORITY-01'],
     lastAssessedAt: Date.now() - 10000,
     transitionHistory: [
-      { from: 'UNASSESSED', to: 'WEAK', reason: '三重例外テストケースで連続失敗検知', timestamp: Date.now() - 1500000 },
-      { from: 'WEAK', to: 'STABLE', reason: '回答骨格PATTERN-LOGICAL-PRIORITY-01配備と決定表優先順位付けロジックにより三重例外判定が安定（GAP-0012解消）', timestamp: Date.now() - 10000 },
+      { from: 'UNASSESSED', to: 'WEAK', reason: '三重例外テストケースで連続失敗検知', timestamp: Date.now() - 1500000, source: 'seeded', evidenceIds: ['spec_seed_history_8'] },
+      { from: 'WEAK', to: 'STABLE', reason: '回答骨格PATTERN-LOGICAL-PRIORITY-01配備と決定表優先順位付けロジックにより三重例外判定が安定（GAP-0012解消）', timestamp: Date.now() - 10000, source: 'seeded', evidenceIds: ['spec_seed_history_9'] },
     ],
   },
   {
@@ -127,6 +142,8 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     name: 'コード構造・依存・副作用理解',
     category: 'code',
     state: 'LEARNING',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_initial_mastery_code_comprehension'],
     successCount: 12,
     failureCount: 3,
     paraphraseFailureCount: 1,
@@ -134,7 +151,7 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     associatedSkeletons: [],
     lastAssessedAt: Date.now() - 180000,
     transitionHistory: [
-      { from: 'UNASSESSED', to: 'LEARNING', reason: '中間JSON表現(CodeIR)パイプライン導入', timestamp: Date.now() - 500000 },
+      { from: 'UNASSESSED', to: 'LEARNING', reason: '中間JSON表現(CodeIR)パイプライン導入', timestamp: Date.now() - 500000, source: 'seeded', evidenceIds: ['spec_seed_history_10'] },
     ],
   },
   {
@@ -142,6 +159,8 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     name: '抽象要件の決定表化と設計書生成',
     category: 'design',
     state: 'LEARNING',
+    source: 'seeded',
+    evidenceIds: ['spec_seed_initial_mastery_abstract_vba'],
     successCount: 8,
     failureCount: 2,
     paraphraseFailureCount: 0,
@@ -149,7 +168,7 @@ export const INITIAL_MASTERY_PROFILES: CapabilityMasteryProfile[] = [
     associatedSkeletons: [],
     lastAssessedAt: Date.now() - 160000,
     transitionHistory: [
-      { from: 'UNASSESSED', to: 'LEARNING', reason: '決定表エンジンおよび外部Copilot指示書機能導入', timestamp: Date.now() - 400000 },
+      { from: 'UNASSESSED', to: 'LEARNING', reason: '決定表エンジンおよび外部Copilot指示書機能導入', timestamp: Date.now() - 400000, source: 'seeded', evidenceIds: ['spec_seed_history_11'] },
     ],
   },
 ];
@@ -240,6 +259,9 @@ class CapabilityGapService {
     candidate_solution: string;
     samplePrompt?: string;
     associatedPatternId?: string;
+    source?: 'observed' | 'seeded' | 'teacher_material';
+    evidenceIds?: string[];
+    experienceId?: string;
   }): CapabilityGapEntry {
     // 既存の同種ギャップがあるか探す
     const existing = this.gaps.find(
@@ -252,8 +274,18 @@ class CapabilityGapService {
       if (entry.samplePrompt && !existing.samples.includes(entry.samplePrompt)) {
         existing.samples.push(entry.samplePrompt);
       }
+      if (entry.experienceId) {
+        existing.experienceId = entry.experienceId;
+        experienceLinkService.linkEntity(entry.experienceId, 'capabilityGap', existing.gap_id);
+      }
+      if (entry.evidenceIds && entry.evidenceIds.length > 0) {
+        existing.evidenceIds = Array.from(new Set([...(existing.evidenceIds || []), ...entry.evidenceIds]));
+      }
       this.saveGaps();
-      this.updateMasteryOnFailure(entry.capabilityId, entry.gap_type === 'generalization_gap');
+      this.updateMasteryOnFailure(entry.capabilityId, entry.gap_type === 'generalization_gap', {
+        experienceId: entry.experienceId,
+        evidenceIds: entry.evidenceIds,
+      });
       return existing;
     }
 
@@ -270,15 +302,25 @@ class CapabilityGapService {
       current_workaround: entry.current_workaround,
       candidate_solution: entry.candidate_solution,
       status: 'OPEN',
+      source: entry.source || 'observed',
+      evidenceIds: entry.evidenceIds || [],
+      experienceId: entry.experienceId,
       firstSeenAt: Date.now(),
       lastSeenAt: Date.now(),
       samples: entry.samplePrompt ? [entry.samplePrompt] : [],
       associatedPatternId: entry.associatedPatternId,
     };
 
+    if (entry.experienceId) {
+      experienceLinkService.linkEntity(entry.experienceId, 'capabilityGap', newEntry.gap_id);
+    }
+
     this.gaps.unshift(newEntry);
     this.saveGaps();
-    this.updateMasteryOnFailure(entry.capabilityId, entry.gap_type === 'generalization_gap');
+    this.updateMasteryOnFailure(entry.capabilityId, entry.gap_type === 'generalization_gap', {
+      experienceId: entry.experienceId,
+      evidenceIds: entry.evidenceIds,
+    });
 
     // 第162章 & 設計思想7.1節: 新規ギャップ発生時に未知タスクを安全に分解し調査経路へ送る
     try {
@@ -329,9 +371,13 @@ class CapabilityGapService {
   }
 
   /**
-   * 21章: 失敗時の習得状態遷移
+   * 21章: 失敗時の習得状態遷移 (優先度A - 1.2 & B - 2.1)
    */
-  private updateMasteryOnFailure(capabilityId: string, isGeneralizationGap: boolean): void {
+  private updateMasteryOnFailure(
+    capabilityId: string,
+    isGeneralizationGap: boolean,
+    options?: { experienceId?: string; evidenceIds?: string[]; evaluator?: string }
+  ): void {
     const prof = this.getProfileById(capabilityId);
     if (!prof) return;
 
@@ -349,6 +395,10 @@ class CapabilityGapService {
         to: 'STABLE',
         reason: '失敗検知により監視レベルを再引き上げ',
         timestamp: Date.now(),
+        source: 'observed',
+        evidenceIds: options?.evidenceIds,
+        evaluator: options?.evaluator || 'runtime_observation',
+        experienceId: options?.experienceId,
       });
       prof.state = 'STABLE';
     } else if (prof.state === 'STABLE' && prof.failureCount >= 5) {
@@ -358,6 +408,10 @@ class CapabilityGapService {
         to: 'REGRESSED',
         reason: '直近の変更等による回帰(regression)の疑い',
         timestamp: Date.now(),
+        source: 'observed',
+        evidenceIds: options?.evidenceIds,
+        evaluator: options?.evaluator || 'runtime_observation',
+        experienceId: options?.experienceId,
       });
       prof.state = 'REGRESSED';
       systemLogger.error(
@@ -370,22 +424,44 @@ class CapabilityGapService {
   }
 
   /**
-   * 21章: 成功時の習得状態遷移
+   * 21章: 成功時の習得状態遷移 (優先度A - 1.2 & B - 2.1 & B - 2.2)
    */
-  public recordSuccess(capabilityId: string): void {
+  public recordSuccess(
+    capabilityId: string,
+    options?: {
+      source?: 'observed' | 'seeded' | 'teacher_material';
+      evidenceIds?: string[];
+      evaluator?: string;
+      experienceId?: string;
+      reasonOverride?: string;
+    }
+  ): void {
     const prof = this.getProfileById(capabilityId);
     if (!prof) return;
 
     prof.successCount += 1;
     prof.lastAssessedAt = Date.now();
 
+    const src = options?.source || 'observed';
+    const evIds = options?.evidenceIds;
+    const evaluator = options?.evaluator || 'runtime_observation';
+    const expId = options?.experienceId;
+
+    if (expId) {
+      experienceLinkService.linkEntity(expId, 'capabilityGap', capabilityId);
+    }
+
     if (prof.state === 'UNASSESSED' || prof.state === 'WEAK') {
       if (prof.successCount >= 3 && prof.successCount > prof.failureCount) {
         prof.transitionHistory.push({
           from: prof.state,
           to: 'LEARNING',
-          reason: '複数回の成功確認により学習中へ昇格',
+          reason: options?.reasonOverride || '複数回の成功確認により学習中へ昇格',
           timestamp: Date.now(),
+          source: src,
+          evidenceIds: evIds,
+          evaluator,
+          experienceId: expId,
         });
         prof.state = 'LEARNING';
       }
@@ -394,8 +470,12 @@ class CapabilityGapService {
         prof.transitionHistory.push({
           from: 'LEARNING',
           to: 'STABLE',
-          reason: '正答率85%以上達成、安定版へ昇格',
+          reason: options?.reasonOverride || '正答率85%以上達成、安定版へ昇格',
           timestamp: Date.now(),
+          source: src,
+          evidenceIds: evIds,
+          evaluator,
+          experienceId: expId,
         });
         prof.state = 'STABLE';
       }
@@ -409,8 +489,12 @@ class CapabilityGapService {
         prof.transitionHistory.push({
           from: 'STABLE',
           to: 'SATURATED',
-          reason: `長期安定稼働・品質保証ゲート合格 (${masteryGate.summary}) により飽和(SATURATED)達成。通常教材生成を休止し回帰試験のみ維持`,
+          reason: options?.reasonOverride || `長期安定稼働・品質保証ゲート合格 (${masteryGate.summary}) により飽和(SATURATED)達成。通常教材生成を休止し回帰試験のみ維持`,
           timestamp: Date.now(),
+          source: src,
+          evidenceIds: evIds,
+          evaluator,
+          experienceId: expId,
         });
         prof.state = 'SATURATED';
       }
@@ -419,8 +503,12 @@ class CapabilityGapService {
         prof.transitionHistory.push({
           from: 'REGRESSED',
           to: 'STABLE',
-          reason: '修復後の連続成功確認によりSTABLEへ復帰',
+          reason: options?.reasonOverride || '修復後の連続成功確認によりSTABLEへ復帰',
           timestamp: Date.now(),
+          source: src,
+          evidenceIds: evIds,
+          evaluator,
+          experienceId: expId,
         });
         prof.state = 'STABLE';
       }

@@ -11,6 +11,7 @@ import {
   ReviewQueueItem,
   ModelSizeComparisonReport,
   FailureRecurrenceEntry,
+  CodeImprovementExperiencePayload,
 } from '../types';
 
 export type { FailureRecurrenceEntry };
@@ -24,6 +25,7 @@ import { capabilityGapService } from './capabilityGapService';
 import { answerPlanService } from './answerPlanService';
 import { failureCatalogService } from './failureCatalogService';
 import { deterministicCapabilityEvolutionService } from './deterministicCapabilityEvolutionService';
+import { experienceLinkService } from './experienceLinkService';
 
 const RECORDS_STORAGE_KEY = 'miki_ai_self_improvement_records';
 const TRAINING_DATA_STORAGE_KEY = 'miki_ai_training_samples';
@@ -35,8 +37,9 @@ const REJECTED_SAMPLES_LOG_KEY = 'miki_ai_rejected_samples_log';
 const REVIEW_QUEUE_KEY = 'miki_ai_review_queue';
 
 /**
- * 初期モデル世代リスト (設計思想 18. 系統樹 & 25. 安全・品質境界)
- * フェイク数値を排し、基準ベースモデルのみの初期状態からスタートします。
+ * 初期モデル世代リスト (設計思想 18. 系統樹 & 優先度C - 3.2: Non-LLM Core設計)
+ * Non-LLM Coreへの移行に伴いニューラルモデル再学習は退役・行われません。
+ * 互換性のための空配列定義を明示します。
  */
 export const INITIAL_GENERATIONS: ModelGeneration[] = [];
 
@@ -158,11 +161,25 @@ class SelfImprovementService {
       approved: true,
       split: 'train',
       createdAt: Date.now(),
+      verifiedEffective: item.verifiedEffective,
+      verificationNote: item.verificationNote,
+      failureReason: item.failureReason,
+      experienceId: item.experienceId,
+      evidenceIds: item.evidenceIds,
     };
     this.trainingSamples.unshift(newSample);
     this.saveTrainingSamples();
+
+    if (newSample.experienceId) {
+      experienceLinkService.linkEntity(newSample.experienceId, 'trainingSample', newSample.id);
+    }
+
     if (newSample.approved && newSample.verifiedEffective === true) {
-      deterministicCapabilityEvolutionService.compileVerifiedSample(newSample);
+      const patch = deterministicCapabilityEvolutionService.compileVerifiedSample(newSample);
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🎯 [1.1 能力コンパイル到達] 要確認キューから承認された検証済みサンプル (ID: ${newSample.id}) から能力パッチ [${patch?.id || 'compiled'}] をコンパイル・配備完了 (verifiedEffective: ${newSample.verifiedEffective})`
+      );
     } else if (newSample.failureReason) {
       deterministicCapabilityEvolutionService.recordFailure(newSample);
     }
@@ -170,9 +187,63 @@ class SelfImprovementService {
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `✅ [要確認キュー承認] サンプルを学習データセットに追加しました (ID: ${item.id})`
+      `✅ [要確認キュー承認] サンプルを学習データセットに追加しました (ID: ${item.id} -> ${newSample.id}, verifiedEffective: ${newSample.verifiedEffective ?? false})`
     );
     return newSample;
+  }
+
+  /**
+   * 学習・改善 相互連携化 作業指示書 v1 (優先度B - 2.2):
+   * コード改善の結果を「新しい経験」として学習側へ自動還元する (相互連携の逆方向ループ)
+   */
+  public ingestExperienceFromCodeImprovement(payload: CodeImprovementExperiencePayload): void {
+    const { experienceId, sourceProposalId, outcome, regressionSummary, relatedCapabilityGapId, details } = payload;
+
+    // 1. experienceLinkServiceに横断リンク登録
+    experienceLinkService.registerLink({
+      experienceId,
+      timestamp: Date.now(),
+      source: 'code_improvement',
+      description: `コード自己改善反映結果: ${outcome} (Proposal: ${sourceProposalId}, Chapter: ${details?.chapterNumber || 'N/A'}, Title: ${details?.title || 'N/A'})`,
+      relatedSelfCodeProposalIds: [sourceProposalId],
+      relatedCapabilityGapIds: relatedCapabilityGapId ? [relatedCapabilityGapId] : [],
+    });
+
+    // 2. 成功した改善は、関連するCapabilityGapの熟達度更新 (source: 'observed' のエントリ追加) に使う
+    if (outcome === 'success') {
+      if (relatedCapabilityGapId) {
+        capabilityGapService.recordSuccess(relatedCapabilityGapId, {
+          source: 'observed',
+          evidenceIds: [
+            `proposal_${sourceProposalId}`,
+            details?.commitHash ? `commit_${details.commitHash}` : `result_${outcome}`,
+          ],
+          evaluator: 'self_code_improvement',
+          experienceId,
+          reasonOverride: `自律コード改善(第${details?.chapterNumber || ''}章 ${details?.title || ''})の適用成功により実測検証完了`,
+        });
+      }
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🔄 [改善→学習: 成功還元] コード改善提案 ${sourceProposalId} (第${details?.chapterNumber || ''}章) の成功を実観測データ (source: 'observed') として能力習得プロファイルへ反映しました`
+      );
+    } else {
+      // 3. 失敗・ロールバックした改善は、FailureRecurrence として記録し、同じ提案を安易に再提案しないための抑制材料にする
+      const failReason = outcome === 'rolled_back'
+        ? `ロールバック実行: ${details?.title || ''} (${regressionSummary.testSummary || 'ロールバック'})`
+        : `コード改善適用失敗: ${details?.error || regressionSummary.testSummary || '回帰テスト不合格'}`;
+
+      this.recordFailureRecurrence({
+        prompt: `CodeImprovement proposal:${sourceProposalId} chapter:${details?.chapterNumber || 'unknown'}`,
+        category: 'code_improvement_failure',
+        reason: failReason,
+      });
+
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `🔄 [改善→学習: 失敗抑制還元] コード改善 ${sourceProposalId} (${outcome}) を FailureRecurrence に記録し、同一失敗の再提案を抑制します`
+      );
+    }
   }
 
   public dismissReviewQueueItem(id: string): boolean {
@@ -312,7 +383,7 @@ class SelfImprovementService {
         category: 'コード生成・修復の論理破綻 (Code Logic Bug)',
         rootCause: '小型モデル単体の推論力だけでは、依存関係の長い構文やCanvas座標系を正しく処理できませんでした。',
         suggestedFixArea: 'skill',
-        recommendation: '「Canvasデバッグスキル」や「構文検証パーサー」の手続きをプロンプトにインジェクトするか、Colabでのコード修復教材でモデルを専門化してください。',
+        recommendation: '決定表・回答骨格（Response Skeleton）や構文検証パーサー等の決定論的パッチを生成・配備し、能力ギャップ（CapabilityGap）を解消してください。',
       };
     }
 
@@ -331,7 +402,7 @@ class SelfImprovementService {
       category: '小型モデル表現力の限界 (Model Capacity Limit)',
       rootCause: '現在の1.5B/0.5Bモデルでは、高度な文脈追従や複雑な複数条件の同時処理が困難でした。',
       suggestedFixArea: 'model',
-      recommendation: 'この失敗ケースをJSONL学習データとして保存し、Colab環境でのLoRA学習データセットに含めてください。',
+      recommendation: 'この失敗ケースから成立条件と反例を特定し、決定論的能力パッチ（CapabilityPatch）または回答骨格として定着させてください。',
     };
   }
 
@@ -370,8 +441,11 @@ class SelfImprovementService {
       return diagnosis;
     }
 
+    const experienceId = `exp_failure_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const recordId = 'diag_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+
     const record: SelfImprovementRecord = {
-      id: 'diag_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      id: recordId,
       timestamp: Date.now(),
       type: 'failure_diagnosis',
       targetArea: diagnosis.suggestedFixArea,
@@ -380,11 +454,22 @@ class SelfImprovementService {
       candidate: assistantResponse,
       result: 'inconclusive',
       adopted: false,
+      experienceId,
+      evidenceIds: [userMessage.slice(0, 30), diagnosis.rootCause.slice(0, 30)],
     };
     this.records.unshift(record);
     this.saveRecords();
 
-    // 設計思想 32章: 不足能力レジストリへ失敗事象を自動登録
+    // 共通experienceIdで系譜を記録
+    experienceLinkService.createExperienceLink({
+      experienceId,
+      source: 'failure',
+      description: `失敗診断: ${diagnosis.category}`,
+      initialEvidence: [userMessage, diagnosis.rootCause],
+      failureLogId: recordId,
+    });
+
+    // 設計思想 32章: 不足能力レジストリへ失敗事象を自動登録 (共通experienceId連携)
     try {
       const isCodeOrVba =
         userMessage.toLowerCase().includes('vba') ||
@@ -400,6 +485,9 @@ class SelfImprovementService {
         current_workaround: diagnosis.recommendation,
         candidate_solution: `修復領域: ${diagnosis.suggestedFixArea} (回答骨格/決定表/教師教材)`,
         samplePrompt: userMessage,
+        source: 'observed',
+        evidenceIds: [recordId],
+        experienceId,
       });
     } catch (gapErr) {
       console.warn('Failed to record capability gap:', gapErr);
@@ -560,9 +648,18 @@ class SelfImprovementService {
         category: sample.category || 'chat',
         reasons: safety.reasons,
         createdAt: Date.now(),
+        verifiedEffective: sample.verifiedEffective,
+        verificationNote: sample.verificationNote,
+        failureReason: sample.failureReason,
+        experienceId: sample.experienceId,
+        evidenceIds: sample.evidenceIds,
       };
       this.reviewQueue.unshift(reviewItem);
       this.saveReviewQueue();
+
+      if (sample.experienceId) {
+        experienceLinkService.linkEntity(sample.experienceId, 'trainingSample', reviewItem.id);
+      }
 
       systemLogger.info(
         'SELF_IMPROVEMENT',
@@ -885,9 +982,9 @@ class SelfImprovementService {
   }
 
   /**
-   * DPO/LoRA学習サンプルの自動クリーンアップ・重複除去
+   * 高品質学習サンプル・決定論的教材の自動クリーンアップ・重複除去
    * (名ばかりの空処理を排し、内容の正規化・重複排除・低品質サンプルの刈り込みを実際に実行)
-   * 設計思想 7. 学習データの改善 & 11. バックグラウンド自己対話
+   * 設計思想 7. 学習データの改善 & 11. バックグラウンド自己対話 & 優先度C - 3.1: Non-LLM Core設計
    */
   public cleanAndDeduplicateSamples(): {
     beforeCount: number;
@@ -930,6 +1027,11 @@ class SelfImprovementService {
           category: sample.category || 'chat',
           reasons: safety.reasons,
           createdAt: Date.now(),
+          verifiedEffective: sample.verifiedEffective,
+          verificationNote: sample.verificationNote,
+          failureReason: sample.failureReason,
+          experienceId: sample.experienceId,
+          evidenceIds: sample.evidenceIds,
         });
         prunedUnsafe++;
         continue;
@@ -1016,8 +1118,8 @@ class SelfImprovementService {
   }
 
   /**
-   * Colab / LoRA学習用のJSONLファイル出力 (スプリット指定対応)
-   * 設計思想 7. 学習データの改善 (train / validation / test 分離 & リーク防止)
+   * 学習サンプルJSONL・検証用データセット出力 (スプリット指定対応)
+   * 設計思想 7. 学習データの改善 (train / validation / test 分離 & リーク防止) & 優先度C - 3.1: Non-LLM Core設計
    */
   public exportTrainingJSONL(
     filterOnlyApproved: boolean = true,
