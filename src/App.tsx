@@ -119,6 +119,7 @@ import { decisionLearningService } from './services/decisionLearningService';
 import { componentRegistryService } from './services/componentRegistryService';
 import { componentArtifactStoreService } from './services/componentArtifactStoreService';
 import { answerContentIrService } from './services/answerContentIrService';
+import { responseSurfacePolicyService } from './services/responseSurfacePolicyService';
 import { latentIntentMiningService } from './services/latentIntentMiningService';
 import { metacognitiveCalibrationService } from './services/metacognitiveCalibrationService';
 import { affectionDynamicsService } from './services/affectionDynamicsService';
@@ -1500,6 +1501,66 @@ improvementCanaryRollbackService.initialize();
       }
 
       lastTurnUsedMemoryIdsRef.current = [];
+    }
+
+    // 設計思想 13.2 / 19.2: 直前ターンの表現候補へのフィードバック反映 (成功率学習・非LLM適応)
+    const lastTurnVariations = responseSurfacePolicyService.getLastTurnUsedVariationIds();
+    if (lastTurnVariations.length > 0) {
+      const isNegativeFeedback =
+        text.includes('違う') ||
+        text.includes('そうじゃなくて') ||
+        text.includes('間違') ||
+        text.includes('ダメ') ||
+        text.includes('やり直') ||
+        text.includes('そうではなく') ||
+        text.includes('わかりにくい') ||
+        text.includes('変な言い方') ||
+        text.includes('って言わないで');
+
+      const isPositiveFeedback =
+        text.includes('ありがとう') ||
+        text.includes('助かった') ||
+        text.includes('わかりやすい') ||
+        text.includes('いいね') ||
+        text.includes('素晴らしい') ||
+        text.includes('完璧') ||
+        text.includes('さすが');
+
+      if (isNegativeFeedback) {
+        responseSurfacePolicyService.recordVariationOutcomes(lastTurnVariations, false);
+        systemLogger.info(
+          'ANSWER_PLAN',
+          `📉 [13.2 表層表現学習] ユーザー否定フィードバック検知: 直前ターン表現(${lastTurnVariations.join(', ')})の成功スコアを減算`
+        );
+      } else if (isPositiveFeedback) {
+        responseSurfacePolicyService.recordVariationOutcomes(lastTurnVariations, true);
+        systemLogger.info(
+          'ANSWER_PLAN',
+          `📈 [13.2 表層表現学習] ユーザー肯定フィードバック検知: 直前ターン表現(${lastTurnVariations.join(', ')})の成功スコアを加算`
+        );
+      }
+      responseSurfacePolicyService.clearLastTurnUsedVariations();
+    }
+
+    // 設計思想 5.1 / 13.2: 話し方に緩やかに寄せる多軸性格の自動調整 (5ターン継続判定)
+    const currentMultiAxisPersona = answerContentIrService.getDefaultPersona();
+    const userUtterances = messages
+      .filter((m) => m.role === 'user')
+      .map((m) => m.content)
+      .concat([text]);
+
+    const adaptation = responseDesignService.adaptPersonaToUserStyle(
+      currentMultiAxisPersona,
+      userUtterances,
+      { lockPersonaByUser: currentMultiAxisPersona.lockPersonaByUser }
+    );
+    if (adaptation.changed) {
+      answerContentIrService.updateDefaultPersona(adaptation.adaptedPersona);
+      systemLogger.info(
+        'ANSWER_PLAN',
+        `🎭 [多軸性格自動適応] ユーザー発話傾向に適応: ${adaptation.reason}`,
+        { adapted: adaptation.adaptedPersona }
+      );
     }
 
     // ユーザーによる言い回し・口調訂正（「〜って言わないで」「〜っておかしい」等）の自己学習

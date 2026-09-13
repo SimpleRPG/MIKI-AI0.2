@@ -1,4 +1,4 @@
-import { ResponseLength, ResponseQualityEvaluation, ConversationStage, ConversationState } from '../types';
+import { ResponseLength, ResponseQualityEvaluation, ConversationStage, ConversationState, MultiAxisPersonaConfig } from '../types';
 import { storageService } from './storageService';
 import { isCasualGreetingOrShortSocial } from './conversationStateService';
 
@@ -8,6 +8,34 @@ export interface UserStyleCorrectionRule {
   replacement: string;
   reason?: string;
   createdAt: number;
+}
+
+/** ユーザー発話傾向の分析結果 */
+export interface UserSpeakingStyleAnalysis {
+  politeRatio: number;       // 0.0〜1.0 (敬体: です・ます等の比率)
+  casualRatio: number;       // 0.0〜1.0 (常体: だ・である等の比率)
+  avgSentenceLength: number;  // 1発話あたりの平均文字数
+  emojiFrequency: number;    // 1発話あたりの絵文字・記号頻度
+  sampleCount: number;
+  dominantStyle: 'POLITE' | 'CASUAL' | 'NEUTRAL';
+  dominantVerbosity: 'CONCISE' | 'STANDARD' | 'DETAILED';
+}
+
+/** 口調自動適応の判定結果 */
+export interface PersonaAdaptationResult {
+  adaptedPersona: MultiAxisPersonaConfig;
+  changed: boolean;
+  reason: string;
+  analysis: UserSpeakingStyleAnalysis;
+}
+
+/** 変化速度制限用の連続傾向記録 */
+export interface StyleAdaptationState {
+  consecutiveCasualTurns: number;
+  consecutivePoliteTurns: number;
+  consecutiveConciseTurns: number;
+  consecutiveDetailedTurns: number;
+  lastAdaptedAt: number;
 }
 
 /**
@@ -540,6 +568,196 @@ export class ResponseDesignService {
       unnaturalPhrasesFixed,
       passed,
       feedback,
+    };
+  }
+
+  /**
+   * 指示書 2.2-1: ユーザー自身の過去発話から、語尾の傾向（敬体/常体の比率）・平均文長・絵文字使用頻度を集計する軽量関数
+   */
+  public analyzeUserSpeakingStyle(
+    userUtterances: string[],
+    windowSize: number = 10
+  ): UserSpeakingStyleAnalysis {
+    const samples = (userUtterances || [])
+      .map((u) => (typeof u === 'string' ? u.trim() : ''))
+      .filter((u) => u.length > 0)
+      .slice(-windowSize);
+
+    if (samples.length === 0) {
+      return {
+        politeRatio: 0.5,
+        casualRatio: 0.5,
+        avgSentenceLength: 30,
+        emojiFrequency: 0,
+        sampleCount: 0,
+        dominantStyle: 'NEUTRAL',
+        dominantVerbosity: 'STANDARD',
+      };
+    }
+
+    let politeCount = 0;
+    let casualCount = 0;
+    let totalLength = 0;
+    let emojiCount = 0;
+
+    // 敬体判定正規表現 (文末または句読点直前)
+    const politeRegex = /(?:です|ます|でした|ました|でしょうか|でしょう|ませんか|あります|ございます|ください|お願いします?|存じます|いたします)(?:[。！？!?\s]|$)/;
+    // 常体判定正規表現 (文末または句読点直前)
+    const casualRegex = /(?:だ|だよ|だね|だろう|じゃん|する|しない|した|して|てる|ちゃう|やろ|ね|よ|わ)(?:[。！？!?\s]|$)/;
+    // 絵文字および感情表現記号
+    const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]|\(笑\)|[wW]{2,}|♪|✨|🎉|👍/gu;
+
+    for (const text of samples) {
+      totalLength += text.length;
+
+      const matchedEmojis = text.match(emojiRegex);
+      if (matchedEmojis) {
+        emojiCount += matchedEmojis.length;
+      }
+
+      const isPolite = politeRegex.test(text);
+      const isCasual = casualRegex.test(text);
+
+      if (isPolite && !isCasual) {
+        politeCount++;
+      } else if (isCasual && !isPolite) {
+        casualCount++;
+      } else {
+        politeCount += 0.5;
+        casualCount += 0.5;
+      }
+    }
+
+    const politeRatio = Math.round((politeCount / samples.length) * 100) / 100;
+    const casualRatio = Math.round((casualCount / samples.length) * 100) / 100;
+    const avgSentenceLength = Math.round(totalLength / samples.length);
+    const emojiFrequency = Math.round((emojiCount / samples.length) * 10) / 10;
+
+    const dominantStyle: 'POLITE' | 'CASUAL' | 'NEUTRAL' =
+      politeRatio >= 0.65 ? 'POLITE' : casualRatio >= 0.65 ? 'CASUAL' : 'NEUTRAL';
+
+    const dominantVerbosity: 'CONCISE' | 'STANDARD' | 'DETAILED' =
+      avgSentenceLength <= 25 ? 'CONCISE' : avgSentenceLength >= 70 ? 'DETAILED' : 'STANDARD';
+
+    return {
+      politeRatio,
+      casualRatio,
+      avgSentenceLength,
+      emojiFrequency,
+      sampleCount: samples.length,
+      dominantStyle,
+      dominantVerbosity,
+    };
+  }
+
+  /**
+   * 指示書 2.2-2 & 2.2-3:
+   * ユーザーの話し方に緩やかに寄せる自動調整ロジック
+   * - ユーザー明示固定（lockPersonaByUser）が有効な場合は自動調整をスキップ
+   * - 変化速度制限: 直近の傾向が一定回数（例: 5ターン）継続した場合のみ反映
+   */
+  public adaptPersonaToUserStyle(
+    currentPersona: MultiAxisPersonaConfig,
+    userUtterances: string[],
+    options?: {
+      lockPersonaByUser?: boolean;
+      minConsecutiveTurns?: number;
+    }
+  ): PersonaAdaptationResult {
+    const minTurns = options?.minConsecutiveTurns ?? 5;
+    const isLocked = Boolean(currentPersona.lockPersonaByUser || options?.lockPersonaByUser);
+
+    const analysis = this.analyzeUserSpeakingStyle(userUtterances, 10);
+
+    if (isLocked) {
+      return {
+        adaptedPersona: { ...currentPersona },
+        changed: false,
+        reason: 'ユーザー指定による性格設定固定(lockPersonaByUser)が有効なため、口調自動適応を抑止しています',
+        analysis,
+      };
+    }
+
+    let state: StyleAdaptationState = {
+      consecutiveCasualTurns: 0,
+      consecutivePoliteTurns: 0,
+      consecutiveConciseTurns: 0,
+      consecutiveDetailedTurns: 0,
+      lastAdaptedAt: 0,
+    };
+
+    try {
+      const raw = storageService.getItem('miki_style_adaptation_state');
+      if (raw) {
+        state = { ...state, ...JSON.parse(raw) };
+      }
+    } catch {
+      // ignore
+    }
+
+    if (analysis.dominantStyle === 'CASUAL') {
+      state.consecutiveCasualTurns++;
+      state.consecutivePoliteTurns = 0;
+    } else if (analysis.dominantStyle === 'POLITE') {
+      state.consecutivePoliteTurns++;
+      state.consecutiveCasualTurns = 0;
+    }
+
+    if (analysis.dominantVerbosity === 'CONCISE') {
+      state.consecutiveConciseTurns++;
+      state.consecutiveDetailedTurns = 0;
+    } else if (analysis.dominantVerbosity === 'DETAILED') {
+      state.consecutiveDetailedTurns++;
+      state.consecutiveConciseTurns = 0;
+    }
+
+    const adapted: MultiAxisPersonaConfig = { ...currentPersona };
+    const changeReasons: string[] = [];
+
+    // 敬体／常体および形式度の適応
+    if (state.consecutiveCasualTurns >= minTurns) {
+      if (adapted.politeness !== 'CASUAL' || adapted.formality !== 'LOW') {
+        adapted.politeness = 'CASUAL';
+        adapted.formality = 'LOW';
+        changeReasons.push(`常体傾向が${state.consecutiveCasualTurns}ターン継続したためCASUAL/低形式度に適応`);
+      }
+    } else if (state.consecutivePoliteTurns >= minTurns) {
+      if (adapted.politeness === 'CASUAL' || adapted.formality === 'LOW') {
+        adapted.politeness = 'CASUAL_POLITE';
+        adapted.formality = 'MEDIUM';
+        changeReasons.push(`敬体傾向が${state.consecutivePoliteTurns}ターン継続したためCASUAL_POLITE/中形式度に適応`);
+      }
+    }
+
+    // 文長(verbosity)の適応
+    if (state.consecutiveConciseTurns >= minTurns) {
+      if (adapted.verbosity !== 'CONCISE') {
+        adapted.verbosity = 'CONCISE';
+        changeReasons.push(`短文傾向が${state.consecutiveConciseTurns}ターン継続したためCONCISEに適応`);
+      }
+    } else if (state.consecutiveDetailedTurns >= minTurns) {
+      if (adapted.verbosity !== 'DETAILED') {
+        adapted.verbosity = 'DETAILED';
+        changeReasons.push(`詳細文傾向が${state.consecutiveDetailedTurns}ターン継続したためDETAILEDに適応`);
+      }
+    }
+
+    const changed = changeReasons.length > 0;
+    if (changed) {
+      state.lastAdaptedAt = Date.now();
+    }
+
+    try {
+      storageService.setItem('miki_style_adaptation_state', JSON.stringify(state));
+    } catch {
+      // ignore
+    }
+
+    return {
+      adaptedPersona: adapted,
+      changed,
+      reason: changed ? changeReasons.join(' | ') : `直近傾向継続数(常体:${state.consecutiveCasualTurns}, 敬体:${state.consecutivePoliteTurns}, 短文:${state.consecutiveConciseTurns}, 詳細:${state.consecutiveDetailedTurns})が閾値(${minTurns})未満のため維持`,
+      analysis,
     };
   }
 }

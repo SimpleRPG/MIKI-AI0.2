@@ -13,6 +13,7 @@ import {
 } from './surfaceVariationData';
 import { SKELETON_VARIATIONS_DATA } from './skeletonVariationData';
 import { AnswerSkeletonType, MultiAxisPersonaConfig } from '../types';
+import { responseSurfacePolicyService } from './responseSurfacePolicyService';
 
 export class RecentUsageCache {
   private static instance: RecentUsageCache;
@@ -27,7 +28,9 @@ export class RecentUsageCache {
   }
 
   /**
-   * 直近使用履歴を除外して候補からランダム選択
+   * 直近使用履歴を除外して候補から選択
+   * 指示書 1.2 / 1.3: responseSurfacePolicyService の学習結果スコアに基づく加重選択
+   * （低スコアの候補は選ばれにくくなり、高スコアの候補が優先される）
    * @param categoryKey 部品カテゴリ識別子 (例: 'connector:DISASTER_RECOVERY')
    * @param items 候補プール (30件等)
    * @param maxRecentMemory 記憶する直近履歴件数 (デフォルト10件、またはプール数の1/3)
@@ -56,9 +59,22 @@ export class RecentUsageCache {
       available = items;
     }
 
-    // 候補からランダムに1つ選択
-    const chosenIndex = Math.floor(Math.random() * available.length);
-    const chosen = available[chosenIndex];
+    // 指示書 1.2 / 1.3: 学習済み成功・失敗スコアに基づく重み付き選択
+    const totalWeight = available.reduce((sum, item) => {
+      const score = responseSurfacePolicyService.getOutcomeScore(item.id);
+      return sum + Math.max(1, score);
+    }, 0);
+
+    let chosen = available[0];
+    let randomVal = Math.random() * totalWeight;
+    for (const item of available) {
+      const w = Math.max(1, responseSurfacePolicyService.getOutcomeScore(item.id));
+      if (randomVal <= w) {
+        chosen = item;
+        break;
+      }
+      randomVal -= w;
+    }
 
     // 履歴更新: 直近maxRecentMemory件（またはプール数の1/3）を維持
     const limit = Math.min(maxRecentMemory, Math.max(1, Math.floor(items.length / 3)));
@@ -107,6 +123,7 @@ export class SurfaceVariationService {
   private static instance: SurfaceVariationService;
   private cache: RecentUsageCache;
   private dynamicVariations: Map<string, VariationItem[]> = new Map();
+  private currentTurnUsedIds: Set<string> = new Set();
 
   constructor() {
     this.cache = RecentUsageCache.getInstance();
@@ -117,6 +134,25 @@ export class SurfaceVariationService {
       SurfaceVariationService.instance = new SurfaceVariationService();
     }
     return SurfaceVariationService.instance;
+  }
+
+  /** 今回の生成ターンで実際に選択された表現IDを追跡 */
+  public trackTurnUsedId(id: string): void {
+    if (id && id.trim()) {
+      this.currentTurnUsedIds.add(id.trim());
+    }
+  }
+
+  /** 今回の生成ターンで使われた表現ID群を取得 */
+  public getTurnUsedIds(): string[] {
+    return Array.from(this.currentTurnUsedIds);
+  }
+
+  /** 今回の生成ターンの使用表現ID群を取得しリセット */
+  public resetTurnUsedIds(): string[] {
+    const ids = Array.from(this.currentTurnUsedIds);
+    this.currentTurnUsedIds.clear();
+    return ids;
   }
 
   /**
@@ -174,7 +210,9 @@ export class SurfaceVariationService {
     const categoryKey = `connector:${key}`;
     const base = SCENE_CONNECTORS_DATA[key] || SCENE_CONNECTORS_DATA.DEFAULT;
     const pool = this.getMergedPool(categoryKey, base);
-    return this.cache.selectNonRepeating(categoryKey, pool);
+    const chosen = this.cache.selectNonRepeating(categoryKey, pool);
+    this.trackTurnUsedId(chosen.id);
+    return chosen;
   }
 
   /**
@@ -188,12 +226,16 @@ export class SurfaceVariationService {
     if (prudence === 'VERY_HIGH') {
       const categoryKey = 'prudence:VERY_HIGH';
       const pool = this.getMergedPool(categoryKey, PRUDENCE_NOTES_DATA.VERY_HIGH);
-      return this.cache.selectNonRepeating(categoryKey, pool);
+      const chosen = this.cache.selectNonRepeating(categoryKey, pool);
+      this.trackTurnUsedId(chosen.id);
+      return chosen;
     }
     if (prudence === 'HIGH') {
       const categoryKey = 'prudence:HIGH';
       const pool = this.getMergedPool(categoryKey, PRUDENCE_NOTES_DATA.HIGH);
-      return this.cache.selectNonRepeating(categoryKey, pool);
+      const chosen = this.cache.selectNonRepeating(categoryKey, pool);
+      this.trackTurnUsedId(chosen.id);
+      return chosen;
     }
     return null;
   }
@@ -211,12 +253,16 @@ export class SurfaceVariationService {
     if (proactive === 'ACTIVE') {
       const categoryKey = 'proactive:ACTIVE';
       const pool = this.getMergedPool(categoryKey, PROACTIVE_SUGGESTIONS_DATA.ACTIVE);
-      return this.cache.selectNonRepeating(categoryKey, pool);
+      const chosen = this.cache.selectNonRepeating(categoryKey, pool);
+      this.trackTurnUsedId(chosen.id);
+      return chosen;
     }
     if (proactive === 'MODERATE') {
       const categoryKey = 'proactive:MODERATE';
       const pool = this.getMergedPool(categoryKey, PROACTIVE_SUGGESTIONS_DATA.MODERATE);
-      return this.cache.selectNonRepeating(categoryKey, pool);
+      const chosen = this.cache.selectNonRepeating(categoryKey, pool);
+      this.trackTurnUsedId(chosen.id);
+      return chosen;
     }
     return null;
   }
@@ -228,12 +274,16 @@ export class SurfaceVariationService {
     if (humor === 'MODERATE') {
       const categoryKey = 'humor:MODERATE';
       const pool = this.getMergedPool(categoryKey, WARMTH_AND_HUMOR_DATA.HUMOR_MODERATE);
-      return this.cache.selectNonRepeating(categoryKey, pool);
+      const chosen = this.cache.selectNonRepeating(categoryKey, pool);
+      this.trackTurnUsedId(chosen.id);
+      return chosen;
     }
     if (humor === 'LIGHT') {
       const categoryKey = 'humor:LIGHT';
       const pool = this.getMergedPool(categoryKey, WARMTH_AND_HUMOR_DATA.HUMOR_LIGHT);
-      return this.cache.selectNonRepeating(categoryKey, pool);
+      const chosen = this.cache.selectNonRepeating(categoryKey, pool);
+      this.trackTurnUsedId(chosen.id);
+      return chosen;
     }
     return null;
   }
@@ -242,11 +292,15 @@ export class SurfaceVariationService {
     if (politeness === 'CASUAL') {
       const categoryKey = 'warmth:HIGH_CASUAL';
       const pool = this.getMergedPool(categoryKey, WARMTH_AND_HUMOR_DATA.WARMTH_HIGH_CASUAL);
-      return this.cache.selectNonRepeating(categoryKey, pool);
+      const chosen = this.cache.selectNonRepeating(categoryKey, pool);
+      this.trackTurnUsedId(chosen.id);
+      return chosen;
     }
     const categoryKey = 'warmth:HIGH_POLITE';
     const pool = this.getMergedPool(categoryKey, WARMTH_AND_HUMOR_DATA.WARMTH_HIGH_POLITE);
-    return this.cache.selectNonRepeating(categoryKey, pool);
+    const chosen = this.cache.selectNonRepeating(categoryKey, pool);
+    this.trackTurnUsedId(chosen.id);
+    return chosen;
   }
 
   /**
@@ -264,6 +318,7 @@ export class SurfaceVariationService {
     nextActions: string;
   } {
     if (scene === 'DISASTER_RECOVERY') {
+      this.trackTurnUsedId('heading:disaster:recovery');
       return {
         conclusion: '【緊急対処手順】',
         reasons: '【障害の直接要因】',
@@ -273,6 +328,7 @@ export class SurfaceVariationService {
       };
     }
     if (scene === 'ERROR_REPORT') {
+      this.trackTurnUsedId('heading:error:report');
       return {
         conclusion: '【エラー診断結果】',
         reasons: '【エラー発生原因】',
@@ -282,6 +338,7 @@ export class SurfaceVariationService {
       };
     }
     if (scene === 'TECHNICAL_RESEARCH') {
+      this.trackTurnUsedId('heading:technical:research');
       return {
         conclusion: '【技術調査結論】',
         reasons: '【技術的根拠・仕様】',
@@ -291,6 +348,7 @@ export class SurfaceVariationService {
       };
     }
     if (scene === 'CODE_DELIVERY') {
+      this.trackTurnUsedId('heading:code:delivery');
       return {
         conclusion: '【納品仕様・実装概要】',
         reasons: '【設計採用理由】',
@@ -306,26 +364,35 @@ export class SurfaceVariationService {
       cKey,
       this.getMergedPool(cKey, SECTION_HEADINGS_DEFAULT_DATA.conclusion)
     );
+    this.trackTurnUsedId(cItem.id);
+
     const rKey = `heading:reasons:${skeleton}`;
     const rItem = this.cache.selectNonRepeating(
       rKey,
       this.getMergedPool(rKey, SECTION_HEADINGS_DEFAULT_DATA.reasons)
     );
+    this.trackTurnUsedId(rItem.id);
+
     const cdKey = `heading:conditions:${skeleton}`;
     const cdItem = this.cache.selectNonRepeating(
       cdKey,
       this.getMergedPool(cdKey, SECTION_HEADINGS_DEFAULT_DATA.conditions)
     );
+    this.trackTurnUsedId(cdItem.id);
+
     const exKey = `heading:exceptions:${skeleton}`;
     const exItem = this.cache.selectNonRepeating(
       exKey,
       this.getMergedPool(exKey, SECTION_HEADINGS_DEFAULT_DATA.exceptions)
     );
+    this.trackTurnUsedId(exItem.id);
+
     const naKey = `heading:nextActions:${skeleton}`;
     const naItem = this.cache.selectNonRepeating(
       naKey,
       this.getMergedPool(naKey, SECTION_HEADINGS_DEFAULT_DATA.nextActions)
     );
+    this.trackTurnUsedId(naItem.id);
 
     return {
       conclusion: cItem.text,
@@ -344,7 +411,9 @@ export class SurfaceVariationService {
     if (!base || base.length === 0) return null;
     const categoryKey = `skeleton:${patternId}`;
     const pool = this.getMergedPool(categoryKey, base);
-    return this.cache.selectNonRepeating(categoryKey, pool);
+    const chosen = this.cache.selectNonRepeating(categoryKey, pool);
+    this.trackTurnUsedId(chosen.id);
+    return chosen;
   }
 
   /** 全プールの状態（静的件数、動的件数、累積使用件数等）を一覧化 */

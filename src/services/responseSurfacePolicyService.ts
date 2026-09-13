@@ -21,9 +21,16 @@ export interface SurfacePolicy {
 
 const STORAGE_KEY = 'miki_response_surface_policy_v1';
 
+export interface VariationOutcomeStats {
+  success: number;
+  failure: number;
+  score: number;
+}
+
 class ResponseSurfacePolicyService {
   private static instance: ResponseSurfacePolicyService;
-  private connectorStats: Record<string, { success: number; failure: number }> = {};
+  private variationStats: Record<string, { success: number; failure: number }> = {};
+  private lastTurnUsedVariationIds: string[] = [];
 
   private constructor() { this.load(); }
 
@@ -36,14 +43,19 @@ class ResponseSurfacePolicyService {
     try {
       const raw = storageService.getItem(STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : {};
-      if (parsed && typeof parsed === 'object') this.connectorStats = parsed;
+      if (parsed && typeof parsed === 'object') this.variationStats = parsed;
     } catch {
-      this.connectorStats = {};
+      this.variationStats = {};
     }
   }
 
   private save(): void {
-    storageService.setItem(STORAGE_KEY, JSON.stringify(this.connectorStats));
+    storageService.setItem(STORAGE_KEY, JSON.stringify(this.variationStats));
+  }
+
+  /** 後方互換用コネクタ統計アクセス */
+  public get connectorStats(): Record<string, { success: number; failure: number }> {
+    return this.variationStats;
   }
 
   public resolveResolution(detailLevel: ResponseLength | undefined, persona: MultiAxisPersonaConfig): SurfaceResolution {
@@ -106,12 +118,17 @@ class ResponseSurfacePolicyService {
       .sort((a, b) => b.score - a.score || a.text.localeCompare(b.text))[0].text;
   }
 
-  private connectorScore(text: string): number {
-    const stat = this.connectorStats[text];
+  public getOutcomeScore(idOrText: string): number {
+    if (!idOrText) return 50;
+    const stat = this.variationStats[idOrText];
     if (!stat) return 50;
     const total = stat.success + stat.failure;
-    if (!total) return 50;
+    if (total === 0) return 50;
     return (stat.success / total) * 100;
+  }
+
+  private connectorScore(text: string): number {
+    return this.getOutcomeScore(text);
   }
 
   private chooseEnding(persona: MultiAxisPersonaConfig): string {
@@ -120,13 +137,59 @@ class ResponseSurfacePolicyService {
     return 'です！';
   }
 
-  /** 13.2: 表現候補だけを学習対象にする。意味・安全基準は変更しない。 */
-  public recordConnectorOutcome(connector: string, success: boolean): void {
-    if (!connector) return;
-    const current = this.connectorStats[connector] || { success: 0, failure: 0 };
+  /**
+   * 13.2 / 作業指示書 1.2:
+   * 表現選択（接続表現・文末表現・見出し・装飾表現）の成功・失敗フィードバックを記録。
+   * ※ surfaceVariationGrowthService の verifyCandidate（意味保持・文法検査）とは独立した仕組み。
+   * こちらは「文法的に正しいか」ではなく「ユーザーに実際に好評だったか」を学習する層。
+   */
+  public recordVariationOutcome(idOrText: string, success: boolean): void {
+    if (!idOrText || !idOrText.trim()) return;
+    const key = idOrText.trim();
+    const current = this.variationStats[key] || { success: 0, failure: 0 };
     current[success ? 'success' : 'failure'] += 1;
-    this.connectorStats[connector] = current;
+    this.variationStats[key] = current;
     this.save();
+  }
+
+  /** 複数表現の成否フィードバックを一括記録 */
+  public recordVariationOutcomes(ids: string[], success: boolean): void {
+    if (!Array.isArray(ids)) return;
+    ids.forEach((id) => this.recordVariationOutcome(id, success));
+  }
+
+  /** 後方互換用：コネクタのフィードバック記録 */
+  public recordConnectorOutcome(connector: string, success: boolean): void {
+    this.recordVariationOutcome(connector, success);
+  }
+
+  /** 全表現の学習統計サマリーを取得 */
+  public getStats(): Record<string, VariationOutcomeStats> {
+    const res: Record<string, VariationOutcomeStats> = {};
+    for (const [key, val] of Object.entries(this.variationStats)) {
+      const total = val.success + val.failure;
+      res[key] = {
+        success: val.success,
+        failure: val.failure,
+        score: total > 0 ? (val.success / total) * 100 : 50,
+      };
+    }
+    return res;
+  }
+
+  /** 直前ターンで実際に選ばれた表現ID群を一時保存 */
+  public recordLastTurnUsedVariations(ids: string[]): void {
+    this.lastTurnUsedVariationIds = Array.from(new Set(ids.filter(Boolean)));
+  }
+
+  /** 直前ターンで使われた表現ID群を取得 */
+  public getLastTurnUsedVariationIds(): string[] {
+    return [...this.lastTurnUsedVariationIds];
+  }
+
+  /** 直前ターン表現ID群をクリア */
+  public clearLastTurnUsedVariations(): void {
+    this.lastTurnUsedVariationIds = [];
   }
 }
 

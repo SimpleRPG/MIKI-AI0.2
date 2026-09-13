@@ -3443,6 +3443,7 @@ export interface MultiAxisPersonaConfig {
   askOnlyWhenBlocking: boolean;
   conclusionFirst: boolean;
   humor: 'OFF' | 'LIGHT' | 'MODERATE';
+  lockPersonaByUser?: boolean; // ユーザー明示固定フラグ (口調自動適応の無効化)
   currentScene:
     | 'NORMAL'              // 通常会話
     | 'TECHNICAL_RESEARCH'  // 技術調査

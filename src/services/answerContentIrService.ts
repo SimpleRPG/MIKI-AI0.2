@@ -9,6 +9,10 @@ import { systemLogger } from './systemLogger';
 import { responseSurfacePolicyService } from './responseSurfacePolicyService';
 import { responseDesignService } from './responseDesignService';
 import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
+import { surfaceVariationService } from './surfaceVariationService';
+import { storageService } from './storageService';
+
+const MULTI_AXIS_PERSONA_STORAGE_KEY = 'miki_multi_axis_persona_v1';
 
 /**
  * 非LLM中心・自己成長型AIコンパニオン 設計思想指示書(統合版) 第3章 / 第5.1節 / 第5.2節 / 第13.4節
@@ -20,21 +24,8 @@ import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
 export class AnswerContentIrService {
   private static instance: AnswerContentIrService;
 
-  /** 設計思想 5.1 規定の多軸性格プロファイル */
-  private defaultPersona: MultiAxisPersonaConfig = {
-    politeness: 'CASUAL_POLITE',
-    warmth: 'MEDIUM_HIGH',
-    directness: 'HIGH',
-    formality: 'MEDIUM_LOW',
-    verbosity: 'ADAPTIVE',
-    technicalTerminology: 'BALANCED',
-    proactiveSuggestion: 'MODERATE',
-    prudence: 'HIGH',
-    askOnlyWhenBlocking: true,
-    conclusionFirst: true,
-    humor: 'OFF',
-    currentScene: 'NORMAL',
-  };
+  /** 設計思想 5.1 規定の多軸性格プロファイル（ストレージまたは設定値から復元可能） */
+  private defaultPersona: MultiAxisPersonaConfig = this.loadInitialPersona();
 
   private constructor() {}
 
@@ -46,10 +37,63 @@ export class AnswerContentIrService {
   }
 
   /**
+   * 初期性格プロファイルの読み込み
+   * 指示書 3: askOnlyWhenBlocking などの固定値を設定値・ストレージから動的に受け取る
+   */
+  private loadInitialPersona(): MultiAxisPersonaConfig {
+    const fallback: MultiAxisPersonaConfig = {
+      politeness: 'CASUAL_POLITE',
+      warmth: 'MEDIUM_HIGH',
+      directness: 'HIGH',
+      formality: 'MEDIUM_LOW',
+      verbosity: 'ADAPTIVE',
+      technicalTerminology: 'BALANCED',
+      proactiveSuggestion: 'MODERATE',
+      prudence: 'HIGH',
+      askOnlyWhenBlocking: true,
+      conclusionFirst: true,
+      humor: 'OFF',
+      currentScene: 'NORMAL',
+    };
+    try {
+      const saved = storageService.getItem(MULTI_AXIS_PERSONA_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return { ...fallback, ...parsed };
+        }
+      }
+    } catch {
+      // fallback
+    }
+    return fallback;
+  }
+
+  /**
    * 現在の多軸性格プロファイルを取得
    */
   public getDefaultPersona(): MultiAxisPersonaConfig {
     return { ...this.defaultPersona };
+  }
+
+  /**
+   * 指示書 3: 多軸性格プロファイルの更新・設定（askOnlyWhenBlocking等を動的設定可能にする）
+   */
+  public updateDefaultPersona(update: Partial<MultiAxisPersonaConfig>): MultiAxisPersonaConfig {
+    this.defaultPersona = {
+      ...this.defaultPersona,
+      ...update,
+    };
+    try {
+      storageService.setItem(MULTI_AXIS_PERSONA_STORAGE_KEY, JSON.stringify(this.defaultPersona));
+    } catch {
+      // ignore
+    }
+    return { ...this.defaultPersona };
+  }
+
+  public setDefaultPersona(update: Partial<MultiAxisPersonaConfig>): void {
+    this.updateDefaultPersona(update);
   }
 
   /**
@@ -100,7 +144,10 @@ export class AnswerContentIrService {
     skeletonType: AnswerSkeletonType = 'GENERAL_ANSWER',
     customPersona?: Partial<MultiAxisPersonaConfig>,
     extraArtifactCode?: string
-  ): { surfaceText: string; inspection: SemanticPreservationInspection } {
+  ): { surfaceText: string; inspection: SemanticPreservationInspection; usedVariationIds: string[] } {
+    // 指示書 1.2: 表現選択フィードバック用IDトラッキングのリセット
+    surfaceVariationService.resetTurnUsedIds();
+
     const persona: MultiAxisPersonaConfig = { ...this.defaultPersona, ...customPersona };
     const policy = responseSurfacePolicyService.choosePolicy(
       skeletonType,
@@ -210,11 +257,22 @@ export class AnswerContentIrService {
     surfaceText = dedup.cleanedText;
 
     const inspection = this.verifySemanticPreservation(ir, surfaceText);
+    
+    // 指示書 1.2: 今回の表層生成で実際に使われた表現ID群（接続表現、見出し、注記、語尾等）を収集・保存
+    const usedVariationIds = surfaceVariationService.getTurnUsedIds();
+    if (policy.connector && !usedVariationIds.includes(policy.connector)) {
+      usedVariationIds.push(policy.connector);
+    }
+    if (policy.ending && !usedVariationIds.includes(policy.ending)) {
+      usedVariationIds.push(policy.ending);
+    }
+    responseSurfacePolicyService.recordLastTurnUsedVariations(usedVariationIds);
+
     systemLogger.info(
       'ANSWER_PLAN',
-      `📝 [5.2 表層生成完了] 骨格: ${skeletonType} | 解像度: ${policy.resolution} | 文字数: ${surfaceText.length} | 重複除去: ${dedup.duplicatesRemovedCount}件 | 意味保持合格: ${inspection.isPreserved}`
+      `📝 [5.2 表層生成完了] 骨格: ${skeletonType} | 解像度: ${policy.resolution} | 文字数: ${surfaceText.length} | 使用表現数: ${usedVariationIds.length}件 | 重複除去: ${dedup.duplicatesRemovedCount}件 | 意味保持合格: ${inspection.isPreserved}`
     );
-    return { surfaceText, inspection };
+    return { surfaceText, inspection, usedVariationIds };
   }
 
   /**
