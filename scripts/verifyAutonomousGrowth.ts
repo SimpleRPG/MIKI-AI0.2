@@ -143,6 +143,7 @@ async function runTests() {
   console.log('\n================================================================');
   if (passedAll) {
     console.log('🎉 全ての自律成長検証テストに合格しました！');
+    process.exit(0);
   } else {
     console.log('⚠️ 一部のテストで不合格が検出されました');
     process.exit(1);

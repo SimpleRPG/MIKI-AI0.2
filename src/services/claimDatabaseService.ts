@@ -395,6 +395,16 @@ export class ClaimDatabaseService {
     return list.sort((a, b) => b.updated_at - a.updated_at);
   }
 
+  public listClaims(filter?: {
+    world?: ClaimWorld;
+    kind?: ClaimKind;
+    status?: ClaimVerificationStatus;
+    keyword?: string;
+    excludeSuperseded?: boolean;
+  }): ClaimRecord[] {
+    return this.queryClaims(filter);
+  }
+
   /**
    * 自然言語の問いかけから主張DB内の最適な主張を照合・抽出
    * 設計思想指示書 第3章 ルートB / 第6章 / 第7章
@@ -446,7 +456,7 @@ export class ClaimDatabaseService {
       if (claim.status === 'DEVICE_VERIFIED') score += 20;
       else if (claim.status === 'SUPPORTED') score += 15;
       else if (claim.status === 'DISPUTED' || claim.status === 'CONTRADICTED') score -= 20;
-      else if (claim.status === 'UNVERIFIED') score -= 5;
+      else if (claim.status === 'UNVERIFIED' || claim.status === 'CANDIDATE') score -= 5;
 
       return { claim, score };
     });
@@ -482,7 +492,7 @@ export class ClaimDatabaseService {
       confidence = 'CERTAIN';
     } else if (bestClaim.world === 'FICTION' || bestClaim.world === 'HYPOTHETICAL') {
       confidence = 'HYPOTHETICAL';
-    } else if (bestClaim.status === 'UNVERIFIED') {
+    } else if (bestClaim.status === 'UNVERIFIED' || bestClaim.status === 'CANDIDATE') {
       confidence = 'UNVERIFIED';
     }
 
@@ -575,6 +585,7 @@ export class ClaimDatabaseService {
       UNKNOWN_CONTEXT: 0,
     };
     const byStatus: Record<ClaimVerificationStatus, number> = {
+      CANDIDATE: 0,
       UNVERIFIED: 0,
       SUPPORTED: 0,
       DEVICE_VERIFIED: 0,

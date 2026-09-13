@@ -127,6 +127,13 @@ export class SurfaceVariationService {
   }
 
   /**
+   * 履歴のリセット（キャッシュへの委譲）
+   */
+  public clearHistory(): void {
+    this.cache.clearHistory();
+  }
+
+  /**
    * 動的バリエーション（VERIFIED昇格済み）の登録
    */
   public registerDynamicVariant(categoryKey: string, item: VariationItem): void {

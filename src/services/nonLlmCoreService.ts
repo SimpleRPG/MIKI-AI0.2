@@ -35,6 +35,13 @@ import { verifiedKnowledgePromotionService } from './verifiedKnowledgePromotionS
 import { verifiedCapabilityPromotionService } from './verifiedCapabilityPromotionService';
 import { unknownTaskDecompositionService } from './unknownTaskDecompositionService';
 import { causalMemoryLedgerService } from './causalMemoryLedgerService';
+import { bannedTopicsConfigService } from './bannedTopicsConfigService';
+import { evidenceBasedPromotionGateService } from './evidenceBasedPromotionGateService';
+import { mikiAutonomousDevStudioService } from './mikiAutonomousDevStudioService';
+import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
+import { mikiReasoningTemplateService, ReasoningMatchResult } from './mikiReasoningTemplateService';
+import { mikiConversationLearningService } from './mikiConversationLearningService';
+import { normalizeKey } from './mikiUnifiedLearningContinuumService';
 
 export interface NonLlmCoreResult {
   replyText: string;
@@ -100,10 +107,31 @@ export class NonLlmCoreService {
       return this.buildResult('RESOLVED', 'empty_input', '入力が空です。', state, 'CASUAL_CHAT', 0, [], started, stages);
     }
 
+    // 0. ユーザー手動設定による禁止トピック検査 (コード固定ではなくユーザー設定式)
+    const bannedCheck = bannedTopicsConfigService.checkBanned(prompt);
+    if (bannedCheck.isBanned) {
+      const ir = answerContentIrService.buildAnswerIR({
+        conclusion: '手動設定された禁止トピックに該当するため、処理を制限しました。',
+        target: state.currentTopic || '禁止トピック保護',
+        reasons: [bannedCheck.reason || 'ユーザー手動設定によるフィルタが適用されました。'],
+        conditions: ['前提として、本人設定画面より禁止キーワードの追加・解除・編集が可能です。'],
+        certainty: 'CERTAIN',
+        detailLevel: 'STANDARD',
+      });
+      const surface = answerContentIrService.generateSurfaceTextFromIR(ir, 'GENERAL_ANSWER', undefined);
+      return this.buildResult('NEEDS_CONFIRMATION', 'banned_topic_filtered', surface.surfaceText, state, 'PROHIBITED_TOPIC', 0, [], started, stages);
+    }
+
     // 会話もゲームも同じMikiの経験列。ここでは入力を観測し、最終結果でOutcomeを確定する。
     const unifiedBefore = unifiedMikiExperienceService.rankDomains(prompt).filter(x => x.score > 0).slice(0, 3);
     mikiUnifiedLearningContinuumService.initialize();
     mikiUnifiedLearningContinuumService.syncFromUnifiedExperience();
+
+    // 0. 前ターンの未解決/要確認応答・推論結果に対するユーザー反応の統計的学習・観測 (Chapter 1 & 2)
+    mikiConversationLearningService.evaluatePreviousTurn(prompt, state);
+
+    // 0.1 ユーザーによる正解・模範回答・意見の教示検知 (Chapter 1)
+    const teachingResult = mikiConversationLearningService.detectAndRegisterTeaching(prompt, state.currentTopic);
 
     // 1. 会話状態・対話行為・参照解決
     let t = performance.now();
@@ -121,6 +149,7 @@ export class NonLlmCoreService {
       currentTopic: state.currentTopic || this.extractTopic(prompt),
       recentEntities: Array.from(new Set([...(state.recentEntities || []), ...japaneseAnalysis.contentTokens.slice(-4), ...(anaphora.resolved ? [anaphora.resolved] : []), this.extractTopic(prompt)])).filter(Boolean).slice(-10),
       updatedAt: Date.now(),
+      lastCandidateClaimId: teachingResult.detected && teachingResult.candidateClaim ? teachingResult.candidateClaim.claim_id : state.lastCandidateClaimId,
     };
 
     if (anaphora.confidence === 'ambiguous') {
@@ -227,6 +256,31 @@ export class NonLlmCoreService {
         const only = safeCandidates[0];
         assembledCode = only.implementation_txt;
       }
+
+      // 自律開発スタジオ (Dev Studio) で配備済みのツール・コードも、客観昇格ゲート (Promotion Gate) の合格を検証して再利用
+      if (!assembledCode && safeCandidates.length === 0) {
+        const deployedProjects = mikiAutonomousDevStudioService.getProjects().filter((p) => p.stage === 'DEPLOYED');
+        for (const proj of deployedProjects) {
+          const totalTests = proj.testCases.length;
+          const passedTests = proj.testCases.filter((tc) => tc.passed).length;
+          const accuracy = totalTests > 0 ? (passedTests / totalTests) * 100 : 0;
+          const reviewScore = proj.reviewResult?.overallScore || 0;
+
+          const gateEval = evidenceBasedPromotionGateService.evaluatePromotionReadiness({
+            recordCount: Math.max(10, totalTests * 2),
+            accuracyScore: Math.min(100, (accuracy + reviewScore) / 2),
+            determinismRate: 100,
+            userCorrectionRate: 0,
+          });
+
+          if (gateEval.ready && proj.implementationCode) {
+            assembledCode = proj.implementationCode;
+            usedComponents.push(`dev_studio:${proj.id}`);
+            systemLogger.info('SELF_IMPROVEMENT', `🛠️ [Dev Studio動的コード採用] ${proj.id}: 「${proj.title}」を客観昇格ゲート検証合格に基づき適用`);
+            break;
+          }
+        }
+      }
     }
     stages.components = Math.round(performance.now() - t);
 
@@ -248,6 +302,12 @@ export class NonLlmCoreService {
     }
 
     stages.decision = Math.round(performance.now() - t);
+
+    // 6.5 推論テンプレートの適用試行 (Chapter 2: 複数検証済み主張の統合推論)
+    let appliedReasoningResult: ReasoningMatchResult | null = null;
+    if (csp.isSatisfied && !assembledCode) {
+      appliedReasoningResult = mikiReasoningTemplateService.evaluateAndApply(prompt, nextState);
+    }
 
     // 7. Answer IR。Claimが弱い場合は「不明」を不明のまま表現する。
     let ir;
@@ -280,6 +340,27 @@ export class NonLlmCoreService {
         detailLevel: 'STANDARD',
       });
       skeleton = 'TASK_COMPLETION';
+    } else if (appliedReasoningResult && appliedReasoningResult.matched) {
+      ir = appliedReasoningResult.answerIR;
+      skeleton = appliedReasoningResult.skeletonType;
+      status = 'RESOLVED';
+      reason = `reasoning_template_applied:${appliedReasoningResult.template.id}`;
+      nextState.lastReasoningTemplateId = appliedReasoningResult.template.id;
+    } else if (teachingResult.detected && teachingResult.candidateClaim) {
+      ir = answerContentIrService.buildAnswerIR({
+        conclusion: teachingResult.message || `「${teachingResult.extractedStatement}」を新しい知識候補として記録しました。`,
+        target: 'ユーザー教示の記録と検証準備',
+        reasons: [
+          `ユーザーからの直接教示を検知: 「${teachingResult.extractedStatement}」`,
+          '主張DBへ CANDIDATE 状態で安全に登録しました (自己証明禁止のため複数回の一貫した確認を経て昇格)',
+        ],
+        conditions: ['前提として、今後の対話や検証を経て確定知識へ昇格します。'],
+        certainty: 'CERTAIN',
+        detailLevel: 'STANDARD',
+      });
+      skeleton = 'GENERAL_ANSWER';
+      status = 'RESOLVED';
+      reason = 'user_teaching_recorded';
     } else if (claimMatch.hasMatch && claimMatch.bestClaim && claimMatch.confidence !== 'UNVERIFIED') {
       const claim = claimMatch.bestClaim;
       const memoryReasons = relevantMemories.slice(0, 2).map((m: any) => `関連記憶: ${String(m.content || '').slice(0, 100)}`);
@@ -292,6 +373,26 @@ export class NonLlmCoreService {
         worldScope: claim.world,
         nextActions: latent.suggestedProactiveAction ? [latent.suggestedProactiveAction] : [],
       });
+    } else if (dialogueAct === 'CASUAL_CHAT') {
+      const casualConclusion = /お疲れ|おつかれ/i.test(prompt)
+        ? 'お疲れ様です！本日も順調に進んでいます。'
+        : /ありがとう|感謝/i.test(prompt)
+        ? 'どういたしまして！お役に立てて何よりです。'
+        : /おはよう/i.test(prompt)
+        ? 'おはようございます！今日も一日頑張りましょう。'
+        : 'こんにちは！本日もよろしくお願いいたします。準備万全です。';
+
+      ir = answerContentIrService.buildAnswerIR({
+        conclusion: casualConclusion,
+        target: '日常対話・挨拶',
+        reasons: ['日常対話・挨拶として認識しました。'],
+        conditions: ['前提として、いつでも作業指示やご相談を受け付けています。'],
+        certainty: 'CERTAIN',
+        detailLevel: 'STANDARD',
+      });
+      skeleton = 'GENERAL_ANSWER';
+      status = 'RESOLVED';
+      reason = 'casual_chat_resolved';
     } else {
       status = 'UNRESOLVED';
       reason = claimMatch.unmetReason || 'knowledge_gap';
@@ -393,7 +494,7 @@ export class NonLlmCoreService {
           ...researchReasons,
           ],
           exceptions: [reason, `Knowledge Gap: ${gap.id}`],
-            conditions: ['検索結果・記憶・生成情報は証拠候補であり、それだけで真実として昇格させません。'],
+          conditions: ['前提として、検索結果・記憶・生成情報は証拠候補であり、検証なしに真実として昇格させません。'],
           nextActions: [researchNextAction],
           certainty: 'UNKNOWN',
           detailLevel: 'STANDARD',
@@ -445,9 +546,24 @@ export class NonLlmCoreService {
       lesson: status === 'RESOLVED' ? `conversation:${dialogueAct}` : `gap:${reason}`,
     });
     mikiUnifiedLearningContinuumService.observe({
-      domain: 'conversation', key: dialogueAct, outcome: unifiedOutcome, verified: status === 'RESOLVED' && (Boolean(claimMatch.hasMatch) || Boolean((ir as any).__researchPerformed)),
+      domain: 'conversation', key: dialogueAct, outcome: unifiedOutcome, verified: status === 'RESOLVED' && (Boolean(claimMatch.hasMatch) || Boolean(appliedReasoningResult) || Boolean((ir as any).__researchPerformed)),
       capabilityIds: usedComponents, concepts: japaneseAnalysis.contentTokens.slice(0, 12),
     });
+    const convKey = `conversation:${normalizeKey(`${dialogueAct}:${nextState.currentTopic || 'general'}`)}`;
+    mikiUnifiedLearningContinuumService.observe({
+      domain: 'conversation', key: convKey, outcome: unifiedOutcome, verified: status === 'RESOLVED' && (Boolean(claimMatch.hasMatch) || Boolean(appliedReasoningResult) || Boolean((ir as any).__researchPerformed)),
+      capabilityIds: usedComponents, concepts: japaneseAnalysis.contentTokens.slice(0, 12),
+    });
+
+    nextState.lastResultStatus = status;
+    nextState.lastPrompt = prompt;
+    nextState.lastDialogueAct = dialogueAct;
+    nextState.lastTopic = nextState.currentTopic;
+    nextState.lastNormalizedKey = convKey;
+    if (appliedReasoningResult) {
+      nextState.lastReasoningTemplateId = appliedReasoningResult.template.id;
+    }
+
     const sharedConcepts = unifiedMikiExperienceService.sharedConcepts(prompt, 4);
     if (unifiedBefore.length > 0 || sharedConcepts.length > 0) {
       reason += `; unified_experience=${sharedConcepts.map(x => x.concept).join(',') || unifiedBefore.map(x => x.domain).join(',')}`;
@@ -466,6 +582,13 @@ export class NonLlmCoreService {
       }
     } catch { /* best effort */ }
 
+    // 会話成功時の自律成長サイクル低負荷トリガー (非ブロッキング)
+    if (status === 'RESOLVED') {
+      setTimeout(() => {
+        surfaceVariationGrowthService.runAutonomousVariationGrowthCycle(2).catch(() => {});
+      }, 300);
+    }
+
     systemLogger.info('CHAT', `🧠 [非LLM Core/Unified] ${status} / ${reason} / ${totalMs}ms / intent=${dialogueAct}`);
 
     return {
@@ -474,7 +597,7 @@ export class NonLlmCoreService {
       status,
       reason,
       intentCategory: dialogueAct,
-      matchedClaimsCount: (claimMatch.hasMatch ? 1 : 0) + (verifiedResearchClaimId ? 1 : 0),
+      matchedClaimsCount: (claimMatch.hasMatch ? 1 : 0) + (appliedReasoningResult ? appliedReasoningResult.participatingClaims.length : 0) + (verifiedResearchClaimId ? 1 : 0),
       usedComponents,
       assembledCode,
       taskExecution,

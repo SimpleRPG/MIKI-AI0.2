@@ -871,7 +871,8 @@ export interface ResponseQualityEvaluation {
  */
 export type ConversationStage =
   | 'QUESTION' | 'CLARIFICATION' | 'CORRECTION' | 'COMPARISON'
-  | 'DECISION' | 'FOLLOW_UP' | 'TOPIC_CHANGE' | 'CLOSING';
+  | 'DECISION' | 'FOLLOW_UP' | 'TOPIC_CHANGE' | 'CLOSING'
+  | 'CAUSALITY' | 'CONDITIONAL';
 
 export interface ConversationCorrectionEvent {
   oldValue: string;
@@ -891,6 +892,20 @@ export interface ConversationState {
   expectedResponseLength: ResponseLength;
   recentEntities?: string[];
   updatedAt: number;
+  /** 直前の非LLM中核の応答結果状態 */
+  lastResultStatus?: 'RESOLVED' | 'UNRESOLVED' | 'NEEDS_CONFIRMATION';
+  /** 直前のユーザープロンプト */
+  lastPrompt?: string;
+  /** 直前の対話行為 */
+  lastDialogueAct?: DialogueAct;
+  /** 直前の話題 */
+  lastTopic?: string;
+  /** 直前の観測用正規化キー */
+  lastNormalizedKey?: string;
+  /** 直前に登録または観測されたClaim候補ID */
+  lastCandidateClaimId?: string;
+  /** 直前に適用された推論テンプレートID */
+  lastReasoningTemplateId?: string;
 }
 
 /**
@@ -3136,6 +3151,7 @@ export type ClaimKind =
 
 /** 6.2 主張DB: 検証状態 */
 export type ClaimVerificationStatus =
+  | 'CANDIDATE'
   | 'UNVERIFIED'
   | 'SUPPORTED'
   | 'DEVICE_VERIFIED'

@@ -35,7 +35,7 @@ const domains = (): Record<UnifiedExperienceDomain, number> => ({
   conversation: 0, rpg: 0, execution: 0, research: 0, code: 0, system: 0,
 });
 
-function normalizeKey(value: string): string {
+export function normalizeKey(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 160);
 }
 
@@ -44,6 +44,10 @@ export class MikiUnifiedLearningContinuumService {
   private initialized = false;
 
   constructor() { this.load(); }
+
+  public getProfile(key: string): LearningProfile | undefined {
+    return this.profiles.get(normalizeKey(key));
+  }
 
   private load() {
     try {
