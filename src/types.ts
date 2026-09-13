@@ -37,7 +37,7 @@ export type MemoryDestination =
   | 'search_policy'       // 5. 検索ポリシー: どの情報をどう検索・取得すべきかの方針
   | 'retrieval_policy'    // 5. (検索ポリシー別名)
   | 'evaluation_set'      // 6. 評価セット: 能力検証・回帰ベンチマークテストケース候補
-  | 'lora_dataset'        // 7. LoRA教材: モデル追加学習用の高品質instruction/outputペア
+  | 'verified_candidate'  // 7. 能力改善候補: 決定論的能力・回答骨格・定石ルール昇格用ペア
   | 'quarantine'          // 8. 隔離: 出典・正解・利用条件が不明な情報 (プロンプト注入完全除外)
   | 'discard_candidate';  // 9. 破棄候補: 重複・誤り・低価値・badCount超過 (一括確認対象)
 
@@ -1067,18 +1067,20 @@ export interface SelfImprovementRecord {
 }
 
 /**
- * Colab / LoRA学習用 高品質教材JSONL (設計思想 7. 学習データの改善)
+ * 検証済み能力改善候補 (CapabilityLearningCandidate)
+ * 旧: モデル追加学習用教材JSONL から移行。
+ * 経験・証拠・検証結果から決定論的能力パッチ・回答骨格・定石ルールを合成するための学習・検証単位。
  */
-export interface TrainingSampleJSONL {
+export interface CapabilityLearningCandidate {
   id: string;
   instruction: string;
   inputContext?: string;
   outputTarget: string;
   category: 'chat' | 'code' | 'vba' | 'retrieval' | 'correction' | 'tool_use';
   reliability: 'high' | 'medium' | 'low';
-  source?: 'local_user' | 'autonomous_cycle' | 'external_teacher' | 'synthetic' | 'benchmark_feedback' | string;
+  source?: 'local_user' | 'autonomous_cycle' | 'external_teacher' | 'synthetic' | 'benchmark_feedback' | 'web_search' | 'memory_routing' | string;
   approved: boolean;
-  split?: 'train' | 'validation' | 'test'; // 設計思想 7: 学習・検証・テストの厳格なデータ分離 (リーク防止)
+  split?: 'train' | 'validation' | 'test'; // 設計思想 7: 検証・テストの厳格なデータ分離 (リーク防止)
   originalFailureOutput?: string;
   failureReason?: string;
   correctionHistory?: string[];
@@ -1090,7 +1092,11 @@ export interface TrainingSampleJSONL {
   createdAt: number;
   experienceId?: string;
   evidenceIds?: string[];
+  capabilityId?: string;
 }
+
+/** 互換性のための型エイリアス */
+export type TrainingSampleJSONL = CapabilityLearningCandidate;
 
 /**
  * 失敗パターンの再現性追跡 (設計思想 9. 回帰テスト & 37. 外部教師パイプライン)
@@ -1896,7 +1902,7 @@ export interface MasteryHistoryEntry {
   to: CapabilityMasteryState;
   reason: string;
   timestamp: number;
-  source: 'observed' | 'seeded' | 'migrated' | 'imported';
+  source: 'observed' | 'seeded' | 'migrated' | 'imported' | 'teacher_material';
   evidenceIds?: string[];   // observedの場合、根拠となるTrainingSample/RegressionResult等のID配列
   verifiedAt?: number;
   evaluator?: string;       // 'self' | 'user' | 'regression_test' 等
@@ -1908,6 +1914,8 @@ export interface CapabilityMasteryProfile {
   name: string;
   category: string;
   state: CapabilityMasteryState;
+  source?: 'observed' | 'seeded' | 'migrated' | 'imported' | 'teacher_material';
+  evidenceIds?: string[];
   successCount: number;
   failureCount: number;
   paraphraseFailureCount: number;
@@ -1938,7 +1946,7 @@ export interface CapabilityGapEntry {
   lastSeenAt: number;
   samples: string[];
   associatedPatternId?: string; // 紐づく回答骨格パターンID
-  source?: 'observed' | 'seeded' | 'migrated' | 'imported';
+  source?: 'observed' | 'seeded' | 'migrated' | 'imported' | 'teacher_material';
   evidenceIds?: string[];
   experienceId?: string;
 }
@@ -3048,6 +3056,8 @@ export interface ExperienceLink {
   timestamp: number;
   source: 'conversation' | 'failure' | 'user_correction' | 'investigation' | 'code_improvement' | 'external_teacher' | string;
   description?: string;
+  failureLogId?: string;
+  evidenceIds?: string[];
   relatedTrainingSampleIds?: string[];
   relatedCapabilityGapIds?: string[];
   relatedHeuristicRuleIds?: string[];

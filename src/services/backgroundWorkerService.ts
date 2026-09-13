@@ -21,6 +21,7 @@ import { regressionBenchmarkService } from './regressionBenchmarkService';
 import { nonLlmRuntimeService } from './nonLlmRuntimeService';
 import { syntheticDataService } from './syntheticDataService';
 import { longTermMemoryService } from './longTermMemoryService';
+import { experienceLinkService } from './experienceLinkService';
 import { capabilityGapService } from './capabilityGapService';
 import { virtualTrainingService } from './virtualTrainingService';
 import { capabilityPluginService } from './capabilityPluginService';
@@ -716,20 +717,26 @@ export class BackgroundWorkerService {
               });
 
               if (failureCheck.isActionable) {
-                selfImprovementService.addTrainingSample({
-                  instruction: prompt,
-                  outputTarget: 'うん、わかった！任せて！すぐに確認してやってみるね。',
-                  category: 'chat',
-                  reliability: 'high',
-                  approved: true,
-                  split: 'train',
-                  originalFailureOutput: err.actualOutcome.actualIntent || '敬語・ロボット的応答',
-                  failureReason: `[再現確認: ${failureCheck.recurrenceCount}回] ロボット的敬語の混入・制約逸脱に対する自己補正プロンプト`,
+                const experienceId = `exp_bg_failure_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+                const failureLogId = `fail_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+                experienceLinkService.getOrCreateLink(experienceId, 'autonomous_cycle', `再発失敗検知: ${prompt.slice(0, 30)}`);
+                experienceLinkService.linkEntity(experienceId, 'failureLog', failureLogId);
+
+                capabilityGapService.recordGap({
+                  description: `[再発弱点検知: ${failureCheck.recurrenceCount}回] ${prompt.slice(0, 40)}: ロボット的敬語の混入・制約逸脱`,
+                  gap_type: 'failure',
+                  capabilityId: 'cap_direct_answer',
+                  impact: 'HIGH',
+                  current_workaround: '親友口調制約を回答計画(AnswerPlan)に決定論的に反映',
+                  candidate_solution: 'タメ口ペルソナ制約テンプレートの適用とCSP制約充足チェックの厳格化',
+                  samplePrompt: prompt,
+                  failureLogId,
+                  experienceId,
                 });
                 selfImprovementService.markFailurePromoted(failureCheck.patternKey);
-                weaknessFound.push(`[再発弱点昇格] 「${prompt.substring(0, 15)}...」が${failureCheck.recurrenceCount}回再現 ➔ 学習サンプルへ追加`);
+                weaknessFound.push(`[再発弱点昇格] 「${prompt.substring(0, 15)}...」が${failureCheck.recurrenceCount}回再現 ➔ 能力ギャップとして登録・改善提案へ移行`);
               } else {
-                weaknessFound.push(`[一過性失敗ガード] 「${prompt.substring(0, 15)}...」初回検知 (再現待機: ${failureCheck.recurrenceCount}/2回) ➔ サンプル追加保留`);
+                weaknessFound.push(`[一過性失敗ガード] 「${prompt.substring(0, 15)}...」初回検知 (再現待機: ${failureCheck.recurrenceCount}/2回) ➔ 改善提案保留`);
               }
             }
           });

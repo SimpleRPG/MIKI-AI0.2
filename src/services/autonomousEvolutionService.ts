@@ -282,22 +282,37 @@ export class AutonomousEvolutionService {
         verifiedEffective: true,
       };
 
-      // DPO/SFT学習サンプルへ自動昇格 (共通experienceIdを連携)
-      const sampleId = selfImprovementService.addTrainingSample({
-        instruction: prompt,
-        outputTarget: ideal,
-        category: 'chat',
-        reliability: 'high',
-        approved: true,
-        split: 'train',
-        originalFailureOutput: flawed,
-        failureReason: `[第19章 反実仮想反省] ${reflectionItem.rootCause}`,
+      // 失敗・反実仮想反省から能力ギャップを記録し、決定論的能力パッチへコンパイル
+      capabilityGapService.recordGap({
+        description: `[第19章 反実仮想反省] ${reflectionItem.rootCause}`,
+        gap_type: 'failure',
+        capabilityId: 'cap_direct_answer',
+        impact: 'HIGH',
+        current_workaround: '反省に基づく回答骨格の制約を回答計画へ注入',
+        candidate_solution: reflectionItem.lessonLearned,
+        samplePrompt: prompt,
         experienceId,
         evidenceIds: [reflectionItem.id, ...evidenceIds],
       });
 
-      if (sampleId) {
-        experienceLinkService.linkEntity(experienceId, 'trainingSample', sampleId);
+      const candidate = selfImprovementService.registerCapabilityCandidate({
+        instruction: prompt,
+        outputTarget: ideal,
+        category: 'chat',
+        reliability: 'high',
+        source: 'autonomous_cycle',
+        approved: true,
+        split: 'train',
+        originalFailureOutput: flawed,
+        failureReason: `[第19章 反実仮想反省] ${reflectionItem.rootCause}`,
+        verifiedEffective: true,
+        verificationNote: `理想応答生成による自己補正: ${reflectionItem.lessonLearned.slice(0, 40)}`,
+        experienceId,
+        evidenceIds: [reflectionItem.id, ...evidenceIds],
+      });
+
+      if (candidate?.id) {
+        experienceLinkService.linkEntity(experienceId, 'trainingSample', candidate.id);
       }
       experienceLinkService.linkEntity(experienceId, 'reflection', reflectionItem.id);
 

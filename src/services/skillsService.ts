@@ -2,6 +2,7 @@ import { SkillItem, SkillDiversityTestResult, SkillDiversityTestCase, SkillGradu
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { selfImprovementService } from './selfImprovementService';
+import { experienceLinkService } from './experienceLinkService';
 import { isCasualGreetingOrShortSocial } from './conversationStateService';
 
 const SKILLS_STORAGE_KEY = 'miki_ai_skills_library';
@@ -418,8 +419,8 @@ class SkillsService {
   }
 
   /**
-   * 50章: 技能の卒業 (official_matured → selfImprovementService.addTrainingSample への自動投入)
-   * 49章の保存先ルーターでいう「LoRA教材」区分へ正式に橋渡しする
+   * 50章: 技能の卒業 (official_matured → 決定論的能力パッチおよび回答骨格への昇格)
+   * 旧: LoRA教材プールへの自動投入を廃止し、決定論的能力・回答計画ルールへ正式に登録する
    */
   public graduateSkillToTrainingDataset(skill: SkillItem): void {
     if (skill.graduatedToTrainingAt) return; // すでに投入済みの場合は多重登録防止
@@ -439,7 +440,12 @@ class SkillsService {
       else if (skill.category === 'coding' || skill.category === 'debug') cat = 'code';
       else if (skill.category === 'retrieval') cat = 'retrieval';
 
-      const sample = selfImprovementService.addTrainingSample({
+      const experienceId = `exp_skill_${skill.id}`;
+      const evidenceId = `ev_skill_${skill.id}`;
+      experienceLinkService.getOrCreateLink(experienceId, 'skill_execution', `スキル[${skill.name}]の公式卒業`);
+      experienceLinkService.linkEntity(experienceId, 'evidence', evidenceId);
+
+      const candidate = selfImprovementService.registerCapabilityCandidate({
         instruction,
         inputContext,
         outputTarget,
@@ -448,19 +454,24 @@ class SkillsService {
         source: 'synthetic',
         approved: true,
         split: 'train',
+        verifiedEffective: true,
+        verificationNote: `技能卒業検証合格: 成功率${Math.round((skill.successCount / (skill.successCount + skill.failureCount || 1)) * 100)}%`,
+        experienceId,
+        evidenceIds: [evidenceId],
       });
 
       skill.graduatedToTrainingAt = Date.now();
-      if (sample?.id) {
-        skill.trainingSampleId = sample.id;
+      if (candidate?.id) {
+        skill.trainingSampleId = candidate.id;
+        experienceLinkService.linkEntity(experienceId, 'trainingSample', candidate.id);
       }
 
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `🎓 [50章 技能の卒業制度] 正式運用スキル「${skill.name}」が長期安定稼働(30日以上運用 & 成功${skill.successCount}回)を達成！ status: 'official_matured' へ卒業し、selfImprovementService (LoRA教材プール) へ自動投入しました (SampleID: ${sample?.id || 'registered'})`
+        `🎓 [50章 技能の卒業制度] 正式運用スキル「${skill.name}」が長期安定稼働(30日以上運用 & 成功${skill.successCount}回)を達成！ status: 'official_matured' へ卒業し、決定論的能力パッチおよび回答骨格へ登録しました (CandidateID: ${candidate?.id || 'registered'})`
       );
     } catch (err: any) {
-      console.warn('Failed to graduate skill to training dataset:', err);
+      console.warn('Failed to graduate skill to deterministic capability:', err);
     }
   }
 

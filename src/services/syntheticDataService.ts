@@ -12,6 +12,7 @@ import { regressionBenchmarkService } from './regressionBenchmarkService';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { checkSampleSafety } from '../utils/trainingSampleSafetyFilter';
+import { experienceLinkService } from './experienceLinkService';
 import { nonLlmRuntimeService } from './nonLlmRuntimeService';
 
 const SYNTHETIC_BATCHES_STORAGE_KEY = 'miki_ai_synthetic_batches';
@@ -714,11 +715,16 @@ export class SyntheticDataService {
         continue;
       }
 
-      // (e) 最終承認 (APPROVED) & selfImprovementService への登録
+      // (e) 最終承認 (APPROVED) & 決定論的能力候補への登録
       prob.status = 'APPROVED';
       approvedCount++;
 
-      selfImprovementService.addTrainingSample({
+      const experienceId = `exp_syn_${prob.id}`;
+      const evidenceId = `ev_syn_${prob.id}`;
+      experienceLinkService.getOrCreateLink(experienceId, 'synthetic_problem', `合成教材生成・機械検証: ${prob.category}`);
+      experienceLinkService.linkEntity(experienceId, 'evidence', evidenceId);
+
+      const candidate = selfImprovementService.registerCapabilityCandidate({
         instruction: safety.redactedUserText ?? prob.instruction,
         inputContext: prob.inputContext,
         outputTarget: safety.redactedAssistantText ?? prob.expectedOutput,
@@ -727,8 +733,15 @@ export class SyntheticDataService {
         source: 'synthetic',
         approved: true,
         split: 'train',
-        failureReason: `[端末内 合成教材工場] 弱点分野(${prob.category})への自律練習問題 (機械検証済)`,
+        verifiedEffective: true,
+        verificationNote: `[端末内 合成教材工場] 弱点分野(${prob.category})への自律練習問題 (機械検証済: ${prob.verificationDetails?.method || 'deterministic'})`,
+        experienceId,
+        evidenceIds: [evidenceId],
       });
+
+      if (candidate?.id) {
+        experienceLinkService.linkEntity(experienceId, 'trainingSample', candidate.id);
+      }
     }
 
     const durationMs = Date.now() - startTime;

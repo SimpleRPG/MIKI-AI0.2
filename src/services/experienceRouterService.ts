@@ -11,6 +11,7 @@ import { storageService } from './storageService';
 import { regressionBenchmarkService } from './regressionBenchmarkService';
 import { skillsService } from './skillsService';
 import { selfImprovementService } from './selfImprovementService';
+import { experienceLinkService } from './experienceLinkService';
 
 /**
  * 49章：経験の保存先ルーター (Experience Destination Router)
@@ -197,7 +198,7 @@ export class ExperienceRouterService {
       };
     }
 
-    // 判定F: LoRA教材 (lora_dataset)
+    // 判定F: 能力改善候補 (verified_candidate)
     // 高品質な対話トーン(タメ口・親友口調)の模範例、または確定した高品質コード生成ペア
     if (
       (candidate.category === 'relationship' || candidate.category === 'chat') &&
@@ -207,8 +208,8 @@ export class ExperienceRouterService {
       /みき|タメ口|相棒|親友/i.test(content)
     ) {
       return {
-        destination: 'lora_dataset',
-        reason: '高品質な対話トーン模範例としてLoRA追加学習教材へ振り分けられました。',
+        destination: 'verified_candidate',
+        reason: '高品質な対話トーン模範例として決定論的能力・回答骨格候補へ振り分けられました。',
         factors,
         riskScore: 5,
       };
@@ -421,22 +422,39 @@ export class ExperienceRouterService {
   }
 
   /**
-   * LoRA教材 (lora_dataset) の記憶をモデル学習教材へ連携する
+   * 能力改善候補 (verified_candidate) の記憶を決定論的能力候補へ連携する
+   * （旧: exportToLoraDataset を移行）
    */
-  public exportToLoraDataset(item: MemoryItem): void {
-    selfImprovementService.addTrainingSample({
+  public routeToCapabilityCandidate(item: MemoryItem): void {
+    const experienceId = `exp_mem_${item.id}`;
+    const evidenceId = `ev_mem_${item.id}`;
+    experienceLinkService.getOrCreateLink(experienceId, 'conversation', `記憶[${item.id}]の能力改善候補化`);
+    experienceLinkService.linkEntity(experienceId, 'evidence', evidenceId);
+
+    selfImprovementService.registerCapabilityCandidate({
       instruction: `ユーザーからの質問・文脈: ${item.sourceRef || item.category}`,
       outputTarget: item.content,
       category: item.category === 'vba' ? 'vba' : 'code',
       reliability: 'high',
-      source: 'manual',
+      source: 'memory_routing',
       approved: true,
       split: 'train',
+      verifiedEffective: true,
+      verificationNote: `記憶ルーティング検証済: ${item.category}`,
+      experienceId,
+      evidenceIds: [evidenceId],
     });
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🎓 [49章 LoRA教材] 記憶 [${item.id}] を自己改善ファインチューニングデータセットへ追加しました`
+      `🎓 [49章 能力改善候補] 記憶 [${item.id}] を決定論的能力・回答骨格候補へ登録しました`
     );
+  }
+
+  /**
+   * @deprecated 非LLM移行に伴い廃止。routeToCapabilityCandidate を使用してください。
+   */
+  public exportToLoraDataset(item: MemoryItem): void {
+    this.routeToCapabilityCandidate(item);
   }
 }
 

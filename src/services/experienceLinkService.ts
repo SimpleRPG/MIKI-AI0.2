@@ -53,6 +53,34 @@ export class ExperienceLinkService {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   }
 
+  public getOrCreateLink(
+    experienceId: string,
+    source: ExperienceLink['source'] = 'conversation',
+    description?: string
+  ): ExperienceLink {
+    this.load();
+    let link = this.links.get(experienceId);
+    if (!link) {
+      link = {
+        experienceId,
+        timestamp: Date.now(),
+        source,
+        description,
+        evidenceIds: [],
+        relatedTrainingSampleIds: [],
+        relatedCapabilityGapIds: [],
+        relatedHeuristicRuleIds: [],
+        relatedSelfCodeProposalIds: [],
+        relatedRegressionResultIds: [],
+        relatedResponseSkeletonIds: [],
+        relatedReflectionIds: [],
+      };
+      this.links.set(experienceId, link);
+      this.save();
+    }
+    return link;
+  }
+
   public createExperienceLink(params: {
     experienceId: string;
     source?: ExperienceLink['source'];
@@ -118,6 +146,9 @@ export class ExperienceLinkService {
     experienceId: string,
     type:
       | 'trainingSample'
+      | 'candidate'
+      | 'evidence'
+      | 'failureLog'
       | 'capabilityGap'
       | 'heuristicRule'
       | 'selfCodeProposal'
@@ -140,7 +171,14 @@ export class ExperienceLinkService {
 
     switch (type) {
       case 'trainingSample':
+      case 'candidate':
         link.relatedTrainingSampleIds = Array.from(new Set([...(link.relatedTrainingSampleIds || []), entityId]));
+        break;
+      case 'evidence':
+        link.evidenceIds = Array.from(new Set([...(link.evidenceIds || []), entityId]));
+        break;
+      case 'failureLog':
+        link.failureLogId = entityId;
         break;
       case 'capabilityGap':
         link.relatedCapabilityGapIds = Array.from(new Set([...(link.relatedCapabilityGapIds || []), entityId]));

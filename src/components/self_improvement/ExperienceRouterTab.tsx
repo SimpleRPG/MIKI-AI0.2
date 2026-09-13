@@ -90,13 +90,13 @@ const DESTINATION_CONFIG: Record<
     border: 'border-pink-700/60',
     desc: '能力検証・回帰ベンチマークテストケース候補',
   },
-  lora_dataset: {
-    label: 'LoRA教材',
+  verified_candidate: {
+    label: '能力改善候補',
     icon: Cpu,
     color: 'text-purple-400',
     bg: 'bg-purple-950/40',
     border: 'border-purple-700/60',
-    desc: 'モデル追加学習用の高品質instruction/outputペア',
+    desc: '決定論的能力・回答骨格・定石ルール昇格用の模範ペア',
   },
   quarantine: {
     label: '隔離',

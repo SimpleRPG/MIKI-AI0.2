@@ -1845,7 +1845,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                       ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
                                       : mem.destination === 'search_policy'
                                       ? 'bg-purple-950/80 text-purple-300 border-purple-800'
-                                      : mem.destination === 'lora_dataset'
+                                      : mem.destination === 'verified_candidate'
                                       ? 'bg-pink-950/80 text-pink-300 border-pink-800'
                                       : 'bg-slate-900 text-slate-400 border-slate-700'
                                   }`}
@@ -1860,8 +1860,8 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                                     ? '評価セット'
                                     : mem.destination === 'search_policy'
                                     ? '検索ポリシー'
-                                    : mem.destination === 'lora_dataset'
-                                    ? 'LoRA教材'
+                                    : mem.destination === 'verified_candidate'
+                                    ? '能力改善候補'
                                     : mem.destination}
                                 </span>
                               )}
@@ -3726,7 +3726,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `miki_lora_dataset_${Date.now()}.jsonl`;
+                    a.download = `miki_capability_candidates_${Date.now()}.jsonl`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);

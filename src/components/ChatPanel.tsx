@@ -656,17 +656,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       });
     }
 
-    // 学習データ / 自己改善データへ追加
+    // 有効性の証拠(Evidence)および能力改善候補へ連携
     if (type === 'good') {
-      const added = selfImprovementService.addTrainingSample({
-        instruction: userPrompt,
-        outputTarget: msg.content,
-        category: msg.content.includes('```') ? 'code' : 'chat',
-        reliability: 'high',
-        approved: true,
+      const feedbackRes = selfImprovementService.recordUserFeedbackEvidence({
+        userPrompt,
+        assistantOutput: msg.content,
+        isPositive: true,
+        messageId: msg.id,
+        usedSkillIds: msg.usedSkills?.map((s) => s.id),
       });
-      if (added) {
-        systemLogger.info('SELF_IMPROVEMENT', 'ユーザーから高評価(👍)を受信。安全検査通過済みColab/LoRA用高品質教材に自動登録しました。');
+
+      if (feedbackRes.candidateCreated) {
+        systemLogger.info('SELF_IMPROVEMENT', 'ユーザー高評価(👍)を受信。有効性の証拠として記録し、決定論的能力・回答骨格候補へ連携しました。');
 
         // 設計思想 第28章 28.3: コード骨格の実績テンプレート化連携
         if (msg.content.includes('```')) {
@@ -680,7 +681,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           }
         }
       } else {
-        systemLogger.warn('SELF_IMPROVEMENT', 'ユーザー高評価(👍)を受信しましたが、コンテンツ安全境界フィルタにより教材登録から除外・ログ記録されました。');
+        systemLogger.info('SELF_IMPROVEMENT', 'ユーザー高評価(👍)を受信。応答の有効性検証ログおよび経験リンクを記録しました。');
       }
     } else {
       if (msg.completionEvaluation?.autoDiagnosedAt) {
@@ -786,7 +787,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       skill: 'スキル',
       search_policy: '検索ポリシー',
       evaluation_set: '評価セット',
-      lora_dataset: 'LoRA教材',
+      verified_candidate: '能力改善候補',
       quarantine: '安全隔離',
       discard_candidate: '破棄候補',
     };

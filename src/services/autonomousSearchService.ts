@@ -8,6 +8,7 @@ import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { workingAgendaService } from './workingAgendaService';
 import { selfImprovementService } from './selfImprovementService';
+import { experienceLinkService } from './experienceLinkService';
 import { capabilityGapService } from './capabilityGapService';
 import { privacyGuardrailService } from './privacyGuardrailService';
 import { bannedTopicsConfigService } from './bannedTopicsConfigService';
@@ -654,20 +655,31 @@ export class AutonomousSearchService {
       }
     }
 
-    // 2. 合成学習データセット (Synthetic Data) への教材還元
+    // 2. Web検索知見を Evidence / Experience として記録 (TrainingSampleへの直接投入を廃止)
     if (this.config.autoLearnToSyntheticData && extractedKnowledge.length > 0) {
       try {
-        selfImprovementService.addTrainingSample({
+        const experienceId = `exp_search_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const evidenceId = `ev_search_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        experienceLinkService.getOrCreateLink(experienceId, 'web_search', `Web検索知見獲得: ${query.slice(0, 40)}`);
+        experienceLinkService.linkEntity(experienceId, 'evidence', evidenceId);
+
+        // 検索結果は無条件で正解とせず、未検証の能力改善候補(approved: false)として記録し、
+        // 独立検証(Verification)を経てからCapability/骨格へ昇格させる
+        selfImprovementService.registerCapabilityCandidate({
           instruction: `「${query}」についての最新情報や仕様、知見を説明してください。`,
           outputTarget: summary || extractedKnowledge.join('\n'),
           category: 'retrieval',
-          reliability: 'high',
-          source: 'auto_repair',
-          verificationNote: `Web検索自律学習教材: ${query.slice(0, 30)}`,
+          reliability: 'medium',
+          source: 'web_search',
+          approved: false, // 未検証: 自動昇格防止
+          verifiedEffective: false,
+          verificationNote: `Web検索未検証証拠: ${query.slice(0, 30)}`,
+          experienceId,
+          evidenceIds: [evidenceId],
         });
         integratedToSyntheticData = true;
       } catch (synErr) {
-        console.warn('Failed to integrate search knowledge to synthetic data:', synErr);
+        console.warn('Failed to integrate search knowledge to capability candidates:', synErr);
       }
     }
 

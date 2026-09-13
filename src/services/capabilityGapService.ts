@@ -261,6 +261,7 @@ class CapabilityGapService {
     associatedPatternId?: string;
     source?: 'observed' | 'seeded' | 'teacher_material';
     evidenceIds?: string[];
+    failureLogId?: string;
     experienceId?: string;
   }): CapabilityGapEntry {
     // 既存の同種ギャップがあるか探す
@@ -277,6 +278,9 @@ class CapabilityGapService {
       if (entry.experienceId) {
         existing.experienceId = entry.experienceId;
         experienceLinkService.linkEntity(entry.experienceId, 'capabilityGap', existing.gap_id);
+        if (entry.failureLogId) {
+          experienceLinkService.linkEntity(entry.experienceId, 'failureLog', entry.failureLogId);
+        }
       }
       if (entry.evidenceIds && entry.evidenceIds.length > 0) {
         existing.evidenceIds = Array.from(new Set([...(existing.evidenceIds || []), ...entry.evidenceIds]));
@@ -313,6 +317,9 @@ class CapabilityGapService {
 
     if (entry.experienceId) {
       experienceLinkService.linkEntity(entry.experienceId, 'capabilityGap', newEntry.gap_id);
+      if (entry.failureLogId) {
+        experienceLinkService.linkEntity(entry.experienceId, 'failureLog', entry.failureLogId);
+      }
     }
 
     this.gaps.unshift(newEntry);
@@ -552,6 +559,8 @@ class CapabilityGapService {
         to: 'STABLE',
         reason: '回答骨格PATTERN-LOGICAL-PRIORITY-01配備と決定表優先順位付けロジックにより三重例外の判定が安定（GAP-0012解消）',
         timestamp: Date.now(),
+        source: 'observed',
+        evidenceIds: ['gap_resolve_action_gap0012'],
       });
     }
     this.saveGaps();
@@ -581,6 +590,8 @@ class CapabilityGapService {
         to: 'SATURATED',
         reason: '婉曲的・間接的な訂正表現の正規表現拡張とカテゴリ一般化によりGAP-0031を完全解消',
         timestamp: Date.now(),
+        source: 'observed',
+        evidenceIds: ['gap_resolve_action_gap0031'],
       });
     }
     this.saveGaps();

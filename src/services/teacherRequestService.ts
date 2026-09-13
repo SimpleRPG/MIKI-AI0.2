@@ -22,6 +22,7 @@ import { completionJudgeService } from './completionJudgeService';
 import { schemaValidationService } from './schemaValidationService';
 import { sendChatMessage, apiUrl, getCustomApiHeaders, SERVER_UNAVAILABLE_MESSAGE } from './api';
 import { capabilityGapService } from './capabilityGapService';
+import { experienceLinkService } from './experienceLinkService';
 import { answerPlanService } from './answerPlanService';
 import { privacyGuardrailService } from './privacyGuardrailService';
 
@@ -456,7 +457,7 @@ export class TeacherRequestService {
    * 返ってきた教材は無条件で正解とせず:
    * 1. checkSampleSafety によるコンテンツ安全境界チェック
    * 2. 品質フィルタ（文字数、自己矛盾）チェック
-   * 3. source: 'external_teacher' / 中信頼(medium)ラベルで addTrainingSample に保存
+   * 3. source: 'external_teacher' / 中信頼(medium)ラベルで registerCapabilityCandidate に保存
    */
   public async requestTeacherMaterial(
     payload: TeacherRequestPayload,
@@ -809,21 +810,33 @@ export class TeacherRequestService {
         generalizationGapRecorded = true;
       }
 
-      // 3. 独立検証合格 ➔ 中信頼(medium) & source: 'external_teacher' で保存
-      // 勝手な自動マージを防止するため approved: false (ユーザーによる確認・承認待ち) とする
-      const savedSample = selfImprovementService.addTrainingSample({
+      // 3. 外部教師からの応答を候補(Candidate)および証拠(Evidence)として記録
+      // 勝手な自動マージを防止するため approved: false (ユーザーによる確認・承認待ち) とし、
+      // 独立検証結果 (verifiedEffective) を付与して決定論的能力候補へ渡す
+      const experienceId = (payload as any).experienceId || `exp_teacher_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const evidenceId = `ev_teacher_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      experienceLinkService.getOrCreateLink(experienceId, 'external_teacher', `外部教師回答: ${payload.failureCategory}`);
+      experienceLinkService.linkEntity(experienceId, 'evidence', evidenceId);
+
+      const savedSample = selfImprovementService.registerCapabilityCandidate({
         instruction: safety.redactedUserText ?? mat.instruction,
         inputContext: mat.inputContext,
         outputTarget: safety.redactedAssistantText ?? mat.outputTarget,
         category: (mat.category as any) || (payload.failureCategory as any) || 'chat',
-        reliability: 'medium', // 中信頼扱い
+        reliability: 'medium', // 教師LLM出力は中信頼扱い
         source: 'external_teacher',
         approved: false, // 勝手な自動マージ防止: ユーザー確認待ち
         split: 'train',
         failureReason: payload.failureReason,
         verifiedEffective,
         verificationNote,
+        experienceId,
+        evidenceIds: [evidenceId],
       });
+
+      if (savedSample?.id) {
+        experienceLinkService.linkEntity(experienceId, 'trainingSample', savedSample.id);
+      }
 
       // 弱点昇格フラグを更新
       if (patternKeyToPromote) {

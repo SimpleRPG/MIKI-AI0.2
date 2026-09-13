@@ -1,6 +1,7 @@
 import {
   SelfImprovementRecord,
   TrainingSampleJSONL,
+  CapabilityLearningCandidate,
   TrainingDataSplitStats,
   ModelGeneration,
   MemoryItem,
@@ -29,6 +30,7 @@ import { experienceLinkService } from './experienceLinkService';
 
 const RECORDS_STORAGE_KEY = 'miki_ai_self_improvement_records';
 const TRAINING_DATA_STORAGE_KEY = 'miki_ai_training_samples';
+const CAPABILITY_CANDIDATES_STORAGE_KEY = 'miki_ai_capability_learning_candidates_v1';
 const MODEL_GENERATIONS_KEY = 'miki_ai_model_generations';
 const TRAINING_THRESHOLD_KEY = 'miki_ai_training_threshold';
 const LAST_NOTIFIED_THRESHOLD_KEY = 'miki_ai_training_notified_count';
@@ -61,9 +63,11 @@ class SelfImprovementService {
         const rawRec = storageService.getItem(RECORDS_STORAGE_KEY);
         if (rawRec) this.records = JSON.parse(rawRec);
 
-        const rawTrain = storageService.getItem(TRAINING_DATA_STORAGE_KEY);
-        if (rawTrain) {
-          const parsed: TrainingSampleJSONL[] = JSON.parse(rawTrain);
+        const rawCandidates =
+          storageService.getItem(CAPABILITY_CANDIDATES_STORAGE_KEY) ||
+          storageService.getItem(TRAINING_DATA_STORAGE_KEY);
+        if (rawCandidates) {
+          const parsed: CapabilityLearningCandidate[] = JSON.parse(rawCandidates);
           // 互換性担保: 既存サンプルに split がなければ 'train' をデフォルト設定
           this.trainingSamples = parsed.map((s) => ({
             ...s,
@@ -107,7 +111,9 @@ class SelfImprovementService {
   public saveTrainingSamples(): void {
     if (typeof storageService !== 'undefined') {
       try {
-        storageService.setItem(TRAINING_DATA_STORAGE_KEY, JSON.stringify(this.trainingSamples));
+        const serialized = JSON.stringify(this.trainingSamples);
+        storageService.setItem(CAPABILITY_CANDIDATES_STORAGE_KEY, serialized);
+        storageService.setItem(TRAINING_DATA_STORAGE_KEY, serialized);
       } catch (e) {}
     }
   }
@@ -233,7 +239,7 @@ class SelfImprovementService {
         ? `ロールバック実行: ${details?.title || ''} (${regressionSummary.testSummary || 'ロールバック'})`
         : `コード改善適用失敗: ${details?.error || regressionSummary.testSummary || '回帰テスト不合格'}`;
 
-      this.recordFailureRecurrence({
+      this.recordOrCheckFailureRecurrence({
         prompt: `CodeImprovement proposal:${sourceProposalId} chapter:${details?.chapterNumber || 'unknown'}`,
         category: 'code_improvement_failure',
         reason: failReason,
@@ -595,23 +601,95 @@ class SelfImprovementService {
   }
 
   /**
-   * ユーザーからの👎フィードバックや会話の成功を学習用JSONLに追加
-   * 設計思想 7. 学習データの改善 (train / validation / test 分離) & 25. 安全・品質境界
+   * ユーザーからのフィードバック (Good/Bad) を証拠として記録
+   * 単なる「正解」として学習データに直結させず、有効性の証拠候補として検証し、必要に応じて回答骨格へ反映
    */
-  public addTrainingSample(sample: {
+  public recordUserFeedbackEvidence(params: {
+    userPrompt: string;
+    assistantOutput: string;
+    isPositive: boolean;
+    messageId: string;
+    usedSkillIds?: string[];
+  }): { evidenceId: string; experienceId: string; candidateCreated: boolean } {
+    const experienceId = `exp_feedback_${params.messageId}`;
+    const evidenceId = `ev_feedback_${params.messageId}`;
+
+    experienceLinkService.getOrCreateLink(
+      experienceId,
+      'conversation',
+      `ユーザー${params.isPositive ? '高評価(👍)' : '低評価(👎)'}フィードバック`
+    );
+    experienceLinkService.linkEntity(experienceId, 'evidence', evidenceId);
+
+    if (!params.isPositive) {
+      // ユーザー低評価: 能力ギャップとして記録
+      const failureLogId = `fail_feedback_${params.messageId}`;
+      capabilityGapService.recordGap({
+        description: `ユーザーからの低評価(👎): ${params.userPrompt.slice(0, 40)}`,
+        gap_type: 'failure',
+        capabilityId: params.assistantOutput.includes('```') ? 'cap_code_comprehension' : 'cap_direct_answer',
+        impact: 'MEDIUM',
+        current_workaround: '回答骨格および制約条件の見直し',
+        candidate_solution: '入力文脈と不満箇所の反省分析による回答計画制約の追加',
+        samplePrompt: params.userPrompt,
+        failureLogId,
+        experienceId,
+      });
+      experienceLinkService.linkEntity(experienceId, 'failureLog', failureLogId);
+      return { evidenceId, experienceId, candidateCreated: false };
+    }
+
+    // 肯定評価 (👍): 有効性の証拠候補として安全検査および構造検査
+    const safety = checkSampleSafety(params.userPrompt, params.assistantOutput);
+    if (!safety.safe) {
+      return { evidenceId, experienceId, candidateCreated: false };
+    }
+
+    // コードブロックや明確な実質回答を含む場合、回答骨格・決定論的能力パッチへの昇格候補として登録
+    const hasCode = params.assistantOutput.includes('```');
+    const isSubstantive = params.assistantOutput.length >= 20;
+
+    if (hasCode || isSubstantive) {
+      const candidate = this.registerCapabilityCandidate({
+        instruction: safety.redactedUserText ?? params.userPrompt,
+        outputTarget: safety.redactedAssistantText ?? params.assistantOutput,
+        category: hasCode ? 'code' : 'chat',
+        reliability: 'high',
+        source: 'local_user',
+        approved: true,
+        split: 'train',
+        verifiedEffective: true,
+        verificationNote: 'ユーザー肯定的フィードバック(👍)受領による有効性証拠',
+        experienceId,
+        evidenceIds: [evidenceId],
+      });
+      return { evidenceId, experienceId, candidateCreated: Boolean(candidate) };
+    }
+
+    return { evidenceId, experienceId, candidateCreated: false };
+  }
+
+  /**
+   * 検証済み能力改善候補 (CapabilityLearningCandidate) の登録
+   * モデル重み学習 (LoRA/SFT/DPO) ではなく、決定論的な能力パッチ・回答骨格・ルールへの昇格候補として蓄積
+   */
+  public registerCapabilityCandidate(sample: {
     instruction: string;
     inputContext?: string;
     outputTarget: string;
-    category?: TrainingSampleJSONL['category'];
-    reliability?: TrainingSampleJSONL['reliability'];
-    source?: TrainingSampleJSONL['source'];
+    category?: CapabilityLearningCandidate['category'];
+    reliability?: CapabilityLearningCandidate['reliability'];
+    source?: CapabilityLearningCandidate['source'];
     approved?: boolean;
     split?: 'train' | 'validation' | 'test';
     originalFailureOutput?: string;
     failureReason?: string;
     verifiedEffective?: boolean;
     verificationNote?: string;
-  }): TrainingSampleJSONL | null {
+    experienceId?: string;
+    evidenceIds?: string[];
+    capabilityId?: string;
+  }): CapabilityLearningCandidate | null {
     // 1. コンテンツ安全境界チェック (設計思想 25. 安全・品質境界)
     // 既存のcleanAndDeduplicateSamplesより前に必ず実行
     const safety = checkSampleSafety(sample.instruction, sample.outputTarget);
@@ -631,7 +709,7 @@ class SelfImprovementService {
 
       systemLogger.warn(
         'SELF_IMPROVEMENT',
-        `🛡️ [安全境界ガード] 危険/不適切コンテンツを検知したため教材追加を除外しました (理由: ${safety.reasons.join(', ')}, ハッシュ: ${excerptHash})`
+        `🛡️ [安全境界ガード] 危険/不適切コンテンツを検知したため能力候補追加を除外しました (理由: ${safety.reasons.join(', ')}, ハッシュ: ${excerptHash})`
       );
       return null;
     }
@@ -674,14 +752,14 @@ class SelfImprovementService {
     const isRedacted = Boolean(safety.redacted);
 
     // 外部教師(external_teacher)経由は無条件で正解とせず中信頼扱いとする (設計方針 39節)
-    const effectiveReliability: TrainingSampleJSONL['reliability'] = sample.reliability
+    const effectiveReliability: CapabilityLearningCandidate['reliability'] = sample.reliability
       ? sample.reliability
       : sample.source === 'external_teacher'
       ? 'medium'
       : 'high';
 
-    const newSample: TrainingSampleJSONL = {
-      id: 'train_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    const newCandidate: CapabilityLearningCandidate = {
+      id: 'cand_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       instruction: finalInstruction,
       inputContext: sample.inputContext,
       outputTarget: finalOutputTarget,
@@ -697,14 +775,28 @@ class SelfImprovementService {
       redacted: isRedacted,
       redactedReasons: isRedacted ? safety.reasons : undefined,
       createdAt: Date.now(),
+      experienceId: sample.experienceId,
+      evidenceIds: sample.evidenceIds,
+      capabilityId: sample.capabilityId,
     };
 
-    this.trainingSamples.unshift(newSample);
+    this.trainingSamples.unshift(newCandidate);
     this.saveTrainingSamples();
-    if (newSample.approved && newSample.verifiedEffective === true) {
-      deterministicCapabilityEvolutionService.compileVerifiedSample(newSample);
-    } else if (newSample.failureReason) {
-      deterministicCapabilityEvolutionService.recordFailure(newSample);
+
+    // 経験リンクの双方向結合
+    if (newCandidate.experienceId) {
+      experienceLinkService.linkEntity(newCandidate.experienceId, 'trainingSample', newCandidate.id);
+      if (newCandidate.evidenceIds) {
+        newCandidate.evidenceIds.forEach((evId) => {
+          experienceLinkService.linkEntity(newCandidate.experienceId!, 'evidence', evId);
+        });
+      }
+    }
+
+    if (newCandidate.approved && newCandidate.verifiedEffective === true) {
+      deterministicCapabilityEvolutionService.compileVerifiedSample(newCandidate);
+    } else if (newCandidate.failureReason) {
+      deterministicCapabilityEvolutionService.recordFailure(newCandidate);
     }
     this.checkTrainingThreshold();
 
@@ -715,7 +807,29 @@ class SelfImprovementService {
       );
     }
 
-    return newSample;
+    return newCandidate;
+  }
+
+  /**
+   * @deprecated 非LLM学習アーキテクチャ移行に伴い非推奨。registerCapabilityCandidate を使用してください。
+   */
+  public addTrainingSample(sample: {
+    instruction: string;
+    inputContext?: string;
+    outputTarget: string;
+    category?: CapabilityLearningCandidate['category'];
+    reliability?: CapabilityLearningCandidate['reliability'];
+    source?: CapabilityLearningCandidate['source'];
+    approved?: boolean;
+    split?: 'train' | 'validation' | 'test';
+    originalFailureOutput?: string;
+    failureReason?: string;
+    verifiedEffective?: boolean;
+    verificationNote?: string;
+    experienceId?: string;
+    evidenceIds?: string[];
+  }): CapabilityLearningCandidate | null {
+    return this.registerCapabilityCandidate(sample);
   }
 
   /**
