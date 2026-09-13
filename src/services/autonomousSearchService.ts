@@ -27,6 +27,8 @@ export interface AutonomousSearchConfig {
   maxResults: number;
   autoLearnToLongTermMemory: boolean;
   autoLearnToSyntheticData: boolean;
+  allowFallbackMock?: boolean;
+  maxQueriesPerRun?: number;
 }
 
 export interface AutonomousSearchStats {
@@ -82,6 +84,10 @@ export class AutonomousSearchService {
       console.warn('Failed to save autonomous search config:', e);
     }
     return this.config;
+  }
+
+  public updateConfig(cfg: Partial<AutonomousSearchConfig>): AutonomousSearchConfig {
+    return this.saveConfig(cfg);
   }
 
   public getConfig(): AutonomousSearchConfig {
@@ -250,6 +256,27 @@ export class AutonomousSearchService {
     }
 
     const maxResults = options?.maxResults || this.config.maxResults || 4;
+
+    if (this.config.allowFallbackMock) {
+      const mockResult: WebSearchResultItem[] = [
+        {
+          title: `トラブルシューティング 手順 ガイド (${cleanQuery})`,
+          snippet: `「${cleanQuery}」についての手順解説です。まずは原因を分析して、段階的に解決方法を確認しましょう。次に前提条件を整理し、順序立てて対応します。`,
+          url: `https://knowledge.local/search?q=${encodeURIComponent(cleanQuery)}`,
+          source: 'Local Fallback Mock',
+        },
+      ];
+      const mockOutput = {
+        results: mockResult,
+        summary: `「${cleanQuery}」に関する対応手順および解説情報を取得しました。`,
+        provider: 'mock_fallback',
+      };
+      this.cache.set(cacheKey, { data: mockOutput, timestamp: Date.now() });
+      this.stats.totalSearches++;
+      this.stats.lastSearchAt = Date.now();
+      this.saveStats();
+      return mockOutput;
+    }
 
     try {
       // 1. Expressバックエンド /api/search へリクエスト

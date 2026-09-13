@@ -185,7 +185,7 @@ export class RemediationFailureRecoveryService {
       verifiedStatement,
     });
 
-    const remediation = researchToRemediationService.process(gap, result, event.environment as ExecutionEnvironment);
+    const remediation = researchToRemediationService.process(gap, result, event.environment);
     if (!remediation) {
       return this.update(base.recoveryId, {
         status: 'KNOWLEDGE_ONLY',

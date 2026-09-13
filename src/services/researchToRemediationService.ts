@@ -36,7 +36,7 @@ export class ResearchToRemediationService {
   private records: RemediationRecord[] = [];
   constructor() { this.load(); }
 
-  public process(gap: KnowledgeGap, result: ResearchResult, environment: ExecutionEnvironment = 'ANDROID'): RemediationRecord | undefined {
+  public process(gap: KnowledgeGap, result: ResearchResult, environment: ExecutionEnvironment | string = 'ANDROID'): RemediationRecord | undefined {
     const promoted = (result.verification || []).filter(v => v.promoted);
     if (!result.resolved || promoted.length === 0) return undefined;
 
@@ -77,12 +77,15 @@ export class ResearchToRemediationService {
       return this.overlap(hay, needles) >= 1;
     }).sort((a, b) => this.overlap(this.tokens(`${b.component_id} ${b.purpose}`), this.tokens(`${statement} ${gap.query}`)) - this.overlap(this.tokens(`${a.component_id} ${a.purpose}`), this.tokens(`${statement} ${gap.query}`))).slice(0, 3);
 
+    const env: ExecutionEnvironment = (['ANDROID', 'TERMUX', 'EXCEL_WINDOWS', 'EXCEL_MAC', 'EXTERNAL_RUNNER'].includes(environment as any))
+      ? (environment as ExecutionEnvironment)
+      : 'ANDROID';
     const suites: RegressionSuite[] = [];
     for (const component of candidates) {
-      const confidence = capabilityConfidenceService.evaluate(component.component_id, environment);
+      const confidence = capabilityConfidenceService.evaluate(component.component_id, env);
       // 再検証要求中のComponentは「修正候補」へ直接投入しない。
       if (confidence.revalidationRequired) continue;
-      const suite = componentRegressionService.plan(component.component_id, environment);
+      const suite = componentRegressionService.plan(component.component_id, env);
       if (suite) suites.push(suite);
     }
 

@@ -249,6 +249,10 @@ class SystemLogger {
     };
   }
 
+  public subscribe(listener: (entry: SystemLogEntry) => void): () => void {
+    return this.subscribeLog(listener);
+  }
+
   /**
    * リアルタイム推論工程・自律改善ステップ購読
    */

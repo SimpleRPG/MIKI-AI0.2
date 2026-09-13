@@ -48,7 +48,7 @@ class FormalConstraintSolverService {
       var2: 'activeWeights',
       predicateName: 'PROTECT_QWEN_3B',
       check: (m, w) => {
-        if (m === 'legacy-generative-model') return w === 'IMMUTABLE';
+        if (m === 'legacy-generative-model' || m === 'Qwen-3B-Base') return w === 'IMMUTABLE';
         return true;
       },
       description: 'モデル生成系ランタイムモデル重み不変保護制約',

@@ -81,7 +81,7 @@ export class FailureUnderstandingService {
         }
         // Knowledge-only promotion is not enough: feed the verified research result
         // into the existing safe Research→Remediation boundary as well.
-        researchToRemediationService.process(gap, result, event.environment as ExecutionEnvironment);
+        researchToRemediationService.process(gap, result, event.environment);
       }
       this.records.unshift({
         id: `FAIL-UNDERSTAND-${this.hash(`${event.event_id}|${gap.id}`)}`,
