@@ -449,13 +449,6 @@ export class ExperienceRouterService {
       `🎓 [49章 能力改善候補] 記憶 [${item.id}] を決定論的能力・回答骨格候補へ登録しました`
     );
   }
-
-  /**
-   * @deprecated 非LLM移行に伴い廃止。routeToCapabilityCandidate を使用してください。
-   */
-  public exportToLoraDataset(item: MemoryItem): void {
-    this.routeToCapabilityCandidate(item);
-  }
 }
 
 export const experienceRouterService = new ExperienceRouterService();

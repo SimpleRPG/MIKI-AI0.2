@@ -1952,18 +1952,29 @@ export interface CapabilityGapEntry {
 }
 
 /**
- * 設計思想 16章: LoRA検討の発動条件と仮想学習試験
+ * 設計思想 16章: 非LLMアーキテクチャ 能力充足度判定 (旧: LoraTriggerAssessment)
+ * 検索・記憶・回答骨格で制御が充足しているか客観的に判定
  */
-export interface LoraTriggerAssessment {
-  triggered: boolean; // 16.2の発動条件を満たしたか
+export interface CapabilitySufficiencyAssessment {
+  triggered: boolean; // 発動条件を満たしたか
   reasons: string[];
   paraphraseFailureRepeated: boolean;
   skeletonAddedButFailurePersists: boolean;
   weakCapabilityStagnated: boolean;
-  recommendation: 'MAINTAIN_DISABLED' | 'RECOMMEND_VIRTUAL_TEST' | 'APPROVE_LORA_CANDIDATE';
+  recommendation:
+    | 'MAINTAIN_NON_LLM_CORE'
+    | 'RECOMMEND_CAPABILITY_TRIAL'
+    | 'DECOMPOSE_CAPABILITY_GAP'
+    | 'MAINTAIN_DISABLED'
+    | 'RECOMMEND_VIRTUAL_TEST'
+    | 'APPROVE_LORA_CANDIDATE';
 }
+export type LoraTriggerAssessment = CapabilitySufficiencyAssessment;
 
-export interface VirtualTrainingTrial {
+/**
+ * 設計思想 16章: 非LLMアーキテクチャ 決定論的能力検証試験 (旧: VirtualTrainingTrial)
+ */
+export interface CapabilityEvaluationTrial {
   trialId: string;
   capabilityId: string;
   testPrompt: string;
@@ -1975,10 +1986,17 @@ export interface VirtualTrainingTrial {
   step4_paraphraseRetestPassed: boolean;
   step5_crossDomainRetestPassed: boolean;
   step6_regressionCheckPassed: boolean;
-  verdict: 'NO_LORA_NEEDED_SAVE_SKELETON' | 'LORA_CANDIDATE' | 'INCONCLUSIVE_TOO_DIFFICULT' | 'REJECT_REGRESSION';
+  verdict:
+    | 'VERIFIED_NON_LLM_CAPABILITY'
+    | 'REQUIRES_DECOMPOSITION'
+    | 'INCONCLUSIVE_TOO_DIFFICULT'
+    | 'REJECT_REGRESSION'
+    | 'NO_LORA_NEEDED_SAVE_SKELETON'
+    | 'LORA_CANDIDATE';
   verdictDetails: string;
   timestamp: number;
 }
+export type VirtualTrainingTrial = CapabilityEvaluationTrial;
 
 /**
  * 設計思想 22〜25章 & 35章 第10段階: コード理解AI (Code IR)
@@ -2227,7 +2245,8 @@ export interface SystemFeatureFlags {
   ANSWER_PLAN_CACHE: FeatureFlagState;
   TEACHER_ROUTER: FeatureFlagState;
   MULTI_STEP_REASONING: FeatureFlagState;
-  LORA_TRAINING: FeatureFlagState; // 16.2の発動条件を満たすまで長期DISABLED固定
+  LORA_TRAINING?: FeatureFlagState; // 非LLM化に伴い退役
+  DETERMINISTIC_CAPABILITY_EVOLUTION?: FeatureFlagState;
   CODE_UNDERSTANDING: FeatureFlagState;
   VBA_DESIGN_ASSISTANT: FeatureFlagState;
   // 設計思想 49章 & 50章 機能フラグ
@@ -3059,6 +3078,7 @@ export interface ExperienceLink {
   failureLogId?: string;
   evidenceIds?: string[];
   relatedTrainingSampleIds?: string[];
+  relatedCandidateIds?: string[];
   relatedCapabilityGapIds?: string[];
   relatedHeuristicRuleIds?: string[];
   relatedSelfCodeProposalIds?: string[];

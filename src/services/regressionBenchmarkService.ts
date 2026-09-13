@@ -5,7 +5,6 @@ import {
   ModelSizeComparisonReport,
   ModelSizeProfile,
   BenchmarkScores,
-  ModelGeneration,
 } from '../types';
 import { systemLogger } from './systemLogger';
 import { nonLlmRuntimeService } from './nonLlmRuntimeService';
@@ -648,17 +647,13 @@ export class RegressionBenchmarkService {
         `⚖️ モデルサイズ比較ベンチマーク開始 [Model A: ${modelAId} vs Model B: ${modelBId}] (structuralBudget: ${structuralBudget})`
       );
 
-      // 世代情報からモデル情報解決
-      const allGens = selfImprovementService.getGenerations();
-      const genA = allGens.find((g) => g.generationId === modelAId || g.modelName === modelAId || g.baseModel === modelAId);
-      const genB = allGens.find((g) => g.generationId === modelBId || g.modelName === modelBId || g.baseModel === modelBId);
-
-      const nameA = genA?.modelName || modelAId;
-      const nameB = genB?.modelName || modelBId;
+      // モデル情報解決
+      const nameA = modelAId;
+      const nameB = modelBId;
 
       // パラメータ数特定 (デフォルト 1.5e9 と 3.0e9)
-      const paramsA = genA?.parameterCount || (nameA.toLowerCase().includes('3b') ? 3.0e9 : 1.5e9);
-      const paramsB = genB?.parameterCount || (nameB.toLowerCase().includes('1.5b') ? 1.5e9 : 3.0e9);
+      const paramsA = nameA.toLowerCase().includes('3b') ? 3.0e9 : 1.5e9;
+      const paramsB = nameB.toLowerCase().includes('1.5b') ? 1.5e9 : 3.0e9;
 
       // 端末温度情報取得
       const conditions = backgroundWorkerService.getExecutionConditions();

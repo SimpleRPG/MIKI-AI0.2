@@ -129,6 +129,7 @@ export type SelfImprovementTab =
   | 'plugins'
   | 'phase5'
   | 'lab'
+  | 'candidates'
   | 'colab'
   | 'generations'
   | 'answer_plans'
@@ -1002,15 +1003,15 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('colab')}
+            onClick={() => setActiveTab('candidates')}
             className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
-              activeTab === 'colab'
-                ? 'border-amber-500 text-amber-300'
+              activeTab === 'candidates' || activeTab === 'colab'
+                ? 'border-emerald-500 text-emerald-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Cpu className="w-4 h-4 text-amber-400" />
-            <span>Colab連携 & LoRA教材</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>能力改善候補 (Candidates)</span>
           </button>
 
           <button
@@ -1023,18 +1024,6 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
           >
             <GraduationCap className="w-4 h-4 text-emerald-400" />
             <span>外部教師連携 (Gemini)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('generations')}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all shrink-0 ${
-              activeTab === 'generations'
-                ? 'border-pink-500 text-pink-300'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <GitBranch className="w-4 h-4 text-pink-400" />
-            <span>モデル世代 & 系統樹</span>
           </button>
 
           <button
@@ -4175,87 +4164,42 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
 
           {/* TAB: 外部教師リクエスト・パイプライン (設計思想 37〜39節 フェーズ8) */}
           {activeTab === 'teacher' && (
-            <ExternalTeacherTab onJumpToColab={() => setActiveTab('colab')} />
+            <ExternalTeacherTab onJumpToCandidates={() => setActiveTab('candidates')} />
           )}
 
-          {/* TAB 4: Colab連携 & LoRA教材 (第4世代) */}
-          {activeTab === 'colab' && (
+          {/* TAB 4: 非LLM能力改善候補データセット (設計思想 1 & 7) */}
+          {(activeTab === 'candidates' || activeTab === 'colab') && (
             <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/40 space-y-2.5">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/40 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
-                    <Cpu className="w-4 h-4 text-amber-400" />
-                    <span>Google Colab LoRA Fine-Tuning & GGUF 自動変換 (設計思想 1 & 7)</span>
+                  <div className="flex items-center gap-2 font-bold text-emerald-300 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>非LLM能力改善候補データセット (Capability Learning Candidates)</span>
                   </div>
                   <button
                     onClick={() => handleExportJSONLFile()}
-                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+                    className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>教材データセット(JSONL)保存</span>
+                    <span>候補データセット(JSONL)保存</span>
                   </button>
                 </div>
                 <p className="text-slate-300 text-[11px] leading-relaxed">
-                  端末内で蓄積された高品質な会話・修復成功パターンを<strong>SFT/LoRA学習用JSONL</strong>としてエクスポート。
-                  Colab上の無料T4 GPUで10分でファインチューニングし、GGUF(旧量子化方式)に量子化してGalaxy S25へ即座に取り込めます。
+                  外部教師(Gemini)・失敗診断・合成教材から抽出された能力改善候補を蓄積・検証管理します。
+                  検証に合格した候補は回答骨格・決定論的能力パッチとして即座にコンパイル・配備されます。
                 </p>
               </div>
 
-              {/* Colab Script / Retired Feature Notification Box */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[11px] text-amber-300 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Colab外部学習基盤 & モデル学習・エクスポート機能（退役）</span>
-                  </span>
-                  <button
-                    onClick={() => handleCopy(colabScript, 'colabScript')}
-                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[10px] font-bold flex items-center gap-1"
-                  >
-                    {copiedText === 'colabScript' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedText === 'colabScript' ? 'コピー完了！' : '案内文をコピー'}</span>
-                  </button>
-                </div>
-                <div className="p-3 bg-amber-950/20 border border-amber-800/40 rounded-lg text-amber-200/90 text-xs leading-relaxed font-sans">
-                  <p className="font-semibold text-amber-300 mb-1">
-                    【機能移行のお知らせ】
-                  </p>
-                  <p>
-                    {colabScript}
-                  </p>
-                </div>
-              </div>
-
-              {/* 4-Step Guide */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-center text-[10px]">
-                <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
-                  <div className="font-bold text-amber-300">Step 1. JSONL保存</div>
-                  <p className="text-slate-400">右上のボタンからdataset.jsonlをダウンロード</p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
-                  <div className="font-bold text-sky-300">Step 2. Colab実行</div>
-                  <p className="text-slate-400">上記スクリプトをColabに貼り付けてRun</p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
-                  <div className="font-bold text-purple-300">Step 3. GGUF出力</div>
-                  <p className="text-slate-400">スクリプトが自動で旧量子化方式 GGUFへ量子化変換</p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
-                  <div className="font-bold text-emerald-300">Step 4. 端末へ転送</div>
-                  <p className="text-slate-400">GGUFモデルマネージャーから読み込んで進化完了！</p>
-                </div>
-              </div>
-
               {/* Dataset Hygiene & Quality Management Card (設計思想 1 & 18) */}
-              <div className="p-4 rounded-xl bg-slate-950/80 border border-amber-900/40 space-y-3">
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-emerald-900/40 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <div className="font-bold text-amber-300 text-xs flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-amber-400" />
-                      <span>LoRA学習データセット品質管理 & 自動クリーンアップ</span>
+                    <div className="font-bold text-emerald-300 text-xs flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                      <span>能力改善候補データセット品質管理 & 自動クリーンアップ</span>
                     </div>
                     <p className="text-[11px] text-slate-400">
-                      短文ゴミデータ・重複ログの排除、および品質基準を満たした有効サンプルの蓄積状況
+                      短文ゴミデータ・重複ログの排除、および品質基準を満たした有効候補の蓄積状況
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

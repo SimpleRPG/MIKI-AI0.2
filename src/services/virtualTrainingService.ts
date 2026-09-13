@@ -1,4 +1,6 @@
 import {
+  CapabilitySufficiencyAssessment,
+  CapabilityEvaluationTrial,
   LoraTriggerAssessment,
   VirtualTrainingTrial,
 } from '../types';
@@ -7,10 +9,19 @@ import { answerPlanService } from './answerPlanService';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 
-const VIRTUAL_TRIALS_KEY = 'miki_virtual_training_trials_v32';
+const CAPABILITY_TRIALS_KEY = 'miki_virtual_training_trials_v32';
 
-class VirtualTrainingService {
-  private trials: VirtualTrainingTrial[] = [];
+/**
+ * 非LLMアーキテクチャ: 決定論的能力検証・充足度評価サービス
+ * （旧: VirtualTrainingService）
+ *
+ * 目的:
+ * - 重み更新・LoRAを行わず、プロンプト/回答骨格/検索/ヒューリスティック規則の
+ *   組み合わせで能力が充足しているかを客観的に判定・検証する。
+ * - 充足しない場合はLoRAではなく「能力ギャップの再分解」と「対策骨格の生成」に誘導する。
+ */
+export class CapabilityEvaluationService {
+  private trials: CapabilityEvaluationTrial[] = [];
 
   constructor() {
     this.loadTrials();
@@ -18,32 +29,32 @@ class VirtualTrainingService {
 
   private loadTrials(): void {
     try {
-      const raw = storageService.getItem(VIRTUAL_TRIALS_KEY);
+      const raw = storageService.getItem(CAPABILITY_TRIALS_KEY);
       if (raw) {
         this.trials = JSON.parse(raw);
       }
     } catch (e) {
-      console.warn('Failed to load virtual training trials:', e);
+      console.warn('Failed to load capability evaluation trials:', e);
     }
   }
 
   public saveTrials(): void {
     try {
-      storageService.setItem(VIRTUAL_TRIALS_KEY, JSON.stringify(this.trials));
+      storageService.setItem(CAPABILITY_TRIALS_KEY, JSON.stringify(this.trials));
     } catch (e) {
-      console.warn('Failed to save virtual training trials:', e);
+      console.warn('Failed to save capability evaluation trials:', e);
     }
   }
 
-  public getAllTrials(): VirtualTrainingTrial[] {
+  public getAllTrials(): CapabilityEvaluationTrial[] {
     return this.trials;
   }
 
   /**
-   * 16.2 LoRA検討の発動条件判定
+   * 能力充足度判定 (旧: evaluateLoraTriggerCondition)
    * 検索・記憶・回答骨格で制御が明確に頭打ちになったか客観的に判定
    */
-  public evaluateLoraTriggerCondition(capabilityId?: string): LoraTriggerAssessment {
+  public evaluateSufficiencyCondition(capabilityId?: string): CapabilitySufficiencyAssessment {
     const gaps = capabilityGapService.getAllGaps();
     const profiles = capabilityGapService.getAllProfiles();
 
@@ -73,7 +84,7 @@ class VirtualTrainingService {
       );
     }
 
-    // 条件3: 21章の能力状態が、骨格追加を続けてもSATURATEDにならずWEAKのまま停滞する
+    // 条件3: 能力状態が、骨格追加を続けてもSATURATEDにならずWEAKのまま停滞する
     const stagnatedProfiles = profiles.filter(
       (p) => p.state === 'WEAK' && (p.failureCount + p.generalizationGapCount) >= 6
     );
@@ -89,14 +100,14 @@ class VirtualTrainingService {
       (paraphraseFailureRepeated && skeletonAddedButFailurePersists) ||
       (weakCapabilityStagnated && skeletonAddedButFailurePersists);
 
-    let recommendation: 'MAINTAIN_DISABLED' | 'RECOMMEND_VIRTUAL_TEST' | 'APPROVE_LORA_CANDIDATE' =
-      'MAINTAIN_DISABLED';
+    let recommendation: CapabilitySufficiencyAssessment['recommendation'] =
+      'MAINTAIN_NON_LLM_CORE';
 
     if (triggered) {
-      recommendation = 'RECOMMEND_VIRTUAL_TEST';
+      recommendation = 'RECOMMEND_CAPABILITY_TRIAL';
     } else {
       reasons.push(
-        '現時点では検索・記憶・回答骨格（6〜9章）による制御が機能しており、LoRA検討の発動条件を満たしていません。LORA_TRAINING: DISABLEDを維持します。'
+        '現時点では検索・記憶・回答骨格・決定論的規則による非LLM制御が機能しています。'
       );
     }
 
@@ -110,11 +121,16 @@ class VirtualTrainingService {
     };
   }
 
+  /** 後方互換性エイリアス */
+  public evaluateLoraTriggerCondition(capabilityId?: string): LoraTriggerAssessment {
+    return this.evaluateSufficiencyCondition(capabilityId);
+  }
+
   /**
-   * 16.3 仮想学習試験のシミュレーション実行
-   * 候補教材をいきなりLoRAへ入れず、検索注入だけで改善するかを6段階で厳格に検証
+   * 決定論的能力検証試験のシミュレーション実行 (旧: runVirtualTrainingTrial)
+   * 候補教材を重み更新へ入れず、非LLM（回答骨格・検索注入）だけで解決可能かを6段階で厳格に検証
    */
-  public async runVirtualTrainingTrial(
+  public async runCapabilityEvaluationTrial(
     input:
       | string
       | {
@@ -124,7 +140,7 @@ class VirtualTrainingService {
           crossDomainPrompt: string;
           candidateContent: string;
         }
-  ): Promise<VirtualTrainingTrial> {
+  ): Promise<CapabilityEvaluationTrial> {
     const params =
       typeof input === 'string'
         ? {
@@ -151,7 +167,7 @@ class VirtualTrainingService {
     const step3_sameProblemRetestPassed = true;
 
     // 4. 言い換え問題で再回答 (未知の言い回し)
-    // 骨格が適切であれば言い換えでも80%以上の確率でパス
+    // 骨格が適切であれば言い換えでもパス
     const step4_paraphraseRetestPassed = params.candidateContent.length > 20;
 
     // 5. 別分野の同構造問題で再回答
@@ -161,30 +177,30 @@ class VirtualTrainingService {
     const step6_regressionCheckPassed = true;
 
     // 判定ロジック:
-    // 検索注入だけで改善した場合: LoRA不要！回答骨格または会話スキルとして保存
-    // 検索注入で改善せずLoRAが必要な極端な場合のみ: LORA_CANDIDATE
-    let verdict: VirtualTrainingTrial['verdict'] = 'NO_LORA_NEEDED_SAVE_SKELETON';
+    // 非LLM（骨格・検索注入）だけで改善した場合: VERIFIED_NON_LLM_CAPABILITY
+    // 改善しなかった場合: REQUIRES_DECOMPOSITION (能力ギャップを再分解し、外部教師に対策骨格を作らせる)
+    let verdict: CapabilityEvaluationTrial['verdict'] = 'VERIFIED_NON_LLM_CAPABILITY';
     let verdictDetails = '';
 
     if (step3_sameProblemRetestPassed && step4_paraphraseRetestPassed && step6_regressionCheckPassed) {
-      verdict = 'NO_LORA_NEEDED_SAVE_SKELETON';
+      verdict = 'VERIFIED_NON_LLM_CAPABILITY';
       verdictDetails =
-        '🎉 【判定: LoRA不要】プロンプト検索注入・回答骨格だけで言い換え試験・回帰試験ともに合格しました。モデルの重みを変更せず、回答骨格(9章)として保存・再利用します。';
+        '🎉 【判定: 非LLM能力検証合格】回答骨格・決定論的制御だけで言い換え試験・回帰試験ともに合格しました。重み更新を行わず、回答骨格として保存・再利用します。';
     } else if (!step4_paraphraseRetestPassed) {
-      verdict = 'LORA_CANDIDATE';
+      verdict = 'REQUIRES_DECOMPOSITION';
       verdictDetails =
-        '⚠️ 【判定: LoRA候補】検索注入では未知の言い回し・言い換え試験を突破できませんでした。16.2発動条件に基づき、LoRA追加学習候補として隔離蓄積します。';
+        '⚠️ 【判定: 能力ギャップ再分解】回答骨格の単純適用では言い換え試験を突破できませんでした。能力ギャップを細分化し、外部教師に対策骨格を要請します。';
     } else if (!step6_regressionCheckPassed) {
       verdict = 'REJECT_REGRESSION';
       verdictDetails =
-        '❌ 【判定: 不採用】一般会話能力の回帰（悪化）が検出されたため、本教材は不採用とします。';
+        '❌ 【判定: 不採用】回帰（他能力の悪化）が検出されたため、本対策は不採用とします。';
     } else {
       verdict = 'INCONCLUSIVE_TOO_DIFFICULT';
       verdictDetails =
-        '❓ 【判定: 保留】問題分解不足または3B能力上限の可能性があります。問題を小さな判断へ再分割してください。';
+        '❓ 【判定: 保留】問題分解不足の可能性があります。問題を小さな判断へ再分割してください。';
     }
 
-    const trial: VirtualTrainingTrial = {
+    const trial: CapabilityEvaluationTrial = {
       trialId,
       capabilityId: params.capabilityId,
       testPrompt: params.testPrompt,
@@ -205,12 +221,29 @@ class VirtualTrainingService {
     this.saveTrials();
 
     systemLogger.info(
-      'VIRTUAL_TRAINING',
-      `🧪 [16.3 仮想学習試験完了] ${trial.trialId} -> 判定: ${trial.verdict}`
+      'SELF_IMPROVEMENT',
+      `🧪 [決定論的能力検証試験完了] ${trial.trialId} -> 判定: ${trial.verdict}`
     );
 
     return trial;
   }
+
+  /** 後方互換性エイリアス */
+  public async runVirtualTrainingTrial(
+    input:
+      | string
+      | {
+          capabilityId: string;
+          testPrompt: string;
+          paraphrasePrompts: string[];
+          crossDomainPrompt: string;
+          candidateContent: string;
+        }
+  ): Promise<VirtualTrainingTrial> {
+    return this.runCapabilityEvaluationTrial(input);
+  }
 }
 
-export const virtualTrainingService = new VirtualTrainingService();
+export const capabilityEvaluationService = new CapabilityEvaluationService();
+export const virtualTrainingService = capabilityEvaluationService;
+export type VirtualTrainingService = CapabilityEvaluationService;

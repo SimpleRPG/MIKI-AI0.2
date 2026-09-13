@@ -14,7 +14,8 @@ export const DEFAULT_FEATURE_FLAGS: SystemFeatureFlags = {
   ANSWER_PLAN_CACHE: 'STABLE',
   TEACHER_ROUTER: 'DEVELOPMENT',
   MULTI_STEP_REASONING: 'SHADOW',
-  LORA_TRAINING: 'DISABLED', // 16.2の発動条件を満たすまで長期固定
+  LORA_TRAINING: 'DISABLED', // 非LLM化に伴い退役 (DISABLED固定)
+  DETERMINISTIC_CAPABILITY_EVOLUTION: 'STABLE',
   CODE_UNDERSTANDING: 'DEVELOPMENT',
   VBA_DESIGN_ASSISTANT: 'DEVELOPMENT',
   EXPERIENCE_ROUTER: 'STABLE',
@@ -51,8 +52,12 @@ export const FEATURE_FLAG_DESCRIPTIONS: Record<keyof SystemFeatureFlags, { title
     desc: '直接回答で解けない複雑問題の分解。過剰思考を抑制するためシャドウ運用（6章）。',
   },
   LORA_TRAINING: {
-    title: 'LoRA追加学習 (LoRA Training)',
-    desc: '重み更新。16.2の発動条件を満たすまで長期DISABLED固定（16, 17, 31章）。',
+    title: '旧LoRA追加学習 (Retired)',
+    desc: '非LLM化に伴い退役。決定論的能力進化 (Deterministic Capability Evolution) へ移行。',
+  },
+  DETERMINISTIC_CAPABILITY_EVOLUTION: {
+    title: '決定論的能力進化 (Deterministic Capability Evolution)',
+    desc: '検証済みの修正対を重み更新ではなく決定論的な回答骨格・規則・能力パッチへコンパイル。',
   },
   CODE_UNDERSTANDING: {
     title: 'コード理解AI (Code Understanding)',

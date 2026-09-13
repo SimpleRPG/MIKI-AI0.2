@@ -1,4 +1,4 @@
-import { TrainingSampleJSONL } from '../types';
+import { CapabilityLearningCandidate } from '../types';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { answerPlanService } from './answerPlanService';
@@ -15,7 +15,7 @@ export interface CapabilityPatch {
   id: string;
   capabilityId: string;
   sourceSampleId: string;
-  category: TrainingSampleJSONL['category'];
+  category: CapabilityLearningCandidate['category'];
   triggerKeywords: string[];
   rule: string;
   verification: 'verified' | 'pending';
@@ -56,12 +56,12 @@ function extractKeywords(text: string): string[] {
   return Array.from(new Set(candidates)).slice(0, 12);
 }
 
-function inferCapabilityId(sample: TrainingSampleJSONL): string {
-  if (sample.category === 'code') return 'cap_code_comprehension';
-  if (sample.category === 'correction') return 'cap_correction';
-  if (sample.category === 'retrieval') return 'cap_retrieval_grounding';
-  if (sample.category === 'tool_use') return 'cap_tool_selection';
-  if (sample.category === 'vba') return 'cap_vba_reasoning';
+function inferCapabilityId(candidate: CapabilityLearningCandidate): string {
+  if (candidate.category === 'code') return 'cap_code_comprehension';
+  if (candidate.category === 'correction') return 'cap_correction';
+  if (candidate.category === 'retrieval') return 'cap_retrieval_grounding';
+  if (candidate.category === 'tool_use') return 'cap_tool_selection';
+  if (candidate.category === 'vba') return 'cap_vba_reasoning';
   return 'cap_direct_answer';
 }
 
@@ -96,30 +96,30 @@ class DeterministicCapabilityEvolutionService {
   }
 
   /**
-   * 承認済みかつ検証済みのサンプルを能力パッチへコンパイルする。
+   * 承認済みかつ検証済みの能力改善候補を能力パッチへコンパイルする。
    * 同一の入力・出力対は二重登録しない。
    */
-  public compileVerifiedSample(sample: TrainingSampleJSONL): CapabilityPatch | null {
-    if (!sample.approved || sample.verifiedEffective !== true) return null;
+  public compileVerifiedCandidate(candidate: CapabilityLearningCandidate): CapabilityPatch | null {
+    if (!candidate.approved || candidate.verifiedEffective !== true) return null;
 
-    const capabilityId = inferCapabilityId(sample);
-    const keywords = extractKeywords(`${sample.instruction} ${sample.failureReason || ''}`);
+    const capabilityId = inferCapabilityId(candidate);
+    const keywords = extractKeywords(`${candidate.instruction} ${candidate.failureReason || ''}`);
     if (keywords.length === 0) return null;
 
-    const signature = `${sample.id}:${capabilityId}:${keywords.join('|')}`;
+    const signature = `${candidate.id}:${capabilityId}:${keywords.join('|')}`;
     const existing = this.patches.find((p) => p.id === signature);
     if (existing) return existing;
 
     const patch: CapabilityPatch = {
       id: signature,
       capabilityId,
-      sourceSampleId: sample.id,
-      category: sample.category,
+      sourceSampleId: candidate.id,
+      category: candidate.category,
       triggerKeywords: keywords,
       rule: [
-        `入力カテゴリ=${sample.category}`,
+        `入力カテゴリ=${candidate.category}`,
         `重要語=${keywords.join(' / ')}`,
-        `失敗原因=${sample.failureReason || '未指定'}`,
+        `失敗原因=${candidate.failureReason || '未指定'}`,
         '検証済みの修正結果を優先し、未検証の推測を追加しない',
       ].join('\n'),
       verification: 'verified',
@@ -131,13 +131,13 @@ class DeterministicCapabilityEvolutionService {
 
     // 能力パッチを次回実行時に実際に使える回答骨格へコンパイルする。
     answerPlanService.installDeterministicCapabilityPatch({
-      patternId: `PATTERN-CAPABILITY-${capabilityId}-${sample.id}`,
+      patternId: `PATTERN-CAPABILITY-${capabilityId}-${candidate.id}`,
       capabilityId,
       triggerKeywords: keywords,
       rule: patch.rule,
-      samplePrompt: sample.instruction,
-      outputTarget: sample.outputTarget,
-      category: sample.category,
+      samplePrompt: candidate.instruction,
+      outputTarget: candidate.outputTarget,
+      category: candidate.category,
     });
 
     // 既存の能力レジストリへ成功を反映。
@@ -145,23 +145,30 @@ class DeterministicCapabilityEvolutionService {
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🧩 [Non-LLM能力コンパイル] ${capabilityId} に検証済みパッチを追加: ${sample.id}`
+      `🧩 [Non-LLM能力コンパイル] ${capabilityId} に検証済みパッチを追加: ${candidate.id}`
     );
 
     return patch;
   }
 
+  /**
+   * 互換性担保: compileVerifiedSample は compileVerifiedCandidate に委譲
+   */
+  public compileVerifiedSample(candidate: CapabilityLearningCandidate): CapabilityPatch | null {
+    return this.compileVerifiedCandidate(candidate);
+  }
+
   /** 未検証の失敗はモデル学習ではなく能力ギャップとして記録する。 */
-  public recordFailure(sample: Pick<TrainingSampleJSONL, 'instruction' | 'category' | 'failureReason'>): void {
-    const capabilityId = inferCapabilityId(sample as TrainingSampleJSONL);
+  public recordFailure(candidate: Pick<CapabilityLearningCandidate, 'instruction' | 'category' | 'failureReason'>): void {
+    const capabilityId = inferCapabilityId(candidate as CapabilityLearningCandidate);
     capabilityGapService.recordGap({
-      description: sample.failureReason || `${sample.category}カテゴリで期待結果と実結果の差異を検出`,
+      description: candidate.failureReason || `${candidate.category}カテゴリで期待結果と実結果の差異を検出`,
       gap_type: 'failure',
       capabilityId,
       impact: 'MEDIUM',
       current_workaround: '検証済みの修正対を回答骨格・技能・規則へコンパイル',
       candidate_solution: '入力特徴・制約・期待結果を決定論的な能力パッチとして登録し、回帰試験で再検証',
-      samplePrompt: sample.instruction,
+      samplePrompt: candidate.instruction,
     });
   }
 
@@ -226,12 +233,12 @@ class DeterministicCapabilityEvolutionService {
     return (h >>> 0).toString(16).padStart(8, '0');
   }
 
-  /** 承認済みサンプルの蓄積を、実行可能な骨格へ変換する。 */
-  public compileBatch(samples: TrainingSampleJSONL[]): { compiled: number; skipped: number } {
+  /** 承認済み能力改善候補の蓄積を、実行可能な骨格へ変換する。 */
+  public compileBatch(candidates: CapabilityLearningCandidate[]): { compiled: number; skipped: number } {
     let compiled = 0;
     let skipped = 0;
-    for (const sample of samples) {
-      if (this.compileVerifiedSample(sample)) compiled++;
+    for (const candidate of candidates) {
+      if (this.compileVerifiedCandidate(candidate)) compiled++;
       else skipped++;
     }
     return { compiled, skipped };

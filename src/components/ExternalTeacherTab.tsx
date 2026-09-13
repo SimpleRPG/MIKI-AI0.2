@@ -29,7 +29,7 @@ import {
   TeacherRequestPayload,
   TeacherGeneratedMaterial,
   TeacherUsageRecord,
-  TrainingSampleJSONL,
+  CapabilityLearningCandidate,
   ResponseSkeleton,
   DelayedTeacherQueueItem,
   AutoTeacherRequestRecord,
@@ -38,15 +38,17 @@ import { teacherRequestService } from '../services/teacherRequestService';
 import { selfImprovementService } from '../services/selfImprovementService';
 
 interface ExternalTeacherTabProps {
+  onJumpToCandidates?: () => void;
   onJumpToColab?: () => void;
 }
 
-export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpToColab }) => {
+export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpToCandidates, onJumpToColab }) => {
+  const jumpTarget = onJumpToCandidates || onJumpToColab;
   const [budgetStatus, setBudgetStatus] = useState<TeacherBudgetStatus>(() =>
     teacherRequestService.checkBudget()
   );
   const [failurePatterns, setFailurePatterns] = useState<FailureRecurrenceEntry[]>([]);
-  const [externalSamples, setExternalSamples] = useState<TrainingSampleJSONL[]>([]);
+  const [externalSamples, setExternalSamples] = useState<CapabilityLearningCandidate[]>([]);
   const [usageRecords, setUsageRecords] = useState<TeacherUsageRecord[]>([]);
   const [autoRecords, setAutoRecords] = useState<AutoTeacherRequestRecord[]>([]);
   const [autoRequestEnabled, setAutoRequestEnabled] = useState<boolean>(() =>
@@ -65,7 +67,7 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
     material?: TeacherGeneratedMaterial;
     error?: string;
     verifiedPassed?: boolean;
-    savedSample?: TrainingSampleJSONL | null;
+    savedSample?: CapabilityLearningCandidate | null;
     savedSkeleton?: ResponseSkeleton | null;
     verifiedEffective?: boolean;
     verificationNote?: string;
@@ -95,7 +97,7 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
     setFailurePatterns([...recurrences]);
 
     const samples = selfImprovementService
-      .getTrainingSamples()
+      .getCapabilityCandidates()
       .filter((s) => s.source === 'external_teacher');
     setExternalSamples(samples);
 
@@ -836,13 +838,13 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
                 </div>
               )}
 
-              {onJumpToColab && (
+              {jumpTarget && (
                 <div className="pt-2 flex justify-end">
                   <button
-                    onClick={onJumpToColab}
+                    onClick={jumpTarget}
                     className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs flex items-center gap-1.5 transition-colors"
                   >
-                    <span>Colab連携タブでLoRA教材を確認</span>
+                    <span>能力改善候補データセットを確認</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -1037,12 +1039,12 @@ export const ExternalTeacherTab: React.FC<ExternalTeacherTabProps> = ({ onJumpTo
               {externalSamples.length} 件
             </span>
           </div>
-          {onJumpToColab && (
+          {jumpTarget && (
             <button
-              onClick={onJumpToColab}
+              onClick={jumpTarget}
               className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
             >
-              <span>Colab用JSONLエクスポートへ</span>
+              <span>能力改善候補一覧へ</span>
               <ArrowRight className="w-3 h-3" />
             </button>
           )}

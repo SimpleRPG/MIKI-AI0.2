@@ -77,7 +77,7 @@ export const CapabilityMasteryTab: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-5 space-y-4 overflow-y-auto max-h-[calc(85vh-120px)] text-slate-200">
-      {/* 16.2 LoRA 発動条件判定バナー */}
+      {/* 16.2 非LLM能力充足度・改善試験判定バナー */}
       <div
         className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg ${
           assessment.triggered
@@ -98,11 +98,11 @@ export const CapabilityMasteryTab: React.FC = () => {
               <span>設計思想 16.2章</span>
             </span>
             <h3 className="font-bold text-sm text-slate-100">
-              LoRA検討の発動条件判定モニター (Trigger Condition Assessment)
+              非LLM能力充足度判定モニター (Capability Sufficiency Assessment)
             </h3>
           </div>
           <p className="text-xs leading-relaxed max-w-2xl text-slate-300">
-            検索・記憶・回答骨格の導入でも抑制できず、同一能力で3回以上の言い換え失敗・汎化不足が反復した場合のみLoRA検討を発動します。
+            検索・記憶・回答骨格の導入でも抑制できず、同一能力で3回以上の言い換え失敗・汎化不足が反復した場合に詳細な検証試験を実施します。
           </p>
         </div>
 
@@ -116,7 +116,7 @@ export const CapabilityMasteryTab: React.FC = () => {
                   : 'bg-emerald-950 text-emerald-300 border-emerald-700'
               }`}
             >
-              {assessment.triggered ? '⚠️ 条件該当 (要仮想試験)' : '🛡️ 検索/骨格で制御良好 (LoRA不要)'}
+              {assessment.triggered ? '⚠️ 条件該当 (要能力検証試験)' : '🛡️ 検索/骨格で制御良好 (非LLM充足)'}
             </div>
           </div>
         </div>

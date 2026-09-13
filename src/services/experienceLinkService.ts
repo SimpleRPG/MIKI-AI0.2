@@ -173,6 +173,7 @@ export class ExperienceLinkService {
       case 'trainingSample':
       case 'candidate':
         link.relatedTrainingSampleIds = Array.from(new Set([...(link.relatedTrainingSampleIds || []), entityId]));
+        link.relatedCandidateIds = Array.from(new Set([...(link.relatedCandidateIds || []), entityId]));
         break;
       case 'evidence':
         link.evidenceIds = Array.from(new Set([...(link.evidenceIds || []), entityId]));
