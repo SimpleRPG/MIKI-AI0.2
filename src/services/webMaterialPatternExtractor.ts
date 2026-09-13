@@ -17,6 +17,8 @@ import { bannedTopicsConfigService } from './bannedTopicsConfigService';
  */
 export const VALID_WEB_REAL_DATA_PROVIDERS = [
   'wikipedia_direct',
+  'duckduckgo_direct',
+  'jina_direct',
   'api_search',
   'wikipedia',
   'duckduckgo',

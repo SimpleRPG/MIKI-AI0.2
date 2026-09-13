@@ -14,6 +14,83 @@ import { bannedTopicsConfigService } from './bannedTopicsConfigService';
 import { WebMaterialPatternExtractor } from './webMaterialPatternExtractor';
 import { answerPlanService } from './answerPlanService';
 import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
+import { getJinaApiKeyItem } from './api';
+
+/**
+ * Jina Reader検索レスポンス (Markdown / JSON) のパーサー
+ * Jina利用規約: https://jina.ai/legal/terms-of-service/
+ */
+export function parseJinaSearchResults(rawText: string, maxResults = 4): WebSearchResultItem[] {
+  if (!rawText || !rawText.trim()) return [];
+
+  // 1. JSON形式のレスポンスのパース判定
+  if (rawText.trim().startsWith('{')) {
+    try {
+      const json = JSON.parse(rawText);
+      const dataItems = Array.isArray(json.data) ? json.data : (json.data?.results || []);
+      if (Array.isArray(dataItems) && dataItems.length > 0) {
+        return dataItems.slice(0, maxResults).map((d: any) => ({
+          title: d.title || 'Jina Search Result',
+          snippet: (d.description || d.content || '').slice(0, 500).replace(/[\r\n]+/g, ' ').trim(),
+          url: d.url || '',
+          source: 'Jina Reader (Web)',
+        }));
+      }
+    } catch {
+      // JSONパースに失敗した場合はMarkdownパースへフォールバック
+    }
+  }
+
+  // 2. Markdown形式のパース
+  // Jinaのレスポンスは "Title: " や "[1] Title: ", "### Title: " で始まるブロックで区切られる
+  const items: WebSearchResultItem[] = [];
+  const blocks = rawText.split(/(?=(?:^|\n)(?:\[\d+\]\s*)?Title:\s*)/);
+
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (!trimmed || !/(?:^|\n)(?:\[\d+\]\s*)?Title:\s*/.test(trimmed)) continue;
+
+    const titleMatch = trimmed.match(/(?:^|\n)(?:\[\d+\]\s*)?Title:\s*([^\n]+)/);
+    const urlMatch = trimmed.match(/(?:^|\n)(?:\[\d+\]\s*)?URL(?:\s*Source)?:\s*([^\n]+)/i);
+
+    const contentIndex = trimmed.indexOf('Markdown Content:');
+    let snippet = '';
+    if (contentIndex !== -1) {
+      snippet = trimmed.slice(contentIndex + 'Markdown Content:'.length).trim();
+    } else {
+      const lines = trimmed.split('\n').filter(l =>
+        !l.match(/^(?:\[\d+\]\s*)?Title:/i) &&
+        !l.match(/^(?:\[\d+\]\s*)?URL/i) &&
+        !l.match(/^(?:\[\d+\]\s*)?Published Time:/i)
+      );
+      snippet = lines.join(' ').trim();
+    }
+
+    // Markdown装飾を除去してスニペットを整形
+    snippet = snippet
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[#*`_~]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 500);
+
+    const title = titleMatch ? titleMatch[1].trim() : 'Web情報';
+    const url = urlMatch ? urlMatch[1].trim() : '';
+
+    if (title || snippet) {
+      items.push({
+        title,
+        snippet: snippet || title,
+        url: url || 'https://jina.ai',
+        source: 'Jina Reader (Web)',
+      });
+    }
+
+    if (items.length >= maxResults) break;
+  }
+
+  return items;
+}
 
 const SEARCH_CONFIG_KEY = 'miki_ai_autonomous_search_config';
 const SEARCH_RECORDS_KEY = 'miki_ai_autonomous_search_records';
@@ -222,7 +299,11 @@ export class AutonomousSearchService {
    */
   public async executeSearch(
     query: string,
-    options?: { maxResults?: number; bypassCache?: boolean }
+    options?: {
+      maxResults?: number;
+      bypassCache?: boolean;
+      preferredProvider?: 'auto' | 'wikipedia' | 'jina' | 'duckduckgo';
+    }
   ): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string }> {
     const cleanQuery = query.trim();
     if (!cleanQuery) return { results: [] };
@@ -277,39 +358,173 @@ export class AutonomousSearchService {
       return mockOutput;
     }
 
-    // 1. 直接 Wikipedia API (CORS対応オープンエンドポイント)
-    // 作業指示書 v21 第1.3節: (B) server.tsを経由せず、クライアント側から直接Wikipedia等の外部APIをfetch()する形に統一
-    try {
-      const wikiUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanQuery)}&utf8=&format=json&origin=*&srlimit=${maxResults}`;
-      const wikiRes = await fetch(wikiUrl, { signal: AbortSignal.timeout(5000) });
-      if (wikiRes.ok) {
-        const wikiData = await wikiRes.json();
-        const hits = wikiData?.query?.search || [];
-        const results: WebSearchResultItem[] = hits.map((hit: any) => ({
-          title: hit.title,
-          snippet: (hit.snippet || '').replace(/<[^>]+>/g, '').trim(),
-          url: `https://ja.wikipedia.org/wiki/${encodeURIComponent(hit.title)}`,
-          source: 'Wikipedia (Direct)',
-          publishedDate: hit.timestamp,
-        }));
+    // 2. 検索プロバイダ実行パイプライン (作業指示書 v23 第1.1節)
+    // 順序: Wikipedia直接fetch -> Jina Reader検索 (s.jina.ai) -> DuckDuckGo Instant Answer -> local_fallback
+    const preferred = options?.preferredProvider || 'auto';
 
-        const summary = results.length > 0 ? results[0].snippet : `「${cleanQuery}」に関する知見を取得しました。`;
-        const output = { results, summary, provider: 'wikipedia_direct' };
-        this.cache.set(cacheKey, { data: output, timestamp: Date.now() });
+    // --- サブルーチン: Wikipedia直接fetch (CORS対応オープンエンドポイント) ---
+    const runWikipedia = async (): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null> => {
+      try {
+        const wikiUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanQuery)}&utf8=&format=json&origin=*&srlimit=${maxResults}`;
+        const wikiRes = await fetch(wikiUrl, { signal: AbortSignal.timeout(5000) });
+        if (wikiRes.ok) {
+          const wikiData = await wikiRes.json();
+          const hits = wikiData?.query?.search || [];
+          if (hits.length > 0) {
+            const results: WebSearchResultItem[] = hits.map((hit: any) => ({
+              title: hit.title,
+              snippet: (hit.snippet || '').replace(/<[^>]+>/g, '').trim(),
+              url: `https://ja.wikipedia.org/wiki/${encodeURIComponent(hit.title)}`,
+              source: 'Wikipedia (Direct)',
+              publishedDate: hit.timestamp,
+            }));
+            const summary = results[0].snippet || `「${cleanQuery}」に関する知見を取得しました。`;
+            systemLogger.info('SELF_IMPROVEMENT', `📖 [Wikipedia] 直接検索成功: ${results.length}件 (provider: wikipedia_direct)`);
+            return { results, summary, provider: 'wikipedia_direct' };
+          }
+        }
+      } catch (directErr) {
+        console.warn('[AutonomousSearch] Direct Wikipedia fetch error:', directErr);
+      }
+      return null;
+    };
+
+    // --- サブルーチン: Jina Reader直接検索 (s.jina.ai) ---
+    // Jina利用規約: https://jina.ai/legal/terms-of-service/
+    // クライアント側から直接fetch。登録済みAPIキーがあればAuthorizationヘッダーに付与。
+    const runJinaReader = async (): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null> => {
+      try {
+        const jinaHeaders: Record<string, string> = {
+          Accept: 'text/plain',
+        };
+        const jinaKey = getJinaApiKeyItem();
+        if (jinaKey) {
+          jinaHeaders['Authorization'] = `Bearer ${jinaKey}`;
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            '🔑 [Jina Reader] 登録済みAPIキーを使用して認証ヘッダーを付与しました (Bearer jina_***)'
+          );
+        }
+
+        const jinaUrl = `https://s.jina.ai/${encodeURIComponent(cleanQuery)}`;
+        const jinaRes = await fetch(jinaUrl, {
+          headers: jinaHeaders,
+          signal: AbortSignal.timeout(8000),
+        });
+
+        if (jinaRes.ok) {
+          const jinaText = await jinaRes.text();
+          const jinaResults = parseJinaSearchResults(jinaText, maxResults);
+          if (jinaResults.length > 0) {
+            const summary = jinaResults[0].snippet || `「${cleanQuery}」に関するWeb知見を取得しました。`;
+            systemLogger.info(
+              'SELF_IMPROVEMENT',
+              `🌐 [Jina Reader] Web検索成功: ${jinaResults.length}件取得 (provider: jina_direct)`
+            );
+            return { results: jinaResults, summary, provider: 'jina_direct' };
+          } else {
+            systemLogger.warn(
+              'SELF_IMPROVEMENT',
+              '⚠️ [Jina Reader] レスポンス本文から有効な検索結果を抽出できませんでした'
+            );
+          }
+        } else {
+          systemLogger.warn(
+            'SELF_IMPROVEMENT',
+            `⚠️ [Jina Reader] 検索エンドポイント応答: HTTP ${jinaRes.status} (${jinaRes.statusText})`
+          );
+        }
+      } catch (jinaErr: any) {
+        console.warn('[AutonomousSearch] Jina Reader fetch error:', jinaErr);
+        systemLogger.warn('SELF_IMPROVEMENT', `⚠️ [Jina Reader] 取得例外: ${jinaErr?.message || String(jinaErr)}`);
+      }
+      return null;
+    };
+
+    // --- サブルーチン: DuckDuckGo Instant Answer API ---
+    // DuckDuckGo Attribution & 非商用ポリシー: https://duckduckgo.com/api
+    const runDuckDuckGo = async (): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null> => {
+      try {
+        const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}&format=json&no_html=1&skip_disambig=1`;
+        const ddgRes = await fetch(ddgUrl, { signal: AbortSignal.timeout(5000) });
+        if (ddgRes.ok) {
+          const ddgData = await ddgRes.json();
+          const results: WebSearchResultItem[] = [];
+
+          // 1. Abstract (主要即答テキスト)
+          const abstractText = (ddgData.AbstractText || ddgData.Abstract || '').trim();
+          if (abstractText) {
+            results.push({
+              title: ddgData.Heading || cleanQuery,
+              snippet: abstractText,
+              url: ddgData.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}`,
+              source: `DuckDuckGo (${ddgData.AbstractSource || 'Instant Answer'})`,
+            });
+          }
+
+          // 2. RelatedTopics (関連トピック)
+          if (Array.isArray(ddgData.RelatedTopics)) {
+            for (const item of ddgData.RelatedTopics) {
+              if (results.length >= maxResults) break;
+              if (item.Text && item.FirstURL) {
+                const topicText = item.Text.trim();
+                const titlePart = topicText.split(' - ')[0] || topicText.slice(0, 30);
+                results.push({
+                  title: titlePart,
+                  snippet: topicText,
+                  url: item.FirstURL,
+                  source: 'DuckDuckGo Instant Answer',
+                });
+              }
+            }
+          }
+
+          if (results.length > 0) {
+            const summary = results[0].snippet;
+            systemLogger.info(
+              'SELF_IMPROVEMENT',
+              `🦆 [DuckDuckGo] 即答ナレッジ取得成功: ${results.length}件 (provider: duckduckgo_direct)`
+            );
+            return { results, summary, provider: 'duckduckgo_direct' };
+          }
+        }
+      } catch (ddgErr: any) {
+        console.warn('[AutonomousSearch] DuckDuckGo fetch error:', ddgErr);
+        systemLogger.warn('SELF_IMPROVEMENT', `⚠️ [DuckDuckGo] 取得例外: ${ddgErr?.message || String(ddgErr)}`);
+      }
+      return null;
+    };
+
+    // 優先指定に応じた実行順序の制御
+    let pipelineSteps: Array<() => Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null>>;
+    if (preferred === 'jina') {
+      pipelineSteps = [runJinaReader, runWikipedia, runDuckDuckGo];
+    } else if (preferred === 'duckduckgo') {
+      pipelineSteps = [runDuckDuckGo, runWikipedia, runJinaReader];
+    } else if (preferred === 'wikipedia') {
+      pipelineSteps = [runWikipedia, runJinaReader, runDuckDuckGo];
+    } else {
+      // デフォルト順: Wikipedia直接fetch -> Jina Reader検索 -> DuckDuckGo Instant Answer
+      pipelineSteps = [runWikipedia, runJinaReader, runDuckDuckGo];
+    }
+
+    // パイプラインを順次実行
+    for (const step of pipelineSteps) {
+      const stepOutput = await step();
+      if (stepOutput && stepOutput.results.length > 0) {
+        this.cache.set(cacheKey, { data: stepOutput, timestamp: Date.now() });
         this.stats.totalSearches++;
         this.stats.lastSearchAt = Date.now();
         this.saveStats();
-        return output;
+        return stepOutput;
       }
-    } catch (directErr) {
-      console.warn('[AutonomousSearch] Direct Wikipedia fetch error:', directErr);
     }
 
-    // 2. 検索失敗時のフォールバック (オフライン・接続不可環境)
+    // 5. 検索失敗時のフォールバック (オフライン・全検索エンジン空振り)
     // 作業指示書 v21 第2.1節: 架空の検索結果やもっともらしい説明文を生成せず、「検索できませんでした」という事実のみを返す
     const failureOutput = {
       results: [],
-      summary: `「${cleanQuery}」の検索に失敗しました（オフライン、または接続失敗）。`,
+      summary: `「${cleanQuery}」の検索に失敗しました（外部検索エンジン全件該当なし、または接続失敗）。`,
       provider: 'local_fallback',
     };
     this.stats.totalSearches++;

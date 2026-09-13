@@ -217,6 +217,39 @@ export function removeGeminiApiKey(idOrKey: string): SavedGeminiKeyItem[] {
   return items;
 }
 
+const JINA_API_KEY_STORAGE_KEY = 'miki_custom_jina_api_key';
+
+/**
+ * Jina Reader APIキーの取得（端末内ローカルストレージ保管・任意）
+ * 作業指示書 v23 第1.3節
+ */
+export function getJinaApiKeyItem(): string {
+  try {
+    const raw = storageService.getItem(JINA_API_KEY_STORAGE_KEY);
+    return (raw || '').trim();
+  } catch (e) {
+    console.warn('Error reading miki_custom_jina_api_key:', e);
+    return '';
+  }
+}
+
+/**
+ * Jina Reader APIキーの設定・保存（端末内ローカルストレージ保管）
+ * 作業指示書 v23 第1.3節
+ */
+export function setJinaApiKeyItem(key: string): void {
+  const trimmed = (key || '').trim();
+  try {
+    if (!trimmed) {
+      storageService.removeItem(JINA_API_KEY_STORAGE_KEY);
+    } else {
+      storageService.setItem(JINA_API_KEY_STORAGE_KEY, trimmed);
+    }
+  } catch (e) {
+    console.warn('Error saving miki_custom_jina_api_key:', e);
+  }
+}
+
 export function getCustomApiHeaders(extraHeaders?: Record<string, string>): Record<string, string> {
   const keys = getGeminiApiKeys();
   const headers: Record<string, string> = {

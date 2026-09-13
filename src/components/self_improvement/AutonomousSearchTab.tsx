@@ -18,6 +18,10 @@ import {
   Plus,
   Trash2,
   RotateCcw,
+  Key,
+  Eye,
+  EyeOff,
+  Check,
 } from 'lucide-react';
 import {
   autonomousSearchService,
@@ -29,14 +33,21 @@ import {
   bannedTopicsConfigService,
   BannedTopicsConfig,
 } from '../../services/bannedTopicsConfigService';
+import { getJinaApiKeyItem, setJinaApiKeyItem } from '../../services/api';
 
 export const AutonomousSearchTab: React.FC = () => {
   const [config, setConfig] = useState<AutonomousSearchConfig>(() => autonomousSearchService.getConfig());
   const [stats, setStats] = useState<AutonomousSearchStats>(() => autonomousSearchService.getStats());
   const [records, setRecords] = useState<AutonomousSearchLearningRecord[]>(() => autonomousSearchService.getRecentRecords(20));
 
+  // Jina APIキー設定 (作業指示書 v23 第1.3節)
+  const [jinaApiKey, setJinaApiKey] = useState<string>(() => getJinaApiKeyItem());
+  const [showJinaKey, setShowJinaKey] = useState(false);
+  const [jinaKeyNotice, setJinaKeyNotice] = useState<string | null>(null);
+
   // テスト検索用
   const [testQuery, setTestQuery] = useState('React 19 Server Actions 仕様');
+  const [preferredProvider, setPreferredProvider] = useState<'auto' | 'wikipedia' | 'jina' | 'duckduckgo'>('auto');
   const [isSearching, setIsSearching] = useState(false);
   const [searchOutput, setSearchOutput] = useState<{
     results: any[];
@@ -94,12 +105,29 @@ export const AutonomousSearchTab: React.FC = () => {
     setConfig(updated);
   };
 
+  const handleSaveJinaKey = () => {
+    setJinaApiKeyItem(jinaApiKey);
+    setJinaKeyNotice('Jina Reader APIキーを端末内に保存しました。');
+    setTimeout(() => setJinaKeyNotice(null), 3000);
+  };
+
+  const handleClearJinaKey = () => {
+    setJinaApiKey('');
+    setJinaApiKeyItem('');
+    setJinaKeyNotice('Jina Reader APIキーを解除しました（未登録状態）。');
+    setTimeout(() => setJinaKeyNotice(null), 3000);
+  };
+
   const handleExecuteTestSearch = async () => {
     if (!testQuery.trim() || isSearching) return;
     setIsSearching(true);
     setSearchOutput(null);
     try {
-      const res = await autonomousSearchService.executeSearch(testQuery.trim(), { maxResults: 4, bypassCache: true });
+      const res = await autonomousSearchService.executeSearch(testQuery.trim(), {
+        maxResults: 4,
+        bypassCache: true,
+        preferredProvider,
+      });
       const record = autonomousSearchService.learnFromSearch(testQuery.trim(), res.results, res.summary, {
         triggerType: 'in_conversation',
       });
@@ -260,6 +288,77 @@ export const AutonomousSearchTab: React.FC = () => {
         </div>
       </div>
 
+      {/* 作業指示書 v23 第1.3節: Jina Reader APIキー設定 (任意) */}
+      <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Key className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Jina Reader APIキー設定 (任意)</span>
+          </h4>
+          <span
+            className={`text-[10.5px] px-2 py-0.5 rounded-full font-mono border ${
+              jinaApiKey
+                ? 'bg-emerald-950/70 text-emerald-300 border-emerald-600/50'
+                : 'bg-slate-900 text-slate-400 border-slate-700'
+            }`}
+          >
+            {jinaApiKey ? '登録済み (認証ヘッダー付与)' : '未登録 (無料エンドポイント/DDG/Wikiで動作)'}
+          </span>
+        </div>
+
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          未入力でも動作しますが、入力するとより多く検索できるようになります（任意項目）。
+          入力されたキーは端末内ローカルストレージ（ブラウザ内）にのみ安全に保管され、サーバーやAPKのビルド成果物には一切埋め込まれません。
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <input
+              type={showJinaKey ? 'text' : 'password'}
+              value={jinaApiKey}
+              onChange={(e) => setJinaApiKey(e.target.value)}
+              placeholder="jina_... または APIキーを入力（空欄で未登録）"
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 pr-10 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => setShowJinaKey(!showJinaKey)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+              title={showJinaKey ? 'キーを隠す' : 'キーを表示する'}
+            >
+              {showJinaKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={handleSaveJinaKey}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>保存</span>
+            </button>
+            {jinaApiKey && (
+              <button
+                onClick={handleClearJinaKey}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl flex items-center gap-1 transition-colors"
+                title="キーをクリア"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>クリア</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {jinaKeyNotice && (
+          <div className="text-[11px] text-emerald-400 bg-emerald-950/40 border border-emerald-800/50 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>{jinaKeyNotice}</span>
+          </div>
+        )}
+      </div>
+
       {/* 設計思想 21.2 & 作業指示書 v19: 禁止トピック手動設定パネル */}
       <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-3">
         <div className="flex items-center justify-between">
@@ -340,10 +439,67 @@ export const AutonomousSearchTab: React.FC = () => {
 
       {/* 手動検索・学習テスト */}
       <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-3">
-        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-          <Search className="w-3.5 h-3.5 text-sky-400" />
-          <span>Web検索 & ナレッジ抽出テスト</span>
-        </h4>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Search className="w-3.5 h-3.5 text-sky-400" />
+            <span>Web検索 & ナレッジ抽出テスト</span>
+          </h4>
+          {/* プロバイダ優先セレクタ */}
+          <div className="flex items-center gap-1 text-[11px]">
+            <span className="text-slate-400 text-[10px]">実行順序:</span>
+            <div className="flex rounded-lg bg-slate-900 p-0.5 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setPreferredProvider('auto')}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                  preferredProvider === 'auto'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="自動パイプライン: Wikipedia → Jina Reader → DuckDuckGo"
+              >
+                自動
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreferredProvider('jina')}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                  preferredProvider === 'jina'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Jina Reader 直接優先"
+              >
+                Jina
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreferredProvider('duckduckgo')}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                  preferredProvider === 'duckduckgo'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="DuckDuckGo 即答直接優先"
+              >
+                DDG
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreferredProvider('wikipedia')}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                  preferredProvider === 'wikipedia'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Wikipedia 直接優先"
+              >
+                Wiki
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="flex gap-2">
           <input
             type="text"
@@ -356,7 +512,7 @@ export const AutonomousSearchTab: React.FC = () => {
           <button
             onClick={handleExecuteTestSearch}
             disabled={isSearching || !testQuery.trim()}
-            className="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+            className="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all shrink-0"
           >
             {isSearching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
             <span>検索 & 学習</span>
@@ -366,11 +522,34 @@ export const AutonomousSearchTab: React.FC = () => {
         {/* 検索テスト結果 */}
         {searchOutput && (
           <div className="mt-3 p-3 bg-slate-900/90 border border-sky-500/40 rounded-xl space-y-2 text-xs">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="font-semibold text-sky-300">プロバイダー: {searchOutput.provider}</span>
-              <span className="text-[10px] text-emerald-400 font-mono">
-                ✓ 長期記憶・合成データセットに還元完了
-              </span>
+            <div className="flex items-center justify-between text-slate-400 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-400">プロバイダー:</span>
+                <span
+                  className={`text-[10.5px] px-2 py-0.5 rounded font-mono font-bold border ${
+                    searchOutput.provider === 'jina_direct'
+                      ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
+                      : searchOutput.provider === 'duckduckgo_direct'
+                      ? 'bg-amber-950 text-amber-300 border-amber-700'
+                      : searchOutput.provider === 'wikipedia_direct'
+                      ? 'bg-sky-950 text-sky-300 border-sky-700'
+                      : 'bg-slate-800 text-slate-300 border-slate-700'
+                  }`}
+                >
+                  {searchOutput.provider === 'jina_direct'
+                    ? '🌐 Jina Reader (jina_direct)'
+                    : searchOutput.provider === 'duckduckgo_direct'
+                    ? '🦆 DuckDuckGo Instant Answer (duckduckgo_direct)'
+                    : searchOutput.provider === 'wikipedia_direct'
+                    ? '📖 Wikipedia (wikipedia_direct)'
+                    : '⚠️ ローカルフォールバック (local_fallback)'}
+                </span>
+              </div>
+              {searchOutput.results.length > 0 && (
+                <span className="text-[10px] text-emerald-400 font-mono">
+                  ✓ 長期記憶・合成データセットに還元完了
+                </span>
+              )}
             </div>
             {searchOutput.summary && (
               <div className="p-2.5 bg-black/40 border border-slate-800 rounded-lg text-slate-200 leading-relaxed text-[11px]">
