@@ -9,7 +9,7 @@
  */
 
 import { systemLogger } from './systemLogger';
-import { apiUrl } from './api';
+import { apiUrl, SERVER_UNAVAILABLE_MESSAGE } from './api';
 
 export interface RepoMapSymbol {
   kind: string;
@@ -73,13 +73,13 @@ export class AiderEngineService {
       systemLogger.info('SELF_IMPROVEMENT', `[Aider Repo Map] ${data.scannedFilesCount} ファイル / ${data.totalSymbolsCount} シンボル走査完了`);
       return data;
     } catch (err: any) {
-      console.warn('fetchRepoMap failed:', err);
+      systemLogger.warn('SELF_IMPROVEMENT', `fetchRepoMap失敗: ${SERVER_UNAVAILABLE_MESSAGE}`);
       return {
         success: false,
         scannedFilesCount: 0,
         totalSymbolsCount: 0,
         entries: [],
-        formattedRepoMap: '=== AIDER REPOSITORY MAP (OFFLINE FALLBACK) ===\n',
+        formattedRepoMap: `=== AIDER REPOSITORY MAP ===\n${SERVER_UNAVAILABLE_MESSAGE}\n`,
         generatedAt: Date.now(),
       };
     }
@@ -97,12 +97,12 @@ export class AiderEngineService {
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        return { success: false, error: data.error || '置換に失敗しました' };
+        return { success: false, error: data.error || SERVER_UNAVAILABLE_MESSAGE };
       }
       systemLogger.info('SELF_IMPROVEMENT', `[Aider Diff] ${data.diffSummary}`);
       return data;
     } catch (err: any) {
-      return { success: false, error: err.message || '通信エラー' };
+      return { success: false, error: SERVER_UNAVAILABLE_MESSAGE };
     }
   }
 
@@ -125,7 +125,7 @@ export class AiderEngineService {
         healed: false,
         attempts: 1,
         cleanCode: code,
-        repairHistory: [{ attempt: 1, error: err.message || '通信エラー', fixApplied: '修復不可' }],
+        repairHistory: [{ attempt: 1, error: SERVER_UNAVAILABLE_MESSAGE, fixApplied: '修復不可' }],
         finalErrorCount: 1,
       };
     }
@@ -172,7 +172,7 @@ export class AiderEngineService {
       systemLogger.info('SELF_IMPROVEMENT', `[Aider Rollback] コミット [${hash}] を物理復元しました: ${data.message}`);
       return { success: data.success, message: data.message || data.error, restoredFiles: data.restoredFiles };
     } catch (err: any) {
-      return { success: false, message: err.message || 'ロールバック通信エラー' };
+      return { success: false, message: SERVER_UNAVAILABLE_MESSAGE };
     }
   }
 }

@@ -1116,6 +1116,7 @@ export class BackgroundWorkerService {
                   summary: searchRes.summary,
                   sourceQuery: webTopic,
                   sourceUrl: r.url,
+                  provider: searchRes.provider,
                 });
 
                 if (skeletonCand) {
@@ -1138,6 +1139,7 @@ export class BackgroundWorkerService {
                   text: combinedSnippets,
                   sourceQuery: webTopic,
                   sourceUrl: searchResults[0]?.url || '',
+                  provider: searchRes.provider,
                 });
 
                 if (surfacePatterns.length > 0) {

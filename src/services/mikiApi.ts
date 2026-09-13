@@ -1,5 +1,6 @@
 import { Character, WorldLocation, StoryEntry, Monster, Quest } from '../types/rpg';
-import { apiUrl } from './api';
+import { simpleRpgRuleEngineService } from './simpleRpgRuleEngineService';
+import { unifiedMikiExperienceService } from './unifiedMikiExperienceService';
 
 export interface NarrateResponse {
   narration: string;
@@ -21,87 +22,87 @@ export interface CombatResponse {
   mikiComment?: string;
 }
 
+/**
+ * 冒険ナレーションの生成（作業指示書 v21: (A) 純粋なロジックとしてクライアント内で直接呼び出し）
+ */
 export async function requestNarration(
   action: string,
   character: Character,
   worldState: WorldLocation,
-  recentHistory: StoryEntry[],
+  recentHistory?: StoryEntry[],
   rollResult?: { dice: number; mod: number; total: number }
 ): Promise<NarrateResponse> {
-  const res = await fetch(apiUrl('/api/miki/narrate'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action,
-      character,
-      worldState,
-      recentHistory,
-      rollResult
-    })
+  const deterministicSeed = rollResult?.total ?? Date.now();
+  const data = simpleRpgRuleEngineService.narrate(action, character, worldState, deterministicSeed);
+  unifiedMikiExperienceService.observeRpg({
+    action: 'narrate',
+    input: String(action || ''),
+    outcome: 'SUCCESS',
+    verified: true,
+    capabilityIds: ['simple_rpg.combat'],
+    lesson: 'narration outcome joined unified experience',
   });
-
-  if (!res.ok) {
-    throw new Error('Failed to communicate with MIKI AI');
-  }
-
-  const json = await res.json();
-  return json.data;
+  return data;
 }
 
+/**
+ * クエスト生成（作業指示書 v21: (A) 純粋なロジックとしてクライアント内で直接呼び出し）
+ */
 export async function generateAIQuest(
   character: Character,
   setting: string,
   difficulty: string
 ): Promise<Quest> {
-  const res = await fetch(apiUrl('/api/miki/quest'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ character, setting, difficulty })
+  const quest = simpleRpgRuleEngineService.quest(setting, difficulty, character);
+  unifiedMikiExperienceService.observeRpg({
+    action: 'quest',
+    input: `${setting || ''}|${difficulty || ''}`,
+    outcome: 'SUCCESS',
+    verified: true,
+    capabilityIds: ['simple_rpg.guild'],
+    lesson: 'quest planning joined unified experience',
   });
-
-  if (!res.ok) {
-    throw new Error('Failed to generate quest from MIKI');
-  }
-
-  const json = await res.json();
-  return json.quest;
+  return quest;
 }
 
+/**
+ * 戦闘ターン解決（作業指示書 v21: (A) 純粋なロジックとしてクライアント内で直接呼び出し）
+ */
 export async function resolveCombatTurn(
   playerMove: string,
   character: Character,
   monster: Monster,
   rollResult?: { dice: number; mod: number; total: number }
 ): Promise<CombatResponse> {
-  const res = await fetch(apiUrl('/api/miki/combat'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerMove, character, monster, rollResult })
+  const deterministicSeed = Number(rollResult?.total || 0);
+  const data = simpleRpgRuleEngineService.combat(playerMove, character, monster, deterministicSeed);
+  unifiedMikiExperienceService.observeRpg({
+    action: 'combat',
+    input: `${playerMove || ''}|${monster?.name || ''}`,
+    outcome: data.playerDamage > 0 ? 'SUCCESS' : 'FAILURE',
+    verified: true,
+    capabilityIds: ['simple_rpg.combat', 'simple_rpg.equipment'],
+    lesson: data.isCritical ? 'critical hit combat observed directly' : 'combat mechanics observed directly',
   });
-
-  if (!res.ok) {
-    throw new Error('Failed to resolve combat round');
-  }
-
-  const json = await res.json();
-  return json.data;
+  return data;
 }
 
+/**
+ * Mikiとの会話（作業指示書 v21: (A) 純粋なロジックとしてクライアント内で直接呼び出し）
+ */
 export async function talkToMiki(
   message: string,
   character: Character,
   worldState: WorldLocation
 ): Promise<string> {
-  const res = await fetch(apiUrl('/api/miki/chat'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, character, worldState })
+  const reply = simpleRpgRuleEngineService.chat(message, character, worldState);
+  unifiedMikiExperienceService.observeRpg({
+    action: 'chat',
+    input: String(message || ''),
+    outcome: 'SUCCESS',
+    verified: true,
+    capabilityIds: ['simple_rpg.combat', 'simple_rpg.equipment'],
+    lesson: 'rpg-chat is part of the unified experience',
   });
-
-  if (!res.ok) {
-    throw new Error('MIKI is resting right now');
-  }
-
-  const json = await res.json();
-  return json.reply;
+  return reply;
 }

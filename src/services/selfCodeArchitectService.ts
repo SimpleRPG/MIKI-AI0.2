@@ -40,7 +40,7 @@ import { latentIntentMiningService } from './latentIntentMiningService';
 import { metacognitiveCalibrationService } from './metacognitiveCalibrationService';
 import { affectionDynamicsService } from './affectionDynamicsService';
 import { chapter31Service } from '../autonomous_modules/chapter_31_collocation_ast_refactor';
-import { apiUrl, getCustomApiHeaders } from './api';
+import { apiUrl, getCustomApiHeaders, SERVER_UNAVAILABLE_MESSAGE } from './api';
 
 
 import { FULL_SPECIFICATION_REGISTRY } from '../data/specificationRegistryData';
@@ -1027,9 +1027,10 @@ export class SelfCodeArchitectService {
         }
         return true;
       }
+      systemLogger.warn('SELF_IMPROVEMENT', `📁 [実体コード物理保存不可] ${SERVER_UNAVAILABLE_MESSAGE} (HTTP ${res.status})`);
       return false;
-    } catch (e) {
-      console.warn('saveModuleFileToServer error:', e);
+    } catch (e: any) {
+      systemLogger.warn('SELF_IMPROVEMENT', `📁 [実体コード物理保存不可] ${SERVER_UNAVAILABLE_MESSAGE} (${e?.message || '接続エラー'})`);
       return false;
     }
   }

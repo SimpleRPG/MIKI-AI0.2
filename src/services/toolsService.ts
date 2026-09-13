@@ -15,7 +15,7 @@ import { selfCodeArchitectService } from './selfCodeArchitectService';
 import { cognitiveDebuggerService } from './cognitiveDebuggerService';
 import { digitalResearchNoteService } from './digitalResearchNoteService';
 import { codebaseReflectionService } from './codebaseReflectionService';
-import { apiUrl } from './api';
+import { apiUrl, SERVER_UNAVAILABLE_MESSAGE } from './api';
 
 const TOOLS_STATS_STORAGE_KEY = 'miki_ai_tools_stats';
 
@@ -998,22 +998,21 @@ export class ToolsService {
             };
           }
         } catch (netErr) {
-          systemLogger.warn('TOOLS', `動的ツール外部サンドボックス通信失敗、ローカルフォールバック実行: ${netErr}`);
+          systemLogger.warn('TOOLS', `動的ツール外部サンドボックス通信失敗: ${netErr}`);
         }
 
-        // ローカル実行フォールバック
-        execResult = { status: 'OK', tool: tool.name, processedParams: params, timestamp: Date.now() };
-        outputSummary = `🛠️ [動的ツール実行完了: ${tool.name}] ローカルセーフモードで正常完了しました`;
+        // 作業指示書 v21 第1.4節: サーバー未接続・通信失敗時は成功したかのように偽装せず、正直に未接続を明示
         const totalMs = performance.now() - startTime;
         return {
           toolId,
           toolName: tool.name,
-          success: true,
-          result: execResult,
-          outputSummary,
+          success: false,
+          result: null,
+          outputSummary: `❌ [動的ツール実行不可: ${tool.name}] ${SERVER_UNAVAILABLE_MESSAGE}`,
           executionTimeMs: Math.round(totalMs),
           permission: tool.permission,
           executedAt: Date.now(),
+          error: SERVER_UNAVAILABLE_MESSAGE,
         };
       }
 

@@ -9,7 +9,6 @@
 
 import { WebCodeSearchResult, WebCodeSnippet } from '../types';
 import { systemLogger } from './systemLogger';
-import { apiUrl, getCustomApiHeaders } from './api';
 
 export interface CodeSearchOptions {
   language?: string;
@@ -21,6 +20,7 @@ export class CodeSearchService {
 
   /**
    * ネットの海からコード・アルゴリズム・ライブラリを発掘
+   * (作業指示書 v21: (B) クライアントから直接GitHub Search API等をfetch()する形に統一)
    */
   public async searchCode(query: string, options?: CodeSearchOptions): Promise<WebCodeSearchResult> {
     const cleanQuery = query.trim();
@@ -31,61 +31,62 @@ export class CodeSearchService {
       return this.cache.get(cacheKey)!;
     }
 
-    systemLogger.info('SELF_IMPROVEMENT', `[第171章 コード発掘] ネットの海から「${cleanQuery}」のコードを探索中...`);
+    systemLogger.info('SELF_IMPROVEMENT', `[第171章 コード発掘] GitHub公開APIから「${cleanQuery}」のコードを直接探索中...`);
+
+    const maxResults = options?.maxResults || 4;
 
     try {
-      const res = await fetch(apiUrl('/api/self-code/search-web-code'), {
-        method: 'POST',
-        headers: getCustomApiHeaders(),
-        body: JSON.stringify({
-          query: cleanQuery,
-          language,
-          maxResults: options?.maxResults || 4,
-        }),
+      const ghUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(`${cleanQuery} language:${language}`)}&sort=stars&order=desc&per_page=${maxResults}`;
+      const res = await fetch(ghUrl, {
+        headers: {
+          Accept: 'application/vnd.github.v3+json',
+        },
+        signal: AbortSignal.timeout(6000),
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: 検索リクエスト失敗`);
+      if (res.ok) {
+        const ghData = await res.json();
+        const items = ghData?.items || [];
+        const snippets: WebCodeSnippet[] = items.map((repo: any) => ({
+          id: `gh_${repo.id}`,
+          title: `${repo.full_name} (${repo.stargazers_count || 0}★)`,
+          language: repo.language || language,
+          code: `// Repository: ${repo.html_url}\n// Description: ${repo.description || 'No description'}\n// Default branch: ${repo.default_branch}\n`,
+          sourceUrl: repo.html_url,
+          sourceType: 'web',
+          description: repo.description || `GitHub Repository ${repo.full_name}`,
+        }));
+
+        const result: WebCodeSearchResult = {
+          query: cleanQuery,
+          language,
+          snippets,
+          suggestedTools: items.slice(0, 2).map((repo: any) => ({
+            name: `${repo.name.replace(/[^a-zA-Z0-9]/g, '')}Integration`,
+            description: `${repo.name}の機能を活用する連携ツール`,
+            targetProblem: repo.description || cleanQuery,
+          })),
+          summary: `GitHubから「${cleanQuery}」に関連するリポジトリ・コードを ${snippets.length} 件取得しました。`,
+          searchedAt: Date.now(),
+        };
+
+        this.cache.set(cacheKey, result);
+        return result;
       }
-
-      const data: WebCodeSearchResult = await res.json();
-      this.cache.set(cacheKey, data);
-      systemLogger.info(
-        'SELF_IMPROVEMENT',
-        `[第171章 コード発掘] 「${cleanQuery}」から ${data.snippets.length} 件のコードスニペットを取得完了`
-      );
-      return data;
     } catch (err: any) {
-      systemLogger.warn('SELF_IMPROVEMENT', `[第171章 コード発掘] 外部検索フォールバック実行: ${err?.message}`);
-
-      // ローカルフォールバック生成
-      const fallbackResult: WebCodeSearchResult = {
-        query: cleanQuery,
-        language,
-        snippets: [
-          {
-            id: `local_${Date.now()}`,
-            title: `${cleanQuery} 最適化実装パターン`,
-            language,
-            code: `// [ローカル自律合成コード]\nexport function handle_${cleanQuery.replace(/[^a-zA-Z0-9]/g, '_')}(input: unknown): { success: boolean; data: any } {\n  // 高速キャッシュと純粋関数処理\n  return { success: true, data: input };\n}`,
-            sourceUrl: `https://github.com/topics/${encodeURIComponent(cleanQuery)}`,
-            sourceType: 'web',
-            description: `「${cleanQuery}」に関する自律的コードパターン抽出`,
-          },
-        ],
-        suggestedTools: [
-          {
-            name: `${cleanQuery.slice(0, 12)}Processor`,
-            description: `「${cleanQuery}」の処理を安全・高速に実行する動的ツール`,
-            targetProblem: `${cleanQuery} の自律自動化`,
-          },
-        ],
-        summary: `「${cleanQuery}」のコードパターンをローカル推論にて取得しました。`,
-        searchedAt: Date.now(),
-      };
-
-      return fallbackResult;
+      systemLogger.warn('SELF_IMPROVEMENT', `[第171章 コード発掘] 直接GitHub検索エラー: ${err?.message}`);
     }
+
+    // 検索失敗時（オフラインまたはレートリミット）: 架空のコードを捏造せず事実のみを返す
+    const failureResult: WebCodeSearchResult = {
+      query: cleanQuery,
+      language,
+      snippets: [],
+      suggestedTools: [],
+      summary: `「${cleanQuery}」のコード検索に失敗しました（オフライン、または接続失敗）。`,
+      searchedAt: Date.now(),
+    };
+    return failureResult;
   }
 
   /**

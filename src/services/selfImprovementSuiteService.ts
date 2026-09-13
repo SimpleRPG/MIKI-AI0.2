@@ -10,7 +10,7 @@
 
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
-import { apiUrl, getCustomApiHeaders } from './api';
+import { apiUrl, getCustomApiHeaders, SERVER_UNAVAILABLE_MESSAGE } from './api';
 
 export interface DryRunVerificationResult {
   valid: boolean;
@@ -118,7 +118,7 @@ export class SelfImprovementSuiteService {
     } catch (err: any) {
       return {
         valid: false,
-        errors: [err.message || 'Dry-run サーバー通信失敗'],
+        errors: [`${SERVER_UNAVAILABLE_MESSAGE} (${err?.message || '通信失敗'})`],
         astNodesCount: 0,
         extractedExports: [],
         transpilePassed: false,
@@ -145,13 +145,13 @@ export class SelfImprovementSuiteService {
       systemLogger.info('SELF_IMPROVEMENT', `[ベンチマーク] 第${chapterNumber}章: 速度向上=${data.speedupMultiplier}, レイテンシ=${data.optimizedLatencyMs}ms`);
       return data;
     } catch (err: any) {
-      systemLogger.warn('SELF_IMPROVEMENT', `ベンチマーク実行不可 (オフラインまたはエラー): ${err?.message}`);
+      systemLogger.warn('SELF_IMPROVEMENT', `ベンチマーク実行不可: ${SERVER_UNAVAILABLE_MESSAGE}`);
       const failureResult: BenchmarkMetrics = {
         chapterNumber,
         iterations,
         baseLatencyMs: 0,
         optimizedLatencyMs: 0,
-        speedupMultiplier: '0x (未測定)',
+        speedupMultiplier: '0x (未接続・未測定)',
         memorySavedBytes: 0,
         throughputPerSec: 0,
         verified: false,
@@ -184,7 +184,8 @@ export class SelfImprovementSuiteService {
       systemLogger.info('SELF_IMPROVEMENT', `[弱点克服コード生成] ${data.filename} を自動作成・ディスク配備完了`);
       return data;
     } catch (err: any) {
-      throw err;
+      systemLogger.warn('SELF_IMPROVEMENT', `自律コード生成不可: ${SERVER_UNAVAILABLE_MESSAGE}`);
+      throw new Error(`${SERVER_UNAVAILABLE_MESSAGE} (${err?.message || '通信失敗'})`);
     }
   }
 
@@ -214,7 +215,7 @@ export class SelfImprovementSuiteService {
         healthStatus: 'CRITICAL',
         errorRate: 1.0,
         rollbackAvailable: true,
-        decision: `カナリア実実行エラー: ${err?.message || '通信失敗'}`,
+        decision: `カナリア実実行不可: ${SERVER_UNAVAILABLE_MESSAGE}`,
         evaluatedAt: Date.now(),
       };
     }

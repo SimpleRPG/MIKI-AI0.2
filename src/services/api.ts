@@ -20,8 +20,18 @@ import {
 // APKなど「フロントエンドだけが単体で動くビルド」では server.ts (Express) が
 // 同一オリジンに存在しないため、Termux等で起動したサーバーのアドレスを
 // 明示的に指定できるようにする。未設定なら従来通り同一オリジン(相対パス)。
+export const SERVER_UNAVAILABLE_MESSAGE = 'この機能は外部サーバーへの接続が必要です。現在未接続です。';
+
+export function getCustomApiBaseUrl(): string {
+  return (storageService.getItem('miki_api_base_url') || '').trim().replace(/\/+$/, '');
+}
+
+export function isExternalServerConfigured(): boolean {
+  return Boolean(getCustomApiBaseUrl());
+}
+
 export function apiUrl(path: string): string {
-  const base = (storageService.getItem('miki_api_base_url') || '').trim().replace(/\/+$/, '');
+  const base = getCustomApiBaseUrl();
   return base ? `${base}${path}` : path;
 }
 

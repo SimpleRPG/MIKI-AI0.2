@@ -14,7 +14,6 @@ import { bannedTopicsConfigService } from './bannedTopicsConfigService';
 import { WebMaterialPatternExtractor } from './webMaterialPatternExtractor';
 import { answerPlanService } from './answerPlanService';
 import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
-import { apiUrl, getCustomApiHeaders } from './api';
 
 const SEARCH_CONFIG_KEY = 'miki_ai_autonomous_search_config';
 const SEARCH_RECORDS_KEY = 'miki_ai_autonomous_search_records';
@@ -260,15 +259,15 @@ export class AutonomousSearchService {
     if (this.config.allowFallbackMock) {
       const mockResult: WebSearchResultItem[] = [
         {
-          title: `トラブルシューティング 手順 ガイド (${cleanQuery})`,
-          snippet: `「${cleanQuery}」についての手順解説です。まずは原因を分析して、段階的に解決方法を確認しましょう。次に前提条件を整理し、順序立てて対応します。`,
+          title: `【テスト用モック】トラブルシューティング ガイド (${cleanQuery})`,
+          snippet: `【テスト用モックデータ】「${cleanQuery}」についての手順解説です。実データではありません。`,
           url: `https://knowledge.local/search?q=${encodeURIComponent(cleanQuery)}`,
-          source: 'Local Fallback Mock',
+          source: 'Mock (Non-Real)',
         },
       ];
       const mockOutput = {
         results: mockResult,
-        summary: `「${cleanQuery}」に関する対応手順および解説情報を取得しました。`,
+        summary: `【テスト用モック】「${cleanQuery}」に関するテスト用モックデータです（実データではありません）。`,
         provider: 'mock_fallback',
       };
       this.cache.set(cacheKey, { data: mockOutput, timestamp: Date.now() });
@@ -278,43 +277,11 @@ export class AutonomousSearchService {
       return mockOutput;
     }
 
-    try {
-      // 1. Expressバックエンド /api/search へリクエスト
-      const res = await fetch(apiUrl('/api/search'), {
-        method: 'POST',
-        headers: getCustomApiHeaders(),
-        body: JSON.stringify({ query: safeQuery, maxResults }),
-        signal: AbortSignal.timeout(6000),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const output = {
-          results: (data.results || []).map((r: any) => ({
-            title: r.title || cleanQuery,
-            snippet: r.snippet || '',
-            url: r.url || '',
-            source: r.source || 'Web Search',
-            publishedDate: r.publishedDate,
-          })),
-          summary: data.summary || '',
-          provider: data.provider || 'api_search',
-        };
-
-        this.cache.set(cacheKey, { data: output, timestamp: Date.now() });
-        this.stats.totalSearches++;
-        this.stats.lastSearchAt = Date.now();
-        this.saveStats();
-        return output;
-      }
-    } catch (apiErr) {
-      console.warn('[AutonomousSearch] Backend /api/search unavailable, falling back to direct Wikipedia API:', apiErr);
-    }
-
-    // 2. フォールバック: 直接 Wikipedia API (CORS対応オープンエンドポイント)
+    // 1. 直接 Wikipedia API (CORS対応オープンエンドポイント)
+    // 作業指示書 v21 第1.3節: (B) server.tsを経由せず、クライアント側から直接Wikipedia等の外部APIをfetch()する形に統一
     try {
       const wikiUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanQuery)}&utf8=&format=json&origin=*&srlimit=${maxResults}`;
-      const wikiRes = await fetch(wikiUrl, { signal: AbortSignal.timeout(4000) });
+      const wikiRes = await fetch(wikiUrl, { signal: AbortSignal.timeout(5000) });
       if (wikiRes.ok) {
         const wikiData = await wikiRes.json();
         const hits = wikiData?.query?.search || [];
@@ -338,24 +305,17 @@ export class AutonomousSearchService {
       console.warn('[AutonomousSearch] Direct Wikipedia fetch error:', directErr);
     }
 
-    // 3. 究極フォールバック (オフライン・接続不可環境)
-    const fallbackResult: WebSearchResultItem[] = [
-      {
-        title: `${cleanQuery} (ローカル参照)`,
-        snippet: `「${cleanQuery}」についてローカル知識ベースから参照。最新版では該当仕様が策定・更新されています。`,
-        url: `https://www.google.com/search?q=${encodeURIComponent(cleanQuery)}`,
-        source: 'Local Synthetic Fallback',
-      },
-    ];
-    const fallbackOutput = {
-      results: fallbackResult,
-      summary: `「${cleanQuery}」に関する基礎仕様・解説情報を取得しました。`,
+    // 2. 検索失敗時のフォールバック (オフライン・接続不可環境)
+    // 作業指示書 v21 第2.1節: 架空の検索結果やもっともらしい説明文を生成せず、「検索できませんでした」という事実のみを返す
+    const failureOutput = {
+      results: [],
+      summary: `「${cleanQuery}」の検索に失敗しました（オフライン、または接続失敗）。`,
       provider: 'local_fallback',
     };
     this.stats.totalSearches++;
     this.stats.lastSearchAt = Date.now();
     this.saveStats();
-    return fallbackOutput;
+    return failureOutput;
   }
 
   /**

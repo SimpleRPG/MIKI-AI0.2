@@ -12,6 +12,27 @@
 
 import { bannedTopicsConfigService } from './bannedTopicsConfigService';
 
+/**
+ * 実データ由来プロバイダの検証（作業指示書 v21 第2.2節: 捏造・モックデータの排除）
+ */
+export const VALID_WEB_REAL_DATA_PROVIDERS = [
+  'wikipedia_direct',
+  'api_search',
+  'wikipedia',
+  'duckduckgo',
+  'searxng',
+  'gemini_grounding',
+] as const;
+
+export function isRealDataProvider(provider?: string): boolean {
+  if (!provider) return false;
+  const p = provider.toLowerCase().trim();
+  if (p.includes('fallback') || p.includes('mock') || p.includes('local') || p.includes('offline') || p.includes('synthetic')) {
+    return false;
+  }
+  return VALID_WEB_REAL_DATA_PROVIDERS.includes(p as any);
+}
+
 export interface WebExtractedSurfacePattern {
   originalFragment: string;
   abstractedPattern: string;
@@ -20,6 +41,7 @@ export interface WebExtractedSurfacePattern {
   sourceQuery: string;
   sourceUrl: string;
   extractedAt: number;
+  provider?: string;
 }
 
 export interface WebExtractedSkeletonPattern {
@@ -30,6 +52,7 @@ export interface WebExtractedSkeletonPattern {
   sourceUrl: string;
   extractedAt: number;
   originalFragment: string;
+  provider?: string;
 }
 
 export class WebMaterialPatternExtractor {
@@ -82,8 +105,9 @@ export class WebMaterialPatternExtractor {
     text: string;
     sourceQuery: string;
     sourceUrl: string;
+    provider?: string;
   }): WebExtractedSurfacePattern[] {
-    const { text, sourceQuery, sourceUrl } = params;
+    const { text, sourceQuery, sourceUrl, provider } = params;
 
     // 禁止トピック検査
     if (bannedTopicsConfigService.checkBanned(text).isBanned || bannedTopicsConfigService.checkBanned(sourceQuery).isBanned) {
@@ -136,6 +160,7 @@ export class WebMaterialPatternExtractor {
         sourceQuery,
         sourceUrl: sourceUrl || 'https://web-search-knowledge.local',
         extractedAt: Date.now(),
+        provider,
       });
 
       if (patterns.length >= 4) break; // 1件の検索結果から最大4パターンまで
@@ -153,8 +178,9 @@ export class WebMaterialPatternExtractor {
     summary?: string;
     sourceQuery: string;
     sourceUrl: string;
+    provider?: string;
   }): WebExtractedSkeletonPattern | null {
-    const { title, snippet, summary, sourceQuery, sourceUrl } = params;
+    const { title, snippet, summary, sourceQuery, sourceUrl, provider } = params;
     const combined = `${title} ${snippet} ${summary || ''}`;
 
     // 禁止トピック検査
@@ -217,6 +243,7 @@ export class WebMaterialPatternExtractor {
       sourceUrl: sourceUrl || 'https://web-search-knowledge.local',
       extractedAt: Date.now(),
       originalFragment: snippet.slice(0, 120),
+      provider,
     };
   }
 }

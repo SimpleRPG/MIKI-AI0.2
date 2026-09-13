@@ -8,7 +8,7 @@
  */
 
 import { systemLogger } from './systemLogger';
-import { apiUrl, getCustomApiHeaders } from './api';
+import { apiUrl, getCustomApiHeaders, SERVER_UNAVAILABLE_MESSAGE } from './api';
 
 export interface CanaryDeploymentState {
   proposalId: string;
@@ -116,7 +116,7 @@ class CanaryDeploymentSafetyService {
         rollbackAvailable: true,
         deployedAt: new Date().toISOString(),
         candidateCodeSnippet: codeSnippet,
-        evaluationDetails: `カナリア実実行API通信失敗: ${err?.message || err}`,
+        evaluationDetails: `カナリア実実行不可: ${SERVER_UNAVAILABLE_MESSAGE}`,
       };
 
       this.activeDeployments.set(proposalId, failedState);

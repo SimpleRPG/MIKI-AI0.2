@@ -20,7 +20,7 @@ import { systemLogger } from './systemLogger';
 import { checkSampleSafety } from '../utils/trainingSampleSafetyFilter';
 import { completionJudgeService } from './completionJudgeService';
 import { schemaValidationService } from './schemaValidationService';
-import { sendChatMessage, apiUrl, getCustomApiHeaders } from './api';
+import { sendChatMessage, apiUrl, getCustomApiHeaders, SERVER_UNAVAILABLE_MESSAGE } from './api';
 import { capabilityGapService } from './capabilityGapService';
 import { answerPlanService } from './answerPlanService';
 import { privacyGuardrailService } from './privacyGuardrailService';
@@ -561,7 +561,7 @@ export class TeacherRequestService {
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
-        const errMsg = errJson.error || `サーバー通信エラー (HTTP ${res.status})`;
+        const errMsg = errJson.error || `${SERVER_UNAVAILABLE_MESSAGE} (HTTP ${res.status})`;
         this.recordTeacherUsage({
           generatedSamplesCount: 0,
           verifiedPassedCount: 0,
@@ -880,7 +880,7 @@ export class TeacherRequestService {
         generalizationGapRecorded,
       };
     } catch (err: any) {
-      const errMsg = err?.message || '通信例外が発生しました';
+      const errMsg = `${SERVER_UNAVAILABLE_MESSAGE} (${err?.message || '通信失敗'})`;
       this.recordTeacherUsage({
         generatedSamplesCount: 0,
         verifiedPassedCount: 0,

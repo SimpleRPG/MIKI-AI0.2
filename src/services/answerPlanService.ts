@@ -11,6 +11,7 @@ import { surfaceVariationService } from './surfaceVariationService';
 import { unknownTaskDecompositionService } from './unknownTaskDecompositionService';
 import { capabilityGapService } from './capabilityGapService';
 import { bannedTopicsConfigService } from './bannedTopicsConfigService';
+import { isRealDataProvider } from './webMaterialPatternExtractor';
 
 const SKELETONS_STORAGE_KEY = 'miki_response_skeletons_v32';
 
@@ -585,7 +586,17 @@ class AnswerPlanService {
     sourceUrl: string;
     extractedAt: number;
     originalFragment: string;
+    provider?: string;
   }): ResponseSkeleton | null {
+    // 作業指示書 v21 第2.2節: プロバイダが実データ由来でない場合は候補化せずに破棄
+    if (!isRealDataProvider(params.provider)) {
+      systemLogger.warn(
+        'ANSWER_PLAN',
+        `🛡️ [Web骨格候補除外] プロバイダ「${params.provider || 'none'}」は実データではないため、骨格候補への登録を破棄しました`
+      );
+      return null;
+    }
+
     return this.registerSkeletonCandidate({
       instruction: params.instructionStructure,
       outputTarget: params.originalFragment,

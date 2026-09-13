@@ -14,7 +14,7 @@ import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
 import { answerContentIrService } from './answerContentIrService';
 import { AnswerContentIR } from '../types';
 import { bannedTopicsConfigService } from './bannedTopicsConfigService';
-import { WebExtractedSurfacePattern } from './webMaterialPatternExtractor';
+import { WebExtractedSurfacePattern, isRealDataProvider } from './webMaterialPatternExtractor';
 
 export interface VariationCandidateRecord {
   id: string;
@@ -437,6 +437,16 @@ export class SurfaceVariationGrowthService {
 
     for (const pattern of patterns) {
       if (promotedCount >= maxPromotions) break;
+
+      // 作業指示書 v21 第2.2節: プロバイダが実データ由来でない場合は候補化せずに破棄
+      if (!isRealDataProvider(pattern.provider)) {
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `🛡️ [Web言い回し破棄] プロバイダ「${pattern.provider || 'none'}」は実データではないため、言い回し候補化を破棄しました`
+        );
+        rejectedCount++;
+        continue;
+      }
 
       // 禁止トピック検査 (手動設定リスト参照)
       const bannedCheck = bannedTopicsConfigService.checkBanned(

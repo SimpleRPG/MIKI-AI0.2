@@ -103,7 +103,7 @@ export async function callSelfCodeApi<T>(
       success: false,
       offline: true,
       error: err?.message || 'Network unreachable',
-      reason: 'サーバーに接続できないため、測定・実行できませんでした（オフライン）。架空の成功判定は行いません。',
+      reason: 'この機能は外部サーバーへの接続が必要です。現在未接続です。',
     };
   }
 }
