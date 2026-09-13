@@ -84,14 +84,15 @@ export function generateSmartCompanionReply(
     }
   }
 
-  // 0.06 設計思想 第29章 & 第123章: みき自律アプリ改善リクエスト (Autonomous Self-Improvement)
+  // 0.06 設計思想 第29章 & 第123章: みき自律アプリ改善リクエスト (Autonomous Self-Improvement Proposal Staging)
   const isSelfImprovementIntent =
     /(自分で.*(改善|直して|進めて|アプリ)|アプリ.*(改善|自己改善)|仕様書.*(実装|適合|進めて)|自律.*改善|未実装.*(実装|改善)|自己改善して)/i.test(p);
   if (isSelfImprovementIntent) {
+    // 安全弁（第2.1節）: runAutonomousImprovementCycle は提案生成とシミュレーション検証のみを行い、本番ファイルは書き換えない
     void selfCodeArchitectService.runAutonomousImprovementCycle().catch((err) => {
       console.warn('Autonomous improvement background error:', err);
     });
-    return `うん、わかった！私が自分でアプリの改善を進めるね！任せて！🛠️✨\n\n仕様書の未実装要件やドリフトを自律的に見つけて、モデル生成系ランタイム保護やプライバシー境界などの不変条件を守りながら、安全に自律実装パイプライン（ローカルLLM/教師支援）を実行中だよ！進捗は「自己改善ラボ」タブで確認できるよ！😊💪`;
+    return `うん、わかった！改善提案の策定と安全シミュレーションを開始するね！📋✨\n\n不変条件エンジンで安全性を検証したうえで、検証用zipの準備と改善提案の生成を行うよ！（※本番ファイルへの即時自動適用は安全のため停止中だよ）。\n\n生成された提案は「自己改善ラボ → 自己コード改善」タブから、外部AI検算用の『zipダウンロード』や、確認後の『Gitコミット/反映』ができるよ！😊`;
   }
 
   // 0.07 設計思想 第29章: 自己コード監査・仕様整合性チェック

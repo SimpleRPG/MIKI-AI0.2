@@ -31,7 +31,10 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Download,
+  FolderGit2,
 } from 'lucide-react';
+import { GitIntegrationView } from './GitIntegrationView';
 import {
   SpecificationChapterMeta,
   SelfCodeAuditResult,
@@ -83,7 +86,7 @@ export interface LiveDiffPreview {
 
 export const SelfCodeArchitectTab: React.FC = () => {
   const [activeView, setActiveView] = useState<
-    'roadmap' | 'completed' | 'proposals' | 'invariants' | 'chap28' | 'advanced_services' | 'code_reflection' | 'advanced_suite'
+    'roadmap' | 'completed' | 'proposals' | 'invariants' | 'chap28' | 'advanced_services' | 'code_reflection' | 'advanced_suite' | 'git_integration'
   >('roadmap');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -308,6 +311,42 @@ export const SelfCodeArchitectTab: React.FC = () => {
       setAuditResult(selfCodeArchitectService.getLatestAudit()!);
       setActionNotice('提案を安全にロールバックしました。元の安定状態を維持しています。');
       setTimeout(() => setActionNotice(null), 4000);
+    }
+  };
+
+  // 第2.3節: 提案反映済み仮想状態のZipダウンロード（外部AI検算・diff確認用）
+  const handleDownloadProposalZip = async (prop: SelfImprovementProposal) => {
+    setActionNotice(`提案 [${prop.title}] の仮想適用ZIPアーカイブを準備中...`);
+    try {
+      // 1. 提案内容をバックエンドの一時ディレクトリ (.miki_pending_proposals) にステージング
+      const stagePayload = {
+        proposalId: prop.id,
+        targetChapterNumber: prop.targetChapterNumber,
+        targetFile: prop.targetFile || prop.contract?.allowedFiles?.[0] || 'src/services/selfCodeArchitectService.ts',
+        title: prop.title,
+        prompt: prop.prompt,
+        codeSnippet: prop.codeSnippet || `// Proposed implementation for ${prop.title}\n`,
+      };
+      await fetch('/api/self-code/stage-proposal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stagePayload),
+      });
+
+      // 2. zipファイルをダウンロード
+      const downloadUrl = `/api/self-code/export-proposal-zip?proposalId=${encodeURIComponent(prop.id)}`;
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `miki-proposal-${prop.id}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setActionNotice(`✅ 提案 [${prop.title}] の検算用ZIPをダウンロードしました！外部AIやdiffツールで検算してください。`);
+      setTimeout(() => setActionNotice(null), 6000);
+    } catch (err: any) {
+      setActionNotice(`❌ ZIPダウンロード失敗: ${err?.message || '通信エラー'}`);
+      setTimeout(() => setActionNotice(null), 5000);
     }
   };
 
@@ -952,6 +991,17 @@ export const SelfCodeArchitectTab: React.FC = () => {
             <Sparkles className="w-3.5 h-3.5 text-pink-300" />
             自律進化6大ツール群 (DryRun/ベンチ/弱点克服/カナリア/ペアプロ/Aider統合)
           </button>
+          <button
+            onClick={() => setActiveView('git_integration')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+              activeView === 'git_integration'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <FolderGit2 className="w-3.5 h-3.5 text-emerald-300" />
+            Git・GitHub連携 (Termux / 本番Push)
+          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -1372,6 +1422,15 @@ export const SelfCodeArchitectTab: React.FC = () => {
 
                   {/* アクションボタン */}
                   <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-800/60">
+                    <button
+                      onClick={() => handleDownloadProposalZip(prop)}
+                      className="px-3 py-1.5 bg-indigo-900/60 hover:bg-indigo-800/80 border border-indigo-700/60 text-indigo-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow active:scale-95"
+                      title="この改善提案を現在のコードベースに仮想適用した完全ZIPをダウンロード（外部AI/diff検算用・指示書2.3節）"
+                    >
+                      <Download className="w-3.5 h-3.5 text-indigo-400" />
+                      検証用ZIPダウンロード
+                    </button>
+
                     {prop.status === 'PROPOSED' && (
                       <button
                         onClick={() => handleSimulate(prop.id)}
@@ -2156,6 +2215,9 @@ export const SelfCodeArchitectTab: React.FC = () => {
 
       {/* ── 設計思想 自律進化5大ツール群 (DryRun/ベンチ/弱点克服/カナリア/ペアプロ) ── */}
       {activeView === 'advanced_suite' && <AdvancedSelfCodeSuiteView />}
+
+      {/* ── 実Git・GitHub連携ハブ (Termux / 本番Push) (第2.4節) ── */}
+      {activeView === 'git_integration' && <GitIntegrationView />}
     </div>
   );
 };

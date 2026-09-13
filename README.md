@@ -1,3 +1,28 @@
+# Miki-AI: 自律進化・開発環境連携ガイド
+
+## Gitリポジトリ初期化とTermux / GitHub連携手順 (第2.4節)
+
+本プロジェクトでは、コード改善・自律進化の成果を安全にバージョン管理し、GitHubと同期するために**本物のGit CLI**と連動しています（内部スナップショット `.aider_commits.json` とは完全に区別されます）。
+
+### 1. Gitの初期化 (初回の1回のみ)
+Termuxまたは作業端末のシェルで、プロジェクトのルートディレクトリにて以下を実行してください。
+```bash
+git init
+git branch -M main
+git config user.name "Your Name"
+git config user.email "your.email@example.com"
+```
+※アプリ起動時に `.git` が存在しない場合は、サーバーログに警告が表示されます。また、アプリ画面内の「自己改善ラボ → 自己コード改善 → Git・GitHub連携」タブにある「Gitリポジトリを初期化 (git init)」ボタンからもワンクリックで初期化できます。
+
+### 2. コミットと秘密情報スキャナ (指示書 2.4-4)
+コミット前に**秘密情報スキャナ**が自動稼働し、APIキー（Gemini/Google APIキー等）やGitHub PAT、秘密鍵等の機密文字列がコード差分に含まれている場合は、コミットが自動的に拒否されます。
+
+### 3. Termux経由のGitHub Push (指示書 2.4-5)
+- **安全規約**: 自動ループから不用意にGitHubへpushされることはありません。必ず人間が確認の上、画面上の「GitHubへプッシュを実行する」ボタンを押すか、Termuxから手動で `git push` を実行してください。
+- **PATの管理**: GitHub Personal Access Tokenは、リポジトリ内のファイルには一切保存されず、ブラウザの `localStorage` またはTermuxの環境変数でのみ安全に保持されます。
+
+---
+
 # 実装内容: 良い・悪い評価 (設計思想 24.推奨実装順序 第1世代-7)
 
 `fix-memory-retrieval` (記憶検索 / 使用記憶の記録) の続きとして、

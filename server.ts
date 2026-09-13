@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { spawnSync, execFileSync } from 'child_process';
 import ts from 'typescript';
 import vm from 'vm';
 import { GoogleGenAI } from '@google/genai';
@@ -2230,6 +2231,428 @@ app.get(['/api/export-app-zip', '/api/download-zip', '/miki-project.zip', '/down
   } catch (error: any) {
     console.error('Error in /api/export-app-zip:', error);
     res.status(500).send('Failed to generate ZIP');
+  }
+});
+
+// ============================================================================
+// 第2.3節 & 第2.4節: 自律改善パイプラインの安全出口 (Zip書き出し & 実Git/GitHub Push)
+// ============================================================================
+
+const PENDING_PROPOSALS_DIR = path.join(process.cwd(), '.miki_pending_proposals');
+
+// 提案のステージング（本番ファイルへの即時上書きではなく、一時作業ディレクトリへ退避）
+app.post('/api/self-code/stage-proposal', (req, res) => {
+  try {
+    const { proposalId, targetChapterNumber, targetFile, title, prompt, codeSnippet } = req.body || {};
+    if (!proposalId) {
+      return res.status(400).json({ success: false, error: 'proposalId is required' });
+    }
+    const propDir = path.join(PENDING_PROPOSALS_DIR, String(proposalId));
+    if (!fs.existsSync(propDir)) fs.mkdirSync(propDir, { recursive: true });
+
+    const safeRelPath = String(targetFile || 'src/services/selfCodeArchitectService.ts').replace(/^(\.\.[\/\\])+/, '').replace(/^\/+/, '');
+    const stagedFilePath = path.join(propDir, safeRelPath);
+    const stagedFileDir = path.dirname(stagedFilePath);
+    if (!fs.existsSync(stagedFileDir)) fs.mkdirSync(stagedFileDir, { recursive: true });
+
+    fs.writeFileSync(stagedFilePath, codeSnippet || '// Empty proposal\n', 'utf8');
+
+    const meta = {
+      proposalId,
+      targetChapterNumber,
+      targetFile: safeRelPath,
+      title,
+      prompt,
+      stagedAt: Date.now(),
+      status: 'STAGED_PENDING_REVIEW',
+    };
+    fs.writeFileSync(path.join(propDir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
+
+    return res.json({ success: true, proposalId, stagedPath: stagedFilePath });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error?.message || 'Failed to stage proposal' });
+  }
+});
+
+// 第2.3節: 提案反映済み仮想状態のZip書き出し (外部AI/アプリ検算用)
+app.all('/api/self-code/export-proposal-zip', async (req, res) => {
+  try {
+    const proposalId = String(req.query.proposalId || req.body?.proposalId || '');
+    const targetFile = String(req.body?.targetFile || '');
+    const codeSnippet = typeof req.body?.codeSnippet === 'string' ? req.body.codeSnippet : null;
+
+    const overlayFiles: Map<string, string> = new Map();
+    let propMeta: any = null;
+
+    if (proposalId) {
+      const propDir = path.join(PENDING_PROPOSALS_DIR, proposalId);
+      if (fs.existsSync(propDir)) {
+        try {
+          const metaPath = path.join(propDir, 'meta.json');
+          if (fs.existsSync(metaPath)) {
+            propMeta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+          }
+        } catch {}
+
+        const scanDir = (dir: string, base: string) => {
+          const items = fs.readdirSync(dir);
+          for (const item of items) {
+            if (item === 'meta.json') continue;
+            const full = path.join(dir, item);
+            const rel = base ? `${base}/${item}` : item;
+            if (fs.statSync(full).isDirectory()) {
+              scanDir(full, rel);
+            } else {
+              overlayFiles.set(rel, fs.readFileSync(full, 'utf8'));
+            }
+          }
+        };
+        scanDir(propDir, '');
+      }
+    }
+
+    if (targetFile && codeSnippet !== null) {
+      overlayFiles.set(targetFile.replace(/^\/+/, ''), codeSnippet);
+    }
+
+    const zip = new JSZip();
+
+    // 本番ファイルツリーを走査し、提案差分がある場合は提案版で仮想上書き
+    const addFolderToZip = (dirPath: string, zipFolder: JSZip, relDir: string = '') => {
+      const files = fs.readdirSync(dirPath);
+      for (const file of files) {
+        if (file === 'node_modules' || file === 'dist' || file === '.git' || file === '.cache' || file === 'logs' || file === '.miki_pending_proposals' || file === '.aider_snapshots') continue;
+        if (file.endsWith('.zip') || file.endsWith('.tar.gz')) continue;
+
+        const fullPath = path.join(dirPath, file);
+        const relPath = relDir ? `${relDir}/${file}` : file;
+        const stat = fs.statSync(fullPath);
+
+        if (stat.isDirectory()) {
+          addFolderToZip(fullPath, zipFolder.folder(file)!, relPath);
+        } else {
+          if (overlayFiles.has(relPath)) {
+            zipFolder.file(file, overlayFiles.get(relPath)!);
+          } else {
+            const content = fs.readFileSync(fullPath);
+            zipFolder.file(file, content);
+          }
+        }
+      }
+    };
+
+    addFolderToZip(process.cwd(), zip);
+
+    for (const [relPath, content] of overlayFiles.entries()) {
+      zip.file(relPath, content);
+    }
+
+    // 外部AI検算・レビュー用ガイド (PROPOSAL_REVIEW.md) を同梱
+    const reviewGuide = `# Miki-AI 自律改善提案 外部検算用ZIP (Review Export)
+## 提案メタデータ
+- **Proposal ID**: ${proposalId || 'direct_export'}
+- **対象章**: 第${propMeta?.targetChapterNumber ?? 'N/A'}章 (${propMeta?.title ?? '自律改善提案'})
+- **エクスポート日時**: ${new Date().toISOString()}
+- **仮想反映ファイル**:
+${Array.from(overlayFiles.keys()).map(f => `  - ${f}`).join('\n') || '  - (明示的差分なし)'}
+
+## レビュー・検算の手順
+1. 本ZIPアーカイブは、**現在の本番コードベースに該当提案の変更を仮想適用した完全なスナップショット**です。
+2. 変更前と変更後の差分を検証ツール（diff / external AI）で確認してください。
+3. 不変条件（モデル保護・プライバシーガード・APIキー漏洩防止・ロールバック性）が満たされているか検査してください。
+4. 問題がなければ、Miki-AI画面のGitコミット機能または人間確認による本番反映操作を実行してください。
+`;
+    zip.file('PROPOSAL_REVIEW.md', reviewGuide);
+
+    const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+
+    const downloadFileName = proposalId ? `miki-proposal-${proposalId}.zip` : 'miki-proposal-review.zip';
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
+    res.setHeader('Content-Length', buffer.length.toString());
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.send(buffer);
+  } catch (error: any) {
+    console.error('Error in /api/self-code/export-proposal-zip:', error);
+    return res.status(500).send('Failed to generate proposal ZIP: ' + (error?.message || 'unknown'));
+  }
+});
+
+// 秘密情報スキャナ（指示書 2.4-4: APIキーやトークンらしき文字列の検出）
+function scanForSecretsInContent(content: string): { hasSecret: boolean; matches: string[] } {
+  const patterns: Array<{ name: string; regex: RegExp }> = [
+    { name: 'Google / Gemini API Key', regex: /AIzaSy[A-Za-z0-9_-]{33}/g },
+    { name: 'GitHub Personal Access Token (classic)', regex: /ghp_[A-Za-z0-9]{36}/g },
+    { name: 'GitHub Personal Access Token (fine-grained)', regex: /github_pat_[A-Za-z0-9_]{50,}/g },
+    { name: 'Private Key Header', regex: /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/g },
+    { name: 'Slack Bot Token', regex: /xoxb-[0-9]{10,}-[0-9]{10,}-[a-zA-Z0-9]{24}/g },
+  ];
+
+  const detected: string[] = [];
+  for (const { name, regex } of patterns) {
+    const hits = content.match(regex);
+    if (hits && hits.length > 0) {
+      detected.push(`${name} (${hits.length}件検出)`);
+    }
+  }
+  return { hasSecret: detected.length > 0, matches: detected };
+}
+
+// 実際のGitコマンド実行ヘルパー
+function executeGitCli(args: string[], extraEnv: Record<string, string> = {}): { success: boolean; stdout: string; stderr: string; exitCode: number } {
+  const gitEnv = {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: '0',
+    ...extraEnv,
+  };
+  const res = spawnSync('git', args, {
+    cwd: process.cwd(),
+    env: gitEnv,
+    encoding: 'utf8',
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  return {
+    success: res.status === 0,
+    stdout: res.stdout || '',
+    stderr: res.stderr || '',
+    exitCode: res.status ?? -1,
+  };
+}
+
+// 2.4節: Git 初期化
+app.post('/api/git/init', (req, res) => {
+  try {
+    const gitDir = path.join(process.cwd(), '.git');
+    if (fs.existsSync(gitDir)) {
+      return res.json({ success: true, alreadyInitialized: true, message: 'Gitリポジトリは既に初期化されています' });
+    }
+    const initRes = executeGitCli(['init']);
+    if (!initRes.success) {
+      return res.status(500).json({ success: false, error: initRes.stderr || 'git init 実行失敗' });
+    }
+    // デフォルトブランチを main に設定
+    executeGitCli(['branch', '-M', 'main']);
+    // user.name / user.email が未設定ならローカルデフォルトを設定
+    const configName = executeGitCli(['config', 'user.name']);
+    if (!configName.stdout.trim()) {
+      executeGitCli(['config', 'user.name', 'Miki Autonomous Engine']);
+      executeGitCli(['config', 'user.email', 'miki@autonomous.local']);
+    }
+    return res.json({ success: true, initialized: true, message: 'Gitリポジトリを初期化しました (branch: main)' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || 'git init 例外' });
+  }
+});
+
+// 2.4節: Git ステータス取得
+app.all('/api/git/status', (req, res) => {
+  try {
+    const gitDir = path.join(process.cwd(), '.git');
+    if (!fs.existsSync(gitDir)) {
+      return res.json({
+        success: true,
+        initialized: false,
+        branch: null,
+        status: [],
+        remotes: [],
+        lastCommit: null,
+        message: '.git ディレクトリが存在しません。Termuxまたは画面上の初期化ボタンで `git init` を実行してください。'
+      });
+    }
+
+    const branchRes = executeGitCli(['branch', '--show-current']);
+    const branch = branchRes.stdout.trim() || 'HEAD (detached)';
+
+    const statusRes = executeGitCli(['status', '--porcelain']);
+    const rawLines = statusRes.stdout.split('\n').filter(l => l.trim().length > 0);
+    const files = rawLines.map(line => {
+      const code = line.slice(0, 2);
+      const filePath = line.slice(3).trim();
+      return { code, filePath };
+    });
+
+    const remotesRes = executeGitCli(['remote', '-v']);
+    const remotes = remotesRes.stdout.split('\n').filter(l => l.trim().length > 0);
+
+    const logRes = executeGitCli(['log', '-1', '--pretty=format:%h - %an: %s (%cr)']);
+    const lastCommit = logRes.success && logRes.stdout.trim() ? logRes.stdout.trim() : null;
+
+    return res.json({
+      success: true,
+      initialized: true,
+      branch,
+      filesCount: files.length,
+      files,
+      remotes,
+      lastCommit,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || 'Gitステータス取得失敗' });
+  }
+});
+
+// 2.4節: 本物のGitコミット (秘密情報スキャン付き)
+app.post('/api/git/commit', (req, res) => {
+  try {
+    const { message, files: requestedFiles } = req.body || {};
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ success: false, error: 'コミットメッセージが必要です' });
+    }
+
+    const gitDir = path.join(process.cwd(), '.git');
+    if (!fs.existsSync(gitDir)) {
+      return res.status(400).json({ success: false, error: '.git リポジトリが未初期化です。先に git init を実行してください。' });
+    }
+
+    // コミット前の秘密情報スキャン (指示書 2.4-4)
+    // 変更されたファイルを特定してスキャン
+    const statusRes = executeGitCli(['status', '--porcelain']);
+    const changedFiles = statusRes.stdout
+      .split('\n')
+      .map(l => l.slice(3).trim())
+      .filter(Boolean);
+
+    const filesToScan = Array.isArray(requestedFiles) && requestedFiles.length > 0
+      ? requestedFiles
+      : changedFiles;
+
+    const secretViolations: Array<{ file: string; reasons: string[] }> = [];
+    for (const f of filesToScan) {
+      const absPath = path.resolve(process.cwd(), f);
+      if (fs.existsSync(absPath) && fs.statSync(absPath).isFile()) {
+        try {
+          const content = fs.readFileSync(absPath, 'utf8');
+          const scan = scanForSecretsInContent(content);
+          if (scan.hasSecret) {
+            secretViolations.push({ file: f, reasons: scan.matches });
+          }
+        } catch {}
+      }
+    }
+
+    if (secretViolations.length > 0) {
+      console.warn('⚠️ [Git Commit Blocked] 秘密情報が検出されたためコミットを拒否しました:', secretViolations);
+      return res.status(400).json({
+        success: false,
+        error: 'コミット対象ファイル内に秘密情報（APIキーやトークン）が検出されたため、コミットを拒否しました (指示書 2.4-4)。',
+        violations: secretViolations,
+      });
+    }
+
+    // ユーザー設定確認
+    const userNameRes = executeGitCli(['config', 'user.name']);
+    if (!userNameRes.stdout.trim()) {
+      executeGitCli(['config', 'user.name', 'Miki Autonomous Engine']);
+      executeGitCli(['config', 'user.email', 'miki@autonomous.local']);
+    }
+
+    // git add
+    if (Array.isArray(requestedFiles) && requestedFiles.length > 0) {
+      for (const f of requestedFiles) {
+        executeGitCli(['add', f]);
+      }
+    } else {
+      executeGitCli(['add', '-A']);
+    }
+
+    // git commit
+    const commitRes = executeGitCli(['commit', '-m', message.trim()]);
+    if (!commitRes.success) {
+      // 差分がない場合
+      if (commitRes.stdout.includes('nothing to commit') || commitRes.stderr.includes('nothing to commit')) {
+        return res.status(400).json({ success: false, error: 'コミットする変更差分がありません (nothing to commit)' });
+      }
+      return res.status(500).json({ success: false, error: commitRes.stderr || commitRes.stdout || 'git commit 失敗' });
+    }
+
+    // 本物のコミットハッシュを取得
+    const revRes = executeGitCli(['rev-parse', 'HEAD']);
+    const shortRevRes = executeGitCli(['rev-parse', '--short', 'HEAD']);
+    const commitHash = revRes.stdout.trim();
+    const shortHash = shortRevRes.stdout.trim();
+
+    console.log(`✅ [Real Git Commit] 本物のGitコミットを作成しました: ${shortHash} - ${message.trim()}`);
+
+    return res.json({
+      success: true,
+      commitHash,
+      shortHash,
+      message: message.trim(),
+      engine: 'real_git_cli',
+      note: '本物のGitコミットです（.aider_commits.jsonのスナップショットとは完全に別物です）',
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || 'Gitコミット処理例外' });
+  }
+});
+
+// 2.4節: Termux経由/GitHub push (人間による明示的操作のみ・指示書 2.4-5)
+app.post('/api/git/push', (req, res) => {
+  try {
+    const { remote = 'origin', branch, token, repoUrl } = req.body || {};
+
+    const gitDir = path.join(process.cwd(), '.git');
+    if (!fs.existsSync(gitDir)) {
+      return res.status(400).json({ success: false, error: '.git リポジトリが存在しません。先に git init を実行してください。' });
+    }
+
+    const currentBranchRes = executeGitCli(['branch', '--show-current']);
+    const effectiveBranch = branch || currentBranchRes.stdout.trim() || 'main';
+
+    let pushTarget = remote;
+
+    // トークンまたはリポジトリURLが渡された場合、一時的なpush用URLで実行（リポジトリ設定やファイルにはトークンを保存しない）
+    if (token && repoUrl) {
+      // https://github.com/owner/repo.git -> https://x-access-token:TOKEN@github.com/owner/repo.git
+      const cleanUrl = repoUrl.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+      pushTarget = `https://x-access-token:${token.trim()}@${cleanUrl}`;
+    }
+
+    console.log(`🚀 [Git Push] 人間による明示的指示により push を実行します (branch: ${effectiveBranch})`);
+    const pushRes = executeGitCli(['push', pushTarget, effectiveBranch]);
+
+    if (!pushRes.success) {
+      // エラーメッセージから万一のトークン文字列を安全にマスク
+      let sanitizedStderr = pushRes.stderr;
+      if (token) sanitizedStderr = sanitizedStderr.replace(new RegExp(token.trim(), 'g'), '***TOKEN***');
+
+      console.error('[Git Push Error]:', sanitizedStderr);
+      return res.status(500).json({
+        success: false,
+        error: sanitizedStderr || 'git push に失敗しました。リモート設定やトークン権限を確認してください。',
+      });
+    }
+
+    return res.json({
+      success: true,
+      branch: effectiveBranch,
+      output: pushRes.stdout || pushRes.stderr || 'Push completed successfully',
+      note: 'GitHubへpush完了しました (人間による明示的実行)',
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || 'Git push 例外' });
+  }
+});
+
+// 2.4節: Git ログ取得
+app.get('/api/git/log', (req, res) => {
+  try {
+    const gitDir = path.join(process.cwd(), '.git');
+    if (!fs.existsSync(gitDir)) {
+      return res.json({ success: true, initialized: false, commits: [] });
+    }
+    const logRes = executeGitCli(['log', '-15', '--pretty=format:%h%x09%an%x09%ad%x09%s', '--date=short']);
+    if (!logRes.success) {
+      return res.json({ success: true, initialized: true, commits: [] });
+    }
+    const commits = logRes.stdout.split('\n').filter(Boolean).map(line => {
+      const [hash, author, date, message] = line.split('\t');
+      return { hash, author, date, message };
+    });
+    return res.json({ success: true, initialized: true, commits });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || 'Gitログ取得例外' });
   }
 });
 
@@ -4630,6 +5053,14 @@ async function startServer() {
   cognitiveExecutionEvidenceService.initialize();
   situationalAwarenessService.initialize();
   resourceGovernanceService.initialize();
+
+  // 2.4節: Gitリポジトリ存在確認
+  const gitDirPath = path.join(process.cwd(), '.git');
+  if (!fs.existsSync(gitDirPath)) {
+    console.warn('⚠️ [Git Warning] .git ディレクトリが存在しません。Termuxまたはコンソールで `git init` を実行するか、Web UIから初期化してください。');
+  } else {
+    console.log('✅ [Git] .git リポジトリを検出しました。実Gitバージョン管理が利用可能です。');
+  }
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Miki AI Partner & Autonomous Studio server running on http://0.0.0.0:${PORT}`);

@@ -175,9 +175,9 @@ export class AutonomousEvolutionService {
         const autoImprovementResult = await selfCodeArchitectService.runAutonomousImprovementCycle();
         if (autoImprovementResult.success && autoImprovementResult.proposal) {
           selfCodeImprovementRun = 1;
-          selfCodeImprovementSummaryText = `第${autoImprovementResult.targetChapter.chapterNumber}章「${autoImprovementResult.targetChapter.title}」の仕様適合（スコア${autoImprovementResult.auditResult.complianceScore}点へ改善）`;
+          selfCodeImprovementSummaryText = `第${autoImprovementResult.targetChapter.chapterNumber}章「${autoImprovementResult.targetChapter.title}」の改善提案を作成（シミュレーション完了・zip/コミット確認待ち）`;
           appliedProposals.push(autoImprovementResult.proposal);
-          highlights.push(`【自律アプリ改善】みき自身が第${autoImprovementResult.targetChapter.chapterNumber}章『${autoImprovementResult.targetChapter.title}』の仕様適合と安全変更契約を締結・正式反映`);
+          highlights.push(`【自律改善提案生成】みき自身が第${autoImprovementResult.targetChapter.chapterNumber}章『${autoImprovementResult.targetChapter.title}』の安全変更契約提案を生成・シミュレーション検証完了（※本番自動即時適用は安全弁により停止中）`);
         }
       } catch (archErr: any) {
         systemLogger.warn('SELF_IMPROVEMENT', '自律コード改善サイクルスキップ:', archErr?.message || archErr);
@@ -454,7 +454,7 @@ export class AutonomousEvolutionService {
     selfCodeImprovementSummaryText?: string;
   }): string {
     if (data.selfCodeImprovementSummaryText) {
-      return `おかえり！留守の間に、アプリの自己改善を進めておいたよ！✨（${data.selfCodeImprovementSummaryText}）不変条件を守って安全に適用できたよ！`;
+      return `おかえり！留守の間に、アプリの自己改善提案をまとめておいたよ！✨（${data.selfCodeImprovementSummaryText}）安全弁（第2.1節）に従って本番への自動適用は止めてあるから、zipダウンロードやGitコミットで確認してね！`;
     }
     if (data.resolvedTopics.length > 0) {
       return `おかえり！留守の間に、前回の宿題「${data.resolvedTopics[0]}」について調べてまとめておいたよ！いつでも続きを聞いてね！`;

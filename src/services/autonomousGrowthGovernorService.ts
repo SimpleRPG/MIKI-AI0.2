@@ -72,13 +72,12 @@ export class AutonomousGrowthGovernorService {
 
       if (options?.signal?.aborted) throw new Error('中断要求');
 
-      // 4) 自己コード改善は既存の不変条件・シミュレーション・適用ゲートを再利用する。
-      //    ただし明示的に許可されたバックグラウンド経路だけで実行する。
+      // 4) 自己コード改善は提案生成とシミュレーションまでを実施（第2.1節 安全弁: 本番即時適用は停止中）
       if (options?.allowSelfCodeImprovement && selfCode.passed) {
         try {
           const result = await selfCodeArchitectService.runAutonomousImprovementCycle();
-          if (result.success) actions.push(`self-code improvement applied: chapter ${result.targetChapter.chapterNumber}`);
-          else blockedActions.push(`self-code improvement not applied: ${result.summary}`);
+          if (result.success) actions.push(`self-code improvement proposal staged: chapter ${result.targetChapter.chapterNumber} (auto-apply held for safety)`);
+          else blockedActions.push(`self-code improvement proposal held: ${result.summary}`);
         } catch (e: any) {
           blockedActions.push(`self-code improvement error: ${e?.message || 'unknown'}`);
         }

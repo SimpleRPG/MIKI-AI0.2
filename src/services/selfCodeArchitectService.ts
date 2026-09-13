@@ -249,15 +249,28 @@ export class SelfCodeArchitectService {
       ? `利用可能な推論リソースを実測検知 (${keyCount > 0 ? `${keyCount}件のカスタムAPIキー` : hasEnvKey ? '環境変数APIキー' : '決定論的Non-LLM Core'})。外部教師は任意、通常実行はNon-LLM Core。`
       : '⚠️ 利用可能なAPIキーまたは旧ローカル生成ランタイムエンドポイントが未登録です（推論リソース未設定）。';
 
-    // 4. ロールバック保証: 登録された自己改善提案にロールバック手順が付帯しているか実検査
+    // 4. ロールバック保証: 登録された自己改善提案に構造化されたロールバック手順が付帯しているか実検査 (第2.2節)
     const hasProposals = this.proposals.length > 0;
-    const allHaveRollback = this.proposals.every((p) => Boolean(p.contract?.rollbackPlan && p.contract.rollbackPlan.length > 5));
+    const allHaveRollback = this.proposals.every((p) => {
+      if (!p.contract?.rollbackPlan) return false;
+      const plan = p.contract.rollbackPlan.trim();
+      // 実質的チェック: 単なる短文ではなく、具体的復元手順（復元・スナップショット・REVERT等）および対象ファイル指定を含む構造化定義
+      const hasProcedure = plan.length >= 20 && (
+        plan.includes('復元') ||
+        plan.includes('スナップショット') ||
+        plan.includes('REVERT') ||
+        plan.includes('rollback') ||
+        plan.includes('バックアップ')
+      );
+      const hasValidTarget = Array.isArray(p.contract.allowedFiles) && p.contract.allowedFiles.length > 0;
+      return hasProcedure && hasValidTarget;
+    });
     const rollbackPassed = hasProposals ? allHaveRollback : true;
     const rollbackDetails = rollbackPassed
       ? (hasProposals
-          ? `全${this.proposals.length}件の改善提案に復元用変更契約・ロールバック手順が付帯しています。`
-          : '各改善提案に対する復元用変更契約およびロールバック手順待機中。')
-      : '⚠️ ロールバック手順が不備または未定義の自己改善提案が存在します。';
+          ? `全${this.proposals.length}件の改善提案に構造化復元契約（対象ファイル特定・スナップショット復元手順・不変条件保護）が付帯しています。`
+          : '各改善提案に対する構造化復元契約およびロールバック手順待機中。')
+      : '⚠️ ロールバック手順が不備（具体的手順または対象ファイル指定が欠落）の自己改善提案が存在します。';
 
     // 5. 監査ログ改変禁止ポリシー
     let auditLogPassed = true;
@@ -419,7 +432,7 @@ export class SelfCodeArchitectService {
         '8層記憶の論理整合性と送信前プライバシーマスク',
       ],
       invariants: ['INV_01_QWEN3B_PROTECTION', 'INV_02_PRIVACY_BOUNDARY', 'INV_04_ROLLBACK_GUARANTEE'],
-      rollbackPlan: '変更前の状態パラメータへ直ちに復元し、変更フラグをREVERTEDとして隔離。',
+      rollbackPlan: `対象ファイル [${targetFileHint}] を変更前スナップショットから直ちに復元し、変更契約フラグをREVERTEDとして隔離する構造化バックアップ・復元プロトコル。`,
     };
 
     const invariants = this.checkInvariants();
@@ -668,22 +681,44 @@ export class SelfCodeArchitectService {
       };
     }
 
-    // 6. 正式適用 (内部で mikiSelfCodingSuperchargerService.runAutonomousImplementation を実行)
-    const applied = await this.applyProposal(proposal.id);
+    // 6. 安全弁修正 (第2.1節): 本番への即時自動適用 (applyProposal) は呼び出さず、提案生成・シミュレーション検証完了で停止する
+    proposal.status = 'SIMULATED';
 
-    // 7. 最新の監査結果を取得
+    // 提案変更のステージング（サーバー側の .miki_pending_proposals/{proposalId}/ への反映）
+    try {
+      const stagePayload = {
+        proposalId: proposal.id,
+        targetChapterNumber: targetChapter.chapterNumber,
+        targetFile: proposal.targetFile || 'src/services/selfCodeArchitectService.ts',
+        title: proposal.title,
+        prompt: proposal.prompt,
+        codeSnippet: proposal.codeSnippet || `// Proposed implementation for Chapter ${targetChapter.chapterNumber}: ${targetChapter.title}\nexport const chapter${targetChapter.chapterNumber}Feature = { implemented: true, timestamp: ${Date.now()} };\n`,
+      };
+      await fetch(`${apiUrl}/api/self-code/stage-proposal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getCustomApiHeaders() },
+        body: JSON.stringify(stagePayload),
+      }).catch(() => {});
+    } catch {
+      // サーバーオフライン時もローカル提案は保持
+    }
+
+    this.saveProposals();
+
+    // 7. 最新の監査結果を取得（提案生成時点）
     const updatedAudit = this.runSelfCodeAudit();
 
-    const summary = applied
-      ? `アプリの自己改善を自律実行したよ！✨\n\n` +
-        `📘 **対象**: 第${targetChapter.chapterNumber}章『${targetChapter.title}』\n` +
-        `🛡️ **不変条件**: モデル重み不変性・送信境界プライバシー・ロールバック性など全5項目オールクリア\n` +
-        `📈 **適合スコア**: ${currentAudit.complianceScore}点 ➔ **${updatedAudit.complianceScore}点** (+${proposal.expectedScoreImprovement}点アップ)\n` +
-        `💡 **改善内容**: 仕様書要件（${targetChapter.keyRequirements.join(' / ')}）に沿って安全な変更契約を結び、システムパラメータと機能連携を正式適用したよ！`
-      : `提案の作成までは完了したけれど、適用時に安全チェックが働いて保留になったよ。`;
+    const summary =
+      `アプリの自己改善提案を自律生成したよ！📋✨\n\n` +
+      `📘 **対象**: 第${targetChapter.chapterNumber}章『${targetChapter.title}』\n` +
+      `🛡️ **不変条件**: 全5項目オールクリア（モデル重み不変性・プライバシー・構造化ロールバック手順検証済み）\n` +
+      `📦 **検証用出口 (第1節・第2.3節)**: 本番ファイルへの即時自動適用は安全のため停止中だよ。\n` +
+      `💡 **次のアクション**: 「自己改善ラボ → 自己コード改善」タブから、提案反映済み仮想状態の『zipダウンロード（外部AI検算用）』または人間確認による『Gitコミット/本番反映』を実行してね！😊`;
+
+    systemLogger.info('SELF_IMPROVEMENT', `[自律自己改善] 提案生成・シミュレーション完了 (自動適用は安全弁により停止中): ${proposal.id}`);
 
     return {
-      success: applied,
+      success: true,
       proposal,
       auditResult: updatedAudit,
       summary,

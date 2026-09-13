@@ -33,3 +33,13 @@ Thumbs.db
 .cache/
 tmp/
 temp/
+
+# Pending proposals & change snapshots (CRITICAL: Do not commit proposals or snapshots)
+.miki_pending_proposals/
+.aider_commits.json
+.aider_snapshots/
+*.zip
+*.tar.gz
+miki-project.zip
+*.local.json
+
