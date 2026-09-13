@@ -773,31 +773,41 @@ export const SuperchargerToolsSubView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                {deadCodeResult.findings.map((f, i) => (
-                  <div
-                    key={i}
-                    className="p-3 bg-slate-900/80 border border-slate-800 rounded-xl space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono text-cyan-300">{f.file} : {f.line}行</span>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          f.type === 'UNUSED_EXPORT'
-                            ? 'bg-rose-500/20 text-rose-300'
-                            : 'bg-amber-500/20 text-amber-300'
-                        }`}
-                      >
-                        {f.type === 'UNUSED_EXPORT' ? '未使用エクスポート' : '重複ヘルパー'}
-                      </span>
+              {deadCodeResult.findings.length === 0 ? (
+                <div className="p-6 bg-slate-900/40 border border-emerald-500/20 rounded-xl text-center space-y-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+                  <div className="text-sm font-bold text-slate-200">コードベース健全 (検出 0件)</div>
+                  <p className="text-xs text-slate-400">走査したファイル群に未使用エクスポートや重複ヘルパー、デバッグ残骸は検出されませんでした。</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {deadCodeResult.findings.map((f, i) => (
+                    <div
+                      key={i}
+                      className="p-3 bg-slate-900/80 border border-slate-800 rounded-xl space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono text-cyan-300">{f.file} : {f.line}行</span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            f.type === 'UNUSED_EXPORT'
+                              ? 'bg-rose-500/20 text-rose-300'
+                              : f.type === 'REDUNDANT_HELPER'
+                              ? 'bg-amber-500/20 text-amber-300'
+                              : 'bg-indigo-500/20 text-indigo-300'
+                          }`}
+                        >
+                          {f.type === 'UNUSED_EXPORT' ? '未使用エクスポート' : f.type === 'REDUNDANT_HELPER' ? '重複ヘルパー' : '残骸ブロック'}
+                        </span>
+                      </div>
+                      <div className="text-xs font-mono text-slate-200 bg-black/40 px-2 py-1 rounded">
+                        {f.symbol}
+                      </div>
+                      <div className="text-xs text-slate-400">{f.suggestion}</div>
                     </div>
-                    <div className="text-xs font-mono text-slate-200 bg-black/40 px-2 py-1 rounded">
-                      {f.symbol}
-                    </div>
-                    <div className="text-xs text-slate-400">{f.suggestion}</div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

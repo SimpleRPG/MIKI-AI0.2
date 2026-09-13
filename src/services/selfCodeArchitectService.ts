@@ -41,6 +41,8 @@ import { metacognitiveCalibrationService } from './metacognitiveCalibrationServi
 import { affectionDynamicsService } from './affectionDynamicsService';
 import { chapter31Service } from '../autonomous_modules/chapter_31_collocation_ast_refactor';
 import { apiUrl, getCustomApiHeaders, SERVER_UNAVAILABLE_MESSAGE } from './api';
+import { unifiedMikiExperienceService } from './unifiedMikiExperienceService';
+import { selfImprovementExperimentService } from './selfImprovementExperimentService';
 
 
 import { FULL_SPECIFICATION_REGISTRY } from '../data/specificationRegistryData';
@@ -528,6 +530,10 @@ export class SelfCodeArchitectService {
       `[個別提案適用パイプライン開始] 第${proposal.targetChapterNumber}章: ${prompt.slice(0, 60)} -> ${targetFileHint}`
     );
 
+    // ── 指示書 1.2: 改善前実運用指標スナップショット ──
+    const beforeSnapshot = selfImprovementExperimentService.snapshot();
+    const preAuditScore = this.getLatestAudit({ silent: true })?.complianceScore || 0;
+
     let implResult;
     try {
       const extConfig = (() => {
@@ -549,6 +555,35 @@ export class SelfCodeArchitectService {
       );
     } catch (implErr: any) {
       systemLogger.error('SELF_IMPROVEMENT', `[個別提案適用エラー] 実装パイプライン実行例外: ${implErr?.message}`);
+      const afterFailSnapshot = selfImprovementExperimentService.snapshot();
+      const failEval = selfImprovementExperimentService.evaluate('SELF_CODE_IMPROVEMENT', beforeSnapshot, afterFailSnapshot, 'error');
+      unifiedMikiExperienceService.observeSelfCodeImprovement({
+        target: `第${proposal.targetChapterNumber}章 ${targetChapter?.title || '自己改善'}`,
+        chapterNumber: proposal.targetChapterNumber,
+        targetFile: targetFileHint,
+        problem: proposal.description || '仕様書適合のための自己改善',
+        rootCause: implErr?.message || '実装例外',
+        hypothesis: '共通実装パイプラインによる自己コード生成・配備',
+        improvementMethod: 'runAutonomousImplementation',
+        knowledgeUsed: proposal.dslCommands || [],
+        changeDetails: { linesCount: 0, summary: '実装例外により中断' },
+        metricsBefore: {
+          failureRate: beforeSnapshot.metrics.failureRate,
+          openGaps: beforeSnapshot.openGapCount,
+          stableCases: beforeSnapshot.stableCaseCount,
+        },
+        metricsAfter: {
+          failureRate: afterFailSnapshot.metrics.failureRate,
+          openGaps: afterFailSnapshot.openGapCount,
+          stableCases: afterFailSnapshot.stableCaseCount,
+        },
+        scoreDelta: failEval.scoreDelta,
+        testResults: { syntaxPassed: false, testsPassed: false, testSummary: '例外発生' },
+        operationalResult: `実装例外中断: ${implErr?.message}`,
+        verdict: 'REJECT',
+        sideEffects: [],
+        rolledBack: false,
+      });
       return false;
     }
 
@@ -605,11 +640,57 @@ export class SelfCodeArchitectService {
     this.saveProposals();
 
     // 監査を再実行してスコアを更新
-    this.runSelfCodeAudit();
+    const postAudit = this.runSelfCodeAudit();
+
+    // ── 指示書 1.1 & 1.2: 改善後実運用指標スナップショットとUnified Learningへの経験接続 ──
+    const afterSnapshot = selfImprovementExperimentService.snapshot();
+    const outcomeStr = implResult.applied ? (implResult.syntaxCheckPassed ? 'applied' : 'syntax_warning') : 'rejected';
+    const expResult = selfImprovementExperimentService.evaluate('SELF_CODE_IMPROVEMENT', beforeSnapshot, afterSnapshot, outcomeStr);
+
+    unifiedMikiExperienceService.observeSelfCodeImprovement({
+      target: `第${proposal.targetChapterNumber}章 ${targetChapter?.title || '自己改善'}`,
+      chapterNumber: proposal.targetChapterNumber,
+      targetFile: targetFileHint,
+      problem: proposal.description || `第${proposal.targetChapterNumber}章 仕様書ドリフトの是正`,
+      rootCause: targetChapter?.summary || '未実装または仕様ドリフト',
+      hypothesis: `仕様書第${proposal.targetChapterNumber}章の要件に基づく自律コード合成・テスト・配備`,
+      improvementMethod: proposal.generationMethod || 'autonomous_implementation',
+      knowledgeUsed: [
+        ...(proposal.dslCommands || []),
+        ...(proposal.teacherAssisted?.rules || []),
+      ],
+      changeDetails: {
+        linesCount: implResult.linesCount,
+        summary: `提案反映: ${proposal.title} (${implResult.linesCount}行)`,
+        snippet: implResult.code ? implResult.code.slice(0, 400) : undefined,
+      },
+      metricsBefore: {
+        failureRate: beforeSnapshot.metrics.failureRate,
+        openGaps: beforeSnapshot.openGapCount,
+        complianceScore: preAuditScore,
+        stableCases: beforeSnapshot.stableCaseCount,
+      },
+      metricsAfter: {
+        failureRate: afterSnapshot.metrics.failureRate,
+        openGaps: afterSnapshot.openGapCount,
+        complianceScore: postAudit.complianceScore,
+        stableCases: afterSnapshot.stableCaseCount,
+      },
+      scoreDelta: expResult.scoreDelta,
+      testResults: {
+        syntaxPassed: implResult.syntaxCheckPassed ?? true,
+        testsPassed: implResult.applied,
+        testSummary: `適用=${implResult.applied}, 構文=${implResult.syntaxCheckPassed ?? true}`,
+      },
+      operationalResult: `正式配備完了 (Commit: ${implResult.commitHash || 'N/A'}, Status: ${targetMeta?.status || 'N/A'})`,
+      verdict: expResult.verdict,
+      sideEffects: [],
+      rolledBack: false,
+    });
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🎉 [第29章 正式反映] 提案 ${proposal.title} が自己改善コントロールプレーンにより安全に適用されました (Method: ${proposal.generationMethod || 'unknown'}, Status: ${targetMeta?.status || 'N/A'}, Commit: ${implResult.commitHash || 'N/A'})。`
+      `🎉 [第29章 正式反映] 提案 ${proposal.title} が自己改善コントロールプレーンにより安全に適用されました (Method: ${proposal.generationMethod || 'unknown'}, Status: ${targetMeta?.status || 'N/A'}, Commit: ${implResult.commitHash || 'N/A'}, Verdict: ${expResult.verdict})。`
     );
     return true;
   }

@@ -1559,7 +1559,7 @@ improvementCanaryRollbackService.initialize();
         signal
       );
       systemLogger.info(
-        'CONVERSATION_STATE',
+        'CHAT',
         `🎯 [2.2 会話戦略学習] 直前ターン戦略[${prevInfo.strategy}] (Stage: ${prevInfo.stage}) に対して教師信号「${signal}」を検知・記録`
       );
       lastTurnStrategyRef.current = null;
@@ -2285,8 +2285,7 @@ improvementCanaryRollbackService.initialize();
           pipelineRes.strategy ||
           conversationStrategyService.selectConversationStrategy({
             prompt: text,
-            stage: conversationState?.stage,
-            persona: persona?.name,
+            stage: conversationState?.stage || 'QUESTION',
           }).strategy;
         lastTurnStrategyRef.current = {
           strategy: appliedPipelineStrategy,

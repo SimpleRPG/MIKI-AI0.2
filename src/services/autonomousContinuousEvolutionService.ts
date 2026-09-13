@@ -26,6 +26,8 @@ import { mikiIntrospectionJournalService } from './mikiIntrospectionJournalServi
 import { digitalResearchNoteService } from './digitalResearchNoteService';
 import { cognitiveDebuggerService } from './cognitiveDebuggerService';
 import { AutonomousVerificationData, SpecificationChapterMeta } from '../types';
+import { unifiedMikiExperienceService } from './unifiedMikiExperienceService';
+import { selfImprovementExperimentService } from './selfImprovementExperimentService';
 
 export interface AutonomousEvolutionStepEvent {
   phase:
@@ -36,6 +38,7 @@ export interface AutonomousEvolutionStepEvent {
     | 'TDD_TEST'
     | 'MUTATION_TEST'
     | 'DEPENDENCY_CHECK'
+    | 'APPROVAL_GATE'
     | 'SELF_HEALING'
     | 'INVARIANTS'
     | 'SNAPSHOT'
@@ -81,6 +84,13 @@ export interface AutonomousEvolutionRecord {
   beforeCode?: string;
   afterCode?: string;
   mutationTestResult?: MutationTestResult;
+  awaitingApproval?: boolean;
+  pendingApprovalData?: {
+    code: string;
+    targetFile: string;
+    prompt: string;
+    riskReasons: string[];
+  };
   lesson?: {
     title: string;
     rule: string;
@@ -325,6 +335,9 @@ export class AutonomousContinuousEvolutionService {
       systemLogger.info('SELF_IMPROVEMENT', `[自律自己改善: ${phase}] ${title} - ${detail}`);
     };
 
+    // ── 指示書 1.2: 改善前実運用指標スナップショット ──
+    const beforeSnapshot = selfImprovementExperimentService.snapshot();
+
     try {
       // ── Step 1: 監査 (Audit & Drift Detection) ──
       logStep('AUDIT', 'コードベース監査 & 仕様書ドリフト解析', '全170章の仕様書と実装状況を照合中...');
@@ -557,6 +570,94 @@ export default ${fallbackClassName};
         mutationResult.killRate >= 75 ? 'SUCCESS' : 'WARNING'
       );
 
+      // ── 指示書 1.6: リスク評価 & 承認ゲート (requireApproval ゲート) ──
+      // proposal → risk evaluation → 承認必要か？ → YES:停止 / NO:実行という実際の分岐
+      const riskReasons: string[] = [];
+      if (this.config.requireApproval) {
+        riskReasons.push('Auto-Pilot設定で人間の事前承認（requireApproval）が有効化されています');
+      }
+      if (mutationResult.killRate < 60) {
+        riskReasons.push(`ミューテーションキル率が基準値未満 (${mutationResult.killRate}%)`);
+      }
+      const isCriticalCoreFile = /(server\.ts|selfCodeArchitectService\.ts|App\.tsx)$/.test(targetInfo.targetFile);
+      if (isCriticalCoreFile) {
+        riskReasons.push(`基幹コアファイル (${targetInfo.targetFile}) に対する変更`);
+      }
+
+      const isApprovalRequired = this.config.requireApproval || (riskReasons.length > 0 && !this.config.enabled);
+      if (isApprovalRequired) {
+        logStep(
+          'APPROVAL_GATE',
+          '承認ゲート待機 (Approval Required)',
+          `安全ポリシーに基づき配備を一時停止しました。理由: ${riskReasons.join(' / ')}。ユーザーによる明示的な承認後に配備されます。`,
+          'WARNING'
+        );
+
+        const awaitingRecord: AutonomousEvolutionRecord = {
+          id: recordId,
+          timestamp: Date.now(),
+          chapterNumber: targetInfo.chapter?.chapterNumber,
+          chapterTitle: targetInfo.chapter?.title,
+          targetFile: targetInfo.targetFile,
+          prompt: targetInfo.prompt,
+          reasoning: `承認待機中: ${targetInfo.reason} (理由: ${riskReasons.join('; ')})`,
+          previousScore,
+          newScore: previousScore,
+          verification: ver,
+          selfHealingAttempts,
+          invariantsPassed: true,
+          applied: false,
+          steps,
+          beforeCode: targetInfo.chapter?.keyRequirements?.join('\n') || '',
+          afterCode: currentCode,
+          mutationTestResult: mutationResult,
+          awaitingApproval: true,
+          pendingApprovalData: {
+            code: currentCode,
+            targetFile: targetInfo.targetFile,
+            prompt: targetInfo.prompt,
+            riskReasons,
+          },
+          lesson: {
+            title: `承認待機: ${targetInfo.chapter?.title || targetInfo.targetFile}`,
+            rule: `承認待ちキューに保持されました。承認後に物理配備・正式適用されます。`,
+          },
+        };
+
+        this.history.unshift(awaitingRecord);
+        this.saveHistory();
+        this.notifyState(awaitingRecord);
+
+        // 指示書 1.1 & 1.2: 承認待ち状態をUnified Learning層へHOLD判定として記録
+        const expEval = selfImprovementExperimentService.evaluate('SELF_CODE_IMPROVEMENT', beforeSnapshot, beforeSnapshot, 'AWAITING_APPROVAL');
+        unifiedMikiExperienceService.observeSelfCodeImprovement({
+          target: targetInfo.chapter ? `第${targetInfo.chapter.chapterNumber}章 ${targetInfo.chapter.title}` : targetInfo.targetFile,
+          chapterNumber: targetInfo.chapter?.chapterNumber,
+          targetFile: targetInfo.targetFile,
+          problem: targetInfo.reason,
+          rootCause: '承認ゲート待機',
+          hypothesis: targetInfo.prompt,
+          improvementMethod: 'autonomous_pipeline_awaiting_approval',
+          knowledgeUsed: targetInfo.chapter?.keyRequirements || [],
+          changeDetails: { linesCount: currentCode.split('\n').length, summary: '承認ゲート待機中' },
+          metricsBefore: { complianceScore: previousScore },
+          metricsAfter: { complianceScore: previousScore },
+          scoreDelta: 0,
+          testResults: {
+            syntaxPassed: ver.syntaxPassed,
+            testsPassed: ver.testsPassed,
+            mutationKillRate: mutationResult.killRate,
+          },
+          operationalResult: `承認ゲート停止: ${riskReasons.join('; ')}`,
+          verdict: 'HOLD',
+          sideEffects: [],
+          rolledBack: false,
+        });
+
+        this.isRunningCycle = false;
+        return awaitingRecord;
+      }
+
       // ── Step 8: スナップショット自動作成 & 物理配備 (Deploy) ──
       logStep('SNAPSHOT', '復元ポイント（スナップショット）自動生成', '万が一のロールバックに備え、変更前状態を完全記録中...');
       // 物理配備を実行 (自己修復・テスト済みの currentCode を渡して確実に配備)
@@ -707,6 +808,50 @@ export default ${fallbackClassName};
       this.saveHistory();
       this.notifyState(record);
 
+      // ── 指示書 1.1 & 1.2: 改善後実運用指標スナップショットとUnified Learningへの経験接続 ──
+      const afterSnapshot = selfImprovementExperimentService.snapshot();
+      const outcomeStr = isFullRequirementMet ? 'COMPLETED' : (deploySuccess ? 'applied' : 'failed');
+      const expEval = selfImprovementExperimentService.evaluate('SELF_CODE_IMPROVEMENT', beforeSnapshot, afterSnapshot, outcomeStr);
+
+      unifiedMikiExperienceService.observeSelfCodeImprovement({
+        target: targetInfo.chapter ? `第${targetInfo.chapter.chapterNumber}章 ${targetInfo.chapter.title}` : targetInfo.targetFile,
+        chapterNumber: targetInfo.chapter?.chapterNumber,
+        targetFile: targetInfo.targetFile,
+        problem: targetInfo.reason,
+        rootCause: targetInfo.chapter?.summary || '未実装または仕様ドリフト',
+        hypothesis: targetInfo.prompt,
+        improvementMethod: finalApply.generationMethod || 'autonomous_pipeline',
+        knowledgeUsed: targetInfo.chapter?.keyRequirements || [],
+        changeDetails: {
+          linesCount: finalApply.linesCount || currentCode.split('\n').length,
+          summary: `自律改善配備: ${targetInfo.chapter?.title || targetInfo.targetFile} (${finalApply.linesCount || 0}行)`,
+          snippet: currentCode.slice(0, 400),
+        },
+        metricsBefore: {
+          failureRate: beforeSnapshot.metrics.failureRate,
+          openGaps: beforeSnapshot.openGapCount,
+          complianceScore: previousScore,
+          stableCases: beforeSnapshot.stableCaseCount,
+        },
+        metricsAfter: {
+          failureRate: afterSnapshot.metrics.failureRate,
+          openGaps: afterSnapshot.openGapCount,
+          complianceScore: newScore,
+          stableCases: afterSnapshot.stableCaseCount,
+        },
+        scoreDelta: expEval.scoreDelta,
+        testResults: {
+          syntaxPassed: ver.syntaxPassed,
+          testsPassed: ver.testsPassed,
+          mutationKillRate: mutationResult.killRate,
+          testSummary: `単体テスト:${ver.testPassedCount}/${ver.testTotalCount}, 変異体キル率:${mutationResult.killRate}%`,
+        },
+        operationalResult: `自律改善配備完了 (スコア: ${previousScore}点 ➔ ${newScore}点, Commit: ${finalApply.commitHash || 'N/A'})`,
+        verdict: expEval.verdict,
+        sideEffects: [],
+        rolledBack: false,
+      });
+
       // ── Step 10: 認知内省日誌・デジタル研究ノート・認知デバッガへの自動同期 ──
       try {
         mikiIntrospectionJournalService.generateIntrospectionNote(
@@ -784,11 +929,102 @@ export default ${fallbackClassName};
       this.saveHistory();
       this.notifyState(failedRecord);
 
+      try {
+        const afterFailSnapshot = selfImprovementExperimentService.snapshot();
+        const failEval = selfImprovementExperimentService.evaluate('SELF_CODE_IMPROVEMENT', beforeSnapshot, afterFailSnapshot, 'error');
+        unifiedMikiExperienceService.observeSelfCodeImprovement({
+          target: explicitTarget?.prompt || '自律改善サイクル',
+          targetFile: 'unknown',
+          problem: err?.message || '実行時エラー中断',
+          rootCause: '自律改善パイプライン例外発生',
+          hypothesis: '自律改善サイクルの完遂',
+          improvementMethod: 'autonomous_pipeline',
+          knowledgeUsed: [],
+          changeDetails: { linesCount: 0, summary: 'エラー中断' },
+          metricsBefore: { failureRate: beforeSnapshot.metrics.failureRate },
+          metricsAfter: { failureRate: afterFailSnapshot.metrics.failureRate },
+          scoreDelta: failEval.scoreDelta,
+          testResults: { syntaxPassed: false, testsPassed: false, testSummary: '例外発生' },
+          operationalResult: `自律自己改善中断: ${err?.message}`,
+          verdict: 'REJECT',
+          sideEffects: [],
+          rolledBack: false,
+        });
+      } catch { /* best effort */ }
+
       throw err;
     } finally {
       this.isRunningCycle = false;
       this.notifyState();
     }
+  }
+
+  /**
+   * 指示書 1.6: 承認待ちレコードの人手承認 & 物理配備 (Approval Execution)
+   */
+  public async approveAndDeployRecord(recordId: string): Promise<{ success: boolean; message: string }> {
+    const record = this.history.find((r) => r.id === recordId);
+    if (!record || !record.awaitingApproval || !record.pendingApprovalData) {
+      return { success: false, message: '承認対象のレコードが見つかりません。' };
+    }
+
+    const { code, targetFile, prompt } = record.pendingApprovalData;
+    systemLogger.info('SELF_IMPROVEMENT', `[承認ゲート通過] ユーザーにより承認されたレコード ${recordId} の本番配備を開始: ${targetFile}`);
+
+    const beforeSnapshot = selfImprovementExperimentService.snapshot();
+    const deployResult = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
+      prompt,
+      targetFile,
+      true, // 正式配備
+      code
+    );
+
+    record.applied = deployResult.applied;
+    record.commitHash = deployResult.commitHash;
+    record.awaitingApproval = false;
+    record.pendingApprovalData = undefined;
+
+    const afterSnapshot = selfImprovementExperimentService.snapshot();
+    const expEval = selfImprovementExperimentService.evaluate(
+      'SELF_CODE_IMPROVEMENT',
+      beforeSnapshot,
+      afterSnapshot,
+      deployResult.applied ? 'applied' : 'failed'
+    );
+
+    unifiedMikiExperienceService.observeSelfCodeImprovement({
+      target: record.chapterTitle || targetFile,
+      chapterNumber: record.chapterNumber,
+      targetFile,
+      problem: record.reasoning,
+      rootCause: '承認ゲート承認後の本番配備',
+      hypothesis: prompt,
+      improvementMethod: 'approved_deploy',
+      knowledgeUsed: [record.chapterTitle || ''],
+      changeDetails: {
+        linesCount: deployResult.linesCount,
+        summary: `承認済み配備: ${record.chapterTitle || targetFile} (${deployResult.linesCount}行)`,
+      },
+      metricsBefore: { complianceScore: record.previousScore },
+      metricsAfter: { complianceScore: record.newScore },
+      scoreDelta: expEval.scoreDelta,
+      testResults: {
+        syntaxPassed: deployResult.syntaxCheckPassed ?? true,
+        testsPassed: deployResult.applied,
+      },
+      operationalResult: `承認後配備完了 (Commit: ${deployResult.commitHash || 'N/A'})`,
+      verdict: expEval.verdict,
+      sideEffects: [],
+      rolledBack: false,
+    });
+
+    this.saveHistory();
+    this.notifyState(record);
+
+    return {
+      success: deployResult.applied,
+      message: deployResult.applied ? `配備に成功しました (Commit: ${deployResult.commitHash || 'N/A'})` : '配備に失敗しました',
+    };
   }
 
   /**

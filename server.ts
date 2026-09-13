@@ -3458,55 +3458,57 @@ app.post('/api/self-code/dead-code-scan', (req, res) => {
 
     if (fs.existsSync(modulesDir)) {
       const files = fs.readdirSync(modulesDir).filter((f) => f.endsWith('.ts'));
-      for (const file of files.slice(0, 15)) {
+      for (const file of files) {
         const fullPath = path.join(modulesDir, file);
         const content = fs.readFileSync(fullPath, 'utf-8');
         const lines = content.split('\n');
 
         lines.forEach((line, idx) => {
-          if (/export\s+const\s+old[A-Za-z0-9_]*/.test(line)) {
+          const trimmed = line.trim();
+          if (/export\s+const\s+(old[A-Za-z0-9_]*|legacy[A-Za-z0-9_]*|deprecated[A-Za-z0-9_]*)/.test(trimmed)) {
             findings.push({
               file: `src/autonomous_modules/${file}`,
-              symbol: line.trim(),
+              symbol: trimmed,
               type: 'UNUSED_EXPORT',
               line: idx + 1,
               suggestion: '最新APIへの統合に伴い、このレガシーエクスポートは安全に削除または非推奨化可能です。',
             });
           }
-          if (/function\s+deepClone\b/.test(line) || /function\s+formatDate\b/.test(line)) {
+          if (/function\s+(deepClone|formatDate|sleep|noop)\b/.test(trimmed)) {
             findings.push({
               file: `src/autonomous_modules/${file}`,
-              symbol: line.trim(),
+              symbol: trimmed,
               type: 'REDUNDANT_HELPER',
               line: idx + 1,
               suggestion: 'プロジェクト共通ユーティリティ (src/lib/utils.ts) への統一が可能です。',
+            });
+          }
+          if (/^\/\/\s*(const|let|var|function|class|export|import)\s+[a-zA-Z0-9_]+/.test(trimmed)) {
+            findings.push({
+              file: `src/autonomous_modules/${file}`,
+              symbol: trimmed.slice(0, 60),
+              type: 'DEAD_BLOCK',
+              line: idx + 1,
+              suggestion: 'コメントアウトされた残骸コードブロックです。Git履歴に残るため削除可能です。',
+            });
+          }
+          if (/console\.(log|debug)\(.*(?:TODO|dummy|temporary|mock).*\)/i.test(trimmed)) {
+            findings.push({
+              file: `src/autonomous_modules/${file}`,
+              symbol: trimmed.slice(0, 60),
+              type: 'DEAD_BLOCK',
+              line: idx + 1,
+              suggestion: '開発用暫定デバッグ出力です。不要なI/O負荷を軽減するためクリーンアップ可能です。',
             });
           }
         });
       }
     }
 
-    // デモ用・スキャン結果（発見がない場合でも安全な候補を表示）
-    if (findings.length === 0) {
-      findings.push({
-        file: 'src/autonomous_modules/chapter_31_collocation_ast_refactor.ts',
-        symbol: 'interface LegacyCollocationOpts',
-        type: 'UNUSED_EXPORT',
-        line: 14,
-        suggestion: 'Chapter31Specification に完全統合されたため削除可能 (48バイト削減)',
-      });
-      findings.push({
-        file: 'src/autonomous_modules/chapter_12_qwen_shadow_engine.ts',
-        symbol: 'function internalMockTimestamp()',
-        type: 'REDUNDANT_HELPER',
-        line: 28,
-        suggestion: 'Date.now() 共通ユーティリティへの統合を推奨 (重複排除)',
-      });
-    }
-
+    const scannedCount = fs.existsSync(modulesDir) ? fs.readdirSync(modulesDir).filter((f) => f.endsWith('.ts')).length : 0;
     return res.json({
       success: true,
-      scannedFilesCount: fs.existsSync(modulesDir) ? fs.readdirSync(modulesDir).filter((f) => f.endsWith('.ts')).length : 12,
+      scannedFilesCount: scannedCount,
       findingsCount: findings.length,
       estimatedBytesSavings: findings.length * 128,
       findings,

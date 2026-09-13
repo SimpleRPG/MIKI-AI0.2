@@ -18,6 +18,48 @@ import { causalMemoryLedgerService } from './causalMemoryLedgerService';
 export type UnifiedExperienceDomain = 'conversation' | 'rpg' | 'execution' | 'research' | 'code' | 'system';
 export type UnifiedOutcome = 'SUCCESS' | 'FAILURE' | 'UNKNOWN' | 'BLOCKED';
 
+export interface SelfCodeExperienceDetail {
+  id?: string;
+  target: string;
+  chapterNumber?: number;
+  targetFile?: string;
+  problem: string;
+  rootCause: string;
+  hypothesis: string;
+  improvementMethod: string;
+  knowledgeUsed: string[];
+  changeDetails: {
+    linesCount: number;
+    summary: string;
+    snippet?: string;
+  };
+  metricsBefore: {
+    failureRate?: number;
+    openGaps?: number;
+    complianceScore?: number;
+    stableCases?: number;
+  };
+  metricsAfter: {
+    failureRate?: number;
+    openGaps?: number;
+    complianceScore?: number;
+    stableCases?: number;
+  };
+  scoreDelta: number;
+  testResults: {
+    syntaxPassed: boolean;
+    testsPassed: boolean;
+    mutationKillRate?: number;
+    testSummary?: string;
+  };
+  operationalResult: string;
+  verdict: 'ADOPT' | 'HOLD' | 'REJECT';
+  sideEffects: string[];
+  rolledBack: boolean;
+  rollbackReason?: string;
+  timestamp?: number;
+}
+
 export interface UnifiedExperience {
   id: string;
   timestamp: number;
@@ -30,6 +72,7 @@ export interface UnifiedExperience {
   capabilityIds: string[];
   concepts: string[];
   lesson?: string;
+  selfCodeDetail?: SelfCodeExperienceDetail;
 }
 
 export interface UnifiedMikiState {
@@ -40,6 +83,7 @@ export interface UnifiedMikiState {
   conceptCounts: Record<string, number>;
   capabilityUseCounts: Record<string, number>;
   recent: UnifiedExperience[];
+  selfCodeExperiences: SelfCodeExperienceDetail[];
   lastUpdatedAt: number;
 }
 
@@ -73,6 +117,7 @@ export class UnifiedMikiExperienceService {
     conceptCounts: {},
     capabilityUseCounts: {},
     recent: [],
+    selfCodeExperiences: [],
     lastUpdatedAt: 0,
   };
 
@@ -92,6 +137,7 @@ export class UnifiedMikiExperienceService {
         conceptCounts: parsed.conceptCounts || {},
         capabilityUseCounts: parsed.capabilityUseCounts || {},
         recent: Array.isArray(parsed.recent) ? parsed.recent.slice(-MAX_RECENT) : [],
+        selfCodeExperiences: Array.isArray(parsed.selfCodeExperiences) ? parsed.selfCodeExperiences.slice(-60) : [],
       };
     } catch { /* safe defaults */ }
   }
@@ -171,6 +217,59 @@ export class UnifiedMikiExperienceService {
 
   public observeExecution(input: { action: string; goal: string; outcome: UnifiedOutcome; verified?: boolean; capabilityIds?: string[]; lesson?: string }): UnifiedExperience {
     return this.observe({ domain: 'execution', action: input.action, input: input.goal, outcome: input.outcome, verified: input.verified, capabilityIds: input.capabilityIds, lesson: input.lesson });
+  }
+
+  /**
+   * 自己コード改善の1サイクルを独立した経験記録としてUnified Learning層へ接続 (指示書 1.1)
+   * 改善対象・問題・根本原因・仮説・使用した改善方法・知識・変更内容・指標前後・テスト結果・採用判定・副作用・ロールバック有無を保持
+   */
+  public observeSelfCodeImprovement(detail: SelfCodeExperienceDetail): UnifiedExperience {
+    const timestamp = detail.timestamp || Date.now();
+    const outcome: UnifiedOutcome = detail.verdict === 'ADOPT'
+      ? 'SUCCESS'
+      : detail.verdict === 'HOLD'
+      ? 'UNKNOWN'
+      : 'FAILURE';
+
+    const lesson = `[自己コード改善:${detail.target}] 判定:${detail.verdict}, スコア変動:${detail.scoreDelta >= 0 ? '+' : ''}${detail.scoreDelta}pt, 手法:${detail.improvementMethod}. 仮説:${detail.hypothesis} -> 結果:${detail.operationalResult}`;
+    const inputStr = `${detail.target} ${detail.problem} ${detail.rootCause} ${detail.improvementMethod} ${detail.knowledgeUsed.join(' ')}`;
+
+    const experience = this.observe({
+      domain: 'code',
+      action: 'self_code_improvement',
+      input: inputStr,
+      outcome,
+      verified: detail.testResults.syntaxPassed && detail.testResults.testsPassed && !detail.rolledBack,
+      sourceFingerprint: detail.targetFile || `chap_${detail.chapterNumber || 'unknown'}`,
+      capabilityIds: ['self_code_architect', 'continuous_evolution', ...(detail.chapterNumber ? [`chapter_${detail.chapterNumber}`] : [])],
+      lesson,
+      timestamp,
+    });
+
+    // 詳細メタデータを紐づけて保存
+    const enrichedDetail: SelfCodeExperienceDetail = {
+      ...detail,
+      id: detail.id || `SCEXP-${experience.id}`,
+      timestamp,
+    };
+    experience.selfCodeDetail = enrichedDetail;
+
+    this.state.selfCodeExperiences = [
+      ...this.state.selfCodeExperiences,
+      enrichedDetail,
+    ].slice(-60);
+    this.save();
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🧠 [UnifiedLearning 接続] 自己コード改善経験を記録: ${detail.target} -> Verdict: ${detail.verdict} (${detail.scoreDelta >= 0 ? '+' : ''}${detail.scoreDelta}pt)`
+    );
+
+    return experience;
+  }
+
+  public getSelfCodeExperiences(limit = 20): SelfCodeExperienceDetail[] {
+    return this.state.selfCodeExperiences.slice(-Math.max(1, Math.min(60, limit)));
   }
 
   public getState(): UnifiedMikiState {

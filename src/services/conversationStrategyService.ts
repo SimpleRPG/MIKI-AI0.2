@@ -303,7 +303,7 @@ export class ConversationStrategyService {
     this.saveRecords();
 
     systemLogger.info(
-      'CONVERSATION_STATE',
+      'CHAT',
       `🎯 [2.3 戦略成果学習] 戦略: ${strategy} (Stage: ${stage}) | 信号: ${signal} | 累計試行: ${existing.totalTrials} (自発: ${existing.userLedCount}, 訂正: ${existing.correctedCount}, 離脱: ${existing.disengagedCount})`
     );
 

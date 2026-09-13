@@ -138,7 +138,7 @@ export interface SelfImplementationResult {
   targetFile: string;
   isNewFile: boolean;
   snapshotId: string | null;
-  commitHash: string;
+  commitHash?: string;
   applied: boolean;
   syntaxCheckPassed: boolean;
   syntaxError?: string | null;
@@ -380,102 +380,24 @@ class MikiSelfCodingSuperchargerService {
     if (isApiFailure(res)) {
       systemLogger.warn('SELF_IMPROVEMENT', `自律自己実装API未応答/404: ${res.reason}`);
 
-      // フォールバック用の型安全モジュール骨格（人類の先行OSS設計パターン適合）を自律合成
-      const fallbackClassName = (targetFileHint || 'ResilientModule').split('/').pop()?.replace(/\.tsx?$/, '') || 'ResilientModule';
-      const cleanName = fallbackClassName.replace(/[^a-zA-Z0-9_]/g, '') || 'ResilientService';
-      const synthesized = `/**
- * MIKI-AI 自律生成モジュール (先行OSS設計パターン適合)
- * 要求仕様: ${prompt}
- * 対象ファイル: ${targetFileHint || 'src/autonomous_modules/applied_module.ts'}
- * 生成日時: ${new Date().toISOString()}
- */
-
-export interface I${cleanName}Config {
-  enabled?: boolean;
-  timeoutMs?: number;
-}
-
-export class ${cleanName} {
-  private config: I${cleanName}Config;
-  private cache = new Map<string, unknown>();
-
-  constructor(config: I${cleanName}Config = {}) {
-    this.config = { enabled: true, timeoutMs: 5000, ...config };
-  }
-
-  public async executeTask(payload: unknown): Promise<{ success: boolean; data: unknown; timestamp: number }> {
-    if (!payload) {
-      throw new Error('Invalid payload: payload cannot be null or undefined');
-    }
-    const cacheKey = typeof payload === 'string' ? payload : JSON.stringify(payload);
-    if (this.cache.has(cacheKey)) {
-      return { success: true, data: this.cache.get(cacheKey), timestamp: Date.now() };
-    }
-    const result = { processed: true, payload, executionTime: Date.now() };
-    this.cache.set(cacheKey, result);
-    return { success: true, data: result, timestamp: Date.now() };
-  }
-
-  public clearCache(): void {
-    this.cache.clear();
-  }
-}
-
-export default ${cleanName};
-`;
-
       const targetPath = targetFileHint || 'src/autonomous_modules/applied_module.ts';
-      const effectiveCode = (codeOverride && codeOverride.trim().length > 20) ? codeOverride : synthesized;
-      const commitHash = `vcommit_${Math.random().toString(36).slice(2, 9)}`;
-
-      // 【配備フェーズ (autoApply: true)】: サーバー404/未接続時でもクライアント仮想モジュールストアへ安全配備
-      if (autoApply) {
-        try {
-          const virtualModulesKey = 'miki_virtual_deployed_modules';
-          const existingRaw = storageService.getItem(virtualModulesKey) || '{}';
-          const modulesMap = JSON.parse(existingRaw);
-          modulesMap[targetPath] = {
-            code: effectiveCode,
-            prompt,
-            updatedAt: Date.now(),
-            commit: commitHash,
-          };
-          storageService.setItem(virtualModulesKey, JSON.stringify(modulesMap));
-          systemLogger.info('SELF_IMPROVEMENT', `[自律自己実装・仮想配備] 実装サーバー404/未接続のため仮想サンドボックスへ配備完了 (${commitHash}, ${effectiveCode.split('\n').length}行)`);
-        } catch (storageErr) {
-          console.warn('[Virtual Deploy Error]', storageErr);
-        }
-
-        return {
-          success: true,
-          prompt,
-          targetFile: targetPath,
-          isNewFile: true,
-          snapshotId: `virtual_snap_${Date.now()}`,
-          commitHash,
-          applied: true,
-          syntaxCheckPassed: true,
-          reasoning: `実装サーバー(Port 3000)未応答/404のため、クライアント仮想ファイルストアへコード (${effectiveCode.split('\n').length}行) を安全配備しました。`,
-          code: effectiveCode,
-          linesCount: effectiveCode.split('\n').length,
-          generationMethod: codeOverride ? 'override' : 'teacher_assisted_template',
-        };
-      }
-
-      // 【生成フェーズ (autoApply: false)】: サーバー404/未接続時も完全な型安全モジュールを返却 (0行コード完全防止)
+      // 実装失敗時は明確に success: false, applied: false, isRequirementImplemented: false として扱う
+      // generic fallback を生成して成功や配備済みに偽装する経路を完全廃止し、失敗として正確に伝播する (指示書 1.3 & 1.4)
       return {
-        success: true,
+        success: false,
         prompt,
         targetFile: targetPath,
-        isNewFile: true,
-        snapshotId: `client_snap_${Date.now()}`,
-        commitHash: `c_${Math.random().toString(36).slice(2, 9)}`,
+        isNewFile: false,
+        snapshotId: `failed_attempt_${Date.now()}`,
+        commitHash: undefined,
         applied: false,
-        syntaxCheckPassed: true,
-        reasoning: `実装サーバー(Port 3000)未応答のため、型安全なモジュール骨格を自律合成しました。`,
-        code: synthesized,
-        linesCount: synthesized.split('\n').length,
-        generationMethod: 'teacher_assisted_template',
+        syntaxCheckPassed: false,
+        reasoning: `実装APIが未応答または失敗したため、自己実装を完了できませんでした (失敗として記録)。API失敗理由: ${res.reason}`,
+        code: '',
+        linesCount: 0,
+        generationMethod: 'fallback_template',
+        isRequirementImplemented: false,
+        error: res.reason,
       };
     }
     if (res.teacherAssisted?.templateAcquired && res.teacherAssisted.rules && res.teacherAssisted.rules.length > 0) {

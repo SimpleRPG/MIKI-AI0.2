@@ -33,6 +33,7 @@ import {
   Loader2,
   Download,
   FolderGit2,
+  ShieldAlert,
 } from 'lucide-react';
 import { GitIntegrationView } from './GitIntegrationView';
 import {
@@ -163,6 +164,25 @@ export const SelfCodeArchitectTab: React.FC = () => {
   );
   const [moduleSearch, setModuleSearch] = useState('');
 
+  // ── 指示書 1.6: 承認ゲート待機レコード管理用ステート ──
+  const [pendingApprovalRecords, setPendingApprovalRecords] = useState(() =>
+    autonomousContinuousEvolutionService.getHistory().filter((r) => r.awaitingApproval)
+  );
+  const [isApprovingRecordId, setIsApprovingRecordId] = useState<string | null>(null);
+
+  const handleApproveRecord = async (recordId: string) => {
+    setIsApprovingRecordId(recordId);
+    try {
+      const res = await autonomousContinuousEvolutionService.approveAndDeployRecord(recordId);
+      setActionNotice(res.message);
+      setPendingApprovalRecords(autonomousContinuousEvolutionService.getHistory().filter((r) => r.awaitingApproval));
+      setAuditResult(selfCodeArchitectService.getLatestAudit() ?? selfCodeArchitectService.runSelfCodeAudit());
+      setTimeout(() => setActionNotice(null), 5000);
+    } finally {
+      setIsApprovingRecordId(null);
+    }
+  };
+
   const handleSynthesizeRecipe = (chapNum: number) => {
     setRecipeChapter(chapNum);
     const rec = selfCodeArchitectService.getRecipeForChapter(chapNum);
@@ -184,6 +204,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
         SELF_HEALING: 'warn',
         TDD_TEST: 'success',
         MUTATION_TEST: step.status === 'WARNING' ? 'warn' : 'purple',
+        APPROVAL_GATE: 'warn',
         SNAPSHOT: 'info',
         DEPLOY: 'success',
         COMPLETED: step.status === 'WARNING' ? 'cyan' : 'success',
@@ -221,7 +242,10 @@ export const SelfCodeArchitectTab: React.FC = () => {
     const unsubState = autonomousContinuousEvolutionService.subscribe((record, isRunning) => {
       if (isRunning) {
         setIsAutoImproving(true);
+      } else {
+        setIsAutoImproving(false);
       }
+      setPendingApprovalRecords(autonomousContinuousEvolutionService.getHistory().filter((r) => r.awaitingApproval));
     });
 
     return () => {
@@ -551,6 +575,63 @@ export const SelfCodeArchitectTab: React.FC = () => {
         <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl flex items-center gap-3 text-emerald-300 text-sm shadow-lg animate-fade-in">
           <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-400" />
           <span>{actionNotice}</span>
+        </div>
+      )}
+
+      {/* ── 指示書 1.6: 承認ゲート待機中の変更パネル ── */}
+      {pendingApprovalRecords.length > 0 && (
+        <div className="p-4 bg-amber-950/40 border-2 border-amber-500/60 rounded-2xl space-y-3 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+              <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0" />
+              <span>承認ゲート待機中 ({pendingApprovalRecords.length}件の自律改善がユーザー承認待ち)</span>
+            </div>
+            <span className="text-[11px] font-mono px-2 py-0.5 bg-amber-950 text-amber-300 border border-amber-800/80 rounded-full">
+              Safe-Staging Mode Active
+            </span>
+          </div>
+          <p className="text-xs text-slate-300">
+            安全ポリシーまたは事前承認設定（requireApproval）により、コードの合成と検証（AST・単体テスト・変異体テスト）完了後に一時停止しています。内容を確認して本番適用を承認してください。
+          </p>
+
+          <div className="space-y-2 pt-1">
+            {pendingApprovalRecords.map((rec) => (
+              <div
+                key={rec.id}
+                className="p-3 bg-slate-900/90 border border-amber-500/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-amber-300">
+                      第{rec.chapterNumber ?? '?'}章: {rec.chapterTitle || rec.targetFile}
+                    </span>
+                    <span className="text-[10px] font-mono text-cyan-300 bg-black/40 px-1.5 py-0.5 rounded">
+                      {rec.targetFile}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    理由: {rec.reasoning}
+                  </div>
+                  {rec.mutationTestResult && (
+                    <div className="text-[11px] text-emerald-400 font-mono">
+                      変異体キル率: {rec.mutationTestResult.killRate}% ({rec.mutationTestResult.killedMutants}/{rec.mutationTestResult.totalMutants}体) • 構文・単体テスト全件通過済み
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleApproveRecord(rec.id)}
+                    disabled={isApprovingRecordId === rec.id}
+                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    <CheckCircle2 className={`w-4 h-4 ${isApprovingRecordId === rec.id ? 'animate-spin' : ''}`} />
+                    {isApprovingRecordId === rec.id ? '配備中...' : '承認して本番配備'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

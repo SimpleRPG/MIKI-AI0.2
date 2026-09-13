@@ -66,6 +66,24 @@ export class SelfImprovementExperimentService {
     } else if (action === 'OBSERVE_FAILURE' && failureImprovement > 0) {
       verdict = 'ADOPT';
       reason = `失敗率が ${(failureImprovement * 100).toFixed(1)}pt 改善したため、観測結果を採用します。`;
+    } else if (action === 'SELF_CODE_IMPROVEMENT') {
+      // 自己コード改善の前後評価 (指示書 1.2)
+      // 構文・単体テスト失敗やロールバックがある場合は厳格に REJECT
+      const isFailedOutcome = outcome?.includes('error') || outcome?.includes('failed') || outcome?.includes('syntaxError') || outcome === 'REJECTED';
+      const isRollback = outcome?.includes('rollback');
+      if (isFailedOutcome || isRollback) {
+        verdict = 'REJECT';
+        reason = `自己コード改善において構文/単体テストの不合格またはロールバックが発生したため却下 (REJECT) と判定しました: ${outcome || 'validation failed'}`;
+      } else if (scoreDelta > 0 || failureImprovement > 0 || gapImprovement > 0 || stableImprovement > 0) {
+        verdict = 'ADOPT';
+        reason = `実運用指標が向上 (総合差分:+${scoreDelta}pt, 失敗率改善:${(failureImprovement * 100).toFixed(1)}pt, Gap解消:${gapImprovement}件) したため正式採用 (ADOPT) と判定しました。`;
+      } else if (scoreDelta === 0) {
+        verdict = 'HOLD';
+        reason = `指標に有意な変動が観測されなかったため保留 (HOLD) 判定としました。${outcome ? ` (実行状態=${outcome})` : ''}`;
+      } else {
+        verdict = 'REJECT';
+        reason = `実運用指標の退行 (総合差分:${scoreDelta}pt) が観測されたため却下 (REJECT) と判定しました。`;
+      }
     } else if (action === 'IDLE') {
       verdict = 'HOLD';
       reason = '改善対象がないため変更を加えず待機します。';
