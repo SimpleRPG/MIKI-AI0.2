@@ -1,6 +1,6 @@
 /**
  * 証拠付き自己改善ループ (Evidence-Based Self-Improvement Loop) 型定義
- * MIKI-AI 非LLM化 作業指示書 v23 に準拠
+ * MIKI-AI 非LLM化 作業指示書 v24 に準拠
  */
 
 // 1. ChangeSetID: Experiment・Snapshot・Patch・Test・Canary・Rollback・Git Commitを一意に追跡

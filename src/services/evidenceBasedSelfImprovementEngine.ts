@@ -29,6 +29,7 @@ export class EvidenceBasedSelfImprovementEngine {
   private isExecutionLocked = false;
   private currentLockHolder: string | null = null;
   private lockAcquiredAt = 0;
+  private lockDepth = 0;
   private readonly lockTimeoutMs = 120_000; // 2分で自動解放 (安全策)
 
   // 永続化ストレージキー
@@ -62,6 +63,16 @@ export class EvidenceBasedSelfImprovementEngine {
   public acquireExecutionLock(holderName: string): { acquired: boolean; reason?: string } {
     const now = Date.now();
     if (this.isExecutionLocked) {
+      // 再入可能 (Re-entrant) ロックのサポート: 同一ホルダーまたは CanonicalController からの委譲実行
+      const isReentrant =
+        this.currentLockHolder === holderName ||
+        (this.currentLockHolder === 'CanonicalController' && holderName === 'AutonomousContinuousEvolutionService');
+
+      if (isReentrant) {
+        this.lockDepth++;
+        return { acquired: true };
+      }
+
       if (now - this.lockAcquiredAt > this.lockTimeoutMs) {
         systemLogger.warn(
           'SELF_IMPROVEMENT',
@@ -79,16 +90,26 @@ export class EvidenceBasedSelfImprovementEngine {
     this.isExecutionLocked = true;
     this.currentLockHolder = holderName;
     this.lockAcquiredAt = now;
+    this.lockDepth = 1;
     systemLogger.info('SELF_IMPROVEMENT', `🔒 [Canonical Lock Acquired] ${holderName} が自己改善の排他権を取得しました`);
     return { acquired: true };
   }
 
   public releaseExecutionLock(holderName: string): void {
-    if (this.currentLockHolder === holderName || holderName === 'force' || holderName === 'timeout') {
-      this.isExecutionLocked = false;
-      this.currentLockHolder = null;
-      this.lockAcquiredAt = 0;
-      systemLogger.info('SELF_IMPROVEMENT', `🔓 [Canonical Lock Released] 排他権が解放されました`);
+    if (
+      this.currentLockHolder === holderName ||
+      holderName === 'force' ||
+      holderName === 'timeout' ||
+      (this.currentLockHolder === 'CanonicalController' && holderName === 'AutonomousContinuousEvolutionService')
+    ) {
+      this.lockDepth--;
+      if (this.lockDepth <= 0 || holderName === 'force' || holderName === 'timeout') {
+        this.isExecutionLocked = false;
+        this.currentLockHolder = null;
+        this.lockAcquiredAt = 0;
+        this.lockDepth = 0;
+        systemLogger.info('SELF_IMPROVEMENT', `🔓 [Canonical Lock Released] 排他権が解放されました`);
+      }
     }
   }
 
@@ -167,10 +188,15 @@ export class EvidenceBasedSelfImprovementEngine {
     let verdict: RequirementContract['verdict'] = 'UNTESTED';
     let verdictReason = '';
 
+    const isAdoptedOrVerified =
+      evidence.finalVerdict === 'ADOPT' ||
+      evidence.adoptionState === 'ADOPTED' ||
+      evidence.adoptionState === 'VERIFIED';
+
     if (forbiddenViolated) {
       verdict = 'VIOLATED';
       verdictReason = '禁止事項 (Forbidden Behavior) への抵触が検知されました';
-    } else if (isTestPassed && isGeneralizationPassed && evidence.finalVerdict === 'ADOPT') {
+    } else if (isTestPassed && isGeneralizationPassed && isAdoptedOrVerified) {
       verdict = 'SATISFIED';
       verdictReason = '全受入基準・必須挙動・反例ゲート・汎化ゲートを満たしました (テスト通過≠要求充足を証明済み)';
     } else if (isTestPassed) {
@@ -508,7 +534,11 @@ export class EvidenceBasedSelfImprovementEngine {
     category: NoChangeReasonCategory;
     rationale: string;
     target: string;
+    targetFile?: string;
+    reason?: string;
+    riskComparison?: string;
     consideredAlternatives: string[];
+    evaluatedMetrics?: Record<string, any>;
   }): NoChangeDecision {
     const decision: NoChangeDecision = {
       ...params,

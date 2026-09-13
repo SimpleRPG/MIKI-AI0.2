@@ -106,7 +106,7 @@ export class SelfImprovementControllerService {
     const before = selfImprovementExperimentService.snapshot();
 
     try {
-      // ── 指示書 v23 第2章 & ターゲット選定 ──
+      // ── 指示書 v24 第2章 & ターゲット選定 ──
       // 1. 作業指示 (Work Directive) の最優先評価
       const activeDirective = workDirectiveIngestionService.getPendingDirective();
       if (activeDirective) {
@@ -116,26 +116,41 @@ export class SelfImprovementControllerService {
         );
         workDirectiveIngestionService.markStatus(activeDirective.directiveId, 'IN_PROGRESS');
 
+        const candidateFile = activeDirective.targets.find((t) => /\.(ts|tsx)$/.test(t)) || 'src/services/evidenceBasedSelfImprovementEngine.ts';
         const decision: ImprovementDecision = {
           action: 'EXECUTE_DIRECTIVE',
           reason: `受領した作業指示「${activeDirective.title}」を最優先履行します。(要求: ${activeDirective.requirements.length}項目)`,
           directiveId: activeDirective.directiveId,
-          targetFile: activeDirective.targets[0],
+          targetFile: candidateFile,
         };
+
+        // 要求契約 (Requirement Contracts) を事前登録
+        const contracts = workDirectiveIngestionService.generateRequirementContracts(activeDirective.directiveId);
+        for (const c of contracts) {
+          evidenceBasedSelfImprovementEngine.registerContract(c);
+        }
 
         // 自律進化パイプラインを指示書ターゲットで実行
         try {
           const evoRecord = await autonomousContinuousEvolutionService.runFullAutonomousCycle({
             prompt: `作業指示履行: ${activeDirective.title} - ${activeDirective.goal}`,
-            targetFile: activeDirective.targets[0] || 'src/services/evidenceBasedSelfImprovementEngine.ts',
+            targetFile: candidateFile,
             reason: activeDirective.goal,
           });
+
+          // 契約と証拠の事後照合判定
+          const evidence = evidenceBasedSelfImprovementEngine.getEvidence(evoRecord.implementationEvidenceId || '');
+          if (evidence) {
+            for (const c of contracts) {
+              evidenceBasedSelfImprovementEngine.evaluateRequirementContract(c, evidence);
+            }
+          }
 
           workDirectiveIngestionService.markStatus(
             activeDirective.directiveId,
             evoRecord.applied ? 'COMPLETED' : 'PENDING',
             evoRecord.changeSetId,
-            `配備結果: ${evoRecord.applied ? '成功' : '承認待ちまたは保留'} (スコア: ${evoRecord.newScore}点)`
+            `配備結果: ${evoRecord.applied ? '合格・採択完了' : '承認待ちまたは保留'} (スコア: ${evoRecord.newScore}点, Adoption: ${evoRecord.adoptionState}, Git: ${evoRecord.deploymentState})`
           );
 
           return this.recordMeasured(

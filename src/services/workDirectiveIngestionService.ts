@@ -193,7 +193,9 @@ export class WorkDirectiveIngestionService {
       targets: Array.from(targets),
       requirements: requirements.length > 0 ? requirements : ['要求仕様の全項目実装と検証'],
       forbiddenBehaviors: forbiddenBehaviors.length > 0 ? forbiddenBehaviors : ['仕様に反する実装の禁止'],
+      forbiddenItems: forbiddenBehaviors.length > 0 ? forbiddenBehaviors : ['仕様に反する実装の禁止'],
       completionCriteria: completionCriteria.length > 0 ? completionCriteria : ['全テスト合格とエビデンス記録'],
+      acceptanceCriteria: completionCriteria.length > 0 ? completionCriteria : ['全テスト合格とエビデンス記録'],
       parsedAt: Date.now(),
       priority: 'CRITICAL',
       status: 'PENDING',
@@ -256,10 +258,17 @@ export class WorkDirectiveIngestionService {
     return this.ingestDirective(rawText, customTitle);
   }
 
-  public ingestV23Directive(): StructuredDirective {
-    const v23Text = `# MIKI-AI 非LLM化 作業指示書 v23
+  public ingestV24Directive(): StructuredDirective {
+    const v24Text = `# MIKI-AI 非LLM化 作業指示書 v24
 ## 目的
-証拠付き自己改善ループ (Evidence-Based Self-Improvement Loop) の徹底実装。テスト通過のみで改善と判定せず、反例探索・汎化・因果性・停止ポリシー・実利用フィードバックの14要件を完全遵守する。
+証拠付き自己改善ループ (Evidence-Based Self-Improvement Loop) の徹底実装。テスト通過のみで改善と判定せず、反例探索・汎化・因果性・停止ポリシー・実利用フィードバックの14要件を完全遵守する。また、401(認証エラー)時の安全なフォールバック処理を徹底する。
+
+## 対象
+- src/services/evidenceBasedSelfImprovementEngine.ts
+- src/services/workDirectiveIngestionService.ts
+- src/services/autonomousContinuousEvolutionService.ts
+- src/types/evidenceSelfImprovementTypes.ts
+- src/services/autonomousSearchService.ts
 
 ## 実装要求項目
 1. ChangeSetIDの一意追跡 (Experiment, Snapshot, Patch, Test, Canary, Rollback, Git Commit)
@@ -287,7 +296,11 @@ export class WorkDirectiveIngestionService {
 - 全14項目の自己改善パイプラインが正常に稼働し、ImplementationEvidenceが記録されること
 - 指示書取り込みUIから指示書を読み込み、RequirementContractとして自動反映できること`;
 
-    return this.ingestDirective(v23Text, 'MIKI-AI 非LLM化 作業指示書 v23 (公式14要件)');
+    return this.ingestDirective(v24Text, 'MIKI-AI 非LLM化 作業指示書 v24 (公式14要件)');
+  }
+
+  public ingestV23Directive(): StructuredDirective {
+    return this.ingestV24Directive();
   }
 
   public getPendingDirective(): StructuredDirective | undefined {

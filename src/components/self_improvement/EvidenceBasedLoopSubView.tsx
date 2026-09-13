@@ -80,9 +80,9 @@ export const EvidenceBasedLoopSubView: React.FC = () => {
     refreshState();
   };
 
-  const handleLoadV23Preset = () => {
-    const v23Directive = workDirectiveIngestionService.ingestV23Directive();
-    setSelectedDirective(v23Directive);
+  const handleLoadV24Preset = () => {
+    const v24Directive = workDirectiveIngestionService.ingestV24Directive();
+    setSelectedDirective(v24Directive);
     refreshState();
   };
 
@@ -251,10 +251,10 @@ export const EvidenceBasedLoopSubView: React.FC = () => {
                   作業指示書・方針テキストの取り込み
                 </h3>
                 <button
-                  onClick={handleLoadV23Preset}
+                  onClick={handleLoadV24Preset}
                   className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-medium transition border border-indigo-200"
                 >
-                  指示書(v23)を即時取込
+                  指示書(v24)を即時取込
                 </button>
               </div>
               <p className="text-xs text-slate-500">
@@ -312,8 +312,8 @@ export const EvidenceBasedLoopSubView: React.FC = () => {
                     <p className="text-slate-500 line-clamp-1">{dir.goal}</p>
                     <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
                       <span>要求: {dir.requirements.length}項目</span>
-                      <span>禁止: {dir.forbiddenItems.length}項目</span>
-                      <span>完了条件: {dir.acceptanceCriteria.length}項目</span>
+                      <span>禁止: {(dir.forbiddenItems || dir.forbiddenBehaviors || []).length}項目</span>
+                      <span>完了条件: {(dir.acceptanceCriteria || dir.completionCriteria || []).length}項目</span>
                     </div>
                   </div>
                 ))}
@@ -412,10 +412,10 @@ export const EvidenceBasedLoopSubView: React.FC = () => {
                 <div className="space-y-1">
                   <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                    4. 禁止事項 (Forbidden Behaviors - {selectedDirective.forbiddenItems.length}項目)
+                    4. 禁止事項 (Forbidden Behaviors - {(selectedDirective.forbiddenItems || selectedDirective.forbiddenBehaviors || []).length}項目)
                   </h4>
                   <ul className="space-y-1.5">
-                    {selectedDirective.forbiddenItems.map((forb, idx) => (
+                    {(selectedDirective.forbiddenItems || selectedDirective.forbiddenBehaviors || []).map((forb, idx) => (
                       <li
                         key={idx}
                         className="text-xs text-rose-800 bg-rose-50/50 p-2.5 rounded-xl border border-rose-100 flex items-start gap-2 font-medium"
@@ -433,10 +433,10 @@ export const EvidenceBasedLoopSubView: React.FC = () => {
                 <div className="space-y-1">
                   <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                     <Scale className="w-3.5 h-3.5 text-purple-600" />
-                    5. 完了条件 (Acceptance Criteria - {selectedDirective.acceptanceCriteria.length}項目)
+                    5. 完了条件 (Acceptance Criteria - {(selectedDirective.acceptanceCriteria || selectedDirective.completionCriteria || []).length}項目)
                   </h4>
                   <ul className="space-y-1.5">
-                    {selectedDirective.acceptanceCriteria.map((acc, idx) => (
+                    {(selectedDirective.acceptanceCriteria || selectedDirective.completionCriteria || []).map((acc, idx) => (
                       <li
                         key={idx}
                         className="text-xs text-purple-800 bg-purple-50/40 p-2.5 rounded-xl border border-purple-100 flex items-start gap-2"
@@ -459,7 +459,7 @@ export const EvidenceBasedLoopSubView: React.FC = () => {
             ) : (
               <div className="h-64 flex flex-col items-center justify-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-slate-400 text-xs p-6 text-center">
                 <FileText className="w-8 h-8 mb-2 text-slate-300" />
-                左側のリストから指示書を選択するか、「指示書(v23)を即時取込」ボタンを押してください。
+                左側のリストから指示書を選択するか、「指示書(v24)を即時取込」ボタンを押してください。
               </div>
             )}
           </div>
