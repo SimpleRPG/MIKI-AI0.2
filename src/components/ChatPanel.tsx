@@ -109,6 +109,7 @@ import { UnitTestStudioModal } from './chat/UnitTestStudioModal';
 import { DependencyGraphModal } from './chat/DependencyGraphModal';
 import { SnapshotTimeMachineModal } from './chat/SnapshotTimeMachineModal';
 import { AutonomousSelfImprovementModal } from './chat/AutonomousSelfImprovementModal';
+import { AutonomousDevStudioModal } from './chat/AutonomousDevStudioModal';
 import { AutonomousEvolutionCard } from './chat/AutonomousEvolutionCard';
 import JSZip from 'jszip';
 
@@ -242,6 +243,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isTimeMachineOpen, setIsTimeMachineOpen] = useState(false);
   const [isSelfImplementLauncherOpen, setIsSelfImplementLauncherOpen] = useState(false);
   const [isAutonomousImprovementModalOpen, setIsAutonomousImprovementModalOpen] = useState(false);
+  const [isAutonomousDevStudioOpen, setIsAutonomousDevStudioOpen] = useState(false);
   const [autonomousVerifications, setAutonomousVerifications] = useState<Record<string, AutonomousVerificationData>>({});
   const [expandedExternalDiagMsgId, setExpandedExternalDiagMsgId] = useState<string | null>(null);
 
@@ -267,6 +269,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       }
     } else if (insight.actionType === 'OPEN_VITALS' || insight.actionType === 'OPEN_EVOLUTION') {
       setIsAutonomousImprovementModalOpen(true);
+    } else if (insight.actionType === 'OPEN_DEV_STUDIO') {
+      setIsAutonomousDevStudioOpen(true);
     }
   };
 
@@ -1056,11 +1060,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           {/* みき全方位認知ヘルス＆内省日誌ボタン */}
           <button
             onClick={() => setIsAutonomousImprovementModalOpen(true)}
-            className="px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all bg-slate-900 hover:bg-slate-800/90 text-purple-300 hover:text-white border-purple-900/40 hover:border-purple-700 shrink-0 shadow-xs"
+            className="px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all bg-slate-900 hover:bg-slate-800/90 text-purple-300 hover:text-white border-purple-900/40 hover:border-purple-700 shrink-0 shadow-xs cursor-pointer"
             title="みきの全方位認知ヘルスレーダー（健康度スコア）＆内省日誌を開く"
           >
             <HeartPulse className="w-3 h-3 text-pink-400" />
             <span>認知ヘルス</span>
+          </button>
+
+          {/* みき自律コード開発工房ボタン */}
+          <button
+            id="btn-open-dev-studio-header"
+            onClick={() => setIsAutonomousDevStudioOpen(true)}
+            className="px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all bg-purple-950/40 hover:bg-purple-900/60 text-cyan-300 hover:text-white border-purple-800/50 hover:border-cyan-500/50 shrink-0 shadow-xs cursor-pointer"
+            title="みきの自律コード開発工房（仕様策定・TDDテスト・実装・サンドボックス即時実行・ツール配備）を開く"
+          >
+            <Code2 className="w-3 h-3 text-cyan-400" />
+            <span>自律コード開発</span>
           </button>
         </div>
         )}
@@ -3844,6 +3859,12 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
             },
           ]);
         }}
+      />
+
+      {/* 🛠️ みき自律コード開発工房モーダル */}
+      <AutonomousDevStudioModal
+        isOpen={isAutonomousDevStudioOpen}
+        onClose={() => setIsAutonomousDevStudioOpen(false)}
       />
     </div>
   );

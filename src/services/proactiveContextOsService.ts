@@ -29,7 +29,7 @@ export interface ProactiveInsightItem {
   title: string;
   description: string;
   suggestedPrompt?: string;
-  actionType?: 'INSERT_PROMPT' | 'OPEN_VITALS' | 'RUN_DEFRAG' | 'OPEN_EVOLUTION';
+  actionType?: 'INSERT_PROMPT' | 'OPEN_VITALS' | 'RUN_DEFRAG' | 'OPEN_EVOLUTION' | 'OPEN_DEV_STUDIO';
 }
 
 export interface PersonaAnchorState {
@@ -275,6 +275,16 @@ export class ProactiveContextOsService {
       title: 'みきの認知ヘルス確認',
       description: 'バイタル健全度や6大防壁の堅持状況をいつでもチェック＆自律修復できるよ！',
       actionType: 'OPEN_VITALS',
+    });
+
+    // 4. 自律コード開発工房インサイト
+    items.push({
+      id: 'code_forge_studio',
+      type: 'SHORTCUT',
+      emoji: '🛠️',
+      title: '自律コード開発工房',
+      description: 'みきが新しい動的ツールやVBA・TS関数を仕様策定からTDD・即時実行まで自走開発するよ！',
+      actionType: 'OPEN_DEV_STUDIO',
     });
 
     this.cachedInsights = items;

@@ -3636,3 +3636,103 @@ export interface CloudAiEscalationRequest {
 
 export type Message = ChatMessage;
 
+/**
+ * 設計思想 第171/172章: みき自律コード開発工房＆自己修復スタジオ型定義
+ */
+export type AutonomousDevCategory =
+  | 'DYNAMIC_TOOL'
+  | 'VBA_MACRO'
+  | 'UTILITY_ALGORITHM'
+  | 'DATA_PROCESSOR'
+  | 'SYSTEM_EXTENSION'
+  | 'TYPESCRIPT_HELPER'
+  | 'ALGORITHM';
+
+export type AutonomousDevLanguage = 'typescript' | 'vba' | 'javascript';
+
+export type AutonomousDevStage =
+  | 'SPECCING'
+  | 'TDD_GENERATING'
+  | 'CODING'
+  | 'COUNCIL_REVIEW'
+  | 'SANDBOX_VERIFIED'
+  | 'DEPLOYED';
+
+export interface AutonomousDevSpecInput {
+  name: string;
+  type: string;
+  description: string;
+  sampleValue?: any;
+}
+
+export interface AutonomousDevSpec {
+  featureName: string;
+  summary: string;
+  targetProblem: string;
+  inputs: AutonomousDevSpecInput[];
+  outputType: string;
+  invariants: string[];
+}
+
+export interface AutonomousDevTestCase {
+  id: string;
+  title: string;
+  testType: 'NORMAL' | 'BOUNDARY' | 'ERROR_CASE';
+  inputMock: any;
+  expectedResultSnippet: string;
+  passed: boolean;
+  executionMs: number;
+}
+
+export interface CodeHealthFinding {
+  severity: 'CRITICAL' | 'WARNING' | 'OPTIMIZATION';
+  category: 'TYPE_LOOSENESS' | 'EXCEPTION_SAFETY' | 'PERFORMANCE' | 'CLEAN_ARCHITECTURE';
+  message: string;
+  fixProposal: string;
+}
+
+export interface CodeHealingReport {
+  id: string;
+  language: AutonomousDevLanguage;
+  originalCode: string;
+  healedCode: string;
+  findings: CodeHealthFinding[];
+  healthScoreBefore: number;
+  healthScoreAfter: number;
+  createdAt: number;
+}
+
+export interface AutonomousDevProject {
+  id: string;
+  title: string;
+  category: AutonomousDevCategory;
+  language: AutonomousDevLanguage;
+  stage: AutonomousDevStage;
+  progress: number;
+  spec: AutonomousDevSpec;
+  testCases: AutonomousDevTestCase[];
+  implementationCode: string;
+  testSuiteCode: string;
+  reviewResult?: {
+    overallScore: number;
+    passed?: boolean;
+    secOpsScore: number;
+    secOpsCritique: string;
+    cleanCodeScore: number;
+    cleanCodeCritique: string;
+    qaScore: number;
+    qaCritique: string;
+  };
+  sandboxExecution?: {
+    executedAt: number;
+    inputUsed: any;
+    output: any;
+    isSuccess: boolean;
+    elapsedMs: number;
+    consoleLogs: string[];
+  };
+  deployedToolId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
