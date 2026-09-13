@@ -17,31 +17,42 @@ import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
 import { getJinaApiKeyItem } from './api';
 
 /**
- * Jina Reader検索レスポンス (Markdown / JSON) のパーサー
+ * Jina Reader検索レスポンス (JSON固定・Markdownフォールバック) のパーサー
  * Jina利用規約: https://jina.ai/legal/terms-of-service/
+ * 公式仕様: url, title, content, timestamp (publishedTime)
  */
 export function parseJinaSearchResults(rawText: string, maxResults = 4): WebSearchResultItem[] {
   if (!rawText || !rawText.trim()) return [];
 
-  // 1. JSON形式のレスポンスのパース判定
+  // 1. JSON形式のレスポンスのパース (公式仕様: Accept: application/json)
   if (rawText.trim().startsWith('{')) {
     try {
       const json = JSON.parse(rawText);
-      const dataItems = Array.isArray(json.data) ? json.data : (json.data?.results || []);
+      const dataItems = Array.isArray(json.data)
+        ? json.data
+        : (json.data?.results || (json.data && typeof json.data === 'object' && json.data.title ? [json.data] : []));
       if (Array.isArray(dataItems) && dataItems.length > 0) {
+        if (dataItems[0]) {
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            `[Jina Reader] レスポンス1件目キー: ${Object.keys(dataItems[0]).join(', ')}`
+          );
+        }
         return dataItems.slice(0, maxResults).map((d: any) => ({
           title: d.title || 'Jina Search Result',
-          snippet: (d.description || d.content || '').slice(0, 500).replace(/[\r\n]+/g, ' ').trim(),
+          snippet: (d.content || d.description || '').slice(0, 500).replace(/[\r\n]+/g, ' ').trim(),
           url: d.url || '',
           source: 'Jina Reader (Web)',
+          publishedDate: d.publishedTime || d.timestamp || d.publishedDate,
         }));
       }
-    } catch {
+    } catch (parseErr) {
+      console.warn('[AutonomousSearch] Jina JSON parse failed, falling back to markdown:', parseErr);
       // JSONパースに失敗した場合はMarkdownパースへフォールバック
     }
   }
 
-  // 2. Markdown形式のパース
+  // 2. Markdown形式のパース (JSONパース失敗時の安全フォールバック)
   // Jinaのレスポンスは "Title: " や "[1] Title: ", "### Title: " で始まるブロックで区切られる
   const items: WebSearchResultItem[] = [];
   const blocks = rawText.split(/(?=(?:^|\n)(?:\[\d+\]\s*)?Title:\s*)/);
@@ -395,7 +406,7 @@ export class AutonomousSearchService {
     const runJinaReader = async (): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null> => {
       try {
         const jinaHeaders: Record<string, string> = {
-          Accept: 'text/plain',
+          Accept: 'application/json',
         };
         const jinaKey = getJinaApiKeyItem();
         if (jinaKey) {
@@ -411,6 +422,15 @@ export class AutonomousSearchService {
           headers: jinaHeaders,
           signal: AbortSignal.timeout(8000),
         });
+
+        // 作業指示書 v24 第1.3節: 401(認証エラー)の専用処理
+        if (jinaRes.status === 401) {
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            'ℹ️ [Jina Reader] APIキー未登録または無効のためスキップしました。DuckDuckGoへフォールバックします。'
+          );
+          return null; // エラーではなく「未設定」として扱い、次のプロバイダへ静かに進む
+        }
 
         if (jinaRes.ok) {
           const jinaText = await jinaRes.text();
