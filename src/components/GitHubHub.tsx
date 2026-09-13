@@ -52,6 +52,13 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
       storageService.setItem('miki_api_base_url', val.trim());
     } catch (e) {}
   };
+  const [searxngBaseUrl, setSearxngBaseUrlState] = useState(() => storageService.getItem('miki_searxng_base_url') || '');
+  const setSearxngBaseUrl = (val: string) => {
+    setSearxngBaseUrlState(val);
+    try {
+      storageService.setItem('miki_searxng_base_url', val.trim());
+    } catch (e) {}
+  };
   const handleSaveToken = (val: string) => {
     setToken(val);
     try {
@@ -251,6 +258,22 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
               />
               <p className="text-[10px] text-slate-500 mt-1">
                 GoogleAIStudioのプレビューやWeb版ではこの欄は空のままでOKです。APK版で「Unexpected token &lt;」エラーが出る場合は、Termuxで`npm run dev`を起動した上でこのURLを設定してください。
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-slate-400 mb-1">
+                SearXNG検索プロキシURL (Termux等で自己ホストする場合のみ入力。空欄ならローカル検索プロキシなしで従来の外部検索のみ使用)
+              </label>
+              <input
+                type="text"
+                value={searxngBaseUrl}
+                onChange={(e) => setSearxngBaseUrl(e.target.value)}
+                placeholder="例: http://127.0.0.1:8888 (空欄時は従来の外部検索のみ使用)"
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 font-mono"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Termux環境等でSearXNG（自己ホスト型メタ検索エンジン）を動かしている場合に設定します。未起動時や空欄の場合は従来の外部検索（Wikipedia / Jina / DuckDuckGo）へ自動で静かにフォールバックします。
               </p>
             </div>
 

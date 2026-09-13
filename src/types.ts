@@ -1835,6 +1835,7 @@ export interface ResponseSkeleton {
     url?: string;
     extractedAt?: number;
     fragment?: string;
+    provider?: string;
   };
 }
 

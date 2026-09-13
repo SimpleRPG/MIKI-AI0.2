@@ -334,6 +334,7 @@ class AnswerPlanService {
       url?: string;
       extractedAt?: number;
       fragment?: string;
+      provider?: string;
     };
     responsePlanOverride?: string[];
     triggerKeywordsOverride?: string[];
@@ -607,6 +608,7 @@ class AnswerPlanService {
         url: params.sourceUrl,
         extractedAt: params.extractedAt,
         fragment: params.originalFragment,
+        provider: params.provider,
       },
       responsePlanOverride: params.responseSteps,
       triggerKeywordsOverride: params.sampleTriggerWords,

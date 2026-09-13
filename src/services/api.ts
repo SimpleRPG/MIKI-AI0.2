@@ -218,6 +218,39 @@ export function removeGeminiApiKey(idOrKey: string): SavedGeminiKeyItem[] {
 }
 
 const JINA_API_KEY_STORAGE_KEY = 'miki_custom_jina_api_key';
+export const SEARXNG_BASE_URL_STORAGE_KEY = 'miki_searxng_base_url';
+export const DEFAULT_SEARXNG_BASE_URL = 'http://127.0.0.1:8888';
+
+/**
+ * SearXNG検索プロキシURLの取得（端末内ローカルストレージ保管・任意）
+ * 未設定時は空文字列、または fallbackToDefault=true 時に 'http://127.0.0.1:8888'
+ */
+export function getSearxngBaseUrlItem(fallbackToDefault = false): string {
+  try {
+    const raw = storageService.getItem(SEARXNG_BASE_URL_STORAGE_KEY);
+    if (raw && raw.trim()) return raw.trim();
+    return fallbackToDefault ? DEFAULT_SEARXNG_BASE_URL : '';
+  } catch (e) {
+    console.warn('Error reading miki_searxng_base_url:', e);
+    return fallbackToDefault ? DEFAULT_SEARXNG_BASE_URL : '';
+  }
+}
+
+/**
+ * SearXNG検索プロキシURLの設定・保存（端末内ローカルストレージ保管）
+ */
+export function setSearxngBaseUrlItem(url: string): void {
+  const trimmed = (url || '').trim();
+  try {
+    if (!trimmed) {
+      storageService.removeItem(SEARXNG_BASE_URL_STORAGE_KEY);
+    } else {
+      storageService.setItem(SEARXNG_BASE_URL_STORAGE_KEY, trimmed);
+    }
+  } catch (e) {
+    console.warn('Error saving miki_searxng_base_url:', e);
+  }
+}
 
 /**
  * Jina Reader APIキーの取得（端末内ローカルストレージ保管・任意）

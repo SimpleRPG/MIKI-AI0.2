@@ -33,12 +33,16 @@ import {
   bannedTopicsConfigService,
   BannedTopicsConfig,
 } from '../../services/bannedTopicsConfigService';
-import { getJinaApiKeyItem, setJinaApiKeyItem } from '../../services/api';
+import { getJinaApiKeyItem, setJinaApiKeyItem, getSearxngBaseUrlItem, setSearxngBaseUrlItem } from '../../services/api';
 
 export const AutonomousSearchTab: React.FC = () => {
   const [config, setConfig] = useState<AutonomousSearchConfig>(() => autonomousSearchService.getConfig());
   const [stats, setStats] = useState<AutonomousSearchStats>(() => autonomousSearchService.getStats());
   const [records, setRecords] = useState<AutonomousSearchLearningRecord[]>(() => autonomousSearchService.getRecentRecords(20));
+
+  // SearXNG Base URL 設定 (自己ホスト型検索プロキシ)
+  const [searxngUrl, setSearxngUrl] = useState<string>(() => getSearxngBaseUrlItem());
+  const [searxngNotice, setSearxngNotice] = useState<string | null>(null);
 
   // Jina APIキー設定 (作業指示書 v23 第1.3節)
   const [jinaApiKey, setJinaApiKey] = useState<string>(() => getJinaApiKeyItem());
@@ -47,7 +51,7 @@ export const AutonomousSearchTab: React.FC = () => {
 
   // テスト検索用
   const [testQuery, setTestQuery] = useState('React 19 Server Actions 仕様');
-  const [preferredProvider, setPreferredProvider] = useState<'auto' | 'wikipedia' | 'jina' | 'duckduckgo'>('auto');
+  const [preferredProvider, setPreferredProvider] = useState<'auto' | 'searxng' | 'wikipedia' | 'jina' | 'duckduckgo'>('auto');
   const [isSearching, setIsSearching] = useState(false);
   const [searchOutput, setSearchOutput] = useState<{
     results: any[];
@@ -105,6 +109,19 @@ export const AutonomousSearchTab: React.FC = () => {
     setConfig(updated);
   };
 
+  const handleSaveSearxngUrl = () => {
+    setSearxngBaseUrlItem(searxngUrl);
+    setSearxngNotice('SearXNG検索プロキシURLを端末内に保存しました。');
+    setTimeout(() => setSearxngNotice(null), 3000);
+  };
+
+  const handleClearSearxngUrl = () => {
+    setSearxngUrl('');
+    setSearxngBaseUrlItem('');
+    setSearxngNotice('SearXNG検索プロキシURLを解除しました（空欄設定）。');
+    setTimeout(() => setSearxngNotice(null), 3000);
+  };
+
   const handleSaveJinaKey = () => {
     setJinaApiKeyItem(jinaApiKey);
     setJinaKeyNotice('Jina Reader APIキーを端末内に保存しました。');
@@ -130,6 +147,7 @@ export const AutonomousSearchTab: React.FC = () => {
       });
       const record = autonomousSearchService.learnFromSearch(testQuery.trim(), res.results, res.summary, {
         triggerType: 'in_conversation',
+        provider: res.provider,
       });
       setSearchOutput({
         results: res.results,
@@ -286,6 +304,66 @@ export const AutonomousSearchTab: React.FC = () => {
             />
           </label>
         </div>
+      </div>
+
+      {/* SearXNG (Termuxローカル) 検索プロキシ設定 (任意) */}
+      <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Globe className="w-3.5 h-3.5 text-purple-400" />
+            <span>SearXNG 検索プロキシURL (Termuxローカル・任意)</span>
+          </h4>
+          <span
+            className={`text-[10.5px] px-2 py-0.5 rounded-full font-mono border ${
+              searxngUrl
+                ? 'bg-purple-950/70 text-purple-300 border-purple-600/50'
+                : 'bg-slate-900 text-slate-400 border-slate-700'
+            }`}
+          >
+            {searxngUrl ? `接続先: ${searxngUrl}` : '空欄 (未起動時は従来の外部検索のみ使用)'}
+          </span>
+        </div>
+
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          Termux等で自己ホスト型SearXNG（メタ検索エンジンJSON API）を動かしている場合にURLを設定します。未起動時や空欄の場合は従来の外部検索（Wikipedia / Jina / DuckDuckGo）へ自動で静かにフォールバックします。
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={searxngUrl}
+            onChange={(e) => setSearxngUrl(e.target.value)}
+            placeholder="例: http://127.0.0.1:8888 (空欄なら従来の外部検索のみ使用)"
+            className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500 font-mono"
+          />
+
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={handleSaveSearxngUrl}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>保存</span>
+            </button>
+            {searxngUrl && (
+              <button
+                onClick={handleClearSearxngUrl}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl flex items-center gap-1 transition-colors"
+                title="URLをクリア"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>クリア</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {searxngNotice && (
+          <div className="text-[11px] text-purple-400 bg-purple-950/40 border border-purple-800/50 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>{searxngNotice}</span>
+          </div>
+        )}
       </div>
 
       {/* 作業指示書 v23 第1.3節: Jina Reader APIキー設定 (任意) */}
@@ -456,9 +534,21 @@ export const AutonomousSearchTab: React.FC = () => {
                     ? 'bg-sky-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
-                title="自動パイプライン: Wikipedia → Jina Reader → DuckDuckGo"
+                title="自動パイプライン: SearXNG → Wikipedia → Jina Reader → DuckDuckGo"
               >
                 自動
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreferredProvider('searxng')}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                  preferredProvider === 'searxng'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="SearXNG (Termuxローカル) 直接優先"
+              >
+                SearXNG
               </button>
               <button
                 type="button"
@@ -527,7 +617,9 @@ export const AutonomousSearchTab: React.FC = () => {
                 <span className="text-[11px] text-slate-400">プロバイダー:</span>
                 <span
                   className={`text-[10.5px] px-2 py-0.5 rounded font-mono font-bold border ${
-                    searchOutput.provider === 'jina_direct'
+                    searchOutput.provider === 'searxng'
+                      ? 'bg-purple-950 text-purple-300 border-purple-700'
+                      : searchOutput.provider === 'jina_direct'
                       ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
                       : searchOutput.provider === 'duckduckgo_direct'
                       ? 'bg-amber-950 text-amber-300 border-amber-700'
@@ -536,7 +628,9 @@ export const AutonomousSearchTab: React.FC = () => {
                       : 'bg-slate-800 text-slate-300 border-slate-700'
                   }`}
                 >
-                  {searchOutput.provider === 'jina_direct'
+                  {searchOutput.provider === 'searxng'
+                    ? '🔍 SearXNG (searxng)'
+                    : searchOutput.provider === 'jina_direct'
                     ? '🌐 Jina Reader (jina_direct)'
                     : searchOutput.provider === 'duckduckgo_direct'
                     ? '🦆 DuckDuckGo Instant Answer (duckduckgo_direct)'

@@ -313,7 +313,7 @@ export class AutonomousSearchService {
     options?: {
       maxResults?: number;
       bypassCache?: boolean;
-      preferredProvider?: 'auto' | 'wikipedia' | 'jina' | 'duckduckgo';
+      preferredProvider?: 'auto' | 'searxng' | 'wikipedia' | 'jina' | 'duckduckgo';
     }
   ): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string }> {
     const cleanQuery = query.trim();
@@ -369,9 +369,48 @@ export class AutonomousSearchService {
       return mockOutput;
     }
 
-    // 2. 検索プロバイダ実行パイプライン (作業指示書 v23 第1.1節)
-    // 順序: Wikipedia直接fetch -> Jina Reader検索 (s.jina.ai) -> DuckDuckGo Instant Answer -> local_fallback
+    // 2. 検索プロバイダ実行パイプライン (SearXNG最優先 + Wikipedia + Jina + DuckDuckGo)
     const preferred = options?.preferredProvider || 'auto';
+
+    // --- サブルーチン: SearXNG (Termuxローカル・自己ホスト型メタ検索エンジン) ---
+    const runSearxng = async (): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null> => {
+      try {
+        const storedUrl = storageService.getItem('miki_searxng_base_url');
+        const searxngBaseUrl = (storedUrl && storedUrl.trim())
+          ? storedUrl.trim().replace(/\/+$/, '')
+          : 'http://127.0.0.1:8888';
+
+        const searxUrl = `${searxngBaseUrl}/search?q=${encodeURIComponent(cleanQuery)}&format=json`;
+        const searxRes = await fetch(searxUrl, { signal: AbortSignal.timeout(2500) });
+        if (searxRes.ok) {
+          const searxData = await searxRes.json();
+          const hits = Array.isArray(searxData?.results) ? searxData.results : [];
+          if (hits.length > 0) {
+            const results: WebSearchResultItem[] = hits.slice(0, maxResults).map((hit: any) => ({
+              title: hit.title || cleanQuery,
+              snippet: (hit.content || hit.snippet || '').replace(/<[^>]+>/g, '').trim(),
+              url: hit.url || '',
+              source: 'SearXNG (Local)',
+              publishedDate: hit.publishedDate || hit.published_date,
+            }));
+            if (results.length > 0) {
+              const summary = results[0].snippet || `「${cleanQuery}」に関する知見をSearXNGから取得しました。`;
+              systemLogger.info('SELF_IMPROVEMENT', `🔍 [SearXNG] ローカル検索成功: ${results.length}件 (provider: searxng)`);
+              return { results, summary, provider: 'searxng' };
+            }
+          } else {
+            systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 検索結果0件のためフォールバック');
+          }
+        } else {
+          systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [SearXNG] 応答ステータス HTTP ${searxRes.status} のためフォールバック`);
+        }
+      } catch (searxErr: any) {
+        // Termux未起動やタイムアウト時は日常的状態のため、警告ではなく情報ログで静かにフォールバック
+        const reason = searxErr?.name === 'TimeoutError' ? 'タイムアウト' : '未起動または接続不可';
+        systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [SearXNG] 未応答のためフォールバック (${reason})`);
+      }
+      return null;
+    };
 
     // --- サブルーチン: Wikipedia直接fetch (CORS対応オープンエンドポイント) ---
     const runWikipedia = async (): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null> => {
@@ -515,17 +554,19 @@ export class AutonomousSearchService {
       return null;
     };
 
-    // 優先指定に応じた実行順序の制御
+    // 優先指定に応じた実行順序の制御 (指示2: SearXNGを最優先経路に追加)
     let pipelineSteps: Array<() => Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null>>;
-    if (preferred === 'jina') {
-      pipelineSteps = [runJinaReader, runWikipedia, runDuckDuckGo];
+    if (preferred === 'searxng') {
+      pipelineSteps = [runSearxng, runWikipedia, runJinaReader, runDuckDuckGo];
+    } else if (preferred === 'jina') {
+      pipelineSteps = [runJinaReader, runSearxng, runWikipedia, runDuckDuckGo];
     } else if (preferred === 'duckduckgo') {
-      pipelineSteps = [runDuckDuckGo, runWikipedia, runJinaReader];
+      pipelineSteps = [runDuckDuckGo, runSearxng, runWikipedia, runJinaReader];
     } else if (preferred === 'wikipedia') {
-      pipelineSteps = [runWikipedia, runJinaReader, runDuckDuckGo];
+      pipelineSteps = [runWikipedia, runSearxng, runJinaReader, runDuckDuckGo];
     } else {
-      // デフォルト順: Wikipedia直接fetch -> Jina Reader検索 -> DuckDuckGo Instant Answer
-      pipelineSteps = [runWikipedia, runJinaReader, runDuckDuckGo];
+      // 既定順序 (preferred === 'auto'): SearXNG(Termuxローカル) -> Wikipedia直接fetch -> Jina Reader検索 -> DuckDuckGo Instant Answer
+      pipelineSteps = [runSearxng, runWikipedia, runJinaReader, runDuckDuckGo];
     }
 
     // パイプラインを順次実行
@@ -564,6 +605,7 @@ export class AutonomousSearchService {
     options?: {
       triggerType: 'in_conversation' | 'idle_autonomous' | 'working_agenda' | 'capability_gap';
       resolvedAgendaId?: string;
+      provider?: string;
     }
   ): AutonomousSearchLearningRecord {
     const triggerType = options?.triggerType || 'in_conversation';
@@ -644,12 +686,19 @@ export class AutonomousSearchService {
     // 検索結果の受け答え構造・手順・FAQから骨格候補を抽出・登録 (WEB_OBSERVED, 3回観測昇格制)
     try {
       for (const r of results.slice(0, 2)) {
+        const itemProvider = options?.provider ||
+          (r.source?.includes('SearXNG') ? 'searxng' :
+           r.source?.includes('Wikipedia') ? 'wikipedia_direct' :
+           r.source?.includes('Jina') ? 'jina_direct' :
+           r.source?.includes('DuckDuckGo') ? 'duckduckgo_direct' : undefined);
+
         const skeletonCand = WebMaterialPatternExtractor.extractSkeletonStructuresFromWebText({
           title: r.title,
           snippet: r.snippet,
           summary,
           sourceQuery: query,
           sourceUrl: r.url,
+          provider: itemProvider,
         });
 
         if (skeletonCand) {
@@ -668,10 +717,17 @@ export class AutonomousSearchService {
         .filter(Boolean)
         .join('\n');
       if (combinedSnippets) {
+        const topProvider = options?.provider ||
+          (results[0]?.source?.includes('SearXNG') ? 'searxng' :
+           results[0]?.source?.includes('Wikipedia') ? 'wikipedia_direct' :
+           results[0]?.source?.includes('Jina') ? 'jina_direct' :
+           results[0]?.source?.includes('DuckDuckGo') ? 'duckduckgo_direct' : undefined);
+
         const surfacePatterns = WebMaterialPatternExtractor.extractSurfacePatternsFromWebText({
           text: combinedSnippets,
           sourceQuery: query,
           sourceUrl: results[0]?.url || '',
+          provider: topProvider,
         });
 
         if (surfacePatterns.length > 0) {
