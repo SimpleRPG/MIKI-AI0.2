@@ -14,6 +14,10 @@ import {
   Layers,
   HelpCircle,
   AlertCircle,
+  Shield,
+  Plus,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import {
   autonomousSearchService,
@@ -21,6 +25,10 @@ import {
   AutonomousSearchStats,
 } from '../../services/autonomousSearchService';
 import { AutonomousSearchLearningRecord } from '../../types';
+import {
+  bannedTopicsConfigService,
+  BannedTopicsConfig,
+} from '../../services/bannedTopicsConfigService';
 
 export const AutonomousSearchTab: React.FC = () => {
   const [config, setConfig] = useState<AutonomousSearchConfig>(() => autonomousSearchService.getConfig());
@@ -45,9 +53,40 @@ export const AutonomousSearchTab: React.FC = () => {
     details: string[];
   } | null>(null);
 
+  // 禁止トピック手動設定 (設計思想 21.2 & 作業指示書 v19)
+  const [bannedConfig, setBannedConfig] = useState<BannedTopicsConfig>(() =>
+    bannedTopicsConfigService.getConfig()
+  );
+  const [newBannedTopic, setNewBannedTopic] = useState('');
+
   const refreshData = () => {
     setStats(autonomousSearchService.getStats());
     setRecords(autonomousSearchService.getRecentRecords(20));
+    setBannedConfig(bannedTopicsConfigService.getConfig());
+  };
+
+  const handleToggleBannedConfig = () => {
+    bannedTopicsConfigService.setEnabled(!bannedConfig.enabled);
+    setBannedConfig(bannedTopicsConfigService.getConfig());
+  };
+
+  const handleAddBannedTopic = () => {
+    if (!newBannedTopic.trim()) return;
+    const added = bannedTopicsConfigService.addTopic(newBannedTopic.trim());
+    if (added) {
+      setNewBannedTopic('');
+      setBannedConfig(bannedTopicsConfigService.getConfig());
+    }
+  };
+
+  const handleRemoveBannedTopic = (topic: string) => {
+    bannedTopicsConfigService.removeTopic(topic);
+    setBannedConfig(bannedTopicsConfigService.getConfig());
+  };
+
+  const handleResetBannedTopics = () => {
+    bannedTopicsConfigService.resetToDefault();
+    setBannedConfig(bannedTopicsConfigService.getConfig());
   };
 
   const handleToggleConfig = (key: keyof AutonomousSearchConfig) => {
@@ -218,6 +257,84 @@ export const AutonomousSearchTab: React.FC = () => {
               className="rounded accent-sky-500 w-4 h-4 cursor-pointer"
             />
           </label>
+        </div>
+      </div>
+
+      {/* 設計思想 21.2 & 作業指示書 v19: 禁止トピック手動設定パネル */}
+      <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Shield className="w-3.5 h-3.5 text-amber-400" />
+            <span>自律学習・禁止トピック手動設定 (安全除外フィルター)</span>
+          </h4>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleResetBannedTopics}
+              className="px-2 py-1 text-[11px] text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg flex items-center gap-1 transition-colors"
+              title="デフォルト禁止トピック群にリセット"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>初期値へリセット</span>
+            </button>
+            <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer pl-1">
+              <span>フィルター有効</span>
+              <input
+                type="checkbox"
+                checked={bannedConfig.enabled}
+                onChange={handleToggleBannedConfig}
+                className="rounded accent-amber-500 w-3.5 h-3.5 cursor-pointer"
+              />
+            </label>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          本人利用専用の安全設計として、コード固定フィルタではなく手動設定方式を採用しています。
+          登録されたキーワードに一致するWeb検索クエリや取得素材は、縦(骨格)・横(言い回し)の自律学習候補から安全に完全除外されます。
+        </p>
+
+        {/* キーワード追加フォーム */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newBannedTopic}
+            onChange={(e) => setNewBannedTopic(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddBannedTopic()}
+            placeholder="除外したい禁止キーワードを入力して追加 (例: 暴力, 誹謗中傷)"
+            className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+          />
+          <button
+            onClick={handleAddBannedTopic}
+            disabled={!newBannedTopic.trim()}
+            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>追加</span>
+          </button>
+        </div>
+
+        {/* 登録済み禁止トピックタグ一覧 */}
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {bannedConfig.topics.map((topic) => (
+            <span
+              key={topic}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-950/40 border border-amber-800/60 text-amber-200 text-xs rounded-lg"
+            >
+              <span>{topic}</span>
+              <button
+                onClick={() => handleRemoveBannedTopic(topic)}
+                className="hover:text-red-400 transition-colors p-0.5"
+                title={`「${topic}」を削除`}
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+          {bannedConfig.topics.length === 0 && (
+            <span className="text-xs text-slate-500 italic py-1">
+              登録されている禁止トピックはありません。
+            </span>
+          )}
         </div>
       </div>
 

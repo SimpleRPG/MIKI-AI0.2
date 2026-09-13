@@ -10,6 +10,7 @@ import { isCasualGreetingOrShortSocial } from './conversationStateService';
 import { surfaceVariationService } from './surfaceVariationService';
 import { unknownTaskDecompositionService } from './unknownTaskDecompositionService';
 import { capabilityGapService } from './capabilityGapService';
+import { bannedTopicsConfigService } from './bannedTopicsConfigService';
 
 const SKELETONS_STORAGE_KEY = 'miki_response_skeletons_v32';
 
@@ -318,15 +319,36 @@ class AnswerPlanService {
 
   /**
    * 設計思想 9章・16章・20章 縦(骨格)の自律成長パイプライン
-   * 教師教材および実会話の未対応ログから骨格候補を登録し、3回以上観測された場合にVERIFIEDへ正式昇格する。
+   * 教師教材、実会話の未対応ログ、および自律Web検索(WEB_OBSERVED)から骨格候補を登録し、
+   * 3回以上観測された場合にVERIFIEDへ正式昇格する。
    */
   public registerSkeletonCandidate(params: {
     instruction: string;
     outputTarget?: string;
     reasoningExplanation?: string;
     category?: string;
-    sourceType: 'TEACHER_MATERIAL' | 'UNRESOLVED_CONVERSATION';
-  }): ResponseSkeleton {
+    sourceType: 'TEACHER_MATERIAL' | 'UNRESOLVED_CONVERSATION' | 'WEB_OBSERVED';
+    sourceProvenance?: {
+      query?: string;
+      url?: string;
+      extractedAt?: number;
+      fragment?: string;
+    };
+    responsePlanOverride?: string[];
+    triggerKeywordsOverride?: string[];
+  }): ResponseSkeleton | null {
+    // 禁止トピック手動設定の検査
+    const bannedCheck = bannedTopicsConfigService.checkBanned(
+      `${params.instruction} ${params.outputTarget || ''} ${params.sourceProvenance?.query || ''}`
+    );
+    if (bannedCheck.isBanned) {
+      systemLogger.warn(
+        'ANSWER_PLAN',
+        `🚫 [骨格候補除外] 禁止トピック「${bannedCheck.matchedTopic}」に一致したため骨格候補化を破棄しました`
+      );
+      return null;
+    }
+
     const rawCategory = (params.category || 'chat').toLowerCase();
     const isCorrection =
       rawCategory.includes('correction') ||
@@ -339,18 +361,21 @@ class AnswerPlanService {
       params.instruction.includes('食い違い');
 
     // トリガーキーワードの自動抽出（instruction中の名詞・語句）
-    const extractedKeywords: string[] = [];
-    const words = params.instruction.split(/[\s,、。！？!?：:「」()（）]+/);
-    for (const w of words) {
-      if (w.length >= 3 && !['これ', 'それ', 'あれ', 'について', 'ください', '教えて', 'どう', 'どうす'].includes(w)) {
-        extractedKeywords.push(w);
+    let triggerKeywords: string[] = [];
+    if (params.triggerKeywordsOverride && params.triggerKeywordsOverride.length > 0) {
+      triggerKeywords = params.triggerKeywordsOverride.slice(0, 6);
+    } else {
+      const extractedKeywords: string[] = [];
+      const words = params.instruction.split(/[\s,、。！？!?：:「」()（）]+/);
+      for (const w of words) {
+        if (w.length >= 3 && !['これ', 'それ', 'あれ', 'について', 'ください', '教えて', 'どう', 'どうす'].includes(w)) {
+          extractedKeywords.push(w);
+        }
       }
-    }
-
-    // 重複除外＆上限6語
-    const triggerKeywords = Array.from(new Set(extractedKeywords)).slice(0, 6);
-    if (triggerKeywords.length === 0) {
-      triggerKeywords.push(params.instruction.slice(0, 15));
+      triggerKeywords = Array.from(new Set(extractedKeywords)).slice(0, 6);
+      if (triggerKeywords.length === 0) {
+        triggerKeywords.push(params.instruction.slice(0, 15));
+      }
     }
 
     const stage: ConversationStage = isCorrection || isContradiction ? 'CORRECTION' : 'QUESTION';
@@ -366,6 +391,9 @@ class AnswerPlanService {
     if (existing) {
       existing.observedCount = (existing.observedCount || 1) + 1;
       existing.updatedAt = Date.now();
+      if (params.sourceProvenance) {
+        existing.sourceProvenance = params.sourceProvenance;
+      }
 
       // 設計思想 16章「削減知能」強制ルール:
       // 同じ構造のログが複数回（3回以上）確認されて初めてVERIFIEDへ正式昇格
@@ -387,8 +415,10 @@ class AnswerPlanService {
     }
 
     // 回答手順(response_plan)の作成
-    const plans: string[] = [];
-    if (isCorrection) {
+    let plans: string[] = [];
+    if (params.responsePlanOverride && params.responsePlanOverride.length > 0) {
+      plans = [...params.responsePlanOverride];
+    } else if (isCorrection) {
       plans.push('1. 訂正された前提を素直に更新し、古い前提を直ちに無効化する');
       plans.push('2. 新前提に基づく影響範囲を洗い出して再判断する');
       plans.push('3. 修正後の結論を直接先に回答する');
@@ -406,11 +436,18 @@ class AnswerPlanService {
       plans.push('3. 不要な繰り返しや過剰な前置きを排除する');
     }
 
-    const prefix = params.sourceType === 'TEACHER_MATERIAL' ? 'TEACHER' : 'UNRESOLVED';
+    let prefix = 'UNRESOLVED';
+    let situationPrefix = '未対応対話ログより生成';
+    if (params.sourceType === 'TEACHER_MATERIAL') {
+      prefix = 'TEACHER';
+      situationPrefix = '外部教師教材より生成';
+    } else if (params.sourceType === 'WEB_OBSERVED') {
+      prefix = 'WEB';
+      situationPrefix = '自律Web調査より抽出';
+    }
+
     const pattern_id = `PATTERN-${prefix}-${Date.now().toString(36).toUpperCase()}`;
-    const situation = params.sourceType === 'TEACHER_MATERIAL'
-      ? `外部教師教材より生成: ${params.instruction.slice(0, 35)}`
-      : `未対応対話ログより生成: ${params.instruction.slice(0, 35)}`;
+    const situation = `${situationPrefix}: ${params.instruction.slice(0, 35)}`;
 
     const newCandidate: ResponseSkeleton = {
       pattern_id,
@@ -435,6 +472,7 @@ class AnswerPlanService {
       sourceType: params.sourceType,
       observedCount: 1,
       patternSignature,
+      sourceProvenance: params.sourceProvenance,
     };
 
     this.skeletons.unshift(newCandidate);
@@ -456,7 +494,7 @@ class AnswerPlanService {
     outputTarget: string;
     reasoningExplanation?: string;
     category?: string;
-  }): ResponseSkeleton {
+  }): ResponseSkeleton | null {
     return this.registerSkeletonCandidate({
       ...params,
       sourceType: 'TEACHER_MATERIAL',
@@ -512,6 +550,8 @@ class AnswerPlanService {
         category: target.category,
       });
 
+      if (!res) continue;
+
       if (res.status === 'VERIFIED') {
         promotedCount++;
       }
@@ -529,6 +569,37 @@ class AnswerPlanService {
       promotedCount,
       items,
     };
+  }
+
+  /**
+   * 作業指示書 v19 第1.1節: 自律Web検索(WEB_OBSERVED)由来の回答骨格候補の登録
+   * ネット検索調査中に取得した受け答え例（FAQ・Q&Aサイト・トラブルシューティング等）から
+   * 既存骨格に当てはまらない構造を検出し、候補として記録する。
+   * 判定条件は同じ（同じ構造が3回以上観測されてから正式化 VERIFIED）。
+   */
+  public registerSkeletonFromWebObservation(params: {
+    instructionStructure: string;
+    responseSteps: string[];
+    sampleTriggerWords: string[];
+    sourceQuery: string;
+    sourceUrl: string;
+    extractedAt: number;
+    originalFragment: string;
+  }): ResponseSkeleton | null {
+    return this.registerSkeletonCandidate({
+      instruction: params.instructionStructure,
+      outputTarget: params.originalFragment,
+      category: 'web_observed',
+      sourceType: 'WEB_OBSERVED',
+      sourceProvenance: {
+        query: params.sourceQuery,
+        url: params.sourceUrl,
+        extractedAt: params.extractedAt,
+        fragment: params.originalFragment,
+      },
+      responsePlanOverride: params.responseSteps,
+      triggerKeywordsOverride: params.sampleTriggerWords,
+    });
   }
 
   /**

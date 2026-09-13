@@ -1825,11 +1825,17 @@ export interface ResponseSkeleton {
   successRate: number; // 0〜100
   createdAt: number;
   updatedAt: number;
-  // v18 縦の自動成長用フィールド
+  // v18 & v19 縦の自動成長用フィールド
   status?: 'CANDIDATE' | 'VERIFIED';
-  sourceType?: 'TEACHER_MATERIAL' | 'UNRESOLVED_CONVERSATION' | 'PRESET';
+  sourceType?: 'TEACHER_MATERIAL' | 'UNRESOLVED_CONVERSATION' | 'PRESET' | 'WEB_OBSERVED';
   observedCount?: number;
   patternSignature?: string;
+  sourceProvenance?: {
+    query?: string;
+    url?: string;
+    extractedAt?: number;
+    fragment?: string;
+  };
 }
 
 export interface AnswerPlanApplicationResult {

@@ -10,6 +10,10 @@ import { workingAgendaService } from './workingAgendaService';
 import { selfImprovementService } from './selfImprovementService';
 import { capabilityGapService } from './capabilityGapService';
 import { privacyGuardrailService } from './privacyGuardrailService';
+import { bannedTopicsConfigService } from './bannedTopicsConfigService';
+import { WebMaterialPatternExtractor } from './webMaterialPatternExtractor';
+import { answerPlanService } from './answerPlanService';
+import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
 import { apiUrl, getCustomApiHeaders } from './api';
 
 const SEARCH_CONFIG_KEY = 'miki_ai_autonomous_search_config';
@@ -226,6 +230,16 @@ export class AutonomousSearchService {
     }
     const safeQuery = audit.sanitizedText;
 
+    // 作業指示書 v19: 禁止トピック手動設定によるクエリ遮断
+    const bannedQueryCheck = bannedTopicsConfigService.checkBanned(safeQuery);
+    if (bannedQueryCheck.isBanned) {
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `🚫 [Web検索遮断] 検索クエリが禁止トピック「${bannedQueryCheck.matchedTopic}」に一致したため中断: ${safeQuery}`
+      );
+      return { results: [], summary: `禁止トピック（${bannedQueryCheck.matchedTopic}）に該当するため安全にスキップしました。` };
+    }
+
     const cacheKey = safeQuery.toLowerCase();
     if (!options?.bypassCache && this.cache.has(cacheKey)) {
       const cached = this.cache.get(cacheKey)!;
@@ -402,6 +416,48 @@ export class AutonomousSearchService {
       } catch (agErr) {
         console.warn('Failed to resolve agenda via search learning:', agErr);
       }
+    }
+
+    // 4. 作業指示書 v19 第1.1節: 縦(骨格)への自律学習素材還元
+    // 検索結果の受け答え構造・手順・FAQから骨格候補を抽出・登録 (WEB_OBSERVED, 3回観測昇格制)
+    try {
+      for (const r of results.slice(0, 2)) {
+        const skeletonCand = WebMaterialPatternExtractor.extractSkeletonStructuresFromWebText({
+          title: r.title,
+          snippet: r.snippet,
+          summary,
+          sourceQuery: query,
+          sourceUrl: r.url,
+        });
+
+        if (skeletonCand) {
+          answerPlanService.registerSkeletonFromWebObservation(skeletonCand);
+        }
+      }
+    } catch (skErr) {
+      console.warn('Failed to extract web skeleton pattern:', skErr);
+    }
+
+    // 5. 作業指示書 v19 第1.2節 & 第1.3節: 横(言い回し)への自律学習素材還元
+    // 検索結果から普遍的な言い回し・文頭・文末パターンを抽出し、弱点カテゴリの候補として検証・昇格
+    try {
+      const combinedSnippets = results
+        .map((r) => r.snippet)
+        .filter(Boolean)
+        .join('\n');
+      if (combinedSnippets) {
+        const surfacePatterns = WebMaterialPatternExtractor.extractSurfacePatternsFromWebText({
+          text: combinedSnippets,
+          sourceQuery: query,
+          sourceUrl: results[0]?.url || '',
+        });
+
+        if (surfacePatterns.length > 0) {
+          surfaceVariationGrowthService.processWebMaterialForVariationGrowth(surfacePatterns, 1);
+        }
+      }
+    } catch (varErr) {
+      console.warn('Failed to extract web surface variation pattern:', varErr);
     }
 
     if (triggerType === 'in_conversation') {

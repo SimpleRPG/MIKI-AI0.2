@@ -13,13 +13,21 @@ import { VariationItem } from './surfaceVariationData';
 import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
 import { answerContentIrService } from './answerContentIrService';
 import { AnswerContentIR } from '../types';
+import { bannedTopicsConfigService } from './bannedTopicsConfigService';
+import { WebExtractedSurfacePattern } from './webMaterialPatternExtractor';
 
 export interface VariationCandidateRecord {
   id: string;
   categoryKey: string;
   seedText: string;
   candidateText: string;
-  mutationType: 'CONJUGATION_SHIFT' | 'CONNECTOR_SYNONYM' | 'POLITENESS_FLIP' | 'WORD_ORDER_SHIFT' | 'DEFECTIVE_PROBE';
+  mutationType:
+    | 'CONJUGATION_SHIFT'
+    | 'CONNECTOR_SYNONYM'
+    | 'POLITENESS_FLIP'
+    | 'WORD_ORDER_SHIFT'
+    | 'DEFECTIVE_PROBE'
+    | 'WEB_DERIVED';
   status: 'CANDIDATE' | 'VERIFIED' | 'REJECTED';
   verification: {
     semanticPreserved: boolean;
@@ -27,6 +35,12 @@ export interface VariationCandidateRecord {
     grammarClean: boolean;
     grammarIssues: string[];
     rejectionReason?: string;
+  };
+  sourceProvenance?: {
+    query?: string;
+    url?: string;
+    extractedAt?: number;
+    fragment?: string;
   };
   createdAt: number;
 }
@@ -384,6 +398,164 @@ export class SurfaceVariationGrowthService {
       rejectionReasons,
       promotedItems,
       summary,
+    };
+  }
+
+  /**
+   * 作業指示書 v19 第1.2節 & 第1.3節:
+   * 自律Web検索から取得した自然な言い回しパターンを、弱点カテゴリの同義候補として検証・昇格する
+   * - 意味保持検査(verifySemanticPreservation)は今まで通り必須
+   * - 文章を丸ごと転用せず、抽象化された言い回しパターンのみを適用
+   * - 禁止トピック検査(bannedTopicsConfigService)を経由
+   * - 出典記録(sourceProvenance)を残す
+   */
+  public processWebMaterialForVariationGrowth(
+    patterns: WebExtractedSurfacePattern[],
+    maxPromotions: number = 1
+  ): {
+    processedCount: number;
+    passedCount: number;
+    rejectedCount: number;
+    promotedCount: number;
+    promotedItems: Array<{ categoryKey: string; id: string; text: string }>;
+  } {
+    if (!patterns || patterns.length === 0) {
+      return { processedCount: 0, passedCount: 0, rejectedCount: 0, promotedCount: 0, promotedItems: [] };
+    }
+
+    const weaknesses = this.detectWeaknessCategories(3);
+    if (weaknesses.length === 0) {
+      return { processedCount: 0, passedCount: 0, rejectedCount: 0, promotedCount: 0, promotedItems: [] };
+    }
+
+    const categoriesSummary = surfaceVariationService.getAllCategoriesSummary();
+    let processedCount = 0;
+    let passedCount = 0;
+    let rejectedCount = 0;
+    let promotedCount = 0;
+    const promotedItems: Array<{ categoryKey: string; id: string; text: string }> = [];
+
+    for (const pattern of patterns) {
+      if (promotedCount >= maxPromotions) break;
+
+      // 禁止トピック検査 (手動設定リスト参照)
+      const bannedCheck = bannedTopicsConfigService.checkBanned(
+        `${pattern.abstractedPattern} ${pattern.sourceQuery} ${pattern.originalFragment}`
+      );
+      if (bannedCheck.isBanned) {
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `🚫 [Web言い回し破棄] 禁止トピック「${bannedCheck.matchedTopic}」に一致したため候補化を中止: 「${pattern.abstractedPattern}」`
+        );
+        rejectedCount++;
+        continue;
+      }
+
+      // 最も親和性の高い弱点カテゴリを探索
+      let targetCategoryKey = weaknesses[0].categoryKey;
+      if (pattern.extractedStyle === 'CONCLUSION_FIRST') {
+        const found = weaknesses.find((w) => w.categoryKey.includes('lead') || w.categoryKey.includes('connector'));
+        if (found) targetCategoryKey = found.categoryKey;
+      } else if (pattern.extractedStyle === 'POLITE' || pattern.extractedStyle === 'CASUAL') {
+        const found = weaknesses.find((w) => w.categoryKey.includes('acknowledgement') || w.categoryKey.includes('greeting'));
+        if (found) targetCategoryKey = found.categoryKey;
+      }
+
+      const catInfo = categoriesSummary.find((c) => c.categoryKey === targetCategoryKey);
+      if (!catInfo || catInfo.samplePool.length === 0) continue;
+
+      const seedItem = catInfo.samplePool[0];
+      processedCount++;
+
+      // 既存の言い回しの主旨（シード）に合わせてWebの接続詞・語尾スタイルを適用した新候補文を合成
+      let candidateText = '';
+      if (pattern.connectorPhrase && !seedItem.text.startsWith(pattern.connectorPhrase)) {
+        candidateText = `${pattern.connectorPhrase}、${seedItem.text.replace(/^[、,\s]+/, '')}`;
+      } else if (pattern.extractedStyle === 'POLITE' && !seedItem.text.endsWith('です。')) {
+        candidateText = seedItem.text.replace(/だよ[。！]?$/, 'ですよ。').replace(/ね[。！]?$/, 'ですね。');
+      } else if (pattern.extractedStyle === 'CASUAL' && (seedItem.text.endsWith('です。') || seedItem.text.endsWith('ます。'))) {
+        candidateText = seedItem.text.replace(/です。$/, 'だよ。').replace(/ます。$/, 'るよ。');
+      } else {
+        // パターンから抽出された抽象骨組みがそのまま自然な表現の場合
+        candidateText = pattern.abstractedPattern || seedItem.text;
+      }
+
+      if (!candidateText || typeof candidateText !== 'string') {
+        candidateText = seedItem.text;
+      }
+
+      // 厳格な意味保持・文法検査 (基準は緩めない)
+      const vResult = this.verifyCandidate(seedItem.text, candidateText);
+      const candidateId = `VAR-WEB-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+      const record: VariationCandidateRecord = {
+        id: candidateId,
+        categoryKey: targetCategoryKey,
+        seedText: seedItem.text,
+        candidateText,
+        mutationType: 'WEB_DERIVED',
+        status: vResult.passed ? 'CANDIDATE' : 'REJECTED',
+        verification: {
+          semanticPreserved: vResult.semanticPreserved,
+          missingOrDistorted: vResult.missingOrDistorted,
+          grammarClean: vResult.grammarClean,
+          grammarIssues: vResult.grammarIssues,
+          rejectionReason: vResult.rejectionReason,
+        },
+        sourceProvenance: {
+          query: pattern.sourceQuery,
+          url: pattern.sourceUrl,
+          extractedAt: pattern.extractedAt,
+          fragment: pattern.originalFragment,
+        },
+        createdAt: Date.now(),
+      };
+
+      if (vResult.passed) {
+        passedCount++;
+        if (promotedCount < maxPromotions) {
+          record.status = 'VERIFIED';
+          surfaceVariationService.registerDynamicVariant(targetCategoryKey, {
+            id: candidateId,
+            text: candidateText,
+            sourceType: 'WEB_OBSERVED',
+            sourceProvenance: {
+              query: pattern.sourceQuery,
+              url: pattern.sourceUrl,
+              extractedAt: pattern.extractedAt,
+              fragment: pattern.originalFragment,
+            },
+          });
+
+          promotedCount++;
+          promotedItems.push({
+            categoryKey: targetCategoryKey,
+            id: candidateId,
+            text: candidateText,
+          });
+
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            `🌐✨ [Web由来言い回し昇格] ${targetCategoryKey} にWeb調査由来の変種を採用 (id:${candidateId}): 「${candidateText}」 (出典: ${pattern.sourceQuery} - ${pattern.sourceUrl})`
+          );
+        }
+      } else {
+        rejectedCount++;
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `🛡️ [Web由来言い回し破棄] 意味・文法検査不合格により候補を破棄: 「${candidateText}」 (理由: ${vResult.rejectionReason})`
+        );
+      }
+
+      this.candidateRecords.unshift(record);
+    }
+
+    return {
+      processedCount,
+      passedCount,
+      rejectedCount,
+      promotedCount,
+      promotedItems,
     };
   }
 

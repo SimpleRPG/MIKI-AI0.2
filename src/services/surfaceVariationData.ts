@@ -6,6 +6,13 @@
 export interface VariationItem {
   id: string;
   text: string;
+  sourceType?: 'PRESET' | 'MUTATION' | 'WEB_OBSERVED';
+  sourceProvenance?: {
+    query?: string;
+    url?: string;
+    extractedAt?: number;
+    fragment?: string;
+  };
 }
 
 // =============================================================================

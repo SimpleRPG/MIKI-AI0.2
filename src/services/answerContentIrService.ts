@@ -227,13 +227,14 @@ export class AnswerContentIrService {
     surfaceText: string
   ): SemanticPreservationInspection {
     const missingOrDistorted: string[] = [];
-    const lowerText = surfaceText.toLowerCase();
+    const safeText = typeof surfaceText === 'string' ? surfaceText : '';
+    const lowerText = safeText.toLowerCase();
 
     // 1. 条件の保持検査 (IRに条件がある場合、表層文に条件提示マーカーがあるか)
     let conditionsPreserved = true;
     if (ir.conditions && ir.conditions.length > 0) {
       const conditionMarkers = ['場合', 'なら', 'であれば', '前提', 'ただし', '条件', 'かつ', 'とき'];
-      const hasConditionMarker = conditionMarkers.some((m) => surfaceText.includes(m));
+      const hasConditionMarker = conditionMarkers.some((m) => safeText.includes(m));
       if (!hasConditionMarker) {
         conditionsPreserved = false;
         missingOrDistorted.push(
@@ -245,7 +246,7 @@ export class AnswerContentIrService {
     // 2. 否定の保持検査 (IR結論が否定なのに表層文が肯定断定されていないか)
     let negationPreserved = true;
     const isIrNegative = /できない|しない|不要|非推奨|禁止|失敗|不可|ない/.test(ir.conclusion);
-    const isSurfaceNegative = /できない|しない|不要|非推奨|禁止|失敗|不可|ありません|ない/.test(surfaceText);
+    const isSurfaceNegative = /できない|しない|不要|非推奨|禁止|失敗|不可|ありません|ない/.test(safeText);
     if (isIrNegative && !isSurfaceNegative) {
       negationPreserved = false;
       missingOrDistorted.push(
@@ -257,7 +258,7 @@ export class AnswerContentIrService {
     let certaintyPreserved = true;
     if (ir.certainty === 'CONDITIONAL' || ir.certainty === 'HYPOTHETICAL') {
       const overConfidentMarkers = ['絶対に', '確実に', '100%', '完全保証', '間違いなく'];
-      const hasOverConfidence = overConfidentMarkers.some((m) => surfaceText.includes(m));
+      const hasOverConfidence = overConfidentMarkers.some((m) => safeText.includes(m));
       if (hasOverConfidence) {
         certaintyPreserved = false;
         missingOrDistorted.push(
@@ -270,7 +271,7 @@ export class AnswerContentIrService {
     let worldScopePreserved = true;
     if (ir.world_scope === 'FICTION' || ir.world_scope === 'HYPOTHETICAL') {
       const realWorldExaggeration = ['現実の事実', '公文書で確認', '本名で実在', '正式な事実'];
-      const hasRealExaggeration = realWorldExaggeration.some((m) => surfaceText.includes(m));
+      const hasRealExaggeration = realWorldExaggeration.some((m) => safeText.includes(m));
       if (hasRealExaggeration) {
         worldScopePreserved = false;
         missingOrDistorted.push(
