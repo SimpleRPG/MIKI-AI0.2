@@ -44,6 +44,8 @@ import { frontierGovernanceService } from './frontierGovernanceService';
 import { autonomousHardeningService } from './autonomousHardeningService';
 import { answerPlanService } from './answerPlanService';
 import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
+import { bannedTopicsConfigService } from './bannedTopicsConfigService';
+import { WebMaterialPatternExtractor } from './webMaterialPatternExtractor';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -1054,6 +1056,105 @@ export class BackgroundWorkerService {
           weaknessFound.push(
             `[横(言い回し)自律成長] 弱点検出カテゴリ${variationGrowth.weaknessDetected.length}件に対し、候補${variationGrowth.totalGenerated}件生成 (合格:${variationGrowth.passedCount}件, 破棄:${variationGrowth.rejectedCount}件, 正式昇格:${variationGrowth.promotedCount}件)`
           );
+        }
+
+        // --- 作業指示書 v20: Web検索自律学習素材による縦(骨格)・横(言い回し)の自律成長ループ配線 ---
+        // 歯止め: 1サイクルあたりの自律Web検索回数上限 (上限1クエリ, 最大3件取得)
+        const searchConfig = autonomousSearchService.getConfig();
+        if (searchConfig.enabled && !abortSignal.aborted) {
+          // 弱点カテゴリまたは未対応課題から検索トピックを特定
+          let webTopic = '';
+          const weaknesses = surfaceVariationGrowthService.detectWeaknessCategories(3);
+          if (weaknesses.length > 0) {
+            const topWeakness = weaknesses[0].categoryKey;
+            if (topWeakness.includes('disaster') || topWeakness.includes('error')) {
+              webTopic = 'トラブルシューティング 障害対応 手順';
+            } else if (topWeakness.includes('lead') || topWeakness.includes('step')) {
+              webTopic = '手順 説明 構成 ベストプラクティス';
+            } else {
+              webTopic = '対話 受け答え 丁寧な説明 手順';
+            }
+          } else {
+            const gaps = capabilityGapService.getAllGaps().filter((g) => g.status === 'OPEN');
+            if (gaps.length > 0) {
+              webTopic = `${gaps[0].capabilityId} 手順 ガイド`.slice(0, 40);
+            } else {
+              webTopic = 'トラブルシューティング 手順 ガイド';
+            }
+          }
+
+          // 1. 禁止トピック手動設定による事前チェック
+          const bannedCheck = bannedTopicsConfigService.checkBanned(webTopic);
+          if (bannedCheck.isBanned) {
+            systemLogger.warn(
+              'SELF_IMPROVEMENT',
+              `🚫 [Web自律成長除外] クエリ「${webTopic}」は禁止トピック「${bannedCheck.matchedTopic}」に抵触するため検索をスキップしました`
+            );
+          } else {
+            systemLogger.info(
+              'SELF_IMPROVEMENT',
+              `🌐 [Web自律成長検索] クエリ「${webTopic}」で自律学習素材を取得中... (歯止め: 1検索/サイクル上限)`
+            );
+
+            // 2. Web検索実行 (最大3件取得)
+            const searchRes = await autonomousSearchService.executeSearch(webTopic, { maxResults: 3 });
+            const searchResults = searchRes.results || [];
+
+            systemLogger.info(
+              'SELF_IMPROVEMENT',
+              `🌐 [Web素材取得件数] クエリ:「${webTopic}」, 取得件数: ${searchResults.length}件`
+            );
+
+            if (searchResults.length > 0) {
+              // 3. 縦(骨格)への還元: 検索結果から構造抽出 -> registerSkeletonFromWebObservation (WEB_OBSERVED, 3回観測昇格制)
+              let webSkeletonProcessed = 0;
+              let webSkeletonPromoted = 0;
+              for (const r of searchResults.slice(0, 2)) {
+                const skeletonCand = WebMaterialPatternExtractor.extractSkeletonStructuresFromWebText({
+                  title: r.title,
+                  snippet: r.snippet,
+                  summary: searchRes.summary,
+                  sourceQuery: webTopic,
+                  sourceUrl: r.url,
+                });
+
+                if (skeletonCand) {
+                  webSkeletonProcessed++;
+                  const regResult = answerPlanService.registerSkeletonFromWebObservation(skeletonCand);
+                  if (regResult && regResult.status === 'VERIFIED') {
+                    webSkeletonPromoted++;
+                  }
+                }
+              }
+
+              // 4. 横(言い回し)への還元: 普遍的言い回し抽出 -> processWebMaterialForVariationGrowth (WEB_DERIVED, 意味保持検査合格のみ)
+              const combinedSnippets = searchResults
+                .map((r) => r.snippet)
+                .filter(Boolean)
+                .join('\n');
+              let webVarResult = { processedCount: 0, passedCount: 0, rejectedCount: 0, promotedCount: 0 };
+              if (combinedSnippets) {
+                const surfacePatterns = WebMaterialPatternExtractor.extractSurfacePatternsFromWebText({
+                  text: combinedSnippets,
+                  sourceQuery: webTopic,
+                  sourceUrl: searchResults[0]?.url || '',
+                });
+
+                if (surfacePatterns.length > 0) {
+                  webVarResult = surfaceVariationGrowthService.processWebMaterialForVariationGrowth(surfacePatterns, 1);
+                }
+              }
+
+              systemLogger.info(
+                'SELF_IMPROVEMENT',
+                `🌐✨ [Web自律成長結果] 骨格候補(WEB_OBSERVED): ${webSkeletonProcessed}件到達 (正式昇格: ${webSkeletonPromoted}件), 言い回し変種(WEB_DERIVED): ${webVarResult.processedCount}件到達 (合格: ${webVarResult.passedCount}件, 破棄: ${webVarResult.rejectedCount}件, 正式昇格: ${webVarResult.promotedCount}件)`
+              );
+
+              weaknessFound.push(
+                `[Web素材自律成長] クエリ「${webTopic}」(${searchResults.length}件取得) より 縦(骨格WEB_OBSERVED): 候補${webSkeletonProcessed}件(昇格${webSkeletonPromoted}件), 横(言い回しWEB_DERIVED): 合格${webVarResult.passedCount}件(破棄${webVarResult.rejectedCount}件, 昇格${webVarResult.promotedCount}件)`
+              );
+            }
+          }
         }
       } catch (growthErr: any) {
         systemLogger.warn('SELF_IMPROVEMENT', '縦横自律成長サイクルの実行中に例外が発生しました', growthErr);
