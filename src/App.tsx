@@ -35,6 +35,7 @@ import {
   PrivacyAuditResult,
   AnswerContentIR,
   NonLlmPipelineMeta,
+  ConversationStrategy,
 } from './types';
 import { toolsService } from './services/toolsService';
 import { taskPlanService } from './services/taskPlanService';
@@ -100,6 +101,7 @@ import { codeUnderstandingService } from './services/codeUnderstandingService';
 import { vbaDesignAssistantService } from './services/vbaDesignAssistantService';
 import { featureFlagsService } from './services/featureFlagsService';
 import { dialogueEvaluationService } from './services/dialogueEvaluationService';
+import { conversationStrategyService } from './services/conversationStrategyService';
 import { initializeChapter69to90 } from './services/chapter69_90PlatformServices';
 import { privacyGuardrailService } from './services/privacyGuardrailService';
 import { uncertaintyTeacherService } from './services/uncertaintyTeacherService';
@@ -278,6 +280,11 @@ export default function App() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const currentAssistantIdRef = useRef<string | null>(null);
   const lastTurnUsedMemoryIdsRef = useRef<string[]>([]);
+  const lastTurnStrategyRef = useRef<{
+    strategy: ConversationStrategy;
+    stage: any;
+    text: string;
+  } | null>(null);
   const currentAnswerIrRef = useRef<AnswerContentIR | null>(null);
 
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState<boolean>(false);
@@ -1542,6 +1549,22 @@ improvementCanaryRollbackService.initialize();
       responseSurfacePolicyService.clearLastTurnUsedVariations();
     }
 
+    // 指示書 2.2: 直前ターンの会話戦略 (ConversationStrategy) に対する教師信号検知と成果学習
+    if (lastTurnStrategyRef.current) {
+      const prevInfo = lastTurnStrategyRef.current;
+      const signal = conversationStrategyService.detectOutcomeSignal(text, prevInfo.text);
+      conversationStrategyService.recordStrategyOutcome(
+        prevInfo.strategy,
+        prevInfo.stage,
+        signal
+      );
+      systemLogger.info(
+        'CONVERSATION_STATE',
+        `🎯 [2.2 会話戦略学習] 直前ターン戦略[${prevInfo.strategy}] (Stage: ${prevInfo.stage}) に対して教師信号「${signal}」を検知・記録`
+      );
+      lastTurnStrategyRef.current = null;
+    }
+
     // 設計思想 5.1 / 13.2: 話し方に緩やかに寄せる多軸性格の自動調整 (5ターン継続判定)
     const currentMultiAxisPersona = answerContentIrService.getDefaultPersona();
     const userUtterances = messages
@@ -2007,6 +2030,17 @@ improvementCanaryRollbackService.initialize();
           )
         );
 
+        // 指示書 2.1: 決定論的即答パスの会話戦略を次ターン教師信号用に記録
+        lastTurnStrategyRef.current = {
+          strategy: (deterministicDirectReply.skeleton === 'CORRECTION'
+            ? 'SHORT_ACK'
+            : deterministicDirectReply.skeleton === 'RECOMMENDATION'
+            ? 'HAND_OVER'
+            : 'EXPLAIN') as ConversationStrategy,
+          stage: conversationState?.stage || 'QUESTION',
+          text,
+        };
+
         setIsGenerating(false);
         setIsLoading(false);
         return;
@@ -2245,6 +2279,21 @@ improvementCanaryRollbackService.initialize();
         };
 
         setMessages((prev) => [...prev, cpuMsg]);
+
+        // 指示書 2.1: 非LLM自律統合パイプラインの会話戦略を次ターン教師信号用に記録
+        const appliedPipelineStrategy =
+          pipelineRes.strategy ||
+          conversationStrategyService.selectConversationStrategy({
+            prompt: text,
+            stage: conversationState?.stage,
+            persona: persona?.name,
+          }).strategy;
+        lastTurnStrategyRef.current = {
+          strategy: appliedPipelineStrategy,
+          stage: conversationState?.stage || 'QUESTION',
+          text,
+        };
+
         setIsLoading(false);
         setIsGenerating(false);
 

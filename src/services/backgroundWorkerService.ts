@@ -46,6 +46,7 @@ import { answerPlanService } from './answerPlanService';
 import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
 import { bannedTopicsConfigService } from './bannedTopicsConfigService';
 import { WebMaterialPatternExtractor } from './webMaterialPatternExtractor';
+import { conversationStrategyService } from './conversationStrategyService';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -657,6 +658,13 @@ export class BackgroundWorkerService {
           predictedErrors: [],
           actualErrors: [],
         });
+      }
+
+      // Step 3.8: 指示書 4: 会話癖の自己統計集計 (質問率・平均返信長・訂正率・話題変更率)
+      try {
+        conversationStrategyService.generateConversationHabitsReport(context?.messages);
+      } catch (habitErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '会話癖レポート生成中に例外が発生しました', habitErr);
       }
 
       systemLogger.info(

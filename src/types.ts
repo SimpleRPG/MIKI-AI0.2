@@ -3373,6 +3373,24 @@ export interface ComponentTxtPackage {
 }
 
 /** 3 & 5.2 回答内容IR (Answer Content IR) */
+export type ConversationStrategy =
+  | 'EMPATHY_ONLY'        // 共感のみ、質問しない
+  | 'SHORT_ACK'           // 短い受け止め
+  | 'ASK_QUESTION'        // 質問して深掘りする
+  | 'EXPLAIN'             // 説明・情報提供
+  | 'EXPAND_TOPIC'        // 話題を広げる
+  | 'DEEPEN'              // 今の話題を深掘り
+  | 'RETURN_TO_PREVIOUS'  // 前の話題へ戻る
+  | 'CHANGE_TOPIC'        // 話題転換
+  | 'HAND_OVER'           // ユーザーに主導権を渡す
+  | 'CLOSE_CONVERSATION'; // 会話を終える
+
+export type StrategyOutcomeSignal =
+  | 'corrected'               // 訂正キーワード検知
+  | 'user_led_continuation'   // ユーザーの返信が1文かつ次の質問を含む（自発的に話を続けた）
+  | 'disengaged'              // 返信が極端に短い、または話題が変わった
+  | 'neutral_continuation';   // 通常の継続
+
 export interface AnswerContentIR {
   ir_id: string;
   conclusion: string;
@@ -3385,6 +3403,7 @@ export interface AnswerContentIR {
   detail_level: 'BRIEF' | 'STANDARD' | 'DETAILED';
   interaction_mode: 'NORMAL' | 'CODE_DELIVERY' | 'TROUBLESHOOTING' | 'SAFETY_GATE';
   world_scope: ClaimWorld;
+  strategy?: ConversationStrategy;
 }
 
 /** 13.4 意味保持検査 (Semantic Preservation Inspection) */

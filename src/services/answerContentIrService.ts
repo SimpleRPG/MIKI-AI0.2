@@ -4,12 +4,15 @@ import {
   ClaimWorld,
   AnswerSkeletonType,
   MultiAxisPersonaConfig,
+  ConversationStrategy,
+  ConversationStage,
 } from '../types';
 import { systemLogger } from './systemLogger';
 import { responseSurfacePolicyService } from './responseSurfacePolicyService';
 import { responseDesignService } from './responseDesignService';
 import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
 import { surfaceVariationService } from './surfaceVariationService';
+import { conversationStrategyService } from './conversationStrategyService';
 import { storageService } from './storageService';
 
 const MULTI_AXIS_PERSONA_STORAGE_KEY = 'miki_multi_axis_persona_v1';
@@ -97,7 +100,7 @@ export class AnswerContentIrService {
   }
 
   /**
-   * ユーザー入力・文脈・判断結果から回答内容IRを構築
+   * 指示書 1.3: ユーザー入力・文脈・判断結果・会話戦略から回答内容IRを構築
    */
   public buildAnswerIR(params: {
     conclusion: string;
@@ -110,7 +113,20 @@ export class AnswerContentIrService {
     detailLevel?: AnswerContentIR['detail_level'];
     interactionMode?: AnswerContentIR['interaction_mode'];
     worldScope?: ClaimWorld;
+    strategy?: ConversationStrategy;
+    prompt?: string;
+    stage?: ConversationStage;
   }): AnswerContentIR {
+    let resolvedStrategy = params.strategy;
+    if (!resolvedStrategy && (params.prompt || params.stage)) {
+      const selected = conversationStrategyService.selectConversationStrategy({
+        prompt: params.prompt || '',
+        stage: params.stage || 'QUESTION',
+        persona: this.defaultPersona,
+      });
+      resolvedStrategy = selected.strategy;
+    }
+
     const ir: AnswerContentIR = {
       ir_id: `IR-${Date.now().toString(36).toUpperCase()}`,
       conclusion: params.conclusion,
@@ -123,11 +139,12 @@ export class AnswerContentIrService {
       detail_level: params.detailLevel || 'STANDARD',
       interaction_mode: params.interactionMode || 'NORMAL',
       world_scope: params.worldScope || 'REAL',
+      strategy: resolvedStrategy,
     };
 
     systemLogger.info(
       'ANSWER_PLAN',
-      `🧩 [5.2 回答内容IR構築] ${ir.ir_id}: 結論:「${ir.conclusion}」 | 確実性: ${ir.certainty} | 世界: ${ir.world_scope} | 条件数: ${ir.conditions.length}`
+      `🧩 [5.2 回答内容IR構築] ${ir.ir_id}: 結論:「${ir.conclusion}」 | 戦略: ${ir.strategy || '未指定'} | 確実性: ${ir.certainty} | 世界: ${ir.world_scope} | 条件数: ${ir.conditions.length}`
     );
 
     return ir;
@@ -169,68 +186,87 @@ export class AnswerContentIrService {
 
     const formattedConclusion = formatItem(ir.conclusion);
 
+    // 指示書 1.3 & 3章: 戦略に基づく回答骨格の制限と質問付加の抑制
+    const isEmpathyOnly = ir.strategy === 'EMPATHY_ONLY';
+    const isShortAck = ir.strategy === 'SHORT_ACK';
+    const isClose = ir.strategy === 'CLOSE_CONVERSATION';
+    const skipNextActionsAndQuestions = isEmpathyOnly || isShortAck || isClose;
+
     // 5.2: 骨格は内容IRを並べ替えるだけ。条件・確実性・世界スコープを生成し直さない。
     switch (skeletonType) {
       case 'RECOMMENDATION':
         lines.push(`${headings.conclusion}\n${formattedConclusion}`);
-        if (policy.resolution !== 'BRIEF') addList(headings.reasons, ir.reasons);
-        if (policy.resolution === 'DETAILED') addList(headings.exceptions, ir.exceptions);
-        if (policy.resolution !== 'BRIEF') addList(headings.conditions, ir.conditions);
+        if (!skipNextActionsAndQuestions && policy.resolution !== 'BRIEF') addList(headings.reasons, ir.reasons);
+        if (!skipNextActionsAndQuestions && policy.resolution === 'DETAILED') addList(headings.exceptions, ir.exceptions);
+        if (!skipNextActionsAndQuestions && policy.resolution !== 'BRIEF') addList(headings.conditions, ir.conditions);
         break;
       case 'CORRECTION':
         lines.push(`${headings.conclusion}\n${formattedConclusion}`);
-        if (policy.resolution !== 'BRIEF') {
+        if (!skipNextActionsAndQuestions && policy.resolution !== 'BRIEF') {
           addList(headings.conditions, ir.conditions);
           addList(headings.exceptions, ir.exceptions);
         }
         break;
       case 'UNKNOWN_INVESTIGATION':
         lines.push(`${headings.conclusion}\n${formattedConclusion}`);
-        if (policy.resolution !== 'BRIEF') {
+        if (!skipNextActionsAndQuestions && policy.resolution !== 'BRIEF') {
           addList(headings.exceptions, ir.exceptions);
           addList(headings.conditions, ir.conditions);
         }
-        addList(headings.nextActions, ir.next_actions);
+        if (!skipNextActionsAndQuestions) addList(headings.nextActions, ir.next_actions);
         break;
       case 'TASK_COMPLETION':
         lines.push(`${headings.conclusion}\n${formattedConclusion}`);
         if (extraArtifactCode && policy.resolution !== 'BRIEF') {
           lines.push(`\n【成果物】\n\`\`\`vba\n${extraArtifactCode.trim()}\n\`\`\``);
         }
-        addList(headings.conditions, ir.conditions);
-        if (policy.resolution === 'DETAILED') addList(headings.exceptions, ir.exceptions);
-        addList(headings.nextActions, ir.next_actions);
+        if (!skipNextActionsAndQuestions) {
+          addList(headings.conditions, ir.conditions);
+          if (policy.resolution === 'DETAILED') addList(headings.exceptions, ir.exceptions);
+          addList(headings.nextActions, ir.next_actions);
+        }
         break;
       case 'GENERAL_ANSWER':
       default:
         lines.push(formattedConclusion);
-        if (policy.resolution !== 'BRIEF') addList(headings.conditions, ir.conditions);
-        if (policy.resolution === 'DETAILED') addList(headings.exceptions, ir.exceptions);
-        if (policy.resolution !== 'BRIEF') addList(headings.reasons, ir.reasons);
-        addList(headings.nextActions, ir.next_actions);
+        if (!skipNextActionsAndQuestions && policy.resolution !== 'BRIEF') addList(headings.conditions, ir.conditions);
+        if (!skipNextActionsAndQuestions && policy.resolution === 'DETAILED') addList(headings.exceptions, ir.exceptions);
+        if (!skipNextActionsAndQuestions && policy.resolution !== 'BRIEF') addList(headings.reasons, ir.reasons);
+        if (!skipNextActionsAndQuestions) addList(headings.nextActions, ir.next_actions);
         break;
     }
 
     // 接続表現の適用 (currentScene と directness に最適化)
     const activeConnector = surfaceGrammarAndStyleService.getSceneConnector(persona.currentScene, persona.directness) || policy.connector;
-    if (lines.length > 1 && activeConnector && !lines[1].startsWith('\n【')) {
+    if (lines.length > 1 && activeConnector && !lines[1].startsWith('\n【') && !skipNextActionsAndQuestions) {
       lines[1] = `\n${activeConnector}、${lines[1].trimStart()}`;
     }
 
-    // 慎重さ (prudence) の注記付加
-    const prudenceNote = surfaceGrammarAndStyleService.applyPrudenceNote(persona.prudence, persona.currentScene);
-    if (prudenceNote) {
-      lines.push(`\n${prudenceNote}`);
+    // 慎重さ (prudence) の注記付加 (EMPATHY_ONLY / SHORT_ACK ではノイズになるためスキップ)
+    if (!skipNextActionsAndQuestions) {
+      const prudenceNote = surfaceGrammarAndStyleService.applyPrudenceNote(persona.prudence, persona.currentScene);
+      if (prudenceNote) {
+        lines.push(`\n${prudenceNote}`);
+      }
     }
 
-    // 積極的提案 (proactiveSuggestion) の付加
-    const proactiveNote = surfaceGrammarAndStyleService.applyProactiveSuggestion(persona.proactiveSuggestion, persona.currentScene);
-    if (proactiveNote && policy.resolution !== 'BRIEF') {
-      lines.push(`\n${proactiveNote}`);
+    // 積極的提案 (proactiveSuggestion) の付加 (EMPATHY_ONLY / SHORT_ACK では質問付加を完全禁止)
+    if (!skipNextActionsAndQuestions) {
+      const proactiveNote = surfaceGrammarAndStyleService.applyProactiveSuggestion(persona.proactiveSuggestion, persona.currentScene);
+      if (proactiveNote && policy.resolution !== 'BRIEF') {
+        lines.push(`\n${proactiveNote}`);
+      }
     }
 
     let surfaceText = lines.join('\n').trim();
     if (!surfaceText) surfaceText = (formattedConclusion || '現時点では回答を確定できません。').trim();
+
+    // 指示書 1.3: EMPATHY_ONLY の場合、文末の質問表現（〜ですか？、〜いかがですか？等）を徹底排除
+    if (isEmpathyOnly) {
+      surfaceText = surfaceText
+        .replace(/[？?]\s*$/, '。')
+        .replace(/(?:いかがですか|どうでしょうか|何かありますか|教えてください|確認しますか)[。？?]?\s*$/, 'ゆっくり休んでくださいね。');
+    }
 
     // 温かみ (warmth) とユーモア (humor) の適用
     surfaceText = surfaceGrammarAndStyleService.applyWarmthAndHumor(surfaceText, persona);

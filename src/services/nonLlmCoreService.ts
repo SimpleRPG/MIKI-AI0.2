@@ -1,4 +1,4 @@
-import { ChatMessage, ConversationState, AnswerSkeletonType } from '../types';
+import { ChatMessage, ConversationState, AnswerSkeletonType, ConversationStrategy } from '../types';
 import {
   classifyDialogueAct,
   defaultConversationState,
@@ -10,6 +10,7 @@ import { claimDatabaseService } from './claimDatabaseService';
 import { longTermMemoryService } from './longTermMemoryService';
 import { latentIntentMiningService } from './latentIntentMiningService';
 import { answerContentIrService } from './answerContentIrService';
+import { conversationStrategyService } from './conversationStrategyService';
 import { componentRegistryService } from './componentRegistryService';
 import { capabilityGraphService } from './capabilityGraphService';
 import { simpleRpgReferenceService } from './simpleRpgReferenceService';
@@ -59,6 +60,7 @@ export interface NonLlmCoreResult {
   knowledgeGapId?: string;
   researchPerformed?: boolean;
   researchEvidenceCount?: number;
+  strategy?: ConversationStrategy;
   telemetry: {
     totalMs: number;
     cpuMs: number;
@@ -377,25 +379,40 @@ export class NonLlmCoreService {
         nextActions: latent.suggestedProactiveAction ? [latent.suggestedProactiveAction] : [],
       });
     } else if (dialogueAct === 'CASUAL_CHAT') {
-      const casualConclusion = /お疲れ|おつかれ/i.test(prompt)
-        ? 'お疲れ様です！本日も順調に進んでいます。'
-        : /ありがとう|感謝/i.test(prompt)
-        ? 'どういたしまして！お役に立てて何よりです。'
-        : /おはよう/i.test(prompt)
-        ? 'おはようございます！今日も一日頑張りましょう。'
-        : 'こんにちは！本日もよろしくお願いいたします。準備万全です。';
+      const fatigueRegex = /(?:疲れた|しんどい|もう無理|だるい|つらい|嫌になった|最悪|やってられない|眠い|限界|へろへろ|クタクタ)/;
+      const isFatigue = fatigueRegex.test(prompt);
+
+      let casualConclusion: string;
+      if (isFatigue) {
+        casualConclusion = '本当にお疲れ様でした。今日は大変でしたね。無理をなさらず、ゆっくり休んでくださいね。';
+      } else if (/お疲れ|おつかれ/i.test(prompt)) {
+        casualConclusion = 'お疲れ様です！本日も順調に進んでいます。';
+      } else if (/ありがとう|感謝/i.test(prompt)) {
+        casualConclusion = 'どういたしまして！お役に立てて何よりです。';
+      } else if (/おはよう/i.test(prompt)) {
+        casualConclusion = 'おはようございます！今日も一日頑張りましょう。';
+      } else {
+        casualConclusion = 'こんにちは！本日もよろしくお願いいたします。準備万全です。';
+      }
+
+      const strategyResult = conversationStrategyService.selectConversationStrategy({
+        prompt,
+        stage: nextState.stage,
+        persona: answerContentIrService.getDefaultPersona(),
+      });
 
       ir = answerContentIrService.buildAnswerIR({
         conclusion: casualConclusion,
-        target: '日常対話・挨拶',
-        reasons: ['日常対話・挨拶として認識しました。'],
-        conditions: ['前提として、いつでも作業指示やご相談を受け付けています。'],
+        target: '日常対話・挨拶・共感',
+        reasons: ['日常対話・挨拶・感情の受け止めとして認識しました。'],
+        conditions: isFatigue ? [] : ['前提として、いつでも作業指示やご相談を受け付けています。'],
         certainty: 'CERTAIN',
-        detailLevel: 'STANDARD',
+        detailLevel: 'BRIEF',
+        strategy: strategyResult.strategy,
       });
       skeleton = 'GENERAL_ANSWER';
       status = 'RESOLVED';
-      reason = 'casual_chat_resolved';
+      reason = isFatigue ? 'empathy_fatigue_resolved' : 'casual_chat_resolved';
     } else {
       status = 'UNRESOLVED';
       reason = claimMatch.unmetReason || 'knowledge_gap';
@@ -609,6 +626,7 @@ export class NonLlmCoreService {
       knowledgeGapId: (ir as any).__knowledgeGapId,
       researchPerformed: Boolean((ir as any).__researchPerformed),
       researchEvidenceCount: Number((ir as any).__researchEvidenceCount || 0),
+      strategy: ir.strategy,
       telemetry: { totalMs, cpuMs: totalMs, npuMs: 0, gpuMs: 0, stages, externalBytesSent: 0 },
     };
   }
