@@ -53,6 +53,7 @@ import { situationalAwarenessService } from './src/miki/selfAwareness/services/s
 import { operationalConformanceService } from './src/miki/verification/services/operationalConformanceService';
 import { mikiCognitiveKernelService } from './src/miki/selfAwareness/services/mikiCognitiveKernelService';
 import { initializeChapter69to90 } from './src/miki';
+import { mikiCategoryInteractionRuntime } from './src/miki/core/mikiCategoryInteractionRuntime';
 import { automationStudioService } from './src/miki/execution/services/automationStudioService';
 import { digitalResearchNoteService } from './src/miki/research/services/digitalResearchNoteService';
 import { resourceGovernanceService } from './src/miki/safety/services/resourceGovernanceService';
@@ -61,6 +62,10 @@ import { cognitiveEvidenceIntegrationService } from './src/miki/selfAwareness/se
 import { cognitiveExecutionEvidenceService } from './src/miki/selfAwareness/services/cognitiveExecutionEvidenceService';
 
 dotenv.config();
+
+// MIKI 17分類の相互作用ランタイムを起動する。
+// 既存のChapter69-90初期化は変更せず、17分類側を並行稼働させる。
+mikiCategoryInteractionRuntime.start();
 
 const app = express();
 const PORT = 3000;

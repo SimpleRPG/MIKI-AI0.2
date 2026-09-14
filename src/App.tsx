@@ -61,6 +61,7 @@ import {
 } from './miki/conversation/services/conversationStateService';
 import { responseDesignService } from './miki/strategy/services/responseDesignService';
 import { nonLlmCoreService } from './miki/safety/services/nonLlmCoreService';
+import { mikiCategoryInteractionRuntime } from './miki/core/mikiCategoryInteractionRuntime';
 import { executionLearningCoordinatorService } from './miki/learning/services/executionLearningCoordinatorService';
 import { failureUnderstandingService } from './miki/memory/services/failureUnderstandingService';
 import { recoveryOrchestratorService } from './miki/safety/services/recoveryOrchestratorService';
@@ -1065,6 +1066,7 @@ improvementCanaryRollbackService.initialize();
 
     // ユーザーチャット操作を記録し、バックグラウンド重処理の割り込みを防止
     backgroundWorkerService.recordUserActivity();
+    mikiCategoryInteractionRuntime.requestInteraction('conversation.request', { text, attachedCount: attached?.length || 0 }, 'conversation');
 
     if (abortControllerRef.current) {
       systemLogger.warn('CHAT', '前回の未完了リクエストが存在したため中断して新規リクエストを開始します');

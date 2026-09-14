@@ -1,0 +1,54 @@
+
+> miki-ai@1.0.4 lint
+> tsc --noEmit
+
+src/components/ExternalTeacherTab.tsx(100,8): error TS2551: Property 'getCapabilityCandidates' does not exist on type 'SelfImprovementService'. Did you mean 'registerCapabilityCandidate'?
+src/components/ExternalTeacherTab.tsx(101,16): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/autonomy/services/autonomousContinuousEvolutionService.ts(44,8): error TS2307: Cannot find module '../types/evidenceSelfImprovementTypes' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousContinuousEvolutionService.ts(673,215): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/capability/services/capabilityTraceabilityService.ts(9,45): error TS2307: Cannot find module '../data/specificationRegistryData' or its corresponding type declarations.
+src/miki/capability/services/capabilityTraceabilityService.ts(154,16): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/capability/services/capabilityTraceabilityService.ts(156,13): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/conversation/services/conversationEvaluationService.ts(13,33): error TS2307: Cannot find module '../utils/companionEngine' or its corresponding type declarations.
+src/miki/conversation/services/conversationStateService.ts(3,38): error TS2307: Cannot find module '../autonomous_modules/anaphora_history_stack' or its corresponding type declarations.
+src/miki/conversation/services/conversationStateService.ts(4,37): error TS2307: Cannot find module '../autonomous_modules/anaphora_resolver_sample' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationGrowthService.ts(12,31): error TS2307: Cannot find module './surfaceVariationData' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationGrowthService.ts(339,14): error TS7006: Parameter 'm' implicitly has an 'any' type.
+src/miki/conversation/services/surfaceVariationService.ts(13,8): error TS2307: Cannot find module './surfaceVariationData' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationService.ts(14,42): error TS2307: Cannot find module './skeletonVariationData' or its corresponding type declarations.
+src/miki/data/simpleRpgReferenceService.ts(1,32): error TS2307: Cannot find module '../../../services/storageService' or its corresponding type declarations.
+src/miki/execution/services/backgroundWorkerService.ts(15,66): error TS2307: Cannot find module '../utils/memoryRetrieval' or its corresponding type declarations.
+src/miki/execution/services/simpleRpgRuleEngineService.ts(1,64): error TS2307: Cannot find module '../types/rpg' or its corresponding type declarations.
+src/miki/execution/services/simpleRpgRuleEngineService.ts(99,221): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/execution/services/workDirectiveIngestionService.ts(7,8): error TS2307: Cannot find module '../types/evidenceSelfImprovementTypes' or its corresponding type declarations.
+src/miki/execution/services/workDirectiveIngestionService.ts(222,40): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/miki/execution/services/workDirectiveIngestionService.ts(222,45): error TS7006: Parameter 'idx' implicitly has an 'any' type.
+src/miki/improvement/services/evidenceBasedSelfImprovementEngine.ts(19,8): error TS2307: Cannot find module '../types/evidenceSelfImprovementTypes' or its corresponding type declarations.
+src/miki/improvement/services/evidenceBasedSelfImprovementEngine.ts(173,65): error TS7006: Parameter 'fb' implicitly has an 'any' type.
+src/miki/improvement/services/evidenceBasedSelfImprovementEngine.ts(317,62): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/improvement/services/selfImprovementControllerService.ts(18,37): error TS2307: Cannot find module '../types/evidenceSelfImprovementTypes' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementControllerService.ts(119,61): error TS7006: Parameter 't' implicitly has an 'any' type.
+src/miki/improvement/services/selfImprovementService.ts(24,60): error TS2307: Cannot find module '../utils/trainingSampleSafetyFilter' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementService.ts(536,16): error TS2307: Cannot find module './teacherRequestService' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementService.ts(545,23): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/miki/index.ts(24,1): error TS2308: Module './autonomy' has already exported a member named 'MutationTestResult'. Consider explicitly re-exporting to resolve the ambiguity.
+src/miki/learning/services/taskResultFeedbackService.ts(64,48): error TS2307: Cannot find module './executionRunnerService' or its corresponding type declarations.
+src/miki/learning/services/teacherRequestService.ts(20,35): error TS2307: Cannot find module '../utils/trainingSampleSafetyFilter' or its corresponding type declarations.
+src/miki/memory/services/longTermMemoryService.ts(18,8): error TS2307: Cannot find module '../utils/memoryRetrieval' or its corresponding type declarations.
+src/miki/memory/services/longTermMemoryService.ts(288,7): error TS2322: Type 'unknown[]' is not assignable to type 'string[]'.
+  Type 'unknown' is not assignable to type 'string'.
+src/miki/memory/services/longTermMemoryService.ts(427,13): error TS18046: 'tok' is of type 'unknown'.
+src/miki/memory/services/longTermMemoryService.ts(427,54): error TS18046: 'tok' is of type 'unknown'.
+src/miki/research.ts(28,1): error TS2308: Module './research/services/researchService' has already exported a member named 'ResearchRoute'. Consider explicitly re-exporting to resolve the ambiguity.
+src/miki/research/services/syntheticDataService.ts(14,35): error TS2307: Cannot find module '../utils/trainingSampleSafetyFilter' or its corresponding type declarations.
+src/miki/safety/services/featureFlagsService.ts(132,5): error TS2322: Type 'FeatureFlagState | undefined' is not assignable to type 'FeatureFlagState'.
+  Type 'undefined' is not assignable to type 'FeatureFlagState'.
+src/miki/safety/services/nonLlmCoreService.ts(16,43): error TS2307: Cannot find module './simpleRpgReferenceService' or its corresponding type declarations.
+src/miki/safety/services/nonLlmCoreService.ts(179,82): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/selfAwareness/services/affectionDynamicsService.ts(17,42): error TS2307: Cannot find module '../autonomous_modules/chapter_39' or its corresponding type declarations.
+src/miki/selfAwareness/services/metacognitiveCalibrationService.ts(18,46): error TS2307: Cannot find module '../autonomous_modules/chapter_38' or its corresponding type declarations.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(42,34): error TS2307: Cannot find module '../autonomous_modules/chapter_31_collocation_ast_refactor' or its corresponding type declarations.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(48,45): error TS2307: Cannot find module '../data/specificationRegistryData' or its corresponding type declarations.
+src/miki/unknown/services/counterfactualReasoningService.ts(22,47): error TS2307: Cannot find module '../autonomous_modules/chapter_36' or its corresponding type declarations.
+src/miki/unknown/services/latentIntentMiningService.ts(22,45): error TS2307: Cannot find module '../autonomous_modules/chapter_37' or its corresponding type declarations.
+src/miki/verification/services/formalConstraintSolverService.ts(12,36): error TS2307: Cannot find module '../autonomous_modules/chapter_59' or its corresponding type declarations.

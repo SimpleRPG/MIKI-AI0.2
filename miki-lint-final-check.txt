@@ -1,0 +1,9 @@
+
+> miki-ai@1.0.4 lint
+> tsc --noEmit
+
+src/components/ExternalTeacherTab.tsx(100,8): error TS2551: Property 'getCapabilityCandidates' does not exist on type 'SelfImprovementService'. Did you mean 'registerCapabilityCandidate'?
+src/components/ExternalTeacherTab.tsx(101,16): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/index.ts(24,1): error TS2308: Module './autonomy' has already exported a member named 'MutationTestResult'. Consider explicitly re-exporting to resolve the ambiguity.
+src/miki/safety/services/featureFlagsService.ts(132,5): error TS2322: Type 'FeatureFlagState | undefined' is not assignable to type 'FeatureFlagState'.
+  Type 'undefined' is not assignable to type 'FeatureFlagState'.

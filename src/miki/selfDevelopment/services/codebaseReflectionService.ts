@@ -77,7 +77,7 @@ class CodebaseReflectionService {
         category: 'SERVICE',
         description: 'ローカルGPU/GGUF/モデル生成系ランタイムモデル推論実行・保護・不変条件チェック',
         primaryExports: ['nonLlmRuntimeService'],
-        dependencies: ['nonLlmModelCatalog.ts', 'storageService.ts'],
+        dependencies: ['storageService.ts'],
         linkedChapterNumbers: [0, 1, 14, 15, 16],
         riskLevel: 'HIGH',
       },

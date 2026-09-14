@@ -1,0 +1,4 @@
+
+> miki-ai@1.0.4 lint
+> tsc --noEmit
+

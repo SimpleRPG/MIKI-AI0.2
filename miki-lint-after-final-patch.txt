@@ -1,0 +1,5 @@
+
+> miki-ai@1.0.4 lint
+> tsc --noEmit
+
+src/miki/improvement/services/selfImprovementService.ts(818,21): error TS2551: Property 'capabilityCandidates' does not exist on type 'SelfImprovementService'. Did you mean 'getCapabilityCandidates'?

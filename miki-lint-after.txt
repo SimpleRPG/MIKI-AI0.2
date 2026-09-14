@@ -1,0 +1,616 @@
+
+> miki-ai@1.0.4 lint
+> tsc --noEmit
+
+src/App.tsx(1400,56): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/App.tsx(2638,31): error TS18048: 'synthesizedWf' is possibly 'undefined'.
+src/App.tsx(2638,80): error TS18048: 'synthesizedWf' is possibly 'undefined'.
+src/App.tsx(3248,15): error TS18048: 'draftVerificationData' is possibly 'undefined'.
+src/App.tsx(3249,32): error TS18048: 'draftVerificationData' is possibly 'undefined'.
+src/components/ChatPanel.tsx(720,56): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/components/ExternalTeacherTab.tsx(100,8): error TS2551: Property 'getCapabilityCandidates' does not exist on type 'SelfImprovementService'. Did you mean 'registerCapabilityCandidate'?
+src/components/ExternalTeacherTab.tsx(101,16): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/components/self_improvement/NonLlmArchitectureTab.tsx(903,46): error TS18046: 'ev' is of type 'unknown'.
+src/components/self_improvement/NonLlmArchitectureTab.tsx(904,32): error TS18046: 'ev' is of type 'unknown'.
+src/components/self_improvement/NonLlmArchitectureTab.tsx(906,30): error TS18046: 'ev' is of type 'unknown'.
+src/components/self_improvement/NonLlmArchitectureTab.tsx(906,53): error TS18046: 'ev' is of type 'unknown'.
+src/components/self_improvement/SelfCodeArchitectTab.tsx(266,31): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/components/self_improvement/SelfCodeArchitectTab.tsx(1229,53): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/components/self_improvement/SelfCodeArchitectTab.tsx(1229,58): error TS7006: Parameter 'idx' implicitly has an 'any' type.
+src/miki/autonomy/services/autonomousContinuousEvolutionService.ts(12,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousContinuousEvolutionService.ts(13,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousContinuousEvolutionService.ts(28,70): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousContinuousEvolutionService.ts(44,8): error TS2307: Cannot find module '../types/evidenceSelfImprovementTypes' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousContinuousEvolutionService.ts(673,215): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/autonomy/services/autonomousEvolutionService.ts(6,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousEvolutionService.ts(7,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousEvolutionService.ts(8,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousEvolutionService.ts(17,41): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousGrowthGovernorService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousGrowthGovernorService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousHardeningService.ts(16,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousHardeningService.ts(17,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousHardeningService.ts(18,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/autonomy/services/autonomousRevalidationLoopService.ts(5,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/capabilityGapService.ts(6,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/capability/services/capabilityGapService.ts(7,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/capabilityGapService.ts(8,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/capabilityGraphService.ts(1,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/capability/services/capabilityGraphService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/capabilityGraphService.ts(161,59): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/miki/capability/services/capabilityGraphService.ts(168,59): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/miki/capability/services/capabilityGraphService.ts(212,50): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/capability/services/capabilityGraphService.ts(213,34): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/capability/services/capabilityGraphService.ts(213,68): error TS7006: Parameter 't' implicitly has an 'any' type.
+src/miki/capability/services/capabilityGraphService.ts(216,35): error TS18046: 'o' is of type 'unknown'.
+src/miki/capability/services/capabilityImplementationRegistryService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/capabilityImplementationRegistryService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/capabilityLearningService.ts(4,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/capabilityLearningService.ts(5,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/capabilityPluginService.ts(5,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/capability/services/capabilityPluginService.ts(6,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/capabilityPluginService.ts(7,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/capabilityPluginService.ts(305,38): error TS7006: Parameter 't' implicitly has an 'any' type.
+src/miki/capability/services/capabilityPluginService.ts(376,38): error TS7006: Parameter 'perm' implicitly has an 'any' type.
+src/miki/capability/services/capabilityPluginService.ts(381,7): error TS2322: Type 'unknown[]' is not assignable to type 'string[]'.
+  Type 'unknown' is not assignable to type 'string'.
+src/miki/capability/services/capabilityReuseService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/capabilityReuseService.ts(3,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/capabilityTraceabilityService.ts(9,45): error TS2307: Cannot find module '../data/specificationRegistryData' or its corresponding type declarations.
+src/miki/capability/services/capabilityTraceabilityService.ts(154,16): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/capability/services/capabilityTraceabilityService.ts(156,13): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/capability/services/componentArtifactStoreService.ts(1,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/capability/services/componentArtifactStoreService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/componentArtifactStoreService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/componentCompositionService.ts(1,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/capability/services/componentCompositionService.ts(4,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/componentCompositionService.ts(70,58): error TS7006: Parameter 'dep' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(74,51): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(74,109): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(106,58): error TS7006: Parameter 'dep' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(115,51): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(116,53): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(132,63): error TS7006: Parameter 'dep' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(162,27): error TS7006: Parameter 'dep' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(181,59): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(183,59): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(195,54): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(196,34): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(196,68): error TS7006: Parameter 't' implicitly has an 'any' type.
+src/miki/capability/services/componentCompositionService.ts(199,39): error TS18046: 'o' is of type 'unknown'.
+src/miki/capability/services/componentRegistryService.ts(7,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/capability/services/componentRegistryService.ts(8,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/componentRegistryService.ts(9,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/componentVersionHistoryService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/componentVersionHistoryService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/deterministicCapabilityEvolutionService.ts(1,45): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/capability/services/deterministicCapabilityEvolutionService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/deterministicCapabilityEvolutionService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/deterministicCapabilityExecutionService.ts(6,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/dynamicToolFactoryService.ts(14,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/capability/services/dynamicToolFactoryService.ts(15,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/dynamicToolFactoryService.ts(18,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/skillsService.ts(1,102): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/capability/services/skillsService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/skillsService.ts(3,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/skillsService.ts(431,70): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/capability/services/skillsService.ts(431,73): error TS7006: Parameter 'idx' implicitly has an 'any' type.
+src/miki/capability/services/skillsService.ts(436,56): error TS7006: Parameter 'st' implicitly has an 'any' type.
+src/miki/capability/services/skillsService.ts(436,60): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/miki/capability/services/skillsService.ts(726,72): error TS7006: Parameter 'k' implicitly has an 'any' type.
+src/miki/capability/services/skillsService.ts(760,35): error TS7006: Parameter 'st' implicitly has an 'any' type.
+src/miki/capability/services/toolsService.ts(9,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/capability/services/toolsService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/capability/services/toolsService.ts(11,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/capability/services/toolsService.ts(18,52): error TS2307: Cannot find module './api' or its corresponding type declarations.
+src/miki/capability/services/toolsService.ts(909,10): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/miki/capability/services/toolsService.ts(1480,22): error TS7006: Parameter 'line' implicitly has an 'any' type.
+src/miki/capability/services/toolsService.ts(1480,28): error TS7006: Parameter 'idx' implicitly has an 'any' type.
+src/miki/conversation/services/answerContentIrService.ts(9,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/conversation/services/answerContentIrService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/conversation/services/answerContentIrService.ts(16,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/conversation/services/conversationBranchService.ts(11,45): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/conversation/services/conversationBranchService.ts(12,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/conversation/services/conversationBranchService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/conversation/services/conversationComponentCompositionService.ts(5,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/conversation/services/conversationComponentCompositionService.ts(14,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/conversation/services/conversationComponentCompositionService.ts(15,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/conversation/services/conversationComponentCompositionService.ts(620,84): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/conversation/services/conversationEvaluationService.ts(9,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/conversation/services/conversationEvaluationService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/conversation/services/conversationEvaluationService.ts(12,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/conversation/services/conversationEvaluationService.ts(13,33): error TS2307: Cannot find module '../utils/companionEngine' or its corresponding type declarations.
+src/miki/conversation/services/conversationEvaluationService.ts(326,39): error TS7006: Parameter 'kw' implicitly has an 'any' type.
+src/miki/conversation/services/conversationEvaluationService.ts(330,63): error TS7006: Parameter 'kw' implicitly has an 'any' type.
+src/miki/conversation/services/conversationEvaluationService.ts(342,61): error TS7006: Parameter 'fk' implicitly has an 'any' type.
+src/miki/conversation/services/conversationEvaluationService.ts(650,73): error TS18046: 'score' is of type 'unknown'.
+src/miki/conversation/services/conversationStateService.ts(1,98): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/conversation/services/conversationStateService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/conversation/services/conversationStateService.ts(3,38): error TS2307: Cannot find module '../autonomous_modules/anaphora_history_stack' or its corresponding type declarations.
+src/miki/conversation/services/conversationStateService.ts(4,37): error TS2307: Cannot find module '../autonomous_modules/anaphora_resolver_sample' or its corresponding type declarations.
+src/miki/conversation/services/conversationTaskboardService.ts(16,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/conversation/services/conversationTaskboardService.ts(17,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/conversation/services/conversationTaskboardService.ts(18,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/conversation/services/dialogueEvaluationService.ts(8,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/conversation/services/dialogueEvaluationService.ts(9,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/conversation/services/dialogueEvaluationService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/conversation/services/dialogueEvaluationService.ts(12,33): error TS2307: Cannot find module './api' or its corresponding type declarations.
+src/miki/conversation/services/dialogueEvaluationService.ts(249,50): error TS7006: Parameter 'k' implicitly has an 'any' type.
+src/miki/conversation/services/dialogueEvaluationService.ts(250,22): error TS7006: Parameter 'k' implicitly has an 'any' type.
+src/miki/conversation/services/dialogueEvaluationService.ts(392,60): error TS7006: Parameter 'h' implicitly has an 'any' type.
+src/miki/conversation/services/dialogueEvaluationService.ts(392,63): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/miki/conversation/services/hybridConversationEngineService.ts(1,55): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/conversation/services/liveConversationRepairService.ts(11,66): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/conversation/services/liveConversationRepairService.ts(12,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/conversation/services/liveConversationRepairService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/conversation/services/surfaceGrammarAndStyleService.ts(5,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/conversation/services/surfaceGrammarAndStyleService.ts(6,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationGrowthService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationGrowthService.ts(12,31): error TS2307: Cannot find module './surfaceVariationData' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationGrowthService.ts(15,33): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationGrowthService.ts(20,45): error TS2307: Cannot find module './api' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationGrowthService.ts(339,14): error TS7006: Parameter 'm' implicitly has an 'any' type.
+src/miki/conversation/services/surfaceVariationService.ts(13,8): error TS2307: Cannot find module './surfaceVariationData' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationService.ts(14,42): error TS2307: Cannot find module './skeletonVariationData' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationService.ts(15,60): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/data/simpleRpgReferenceService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/execution/services/androidNativeRunnerAdapterService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/execution/services/automationStudioService.ts(2,30): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/execution/services/backgroundWorkerService.ts(10,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/execution/services/backgroundWorkerService.ts(14,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/execution/services/backgroundWorkerService.ts(15,66): error TS2307: Cannot find module '../utils/memoryRetrieval' or its corresponding type declarations.
+src/miki/execution/services/backgroundWorkerService.ts(18,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/execution/services/executionRunnerService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/execution/services/executionRunnerService.ts(4,39): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/execution/services/executionRunnerService.ts(6,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/execution/services/executionRunnerService.ts(115,62): error TS7006: Parameter 'env' implicitly has an 'any' type.
+src/miki/execution/services/externalRunnerAdapterService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/execution/services/nativeWorkManagerService.ts(2,40): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/execution/services/personalApiGatewayService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/execution/services/personalApiGatewayService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/execution/services/remediationExecutionCoordinatorService.ts(7,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/execution/services/simpleRpgRuleEngineService.ts(1,64): error TS2307: Cannot find module '../types/rpg' or its corresponding type declarations.
+src/miki/execution/services/simpleRpgRuleEngineService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/execution/services/simpleRpgRuleEngineService.ts(99,221): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/execution/services/storagePlanningService.ts(1,66): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/execution/services/storagePlanningService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/execution/services/storagePlanningService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/execution/services/taskExecutionOrchestratorService.ts(6,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/execution/services/taskLineageService.ts(1,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/execution/services/taskLineageService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/execution/services/workDirectiveIngestionService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/execution/services/workDirectiveIngestionService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/execution/services/workDirectiveIngestionService.ts(7,8): error TS2307: Cannot find module '../types/evidenceSelfImprovementTypes' or its corresponding type declarations.
+src/miki/execution/services/workDirectiveIngestionService.ts(222,40): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/miki/execution/services/workDirectiveIngestionService.ts(222,45): error TS7006: Parameter 'idx' implicitly has an 'any' type.
+src/miki/execution/services/workflowSynthesisService.ts(5,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/execution/services/workflowSynthesisService.ts(8,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/execution/services/workflowSynthesisService.ts(11,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/execution/services/workflowSynthesisService.ts(291,33): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/execution/services/workflowSynthesisService.ts(297,37): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/execution/services/workflowSynthesisService.ts(298,38): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/execution/services/workflowSynthesisService.ts(317,33): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/execution/services/workflowSynthesisService.ts(348,43): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/experience/services/experienceFreshnessService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/experience/services/experienceLinkService.ts(11,32): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/experience/services/experienceLinkService.ts(12,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/experience/services/experienceLinkService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/experience/services/experienceRouterService.ts(8,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/experience/services/experienceRouterService.ts(9,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/experience/services/experienceRouterService.ts(10,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/experience/services/experienceRouterService.ts(379,49): error TS7006: Parameter 'l' implicitly has an 'any' type.
+src/miki/experience/services/experienceRouterService.ts(405,49): error TS7006: Parameter 'l' implicitly has an 'any' type.
+src/miki/experience/services/unifiedMikiExperienceService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/experience/services/unifiedMikiExperienceService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/experience/services/virtualExperienceGeneratorService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/experience/services/virtualExperienceGeneratorService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/componentImprovementCandidateService.ts(1,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/improvement/services/componentImprovementCandidateService.ts(3,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/componentImprovementCandidateService.ts(4,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/deterministicSelfImprovementLabService.ts(14,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/deterministicSelfImprovementLabService.ts(56,44): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/improvement/services/deterministicSelfImprovementLabService.ts(79,108): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/improvement/services/deterministicSelfImprovementLabService.ts(96,108): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/improvement/services/deterministicSelfImprovementLabService.ts(106,108): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/improvement/services/deterministicSelfImprovementLabService.ts(119,41): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/improvement/services/evidenceBasedSelfImprovementEngine.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/evidenceBasedSelfImprovementEngine.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/evidenceBasedSelfImprovementEngine.ts(19,8): error TS2307: Cannot find module '../types/evidenceSelfImprovementTypes' or its corresponding type declarations.
+src/miki/improvement/services/evidenceBasedSelfImprovementEngine.ts(173,65): error TS7006: Parameter 'fb' implicitly has an 'any' type.
+src/miki/improvement/services/evidenceBasedSelfImprovementEngine.ts(317,62): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/improvement/services/hardeningRegressionCandidateService.ts(8,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/hardeningRegressionCandidateService.ts(9,39): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/improvement/services/improvementCanaryRollbackService.ts(1,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/improvement/services/improvementCanaryRollbackService.ts(7,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/improvementCanaryRollbackService.ts(8,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/improvementProposalService.ts(4,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/improvementProposalService.ts(5,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/improvementRegressionCoordinatorService.ts(5,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/improvementRegressionCoordinatorService.ts(6,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/improvementStaticGuardService.ts(1,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/improvement/services/improvementStaticGuardService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/improvementStaticGuardService.ts(60,76): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/miki/improvement/services/safeImprovementPipelineService.ts(5,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/safeImprovementPipelineService.ts(6,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementControllerService.ts(6,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementControllerService.ts(7,28): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementControllerService.ts(8,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementControllerService.ts(18,37): error TS2307: Cannot find module '../types/evidenceSelfImprovementTypes' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementControllerService.ts(119,61): error TS7006: Parameter 't' implicitly has an 'any' type.
+src/miki/improvement/services/selfImprovementExperimentService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementExperimentService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementExperimentService.ts(40,61): error TS7006: Parameter 'm' implicitly has an 'any' type.
+src/miki/improvement/services/selfImprovementMetricsService.ts(6,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementMetricsService.ts(7,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementService.ts(16,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementService.ts(20,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementService.ts(21,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementService.ts(24,60): error TS2307: Cannot find module '../utils/trainingSampleSafetyFilter' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementService.ts(536,16): error TS2307: Cannot find module './teacherRequestService' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementService.ts(545,23): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/miki/improvement/services/selfImprovementService.ts(790,43): error TS7006: Parameter 'evId' implicitly has an 'any' type.
+src/miki/improvement/services/selfImprovementSuiteService.ts(11,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementSuiteService.ts(12,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementSuiteService.ts(13,73): error TS2307: Cannot find module './api' or its corresponding type declarations.
+src/miki/index.ts(24,1): error TS2308: Module './autonomy' has already exported a member named 'MutationTestResult'. Consider explicitly re-exporting to resolve the ambiguity.
+src/miki/learning/services/autonomousCurriculumService.ts(14,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/learning/services/autonomousCurriculumService.ts(15,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/codeComprehensionQuizService.ts(2,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/learning/services/decisionLearningService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/learning/services/decisionLearningService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/decisionLearningService.ts(4,86): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/learning/services/decisionLearningService.ts(36,40): error TS2339: Property 'outcome' does not exist on type '{}'.
+src/miki/learning/services/decisionLearningService.ts(36,76): error TS2339: Property 'outcome' does not exist on type '{}'.
+src/miki/learning/services/decisionLearningService.ts(36,117): error TS2339: Property 'cause' does not exist on type '{}'.
+src/miki/learning/services/decisionLearningService.ts(37,31): error TS2339: Property 'cause' does not exist on type '{}'.
+src/miki/learning/services/decisionLearningService.ts(37,61): error TS2339: Property 'cause' does not exist on type '{}'.
+src/miki/learning/services/executionLearningCoordinatorService.ts(6,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/mikiConversationLearningService.ts(5,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/learning/services/mikiConversationLearningService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/mikiUnifiedLearningContinuumService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/learning/services/mikiUnifiedLearningContinuumService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/simpleRpgCapabilityLearningService.ts(1,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/learning/services/simpleRpgCapabilityLearningService.ts(4,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/learning/services/simpleRpgCapabilityLearningService.ts(5,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/taskConversationFeedbackService.ts(4,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/taskResultFeedbackService.ts(7,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/taskResultFeedbackService.ts(64,48): error TS2307: Cannot find module './executionRunnerService' or its corresponding type declarations.
+src/miki/learning/services/teacherDriftService.ts(9,41): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/learning/services/teacherDriftService.ts(10,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/learning/services/teacherDriftService.ts(11,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/teacherRequestService.ts(16,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/learning/services/teacherRequestService.ts(17,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/learning/services/teacherRequestService.ts(19,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/teacherRequestService.ts(20,35): error TS2307: Cannot find module '../utils/trainingSampleSafetyFilter' or its corresponding type declarations.
+src/miki/learning/services/teacherRequestService.ts(23,90): error TS2307: Cannot find module './api' or its corresponding type declarations.
+src/miki/learning/services/teacherRequestService.ts(547,169): error TS7006: Parameter 'm' implicitly has an 'any' type.
+src/miki/learning/services/uncertaintyTeacherService.ts(1,61): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/learning/services/uncertaintyTeacherService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/learning/services/uncertaintyTeacherService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/uncertaintyTeacherService.ts(4,33): error TS2307: Cannot find module './api' or its corresponding type declarations.
+src/miki/learning/services/userProficiencyService.ts(15,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/learning/services/userProficiencyService.ts(16,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/learning/services/userProficiencyService.ts(17,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/learning/services/virtualTrainingService.ts(6,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/learning/services/virtualTrainingService.ts(9,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/learning/services/virtualTrainingService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/causalMemoryLedgerService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/causalMemoryLedgerService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/claimDatabaseService.ts(10,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/memory/services/claimDatabaseService.ts(11,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/claimDatabaseService.ts(12,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/claimDatabaseService.ts(501,13): error TS7006: Parameter 'id' implicitly has an 'any' type.
+src/miki/memory/services/claimDatabaseService.ts(502,16): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/memory/services/evidenceService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/evidenceService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/failureCatalogService.ts(8,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/memory/services/failureCatalogService.ts(9,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/failureCatalogService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/failureCatalogService.ts(205,53): error TS7006: Parameter 'tp' implicitly has an 'any' type.
+src/miki/memory/services/failureMemoryService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/failureMemoryService.ts(3,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/failureUnderstandingService.ts(4,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/knowledgeHalfLifeService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/longTermMemoryService.ts(10,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/memory/services/longTermMemoryService.ts(11,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/longTermMemoryService.ts(18,8): error TS2307: Cannot find module '../utils/memoryRetrieval' or its corresponding type declarations.
+src/miki/memory/services/longTermMemoryService.ts(427,13): error TS18046: 'tok' is of type 'unknown'.
+src/miki/memory/services/longTermMemoryService.ts(427,54): error TS18046: 'tok' is of type 'unknown'.
+src/miki/memory/services/longTermMemoryService.ts(434,25): error TS7006: Parameter 't' implicitly has an 'any' type.
+src/miki/memory/services/longTermMemoryService.ts(437,37): error TS7006: Parameter 'k' implicitly has an 'any' type.
+src/miki/memory/services/longTermMemoryService.ts(455,29): error TS7006: Parameter 'id' implicitly has an 'any' type.
+src/miki/memory/services/longTermMemoryService.ts(802,67): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/miki/memory/services/memoryAuditService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/memoryAuditService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/memoryAuditService.ts(13,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/memory/services/memoryAuditService.ts(84,46): error TS7006: Parameter 'm' implicitly has an 'any' type.
+src/miki/memory/services/memoryPromotionService.ts(1,28): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/memory/services/memoryPromotionService.ts(4,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/metaMemoryService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/mikiBrainCapsuleService.ts(12,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/mikiBrainCapsuleService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/mikiIntrospectionJournalService.ts(12,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/mikiIntrospectionJournalService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/structuralMemoryService.ts(1,53): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/memory/services/structuralMemoryService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/structuralMemoryService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/taskCaseMemoryService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/taskCaseMemoryService.ts(5,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/memory/services/wordAssociationGraphService.ts(1,29): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/memory/services/wordAssociationGraphService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/memory/services/wordAssociationGraphService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/promotion/services/componentPromotionService.ts(4,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/promotion/services/componentPromotionService.ts(5,33): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/promotion/services/evidenceBasedPromotionGateService.ts(16,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/promotion/services/heuristicGraduationService.ts(1,35): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/promotion/services/heuristicGraduationService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/promotion/services/heuristicGraduationService.ts(4,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/promotion/services/verifiedCapabilityPromotionService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/promotion/services/verifiedCapabilityPromotionService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/promotion/services/verifiedKnowledgePromotionService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/promotion/services/verifiedKnowledgePromotionService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/research.ts(28,1): error TS2308: Module './research/services/researchService' has already exported a member named 'ResearchRoute'. Consider explicitly re-exporting to resolve the ambiguity.
+src/miki/research/services/autonomousSearchService.ts(6,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/research/services/autonomousSearchService.ts(7,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/research/services/autonomousSearchService.ts(8,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/research/services/autonomousSearchService.ts(18,35): error TS2307: Cannot find module './api' or its corresponding type declarations.
+src/miki/research/services/causalInvestigationService.ts(2,30): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/research/services/digitalResearchNoteService.ts(12,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/research/services/digitalResearchNoteService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/research/services/embeddingService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/research/services/embeddingService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/research/services/embeddingService.ts(5,84): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/research/services/embeddingService.ts(238,8): error TS7006: Parameter 'm' implicitly has an 'any' type.
+src/miki/research/services/embeddingService.ts(313,8): error TS7006: Parameter 'm' implicitly has an 'any' type.
+src/miki/research/services/japaneseAnalysisService.ts(1,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/research/services/japaneseDictionaryService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/research/services/japaneseDictionaryService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/research/services/offlineKnowledgePackService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/research/services/researchStrategyService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/research/services/researchToRemediationService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/research/services/researchToRemediationService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/research/services/syntheticDataService.ts(7,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/research/services/syntheticDataService.ts(12,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/research/services/syntheticDataService.ts(13,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/research/services/syntheticDataService.ts(14,35): error TS2307: Cannot find module '../utils/trainingSampleSafetyFilter' or its corresponding type declarations.
+src/miki/research/services/webMaterialPatternExtractor.ts(14,32): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/safety/services/abstractSanitizerService.ts(1,39): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/safety/services/abstractSanitizerService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/safety/services/abstractSanitizerService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/abstractSanitizerService.ts(66,20): error TS7053: Element implicitly has an 'any' type because expression of type 'AbstractSymbolMapping' can't be used to index type '{ worksheet: number; supplier_or_entity: number; procedure: number; column: number; path: number; host: number; credential: number; person: number; }'.
+src/miki/safety/services/abstractSanitizerService.ts(67,31): error TS7053: Element implicitly has an 'any' type because expression of type 'AbstractSymbolMapping' can't be used to index type '{ worksheet: number; supplier_or_entity: number; procedure: number; column: number; path: number; host: number; credential: number; person: number; }'.
+src/miki/safety/services/abstractSanitizerService.ts(70,5): error TS7053: Element implicitly has an 'any' type because expression of type 'AbstractSymbolMapping' can't be used to index type '{ worksheet: number; supplier_or_entity: number; procedure: number; column: number; path: number; host: number; credential: number; person: number; }'.
+src/miki/safety/services/bannedTopicsConfigService.ts(11,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/safety/services/bannedTopicsConfigService.ts(12,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/canaryDeploymentSafetyService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/canaryDeploymentSafetyService.ts(11,73): error TS2307: Cannot find module './api' or its corresponding type declarations.
+src/miki/safety/services/cloudAiRestrictedGatewayService.ts(15,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/safety/services/cloudAiRestrictedGatewayService.ts(17,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/cloudAiRestrictedGatewayService.ts(19,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/safety/services/failureRecoveryService.ts(5,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/featureFlagsService.ts(1,54): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/safety/services/featureFlagsService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/safety/services/featureFlagsService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/featureFlagsService.ts(139,52): error TS2731: Implicit conversion of a 'symbol' to a 'string' will fail at runtime. Consider wrapping this expression in 'String(...)'.
+src/miki/safety/services/llmMigrationProtocolService.ts(12,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/safety/services/llmMigrationProtocolService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/llmMigrationProtocolService.ts(14,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/safety/services/llmMigrationProtocolService.ts(311,36): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(311,39): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(312,36): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(312,39): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(314,50): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(314,53): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(315,51): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(318,39): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(318,42): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(325,13): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(326,16): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(328,59): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(328,62): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/miki/safety/services/llmMigrationProtocolService.ts(418,55): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/miki/safety/services/modelLifecycleService.ts(1,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/nonLlmCoreService.ts(1,90): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/safety/services/nonLlmCoreService.ts(16,43): error TS2307: Cannot find module './simpleRpgReferenceService' or its corresponding type declarations.
+src/miki/safety/services/nonLlmCoreService.ts(20,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/nonLlmCoreService.ts(179,82): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/safety/services/nonLlmCoreService.ts(270,54): error TS7006: Parameter 'tc' implicitly has an 'any' type.
+src/miki/safety/services/nonLlmCoreService.ts(296,68): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/miki/safety/services/nonLlmCoreService.ts(298,57): error TS7006: Parameter 'name' implicitly has an 'any' type.
+src/miki/safety/services/nonLlmHardwarePipelineService.ts(5,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/safety/services/nonLlmHardwarePipelineService.ts(11,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/nonLlmRuntimeService.ts(1,34): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/safety/services/privacyGuardrailService.ts(6,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/safety/services/privacyGuardrailService.ts(7,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/safety/services/privacyGuardrailService.ts(8,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/recoveryOrchestratorService.ts(6,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/recoveryOrchestratorService.ts(7,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/safety/services/remediationFailureRecoveryService.ts(9,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/remediationFailureRecoveryService.ts(10,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/safety/services/resourceGovernanceService.ts(7,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/safety/services/resourceGovernanceService.ts(8,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/safety/services/reversibilityService.ts(2,30): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/safety/services/sandboxPermissionService.ts(12,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfAwareness/services/affectionDynamicsService.ts(14,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfAwareness/services/affectionDynamicsService.ts(15,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfAwareness/services/affectionDynamicsService.ts(16,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfAwareness/services/affectionDynamicsService.ts(17,42): error TS2307: Cannot find module '../autonomous_modules/chapter_39' or its corresponding type declarations.
+src/miki/selfAwareness/services/cognitiveEvidenceIntegrationService.ts(4,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfAwareness/services/cognitiveExecutionEvidenceService.ts(4,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfAwareness/services/knowledgeOperatingSystemService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfAwareness/services/knowledgeOperatingSystemService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfAwareness/services/metacognitiveCalibrationService.ts(14,48): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfAwareness/services/metacognitiveCalibrationService.ts(15,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfAwareness/services/metacognitiveCalibrationService.ts(16,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfAwareness/services/metacognitiveCalibrationService.ts(18,46): error TS2307: Cannot find module '../autonomous_modules/chapter_38' or its corresponding type declarations.
+src/miki/selfAwareness/services/mikiCognitiveVitalsService.ts(12,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfAwareness/services/mikiCognitiveVitalsService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfAwareness/services/mikiReasoningTemplateService.ts(7,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfAwareness/services/mikiReasoningTemplateService.ts(11,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfAwareness/services/situationalAwarenessService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfAwareness/services/situationalAwarenessService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfAwareness/services/whyAnswerInspectorService.ts(10,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfAwareness/services/whyAnswerInspectorService.ts(11,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfAwareness/services/worldModelService.ts(1,95): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfAwareness/services/worldModelService.ts(3,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfAwareness/services/worldModelService.ts(137,67): error TS7006: Parameter 'k' implicitly has an 'any' type.
+src/miki/selfAwareness/services/worldModelService.ts(138,29): error TS7006: Parameter 'kw' implicitly has an 'any' type.
+src/miki/selfDevelopment/services/aiderEngineService.ts(11,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/aiderEngineService.ts(12,52): error TS2307: Cannot find module './api' or its corresponding type declarations.
+src/miki/selfDevelopment/services/autonomousSoftwareFactoryService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/codeMapService.ts(7,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfDevelopment/services/codeSearchService.ts(10,53): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfDevelopment/services/codeSearchService.ts(11,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/codeSkeletonService.ts(10,38): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfDevelopment/services/codeSkeletonService.ts(11,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfDevelopment/services/codeSkeletonService.ts(12,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/codeUnderstandingService.ts(8,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfDevelopment/services/codeUnderstandingService.ts(9,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/codeUnderstandingService.ts(348,35): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/miki/selfDevelopment/services/codeUnderstandingService.ts(400,48): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/selfDevelopment/services/codebaseReflectionService.ts(12,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/mikiAutonomousDevStudioService.ts(19,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfDevelopment/services/mikiAutonomousDevStudioService.ts(20,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/mikiAutonomousDevStudioService.ts(21,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfDevelopment/services/mikiAutonomousDevStudioService.ts(346,66): error TS7006: Parameter 'cur' implicitly has an 'any' type.
+src/miki/selfDevelopment/services/mikiAutonomousDevStudioService.ts(355,66): error TS7006: Parameter 'cur' implicitly has an 'any' type.
+src/miki/selfDevelopment/services/mikiAutonomousDevStudioService.ts(799,84): error TS7006: Parameter 'cur' implicitly has an 'any' type.
+src/miki/selfDevelopment/services/mikiSelfCodingSuperchargerService.ts(1,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/mikiSelfCodingSuperchargerService.ts(2,44): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfDevelopment/services/mikiSelfCodingSuperchargerService.ts(5,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfDevelopment/services/nonLlmCodeSynthesisService.ts(1,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfDevelopment/services/requestTypeCompilerService.ts(1,56): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfDevelopment/services/requestTypeCompilerService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/selfCodeApiClient.ts(9,45): error TS2307: Cannot find module './api' or its corresponding type declarations.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(21,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(22,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(23,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(42,34): error TS2307: Cannot find module '../autonomous_modules/chapter_31_collocation_ast_refactor' or its corresponding type declarations.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(43,73): error TS2307: Cannot find module './api' or its corresponding type declarations.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(48,45): error TS2307: Cannot find module '../data/specificationRegistryData' or its corresponding type declarations.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(186,33): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(1028,55): error TS7006: Parameter 'inv' implicitly has an 'any' type.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(1042,66): error TS7006: Parameter 'cmd' implicitly has an 'any' type.
+src/miki/selfDevelopment/services/selfCodeArchitectService.ts(1042,71): error TS7006: Parameter 'idx' implicitly has an 'any' type.
+src/miki/selfDevelopment/services/skillIrCompilerService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/specAstParserService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/specContractCompilerService.ts(6,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/specContractCompilerService.ts(7,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/selfDevelopment/services/vbaDesignAssistantService.ts(6,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/selfDevelopment/services/vbaDesignAssistantService.ts(7,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/selfDevelopment/services/vbaDesignAssistantService.ts(224,10): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/miki/strategy/services/answerPlanService.ts(7,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/answerPlanService.ts(8,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/strategy/services/answerPlanService.ts(9,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/strategy/services/answerPlanService.ts(412,48): error TS7006: Parameter 'k' implicitly has an 'any' type.
+src/miki/strategy/services/answerPlanService.ts(815,32): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/strategy/services/answerPlanService.ts(817,24): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/miki/strategy/services/changeImpactSimulatorService.ts(2,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/changeImpactSimulatorService.ts(13,37): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/miki/strategy/services/changeImpactSimulatorService.ts(21,24): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/strategy/services/changeImpactSimulatorService.ts(22,24): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/strategy/services/changeImpactSimulatorService.ts(22,71): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/strategy/services/changeImpactSimulatorService.ts(23,40): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/strategy/services/changeImpactSimulatorService.ts(23,101): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/strategy/services/changeImpactSimulatorService.ts(24,50): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/miki/strategy/services/changeImpactSimulatorService.ts(25,41): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/strategy/services/changeImpactSimulatorService.ts(25,111): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/miki/strategy/services/contextBudgetEngineService.ts(1,70): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/contextBudgetEngineService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/strategy/services/conversationStrategyService.ts(6,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/conversationStrategyService.ts(7,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/strategy/services/conversationStrategyService.ts(8,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/strategy/services/implementationSelectionService.ts(1,37): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/minimalScopeService.ts(1,34): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/minimalScopeService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/strategy/services/minimalScopeService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/strategy/services/planOrchestratorService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/strategy/services/proactiveContextOsService.ts(12,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/strategy/services/proactiveContextOsService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/strategy/services/responseDesignService.ts(1,121): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/responseDesignService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/strategy/services/responseSurfacePolicyService.ts(1,76): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/responseSurfacePolicyService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/strategy/services/samplingTuningService.ts(1,80): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/samplingTuningService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/strategy/services/samplingTuningService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/strategy/services/taskPlanService.ts(8,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/taskPlanService.ts(9,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/strategy/services/taskPlanService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/strategy/services/taskPlanService.ts(188,35): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(340,31): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(343,32): error TS7006: Parameter 'h' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(346,33): error TS7006: Parameter 'u' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(508,10): error TS7006: Parameter 'u' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(513,62): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(541,52): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(579,42): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(580,39): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(622,55): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(625,66): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(706,8): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(767,12): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/strategy/services/taskPlanService.ts(778,23): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/strategy/services/unifiedDecisionEngineService.ts(8,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/unifiedDecisionEngineService.ts(9,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/strategy/services/unifiedDecisionEngineService.ts(10,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/strategy/services/workingAgendaService.ts(1,35): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/strategy/services/workingAgendaService.ts(2,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/strategy/services/workingAgendaService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/unknown/services/counterexampleContractRefinementService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/unknown/services/counterexampleContractRefinementService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/unknown/services/counterfactualReasoningService.ts(18,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/unknown/services/counterfactualReasoningService.ts(19,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/unknown/services/counterfactualReasoningService.ts(20,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/unknown/services/counterfactualReasoningService.ts(22,47): error TS2307: Cannot find module '../autonomous_modules/chapter_36' or its corresponding type declarations.
+src/miki/unknown/services/counterfactualWorkSimulatorService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/unknown/services/counterfactualWorkSimulatorService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/unknown/services/knowledgeGapService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/unknown/services/knowledgeGapService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/unknown/services/latentIntentMiningService.ts(18,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/unknown/services/latentIntentMiningService.ts(19,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/unknown/services/latentIntentMiningService.ts(20,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/unknown/services/latentIntentMiningService.ts(22,45): error TS2307: Cannot find module '../autonomous_modules/chapter_37' or its corresponding type declarations.
+src/miki/unknown/services/latentIntentMiningService.ts(201,59): error TS7006: Parameter 'n' implicitly has an 'any' type.
+src/miki/unknown/services/unknownResolutionService.ts(4,30): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/unknown/services/unknownTaskDecompositionService.ts(1,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/unknown/services/unknownTaskDecompositionService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/verification/services/benchmarkFactoryService.ts(2,30): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/verification/services/calibrationDriftService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/verification/services/calibrationDriftService.ts(3,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/verification/services/codeVerificationService.ts(8,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/cognitiveDebuggerService.ts(12,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/verification/services/cognitiveDebuggerService.ts(13,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/verification/services/completionJudgeService.ts(9,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/completionJudgeService.ts(10,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/verification/services/componentRegressionService.ts(4,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/verification/services/componentRegressionService.ts(5,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/verification/services/componentRegressionService.ts(7,39): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/componentTestCaseService.ts(2,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/verification/services/componentTestCaseService.ts(3,60): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/componentTestCaseService.ts(83,12): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/verification/services/componentVerificationService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/verification/services/componentVerificationService.ts(5,56): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/draftVerificationService.ts(1,41): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/draftVerificationService.ts(3,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/verification/services/falsificationService.ts(8,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/formalConstraintSolverService.ts(11,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/verification/services/formalConstraintSolverService.ts(12,36): error TS2307: Cannot find module '../autonomous_modules/chapter_59' or its corresponding type declarations.
+src/miki/verification/services/formalProofService.ts(11,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/verification/services/regressionBenchmarkService.ts(8,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/regressionBenchmarkService.ts(9,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/verification/services/regressionBenchmarkService.ts(11,32): error TS2307: Cannot find module './storageService' or its corresponding type declarations.
+src/miki/verification/services/regressionBenchmarkService.ts(288,63): error TS7006: Parameter 'kw' implicitly has an 'any' type.
+src/miki/verification/services/regressionBenchmarkService.ts(289,71): error TS7006: Parameter 'kw' implicitly has an 'any' type.
+src/miki/verification/services/regressionBenchmarkService.ts(532,51): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/miki/verification/services/schemaValidationService.ts(7,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/testAssertionService.ts(1,39): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/vbaStaticVerifierService.ts(6,8): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/verifierService.ts(1,54): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+src/miki/verification/services/verifierService.ts(5,30): error TS2307: Cannot find module './systemLogger' or its corresponding type declarations.
+src/miki/verification/services/verifierService.ts(78,70): error TS7006: Parameter 'id' implicitly has an 'any' type.
+src/services/api.ts(798,58): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/utils/companionEngine.ts(777,30): error TS7006: Parameter 'proc' implicitly has an 'any' type.
+src/utils/companionEngine.ts(779,28): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/utils/companionEngine.ts(787,45): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/utils/companionEngine.ts(800,45): error TS7006: Parameter 'tc' implicitly has an 'any' type.

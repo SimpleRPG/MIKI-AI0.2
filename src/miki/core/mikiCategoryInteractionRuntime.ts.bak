@@ -8,8 +8,6 @@ import {
 import {
   selfImprovementControllerService,
 } from '../improvement/services/selfImprovementControllerService';
-import { storageService } from '../../services/storageService';
-import { longTermMemoryService } from '../memory/services/longTermMemoryService';
 
 const NEXT_CATEGORY: Record<MikiCategory, MikiCategory> = {
   autonomy: 'capability',
@@ -113,60 +111,6 @@ class MikiCategoryInteractionRuntime {
     /*
      * category.cycle は17分類の基本連鎖を作る。
      */
-if (      category === 'conversation' &&      interaction.type === 'conversation.request'    ) {      const next = NEXT_CATEGORY[category];      if (next) {        mikiInteractionBusService.publish(          category,          'category.interaction',          {            requestId: interaction.id,            text: typeof interaction.payload === 'object' && interaction.payload !== null && 'text' in interaction.payload ? interaction.payload.text : interaction.payload,            from: category,            to: next,          },          next,        );      }      return;    }
-    if (
-      category === 'data' &&
-      interaction.type === 'category.interaction'
-    ) {
-      const payload =
-        typeof interaction.payload === 'object' &&
-        interaction.payload !== null
-          ? interaction.payload as { text?: unknown; requestId?: unknown }
-          : {};
-
-      const text =
-        typeof payload.text === 'string'
-          ? payload.text
-          : '';
-
-      if (text) {
-        void longTermMemoryService
-          .searchPipeline(text, storageService.getMemories())
-          .then(result => {
-            mikiInteractionBusService.publish(
-              category,
-              'category.interaction',
-              {
-                requestId: payload.requestId,
-                text,
-                memorySearch: result,
-                from: category,
-                to: 'execution',
-              },
-              'execution',
-            );
-          })
-          .catch(error => {
-            mikiInteractionBusService.publish(
-              category,
-              'category.interaction',
-              {
-                requestId: payload.requestId,
-                text,
-                error: error instanceof Error
-                  ? error.message
-                  : String(error),
-                from: category,
-                to: 'execution',
-              },
-              'execution',
-            );
-          });
-      }
-
-      return;
-    }
-
     if (interaction.type !== 'category.cycle') {
       return;
     }
@@ -230,25 +174,6 @@ if (      category === 'conversation' &&      interaction.type === 'conversation
       );
     }
   }
-
-  requestInteraction(
-    type: string,
-    payload: unknown,
-    source: MikiCategory = 'conversation',
-    target?: MikiCategory,
-  ): MikiInteraction {
-    if (!this.active) {
-      this.start();
-    }
-
-    return mikiInteractionBusService.publish(
-      source,
-      type,
-      payload,
-      target,
-    );
-  }
-
 
   runImprovementFlow(payload: unknown = {}): MikiInteraction[] {
     if (!this.active) {

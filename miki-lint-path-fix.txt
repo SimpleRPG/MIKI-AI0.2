@@ -1,0 +1,23 @@
+
+> miki-ai@1.0.4 lint
+> tsc --noEmit
+
+src/components/ExternalTeacherTab.tsx(100,8): error TS2551: Property 'getCapabilityCandidates' does not exist on type 'SelfImprovementService'. Did you mean 'registerCapabilityCandidate'?
+src/components/ExternalTeacherTab.tsx(101,16): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/miki/conversation/services/surfaceVariationGrowthService.ts(12,31): error TS2307: Cannot find module './surfaceVariationData' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationGrowthService.ts(339,14): error TS7006: Parameter 'm' implicitly has an 'any' type.
+src/miki/conversation/services/surfaceVariationService.ts(13,8): error TS2307: Cannot find module './surfaceVariationData' or its corresponding type declarations.
+src/miki/conversation/services/surfaceVariationService.ts(14,42): error TS2307: Cannot find module './skeletonVariationData' or its corresponding type declarations.
+src/miki/data/simpleRpgReferenceService.ts(1,32): error TS2307: Cannot find module '../../../services/storageService' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementService.ts(24,60): error TS2307: Cannot find module '../utils/trainingSampleSafetyFilter' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementService.ts(536,16): error TS2307: Cannot find module './teacherRequestService' or its corresponding type declarations.
+src/miki/improvement/services/selfImprovementService.ts(545,23): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/miki/index.ts(24,1): error TS2308: Module './autonomy' has already exported a member named 'MutationTestResult'. Consider explicitly re-exporting to resolve the ambiguity.
+src/miki/learning/services/taskResultFeedbackService.ts(64,48): error TS2307: Cannot find module './executionRunnerService' or its corresponding type declarations.
+src/miki/learning/services/teacherRequestService.ts(20,35): error TS2307: Cannot find module '../utils/trainingSampleSafetyFilter' or its corresponding type declarations.
+src/miki/research.ts(28,1): error TS2308: Module './research/services/researchService' has already exported a member named 'ResearchRoute'. Consider explicitly re-exporting to resolve the ambiguity.
+src/miki/research/services/syntheticDataService.ts(14,35): error TS2307: Cannot find module '../utils/trainingSampleSafetyFilter' or its corresponding type declarations.
+src/miki/safety/services/featureFlagsService.ts(132,5): error TS2322: Type 'FeatureFlagState | undefined' is not assignable to type 'FeatureFlagState'.
+  Type 'undefined' is not assignable to type 'FeatureFlagState'.
+src/miki/safety/services/nonLlmCoreService.ts(16,43): error TS2307: Cannot find module './simpleRpgReferenceService' or its corresponding type declarations.
+src/miki/safety/services/nonLlmCoreService.ts(179,82): error TS7006: Parameter 'x' implicitly has an 'any' type.
