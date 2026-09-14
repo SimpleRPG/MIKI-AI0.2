@@ -14,8 +14,8 @@ import {
   AlertTriangle,
   Play,
 } from 'lucide-react';
-import { storagePlanningService } from '../../services/storagePlanningService';
-import { modelLifecycleService, ModelDecommissionEvaluation } from '../../services/modelLifecycleService';
+import { storagePlanningService } from '../../miki/execution/services/storagePlanningService';
+import { modelLifecycleService, ModelDecommissionEvaluation } from '../../miki/safety/services/modelLifecycleService';
 import { StorageCapacityPlanReport } from '../../types';
 
 export const StorageCapacityPlanTab: React.FC = () => {

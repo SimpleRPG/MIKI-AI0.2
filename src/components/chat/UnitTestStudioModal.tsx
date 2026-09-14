@@ -19,7 +19,7 @@ import {
 import {
   mikiSelfCodingSuperchargerService,
   UnitTestRunResult,
-} from '../../services/mikiSelfCodingSuperchargerService';
+} from '../../miki/selfDevelopment/services/mikiSelfCodingSuperchargerService';
 
 interface UnitTestStudioModalProps {
   isOpen: boolean;

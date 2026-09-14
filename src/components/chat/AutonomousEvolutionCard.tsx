@@ -19,8 +19,8 @@ import {
 import {
   AutonomousEvolutionRecord,
   autonomousContinuousEvolutionService,
-} from '../../services/autonomousContinuousEvolutionService';
-import { mikiSelfCodingSuperchargerService, MutationTestResult } from '../../services/mikiSelfCodingSuperchargerService';
+} from '../../miki/autonomy/services/autonomousContinuousEvolutionService';
+import { mikiSelfCodingSuperchargerService, MutationTestResult } from '../../miki/selfDevelopment/services/mikiSelfCodingSuperchargerService';
 
 interface AutonomousEvolutionCardProps {
   record: AutonomousEvolutionRecord;

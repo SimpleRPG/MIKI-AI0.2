@@ -26,7 +26,7 @@ import {
   CompletionChecklist,
   WorkspaceFile,
 } from '../../types';
-import { completionJudgeService } from '../../services/completionJudgeService';
+import { completionJudgeService } from '../../miki/verification/services/completionJudgeService';
 
 interface CompletionJudgeTabProps {
   onNotify?: (message: string) => void;

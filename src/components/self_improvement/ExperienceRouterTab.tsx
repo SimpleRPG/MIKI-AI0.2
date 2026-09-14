@@ -20,11 +20,11 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { MemoryItem, MemoryDestination, ExperienceRoutingResult } from '../../types';
-import { experienceRouterService } from '../../services/experienceRouterService';
+import { experienceRouterService } from '../../miki/experience/services/experienceRouterService';
 import { storageService } from '../../services/storageService';
-import { skillsService } from '../../services/skillsService';
-import { regressionBenchmarkService } from '../../services/regressionBenchmarkService';
-import { selfImprovementService } from '../../services/selfImprovementService';
+import { skillsService } from '../../miki/capability/services/skillsService';
+import { regressionBenchmarkService } from '../../miki/verification/services/regressionBenchmarkService';
+import { selfImprovementService } from '../../miki/improvement/services/selfImprovementService';
 
 interface ExperienceRouterTabProps {
   onRefreshAll?: () => void;

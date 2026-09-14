@@ -13,7 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { ResponseSkeleton, ConversationStage } from '../../types';
-import { answerPlanService } from '../../services/answerPlanService';
+import { answerPlanService } from '../../miki/strategy/services/answerPlanService';
 
 export const AnswerPlanTab: React.FC = () => {
   const [skeletons, setSkeletons] = useState<ResponseSkeleton[]>(() =>

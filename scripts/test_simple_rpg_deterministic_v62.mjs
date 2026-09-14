@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 const root = new URL('..', import.meta.url).pathname;
-const service = fs.readFileSync(`${root}/src/services/simpleRpgRuleEngineService.ts`, 'utf8');
+const service = fs.readFileSync(`${root}/miki/execution/services/simpleRpgRuleEngineService.ts`, 'utf8');
 const server = fs.readFileSync(`${root}/server.ts`, 'utf8');
 assert.match(service, /class SimpleRpgRuleEngineService/);
 for (const name of ['gather','craft','cook','equip','enhance','repair','farm','fertilize','fish','pet','guild','job','skill','market_buy','market_sell','housing','save','load']) assert.match(service, new RegExp(`case '${name}'`));

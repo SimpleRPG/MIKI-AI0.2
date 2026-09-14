@@ -1,9 +1,9 @@
 /** v47 非LLM設計思想の静的契約チェック。外部サービス・実機を使わない。 */
 import fs from 'fs';
 
-const core = fs.readFileSync('src/services/nonLlmCoreService.ts', 'utf8');
-const hw = fs.readFileSync('src/services/nonLlmHardwarePipelineService.ts', 'utf8');
-const migration = fs.readFileSync('src/services/llmMigrationProtocolService.ts', 'utf8');
+const core = fs.readFileSync('miki/safety/services/nonLlmCoreService.ts', 'utf8');
+const hw = fs.readFileSync('miki/safety/services/nonLlmHardwarePipelineService.ts', 'utf8');
+const migration = fs.readFileSync('miki/safety/services/llmMigrationProtocolService.ts', 'utf8');
 
 const forbidden = [
   /score:\s*50\b/,

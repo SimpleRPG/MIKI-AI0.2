@@ -12,7 +12,7 @@ import { FeatureFlagState, SystemFeatureFlags } from '../../types';
 import {
   featureFlagsService,
   FEATURE_FLAG_DESCRIPTIONS,
-} from '../../services/featureFlagsService';
+} from '../../miki/safety/services/featureFlagsService';
 
 export const FeatureFlagsTab: React.FC = () => {
   const [flags, setFlags] = useState<SystemFeatureFlags>(() =>

@@ -9,7 +9,7 @@ import {
   Sparkles,
   ShieldCheck,
 } from 'lucide-react';
-import { minimalScopeService } from '../../services/minimalScopeService';
+import { minimalScopeService } from '../../miki/strategy/services/minimalScopeService';
 import { MinimalScopeItem } from '../../types';
 
 export const MinimalScopeTab: React.FC = () => {

@@ -32,14 +32,14 @@ import {
   FailureSynthesisResult,
   CanaryTrialResult,
   PairProgrammingReview,
-} from '../../services/selfImprovementSuiteService';
-import { cognitiveDebuggerService } from '../../services/cognitiveDebuggerService';
+} from '../../miki/improvement/services/selfImprovementSuiteService';
+import { cognitiveDebuggerService } from '../../miki/verification/services/cognitiveDebuggerService';
 import {
   aiderEngineService,
   RepoMapResponse,
   AutoHealResult,
   AiderCommitRecord,
-} from '../../services/aiderEngineService';
+} from '../../miki/selfDevelopment/services/aiderEngineService';
 import { SuperchargerToolsSubView } from './SuperchargerToolsSubView';
 import { UltraSelfEvolverSubView } from './UltraSelfEvolverSubView';
 

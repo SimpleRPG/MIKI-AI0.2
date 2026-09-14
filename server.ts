@@ -8,31 +8,31 @@ import ts from 'typescript';
 import vm from 'vm';
 import { GoogleGenAI } from '@google/genai';
 import JSZip from 'jszip';
-import { requestTypeCompilerService } from './src/services/requestTypeCompilerService';
-import { nonLlmCodeSynthesisService } from './src/services/nonLlmCodeSynthesisService';
-import { componentRegistryService } from './src/services/componentRegistryService';
-import { simpleRpgRuleEngineService } from './src/services/simpleRpgRuleEngineService';
-import { simpleRpgCapabilityLearningService } from './src/services/simpleRpgCapabilityLearningService';
-import { unifiedMikiExperienceService } from './src/services/unifiedMikiExperienceService';
-import { mikiUnifiedLearningContinuumService } from './src/services/mikiUnifiedLearningContinuumService';
-import { verifiedKnowledgePromotionService } from './src/services/verifiedKnowledgePromotionService';
-import { verifiedCapabilityPromotionService } from './src/services/verifiedCapabilityPromotionService';
-import { capabilityConfidenceService } from './src/services/capabilityConfidenceService';
-import { failureUnderstandingService } from './src/services/failureUnderstandingService';
-import { autonomousGrowthGovernorService } from './src/services/autonomousGrowthGovernorService';
-import { autonomousRevalidationLoopService } from './src/services/autonomousRevalidationLoopService';
-import { researchToRemediationService } from './src/services/researchToRemediationService';
-import { remediationExecutionCoordinatorService } from './src/services/remediationExecutionCoordinatorService';
-import { remediationFailureRecoveryService } from './src/services/remediationFailureRecoveryService';
-import { counterexampleContractRefinementService } from './src/services/counterexampleContractRefinementService';
-import { unknownTaskDecompositionService } from './src/services/unknownTaskDecompositionService';
-import { virtualExperienceGeneratorService } from './src/services/virtualExperienceGeneratorService';
-import { formalSemanticsKernelService } from './src/services/formalSemanticsKernelService';
-import { faultInjectionLabService } from './src/services/faultInjectionLabService';
-import { capabilityCompositionProofService } from './src/services/capabilityCompositionProofService';
-import { executableExplanationService } from './src/services/executableExplanationService';
-import { specContractCompilerService, setSpecFileReader } from './src/services/specContractCompilerService';
-import { causalMemoryLedgerService } from './src/services/causalMemoryLedgerService';
+import { requestTypeCompilerService } from './src/miki/selfDevelopment/services/requestTypeCompilerService';
+import { nonLlmCodeSynthesisService } from './src/miki/selfDevelopment/services/nonLlmCodeSynthesisService';
+import { componentRegistryService } from './src/miki/capability/services/componentRegistryService';
+import { simpleRpgRuleEngineService } from './src/miki/execution/services/simpleRpgRuleEngineService';
+import { simpleRpgCapabilityLearningService } from './src/miki/learning/services/simpleRpgCapabilityLearningService';
+import { unifiedMikiExperienceService } from './src/miki/experience/services/unifiedMikiExperienceService';
+import { mikiUnifiedLearningContinuumService } from './src/miki/learning/services/mikiUnifiedLearningContinuumService';
+import { verifiedKnowledgePromotionService } from './src/miki/promotion/services/verifiedKnowledgePromotionService';
+import { verifiedCapabilityPromotionService } from './src/miki/promotion/services/verifiedCapabilityPromotionService';
+import { capabilityConfidenceService } from './src/miki/capability/services/capabilityConfidenceService';
+import { failureUnderstandingService } from './src/miki/memory/services/failureUnderstandingService';
+import { autonomousGrowthGovernorService } from './src/miki/autonomy/services/autonomousGrowthGovernorService';
+import { autonomousRevalidationLoopService } from './src/miki/autonomy/services/autonomousRevalidationLoopService';
+import { researchToRemediationService } from './src/miki/research/services/researchToRemediationService';
+import { remediationExecutionCoordinatorService } from './src/miki/execution/services/remediationExecutionCoordinatorService';
+import { remediationFailureRecoveryService } from './src/miki/safety/services/remediationFailureRecoveryService';
+import { counterexampleContractRefinementService } from './src/miki/unknown/services/counterexampleContractRefinementService';
+import { unknownTaskDecompositionService } from './src/miki/unknown/services/unknownTaskDecompositionService';
+import { virtualExperienceGeneratorService } from './src/miki/experience/services/virtualExperienceGeneratorService';
+import { formalSemanticsKernelService } from './src/miki/verification/services/formalSemanticsKernelService';
+import { faultInjectionLabService } from './src/miki/verification/services/faultInjectionLabService';
+import { capabilityCompositionProofService } from './src/miki/capability/services/capabilityCompositionProofService';
+import { executableExplanationService } from './src/miki/execution/services/executableExplanationService';
+import { specContractCompilerService, setSpecFileReader } from './src/miki/selfDevelopment/services/specContractCompilerService';
+import { causalMemoryLedgerService } from './src/miki/memory/services/causalMemoryLedgerService';
 
 setSpecFileReader((specPath: string) => {
   try {
@@ -45,20 +45,20 @@ setSpecFileReader((specPath: string) => {
   }
   return null;
 });
-import { knowledgeHalfLifeService } from './src/services/knowledgeHalfLifeService';
-import { frontierGovernanceService } from './src/services/frontierGovernanceService';
-import { deterministicSelfImprovementLabService } from './src/services/deterministicSelfImprovementLabService';
-import { capabilitySloService, approvalPermissionService, cognitiveStateCheckpointService, blindComparisonLabService } from './src/services/operationalGovernanceService';
-import { situationalAwarenessService } from './src/services/situationalAwarenessService';
-import { operationalConformanceService } from './src/services/operationalConformanceService';
-import { mikiCognitiveKernelService } from './src/services/mikiCognitiveKernelService';
-import { initializeChapter69to90 } from './src/services/chapter69_90PlatformServices';
-import { automationStudioService } from './src/services/automationStudioService';
-import { digitalResearchNoteService } from './src/services/digitalResearchNoteService';
-import { resourceGovernanceService } from './src/services/resourceGovernanceService';
-import { causalInvestigationService } from './src/services/causalInvestigationService';
-import { cognitiveEvidenceIntegrationService } from './src/services/cognitiveEvidenceIntegrationService';
-import { cognitiveExecutionEvidenceService } from './src/services/cognitiveExecutionEvidenceService';
+import { knowledgeHalfLifeService } from './src/miki/memory/services/knowledgeHalfLifeService';
+import { frontierGovernanceService } from './src/miki/strategy/services/frontierGovernanceService';
+import { deterministicSelfImprovementLabService } from './src/miki/improvement/services/deterministicSelfImprovementLabService';
+import { capabilitySloService, approvalPermissionService, cognitiveStateCheckpointService, blindComparisonLabService } from './src/miki/autonomy/services/operationalGovernanceService';
+import { situationalAwarenessService } from './src/miki/selfAwareness/services/situationalAwarenessService';
+import { operationalConformanceService } from './src/miki/verification/services/operationalConformanceService';
+import { mikiCognitiveKernelService } from './src/miki/selfAwareness/services/mikiCognitiveKernelService';
+import { initializeChapter69to90 } from './src/miki';
+import { automationStudioService } from './src/miki/execution/services/automationStudioService';
+import { digitalResearchNoteService } from './src/miki/research/services/digitalResearchNoteService';
+import { resourceGovernanceService } from './src/miki/safety/services/resourceGovernanceService';
+import { causalInvestigationService } from './src/miki/research/services/causalInvestigationService';
+import { cognitiveEvidenceIntegrationService } from './src/miki/selfAwareness/services/cognitiveEvidenceIntegrationService';
+import { cognitiveExecutionEvidenceService } from './src/miki/selfAwareness/services/cognitiveExecutionEvidenceService';
 
 dotenv.config();
 
@@ -2250,7 +2250,7 @@ app.post('/api/self-code/stage-proposal', (req, res) => {
     const propDir = path.join(PENDING_PROPOSALS_DIR, String(proposalId));
     if (!fs.existsSync(propDir)) fs.mkdirSync(propDir, { recursive: true });
 
-    const safeRelPath = String(targetFile || 'src/services/selfCodeArchitectService.ts').replace(/^(\.\.[\/\\])+/, '').replace(/^\/+/, '');
+    const safeRelPath = String(targetFile || 'miki/selfDevelopment/services/selfCodeArchitectService.ts').replace(/^(\.\.[\/\\])+/, '').replace(/^\/+/, '');
     const stagedFilePath = path.join(propDir, safeRelPath);
     const stagedFileDir = path.dirname(stagedFilePath);
     if (!fs.existsSync(stagedFileDir)) fs.mkdirSync(stagedFileDir, { recursive: true });
@@ -3528,17 +3528,17 @@ app.post('/api/self-code/prompt-to-patch', (req, res) => {
 
     // 自然言語プロンプトの意図分析
     const lower = prompt.toLowerCase();
-    let targetFile = 'src/services/selfImprovementSuiteService.ts';
+    let targetFile = 'miki/improvement/services/selfImprovementSuiteService.ts';
     let targetFeature = '自律改善機能拡張';
 
     if (lower.includes('aider') || lower.includes('commit') || lower.includes('diff')) {
-      targetFile = 'src/services/aiderEngineService.ts';
+      targetFile = 'miki/selfDevelopment/services/aiderEngineService.ts';
       targetFeature = 'Aiderエンジン強化';
     } else if (lower.includes('ベンチ') || lower.includes('メモリ') || lower.includes('速度')) {
-      targetFile = 'src/services/selfImprovementSuiteService.ts';
+      targetFile = 'miki/improvement/services/selfImprovementSuiteService.ts';
       targetFeature = 'ベンチマーク測定精度向上';
     } else if (lower.includes('不変条件') || lower.includes('安全') || lower.includes('ガード')) {
-      targetFile = 'src/services/selfCodeArchitectService.ts';
+      targetFile = 'miki/selfDevelopment/services/selfCodeArchitectService.ts';
       targetFeature = '不変条件安全防壁強化';
     }
 

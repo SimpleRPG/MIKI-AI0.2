@@ -24,9 +24,9 @@ import {
   LoraTriggerAssessment,
   ExperienceLink,
 } from '../../types';
-import { capabilityGapService } from '../../services/capabilityGapService';
-import { virtualTrainingService } from '../../services/virtualTrainingService';
-import { experienceLinkService } from '../../services/experienceLinkService';
+import { capabilityGapService } from '../../miki/capability/services/capabilityGapService';
+import { virtualTrainingService } from '../../miki/learning/services/virtualTrainingService';
+import { experienceLinkService } from '../../miki/experience/services/experienceLinkService';
 
 export const CapabilityMasteryTab: React.FC = () => {
   const [profiles, setProfiles] = useState<CapabilityMasteryProfile[]>(() =>

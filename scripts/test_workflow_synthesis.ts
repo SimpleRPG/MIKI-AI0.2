@@ -1,6 +1,6 @@
-import { workflowSynthesisService } from '../src/services/workflowSynthesisService';
-import { codeSkeletonService } from '../src/services/codeSkeletonService';
-import { codeVerificationService } from '../src/services/codeVerificationService';
+import { workflowSynthesisService } from '../src/miki/execution/services/workflowSynthesisService';
+import { codeSkeletonService } from '../src/miki/selfDevelopment/services/codeSkeletonService';
+import { codeVerificationService } from '../src/miki/verification/services/codeVerificationService';
 
 async function runWorkflowSynthesisTests() {
   console.log('================================================================');
@@ -98,7 +98,7 @@ async function runWorkflowSynthesisTests() {
 
   // 次にユーザーによる明示的な権限承認 (grantConsentAndActivate) をシミュレート
   console.log('\n  [テストB] ユーザーが明示的に権限を承認 (grantConsentAndActivate)');
-  const { capabilityPluginService } = await import('../src/services/capabilityPluginService');
+  const { capabilityPluginService } = await import('../miki/capabilityPluginService');
   capabilityPluginService.grantConsentAndActivate('plugin_web_search', ['network_cloud', 'sensitive_filter'], 'テスト用明示承認');
   
   // 承認後のフルパイプライン自律実行

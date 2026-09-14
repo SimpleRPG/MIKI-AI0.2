@@ -3,10 +3,10 @@ import {
   isRealDataProvider,
   VALID_WEB_REAL_DATA_PROVIDERS,
   WebMaterialPatternExtractor,
-} from '../src/services/webMaterialPatternExtractor';
-import { nativeWorkManagerService } from '../src/services/nativeWorkManagerService';
-import { autonomousSearchService } from '../src/services/autonomousSearchService';
-import { answerPlanService } from '../src/services/answerPlanService';
+} from '../src/miki/research/services/webMaterialPatternExtractor';
+import { nativeWorkManagerService } from '../src/miki/execution/services/nativeWorkManagerService';
+import { autonomousSearchService } from '../src/miki/research/services/autonomousSearchService';
+import { answerPlanService } from '../src/miki/strategy/services/answerPlanService';
 
 async function runTest() {
   console.log('=== Headless WebView レンダリング＆自律学習パイプライン 検証開始 ===\n');

@@ -5,8 +5,8 @@
  * resolveAnaphoraの候補抽出とcounterfactualReasoningServiceの分岐シミュレーションが
  * 正確に連動して動作することを検証するためのシミュレーションスクリプトです。
  */
-import { counterfactualReasoningService } from '../src/services/counterfactualReasoningService';
-import { resolveAnaphora, defaultConversationState } from '../src/services/conversationStateService';
+import { counterfactualReasoningService } from '../src/miki/unknown/services/counterfactualReasoningService';
+import { resolveAnaphora, defaultConversationState } from '../src/miki/conversation/services/conversationStateService';
 import { ConversationState } from '../src/types';
 
 function runCounterfactualShadowSimulation() {

@@ -2,14 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 const root = process.cwd();
 const files = [
-  'src/services/autonomousGrowthGovernorService.ts',
-  'src/services/simpleRpgCapabilityLearningService.ts',
-  'src/services/simpleRpgRuleEngineService.ts',
+  'miki/autonomy/services/autonomousGrowthGovernorService.ts',
+  'miki/learning/services/simpleRpgCapabilityLearningService.ts',
+  'miki/execution/services/simpleRpgRuleEngineService.ts',
   'server.ts'
 ];
 for (const f of files) if (!fs.existsSync(path.join(root, f))) throw new Error(`missing ${f}`);
-const governor = fs.readFileSync(path.join(root, 'src/services/autonomousGrowthGovernorService.ts'),'utf8');
-const rpg = fs.readFileSync(path.join(root, 'src/services/simpleRpgRuleEngineService.ts'),'utf8');
+const governor = fs.readFileSync(path.join(root, 'miki/autonomy/services/autonomousGrowthGovernorService.ts'),'utf8');
+const rpg = fs.readFileSync(path.join(root, 'miki/execution/services/simpleRpgRuleEngineService.ts'),'utf8');
 if (/Math\.random\s*\(/.test(governor) || /eval\s*\(/.test(governor) || /new\s+Function\s*\(/.test(governor)) throw new Error('unsafe dynamic/random growth path');
 if (/Math\.random\s*\(/.test(rpg) || /eval\s*\(/.test(rpg) || /new\s+Function\s*\(/.test(rpg)) throw new Error('unsafe RPG runtime');
 if (!governor.includes('simpleRpgCapabilityLearningService.audit()')) throw new Error('missing RPG audit');

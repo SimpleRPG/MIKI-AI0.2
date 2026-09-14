@@ -1,5 +1,5 @@
-import { classifyClaimEpistemology, detectFictionalConfirmedConfusion } from '../src/services/falsificationService';
-import { memoryAuditService } from '../src/services/memoryAuditService';
+import { classifyClaimEpistemology, detectFictionalConfirmedConfusion } from '../src/miki/verification/services/falsificationService';
+import { memoryAuditService } from '../src/miki/memory/services/memoryAuditService';
 import { storageService } from '../src/services/storageService';
 import { MemoryItem } from '../src/types';
 

@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 const root = process.cwd();
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
-const research = read('src/services/researchService.ts');
-const reval = read('src/services/autonomousRevalidationLoopService.ts');
-const failure = read('src/services/failureUnderstandingService.ts');
+const research = read('miki/researchService.ts');
+const reval = read('miki/autonomy/services/autonomousRevalidationLoopService.ts');
+const failure = read('miki/memory/services/failureUnderstandingService.ts');
 const checks = [
   ['multi-pass research exists', research.includes('maxPasses') && research.includes('second-pass independent verification')],
   ['freshness gate supported', research.includes('requireFresh') && research.includes('maxAgeDays')],

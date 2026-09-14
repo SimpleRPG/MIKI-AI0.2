@@ -17,9 +17,9 @@ import {
   AlertTriangle,
   ArrowRight,
 } from 'lucide-react';
-import { privacyGuardrailService } from '../../services/privacyGuardrailService';
-import { abstractSanitizerService } from '../../services/abstractSanitizerService';
-import { featureFlagsService } from '../../services/featureFlagsService';
+import { privacyGuardrailService } from '../../miki/safety/services/privacyGuardrailService';
+import { abstractSanitizerService } from '../../miki/safety/services/abstractSanitizerService';
+import { featureFlagsService } from '../../miki/safety/services/featureFlagsService';
 import {
   PrivacyAuditLogEntry,
   PrivacyAuditResult,

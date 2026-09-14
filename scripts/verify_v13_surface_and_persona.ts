@@ -1,6 +1,6 @@
-import { answerContentIrService } from '../src/services/answerContentIrService';
-import { surfaceGrammarAndStyleService } from '../src/services/surfaceGrammarAndStyleService';
-import { responseDesignService } from '../src/services/responseDesignService';
+import { answerContentIrService } from '../src/miki/conversation/services/answerContentIrService';
+import { surfaceGrammarAndStyleService } from '../src/miki/conversation/services/surfaceGrammarAndStyleService';
+import { responseDesignService } from '../src/miki/strategy/services/responseDesignService';
 import { AnswerContentIR, MultiAxisPersonaConfig } from '../src/types';
 
 console.log('================================================================');

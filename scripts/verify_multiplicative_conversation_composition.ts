@@ -9,12 +9,12 @@
  * 5. mikiUnifiedLearningContinuumService.getSnapshot() に3つの成長指標が正確に反映されること
  */
 
-import { claimDatabaseService } from '../src/services/claimDatabaseService';
-import { componentRegistryService } from '../src/services/componentRegistryService';
-import { conversationComponentCompositionService } from '../src/services/conversationComponentCompositionService';
-import { wordAssociationGraphService } from '../src/services/wordAssociationGraphService';
-import { formalConstraintSolverService } from '../src/services/formalConstraintSolverService';
-import { mikiUnifiedLearningContinuumService } from '../src/services/mikiUnifiedLearningContinuumService';
+import { claimDatabaseService } from '../src/miki/memory/services/claimDatabaseService';
+import { componentRegistryService } from '../src/miki/capability/services/componentRegistryService';
+import { conversationComponentCompositionService } from '../src/miki/conversation/services/conversationComponentCompositionService';
+import { wordAssociationGraphService } from '../src/miki/memory/services/wordAssociationGraphService';
+import { formalConstraintSolverService } from '../src/miki/verification/services/formalConstraintSolverService';
+import { mikiUnifiedLearningContinuumService } from '../src/miki/learning/services/mikiUnifiedLearningContinuumService';
 import { ClaimRecord } from '../src/types';
 
 function assert(condition: boolean, message: string) {

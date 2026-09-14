@@ -1,7 +1,7 @@
 import fs from 'fs';
-const utd=fs.readFileSync('src/services/unknownTaskDecompositionService.ts','utf8');
-const vexp=fs.readFileSync('src/services/virtualExperienceGeneratorService.ts','utf8');
-const bg=fs.readFileSync('src/services/backgroundWorkerService.ts','utf8');
+const utd=fs.readFileSync('miki/unknownTaskDecompositionService.ts','utf8');
+const vexp=fs.readFileSync('miki/experience/services/virtualExperienceGeneratorService.ts','utf8');
+const bg=fs.readFileSync('miki/execution/services/backgroundWorkerService.ts','utf8');
 const server=fs.readFileSync('server.ts','utf8');
 const checks=[
  ['unknown task service', utd.includes('class UnknownTaskDecompositionService')],

@@ -18,7 +18,7 @@ import {
 import {
   conversationEvaluationService,
   CHAPTER_18_FIXED_SCENARIOS,
-} from '../../services/conversationEvaluationService';
+} from '../../miki/conversation/services/conversationEvaluationService';
 import {
   DualEvaluationReport,
   FixedScenarioEvaluationResult,

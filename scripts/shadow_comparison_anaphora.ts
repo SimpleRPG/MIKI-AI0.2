@@ -6,7 +6,7 @@ import {
   resolveAnaphora,
   extractConversationState,
   defaultConversationState,
-} from '../src/services/conversationStateService';
+} from '../src/miki/conversation/services/conversationStateService';
 import { ConversationState } from '../src/types';
 
 interface TurnScenario {

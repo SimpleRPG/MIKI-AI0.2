@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 const root = process.cwd();
-const svc = fs.readFileSync(`${root}/src/services/mikiUnifiedLearningContinuumService.ts`, 'utf8');
-const core = fs.readFileSync(`${root}/src/services/nonLlmCoreService.ts`, 'utf8');
-const task = fs.readFileSync(`${root}/src/services/taskExecutionOrchestratorService.ts`, 'utf8');
+const svc = fs.readFileSync(`${root}/miki/learning/services/mikiUnifiedLearningContinuumService.ts`, 'utf8');
+const core = fs.readFileSync(`${root}/miki/safety/services/nonLlmCoreService.ts`, 'utf8');
+const task = fs.readFileSync(`${root}/miki/execution/services/taskExecutionOrchestratorService.ts`, 'utf8');
 assert.match(svc, /Miki Unified Learning Continuum/);
 assert.match(svc, /episodic_buffer/);
 assert.match(svc, /procedural/);

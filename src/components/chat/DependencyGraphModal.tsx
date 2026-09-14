@@ -16,7 +16,7 @@ import {
 import {
   mikiSelfCodingSuperchargerService,
   DependencyGraphResult,
-} from '../../services/mikiSelfCodingSuperchargerService';
+} from '../../miki/selfDevelopment/services/mikiSelfCodingSuperchargerService';
 import { WorkspaceFile } from '../../types';
 
 interface DependencyGraphModalProps {

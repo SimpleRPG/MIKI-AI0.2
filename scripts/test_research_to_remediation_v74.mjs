@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 const root = process.argv[2] || process.cwd();
-const svc = fs.readFileSync(path.join(root,'src/services/researchToRemediationService.ts'),'utf8');
-const reval = fs.readFileSync(path.join(root,'src/services/autonomousRevalidationLoopService.ts'),'utf8');
+const svc = fs.readFileSync(path.join(root,'miki/researchToRemediationService.ts'),'utf8');
+const reval = fs.readFileSync(path.join(root,'miki/autonomy/services/autonomousRevalidationLoopService.ts'),'utf8');
 const server = fs.readFileSync(path.join(root,'server.ts'),'utf8');
 const checks = [
  ['service exists', svc.includes('class ResearchToRemediationService')],

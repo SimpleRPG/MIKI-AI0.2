@@ -16,7 +16,7 @@ import {
 import {
   nonLlmHardwarePipelineService,
   NonLlmPipelineExecutionResult,
-} from '../../../services/nonLlmHardwarePipelineService';
+} from '../../../miki/safety/services/nonLlmHardwarePipelineService';
 
 export const HardwarePipelineSubView: React.FC = () => {
   const [testPrompt, setTestPrompt] = useState('Excelの社員番号列で重複を排除して新規シートに出力する安全なマクロを作って');

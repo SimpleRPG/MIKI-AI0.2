@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8');
-const kernel=read('src/services/mikiCognitiveKernelService.ts');
+const kernel=read('miki/selfAwareness/services/mikiCognitiveKernelService.ts');
 const server=read('server.ts');
-const conformance=read('src/services/operationalConformanceService.ts');
+const conformance=read('miki/verification/services/operationalConformanceService.ts');
 const chapter=read('src/services/chapter69_90PlatformServices.ts');
-const evo=read('src/services/autonomousContinuousEvolutionService.ts');
-const sc=read('src/services/mikiSelfCodingSuperchargerService.ts');
+const evo=read('miki/autonomy/services/autonomousContinuousEvolutionService.ts');
+const sc=read('miki/selfDevelopment/services/mikiSelfCodingSuperchargerService.ts');
 let n=0, ok=0;
 function t(name,cond){n++;if(cond){ok++;console.log('PASS',name)}else console.log('FAIL',name)}
 t('unified cognitive kernel exists', kernel.includes('class MikiCognitiveKernelService') && kernel.includes("runtimePolicy: 'NON_LLM_ONLY'"));

@@ -1,9 +1,9 @@
 /**
  * 設計思想 7.3節 自己成長ループ自動化 (Autonomous Hardening Wiring & Circuit Breaker) 検証スクリプト
  */
-import { autonomousHardeningService, MAX_SHALLOW_FUTURE_SCENARIOS, MAX_SHALLOW_RED_TEAM_ATTACKS, MAX_DEEP_FUTURE_SCENARIOS, MAX_DEEP_RED_TEAM_ATTACKS, MAX_CONSECUTIVE_FAILURES } from '../src/services/autonomousHardeningService';
-import { backgroundWorkerService } from '../src/services/backgroundWorkerService';
-import { hardeningRegressionCandidateService } from '../src/services/hardeningRegressionCandidateService';
+import { autonomousHardeningService, MAX_SHALLOW_FUTURE_SCENARIOS, MAX_SHALLOW_RED_TEAM_ATTACKS, MAX_DEEP_FUTURE_SCENARIOS, MAX_DEEP_RED_TEAM_ATTACKS, MAX_CONSECUTIVE_FAILURES } from '../src/miki/autonomy/services/autonomousHardeningService';
+import { backgroundWorkerService } from '../src/miki/execution/services/backgroundWorkerService';
+import { hardeningRegressionCandidateService } from '../src/miki/improvement/services/hardeningRegressionCandidateService';
 import fs from 'fs';
 import path from 'path';
 
@@ -21,7 +21,7 @@ async function runVerification() {
   // 1. 静的配線確認 (grep)
   console.log('[TEST 1] 静的配線チェック (App.tsx & backgroundWorkerService.ts)');
   const appTsx = fs.readFileSync(path.resolve('src/App.tsx'), 'utf-8');
-  const bgService = fs.readFileSync(path.resolve('src/services/backgroundWorkerService.ts'), 'utf-8');
+  const bgService = fs.readFileSync(path.resolve('miki/execution/services/backgroundWorkerService.ts'), 'utf-8');
   assert(appTsx.includes('autonomousHardeningService.'), 'App.tsx に autonomousHardeningService の呼び出しが存在する');
   assert(bgService.includes('autonomousHardeningService.runAutonomousHardeningCycle'), 'backgroundWorkerService.ts に runAutonomousHardeningCycle の呼び出しが存在する');
   assert(bgService.includes('autonomousHardeningService.recordPredictionError'), 'backgroundWorkerService.ts に recordPredictionError の呼び出しが存在する');

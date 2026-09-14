@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const answerPlan = fs.readFileSync(path.join(root, 'src/services/answerPlanService.ts'), 'utf8');
-const evolution = fs.readFileSync(path.join(root, 'src/services/deterministicCapabilityEvolutionService.ts'), 'utf8');
+const answerPlan = fs.readFileSync(path.join(root, 'miki/strategy/services/answerPlanService.ts'), 'utf8');
+const evolution = fs.readFileSync(path.join(root, 'miki/capability/services/deterministicCapabilityEvolutionService.ts'), 'utf8');
 
 const required = [
   'installDeterministicCapabilityPatch',

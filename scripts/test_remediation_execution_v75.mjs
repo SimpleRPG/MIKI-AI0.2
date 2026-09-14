@@ -1,8 +1,8 @@
 import fs from 'fs';
 const root = new URL('..', import.meta.url).pathname;
-const svc = fs.readFileSync(`${root}/src/services/remediationExecutionCoordinatorService.ts`, 'utf8');
+const svc = fs.readFileSync(`${root}/miki/execution/services/remediationExecutionCoordinatorService.ts`, 'utf8');
 const server = fs.readFileSync(`${root}/server.ts`, 'utf8');
-const bg = fs.readFileSync(`${root}/src/services/backgroundWorkerService.ts`, 'utf8');
+const bg = fs.readFileSync(`${root}/miki/execution/services/backgroundWorkerService.ts`, 'utf8');
 const checks = [
  ['service exists', svc.includes('class RemediationExecutionCoordinatorService')],
  ['runner dispatch', svc.includes('executionRunnerService.markSubmitted')],

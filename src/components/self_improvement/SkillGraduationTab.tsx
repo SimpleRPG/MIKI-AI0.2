@@ -22,8 +22,8 @@ import {
   SkillGraduationProgress,
   SkillDiversityTestResult,
 } from '../../types';
-import { skillsService } from '../../services/skillsService';
-import { selfImprovementService } from '../../services/selfImprovementService';
+import { skillsService } from '../../miki/capability/services/skillsService';
+import { selfImprovementService } from '../../miki/improvement/services/selfImprovementService';
 
 export const SkillGraduationTab: React.FC = () => {
   const [skills, setSkills] = useState<SkillItem[]>([]);

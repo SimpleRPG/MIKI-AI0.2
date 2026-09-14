@@ -15,14 +15,14 @@ import {
   PROACTIVE_SUGGESTIONS_DATA,
   WARMTH_AND_HUMOR_DATA,
   SECTION_HEADINGS_DEFAULT_DATA,
-} from '../src/services/surfaceVariationData';
-import { SKELETON_VARIATIONS_DATA } from '../src/services/skeletonVariationData';
+} from '../miki/data/surfaceVariationData';
+import { SKELETON_VARIATIONS_DATA } from '../miki/data/skeletonVariationData';
 import {
   surfaceVariationService,
   RecentUsageCache,
-} from '../src/services/surfaceVariationService';
-import { surfaceGrammarAndStyleService } from '../src/services/surfaceGrammarAndStyleService';
-import { answerPlanService } from '../src/services/answerPlanService';
+} from '../src/miki/conversation/services/surfaceVariationService';
+import { surfaceGrammarAndStyleService } from '../src/miki/conversation/services/surfaceGrammarAndStyleService';
+import { answerPlanService } from '../src/miki/strategy/services/answerPlanService';
 
 async function runVerification() {
   console.log('=== [v14 Verification] 設計思想 19.2節 表層部品バリエーション検証 ===\n');

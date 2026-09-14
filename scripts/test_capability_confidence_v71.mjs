@@ -3,10 +3,10 @@ import path from 'node:path';
 
 const root = path.resolve(new URL('..', import.meta.url).pathname);
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
-const graph = read('src/services/capabilityGraphService.ts');
-const confidence = read('src/services/capabilityConfidenceService.ts');
-const research = read('src/services/researchService.ts');
-const failure = read('src/services/failureUnderstandingService.ts');
+const graph = read('miki/capabilityGraphService.ts');
+const confidence = read('miki/capabilityConfidenceService.ts');
+const research = read('miki/researchService.ts');
+const failure = read('miki/memory/services/failureUnderstandingService.ts');
 const server = read('server.ts');
 
 const checks = [

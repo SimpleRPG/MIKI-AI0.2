@@ -1,6 +1,6 @@
-import { knowledgeOperatingSystemService } from '../src/services/knowledgeOperatingSystemService';
-import { counterfactualWorkSimulatorService } from '../src/services/counterfactualWorkSimulatorService';
-import { personalApiGatewayService } from '../src/services/personalApiGatewayService';
+import { knowledgeOperatingSystemService } from '../src/miki/selfAwareness/services/knowledgeOperatingSystemService';
+import { counterfactualWorkSimulatorService } from '../src/miki/unknown/services/counterfactualWorkSimulatorService';
+import { personalApiGatewayService } from '../src/miki/execution/services/personalApiGatewayService';
 
 const source=knowledgeOperatingSystemService.register({type:'SOURCE',title:'test source',content:'source',sourceIds:[],evidenceIds:[],dependsOn:[],replaces:[],conditions:[],confidence:1,freshness:1,metadata:{test:true}});
 const evidence=knowledgeOperatingSystemService.register({type:'EVIDENCE',title:'test evidence',content:'execution evidence',sourceIds:[source.id],evidenceIds:[],dependsOn:[],replaces:[],conditions:[],confidence:.9,freshness:1,metadata:{test:true}});

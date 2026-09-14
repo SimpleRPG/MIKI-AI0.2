@@ -95,24 +95,24 @@ import {
   ComprehensiveCodeVerification,
   FalsificationEvaluation,
 } from '../types';
-import { selfImprovementService } from '../services/selfImprovementService';
-import { skillsService } from '../services/skillsService';
-import { capabilityPluginService } from '../services/capabilityPluginService';
-import { worldModelService } from '../services/worldModelService';
-import { workflowSynthesisService } from '../services/workflowSynthesisService';
-import { codeVerificationService } from '../services/codeVerificationService';
-import { falsificationService } from '../services/falsificationService';
+import { selfImprovementService } from '../miki/improvement/services/selfImprovementService';
+import { skillsService } from '../miki/capability/services/skillsService';
+import { capabilityPluginService } from '../miki/capability/services/capabilityPluginService';
+import { worldModelService } from '../miki/selfAwareness/services/worldModelService';
+import { workflowSynthesisService } from '../miki/execution/services/workflowSynthesisService';
+import { codeVerificationService } from '../miki/verification/services/codeVerificationService';
+import { falsificationService } from '../miki/verification/services/falsificationService';
 import {
   backgroundWorkerService,
   canRunShallowSleep,
   canRunDeepSleep,
   getDeepSleepUnmetReasons,
   getShallowSleepUnmetReasons,
-} from '../services/backgroundWorkerService';
-import { regressionBenchmarkService } from '../services/regressionBenchmarkService';
-import { nativeBackgroundService } from '../services/nativeBackgroundService';
-import { toolsService } from '../services/toolsService';
-import { syntheticDataService } from '../services/syntheticDataService';
+} from '../miki/execution/services/backgroundWorkerService';
+import { regressionBenchmarkService } from '../miki/verification/services/regressionBenchmarkService';
+import { nativeBackgroundService } from '../miki/execution/services/nativeBackgroundService';
+import { toolsService } from '../miki/capability/services/toolsService';
+import { syntheticDataService } from '../miki/research/services/syntheticDataService';
 import { retrieveScoredMemories } from '../utils/memoryRetrieval';
 
 export type SelfImprovementTab =

@@ -26,9 +26,9 @@ import {
   Activity,
   Filter,
 } from 'lucide-react';
-import { workDirectiveIngestionService } from '../../services/workDirectiveIngestionService';
-import { evidenceBasedSelfImprovementEngine } from '../../services/evidenceBasedSelfImprovementEngine';
-import { selfImprovementControllerService, ImprovementDecision } from '../../services/selfImprovementControllerService';
+import { workDirectiveIngestionService } from '../../miki/execution/services/workDirectiveIngestionService';
+import { evidenceBasedSelfImprovementEngine } from '../../miki/improvement/services/evidenceBasedSelfImprovementEngine';
+import { selfImprovementControllerService, ImprovementDecision } from '../../miki/improvement/services/selfImprovementControllerService';
 import {
   StructuredDirective,
   RequirementContract,

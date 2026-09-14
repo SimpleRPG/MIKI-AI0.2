@@ -26,14 +26,14 @@ import {
   SystemLogEntry,
   StepExecutionSnapshot,
 } from '../services/systemLogger';
-import { proactiveContextOsService, ContextAwarenessSnapshot } from '../services/proactiveContextOsService';
-import { selfCodeArchitectService } from '../services/selfCodeArchitectService';
+import { proactiveContextOsService, ContextAwarenessSnapshot } from '../miki/strategy/services/proactiveContextOsService';
+import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
 import {
   autonomousContinuousEvolutionService,
   AutonomousEvolutionStepEvent,
   AutonomousEvolutionRecord,
-} from '../services/autonomousContinuousEvolutionService';
-import { aiderEngineService, AiderCommitRecord } from '../services/aiderEngineService';
+} from '../miki/autonomy/services/autonomousContinuousEvolutionService';
+import { aiderEngineService, AiderCommitRecord } from '../miki/selfDevelopment/services/aiderEngineService';
 
 interface RealtimeActivityMonitorModalProps {
   isOpen: boolean;

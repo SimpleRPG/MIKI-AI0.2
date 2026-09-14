@@ -17,36 +17,36 @@ import {
 } from 'lucide-react';
 import {
   claimDatabaseService,
-} from '../../services/claimDatabaseService';
+} from '../../miki/memory/services/claimDatabaseService';
 import {
   unifiedDecisionEngineService,
-} from '../../services/unifiedDecisionEngineService';
+} from '../../miki/strategy/services/unifiedDecisionEngineService';
 import {
   componentRegistryService,
-} from '../../services/componentRegistryService';
+} from '../../miki/capability/services/componentRegistryService';
 import {
   answerContentIrService,
-} from '../../services/answerContentIrService';
+} from '../../miki/conversation/services/answerContentIrService';
 import {
   counterfactualReasoningService,
-} from '../../services/counterfactualReasoningService';
+} from '../../miki/unknown/services/counterfactualReasoningService';
 import {
   latentIntentMiningService,
-} from '../../services/latentIntentMiningService';
+} from '../../miki/unknown/services/latentIntentMiningService';
 import {
   metacognitiveCalibrationService,
-} from '../../services/metacognitiveCalibrationService';
+} from '../../miki/selfAwareness/services/metacognitiveCalibrationService';
 import {
   affectionDynamicsService,
-} from '../../services/affectionDynamicsService';
+} from '../../miki/selfAwareness/services/affectionDynamicsService';
 import {
   formalConstraintSolverService,
   ConstraintSolveResult,
-} from '../../services/formalConstraintSolverService';
+} from '../../miki/verification/services/formalConstraintSolverService';
 import {
   autonomousContinuousEvolutionService,
   AutonomousEvolutionRecord,
-} from '../../services/autonomousContinuousEvolutionService';
+} from '../../miki/autonomy/services/autonomousContinuousEvolutionService';
 import {
   chapter31Service,
   CollocationMatch,
@@ -72,7 +72,7 @@ import {
   CompiledRequestType,
   AnswerSkeletonType,
 } from '../../types';
-import { requestTypeCompilerService } from '../../services/requestTypeCompilerService';
+import { requestTypeCompilerService } from '../../miki/selfDevelopment/services/requestTypeCompilerService';
 import { PromotionGateSubView } from './non_llm_views/PromotionGateSubView';
 import { AutonomousHardeningSubView } from './non_llm_views/AutonomousHardeningSubView';
 import { CloudGatewaySubView } from './non_llm_views/CloudGatewaySubView';
@@ -193,7 +193,7 @@ export const NonLlmArchitectureTab: React.FC = () => {
   const [affectionEvalResult, setAffectionEvalResult] = useState<AffectionEvaluationResult | null>(null);
 
   // --- Chapter 59: CSP Formal Constraint Solver State ---
-  const [cspTargetFiles, setCspTargetFiles] = useState('src/services/vbaDesignAssistantService.ts, src/types.ts');
+  const [cspTargetFiles, setCspTargetFiles] = useState('miki/selfDevelopment/services/vbaDesignAssistantService.ts, src/types.ts');
   const [cspForbiddenFiles, setCspForbiddenFiles] = useState('.env, /weights/qwen_3b.bin');
   const [cspMustPreserve, setCspMustPreserve] = useState('Qwen-3B-Base, IMMUTABLE');
   const [cspSolveResult, setCspSolveResult] = useState<ConstraintSolveResult | null>(null);

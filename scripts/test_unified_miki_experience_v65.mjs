@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 
-const core = fs.readFileSync('src/services/nonLlmCoreService.ts','utf8');
-const unified = fs.readFileSync('src/services/unifiedMikiExperienceService.ts','utf8');
+const core = fs.readFileSync('miki/safety/services/nonLlmCoreService.ts','utf8');
+const unified = fs.readFileSync('miki/experience/services/unifiedMikiExperienceService.ts','utf8');
 const server = fs.readFileSync('server.ts','utf8');
-const agenda = fs.readFileSync('src/services/workingAgendaService.ts','utf8');
+const agenda = fs.readFileSync('miki/strategy/services/workingAgendaService.ts','utf8');
 assert.match(core, /unifiedMikiExperienceService/);
 assert.match(server, /unifiedMikiExperienceService\.observeRpg/);
 assert.match(server, /\/api\/miki\/unified-experience\/state/);

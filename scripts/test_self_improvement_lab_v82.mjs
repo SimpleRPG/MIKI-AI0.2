@@ -3,7 +3,7 @@ import path from 'node:path';
 const root = path.resolve(new URL('..', import.meta.url).pathname);
 const checks=[];
 const must=(name,ok)=>{checks.push([name,!!ok]); if(!ok) throw new Error(name)};
-const svc=fs.readFileSync(path.join(root,'src/services/deterministicSelfImprovementLabService.ts'),'utf8');
+const svc=fs.readFileSync(path.join(root,'miki/improvement/services/deterministicSelfImprovementLabService.ts'),'utf8');
 const server=fs.readFileSync(path.join(root,'server.ts'),'utf8');
 must('lab service exists', svc.includes('class DeterministicSelfImprovementLabService'));
 must('web evidence stage', svc.includes("WEB_EVIDENCE"));
@@ -14,7 +14,7 @@ must('candidate only', svc.includes("CANDIDATE_READY") && svc.includes('USER_OR_
 must('no auto full release', !svc.includes('promoteToFullRelease'));
 must('local llm explicitly denied', svc.includes('LOCAL_LLM_RUNTIME_REACTIVATION'));
 must('production overwrite explicitly denied', svc.includes('DIRECT_PRODUCTION_OVERWRITE'));
-must('dynamic tool has no retired local creator', !fs.readFileSync(path.join(root,'src/services/dynamicToolFactoryService.ts'),'utf8').includes("createdBy: 'QWEN_3B'"));
+must('dynamic tool has no retired local creator', !fs.readFileSync(path.join(root,'miki/capability/services/dynamicToolFactoryService.ts'),'utf8').includes("createdBy: 'QWEN_3B'"));
 must('server tool has no retired local creator', !server.includes("createdBy: 'QWEN_3B'"));
 must('route exists', server.includes("/api/miki/self-improvement-lab/run"));
 must('contract route exists', server.includes("/api/miki/self-improvement-lab/contract"));

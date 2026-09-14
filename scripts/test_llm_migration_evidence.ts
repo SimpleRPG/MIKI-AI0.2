@@ -1,4 +1,4 @@
-import { llmMigrationProtocolService } from '../src/services/llmMigrationProtocolService';
+import { llmMigrationProtocolService } from '../src/miki/safety/services/llmMigrationProtocolService';
 
 const taskId = 'MIG-EVIDENCE-SELFTEST';
 const existing = llmMigrationProtocolService.getTaskById(taskId);

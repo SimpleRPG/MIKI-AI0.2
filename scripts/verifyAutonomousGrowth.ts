@@ -1,6 +1,6 @@
-import { answerPlanService } from '../src/services/answerPlanService';
-import { surfaceVariationGrowthService } from '../src/services/surfaceVariationGrowthService';
-import { surfaceVariationService } from '../src/services/surfaceVariationService';
+import { answerPlanService } from '../src/miki/strategy/services/answerPlanService';
+import { surfaceVariationGrowthService } from '../src/miki/conversation/services/surfaceVariationGrowthService';
+import { surfaceVariationService } from '../src/miki/conversation/services/surfaceVariationService';
 
 async function runTests() {
   console.log('================================================================');

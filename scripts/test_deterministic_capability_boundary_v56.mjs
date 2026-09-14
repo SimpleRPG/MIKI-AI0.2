@@ -34,7 +34,7 @@ if (hits.length) {
   process.exit(1);
 }
 
-const evolution = fs.readFileSync(path.join(root, 'src/services/deterministicCapabilityEvolutionService.ts'), 'utf8');
+const evolution = fs.readFileSync(path.join(root, 'miki/capability/services/deterministicCapabilityEvolutionService.ts'), 'utf8');
 for (const required of ['compileVerifiedSample', 'recordFailure', 'recordSuccess', 'capabilityGapService', 'answerPlanService']) {
   if (!evolution.includes(required)) {
     console.error(`FAIL: deterministic capability evolution missing ${required}`);
@@ -42,7 +42,7 @@ for (const required of ['compileVerifiedSample', 'recordFailure', 'recordSuccess
   }
 }
 
-const context = fs.readFileSync(path.join(root, 'src/services/contextBudgetEngineService.ts'), 'utf8');
+const context = fs.readFileSync(path.join(root, 'miki/strategy/services/contextBudgetEngineService.ts'), 'utf8');
 for (const forbiddenContext of ['nCtx', 'modelParamB', 'Qwen', 'Llama', 'KV-cache']) {
   if (context.includes(forbiddenContext)) {
     console.error(`FAIL: structural budget still depends on ${forbiddenContext}`);

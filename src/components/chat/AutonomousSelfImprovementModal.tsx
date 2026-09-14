@@ -44,26 +44,26 @@ import {
   AutonomousEvolutionStepEvent,
   AutopilotConfig,
   ImprovementBacklogItem,
-} from '../../services/autonomousContinuousEvolutionService';
+} from '../../miki/autonomy/services/autonomousContinuousEvolutionService';
 import {
   selfCodeArchitectService,
   SPECIFICATION_REGISTRY,
-} from '../../services/selfCodeArchitectService';
+} from '../../miki/selfDevelopment/services/selfCodeArchitectService';
 import {
   mikiCognitiveVitalsService,
   CognitiveVitalsSnapshot,
   SelfHealingDefragResult,
-} from '../../services/mikiCognitiveVitalsService';
+} from '../../miki/selfAwareness/services/mikiCognitiveVitalsService';
 import {
   mikiIntrospectionJournalService,
   IntrospectionEntry,
-} from '../../services/mikiIntrospectionJournalService';
+} from '../../miki/memory/services/mikiIntrospectionJournalService';
 import {
   mikiBrainCapsuleService,
   MikiBrainCapsule,
   CapsuleRestoreResult,
-} from '../../services/mikiBrainCapsuleService';
-import { mikiSelfCodingSuperchargerService } from '../../services/mikiSelfCodingSuperchargerService';
+} from '../../miki/memory/services/mikiBrainCapsuleService';
+import { mikiSelfCodingSuperchargerService } from '../../miki/selfDevelopment/services/mikiSelfCodingSuperchargerService';
 import { SpecificationChapterMeta } from '../../types';
 
 interface AutonomousSelfImprovementModalProps {

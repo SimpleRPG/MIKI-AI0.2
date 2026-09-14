@@ -14,7 +14,7 @@ import {
   mikiSelfCodingSuperchargerService,
   DiffResult,
   SyntaxCheckResult,
-} from '../../services/mikiSelfCodingSuperchargerService';
+} from '../../miki/selfDevelopment/services/mikiSelfCodingSuperchargerService';
 
 interface DiffPreviewModalProps {
   isOpen: boolean;

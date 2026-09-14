@@ -1,5 +1,5 @@
 import fs from 'fs';
-const s=fs.readFileSync('src/services/operationalConformanceService.ts','utf8');
+const s=fs.readFileSync('miki/verification/services/operationalConformanceService.ts','utf8');
 const server=fs.readFileSync('server.ts','utf8');
 const checks=[
  ['uncertainty decomposition',/UncertaintyKind.*REQUIREMENT.*MEMORY_CONFLICT.*CAPABILITY_BOUNDARY/s],

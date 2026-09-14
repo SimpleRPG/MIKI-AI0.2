@@ -1,6 +1,6 @@
 import { Character, WorldLocation, StoryEntry, Monster, Quest } from '../types/rpg';
-import { simpleRpgRuleEngineService } from './simpleRpgRuleEngineService';
-import { unifiedMikiExperienceService } from './unifiedMikiExperienceService';
+import { simpleRpgRuleEngineService } from '../miki/execution/services/simpleRpgRuleEngineService';
+import { unifiedMikiExperienceService } from '../miki/experience/services/unifiedMikiExperienceService';
 
 export interface NarrateResponse {
   narration: string;

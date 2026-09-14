@@ -26,7 +26,7 @@ import {
 import {
   mikiAutonomousDevStudioService,
   DevIdeaSuggestion,
-} from '../../services/mikiAutonomousDevStudioService';
+} from '../../miki/selfDevelopment/services/mikiAutonomousDevStudioService';
 import {
   AutonomousDevProject,
   AutonomousDevCategory,

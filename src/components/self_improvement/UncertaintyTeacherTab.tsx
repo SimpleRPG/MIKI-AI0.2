@@ -13,8 +13,8 @@ import {
   Cpu,
   Moon,
 } from 'lucide-react';
-import { uncertaintyTeacherService } from '../../services/uncertaintyTeacherService';
-import { capabilityGapService } from '../../services/capabilityGapService';
+import { uncertaintyTeacherService } from '../../miki/learning/services/uncertaintyTeacherService';
+import { capabilityGapService } from '../../miki/capability/services/capabilityGapService';
 import { UncertaintyDivergenceItem, CapabilityGapEntry } from '../../types';
 
 export const UncertaintyTeacherTab: React.FC = () => {

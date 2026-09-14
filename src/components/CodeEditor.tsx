@@ -48,7 +48,7 @@ import { DiffPreviewModal } from './chat/DiffPreviewModal';
 import { UnitTestStudioModal } from './chat/UnitTestStudioModal';
 import { DependencyGraphModal } from './chat/DependencyGraphModal';
 import { SnapshotTimeMachineModal } from './chat/SnapshotTimeMachineModal';
-import { mikiSelfCodingSuperchargerService } from '../services/mikiSelfCodingSuperchargerService';
+import { mikiSelfCodingSuperchargerService } from '../miki/selfDevelopment/services/mikiSelfCodingSuperchargerService';
 
 interface CodeEditorProps {
   files: WorkspaceFile[];

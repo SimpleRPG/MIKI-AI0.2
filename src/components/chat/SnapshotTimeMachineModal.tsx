@@ -15,7 +15,7 @@ import {
 import {
   mikiSelfCodingSuperchargerService,
   SnapshotRecord,
-} from '../../services/mikiSelfCodingSuperchargerService';
+} from '../../miki/selfDevelopment/services/mikiSelfCodingSuperchargerService';
 
 interface SnapshotTimeMachineModalProps {
   isOpen: boolean;
