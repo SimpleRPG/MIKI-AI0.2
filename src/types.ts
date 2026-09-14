@@ -474,19 +474,6 @@ export interface CodeProposal {
 }
 
 /**
- * 旧ローカル生成ランタイム設定（退役） (設計思想 3. 実設定反映)
- */
-export interface NativeLlamaConfig {
-  nGpuLayers: number;       // 0〜99 (0=純CPU, 99=全層GPUオフロード)
-  nCtx: number;             // コンテキスト長 (512, 1024, 2048, 4096, 8192)
-  nThreads: number;         // CPUスレッド数 (1〜16)
-  temperature: number;      // サンプリング温度 (0.1〜1.5)
-  topP: number;             // Top-P核サンプリング (0.1〜1.0)
-  maxTokens: number;        // 最大生成トークン数 (64〜2048)
-  repetitionPenalty: number;// 繰り返しペナルティ (1.0〜1.5)
-}
-
-/**
  * VBA準備・安全ゲート検証結果 (設計思想 10. VBA準備ゲート)
  */
 export interface VbaSafetyAssessment {
@@ -1009,30 +996,7 @@ export interface GitHubRepoData {
   branch: string;
 }
 
-export interface RuntimeCapabilityModel {
-  id: string;
-  name: string;
-  expertRole: 'code' | 'shader' | 'logic' | 'moe_chat' | 'general';
-  expertName: string;
-  icon: string;
-  sizeMB: number;
-  parameters: string;
-  quantization: string;
-  vramMB: number;
-  description: string;
-  huggingFaceRepo: string;
-  format?: 'gguf' | 'mlc';
-  downloadUrl?: string;
-  fileName?: string;
-  downloadStatus: 'not_downloaded' | 'downloading' | 'cached' | 'loaded_in_vram' | 'error';
-  downloadProgress: number;
-  statusText?: string;
-  errorMessage?: string;
-  downloadSpeed?: string;
-  etaSeconds?: number;
-  lastUpdatedTime?: number;
-  isStalled?: boolean;
-}
+
 
 export interface WebGPUStatus {
   supported: boolean;
@@ -1512,7 +1476,6 @@ export interface RegressionSuiteRunReport {
   timestamp: number;
   modelName: string;
   modelId?: string;               // 実際にテストされた実行器の識別子
-  engineType?: 'native_gguf' | 'webllm' | 'none'; // 実行エンジン種別
   totalTests: number;
   passedTests: number;
   failedTests: number;

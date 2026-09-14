@@ -1,8 +1,8 @@
-import { answerPlanService } from '../src/services/answerPlanService';
-import { surfaceVariationGrowthService } from '../src/services/surfaceVariationGrowthService';
-import { bannedTopicsConfigService } from '../src/services/bannedTopicsConfigService';
-import { WebMaterialPatternExtractor } from '../src/services/webMaterialPatternExtractor';
-import { autonomousSearchService } from '../src/services/autonomousSearchService';
+import { answerPlanService } from '../src/miki/strategy/services/answerPlanService';
+import { surfaceVariationGrowthService } from '../src/miki/conversation/services/surfaceVariationGrowthService';
+import { bannedTopicsConfigService } from '../src/miki/safety/services/bannedTopicsConfigService';
+import { WebMaterialPatternExtractor } from '../src/miki/research/services/webMaterialPatternExtractor';
+import { autonomousSearchService } from '../src/miki/research/services/autonomousSearchService';
 
 async function runWebMaterialVerification() {
   console.log('================================================================');

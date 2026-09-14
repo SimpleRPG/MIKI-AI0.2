@@ -11,11 +11,11 @@ import {
 import { generateSmartCompanionReply } from '../utils/companionEngine';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
-import { privacyGuardrailService } from './privacyGuardrailService';
+import { privacyGuardrailService } from '../miki/safety/services/privacyGuardrailService';
 import {
   nonLlmHardwarePipelineService,
   HardwareTelemetry,
-} from './nonLlmHardwarePipelineService';
+} from '../miki/safety/services/nonLlmHardwarePipelineService';
 
 // APKなど「フロントエンドだけが単体で動くビルド」では server.ts (Express) が
 // 同一オリジンに存在しないため、Termux等で起動したサーバーのアドレスを

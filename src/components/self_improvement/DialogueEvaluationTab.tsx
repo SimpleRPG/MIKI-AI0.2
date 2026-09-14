@@ -14,7 +14,7 @@ import {
 import {
   dialogueEvaluationService,
   FIXED_SCENARIOS_12,
-} from '../../services/dialogueEvaluationService';
+} from '../../miki/conversation/services/dialogueEvaluationService';
 import {
   FixedScenarioResult,
   DynamicDialogueEvaluationResult,

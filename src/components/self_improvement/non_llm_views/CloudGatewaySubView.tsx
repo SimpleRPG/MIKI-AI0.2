@@ -13,12 +13,12 @@ import {
 } from 'lucide-react';
 import {
   cloudAiRestrictedGatewayService,
-} from '../../../services/cloudAiRestrictedGatewayService';
+} from '../../../miki/safety/services/cloudAiRestrictedGatewayService';
 import {
   CloudAiEscalationRequest,
   CloudEscalationTrigger,
 } from '../../../types';
-import { improvementProposalService } from '../../../services/improvementProposalService';
+import { improvementProposalService } from '../../../miki/improvement/services/improvementProposalService';
 
 export const CloudGatewaySubView: React.FC = () => {
   const [requests, setRequests] = useState<CloudAiEscalationRequest[]>(() =>

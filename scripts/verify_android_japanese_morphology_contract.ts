@@ -5,7 +5,7 @@ const root = process.cwd();
 const script = fs.readFileSync(path.join(root, 'scripts/install_android_japanese_morphology.sh'), 'utf8');
 const plugin = fs.readFileSync(path.join(root, 'android-native/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt'), 'utf8');
 const runner = fs.readFileSync(path.join(root, 'android-native/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt'), 'utf8');
-const service = fs.readFileSync(path.join(root, 'src/services/japaneseMorphologyService.ts'), 'utf8');
+const service = fs.readFileSync(path.join(root, 'miki/research/services/japaneseMorphologyService.ts'), 'utf8');
 
 const required = [
   ['Sudachi Java 0.8.1', /sudachi:0\.8\.1/],

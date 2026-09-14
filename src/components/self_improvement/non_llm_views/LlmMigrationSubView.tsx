@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import {
   llmMigrationProtocolService,
-} from '../../../services/llmMigrationProtocolService';
+} from '../../../miki/safety/services/llmMigrationProtocolService';
 import {
   LlmMigrationTask,
   LlmMigrationStatus,

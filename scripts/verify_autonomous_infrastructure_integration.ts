@@ -7,12 +7,12 @@
  * 4. 表層表現の多様性と定型文反復抑制 (surfaceVariationService)
  */
 
-import { bannedTopicsConfigService } from '../src/services/bannedTopicsConfigService';
-import { evidenceBasedPromotionGateService, PROMOTION_GATE_CRITERIA } from '../src/services/evidenceBasedPromotionGateService';
-import { mikiAutonomousDevStudioService } from '../src/services/mikiAutonomousDevStudioService';
-import { surfaceVariationService } from '../src/services/surfaceVariationService';
-import { nonLlmCoreService } from '../src/services/nonLlmCoreService';
-import { componentRegistryService } from '../src/services/componentRegistryService';
+import { bannedTopicsConfigService } from '../src/miki/safety/services/bannedTopicsConfigService';
+import { evidenceBasedPromotionGateService, PROMOTION_GATE_CRITERIA } from '../src/miki/promotion/services/evidenceBasedPromotionGateService';
+import { mikiAutonomousDevStudioService } from '../src/miki/selfDevelopment/services/mikiAutonomousDevStudioService';
+import { surfaceVariationService } from '../src/miki/conversation/services/surfaceVariationService';
+import { nonLlmCoreService } from '../src/miki/safety/services/nonLlmCoreService';
+import { componentRegistryService } from '../src/miki/capability/services/componentRegistryService';
 
 async function runIntegrationVerification() {
   console.log('=== [Miki Autonomous Infrastructure Integration Verification] ===\n');

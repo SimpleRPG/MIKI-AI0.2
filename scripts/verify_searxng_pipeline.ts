@@ -1,17 +1,17 @@
 import http from 'http';
-import { autonomousSearchService } from '../src/services/autonomousSearchService';
+import { autonomousSearchService } from '../src/miki/research/services/autonomousSearchService';
 import {
   isRealDataProvider,
   VALID_WEB_REAL_DATA_PROVIDERS,
   WebMaterialPatternExtractor,
-} from '../src/services/webMaterialPatternExtractor';
+} from '../src/miki/research/services/webMaterialPatternExtractor';
 import { storageService } from '../src/services/storageService';
 import {
   getSearxngBaseUrlItem,
   setSearxngBaseUrlItem,
   DEFAULT_SEARXNG_BASE_URL,
 } from '../src/services/api';
-import { answerPlanService } from '../src/services/answerPlanService';
+import { answerPlanService } from '../src/miki/strategy/services/answerPlanService';
 
 async function runTest() {
   console.log('=== SearXNGパイプライン＆UI設定 検証開始 ===\n');

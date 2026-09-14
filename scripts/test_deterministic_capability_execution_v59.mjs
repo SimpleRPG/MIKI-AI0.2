@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const service = path.join(root, 'src/services/deterministicCapabilityExecutionService.ts');
-const core = path.join(root, 'src/services/nonLlmCoreService.ts');
+const service = path.join(root, 'miki/capability/services/deterministicCapabilityExecutionService.ts');
+const core = path.join(root, 'miki/safety/services/nonLlmCoreService.ts');
 const text = fs.readFileSync(service, 'utf8');
 const coreText = fs.readFileSync(core, 'utf8');
 

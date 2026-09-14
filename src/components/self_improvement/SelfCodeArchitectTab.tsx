@@ -48,22 +48,22 @@ import {
 import {
   selfCodeArchitectService,
   SPECIFICATION_REGISTRY,
-} from '../../services/selfCodeArchitectService';
-import { teacherDriftService } from '../../services/teacherDriftService';
-import { codeSkeletonService } from '../../services/codeSkeletonService';
-import { userProficiencyService } from '../../services/userProficiencyService';
-import { autonomousCurriculumService } from '../../services/autonomousCurriculumService';
-import { proactiveContextOsService } from '../../services/proactiveContextOsService';
-import { digitalResearchNoteService } from '../../services/digitalResearchNoteService';
-import { cognitiveDebuggerService } from '../../services/cognitiveDebuggerService';
-import { codebaseReflectionService, ImprovementRecipe } from '../../services/codebaseReflectionService';
+} from '../../miki/selfDevelopment/services/selfCodeArchitectService';
+import { teacherDriftService } from '../../miki/learning/services/teacherDriftService';
+import { codeSkeletonService } from '../../miki/selfDevelopment/services/codeSkeletonService';
+import { userProficiencyService } from '../../miki/learning/services/userProficiencyService';
+import { autonomousCurriculumService } from '../../miki/learning/services/autonomousCurriculumService';
+import { proactiveContextOsService } from '../../miki/strategy/services/proactiveContextOsService';
+import { digitalResearchNoteService } from '../../miki/research/services/digitalResearchNoteService';
+import { cognitiveDebuggerService } from '../../miki/verification/services/cognitiveDebuggerService';
+import { codebaseReflectionService, ImprovementRecipe } from '../../miki/selfDevelopment/services/codebaseReflectionService';
 import { AdvancedSelfCodeSuiteView } from './AdvancedSelfCodeSuiteView';
 import { EvidenceBasedLoopSubView } from './EvidenceBasedLoopSubView';
-import { aiderEngineService } from '../../services/aiderEngineService';
-import { selfImprovementSuiteService } from '../../services/selfImprovementSuiteService';
-import { mikiSelfCodingSuperchargerService } from '../../services/mikiSelfCodingSuperchargerService';
-import { mikiUltraEvolverService } from '../../services/mikiUltraEvolverService';
-import { autonomousContinuousEvolutionService } from '../../services/autonomousContinuousEvolutionService';
+import { aiderEngineService } from '../../miki/selfDevelopment/services/aiderEngineService';
+import { selfImprovementSuiteService } from '../../miki/improvement/services/selfImprovementSuiteService';
+import { mikiSelfCodingSuperchargerService } from '../../miki/selfDevelopment/services/mikiSelfCodingSuperchargerService';
+import { mikiUltraEvolverService } from '../../miki/autonomy/services/mikiUltraEvolverService';
+import { autonomousContinuousEvolutionService } from '../../miki/autonomy/services/autonomousContinuousEvolutionService';
 
 export interface LiveLogItem {
   id: string;
@@ -347,7 +347,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
       const stagePayload = {
         proposalId: prop.id,
         targetChapterNumber: prop.targetChapterNumber,
-        targetFile: prop.targetFile || prop.contract?.allowedFiles?.[0] || 'src/services/selfCodeArchitectService.ts',
+        targetFile: prop.targetFile || prop.contract?.allowedFiles?.[0] || 'miki/selfDevelopment/services/selfCodeArchitectService.ts',
         title: prop.title,
         prompt: prop.prompt,
         codeSnippet: prop.codeSnippet || `// Proposed implementation for ${prop.title}\n`,
@@ -1493,13 +1493,13 @@ export const SelfCodeArchitectTab: React.FC = () => {
                         <div className="flex items-center justify-between text-slate-400 text-[10px] pb-1 border-b border-slate-800">
                           <span className="flex items-center gap-1 text-slate-200 font-semibold truncate">
                             <FileCode className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                            変更対象: {prop.contract.allowedFiles[0] || 'src/services/selfCodeArchitectService.ts'}
+                            変更対象: {prop.contract.allowedFiles[0] || 'miki/selfDevelopment/services/selfCodeArchitectService.ts'}
                           </span>
                           <span className="text-emerald-400 font-bold shrink-0">AST パッチ差分</span>
                         </div>
                         <div className="bg-black/70 rounded p-2.5 space-y-1 overflow-x-auto text-[10px] leading-relaxed">
                           <div className="text-cyan-400 font-bold">@@ 仕様書 第{prop.targetChapterNumber}章 準拠パッチ適用 @@</div>
-                          <div className="text-slate-500">// Invariant-protected target: {prop.contract.allowedFiles[0] || 'src/services/selfCodeArchitectService.ts'}</div>
+                          <div className="text-slate-500">// Invariant-protected target: {prop.contract.allowedFiles[0] || 'miki/selfDevelopment/services/selfCodeArchitectService.ts'}</div>
                           <div className="text-slate-500">// Preserved invariants: {prop.contract.mustPreserve.slice(0, 2).join(' / ')}</div>
                           <div className="text-emerald-400 bg-emerald-950/40 px-1 py-0.5 rounded font-semibold">+ export interface Chapter{prop.targetChapterNumber}Specification {'{'}</div>
                           <div className="text-emerald-400 bg-emerald-950/40 px-1 py-0.5 rounded font-semibold">+   chapterNumber: {prop.targetChapterNumber};</div>

@@ -1,7 +1,7 @@
 import type { MemoryItem } from '../types';
 import { storageService } from '../services/storageService';
-import { experienceRouterService } from '../services/experienceRouterService';
-import { japaneseAnalysisService } from '../services/japaneseAnalysisService';
+import { experienceRouterService } from '../miki/experience/services/experienceRouterService';
+import { japaneseAnalysisService } from '../miki/research/services/japaneseAnalysisService';
 
 /**
  * 多層ベクトル検索 & 知識グラフ依存関係検索エンジン

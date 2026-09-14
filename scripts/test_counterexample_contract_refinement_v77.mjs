@@ -1,6 +1,6 @@
 import fs from 'fs';
-const svc = fs.readFileSync('src/services/counterexampleContractRefinementService.ts','utf8');
-const recovery = fs.readFileSync('src/services/remediationFailureRecoveryService.ts','utf8');
+const svc = fs.readFileSync('miki/unknown/services/counterexampleContractRefinementService.ts','utf8');
+const recovery = fs.readFileSync('miki/safety/services/remediationFailureRecoveryService.ts','utf8');
 const server = fs.readFileSync('server.ts','utf8');
 const checks = [
  ['service exists', svc.includes('CounterexampleContractRefinementService')],

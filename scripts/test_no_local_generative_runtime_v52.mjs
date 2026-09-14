@@ -32,7 +32,7 @@ for (const file of ['src/services/nativeLlmService.ts','src/services/webLlmServi
     console.error(`RETIRED FILE STILL EXISTS: ${file}`); failed = true;
   }
 }
-if (!fs.existsSync(path.join(root, 'src/services/nonLlmRuntimeService.ts'))) {
+if (!fs.existsSync(path.join(root, 'miki/safety/services/nonLlmRuntimeService.ts'))) {
   console.error('Missing deterministic runtime adapter'); failed = true;
 }
 if (failed) process.exit(1);

@@ -27,14 +27,14 @@ import {
   autonomousSearchService,
   AutonomousSearchConfig,
   AutonomousSearchStats,
-} from '../../services/autonomousSearchService';
+} from '../../miki/research/services/autonomousSearchService';
 import { AutonomousSearchLearningRecord } from '../../types';
 import {
   bannedTopicsConfigService,
   BannedTopicsConfig,
-} from '../../services/bannedTopicsConfigService';
+} from '../../miki/safety/services/bannedTopicsConfigService';
 import { getJinaApiKeyItem, setJinaApiKeyItem, getSearxngBaseUrlItem, setSearxngBaseUrlItem } from '../../services/api';
-import { nativeWorkManagerService } from '../../services/nativeWorkManagerService';
+import { nativeWorkManagerService } from '../../miki/execution/services/nativeWorkManagerService';
 
 export const AutonomousSearchTab: React.FC = () => {
   const [config, setConfig] = useState<AutonomousSearchConfig>(() => autonomousSearchService.getConfig());

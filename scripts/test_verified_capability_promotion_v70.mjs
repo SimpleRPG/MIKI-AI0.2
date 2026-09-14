@@ -1,7 +1,7 @@
 import fs from 'fs';
-const service = fs.readFileSync('src/services/verifiedCapabilityPromotionService.ts','utf8');
-const graph = fs.readFileSync('src/services/capabilityGraphService.ts','utf8');
-const core = fs.readFileSync('src/services/nonLlmCoreService.ts','utf8');
+const service = fs.readFileSync('miki/promotion/services/verifiedCapabilityPromotionService.ts','utf8');
+const graph = fs.readFileSync('miki/capabilityGraphService.ts','utf8');
+const core = fs.readFileSync('miki/safety/services/nonLlmCoreService.ts','utf8');
 const server = fs.readFileSync('server.ts','utf8');
 const checks = [
   ['service exists', service.includes('export class VerifiedCapabilityPromotionService')],

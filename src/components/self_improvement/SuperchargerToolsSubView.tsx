@@ -30,8 +30,8 @@ import {
   EvolutionLesson,
   DeadCodeScanResult,
   PromptToPatchResult,
-} from '../../services/mikiSelfCodingSuperchargerService';
-import { aiderEngineService } from '../../services/aiderEngineService';
+} from '../../miki/selfDevelopment/services/mikiSelfCodingSuperchargerService';
+import { aiderEngineService } from '../../miki/selfDevelopment/services/aiderEngineService';
 
 export const SuperchargerToolsSubView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<

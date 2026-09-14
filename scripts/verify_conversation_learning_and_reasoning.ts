@@ -1,9 +1,9 @@
-import { nonLlmCoreService } from '../src/services/nonLlmCoreService';
-import { claimDatabaseService } from '../src/services/claimDatabaseService';
-import { mikiUnifiedLearningContinuumService } from '../src/services/mikiUnifiedLearningContinuumService';
-import { mikiReasoningTemplateService } from '../src/services/mikiReasoningTemplateService';
-import { mikiConversationLearningService } from '../src/services/mikiConversationLearningService';
-import { defaultConversationState } from '../src/services/conversationStateService';
+import { nonLlmCoreService } from '../src/miki/safety/services/nonLlmCoreService';
+import { claimDatabaseService } from '../src/miki/memory/services/claimDatabaseService';
+import { mikiUnifiedLearningContinuumService } from '../src/miki/learning/services/mikiUnifiedLearningContinuumService';
+import { mikiReasoningTemplateService } from '../src/miki/selfAwareness/services/mikiReasoningTemplateService';
+import { mikiConversationLearningService } from '../src/miki/learning/services/mikiConversationLearningService';
+import { defaultConversationState } from '../src/miki/conversation/services/conversationStateService';
 
 async function runVerification() {
   console.log('=== [みき自律学習・推論昇格統合検証] 開始 ===');

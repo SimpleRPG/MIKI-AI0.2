@@ -33,9 +33,9 @@ import {
   CrossModuleImpactAnalysis,
   VbaStaticVerificationResult,
 } from '../../types';
-import { codeUnderstandingService } from '../../services/codeUnderstandingService';
-import { vbaDesignAssistantService } from '../../services/vbaDesignAssistantService';
-import { vbaStaticVerifierService } from '../../services/vbaStaticVerifierService';
+import { codeUnderstandingService } from '../../miki/selfDevelopment/services/codeUnderstandingService';
+import { vbaDesignAssistantService } from '../../miki/selfDevelopment/services/vbaDesignAssistantService';
+import { vbaStaticVerifierService } from '../../miki/verification/services/vbaStaticVerifierService';
 
 const DEFAULT_MODULES: VbaModuleFile[] = [
   {

@@ -20,9 +20,9 @@ import {
   HeuristicRuleItem,
   CounterfactualReflectionItem,
 } from '../../types';
-import { autonomousEvolutionService } from '../../services/autonomousEvolutionService';
-import { workingAgendaService } from '../../services/workingAgendaService';
-import { selfCodeArchitectService } from '../../services/selfCodeArchitectService';
+import { autonomousEvolutionService } from '../../miki/autonomy/services/autonomousEvolutionService';
+import { workingAgendaService } from '../../miki/strategy/services/workingAgendaService';
+import { selfCodeArchitectService } from '../../miki/selfDevelopment/services/selfCodeArchitectService';
 import { Code2 } from 'lucide-react';
 
 export const IdleEvolutionTab: React.FC = () => {

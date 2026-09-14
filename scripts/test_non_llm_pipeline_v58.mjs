@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const core = fs.readFileSync(path.join(root, 'src/services/nonLlmCoreService.ts'), 'utf8');
-const answerPlan = fs.readFileSync(path.join(root, 'src/services/answerPlanService.ts'), 'utf8');
-const compiler = fs.readFileSync(path.join(root, 'src/services/requestTypeCompilerService.ts'), 'utf8');
-const solver = fs.readFileSync(path.join(root, 'src/services/formalConstraintSolverService.ts'), 'utf8');
+const core = fs.readFileSync(path.join(root, 'miki/safety/services/nonLlmCoreService.ts'), 'utf8');
+const answerPlan = fs.readFileSync(path.join(root, 'miki/strategy/services/answerPlanService.ts'), 'utf8');
+const compiler = fs.readFileSync(path.join(root, 'miki/selfDevelopment/services/requestTypeCompilerService.ts'), 'utf8');
+const solver = fs.readFileSync(path.join(root, 'miki/verification/services/formalConstraintSolverService.ts'), 'utf8');
 
 const required = [
   [core, "import { answerPlanService } from './answerPlanService';", 'AnswerPlan is wired into Non-LLM Core'],

@@ -71,11 +71,11 @@ import {
   dismissMemoryConflict,
 } from '../utils/memoryRetrieval';
 import { storageService } from '../services/storageService';
-import { experienceRouterService } from '../services/experienceRouterService';
-import { longTermMemoryService } from '../services/longTermMemoryService';
-import { embeddingService, EmbeddingStats } from '../services/embeddingService';
-import { memoryAuditService, MemoryAuditCycleRecord } from '../services/memoryAuditService';
-import { selfImprovementService } from '../services/selfImprovementService';
+import { experienceRouterService } from '../miki/experience/services/experienceRouterService';
+import { longTermMemoryService } from '../miki/memory/services/longTermMemoryService';
+import { embeddingService, EmbeddingStats } from '../miki/research/services/embeddingService';
+import { memoryAuditService, MemoryAuditCycleRecord } from '../miki/memory/services/memoryAuditService';
+import { selfImprovementService } from '../miki/improvement/services/selfImprovementService';
 
 export interface MemoryModalProps {
   isOpen: boolean;

@@ -3,11 +3,11 @@ import path from 'node:path';
 
 const root = process.cwd();
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
-const service = read('src/services/remediationFailureRecoveryService.ts');
-const failure = read('src/services/failureUnderstandingService.ts');
+const service = read('miki/safety/services/remediationFailureRecoveryService.ts');
+const failure = read('miki/memory/services/failureUnderstandingService.ts');
 const server = read('server.ts');
-const worker = read('src/services/backgroundWorkerService.ts');
-const remediation = read('src/services/researchToRemediationService.ts');
+const worker = read('miki/execution/services/backgroundWorkerService.ts');
+const remediation = read('miki/researchToRemediationService.ts');
 
 const checks = [
   ['service exists', service.includes('class RemediationFailureRecoveryService')],

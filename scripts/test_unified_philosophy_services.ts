@@ -1,8 +1,8 @@
-import { claimDatabaseService } from '../src/services/claimDatabaseService';
-import { requestTypeCompilerService } from '../src/services/requestTypeCompilerService';
-import { componentRegistryService } from '../src/services/componentRegistryService';
-import { worldModelService } from '../src/services/worldModelService';
-import { formalConstraintSolverService } from '../src/services/formalConstraintSolverService';
+import { claimDatabaseService } from '../src/miki/memory/services/claimDatabaseService';
+import { requestTypeCompilerService } from '../src/miki/selfDevelopment/services/requestTypeCompilerService';
+import { componentRegistryService } from '../src/miki/capability/services/componentRegistryService';
+import { worldModelService } from '../src/miki/selfAwareness/services/worldModelService';
+import { formalConstraintSolverService } from '../src/miki/verification/services/formalConstraintSolverService';
 
 console.log('='.repeat(64));
 console.log('🧪 統合版設計思想主要サービス & 第59章 動作実態検証テスト');

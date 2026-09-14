@@ -1,7 +1,7 @@
 import { PersonaConfig, MemoryItem } from '../types';
-import { toolsService } from '../services/toolsService';
-import { codeUnderstandingService } from '../services/codeUnderstandingService';
-import { selfCodeArchitectService } from '../services/selfCodeArchitectService';
+import { toolsService } from '../miki/capability/services/toolsService';
+import { codeUnderstandingService } from '../miki/selfDevelopment/services/codeUnderstandingService';
+import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
 
 export function generateSmartCompanionReply(
   prompt: string,

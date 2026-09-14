@@ -14,12 +14,12 @@ import {
   retrieveScoredMemoriesHybrid,
   type ScoredMemory,
 } from './memoryRetrieval';
-import { skillsService } from '../services/skillsService';
-import { toolsService } from '../services/toolsService';
-import { longTermMemoryService } from '../services/longTermMemoryService';
-import { workingAgendaService } from '../services/workingAgendaService';
-import { structuralMemoryService } from '../services/structuralMemoryService';
-import { failureCatalogService } from '../services/failureCatalogService';
+import { skillsService } from '../miki/capability/services/skillsService';
+import { toolsService } from '../miki/capability/services/toolsService';
+import { longTermMemoryService } from '../miki/memory/services/longTermMemoryService';
+import { workingAgendaService } from '../miki/strategy/services/workingAgendaService';
+import { structuralMemoryService } from '../miki/memory/services/structuralMemoryService';
+import { failureCatalogService } from '../miki/memory/services/failureCatalogService';
 import { extractSmartCodeForImprovement } from './codeUnderstanding';
 import type { ConversationState } from '../types';
 

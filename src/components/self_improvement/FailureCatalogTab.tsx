@@ -24,7 +24,7 @@ import {
   FailureSignatureStatus,
   AntiPatternMatchResult,
 } from '../../types';
-import { failureCatalogService } from '../../services/failureCatalogService';
+import { failureCatalogService } from '../../miki/memory/services/failureCatalogService';
 
 interface FailureCatalogTabProps {
   onNotify?: (message: string) => void;

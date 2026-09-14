@@ -1,6 +1,6 @@
 import fs from 'fs';
 const root='.';
-const s=fs.readFileSync('src/services/cognitiveExecutionEvidenceService.ts','utf8');
+const s=fs.readFileSync('miki/selfAwareness/services/cognitiveExecutionEvidenceService.ts','utf8');
 const server=fs.readFileSync('server.ts','utf8');
 const tests=[
  ['evidence service exists',s.includes('class CognitiveExecutionEvidenceService')],

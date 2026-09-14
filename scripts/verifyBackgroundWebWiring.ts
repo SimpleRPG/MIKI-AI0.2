@@ -10,11 +10,11 @@
  */
 
 import http from 'http';
-import { backgroundWorkerService } from '../src/services/backgroundWorkerService';
-import { bannedTopicsConfigService } from '../src/services/bannedTopicsConfigService';
-import { autonomousSearchService } from '../src/services/autonomousSearchService';
-import { answerPlanService } from '../src/services/answerPlanService';
-import { surfaceVariationGrowthService } from '../src/services/surfaceVariationGrowthService';
+import { backgroundWorkerService } from '../src/miki/execution/services/backgroundWorkerService';
+import { bannedTopicsConfigService } from '../src/miki/safety/services/bannedTopicsConfigService';
+import { autonomousSearchService } from '../src/miki/research/services/autonomousSearchService';
+import { answerPlanService } from '../src/miki/strategy/services/answerPlanService';
+import { surfaceVariationGrowthService } from '../src/miki/conversation/services/surfaceVariationGrowthService';
 import { systemLogger } from '../src/services/systemLogger';
 import { storageService } from '../src/services/storageService';
 

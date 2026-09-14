@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 const root = new URL('..', import.meta.url).pathname;
-const engine = fs.readFileSync(new URL('../src/services/simpleRpgRuleEngineService.ts', import.meta.url), 'utf8');
-const learner = fs.readFileSync(new URL('../src/services/simpleRpgCapabilityLearningService.ts', import.meta.url), 'utf8');
+const engine = fs.readFileSync(new URL('../miki/execution/services/simpleRpgRuleEngineService.ts', import.meta.url), 'utf8');
+const learner = fs.readFileSync(new URL('../miki/learning/services/simpleRpgCapabilityLearningService.ts', import.meta.url), 'utf8');
 assert.doesNotMatch(engine, /\beval\s*\(|new\s+Function\s*\(|Math\.random\s*\(/);
 assert.match(learner, /sourceFingerprint/);
 assert.match(learner, /registerVerified/);

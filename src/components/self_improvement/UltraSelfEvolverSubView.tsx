@@ -41,17 +41,17 @@ import {
   BigOOptimizeResult,
   RuntimeSentryResult,
   AutonomousWebEvolveResult,
-} from '../../services/mikiUltraEvolverService';
-import { aiderEngineService, RepoMapResponse, RepoMapEntry } from '../../services/aiderEngineService';
-import { codeSearchService } from '../../services/codeSearchService';
-import { dynamicToolFactoryService } from '../../services/dynamicToolFactoryService';
-import { toolsService } from '../../services/toolsService';
+} from '../../miki/autonomy/services/mikiUltraEvolverService';
+import { aiderEngineService, RepoMapResponse, RepoMapEntry } from '../../miki/selfDevelopment/services/aiderEngineService';
+import { codeSearchService } from '../../miki/selfDevelopment/services/codeSearchService';
+import { dynamicToolFactoryService } from '../../miki/capability/services/dynamicToolFactoryService';
+import { toolsService } from '../../miki/capability/services/toolsService';
 import {
   mikiSelfCodingSuperchargerService,
   SelfImplementationResult,
   SnapshotRecord,
   GapRecommendation,
-} from '../../services/mikiSelfCodingSuperchargerService';
+} from '../../miki/selfDevelopment/services/mikiSelfCodingSuperchargerService';
 import { storageService } from '../../services/storageService';
 import { WebCodeSearchResult, ToolDefinition } from '../../types';
 

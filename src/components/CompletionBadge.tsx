@@ -20,7 +20,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { CompletionEvaluation, CompletionStatus } from '../types';
-import { completionJudgeService } from '../services/completionJudgeService';
+import { completionJudgeService } from '../miki/verification/services/completionJudgeService';
 
 interface CompletionBadgeProps {
   evaluation: CompletionEvaluation;

@@ -12,7 +12,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { CapabilityPlugin, PluginConsentRequest } from '../types';
-import { capabilityPluginService } from '../services/capabilityPluginService';
+import { capabilityPluginService } from '../miki/capability/services/capabilityPluginService';
 
 interface PluginConsentDialogProps {
   request: PluginConsentRequest;

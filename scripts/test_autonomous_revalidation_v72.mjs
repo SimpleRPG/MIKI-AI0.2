@@ -2,9 +2,9 @@ import fs from 'fs';
 const root = new URL('..', import.meta.url).pathname;
 const checks = [];
 function ok(name, value){ checks.push([name, !!value]); }
-const loop = fs.readFileSync(root+'src/services/autonomousRevalidationLoopService.ts','utf8');
-const bus = fs.readFileSync(root+'src/services/executionEventBusService.ts','utf8');
-const bg = fs.readFileSync(root+'src/services/backgroundWorkerService.ts','utf8');
+const loop = fs.readFileSync(root+'miki/autonomy/services/autonomousRevalidationLoopService.ts','utf8');
+const bus = fs.readFileSync(root+'miki/executionEventBusService.ts','utf8');
+const bg = fs.readFileSync(root+'miki/execution/services/backgroundWorkerService.ts','utf8');
 const server = fs.readFileSync(root+'server.ts','utf8');
 ok('revalidation service exists', loop.includes('class AutonomousRevalidationLoopService'));
 ok('forces web research', loop.includes("forceRoute: 'WEB_SEARCH'"));

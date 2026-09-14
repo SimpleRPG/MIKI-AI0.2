@@ -34,8 +34,8 @@ import {
   DelayedTeacherQueueItem,
   AutoTeacherRequestRecord,
 } from '../types';
-import { teacherRequestService } from '../services/teacherRequestService';
-import { selfImprovementService } from '../services/selfImprovementService';
+import { teacherRequestService } from '../miki/learning/services/teacherRequestService';
+import { selfImprovementService } from '../miki/improvement/services/selfImprovementService';
 
 interface ExternalTeacherTabProps {
   onJumpToCandidates?: () => void;

@@ -21,8 +21,8 @@ import {
   PromotionEvidenceInput,
   PromotionEvaluationResult,
   PROMOTION_GATE_CRITERIA,
-} from '../../../services/evidenceBasedPromotionGateService';
-import { componentRegistryService } from '../../../services/componentRegistryService';
+} from '../../../miki/promotion/services/evidenceBasedPromotionGateService';
+import { componentRegistryService } from '../../../miki/capability/services/componentRegistryService';
 
 export const PromotionGateSubView: React.FC = () => {
   const [recordCount, setRecordCount] = useState('12');

@@ -1,7 +1,7 @@
-import { capabilityImplementationRegistryService } from '../src/services/capabilityImplementationRegistryService';
-import { implementationSelectionService } from '../src/services/implementationSelectionService';
-import { requestTypeCompilerService } from '../src/services/requestTypeCompilerService';
-import { hybridConversationEngineService } from '../src/services/hybridConversationEngineService';
+import { capabilityImplementationRegistryService } from '../src/miki/capability/services/capabilityImplementationRegistryService';
+import { implementationSelectionService } from '../src/miki/strategy/services/implementationSelectionService';
+import { requestTypeCompilerService } from '../src/miki/selfDevelopment/services/requestTypeCompilerService';
+import { hybridConversationEngineService } from '../src/miki/conversation/services/hybridConversationEngineService';
 
 function assert(condition: unknown, message: string) { if (!condition) throw new Error(message); }
 

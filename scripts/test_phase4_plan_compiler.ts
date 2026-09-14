@@ -8,10 +8,10 @@
  * - capabilityPluginService (能力契約・権限診断)
  * - capabilityGapService (不足能力と代替プラグイン連携)
  */
-import { skillIrCompilerService } from '../src/services/skillIrCompilerService';
-import { formalConstraintSolverService } from '../src/services/formalConstraintSolverService';
-import { capabilityPluginService } from '../src/services/capabilityPluginService';
-import { capabilityGapService } from '../src/services/capabilityGapService';
+import { skillIrCompilerService } from '../src/miki/selfDevelopment/services/skillIrCompilerService';
+import { formalConstraintSolverService } from '../src/miki/verification/services/formalConstraintSolverService';
+import { capabilityPluginService } from '../src/miki/capability/services/capabilityPluginService';
+import { capabilityGapService } from '../src/miki/capability/services/capabilityGapService';
 
 let passCount = 0;
 let totalCount = 0;

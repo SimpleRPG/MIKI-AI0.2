@@ -3,7 +3,7 @@
  * の模擬対話フロー追跡検証スクリプト
  * ※本スクリプトはシミュレーション対話ログ（全16ターン）を用いて整合性判定を検証します。
  */
-import { classifyClaimEpistemology } from '../src/services/falsificationService';
+import { classifyClaimEpistemology } from '../src/miki/verification/services/falsificationService';
 import { EpistemicClaimClassification } from '../src/types';
 
 interface EpistemicTurnScenario {

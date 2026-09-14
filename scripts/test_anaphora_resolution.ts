@@ -1,4 +1,4 @@
-import { resolveAnaphora, defaultConversationState } from '../src/services/conversationStateService';
+import { resolveAnaphora, defaultConversationState } from '../src/miki/conversation/services/conversationStateService';
 import { ConversationState } from '../src/types';
 
 function runAnaphoraUnitTests() {

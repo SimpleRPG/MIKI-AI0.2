@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import {
   autonomousHardeningService,
-} from '../../../services/autonomousHardeningService';
+} from '../../../miki/autonomy/services/autonomousHardeningService';
 import {
   FutureQuestionScenario,
   RedTeamAttackCase,

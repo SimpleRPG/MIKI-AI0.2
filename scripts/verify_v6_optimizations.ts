@@ -4,7 +4,7 @@ import {
   inferConversationStage,
   defaultConversationState,
   CONVERSATION_STATE_INSTRUCTION,
-} from '../src/services/conversationStateService';
+} from '../src/miki/conversation/services/conversationStateService';
 import { PersonaConfig, WorkspaceFile, MemoryItem } from '../src/types';
 
 async function runTests() {
