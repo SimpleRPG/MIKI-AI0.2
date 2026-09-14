@@ -1,7 +1,6 @@
 import { StorageCapacityPlanReport, StoragePartitionUsage } from '../../../types';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
-import { modelLifecycleService } from '../../safety/services/modelLifecycleService';
 
 const STORAGE_AUDIT_LOG_KEY = 'miki_storage_audit_log_v32';
 
@@ -59,29 +58,10 @@ export class StoragePlanningService {
     }
 
     // 28章 推奨配分定義 (合計60GB)
-    // 1. モデル関係: 約18GB (旧モデルキャッシュ)
-    // 2. 会話・教材データ: 約12GB (JSONL, 会話ログ, 教師教材)
-    // 3. 評価・実験: 約8GB (ベンチマーク, 回帰レポート, A/Bログ)
-    // 4. 旧学習成果物: 約8GB (旧学習アダプター)
-    // 5. バックアップ: 約6GB (SQLite/IndexedDBスナップショット)
-    // 6. 空き・一時領域: 約8GB (作業キャッシュ, 一時スクラッチ)
+    // 60GBの保存容量を、会話・教材・評価・バックアップ・一時領域へ配分。
+    // ローカル生成モデル/GGUF/量子化重み/KVキャッシュは管理対象外。
 
     const partitions: StoragePartitionUsage[] = [
-      {
-        id: 'part_models',
-        category: 'models',
-        name: 'モデル関係 (GGUF / 量子化重み / KVキャッシュ)',
-        allocatedGb: 18,
-        usedBytes: 4.8 * 1024 * 1024 * 1024, // 約4.8GB (Qwen2.5-3B-旧量子化キャッシュ + 1.5B等)
-        estimatedMb: 4915,
-        itemCount: 3,
-        description: '端末内3B/1.5B主モデル、フォールバックモデル、埋め込みモデル',
-        itemsDetail: [
-          'qwen2.5-3b-instruct-q4_k_m.gguf (~2.2GB)',
-          'qwen2.5-1.5b-instruct-q4_k_m.gguf (~1.1GB)',
-          'webgpu_runtime_cache_v2 (~1.6GB)',
-        ],
-      },
       {
         id: 'part_dialogue_materials',
         category: 'dialogue_and_materials',
@@ -196,12 +176,9 @@ export class StoragePlanningService {
     removed += 8;
     reclaimed += 24.1;
 
-    // 3. 第24章 モデル実測データ駆動型自律退役思考の実行 (モデル生成系ランタイムは絶対保護)
-    const modelReasoning = modelLifecycleService.runDeepSleepModelReasoning();
-
-    const logEntry = `[${timestamp}] 第21章/第24章 自動整理完了: ${removed}件の重複・一時ファイルを安全に除去し、${reclaimed.toFixed(
+    const logEntry = `[${timestamp}] 第21章 自動整理完了: ${removed}件の重複・一時ファイルを安全に除去し、${reclaimed.toFixed(
       1
-    )}MBの容量を回収。${modelReasoning.autonomousThought}`;
+    )}MBの容量を回収。ローカル生成モデル管理は対象外です。`;
 
     this.auditLogs.push(logEntry);
     this.saveAuditLogs();
@@ -212,7 +189,7 @@ export class StoragePlanningService {
       spaceReclaimedMb: reclaimed,
       removedCount: removed,
       log: logEntry,
-      modelReasoningSummary: modelReasoning.autonomousThought,
+      modelReasoningSummary: 'ローカル生成モデル管理は退役済みです。',
     };
   }
 }

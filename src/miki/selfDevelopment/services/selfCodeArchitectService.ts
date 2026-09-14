@@ -196,22 +196,6 @@ export class SelfCodeArchitectService {
   public checkInvariants(): { allPassed: boolean; checks: InvariantCheckItem[] } {
     const now = Date.now();
 
-    // 1. 旧生成モデル 保護チェック: 意図せぬアンカーモデルの削除・除外フラグの有無
-    const customModelsRaw = storageService.getItem('miki_custom_models');
-    let qwenProtected = true;
-    let qwenDetails = 'IMMUTABLE_ANCHORフラグにより削除・自動Evictionから恒久除外されています。';
-    if (customModelsRaw) {
-      try {
-        const models = JSON.parse(customModelsRaw);
-        if (Array.isArray(models) && models.some((m: any) => (m.id?.includes('qwen') || m.name?.includes('qwen')) && m.deleted)) {
-          qwenProtected = false;
-          qwenDetails = '⚠️ アンカーモデルに対する不正削除フラグが検出されました。';
-        }
-      } catch {
-        // parsing fallback
-      }
-    }
-
     // 2. 送信境界プライバシーガードレール実検査: 模擬機密トークンの遮断テスト
     let privacyPassed = true;
     let privacyDetails = 'privacyGuardrailServiceによる二重正規表現スキャナおよび抽象シンボル置換が稼働中。';
@@ -245,7 +229,6 @@ export class SelfCodeArchitectService {
       }
     } catch {}
     const hasEnvKey = typeof process !== 'undefined' && Boolean(process.env?.GEMINI_API_KEY);
-    const hasLocalLlm = false;
     const quotaPassed = keyCount > 0 || hasEnvKey;
     const quotaDetails = quotaPassed
       ? `利用可能な推論リソースを実測検知 (${keyCount > 0 ? `${keyCount}件のカスタムAPIキー` : hasEnvKey ? '環境変数APIキー' : '決定論的Non-LLM Core'})。外部教師は任意、通常実行はNon-LLM Core。`
@@ -286,15 +269,6 @@ export class SelfCodeArchitectService {
 
     const checks: InvariantCheckItem[] = [
       {
-        id: 'INV_01_QWEN3B_PROTECTION',
-        name: 'モデル重み不変性原則 (第24章・不変条件)',
-        rule: '旧生成モデル (qwen2.5-3b-instruct-q4_k_m.gguf) の退役・削除・差し替えを許可しない。',
-        passed: qwenProtected,
-        severity: 'CRITICAL',
-        details: qwenDetails,
-        checkedAt: now,
-      },
-      {
         id: 'INV_02_PRIVACY_BOUNDARY',
         name: '送信境界プライバシーガードレール (第17章・不変条件)',
         rule: '外部送信前に個人情報・会社固有情報・生APIキーを抽象シンボル化または遮断する。',
@@ -306,7 +280,7 @@ export class SelfCodeArchitectService {
       {
         id: 'INV_03_QUOTA_ROTATION',
         name: 'Gemini API動的キー循環・自動フォールバック (第25章・不変条件)',
-        rule: 'API利用制限(429/503)時に停止せず、複数キーを自動循環しローカルモデルへ安全退行する。',
+        rule: 'API利用制限(429/503)時も、利用可能な外部教師または決定論的コアへ安全に切り替えられる。',
         passed: quotaPassed,
         severity: 'HIGH',
         details: quotaDetails,
