@@ -8,6 +8,10 @@
  * 各カテゴリのservices
  */
 
+export * from './core/mikiInteractionBus';
+export * from './core/mikiCategoryCoordinator';
+export * from './core/mikiCategoryInteractionRuntime';
+export * from './core/mikiCategoryInteractionRuntimeSmoke';
 export * from './autonomy';
 export * from './capability';
 export * from './conversation';
