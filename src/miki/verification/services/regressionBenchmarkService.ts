@@ -330,66 +330,14 @@ export class RegressionBenchmarkService {
     };
   }
 
-  /**
-   * 現在推論エンジンに実際にロードされているアクティブモデルの情報を取得
-   * 呼び出し元が自由なモデル名を名乗ることを防ぎ、実機状態との一致を保証する
-   * (設計思想 25. 安全・品質境界 & 評価基準の改ざん防止)
-   */
-  public getActiveLoadedModelInfo(): {
-    isReady: boolean;
-    modelId: string | null;
-    modelName: string;
-    engineType: 'native_gguf' | 'webllm' | 'none';
-  } {
-    const isNativeReady = nonLlmRuntimeService.isNative() && !!nonLlmRuntimeService.getActiveModelId();
-    const isWebReady = nonLlmRuntimeService.isLoaded() && !!nonLlmRuntimeService.getActiveModelId();
-
-    if (isNativeReady) {
-      const activeId = nonLlmRuntimeService.getActiveModelId()!;
-      // ファイル名からクリーンな表示名を導出
-      const cleanName = activeId.replace(/\.gguf$/i, '');
-      return {
-        isReady: true,
-        modelId: activeId,
-        modelName: cleanName,
-        engineType: 'native_gguf',
-      };
-    }
-
-    if (isWebReady) {
-      const activeId = nonLlmRuntimeService.getActiveModelId()!;
-      return {
-        isReady: true,
-        modelId: activeId,
-        modelName: activeId,
-        engineType: 'webllm',
-      };
-    }
-
-    return {
-      isReady: false,
-      modelId: null,
-      modelName: '未ロード (推論モデルなし)',
-      engineType: 'none',
-    };
-  }
 
   /**
    * ベンチマークスイート全体を一括実行 (Run Full Regression Suite)
-   * 呼び出し元からの自由なmodelName引数は廃止され、推論エンジンに実際にロードされている
-   * アクティブモデル(退役ローカル生成器 または 退役Web生成器)からモデルID・モデル名を強制的に取得・埋め込みます。
-   * (設計思想 25. 評価基準の改ざん防止・テスト対象と昇格対象の同一性保証)
+   * Non-LLM Core上の固定テストスイートを実行し、能力退行を評価します。
    */
   public async runFullSuite(): Promise<RegressionSuiteRunReport> {
     if (this.isRunning) {
       throw new Error('ベンチマークスイートが既に実行中です');
-    }
-
-    const activeInfo = this.getActiveLoadedModelInfo();
-    if (!activeInfo.isReady || !activeInfo.modelId) {
-      throw new Error(
-        '【実行拒否】推論エンジンにモデルがロードされていません。Non-LLM Core設定(退役ローカル生成器または退役Web生成器)で評価対象モデルをロードしてから回帰テストを実行してください。'
-      );
     }
 
     this.isRunning = true;
@@ -398,7 +346,7 @@ export class RegressionBenchmarkService {
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🧪 実機ベンチマーク＆退行テスト一括実行開始 [Target: ${activeInfo.modelName} (ID: ${activeInfo.modelId}, Engine: ${activeInfo.engineType})]`
+      '🧪 Non-LLM Core ベンチマーク＆退行テスト一括実行開始'
     );
 
     const results: BenchmarkTestResult[] = [];
@@ -431,9 +379,8 @@ export class RegressionBenchmarkService {
       const report: RegressionSuiteRunReport = {
         id: reportId,
         timestamp: Date.now(),
-        modelName: activeInfo.modelName,
-        modelId: activeInfo.modelId,
-        engineType: activeInfo.engineType,
+        modelName: 'Non-LLM Core',
+        modelId: undefined,
         totalTests: results.length,
         passedTests,
         failedTests,
@@ -449,7 +396,7 @@ export class RegressionBenchmarkService {
 
       systemLogger.info(
         'SELF_IMPROVEMENT',
-        `✓ ベンチマーク完了 [${activeInfo.modelName}]: スコア ${overallScore}点 (合格: ${passedTests}/${results.length}, 退行: ${regressionsCount}件)`
+        `✓ ベンチマーク完了 [Non-LLM Core]: スコア ${overallScore}点 (合格: ${passedTests}/${results.length}, 退行: ${regressionsCount}件)`
       );
 
       return report;
@@ -492,14 +439,17 @@ export class RegressionBenchmarkService {
     name: string,
     params: number,
     structuralBudget: number,
-    thermalState: 'normal' | 'warm' | 'hot' | 'critical',
-    activeLoaded: { isReady: boolean; modelId: string | null; modelName: string; engineType: string },
-    runLiveEvaluation?: boolean
+    thermalState: 'normal' | 'warm' | 'hot' | 'critical'
   ): Promise<ModelSizeProfile> {
     const memoryMb = estimateModelMemoryMb(params, structuralBudget);
     const is3B = params >= 2.5e9;
 
-    // 1. 過去の実機ベンチマークレポート（同一モデル）が存在するか検索
+    let scores: BenchmarkScores;
+    let avgTps = 0;
+    let avgFirstTokenMs = 0;
+    let jsonSuccessRate = is3B ? 0.98 : 0.86;
+
+    // 1. 過去のベンチマークレポート（同一モデル）が存在するか検索
     const matchedReport = this.reports.find(
       (r) =>
         r.modelId === modelId ||
@@ -508,46 +458,8 @@ export class RegressionBenchmarkService {
         (!is3B && (r.modelName.includes('1.5B') || r.modelName.includes('1.5b')))
     );
 
-    // 2. 現在アクティブなモデルと一致し、ライブ評価が有効な場合は実測
-    const isActiveTarget =
-      activeLoaded.isReady &&
-      activeLoaded.modelId &&
-      (activeLoaded.modelId === modelId ||
-        activeLoaded.modelName.toLowerCase().includes(name.toLowerCase()) ||
-        (is3B && activeLoaded.modelName.includes('3B')) ||
-        (!is3B && activeLoaded.modelName.includes('1.5B')));
-
-    let scores: BenchmarkScores;
-    let avgTps = 0;
-    let avgFirstTokenMs = 0;
-    let jsonSuccessRate = is3B ? 0.98 : 0.86;
-
-    if (isActiveTarget && runLiveEvaluation) {
-      // 実機テストを実行
-      const liveReport = await this.runFullSuite();
-      const accuracyScore = Math.min(100, Math.round((liveReport.passedTests / liveReport.totalTests) * 100));
-      const groundingScore = Math.min(100, Math.round(liveReport.overallScore * 0.96));
-
-      // JSONタスクの結果を検証
-      const jsonResult = liveReport.results.find((r) => r.testId === 'tc_json_structured_01');
-      if (jsonResult) {
-        jsonSuccessRate = evaluateJsonSuccess(jsonResult.generatedResponse) ? 1.0 : 0.0;
-      }
-
-      scores = {
-        overallScore: liveReport.overallScore,
-        accuracyScore,
-        groundingScore,
-        categoryScores: liveReport.categoryScores,
-        regressionsCount: liveReport.regressionsCount,
-        passedTests: liveReport.passedTests,
-        totalTests: liveReport.totalTests,
-      };
-      // 実測レイテンシからTTFTとTPSを算出
-      avgFirstTokenMs = Math.round(liveReport.averageLatencyMs * 0.25);
-      const estTokens = 160;
-      avgTps = Number((estTokens / (liveReport.averageLatencyMs / 1000)).toFixed(1));
-    } else if (matchedReport) {
+    // 2. 保存済みレポートがあれば再利用
+    if (matchedReport) {
       // 過去の実測レポートから再現
       const accuracyScore = Math.min(100, Math.round((matchedReport.passedTests / matchedReport.totalTests) * 100));
       const groundingScore = Math.min(100, Math.round(matchedReport.overallScore * 0.95));
@@ -632,7 +544,7 @@ export class RegressionBenchmarkService {
   public async runModelSizeComparison(
     modelAId: string,
     modelBId: string,
-    options?: { structuralBudget?: number; runLiveEvaluation?: boolean }
+    options?: { structuralBudget?: number }
   ): Promise<ModelSizeComparisonReport> {
     if (this.isRunning) {
       throw new Error('ベンチマーク評価が既に実行中です');
@@ -659,18 +571,13 @@ export class RegressionBenchmarkService {
       const conditions = backgroundWorkerService.getExecutionConditions();
       const currentThermal = conditions.thermalState;
 
-      // 現在ロード中の実機モデル
-      const activeLoaded = this.getActiveLoadedModelInfo();
-
       // 各モデルのプロファイル構築
       const profileA = await this.buildModelProfile(
         modelAId,
         nameA,
         paramsA,
         structuralBudget,
-        currentThermal,
-        activeLoaded,
-        options?.runLiveEvaluation
+        currentThermal
       );
 
       const profileB = await this.buildModelProfile(
@@ -678,9 +585,7 @@ export class RegressionBenchmarkService {
         nameB,
         paramsB,
         structuralBudget,
-        currentThermal,
-        activeLoaded,
-        options?.runLiveEvaluation
+        currentThermal
       );
 
       // 判定と理由

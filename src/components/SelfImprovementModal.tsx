@@ -2157,23 +2157,12 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {(() => {
-                      const activeInfo = regressionBenchmarkService.getActiveLoadedModelInfo();
-                      return (
-                        <div className="text-[11px] flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-                          <span className="text-slate-400">現在ロード中モデル:</span>
-                          {activeInfo.isReady ? (
-                            <span className="font-mono font-bold text-emerald-400">
-                              {activeInfo.modelName} ({activeInfo.engineType === 'native_gguf' ? '退役ローカル生成器' : '退役Web生成器'})
-                            </span>
-                          ) : (
-                            <span className="text-amber-400 font-semibold">
-                              ⚠️ 未ロード (Non-LLM Core設定でロード必要)
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    <div className="text-[11px] flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
+                      <span className="text-slate-400">実行基盤:</span>
+                      <span className="font-mono font-bold text-emerald-400">
+                        Non-LLM Core
+                      </span>
+                    </div>
 
                     <button
                       onClick={handleRunBenchmark}
