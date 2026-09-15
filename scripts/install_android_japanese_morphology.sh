@@ -11,7 +11,7 @@ ASSET_DIR="$ANDROID_DIR/app/src/main/assets"
 BUILD_GRADLE="$ANDROID_DIR/app/build.gradle"
 BUILD_GRADLE_KTS="$ANDROID_DIR/app/build.gradle.kts"
 [[ -d "$ANDROID_DIR" ]] || { echo "android/ がありません。先に npx cap add android"; exit 2; }
-mkdir -p "$PACKAGE_DIR" "$ASSET_DIR"
+mkdir -p "$PACKAGE_DIR" "$ASSET_DIR" "$(dirname "$ASSET_SRC")"
 cp "$PLUGIN_SRC" "$PACKAGE_DIR/MIKIJapaneseMorphologyPlugin.kt"
 cp "$NATIVE_RUNNER_SRC" "$PACKAGE_DIR/MIKINativeRunnerPlugin.kt"
 cp "$SPEECH_SRC" "$PACKAGE_DIR/MIKISpeechRecognitionPlugin.kt"
