@@ -54,6 +54,8 @@ jobs:
 
           npx cap add android
           sed -i 's/minSdkVersion = 24/minSdkVersion = 26/' android/variables.gradle
+          sed -i "/classpath 'com.android.tools.build:gradle:8.13.0'/a\\          classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.0'" android/build.gradle
+          sed -i "/apply plugin: 'com.android.application'/a\\apply plugin: 'org.jetbrains.kotlin.android'" android/app/build.gradle
           bash scripts/install_android_japanese_morphology.sh
           npx cap sync android
 
