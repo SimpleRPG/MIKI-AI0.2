@@ -2295,6 +2295,13 @@ improvementCanaryRollbackService.initialize();
 
         setMessages((prev) => [...prev, cpuMsg]);
 
+        // 作業指示書 v15 (v10内的自己反証接続): 自己反証結果をConversationStateへ書き込み
+        setConversationState((prev) => ({
+          ...prev,
+          lastFalsificationPassed: cpuFalsificationReport.passed,
+          lastFalsificationScore: cpuFalsificationReport.falsificationScore,
+        }));
+
         // 指示書 2.1: 非LLM自律統合パイプラインの会話戦略を次ターン教師信号用に記録
         const appliedPipelineStrategy =
           pipelineRes.strategy ||
@@ -3128,6 +3135,15 @@ improvementCanaryRollbackService.initialize();
         'CHAT',
         `[15-16章 内的自己反証] 反証スコア=${falsificationReport.falsificationScore}点 合格=${falsificationReport.passed ? 'PASS' : 'WARN/FAIL'} 警告=${falsificationReport.falsificationWarnings.length}件`
       );
+
+      // 作業指示書 v15 (v10内的自己反証接続): 自己反証結果をConversationStateへ書き込み
+      newConvState.lastFalsificationPassed = falsificationReport.passed;
+      newConvState.lastFalsificationScore = falsificationReport.falsificationScore;
+      setConversationState((prev) => ({
+        ...prev,
+        lastFalsificationPassed: falsificationReport.passed,
+        lastFalsificationScore: falsificationReport.falsificationScore,
+      }));
 
       // =========================================================================
       // 設計思想 22〜25章: コード理解中間IRの抽出 (CodeUnderstandingIR)

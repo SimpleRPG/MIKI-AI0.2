@@ -428,6 +428,10 @@ export function extractConversationState(
       expectedResponseLength,
       recentEntities,
       updatedAt: Date.now(),
+      lastFalsificationPassed: prevState?.lastFalsificationPassed,
+      lastFalsificationScore: prevState?.lastFalsificationScore,
+      lastReasoningTemplateId: prevState?.lastReasoningTemplateId,
+      lastCandidateClaimId: prevState?.lastCandidateClaimId,
     };
 
     const stats: StateExtractionStats = {
@@ -458,6 +462,10 @@ export function extractConversationState(
       pendingQuestions: prevState?.pendingQuestions || [],
       expectedResponseLength: effectiveLength,
       updatedAt: Date.now(),
+      lastFalsificationPassed: prevState?.lastFalsificationPassed,
+      lastFalsificationScore: prevState?.lastFalsificationScore,
+      lastReasoningTemplateId: prevState?.lastReasoningTemplateId,
+      lastCandidateClaimId: prevState?.lastCandidateClaimId,
     };
 
     const stats: StateExtractionStats = {
