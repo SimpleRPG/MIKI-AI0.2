@@ -53,6 +53,7 @@ jobs:
           EOF
 
           npx cap add android
+          sed -i 's/minSdkVersion = 24/minSdkVersion = 26/' android/variables.gradle
           bash scripts/install_android_japanese_morphology.sh
           npx cap sync android
 
