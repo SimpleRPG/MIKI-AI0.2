@@ -28,3 +28,4 @@ export * from './improvement/services/selfImprovementExperimentService';
 export * from './improvement/services/selfImprovementMetricsService';
 export * from './improvement/services/selfImprovementService';
 export * from './improvement/services/selfImprovementSuiteService';
+export * from './improvement/services/selfImprovementRequestEventService';

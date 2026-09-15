@@ -33,3 +33,5 @@ export * from './safety/services/resourceGovernanceService';
 export * from './safety/services/reversibilityService';
 export * from './safety/services/sandboxPermissionService';
 export * from './safety/services/securityImmunityService';
+export * from './safety/services/deterministicRuntimePolicyService';
+export * from './safety/services/selfImprovementOperationalGuardService';

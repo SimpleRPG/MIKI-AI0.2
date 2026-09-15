@@ -19,6 +19,7 @@ import {
   buildCleanStandaloneHtml,
   shareOrSaveZipOnMobile,
   downloadFullServerZipMobile,
+  downloadCompleteInstructionText,
 } from '../utils/codeParser';
 
 export interface ExportModalProps {
@@ -75,6 +76,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     } finally {
       setIsZipping(false);
     }
+  };
+
+
+  const handleDownloadInstructionText = () => {
+    try {
+      downloadCompleteInstructionText(name, files);
+      setShareStatus('✅ 完全作業指示書TXTを保存しました');
+    } catch (error) {
+      setShareStatus(`❌ TXT保存失敗: ${String(error)}`);
+    }
+    setTimeout(() => setShareStatus(null), 4000);
   };
 
   const handleDownloadHtml = () => {
@@ -162,7 +174,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </a>
 
               {/* Web Share API / Files Save */}
-              <button
+                            <button
+                onClick={handleDownloadInstructionText}
+                className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-violet-300 border border-violet-500/40 font-bold py-2.5 px-4 rounded-xl text-xs transition-colors"
+              >
+                <FileCode className="w-4 h-4" />
+                <span>完全作業指示書TXTを保存</span>
+              </button>
+
+<button
                 onClick={handleMobileShare}
                 disabled={isZipping}
                 className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 active:scale-95"

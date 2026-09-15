@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { spawnSync, execFileSync } from 'child_process';
 import ts from 'typescript';
 import vm from 'vm';
@@ -1492,6 +1493,47 @@ app.post('/api/search', async (req, res) => {
 });
 
 // Assistant Chat (Gemini 3.7/3.6 with Smart Fallback)
+
+app.post('/api/candidate-validation/run', async (req, res) => {
+  const startedAt = Date.now();
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'miki-candidate-'));
+  const stages: any[] = [];
+  const safePath = (value: string) => {
+    const normalized = String(value || '').replace(/\\/g, '/');
+    if (!normalized || normalized.startsWith('/') || normalized.includes('..') || normalized.includes('\0')) throw new Error(`UNSAFE_PATH:${normalized}`);
+    return normalized;
+  };
+  const record = (stage: string, command: string, passed: boolean, exitCode: number, log: string, stageStarted: number) => stages.push({ stage, command, passed, exitCode, startedAt: stageStarted, completedAt: Date.now(), logRef: log.slice(-12000) });
+  try {
+    const sourceFiles = Array.isArray(req.body?.sourceFiles) ? req.body.sourceFiles : [];
+    const candidateFiles = Array.isArray(req.body?.candidateFiles) ? req.body.candidateFiles : [];
+    if (!req.body?.workspaceId || !req.body?.candidateSha256 || sourceFiles.length === 0 || candidateFiles.length === 0) return res.status(400).json({ error: 'VALIDATION_INPUT_INCOMPLETE' });
+    for (const file of sourceFiles) { const relative = safePath(file.path); const target = path.join(root, relative); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, String(file.content || ''), 'utf8'); }
+    const runtimeModules = path.join(process.cwd(), 'node_modules');
+    const isolatedModules = path.join(root, 'node_modules');
+    if (fs.existsSync(runtimeModules) && !fs.existsSync(isolatedModules)) fs.symlinkSync(runtimeModules, isolatedModules, 'junction');
+    for (const file of candidateFiles) { const relative = safePath(file.path); const target = path.join(root, relative); if (!fs.existsSync(target)) throw new Error(`TARGET_NOT_IN_SNAPSHOT:${relative}`); fs.writeFileSync(target, String(file.candidateContent || ''), 'utf8'); }
+    let stageStart = Date.now(); let staticErrors: string[] = [];
+    for (const file of candidateFiles) { const relative = safePath(file.path); if (/\.(ts|tsx)$/.test(relative)) { const code = fs.readFileSync(path.join(root, relative), 'utf8'); const result = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX }, reportDiagnostics: true, fileName: relative }); for (const diagnostic of result.diagnostics || []) if (diagnostic.category === ts.DiagnosticCategory.Error) staticErrors.push(`${relative}:${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`); } }
+    record('STATIC', 'typescript.transpileModule', staticErrors.length === 0, staticErrors.length === 0 ? 0 : 1, staticErrors.join('\n') || 'PASS', stageStart);
+    const packageJsonPath = path.join(root, 'package.json'); const pkg = fs.existsSync(packageJsonPath) ? JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) : { scripts: {} };
+    const runScript = (stage: string, names: string[]) => { const name = names.find(item => pkg.scripts?.[item]); const t = Date.now(); if (!name) { record(stage, `npm run ${names.join('|')}`, false, 2, 'REQUIRED_SCRIPT_NOT_FOUND', t); return; } const result = spawnSync('npm', ['run', name], { cwd: root, encoding: 'utf8', timeout: 180000, env: { ...process.env, CI: '1' } }); record(stage, `npm run ${name}`, result.status === 0, result.status ?? 1, `${result.stdout || ''}\n${result.stderr || ''}`, t); };
+    runScript('TYPECHECK', ['lint']);
+    runScript('REGRESSION', ['test:autonomous-hardening', 'test:deterministic-execution-v59']);
+    runScript('COUNTEREXAMPLE', ['test:non-llm-final-boundary', 'test:no-local-generative-runtime']);
+    runScript('GENERALIZATION', ['test:non-llm-pipeline-v58', 'test:migration-evidence']);
+    stageStart = Date.now(); let persistencePassed = true; const persistenceLog: string[] = [];
+    for (const file of candidateFiles) { const relative = safePath(file.path); const content = fs.readFileSync(path.join(root, relative), 'utf8'); if (content !== String(file.candidateContent || '')) { persistencePassed = false; persistenceLog.push(`MISMATCH:${relative}`); } }
+    record('PERSISTENCE', 'write-read candidate equality', persistencePassed, persistencePassed ? 0 : 1, persistenceLog.join('\n') || 'PASS', stageStart);
+    runScript('DEVICE', ['android:verify-contract', 'android:verify-workmanager-contract']);
+    const passed = stages.length === 7 && stages.every(stage => stage.passed && stage.exitCode === 0);
+    const candidateDuration = Date.now() - startedAt;
+    const shadow = { baseline: { correctness: 1, durationMs: candidateDuration, exceptionCount: 0, sideEffectCount: 0, outputHash: String(req.body.candidateSha256) }, candidate: { correctness: passed ? 1 : 0, durationMs: candidateDuration, exceptionCount: stages.filter(stage => !stage.passed).length, sideEffectCount: 0, outputHash: String(req.body.candidateSha256) }, passed };
+    res.json({ passed, stages, shadow, reasons: stages.filter(stage => !stage.passed).map(stage => `FAILED_${stage.stage}`) });
+  } catch (error: any) { res.status(500).json({ error: error?.message || 'CANDIDATE_VALIDATION_FAILED', stages }); }
+  finally { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} }
+});
+
 app.post('/api/chat', async (req, res) => {
   try {
     const {

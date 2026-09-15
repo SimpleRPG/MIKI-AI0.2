@@ -35,3 +35,8 @@ export * from './verification/services/schemaValidationService';
 export * from './verification/services/testAssertionService';
 export * from './verification/services/vbaStaticVerifierService';
 export * from './verification/services/verifierService';
+export * from './verification/services/claimVerificationEventService';
+export * from './verification/services/externalReviewNormalizerService';
+export * from './verification/services/projectTestRegistryService';
+export * from './verification/services/unifiedValidationCoordinatorService';
+export * from './verification/services/unknownVerificationSubscriberService';

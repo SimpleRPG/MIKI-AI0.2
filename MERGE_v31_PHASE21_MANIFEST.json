@@ -1,0 +1,13 @@
+{
+  "base": "phase20 cumulative",
+  "phase": "phase21-separated-improvement-intakes",
+  "implemented": [
+    "formal Improvement Intake Router",
+    "separate AUTONOMOUS_DISCOVERY and EXTERNAL_DIRECTIVE runs",
+    "external directive ledger with source hash, requirements, prohibitions, invariants, validation and delivery conditions",
+    "separate Run IDs and Blackboard payloads",
+    "direction priority remains applicable to autonomous discovery before intake",
+    "external directives use their own priority and do not get rewritten by direction policy"
+  ],
+  "boundary": "The two intake types remain separate records and separate improvement runs. They only share the canonical queue and downstream safety pipeline."
+}

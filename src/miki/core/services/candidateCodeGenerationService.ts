@@ -1,0 +1,27 @@
+import { improvementIntakeRouterService } from './improvementIntakeRouterService';
+import { autonomousCandidatePreparationService } from './autonomousCandidatePreparationService';
+export interface CandidateGenerationFile { path:string; candidateContent:string; evidenceIds:string[]; }
+export interface CandidateGenerationOutcome { accepted:boolean; runId:string; workspaceId?:string; files:CandidateGenerationFile[]; reasons:string[]; responseHash?:string; }
+class CandidateCodeGenerationService {
+ async generate(runId:string):Promise<CandidateGenerationOutcome>{
+  const run=improvementIntakeRouterService.get(runId);if(!run)return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND']};
+  const probe=await autonomousCandidatePreparationService.prepareForRun(runId,[]);const targetPaths=probe.targetPaths;
+  if(targetPaths.length===0)return {accepted:false,runId,files:[],reasons:[probe.reason||'TARGET_FILES_NOT_RESOLVED']};
+  const sources=new Map(autonomousCandidatePreparationService.getSourceFiles().map(file=>[file.path,file]));const targetFiles=targetPaths.map(path=>sources.get(path)).filter((value):value is NonNullable<typeof value>=>Boolean(value));
+  if(targetFiles.length!==targetPaths.length)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
+  const contract={formatVersion:1,runId:run.runId,runType:run.runType,objective:run.objective,targets:targetFiles.map(file=>({path:file.path,language:file.language,baselineContent:file.content})),requirements:this.strings(run.payload.requirements),prohibitions:this.strings(run.payload.prohibitions),invariants:this.strings(run.payload.invariants),validationRequirements:this.strings(run.payload.validationRequirements),responseContract:{files:[{path:'must equal one requested target path',candidateContent:'complete file content without markdown fences',evidenceIds:['optional evidence ids']}],summary:'short description'}};
+  const prompt=['You are a code candidate generator operating in an isolated workspace.','Return JSON only. Do not use markdown fences. Do not omit file content. Do not claim tests were run. Preserve all invariants and prohibitions.',JSON.stringify(contract)].join('\n');
+  let responseText='';
+  try{const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,history:[],useSearch:false,engineMode:'cloud',speakerMode:false,workspaceFiles:targetFiles.map(file=>({path:file.path,name:file.path.split('/').pop()||file.path,content:file.content,language:file.language})),attachedFiles:[],memories:[],activeGameCode:''})});if(!response.ok)return {accepted:false,runId,files:[],reasons:[`CODE_GENERATION_HTTP_${response.status}`]};const body=await response.json();responseText=typeof body.text==='string'?body.text:typeof body.reply==='string'?body.reply:'';}catch(error){return {accepted:false,runId,files:[],reasons:[error instanceof Error?`CODE_GENERATION_FAILED:${error.message}`:'CODE_GENERATION_FAILED']};}
+  const parsed=this.parse(responseText);if(!parsed)return {accepted:false,runId,files:[],reasons:['CODE_GENERATION_RESPONSE_INVALID_JSON'],responseHash:this.hash(responseText)};
+  const targetSet=new Set(targetPaths);const reasons:string[]=[];const files:CandidateGenerationFile[]=[];
+  for(const item of parsed){if(!targetSet.has(item.path)){reasons.push(`UNEXPECTED_TARGET:${item.path}`);continue;}const baseline=sources.get(item.path)?.content||'';if(!item.candidateContent.trim()||item.candidateContent.trim()===baseline.trim()){reasons.push(`UNCHANGED_OR_EMPTY:${item.path}`);continue;}for(const prohibition of this.strings(run.payload.prohibitions)){if(prohibition&&item.candidateContent.includes(prohibition))reasons.push(`PROHIBITION_TEXT_PRESENT:${prohibition}`);}files.push({path:item.path,candidateContent:item.candidateContent,evidenceIds:item.evidenceIds});}
+  if(reasons.length>0||files.length===0)return {accepted:false,runId,files:[],reasons:reasons.length?reasons:['NO_VALID_CANDIDATE_FILES'],responseHash:this.hash(responseText)};
+  const prepared=await autonomousCandidatePreparationService.prepareForRun(runId,files);if(!prepared.workspaceId)return {accepted:false,runId,files:[],reasons:[prepared.reason||'CANDIDATE_WORKSPACE_NOT_CREATED'],responseHash:this.hash(responseText)};
+  return {accepted:true,runId,workspaceId:prepared.workspaceId,files,reasons:[],responseHash:this.hash(responseText)};
+ }
+ private parse(text:string):CandidateGenerationFile[]|undefined{try{const trimmed=text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');const value=JSON.parse(trimmed);if(!value||!Array.isArray(value.files))return undefined;const files:CandidateGenerationFile[]=[];for(const row of value.files){if(typeof row?.path!=='string'||typeof row?.candidateContent!=='string')return undefined;files.push({path:row.path,candidateContent:row.candidateContent,evidenceIds:Array.isArray(row.evidenceIds)?row.evidenceIds.filter((x:unknown):x is string=>typeof x==='string'):[]});}return files;}catch{return undefined;}}
+ private strings(value:unknown):string[]{return Array.isArray(value)?value.filter((item):item is string=>typeof item==='string'):[];}
+ private hash(text:string):string{let hash=2166136261;for(let index=0;index<text.length;index+=1){hash^=text.charCodeAt(index);hash=Math.imul(hash,16777619);}return `fnv1a-${(hash>>>0).toString(16).padStart(8,'0')}`;}
+}
+export const candidateCodeGenerationService=new CandidateCodeGenerationService();

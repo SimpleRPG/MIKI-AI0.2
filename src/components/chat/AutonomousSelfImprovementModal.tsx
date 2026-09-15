@@ -45,6 +45,7 @@ import {
   AutopilotConfig,
   ImprovementBacklogItem,
 } from '../../miki/autonomy/services/autonomousContinuousEvolutionService';
+import { selfImprovementControllerService } from '../../miki/improvement/services/selfImprovementControllerService';
 import {
   selfCodeArchitectService,
   SPECIFICATION_REGISTRY,
@@ -288,8 +289,8 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
   const handleRunBatch = async (count: number = 3) => {
     try {
       setNotice(`🚀 上位${count}章の連続バッチ自己改善を開始しました...`);
-      const res = await autonomousContinuousEvolutionService.runBatchAutonomousCycles(count);
-      setNotice(`🎉 バッチ改善完了！${res.length}章を安全に合成・検証・配備しました！`);
+      const res = await selfImprovementControllerService.runOnce(`autonomous-modal-batch-request-${count}`);
+      setNotice(`自己改善要求を正本パイプラインで処理しました: ${res.decision.action} / ${res.result}`);
       refreshBacklog();
     } catch (err: any) {
       setNotice(`⚠️ バッチ改善エラー: ${err?.message}`);
@@ -324,8 +325,8 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
           ? { prompt: customPromptInput.trim() }
           : undefined;
 
-      const res = await autonomousContinuousEvolutionService.runFullAutonomousCycle(target);
-      setNotice(`🎉 自律改善成功！第${res.chapterNumber ?? ''}章 適合スコア: ${res.previousScore}➔${res.newScore}点 (+${Math.max(0, res.newScore - res.previousScore)}点)`);
+      const res = await selfImprovementControllerService.runOnce('autonomous-modal-manual');
+      setNotice(`自己改善要求を処理しました: ${res.decision.action} / ${res.result}`);
     } catch (err: any) {
       setNotice(`⚠️ 中断: ${err?.message || 'エラーが発生しました'}`);
     }
@@ -340,7 +341,7 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
     try {
       const data = await mikiSelfCodingSuperchargerService.rollbackSnapshot(record.snapshotId);
       if (data.success) {
-        setRollbackSuccessId(record.id);
+        setRollbackSuccessId(record.run_id);
         setNotice(`⏪ スナップショットから ${record.targetFile} を安全に復元しました！`);
         if (onApplyRestoredCode) {
           onApplyRestoredCode(record.targetFile, data.restoredContent || '');
@@ -377,7 +378,7 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
                 {config.enabled ? (
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 animate-pulse">
                     <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    自動巡回中 ({config.intervalSeconds}s)
+                    自動巡回中 ({Math.round(config.intervalMinutes / 60)}時間ごと)
                   </span>
                 ) : (
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
@@ -1461,26 +1462,26 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
               <div className="space-y-4 max-w-xl">
                 <div>
                   <label className="text-xs font-medium text-slate-300 block mb-1.5">
-                    自動巡回の間隔: {config.intervalSeconds} 秒
+                    自己改善の自動実行間隔
                   </label>
-                  <input
-                    type="range"
-                    min="15"
-                    max="300"
-                    step="15"
-                    value={config.intervalSeconds}
+                  <select
+                    value={config.intervalMinutes}
                     onChange={(e) => {
-                      const val = Number(e.target.value);
-                      autonomousContinuousEvolutionService.saveConfig({ intervalSeconds: val });
-                      setConfig((c) => ({ ...c, intervalSeconds: val }));
+                      const val = Math.min(10080, Math.max(60, Number(e.target.value) || 360));
+                      autonomousContinuousEvolutionService.saveConfig({ intervalMinutes: val });
+                      setConfig((c) => ({ ...c, intervalMinutes: val }));
                     }}
-                    className="w-full accent-purple-500"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                    <span>15秒 (超高速)</span>
-                    <span>60秒 (標準)</span>
-                    <span>300秒 (省電力)</span>
-                  </div>
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200"
+                  >
+                    <option value={60}>1時間ごと</option>
+                    <option value={180}>3時間ごと</option>
+                    <option value={360}>6時間ごと</option>
+                    <option value={720}>12時間ごと</option>
+                    <option value={1440}>24時間ごと</option>
+                    <option value={2880}>48時間ごと</option>
+                    <option value={10080}>7日ごと</option>
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1">自動実行は既定OFF、承認必須を推奨します。</p>
                 </div>
 
                 <div>

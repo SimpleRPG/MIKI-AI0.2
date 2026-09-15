@@ -11,3 +11,4 @@ export function data() {
 
 // === MIKI CATEGORY SERVICE EXPORTS ===
 // data 配下のサービスを、この17分類の管理入口から公開する。
+export * from './data/services/deterministicModelCatalog';

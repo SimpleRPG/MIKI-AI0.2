@@ -1,4 +1,4 @@
-import { executionEventBusService, ExecutionEvent } from '../../execution/services/executionEventBusService';
+import type { ExecutionEvent } from '../../execution/services/executionEventBusService';
 import { knowledgeGapService, KnowledgeGap } from '../../unknown/services/knowledgeGapService';
 import { researchService, ResearchResult } from '../../research/services/researchService';
 import { taskCaseMemoryService } from '../../memory/services/taskCaseMemoryService';
@@ -16,6 +16,9 @@ import { workDirectiveIngestionService } from '../../execution/services/workDire
 import { evidenceBasedSelfImprovementEngine } from './evidenceBasedSelfImprovementEngine';
 import { autonomousContinuousEvolutionService } from '../../autonomy/services/autonomousContinuousEvolutionService';
 import { StructuredDirective } from '../../../types/evidenceSelfImprovementTypes';
+import { selfImprovementExecutionCoordinatorService } from '../../execution/services/selfImprovementExecutionCoordinatorService';
+import { selfImprovementOperationalGuardService } from '../../safety/services/selfImprovementOperationalGuardService';
+import { crossDomainCirculationService } from '../../core/services/crossDomainCirculationService';
 
 export type ImprovementAction =
   | 'EXECUTE_DIRECTIVE'
@@ -69,12 +72,6 @@ export class SelfImprovementControllerService {
   public initialize() {
     if (this.initialized) return;
     this.initialized = true;
-    this.unsubscribe.push(
-      executionEventBusService.subscribe('execution.completed', (e) => this.schedule('execution.completed', e))
-    );
-    this.unsubscribe.push(
-      executionEventBusService.subscribe('execution.failed', (e) => this.schedule('execution.failed', e))
-    );
     selfImprovementMetricsService.initialize();
     systemLogger.info('SELF_IMPROVEMENT', '🧭 [SelfImprovement: Canonical Controller] initialized');
   }
@@ -87,6 +84,42 @@ export class SelfImprovementControllerService {
   }
 
   public async runOnce(trigger = 'manual'): Promise<ImprovementRun> {
+    return selfImprovementExecutionCoordinatorService.runExclusive(
+      'CONTINUOUS_EVOLUTION',
+      async () => {
+        const begun = selfImprovementOperationalGuardService.begin(1);
+        if (!begun.ok) {
+          return this.record(trigger, { action: 'IDLE', reason: begun.reason }, 'guard-blocked');
+        }
+        try {
+          crossDomainCirculationService.record('execution', 'improvement', 'SELF_IMPROVEMENT_RUN_STARTED', trigger);
+          const result = await this.runOnceInternal(trigger);
+          crossDomainCirculationService.record('improvement', 'verification', 'IMPROVEMENT_RESULT_REQUIRES_VALIDATION', result.run_id);
+          if (storageService.getBackendName() === 'memory') {
+            selfImprovementOperationalGuardService.fail('MEMORY_ONLY_PERSISTENCE');
+            return this.record(trigger, { action: 'IDLE', reason: '永続保存先がmemory-onlyのため完了扱いにしません。' }, 'persistence-blocked');
+          }
+          await storageService.flushNow();
+          selfImprovementOperationalGuardService.markPersisted();
+          if (!selfImprovementOperationalGuardService.complete()) {
+            throw new Error('SELF_IMPROVEMENT_PERSISTENCE_NOT_CONFIRMED');
+          }
+          crossDomainCirculationService.record('verification', 'memory', 'IMPROVEMENT_RUN_PERSISTED', result.run_id);
+          crossDomainCirculationService.record('memory', 'learning', 'IMPROVEMENT_EXPERIENCE_AVAILABLE', result.run_id);
+          return result;
+        } catch (error) {
+          selfImprovementOperationalGuardService.fail(String(error));
+          throw error;
+        } finally {
+          selfImprovementOperationalGuardService.reset();
+        }
+      },
+      undefined,
+      1,
+    );
+  }
+
+  private async runOnceInternal(trigger: string): Promise<ImprovementRun> {
     const now = Date.now();
     if (this.running) {
       return this.record(trigger, { action: 'IDLE', reason: '別の自己改善サイクルが実行中です。' }, 'busy');

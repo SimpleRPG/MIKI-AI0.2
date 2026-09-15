@@ -1,3 +1,4 @@
+import { selfImprovementControllerService } from '../../miki/improvement/services/selfImprovementControllerService';
 import React, { useState } from 'react';
 import {
   Database,
@@ -207,8 +208,11 @@ export const NonLlmArchitectureTab: React.FC = () => {
     setIsEvolutionRunning(true);
     setEvolutionError(null);
     try {
-      const record = await autonomousContinuousEvolutionService.runFullAutonomousCycle();
-      setEvolutionRecord(record);
+      const record = await selfImprovementControllerService.runOnce('non-llm-architecture-manual');
+      setEvolutionRecord(null);
+      if (record.result === 'error' || record.result === 'persistence-blocked') {
+        setEvolutionError(`${record.decision.reason} / ${record.result}`);
+      }
       refreshAll();
     } catch (err: any) {
       setEvolutionError(err?.message || '自律自己改善サイクルの実行中にエラーが発生しました');

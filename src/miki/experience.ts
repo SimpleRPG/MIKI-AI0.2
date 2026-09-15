@@ -20,3 +20,4 @@ export * from './experience/services/experienceLinkService';
 export * from './experience/services/experienceRouterService';
 export * from './experience/services/unifiedMikiExperienceService';
 export * from './experience/services/virtualExperienceGeneratorService';
+export * from './experience/services/unifiedExperienceImprovementBridgeService';

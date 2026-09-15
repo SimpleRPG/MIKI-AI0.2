@@ -21,3 +21,5 @@ export * from './unknown/services/knowledgeGapService';
 export * from './unknown/services/latentIntentMiningService';
 export * from './unknown/services/unknownResolutionService';
 export * from './unknown/services/unknownTaskDecompositionService';
+export * from './unknown/services/unknownKnowledgeIntegrationService';
+export * from './unknown/services/unifiedUnknownResolutionCoordinatorService';

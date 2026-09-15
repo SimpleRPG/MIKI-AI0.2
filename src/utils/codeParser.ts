@@ -368,6 +368,47 @@ export function downloadSingleHtml(projectName: string, htmlContent: string) {
   }
 }
 
+
+export function buildCompleteInstructionText(projectName: string, files: WorkspaceFile[]): string {
+  const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path));
+  const header = [
+    'MIKI-AI 完全作業指示書',
+    `PROJECT=${projectName}`,
+    `CREATED_AT=${new Date().toISOString()}`,
+    `FILE_COUNT=${sorted.length}`,
+    'DELIVERY_TYPE=CUMULATIVE_FULL_WORKSPACE',
+    'NOTE=各[FINAL_FILE_CONTENT]の内側だけを指定PATHへ保存すること。',
+    '',
+  ];
+  const body = sorted.flatMap((file, index) => [
+    '='.repeat(100),
+    `FILE_NO=${String(index + 1).padStart(4, '0')}`,
+    `PATH=${file.path}`,
+    'ACTION=REPLACE_FULL_OR_CREATE',
+    '[FINAL_FILE_CONTENT]',
+    file.content || '',
+    '[/FINAL_FILE_CONTENT]',
+    '',
+  ]);
+  return `\uFEFF${[...header, ...body].join('\n')}`;
+}
+
+export function downloadCompleteInstructionText(projectName: string, files: WorkspaceFile[]): void {
+  const text = buildCompleteInstructionText(projectName, files);
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${projectName}_完全作業指示書.txt`;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    document.body.removeChild(anchor);
+  }, 1000);
+}
+
 export interface ZipExtractionResult {
   success: boolean;
   files: WorkspaceFile[];

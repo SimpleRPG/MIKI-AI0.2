@@ -19,3 +19,4 @@ export * from './promotion/services/evidenceBasedPromotionGateService';
 export * from './promotion/services/heuristicGraduationService';
 export * from './promotion/services/verifiedCapabilityPromotionService';
 export * from './promotion/services/verifiedKnowledgePromotionService';
+export * from './promotion/services/modelLifecycleService';

@@ -7,6 +7,8 @@ import { systemLogger } from '../../../services/systemLogger';
 import { componentImprovementCandidateService } from './componentImprovementCandidateService';
 import { improvementCanaryRollbackService } from './improvementCanaryRollbackService';
 import { selfImprovementExperimentService } from './selfImprovementExperimentService';
+import { unifiedValidationCoordinatorService } from '../../verification/services/unifiedValidationCoordinatorService';
+import { crossDomainCirculationService } from '../../core/services/crossDomainCirculationService';
 
 export type SafeImprovementStage = 'PROPOSED' | 'REGRESSION_PLANNED' | 'WAITING_RESULTS' | 'PASSED' | 'CANARY' | 'REJECTED' | 'ADOPTED' | 'ROLLED_BACK';
 
@@ -46,6 +48,7 @@ export class SafeImprovementPipelineService {
     run.candidate_id = candidateId;
     run.base_component_id = candidate.base_component_id;
     run.reason = `改善候補 ${candidateId} を安全検証します。差分行数=${candidate.changed_lines}`;
+    unifiedValidationCoordinatorService.open(candidateId, run.implementation_hash);
     componentImprovementCandidateService.markTesting(candidateId);
     this.runs.set(run.run_id, run); this.save();
     return run;
@@ -110,6 +113,18 @@ export class SafeImprovementPipelineService {
   public adopt(runId: string): ComponentPromotionResult {
     const run = this.refresh(runId);
     if (!run) return { componentId: '', accepted: false, reason: 'Safe Improvement Runが存在しません。' };
+    if (run.candidate_id) {
+      const validation = unifiedValidationCoordinatorService.canPromote(run.candidate_id, run.implementation_hash);
+      if (!validation.allowed) {
+        run.stage = 'REJECTED';
+        run.reason = `統一Validation未合格: ${validation.reason}`;
+        run.updated_at = Date.now();
+        this.save();
+        crossDomainCirculationService.record('verification', 'improvement', 'CANDIDATE_REJECTED_BY_VALIDATION', run.candidate_id);
+        return { componentId: run.component_id, accepted: false, reason: run.reason };
+      }
+      crossDomainCirculationService.record('verification', 'promotion', 'CANDIDATE_VALIDATION_PASSED', run.candidate_id);
+    }
     if (!run.suite_id) return { componentId: run.component_id, accepted: false, reason: 'Regression Suiteが未作成です。' };
     if (run.stage !== 'PASSED') return { componentId: run.component_id, accepted: false, suiteId: run.suite_id, reason: `現在stage=${run.stage}。Regression PASSが必要です。` };
     // Regression PASSは正式VERIFIEDではなくLIMITED/Canary開始資格として扱う。

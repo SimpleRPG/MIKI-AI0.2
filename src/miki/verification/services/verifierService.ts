@@ -3,6 +3,8 @@ import { claimDatabaseService } from '../../memory/services/claimDatabaseService
 import { evidenceService, EvidenceRecord } from '../../memory/services/evidenceService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
 import { systemLogger } from '../../../services/systemLogger';
+import { claimVerificationEventService } from './claimVerificationEventService';
+import { crossDomainCirculationService } from '../../core/services/crossDomainCirculationService';
 
 export type VerificationOutcome =
   | 'SUPPORTED'
@@ -116,7 +118,7 @@ export class VerifierService {
       `🔐 [Verifier] ${claim.claim_id}: ${claim.status} -> ${outcome} / independent=${independentClusters.size} / execution=${executionEvidence.length}`
     );
 
-    return {
+    const verificationResult: VerificationResult = {
       claimId: claim.claim_id,
       outcome,
       previousStatus,
@@ -128,6 +130,17 @@ export class VerifierService {
       reasons,
       promoted,
     };
+
+    crossDomainCirculationService.record('verification', promoted ? 'promotion' : 'unknown', `CLAIM_${outcome}`, claim.claim_id);
+
+    claimVerificationEventService.publish({
+      claimId: claim.claim_id,
+      outcome,
+      promoted,
+      occurredAt: Date.now(),
+    });
+
+    return verificationResult;
   }
 
   public verifyMany(params: {

@@ -18,6 +18,14 @@ import {
 import { GitHubRepoData, PersonaConfig, WorkspaceFile } from '../types';
 import { apiService } from '../services/api';
 import { storageService } from '../services/storageService';
+import { unknownResolutionService, type UnknownResolution } from '../miki/unknown/services/unknownResolutionService';
+import { crossDomainCirculationService, type DomainCoverage } from '../miki/core/services/crossDomainCirculationService';
+import { domainIntegrationBootstrapService } from '../miki/core/services/domainIntegrationBootstrapService';
+import { taskBlackboardService } from '../miki/core/services/taskBlackboardService';
+import { autonomousSelfImprovementLoopService } from '../miki/core/services/autonomousSelfImprovementLoopService';
+import { autonomousIssueDiscoveryService } from '../miki/core/services/autonomousIssueDiscoveryService';
+import { selfImprovementDirectionService, type ImprovementDirection } from '../miki/core/services/selfImprovementDirectionService';
+import { externalDirectiveIntakeService, type ExternalDirective } from '../miki/core/services/externalDirectiveIntakeService';
 
 export interface GitHubHubProps {
   onLoadRepoIntoWorkspace: (repoData: GitHubRepoData) => void;
@@ -32,6 +40,11 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
   workspaceFiles,
   persona,
 }) => {
+  const [directiveRows, setDirectiveRows] = useState<ExternalDirective[]>(() => externalDirectiveIntakeService.list().slice(0, 5));
+  const [directiveText, setDirectiveText] = useState('');
+  const [directiveFileName, setDirectiveFileName] = useState('external-ai-directive.txt');
+  const [directiveBusy, setDirectiveBusy] = useState(false);
+  const [directiveStatus, setDirectiveStatus] = useState('');
   const [token, setToken] = useState(() => storageService.getItem('miki_github_pat') || '');
   const [repoUrl, setRepoUrlState] = useState(() => storageService.getItem('miki_github_repo_url') || '');
   const [branch, setBranchState] = useState(() => storageService.getItem('miki_github_branch') || 'main');
@@ -44,6 +57,20 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(
     () => new Set(workspaceFiles.map((f) => f.path))
   );
+
+  const [unknownRecords, setUnknownRecords] = useState<UnknownResolution[]>(() => unknownResolutionService.list(8));
+  const [domainCoverage, setDomainCoverage] = useState<DomainCoverage[]>(() => crossDomainCirculationService.getCoverage());
+  const [improvementDirection, setImprovementDirection] = useState<ImprovementDirection>(() => selfImprovementDirectionService.getPolicy().direction);
+  const [discoveryInterval, setDiscoveryInterval] = useState<number>(() => autonomousIssueDiscoveryService.getConfig().intervalMinutes);
+  useEffect(() => {
+    const refresh = () => {
+      setUnknownRecords(unknownResolutionService.list(8));
+      setDomainCoverage(crossDomainCirculationService.getCoverage());
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 5000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const [apiBaseUrl, setApiBaseUrlState] = useState(() => storageService.getItem('miki_api_base_url') || '');
   const setApiBaseUrl = (val: string) => {
@@ -197,6 +224,30 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
     }
   };
 
+  const receiveExternalDirective = async () => {
+    if (!directiveText.trim() || directiveBusy) return;
+    setDirectiveBusy(true);
+    setDirectiveStatus('');
+    try {
+      const result = await externalDirectiveIntakeService.receiveTextFile(directiveFileName, directiveText);
+      setDirectiveRows(externalDirectiveIntakeService.list().slice(0, 5));
+      setDirectiveStatus(`別Runで受付済み: ${result.run.runId}`);
+      setDirectiveText('');
+    } catch (error) {
+      setDirectiveStatus(error instanceof Error ? error.message : '外部指示書を受け付けられませんでした');
+    } finally {
+      setDirectiveBusy(false);
+    }
+  };
+
+  const loadDirectiveFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setDirectiveFileName(file.name);
+    setDirectiveText(await file.text());
+    event.target.value = '';
+  };
+
   return (
     <div className="flex-1 bg-slate-950 text-slate-100 p-4 sm:p-8 overflow-y-auto select-none">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -212,6 +263,25 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
             </p>
           </div>
         </div>
+
+
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <div>
+            <div className="text-sm font-bold text-amber-300">外部AI作業指示書</div>
+            <p className="text-[11px] text-slate-400 mt-1">自動発見課題とは別Runで受け付け、共通Queue以降だけ同じ安全パイプラインを使います。</p>
+          </div>
+          <label className="min-h-11 flex items-center justify-center rounded-xl border border-dashed border-slate-700 bg-slate-950 text-xs text-slate-300 cursor-pointer px-3">
+            TXTを選択
+            <input type="file" accept=".txt,text/plain" className="hidden" onChange={loadDirectiveFile} />
+          </label>
+          <input value={directiveFileName} onChange={(event) => setDirectiveFileName(event.target.value)} className="w-full min-h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-base text-slate-100" aria-label="作業指示書ファイル名" />
+          <textarea value={directiveText} onChange={(event) => setDirectiveText(event.target.value)} rows={7} className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-base text-slate-100 resize-y" placeholder="外部AIの作業指示書を貼り付けるか、TXTを選択" />
+          <button onClick={receiveExternalDirective} disabled={!directiveText.trim() || directiveBusy} className="w-full min-h-11 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm disabled:opacity-40">
+            {directiveBusy ? '受付処理中' : '別Runとして受け付ける'}
+          </button>
+          {directiveStatus && <div className="text-xs rounded-lg bg-slate-950 border border-slate-800 p-2 text-slate-300">{directiveStatus}</div>}
+          {directiveRows.length > 0 && <div className="space-y-2">{directiveRows.map((row) => <div key={row.directiveId} className="rounded-xl border border-slate-800 bg-slate-950 p-3"><div className="text-xs font-semibold text-slate-200 break-all">{row.sourceFileName}</div><div className="text-[10px] text-slate-400 mt-1">{row.status} / {row.runId || 'Run未発行'} / 対象 {row.targetFiles.length}件</div></div>)}</div>}
+        </section>
 
         {/* Status Notification */}
         {statusMessage && (
@@ -324,6 +394,50 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
             </div>
           </div>
         </div>
+
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2 text-violet-300 font-bold text-sm"><Search className="w-4 h-4" /><span>未知調査・GitHub探索台帳</span></div>
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {unknownRecords.length === 0 ? <p className="text-xs text-slate-500">未知調査の記録はまだありません。</p> : unknownRecords.map((record) => (
+              <article key={record.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-xs text-slate-200 line-clamp-2">{record.question}</p>
+                <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-1 text-[10px] text-slate-400"><span>{record.classification}</span><span>Evidence {record.evidenceIds.length}</span><span>Claim {record.claimIds.length}</span><span>{record.verificationStatus}</span></div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <div className="text-sm font-bold text-fuchsia-300">自己改善の方向・間隔</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {([
+              ['BALANCED','バランス'],['CODE_QUALITY','コードの書き方'],['CONVERSATION','会話・理解力'],
+              ['VBA_EXPERTISE','VBA解析・修復'],['RESEARCH','ネット調査'],['MOBILE_STABILITY','スマホ安定性'],
+            ] as Array<[ImprovementDirection,string]>).map(([value,label]) => (
+              <button key={value} onClick={() => { selfImprovementDirectionService.setDirection(value); setImprovementDirection(value); }} className={`rounded-lg border px-2 py-2 text-[10px] font-semibold ${improvementDirection === value ? 'border-fuchsia-400 bg-fuchsia-950/50 text-fuchsia-200' : 'border-slate-700 bg-slate-950 text-slate-400'}`}>{label}</button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <select value={discoveryInterval} onChange={(event) => { const value=Number(event.target.value); autonomousIssueDiscoveryService.setConfig({ intervalMinutes:value, enabled:true }); setDiscoveryInterval(value); }} className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200">
+              <option value={60}>1時間ごと</option><option value={180}>3時間ごと</option><option value={360}>6時間ごと</option><option value={720}>12時間ごと</option><option value={1440}>24時間ごと</option><option value={2880}>48時間ごと</option><option value={10080}>7日ごと</option>
+            </select>
+            <button onClick={() => { void autonomousIssueDiscoveryService.scan(); }} className="rounded-lg border border-cyan-700 bg-cyan-950/30 px-3 py-2 text-[10px] font-semibold text-cyan-200">今すぐ課題検索</button>
+          </div>
+          <div className="text-[9px] text-slate-500">選んだ方向は課題の優先順位へ反映されます。検証なしの適用やGitHub pushは行いません。</div>
+        </section>
+
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between"><div className="text-sm font-bold text-cyan-300">18分類 相互循環カバレッジ</div><div className="text-[10px] text-slate-400">Blackboard {taskBlackboardService.list(200).length}件 / 課題 {autonomousIssueDiscoveryService.list(200).filter(item => !item.resolvedAt).length}件 / 自己改善 {autonomousSelfImprovementLoopService.getState().status}</div></div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            {domainCoverage.map((item) => (
+              <div key={item.domain} className={`rounded-lg border p-2 ${item.connected ? 'border-emerald-800 bg-emerald-950/20' : 'border-amber-800 bg-amber-950/20'}`}>
+                <div className="text-[11px] font-semibold text-slate-200 truncate">{item.domain}</div>
+                <div className="text-[9px] text-slate-400">IN {item.inbound} / OUT {item.outbound}</div>
+                <div className={`text-[9px] ${item.connected ? 'text-emerald-300' : 'text-amber-300'}`}>{domainIntegrationBootstrapService.getStatus().registered.some((entry) => entry.domain === item.domain) ? (item.connected ? '入口登録・循環確認' : '入口登録・実循環待ち') : '入口未登録'}</div>
+              </div>
+            ))}
+          </div>
+        </section>
 
         {/* Action Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -1,4 +1,5 @@
 import { improvementCanaryRollbackService } from './miki/improvement/services/improvementCanaryRollbackService';
+import { autonomousCandidatePreparationService } from './miki/core/services/autonomousCandidatePreparationService';
 import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { ChatPanel } from './components/ChatPanel';
@@ -91,6 +92,9 @@ import { longTermMemoryService } from './miki/memory/services/longTermMemoryServ
 import { codeVerificationService } from './miki/verification/services/codeVerificationService';
 import { falsificationService, classifyClaimEpistemology } from './miki/verification/services/falsificationService';
 import { counterfactualReasoningService } from './miki/unknown/services/counterfactualReasoningService';
+import { crossDomainCirculationService } from './miki/core/services/crossDomainCirculationService';
+import { domainIntegrationBootstrapService } from './miki/core/services/domainIntegrationBootstrapService';
+import { unifiedUnknownResolutionCoordinatorService } from './miki/unknown/services/unifiedUnknownResolutionCoordinatorService';
 import { experienceRouterService } from './miki/experience/services/experienceRouterService';
 import { workflowSynthesisService } from './miki/execution/services/workflowSynthesisService';
 import { answerPlanService } from './miki/strategy/services/answerPlanService';
@@ -297,6 +301,8 @@ export default function App() {
   const [isEvolutionRunning, setIsEvolutionRunning] = useState<boolean>(false);
 
   useEffect(() => {
+    crossDomainCirculationService.initialize();
+    void domainIntegrationBootstrapService.initialize();
     capabilityLearningService.initialize();
     initializeChapter69to90();
     componentArtifactStoreService.reconcile(componentRegistryService.getAllComponents());
@@ -326,6 +332,8 @@ improvementCanaryRollbackService.initialize();
     taskConversationFeedbackService.initialize();
     return () => {
     taskConversationFeedbackService.dispose();
+    domainIntegrationBootstrapService.dispose();
+    crossDomainCirculationService.dispose();
     taskResultFeedbackService.dispose();
     executionLearningCoordinatorService.dispose();
     recoveryOrchestratorService.dispose();
@@ -466,6 +474,7 @@ improvementCanaryRollbackService.initialize();
       storageService.setItem('gamecraft_workspace_files', JSON.stringify(workspaceFiles));
       // 設計思想 Master v5.0 第2章⑥ 構造記憶 (Structural Memory) のシンボルグラフ自動同期
       structuralMemoryService.syncFromWorkspaceFiles(workspaceFiles);
+      autonomousCandidatePreparationService.syncWorkspaceFiles(workspaceFiles);
     } catch (e) {
       console.warn('Storage quota limit reached for workspace files', e);
     }
@@ -1704,15 +1713,20 @@ improvementCanaryRollbackService.initialize();
       ]);
 
       try {
-        const record = await autonomousContinuousEvolutionService.runFullAutonomousCycle();
-        const diffSummary = `🎉 **自律自己改善サイクルが全工程オールクリアで完了したよ！**\n\n` +
-          `- 🎯 **改善対象**: ${record.chapterNumber ? `第${record.chapterNumber}章『${record.chapterTitle}』` : record.targetFile}\n` +
-          `- 🛡️ **5大不変条件**: 全項目パス (モデル重み不変性・プライバシー防壁・API循環・ロールバック性・監査不変)\n` +
-          `- 🧪 **自律検証**: AST構文合格 / TDD単体テスト ${record.verification.testPassedCount}/${record.verification.testTotalCount} 件パス / 循環参照 0件\n` +
-          `- 🔄 **自律修復 (Self-Healing)**: ${record.selfHealingAttempts}回試行\n` +
-          `- 📈 **設計思想適合スコア**: ${record.previousScore}点 ➔ **${record.newScore}点** (+${Math.max(0, record.newScore - record.previousScore)}点)\n` +
-          `- ⏱️ **安全機構**: 変更前スナップショット自動記録済（いつでもワンクリックで復元可能）\n\n` +
-          `下のカードから各実行ステージの詳細ログや、TDDテスト結果、差分の確認・ロールバックができるよ！いつでもツールバーの「🤖」アイコンからオートパイロット（定期自動巡回）も有効にできるからね😊💕`;
+        const record = await selfImprovementControllerService.runOnce('chat-self-improvement-request');
+        const diffSummary = `**自己改善の正本パイプラインを実行しました**
+
+` +
+          `- **実行ID**: ${record.run_id}
+` +
+          `- **選択アクション**: ${record.decision.action}
+` +
+          `- **理由**: ${record.decision.reason}
+` +
+          `- **観測結果**: ${record.result}
+
+` +
+          `候補の採用は統一Validationと永続化確認を通過した場合だけ行われます。`;
 
         setMessages((prev) =>
           prev.map((m) =>
@@ -1721,7 +1735,6 @@ improvementCanaryRollbackService.initialize();
                   ...m,
                   content: diffSummary,
                   isStreaming: false,
-                  autonomousEvolution: record,
                 }
               : m
           )
@@ -2716,13 +2729,28 @@ improvementCanaryRollbackService.initialize();
         { role: 'system', content: combinedSystemPrompt },
       ];
 
-      let userPromptContent = text;
+      const unknownResolution = await unifiedUnknownResolutionCoordinatorService.resolveForChat({
+        question: text,
+        useSearch,
+        hasAttachments: Boolean(attached && attached.length > 0),
+        onProgress: (message, details) => {
+          systemLogger.info('STEP', `[未知解決] ${message}`, details);
+        },
+      });
+      let userPromptContent = unknownResolution.effectiveText;
       if (attached && attached.length > 0) {
         const attachedDesc = attached
           .map((a) => `[添付: ${a.name} (${a.type})]\n${(a.content || '').slice(0, 600)}`)
           .join('\n\n');
-        userPromptContent = `${attachedDesc}\n\n${text}`;
+        userPromptContent = `${attachedDesc}\n\n${unknownResolution.effectiveText}`;
       }
+      systemLogger.info('CHAT', `[未知解決] ${unknownResolution.status}`, {
+        unknownId: unknownResolution.resolution.id,
+        classification: unknownResolution.resolution.classification,
+        evidenceCount: unknownResolution.evidenceCount,
+        provider: unknownResolution.provider,
+        routes: unknownResolution.routes,
+      });
 
       // 作業指示書 v5 優先度7: 会話履歴(chatContext)の送信トークン量削減
       // 1. 直近履歴保持件数を6件から4件に減らしトークン消費を抑制
@@ -2860,9 +2888,9 @@ improvementCanaryRollbackService.initialize();
         try {
           systemLogger.info('CHAT', 'Cloud Gemini API を呼び出します');
           const apiRes = await sendChatMessage({
-            prompt: text,
+            prompt: userPromptContent,
             history: messages,
-            useSearch: useSearch,
+            useSearch: false,
             engineMode: 'gemini_cloud',
             speakerMode,
             cachedModels: cachedModelsList,

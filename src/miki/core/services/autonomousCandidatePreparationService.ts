@@ -1,0 +1,52 @@
+import { storageService } from '../../../services/storageService';
+import { autonomousIssueDiscoveryService, type DiscoveredIssue } from './autonomousIssueDiscoveryService';
+import { isolatedCandidateWorkspaceService, type CandidateWorkspace } from './isolatedCandidateWorkspaceService';
+
+export interface SourceFileSnapshot { path:string; content:string; language:string; evidenceIds:string[]; updatedAt:number; contentHash?:string; }
+export interface TargetResolution { issueId:string; targetPaths:string[]; evidenceIds:string[]; confidence:number; reasons:string[]; }
+export interface CandidateDraft { issueId:string; targetPath:string; baselineContent:string; candidateContent:string; evidenceIds:string[]; generationMode:'AI_SUPPLIED'|'SAFE_TEMPLATE'; }
+const SNAPSHOT_KEY='miki_candidate_source_snapshots_v1';
+class AutonomousCandidatePreparationService {
+ private files=new Map<string,SourceFileSnapshot>();
+ constructor(){this.load();}
+ syncSourceFiles(files:Array<{path:string;content:string;language?:string;evidenceIds?:string[]}>):void{
+  for(const file of files){if(!file.path||!file.content)continue;this.files.set(file.path,{path:file.path,content:file.content,language:file.language||this.language(file.path),evidenceIds:[...(file.evidenceIds||[])],updatedAt:Date.now()});}
+  this.save();
+ }
+ resolve(issue:DiscoveredIssue):TargetResolution{
+  const terms=this.terms(`${issue.title} ${issue.detail} ${issue.sourceId}`);const scored=[...this.files.values()].map(file=>{const hay=`${file.path} ${file.content.slice(0,12000)}`.toLowerCase();const hits=terms.filter(term=>hay.includes(term));const pathHits=terms.filter(term=>file.path.toLowerCase().includes(term));return {file,score:hits.length+pathHits.length*3,reasons:[...pathHits.map(x=>`PATH:${x}`),...hits.map(x=>`CONTENT:${x}`)]};}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,3);
+  return {issueId:issue.id,targetPaths:scored.map(x=>x.file.path),evidenceIds:[...new Set(scored.flatMap(x=>x.file.evidenceIds))],confidence:scored.length===0?0:Math.min(1,scored[0].score/10),reasons:scored.flatMap(x=>x.reasons).slice(0,20)};
+ }
+ async prepare(issueId:string,aiCandidates?:Array<{path:string;candidateContent:string;evidenceIds?:string[]}>):Promise<CandidateWorkspace|undefined>{
+  const issue=autonomousIssueDiscoveryService.list(500).find(x=>x.id===issueId);if(!issue)return undefined;const resolution=this.resolve(issue);if(resolution.confidence<0.3||resolution.targetPaths.length===0)return undefined;
+  const supplied=new Map((aiCandidates||[]).map(x=>[x.path,x]));const drafts:CandidateDraft[]=[];
+  for(const path of resolution.targetPaths){const source=this.files.get(path);if(!source)continue;const candidate=supplied.get(path);const candidateContent=candidate?.candidateContent||this.safeTemplate(source.content,issue);if(candidateContent.trim()===source.content.trim())continue;drafts.push({issueId,targetPath:path,baselineContent:source.content,candidateContent,evidenceIds:[...new Set([...source.evidenceIds,...resolution.evidenceIds,...(candidate?.evidenceIds||[])])],generationMode:candidate?'AI_SUPPLIED':'SAFE_TEMPLATE'});}
+  if(drafts.length===0)return undefined;return isolatedCandidateWorkspaceService.create(issueId,drafts.map(x=>({path:x.targetPath,baselineContent:x.baselineContent,candidateContent:x.candidateContent,evidenceIds:x.evidenceIds})));
+ }
+
+ syncWorkspaceFiles(files:Array<{path:string;content:string;language?:string}>):{registered:number;updated:number;removed:number}{
+  const incoming=new Set(files.map(file=>file.path));let registered=0;let updated=0;let removed=0;
+  for(const file of files){const current=this.files.get(file.path);if(!current){registered+=1;}else if(current.content!==file.content||current.language!==(file.language||this.language(file.path))){updated+=1;}this.files.set(file.path,{path:file.path,content:file.content,language:file.language||this.language(file.path),evidenceIds:current?.evidenceIds||[],updatedAt:Date.now(),contentHash:this.fastHash(file.content)});}
+  for(const path of [...this.files.keys()]){if(!incoming.has(path)){this.files.delete(path);removed+=1;}}
+  this.save();return {registered,updated,removed};
+ }
+ async prepareForRun(runId:string,aiCandidates?:Array<{path:string;candidateContent:string;evidenceIds?:string[]}>):Promise<{workspaceId?:string;targetPaths:string[];missingPaths:string[];reason?:string}>{
+  const { improvementIntakeRouterService }=await import('./improvementIntakeRouterService');const run=improvementIntakeRouterService.get(runId);if(!run)return {targetPaths:[],missingPaths:[],reason:'IMPROVEMENT_RUN_NOT_FOUND'};
+  if(run.runType==='EXTERNAL_DIRECTIVE'){
+   const targetPaths=Array.isArray(run.payload.targetFiles)?run.payload.targetFiles.filter((value):value is string=>typeof value==='string'):[];const missingPaths=targetPaths.filter(path=>!this.files.has(path));if(targetPaths.length===0)return {targetPaths:[],missingPaths:[],reason:'EXTERNAL_DIRECTIVE_TARGETS_MISSING'};if(missingPaths.length>0)return {targetPaths,missingPaths,reason:'EXTERNAL_DIRECTIVE_TARGET_NOT_FOUND'};
+   const supplied=new Map((aiCandidates||[]).map(candidate=>[candidate.path,candidate]));const drafts=[] as Array<{path:string;baselineContent:string;candidateContent:string;evidenceIds:string[]}>;
+   for(const path of targetPaths){const source=this.files.get(path);const candidate=supplied.get(path);if(!source||!candidate||candidate.candidateContent.trim()===source.content.trim())continue;drafts.push({path,baselineContent:source.content,candidateContent:candidate.candidateContent,evidenceIds:[...new Set([...source.evidenceIds,...(candidate.evidenceIds||[])])]});}
+   if(drafts.length===0)return {targetPaths,missingPaths:[],reason:'EXTERNAL_DIRECTIVE_AI_CANDIDATE_REQUIRED'};const workspace=await isolatedCandidateWorkspaceService.create(runId,drafts);improvementIntakeRouterService.update(runId,{workspaceId:workspace.workspaceId,status:'IN_PROGRESS'});return {workspaceId:workspace.workspaceId,targetPaths,missingPaths:[]};
+  }
+  const issueId=typeof run.payload.issueId==='string'?run.payload.issueId:run.sourceId;const issue=(await import('./autonomousIssueDiscoveryService')).autonomousIssueDiscoveryService.list(500).find(item=>item.id===issueId);if(!issue)return {targetPaths:[],missingPaths:[],reason:'AUTONOMOUS_ISSUE_NOT_FOUND'};const resolution=this.resolve(issue);if(resolution.targetPaths.length===0||resolution.confidence<0.3)return {targetPaths:resolution.targetPaths,missingPaths:[],reason:'AUTONOMOUS_TARGET_CONFIDENCE_LOW'};const workspace=await this.prepare(issue.id,aiCandidates||[]);if(!workspace)return {targetPaths:resolution.targetPaths,missingPaths:[],reason:'AUTONOMOUS_AI_CANDIDATE_REQUIRED'};improvementIntakeRouterService.update(runId,{workspaceId:workspace.workspaceId,status:'IN_PROGRESS'});return {workspaceId:workspace.workspaceId,targetPaths:resolution.targetPaths,missingPaths:[]};
+ }
+
+ getSourceFiles():SourceFileSnapshot[]{return [...this.files.values()].map(x=>({...x,evidenceIds:[...x.evidenceIds]}));}
+ private safeTemplate(content:string,issue:DiscoveredIssue):string{const note=`\n/* MIKI-AI isolated candidate note\n * Issue: ${issue.kind} / ${issue.id}\n * This draft is isolated and requires AI-supplied implementation plus validation.\n */\n`;return content+note;}
+ private terms(text:string):string[]{return [...new Set(text.toLowerCase().split(/[^a-z0-9_\u3040-\u30ff\u3400-\u9fff]+/).filter(x=>x.length>=3))].slice(0,40);}
+ private language(path:string):string{const ext=path.split('.').pop()?.toLowerCase();return ext==='tsx'?'typescriptreact':ext==='ts'?'typescript':ext==='bas'?'vba':ext||'text';}
+ private fastHash(text:string):string{let hash=2166136261;for(let index=0;index<text.length;index+=1){hash^=text.charCodeAt(index);hash=Math.imul(hash,16777619);}return `fnv1a-${(hash>>>0).toString(16).padStart(8,'0')}`;}
+ private save():void{storageService.setItem(SNAPSHOT_KEY,JSON.stringify(this.getSourceFiles().slice(-1000)));}
+ private load():void{try{const raw=storageService.getItem(SNAPSHOT_KEY);const rows=raw?JSON.parse(raw):[];if(Array.isArray(rows))for(const row of rows)this.files.set(row.path,row);}catch{this.files.clear();}}
+}
+export const autonomousCandidatePreparationService=new AutonomousCandidatePreparationService();

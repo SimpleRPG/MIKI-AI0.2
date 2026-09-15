@@ -10,6 +10,7 @@
  */
 
 import { systemLogger } from '../../../services/systemLogger';
+import { selfImprovementRequestEventService } from '../../improvement/services/selfImprovementRequestEventService';
 import { storageService } from '../../../services/storageService';
 import {
   selfCodeArchitectService,
@@ -131,7 +132,7 @@ export interface AutonomousEvolutionRecord {
 
 export interface AutopilotConfig {
   enabled: boolean;
-  intervalSeconds: number;
+  intervalMinutes: number;
   requireApproval: boolean;
   targetDomain: 'ALL' | 'SPECIFICATION_CHAPTERS' | 'PERFORMANCE' | 'SAFETY' | 'RESILIENCE';
   maxContinuousRuns: number;
@@ -144,7 +145,7 @@ const EVOLUTION_HISTORY_KEY = 'miki_evolution_history_v1';
 export class AutonomousContinuousEvolutionService {
   private config: AutopilotConfig = {
     enabled: false,
-    intervalSeconds: 60,
+    intervalMinutes: 360,
     requireApproval: false,
     targetDomain: 'ALL',
     maxContinuousRuns: 5,
@@ -166,7 +167,15 @@ export class AutonomousContinuousEvolutionService {
     try {
       const raw = storageService.getItem(AUTOPILOT_CONFIG_KEY);
       if (raw) {
-        this.config = { ...this.config, ...JSON.parse(raw) };
+        const parsed = JSON.parse(raw) as Partial<AutopilotConfig> & { intervalSeconds?: number };
+        const migratedMinutes = parsed.intervalMinutes ?? (parsed.intervalSeconds ? Math.ceil(parsed.intervalSeconds / 60) : undefined);
+        this.config = {
+          ...this.config,
+          ...parsed,
+          intervalMinutes: Math.min(10080, Math.max(60, migratedMinutes ?? this.config.intervalMinutes)),
+          requireApproval: parsed.requireApproval ?? true,
+        };
+        this.saveConfig(this.config);
       }
     } catch (e) {
       console.warn('Failed to load autopilot config:', e);
@@ -266,22 +275,17 @@ export class AutonomousContinuousEvolutionService {
     this.saveConfig({ enabled: true });
     if (this.timerId) clearInterval(this.timerId);
 
-    systemLogger.info('SELF_IMPROVEMENT', `🤖 [自動巡回開始] みきの自律コード自己改善デーモンを起動しました (巡回間隔: ${this.config.intervalSeconds}秒)`);
+    systemLogger.info('SELF_IMPROVEMENT', `🤖 [自動巡回開始] みきの自律コード自己改善デーモンを起動しました (巡回間隔: ${this.config.intervalMinutes}分)`);
 
     this.timerId = setInterval(() => {
       if (!this.isRunningCycle && this.config.enabled) {
-        this.runFullAutonomousCycle().catch((err) => {
-          systemLogger.warn('SELF_IMPROVEMENT', 'Autopilot iteration error', err);
+        selfImprovementRequestEventService.publish({
+          trigger: 'autopilot-scheduled',
+          requestedAt: Date.now(),
+          source: 'AUTOPILOT',
         });
       }
-    }, Math.max(15, this.config.intervalSeconds) * 1000);
-
-    // 初回即時巡回も実行
-    setTimeout(() => {
-      if (!this.isRunningCycle && this.config.enabled) {
-        this.runFullAutonomousCycle().catch(() => {});
-      }
-    }, 1000);
+    }, Math.max(60, this.config.intervalMinutes) * 60 * 1000);
   }
 
   public stopAutopilot(): void {

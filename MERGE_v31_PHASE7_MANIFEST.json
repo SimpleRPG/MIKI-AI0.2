@@ -1,0 +1,24 @@
+{
+  "base": "uploaded phase5 cumulative ZIPTXT",
+  "phase": "phase7-implemented-high-priority-integration",
+  "implemented": [
+    "Claim verification event publishing",
+    "deterministic self-improvement run IDs",
+    "autopilot intervalMinutes with hour presets",
+    "disable local-model tests in synthetic generation callers",
+    "single cumulative instruction TXT export",
+    "GitHub unknown research ledger UI"
+  ],
+  "not_claimed_complete": [
+    "full removal of all legacy local-LLM compatibility types",
+    "all self-improvement entrypoints canonicalized",
+    "secure storage migration",
+    "network capability discovery license/security pipeline",
+    "full cumulative ZIP runtime manifest and re-extract verification"
+  ],
+  "validation_required": [
+    "npm run lint",
+    "npm run build",
+    "targeted static checks"
+  ]
+}

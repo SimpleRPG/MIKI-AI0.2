@@ -33,3 +33,4 @@ export * from './execution/services/universalIoService';
 export * from './execution/services/workDirectiveIngestionService';
 export * from './execution/services/workManagerService';
 export * from './execution/services/workflowSynthesisService';
+export * from './execution/services/selfImprovementExecutionCoordinatorService';

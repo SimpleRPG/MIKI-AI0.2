@@ -32,3 +32,4 @@ export * from './selfDevelopment/services/softwareFactoryService';
 export * from './selfDevelopment/services/specAstParserService';
 export * from './selfDevelopment/services/specContractCompilerService';
 export * from './selfDevelopment/services/vbaDesignAssistantService';
+export * from './selfDevelopment/services/codeTemplateLibraryService';

@@ -779,7 +779,6 @@ export class SyntheticDataService {
       // モデルがロードされている場合は推論テストも併せて試行
       const summary = await this.generateSyntheticBatch({
         batchSize: 5,
-        testWithLocalModel: true,
       });
       return summary;
     } catch (e: any) {

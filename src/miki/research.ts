@@ -30,3 +30,4 @@ export * from './research/services/scienceExperimentService';
 export * from './research/services/syntheticDataService';
 export * from './research/services/virtualExpertService';
 export * from './research/services/webMaterialPatternExtractor';
+export * from './research/services/unknownResearchControlService';

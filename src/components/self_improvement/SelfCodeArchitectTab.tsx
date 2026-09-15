@@ -64,6 +64,7 @@ import { selfImprovementSuiteService } from '../../miki/improvement/services/sel
 import { mikiSelfCodingSuperchargerService } from '../../miki/selfDevelopment/services/mikiSelfCodingSuperchargerService';
 import { mikiUltraEvolverService } from '../../miki/autonomy/services/mikiUltraEvolverService';
 import { autonomousContinuousEvolutionService } from '../../miki/autonomy/services/autonomousContinuousEvolutionService';
+import { selfImprovementControllerService } from '../../miki/improvement/services/selfImprovementControllerService';
 
 export interface LiveLogItem {
   id: string;
@@ -484,31 +485,15 @@ export const SelfCodeArchitectTab: React.FC = () => {
     });
 
     try {
-      const record = await autonomousContinuousEvolutionService.runFullAutonomousCycle({
-        chapterNumber: targetChapter.chapterNumber,
-      });
-
-      if (record.afterCode) {
-        setLiveDiff({
-          targetFile: record.targetFile,
-          summary: `第${targetChapter.chapterNumber}章 実装コード差分`,
-          changes: [
-            { type: 'header', text: `+++++++ ${record.targetFile} (実体コード)` },
-            ...record.afterCode.split('\n').slice(0, 15).map((l) => ({ type: 'add' as const, text: `+ ${l}` })),
-          ],
-        });
-      }
+      const record = await selfImprovementControllerService.runOnce(`self-code-architect-chapter-${targetChapter.chapterNumber}`);
+      setLiveDiff(null);
+      addLiveLog(`正本パイプライン結果: ${record.decision.action} / ${record.result}`, 'info');
 
       const updatedAudit = selfCodeArchitectService.getLatestAudit()!;
       setAuditResult(updatedAudit);
       setProposals([...selfCodeArchitectService.getProposals()]);
 
-      const isStub = record.reasoning.includes('雛形') || record.reasoning.includes('未実装');
-      if (isStub) {
-        setActionNotice(`ℹ️ 第${targetChapter.chapterNumber}章: 旧ローカル生成ランタイムオフラインのため型安全な雛形スタブを配備しました（完全な要件実装は保留）。`);
-      } else {
-        setActionNotice(`✨ 第${targetChapter.chapterNumber}章『${targetChapter.title}』の自律改善・配備が完了しました！適合スコア: ${record.newScore}点`);
-      }
+      setActionNotice(`第${targetChapter.chapterNumber}章の自己改善要求を処理しました: ${record.decision.action} / ${record.result}`);
       setTimeout(() => setActionNotice(null), 6000);
     } catch (err: any) {
       addLiveLog(`❌ 自律改善サイクル停止: ${err?.message || err}`, 'warn');

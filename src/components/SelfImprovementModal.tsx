@@ -589,7 +589,6 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
     try {
       const summary = await syntheticDataService.generateSyntheticBatch({
         batchSize: 6,
-        testWithLocalModel: true,
       });
       setTrainingSamples(selfImprovementService.getTrainingSamples());
       setSplitStats(selfImprovementService.getSplitStats());
