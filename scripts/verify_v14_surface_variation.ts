@@ -15,8 +15,8 @@ import {
   PROACTIVE_SUGGESTIONS_DATA,
   WARMTH_AND_HUMOR_DATA,
   SECTION_HEADINGS_DEFAULT_DATA,
-} from '../miki/data/surfaceVariationData';
-import { SKELETON_VARIATIONS_DATA } from '../miki/data/skeletonVariationData';
+} from '../src/miki/data/surfaceVariationData';
+import { SKELETON_VARIATIONS_DATA } from '../src/miki/data/skeletonVariationData';
 import {
   surfaceVariationService,
   RecentUsageCache,

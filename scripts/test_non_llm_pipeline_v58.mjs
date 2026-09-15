@@ -2,14 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const core = fs.readFileSync(path.join(root, 'miki/safety/services/nonLlmCoreService.ts'), 'utf8');
-const answerPlan = fs.readFileSync(path.join(root, 'miki/strategy/services/answerPlanService.ts'), 'utf8');
-const compiler = fs.readFileSync(path.join(root, 'miki/selfDevelopment/services/requestTypeCompilerService.ts'), 'utf8');
-const solver = fs.readFileSync(path.join(root, 'miki/verification/services/formalConstraintSolverService.ts'), 'utf8');
+const core = fs.readFileSync(path.join(root, 'src/miki/safety/services/nonLlmCoreService.ts'), 'utf8');
+const answerPlan = fs.readFileSync(path.join(root, 'src/miki/strategy/services/answerPlanService.ts'), 'utf8');
+const compiler = fs.readFileSync(path.join(root, 'src/miki/selfDevelopment/services/requestTypeCompilerService.ts'), 'utf8');
+const solver = fs.readFileSync(path.join(root, 'src/miki/verification/services/formalConstraintSolverService.ts'), 'utf8');
 
 const required = [
-  [core, "import { answerPlanService } from './answerPlanService';", 'AnswerPlan is wired into Non-LLM Core'],
-  [core, "import { formalConstraintSolverService } from './formalConstraintSolverService';", 'formal constraint solver is wired into Non-LLM Core'],
+  [core, "import { answerPlanService } from '../../strategy/services/answerPlanService';", 'AnswerPlan is wired into Non-LLM Core'],
+  [core, "import { formalConstraintSolverService } from '../../verification/services/formalConstraintSolverService';", 'formal constraint solver is wired into Non-LLM Core'],
   [core, 'answerPlanService.matchSkeleton(prompt, nextState)', 'compiled request reaches deterministic answer planning'],
   [core, 'formalConstraintSolverService.solveCSP', 'compiled request reaches formal constraint verification'],
   [core, 'capabilityPlanApplied', 'verified skill composition affects execution'],

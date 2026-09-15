@@ -74,12 +74,13 @@ export class MikiConversationLearningService {
       promotedClaims: [],
     };
 
-    // 観測対象: 直前のターンが存在し、未解決/要確認であったか、または推論テンプレートが適用されていた場合
+    // 観測対象: 直前のターンが存在し、未解決/要確認であったか、推論テンプレート適用、Claim候補、または内的自己反証スコアが存在する場合
     const shouldObserve = Boolean(
       state.lastResultStatus === 'UNRESOLVED' ||
       state.lastResultStatus === 'NEEDS_CONFIRMATION' ||
       state.lastReasoningTemplateId ||
-      state.lastCandidateClaimId
+      state.lastCandidateClaimId ||
+      state.lastFalsificationPassed !== undefined
     );
 
     if (!shouldObserve) {
@@ -98,6 +99,11 @@ export class MikiConversationLearningService {
       outcome = 'FAILURE';
       verified = false;
       reason = 'ユーザーからの訂正・不満を検知 (CORRECTION)';
+    } else if (state.lastFalsificationPassed === false) {
+      // v10 / 作業指示書 v15: Mikiが自分で矛盾・エッジケース破綻を検知した場合、ユーザーの沈黙を成功と解釈しない
+      outcome = 'FAILURE';
+      verified = false;
+      reason = `内的自己反証で不合格を自己検知 (FALSIFICATION_FAILED: score=${state.lastFalsificationScore ?? 'N/A'})`;
     } else if (isStrongPositive) {
       outcome = 'SUCCESS';
       verified = true;

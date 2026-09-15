@@ -98,7 +98,7 @@ async function runWorkflowSynthesisTests() {
 
   // 次にユーザーによる明示的な権限承認 (grantConsentAndActivate) をシミュレート
   console.log('\n  [テストB] ユーザーが明示的に権限を承認 (grantConsentAndActivate)');
-  const { capabilityPluginService } = await import('../miki/capabilityPluginService');
+  const { capabilityPluginService } = await import('../src/miki/capability/services/capabilityPluginService');
   capabilityPluginService.grantConsentAndActivate('plugin_web_search', ['network_cloud', 'sensitive_filter'], 'テスト用明示承認');
   
   // 承認後のフルパイプライン自律実行

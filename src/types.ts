@@ -893,6 +893,10 @@ export interface ConversationState {
   lastCandidateClaimId?: string;
   /** 直前に適用された推論テンプレートID */
   lastReasoningTemplateId?: string;
+  /** 直前の内的自己反証合格フラグ (v10 / 作業指示書v15) */
+  lastFalsificationPassed?: boolean;
+  /** 直前の内的自己反証スコア (v10 / 作業指示書v15) */
+  lastFalsificationScore?: number;
 }
 
 /**

@@ -645,7 +645,7 @@ export class AutonomousSearchService {
           tags: ['web_search', 'autonomous_learning', query.slice(0, 20)],
           memoryType: 'semantic',
           destination: 'long_term_memory',
-          approved: true,
+          approved: false, // 未検証: 自動昇格防止
         };
         storageService.saveMemoryItem(memItem);
         integratedToMemory = true;
