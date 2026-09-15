@@ -7,9 +7,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const js = fs.readFileSync(path.join(root, 'miki/execution/services/androidNativeRunnerAdapterService.ts'), 'utf8');
+const js = fs.readFileSync(path.join(root, 'src/miki/execution/services/androidNativeRunnerAdapterService.ts'), 'utf8');
 const kt = fs.readFileSync(path.join(root, 'android-native/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt'), 'utf8');
-const reg = fs.readFileSync(path.join(root, 'miki/capability/services/componentRegistryService.ts'), 'utf8');
+const reg = fs.readFileSync(path.join(root, 'src/miki/capability/services/componentRegistryService.ts'), 'utf8');
 
 const required = [
   ['JS artifact_snapshot_key input', js.includes('artifact_snapshot_key: string;')],

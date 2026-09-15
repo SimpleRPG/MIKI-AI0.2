@@ -4,7 +4,7 @@ import path from 'node:path';
 const root = process.cwd();
 const plugin = path.join(root, 'android-native/src/main/java/com/miki/ai/MIKISpeechRecognitionPlugin.kt');
 const installer = path.join(root, 'scripts/install_android_japanese_morphology.sh');
-const service = path.join(root, 'miki/conversation/services/speechRecognitionService.ts');
+const service = path.join(root, 'src/miki/conversation/services/speechRecognitionService.ts');
 
 for (const file of [plugin, installer, service]) {
   if (!fs.existsSync(file)) throw new Error(`missing voice contract file: ${file}`);

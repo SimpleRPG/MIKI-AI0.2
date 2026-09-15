@@ -21,7 +21,7 @@ async function runVerification() {
   // 1. 静的配線確認 (grep)
   console.log('[TEST 1] 静的配線チェック (App.tsx & backgroundWorkerService.ts)');
   const appTsx = fs.readFileSync(path.resolve('src/App.tsx'), 'utf-8');
-  const bgService = fs.readFileSync(path.resolve('miki/execution/services/backgroundWorkerService.ts'), 'utf-8');
+  const bgService = fs.readFileSync(path.resolve('src/miki/execution/services/backgroundWorkerService.ts'), 'utf-8');
   assert(appTsx.includes('autonomousHardeningService.'), 'App.tsx に autonomousHardeningService の呼び出しが存在する');
   assert(bgService.includes('autonomousHardeningService.runAutonomousHardeningCycle'), 'backgroundWorkerService.ts に runAutonomousHardeningCycle の呼び出しが存在する');
   assert(bgService.includes('autonomousHardeningService.recordPredictionError'), 'backgroundWorkerService.ts に recordPredictionError の呼び出しが存在する');
