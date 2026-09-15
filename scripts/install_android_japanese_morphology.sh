@@ -15,20 +15,29 @@ mkdir -p "$PACKAGE_DIR" "$ASSET_DIR"
 cp "$PLUGIN_SRC" "$PACKAGE_DIR/MIKIJapaneseMorphologyPlugin.kt"
 cp "$NATIVE_RUNNER_SRC" "$PACKAGE_DIR/MIKINativeRunnerPlugin.kt"
 cp "$SPEECH_SRC" "$PACKAGE_DIR/MIKISpeechRecognitionPlugin.kt"
-# The dictionary is a build input, not committed binary data. Pin the known
-# SudachiDict release so APK builds remain reproducible.
+# Sudachi Java consumes the pre-built system_core.dic distributed by
+# SudachiDict. Do not extract it from the Python wheel.
 DICT_VERSION="20260723"
-DICT_SHA256="b3869ce6b12b4bfa09575dc19030703bb669ab41bac12a74cafcbb28c6be2498"
-DICT_PACKAGE="sudachidict_core==${DICT_VERSION}"
+DICT_URL="https://d2ej7fkh96fzlu.cloudfront.net/sudachidict/sudachi-dictionary-${DICT_VERSION}-core.zip"
 if [[ ! -f "$ASSET_SRC" ]]; then
   TMP="$(mktemp -d)"
   trap 'rm -rf "$TMP"' EXIT
-  python3 -m pip download --no-deps --only-binary=:all: "$DICT_PACKAGE" -d "$TMP" >/dev/null
-  WHEEL=$(find "$TMP" -maxdepth 1 -name "sudachidict_core-${DICT_VERSION}-*.whl" -print -quit)
-  [[ -n "$WHEEL" ]] || { echo "SudachiDict wheel not found"; exit 3; }
-  ACTUAL_SHA256=$(sha256sum "$WHEEL" | awk '{print $1}')
-  [[ "$ACTUAL_SHA256" == "$DICT_SHA256" ]] || { echo "SudachiDict SHA-256 mismatch: $ACTUAL_SHA256"; exit 4; }
-  unzip -j -o "$WHEEL" '*/resources/system_core.dic' -d "$TMP/extracted" >/dev/null
+  ZIP="$TMP/sudachi-dictionary-${DICT_VERSION}-core.zip"
+
+  curl --fail --location --silent --show-error "$DICT_URL" -o "$ZIP"
+
+  unzip -l "$ZIP" | grep -Eq '(^|/)system_core\.dic$' || {
+    echo "Sudachi core archive does not contain system_core.dic"
+    exit 3
+  }
+
+  unzip -j -o "$ZIP" '*/system_core.dic' -d "$TMP/extracted" >/dev/null
+
+  [[ -s "$TMP/extracted/system_core.dic" ]] || {
+    echo "system_core.dic was not extracted"
+    exit 4
+  }
+
   cp "$TMP/extracted/system_core.dic" "$ASSET_SRC"
 fi
 cp "$ASSET_SRC" "$ASSET_DIR/system_core.dic"
