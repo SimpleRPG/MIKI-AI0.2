@@ -1,0 +1,16 @@
+{
+  "version": "v47",
+  "passed": true,
+  "checks": {
+    "assessmentStoredAsObservation": true,
+    "diagnosticFailureNotBusinessError": true,
+    "handlerDiagnosticHonored": true,
+    "onlyImprovementObservationRead": true,
+    "exactAssessmentOperationRequired": true,
+    "schemaProducerDispatchRequired": true,
+    "assessmentEvidenceRequired": true,
+    "priorityStableSort": true,
+    "proposalSchemaValidated": true,
+    "dedupeOnlyAfterSuccess": true
+  }
+}

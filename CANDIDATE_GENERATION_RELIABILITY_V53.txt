@@ -1,0 +1,19 @@
+MIKI-AI Candidate Generation Reliability v53
+
+Source: MIKI-AI0.2-main_review-package-library-ui-v52.zip
+
+Implemented:
+- Bounded two-attempt candidate generation
+- 90-second request timeout with AbortController
+- One repair retry after malformed or empty response
+- API base URL and configured headers
+- Multiple response-container extraction
+- JSON-object extraction from fenced or prefixed replies
+- Canonical SHA-256 response identity
+- Persistent generation attempt/failure ledger
+- Candidate Workspace creation only after response validation
+- Existing candidate validation and review ZIP pipeline retained
+
+Static checks: PASS
+Live external AI request: NOT_EXECUTED
+Full TypeScript/Vite/APK/Android tests: NOT_EXECUTED

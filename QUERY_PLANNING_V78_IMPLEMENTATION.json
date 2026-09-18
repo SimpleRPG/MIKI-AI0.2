@@ -1,0 +1,23 @@
+{
+  "version": 78,
+  "status": "IMPLEMENTED_STATIC_VALIDATION_PASSED",
+  "implemented": [
+    "Query Intent Model",
+    "Environment Fingerprint for Galaxy S25 Android arm64",
+    "Research Query Plan persistence",
+    "Query Revision Pair persistence",
+    "Query preflight privacy and breadth checks",
+    "Role-diverse query generation",
+    "Web research policy linkage",
+    "Typed Core UI Gateway operations",
+    "Galaxy S25-oriented Query Planning UI"
+  ],
+  "notClaimed": [
+    "Runtime SearXNG execution",
+    "Runtime 18-domain dispatch completion",
+    "Full TypeScript build",
+    "Vite build",
+    "APK build",
+    "Galaxy S25 E2E"
+  ]
+}

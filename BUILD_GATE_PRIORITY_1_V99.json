@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "priority": 1,
+  "title": "Complete TypeScript foundation recovery",
+  "status": "BLOCKED",
+  "blockReason": "npm ci could not complete because package downloads from registry.npmjs.org repeatedly returned HTTP 503 and the execution timed out",
+  "requiredInput": [
+    "Availability of all package-lock.json dependencies from the configured npm registry or an equivalent verified package cache"
+  ],
+  "resumeCondition": [
+    "npm ci --ignore-scripts completes with exitCode 0",
+    "npm run lint executes repository-wide TypeScript and completes with exitCode 0"
+  ],
+  "blockedAt": "2026-09-18T04:34:00Z",
+  "commands": [
+    "npm ci --ignore-scripts",
+    "npm ci --ignore-scripts --fetch-retries=5 --fetch-retry-mintimeout=1000 --fetch-retry-maxtimeout=10000"
+  ],
+  "environment": {
+    "nodeVersion": "v24.16.0",
+    "npmVersion": "11.19.1",
+    "packageSha256": "47fe946979b21c317e9cce3c7d3a6e5f3bffea8cd00378e540f5ef3211aaeaec",
+    "packageLockSha256": "a4a3facf0999ee28fec11a42768f34f946b478ce2c074a44a28dfdad45908a78"
+  },
+  "completionClaims": {
+    "npmCi": false,
+    "fullTypeScript": false,
+    "viteBuild": false,
+    "androidBuild": false,
+    "galaxyS25E2E": false
+  }
+}

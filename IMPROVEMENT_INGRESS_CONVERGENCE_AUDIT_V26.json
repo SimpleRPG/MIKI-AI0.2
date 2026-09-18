@@ -1,0 +1,13 @@
+{
+  "version": "v26",
+  "passed": true,
+  "checks": {
+    "ingressOwnsQueue": true,
+    "bootstrapUsesIngress": true,
+    "intakeUsesIngress": true,
+    "runAndTriggerUnified": true,
+    "exported": true
+  },
+  "improvementIngress": "selfImprovementIngressService",
+  "worker": "autonomousSelfImprovementLoopService"
+}

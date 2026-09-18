@@ -1,0 +1,13 @@
+{
+  "version": "v24",
+  "passed": true,
+  "checks": {
+    "singleDisposeUnregister": true,
+    "noLegacyDomainsReference": true,
+    "workerModeMarked": true,
+    "plannerDetectsWorker": true,
+    "recursiveImprovementBlocked": true,
+    "singleNewIngress": true,
+    "ingressExported": true
+  }
+}

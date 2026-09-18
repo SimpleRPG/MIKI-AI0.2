@@ -1,0 +1,17 @@
+{
+  "base": "phase13 cumulative",
+  "phase": "phase14-recovery-negative-knowledge-resource-gate",
+  "implemented": [
+    "startup recovery of interrupted ROUTING tasks to PAUSED",
+    "Negative Knowledge with deterministic fingerprint and retry delay",
+    "Plateau detection and automatic pause",
+    "ResourceGovernance gate before research, validation and self-improvement",
+    "recursive evidence ID extraction adapter",
+    "normalized results and evidence IDs written to Blackboard"
+  ],
+  "truth_boundary": [
+    "no automatic resumption after restart",
+    "resource gate reuses existing component-test condition",
+    "negative knowledge delays repeated failed routes but does not delete them"
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "series": "BIBI_PARALLEL_LOW_PRIORITY",
+  "baseArchive": "MIKI-AI0.2-main_domain-reply-plan-binding-v114.zip.txt",
+  "targetPriority": 14,
+  "changeId": "BIBI-P14-JINA-REMOVE-001",
+  "implemented": [
+    "Jina API key accessors removed",
+    "Jina search parser and runtime provider removed",
+    "Jina provider UI removed",
+    "jina_direct removed",
+    "legacy Jina secret deletion migration added"
+  ],
+  "pending": [
+    "full TypeScript build",
+    "runtime and Galaxy S25 verification"
+  ],
+  "completed": [
+    "Crawl4AI connection card, type, secret input, and runtime reference removal",
+    "legacy research provider removal regression test v2",
+    "priority 13 secret redaction pure service",
+    "priority 13 execution request validation strengthening",
+    "priority 13 boundary regression test v1"
+  ],
+  "parallelPriority": 13,
+  "nextTarget": "Continue priority 13 with independent backend boundary helpers; avoid priorities 3-8 and core lineage files",
+  "masterCoordination": {
+    "thisBranchRole": "MASTER_FOR_PARALLEL_MERGE",
+    "otherAiOwnedPriorities": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "mergeRule": "Do not duplicate. Compare source, contracts, storage keys, runtime owners, and tests before integrating."
+  },
+  "base": "MIKI-AI0.2-main_priority2-implemented-v119.zip.txt",
+  "role": "MASTER_FOR_PARALLEL_MERGE",
+  "mergedPriorities": [
+    1,
+    2,
+    13,
+    14
+  ],
+  "externalAiOwnedPriorities": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "verification": [
+    "test_evidence_lineage_binding_v115",
+    "test_priority_one_completion_v117",
+    "test_priority2_half_v118",
+    "test_priority2_complete_v119",
+    "test_bibi_remove_legacy_research_providers_v2",
+    "test_bibi_priority13_boundaries_v1",
+    "test_typed_core_ui_gateway_v72",
+    "test_domain_reply_plan_binding_v114"
+  ],
+  "buildGateNote": "BUILD_GATE_PRIORITY_1_V99 remains BLOCKED; external build verification stays priority 15."
+}

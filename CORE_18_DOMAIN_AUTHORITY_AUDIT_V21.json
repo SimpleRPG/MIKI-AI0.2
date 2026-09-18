@@ -1,0 +1,22 @@
+{
+  "version": "v21",
+  "passed": true,
+  "checks": {
+    "coreOwnsBlackboard": true,
+    "coreOwnsPlanning": true,
+    "coreOwnsDispatch": true,
+    "coreCollectsResults": true,
+    "coreReevaluates": true,
+    "coreCompletes": true,
+    "adaptiveDelegates": true,
+    "sequentialDelegates": true,
+    "selfImprovementEntersFacade": true,
+    "noFixedSequentialAuthority": true,
+    "exported": true
+  },
+  "authority": "coreOrchestratorService",
+  "compatibilityEntrypoints": [
+    "adaptiveWorkflowOrchestratorService",
+    "domainSequentialWorkflowService"
+  ]
+}

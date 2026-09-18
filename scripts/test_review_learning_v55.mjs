@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+const checks=[];
+const read=p=>fs.readFileSync(p,'utf8');
+const ext=read('src/miki/core/services/externalReviewIntakeService.ts');
+const zip=read('src/miki/core/services/reviewZipExportService.ts');
+const learn=read('src/miki/core/services/reviewDecisionLearningService.ts');
+const check=(name,ok)=>{checks.push({name,ok});console.log(`${ok?'PASS':'FAIL'} ${name}`)};
+check('package decision statuses', /'ACCEPTED'\|'REJECTED'\|'NEEDS_CHANGES'\|'HOLD'/.test(zip));
+check('status update persisted', zip.includes("updateStatus(packageId:string,status:ReviewPackageStatus)"));
+check('learning episode exists', learn.includes('ReviewLearningEpisode'));
+check('accept reject correction hold separated', ['ACCEPTED_EXAMPLE','REJECTED_EXAMPLE','CORRECTION_PAIR','HELD_NO_GENERALIZATION'].every(v=>learn.includes(v)));
+check('no automatic generalization', learn.includes('generalizationAllowed: false'));
+check('persistence reread receipt', learn.includes('LEARNING_EPISODE_PERSISTENCE_FAILED')&&learn.includes('reloaded'));
+check('core completion gates projection', ext.includes("if (coreResult.task.status === 'COMPLETED')"));
+check('request changes creates rerun', ext.includes("runType: 'REVALIDATION'")&&ext.includes('REGENERATE_FROM_EXTERNAL_REVIEW'));
+check('hold not counted as positive or negative', learn.includes("'HELD_NO_GENERALIZATION'"));
+check('package and manifest bound', learn.includes('candidateManifestSha256'));
+const failed=checks.filter(x=>!x.ok);fs.writeFileSync('REVIEW_LEARNING_V55.json',JSON.stringify({passed:failed.length===0,checks},null,2));if(failed.length)process.exit(1);

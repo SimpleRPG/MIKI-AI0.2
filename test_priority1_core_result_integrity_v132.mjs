@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+const file='src/miki/core/services/coreOrchestratorService.ts';
+const s=fs.readFileSync(file,'utf8');
+const checks=[];
+const check=(name,ok)=>{checks.push({name,ok});console.log(`${ok?'PASS':'FAIL'} ${name}`)};
+check('incomplete result uses verified decision id',/decisionId:lineage\.verifiedDecisionId/.test(s));
+check('unverified last decision is not returned',!/unknowns:\[\.\.\.new Set\(replyRecords\.flatMap\(record=>record\.unknowns\)\)\],decisionId:lastDecision\?\.id/.test(s));
+check('completion gate rejects unverified lineage',/LINEAGE_VERIFICATION_FAILED/.test(fs.readFileSync('src/miki/core/services/coreCompletionGateService.ts','utf8')));
+check('core lineage read model exists',fs.existsSync('src/miki/core/services/coreLineageReadModelService.ts'));
+check('domain reply ledger exists',fs.existsSync('src/miki/core/services/domainReplyLedgerService.ts'));
+check('persistence receipt ledger exists',fs.existsSync('src/miki/core/services/persistenceReceiptLedgerService.ts'));
+if(checks.some(x=>!x.ok)) process.exit(1);
+console.log(`PASS ${checks.length}/${checks.length}`);

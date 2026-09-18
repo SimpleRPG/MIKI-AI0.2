@@ -1,0 +1,40 @@
+ビービー Ver121 マスター指示書
+
+1. 目的
+UIからcoreへ自己コード改善を開始し、必要な17専門分類が処理し、coreが結果を回収する通常循環を完成させる。最初のMVPは、評価可能なCandidateを作成し、評価用ZIPを出力し、外部AI Feedbackを取り込み、利用者の採用・却下・要修正・保留を学習へ戻すことである。初回から完璧なCandidateは要求しない。
+
+2. 今回の統合範囲
+- 優先度3: Issueを対象・関連ファイル、期待動作、完了条件へ正規化し、既存Candidate GeneratorとWorkspaceを再利用する基礎。
+- 優先度5: 外部AI FeedbackのPackage、Revision、Manifest、ZIP SHA照合、準信頼取込み、部分採用・部分却下の基礎。
+- 優先度6: 採否Episodeから学習Artifactを作り、学習あり・なしの影響比較、失敗再発防止、Correction再利用、Artifact停止を扱う基礎。
+
+3. レビュー時に修正した不具合
+- ExternalReviewRecord生成時に重複していたclaimsプロパティを1つへ統合した。
+- 未定義変数linesへの参照を削除した。
+- ExternalReviewDecisionへ必須のexternalAiRoleを追加した。
+- PARTIAL_ACCEPTとPARTIAL_REJECTをHOLDではなくCorrection学習へ接続した。
+- Candidate Generatorは受領Manifest上で既存正本と同一のため重複追加しなかった。
+
+4. 未完了の最優先事項
+- 優先度4の評価用ZIP差分を受領後に統合する。
+- 優先度7の検索・知識・部品作成接続差分を受領後に統合する。
+- 優先度8のcore再計画・再開差分を受領後に統合する。
+- 優先度3、5、6をUI起点の実TaskでRuntime完走させる。
+- FeedbackとDecisionの正式保存を18分類のmemory経路とPersistence Receiptへ統一する。
+- 部分採否をChange ID単位へ拘束し、最新Candidateへの競合確認を行う。
+- 学習Artifactを次回Candidate生成に使用し、使用Artifact IDと効果を記録する。
+
+5. 重複実装防止
+- 同じ入口、保存先、状態正本、出力契約を持つ別Serviceを作らない。
+- Gateway、Ledger、Writer、Controller、Loopは責務ごとに正本を1つにする。
+- 新規ファイル作成前に、既存部品の再利用・拡張・統合可否を確認する。
+- 旧実装を統合した場合はRuntime参照0件を確認する。
+
+6. 外部AIの位置付け
+外部AIは評価者、内部で解けない未知部品の作成者、教師である。Feedbackは準信頼としてClaim単位で扱い、利用者のDecisionと内部検証を経ずに正本化しない。
+
+7. 外部環境
+npm Registry、完全Build、Termux、SearXNG実接続、GitHub Actions、Galaxy S25総合E2Eは優先度15に固定する。優先度1から14ではMock、Fixture、静的契約、内部Runtimeで進める。
+
+8. 完了報告
+各差分の基準正本、変更・追加・削除ファイル、再利用部品、新規部品、統合した重複、残したLegacy、試験結果、未実施試験、SHA-256を記録する。

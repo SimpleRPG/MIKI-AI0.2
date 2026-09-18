@@ -1,0 +1,23 @@
+{
+  "base": "phase15 cumulative",
+  "phase": "phase16-autonomous-issue-discovery",
+  "implemented": [
+    "scheduled autonomous issue discovery",
+    "startup issue scan",
+    "execution failure discovery and immediate queueing",
+    "open Knowledge Gap discovery",
+    "open Capability Gap discovery",
+    "stalled Blackboard task discovery",
+    "18-domain disconnected coverage discovery",
+    "Claim contradiction discovery",
+    "priority scoring, deterministic fingerprint, deduplication and bounded queueing",
+    "removed execution-event bypass from canonical controller"
+  ],
+  "default_scan_interval_minutes": 180,
+  "safety_boundary": [
+    "maximum 5 issues queued per scan",
+    "minimum priority 40",
+    "scan interval configurable 15 minutes to 7 days",
+    "discovery creates improvement requests but does not bypass validation or automatically push code"
+  ]
+}

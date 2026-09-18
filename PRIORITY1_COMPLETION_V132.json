@@ -1,0 +1,19 @@
+{
+  "version": "132",
+  "priority": 1,
+  "status": "IMPLEMENTED_STATIC_VERIFIED",
+  "base": "ビービー_Ver131_既存設定画面_SEARXNG統合修正版",
+  "changes": [
+    "Removed duplicate decisionId property from incomplete Core Result",
+    "Kept only lineage-verified Decision ID in UI-facing Core Result",
+    "Added regression test preventing unverified Blackboard Decision leakage"
+  ],
+  "reused": [
+    "coreLineageReadModelService",
+    "coreCompletionGateService",
+    "domainReplyLedgerService",
+    "persistenceReceiptLedgerService"
+  ],
+  "newDuplicateServices": 0,
+  "externalRuntimeDeferred": ["npm dependencies", "Vite build", "APK build", "Galaxy S25 E2E"]
+}

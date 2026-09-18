@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "packageType": "CHANGED_OR_ADDED_FILES_ONLY",
+  "baseArchive": "MIKI-AI0.2-main_priority1-2-3-5-6-merged-v122.zip",
+  "priority": 13,
+  "files": [
+    "src/miki/safety/services/secretRedactionService.ts",
+    "src/miki/safety/services/workspacePathBoundaryService.ts",
+    "src/miki/execution/services/workspaceExecutionBrokerService.ts",
+    "scripts/test_bibi_priority13_boundaries_v1.mjs"
+  ],
+  "removedFiles": [],
+  "remaining": [
+    "backend loopback, CORS allowlist, session authentication and operation authorization",
+    "physical multi-key secret storage",
+    "removal of env rewrite and running-source write APIs",
+    "filesystem realpath and symlink enforcement",
+    "real process adapter connection",
+    "preview-only origin"
+  ]
+}

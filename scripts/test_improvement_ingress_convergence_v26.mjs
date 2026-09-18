@@ -1,0 +1,6 @@
+import fs from 'node:fs';
+const ingress=fs.readFileSync('src/miki/core/services/selfImprovementIngressService.ts','utf8');
+const bootstrap=fs.readFileSync('src/miki/core/services/domainIntegrationBootstrapService.ts','utf8');
+const intake=fs.readFileSync('src/miki/core/services/improvementIntakeRouterService.ts','utf8');
+const checks={ingressOwnsQueue:ingress.includes('autonomousSelfImprovementLoopService.enqueue'),bootstrapUsesIngress:bootstrap.includes('selfImprovementIngressService.submit')&&!bootstrap.includes('autonomousSelfImprovementLoopService.enqueue('),intakeUsesIngress:intake.includes('selfImprovementIngressService.submitRun')&&!intake.includes('autonomousSelfImprovementLoopService.enqueueRun'),runAndTriggerUnified:ingress.includes('return this.submit({trigger:run.objective'),exported:fs.readFileSync('src/miki/core.ts','utf8').includes('selfImprovementIngressService')};
+const passed=Object.values(checks).every(Boolean);const report={version:'v26',passed,checks,improvementIngress:'selfImprovementIngressService',worker:'autonomousSelfImprovementLoopService'};fs.writeFileSync('IMPROVEMENT_INGRESS_CONVERGENCE_AUDIT_V26.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));if(!passed)process.exitCode=1;

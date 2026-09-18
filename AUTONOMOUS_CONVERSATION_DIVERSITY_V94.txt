@@ -1,0 +1,5 @@
+VERSION=v94
+SOURCE=v93
+IMPLEMENTED=P0-CONV-02,P0-CONV-03_PARTIAL
+CHANGES=surface repetition assessment; bounded recent history; repetition penalty; surface signature lineage
+NOT_RUN=FULL_TYPESCRIPT,VITE,APK,GALAXY_S25_E2E

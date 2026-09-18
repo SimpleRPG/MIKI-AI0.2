@@ -1,0 +1,1280 @@
+// save-system.js 
+// セーブデータ関係
+// オンラインブラウザゲーム化前段階：テストプレイヤーがデバッグ状態を引き継げるようにする
+
+const SAVE_VERSION = 1;
+const SAVE_KEY = "myGatherGameSave_v1";
+
+// ==============================
+// ゲーム状態 → プレーンオブジェクトへ
+// ==============================
+function makeSaveData() {
+  let player, pet, companionTypeId, companionTraitId;
+  let petListSafe, activePetIdSafe, activePartyIdsSafe;
+  let materialsSafe, gatherSkillsSafe, craftSkillsSafe, intermediateMatsSafe, cookingMatsSafe, lastGatherInfoSafe, gatherStatsSafe;
+  let itemCountsSafe, weaponsSafe, armorsSafe, potionsSafe;
+  let weaponCountsSafe, armorCountsSafe, potionCountsSafe;
+  let weaponInstancesSafe, armorInstancesSafe;
+  let carryPotionsSafe, carryFoodsSafe, carryDrinksSafe, carryWeaponsSafe, carryArmorsSafe, carryToolsSafe;
+  let toolCountsSafe, cookedFoodsSafe, cookedDrinksSafe, lastBattleItemCategorySafe, lastBattleItemIdSafe;
+  let isExploringSafe, exploringAreaSafe, areaBossClearedSafe, areaBossAvailableSafe;
+  let shieldBlowGuardTurnRemainSafe, playerStatusesSafe;
+  let hungerSafe, thirstSafe, wellFedUntilSafe;
+  let escapeFailBonusSafe;
+  let gatherBasesSafe, gatherBaseStockTicksSafe;
+  let farmSafe, fishDexSafe;
+  let marketListingsSafe, marketBuyOrdersSafe, marketTradeLogsSafe, marketOrderIdSeqSafe, marketListingIdSeqSafe;
+  let maxMarketListingSlotsSafe, marketQuickCancelCountSafe, marketCancelPenaltyLevelSafe, marketCancelCooldownUntilSafe;
+  let playerGuildIdSafe, guildFameSafe, guildQuestProgressSafe, combatGuildTreeUnlockedSafe, combatGuildSkillPointsSafe;
+  let guildCoinsSafe, guildLearnedRecipesSafe, guildEquipLicensesSafe, guildDeliveryStatsSafe, guildDailyDateSafe, guildDailyTakenDateSafe, guildDailyProgressSafe;
+  let citizenshipUnlockedSafe, housingStateSafe;
+  let rareGatherItemsSafe; // ★追加: レア素材（星屑の結晶など）の専用在庫
+  let byproductMatsSafe;   // ★追加: 副産物素材の専用在庫
+  let unlockedGuildJobsSafe; // ★追加: 解放済みギルド職リスト
+
+  try {
+    player = {
+      level,
+      exp,
+      expToNext,
+      rebirthCount,
+      // ★追加: 転生タイプ別ポイントと直近の転生タイプもセーブ
+      rebirthCombatPt: (typeof rebirthCombatPt !== "undefined") ? rebirthCombatPt : 0,
+      rebirthGatherPt: (typeof rebirthGatherPt !== "undefined") ? rebirthGatherPt : 0,
+      rebirthCraftPt:  (typeof rebirthCraftPt  !== "undefined") ? rebirthCraftPt  : 0,
+      lastRebirthType: (typeof lastRebirthType !== "undefined") ? lastRebirthType : "combat",
+      growthType,
+      STR,
+      VIT,
+      INT_,
+      DEX_,
+      LUK_,
+      hp,
+      hpMax,
+      mp,
+      mpMax,
+      sp,
+      spMax,
+      hpMaxBase,
+      mpMaxBase,
+      spMaxBase,
+      jobId,
+      jobChangedOnce,
+      everBeastTamer,
+      money,
+      // ★追加: 職業初期ステ適用フラグもセーブ
+      initialJobStatsApplied: (typeof initialJobStatsApplied !== "undefined") ? initialJobStatsApplied : false
+    };
+  } catch (e) {
+    throw e;
+  }
+
+  try {
+    pet = {
+      petLevel,
+      petExp,
+      petExpToNext,
+      petRebirthCount,
+      petHpBase,
+      petAtkBase,
+      // ★追加: petDefBaseが今までセーブ対象から漏れていた（値が固定2の間は無害だったが、
+      //   DEF成長を追加した以上、セーブ/ロードで積み上げた成長が失われるバグになるため追加）
+      petDefBase,
+      petHpMax,
+      petHp,
+      petBuffRate,
+      petGrowthType,
+      petSkills,
+      petName: (typeof petName !== "undefined") ? petName : ""
+    };
+  } catch (e) {
+    throw e;
+  }
+
+  try {
+    companionTypeId  = (typeof window !== "undefined") ? (window.companionTypeId  || null) : null;
+    companionTraitId = (typeof window !== "undefined") ? (window.companionTraitId || null) : null;
+  } catch (e) {
+    throw e;
+  }
+
+  // ★追加: 複数ペット基盤のセーブ（petList / activePetId）
+  try {
+    if (typeof window !== "undefined" && Array.isArray(window.petList)) {
+      petListSafe = window.petList;
+    } else {
+      petListSafe = [];
+    }
+    activePetIdSafe = (typeof window !== "undefined") ? (window.activePetId || null) : null;
+    activePartyIdsSafe = (typeof window !== "undefined" && Array.isArray(window.activePartyIds))
+      ? window.activePartyIds.slice()
+      : [];
+  } catch (e) {
+    throw e;
+  }
+
+  try {
+    materialsSafe        = materials;
+    gatherSkillsSafe     = gatherSkills;
+    craftSkillsSafe      = craftSkills;
+    intermediateMatsSafe = intermediateMats;
+    cookingMatsSafe      = cookingMats;
+    lastGatherInfoSafe   = lastGatherInfo;
+    gatherStatsSafe      = (typeof window !== "undefined" && window.gatherStats) ? window.gatherStats : {};
+  } catch (e) {
+    throw e;
+  }
+
+  try {
+    itemCountsSafe  = itemCounts;
+    weaponsSafe     = weapons;
+    armorsSafe      = armors;
+    potionsSafe     = potions;
+    weaponCountsSafe = weaponCounts;
+    armorCountsSafe  = armorCounts;
+    potionCountsSafe = potionCounts;
+    weaponInstancesSafe = weaponInstances;
+    armorInstancesSafe  = armorInstances;
+    carryPotionsSafe = carryPotions;
+    carryFoodsSafe   = carryFoods;
+    carryDrinksSafe  = carryDrinks;
+    carryWeaponsSafe = carryWeapons;
+    carryArmorsSafe  = carryArmors;
+    carryToolsSafe   = carryTools;
+    toolCountsSafe   = toolCounts;
+    cookedFoodsSafe  = cookedFoods;
+    cookedDrinksSafe = cookedDrinks;
+    lastBattleItemCategorySafe = lastBattleItemCategory;
+    lastBattleItemIdSafe       = lastBattleItemId;
+  } catch (e) {
+    throw e;
+  }
+
+  try {
+    isExploringSafe   = (typeof window !== "undefined") ? window.isExploring   : false;
+    exploringAreaSafe = (typeof window !== "undefined") ? window.exploringArea : null;
+
+    areaBossClearedSafe   = areaBossCleared;
+    areaBossAvailableSafe = areaBossAvailable;
+
+    shieldBlowGuardTurnRemainSafe = shieldBlowGuardTurnRemain;
+    playerStatusesSafe = playerStatuses;
+
+    hungerSafe       = hunger;
+    thirstSafe       = thirst;
+    wellFedUntilSafe = wellFedUntil;
+
+    escapeFailBonusSafe = escapeFailBonus;
+  } catch (e) {
+    throw e;
+  }
+
+  try {
+    gatherBasesSafe       = gatherBases;
+    gatherBaseStockTicksSafe = gatherBaseStockTicks;
+  } catch (e) {
+    throw e;
+  }
+
+  try {
+    farmSafe = (typeof getFarmSaveData === "function") ? getFarmSaveData() : null;
+  } catch (e) {
+    throw e;
+  }
+
+  try {
+    fishDexSafe = (typeof window !== "undefined" && window.fishDex) ? window.fishDex : {};
+  } catch (e) {
+    throw e;
+  }
+
+  try {
+    marketListingsSafe   = marketListings;
+    marketBuyOrdersSafe  = marketBuyOrders;
+    marketTradeLogsSafe  = marketTradeLogs;
+    marketOrderIdSeqSafe = marketOrderIdSeq;
+    marketListingIdSeqSafe = marketListingIdSeq;
+    maxMarketListingSlotsSafe = (typeof window !== "undefined" && typeof window.maxMarketListingSlots === "number") ? window.maxMarketListingSlots : 3;
+    marketQuickCancelCountSafe = (typeof window !== "undefined" && typeof window.marketQuickCancelCount === "number") ? window.marketQuickCancelCount : 0;
+    marketCancelPenaltyLevelSafe = (typeof window !== "undefined" && typeof window.marketCancelPenaltyLevel === "number") ? window.marketCancelPenaltyLevel : 0;
+    marketCancelCooldownUntilSafe = (typeof window !== "undefined" && typeof window.marketCancelCooldownUntil === "number") ? window.marketCancelCooldownUntil : 0;
+  } catch (e) {
+    throw e;
+  }
+
+  try {
+    playerGuildIdSafe        = (typeof window !== "undefined") ? window.playerGuildId : null;
+    guildFameSafe            = (typeof window !== "undefined") ? (window.guildFame || {}) : {};
+    guildQuestProgressSafe   = (typeof window !== "undefined") ? (window.guildQuestProgress || {}) : {};
+    combatGuildTreeUnlockedSafe = (typeof window !== "undefined") ? (window.combatGuildTreeUnlocked || {}) : {};
+    combatGuildSkillPointsSafe  = (typeof window !== "undefined") ? (window.combatGuildSkillPoints || 0) : 0;
+    guildCoinsSafe           = (typeof window !== "undefined" && typeof window.guildCoins === "number") ? window.guildCoins : 0;
+    guildLearnedRecipesSafe  = (typeof window !== "undefined" && Array.isArray(window.guildLearnedRecipes)) ? window.guildLearnedRecipes : [];
+    guildEquipLicensesSafe   = (typeof window !== "undefined" && window.guildEquipLicenses && typeof window.guildEquipLicenses === "object") ? window.guildEquipLicenses : {};
+    guildDeliveryStatsSafe   = (typeof window !== "undefined" && window.guildDeliveryStats) ? window.guildDeliveryStats : {};
+    guildDailyDateSafe       = (typeof window !== "undefined") ? window.guildDailyDate : null;
+    guildDailyTakenDateSafe  = (typeof window !== "undefined") ? window.guildDailyTakenDate : null;
+    guildDailyProgressSafe   = (typeof window !== "undefined") ? (window.guildDailyProgress || {}) : {};
+  } catch (e) {
+    throw e;
+  }
+
+  try {
+    citizenshipUnlockedSafe = (typeof window !== "undefined") ? !!window.citizenshipUnlocked : false;
+    housingStateSafe = (typeof window !== "undefined" && window.housingState)
+      ? window.housingState
+      : { hasBase: false, baseLevel: 0, lastGuildId: null };
+  } catch (e) {
+    throw e;
+  }
+
+  // ★追加: レア素材（星屑の結晶など）の専用在庫をセーブ
+  try {
+    rareGatherItemsSafe = (typeof window !== "undefined" && window.rareGatherItems)
+      ? window.rareGatherItems
+      : {};
+  } catch (e) {
+    rareGatherItemsSafe = {};
+  }
+
+  // ★追加: 副産物素材の専用在庫をセーブ
+  try {
+    byproductMatsSafe = (typeof window !== "undefined" && window.byproductMats)
+      ? window.byproductMats
+      : {};
+  } catch (e) {
+    byproductMatsSafe = {};
+  }
+
+  // ★追加: 解放済みギルド職リストをセーブ
+  try {
+    unlockedGuildJobsSafe = (typeof window !== "undefined" && window.unlockedGuildJobs)
+      ? window.unlockedGuildJobs
+      : {};
+  } catch (e) {
+    unlockedGuildJobsSafe = {};
+  }
+
+  return {
+    version: SAVE_VERSION,
+
+    // --------------------------------
+    // 基本プレイヤー情報（game-core-1 / 2）
+    // --------------------------------
+    player,
+
+    // ペット関連（従来の単一ペット用）
+    pet,
+
+    // ペット種・特性
+    companionTypeId,
+    companionTraitId,
+
+    // ★追加: 複数ペット用のリストとアクティブID
+    petList: petListSafe,
+    activePetId: activePetIdSafe,
+    // ★獣群使い用：同時編成中のペットID配列
+    activePartyIds: activePartyIdsSafe,
+
+    // --------------------------------
+    // 採取・クラフト・素材
+    // --------------------------------
+    materials:    materialsSafe,
+    gatherSkills: gatherSkillsSafe,
+    craftSkills:  craftSkillsSafe,
+    intermediateMats: intermediateMatsSafe,
+    cookingMats:  cookingMatsSafe,
+    lastGatherInfo: lastGatherInfoSafe,
+    gatherStats: gatherStatsSafe,
+
+    // ★追加: レア素材（星屑の結晶など）
+    rareGatherItems: rareGatherItemsSafe,
+
+    // ★追加: 副産物素材
+    byproductMats: byproductMatsSafe,
+
+    // --------------------------------
+    // インベントリ・装備
+    // --------------------------------
+    itemCounts: itemCountsSafe,
+
+    weapons: weaponsSafe,
+    armors:  armorsSafe,
+    potions: potionsSafe,
+
+    weaponCounts: weaponCountsSafe,
+    armorCounts:  armorCountsSafe,
+    potionCounts: potionCountsSafe,
+
+    weaponInstances: weaponInstancesSafe,
+    armorInstances:  armorInstancesSafe,
+    petEquipInstances: Array.isArray(window.petEquipInstances) ? window.petEquipInstances : [],
+    petEquipCounts:    (window.petEquipCounts && typeof window.petEquipCounts === "object") ? window.petEquipCounts : {},
+
+    equippedWeaponId,
+    equippedArmorId,
+    equippedWeaponIndex,
+    equippedArmorIndex,
+
+    carryPotions: carryPotionsSafe,
+    carryFoods:   carryFoodsSafe,
+    carryDrinks:  carryDrinksSafe,
+    carryWeapons: carryWeaponsSafe,
+    carryArmors:  carryArmorsSafe,
+    carryTools:   carryToolsSafe,
+    toolCounts:   toolCountsSafe,
+    cookedFoods:  cookedFoodsSafe,
+    cookedDrinks: cookedDrinksSafe,
+    lastBattleItemCategory: lastBattleItemCategorySafe,
+    lastBattleItemId:       lastBattleItemIdSafe,
+
+    // --------------------------------
+    // 探索・戦闘系
+    // --------------------------------
+    isExploring:   isExploringSafe,
+    exploringArea: exploringAreaSafe,
+
+    areaBossCleared:   areaBossClearedSafe,
+    areaBossAvailable: areaBossAvailableSafe,
+
+    shieldBlowGuardTurnRemain: shieldBlowGuardTurnRemainSafe,
+    playerStatuses:            playerStatusesSafe,
+
+    hunger:       hungerSafe,
+    thirst:       thirstSafe,
+    wellFedUntil: wellFedUntilSafe,
+
+    escapeFailBonus: escapeFailBonusSafe,
+
+    // --------------------------------
+    // 採取拠点・自動採取
+    // --------------------------------
+    gatherBases:          gatherBasesSafe,
+    gatherBaseStockTicks: gatherBaseStockTicksSafe,
+
+    // --------------------------------
+    // 農園
+    // --------------------------------
+    farm: farmSafe,
+
+    // --------------------------------
+    // 釣り図鑑
+    // --------------------------------
+    fishDex: fishDexSafe,
+
+    // --------------------------------
+    // 市場
+    // --------------------------------
+    marketListings:   marketListingsSafe,
+    marketBuyOrders:  marketBuyOrdersSafe,
+    marketTradeLogs:  marketTradeLogsSafe,
+    marketOrderIdSeq: marketOrderIdSeqSafe,
+    marketListingIdSeq: marketListingIdSeqSafe,
+    maxMarketListingSlots: maxMarketListingSlotsSafe,
+    marketQuickCancelCount: marketQuickCancelCountSafe,
+    marketCancelPenaltyLevel: marketCancelPenaltyLevelSafe,
+    marketCancelCooldownUntil: marketCancelCooldownUntilSafe,
+
+    // --------------------------------
+    // ギルド関連
+    // --------------------------------
+    playerGuildId:          playerGuildIdSafe,
+    guildFame:              guildFameSafe,
+    guildQuestProgress:     guildQuestProgressSafe,
+    combatGuildTreeUnlocked: combatGuildTreeUnlockedSafe,
+    combatGuildSkillPoints:  combatGuildSkillPointsSafe,
+    guildCoins:              guildCoinsSafe,
+    guildLearnedRecipes:     guildLearnedRecipesSafe,
+    guildEquipLicenses:      guildEquipLicensesSafe,
+    guildDeliveryStats:      guildDeliveryStatsSafe,
+    guildDailyDate:          guildDailyDateSafe,
+    guildDailyTakenDate:     guildDailyTakenDateSafe,
+    guildDailyProgress:      guildDailyProgressSafe,
+    guildBuffs:              (typeof window !== "undefined" && window.guildBuffs) ? window.guildBuffs : { gatherBuffUntil: 0, combatBuffUntil: 0 },
+    // ★追加: 解放済みギルド職
+    unlockedGuildJobs: unlockedGuildJobsSafe,
+
+    // --------------------------------
+    // 市民権・ハウジング
+    // --------------------------------
+    citizenshipUnlocked: citizenshipUnlockedSafe,
+    housingState:        housingStateSafe
+  };
+}
+
+// ==============================
+// インスタンス整形・装備補正ヘルパ
+// ==============================
+
+function normalizeInstanceLocations() {
+  if (Array.isArray(weaponInstances)) {
+    weaponInstances.forEach(inst => {
+      if (!inst) return;
+      if (!inst.location) inst.location = "warehouse";
+    });
+  }
+  if (Array.isArray(armorInstances)) {
+    armorInstances.forEach(inst => {
+      if (!inst) return;
+      if (!inst.location) inst.location = "warehouse";
+    });
+  }
+}
+
+function fixEquippedAfterLoad() {
+  // 武器
+  if (Array.isArray(weaponInstances)) {
+    let ok = false;
+    if (typeof equippedWeaponIndex === "number") {
+      const inst = weaponInstances[equippedWeaponIndex];
+      if (inst && inst.id === equippedWeaponId) {
+        inst.location = "equipped";
+        ok = true;
+      }
+    }
+    if (!ok && equippedWeaponId) {
+      let found = -1;
+      weaponInstances.forEach((w, i) => {
+        if (found !== -1) return;
+        if (w && w.id === equippedWeaponId) found = i;
+      });
+      if (found === -1) {
+        equippedWeaponIndex = null;
+        equippedWeaponId = null;
+      } else {
+        equippedWeaponIndex = found;
+        weaponInstances[found].location = "equipped";
+      }
+    }
+  }
+
+  // 防具
+  if (Array.isArray(armorInstances)) {
+    let ok = false;
+    if (typeof equippedArmorIndex === "number") {
+      const inst = armorInstances[equippedArmorIndex];
+      if (inst && inst.id === equippedArmorId) {
+        inst.location = "equipped";
+        ok = true;
+      }
+    }
+    if (!ok && equippedArmorId) {
+      let found = -1;
+      armorInstances.forEach((a, i) => {
+        if (found !== -1) return;
+        if (a && a.id === equippedArmorId) found = i;
+      });
+      if (found === -1) {
+        equippedArmorIndex = null;
+        equippedArmorId = null;
+      } else {
+        equippedArmorIndex = found;
+        armorInstances[found].location = "equipped";
+      }
+    }
+  }
+}
+
+// ==============================
+// セーブデータ → ゲーム状態へ反映
+// ==============================
+function applySaveData(data) {
+  // -------- プレイヤー --------
+  try {
+    if (data.player) {
+      const p = data.player;
+      if ("level" in p)          level          = p.level;
+      if ("exp" in p)            exp            = p.exp;
+      if ("expToNext" in p)      expToNext      = p.expToNext;
+      if ("rebirthCount" in p)   rebirthCount   = p.rebirthCount;
+
+      // ★追加: 転生タイプ別ポイントと直近の転生タイプをロード
+      if ("rebirthCombatPt" in p) {
+        rebirthCombatPt = p.rebirthCombatPt;
+        if (typeof window !== "undefined") {
+          window.rebirthCombatPt = rebirthCombatPt;
+        }
+      }
+      if ("rebirthGatherPt" in p) {
+        rebirthGatherPt = p.rebirthGatherPt;
+        if (typeof window !== "undefined") {
+          window.rebirthGatherPt = rebirthGatherPt;
+        }
+      }
+      if ("rebirthCraftPt" in p) {
+        rebirthCraftPt = p.rebirthCraftPt;
+        if (typeof window !== "undefined") {
+          window.rebirthCraftPt = rebirthCraftPt;
+        }
+      }
+      if ("lastRebirthType" in p) {
+        lastRebirthType = p.lastRebirthType || "combat";
+        if (typeof window !== "undefined") {
+          window.lastRebirthType = lastRebirthType;
+        }
+      }
+
+      if ("growthType" in p)     growthType     = p.growthType;
+
+      if ("STR" in p)            STR            = p.STR;
+      if ("VIT" in p)            VIT            = p.VIT;
+      if ("INT_" in p)           INT_           = p.INT_;
+      if ("DEX_" in p)           DEX_           = p.DEX_;
+      if ("LUK_" in p)           LUK_           = p.LUK_;
+
+      if ("hp" in p)             hp             = p.hp;
+      if ("hpMax" in p)          hpMax          = p.hpMax;
+      if ("mp" in p)             mp             = p.mp;
+      if ("mpMax" in p)          mpMax          = p.mpMax;
+      if ("sp" in p)             sp             = p.sp;
+      if ("spMax" in p)          spMax          = p.spMax;
+
+      if ("hpMaxBase" in p)      hpMaxBase      = p.hpMaxBase;
+      if ("mpMaxBase" in p)      mpMaxBase      = p.mpMaxBase;
+      if ("spMaxBase" in p)      spMaxBase      = p.spMaxBase;
+
+      if ("jobId" in p)          jobId          = p.jobId;
+      if ("jobChangedOnce" in p) jobChangedOnce = p.jobChangedOnce;
+      if ("everBeastTamer" in p) everBeastTamer = p.everBeastTamer;
+
+      if ("money" in p)          money          = p.money;
+
+      // ★追加: 職業初期ステ適用フラグをロード
+      if ("initialJobStatsApplied" in p) {
+        if (typeof initialJobStatsApplied !== "undefined") {
+          initialJobStatsApplied = !!p.initialJobStatsApplied;
+        }
+        if (typeof window !== "undefined") {
+          window.initialJobStatsApplied = !!p.initialJobStatsApplied;
+        }
+      }
+    }
+  } catch (e) {
+    throw e;
+  }
+
+  // -------- ペット（従来の単一ペット） --------
+  try {
+    if (data.pet) {
+      const pet = data.pet;
+      if ("petLevel" in pet)        petLevel        = pet.petLevel;
+      if ("petExp" in pet)          petExp          = pet.petExp;
+      if ("petExpToNext" in pet)    petExpToNext    = pet.petExpToNext;
+      if ("petRebirthCount" in pet) petRebirthCount = pet.petRebirthCount;
+      if ("petHpBase" in pet)       petHpBase       = pet.petHpBase;
+      if ("petAtkBase" in pet)      petAtkBase      = pet.petAtkBase;
+      if ("petDefBase" in pet)      petDefBase      = pet.petDefBase;
+      if ("petHpMax" in pet)        petHpMax        = pet.petHpMax;
+      if ("petHp" in pet)           petHp           = pet.petHp;
+      if ("petBuffRate" in pet)     petBuffRate     = pet.petBuffRate;
+      if ("petGrowthType" in pet)   petGrowthType   = pet.petGrowthType;
+      if (Array.isArray(pet.petSkills)) petSkills   = pet.petSkills;
+      if ("petName" in pet)         petName         = pet.petName;
+    }
+  } catch (e) {
+    throw e;
+  }
+
+  // ペット種／特性
+  try {
+    if (typeof window !== "undefined") {
+      if ("companionTypeId" in data) {
+        window.companionTypeId = data.companionTypeId;
+        if (typeof companionTypeId !== "undefined") {
+          companionTypeId = data.companionTypeId;
+        }
+      }
+      if ("companionTraitId" in data) {
+        window.companionTraitId = data.companionTraitId;
+        if (typeof companionTraitId !== "undefined") {
+          companionTraitId = data.companionTraitId;
+        }
+      }
+    }
+  } catch (e) {
+    throw e;
+  }
+
+  // ★追加: 複数ペット用 petList / activePetId のロード
+  try {
+    if (typeof window !== "undefined") {
+      if (Array.isArray(data.petList)) {
+        window.petList = data.petList;
+      } else {
+        window.petList = Array.isArray(window.petList) ? window.petList : [];
+      }
+      if ("activePetId" in data) {
+        window.activePetId = data.activePetId || null;
+      } else if (!window.activePetId) {
+        window.activePetId = null;
+      }
+
+      // ★獣群使い用：編成中パーティIDのロード（旧セーブには存在しない）
+      if (Array.isArray(data.activePartyIds)) {
+        window.activePartyIds = data.activePartyIds.filter(id =>
+          window.petList.some(p => p && p.id === id)
+        );
+      } else {
+        window.activePartyIds = [];
+      }
+
+      // 旧セーブ互換: petList が空で companionTypeId があるなら 1 匹だけ移行
+      if (typeof window.ensurePetListFromLegacy === "function") {
+        window.ensurePetListFromLegacy();
+      }
+      // 旧セーブ互換: equip フィールド（装備2枠）が無ければ補う
+      if (typeof window.ensurePetEquipSlots === "function") {
+        window.ensurePetEquipSlots();
+      }
+
+      // パーティが空のままなら、activePetId（あれば）を1件だけ入れて後方互換を保つ
+      if (window.activePartyIds.length === 0 && window.activePetId) {
+        window.activePartyIds = [window.activePetId];
+      }
+
+      // activePetId があり、同期ヘルパーがあれば単一ペット変数へ反映
+      if (typeof window.loadActivePetToGlobals === "function" && window.activePetId) {
+        window.loadActivePetToGlobals();
+      }
+    }
+  } catch (e) {
+    throw e;
+  }
+
+  // -------- 採取・クラフト・素材 --------
+  try {
+    if (data.materials && typeof materials === "object") {
+      Object.keys(materials).forEach(k => delete materials[k]);
+      Object.keys(data.materials).forEach(k => {
+        materials[k] = data.materials[k];
+      });
+      if (typeof window !== "undefined") {
+        window.materials = materials;
+      }
+    }
+
+    if (data.gatherSkills) {
+      gatherSkills = data.gatherSkills;
+    }
+
+    if (data.craftSkills) {
+      craftSkills = data.craftSkills;
+    }
+
+    if (data.intermediateMats && typeof intermediateMats === "object") {
+      Object.keys(intermediateMats).forEach(k => delete intermediateMats[k]);
+      Object.keys(data.intermediateMats).forEach(k => {
+        intermediateMats[k] = data.intermediateMats[k];
+      });
+      if (typeof window !== "undefined") {
+        window.intermediateMats = intermediateMats;
+      }
+    }
+
+    if (data.cookingMats && typeof cookingMats === "object") {
+      Object.keys(cookingMats).forEach(k => delete cookingMats[k]);
+      Object.keys(data.cookingMats).forEach(k => {
+        cookingMats[k] = data.cookingMats[k];
+      });
+    }
+
+    if (data.lastGatherInfo) {
+      lastGatherInfo = data.lastGatherInfo;
+    }
+
+    if (data.gatherStats && typeof window !== "undefined") {
+      window.gatherStats = window.gatherStats || {};
+      Object.keys(window.gatherStats).forEach(k => delete window.gatherStats[k]);
+      Object.keys(data.gatherStats).forEach(k => {
+        window.gatherStats[k] = data.gatherStats[k];
+      });
+    }
+
+    // ★追加: レア素材在庫のロード（星屑の結晶など）
+    if (typeof window !== "undefined") {
+      window.rareGatherItems = window.rareGatherItems || {};
+      if (data.rareGatherItems && typeof data.rareGatherItems === "object") {
+        Object.keys(window.rareGatherItems).forEach(k => delete window.rareGatherItems[k]);
+        Object.keys(data.rareGatherItems).forEach(k => {
+          window.rareGatherItems[k] = data.rareGatherItems[k];
+        });
+      }
+    }
+
+    // ★追加: 副産物素材在庫のロード
+    if (typeof window !== "undefined") {
+      window.byproductMats = window.byproductMats || {};
+      if (data.byproductMats && typeof data.byproductMats === "object") {
+        Object.keys(window.byproductMats).forEach(k => delete window.byproductMats[k]);
+        Object.keys(data.byproductMats).forEach(k => {
+          window.byproductMats[k] = data.byproductMats[k];
+        });
+      }
+    }
+  } catch (e) {
+    throw e;
+  }
+
+  // -------- インベントリ・装備 --------
+  try {
+    if (data.itemCounts && typeof itemCounts === "object") {
+      Object.keys(itemCounts).forEach(k => delete itemCounts[k]);
+      Object.keys(data.itemCounts).forEach(k => {
+        itemCounts[k] = data.itemCounts[k];
+      });
+    }
+
+    if (Array.isArray(data.weapons))         weapons         = data.weapons;
+    if (Array.isArray(data.armors))          armors          = data.armors;
+    if (Array.isArray(data.potions))         potions         = data.potions;
+    if (data.weaponCounts)                   weaponCounts    = data.weaponCounts;
+    if (data.armorCounts)                    armorCounts     = data.armorCounts;
+    if (data.potionCounts)                   potionCounts    = data.potionCounts;
+
+    if (Array.isArray(data.weaponInstances)) {
+      weaponInstances.length = 0;
+      data.weaponInstances.forEach(i => weaponInstances.push(i));
+    }
+    if (Array.isArray(data.armorInstances)) {
+      armorInstances.length = 0;
+      data.armorInstances.forEach(i => armorInstances.push(i));
+    }
+    if (Array.isArray(data.petEquipInstances)) {
+      if (!Array.isArray(window.petEquipInstances)) window.petEquipInstances = [];
+      window.petEquipInstances.length = 0;
+      data.petEquipInstances.forEach(i => window.petEquipInstances.push(i));
+    }
+    window.petEquipCounts = (data.petEquipCounts && typeof data.petEquipCounts === "object")
+      ? data.petEquipCounts
+      : {};
+
+    // ★ 装備インデックス／ID をローカルと window 両方に反映（ロード後に消えないようにする）
+    if ("equippedWeaponId" in data) {
+      equippedWeaponId = data.equippedWeaponId;
+      if (typeof window !== "undefined") {
+        window.equippedWeaponId = data.equippedWeaponId;
+      }
+    }
+    if ("equippedArmorId" in data) {
+      equippedArmorId = data.equippedArmorId;
+      if (typeof window !== "undefined") {
+        window.equippedArmorId = data.equippedArmorId;
+      }
+    }
+    if ("equippedWeaponIndex" in data) {
+      equippedWeaponIndex = data.equippedWeaponIndex;
+      if (typeof window !== "undefined") {
+        window.equippedWeaponIndex = data.equippedWeaponIndex;
+      }
+    }
+    if ("equippedArmorIndex" in data) {
+      equippedArmorIndex = data.equippedArmorIndex;
+      if (typeof window !== "undefined") {
+        window.equippedArmorIndex = data.equippedArmorIndex;
+      }
+    }
+
+    if (data.carryPotions && typeof carryPotions === "object") {
+      Object.keys(carryPotions).forEach(k => delete carryPotions[k]);
+      Object.keys(data.carryPotions).forEach(k => {
+        carryPotions[k] = data.carryPotions[k];
+      });
+    }
+    if (data.carryFoods && typeof carryFoods === "object") {
+      Object.keys(carryFoods).forEach(k => delete carryFoods[k]);
+      Object.keys(data.carryFoods).forEach(k => {
+        carryFoods[k] = data.carryFoods[k];
+      });
+    }
+    if (data.carryDrinks && typeof carryDrinks === "object") {
+      Object.keys(carryDrinks).forEach(k => delete carryDrinks[k]);
+      Object.keys(data.carryDrinks).forEach(k => {
+        carryDrinks[k] = data.carryDrinks[k];
+      });
+    }
+    if (data.carryWeapons && typeof carryWeapons === "object") {
+      Object.keys(carryWeapons).forEach(k => delete carryWeapons[k]);
+      Object.keys(data.carryWeapons).forEach(k => {
+        carryWeapons[k] = data.carryWeapons[k];
+      });
+    }
+    if (data.carryArmors && typeof carryArmors === "object") {
+      Object.keys(carryArmors).forEach(k => delete carryArmors[k]);
+      Object.keys(data.carryArmors).forEach(k => {
+        carryArmors[k] = data.carryArmors[k];
+      });
+    }
+    if (data.carryTools && typeof carryTools === "object") {
+      Object.keys(carryTools).forEach(k => delete carryTools[k]);
+      Object.keys(data.carryTools).forEach(k => {
+        carryTools[k] = data.carryTools[k];
+      });
+    }
+    if (data.toolCounts && typeof toolCounts === "object") {
+      Object.keys(toolCounts).forEach(k => delete toolCounts[k]);
+      Object.keys(data.toolCounts).forEach(k => {
+        toolCounts[k] = data.toolCounts[k];
+      });
+    }
+    if (data.cookedFoods && typeof cookedFoods === "object") {
+      Object.keys(cookedFoods).forEach(k => delete cookedFoods[k]);
+      Object.keys(data.cookedFoods).forEach(k => {
+        cookedFoods[k] = data.cookedFoods[k];
+      });
+    }
+    if (data.cookedDrinks && typeof cookedDrinks === "object") {
+      Object.keys(cookedDrinks).forEach(k => delete cookedDrinks[k]);
+      Object.keys(data.cookedDrinks).forEach(k => {
+        cookedDrinks[k] = data.cookedDrinks[k];
+      });
+    }
+    if ("lastBattleItemCategory" in data) lastBattleItemCategory = data.lastBattleItemCategory;
+    if ("lastBattleItemId" in data)       lastBattleItemId       = data.lastBattleItemId;
+  } catch (e) {
+    throw e;
+  }
+
+  // -------- 探索・戦闘系 --------
+  try {
+    if (typeof data.isExploring === "boolean") {
+      window.isExploring = data.isExploring;
+    }
+    if (typeof data.exploringArea === "string") {
+      window.exploringArea = data.exploringArea;
+    }
+
+    if (data.areaBossCleared) {
+      areaBossCleared = data.areaBossCleared;
+    }
+    if (data.areaBossAvailable) {
+      Object.keys(areaBossAvailable).forEach(k => {
+        if (k in data.areaBossAvailable) {
+          areaBossAvailable[k] = !!data.areaBossAvailable[k];
+        }
+      });
+    }
+
+    if (typeof data.shieldBlowGuardTurnRemain === "number") {
+      shieldBlowGuardTurnRemain = data.shieldBlowGuardTurnRemain;
+    }
+    if (Array.isArray(data.playerStatuses)) {
+      playerStatuses = data.playerStatuses;
+    }
+
+    if (typeof data.hunger === "number") hunger = data.hunger;
+    if (typeof data.thirst === "number") thirst = data.thirst;
+    if (typeof data.wellFedUntil === "number") wellFedUntil = data.wellFedUntil;
+
+    if (typeof data.escapeFailBonus === "number") escapeFailBonus = data.escapeFailBonus;
+  } catch (e) {
+    throw e;
+  }
+
+  // -------- 採取拠点・自動採取 --------
+  try {
+    if (data.gatherBases && typeof gatherBases === "object") {
+      Object.keys(gatherBases).forEach(k => delete gatherBases[k]);
+      Object.keys(data.gatherBases).forEach(k => {
+        const src = data.gatherBases[k] || {};
+        gatherBases[k] = {
+          level: src.level || 0,
+          mode:  src.mode  || "normal"
+        };
+      });
+    }
+    if (typeof data.gatherBaseStockTicks === "number") {
+      gatherBaseStockTicks = data.gatherBaseStockTicks;
+    }
+  } catch (e) {
+    throw e;
+  }
+
+  // -------- 農園 --------
+  try {
+    if (data.farm && typeof applyFarmSaveData === "function") {
+      applyFarmSaveData(data.farm);
+    } else if (typeof initFarmSystem === "function") {
+      initFarmSystem();
+    }
+  } catch (e) {
+    throw e;
+  }
+
+  // -------- 釣り図鑑 --------
+  try {
+    if (data.fishDex && typeof window !== "undefined") {
+      window.fishDex = window.fishDex || {};
+      Object.keys(window.fishDex).forEach(k => delete window.fishDex[k]);
+      Object.keys(data.fishDex).forEach(k => {
+        window.fishDex[k] = data.fishDex[k];
+      });
+    }
+  } catch (e) {
+    throw e;
+  }
+
+  // -------- 市場 --------
+  try {
+    if (typeof marketListings !== "undefined" && Array.isArray(data.marketListings)) {
+      marketListings = data.marketListings;
+      if (typeof window !== "undefined") {
+        window.marketListings = marketListings;
+      }
+    }
+    if (typeof marketBuyOrders !== "undefined" && Array.isArray(data.marketBuyOrders)) {
+      marketBuyOrders = data.marketBuyOrders;
+      if (typeof window !== "undefined") {
+        window.marketBuyOrders = marketBuyOrders;
+      }
+    }
+    if (typeof marketTradeLogs !== "undefined" && Array.isArray(data.marketTradeLogs)) {
+      marketTradeLogs = data.marketTradeLogs;
+      if (typeof window !== "undefined") {
+        window.marketTradeLogs = marketTradeLogs;
+      }
+    }
+    if (typeof marketOrderIdSeq !== "undefined" && typeof data.marketOrderIdSeq === "number") {
+      marketOrderIdSeq = data.marketOrderIdSeq;
+    }
+    if (typeof marketListingIdSeq !== "undefined" && typeof data.marketListingIdSeq === "number") {
+      marketListingIdSeq = data.marketListingIdSeq;
+    }
+    if (typeof window !== "undefined") {
+      if (typeof data.maxMarketListingSlots === "number") {
+        window.maxMarketListingSlots = data.maxMarketListingSlots;
+      }
+      if (typeof data.marketQuickCancelCount === "number") {
+        window.marketQuickCancelCount = data.marketQuickCancelCount;
+      }
+      if (typeof data.marketCancelPenaltyLevel === "number") {
+        window.marketCancelPenaltyLevel = data.marketCancelPenaltyLevel;
+      }
+      if (typeof data.marketCancelCooldownUntil === "number") {
+        window.marketCancelCooldownUntil = data.marketCancelCooldownUntil;
+      }
+    }
+  } catch (e) {
+    throw e;
+  }
+
+  // -------- ギルド関連 --------
+  try {
+    if (typeof window !== "undefined") {
+      if (typeof data.playerGuildId !== "undefined") {
+        window.playerGuildId = data.playerGuildId;
+      }
+      if (data.guildFame) {
+        window.guildFame = window.guildFame || {};
+        Object.keys(window.guildFame).forEach(k => delete window.guildFame[k]);
+        Object.keys(data.guildFame).forEach(k => {
+          window.guildFame[k] = data.guildFame[k];
+        });
+      }
+      if (data.guildQuestProgress) {
+        window.guildQuestProgress = window.guildQuestProgress || {};
+        Object.keys(window.guildQuestProgress).forEach(k => delete window.guildQuestProgress[k]);
+        Object.keys(data.guildQuestProgress).forEach(k => {
+          window.guildQuestProgress[k] = data.guildQuestProgress[k];
+        });
+      }
+
+      if (data.combatGuildTreeUnlocked) {
+        window.combatGuildTreeUnlocked = window.combatGuildTreeUnlocked || {};
+        Object.keys(window.combatGuildTreeUnlocked).forEach(k => delete window.combatGuildTreeUnlocked[k]);
+        Object.keys(data.combatGuildTreeUnlocked).forEach(k => {
+          window.combatGuildTreeUnlocked[k] = data.combatGuildTreeUnlocked[k];
+        });
+      }
+      if (typeof data.combatGuildSkillPoints === "number") {
+        window.combatGuildSkillPoints = data.combatGuildSkillPoints;
+      }
+
+      if (typeof data.guildCoins === "number") {
+        window.guildCoins = data.guildCoins;
+      }
+      if (Array.isArray(data.guildLearnedRecipes)) {
+        window.guildLearnedRecipes = data.guildLearnedRecipes;
+      }
+      if (data.guildEquipLicenses && typeof data.guildEquipLicenses === "object") {
+        window.guildEquipLicenses = data.guildEquipLicenses;
+      }
+      if (data.guildDeliveryStats && typeof data.guildDeliveryStats === "object") {
+        window.guildDeliveryStats = data.guildDeliveryStats;
+      }
+      if (typeof data.guildDailyDate !== "undefined") {
+        window.guildDailyDate = data.guildDailyDate;
+      }
+      if (typeof data.guildDailyTakenDate !== "undefined") {
+        window.guildDailyTakenDate = data.guildDailyTakenDate;
+      }
+      if (data.guildDailyProgress && typeof data.guildDailyProgress === "object") {
+        window.guildDailyProgress = data.guildDailyProgress;
+      }
+      if (data.guildBuffs && typeof data.guildBuffs === "object") {
+        window.guildBuffs = data.guildBuffs;
+      }
+
+      if (typeof data.citizenshipUnlocked === "boolean") {
+        window.citizenshipUnlocked = data.citizenshipUnlocked;
+      }
+
+      if (data.housingState) {
+        window.housingState = window.housingState || {};
+        window.housingState.hasBase = !!data.housingState.hasBase;
+        window.housingState.baseLevel = data.housingState.baseLevel || 0;
+        window.housingState.lastGuildId =
+          (typeof data.housingState.lastGuildId !== "undefined")
+            ? data.housingState.lastGuildId
+            : null;
+        window.housingState.landId = data.housingState.landId || null;
+        window.housingState.rentDueAt = data.housingState.rentDueAt || null;
+        window.housingState.rentUnpaid = !!data.housingState.rentUnpaid;
+        window.housingState.furnitureSlots = Array.isArray(data.housingState.furnitureSlots)
+          ? data.housingState.furnitureSlots
+          : [];
+        window.housingState.houseType = data.housingState.houseType || null;
+        if (data.housingState.furnitureGrid) {
+          window.housingState.furnitureGrid = data.housingState.furnitureGrid;
+        }
+      }
+
+      // ★追加: 解放済みギルド職のロード
+      if (data.unlockedGuildJobs && typeof data.unlockedGuildJobs === "object") {
+        window.unlockedGuildJobs = window.unlockedGuildJobs || {};
+        Object.keys(window.unlockedGuildJobs).forEach(k => delete window.unlockedGuildJobs[k]);
+        Object.keys(data.unlockedGuildJobs).forEach(k => {
+          window.unlockedGuildJobs[k] = data.unlockedGuildJobs[k];
+        });
+      }
+
+      // ★修正: unlockedGuildJobs だけロードしても転職モーダルの候補リスト
+      //   （window.jobCandidateIds）は基本職 [0,1,2] のままになってしまい、
+      //   セーブ＆ロード後に解放済みのギルド職（呪術師など）が転職候補から
+      //   消えるバグがあったため、ロード済みの unlockedGuildJobs から
+      //   candidateIds を再構築する。
+      if (typeof resetCandidateJobsToBasic === "function") {
+        resetCandidateJobsToBasic();
+      } else {
+        window.jobCandidateIds = [0, 1, 2];
+      }
+      if (window.unlockedGuildJobs && typeof addCandidateJobsByGuildId === "function") {
+        Object.keys(window.unlockedGuildJobs).forEach(guildId => {
+          addCandidateJobsByGuildId(guildId);
+        });
+      }
+    }
+  } catch (e) {
+    throw e;
+  }
+
+  // -------- インスタンス整形・装備補正・カウント再同期 --------
+  try {
+    normalizeInstanceLocations();
+    fixEquippedAfterLoad();
+    if (typeof syncEquipmentCountsFromInstances === "function") {
+      syncEquipmentCountsFromInstances();
+    }
+  } catch (e) {
+    throw e;
+  }
+
+  // -------- 復元後の再計算・UI --------
+  try {
+    if (typeof recalcStats === "function") {
+      recalcStats();
+    } else if (typeof updateDisplay === "function") {
+      updateDisplay();
+    }
+
+    if (typeof renderPlayerStatusIcons === "function") {
+      renderPlayerStatusIcons();
+    }
+    if (typeof renderEnemyStatusIcons === "function") {
+      renderEnemyStatusIcons();
+    }
+    if (typeof refreshExploreAreaSelect === "function") {
+      refreshExploreAreaSelect();
+    }
+    if (typeof updateReturnTownButton === "function") {
+      updateReturnTownButton();
+    }
+    if (typeof refreshEquipSelects === "function") {
+      refreshEquipSelects();
+    }
+    if (typeof refreshBattleItemSelect === "function") {
+      refreshBattleItemSelect();
+    }
+    if (typeof refreshUseItemSelect === "function") {
+      refreshUseItemSelect();
+    }
+    if (typeof refreshCarryFoodDrinkSelects === "function") {
+      refreshCarryFoodDrinkSelects();
+    }
+    if (typeof updateHungerThirstEffects === "function") {
+      updateHungerThirstEffects();
+    }
+    if (typeof renderGuildUI === "function") {
+      renderGuildUI();
+    }
+    if (typeof refreshHousingFromState === "function") {
+      refreshHousingFromState();
+    }
+
+    // ★追加: セーブ反映後に採取統計UIも最新状態にする
+    if (typeof refreshGatherStatsUI === "function") {
+      refreshGatherStatsUI();
+    }
+  } catch (e) {
+    throw e;
+  }
+}
+
+// ==============================
+// ローカルストレージにセーブ
+// ==============================
+function saveToLocal() {
+  // 戦闘中セーブ禁止（探索中は可）
+  if (typeof window !== "undefined" && window.currentEnemy) {
+    if (typeof appendLog === "function") {
+      appendLog("戦闘中はセーブできない！");
+    }
+    return;
+  }
+
+  try {
+    const data = makeSaveData();
+
+    let json;
+    try {
+      json = JSON.stringify(data);
+    } catch (e2) {
+      throw e2;
+    }
+
+    try {
+      localStorage.setItem(SAVE_KEY, json);
+    } catch (e3) {
+      throw e3;
+    }
+
+    if (typeof appendLog === "function") {
+      appendLog("ゲームデータをローカルに保存しました");
+    }
+  } catch (e) {
+    console.error(e);
+    if (typeof appendLog === "function") {
+      appendLog("ローカル保存に失敗しました: " + e.message);
+    }
+  }
+}
+
+// ==============================
+// ローカルストレージからロード
+// ==============================
+function loadFromLocal() {
+  try {
+    const json = localStorage.getItem(SAVE_KEY);
+    if (!json) {
+      if (typeof appendLog === "function") {
+        appendLog("ローカルにセーブデータがありません");
+      }
+      return;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(json);
+    } catch (e2) {
+      throw e2;
+    }
+
+    applySaveData(data);
+
+    // ★ セーブロード後に採取統計UIを再描画
+    if (typeof refreshGatherStatsUI === "function") {
+      refreshGatherStatsUI();
+    }
+
+    if (typeof appendLog === "function") {
+      appendLog("ローカルのセーブデータを読み込みました");
+    }
+  } catch (e) {
+    console.error(e);
+    if (typeof appendLog === "function") {
+      appendLog("ローカルのセーブデータ読み込みに失敗しました: " + e.message);
+    }
+  }
+}
+
+// ==============================
+// エクスポート（プレイヤーがコピーする文字列）
+// ==============================
+function exportSaveData() {
+  try {
+    const data = makeSaveData();
+    const json = JSON.stringify(data);
+    const textarea = document.getElementById("exportSaveText");
+    if (textarea) {
+      textarea.value = json;
+      textarea.select();
+    }
+    if (typeof appendLog === "function") {
+      appendLog("セーブデータをエクスポート用テキストに出力しました（コピーして保存してください）");
+    }
+  } catch (e) {
+    console.error(e);
+    if (typeof appendLog === "function") {
+      appendLog("エクスポートに失敗しました: " + e.message);
+    }
+  }
+}
+
+// ==============================
+// インポート（貼り付け文字列から読み込み）
+// ==============================
+function importSaveData() {
+  try {
+    const textarea = document.getElementById("importSaveText");
+    if (!textarea) {
+      if (typeof appendLog === "function") {
+        appendLog("インポート用テキストエリアが見つかりません");
+      }
+      return;
+    }
+    const json = textarea.value.trim();
+    if (!json) {
+      if (typeof appendLog === "function") {
+        appendLog("インポートするテキストが空です");
+      }
+      return;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(json);
+    } catch (e2) {
+      throw e2;
+    }
+
+    applySaveData(data);
+    try {
+      localStorage.setItem(SAVE_KEY, json);
+    } catch (e3) {
+      throw e3;
+    }
+
+    // ★ インポート直後も統計UIを最新にしておく
+    if (typeof refreshGatherStatsUI === "function") {
+      refreshGatherStatsUI();
+    }
+
+    if (typeof appendLog === "function") {
+      appendLog("インポートしたセーブデータを読み込みました");
+    }
+  } catch (e) {
+    console.error(e);
+    if (typeof appendLog === "function") {
+      appendLog("インポートに失敗しました（テキストが壊れている可能性があります）: " + e.message);
+    }
+  }
+}

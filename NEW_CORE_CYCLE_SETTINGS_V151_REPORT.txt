@@ -1,0 +1,36 @@
+Ver151 COREサイクル設定実装レポート
+
+1. 実装内容
+- 会話のCORE最大サイクルを設定可能化。
+- 自己コード改善の安全上限を会話とは別設定化。
+- 既定値は会話3サイクル、自己コード改善64サイクル。
+- どちらも1〜100の範囲で設定可能。
+- 自己コード改善の64は「工程を64回で終了」という意味ではなく、Adaptive処理が無限ループしないための安全停止上限。
+- 設定はstorageServiceへ保存。
+- 新UIの「設定」画面からCORE経由で保存・再読込可能。
+- 新UI会話入口から固定maxCycles:18を削除し、保存された会話設定をCore Task Ingressが適用。
+- SELF_IMPROVEMENTの固定maxCycles:18を削除した箇所は、保存された自己コード改善設定をCore Task Ingressが適用。
+- Core Orchestratorの内部安全上限を100へ変更し、設定値を受け取った上で制御。
+
+2. 設定の意味
+会話:
+- 初期値 3
+- ユーザーが1〜100で変更可能。
+
+自己コード改善:
+- 初期値 64
+- 会話とは独立した1〜100の安全上限。
+- Candidate→Validation→Review Package→ZIPという工程自体は固定回数でなく、Coreの状態・完了条件によるAdaptive処理。
+
+3. 確認済み
+- test_core_cycle_settings_v1.mjs PASS
+- test_new_ui_18_domain_closed_loop_v149.mjs PASS
+- test_core_18_domain_authority_v21.mjs PASS
+- test_ui_event_core_integration_v34.mjs PASS
+- test_18_domain_stage_pipeline_v18.mjs PASS
+- ZIP integrity PASS
+
+4. 未確認
+- npm build/typecheck: この作業環境にnode_modules/.bin/tscが無いため未実行。
+- 実ブラウザ上の設定保存・再起動後復元: 未実行。
+- 実SearXNG/Gemini外部接続: 未実行。

@@ -1,0 +1,17 @@
+{
+  "version": "v3",
+  "versionCodePolicy": "UNCHANGED: versionCode 1 and versionName 1.0 retained by user request",
+  "implemented": [
+    "PR and signed APK jobs split",
+    "repository secrets used only on push/workflow_dispatch signed job",
+    "MIKI_CERT_SHA256 required",
+    "native runner, WorkManager, Japanese morphology and speech integration scripts executed",
+    "post-install native files and registrations checked",
+    "@google/genai pinned to 2.19.0",
+    "Android setup action updated to v4"
+  ],
+  "remainingBoundary": [
+    "package-lock.json could not be safely generated in the isolated environment because npm registry retrieval failed; workflow uses npm ci when a lockfile exists and otherwise emits a warning before npm install",
+    "actual GitHub-hosted execution remains the final verification"
+  ]
+}

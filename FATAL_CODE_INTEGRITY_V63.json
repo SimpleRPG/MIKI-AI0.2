@@ -1,0 +1,16 @@
+{
+  "version": "v63",
+  "passed": true,
+  "checks": {
+    "validChapterIdentifiers": true,
+    "chapterUsesTimeout": true,
+    "chapterUsesCapacity": true,
+    "solverUsesFormalCache": true,
+    "invalidSnapshotsRemoved": true,
+    "invalidSnapshotsQuarantined": true,
+    "stageFailClosed": true,
+    "rollbackFailClosed": true,
+    "unreachableStageWriteRemoved": true,
+    "unreachableRollbackWriteRemoved": true
+  }
+}

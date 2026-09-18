@@ -1,0 +1,54 @@
+{
+  "formatVersion": 1,
+  "version": "v14",
+  "base": "final_v13.zip",
+  "purpose": "18-domain connectivity verification and operational participation",
+  "domains": [
+    "core",
+    "autonomy",
+    "capability",
+    "conversation",
+    "data",
+    "execution",
+    "experience",
+    "improvement",
+    "learning",
+    "memory",
+    "promotion",
+    "research",
+    "safety",
+    "selfAwareness",
+    "selfDevelopment",
+    "strategy",
+    "unknown",
+    "verification"
+  ],
+  "changes": [
+    "Added fail-closed startup connectivity audit",
+    "Added PARTICIPATE command for every domain",
+    "Added domain-specific contribution and evidence obligations",
+    "Adaptive workflow dispatches each domain once per task",
+    "Removed stray .bak source file"
+  ],
+  "tests": [
+    {
+      "name": "18-domain-connectivity",
+      "exitCode": 0,
+      "stdout": "PASS 18 domain connectivity contract (18 domains)",
+      "stderr": ""
+    },
+    {
+      "name": "self-improvement-governance-v13",
+      "exitCode": 0,
+      "stdout": "PASS preflight wired\nPASS complexity gate wired\nPASS integrity auditor wired\nPASS cumulative revalidation wired\nPASS completion after audit\nPASS review export does not complete early\nPASS improvement debt discovery\nPASS environment router wired\nPASS all services exported",
+      "stderr": ""
+    }
+  ],
+  "typecheck": {
+    "exitCode": 2,
+    "targetDiagnostics": [],
+    "projectDiagnosticsPresent": true,
+    "note": "target files have zero diagnostics; project-wide diagnostics remain because dependencies and pre-existing project errors are unresolved"
+  },
+  "generatedAt": "2026-09-16T04:22:12Z"
+}

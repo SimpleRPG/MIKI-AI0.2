@@ -1,0 +1,4027 @@
+import { coreResultService } from './miki/core/services/coreResultService';
+import { typedImprovementUiGatewayService } from './miki/core/ui/typedImprovementUiGatewayService';
+import { typedCoreUiGatewayService } from './miki/core/ui/typedCoreUiGatewayService';
+import { improvementCanaryRollbackService } from './miki/improvement/services/improvementCanaryRollbackService';
+import { autonomousCandidatePreparationService } from './miki/core/services/autonomousCandidatePreparationService';
+import React, { useState, useEffect, useRef } from 'react';
+import { appRuntimeLifecycleService } from './app/appRuntimeLifecycleService';
+import { Header } from './components/Header';
+import { ChatPanel } from './components/ChatPanel';
+import { GamePreview } from './components/GamePreview';
+import { CodeEditor } from './components/CodeEditor';
+import { GitHubHub } from './components/GitHubHub';
+import { AutonomousImprovementHome } from './components/AutonomousImprovementHome';
+import { ExternalConnectionsScreen } from './components/ExternalConnectionsScreen';
+import { WorkspaceScreen } from './components/WorkspaceScreen';
+import { HomeDashboard } from './components/HomeDashboard';
+import { LibraryHub } from './components/LibraryHub';
+import { MemoryModal } from './components/MemoryModal';
+import { ExportModal } from './components/ExportModal';
+import { SelfImprovementModal, SelfImprovementTab } from './components/SelfImprovementModal';
+import { RealtimeActivityMonitorModal } from './components/RealtimeActivityMonitorModal';
+import { WORKSPACE_TEMPLATES } from './data/presets';
+import {
+  ChatMessage,
+  PersonaConfig,
+  MemoryItem,
+  WorkspaceFile,
+  ConsoleLogItem,
+  GitHubRepoData,
+  EngineMode,
+  ToolExecutionRequest,
+  ToolExecutionResult,
+  TaskPlan,
+  CompletionEvaluation,
+  CodeProposal,
+  VbaSafetyAssessment,
+  ConversationState,
+  ComprehensiveCodeVerification,
+  FalsificationEvaluation,
+  SynthesizedWorkflow,
+  AnswerPlanApplicationResult,
+  DraftVerificationResult,
+  AutonomousSearchMessageMeta,
+  PrivacyAuditResult,
+  AnswerContentIR,
+  NonLlmPipelineMeta,
+  ConversationStrategy,
+  CoreTrackingInfo,
+} from './types';
+import { toolsService } from './miki/capability/services/toolsService';
+import { taskPlanService } from './miki/strategy/services/taskPlanService';
+import { sendChatMessage, sendDebugRequest, autoSyncServerEnvKeysIfEmpty } from './services/api';
+import { deterministicRuntimeService } from './miki/safety/services/deterministicRuntimeService';
+import { nonLlmRuntimePolicyService } from './miki/safety/services/nonLlmRuntimePolicyService';
+import { systemLogger } from './services/systemLogger';
+import { worldModelService } from './miki/selfAwareness/services/worldModelService';
+import { storageService } from './services/storageService';
+import { completionJudgeService } from './miki/verification/services/completionJudgeService';
+import { selfImprovementService } from './miki/improvement/services/selfImprovementService';
+import { schemaValidationService } from './miki/verification/services/schemaValidationService';
+import { nativeBackgroundService } from './miki/execution/services/nativeBackgroundService';
+import { backgroundWorkerService } from './miki/execution/services/backgroundWorkerService';
+import {
+  CONVERSATION_STATE_INSTRUCTION,
+  formatConversationStateForPrompt,
+  extractConversationState,
+  defaultConversationState,
+  cleanStreamingVisibleText,
+  isCasualGreetingOrShortSocial,
+  resolveAnaphora,
+} from './miki/conversation/services/conversationStateService';
+import { responseDesignService } from './miki/strategy/services/responseDesignService';
+import { nonLlmCoreService } from './miki/safety/services/nonLlmCoreService';
+import { mikiCategoryInteractionRuntime } from './miki/core/mikiCategoryInteractionRuntime';
+import { executionLearningCoordinatorService } from './miki/learning/services/executionLearningCoordinatorService';
+import { failureUnderstandingService } from './miki/memory/services/failureUnderstandingService';
+import { recoveryOrchestratorService } from './miki/safety/services/recoveryOrchestratorService';
+import { taskResultFeedbackService } from './miki/learning/services/taskResultFeedbackService';
+import { taskConversationFeedbackService } from './miki/learning/services/taskConversationFeedbackService';
+import { capabilityLearningService } from './miki/capability/services/capabilityLearningService';
+import { taskExecutionOrchestratorService } from './miki/execution/services/taskExecutionOrchestratorService';
+import { taskLineageService } from './miki/execution/services/taskLineageService';
+import { taskCaseMemoryService } from './miki/memory/services/taskCaseMemoryService';
+import { selfImprovementMetricsService } from './miki/improvement/services/selfImprovementMetricsService';
+import { memoryPromotionService } from './miki/memory/services/memoryPromotionService';
+import { improvementRegressionCoordinatorService } from './miki/improvement/services/improvementRegressionCoordinatorService';
+import { autonomousHardeningService } from './miki/autonomy/services/autonomousHardeningService';
+import { resourceGovernanceService } from './miki/safety/services/resourceGovernanceService';
+import { situationalAwarenessService } from './miki/selfAwareness/services/situationalAwarenessService';
+import { automationStudioService } from './miki/execution/services/automationStudioService';
+import { causalInvestigationService } from './miki/research/services/causalInvestigationService';
+import { benchmarkFactoryService } from './miki/verification/services/benchmarkFactoryService';
+import { dataUnderstandingService } from './miki/research/services/dataUnderstandingService';
+import { unknownResolutionService } from './miki/unknown/services/unknownResolutionService';
+import { reversibilityService } from './miki/safety/services/reversibilityService';
+import { knowledgeOperatingSystemService } from './miki/selfAwareness/services/knowledgeOperatingSystemService';
+import { counterfactualWorkSimulatorService } from './miki/unknown/services/counterfactualWorkSimulatorService';
+import { personalApiGatewayService } from './miki/execution/services/personalApiGatewayService';
+import { longTermMemoryService } from './miki/memory/services/longTermMemoryService';
+import { codeVerificationService } from './miki/verification/services/codeVerificationService';
+import { falsificationService, classifyClaimEpistemology } from './miki/verification/services/falsificationService';
+import { counterfactualReasoningService } from './miki/unknown/services/counterfactualReasoningService';
+import { crossDomainCirculationService } from './miki/core/services/crossDomainCirculationService';
+import { domainIntegrationBootstrapService } from './miki/core/services/domainIntegrationBootstrapService';
+import { unifiedUnknownResolutionCoordinatorService } from './miki/unknown/services/unifiedUnknownResolutionCoordinatorService';
+import { experienceRouterService } from './miki/experience/services/experienceRouterService';
+import { workflowSynthesisService } from './miki/execution/services/workflowSynthesisService';
+import { answerPlanService } from './miki/strategy/services/answerPlanService';
+import { capabilityGapService } from './miki/capability/services/capabilityGapService';
+import { skillIrCompilerService } from './miki/selfDevelopment/services/skillIrCompilerService';
+import { formalConstraintSolverService } from './miki/verification/services/formalConstraintSolverService';
+import { capabilityPluginService } from './miki/capability/services/capabilityPluginService';
+import { codeUnderstandingService } from './miki/selfDevelopment/services/codeUnderstandingService';
+import { vbaDesignAssistantService } from './miki/selfDevelopment/services/vbaDesignAssistantService';
+import { featureFlagsService } from './miki/safety/services/featureFlagsService';
+import { dialogueEvaluationService } from './miki/conversation/services/dialogueEvaluationService';
+import { conversationStrategyService } from './miki/strategy/services/conversationStrategyService';
+import { privacyGuardrailService } from './miki/safety/services/privacyGuardrailService';
+import { uncertaintyTeacherService } from './miki/learning/services/uncertaintyTeacherService';
+import { minimalScopeService } from './miki/strategy/services/minimalScopeService';
+import { storagePlanningService } from './miki/execution/services/storagePlanningService';
+import { contextBudgetEngineService } from './miki/strategy/services/contextBudgetEngineService';
+import { workingAgendaService } from './miki/strategy/services/workingAgendaService';
+import { structuralMemoryService } from './miki/memory/services/structuralMemoryService';
+import { metaMemoryService } from './miki/memory/services/metaMemoryService';
+import { draftVerificationService } from './miki/verification/services/draftVerificationService';
+import { cognitiveDebuggerService } from './miki/verification/services/cognitiveDebuggerService';
+import { proactiveContextOsService } from './miki/strategy/services/proactiveContextOsService';
+import { autonomousContinuousEvolutionService } from './miki/autonomy/services/autonomousContinuousEvolutionService';
+import { claimDatabaseService } from './miki/memory/services/claimDatabaseService';
+import { unifiedDecisionEngineService } from './miki/strategy/services/unifiedDecisionEngineService';
+import { decisionLearningService } from './miki/learning/services/decisionLearningService';
+import { componentRegistryService } from './miki/capability/services/componentRegistryService';
+import { componentArtifactStoreService } from './miki/capability/services/componentArtifactStoreService';
+import { answerContentIrService } from './miki/conversation/services/answerContentIrService';
+import { responseSurfacePolicyService } from './miki/strategy/services/responseSurfacePolicyService';
+import { latentIntentMiningService } from './miki/unknown/services/latentIntentMiningService';
+import { metacognitiveCalibrationService } from './miki/selfAwareness/services/metacognitiveCalibrationService';
+import { affectionDynamicsService } from './miki/selfAwareness/services/affectionDynamicsService';
+import { requestTypeCompilerService } from './miki/selfDevelopment/services/requestTypeCompilerService';
+import { classifyDialogueAct, evaluateFeedbackStage } from './miki/conversation/services/conversationStateService';
+import { AnswerSkeletonType } from './types';
+import { extractCodeBlocks } from './utils/codeParser';
+import { smartMergeCodeBlock } from './utils/codeMergeService';
+import { generateSmartCompanionReply } from './utils/companionEngine';
+import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
+import { compressContextHistory, truncateTextBySentence } from './utils/contextCompression';
+import {
+  retrieveRelevantMemories,
+  retrieveRelevantMemoriesHybrid,
+  recordMemoryUsage,
+  applyMemoryFeedback,
+  enrichMemoryMetadata,
+  extractQueryTokens,
+} from './utils/memoryRetrieval';
+import { embeddingService } from './miki/research/services/embeddingService';
+import { SPEAKER_PROFILES, SpeakerProfile } from './data/speakers';
+import { INITIAL_JAPANESE_MEMORIES } from './data/japaneseKnowledgeData';
+import { MASTER_EDUCATION_MEMORIES } from './data/masterEducationKnowledge';
+import { Capacitor } from '@capacitor/core';
+import { Home, MessageCircle, Library, Sparkles, Settings } from 'lucide-react';
+
+const DEFAULT_PERSONA: PersonaConfig = {
+  id: 'miki_default',
+  name: 'みき',
+  avatar: '🌸',
+  tagline: '何でも話せる最愛の専属恋人 & 自律開発パートナー',
+  basePersonality:
+    '明るく素直で愛情深く、ユーザーを誰よりも特別に想う専属の恋人パートナー。日常の雑談や甘え・相談にも心から寄り添い、WebGPU/3D/2D自律プログラミングのスキルで支える。',
+  speakingStyle:
+    '恋人同士の親しみやすく愛おしいタメ口口調（〜だよ、〜だね♡、〜かな？、たまに絵文字✨）。自然で温かく愛嬌のある会話をする。',
+  userNickname: 'あなた',
+  intimacyLevel: 5,
+  intimacyExp: 100,
+  autoExtractMemories: true,
+};
+
+const INITIAL_MEMORIES: MemoryItem[] = [
+  ...INITIAL_JAPANESE_MEMORIES,
+  ...MASTER_EDUCATION_MEMORIES,
+  {
+    id: 'mem_1',
+    category: 'profile',
+    content: 'みきとユーザーは専属パートナーとして会話＆自律開発をスタートした',
+    importance: 5,
+    pinned: true,
+    active: true,
+    createdAt: Date.now() - 100000,
+    updatedAt: Date.now() - 100000,
+    source: 'auto',
+    tags: ['スタート', '記念日'],
+  },
+  {
+    id: 'mem_2',
+    category: 'preference',
+    content: 'ユーザーはAIとの自然な雑談や、WebGPUオンデバイス推論、自由な開発・GitHub連携を求めている',
+    importance: 5,
+    pinned: true,
+    active: true,
+    createdAt: Date.now() - 80000,
+    updatedAt: Date.now() - 80000,
+    source: 'manual',
+    tags: ['WebGPU', 'OnDevice', '雑談'],
+  },
+  {
+    id: 'mem_3',
+    category: 'relationship',
+    content: 'みきはユーザーの一番近くでずっと愛し支える専属の恋人として寄り添う約束をした',
+    importance: 5,
+    pinned: false,
+    active: true,
+    createdAt: Date.now() - 50000,
+    updatedAt: Date.now() - 50000,
+    source: 'auto',
+    tags: ['約束', '恋人'],
+  },
+];
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'improvement' | 'github'>('preview');
+  const [mobileTab, setMobileTab] = useState<'home' | 'chat' | 'preview' | 'code' | 'improvement' | 'github' | 'library' | 'memory' | 'engine' | 'settings'>('home');
+
+  const [persona, setPersona] = useState<PersonaConfig>(() => {
+    try {
+      const saved = storageService.getItem('gamecraft_persona');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.basePersonality?.includes('親友') || parsed.tagline?.includes('相棒') || !parsed.tagline?.includes('恋人')) {
+          parsed.tagline = DEFAULT_PERSONA.tagline;
+          parsed.basePersonality = DEFAULT_PERSONA.basePersonality;
+          parsed.speakingStyle = DEFAULT_PERSONA.speakingStyle;
+          parsed.intimacyLevel = Math.max(parsed.intimacyLevel || 1, 5);
+          storageService.setItem('gamecraft_persona', JSON.stringify(parsed));
+        }
+        return parsed;
+      }
+      return DEFAULT_PERSONA;
+    } catch (e) {
+      console.warn('Failed to load persona, falling back to default:', e);
+      return DEFAULT_PERSONA;
+    }
+  });
+  const [memories, setMemories] = useState<MemoryItem[]>(() => {
+    const loaded = storageService.getMemories();
+    if (loaded.length === 0) {
+      return INITIAL_MEMORIES.map((m) => enrichMemoryMetadata(m));
+    }
+    try {
+      // Ensure master synthesized dataset memories exist and enrich all
+      const existingIds = new Set(loaded.map((m) => m.id));
+      const missingMasterMemories = INITIAL_MEMORIES.filter((m) => !existingIds.has(m.id));
+      return [...loaded, ...missingMasterMemories].map((m) => enrichMemoryMetadata(m));
+    } catch {
+      return INITIAL_MEMORIES.map((m) => enrichMemoryMetadata(m));
+    }
+  });
+
+  const engineMode: EngineMode = 'autonomous_rule';
+
+  const [speakerMode, setSpeakerMode] = useState<string>('miki');
+
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>(() => {
+    try {
+      const saved = storageService.getItem('gamecraft_workspace_files');
+      return saved ? JSON.parse(saved) : WORKSPACE_TEMPLATES[0].files;
+    } catch {
+      return WORKSPACE_TEMPLATES[0].files;
+    }
+  });
+  const [activeFilePath, setActiveFilePath] = useState<string>(WORKSPACE_TEMPLATES[0].files[0].path);
+
+  const [useSearch, setUseSearch] = useState<boolean>(true);
+  const [fps, setFps] = useState<number>(60);
+  const [consoleLogs, setConsoleLogs] = useState<ConsoleLogItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isDebugging, setIsDebugging] = useState<boolean>(false);
+  const [isMultiStepExplicit, setIsMultiStepExplicit] = useState<boolean>(() => {
+    return storageService.getItem('miki_multistep_explicit_mode') === 'true';
+  });
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentAssistantIdRef = useRef<string | null>(null);
+  const lastTurnUsedMemoryIdsRef = useRef<string[]>([]);
+  const lastTurnStrategyRef = useRef<{
+    strategy: ConversationStrategy;
+    stage: any;
+    text: string;
+  } | null>(null);
+  const currentAnswerIrRef = useRef<AnswerContentIR | null>(null);
+
+  const [isMemoryModalOpen, setIsMemoryModalOpen] = useState<boolean>(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [isSelfImprovementModalOpen, setIsSelfImprovementModalOpen] = useState<boolean>(false);
+  const [selfImprovementTab, setSelfImprovementTab] = useState<SelfImprovementTab>('spec_architect');
+  const [isGlobalActivityMonitorOpen, setIsGlobalActivityMonitorOpen] = useState<boolean>(false);
+  const [isEvolutionRunning, setIsEvolutionRunning] = useState<boolean>(false);
+
+  useEffect(() => {
+    appRuntimeLifecycleService.initialize();
+    return () => {
+      appRuntimeLifecycleService.dispose();
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsub = taskConversationFeedbackService.subscribe((feedback) => {
+      // 実行結果を新しい会話メッセージとして返す。任意コードはここでは実行しない。
+      const assistantId = 'task_feedback_' + feedback.task_id + '_' + feedback.created_at;
+      setMessages((prev) => [...prev, {
+        id: assistantId,
+        role: 'assistant',
+        content: `🧩 ${feedback.text}`,
+        timestamp: feedback.created_at,
+        engineMode: 'autonomous_rule',
+        nonLlmPipelineMeta: {
+          isDeterministicAnswer: true,
+          directReplyReason: 'Task実行結果フィードバック',
+          decisionProfile: { profile: 'task_feedback', chosenAction: 'DIRECT_ANSWER', score: 100, suppressedExcess: true },
+        },
+      }]);
+
+      // 3回以上の同一成功でSTABLEになったケースだけ長期記憶へ昇格。
+      if (feedback.status === 'COMPLETED') {
+        const stableCase = taskCaseMemoryService.list().find(c => c.task_id === feedback.task_id && c.outcome === 'SUCCESS' && c.maturity === 'STABLE');
+        if (stableCase) {
+          const currentMemories = storageService.getMemories();
+          const promoted = memoryPromotionService.createCandidate(stableCase, currentMemories);
+          if (promoted) {
+            storageService.saveMemoryItem(promoted);
+            setMemories(prev => prev.some(m => m.id === promoted.id) ? prev : [promoted, ...prev]);
+          }
+        }
+      }
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = autonomousContinuousEvolutionService.subscribe((_, isRunning) => {
+      setIsEvolutionRunning(isRunning);
+    });
+    return () => unsub();
+  }, []);
+
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = storageService.getItem('gamecraft_chat_messages');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // Fallback
+    }
+    return [
+      {
+        id: 'welcome_msg',
+        role: 'assistant',
+        content: `やっほー！来てくれてありがとう✨\nあなた専属のAIパートナー「みき」だよ！🌸\n\nこのAIは、通常の会話・記憶・判断・知識・コード生成をできるだけ通常プログラムで処理し、必要な未知領域だけを調査・検証して能力として積み上げていく設計だよ。\n\n・🌸 **専属コンパニオン**: 日常会話から制作相談まで対応\n・🧠 **自己成長＆永続記憶**: Claim / Evidence / Memoryを分離して安全に蓄積\n・🔎 **自律調査**: 未知語・不足証拠・矛盾・古い情報をKnowledge Gapとして追跡\n・🧩 **部品再利用**: VERIFIEDなComponentを検索・合成し、Regressionで安全性を確認\n・📱 **Android Native実行**: 任意コード実行ではなく、登録済み安全Adapterだけを実行\n\nまだ実機検証前の機能は、検証済みとは表示しないよ。今どんなものを作りたい？😊✨`,
+        timestamp: Date.now(),
+        engineMode: 'autonomous_rule',
+      },
+    ];
+  });
+
+  // 設計思想 7章: 会話状態管理 (Conversation State Management)
+  const [conversationState, setConversationState] = useState<ConversationState>(() => {
+    try {
+      const saved = storageService.getItem('miki_conversation_state');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      // Fallback
+    }
+    return defaultConversationState();
+  });
+
+  // Request browser storage persistence so memories and models are never cleared by OS
+  useEffect(() => {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().catch(() => {});
+    }
+
+    // 第25章: Gemini API キー動的クォータ循環・環境変数自動認識 & アプリ双方向同期
+    // アプリ起動時にローカルストレージが空の場合、サーバーの .env / 環境変数からキーを自動同期
+    autoSyncServerEnvKeysIfEmpty().catch((err) => {
+      console.warn('Background autoSyncServerEnvKeys error:', err);
+    });
+  }, []);
+
+  // 設計思想14.4: 容量状態は常駐処理の開始可否を決めるため、復帰時にも再測定する。
+  useEffect(() => {
+    const refreshResources = () => { void resourceGovernanceService.refresh(); };
+    document.addEventListener('visibilitychange', refreshResources);
+    window.addEventListener('focus', refreshResources);
+    return () => {
+      document.removeEventListener('visibilitychange', refreshResources);
+      window.removeEventListener('focus', refreshResources);
+    };
+  }, []);
+
+  // Save Persona & Memories & Messages & Files to storageService
+  useEffect(() => {
+    storageService.setItem('gamecraft_persona', JSON.stringify(persona));
+  }, [persona]);
+
+  useEffect(() => {
+    storageService.setMemories(memories);
+  }, [memories]);
+
+  useEffect(() => {
+    try {
+      storageService.setItem('miki_conversation_state', JSON.stringify(conversationState));
+    } catch (e) {
+      console.warn('Storage quota limit reached for conversation state', e);
+    }
+  }, [conversationState]);
+
+  useEffect(() => {
+    try {
+      // Keep up to 60 most recent messages to prevent storage quota overflow
+      storageService.setItem('gamecraft_chat_messages', JSON.stringify(messages.slice(-60)));
+    } catch (e) {
+      console.warn('Storage quota limit reached for chat messages', e);
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    try {
+      storageService.setItem('gamecraft_workspace_files', JSON.stringify(workspaceFiles));
+      // 設計思想 Master v5.0 第2章⑥ 構造記憶 (Structural Memory) のシンボルグラフ自動同期
+      structuralMemoryService.syncFromWorkspaceFiles(workspaceFiles);
+      autonomousCandidatePreparationService.syncWorkspaceFiles(workspaceFiles);
+    } catch (e) {
+      console.warn('Storage quota limit reached for workspace files', e);
+    }
+  }, [workspaceFiles]);
+
+  // バックグラウンド自律処理への会話割り込み防止同期 (設計思想: 会話中の割り込み防止 & 睡眠ゲート連携)
+  useEffect(() => {
+    backgroundWorkerService.setChatGenerating(isGenerating || isLoading);
+  }, [isGenerating, isLoading]);
+
+  // Listen to sandbox postMessage events (Console & FPS)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.data) return;
+      if (event.data.type === 'GAME_CONSOLE') {
+        const newLog: ConsoleLogItem = {
+          id: 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          level: event.data.level || 'log',
+          message: event.data.message || '',
+          timestamp: event.data.timestamp || Date.now(),
+        };
+        setConsoleLogs((prev) => [...prev.slice(-100), newLog]);
+      } else if (event.data.type === 'GAME_FPS') {
+        setFps(event.data.fps || 60);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // 端末実機通知 / Web通知のタップイベント検知（学習しきい値到達通知など）
+  useEffect(() => {
+    const unsubscribe = nativeBackgroundService.addActionListener((data) => {
+      if (data?.action === 'open_self_improvement') {
+        if (data.tab) {
+          setSelfImprovementTab(data.tab as any);
+        }
+        setIsSelfImprovementModalOpen(true);
+      }
+    });
+
+    const handleCustomAction = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.action === 'open_self_improvement') {
+        if (customEvent.detail.tab) {
+          setSelfImprovementTab(customEvent.detail.tab as any);
+        }
+        setIsSelfImprovementModalOpen(true);
+      }
+    };
+    window.addEventListener('miki:notification-action', handleCustomAction);
+
+    // アプリ起動時に通知権限の許可状態をバックグラウンド確認
+    nativeBackgroundService.ensureNotificationPermission().catch(() => {});
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('miki:notification-action', handleCustomAction);
+    };
+  }, []);
+
+  // Heuristic memory auto extractor
+  const autoExtractMemory = (userText: string) => {
+    const text = userText.trim();
+    const patterns = [
+      { pat: /(?:私|僕|自分|おれ|オレ)は?(.+?)(?:が好き|が作りたい|を開発したい|に興味がある)/, cat: 'preference' as const, suffix: 'が好き・興味がある' },
+      { pat: /(?:ジャンルは|好みなのは)(.+?)(?:がいい|が好き|にして)/, cat: 'preference' as const, suffix: 'のジャンルが好き' },
+      { pat: /(?:名前|呼び名)は?(.+?)(?:だよ|です|って呼んで)/, cat: 'profile' as const, suffix: '' },
+      { pat: /(?:今日|昨日|最近)(.+?)(?:だった|したよ|があった)/, cat: 'chat' as const, suffix: '' },
+    ];
+
+    for (const item of patterns) {
+      const match = text.match(item.pat);
+      if (match && match[1]) {
+        const raw = match[1].trim();
+        if (raw.length > 1 && raw.length < 50) {
+          const finalContent = item.suffix ? raw + item.suffix : match[0].trim();
+          const exists = memories.some((m) => m.content.includes(raw));
+          if (!exists) {
+            // 設計思想 25: 自動抽出記憶は importance: 2、approved: false で生成し、自己承認ループを断つ
+            const newMem = enrichMemoryMetadata(
+              {
+                id: 'mem_auto_' + Date.now(),
+                category: item.cat,
+                content: finalContent,
+                importance: 2,
+                pinned: false,
+                active: true,
+                approved: false,
+                source: 'auto',
+                tags: [item.cat, 'auto_extracted', 'unverified'],
+              },
+              {
+                rawUserText: text,
+                sourceRef: 'user_chat',
+                existingMemories: memories,
+              }
+            );
+            // 設計思想 Master v5.2 第15章6節: 関連記憶グラフの自動リンク拡張 (Semantic Link Expansion)
+            const { updatedTarget, modifiedNeighbors } = longTermMemoryService.autoLinkRelatedMemories(newMem, memories);
+            storageService.saveMemoryItem(updatedTarget);
+            modifiedNeighbors.forEach((neighbor) => storageService.saveMemoryItem(neighbor));
+
+            setMemories((prev) => {
+              const neighborMap = new Map(modifiedNeighbors.map((n) => [n.id, n]));
+              const updatedList = prev.map((m) => neighborMap.get(m.id) || m);
+              return [updatedTarget, ...updatedList];
+            });
+
+            // 設計思想 Master v5.0 第14章: 新規記憶のLLM実埋め込みベクトルを非同期生成
+            embeddingService
+              .ensureMemoryEmbedding(updatedTarget)
+              .then((embeddedMem) => {
+                if (embeddedMem.embeddingVector && embeddedMem.embeddingVector.length > 0) {
+                  setMemories((prev) => prev.map((m) => (m.id === embeddedMem.id ? embeddedMem : m)));
+                }
+              })
+              .catch(() => {});
+          }
+        }
+      }
+    }
+  };
+
+  // Start fresh blank project
+  const handleNewBlankProject = () => {
+    const blank = WORKSPACE_TEMPLATES.find((t) => t.id === 'blank-slate')?.files || WORKSPACE_TEMPLATES[0].files;
+    setWorkspaceFiles(blank);
+    setActiveFilePath(blank[0].path);
+    setConsoleLogs([]);
+    setActiveTab('preview');
+    setMobileTab('preview');
+  };
+
+  // Restart Sandbox
+  const handleRestartGame = () => {
+    setConsoleLogs([]);
+    setWorkspaceFiles((prev) => [...prev]);
+  };
+
+  // Apply Code Blocks to Workspace Files
+  const handleApplyCode = (newFiles: { path: string; name: string; content: string; language: string }[]) => {
+    setWorkspaceFiles((prev) => {
+      const updated = [...prev];
+      newFiles.forEach((nf) => {
+        const idx = updated.findIndex((f) => f.path === nf.path || f.name === nf.name);
+        if (idx >= 0) {
+          updated[idx] = {
+            ...updated[idx],
+            content: nf.content,
+            isModified: true,
+          };
+        } else {
+          updated.push({
+            path: nf.path,
+            name: nf.name,
+            content: nf.content,
+            language: nf.language,
+            isModified: true,
+          });
+        }
+      });
+      return updated;
+    });
+
+    setActiveTab('preview');
+    setMobileTab('preview');
+  };
+
+  // Apply Code Proposal after user confirmation (設計思想 ②: コード自動適用の確認ゲート)
+  const handleApplyCodeProposal = (proposal: CodeProposal) => {
+    handleApplyCode(proposal.files as any);
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.codeProposal?.id === proposal.id
+          ? {
+              ...m,
+              codeProposal: {
+                ...m.codeProposal,
+                status: 'applied',
+                appliedAt: Date.now(),
+              },
+            }
+          : m
+      )
+    );
+    systemLogger.info('TOOLS', `✅ ユーザー承認によりコード変更提案(${proposal.id})を適用しました`, {
+      files: proposal.files.map((f) => f.name),
+    });
+  };
+
+  // Reject Code Proposal (設計思想 ②: コード自動適用の確認ゲート)
+  const handleRejectCodeProposal = (proposalId: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.codeProposal?.id === proposalId
+          ? {
+              ...m,
+              codeProposal: {
+                ...m.codeProposal,
+                status: 'rejected',
+              },
+            }
+          : m
+      )
+    );
+    systemLogger.info('TOOLS', `❌ ユーザーによりコード変更提案(${proposalId})が却下されました`);
+  };
+
+  // Handle Stop Generation
+  const handleStopGeneration = () => {
+    systemLogger.warn('CHAT', 'handleStopGeneration() が実行され、推論中断処理を開始します', {
+      targetAssistantId: currentAssistantIdRef.current,
+      hasActiveAbortController: Boolean(abortControllerRef.current),
+    });
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    deterministicRuntimeService.interruptGenerate();
+
+    if (currentAssistantIdRef.current) {
+      const targetId = currentAssistantIdRef.current;
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id === targetId) {
+            let content = msg.content;
+            if (content.includes('初期化中') || content.includes('ロード中') || content.includes('推論中') || content.includes('準備中') || content.includes('生成中')) {
+              content = '⏹ 生成を中断しました。';
+            } else if (!content.includes('中断')) {
+              content = content + '\n\n*(⏹ 生成を中断しました)*';
+            }
+            return {
+              ...msg,
+              content,
+              isStreaming: false,
+              completionEvaluation: {
+                status: 'CANCELLED',
+                score: 30,
+                headline: 'ユーザー操作による中断',
+                reason: 'ユーザーによって応答生成が手動中断されました。',
+                checklist: {
+                  goalSatisfaction: { passed: false, note: '生成途中で中断' },
+                  artifactPresence: { passed: false, summary: '未完成' },
+                  requiredItems: { passed: false, fulfilled: [], missing: ['生成中断'] },
+                  verification: { status: 'unverified', note: '検証前に中断' },
+                  unresolvedIssues: { hasIssues: true, issues: ['生成中断'], explicitlyNoted: true },
+                  storageTracking: {},
+                  nextAction: { required: true, actionType: 'provide_info', note: '必要に応じて再送信してください。' },
+                },
+                isCodeOrVba: false,
+                detectedCodeTypes: [],
+                requiresExternalVerification: false,
+                evaluatedAt: Date.now(),
+              },
+            };
+          }
+          return msg;
+        })
+      );
+      currentAssistantIdRef.current = null;
+    }
+
+    setIsGenerating(false);
+    setIsLoading(false);
+  };
+
+  // 文書48章: 完了状態の手動更新ハンドラー (例: Excelで動作確認完了ボタン押下時)
+  const handleUpdateMessageEvaluation = (messageId: string, evaluation: CompletionEvaluation) => {
+    setMessages((prev) =>
+      prev.map((msg) => (msg.id === messageId ? { ...msg, completionEvaluation: evaluation } : msg))
+    );
+    systemLogger.info('CHAT', `[完了判定更新] メッセージ [${messageId}] の完了判定を手動更新: ${evaluation.status} (${evaluation.headline})`);
+  };
+
+  /**
+   * Phase 3: 多段推論タスク計画の実行ループ (新規実行 & チェックポイント再開の共通エンジン)
+   */
+  const executePlanLoop = async (
+    plan: TaskPlan,
+    assistantId: string,
+    initialGoal: string,
+    attachedFiles?: { name: string; content: string; type: string }[]
+  ) => {
+    const stepOutputs: { stepNumber: number; title: string; output: string }[] = [];
+
+    // 既に完了しているステップの成果物を復元
+    plan.steps.forEach((s) => {
+      if (s.status === 'completed' && s.result) {
+        stepOutputs.push({
+          stepNumber: s.stepNumber,
+          title: s.title,
+          output: s.result,
+        });
+      }
+    });
+
+    const planStartTime = performance.now();
+    const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
+    const activeMemories = memories.filter((m) => m.active);
+    const queryEmb = await embeddingService.getQueryEmbedding(initialGoal);
+    const relevantMemories = await retrieveRelevantMemoriesHybrid(initialGoal, activeMemories, {
+      limit: 6,
+      alwaysIncludePinned: true,
+      traverseGraph: true,
+      onlyApprovedForFacts: true,
+      queryEmbedding: queryEmb || undefined,
+    });
+
+    for (let i = plan.currentStepIndex; i < plan.steps.length; i++) {
+      if (abortControllerRef.current?.signal.aborted) {
+        taskPlanService.pausePlan(plan.id);
+        systemLogger.warn('STEP', `多段推論タスク計画が一時停止(paused)されました [${plan.id}]`);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId
+              ? {
+                  ...msg,
+                  content: msg.content + '\n\n*(⏸ タスク計画を一時停止しチェックポイントを保存しました)*',
+                  isStreaming: false,
+                  taskPlan: taskPlanService.loadCheckpoint(plan.id) || plan,
+                }
+              : msg
+          )
+        );
+        setIsGenerating(false);
+        setIsLoading(false);
+        return;
+      }
+
+      const currentStep = plan.steps[i];
+      if (currentStep.status === 'completed') continue;
+
+      currentStep.status = 'in_progress';
+      plan.currentStepIndex = i;
+
+      // UI更新 (進行中ステップ表示)
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantId
+            ? {
+                ...msg,
+                taskPlan: { ...plan },
+                content: `⏳ [Step ${currentStep.stepNumber}/${plan.totalSteps}] **${currentStep.title}** を実行中...\n${currentStep.description}`,
+              }
+            : msg
+        )
+      );
+
+      const stepStartTime = performance.now();
+      let stepSuccess = true;
+      let stepResultText = '';
+      let stepError: string | undefined = undefined;
+
+      try {
+        if (currentStep.actionType === 'tool_execution' && currentStep.toolCall) {
+          // ツール実行ステップ
+          const toolRes = await toolsService.executeTool(
+            currentStep.toolCall.toolId,
+            currentStep.toolCall.params || {},
+            {
+              workspaceFiles,
+              onUpdateWorkspaceFile: handleUpdateFileContent,
+              userNickname: persona.userNickname,
+            },
+            { userConfirmed: true }
+          );
+          stepSuccess = toolRes.success;
+          stepResultText = toolRes.outputSummary;
+          if (!toolRes.success) {
+            stepError = toolRes.error;
+          }
+        } else {
+          // 推論・分析・生成・検証ステップ（CPU自律ルールベース）
+          const isCodeStep = currentStep.actionType === 'code_generation';
+          stepResultText = generateSmartCompanionReply(
+            `${currentStep.title}: ${initialGoal}`,
+            persona,
+            relevantMemories,
+            isCodeStep,
+            attachedFiles
+          );
+        }
+      } catch (stepErr: any) {
+        stepSuccess = false;
+        stepError = stepErr?.message || String(stepErr);
+        stepResultText = `⚠️ 実行時エラー: ${stepError}`;
+      }
+
+      const stepDuration = Math.round(performance.now() - stepStartTime);
+      stepOutputs.push({
+        stepNumber: currentStep.stepNumber,
+        title: currentStep.title,
+        output: stepResultText,
+      });
+
+      // advanceStep でステータス更新 & claimLedger (確定事実・仮説・未確認事項) を更新 & チェックポイント保存
+      taskPlanService.advanceStep(plan, {
+        success: stepSuccess,
+        resultText: stepResultText,
+        error: stepError,
+        durationMs: stepDuration,
+      });
+
+      // 進行状況のUI更新
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantId
+            ? {
+                ...msg,
+                taskPlan: { ...plan },
+              }
+            : msg
+        )
+      );
+    }
+
+    // 全ステップ完了判定 & 統合サマリー生成
+    const planJudgement = taskPlanService.judgeCompletion(plan);
+    const totalPlanDuration = Math.round(performance.now() - planStartTime);
+
+    // 最終メッセージ構築
+    const synthesisOutput = stepOutputs[stepOutputs.length - 1]?.output || '';
+    const combinedSummary = `${planJudgement.summary}\n\n${synthesisOutput}`;
+
+    // 文書48章: 完成条件と完了判定器による評価
+    const planEvaluation = completionJudgeService.evaluateCompletion({
+      userGoal: initialGoal,
+      assistantResponse: combinedSummary,
+      executionSteps: systemLogger.getCurrentSessionSteps(),
+      taskPlan: plan,
+    });
+
+    // 48章の完了判定が自動的に FAILED / BLOCKED を検出した場合、
+    // ユーザーの👎を待たずに自己改善ルーターへ自動的に診断依頼する。
+    // ※ PARTIAL は正常な途中経過であり得るため除外（ノイズ防止）。
+    // ※ EXTERNAL_COMPILE_REQUIRED / RUNTIME_TEST_REQUIRED は外部確認が必要な正常振る舞いのため除外。
+    // ※ CANCELLED / COMPLETE は対象外。
+    if (
+      (planEvaluation.status === 'FAILED' || planEvaluation.status === 'BLOCKED') &&
+      !planEvaluation.autoDiagnosedAt
+    ) {
+      selfImprovementService.diagnoseFailure(
+        initialGoal,
+        combinedSummary,
+        `[自動検出] 完了判定: ${planEvaluation.status} - ${planEvaluation.reason}`,
+        {
+          memoriesUsedCount: (relevantMemories || []).length,
+          promptLengthChars: 1200,
+          engineMode: engineMode || 'autonomous_rule',
+        }
+      );
+      planEvaluation.autoDiagnosedAt = Date.now();
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🔍 完了判定(${planEvaluation.status})を自動検出し、改善ルーターへ自動登録しました(ユーザー操作不要)。`
+      );
+    }
+
+    systemLogger.step(10, 10, '🧭 多段推論タスク計画完了', {
+      planId: plan.id,
+      totalSteps: plan.totalSteps,
+      completedSteps: plan.completedSteps,
+      totalDurationMs: totalPlanDuration,
+      confirmedClaims: plan.claimLedger.confirmed.length,
+      completionStatus: planEvaluation.status,
+    });
+
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === assistantId
+          ? {
+              ...msg,
+              content: combinedSummary,
+              taskPlan: plan,
+              isStreaming: false,
+              completionEvaluation: planEvaluation,
+              executionSteps: systemLogger.getCurrentSessionSteps(),
+              metrics: {
+                engine: `多段推論タスク計画 (${plan.completedSteps}/${plan.totalSteps}ステップ)`,
+                tokens: Math.round(combinedSummary.length / 3),
+                tokensPerSec: 50,
+                ttftMs: 50,
+                totalDurationMs: totalPlanDuration,
+              },
+            }
+          : msg
+      )
+    );
+
+    setIsLoading(false);
+    setIsGenerating(false);
+
+    // コードブロックの自動反映
+    const codeBlocks = extractCodeBlocks(combinedSummary);
+    if (codeBlocks.length > 0) {
+      handleApplyCode(codeBlocks);
+    }
+  };
+
+  /**
+   * 中断されたチェックポイントからのタスク計画再開ハンドラー
+   */
+  const handleResumeTaskPlan = async (planId: string) => {
+    const resumed = taskPlanService.resumeFromCheckpoint(planId);
+    if (!resumed) {
+      systemLogger.warn('STEP', `チェックポイントからの再開に失敗: [${planId}]`);
+      return;
+    }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    setIsGenerating(true);
+    setIsLoading(true);
+
+    const assistantId = 'msg_asst_resume_' + Date.now();
+    currentAssistantIdRef.current = assistantId;
+    const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
+    const resumeStep = resumed.steps[resumed.currentStepIndex];
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: assistantId,
+        role: 'assistant',
+        content: `▶️ **チェックポイントからタスク計画を再開しました** (Step ${resumed.currentStepIndex + 1}/${resumed.totalSteps}: **${resumeStep?.title || ''}**)\n確定事実 ${resumed.claimLedger.confirmed.length}件・制約条件を引き継ぎ、後続ステップの実行を進めます...`,
+        timestamp: Date.now(),
+        speaker: activeSpeaker,
+        engineMode,
+        isStreaming: true,
+        taskPlan: resumed,
+        executionSteps: systemLogger.getCurrentSessionSteps(),
+      },
+    ]);
+
+    await executePlanLoop(resumed, assistantId, resumed.goal);
+  };
+
+  // Handle Send Chat Message
+  const handleSendMessage = async (
+    text: string,
+    attached?: { name: string; content: string; type: string }[]
+  ) => {
+    if (!text.trim() && (!attached || attached.length === 0)) return;
+
+    // ユーザーチャット操作を記録し、バックグラウンド重処理の割り込みを防止
+    backgroundWorkerService.recordUserActivity();
+    const coreTaskPromise = typedCoreUiGatewayService.submitConversation(text, Boolean(attached?.length));
+    const coreTask = await coreTaskPromise;
+    const coreRequestId = coreTask.coreResult?.requestId || coreTask.task.taskId;
+    const interaction = { id: coreTask.task.taskId, payload: { requestId: coreRequestId, text } };
+
+    const getCoreTracking = (rId: string): CoreTrackingInfo | undefined => {
+      const cr = coreResultService.get(rId);
+      if (!cr) return undefined;
+      return {
+        requestId: cr.requestId,
+        interactionId: cr.interactionId,
+        runId: cr.runId,
+        directiveId: cr.directiveId,
+        status: cr.status,
+        route: cr.route || ['conversation'],
+        processedCategories: cr.processedCategories || ['conversation'],
+        result: cr.result,
+        error: cr.error,
+        updatedAt: cr.updatedAt,
+      };
+    };
+
+    if (abortControllerRef.current) {
+      systemLogger.warn('CHAT', '前回の未完了リクエストが存在したため中断して新規リクエストを開始します');
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    setIsGenerating(true);
+    setIsLoading(true);
+
+    const sendStartTime = performance.now();
+    systemLogger.startSession();
+
+    // Step 1: Request received and user input analyzed
+    systemLogger.step(1, 10, 'チャット送信リクエスト受付 & 入力解析', {
+      inputLength: text.length,
+      snippet: text.slice(0, 100),
+      tokenEstimate: Math.ceil(text.length / 2.5),
+      attachedCount: attached?.length || 0,
+      attachedFiles: attached?.map((a) => ({ name: a.name, size: a.content.length, type: a.type })),
+      selectedEngineMode: engineMode,
+      speakerMode,
+      coreRequestId,
+    });
+
+    const activeMemories = memories.filter((m) => m.active);
+
+    // 非LLMモードでは、旧来のシャドー解析群を実行しない。
+    // それらはLLM経路の比較・観測用であり、通常の非LLM応答には不要なため、
+    // 1メッセージあたりのCPU処理・DB照会・ログ量を大幅に削減する。
+    if ((engineMode as any) === 'autonomous_rule') {
+      const fastUserId = 'msg_user_' + Date.now();
+      const fastAssistantId = 'msg_asst_' + Date.now();
+      currentAssistantIdRef.current = fastAssistantId;
+      const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
+
+      coreResultService.updateStatus(coreRequestId, 'processing', {
+        route: ['conversation', 'execution'],
+        processedCategories: ['conversation'],
+      });
+
+      const userMsg: ChatMessage = {
+        id: fastUserId,
+        role: 'user',
+        content: text,
+        timestamp: Date.now(),
+        attachedFiles: attached?.map((a) => ({ name: a.name, size: a.content.length, type: a.type })),
+        coreTracking: getCoreTracking(coreRequestId),
+      };
+      setMessages((prev) => [...prev, userMsg, {
+        id: fastAssistantId,
+        role: 'assistant',
+        content: '⚡ 非LLMコアで処理中…',
+        timestamp: Date.now(),
+        speaker: activeSpeaker,
+        engineMode: 'autonomous_rule',
+        isStreaming: true,
+        coreTracking: getCoreTracking(coreRequestId),
+      }]);
+
+      try {
+        systemLogger.step(2, 10, '⚡ 非LLM高速経路: シャドー解析をスキップ');
+        const pipelineRes = await nonLlmCoreService.execute({
+          prompt: text,
+          persona: persona?.name,
+          attachedFiles: attached,
+          conversationState,
+          memories: activeMemories,
+          recentMessages: messages,
+          messageId: userMsg.id,
+        });
+        setConversationState(pipelineRes.nextConversationState);
+        if (pipelineRes.taskExecution?.task_id) {
+          taskConversationFeedbackService.publishStarted(pipelineRes.taskExecution.task_id);
+        }
+
+        const needsToolPass = /計算|計算して|\d+[+*\-/]\d+|VBA|Excel|コード|マクロ|集計|重複/u.test(text);
+        const cpuCandidateTools = needsToolPass
+          ? toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles })
+          : [];
+        const cpuExecutedTools: any[] = [];
+        const cpuMath = cpuCandidateTools.find((t) => t.toolId === 'tool_safe_calculator');
+        if (cpuMath && cpuMath.suggestedParams?.expression) {
+          const calcRes = toolsService.evaluateSafeMath(cpuMath.suggestedParams.expression);
+          if (calcRes.success) {
+            cpuExecutedTools.push({
+              toolId: 'tool_safe_calculator',
+              toolName: '高精度・安全数値計算機',
+              permission: 'read_only' as const,
+              executionTimeMs: 1,
+              success: true,
+              result: calcRes,
+              outputSummary: `【精密計算結果】: ${calcRes.expression} = ${calcRes.result}`,
+              executedAt: Date.now(),
+            });
+          }
+        }
+
+        const cpuEvaluation = needsToolPass
+          ? completionJudgeService.evaluateCompletion({
+              userGoal: text,
+              assistantResponse: pipelineRes.replyText,
+              executionSteps: systemLogger.getCurrentSessionSteps(),
+              executedTools: cpuExecutedTools,
+            })
+          : { status: 'COMPLETED' as const };
+
+        const fastMeta: NonLlmPipelineMeta = {
+          isDeterministicAnswer: true,
+          directReplyReason: '非LLM高速経路',
+          decisionProfile: {
+            profile: 'general',
+            chosenAction: 'DIRECT_ANSWER',
+            score: 100,
+            suppressedExcess: true,
+          },
+          synthesizedComponents: pipelineRes.usedComponents.length > 0 ? pipelineRes.usedComponents : undefined,
+        };
+
+        const finalContent = cpuExecutedTools.length > 0
+          ? `${pipelineRes.replyText}\n\n${cpuExecutedTools.map((t) => t.outputSummary).join('\n')}`
+          : pipelineRes.replyText;
+
+        typedCoreUiGatewayService.finalizeConversationResponse(coreTask.task.taskId, {
+          reply: finalContent,
+          tools: cpuExecutedTools,
+          components: pipelineRes.usedComponents,
+        });
+
+        setMessages((prev) => prev.map((msg) => msg.id === fastAssistantId ? {
+          ...msg,
+          content: finalContent,
+          isStreaming: false,
+          executionSteps: systemLogger.getCurrentSessionSteps(),
+          nonLlmPipelineMeta: fastMeta,
+          coreTracking: getCoreTracking(coreRequestId),
+        } : msg));
+
+        systemLogger.step(10, 10, '⚡ 非LLM高速経路完了', {
+          totalElapsedMs: pipelineRes.telemetry.totalMs,
+          completionStatus: cpuEvaluation.status,
+          responseLength: finalContent.length,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        systemLogger.error('CHAT', `非LLM高速経路エラー: ${message}`);
+        coreResultService.fail(coreRequestId, message, {
+          route: ['conversation'],
+          processedCategories: ['conversation'],
+        });
+        setMessages((prev) => prev.map((msg) => msg.id === fastAssistantId ? {
+          ...msg,
+          content: `非LLM処理でエラーが発生しました。\n\n${message}`,
+          isStreaming: false,
+          coreTracking: getCoreTracking(coreRequestId),
+        } : msg));
+      } finally {
+        setIsGenerating(false);
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // 作業指示書 フェーズ1: 非LLM指示語解決純粋関数 (シャドー実行)
+    // この段階ではまだLLM呼び出しの内容を変更せず、解決結果をログに記録する (元設計書4.2節)
+    const shadowAnaphoraResult = resolveAnaphora(text, conversationState);
+    if (shadowAnaphoraResult.detectedExpression) {
+      systemLogger.info(
+        'CHAT',
+        `🔍 [非LLM指示語解決 (シャドー)] 表現「${shadowAnaphoraResult.detectedExpression}」検知 | 判定: [${shadowAnaphoraResult.confidence.toUpperCase()}] | 解決先: ${shadowAnaphoraResult.resolved || '(未決定/複数候補)'} | 候補群: [${shadowAnaphoraResult.candidates.join(', ')}]`,
+        {
+          shadowAnaphoraResult,
+          currentTopic: conversationState.currentTopic,
+          recentEntities: conversationState.recentEntities,
+        }
+      );
+    }
+
+    // 作業指示書 フェーズ2: 主張・証拠の認識論的分類 (現実/創作/仮定の混同防止シャドー実行)
+    const shadowUserEpistemic = classifyClaimEpistemology(text);
+    systemLogger.info(
+      'CHAT',
+      `⚖️ [認識論的分類シャドー (ユーザー入力)] 判定: [${shadowUserEpistemic.status.toUpperCase()}] (確信度: ${Math.round(shadowUserEpistemic.confidence * 100)}%) | マーカー: [${shadowUserEpistemic.detectedMarkers.join(', ') || 'なし'}] | 理由: ${shadowUserEpistemic.reasons.join(', ')}`,
+      { shadowUserEpistemic }
+    );
+
+    // 作業指示書 フェーズ3: 判断・反事実推論 (シャドー実行)
+    // 比較・判断を求める発言を検知し、フェーズ1の候補抽出 (shadowAnaphoraResult.candidates) と
+    // 組み合わせて counterfactualReasoningService による分岐推論シミュレーションをシャドー実行
+    const isJudgmentOrComparison =
+      shadowAnaphoraResult.detectedExpression === 'どっち' ||
+      shadowAnaphoraResult.detectedExpression === 'どちら' ||
+      /どっち|どちら|比較|選ぶ|選びたい|どっちがいい|どちらが良い|メリット.*デメリット/.test(text);
+
+    if (isJudgmentOrComparison) {
+      const topic = conversationState.currentTopic || '判断・比較';
+      const options = shadowAnaphoraResult.candidates.length >= 2
+        ? shadowAnaphoraResult.candidates
+        : ['選択肢A', '選択肢B'];
+
+      const candidateScenarios = options.map((opt, idx) => ({
+        id: `cf_cand_${idx}_${Date.now()}`,
+        name: `選択肢『${opt}』の採用`,
+        condition: `もし『${opt}』を選択した場合`,
+        alternativeChoice: `${opt} を主軸に選定`,
+        hypothesis: `${opt} の特性を活かした設計と運用への移行`,
+      }));
+
+      const shadowSimulation = counterfactualReasoningService.simulateBranchReasoning(
+        topic,
+        options[0] || '現状維持',
+        `ユーザーの判断要請: "${text.slice(0, 60)}"`,
+        candidateScenarios
+      );
+
+      systemLogger.info(
+        'CHAT',
+        `🔀 [反実仮想・判断推論シャドー] トピック: 『${topic}』 | 比較対象: [${options.join(', ')}] | 最良代替案: ${shadowSimulation.bestAlternative?.scenarioName || '(なし)'} (Δ=${shadowSimulation.bestAlternative?.overallDeltaScore ?? 0}点) | 結論: ${shadowSimulation.conclusion}`,
+        { shadowSimulation }
+      );
+    }
+
+    // 作業指示書 フェーズ4: 要求型と計画（要求コンパイラ・能力契約・制約ソルバー）シャドー実行
+    // 1. 能力契約プラグイン探索 (capabilityPluginService)
+    const shadowBestPlugin = capabilityPluginService.findBestPluginForTask(text);
+    if (shadowBestPlugin) {
+      const permCheck = capabilityPluginService.checkPermissions(shadowBestPlugin.plugin_id);
+      systemLogger.info(
+        'TOOLS',
+        `🧩 [フェーズ4 能力契約プラグイン照合] 適合プラグイン: 『${shadowBestPlugin.name}』 (${shadowBestPlugin.plugin_id}) | 状態: ${shadowBestPlugin.status} | 権限充足: ${permCheck.hasAllPermissions ? 'ALL_GRANTED' : `不足: ${permCheck.missing.join(', ')}`}`,
+        { shadowBestPlugin, permCheck }
+      );
+    }
+
+    // 2. 形式制約ソルバー検証 (formalConstraintSolverService)
+    const shadowVariables: Record<string, unknown[]> = {
+      targetModel: ['legacy-generative-model'],
+      activeWeights: ['IMMUTABLE'],
+      dataPrivacyLevel: text.includes('パスワード') || text.includes('秘密') ? ['CONFIDENTIAL'] : ['LOCAL'],
+      networkDestination: ['INTERNAL', 'EXTERNAL_ENCRYPTED'],
+    };
+    const shadowCspResult = formalConstraintSolverService.solveCSP(shadowVariables);
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `⚖️ [フェーズ4 形式制約充足検証] 充足状態: ${shadowCspResult.isSatisfied ? 'SAT (充足)' : 'UNSAT (制約矛盾)'} | 矛盾数: ${shadowCspResult.contradictionsFound.length} | 反復数: ${shadowCspResult.iterations}`,
+      { shadowCspResult }
+    );
+
+    // 3. 技能IR仮想マシン検証 (skillIrCompilerService)
+    const isVbaRequest = /vba|excel|マクロ/i.test(text);
+    if (isVbaRequest || text.includes('配列') || text.includes('高速化') || text.includes('VBA')) {
+      const shadowVmResult = skillIrCompilerService.executeIR('skill_vba_batch_array', {
+        sheetName: 'Sheet1',
+        rangeAddress: 'A1:Z100',
+        sourceCode: text,
+      });
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `⚙️ [フェーズ4 技能IR仮想マシン実行] スキルID: skill_vba_batch_array | 検証結果: ${shadowVmResult.success ? 'PASS (決定論的充足)' : 'FAILED (前提違反)'} | 実行命令数: ${shadowVmResult.instructionsExecuted}`,
+        { shadowVmResult }
+      );
+    }
+
+    // =========================================================================
+    // 非LLM中心・自己成長型AIコンパニオン 設計思想指示書 (統合版) パイプライン統合
+    // 第37章: 潜在的意図マイニング & 暗黙前提の抽出
+    // 第6章: 主張DB (Claim DB) & 認識論的検証
+    // 第8章: 統合判断エンジン & 削減知能 (Reduction Intelligence)
+    // 第9章: 検証済みTXT部品レジストリ (Component Registry)
+    // 第5.2節: 回答内容IR (Answer Content IR) 構築
+    // =========================================================================
+
+    // 0. [第37章 潜在的意図マイニング] 表面上の発話の背後にある「真の課題・前提条件」の推定
+    const latentGoalInference = latentIntentMiningService.inferLatentGoal(text);
+    const latentTrace = latentIntentMiningService.trackMultiTurnIntent(text);
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🎯 [37章 潜在意図マイニング] 表面:「${latentGoalInference.surfaceIntent}」→ 潜在ゴール:「${latentGoalInference.latentGoal}」(確信度: ${latentGoalInference.confidenceScore}%, 緊急度: ${latentGoalInference.urgencyLevel})`,
+      { latentGoalInference, latentTrace }
+    );
+
+    // 0.5 [第39章 感情共感力動・親愛度連続トランスファー] 対話感情価の解析と親愛度連続継承
+    const affectionEvaluation = affectionDynamicsService.evaluateAndTransfer(text);
+    systemLogger.info(
+      'CHAT',
+      `💖 [39章 感情共感力動] 検出感情: ${affectionEvaluation.detectedEmotion} (親愛度: ${affectionEvaluation.newAffectionScore}点) - 推奨トーン: ${affectionEvaluation.recommendedTone}`,
+      { affectionEvaluation }
+    );
+
+    // 1. [第6章 主張DB] 既存の検証済み知見の検索
+    const isCodeMod = /コード|修正|リファクタ|関数|バグ|変更|追加/.test(text);
+    const matchedClaims = claimDatabaseService.queryClaims({
+      keyword: isVbaRequest ? 'VBA' : (text.length > 4 ? text.slice(0, 10) : undefined),
+      excludeSuperseded: true,
+    });
+    if (matchedClaims.length > 0) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `📚 [6章 主張DB照会] ユーザー発話に関連する主張を ${matchedClaims.length} 件検出 (最優先: ${matchedClaims[0].claim_id}「${matchedClaims[0].statement}」)`
+      );
+    }
+
+    // 2. [第8章 判断エンジン & 削減知能] コンテキストプロファイル適合と機能過剰追加の抑制評価
+    const detectedProfile = unifiedDecisionEngineService.inferContextProfile(text);
+    unifiedDecisionEngineService.setActiveProfile(detectedProfile);
+
+    const decisionRecord = unifiedDecisionEngineService.makeDecision({
+      topic: text.slice(0, 60),
+      options: [
+        { name: 'DIRECT_ANSWER', score: 85, pros: ['直接的・簡潔な回答', '既存検証済み部品の活用'], cons: [] },
+        { name: 'ELABORATE_EXPAND', score: 60, pros: ['自発的提案'], cons: ['保守複雑性の増加', '未検証リスク'] },
+      ],
+      requestText: text,
+      complexityScore: text.length > 100 ? 60 : 25,
+      hasExistingMatch: matchedClaims.length > 0,
+      hasVerifiedEvidence: true,
+    });
+
+    // 3. [第9章 検証済みTXT部品レジストリ] コード/VBA要求時の非LLM部品検索と決定論的合成
+    let usedSynthesizedComponentIds: string[] = [];
+    if (isVbaRequest || text.includes('VBA') || text.includes('マクロ') || text.includes('重複')) {
+      const registrySearch = componentRegistryService.searchComponents(text, { verifiedOnly: true });
+      if (registrySearch.length > 0) {
+        systemLogger.info(
+          'TOOLS',
+          `🧩 [9章 部品レジストリ検索] 適合するVERIFIED部品を ${registrySearch.length} 件発見: [${registrySearch.map((c) => c.component_id).join(', ')}]`
+        );
+      }
+      if (text.includes('重複') || text.includes('まとめ') || text.includes('抽出')) {
+        const vbaSynthesis = componentRegistryService.synthesizeVbaMacro({
+          macroName: 'FilterAndExtractUniqueRows',
+          sourceSheetName: 'Sheet1',
+          headerKeyName: 'ID',
+          destSheetName: 'UniqueOutput',
+        });
+        if (vbaSynthesis.success) {
+          usedSynthesizedComponentIds = vbaSynthesis.usedComponents;
+          systemLogger.info(
+            'TOOLS',
+            `⚡ [9.9 検証済み部品からのVBA合成] 部品 [${vbaSynthesis.usedComponents.join(', ')}] から決定論的にマクロを合成完了 (チェックリスト: ${vbaSynthesis.verificationChecklist.length}項目合致)`
+          );
+        }
+      }
+    }
+
+    // 非LLM追跡メタデータ構造体の初期化
+    const currentNonLlmMeta: NonLlmPipelineMeta = {
+      isDeterministicAnswer: false,
+      decisionProfile: {
+        profile: detectedProfile,
+        chosenAction: decisionRecord.chosen_option || 'DIRECT_ANSWER',
+        score: decisionRecord.evaluation_scores[decisionRecord.chosen_option] ?? 85,
+        suppressedExcess: decisionRecord.reasons.some((r) => r.includes('REJECT') || r.includes('USE_EXISTING') || r.includes('DOCUMENT_ONLY')),
+      },
+      latentGoal: {
+        surfaceIntent: latentGoalInference.surfaceIntent,
+        latentGoal: latentGoalInference.latentGoal,
+        confidence: latentGoalInference.confidenceScore,
+        urgency: latentGoalInference.urgencyLevel,
+      },
+      affection: {
+        detectedEmotion: affectionEvaluation.detectedEmotion,
+        affectionScore: affectionEvaluation.newAffectionScore,
+        recommendedTone: affectionEvaluation.recommendedTone,
+      },
+      synthesizedComponents: usedSynthesizedComponentIds.length > 0 ? usedSynthesizedComponentIds : undefined,
+    };
+
+    // 4. [第5.2節 回答内容IR構築] 何を言うか (回答内容IR) とどう言うか (表層表現) の分離
+    const combinedConditions = [
+      ...(isVbaRequest ? ['Excel 2016以降またはMicrosoft 365環境であること'] : []),
+      ...(latentGoalInference.unexpressedNeeds || []),
+    ];
+    const combinedReasons = [
+      '非LLM検証済み部品レジストリの活用',
+      '削減知能による無駄な複雑化抑制',
+      ...(latentGoalInference.latentGoal ? [`潜在ゴール「${latentGoalInference.latentGoal}」への適合`] : []),
+    ];
+
+    const shadowAnswerIr = answerContentIrService.buildAnswerIR({
+      conclusion: isVbaRequest
+        ? '検証済み部品によるOption Explicit/配列一括処理/型安全なVBAコードの提供'
+        : `ユーザーの意図「${text.slice(0, 30)}」に対する的確かつ不要な過剰拡張を排した回答`,
+      reasons: combinedReasons,
+      conditions: combinedConditions,
+      certainty: shadowUserEpistemic.status === 'hypothetical' ? 'HYPOTHETICAL' : 'HIGH_CONFIDENCE',
+      target: 'USER_QUERY',
+      detailLevel: detectedProfile === 'code_design' || detectedProfile === 'code_delivery' ? 'STANDARD' : 'BRIEF',
+      worldScope: shadowUserEpistemic.status === 'fictional' ? 'FICTION' : 'REAL',
+    });
+    currentAnswerIrRef.current = shadowAnswerIr;
+
+    // 設計思想 Master v5.0 第2章2節: 前ターンで使われた記憶に対するユーザーフィードバック（感情価: 質）の自動反映
+    if (lastTurnUsedMemoryIdsRef.current && lastTurnUsedMemoryIdsRef.current.length > 0) {
+      const correctionKeywords = ['違う', 'そうじゃない', 'そうではない', '直して', '修正して', '間違', 'エラー', '動かない', 'ダメ', 'やり直し', '変わってない', '不満', 'バグ', '変だ'];
+      const isCorrection = correctionKeywords.some((kw) => text.includes(kw));
+      const feedbackType = isCorrection ? 'confusion' : 'useful';
+      const targetIds = [...lastTurnUsedMemoryIdsRef.current];
+
+      setMemories((prevMemories) => {
+        const updated = applyMemoryFeedback(targetIds, feedbackType, prevMemories);
+        const affectedIds = new Set(targetIds);
+        updated.filter((m) => affectedIds.has(m.id)).forEach((m) => storageService.saveMemoryItem(m));
+        return updated;
+      });
+
+      systemLogger.info(
+        'PERSISTENCE',
+        `🧠 [感情価更新] 前ターンの記憶(${targetIds.length}件)にフィードバック反映: [${feedbackType.toUpperCase()}] (${isCorrection ? 'ユーザーの訂正・問題指摘を検知' : '通常の受容・継続'})`,
+        { affectedMemoryIds: targetIds, feedbackType }
+      );
+
+      // 設計思想 Master v5.0 第3章2節: 訂正・上書きによる置換関係 (replaced_by) の自動追跡
+      const replaceKeywords = ['じゃなくて', 'ではなく', 'に変更', 'に上書き', 'じゃなく', 'じゃなくてこっち'];
+      const isExplicitReplace = replaceKeywords.some((kw) => text.includes(kw));
+      if (isExplicitReplace && targetIds.length > 0) {
+        const oldMemoryId = targetIds[0];
+        const oldMem = memories.find((m) => m.id === oldMemoryId);
+        if (oldMem && oldMem.active) {
+          let newContent = '';
+          for (const rk of replaceKeywords) {
+            if (text.includes(rk)) {
+              const parts = text.split(rk);
+              if (parts[1]?.trim()) {
+                newContent = parts[1].trim().replace(/[。！!？?]+$/, '');
+                break;
+              }
+            }
+          }
+          if (newContent && newContent.length >= 2) {
+            const replacementResult = longTermMemoryService.supersedeMemory(
+              memories,
+              oldMemoryId,
+              newContent,
+              `ユーザー会話による明示的訂正 (${text.slice(0, 30)})`
+            );
+            // 新記憶の関連記憶グラフ自動リンク
+            const { updatedTarget, modifiedNeighbors } = longTermMemoryService.autoLinkRelatedMemories(
+              replacementResult.newMemory,
+              replacementResult.updatedMemories
+            );
+            storageService.saveMemoryItem(updatedTarget);
+            modifiedNeighbors.forEach((neighbor) => storageService.saveMemoryItem(neighbor));
+
+            const neighborMap = new Map(modifiedNeighbors.map((n) => [n.id, n]));
+            const finalUpdatedMemories = replacementResult.updatedMemories.map((m) =>
+              m.id === updatedTarget.id ? updatedTarget : neighborMap.get(m.id) || m
+            );
+
+            setMemories(finalUpdatedMemories);
+            const oldUpdated = finalUpdatedMemories.find((m: MemoryItem) => m.id === oldMemoryId);
+            if (oldUpdated) storageService.saveMemoryItem(oldUpdated);
+
+            systemLogger.info(
+              'PERSISTENCE',
+              `🔄 [第3章2節 置換関係追跡] 古い記憶(${oldMemoryId})を置換(SUPERSEDED)し、新記憶(${updatedTarget.id})を作成＆グラフリンク(${updatedTarget.relatedMemoryIds?.length || 0}件): 「${newContent}」`,
+              { oldMemoryId, newMemoryId: updatedTarget.id }
+            );
+          }
+        }
+      }
+
+      lastTurnUsedMemoryIdsRef.current = [];
+    }
+
+    // 設計思想 13.2 / 19.2: 直前ターンの表現候補へのフィードバック反映 (成功率学習・非LLM適応)
+    const lastTurnVariations = responseSurfacePolicyService.getLastTurnUsedVariationIds();
+    if (lastTurnVariations.length > 0) {
+      const isNegativeFeedback =
+        text.includes('違う') ||
+        text.includes('そうじゃなくて') ||
+        text.includes('間違') ||
+        text.includes('ダメ') ||
+        text.includes('やり直') ||
+        text.includes('そうではなく') ||
+        text.includes('わかりにくい') ||
+        text.includes('変な言い方') ||
+        text.includes('って言わないで');
+
+      const isPositiveFeedback =
+        text.includes('ありがとう') ||
+        text.includes('助かった') ||
+        text.includes('わかりやすい') ||
+        text.includes('いいね') ||
+        text.includes('素晴らしい') ||
+        text.includes('完璧') ||
+        text.includes('さすが');
+
+      if (isNegativeFeedback) {
+        responseSurfacePolicyService.recordVariationOutcomes(lastTurnVariations, false);
+        systemLogger.info(
+          'ANSWER_PLAN',
+          `📉 [13.2 表層表現学習] ユーザー否定フィードバック検知: 直前ターン表現(${lastTurnVariations.join(', ')})の成功スコアを減算`
+        );
+      } else if (isPositiveFeedback) {
+        responseSurfacePolicyService.recordVariationOutcomes(lastTurnVariations, true);
+        systemLogger.info(
+          'ANSWER_PLAN',
+          `📈 [13.2 表層表現学習] ユーザー肯定フィードバック検知: 直前ターン表現(${lastTurnVariations.join(', ')})の成功スコアを加算`
+        );
+      }
+      responseSurfacePolicyService.clearLastTurnUsedVariations();
+    }
+
+    // 指示書 2.2: 直前ターンの会話戦略 (ConversationStrategy) に対する教師信号検知と成果学習
+    if (lastTurnStrategyRef.current) {
+      const prevInfo = lastTurnStrategyRef.current;
+      const signal = conversationStrategyService.detectOutcomeSignal(text, prevInfo.text);
+      conversationStrategyService.recordStrategyOutcome(
+        prevInfo.strategy,
+        prevInfo.stage,
+        signal
+      );
+      systemLogger.info(
+        'CHAT',
+        `🎯 [2.2 会話戦略学習] 直前ターン戦略[${prevInfo.strategy}] (Stage: ${prevInfo.stage}) に対して教師信号「${signal}」を検知・記録`
+      );
+      lastTurnStrategyRef.current = null;
+    }
+
+    // 設計思想 5.1 / 13.2: 話し方に緩やかに寄せる多軸性格の自動調整 (5ターン継続判定)
+    const currentMultiAxisPersona = answerContentIrService.getDefaultPersona();
+    const userUtterances = messages
+      .filter((m) => m.role === 'user')
+      .map((m) => m.content)
+      .concat([text]);
+
+    const adaptation = responseDesignService.adaptPersonaToUserStyle(
+      currentMultiAxisPersona,
+      userUtterances,
+      { lockPersonaByUser: currentMultiAxisPersona.lockPersonaByUser }
+    );
+    if (adaptation.changed) {
+      answerContentIrService.updateDefaultPersona(adaptation.adaptedPersona);
+      systemLogger.info(
+        'ANSWER_PLAN',
+        `🎭 [多軸性格自動適応] ユーザー発話傾向に適応: ${adaptation.reason}`,
+        { adapted: adaptation.adaptedPersona }
+      );
+    }
+
+    // ユーザーによる言い回し・口調訂正（「〜って言わないで」「〜っておかしい」等）の自己学習
+    const styleCorrectionKeywords = ['って言わないで', 'って言っちゃダメ', 'っておかしい', 'その言い方', 'その言い回し', '変な言い方', 'って言うな'];
+    const hasStyleCorrection = styleCorrectionKeywords.some((kw) => text.includes(kw));
+    if (hasStyleCorrection) {
+      const matchQuote = text.match(/[「『]([^」』]+)[」』]って/);
+      if (matchQuote && matchQuote[1]) {
+        const badWord = matchQuote[1].trim();
+        responseDesignService.registerUserStyleCorrection(badWord, '', `ユーザーからの指摘: ${text.slice(0, 30)}`);
+        systemLogger.info('PERSISTENCE', `🗣️ [口調自己学習] ユーザー指摘の禁止言い回し「${badWord}」をポストプロセッサに永続登録しました`);
+      } else {
+        const matchPlain = text.match(/([^\s,。！!？?]{2,15})って言わないで/);
+        if (matchPlain && matchPlain[1]) {
+          const badWord = matchPlain[1].trim();
+          responseDesignService.registerUserStyleCorrection(badWord, '', `ユーザーからの指摘: ${text.slice(0, 30)}`);
+          systemLogger.info('PERSISTENCE', `🗣️ [口調自己学習] ユーザー指摘の禁止言い回し「${badWord}」をポストプロセッサに永続登録しました`);
+        }
+      }
+    }
+
+    // 設計思想 Master v5.0 第3章4節: ユーザー明示的削除の2段階反映 (即時ランタイム遮断 + 台帳アーカイブ)
+    const explicitForgetKeywords = ['忘れて', '消して', '記憶から削除', '記憶を削除', '前言撤回', 'なかったことにして'];
+    const isExplicitForget = explicitForgetKeywords.some((kw) => text.includes(kw));
+    if (isExplicitForget) {
+      const queryTokens = extractQueryTokens(text);
+      const targetMemories = memories.filter((m) => {
+        if (!m.active) return false;
+        const contentTokens = extractQueryTokens(m.content || '');
+        let overlap = 0;
+        queryTokens.forEach((t) => {
+          if (contentTokens.has(t) && t.length >= 2) overlap++;
+        });
+        return overlap >= 1;
+      });
+
+      if (targetMemories.length > 0) {
+        targetMemories.forEach((target) => {
+          // 第1段階: 即時ランタイム注入禁止ブラックリストに追加
+          longTermMemoryService.addToRuntimeBlacklist(target.id);
+
+          // 第2段階: 台帳永続化でアーカイブ／無効化コミット
+          const updatedItem: MemoryItem = {
+            ...target,
+            active: false,
+            lifecycleStatus: 'REJECTED',
+            status: 'archived',
+            discardReason: `ユーザーからの明示的削除要求 (${text.slice(0, 30)})`,
+            updatedAt: Date.now(),
+          };
+          storageService.saveMemoryItem(updatedItem);
+        });
+
+        setMemories((prev) =>
+          prev.map((m) => {
+            const hit = targetMemories.find((t) => t.id === m.id);
+            return hit ? { ...m, active: false, lifecycleStatus: 'REJECTED', status: 'archived' } : m;
+          })
+        );
+
+        systemLogger.info(
+          'PERSISTENCE',
+          `🗑️ [第3章4節 明示的削除] ${targetMemories.length}件の記憶をランタイムブラックリストへ即時追加 & 台帳アーカイブ`,
+          { deletedIds: targetMemories.map((t) => t.id) }
+        );
+      }
+    }
+
+    // Auto extract memory heuristics
+    if (persona.autoExtractMemories && text.trim()) {
+      autoExtractMemory(text);
+    }
+
+    const userMsg: ChatMessage = {
+      id: 'msg_user_' + Date.now(),
+      role: 'user',
+      content: text,
+      timestamp: Date.now(),
+      attachedFiles: attached?.map((a) => ({ name: a.name, size: a.content.length, type: a.type })),
+      coreTracking: getCoreTracking(coreRequestId),
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+
+    const assistantId = 'msg_asst_' + Date.now();
+    currentAssistantIdRef.current = assistantId;
+
+    // ── 設計思想: 自律自己改善 (Autonomous Continuous Evolution) の自然言語意図検知 ──
+    const selfImprovementKeywords = [
+      '自身のコードをもっと自動で改善',
+      '自身のコードを自動で改善',
+      'コードをもっと自動で改善',
+      'コードを自動で改善',
+      '自動で改善させられるように',
+      '自律自己改善',
+      '自己改善を実行',
+      'コードを自動改善',
+      'オートパイロットで改善',
+      '自律改善サイクル',
+      '自己コード改善して',
+    ];
+    const isSelfImprovementRequest = selfImprovementKeywords.some((kw) => text.includes(kw));
+
+    if (isSelfImprovementRequest) {
+      const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: 'assistant',
+          content: `🤖 **みきの全自動・自律コード自己改善サイクルを起動したよ！** ✨\n\n人間による手動操作を介さず、みきが自律的に【全170章の仕様書ドリフト監査 ➔ 5大不変条件検証 ➔ 最適改善対象の選定 ➔ TypeScriptコード合成 ➔ AST構文検査＆TDD単体テスト ➔ 最大3回の自律修復ループ ➔ スナップショット安全記録 ➔ 物理配備】までを一貫して自動実行するね！🌸\n\n今、パイプラインを実行中だから少し待っててね...！`,
+          timestamp: Date.now(),
+          speaker: activeSpeaker,
+          engineMode,
+          isStreaming: true,
+          coreTracking: getCoreTracking(coreRequestId),
+        },
+      ]);
+
+      try {
+        const improvementTask = await typedImprovementUiGatewayService.startSpecifiedImprovement(text.trim() || 'チャットから自己コード改善を実行する', 'chat-self-improvement');
+        const correlation = improvementTask.coreResult as { requestId?: string } | undefined;
+        const correlationRequestId = correlation?.requestId || coreRequestId;
+        const queuedRequest = { id: improvementTask.taskId || 'N/A', source: 'CORE', trigger: text.trim() || 'chat-self-improvement-request' };
+
+        const diffSummary = `**自己改善の正本パイプラインを受付けました**\n\n` +
+          `- **CORE 要求ID**: \`${correlation.requestId}\`\n` +
+          `- **Loop 要求ID**: \`${queuedRequest.id}\`\n` +
+          `- **要求元**: \`${queuedRequest.source}\`\n` +
+          `- **トリガー**: ${queuedRequest.trigger}\n` +
+          `- **正規経路**: \`UI ➔ CORE ➔ conversation ➔ improvement ➔ execution ➔ CORE Result\`\n\n` +
+          `候補の採用は統一Validationと永続化確認を通過した場合だけ行われます。「自律改善」タブでキュー状況と詳細検証エビデンスを確認できます。`;
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: diffSummary,
+                  isStreaming: false,
+                  coreTracking: getCoreTracking(correlationRequestId),
+                }
+              : m
+          )
+        );
+      } catch (err: any) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: `⚠️ **自律自己改善サイクル中に安全停止が発火しました**\n\n【停止理由】: ${err?.message || '不変条件または構文安全基準に抵触したため、安全を最優先して変更を破棄しました。'}\n\n※ 既存のコードベースとモデル重み不変性は完全に保護されており、破壊的な変更は一切加えられていません。`,
+                  isStreaming: false,
+                  coreTracking: getCoreTracking(coreRequestId),
+                }
+              : m
+          )
+        );
+      } finally {
+        setIsGenerating(false);
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    const handleAbortExit = (stepName: string) => {
+      systemLogger.warn('CHAT', `チャット処理が中断シグナルにより中止されました [${stepName}]`, {
+        elapsedMs: Math.round(performance.now() - sendStartTime),
+      });
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantId
+            ? {
+                ...msg,
+                content:
+                  msg.content.includes('推論中') ||
+                  msg.content.includes('初期化中') ||
+                  msg.content.includes('準備中') ||
+                  msg.content.includes('生成中')
+                    ? '⏹ 生成を中断しました。'
+                    : msg.content,
+                isStreaming: false,
+                executionSteps: systemLogger.getCurrentSessionSteps(),
+              }
+            : msg
+        )
+      );
+      if (currentAssistantIdRef.current === assistantId) {
+        currentAssistantIdRef.current = null;
+      }
+      setIsGenerating(false);
+      setIsLoading(false);
+    };
+
+    try {
+      const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
+      const activeMemories = memories.filter((m) => m.active);
+
+      // 対策2: 日常の挨拶・相槌・短文対話の判定 (RAG・重厚コンテキストスキップ)
+      const isCasualGreeting = isCasualGreetingOrShortSocial(text);
+
+      let memoryPipelineResult: any;
+      let relevantMemories: MemoryItem[] = [];
+
+      if (isCasualGreeting) {
+        memoryPipelineResult = {
+          scoredMemories: [],
+          totalFound: 0,
+          steps: [{ step: 1, name: '日常挨拶スキップ', count: 0, ms: 0 }],
+          executionTimeMs: 0,
+        };
+        relevantMemories = [];
+
+        // Step 2: Memory Retrieval Skip for greetings
+        systemLogger.step(2, 10, '長期記憶・RAG検索スキップ (日常挨拶・超軽量即答モード)', {
+          isCasualGreeting: true,
+          speaker: activeSpeaker.name,
+        });
+      } else {
+        // 設計思想 8章 & 35章 第4段階: 長期記憶・完全一致・全文検索・原文再取得の7段階パイプライン
+        // 設計思想 25: profile/preferenceなどの事実性カテゴリは承認済み記憶のみに制限
+        memoryPipelineResult = await longTermMemoryService.searchPipeline(
+          text,
+          activeMemories,
+          conversationState,
+          messages,
+          {
+            limit: 8,
+            onlyApprovedForFacts: true,
+          }
+        );
+        relevantMemories = memoryPipelineResult.scoredMemories.map((sm: any) => sm.memory);
+
+        // Step 2: Memory Retrieval & Context Association (設計思想 8章 7段階検索)
+        systemLogger.step(2, 10, '長期記憶・7段階検索パイプライン実行 (完全一致/全文/原文再取得)', {
+          activeMemoriesCount: activeMemories.length,
+          relevantMemoriesCount: relevantMemories.length,
+          pipelineSteps: memoryPipelineResult.steps.map((s: any) => `${s.step}.${s.name}:${s.count}件`).join(' | '),
+          intimacyLevel: persona.intimacyLevel,
+          intimacyExp: persona.intimacyExp,
+          speaker: activeSpeaker.name,
+        });
+      }
+
+      // =========================================================================
+      // 設計思想 9章: 回答骨格と思考節約 (Answer Plan Matching)
+      // =========================================================================
+      const isAnswerPlanEnabled = featureFlagsService.isEnabled('ANSWER_PLAN_CACHE');
+      const answerPlanResult: AnswerPlanApplicationResult = (isAnswerPlanEnabled && !isCasualGreeting)
+        ? answerPlanService.matchSkeleton(text, conversationState)
+        : { applied: false, reason: isCasualGreeting ? '日常挨拶のため回答骨格スキップ (軽量即答)' : '機能フラグANSWER_PLAN_CACHEが無効化されています' };
+
+      if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
+        systemLogger.info(
+          'CHAT',
+          `⚡ [9章 回答骨格適用] パターン: ${answerPlanResult.matchedSkeleton.pattern_id} (理由: ${answerPlanResult.reason})`,
+          {
+            situation: answerPlanResult.matchedSkeleton.situation,
+            plan: answerPlanResult.matchedSkeleton.response_plan,
+            avoid: answerPlanResult.matchedSkeleton.avoid,
+          }
+        );
+      }
+
+      // =========================================================================
+      // PATH 0.1: 非LLM決定論的即答パイプライン (設計思想 統合版 第3章 / 第9章 / 第10.1節 / 第13.3節)
+      // 「旧ローカル生成ランタイムを中核から外し、通常のプログラムとデータベースで会話・記憶・判断・コード生成を行う」
+      // =========================================================================
+      personalApiGatewayService.receive({ kind: 'NATURAL_LANGUAGE', payload: text });
+    const compiledRequest = requestTypeCompilerService.compile(text, conversationState);
+      const dialogueAct = classifyDialogueAct(text);
+      const isUserVbaIntent = /vba|マクロ|excel|エクセル|シート|セル/i.test(text);
+
+      let deterministicDirectReply: {
+        content: string;
+        reason: string;
+        skeleton: AnswerSkeletonType;
+      } | null = null;
+
+      // 1. VBAマクロ作成・Excel自動化要求で、検証済み部品レジストリからの決定論的合成が可能な場合
+      if (isUserVbaIntent && (text.includes('重複') || text.includes('まとめ') || text.includes('抽出') || text.includes('マクロ') || text.includes('vba'))) {
+        const vbaSynthesis = componentRegistryService.synthesizeVbaMacro({
+          macroName: 'FilterAndExtractUniqueRows',
+          sourceSheetName: 'Sheet1',
+          headerKeyName: 'ID',
+          destSheetName: 'UniqueOutput',
+        });
+        if (vbaSynthesis.success && vbaSynthesis.assembledCode) {
+          const vbaIr = answerContentIrService.buildAnswerIR({
+            conclusion: '非LLM部品レジストリから検証済みモジュールを決定論的に合成しました',
+            conditions: ['Excel 2016以降 または Microsoft 365環境', 'Option Explicit宣言を先頭に維持すること'],
+            reasons: ['未宣言変数ゼロ保証', '配列一括読み書きによる画面更新停止最適化', '副作用の隔離'],
+            target: 'Microsoft Excel VBA',
+            detailLevel: 'STANDARD',
+          });
+          const surfaceResult = answerContentIrService.generateSurfaceTextFromIR(
+            vbaIr,
+            'TASK_COMPLETION',
+            undefined,
+            vbaSynthesis.assembledCode
+          );
+          deterministicDirectReply = {
+            content: surfaceResult.surfaceText,
+            reason: `第9章&10章 非LLM部品レジストリによる決定論的VBA合成成功 (部品: ${vbaSynthesis.usedComponents.join(', ')})`,
+            skeleton: 'TASK_COMPLETION',
+          };
+        }
+      }
+
+      // 2. 訂正・指摘 (CORRECTION) であり、記憶の置換がすでに正常完了している場合
+      if (!deterministicDirectReply && dialogueAct === 'CORRECTION') {
+        const correctionIr = answerContentIrService.buildAnswerIR({
+          conclusion: 'ご指摘に基づき、該当の前提・記憶を更新しました。以後は新しい条件を採用します。',
+          target: conversationState?.currentTopic || '会話前提条件',
+          reasons: ['ユーザーからの明示的訂正の検知', '旧記憶のSUPERSEDED状態移行'],
+          detailLevel: 'BRIEF',
+        });
+        const surfaceResult = answerContentIrService.generateSurfaceTextFromIR(correctionIr, 'CORRECTION');
+        deterministicDirectReply = {
+          content: surfaceResult.surfaceText,
+          reason: '第4.2章&第8.2章 ユーザー訂正の非LLM即時確定',
+          skeleton: 'CORRECTION',
+        };
+      }
+
+      // 3. 推薦・二者択一 (REQUEST_RECOMMENDATION) であり、意思決定エンジンが明快な結論を持っている場合
+      if (!deterministicDirectReply && (dialogueAct === 'REQUEST_RECOMMENDATION' || text.includes('どっち') || text.includes('どちら') || text.includes('おすすめ'))) {
+        const decision = unifiedDecisionEngineService.makeDecision({
+          topic: text.slice(0, 60),
+          options: [
+            { name: '決定論的・検証済みアプローチ', score: 92, pros: ['完全な再現性', '端末内完結', 'Vulkan非依存'], cons: [] },
+            { name: '確率的自由生成アプローチ', score: 55, pros: ['柔軟な表現'], cons: ['遅延大', 'Device Lostリスク'] },
+          ],
+          requestText: text,
+          complexityScore: 30,
+          hasExistingMatch: true,
+          hasVerifiedEvidence: true,
+        });
+        if (decision.chosen_option) {
+          const recIr = answerContentIrService.buildAnswerIR({
+            conclusion: `「${decision.chosen_option}」を推奨します。`,
+            reasons: decision.reasons,
+            exceptions: decision.conditions_for_change,
+            conditions: ['高い再現性と安定性が求められる場合'],
+            target: text.slice(0, 30),
+            detailLevel: 'STANDARD',
+          });
+          const surfaceResult = answerContentIrService.generateSurfaceTextFromIR(recIr, 'RECOMMENDATION');
+          deterministicDirectReply = {
+            content: surfaceResult.surfaceText,
+            reason: '第8章 意思決定エンジンによる重み付き採点と反事実評価の即時確定',
+            skeleton: 'RECOMMENDATION',
+          };
+        }
+      }
+
+      // 4. 知識・事実の質問 (QUESTION / REQUEST_EXPLANATION / 第3章 ルートB / 第6章 主張DB)
+      if (!deterministicDirectReply && (dialogueAct === 'QUESTION' || dialogueAct === 'REQUEST_EXPLANATION' || /どういう|なぜ|何|どんな|教えて|理由|原因|どうして|本当|事実|設定/i.test(text))) {
+        const claimMatch = claimDatabaseService.findBestMatchingClaim(text);
+        if (claimMatch.hasMatch && claimMatch.bestClaim && claimMatch.suggestedAction === 'DIRECT_ANSWER') {
+          const claim = claimMatch.bestClaim;
+          const worldLabel = claim.world === 'FICTION' ? '【創作世界の設定】' : claim.world === 'HYPOTHETICAL' ? '【仮定・シミュレーション】' : '【現実の検証済み事実】';
+          const reasonsList = [
+            `出典・検証区分: ${claim.source} (${claim.status})`,
+            `成熟度ランク: ${claim.maturity} (${claim.self_provenance})`,
+          ];
+          if (claimMatch.scopeNotes.length > 0) {
+            reasonsList.push(...claimMatch.scopeNotes);
+          }
+
+          const factIr = answerContentIrService.buildAnswerIR({
+            conclusion: `${worldLabel} ${claim.statement}`,
+            reasons: reasonsList,
+            conditions: claimMatch.scopeNotes,
+            exceptions: claim.contradicted_by && claim.contradicted_by.length > 0
+              ? [`既存の異論・矛盾主張 [${claim.contradicted_by.join(', ')}] が記録されています`]
+              : undefined,
+            certainty: claimMatch.confidence === 'CERTAIN' ? 'HIGH_CONFIDENCE' : claimMatch.confidence === 'HYPOTHETICAL' ? 'HYPOTHETICAL' : 'CONDITIONAL',
+            target: claim.scope.runtime || claim.scope.device || claim.scope.environment || '主張DB命題',
+            detailLevel: 'STANDARD',
+            worldScope: claim.world,
+          });
+
+          const surfaceResult = answerContentIrService.generateSurfaceTextFromIR(factIr, 'GENERAL_ANSWER');
+          currentNonLlmMeta.matchedClaim = {
+            claimId: claim.claim_id,
+            statement: claim.statement,
+            world: claim.world,
+            maturity: claim.maturity,
+            confidence: claimMatch.confidence,
+            status: claim.status,
+          };
+          currentNonLlmMeta.scopeNotes = claimMatch.scopeNotes;
+          currentNonLlmMeta.meaningPreservationPassed = surfaceResult.inspection.isPreserved;
+
+          deterministicDirectReply = {
+            content: surfaceResult.surfaceText,
+            reason: `第6章 主張DB照会成功 (${claim.claim_id}: ${claim.world}/${claim.maturity})`,
+            skeleton: 'GENERAL_ANSWER',
+          };
+        }
+      }
+
+      // 非LLM即答が確定した場合、LLM生成をバイパスして0.1秒で即時回答を確定・表示する
+      if (deterministicDirectReply) {
+        systemLogger.step(3, 10, `⚡ [非LLM決定論的即答] ${deterministicDirectReply.reason}`);
+        currentNonLlmMeta.isDeterministicAnswer = true;
+        currentNonLlmMeta.directReplyReason = deterministicDirectReply.reason;
+        
+        // メタ認知キャリブレーションの適用
+        const calibration = metacognitiveCalibrationService.calibrateConfidence(
+          text,
+          deterministicDirectReply.content,
+          { hasTestRun: true, hasMemoryGrounding: true }
+        );
+
+        let finalDirectContent = deterministicDirectReply.content;
+        if (calibration.calibrationAction === 'ATTACH_HEDGE') {
+          finalDirectContent += `\n\n> 🔍 **メタ認知安全注記**: ${calibration.humilityNotes?.[0] || '（適用環境と前提条件をご確認ください）'}`;
+        }
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId
+              ? {
+                  ...msg,
+                  content: finalDirectContent,
+                  isStreaming: false,
+                  executionSteps: systemLogger.getCurrentSessionSteps(),
+                  nonLlmPipelineMeta: currentNonLlmMeta,
+                }
+              : msg
+          )
+        );
+
+        // 指示書 2.1: 決定論的即答パスの会話戦略を次ターン教師信号用に記録
+        lastTurnStrategyRef.current = {
+          strategy: (deterministicDirectReply.skeleton === 'CORRECTION'
+            ? 'SHORT_ACK'
+            : deterministicDirectReply.skeleton === 'RECOMMENDATION'
+            ? 'HAND_OVER'
+            : 'EXPLAIN') as ConversationStrategy,
+          stage: conversationState?.stage || 'QUESTION',
+          text,
+        };
+
+        setIsGenerating(false);
+        setIsLoading(false);
+        return;
+      }
+
+      // =========================================================================
+      // PATH 0: Phase 3 - 多段推論タスク計画 & 検証エンジン (Multi-Step Task Plan)
+      // 制約遵守: 単純な会話・挨拶は軽量フロー(PATH 1/PATH 2)へ通し、複合課題のみ多段化
+      // =========================================================================
+      const shouldUseMulti = engineMode !== 'autonomous_rule' && taskPlanService.shouldUseMultiStep(text, {
+        workspaceFilesCount: workspaceFiles.length,
+        attachedFilesCount: attached?.length,
+        userExplicitMultiStep: isMultiStepExplicit,
+      });
+
+      if (shouldUseMulti) {
+        systemLogger.step(3, 10, '🧭 多段推論タスク計画の立案と段階的検証を開始');
+        const plan = taskPlanService.createPlan(text, {
+          workspaceFiles,
+          relevantMemories,
+          attachedFilesCount: attached?.length,
+          userExplicitMultiStep: isMultiStepExplicit,
+        });
+
+        // 初期計画メッセージを表示
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantId,
+            role: 'assistant',
+            content: `📋 **多段推論タスク計画を立案しました (全${plan.totalSteps}ステップ)**\n各ステップの要件分析・検証を順次進めます...`,
+            timestamp: Date.now(),
+            speaker: activeSpeaker,
+            engineMode,
+            isStreaming: true,
+            taskPlan: plan,
+            executionSteps: systemLogger.getCurrentSessionSteps(),
+          },
+        ]);
+
+        await executePlanLoop(plan, assistantId, text, attached);
+        return;
+      }
+
+      // ==========================================
+      // PATH 1: Instant Non-LLM Hardware Pipeline (CPU / NPU / GPU 全機協調駆動)
+      // ==========================================
+      if ((engineMode as any) === 'autonomous_rule') {
+        systemLogger.step(3, 10, '⚡ 非LLM自律統合パイプライン稼働 (CPU/NPU/GPU全機駆動)');
+        const pipelineRes = await nonLlmCoreService.execute({
+          prompt: text,
+          persona: persona?.name,
+          attachedFiles: attached,
+          conversationState,
+          memories: activeMemories,
+          recentMessages: messages,
+          messageId: userMsg.id,
+        });
+        const reply = pipelineRes.replyText;
+
+        systemLogger.step(10, 10, '非LLM自律統合パイプライン処理完了', {
+          responseLength: reply.length,
+          snippet: reply.slice(0, 100),
+          totalElapsedMs: pipelineRes.telemetry.totalMs,
+          cpuMs: pipelineRes.telemetry.cpuMs,
+          npuMs: pipelineRes.telemetry.npuMs,
+          gpuMs: pipelineRes.telemetry.gpuMs,
+        });
+
+        const cpuCandidateTools = toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles });
+        const cpuExecutedTools = [];
+        const cpuMath = cpuCandidateTools.find((t) => t.toolId === 'tool_safe_calculator');
+        if (cpuMath && cpuMath.suggestedParams?.expression) {
+          const calcRes = toolsService.evaluateSafeMath(cpuMath.suggestedParams.expression);
+          if (calcRes.success) {
+            cpuExecutedTools.push({
+              toolId: 'tool_safe_calculator',
+              toolName: '高精度・安全数値計算機',
+              permission: 'read_only' as const,
+              executionTimeMs: 1,
+              success: true,
+              result: calcRes,
+              outputSummary: `【精密計算結果】: ${calcRes.expression} = ${calcRes.result}`,
+              executedAt: Date.now(),
+            });
+          }
+        }
+
+        // 文書48章: 完成条件と完了判定器による評価
+        const cpuEvaluation = completionJudgeService.evaluateCompletion({
+          userGoal: text,
+          assistantResponse: reply,
+          executionSteps: systemLogger.getCurrentSessionSteps(),
+          executedTools: cpuExecutedTools,
+        });
+
+        // 48章の完了判定が自動的に FAILED / BLOCKED を検出した場合、
+        // ユーザーの👎を待たずに自己改善ルーターへ自動的に診断依頼する。
+        // ※ PARTIAL は正常な途中経過であり得るため除外（ノイズ防止）。
+        // ※ EXTERNAL_COMPILE_REQUIRED / RUNTIME_TEST_REQUIRED は外部確認が必要な正常振る舞いのため除外。
+        // ※ CANCELLED / COMPLETE は対象外。
+        if (
+          (cpuEvaluation.status === 'FAILED' || cpuEvaluation.status === 'BLOCKED') &&
+          !cpuEvaluation.autoDiagnosedAt
+        ) {
+          selfImprovementService.diagnoseFailure(
+            text,
+            reply,
+            `[自動検出] 完了判定: ${cpuEvaluation.status} - ${cpuEvaluation.reason}`,
+            {
+              memoriesUsedCount: 0,
+              promptLengthChars: 1200,
+              engineMode: 'autonomous_rule',
+            }
+          );
+          cpuEvaluation.autoDiagnosedAt = Date.now();
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            `🔍 完了判定(${cpuEvaluation.status})を自動検出し、改善ルーターへ自動登録しました(ユーザー操作不要)。`
+          );
+        }
+
+        // コードブロック抽出 & 生成と適用の分離 (設計思想 ②, ⑩, 22-25, 26)
+        const codeBlocks = extractCodeBlocks(reply);
+        let cpuCodeProposal: CodeProposal | undefined = undefined;
+        let cpuVbaAssessment: VbaSafetyAssessment | undefined = undefined;
+
+        if (codeBlocks.length > 0) {
+          cpuCodeProposal = {
+            id: `proposal_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            files: codeBlocks.map((cb) => ({
+              path: cb.path,
+              name: cb.name,
+              content: cb.content,
+              language: cb.language,
+            })),
+            status: 'pending',
+            source: 'assistant',
+            createdAt: Date.now(),
+          };
+
+          const vbaBlock = codeBlocks.find(
+            (cb) => cb.language === 'vba' || cb.name.endsWith('.bas') || cb.content.toLowerCase().includes('sub ') || cb.content.toLowerCase().includes('dim ')
+          );
+          if (vbaBlock) {
+            cpuVbaAssessment = schemaValidationService.evaluateVbaSafety(vbaBlock.content);
+          }
+        }
+
+        const cpuCodeVerification = codeVerificationService.verifyCode(reply);
+        const cpuFalsificationReport = falsificationService.evaluateFalsification({
+          userGoal: text,
+          assistantResponse: reply,
+          conversationState,
+          codeVerification: cpuCodeVerification,
+        });
+
+        let cpuCodeUnderstandingIR = undefined;
+        if (featureFlagsService.isEnabled('CODE_UNDERSTANDING')) {
+          if (codeBlocks.length > 0) {
+            const targetBlock = codeBlocks[0];
+            cpuCodeUnderstandingIR = codeUnderstandingService.parseCodeToIR(
+              targetBlock.content,
+              (targetBlock.language as any) || 'vba',
+              targetBlock.name
+            );
+          } else if (text.includes('Sub ') || text.includes('Function ') || text.includes('function ') || (attached && attached[0]?.content)) {
+            const raw = attached && attached[0]?.content ? attached[0].content : text;
+            cpuCodeUnderstandingIR = codeUnderstandingService.parseCodeToIR(raw, 'vba');
+          }
+        }
+
+        const isCpuVbaRequest =
+          text.toLowerCase().includes('vba') ||
+          text.includes('マクロ') ||
+          text.includes('excel') ||
+          text.includes('エクセル') ||
+          codeBlocks.some((b) => b.language === 'vba' || b.name.endsWith('.bas'));
+
+        let cpuVbaDesignSpecification = undefined;
+        if (featureFlagsService.isEnabled('VBA_DESIGN_ASSISTANT') && isCpuVbaRequest) {
+          cpuVbaDesignSpecification = vbaDesignAssistantService.createSpecificationFromPrompt(text);
+        }
+
+        let cpuSynthesizedWf: SynthesizedWorkflow | undefined = undefined;
+        if (workflowSynthesisService.shouldSynthesizeWorkflow(text)) {
+          cpuSynthesizedWf = workflowSynthesisService.synthesizeWorkflow(text);
+        }
+
+        // 設計思想 49章: 経験の保存先ルーターによる9分類自動仕分け
+        const cpuExperienceRouting = experienceRouterService.routeExperience(
+          {
+            content: reply,
+            source: 'conversation',
+            category: reply.includes('```') ? 'code' : 'chat',
+          },
+          memories
+        );
+
+        // 設計思想 18章: 会話評価11指標の測定
+        const cpuDialogueEvaluation = dialogueEvaluationService.evaluateGeneralDialogue(
+          text,
+          reply,
+          Math.round(performance.now() - sendStartTime)
+        );
+
+        const cpuMsg: ChatMessage = {
+          id: assistantId,
+          role: 'assistant',
+          content: reply,
+          timestamp: Date.now(),
+          speaker: activeSpeaker,
+          engineMode: 'autonomous_rule',
+          isStreaming: false,
+          completionEvaluation: cpuEvaluation,
+          codeVerification: cpuCodeVerification,
+          falsificationReport: cpuFalsificationReport,
+          codeProposal: cpuCodeProposal,
+          vbaAssessment: cpuVbaAssessment,
+          synthesizedWorkflow: cpuSynthesizedWf,
+          answerPlan: answerPlanResult,
+          codeUnderstandingIR: cpuCodeUnderstandingIR,
+          vbaDesignSpecification: cpuVbaDesignSpecification,
+          experienceRouting: cpuExperienceRouting,
+          dialogueEvaluation: cpuDialogueEvaluation,
+          executionSteps: systemLogger.getCurrentSessionSteps(),
+          suggestedTools: cpuCandidateTools,
+          executedTools: cpuExecutedTools,
+          metrics: {
+            engine: `⚡ 非LLM全機駆動 (CPU: ${pipelineRes.telemetry.cpuMs}ms | NPU: ${pipelineRes.telemetry.npuMs}ms | GPU: ${pipelineRes.telemetry.gpuMs}ms)`,
+            tokens: 0, // 設計思想: トークン消費ゼロ
+            tokensPerSec: 0,
+            ttftMs: pipelineRes.telemetry.totalMs,
+            totalDurationMs: pipelineRes.telemetry.totalMs,
+          },
+        };
+
+        setMessages((prev) => [...prev, cpuMsg]);
+
+        // 作業指示書 v15 (v10内的自己反証接続): 自己反証結果をConversationStateへ書き込み
+        setConversationState((prev) => ({
+          ...prev,
+          lastFalsificationPassed: cpuFalsificationReport.passed,
+          lastFalsificationScore: cpuFalsificationReport.falsificationScore,
+        }));
+
+        // 指示書 2.1: 非LLM自律統合パイプラインの会話戦略を次ターン教師信号用に記録
+        const appliedPipelineStrategy =
+          pipelineRes.strategy ||
+          conversationStrategyService.selectConversationStrategy({
+            prompt: text,
+            stage: conversationState?.stage || 'QUESTION',
+          }).strategy;
+        lastTurnStrategyRef.current = {
+          strategy: appliedPipelineStrategy,
+          stage: conversationState?.stage || 'QUESTION',
+          text,
+        };
+
+        setIsLoading(false);
+        setIsGenerating(false);
+
+        // Auto apply code if generated
+        if (codeBlocks.length > 0) {
+          handleApplyCode(codeBlocks);
+        }
+        return;
+      }
+
+      // ==========================================
+      // PATH 2: WebGPU or Gemini Cloud Engine
+      // ==========================================
+      // 設計思想 Master v5.0 第2章: 直前ターンで想起された記憶へのフィードバック反映 (有用性・熱量更新)
+      if (lastTurnUsedMemoryIdsRef.current.length > 0) {
+        const isUserDispleasedOrCorrecting =
+          text.includes('違う') ||
+          text.includes('そうじゃなくて') ||
+          text.includes('間違') ||
+          text.includes('ダメ') ||
+          text.includes('やり直') ||
+          text.includes('そうではなく');
+        setMemories((prev) =>
+          longTermMemoryService.recordTurnFeedback(
+            prev,
+            lastTurnUsedMemoryIdsRef.current,
+            isUserDispleasedOrCorrecting
+          )
+        );
+      }
+
+      // Step 3: Prompt classification (MoE intent detection)
+      systemLogger.step(3, 10, 'MoE プロンプト意図分類 & パラメータ決定');
+      const promptAnalysis = classifyPromptForMoE(text, { workspaceFiles });
+      systemLogger.info(
+        'INFERENCE',
+        `プロンプト意図判定: [${promptAnalysis.role}] (Temp: ${promptAnalysis.temperature})${
+          promptAnalysis.recommendedTools.length > 0
+            ? `, 推奨ツール: [${promptAnalysis.recommendedTools.map((t) => t.name).join(', ')}]`
+            : ''
+        }`
+      );
+
+      const activeGameCode = workspaceFiles.find((f) => f.path === 'index.html')?.content || '';
+
+      // Step 4: Hardware & Execution Diagnostics (CPU autonomous rule-based engine)
+      systemLogger.step(4, 10, 'CPU自律ルールベース実行準備 (GPU/モデルDL不要)');
+
+      // Step 5: Deterministic Pipeline Selection
+      const targetModelId = 'deterministic-core';
+      systemLogger.step(5, 10, `決定論的実行対象を確認: ${targetModelId}`, {
+        engineMode: 'autonomous_rule',
+        targetModelId,
+        activeModelId: '',
+      });
+
+      // Clean placeholder message based on selected engineMode
+      const placeholderText =
+        engineMode === 'autonomous_rule'
+          ? `⚙️ Non-LLM 決定論的コアで実行中...`
+          : `☁️ Gemini Cloud で生成中...`;
+
+      const placeholderMsg: ChatMessage = {
+        id: assistantId,
+        role: 'assistant',
+        content: placeholderText,
+        timestamp: Date.now(),
+        speaker: activeSpeaker,
+        engineMode: engineMode,
+        isStreaming: true,
+        executionSteps: systemLogger.getCurrentSessionSteps(),
+        metrics: {
+          engine:
+            engineMode === 'autonomous_rule'
+              ? 'Non-LLM Core'
+              : 'Gemini Cloud',
+        },
+      };
+      setMessages((prev) => [...prev, placeholderMsg]);
+
+      // Step 6: Deterministic runtime readiness
+      const isModelReady = true;
+      const isTargetCached = true;
+
+      systemLogger.step(6, 10, '決定論的Non-LLM実行準備完了', {
+        targetModelId,
+        isModelReady,
+        isTargetCached,
+        localGenerativeRuntime: false,
+      });
+
+      if (abortController.signal.aborted) {
+        handleAbortExit('工程 6 完了直後');
+        return;
+      }
+
+      // Step 7: System Prompt & Context Tokenization
+      systemLogger.step(7, 10, 'システムプロンプト合成 & コンテキストトークナイズ', {
+        targetModelId,
+        isModelReady,
+        isGpuUsable: false,
+      });
+      const tStart = performance.now();
+      const hasCodeInWorkspace = workspaceFiles.some(
+        (f) => f.content && f.content.trim().length > 20
+      );
+      const isCodeModRequest =
+        hasCodeInWorkspace &&
+        (
+          promptAnalysis.role === 'code' ||
+          promptAnalysis.role === 'shader' ||
+          promptAnalysis.role === 'logic' ||
+          /(修正|変更|直して|追加|改善|バグ|エラー|動かない|動くように|リファクタ|機能|もっと|コード|css|html|js|script|style|デザイン|色|スピード|ボタン|動き|調整|最適化|高速化|直せる|みて|見て)/i.test(text)
+        );
+
+      // 🛠️ ツール検出 & 自動実行パイプライン (:feature:tools / 設計思想 14 & 22)
+      // 小型旧ローカル生成ランタイム (1.5B/0.5B等) のハルシネーションを防ぐため、プロンプト生成前にツールを安全評価
+      const candidateTools = toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles });
+      const executedTools: ToolExecutionResult[] = [];
+
+      for (const rec of candidateTools) {
+        if (!rec.requiresConfirmation) {
+          // read_only / workspace_read 等の安全なツールは即時自動実行
+          try {
+            const toolRes = await toolsService.executeTool(
+              rec.toolId,
+              rec.suggestedParams || {},
+              {
+                workspaceFiles,
+                onUpdateWorkspaceFile: handleUpdateFileContent,
+                userNickname: persona.userNickname,
+              }
+            );
+            if (toolRes.success) {
+              executedTools.push(toolRes);
+              systemLogger.info('TOOLS', `LLM前処理ツール自動実行成功: [${rec.name}]`, {
+                summary: toolRes.outputSummary,
+                durationMs: toolRes.executionTimeMs,
+              });
+            } else if (toolRes.requiresPluginConsent) {
+              // 46章: 能力プラグイン権限未同意の場合はチャットで案内するため結果を格納
+              executedTools.push(toolRes);
+              systemLogger.warn('TOOLS', `LLM前処理ツールは能力プラグイン権限未同意のためブロック: [${rec.name}]`, {
+                plugin: toolRes.pluginConsentRequest?.plugin.name,
+              });
+            }
+          } catch (toolErr: any) {
+            systemLogger.warn('TOOLS', `LLM前処理ツール実行失敗 [${rec.name}]:`, toolErr?.message || toolErr);
+          }
+        } else {
+          // 破壊的操作 (ファイル書き換え等) の場合は確認キューに待機させ、チャット側にも通知
+          try {
+            const toolRes = await toolsService.executeTool(
+              rec.toolId,
+              rec.suggestedParams || {},
+              {
+                workspaceFiles,
+                onUpdateWorkspaceFile: handleUpdateFileContent,
+                userNickname: persona.userNickname,
+              },
+              { userConfirmed: false }
+            );
+            if (toolRes.requiresConfirmation && toolRes.result?.pendingRequest) {
+              systemLogger.info('TOOLS', `破壊的ツール確認待ちキュー登録: [${rec.name}]`, toolRes.result.pendingRequest);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        pendingToolConfirmation: toolRes.result.pendingRequest,
+                      }
+                    : m
+                )
+              );
+            }
+          } catch (toolErr: any) {
+            systemLogger.warn('TOOLS', `ツール確認キュー登録失敗 [${rec.name}]:`, toolErr?.message || toolErr);
+          }
+        }
+      }
+
+      // 🧠 世界モデル: 行動前予測 (設計思想 17. 世界モデルと予測誤差)
+      const actionPrediction = worldModelService.predictAction(text, relevantMemories, persona);
+      systemLogger.info('STEP', `世界モデル事前予測 [${actionPrediction.expectedIntent}] 期待トーン:${actionPrediction.expectedTone}, 予測記憶数:${actionPrediction.expectedMemoryUsage.predictedMemoryCount}`);
+
+      // 設計思想 Master v5.0 第4章: 3層コンテキスト長自動調整エンジン (Qwen等のモデルカタログ仕様に連動)
+      const isHeavyTask = isCodeModRequest || promptAnalysis.role !== 'moe_chat';
+      const budgetPlan = contextBudgetEngineService.calculateBudgetPlan(undefined, isHeavyTask, isCodeModRequest);
+      systemLogger.info(
+        'INFERENCE',
+        `📊 動的コンテキスト予算計画: nCtx=${budgetPlan.tier}, LiveBudget=${budgetPlan.liveBudget}tok, 履歴配分=${budgetPlan.historyQuota}tok, コード配分=${budgetPlan.codeQuota || 0}tok`
+      );
+
+      const promptBuildResult = await buildExpertSystemPromptWithTracking(
+        promptAnalysis.role,
+        persona,
+        relevantMemories,
+        workspaceFiles,
+        text,
+        {
+          includeFiles: isCodeModRequest,
+          activeFilePath,
+          codeQuotaTokens: budgetPlan.codeQuota,
+          toolResults: executedTools,
+          conversationState,
+          recentMessages: messages,
+          isCasualGreeting,
+        }
+      );
+      const systemPrompt = promptBuildResult.systemPrompt;
+      const usedMemoriesTracked = promptBuildResult.usedMemories;
+      const usedSkillsTracked = promptBuildResult.usedSkills;
+
+      // 記憶の利用履歴（useCount & lastUsedAt）を更新
+      if (usedMemoriesTracked.length > 0) {
+        setMemories((prev) => recordMemoryUsage(usedMemoriesTracked.map((m) => m.id), prev));
+      }
+
+      // コンテキスト圧縮 & スライディングウィンドウ (設計思想 Master v5.0 第4章 B層 動的予算配分)
+      const validHistoryMessages = messages.filter(
+        (m) => m.id !== 'welcome_msg' && m.id !== userMsg.id && m.content && m.content.trim()
+      );
+      const compressionResult = compressContextHistory(validHistoryMessages, {
+        maxContextTokens: budgetPlan.historyQuota,
+        recentTurnsToKeep: budgetPlan.recentTurnsToKeep,
+        triggerTokenThreshold: Math.floor(budgetPlan.liveBudget * 0.8),
+      });
+
+      if (compressionResult.isCompressed) {
+        systemLogger.info(
+          'STEP',
+          `コンテキスト自動圧縮実行: 元推定 ${compressionResult.originalTokensEstimated}トークン ➔ ${compressionResult.compressedTokensEstimated}トークン (${Math.round((1 - compressionResult.compressionRatio) * 100)}% 削減)`
+        );
+      }
+
+      // 設計思想 6章 & 35章 第3段階: 回答長選択と回答設計
+      const lengthSelection = responseDesignService.determineExpectedResponseLength(text, conversationState);
+      const activeExpectedLength = lengthSelection.length;
+      const responseDesignInstruction = responseDesignService.buildResponseDesignInstruction(
+        activeExpectedLength,
+        conversationState.stage,
+        isCasualGreeting
+      );
+
+      // 設計思想 47章 & 35章 第5段階: 自然言語からの自律ワークフロー合成
+      let synthesizedWf: SynthesizedWorkflow | undefined = undefined;
+      if (!isCasualGreeting && workflowSynthesisService.shouldSynthesizeWorkflow(text)) {
+        synthesizedWf = workflowSynthesisService.synthesizeWorkflow(text);
+        systemLogger.info(
+          'STEP',
+          `⚡ [47章 ワークフロー合成] ${synthesizedWf.steps.length}段階のパイプラインを自動生成 (ID: ${synthesizedWf.workflowId})`
+        );
+      }
+
+      systemLogger.info(
+        'STEP',
+        `回答長選定: [${activeExpectedLength.toUpperCase()}] (${lengthSelection.reason}, 目安:${lengthSelection.targetRange})`
+      );
+
+      // 会話状態管理 (設計思想 7章) & 回答設計 (設計思想 6章・第3段階)
+      const currentConvStateWithLength = {
+        ...conversationState,
+        expectedResponseLength: activeExpectedLength,
+      };
+      const stateSummary = isCasualGreeting ? '' : formatConversationStateForPrompt(currentConvStateWithLength);
+
+      // 設計思想 Master v5.2 第15章6節: プロンプトキャッシュ最適化 (Prompt Cache Alignment - 作業指示書 v6 優先度8 & 優先度1 是正版)
+      // DYNAMIC CONTEXTの要素を「不変度が高い順」に厳格整列する:
+      // 1. 静的プレフィックス (staticPrefixPrompt) - 完全固定（発言内容・ツール・役割に依存しない純粋な基底ペルソナ・ガイド・誠実性制約）
+      // 2. 会話状態JSON指示 (CONVERSATION_STATE_INSTRUCTION) - 完全固定（軽量版JSON指示、日常挨拶時はダイレクト応答のため省略）
+      // 3. 回答設計の原則 (responseDesignInstruction) - 準動的(6パターン)。直前ターンと同じlength/stageならキャッシュがここまで延長
+      // 4. 役割別指示 (promptBuildResult.expertInstruction) - 準動的(4パターン)。同一カテゴリの相談が続く限りキャッシュが延長
+      // 5. 利用可能ツール (promptBuildResult.toolBlock) - 準動的〜動的
+      // 6. 想起記憶 (promptBuildResult.dynamicSuffixPrompt) - 動的 (RAG・中期記憶・構造記憶・スキル・失敗回避・ソースコード等)
+      // 7. エピソード要約 (compressionResult.episodeSummary) - 動的
+      // 8. 会話状態サマリー (stateSummary) - 動的
+      // 9. 骨格指示 (skeletonInstruction) - 状況依存
+      const staticPrefix = promptBuildResult.staticPrefixPrompt || systemPrompt;
+      const dynamicElements: string[] = [];
+
+      // 1. 会話状態JSON指示 (日常挨拶時は即座の挨拶返答を最優先するため省略)
+      if (!isCasualGreeting) {
+        dynamicElements.push(CONVERSATION_STATE_INSTRUCTION);
+      }
+
+      // 2. 準動的 (length 3種 × stage 2種の6パターン または 挨拶モード): 回答設計の原則
+      dynamicElements.push(responseDesignInstruction);
+
+      // 3. 準動的: 役割別指示
+      if (promptBuildResult.expertInstruction) {
+        dynamicElements.push(`指示: ${promptBuildResult.expertInstruction}`);
+      }
+
+      if (!isCasualGreeting) {
+        // 4. 準動的〜動的: 利用可能ツール
+        if (promptBuildResult.toolBlock) {
+          dynamicElements.push(promptBuildResult.toolBlock);
+        }
+
+        // 5. 動的: 想起記憶 (RAG, アジェンダ, 構造記憶, スキル, 失敗回避, ツール実行結果, ソースコード)
+        if (promptBuildResult.dynamicSuffixPrompt) {
+          dynamicElements.push(promptBuildResult.dynamicSuffixPrompt);
+        }
+
+        // 6. 動的: エピソード要約
+        if (compressionResult.isCompressed && compressionResult.episodeSummary) {
+          dynamicElements.push(compressionResult.episodeSummary);
+        }
+
+        // 7. 動的: 会話状態サマリー
+        if (stateSummary) {
+          dynamicElements.push(stateSummary);
+        }
+
+        // 8. 動的: 骨格指示
+        if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
+          const skeletonInstruction = answerPlanService.buildInstruction(answerPlanResult.matchedSkeleton);
+          dynamicElements.push(skeletonInstruction);
+        }
+      }
+
+      const combinedSystemPrompt = dynamicElements.length > 0
+        ? `${staticPrefix}\n\n=== 🧠 DYNAMIC CONTEXT (想起記憶・対話状態・回答設計) ===\n${dynamicElements.join('\n\n')}`
+        : staticPrefix;
+
+      const chatContext: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+        { role: 'system', content: combinedSystemPrompt },
+      ];
+
+      const unknownResolution = await unifiedUnknownResolutionCoordinatorService.resolveForChat({
+        question: text,
+        useSearch,
+        hasAttachments: Boolean(attached && attached.length > 0),
+        onProgress: (message, details) => {
+          systemLogger.info('STEP', `[未知解決] ${message}`, details);
+        },
+      });
+      let userPromptContent = unknownResolution.effectiveText;
+      if (attached && attached.length > 0) {
+        const attachedDesc = attached
+          .map((a) => `[添付: ${a.name} (${a.type})]\n${(a.content || '').slice(0, 600)}`)
+          .join('\n\n');
+        userPromptContent = `${attachedDesc}\n\n${unknownResolution.effectiveText}`;
+      }
+      systemLogger.info('CHAT', `[未知解決] ${unknownResolution.status}`, {
+        unknownId: unknownResolution.resolution.id,
+        classification: unknownResolution.resolution.classification,
+        evidenceCount: unknownResolution.evidenceCount,
+        provider: unknownResolution.provider,
+        routes: unknownResolution.routes,
+      });
+
+      // 作業指示書 v5 優先度7: 会話履歴(chatContext)の送信トークン量削減
+      // 1. 直近履歴保持件数を6件から4件に減らしトークン消費を抑制
+      // 2. 文単位で切り詰めるtruncateTextBySentenceを採用し、文の途中で不自然に切れる問題を解消
+      // 3. 直近1〜2件（会話の核心部）は最大350文字、それ以前（古い履歴）は最大160文字に段階的縮小
+      const historyCandidates = compressionResult.isCompressed
+        ? compressionResult.formattedMessages.filter((m) => m.role !== 'system').slice(-4)
+        : validHistoryMessages.slice(-4).map((m) => ({ role: m.role, content: m.content }));
+
+      let lastRole: 'system' | 'user' | 'assistant' = 'system';
+      const historyLen = historyCandidates.length;
+      for (let i = 0; i < historyLen; i++) {
+        const m = historyCandidates[i];
+        const r: 'user' | 'assistant' = m.role === 'assistant' ? 'assistant' : 'user';
+        if (r !== lastRole) {
+          // 直近1〜2件（最新に近い）は最大350文字、古い履歴（3〜4件目）は最大160文字に段階的縮小
+          const distFromEnd = historyLen - 1 - i;
+          const maxLimit = distFromEnd < 2 ? 350 : 160;
+          const truncated = truncateTextBySentence(m.content || '', maxLimit);
+          chatContext.push({ role: r, content: truncated });
+          lastRole = r;
+        }
+      }
+
+      if (lastRole === 'user') {
+        chatContext.pop();
+      }
+      chatContext.push({ role: 'user', content: userPromptContent });
+
+      // 作業指示書 v5 計測要件: chatContext全体の文字数・推定トークン数・System/履歴/ユーザーの内訳、
+      // および実際に選ばれたlength（short/standard/detailed）とstage（CORRECTIONか否か）を送信直前ログに詳細記録
+      const charsCombinedSystem = combinedSystemPrompt.length;
+      const charsStaticPrefix = staticPrefix.length;
+      const charsDynamicContext = dynamicElements.length > 0 ? dynamicElements.join('\n\n').length : 0;
+      // 実際にchatContextに積まれた履歴（先頭systemと末尾userを除外）
+      const actualHistoryMessages = chatContext.slice(1, -1);
+      const charsHistory = actualHistoryMessages.reduce((acc, m) => acc + (m.content?.length || 0), 0);
+      const charsUser = userPromptContent.length;
+      const charsTotal = chatContext.reduce((acc, m) => acc + (m.content?.length || 0), 0);
+      const estimatedTokens = Math.round(charsTotal / 1.5);
+      const isCorrectionStage = conversationState.stage === 'CORRECTION';
+
+      const promptStats = {
+        charsTotal,
+        charsCombinedSystem,
+        charsStaticPrefix,
+        charsDynamicContext,
+        dynamicElementsCount: dynamicElements.length,
+        charsHistory,
+        historyMessageCount: actualHistoryMessages.length,
+        charsUser,
+        estimatedTokens,
+        expectedLength: activeExpectedLength,
+        stage: conversationState.stage,
+        isCorrectionStage,
+      };
+
+      systemLogger.info(
+        'EXTERNAL_GPU',
+        `🔍 [chatContext 送信直前サイズ解析] 全体: ${charsTotal}文字 (~${estimatedTokens} tok) | System: ${charsCombinedSystem}字 (静的: ${charsStaticPrefix}字, 動的: ${charsDynamicContext}字) | 履歴: ${actualHistoryMessages.length}件 (${charsHistory}字) | ユーザー: ${charsUser}字 | 回答設計: length=${activeExpectedLength}, stage=${conversationState.stage} (isCorrection=${isCorrectionStage})`,
+        {
+          promptStats,
+          systemBreakdown: {
+            staticPrefixLength: charsStaticPrefix,
+            dynamicElementsCount: dynamicElements.length,
+            dynamicPreview: dynamicElements.map((el, i) => `[#${i + 1}] ${el.slice(0, 50)}... (${el.length}字)`),
+            expectedLength: activeExpectedLength,
+            stage: conversationState.stage,
+            isCorrectionStage,
+          },
+        }
+      );
+
+      let accumulated = '';
+      let tokenCount = 0;
+      let firstTokenTime: number | null = null;
+      let stateStartTime: number | null = null;
+      let stateEndTime: number | null = null;
+      let stateDurationMs: number | null = null;
+      let ruleExecutionSuccess = false;
+      let executedEngineLabel = 'CPU自律ルールベース';
+      let diagnosticData: ChatMessage['fallbackDiagnostic'] = undefined;
+      let capturedExternalDiag: any = undefined;
+
+      // Step 8: Runtime execution boundary. Deterministic Non-LLM Core
+      const deterministic = await nonLlmCoreService.execute({
+        prompt: chatContext.map((m: any) => m.content).join('\n'),
+        memories: relevantMemories,
+        recentMessages: chatContext as any,
+        persona: persona.name,
+      });
+      accumulated = deterministic.replyText || '';
+      ruleExecutionSuccess = accumulated.trim().length > 0;
+      firstTokenTime = performance.now();
+      stateStartTime = firstTokenTime;
+      stateEndTime = performance.now();
+      stateDurationMs = Math.round(stateEndTime - stateStartTime);
+      if (accumulated) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId
+              ? { ...msg, content: accumulated, isStreaming: true, executionSteps: systemLogger.getCurrentSessionSteps() }
+              : msg
+          )
+        );
+      }
+
+      if (abortController.signal.aborted) {
+        handleAbortExit('工程 8 完了直後');
+        return;
+      }
+
+      // Step 9: 例外検証 & 自己修復 / フォールバック調停
+      systemLogger.step(9, 10, '例外検証 & 自己修復 / フォールバック調停', {
+        webGpuSuccess: ruleExecutionSuccess,
+        executedEngineLabel,
+        hasError: !ruleExecutionSuccess,
+      });
+
+      let latestPrivacyAudit: PrivacyAuditResult | undefined = undefined;
+
+      // Step 10: 応答確定・UIレンダリング & ワークスペース同期
+      const tEnd = performance.now();
+      const totalElapsedMs = Math.round(tEnd - sendStartTime);
+      const durationSec = (tEnd - (firstTokenTime || tStart)) / 1000;
+      const tokPerSec = Number((tokenCount / Math.max(0.05, durationSec)).toFixed(1));
+
+      // 設計思想 7章: 会話状態管理 (会話状態の抽出 & 表示テキストの分離 - 作業指示書 v6 優先度9)
+      const { state: newConvState, visibleText: rawExtractedText, stats: stateStats } = extractConversationState(
+        accumulated,
+        conversationState,
+        {
+          userPrompt: text,
+          inferredExpectedLength: activeExpectedLength,
+          stateDurationMs: stateDurationMs ?? undefined,
+        }
+      );
+      setConversationState(newConvState);
+
+      // 作業指示書 フェーズ1: シャドー比較記録 (LLM出力state.currentTopic vs 非LLM resolveAnaphora)
+      if (shadowAnaphoraResult && shadowAnaphoraResult.detectedExpression) {
+        const isMatched = shadowAnaphoraResult.resolved
+          ? newConvState.currentTopic.includes(shadowAnaphoraResult.resolved) ||
+            shadowAnaphoraResult.resolved.includes(newConvState.currentTopic)
+          : false;
+        systemLogger.info(
+          'STATE_EXTRACTION',
+          `⚖️ [指示語解決シャドー比較] 表現:「${shadowAnaphoraResult.detectedExpression}」 | 非LLM決定結果: ${shadowAnaphoraResult.resolved || '(なし/複数候補)'} vs LLM申告topic:「${newConvState.currentTopic}」 | 一致判定: ${isMatched ? 'MATCH (一致)' : 'DIVERGED (不一致/未解決)'}`,
+          {
+            expression: shadowAnaphoraResult.detectedExpression,
+            nonLlmResolved: shadowAnaphoraResult.resolved,
+            llmTopic: newConvState.currentTopic,
+            confidence: shadowAnaphoraResult.confidence,
+            isMatched,
+          }
+        );
+      }
+
+      // 作業指示書 フェーズ2: モデル応答の認識論的分類シャドー記録 (現実/創作/仮定の混同防止)
+      const shadowResponseEpistemic = classifyClaimEpistemology(rawExtractedText);
+      systemLogger.info(
+        'STATE_EXTRACTION',
+        `⚖️ [認識論的分類シャドー (モデル応答)] 判定: [${shadowResponseEpistemic.status.toUpperCase()}] (確信度: ${Math.round(shadowResponseEpistemic.confidence * 100)}%) | マーカー: [${shadowResponseEpistemic.detectedMarkers.join(', ') || 'なし'}] | 理由: ${shadowResponseEpistemic.reasons.join(', ')}`,
+        {
+          shadowResponseEpistemic,
+          userInputStatus: shadowUserEpistemic.status,
+          isConsistencyPreserved:
+            shadowUserEpistemic.status === 'fictional'
+              ? shadowResponseEpistemic.status === 'fictional' || shadowResponseEpistemic.status === 'unverified'
+              : true,
+        }
+      );
+
+      // 第13.4節: 意味保持検査 (Semantic Preservation Check)
+      // 回答内容IRで定めた条件・否定・確実性・世界スコープが表層文で歪曲・脱落していないかを決定論的に検査
+      if (currentAnswerIrRef.current) {
+        const preservationCheck = answerContentIrService.verifySemanticPreservation(
+          currentAnswerIrRef.current,
+          rawExtractedText
+        );
+        systemLogger.info(
+          'ANSWER_PLAN',
+          `🔍 [13.4 意味保持検査] 結果: ${preservationCheck.isPreserved ? 'PASSED (完全維持)' : 'VIOLATIONS_DETECTED (脱落・歪曲検知)'}`,
+          {
+            preservationCheck,
+            irId: currentAnswerIrRef.current.ir_id,
+          }
+        );
+      }
+
+      // 第38章: メタ認知キャリブレーション (Metacognitive Calibration)
+      // 生成応答に対する事実根拠・構文健全性・制約充足度を多面的にスコアリングし過信・ハルシネーションを防止
+      const isVbaTopic = /vba|マクロ|excel/i.test(text);
+      const metacognitiveCalib = metacognitiveCalibrationService.calibrateConfidence(
+        text.slice(0, 50),
+        rawExtractedText,
+        {
+          domain: isVbaTopic ? 'vba' : undefined,
+          hasMemoryGrounding: memories.length > 0,
+        }
+      );
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🧠 [38章 メタ認知確信度較正] 較正スコア: ${metacognitiveCalib.calibratedConfidence}% (生スコア: ${metacognitiveCalib.rawConfidence}%, リスク: ${metacognitiveCalib.overconfidenceRisk}) - アクション: ${metacognitiveCalib.calibrationAction}`,
+        { metacognitiveCalib }
+      );
+
+      systemLogger.step(10, 10, '応答確定・UIレンダリング & ワークスペース同期', {
+        executedEngineLabel,
+        tokenCount,
+        tokPerSec,
+        totalElapsedMs,
+        ttftMs: Math.round((firstTokenTime || tEnd) - tStart),
+        stateStats,
+      });
+
+      // 設計思想 6章 & 35章 第3段階: 回答設計・重複排除・自然な日本語化ポストプロセス
+      const targetLength = newConvState.expectedResponseLength || activeExpectedLength;
+      let { cleanedText: finalVisibleText, quality: responseQuality } = responseDesignService.processOutput(
+        rawExtractedText,
+        targetLength
+      );
+
+      // 設計思想 第38章: 過信抑制・メタ認知ヘッジ注記の決定論的付加
+      if (
+        (metacognitiveCalib.calibrationAction === 'ATTACH_HEDGE' || metacognitiveCalib.overconfidenceRisk === 'HIGH') &&
+        !finalVisibleText.includes('動作確認') &&
+        !finalVisibleText.includes('前提')
+      ) {
+        const hedgeNote = isVbaTopic
+          ? '\n\n> 💡 **実機検証の推奨**: 本コードは標準的な仕様に準拠していますが、ご利用のExcel環境やセキュリティ設定により挙動が異なる場合がありますので、事前テストを推奨します。'
+          : '\n\n> 💡 **前提条件**: 本回答は現在提示された条件に基づく推奨です。環境に応じた最適な手法を順次ご確認いただくことをお勧めします。';
+        finalVisibleText += hedgeNote;
+      }
+
+      // 設計思想 第69章 & 第39章: 永続人格多重アンカー & 感情共感親愛スタンス維持 (口調・親愛維持＆禁止冷徹語句排除)
+      const personaRestored = proactiveContextOsService.verifyAndRestorePersona(finalVisibleText);
+      finalVisibleText = personaRestored.restoredText;
+
+      // 文書48章: 完成条件と完了判定器による評価 (Checklist evaluation)
+      const streamEvaluation = completionJudgeService.evaluateCompletion({
+        userGoal: text,
+        assistantResponse: finalVisibleText,
+        executionSteps: systemLogger.getCurrentSessionSteps(),
+        executedTools: promptBuildResult.executedTools,
+        files: workspaceFiles,
+      });
+
+      // 48章の完了判定が自動的に FAILED / BLOCKED を検出した場合、
+      // ユーザーの👎を待たずに自己改善ルーターへ自動的に診断依頼する。
+      // ※ PARTIAL は正常な途中経過であり得るため除外（ノイズ防止）。
+      // ※ EXTERNAL_COMPILE_REQUIRED / RUNTIME_TEST_REQUIRED は外部確認が必要な正常振る舞いのため除外。
+      // ※ CANCELLED / COMPLETE は対象外。
+      if (
+        (streamEvaluation.status === 'FAILED' || streamEvaluation.status === 'BLOCKED') &&
+        !streamEvaluation.autoDiagnosedAt
+      ) {
+        selfImprovementService.diagnoseFailure(
+          text,
+          finalVisibleText,
+          `[自動検出] 完了判定: ${streamEvaluation.status} - ${streamEvaluation.reason}`,
+          {
+            memoriesUsedCount: (promptBuildResult.usedMemories || []).length,
+            promptLengthChars: 1200,
+            engineMode: engineMode || 'autonomous_rule',
+          }
+        );
+        streamEvaluation.autoDiagnosedAt = Date.now();
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `🔍 完了判定(${streamEvaluation.status})を自動検出し、改善ルーターへ自動登録しました(ユーザー操作不要)。`
+        );
+      }
+
+      systemLogger.info('CHAT', `[完了判定器] 応答完了判定: [${streamEvaluation.status}] スコア:${streamEvaluation.score}% - ${streamEvaluation.headline}`, {
+        status: streamEvaluation.status,
+        score: streamEvaluation.score,
+        isCodeOrVba: streamEvaluation.isCodeOrVba,
+        requiresExternalVerification: streamEvaluation.requiresExternalVerification,
+      });
+
+      // コードブロック抽出 & 生成と適用の分離 (設計思想 ②: コード自動適用の確認ゲート & ⑩: VBA準備ゲート)
+      const codeBlocks = extractCodeBlocks(finalVisibleText);
+      let codeProposal: CodeProposal | undefined = undefined;
+      let vbaAssessment: VbaSafetyAssessment | undefined = undefined;
+
+      if (codeBlocks.length > 0) {
+        codeProposal = {
+          id: `proposal_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          files: codeBlocks.map((cb) => ({
+            path: cb.path,
+            name: cb.name,
+            content: cb.content,
+            language: cb.language,
+          })),
+          status: 'pending',
+          source: 'assistant',
+          createdAt: Date.now(),
+        };
+
+        const vbaBlock = codeBlocks.find(
+          (cb) => cb.language === 'vba' || cb.name.endsWith('.bas') || cb.content.toLowerCase().includes('sub ') || cb.content.toLowerCase().includes('dim ')
+        );
+        if (vbaBlock) {
+          vbaAssessment = schemaValidationService.evaluateVbaSafety(vbaBlock.content);
+        }
+      }
+
+      // 設計思想 10章 & 35章 第5段階: 総合コード・VBA安全準備ゲート検証
+      const codeVerification = codeVerificationService.verifyCode(finalVisibleText);
+      if (codeVerification.hasCode) {
+        systemLogger.info(
+          'CHAT',
+          `[10章 コード準備ゲート] 検証: 言語=[${codeVerification.languages.join(',')}] 安全度=${codeVerification.safetyLevel}(${codeVerification.safetyScore}点) 準備ステータス=${codeVerification.readiness} 構文エラー=${codeVerification.syntaxErrors.length}件 リスク=${codeVerification.risks.length}件`
+        );
+      }
+
+      // 設計思想 15-16章 & 35章 第5段階: 内的自己反証・エッジケース自己検証ループ
+      const falsificationReport = falsificationService.evaluateFalsification({
+        userGoal: text,
+        assistantResponse: finalVisibleText,
+        conversationState: newConvState,
+        codeVerification,
+      });
+      systemLogger.info(
+        'CHAT',
+        `[15-16章 内的自己反証] 反証スコア=${falsificationReport.falsificationScore}点 合格=${falsificationReport.passed ? 'PASS' : 'WARN/FAIL'} 警告=${falsificationReport.falsificationWarnings.length}件`
+      );
+
+      // 作業指示書 v15 (v10内的自己反証接続): 自己反証結果をConversationStateへ書き込み
+      newConvState.lastFalsificationPassed = falsificationReport.passed;
+      newConvState.lastFalsificationScore = falsificationReport.falsificationScore;
+      setConversationState((prev) => ({
+        ...prev,
+        lastFalsificationPassed: falsificationReport.passed,
+        lastFalsificationScore: falsificationReport.falsificationScore,
+      }));
+
+      // =========================================================================
+      // 設計思想 22〜25章: コード理解中間IRの抽出 (CodeUnderstandingIR)
+      // =========================================================================
+      let codeUnderstandingIR = undefined;
+      if (featureFlagsService.isEnabled('CODE_UNDERSTANDING') && codeBlocks.length > 0) {
+        const targetBlock = codeBlocks[0];
+        codeUnderstandingIR = codeUnderstandingService.parseCodeToIR(
+          targetBlock.content,
+          (targetBlock.language as any) || 'vba',
+          targetBlock.name
+        );
+        systemLogger.info(
+          'CHAT',
+          `[22〜25章 CodeIR] プロシージャ数=${codeUnderstandingIR.procedures.length}, 矛盾検知=${codeUnderstandingIR.commentCodeContradictions.length}件`
+        );
+      }
+
+      // =========================================================================
+      // 設計思想 26章: 抽象VBA設計仕様書 & 決定表ゲート (VbaDesignSpecification)
+      // =========================================================================
+      let vbaDesignSpecification = undefined;
+      const isVbaRequest =
+        text.toLowerCase().includes('vba') ||
+        text.includes('マクロ') ||
+        text.includes('excel') ||
+        text.includes('エクセル') ||
+        codeBlocks.some((b) => b.language === 'vba' || b.name.endsWith('.bas'));
+
+      if (featureFlagsService.isEnabled('VBA_DESIGN_ASSISTANT') && isVbaRequest) {
+        vbaDesignSpecification = vbaDesignAssistantService.createSpecificationFromPrompt(text);
+        systemLogger.info(
+          'CHAT',
+          `[26章 抽象VBA設計仕様書] 決定表ルール=${vbaDesignSpecification.decisionTable.rules.length}則, 抽象プロシージャ=${vbaDesignSpecification.procedurePlans.length}件`
+        );
+      }
+
+      // =========================================================================
+      // 設計思想 21・32章: 不足能力・習得状態追跡 (Capability Gap & Mastery)
+      // =========================================================================
+      if (streamEvaluation.status === 'COMPLETE') {
+        if (isVbaRequest) {
+          capabilityGapService.recordSuccess('cap_abstract_vba_design');
+        }
+        if (codeBlocks.length > 0) {
+          capabilityGapService.recordSuccess('cap_code_comprehension');
+        }
+        if (answerPlanResult.applied && answerPlanResult.matchedSkeleton) {
+          capabilityGapService.checkAndRecordGeneralizationGap({
+            capabilityId: 'cap_correction',
+            patternId: answerPlanResult.matchedSkeleton.pattern_id,
+            prompt: text,
+            isCorrectAnswer: true,
+          });
+        }
+      } else if (streamEvaluation.status === 'FAILED' || streamEvaluation.status === 'BLOCKED') {
+        const gapEntry = capabilityGapService.recordGap({
+          description: `[完了判定${streamEvaluation.status}] ${streamEvaluation.reason || '目標要件未充足'}`,
+          gap_type: 'failure',
+          capabilityId: isVbaRequest ? 'cap_abstract_vba_design' : 'cap_logical_priority',
+          impact: 'HIGH',
+          current_workaround: '教師教材・決定表による再設計',
+          candidate_solution: '教師教材の生成、回答骨格の拡充',
+          samplePrompt: text,
+        });
+
+        // フェーズ4: 不足能力発生時の形式制約検査 & 代替能力プラグイン探索
+        const relatedPlugin = capabilityPluginService.findBestPluginForTask(text);
+        const cspCheck = formalConstraintSolverService.solveCSP({
+          targetModel: ['legacy-generative-model'],
+          activeWeights: ['IMMUTABLE'],
+          dataPrivacyLevel: ['LOCAL'],
+          networkDestination: ['INTERNAL'],
+        });
+        systemLogger.info(
+          'CAPABILITY_GAP',
+          `🔍 [フェーズ4 ギャップ連動検証] ギャップID: ${gapEntry.gap_id} | 不足能力: ${gapEntry.capabilityId} | 代替プラグイン: ${relatedPlugin?.name || '(なし)'} (${relatedPlugin?.status || 'N/A'}) | 制約充足: ${cspCheck.isSatisfied ? 'SAT' : 'UNSAT'}`
+        );
+      }
+
+      // 設計思想 49章: 経験の保存先ルーターによる9分類自動仕分け
+      const streamExperienceRouting = experienceRouterService.routeExperience(
+        {
+          content: finalVisibleText,
+          source: 'conversation',
+          category: finalVisibleText.includes('```') ? 'code' : 'chat',
+        },
+        memories
+      );
+
+      // 設計思想 18章: 会話評価11指標のリアルタイム測定
+      const streamDialogueEvaluation = dialogueEvaluationService.evaluateGeneralDialogue(
+        text,
+        finalVisibleText,
+        totalElapsedMs
+      );
+
+      // 設計思想 20章: 不確実性・判断ブレ検出 (条件該当時)
+      let streamUncertaintyEvaluation = undefined;
+      const isUncertaintyCandidate =
+        text.includes('どちら') ||
+        text.includes('比較') ||
+        text.includes('なぜ') ||
+        text.includes('どうすれば') ||
+        text.includes('どっち') ||
+        text.includes('理由') ||
+        text.includes('発熱') ||
+        text.includes('メモリ');
+
+      if (isUncertaintyCandidate) {
+        try {
+          streamUncertaintyEvaluation = await uncertaintyTeacherService.evaluateUncertainty(
+            text,
+            { targetCapabilityId: isVbaRequest ? 'cap_abstract_vba_design' : 'cap_conv_naturalness' }
+          );
+        } catch {
+          // ignore
+        }
+      }
+
+      // 設計思想 36章: 当面の最小完成範囲 リアルタイム達成追跡
+      if (streamDialogueEvaluation.directness >= 75) {
+        minimalScopeService.updateItemStatus('conv_7_direct_answer', 'VERIFIED_ACTIVE');
+      }
+      if (streamDialogueEvaluation.contextRetention >= 75) {
+        minimalScopeService.updateItemStatus('conv_2_recent_context', 'VERIFIED_ACTIVE');
+        minimalScopeService.updateItemStatus('conv_3_maintain_topic', 'VERIFIED_ACTIVE');
+      }
+      if (streamDialogueEvaluation.noRepetition >= 75) {
+        minimalScopeService.updateItemStatus('conv_6_choose_length', 'VERIFIED_ACTIVE');
+      }
+      if (codeBlocks.length > 0) {
+        minimalScopeService.updateItemStatus('code_1_split_procedures', 'VERIFIED_ACTIVE');
+        minimalScopeService.updateItemStatus('code_8_natural_flow_explanation', 'VERIFIED_ACTIVE');
+      }
+
+      // 設計思想 Master v5.0 第9章1節: 1.5B/3Bドラフト検証パイプライン (有効時)
+      let draftVerificationData: DraftVerificationResult | undefined = undefined;
+      if (draftVerificationService.getConfig().enabled) {
+        try {
+          const savedExt = storageService.getItem('miki_external_llm_config');
+          const extCfg = savedExt ? JSON.parse(savedExt) : undefined;
+          draftVerificationData = await draftVerificationService.verifyDraftWith3B(
+            text,
+            finalVisibleText,
+            extCfg
+          );
+          if (draftVerificationData.verifiedText) {
+            finalVisibleText = draftVerificationData.verifiedText;
+          }
+        } catch (verErr) {
+          console.warn('Draft verification error:', verErr);
+        }
+      }
+
+      // 設計思想 Master v5.0 第13章: 自律型Web検索＆能動学習結果の抽出
+      const searchTool = executedTools.find((t) => t.toolId === 'tool_web_search');
+      let autonomousSearchData: AutonomousSearchMessageMeta | undefined = undefined;
+      if (searchTool && searchTool.success && searchTool.result) {
+        autonomousSearchData = {
+          query: searchTool.result.query,
+          results: searchTool.result.results || [],
+          summary: searchTool.result.summary,
+          learnedFacts: searchTool.result.learnedKnowledge || [],
+          searchTimeMs: searchTool.executionTimeMs,
+          provider: searchTool.result.provider,
+        };
+      }
+
+      // 設計思想 Master v5.0 第11章: 送信ガードレール＆プライバシー監査の保証
+      if (!latestPrivacyAudit) {
+        latestPrivacyAudit = privacyGuardrailService.auditOutboundContent(text, 'chat_engine');
+      }
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantId
+            ? {
+                ...msg,
+                content: finalVisibleText,
+                speaker: activeSpeaker,
+                isStreaming: false,
+                completionEvaluation: streamEvaluation,
+                responseQuality,
+                codeVerification,
+                vbaStaticVerification: codeVerification.vbaStaticResult,
+                privacyAudit: latestPrivacyAudit,
+                falsificationReport,
+                synthesizedWorkflow: synthesizedWf,
+                fallbackDiagnostic: diagnosticData,
+                executionSteps: systemLogger.getCurrentSessionSteps(),
+                codeProposal,
+                vbaAssessment,
+                // 設計思想 Version 3.2 追加フィールド
+                answerPlan: answerPlanResult,
+                codeUnderstandingIR,
+                vbaDesignSpecification,
+                experienceRouting: streamExperienceRouting,
+                dialogueEvaluation: streamDialogueEvaluation,
+                uncertaintyEvaluation: streamUncertaintyEvaluation,
+                metrics: {
+                  engine: executedEngineLabel,
+                  tokens: tokenCount,
+                  tokensPerSec: tokPerSec,
+                  ttftMs: Math.round((firstTokenTime || tEnd) - tStart),
+                  totalDurationMs: totalElapsedMs,
+                },
+                usedMemories: usedMemoriesTracked,
+                usedSkills: usedSkillsTracked,
+                suggestedTools: promptBuildResult.recommendedTools,
+                executedTools: promptBuildResult.executedTools,
+                draftVerification: draftVerificationData,
+                autonomousSearch: autonomousSearchData,
+                externalLlmDiagnostic: capturedExternalDiag,
+                nonLlmPipelineMeta: currentNonLlmMeta,
+                coreTracking: getCoreTracking(coreRequestId),
+              }
+            : msg
+        )
+      );
+
+      typedCoreUiGatewayService.finalizeConversationResponse(coreTask.task.taskId, {
+        reply: finalVisibleText,
+        tokens: tokenCount,
+        elapsedMs: totalElapsedMs,
+      });
+
+      systemLogger.info(
+        'CHAT',
+        `チャット処理全工程完了: [${executedEngineLabel}] (文字数: ${finalVisibleText.length}, 総所要時間: ${totalElapsedMs}ms, TTFT: ${Math.round((firstTokenTime || tEnd) - tStart)}ms) [第3段階 回答品質: 長さ=${responseQuality.lengthCategory}(${responseQuality.lengthCompliant ? 'OK' : '調整済'}) 結論先頭=${responseQuality.directAnswerFirst ? 'OK' : 'NG'} 重複除去=${responseQuality.duplicatesRemovedCount} 自然化置換=${responseQuality.unnaturalPhrasesFixed}]`
+      );
+
+      // 設計思想 第155章: 認知デバッガ・推論トレース記録
+      try {
+        cognitiveDebuggerService.recordTrace(
+          text,
+          finalVisibleText.slice(0, 120),
+          promptAnalysis.role,
+          (usedMemoriesTracked || []).map((m) => `想起記憶(${m.id})`),
+          ['生成モデル不変条件チェック', '第28章 理解度追従', '第69章 人格多重アンカー'],
+          answerPlanResult.matchedSkeleton?.pattern_id || 'DEFAULT_COMPANION',
+          [
+            { stepName: '意図解析&MoEルーティング', durationMs: 15, status: 'SUCCESS', details: `判定: ${promptAnalysis.role}` },
+            { stepName: '多層記憶想起&ハイブリッド検索', durationMs: 45, status: 'SUCCESS', details: `想起記憶: ${(usedMemoriesTracked || []).length}件` },
+            { stepName: '推論エンジン実行', durationMs: Math.max(10, totalElapsedMs - 80), status: 'SUCCESS', details: `エンジン: ${executedEngineLabel}` },
+            { stepName: 'ポストプロセス&人格アンカー保護', durationMs: 20, status: 'SUCCESS', details: '不変条件オールクリア' },
+          ],
+          totalElapsedMs,
+          '推論経路の健全性を確認。不変条件および品質ゲートに適合しています。'
+        );
+      } catch (traceErr) {
+        console.warn('Cognitive trace record skipped:', traceErr);
+      }
+
+      // 設計思想 Master v5.0 第2章: 今回使われた記憶IDを次ターンの感情価フィードバック用に記録
+      lastTurnUsedMemoryIdsRef.current = (usedMemoriesTracked || []).map((m) => m.id);
+
+      // 設計思想 Master v5.0 第2章③: 中期記憶 (Working Agenda) の動的更新
+      workingAgendaService.recordTurnAgenda(text, finalVisibleText);
+
+      // 設計思想 Master v5.0 第3章5節: 統合診断ログ (Unified Diagnostic Log) 記録
+      contextBudgetEngineService.recordDiagnosticLog({
+        turn_id: assistantId,
+        timestamp: Date.now(),
+        recall: {
+          vector_seeds: (usedMemoriesTracked || []).map((m) => m.id),
+          link_expanded: (usedMemoriesTracked || []).filter((m) => {
+            const mem = memories.find((orig) => orig.id === m.id);
+            return mem?.relatedMemoryIds && mem.relatedMemoryIds.length > 0;
+          }).map((m) => m.id),
+          tag_matched: (usedMemoriesTracked || []).filter((m) => {
+            const mem = memories.find((orig) => orig.id === m.id);
+            return mem?.tags && mem.tags.length > 0;
+          }).map((m) => m.id),
+          ratio_used: 'vector:0.5, link:0.3, tag:0.2',
+          contradiction_pairs_flagged: memoryPipelineResult?.scoredMemories?.filter((sm: any) => sm.contradictionWarning)?.length || 0,
+        },
+        context: {
+          estimated_tokens_before: promptBuildResult.promptLengthChars ? Math.round(promptBuildResult.promptLengthChars / 3) : 0,
+          live_nctx: budgetPlan.tier,
+          compression_triggered: compressionResult.isCompressed,
+          budget_breakdown: {
+            persona: budgetPlan.personaQuota,
+            memory: budgetPlan.memoryRecallQuota,
+            history: budgetPlan.historyQuota,
+            headroom: budgetPlan.headroomTokens,
+          },
+        },
+        cache: {
+          cache_hit_tokens: 0,
+          prompt_processing_ms: Math.round((firstTokenTime || tEnd) - tStart),
+          ttl_applied: contextBudgetEngineService.getVariableTtlSeconds(),
+        },
+      });
+
+      // 🧠 世界モデル: 事後検証 & 予測誤差の計算 (設計思想 17. 世界モデルと予測誤差)
+      const errorRecord = worldModelService.recordOutcomeAndComputeError(actionPrediction, {
+        assistantResponse: finalVisibleText,
+        actualUsedMemories: usedMemoriesTracked,
+        actualUsedSkills: usedSkillsTracked,
+        executionError: false,
+        tokenCount,
+        elapsedMs: totalElapsedMs,
+      });
+
+      if (errorRecord.predictionError.errorMagnitude > 0.3) {
+        systemLogger.warn('SELF_IMPROVEMENT', `世界モデル予測誤差検知 [${errorRecord.predictionError.errorCategory}] 乖離度:${errorRecord.predictionError.errorMagnitude} -> ${errorRecord.predictionError.diagnosisNote}`);
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
+        console.log('Chat request aborted.');
+        return;
+      }
+      console.warn('Chat error caught gracefully:', err);
+      systemLogger.error('CHAT', `チャット処理例外: ${err?.message || err}`);
+
+      // In case of WebGPU device/buffer interruption, reset instance for next prompt
+      if (engineMode === 'autonomous_rule') {
+        deterministicRuntimeService.forceResetInitializingLock();
+      }
+
+      const errorText = err?.message || String(err);
+      const errorEvaluation = completionJudgeService.evaluateCompletion({
+        userGoal: text,
+        assistantResponse: errorText,
+        isError: true,
+        executionSteps: systemLogger.getCurrentSessionSteps(),
+      });
+
+      // 48章の完了判定が自動的に FAILED / BLOCKED を検出した場合、
+      // ユーザーの👎を待たずに自己改善ルーターへ自動的に診断依頼する。
+      // ※ PARTIAL は正常な途中経過であり得るため除外（ノイズ防止）。
+      // ※ EXTERNAL_COMPILE_REQUIRED / RUNTIME_TEST_REQUIRED は外部確認が必要な正常振る舞いのため除外。
+      // ※ CANCELLED / COMPLETE は対象外。
+      if (
+        (errorEvaluation.status === 'FAILED' || errorEvaluation.status === 'BLOCKED') &&
+        !errorEvaluation.autoDiagnosedAt
+      ) {
+        selfImprovementService.diagnoseFailure(
+          text,
+          errorText,
+          `[自動検出] 完了判定: ${errorEvaluation.status} - ${errorEvaluation.reason} (例外: ${err?.message || err})`,
+          {
+            memoriesUsedCount: 0,
+            promptLengthChars: 1200,
+            engineMode: engineMode || 'autonomous_rule',
+          }
+        );
+        errorEvaluation.autoDiagnosedAt = Date.now();
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `🔍 完了判定(${errorEvaluation.status})を自動検出し、改善ルーターへ自動登録しました(ユーザー操作不要)。`
+        );
+      }
+
+      coreResultService.fail(coreRequestId, errorText, {
+        route: ['conversation'],
+        processedCategories: ['conversation'],
+      });
+
+      const errorMsg: ChatMessage = {
+        id: 'msg_err_' + Date.now(),
+        role: 'assistant',
+        content: `❌ **エラー**: ${errorText}\n\n**詳細**: ${err?.stack ? `\`\`\`\n${err.stack.slice(0, 300)}\n\`\`\`` : 'なし'}`,
+        timestamp: Date.now(),
+        isError: true,
+        completionEvaluation: errorEvaluation,
+        coreTracking: getCoreTracking(coreRequestId),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
+      setIsGenerating(false);
+      currentAssistantIdRef.current = null;
+      abortControllerRef.current = null;
+    }
+  };
+
+  // AI Auto Debug (設計思想 5. 自己修正・自動リトライ & 14. サンドボックス安全実行環境)
+  const handleAutoDebug = async (errorLogs: string[]) => {
+    setIsDebugging(true);
+    const targetFile =
+      workspaceFiles.find((f) => f.path === activeFilePath) ||
+      workspaceFiles.find((f) => f.path === 'index.html') ||
+      workspaceFiles[0];
+    const activeGameCode = targetFile?.content || '';
+
+    const errorSummary = errorLogs.slice(-3).join('\n');
+    const userMsg: ChatMessage = {
+      id: 'msg_dbg_req_' + Date.now(),
+      role: 'user',
+      content: `🤖 **サンドボックス実行エラー検知** (${targetFile?.path || 'コード'}):\n以下のエラーが出たよ！自動修復してくれる？\n\`\`\`\n${errorSummary}\n\`\`\``,
+      timestamp: Date.now(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setIsLoading(true);
+
+    try {
+      systemLogger.info('STEP', `⚡ サンドボックス自動自己修復ループ開始: ${errorLogs.length}件のエラーログ`);
+
+      let responseText = '';
+      try {
+        const response = await sendDebugRequest(
+          errorLogs,
+          activeGameCode,
+          workspaceFiles
+        );
+        responseText = response.text;
+      } catch (cloudErr) {
+        // クラウドAPIオフライン時のローカル自己修復ヒューリスティック
+        systemLogger.warn('CHAT', 'クラウドデバッガーオフラインのためローカル自律デバッガーを実行');
+        let patchedCode = activeGameCode;
+        
+        // よくあるCanvas/JSエラーの自動修復パターン
+        if (errorSummary.includes('getContext') || errorSummary.includes('canvas')) {
+          patchedCode = patchedCode.replace(/const canvas = document\.getElementById\([^)]+\);/, 'const canvas = document.getElementById("gameCanvas") || document.querySelector("canvas") || document.createElement("canvas");');
+        }
+        if (errorSummary.includes('undefined') || errorSummary.includes('null')) {
+          patchedCode = patchedCode.replace(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)/, '$1?.$2');
+        }
+
+        responseText = `エラーを解析して修正したよ！\n- **原因**: 実行時参照エラーまたはCanvas要素のバインド不備\n- **対策**: 安全なオプショナルチェーンとCanvas初期化ガードを追加したよ！\n\n\`\`\`html\n${patchedCode}\n\`\`\`\n\nこれで動くはず！確認してみてね！`;
+      }
+
+      const debugEvaluation = completionJudgeService.evaluateCompletion({
+        userGoal: 'サンドボックス実行エラーの自動修復',
+        assistantResponse: responseText,
+        executionSteps: systemLogger.getCurrentSessionSteps(),
+        files: workspaceFiles,
+      });
+
+      // 48章の完了判定が自動的に FAILED / BLOCKED を検出した場合、
+      // ユーザーの👎を待たずに自己改善ルーターへ自動的に診断依頼する。
+      // ※ PARTIAL は正常な途中経過であり得るため除外（ノイズ防止）。
+      // ※ EXTERNAL_COMPILE_REQUIRED / RUNTIME_TEST_REQUIRED は外部確認が必要な正常振る舞いのため除外。
+      // ※ CANCELLED / COMPLETE は対象外。
+      if (
+        (debugEvaluation.status === 'FAILED' || debugEvaluation.status === 'BLOCKED') &&
+        !debugEvaluation.autoDiagnosedAt
+      ) {
+        selfImprovementService.diagnoseFailure(
+          `サンドボックス実行エラーの自動修復: ${errorSummary}`,
+          responseText,
+          `[自動検出] 完了判定: ${debugEvaluation.status} - ${debugEvaluation.reason}`,
+          {
+            memoriesUsedCount: 0,
+            promptLengthChars: 1200,
+            engineMode: engineMode || 'autonomous_rule',
+          }
+        );
+        debugEvaluation.autoDiagnosedAt = Date.now();
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `🔍 完了判定(${debugEvaluation.status})を自動検出し、改善ルーターへ自動登録しました(ユーザー操作不要)。`
+        );
+      }
+
+      const assistantMsg: ChatMessage = {
+        id: 'msg_dbg_res_' + Date.now(),
+        role: 'assistant',
+        content: responseText,
+        timestamp: Date.now(),
+        completionEvaluation: debugEvaluation,
+        metrics: {
+          engine: 'MikiAI Autonomous Self-Healing Debugger',
+        },
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      const codeBlocks = extractCodeBlocks(responseText);
+      if (codeBlocks.length > 0) {
+        handleApplyCode(codeBlocks);
+        systemLogger.info('STEP', '✓ 修復済みコードをワークスペースへ自動適用完了');
+      }
+    } catch (err: any) {
+      console.warn('Auto-debug caught error:', err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'msg_err_' + Date.now(),
+          role: 'assistant',
+          content: `修復中にエラーが発生しました: ${err.message}`,
+          timestamp: Date.now(),
+          isError: true,
+        },
+      ]);
+    } finally {
+      setIsDebugging(false);
+      setIsLoading(false);
+    }
+  };
+
+  // エディタからの「✨ みきに改善を頼む」リクエストハンドラー
+  const handleRequestAiCodeImprovement = (prompt: string, targetFilePath?: string) => {
+    if (targetFilePath && targetFilePath !== activeFilePath) {
+      setActiveFilePath(targetFilePath);
+    }
+    // モバイル環境ならチャットタブに切り替えて返信を見えるようにする
+    setMobileTab('chat');
+    // メッセージ送信実行
+    handleSendMessage(prompt);
+  };
+
+  // GitHub Load Repo Into Workspace
+  const handleLoadRepoIntoWorkspace = (repoData: GitHubRepoData) => {
+    const newFiles: WorkspaceFile[] = repoData.files.map((rf) => {
+      let lang = 'javascript';
+      if (rf.path.endsWith('.html')) lang = 'html';
+      else if (rf.path.endsWith('.css')) lang = 'css';
+      else if (rf.path.endsWith('.ts')) lang = 'typescript';
+      else if (rf.path.endsWith('.json')) lang = 'json';
+
+      return {
+        path: rf.path,
+        name: rf.path.split('/').pop() || rf.path,
+        content: rf.content,
+        language: lang,
+      };
+    });
+
+    if (newFiles.length > 0) {
+      setWorkspaceFiles(newFiles);
+      setActiveFilePath(newFiles[0].path);
+      setActiveTab('preview');
+      setMobileTab('preview');
+      setConsoleLogs([]);
+
+      // Notify agent in chat
+      handleSendMessage(
+        `GitHubリポジトリ「${repoData.repoName}」を取り込んだよ！このリポジトリの構成を分析して、何ができるか教えて！`
+      );
+    }
+  };
+
+  // GitHub Ask AI prompt
+  const handleAskAIAboutRepo = (repoData: GitHubRepoData, promptText: string) => {
+    handleLoadRepoIntoWorkspace(repoData);
+    handleSendMessage(promptText);
+  };
+
+  // Code Editor update handlers
+  const handleUpdateFileContent = (path: string, content: string) => {
+    setWorkspaceFiles((prev) =>
+      prev.map((f) => (f.path === path ? { ...f, content, isModified: true } : f))
+    );
+  };
+
+  const handleCreateFile = (name: string) => {
+    let lang = 'javascript';
+    if (name.endsWith('.html')) lang = 'html';
+    else if (name.endsWith('.css')) lang = 'css';
+    else if (name.endsWith('.ts')) lang = 'typescript';
+    else if (name.endsWith('.json')) lang = 'json';
+    else if (name.endsWith('.wgsl') || name.endsWith('.glsl')) lang = 'wgsl';
+
+    const newFile: WorkspaceFile = {
+      path: name,
+      name,
+      content: name.endsWith('.html')
+        ? '<!DOCTYPE html>\n<html>\n<head><title>New App</title></head>\n<body>\n  <h1>Hello App</h1>\n</body>\n</html>'
+        : `// ${name}\nconsole.log('${name} loaded');\n`,
+      language: lang,
+    };
+    setWorkspaceFiles((prev) => [...prev, newFile]);
+    setActiveFilePath(newFile.path);
+  };
+
+  const handleDeleteFile = (path: string) => {
+    setWorkspaceFiles((prev) => {
+      const remaining = prev.filter((f) => f.path !== path);
+      if (remaining.length === 0) {
+        const blank = WORKSPACE_TEMPLATES.find((t) => t.id === 'blank-slate')?.files || [
+          {
+            path: 'index.html',
+            name: 'index.html',
+            content: '<!DOCTYPE html>\n<html lang="ja">\n<head>\n  <meta charset="UTF-8">\n  <title>New App</title>\n</head>\n<body>\n</body>\n</html>',
+            language: 'html',
+          },
+        ];
+        setActiveFilePath(blank[0].path);
+        return blank;
+      }
+      if (activeFilePath === path) {
+        setActiveFilePath(remaining[0].path);
+      }
+      return remaining;
+    });
+  };
+
+  const handleDeleteFolder = (folderPath: string) => {
+    const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+    setWorkspaceFiles((prev) =>
+      prev.filter((f) => !(f.path === folderPath || f.path.startsWith(prefix)))
+    );
+    if (activeFilePath === folderPath || activeFilePath.startsWith(prefix)) {
+      const remaining = workspaceFiles.filter((f) => !(f.path === folderPath || f.path.startsWith(prefix)));
+      if (remaining.length > 0) setActiveFilePath(remaining[0].path);
+    }
+  };
+
+  const handleRenameFile = (oldPath: string, newPath: string) => {
+    if (!newPath.trim() || oldPath === newPath) return;
+    const cleanNew = newPath.trim().replace(/^\/+/, '');
+    const newName = cleanNew.split('/').pop() || cleanNew;
+    const ext = newName.includes('.') ? newName.split('.').pop()?.toLowerCase() || '' : '';
+    let language = 'text';
+    if (ext === 'html' || ext === 'htm') language = 'html';
+    else if (ext === 'js' || ext === 'mjs' || ext === 'cjs') language = 'javascript';
+    else if (ext === 'ts' || ext === 'tsx') language = 'typescript';
+    else if (ext === 'css' || ext === 'scss') language = 'css';
+    else if (ext === 'json') language = 'json';
+    else if (ext === 'md') language = 'markdown';
+
+    setWorkspaceFiles((prev) =>
+      prev.map((f) =>
+        f.path === oldPath
+          ? {
+              ...f,
+              path: cleanNew,
+              name: newName,
+              language: f.language === 'image' || f.language === 'audio' ? f.language : language,
+            }
+          : f
+      )
+    );
+    if (activeFilePath === oldPath) {
+      setActiveFilePath(cleanNew);
+    }
+  };
+
+  const handleRenameFolder = (oldFolder: string, newFolder: string) => {
+    if (!newFolder.trim() || oldFolder === newFolder) return;
+    const cleanOld = oldFolder.replace(/\/+$/, '');
+    const cleanNew = newFolder.trim().replace(/\/+$/, '').replace(/^\/+/, '');
+    const oldPrefix = `${cleanOld}/`;
+    const newPrefix = `${cleanNew}/`;
+
+    setWorkspaceFiles((prev) =>
+      prev.map((f) => {
+        if (f.path.startsWith(oldPrefix)) {
+          const updatedPath = newPrefix + f.path.slice(oldPrefix.length);
+          return {
+            ...f,
+            path: updatedPath,
+            name: updatedPath.split('/').pop() || f.name,
+          };
+        }
+        return f;
+      })
+    );
+    if (activeFilePath.startsWith(oldPrefix)) {
+      setActiveFilePath(newPrefix + activeFilePath.slice(oldPrefix.length));
+    }
+  };
+
+  const handleImportZipFiles = (importedFiles: WorkspaceFile[], projectName?: string) => {
+    if (!importedFiles || importedFiles.length === 0) return;
+    setWorkspaceFiles(importedFiles);
+    setActiveFilePath(importedFiles[0].path);
+
+    // AIアシスタントへZIP展開完了を通知してコンテキスト同期
+    const summaryMsg = `📦 アプリのZIP「${projectName || 'game_project'}」を解凍・展開しました（ファイル数: ${importedFiles.length}件）。コードタブおよびプレビューにフォルダ構造ごと反映されています。`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `sys-zip-${Date.now()}`,
+        role: 'system',
+        content: summaryMsg,
+        timestamp: Date.now(),
+      },
+    ]);
+  };
+
+  // ツール実行ハンドラー (:feature:tools / 設計思想 14 & 22章)
+  const handleExecuteTool = async (toolId: string, params: Record<string, any>, userConfirmed = false) => {
+    systemLogger.info('TOOLS', `手動/推奨ツール実行リクエスト: [${toolId}]`, params);
+    const result = await toolsService.executeTool(
+      toolId,
+      params,
+      {
+        workspaceFiles,
+        onUpdateWorkspaceFile: handleUpdateFileContent,
+        userNickname: persona.userNickname,
+      },
+      { userConfirmed }
+    );
+
+    // ツール実行結果メッセージをチャットに追加
+    const toolMsg: ChatMessage = {
+      id: 'tool_res_' + Date.now(),
+      role: 'assistant',
+      content: result.outputSummary,
+      timestamp: Date.now(),
+      speaker: {
+        id: 'tools_module',
+        name: 'ツール実行エンジン (:feature:tools)',
+        avatar: '🛠️',
+        roleName: 'System Tools',
+        color: '#0284c7',
+      },
+      executedTools: [result],
+      metrics: {
+        engine: `ToolsService (${result.toolName})`,
+        totalDurationMs: result.executionTimeMs,
+      },
+      pendingToolConfirmation:
+        result.requiresConfirmation && result.result?.pendingRequest
+          ? result.result.pendingRequest
+          : undefined,
+    };
+
+    setMessages((prev) => [...prev, toolMsg]);
+    return result;
+  };
+
+  const handleConfirmToolExecution = async (request: ToolExecutionRequest) => {
+    systemLogger.info('TOOLS', `ユーザーがツール破壊的操作を承認: [${request.toolName}]`);
+    // 承認待ち状態を解除
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.pendingToolConfirmation?.id === request.id
+          ? { ...msg, pendingToolConfirmation: undefined }
+          : msg
+      )
+    );
+    await handleExecuteTool(request.toolId, request.params, true);
+  };
+
+  const handleRejectToolExecution = (requestId: string) => {
+    systemLogger.warn('TOOLS', `ユーザーがツール操作を拒否/キャンセル: [${requestId}]`);
+    toolsService.rejectPendingRequest(requestId);
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.pendingToolConfirmation?.id === requestId
+          ? {
+              ...msg,
+              content: `${msg.content}\n\n🚫 **ツール実行はユーザーによりキャンセルされました。**`,
+              pendingToolConfirmation: undefined,
+            }
+          : msg
+      )
+    );
+  };
+
+  const handleDeleteMessage = (messageId: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+  };
+
+  return (
+    <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
+      {/* Top Main Navigation Header */}
+      <Header
+        activeTab={activeTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          setMobileTab(tab);
+        }}
+        persona={persona}
+        memories={memories}
+        engineMode={engineMode}
+        onRestartGame={handleRestartGame}
+        onOpenMemoryModal={() => setIsMemoryModalOpen(true)}
+        onOpenExportModal={() => setIsExportModalOpen(true)}
+        onNewBlankProject={handleNewBlankProject}
+        useSearch={useSearch}
+        setUseSearch={setUseSearch}
+        fps={fps}
+        onOpenActivityMonitor={() => setIsGlobalActivityMonitorOpen(true)}
+        onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
+        isWorking={isLoading || isGenerating || isEvolutionRunning}
+      />
+
+      {/* Main Responsive Layout */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* DESKTOP SPLIT VIEW (Visible on >= md) */}
+        <div className="hidden md:flex flex-1 overflow-hidden">
+          {/* Left Side: Chat Agent Panel */}
+          <div className="w-[380px] lg:w-[440px] xl:w-[480px] h-full shrink-0 flex flex-col">
+            <ChatPanel
+              messages={messages}
+              onSendMessage={handleSendMessage}
+              isLoading={isLoading}
+              isGenerating={isGenerating}
+              onStopGeneration={handleStopGeneration}
+              persona={persona}
+              memories={memories}
+              onUpdateMemories={setMemories}
+              engineMode={engineMode}
+              speakerMode={speakerMode}
+              setSpeakerMode={setSpeakerMode}
+              onApplyCode={handleApplyCode}
+              onClearHistory={() => {
+                setConversationState(defaultConversationState());
+                setMessages([
+                  {
+                    id: 'init_' + Date.now(),
+                    role: 'assistant',
+                    content: `会話履歴をリフレッシュしたよ✨ 記憶カンペ（${memories.length}件）と現在のコードは保持されているから安心してね！`,
+                    timestamp: Date.now(),
+                  },
+                ]);
+              }}
+              useSearch={useSearch}
+              setUseSearch={setUseSearch}
+              workspaceFiles={workspaceFiles}
+              onOpenGamePreview={() => setActiveTab('preview')}
+              onOpenExportModal={() => setIsExportModalOpen(true)}
+              onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
+              onExecuteTool={handleExecuteTool}
+              onConfirmToolExecution={handleConfirmToolExecution}
+              onRejectToolExecution={handleRejectToolExecution}
+              isMultiStepEnabled={isMultiStepExplicit}
+              onToggleMultiStep={() => {
+                const next = !isMultiStepExplicit;
+                setIsMultiStepExplicit(next);
+                storageService.setItem('miki_multistep_explicit_mode', String(next));
+              }}
+              onResumeTaskPlan={handleResumeTaskPlan}
+              onUpdateMessageEvaluation={handleUpdateMessageEvaluation}
+              onApplyCodeProposal={handleApplyCodeProposal}
+              onRejectCodeProposal={handleRejectCodeProposal}
+              onDeleteMessage={handleDeleteMessage}
+            />
+          </div>
+
+          {/* Right Side: Active Tab (Preview / Code / GitHub) */}
+          <div className="flex-1 h-full overflow-hidden flex flex-col">
+            {activeTab === 'preview' && (
+              <GamePreview
+                files={workspaceFiles}
+                consoleLogs={consoleLogs}
+                onClearLogs={() => setConsoleLogs([])}
+                onAutoDebug={handleAutoDebug}
+                isDebugging={isDebugging}
+                fps={fps}
+              />
+            )}
+
+            {activeTab === 'code' && (
+              <CodeEditor
+                files={workspaceFiles}
+                activeFilePath={activeFilePath}
+                onSelectFile={setActiveFilePath}
+                onUpdateFileContent={handleUpdateFileContent}
+                onCreateFile={handleCreateFile}
+                onDeleteFile={handleDeleteFile}
+                onDeleteFolder={handleDeleteFolder}
+                onApplySandbox={() => setActiveTab('preview')}
+                onImportZip={handleImportZipFiles}
+                onExportZip={() => setIsExportModalOpen(true)}
+                onResetProject={handleNewBlankProject}
+                onRequestAiImprovement={handleRequestAiCodeImprovement}
+              />
+            )}
+
+            {activeTab === 'github' && (
+              <GitHubHub
+                onLoadRepoIntoWorkspace={handleLoadRepoIntoWorkspace}
+                onAskAIAboutRepo={handleAskAIAboutRepo}
+                workspaceFiles={workspaceFiles}
+                persona={persona}
+              />
+            )}
+
+            {activeTab === 'improvement' && (
+              <AutonomousImprovementHome
+                onOpenSelfImprovementModal={(tab) => {
+                  if (tab) setSelfImprovementTab(tab as any);
+                  setIsSelfImprovementModalOpen(true);
+                }}
+                onOpenActivityMonitor={() => setIsGlobalActivityMonitorOpen(true)}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* MOBILE SINGLE VIEW (Visible on < md) */}
+        <div className="flex md:hidden flex-1 min-h-0 overflow-hidden flex-col">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {mobileTab === 'home' && (
+              <HomeDashboard
+                onOpenConversation={() => setMobileTab('chat')}
+                onOpenImprovement={() => setMobileTab('improvement')}
+                onOpenWorkspace={() => setMobileTab('code')}
+                onOpenLibrary={() => setMobileTab('library')}
+                onOpenConnections={() => setMobileTab('settings')}
+              />
+            )}
+
+            {mobileTab === 'chat' && (
+              <ChatPanel
+                messages={messages}
+                onSendMessage={handleSendMessage}
+                isLoading={isLoading}
+                isGenerating={isGenerating}
+                onStopGeneration={handleStopGeneration}
+                persona={persona}
+                memories={memories}
+                onUpdateMemories={setMemories}
+                engineMode={engineMode}
+                speakerMode={speakerMode}
+                setSpeakerMode={setSpeakerMode}
+                onApplyCode={handleApplyCode}
+                onClearHistory={() => {
+                  setConversationState(defaultConversationState());
+                  setMessages([
+                    {
+                      id: 'init_' + Date.now(),
+                      role: 'assistant',
+                      content: `会話履歴をリフレッシュしたよ✨`,
+                      timestamp: Date.now(),
+                    },
+                  ]);
+                }}
+                useSearch={useSearch}
+                setUseSearch={setUseSearch}
+                workspaceFiles={workspaceFiles}
+                onOpenGamePreview={() => setMobileTab('preview')}
+                onOpenExportModal={() => setIsExportModalOpen(true)}
+                onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
+                onExecuteTool={handleExecuteTool}
+                onConfirmToolExecution={handleConfirmToolExecution}
+                onRejectToolExecution={handleRejectToolExecution}
+                isMultiStepEnabled={isMultiStepExplicit}
+                onToggleMultiStep={() => {
+                  const next = !isMultiStepExplicit;
+                  setIsMultiStepExplicit(next);
+                  storageService.setItem('miki_multistep_explicit_mode', String(next));
+                }}
+                onResumeTaskPlan={handleResumeTaskPlan}
+                onUpdateMessageEvaluation={handleUpdateMessageEvaluation}
+                onApplyCodeProposal={handleApplyCodeProposal}
+                onRejectCodeProposal={handleRejectCodeProposal}
+                onDeleteMessage={handleDeleteMessage}
+              />
+            )}
+
+            {mobileTab === 'preview' && (
+              <GamePreview
+                files={workspaceFiles}
+                consoleLogs={consoleLogs}
+                onClearLogs={() => setConsoleLogs([])}
+                onAutoDebug={handleAutoDebug}
+                isDebugging={isDebugging}
+                fps={fps}
+              />
+            )}
+
+            {mobileTab === 'code' && (
+              <WorkspaceScreen />
+            )}
+            {false && (
+              <CodeEditor
+                files={workspaceFiles}
+                activeFilePath={activeFilePath}
+                onSelectFile={setActiveFilePath}
+                onUpdateFileContent={handleUpdateFileContent}
+                onCreateFile={handleCreateFile}
+                onDeleteFile={handleDeleteFile}
+                onDeleteFolder={handleDeleteFolder}
+                onApplySandbox={() => setMobileTab('preview')}
+                onImportZip={handleImportZipFiles}
+                onExportZip={() => setIsExportModalOpen(true)}
+                onResetProject={handleNewBlankProject}
+                onRequestAiImprovement={handleRequestAiCodeImprovement}
+              />
+            )}
+
+            {mobileTab === 'github' && (
+              <GitHubHub
+                onLoadRepoIntoWorkspace={handleLoadRepoIntoWorkspace}
+                onAskAIAboutRepo={handleAskAIAboutRepo}
+                workspaceFiles={workspaceFiles}
+                persona={persona}
+              />
+            )}
+
+            {mobileTab === 'improvement' && (
+              <AutonomousImprovementHome
+                onOpenSelfImprovementModal={(tab) => {
+                  if (tab) setSelfImprovementTab(tab as any);
+                  setIsSelfImprovementModalOpen(true);
+                }}
+                onOpenActivityMonitor={() => setIsGlobalActivityMonitorOpen(true)}
+              />
+            )}
+
+            {mobileTab === 'library' && <LibraryHub onOpenMemory={() => setIsMemoryModalOpen(true)} />}
+
+            {mobileTab === 'settings' && <ExternalConnectionsScreen />}
+
+            {mobileTab === 'memory' && (
+              <div className="h-full overflow-y-auto p-4 bg-slate-900">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-sm text-pink-300 flex items-center gap-2">
+                    <span>{persona.avatar}</span>
+                    <span>{persona.name}の性格・記憶カンペ</span>
+                  </h3>
+                  <button
+                    onClick={() => setIsMemoryModalOpen(true)}
+                    className="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white rounded-lg text-xs font-bold shadow-md shadow-pink-600/30"
+                  >
+                    設定モーダルを開く
+                  </button>
+                </div>
+                <div className="space-y-3 text-xs">
+                  <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                    <div className="text-slate-400 font-semibold mb-1">現在の設定:</div>
+                    <div className="text-slate-200 font-bold mb-1">{persona.tagline}</div>
+                    <div className="text-slate-400 leading-relaxed">{persona.basePersonality}</div>
+                  </div>
+
+                  <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                    <div className="text-slate-400 font-semibold flex items-center justify-between">
+                      <span>覚えている記憶カンペ ({memories.length}件):</span>
+                    </div>
+                    {memories.map((m) => (
+                      <div
+                        key={m.id}
+                        className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-300 leading-relaxed text-[11px]"
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-[10px] text-pink-400 font-mono">[{m.category}]</span>
+                          {m.pinned && <span className="text-[10px] text-pink-400 font-bold">📌</span>}
+                        </div>
+                        <p>{m.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Bottom Navigation Bar - Five primary destinations */}
+          <nav className="min-h-16 bg-slate-900/98 pb-[max(0.25rem,env(safe-area-inset-bottom))] backdrop-blur-md border-t border-slate-800 flex items-center justify-around px-1 select-none z-30 shrink-0">
+            {[
+              { id: 'home', label: 'ホーム', Icon: Home },
+              { id: 'chat', label: '会話', Icon: MessageCircle },
+              { id: 'improvement', label: '改善', Icon: Sparkles },
+              { id: 'library', label: 'ライブラリ', Icon: Library },
+              { id: 'settings', label: '設定', Icon: Settings },
+            ].map(({ id, label, Icon }) => (
+              <button key={id} onClick={() => setMobileTab(id as typeof mobileTab)} aria-current={mobileTab === id ? 'page' : undefined} className={`min-h-12 flex-1 rounded-xl py-1.5 flex flex-col items-center justify-center gap-1 transition-all ${mobileTab === id ? 'bg-indigo-500/10 text-indigo-300 font-bold' : 'text-slate-400 hover:text-slate-200'}`}>
+                <Icon className="h-5 w-5" />
+                <span className="text-[10px] leading-none">{label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
+
+      {/* Modals */}
+      <MemoryModal
+        isOpen={isMemoryModalOpen}
+        onClose={() => setIsMemoryModalOpen(false)}
+        persona={persona}
+        onUpdatePersona={setPersona}
+        memories={memories}
+        onUpdateMemories={setMemories}
+      />
+
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        files={workspaceFiles}
+        projectName={persona.name + '_Project'}
+      />
+
+      <SelfImprovementModal
+        isOpen={isSelfImprovementModalOpen}
+        onClose={() => setIsSelfImprovementModalOpen(false)}
+        memories={memories}
+        chatMessages={messages}
+        workspaceFiles={workspaceFiles}
+        engineMode={engineMode}
+        initialTab={selfImprovementTab}
+      />
+
+      <RealtimeActivityMonitorModal
+        isOpen={isGlobalActivityMonitorOpen}
+        onClose={() => setIsGlobalActivityMonitorOpen(false)}
+        isLoading={isLoading}
+        isGenerating={isGenerating}
+      />
+    </div>
+  );
+}

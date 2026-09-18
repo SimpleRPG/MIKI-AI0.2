@@ -1,0 +1,277 @@
+# MIKI-AI 18分類 設計思想・実装指示
+
+## 1. この文書の位置づけ
+
+この文書を、MIKI-AIの現行アーキテクチャに関する設計思想と実装判断の正本とする。
+過去の作業指示書、版ごとの実装履歴、移行履歴、旧設計思想文書は正本にしない。
+実装事実はコードと機械検証結果で確認し、この文書だけを実装完了の証拠にしてはならない。
+
+## 2. 基本構造
+
+MIKI-AIは、COREと17の専門分類から成る18分類構造を使用する。
+
+1. core
+2. autonomy
+3. capability
+4. conversation
+5. data
+6. execution
+7. experience
+8. improvement
+9. learning
+10. memory
+11. promotion
+12. research
+13. safety
+14. selfAwareness
+15. selfDevelopment
+16. strategy
+17. unknown
+18. verification
+
+COREは18分類の一つとして物理配置されるが、実行上は中央統括を担当する。17専門分類はCOREの下で専門処理を担当する。
+
+## 3. COREの責務
+
+COREは次を一元管理する。
+
+- UI、イベント、自己改善、外部指示などの正規入口
+- タスクID、Run ID、correlation ID、causation ID
+- Blackboardの生成、読取り、更新、永続化
+- 現在状態に必要な専門分類の選択
+- Domain Commandの配送
+- Domain Resultの回収と正規化
+- Evidence、未解決要件、エラー、再試行可否の統合
+- 結果回収後の再評価と次経路の決定
+- 停止、再開、取消、タイムアウト、循環上限
+- 完了条件とフェイルクローズ
+
+COREは各分類の内部データを直接書き換えない。専門処理は必ず分類の公開入口へCommandとして依頼する。
+
+## 4. 17専門分類の責務
+
+### autonomy
+自律実行、定期実行、バックグラウンド処理、実行予算を担当する。
+
+### capability
+利用可能能力、能力不足、部品選択、Capability Gapを担当する。
+
+### conversation
+会話入力、意図、照応、否定、訂正、数値・版数、回答候補合成を担当する。
+
+### data
+構造化データ、Schema、テストデータ、決定論モデル情報を担当する。
+
+### execution
+計画された処理、検査Runner、実行要求、実行結果を担当する。
+
+### experience
+過去事例、今回結果、成功・失敗・修正の経験化を担当する。
+
+### improvement
+改善要求、課題選定、候補ライフサイクル、改善Queueを担当する。
+
+### learning
+検証済み結果からの学習、信頼度更新、再利用成績を担当する。
+
+### memory
+記憶Repository、永続化、検索適格性、隔離・削除遮断を担当する。
+
+### promotion
+Validation済み候補の昇格判定、レビュー待ち状態、定着状態を担当する。
+
+### research
+ローカル資料、Web、GitHub、外部AI調査バンドル、Evidence取得を担当する。
+
+### safety
+秘密情報、禁止操作、端末資源、危険処理、ロールバック可能性を担当する。
+
+### selfAwareness
+自己構成、未確認範囲、制約、不足、接続状態を担当する。
+
+### selfDevelopment
+対象コード理解、隔離候補生成、部品・テンプレート候補を担当する。
+
+### strategy
+Blackboardの状態から計画案、優先度、代替案を作る。最終配送先はCOREが決定する。
+
+### unknown
+未知分類、Knowledge Gap、再利用可能な過去解決、未解決状態を担当する。
+
+### verification
+Evidence、Claim、反証、型、回帰、一般化、永続化、端末検査を担当する。
+
+## 5. 正規実行経路
+
+すべての主要な状態変更は次の経路を使用する。
+
+```text
+UI / Event / Autonomous Trigger / External Directive
+  -> Core Task Ingress
+  -> Core Orchestrator
+  -> Task Blackboard
+  -> 必要な専門分類だけを選択
+  -> Domain Command
+  -> Domain Result + Evidence + unresolvedRequirements
+  -> Coreへ返却
+  -> Blackboard更新
+  -> Coreが再評価
+  -> 次分類 / 保存 / 検証 / 停止 / 完了
+```
+
+表示専用のローカルUI状態までCOREへ集中させない。永続状態、業務状態、改善状態、外部作用を伴う操作はCORE経由を原則とする。
+
+## 6. 分類間連携
+
+分類同士を固定チェーンで直結しない。分類は結果と未解決要件をCOREへ返す。
+
+- Eventは起きた事実を表す。
+- Commandは一つの分類への実行要求を表す。
+- Resultは観測結果、Evidence、未解決要件、エラーを表す。
+- 次の分類はCOREがBlackboardを再評価して選ぶ。
+
+全18分類を毎回形式的に呼ばない。必要な分類だけを呼ぶ。全分類診断は起動監査または手動監査に限定する。
+
+## 7. 自己改善
+
+自己改善の本番コード自動適用は行わない。自律範囲はレビュー待ち累積ZIPの作成までとする。
+
+```text
+課題自動発見
+  -> 自動発見Run
+  -> 自己改善Ingress
+  -> 永続Queue
+  -> CORE / Blackboard / 必要分類
+  -> 対象ファイルをEvidenceで特定
+  -> 現行Snapshot固定
+  -> 隔離Candidate Workspace
+  -> 候補SHA固定
+  -> STATIC / TYPECHECK / REGRESSION / COUNTEREXAMPLE
+     / GENERALIZATION / PERSISTENCE / DEVICE
+  -> Shadow Evaluation
+  -> 単一Promotion Gate
+  -> レビュー待ち台帳
+  -> 累積レビューZIP
+  -> 外部AIと利用者による手動確認
+```
+
+自動発見Runと外部AI作業指示Runは別Run、別Task、別Workspaceとして管理する。安全パイプラインだけを共通利用する。
+
+不足時は待機だけにせず、Knowledge Gap、Capability Gap、Validation Script不足、実行環境不足として必要資産を増やす。ただし物理的な資源不足や安全違反を無視して強行しない。
+
+## 8. Evidenceと完了条件
+
+次を完了の証拠にしてはならない。
+
+- ファイルを作成しただけ
+- exportしただけ
+- UI文言を変更しただけ
+- 固定のtrue、success、passed
+- AIの自己申告
+- ユーザーの肯定または否定1回
+- エラーダイアログが表示されなかっただけ
+
+完了には最低限、実在、配線、実動作、成果物証跡が必要である。
+
+```text
+EXISTENCE
+WIRING
+BEHAVIOR
+ARTIFACT
+```
+
+完了判定は安全側のPARTIALから開始し、taskId、correlationId、artifactHash、verification Evidence、検証環境、必須検査PASSが揃った場合だけ完了へ進める。
+
+## 9. ユーザー反応
+
+ユーザー反応は重要なEvidenceだが、唯一の真実にはしない。
+
+- 一回の肯定でVERIFIEDへ昇格しない。
+- 一回の否定で全回答や全部品を破棄しない。
+- どの部分が良かったか、誤っていたか、訂正されたかを分離する。
+- ユーザーが提示した訂正自体も既存Claim、辞書、公式情報、実行結果と照合する。
+- 未知語や矛盾がある場合はUNKNOWNまたはCONFLICTEDとして追加調査へ戻す。
+
+## 10. 記憶
+
+アプリから見た記憶の正本は単一Memory Repository契約とする。
+
+- AndroidはSQLiteをBackendにする。
+- WebはIndexedDBをBackendにする。
+- JSON全件配列は移行・互換・バックアップ用途に限定する。
+- 更新はレコード単位とし、FTSも差分更新する。
+- retrieval、usage、execution success、validation success、ユーザー反応を別指標にする。
+- quarantine、discard candidate、inactive、expired、superseded、pending revalidationは回答、自己改善、クラウド送信、exportから遮断する。
+
+## 11. 会話と言語
+
+日本語解析は次の部品を役割別に合成する。
+
+```text
+Sudachi Native
++ Intl.Segmenter
++ 決定論的辞書
++ N-gram
+```
+
+通常会話では検証済み部品を制限時間内で組み合わせる。未研究の組合せはバックグラウンド研究で候補化し、意味保持、反証、複数観測を経て昇格させる。
+
+## 12. 外部知識と外部AI
+
+既存Claimと記憶、Web検索、公式資料、実行試験、外部AIを区別する。
+
+外部AI調査は関連Knowledge Gapを小規模バンドルにまとめ、自動API、手動コピー、質問TXT、返信TXT取込みを選択可能にする。外部AI回答はCLOUD_AI Evidenceとして保存し、直ちに検証済み知識へ昇格させない。
+
+## 13. ローカルLLM
+
+旧GGUF、llama.cpp、WebLLMなどのローカル生成ランタイムは使用しない。通常処理は決定論的Non-LLM部品を使用し、自由生成が必要な場合だけ明示された外部AI経路を使用する。
+
+ローカルLLM再導入禁止の監査規則と退役試験は保持してよいが、旧実行コード、旧設定UI、旧モデル読込み、旧案内文、旧互換層は参照がなくなり次第削除する。
+
+## 14. UI
+
+スマートフォンを第一対象とする。
+
+- 主要操作は44px相当以上
+- 入力文字は16px以上
+- 1列配置を基本
+- 詳細は折り畳み
+- Queue受付と処理完了を区別
+- 現在分類、待機理由、Evidence不足、再試行、レビュー待ち件数を表示
+- 自己改善の方向と実行間隔を設定可能にする
+
+## 15. 重複と複雑性
+
+同じ責務のController、Coordinator、Router、Gate、保存キー、イベントを増やさない。
+
+新規サービスを作る前に既存サービスを検索し、入出力、副作用、保存先、呼出元を比較する。機能差がなければ正本へ統合する。互換入口は独自処理を持たず、正本へ委譲する。
+
+複雑性コストとして、新規ファイル、Public API、保存キー、イベント、依存辺、変更行数を計測する。
+
+## 16. GitHubと成果物
+
+GitHub push機能は残すが、自己改善ループから自動pushしない。
+
+レビューZIPは差分だけではなく、候補、基準SHA、候補SHA、Validation Evidence、Shadow結果、Promotion判定、競合、依存順を含める。複数候補を累積する場合は、同一ファイル競合、古いbaseline、依存循環を検査する。
+
+## 17. 変更時の必須監査
+
+- 18分類の単一定義
+- 未分類サービス0件
+- UI・イベントのCORE迂回
+- 分類結果が実分類名義でBlackboardへ戻ること
+- COREによる再評価
+- 相対import断線0件
+- 静的import循環
+- 旧ローカル生成経路0件
+- 固定成功値0件
+- 空catchの重要経路0件
+- 記憶隔離・削除の全経路遮断
+- 候補SHAとEvidence SHAの一致
+- ZIP破損検査とZIPTXT一致
+
+## 18. 正本と履歴
+
+現行の設計判断は、この文書、現行コード、機械検証結果で確認する。
+
+過去版の作業指示書、版別実装レポート、移行履歴、修正作業ログ、旧設計思想文書をリポジトリの正本として残さない。必要な実行証跡はCI Artifact、監査JSON、Git履歴へ保存し、ルートへ版別TXTを積み増さない。

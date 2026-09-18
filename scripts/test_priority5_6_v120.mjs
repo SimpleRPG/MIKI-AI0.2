@@ -1,0 +1,5 @@
+import fs from 'node:fs';const intake=fs.readFileSync('src/miki/core/services/externalReviewIntakeService.ts','utf8');const learning=fs.readFileSync('src/miki/core/services/reviewLearningArtifactService.ts','utf8');const gw=fs.readFileSync('src/miki/core/ui/typedImprovementUiGatewayService.ts','utf8');
+for(const x of ['SEMI_TRUSTED_EXTERNAL_AI','PARTIAL_ACCEPT','PARTIAL_REJECT','promptSha256','corePlanRevision','operationInstanceId','claims: string[]','unknownComponents: string[]','questions: string[]','mismatchReasons'])if(!intake.includes(x))throw new Error('feedback missing '+x);
+for(const x of ['compareLearningImpact','usedEpisodeOrArtifactCount','rejectedMethodRecurrenceBlockIds','correctionReuseIds','suspendArtifact'])if(!learning.includes(x))throw new Error('learning missing '+x);
+for(const x of ["commandType:'IMPORT_EXTERNAL_FEEDBACK'","commandType:'SUBMIT_REVIEW_DECISION'",'packageId:command.packageId','externalReviewId:command.externalReviewId'])if(!gw.includes(x))throw new Error('gateway missing '+x);
+console.log('PASS priority 5 and 6 implementation v120');

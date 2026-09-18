@@ -1,0 +1,20 @@
+MIKI-AI UI Shell v69 validation
+
+scripts/test_ui_shell_v69.mjs: EXIT 0
+scripts/test_general_workspace_v68.mjs: EXIT 0
+scripts/test_fatal_code_integrity_v63.mjs: EXIT 0
+
+five_primary_tabs: PASS
+home_component_exists: PASS
+library_component_exists: PASS
+workspace_route: PASS
+connections_route: PASS
+review_library_route: PASS
+safe_area_bottom: PASS
+old_six_tabs_removed: PASS
+workflow_kept: PASS
+gradle_kept: PASS
+
+LIMITATIONS:
+TypeScript full build not run because node_modules is not included.
+Galaxy S25 runtime interaction not run.

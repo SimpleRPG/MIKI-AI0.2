@@ -1,0 +1,15 @@
+{
+  "version": "v25",
+  "passed": true,
+  "checks": {
+    "ingressOwnsSubmit": true,
+    "ingressOwnsResume": true,
+    "ingressOwnsPauseCancel": true,
+    "adaptiveUsesIngress": true,
+    "sequentialUsesIngress": true,
+    "selfImprovementUsesIngress": true,
+    "singleAuthorityImplementation": true
+  },
+  "ingress": "coreTaskIngressService",
+  "authority": "coreOrchestratorService"
+}

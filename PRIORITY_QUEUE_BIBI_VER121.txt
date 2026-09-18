@@ -1,0 +1,39 @@
+ビービー Ver121 優先度キュー
+
+基準正本
+- ビービー Ver120
+
+今回統合
+- 受領差分: MIKI-AI0.2-main_priority3-5-6_diff-only-v122.zip.txt
+- 対象: 優先度3、5、6
+- マージ方式: 差分レビュー後の責務単位統合
+
+実装状況
+優先度1  統合済み。外部Build確認は優先度15。
+優先度2  統合済み。
+優先度3  統合済み。候補生成の静的配線基礎。実候補Runtimeは未確認。
+優先度4  別Window担当。未統合。
+優先度5  統合済み。外部AI Feedback取込み、Package照合、部分採否基礎。
+優先度6  統合済み。学習影響比較、Artifact停止、Correction再利用基礎。
+優先度7  別Window担当。未統合。
+優先度8  別Window担当。未統合。
+優先度9  未着手。候補検証の実用化。
+優先度10 未着手。Web取得・Query学習。
+優先度11 未着手。自律会話構成の実効果。
+優先度12 未着手。汎用Workspace・Preview・VBA実運用。
+優先度13 一部統合済み。Secret RedactionとExecution Broker検査。残作業あり。
+優先度14 統合済み。Jina・Crawl4AI撤去。
+優先度15 最終固定。npm、Build、Termux、GitHub Actions、Galaxy S25総合E2E。
+
+次のマージ対象
+1. 優先度4の差分
+2. 優先度7の差分
+3. 優先度8の差分
+
+固定規則
+- 新規実装前に既存Service、型、Gateway、Ledger、Writer、保存Keyを横断確認する。
+- 同一責務の重複実装を禁止し、再利用、拡張、統合を優先する。
+- 差分をファイル単位で無条件上書きしない。
+- 受領差分に構文・型・契約上の問題がある場合は修正してから統合し、修正内容をログへ残す。
+- 実装済みと、静的試験PASSと、Runtime完走と、実機完走を区別する。
+- Termux、GitHub Actions、Galaxy S25依存の実行確認は優先度15に固定する。

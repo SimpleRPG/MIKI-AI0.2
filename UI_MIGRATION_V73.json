@@ -1,0 +1,61 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "name": "review package UI uses typed gateway",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "review package UI has no review service import",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "gateway owns review package query",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "gateway owns review regeneration",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "gateway owns external review import",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "gateway owns adoption decision",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "ui command id contains no random",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "core action status exists",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "destructive confirmation exists",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "github actions preserved",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "gradle wrapper preserved",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "generatedAt": "2026-09-18T00:26:45.472Z"
+}

@@ -1,0 +1,12 @@
+{
+  "version": "v51",
+  "runtimePolicy": "NON_LLM_ONLY",
+  "localGenerativeRuntime": "REMOVED",
+  "normalEngineModes": ["autonomous_rule", "gemini_cloud"],
+  "legacyEngineModes": ["native_gpu", "webgpu", "external_gpu"],
+  "legacyModePolicy": "NORMALIZE_TO_NON_LLM",
+  "primaryRuntime": "nonLlmCoreService.execute",
+  "externalTeacher": "gemini_cloud",
+  "localModelLoading": false,
+  "localModelStreaming": false
+}

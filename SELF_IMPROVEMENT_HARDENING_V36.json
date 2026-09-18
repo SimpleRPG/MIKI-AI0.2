@@ -1,0 +1,34 @@
+{
+  "version": "v36",
+  "base": "MIKI-AI0.2-main_18-domain-design-cleanup-v2.zip (1).txt",
+  "implemented": [
+    "registerExecutionClaimからEXECUTION Evidenceの自動ADMISSIBLE化を除去",
+    "VerifierのDEVICE_VERIFIED昇格に厳格なexecutionRequirement照合を必須化",
+    "counterexample/generalization結果欠落時の暗黙PASSを除去",
+    "beforeHash/afterHashを改行正規化済みSHA-256へ変更",
+    "専用fail-closed回帰テストを追加",
+    "作業指示書v4へ実装状態・証跡・納品単位を追加"
+  ],
+  "dedicatedTest": {
+    "command": "node scripts/test_self_improvement_fail_closed_v36.mjs",
+    "exitCode": 0,
+    "checks": 7
+  },
+  "tsc": {
+    "exitCode": 2,
+    "targetFileDiagnostics": {
+      "evidenceService.ts": 0,
+      "verifierService.ts": 0,
+      "evidenceBasedSelfImprovementEngine.ts": 0,
+      "autonomousContinuousEvolutionService.ts": 0
+    },
+    "overall": "BLOCKED_BY_EXISTING_PROJECT_DIAGNOSTICS"
+  },
+  "remaining": [
+    "self-code APIのcore ingress統合",
+    "unit-test-runへの現行tsconfig型検査",
+    "回帰Runner readinessと採用Gateの結合",
+    "Evidence IDの衝突耐性化",
+    "DecisionCommandによる正式状態遷移強制"
+  ]
+}

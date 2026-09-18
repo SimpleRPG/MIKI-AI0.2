@@ -1,0 +1,26 @@
+{
+  "version": "v148",
+  "passed": true,
+  "checks": {
+    "readinessIsStructured": true,
+    "uiUsesKindAndEntry": true,
+    "noLegacySelfImprovementFlow": true,
+    "noFixedThreeRouteInjection": true,
+    "candidateRequiresReadiness": true,
+    "validationRequiresCandidate": true,
+    "packageRequiresValidation": true,
+    "candidateIdentityContract": true,
+    "validationIdentityContract": true,
+    "packageIdentityContract": true,
+    "dependsOnOperationInstance": true,
+    "planPreservesCompletedOps": true,
+    "completionUsesPlan": true,
+    "completionChecksPackageReceipt": true,
+    "receiptLedgerTracksNestedReceipts": true,
+    "noTargetCommandDedupe": true,
+    "revisitsAreAllowed": true,
+    "uiHidesIdsInPrimaryStatus": true,
+    "requiredTestsAreFixtureOriented": true
+  },
+  "failed": []
+}

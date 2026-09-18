@@ -1,0 +1,10 @@
+{
+  "policyVersion": "1.0.0",
+  "status": "ACTIVE",
+  "localGenerativeModels": "REMOVED",
+  "allowedRuntime": ["NON_LLM_CORE"],
+  "blockedRuntimePatterns": ["llama-server", "llama-swap", "WebLLM", "LOCAL_LLM_ENDPOINT"],
+  "selfCodePolicy": "VERIFIED_COMPONENT_COMPOSITION_OR_EXPLICIT_CODE_ONLY",
+  "missingCapabilityPolicy": "BLOCK_AND_REPORT",
+  "externalTeacherPolicy": "OPTIONAL_AND_NON_RUNTIME"
+}
