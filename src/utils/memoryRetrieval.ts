@@ -1,7 +1,7 @@
 import type { MemoryItem } from '../types';
 import { storageService } from '../services/storageService';
 import { experienceRouterService } from '../miki/experience/services/experienceRouterService';
-import { japaneseAnalysisCompositionService } from '../miki/conversation/services/japaneseAnalysisCompositionService';
+import { conversationComponentPipelineService } from '../miki/conversation/services/conversationComponentPipelineService';
 
 import { isMemoryEligible } from '../miki/memory/services/memoryEligibilityPolicyService';
 /**
@@ -122,7 +122,7 @@ export function extractQueryTokens(text: string): Set<string> {
   if (!text) return tokens;
 
   // 日本語解析基盤をTier 1へ接続。Intl.Segmenter→決定論的fallbackの結果を使う。
-  const analysis = japaneseAnalysisCompositionService.analyzeSync(text).analysis;
+  const analysis = conversationComponentPipelineService.analyzeSync(text).analysis;
   analysis.contentTokens.forEach((w) => {
     if (w.length >= 1 && !STOPWORDS.has(w)) tokens.add(w);
   });

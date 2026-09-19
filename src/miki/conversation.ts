@@ -27,7 +27,6 @@ export * from './conversation/services/speechRecognitionService';
 export * from './conversation/services/surfaceGrammarAndStyleService';
 export * from './conversation/services/surfaceVariationGrowthService';
 export * from './conversation/services/surfaceVariationService';
-export * from './conversation/services/japaneseAnalysisComponentOrchestratorService';
 export * from './conversation/services/japaneseAnalysisCompositionService';
 export * from './conversation/services/runtimeConversationCompositionService';
 export * from './conversation/services/conversationCompositionResearchSchedulerService';

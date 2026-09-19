@@ -23,7 +23,7 @@ import { knowledgeGapService } from '../../unknown/services/knowledgeGapService'
 import { researchService } from '../../research/services/researchService';
 import { capabilityReuseService } from '../../capability/services/capabilityReuseService';
 import { failureMemoryService } from '../../memory/services/failureMemoryService';
-import { japaneseAnalysisCompositionService } from '../../conversation/services/japaneseAnalysisCompositionService';
+import { conversationComponentPipelineService } from '../../conversation/services/conversationComponentPipelineService';
 import { japaneseAnalysisService } from '../../research/services/japaneseAnalysisService';
 import { runtimeConversationCompositionService } from '../../conversation/services/runtimeConversationCompositionService';
 import { hybridConversationEngineService } from '../../conversation/services/hybridConversationEngineService';
@@ -107,7 +107,8 @@ export class NonLlmCoreService {
     const memories = params.memories || [];
     const recentMessages = params.recentMessages || [];
     const stages: Record<string, number> = {};
-    const japaneseAnalysis = japaneseAnalysisCompositionService.analyzeSync(prompt).analysis;
+    const componentAnalysis = conversationComponentPipelineService.analyzeSync(prompt);
+    const japaneseAnalysis = componentAnalysis.analysis;
     stages.japanese = 0; // analysis is intentionally sub-millisecond on supported WebView engines
 
     if (!prompt) {
@@ -221,7 +222,7 @@ export class NonLlmCoreService {
 
     // 5. コード要求は既存部品を先に探す。汎用自然言語から勝手にVBAを生成しない。
     t = performance.now();
-    let usedComponents: string[] = [];
+    let usedComponents: string[] = [...componentAnalysis.usedComponentIds];
     let assembledCode: string | undefined;
     let taskExecution: NonLlmCoreResult['taskExecution'];
     const isCodeRequest = compiled.category === 'CODE_SYNTHESIS';

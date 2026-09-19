@@ -74,8 +74,8 @@ class DomainIntegrationBootstrapService{
    return done(operational);
   }
   if(domain==='conversation'&&envelope.command==='ANALYZE_TEXT'){
-   const {japaneseAnalysisComponentOrchestratorService}=await import('../../conversation/services/japaneseAnalysisComponentOrchestratorService');
-   return done(await japaneseAnalysisComponentOrchestratorService.analyze(String(envelope.payload.text||'')));
+   const {conversationComponentPipelineService}=await import('../../conversation/services/conversationComponentPipelineService');
+   return done(await conversationComponentPipelineService.analyze(String(envelope.payload.text||'')));
   }
   if(domain==='unknown'&&envelope.command==='RESOLVE_UNKNOWN'){
    const {unifiedUnknownResolutionCoordinatorService}=await import('../../unknown/services/unifiedUnknownResolutionCoordinatorService');

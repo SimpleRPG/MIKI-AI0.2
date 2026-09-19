@@ -1,6 +1,6 @@
 import { AnswerSkeletonType, ConversationState } from '../../../types';
 import { classifyDialogueAct, inferConversationStage, resolveAnaphora } from './conversationStateService';
-import { japaneseAnalysisCompositionService } from './japaneseAnalysisCompositionService';
+import { conversationComponentPipelineService } from './conversationComponentPipelineService';
 import { answerContentIrService } from './answerContentIrService';
 import { runtimeConversationCompositionService } from './runtimeConversationCompositionService';
 
@@ -22,7 +22,7 @@ export class HybridConversationEngineService {
     const dialogueAct = classifyDialogueAct(text);
     const stage = inferConversationStage(text, state.stage);
     const anaphora = resolveAnaphora(text, state);
-    const analysis = japaneseAnalysisCompositionService.analyzeSync(text).analysis;
+    const analysis = conversationComponentPipelineService.analyzeSync(text).analysis;
     let skeleton: AnswerSkeletonType = 'GENERAL_ANSWER';
     if (dialogueAct === 'CORRECTION') skeleton = 'CORRECTION';
     else if (dialogueAct === 'REQUEST_ARTIFACT') skeleton = 'TASK_COMPLETION';

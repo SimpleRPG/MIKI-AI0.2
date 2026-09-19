@@ -28,6 +28,7 @@ export interface CompositionPlan {
   score: number;
   reasons: string[];
   blocked_reason?: string;
+  initial_input_types?: string[];
 }
 
 /**
@@ -78,6 +79,119 @@ export class ComponentCompositionService {
     const planId = `CASEPLAN-${this.hash(`${goal}|${ordered.map(c => c.component_id).join('|')}`)}`;
     return { plan_id: planId, goal, capability_plan_id: undefined, steps, verified: true, executable: true,
       score: ordered.length * 100, reasons: ['Task Case Memoryの成功経路を再利用し、実行前に現在のVERIFIED/I-O/依存条件を再検証しました。'] };
+  }
+
+  /**
+   * 通常ランタイムで利用するComponent集合を、既存のComposition契約で検査する。
+   *
+   * VERIFIEDだけを要求する composeFromComponentIds と違い、
+   * 解析など「決定論的・READ_ONLY・実行許可済み」の基盤Componentは
+   * ANALYZED/DEVICE_TESTEDでも実行計画を作れる。
+   * ただし `verified` は全ComponentがVERIFIEDの場合だけ true。
+   */
+  /**
+   * 通常ランタイムで利用するComponent集合を、既存のComposition契約で検査する。
+   *
+   * `initialInputTypes` は外部入力(例: 会話テキストString)を明示する契約であり、
+   * Component同士の出力だけで無理に直列化しない。CANDIDATEはランタイム実行対象にせず、
+   * ANALYZED / DEVICE_TESTED / VERIFIED のみを実行計画へ載せる。
+   */
+  public composeRuntimeComponentIds(
+    goal: string,
+    componentIds: string[],
+    environment = 'conversation',
+    initialInputTypes: string[] = [],
+  ): CompositionPlan | undefined {
+    const uniqueIds = [...new Set(componentIds)];
+    if (!uniqueIds.length) return undefined;
+
+    const components = uniqueIds
+      .map(id => componentRegistryService.getComponent(id))
+      .filter((c): c is ComponentTxtPackage => Boolean(c));
+
+    if (components.length !== uniqueIds.length) return undefined;
+
+    const allowedStatuses = new Set<ComponentTxtPackage['status']>([
+      'ANALYZED',
+      'DEVICE_TESTED',
+      'VERIFIED',
+    ]);
+
+    if (!components.every(c =>
+      allowedStatuses.has(c.status) &&
+      c.deterministic === true &&
+      c.security_class === 'READ_ONLY' &&
+      c.implementation_hash &&
+      this.supportsEnvironment(c, environment)
+    )) return undefined;
+
+    const normalizedInitialInputs = new Set(
+      initialInputTypes.map(type => type.trim().toLowerCase()).filter(Boolean)
+    );
+    const ordered = this.orderByDependenciesAndDataFlow(components);
+    if (!ordered) return undefined;
+
+    const inputTypeSatisfied = (type: string, previous: ComponentTxtPackage[]): boolean => {
+      const normalized = type.trim().toLowerCase();
+      if (!normalized) return true;
+      if (normalizedInitialInputs.has(normalized)) return true;
+      return previous.some(component =>
+        this.matchTypes(
+          component,
+          { inputs: [{ type: normalized } as any], outputs: [] } as ComponentTxtPackage,
+        ).length > 0
+      );
+    };
+
+    for (let index = 0; index < ordered.length; index += 1) {
+      const current = ordered[index];
+      const previous = ordered.slice(0, index);
+      const dependencies = current.dependencies || [];
+      if (!dependencies.every(dep => previous.some(p => p.component_id === dep))) return undefined;
+      if (!(current.inputs || []).every(input => inputTypeSatisfied(input.type, previous))) return undefined;
+    }
+
+    const steps: CompositionStep[] = ordered.map((component, index) => {
+      const previous = ordered.slice(0, index);
+      const consumes = previous
+        .filter(p => this.matchTypes(p, component).length > 0)
+        .map(p => p.component_id);
+      const deps = (component.dependencies || []).filter(dep =>
+        ordered.some(p => p.component_id === dep)
+      );
+
+      return {
+        step_id: `RSTEP-${this.hash(`${goal}|${component.component_id}|${index}`)}`,
+        order: index + 1,
+        component_id: component.component_id,
+        entry_point: component.entry_point,
+        input_types: (component.inputs || []).map(x => x.type),
+        output_types: (component.outputs || []).map(x => x.type),
+        consumes_from: consumes,
+        dependency_ids: deps,
+        failure_policy: this.failurePolicy(component),
+        rollback_safe: this.isRollbackSafe(component),
+      };
+    });
+
+    const planId = `RCMP-${this.hash(`${goal}|${ordered.map(c => c.component_id).join('>')}|${normalizedInitialInputs.size}`)}`;
+    const verified = ordered.every(c => c.status === 'VERIFIED');
+
+    return {
+      plan_id: planId,
+      goal,
+      capability_plan_id: undefined,
+      steps,
+      verified,
+      executable: true,
+      score: verified ? 100 : 75,
+      reasons: [
+        '共通Component Registryから取得した決定論的・READ_ONLY Component集合を実行前検査しました。',
+        `外部初期入力型: ${[...normalizedInitialInputs].join(', ') || 'なし'}`,
+        verified ? '全ComponentがVERIFIEDです。' : '未VERIFIED Componentを含むため、実行可能だが正式検証済みとは扱いません。',
+      ],
+      initial_input_types: [...normalizedInitialInputs],
+    };
   }
 
   public composeFromCapabilityPlan(goal: string, capabilityPlan: ComponentPlan): CompositionPlan {

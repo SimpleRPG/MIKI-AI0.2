@@ -73,6 +73,7 @@ export class ComponentRegistryService {
     // 任意コード実行はせず、Native側のallow-list Adapterとの契約だけを検証する。
     this.ensureAndroidNativeSmokeComponent();
     this.ensureAndroidJapaneseMorphologySelfTestComponent();
+    this.ensureConversationAnalysisComponents();
     // Constructorで後から追加したSeedもTXT正本へ必ず同期する。
     this.reconcileArtifactIndex();
     // 既存インストールを含め、Registryの現行版をversion ledgerへ同期する。
@@ -84,6 +85,103 @@ export class ComponentRegistryService {
       ComponentRegistryService.instance = new ComponentRegistryService();
     }
     return ComponentRegistryService.instance;
+  }
+
+  /**
+   * 会話解析を言語専用オーケストレータではなく、通常のRegistry Componentとして登録する。
+   * 解析方式の実装は各entryPointへ委譲し、Registryは契約・状態・安全条件を管理する。
+   */
+  private ensureConversationAnalysisComponents(): void {
+    const definitions: Array<{
+      id: 'conversation.analysis.sudachi' | 'conversation.analysis.intl_segmenter' | 'conversation.analysis.dictionary_ngram' | 'conversation.analysis.composed';
+      purpose: string;
+      entryPoint: string;
+      input: string;
+      output: string;
+    }> = [
+      {
+        id: 'conversation.analysis.sudachi',
+        purpose: 'Sudachiによる決定論的な日本語形態素解析Fragmentを提供する',
+        entryPoint: 'ConversationAnalysisAdapter/sudachi',
+        input: 'String',
+        output: 'ConversationAnalysisFragment',
+      },
+      {
+        id: 'conversation.analysis.intl_segmenter',
+        purpose: 'Intl.Segmenterによる言語解析Fragmentを提供する',
+        entryPoint: 'ConversationAnalysisAdapter/intl_segmenter',
+        input: 'String',
+        output: 'ConversationAnalysisFragment',
+      },
+      {
+        id: 'conversation.analysis.dictionary_ngram',
+        purpose: '決定論的Dictionary/N-gramによる解析Fragmentを提供する',
+        entryPoint: 'ConversationAnalysisAdapter/dictionary_ngram',
+        input: 'String',
+        output: 'ConversationAnalysisFragment',
+      },
+      {
+        id: 'conversation.analysis.composed',
+        purpose: '複数の解析Component結果を共通Composition契約で統合した結果を表す',
+        entryPoint: 'ConversationComponentPipelineService/compose',
+        input: 'ConversationAnalysisFragment',
+        output: 'ConversationAnalysisBundle',
+      },
+    ];
+
+    let changed = false;
+    for (const definition of definitions) {
+      if (this.components.has(definition.id)) continue;
+      const implementation = [
+        `COMPONENT_ID: ${definition.id}`,
+        `ENTRY_POINT: ${definition.entryPoint}`,
+        'RUNTIME: NON_LLM',
+        'SECURITY: READ_ONLY',
+        'DETERMINISTIC: true',
+      ].join('\n');
+      const validation = [
+        'STATUS: ANALYZED',
+        'RUNTIME_ELIGIBLE: true',
+        'VERIFIED: false',
+        'NOTE: 実装検査・環境試験・実機試験の結果に応じて正式検証へ昇格する',
+      ].join('\n');
+
+      const pkg: ComponentTxtPackage = {
+        component_id: definition.id,
+        version: '1.0.0',
+        status: 'ANALYZED',
+        purpose: definition.purpose,
+        inputs: [{ name: 'input', type: definition.input, description: '共通Component入力' }],
+        outputs: [{ name: 'output', type: definition.output, description: '共通Component出力' }],
+        preconditions: ['input is valid', 'runtime policy allows deterministic read-only component'],
+        postconditions: ['output is deterministic and structurally valid'],
+        side_effects: [],
+        dependencies: [],
+        supported_environments: ['universal', 'conversation', 'ANDROID'],
+        entry_point: definition.entryPoint,
+        failure_behavior: '解析不能・未利用時は結果を捏造せず unavailable として後続判定へ返す',
+        security_class: 'READ_ONLY',
+        idempotent: true,
+        deterministic: true,
+        component_txt: `COMPONENT_ID: ${definition.id}\nVERSION: 1.0.0\nSTATUS: ANALYZED\nENTRY_POINT: ${definition.entryPoint}`,
+        implementation_txt: implementation,
+        tests_txt: `TEST_CASE: NORMAL, valid_input -> deterministic_${definition.output}\nTEST_CASE: EMPTY, empty_input -> safe_empty_result`,
+        validation_txt: validation,
+        sources_txt: 'Runtime adapter implementation + deterministic analyzer provider.',
+        history_txt: '2026-09-20: unified under common Conversation Component Pipeline.',
+        implementation_hash: computeCodeHash(implementation),
+        validation_hash: computeCodeHash(validation),
+        success_count: 0,
+        failure_count: 0,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+
+      this.components.set(definition.id, pkg);
+      changed = true;
+    }
+
+    if (changed) this.saveToStorage();
   }
 
   /**
