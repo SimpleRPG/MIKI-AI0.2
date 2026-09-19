@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Square, Clock3, FileUp, Save, RefreshCw } from 'lucide-react';
 import { typedImprovementUiGatewayService } from '../../miki/core/ui/typedImprovementUiGatewayService';
+import { storageService } from '../../services/storageService';
 
 const STORAGE_KEY = 'miki.autonomousImprovementSettings.v1';
 
@@ -12,7 +13,7 @@ const durationMs = (mode: DurationMode) => mode === 'forever' ? Number.POSITIVE_
 
 export const AutonomousImprovementSettingsPanel: React.FC = () => {
   const [settings, setSettings] = useState<Settings>(() => {
-    try { return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; } catch { return defaults; }
+    try { return { ...defaults, ...JSON.parse(storageService.getItem(STORAGE_KEY) || '{}') }; } catch { return defaults; }
   });
   const [running, setRunning] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -20,11 +21,11 @@ export const AutonomousImprovementSettingsPanel: React.FC = () => {
   const stopRef = useRef(false);
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* localStorage unavailable */ }
+    try { storageService.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* localStorage unavailable */ }
   }, [settings]);
 
   const saveSettings = () => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
+    try { storageService.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
     setMessage('設定を保存しました');
   };
 

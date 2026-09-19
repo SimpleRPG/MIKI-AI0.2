@@ -36,6 +36,7 @@ import {
   Filter,
   AlertCircle,
   Scale,
+  Settings,
   GraduationCap,
   Boxes,
   Lock,

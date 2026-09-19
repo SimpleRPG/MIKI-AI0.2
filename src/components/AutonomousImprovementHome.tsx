@@ -52,6 +52,7 @@ import {
   StructuredDirective,
 } from '../types/evidenceSelfImprovementTypes';
 import { ReviewPackageLibrary } from './ReviewPackageLibrary';
+import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewayService';
 
 export interface AutonomousImprovementHomeProps {
   onOpenSelfImprovementModal?: (tab?: string) => void;
@@ -81,18 +82,9 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     typedImprovementUiGatewayService.listRestoredPriorityOneRuntime()
   );
   const coreRuntime = coreRuntimes[coreRuntimes.length - 1];
-  const pendingCoreRuntimes = coreRuntimes.filter((item) =>
-    item.taskStatus !== 'COMPLETED' && item.taskStatus !== 'CANCELLED'
+  const [loopState, setLoopState] = useState(() =>
+    typedImprovementUiGatewayService.getLoopState()
   );
-  const loopState = {
-    status: coreRuntime?.taskStatus || 'IDLE',
-    queue: pendingCoreRuntimes.map((item) => ({ id: item.taskId, trigger: item.stopReasons[0] || item.operationInstanceId || 'Core Task', source: 'CORE', priority: 50, attempts: item.taskRevision, enqueuedAt: item.updatedAt })),
-    activeRequestId: coreRuntime?.operationInstanceId,
-    lastTaskId: coreRuntime?.taskId,
-    retryAt: undefined as number | undefined,
-    lastReason: coreRuntime?.stopReasons[0],
-    updatedAt: coreRuntime?.updatedAt || Date.now(),
-  };
   const canonicalRuns = coreRuntimes.map((item) => ({
     run_id: item.taskId,
     verdict: item.waitingPackageIds.length > 0 ? 'WAIT_EXTERNAL_FEEDBACK' : item.taskStatus,
@@ -146,6 +138,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 
     const timer = setInterval(() => {
       setCoreRuntimes(typedImprovementUiGatewayService.listRestoredPriorityOneRuntime());
+      setLoopState(typedImprovementUiGatewayService.getLoopState());
       setStructuredDirectives(typedImprovementUiGatewayService.getStructuredDirectives());
       setExternalDirectives(typedImprovementUiGatewayService.getExternalDirectives());
       setIntakeRuns(typedImprovementUiGatewayService.getIntakeRuns(50));
@@ -162,6 +155,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 
   const triggerRefresh = () => {
     setCoreRuntimes(typedImprovementUiGatewayService.listRestoredPriorityOneRuntime());
+    setLoopState(typedImprovementUiGatewayService.getLoopState());
     setStructuredDirectives(typedImprovementUiGatewayService.getStructuredDirectives());
     setExternalDirectives(typedImprovementUiGatewayService.getExternalDirectives());
     setIntakeRuns(typedImprovementUiGatewayService.getIntakeRuns(50));
@@ -323,18 +317,20 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       setIsTestingFlow(true);
       setLastTestResult(null);
 
-      const { requestId, promise } = typedImprovementUiGatewayService.requestWithResult(
-        'conversation.request',
-        { text: testFlowInput.trim() },
-        'conversation'
-      );
+      const coreTask = await typedCoreUiGatewayService.submitConversation(testFlowInput.trim());
+      const requestId = coreTask.coreResult?.requestId || coreTask.task.taskId;
+      const res = coreTask.coreResult || {
+        requestId,
+        status: coreTask.task.status === 'COMPLETED' ? 'completed' : 'waiting',
+        route: coreTask.coreResult?.route || [],
+        processedCategories: coreTask.coreResult?.processedCategories || [],
+      };
 
       setActionMessage({
-        text: `CORE Request [${requestId}] を発行しました。conversation → data → execution 経路を追跡中...`,
+        text: `CORE Request [${requestId}] を発行しました。現在のAdaptive CORE経路を追跡しました。`,
         type: 'info',
       });
 
-      const res = await promise;
       setLastTestResult(res);
       setActionMessage({
         text: `CORE Result [${requestId}] を受信しました (ステータス: ${res.status})`,
