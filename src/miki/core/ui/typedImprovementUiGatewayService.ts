@@ -5,6 +5,7 @@ import { isolatedCandidateWorkspaceService } from '../services/isolatedCandidate
 import { candidateValidationEvidenceService } from '../services/candidateValidationEvidenceService';
 import { coreResultService } from '../services/coreResultService';
 import { coreTaskIngressService, type CoreTaskIngressRequest } from '../services/coreTaskIngressService';
+import { coreCycleSettingsService } from '../services/coreCycleSettingsService';
 import { priorityOneRuntimeReadModelService } from '../services/priorityOneRuntimeReadModelService';
 export type { PriorityOneRuntimeItem, PriorityOneAllowedAction } from '../services/priorityOneRuntimeReadModelService';
 import { selfImprovementControllerService } from '../../improvement/services/selfImprovementControllerService';
@@ -72,7 +73,7 @@ class TypedImprovementUiGatewayService {
 
   async sendImprovementCommand(command:ImprovementUiCommand):Promise<ImprovementUiCommandResult>{
     if(command.commandType==='RESUME_IMPROVEMENT_TASK'){
-      const resumed=await coreTaskIngressService.resume(command.taskId);
+      const resumed=await coreTaskIngressService.resume(command.taskId,coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'));
       return this.toCommandResult(command,resumed);
     }
     const request:CoreTaskIngressRequest={kind:'SELF_IMPROVEMENT',goal:command.goal,source:'core',payload:{commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt,entry:'TYPED_IMPROVEMENT_UI_GATEWAY',mode:command.commandType,...(command.commandType==='START_SPECIFIED_IMPROVEMENT'?{target:command.target}:command.commandType==='COMMIT_CANDIDATE_TRANSACTION'?{workspaceId:command.workspaceId,persistenceReceiptId:command.persistenceReceiptId}:command.commandType==='IMPORT_EXTERNAL_FEEDBACK'?{packageId:command.packageId,rawResponse:command.rawResponse,sourceType:command.sourceType}:command.commandType==='SUBMIT_REVIEW_DECISION'?{externalReviewId:command.externalReviewId,decision:command.decision,reason:command.reason}:{autonomousDiscovery:true})}};

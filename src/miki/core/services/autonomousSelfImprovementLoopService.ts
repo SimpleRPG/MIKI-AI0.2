@@ -16,6 +16,7 @@ import { cumulativeRevalidationService } from './cumulativeRevalidationService';
 import { improvementDebtService } from './improvementDebtService';
 import { isolatedCandidateWorkspaceService } from './isolatedCandidateWorkspaceService';
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
+import { coreCycleSettingsService } from './coreCycleSettingsService';
 
 export type AutonomousLoopStatus = 'IDLE' | 'RUNNING' | 'WAITING_RESOURCE' | 'WAITING_EVIDENCE' | 'PAUSED' | 'FAILED';
 
@@ -207,7 +208,7 @@ class AutonomousSelfImprovementLoopService {
 
         request.attempts += 1;
         const workflow = request.taskId
-          ? await coreTaskIngressService.resume(request.taskId)
+          ? await coreTaskIngressService.resume(request.taskId, coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'))
           : await coreTaskIngressService.submit({
               kind: 'SELF_IMPROVEMENT',
               goal: request.trigger,
@@ -222,7 +223,6 @@ class AutonomousSelfImprovementLoopService {
               orchestrationMode: 'SELF_IMPROVEMENT_WORKER',
               ...(request.payload || {}),
               },
-              maxCycles: 18,
             });
         if (!workflow) {
           this.failOrRetry(request, 'BLACKBOARD_TASK_RESUME_FAILED');
@@ -405,7 +405,20 @@ class AutonomousSelfImprovementLoopService {
     try {
       const raw = storageService.getItem(KEY) || storageService.getItem(LEGACY_KEY);
       if (raw) {
-        this.state = { ...this.state, ...JSON.parse(raw) };
+        const parsed = JSON.parse(raw) as Partial<AutonomousLoopState>;
+        const loadedQueue = Array.isArray(parsed.queue) ? parsed.queue : [];
+        const activeQueue = loadedQueue.filter((item) =>
+          item && Number.isFinite(item.attempts) && item.attempts >= 0 && item.attempts < MAX_ATTEMPTS
+        );
+        const purgedCount = loadedQueue.length - activeQueue.length;
+        this.state = { ...this.state, ...parsed, queue: activeQueue };
+        if (purgedCount > 0) {
+          this.state.status = activeQueue.length > 0 ? 'IDLE' : 'IDLE';
+          this.state.activeRequestId = undefined;
+          this.state.retryAt = undefined;
+          this.state.lastReason = `EXHAUSTED_REQUESTS_PURGED:${purgedCount}`;
+          this.save();
+        }
       }
     } catch {
       this.state = { status: 'IDLE', queue: [], updatedAt: 0 };

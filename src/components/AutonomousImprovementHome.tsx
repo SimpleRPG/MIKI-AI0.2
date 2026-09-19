@@ -1030,7 +1030,8 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[11px] text-slate-400">
-                          試行回数: {req.attempts} / 3
+                          試行回数: {req.attempts}回
+                          <span className="ml-2 text-indigo-300">CORE安全上限: {typedCoreUiGatewayService.getCoreCycleSettings().selfImprovementMaxCycles}サイクル</span>
                         </span>
                       </div>
                     </div>
