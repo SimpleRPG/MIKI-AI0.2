@@ -1,7 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { coreTaskIngressService } from './coreTaskIngressService';
 import { canonicalSha256Object } from './canonicalSha256Service';
-import { getSearxngBaseUrlItem, setSearxngBaseUrlItem } from '../../../services/api';
+import { setSearxngBaseUrlItem } from '../../../services/api';
 export type ExternalConnectionId='termux'|'searxng'|'github'|'gemini'|'teacher'|'embedding'|'backend';
 export type ExternalConnectionStatus='DISABLED'|'NOT_CONFIGURED'|'CHECKING'|'AVAILABLE'|'DEGRADED'|'AUTHENTICATION_FAILED'|'PERMISSION_DENIED'|'ENDPOINT_NOT_FOUND'|'CONNECTION_REFUSED'|'TIMEOUT'|'RATE_LIMITED'|'INVALID_RESPONSE'|'ENVIRONMENT_BLOCKED'|'UNKNOWN';
 export interface ExternalConnectionConfig {id:ExternalConnectionId;enabled:boolean;name:string;baseUrl:string;path:string;timeoutMs:number;retryCount:number;inheritTermux:boolean;secretRef?:string;model?:string;repositoryUrl?:string;branch?:string;roles?:Array<'REVIEWER'|'UNKNOWN_COMPONENT_AUTHOR'|'TEACHER'>;}
@@ -17,7 +17,7 @@ const defaults:ExternalConnectionConfig[]=[
 {id:'backend',enabled:true,name:'MIKI-AI Backend',baseUrl:'',path:'/api/health',timeoutMs:8000,retryCount:1,inheritTermux:false},
 ];
 class ExternalConnectionUiService{
- list():ExternalConnectionView[]{const configs=this.read<ExternalConnectionConfig[]>(CONFIG_KEY,defaults);const statuses=this.read<Record<string,Partial<ExternalConnectionView>>>(STATUS_KEY,{});return configs.map(config=>{const merged=config.id==='searxng'?{...config,baseUrl:getSearxngBaseUrlItem()}:config;return {config:{...merged,roles:merged.roles?[...merged.roles]:undefined},status:merged.enabled?(this.configured(merged)?'UNKNOWN':'NOT_CONFIGURED'):'DISABLED',...(statuses[config.id]||{})};});}
+ list():ExternalConnectionView[]{const configs=this.read<ExternalConnectionConfig[]>(CONFIG_KEY,defaults);const statuses=this.read<Record<string,Partial<ExternalConnectionView>>>(STATUS_KEY,{});return configs.map(config=>{return {config:{...config,roles:config.roles?[...config.roles]:undefined},status:config.enabled?(this.configured(config)?'UNKNOWN':'NOT_CONFIGURED'):'DISABLED',...(statuses[config.id]||{})};});}
  async save(config:ExternalConnectionConfig,secret?:string):Promise<{coreTaskId:string;configReceiptId:string;secretReceiptId?:string}>{this.validate(config);const result=await coreTaskIngressService.submit({kind:'USER_REQUEST',goal:`${config.name}の外部接続設定を保存する`,source:'conversation',payload:{operation:'SAVE_EXTERNAL_CONNECTION_CONFIG',connectionId:config.id,config:this.sanitizeConfig(config)},maxCycles:18});if(result.task.status!=='COMPLETED')throw new Error('CORE_CONFIG_SAVE_NOT_COMPLETED');const rows=this.read<ExternalConnectionConfig[]>(CONFIG_KEY,defaults);storageService.setItem(CONFIG_KEY,JSON.stringify(rows.map(row=>row.id===config.id?{...config,secretRef:secret?`${config.id.toUpperCase()}_SECRET_REF`:row.secretRef}:row)));if(config.id==='searxng')setSearxngBaseUrlItem(config.baseUrl);let secretReceiptId:string|undefined;if(secret){const refs=this.read<Record<string,{set:boolean;updatedAt:number}>>(SECRET_KEY,{});refs[config.id]={set:true,updatedAt:Date.now()};storageService.setItem(SECRET_KEY,JSON.stringify(refs));secretReceiptId=`SEC-${canonicalSha256Object({id:config.id,at:refs[config.id].updatedAt}).slice(0,20)}`;}return {coreTaskId:result.task.taskId,configReceiptId:`CFG-${canonicalSha256Object(this.sanitizeConfig(config)).slice(0,20)}`,secretReceiptId};}
  async test(id:ExternalConnectionId):Promise<ExternalConnectionView>{const current=this.list().find(item=>item.config.id===id);if(!current)throw new Error('CONNECTION_NOT_FOUND');this.setStatus(id,{status:'CHECKING',lastCheckedAt:Date.now()});const validation=this.validate(current.config,false);const result=await coreTaskIngressService.submit({kind:'SYSTEM_TASK',goal:`${current.config.name}の非破壊接続診断を行う`,source:'conversation',payload:{operation:'TEST_EXTERNAL_CONNECTION',connectionId:id,config:this.sanitizeConfig(current.config),destructive:false},maxCycles:18});const status:ExternalConnectionStatus=!validation?'NOT_CONFIGURED':result.task.status==='COMPLETED'?'AVAILABLE':'UNKNOWN';this.setStatus(id,{status,lastCheckedAt:Date.now(),failureStage:status==='AVAILABLE'?undefined:'CORE_DIAGNOSTIC',sanitizedMessage:status==='AVAILABLE'?'接続確認が完了しました':'core診断結果を確認してください',endpointFingerprint:canonicalSha256Object({baseUrl:current.config.baseUrl,path:current.config.path}).slice(0,16),coreTaskId:result.task.taskId});return this.list().find(item=>item.config.id===id)!;}
  exportSanitized():string{return JSON.stringify({formatVersion:1,connections:this.list().map(item=>({config:this.sanitizeConfig(item.config),status:item.status,lastCheckedAt:item.lastCheckedAt,failureStage:item.failureStage}))},null,2);}
@@ -26,6 +26,13 @@ class ExternalConnectionUiService{
  private validate(config:ExternalConnectionConfig,throwError=true){let ok=true;if(config.enabled&&!this.configured(config))ok=false;if(config.timeoutMs<1000||config.retryCount<0)ok=false;try{this.rejectCredentialUrl(config.baseUrl);if(config.repositoryUrl)this.rejectCredentialUrl(config.repositoryUrl);}catch(error){if(throwError)throw error;ok=false;}if(!ok&&throwError)throw new Error('CONNECTION_CONFIG_INVALID');return ok;}
  private rejectCredentialUrl(value:string){if(!value)return value;const decoded=decodeURIComponent(value);if(/(?:api[_-]?key|token|password|passwd|secret)=/i.test(decoded)||/https?:\/\/[^/@:]+:[^/@]+@/i.test(decoded))throw new Error('CREDENTIAL_IN_URL_REJECTED');return value;}
  private setStatus(id:ExternalConnectionId,value:Partial<ExternalConnectionView>){const rows=this.read<Record<string,Partial<ExternalConnectionView>>>(STATUS_KEY,{});rows[id]=value;storageService.setItem(STATUS_KEY,JSON.stringify(rows));}
- private read<T>(key:string,fallback:T):T{try{const raw=storageService.getItem(key);return raw?JSON.parse(raw):fallback;}catch{return fallback;}}
+ private read<T>(key:string,fallback:T):T{
+  try{
+    const raw=storageService.getItem(key);
+    if(raw===null||raw===undefined||raw==='')return fallback;
+    if(typeof raw==='string')return JSON.parse(raw) as T;
+    return raw as T;
+  }catch{return fallback;}
+ }
 }
 export const externalConnectionUiService=new ExternalConnectionUiService();
