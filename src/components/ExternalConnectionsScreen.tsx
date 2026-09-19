@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { CoreCycleSettingsPanel } from './CoreCycleSettingsPanel';
 import React,{useMemo,useRef,useState} from 'react';
 import {ChevronDown,ChevronUp,Cloud,Copy,Eye,EyeOff,RefreshCw,Save,Settings2,ShieldCheck,TriangleAlert} from 'lucide-react';

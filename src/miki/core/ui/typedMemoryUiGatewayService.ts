@@ -23,8 +23,8 @@ class TypedMemoryUiGatewayService {
   getProjectMemories(): MemoryItem[] { return storageService.getProjectMemories(); }
   getMemoriesByDestination(destination: MemoryDestination): MemoryItem[] { return storageService.getMemoriesByDestination(destination); }
   getMemoriesByType(type: MemoryType): MemoryItem[] { return storageService.getMemoriesByType(type); }
-  resolveConflict(id: string): void { storageService.resolveConflict(id); }
-  dismissConflict(id: string): void { storageService.dismissConflict(id); }
+  resolveConflict(keepId: string, discardId: string): void { storageService.resolveConflict(keepId, discardId); }
+  dismissConflict(idA: string, idB: string): void { storageService.dismissConflict(idA, idB); }
 
   applyRoutingToMemory(...args: Parameters<typeof experienceRouterService.applyRoutingToMemory>): ReturnType<typeof experienceRouterService.applyRoutingToMemory> {
     return experienceRouterService.applyRoutingToMemory(...args);
@@ -55,7 +55,7 @@ class TypedMemoryUiGatewayService {
     return longTermMemoryService.supersedeMemory(...args);
   }
 
-  getEmbeddingStats(): ReturnType<typeof embeddingService.getStats> { return embeddingService.getStats(); }
+  getEmbeddingStats(): ReturnType<typeof embeddingService.getStats> { return embeddingService.getStats(storageService.getMemories()); }
   ensureMemoryEmbedding(...args: Parameters<typeof embeddingService.ensureMemoryEmbedding>): ReturnType<typeof embeddingService.ensureMemoryEmbedding> {
     return embeddingService.ensureMemoryEmbedding(...args);
   }

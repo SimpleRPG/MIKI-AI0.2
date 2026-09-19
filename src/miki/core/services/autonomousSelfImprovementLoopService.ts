@@ -172,6 +172,16 @@ class AutonomousSelfImprovementLoopService {
         this.state.activeRequestId = request.id;
         this.save();
 
+        // Persisted requests can come from an older implementation with an
+        // already-exhausted attempt count. Never execute them again.
+        if (!Number.isFinite(request.attempts) || request.attempts >= MAX_ATTEMPTS) {
+          this.failOrRetry(request, 'MAX_ATTEMPTS_REACHED');
+          if (this.state.queue.length === 0) {
+            break;
+          }
+          continue;
+        }
+
         if (request.runId) {
           const preflight = selfImprovementPreflightService.evaluate(request.runId);
           if (!preflight.passed) {
@@ -327,8 +337,8 @@ class AutonomousSelfImprovementLoopService {
       return false;
     }
     isolatedCandidateWorkspaceService.setStatus(request.workspaceId, 'EXPORTED');
-    improvementIntakeRouterService.update(request.runId, { status: 'AWAITING_EXTERNAL_REVIEW', workspaceId: request.workspaceId });
-    this.completeCurrent(`SELF_IMPROVEMENT_COMPLETED:${artifact.fileName}:${artifact.sha256}`);
+    improvementIntakeRouterService.update(request.runId, { status: 'IN_PROGRESS', workspaceId: request.workspaceId });
+    this.completeCurrent(`SELF_IMPROVEMENT_COMPLETED:${artifact.artifact.fileName}:${artifact.artifact.zipSha256}`);
     return true;
   }
 

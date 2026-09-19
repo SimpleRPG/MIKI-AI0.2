@@ -25,6 +25,7 @@ class CandidateCommitTransactionService{
  }
  rollback(transactionId:string,reason:string):CandidateCommitTransaction|undefined{const row=this.rows.get(transactionId);if(!row)return undefined;row.status='ROLLED_BACK';row.failure=reason;row.updatedAt=Date.now();this.persist();return this.clone(row);}
  get(transactionId:string){const row=this.rows.get(transactionId);return row?this.clone(row):undefined;}
+ list():CandidateCommitTransaction[]{return [...this.rows.values()].sort((a,b)=>b.updatedAt-a.updatedAt).map(row=>this.clone(row));}
  latestCommitted(issueId:string){return [...this.rows.values()].filter(row=>row.issueId===issueId&&row.status==='COMMITTED').sort((a,b)=>b.revision-a.revision)[0];}
  private recoverIncomplete(){for(const row of this.rows.values())if(row.status==='STAGED'||row.status==='APPLYING'){const previous=row.previousTransactionId?this.rows.get(row.previousTransactionId):undefined;if(previous?.status==='COMMITTED'){row.status='ROLLED_BACK';row.failure='RESTART_RECOVERED_TO_PREVIOUS_REVISION';}else{row.status='RECOVERY_REQUIRED';row.failure='RESTART_WITHOUT_SAFE_PREVIOUS_REVISION';}row.updatedAt=Date.now();}this.safePersist();}
  private nextRevision(issueId:string){return Math.max(0,...[...this.rows.values()].filter(row=>row.issueId===issueId).map(row=>row.revision))+1;}

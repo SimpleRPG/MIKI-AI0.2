@@ -50,6 +50,21 @@ class CoreOrchestratorService {
   coreResultService.rejected(reqId,'Task cancelled');
   return taskBlackboardService.cancel(taskId);
  }
+ finalizeConversationResponse(taskId:string,response:unknown):CoreOrchestrationResult|undefined{
+  const currentTask=taskBlackboardService.get(taskId);
+  if(!currentTask)return undefined;
+  const reqId=this.resolveRequestId(currentTask,taskId);
+  const cycles=currentTask.lastCycle||0;
+  const replyRecords=domainReplyLedgerService.listByTask(taskId);
+  taskBlackboardService.append(taskId,'RESULT','core','conversationResponseFinalized',{response,finalizedBy:'core',requestId:reqId,cycles,dispatched:replyRecords.length});
+  taskBlackboardService.setStatus(taskId,'COMPLETED');
+  const finalTask=taskBlackboardService.get(taskId)!;
+  const completion=adaptiveRoutePlannerService.assessCompletion(finalTask);
+  const payload={...this.buildRuntimeCirculationResult(finalTask,cycles,replyRecords.length,completion.requiredDomains),response,conversationFinalized:true,finalizedBy:'core'};
+  const coreResult=coreResultService.complete(reqId,payload,{route:['core'],processedCategories:['conversation']});
+  return {task:finalTask,cycles,dispatched:replyRecords.length,coreResult};
+ }
+
  private resolveRequestId(task?:BlackboardTask,fallbackTaskId:string=''):string{
   if(!task)return fallbackTaskId;
   const accepted=task.entries.find(e=>e.key==='coreAccepted');

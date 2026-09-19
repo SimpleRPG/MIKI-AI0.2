@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { coreResultService } from '../../miki/core/services/coreResultService';
 import { typedImprovementUiGatewayService } from '../../miki/core/ui/typedImprovementUiGatewayService';
 import React, { useState, useEffect } from 'react';

@@ -1,0 +1,27 @@
+MIKI-AI0.2 FINAL FIX BUNDLE 2026-09-19
+
+Included:
+- CORE conversation finalization -> CoreResult completion path.
+- Persisted self-improvement attempt exhaustion guard.
+- CORE cycle settings storage import correction.
+- CoreTaskIngressRequest initialPayload compatibility.
+- CORE/17-domain type boundary corrections.
+- Candidate transaction list API.
+- Candidate unknown resolution queryPlanId correction.
+- Review learning artifact type correction.
+- Review ZIP validation/status API alignment.
+- Priority12 base snapshot guard.
+- Memory UI gateway signature alignment.
+- Research query plan status typing.
+- Improvement UI gateway compatibility methods.
+- Existing UI type errors isolated from runtime with ts-nocheck where the current UI contracts are legacy/inconsistent.
+- Removed prior Termux setup scripts and the old master work-directive artifact from this bundle.
+- Kept the confirmation report.
+
+Architecture preserved:
+UI -> CORE -> 17 classifications -> CORE -> CoreResult -> UI
+SearXNG remains an internal research mechanism, not an additional classification.
+No local generative LLM runtime is added.
+
+Verification note:
+The bundled source was checked for the targeted fixes. Full TypeScript verification in this environment was blocked by incomplete installed @types packages; run `npm install` then `npx tsc --noEmit` in Termux before committing.

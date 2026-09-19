@@ -9,6 +9,7 @@ import { priorityOneRuntimeReadModelService } from '../services/priorityOneRunti
 export type { PriorityOneRuntimeItem, PriorityOneAllowedAction } from '../services/priorityOneRuntimeReadModelService';
 import { selfImprovementControllerService } from '../../improvement/services/selfImprovementControllerService';
 import { autonomousSelfImprovementLoopService } from '../services/autonomousSelfImprovementLoopService';
+import { mikiCategoryInteractionRuntime } from '../mikiCategoryInteractionRuntime';
 
 export type { AutonomousLoopState, AutonomousImprovementRequest } from '../services/autonomousSelfImprovementLoopService';
 export type { ImprovementRun } from '../../improvement/services/selfImprovementControllerService';
@@ -80,6 +81,8 @@ class TypedImprovementUiGatewayService {
     return this.toCommandResult(command,result);
   }
 
+  async executeDirective(directiveId:string){ return selfImprovementControllerService.executeDirective(directiveId); }
+  requestWithResult<T=unknown>(type:string,payload:unknown,source:any='conversation',target?:any){ return mikiCategoryInteractionRuntime.requestWithResult<T>(type,payload,source,target); }
   startSpecifiedImprovement(goal:string,target:string){return this.sendImprovementCommand({commandType:'START_SPECIFIED_IMPROVEMENT',goal,target,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-improvement'),operationInstanceId:coreResultService.generateRequestId('operation')});}
   discoverImprovementTarget(goal='改善対象を自動で探し、評価可能な候補を作る'){return this.sendImprovementCommand({commandType:'DISCOVER_IMPROVEMENT_TARGET',goal,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-discovery'),operationInstanceId:coreResultService.generateRequestId('operation')});}
   resumeImprovementTask(taskId:string){return this.sendImprovementCommand({commandType:'RESUME_IMPROVEMENT_TASK',taskId,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-resume'),operationInstanceId:coreResultService.generateRequestId('operation')});}
