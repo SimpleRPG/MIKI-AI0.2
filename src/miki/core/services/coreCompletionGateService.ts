@@ -82,7 +82,7 @@ class CoreCompletionGateService {
   evaluateCoreOwnedOperation(task: BlackboardTask, operation: string, domain: MikiDomain = 'data'): CoreCompletionAssessment {
     const reasons: string[] = [];
     const observed = task.entries.some((entry) => {
-      if (entry.domain !== domain || entry.kind !== 'RESULT') return false;
+      if (entry.domain !== domain || entry.kind !== 'OBSERVATION') return false;
       const value = entry.value && typeof entry.value === 'object'
         ? entry.value as Record<string, unknown> : undefined;
       if (!value || value.coreCollected !== true || value.collectedBy !== 'core'
