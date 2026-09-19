@@ -338,7 +338,41 @@ class AdaptiveRoutePlannerService {
 
   private planGeneral(task:BlackboardTask,input:Record<string,unknown>,kind:string):PlannedRoute[] {
     const text=`${task.goal} ${task.entries.map(e=>`${e.key} ${String(e.value)}`).join(' ')}`;
-    const routes:PlannedRoute[]=[...this.adoptAssessmentProposals(task)];
+    const operation=String(input.operation||'');
+    const routes:PlannedRoute[]=[];
+
+    // UI-owned persistence/diagnostic operations still enter CORE, but they
+    // must not fall into the generic conversation/strategy fallback.
+    // The operation is already an explicit structured field in the request;
+    // no new entry tag is introduced.
+    const coreOwnedDataOperations=new Set([
+      'SAVE_EXTERNAL_CONNECTION_CONFIG',
+      'TEST_EXTERNAL_CONNECTION',
+      'SAVE_WEB_RESEARCH_POLICY',
+      'SAVE_RESEARCH_QUERY_PLANNING_POLICY',
+      'SAVE_CORE_CYCLE_SETTINGS'
+    ]);
+    if(coreOwnedDataOperations.has(operation)){
+      routes.push({
+        target:'data',
+        command:'ASSESS_DOMAIN',
+        reason:`CORE selected the data classification for operation ${operation}`,
+        payload:{
+          ...input,
+          taskId:task.taskId,
+          operation,
+          requestedOperation:operation,
+          goal:task.goal,
+          adaptive:true,
+          priority:100
+        }
+      });
+      return this.decorateOperations(task,this.uniqueOperations(routes));
+    }
+
+    const routesFromAssessment=[...this.adoptAssessmentProposals(task)];
+    routes.push(...routesFromAssessment);
+
     const isUnknown=/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(text);
     const isSelfImprovement=kind==='SELF_IMPROVEMENT';
     if(!task.visitedDomains.includes('conversation'))
@@ -358,6 +392,19 @@ class AdaptiveRoutePlannerService {
     if(isUiSelfImprovement) return coreCompletionGateService.evaluate(task,[]);
     const isUiConversation=String(input.kind||'')==='USER_REQUEST' && String(input.entry||'')==='TYPED_CONVERSATION_UI_GATEWAY';
     if(isUiConversation) return this.evaluateConversationCompletion(task);
+
+    const operation=String(input.operation||'');
+    const coreOwnedDataOperations=new Set([
+      'SAVE_EXTERNAL_CONNECTION_CONFIG',
+      'TEST_EXTERNAL_CONNECTION',
+      'SAVE_WEB_RESEARCH_POLICY',
+      'SAVE_RESEARCH_QUERY_PLANNING_POLICY',
+      'SAVE_CORE_CYCLE_SETTINGS'
+    ]);
+    if(coreOwnedDataOperations.has(operation)){
+      return coreCompletionGateService.evaluateCoreOwnedOperation(task,operation,'data');
+    }
+
     const text=`${task.goal} ${String(input.kind||'')}`;
     const isUnknown=/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(text);
     const isSelfImprovement=String(input.kind||'')==='SELF_IMPROVEMENT';

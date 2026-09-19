@@ -79,6 +79,57 @@ class CoreCompletionGateService {
     if (!lineage.lineageVerified) reasons.push('LINEAGE_VERIFICATION_FAILED');
     return {businessCompletion: reasons.length===0, failClosed:true, requiredDomains:required, missingDomains, failedDomains, missingReceipts, persistenceConfirmed, evidenceQualityPassed:quality.passed, reasons, missingRequiredOperations};
   }
+  evaluateCoreOwnedOperation(task: BlackboardTask, operation: string, domain: MikiDomain = 'data'): CoreCompletionAssessment {
+    const reasons: string[] = [];
+    const observed = task.entries.some((entry) => {
+      if (entry.domain !== domain || entry.kind !== 'RESULT') return false;
+      const value = entry.value && typeof entry.value === 'object'
+        ? entry.value as Record<string, unknown> : undefined;
+      if (!value || value.coreCollected !== true || value.collectedBy !== 'core'
+        || value.operation !== 'ASSESS_DOMAIN' || typeof value.dispatchId !== 'string') return false;
+      const reply = entryReply(entry);
+      if (!reply || reply.operationClass !== 'DIAGNOSTIC') return false;
+      const status = String(reply.status || '').toUpperCase();
+      return status === 'OBSERVED' || status === 'SUCCEEDED' || status === 'SUCCESS' || status === 'COMPLETED';
+    });
+
+    if (!observed) reasons.push(`CORE_OPERATION_NOT_COMPLETED:${operation}`);
+    if (task.entries.some((entry) => entry.kind === 'ERROR')) reasons.push('UNRESOLVED_DOMAIN_ERROR');
+    if (task.pendingDomains.length) reasons.push('PENDING_DOMAIN_REMAINS');
+
+    const replyRecords = domainReplyLedgerService.listByTask(task.taskId);
+    const lastDecision = task.entries.filter((entry) => entry.domain === 'core' && entry.kind === 'DECISION').at(-1);
+    const lineage = coreLineageReadModelService.verify(task, {
+      replyIds: replyRecords.map((record) => record.replyId),
+      evidenceIds: [...new Set(replyRecords.flatMap((record) => record.evidenceIds))],
+      receiptIds: [...new Set(replyRecords.flatMap((record) => record.receiptIds))],
+      decisionId: lastDecision?.id
+    });
+    if (replyRecords.length > 0 && !lineage.lineageVerified) reasons.push('LINEAGE_VERIFICATION_FAILED');
+
+    const quality = evidenceQualityGateService.evaluate(task);
+    const evidenceQualityPassed = replyRecords.length === 0 ? true : quality.passed;
+    if (!evidenceQualityPassed) reasons.push(`EVIDENCE_QUALITY_FAILED:${quality.reasons.join(',')}`);
+
+    return {
+      businessCompletion: reasons.length === 0,
+      failClosed: true,
+      requiredDomains: [domain],
+      missingDomains: observed ? [] : [domain],
+      failedDomains: observed ? [] : [domain],
+      missingReceipts: [],
+      // The actual external-config persistence happens after CORE completion
+      // returns to externalConnectionUiService. CORE must not claim that
+      // persistence has already been confirmed at this point.
+      persistenceConfirmed: false,
+      evidenceQualityPassed,
+      reasons,
+      missingRequiredOperations: []
+    };
+  }
+
+
+
   private evaluateAdaptivePlan(task: BlackboardTask): CoreCompletionAssessment {
     const plan=corePlanRevisionService.latest(task);
     const requiredOperations=plan?.requiredOperations||[];
