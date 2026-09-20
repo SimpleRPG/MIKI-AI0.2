@@ -4,19 +4,12 @@ import { coreTaskIngressService } from './coreTaskIngressService';
 import { taskBlackboardService } from './taskBlackboardService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { resourceGovernanceService } from '../../safety/services/resourceGovernanceService';
-import { candidateCodeGenerationService } from './candidateCodeGenerationService';
-import { candidateConstraintValidationService } from './candidateConstraintValidationService';
-import { candidateValidationRunnerService } from './candidateValidationRunnerService';
-import { reviewZipExportService } from './reviewZipExportService';
 import { requiredAssetAcquisitionService } from './requiredAssetAcquisitionService';
 import { selfImprovementPreflightService } from './selfImprovementPreflightService';
-import { runIntegrityAuditorService } from './runIntegrityAuditorService';
-import { complexityCostGateService } from './complexityCostGateService';
-import { cumulativeRevalidationService } from './cumulativeRevalidationService';
 import { improvementDebtService } from './improvementDebtService';
-import { isolatedCandidateWorkspaceService } from './isolatedCandidateWorkspaceService';
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
+import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 
 export type AutonomousLoopStatus = 'IDLE' | 'RUNNING' | 'WAITING_RESOURCE' | 'WAITING_EVIDENCE' | 'PAUSED' | 'FAILED';
 
@@ -25,6 +18,12 @@ export interface AutonomousImprovementRequest {
   trigger: string;
   source: 'AUTOPILOT' | 'UI' | 'EXECUTION' | 'SYSTEM';
   runId?: string;
+  /** Canonical lineage: one ChangeSetID follows the whole improvement request. */
+  changeSetId?: ChangeSetID;
+  /** Existing Strategy Memory choice for this autonomous improvement request. */
+  strategyId?: string;
+  strategyName?: string;
+  strategyFeedbackRecorded?: boolean;
   runType?: string;
   sourceId?: string;
   priority?: number;
@@ -106,6 +105,7 @@ class AutonomousSelfImprovementLoopService {
       trigger,
       source,
       runId: meta.runId,
+      changeSetId: meta.changeSetId,
       runType: meta.runType,
       sourceId: meta.sourceId,
       priority: meta.priority,
@@ -116,7 +116,11 @@ class AutonomousSelfImprovementLoopService {
       evidenceWaitCount: 0,
     };
     this.state.queue.push(item);
-    this.state.queue.sort((left, right) => (right.priority || 0) - (left.priority || 0) || left.createdAt - right.createdAt);
+    this.state.queue.sort((left, right) =>
+      (right.priority || 0) - (left.priority || 0) ||
+      left.createdAt - right.createdAt ||
+      left.id.localeCompare(right.id)
+    );
     this.state.status = 'IDLE';
     this.state.retryAt = undefined;
     this.save();
@@ -198,14 +202,6 @@ class AutonomousSelfImprovementLoopService {
           break;
         }
 
-        if (request.workspaceId && request.runId) {
-          const completed = await this.retryValidationAndExport(request);
-          if (completed) {
-            continue;
-          }
-          break;
-        }
-
         request.attempts += 1;
         const workflow = request.taskId
           ? await coreTaskIngressService.resume(request.taskId, coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'))
@@ -217,6 +213,7 @@ class AutonomousSelfImprovementLoopService {
               trigger: request.trigger,
               source: request.source,
               runId: request.runId,
+              changeSetId: request.changeSetId,
               runType: request.runType,
               sourceId: request.sourceId,
               priority: request.priority,
@@ -233,42 +230,6 @@ class AutonomousSelfImprovementLoopService {
         }
         request.taskId = workflow.task.taskId;
         this.state.lastTaskId = workflow.task.taskId;
-
-        if (request.runId) {
-          const generation = await candidateCodeGenerationService.generate(request.runId);
-          if (generation.accepted && generation.workspaceId) {
-            request.workspaceId = generation.workspaceId;
-            const workspace = isolatedCandidateWorkspaceService.get(generation.workspaceId);
-            if (!workspace) {
-              this.failOrRetry(request, 'WORKSPACE_NOT_FOUND_AFTER_GENERATION');
-              continue;
-            }
-            const complexity = complexityCostGateService.evaluate(workspace);
-            if (!complexity.passed) {
-              isolatedCandidateWorkspaceService.setStatus(generation.workspaceId, 'REJECTED');
-              improvementDebtService.record('CUMULATIVE_REGRESSION', `COMPLEXITY:${complexity.reasons.join(',')}`, request.runId);
-              this.failOrRetry(request, complexity.reasons.join(','));
-              continue;
-            }
-            const constraint = candidateConstraintValidationService.validate(request.runId, generation.workspaceId);
-            if (!constraint.passed) {
-              this.failOrRetry(request, constraint.reasons.join(','));
-              if (this.state.status !== 'RUNNING') {
-                break;
-              }
-              continue;
-            }
-            const completed = await this.retryValidationAndExport(request);
-            if (completed) {
-              continue;
-            }
-            break;
-          }
-          if (generation.reasons.some(reason => reason.includes('HTTP_') || reason.includes('FAILED') || reason.includes('REQUIRED'))) {
-            await this.acquireThenWaitForEvidence(request, generation.reasons.join(','));
-            break;
-          }
-        }
 
         const quality = evidenceQualityGateService.evaluate(workflow.task);
         if (workflow.task.status === 'COMPLETED' && quality.passed) {
@@ -309,37 +270,24 @@ class AutonomousSelfImprovementLoopService {
     }
   }
 
-  private async retryValidationAndExport(request: AutonomousImprovementRequest): Promise<boolean> {
-    if (!request.workspaceId || !request.runId) {
+  private async resumeCanonicalCoreTask(request: AutonomousImprovementRequest): Promise<boolean> {
+    if (!request.taskId) return false;
+    const workflow = await coreTaskIngressService.resume(
+      request.taskId,
+      coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT')
+    );
+    if (!workflow) return false;
+    const quality = evidenceQualityGateService.evaluate(workflow.task);
+    if (workflow.task.status === 'COMPLETED' && quality.passed) {
+      this.completeCurrent('CORE_SELF_IMPROVEMENT_CYCLE_COMPLETED');
+      return true;
+    }
+    if (!quality.passed) {
+      await this.acquireThenWaitForEvidence(request, quality.reasons.join(','));
       return false;
     }
-    const validation = await candidateValidationRunnerService.run(request.workspaceId);
-    if (!validation.passed) {
-      await this.acquireThenWaitForEvidence(request, validation.reasons.join(','));
-      return false;
-    }
-    const artifact = await reviewZipExportService.create(request.runId, request.workspaceId);
-    if (!artifact.ok || !artifact.artifact) {
-      await this.acquireThenWaitForEvidence(request, `REVIEW_EXPORT_NOT_READY:${artifact.code}:${request.workspaceId}`);
-      return false;
-    }
-    const integrity = runIntegrityAuditorService.audit(request.runId, request.workspaceId);
-    if (!integrity.passed) {
-      improvementDebtService.record('UNEXECUTED_CHECK', `RUN_INTEGRITY:${integrity.reasons.join(',')}`, request.runId);
-      this.failOrRetry(request, `RUN_INTEGRITY_FAILED:${integrity.reasons.join(',')}`);
-      return false;
-    }
-    const exportedWorkspaceIds = isolatedCandidateWorkspaceService.list().filter(item => item.status === 'EXPORTED').map(item => item.workspaceId);
-    const cumulative = await cumulativeRevalidationService.run(exportedWorkspaceIds);
-    if (!cumulative.passed) {
-      improvementDebtService.record('CUMULATIVE_REGRESSION', cumulative.reasons.join(','), request.runId);
-      this.failOrRetry(request, `CUMULATIVE_REVALIDATION_FAILED:${cumulative.reasons.join(',')}`);
-      return false;
-    }
-    isolatedCandidateWorkspaceService.setStatus(request.workspaceId, 'EXPORTED');
-    improvementIntakeRouterService.update(request.runId, { status: 'IN_PROGRESS', workspaceId: request.workspaceId });
-    this.completeCurrent(`SELF_IMPROVEMENT_COMPLETED:${artifact.artifact.fileName}:${artifact.artifact.zipSha256}`);
-    return true;
+    this.failOrRetry(request, `CORE_WORKFLOW_${workflow.task.status}`);
+    return false;
   }
 
   private waitForResource(request: AutonomousImprovementRequest, reason: string): void {

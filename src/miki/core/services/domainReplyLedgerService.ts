@@ -5,6 +5,15 @@ import type { DomainEnvelope, DomainReply } from './domainRouterService';
 import { EvidenceService } from '../../memory/services/evidenceService';
 import { canonicalSha256Object } from './canonicalSha256Service';
 
+export interface ActionLineage {
+  actionId: string;
+  knowledgeIds: string[];
+  capabilityIds: string[];
+  evidenceIds: string[];
+  permissionClasses: string[];
+  outcome: 'SUCCEEDED' | 'REJECTED' | 'FAILED' | 'OBSERVED';
+}
+
 export interface DomainReplyLedgerRecord {
   replyId: string;
   taskId: string;
@@ -22,8 +31,10 @@ export interface DomainReplyLedgerRecord {
   receiptIds: string[];
   retryable: boolean;
   summary: string;
+  idempotencyKey: string;
   failure?: string;
   completedAt: number;
+  actionLineage: ActionLineage;
 }
 
 const STORAGE_KEY = 'miki_domain_reply_ledger_v1';
@@ -38,10 +49,18 @@ class DomainReplyLedgerService {
 
   record(taskId: string, operationId: string, envelope: DomainEnvelope, reply: DomainReply): DomainReplyLedgerRecord {
     const normalized = reply.normalized;
+    const idempotencyKey = typeof envelope.payload.idempotencyKey === 'string'
+      ? envelope.payload.idempotencyKey.trim()
+      : '';
     const evidenceIds = [...new Set(normalized?.evidenceIds || envelope.evidenceIds)];
     const discoveredReceipts=this.collectStrings(normalized?.data, /(?:persistence)?receipt(?:ids?)?/i);
     const receiptIds=[...new Set([...evidenceIds.filter(id => /receipt/i.test(id)), ...discoveredReceipts])];
     const unknowns = this.collectStrings(normalized?.data, /unknown/i);
+    const data = normalized?.data;
+    const knowledgeIds = this.collectStrings(data, /^(?:knowledgeIds?|knowledge_refs?)$/i);
+    const capabilityIds = this.collectStrings(data, /^(?:capabilityIds?|capability_refs?)$/i);
+    const permissionClasses = this.collectStrings(data, /^(?:permission|permissionClass|permission_class)$/i);
+    const actionId = this.collectStrings(envelope.payload, /^(?:actionId|operationInstanceId|idempotencyKey)$/i)[0] || envelope.envelopeId;
     const replyId = `DREPLY-${envelope.envelopeId}`;
     const record: DomainReplyLedgerRecord = {
       replyId,
@@ -60,11 +79,20 @@ class DomainReplyLedgerService {
       receiptIds,
       retryable: normalized?.retryable || false,
       summary: normalized?.summary || reply.error || `${reply.domain} completed ${reply.command}`,
+      idempotencyKey,
       failure: reply.accepted ? undefined : reply.error,
-      completedAt: reply.completedAt
+      completedAt: reply.completedAt,
+      actionLineage: {
+        actionId,
+        knowledgeIds: [...new Set(knowledgeIds)].sort(),
+        capabilityIds: [...new Set(capabilityIds)].sort(),
+        evidenceIds: [...new Set(evidenceIds)].sort(),
+        permissionClasses: [...new Set(permissionClasses)].sort(),
+        outcome: normalized?.status || (reply.accepted ? 'SUCCEEDED' : 'FAILED'),
+      },
     };
     this.records.set(replyId, record);
-    const contentSha256 = canonicalSha256Object({ taskId, operationId, operationInstanceId: record.operationInstanceId, corePlanRevision: record.corePlanRevision, dispatchId: record.dispatchId, classificationId: record.classificationId, command: record.command, status: record.status, summary: record.summary });
+    const contentSha256 = canonicalSha256Object({ taskId, operationId, operationInstanceId: record.operationInstanceId, corePlanRevision: record.corePlanRevision, dispatchId: record.dispatchId, classificationId: record.classificationId, command: record.command, status: record.status, summary: record.summary, idempotencyKey: record.idempotencyKey });
     for (const evidenceId of evidenceIds) EvidenceService.getInstance().bindExecutionLineage(evidenceId, { taskId, corePlanRevision: record.corePlanRevision, operationInstanceId: record.operationInstanceId, replyId, contentSha256, verificationStatus: record.status === 'SUCCEEDED' ? 'VERIFIED' : record.status === 'FAILED' || record.status === 'REJECTED' ? 'REJECTED' : 'UNVERIFIED' });
     this.persist();
     return this.clone(record);
@@ -73,6 +101,15 @@ class DomainReplyLedgerService {
   get(replyId: string): DomainReplyLedgerRecord | undefined {
     const record = this.records.get(replyId);
     return record ? this.clone(record) : undefined;
+  }
+
+  findSucceededByIdempotencyKey(idempotencyKey: string): DomainReplyLedgerRecord | undefined {
+    const key = String(idempotencyKey || '').trim();
+    if (!key) return undefined;
+    return [...this.records.values()]
+      .filter(record => record.idempotencyKey === key && record.status === 'SUCCEEDED')
+      .sort((a, b) => b.completedAt - a.completedAt || a.replyId.localeCompare(b.replyId))
+      .map(record => this.clone(record))[0];
   }
 
   listByTask(taskId: string): DomainReplyLedgerRecord[] {
@@ -106,7 +143,7 @@ class DomainReplyLedgerService {
   }
 
   private clone(record: DomainReplyLedgerRecord): DomainReplyLedgerRecord {
-    return {...record, evidenceIds: [...record.evidenceIds], unknowns: [...record.unknowns], receiptIds: [...record.receiptIds]};
+    return {...record, evidenceIds: [...record.evidenceIds], unknowns: [...record.unknowns], receiptIds: [...record.receiptIds], actionLineage: {...record.actionLineage, knowledgeIds: [...record.actionLineage.knowledgeIds], capabilityIds: [...record.actionLineage.capabilityIds], evidenceIds: [...record.actionLineage.evidenceIds], permissionClasses: [...record.actionLineage.permissionClasses]}};
   }
 
   private persist(): void {
@@ -127,7 +164,21 @@ class DomainReplyLedgerService {
       if (!Array.isArray(records)) return;
       for (const record of records) {
         if (!this.isRecord(record)) continue;
-        this.records.set(record.replyId, record);
+        const actionLineage: ActionLineage = record.actionLineage && typeof record.actionLineage === 'object'
+          ? {
+              actionId: typeof record.actionLineage.actionId === 'string' ? record.actionLineage.actionId : record.operationInstanceId || record.dispatchId,
+              knowledgeIds: Array.isArray(record.actionLineage.knowledgeIds) ? record.actionLineage.knowledgeIds.filter((x): x is string => typeof x === 'string') : [],
+              capabilityIds: Array.isArray(record.actionLineage.capabilityIds) ? record.actionLineage.capabilityIds.filter((x): x is string => typeof x === 'string') : [],
+              evidenceIds: Array.isArray(record.actionLineage.evidenceIds) ? record.actionLineage.evidenceIds.filter((x): x is string => typeof x === 'string') : [...record.evidenceIds],
+              permissionClasses: Array.isArray(record.actionLineage.permissionClasses) ? record.actionLineage.permissionClasses.filter((x): x is string => typeof x === 'string') : [],
+              outcome: record.actionLineage.outcome || record.status,
+            }
+          : { actionId: record.operationInstanceId || record.dispatchId, knowledgeIds: [], capabilityIds: [], evidenceIds: [...record.evidenceIds], permissionClasses: [], outcome: record.status };
+        this.records.set(record.replyId, {
+          ...record,
+          idempotencyKey: typeof record.idempotencyKey === 'string' ? record.idempotencyKey : '',
+          actionLineage,
+        });
       }
     } catch (error) {
       this.records.clear();

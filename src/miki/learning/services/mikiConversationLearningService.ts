@@ -1,7 +1,7 @@
 import {
   ClaimRecord,
   ConversationState,
-  DialogueAct,
+  DialogueAct, ConversationOutcomeKind, ConversationQualityCause, ConversationOutcomeAssessment, AnswerContentIR, ConversationAnswerDecisionSnapshot, ConversationAnswerChangeExplanation, ConversationAnswerChangeCause,
 } from '../../../types';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import {
@@ -11,6 +11,7 @@ import {
 } from './mikiUnifiedLearningContinuumService';
 import { UnifiedOutcome } from '../../experience/services/unifiedMikiExperienceService';
 import { systemLogger } from '../../../services/systemLogger';
+import { evidenceService } from '../../memory/services/evidenceService';
 
 export interface PreviousTurnEvaluationResult {
   observed: boolean;
@@ -19,6 +20,7 @@ export interface PreviousTurnEvaluationResult {
   key: string;
   reason: string;
   promotedClaims: ClaimRecord[];
+  conversationOutcome: ConversationOutcomeAssessment;
 }
 
 export interface TeachingDetectionResult {
@@ -61,6 +63,25 @@ export class MikiConversationLearningService {
    * 直前の非LLM中核の応答結果（特にUNRESOLVEDまたはNEEDS_CONFIRMATION、または推論適用）に対する
    * ユーザーの次の発言を観測し、学習基盤へ記録する。
    */
+  public buildAnswerDecisionSnapshot(input:{prompt:string;ir:AnswerContentIR;surfaceText:string;claimIds?:string[];evidenceIds?:string[];capabilityIds?:string[];experienceIds?:string[];strategyRefs?:string[];decisionRefs?:string[]}):ConversationAnswerDecisionSnapshot{
+    const inputKey=normalizeKey(input.prompt||''); const uniq=(v?:string[])=>[...new Set((v||[]).map(String).filter(Boolean))].sort(); const stable=(v:unknown)=>{const raw=JSON.stringify(v);let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16).padStart(8,'0');};
+    const knowledgeRefs=uniq(input.claimIds), evidenceRefs=uniq(input.evidenceIds), capabilityRefs=uniq(input.capabilityIds), experienceRefs=uniq(input.experienceIds), strategyRefs=uniq(input.strategyRefs), decisionRefs=uniq(input.decisionRefs);
+    const decisionFingerprint=stable({conclusion:input.ir.conclusion,reasons:input.ir.reasons,conditions:input.ir.conditions,exceptions:input.ir.exceptions,next_actions:input.ir.next_actions,certainty:input.ir.certainty,target:input.ir.target,detail_level:input.ir.detail_level,interaction_mode:input.ir.interaction_mode,world_scope:input.ir.world_scope,strategy:input.ir.strategy});
+    return {inputKey,decisionFingerprint,answerFingerprint:stable(input.surfaceText||''),knowledgeRefs,evidenceRefs,capabilityRefs,experienceRefs,strategyRefs,decisionRefs,capturedAt:Date.now()};
+  }
+
+  public compareAndRecordAnswerChange(state:ConversationState,current:ConversationAnswerDecisionSnapshot):{state:ConversationState;explanation:ConversationAnswerChangeExplanation}{
+    const history=state.answerDecisionHistory||[]; const previous=[...history].reverse().find(x=>x.inputKey===current.inputKey)||(state.lastAnswerDecisionSnapshot?.inputKey===current.inputKey?state.lastAnswerDecisionSnapshot:undefined); const sameInput=Boolean(previous&&current.inputKey);
+    const diff=(a:string[],b:string[])=>[...new Set([...b.filter(x=>!a.includes(x)),...a.filter(x=>!b.includes(x))])].sort();
+    const changedReferences={knowledge:previous?diff(previous.knowledgeRefs,current.knowledgeRefs):[],evidence:previous?diff(previous.evidenceRefs,current.evidenceRefs):[],capability:previous?diff(previous.capabilityRefs,current.capabilityRefs):[],experience:previous?diff(previous.experienceRefs,current.experienceRefs):[],strategy:previous?diff(previous.strategyRefs,current.strategyRefs):[],decision:previous?diff(previous.decisionRefs,current.decisionRefs):[]};
+    const causes:ConversationAnswerChangeCause[]=[]; if(sameInput&&previous&&previous.answerFingerprint!==current.answerFingerprint){if(changedReferences.knowledge.length)causes.push('KNOWLEDGE_CHANGED');if(changedReferences.evidence.length)causes.push('EVIDENCE_CHANGED');if(changedReferences.capability.length)causes.push('CAPABILITY_CHANGED');if(changedReferences.experience.length)causes.push('EXPERIENCE_CHANGED');if(changedReferences.strategy.length)causes.push('STRATEGY_CHANGED');if(changedReferences.decision.length)causes.push('DECISION_CHANGED');if(previous.decisionFingerprint===current.decisionFingerprint)causes.push('SURFACE_CHANGED');if(!causes.length)causes.push('UNATTRIBUTED_CHANGE');}
+    let explanation='同一入力の比較対象がありません。',confidence=0.2; if(sameInput&&previous){if(previous.answerFingerprint===current.answerFingerprint){explanation='同一入力に対する前回回答と現在回答は同一でした。';confidence=1;}else{explanation=`同一入力で回答が変化。変化した追跡軸: ${causes.join(' / ')}。これは原因候補であり、因果証明ではありません。`;confidence=causes.includes('UNATTRIBUTED_CHANGE')?0.3:0.85;}}
+    const result:ConversationAnswerChangeExplanation={sameInput,changed:Boolean(sameInput&&previous&&previous.answerFingerprint!==current.answerFingerprint),causes:[...new Set(causes)],changedReferences,previousSnapshotAt:previous?.capturedAt,currentSnapshotAt:current.capturedAt,previousAnswerFingerprint:previous?.answerFingerprint,currentAnswerFingerprint:current.answerFingerprint,explanation,confidence};
+    const nextState={...state,lastAnswerDecisionSnapshot:current,answerDecisionHistory:[...history,current].slice(-12),lastAnswerChangeExplanation:result}; return {state:nextState,explanation:result};
+  }
+
+  public assessConversationOutcome(currentPrompt:string,state:ConversationState):ConversationOutcomeAssessment{const text=String(currentPrompt||'').trim();const correction=this.isUserCorrection(text);const strongNegative=/(?:嫌|最悪|分かりにく|わかりにく|長すぎ|役に立た|ダメ)/i.test(text);const followUp=/(?:もっと|詳しく|続き|あと|それと|もう一つ|もう1点)/i.test(text);const topicChanged=/(?:別の話|ところで|話変わる|全然違う|別の質問)/i.test(text);const goalCompleted=state.goalProgress?.status==='COMPLETED'||/(?:解決した|できた|完了した|ありがとう|助かった)/i.test(text);const factualGroundingVerified=state.lastCandidateClaimId?state.lastFalsificationPassed===true:state.lastResultStatus==='RESOLVED';const constraintSatisfied=!/(?:それじゃない|条件違|指定違)/i.test(text);const causes:ConversationQualityCause[]=[];if(correction)causes.push(state.dialogueRepair?.required?'reference_error':'intent_error');if(state.unresolvedState==='UNKNOWN')causes.push('knowledge_gap');if(state.unresolvedState==='INSUFFICIENT_EVIDENCE')causes.push('evidence_weakness');if(state.unresolvedState==='CAPABILITY_MISSING'||state.unresolvedState==='EXECUTION_FAILED')causes.push('execution_error');if(state.unresolvedState==='PENDING_USER_INPUT')causes.push('intent_error');if(followUp)causes.push('surface_wording_error');if(state.invalidatedAssumptions.length>0)causes.push('context_loss');if(!constraintSatisfied)causes.push('constraint_violation');let outcome:ConversationOutcomeKind='UNRESOLVED';if(topicChanged)outcome='TOPIC_CHANGED';else if(correction)outcome='CORRECTED';else if(strongNegative)outcome='NEGATIVE_FEEDBACK';else if(followUp)outcome='NEEDS_MORE_EXPLANATION';else if(goalCompleted||state.lastResultStatus==='RESOLVED')outcome='RESOLVED';return{outcome,causes:[...new Set(causes)],goalCompleted,factualGroundingVerified,constraintSatisfied,surfaceQuality:correction||strongNegative||followUp?'NEEDS_REPAIR':goalCompleted?'GOOD':'UNKNOWN'};}
+
   public evaluatePreviousTurn(
     currentPrompt: string,
     state: ConversationState
@@ -72,6 +93,7 @@ export class MikiConversationLearningService {
       key: '',
       reason: '直前の観測対象状態なし',
       promotedClaims: [],
+      conversationOutcome: this.assessConversationOutcome(currentPrompt, state),
     };
 
     // 観測対象: 直前のターンが存在し、未解決/要確認であったか、推論テンプレート適用、Claim候補、または内的自己反証スコアが存在する場合
@@ -88,6 +110,7 @@ export class MikiConversationLearningService {
     }
 
     const text = currentPrompt.trim();
+    const conversationOutcome = this.assessConversationOutcome(text, state);
     const isCorrection = this.isUserCorrection(text);
     const isStrongPositive = this.isUserStrongAffirmative(text);
 
@@ -189,6 +212,7 @@ export class MikiConversationLearningService {
       key: conversationKey,
       reason,
       promotedClaims,
+      conversationOutcome,
     };
   }
 
@@ -246,13 +270,24 @@ export class MikiConversationLearningService {
         world: 'REAL',
         kind: 'FACT_CLAIM',
         status: 'CANDIDATE',
-        source: 'user_teaching',
+        source: 'USER_CLAIM',
         self_provenance: 'USER_CONFIRMED',
         maturity: 'DEFINED',
         scope: { environment: 'user_conversation', conditions: { topic: contextTopic || 'user_instruction' } },
         origin_source_id: 'user_conversation_feedback',
-        independence_cluster_id: 'cluster_user_teaching',
+        independence_cluster_id: `cluster_user_claim_${contextTopic || 'general'}`,
       });
+      const userClaimEvidence = evidenceService.recordUserClaimEvidence({
+        title: `User claim for ${candidateClaim.claim_id}`,
+        statement: cleanedStatement,
+        sourceId: candidateClaim.claim_id,
+        metadata: {
+          environment: 'user_conversation',
+          result_summary: 'ユーザー発言として保存。客観的事実の検証結果ではない。',
+          verification_status: 'UNVERIFIED',
+        },
+      });
+      evidenceService.attachEvidenceToClaim(userClaimEvidence.evidence_id, candidateClaim.claim_id);
     }
 
     // 候補キーの初回観測 (初回登録時は1回目なので昇格しない: 歯止め)
@@ -292,6 +327,20 @@ export class MikiConversationLearningService {
   ): ClaimCandidatePromotionEvaluation {
     const key = `claim_candidate:${claimId}`;
     const profile = mikiUnifiedLearningContinuumService.getProfile(key);
+    const candidate = claimDatabaseService.getClaim(claimId);
+
+    // 116: USER_CLAIMはユーザー発言の証跡であり、客観的事実の独立検証ではない。
+    // 既存Verifierが別途SUPPORTED/DEVICE_VERIFIEDへ変更するまで、自動昇格を止める。
+    if (candidate?.source === 'USER_CLAIM') {
+      return {
+        eligible: false,
+        reason: 'USER_CLAIM_REQUIRES_INDEPENDENT_VERIFICATION',
+        confidence: profile?.confidence ?? 0,
+        uses: profile?.uses ?? 0,
+        failures: profile?.failures ?? 0,
+        verified: profile?.verified ?? 0,
+      };
+    }
 
     if (!profile) {
       return {

@@ -170,6 +170,31 @@ export class AutonomousContinuousEvolutionService {
     this.loadHistory();
   }
 
+  private persistConfig(): void {
+    try {
+      storageService.setItem(AUTOPILOT_CONFIG_KEY, JSON.stringify(this.config));
+    } catch (e) {
+      console.warn('Failed to save autopilot config:', e);
+    }
+  }
+
+  private syncAutopilotTimer(): void {
+    if (this.timerId) {
+      clearInterval(this.timerId);
+      this.timerId = null;
+    }
+    if (!this.config.enabled) return;
+    this.timerId = setInterval(() => {
+      if (!this.isRunningCycle && this.config.enabled) {
+        selfImprovementRequestEventService.publish({
+          trigger: 'autopilot-scheduled',
+          requestedAt: Date.now(),
+          source: 'AUTOPILOT',
+        });
+      }
+    }, Math.max(60, this.config.intervalMinutes) * 60 * 1000);
+  }
+
   private loadConfig(): void {
     try {
       const raw = storageService.getItem(AUTOPILOT_CONFIG_KEY);
@@ -181,26 +206,29 @@ export class AutonomousContinuousEvolutionService {
           ...parsed,
           intervalMinutes: Math.min(10080, Math.max(60, migratedMinutes ?? this.config.intervalMinutes)),
           requireApproval: parsed.requireApproval ?? true,
+          maxContinuousRuns: Math.max(1, Math.min(100, Number(parsed.maxContinuousRuns ?? this.config.maxContinuousRuns))),
+          autoHealLimit: Math.max(0, Math.min(20, Number(parsed.autoHealLimit ?? this.config.autoHealLimit))),
         };
-        this.saveConfig(this.config);
+        this.persistConfig();
       }
+      this.syncAutopilotTimer();
     } catch (e) {
       console.warn('Failed to load autopilot config:', e);
+      this.timerId = null;
     }
   }
 
   public saveConfig(newConfig: Partial<AutopilotConfig>): void {
-    this.config = { ...this.config, ...newConfig };
-    try {
-      storageService.setItem(AUTOPILOT_CONFIG_KEY, JSON.stringify(this.config));
-    } catch (e) {
-      console.warn('Failed to save autopilot config:', e);
-    }
-    if (this.config.enabled) {
-      this.startAutopilot();
-    } else {
-      this.stopAutopilot();
-    }
+    const next: AutopilotConfig = {
+      ...this.config,
+      ...newConfig,
+      intervalMinutes: Math.min(10080, Math.max(60, Number(newConfig.intervalMinutes ?? this.config.intervalMinutes))),
+      maxContinuousRuns: Math.max(1, Math.min(100, Number(newConfig.maxContinuousRuns ?? this.config.maxContinuousRuns))),
+      autoHealLimit: Math.max(0, Math.min(20, Number(newConfig.autoHealLimit ?? this.config.autoHealLimit))),
+    };
+    this.config = next;
+    this.persistConfig();
+    this.syncAutopilotTimer();
     this.notifyState();
   }
 
@@ -279,30 +307,18 @@ export class AutonomousContinuousEvolutionService {
   // ──【自動巡回タイマー制御】──
   public startAutopilot(): void {
     this.config.enabled = true;
-    this.saveConfig({ enabled: true });
-    if (this.timerId) clearInterval(this.timerId);
-
+    this.persistConfig();
+    this.syncAutopilotTimer();
     systemLogger.info('SELF_IMPROVEMENT', `🤖 [自動巡回開始] みきの自律コード自己改善デーモンを起動しました (巡回間隔: ${this.config.intervalMinutes}分)`);
-
-    this.timerId = setInterval(() => {
-      if (!this.isRunningCycle && this.config.enabled) {
-        selfImprovementRequestEventService.publish({
-          trigger: 'autopilot-scheduled',
-          requestedAt: Date.now(),
-          source: 'AUTOPILOT',
-        });
-      }
-    }, Math.max(60, this.config.intervalMinutes) * 60 * 1000);
+    this.notifyState();
   }
 
   public stopAutopilot(): void {
     this.config.enabled = false;
-    this.saveConfig({ enabled: false });
-    if (this.timerId) {
-      clearInterval(this.timerId);
-      this.timerId = null;
-    }
+    this.persistConfig();
+    this.syncAutopilotTimer();
     systemLogger.info('SELF_IMPROVEMENT', '⏹️ [自動巡回停止] みきの自律コード自己改善デーモンを停止しました');
+    this.notifyState();
   }
 
   /**
@@ -341,9 +357,9 @@ export class AutonomousContinuousEvolutionService {
     }
 
     // すべて実装済みの場合はパフォーマンス・レジリエンスの自律強化
-    const fallbackRandomNum = Math.floor(Math.random() * 50) + 171;
+    const fallbackChapterNumber = 171;
     return {
-      targetFile: `src/autonomous_modules/chapter_${fallbackRandomNum}_performance_cache.ts`,
+      targetFile: `src/autonomous_modules/chapter_${fallbackChapterNumber}_performance_cache.ts`,
       prompt: `高負荷時のメモリ消費を抑制し、応答時間を半減させるインメモリLRUキャッシュとAST最適化ヘルパーモジュールを安全に構築してください。`,
       reason: `全章完了に伴い、自律パフォーマンス最適化フェーズへ自動移行しました。`,
     };
@@ -498,7 +514,9 @@ export class AutonomousContinuousEvolutionService {
         console.warn('ネット大海コード調査スキップ (オフライン自己学習フォールバック):', searchErr);
       }
 
-      const activeLlm = deterministicRuntimeService.getActiveExternalConfig();
+      // V183: autonomous improvement may use the canonical non-LLM pipeline only.
+      // External teacher data is handled by the research/evidence boundary, not by
+      // direct code-generation parameters in this legacy autonomy service.
 
       // ── Step 4: コード合成 (Code Synthesis) ──
       logStep('SYNTHESIS', 'TypeScriptモジュール自律合成', `「${targetInfo.prompt.slice(0, 40)}」に基づく型安全コードを生成中 (決定論的テンプレート + 検証済み部品)...`);
@@ -506,9 +524,7 @@ export class AutonomousContinuousEvolutionService {
         targetInfo.prompt,
         targetInfo.targetFile,
         false, // 検証完了まで物理書き込みを保留
-        undefined,
-        activeLlm.endpoint,
-        activeLlm.model
+        undefined
       );
 
       // v85: 旧ローカルLLMへの直接接続は廃止。失敗時は決定論的テンプレート経路へ進む。
@@ -624,9 +640,7 @@ export default ${fallbackClassName};
           fixPrompt,
           targetInfo.targetFile,
           false,
-          undefined,
-          activeLlm.endpoint,
-          activeLlm.model
+          undefined
         );
 
         if (healedImpl.code) {
@@ -710,11 +724,10 @@ export default ${fallbackClassName};
         explicitTarget?.prompt?.includes('指示')
       );
       logStep('CAUSAL_EXPERIMENT', '因果性検証実験 (Causal Impact Verification)', '外乱要因を排除するため、ベースラインと介入後を複数試行し因果効果を測定中...');
-      const scoreIncrement = targetInfo.chapter ? 1 : (isDirectiveExecution ? 1 : 0);
       const causalExperimentResult = evidenceBasedSelfImprovementEngine.runCausalExperiment(
         changeSetId,
         () => previousScore,
-        () => previousScore + scoreIncrement,
+        () => previousScore,
         3
       );
       logStep(
@@ -725,7 +738,7 @@ export default ${fallbackClassName};
       );
 
       // ── Step 7.4: 自動停止ポリシー判定 (11. Stop Policy & 10. No-Change Decision) ──
-      const projectedScoreDelta = targetInfo.chapter ? 1 : (isDirectiveExecution ? 1 : 0);
+      const projectedScoreDelta = 0; // No intervention has been applied yet; never invent a gain.
       const stopCheck = evidenceBasedSelfImprovementEngine.checkStopPolicy({
         scoreDelta: projectedScoreDelta,
         hasRegression: false,
@@ -808,7 +821,8 @@ export default ${fallbackClassName};
         riskReasons.push(`基幹コアファイル (${targetInfo.targetFile}) に対する変更`);
       }
 
-      const isApprovalRequired = !isDirectiveExecution && (this.config.requireApproval || (riskReasons.length > 0 && !this.config.enabled));
+      const isApprovalRequired = true;
+      riskReasons.unshift('V183_CANONICAL_REVIEW_ONLY:自律改善は検証済み候補をレビュー待ちで停止し、本番書込みを自動実行しない');
       if (isApprovalRequired) {
         logStep(
           'APPROVAL_GATE',
@@ -832,6 +846,8 @@ export default ${fallbackClassName};
           invariantsPassed: true,
           applied: false,
           steps,
+          adoptionState: 'STAGED',
+          deploymentState: 'LOCAL_PATCH',
           beforeCode: targetInfo.chapter?.keyRequirements?.join('\n') || '',
           afterCode: currentCode,
           mutationTestResult: mutationResult,
@@ -843,8 +859,8 @@ export default ${fallbackClassName};
             riskReasons,
           },
           lesson: {
-            title: `承認待機: ${targetInfo.chapter?.title || targetInfo.targetFile}`,
-            rule: `承認待ちキューに保持されました。承認後に物理配備・正式適用されます。`,
+            title: `レビュー待機: ${targetInfo.chapter?.title || targetInfo.targetFile}`,
+            rule: `候補をレビュー待ちに保持しました。runFullAutonomousCycleから本番書込みは行いません。手動承認処理は別境界で実施します。`,
           },
         };
 
@@ -888,10 +904,8 @@ export default ${fallbackClassName};
       const finalApply = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
         targetInfo.prompt,
         targetInfo.targetFile,
-        true, // ここで正式書き込み
-        currentCode,
-        activeLlm.endpoint,
-        activeLlm.model
+        false,
+        currentCode
       );
 
       let deploySuccess = finalApply.applied;
@@ -1321,10 +1335,11 @@ export default ${fallbackClassName};
 
     const beforeSnapshot = selfImprovementExperimentService.snapshot();
     const deployResult = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
-      prompt,
-      targetFile,
-      true, // 正式配備
-      code
+        prompt,
+        targetFile,
+        true, // 正式配備
+        code,
+        'CORE_PROMOTION'
     );
 
     record.applied = deployResult.applied;

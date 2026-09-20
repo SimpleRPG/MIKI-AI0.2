@@ -1,5 +1,6 @@
 import { CompiledRequestType, ConversationState } from '../../../types';
 import { systemLogger } from '../../../services/systemLogger';
+import { decomposeMultiIntent } from '../../unknown/services/multiIntentDecompositionService';
 
 /**
  * 非LLM中心・自己成長型AIコンパニオン 設計思想指示書(統合版) 第10.1節
@@ -41,6 +42,8 @@ export class RequestTypeCompilerService {
       requestHash = Math.imul(requestHash, 16777619);
     }
     const requestId = `REQ-${(requestHash >>> 0).toString(16).toUpperCase().padStart(8, '0')}`;
+
+    const intentPlan = decomposeMultiIntent(rawText);
 
     // 1. GOAL (目的・ゴール) の抽出
     let goal = '一般的な問い合わせ・対話処理';
@@ -182,6 +185,7 @@ export class RequestTypeCompilerService {
       rollbackRequirement,
       canExecuteDeterministically,
       compiledAt: Date.now(),
+      intentPlan,
     };
 
     systemLogger.info(

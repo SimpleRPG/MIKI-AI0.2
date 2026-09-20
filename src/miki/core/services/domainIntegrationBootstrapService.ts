@@ -52,13 +52,15 @@ class DomainIntegrationBootstrapService{
   if(domain==='conversation')return ['ANALYZE_TEXT'];
   if(domain==='unknown')return ['RESOLVE_UNKNOWN'];
   if(domain==='research')return ['RUN_RESEARCH'];
-  if(domain==='improvement'||domain==='autonomy')return ['RUN_SELF_IMPROVEMENT','DISCOVER_IMPROVEMENT_ISSUE'];
+  if(domain==='autonomy')return ['RUN_SELF_IMPROVEMENT','SAVE_AUTONOMY_CONFIG'];
+  if(domain==='improvement')return ['RUN_SELF_IMPROVEMENT','DISCOVER_IMPROVEMENT_ISSUE'];
+  if(domain==='learning')return ['LEARN_FROM_CORE_RESULT'];
   if(domain==='strategy')return ['PLAN_PENDING_IMPROVEMENT_RUN'];
   if(domain==='capability')return ['RESOLVE_CAPABILITY_GAPS'];
   if(domain==='memory')return ['FLUSH'];
   if(domain==='verification')return ['VALIDATE_CANDIDATE'];
   if(domain==='selfDevelopment')return ['GENERATE_CANDIDATE'];
-  if(domain==='promotion')return ['CREATE_REVIEW_PACKAGE'];
+  if(domain==='promotion')return ['CREATE_REVIEW_PACKAGE','APPROVE_REVIEWED_CANDIDATE'];
   return [];
  }
 
@@ -86,7 +88,26 @@ class DomainIntegrationBootstrapService{
    const {knowledgeGapService}=await import('../../unknown/services/knowledgeGapService');
    const gap=knowledgeGapService.getById(String(envelope.payload.gapId||''));
    if(!gap)return {accepted:false,domain,command:envelope.command,error:'KNOWLEDGE_GAP_NOT_FOUND',completedAt:Date.now()};
-   return done(await researchService.researchGap(gap));
+   const adaptive = envelope.payload.adaptive !== false;
+   const requestedQuery = typeof envelope.payload.query === 'string' ? envelope.payload.query.trim() : '';
+   const requestedRound = Number.isFinite(Number(envelope.payload.continuationRound))
+     ? Math.max(0, Math.floor(Number(envelope.payload.continuationRound)))
+     : 0;
+   return done(await researchService.researchGap(gap,{
+     adaptive,
+     query: requestedQuery || undefined,
+     continuationRound: requestedRound,
+     maxPasses: Number.isFinite(Number(envelope.payload.maxPasses)) ? Number(envelope.payload.maxPasses) : undefined,
+     maxPagesPerPass: Number.isFinite(Number(envelope.payload.maxPagesPerPass)) ? Number(envelope.payload.maxPagesPerPass) : undefined
+   }));
+  }
+  if(domain==='autonomy'&&envelope.command==='SAVE_AUTONOMY_CONFIG'){
+   const {autonomousContinuousEvolutionService}=await import('../../autonomy/services/autonomousContinuousEvolutionService');
+   const raw=envelope.payload.config;
+   if(!raw||typeof raw!=='object')return {accepted:false,domain,command:envelope.command,error:'AUTONOMY_CONFIG_REQUIRED',completedAt:Date.now()};
+   const source=raw as Record<string,unknown>;
+   autonomousContinuousEvolutionService.saveConfig({enabled:typeof source.enabled==='boolean'?source.enabled:undefined,intervalMinutes:typeof source.intervalMinutes==='number'?source.intervalMinutes:undefined,requireApproval:typeof source.requireApproval==='boolean'?source.requireApproval:undefined,targetDomain:typeof source.targetDomain==='string'?source.targetDomain as any:undefined,maxContinuousRuns:typeof source.maxContinuousRuns==='number'?source.maxContinuousRuns:undefined,autoHealLimit:typeof source.autoHealLimit==='number'?source.autoHealLimit:undefined});
+   return done({operation:'SAVE_AUTONOMY_CONFIG',operationClass:'BUSINESS',config:autonomousContinuousEvolutionService.getConfig(),mutationApplied:true,evidenceIds:[]});
   }
   if((domain==='improvement'||domain==='autonomy')&&envelope.command==='RUN_SELF_IMPROVEMENT'){
    const {improvementAssessmentService}=await import('../../improvement/services/improvementAssessmentService');
@@ -109,6 +130,21 @@ class DomainIntegrationBootstrapService{
   if(domain==='improvement'&&envelope.command==='DISCOVER_IMPROVEMENT_ISSUE'){
    const result=await autonomousIssueDiscoveryService.scan();
    return done({operation:'DISCOVER_IMPROVEMENT_ISSUE',operationClass:'BUSINESS',...result,mutationApplied:false,evidenceIds:[]});
+  }
+  if(domain==='learning'&&envelope.command==='LEARN_FROM_CORE_RESULT'){
+   const {mikiUnifiedLearningContinuumService}=await import('../../learning/services/mikiUnifiedLearningContinuumService');
+   const evidenceIds=Array.isArray(envelope.payload.evidenceIds)?envelope.payload.evidenceIds.map(String).filter(Boolean):[];
+   if(evidenceIds.length===0)return {accepted:false,domain,command:envelope.command,error:'LEARNING_EVIDENCE_REQUIRED',completedAt:Date.now()};
+   const rawOutcome=String(envelope.payload.outcome||'SUCCESS').toUpperCase();
+   const outcome=rawOutcome==='FAILURE'?'FAILURE':rawOutcome==='BLOCKED'?'BLOCKED':'SUCCESS';
+   const verified=Boolean(envelope.payload.verified);
+   const capabilityIds=Array.isArray(envelope.payload.capabilityIds)?envelope.payload.capabilityIds.map(String).filter(Boolean):[];
+   const concepts=Array.isArray(envelope.payload.concepts)?envelope.payload.concepts.map(String).filter(Boolean).slice(0,20):[];
+   const key=String(envelope.payload.key||envelope.payload.sourceOperation||envelope.payload.taskId||'core-result');
+   const lesson=String(envelope.payload.lesson||`${String(envelope.payload.sourceDomain||'unknown')}:${String(envelope.payload.sourceOperation||'unknown')} learned by CORE`);
+   mikiUnifiedLearningContinuumService.initialize();
+   mikiUnifiedLearningContinuumService.observe({domain:String(envelope.payload.learningDomain||'system') as any,key,action:String(envelope.payload.sourceOperation||'core-result'),input:String(envelope.payload.input||envelope.payload.goal||'').slice(0,500),outcome,verified,capabilityIds,concepts,lesson});
+   return done({operation:'LEARN_FROM_CORE_RESULT',operationClass:'BUSINESS',status:'SUCCEEDED',learningRecorded:true,sourceDomain:String(envelope.payload.sourceDomain||''),sourceOperation:String(envelope.payload.sourceOperation||''),sourceOperationInstanceId:String(envelope.payload.sourceOperationInstanceId||''),verified,evidenceIds,capabilityIds,concepts,lesson});
   }
   if(domain==='memory'&&envelope.command==='FLUSH'){
    if(storageService.getBackendName()==='memory')return {accepted:false,domain,command:envelope.command,error:'MEMORY_ONLY_PERSISTENCE',completedAt:Date.now()};
@@ -149,6 +185,14 @@ class DomainIntegrationBootstrapService{
      baselineSnapshotSha256:workspace.baseSnapshotSha256,changedFilePaths,
      unresolvedItems:result.reasons,generationEvidenceIds:[...new Set(workspace.files.flatMap(file=>file.evidenceIds))],
      persistenceReceiptIds:[receipt.receiptId],evidenceIds:[...new Set(workspace.files.flatMap(file=>file.evidenceIds))]});
+  }
+  if(domain==='promotion'&&envelope.command==='APPROVE_REVIEWED_CANDIDATE'){
+   const recordId=String(envelope.payload.recordId||'');
+   if(!recordId)return {accepted:false,domain,command:envelope.command,error:'APPROVAL_RECORD_ID_REQUIRED',completedAt:Date.now()};
+   const {autonomousContinuousEvolutionService}=await import('../../autonomy/services/autonomousContinuousEvolutionService');
+   const result=await autonomousContinuousEvolutionService.approveAndDeployRecord(recordId);
+   if(!result.success)return {accepted:false,domain,command:envelope.command,error:result.message,result:{operation:'APPROVE_REVIEWED_CANDIDATE',operationClass:'BUSINESS',...result,evidenceIds:[]},completedAt:Date.now()};
+   return done({operation:'APPROVE_REVIEWED_CANDIDATE',operationClass:'BUSINESS',...result,evidenceIds:[]});
   }
   if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
    const {reviewZipExportService}=await import('./reviewZipExportService');

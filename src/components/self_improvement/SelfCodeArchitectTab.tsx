@@ -165,7 +165,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
   const handleApproveRecord = async (recordId: string) => {
     setIsApprovingRecordId(recordId);
     try {
-      const res = await gateway.continuousEvolution.approveAndDeployRecord(recordId);
+      const res = await gateway.approveAndDeployRecord(recordId);
       setActionNotice(res.message);
       setPendingApprovalRecords(gateway.continuousEvolution.getHistory().filter((r) => r.awaitingApproval));
       setAuditResult(gateway.architect.getLatestAudit() ?? gateway.architect.runSelfCodeAudit());
@@ -179,7 +179,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
     setRecipeChapter(chapNum);
     const rec = gateway.architect.getRecipeForChapter(chapNum);
     setActiveRecipe(rec);
-    setActionNotice(`第${chapNum}章の安全自律改善レシピを合成しました！`);
+    setActionNotice(`選択した仕様の安全自律改善レシピを合成しました！`);
     setTimeout(() => setActionNotice(null), 4000);
   };
 
@@ -277,7 +277,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
     setProposals(gateway.architect.getProposals());
     setSelectedChapter(null);
     setActiveView('proposals');
-    setActionNotice(`第${chapterNumber}章の自己改善プロポーザル・変更契約を発行しました！`);
+    setActionNotice(`選択した仕様の自己改善プロポーザル・変更契約を発行しました！`);
     setTimeout(() => setActionNotice(null), 4000);
   };
 
@@ -422,7 +422,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
       { id: 'regression', name: '退行防止ベンチマーク', category: 'QUALITY', status: 'pending', detail: '既存テストケースおよび仕様適合性の退行ゼロ確認' },
     ]);
 
-    addLiveLog(`🚀 【自律進化パイプライン始動】第${targetChapter.chapterNumber}章『${targetChapter.title}』の自律実装に着手`, 'purple');
+    addLiveLog(`🚀 【自律進化パイプライン始動】対象『${targetChapter.title}』の自律実装に着手`, 'purple');
 
     // 実測進化パイプラインのステップ通知を購読
     const unsubscribe = gateway.continuousEvolution.onStep((step) => {
@@ -475,7 +475,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
     });
 
     try {
-      const result = await typedImprovementUiGatewayService.startSpecifiedImprovement(`第${targetChapter.chapterNumber}章の自己コード改善`, `chapter-${targetChapter.chapterNumber}`);
+      const result = await typedImprovementUiGatewayService.startSpecifiedImprovement(`対象仕様『${targetChapter.title}』の自己コード改善`, `chapter-${targetChapter.chapterNumber}`);
       setLiveDiff(null);
       addLiveLog(`CORE正本パイプライン: ${result.currentStage} (Task: ${result.taskId || 'N/A'}, CORE Req: ${result.coreResult?.requestId || 'N/A'})`, 'info');
 
@@ -483,11 +483,11 @@ export const SelfCodeArchitectTab: React.FC = () => {
       setAuditResult(updatedAudit);
       setProposals([...gateway.architect.getProposals()]);
 
-      setActionNotice(`第${targetChapter.chapterNumber}章の自己改善要求をCORE正本パイプラインで処理しました: ${queuedRequest.id} / QUEUED`);
+      setActionNotice(`対象仕様の自己改善要求をCORE正本パイプラインで処理しました: ${queuedRequest.id} / QUEUED`);
       setTimeout(() => setActionNotice(null), 6000);
     } catch (err: any) {
       addLiveLog(`❌ 自律改善サイクル停止: ${err?.message || err}`, 'warn');
-      setActionNotice(`⚠️ 第${targetChapter.chapterNumber}章の自律改善が停止しました: ${err?.message || err}`);
+      setActionNotice(`⚠️ 対象仕様の自律改善が停止しました: ${err?.message || err}`);
       setTimeout(() => setActionNotice(null), 6000);
     } finally {
       unsubscribe();
@@ -527,7 +527,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
         break;
       }
       const t = targets[i];
-      addLiveLog(`▶️ [進行 ${i + 1}/${targets.length}] 第${t.chapterNumber}章『${t.title}』に着手`, 'info');
+      addLiveLog(`▶️ [進行 ${i + 1}/${targets.length}] 対象『${t.title}』に着手`, 'info');
       await runRealtimeChapterCycle(t);
       completedInRun++;
       if (i < targets.length - 1 && !stopBatchRef.current) {
@@ -579,7 +579,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-amber-300">
-                      第{rec.chapterNumber ?? '?'}章: {rec.chapterTitle || rec.targetFile}
+                      対象: {rec.chapterTitle || rec.targetFile}
                     </span>
                     <span className="text-[10px] font-mono text-cyan-300 bg-black/40 px-1.5 py-0.5 rounded">
                       {rec.targetFile}
@@ -727,7 +727,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                 <span className="font-semibold text-slate-300 flex items-center gap-2">
                   {liveActiveChapter ? (
                     <>
-                      <span className="text-amber-400 font-bold">第{liveActiveChapter.chapterNumber}章</span>
+                      <span className="text-amber-400 font-bold">{liveActiveChapter.title}</span>
                       <span>『{liveActiveChapter.title}』</span>
                     </>
                   ) : (
@@ -1013,7 +1013,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
             }`}
           >
             <Cpu className="w-3.5 h-3.5 text-violet-300" />
-            第28章 教師監視/骨格/理解度
+            教師監視 / 骨格 / 理解度
           </button>
           <button
             onClick={() => setActiveView('advanced_services')}
@@ -1148,12 +1148,12 @@ export const SelfCodeArchitectTab: React.FC = () => {
               className="bg-slate-900 border border-slate-800 px-3 py-2 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
             >
               <option value="ALL">全カテゴリ</option>
-              <option value="CORE_FOUNDATION">中核基盤 (第0〜13章)</option>
-              <option value="EXTENDED_SERVICES">拡張サービス (第14〜27章)</option>
-              <option value="AUTONOMOUS_ADVANCED">自律進化・完成判定 (第28〜53章)</option>
-              <option value="DEEP_SPECIFICATION">深層アーキテクチャ・作業台 (第54〜90章)</option>
-              <option value="FORMAL_SYNTHESIS">仕様駆動合成・SLO (第91〜122章)</option>
-              <option value="SELF_IMPROVEMENT_MVP">自己アプリ改善・作業契約 (第123〜169章)</option>
+              <option value="CORE_FOUNDATION">中核基盤</option>
+              <option value="EXTENDED_SERVICES">拡張サービス</option>
+              <option value="AUTONOMOUS_ADVANCED">自律進化・完成判定</option>
+              <option value="DEEP_SPECIFICATION">深層アーキテクチャ・作業台</option>
+              <option value="FORMAL_SYNTHESIS">仕様駆動合成・SLO</option>
+              <option value="SELF_IMPROVEMENT_MVP">自己アプリ改善・作業契約</option>
             </select>
           </div>
         </div>
@@ -1166,7 +1166,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
             <BookOpen className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
             <div className="text-xs space-y-1">
               <div className="font-bold text-indigo-200">
-                設計思想指示書・未実装章の自律参照 & コード改善機能 (第29章・第130章)
+                設計思想・未実装項目の自律参照 & コード改善機能
               </div>
               <div className="text-slate-300 leading-relaxed">
                 MIKI-AIは本一覧から未実装の仕様章を選択し、要件・不変条件・変更契約（Change Contract）を読み込んで自律的に改善プロポーザルを生成できます。
@@ -1184,7 +1184,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="px-2 py-0.5 bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 rounded-md text-[10px] font-bold">
-                      第{chapter.chapterNumber}章 {chapter.versionAdded}
+                      {chapter.title} · {chapter.versionAdded}
                     </span>
                     <span className="text-[10px] text-amber-400 font-semibold px-2 py-0.5 bg-amber-950/40 border border-amber-800/40 rounded-md">
                       {chapter.status === 'IN_PROGRESS' ? '進行中' : '未実装'}
@@ -1264,7 +1264,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="px-2 py-0.5 bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 rounded-md text-[10px] font-bold">
-                    第{chapter.chapterNumber}章 {chapter.versionAdded}
+                    {chapter.title} · {chapter.versionAdded}
                   </span>
                   <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
                     <Check className="w-3 h-3 text-emerald-400" />
@@ -1363,7 +1363,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800 rounded-md text-[10px] font-bold">
-                        第{prop.targetChapterNumber}章
+                        対象仕様
                       </span>
                       <h4 className="font-bold text-slate-100 text-sm">{prop.title}</h4>
                     </div>
@@ -1473,7 +1473,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                           <span className="text-emerald-400 font-bold shrink-0">AST パッチ差分</span>
                         </div>
                         <div className="bg-black/70 rounded p-2.5 space-y-1 overflow-x-auto text-[10px] leading-relaxed">
-                          <div className="text-cyan-400 font-bold">@@ 仕様書 第{prop.targetChapterNumber}章 準拠パッチ適用 @@</div>
+                          <div className="text-cyan-400 font-bold">@@ 仕様書 対象仕様 準拠パッチ適用 @@</div>
                           <div className="text-slate-500">// Invariant-protected target: {prop.contract.allowedFiles[0] || 'miki/selfDevelopment/services/gateway.architect.ts'}</div>
                           <div className="text-slate-500">// Preserved invariants: {prop.contract.mustPreserve.slice(0, 2).join(' / ')}</div>
                           <div className="text-emerald-400 bg-emerald-950/40 px-1 py-0.5 rounded font-semibold">+ export interface Chapter{prop.targetChapterNumber}Specification {'{'}</div>
@@ -1560,7 +1560,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
             <ShieldCheck className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
             <div className="text-xs space-y-1">
               <div className="font-bold text-cyan-200">
-                不変条件エンジン (Invariants Engine - 第30章)
+                不変条件エンジン (Invariants Engine)
               </div>
               <div className="text-slate-300 leading-relaxed">
                 自己改善において「評価器ハック」「ベンチマーク改ざん」「旧生成モデルモデルの勝手な削除」「プライバシー越境」を絶対的に遮断する不可逆ガードレールです。
@@ -1612,7 +1612,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
             <Cpu className="w-5 h-5 text-violet-400 flex-shrink-0 mt-0.5" />
             <div className="text-xs space-y-1">
               <div className="font-bold text-violet-200 text-sm">
-                第28章 教師モニタリング・コード骨格テンプレート化・理解度追従型説明調整
+                教師モニタリング・コード骨格テンプレート化・理解度追従型説明調整
               </div>
               <div className="text-slate-300 leading-relaxed">
                 外部モデルの劣化や挙動変化を早期遮断する「教師ドリフトプローブ」、高品質コードをパラメータ再利用する「骨格テンプレート」、相手の専門性に合わせてペルソナ口調を保ちつつ説明深度のみを最適化する「理解度適応エンジン」の3本柱が稼働しています。
@@ -1806,7 +1806,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                   新世代自律認知OS & 研究・デバッグ基盤
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  第33章(能力境界), 第34章(技能圧縮), 第35/54章(能動知覚), 第57章(研究ノート), 第69章(人格アンカー), 第155章(認知デバッガ)
+                  能力境界 / 技能圧縮 / 能動知覚 / 研究ノート / 人格アンカー / 認知デバッガ
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1823,7 +1823,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
                   <GraduationCap className="w-4 h-4 text-amber-400" />
-                  第33・34章 能力境界＆技能圧縮 (Skill IR)
+                  能力境界＆技能圧縮 (Skill IR)
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-amber-950 text-amber-300 border border-amber-800">
                   ロスレス圧縮
@@ -1886,7 +1886,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
                   <Eye className="w-4 h-4 text-cyan-400" />
-                  第35・54・69章 能動知覚OS＆人格アンカー
+                  能動知覚OS＆人格アンカー
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-cyan-950 text-cyan-300 border border-cyan-800">
                   常時知覚中
@@ -1942,7 +1942,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
                   <BookOpen className="w-4 h-4 text-emerald-400" />
-                  第57章 デジタル研究ノート (自己実験＆仮説検証)
+                  デジタル研究ノート (自己実験＆仮説検証)
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">
                   科学的自己進化
@@ -1992,7 +1992,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <span className="text-xs font-bold text-violet-300 flex items-center gap-1.5">
                   <Activity className="w-4 h-4 text-violet-400" />
-                  第155章 認知デバッガ (推論トレース＆失敗経路診断)
+                  認知デバッガ (推論トレース＆失敗経路診断)
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-violet-950 text-violet-300 border border-violet-800">
                   透明推論モニタ
@@ -2097,7 +2097,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                 >
                   {gateway.specificationRegistry.map((c) => (
                     <option key={c.chapterNumber} value={c.chapterNumber}>
-                      第{c.chapterNumber}章: {c.title.slice(0, 26)}... ({c.status})
+                      {c.title.slice(0, 36)}... ({c.status})
                     </option>
                   ))}
                 </select>
@@ -2116,7 +2116,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                 <div className="p-4 bg-slate-950/80 border border-indigo-900/50 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-200">
-                      第{activeRecipe.chapterNumber}章: {activeRecipe.chapterTitle}
+                      {activeRecipe.chapterTitle}
                     </span>
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
@@ -2187,7 +2187,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                   <button
                     onClick={async () => {
                       setIsAutoImproving(true);
-                      setActionNotice(`第${activeRecipe.chapterNumber}章の自律改善サイクルを実行中...`);
+                      setActionNotice(`選択した仕様の自律改善サイクルを実行中...`);
                       try {
                         const res = await gateway.architect.runAutonomousImprovementCycle(activeRecipe.chapterNumber);
                         setAuditResult(res.auditResult);
@@ -2271,7 +2271,7 @@ export const SelfCodeArchitectTab: React.FC = () => {
                       主要エクスポート: <span className="text-slate-300 font-mono">{mod.primaryExports.join(', ')}</span>
                     </div>
                     <div className="text-slate-500">
-                      関連章: <span className="text-indigo-400 font-mono">第{mod.linkedChapterNumbers.join(', ')}章</span>
+                      関連仕様: <span className="text-indigo-400 font-mono">{mod.linkedChapterNumbers.join(', ')}</span>
                     </div>
                   </div>
                 </div>

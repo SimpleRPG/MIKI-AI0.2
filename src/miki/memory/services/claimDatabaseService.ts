@@ -16,6 +16,19 @@ const CLAIMS_STORAGE_KEY = 'miki_claim_db_v1';
 /**
  * 主張間の関係リンク
  */
+export type BeliefRevisionStatus='ACTIVE'|'UNDER_REVIEW'|'CONTRADICTED'|'SUPERSEDED'|'QUARANTINED';
+
+export interface BeliefRevisionResult {
+  status:'COEXIST'|'QUARANTINE_NEW'|'UNDER_REVIEW_BOTH'|'SUPERSEDE_EXISTING';
+  existingClaimId:string;
+  candidateClaimId:string;
+  existingConfidence:number;
+  candidateConfidence:number;
+  reason:string;
+  independentEvidenceClusters:string[];
+  committed:boolean;
+}
+
 export interface ClaimRelation {
   source_claim_id: string;
   target_claim_id: string;
@@ -214,6 +227,88 @@ export class ClaimDatabaseService {
   }
 
   /**
+   * Knowledge / Belief Revisionの正式規則。
+   * 矛盾検出だけでは新Claimを真実扱いせず、独立Evidence・検証状態・成熟度を再評価する。
+   * commit=falseでは判断のみを返し、状態を書き換えない。
+   */
+  public reviseBelief(params:{
+    existingClaimId:string;
+    candidateClaimId:string;
+    independentlyObservedClusterIds?:string[];
+    candidateVerified?:boolean;
+    candidateEvidenceQuality?:number;
+    commit?:boolean;
+  }):BeliefRevisionResult {
+    const existing=this.claims.get(params.existingClaimId);
+    const candidate=this.claims.get(params.candidateClaimId);
+    if(!existing||!candidate)throw new Error('BELIEF_REVISION_CLAIM_NOT_FOUND');
+
+    const independentEvidenceClusters=[...new Set((params.independentlyObservedClusterIds||[]).filter(Boolean))];
+    const existingClusters=existing.independence_cluster_id?[existing.independence_cluster_id]:[];
+    const candidateVerified=params.candidateVerified===true;
+    const evidenceQuality=Math.max(0,Math.min(1,Number(params.candidateEvidenceQuality??0)));
+
+    const maturityScore=(claim:ClaimRecord)=>{
+      const rank:Record<ClaimMaturity,number>={DISCOVERED:10,DEFINED:20,CONNECTED:30,APPLIED:45,REPRODUCED:60,TRANSFERRED:70,MATURE:80,RESTRICTED:0};
+      return rank[claim.maturity]||0;
+    };
+    const statusScore=(claim:ClaimRecord)=>{
+      const rank:Record<ClaimVerificationStatus,number>={
+        UNVERIFIED:10,CANDIDATE:15,SUPPORTED:45,DEVICE_VERIFIED:65,DISPUTED:20,CONTRADICTED:5,FALSE:0,SUPERSEDED:0,CONTEXT_ONLY:25
+      };
+      return rank[claim.status]||0;
+    };
+    const existingConfidence=Math.round(Math.max(0,Math.min(100,statusScore(existing)+maturityScore(existing)/4+(existingClusters.length>0?10:0)))*100)/100;
+    const candidateConfidence=Math.round(Math.max(0,Math.min(100,statusScore(candidate)+maturityScore(candidate)/4+evidenceQuality*20+(independentEvidenceClusters.length>0?15:0)+(candidateVerified?15:0)))*100)/100;
+
+    const contradiction=this.detectContradictions(candidate).some(x=>x.claim_id===existing.claim_id)
+      || existing.contradicted_by?.includes(candidate.claim_id)
+      || candidate.contradicted_by?.includes(existing.claim_id);
+
+    if(!contradiction){
+      return {status:'COEXIST',existingClaimId:existing.claim_id,candidateClaimId:candidate.claim_id,existingConfidence,candidateConfidence,reason:'Claims are not contradictory in the current scope/world comparison; preserve both.',independentEvidenceClusters,committed:false};
+    }
+
+    let status:BeliefRevisionResult['status']='UNDER_REVIEW_BOTH';
+    let reason='Contradiction detected; neither claim is promoted solely from contradiction.';
+    if(!candidateVerified || independentEvidenceClusters.length===0 || evidenceQuality<0.5){
+      status='QUARANTINE_NEW';
+      reason='Candidate lacks independently verified support; quarantine without replacing the existing claim.';
+    }else if(candidateConfidence>existingConfidence){
+      status='SUPERSEDE_EXISTING';
+      reason='Candidate has verified support and stronger independent evidence; explicit revision may supersede the existing claim.';
+    }
+
+    let committed=false;
+    if(params.commit){
+      if(status==='QUARANTINE_NEW'){
+        (candidate as ClaimRecord & {beliefStatus?:BeliefRevisionStatus;beliefConfidence?:number}).beliefStatus='QUARANTINED';
+        (candidate as ClaimRecord & {beliefStatus?:BeliefRevisionStatus;beliefConfidence?:number}).beliefConfidence=candidateConfidence;
+      }else if(status==='UNDER_REVIEW_BOTH'){
+        (existing as ClaimRecord & {beliefStatus?:BeliefRevisionStatus;beliefConfidence?:number}).beliefStatus='UNDER_REVIEW';
+        (candidate as ClaimRecord & {beliefStatus?:BeliefRevisionStatus;beliefConfidence?:number}).beliefStatus='UNDER_REVIEW';
+        (existing as ClaimRecord & {beliefStatus?:BeliefRevisionStatus;beliefConfidence?:number}).beliefConfidence=existingConfidence;
+        (candidate as ClaimRecord & {beliefStatus?:BeliefRevisionStatus;beliefConfidence?:number}).beliefConfidence=candidateConfidence;
+      }else if(status==='SUPERSEDE_EXISTING'){
+        this.supersedeClaim(existing.claim_id,candidate.claim_id,'Belief Revision: verified independent evidence outweighed existing claim');
+        (candidate as ClaimRecord & {beliefStatus?:BeliefRevisionStatus;beliefConfidence?:number}).beliefStatus='ACTIVE';
+        (candidate as ClaimRecord & {beliefStatus?:BeliefRevisionStatus;beliefConfidence?:number}).beliefConfidence=candidateConfidence;
+      }
+      this.saveToStorage();
+      committed=true;
+    }
+
+    return {status,existingClaimId:existing.claim_id,candidateClaimId:candidate.claim_id,existingConfidence,candidateConfidence,reason,independentEvidenceClusters,committed};
+  }
+
+  /** ClaimのBelief Statusを取得する。旧レコードはACTIVEとして互換扱いする。 */
+  public getBeliefStatus(claimId:string):BeliefRevisionStatus|undefined {
+    const claim=this.claims.get(claimId);
+    if(!claim)return undefined;
+    return (claim as ClaimRecord & {beliefStatus?:BeliefRevisionStatus}).beliefStatus||'ACTIVE';
+  }
+
+  /**
    * 6.4 訂正・改訂処理: 古い主張をSUPERSEDEDにし、新しい主張で更新
    * 上書きで消すのではなく、変更履歴として両方を残す
    */
@@ -223,10 +318,12 @@ export class ClaimDatabaseService {
     if (!oldClaim || !newClaim) return false;
 
     oldClaim.status = 'SUPERSEDED';
+    (oldClaim as ClaimRecord & {beliefStatus?:BeliefRevisionStatus}).beliefStatus = 'SUPERSEDED';
     oldClaim.superseded_by = newClaimId;
     oldClaim.updated_at = Date.now();
 
     newClaim.superseded_from = oldClaimId;
+    (newClaim as ClaimRecord & {beliefStatus?:BeliefRevisionStatus}).beliefStatus = 'ACTIVE';
     newClaim.updated_at = Date.now();
 
     this.relations.push({
@@ -423,6 +520,7 @@ export class ClaimDatabaseService {
     const qLower = query.toLowerCase();
     const activeClaims = Array.from(this.claims.values()).filter(
       (c) => c.status !== 'SUPERSEDED' && c.status !== 'FALSE'
+        && (c as ClaimRecord & {beliefStatus?:BeliefRevisionStatus}).beliefStatus !== 'QUARANTINED'
     );
 
     // 1. スコアリング (キーワード一致、重要語、成熟度、検証状態)

@@ -1,15 +1,16 @@
 /**
- * MIKI v85 — 共通認知カーネル
+ * Legacy cognition API compatibility adapter.
  *
- * 会話/RPG/研究/コード/システムを別AIとして扱わず、同一の認知ループへ束ねる。
- * 通常経路は完全NON_LLM_ONLY。外部Geminiは教師/証拠経路としてのみ別サービスから利用する。
+ * The legacy 7-area cognition controller is retired as an execution authority.
+ * This adapter keeps the old HTTP surface usable while every request enters the
+ * single CORE + 17 classification architecture and returns the CORE result.
  */
-import { integratedCognitionControllerService, CognitiveDecision } from '../../../services/chapter69_90PlatformServices';
-import { unifiedMikiExperienceService, UnifiedExperienceDomain } from '../../experience/services/unifiedMikiExperienceService';
-import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
+import { coreTaskIngressService } from '../../core/services/coreTaskIngressService';
 import { operationalConformanceService } from '../../verification/services/operationalConformanceService';
 
-export type CognitiveCycleDomain = 'conversation'|'rpg'|'research'|'code'|'data'|'system'|'task';
+export type CognitiveCycleDomain =
+  | 'conversation' | 'rpg' | 'research' | 'code' | 'data' | 'system' | 'task';
+
 export interface CognitiveCycleInput {
   domain: CognitiveCycleDomain;
   input: string;
@@ -22,77 +23,117 @@ export interface CognitiveCycleInput {
   needsFresh?: boolean;
   capabilityIds?: string[];
 }
+
+export interface CognitiveDecision {
+  authority: 'CORE';
+  route: string[];
+  taskId: string;
+  status: string;
+}
+
 export interface CognitiveCycleResult {
   traceId: string;
   decision: CognitiveDecision;
   uncertaintyAction: string;
   recordedExperience: boolean;
   terminal: ReturnType<typeof operationalConformanceService.terminal>;
+  coreResult?: unknown;
 }
 
 let seq = 0;
-const id = (prefix:string) => `${prefix}-${++seq}-${Date.now().toString(36)}`;
+const id = (prefix: string) => `${prefix}-${++seq}-${Date.now().toString(36)}`;
 
 class MikiCognitiveKernelService {
-  cycle(input: CognitiveCycleInput): CognitiveCycleResult {
+  async cycle(input: CognitiveCycleInput): Promise<CognitiveCycleResult> {
+    if (!input.input || !input.input.trim()) throw new Error('COGNITIVE_CYCLE_INPUT_REQUIRED');
+
     const traceId = id('miki-trace');
-    const decision = integratedCognitionControllerService.decide(input);
-    const uncertainty = operationalConformanceService.classifyUncertainty({
-      kind: (input.uncertainty ?? 0) >= .8 ? 'INSUFFICIENT_EVIDENCE' : 'REQUIREMENT',
-      magnitude: Math.max(0, Math.min(1, input.uncertainty ?? 0)),
-      decisive: (input.uncertainty ?? 0) >= .8,
-      evidence: input.input.trim() ? ['USER_INPUT'] : [],
-    });
-
-    operationalConformanceService.trace(traceId, {
-      stage: 'INTENT', type: 'cognitive_cycle', referenceIds: input.capabilityIds ?? [],
-      stateChanges: [`DOMAIN:${input.domain}`, `ACTION:${uncertainty.action}`],
-      retry: 0, metrics: { uncertainty: input.uncertainty ?? 0 }, privacyMode: input.privacy ? 'REDACTED' : 'HASHED',
-    });
-
-    let recordedExperience = false;
-    const unifiedDomain: UnifiedExperienceDomain =
-      input.domain === 'data' || input.domain === 'task' ? 'execution' : input.domain;
-    try {
-      unifiedMikiExperienceService.observe({
-        domain: unifiedDomain,
-        action: 'cognitive_cycle',
-        input: input.input.slice(0, 500),
-        outcome: uncertainty.action === 'EXECUTE' ? 'SUCCESS' : 'BLOCKED',
-        verified: false,
+    const core = await coreTaskIngressService.submit({
+      kind: 'USER_REQUEST',
+      source: 'core',
+      goal: input.input.trim(),
+      payload: {
+        entry: 'LEGACY_COGNITION_API',
+        legacyDomain: input.domain,
+        importance: input.importance,
+        uncertainty: input.uncertainty,
+        irreversible: input.irreversible,
+        privacy: input.privacy,
+        hasCode: input.hasCode,
+        hasData: input.hasData,
+        needsFresh: input.needsFresh,
         capabilityIds: input.capabilityIds ?? [],
-        lesson: `共通認知カーネル: ${decision.route.join('→')}; uncertainty=${uncertainty.action}`,
-      });
-      recordedExperience = true;
-    } catch { /* 学習記録失敗は回答経路を停止させない */ }
+        traceId,
+      },
+    });
 
-    if (recordedExperience) {
-      try {
-        mikiUnifiedLearningContinuumService.observe({
-          domain: unifiedDomain,
-          action: 'cognitive_cycle',
-          input: input.input.slice(0, 500),
-          outcome: 'SUCCESS', verified: false,
-          capabilityIds: input.capabilityIds ?? [],
-          lesson: `同一Miki認知ループ: ${decision.route.join(',')}`,
-        });
-      } catch { /* best effort */ }
-    }
+    const resultPayload = core.coreResult?.result as Record<string, unknown> | undefined;
+    const route = Array.isArray(resultPayload?.selectedClassificationIds)
+      ? resultPayload.selectedClassificationIds.map(String)
+      : core.task.visitedDomains.map(String);
+    const status = String(core.task.status);
+    const uncertainty = Number(input.uncertainty ?? 0);
+    const uncertaintyAction =
+      uncertainty >= 0.8 && (status === 'WAITING' || status === 'PAUSED')
+        ? 'ASK_MINIMAL'
+        : status === 'COMPLETED'
+          ? 'EXECUTE'
+          : 'HOMEWORK';
 
+    const recordedExperience = core.coreResult?.status === 'COMPLETED';
     const terminal = operationalConformanceService.terminal({
       traceId,
-      budget: { maxSteps: 8, maxReplans: 2, maxToolRetries: 2, maxDuplicateSearches: 2, maxRuntimeMs: 30000, maxStateChanges: 16 },
-      steps: 1, replans: 0, toolRetries: 0, runtimeMs: 0, stateChanges: 1,
+      budget: {
+        maxSteps: 8,
+        maxReplans: 2,
+        maxToolRetries: 2,
+        maxDuplicateSearches: 2,
+        maxRuntimeMs: 30000,
+        maxStateChanges: 16,
+      },
+      steps: Math.max(1, core.cycles),
+      replans: Math.max(0, core.cycles - 1),
+      toolRetries: 0,
+      runtimeMs: 0,
+      stateChanges: Math.max(1, core.dispatched),
       before: { evidence: 0, state: 0, artifacts: 0, candidatesReduced: 0 },
-      after: { evidence: recordedExperience ? 1 : 0, state: 1, artifacts: 0, candidatesReduced: decision.route.length > 1 ? 1 : 0 },
-      userInput: uncertainty.action === 'ASK_MINIMAL',
-      capabilityLimit: uncertainty.action === 'HOMEWORK',
+      after: {
+        evidence: Array.isArray(resultPayload?.evidenceIds) ? resultPayload.evidenceIds.length : 0,
+        state: 1,
+        artifacts: 0,
+        candidatesReduced: route.length > 1 ? 1 : 0,
+      },
+      userInput: uncertaintyAction === 'ASK_MINIMAL',
+      capabilityLimit: uncertaintyAction === 'HOMEWORK',
     });
-    return { traceId, decision, uncertaintyAction: uncertainty.action, recordedExperience, terminal };
+
+    return {
+      traceId,
+      decision: {
+        authority: 'CORE',
+        route,
+        taskId: core.task.taskId,
+        status,
+      },
+      uncertaintyAction,
+      recordedExperience,
+      terminal,
+      coreResult: core.coreResult,
+    };
   }
 
   status() {
-    return { runtimePolicy: 'NON_LLM_ONLY', unifiedDomains: ['conversation','rpg','research','code','data','system','task'], loop: ['intent','route','evidence','execute','evaluate','learn'], localLlmRuntime: false };
+    return {
+      runtimePolicy: 'NON_LLM_ONLY',
+      authority: 'CORE',
+      unifiedDomains: [
+        'core', 'autonomy', 'capability', 'conversation', 'data', 'execution',
+        'experience', 'improvement', 'learning', 'memory', 'promotion', 'research',
+        'safety', 'selfAwareness', 'selfDevelopment', 'strategy', 'unknown', 'verification',
+      ],
+      loop: ['core_ingress', 'plan', 'route', 'evidence', 'execute', 'evaluate', 'learn', 'core_result'],
+      localLlmRuntime: false,
+    };
   }
 }
 

@@ -273,7 +273,7 @@ export const EvidenceBasedLoopSubView: React.FC = () => {
               <textarea
                 value={rawDirectiveText}
                 onChange={(e) => setRawDirectiveText(e.target.value)}
-                placeholder="ここに作業指示テキストを貼り付け... (例: 第2章 証拠ベースの自律改善ループの確立...)"
+                placeholder="ここに現在の作業指示テキストを貼り付け..."
                 className="w-full h-44 p-3 border border-slate-200 rounded-xl text-xs font-mono bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition resize-none"
               />
               <div className="flex justify-end">

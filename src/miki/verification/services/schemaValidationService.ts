@@ -5,6 +5,7 @@ import {
   TeacherGeneratedMaterial,
   VbaSafetyAssessment
 } from '../../../types';
+import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 
 export interface ValidationResult<T> {
   valid: boolean;
@@ -12,10 +13,147 @@ export interface ValidationResult<T> {
   errors: string[];
 }
 
+
+/**
+ * COREがTask Blackboardから導出する単一CognitiveStateの検証・Migration契約。
+ * Truth DBではなく、既存Task Blackboardへcommitする前の安全ゲートとして使用する。
+ */
+export interface UnifiedCognitiveStateV2 {
+  schemaVersion: 2;
+  taskId: string;
+  cycle: number;
+  revision: number;
+  goal: string;
+  input: string;
+  source: string;
+  constraints: string[];
+  activeDomains: string[];
+  requiredDomains: string[];
+  pendingIntentIds: string[];
+  evidenceIds: string[];
+  unknowns: string[];
+  capabilityRefs: string[];
+  recentOutcomes: Array<{ kind: string; domain: string; key: string; status?: string }>;
+  learningCandidates: Array<{ domain: string; key: string; valueHash: string }>;
+  environmentSignature?: string;
+  invariantsVersion: 1;
+  stateHash: string;
+}
+
+const UNIFIED_COGNITIVE_STATE_DOMAINS = new Set([
+  'core','autonomy','capability','conversation','data','execution','experience','improvement',
+  'learning','memory','promotion','research','safety','selfAwareness','selfDevelopment',
+  'strategy','unknown','verification'
+]);
+
+function cognitiveStateBody(value: Record<string, unknown>): Record<string, unknown> {
+  const { stateHash: _ignored, ...body } = value;
+  return body;
+}
+
 /**
  * 構造化データのJSON Schema定義 & ランタイム検証サービス (設計思想 8. JSON Schemaと構造化DB)
  */
 export class SchemaValidationService {
+  /**
+   * UnifiedCognitiveStateのInvariant検査。状態保存前にのみ使用し、失敗時はcommitしない。
+   */
+  public validateUnifiedCognitiveState(input: any): ValidationResult<UnifiedCognitiveStateV2> {
+    const errors: string[] = [];
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return { valid: false, errors: ['COGNITIVE_STATE_NOT_OBJECT'] };
+    }
+    if (input.schemaVersion !== 2) errors.push('COGNITIVE_STATE_SCHEMA_V2_REQUIRED');
+    if (typeof input.taskId !== 'string' || !input.taskId.trim()) errors.push('COGNITIVE_STATE_TASK_ID_REQUIRED');
+    if (typeof input.goal !== 'string' || !input.goal.trim()) errors.push('COGNITIVE_STATE_GOAL_REQUIRED');
+    if (typeof input.input !== 'string') errors.push('COGNITIVE_STATE_INPUT_REQUIRED');
+    if (typeof input.source !== 'string' || !input.source.trim()) errors.push('COGNITIVE_STATE_SOURCE_REQUIRED');
+    if (!Number.isInteger(input.cycle) || input.cycle < 0) errors.push('COGNITIVE_STATE_CYCLE_INVALID');
+    if (!Number.isInteger(input.revision) || input.revision < 0) errors.push('COGNITIVE_STATE_REVISION_INVALID');
+    if (input.invariantsVersion !== 1) errors.push('COGNITIVE_STATE_INVARIANT_VERSION_INVALID');
+
+    const arrays: Array<[string, unknown]> = [
+      ['constraints', input.constraints],
+      ['activeDomains', input.activeDomains],
+      ['requiredDomains', input.requiredDomains],
+      ['pendingIntentIds', input.pendingIntentIds],
+      ['evidenceIds', input.evidenceIds],
+      ['unknowns', input.unknowns],
+      ['capabilityRefs', input.capabilityRefs],
+      ['recentOutcomes', input.recentOutcomes],
+      ['learningCandidates', input.learningCandidates],
+    ];
+    for (const [name, value] of arrays) if (!Array.isArray(value)) errors.push(`COGNITIVE_STATE_${name.toUpperCase()}_ARRAY_REQUIRED`);
+
+    const domainArrays = [input.activeDomains, input.requiredDomains].filter(Array.isArray);
+    for (const list of domainArrays as unknown[][]) {
+      const seen = new Set<string>();
+      for (const value of list) {
+        if (typeof value !== 'string' || !value.trim()) errors.push('COGNITIVE_STATE_DOMAIN_VALUE_INVALID');
+        else {
+          if (!UNIFIED_COGNITIVE_STATE_DOMAINS.has(value)) errors.push(`COGNITIVE_STATE_UNKNOWN_DOMAIN:${value}`);
+          if (seen.has(value)) errors.push(`COGNITIVE_STATE_DUPLICATE_DOMAIN:${value}`);
+          seen.add(value);
+        }
+      }
+    }
+
+    const intentIds = Array.isArray(input.pendingIntentIds) ? input.pendingIntentIds : [];
+    if (intentIds.some((x: unknown) => typeof x !== 'string' || !x.trim())) errors.push('COGNITIVE_STATE_PENDING_INTENT_INVALID');
+    if (new Set(intentIds).size !== intentIds.length) errors.push('COGNITIVE_STATE_PENDING_INTENT_DUPLICATE');
+
+    const evidenceIds = Array.isArray(input.evidenceIds) ? input.evidenceIds : [];
+    if (evidenceIds.some((x: unknown) => typeof x !== 'string' || !x.trim())) errors.push('COGNITIVE_STATE_EVIDENCE_ID_INVALID');
+    if (new Set(evidenceIds).size !== evidenceIds.length) errors.push('COGNITIVE_STATE_EVIDENCE_DUPLICATE');
+
+    if (!Array.isArray(input.recentOutcomes) || input.recentOutcomes.some((x: unknown) => !x || typeof x !== 'object')) {
+      errors.push('COGNITIVE_STATE_OUTCOME_RECORD_INVALID');
+    }
+    if (!Array.isArray(input.learningCandidates) || input.learningCandidates.some((x: unknown) => !x || typeof x !== 'object')) {
+      errors.push('COGNITIVE_STATE_LEARNING_CANDIDATE_INVALID');
+    }
+    if (input.environmentSignature !== undefined && typeof input.environmentSignature !== 'string') errors.push('COGNITIVE_STATE_ENVIRONMENT_SIGNATURE_INVALID');
+    if (typeof input.stateHash !== 'string' || !/^[a-f0-9]{64}$/i.test(input.stateHash)) errors.push('COGNITIVE_STATE_HASH_INVALID');
+
+    if (!errors.length) {
+      const expected = canonicalSha256Object(cognitiveStateBody(input));
+      if (expected !== String(input.stateHash).toLowerCase()) errors.push('COGNITIVE_STATE_HASH_MISMATCH');
+    }
+    return { valid: errors.length === 0, data: errors.length === 0 ? input as UnifiedCognitiveStateV2 : undefined, errors };
+  }
+
+  /**
+   * 旧schemaVersion=1をV2へ移行する。意味を推測して補完せず、追加フィールドは安全な空配列で初期化する。
+   */
+  public migrateUnifiedCognitiveState(input: any): ValidationResult<UnifiedCognitiveStateV2> {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return { valid: false, errors: ['COGNITIVE_STATE_NOT_OBJECT'] };
+    if (input.schemaVersion === 2) return this.validateUnifiedCognitiveState(input);
+    if (input.schemaVersion !== 1) return { valid: false, errors: ['COGNITIVE_STATE_UNSUPPORTED_SCHEMA'] };
+    const body: Record<string, unknown> = {
+      schemaVersion: 2,
+      taskId: String(input.taskId || ''),
+      cycle: Number.isInteger(input.cycle) ? input.cycle : 0,
+      revision: Number.isInteger(input.revision) ? input.revision : 0,
+      goal: typeof input.goal === 'string' ? input.goal : '',
+      input: typeof input.input === 'string' ? input.input : '',
+      source: typeof input.source === 'string' ? input.source : 'core',
+      constraints: Array.isArray(input.constraints) ? input.constraints.filter((x: unknown): x is string => typeof x === 'string' && x.trim()).map((x: string) => x.trim()) : [],
+      activeDomains: Array.isArray(input.activeDomains) ? [...new Set(input.activeDomains.filter((x: unknown): x is string => typeof x === 'string' && UNIFIED_COGNITIVE_STATE_DOMAINS.has(x)))] : [],
+      requiredDomains: Array.isArray(input.requiredDomains) ? [...new Set(input.requiredDomains.filter((x: unknown): x is string => typeof x === 'string' && UNIFIED_COGNITIVE_STATE_DOMAINS.has(x)))] : [],
+      pendingIntentIds: Array.isArray(input.pendingIntentIds) ? [...new Set(input.pendingIntentIds.filter((x: unknown): x is string => typeof x === 'string' && x.trim()))] : [],
+      evidenceIds: Array.isArray(input.evidenceIds) ? [...new Set(input.evidenceIds.filter((x: unknown): x is string => typeof x === 'string' && x.trim()))] : [],
+      unknowns: Array.isArray(input.unknowns) ? input.unknowns.filter((x: unknown): x is string => typeof x === 'string' && x.trim()) : [],
+      capabilityRefs: Array.isArray(input.capabilityRefs) ? input.capabilityRefs.filter((x: unknown): x is string => typeof x === 'string' && x.trim()) : [],
+      recentOutcomes: Array.isArray(input.recentOutcomes) ? input.recentOutcomes : [],
+      learningCandidates: Array.isArray(input.learningCandidates) ? input.learningCandidates : [],
+      environmentSignature: typeof input.environmentSignature === 'string' ? input.environmentSignature : undefined,
+      invariantsVersion: 1,
+    };
+    const migrated = { ...body, stateHash: canonicalSha256Object(body) };
+    const result = this.validateUnifiedCognitiveState(migrated);
+    return result.valid ? result : { valid: false, errors: ['COGNITIVE_STATE_MIGRATION_FAILED', ...result.errors] };
+  }
+
   /**
    * 記憶アイテム (MemoryItem) のスキーマ検証
    */

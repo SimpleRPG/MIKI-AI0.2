@@ -19,6 +19,7 @@ import { StructuredDirective } from '../../../types/evidenceSelfImprovementTypes
 import { selfImprovementExecutionCoordinatorService } from '../../execution/services/selfImprovementExecutionCoordinatorService';
 import { selfImprovementOperationalGuardService } from '../../safety/services/selfImprovementOperationalGuardService';
 import { crossDomainCirculationService } from '../../core/services/crossDomainCirculationService';
+import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 
 export type ImprovementAction =
   | 'EXECUTE_DIRECTIVE'
@@ -33,6 +34,9 @@ export type ImprovementAction =
 export interface ImprovementDecision {
   action: ImprovementAction;
   reason: string;
+  /** Existing Strategy Memory decision selected for this improvement attempt. */
+  strategyId?: string;
+  strategyName?: string;
   directiveId?: string;
   caseId?: string;
   gapId?: string;
@@ -42,6 +46,8 @@ export interface ImprovementDecision {
 
 export interface ImprovementRun {
   run_id: string;
+  /** Same lineage identifier used by Experiment / Candidate / Patch / Test / Commit. */
+  changeSetId?: ChangeSetID;
   trigger: string;
   decision: ImprovementDecision;
   result?: string;
@@ -150,6 +156,7 @@ export class SelfImprovementControllerService {
     this.running = true;
     this.lastRunAt = now;
     const before = selfImprovementExperimentService.snapshot();
+    const runChangeSetId = evidenceBasedSelfImprovementEngine.generateChangeSetId(trigger);
 
     try {
       // ── 指示書 v24 第2章 & ターゲット選定 ──
@@ -163,12 +170,13 @@ export class SelfImprovementControllerService {
         workDirectiveIngestionService.markStatus(activeDirective.directiveId, 'IN_PROGRESS');
 
         const candidateFile = activeDirective.targets.find((t) => /\.(ts|tsx)$/.test(t)) || 'miki/improvement/services/evidenceBasedSelfImprovementEngine.ts';
-        const decision: ImprovementDecision = {
+        let decision: ImprovementDecision = {
           action: 'EXECUTE_DIRECTIVE',
           reason: `受領した作業指示「${activeDirective.title}」を最優先履行します。(要求: ${activeDirective.requirements.length}項目)`,
           directiveId: activeDirective.directiveId,
           targetFile: candidateFile,
         };
+        decision = this.selectStrategyForDecision(decision);
 
         // 要求契約 (Requirement Contracts) を事前登録
         const contracts = workDirectiveIngestionService.generateRequirementContracts(activeDirective.directiveId);
@@ -203,7 +211,8 @@ export class SelfImprovementControllerService {
             trigger,
             decision,
             evoRecord.applied ? 'directive-completed' : 'directive-staged',
-            before
+            before,
+            evoRecord.changeSetId || runChangeSetId
           );
         } catch (dirErr: any) {
           workDirectiveIngestionService.markStatus(
@@ -225,11 +234,12 @@ export class SelfImprovementControllerService {
         .find((c) => c.status === 'DEVICE_TESTED' && !!c.implementation_hash);
 
       if (stable && (signals[0]?.kind !== 'FAILURE_RATE' || signals[0].score < 70)) {
-        const decision: ImprovementDecision = {
+        let decision: ImprovementDecision = {
           action: 'PROMOTE_CASE',
           reason: `${signals[0]?.reason || '安定成功ケース'} 安定ケースを長期記憶へ昇格します。`,
           caseId: stable.case_id,
         };
+        decision = this.selectStrategyForDecision(decision);
         const memories = storageService.getMemories();
         const candidate = memoryPromotionService.createCandidate(stable, memories);
         if (candidate) {
@@ -248,13 +258,14 @@ export class SelfImprovementControllerService {
             `失敗率が高いため改善案を要求します。${topSignal.reason}`,
             topSignal.reason
           );
-          const decision: ImprovementDecision = {
+          let decision: ImprovementDecision = {
             action: 'REQUEST_CLOUD_PROPOSAL',
             reason: proposal
               ? `高失敗率を受け、${deviceCandidate.component_id} の改善案をCloud AIへ限定要求しました。`
               : `高失敗率ですが改善案要求を作成できませんでした。`,
             caseId: proposal?.proposal_id,
           };
+          decision = this.selectStrategyForDecision(decision);
           return this.recordMeasured(
             trigger,
             decision,
@@ -264,11 +275,12 @@ export class SelfImprovementControllerService {
         }
         const proposal = safeImprovementPipelineService.propose(deviceCandidate.component_id, environment);
         const planned = safeImprovementPipelineService.planRegression(proposal.run_id);
-        const decision: ImprovementDecision = {
+        let decision: ImprovementDecision = {
           action: 'RUN_REGRESSION',
           reason: `DEVICE_TESTED部品 ${deviceCandidate.component_id} の安全なRegressionを開始します。`,
           caseId: planned.suite?.suite_id,
         };
+        decision = this.selectStrategyForDecision(decision);
         return this.recordMeasured(trigger, decision, planned.suite ? 'regression-planned' : 'regression-blocked', before);
       }
 
@@ -284,12 +296,13 @@ export class SelfImprovementControllerService {
 
       // 3. 仕様書ドリフトまたは未実装章の自律自己コード改善
       const nextTarget = legacyEvolutionCoreOperationService.selectNextTarget();
-      const decision: ImprovementDecision = {
+      let decision: ImprovementDecision = {
         action: 'AUTONOMOUS_CODE_EVOLUTION',
         reason: nextTarget.reason,
         targetChapter: nextTarget.chapter?.chapterNumber,
         targetFile: nextTarget.targetFile,
       };
+      decision = this.selectStrategyForDecision(decision);
       const evoRecord = await legacyEvolutionCoreOperationService.execute({
         chapterNumber: nextTarget.chapter?.chapterNumber,
         targetFile: nextTarget.targetFile,
@@ -300,7 +313,8 @@ export class SelfImprovementControllerService {
         trigger,
         decision,
         evoRecord.applied ? 'evolution-applied' : 'evolution-staged',
-        before
+        before,
+        evoRecord.changeSetId || runChangeSetId
       );
 
       return this.recordMeasured(
@@ -391,6 +405,23 @@ export class SelfImprovementControllerService {
   private taskCaseMemoryServiceStable() {
     return taskCaseMemoryService.list().find((c) => c.outcome === 'SUCCESS' && c.maturity === 'STABLE' && c.component_ids.length > 0);
   }
+  private selectStrategyForDecision(decision: ImprovementDecision): ImprovementDecision {
+    const targetDomain =
+      decision.action === 'AUTONOMOUS_CODE_EVOLUTION' || decision.action === 'EXECUTE_DIRECTIVE' || decision.action === 'REQUEST_CLOUD_PROPOSAL'
+        ? 'SELF_CODING'
+        : decision.action === 'RUN_REGRESSION'
+          ? 'VERIFICATION'
+          : '';
+    if (!targetDomain) return decision;
+    const available = evidenceBasedSelfImprovementEngine.getStrategies().filter(strategy => strategy.targetDomain === targetDomain);
+    if (available.length === 0) return decision;
+    const conditions = decision.action === 'RUN_REGRESSION'
+      ? ['UNIT_TEST', 'MUTATION_TEST']
+      : ['SYNTAX_VALIDATION', 'TYPE_SAFETY'];
+    const strategy = evidenceBasedSelfImprovementEngine.selectBestStrategy(targetDomain, conditions);
+    return { ...decision, strategyId: strategy.strategyId, strategyName: strategy.strategyName };
+  }
+
 
   private schedule(trigger: string, _event: ExecutionEvent) {
     setTimeout(() => {
@@ -402,21 +433,34 @@ export class SelfImprovementControllerService {
     trigger: string,
     decision: ImprovementDecision,
     result: string,
-    before: ReturnType<typeof selfImprovementExperimentService.snapshot>
+    before: ReturnType<typeof selfImprovementExperimentService.snapshot>,
+    changeSetId?: ChangeSetID
   ): ImprovementRun {
     const after = selfImprovementExperimentService.snapshot();
-    const experiment = selfImprovementExperimentService.evaluate(decision.action, before, after, result);
-    return this.record(trigger, decision, result, experiment);
+    const experiment = selfImprovementExperimentService.evaluate(decision.action, before, after, result, changeSetId);
+    if (decision.strategyId) {
+      evidenceBasedSelfImprovementEngine.recordLearningUsage(decision.strategyId, 'STRATEGY', decision.caseId || decision.directiveId);
+      if (experiment.verdict === 'ADOPT' || experiment.verdict === 'REJECT') {
+        evidenceBasedSelfImprovementEngine.feedBackExecutionResult(
+          decision.strategyId,
+          experiment.verdict === 'ADOPT',
+          experiment.verdict === 'REJECT' ? experiment.reason : undefined
+        );
+      }
+    }
+    return this.record(trigger, decision, result, experiment, changeSetId);
   }
 
   private record(
     trigger: string,
     decision: ImprovementDecision,
     result: string,
-    experiment?: ReturnType<typeof selfImprovementExperimentService.evaluate>
+    experiment?: ReturnType<typeof selfImprovementExperimentService.evaluate>,
+    changeSetId?: ChangeSetID
   ): ImprovementRun {
     const run: ImprovementRun = {
       run_id: `SIR-${this.hash(`${trigger}|${decision.action}|${Date.now()}`)}`,
+      changeSetId,
       trigger,
       decision,
       result,

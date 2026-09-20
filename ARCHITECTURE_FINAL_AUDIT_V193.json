@@ -1,0 +1,7 @@
+{
+  "version": "v193",
+  "passed": true,
+  "domainCount": 18,
+  "failures": [],
+  "policy": "CORE is the single planner/authority; 17 classifications execute selected work; self-code physical apply requires CORE_PROMOTION; local generative runtime is unavailable"
+}

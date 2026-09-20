@@ -12,6 +12,14 @@ export type StorageTier = 'HOT' | 'WARM' | 'COLD' | 'DORMANT' | 'QUARANTINED';
 
 export type ResourceTier='LIGHT'|'MEDIUM'|'HEAVY'|'EXTREME';
 export interface CapabilityBudget { tier:ResourceTier; maxDurationMs:number; maxStorageBytes:number; backgroundAllowed:boolean; reason:string; }
+export interface BackgroundBudgetDecision {
+  allowed: boolean;
+  maxCycles: number;
+  maxDurationMs: number;
+  reductionRatio: number;
+  reason: string;
+}
+
 export interface ResourceSnapshot {
   quotaBytes: number | null;
   usageBytes: number | null;
@@ -63,6 +71,27 @@ class ResourceGovernanceService {
     this.snapshot = { quotaBytes: quota, usageBytes: usage, freeBytes: free, freeGb, mode, measuredAt: Date.now() };
     try { storageService.setItem(SNAPSHOT_KEY, JSON.stringify(this.snapshot)); } catch { /* quota may be full */ }
     return this.snapshot;
+  }
+
+  /**
+   * 既存ResourceGovernanceの予算判断をBackground自律処理へ接続する。
+   * 固定Queueや別Task Managerは作らず、CORE cycle単位で縮退/停止を判断する。
+   */
+  assessBackgroundBudget(background:boolean, foregroundActive:boolean, cycle:number, startedAt:number, now=Date.now()):BackgroundBudgetDecision {
+    if(!background) return {allowed:true,maxCycles:Number.MAX_SAFE_INTEGER,maxDurationMs:Number.MAX_SAFE_INTEGER,reductionRatio:0,reason:'FOREGROUND_OR_UNSCOPED'};
+    if(foregroundActive) return {allowed:false,maxCycles:0,maxDurationMs:0,reductionRatio:1,reason:'FOREGROUND_REQUEST_ACTIVE'};
+    const elapsed=Math.max(0,now-startedAt);
+    const profile:Record<ResourceMode,{maxCycles:number;maxDurationMs:number;reductionRatio:number}>={
+      NORMAL:{maxCycles:6,maxDurationMs:60_000,reductionRatio:0},
+      CONSERVE:{maxCycles:2,maxDurationMs:20_000,reductionRatio:.5},
+      CLEANUP:{maxCycles:1,maxDurationMs:15_000,reductionRatio:.8},
+      STOP_COLLECTION:{maxCycles:0,maxDurationMs:0,reductionRatio:1},
+    };
+    const p=profile[this.snapshot.mode];
+    if(cycle>p.maxCycles || elapsed>p.maxDurationMs){
+      return {allowed:false,...p,reason:this.snapshot.mode==='NORMAL'?'BACKGROUND_BUDGET_EXCEEDED':'RESOURCE_MODE_BUDGET_EXCEEDED'};
+    }
+    return {allowed:true,...p,reason:this.snapshot.mode==='NORMAL'?'BACKGROUND_BUDGET_ALLOWED':'BACKGROUND_BUDGET_REDUCED'};
   }
 
   budgetFor(tier:ResourceTier, critical=false): CapabilityBudget {

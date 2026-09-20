@@ -21,7 +21,6 @@ export * from './safety/services/cloudAiRestrictedGatewayService';
 export * from './safety/services/failureRecoveryService';
 export * from './safety/services/failureToleranceKernelService';
 export * from './safety/services/featureFlagsService';
-export * from './safety/services/llmMigrationProtocolService';
 export * from './safety/services/nonLlmCoreService';
 export * from './safety/services/nonLlmHardwarePipelineService';
 export * from './safety/services/nonLlmRuntimePolicyService';

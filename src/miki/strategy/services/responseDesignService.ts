@@ -1,6 +1,6 @@
 import { ResponseLength, ResponseQualityEvaluation, ConversationStage, ConversationState, MultiAxisPersonaConfig } from '../../../types';
 import { storageService } from '../../../services/storageService';
-import { isCasualGreetingOrShortSocial } from '../../conversation/services/conversationStateService';
+import { isCasualGreetingOrShortSocial, adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
 
 export interface UserStyleCorrectionRule {
   id: string;
@@ -181,6 +181,15 @@ export class ResponseDesignService {
    * 6.2 & 6.3 回答設計および日本語化プロンプトの構築
    * 結論ファースト、前置きの排除、回答長制約、重複排除、防御的態度の排除を注入
    */
+  /** v210: 既存回答長判定を基礎値として、ユーザー理解度に応じた説明量へ適応する。 */
+  public adaptLengthForUnderstanding(
+    prompt: string,
+    state: ConversationState | null | undefined,
+    baseLength: ResponseLength,
+  ): ReturnType<typeof adaptExplanationDetailLevel> {
+    return adaptExplanationDetailLevel(prompt, state, baseLength);
+  }
+
   public buildResponseDesignInstruction(
     length: ResponseLength,
     stage?: ConversationStage,

@@ -510,22 +510,11 @@ export class SelfCodeArchitectService {
 
     let implResult;
     try {
-      const extConfig = (() => {
-        try {
-          const raw = storageService.getItem('miki_external_llm_config');
-          return raw ? JSON.parse(raw) : null;
-        } catch {
-          return null;
-        }
-      })();
-
       implResult = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
         prompt,
         targetFileHint,
-        true, // 物理書き込み & コミットを実行
-        undefined,
-        extConfig?.endpoint,
-        extConfig?.model
+        false, // V189/V192: direct selfDevelopment caller is review-only.
+        undefined
       );
     } catch (implErr: any) {
       systemLogger.error('SELF_IMPROVEMENT', `[個別提案適用エラー] 実装パイプライン実行例外: ${implErr?.message}`);

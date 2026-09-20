@@ -1,6 +1,7 @@
 import { SelfImprovementMetrics, selfImprovementMetricsService } from './selfImprovementMetricsService';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
+import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 
 export type ExperimentVerdict = 'ADOPT' | 'HOLD' | 'REJECT';
 export interface ImprovementExperimentSnapshot {
@@ -12,6 +13,7 @@ export interface ImprovementExperimentSnapshot {
 }
 export interface ImprovementExperimentResult {
   experiment_id: string;
+  changeSetId?: ChangeSetID;
   action: string;
   before: ImprovementExperimentSnapshot;
   after: ImprovementExperimentSnapshot;
@@ -48,7 +50,7 @@ export class SelfImprovementExperimentService {
     };
   }
 
-  public evaluate(action: string, before: ImprovementExperimentSnapshot, after: ImprovementExperimentSnapshot, outcome?: string): ImprovementExperimentResult {
+  public evaluate(action: string, before: ImprovementExperimentSnapshot, after: ImprovementExperimentSnapshot, outcome?: string, changeSetId?: ChangeSetID): ImprovementExperimentResult {
     const failureImprovement = before.metrics.failureRate - after.metrics.failureRate;
     const gapImprovement = before.openGapCount - after.openGapCount;
     const reuseImprovement = after.metrics.reuseRate - before.metrics.reuseRate;
@@ -95,6 +97,7 @@ export class SelfImprovementExperimentService {
     scoreDelta = Math.max(-100, Math.min(100, scoreDelta));
     const result: ImprovementExperimentResult = {
       experiment_id: `SIE-${this.hash(`${action}|${before.createdAt}|${after.createdAt}`)}`,
+      changeSetId,
       action,
       before,
       after,

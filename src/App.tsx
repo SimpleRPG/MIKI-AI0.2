@@ -2486,7 +2486,8 @@ export default function App() {
 
       // 設計思想 6章 & 35章 第3段階: 回答長選択と回答設計
       const lengthSelection = responseDesignService.determineExpectedResponseLength(text, conversationState);
-      const activeExpectedLength = lengthSelection.length;
+      const explanationAdaptation = adaptExplanationDetailLevel(text, conversationState, lengthSelection.length);
+      const activeExpectedLength = explanationAdaptation.selectedDetailLevel;
       const responseDesignInstruction = responseDesignService.buildResponseDesignInstruction(
         activeExpectedLength,
         conversationState.stage,
@@ -2505,13 +2506,14 @@ export default function App() {
 
       systemLogger.info(
         'STEP',
-        `回答長選定: [${activeExpectedLength.toUpperCase()}] (${lengthSelection.reason}, 目安:${lengthSelection.targetRange})`
+        `回答長選定: [${activeExpectedLength.toUpperCase()}] (${lengthSelection.reason}; 理解度=${explanationAdaptation.understandingLevel}; ${explanationAdaptation.reason}, 目安:${lengthSelection.targetRange})`
       );
 
       // 会話状態管理 (設計思想 7章) & 回答設計 (設計思想 6章・第3段階)
       const currentConvStateWithLength = {
         ...conversationState,
         expectedResponseLength: activeExpectedLength,
+        explanationAdaptation,
       };
       const stateSummary = isCasualGreeting ? '' : formatConversationStateForPrompt(currentConvStateWithLength);
 
@@ -2735,6 +2737,7 @@ export default function App() {
           userPrompt: text,
           inferredExpectedLength: activeExpectedLength,
           stateDurationMs: stateDurationMs ?? undefined,
+          turnTaskId: coreTask.task.taskId,
         }
       );
       setConversationState(newConvState);

@@ -12,6 +12,15 @@ export type VerificationOutcome =
   | 'CONTRADICTED'
   | 'UNRESOLVED';
 
+export interface ClaimEvidencePolicy {
+  claimKind: ClaimRecord['kind'];
+  promotionAllowed: boolean;
+  minIndependentClusters: number;
+  allowedEvidenceKinds: EvidenceRecord['kind'][];
+  requireFresh: boolean;
+  rationale: string;
+}
+
 export interface VerificationResult {
   claimId: string;
   outcome: VerificationOutcome;
@@ -46,6 +55,33 @@ export class VerifierService {
     return VerifierService.instance;
   }
 
+  private evidencePolicyForClaim(claim: ClaimRecord): ClaimEvidencePolicy {
+    const highRisk = /安全|security|credential|secret|token|権限|削除|破壊|production|本番|legal|法律|financial|金銭|最新版|最新/i.test(claim.statement);
+    const baseByKind: Record<ClaimRecord['kind'], Omit<ClaimEvidencePolicy, 'claimKind'|'rationale'>> = {
+      OBSERVATION: { promotionAllowed: true, minIndependentClusters: 1, allowedEvidenceKinds: ['USER_OBSERVATION','EXECUTION','DOCUMENT'], requireFresh: highRisk },
+      FACT_CLAIM: { promotionAllowed: true, minIndependentClusters: highRisk ? 3 : 2, allowedEvidenceKinds: ['WEB','DOCUMENT','EXECUTION','USER_OBSERVATION','CLOUD_AI'], requireFresh: highRisk },
+      OPINION: { promotionAllowed: false, minIndependentClusters: 0, allowedEvidenceKinds: ['USER_OBSERVATION','DOCUMENT'], requireFresh: false },
+      HYPOTHESIS: { promotionAllowed: false, minIndependentClusters: 0, allowedEvidenceKinds: ['WEB','DOCUMENT','EXECUTION'], requireFresh: false },
+      PREDICTION: { promotionAllowed: false, minIndependentClusters: 0, allowedEvidenceKinds: ['WEB','DOCUMENT','EXECUTION'], requireFresh: highRisk },
+      INSTRUCTION: { promotionAllowed: false, minIndependentClusters: 0, allowedEvidenceKinds: ['DOCUMENT','EXECUTION'], requireFresh: false },
+      QUOTE: { promotionAllowed: true, minIndependentClusters: 1, allowedEvidenceKinds: ['DOCUMENT','WEB'], requireFresh: highRisk },
+      FICTIONAL_STATEMENT: { promotionAllowed: false, minIndependentClusters: 0, allowedEvidenceKinds: ['USER_OBSERVATION','DOCUMENT'], requireFresh: false },
+      JOKE_OR_IRONY: { promotionAllowed: false, minIndependentClusters: 0, allowedEvidenceKinds: ['USER_OBSERVATION'], requireFresh: false },
+      CORRECTION: { promotionAllowed: true, minIndependentClusters: highRisk ? 2 : 1, allowedEvidenceKinds: ['USER_OBSERVATION','WEB','DOCUMENT','EXECUTION','CLOUD_AI'], requireFresh: highRisk },
+    };
+    const base = baseByKind[claim.kind];
+    return {
+      claimKind: claim.kind,
+      ...base,
+      rationale: highRisk ? 'high-risk terms require stronger independent and fresh evidence' : 'claim-type-specific evidence policy',
+    };
+  }
+
+  public getClaimEvidencePolicy(claimId: string): ClaimEvidencePolicy | undefined {
+    const claim = claimDatabaseService.getClaim(claimId);
+    return claim ? this.evidencePolicyForClaim(claim) : undefined;
+  }
+
   public verifyClaim(params: {
     claimId: string;
     evidenceIds?: string[];
@@ -78,20 +114,22 @@ export class VerifierService {
       };
     }
 
+    const policy = this.evidencePolicyForClaim(claim);
     const previousStatus = claim.status;
     const evidence = this.collectEvidence(params.claimId, params.evidenceIds);
     const executionEvidence = this.collectEvidence(params.claimId, params.executionEvidenceIds)
       .filter((e) => e.kind === 'EXECUTION');
 
     const admissible = evidence.filter((e) => e.status === 'ADMISSIBLE');
-    const independentClusters = new Set(admissible.map((e) => e.independence_cluster_id));
+    const policyEvidence = admissible.filter((e) => policy.allowedEvidenceKinds.includes(e.kind));
+    const independentClusters = new Set(policyEvidence.map((e) => e.independence_cluster_id));
     const contradictionCount = (claim.contradicted_by || []).filter((id) => {
       const other = claimDatabaseService.getClaim(id);
       return !!other && other.status !== 'SUPERSEDED' && other.status !== 'FALSE';
     }).length;
 
     const maxAgeDays = Math.max(1, params.maxAgeDays ?? 365);
-    const stale = params.requireFresh === true && this.isStale(admissible, maxAgeDays);
+    const stale = (params.requireFresh === true || policy.requireFresh) && this.isStale(policyEvidence, maxAgeDays);
     const strictExecutionEvidence = params.executionRequirement
       ? executionEvidence.filter((item) => evidenceService.isAdmissibleExecutionEvidence({
           evidenceId: item.evidence_id,
@@ -101,7 +139,9 @@ export class VerifierService {
     const reasons: string[] = [];
     let outcome: VerificationOutcome = 'UNRESOLVED';
 
-    if (claim.status === 'FALSE' || claim.status === 'SUPERSEDED') {
+    if (!policy.promotionAllowed) {
+      reasons.push(`Claim種別 ${claim.kind} は事実の正式昇格対象ではありません。文脈・仮説として保持します。`);
+    } else if (claim.status === 'FALSE' || claim.status === 'SUPERSEDED') {
       reasons.push(`Claim状態が${claim.status}のため昇格できません。`);
     } else if (contradictionCount > 0) {
       outcome = 'CONTRADICTED';
@@ -117,12 +157,12 @@ export class VerifierService {
       reasons.push('EXECUTION証拠の厳格照合条件がないためDEVICE_VERIFIEDへ昇格しません。');
     } else if (executionEvidence.length > strictExecutionEvidence.length) {
       reasons.push('EXECUTION証拠の成果物、実装、テストケース、環境、PASS状態が一致しません。');
-    } else if (independentClusters.size >= 2) {
+    } else if (independentClusters.size >= policy.minIndependentClusters) {
       outcome = 'SUPPORTED';
       reasons.push(`独立証拠クラスター${independentClusters.size}件を確認しました。`);
       claimDatabaseService.setVerificationStatus(claim.claim_id, 'SUPPORTED', 'Verifier: independent evidence');
     } else {
-      reasons.push(`独立証拠クラスターが${independentClusters.size}件しかありません。SUPPORTEDには2件以上必要です。`);
+      reasons.push(`独立証拠クラスターが${independentClusters.size}件しかありません。現在のEvidence Policyでは${policy.minIndependentClusters}件以上が必要です。`);
     }
 
     const promoted = outcome === 'SUPPORTED' || outcome === 'DEVICE_VERIFIED';

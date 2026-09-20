@@ -63,6 +63,7 @@ import { resourceGovernanceService } from './src/miki/safety/services/resourceGo
 import { causalInvestigationService } from './src/miki/research/services/causalInvestigationService';
 import { cognitiveEvidenceIntegrationService } from './src/miki/selfAwareness/services/cognitiveEvidenceIntegrationService';
 import { cognitiveExecutionEvidenceService } from './src/miki/selfAwareness/services/cognitiveExecutionEvidenceService';
+import { selfImprovementMetricsService } from './src/miki/improvement/services/selfImprovementMetricsService';
 
 dotenv.config();
 
@@ -254,6 +255,10 @@ const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash'];
 // Cloud Gemini remains available only where an explicit external teacher /
 // knowledge operation is required by the existing design.
 // ============================================================================
+function externalTeacherBoundaryMetadata() {
+  return { sourceClass: 'EXTERNAL_TEACHER', trustLevel: 'UNTRUSTED_EXTERNAL_AI', requiresCoreReview: true, directApplyAllowed: false, evidenceRequired: true };
+}
+
 function makeGeminiCompatibleResponse(text: string) {
   return {
     text,
@@ -2917,7 +2922,7 @@ app.post('/api/miki/reasoning-asset',(req,res)=>res.json(operationalConformanceS
 app.post('/api/miki/reasoning-asset/related',(req,res)=>res.json({assets:operationalConformanceService.relatedAssets(Array.isArray(req.body?.refs)?req.body.refs:[])}));
 app.post('/api/miki/integration-scenario',(req,res)=>res.json(operationalConformanceService.runIntegrationScenario(req.body||{})));
 app.get('/api/miki/integration-scenario',(req,res)=>res.json({scenarios:operationalConformanceService.listScenarios()}));
-app.post('/api/miki/cognition/cycle',(req,res)=>{try{res.json(mikiCognitiveKernelService.cycle(req.body||{}));}catch(e:any){res.status(400).json({success:false,error:e?.message||String(e)});}});
+app.post('/api/miki/cognition/cycle',async (req,res)=>{try{res.json(await mikiCognitiveKernelService.cycle(req.body||{}));}catch(e:any){res.status(400).json({success:false,error:e?.message||String(e)});}});
 app.get('/api/miki/cognition/status',(_req,res)=>res.json(mikiCognitiveKernelService.status()));
 app.get('/api/miki/operational-conformance/summary',(_req,res)=>res.json(operationalConformanceService.summary()));
 app.get('/api/miki/automation',(_req,res)=>res.json({workflows:automationStudioService.list()}));
@@ -3783,6 +3788,7 @@ ${catalogText || '(該当ファイルなし)'}
         : `${reasoning}（警告: LLMが選定したファイル「${targetFile}」が実際には見つかりませんでした。手動確認が必要です）`,
       searchReplaceDiff,
       dryRunValid,
+      ...externalTeacherBoundaryMetadata(),
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || 'パッチ生成失敗' });
@@ -3874,6 +3880,8 @@ interface TeacherSkillRecord {
   sourceType?: 'gemini' | 'human_wisdom_web' | 'github' | 'npm' | 'tech_docs' | 'oss_pattern';
   sourceUrl?: string;
   sourceTitle?: string;
+  trustStatus?: 'UNVERIFIED' | 'VERIFIED' | 'REJECTED';
+  persistenceStatus?: 'PROPOSAL_ONLY' | 'VERIFIED_PERSISTED';
 }
 
 const TEACHER_SKILLS_FILE = path.join(process.cwd(), '.miki_teacher_skills.json');
@@ -3904,6 +3912,7 @@ function findRelevantTeacherSkills(prompt: string): TeacherSkillRecord[] {
   if (skills.length === 0) return [];
   const lower = prompt.toLowerCase();
   return skills
+    .filter((s) => s.trustStatus === 'VERIFIED')
     .filter(
       (s) =>
         s.tags.some((t) => lower.includes(t.toLowerCase())) ||
@@ -4217,7 +4226,7 @@ async function searchHumanWisdomCode(rawPrompt: string, language = 'typescript')
 
   // 人類の知恵をTeacherSkillRecordとして学習・蓄積（知識やスキルを増やす！）
   const learnedSkill: TeacherSkillRecord = {
-    id: `skill_hw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `skill_hw_${crypto.createHash('sha256').update(JSON.stringify({ query: cleanQuery, sourceUrl: bestSnippet.sourceUrl, code: bestSnippet.code })).digest('hex').slice(0, 24)}`,
     category: skillCategory,
     tags: ['human_wisdom', 'oss_pattern', 'typescript', language, ...cleanQuery.split(/\s+/).slice(0, 3)],
     rules: [
@@ -4228,13 +4237,15 @@ async function searchHumanWisdomCode(rawPrompt: string, language = 'typescript')
     skeletonTemplate: bestSnippet.code,
     sourceTask: cleanQuery,
     createdAt: Date.now(),
-    usageCount: 1,
+    usageCount: 0,
+    trustStatus: 'UNVERIFIED',
+    persistenceStatus: 'PROPOSAL_ONLY',
     sourceType: bestSnippet.sourceType === 'web' ? 'human_wisdom_web' : (bestSnippet.sourceType as any),
     sourceUrl: bestSnippet.sourceUrl,
     sourceTitle: bestSnippet.title,
   };
 
-  saveTeacherSkill(learnedSkill);
+  // V200: external teacher material remains a proposal until explicit verification/persistence.
 
   return {
     bestCodeSnippet: bestSnippet.code,
@@ -4317,8 +4328,9 @@ export const ${className.charAt(0).toLowerCase() + className.slice(1)} = new ${c
 }
 
 app.get('/api/self-code/teacher-skills', (req, res) => {
-  const skills = loadTeacherSkills();
-  res.json({ success: true, skills });
+  const includeQuarantined = String(req.query.includeQuarantined || '') === '1';
+  const skills = loadTeacherSkills().filter((skill) => includeQuarantined || skill.trustStatus === 'VERIFIED');
+  res.json({ success: true, skills, includeQuarantined });
 });
 
 // 自律自己実装パイプライン (Prompt -> AST Plan -> Snapshot -> Verify -> Apply -> Commit)
@@ -4859,12 +4871,17 @@ ${code.slice(0, 3000)}
 // 方針: 内部走査を事前構築した Map または Set による O(1) ルックアップに置換
 
 // 元コード先頭: ${firstNonEmpty.trim()}
-// ※ LLM未接続時は構造解析のみ実施し、未検証のダミー置換コードは生成しません。
+// ※ 外部教師未使用時は構造解析のみ実施し、未検証のダミー置換コードは生成しません。
 ${code}`;
 
     return res.json({
       success: true,
       targetName,
+      sourceClass: 'DETERMINISTIC_NON_LLM_ANALYSIS',
+      trustLevel: 'LOCAL_DETERMINISTIC_ANALYSIS',
+      requiresCoreReview: true,
+      directApplyAllowed: false,
+      evidenceRequired: true,
       detectedIssue,
       originalComplexity,
       optimizedComplexity,
@@ -4915,8 +4932,9 @@ ${safeReplaceSnippet}
       diagnosedFault: 'Null/Undefined 安全アクセス違反 (Optional Chaining & Array Check 欠落)',
       hotfixStrategy: '防御的配列初期化とオプショナルチェーンガード節を自動注入',
       searchReplacePatch,
-      instantAutoApplied: true,
-      recoveryStatus: 'HEALED',
+      instantAutoApplied: false,
+      recoveryStatus: 'STAGED_FOR_REVIEW',
+      requiresCoreReview: true,
       preventedCrashesCount: 1,
     });
   } catch (err: any) {
@@ -4926,7 +4944,7 @@ ${safeReplaceSnippet}
 
 // ======================================================================
 // 設計思想 Master v5.40 第171章 & 第172章
-// モデル生成系ランタイム ネット大海探索・自律コード発掘＆動的ツール創成・自己改善高速化API
+// 外部知識・コード例探索・検証補助API
 // ======================================================================
 
 app.post('/api/self-code/search-web-code', async (req, res) => {
@@ -5197,6 +5215,8 @@ app.post('/api/miki/self-improvement-lab/run', async (req, res) => {
     return res.status(500).json({ success: false, error: err?.message || 'self-improvement lab failed' });
   }
 });
+
+app.get('/api/miki/cognitive-observability', (_req, res) => res.json({ snapshot: selfImprovementMetricsService.cognitiveObservabilitySnapshot(), weaknesses: selfImprovementMetricsService.rankWeaknesses() }));
 
 app.get('/api/miki/self-improvement-lab/contract', (_req, res) => {
   res.json({

@@ -8,12 +8,28 @@ import { negativeKnowledgeService } from './negativeKnowledgeService';
 import { plateauDetectorService } from './plateauDetectorService';
 import { coreResultService, type CoreResult } from './coreResultService';
 import { domainReplyLedgerService } from './domainReplyLedgerService';
+import { resourceGovernanceService } from '../../safety/services/resourceGovernanceService';
+import { canonicalSha256Object } from './canonicalSha256Service';
+import { executionEnvironmentRouterService } from './executionEnvironmentRouterService';
+import { schemaValidationService } from '../../verification/services/schemaValidationService';
 
 export interface CoreOrchestrationResult { task:BlackboardTask; cycles:number; dispatched:number; coreResult?:CoreResult; }
+
+export interface UnifiedCognitiveStateSnapshot {
+  schemaVersion:2; taskId:string; cycle:number; revision:number; goal:string; input:string; source:string;
+  constraints:string[]; activeDomains:string[]; requiredDomains:string[]; pendingIntentIds:string[]; evidenceIds:string[]; unknowns:string[]; capabilityRefs:string[];
+  recentOutcomes:Array<{kind:string;domain:string;key:string;status?:string}>;
+  learningCandidates:Array<{domain:string;key:string;valueHash:string}>;
+  environmentSignature?:string; invariantsVersion:1; stateHash:string;
+}
+
 
 class CoreOrchestratorService {
  async run(goal:string,source:MikiDomain='core',payload:Record<string,unknown>={},maxCycles=18):Promise<CoreOrchestrationResult>{
   const created=taskBlackboardService.create(goal,source,payload);
+  if(payload.kind==='USER_REQUEST' || payload.foreground===true){
+   taskBlackboardService.pauseBackgroundTasksForForeground(created.taskId);
+  }
   const requestId=typeof payload.requestId==='string'?payload.requestId:created.taskId;
   coreResultService.createRequest({
    requestId,
@@ -83,16 +99,66 @@ class CoreOrchestratorService {
   let dispatched=0;let cycles=taskBlackboardService.get(taskId)?.lastCycle||0;
   while(cycles<Math.max(1,Math.min(maxCycles,100))){
    cycles+=1;taskBlackboardService.setCycle(taskId,cycles);
-   const current=taskBlackboardService.get(taskId);if(!current||current.status==='PAUSED'||current.status==='CANCELLED')break;
-   taskBlackboardService.append(taskId,'CHECKPOINT','core',`coreCycle:${cycles}`,{revision:current.revision,cycle:cycles});
+   const currentBeforeState=taskBlackboardService.get(taskId);if(!currentBeforeState||currentBeforeState.status==='PAUSED'||currentBeforeState.status==='CANCELLED')break;
+   const currentPayloadEntry=currentBeforeState.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
+   const currentPayload=currentPayloadEntry&&typeof currentPayloadEntry==='object'&&!Array.isArray(currentPayloadEntry)?currentPayloadEntry as Record<string,unknown>:{ };
+   const isBackground=currentPayload.background===true||currentPayload.orchestrationMode==='SELF_IMPROVEMENT_WORKER'||currentPayload.executionPriority==='BACKGROUND';
+   if(isBackground&&taskBlackboardService.hasActiveForegroundTask(taskId)){
+    taskBlackboardService.pause(taskId,'FOREGROUND_USER_REQUEST_ACTIVE');
+    taskBlackboardService.append(taskId,'CHECKPOINT','core',`backgroundBudgetCycle:${cycles}`,{revision:currentBeforeState.revision,cycle:cycles,mode:'FOREGROUND_BLOCKED',replanRequired:true});
+    coreResultService.waiting(reqId,{error:'Background task paused for foreground user request'});break;
+   }
+   if(isBackground){
+    const budgetCycle=taskBlackboardService.backgroundBudgetCycle(taskId);
+    const budget=resourceGovernanceService.assessBackgroundBudget(true,false,budgetCycle,currentBeforeState.createdAt);
+    taskBlackboardService.append(taskId,'CHECKPOINT','core',`backgroundBudgetCycle:${cycles}`,{revision:currentBeforeState.revision,cycle:cycles,budgetCycle,allowed:budget.allowed,maxCycles:budget.maxCycles,maxDurationMs:budget.maxDurationMs,reductionRatio:budget.reductionRatio,reason:budget.reason,resourceMode:resourceGovernanceService.getSnapshot().mode});
+    if(!budget.allowed){taskBlackboardService.pause(taskId,`BACKGROUND_BUDGET:${budget.reason}`);coreResultService.waiting(reqId,{error:`Background task paused by resource budget: ${budget.reason}`});break;}
+   }
+   taskBlackboardService.append(taskId,'CHECKPOINT','core',`coreCycle:${cycles}`,{revision:currentBeforeState.revision,cycle:cycles});
+   const stateBase=taskBlackboardService.get(taskId)!;
+   const rawCognitiveState=this.buildUnifiedCognitiveState(stateBase,cycles);
+   const migratedCognitiveState=schemaValidationService.migrateUnifiedCognitiveState(rawCognitiveState);
+   if(!migratedCognitiveState.valid||!migratedCognitiveState.data){
+    taskBlackboardService.append(taskId,'ERROR','core',`cognitiveStateInvariantFailed:${cycles}`,{schemaVersion:2,errors:migratedCognitiveState.errors,action:'REPLAN'});
+    continue;
+   }
+   const cognitiveState=migratedCognitiveState.data as UnifiedCognitiveStateSnapshot;
+   const cognitiveStateEntry=taskBlackboardService.appendIfRevision(taskId,stateBase.revision,'DECISION','core',`cognitiveState:${cycles}`,cognitiveState);
+
+   if(!cognitiveStateEntry){
+
+    taskBlackboardService.append(taskId,'DECISION','core',`cognitiveStateCommitConflict:${cycles}`,{expectedRevision:stateBase.revision,actualRevision:taskBlackboardService.get(taskId)?.revision||0,action:'REPLAN'});
+
+    continue;
+
+   }
+   const current=taskBlackboardService.get(taskId)!;
    const plateau=plateauDetectorService.evaluate(current);
    if(plateau.plateau){
+    taskBlackboardService.append(taskId,'DECISION','core',`coreCycleGuard:${cycles}`,plateau);
     taskBlackboardService.pause(taskId,plateau.reason);
     coreResultService.waiting(reqId,{error:plateau.reason});
     break;
    }
-   const routes=adaptiveRoutePlannerService.plan(current).filter(route=>negativeKnowledgeService.canRetry(route.target,route.command,route.reason));
-   taskBlackboardService.append(taskId,'DECISION','core',`corePlan:${cycles}`,routes.map(route=>({target:route.target,command:route.command,reason:route.reason})));
+   const planEnvironment=executionEnvironmentRouterService.capture(this.readEnvironmentHints(current));
+   const goalDecision=adaptiveRoutePlannerService.resolveGoalConflicts(current);
+   if(goalDecision.conflictDetected){
+    taskBlackboardService.append(taskId,'DECISION','core',`goalConflictResolution:${cycles}`,{
+      selectedGoalId:goalDecision.selectedGoalId,
+      selectedGoal:goalDecision.selectedGoal,
+      pausedGoalIds:goalDecision.pausedGoalIds,
+      blockedGoalIds:goalDecision.blockedGoalIds,
+      decisions:goalDecision.decisions,
+      ruleVersion:'V201'
+    });
+   }
+   const planningTask=goalDecision.selectedGoal!==current.goal
+     ? {...current,goal:goalDecision.selectedGoal}
+     : current;
+   const routes=adaptiveRoutePlannerService.plan(planningTask).filter(route=>negativeKnowledgeService.canRetry(route.target,route.command,route.reason));
+   for(const route of routes) route.payload={...route.payload,environmentSignature:planEnvironment.signature};
+   taskBlackboardService.append(taskId,'DECISION','core',`coreEnvironmentPlan:${cycles}`,planEnvironment);
+   taskBlackboardService.append(taskId,'DECISION','core',`corePlan:${cycles}`,routes.map(route=>({target:route.target,command:route.command,reason:route.reason,environmentSignature:route.payload.environmentSignature})));
    const proposedRequirements=routes.map(route=>{
     const operationInstanceId=String(route.payload.operationInstanceId||'');
     const dedupeKey=String(route.payload.dedupeKey||`${taskId}:${route.command}`);
@@ -121,9 +187,61 @@ class CoreOrchestratorService {
     }
    }
    if(routes.length===0)break;
+   const dispatchEnvironment=executionEnvironmentRouterService.capture(this.readEnvironmentHints(current));
+   const environmentComparison=executionEnvironmentRouterService.compare(planEnvironment,dispatchEnvironment);
+   if(environmentComparison.changed){
+    const priorDriftCount=current.entries.filter(entry=>entry.kind==='DECISION'&&entry.key==='environmentDriftDetected').length;
+    taskBlackboardService.append(taskId,'DECISION','core','environmentDriftDetected',{
+      schemaVersion:1,phase:'PLAN_TO_EXECUTION',cycle:cycles,
+      plannedSignature:planEnvironment.signature,currentSignature:dispatchEnvironment.signature,
+      changedFields:environmentComparison.changedFields,action:'REPLAN',
+      priorDriftCount
+    });
+    if(priorDriftCount>=2){
+      taskBlackboardService.pause(taskId,'ENVIRONMENT_DRIFT_REPEATED');
+      coreResultService.waiting(reqId,{error:'ENVIRONMENT_DRIFT_REPEATED',changedFields:environmentComparison.changedFields});
+      break;
+    }
+    taskBlackboardService.append(taskId,'DECISION','core',`coreEnvironmentReplan:${cycles}`,{
+      reason:'Environment changed after plan creation; Permission/Safety/Evidence must be reconsidered by the next CORE plan',
+      previousSignature:planEnvironment.signature,nextSignature:dispatchEnvironment.signature,
+      changedFields:environmentComparison.changedFields
+    });
+    continue;
+   }
    taskBlackboardService.setPending(taskId,routes.map(route=>route.target));
    coreResultService.updateStatus(reqId,'processing',{route:routes.map(r=>r.target as any)});
    for(const route of routes){
+    const idempotencyKey=typeof route.payload.idempotencyKey==='string'?route.payload.idempotencyKey.trim():'';
+    if(idempotencyKey){
+      const prior=domainReplyLedgerService.findSucceededByIdempotencyKey(idempotencyKey);
+      if(prior){
+        taskBlackboardService.append(taskId,'DECISION','core','actionIdempotencyReused',{
+          schemaVersion:1,status:'REUSED_SUCCEEDED',idempotencyKey,reusedFromReplyId:prior.replyId,
+          target:route.target,command:route.command,reason:'既に成功した同一Idempotency KeyのActionを再実行せず既存結果を再利用'
+        });
+        const reusedValue={
+          schemaVersion:3,collectedBy:'core',coreCollected:true,sourceDomain:route.target,
+          producerId:'domainReplyLedgerService',operation:route.command,
+          operationInstanceId:route.payload.operationInstanceId,planRevision:route.payload.planRevision,
+          planSha256:route.payload.planSha256,idempotencyKey,
+          operationClass:'BUSINESS',status:'SUCCEEDED',
+          reply:{status:'SUCCEEDED',operationClass:'BUSINESS',reused:true,reusedFromReplyId:prior.replyId,
+            data:{summary:prior.summary,evidenceIds:prior.evidenceIds,receiptIds:prior.receiptIds}}
+        };
+        taskBlackboardService.append(taskId,'RESULT',route.target,`domainResult:${route.target}:${route.command}`,reusedValue,prior.evidenceIds);
+        const proposalKey=typeof route.payload.dedupeKey==='string'?route.payload.dedupeKey:'';
+        if(proposalKey)taskBlackboardService.append(taskId,'DECISION','core',`proposedOperationSucceeded:${proposalKey}`,{
+          schemaVersion:1,operation:route.command,operationClass:'BUSINESS',status:'OPERATION_SUCCEEDED',
+          dedupeKey:proposalKey,idempotencyKey,reusedFromReplyId:prior.replyId,completedAt:prior.completedAt
+        });
+        continue;
+      }
+    }
+    if(idempotencyKey)taskBlackboardService.append(taskId,'DECISION','core','actionStarted',{
+      schemaVersion:1,status:'STARTED',idempotencyKey,target:route.target,command:route.command,
+      operationInstanceId:route.payload.operationInstanceId,attempt:route.payload.attempt||0,cycle:cycles
+    });
     const envelope=domainRouterService.create('core',route.target,route.command,{...route.payload,taskId,requestId:reqId},{correlationId:taskId,causationId:taskId,depth:cycles});
     const reply=await domainRouterService.dispatch(envelope);dispatched+=1;
     const operationId=this.readPayloadString(current,'operationId')||this.readPayloadString(current,'operation')||taskId;
@@ -132,8 +250,22 @@ class CoreOrchestratorService {
     const resultKind=operationClass==='DIAGNOSTIC'?'OBSERVATION':(reply.accepted?'RESULT':'ERROR');
     const proposalKey=typeof route.payload.dedupeKey==='string'?route.payload.dedupeKey:'';
     const operationSucceeded=reply.accepted&&reply.normalized?.status==='SUCCEEDED'&&operationClass==='BUSINESS';
-    if(proposalKey&&operationSucceeded)taskBlackboardService.append(taskId,'DECISION','core',`proposedOperationSucceeded:${proposalKey}`,{schemaVersion:1,operation:route.command,dispatchId:envelope.envelopeId,operationClass:'BUSINESS',status:'OPERATION_SUCCEEDED',dedupeKey:proposalKey,completedAt:reply.completedAt});
-    taskBlackboardService.append(taskId,resultKind,route.target,`${resultKind==='OBSERVATION'?'domainObservation':'domainResult'}:${route.target}:${route.command}`,{schemaVersion:3,collectedBy:'core',coreCollected:true,sourceDomain:route.target,producerId:'domainRouterService',dispatchId:envelope.envelopeId,replyId:replyRecord.replyId,operation:route.command,operationInstanceId:route.payload.operationInstanceId,planRevision:route.payload.planRevision,planSha256:route.payload.planSha256,operationClass,reply:reply.normalized||reply.error,auditTag:'coreCollected:'},replyRecord.evidenceIds);
+    if(typeof route.payload.idempotencyKey==='string'&&route.payload.idempotencyKey)taskBlackboardService.append(taskId,'DECISION','core','actionCompleted',{
+      schemaVersion:1,status:operationSucceeded?'SUCCEEDED':'FAILED',idempotencyKey:String(route.payload.idempotencyKey),
+      target:route.target,command:route.command,operationInstanceId:route.payload.operationInstanceId,
+      replyId:replyRecord.replyId,cycle:cycles
+    });
+    const expectedRevision=taskBlackboardService.get(taskId)?.revision ?? -1;
+    const resultWrite=taskBlackboardService.appendIfRevision(taskId,expectedRevision,resultKind,route.target,`${resultKind==='OBSERVATION'?'domainObservation':'domainResult'}:${route.target}:${route.command}`,{schemaVersion:3,collectedBy:'core',coreCollected:true,sourceDomain:route.target,producerId:'domainRouterService',dispatchId:envelope.envelopeId,replyId:replyRecord.replyId,operation:route.command,operationInstanceId:route.payload.operationInstanceId,planRevision:route.payload.planRevision,intentPlanKey:route.payload.intentPlanKey,intentHypothesisId:route.payload.intentHypothesisId,intentHypothesisKind:route.payload.intentHypothesisKind,intentIds:Array.isArray(route.payload.intentIds)?route.payload.intentIds.map(String):[],planSha256:route.payload.planSha256,idempotencyKey:typeof route.payload.idempotencyKey==='string'?route.payload.idempotencyKey:'',operationClass,reply:reply.normalized||reply.error,auditTag:'coreCollected:'},replyRecord.evidenceIds);
+    if(!resultWrite){
+      const latest=taskBlackboardService.get(taskId);
+      if(latest)taskBlackboardService.append(taskId,'CHECKPOINT','core',`coreRevisionConflict:${cycles}:${route.command}`,{schemaVersion:1,expectedRevision,currentRevision:latest.revision,operationInstanceId:route.payload.operationInstanceId,replyId:replyRecord.replyId,replanRequired:true});
+    } else if(proposalKey&&operationSucceeded){
+      const proposalRevision=taskBlackboardService.get(taskId)?.revision ?? -1;
+      if(!taskBlackboardService.appendIfRevision(taskId,proposalRevision,'DECISION','core',`proposedOperationSucceeded:${proposalKey}`,{schemaVersion:1,operation:route.command,dispatchId:envelope.envelopeId,operationClass:'BUSINESS',status:'OPERATION_SUCCEEDED',dedupeKey:proposalKey,completedAt:reply.completedAt})){
+        const latest=taskBlackboardService.get(taskId); if(latest)taskBlackboardService.append(taskId,'CHECKPOINT','core',`coreRevisionConflict:proposal:${cycles}:${route.command}`,{schemaVersion:1,currentRevision:latest.revision,operationInstanceId:route.payload.operationInstanceId,replyId:replyRecord.replyId,replanRequired:true});
+      }
+    }
     coreResultService.recordCategoryStep(reqId,route.target as any,reply.accepted?'processing':'failed');
     if(!reply.accepted)negativeKnowledgeService.record(route.target,route.command,reply.error||route.reason,['research','strategy','safety']);
    }
@@ -196,8 +328,51 @@ class CoreOrchestratorService {
   const lineage=coreLineageReadModelService.verify(task,{replyIds,evidenceIds,receiptIds:persistenceReceiptIds,decisionId:decision?.id});
   const plan=corePlanRevisionService.latest(task);
   const currentOperation=plan?.requiredOperations.find(operation=>operation.status==='RUNNING')||plan?.requiredOperations.find(operation=>operation.status==='PENDING'||operation.status==='BLOCKED');
-  return {taskId:task.taskId,operationId:this.readPayloadString(task,'operationId')||this.readPayloadString(task,'operation')||task.taskId,commandId:this.readPayloadString(task,'uiCommandId')||this.readPayloadString(task,'commandId'),cycles,dispatched,status:'COMPLETED',taskRevision:task.revision,corePlanRevision:plan?.planRevision,currentOperationInstanceId:currentOperation?.operationInstanceId,currentBusinessStage:currentOperation?.operation,nextOperationInstanceId:plan?.requiredOperations.find(operation=>operation.status==='PENDING'&&operation.operationInstanceId!==currentOperation?.operationInstanceId)?.operationInstanceId,requiredDomains,selectedClassificationIds:[...task.visitedDomains],replyIds:lineage.verifiedReplyIds,evidenceIds:lineage.verifiedEvidenceIds,decisionId:lineage.verifiedDecisionId,persistenceReceiptIds:lineage.verifiedReceiptIds,lineageVerified:lineage.lineageVerified,rejectedLineageIds:{replyIds:lineage.rejectedReplyIds,evidenceIds:lineage.rejectedEvidenceIds,receiptIds:lineage.rejectedReceiptIds,decisionIds:lineage.rejectedDecisionIds},unknowns,failures};
+  return {taskId:task.taskId,operationId:this.readPayloadString(task,'operationId')||this.readPayloadString(task,'operation')||task.taskId,commandId:this.readPayloadString(task,'uiCommandId')||this.readPayloadString(task,'commandId'),cycles,dispatched,status:'COMPLETED',taskRevision:task.revision,corePlanRevision:plan?.planRevision,currentOperationInstanceId:currentOperation?.operationInstanceId,currentBusinessStage:currentOperation?.operation,nextOperationInstanceId:plan?.requiredOperations.find(operation=>operation.status==='PENDING'&&operation.operationInstanceId!==currentOperation?.operationInstanceId)?.operationInstanceId,requiredDomains,selectedClassificationIds:[...task.visitedDomains],replyIds:lineage.verifiedReplyIds,evidenceIds:lineage.verifiedEvidenceIds,decisionId:lineage.verifiedDecisionId,persistenceReceiptIds:lineage.verifiedReceiptIds,lineageVerified:lineage.lineageVerified,rejectedLineageIds:{replyIds:lineage.rejectedReplyIds,evidenceIds:lineage.rejectedEvidenceIds,receiptIds:lineage.rejectedReceiptIds,decisionIds:lineage.rejectedDecisionIds},unknowns,failures,cognitiveState:this.latestUnifiedCognitiveState(task)};
  }
+ private readEnvironmentHints(task:BlackboardTask):Record<string,unknown>{
+  const value=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
+  return value&&typeof value==='object'&&!Array.isArray(value)
+    ? (value as Record<string,unknown>)
+    : {};
+ }
+ private buildUnifiedCognitiveState(task:BlackboardTask,cycle:number):UnifiedCognitiveStateSnapshot{
+  const payload=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
+  const payloadObject=payload&&typeof payload==='object'&&!Array.isArray(payload) ? payload as Record<string,unknown> : {};
+  const input=typeof payloadObject.input==='string' ? payloadObject.input : typeof payloadObject.text==='string' ? payloadObject.text : task.goal;
+  const constraints=[
+    ...(Array.isArray(payloadObject.constraints)?payloadObject.constraints:[]),
+    ...(Array.isArray(payloadObject.prohibitions)?payloadObject.prohibitions:[]),
+    ...(Array.isArray(payloadObject.acceptanceCriteria)?payloadObject.acceptanceCriteria:[]),
+  ].filter((value):value is string=>typeof value==='string'&&value.trim()).map(value=>value.trim()).slice(0,40);
+  const evidenceIds=[...new Set(task.entries.flatMap(entry=>entry.evidenceIds).filter(Boolean))].slice(-120);
+  const unknowns=this.collectUnresolved(task,/unknown|gap|missing|unresolved|blocked/i).slice(0,80);
+  const capabilityRefs=this.collectValues(task,/capability|component/i).slice(0,80);
+  const recentOutcomes=task.entries.filter(entry=>['RESULT','ERROR','OBSERVATION'].includes(entry.kind)).slice(-40).map(entry=>({
+    kind:entry.kind,domain:entry.domain,key:entry.key,
+    status:typeof entry.value==='object'&&entry.value!==null&&typeof (entry.value as Record<string,unknown>).status==='string' ? String((entry.value as Record<string,unknown>).status) : undefined
+  }));
+  const learningCandidates=task.entries.filter(entry=>entry.domain==='learning'||/learning|learn|confidence|knowledge update/i.test(entry.key)).slice(-30).map(entry=>({
+    domain:entry.domain,key:entry.key,valueHash:canonicalSha256Object(entry.value)
+  }));
+  const requiredDomains=Array.isArray(payloadObject.requiredDomains)
+    ? payloadObject.requiredDomains.filter((value):value is string=>typeof value==='string'&&value.trim()).slice(0,18)
+    : [];
+  const intentPlanValue=payloadObject.intentPlan&&typeof payloadObject.intentPlan==='object'&&!Array.isArray(payloadObject.intentPlan) ? payloadObject.intentPlan as Record<string,unknown> : undefined;
+  const intentUnits=Array.isArray(intentPlanValue?.units)?intentPlanValue.units.filter((item):item is Record<string,unknown>=>Boolean(item&&typeof item==='object')):[];
+  const completedIntentIds=new Set(task.entries.filter(entry=>entry.kind==='RESULT').flatMap(entry=>{ const value=entry.value&&typeof entry.value==='object'&&!Array.isArray(entry.value)?entry.value as Record<string,unknown>:{}; return Array.isArray(value.intentIds)?value.intentIds.filter((x):x is string=>typeof x==='string'):[]; }));
+  const pendingIntentIds=intentUnits.map(unit=>typeof unit.id==='string'?unit.id:'').filter(id=>Boolean(id)&&!completedIntentIds.has(id));
+  const base={schemaVersion:2 as const,taskId:task.taskId,cycle,revision:task.revision,goal:task.goal,input,source:String(task.source),constraints:[...new Set(constraints)],activeDomains:[...task.visitedDomains],requiredDomains:[...new Set(requiredDomains)],pendingIntentIds:[...new Set(pendingIntentIds)],evidenceIds,unknowns,capabilityRefs,recentOutcomes,learningCandidates,environmentSignature:undefined as string|undefined,invariantsVersion:1 as const};
+  return {...base,stateHash:canonicalSha256Object(base)};
+ }
+
+ private latestUnifiedCognitiveState(task:BlackboardTask):UnifiedCognitiveStateSnapshot|undefined{
+  const entry=[...task.entries].reverse().find(item=>item.kind==='DECISION'&&item.domain==='core'&&item.key.startsWith('cognitiveState:'));
+  if(!entry||!entry.value||typeof entry.value!=='object') return undefined;
+  const value=entry.value as UnifiedCognitiveStateSnapshot;
+  return (value.schemaVersion===1||value.schemaVersion===2)&&typeof value.stateHash==='string' ? value : undefined;
+ }
+
  private readPayloadString(task:BlackboardTask,key:string):string|undefined{
   const payload=task.entries.find(entry=>entry.key==='payload')?.value;
   if(typeof payload!=='object'||payload===null)return undefined;

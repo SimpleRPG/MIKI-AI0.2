@@ -6,12 +6,41 @@ import { coreCompletionGateService, type CoreCompletionAssessment } from './core
 import { EvidenceService } from '../../memory/services/evidenceService';
 import { proposalQuarantineService } from './proposalQuarantineService';
 import { autonomousCandidatePreparationService } from './autonomousCandidatePreparationService';
+import { decomposeMultiIntent, selectMultiIntentHypothesis, type MultiIntentPlan } from '../../unknown/services/multiIntentDecompositionService';
 
 export interface PlannedRoute {
   target:MikiDomain;
   command:DomainCommand;
   reason:string;
   payload:Record<string,unknown>;
+}
+
+export interface CoreGoalCandidate {
+  id:string;
+  goal:string;
+  priority:number;
+  foreground?:boolean;
+  safetyRequired?:boolean;
+  permissionGranted?:boolean;
+  deadlineAt?:number;
+  dependsOn?:string[];
+  conflictsWith?:string[];
+  includes?:string[];
+  status?:'ACTIVE'|'PAUSED'|'BLOCKED'|'WAITING_USER'|'COMPLETED'|'CANCELLED';
+}
+
+export interface GoalConflictDecision {
+  selectedGoalId:string;
+  selectedGoal:string;
+  conflictDetected:boolean;
+  pausedGoalIds:string[];
+  blockedGoalIds:string[];
+  decisions:Array<{
+    goalId:string;
+    action:'SELECT'|'PAUSE'|'BLOCK'|'WAIT';
+    reason:string;
+    comparisonKey:string;
+  }>;
 }
 
 export interface ImprovementReadiness {
@@ -130,17 +159,123 @@ class AdaptiveRoutePlannerService {
     };
   }
 
+  /**
+   * Goal間の競合をCOREが決定論的に解決する。
+   * 候補が与えられていない場合は現在Goalのみを正本候補として扱う。
+   * 配列順・Map挿入順・非同期完了順は最終判断に使用しない。
+   */
+  resolveGoalConflicts(task:BlackboardTask):GoalConflictDecision {
+    const input=this.payload(task);
+    const raw=Array.isArray(input.goalCandidates)?input.goalCandidates:[];
+
+    const candidates:CoreGoalCandidate[]=[{
+      id:'CURRENT_TASK_GOAL',
+      goal:task.goal,
+      priority:100,
+      foreground:String(input.kind||'')==='USER_REQUEST' || input.foreground===true,
+      safetyRequired:false,
+      permissionGranted:true,
+      status:'ACTIVE'
+    }];
+
+    for(const item of raw){
+      if(!item||typeof item!=='object')continue;
+      const x=item as Record<string,unknown>;
+      const goal=String(x.goal||'').trim();
+      const id=String(x.id||'').trim();
+      if(!goal||!id||id==='CURRENT_TASK_GOAL')continue;
+      candidates.push({
+        id,goal,
+        priority:Number.isFinite(Number(x.priority))?Number(x.priority):0,
+        foreground:x.foreground===true,
+        safetyRequired:x.safetyRequired===true,
+        permissionGranted:x.permissionGranted!==false,
+        deadlineAt:Number.isFinite(Number(x.deadlineAt))?Number(x.deadlineAt):undefined,
+        dependsOn:Array.isArray(x.dependsOn)?x.dependsOn.map(String):[],
+        conflictsWith:Array.isArray(x.conflictsWith)?x.conflictsWith.map(String):[],
+        includes:Array.isArray(x.includes)?x.includes.map(String):[],
+        status:(typeof x.status==='string'?x.status:'ACTIVE') as CoreGoalCandidate['status']
+      });
+    }
+
+    const byId=new Map(candidates.map(x=>[x.id,x]));
+    const actionable=candidates.filter(x=>!['COMPLETED','CANCELLED'].includes(String(x.status||'')));
+    const dependencySatisfied=(x:CoreGoalCandidate)=>{
+      return (x.dependsOn||[]).every(depId=>{
+        const dep=byId.get(depId);
+        return Boolean(dep && dep.status==='COMPLETED');
+      });
+    };
+    const safetyRank=(x:CoreGoalCandidate)=>x.safetyRequired?2:(x.permissionGranted?1:0);
+    const permissionRank=(x:CoreGoalCandidate)=>x.permissionGranted?1:0;
+    const dependencyRank=(x:CoreGoalCandidate)=>dependencySatisfied(x)?1:0;
+    const deadlineRank=(x:CoreGoalCandidate)=>Number.isFinite(x.deadlineAt)?-(x.deadlineAt as number):Number.MIN_SAFE_INTEGER;
+    const canonicalKey=(x:CoreGoalCandidate)=>
+      `${x.id}\u0000${x.goal}\u0000${String(x.priority).padStart(12,'0')}\u0000${x.deadlineAt||0}`;
+
+    const compare=(a:CoreGoalCandidate,b:CoreGoalCandidate)=>{
+      const ordered=[
+        Number(a.foreground===true)-Number(b.foreground===true),
+        Number(a.priority)-Number(b.priority),
+        safetyRank(a)-safetyRank(b),
+        permissionRank(a)-permissionRank(b),
+        dependencyRank(a)-dependencyRank(b),
+        deadlineRank(a)-deadlineRank(b),
+      ];
+      for(const d of ordered){
+        if(d!==0)return d;
+      }
+      const ak=canonicalKey(a),bk=canonicalKey(b);
+      return ak<bk?-1:ak>bk?1:0;
+    };
+
+    const sorted=[...actionable].sort((a,b)=>-compare(a,b));
+    const selected=sorted.find(x=>dependencySatisfied(x)&&x.permissionGranted!==false) || sorted[0] || candidates[0];
+    const pausedGoalIds:string[]=[];
+    const blockedGoalIds:string[]=[];
+    const decisions:GoalConflictDecision['decisions']=[];
+
+    for(const x of actionable){
+      if(x.id===selected.id){
+        decisions.push({goalId:x.id,action:'SELECT',reason:'CORE deterministic goal precedence',comparisonKey:canonicalKey(x)});
+        continue;
+      }
+      const blocked=!dependencySatisfied(x);
+      const denied=x.permissionGranted===false;
+      let action:'PAUSE'|'BLOCK'|'WAIT'='PAUSE';
+      let reason='Foreground/priority conflict; goal paused for later resume';
+      if(blocked){ action='BLOCK'; reason='Goal dependency is not satisfied'; blockedGoalIds.push(x.id); }
+      else if(denied){ action='WAIT'; reason='User/permission decision is required'; }
+      else { pausedGoalIds.push(x.id); }
+      decisions.push({goalId:x.id,action,reason,comparisonKey:canonicalKey(x)});
+    }
+
+    return {
+      selectedGoalId:selected.id,
+      selectedGoal:selected.goal,
+      conflictDetected:actionable.length>1,
+      pausedGoalIds:[...new Set(pausedGoalIds)],
+      blockedGoalIds:[...new Set(blockedGoalIds)],
+      decisions
+    };
+  }
+
   plan(task:BlackboardTask):PlannedRoute[] {
     const input=this.payload(task);
     const kind=String(input.kind||'SYSTEM_TASK');
     const entry=String(input.entry||'');
-    const uiSelfImprovement=kind==='SELF_IMPROVEMENT' && entry==='TYPED_IMPROVEMENT_UI_GATEWAY';
+    const selfImprovement=kind==='SELF_IMPROVEMENT';
 
-    // SELF_IMPROVEMENT from the new UI is an adaptive plan, not a legacy
-    // domain pipeline. Keep this branch exclusive so old fixed flows cannot
-    // inject extra routes into the same cycle.
-    if(uiSelfImprovement) return this.planAdaptiveImprovement(task,input);
+    // All SELF_IMPROVEMENT tasks use the same adaptive CORE cognition,
+    // regardless of whether the task originated from UI, AUTOPILOT,
+    // execution-failure recovery, or another CORE/system ingress. The
+    // ingress metadata remains descriptive; it must not create a second
+    // self-improvement brain or a second planning algorithm.
+    if(selfImprovement) return this.planAdaptiveImprovement(task,input);
     if(kind==='USER_REQUEST' && entry==='TYPED_CONVERSATION_UI_GATEWAY') return this.planConversation(task,input);
+
+    const learningRoutes=this.planLearningFromCompletedResults(task);
+    if(learningRoutes.length>0) return this.decorateOperations(task,this.uniqueOperations(learningRoutes));
 
     return this.planGeneral(task,input,kind);
   }
@@ -319,27 +454,83 @@ class AdaptiveRoutePlannerService {
     return routes;
   }
 
+  private buildIntentHypothesisContext(task:BlackboardTask, plan:MultiIntentPlan){
+    const completed:string[]=[]; const failed:string[]=[]; const evidence:string[]=[];
+    for(const entry of task.entries){
+      if(entry.kind!=='RESULT'&&entry.kind!=='ERROR'&&entry.kind!=='OBSERVATION') continue;
+      const value=objectValue(entry);
+      const ids=Array.isArray(value?.intentIds)?value.intentIds.filter((x):x is string=>typeof x==='string'):[];
+      if(entry.kind==='RESULT') completed.push(...ids);
+      if(entry.kind==='ERROR') failed.push(...ids);
+      if(Array.isArray(value?.evidenceIds)) evidence.push(...value.evidenceIds.filter((x):x is string=>typeof x==='string'));
+    }
+    return {completedIntentIds:[...new Set(completed)],failedIntentIds:[...new Set(failed)],evidenceIntentIds:[...new Set(evidence)]};
+  }
+
   private planConversation(task:BlackboardTask,input:Record<string,unknown>):PlannedRoute[] {
     const text=String(input.text||task.goal||'');
+    const intentPlan=decomposeMultiIntent(text);
+    const intentContext=this.buildIntentHypothesisContext(task,intentPlan);
+    const hypothesisSelection=selectMultiIntentHypothesis(intentPlan,intentContext);
+    const selectedHypothesis=intentPlan.hypotheses.find(h=>h.id===hypothesisSelection.selectedId);
+    const selectedIntentIds=selectedHypothesis?.intentIds||intentPlan.units.map(unit=>unit.id);
+    const completedSet=new Set(intentContext.completedIntentIds);
+    const pendingUnits=intentPlan.units.filter(unit=>selectedIntentIds.includes(unit.id)&&!completedSet.has(unit.id));
+    const selectedUnit=(hypothesisSelection.selectedKind==='SEQUENTIAL'||hypothesisSelection.selectedKind==='DEPENDENT')
+      ? pendingUnits.find(unit=>unit.dependencies.every(dep=>completedSet.has(dep))) || pendingUnits[0]
+      : pendingUnits[0];
+    const focusedText=selectedUnit?.text||text;
+    const intentPayload={intentPlanKey:intentPlan.deterministicKey,intentHypothesisId:hypothesisSelection.selectedId,intentHypothesisKind:hypothesisSelection.selectedKind,intentIds:selectedUnit?[selectedUnit.id]:pendingUnits.map(unit=>unit.id)};
+    const parallelKnowledgeUnits=hypothesisSelection.selectedKind==='PARALLEL'
+      ? pendingUnits.filter(unit=>unit.goal==='KNOWLEDGE' || unit.action==='RESEARCH')
+      : [];
     const conversationResult=this.latestBusinessResult(task,'ANALYZE_TEXT');
     const unknownResult=this.latestBusinessResult(task,'RESOLVE_UNKNOWN');
     const researchResult=this.latestBusinessResult(task,'RUN_RESEARCH');
     const routes:PlannedRoute[]=[];
 
     if(!conversationResult){
-      routes.push({target:'conversation',command:'ANALYZE_TEXT',reason:'COREが会話入力を解析し、必要な分類判断の基礎を作る',payload:{taskId:task.taskId,text,hasAttachments:Boolean(input.hasAttachments),adaptive:true,priority:100}});
-    } else if(/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(text) && !unknownResult){
-      routes.push({target:'unknown',command:'RESOLVE_UNKNOWN',reason:'COREが不足知識を検出し、回答に必要な未知事項を解消する',payload:{taskId:task.taskId,question:text,useSearch:/調べ|検索|最新/i.test(text),hasAttachments:Boolean(input.hasAttachments),adaptive:true,priority:90}});
+      routes.push({target:'conversation',command:'ANALYZE_TEXT',reason:'COREが会話入力を解析し、必要な分類判断の基礎を作る',payload:{taskId:task.taskId,text,hasAttachments:Boolean(input.hasAttachments),adaptive:true,priority:100,...intentPayload,intentIds:[]}});
+    } else if(parallelKnowledgeUnits.length>0){
+      for(const unit of parallelKnowledgeUnits){
+        const perUnit={...intentPayload,intentIds:[unit.id]};
+        routes.push({target:'unknown',command:'RESOLVE_UNKNOWN',reason:`COREがPARALLEL仮説で独立Intent ${unit.id} を処理する`,payload:{taskId:task.taskId,question:unit.text,useSearch:/調べ|検索|最新/i.test(unit.text),hasAttachments:Boolean(input.hasAttachments),adaptive:true,priority:90,...perUnit}});
+      }
+    } else if(selectedUnit?.goal==='BUILD_OR_CHANGE'){
+      routes.push({target:'selfDevelopment',command:'GENERATE_CANDIDATE',reason:`COREがBUILD_OR_CHANGE Intent ${selectedUnit.id} をselfDevelopmentへ委譲する`,payload:{taskId:task.taskId,runId:String(input.runId||task.taskId),goal:selectedUnit.text,candidateRevision:Number(input.candidateRevision||1),requirements:input.requirements,validationRequirements:input.validationRequirements,operationMode:'MULTI_INTENT_BUILD',adaptive:true,priority:80,...intentPayload,intentIds:[selectedUnit.id]}});
+    } else if(/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(focusedText) && !unknownResult){
+      routes.push({target:'unknown',command:'RESOLVE_UNKNOWN',reason:'COREが不足知識を検出し、回答に必要な未知事項を解消する',payload:{taskId:task.taskId,question:focusedText,useSearch:/調べ|検索|最新/i.test(focusedText),hasAttachments:Boolean(input.hasAttachments),adaptive:true,priority:90,...intentPayload}});
     } else if(unknownResult && !researchResult && task.entries.some(e=>e.kind==='RESULT'&&/gapId|researchQuestion|queryPlanId/i.test(e.key))){
-      routes.push({target:'research',command:'RUN_RESEARCH',reason:'COREが未知解消結果を再評価し、明示された知識Gapを調査する',payload:{taskId:task.taskId,gapId:this.readStringFromEntries(task,/gapId/i),adaptive:true,priority:80}});
+      routes.push({target:'research',command:'RUN_RESEARCH',reason:'COREが未知解消結果を再評価し、明示された知識Gapを調査する',payload:{taskId:task.taskId,gapId:this.readStringFromEntries(task,/gapId/i),query:focusedText,adaptive:true,priority:80,...intentPayload}});
     }
     return this.decorateOperations(task,this.uniqueOperations(routes));
+  }
+
+  private planLearningFromCompletedResults(task:BlackboardTask):PlannedRoute[] {
+    const routes:PlannedRoute[]=[]; const sources=['research','execution','verification'] as const;
+    for(const entry of [...successfulBusinessEntries(task)].reverse()){
+      if(!sources.includes(entry.domain as typeof sources[number])) continue; const value=objectValue(entry); if(!value) continue;
+      const sourceOperation=String(value.operation||''); const sourceOperationInstanceId=String(value.operationInstanceId||'');
+      if(!sourceOperation||!sourceOperationInstanceId||sourceOperation==='LEARN_FROM_CORE_RESULT') continue;
+      const evidenceIds=[...new Set(entry.evidenceIds||[])]; if(evidenceIds.length===0) continue;
+      const alreadyLearned=task.entries.some(existing=>existing.kind==='RESULT'&&objectValue(existing)?.operation==='LEARN_FROM_CORE_RESULT'&&String(objectValue(existing)?.sourceOperationInstanceId||'')===sourceOperationInstanceId);
+      if(alreadyLearned) continue;
+      const reply=value.reply&&typeof value.reply==='object'?value.reply as Record<string,unknown>:{}; const data=reply.data&&typeof reply.data==='object'?reply.data as Record<string,unknown>:{};
+      const verified=entry.domain==='research'?data.resolved===true:entry.domain==='verification'?(data.validationStatus==='PASSED'||data.passed===true||data.verified===true):(data.passed===true||data.verified===true);
+      const rawOutcome=String(reply.status||'SUCCEEDED').toUpperCase(); const outcome=rawOutcome==='FAILED'||rawOutcome==='REJECTED'?'FAILURE':'SUCCESS';
+      const capabilityIds=Array.isArray(data.capabilityIds)?data.capabilityIds.map(String).filter(Boolean):[]; const concepts=`${task.goal} ${sourceOperation}`.split(/[^\p{L}\p{N}_-]+/u).filter(Boolean).slice(0,12);
+      routes.push({target:'learning',command:'LEARN_FROM_CORE_RESULT',reason:`CORE selected learning from evidence-producing ${entry.domain}:${sourceOperation}`,payload:{taskId:task.taskId,sourceDomain:entry.domain,sourceOperation,sourceOperationInstanceId,evidenceIds,outcome,verified,learningDomain:'system',key:`${entry.domain}:${sourceOperation}:${sourceOperationInstanceId}`,input:task.goal,concepts,capabilityIds,lesson:`${entry.domain}:${sourceOperation} -> unified learning; verified=${verified}`,adaptive:true,priority:90}}); break;
+    } return routes;
   }
 
   private planGeneral(task:BlackboardTask,input:Record<string,unknown>,kind:string):PlannedRoute[] {
     const text=`${task.goal} ${task.entries.map(e=>`${e.key} ${String(e.value)}`).join(' ')}`;
     const operation=String(input.operation||'');
     const routes:PlannedRoute[]=[];
+    if(operation==='APPROVE_REVIEWED_CANDIDATE'){
+      routes.push({target:'promotion',command:'APPROVE_REVIEWED_CANDIDATE',reason:'COREが明示承認済みCandidateの適用をpromotion経路へ委譲する',payload:{...input,taskId:task.taskId,operation,adaptive:true,priority:100}});
+      return this.decorateOperations(task,this.uniqueOperations(routes));
+    }
 
     // UI-owned persistence/diagnostic operations still enter CORE, but they
     // must not fall into the generic conversation/strategy fallback.
@@ -352,6 +543,16 @@ class AdaptiveRoutePlannerService {
       'SAVE_RESEARCH_QUERY_PLANNING_POLICY',
       'SAVE_CORE_CYCLE_SETTINGS'
     ]);
+    const coreOwnedAutonomyOperations=new Set(['SAVE_AUTONOMY_CONFIG']);
+    if(coreOwnedAutonomyOperations.has(operation)){
+      routes.push({
+        target:'autonomy',
+        command:'SAVE_AUTONOMY_CONFIG',
+        reason:`CORE selected the autonomy classification for operation ${operation}`,
+        payload:{...input,taskId:task.taskId,operation,requestedOperation:operation,goal:task.goal,adaptive:true,priority:100}
+      });
+      return this.decorateOperations(task,this.uniqueOperations(routes));
+    }
     if(coreOwnedDataOperations.has(operation)){
       routes.push({
         target:'data',
@@ -375,25 +576,75 @@ class AdaptiveRoutePlannerService {
 
     const isUnknown=/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(text);
     const isSelfImprovement=kind==='SELF_IMPROVEMENT';
-    if(!task.visitedDomains.includes('conversation'))
-      routes.push({target:'conversation',command:'ANALYZE_TEXT',reason:'入力を構造化する',payload:{text:task.goal}});
-    if(isUnknown&&!task.visitedDomains.includes('unknown'))
-      routes.push({target:'unknown',command:'RESOLVE_UNKNOWN',reason:'未知・不足情報を分類する',payload:{question:task.goal,useSearch:/調べ|検索|最新/i.test(text),hasAttachments:Boolean(input.hasAttachments)}});
-    if(isSelfImprovement&&!task.visitedDomains.includes('improvement'))
-      routes.push({target:'improvement',command:'RUN_SELF_IMPROVEMENT',reason:'自己改善入口を評価する',payload:{trigger:`blackboard-${task.taskId}`,taskId:task.taskId}});
-    if(routes.length===0&&!task.visitedDomains.includes('strategy'))
-      routes.push({target:'strategy',command:'ASSESS_DOMAIN',reason:'次経路を決定するため戦略状態を取得する',payload:{taskId:task.taskId,kind}});
+
+    /*
+     * P0: Researchは「1回やったら終了」ではない。
+     * 最新のRUN_RESEARCH結果が continuationAvailable=true なら、COREが
+     * 同じTaskの次cycleでResearchを再選択する。これは固定チェーンではなく、
+     * Evidence/Verificationの状態に応じた再評価である。
+     */
+    const latestResearch=this.latestBusinessResult(task,'RUN_RESEARCH');
+    const latestResearchValue=latestResearch ? objectValue(latestResearch) : undefined;
+    const latestResearchReply=latestResearchValue?.reply && typeof latestResearchValue.reply==='object'
+      ? latestResearchValue.reply as Record<string,unknown>
+      : undefined;
+    const latestResearchData=(latestResearchReply?.data||latestResearchReply?.result) as Record<string,unknown>|undefined;
+    const continuationAvailable=Boolean(
+      latestResearchData?.continuationAvailable===true ||
+      latestResearchValue?.continuationAvailable===true
+    );
+    const researchGapId=String(
+      latestResearchData?.gapId ||
+      latestResearchValue?.gapId ||
+      this.readStringFromEntries(task,/gapId/i) ||
+      ''
+    );
+
+    if(continuationAvailable && researchGapId){
+      routes.push({
+        target:'research',
+        command:'RUN_RESEARCH',
+        reason:'CORE re-evaluated insufficient verification and continued the same Knowledge Gap research',
+        payload:{
+          taskId:task.taskId,
+          gapId:researchGapId,
+          query:latestResearchData?.nextQuery,
+          continuationRound: Number.isFinite(Number(latestResearchData?.continuationRound))
+            ? Number(latestResearchData?.continuationRound) + 1
+            : 1,
+          adaptive:true,
+          researchContinuation:true,
+          priority:95
+        }
+      });
+    } else {
+      if(!task.visitedDomains.includes('conversation'))
+        routes.push({target:'conversation',command:'ANALYZE_TEXT',reason:'入力を構造化する',payload:{text:task.goal}});
+      if(isUnknown&&!task.visitedDomains.includes('unknown'))
+        routes.push({target:'unknown',command:'RESOLVE_UNKNOWN',reason:'未知・不足情報を分類する',payload:{question:task.goal,useSearch:/調べ|検索|最新/i.test(text),hasAttachments:Boolean(input.hasAttachments)}});
+      if(isSelfImprovement&&!task.visitedDomains.includes('improvement'))
+        routes.push({target:'improvement',command:'RUN_SELF_IMPROVEMENT',reason:'自己改善入口を評価する',payload:{trigger:`blackboard-${task.taskId}`,taskId:task.taskId}});
+      if(routes.length===0&&!task.visitedDomains.includes('strategy'))
+        routes.push({target:'strategy',command:'ASSESS_DOMAIN',reason:'次経路を決定するため戦略状態を取得する',payload:{taskId:task.taskId,kind}});
+    }
     return this.decorateOperations(task,this.uniqueOperations(routes));
   }
 
   assessCompletion(task:BlackboardTask):CoreCompletionAssessment {
     const input=this.payload(task);
-    const isUiSelfImprovement=String(input.kind||'')==='SELF_IMPROVEMENT' && String(input.entry||'')==='TYPED_IMPROVEMENT_UI_GATEWAY';
-    if(isUiSelfImprovement) return coreCompletionGateService.evaluate(task,[]);
+    const isSelfImprovement=String(input.kind||'')==='SELF_IMPROVEMENT';
+    if(isSelfImprovement) return coreCompletionGateService.evaluate(task,[]);
     const isUiConversation=String(input.kind||'')==='USER_REQUEST' && String(input.entry||'')==='TYPED_CONVERSATION_UI_GATEWAY';
     if(isUiConversation) return this.evaluateConversationCompletion(task);
 
     const operation=String(input.operation||'');
+    if(operation==='APPROVE_REVIEWED_CANDIDATE'){
+      return coreCompletionGateService.evaluate(task,['promotion']);
+    }
+    const coreOwnedAutonomyOperations=new Set(['SAVE_AUTONOMY_CONFIG']);
+    if(coreOwnedAutonomyOperations.has(operation)){
+      return coreCompletionGateService.evaluateCoreOwnedOperation(task,operation,'autonomy');
+    }
     const coreOwnedDataOperations=new Set([
       'SAVE_EXTERNAL_CONNECTION_CONFIG',
       'TEST_EXTERNAL_CONNECTION',
@@ -407,22 +658,39 @@ class AdaptiveRoutePlannerService {
 
     const text=`${task.goal} ${String(input.kind||'')}`;
     const isUnknown=/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(text);
-    const isSelfImprovement=String(input.kind||'')==='SELF_IMPROVEMENT';
     const required=isUnknown
       ? ['conversation','unknown','research','verification','experience','learning','memory'] as MikiDomain[]
-      : (isSelfImprovement
-        ? ['conversation','strategy','improvement','verification','safety','learning','memory'] as MikiDomain[]
-        : ['conversation','strategy','safety','experience','memory'] as MikiDomain[]);
+      : ['conversation','strategy','safety','experience','memory'] as MikiDomain[];
     return coreCompletionGateService.evaluate(task,required);
   }
 
   private evaluateConversationCompletion(task:BlackboardTask):CoreCompletionAssessment {
     const analysis=this.latestBusinessResult(task,'ANALYZE_TEXT');
+    const intentPlan=decomposeMultiIntent(task.goal);
+    const completedIntentIds=new Set<string>();
+    const failedIntentIds=new Set<string>();
+    for(const entry of task.entries){
+      if(entry.kind!=='RESULT'&&entry.kind!=='ERROR') continue;
+      const value=objectValue(entry);
+      const ids=Array.isArray(value?.intentIds)?value.intentIds.filter((x):x is string=>typeof x==='string'):[];
+      if(entry.kind==='RESULT') ids.forEach(id=>completedIntentIds.add(id));
+      else ids.forEach(id=>failedIntentIds.add(id));
+    }
+    const final=task.entries.some(e=>e.domain==='core'&&e.kind==='RESULT'&&e.key==='conversationFinalResponse');
+    if(intentPlan.isMultiIntent){
+      const missing=intentPlan.units.filter(unit=>unit.goal!=='INTERACT'&&!completedIntentIds.has(unit.id)).map(unit=>unit.id);
+      const failed=[...failedIntentIds].filter(id=>!completedIntentIds.has(id));
+      const reasons:string[]=[];
+      if(!analysis) reasons.push('CONVERSATION_ANALYSIS_MISSING');
+      if(missing.length) reasons.push(`INTENT_RESULTS_MISSING:${missing.join('|')}`);
+      if(failed.length) reasons.push(`INTENT_RESULTS_FAILED:${failed.join('|')}`);
+      if(!final) reasons.push('FINAL_RESPONSE_MISSING');
+      return {businessCompletion:reasons.length===0,failClosed:true,requiredDomains:[],missingDomains:[],failedDomains:[],missingReceipts:[],persistenceConfirmed:true,evidenceQualityPassed:true,reasons,missingRequiredOperations:[]};
+    }
     const unknownNeeded=/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(task.goal);
     const unknown=unknownNeeded?this.latestBusinessResult(task,'RESOLVE_UNKNOWN'):undefined;
     const researchNeeded=task.entries.some(e=>e.kind==='RESULT'&&/gapId|researchQuestion|queryPlanId/i.test(e.key));
     const research=researchNeeded?this.latestBusinessResult(task,'RUN_RESEARCH'):undefined;
-    const final=task.entries.some(e=>e.domain==='core'&&e.kind==='RESULT'&&e.key==='conversationFinalResponse');
     const reasons:string[]=[];
     if(!analysis) reasons.push('CONVERSATION_ANALYSIS_MISSING');
     if(unknownNeeded&&!unknown) reasons.push('UNKNOWN_RESOLUTION_MISSING');
@@ -592,8 +860,10 @@ class AdaptiveRoutePlannerService {
       }
       const prior=task.entries.filter(entry=>entry.kind==='RESULT'&&objectValue(entry)?.operation===route.command).length;
       const attempt=prior+1;
-      const operationInstanceId=`OPI-${task.taskId}-${route.command}-${attempt}`;
-      const dedupeKey=`${task.taskId}:${route.command}:${attempt}`;
+      const intentSuffix=Array.isArray(route.payload.intentIds)&&route.payload.intentIds.length>0
+        ? `-${route.payload.intentIds.map(String).join('-')}` : '';
+      const operationInstanceId=`OPI-${task.taskId}-${route.command}-${attempt}${intentSuffix}`;
+      const dedupeKey=`${task.taskId}:${route.command}:${attempt}${intentSuffix}`;
       const sourceOperationInstanceId=typeof route.payload.sourceOperationInstanceId==='string'
         ? route.payload.sourceOperationInstanceId : '';
       return {...route,payload:{...route.payload,operationInstanceId,dedupeKey,attempt,
@@ -611,7 +881,22 @@ class AdaptiveRoutePlannerService {
       const key=identity || dedupe || canonicalRouteKey(route);
       if(!unique.has(key)) unique.set(key,route);
     }
-    return [...unique.values()];
+    return [...unique.values()].sort((a,b)=>{
+      const pa=Number(a.payload.priority||0), pb=Number(b.payload.priority||0);
+      if(pa!==pb)return pb-pa;
+      const sa=Boolean(a.payload.safetyApproved===true), sb=Boolean(b.payload.safetyApproved===true);
+      if(sa!==sb)return Number(sb)-Number(sa);
+      const da=Boolean(a.payload.dependenciesSatisfied===true), db=Boolean(b.payload.dependenciesSatisfied===true);
+      if(da!==db)return Number(db)-Number(da);
+      const ea=Array.isArray(a.payload.evidenceIds)?a.payload.evidenceIds.length:0;
+      const eb=Array.isArray(b.payload.evidenceIds)?b.payload.evidenceIds.length:0;
+      if(ea!==eb)return eb-ea;
+      const ca=Number(a.payload.confidence||0), cb=Number(b.payload.confidence||0);
+      if(ca!==cb)return cb-ca;
+      const keyA=`${a.target}\u0000${a.command}\u0000${String(a.payload.operationInstanceId||'')}\u0000${String(a.payload.dedupeKey||'')}`;
+      const keyB=`${b.target}\u0000${b.command}\u0000${String(b.payload.operationInstanceId||'')}\u0000${String(b.payload.dedupeKey||'')}`;
+      return keyA<keyB?-1:keyA>keyB?1:0;
+    });
   }
 }
 

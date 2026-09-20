@@ -5,6 +5,9 @@ import { taskCaseMemoryService } from '../../memory/services/taskCaseMemoryServi
 import { taskLineageService } from '../../execution/services/taskLineageService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { systemLogger } from '../../../services/systemLogger';
+import { operationalConformanceService } from '../../verification/services/operationalConformanceService';
+import { mikiUnifiedLearningContinuumService } from './mikiUnifiedLearningContinuumService';
+import { domainReplyLedgerService } from '../../core/services/domainReplyLedgerService';
 
 export interface TaskFeedbackSnapshot {
   task_id: string;
@@ -82,6 +85,51 @@ export class TaskResultFeedbackService {
       taskCaseMemoryService.recordSuccess({ taskId: task.task_id, goal: task.goal, environment: task.environment, componentIds: steps.map(s => s.component_id), hashes, requestId: event.request_id, evidenceEventId: event.event_id, outputSummary: event.output_summary });
     } else if (event.type === 'execution.failed') {
       taskCaseMemoryService.recordFailure({ taskId: task.task_id, goal: task.goal, environment: task.environment, componentId: event.component_id, implementationHash: event.implementation_hash, requestId: event.request_id, evidenceEventId: event.event_id, errorMessage: event.error_message });
+    }
+
+    // causal_learning_attribution: outcome is recorded as an observation, not as proof of causality.
+    // A later verification step may assess treatment/counterfactual effects; this event only preserves lineage.
+    operationalConformanceService.addCausalEvent({
+      traceId: task.task_id,
+      kind: event.type === 'execution.completed' && event.passed === true ? 'GOAL_RESULT' : 'CORRECTION',
+      ref: `capability:${event.component_id}|request:${event.request_id}|event:${event.event_id}`,
+      value: event.type === 'execution.completed' && event.passed === true ? 1 : -1,
+    });
+
+    // First pass: use the existing CORE Reply Ledger's evidence bindings.
+    // A raw success/failure event alone is never sufficient for causal promotion.
+    const verifiedTaskEvidenceIds = [...new Set(domainReplyLedgerService.listByTask(task.task_id)
+      .filter(record => record.status === 'SUCCEEDED')
+      .flatMap(record => record.evidenceIds)
+      .map(String)
+      .filter(Boolean))];
+    for (const assessment of operationalConformanceService.listCausal()) {
+      if (assessment.traceId !== task.task_id || assessment.conclusion !== 'SUPPORTED') continue;
+      operationalConformanceService.verifyCausalAssessment({
+        traceId: assessment.traceId,
+        candidate: assessment.candidate,
+        evidenceIds: assessment.evidenceIds.length ? assessment.evidenceIds : verifiedTaskEvidenceIds,
+      });
+    }
+
+    // Second pass: only assessments that were explicitly verified against
+    // admissible Evidence are allowed to become verified Learning.
+    // verified_causal_learning_promotion
+    for (const assessment of operationalConformanceService.listVerifiedCausalAssessments(task.task_id)) {
+      mikiUnifiedLearningContinuumService.promoteVerifiedCausalInsight({
+        traceId: assessment.traceId,
+        candidate: assessment.candidate,
+        conclusion: assessment.conclusion,
+        verificationStatus: assessment.verificationStatus,
+        evidenceIds: assessment.evidenceIds,
+        capabilityIds: assessment.capabilityIds,
+        knowledgeRefs: assessment.knowledgeRefs,
+        strategyRefs: assessment.strategyRefs,
+        decisionRefs: assessment.decisionRefs,
+        actionRefs: assessment.actionRefs,
+        treatmentEffect: assessment.treatmentEffect,
+        counterfactualEffect: assessment.counterfactualEffect,
+      });
     }
 
     const snapshot: TaskFeedbackSnapshot = {

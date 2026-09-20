@@ -1,4 +1,5 @@
 import { coreResultService } from '../services/coreResultService';
+import { coreTaskIngressService } from '../services/coreTaskIngressService';
 import {
   selfCodeArchitectService,
   SPECIFICATION_REGISTRY,
@@ -44,6 +45,19 @@ class TypedSelfCodeArchitectUiGatewayService {
   readonly selfCodingSupercharger = mikiSelfCodingSuperchargerService;
   readonly ultraEvolver = mikiUltraEvolverService;
   readonly continuousEvolution = autonomousContinuousEvolutionService;
+  async approveAndDeployRecord(recordId: string): Promise<{ success: boolean; message: string; taskId?: string }> {
+    const task = await coreTaskIngressService.submit({
+      kind: 'SELF_IMPROVEMENT',
+      goal: `レビュー承認済みCandidate ${recordId} を適用する`,
+      source: 'core',
+      payload: { operation: 'APPROVE_REVIEWED_CANDIDATE', recordId, entry: 'TYPED_REVIEW_APPROVAL_UI_GATEWAY' },
+    });
+    const reply = [...task.task.entries].reverse().find(entry => entry.kind === 'RESULT' && entry.domain === 'promotion');
+    const value = reply?.value && typeof reply.value === 'object' ? reply.value as Record<string, unknown> : undefined;
+    const ok = task.task.status === 'COMPLETED' && value?.operation === 'APPROVE_REVIEWED_CANDIDATE';
+    return { success: ok, message: ok ? 'CORE経由でCandidate適用を完了しました。' : String(value?.summary || value?.error || 'CORE承認適用が完了しませんでした。'), taskId: task.task.taskId };
+  }
+
   readonly coreResults = coreResultService;
 }
 

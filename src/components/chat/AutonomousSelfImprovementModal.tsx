@@ -302,11 +302,11 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
 
   const handleToggleAutopilot = () => {
     if (config.enabled) {
-      autonomousContinuousEvolutionService.stopAutopilot();
+      void typedImprovementUiGatewayService.saveAutonomyConfig({ enabled: false });
       setConfig((c) => ({ ...c, enabled: false }));
       setNotice('自動巡回モードを停止しました');
     } else {
-      autonomousContinuousEvolutionService.startAutopilot();
+      void typedImprovementUiGatewayService.saveAutonomyConfig({ enabled: true });
       setConfig((c) => ({ ...c, enabled: true }));
       setNotice('🚀 自動巡回モードを起動しました！バックグラウンドで自己コード改善を継続します');
     }
@@ -1470,7 +1470,7 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
                     value={config.intervalMinutes}
                     onChange={(e) => {
                       const val = Math.min(10080, Math.max(60, Number(e.target.value) || 360));
-                      autonomousContinuousEvolutionService.saveConfig({ intervalMinutes: val });
+                      void typedImprovementUiGatewayService.saveAutonomyConfig({ intervalMinutes: val });
                       setConfig((c) => ({ ...c, intervalMinutes: val }));
                     }}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200"
@@ -1498,7 +1498,7 @@ export const AutonomousSelfImprovementModal: React.FC<AutonomousSelfImprovementM
                     value={config.autoHealLimit}
                     onChange={(e) => {
                       const val = Number(e.target.value);
-                      autonomousContinuousEvolutionService.saveConfig({ autoHealLimit: val });
+                      void typedImprovementUiGatewayService.saveAutonomyConfig({ autoHealLimit: val });
                       setConfig((c) => ({ ...c, autoHealLimit: val }));
                     }}
                     className="w-full accent-purple-500"

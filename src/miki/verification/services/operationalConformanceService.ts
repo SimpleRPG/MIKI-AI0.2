@@ -6,6 +6,8 @@
  *
  * 外部モデルや任意コード実行には依存しない。
  */
+import { EvidenceService } from '../../memory/services/evidenceService';
+
 const now=()=>Date.now();
 const hash=(s:string)=>{let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(16).padStart(8,'0')};
 const clone=<T>(v:T):T=>JSON.parse(JSON.stringify(v));
@@ -30,7 +32,13 @@ export interface EnvironmentSnapshot { id:string; kind:string; signature:string;
 export interface SimulationRecord { id:string; traceId:string; simulatedAt:number; dependencies:EnvironmentSnapshot[]; validity:SimulationValidity; impactedTests:string[]; createdAt:number; }
 
 export interface CausalEvent { id:string; traceId:string; kind:'ANSWER'|'ARTIFACT_USE'|'FOLLOWUP'|'CORRECTION'|'GOAL_RESULT'; ref:string; value:number; createdAt:number; }
-export interface CausalAssessment { traceId:string; candidate:string; treatmentEffect:number; counterfactualEffect:number; attributionRisk:number; conclusion:'SUPPORTED'|'INCONCLUSIVE'|'REJECTED'; createdAt:number; }
+export type CausalVerificationStatus='UNVERIFIED'|'VERIFIED'|'REJECTED';
+export interface CausalAssessment {
+ traceId:string; candidate:string; treatmentEffect:number; counterfactualEffect:number; attributionRisk:number;
+ conclusion:'SUPPORTED'|'INCONCLUSIVE'|'REJECTED'; verificationStatus:CausalVerificationStatus;
+ evidenceIds:string[]; capabilityIds:string[]; knowledgeRefs:string[]; strategyRefs:string[]; decisionRefs:string[]; actionRefs:string[];
+ verifiedAt?:number; createdAt:number;
+}
 
 export type Realization='RULE'|'SEARCH'|'CLASSIFIER'|'SOLVER'|'COMPOSITION'|'SPECIALIST_MODEL';
 export interface RealizationOption { capability:string; method:Realization; proofScore:number; costScore:number; observedSuccess:number; status:'CANDIDATE'|'SELECTED'|'BLOCKED'; reason:string; }
@@ -61,7 +69,9 @@ class OperationalConformanceService {
  listSimulations(){return clone([...this.simulations.values()]);}
 
  addCausalEvent(x:Omit<CausalEvent,'id'|'createdAt'>){const r={...x,id:id('cause'),createdAt:now()};this.causal.push(r);return clone(r);}
- assessCausal(input:{traceId:string;candidate:string;treatment:number;counterfactual:number;confounders?:number}){const effect=input.treatment-input.counterfactual;const risk=Math.max(0,Math.min(1,input.confounders??.3));const conclusion:'SUPPORTED'|'INCONCLUSIVE'|'REJECTED'=Math.abs(effect)>=.2&&risk<.5?'SUPPORTED':Math.abs(effect)<.1||risk>=.7?'REJECTED':'INCONCLUSIVE';const r:CausalAssessment={traceId:input.traceId,candidate:input.candidate,treatmentEffect:input.treatment,counterfactualEffect:input.counterfactual,attributionRisk:risk,conclusion,createdAt:now()};this.assessments.unshift(r);return clone(r);}
+ assessCausal(input:{traceId:string;candidate:string;treatment:number;counterfactual:number;confounders?:number;evidenceIds?:string[];capabilityIds?:string[];knowledgeRefs?:string[];strategyRefs?:string[];decisionRefs?:string[];actionRefs?:string[]}){const effect=input.treatment-input.counterfactual;const risk=Math.max(0,Math.min(1,input.confounders??.3));const conclusion:'SUPPORTED'|'INCONCLUSIVE'|'REJECTED'=Math.abs(effect)>=.2&&risk<.5?'SUPPORTED':Math.abs(effect)<.1||risk>=.7?'REJECTED':'INCONCLUSIVE';const r:CausalAssessment={traceId:input.traceId,candidate:input.candidate,treatmentEffect:input.treatment,counterfactualEffect:input.counterfactual,attributionRisk:risk,conclusion,verificationStatus:'UNVERIFIED',evidenceIds:[...(input.evidenceIds||[])],capabilityIds:[...(input.capabilityIds||[])],knowledgeRefs:[...(input.knowledgeRefs||[])],strategyRefs:[...(input.strategyRefs||[])],decisionRefs:[...(input.decisionRefs||[])],actionRefs:[...(input.actionRefs||[])],createdAt:now()};this.assessments.unshift(r);return clone(r);}
+ verifyCausalAssessment(input:{traceId:string;candidate:string;evidenceIds:string[]}):{ok:boolean;reason:string;assessment?:CausalAssessment}{const row=this.assessments.find(x=>x.traceId===input.traceId&&x.candidate===input.candidate);if(!row)return {ok:false,reason:'CAUSAL_ASSESSMENT_NOT_FOUND'};if(row.conclusion!=='SUPPORTED')return {ok:false,reason:'CAUSAL_ASSESSMENT_NOT_SUPPORTED',assessment:clone(row)};const ids=[...new Set((input.evidenceIds||[]).filter(Boolean))];if(!ids.length)return {ok:false,reason:'CAUSAL_VERIFICATION_EVIDENCE_REQUIRED',assessment:clone(row)};const records=ids.map(id0=>EvidenceService.getInstance().getEvidence(id0));const invalid=records.some(record=>!record||record.status==='REJECTED'||record.metadata?.verification_status!=='VERIFIED');if(invalid)return {ok:false,reason:'CAUSAL_VERIFICATION_EVIDENCE_NOT_VERIFIED',assessment:clone(row)};row.verificationStatus='VERIFIED';row.evidenceIds=ids;row.verifiedAt=now();return {ok:true,reason:'CAUSAL_ASSESSMENT_VERIFIED',assessment:clone(row)};}
+ listVerifiedCausalAssessments(traceId?:string){return clone(this.assessments.filter(x=>x.verificationStatus==='VERIFIED'&&x.conclusion==='SUPPORTED'&&(!traceId||x.traceId===traceId)));}
  listCausal(){return clone(this.assessments);}
 
  selectRealization(capability:string,options:Array<Omit<RealizationOption,'status'|'reason'>>){const normalized:RealizationOption[]=options.map(x=>({...x,status:'CANDIDATE' as const,reason:''})).map(x=>(x.method as string)==='LOCAL_MODEL'?{...x,status:'BLOCKED' as const,reason:'LOCAL_LLM_RUNTIME_RETIRED'}:x);const eligible=normalized.filter(x=>x.proofScore>=.7);if(!eligible.length)return {capability,status:'BLOCKED',options:clone(normalized),reason:'NO_PROVEN_REALIZATION'};const selected=[...eligible].sort((a,b)=>(b.proofScore+b.observedSuccess-b.costScore)-(a.proofScore+a.observedSuccess-a.costScore))[0];for(const x of normalized)x.status=x===selected?'SELECTED':'BLOCKED';for(const x of normalized)x.reason=x===selected?'best_proven_cost_adjusted':'insufficient proof or dominated cost';this.realization.push(...normalized);return {capability,status:'SELECTED',selected:clone(selected),options:clone(normalized)};}

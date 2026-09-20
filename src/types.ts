@@ -289,6 +289,9 @@ export interface WebSearchResultItem {
   source: string;
   relevanceScore?: number;
   publishedDate?: string;
+  sourceId?: string;
+  independenceClusterId?: string;
+  claimText?: string;
 }
 
 export interface AutonomousSearchLearningRecord {
@@ -896,6 +899,121 @@ export interface ConversationCorrectionEvent {
   timestamp: number;
 }
 
+export type ConversationUnderstandingLevel =
+  | 'NOVICE'
+  | 'INTERMEDIATE'
+  | 'ADVANCED'
+  | 'VERIFICATION_FOCUSED'
+  | 'UNKNOWN';
+
+export interface ConversationExplanationAdaptation {
+  understandingLevel: ConversationUnderstandingLevel;
+  selectedDetailLevel: ResponseLength;
+  confidence: number;
+  evidence: string[];
+  reason: string;
+  inferredAt: number;
+}
+
+export type ConversationGoalStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' | 'BLOCKED';
+
+export interface ConversationGoalRecord {
+  goalId: string;
+  goal: string;
+  status: ConversationGoalStatus;
+  revision: number;
+}
+
+export interface ConversationGoalProgress {
+  activeGoalId: string;
+  activeGoal: string;
+  status: ConversationGoalStatus;
+  completedConditions: string[];
+  remainingConditions: string[];
+  blockedConditions: string[];
+  latestUserInstruction: string;
+  pendingActions: string[];
+  previousGoals: ConversationGoalRecord[];
+  revision: number;
+}
+
+export type ConversationUnresolvedState='UNKNOWN'|'INSUFFICIENT_EVIDENCE'|'CAPABILITY_MISSING'|'PERMISSION_DENIED'|'EXECUTION_FAILED'|'WAITING_EXTERNAL'|'PENDING_USER_INPUT';
+export interface ConversationTurnDependency{turnKey:string;dependsOnGoalId?:string;dependsOnEntity?:string;dependsOnTaskId?:string;dependsOnClaimIds:string[];dependsOnMemoryIds:string[];referenceConfidence:'unique'|'ambiguous'|'unresolved';}
+export interface DialogueRepairState{required:boolean;reason?:string;invalidatedTargets:string[];repairRevision:number;}
+
+export type ConversationOutcomeKind='RESOLVED'|'NEEDS_MORE_EXPLANATION'|'MISUNDERSTOOD'|'CORRECTED'|'NEGATIVE_FEEDBACK'|'TOPIC_CHANGED'|'UNRESOLVED';
+export type ConversationQualityCause='intent_error'|'reference_error'|'context_loss'|'memory_retrieval_error'|'knowledge_gap'|'evidence_weakness'|'reasoning_error'|'constraint_violation'|'execution_error'|'surface_wording_error';
+export type ConversationKnowledgeState='MEANING_UNCLEAR'|'UNDERSTOOD_KNOWLEDGE_MISSING'|'UNDERSTOOD_CAPABILITY_MISSING'|'UNDERSTOOD_PERMISSION_DENIED'|'EXECUTED_UNVERIFIED'|'VERIFIED_ENVIRONMENT_MISMATCH'|'UNDERSTOOD_AND_KNOWN';
+export type ConversationCorrectionScope='TURN_ONLY'|'CONVERSATION'|'TOPIC'|'TASK'|'GLOBAL_PREFERENCE';
+export interface ConversationClarificationControl{askedCount:number;maxQuestions:number;lastQuestionKey?:string;waitingForUser:boolean;}
+export interface ConversationCompletenessAssessment{requestedItems:string[];addressedItems:string[];missingItems:string[];complete:boolean;}
+export interface ConversationOutcomeAssessment{outcome:ConversationOutcomeKind;causes:ConversationQualityCause[];goalCompleted:boolean;factualGroundingVerified:boolean;constraintSatisfied:boolean;surfaceQuality:'GOOD'|'NEEDS_REPAIR'|'UNKNOWN';}
+export type ConversationTemporalReferenceKind='EXPLICIT_DATE'|'RELATIVE_DATE'|'RELATIVE_SEQUENCE'|'STATE_BEFORE'|'STATE_AFTER'|'STATE_CURRENT'|'STATE_OLD'|'STATE_NEW';
+export interface ConversationTemporalAnchor{kind:ConversationTemporalReferenceKind;phrase:string;normalized:string;dayOffset?:number;statePhase?:'BEFORE'|'AFTER'|'CURRENT'|'OLD'|'NEW'|'SEQUENCE';}
+export interface ConversationTemporalContext{referenceDate:string;anchors:ConversationTemporalAnchor[];activeDateKey?:string;activeStatePhase?:'BEFORE'|'AFTER'|'CURRENT'|'OLD'|'NEW'|'SEQUENCE';revision:number;conflicts:string[];}
+export interface ConversationTemporalConsistencyReport{passed:boolean;conflicts:string[];normalizedTimeKeys:string[];normalizedStateKeys:string[];}
+
+export type PotentialUnknownBasis =
+  | 'KNOWLEDGE_SCOPE_EDGE'
+  | 'CAPABILITY_VARIANT'
+  | 'FAILURE_BOUNDARY'
+  | 'ENVIRONMENT_VARIANT'
+  | 'COMBINATION_GAP';
+
+export interface PotentialUnknownCandidate {
+  id: string;
+  question: string;
+  basis: PotentialUnknownBasis[];
+  evidence: string[];
+  confidence: number;
+  status: 'CANDIDATE' | 'PROMOTED' | 'DISCARDED';
+  generatedAt: number;
+  promotedGapId?: string;
+}
+
+export type ConversationAnswerChangeCause =
+  | 'KNOWLEDGE_CHANGED'
+  | 'EVIDENCE_CHANGED'
+  | 'CAPABILITY_CHANGED'
+  | 'EXPERIENCE_CHANGED'
+  | 'STRATEGY_CHANGED'
+  | 'DECISION_CHANGED'
+  | 'SURFACE_CHANGED'
+  | 'UNATTRIBUTED_CHANGE';
+
+export interface ConversationAnswerDecisionSnapshot {
+  inputKey: string;
+  decisionFingerprint: string;
+  answerFingerprint: string;
+  knowledgeRefs: string[];
+  evidenceRefs: string[];
+  capabilityRefs: string[];
+  experienceRefs: string[];
+  strategyRefs: string[];
+  decisionRefs: string[];
+  capturedAt: number;
+}
+
+export interface ConversationAnswerChangeExplanation {
+  sameInput: boolean;
+  changed: boolean;
+  causes: ConversationAnswerChangeCause[];
+  changedReferences: {
+    knowledge: string[];
+    evidence: string[];
+    capability: string[];
+    experience: string[];
+    strategy: string[];
+    decision: string[];
+  };
+  previousSnapshotAt?: number;
+  currentSnapshotAt: number;
+  previousAnswerFingerprint?: string;
+  currentAnswerFingerprint: string;
+  explanation: string;
+  confidence: number;
+}
+
 export interface ConversationState {
   currentTopic: string;
   topLevelGoal: string;
@@ -905,8 +1023,28 @@ export interface ConversationState {
   invalidatedAssumptions: string[];
   pendingQuestions: string[];
   expectedResponseLength: ResponseLength;
+  /** ユーザー理解度に応じた説明量適応の判断証跡 */
+  explanationAdaptation?: ConversationExplanationAdaptation;
   recentEntities?: string[];
   updatedAt: number;
+  /** 106/119: 会話Goalの継続追跡。別Goalへ移った場合もpreviousGoalsへ保持する。 */
+  goalProgress?: ConversationGoalProgress;
+  unresolvedState?: ConversationUnresolvedState;
+  turnDependencies?: ConversationTurnDependency[];
+  dialogueRepair?: DialogueRepairState;
+  clarificationPending?: boolean;
+  conversationOutcome?: ConversationOutcomeAssessment;
+  knowledgeState?: ConversationKnowledgeState;
+  correctionScope?: ConversationCorrectionScope;
+  clarificationControl?: ConversationClarificationControl;
+  conversationCompleteness?: ConversationCompletenessAssessment;
+  temporalContext?: ConversationTemporalContext;
+  /** 15: 同一入力への前回判断・回答を再現比較するための共有スナップショット */
+  lastAnswerDecisionSnapshot?: ConversationAnswerDecisionSnapshot;
+  /** 15: 間に別入力が挟まっても、直近の同一入力を比較できる小さな履歴 */
+  answerDecisionHistory?: ConversationAnswerDecisionSnapshot[];
+  /** 15: 学習・知識・能力・戦略の変化による回答差分の説明 */
+  lastAnswerChangeExplanation?: ConversationAnswerChangeExplanation;
   /** 直前の非LLM中核の応答結果状態 */
   lastResultStatus?: 'RESOLVED' | 'UNRESOLVED' | 'NEEDS_CONFIRMATION';
   /** 直前のユーザープロンプト */
@@ -3496,6 +3634,17 @@ export type StrategyOutcomeSignal =
   | 'disengaged'              // 返信が極端に短い、または話題が変わった
   | 'neutral_continuation';   // 通常の継続
 
+export interface AnswerSentenceProvenance {
+  sentenceId: string;
+  kind: 'CONCLUSION' | 'REASON' | 'CONDITION' | 'EXCEPTION' | 'NEXT_ACTION';
+  text: string;
+  claimIds: string[];
+  evidenceIds: string[];
+  verificationOutcomes: string[];
+  verified: boolean;
+  reason: string;
+}
+
 export interface AnswerContentIR {
   ir_id: string;
   conclusion: string;
@@ -3509,6 +3658,7 @@ export interface AnswerContentIR {
   interaction_mode: 'NORMAL' | 'CODE_DELIVERY' | 'TROUBLESHOOTING' | 'SAFETY_GATE';
   world_scope: ClaimWorld;
   strategy?: ConversationStrategy;
+  provenance?: AnswerSentenceProvenance[];
 }
 
 /** 13.4 意味保持検査 (Semantic Preservation Inspection) */
@@ -3617,6 +3767,8 @@ export interface CompiledRequestType {
   rollbackRequirement: boolean;
   canExecuteDeterministically: boolean;
   compiledAt: number;
+  /** P1: 複数意図を既存要求型内で保持する。 */
+  intentPlan?: import('./miki/unknown/services/multiIntentDecompositionService').MultiIntentPlan;
 }
 
 /**

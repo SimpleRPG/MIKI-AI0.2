@@ -363,11 +363,19 @@ class MikiSelfCodingSuperchargerService {
   public async runAutonomousImplementation(
     prompt: string,
     targetFileHint?: string,
-    autoApply: boolean = true,
+    autoApply: boolean = false,
     codeOverride?: string,
-    localLlmEndpoint?: string,
-    localLlmModel?: string
+    authority: 'NONE' | 'CORE_PROMOTION' = 'NONE'
   ): Promise<SelfImplementationResult> {
+    if (autoApply && authority !== 'CORE_PROMOTION') {
+      const targetPath = targetFileHint || 'src/autonomous_modules/pending_review.ts';
+      return {
+        success: false, prompt, targetFile: targetPath, isNewFile: false, applied: false,
+        syntaxCheckPassed: false, reasoning: 'CORE_PROMOTION_AUTHORITY_REQUIRED', code: '',
+        linesCount: 0, generationMethod: 'fallback_template', isRequirementImplemented: false,
+        error: 'CORE_PROMOTION_AUTHORITY_REQUIRED',
+      };
+    }
     const res = await callSelfCodeApi<SelfImplementationResult>('/api/self-code/autonomous-implement', {
       method: 'POST',
       body: {
@@ -375,8 +383,7 @@ class MikiSelfCodingSuperchargerService {
         targetFileHint,
         autoApply,
         codeOverride,
-        localLlmEndpoint,
-        localLlmModel,
+        authority,
       },
     });
     if (isApiFailure(res)) {

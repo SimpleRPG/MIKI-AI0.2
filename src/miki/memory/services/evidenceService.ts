@@ -5,7 +5,7 @@ import type { WebFetchMethod } from '../../../types';
 
 const EVIDENCE_STORAGE_KEY = 'miki_evidence_db_v1';
 
-export type EvidenceKind = 'WEB' | 'USER_OBSERVATION' | 'EXECUTION' | 'DOCUMENT' | 'CLOUD_AI';
+export type EvidenceKind = 'WEB' | 'USER_OBSERVATION' | 'USER_CLAIM' | 'EXECUTION' | 'DOCUMENT' | 'CLOUD_AI';
 export type EvidenceStatus = 'DISCOVERED' | 'ADMISSIBLE' | 'REJECTED';
 
 export interface EvidenceRecord {
@@ -46,6 +46,11 @@ export interface EvidenceRecord {
     content_sha256?: string;
     verification_status?: 'VERIFIED' | 'REJECTED' | 'UNVERIFIED';
     fetch_method?: WebFetchMethod;
+    trust_boundary?: 'UNTRUSTED_EXTERNAL_WEB' | 'UNTRUSTED_EXTERNAL_AI' | 'LOCAL_EXECUTION';
+    external_bundle_id?: string;
+    prompt_sha256?: string;
+    response_sha256?: string;
+    replay_key?: string;
   };
 }
 
@@ -113,10 +118,41 @@ export class EvidenceService {
   }
 
   /**
+   * 116: ユーザー発言そのものを「USER_CLAIM Evidence」として保存する。
+   * USER_CLAIMはユーザーがそう述べたという事実の証跡であり、客観的事実の検証結果ではない。
+   */
+  public recordUserClaimEvidence(input: {
+    title: string;
+    statement: string;
+    sourceId?: string;
+    metadata?: EvidenceRecord['metadata'];
+  }): EvidenceRecord {
+    const now = Date.now();
+    const evidence_id = `EVD-${String(this.counter++).padStart(6, '0')}`;
+    const sourceId = input.sourceId || `user_claim_${now}`;
+    const record: EvidenceRecord = {
+      evidence_id,
+      kind: 'USER_CLAIM',
+      status: 'DISCOVERED',
+      title: input.title.trim() || 'User claim',
+      snippet: input.statement.trim(),
+      source: 'user_claim',
+      source_id: sourceId,
+      independence_cluster_id: `cluster_user_claim_${sourceId}`,
+      created_at: now,
+      claim_ids: [],
+      metadata: input.metadata,
+    };
+    this.records.set(evidence_id, record);
+    this.save();
+    return { ...record, claim_ids: [...record.claim_ids] };
+  }
+
+  /**
    * EvidenceからClaimを発見状態で登録する。
    * SUPPORTED / DEVICE_VERIFIEDへの昇格はここでは行わない。
    */
-  public recordCloudAiEvidence(input: { title: string; snippet: string; source: string; sourceId?: string; independenceClusterId?: string; }): EvidenceRecord {
+  public recordCloudAiEvidence(input: { title: string; snippet: string; source: string; sourceId?: string; independenceClusterId?: string; metadata?: EvidenceRecord['metadata']; }): EvidenceRecord {
     const now = Date.now();
     const evidence_id = `EVD-${String(this.counter++).padStart(6, '0')}`;
     const record: EvidenceRecord = {
@@ -130,6 +166,7 @@ export class EvidenceService {
       independence_cluster_id: input.independenceClusterId || `cluster_cloud_ai_${input.source}`,
       created_at: now,
       claim_ids: [],
+      metadata: input.metadata,
     };
     this.records.set(evidence_id, record);
     this.save();

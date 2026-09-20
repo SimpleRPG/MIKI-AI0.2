@@ -7,7 +7,7 @@ import { domainContractRegistryService } from './domainContractRegistryService';
 
 export type DomainCommand =
   | 'HEALTH_CHECK' | 'DESCRIBE' | 'ANALYZE_TEXT' | 'RESOLVE_UNKNOWN' | 'RUN_RESEARCH'
-  | 'RUN_SELF_IMPROVEMENT' | 'GENERATE_CANDIDATE' | 'CREATE_REVIEW_PACKAGE' | 'PLAN_PENDING_IMPROVEMENT_RUN' | 'RESOLVE_CAPABILITY_GAPS' | 'DISCOVER_IMPROVEMENT_ISSUE' | 'GET_STATUS' | 'FLUSH' | 'VALIDATE_CANDIDATE' | 'ASSESS_DOMAIN' | 'PARTICIPATE' | 'VERIFY_CONNECTION';
+  | 'RUN_SELF_IMPROVEMENT' | 'SAVE_AUTONOMY_CONFIG' | 'GENERATE_CANDIDATE' | 'CREATE_REVIEW_PACKAGE' | 'PLAN_PENDING_IMPROVEMENT_RUN' | 'RESOLVE_CAPABILITY_GAPS' | 'DISCOVER_IMPROVEMENT_ISSUE' | 'LEARN_FROM_CORE_RESULT' | 'GET_STATUS' | 'FLUSH' | 'VALIDATE_CANDIDATE' | 'ASSESS_DOMAIN' | 'PARTICIPATE' | 'VERIFY_CONNECTION';
 
 export interface DomainEnvelope {
   envelopeId: string;
@@ -71,6 +71,8 @@ class DomainRouterService {
   async dispatch(envelope:DomainEnvelope):Promise<DomainReply>{
     const envelopeValidation=domainContractRegistryService.validateEnvelope(envelope);
     if(!envelopeValidation.valid)return {accepted:false,domain:envelope.target,command:envelope.command,error:`DOMAIN_ENVELOPE_CONTRACT_FAILED:${envelopeValidation.reasons.join('|')}`,completedAt:Date.now(),normalized:{status:'REJECTED',operationClass:'DIAGNOSTIC',command:envelope.command,summary:'Domain envelope contract rejected',data:{contractSha256:envelopeValidation.contractSha256,reasons:envelopeValidation.reasons},evidenceIds:[],retryable:false}};
+    const coreOnlyDiagnostics=new Set<DomainCommand>(['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION']);
+    if(envelope.source!=='core'&&!coreOnlyDiagnostics.has(envelope.command))return this.finish(envelope,{accepted:false,domain:envelope.target,command:envelope.command,error:'CORE_ONLY_BUSINESS_ROUTING',completedAt:Date.now()});
     const resourceBlocked=(envelope.command==='RUN_SELF_IMPROVEMENT'||envelope.command==='RUN_RESEARCH'||envelope.command==='VALIDATE_CANDIDATE')&&!resourceGovernanceService.canRunComponentTests();
     if(resourceBlocked)return this.finish(envelope,{accepted:false,domain:envelope.target,command:envelope.command,error:'RESOURCE_GOVERNANCE_BLOCKED',completedAt:Date.now()});
     const governance=governanceKernelService.inspect(envelope);

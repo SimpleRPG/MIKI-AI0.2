@@ -1,7 +1,8 @@
-import { ConversationState, ConversationStage, ResponseLength, DialogueAct, FeedbackStage } from '../../../types';
+import { ConversationState, ConversationStage, ResponseLength, DialogueAct, FeedbackStage, ConversationExplanationAdaptation, ConversationUnderstandingLevel, ConversationGoalStatus } from '../../../types';
 import { systemLogger } from '../../../services/systemLogger';
 import { anaphoraHistoryStack } from '../../../autonomous_modules/anaphora_history_stack';
 import { resolveAnaphoraPure } from '../../../autonomous_modules/anaphora_resolver_sample';
+import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 
 /**
  * 作業指示書 v6 優先度9: 会話状態JSON指示 (超軽量版)
@@ -19,6 +20,74 @@ export const CONVERSATION_STATE_INSTRUCTION = `回答前に会話状態を最小
  * 「ただいま」「おはよう」「うん」などの挨拶・相槌・声かけを検出し、
  * 重いRAG検索や不要な骨格注入、スキル誤爆を完全に防止する。
  */
+export function inferUserUnderstandingLevel(
+  userPrompt: string,
+  state?: ConversationState | null,
+): { level: ConversationUnderstandingLevel; confidence: number; evidence: string[] } {
+  const text = (userPrompt || '').trim();
+  const evidence: string[] = [];
+  let score = 0;
+
+  const noviceMarkers = /初心者|初めて|よくわからない|わからない|分からない|意味がわから|かんたんに|簡単に|基礎から|一から説明/i;
+  const verificationMarkers = /根拠|証拠|検証|確認|公式|仕様|正確|厳密|再現|反証|ソース/i;
+  const advancedMarkers = /TypeScript|JavaScript|Gradle|GitHub|API|JSON|SQL|Vite|React|Kotlin|Android|commit|push|branch|interface|class|function|CognitiveState|CORE|Blackboard|Evidence|Claim|Repository|APK|Termux/i;
+  const deepTechnicalMarkers = /アーキテクチャ|依存関係|型定義|実装|パッチ|リファクタ|ビルド|コンパイル|デバッグ|スタック|レイヤ|スキーマ/i;
+
+  if (noviceMarkers.test(text)) { score -= 3; evidence.push('初心者・意味確認・基礎説明の明示'); }
+  if (verificationMarkers.test(text)) { score += 3; evidence.push('根拠・検証・正確性を重視する発言'); }
+  if (advancedMarkers.test(text)) { score += 3; evidence.push('高度な技術用語・開発用語を使用'); }
+  if (deepTechnicalMarkers.test(text)) { score += 2; evidence.push('実装・構造・デバッグ等の技術文脈'); }
+  if ((state?.corrections?.length || 0) >= 2) { score += 1; evidence.push('過去の訂正履歴が複数あり、会話内容を精密に扱っている'); }
+  if (state?.stage === 'CAUSALITY' || state?.stage === 'CONDITIONAL') { score += 1; evidence.push(`現在の会話段階=${state.stage}`); }
+
+  if (verificationMarkers.test(text) && score >= 3) {
+    return { level: 'VERIFICATION_FOCUSED', confidence: Math.min(0.95, 0.72 + Math.abs(score) * 0.05), evidence };
+  }
+  if (noviceMarkers.test(text) && score <= -2) {
+    return { level: 'NOVICE', confidence: Math.min(0.95, 0.78 + Math.abs(score) * 0.04), evidence };
+  }
+  if (score >= 4) return { level: 'ADVANCED', confidence: Math.min(0.92, 0.70 + score * 0.04), evidence };
+  if (score <= -3) return { level: 'NOVICE', confidence: Math.min(0.92, 0.72 + Math.abs(score) * 0.04), evidence };
+  if (text.length === 0 && !state) return { level: 'UNKNOWN', confidence: 0.2, evidence: ['入力情報不足'] };
+  return { level: 'INTERMEDIATE', confidence: 0.58, evidence: evidence.length ? evidence : ['明確な理解度シグナルなし'] };
+}
+
+export function adaptExplanationDetailLevel(
+  userPrompt: string,
+  state: ConversationState | null | undefined,
+  baseLength: ResponseLength,
+): ConversationExplanationAdaptation {
+  const inferred = inferUserUnderstandingLevel(userPrompt, state);
+  const text = (userPrompt || '').trim();
+  const explicitShort = /短く|簡潔に|一言で|ひとことで|要点だけ|結論だけ|手短に|サクッと|1行で|3行で/i.test(text);
+  const explicitDetailed = /詳しく|詳細に|具体的に|理由も|ステップバイステップ|徹底解説|深く教えて|背景/i.test(text);
+
+  let selectedDetailLevel: ResponseLength = baseLength;
+  let reason = `理解度=${inferred.level}を推定。`;
+  if (explicitShort || baseLength === 'short') {
+    selectedDetailLevel = 'short';
+    reason += '明示的または既存の短文制約を優先。';
+  } else if (explicitDetailed || baseLength === 'detailed') {
+    selectedDetailLevel = 'detailed';
+    reason += '明示的または既存の詳細説明要求を優先。';
+  } else {
+    if (inferred.level === 'NOVICE' || inferred.level === 'VERIFICATION_FOCUSED') selectedDetailLevel = 'detailed';
+    else selectedDetailLevel = 'standard';
+    reason += selectedDetailLevel === 'detailed'
+      ? '初学者には前提・理由を補い、検証重視なら根拠を厚くする。'
+      : '経験者向けでも中核説明を省略しすぎない標準量を維持。';
+  }
+
+  return {
+    understandingLevel: inferred.level,
+    selectedDetailLevel,
+    confidence: inferred.confidence,
+    evidence: inferred.evidence,
+    reason,
+    inferredAt: Date.now(),
+  };
+}
+
 export function isCasualGreetingOrShortSocial(prompt: string): boolean {
   if (!prompt) return false;
   const p = prompt.trim();
@@ -282,7 +351,311 @@ export function evaluateFeedbackStage(
   };
 }
 
+/**
+ * 設計思想106/119/121: 会話全体のGoalを1ターン単位の質問へ分断せず、
+ * 同じConversationState内で継続追跡する決定論的ヘルパー。
+ * 新しいGoal/Task DBは作らず、既存ConversationStateへ状態を保持する。
+ */
+export function updateConversationGoalProgress(
+  state: ConversationState,
+  userPrompt: string,
+  previousState: ConversationState | null,
+): ConversationState {
+  const text = String(userPrompt || '').trim();
+  const previous = previousState?.goalProgress;
+  const previousGoal = previous?.activeGoal || previousState?.topLevelGoal || '';
+  const isTopicShift = state.stage === 'TOPIC_CHANGE';
+  const isCancel = /(?:やめて|中止|キャンセル|取り消し)/i.test(text);
+  const isPause = /(?:いったん置|後で|あとで|保留|一旦保留)/i.test(text);
+  const actionMatches = text.match(/(?:調べ(?:て|る)?|検索(?:して|する)?|確認(?:して|する)?|修正(?:して|する)?|直(?:して|す)|実装(?:して|する)?|作(?:って|る)|テスト(?:して|する)?|検証(?:して|する)?|説明(?:して|する)?|比較(?:して|する)?|作成(?:して|する)?)/g) || [];
+  const pendingActions = [...new Set(actionMatches.map(v => v.trim()))].slice(0, 8);
+
+  let activeGoal = previousGoal;
+  let activeGoalId = previous?.activeGoalId || '';
+  let previousGoals = [...(previous?.previousGoals || [])];
+
+  const explicitGoal = String(state.topLevelGoal || '').trim();
+  const goalCandidate = isTopicShift && (!explicitGoal || explicitGoal === previousGoal)
+    ? (state.currentTopic || text)
+    : explicitGoal;
+  const shouldCreateGoal = Boolean(
+    goalCandidate &&
+    (!activeGoal || isTopicShift || (previousGoal && goalCandidate !== previousGoal && state.stage !== 'FOLLOW_UP'))
+  );
+
+  if (shouldCreateGoal) {
+    if (activeGoal && activeGoalId) {
+      previousGoals.push({
+        goalId: activeGoalId,
+        goal: activeGoal,
+        status: isTopicShift ? 'PAUSED' : (previous?.status || 'ACTIVE'),
+        revision: previous?.revision || 1,
+      });
+      previousGoals = previousGoals.slice(-8);
+    }
+    activeGoal = goalCandidate;
+    activeGoalId = `CG-${canonicalSha256({ goal: activeGoal, topic: state.currentTopic || '', seed: 'conversation-goal-v204' }).slice(0, 20)}`;
+  }
+
+  if (!activeGoal) {
+    activeGoal = text || state.currentTopic || '未定義の会話Goal';
+    activeGoalId = `CG-${canonicalSha256({ goal: activeGoal, topic: state.currentTopic || '', seed: 'conversation-goal-v204' }).slice(0, 20)}`;
+  }
+
+  const completedConditions = [...(previous?.completedConditions || [])];
+  const priorInstruction = previous?.latestUserInstruction || '';
+  if (previous?.status === 'ACTIVE' && previousState?.lastResultStatus === 'RESOLVED' && priorInstruction) {
+    if (!completedConditions.includes(priorInstruction)) completedConditions.push(priorInstruction);
+  }
+
+  const blockedConditions = [...(previous?.blockedConditions || [])];
+  if (previousState?.lastResultStatus === 'NEEDS_CONFIRMATION' && priorInstruction) {
+    if (!blockedConditions.includes(priorInstruction)) blockedConditions.push(priorInstruction);
+  }
+  if (isCancel && text && !blockedConditions.includes(text)) blockedConditions.push(text);
+
+  let status: ConversationGoalStatus = previous?.status || 'ACTIVE';
+  if (isCancel) status = 'CANCELLED';
+  else if (isPause) status = 'PAUSED';
+  else if (state.lastResultStatus === 'NEEDS_CONFIRMATION') status = 'BLOCKED';
+  else if (state.lastResultStatus === 'RESOLVED' && pendingActions.length === 0 && /(?:完了|できた|解決|ありがとう|助かった)/i.test(text)) status = 'COMPLETED';
+  else status = 'ACTIVE';
+
+  const remainingConditions = pendingActions.length > 0
+    ? pendingActions.filter(action => !completedConditions.includes(action))
+    : (previous?.remainingConditions || []).filter(condition => !completedConditions.includes(condition));
+
+  return {
+    ...state,
+    goalProgress: {
+      activeGoalId,
+      activeGoal,
+      status,
+      completedConditions: [...new Set(completedConditions)].slice(-12),
+      remainingConditions: [...new Set(remainingConditions)].slice(0, 12),
+      blockedConditions: [...new Set(blockedConditions)].slice(-12),
+      latestUserInstruction: text,
+      pendingActions,
+      previousGoals,
+      revision: (previous?.revision || 0) + 1,
+    },
+  };
+}
+
+export function inferConversationCorrectionScope(userPrompt:string):{scope:import('../../../types').ConversationCorrectionScope;confidence:'high'|'medium'}{
+ const text=String(userPrompt||'').trim();
+ if (/(?:今後は|これからは|いつも|常に|毎回|デフォルトで|恒久的に)/i.test(text)) return {scope:'GLOBAL_PREFERENCE',confidence:'high'};
+ if (/(?:このタスク|この作業|今回の作業|このコード|この案件)/i.test(text)) return {scope:'TASK',confidence:'high'};
+ if (/(?:この話|この話題|この件では|このテーマ|この会話の間)/i.test(text)) return {scope:'TOPIC',confidence:'high'};
+ if (/(?:この会話|このチャット|ここでは)/i.test(text)) return {scope:'CONVERSATION',confidence:'medium'};
+ return {scope:'TURN_ONLY',confidence:'medium'};
+}
+export function classifyConversationKnowledgeState(userPrompt:string,state:ConversationState):import('../../../types').ConversationKnowledgeState{
+ const text=String(userPrompt||'').trim(); const anaphora=resolveAnaphora(text,state); const hasReference=/(?:これ|それ|あれ|さっき|前の|どっち|どちら)/.test(text);
+ if(hasReference&&(anaphora.confidence==='ambiguous'||anaphora.confidence==='unresolved')) return 'MEANING_UNCLEAR';
+ switch(state.unresolvedState){case 'CAPABILITY_MISSING':return 'UNDERSTOOD_CAPABILITY_MISSING';case 'PERMISSION_DENIED':return 'UNDERSTOOD_PERMISSION_DENIED';case 'EXECUTION_FAILED':return 'EXECUTED_UNVERIFIED';case 'INSUFFICIENT_EVIDENCE':case 'UNKNOWN':case 'WAITING_EXTERNAL':return 'UNDERSTOOD_KNOWLEDGE_MISSING';case 'PENDING_USER_INPUT':return 'MEANING_UNCLEAR';}
+ if(state.lastResultStatus==='RESOLVED'&&state.lastFalsificationPassed===true) return 'UNDERSTOOD_AND_KNOWN';
+ return state.lastResultStatus==='RESOLVED'?'EXECUTED_UNVERIFIED':'UNDERSTOOD_KNOWLEDGE_MISSING';
+}
+export function clarificationGate(state:ConversationState,questionKey:string,maxQuestions=2):{allowed:boolean;next:ConversationState['clarificationControl']}{
+ const previous=state.clarificationControl||{askedCount:0,maxQuestions,waitingForUser:false}; const normalizedKey=String(questionKey||'').trim(); const sameQuestion=Boolean(normalizedKey&&previous.lastQuestionKey===normalizedKey); const allowed=Boolean(normalizedKey&&!sameQuestion&&previous.askedCount<Math.max(1,previous.maxQuestions||maxQuestions));
+ return {allowed,next:{askedCount:allowed?previous.askedCount+1:previous.askedCount,maxQuestions:previous.maxQuestions||maxQuestions,lastQuestionKey:allowed?normalizedKey:previous.lastQuestionKey,waitingForUser:allowed}};
+}
+export function assessConversationCompleteness(state:ConversationState):import('../../../types').ConversationCompletenessAssessment{
+ const progress=state.goalProgress; const requestedItems=[...new Set([...(progress?.completedConditions||[]),...(progress?.remainingConditions||[]),...(progress?.pendingActions||[])])].filter(Boolean); const addressedItems=[...new Set(progress?.completedConditions||[])].filter(Boolean); const missingItems=[...new Set([...(progress?.remainingConditions||[]),...(progress?.blockedConditions||[])])].filter(Boolean); return {requestedItems,addressedItems,missingItems,complete:requestedItems.length===0||missingItems.length===0};
+}
+
+/**
+ * 設計思想109: 会話内の時間表現・状態表現を決定論的に正規化する。
+ * 相対日付は実行時の端末日付を基準に日付キーへ変換し、
+ * 修正前/修正後・実行前/実行後・旧仕様/現仕様を状態軸として分離する。
+ */
+export function normalizeConversationTemporalReferences(
+  userPrompt: string,
+  nowMs = Date.now(),
+): {
+  referenceDate: string;
+  anchors: import('../../../types').ConversationTemporalAnchor[];
+} {
+  const text = String(userPrompt || '').trim();
+  const base = new Date(nowMs);
+  const dateKey = (offset: number): string => {
+    const d = new Date(base.getTime());
+    d.setDate(d.getDate() + offset);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const anchors: import('../../../types').ConversationTemporalAnchor[] = [];
+  const addRelative = (phrase: string, offset: number) => anchors.push({
+    kind: 'RELATIVE_DATE', phrase, normalized: dateKey(offset), dayOffset: offset,
+  });
+  if (/一昨日/.test(text)) addRelative('一昨日', -2);
+  if (/昨日/.test(text)) addRelative('昨日', -1);
+  if (/(?:今日|本日)/.test(text)) addRelative(text.match(/今日|本日/)?.[0] || '今日', 0);
+  if (/明日/.test(text)) addRelative('明日', 1);
+  if (/明後日/.test(text)) addRelative('明後日', 2);
+
+  const explicit = text.match(/(20\d{2})[\/\-年](\d{1,2})[\/\-月](\d{1,2})日?/);
+  if (explicit) {
+    const [, y, m, d] = explicit;
+    anchors.push({
+      kind: 'EXPLICIT_DATE',
+      phrase: explicit[0],
+      normalized: `${y}-${String(Number(m)).padStart(2, '0')}-${String(Number(d)).padStart(2, '0')}`,
+    });
+  }
+
+  const statePatterns: Array<[
+    RegExp,
+    import('../../../types').ConversationTemporalReferenceKind,
+    import('../../../types').ConversationTemporalAnchor['statePhase']
+  ]> = [
+    [/修正前|実行前/, 'STATE_BEFORE', 'BEFORE'],
+    [/修正後|実行後/, 'STATE_AFTER', 'AFTER'],
+    [/現仕様|現在|現状/, 'STATE_CURRENT', 'CURRENT'],
+    [/旧仕様|以前|従来/, 'STATE_OLD', 'OLD'],
+    [/新仕様|最新状態/, 'STATE_NEW', 'NEW'],
+    [/その後|以後|後から/, 'RELATIVE_SEQUENCE', 'SEQUENCE'],
+  ];
+  for (const [pattern, kind, statePhase] of statePatterns) {
+    const match = text.match(pattern);
+    if (match) anchors.push({ kind, phrase: match[0], normalized: statePhase, statePhase });
+  }
+
+  return { referenceDate: dateKey(0), anchors };
+}
+
+/**
+ * 設計思想109: 直前Stateを上書きして過去状態を失わず、
+ * 現ターンの明示的な時間/状態参照を追加して同一会話軸として追跡する。
+ */
+export function buildConversationTemporalContext(
+  userPrompt: string,
+  state: ConversationState,
+  previousState: ConversationState | null = null,
+  nowMs = Date.now(),
+): import('../../../types').ConversationTemporalContext {
+  const normalized = normalizeConversationTemporalReferences(userPrompt, nowMs);
+  const previous = previousState?.temporalContext || state.temporalContext;
+  const allAnchors = [...(previous?.anchors || []), ...normalized.anchors].slice(-24);
+  const dateKeys = allAnchors
+    .filter((a) => a.kind === 'RELATIVE_DATE' || a.kind === 'EXPLICIT_DATE')
+    .map((a) => a.normalized);
+  const statePhases = allAnchors
+    .filter((a) => Boolean(a.statePhase))
+    .map((a) => a.statePhase as NonNullable<import('../../../types').ConversationTemporalAnchor['statePhase']>);
+  const activeDateKey = dateKeys.length > 0
+    ? dateKeys[dateKeys.length - 1]
+    : previous?.activeDateKey;
+  const activeStatePhase = statePhases.length > 0
+    ? statePhases[statePhases.length - 1]
+    : previous?.activeStatePhase;
+
+  const conflicts: string[] = [];
+  const sameTurnDateKeys = [...new Set(normalized.anchors
+    .filter((a) => a.kind === 'RELATIVE_DATE' || a.kind === 'EXPLICIT_DATE')
+    .map((a) => a.normalized))];
+  const comparisonContext = /比較|比べ|違い|推移|から.*まで|まで.*から|その後|翌日|翌日以降/.test(String(userPrompt || ''));
+  if (sameTurnDateKeys.length > 1 && !comparisonContext) {
+    conflicts.push(`同一発話内で時間基準が複数指定されています: ${sameTurnDateKeys.join(' / ')}`);
+  }
+
+  const statePairs = new Set(statePhases);
+  const hasBefore = statePairs.has('BEFORE') || statePairs.has('OLD');
+  const hasAfter = statePairs.has('AFTER') || statePairs.has('NEW');
+  if (hasBefore && hasAfter && !comparisonContext) {
+    conflicts.push('同一発話内で修正前/修正後または旧仕様/新仕様が比較語なしで混在しています。');
+  }
+
+  return {
+    referenceDate: normalized.referenceDate,
+    anchors: allAnchors,
+    activeDateKey,
+    activeStatePhase,
+    revision: (previous?.revision || 0) + 1,
+    conflicts,
+  };
+}
+
+/**
+ * 設計思想109: 最終回答前に、ユーザーが明示した時間/状態軸と
+ * 生成された表面文の時間/状態軸が直接衝突していないか検査する。
+ * 「比較」「推移」等の明示された比較文脈では両方を許容する。
+ */
+export function verifyConversationEntityTimeStateConsistency(
+  userPrompt: string,
+  answerText: string,
+  state: ConversationState,
+  nowMs = Date.now(),
+): import('../../../types').ConversationTemporalConsistencyReport {
+  const promptNorm = normalizeConversationTemporalReferences(userPrompt, nowMs);
+  const answerNorm = normalizeConversationTemporalReferences(answerText, nowMs);
+  const conflicts = [...promptNorm.anchors.length ? buildConversationTemporalContext(userPrompt, state, state, nowMs).conflicts : []];
+  const promptDates = promptNorm.anchors
+    .filter((a) => a.kind === 'RELATIVE_DATE' || a.kind === 'EXPLICIT_DATE')
+    .map((a) => a.normalized);
+  const answerDates = answerNorm.anchors
+    .filter((a) => a.kind === 'RELATIVE_DATE' || a.kind === 'EXPLICIT_DATE')
+    .map((a) => a.normalized);
+  const promptStates = promptNorm.anchors.filter((a) => Boolean(a.statePhase));
+  const answerStates = answerNorm.anchors.filter((a) => Boolean(a.statePhase));
+  const comparisonContext = /比較|比べ|違い|推移|から.*まで|まで.*から|その後|翌日|翌日以降/.test(`${userPrompt} ${answerText}`);
+
+  if (promptDates.length > 0 && answerDates.length > 0 && !comparisonContext) {
+    const promptPrimary = promptDates[promptDates.length - 1];
+    const differing = answerDates.filter((key) => key !== promptPrimary);
+    if (differing.length > 0) conflicts.push(`回答側の時間基準が依頼時点と異なります: ${promptPrimary} -> ${[...new Set(differing)].join(' / ')}`);
+  }
+
+  const promptState = promptStates[promptStates.length - 1]?.statePhase;
+  const conflictingAnswerStates = answerStates
+    .map((a) => a.statePhase)
+    .filter((phase) => {
+      if (!promptState || !phase) return false;
+      if (promptState === 'BEFORE' || promptState === 'OLD') return phase === 'AFTER' || phase === 'NEW' || phase === 'CURRENT';
+      if (promptState === 'AFTER' || promptState === 'NEW') return phase === 'BEFORE' || phase === 'OLD';
+      if (promptState === 'CURRENT') return phase === 'BEFORE' || phase === 'OLD';
+      return false;
+    });
+  if (conflictingAnswerStates.length > 0 && !comparisonContext) {
+    conflicts.push(`回答側の状態基準が依頼時点と衝突しています: ${promptState} -> ${[...new Set(conflictingAnswerStates)].join(' / ')}`);
+  }
+
+  // Entity guard: explicit anaphora must resolve to the same target before a temporal/state guard can pass.
+  const anaphora = resolveAnaphora(userPrompt, state);
+  const promptHasAnaphora = /(?:これ|それ|あれ|さっき|前の|どっち|どちら)/.test(userPrompt);
+  if (promptHasAnaphora && anaphora.confidence === 'ambiguous') {
+    conflicts.push('参照対象が複数候補のまま時間/状態整合性を確定できません。');
+  }
+
+  const normalizedStateKeys = [
+    ...promptStates.map((a) => a.statePhase).filter(Boolean),
+    ...answerStates.map((a) => a.statePhase).filter(Boolean),
+  ] as string[];
+  return {
+    passed: conflicts.length === 0,
+    conflicts: [...new Set(conflicts)],
+    normalizedTimeKeys: [...new Set([...promptDates, ...answerDates])],
+    normalizedStateKeys: [...new Set(normalizedStateKeys)],
+  };
+}
+
+export interface ConversationConsistencyReport{needsRepair:boolean;unresolvedState?:import('../../../types').ConversationUnresolvedState;reason?:string;turnDependency:import('../../../types').ConversationTurnDependency;repairedState:ConversationState;}
+export function evaluateConversationConsistency(userPrompt:string,state:ConversationState,previousState:ConversationState|null,taskId?:string):ConversationConsistencyReport{
+ const text=String(userPrompt||'').trim(); const anaphora=resolveAnaphora(text,state); const correction=/(?:違う|それじゃない|ではなく|じゃない|間違|誤解|勘違い)/i.test(text); const referenceMentioned=/(?:これ|それ|あれ|さっき|前の|どっち|どちら)/.test(text); const clarificationNeeded=anaphora.confidence==='ambiguous'||(anaphora.confidence==='unresolved'&&referenceMentioned);
+ const unresolvedState: any=state.lastResultStatus==='NEEDS_CONFIRMATION'?'PENDING_USER_INPUT':state.lastResultStatus==='UNRESOLVED'?'UNKNOWN':undefined;
+ const dependency={turnKey:`TURN-${canonicalSha256({prompt:text,goal:state.goalProgress?.activeGoalId||previousState?.goalProgress?.activeGoalId||'',revision:state.goalProgress?.revision||0}).slice(0,20)}`,dependsOnGoalId:state.goalProgress?.activeGoalId||previousState?.goalProgress?.activeGoalId,dependsOnEntity:anaphora.resolved||state.currentTopic||undefined,dependsOnTaskId:taskId,dependsOnClaimIds:state.lastCandidateClaimId?[state.lastCandidateClaimId]:[],dependsOnMemoryIds:[],referenceConfidence:anaphora.confidence};
+ const needsRepair=correction||clarificationNeeded; const reason=correction?'USER_CORRECTION_REQUIRES_DIALOGUE_REPAIR':clarificationNeeded?'REFERENCE_AMBIGUOUS_REQUIRES_RESOLUTION':undefined;
+ const knowledgeState=classifyConversationKnowledgeState(text,state); const correctionScope=correction?inferConversationCorrectionScope(text):undefined; const completeness=assessConversationCompleteness(state);
+ const previousClarification=state.clarificationControl||{askedCount:0,maxQuestions:2,waitingForUser:false};
+ const repairedState={...state,unresolvedState,turnDependencies:[...(previousState?.turnDependencies||[]),dependency].slice(-16),dialogueRepair:{required:needsRepair,reason,invalidatedTargets:correction?[previousState?.currentTopic,previousState?.goalProgress?.activeGoal].filter(Boolean) as string[]:[],repairRevision:(previousState?.dialogueRepair?.repairRevision||0)+(needsRepair?1:0)},clarificationPending:clarificationNeeded,knowledgeState,correctionScope:correction?correctionScope?.scope:state.correctionScope,clarificationControl:{...previousClarification,waitingForUser:clarificationNeeded},conversationCompleteness:completeness,pendingQuestions:correction&&clarificationNeeded?[...new Set([...state.pendingQuestions,'正しい参照対象'])].slice(-5):state.pendingQuestions};
+ return {needsRepair,unresolvedState,reason,turnDependency:dependency,repairedState};
+}
+
 export interface ExtractConversationStateOptions {
+  turnTaskId?: string;
   userPrompt?: string;
   inferredExpectedLength?: ResponseLength;
   stateDurationMs?: number;
@@ -306,6 +679,7 @@ export function extractConversationState(
   visibleText: string;
   stats: StateExtractionStats;
 } {
+  const preserveAnswerChangeState=<T extends ConversationState>(nextState:T):T=>({...nextState,lastAnswerDecisionSnapshot:prevState?.lastAnswerDecisionSnapshot,answerDecisionHistory:prevState?.answerDecisionHistory,lastAnswerChangeExplanation:prevState?.lastAnswerChangeExplanation});
   const match = rawResponse.match(/<state>([\s\S]*?)<\/state>/);
   const visibleText = rawResponse.replace(/<state>[\s\S]*?<\/state>\s*/, '').trim();
 
@@ -329,6 +703,7 @@ export function extractConversationState(
       invalidatedAssumptions: prevState?.invalidatedAssumptions || [],
       pendingQuestions: prevState?.pendingQuestions || [],
       expectedResponseLength: effectiveLength,
+      explanationAdaptation: adaptExplanationDetailLevel(options?.userPrompt || '', prevState, effectiveLength),
       recentEntities: prevState?.recentEntities || (prevState?.currentTopic ? [prevState.currentTopic] : []),
       updatedAt: Date.now(),
     };
@@ -347,7 +722,7 @@ export function extractConversationState(
       `ℹ️ [会話状態(state) 抽出結果] <state>タグなし (出力スキップ) | 文字数: 0字 (0 tok) | 所要時間: ${options?.stateDurationMs ?? 'N/A'}ms | ルールベース推定ステージ: ${fallbackState.stage} | 回答長: ${fallbackState.expectedResponseLength}`
     );
 
-    return { state: fallbackState, visibleText: rawResponse, stats };
+    const goalState=updateConversationGoalProgress(fallbackState, options?.userPrompt||'',prevState); const consistency=evaluateConversationConsistency(options?.userPrompt||'',goalState,prevState,options?.turnTaskId); const repairedState=preserveAnswerChangeState({...consistency.repairedState,temporalContext:buildConversationTemporalContext(options?.userPrompt||'',consistency.repairedState,prevState)}); return { state: repairedState, visibleText: rawResponse, stats };
   }
 
   const rawStateBlock = match[0];
@@ -426,6 +801,7 @@ export function extractConversationState(
       invalidatedAssumptions,
       pendingQuestions,
       expectedResponseLength,
+      explanationAdaptation: adaptExplanationDetailLevel(options?.userPrompt || '', prevState, expectedResponseLength),
       recentEntities,
       updatedAt: Date.now(),
       lastFalsificationPassed: prevState?.lastFalsificationPassed,
@@ -449,7 +825,7 @@ export function extractConversationState(
       { stats, parsedKeys: keysFound }
     );
 
-    return { state, visibleText, stats };
+    const goalState=updateConversationGoalProgress(state, options?.userPrompt||'',prevState); const consistency=evaluateConversationConsistency(options?.userPrompt||'',goalState,prevState,options?.turnTaskId); const repairedState=preserveAnswerChangeState({...consistency.repairedState,temporalContext:buildConversationTemporalContext(options?.userPrompt||'',consistency.repairedState,prevState)}); return { state: repairedState, visibleText, stats };
   } catch (parseErr) {
     // JSON構文エラー時はフォールバック
     const fallbackState: ConversationState = {
@@ -461,6 +837,7 @@ export function extractConversationState(
       invalidatedAssumptions: prevState?.invalidatedAssumptions || [],
       pendingQuestions: prevState?.pendingQuestions || [],
       expectedResponseLength: effectiveLength,
+      explanationAdaptation: adaptExplanationDetailLevel(options?.userPrompt || '', prevState, effectiveLength),
       updatedAt: Date.now(),
       lastFalsificationPassed: prevState?.lastFalsificationPassed,
       lastFalsificationScore: prevState?.lastFalsificationScore,
@@ -483,7 +860,7 @@ export function extractConversationState(
       { parseErr: (parseErr as any)?.message }
     );
 
-    return { state: fallbackState, visibleText, stats };
+    const goalState=updateConversationGoalProgress(fallbackState, options?.userPrompt||'',prevState); const consistency=evaluateConversationConsistency(options?.userPrompt||'',goalState,prevState,options?.turnTaskId); const repairedState={...consistency.repairedState,temporalContext:buildConversationTemporalContext(options?.userPrompt||'',consistency.repairedState,prevState)}; return { state: repairedState, visibleText, stats };
   }
 }
 
@@ -516,6 +893,8 @@ export function formatConversationStateForPrompt(state: ConversationState): stri
     const last = state.corrections[state.corrections.length - 1];
     lines.push(`直近の訂正: 「${last.oldValue}」→「${last.newValue}」`);
   }
+  if (state.temporalContext?.activeDateKey) lines.push(`時間基準: ${state.temporalContext.activeDateKey}`);
+  if (state.temporalContext?.activeStatePhase) lines.push(`状態基準: ${state.temporalContext.activeStatePhase}`);
   lines.push(`期待される回答長: ${state.expectedResponseLength}`);
   return lines.join('\n');
 }
@@ -527,6 +906,15 @@ export function cleanStreamingVisibleText(rawStreamedText: string): string {
 /**
  * 指示語・照応解決の結果
  */
+export interface InformationGainQuestionResult {
+  shouldAsk: boolean;
+  question: string;
+  candidateCount: number;
+  expectedRemainingCandidates: number;
+  informationGainBits: number;
+  reason: string;
+}
+
 export interface AnaphoraResolutionResult {
   detectedExpression: string | null;
   resolved: string | null;
@@ -544,6 +932,65 @@ export interface AnaphoraResolutionResult {
  * - 候補が2件以上残る場合: confidence = 'ambiguous', resolved = null, candidates = [選択肢...]
  * - 該当なしの場合: confidence = 'unresolved', resolved = null, candidates = []
  */
+export function selectInformationGainQuestion(candidates: string[]): InformationGainQuestionResult {
+  const normalized = [...new Set(candidates.map(item => item.trim()).filter(Boolean))];
+  const n = normalized.length;
+  if (n <= 1) return { shouldAsk: false, question: '', candidateCount: n, expectedRemainingCandidates: n, informationGainBits: 0, reason: '候補が一意または存在しないため質問不要' };
+  if (n === 2) return {
+    shouldAsk: true,
+    question: `「${normalized[0]}」と「${normalized[1]}」のどちらを指していますか？`,
+    candidateCount: 2,
+    expectedRemainingCandidates: 1,
+    informationGainBits: 1,
+    reason: '二択は1問で候補を一意化できるため、最大情報利得の確認質問を選択',
+  };
+
+  const entropy = (x: number): number => x <= 1 ? 0 : Math.log2(x);
+  const tokenMap = new Map<string, Set<number>>();
+  normalized.forEach((candidate, index) => {
+    const tokens = candidate.normalize('NFKC').toLowerCase().match(/[\p{L}\p{N}_-]{2,}/gu) || [];
+    for (const token of new Set(tokens)) {
+      if (!tokenMap.has(token)) tokenMap.set(token, new Set<number>());
+      tokenMap.get(token)!.add(index);
+    }
+  });
+
+  let best: { token: string; yes: number; no: number; gain: number } | undefined;
+  const baseEntropy = entropy(n);
+  for (const [token, indexes] of tokenMap) {
+    const yes = indexes.size;
+    const no = n - yes;
+    if (yes === 0 || no === 0) continue;
+    const expected = (yes / n) * yes + (no / n) * no;
+    const gain = baseEntropy - entropy(expected);
+    if (!best || gain > best.gain || (gain === best.gain && token < best.token)) best = { token, yes, no, gain };
+  }
+
+  if (best) {
+    const preview = normalized.slice(0, 4).join(' / ');
+    const expected = (best.yes / n) * best.yes + (best.no / n) * best.no;
+    return {
+      shouldAsk: true,
+      question: `「${best.token}」を含む候補を指していますか？（候補: ${preview}${n > 4 ? ' / …' : ''}）`,
+      candidateCount: n,
+      expectedRemainingCandidates: Number(expected.toFixed(3)),
+      informationGainBits: Number(best.gain.toFixed(3)),
+      reason: `候補を${best.yes}件/${best.no}件へ最も均等に分割する識別語「${best.token}」を採用`,
+    };
+  }
+
+  const preview = normalized.slice(0, 4).join(' / ');
+  const expected = (1 / n) * 1 + ((n - 1) / n) * (n - 1);
+  return {
+    shouldAsk: true,
+    question: `次の候補のどれを指していますか？「${preview}${n > 4 ? ' / …' : ''}」`,
+    candidateCount: n,
+    expectedRemainingCandidates: Number(expected.toFixed(3)),
+    informationGainBits: Number((baseEntropy - entropy(expected)).toFixed(3)),
+    reason: '識別語で有効な分割を作れないため候補列挙による最小質問へフォールバック',
+  };
+}
+
 export function resolveAnaphora(
   prompt: string,
   state: ConversationState

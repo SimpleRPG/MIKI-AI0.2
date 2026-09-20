@@ -9,9 +9,34 @@ import { conversationLearningEpisodeService } from './conversationLearningEpisod
 import type { ConversationFeedbackScope } from './conversationFeedbackEvidenceService';
 
 export interface RuntimeConversationCompositionOptions { maxCandidates?: number; timeBudgetMs?: number; assembledCode?: string; }
+export interface RuntimeConversationSelectionCriteria {
+  accuracy: number;
+  goalFit: number;
+  constraintCompliance: number;
+  evidenceSupport: number;
+  unknownHandling: number;
+  detailFit: number;
+  safety: number;
+  userStateFit: number;
+}
+
+export interface RuntimeConversationSelectionRecord {
+  method: 'DETERMINISTIC_WEIGHTED_SELECTION_V1';
+  selectedCandidateId: string;
+  selectedSkeleton: AnswerSkeletonType;
+  selectedScore: number;
+  evaluatedCandidates: Array<{
+    candidateId: string;
+    skeleton: AnswerSkeletonType;
+    score: number;
+    criteria: RuntimeConversationSelectionCriteria;
+    tieBreakKey: string;
+  }>;
+}
+
 export interface RuntimeConversationCandidate { skeleton: AnswerSkeletonType; surfaceText: string; semanticPreserved: boolean; repetitionScore: number; score: number; elapsedMs: number; }
 export interface CoreResultRuntimeConversationCompositionResult extends RuntimeConversationCompositionResult { answerContent: CoreResultAnswerContent; }
-export interface RuntimeConversationCompositionResult { surfaceText: string; selectedSkeleton: AnswerSkeletonType; candidatesEvaluated: number; cacheHit: boolean; elapsedMs: number; bounded: true; personaProfileId: string; personaRevision: number; personaApplied: boolean; compositionPlan: AutonomousAnswerCompositionPlan; compositionPlanId: string; compositionPlanSha256: string; selectedSurfaceSignature: string; repetitionAvoided: boolean; reusedConversationEpisodeIds: string[]; }
+export interface RuntimeConversationCompositionResult { surfaceText: string; selectedSkeleton: AnswerSkeletonType; candidatesEvaluated: number; cacheHit: boolean; elapsedMs: number; bounded: true; personaProfileId: string; personaRevision: number; personaApplied: boolean; compositionPlan: AutonomousAnswerCompositionPlan; compositionPlanId: string; compositionPlanSha256: string; selectedSurfaceSignature: string; repetitionAvoided: boolean; reusedConversationEpisodeIds: string[]; selection?: RuntimeConversationSelectionRecord; }
 interface CachedRuntimeComposition { result: RuntimeConversationCompositionResult; createdAt: number; }
 
 const DEFAULT_MAX_CANDIDATES = 4;
@@ -32,8 +57,105 @@ function uniqueSkeletons(primary: AnswerSkeletonType): AnswerSkeletonType[] {
   if (primary !== 'TASK_COMPLETION') values.push('TASK_COMPLETION');
   return [...new Set(values)];
 }
-function score(candidate: RuntimeConversationCandidate, primary: AnswerSkeletonType): number {
-  return (candidate.semanticPreserved ? 1000 : 0) + (candidate.skeleton === primary ? 100 : 0) + Math.max(0, 50 - candidate.elapsedMs) - Math.min(100, candidate.surfaceText.length / 20) - candidate.repetitionScore * 180;
+function detailFitScore(text: string, detailLevel: AnswerContentIR['detail_level']): number {
+  const length = text.length;
+  if (detailLevel === 'BRIEF') return length <= 220 ? 100 : Math.max(0, 100 - (length - 220) / 8);
+  if (detailLevel === 'DETAILED') return length >= 260 ? 100 : Math.min(100, 60 + length / 6);
+  if (length >= 100 && length <= 900) return 100;
+  if (length < 100) return Math.max(40, length);
+  return Math.max(40, 100 - (length - 900) / 12);
+}
+
+function goalFitScore(candidate: RuntimeConversationCandidate, primary: AnswerSkeletonType, ir: AnswerContentIR): number {
+  if (candidate.skeleton === primary) return 100;
+  if (ir.strategy === 'SHORT_ACK' || ir.strategy === 'EMPATHY_ONLY' || ir.strategy === 'CLOSE_CONVERSATION') {
+    return candidate.skeleton === 'GENERAL_ANSWER' ? 90 : 55;
+  }
+  if (ir.interaction_mode === 'CODE_DELIVERY') return candidate.skeleton === 'TASK_COMPLETION' ? 85 : 50;
+  if (ir.interaction_mode === 'TROUBLESHOOTING') {
+    return candidate.skeleton === 'UNKNOWN_INVESTIGATION' || candidate.skeleton === 'CORRECTION' ? 82 : 50;
+  }
+  if (ir.certainty === 'UNKNOWN') return candidate.skeleton === 'UNKNOWN_INVESTIGATION' ? 85 : 45;
+  return candidate.skeleton === 'GENERAL_ANSWER' ? 75 : 50;
+}
+
+function safetyScore(candidate: RuntimeConversationCandidate, ir: AnswerContentIR): number {
+  const sensitive = ir.interaction_mode === 'SAFETY_GATE' || /禁止|危険|権限|破壊|個人情報/.test(
+    `${ir.conclusion} ${ir.conditions.join(' ')} ${ir.exceptions.join(' ')}`
+  );
+  if (!sensitive) return 100;
+  return /禁止|危険|権限|条件|前提|確認|できない|制限|保留/.test(candidate.surfaceText) ? 100 : 25;
+}
+
+function userStateFitScore(candidate: RuntimeConversationCandidate, ir: AnswerContentIR, persona: MultiAxisPersonaConfig): number {
+  const scene = persona.currentScene;
+  if (scene === 'SHORT_MODE') return candidate.surfaceText.length <= 260 ? 100 : Math.max(30, 100 - (candidate.surfaceText.length - 260) / 6);
+  if (scene === 'DETAILED_MODE') return candidate.surfaceText.length >= 260 ? 100 : 70;
+  if (scene === 'CODE_DELIVERY') return candidate.skeleton === 'TASK_COMPLETION' ? 100 : 65;
+  if (scene === 'ERROR_REPORT' || scene === 'DISASTER_RECOVERY') {
+    return /確認|原因|対処|復旧|保留|失敗/.test(candidate.surfaceText) ? 100 : 65;
+  }
+  if (ir.strategy === 'SHORT_ACK') return candidate.surfaceText.length <= 180 ? 100 : 60;
+  return 85;
+}
+
+function evidenceSupportScore(ir: AnswerContentIR): number {
+  if (ir.certainty === 'UNKNOWN') return ir.reasons.length > 0 || ir.exceptions.length > 0 ? 70 : 35;
+  if (ir.certainty === 'HYPOTHETICAL' || ir.certainty === 'CONDITIONAL') {
+    return ir.reasons.length > 0 || ir.conditions.length > 0 ? 90 : 60;
+  }
+  return ir.reasons.length > 0 || ir.conditions.length > 0 ? 100 : 80;
+}
+
+function selectionCriteria(
+  candidate: RuntimeConversationCandidate,
+  primary: AnswerSkeletonType,
+  ir: AnswerContentIR,
+  persona: MultiAxisPersonaConfig,
+): RuntimeConversationSelectionCriteria {
+  return {
+    accuracy: candidate.semanticPreserved ? 100 : 0,
+    goalFit: goalFitScore(candidate, primary, ir),
+    constraintCompliance: candidate.semanticPreserved ? (ir.conditions.length > 0 ? 100 : 90) : 0,
+    evidenceSupport: evidenceSupportScore(ir),
+    unknownHandling: ir.certainty === 'UNKNOWN'
+      ? (candidate.skeleton === 'UNKNOWN_INVESTIGATION' ? 100 : 35)
+      : 95,
+    detailFit: detailFitScore(candidate.surfaceText, ir.detail_level),
+    safety: safetyScore(candidate, ir),
+    userStateFit: userStateFitScore(candidate, ir, persona),
+  };
+}
+
+function weightedSelectionScore(criteria: RuntimeConversationSelectionCriteria): number {
+  const weights: Array<[keyof RuntimeConversationSelectionCriteria, number]> = [
+    ['accuracy', 25],
+    ['goalFit', 18],
+    ['constraintCompliance', 14],
+    ['evidenceSupport', 10],
+    ['unknownHandling', 10],
+    ['detailFit', 8],
+    ['safety', 10],
+    ['userStateFit', 5],
+  ];
+  const weighted = weights.reduce((sum, [key, weight]) => sum + criteria[key] * weight, 0);
+  return Math.round(weighted) / 100;
+}
+
+function deterministicTieBreak(
+  a: { candidate: RuntimeConversationCandidate; score: number; criteria: RuntimeConversationSelectionCriteria; tieBreakKey: string },
+  b: { candidate: RuntimeConversationCandidate; score: number; criteria: RuntimeConversationSelectionCriteria; tieBreakKey: string },
+  primary: AnswerSkeletonType,
+): number {
+  if (b.score !== a.score) return b.score - a.score;
+  if (b.criteria.accuracy !== a.criteria.accuracy) return b.criteria.accuracy - a.criteria.accuracy;
+  if (b.criteria.safety !== a.criteria.safety) return b.criteria.safety - a.criteria.safety;
+  if (b.criteria.goalFit !== a.criteria.goalFit) return b.criteria.goalFit - a.criteria.goalFit;
+  if (b.criteria.detailFit !== a.criteria.detailFit) return b.criteria.detailFit - a.criteria.detailFit;
+  if (a.candidate.repetitionScore !== b.candidate.repetitionScore) return a.candidate.repetitionScore - b.candidate.repetitionScore;
+  if ((a.candidate.skeleton === primary) !== (b.candidate.skeleton === primary)) return a.candidate.skeleton === primary ? -1 : 1;
+  if (a.candidate.surfaceText.length !== b.candidate.surfaceText.length) return a.candidate.surfaceText.length - b.candidate.surfaceText.length;
+  return a.tieBreakKey.localeCompare(b.tieBreakKey);
 }
 
 export class RuntimeConversationCompositionService {
@@ -65,13 +187,14 @@ export class RuntimeConversationCompositionService {
       const inspection = answerContentIrService.verifySemanticPreservation(ir, rendered.surfaceText);
       const diversity = conversationSurfaceDiversityService.assess(rendered.surfaceText);
       const candidate: RuntimeConversationCandidate = { skeleton, surfaceText: rendered.surfaceText, semanticPreserved: inspection.isPreserved, repetitionScore: diversity.repetitionScore, score: 0, elapsedMs: performance.now() - candidateStartedAt };
-      candidate.score = score(candidate, primarySkeleton); candidates.push(candidate);
+      candidates.push(candidate);
     }
     const selected = candidates.filter(candidate => candidate.semanticPreserved).sort((a, b) => b.score - a.score)[0] || candidates.sort((a, b) => b.score - a.score)[0];
     const fallback = selected || { skeleton: primarySkeleton, surfaceText: answerContentIrService.generateSurfaceTextFromIR(ir, primarySkeleton, surfacePersona, options.assembledCode).surfaceText };
     const selectedDiversity = conversationSurfaceDiversityService.assess(fallback.surfaceText);
     conversationSurfaceDiversityService.record(fallback.surfaceText);
-    const result: RuntimeConversationCompositionResult = { surfaceText: fallback.surfaceText, selectedSkeleton: fallback.skeleton, candidatesEvaluated: candidates.length, cacheHit: false, elapsedMs: performance.now() - startedAt, bounded: true, personaProfileId: personaProfile.profileId, personaRevision: personaProfile.revision, personaApplied: true, compositionPlan, compositionPlanId: compositionPlan.planId, compositionPlanSha256: compositionPlan.planSha256, selectedSurfaceSignature: selectedDiversity.signature, repetitionAvoided: selectedDiversity.repetitionScore < 0.5, reusedConversationEpisodeIds: reusedConversationEpisodes.map(episode => episode.episodeId) };
+    const result: RuntimeConversationCompositionResult = { surfaceText: fallback.surfaceText, selectedSkeleton: fallback.skeleton, candidatesEvaluated: candidates.length, cacheHit: false, elapsedMs: performance.now() - startedAt, bounded: true, personaProfileId: personaProfile.profileId, personaRevision: personaProfile.revision, personaApplied: true, compositionPlan, compositionPlanId: compositionPlan.planId, compositionPlanSha256: compositionPlan.planSha256, selectedSurfaceSignature: selectedDiversity.signature, repetitionAvoided: selectedDiversity.repetitionScore < 0.5, reusedConversationEpisodeIds: reusedConversationEpisodes.map(episode => episode.episodeId), selection };
+    if (selection) systemLogger.info('ANSWER_PLAN', `🎯 [117候補回答決定] ${selection.selectedSkeleton} / score=${selection.selectedScore} / candidates=${selection.evaluatedCandidates.length} / tie-break=deterministic`);
     this.cache.set(cacheKey, { result, createdAt: Date.now() }); this.trimCache(); return result;
   }
   public composeCoreResult(coreResult: CoreResult, options: RuntimeConversationCompositionOptions = {}): CoreResultRuntimeConversationCompositionResult {

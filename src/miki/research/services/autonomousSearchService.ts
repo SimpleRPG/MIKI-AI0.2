@@ -36,6 +36,160 @@ export interface AutonomousSearchStats {
   lastSearchAt?:number;
 }
 
+export type SearchProviderName = 'searxng' | 'wikipedia' | 'duckduckgo';
+
+export type SearchProviderExecutionStatus =
+  | 'SUCCEEDED'
+  | 'EMPTY'
+  | 'FAILED'
+  | 'SKIPPED';
+
+export interface SearchProviderStatusRecord {
+  provider: SearchProviderName;
+  status: SearchProviderExecutionStatus;
+  error?: string;
+}
+
+export interface AutonomousSearchExecutionResult {
+  results: WebSearchResultItem[];
+  summary?: string;
+  provider?: string;
+  providers: SearchProviderName[];
+  providerStatuses: Record<SearchProviderName, SearchProviderStatusRecord>;
+}
+
+interface ProviderSearchOutput {
+  provider: SearchProviderName;
+  results: WebSearchResultItem[];
+}
+
+function compareStableText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function canonicalizeSearchUrl(url: string): string {
+  const trimmed = String(url || '').trim();
+  if (!trimmed) return '';
+
+  try {
+    const parsed = new URL(trimmed);
+    parsed.hash = '';
+
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (/^utm_/i.test(key) || /^(fbclid|gclid|mc_cid|mc_eid)$/i.test(key)) {
+        parsed.searchParams.delete(key);
+      }
+    }
+
+    parsed.searchParams.sort();
+    return parsed.toString();
+  } catch {
+    return trimmed.toLowerCase();
+  }
+}
+
+function deriveSourceIdentity(provider: SearchProviderName, item: WebSearchResultItem, canonicalUrl: string): {
+  sourceId: string;
+  independenceClusterId: string;
+} {
+  const sourceId =
+    item.sourceId ||
+    canonicalUrl ||
+    `${provider}:${String(item.title || '').trim().toLowerCase()}`;
+
+  let independenceClusterId = item.independenceClusterId;
+  if (!independenceClusterId) {
+    try {
+      const host = canonicalUrl
+        ? new URL(canonicalUrl).hostname.toLowerCase().replace(/^www\./, '')
+        : '';
+      independenceClusterId = host
+        ? `cluster_web_${host}`
+        : `cluster_provider_${provider}`;
+    } catch {
+      independenceClusterId = `cluster_provider_${provider}`;
+    }
+  }
+
+  return { sourceId, independenceClusterId };
+}
+
+/**
+ * 複数Providerの結果を、到着順ではなく固定ルールで統合する。
+ * maxResultsはProviderごとの取得上限として扱い、探索経路の多様性を保持する。
+ */
+export function mergeSearchResults(
+  outputs: ProviderSearchOutput[],
+  preferredProvider: 'auto' | SearchProviderName = 'auto',
+  maxResults = 4,
+): WebSearchResultItem[] {
+  const preferredOrder: SearchProviderName[] =
+    preferredProvider === 'auto'
+      ? ['searxng', 'wikipedia', 'duckduckgo']
+      : [
+          preferredProvider,
+          ...(['searxng', 'wikipedia', 'duckduckgo'] as SearchProviderName[]).filter(
+            (name) => name !== preferredProvider,
+          ),
+        ];
+
+  const rank = new Map(preferredOrder.map((provider, index) => [provider, index]));
+  const successfulProviderCount = outputs.filter((output) => output.results.length > 0).length;
+  const maxCombinedResults = Math.max(1, maxResults) * Math.max(1, successfulProviderCount);
+
+  const candidates = outputs.flatMap((output) =>
+    output.results.slice(0, Math.max(1, maxResults)).map((item) => {
+      const canonicalUrl = canonicalizeSearchUrl(item.url);
+      const identity = deriveSourceIdentity(output.provider, item, canonicalUrl);
+      return {
+        item: {
+          ...item,
+          url: canonicalUrl || item.url,
+          sourceId: identity.sourceId,
+          independenceClusterId: identity.independenceClusterId,
+        },
+        provider: output.provider,
+        canonicalKey:
+          canonicalUrl ||
+          `${output.provider}|${String(item.title || '').trim().toLowerCase()}|${String(item.snippet || '').trim().slice(0, 160).toLowerCase()}`,
+      };
+    }),
+  );
+
+  candidates.sort((a, b) => {
+    const relevanceDelta = (b.item.relevanceScore ?? 0) - (a.item.relevanceScore ?? 0);
+    if (relevanceDelta !== 0) return relevanceDelta;
+
+    const providerDelta = (rank.get(a.provider) ?? 99) - (rank.get(b.provider) ?? 99);
+    if (providerDelta !== 0) return providerDelta;
+
+    const canonicalDelta = compareStableText(a.canonicalKey, b.canonicalKey);
+    if (canonicalDelta !== 0) return canonicalDelta;
+
+    const titleDelta = compareStableText(a.item.title, b.item.title);
+    if (titleDelta !== 0) return titleDelta;
+
+    return compareStableText(a.item.source, b.item.source);
+  });
+
+  const deduped = new Map<string, WebSearchResultItem>();
+  for (const candidate of candidates) {
+    if (!deduped.has(candidate.canonicalKey)) {
+      deduped.set(candidate.canonicalKey, candidate.item);
+    }
+  }
+
+  return Array.from(deduped.values()).slice(0, maxCombinedResults);
+}
+
+function createProviderStatuses(): Record<SearchProviderName, SearchProviderStatusRecord> {
+  return {
+    searxng: { provider: 'searxng', status: 'FAILED', error: 'NOT_RUN' },
+    wikipedia: { provider: 'wikipedia', status: 'FAILED', error: 'NOT_RUN' },
+    duckduckgo: { provider: 'duckduckgo', status: 'FAILED', error: 'NOT_RUN' },
+  };
+}
+
 const SEARCH_CONFIG_KEY='miki_autonomous_search_config_v1';
 const SEARCH_STATS_KEY='miki_autonomous_search_stats_v1';
 const SEARCH_RECORDS_KEY='miki_autonomous_search_records_v1';
@@ -50,7 +204,7 @@ const DEFAULT_STATS:AutonomousSearchStats={
 export class AutonomousSearchService {
   private config: AutonomousSearchConfig;
   private stats: AutonomousSearchStats;
-  private cache: Map<string, { data: { results: WebSearchResultItem[]; summary?: string; provider?: string }; timestamp: number }> = new Map();
+  private cache: Map<string, { data: AutonomousSearchExecutionResult; timestamp: number }> = new Map();
 
   constructor() {
     this.config = this.loadConfig();
@@ -241,16 +395,16 @@ export class AutonomousSearchService {
       return { results: [], summary: `禁止トピック（${bannedQueryCheck.matchedTopic}）に該当するため安全にスキップしました。` };
     }
 
-    const cacheKey = safeQuery.toLowerCase();
+    const preferred = options?.preferredProvider || 'auto';
+    const maxResults = Math.max(1, options?.maxResults ?? this.config.maxResults ?? 4);
+    const cacheKey = `${safeQuery.toLowerCase()}|preferred:${preferred}|perProvider:${maxResults}`;
+
     if (!options?.bypassCache && this.cache.has(cacheKey)) {
       const cached = this.cache.get(cacheKey)!;
-      // 1時間有効
       if (Date.now() - cached.timestamp < 3600000) {
         return cached.data;
       }
     }
-
-    const maxResults = options?.maxResults || this.config.maxResults || 4;
 
     if (this.config.allowFallbackMock) {
       const mockResult: WebSearchResultItem[] = [
@@ -261,10 +415,16 @@ export class AutonomousSearchService {
           source: 'Mock (Non-Real)',
         },
       ];
-      const mockOutput = {
+      const mockOutput: AutonomousSearchExecutionResult = {
         results: mockResult,
         summary: `【テスト用モック】「${cleanQuery}」に関するテスト用モックデータです（実データではありません）。`,
         provider: 'mock_fallback',
+        providers: [],
+        providerStatuses: {
+          searxng: { provider: 'searxng', status: 'SKIPPED' },
+          wikipedia: { provider: 'wikipedia', status: 'SKIPPED' },
+          duckduckgo: { provider: 'duckduckgo', status: 'SKIPPED' },
+        },
       };
       this.cache.set(cacheKey, { data: mockOutput, timestamp: Date.now() });
       this.stats.totalSearches++;
@@ -273,11 +433,20 @@ export class AutonomousSearchService {
       return mockOutput;
     }
 
-    // 2. 検索プロバイダ実行パイプライン (SearXNG最優先 + Wikipedia + DuckDuckGo)
-    const preferred = options?.preferredProvider || 'auto';
+    const providerStatuses = createProviderStatuses();
+    const markProvider = (
+      provider: SearchProviderName,
+      status: SearchProviderExecutionStatus,
+      error?: string,
+    ) => {
+      providerStatuses[provider] = {
+        provider,
+        status,
+        ...(error ? { error } : {}),
+      };
+    };
 
-    // --- サブルーチン: SearXNG (Termuxローカル・自己ホスト型メタ検索エンジン) ---
-    const runSearxng = async (): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null> => {
+    const runSearxng = async (): Promise<ProviderSearchOutput | null> => {
       try {
         const storedUrl = storageService.getItem('miki_searxng_base_url');
         const searxngBaseUrl = (storedUrl && storedUrl.trim())
@@ -286,153 +455,239 @@ export class AutonomousSearchService {
 
         const searxUrl = `${searxngBaseUrl}/search?q=${encodeURIComponent(cleanQuery)}&format=json`;
         const searxRes = await fetch(searxUrl, { signal: AbortSignal.timeout(2500) });
-        if (searxRes.ok) {
-          const searxData = await searxRes.json();
-          const hits = Array.isArray(searxData?.results) ? searxData.results : [];
-          if (hits.length > 0) {
-            const results: WebSearchResultItem[] = hits.slice(0, maxResults).map((hit: any) => ({
-              title: hit.title || cleanQuery,
-              snippet: (hit.content || hit.snippet || '').replace(/<[^>]+>/g, '').trim(),
-              url: hit.url || '',
-              source: 'SearXNG (Local)',
-              publishedDate: hit.publishedDate || hit.published_date,
-            }));
-            if (results.length > 0) {
-              const summary = results[0].snippet || `「${cleanQuery}」に関する知見をSearXNGから取得しました。`;
-              systemLogger.info('SELF_IMPROVEMENT', `🔍 [SearXNG] ローカル検索成功: ${results.length}件 (provider: searxng)`);
-              return { results, summary, provider: 'searxng' };
-            }
-          } else {
-            systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 検索結果0件のためフォールバック');
-          }
-        } else {
-          systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [SearXNG] 応答ステータス HTTP ${searxRes.status} のためフォールバック`);
+
+        if (!searxRes.ok) {
+          const reason = `HTTP ${searxRes.status}`;
+          markProvider('searxng', 'FAILED', reason);
+          systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [SearXNG] 応答失敗: ${reason}`);
+          return null;
         }
-      } catch (searxErr: any) {
-        // Termux未起動やタイムアウト時は日常的状態のため、警告ではなく情報ログで静かにフォールバック
-        const reason = searxErr?.name === 'TimeoutError' ? 'タイムアウト' : '未起動または接続不可';
-        systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [SearXNG] 未応答のためフォールバック (${reason})`);
+
+        const searxData = await searxRes.json();
+        const hits = Array.isArray(searxData?.results) ? searxData.results : [];
+
+        if (hits.length === 0) {
+          markProvider('searxng', 'EMPTY');
+          systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 検索結果0件');
+          return null;
+        }
+
+        const results: WebSearchResultItem[] = hits.slice(0, maxResults).map((hit: any) => {
+          const url = typeof hit?.url === 'string' ? hit.url : '';
+          const canonicalUrl = canonicalizeSearchUrl(url);
+          const item = {
+            title: hit?.title || cleanQuery,
+            snippet: (hit?.content || hit?.snippet || '').replace(/<[^>]+>/g, '').trim(),
+            url,
+            source: 'SearXNG (Local)',
+            publishedDate: hit?.publishedDate || hit?.published_date,
+          };
+          const identity = deriveSourceIdentity('searxng', item, canonicalUrl);
+          return {
+            ...item,
+            sourceId: identity.sourceId,
+            independenceClusterId: identity.independenceClusterId,
+          };
+        });
+
+        markProvider('searxng', 'SUCCEEDED');
+        systemLogger.info('SELF_IMPROVEMENT', `🔍 [SearXNG] 並行検索成功: ${results.length}件`);
+        return { provider: 'searxng', results };
+      } catch (error: any) {
+        const reason = error?.name === 'TimeoutError'
+          ? 'タイムアウト'
+          : error?.message || String(error);
+        markProvider('searxng', 'FAILED', reason);
+        systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [SearXNG] 探索経路失敗: ${reason}`);
+        return null;
       }
-      return null;
     };
 
-    // --- サブルーチン: Wikipedia直接fetch (CORS対応オープンエンドポイント) ---
-    const runWikipedia = async (): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null> => {
+    const runWikipedia = async (): Promise<ProviderSearchOutput | null> => {
       try {
         const wikiUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanQuery)}&utf8=&format=json&origin=*&srlimit=${maxResults}`;
         const wikiRes = await fetch(wikiUrl, { signal: AbortSignal.timeout(5000) });
-        if (wikiRes.ok) {
-          const wikiData = await wikiRes.json();
-          const hits = wikiData?.query?.search || [];
-          if (hits.length > 0) {
-            const results: WebSearchResultItem[] = hits.map((hit: any) => ({
-              title: hit.title,
-              snippet: (hit.snippet || '').replace(/<[^>]+>/g, '').trim(),
-              url: `https://ja.wikipedia.org/wiki/${encodeURIComponent(hit.title)}`,
-              source: 'Wikipedia (Direct)',
-              publishedDate: hit.timestamp,
-            }));
-            const summary = results[0].snippet || `「${cleanQuery}」に関する知見を取得しました。`;
-            systemLogger.info('SELF_IMPROVEMENT', `📖 [Wikipedia] 直接検索成功: ${results.length}件 (provider: wikipedia_direct)`);
-            return { results, summary, provider: 'wikipedia_direct' };
-          }
+
+        if (!wikiRes.ok) {
+          const reason = `HTTP ${wikiRes.status}`;
+          markProvider('wikipedia', 'FAILED', reason);
+          return null;
         }
-      } catch (directErr) {
-        console.warn('[AutonomousSearch] Direct Wikipedia fetch error:', directErr);
+
+        const wikiData = await wikiRes.json();
+        const hits = Array.isArray(wikiData?.query?.search) ? wikiData.query.search : [];
+
+        if (hits.length === 0) {
+          markProvider('wikipedia', 'EMPTY');
+          return null;
+        }
+
+        const results: WebSearchResultItem[] = hits.slice(0, maxResults).map((hit: any) => {
+          const url = `https://ja.wikipedia.org/wiki/${encodeURIComponent(hit.title)}`;
+          const canonicalUrl = canonicalizeSearchUrl(url);
+          const item = {
+            title: hit.title,
+            snippet: (hit.snippet || '').replace(/<[^>]+>/g, '').trim(),
+            url,
+            source: 'Wikipedia (Direct)',
+            publishedDate: hit.timestamp,
+          };
+          const identity = deriveSourceIdentity('wikipedia', item, canonicalUrl);
+          return {
+            ...item,
+            sourceId: identity.sourceId,
+            independenceClusterId: identity.independenceClusterId,
+          };
+        });
+
+        markProvider('wikipedia', 'SUCCEEDED');
+        systemLogger.info('SELF_IMPROVEMENT', `📖 [Wikipedia] 並行検索成功: ${results.length}件`);
+        return { provider: 'wikipedia', results };
+      } catch (error: any) {
+        const reason = error?.message || String(error);
+        markProvider('wikipedia', 'FAILED', reason);
+        systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [Wikipedia] 探索経路失敗: ${reason}`);
+        return null;
       }
-      return null;
     };
 
-    // --- サブルーチン: DuckDuckGo Instant Answer API ---
-    // DuckDuckGo Attribution & 非商用ポリシー: https://duckduckgo.com/api
-    const runDuckDuckGo = async (): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null> => {
+    const runDuckDuckGo = async (): Promise<ProviderSearchOutput | null> => {
       try {
         const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}&format=json&no_html=1&skip_disambig=1`;
         const ddgRes = await fetch(ddgUrl, { signal: AbortSignal.timeout(5000) });
-        if (ddgRes.ok) {
-          const ddgData = await ddgRes.json();
-          const results: WebSearchResultItem[] = [];
 
-          // 1. Abstract (主要即答テキスト)
-          const abstractText = (ddgData.AbstractText || ddgData.Abstract || '').trim();
-          if (abstractText) {
-            results.push({
-              title: ddgData.Heading || cleanQuery,
-              snippet: abstractText,
-              url: ddgData.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}`,
-              source: `DuckDuckGo (${ddgData.AbstractSource || 'Instant Answer'})`,
-            });
-          }
+        if (!ddgRes.ok) {
+          const reason = `HTTP ${ddgRes.status}`;
+          markProvider('duckduckgo', 'FAILED', reason);
+          return null;
+        }
 
-          // 2. RelatedTopics (関連トピック)
-          if (Array.isArray(ddgData.RelatedTopics)) {
-            for (const item of ddgData.RelatedTopics) {
-              if (results.length >= maxResults) break;
-              if (item.Text && item.FirstURL) {
-                const topicText = item.Text.trim();
-                const titlePart = topicText.split(' - ')[0] || topicText.slice(0, 30);
-                results.push({
-                  title: titlePart,
-                  snippet: topicText,
-                  url: item.FirstURL,
-                  source: 'DuckDuckGo Instant Answer',
-                });
-              }
+        const ddgData = await ddgRes.json();
+        const results: WebSearchResultItem[] = [];
+
+        const abstractText = (ddgData.AbstractText || ddgData.Abstract || '').trim();
+        if (abstractText) {
+          const url = ddgData.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}`;
+          const canonicalUrl = canonicalizeSearchUrl(url);
+          const item = {
+            title: ddgData.Heading || cleanQuery,
+            snippet: abstractText,
+            url,
+            source: `DuckDuckGo (${ddgData.AbstractSource || 'Instant Answer'})`,
+          };
+          const identity = deriveSourceIdentity('duckduckgo', item, canonicalUrl);
+          results.push({
+            ...item,
+            sourceId: identity.sourceId,
+            independenceClusterId: identity.independenceClusterId,
+          });
+        }
+
+        if (Array.isArray(ddgData.RelatedTopics)) {
+          for (const itemData of ddgData.RelatedTopics) {
+            if (results.length >= maxResults) break;
+            if (itemData?.Text && itemData?.FirstURL) {
+              const topicText = String(itemData.Text).trim();
+              const url = String(itemData.FirstURL);
+              const canonicalUrl = canonicalizeSearchUrl(url);
+              const item = {
+                title: topicText.split(' - ')[0] || topicText.slice(0, 30),
+                snippet: topicText,
+                url,
+                source: 'DuckDuckGo Instant Answer',
+              };
+              const identity = deriveSourceIdentity('duckduckgo', item, canonicalUrl);
+              results.push({
+                ...item,
+                sourceId: identity.sourceId,
+                independenceClusterId: identity.independenceClusterId,
+              });
             }
           }
-
-          if (results.length > 0) {
-            const summary = results[0].snippet;
-            systemLogger.info(
-              'SELF_IMPROVEMENT',
-              `🦆 [DuckDuckGo] 即答ナレッジ取得成功: ${results.length}件 (provider: duckduckgo_direct)`
-            );
-            return { results, summary, provider: 'duckduckgo_direct' };
-          }
         }
-      } catch (ddgErr: any) {
-        console.warn('[AutonomousSearch] DuckDuckGo fetch error:', ddgErr);
-        systemLogger.warn('SELF_IMPROVEMENT', `⚠️ [DuckDuckGo] 取得例外: ${ddgErr?.message || String(ddgErr)}`);
+
+        if (results.length === 0) {
+          markProvider('duckduckgo', 'EMPTY');
+          return null;
+        }
+
+        markProvider('duckduckgo', 'SUCCEEDED');
+        systemLogger.info('SELF_IMPROVEMENT', `🦆 [DuckDuckGo] 並行検索成功: ${results.length}件`);
+        return { provider: 'duckduckgo', results };
+      } catch (error: any) {
+        const reason = error?.message || String(error);
+        markProvider('duckduckgo', 'FAILED', reason);
+        systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [DuckDuckGo] 探索経路失敗: ${reason}`);
+        return null;
       }
-      return null;
     };
 
-    // 優先指定に応じた実行順序の制御 (指示2: SearXNGを最優先経路に追加)
-    let pipelineSteps: Array<() => Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string } | null>>;
-    if (preferred === 'searxng') {
-      pipelineSteps = [runSearxng, runWikipedia, runDuckDuckGo];
-    } else if (preferred === 'duckduckgo') {
-      pipelineSteps = [runDuckDuckGo, runSearxng, runWikipedia];
-    } else if (preferred === 'wikipedia') {
-      pipelineSteps = [runWikipedia, runSearxng, runDuckDuckGo];
-    } else {
-      // 既定順序: SearXNG(Termuxローカル) -> Wikipedia直接fetch -> DuckDuckGo Instant Answer
-      pipelineSteps = [runSearxng, runWikipedia, runDuckDuckGo];
-    }
+    /*
+     * P0: Providerを直列フォールバックしない。
+     * 3経路を同時に開始し、到着順には依存せずmergeSearchResults()で統合する。
+     *
+     * preferredProviderは「最初に試すProvider」ではなく、
+     * 同率候補の決定論的タイブレーク優先度としてだけ利用する。
+     */
+    const providerRuns: Array<{
+      name: SearchProviderName;
+      run: () => Promise<ProviderSearchOutput | null>;
+    }> = [
+      { name: 'searxng', run: runSearxng },
+      { name: 'wikipedia', run: runWikipedia },
+      { name: 'duckduckgo', run: runDuckDuckGo },
+    ];
 
-    // パイプラインを順次実行
-    for (const step of pipelineSteps) {
-      const stepOutput = await step();
-      if (stepOutput && stepOutput.results.length > 0) {
-        this.cache.set(cacheKey, { data: stepOutput, timestamp: Date.now() });
-        this.stats.totalSearches++;
-        this.stats.lastSearchAt = Date.now();
-        this.saveStats();
-        return stepOutput;
-      }
-    }
+    const settled = await Promise.allSettled(
+      providerRuns.map(async ({ name, run }) => {
+        try {
+          return await run();
+        } catch (error: any) {
+          const reason = error?.message || String(error);
+          markProvider(name, 'FAILED', reason);
+          return null;
+        }
+      }),
+    );
 
-    // 5. 検索失敗時のフォールバック (オフライン・全検索エンジン空振り)
-    // 作業指示書 v21 第2.1節: 架空の検索結果やもっともらしい説明文を生成せず、「検索できませんでした」という事実のみを返す
-    const failureOutput = {
-      results: [],
-      summary: `「${cleanQuery}」の検索に失敗しました（外部検索エンジン全件該当なし、または接続失敗）。`,
-      provider: 'local_fallback',
+    const outputs = settled
+      .filter((item): item is PromiseFulfilledResult<ProviderSearchOutput | null> => item.status === 'fulfilled')
+      .map((item) => item.value)
+      .filter((value): value is ProviderSearchOutput => Boolean(value && value.results.length > 0));
+
+    const mergedResults = mergeSearchResults(outputs, preferred, maxResults);
+    const successfulProviders = (['searxng', 'wikipedia', 'duckduckgo'] as SearchProviderName[]).filter(
+      (provider) => providerStatuses[provider].status === 'SUCCEEDED',
+    );
+
+    const result: AutonomousSearchExecutionResult = {
+      results: mergedResults,
+      summary:
+        mergedResults[0]?.snippet ||
+        (successfulProviders.length
+          ? `「${cleanQuery}」について複数の探索経路から候補を取得しました。`
+          : `「${cleanQuery}」について利用可能な探索経路から結果を取得できませんでした。`),
+      provider:
+        successfulProviders.length > 1
+          ? 'parallel'
+          : successfulProviders[0] || 'parallel',
+      providers: successfulProviders,
+      providerStatuses,
     };
+
     this.stats.totalSearches++;
     this.stats.lastSearchAt = Date.now();
     this.saveStats();
-    return failureOutput;
+
+    if (result.results.length > 0) {
+      this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
+      return result;
+    }
+
+    return {
+      ...result,
+      summary: `「${cleanQuery}」の検索に失敗しました（各Providerの状態はproviderStatusesを参照）。`,
+    };
   }
 
   /**
@@ -464,31 +719,33 @@ export class AutonomousSearchService {
       .filter((r) => typeof r.url === 'string' && /^https?:\/\//i.test(r.url))
       .slice(0, maxPages);
 
-    const outputs: Array<{ result: T; success: boolean; text: string; url: string; error?: string }> = [];
-    for (const result of readable) {
-      try {
-        const page = await this.fetchRenderedPage(result.url!, {
-          query,
-          timeoutMs: options?.timeoutMs,
-          renderWaitMs: options?.renderWaitMs,
-        });
-        outputs.push({
-          result,
-          success: page.success,
-          text: page.text || '',
-          url: page.url || result.url!,
-          error: page.error,
-        });
-      } catch (error) {
-        outputs.push({
-          result,
-          success: false,
-          text: '',
-          url: result.url!,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
+    // 各ページ本文取得も並行化する。ただし出力順は入力順に固定する。
+    const outputs = await Promise.all(
+      readable.map(async (result) => {
+        try {
+          const page = await this.fetchRenderedPage(result.url!, {
+            query,
+            timeoutMs: options?.timeoutMs,
+            renderWaitMs: options?.renderWaitMs,
+          });
+          return {
+            result,
+            success: page.success,
+            text: page.text || '',
+            url: page.url || result.url!,
+            error: page.error,
+          };
+        } catch (error) {
+          return {
+            result,
+            success: false,
+            text: '',
+            url: result.url!,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }),
+    );
 
     const successCount = outputs.filter((o) => o.success && o.text.trim()).length;
     systemLogger.info(

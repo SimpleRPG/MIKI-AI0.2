@@ -2,6 +2,7 @@ import { storageService } from '../../../services/storageService';
 import { apiUrl, getCustomApiHeaders } from '../../../services/api';
 import { evidenceService } from '../../memory/services/evidenceService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
+import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 
 export type ExternalAiProvider = 'GEMINI' | 'GENERIC_EXTERNAL_AI';
 export type ExternalAiBundleStatus = 'DRAFT' | 'READY' | 'SENT' | 'RESPONSE_RECEIVED' | 'IMPORTED' | 'FAILED';
@@ -16,6 +17,9 @@ export interface ExternalAiResearchBundle {
   status: ExternalAiBundleStatus;
   mode?: 'AUTO' | 'MANUAL';
   evidenceIds: string[];
+  promptSha256?: string;
+  responseSha256?: string;
+  replayKey?: string;
   createdAt: number;
   updatedAt: number;
   error?: string;
@@ -55,6 +59,8 @@ class ExternalAiResearchBundleService {
           promptText: this.renderPrompt(chunk),
           status: 'READY',
           evidenceIds: [],
+          promptSha256: canonicalSha256Object({ provider, gapIds: chunk.map(gap => gap.id), promptText: this.renderPrompt(chunk) }),
+          replayKey: `ER-REPLAY-${canonicalSha256Object({ provider, gapIds: chunk.map(gap => gap.id).sort() }).slice(0,20)}`,
           createdAt: now,
           updatedAt: now,
         };
@@ -69,6 +75,8 @@ class ExternalAiResearchBundleService {
   public async sendAutomatically(bundleId: string): Promise<ExternalAiResearchBundle | undefined> {
     const bundle = this.bundles.get(bundleId);
     if (!bundle) return undefined;
+    bundle.promptSha256 = canonicalSha256Object({ provider: bundle.provider, gapIds: [...bundle.gapIds].sort(), promptText: bundle.promptText });
+    bundle.replayKey = bundle.replayKey || `ER-REPLAY-${canonicalSha256Object({ provider: bundle.provider, gapIds: [...bundle.gapIds].sort() }).slice(0,20)}`;
     bundle.mode = 'AUTO'; bundle.status = 'SENT'; bundle.updatedAt = Date.now(); this.save();
     try {
       const response = await fetch(apiUrl('/api/chat'), {
@@ -90,8 +98,15 @@ class ExternalAiResearchBundleService {
   public importResponse(bundleId: string, responseText: string, mode: 'AUTO' | 'MANUAL' = 'MANUAL'): ExternalAiResearchBundle | undefined {
     const bundle = this.bundles.get(bundleId);
     if (!bundle || !responseText.trim()) return undefined;
+    const normalizedResponse = responseText.trim();
+    const promptSha256 = bundle.promptSha256 || canonicalSha256Object({ provider: bundle.provider, gapIds: [...bundle.gapIds].sort(), promptText: bundle.promptText });
+    const responseSha256 = canonicalSha256Object({ promptSha256, responseText: normalizedResponse });
+    if (bundle.responseSha256 === responseSha256 && bundle.status === 'IMPORTED') return this.clone(bundle);
+    bundle.promptSha256 = promptSha256;
+    bundle.responseSha256 = responseSha256;
+    bundle.replayKey = bundle.replayKey || `ER-REPLAY-${canonicalSha256Object({ provider: bundle.provider, gapIds: [...bundle.gapIds].sort() }).slice(0,20)}`;
     bundle.mode = mode;
-    bundle.responseText = responseText.trim();
+    bundle.responseText = normalizedResponse;
     bundle.status = 'RESPONSE_RECEIVED';
     const sections = this.splitResponse(bundle, responseText);
     const evidenceIds: string[] = [];
@@ -102,6 +117,7 @@ class ExternalAiResearchBundleService {
         source: bundle.provider,
         sourceId: `${bundle.bundleId}:${section.gapId}`,
         independenceClusterId: `external_ai_${bundle.provider.toLowerCase()}`,
+        metadata: { trust_boundary: 'UNTRUSTED_EXTERNAL_AI', external_bundle_id: bundle.bundleId, prompt_sha256: promptSha256, response_sha256: responseSha256, replay_key: bundle.replayKey },
       });
       evidenceIds.push(evidence.evidence_id);
     }

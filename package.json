@@ -19,7 +19,6 @@
     "android:prepare": "npx cap add android && bash scripts/install_android_native_runner.sh && bash scripts/install_android_japanese_morphology.sh && bash scripts/install_android_workmanager.sh && npx cap sync android",
     "android:verify-japanese-contract": "tsx scripts/verify_android_japanese_morphology_contract.ts",
     "android:verify-voice-contract": "tsx scripts/verify_android_voice_contract.ts",
-    "test:migration-evidence": "tsx scripts/test_llm_migration_evidence.ts",
     "test:no-local-generative-runtime": "node scripts/test_no_local_generative_runtime_v52.mjs",
     "test:non-llm-final-boundary": "node scripts/test_non_llm_final_boundary_v54.mjs",
     "test:no-local-generative-runtime-v55": "node scripts/test_no_local_generative_runtime_v55.mjs",
@@ -33,7 +32,7 @@
     "test:searxng-pipeline": "tsx scripts/verify_searxng_pipeline.ts",
     "test:headless-pipeline": "tsx scripts/verify_headless_webview_pipeline.ts",
     "test:autonomous-hardening": "tsx scripts/verify_autonomous_hardening_wiring.ts",
-    "test:japanese-analysis-composition": "node scripts/test_japanese_analysis_composition.mjs",
+    "test:parallel-research-providers-v160": "node scripts/test_parallel_research_providers_v160.mjs",
     "test:runtime-conversation-composition": "node scripts/test_runtime_conversation_composition.mjs",
     "test:conversation-composition-research": "node scripts/test_conversation_composition_research_scheduler.mjs",
     "test:epistemic-conversation-feedback": "node scripts/test_epistemic_conversation_feedback.mjs",
@@ -107,7 +106,14 @@
     "test:priority10-internal-web-query-cycle-v121": "node scripts/test_priority10_internal_web_query_cycle_v121.mjs",
     "test:priority10-fixture-runtime-v121": "node --experimental-strip-types scripts/test_priority10_fixture_runtime_v121.mjs",
     "test:priority0-adaptive-core-plan-v148": "node scripts/test_priority0_adaptive_core_plan_v148.mjs",
-    "test:searxng-content-read-v153": "node scripts/verify_searxng_content_read_pipeline_v153.mjs"
+    "test:searxng-content-read-v153": "node scripts/verify_searxng_content_read_pipeline_v153.mjs",
+    "test:adaptive-research-v161": "node scripts/test_adaptive_research_continuation_v161.mjs",
+    "test:research-continuation-v162": "node scripts/test_research_continuation_learning_v162.mjs",
+    "test:core-guards-v164": "node scripts/test_core_idempotency_no_progress_v164.mjs",
+    "test:environment-drift-v165": "node scripts/test_environment_drift_v165.mjs",
+    "test:cognitive-observability-v166": "node scripts/test_cognitive_observability_v166.mjs",
+    "test:core-adaptive-routing-v167": "node scripts/test_core_adaptive_routing_v167.mjs",
+    "test:unified-cognitive-state-v168": "node scripts/test_unified_cognitive_state_v168.mjs"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.0",

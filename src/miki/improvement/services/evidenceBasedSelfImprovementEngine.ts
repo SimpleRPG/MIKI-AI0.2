@@ -320,13 +320,18 @@ export class EvidenceBasedSelfImprovementEngine {
       return { strat, score };
     });
 
-    scored.sort((a, b) => b.score - a.score);
+    scored.sort((a, b) => {
+      const scoreDelta = b.score - a.score;
+      if (scoreDelta !== 0) return scoreDelta;
+      // Final deterministic tie-break: never depend on storage insertion order.
+      return a.strat.strategyId.localeCompare(b.strat.strategyId);
+    });
     const chosen = scored[0]?.strat || this.strategies[0];
 
     chosen.selectedCount = (chosen.selectedCount || 0) + 1;
-    chosen.useCount++;
     chosen.lastUsedAt = Date.now();
-    this.recordLearningUsage(chosen.strategyId, 'STRATEGY');
+    // Selection is not counted as application. LearningUsageEvidence.appliedCount
+    // is updated only after the strategy has actually been used by an improvement attempt.
     this.saveState();
 
     return chosen;
@@ -488,6 +493,11 @@ export class EvidenceBasedSelfImprovementEngine {
 
   // ── 9. Learning Usage Evidence (学習教訓の使用追跡) ──
   public recordLearningUsage(learningId: string, type: LearningUsageEvidence['learningType'], caseId?: string): void {
+    const strategy = this.strategies.find((candidate) => candidate.strategyId === learningId);
+    if (strategy) {
+      strategy.useCount = (strategy.useCount || 0) + 1;
+      strategy.lastUsedAt = Date.now();
+    }
     let entry = this.learningUsage.get(learningId);
     if (!entry) {
       entry = {

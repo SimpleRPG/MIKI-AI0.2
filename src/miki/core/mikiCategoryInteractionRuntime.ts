@@ -5,29 +5,8 @@ import {
   mikiInteractionBusService,
 } from './mikiInteractionBus';
 
-import { storageService } from '../../services/storageService';
-import { longTermMemoryService } from '../memory/services/longTermMemoryService';
 import { coreResultService, CoreResult } from './services/coreResultService';
-
-const NEXT_CATEGORY: Record<MikiCategory, MikiCategory> = {
-  autonomy: 'capability',
-  capability: 'conversation',
-  conversation: 'data',
-  data: 'execution',
-  execution: 'experience',
-  experience: 'improvement',
-  improvement: 'learning',
-  learning: 'memory',
-  memory: 'research',
-  research: 'strategy',
-  strategy: 'selfAwareness',
-  selfAwareness: 'selfDevelopment',
-  selfDevelopment: 'verification',
-  verification: 'safety',
-  safety: 'promotion',
-  promotion: 'unknown',
-  unknown: 'autonomy',
-};
+import { coreTaskIngressService } from './services/coreTaskIngressService';
 
 export interface MikiRuntimeState {
   active: boolean;
@@ -83,225 +62,77 @@ class MikiCategoryInteractionRuntime {
   ): void {
     this.lastInteraction = interaction;
 
-    /*
-     * improvement に到達したイベントは、既存の正規自己改善司令塔へ接続する。
-     */
-    if (
-      category === 'improvement' &&
-      interaction.type === 'improvement.flow'
-    ) {
+    /* improvement.flow -> canonical CORE Task */
+    if (category === 'improvement' && interaction.type === 'improvement.flow') {
       void this.runRealImprovementCycle(interaction);
       return;
     }
 
-    /*
-     * conversation.request: CORE Resultに登録し、次のdata分類へ送る。
-     */
-    if (
-      category === 'conversation' &&
-      interaction.type === 'conversation.request'
-    ) {
+    /* conversation.request -> canonical CORE ingress */
+    if (category === 'conversation' && interaction.type === 'conversation.request') {
       const payloadObj =
         typeof interaction.payload === 'object' && interaction.payload !== null
-          ? (interaction.payload as Record<string, unknown>)
+          ? { ...(interaction.payload as Record<string, unknown>) }
           : { text: interaction.payload };
-
-      const requestId =
-        typeof payloadObj.requestId === 'string'
-          ? payloadObj.requestId
-          : interaction.id;
-
-      coreResultService.recordCategoryStep(requestId, 'conversation', 'processing');
-
-      const next = NEXT_CATEGORY[category];
-      if (next) {
-        mikiInteractionBusService.publish(
-          category,
-          'category.interaction',
-          {
-            requestId,
-            text: payloadObj.text,
-            from: category,
-            to: next,
-          },
-          next,
-        );
-      }
+      const requestId = typeof payloadObj.requestId === 'string' ? payloadObj.requestId : interaction.id;
+      payloadObj.requestId = requestId;
+      payloadObj.interactionId = interaction.id;
+      void coreTaskIngressService.submit({
+        kind: 'USER_REQUEST',
+        goal: typeof payloadObj.text === 'string' && payloadObj.text.trim() ? payloadObj.text.trim() : 'conversation.request',
+        source: 'conversation',
+        payload: payloadObj,
+        initialPayload: payloadObj,
+      }).catch(error => {
+        coreResultService.fail(requestId,error instanceof Error ? error.message : String(error),{route:['conversation'],processedCategories:['conversation']});
+      });
       return;
     }
 
-    /*
-     * data分類: 記憶検索を実行し、execution分類へ渡す。
-     */
-    if (
-      category === 'data' &&
-      interaction.type === 'category.interaction'
-    ) {
-      const payload =
-        typeof interaction.payload === 'object' &&
-        interaction.payload !== null
-          ? (interaction.payload as { text?: unknown; requestId?: unknown })
-          : {};
-
-      const requestId =
-        typeof payload.requestId === 'string' ? payload.requestId : interaction.id;
-      coreResultService.recordCategoryStep(requestId, 'data', 'processing');
-
-      const text = typeof payload.text === 'string' ? payload.text : '';
-
-      if (text) {
-        void longTermMemoryService
-          .searchPipeline(text, storageService.getMemories())
-          .then(result => {
-            coreResultService.recordCategoryStep(requestId, 'execution', 'processing');
-            mikiInteractionBusService.publish(
-              category,
-              'category.interaction',
-              {
-                requestId,
-                text,
-                memorySearch: result,
-                from: category,
-                to: 'execution',
-              },
-              'execution',
-            );
-          })
-          .catch(error => {
-            coreResultService.fail(
-              requestId,
-              error instanceof Error ? error.message : String(error),
-              { route: ['conversation', 'data'] }
-            );
-            mikiInteractionBusService.publish(
-              category,
-              'category.interaction',
-              {
-                requestId,
-                text,
-                error: error instanceof Error ? error.message : String(error),
-                from: category,
-                to: 'execution',
-              },
-              'execution',
-            );
-          });
-      }
-
+    /* legacy data/execution events are observation only; no fixed chaining */
+    if (category === 'data' && interaction.type === 'category.interaction') {
+      const payload = typeof interaction.payload === 'object' && interaction.payload !== null ? interaction.payload as Record<string,unknown> : {};
+      const requestId = typeof payload.requestId === 'string' ? payload.requestId : interaction.id;
+      coreResultService.recordCategoryStep(requestId,'data','processing');
       return;
     }
 
-    /*
-     * execution分類: 受信した結果をCORE Resultに反映
-     */
-    if (
-      category === 'execution' &&
-      interaction.type === 'category.interaction'
-    ) {
-      const payload =
-        typeof interaction.payload === 'object' && interaction.payload !== null
-          ? (interaction.payload as { requestId?: string; text?: string; memorySearch?: unknown; error?: string })
-          : {};
-
-      const requestId = payload.requestId || interaction.id;
-      if (payload.error) {
-        coreResultService.fail(requestId, payload.error, {
-          route: ['conversation', 'data', 'execution'],
-          processedCategories: ['conversation', 'data', 'execution'],
-        });
-      } else {
-        coreResultService.complete(
-          requestId,
-          {
-            text: payload.text,
-            memorySearch: payload.memorySearch,
-            status: 'executed',
-          },
-          {
-            route: ['conversation', 'data', 'execution'],
-            processedCategories: ['conversation', 'data', 'execution'],
-          }
-        );
-      }
+    if (category === 'execution' && interaction.type === 'category.interaction') {
+      const payload = typeof interaction.payload === 'object' && interaction.payload !== null ? interaction.payload as Record<string,unknown> : {};
+      const requestId = typeof payload.requestId === 'string' ? payload.requestId : interaction.id;
+      coreResultService.recordCategoryStep(requestId,'execution',payload.error ? 'failed' : 'processing');
+      if (payload.error) coreResultService.fail(requestId,String(payload.error),{route:['execution'],processedCategories:['execution']});
       return;
     }
 
-    if (interaction.type !== 'category.cycle') {
+    if (interaction.type === 'category.cycle') {
+      const payload = typeof interaction.payload === 'object' && interaction.payload !== null ? interaction.payload as Record<string,unknown> : {cycleId:interaction.payload};
+      const requestId = typeof payload.requestId === 'string' ? payload.requestId : undefined;
+      if (requestId) coreResultService.recordCategoryStep(requestId,category,'processing');
       return;
     }
-
-    const next = NEXT_CATEGORY[category];
-
-    if (!next) {
-      return;
-    }
-
-    mikiInteractionBusService.publish(
-      category,
-      'category.interaction',
-      {
-        cycleId: interaction.payload,
-        from: category,
-        to: next,
-      },
-      next,
-    );
   }
 
   private async runRealImprovementCycle(
     interaction: MikiInteraction,
   ): Promise<void> {
-    const payload =
-      typeof interaction.payload === 'object' && interaction.payload !== null
-        ? (interaction.payload as Record<string, unknown>)
-        : {};
-    const requestId =
-      typeof payload.requestId === 'string' ? payload.requestId : interaction.id;
-
-    coreResultService.recordCategoryStep(requestId, 'improvement', 'processing');
-
+    const payload = typeof interaction.payload === 'object' && interaction.payload !== null ? { ...(interaction.payload as Record<string, unknown>) } : {};
+    const requestId = typeof payload.requestId === 'string' ? payload.requestId : interaction.id;
+    payload.requestId = requestId;
+    payload.interactionId = interaction.id;
+    coreResultService.recordCategoryStep(requestId,'improvement','processing');
     try {
-      const trigger =
-        typeof payload.trigger === 'string' ? payload.trigger : 'miki-17-category-interaction';
-      const { queuedRequest } = coreResultService.submitImprovementRequest({
-        trigger,
-        source: 'SYSTEM',
-        runId: typeof payload.runId === 'string' ? payload.runId : undefined,
-        directiveId: typeof payload.directiveId === 'string' ? payload.directiveId : undefined,
-        payload: { ...payload, sourceInteractionId: interaction.id, requestId },
+      const trigger = typeof payload.trigger === 'string' ? payload.trigger : 'miki-17-category-interaction';
+      const result = await coreTaskIngressService.submit({
+        kind:'SELF_IMPROVEMENT', goal:trigger, source:'improvement', payload:{...payload,trigger}, initialPayload:{...payload,trigger},
       });
-
-      this.lastImprovementRunId = queuedRequest.runId;
-
-      mikiInteractionBusService.publish(
-        'improvement',
-        'improvement.completed',
-        {
-          runId: queuedRequest.runId,
-          trigger: queuedRequest.trigger,
-          sourceInteractionId: interaction.id,
-          requestId,
-        },
-        'learning',
-      );
+      this.lastImprovementRunId = typeof result.coreResult?.runId === 'string' ? result.coreResult.runId : undefined;
+      if (result.task.status === 'COMPLETED') coreResultService.recordCategoryStep(requestId,'improvement','completed');
+      else if (result.task.status === 'PAUSED' || result.task.status === 'WAITING') coreResultService.waiting(requestId,{route:['improvement']});
+      else if (result.task.status === 'FAILED') coreResultService.fail(requestId,'CORE_SELF_IMPROVEMENT_TASK_FAILED',{route:['improvement']});
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      coreResultService.fail(requestId, errMsg, {
-        sourceCategory: 'improvement',
-        processedCategories: ['improvement', 'verification'],
-        route: ['improvement', 'verification'],
-      });
-
-      mikiInteractionBusService.publish(
-        'improvement',
-        'improvement.failed',
-        {
-          sourceInteractionId: interaction.id,
-          requestId,
-          error: errMsg,
-        },
-        'verification',
-      );
+      const errMsg=error instanceof Error?error.message:String(error);
+      coreResultService.fail(requestId,errMsg,{sourceCategory:'improvement',processedCategories:['improvement'],route:['improvement']});
     }
   }
 

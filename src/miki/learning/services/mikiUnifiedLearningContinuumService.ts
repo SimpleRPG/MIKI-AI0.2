@@ -46,6 +46,7 @@ export function normalizeKey(value: string): string {
 
 export class MikiUnifiedLearningContinuumService {
   private profiles = new Map<string, LearningProfile>();
+  private causalPromotionKeys = new Set<string>();
   private initialized = false;
 
   constructor() { this.load(); }
@@ -62,13 +63,16 @@ export class MikiUnifiedLearningContinuumService {
       for (const p of Array.isArray(parsed?.profiles) ? parsed.profiles : []) {
         if (p?.key) this.profiles.set(p.key, { ...p, domains: { ...domains(), ...(p.domains || {}) } });
       }
+      for (const key of Array.isArray(parsed?.causalPromotionKeys) ? parsed.causalPromotionKeys : []) {
+        if (typeof key === 'string' && key) this.causalPromotionKeys.add(key);
+      }
     } catch { this.profiles.clear(); }
   }
 
   private save() {
     try {
       const profiles = [...this.profiles.values()].sort((a, b) => b.lastObservedAt - a.lastObservedAt).slice(0, MAX_PROFILES);
-      storageService.setItem(KEY, JSON.stringify({ version: 1, updatedAt: Date.now(), profiles }));
+      storageService.setItem(KEY, JSON.stringify({ version: 1, updatedAt: Date.now(), profiles, causalPromotionKeys: [...this.causalPromotionKeys].slice(-2000) }));
     } catch (error) { systemLogger.warn('PERSISTENCE', `[LearningContinuum] save failed: ${String(error)}`); }
   }
 
@@ -125,6 +129,53 @@ export class MikiUnifiedLearningContinuumService {
       const score = Math.round((direct + related + usage) * 100) / 100;
       return { capabilityId: id, score, reason: p ? `共通経験 uses=${p.uses}, success=${p.successes}, verified=${p.verified}, confidence=${p.confidence}` : '共通経験なし。新規候補として扱う' };
     }).sort((a, b) => b.score - a.score);
+  }
+
+  /**
+   * Verificationを通過した因果評価だけを、既存Unified Learning Continuumへ昇格する。
+   * raw success/failureやCausalEvent単体からverified学習を生成しない。
+   */
+  public promoteVerifiedCausalInsight(input: {
+    traceId: string;
+    candidate: string;
+    conclusion: 'SUPPORTED' | 'INCONCLUSIVE' | 'REJECTED';
+    verificationStatus: 'VERIFIED' | 'UNVERIFIED' | 'REJECTED';
+    evidenceIds: string[];
+    capabilityIds?: string[];
+    knowledgeRefs?: string[];
+    strategyRefs?: string[];
+    decisionRefs?: string[];
+    actionRefs?: string[];
+    treatmentEffect: number;
+    counterfactualEffect: number;
+    domain?: UnifiedExperienceDomain;
+  }): { promoted: boolean; reason: string; key?: string } {
+    if (input.verificationStatus !== 'VERIFIED') return { promoted: false, reason: 'CAUSAL_VERIFICATION_REQUIRED' };
+    if (input.conclusion !== 'SUPPORTED') return { promoted: false, reason: 'CAUSAL_ASSESSMENT_NOT_SUPPORTED' };
+    const evidenceIds = [...new Set((input.evidenceIds || []).filter(Boolean))];
+    if (!evidenceIds.length) return { promoted: false, reason: 'CAUSAL_EVIDENCE_REQUIRED' };
+    const promotionKey = normalizeKey(`causal:${input.traceId}:${input.candidate}:${evidenceIds.join('|')}`);
+    if (this.causalPromotionKeys.has(promotionKey)) return { promoted: false, reason: 'CAUSAL_ALREADY_PROMOTED', key: promotionKey };
+    const refs = [
+      ...(input.knowledgeRefs || []).map(x => `knowledge:${x}`),
+      ...(input.strategyRefs || []).map(x => `strategy:${x}`),
+      ...(input.decisionRefs || []).map(x => `decision:${x}`),
+      ...(input.actionRefs || []).map(x => `action:${x}`),
+    ];
+    const domain = input.domain || (input.knowledgeRefs?.length ? 'research' : input.capabilityIds?.length ? 'execution' : 'system');
+    this.causalPromotionKeys.add(promotionKey);
+    this.observe({
+      domain,
+      key: promotionKey,
+      action: 'verified_causal_attribution',
+      input: input.candidate,
+      outcome: input.treatmentEffect >= input.counterfactualEffect ? 'SUCCESS' : 'FAILURE',
+      verified: true,
+      capabilityIds: input.capabilityIds,
+      concepts: [input.candidate, ...refs].slice(0, 20),
+      lesson: `verified causal effect=${input.treatmentEffect - input.counterfactualEffect}; evidence=${evidenceIds.join(',')}; trace=${input.traceId}`,
+    });
+    return { promoted: true, reason: 'VERIFIED_CAUSAL_PROMOTED', key: promotionKey };
   }
 
   /** 8層記憶へ渡せる「学習要約」。事実DBを汚さず、経験/手続き/メタ学習として扱う。 */

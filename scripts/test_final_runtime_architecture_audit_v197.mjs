@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+const read=p=>fs.readFileSync(p,'utf8');
+const expected=['core','autonomy','capability','conversation','data','execution','experience','improvement','learning','memory','promotion','research','safety','selfAwareness','selfDevelopment','strategy','unknown','verification'];
+const bad=[];
+const files=[];
+function walk(dir){for(const e of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory())walk(p);else if(/\.(ts|tsx)$/.test(e.name))files.push(p);}}
+walk('src');
+const cross=read('src/miki/core/services/crossDomainCirculationService.ts');
+const router=read('src/miki/core/services/domainRouterService.ts');
+const planner=read('src/miki/core/services/adaptiveRoutePlannerService.ts');
+const ingress=read('src/miki/core/services/coreTaskIngressService.ts');
+const kernel=read('src/miki/selfAwareness/services/mikiCognitiveKernelService.ts');
+const supercharger=read('src/miki/selfDevelopment/services/mikiSelfCodingSuperchargerService.ts');
+const aut=read('src/miki/autonomy/services/autonomousContinuousEvolutionService.ts');
+const server=read('server.ts');
+const android=read('android/app/src/main/assets/public/index.html');
+const domainHits=[...cross.matchAll(/'([A-Za-z][A-Za-z0-9]*)'/g)].map(m=>m[1]).filter(x=>expected.includes(x));
+const unique=[...new Set(domainHits)];
+if(unique.length!==18||!expected.every(x=>unique.includes(x)))bad.push('DOMAIN_SET_NOT_EXACT_18');
+if(!ingress.includes('coreOrchestratorService.run('))bad.push('CORE_INGRESS_NOT_CONNECTED');
+if(!router.includes("'RUN_SELF_IMPROVEMENT'"))bad.push('SELF_IMPROVEMENT_COMMAND_MISSING');
+if(!planner.includes("target:'improvement',command:'RUN_SELF_IMPROVEMENT'"))bad.push('CORE_SELF_IMPROVEMENT_ROUTE_MISSING');
+if(kernel.includes('integratedCognitionControllerService'))bad.push('LEGACY_COGNITION_CONTROLLER_STILL_ACTIVE');
+if(!kernel.includes('coreTaskIngressService.submit({'))bad.push('LEGACY_COGNITION_NOT_BRIDGED_TO_CORE');
+if(!supercharger.includes("authority !== 'CORE_PROMOTION'"))bad.push('CORE_PROMOTION_GUARD_MISSING');
+if(!aut.includes("'CORE_PROMOTION'"))bad.push('CORE_PROMOTION_PATH_MISSING');
+if(!server.includes("trustLevel: 'UNTRUSTED_EXTERNAL_AI'")||!server.includes('directApplyAllowed: false'))bad.push('EXTERNAL_TEACHER_BOUNDARY_MISSING');
+const forbidden=[/localLlmEndpoint/i,/localLlmModel/i,/@mlc-ai\/web-llm/i,/from\s+['"][^'"]*(?:nativeLlmService|webLlmService|ggufModels)[^'"]*['"]/i,/new\s+Worker\([^)]*(?:llama|webllm|gguf)/i];
+for(const p of files){const t=read(p);for(const re of forbidden)if(re.test(t))bad.push(`FORBIDDEN_RUNTIME_REF:${p}:${re}`);}
+if(android.includes('WebLLM local execution')||android.includes('on-device MoE'))bad.push('STALE_ANDROID_LOCAL_LLM_SURFACE');
+const report={version:'v197',passed:bad.length===0,domainCount:unique.length,failures:bad,policy:'single CORE authority; selected work through 17 classifications; review-only self-code; external teacher is untrusted evidence; local generative runtime retired'};
+fs.writeFileSync('FINAL_RUNTIME_ARCHITECTURE_AUDIT_V197.json',JSON.stringify(report,null,2));
+console.log(JSON.stringify(report,null,2));
+if(bad.length)process.exit(1);

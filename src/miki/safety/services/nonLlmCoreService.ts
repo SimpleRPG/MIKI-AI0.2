@@ -4,6 +4,15 @@ import {
   defaultConversationState,
   inferConversationStage,
   resolveAnaphora,
+  selectInformationGainQuestion,
+  updateConversationGoalProgress,
+  evaluateConversationConsistency,
+  inferConversationCorrectionScope,
+  classifyConversationKnowledgeState,
+  assessConversationCompleteness,
+  clarificationGate,
+  buildConversationTemporalContext,
+  verifyConversationEntityTimeStateConsistency,
 } from '../../conversation/services/conversationStateService';
 import { requestTypeCompilerService } from '../../selfDevelopment/services/requestTypeCompilerService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
@@ -40,6 +49,7 @@ import { unknownTaskDecompositionService } from '../../unknown/services/unknownT
 import { causalMemoryLedgerService } from '../../memory/services/causalMemoryLedgerService';
 import { bannedTopicsConfigService } from './bannedTopicsConfigService';
 import { evidenceBasedPromotionGateService } from '../../promotion/services/evidenceBasedPromotionGateService';
+import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { mikiAutonomousDevStudioService } from '../../selfDevelopment/services/mikiAutonomousDevStudioService';
 import { surfaceVariationGrowthService } from '../../conversation/services/surfaceVariationGrowthService';
 import { mikiReasoningTemplateService, ReasoningMatchResult } from '../../selfAwareness/services/mikiReasoningTemplateService';
@@ -136,7 +146,7 @@ export class NonLlmCoreService {
     mikiUnifiedLearningContinuumService.syncFromUnifiedExperience();
 
     // 0. 前ターンの未解決/要確認応答・推論結果に対するユーザー反応の統計的学習・観測 (Chapter 1 & 2)
-    mikiConversationLearningService.evaluatePreviousTurn(prompt, state);
+    const previousTurnEvaluation = mikiConversationLearningService.evaluatePreviousTurn(prompt, state);
 
     // 0.1 ユーザーによる正解・模範回答・意見の教示検知 (Chapter 1)
     const teachingResult = mikiConversationLearningService.detectAndRegisterTeaching(prompt, state.currentTopic);
@@ -150,7 +160,7 @@ export class NonLlmCoreService {
     stages.dialogue = Math.round(performance.now() - t);
     if (japaneseAnalysis.hasCorrection && anaphora.resolved) japaneseAnalysisService.recordCorrection(prompt, anaphora.resolved);
 
-    const nextState: ConversationState = {
+    let nextState: ConversationState = {
       ...state,
       stage,
       topLevelGoal: state.topLevelGoal,
@@ -161,12 +171,28 @@ export class NonLlmCoreService {
     };
 
     if (anaphora.confidence === 'ambiguous') {
+      const clarificationGateResult = clarificationGate(nextState, `anaphora:${anaphora.candidates.slice().sort().join('|')}`);
+      nextState.clarificationControl = clarificationGateResult.next;
+      if (!clarificationGateResult.allowed) {
+        nextState.clarificationPending = true;
+        nextState.unresolvedState = 'PENDING_USER_INPUT';
+        const heldIr = answerContentIrService.buildAnswerIR({
+          conclusion: '対象を自動推測せず保留します。',
+          target: nextState.currentTopic || '会話中の対象',
+          conditions: ['同じ確認を繰り返さず、追加情報が得られるまで判断を保留します。'],
+          certainty: 'UNKNOWN',
+          detailLevel: 'BRIEF',
+        });
+        const heldSurface = answerContentIrService.generateSurfaceTextFromIR(heldIr, 'UNKNOWN_INVESTIGATION', undefined);
+        return this.buildResult('UNRESOLVED', 'clarification_gate_exhausted', heldSurface.surfaceText, nextState, dialogueAct, 0, [], started, stages);
+      }
+      const clarification = selectInformationGainQuestion(anaphora.candidates);
       const ir = answerContentIrService.buildAnswerIR({
         conclusion: '対象を一意に特定できません。',
         target: nextState.currentTopic || '会話中の対象',
         exceptions: [`候補: ${anaphora.candidates.join(' / ')}`],
-        conditions: ['どの候補を指しているかで結論が変わるため、確認が必要です。'],
-        nextActions: ['候補のうち対象を1つ指定してください。'],
+        conditions: [`候補数${clarification.candidateCount}件 / 期待残存候補${clarification.expectedRemainingCandidates}件 / 情報利得${clarification.informationGainBits}bit。${clarification.reason}`],
+        nextActions: [clarification.question],
         certainty: 'UNKNOWN',
         detailLevel: 'BRIEF',
       });
@@ -182,7 +208,7 @@ export class NonLlmCoreService {
     simpleRpgReferenceService.recordReferenceUse(simpleRpgReference.matched.map((x) => x.id));
     const implementationSelection = implementationSelectionService.select(compiled);
     stages.request = Math.round(performance.now() - t);
-    nextState.topLevelGoal = compiled.goal;
+    nextState.topLevelGoal=compiled.goal; nextState.lastPrompt=prompt; nextState.lastDialogueAct=dialogueAct; nextState.lastTopic=nextState.currentTopic; const continuousGoalState=updateConversationGoalProgress(nextState,prompt,state); const conversationConsistency=evaluateConversationConsistency(prompt,continuousGoalState,state,params.messageId); nextState=conversationConsistency.repairedState; nextState.conversationCompleteness=assessConversationCompleteness(nextState); nextState.knowledgeState=classifyConversationKnowledgeState(prompt,nextState); nextState.temporalContext=buildConversationTemporalContext(prompt,nextState,state); if(conversationConsistency.turnDependency && /(?:違う|それじゃない|ではなく|じゃない)/i.test(prompt)) nextState.correctionScope=inferConversationCorrectionScope(prompt).scope; if(previousTurnEvaluation.conversationOutcome) nextState.conversationOutcome=previousTurnEvaluation.conversationOutcome;
 
     // 2.5 決定論的能力・計画パイプライン。
     // 検証済み能力パッチは「保存された教材」ではなく、現在の要求に
@@ -217,7 +243,25 @@ export class NonLlmCoreService {
     }
     stages.knowledge = Math.round(performance.now() - t);
 
+    // v211: 潜在Unknownをまず「候補」として生成し、確度の高いものを既存Knowledge Gapへ1件だけ昇格。
+    // 候補は事実扱いせず、ResearchServiceが既存Evidence/Verification経路を利用できる境界で止める。
+    const potentialUnknowns = knowledgeGapService.predictPotentialUnknowns({
+      claims: claimDatabaseService.getAllClaims().slice(-30),
+      capabilityGaps: capabilityGapService.getAllGaps().filter((g) => g.status !== 'RESOLVED').slice(0, 15),
+      failures: failureMemoryService.list().slice(0, 80),
+      environment: compiled.environment,
+      currentQuery: compiled.target || prompt,
+      limit: 5,
+    });
+    const promotedPotentialUnknown = potentialUnknowns.find((candidate) => candidate.confidence >= 0.82);
+    let potentialUnknownGapId: string | undefined;
+    if (promotedPotentialUnknown && !knowledgeGapService.findOpen(promotedPotentialUnknown.question)) {
+      const promotedGap = knowledgeGapService.promotePotentialUnknown(promotedPotentialUnknown, compiled.requestId);
+      potentialUnknownGapId = promotedGap.id;
+    }
+
     // 4. 感情は回答内容の事実を変更せず、表層方針のみに利用する。
+
     affectionDynamicsService.evaluateAndTransfer(prompt);
 
     // 5. コード要求は既存部品を先に探す。汎用自然言語から勝手にVBAを生成しない。
@@ -323,6 +367,7 @@ export class NonLlmCoreService {
     let status: NonLlmCoreResult['status'] = 'RESOLVED';
     let reason = implementationSelection.reason;
     if (simpleRpgReference.matched.length > 0) reason += `; ${simpleRpgReference.note}`;
+    if (potentialUnknowns.length > 0) reason += `; potential_unknowns=${potentialUnknowns.length}${potentialUnknownGapId ? `; promoted_gap=${potentialUnknownGapId}` : ''}`;
     let verifiedResearchClaimId: string | undefined;
     let verifiedResearchOutcome: 'SUPPORTED' | 'DEVICE_VERIFIED' | undefined;
 
@@ -544,14 +589,38 @@ export class NonLlmCoreService {
     if (decisionText && status === 'RESOLVED') ir.conclusion = decisionText;
     if (dialogueAct === 'CORRECTION') skeleton = 'CORRECTION';
 
+    // v210: 既存ResponseLengthを基礎値に、理解度に応じた説明量だけを適応。
+    const explanationAdaptation = adaptExplanationDetailLevel(prompt, nextState, ir.detail_level === 'BRIEF' ? 'short' : ir.detail_level === 'DETAILED' ? 'detailed' : 'standard');
+    ir.detail_level = explanationAdaptation.selectedDetailLevel === 'short' ? 'BRIEF' : explanationAdaptation.selectedDetailLevel === 'detailed' ? 'DETAILED' : 'STANDARD';
+    nextState.explanationAdaptation = explanationAdaptation;
+
     t = performance.now();
     const runtimeComposition = runtimeConversationCompositionService.compose(ir, skeleton, { maxCandidates: 4, timeBudgetMs: 12, assembledCode });
-    const surface = { surfaceText: runtimeComposition.surfaceText };
+    let surface = { surfaceText: runtimeComposition.surfaceText };
+    const temporalGuard = verifyConversationEntityTimeStateConsistency(prompt, surface.surfaceText, nextState);
+    usedComponents.push(`conversation.temporal_state_consistency:${temporalGuard.passed ? 'PASS' : 'BLOCK'}`);
+    if (!temporalGuard.passed) {
+      status = 'UNRESOLVED';
+      reason = `conversation_temporal_state_inconsistency:${temporalGuard.conflicts.join('|')}`;
+      const guardIr = answerContentIrService.buildAnswerIR({ conclusion: '会話内の時間・状態条件が混在しているため、ここでは断定を避けます。', target: nextState.currentTopic || '会話中の対象', exceptions: temporalGuard.conflicts, conditions: ['時間・状態の基準が一意に整合してから結論を確定します。'], certainty: 'UNKNOWN', detailLevel: 'BRIEF' });
+      surface = { surfaceText: answerContentIrService.generateSurfaceTextFromIR(guardIr, 'UNKNOWN_INVESTIGATION', undefined).surfaceText };
+    }
     const preservation = answerContentIrService.verifySemanticPreservation(ir, surface.surfaceText);
     usedComponents.push(`conversation.runtime_composition:${runtimeComposition.selectedSkeleton}`);
     usedComponents.push(`conversation.runtime_candidates:${runtimeComposition.candidatesEvaluated}`);
     if (runtimeComposition.cacheHit) usedComponents.push('conversation.runtime_cache_hit');
     stages.answer = Math.round(performance.now() - t);
+    const explicitEvidenceIds=Array.isArray((ir as any).provenance)?(ir as any).provenance.flatMap((x:any)=>Array.isArray(x?.evidenceIds)?x.evidenceIds:[]):[];
+    const internalEvidenceIds=Array.isArray((ir as any).__evidenceIds)?(ir as any).__evidenceIds:[];
+    const explicitClaimIds=Array.isArray((ir as any).provenance)?(ir as any).provenance.flatMap((x:any)=>Array.isArray(x?.claimIds)?x.claimIds:[]):[];
+    const claimIds=[...(claimMatch.bestClaim?.claim_id?[claimMatch.bestClaim.claim_id]:[]),...(claimMatch.supportingClaims||[]).slice(0,4).map((x:any)=>x.claim_id),...explicitClaimIds].filter(Boolean);
+    const evidenceIds=[...new Set([...internalEvidenceIds,...explicitEvidenceIds].filter(Boolean))];
+    const priorExperiences=unifiedMikiExperienceService.getRecent(80).filter((x:any)=>x.domain==='conversation').map((x:any)=>x.id).slice(-8);
+    const answerChangeSnapshot=mikiConversationLearningService.buildAnswerDecisionSnapshot({prompt,ir,surfaceText:surface.surfaceText,claimIds,evidenceIds,capabilityIds:usedComponents,experienceIds:priorExperiences,strategyRefs:[ir.strategy||'',skeleton],decisionRefs:[implementationSelection.capabilityId,implementationSelection.mode,nextState.lastReasoningTemplateId||'']});
+    const answerChangeComparison=mikiConversationLearningService.compareAndRecordAnswerChange(nextState,answerChangeSnapshot);
+    nextState.lastAnswerDecisionSnapshot=answerChangeComparison.state.lastAnswerDecisionSnapshot;
+    nextState.answerDecisionHistory=answerChangeComparison.state.answerDecisionHistory;
+    nextState.lastAnswerChangeExplanation=answerChangeComparison.explanation;
 
     if (!preservation.isPreserved) {
       status = 'UNRESOLVED';
@@ -579,6 +648,7 @@ export class NonLlmCoreService {
 
     nextState.lastResultStatus = status;
     nextState.lastPrompt = prompt;
+    if(nextState.lastAnswerChangeExplanation?.changed) reason += `; answer_change=${nextState.lastAnswerChangeExplanation.causes.join(',')}`;
     nextState.lastDialogueAct = dialogueAct;
     nextState.lastTopic = nextState.currentTopic;
     nextState.lastNormalizedKey = convKey;

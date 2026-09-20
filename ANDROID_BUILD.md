@@ -1,16 +1,14 @@
-# Miki AI - 端末ネイティブGPU (OpenCL / Vulkan / MLC-LLM / llama.cpp) Android APK ビルド手順
+# Miki AI - Android APK ビルド手順（Capacitor / Deterministic Non-LLM Core）
 
-本プロジェクトは **WebViewのWebGPU制限を完全回避し、Android端末の物理GPU（Snapdragon Adreno / MediaTek Mali等）で直接TVM OpenCL/Vulkanシェーダーおよびllama.cpp C++ JNIを実行するネイティブLLMエンジン** を搭載しています。
+本プロジェクトの現行ランタイムは **CORE + 17分類の決定論的Non-LLMアーキテクチャ**です。Android版はCapacitor/WebViewを実行シェルとして利用し、ローカル生成LLM、retired model format、retired local runtime、retired local runtimeは実行しません。
 
 ---
 
-### 🌟 なぜネイティブGPUエンジン（MLC-LLM / TVM Runtime）なのか？
-1. **WebViewの制限を完全回避**: Android System WebViewではGoogleによりWebGPUが無効化されていますが、本アプリはCapacitorネイティブブリッジ経由でOSネイティブ層（Java/JNI/C++）から直接GPUを叩くため、100%確実にGPUアクセラレーションが動作します。
-2. **8GB以上の実機RAM解放**: `android:largeHeap="true"` を有効化し、ブラウザの2.5GB制限を突破。端末本来の物理メモリを限界まで活用可能。
-3. **MLC-LLM (TVM Runtime) & llama.cpp JNI Architecture**:
-   - `arm64-v8a` 向けネイティブ `.so` / AAR パイプライン
-   - Adreno / Mali GPU 向け OpenCL / Vulkan シェーダー最適化
-   - 30〜60 tokens/sec の超高速レスポンス
+### 🌟 現在のAndroidランタイム方針
+1. UIとアプリ実行はCapacitor/WebViewを使用します。
+2. 通常処理は決定論的Non-LLM Coreと既存の検証済み部品で行います。
+3. 外部Gemini等は必要時のみ教師/Evidence境界から利用し、端末内モデル推論は行いません。
+4. GPU/ネイティブ高速化が必要な個別処理は、その処理能力が実際に導入・検証されている場合だけ使用します。
 
 ---
 

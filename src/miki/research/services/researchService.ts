@@ -4,8 +4,17 @@ import { evidenceService, EvidenceRecord } from '../../memory/services/evidenceS
 import { verifierService, VerificationResult } from '../../verification/services/verifierService';
 import { researchStrategyService, ResearchRoute } from './researchStrategyService';
 import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/services/cognitiveEvidenceIntegrationService';
+import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 
 export type { ResearchRoute };
+
+export type ResearchOutcomeState =
+  | 'EVIDENCE_FOUND'
+  | 'NO_RESULT'
+  | 'INSUFFICIENT_SEARCH'
+  | 'SOURCE_UNAVAILABLE'
+  | 'NOT_FOUND_AFTER_COVERAGE'
+  | 'CONFIRMED_ABSENCE';
 
 export interface ResearchResult {
   gapId: string;
@@ -15,8 +24,15 @@ export interface ResearchResult {
   claimIds: string[];
   resolved: boolean;
   reason: string;
+  outcome: ResearchOutcomeState;
   summary?: string;
   verification?: VerificationResult[];
+  roundsCompleted?: number;
+  continuationAvailable?: boolean;
+  continuationReason?: string;
+  nextQuery?: string;
+  researchQuery?: string;
+  continuationRound?: number;
 }
 
 /**
@@ -41,13 +57,41 @@ export class ResearchService {
     return ResearchService.instance;
   }
 
-  public async researchGap(gap: KnowledgeGap, options?: { forceRoute?: ResearchRoute; requireFresh?: boolean; maxAgeDays?: number; maxPasses?: number }): Promise<ResearchResult> {
+  public async researchGap(gap: KnowledgeGap, options?: {
+    forceRoute?: ResearchRoute;
+    requireFresh?: boolean;
+    maxAgeDays?: number;
+    maxPasses?: number;
+    adaptive?: boolean;
+    maxPagesPerPass?: number;
+    query?: string;
+    continuationRound?: number;
+  }): Promise<ResearchResult> {
     const evidence: EvidenceRecord[] = [];
     const claimIds: string[] = [];
 
     knowledgeGapService.markResearching(gap.id);
     const startedAt = Date.now();
-    const maxPasses = Math.max(1, Math.min(3, options?.maxPasses ?? 2));
+    const baseQuery = typeof options?.query === 'string' && options.query.trim().length > 0
+      ? options.query.trim()
+      : gap.query;
+    const continuationRound = Number.isFinite(options?.continuationRound)
+      ? Math.max(0, Math.floor(options!.continuationRound!))
+      : 0;
+    /*
+     * P0: 固定3回を最終仕様にしない。
+     * 1回の呼び出しには安全な実行上限を置くが、adaptive=trueなら
+     * COREが同じKnowledge Gapを次のcycleで再投入できる。
+     * これにより「無限HTTP」ではなく、状態を持った論理的に無制限な探索になる。
+     */
+    const adaptive = options?.adaptive !== false;
+    const requestedPasses = Number.isFinite(options?.maxPasses)
+      ? Math.max(1, Math.floor(options!.maxPasses!))
+      : 2;
+    const invocationPassLimit = adaptive
+      ? Math.max(requestedPasses, 4)
+      : Math.min(3, requestedPasses);
+    const maxPagesPerPass = Math.max(1, Math.min(3, options?.maxPagesPerPass ?? 2));
     const strategy = options?.forceRoute
       ? { route: options.forceRoute, reason: '呼び出し元が明示的にこの研究経路を要求しました。', alternatives: [] as ResearchRoute[] }
       : researchStrategyService.chooseRoute(gap.type, gap.query);
@@ -63,6 +107,7 @@ export class ResearchService {
           claimIds,
           resolved: false,
           reason: `Local Claim経路を選択しましたが、現在のResearchServiceにはローカルClaimから検証する安全な入口がないため保留しました。 ${strategy.reason}`,
+          outcome: 'INSUFFICIENT_SEARCH',
         };
       }
 
@@ -79,18 +124,37 @@ export class ResearchService {
           claimIds,
           resolved: false,
           reason: `Research Strategy=${strategy.route}。安全な実行入口がないため外部調査は行いませんでした。`,
+          outcome: 'SOURCE_UNAVAILABLE',
         };
       }
 
       let summary: string | undefined;
       let verification: VerificationResult[] = [];
       let resolved = false;
+      let continuationAvailable = false;
+      let continuationReason = '';
+      let nextQuery = gap.query;
+      let roundsCompleted = 0;
+      let previousEvidenceFingerprint = '';
 
-      for (let pass = 0; pass < maxPasses; pass++) {
-        const passQuery = pass === 0
-          ? gap.query
-          : `${gap.query} / second-pass independent verification / official documentation / troubleshooting root cause / compatibility / known failure`;
-        const raw = await autonomousSearchService.executeSearch(passQuery, { bypassCache: pass > 0 });
+      const buildAdaptiveQuery = (round: number, results: VerificationResult[]): string => {
+        if (round === 0) return baseQuery;
+        const reasons = results.flatMap(result => Array.isArray(result.reasons) ? result.reasons : [])
+          .map(String)
+          .filter(Boolean);
+        const focus = reasons.length > 0
+          ? [...new Set(reasons)].slice(0, 4).join(' / ')
+          : 'independent evidence / official documentation / counterevidence / compatibility';
+        return `${baseQuery} / adaptive research round ${continuationRound + round + 1} / ${focus}`;
+      };
+
+      for (let pass = 0; pass < invocationPassLimit; pass++) {
+        roundsCompleted = pass + 1;
+        const passQuery = buildAdaptiveQuery(pass, verification);
+        nextQuery = passQuery;
+        const raw = await autonomousSearchService.executeSearch(passQuery, {
+          bypassCache: pass > 0,
+        });
         const results = this.normalizeSearchResults(raw);
         if (typeof (raw as any)?.summary === 'string') summary = (raw as any).summary;
 
@@ -98,14 +162,19 @@ export class ResearchService {
         // building the final evidence/claim set, so SearXNG -> page content -> Evidence
         // is one Research pipeline rather than two disconnected services.
         const readResults = await autonomousSearchService.readSearchResultPages(passQuery, results, {
-          maxPages: 2,
+          maxPages: maxPagesPerPass,
         });
 
         for (const page of readResults) {
           if (!page.success || !page.text.trim()) continue;
-          const sourceProvider = String((raw as any)?.provider || '').toLowerCase() === 'searxng'
+          const itemSource = String(page.result.source || '').toLowerCase();
+          const sourceProvider = itemSource.includes('searxng')
             ? 'searxng'
-            : 'headless_webview';
+            : itemSource.includes('wikipedia')
+              ? 'wikipedia'
+              : itemSource.includes('duckduckgo')
+                ? 'duckduckgo'
+                : 'headless_webview';
           const content = page.text.trim().slice(0, 12000);
           const pageEvidence = evidenceService.recordWebEvidence({
             title: `${page.result.title} [本文読取]`,
@@ -194,8 +263,53 @@ export class ResearchService {
         // Verified or otherwise admissible claims are mirrored into the Knowledge OS.
         // This is a structural sync only; it never promotes an unverified claim.
         cognitiveEvidenceIntegrationService.ingestClaims(claimIds);
-        if (resolved) break;
+        if (resolved) {
+          continuationAvailable = false;
+          continuationReason = 'VERIFIED';
+          break;
+        }
+
+        const evidenceFingerprint = [...new Set(evidence.map(item => `${item.source_id}|${item.independence_cluster_id}|${item.url}`))]
+          .sort()
+          .join('||');
+        const noNewEvidence = evidenceFingerprint !== '' && evidenceFingerprint === previousEvidenceFingerprint;
+        previousEvidenceFingerprint = evidenceFingerprint;
+
+        if (adaptive && noNewEvidence) {
+          continuationAvailable = false;
+          continuationReason = 'NO_NEW_EVIDENCE';
+          break;
+        }
+
+        continuationAvailable = adaptive && pass + 1 >= invocationPassLimit;
+        continuationReason = continuationAvailable
+          ? 'NEXT_CORE_CYCLE_REQUIRED'
+          : 'INSUFFICIENT_VERIFICATION';
+
+        if (!adaptive) break;
       }
+
+      mikiUnifiedLearningContinuumService.observe({
+        domain: 'research',
+        key: `knowledge-gap:${gap.id}`,
+        action: 'adaptive_research_round',
+        input: baseQuery,
+        outcome: resolved ? 'SUCCESS' : 'FAILURE',
+        verified: resolved,
+        concepts: [gap.type, continuationReason || 'INSUFFICIENT_VERIFICATION'],
+        lesson: resolved
+          ? 'Research evidence was independently verified and promoted.'
+          : continuationAvailable
+            ? 'Research requires another CORE cycle with a new evidence query.'
+            : continuationReason || 'Research stopped without sufficient verification.'
+      });
+      const observedEvidenceCount = evidence.filter(item => item.status !== 'REJECTED').length;
+      const hasAnyResults = observedEvidenceCount > 0 || claimIds.length > 0;
+      const outcome: ResearchOutcomeState = resolved
+        ? 'EVIDENCE_FOUND'
+        : hasAnyResults
+          ? (continuationAvailable ? 'INSUFFICIENT_SEARCH' : 'NOT_FOUND_AFTER_COVERAGE')
+          : (roundsCompleted > 0 ? 'NO_RESULT' : 'SOURCE_UNAVAILABLE');
 
       researchStrategyService.recordOutcome(gap.type, 'WEB_SEARCH', resolved, Date.now() - startedAt);
       return {
@@ -205,13 +319,32 @@ export class ResearchService {
         evidence,
         claimIds,
         resolved,
+        outcome,
         verification,
         summary,
+        roundsCompleted,
+        continuationAvailable,
+        continuationReason,
+        nextQuery,
+        researchQuery: baseQuery,
+        continuationRound,
         reason: resolved
-          ? '複数パスのWeb調査で得たEvidenceを独立性・矛盾条件で検証し、少なくとも1件のClaimをSUPPORTED/DEVICE_VERIFIEDへ昇格しました。'
-          : `最大${maxPasses}パスの調査を行いましたが、独立検証条件を満たさないためKnowledge Gapは未解決です。`,
+          ? 'Web調査で得たEvidenceを独立性・矛盾条件で検証し、少なくとも1件のClaimをSUPPORTED/DEVICE_VERIFIEDへ昇格しました。'
+          : continuationAvailable
+            ? `現在のResearch実行枠では未解決です。COREは次cycleで同じKnowledge Gapを再評価し、次の探索ラウンドを継続できます。`
+            : `Researchを${roundsCompleted}ラウンド実行しましたが、独立検証条件を満たさないためKnowledge Gapは未解決です。`,
       };
     } catch (error) {
+      mikiUnifiedLearningContinuumService.observe({
+        domain: 'research',
+        key: `knowledge-gap:${gap.id}`,
+        action: 'adaptive_research_error',
+        input: baseQuery,
+        outcome: 'FAILURE',
+        verified: false,
+        concepts: [gap.type, 'RESEARCH_ERROR'],
+        lesson: error instanceof Error ? error.message : 'unknown research error'
+      });
       researchStrategyService.recordOutcome(gap.type, strategy.route, false, Date.now() - startedAt);
       knowledgeGapService.markBlocked(
         gap.id,
@@ -225,6 +358,9 @@ export class ResearchService {
         evidence,
         claimIds,
         resolved: false,
+        outcome: evidence.length > 0 ? 'INSUFFICIENT_SEARCH' : 'SOURCE_UNAVAILABLE',
+        researchQuery: baseQuery,
+        continuationRound,
         reason: '調査中にエラーが発生したため、Knowledge GapをBLOCKEDにしました。',
       };
     }

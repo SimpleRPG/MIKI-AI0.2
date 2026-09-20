@@ -79,7 +79,6 @@ import { PromotionGateSubView } from './non_llm_views/PromotionGateSubView';
 import { AutonomousHardeningSubView } from './non_llm_views/AutonomousHardeningSubView';
 import { CloudGatewaySubView } from './non_llm_views/CloudGatewaySubView';
 import { HardwarePipelineSubView } from './non_llm_views/HardwarePipelineSubView';
-import { LlmMigrationSubView } from './non_llm_views/LlmMigrationSubView';
 import {
   GitBranch,
   Sparkles,
@@ -87,7 +86,6 @@ import {
   Heart,
   Layers,
   Cpu,
-  GitMerge,
   ShieldAlert,
   Cloud,
 } from 'lucide-react';
@@ -105,7 +103,7 @@ export const NonLlmArchitectureTab: React.FC = () => {
     | 'metacognitive'
     | 'affection_dynamics'
     | 'formal_csp'
-    | 'llm_migration'
+    | 'runtime_policy'
     | 'promotion_gate'
     | 'autonomous_hardening'
     | 'cloud_gateway'
@@ -590,17 +588,17 @@ export const NonLlmArchitectureTab: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveSubTab('llm_migration')}
+          onClick={() => setActiveSubTab('runtime_policy')}
           className={`flex items-center gap-2 px-3 py-2 text-xs md:text-sm font-medium border-b-2 whitespace-nowrap transition ${
-            activeSubTab === 'llm_migration'
-              ? 'border-amber-500 text-amber-400'
+            activeSubTab === 'runtime_policy'
+              ? 'border-emerald-500 text-emerald-400'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
-          <GitMerge className="w-4 h-4" />
-          第13.3節: LLM移管判定
-          <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-            シャドー
+          <ShieldAlert className="w-4 h-4" />
+          Runtime Policy
+          <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            NON-LLM
           </span>
         </button>
 
@@ -1919,8 +1917,32 @@ export const NonLlmArchitectureTab: React.FC = () => {
         </div>
       )}
 
-      {/* --- Tab 11: LLM Migration Protocol (第13.3節) --- */}
-      {activeSubTab === 'llm_migration' && <LlmMigrationSubView />}
+      {activeSubTab === 'runtime_policy' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl border border-emerald-800/70 bg-slate-900/80">
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldAlert className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-sm font-semibold text-emerald-300">Current Runtime Policy</h3>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              通常処理はCORE + 17分類の決定論的Non-LLM構成で実行します。外部Gemini等は必要時の教師/Evidence境界のみで利用し、端末内の生成モデル実行は行いません。
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[
+              ['Runtime', 'NON_LLM_ONLY'],
+              ['Architecture', 'CORE + 17 classifications'],
+              ['External Teacher', 'UNTRUSTED_EXTERNAL_AI / review required'],
+              ['Physical Self-Code Apply', 'CORE_PROMOTION only'],
+            ].map(([label, value]) => (
+              <div key={label} className="p-3 rounded-xl border border-slate-800 bg-slate-950/70">
+                <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
+                <div className="mt-1 text-xs font-semibold text-slate-200">{value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* --- Tab 12: Autonomous Hardening & Red Teaming (第7.3節) --- */}
       {activeSubTab === 'autonomous_hardening' && <AutonomousHardeningSubView />}

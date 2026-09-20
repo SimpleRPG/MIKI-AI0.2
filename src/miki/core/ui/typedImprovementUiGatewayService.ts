@@ -10,6 +10,7 @@ import { priorityOneRuntimeReadModelService } from '../services/priorityOneRunti
 export type { PriorityOneRuntimeItem, PriorityOneAllowedAction } from '../services/priorityOneRuntimeReadModelService';
 import { selfImprovementControllerService } from '../../improvement/services/selfImprovementControllerService';
 import { autonomousSelfImprovementLoopService } from '../services/autonomousSelfImprovementLoopService';
+import type { AutopilotConfig } from '../../autonomy/services/autonomousContinuousEvolutionService';
 
 export type { AutonomousLoopState, AutonomousImprovementRequest } from '../services/autonomousSelfImprovementLoopService';
 export type { ImprovementRun } from '../../improvement/services/selfImprovementControllerService';
@@ -25,7 +26,8 @@ export type ImprovementUiCommand =
   | { commandType:'RESUME_IMPROVEMENT_TASK'; taskId:string; requestedAt:number; commandId:string; operationInstanceId:string; }
   | { commandType:'IMPORT_EXTERNAL_FEEDBACK'; goal:string; packageId:string; rawResponse:string; sourceType:'PASTED_TEXT'|'IMPORTED_TXT'|'IMPORTED_JSON'; requestedAt:number; commandId:string; operationInstanceId:string; }
   | { commandType:'SUBMIT_REVIEW_DECISION'; goal:string; externalReviewId:string; decision:'ACCEPT'|'REJECT'|'REQUEST_CHANGES'|'HOLD'|'PARTIAL_ACCEPT'|'PARTIAL_REJECT'; reason:string; requestedAt:number; commandId:string; operationInstanceId:string; }
-  | { commandType:'COMMIT_CANDIDATE_TRANSACTION'; goal:string; workspaceId:string; persistenceReceiptId:string; requestedAt:number; commandId:string; operationInstanceId:string; };
+  | { commandType:'COMMIT_CANDIDATE_TRANSACTION'; goal:string; workspaceId:string; persistenceReceiptId:string; requestedAt:number; commandId:string; operationInstanceId:string; }
+  | { commandType:'SAVE_AUTONOMY_CONFIG'; goal:string; config:Partial<AutopilotConfig>; requestedAt:number; commandId:string; operationInstanceId:string; };
 
 export interface ImprovementUiCommandResult {
   commandId:string;
@@ -85,6 +87,7 @@ class TypedImprovementUiGatewayService {
   startSpecifiedImprovement(goal:string,target:string){return this.sendImprovementCommand({commandType:'START_SPECIFIED_IMPROVEMENT',goal,target,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-improvement'),operationInstanceId:coreResultService.generateRequestId('operation')});}
   discoverImprovementTarget(goal='改善対象を自動で探し、評価可能な候補を作る'){return this.sendImprovementCommand({commandType:'DISCOVER_IMPROVEMENT_TARGET',goal,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-discovery'),operationInstanceId:coreResultService.generateRequestId('operation')});}
   resumeImprovementTask(taskId:string){return this.sendImprovementCommand({commandType:'RESUME_IMPROVEMENT_TASK',taskId,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-resume'),operationInstanceId:coreResultService.generateRequestId('operation')});}
+  async saveAutonomyConfig(config:Partial<AutopilotConfig>){const command:ImprovementUiCommand={commandType:'SAVE_AUTONOMY_CONFIG',goal:'自律巡回設定を保存する',config,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-autonomy-config'),operationInstanceId:coreResultService.generateRequestId('operation')};const result=await coreTaskIngressService.submit({kind:'SYSTEM_TASK',goal:command.goal,source:'core',payload:{entry:'TYPED_IMPROVEMENT_UI_GATEWAY',operation:'SAVE_AUTONOMY_CONFIG',config:command.config,commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt}});return this.toCommandResult(command,result);}
 
   private toCommandResult(command:ImprovementUiCommand,result:Awaited<ReturnType<typeof coreTaskIngressService.submit>>|undefined):ImprovementUiCommandResult{
     if(!result)return {commandId:command.commandId,operationInstanceId:command.operationInstanceId,currentStage:'NOT_FOUND',stopReason:'TASK_NOT_FOUND',unresolved:['TASK_NOT_FOUND'],domainReplyIds:[],evidenceIds:[],persistenceReceiptIds:[],requiredDomains:[],missingDomains:[],failedDomains:[],missingReceipts:[],missingRequiredOperations:[],completionReasons:['TASK_NOT_FOUND']};
