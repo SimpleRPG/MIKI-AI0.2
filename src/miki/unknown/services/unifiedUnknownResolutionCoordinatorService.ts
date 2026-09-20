@@ -12,6 +12,8 @@ import {
 export interface UnifiedUnknownRequest {
   question: string;
   useSearch: boolean;
+  /** 解析Componentが報告した未解決語。キーワード判定に掛からなくても調査根拠にする。 */
+  unknownTerms?: string[];
   hasAttachments: boolean;
   confirmRetry?: (message: string) => boolean | Promise<boolean>;
   onProgress?: (message: string, details?: Record<string, unknown>) => void;
@@ -49,9 +51,16 @@ class UnifiedUnknownResolutionCoordinatorService {
       };
     }
 
-    const decision = request.useSearch
+    let decision: ReturnType<typeof autonomousSearchService.detectNeedForSearch> = request.useSearch
       ? autonomousSearchService.detectNeedForSearch(request.question)
-      : { needsSearch: false as const };
+      : { needsSearch: false };
+    const terms = (request.unknownTerms || []).map((term) => String(term).trim()).filter(Boolean);
+    if (request.useSearch && !decision.needsSearch && terms.length > 0) {
+      const searchConfig = autonomousSearchService.getConfig();
+      if (searchConfig.enabled && searchConfig.autoSearchInChat) {
+        decision = { needsSearch: true, query: terms.join(' '), reason: '解析Componentが未解決語を検出', category: 'factual' };
+      }
+    }
 
     if (!decision.needsSearch || !decision.query || !routes.includes('WEB')) {
       unknownResolutionService.attempt(resolution.id, routes[0] || 'SOURCE');

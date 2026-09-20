@@ -41,7 +41,7 @@ const STORAGE_KEY='miki_web_research_policy_v1';
 const DEFAULT_POLICY: WebResearchPolicy={policyId:'WRP-GLOBAL',policyRevision:1,targetMode:'AUTO',maxCandidateUrls:10,maxRenderedPages:5,maxAdditionalChecks:3,stopWhenTargetReached:true,requirePrimarySource:true,requireCounterEvidenceSearch:true,sourceIndependenceMode:'STANDARD',updatedAt:0};
 const clamp=(n:number,min:number,max:number)=>Math.min(max,Math.max(min,Math.trunc(Number.isFinite(n)?n:min)));
 class WebResearchPolicyService {
-  get():WebResearchPolicy {const saved=storageService.getItem<WebResearchPolicy>(STORAGE_KEY);return this.normalize(saved||DEFAULT_POLICY);}
+  get():WebResearchPolicy {const saved=storageService.getJson<WebResearchPolicy>(STORAGE_KEY, DEFAULT_POLICY);return this.normalize(saved||DEFAULT_POLICY);}
   save(input:WebResearchPolicy):WebResearchPolicyReceipt {const current=this.get();const next=this.normalize({...input,policyId:'WRP-GLOBAL',policyRevision:current.policyRevision+1,updatedAt:Date.now()});storageService.setItem(STORAGE_KEY,next);const policySha256=canonicalSha256Object(next);return {receiptId:`WRPR-${policySha256.slice(0,20)}`,policyId:next.policyId,policyRevision:next.policyRevision,policySha256,targetIndependentSourceCount:this.resolveTarget(next),createdAt:next.updatedAt};}
   resolveTarget(policy=this.get()):number|'AUTO' {if(policy.targetMode==='AUTO')return 'AUTO';if(policy.targetMode==='CUSTOM')return clamp(policy.customTargetCount||3,1,25);return policy.targetMode;}
   remaining(progress:WebResearchProgress,policy=this.get()):number|null {const target=this.resolveTarget(policy);if(target==='AUTO')return null;return Math.max(0,target-progress.acceptedIndependentSourceCount);}

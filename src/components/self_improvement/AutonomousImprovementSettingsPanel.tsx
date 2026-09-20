@@ -13,7 +13,7 @@ const durationMs = (mode: DurationMode) => mode === 'forever' ? Number.POSITIVE_
 
 export const AutonomousImprovementSettingsPanel: React.FC = () => {
   const [settings, setSettings] = useState<Settings>(() => {
-    try { return { ...defaults, ...JSON.parse(storageService.getItem(STORAGE_KEY) || '{}') }; } catch { return defaults; }
+    try { return { ...defaults, ...storageService.getJson(STORAGE_KEY, {}) }; } catch { return defaults; }
   });
   const [running, setRunning] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);

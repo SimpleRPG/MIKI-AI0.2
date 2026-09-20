@@ -143,7 +143,7 @@ class JapaneseDictionaryService {
   public getPackageInfo(): JapaneseDictionaryPackageInfo[] { return [...this.packageInfo.values()]; }
 
   private importedEntries(key: string): JapaneseDictionaryEntry[] { return [...this.imported.values()].flat().filter(e => e.normalized === key); }
-  private loadPersonal() { try { const raw = storageService.getItem(PERSONAL_KEY); const arr = raw ? JSON.parse(raw) : []; if (Array.isArray(arr)) for (const e of arr) if (e?.normalized) this.personal.set(e.normalized, e); } catch { /* conservative empty dictionary */ } }
+  private loadPersonal() { try { const arr = storageService.getJson<JapaneseDictionaryEntry[]>(PERSONAL_KEY, []); if (Array.isArray(arr)) for (const e of arr) if (e?.normalized) this.personal.set(e.normalized, e); } catch { /* conservative empty dictionary */ } }
   private savePersonal() { try { storageService.setItem(PERSONAL_KEY, JSON.stringify([...this.personal.values()].slice(-5000))); } catch { systemLogger.warn('CHAT', '[JapaneseDictionary] personal dictionary persistence unavailable'); } }
   private loadPackages() {
     try {

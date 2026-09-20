@@ -330,13 +330,25 @@ class StorageService {
 
   // --- localStorage-compatible synchronous API ---
 
+  /**
+   * localStorage-compatible read boundary. With no fallback, the stored value
+   * is returned exactly as a string. Supplying a non-string fallback opts into
+   * typed JSON decoding for legacy typed call sites.
+   */
   public getItem(key: string): string | null;
   public getItem<T>(key: string, fallback: T): T;
-  public getItem<T>(key: string): T | null;
   public getItem<T = string>(key: string, fallback?: T): T | string | null {
     const raw = this.cache.has(key) ? this.cache.get(key)! : null;
     if (raw === null) return fallback === undefined ? null : fallback;
-    try { return JSON.parse(raw) as T; } catch { return raw as unknown as T; }
+    if (fallback === undefined || typeof fallback === 'string') return raw;
+    try { return JSON.parse(raw) as T; } catch { return fallback; }
+  }
+
+  /** Read a persisted JSON value with an explicit fallback. */
+  public getJson<T>(key: string, fallback: T): T {
+    const raw = this.cache.has(key) ? this.cache.get(key)! : null;
+    if (raw === null) return fallback;
+    try { return JSON.parse(raw) as T; } catch { return fallback; }
   }
 
   public setItem(key: string, value: string): void;

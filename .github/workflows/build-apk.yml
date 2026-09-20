@@ -38,6 +38,9 @@ jobs:
       - name: Install Japanese morphology (Sudachi) dependency
         run: bash scripts/install_android_japanese_morphology.sh
 
+      - name: Install Android WorkManager / headless-fetch plugin
+        run: bash scripts/install_android_workmanager.sh
+
       - name: Sync Capacitor Android
         run: npx cap sync android
 

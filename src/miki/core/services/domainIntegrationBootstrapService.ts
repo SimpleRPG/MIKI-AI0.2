@@ -81,7 +81,7 @@ class DomainIntegrationBootstrapService{
   }
   if(domain==='unknown'&&envelope.command==='RESOLVE_UNKNOWN'){
    const {unifiedUnknownResolutionCoordinatorService}=await import('../../unknown/services/unifiedUnknownResolutionCoordinatorService');
-   return done(await unifiedUnknownResolutionCoordinatorService.resolveForChat({question:String(envelope.payload.question||''),useSearch:Boolean(envelope.payload.useSearch),hasAttachments:Boolean(envelope.payload.hasAttachments)}));
+   return done(await unifiedUnknownResolutionCoordinatorService.resolveForChat({question:String(envelope.payload.question||''),useSearch:Boolean(envelope.payload.useSearch),unknownTerms:Array.isArray(envelope.payload.unknownTerms)?envelope.payload.unknownTerms.map(String).slice(0,3):undefined,hasAttachments:Boolean(envelope.payload.hasAttachments)}));
   }
   if(domain==='research'&&envelope.command==='RUN_RESEARCH'){
    const {researchService}=await import('../../research/services/researchService');

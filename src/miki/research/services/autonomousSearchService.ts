@@ -6,6 +6,7 @@ import {
 } from '../../../types';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
+import { getSearxngSearchSettings, buildSearxngSearchUrl } from './searxngSettingsService';
 import { workingAgendaService } from '../../strategy/services/workingAgendaService';
 import { selfImprovementService } from '../../improvement/services/selfImprovementService';
 import { experienceLinkService } from '../../experience/services/experienceLinkService';
@@ -448,13 +449,9 @@ export class AutonomousSearchService {
 
     const runSearxng = async (): Promise<ProviderSearchOutput | null> => {
       try {
-        const storedUrl = storageService.getItem('miki_searxng_base_url');
-        const searxngBaseUrl = (storedUrl && storedUrl.trim())
-          ? storedUrl.trim().replace(/\/+$/, '')
-          : 'http://127.0.0.1:8888';
-
-        const searxUrl = `${searxngBaseUrl}/search?q=${encodeURIComponent(cleanQuery)}&format=json`;
-        const searxRes = await fetch(searxUrl, { signal: AbortSignal.timeout(2500) });
+        const searxSettings = getSearxngSearchSettings();
+        const searxUrl = buildSearxngSearchUrl(searxSettings, cleanQuery);
+        const searxRes = await fetch(searxUrl, { signal: AbortSignal.timeout(searxSettings.timeoutMs) });
 
         if (!searxRes.ok) {
           const reason = `HTTP ${searxRes.status}`;

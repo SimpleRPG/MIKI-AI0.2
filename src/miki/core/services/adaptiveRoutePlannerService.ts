@@ -7,6 +7,7 @@ import { EvidenceService } from '../../memory/services/evidenceService';
 import { proposalQuarantineService } from './proposalQuarantineService';
 import { autonomousCandidatePreparationService } from './autonomousCandidatePreparationService';
 import { decomposeMultiIntent, selectMultiIntentHypothesis, type MultiIntentPlan } from '../../unknown/services/multiIntentDecompositionService';
+import { detectUnknownTermsFromBlackboardValue } from '../../unknown/services/unknownTermDetectionService';
 
 export interface PlannedRoute {
   target:MikiDomain;
@@ -498,10 +499,13 @@ class AdaptiveRoutePlannerService {
       }
     } else if(selectedUnit?.goal==='BUILD_OR_CHANGE'){
       routes.push({target:'selfDevelopment',command:'GENERATE_CANDIDATE',reason:`COREがBUILD_OR_CHANGE Intent ${selectedUnit.id} をselfDevelopmentへ委譲する`,payload:{taskId:task.taskId,runId:String(input.runId||task.taskId),goal:selectedUnit.text,candidateRevision:Number(input.candidateRevision||1),requirements:input.requirements,validationRequirements:input.validationRequirements,operationMode:'MULTI_INTENT_BUILD',adaptive:true,priority:80,...intentPayload,intentIds:[selectedUnit.id]}});
-    } else if(/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(focusedText) && !unknownResult){
-      routes.push({target:'unknown',command:'RESOLVE_UNKNOWN',reason:'COREが不足知識を検出し、回答に必要な未知事項を解消する',payload:{taskId:task.taskId,question:focusedText,useSearch:/調べ|検索|最新/i.test(focusedText),hasAttachments:Boolean(input.hasAttachments),adaptive:true,priority:90,...intentPayload}});
-    } else if(unknownResult && !researchResult && task.entries.some(e=>e.kind==='RESULT'&&/gapId|researchQuestion|queryPlanId/i.test(e.key))){
-      routes.push({target:'research',command:'RUN_RESEARCH',reason:'COREが未知解消結果を再評価し、明示された知識Gapを調査する',payload:{taskId:task.taskId,gapId:this.readStringFromEntries(task,/gapId/i),query:focusedText,adaptive:true,priority:80,...intentPayload}});
+    } else {
+      const unknownTerms=conversationResult&&!this.lastOperationFailed(task,'RESOLVE_UNKNOWN')?detectUnknownTermsFromBlackboardValue(objectValue(conversationResult)):[];
+      if((/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(focusedText) || unknownTerms.length>0) && !unknownResult){
+        routes.push({target:'unknown',command:'RESOLVE_UNKNOWN',reason:unknownTerms.length>0?`COREが解析結果から未解決語(${unknownTerms.join('、')})を検出し、調査で解消する`:'COREが不足知識を検出し、回答に必要な未知事項を解消する',payload:{taskId:task.taskId,question:focusedText,useSearch:unknownTerms.length>0||/調べ|検索|最新/i.test(focusedText),unknownTerms,hasAttachments:Boolean(input.hasAttachments),adaptive:true,priority:90,...intentPayload}});
+      } else if(unknownResult && !researchResult && task.entries.some(e=>e.kind==='RESULT'&&/gapId|researchQuestion|queryPlanId/i.test(e.key))){
+        routes.push({target:'research',command:'RUN_RESEARCH',reason:'COREが未知解消結果を再評価し、明示された知識Gapを調査する',payload:{taskId:task.taskId,gapId:this.readStringFromEntries(task,/gapId/i),query:focusedText,adaptive:true,priority:80,...intentPayload}});
+      }
     }
     return this.decorateOperations(task,this.uniqueOperations(routes));
   }

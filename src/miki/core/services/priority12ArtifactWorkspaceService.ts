@@ -36,7 +36,7 @@ class Priority12ArtifactWorkspaceService{
  private makeFile(path:string,bytes:Uint8Array):Priority12File{const safe=normalizePath(path);const binary=bytes.some(byte=>byte===0)||(textDecoder.decode(bytes).includes('\uFFFD'));return {path:safe,contentBase64:bytesToBase64(bytes),sha256:canonicalSha256(Array.from(bytes)),size:bytes.length,binary};}
  private snapshot(role:Priority12SnapshotRole,files:Priority12File[],createdAt:number):Priority12Snapshot{const stable=[...files].sort((a,b)=>a.path.localeCompare(b.path));const sha256=canonicalSha256(stable.map(file=>({path:file.path,sha256:file.sha256})));return {snapshotId:`${role.toLowerCase()}-${createdAt}-${sha256.slice(0,12)}`,role,files:stable,sha256,createdAt};}
  private byRole(row:Priority12Workspace,role:Priority12SnapshotRole):Priority12Snapshot|undefined{return row.snapshots.find(item=>item.role===role);}
- private read():Priority12Workspace[]{try{const parsed=JSON.parse(storageService.getItem(KEY)||'[]');return Array.isArray(parsed)?parsed:[];}catch{return [];}}
+ private read():Priority12Workspace[]{try{const parsed=storageService.getJson(KEY, []);return Array.isArray(parsed)?parsed:[];}catch{return [];}}
  private save(rows:Priority12Workspace[]):void{storageService.setItem(KEY,JSON.stringify(rows));}
  private clone(row:Priority12Workspace):Priority12Workspace{return {...row,snapshots:row.snapshots.map(snapshot=>({...snapshot,files:snapshot.files.map(file=>({...file}))}))};}
 }

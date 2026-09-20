@@ -179,8 +179,7 @@ export class MikiBrainCapsuleService {
         storageService.setItem('miki_ai_chat_memories', JSON.stringify(payload.memories));
         restoredMemories = payload.memories.length;
       } else {
-        const rawExisting = storageService.getItem('miki_ai_chat_memories');
-        const existing: any[] = rawExisting ? JSON.parse(rawExisting) : [];
+        const existing: any[] = storageService.getJson<any[]>('miki_ai_chat_memories', []);
         const existingIds = new Set(existing.map((m) => m.id || m.content));
         const newItems = payload.memories.filter((m) => !existingIds.has(m.id || m.content));
         const combined = [...existing, ...newItems];
@@ -195,8 +194,7 @@ export class MikiBrainCapsuleService {
         storageService.setItem('miki_ai_introspection_journal_v1', JSON.stringify(payload.introspectionJournal));
         restoredJournal = payload.introspectionJournal.length;
       } else {
-        const rawExisting = storageService.getItem('miki_ai_introspection_journal_v1');
-        const existing: any[] = rawExisting ? JSON.parse(rawExisting) : [];
+        const existing: any[] = storageService.getJson<any[]>('miki_ai_introspection_journal_v1', []);
         const existingIds = new Set(existing.map((e) => e.id));
         const newEntries = payload.introspectionJournal.filter((e) => !existingIds.has(e.id));
         const combined = [...newEntries, ...existing];
@@ -211,8 +209,7 @@ export class MikiBrainCapsuleService {
         storageService.setItem('miki_autonomous_evolution_history_v1', JSON.stringify(payload.evolutionHistory));
         restoredEvolution = payload.evolutionHistory.length;
       } else {
-        const rawExisting = storageService.getItem('miki_autonomous_evolution_history_v1');
-        const existing: any[] = rawExisting ? JSON.parse(rawExisting) : [];
+        const existing: any[] = storageService.getJson<any[]>('miki_autonomous_evolution_history_v1', []);
         const existingIds = new Set(existing.map((h) => h.id));
         const newHistory = payload.evolutionHistory.filter((h) => !existingIds.has(h.id));
         const combined = [...existing, ...newHistory];
@@ -223,8 +220,7 @@ export class MikiBrainCapsuleService {
 
     // 4. 仕様書達成章の復元
     if (Array.isArray(payload.completedChapters)) {
-      const rawExisting = storageService.getItem('miki_completed_chapters_v1');
-      const existing: number[] = rawExisting ? JSON.parse(rawExisting) : [];
+      const existing: number[] = storageService.getJson<number[]>('miki_completed_chapters_v1', []);
       const merged = Array.from(new Set([...existing, ...payload.completedChapters]));
       storageService.setItem('miki_completed_chapters_v1', JSON.stringify(merged));
       restoredChapters = payload.completedChapters.length;
@@ -232,8 +228,7 @@ export class MikiBrainCapsuleService {
 
     // 5. 動的ツールの復元
     if (Array.isArray(payload.dynamicTools)) {
-      const rawExisting = storageService.getItem('miki_ai_dynamic_tools_v1');
-      const existing: any[] = rawExisting ? JSON.parse(rawExisting) : [];
+      const existing: any[] = storageService.getJson<any[]>('miki_ai_dynamic_tools_v1', []);
       const existingIds = new Set(existing.map((t) => t.id));
       const newTools = payload.dynamicTools.filter((t) => !existingIds.has(t.id));
       const combined = [...existing, ...newTools];
@@ -246,8 +241,7 @@ export class MikiBrainCapsuleService {
       if (mode === 'REPLACE') {
         storageService.setItem('miki_working_agenda_items', JSON.stringify(payload.workingAgendas));
       } else {
-        const rawExisting = storageService.getItem('miki_working_agenda_items');
-        const existing: any[] = rawExisting ? JSON.parse(rawExisting) : [];
+        const existing: any[] = storageService.getJson<any[]>('miki_working_agenda_items', []);
         const existingIds = new Set(existing.map((a) => a.id));
         const newAgendas = payload.workingAgendas.filter((a) => !existingIds.has(a.id));
         const combined = [...existing, ...newAgendas];
