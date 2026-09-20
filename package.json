@@ -113,7 +113,10 @@
     "test:environment-drift-v165": "node scripts/test_environment_drift_v165.mjs",
     "test:cognitive-observability-v166": "node scripts/test_cognitive_observability_v166.mjs",
     "test:core-adaptive-routing-v167": "node scripts/test_core_adaptive_routing_v167.mjs",
-    "test:unified-cognitive-state-v168": "node scripts/test_unified_cognitive_state_v168.mjs"
+    "test:unified-cognitive-state-v168": "node scripts/test_unified_cognitive_state_v168.mjs",
+    "test:p0-runtime-e2e": "tsx scripts/test_p0_runtime_e2e.ts",
+    "verify:p0-gate": "bash scripts/run_p0_gate.sh",
+    "test:p123": "bash scripts/run_p123_gate.sh"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.0",

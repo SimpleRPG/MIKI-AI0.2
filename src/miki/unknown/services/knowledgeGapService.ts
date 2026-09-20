@@ -12,6 +12,18 @@ export type KnowledgeGapType =
 
 export type KnowledgeGapStatus = 'OPEN' | 'RESEARCHING' | 'RESOLVED' | 'BLOCKED';
 
+export interface KnowledgeGapResolutionPlan {
+  planId: string;
+  gapId: string;
+  phase: 'IDENTIFY' | 'COLLECT_EVIDENCE' | 'VERIFY' | 'RESOLVE';
+  missingConditions: string[];
+  requiredEvidence: string[];
+  verificationMethods: string[];
+  researchRoute: 'WEB_SEARCH' | 'EXECUTION_TEST' | 'USER_CLARIFICATION' | 'CORE_REVIEW';
+  blackboardAction: 'RESEARCH' | 'EXECUTION_TEST' | 'CLARIFY' | 'BLOCK';
+  createdAt: number;
+}
+
 export interface KnowledgeGapDetectionContext{target?:string;missingContent?:string;conditions?:string[];environment?:string;taskId?:string;capabilityIds?:string[];claimIds?:string[];}
 export interface KnowledgeGapIdentity{target:string;missingContent:string;conditions:string[];environment:string;taskId:string;capabilityIds:string[];claimIds:string[];semanticKey:string;}
 export interface KnowledgeGap {
@@ -30,6 +42,7 @@ export interface KnowledgeGap {
   updatedAt: number;
   attempts: number;
   lastResearchAt?: number;
+  resolutionPlan?: KnowledgeGapResolutionPlan;
 }
 
 /**
@@ -233,6 +246,42 @@ export class KnowledgeGapService {
       .sort((a, b) => b.priority - a.priority || b.updatedAt - a.updatedAt)
       .slice(0, limit)
       .map((gap) => ({ ...gap, requiredEvidence: [...gap.requiredEvidence] }));
+  }
+
+  public buildResolutionPlan(gapOrId: KnowledgeGap | string, options?: {
+    environment?: string;
+    preferredRoute?: KnowledgeGapResolutionPlan['researchRoute'];
+  }): KnowledgeGapResolutionPlan | undefined {
+    const gap = typeof gapOrId === 'string' ? this.getById(gapOrId) : gapOrId;
+    if (!gap) return undefined;
+    const missingConditions = [
+      ...(gap.identity?.conditions || []),
+      ...(gap.identity?.environment ? [`environment=${gap.identity.environment}`] : []),
+      ...(options?.environment && options.environment !== gap.identity?.environment ? [`currentEnvironment=${options.environment}`] : []),
+    ].filter(Boolean);
+    const researchRoute = options?.preferredRoute || (/実装|再現|性能|互換|環境/.test(`${gap.query} ${gap.reason}`) ? 'EXECUTION_TEST' : 'WEB_SEARCH');
+    const verificationMethods = researchRoute === 'EXECUTION_TEST'
+      ? ['再現可能な実行テスト', '成果物・実装・テストケース・環境の照合', 'Verifierによる明示検証']
+      : ['独立Evidenceの収集', 'Claim/Evidence照合', 'Verifierによる明示検証'];
+    const plan: KnowledgeGapResolutionPlan = {
+      planId: `GAPPLAN-${canonicalSha256Object({ gapId: gap.id, missingConditions, requiredEvidence: gap.requiredEvidence, researchRoute }).slice(0, 20)}`,
+      gapId: gap.id,
+      phase: 'IDENTIFY',
+      missingConditions: [...new Set(missingConditions)].slice(0, 12),
+      requiredEvidence: [...new Set(gap.requiredEvidence)].slice(0, 12),
+      verificationMethods,
+      researchRoute,
+      blackboardAction: researchRoute === 'EXECUTION_TEST' ? 'EXECUTION_TEST' : 'RESEARCH',
+      createdAt: Date.now(),
+    };
+    const updated = this.update(gap.id, { resolutionPlan: plan, status: gap.status === 'RESOLVED' ? 'RESOLVED' : gap.status });
+    return updated?.resolutionPlan ? { ...updated.resolutionPlan, missingConditions: [...updated.resolutionPlan.missingConditions], requiredEvidence: [...updated.resolutionPlan.requiredEvidence], verificationMethods: [...updated.resolutionPlan.verificationMethods] } : undefined;
+  }
+
+  public advanceResolutionPlan(id: string, phase: KnowledgeGapResolutionPlan['phase'], blackboardAction?: KnowledgeGapResolutionPlan['blackboardAction']): KnowledgeGap | undefined {
+    const gap = this.getById(id);
+    if (!gap?.resolutionPlan) return undefined;
+    return this.update(id, { resolutionPlan: { ...gap.resolutionPlan, phase, blackboardAction: blackboardAction || gap.resolutionPlan.blackboardAction } });
   }
 
   public markResearching(id: string): KnowledgeGap | undefined {

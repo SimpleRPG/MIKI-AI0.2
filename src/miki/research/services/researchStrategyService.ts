@@ -10,6 +10,17 @@ interface RouteStats {
   lastUsedAt: number;
 }
 
+export interface ResearchMeaningfulnessAssessment {
+  meaningful: boolean;
+  newEvidenceCount: number;
+  newIndependentClusters: number;
+  contradictionCount: number;
+  freshnessSignals: number;
+  coverageImproved: boolean;
+  unresolvedConditionReduction: number;
+  reason: string;
+}
+
 export interface ResearchStrategyDecision {
   route: ResearchRoute;
   reason: string;
@@ -50,6 +61,41 @@ export class ResearchStrategyService {
       route: selected,
       reason,
       alternatives: ranked.slice(1).map(item => item.route),
+    };
+  }
+
+  public assessMeaningfulness(input: {
+    previousEvidenceIds: string[];
+    currentEvidenceIds: string[];
+    previousIndependentClusters: string[];
+    currentIndependentClusters: string[];
+    contradictionCount?: number;
+    freshnessSignals?: number;
+    previousCoverage?: string[];
+    currentCoverage?: string[];
+    previousUnresolvedConditions?: number;
+    currentUnresolvedConditions?: number;
+  }): ResearchMeaningfulnessAssessment {
+    const previous = new Set(input.previousEvidenceIds);
+    const current = new Set(input.currentEvidenceIds);
+    const newEvidenceCount = [...current].filter((id) => !previous.has(id)).length;
+    const previousClusters = new Set(input.previousIndependentClusters);
+    const currentClusters = new Set(input.currentIndependentClusters);
+    const newIndependentClusters = [...currentClusters].filter((id) => !previousClusters.has(id)).length;
+    const previousCoverage = new Set(input.previousCoverage || []);
+    const currentCoverage = new Set(input.currentCoverage || []);
+    const coverageImproved = [...currentCoverage].some((value) => !previousCoverage.has(value));
+    const unresolvedBefore = Math.max(0, Number(input.previousUnresolvedConditions || 0));
+    const unresolvedAfter = Math.max(0, Number(input.currentUnresolvedConditions || 0));
+    const unresolvedConditionReduction = Math.max(0, unresolvedBefore - unresolvedAfter);
+    const contradictionCount = Math.max(0, Number(input.contradictionCount || 0));
+    const freshnessSignals = Math.max(0, Number(input.freshnessSignals || 0));
+    const meaningful = newEvidenceCount > 0 || newIndependentClusters > 0 || coverageImproved || unresolvedConditionReduction > 0 || freshnessSignals > 0 || contradictionCount > 0;
+    return {
+      meaningful, newEvidenceCount, newIndependentClusters, contradictionCount, freshnessSignals, coverageImproved, unresolvedConditionReduction,
+      reason: meaningful
+        ? `新規Evidence=${newEvidenceCount}, 独立cluster増加=${newIndependentClusters}, coverage改善=${coverageImproved}, 未解決条件減少=${unresolvedConditionReduction}, contradiction=${contradictionCount}, freshness=${freshnessSignals}`
+        : '新規Evidence・独立性・coverage・未解決条件削減・freshnessのいずれも確認できません。',
     };
   }
 

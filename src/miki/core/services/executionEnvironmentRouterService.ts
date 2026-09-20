@@ -64,15 +64,21 @@ class ExecutionEnvironmentRouterService {
       runtimeSignature:text(hints.runtimeSignature),
       networkState:text(hints.networkState),
       environment:text(hints.environment),
+      applicationVersion:text(storageService.getItem('miki_app_version') || (typeof process !== 'undefined' ? process.env.npm_package_version : '')),
+      dependencyLock:text(storageService.getItem('miki_dependency_lock_sha256')),
+      permissionState:text(storageService.getItem('miki_permission_state')),
+      storageAvailability:text(storageService.getBackendName() || 'unknown'),
+      externalSourceFreshness:text(storageService.getItem('miki_external_source_freshness')),
     };
     const signature=canonicalSha256Object(fields);
     return {signature,fields,capturedAt:Date.now()};
   }
 
-  compare(expected:EnvironmentFingerprint, current:EnvironmentFingerprint):{changed:boolean;changedFields:string[]} {
+  compare(expected:EnvironmentFingerprint, current:EnvironmentFingerprint):{changed:boolean;changedFields:string[];requiresReplan:boolean} {
     const keys=[...new Set([...Object.keys(expected.fields),...Object.keys(current.fields)])].sort();
     const changedFields=keys.filter(key => (expected.fields[key]||'') !== (current.fields[key]||''));
-    return {changed:expected.signature!==current.signature || changedFields.length>0,changedFields};
+    const criticalFields=new Set(['networkState','searxngBaseUrl','permissionState','storageAvailability','applicationVersion','dependencyLock','externalSourceFreshness']);
+    return {changed:expected.signature!==current.signature || changedFields.length>0,changedFields,requiresReplan:changedFields.some(key=>criticalFields.has(key))};
   }
 }
 

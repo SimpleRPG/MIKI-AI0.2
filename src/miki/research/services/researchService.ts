@@ -70,6 +70,8 @@ export class ResearchService {
     const evidence: EvidenceRecord[] = [];
     const claimIds: string[] = [];
 
+    knowledgeGapService.buildResolutionPlan(gap);
+    knowledgeGapService.advanceResolutionPlan(gap.id, 'COLLECT_EVIDENCE', 'RESEARCH');
     knowledgeGapService.markResearching(gap.id);
     const startedAt = Date.now();
     const baseQuery = typeof options?.query === 'string' && options.query.trim().length > 0
@@ -251,6 +253,7 @@ export class ResearchService {
         // may promote a Claim or resolve a Knowledge Gap. A second independent
         // pass is allowed when the first pass is insufficient; it still cannot
         // resolve the gap without the same verifier boundary.
+        knowledgeGapService.advanceResolutionPlan(gap.id, 'VERIFY', 'RESEARCH');
         verification = claimIds.length > 0
           ? verifierService.verifyMany({
               claimIds,
@@ -264,6 +267,7 @@ export class ResearchService {
         // This is a structural sync only; it never promotes an unverified claim.
         cognitiveEvidenceIntegrationService.ingestClaims(claimIds);
         if (resolved) {
+          knowledgeGapService.advanceResolutionPlan(gap.id, 'RESOLVE', 'RESEARCH');
           continuationAvailable = false;
           continuationReason = 'VERIFIED';
           break;
@@ -278,6 +282,7 @@ export class ResearchService {
         if (adaptive && noNewEvidence) {
           continuationAvailable = false;
           continuationReason = 'NO_NEW_EVIDENCE';
+          knowledgeGapService.advanceResolutionPlan(gap.id, 'IDENTIFY', 'CLARIFY');
           break;
         }
 

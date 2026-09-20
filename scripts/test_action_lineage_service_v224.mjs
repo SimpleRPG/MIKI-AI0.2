@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const facade=fs.readFileSync('src/miki/core/services/actionLineageService.ts','utf8');
+const ledger=fs.readFileSync('src/miki/core/services/domainReplyLedgerService.ts','utf8');
+assert.match(facade,/domainReplyLedgerService/);
+assert.match(facade,/summarizeTask/);
+assert.match(ledger,/actionLineage: ActionLineage/);
+assert.match(ledger,/knowledgeIds/);
+assert.match(ledger,/evidenceIds/);
+assert.match(ledger,/permissionClasses/);
+console.log('PASS: ActionLineage unified facade V224');
