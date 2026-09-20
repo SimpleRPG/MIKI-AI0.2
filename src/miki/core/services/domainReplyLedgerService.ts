@@ -164,16 +164,26 @@ class DomainReplyLedgerService {
       if (!Array.isArray(records)) return;
       for (const record of records) {
         if (!this.isRecord(record)) continue;
-        const actionLineage: ActionLineage = record.actionLineage && typeof record.actionLineage === 'object'
-          ? {
-              actionId: typeof record.actionLineage.actionId === 'string' ? record.actionLineage.actionId : record.operationInstanceId || record.dispatchId,
-              knowledgeIds: Array.isArray(record.actionLineage.knowledgeIds) ? record.actionLineage.knowledgeIds.filter((x): x is string => typeof x === 'string') : [],
-              capabilityIds: Array.isArray(record.actionLineage.capabilityIds) ? record.actionLineage.capabilityIds.filter((x): x is string => typeof x === 'string') : [],
-              evidenceIds: Array.isArray(record.actionLineage.evidenceIds) ? record.actionLineage.evidenceIds.filter((x): x is string => typeof x === 'string') : [...record.evidenceIds],
-              permissionClasses: Array.isArray(record.actionLineage.permissionClasses) ? record.actionLineage.permissionClasses.filter((x): x is string => typeof x === 'string') : [],
-              outcome: record.actionLineage.outcome || record.status,
-            }
-          : { actionId: record.operationInstanceId || record.dispatchId, knowledgeIds: [], capabilityIds: [], evidenceIds: [...record.evidenceIds], permissionClasses: [], outcome: record.status };
+        let actionLineage: ActionLineage;
+        if (!record.actionLineage) {
+          actionLineage = {
+            actionId: record.operationInstanceId || record.dispatchId,
+            knowledgeIds: [],
+            capabilityIds: [],
+            evidenceIds: [...record.evidenceIds],
+            permissionClasses: [],
+            outcome: record.status,
+          };
+        } else {
+          actionLineage = {
+            actionId: typeof record.actionLineage.actionId === 'string' ? record.actionLineage.actionId : record.operationInstanceId || record.dispatchId,
+            knowledgeIds: Array.isArray(record.actionLineage.knowledgeIds) ? record.actionLineage.knowledgeIds.filter((x): x is string => typeof x === 'string') : [],
+            capabilityIds: Array.isArray(record.actionLineage.capabilityIds) ? record.actionLineage.capabilityIds.filter((x): x is string => typeof x === 'string') : [],
+            evidenceIds: Array.isArray(record.actionLineage.evidenceIds) ? record.actionLineage.evidenceIds.filter((x): x is string => typeof x === 'string') : [...record.evidenceIds],
+            permissionClasses: Array.isArray(record.actionLineage.permissionClasses) ? record.actionLineage.permissionClasses.filter((x): x is string => typeof x === 'string') : [],
+            outcome: record.actionLineage.outcome || record.status,
+          };
+        }
         this.records.set(record.replyId, {
           ...record,
           idempotencyKey: typeof record.idempotencyKey === 'string' ? record.idempotencyKey : '',

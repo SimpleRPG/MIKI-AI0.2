@@ -69,8 +69,6 @@ export class SelfImprovementControllerService {
   private running = false;
   private lastRunAt = 0;
   private readonly cooldownMs = 15_000;
-  private failedClosed = false;
-  private lastFailureReason = '';
   private readonly storageKey = 'miki_self_improvement_runs_v1';
   private constructor() {}
   public static getInstance() {
@@ -93,10 +91,6 @@ export class SelfImprovementControllerService {
 
   public isLocked(): boolean {
     return this.running;
-  }
-
-  public getFailClosedState(): { failedClosed: boolean; lastFailureReason: string } {
-    return { failedClosed: this.failedClosed, lastFailureReason: this.lastFailureReason };
   }
 
   public async executeDirective(directiveId: string): Promise<ImprovementRun> {
@@ -330,19 +324,13 @@ export class SelfImprovementControllerService {
         before
       );
     } catch (error: any) {
-      const reason = error instanceof Error ? error.message : String(error);
-      this.failedClosed = true;
-      this.lastFailureReason = reason;
-      systemLogger.error('SELF_IMPROVEMENT', `⛔ [Fail-Closed] ${reason}`);
       return this.recordMeasured(
         trigger,
-        { action: 'IDLE', reason: `FAIL_CLOSED:${reason}` },
-        'fail-closed',
-        before,
-        runChangeSetId,
+        { action: 'IDLE', reason: `自己改善サイクル中のエラー: ${String(error)}` },
+        'error',
+        before
       );
     } finally {
-      this.failedClosed = false;
       this.running = false;
       evidenceBasedSelfImprovementEngine.releaseExecutionLock('CanonicalController');
     }

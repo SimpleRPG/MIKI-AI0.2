@@ -78,9 +78,9 @@ function buildFactProvenance(payload: Record<string, unknown>, global: { claimId
       const row = item as Record<string, unknown>;
       const text = typeof row.text === 'string' ? row.text.trim() : '';
       if (!text) continue;
-      const claimIds = Array.isArray(row.claimIds) ? row.claimIds.filter((x): x is string => typeof x === 'string' && x.trim()).map(x => x.trim()) : [];
-      const evidenceIds = Array.isArray(row.evidenceIds) ? row.evidenceIds.filter((x): x is string => typeof x === 'string' && x.trim()).map(x => x.trim()) : [];
-      const verificationOutcomes = Array.isArray(row.verificationOutcomes) ? row.verificationOutcomes.filter((x): x is string => typeof x === 'string' && x.trim()).map(x => x.trim()) : [];
+      const claimIds = Array.isArray(row.claimIds) ? row.claimIds.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map(x => x.trim()) : [];
+      const evidenceIds = Array.isArray(row.evidenceIds) ? row.evidenceIds.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map(x => x.trim()) : [];
+      const verificationOutcomes = Array.isArray(row.verificationOutcomes) ? row.verificationOutcomes.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map(x => x.trim()) : [];
       byText.set(text, { text, claimIds, evidenceIds, verificationOutcomes });
     }
     if (byText.size) return facts.map(text => byText.get(text) || { text, ...global });

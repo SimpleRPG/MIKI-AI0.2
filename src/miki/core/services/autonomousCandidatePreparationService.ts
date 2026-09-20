@@ -1,5 +1,5 @@
 import { storageService } from '../../../services/storageService';
-import { autonomousIssueDiscoveryService, type DiscoveredIssue } from './autonomousIssueDiscoveryService';
+import { autonomousIssueDiscoveryService, type DiscoveredIssue, type DiscoveredIssueKind } from './autonomousIssueDiscoveryService';
 import { isolatedCandidateWorkspaceService, type CandidateWorkspace } from './isolatedCandidateWorkspaceService';
 
 export interface SourceFileSnapshot { path:string; content:string; language:string; evidenceIds:string[]; updatedAt:number; contentHash?:string; }

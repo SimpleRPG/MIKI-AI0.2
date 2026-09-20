@@ -254,6 +254,7 @@ export class ClaimDatabaseService {
     };
     const statusScore=(claim:ClaimRecord)=>{
       const rank:Record<ClaimVerificationStatus,number>={
+      UNRESOLVED: 0,
         UNVERIFIED:10,CANDIDATE:15,SUPPORTED:45,DEVICE_VERIFIED:65,DISPUTED:20,CONTRADICTED:5,FALSE:0,SUPERSEDED:0,CONTEXT_ONLY:25
       };
       return rank[claim.status]||0;

@@ -76,11 +76,11 @@ class MikiCognitiveKernelService {
     const uncertaintyAction =
       uncertainty >= 0.8 && (status === 'WAITING' || status === 'PAUSED')
         ? 'ASK_MINIMAL'
-        : status === 'COMPLETED'
+        : status === 'completed'
           ? 'EXECUTE'
           : 'HOMEWORK';
 
-    const recordedExperience = core.coreResult?.status === 'COMPLETED';
+    const recordedExperience = core.coreResult?.status === 'completed';
     const terminal = operationalConformanceService.terminal({
       traceId,
       budget: {

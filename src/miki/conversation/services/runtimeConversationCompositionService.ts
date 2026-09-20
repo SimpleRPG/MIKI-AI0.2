@@ -7,6 +7,7 @@ import type { CoreResult } from '../../core/services/coreResultService';
 import { coreResultAnswerContentIrService, CoreResultAnswerContent } from './coreResultAnswerContentIrService';
 import { conversationLearningEpisodeService } from './conversationLearningEpisodeService';
 import type { ConversationFeedbackScope } from './conversationFeedbackEvidenceService';
+import { systemLogger } from '../../../services/systemLogger';
 
 export interface RuntimeConversationCompositionOptions { maxCandidates?: number; timeBudgetMs?: number; assembledCode?: string; }
 export interface RuntimeConversationConcurrencyState { inFlight: boolean; startedAt?: number; }
@@ -88,7 +89,7 @@ function safetyScore(candidate: RuntimeConversationCandidate, ir: AnswerContentI
   return /禁止|危険|権限|条件|前提|確認|できない|制限|保留/.test(candidate.surfaceText) ? 100 : 25;
 }
 
-function userStateFitScore(candidate: RuntimeConversationCandidate, ir: AnswerContentIR, persona: MultiAxisPersonaConfig): number {
+function userStateFitScore(candidate: RuntimeConversationCandidate, ir: AnswerContentIR, persona: Pick<MultiAxisPersonaConfig, 'currentScene'>): number {
   const scene = persona.currentScene;
   if (scene === 'SHORT_MODE') return candidate.surfaceText.length <= 260 ? 100 : Math.max(30, 100 - (candidate.surfaceText.length - 260) / 6);
   if (scene === 'DETAILED_MODE') return candidate.surfaceText.length >= 260 ? 100 : 70;
@@ -112,7 +113,7 @@ function selectionCriteria(
   candidate: RuntimeConversationCandidate,
   primary: AnswerSkeletonType,
   ir: AnswerContentIR,
-  persona: MultiAxisPersonaConfig,
+  persona: Pick<MultiAxisPersonaConfig, 'currentScene'>,
 ): RuntimeConversationSelectionCriteria {
   return {
     accuracy: candidate.semanticPreserved ? 100 : 0,
@@ -184,61 +185,56 @@ export class RuntimeConversationCompositionService {
       const fallbackRendered = answerContentIrService.generateSurfaceTextFromIR(ir, primarySkeleton, surfacePersona, options.assembledCode);
       const fallbackDiversity = conversationSurfaceDiversityService.assess(fallbackRendered.surfaceText);
       return {
-        surfaceText: fallbackRendered.surfaceText,
-        selectedSkeleton: primarySkeleton,
-        candidatesEvaluated: 0,
-        cacheHit: false,
-        elapsedMs: performance.now() - startedAt,
-        bounded: true,
-        personaProfileId: personaProfile.profileId,
-        personaRevision: personaProfile.revision,
-        personaApplied: true,
-        compositionPlan,
-        compositionPlanId: compositionPlan.planId,
-        compositionPlanSha256: compositionPlan.planSha256,
-        selectedSurfaceSignature: fallbackDiversity.signature,
-        repetitionAvoided: false,
-        reusedConversationEpisodeIds: reusedConversationEpisodes.map(episode => episode.episodeId),
+        surfaceText: fallbackRendered.surfaceText, selectedSkeleton: primarySkeleton, candidatesEvaluated: 0, cacheHit: false,
+        elapsedMs: performance.now() - startedAt, bounded: true, personaProfileId: personaProfile.profileId,
+        personaRevision: personaProfile.revision, personaApplied: true, compositionPlan, compositionPlanId: compositionPlan.planId,
+        compositionPlanSha256: compositionPlan.planSha256, selectedSurfaceSignature: fallbackDiversity.signature,
+        repetitionAvoided: false, reusedConversationEpisodeIds: reusedConversationEpisodes.map((episode) => episode.episodeId),
       };
     }
     this.inFlight.set(cacheKey, { inFlight: true, startedAt: Date.now() });
     const maxCandidates = Math.max(1, Math.min(8, options.maxCandidates || DEFAULT_MAX_CANDIDATES));
     const timeBudgetMs = Math.max(2, Math.min(50, options.timeBudgetMs || DEFAULT_TIME_BUDGET_MS));
-    try {
-      const candidates: RuntimeConversationCandidate[] = [];
-      const evaluated: RuntimeConversationSelectionRecord['evaluatedCandidates'] = [];
-      for (const skeleton of uniqueSkeletons(primarySkeleton).slice(0, maxCandidates)) {
-        if (candidates.length > 0 && performance.now() - startedAt >= timeBudgetMs) break;
-        const candidateStartedAt = performance.now();
-        const rendered = answerContentIrService.generateSurfaceTextFromIR(ir, skeleton, surfacePersona, options.assembledCode);
-        const inspection = answerContentIrService.verifySemanticPreservation(ir, rendered.surfaceText);
-        const diversity = conversationSurfaceDiversityService.assess(rendered.surfaceText);
-        const candidate: RuntimeConversationCandidate = { skeleton, surfaceText: rendered.surfaceText, semanticPreserved: inspection.isPreserved, repetitionScore: diversity.repetitionScore, score: 0, elapsedMs: performance.now() - candidateStartedAt };
-        candidates.push(candidate);
-        const criteria = selectionCriteria(candidate, primarySkeleton, ir, personaProfile);
-        candidate.score = weightedSelectionScore(criteria);
-        evaluated.push({ candidateId: `CAND-${stableSignature(ir, skeleton, rendered.surfaceText, personaProfile.profileId, personaProfile.revision)}`, skeleton, score: candidate.score, criteria, tieBreakKey: `${skeleton}|${rendered.surfaceText.length}|${stableSignature(ir, skeleton, rendered.surfaceText, personaProfile.profileId, personaProfile.revision)}` });
-      }
-      const candidateRecords = evaluated.map((item, index) => ({ ...item, candidate: candidates[index] })).filter(item => item.candidate);
-      candidateRecords.sort((a, b) => deterministicTieBreak(a, b, primarySkeleton));
-      const bestRecord = candidateRecords.find(item => item.candidate.semanticPreserved) || candidateRecords[0];
-      const selected = bestRecord?.candidate;
-      const fallback = selected || { skeleton: primarySkeleton, surfaceText: answerContentIrService.generateSurfaceTextFromIR(ir, primarySkeleton, surfacePersona, options.assembledCode).surfaceText };
-      const selectedDiversity = conversationSurfaceDiversityService.assess(fallback.surfaceText);
-      conversationSurfaceDiversityService.record(fallback.surfaceText);
-      const selection: RuntimeConversationSelectionRecord | undefined = bestRecord ? {
-        method: 'DETERMINISTIC_WEIGHTED_SELECTION_V1',
-        selectedCandidateId: bestRecord.candidateId,
-        selectedSkeleton: bestRecord.skeleton,
-        selectedScore: bestRecord.score,
-        evaluatedCandidates: evaluated,
-      } : undefined;
-      const result: RuntimeConversationCompositionResult = { surfaceText: fallback.surfaceText, selectedSkeleton: fallback.skeleton, candidatesEvaluated: candidates.length, cacheHit: false, elapsedMs: performance.now() - startedAt, bounded: true, personaProfileId: personaProfile.profileId, personaRevision: personaProfile.revision, personaApplied: true, compositionPlan, compositionPlanId: compositionPlan.planId, compositionPlanSha256: compositionPlan.planSha256, selectedSurfaceSignature: selectedDiversity.signature, repetitionAvoided: selectedDiversity.repetitionScore < 0.5, reusedConversationEpisodeIds: reusedConversationEpisodes.map(episode => episode.episodeId), selection };
-      if (selection) systemLogger.info('ANSWER_PLAN', `🎯 [Deterministic selection] ${selection.selectedSkeleton} / score=${selection.selectedScore} / candidates=${selection.evaluatedCandidates.length}`);
-      this.cache.set(cacheKey, { result, createdAt: Date.now() }); this.trimCache(); return result;
-    } finally {
-      this.inFlight.delete(cacheKey);
+    const candidates: RuntimeConversationCandidate[] = [];
+    for (const skeleton of uniqueSkeletons(primarySkeleton).slice(0, maxCandidates)) {
+      if (candidates.length > 0 && performance.now() - startedAt >= timeBudgetMs) break;
+      const candidateStartedAt = performance.now();
+      const rendered = answerContentIrService.generateSurfaceTextFromIR(ir, skeleton, surfacePersona, options.assembledCode);
+      const inspection = answerContentIrService.verifySemanticPreservation(ir, rendered.surfaceText);
+      const diversity = conversationSurfaceDiversityService.assess(rendered.surfaceText);
+      const candidate: RuntimeConversationCandidate = { skeleton, surfaceText: rendered.surfaceText, semanticPreserved: inspection.isPreserved, repetitionScore: diversity.repetitionScore, score: 0, elapsedMs: performance.now() - candidateStartedAt };
+      candidates.push(candidate);
     }
+    const selectionScene: MultiAxisPersonaConfig['currentScene'] =
+      ir.interaction_mode === 'CODE_DELIVERY' ? 'CODE_DELIVERY' :
+      ir.interaction_mode === 'TROUBLESHOOTING' ? 'ERROR_REPORT' :
+      ir.interaction_mode === 'SAFETY_GATE' ? 'DISASTER_RECOVERY' :
+      ir.detail_level === 'BRIEF' ? 'SHORT_MODE' :
+      ir.detail_level === 'DETAILED' ? 'DETAILED_MODE' : 'NORMAL';
+    const scored = candidates.map((candidate, index) => {
+      const criteria = selectionCriteria(candidate, primarySkeleton, ir, { currentScene: selectionScene });
+      const score = weightedSelectionScore(criteria);
+      candidate.score = score;
+      const tieBreakKey = stableSignature(ir, candidate.skeleton, candidate.surfaceText, personaProfile.profileId, personaProfile.revision);
+      return { candidate, score, criteria, tieBreakKey, candidateId: `runtime-candidate-${index + 1}-${tieBreakKey}` };
+    });
+    scored.sort((a, b) => deterministicTieBreak(a, b, primarySkeleton));
+    const chosen = scored.find(item => item.candidate.semanticPreserved) || scored[0];
+    const selected = chosen?.candidate;
+    const fallback = selected || { skeleton: primarySkeleton, surfaceText: answerContentIrService.generateSurfaceTextFromIR(ir, primarySkeleton, surfacePersona, options.assembledCode).surfaceText };
+    const selection: RuntimeConversationSelectionRecord | undefined = chosen ? {
+      method: 'DETERMINISTIC_WEIGHTED_SELECTION_V1',
+      selectedCandidateId: chosen.candidateId,
+      selectedSkeleton: chosen.candidate.skeleton,
+      selectedScore: chosen.score,
+      evaluatedCandidates: scored.map(item => ({ candidateId: item.candidateId, skeleton: item.candidate.skeleton, score: item.score, criteria: item.criteria, tieBreakKey: item.tieBreakKey })),
+    } : undefined;
+    const selectedDiversity = conversationSurfaceDiversityService.assess(fallback.surfaceText);
+    conversationSurfaceDiversityService.record(fallback.surfaceText);
+    const composedResult: RuntimeConversationCompositionResult = { surfaceText: fallback.surfaceText, selectedSkeleton: fallback.skeleton, candidatesEvaluated: candidates.length, cacheHit: false, elapsedMs: performance.now() - startedAt, bounded: true, personaProfileId: personaProfile.profileId, personaRevision: personaProfile.revision, personaApplied: true, compositionPlan, compositionPlanId: compositionPlan.planId, compositionPlanSha256: compositionPlan.planSha256, selectedSurfaceSignature: selectedDiversity.signature, repetitionAvoided: selectedDiversity.repetitionScore < 0.5, reusedConversationEpisodeIds: reusedConversationEpisodes.map(episode => episode.episodeId), selection };
+    const result = composedResult;
+    if (selection) systemLogger.info('ANSWER_PLAN', `🎯 [deterministic selection] ${selection.selectedSkeleton} / score=${selection.selectedScore} / candidates=${selection.evaluatedCandidates.length}`);
+    this.cache.set(cacheKey, { result, createdAt: Date.now() }); this.trimCache(); this.inFlight.delete(cacheKey); return result;
   }
   public composeCoreResult(coreResult: CoreResult, options: RuntimeConversationCompositionOptions = {}): CoreResultRuntimeConversationCompositionResult {
     const answerContent = coreResultAnswerContentIrService.convert(coreResult);

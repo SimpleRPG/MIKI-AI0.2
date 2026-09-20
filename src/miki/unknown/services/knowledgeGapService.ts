@@ -206,7 +206,7 @@ export class KnowledgeGapService {
       type: this.inferType(candidate.question, `PotentialUnknown: ${candidate.basis.join(',')}`),
       priority: Math.round(candidate.confidence * 100),
       requiredEvidence: ['候補となった条件を直接検証できるEvidenceまたは再現可能な試験結果'],
-      reason: `Potential UnknownからResearch対象へ昇格: ${candidate.basis.join(', ')}`,
+      reason: `Potential UnknownからResearch対象へ昇格: ${candidate.basis.join(', ')}`, 
       sourceRequestId,
     });
     candidate.status = 'PROMOTED';

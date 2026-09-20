@@ -63,12 +63,12 @@ class ExecutionEnvironmentRouterService {
       safetySignature:text(hints.safetySignature),
       runtimeSignature:text(hints.runtimeSignature),
       networkState:text(hints.networkState),
-      environment:text(hints.environment),
       applicationVersion:text(storageService.getItem('miki_app_version') || (typeof process !== 'undefined' ? process.env.npm_package_version : '')),
       dependencyLock:text(storageService.getItem('miki_dependency_lock_sha256')),
       permissionState:text(storageService.getItem('miki_permission_state')),
       storageAvailability:text(storageService.getBackendName() || 'unknown'),
       externalSourceFreshness:text(storageService.getItem('miki_external_source_freshness')),
+      environment:text(hints.environment),
     };
     const signature=canonicalSha256Object(fields);
     return {signature,fields,capturedAt:Date.now()};

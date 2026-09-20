@@ -521,7 +521,7 @@ export function normalizeConversationTemporalReferences(
   ];
   for (const [pattern, kind, statePhase] of statePatterns) {
     const match = text.match(pattern);
-    if (match) anchors.push({ kind, phrase: match[0], normalized: statePhase, statePhase });
+    if (match) anchors.push({ kind, phrase: match[0], normalized: String(statePhase), statePhase: statePhase as import('../../../types').ConversationTemporalAnchor['statePhase'] });
   }
 
   return { referenceDate: dateKey(0), anchors };

@@ -20,6 +20,7 @@ import { longTermMemoryService } from '../../memory/services/longTermMemoryServi
 import { latentIntentMiningService } from '../../unknown/services/latentIntentMiningService';
 import { answerContentIrService } from '../../conversation/services/answerContentIrService';
 import { conversationStrategyService } from '../../strategy/services/conversationStrategyService';
+import { adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { capabilityGraphService } from '../../capability/services/capabilityGraphService';
 import { simpleRpgReferenceService } from '../../data/simpleRpgReferenceService';

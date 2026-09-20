@@ -370,7 +370,7 @@ class MikiSelfCodingSuperchargerService {
     if (autoApply && authority !== 'CORE_PROMOTION') {
       const targetPath = targetFileHint || 'src/autonomous_modules/pending_review.ts';
       return {
-        success: false, prompt, targetFile: targetPath, isNewFile: false, applied: false,
+        success: false, prompt, targetFile: targetPath, isNewFile: false, snapshotId: null, applied: false,
         syntaxCheckPassed: false, reasoning: 'CORE_PROMOTION_AUTHORITY_REQUIRED', code: '',
         linesCount: 0, generationMethod: 'fallback_template', isRequirementImplemented: false,
         error: 'CORE_PROMOTION_AUTHORITY_REQUIRED',

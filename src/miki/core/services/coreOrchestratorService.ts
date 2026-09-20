@@ -199,7 +199,7 @@ class CoreOrchestratorService {
     });
     if(priorDriftCount>=2){
       taskBlackboardService.pause(taskId,'ENVIRONMENT_DRIFT_REPEATED');
-      coreResultService.waiting(reqId,{error:'ENVIRONMENT_DRIFT_REPEATED',changedFields:environmentComparison.changedFields});
+      coreResultService.waiting(reqId,{error:'ENVIRONMENT_DRIFT_REPEATED',result:{changedFields:environmentComparison.changedFields}});
       break;
     }
     taskBlackboardService.append(taskId,'DECISION','core',`coreEnvironmentReplan:${cycles}`,{
@@ -336,6 +336,28 @@ class CoreOrchestratorService {
     ? (value as Record<string,unknown>)
     : {};
  }
+ private collectUnresolved(task:BlackboardTask,pattern:RegExp):string[] {
+  const found=new Set<string>();
+  for(const entry of task.entries){
+   if(entry.kind!=='ERROR'&&entry.kind!=='OBSERVATION'&&entry.kind!=='RESULT') continue;
+   if(!pattern.test(entry.key)&&!pattern.test(JSON.stringify(entry.value||{}))) continue;
+   const value=entry.value&&typeof entry.value==='object'&&!Array.isArray(entry.value) ? entry.value as Record<string,unknown> : undefined;
+   const values=value?.unresolvedItems||value?.unresolvedRequirements||value?.unknowns||value?.reasons;
+   if(Array.isArray(values)) for(const item of values) if(typeof item==='string'&&item.trim()) found.add(item.trim());
+  }
+  return [...found];
+ }
+ private collectValues(task:BlackboardTask,pattern:RegExp):string[] {
+  const found=new Set<string>();
+  for(const entry of task.entries){
+   if(!pattern.test(entry.key)&&!pattern.test(JSON.stringify(entry.value||{}))) continue;
+   const value=entry.value&&typeof entry.value==='object'&&!Array.isArray(entry.value) ? entry.value as Record<string,unknown> : undefined;
+   const values=value?.reusableComponents||value?.componentIds||value?.usedCodeComponentIds||value?.capabilityRefs;
+   if(Array.isArray(values)) for(const item of values) if(typeof item==='string'&&item.trim()) found.add(item.trim());
+  }
+  return [...found];
+ }
+
  private buildUnifiedCognitiveState(task:BlackboardTask,cycle:number):UnifiedCognitiveStateSnapshot{
   const payload=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
   const payloadObject=payload&&typeof payload==='object'&&!Array.isArray(payload) ? payload as Record<string,unknown> : {};
@@ -344,7 +366,7 @@ class CoreOrchestratorService {
     ...(Array.isArray(payloadObject.constraints)?payloadObject.constraints:[]),
     ...(Array.isArray(payloadObject.prohibitions)?payloadObject.prohibitions:[]),
     ...(Array.isArray(payloadObject.acceptanceCriteria)?payloadObject.acceptanceCriteria:[]),
-  ].filter((value):value is string=>typeof value==='string'&&value.trim()).map(value=>value.trim()).slice(0,40);
+  ].filter((value):value is string=>typeof value==='string'&&value.trim().length>0).map(value=>value.trim()).slice(0,40);
   const evidenceIds=[...new Set(task.entries.flatMap(entry=>entry.evidenceIds).filter(Boolean))].slice(-120);
   const unknowns=this.collectUnresolved(task,/unknown|gap|missing|unresolved|blocked/i).slice(0,80);
   const capabilityRefs=this.collectValues(task,/capability|component/i).slice(0,80);
@@ -356,7 +378,7 @@ class CoreOrchestratorService {
     domain:entry.domain,key:entry.key,valueHash:canonicalSha256Object(entry.value)
   }));
   const requiredDomains=Array.isArray(payloadObject.requiredDomains)
-    ? payloadObject.requiredDomains.filter((value):value is string=>typeof value==='string'&&value.trim()).slice(0,18)
+    ? payloadObject.requiredDomains.filter((value):value is string=>typeof value==='string'&&value.trim().length>0).slice(0,18)
     : [];
   const intentPlanValue=payloadObject.intentPlan&&typeof payloadObject.intentPlan==='object'&&!Array.isArray(payloadObject.intentPlan) ? payloadObject.intentPlan as Record<string,unknown> : undefined;
   const intentUnits=Array.isArray(intentPlanValue?.units)?intentPlanValue.units.filter((item):item is Record<string,unknown>=>Boolean(item&&typeof item==='object')):[];
@@ -370,7 +392,7 @@ class CoreOrchestratorService {
   const entry=[...task.entries].reverse().find(item=>item.kind==='DECISION'&&item.domain==='core'&&item.key.startsWith('cognitiveState:'));
   if(!entry||!entry.value||typeof entry.value!=='object') return undefined;
   const value=entry.value as UnifiedCognitiveStateSnapshot;
-  return (value.schemaVersion===1||value.schemaVersion===2)&&typeof value.stateHash==='string' ? value : undefined;
+  return value.schemaVersion===2&&typeof value.stateHash==='string' ? value : undefined;
  }
 
  private readPayloadString(task:BlackboardTask,key:string):string|undefined{

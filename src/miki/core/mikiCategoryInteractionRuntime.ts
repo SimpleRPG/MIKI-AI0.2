@@ -70,7 +70,7 @@ class MikiCategoryInteractionRuntime {
 
     /* conversation.request -> canonical CORE ingress */
     if (category === 'conversation' && interaction.type === 'conversation.request') {
-      const payloadObj =
+      const payloadObj: Record<string, unknown> =
         typeof interaction.payload === 'object' && interaction.payload !== null
           ? { ...(interaction.payload as Record<string, unknown>) }
           : { text: interaction.payload };

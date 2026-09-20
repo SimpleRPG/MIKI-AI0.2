@@ -136,10 +136,12 @@ export class ComponentCompositionService {
       if (!normalized) return true;
       if (normalizedInitialInputs.has(normalized)) return true;
       return previous.some(component =>
-        this.matchTypes(
-          component,
-          { inputs: [{ type: normalized } as any], outputs: [] } as ComponentTxtPackage,
-        ).length > 0
+        (component.outputs || []).some(output => {
+          const outputType = String(output.type || '').trim().toLowerCase();
+          return outputType === normalized ||
+            (normalized.startsWith('claim<') && (outputType.startsWith('claim<') || outputType === 'claim')) ||
+            (normalized === 'claim' && outputType.startsWith('claim<'));
+        })
       );
     };
 

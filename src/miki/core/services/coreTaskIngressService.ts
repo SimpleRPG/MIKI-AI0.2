@@ -1,19 +1,13 @@
 import { coreOrchestratorService, type CoreOrchestrationResult } from './coreOrchestratorService';
 import type { MikiDomain } from './crossDomainCirculationService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
-import { multiIntentDecompositionService } from '../../unknown/services/multiIntentDecompositionService';
 export type CoreTaskKind='USER_REQUEST'|'SELF_IMPROVEMENT'|'EXECUTION_EVENT'|'VERIFICATION_EVENT'|'SYSTEM_TASK';
 export interface CoreTaskIngressRequest {kind:CoreTaskKind;goal:string;source:MikiDomain|'core';payload?:Record<string,unknown>;initialPayload?:Record<string,unknown>;maxCycles?:number;}
 class CoreTaskIngressService {
  submit(request:CoreTaskIngressRequest):Promise<CoreOrchestrationResult>{
   if(!request.goal.trim())throw new Error('CORE_TASK_GOAL_REQUIRED');
   const maxCycles=request.maxCycles??coreCycleSettingsService.maxCyclesFor(request.kind);
-  const decomposed = request.kind === 'USER_REQUEST' ? multiIntentDecompositionService.decompose(request.goal) : undefined;
-  const payload={kind:request.kind,...(request.payload||{}),...(request.initialPayload||{})};
-  if (decomposed?.isMultiIntent) {
-   payload.intentDecomposition = decomposed;
-  }
-  return coreOrchestratorService.run(request.goal,request.source as MikiDomain,payload,maxCycles);
+  return coreOrchestratorService.run(request.goal,request.source as MikiDomain,{kind:request.kind,...(request.payload||{}),...(request.initialPayload||{})},maxCycles);
  }
  finalizeConversationResponse(taskId:string,response:unknown):CoreOrchestrationResult|undefined{return coreOrchestratorService.finalizeConversationResponse(taskId,response);}
  resume(taskId:string,maxCycles=coreCycleSettingsService.maxCyclesFor('USER_REQUEST')):Promise<CoreOrchestrationResult|undefined>{

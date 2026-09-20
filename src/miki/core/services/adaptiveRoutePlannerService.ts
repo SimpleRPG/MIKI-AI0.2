@@ -472,17 +472,17 @@ class AdaptiveRoutePlannerService {
     const intentPlan=decomposeMultiIntent(text);
     const intentContext=this.buildIntentHypothesisContext(task,intentPlan);
     const hypothesisSelection=selectMultiIntentHypothesis(intentPlan,intentContext);
-    const selectedHypothesis=intentPlan.hypotheses.find(h=>h.id===hypothesisSelection.selectedId);
-    const selectedIntentIds=selectedHypothesis?.intentIds||intentPlan.units.map(unit=>unit.id);
+    const selectedHypothesis=intentPlan.hypotheses.find((h: MultiIntentPlan['hypotheses'][number])=>h.id===hypothesisSelection.selectedId);
+    const selectedIntentIds=selectedHypothesis?.intentIds||intentPlan.units.map((unit: MultiIntentPlan['units'][number])=>unit.id);
     const completedSet=new Set(intentContext.completedIntentIds);
-    const pendingUnits=intentPlan.units.filter(unit=>selectedIntentIds.includes(unit.id)&&!completedSet.has(unit.id));
+    const pendingUnits=intentPlan.units.filter((unit: MultiIntentPlan['units'][number])=>selectedIntentIds.includes(unit.id)&&!completedSet.has(unit.id));
     const selectedUnit=(hypothesisSelection.selectedKind==='SEQUENTIAL'||hypothesisSelection.selectedKind==='DEPENDENT')
-      ? pendingUnits.find(unit=>unit.dependencies.every(dep=>completedSet.has(dep))) || pendingUnits[0]
+      ? pendingUnits.find((unit: MultiIntentPlan['units'][number])=>unit.dependencies.every((dep:string)=>completedSet.has(dep))) || pendingUnits[0]
       : pendingUnits[0];
     const focusedText=selectedUnit?.text||text;
-    const intentPayload={intentPlanKey:intentPlan.deterministicKey,intentHypothesisId:hypothesisSelection.selectedId,intentHypothesisKind:hypothesisSelection.selectedKind,intentIds:selectedUnit?[selectedUnit.id]:pendingUnits.map(unit=>unit.id)};
+    const intentPayload={intentPlanKey:intentPlan.deterministicKey,intentHypothesisId:hypothesisSelection.selectedId,intentHypothesisKind:hypothesisSelection.selectedKind,intentIds:selectedUnit?[selectedUnit.id]:pendingUnits.map((unit: MultiIntentPlan['units'][number])=>unit.id)};
     const parallelKnowledgeUnits=hypothesisSelection.selectedKind==='PARALLEL'
-      ? pendingUnits.filter(unit=>unit.goal==='KNOWLEDGE' || unit.action==='RESEARCH')
+      ? pendingUnits.filter((unit: MultiIntentPlan['units'][number])=>unit.goal==='KNOWLEDGE' || unit.action==='RESEARCH')
       : [];
     const conversationResult=this.latestBusinessResult(task,'ANALYZE_TEXT');
     const unknownResult=this.latestBusinessResult(task,'RESOLVE_UNKNOWN');
@@ -678,7 +678,7 @@ class AdaptiveRoutePlannerService {
     }
     const final=task.entries.some(e=>e.domain==='core'&&e.kind==='RESULT'&&e.key==='conversationFinalResponse');
     if(intentPlan.isMultiIntent){
-      const missing=intentPlan.units.filter(unit=>unit.goal!=='INTERACT'&&!completedIntentIds.has(unit.id)).map(unit=>unit.id);
+      const missing=intentPlan.units.filter((unit: MultiIntentPlan['units'][number])=>unit.goal!=='INTERACT'&&!completedIntentIds.has(unit.id)).map((unit: MultiIntentPlan['units'][number])=>unit.id);
       const failed=[...failedIntentIds].filter(id=>!completedIntentIds.has(id));
       const reasons:string[]=[];
       if(!analysis) reasons.push('CONVERSATION_ANALYSIS_MISSING');

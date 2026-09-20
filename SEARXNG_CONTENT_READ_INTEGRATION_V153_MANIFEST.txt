@@ -1,8 +1,0 @@
-Ver153 changed files:
-src/miki/research/services/autonomousSearchService.ts
-src/miki/research/services/researchService.ts
-src/miki/memory/services/evidenceService.ts
-scripts/verify_searxng_content_read_pipeline_v153.mjs
-package.json
-SEARXNG_CONTENT_READ_INTEGRATION_V153_REPORT.txt
-SEARXNG_CONTENT_READ_INTEGRATION_V153_MANIFEST.txt

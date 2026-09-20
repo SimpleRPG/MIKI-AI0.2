@@ -36,7 +36,7 @@ export interface ConversationComponentPipelineResult {
  * 共通契約で扱う。将来別言語・別解析方式を追加する場合も同じ境界を使う。
  */
 export class ConversationComponentPipelineService {
-  private readonly analysisComponentIds: ConversationAnalysisComponentId[] = [
+  private readonly analysisComponentIds: Exclude<ConversationAnalysisComponentId, 'conversation.analysis.composed'>[] = [
     'conversation.analysis.sudachi',
     'conversation.analysis.intl_segmenter',
     'conversation.analysis.dictionary_ngram',
@@ -67,7 +67,7 @@ export class ConversationComponentPipelineService {
     const componentRuns: ConversationAnalysisComponentRun[] = this.analysisComponentIds.map((componentId) => {
       const registry = componentRegistryService.getComponent(componentId);
       const rawId = this.mapRegistryIdToRawId(componentId);
-      const raw = composition.components.find(component => component.componentId === rawId);
+      const raw = rawId ? composition.components.find(component => component.componentId === rawId) : undefined;
       return {
         componentId,
         available: Boolean(raw?.available),
@@ -118,6 +118,8 @@ export class ConversationComponentPipelineService {
         return 'INTL_SEGMENTER';
       case 'conversation.analysis.dictionary_ngram':
         return 'DETERMINISTIC_DICTIONARY_NGRAM';
+      default:
+        throw new Error(`UNKNOWN_ANALYSIS_COMPONENT:${componentId}`);
     }
   }
 
