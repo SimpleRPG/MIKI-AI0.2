@@ -71,6 +71,33 @@ type MainSection =
   | 'review_packages'
   | 'details';
 
+const formatRuntimeStatus = (value: string) => {
+  switch ((value || '').toUpperCase()) {
+    case 'COMPLETED': return '完了';
+    case 'FAILED': return '失敗終了';
+    case 'WAITING': return '待機';
+    case 'RUNNING': return '実行中';
+    case 'BLOCKED': return 'ブロック';
+    case 'REJECTED': return '拒否';
+    case 'PROCESSING': return '処理中';
+    case 'WAIT_EXTERNAL_FEEDBACK': return '外部評価待ち';
+    default: return value || '状態不明';
+  }
+};
+
+const formatRuntimeAction = (value: string) => {
+  switch ((value || '').toUpperCase()) {
+    case 'NONE': return 'なし（終了）';
+    case 'WAIT': return '待機';
+    case 'RETRY': return '再試行';
+    case 'REPLAN': return '再計画';
+    case 'REGENERATE_CANDIDATE': return '候補を再生成';
+    case 'IMPORT_FEEDBACK': return '評価結果を取り込み';
+    case 'RECOVER': return '復旧';
+    default: return value || '不明';
+  }
+};
+
 export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps> = ({
   onOpenSelfImprovementModal,
   onOpenActivityMonitor,
@@ -89,6 +116,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   const canonicalRuns = coreRuntimes.map((item) => ({
     run_id: item.taskId,
     verdict: item.waitingPackageIds.length > 0 ? 'WAIT_EXTERNAL_FEEDBACK' : item.taskStatus,
+    taskStatus: item.taskStatus,
     decision: { action: item.allowedActions[0] || 'NONE' },
   })).reverse();
   const [structuredDirectives, setStructuredDirectives] = useState<StructuredDirective[]>(() =>
@@ -206,7 +234,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     }
   };
 
-  // Execute directive through canonical controller
+  // Execute directive through canonical CORE ingress
   const handleExecuteDirective = async (directiveId: string) => {
     try {
       setIsExecutingAction(true);
@@ -221,30 +249,57 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       });
       typedImprovementUiGatewayService.updateRequestStatus(reqId, 'processing', {
         directiveId,
-        route: ['improvement', 'execution'],
-        processedCategories: ['improvement', 'execution'],
+        route: ['improvement', 'core'],
+        processedCategories: ['improvement', 'core'],
       });
       setActionMessage({
-        text: `指示 [${directiveId}] (Req: ${reqId}) をCanonical Controllerで実行中...`,
+        text: `指示 [${directiveId}] (Req: ${reqId}) をCOREへ送信中...`,
         type: 'info',
       });
 
-      const run = await typedImprovementUiGatewayService.executeDirective(directiveId);
-      typedImprovementUiGatewayService.completeRequest(reqId, {
+      const result = await typedImprovementUiGatewayService.executeDirective(directiveId);
+      const stage = String(result.currentBusinessStage || result.currentStage || '').toUpperCase();
+      const finished = stage === 'COMPLETED';
+      const failed = ['FAILED', 'BLOCKED', 'REJECTED'].includes(stage);
+      const message = result.stopReason || result.completionReasons?.[0] || '';
+      const detail = result.nextStage ? ` → 次: ${result.nextStage}` : '';
+
+      const payload = {
         directiveId,
-        runId: run.run_id,
-        verdict: run.verdict,
-        result: run.result,
-        action: run.decision.action,
-      }, {
-        runId: run.run_id,
-        directiveId,
-        route: ['improvement', 'execution', 'verification'],
-        processedCategories: ['improvement', 'execution', 'verification'],
-      });
+        taskId: result.taskId,
+        currentStage: result.currentBusinessStage || result.currentStage,
+        nextStage: result.nextStage,
+        stopReason: result.stopReason,
+        completionReasons: result.completionReasons,
+        missingRequiredOperations: result.missingRequiredOperations,
+        missingReceipts: result.missingReceipts,
+      };
+
+      if (finished) {
+        typedImprovementUiGatewayService.completeRequest(reqId, payload, {
+          runId: result.taskId,
+          directiveId,
+          route: ['improvement', 'core'],
+          processedCategories: ['improvement', 'core'],
+        });
+      } else {
+        typedImprovementUiGatewayService.updateRequestStatus(reqId, failed ? 'failed' : 'processing', {
+          runId: result.taskId,
+          directiveId,
+          route: ['improvement', 'core'],
+          processedCategories: ['improvement', 'core'],
+          error: failed ? (message || stage) : undefined,
+          result: payload,
+        });
+      }
+
       setActionMessage({
-        text: `指示 [${directiveId}] の実行が完了しました (Req: ${reqId}, Run ID: ${run.run_id}, 結果: ${run.verdict || run.result || run.decision.action})`,
-        type: 'success',
+        text: finished
+          ? `指示 [${directiveId}] の実行が完了しました (Req: ${reqId}, Task: ${result.taskId || '―'})`
+          : failed
+            ? `指示 [${directiveId}] は完了せず停止しました (Req: ${reqId}, 状態: ${formatRuntimeStatus(stage)}${message ? `, ${message}` : ''})`
+            : `指示 [${directiveId}] をCOREで受け付けました (Req: ${reqId}, 状態: ${formatRuntimeStatus(stage)}${detail})`,
+        type: finished ? 'success' : failed ? 'error' : 'info',
       });
       triggerRefresh();
     } catch (err: any) {
@@ -1158,19 +1213,14 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                             {run.run_id}
                           </span>
                           <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">
-                            Action: {run.decision.action}
+                            状態: {formatRuntimeStatus(run.verdict)}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">
+                            次の操作: {formatRuntimeAction(run.decision.action)}
                           </span>
                         </div>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            run.verdict === 'ADOPT'
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                              : run.verdict === 'REJECT'
-                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                          }`}
-                        >
-                          {run.verdict || 'HOLD'}
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                          {formatRuntimeStatus(run.verdict)}
                         </span>
                       </div>
 

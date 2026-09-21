@@ -83,7 +83,12 @@ class TypedImprovementUiGatewayService {
     return this.toCommandResult(command,result);
   }
 
-  async executeDirective(directiveId:string){ return selfImprovementControllerService.executeDirective(directiveId); }
+  async executeDirective(directiveId:string){
+    const directive = externalDirectiveIntakeService.list().find((item) => item.directiveId === directiveId);
+    const goal = directive?.objective?.trim() || `指示書 ${directiveId} を実行し、評価可能な候補まで進める`;
+    const target = directive?.targetFiles?.find((item) => typeof item === 'string' && item.trim()) || 'src/components/AutonomousImprovementHome.tsx';
+    return this.startSpecifiedImprovement(goal, target);
+  }
   startSpecifiedImprovement(goal:string,target:string){return this.sendImprovementCommand({commandType:'START_SPECIFIED_IMPROVEMENT',goal,target,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-improvement'),operationInstanceId:coreResultService.generateRequestId('operation')});}
   discoverImprovementTarget(goal='改善対象を自動で探し、評価可能な候補を作る'){return this.sendImprovementCommand({commandType:'DISCOVER_IMPROVEMENT_TARGET',goal,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-discovery'),operationInstanceId:coreResultService.generateRequestId('operation')});}
   resumeImprovementTask(taskId:string){return this.sendImprovementCommand({commandType:'RESUME_IMPROVEMENT_TASK',taskId,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-resume'),operationInstanceId:coreResultService.generateRequestId('operation')});}
