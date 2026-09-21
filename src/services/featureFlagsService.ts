@@ -131,7 +131,7 @@ class FeatureFlagsService {
     const old = this.flags[key];
     this.flags[key] = state;
     this.saveFlags();
-    systemLogger.info('FEATURE_FLAGS', `機能フラグ更新: ${key} [${old} -> ${state}]`);
+    systemLogger.info('FEATURE_FLAGS', `機能フラグ更新: ${String(key)} [${String(old)} -> ${String(state)}]`);
   }
 
   public setFlagState(key: keyof SystemFeatureFlags, state: FeatureFlagState): void {

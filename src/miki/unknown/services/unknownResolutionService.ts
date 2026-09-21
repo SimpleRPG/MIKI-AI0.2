@@ -2,8 +2,20 @@ import { storageService } from '../../../services/storageService';
 
 const KEY = 'miki_unknown_resolution_v2';
 
+export type ResolutionRoute = 'SOURCE' | 'CODE' | 'TEST' | 'WEB' | 'TOOL' | 'USER' | 'STOP';
+export type UnknownClassification =
+  | 'STALE_INFORMATION'
+  | 'CONFLICTING_EVIDENCE'
+  | 'MISSING_CODE_CONTEXT'
+  | 'MISSING_TEST'
+  | 'MISSING_CAPABILITY'
+  | 'AMBIGUOUS_REQUEST'
+  | 'ENVIRONMENT_BLOCKED'
+  | 'UNKNOWN_TERM'
+  | 'MISSING_FACT';
+
 export interface UnknownResolutionAttempt {
-  route: string;
+  route: ResolutionRoute;
   query?: string;
   provider?: string;
   resultCount?: number;
@@ -15,8 +27,8 @@ export interface UnknownResolutionAttempt {
 export interface UnknownResolutionItem {
   id: string;
   question: string;
-  classification: string;
-  routes: string[];
+  classification: UnknownClassification;
+  routes: ResolutionRoute[];
   budget: number;
   attempts: number;
   attemptHistory: UnknownResolutionAttempt[];
@@ -72,7 +84,7 @@ export class UnknownResolutionService {
     return x;
   }
 
-  attempt(id: string, route: string, result?: string, meta?: any): UnknownResolutionItem | undefined {
+  attempt(id: string, route: ResolutionRoute, result?: string, meta?: any): UnknownResolutionItem | undefined {
     const x = this.xs.find((y) => y.id === id);
     if (!x || x.status !== 'OPEN') return x;
     x.attempts++;

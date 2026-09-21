@@ -34,7 +34,7 @@ const unique = (items: string[]): string[] => [...new Set(items.filter(Boolean))
 
 class QueryPatternRepositoryService {
   list(): QueryPatternRecord[] {
-    return storageService.getItem<QueryPatternRecord[]>(STORAGE_KEY, []);
+    const raw=storageService.getItem(STORAGE_KEY);try{return raw?JSON.parse(raw) as QueryPatternRecord[]:[];}catch{return [];}
   }
 
   observe(outcome: ResearchQueryOutcome, intentType: QueryIntentType): QueryPatternRecord {
@@ -72,7 +72,7 @@ class QueryPatternRepositoryService {
     };
     const record: QueryPatternRecord = { ...base, canonicalSha256: canonicalSha256Object(base) };
     const stored = [record, ...this.list().filter(item => item.patternId !== patternId)].slice(0, MAX_PATTERNS);
-    storageService.setItem(STORAGE_KEY, stored);
+    storageService.setItem(STORAGE_KEY, JSON.stringify(stored));
     return record;
   }
 

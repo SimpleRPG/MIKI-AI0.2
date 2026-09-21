@@ -54,7 +54,7 @@ const unique = (items: string[]): string[] => [...new Set(items.filter(Boolean))
 
 class ResearchQueryOutcomeLearningService {
   list(queryPlanId?: string): ResearchQueryOutcome[] {
-    const all = storageService.getItem<ResearchQueryOutcome[]>(OUTCOME_KEY, []);
+    const raw=storageService.getItem(OUTCOME_KEY);let all:ResearchQueryOutcome[]=[];try{all=raw?JSON.parse(raw) as ResearchQueryOutcome[]:[];}catch{}
     return queryPlanId ? all.filter(item => item.queryPlanId === queryPlanId) : all;
   }
 
@@ -86,8 +86,8 @@ class ResearchQueryOutcomeLearningService {
       outcomeSha256,
     };
     const stored = [outcome, ...this.list().filter(item => item.outcomeId !== outcome.outcomeId)].slice(0, MAX_OUTCOMES);
-    storageService.setItem(OUTCOME_KEY, stored);
-    const reloaded = storageService.getItem<ResearchQueryOutcome[]>(OUTCOME_KEY, []).find(item => item.outcomeId === outcome.outcomeId);
+    storageService.setItem(OUTCOME_KEY, JSON.stringify(stored));
+    const rawReloaded=storageService.getItem(OUTCOME_KEY);let reloaded:ResearchQueryOutcome|undefined;try{reloaded=(rawReloaded?JSON.parse(rawReloaded) as ResearchQueryOutcome[]:[]).find(item=>item.outcomeId===outcome.outcomeId);}catch{}
     if (!reloaded || reloaded.outcomeSha256 !== outcome.outcomeSha256) {
       throw new Error(QUERY_OUTCOME_PERSISTENCE_FAILED);
     }

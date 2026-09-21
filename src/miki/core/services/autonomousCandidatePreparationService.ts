@@ -52,7 +52,7 @@ class AutonomousCandidatePreparationService {
   const resolvedTargetPaths=[...(targetPaths||[])].filter(Boolean);
   if(resolvedTargetPaths.length===0)return undefined;
   const supplied=new Map((aiCandidates||[]).map(x=>[x.path,x]));const drafts:CandidateDraft[]=[];
-  for(const path of resolvedTargetPaths){const source=this.files.get(path);if(!source)continue;const candidate=supplied.get(path);const candidateContent=candidate?.candidateContent||this.safeTemplate(source.content,issue);if(candidateContent.trim()===source.content.trim())continue;drafts.push({issueId,targetPath:path,baselineContent:source.content,candidateContent,evidenceIds:[...new Set([...source.evidenceIds,...resolution.evidenceIds,...(candidate?.evidenceIds||[])])],generationMode:candidate?'AI_SUPPLIED':'SAFE_TEMPLATE'});}
+  for(const path of resolvedTargetPaths){const source=this.files.get(path);if(!source)continue;const candidate=supplied.get(path);const candidateContent=candidate?.candidateContent||this.safeTemplate(source.content,issue);if(candidateContent.trim()===source.content.trim())continue;drafts.push({issueId,targetPath:path,baselineContent:source.content,candidateContent,evidenceIds:[...new Set([...source.evidenceIds,...(candidate?.evidenceIds||[])])],generationMode:candidate?'AI_SUPPLIED':'SAFE_TEMPLATE'});}
   if(drafts.length===0)return undefined;return isolatedCandidateWorkspaceService.create(issueId,drafts.map(x=>({path:x.targetPath,baselineContent:x.baselineContent,candidateContent:x.candidateContent,evidenceIds:x.evidenceIds})));
  }
 

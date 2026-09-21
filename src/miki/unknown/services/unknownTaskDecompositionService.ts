@@ -63,6 +63,15 @@ class UnknownTaskDecompositionService {
     return this.clone(record);
   }
 
+  decomposeAndDispatch(task: string, _priority = 2): UnknownTaskDecomposition {
+    const decomposition = this.decompose(task);
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `[UnknownTaskDecomposition] dispatched ${decomposition.decompositionId}`
+    );
+    return decomposition;
+  }
+
   validate(id: string, stepResults: Array<{ stepId: string; passed: boolean }>): UnknownTaskDecomposition | undefined {
     const record = this.records.find(r => r.decompositionId === id); if (!record) return undefined;
     const map = new Map(stepResults.map(x => [x.stepId, x.passed]));
