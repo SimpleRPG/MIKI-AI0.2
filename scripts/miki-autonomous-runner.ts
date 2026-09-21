@@ -18,7 +18,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { selfImprovementControllerService } from '../src/miki/improvement/services/selfImprovementControllerService';
+import { coreTaskIngressService } from '../src/miki/core/services/coreTaskIngressService';
 import { workDirectiveIngestionService } from '../src/miki/execution/services/workDirectiveIngestionService';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -165,7 +165,6 @@ async function main(): Promise<void> {
     console.log(`[DIRECTIVE] requirements=${directive.requirements.length} targets=${directive.targets.length}`);
   }
 
-  selfImprovementControllerService.initialize();
   const started = Date.now();
   let cycles = 0;
   let stopping = false;
@@ -177,12 +176,21 @@ async function main(): Promise<void> {
 
   try {
     while (!stopping && (options.durationMs === null || Date.now() - started < options.durationMs)) {
-      const decision = selfImprovementControllerService.decide();
-      console.log(`[DECIDE] ${decision.action}: ${decision.reason}`);
+      console.log('[CORE] SELF_IMPROVEMENT request prepared');
       if (!options.dryRun) {
-        const result = await selfImprovementControllerService.runOnce('termux-autonomous-runner');
+        const result = await coreTaskIngressService.submit({
+          kind: 'SELF_IMPROVEMENT',
+          goal: 'termux autonomous self improvement',
+          source: 'core',
+          payload: {
+            trigger: 'termux-autonomous-runner',
+          },
+          initialPayload: {
+            trigger: 'termux-autonomous-runner',
+          },
+        });
         cycles++;
-        console.log(`[CYCLE ${cycles}] ${result.decision.action} -> ${result.result ?? 'no-result'}${result.verdict ? ` verdict=${result.verdict}` : ''}`);
+        console.log(`[CYCLE ${cycles}] CORE -> ${result.result ?? 'no-result'}`);
       }
       if (stopping) break;
       const remaining = options.durationMs === null ? options.intervalMs : Math.min(options.intervalMs, Math.max(0, options.durationMs - (Date.now() - started)));
@@ -190,7 +198,6 @@ async function main(): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, remaining));
     }
   } finally {
-    selfImprovementControllerService.dispose();
     console.log(`[RUNNER] stopped. cycles=${cycles} elapsed=${Math.round((Date.now() - started) / 1000)}s`);
   }
 }

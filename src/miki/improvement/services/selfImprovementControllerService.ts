@@ -14,7 +14,6 @@ import { ExecutionEnvironment } from '../../execution/services/executionRunnerSe
 import { improvementProposalService } from './improvementProposalService';
 import { workDirectiveIngestionService } from '../../execution/services/workDirectiveIngestionService';
 import { evidenceBasedSelfImprovementEngine } from './evidenceBasedSelfImprovementEngine';
-import { legacyEvolutionCoreOperationService } from '../../core/services/legacyEvolutionCoreOperationService';
 import { StructuredDirective } from '../../../types/evidenceSelfImprovementTypes';
 import { selfImprovementExecutionCoordinatorService } from '../../execution/services/selfImprovementExecutionCoordinatorService';
 import { selfImprovementOperationalGuardService } from '../../safety/services/selfImprovementOperationalGuardService';
@@ -184,45 +183,22 @@ export class SelfImprovementControllerService {
           evidenceBasedSelfImprovementEngine.registerContract(c);
         }
 
-        // 自律進化パイプラインを指示書ターゲットで実行
-        try {
-          const evoRecord = await legacyEvolutionCoreOperationService.execute({
-            prompt: `作業指示履行: ${activeDirective.title} - ${activeDirective.goal}`,
-            targetFile: candidateFile,
-            reason: activeDirective.goal,
-          });
+        // 旧Controllerから直接コード進化を実行しない。
+        // 自己改善タスクはCOREへ再投入し、以降のDomain選択をCOREに委譲する。
+        workDirectiveIngestionService.markStatus(
+          activeDirective.directiveId,
+          'PENDING',
+          undefined,
+          'CORE_INGRESS_REQUIRED: Directive execution is delegated to CORE.'
+        );
 
-          // 契約と証拠の事後照合判定
-          const evidence = evidenceBasedSelfImprovementEngine.getEvidence(evoRecord.implementationEvidenceId || '');
-          if (evidence) {
-            for (const c of contracts) {
-              evidenceBasedSelfImprovementEngine.evaluateRequirementContract(c, evidence);
-            }
-          }
-
-          workDirectiveIngestionService.markStatus(
-            activeDirective.directiveId,
-            evoRecord.applied ? 'COMPLETED' : 'PENDING',
-            evoRecord.changeSetId,
-            `配備結果: ${evoRecord.applied ? '合格・採択完了' : '承認待ちまたは保留'} (スコア: ${evoRecord.newScore}点, Adoption: ${evoRecord.adoptionState}, Git: ${evoRecord.deploymentState})`
-          );
-
-          return this.recordMeasured(
-            trigger,
-            decision,
-            evoRecord.applied ? 'directive-completed' : 'directive-staged',
-            before,
-            evoRecord.changeSetId || runChangeSetId
-          );
-        } catch (dirErr: any) {
-          workDirectiveIngestionService.markStatus(
-            activeDirective.directiveId,
-            'PENDING',
-            undefined,
-            `試行中エラー: ${dirErr?.message}`
-          );
-          return this.recordMeasured(trigger, decision, `directive-error: ${dirErr?.message}`, before);
-        }
+        return this.recordMeasured(
+          trigger,
+          decision,
+          'core-ingress-required',
+          before,
+          runChangeSetId
+        );
       }
 
       // 2. 既存Auditシグナルと通常改善候補
@@ -294,34 +270,19 @@ export class SelfImprovementControllerService {
         return this.recordMeasured(trigger, decision, result.resolved ? 'research-resolved' : 'research-not-resolved', before);
       }
 
-      // 3. 仕様書ドリフトまたは未実装章の自律自己コード改善
-      const nextTarget = legacyEvolutionCoreOperationService.selectNextTarget();
-      let decision: ImprovementDecision = {
+      // 3. 仕様書ドリフト・未実装・コード進化の判断は旧Evolution経路では実行しない。
+      // COREがSELF_IMPROVEMENTタスクを再評価し、必要なDomainを選択する。
+      const decision: ImprovementDecision = {
         action: 'AUTONOMOUS_CODE_EVOLUTION',
-        reason: nextTarget.reason,
-        targetChapter: nextTarget.chapter?.chapterNumber,
-        targetFile: nextTarget.targetFile,
+        reason: 'COREによる自己改善Domain再評価が必要です。',
       };
-      decision = this.selectStrategyForDecision(decision);
-      const evoRecord = await legacyEvolutionCoreOperationService.execute({
-        chapterNumber: nextTarget.chapter?.chapterNumber,
-        targetFile: nextTarget.targetFile,
-        prompt: nextTarget.prompt,
-        reason: nextTarget.reason,
-      });
-      return this.recordMeasured(
-        trigger,
-        decision,
-        evoRecord.applied ? 'evolution-applied' : 'evolution-staged',
-        before,
-        evoRecord.changeSetId || runChangeSetId
-      );
 
       return this.recordMeasured(
         trigger,
-        { action: 'IDLE', reason: '現在、自動改善を開始すべき安定ケース・未解決Gap・仕様ドリフトはありません。' },
-        'no-op',
-        before
+        decision,
+        'core-reassessment-required',
+        before,
+        runChangeSetId
       );
     } catch (error: any) {
       return this.recordMeasured(
@@ -371,15 +332,10 @@ export class SelfImprovementControllerService {
       };
     }
 
-    const nextTarget = legacyEvolutionCoreOperationService.selectNextTarget();
-    if (nextTarget) {
-      return {
-        action: 'AUTONOMOUS_CODE_EVOLUTION',
-        reason: nextTarget.reason,
-        targetChapter: nextTarget.chapter?.chapterNumber,
-        targetFile: nextTarget.targetFile,
-      };
-    }
+    return {
+      action: 'AUTONOMOUS_CODE_EVOLUTION',
+      reason: 'COREによる自己改善Domain再評価が必要です。',
+    };
 
     if (signals[0]?.kind === 'FAILURE_RATE') return { action: 'OBSERVE_FAILURE', reason: signals[0].reason };
     return { action: 'IDLE', reason: signals[0]?.reason || '改善対象なし' };

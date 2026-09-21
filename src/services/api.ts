@@ -94,7 +94,7 @@ export function getViteEnvApiKeys(): SavedGeminiKeyItem[] {
 
 export function getGeminiApiKeyItems(): SavedGeminiKeyItem[] {
   try {
-    const parsed = storageService.getJson<unknown[]>('miki_custom_gemini_api_keys', []);
+    const parsed = storageService.getJson<Array<string | Partial<SavedGeminiKeyItem>>>('miki_custom_gemini_api_keys', []);
     {
       if (parsed.length > 0) {
         const existingList = parsed

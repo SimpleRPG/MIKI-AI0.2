@@ -19,7 +19,6 @@ import { personalApiGatewayService } from '../miki/execution/services/personalAp
 import { improvementRegressionCoordinatorService } from '../miki/improvement/services/improvementRegressionCoordinatorService';
 import { taskLineageService } from '../miki/execution/services/taskLineageService';
 import { taskCaseMemoryService } from '../miki/memory/services/taskCaseMemoryService';
-import { selfImprovementControllerService } from '../miki/improvement/services/selfImprovementControllerService';
 import { improvementCanaryRollbackService } from '../miki/improvement/services/improvementCanaryRollbackService';
 import { taskExecutionOrchestratorService } from '../miki/execution/services/taskExecutionOrchestratorService';
 import { recoveryOrchestratorService } from '../miki/safety/services/recoveryOrchestratorService';
@@ -61,7 +60,7 @@ class AppRuntimeLifecycleService {
     improvementRegressionCoordinatorService.initialize();
     taskLineageService.initialize();
     taskCaseMemoryService.initialize();
-    selfImprovementControllerService.initialize();
+    selfImprovementMetricsService.initialize();
     improvementCanaryRollbackService.initialize();
     taskExecutionOrchestratorService.initialize();
     recoveryOrchestratorService.initialize();
@@ -86,7 +85,6 @@ class AppRuntimeLifecycleService {
     recoveryOrchestratorService.dispose();
     taskExecutionOrchestratorService.dispose();
     taskCaseMemoryService.dispose();
-    selfImprovementControllerService.dispose();
     selfImprovementMetricsService.dispose();
     taskLineageService.dispose();
     improvementRegressionCoordinatorService.dispose();

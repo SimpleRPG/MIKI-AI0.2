@@ -1,13 +1,13 @@
 {
   "version": "v41",
-  "passed": true,
+  "passed": false,
   "checks": {
     "backgroundUsesIngress": true,
     "backgroundNoDirectController": true,
     "governorUsesIngress": true,
     "governorNoDirectEvolution": true,
-    "coreDomainHandlerOwnsControllerCall": true,
-    "controllerOwnsEvolutionCall": true,
+    "coreDomainHandlerOwnsControllerCall": false,
+    "controllerOwnsEvolutionCall": false,
     "queueAcknowledgedNotApplied": true,
     "backgroundQueueAcknowledged": true
   },

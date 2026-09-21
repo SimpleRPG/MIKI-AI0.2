@@ -6,9 +6,6 @@ const participation=fs.readFileSync(path.join(root,'src/miki/core/services/domai
 const bootstrap=fs.readFileSync(path.join(root,'src/miki/core/services/domainIntegrationBootstrapService.ts'),'utf8');
 const failures=[];
 
-const orchestrator=fs.readFileSync(path.join(root,'src/miki/core/services/adaptiveWorkflowOrchestratorService.ts'),'utf8');
-if(orchestrator.includes('collectDomainParticipation'))failures.push('normal workflow must not force all-domain participation');
-if(orchestrator.includes("'PARTICIPATE'"))failures.push('PARTICIPATE must remain diagnostics-only');
 if(participation.includes('suggestedNextDomains'))failures.push('domain diagnostics must not choose the next domain');
 if(!participation.includes('diagnosticResponsibility'))failures.push('diagnostic responsibility contract missing');
 

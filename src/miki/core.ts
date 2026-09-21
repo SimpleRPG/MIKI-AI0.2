@@ -4,7 +4,6 @@ export * from './core/services/domainIntegrationBootstrapService';
 export * from './core/services/taskBlackboardService';
 export * from './core/services/governanceKernelService';
 export * from './core/services/adaptiveRoutePlannerService';
-export * from './core/services/adaptiveWorkflowOrchestratorService';
 export * from './core/services/evidenceQualityGateService';
 export * from './core/services/negativeKnowledgeService';
 export * from './core/services/plateauDetectorService';
@@ -36,7 +35,6 @@ export * from './core/services/complexityCostGateService';
 export * from './core/services/cumulativeRevalidationService';
 export * from './core/services/domainParticipationService';
 
-export * from './core/services/domainSequentialWorkflowService';
 
 export * from './core/services/coreOrchestratorService';
 

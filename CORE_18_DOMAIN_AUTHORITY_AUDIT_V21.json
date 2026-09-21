@@ -8,14 +8,16 @@
     "coreCollectsResults": true,
     "coreReevaluates": true,
     "coreCompletes": true,
-    "adaptiveDelegates": true,
-    "sequentialDelegates": true,
-    "selfImprovementEntersFacade": true,
-    "noFixedSequentialAuthority": true,
+    "selfImprovementEntersCore": true,
+    "ingressOwnsAuthority": true,
+    "legacyAdaptiveFacadeRemoved": true,
+    "legacySequentialFacadeRemoved": true,
+    "noLegacyAdaptiveExport": true,
+    "noLegacySequentialExport": true,
     "exported": true
   },
   "authority": "coreOrchestratorService",
-  "compatibilityEntrypoints": [
+  "retiredCompatibilityFacades": [
     "adaptiveWorkflowOrchestratorService",
     "domainSequentialWorkflowService"
   ]

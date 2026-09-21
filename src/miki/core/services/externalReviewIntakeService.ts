@@ -319,9 +319,9 @@ class ExternalReviewIntakeService {
 
   private load(): void {
     try {
-      const records = storageService.getJson(RECORDS_KEY, []);
+      const records = storageService.getJson<ExternalReviewRecord[]>(RECORDS_KEY, []);
       if (Array.isArray(records)) for (const record of records) if (record?.externalReviewId) this.records.set(record.externalReviewId, record);
-      const decisions = storageService.getJson(DECISIONS_KEY, []);
+      const decisions = storageService.getJson<ExternalReviewDecision[]>(DECISIONS_KEY, []);
       if (Array.isArray(decisions)) for (const decision of decisions) if (decision?.decisionId) this.decisions.set(decision.decisionId, decision);
     } catch {
       this.records.clear();

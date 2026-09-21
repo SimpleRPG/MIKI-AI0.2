@@ -124,7 +124,7 @@ class MikiCategoryInteractionRuntime {
     try {
       const trigger = typeof payload.trigger === 'string' ? payload.trigger : 'miki-17-category-interaction';
       const result = await coreTaskIngressService.submit({
-        kind:'SELF_IMPROVEMENT', goal:trigger, source:'improvement', payload:{...payload,trigger}, initialPayload:{...payload,trigger},
+        kind: 'SELF_IMPROVEMENT', goal: trigger, source: 'improvement', payload: { ...payload, trigger }, initialPayload: { ...payload, trigger },
       });
       this.lastImprovementRunId = typeof result.coreResult?.runId === 'string' ? result.coreResult.runId : undefined;
       if (result.task.status === 'COMPLETED') coreResultService.recordCategoryStep(requestId,'improvement','completed');

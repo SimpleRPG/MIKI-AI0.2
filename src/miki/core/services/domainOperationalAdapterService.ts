@@ -5,7 +5,6 @@ import { conversationCompositionResearchSchedulerService } from '../../conversat
 import { getManifestDefaultConfig, getManifestNativeEnv, getModelManifest } from '../../data/services/deterministicModelCatalog';
 import { executionRunnerService } from '../../execution/services/executionRunnerService';
 import { unifiedMikiExperienceService } from '../../experience/services/unifiedMikiExperienceService';
-import { selfImprovementControllerService } from '../../improvement/services/selfImprovementControllerService';
 import { autonomousCurriculumService } from '../../learning/services/autonomousCurriculumService';
 import { causalMemoryLedgerService } from '../../memory/services/causalMemoryLedgerService';
 import { heuristicGraduationService } from '../../promotion/services/heuristicGraduationService';
@@ -16,6 +15,8 @@ import { codebaseReflectionService } from '../../selfDevelopment/services/codeba
 import { planOrchestratorService } from '../../strategy/services/planOrchestratorService';
 import { unknownResolutionService } from '../../unknown/services/unknownResolutionService';
 import { completionJudgeService } from '../../verification/services/completionJudgeService';
+import { selfImprovementMetricsService } from '../../improvement/services/selfImprovementMetricsService';
+import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 
 export interface DomainOperationalSnapshot {
   domain: MikiDomain;
@@ -56,7 +57,7 @@ class DomainOperationalAdapterService {
         case 'experience':
           return snapshot(domain,'unifiedMikiExperienceService',{state:unifiedMikiExperienceService.getState(),recent:unifiedMikiExperienceService.getRecent(20)});
         case 'improvement':
-          return snapshot(domain,'selfImprovementControllerService',{decision:selfImprovementControllerService.decide(),runs:selfImprovementControllerService.listRuns()});
+          return snapshot(domain,'selfImprovementOperationalReadModel',{weaknesses:selfImprovementMetricsService.rankWeaknesses(),runs:improvementIntakeRouterService.list(50)});
         case 'learning':
           return snapshot(domain,'autonomousCurriculumService',{boundaries:autonomousCurriculumService.getAllBoundaries(),curriculums:autonomousCurriculumService.getCurriculums(),skills:autonomousCurriculumService.getCompressedSkills()});
         case 'memory':

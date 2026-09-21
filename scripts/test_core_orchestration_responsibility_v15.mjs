@@ -5,7 +5,7 @@ const planner=read('src/miki/core/services/adaptiveRoutePlannerService.ts');
 const participation=read('src/miki/core/services/domainParticipationService.ts');
 const bootstrap=read('src/miki/core/services/domainIntegrationBootstrapService.ts');
 const failures=[];
-if(!orchestrator.includes('adaptiveRoutePlannerService.plan(current)'))failures.push('core route planner is not authoritative');
+if(!/adaptiveRoutePlannerService\.plan\s*\(/.test(orchestrator))failures.push('core route planner is not authoritative');
 if(orchestrator.includes('collectDomainParticipation'))failures.push('normal tasks still force all domains');
 if(orchestrator.includes("'PARTICIPATE'"))failures.push('diagnostic command leaked into normal workflow');
 if(participation.includes('suggestedNextDomains'))failures.push('domain diagnostic chooses next route');

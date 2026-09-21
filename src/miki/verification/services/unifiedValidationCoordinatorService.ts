@@ -34,7 +34,7 @@ export class UnifiedValidationCoordinatorService {
  }
  public get(candidateId:string):ValidationBundle|undefined{const b=this.bundles.get(candidateId);return b?this.clone(b):undefined;}
  private clone<T>(v:T):T{return JSON.parse(JSON.stringify(v));}
- private load(){try{for(const b of storageService.getJson(KEY, []))this.bundles.set(b.candidateId,b);}catch{this.bundles.clear();}}
+ private load(){try{for(const b of storageService.getJson<ValidationBundle[]>(KEY, []))this.bundles.set(b.candidateId,b);}catch{this.bundles.clear();}}
  private save(){storageService.setItem(KEY,JSON.stringify([...this.bundles.values()].slice(-1000)));}
 }
 export const unifiedValidationCoordinatorService=new UnifiedValidationCoordinatorService();

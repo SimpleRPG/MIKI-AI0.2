@@ -17,7 +17,6 @@ export function selfAwareness() {
 export * from './selfAwareness/services/affectionDynamicsService';
 export * from './selfAwareness/services/cognitiveEvidenceIntegrationService';
 export * from './selfAwareness/services/cognitiveExecutionEvidenceService';
-export * from './selfAwareness/services/integratedCognitionControllerService';
 export * from './selfAwareness/services/intelligenceSnapshotService';
 export * from './selfAwareness/services/knowledgeOperatingSystemService';
 export * from './selfAwareness/services/metacognitiveCalibrationService';
