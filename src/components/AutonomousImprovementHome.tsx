@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Activity,
   CheckCircle2,
@@ -48,9 +48,6 @@ import {
   MIKI_CATEGORIES,
   MikiCategory,
 } from '../miki/core/mikiInteractionBus';
-import {
-  StructuredDirective,
-} from '../types/evidenceSelfImprovementTypes';
 import { ReviewPackageLibrary } from './ReviewPackageLibrary';
 import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewayService';
 import { isEditableInputActive } from '../utils/isEditableInputActive';
@@ -119,9 +116,6 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     taskStatus: item.taskStatus,
     decision: { action: item.allowedActions[0] || 'NONE' },
   })).reverse();
-  const [structuredDirectives, setStructuredDirectives] = useState<StructuredDirective[]>(() =>
-    typedImprovementUiGatewayService.getStructuredDirectives()
-  );
   const [externalDirectives, setExternalDirectives] = useState<ExternalDirective[]>(() =>
     typedImprovementUiGatewayService.getExternalDirectives()
   );
@@ -140,9 +134,8 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 
   // Directive creation inputs
   const [newDirectiveText, setNewDirectiveText] = useState('');
-  const [newDirectiveTitle, setNewDirectiveTitle] = useState('');
-  const [newDirectiveSource, setNewDirectiveSource] = useState('直接入力');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED'>('all');
+  const [newDirectiveFileName, setNewDirectiveFileName] = useState('pasted-directive.txt');
+  const directiveFileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedDirectiveId, setSelectedDirectiveId] = useState<string | null>(null);
 
   // Execution triggers state
@@ -170,7 +163,6 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       if (isEditableInputActive()) return;
       setCoreRuntimes(typedImprovementUiGatewayService.listRestoredPriorityOneRuntime());
       setLoopState(typedImprovementUiGatewayService.getLoopState());
-      setStructuredDirectives(typedImprovementUiGatewayService.getStructuredDirectives());
       setExternalDirectives(typedImprovementUiGatewayService.getExternalDirectives());
       setIntakeRuns(typedImprovementUiGatewayService.getIntakeRuns(50));
       setWorkspaces(typedImprovementUiGatewayService.getWorkspaces());
@@ -187,7 +179,6 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   const triggerRefresh = () => {
     setCoreRuntimes(typedImprovementUiGatewayService.listRestoredPriorityOneRuntime());
     setLoopState(typedImprovementUiGatewayService.getLoopState());
-    setStructuredDirectives(typedImprovementUiGatewayService.getStructuredDirectives());
     setExternalDirectives(typedImprovementUiGatewayService.getExternalDirectives());
     setIntakeRuns(typedImprovementUiGatewayService.getIntakeRuns(50));
     setWorkspaces(typedImprovementUiGatewayService.getWorkspaces());
@@ -196,39 +187,60 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     setRefreshTick((prev) => prev + 1);
   };
 
-  // Submit directive
+  const handleDirectiveFileChange = async (event: any) => {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    const lowerName = String(file.name || '').toLowerCase();
+    const supported = /\.(txt|md|markdown|json|yaml|yml)$/.test(lowerName);
+    if (!supported && file.type && !String(file.type).startsWith('text/') && file.type !== 'application/json') {
+      setActionMessage({ text: '対応していないファイル形式です。txt / md / markdown / json / yaml / yml を使用してください。', type: 'error' });
+      event.target.value = '';
+      return;
+    }
+    try {
+      const text = await file.text();
+      setNewDirectiveText(text);
+      setNewDirectiveFileName(file.name || 'imported-directive.txt');
+      setActionMessage({ text: `${file.name} を読み込みました。内容を確認して「指示書を取り込む」を押してください。`, type: 'info' });
+    } catch (err: any) {
+      setActionMessage({ text: `ファイル読み込み失敗: ${err?.message || String(err)}`, type: 'error' });
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const handleDeleteDirective = async (directiveId: string) => {
+    try {
+      setIsExecutingAction(true);
+      typedImprovementUiGatewayService.deleteDirective(directiveId);
+      if (selectedDirectiveId === directiveId) setSelectedDirectiveId(null);
+      setActionMessage({ text: `指示書 [${directiveId}] を削除しました。CORE実行履歴・検証証拠・評価用ZIPは保持されます。`, type: 'success' });
+      triggerRefresh();
+    } catch (err: any) {
+      setActionMessage({ text: `指示書を削除できません: ${err?.message || String(err)}`, type: 'error' });
+    } finally {
+      setIsExecutingAction(false);
+    }
+  };
+
   const handleCreateDirective = async () => {
-    if (!newDirectiveText.trim()) {
+    const text = newDirectiveText.trim();
+    if (!text) {
       setActionMessage({ text: '指示書テキストを入力してください', type: 'error' });
       return;
     }
-
     try {
       setIsExecutingAction(true);
-      // If structured with headers or source
-      const parsed = typedImprovementUiGatewayService.ingestDirective(
-        newDirectiveText,
-        newDirectiveTitle.trim() || undefined
-      );
-
-      // Also ingest via externalDirectiveIntakeService to create IntakeRun
-      await typedImprovementUiGatewayService.receiveDirectiveFile(
-        parsed.title || 'manual_directive.md',
-        newDirectiveText
-      );
-
+      const received = await typedImprovementUiGatewayService.receiveDirectiveFile(newDirectiveFileName || 'pasted-directive.txt', text);
       setNewDirectiveText('');
-      setNewDirectiveTitle('');
+      setNewDirectiveFileName('pasted-directive.txt');
       setActionMessage({
-        text: `指示書を受け付けました (ID: ${parsed.directiveId})。Queue登録と検証の準備が完了しました。`,
+        text: `指示書を取り込みました: ${received.directive.title} (ID: ${received.directive.directiveId}, Run: ${received.run.runId})。CORE Queueへ登録済みです。`,
         type: 'success',
       });
       triggerRefresh();
     } catch (err: any) {
-      setActionMessage({
-        text: `指示受付エラー: ${err?.message || String(err)}`,
-        type: 'error',
-      });
+      setActionMessage({ text: `指示受付エラー: ${err?.message || String(err)}`, type: 'error' });
     } finally {
       setIsExecutingAction(false);
     }
@@ -405,16 +417,13 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     }
   };
 
-  // Filtered directives
-  const filteredDirectives = useMemo(() => {
-    if (statusFilter === 'all') return structuredDirectives;
-    return structuredDirectives.filter((d) => d.status === statusFilter);
-  }, [structuredDirectives, statusFilter]);
-
+  const filteredDirectives = useMemo(() => externalDirectives, [externalDirectives]);
   const selectedDirective = useMemo(() => {
     if (!selectedDirectiveId) return null;
-    return structuredDirectives.find((d) => d.directiveId === selectedDirectiveId) || null;
-  }, [selectedDirectiveId, structuredDirectives]);
+    return externalDirectives.find((d) => d.directiveId === selectedDirectiveId) || null;
+  }, [selectedDirectiveId, externalDirectives]);
+  const getDirectiveRuntimeStatus = (directive: ExternalDirective) =>
+    intakeRuns.find((run) => run.runId === directive.runId)?.status || directive.status;
 
   // Format timestamp helper
   const fmtTime = (ts?: number) => {
@@ -503,7 +512,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       <div className="bg-slate-900/60 border-b border-slate-800/80 px-4 py-1.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0">
         {[
           { id: 'status', label: '現在の状態', icon: Activity },
-          { id: 'directives', label: '作業指示', icon: FileText, count: structuredDirectives.length },
+          { id: 'directives', label: '作業指示', icon: FileText, count: externalDirectives.length },
           { id: 'execution', label: '実行', icon: Play },
           { id: 'queue', label: 'Queue', icon: ListTree, count: loopState.queue.length },
           { id: 'validation', label: '検証', icon: ShieldCheck, count: evidences.length },
@@ -770,51 +779,40 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
         {/* ================= SECTION 2: 作業指示 (DIRECTIVES) ================= */}
         {activeSection === 'directives' && (
           <div className="space-y-4 max-w-6xl mx-auto">
-            {/* Directive Ingestion Form */}
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-indigo-400" />
-                  作業指示書の取り込み・登録
-                </h3>
-                <span className="text-[11px] text-slate-400">
-                  Markdown / テキスト / 外部AIプロンプト対応
-                </span>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-indigo-400" />
+                    作業指示書の取り込み
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    貼り付け・txt / md / markdown / json / yaml / yml を同じ取り込み経路で処理します。タイトルは自動判定します。
+                  </p>
+                </div>
+                <input
+                  ref={directiveFileInputRef}
+                  type="file"
+                  accept=".txt,.md,.markdown,.json,.yaml,.yml,text/plain,text/markdown,application/json,text/yaml"
+                  onChange={handleDirectiveFileChange}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => directiveFileInputRef.current?.click()}
+                  disabled={isExecutingAction}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 disabled:opacity-50"
+                >
+                  ファイルを選択
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder="指示書タイトル (例: 18構成UI移行作業指示)"
-                  value={newDirectiveTitle}
-                  onChange={(e) => setNewDirectiveTitle(e.target.value)}
-                  onInput={(e) => setNewDirectiveTitle(e.currentTarget.value)}
-                  onCompositionStart={(e) => setNewDirectiveTitle(e.currentTarget.value)}
-                  onCompositionUpdate={(e) => setNewDirectiveTitle(e.currentTarget.value)}
-                  onCompositionEnd={(e) => setNewDirectiveTitle(e.currentTarget.value)}
-                  onKeyUp={(e) => setNewDirectiveTitle(e.currentTarget.value)}
-                  onBlur={(e) => setNewDirectiveTitle(e.currentTarget.value)}
-                  className="px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-hidden focus:border-indigo-500"
-                />
-                <select
-                  value={newDirectiveSource}
-                  onChange={(e) => setNewDirectiveSource(e.target.value)}
-                  className="px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-hidden focus:border-indigo-500"
-                >
-                  <option value="直接入力">直接入力</option>
-                  <option value="外部AI">外部AI (Claude / GPT / Gemini)</option>
-                  <option value="Markdownファイル">Markdownファイル</option>
-                  <option value="仕様書ドリフト監査">仕様書ドリフト監査</option>
-                </select>
+              <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-400">
+                <span className="text-slate-500">入力:</span> {newDirectiveFileName}
+                <span className="ml-3 text-slate-500">タイトル:</span> 自動判定
               </div>
 
               <textarea
-                placeholder="作業指示書テキストを入力またはペーストしてください...
-# 目的: ...
-# 対象ファイル: ...
-# 要求要件: ...
-# 禁止事項: ...
-# 検証条件: ..."
+                placeholder="作業指示書を貼り付けてください。JSONもそのまま受け付けます。"
                 value={newDirectiveText}
                 onChange={(e) => setNewDirectiveText(e.target.value)}
                 onInput={(e) => setNewDirectiveText(e.currentTarget.value)}
@@ -823,13 +821,13 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                 onCompositionEnd={(e) => setNewDirectiveText(e.currentTarget.value)}
                 onKeyUp={(e) => setNewDirectiveText(e.currentTarget.value)}
                 onBlur={(e) => setNewDirectiveText(e.currentTarget.value)}
-                rows={5}
+                rows={8}
                 className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono focus:outline-hidden focus:border-indigo-500"
               />
 
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center justify-between gap-3 pt-1">
                 <div className="text-[11px] text-slate-500">
-                  ※ 取り込まれた指示は構文解析され、不変条件検証・最優先Target選定へ構造化されます
+                  取り込み時にタイトル・目的・対象・要件・禁止事項・不変条件・検証条件・納品条件を構造化します。
                 </div>
                 <button
                   onClick={handleCreateDirective}
@@ -837,153 +835,90 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                   className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>指示書を取り込む (Ingest)</span>
+                  <span>指示書を取り込む</span>
                 </button>
               </div>
             </div>
 
-            {/* Directives List & Filters */}
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold text-slate-200">
-                    登録済み指示書一覧 ({filteredDirectives.length}件)
-                  </h3>
-                </div>
-
-                <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
-                  {(['all', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'REJECTED'] as const).map((st) => (
-                    <button
-                      key={st}
-                      onClick={() => setStatusFilter(st)}
-                      className={`px-2 py-0.5 rounded text-[11px] capitalize transition ${
-                        statusFilter === st
-                          ? 'bg-indigo-600 text-white font-semibold'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {st === 'all' ? 'すべて' : st}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <h3 className="text-xs font-bold text-slate-200">
+                登録済み指示書一覧 ({filteredDirectives.length}件)
+              </h3>
 
               {filteredDirectives.length === 0 ? (
                 <div className="p-8 text-center text-xs text-slate-500 bg-slate-950/40 rounded-lg border border-slate-800/40">
-                  該当する作業指示書はありません
+                  登録済みの指示書はありません
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {filteredDirectives.map((d) => (
-                    <div
-                      key={d.directiveId}
-                      onClick={() => setSelectedDirectiveId(d.directiveId)}
-                      className={`p-3.5 rounded-xl border transition cursor-pointer space-y-2 ${
-                        selectedDirectiveId === d.directiveId
-                          ? 'bg-slate-800/80 border-indigo-500 shadow-xs'
-                          : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-mono text-indigo-300 font-medium text-[11px]">
-                          {d.directiveId}
-                        </span>
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                            d.status === 'COMPLETED'
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : d.status === 'IN_PROGRESS'
-                              ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                              : d.status === 'REJECTED'
-                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                              : 'bg-slate-800 text-slate-300 border border-slate-700'
-                          }`}
-                        >
-                          {d.status}
-                        </span>
+                  {filteredDirectives.map((d) => {
+                    const runtimeStatus = getDirectiveRuntimeStatus(d);
+                    const intakeRun = intakeRuns.find((run) => run.runId === d.runId);
+                    return (
+                      <div
+                        key={d.directiveId}
+                        onClick={() => setSelectedDirectiveId(d.directiveId)}
+                        className={`p-3.5 rounded-xl border transition cursor-pointer space-y-2 ${
+                          selectedDirectiveId === d.directiveId
+                            ? 'bg-slate-800/80 border-indigo-500 shadow-xs'
+                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-xs gap-2">
+                          <span className="font-mono text-indigo-300 font-medium text-[11px]">{d.directiveId}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700">
+                            {runtimeStatus}
+                          </span>
+                        </div>
+                        <div className="font-bold text-slate-100 text-xs">{d.title}</div>
+                        <div className="text-[11px] text-slate-400 line-clamp-2">{d.objective}</div>
+                        <div className="text-[10px] text-slate-500">
+                          Run: {d.runId || '―'} {intakeRun?.taskId ? ` / Task: ${intakeRun.taskId}` : ''}
+                        </div>
+                        <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-500">
+                          <span>受領: {fmtTime(d.receivedAt)}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); void handleDeleteDirective(d.directiveId); }}
+                            disabled={isExecutingAction}
+                            className="px-2.5 py-1 rounded-md bg-rose-600/80 hover:bg-rose-600 text-white font-medium flex items-center gap-1 transition disabled:opacity-40"
+                          >
+                            <X className="w-3 h-3" />
+                            <span>削除</span>
+                          </button>
+                        </div>
                       </div>
-
-                      <div className="font-bold text-slate-100 text-xs">
-                        {d.title || d.goal}
-                      </div>
-
-                      <div className="text-[11px] text-slate-400 line-clamp-2">
-                        {d.goal}
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-500">
-                        <span>作成: {fmtTime(d.parsedAt)}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleExecuteDirective(d.directiveId);
-                          }}
-                          disabled={isExecutingAction || d.status === 'COMPLETED'}
-                          className="px-2.5 py-1 rounded-md bg-indigo-600/80 hover:bg-indigo-600 text-white font-medium flex items-center gap-1 transition disabled:opacity-40"
-                        >
-                          <Play className="w-3 h-3" />
-                          <span>指示を実行</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
-              {/* Selected Directive Details Modal / Drawer */}
               {selectedDirective && (
                 <div className="p-4 rounded-xl bg-slate-950 border border-indigo-500/40 space-y-3 mt-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-indigo-400 font-bold text-xs">
-                        {selectedDirective.directiveId}
-                      </span>
-                      <h4 className="font-bold text-xs text-slate-100">
-                        {selectedDirective.title}
-                      </h4>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-mono text-indigo-400 font-bold text-xs">{selectedDirective.directiveId}</div>
+                      <h4 className="font-bold text-xs text-slate-100 mt-1">{selectedDirective.title}</h4>
                     </div>
-                    <button
-                      onClick={() => setSelectedDirectiveId(null)}
-                      className="text-slate-400 hover:text-white p-1"
-                    >
+                    <button onClick={() => setSelectedDirectiveId(null)} className="text-slate-400 hover:text-white p-1">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                    <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
-                      <span className="text-[11px] text-slate-500 font-semibold">
-                        目的 (Goal):
-                      </span>
-                      <p className="text-slate-200">{selectedDirective.goal}</p>
-                    </div>
+                    <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1"><span className="text-[11px] text-slate-500 font-semibold">目的:</span><p className="text-slate-200">{selectedDirective.objective}</p></div>
+                    <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1"><span className="text-[11px] text-slate-500 font-semibold">対象ファイル:</span><p className="text-slate-200 font-mono text-[11px]">{selectedDirective.targetFiles?.join(', ') || '全体'}</p></div>
+                    <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1"><span className="text-[11px] text-slate-500 font-semibold">要件:</span><p className="text-slate-300 text-[11px]">{selectedDirective.requirements?.join(' / ') || '特になし'}</p></div>
+                    <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1"><span className="text-[11px] text-slate-500 font-semibold">禁止事項:</span><p className="text-slate-300 text-[11px]">{selectedDirective.prohibitions?.join(' / ') || '特になし'}</p></div>
+                    <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1 md:col-span-2"><span className="text-[11px] text-slate-500 font-semibold">検証条件 / 納品条件:</span><p className="text-slate-300 text-[11px]">{[...(selectedDirective.validationRequirements || []), ...(selectedDirective.deliveryRequirements || [])].join(' / ') || '指定なし'}</p></div>
+                  </div>
 
-                    <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
-                      <span className="text-[11px] text-slate-500 font-semibold">
-                        対象スコープ (Target Scope):
-                      </span>
-                      <p className="text-slate-200 font-mono text-[11px]">
-                        {selectedDirective.targets?.join(', ') || '全体'}
-                      </p>
-                    </div>
-
-                    <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
-                      <span className="text-[11px] text-slate-500 font-semibold">
-                        禁止事項 (Prohibitions):
-                      </span>
-                      <p className="text-slate-300 text-[11px]">
-                        {selectedDirective.forbiddenBehaviors?.join(' / ') || '特になし'}
-                      </p>
-                    </div>
-
-                    <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
-                      <span className="text-[11px] text-slate-500 font-semibold">
-                        完了条件 (Completion Criteria):
-                      </span>
-                      <p className="text-slate-300 text-[11px]">
-                        {selectedDirective.completionCriteria?.join(' / ') || 'TDD単体テスト通過'}
-                      </p>
-                    </div>
+                  <div className="flex items-center justify-between border-t border-slate-800 pt-3 gap-3">
+                    <span className="text-[10px] text-slate-500">削除してもCORE実行履歴・検証証拠・評価用ZIPは削除されません。実行中の指示書は安全上削除できません。</span>
+                    <button
+                      onClick={() => void handleDeleteDirective(selectedDirective.directiveId)}
+                      disabled={isExecutingAction}
+                      className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold disabled:opacity-50"
+                    >この指示書を削除</button>
                   </div>
                 </div>
               )}

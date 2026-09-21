@@ -10,7 +10,7 @@ const checks = [
  ['evidence direct import removed', !ui.includes("from '../miki/core/services/candidateValidationEvidenceService'")],
  ['core result direct import removed', !ui.includes("from '../miki/core/services/coreResultService'")],
  ['gateway read model', gw.includes('getLoopState()') && gw.includes('getCoreResults(limit = 50)')],
- ['gateway mutations', gw.includes('submitImprovementRequest') && gw.includes('resumeLoop()')],
+ ['gateway mutations', gw.includes('sendImprovementCommand') && gw.includes('resumeImprovementTask')],
  ['ui core runtime facade', ui.includes('typedImprovementUiGatewayService.requestWithResult')],
 ];
 for (const [name, ok] of checks) console.log(`${ok?'PASS':'FAIL'} ${name}`);

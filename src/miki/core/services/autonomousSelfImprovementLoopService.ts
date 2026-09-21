@@ -132,6 +132,24 @@ class AutonomousSelfImprovementLoopService {
     return JSON.parse(JSON.stringify(this.state));
   }
 
+  public cancelByRunId(runId: string): { cancelled: boolean; active: boolean } {
+    const active = this.state.queue.find((item) => item.runId === runId && item.id === this.state.activeRequestId);
+    if (active) return { cancelled: false, active: true };
+    const before = this.state.queue.length;
+    this.state.queue = this.state.queue.filter((item) => item.runId !== runId);
+    const cancelled = before !== this.state.queue.length;
+    if (cancelled) {
+      if (this.state.queue.length === 0) {
+        this.state.status = 'IDLE';
+        this.state.activeRequestId = undefined;
+        this.state.retryAt = undefined;
+      }
+      this.state.lastReason = `DIRECTIVE_CANCELLED:${runId}`;
+      this.save();
+    }
+    return { cancelled, active: false };
+  }
+
   public resume(): void {
     if (!['PAUSED', 'WAITING_RESOURCE', 'WAITING_EVIDENCE', 'FAILED'].includes(this.state.status)) {
       return;

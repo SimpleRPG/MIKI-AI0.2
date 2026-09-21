@@ -73,6 +73,7 @@ class TypedImprovementUiGatewayService {
   getCoreResults(limit = 50) { return coreResultService.list(limit); }
   subscribeCore(listener: () => void) { return coreResultService.subscribeAll(listener); }
 
+  requestWithResult(command:ImprovementUiCommand){ return this.sendImprovementCommand(command); }
   async sendImprovementCommand(command:ImprovementUiCommand):Promise<ImprovementUiCommandResult>{
     if(command.commandType==='RESUME_IMPROVEMENT_TASK'){
       const resumed=await coreTaskIngressService.resume(command.taskId,coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'));
@@ -115,6 +116,7 @@ class TypedImprovementUiGatewayService {
   receiveDirectiveFile(...args: Parameters<typeof externalDirectiveIntakeService.receiveTextFile>) {
     return externalDirectiveIntakeService.receiveTextFile(...args);
   }
+  deleteDirective(directiveId:string) { return externalDirectiveIntakeService.deleteDirective(directiveId); }
   generateRequestId() { return coreResultService.generateRequestId(); }
   createRequest(...args: Parameters<typeof coreResultService.createRequest>) { return coreResultService.createRequest(...args); }
   updateRequestStatus(...args: Parameters<typeof coreResultService.updateStatus>) { return coreResultService.updateStatus(...args); }
