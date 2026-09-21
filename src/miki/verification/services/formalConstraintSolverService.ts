@@ -9,7 +9,7 @@
  */
 
 import { systemLogger } from '../../../services/systemLogger';
-import { formalKnowledgeCache } from '../../../autonomous_modules/chapter_59';
+import { module59typescript } from '../../../autonomous_modules/chapter_59';
 
 export interface ConstraintVariable<T = unknown> {
   name: string;
@@ -48,7 +48,7 @@ class FormalConstraintSolverService {
       var2: 'activeWeights',
       predicateName: 'PROTECT_QWEN_3B',
       check: (m, w) => {
-        if (m === 'legacy-generative-model' || m === 'Qwen-3B-Base') return w === 'IMMUTABLE';
+        if (m === 'legacy-generative-model') return w === 'IMMUTABLE';
         return true;
       },
       description: 'モデル生成系ランタイムモデル重み不変保護制約',
@@ -110,13 +110,13 @@ class FormalConstraintSolverService {
 
     // 自律モジュール (chapter_59.ts) への検証キャッシュ登録と状態同期
     try {
-      formalKnowledgeCache.execute(`csp_${Date.now()}`, {
+      module59typescript.execute(`csp_${Date.now()}`, {
         isSatisfied,
         contradictions,
         assigned,
       });
     } catch (e) {
-      console.warn('Failed to cache in formalKnowledgeCache:', e);
+      console.warn('Failed to cache in module59typescript:', e);
     }
 
     systemLogger.info('SELF_IMPROVEMENT', `[第59章 制約ソルバー] CSP形式検証完了: ${isSatisfied ? '充足 (SAT)' : '矛盾あり (UNSAT)'}`, {

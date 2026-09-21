@@ -1,7 +1,7 @@
-import { componentRegistryService } from '../../capability/services/componentRegistryService';
+import { componentRegistryService } from '../../../services/componentRegistryService';
 import { systemLogger } from '../../../services/systemLogger';
 import { ComponentTestCategory, ComponentTxtPackage } from '../../../types';
-import { hardeningRegressionCandidateService } from '../../improvement/services/hardeningRegressionCandidateService';
+import { hardeningRegressionCandidateService } from '../../../services/hardeningRegressionCandidateService';
 
 export interface ComponentTestCase {
   test_case_id: string;

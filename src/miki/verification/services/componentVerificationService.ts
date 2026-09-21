@@ -1,7 +1,7 @@
-import { componentRegistryService } from '../../capability/services/componentRegistryService';
-import { evidenceService } from '../../memory/services/evidenceService';
+import { componentRegistryService } from '../../../services/componentRegistryService';
+import { evidenceService } from '../../../services/evidenceService';
 import { systemLogger } from '../../../services/systemLogger';
-import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
+import { componentArtifactStoreService } from '../../../services/componentArtifactStoreService';
 import { ComponentStatus, ComponentTestCategory } from '../../../types';
 import { componentTestCaseService } from './componentTestCaseService';
 

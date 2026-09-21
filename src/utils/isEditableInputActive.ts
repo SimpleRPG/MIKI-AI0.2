@@ -1,21 +1,13 @@
-export const isEditableInputActive = (): boolean => {
+/**
+ * Checks if an editable input (input, textarea, select, contenteditable) currently has focus.
+ * Used to suppress global keyboard shortcuts while the user is typing.
+ */
+export function isEditableInputActive(): boolean {
   if (typeof document === 'undefined') return false;
   const active = document.activeElement;
-  if (!(active instanceof HTMLElement)) return false;
-  if (active.isContentEditable) return true;
-  if (active.tagName === 'TEXTAREA') return true;
-  if (active.tagName !== 'INPUT') return false;
-  const type = (active as HTMLInputElement).type.toLowerCase();
-  return ![
-    'button',
-    'checkbox',
-    'color',
-    'file',
-    'hidden',
-    'image',
-    'radio',
-    'range',
-    'reset',
-    'submit',
-  ].includes(type);
-};
+  if (!active) return false;
+  const tagName = active.tagName.toLowerCase();
+  if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') return true;
+  if ((active as HTMLElement).isContentEditable) return true;
+  return false;
+}

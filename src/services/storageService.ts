@@ -1,6 +1,5 @@
 import { Capacitor } from '@capacitor/core';
 import type { MemoryItem, MemoryType, MemoryDestination } from '../types';
-import { isMemoryEligible } from '../miki/memory/services/memoryEligibilityPolicyService';
 
 /**
  * Synchronous-facade persistent storage, backed by:
@@ -220,36 +219,20 @@ class StorageService {
               val,
             ]);
 
-            // If updating memories, sync structured SQLite and FTS by record.
+            // If updating memories, also sync structured SQLite table & FTS index
             if (key === 'gamecraft_memories') {
               try {
                 const memList: MemoryItem[] = JSON.parse(val);
                 if (Array.isArray(memList)) {
-                  const existingResult = await this.sqlite.query(
-                    `SELECT id, json_payload FROM ${this.MEMORIES_STORE};`
-                  );
-                  const existingById = new Map<string, string>();
-                  for (const row of existingResult.values || []) {
-                    if (typeof row.id === 'string') {
-                      existingById.set(row.id, typeof row.json_payload === 'string' ? row.json_payload : '');
+                  await this.sqlite.run(`DELETE FROM ${this.MEMORIES_STORE};`);
+                  if (this.ftsAvailable) {
+                    try {
+                      await this.sqlite.run(`DELETE FROM memories_fts;`);
+                    } catch (ftsDelErr) {
+                      console.warn('storageService: memories_fts DELETE failed', ftsDelErr);
                     }
                   }
-
-                  const incomingIds = new Set(memList.map((memory) => memory.id));
-                  for (const existingId of existingById.keys()) {
-                    if (!incomingIds.has(existingId)) {
-                      if (this.ftsAvailable) {
-                        await this.sqlite.run(`DELETE FROM memories_fts WHERE id = ?;`, [existingId]);
-                      }
-                      await this.sqlite.run(`DELETE FROM ${this.MEMORIES_STORE} WHERE id = ?;`, [existingId]);
-                    }
-                  }
-
                   for (const mem of memList) {
-                    const jsonPayload = JSON.stringify(mem);
-                    if (existingById.get(mem.id) === jsonPayload) {
-                      continue;
-                    }
                     await this.sqlite.run(
                       `INSERT OR REPLACE INTO ${this.MEMORIES_STORE} (id, category, memory_type, content, approved, source_ref, raw_excerpt, created_at, updated_at, json_payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
                       [
@@ -262,21 +245,23 @@ class StorageService {
                         mem.rawExcerpt || '',
                         mem.createdAt || Date.now(),
                         mem.updatedAt || Date.now(),
-                        jsonPayload,
+                        JSON.stringify(mem),
                       ]
                     );
                     if (this.ftsAvailable) {
-                      await this.sqlite.run(`DELETE FROM memories_fts WHERE id = ?;`, [mem.id]);
-                      await this.sqlite.run(
-                        `INSERT INTO memories_fts (rowid, id, content, tags) VALUES ((SELECT rowid FROM ${this.MEMORIES_STORE} WHERE id = ?), ?, ?, ?);`,
-                        [mem.id, mem.id, mem.content, (mem.tags || []).join(' ')]
-                      );
+                      try {
+                        await this.sqlite.run(
+                          `INSERT INTO memories_fts (rowid, id, content, tags) VALUES ((SELECT rowid FROM ${this.MEMORIES_STORE} WHERE id = ?), ?, ?, ?);`,
+                          [mem.id, mem.id, mem.content, (mem.tags || []).join(' ')]
+                        );
+                      } catch (ftsInsErr) {
+                        console.warn('storageService: memories_fts INSERT failed', ftsInsErr);
+                      }
                     }
                   }
                 }
               } catch (e) {
-                console.warn('storageService: sqlite structured memories incremental sync failed', e);
-                throw e;
+                console.warn('storageService: sqlite structured memories sync skipped', e);
               }
             }
           } else {
@@ -330,32 +315,12 @@ class StorageService {
 
   // --- localStorage-compatible synchronous API ---
 
-  /**
-   * localStorage-compatible read boundary. With no fallback, the stored value
-   * is returned exactly as a string. Supplying a non-string fallback opts into
-   * typed JSON decoding for legacy typed call sites.
-   */
-  public getItem(key: string): string | null;
-  public getItem<T>(key: string, fallback: T): T;
-  public getItem<T = string>(key: string, fallback?: T): T | string | null {
-    const raw = this.cache.has(key) ? this.cache.get(key)! : null;
-    if (raw === null) return fallback === undefined ? null : fallback;
-    if (fallback === undefined || typeof fallback === 'string') return raw;
-    try { return JSON.parse(raw) as T; } catch { return fallback; }
+  public getItem(key: string): string | null {
+    return this.cache.has(key) ? this.cache.get(key)! : null;
   }
 
-  /** Read a persisted JSON value with an explicit fallback. */
-  public getJson<T>(key: string, fallback: T): T {
-    const raw = this.cache.has(key) ? this.cache.get(key)! : null;
-    if (raw === null) return fallback;
-    try { return JSON.parse(raw) as T; } catch { return fallback; }
-  }
-
-  public setItem(key: string, value: string): void;
-  public setItem<T>(key: string, value: T): void;
-  public setItem<T = string>(key: string, value: T | string): void {
-    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
-    this.cache.set(key, serialized);
+  public setItem(key: string, value: string): void {
+    this.cache.set(key, value);
     this.dirtyKeys.add(key);
     this.scheduleFlush();
   }
@@ -421,7 +386,13 @@ class StorageService {
   }
 
   public getApprovedMemories(): MemoryItem[] {
-    return this.getMemories().filter((memory) => isMemoryEligible(memory, 'PROMPT'));
+    return this.getMemories().filter(
+      (m) =>
+        m.approved !== false &&
+        m.active !== false &&
+        m.destination !== 'quarantine' &&
+        m.destination !== 'discard_candidate'
+    );
   }
 
   public getUnapprovedMemories(): MemoryItem[] {
@@ -469,19 +440,6 @@ class StorageService {
   }
 
   public saveMemoryItem(item: MemoryItem): void {
-    const normalized: MemoryItem = {
-      ...item,
-      retrievalCount: item.retrievalCount ?? 0,
-      usageCount: item.usageCount ?? item.useCount ?? 0,
-      executionSuccessCount: item.executionSuccessCount ?? 0,
-      validationSuccessCount: item.validationSuccessCount ?? 0,
-      validationFailureCount: item.validationFailureCount ?? 0,
-      positiveFeedbackEvidenceCount: item.positiveFeedbackEvidenceCount ?? item.goodCount ?? 0,
-      negativeFeedbackEvidenceCount: item.negativeFeedbackEvidenceCount ?? item.badCount ?? 0,
-      correctionEvidenceCount: item.correctionEvidenceCount ?? item.confusionCount ?? 0,
-      independentSuccessContextCount: item.independentSuccessContextCount ?? 0,
-    };
-    item = normalized;
     const current = this.getMemories();
     const idx = current.findIndex((m) => m.id === item.id);
     let next: MemoryItem[];
@@ -632,7 +590,8 @@ class StorageService {
   public filterMemoriesForCloud(memories: MemoryItem[]): MemoryItem[] {
     const filterPrivate = this.isCloudFilterPrivateMemories();
     return memories.filter((m) => {
-      if (!isMemoryEligible(m, 'CLOUD')) return false;
+      if (m.active === false) return false;
+      if (m.approved === false) return false;
       if (filterPrivate && (m.category === 'profile' || m.category === 'relationship')) {
         return false;
       }

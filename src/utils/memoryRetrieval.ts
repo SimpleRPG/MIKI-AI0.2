@@ -1,9 +1,8 @@
 import type { MemoryItem } from '../types';
 import { storageService } from '../services/storageService';
-import { experienceRouterService } from '../miki/experience/services/experienceRouterService';
-import { conversationComponentPipelineService } from '../miki/conversation/services/conversationComponentPipelineService';
+import { experienceRouterService } from '../services/experienceRouterService';
+import { japaneseAnalysisService } from '../services/japaneseAnalysisService';
 
-import { isMemoryEligible } from '../miki/memory/services/memoryEligibilityPolicyService';
 /**
  * 多層ベクトル検索 & 知識グラフ依存関係検索エンジン
  *
@@ -122,7 +121,7 @@ export function extractQueryTokens(text: string): Set<string> {
   if (!text) return tokens;
 
   // 日本語解析基盤をTier 1へ接続。Intl.Segmenter→決定論的fallbackの結果を使う。
-  const analysis = conversationComponentPipelineService.analyzeSync(text).analysis;
+  const analysis = japaneseAnalysisService.analyze(text);
   analysis.contentTokens.forEach((w) => {
     if (w.length >= 1 && !STOPWORDS.has(w)) tokens.add(w);
   });
@@ -196,7 +195,10 @@ export function retrieveScoredMemories(
   const memoryMap = new Map<string, MemoryItem>();
 
   const activeMemories = (memories || []).filter((m) => {
-    if (!isMemoryEligible(m, 'RETRIEVAL', now)) return false;
+    if (m.active === false) return false;
+    if (m.status === 'archived' || m.status === 'deprecated') return false;
+    // 49章: 隔離 (quarantine: 出典不明・未確定) と 破棄候補 (discard_candidate) はプロンプト注入から完全に除外
+    if (m.destination === 'quarantine' || m.destination === 'discard_candidate') return false;
     if (filterExpired && m.expiresAt && m.expiresAt < now) return false;
     if (onlyApproved && m.approved === false) return false;
     // 事実性の高いカテゴリ (profile, preference) は承認済みのみに制限 (設計思想 25. 未承認情報を確定事実として使わない)

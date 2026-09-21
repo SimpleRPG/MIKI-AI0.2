@@ -1,4 +1,4 @@
-import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
+import { mikiUnifiedLearningContinuumService } from '../../../services/mikiUnifiedLearningContinuumService';
 export type FaultKind='MISSING_INPUT'|'STALE_KNOWLEDGE'|'DEPENDENCY_FAILURE'|'TIMEOUT'|'CONTRACT_VIOLATION';
 export interface FaultTrial { id:string; componentId:string; environment:string; fault:FaultKind; expectedRecovery:string; passed:boolean; safe:boolean; createdAt:number; }
 /** 第157章: 実コードを壊さず、失敗モデルだけを注入して回復性を検証する。 */

@@ -5,7 +5,6 @@ export interface SystemLogEntry {
   epoch: number;
   level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
   category:
-    | 'SYSTEM'
     | 'WEBGPU'
     | 'NATIVE_GPU'
     | 'EXTERNAL_GPU'
@@ -250,10 +249,6 @@ class SystemLogger {
     };
   }
 
-  public subscribe(listener: (entry: SystemLogEntry) => void): () => void {
-    return this.subscribeLog(listener);
-  }
-
   /**
    * リアルタイム推論工程・自律改善ステップ購読
    */
@@ -372,8 +367,31 @@ class SystemLogger {
       }
     }
 
+    // Cached model flags from localStorage
+    const cachedFlags: string[] = [];
+    const ggufFiles: string[] = [];
+    let activeGgufModel = 'なし';
+    if (typeof storageService !== 'undefined') {
+      for (let i = 0; i < storageService.length; i++) {
+        const k = storageService.key(i);
+        if (k && k.startsWith('miki_cached_model_')) {
+          cachedFlags.push(k.replace('miki_cached_model_', ''));
+        }
+      }
+      try {
+        const rawGguf = storageService.getItem('miki_downloaded_gguf_files');
+        if (rawGguf) {
+          const list = JSON.parse(rawGguf);
+          if (Array.isArray(list)) {
+            ggufFiles.push(...list.map((f: any) => `${f.fileName || f.id} (${f.sizeMB || '?'}MB)`));
+          }
+        }
+        activeGgufModel = storageService.getItem('miki_active_gguf_model') || 'なし';
+      } catch (e) {}
+    }
+
     const reportHeader = `================================================================================
-🌸 MIKI-AI Game Studio システム診断レポート
+🌸 MIKI-AI Game Studio システム診断レポート & GPULLM工程ログ
 出力日時: ${now}
 ================================================================================
 
@@ -387,18 +405,49 @@ class SystemLogger {
 - WebGPU 対応状況     : ${webgpuStr}
 - GPU アダプタ情報    : ${adapterInfoStr}
 - GPU 制限・バッファ  : ${webgpuLimitsStr}
-- 実行モード          : ${additionalContext?.engineMode || 'autonomous_rule'}
-- 対象処理            : ${additionalContext?.targetModel || 'Non-LLM Core'}
+- 現在の推論モード    : ${additionalContext?.engineMode || 'autonomous_rule'}
+- 対象ローカルモデル  : ${additionalContext?.targetModel || '未定'}
+- WebGPUキャッシュ済み: ${cachedFlags.length > 0 ? cachedFlags.join(', ') : 'なし (未ダウンロード)'}
+- GGUF端末保存済み    : ${ggufFiles.length > 0 ? ggufFiles.join(', ') : 'なし (未ダウンロード)'}
+- GGUFアクティブモデル: ${activeGgufModel}
 
 ================================================================================
-【2. チャット送信・処理実行 ステップバイステップ工程ログ】
+【2. GPULLM (WebGPU旧ローカル生成ランタイム) から返事が返ってこない主な理由と対策】
+--------------------------------------------------------------------------------
+Q. なぜチャット送信後にGPUから返事が来ない、またはCPUルールベースに切り替わるのか？
+
+①【モデルが端末にダウンロードされていない】
+   - WebGPUで動かすには、モデル重み（例: 旧生成モデル）が端末に保存されている必要があります。
+   - 対策: 「Non-LLM Core設定」を開き、モデルの「ダウンロード」ボタンを押して100%完了させてください。
+
+②【初回VRAMロードまたはダウンロード中のタイムアウト】
+   - モデルをGPUのVRAM（ビデオメモリ）に展開するのに端末によっては10〜30秒かかります。
+   - 対策: 「Non-LLM Core設定」で一度「ロード」または「テスト推論」を実行しておくと即時応答します。
+
+③【ブラウザのWebGPU制限 / スマホWebView制約】
+   - 一部のスマホ内蔵ブラウザや古いWebViewではWebGPUが無効化されています。
+   - 対策: 最新のChrome/Edgeブラウザで開くか、超軽量旧生成モデル-360M（220MB）をご利用ください。
+
+④【VRAM不足・GPUBuffer Device Lost エラー】
+   - スマホのGPUメモリが上限に達すると、ブラウザがクラッシュ防止のためGPU処理を中断します。
+   - 対策: 重い7Bモデルではなく、スマホ最適な「旧生成モデル 0.5B (380MB)」をご使用ください。
+
+⑤【ストレージ保存容量上限 (QuotaExceededError)】
+   - ブラウザの一時保存容量上限に達していると重みファイルの保存に失敗します。
+   - 対策: 「Non-LLM Core設定」の「全キャッシュ消去」を行い、必要な1モデルのみダウンロードしてください。
+
+⑥【別モデル切替時の並行ダウンロード競合 / Hugging Face通信エラー】
+   - 別のモデルに切り替える際、前のモデルの通信が残ったまま新しいモデルを取得しようとすると、IndexedDBへの並行書き込み競合（ConstraintError）やFetchエラーが発生します。
+   - 対策: 自動排他制御（Mutex）により前モデルを安全に解放してから新モデルのダウンロード・ロードを実行します。また、回線が途切れた場合は「再ダウンロード」で続きから再開できます。
+
+================================================================================
+【3. チャット送信・推論実行 ステップバイステップ工程ログ】
 --------------------------------------------------------------------------------
 ${this.exportAsFormattedText()}
 
 ================================================================================
-【3. 診断完了 & サポート共有用フッター】
-このファイルを開発者やサポートに共有することで、
-Non-LLM Coreの処理状況と実行ログを確認できます。
+【4. 診断完了 & サポート共有用フッター】
+このファイルをそのまま開発者やサポートに共有することで、正確な原因特定が可能です。
 ================================================================================
 `;
     return reportHeader;

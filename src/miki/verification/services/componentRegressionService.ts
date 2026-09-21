@@ -1,11 +1,11 @@
-import { componentRegistryService } from '../../capability/services/componentRegistryService';
+import { componentRegistryService } from '../../../services/componentRegistryService';
 import { componentTestCaseService, ComponentTestCase } from './componentTestCaseService';
-import { executionRunnerService, ExecutionEnvironment, ExecutionRequest } from '../../execution/services/executionRunnerService';
+import { executionRunnerService, ExecutionEnvironment, ExecutionRequest } from '../../../services/executionRunnerService';
 import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from '../../../services/storageService';
-import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
+import { componentArtifactStoreService } from '../../../services/componentArtifactStoreService';
 import { ComponentTestCategory } from '../../../types';
-import { evidenceService } from '../../memory/services/evidenceService';
+import { evidenceService } from '../../../services/evidenceService';
 
 export type RegressionSuiteStatus = 'PLANNED' | 'RUNNING' | 'PASSED' | 'FAILED' | 'BLOCKED';
 

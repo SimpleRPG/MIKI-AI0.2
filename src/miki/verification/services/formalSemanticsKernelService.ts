@@ -1,4 +1,4 @@
-import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
+import { mikiUnifiedLearningContinuumService } from '../../../services/mikiUnifiedLearningContinuumService';
 
 export type SemanticInstruction = { op: 'OBSERVE'|'REQUIRE'|'ALLOW'|'DENY'|'ASSERT'; subject: string; value?: string };
 export type SemanticCheck = { id:string; instructions:SemanticInstruction[]; passed:boolean; violations:string[]; proofHash:string; createdAt:number };

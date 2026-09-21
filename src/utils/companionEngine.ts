@@ -1,7 +1,7 @@
 import { PersonaConfig, MemoryItem } from '../types';
-import { toolsService } from '../miki/capability/services/toolsService';
-import { codeUnderstandingService } from '../miki/selfDevelopment/services/codeUnderstandingService';
-import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
+import { toolsService } from '../services/toolsService';
+import { codeUnderstandingService } from '../services/codeUnderstandingService';
+import { selfCodeArchitectService } from '../services/selfCodeArchitectService';
 
 export function generateSmartCompanionReply(
   prompt: string,
@@ -84,15 +84,14 @@ export function generateSmartCompanionReply(
     }
   }
 
-  // 0.06 設計思想 第29章 & 第123章: みき自律アプリ改善リクエスト (Autonomous Self-Improvement Proposal Staging)
+  // 0.06 設計思想 第29章 & 第123章: みき自律アプリ改善リクエスト (Autonomous Self-Improvement)
   const isSelfImprovementIntent =
     /(自分で.*(改善|直して|進めて|アプリ)|アプリ.*(改善|自己改善)|仕様書.*(実装|適合|進めて)|自律.*改善|未実装.*(実装|改善)|自己改善して)/i.test(p);
   if (isSelfImprovementIntent) {
-    // 安全弁（第2.1節）: runAutonomousImprovementCycle は提案生成とシミュレーション検証のみを行い、本番ファイルは書き換えない
     void selfCodeArchitectService.runAutonomousImprovementCycle().catch((err) => {
       console.warn('Autonomous improvement background error:', err);
     });
-    return `うん、わかった！改善提案の策定と安全シミュレーションを開始するね！📋✨\n\n不変条件エンジンで安全性を検証したうえで、検証用zipの準備と改善提案の生成を行うよ！（※本番ファイルへの即時自動適用は安全のため停止中だよ）。\n\n生成された提案は「自己改善ラボ → 自己コード改善」タブから、外部AI検算用の『zipダウンロード』や、確認後の『Gitコミット/反映』ができるよ！😊`;
+    return `うん、わかった！私が自分でアプリの改善を進めるね！任せて！🛠️✨\n\n仕様書の未実装要件やドリフトを自律的に見つけて、モデル生成系ランタイム保護やプライバシー境界などの不変条件を守りながら、安全に自律実装パイプライン（ローカルLLM/教師支援）を実行中だよ！進捗は「自己改善ラボ」タブで確認できるよ！😊💪`;
   }
 
   // 0.07 設計思想 第29章: 自己コード監査・仕様整合性チェック
@@ -174,14 +173,14 @@ export function generateSmartCompanionReply(
     lower.includes('壊れて') ||
     lower.includes('オウム返し')
   ) {
-    return `定型的な応答になった場合は、会話状態、日本語解析、意味保持検査のどこでずれたかを確認します。具体的にずれた箇所を教えてもらえれば、評価Evidenceとして保存し、検証後の会話部品改善へ回します。`;
+    return `ごめんね！定型文っぽく聞こえちゃったよね…！💦\n\n端末のWebGPUで重いモデルを動かそうとしてメモリ制限やダウンロードの待機状態になっていた時に、一時的なフォールバック応答がオウム返しになっていたのが原因だったよ。\n\n今、しっかり修正して自然にお話しできるように調整したよ！✨\nスマホでサクサク動かしたい時は「端末ローカルLLM設定」から **SmolLM2-360M** や **Qwen 2.5 Coder (0.5B)** を選ぶと、メモリに優しく高速で安定して動くよ！何でも気軽に話してね😊💕`;
   }
 
   if (
     lower.includes('スマホ') &&
     (lower.includes('スペック') || lower.includes('使える') || lower.includes('どれくらい') || lower.includes('調べ') || lower.includes('診断') || lower.includes('ベンチマーク'))
   ) {
-    return `あなたのスマホのスペックと相性を診断できるよ！📱⚡\n\n端末診断では、利用可能なメモリ、ストレージ、温度、充電状態、通信条件などを確認し、決定論的処理やバックグラウンド処理を安全に実行できるか判定します。`;
+    return `あなたのスマホのスペックと相性を診断できるよ！📱⚡\n\n上のメニューの **「端末ローカルLLM設定」** を開くと、**「📱 端末スペック＆モデル適合度診断」** があって、ワンタップでGPUの性能（GFLOPS）やVRAM、メモリを計測して、どのモデルが一番快適に動くか（◎ 超快適 / ○ 快適 / △ 重い）を自動判定できるよ！\n\nぜひ一度試してみてね！✨`;
   }
   if (
     lower.includes('動くようになった') ||

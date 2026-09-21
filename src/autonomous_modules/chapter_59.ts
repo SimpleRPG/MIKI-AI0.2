@@ -108,3 +108,4 @@ export class FormalKnowledgeCache {
 }
 
 export const formalKnowledgeCache = new FormalKnowledgeCache();
+export const module59typescript = formalKnowledgeCache;

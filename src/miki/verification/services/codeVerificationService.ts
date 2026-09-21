@@ -1,32 +1,40 @@
-import {
-  ComprehensiveCodeVerification,
-  CodeLanguageType,
-  CodeSafetyRiskItem,
-  CodeSafetyLevel,
-  CodeReadinessStatus,
-  VbaStaticVerificationResult,
-} from '../../../types';
 import { vbaStaticVerifierService } from './vbaStaticVerifierService';
 import { failureCatalogService } from '../../memory/services/failureCatalogService';
 
-/**
- * 設計思想 10章 & 35章 第5段階:
- * 総合コード・VBA安全準備ゲート & 構文検証サービス (Code & VBA Preparation Gate)
- *
- * 【第5段階 実装要件】:
- * 1. マルチ言語構文整合性チェック（閉じタグ、ブロック対照、未定義・不完全構造の検出）
- * 2. 破壊的・危険命令の多層検出（Shell実行、任意ファイル削除、不正外部通信、自動実行イベント）
- * 3. 動作環境前提（Excel 64bit PtrSafe宣言、Microsoft Scripting Runtime、Canvas 2Dコンテキスト）の明示
- * 4. 実行準備ステータス判定（プレビュー即時可能 / 外部検証必須 / 危険遮断）
- */
+export interface CodeBlock {
+  lang: string;
+  code: string;
+}
+
+export interface RiskItem {
+  riskType: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  description: string;
+  lineSnippet?: string;
+}
+
+export interface CodeVerificationResult {
+  hasCode: boolean;
+  languages: string[];
+  syntaxValid: boolean;
+  syntaxErrors: string[];
+  safetyLevel: 'PASS_SAFE' | 'WARN_REVIEW_NEEDED' | 'BLOCKED_HIGH_RISK';
+  safetyScore: number;
+  risks: RiskItem[];
+  environmentRequirements: string[];
+  readiness: 'READY_FOR_PREVIEW' | 'RUNTIME_GUARD_NEEDED' | 'EXTERNAL_TEST_REQUIRED' | 'BLOCKED';
+  reviewedAt: number;
+  vbaStaticResult?: any;
+}
+
 export class CodeVerificationService {
   /**
    * テキスト中の全コードブロックを解析し、総合コード安全検証を実施する
    */
-  public verifyCode(content: string): ComprehensiveCodeVerification {
+  public verifyCode(content: string): CodeVerificationResult {
     const raw = content || '';
     const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
-    const blocks: Array<{ lang: string; code: string }> = [];
+    const blocks: CodeBlock[] = [];
     let match: RegExpExecArray | null;
 
     while ((match = codeBlockRegex.exec(raw)) !== null) {
@@ -51,32 +59,24 @@ export class CodeVerificationService {
       };
     }
 
-    const detectedLanguages = new Set<CodeLanguageType>();
+    const detectedLanguages = new Set<string>();
     const syntaxErrors: string[] = [];
-    const risks: CodeSafetyRiskItem[] = [];
+    const risks: RiskItem[] = [];
     const envReqs = new Set<string>();
-    let primaryVbaStaticResult: VbaStaticVerificationResult | undefined = undefined;
+    let primaryVbaStaticResult: any = undefined;
 
     for (const b of blocks) {
       const lang = this.normalizeLanguage(b.lang, b.code);
       detectedLanguages.add(lang);
-
-      // 1. 構文整合性チェック
       this.checkSyntax(b.code, lang, syntaxErrors);
-
-      // 2. セキュリティ & 危険命令検査
       this.checkRisks(b.code, lang, risks);
-
-      // 3. 動作環境前提の抽出
       this.checkEnvironment(b.code, lang, envReqs);
 
-      // 4. VBA専用 8大スキャナー静的検証 (63章・64章 & Master v5.0 第10章)
       if (lang === 'vba') {
         const vbaRes = vbaStaticVerifierService.verifyVbaCodeSync(b.code);
         if (!primaryVbaStaticResult) {
           primaryVbaStaticResult = vbaRes;
         }
-
         if (!vbaRes.hasOptionExplicit) {
           syntaxErrors.push('VBAモジュール先頭に Option Explicit が未記載です（未宣言変数によるバグ防止）');
         }
@@ -90,18 +90,8 @@ export class CodeVerificationService {
         }
         for (const fp of vbaRes.forbiddenPatterns) {
           risks.push({
-            riskType:
-              fp.type === 'HARDCODED_CREDENTIAL_PATH'
-                ? 'privilege'
-                : fp.type === 'RESOURCE_LEAK'
-                ? 'memory_leak'
-                : 'auto_exec',
-            severity:
-              fp.type === 'HARDCODED_CREDENTIAL_PATH'
-                ? 'critical'
-                : fp.type === 'UNHANDLED_DIFF_OMISSION' || fp.type === 'PTRSAFE_MISSING'
-                ? 'high'
-                : 'medium',
+            riskType: fp.type === 'HARDCODED_CREDENTIAL_PATH' ? 'privilege' : fp.type === 'RESOURCE_LEAK' ? 'memory_leak' : 'auto_exec',
+            severity: fp.type === 'HARDCODED_CREDENTIAL_PATH' ? 'critical' : fp.type === 'UNHANDLED_DIFF_OMISSION' || fp.type === 'PTRSAFE_MISSING' ? 'high' : 'medium',
             description: `[行${fp.line}] ${fp.explanation}`,
             lineSnippet: fp.codeSnippet,
           });
@@ -114,11 +104,11 @@ export class CodeVerificationService {
         }
       }
 
-      // 5. 設計思想 第51章: 失敗シグネチャ・カタログ事後スキャン (アンチパターン抑止)
       const failureMatches = failureCatalogService.scanForAntiPatterns(b.code, {
         isCodeOrVba: lang === 'vba' || lang === 'javascript' || lang === 'python',
         language: lang,
       });
+
       for (const fm of failureMatches) {
         risks.push({
           riskType: 'bad_practice',
@@ -129,7 +119,6 @@ export class CodeVerificationService {
       }
     }
 
-    // 総合スコアの算出 (初期値100からリスクごとに減点)
     let safetyScore = 100;
     if (syntaxErrors.length > 0) safetyScore -= syntaxErrors.length * 15;
     for (const r of risks) {
@@ -140,8 +129,7 @@ export class CodeVerificationService {
     }
     safetyScore = Math.max(0, Math.min(100, safetyScore));
 
-    // 安全レベル判定
-    let safetyLevel: CodeSafetyLevel = 'PASS_SAFE';
+    let safetyLevel: 'PASS_SAFE' | 'WARN_REVIEW_NEEDED' | 'BLOCKED_HIGH_RISK' = 'PASS_SAFE';
     const hasCritical = risks.some((r) => r.severity === 'critical' || r.severity === 'high');
     const hasMedium = risks.some((r) => r.severity === 'medium');
 
@@ -151,14 +139,12 @@ export class CodeVerificationService {
       safetyLevel = 'WARN_REVIEW_NEEDED';
     }
 
-    // 準備ステータス判定
-    let readiness: CodeReadinessStatus = 'READY_FOR_PREVIEW';
+    let readiness: 'READY_FOR_PREVIEW' | 'RUNTIME_GUARD_NEEDED' | 'EXTERNAL_TEST_REQUIRED' | 'BLOCKED' = 'READY_FOR_PREVIEW';
     const isVba = detectedLanguages.has('vba');
-
     if (safetyLevel === 'BLOCKED_HIGH_RISK') {
       readiness = 'BLOCKED';
     } else if (isVba) {
-      readiness = 'EXTERNAL_TEST_REQUIRED'; // VBAはスマホ単体での完全実行不可、PCでのコンパイル・動作確認が必要
+      readiness = 'EXTERNAL_TEST_REQUIRED';
     } else if (syntaxErrors.length > 0 || hasMedium) {
       readiness = 'RUNTIME_GUARD_NEEDED';
     }
@@ -178,10 +164,7 @@ export class CodeVerificationService {
     };
   }
 
-  /**
-   * 言語の正規化と自動推定
-   */
-  private normalizeLanguage(declaredLang: string, code: string): CodeLanguageType {
+  public normalizeLanguage(declaredLang: string, code: string): string {
     const d = declaredLang.toLowerCase();
     const cLower = code.toLowerCase();
 
@@ -191,42 +174,33 @@ export class CodeVerificationService {
       d === 'bas' ||
       d === 'cls' ||
       cLower.includes('sub ') ||
-      cLower.includes('function ') && (cLower.includes('dim ') || cLower.includes('end sub') || cLower.includes('cells('))
+      (cLower.includes('function ') &&
+        (cLower.includes('dim ') || cLower.includes('end sub') || cLower.includes('cells(')))
     ) {
       return 'vba';
     }
-
     if (d === 'html' || code.includes('<!DOCTYPE') || (code.includes('<html') && code.includes('</html>'))) {
       if (code.includes('<canvas') && (code.includes('requestAnimationFrame') || code.includes('getContext'))) {
         return 'canvas';
       }
       return 'html';
     }
-
     if (d === 'javascript' || d === 'js' || d === 'jsx' || d === 'ts' || d === 'tsx') {
       if (code.includes('getContext') || code.includes('requestAnimationFrame')) {
         return 'canvas';
       }
       return 'javascript';
     }
-
-    if (d === 'python' || d === 'py' || cLower.includes('def ') && cLower.includes('import ')) {
+    if (d === 'python' || d === 'py' || (cLower.includes('def ') && cLower.includes('import '))) {
       return 'python';
     }
-
     if (d === 'json') return 'json';
     if (d === 'sql') return 'sql';
-
     return 'other';
   }
 
-  /**
-   * 構文整合性チェック
-   */
-  private checkSyntax(code: string, lang: CodeLanguageType, errors: string[]): void {
+  public checkSyntax(code: string, lang: string, errors: string[]): void {
     const lines = code.split('\n');
-
-    // 共通: 括弧の整合性 (文字列内部を除く簡易チェック)
     let parenCount = 0;
     let braceCount = 0;
     let bracketCount = 0;
@@ -234,7 +208,6 @@ export class CodeVerificationService {
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed.startsWith('//') || trimmed.startsWith("'") || trimmed.startsWith('#')) continue;
-
       for (const ch of trimmed) {
         if (ch === '(') parenCount++;
         else if (ch === ')') parenCount--;
@@ -251,7 +224,6 @@ export class CodeVerificationService {
     }
     if (bracketCount !== 0) errors.push(`角括弧 [] の対応不整合 (差分: ${bracketCount})`);
 
-    // VBA特有のブロックチェック
     if (lang === 'vba') {
       let subCount = 0;
       let funcCount = 0;
@@ -262,24 +234,14 @@ export class CodeVerificationService {
       for (const line of lines) {
         const l = line.trim().toLowerCase();
         if (l.startsWith("'")) continue;
-
-        // Sub / End Sub
         if (/^sub\s+/i.test(l) || /^private\s+sub\s+/i.test(l) || /^public\s+sub\s+/i.test(l)) subCount++;
         if (/^end\s+sub/i.test(l)) subCount--;
-
-        // Function / End Function
         if (/^function\s+/i.test(l) || /^private\s+function\s+/i.test(l) || /^public\s+function\s+/i.test(l)) funcCount++;
         if (/^end\s+function/i.test(l)) funcCount--;
-
-        // If ... Then (単一行Ifは除外)
         if (/^if\s+.*then\s*$/i.test(l)) ifCount++;
         if (/^end\s+if/i.test(l)) ifCount--;
-
-        // For ... Next
         if (/^for\s+/i.test(l)) forCount++;
         if (/^next(\s+.*)?$/i.test(l)) forCount--;
-
-        // Do ... Loop
         if (/^do(\s+.*)?$/i.test(l)) doCount++;
         if (/^loop(\s+.*)?$/i.test(l)) doCount--;
       }
@@ -291,7 +253,6 @@ export class CodeVerificationService {
       if (doCount > 0) errors.push(`VBA: Loop が不足しています (${doCount}箇所)`);
     }
 
-    // HTML / Canvas 特有のタグ整合性
     if (lang === 'html' || lang === 'canvas') {
       if (code.includes('<canvas') && !code.includes('</canvas>')) {
         errors.push('HTML: <canvas> タグの閉じタグ </canvas> が見当たりません');
@@ -305,13 +266,9 @@ export class CodeVerificationService {
     }
   }
 
-  /**
-   * セキュリティ & 危険命令検査
-   */
-  private checkRisks(code: string, lang: CodeLanguageType, risks: CodeSafetyRiskItem[]): void {
+  public checkRisks(code: string, lang: string, risks: RiskItem[]): void {
     const cLower = code.toLowerCase();
 
-    // 1. シェル・コマンド実行（最高危険度）
     if (
       cLower.includes('wscript.shell') ||
       cLower.includes('shell(') ||
@@ -327,7 +284,6 @@ export class CodeVerificationService {
       });
     }
 
-    // 2. 破壊的ファイルシステム操作
     if (
       (lang === 'vba' && (/kill\s+/i.test(code) || /rmdir\s+/i.test(code))) ||
       cLower.includes('deletefile') ||
@@ -341,7 +297,6 @@ export class CodeVerificationService {
       });
     }
 
-    // 3. 不正ネットワーク通信
     if (
       cLower.includes('winhttp.winhttprequest') ||
       cLower.includes('msxml2.serverxmlhttp') ||
@@ -354,7 +309,6 @@ export class CodeVerificationService {
       });
     }
 
-    // 4. 自動実行イベント
     if (
       cLower.includes('workbook_open') ||
       cLower.includes('auto_open') ||
@@ -367,7 +321,6 @@ export class CodeVerificationService {
       });
     }
 
-    // 5. 無限ループ危険性
     if (
       (/do\s+while\s+true/i.test(code) || /while\s*\(true\)/i.test(code)) &&
       !code.includes('Exit Do') &&
@@ -381,10 +334,7 @@ export class CodeVerificationService {
     }
   }
 
-  /**
-   * 動作環境・ライブラリ前提の抽出
-   */
-  private checkEnvironment(code: string, lang: CodeLanguageType, envReqs: Set<string>): void {
+  public checkEnvironment(code: string, lang: string, envReqs: Set<string>): void {
     const cLower = code.toLowerCase();
 
     if (lang === 'vba') {
@@ -393,15 +343,12 @@ export class CodeVerificationService {
       } else if (cLower.includes('declare ptrsafe')) {
         envReqs.add('64-bit Office対応 (Declare PtrSafe 適用済み)');
       }
-
       if (cLower.includes('scripting.dictionary')) {
         envReqs.add('Microsoft Scripting Runtime 参照設定 または CreateObject("Scripting.Dictionary")');
       }
-
       if (cLower.includes('adodb.connection') || cLower.includes('adodb.recordset')) {
         envReqs.add('Microsoft ActiveX Data Objects (ADO) 参照設定が必要');
       }
-
       if (cLower.includes('regexp') || cLower.includes('vbscript.regexp')) {
         envReqs.add('Microsoft VBScript Regular Expressions 5.5 参照設定 または CreateObject');
       }

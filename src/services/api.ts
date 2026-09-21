@@ -11,27 +11,19 @@ import {
 import { generateSmartCompanionReply } from '../utils/companionEngine';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
-import { privacyGuardrailService } from '../miki/safety/services/privacyGuardrailService';
+import { privacyGuardrailService } from './privacyGuardrailService';
 import {
   nonLlmHardwarePipelineService,
   HardwareTelemetry,
-} from '../miki/safety/services/nonLlmHardwarePipelineService';
+} from './nonLlmHardwarePipelineService';
 
 // APKなど「フロントエンドだけが単体で動くビルド」では server.ts (Express) が
 // 同一オリジンに存在しないため、Termux等で起動したサーバーのアドレスを
 // 明示的に指定できるようにする。未設定なら従来通り同一オリジン(相対パス)。
 export const SERVER_UNAVAILABLE_MESSAGE = 'この機能は外部サーバーへの接続が必要です。現在未接続です。';
 
-export function getCustomApiBaseUrl(): string {
-  return (storageService.getItem('miki_api_base_url') || '').trim().replace(/\/+$/, '');
-}
-
-export function isExternalServerConfigured(): boolean {
-  return Boolean(getCustomApiBaseUrl());
-}
-
 export function apiUrl(path: string): string {
-  const base = getCustomApiBaseUrl();
+  const base = (storageService.getItem('miki_api_base_url') || '').trim().replace(/\/+$/, '');
   return base ? `${base}${path}` : path;
 }
 
@@ -94,9 +86,10 @@ export function getViteEnvApiKeys(): SavedGeminiKeyItem[] {
 
 export function getGeminiApiKeyItems(): SavedGeminiKeyItem[] {
   try {
-    const parsed = storageService.getJson<Array<string | Partial<SavedGeminiKeyItem>>>('miki_custom_gemini_api_keys', []);
-    {
-      if (parsed.length > 0) {
+    const raw = storageService.getItem('miki_custom_gemini_api_keys');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
         const existingList = parsed
           .map((item, idx) => {
             if (typeof item === 'string') {
@@ -216,46 +209,11 @@ export function removeGeminiApiKey(idOrKey: string): SavedGeminiKeyItem[] {
   return items;
 }
 
-export const SEARXNG_BASE_URL_STORAGE_KEY = 'miki_searxng_base_url';
-export const DEFAULT_SEARXNG_BASE_URL = 'http://127.0.0.1:8888';
-
-/**
- * SearXNG検索プロキシURLの取得（端末内ローカルストレージ保管・任意）
- * 未設定時は空文字列、または fallbackToDefault=true 時に 'http://127.0.0.1:8888'
- */
-export function getSearxngBaseUrlItem(fallbackToDefault = false): string {
-  try {
-    const raw = storageService.getItem(SEARXNG_BASE_URL_STORAGE_KEY);
-    if (raw && raw.trim()) return raw.trim();
-    return fallbackToDefault ? DEFAULT_SEARXNG_BASE_URL : '';
-  } catch (e) {
-    console.warn('Error reading miki_searxng_base_url:', e);
-    return fallbackToDefault ? DEFAULT_SEARXNG_BASE_URL : '';
-  }
-}
-
-/**
- * SearXNG検索プロキシURLの設定・保存（端末内ローカルストレージ保管）
- */
-export function setSearxngBaseUrlItem(url: string): void {
-  const trimmed = (url || '').trim();
-  try {
-    if (!trimmed) {
-      storageService.removeItem(SEARXNG_BASE_URL_STORAGE_KEY);
-    } else {
-      storageService.setItem(SEARXNG_BASE_URL_STORAGE_KEY, trimmed);
-    }
-  } catch (e) {
-    console.warn('Error saving miki_searxng_base_url:', e);
-  }
-}
-
-
-export function getCustomApiHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+export function getCustomApiHeaders(extraHeaders?: Record<string, string>): Record<string, string> {
   const keys = getGeminiApiKeys();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...extraHeaders,
+    ...(extraHeaders || {}),
   };
   if (keys.length > 0) {
     headers['x-gemini-api-key'] = keys[0];
@@ -831,4 +789,16 @@ export const apiService = {
     }
   }
 };
+
+export function getSearxngBaseUrlItem(): string {
+  return storageService.getItem('miki_searxng_base_url') || '';
+}
+
+export function setSearxngBaseUrlItem(url?: string): void {
+  if (url) {
+    storageService.setItem('miki_searxng_base_url', url);
+  } else {
+    storageService.removeItem('miki_searxng_base_url');
+  }
+}
 
