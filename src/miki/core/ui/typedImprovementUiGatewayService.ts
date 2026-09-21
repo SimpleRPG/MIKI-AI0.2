@@ -79,7 +79,7 @@ class TypedImprovementUiGatewayService {
       const resumed=await coreTaskIngressService.resume(command.taskId,coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'));
       return this.toCommandResult(command,resumed);
     }
-    const request:CoreTaskIngressRequest={kind:'SELF_IMPROVEMENT',goal:command.goal,source:'core',payload:{commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt,entry:'TYPED_IMPROVEMENT_UI_GATEWAY',mode:command.commandType,...(command.commandType==='START_SPECIFIED_IMPROVEMENT'?{target:command.target}:command.commandType==='COMMIT_CANDIDATE_TRANSACTION'?{workspaceId:command.workspaceId,persistenceReceiptId:command.persistenceReceiptId}:command.commandType==='IMPORT_EXTERNAL_FEEDBACK'?{packageId:command.packageId,rawResponse:command.rawResponse,sourceType:command.sourceType}:command.commandType==='SUBMIT_REVIEW_DECISION'?{externalReviewId:command.externalReviewId,decision:command.decision,reason:command.reason}:{autonomousDiscovery:true})}};
+    const request:CoreTaskIngressRequest={kind:'SELF_IMPROVEMENT',goal:command.goal,source:'core',payload:{commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt,entry:'TYPED_IMPROVEMENT_UI_GATEWAY',mode:command.commandType,...(command.commandType==='START_SPECIFIED_IMPROVEMENT'?{target:command.target,targetFiles:[command.target]}:command.commandType==='COMMIT_CANDIDATE_TRANSACTION'?{workspaceId:command.workspaceId,persistenceReceiptId:command.persistenceReceiptId}:command.commandType==='IMPORT_EXTERNAL_FEEDBACK'?{packageId:command.packageId,rawResponse:command.rawResponse,sourceType:command.sourceType}:command.commandType==='SUBMIT_REVIEW_DECISION'?{externalReviewId:command.externalReviewId,decision:command.decision,reason:command.reason}:{autonomousDiscovery:true})}};
     const result=await coreTaskIngressService.submit(request);
     return this.toCommandResult(command,result);
   }
@@ -87,8 +87,9 @@ class TypedImprovementUiGatewayService {
   async executeDirective(directiveId:string){
     const directive = externalDirectiveIntakeService.list().find((item) => item.directiveId === directiveId);
     const goal = directive?.objective?.trim() || `指示書 ${directiveId} を実行し、評価可能な候補まで進める`;
-    const target = directive?.targetFiles?.find((item) => typeof item === 'string' && item.trim()) || 'src/components/AutonomousImprovementHome.tsx';
-    return this.startSpecifiedImprovement(goal, target);
+    const target = directive?.targetFiles?.find((item) => typeof item === 'string' && item.trim());
+    if(target) return this.startSpecifiedImprovement(goal, target);
+    return this.discoverImprovementTarget(goal);
   }
   startSpecifiedImprovement(goal:string,target:string){return this.sendImprovementCommand({commandType:'START_SPECIFIED_IMPROVEMENT',goal,target,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-improvement'),operationInstanceId:coreResultService.generateRequestId('operation')});}
   discoverImprovementTarget(goal='改善対象を自動で探し、評価可能な候補を作る'){return this.sendImprovementCommand({commandType:'DISCOVER_IMPROVEMENT_TARGET',goal,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-discovery'),operationInstanceId:coreResultService.generateRequestId('operation')});}

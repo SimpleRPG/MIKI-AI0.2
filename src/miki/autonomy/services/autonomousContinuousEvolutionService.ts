@@ -171,7 +171,7 @@ export class AutonomousContinuousEvolutionService {
   private config: AutopilotConfig = {
     enabled: false,
     intervalMinutes: 360,
-    requireApproval: false,
+    requireApproval: true,
     targetDomain: 'ALL',
     maxContinuousRuns: 5,
     autoHealLimit: 3,

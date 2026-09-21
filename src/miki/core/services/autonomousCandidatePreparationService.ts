@@ -47,10 +47,12 @@ class AutonomousCandidatePreparationService {
   return {version:1,source:'AUTONOMOUS_ISSUE',issueId:issue.id,targetPaths,changeScope,investigationSteps,requiredValidation,forbiddenExpansion,rationale:[`Issue ${issue.id}: ${issue.title}`,`source=${issue.sourceId}`,`resolutionConfidence=${resolution.confidence.toFixed(3)}`,...resolution.reasons.slice(0,8)],confidence:resolution.confidence};
  }
 
- async prepare(issueId:string,aiCandidates?:Array<{path:string;candidateContent:string;evidenceIds?:string[]}>):Promise<CandidateWorkspace|undefined>{
-  const issue=autonomousIssueDiscoveryService.list(500).find(x=>x.id===issueId);if(!issue)return undefined;const resolution=this.resolve(issue);if(resolution.confidence<0.3||resolution.targetPaths.length===0)return undefined;
+ async prepare(issueId:string,aiCandidates?:Array<{path:string;candidateContent:string;evidenceIds?:string[]}>,targetPaths?:string[]):Promise<CandidateWorkspace|undefined>{
+  const issue=autonomousIssueDiscoveryService.list(500).find(x=>x.id===issueId);if(!issue)return undefined;
+  const resolvedTargetPaths=[...(targetPaths||[])].filter(Boolean);
+  if(resolvedTargetPaths.length===0)return undefined;
   const supplied=new Map((aiCandidates||[]).map(x=>[x.path,x]));const drafts:CandidateDraft[]=[];
-  for(const path of resolution.targetPaths){const source=this.files.get(path);if(!source)continue;const candidate=supplied.get(path);const candidateContent=candidate?.candidateContent||this.safeTemplate(source.content,issue);if(candidateContent.trim()===source.content.trim())continue;drafts.push({issueId,targetPath:path,baselineContent:source.content,candidateContent,evidenceIds:[...new Set([...source.evidenceIds,...resolution.evidenceIds,...(candidate?.evidenceIds||[])])],generationMode:candidate?'AI_SUPPLIED':'SAFE_TEMPLATE'});}
+  for(const path of resolvedTargetPaths){const source=this.files.get(path);if(!source)continue;const candidate=supplied.get(path);const candidateContent=candidate?.candidateContent||this.safeTemplate(source.content,issue);if(candidateContent.trim()===source.content.trim())continue;drafts.push({issueId,targetPath:path,baselineContent:source.content,candidateContent,evidenceIds:[...new Set([...source.evidenceIds,...resolution.evidenceIds,...(candidate?.evidenceIds||[])])],generationMode:candidate?'AI_SUPPLIED':'SAFE_TEMPLATE'});}
   if(drafts.length===0)return undefined;return isolatedCandidateWorkspaceService.create(issueId,drafts.map(x=>({path:x.targetPath,baselineContent:x.baselineContent,candidateContent:x.candidateContent,evidenceIds:x.evidenceIds})));
  }
 
@@ -68,7 +70,28 @@ class AutonomousCandidatePreparationService {
    for(const path of targetPaths){const source=this.files.get(path);const candidate=supplied.get(path);if(!source||!candidate||candidate.candidateContent.trim()===source.content.trim())continue;drafts.push({path,baselineContent:source.content,candidateContent:candidate.candidateContent,evidenceIds:[...new Set([...source.evidenceIds,...(candidate.evidenceIds||[])])]});}
    if(drafts.length===0)return {targetPaths,missingPaths:[],reason:'EXTERNAL_DIRECTIVE_AI_CANDIDATE_REQUIRED'};const workspace=await isolatedCandidateWorkspaceService.create(runId,drafts);improvementIntakeRouterService.update(runId,{workspaceId:workspace.workspaceId,status:'IN_PROGRESS'});return {workspaceId:workspace.workspaceId,targetPaths,missingPaths:[]};
   }
-  const issueId=typeof run.payload.issueId==='string'?run.payload.issueId:run.sourceId;const issue=(await import('./autonomousIssueDiscoveryService')).autonomousIssueDiscoveryService.list(500).find(item=>item.id===issueId);if(!issue)return {targetPaths:[],missingPaths:[],reason:'AUTONOMOUS_ISSUE_NOT_FOUND'};const resolution=this.resolve(issue);if(resolution.targetPaths.length===0||resolution.confidence<0.3)return {targetPaths:resolution.targetPaths,missingPaths:[],reason:'AUTONOMOUS_TARGET_CONFIDENCE_LOW'};const implementationPlan=this.buildImplementationPlan(issue,resolution);improvementIntakeRouterService.update(runId,{implementationPlan,status:'IN_PROGRESS'});const workspace=await this.prepare(issue.id,aiCandidates||[]);if(!workspace)return {targetPaths:resolution.targetPaths,missingPaths:[],reason:'AUTONOMOUS_AI_CANDIDATE_REQUIRED'};improvementIntakeRouterService.update(runId,{workspaceId:workspace.workspaceId,status:'IN_PROGRESS'});return {workspaceId:workspace.workspaceId,targetPaths:resolution.targetPaths,missingPaths:[]};
+  const issueId=typeof run.payload.issueId==='string'?run.payload.issueId:run.sourceId;
+  const issue=(await import('./autonomousIssueDiscoveryService')).autonomousIssueDiscoveryService.list(500).find(item=>item.id===issueId);
+  if(!issue)return {targetPaths:[],missingPaths:[],reason:'AUTONOMOUS_ISSUE_NOT_FOUND'};
+  const targetPaths=Array.isArray(run.payload.targetFiles)
+    ? run.payload.targetFiles.filter((value):value is string=>typeof value==='string'&&value.trim()).map(value=>value.trim())
+    : [];
+  if(targetPaths.length===0)return {targetPaths:[],missingPaths:[],reason:'CORE_TARGET_FILES_REQUIRED'};
+  const missingPaths=targetPaths.filter(path=>!this.files.has(path));
+  if(missingPaths.length>0)return {targetPaths,missingPaths,reason:'CORE_TARGET_FILES_NOT_FOUND'};
+  const resolution:TargetResolution={
+    issueId:issue.id,
+    targetPaths:[...new Set(targetPaths)].slice(0,3),
+    evidenceIds:[],
+    confidence:1,
+    reasons:['TARGETS_SELECTED_BY_CORE']
+  };
+  const implementationPlan=this.buildImplementationPlan(issue,resolution);
+  improvementIntakeRouterService.update(runId,{implementationPlan,status:'IN_PROGRESS'});
+  const workspace=await this.prepare(issue.id,aiCandidates||[],resolution.targetPaths);
+  if(!workspace)return {targetPaths:resolution.targetPaths,missingPaths:[],reason:'AUTONOMOUS_AI_CANDIDATE_REQUIRED'};
+  improvementIntakeRouterService.update(runId,{workspaceId:workspace.workspaceId,status:'IN_PROGRESS'});
+  return {workspaceId:workspace.workspaceId,targetPaths:resolution.targetPaths,missingPaths:[]};
  }
 
  getSourceFiles():SourceFileSnapshot[]{return [...this.files.values()].map(x=>({...x,evidenceIds:[...x.evidenceIds]}));}
