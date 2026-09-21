@@ -106,7 +106,11 @@ async function run() {
   process.stdout.write(JSON.stringify(report, null, 2) + '\n');
 }
 
-run().catch(error => {
+run()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch(error => {
   const payload = {
     schemaVersion: 1,
     test: 'P0_RUNTIME_E2E',
