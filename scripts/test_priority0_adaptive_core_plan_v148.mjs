@@ -16,7 +16,7 @@ const checks={
     'reviewPackageReady','blockingReasons','recommendedOperations'
   ].every(x=>planner.includes(x)),
 
-  uiUsesKindAndEntry:planner.includes("kind==='SELF_IMPROVEMENT'")&&planner.includes("entry==='TYPED_IMPROVEMENT_UI_GATEWAY'"),
+  uiUsesKindAndEntry:planner.includes("kind==='SELF_IMPROVEMENT'")&&planner.includes("entry==='TYPED_CONVERSATION_UI_GATEWAY'"),
   noLegacySelfImprovementFlow:!planner.includes('SELF_IMPROVEMENT_FLOW'),
   noFixedThreeRouteInjection:!planner.includes("routes.slice(0,3)")&&!planner.includes("unconditional candidate"),
   candidateRequiresReadiness:planner.includes('!latestCandidate && readiness.candidateGenerationReady'),

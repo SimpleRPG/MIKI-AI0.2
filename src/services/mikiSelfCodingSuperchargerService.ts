@@ -363,8 +363,6 @@ class MikiSelfCodingSuperchargerService {
     targetFileHint?: string,
     autoApply: boolean = true,
     codeOverride?: string,
-    localLlmEndpoint?: string,
-    localLlmModel?: string
   ): Promise<SelfImplementationResult> {
     const res = await callSelfCodeApi<SelfImplementationResult>('/api/self-code/autonomous-implement', {
       method: 'POST',
@@ -373,8 +371,6 @@ class MikiSelfCodingSuperchargerService {
         targetFileHint,
         autoApply,
         codeOverride,
-        localLlmEndpoint,
-        localLlmModel,
       },
     });
     if (isApiFailure(res)) {
