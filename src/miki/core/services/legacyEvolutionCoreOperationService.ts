@@ -11,10 +11,6 @@ export type LegacyEvolutionOperationOutput = Awaited<
 >;
 
 class LegacyEvolutionCoreOperationService {
-  public selectNextTarget(): ReturnType<typeof autonomousContinuousEvolutionService.selectNextTarget> {
-    return autonomousContinuousEvolutionService.selectNextTarget();
-  }
-
   public async execute(input: LegacyEvolutionOperationInput): Promise<LegacyEvolutionOperationOutput> {
     const operation = coreOperationRegistryService.get<LegacyEvolutionOperationInput, LegacyEvolutionOperationOutput>(
       LEGACY_EVOLUTION_CORE_OPERATION_ID

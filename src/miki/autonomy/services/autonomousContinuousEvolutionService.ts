@@ -91,6 +91,24 @@ export interface ImprovementBacklogItem {
   keyRequirements: string[];
 }
 
+export interface CoreAutonomousEvolutionCommand {
+  taskId: string;
+  runId: string;
+  changeSetId: ChangeSetID;
+  operationInstanceId: string;
+  corePlanRevision: number;
+  objective: string;
+  targetFile: string;
+  prompt: string;
+  reason?: string;
+  chapterNumber?: number;
+  strategyId?: string;
+  strategyName?: string;
+  strategyEffectivenessScore?: number;
+  implementationPlan?: string[];
+  unknownContext?: string[];
+}
+
 export interface AutonomousEvolutionRecord {
   id: string;
   changeSetId?: ChangeSetID;
@@ -322,55 +340,11 @@ export class AutonomousContinuousEvolutionService {
   }
 
   /**
-   * 次の改善対象を自律的に選定
-   */
-  public selectNextTarget(): {
-    chapter?: SpecificationChapterMeta;
-    targetFile: string;
-    prompt: string;
-    reason: string;
-  } {
-    // 1. 仕様書の未実装章または優先章から選定
-    const unimplemented = selfCodeArchitectService.getUnimplementedChapters();
-    const priorityChapters = [38, 37, 36, 31, 33, 34, 35, 54, 57, 69, 155, 59, 80, 83, 127, 130, 167, 169];
-
-    for (const num of priorityChapters) {
-      const match = unimplemented.find((u) => u.chapterNumber === num);
-      if (match) {
-        return {
-          chapter: match,
-          targetFile: `src/autonomous_modules/chapter_${match.chapterNumber}.ts`,
-          prompt: `設計思想 第${match.chapterNumber}章『${match.title}』の仕様に適合するモジュール実装。主要要件: ${match.keyRequirements.join(' / ')}。不変条件を厳格に保持し、テスト可能なTypeScriptクラスを構築してください。`,
-          reason: `設計思想 第${match.chapterNumber}章（重要度: HIGH）が未完了のため優先選定しました。`,
-        };
-      }
-    }
-
-    if (unimplemented.length > 0) {
-      const first = unimplemented[0];
-      return {
-        chapter: first,
-        targetFile: `src/autonomous_modules/chapter_${first.chapterNumber}.ts`,
-        prompt: `設計思想 第${first.chapterNumber}章『${first.title}』の仕様書要件（${first.keyRequirements.join(' / ')}）に適合するTypeScriptモジュールを構築してください。`,
-        reason: `仕様書レジストリの先頭未実装章（第${first.chapterNumber}章）を自律抽出しました。`,
-      };
-    }
-
-    // すべて実装済みの場合はパフォーマンス・レジリエンスの自律強化
-    const fallbackChapterNumber = 171;
-    return {
-      targetFile: `src/autonomous_modules/chapter_${fallbackChapterNumber}_performance_cache.ts`,
-      prompt: `高負荷時のメモリ消費を抑制し、応答時間を半減させるインメモリLRUキャッシュとAST最適化ヘルパーモジュールを安全に構築してください。`,
-      reason: `全章完了に伴い、自律パフォーマンス最適化フェーズへ自動移行しました。`,
-    };
-  }
-
-  /**
    * 全自動自己改善メインパイプライン (Canonical Pipeline & Evidence-Based Architecture)
    * (Audit -> Invariants -> Strategy -> Contract -> Synthesis -> TDD -> Counterexample Gate -> Generalization Gate -> Causal Experiment -> Stop Policy -> Deploy -> Evidence -> Closed Loop)
    */
   public async runFullAutonomousCycle(
-    explicitTarget?: { chapterNumber?: number; prompt?: string; targetFile?: string; reason?: string }
+    command: CoreAutonomousEvolutionCommand
   ): Promise<AutonomousEvolutionRecord> {
     if (this.isRunningCycle) {
       throw new Error('既に自律改善サイクルが実行中です。完了をお待ちください。');
@@ -403,9 +377,32 @@ export class AutonomousContinuousEvolutionService {
     // ── 指示書 1.2: 改善前実運用指標スナップショット ──
     const beforeSnapshot = selfImprovementExperimentService.snapshot();
 
-    // 1. ChangeSetID の初期発番 (パイプライン全体を貫通する一意ID)
-    let changeSetId = evidenceBasedSelfImprovementEngine.generateChangeSetId(explicitTarget?.targetFile || 'pending');
-    let selectedStrategy = evidenceBasedSelfImprovementEngine.selectBestStrategy('SELF_CODING', ['TYPE_SAFETY', 'SYNTAX_VALIDATION']);
+    if (!command.taskId.trim() || !command.runId.trim() || !command.operationInstanceId.trim()) {
+      throw new Error('CORE_EXECUTION_LINEAGE_REQUIRED');
+    }
+    if (!command.changeSetId.trim()) {
+      throw new Error('CHANGE_SET_ID_REQUIRED');
+    }
+    if (!command.targetFile.trim() || !command.prompt.trim()) {
+      throw new Error('CORE_TARGET_AND_PROMPT_REQUIRED');
+    }
+
+    const changeSetId = command.changeSetId;
+    const selectedStrategy = {
+      strategyId: command.strategyId || 'CORE_SELECTED',
+      strategyName: command.strategyName || 'CORE_SELECTED',
+      effectivenessScore: command.strategyEffectivenessScore ?? 0,
+      description: 'COREが選択した戦略',
+    };
+
+    const targetInfo = {
+      chapter: command.chapterNumber
+        ? selfCodeArchitectService.getChapterByNumber(command.chapterNumber) || undefined
+        : undefined,
+      targetFile: command.targetFile,
+      prompt: command.prompt,
+      reason: command.reason || command.objective,
+    };
 
     try {
       // ── Step 1: 監査 (Audit & Drift Detection) ──
@@ -423,37 +420,18 @@ export class AutonomousContinuousEvolutionService {
       }
       logStep('INVARIANTS', '不変条件オールクリア', '全5項目パス。モデル重み不変性およびプライバシー境界の完全保護を確認', 'SUCCESS');
 
-      // ── Step 3: 対象特定 (Target Selection) ──
-      let targetInfo = this.selectNextTarget();
-      if (explicitTarget?.chapterNumber) {
-        const chap = selfCodeArchitectService.getChapterByNumber(explicitTarget.chapterNumber);
-        if (chap) {
-          targetInfo = {
-            chapter: chap,
-            targetFile: `src/autonomous_modules/chapter_${chap.chapterNumber}.ts`,
-            prompt: `第${chap.chapterNumber}章『${chap.title}』の仕様要件適合モジュール構築: ${chap.keyRequirements.join(' / ')}`,
-            reason: `明示的に指定された第${chap.chapterNumber}章を対象とします。`,
-          };
-        }
-      } else if (explicitTarget?.prompt) {
-        targetInfo.prompt = explicitTarget.prompt;
-        if (explicitTarget.targetFile) targetInfo.targetFile = explicitTarget.targetFile;
-        targetInfo.reason = explicitTarget.reason || 'ユーザー指示に基づく自律実装';
-      }
-
-      // 対象決定に伴う ChangeSetID の再確定
-      changeSetId = evidenceBasedSelfImprovementEngine.generateChangeSetId(targetInfo.targetFile);
-
-      // 5. 自己改善戦略メモリ (Strategy Memory) の選定
-      selectedStrategy = evidenceBasedSelfImprovementEngine.selectBestStrategy('SELF_CODING', [
-        targetInfo.targetFile.includes('chapter_') ? 'SPEC_COMPLIANCE' : 'GENERAL_EVOLUTION',
-        'TYPE_SAFETY',
-      ]);
+      // ── Step 3: CORE決定済み対象の受領 ──
+      logStep(
+        'PROPOSAL',
+        'CORE決定済み自己改善対象を受領',
+        `Task: ${command.taskId} | Run: ${command.runId} | Operation: ${command.operationInstanceId} | PlanRevision: ${command.corePlanRevision} | ChangeSetID: ${changeSetId} | Target: ${targetInfo.targetFile}`,
+        'SUCCESS'
+      );
 
       logStep(
         'PROPOSAL',
-        '自己改善戦略の選定 & ChangeSetID 発番',
-        `ChangeSetID: ${changeSetId} | 採択戦略: ${selectedStrategy.strategyName} (適合度スコア: ${(selectedStrategy.effectivenessScore ?? 80).toFixed(0)}) - ${selectedStrategy.description}`,
+        'CORE決定済み戦略を受領',
+        `採択戦略: ${selectedStrategy.strategyName} (${selectedStrategy.strategyId})`,
         'SUCCESS'
       );
 
@@ -463,7 +441,9 @@ export class AutonomousContinuousEvolutionService {
         requirementId: targetInfo.chapter ? `REQ-CHAP-${targetInfo.chapter.chapterNumber}` : `REQ-DIRECTIVE-${Date.now()}`,
         title: targetInfo.chapter ? `第${targetInfo.chapter.chapterNumber}章『${targetInfo.chapter.title}』適合` : targetInfo.prompt.slice(0, 50),
         acceptanceCriteria: targetInfo.chapter?.keyRequirements || [
-          'TypeScript構文エラーおよび循環参照なし',
+          ...(command.implementationPlan && command.implementationPlan.length > 0
+            ? command.implementationPlan
+            : ['CORE指定の実装計画を満たす', 'TypeScript構文エラーおよび循環参照なし']),
           'TDD単体テストおよび不変条件の完全通過',
           '境界値・異常入力に対する反例探索ゲート合格',
         ],
@@ -1247,7 +1227,7 @@ export default ${fallbackClassName};
       // 4. Failure Classification (10分類) の適用
       const failureClassification = evidenceBasedSelfImprovementEngine.classifyFailure(
         err?.message || '自律改善パイプライン例外',
-        `Target: ${explicitTarget?.targetFile || 'unknown'}`
+        `Target: ${command.targetFile}`
       );
 
       // 14. Closed Loop: 失敗結果を戦略メモリへフィードバック
@@ -1261,9 +1241,9 @@ export default ${fallbackClassName};
         id: recordId,
         changeSetId,
         timestamp: Date.now(),
-        targetFile: explicitTarget?.targetFile || 'unknown',
-        prompt: explicitTarget?.prompt || '自律改善サイクル',
-        reasoning: `${err?.message || 'エラー中断'} [分類: ${failureClassification.category} (${failureClassification.label})]`,
+        targetFile: command.targetFile,
+        prompt: command.prompt,
+        reasoning: `${err?.message || 'エラー中断'} [分類: ${failureClassification.category} (${failureClassification.label})] [Task:${command.taskId} Run:${command.runId} Operation:${command.operationInstanceId}]`,
         failureCategory: failureClassification.category,
         previousScore: 0,
         newScore: 0,
@@ -1293,8 +1273,8 @@ export default ${fallbackClassName};
         const afterFailSnapshot = selfImprovementExperimentService.snapshot();
         const failEval = selfImprovementExperimentService.evaluate('SELF_CODE_IMPROVEMENT', beforeSnapshot, afterFailSnapshot, 'error');
         unifiedMikiExperienceService.observeSelfCodeImprovement({
-          target: explicitTarget?.prompt || '自律改善サイクル',
-          targetFile: explicitTarget?.targetFile || 'unknown',
+          target: command.prompt,
+          targetFile: command.targetFile,
           problem: err?.message || '実行時エラー中断',
           rootCause: `[${failureClassification.category}] ${failureClassification.description}`,
           hypothesis: '自律改善サイクルの完遂',
@@ -1450,23 +1430,15 @@ export default ${fallbackClassName};
   }
 
   /**
-   * 連続バッチ自己改善 (Batch Autonomous Cycles)
-   * 指定件数（デフォルト3件）のバックログ上位項目を連続して全自動改善します。
+   * 旧バッチ入口。
+   * 改善対象の選定・複数実行はCOREの責務であり、このサービスでは実行しない。
    */
-  public async runBatchAutonomousCycles(count: number = 3): Promise<AutonomousEvolutionRecord[]> {
-    const results: AutonomousEvolutionRecord[] = [];
-    const backlog = this.getImprovementBacklog();
-    const targets = backlog.slice(0, Math.max(1, count));
-
-    for (const target of targets) {
-      try {
-        const rec = await this.runFullAutonomousCycle({ chapterNumber: target.chapterNumber });
-        results.push(rec);
-      } catch (err) {
-        systemLogger.warn('SELF_IMPROVEMENT', `バッチ自律改善エラー [第${target.chapterNumber}章]`, err);
-      }
-    }
-    return results;
+  public async runBatchAutonomousCycles(_count: number = 3): Promise<AutonomousEvolutionRecord[]> {
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      '[AutonomousContinuousEvolutionService] batch planning is owned by CORE'
+    );
+    return [];
   }
 
   /**
