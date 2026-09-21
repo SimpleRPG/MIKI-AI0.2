@@ -5,6 +5,7 @@ import { verifierService, VerificationResult } from '../../verification/services
 import { researchStrategyService, ResearchRoute } from './researchStrategyService';
 import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/services/cognitiveEvidenceIntegrationService';
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
+import { webTermLearningService } from './webTermLearningService';
 
 export type { ResearchRoute };
 
@@ -69,6 +70,7 @@ export class ResearchService {
   }): Promise<ResearchResult> {
     const evidence: EvidenceRecord[] = [];
     const claimIds: string[] = [];
+    const learnedTermComponentIds: string[] = [];
 
     knowledgeGapService.buildResolutionPlan(gap);
     knowledgeGapService.advanceResolutionPlan(gap.id, 'COLLECT_EVIDENCE', 'RESEARCH');
@@ -194,6 +196,20 @@ export class ResearchService {
             },
           });
           evidence.push(pageEvidence);
+
+          if (pageEvidence.status !== 'REJECTED') {
+            const termLearning = webTermLearningService.learnPage({
+              text: content,
+              url: page.url,
+              evidenceId: pageEvidence.evidence_id,
+              sourceTitle: page.result.title,
+            });
+            for (const componentId of termLearning.componentIds) {
+              if (!learnedTermComponentIds.includes(componentId)) {
+                learnedTermComponentIds.push(componentId);
+              }
+            }
+          }
 
           if (pageEvidence.status === 'REJECTED') continue;
           // The page itself is evidence; keep the claim conservative by using the

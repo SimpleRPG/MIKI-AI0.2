@@ -39,3 +39,5 @@ export * from './research/services/queryPatternRepositoryService';
 
 export { internalWebQueryLearningCycleService } from './research/services/internalWebQueryLearningCycleService';
 export type { ResearchEnvironmentKind, WebContentKind, RenderedPageInput, RenderedPageSections, InternalResearchEvidence, InternalResearchClaim, LearnedTerm, InternalKnowledgeComponent, InternalWebQueryCycleResult } from './research/services/internalWebQueryLearningCycleService';
+
+export * from "./research/services/webTermLearningService";
