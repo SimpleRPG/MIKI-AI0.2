@@ -30,6 +30,7 @@ import {
 import { workDirectiveIngestionService } from '../../miki/execution/services/workDirectiveIngestionService';
 import { evidenceBasedSelfImprovementEngine } from '../../miki/improvement/services/evidenceBasedSelfImprovementEngine';
 import { typedImprovementUiGatewayService } from '../../miki/core/ui/typedImprovementUiGatewayService';
+import { isEditableInputActive } from '../../utils/isEditableInputActive';
 import {
   StructuredDirective,
   RequirementContract,
@@ -78,7 +79,10 @@ export const EvidenceBasedLoopSubView: React.FC = () => {
 
   useEffect(() => {
     refreshState();
-    const interval = setInterval(refreshState, 3000);
+    const interval = setInterval(() => {
+      if (isEditableInputActive()) return;
+      refreshState();
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -273,6 +277,10 @@ export const EvidenceBasedLoopSubView: React.FC = () => {
               <textarea
                 value={rawDirectiveText}
                 onChange={(e) => setRawDirectiveText(e.target.value)}
+                onInput={(e) => setRawDirectiveText(e.currentTarget.value)}
+                onCompositionStart={(e) => setRawDirectiveText(e.currentTarget.value)}
+                onCompositionUpdate={(e) => setRawDirectiveText(e.currentTarget.value)}
+                onCompositionEnd={(e) => setRawDirectiveText(e.currentTarget.value)}
                 placeholder="ここに現在の作業指示テキストを貼り付け..."
                 className="w-full h-44 p-3 border border-slate-200 rounded-xl text-xs font-mono bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition resize-none"
               />

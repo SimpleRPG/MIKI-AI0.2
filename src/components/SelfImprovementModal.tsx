@@ -52,6 +52,7 @@ import {
   CheckSquare,
   Globe,
 } from 'lucide-react';
+import { isEditableInputActive } from '../utils/isEditableInputActive';
 import { ExternalTeacherTab } from './ExternalTeacherTab';
 import { PluginConsentDialog } from './PluginConsentDialog';
 import { AnswerPlanTab } from './self_improvement/AnswerPlanTab';
@@ -440,6 +441,7 @@ export const SelfImprovementModal: React.FC<SelfImprovementModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     const interval = setInterval(() => {
+      if (isEditableInputActive()) return;
       setWmStatus(backgroundWorkerService.getStatus());
       setWmLogs(backgroundWorkerService.getLogs());
     }, 1500);

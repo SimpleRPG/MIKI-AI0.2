@@ -53,6 +53,7 @@ import {
 } from '../types/evidenceSelfImprovementTypes';
 import { ReviewPackageLibrary } from './ReviewPackageLibrary';
 import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewayService';
+import { isEditableInputActive } from '../utils/isEditableInputActive';
 
 export interface AutonomousImprovementHomeProps {
   onOpenSelfImprovementModal?: (tab?: string) => void;
@@ -133,10 +134,12 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   // Auto-refresh timer & real-time subscriptions
   useEffect(() => {
     const unsubCore = typedImprovementUiGatewayService.subscribeCore(() => {
+      if (isEditableInputActive()) return;
       setCoreResults(typedImprovementUiGatewayService.getCoreResults(50));
     });
 
     const timer = setInterval(() => {
+      if (isEditableInputActive()) return;
       setCoreRuntimes(typedImprovementUiGatewayService.listRestoredPriorityOneRuntime());
       setLoopState(typedImprovementUiGatewayService.getLoopState());
       setStructuredDirectives(typedImprovementUiGatewayService.getStructuredDirectives());
@@ -730,6 +733,12 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                   placeholder="指示書タイトル (例: 18構成UI移行作業指示)"
                   value={newDirectiveTitle}
                   onChange={(e) => setNewDirectiveTitle(e.target.value)}
+                  onInput={(e) => setNewDirectiveTitle(e.currentTarget.value)}
+                  onCompositionStart={(e) => setNewDirectiveTitle(e.currentTarget.value)}
+                  onCompositionUpdate={(e) => setNewDirectiveTitle(e.currentTarget.value)}
+                  onCompositionEnd={(e) => setNewDirectiveTitle(e.currentTarget.value)}
+                  onKeyUp={(e) => setNewDirectiveTitle(e.currentTarget.value)}
+                  onBlur={(e) => setNewDirectiveTitle(e.currentTarget.value)}
                   className="px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-hidden focus:border-indigo-500"
                 />
                 <select
@@ -753,6 +762,12 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 # 検証条件: ..."
                 value={newDirectiveText}
                 onChange={(e) => setNewDirectiveText(e.target.value)}
+                onInput={(e) => setNewDirectiveText(e.currentTarget.value)}
+                onCompositionStart={(e) => setNewDirectiveText(e.currentTarget.value)}
+                onCompositionUpdate={(e) => setNewDirectiveText(e.currentTarget.value)}
+                onCompositionEnd={(e) => setNewDirectiveText(e.currentTarget.value)}
+                onKeyUp={(e) => setNewDirectiveText(e.currentTarget.value)}
+                onBlur={(e) => setNewDirectiveText(e.currentTarget.value)}
                 rows={5}
                 className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono focus:outline-hidden focus:border-indigo-500"
               />

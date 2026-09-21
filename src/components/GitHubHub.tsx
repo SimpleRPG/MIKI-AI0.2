@@ -16,6 +16,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { GitHubRepoData, PersonaConfig, WorkspaceFile } from '../types';
+import { isEditableInputActive } from '../utils/isEditableInputActive';
 import {
   typedGitHubUiGatewayService,
   type DomainCoverage,
@@ -61,6 +62,7 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
   const [discoveryInterval, setDiscoveryInterval] = useState<number>(() => typedGitHubUiGatewayService.issueDiscovery.getConfig().intervalMinutes);
   useEffect(() => {
     const refresh = () => {
+      if (isEditableInputActive()) return;
       setUnknownRecords(typedGitHubUiGatewayService.unknown.list(8));
       setDomainCoverage(typedGitHubUiGatewayService.circulation.getCoverage());
     };
