@@ -2,7 +2,7 @@ import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { longTermMemoryService } from './longTermMemoryService';
 import { embeddingService } from './embeddingService';
-import { unifiedWebResearchService } from './autonomousSearchService';
+import { unifiedWebResearchService } from '../miki/research/services/unifiedWebResearchService';
 import { classifyClaimEpistemology } from './falsificationService';
 import type {
   MemoryItem,

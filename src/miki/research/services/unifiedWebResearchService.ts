@@ -36,8 +36,24 @@ export class UnifiedWebResearchService {
     return autonomousSearchService.getConfig();
   }
 
-  public setConfig(config: AutonomousSearchConfig) {
-    return autonomousSearchService.setConfig(config);
+  public saveConfig(config: Partial<AutonomousSearchConfig>) {
+    return autonomousSearchService.saveConfig(config);
+  }
+
+  public updateConfig(config: Partial<AutonomousSearchConfig>) {
+    return autonomousSearchService.updateConfig(config);
+  }
+
+  public getStats() {
+    return autonomousSearchService.getStats();
+  }
+
+  public getRecentRecords(limit = 20) {
+    return autonomousSearchService.getRecentRecords(limit);
+  }
+
+  public detectNeedForSearch(userText: string) {
+    return autonomousSearchService.detectNeedForSearch(userText);
   }
 
   public learnFromSearch(
@@ -46,8 +62,22 @@ export class UnifiedWebResearchService {
     return autonomousSearchService.learnFromSearch(...args);
   }
 
-  public getStats() {
-    return autonomousSearchService.getStats();
+  public performIdleAutonomousLearning(
+    ...args: Parameters<typeof autonomousSearchService.performIdleAutonomousLearning>
+  ) {
+    return autonomousSearchService.performIdleAutonomousLearning(...args);
+  }
+
+  public fetchRenderedPage(
+    ...args: Parameters<typeof autonomousSearchService.fetchRenderedPage>
+  ) {
+    return autonomousSearchService.fetchRenderedPage(...args);
+  }
+
+  public readSearchResultPages(
+    ...args: Parameters<typeof autonomousSearchService.readSearchResultPages>
+  ) {
+    return autonomousSearchService.readSearchResultPages(...args);
   }
 }
 

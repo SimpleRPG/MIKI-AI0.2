@@ -9,7 +9,7 @@ import { systemLogger } from './systemLogger';
 import { worldModelService } from './worldModelService';
 import { selfImprovementService } from '../miki/improvement/services/selfImprovementService';
 import { workingAgendaService } from './workingAgendaService';
-import { unifiedWebResearchService } from './autonomousSearchService';
+import { unifiedWebResearchService } from '../miki/research/services/unifiedWebResearchService';
 import { syntheticDataService } from './syntheticDataService';
 import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
 import { SelfImprovementProposal } from '../types';
