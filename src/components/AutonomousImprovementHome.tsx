@@ -268,7 +268,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
         type: 'info',
       });
 
-      const result = await typedImprovementUiGatewayService.executeDirective(directiveId);
+      const result = await typedImprovementUiGatewayService.executeDirectiveUntilReviewPackage(directiveId);
       const stage = String(result.currentBusinessStage || result.currentStage || '').toUpperCase();
       const finished = stage === 'COMPLETED';
       const failed = ['FAILED', 'BLOCKED', 'REJECTED'].includes(stage);
