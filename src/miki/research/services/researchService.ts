@@ -214,6 +214,11 @@ export class ResearchService {
               research_intent_type: queryPlan.status === "READY" ? queryPlan.queries[pass]?.intentType : undefined,
               research_source_role_target: queryPlan.status === "READY" ? ({ COUNTEREVIDENCE: "COUNTEREVIDENCE", PRIMARY_SOURCE: "PRIMARY", OFFICIAL_SPECIFICATION: "OFFICIAL" } as Record<string,string>)[queryPlan.queries[pass]?.intentType || ""] || "UNCLASSIFIED" : "UNCLASSIFIED",
               research_source_role: queryPlan.status === "READY" ? ({ COUNTEREVIDENCE: "COUNTEREVIDENCE", PRIMARY_SOURCE: "PRIMARY", OFFICIAL_SPECIFICATION: "OFFICIAL" } as Record<string,string>)[queryPlan.queries[pass]?.intentType || ""] || "UNCLASSIFIED" : "UNCLASSIFIED",
+              research_source_provider: String(page.result.source || ""),
+              research_source_engine: String((page.result as any).engine || ""),
+              research_source_author: String((page.result as any).author || ""),
+              research_source_category: String((page.result as any).category || ""),
+              research_source_metadata: String((page.result as any).metadata || ""),
             },
           });
           evidence.push(pageEvidence);

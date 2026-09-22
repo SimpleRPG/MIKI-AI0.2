@@ -58,6 +58,11 @@ export interface EvidenceRecord {
 research_source_role_target?: "PRIMARY"|"OFFICIAL"|"SECONDARY"|"COUNTEREVIDENCE"|"UNCLASSIFIED";
     research_source_role?: "PRIMARY"|"OFFICIAL"|"SECONDARY"|"COUNTEREVIDENCE"|"UNCLASSIFIED";
     research_intent_type?: string;
+    research_source_provider?: string;
+    research_source_engine?: string;
+    research_source_author?: string;
+    research_source_category?: string;
+    research_source_metadata?: string;
   };
 }
 
