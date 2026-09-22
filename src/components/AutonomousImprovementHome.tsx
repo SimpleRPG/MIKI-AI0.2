@@ -49,6 +49,7 @@ import {
   MikiCategory,
 } from '../miki/core/mikiInteractionBus';
 import { ReviewPackageLibrary } from './ReviewPackageLibrary';
+import { SelfCodeSpaceScreen } from './SelfCodeSpaceScreen';
 import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewayService';
 import { isEditableInputActive } from '../utils/isEditableInputActive';
 
@@ -65,6 +66,7 @@ type MainSection =
   | 'history'
   | 'core_18'
   | 'review_packages'
+  | 'self_code'
 ;
 
 const formatRuntimeStatus = (value: string) => {
@@ -474,6 +476,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
           { id: 'history', label: '履歴', icon: Clock, count: canonicalRuns.length },
           { id: 'core_18', label: '18構成 & CORE Result', icon: Boxes, count: coreResults.length },
           { id: 'review_packages', label: '評価用ZIP', icon: UploadCloud },
+          { id: 'self_code', label: '自己コードスペース', icon: FileCode },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSection === tab.id;
@@ -728,6 +731,10 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
               )}
             </div>
           </div>
+        )}
+
+        {activeSection === 'self_code' && (
+          <SelfCodeSpaceScreen />
         )}
 
         {activeSection === 'review_packages' && (
