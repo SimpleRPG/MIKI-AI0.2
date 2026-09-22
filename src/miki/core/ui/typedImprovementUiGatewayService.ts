@@ -20,9 +20,21 @@ export type { CandidateWorkspace } from '../services/isolatedCandidateWorkspaceS
 export type { CandidateValidationEvidence } from '../services/candidateValidationEvidenceService';
 export type { CoreResult } from '../services/coreResultService';
 
+type ImprovementDirectiveContext = {
+  directiveId?:string;
+  sourceHash?:string;
+  targetFiles?:string[];
+  requirements?:string[];
+  prohibitions?:string[];
+  invariants?:string[];
+  validationRequirements?:string[];
+  deliveryRequirements?:string[];
+  relatedIssueIds?:string[];
+};
+
 export type ImprovementUiCommand =
-  | { commandType:'START_SPECIFIED_IMPROVEMENT'; goal:string; target:string; requestedAt:number; commandId:string; operationInstanceId:string; }
-  | { commandType:'DISCOVER_IMPROVEMENT_TARGET'; goal:string; requestedAt:number; commandId:string; operationInstanceId:string; }
+  | { commandType:'START_SPECIFIED_IMPROVEMENT'; goal:string; target:string; context?:Record<string,unknown>; directiveId?:string; runId?:string; requirements?:string[]; prohibitions?:string[]; invariants?:string[]; validationRequirements?:string[]; deliveryRequirements?:string[]; requestedAt:number; commandId:string; operationInstanceId:string; }
+  | { commandType:'DISCOVER_IMPROVEMENT_TARGET'; goal:string; directiveContext?:ImprovementDirectiveContext; requestedAt:number; commandId:string; operationInstanceId:string; }
   | { commandType:'RESUME_IMPROVEMENT_TASK'; taskId:string; requestedAt:number; commandId:string; operationInstanceId:string; }
   | { commandType:'IMPORT_EXTERNAL_FEEDBACK'; goal:string; packageId:string; rawResponse:string; sourceType:'PASTED_TEXT'|'IMPORTED_TXT'|'IMPORTED_JSON'; requestedAt:number; commandId:string; operationInstanceId:string; }
   | { commandType:'SUBMIT_REVIEW_DECISION'; goal:string; externalReviewId:string; decision:'ACCEPT'|'REJECT'|'REQUEST_CHANGES'|'HOLD'|'PARTIAL_ACCEPT'|'PARTIAL_REJECT'; reason:string; requestedAt:number; commandId:string; operationInstanceId:string; }
@@ -79,20 +91,58 @@ class TypedImprovementUiGatewayService {
       const resumed=await coreTaskIngressService.resume(command.taskId,coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'));
       return this.toCommandResult(command,resumed);
     }
-    const request:CoreTaskIngressRequest={kind:'SELF_IMPROVEMENT',goal:command.goal,source:'core',payload:{commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt,entry:'TYPED_IMPROVEMENT_UI_GATEWAY',mode:command.commandType,...(command.commandType==='START_SPECIFIED_IMPROVEMENT'?{target:command.target,targetFiles:[command.target]}:command.commandType==='COMMIT_CANDIDATE_TRANSACTION'?{workspaceId:command.workspaceId,persistenceReceiptId:command.persistenceReceiptId}:command.commandType==='IMPORT_EXTERNAL_FEEDBACK'?{packageId:command.packageId,rawResponse:command.rawResponse,sourceType:command.sourceType}:command.commandType==='SUBMIT_REVIEW_DECISION'?{externalReviewId:command.externalReviewId,decision:command.decision,reason:command.reason}:{autonomousDiscovery:true})}};
+    const request:CoreTaskIngressRequest={kind:'SELF_IMPROVEMENT',goal:command.goal,source:'core',payload:{...('directiveContext' in command ? (command.directiveContext||{}) : {}),commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt,entry:'TYPED_IMPROVEMENT_UI_GATEWAY',mode:command.commandType,...(command.commandType==='START_SPECIFIED_IMPROVEMENT'?{target:command.target,targetFiles:[command.target]}:command.commandType==='COMMIT_CANDIDATE_TRANSACTION'?{workspaceId:command.workspaceId,persistenceReceiptId:command.persistenceReceiptId}:command.commandType==='IMPORT_EXTERNAL_FEEDBACK'?{packageId:command.packageId,rawResponse:command.rawResponse,sourceType:command.sourceType}:command.commandType==='SUBMIT_REVIEW_DECISION'?{externalReviewId:command.externalReviewId,decision:command.decision,reason:command.reason}:{autonomousDiscovery:true})}};
     const result=await coreTaskIngressService.submit(request);
     return this.toCommandResult(command,result);
   }
 
   async executeDirective(directiveId:string){
-    const directive = externalDirectiveIntakeService.list().find((item) => item.directiveId === directiveId);
-    const goal = directive?.objective?.trim() || `指示書 ${directiveId} を実行し、評価可能な候補まで進める`;
-    const target = directive?.targetFiles?.find((item) => typeof item === 'string' && item.trim());
-    if(target) return this.startSpecifiedImprovement(goal, target);
-    return this.discoverImprovementTarget(goal);
+    const directive=externalDirectiveIntakeService.list().find(
+      (item)=>item.directiveId===directiveId
+    );
+    const goal=directive?.objective?.trim()
+      || `指示書 ${directiveId} を実行し、評価可能な候補まで進める`;
+
+    const directiveContext:ImprovementDirectiveContext={
+      directiveId,
+      sourceHash:directive?.sourceHash,
+      targetFiles:directive?.targetFiles || [],
+      requirements:directive?.requirements || [],
+      prohibitions:directive?.prohibitions || [],
+      invariants:directive?.invariants || [],
+      validationRequirements:directive?.validationRequirements || [],
+      deliveryRequirements:directive?.deliveryRequirements || [],
+      relatedIssueIds:directive?.relatedIssueIds || []
+    };
+
+    const target=directive?.targetFiles?.find(
+      (item)=>typeof item==='string' && item.trim()
+    );
+
+    if(target){
+      return this.startSpecifiedImprovement(goal,target,directiveContext);
+    }
+
+    return this.discoverImprovementTarget(goal,directiveContext);
   }
-  startSpecifiedImprovement(goal:string,target:string){return this.sendImprovementCommand({commandType:'START_SPECIFIED_IMPROVEMENT',goal,target,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-improvement'),operationInstanceId:coreResultService.generateRequestId('operation')});}
-  discoverImprovementTarget(goal='改善対象を自動で探し、評価可能な候補を作る'){return this.sendImprovementCommand({commandType:'DISCOVER_IMPROVEMENT_TARGET',goal,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-discovery'),operationInstanceId:coreResultService.generateRequestId('operation')});}
+  startSpecifiedImprovement(goal:string,target:string,directiveContext:ImprovementDirectiveContext={}){
+    return this.sendImprovementCommand({
+      commandType:'START_SPECIFIED_IMPROVEMENT',
+      goal,target,directiveContext,
+      requestedAt:Date.now(),
+      commandId:coreResultService.generateRequestId('ui-improvement'),
+      operationInstanceId:coreResultService.generateRequestId('operation')
+    });
+  }
+  discoverImprovementTarget(goal='改善対象を自動で探し、評価可能な候補を作る',directiveContext:ImprovementDirectiveContext={}){
+    return this.sendImprovementCommand({
+      commandType:'DISCOVER_IMPROVEMENT_TARGET',
+      goal,directiveContext,
+      requestedAt:Date.now(),
+      commandId:coreResultService.generateRequestId('ui-discovery'),
+      operationInstanceId:coreResultService.generateRequestId('operation')
+    });
+  }
   resumeImprovementTask(taskId:string){return this.sendImprovementCommand({commandType:'RESUME_IMPROVEMENT_TASK',taskId,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-resume'),operationInstanceId:coreResultService.generateRequestId('operation')});}
   async saveAutonomyConfig(config:Partial<AutopilotConfig>){const command:ImprovementUiCommand={commandType:'SAVE_AUTONOMY_CONFIG',goal:'自律巡回設定を保存する',config,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-autonomy-config'),operationInstanceId:coreResultService.generateRequestId('operation')};const result=await coreTaskIngressService.submit({kind:'SYSTEM_TASK',goal:command.goal,source:'core',payload:{entry:'TYPED_IMPROVEMENT_UI_GATEWAY',operation:'SAVE_AUTONOMY_CONFIG',config:command.config,commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt}});return this.toCommandResult(command,result);}
 
