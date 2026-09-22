@@ -212,6 +212,7 @@ export class ResearchService {
               research_query_plan_id: queryPlan.status === "READY" ? queryPlan.planId : undefined,
               research_source_tier_target: queryPlan.status === "READY" ? queryPlan.queries[pass]?.sourceTierTarget : undefined,
               research_intent_type: queryPlan.status === "READY" ? queryPlan.queries[pass]?.intentType : undefined,
+              research_source_role: queryPlan.status === "READY" ? ({ COUNTEREVIDENCE: "COUNTEREVIDENCE", PRIMARY_SOURCE: "PRIMARY", OFFICIAL_SPECIFICATION: "OFFICIAL" } as Record<string,string>)[queryPlan.queries[pass]?.intentType || ""] || "UNCLASSIFIED" : "UNCLASSIFIED",
             },
           });
           evidence.push(pageEvidence);
