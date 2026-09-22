@@ -49,6 +49,14 @@ export interface ResearchResult {
  * - Search alone never resolves a Knowledge Gap.
  * - Only a later explicit verifier may promote Claims or resolve the Gap.
  */
+function assessResearchSourceRole(query: { intentType?: string; sourceTierTarget?: string; siteOrDomainConstraints?: string[] }, page: { url: string }): "PRIMARY"|"OFFICIAL"|"SECONDARY"|"COUNTEREVIDENCE"|"UNCLASSIFIED" {
+  if (query.intentType === "COUNTEREVIDENCE") return "COUNTEREVIDENCE";
+  const host = (() => { try { return new URL(page.url).hostname.toLowerCase().replace(/^www\\./, ""); } catch { return ""; } })();
+  const constraints = (query.siteOrDomainConstraints || []).map(v => v.toLowerCase().replace(/^https?:\\/\\//, "").replace(/^www\\./, "").split("/")[0]).filter(Boolean);
+  if (host && constraints.some(domain => host === domain || host.endsWith("." + domain))) return "OFFICIAL";
+  return "UNCLASSIFIED";
+}
+
 export class ResearchService {
   private static instance: ResearchService;
 
@@ -213,7 +221,7 @@ export class ResearchService {
               research_source_tier_target: queryPlan.status === "READY" ? queryPlan.queries[pass]?.sourceTierTarget : undefined,
               research_intent_type: queryPlan.status === "READY" ? queryPlan.queries[pass]?.intentType : undefined,
               research_source_role_target: queryPlan.status === "READY" ? ({ COUNTEREVIDENCE: "COUNTEREVIDENCE", PRIMARY_SOURCE: "PRIMARY", OFFICIAL_SPECIFICATION: "OFFICIAL" } as Record<string,string>)[queryPlan.queries[pass]?.intentType || ""] || "UNCLASSIFIED" : "UNCLASSIFIED",
-              research_source_role: queryPlan.status === "READY" ? ({ COUNTEREVIDENCE: "COUNTEREVIDENCE", PRIMARY_SOURCE: "PRIMARY", OFFICIAL_SPECIFICATION: "OFFICIAL" } as Record<string,string>)[queryPlan.queries[pass]?.intentType || ""] || "UNCLASSIFIED" : "UNCLASSIFIED",
+              research_source_role: queryPlan.status === "READY" ? assessResearchSourceRole(queryPlan.queries[pass], { url: page.url }) : "UNCLASSIFIED",
               research_source_provider: String(page.result.source || ""),
               research_source_engine: String((page.result as any).engine || ""),
               research_source_author: String((page.result as any).author || ""),
