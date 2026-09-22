@@ -478,6 +478,11 @@ export class AutonomousSearchService {
             url,
             source: 'SearXNG (Local)',
             publishedDate: hit?.publishedDate || hit?.published_date,
+            engine: typeof hit?.engine === "string" ? hit.engine : "",
+            engines: Array.isArray(hit?.engines) ? hit.engines : [],
+            author: typeof hit?.author === "string" ? hit.author : "",
+            category: typeof hit?.category === "string" ? hit.category : "",
+            metadata: typeof hit?.metadata === "string" ? hit.metadata : "",
           };
           const identity = deriveSourceIdentity('searxng', item, canonicalUrl);
           return {
@@ -700,6 +705,11 @@ export class AutonomousSearchService {
     independenceClusterId?: string;
     claimText?: string;
     source?: string;
+    engine?: string;
+    engines?: string[];
+    author?: string;
+    category?: string;
+    metadata?: string;
   }>(
     query: string,
     results: T[],
