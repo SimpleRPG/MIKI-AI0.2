@@ -2,6 +2,7 @@ import { workDirectiveIngestionService } from '../../execution/services/workDire
 import { externalDirectiveIntakeService } from '../services/externalDirectiveIntakeService';
 import { improvementIntakeRouterService } from '../services/improvementIntakeRouterService';
 import { isolatedCandidateWorkspaceService } from '../services/isolatedCandidateWorkspaceService';
+import { reviewZipExportService } from '../services/reviewZipExportService';
 import { candidateValidationEvidenceService } from '../services/candidateValidationEvidenceService';
 import { coreResultService } from '../services/coreResultService';
 import { coreTaskIngressService, type CoreTaskIngressRequest } from '../services/coreTaskIngressService';
@@ -144,6 +145,28 @@ class TypedImprovementUiGatewayService {
     });
   }
   resumeImprovementTask(taskId:string){return this.sendImprovementCommand({commandType:'RESUME_IMPROVEMENT_TASK',taskId,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-resume'),operationInstanceId:coreResultService.generateRequestId('operation')});}
+  async executeDirectiveUntilReviewPackage(directiveId:string,maxCycles=64){
+    let result=await this.executeDirective(directiveId);
+    let cycles=0;
+    while(result.taskId&&cycles<maxCycles){
+      const stage=String(result.currentBusinessStage||result.currentStage||'').toUpperCase();
+      if(['COMPLETED','FAILED','BLOCKED','REJECTED'].includes(stage))break;
+      result=await this.resumeImprovementTask(result.taskId);
+      cycles++;
+    }
+    const run=result.taskId
+      ? this.getIntakeRuns(100).find(item=>item.taskId===result.taskId)
+      : undefined;
+    const packageRecord=run
+      ? reviewZipExportService.list().find(item=>item.runId===run.runId)
+      : undefined;
+    return {
+      ...result,
+      packageId:packageRecord?.packageId,
+      packageStatus:packageRecord?.status,
+      cycles
+    };
+  }
   async saveAutonomyConfig(config:Partial<AutopilotConfig>){const command:ImprovementUiCommand={commandType:'SAVE_AUTONOMY_CONFIG',goal:'自律巡回設定を保存する',config,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-autonomy-config'),operationInstanceId:coreResultService.generateRequestId('operation')};const result=await coreTaskIngressService.submit({kind:'SYSTEM_TASK',goal:command.goal,source:'core',payload:{entry:'TYPED_IMPROVEMENT_UI_GATEWAY',operation:'SAVE_AUTONOMY_CONFIG',config:command.config,commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt}});return this.toCommandResult(command,result);}
 
   private toCommandResult(command:ImprovementUiCommand,result:Awaited<ReturnType<typeof coreTaskIngressService.submit>>|undefined):ImprovementUiCommandResult{
