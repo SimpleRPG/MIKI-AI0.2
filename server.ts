@@ -4701,7 +4701,7 @@ app.get('/api/self-code/complexity-heatmap', async (req, res) => {
     const filesToScan = [
       { path: 'miki/selfDevelopment/services/selfCodeArchitectService.ts', category: 'ARCHITECT' },
       { path: 'miki/improvement/services/selfImprovementSuiteService.ts', category: 'SELF_IMPROVE' },
-      { path: 'services/aiderEngineService.ts', category: 'AIDER' },
+      { path: 'miki/selfDevelopment/services/aiderEngineService.ts', category: 'AIDER' },
       { path: 'miki/selfDevelopment/services/mikiSelfCodingSuperchargerService.ts', category: 'SUPERCHARGER' },
       { path: 'services/mikiCognitiveVitalsService.ts', category: 'VITALS' },
       { path: 'services/mikiUltraEvolverService.ts', category: 'EVOLVER' },
