@@ -356,9 +356,7 @@ class AdaptiveRoutePlannerService {
         payload:{
           taskId:task.taskId,runId:String(input.runId||task.taskId),goal:task.goal,
           candidateRevision:Number(input.candidateRevision||1),
-          targetFiles:Array.isArray(input.targetFiles)
-            ? input.targetFiles.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).slice(0,3)
-            : coreTargetPaths,
+          targetFiles:coreTargetPaths,
           requirements:input.requirements,
           prohibitions:input.prohibitions,
           invariants:input.invariants,
@@ -373,9 +371,7 @@ class AdaptiveRoutePlannerService {
         reason:'Validation rejected the candidate; Core requests a new Candidate Revision',
         payload:{taskId:task.taskId,runId:String(input.runId||task.taskId),goal:task.goal,
           candidateRevision:Number(candidate.candidateRevision||1)+1,
-          targetFiles:Array.isArray(input.targetFiles)
-            ? input.targetFiles.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).slice(0,3)
-            : coreTargetPaths,
+          targetFiles:coreTargetPaths,
           requirements:input.requirements,
           prohibitions:input.prohibitions,
           invariants:input.invariants,
@@ -883,11 +879,16 @@ class AdaptiveRoutePlannerService {
   }
   private stringArrayFromEntries(task:BlackboardTask,pattern:RegExp):string[] {
     const found=new Set<string>();
-    for(const entry of [...task.entries].reverse()){
-      const value=objectValue(entry);
-      if(value) for(const [key,item] of Object.entries(value)) if(pattern.test(key)&&Array.isArray(item))
-        for(const id of item) if(typeof id==='string'&&id) found.add(id);
-    }
+    const walk=(value:unknown,depth:number):void=>{
+      if(depth>6||!value||typeof value!=='object')return;
+      if(Array.isArray(value)){for(const item of value)walk(item,depth+1);return;}
+      for(const [key,item] of Object.entries(value as Record<string,unknown>)){
+        if(pattern.test(key)&&Array.isArray(item))
+          for(const id of item)if(typeof id==='string'&&id.trim())found.add(id.trim());
+        walk(item,depth+1);
+      }
+    };
+    for(const entry of [...task.entries].reverse())walk(entry.value,0);
     return [...found];
   }
 
