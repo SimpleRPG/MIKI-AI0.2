@@ -208,6 +208,10 @@ export class ResearchService {
               observed_at: Date.now(),
               environment: 'MIKI-AI0.2 research page reader',
               result_summary: `検索結果URLを実際に読み取り、本文${page.text.length}文字を取得`,
+              research_query_id: queryPlan.status === "READY" ? queryPlan.queries[pass]?.queryId : undefined,
+              research_query_plan_id: queryPlan.status === "READY" ? queryPlan.planId : undefined,
+              research_source_tier_target: queryPlan.status === "READY" ? queryPlan.queries[pass]?.sourceTierTarget : undefined,
+              research_intent_type: queryPlan.status === "READY" ? queryPlan.queries[pass]?.intentType : undefined,
             },
           });
           evidence.push(pageEvidence);
