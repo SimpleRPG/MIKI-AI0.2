@@ -103,7 +103,7 @@ git config user.email "your.email@example.com"
 - `src/services/teacherRequestService.ts`:
   - `requestTeacherMaterial` 内の (d) VBA安全性チェック直後に (e) 端末側効果検証ループ（ステップ7〜9）を追加。
   - `buildTeacherRequestPayload` に `anonymizedExample` の出力を追加。
-- `src/services/selfImprovementService.ts`:
+- `src/miki/improvement/services/selfImprovementService.ts`:
   - `addTrainingSample` で `verifiedEffective` および `verificationNote` を受け取り新規サンプルへ保存。
 - `src/utils/companionEngine.ts`:
   - 端末内モデルにおいて言い換え生成プロンプトの解釈および一時注入教材（`【参照教材・解法指針】`）の解法適用に対応。
