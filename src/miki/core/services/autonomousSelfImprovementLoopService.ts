@@ -7,7 +7,6 @@ import { resourceGovernanceService } from '../../safety/services/resourceGoverna
 import { requiredAssetAcquisitionService } from './requiredAssetAcquisitionService';
 import { selfImprovementPreflightService } from './selfImprovementPreflightService';
 import { improvementDebtService } from './improvementDebtService';
-import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 
@@ -148,7 +147,16 @@ class AutonomousSelfImprovementLoopService {
     const active = this.state.queue.find((item) => item.runId === runId && item.id === this.state.activeRequestId);
     if (active) return { cancelled: false, active: true };
     const before = this.state.queue.length;
+    const cancelledTasks = this.state.queue
+      .filter((item) => item.runId === runId && item.taskId)
+      .map((item) => item.taskId as string);
     this.state.queue = this.state.queue.filter((item) => item.runId !== runId);
+    for (const taskId of cancelledTasks) {
+      const task = taskBlackboardService.get(taskId);
+      if (task && !['COMPLETED', 'CANCELLED'].includes(task.status)) {
+        taskBlackboardService.cancel(taskId);
+      }
+    }
     const cancelled = before !== this.state.queue.length;
     if (cancelled) {
       if (this.state.queue.length === 0) {
