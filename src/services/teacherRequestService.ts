@@ -15,7 +15,7 @@ import {
   TeacherBudgetTier,
 } from '../types';
 import { storageService } from './storageService';
-import { selfImprovementService } from './selfImprovementService';
+import { selfImprovementService } from '../miki/improvement/services/selfImprovementService';
 import { systemLogger } from './systemLogger';
 import { checkSampleSafety } from '../utils/trainingSampleSafetyFilter';
 import { completionJudgeService } from './completionJudgeService';

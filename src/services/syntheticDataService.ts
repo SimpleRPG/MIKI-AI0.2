@@ -6,7 +6,7 @@ import {
   TrainingSampleJSONL,
 } from '../types';
 import { toolsService } from './toolsService';
-import { selfImprovementService } from './selfImprovementService';
+import { selfImprovementService } from '../miki/improvement/services/selfImprovementService';
 import { worldModelService } from './worldModelService';
 import { regressionBenchmarkService } from './regressionBenchmarkService';
 import { systemLogger } from './systemLogger';

@@ -1,7 +1,7 @@
 import { SkillItem, SkillDiversityTestResult, SkillDiversityTestCase, SkillGraduationProgress } from '../types';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
-import { selfImprovementService } from './selfImprovementService';
+import { selfImprovementService } from '../miki/improvement/services/selfImprovementService';
 import { isCasualGreetingOrShortSocial } from './conversationStateService';
 
 const SKILLS_STORAGE_KEY = 'miki_ai_skills_library';
