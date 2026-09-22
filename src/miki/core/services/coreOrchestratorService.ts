@@ -340,12 +340,14 @@ class CoreOrchestratorService {
  private collectUnresolved(task:BlackboardTask,pattern:RegExp):string[] {
   for(const entry of [...task.entries].reverse()){
    if(entry.kind!=="ERROR"&&entry.kind!=="OBSERVATION"&&entry.kind!=="RESULT") continue;
+   if(!pattern.test(entry.key)&&!pattern.test(JSON.stringify(entry.value||{}))) continue;
+   const value=entry.value&&typeof entry.value==="object"&&!Array.isArray(entry.value)?entry.value as Record<string,unknown>:undefined;
    const values=value?.unresolvedItems??value?.unresolvedRequirements??value?.unknowns;
    if(Array.isArray(values)) return [...new Set(values.filter((item):item is string=>typeof item==="string"&&item.trim()).map(item=>item.trim()))];
   }
   return [];
  }
- private collectValues(task:BlackboardTask,pattern:RegExp):string[] {
+private collectValues(task:BlackboardTask,pattern:RegExp):string[] {
   const found=new Set<string>();
   for(const entry of task.entries){
    if(!pattern.test(entry.key)&&!pattern.test(JSON.stringify(entry.value||{}))) continue;
