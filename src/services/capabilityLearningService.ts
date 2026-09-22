@@ -1,4 +1,4 @@
-import { ExecutionEvent } from './executionEventBusService';
+import { ExecutionEvent } from '../miki/execution/services/executionEventBusService';
 import { componentRegistryService } from './componentRegistryService';
 import { failureMemoryService } from './failureMemoryService';
 import { systemLogger } from './systemLogger';

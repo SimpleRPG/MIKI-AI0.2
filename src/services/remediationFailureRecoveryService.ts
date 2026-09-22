@@ -1,4 +1,4 @@
-import { executionEventBusService, ExecutionEvent } from './executionEventBusService';
+import { executionEventBusService, ExecutionEvent } from '../miki/execution/services/executionEventBusService';
 import { researchToRemediationService } from './researchToRemediationService';
 import { componentRegressionService } from './componentRegressionService';
 import { knowledgeGapService, KnowledgeGap } from './knowledgeGapService';

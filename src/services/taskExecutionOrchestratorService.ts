@@ -4,7 +4,7 @@ import { componentCompositionService } from './componentCompositionService';
 import { capabilityGraphService } from './capabilityGraphService';
 import { failureMemoryService } from './failureMemoryService';
 import { systemLogger } from './systemLogger';
-import { executionEventBusService, ExecutionEvent } from './executionEventBusService';
+import { executionEventBusService, ExecutionEvent } from '../miki/execution/services/executionEventBusService';
 import { capabilityLearningService } from './capabilityLearningService';
 import { taskLineageService } from './taskLineageService';
 import { taskCaseMemoryService } from './taskCaseMemoryService';

@@ -4,7 +4,7 @@ import { failureMemoryService } from './failureMemoryService';
 import { componentVersionHistoryService } from './componentVersionHistoryService';
 import { downstreamImpactService } from './downstreamImpactService';
 import { experienceFreshnessService } from './experienceFreshnessService';
-import { executionEventBusService } from './executionEventBusService';
+import { executionEventBusService } from '../miki/execution/services/executionEventBusService';
 
 export interface ExecutionRouteScore {
   component_id: string;

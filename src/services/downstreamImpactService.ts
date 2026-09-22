@@ -1,4 +1,4 @@
-import { executionEventBusService } from './executionEventBusService';
+import { executionEventBusService } from '../miki/execution/services/executionEventBusService';
 import { taskCaseMemoryService } from './taskCaseMemoryService';
 import { capabilityReuseService } from './capabilityReuseService';
 import { experienceFreshnessService } from './experienceFreshnessService';

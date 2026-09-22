@@ -1,7 +1,7 @@
 import { componentImprovementCandidateService } from './componentImprovementCandidateService';
 import { safeImprovementPipelineService, SafeImprovementRun } from './safeImprovementPipelineService';
 import { componentRegressionService } from './componentRegressionService';
-import { executionEventBusService, ExecutionEvent } from './executionEventBusService';
+import { executionEventBusService, ExecutionEvent } from '../miki/execution/services/executionEventBusService';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { ExecutionEnvironment, executionRunnerService, ExecutionRequest } from './executionRunnerService';

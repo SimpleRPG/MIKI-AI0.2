@@ -14,7 +14,7 @@ import { autonomousSearchService } from './autonomousSearchService';
 import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
 import { cognitiveDebuggerService } from './cognitiveDebuggerService';
 import { digitalResearchNoteService } from './digitalResearchNoteService';
-import { codebaseReflectionService } from './codebaseReflectionService';
+import { codebaseReflectionService } from '../miki/selfDevelopment/services/codebaseReflectionService';
 import { apiUrl } from './api';
 
 const TOOLS_STATS_STORAGE_KEY = 'miki_ai_tools_stats';

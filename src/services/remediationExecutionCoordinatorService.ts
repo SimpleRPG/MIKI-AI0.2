@@ -1,4 +1,4 @@
-import { executionEventBusService, ExecutionEvent } from './executionEventBusService';
+import { executionEventBusService, ExecutionEvent } from '../miki/execution/services/executionEventBusService';
 import { executionRunnerService, ExecutionEnvironment } from './executionRunnerService';
 import { componentRegressionService } from './componentRegressionService';
 import { researchToRemediationService, RemediationRecord } from './researchToRemediationService';

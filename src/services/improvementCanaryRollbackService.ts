@@ -1,6 +1,6 @@
 import { ComponentTxtPackage } from '../types';
 import { ExecutionEnvironment } from './executionRunnerService';
-import { executionEventBusService, ExecutionEvent } from './executionEventBusService';
+import { executionEventBusService, ExecutionEvent } from '../miki/execution/services/executionEventBusService';
 import { componentRegistryService } from './componentRegistryService';
 import { downstreamImpactService, DownstreamImpact } from './downstreamImpactService';
 import { selfImprovementExperimentService, ImprovementExperimentSnapshot } from './selfImprovementExperimentService';

@@ -1,5 +1,5 @@
 import { componentRegistryService } from './componentRegistryService';
-import { executionEventBusService, ExecutionEvent } from './executionEventBusService';
+import { executionEventBusService, ExecutionEvent } from '../miki/execution/services/executionEventBusService';
 import { experienceFreshnessService } from './experienceFreshnessService';
 import { failureMemoryService } from './failureMemoryService';
 

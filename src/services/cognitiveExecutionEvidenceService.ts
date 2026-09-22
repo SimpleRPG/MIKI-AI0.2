@@ -1,4 +1,4 @@
-import { executionEventBusService, ExecutionEvent } from './executionEventBusService';
+import { executionEventBusService, ExecutionEvent } from '../miki/execution/services/executionEventBusService';
 import { knowledgeOperatingSystemService } from './knowledgeOperatingSystemService';
 import { unifiedMikiExperienceService } from './unifiedMikiExperienceService';
 import { systemLogger } from './systemLogger';

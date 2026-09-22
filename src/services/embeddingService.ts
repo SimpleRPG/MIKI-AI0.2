@@ -1,7 +1,7 @@
 import { nonLlmRuntimeService, NonLlmTeacherConfig } from './nonLlmRuntimeService';
 import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
-import { nativeBackgroundService } from './nativeBackgroundService';
+import { nativeBackgroundService } from '../miki/execution/services/nativeBackgroundService';
 import type { MemoryItem, EmbeddingHealthStatus, EmbeddingHealthCheckResult } from '../types';
 
 export interface EmbeddingStats {

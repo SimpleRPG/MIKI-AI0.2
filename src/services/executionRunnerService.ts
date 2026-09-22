@@ -2,7 +2,7 @@ import { componentRegistryService } from './componentRegistryService';
 import { componentVerificationService } from './componentVerificationService';
 import { systemLogger } from './systemLogger';
 import { ComponentTestCategory } from '../types';
-import { executionEventBusService } from './executionEventBusService';
+import { executionEventBusService } from '../miki/execution/services/executionEventBusService';
 import { storageService } from './storageService';
 import { componentArtifactStoreService } from './componentArtifactStoreService';
 import { testAssertionService } from './testAssertionService';
