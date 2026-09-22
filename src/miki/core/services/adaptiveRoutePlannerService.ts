@@ -651,13 +651,6 @@ class AdaptiveRoutePlannerService {
       }
       return this.decorateOperations(task,this.uniqueOperations(routes));
     }
-    if(operation==='APPROVE_REUSABLE_COMPONENTS'){
-      const completed=Boolean(this.latestBusinessResult(task,'APPROVE_REUSABLE_COMPONENTS'));
-      const reasons:string[]=[];
-      if(task.entries.some(entry=>entry.kind==='ERROR'))reasons.push('UNRESOLVED_DOMAIN_ERROR');
-      if(task.pendingDomains.length)reasons.push('PENDING_DOMAIN_REMAINS');
-      return {businessCompletion:completed&&reasons.length===0,failClosed:true,requiredDomains:[],missingDomains:completed?[]:['learning'],failedDomains:completed?[]:['learning'],missingReceipts:[],persistenceConfirmed:false,evidenceQualityPassed:true,reasons,missingRequiredOperations:[]};
-    }
     if(operation==='APPROVE_REVIEWED_CANDIDATE'){
       routes.push({target:'promotion',command:'APPROVE_REVIEWED_CANDIDATE',reason:'COREが明示承認済みCandidateの適用をpromotion経路へ委譲する',payload:{...input,taskId:task.taskId,operation,adaptive:true,priority:100}});
       return this.decorateOperations(task,this.uniqueOperations(routes));
@@ -774,6 +767,13 @@ class AdaptiveRoutePlannerService {
     }
     if(operation==='DECIDE_CANDIDATE_ADOPTION'){
       return coreCompletionGateService.evaluateCoreOwnedOperation(task,operation,'strategy');
+    }
+    if(operation==='APPROVE_REUSABLE_COMPONENTS'){
+      const completed=Boolean(this.latestBusinessResult(task,'APPROVE_REUSABLE_COMPONENTS'));
+      const reasons:string[]=[];
+      if(task.entries.some(entry=>entry.kind==='ERROR'))reasons.push('UNRESOLVED_DOMAIN_ERROR');
+      if(task.pendingDomains.length)reasons.push('PENDING_DOMAIN_REMAINS');
+      return {businessCompletion:completed&&reasons.length===0,failClosed:true,requiredDomains:[],missingDomains:completed?[]:['learning'],failedDomains:completed?[]:['learning'],missingReceipts:[],persistenceConfirmed:false,evidenceQualityPassed:true,reasons,missingRequiredOperations:[]};
     }
     const coreOwnedAutonomyOperations=new Set(['SAVE_AUTONOMY_CONFIG']);
     if(coreOwnedAutonomyOperations.has(operation)){
