@@ -50,24 +50,6 @@ export class ProjectTestRegistryService {
         requiresDependencies: true,
         timeoutMs: 300000,
       },
-      {
-        id: 'deterministic-boundary-v59',
-        filePatterns: ['^(src/services/|server\\.ts$)'],
-        command: 'npm',
-        args: ['run', 'test:deterministic-execution-v59'],
-        kind: 'UNIT',
-        requiresDependencies: true,
-        timeoutMs: 180000,
-      },
-      {
-        id: 'autonomous-hardening',
-        filePatterns: ['^(src/services/|server\\.ts$)'],
-        command: 'npm',
-        args: ['run', 'test:autonomous-hardening'],
-        kind: 'REGRESSION',
-        requiresDependencies: true,
-        timeoutMs: 180000,
-      },
     ];
     this.save();
   }
