@@ -128,6 +128,14 @@ class TypedImprovementUiGatewayService {
       }
     }
 
+    if(directive?.runId){
+      return this.taskSnapshotResult(
+        existingRun?.taskId || `RUN:${directive.runId}`,
+        0,
+        existingRun?.status || directive.status
+      );
+    }
+
     const target=directive?.targetFiles?.find(
       (item)=>typeof item==='string' && item.trim()
     );
