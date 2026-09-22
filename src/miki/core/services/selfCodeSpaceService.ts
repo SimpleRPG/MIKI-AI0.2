@@ -78,6 +78,24 @@ class SelfCodeSpaceService {
     return this.listFiles().map(file => ({ path: file.path, content: file.content, language: this.language(file.path), evidenceIds: [], updatedAt: syncedAt, contentHash: file.sha256 }));
   }
 
+  applyCandidate(files: Array<{path:string; baselineSha256:string; candidateContent:string}>): SelfCodeSnapshot {
+    const snapshot=this.get();
+    if(!snapshot) throw new Error('SELF_CODE_SPACE_NOT_SYNCED');
+    const current=new Map(snapshot.files.map(file=>[file.path,file]));
+    for(const file of files){
+      const target=current.get(file.path);
+      if(!target) throw new Error(`SELF_CODE_FILE_NOT_FOUND:${file.path}`);
+      if(target.sha256!==file.baselineSha256) throw new Error(`SELF_CODE_BASELINE_CONFLICT:${file.path}`);
+    }
+    const next=snapshot.files.map(file=>{
+      const change=files.find(item=>item.path===file.path);
+      return change ? {...file,content:change.candidateContent,sha256:canonicalSha256(change.candidateContent)} : {...file};
+    });
+    const updated:SelfCodeSnapshot={...snapshot,files:next,repoSha256:canonicalSha256(next.map(file=>({path:file.path,sha256:file.sha256}))),syncedAt:Date.now()};
+    storageService.setItem(KEY,JSON.stringify(updated));
+    return this.clone(updated);
+  }
+
   search(query: string, limit = 20): SelfCodeFile[] {
     const q = query.trim().toLowerCase();
     if (!q) return [];
