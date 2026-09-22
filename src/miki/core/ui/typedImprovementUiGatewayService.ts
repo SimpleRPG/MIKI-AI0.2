@@ -7,6 +7,7 @@ import { candidateValidationEvidenceService } from '../services/candidateValidat
 import { coreResultService } from '../services/coreResultService';
 import { coreTaskIngressService, type CoreTaskIngressRequest } from '../services/coreTaskIngressService';
 import { coreCycleSettingsService } from '../services/coreCycleSettingsService';
+import { taskBlackboardService } from '../services/taskBlackboardService';
 import { priorityOneRuntimeReadModelService } from '../services/priorityOneRuntimeReadModelService';
 export type { PriorityOneRuntimeItem, PriorityOneAllowedAction } from '../services/priorityOneRuntimeReadModelService';
 import { selfImprovementControllerService } from '../../improvement/services/selfImprovementControllerService';
@@ -116,6 +117,19 @@ class TypedImprovementUiGatewayService {
       relatedIssueIds:directive?.relatedIssueIds || []
     };
 
+    const existingRun=directive?.runId
+      ? this.getIntakeRuns(100).find(item=>item.runId===directive.runId)
+      : undefined;
+    if(existingRun?.taskId){
+      const task=taskBlackboardService.get(existingRun.taskId);
+      if(task?.status==='PAUSED'){
+        return this.resumeImprovementTask(task.taskId);
+      }
+      if(task){
+        return this.taskSnapshotResult(task.taskId,task.revision,task.status);
+      }
+    }
+
     const target=directive?.targetFiles?.find(
       (item)=>typeof item==='string' && item.trim()
     );
@@ -125,6 +139,17 @@ class TypedImprovementUiGatewayService {
     }
 
     return this.discoverImprovementTarget(goal,directiveContext);
+  }
+  private taskSnapshotResult(taskId:string,revision:number,status:string):ImprovementUiCommandResult{
+    return {
+      commandId:coreResultService.generateRequestId('ui-existing'),
+      operationInstanceId:coreResultService.generateRequestId('operation'),
+      taskId,taskRevision:revision,currentStage:status,currentBusinessStage:status,
+      nextStage:status==='COMPLETED'?undefined:'CORE_REPLAN',
+      unresolved:[],domainReplyIds:[],evidenceIds:[],persistenceReceiptIds:[],
+      requiredDomains:[],missingDomains:[],failedDomains:[],missingReceipts:[],
+      missingRequiredOperations:[],completionReasons:[]
+    };
   }
   startSpecifiedImprovement(goal:string,target:string,directiveContext:ImprovementDirectiveContext={}){
     return this.sendImprovementCommand({
