@@ -1,6 +1,6 @@
 import { systemLogger } from './systemLogger';
 import { japaneseDictionaryService, JapaneseDictionaryEntry } from './japaneseDictionaryService';
-import { japaneseMorphologyService, NativeJapaneseMorpheme } from './japaneseMorphologyService';
+import { japaneseMorphologyService, NativeJapaneseMorpheme } from '../miki/research/services/japaneseMorphologyService';
 
 /**
  * 設計思想 4.2/12.3 の日本語解析基盤。
