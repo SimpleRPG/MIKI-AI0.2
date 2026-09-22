@@ -8,7 +8,6 @@ import {
   GitHubRepoData,
   PrivacyAuditResult,
 } from '../types';
-import { generateSmartCompanionReply } from '../utils/companionEngine';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { privacyGuardrailService } from './privacyGuardrailService';
@@ -590,22 +589,17 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
   }
 
   // Standalone / On-device Heuristic Companion Fallback
-  const isCode = params.prompt.includes('作って') || params.prompt.includes('ゲーム') || params.prompt.includes('開発') || params.prompt.includes('コード');
-  const reply = generateSmartCompanionReply(
-    params.prompt,
-    params.persona,
-    params.memories,
-    isCode,
-    params.attachedFiles
-  );
-
-  systemLogger.info('CHAT', 'Autonomous fallback companion generated response', { isCode });
-
+  const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
+    prompt: params.prompt,
+    persona: params.persona?.name,
+    attachedFiles: params.attachedFiles,
+  });
   return {
-    text: reply,
-    engineMode: params.engineMode || 'autonomous_rule',
-    model: 'Smart Companion Engine',
+    text: pipelineRes.replyText,
+    engineMode: params.engineMode || "autonomous_rule",
+    model: "非LLM自律統合中核（フォールバック）",
     privacyAudit: promptAudit,
+    hardwareTelemetry: pipelineRes.telemetry,
   };
 }
 

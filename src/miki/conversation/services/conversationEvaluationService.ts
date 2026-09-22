@@ -10,7 +10,6 @@ import {
 import { systemLogger } from '../../../services/systemLogger';
 import { deterministicRuntimeService } from '../../safety/services/deterministicRuntimeService';
 import { storageService } from '../../../services/storageService';
-import { companionEngine } from '../../../utils/companionEngine';
 
 const DUAL_EVAL_REPORTS_KEY = 'miki_ai_dual_eval_reports';
 const FIXED_SCENARIO_RESULTS_KEY = 'miki_ai_fixed_scenario_results';

@@ -142,7 +142,6 @@ import { classifyDialogueAct, evaluateFeedbackStage } from './miki/conversation/
 import { AnswerSkeletonType } from './types';
 import { extractCodeBlocks } from './utils/codeParser';
 import { smartMergeCodeBlock } from './utils/codeMergeService';
-import { generateSmartCompanionReply } from './utils/companionEngine';
 import { classifyPromptForMoE, buildExpertSystemPrompt, buildExpertSystemPromptWithTracking } from './utils/moeRouter';
 import { compressContextHistory, truncateTextBySentence } from './utils/contextCompression';
 import {
@@ -801,14 +800,13 @@ export default function App() {
           }
         } else {
           // 推論・分析・生成・検証ステップ（CPU自律ルールベース）
-          const isCodeStep = currentStep.actionType === 'code_generation';
-          stepResultText = generateSmartCompanionReply(
-            `${currentStep.title}: ${initialGoal}`,
-            persona,
-            relevantMemories,
-            isCodeStep,
-            attachedFiles
-          );
+          const pipelineRes = await nonLlmCoreService.execute({
+            prompt: currentStep.title + ": " + initialGoal,
+            recentMessages: [],
+            memories: relevantMemories,
+            attachedFiles,
+          });
+          stepResultText = pipelineRes.replyText;
         }
       } catch (stepErr: any) {
         stepSuccess = false;
