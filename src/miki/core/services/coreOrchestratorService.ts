@@ -283,8 +283,9 @@ class CoreOrchestratorService {
   const finalTask=taskBlackboardService.get(taskId)!;
   if(finalTask.status==='ROUTING'){
    const hasError=finalTask.entries.some(entry=>entry.kind==='ERROR');
-   const finalStatus=hasError?'FAILED':'WAITING';
+   const finalStatus=hasError?'FAILED':cycleBudget>=cycleLimit?'PAUSED':'WAITING';
    taskBlackboardService.setStatus(taskId,finalStatus);
+   if(finalStatus==='PAUSED') taskBlackboardService.append(taskId,'CHECKPOINT','core','coreCycleBudgetExhausted',{cycle:cycles,cycleBudget,cycleLimit,resumeRequired:true});
    const completion=adaptiveRoutePlannerService.assessCompletion(finalTask);
    const waitingResult=this.buildIncompleteCirculationResult(finalTask,cycles,dispatched,completion);
    if(hasError){
