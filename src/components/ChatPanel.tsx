@@ -133,7 +133,6 @@ import { DiffPreviewModal } from './chat/DiffPreviewModal';
 import { UnitTestStudioModal } from './chat/UnitTestStudioModal';
 import { DependencyGraphModal } from './chat/DependencyGraphModal';
 import { SnapshotTimeMachineModal } from './chat/SnapshotTimeMachineModal';
-import { AutonomousSelfImprovementModal } from './chat/AutonomousSelfImprovementModal';
 import { AutonomousDevStudioModal } from './chat/AutonomousDevStudioModal';
 import { AutonomousEvolutionCard } from './chat/AutonomousEvolutionCard';
 import JSZip from 'jszip';
@@ -266,7 +265,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isDependencyGraphModalOpen, setIsDependencyGraphModalOpen] = useState(false);
   const [isTimeMachineOpen, setIsTimeMachineOpen] = useState(false);
   const [isSelfImplementLauncherOpen, setIsSelfImplementLauncherOpen] = useState(false);
-  const [isAutonomousImprovementModalOpen, setIsAutonomousImprovementModalOpen] = useState(false);
   const [isAutonomousDevStudioOpen, setIsAutonomousDevStudioOpen] = useState(false);
   const [autonomousVerifications, setAutonomousVerifications] = useState<Record<string, AutonomousVerificationData>>({});
   const [expandedExternalDiagMsgId, setExpandedExternalDiagMsgId] = useState<string | null>(null);
@@ -292,7 +290,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         textareaRef.current.focus();
       }
     } else if (insight.actionType === 'OPEN_VITALS' || insight.actionType === 'OPEN_EVOLUTION') {
-      setIsAutonomousImprovementModalOpen(true);
+      onOpenSelfImprovementModal?.();
     } else if (insight.actionType === 'OPEN_DEV_STUDIO') {
       setIsAutonomousDevStudioOpen(true);
     }
@@ -3445,7 +3443,7 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                 type="button"
                 onClick={() => {
                   setIsSelfImplementLauncherOpen(false);
-                  setIsAutonomousImprovementModalOpen(true);
+                  onOpenSelfImprovementModal?.();
                 }}
                 className="flex items-center gap-1.5 p-2 bg-gradient-to-r from-emerald-950/80 to-teal-950/80 hover:from-emerald-900/90 hover:to-teal-900/90 border border-emerald-500/50 rounded-lg text-emerald-200 text-left transition-all cursor-pointer"
               >
@@ -3822,40 +3820,6 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
         }}
       />
 
-      {/* 🤖 みき自律コード自動巡回・オートパイロット＆自己改善スタジオモーダル */}
-      <AutonomousSelfImprovementModal
-        isOpen={isAutonomousImprovementModalOpen}
-        onClose={() => setIsAutonomousImprovementModalOpen(false)}
-        onOpenDiff={(fileName, oldCode, newCode, filePath) => {
-          setDiffModalState({
-            isOpen: true,
-            fileName,
-            oldCode,
-            newCode,
-            filePath,
-          });
-        }}
-        onOpenUnitTest={(block) => {
-          setTestModalState({
-            isOpen: true,
-            fileName: block.name,
-            code: block.content,
-          });
-        }}
-        onApplyRestoredCode={(filePath, content) => {
-          const fileName = filePath.split('/').pop() || filePath;
-          onApplyCode([
-            {
-              name: fileName,
-              path: filePath,
-              content,
-              language: 'typescript',
-            },
-          ]);
-        }}
-      />
-
-      {/* 🛠️ みき自律コード開発工房モーダル */}
       <AutonomousDevStudioModal
         isOpen={isAutonomousDevStudioOpen}
         onClose={() => setIsAutonomousDevStudioOpen(false)}
