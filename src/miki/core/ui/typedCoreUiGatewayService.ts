@@ -6,7 +6,7 @@ import { externalReviewIntakeService, type ExternalReviewRecord, type ExternalRe
 import { webResearchPolicyService, type WebResearchPolicy, type WebResearchPolicyReceipt } from '../../research/services/webResearchPolicyService';
 import { researchQueryPlanningService, type QueryPlanningPolicy, type ResearchQueryPlan } from '../../research/services/researchQueryPlanningService';
 import { coreCycleSettingsService, type CoreCycleSettings } from '../services/coreCycleSettingsService';
-import { mikiCodeSpaceService } from '../services/mikiCodeSpaceService';
+import { selfCodeSpaceService } from '../services/selfCodeSpaceService';
 
 export type UiOperation =
   | 'LIST_EXTERNAL_CONNECTIONS' | 'SAVE_EXTERNAL_CONNECTION_CONFIG' | 'TEST_EXTERNAL_CONNECTION' | 'EXPORT_EXTERNAL_CONNECTION_CONFIG'
@@ -29,6 +29,12 @@ class TypedCoreUiGatewayService {
  async testExternalConnection(connectionId:string):Promise<UiCommandResult<ExternalConnectionView[]>>{const commandId=id();try{const x=await externalConnectionUiService.test(connectionId as ExternalConnectionConfig['id']);return {commandId,taskId:x.coreTaskId,status:x.status==='AVAILABLE'?'SUCCESS':'BLOCKED',summary:x.sanitizedMessage||x.status,data:this.listExternalConnections(),receiptIds:[],diagnosticIds:x.failureStage?[`${x.config.id}:${x.failureStage}`]:[],nextActions:x.status==='AVAILABLE'?[]:['OPEN_CONNECTION_SETTINGS'],completedAt:Date.now()};}catch(e){return this.failed(commandId,e);}}
  exportExternalConnections():Blob{return new Blob([externalConnectionUiService.exportSanitized()],{type:'application/json;charset=utf-8'});}
  listWorkspaces():WorkspaceRecord[]{return generalWorkspaceService.list();}
+ getSelfCodeSnapshot(){return selfCodeSpaceService.get();}
+ listSelfCodeFiles(){return selfCodeSpaceService.listFiles();}
+ readSelfCodeFile(path:string){return selfCodeSpaceService.readFile(path);}
+ searchSelfCode(query:string,limit=20){return selfCodeSpaceService.search(query,limit);}
+ selfCodeSearch(query:string,limit=8){return selfCodeSpaceService.context(query,limit);}
+ async syncSelfCode(token?:string){return selfCodeSpaceService.sync(token);}
  async createWorkspace(input:{name:string;workspaceMode:WorkspaceMode;assetKind:string;sourceLocator:string;baseContent:string;trustStatus?:WorkspaceRecord['trustStatus'];targetEnvironment?:string}):Promise<UiCommandResult<WorkspaceRecord>>{const commandId=id();try{const row=await generalWorkspaceService.create(input);return {commandId,taskId:row.coreTaskId,status:'SUCCESS',summary:'Workspaceをcore経由で作成しました',data:row,receiptIds:[row.baseSnapshotId],diagnosticIds:[],nextActions:['SAVE_WORKSPACE_CANDIDATE'],completedAt:Date.now()};}catch(e){return this.failed(commandId,e);}}
  async saveWorkspaceCandidate(workspaceId:string,content:string):Promise<UiCommandResult<WorkspaceRecord>>{const commandId=id();try{const row=await generalWorkspaceService.setCandidate(workspaceId,content);return {commandId,taskId:row.coreTaskId,status:'SUCCESS',summary:'Candidate Revisionを保存しました',data:row,receiptIds:row.candidateRevisionId?[row.candidateRevisionId]:[],diagnosticIds:[],nextActions:['ANALYZE_VBA_WORKSPACE'],completedAt:Date.now()};}catch(e){return this.failed(commandId,e);}}
  analyzeVba(workspaceId:string){return generalWorkspaceService.analyzeVba(workspaceId);}

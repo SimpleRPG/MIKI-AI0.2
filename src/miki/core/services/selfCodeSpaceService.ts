@@ -16,11 +16,11 @@ export interface MikiCodeSnapshot {
   syncedAt: number;
 }
 
-const KEY = 'miki_own_code_space_v1';
+const KEY = 'miki_self_code_space_v1';
 const REPOSITORY = 'SimpleRPG/MIKI-AI0.2';
 const BRANCH = 'main';
 
-class MikiCodeSpaceService {
+class SelfCodeSpaceService {
   async sync(token?: string): Promise<MikiCodeSnapshot> {
     const result = await apiService.importFromGitHub({
       repoUrl: REPOSITORY,
@@ -95,4 +95,4 @@ class MikiCodeSpaceService {
   }
 }
 
-export const mikiCodeSpaceService = new MikiCodeSpaceService();
+export const selfCodeSpaceService = new SelfCodeSpaceService();

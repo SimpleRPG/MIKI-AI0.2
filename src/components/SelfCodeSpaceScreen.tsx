@@ -2,20 +2,20 @@ import React,{useEffect,useMemo,useState} from 'react';
 import {RefreshCw,Search,FileCode2,ChevronLeft,Database} from 'lucide-react';
 import {typedCoreUiGatewayService} from '../miki/core/ui/typedCoreUiGatewayService';
 
-export const MikiCodeSpaceScreen:React.FC=()=>{
- const [snapshot,setSnapshot]=useState(typedCoreUiGatewayService.getMikiCodeSnapshot());
+export const SelfCodeSpaceScreen:React.FC=()=>{
+ const [snapshot,setSnapshot]=useState(typedCoreUiGatewayService.getSelfCodeSnapshot());
  const [query,setQuery]=useState('');
  const [selected,setSelected]=useState<string>();
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState('');
 
- const files=useMemo(()=>query?typedCoreUiGatewayService.searchMikiCode(query,100):typedCoreUiGatewayService.listMikiCodeFiles(),[query,snapshot]);
- const current=selected?typedCoreUiGatewayService.readMikiCodeFile(selected):undefined;
+ const files=useMemo(()=>query?typedCoreUiGatewayService.searchSelfCode(query,100):typedCoreUiGatewayService.listSelfCodeFiles(),[query,snapshot]);
+ const current=selected?typedCoreUiGatewayService.readSelfCodeFile(selected):undefined;
 
  const sync=async()=>{
   setBusy(true);setMessage('');
   try{
-   const result=await typedCoreUiGatewayService.syncMikiCode();
+   const result=await typedCoreUiGatewayService.syncSelfCode();
    setSnapshot(result.snapshot);
    setSelected(undefined);
    setMessage(`同期完了: ${result.snapshot.files.length}ファイル / ${result.snapshot.repoSha256.slice(0,16)}`);
@@ -40,7 +40,7 @@ export const MikiCodeSpaceScreen:React.FC=()=>{
   <header className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
    <div className="flex items-center gap-2">
     <Database className="h-5 w-5 text-indigo-300"/>
-    <div><h1 className="text-lg font-bold">みきコード</h1><p className="text-xs text-slate-400">みき自身の正本コード専用スペース</p></div>
+    <div><h1 className="text-lg font-bold">自己コードスペース</h1><p className="text-xs text-slate-400">みき自身の正本コード専用スペース</p></div>
    </div>
    <div className="mt-3 text-[10px] text-slate-500 font-mono break-all">
     {snapshot?`${snapshot.repository} · ${snapshot.branch} · ${snapshot.files.length} files · ${snapshot.repoSha256}`:'未同期'}

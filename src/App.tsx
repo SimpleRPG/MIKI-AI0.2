@@ -14,7 +14,6 @@ import { GitHubHub } from './components/GitHubHub';
 import { AutonomousImprovementHome } from './components/AutonomousImprovementHome';
 import { ExternalConnectionsScreen } from './components/ExternalConnectionsScreen';
 import { WorkspaceScreen } from './components/WorkspaceScreen';
-import { MikiCodeSpaceScreen } from './components/MikiCodeSpaceScreen';
 import { HomeDashboard } from './components/HomeDashboard';
 import { LibraryHub } from './components/LibraryHub';
 import { MemoryModal } from './components/MemoryModal';
@@ -218,7 +217,7 @@ const INITIAL_MEMORIES: MemoryItem[] = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'improvement' | 'github'>('preview');
-  const [mobileTab, setMobileTab] = useState<'home' | 'chat' | 'preview' | 'code' | 'miki-code' | 'improvement' | 'github' | 'library' | 'memory' | 'engine' | 'settings'>('home');
+  const [mobileTab, setMobileTab] = useState<'home' | 'chat' | 'preview' | 'code' | 'improvement' | 'github' | 'library' | 'memory' | 'engine' | 'settings'>('home');
 
   const [persona, setPersona] = useState<PersonaConfig>(() => {
     try {
@@ -3867,7 +3866,7 @@ export default function App() {
               />
             )}
 
-            {mobileTab === 'miki-code' && <MikiCodeSpaceScreen />}\n\n            {mobileTab === 'preview' && (
+            {mobileTab === 'preview' && (
               <GamePreview
                 files={workspaceFiles}
                 consoleLogs={consoleLogs}
