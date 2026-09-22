@@ -6,6 +6,7 @@ import { researchStrategyService, ResearchRoute } from './researchStrategyServic
 import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/services/cognitiveEvidenceIntegrationService';
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 import { webTermLearningService } from './webTermLearningService';
+import { researchQueryPlanningService } from './researchQueryPlanningService';
 
 export type { ResearchRoute };
 
@@ -92,9 +93,12 @@ export class ResearchService {
     const requestedPasses = Number.isFinite(options?.maxPasses)
       ? Math.max(1, Math.floor(options!.maxPasses!))
       : 2;
-    const invocationPassLimit = adaptive
-      ? Math.max(requestedPasses, 4)
-      : Math.min(3, requestedPasses);
+    const queryPlan = researchQueryPlanningService.buildPlan(baseQuery);
+    const invocationPassLimit = Math.min(
+      queryPlan.policy.maxTotalSearchRequests,
+      queryPlan.policy.maxQueriesPerPlan,
+      adaptive ? Math.max(requestedPasses, queryPlan.queries.length) : Math.min(3, requestedPasses),
+    );
     const maxPagesPerPass = Math.max(1, Math.min(3, options?.maxPagesPerPass ?? 2));
     const strategy = options?.forceRoute
       ? { route: options.forceRoute, reason: '呼び出し元が明示的にこの研究経路を要求しました。', alternatives: [] as ResearchRoute[] }
@@ -140,6 +144,8 @@ export class ResearchService {
       let nextQuery = gap.query;
       let roundsCompleted = 0;
       let previousEvidenceFingerprint = '';
+      let previousEvidenceIds: string[] = [];
+      let previousIndependentClusters: string[] = [];
 
       const buildAdaptiveQuery = (round: number, results: VerificationResult[]): string => {
         if (round === 0) return baseQuery;
@@ -154,7 +160,10 @@ export class ResearchService {
 
       for (let pass = 0; pass < invocationPassLimit; pass++) {
         roundsCompleted = pass + 1;
-        const passQuery = buildAdaptiveQuery(pass, verification);
+        const plannedQuery = queryPlan.status === 'READY'
+          ? queryPlan.queries[pass]?.queryText
+          : undefined;
+        const passQuery = plannedQuery || buildAdaptiveQuery(pass, verification);
         nextQuery = passQuery;
         const raw = await autonomousSearchService.executeSearch(passQuery, {
           bypassCache: pass > 0,
@@ -292,12 +301,30 @@ export class ResearchService {
         const evidenceFingerprint = [...new Set(evidence.map(item => `${item.source_id}|${item.independence_cluster_id}|${item.url}`))]
           .sort()
           .join('||');
+        const currentEvidenceIds = [...new Set(
+          evidence.filter(item => item.status !== 'REJECTED').map(item => item.evidence_id)
+        )];
+        const currentIndependentClusters = [...new Set(
+          evidence
+            .filter(item => item.status !== 'REJECTED' && item.independence_cluster_id)
+            .map(item => item.independence_cluster_id as string)
+        )];
+        const meaningfulness = researchStrategyService.assessMeaningfulness({
+          previousEvidenceIds,
+          currentEvidenceIds,
+          previousIndependentClusters,
+          currentIndependentClusters,
+          previousCoverage: previousIndependentClusters,
+          currentCoverage: currentIndependentClusters,
+        });
         const noNewEvidence = evidenceFingerprint !== '' && evidenceFingerprint === previousEvidenceFingerprint;
         previousEvidenceFingerprint = evidenceFingerprint;
+        previousEvidenceIds = currentEvidenceIds;
+        previousIndependentClusters = currentIndependentClusters;
 
-        if (adaptive && noNewEvidence) {
+        if (adaptive && (noNewEvidence || (!meaningfulness.meaningful && pass > 0))) {
           continuationAvailable = false;
-          continuationReason = 'NO_NEW_EVIDENCE';
+          continuationReason = noNewEvidence ? 'NO_NEW_EVIDENCE' : 'LOW_INFORMATION_GAIN';
           knowledgeGapService.advanceResolutionPlan(gap.id, 'IDENTIFY', 'CLARIFY');
           break;
         }
