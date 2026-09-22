@@ -33,7 +33,6 @@ class TypedCoreUiGatewayService {
  listSelfCodeFiles(){return selfCodeSpaceService.listFiles();}
  readSelfCodeFile(path:string){return selfCodeSpaceService.readFile(path);}
  searchSelfCode(query:string,limit=20){return selfCodeSpaceService.search(query,limit);}
- selfCodeSearch(query:string,limit=8){return selfCodeSpaceService.context(query,limit);}
  async syncSelfCode(token?:string){return selfCodeSpaceService.sync(token);}
  async createWorkspace(input:{name:string;workspaceMode:WorkspaceMode;assetKind:string;sourceLocator:string;baseContent:string;trustStatus?:WorkspaceRecord['trustStatus'];targetEnvironment?:string}):Promise<UiCommandResult<WorkspaceRecord>>{const commandId=id();try{const row=await generalWorkspaceService.create(input);return {commandId,taskId:row.coreTaskId,status:'SUCCESS',summary:'Workspaceをcore経由で作成しました',data:row,receiptIds:[row.baseSnapshotId],diagnosticIds:[],nextActions:['SAVE_WORKSPACE_CANDIDATE'],completedAt:Date.now()};}catch(e){return this.failed(commandId,e);}}
  async saveWorkspaceCandidate(workspaceId:string,content:string):Promise<UiCommandResult<WorkspaceRecord>>{const commandId=id();try{const row=await generalWorkspaceService.setCandidate(workspaceId,content);return {commandId,taskId:row.coreTaskId,status:'SUCCESS',summary:'Candidate Revisionを保存しました',data:row,receiptIds:row.candidateRevisionId?[row.candidateRevisionId]:[],diagnosticIds:[],nextActions:['ANALYZE_VBA_WORKSPACE'],completedAt:Date.now()};}catch(e){return this.failed(commandId,e);}}

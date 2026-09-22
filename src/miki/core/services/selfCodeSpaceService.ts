@@ -2,17 +2,17 @@ import { storageService } from '../../../services/storageService';
 import { apiService } from '../../../services/api';
 import { canonicalSha256 } from './canonicalSha256Service';
 
-export interface MikiCodeFile {
+export interface SelfCodeFile {
   path: string;
   content: string;
   sha256: string;
 }
 
-export interface MikiCodeSnapshot {
+export interface SelfCodeSnapshot {
   repository: string;
   branch: string;
   repoSha256: string;
-  files: MikiCodeFile[];
+  files: SelfCodeFile[];
   syncedAt: number;
 }
 
@@ -21,7 +21,7 @@ const REPOSITORY = 'SimpleRPG/MIKI-AI0.2';
 const BRANCH = 'main';
 
 class SelfCodeSpaceService {
-  async sync(token?: string): Promise<MikiCodeSnapshot> {
+  async sync(token?: string): Promise<SelfCodeSnapshot> {
     const result = await apiService.importFromGitHub({
       repoUrl: REPOSITORY,
       branch: BRANCH,
@@ -29,10 +29,10 @@ class SelfCodeSpaceService {
     });
 
     if (!result.success || !result.files?.length) {
-      throw new Error(result.message || 'MIKI_CODE_SPACE_SYNC_FAILED');
+      throw new Error(result.message || 'SELF_CODE_SPACE_SYNC_FAILED');
     }
 
-    const files: MikiCodeFile[] = result.files
+    const files: SelfCodeFile[] = result.files
       .filter((file: any) => typeof file.path === 'string' && typeof file.content === 'string')
       .map((file: any) => ({
         path: file.path,
@@ -40,9 +40,9 @@ class SelfCodeSpaceService {
         sha256: canonicalSha256(file.content),
       }));
 
-    if (!files.length) throw new Error('MIKI_CODE_SPACE_NO_FILES');
+    if (!files.length) throw new Error('SELF_CODE_SPACE_NO_FILES');
 
-    const snapshot: MikiCodeSnapshot = {
+    const snapshot: SelfCodeSnapshot = {
       repository: REPOSITORY,
       branch: BRANCH,
       repoSha256: canonicalSha256(files.map(file => ({ path: file.path, sha256: file.sha256 }))),
@@ -54,7 +54,7 @@ class SelfCodeSpaceService {
     return this.clone(snapshot);
   }
 
-  get(): MikiCodeSnapshot | undefined {
+  get(): SelfCodeSnapshot | undefined {
     try {
       const raw = storageService.getItem(KEY);
       if (!raw) return undefined;
@@ -65,15 +65,15 @@ class SelfCodeSpaceService {
     }
   }
 
-  listFiles(): MikiCodeFile[] {
+  listFiles(): SelfCodeFile[] {
     return this.get()?.files || [];
   }
 
-  readFile(path: string): MikiCodeFile | undefined {
+  readFile(path: string): SelfCodeFile | undefined {
     return this.listFiles().find(file => file.path === path);
   }
 
-  search(query: string, limit = 20): MikiCodeFile[] {
+  search(query: string, limit = 20): SelfCodeFile[] {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return this.listFiles()
@@ -81,13 +81,7 @@ class SelfCodeSpaceService {
       .slice(0, Math.max(1, limit));
   }
 
-  context(query: string, limit = 8): string {
-    return this.search(query, limit)
-      .map(file => `=== ${file.path} ===\n${file.content}`)
-      .join('\n\n');
-  }
-
-  private clone(snapshot: MikiCodeSnapshot): MikiCodeSnapshot {
+  private clone(snapshot: SelfCodeSnapshot): SelfCodeSnapshot {
     return {
       ...snapshot,
       files: snapshot.files.map(file => ({ ...file })),
