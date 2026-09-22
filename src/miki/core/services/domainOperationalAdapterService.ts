@@ -17,6 +17,7 @@ import { unknownResolutionService } from '../../unknown/services/unknownResoluti
 import { completionJudgeService } from '../../verification/services/completionJudgeService';
 import { selfImprovementMetricsService } from '../../improvement/services/selfImprovementMetricsService';
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
+import { selfCodeSpaceService } from './selfCodeSpaceService';
 
 export interface DomainOperationalSnapshot {
   domain: MikiDomain;
@@ -39,7 +40,7 @@ const snapshot = (domain:MikiDomain, serviceId:string, data:unknown):DomainOpera
 });
 
 class DomainOperationalAdapterService {
-  inspect(domain:MikiDomain):DomainOperationalSnapshot {
+  inspect(domain:MikiDomain,context:Record<string,unknown>={}):DomainOperationalSnapshot {
     try {
       switch(domain){
         case 'core':
@@ -70,8 +71,13 @@ class DomainOperationalAdapterService {
           return snapshot(domain,'resourceGovernanceService',{resources:resourceGovernanceService.getSnapshot()});
         case 'selfAwareness':
           return snapshot(domain,'mikiCognitiveVitalsService',{vitals:mikiCognitiveVitalsService.getSnapshot()});
-        case 'selfDevelopment':
-          return snapshot(domain,'codebaseReflectionService',{architecture:codebaseReflectionService.getArchitectureOverview(),modules:codebaseReflectionService.getAllModules()});
+        case 'selfDevelopment': {
+          const query=String(context.target||context.goal||'').trim().toLowerCase();
+          const tokens=query.split(/[\\s/._:-]+/).filter(x=>x.length>=2).slice(0,12);
+          const files=selfCodeSpaceService.listSourceFiles();
+          const ranked=files.map(file=>({file,score:tokens.reduce((n,t)=>n+(file.path.toLowerCase().includes(t)?5:0)+(file.content.toLowerCase().includes(t)?1:0),0)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.file.path.localeCompare(b.file.path)).slice(0,3).map(x=>x.file.path);
+          return snapshot(domain,'selfDevelopmentOperationalAdapter',{architecture:codebaseReflectionService.getArchitectureOverview(),modules:codebaseReflectionService.getAllModules(),targetFiles:ranked,query});
+        }
         case 'strategy':
           return snapshot(domain,'planOrchestratorService',{runs:planOrchestratorService.listRuns()});
         case 'unknown':

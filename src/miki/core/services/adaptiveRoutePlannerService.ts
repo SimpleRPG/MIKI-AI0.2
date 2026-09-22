@@ -81,7 +81,7 @@ class AdaptiveRoutePlannerService {
    * 独自に対象を再選定してはならない。
    */
   private resolveCoreTargetPaths(task:BlackboardTask,input:Record<string,unknown>):string[] {
-    const explicit=Array.isArray(input.targetFiles)?input.targetFiles.filter((value):value is string=>typeof value==="string"&&Boolean(value.trim())).map(value=>value.trim()):[];
+    const explicit=Array.isArray(input.targetFiles)?input.targetFiles.filter((value):value is string=>typeof value==="string"&&Boolean(value.trim())).map(value=>value.trim()):this.stringArrayFromEntries(task,/target.?files|targetPaths|changedFilePaths/i);
     return [...new Set(explicit)].slice(0,3);
   }
 
@@ -314,7 +314,7 @@ class AdaptiveRoutePlannerService {
         payload:{taskId:task.taskId,trigger:`core-adaptive:${task.taskId}`,adaptive:true,priority:100}
       });
     } else if(!readiness.repositoryContextAvailable || !readiness.targetFilesKnown) {
-      const target: MikiDomain = readiness.repositoryContextAvailable ? 'data' : 'selfDevelopment';
+      const target: MikiDomain = 'selfDevelopment';
       routes.push({
         target,command:'ASSESS_DOMAIN',
         reason:readiness.repositoryContextAvailable

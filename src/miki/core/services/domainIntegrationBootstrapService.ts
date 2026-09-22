@@ -71,7 +71,7 @@ class DomainIntegrationBootstrapService{
   if(envelope.command==='HEALTH_CHECK'||envelope.command==='DESCRIBE'||envelope.command==='GET_STATUS')return done({domain,registered:true,commands:domainRouterService.getRegistrations().find(x=>x.domain===domain)?.commands||[]});
   if(envelope.command==='ASSESS_DOMAIN'){
    const {domainOperationalAdapterService}=await import('./domainOperationalAdapterService');
-   const operational=domainOperationalAdapterService.inspect(domain);
+   const operational=domainOperationalAdapterService.inspect(domain,envelope.payload);
    if(!operational.available)return {accepted:false,domain,command:envelope.command,result:operational,error:operational.unresolvedRequirements.join(','),completedAt:Date.now()};
    return done(operational);
   }
