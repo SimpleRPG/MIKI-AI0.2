@@ -1,5 +1,5 @@
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
-import { autonomousCandidatePreparationService } from './autonomousCandidatePreparationService';
+import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { apiUrl, getCustomApiHeaders } from '../../../services/api';
 import { storageService } from '../../../services/storageService';
 import { canonicalSha256 } from './canonicalSha256Service';
@@ -13,7 +13,7 @@ class CandidateCodeGenerationService {
   const run=improvementIntakeRouterService.get(runId);if(!run)return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND']};
   const probe=await autonomousCandidatePreparationService.prepareForRun(runId,[]);const targetPaths=probe.targetPaths;
   if(targetPaths.length===0)return {accepted:false,runId,files:[],reasons:[probe.reason||'TARGET_FILES_NOT_RESOLVED']};
-  const sources=new Map(autonomousCandidatePreparationService.getSourceFiles().map(file=>[file.path,file]));const targetFiles=targetPaths.map(path=>sources.get(path)).filter((value):value is NonNullable<typeof value>=>Boolean(value));
+  const sources=new Map(selfCodeSpaceService.listSourceFiles().map(file=>[file.path,file]));const targetFiles=targetPaths.map(path=>sources.get(path)).filter((value):value is NonNullable<typeof value>=>Boolean(value));
   if(targetFiles.length!==targetPaths.length)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
   const implementationPlan=run.implementationPlan;
   if(run.runType==='AUTONOMOUS_DISCOVERY'&&!implementationPlan)return {accepted:false,runId,files:[],reasons:['AUTONOMOUS_IMPLEMENTATION_PLAN_REQUIRED']};

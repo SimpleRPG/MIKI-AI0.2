@@ -5,7 +5,7 @@ import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { coreCompletionGateService, type CoreCompletionAssessment } from './coreCompletionGateService';
 import { EvidenceService } from '../../memory/services/evidenceService';
 import { proposalQuarantineService } from './proposalQuarantineService';
-import { autonomousCandidatePreparationService } from './autonomousCandidatePreparationService';
+import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { decomposeMultiIntent, selectMultiIntentHypothesis, type MultiIntentPlan } from '../../unknown/services/multiIntentDecompositionService';
 import { detectUnknownTermsFromBlackboardValue } from '../../unknown/services/unknownTermDetectionService';
 
@@ -92,7 +92,7 @@ class AdaptiveRoutePlannerService {
     const target=String(input.target||'').trim();
     if(target){
       const normalized=target.toLowerCase();
-      const exact=autonomousCandidatePreparationService.getSourceFiles()
+      const exact=selfCodeSpaceService.listSourceFiles()
         .filter(file=>{
           const path=file.path.toLowerCase();
           return path===normalized||path.endsWith(`/${normalized}`);
@@ -101,7 +101,7 @@ class AdaptiveRoutePlannerService {
       if(exact.length>0)return exact.slice(0,3);
     }
 
-    const sourceSnapshot=autonomousCandidatePreparationService.getSourceFiles();
+    const sourceSnapshot=selfCodeSpaceService.listSourceFiles();
     if(sourceSnapshot.length===0)return [];
 
     const results=task.entries.filter(entry=>entry.kind==='RESULT');
@@ -174,7 +174,7 @@ class AdaptiveRoutePlannerService {
       results.some(entry=>/improvement|selfAwareness|DISCOVER_IMPROVEMENT_ISSUE/i.test(entry.domain+':'+entry.key))
     );
 
-    const sourceSnapshot=autonomousCandidatePreparationService.getSourceFiles();
+    const sourceSnapshot=selfCodeSpaceService.listSourceFiles();
     const targetText=String(input.target||'').trim().toLowerCase();
     const repositoryContextAvailable=Boolean(
       input.repositoryContext || input.repositoryPath || sourceSnapshot.length>0 ||

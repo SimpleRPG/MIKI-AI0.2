@@ -3,7 +3,6 @@ import { coreResultService } from './miki/core/services/coreResultService';
 import { typedImprovementUiGatewayService } from './miki/core/ui/typedImprovementUiGatewayService';
 import { typedCoreUiGatewayService } from './miki/core/ui/typedCoreUiGatewayService';
 import { improvementCanaryRollbackService } from './miki/improvement/services/improvementCanaryRollbackService';
-import { autonomousCandidatePreparationService } from './miki/core/services/autonomousCandidatePreparationService';
 import React, { useState, useEffect, useRef } from 'react';
 import { appRuntimeLifecycleService } from './app/appRuntimeLifecycleService';
 import { Header } from './components/Header';

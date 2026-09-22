@@ -1,5 +1,5 @@
 import { apiUrl, getCustomApiHeaders } from '../../../services/api';
-import { autonomousCandidatePreparationService } from './autonomousCandidatePreparationService';
+import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { isolatedCandidateWorkspaceService } from './isolatedCandidateWorkspaceService';
 import { candidateValidationEvidenceService, type ValidationStage } from './candidateValidationEvidenceService';
 import { shadowEvaluationService } from './shadowEvaluationService';
@@ -13,7 +13,7 @@ class CandidateValidationRunnerService {
   if(!workspace)return {passed:false,workspaceId,reasons:['WORKSPACE_NOT_FOUND']};
   const candidateSha256=workspace.candidateRevisionSha256||'';
   if(!candidateSha256)return this.rollbackFailure(workspaceId,workspace.writeGuardId,['CANDIDATE_HASH_MISSING']);
-  const sourceFiles=autonomousCandidatePreparationService.getSourceFiles();
+  const sourceFiles=selfCodeSpaceService.listSourceFiles();
   const run=workspace.runId?improvementIntakeRouterService.get(workspace.runId):undefined;
   const validationRequirements=Array.isArray(run?.payload.validationRequirements)
     ? run.payload.validationRequirements.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim()))
