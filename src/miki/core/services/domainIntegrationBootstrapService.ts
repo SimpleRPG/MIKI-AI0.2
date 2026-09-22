@@ -198,9 +198,10 @@ class DomainIntegrationBootstrapService{
    const {reviewZipExportService}=await import('./reviewZipExportService');
    const {isolatedCandidateWorkspaceService}=await import('./isolatedCandidateWorkspaceService');
    const {persistenceReceiptLedgerService}=await import('./persistenceReceiptLedgerService');
+   const {selfCodeSpaceService}=await import('./selfCodeSpaceService');
    const pkg=reviewZipExportService.list().find(item=>item.packageId===packageId);
    if(!pkg)return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_FOUND',completedAt:Date.now()};
-   if(pkg.status!=='ACCEPTED')return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_ACCEPTED',completedAt:Date.now()};
+   if(pkg.status!=='ACCEPTED'&&pkg.status!=='EXTERNAL_REVIEW_PENDING')return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_ACCEPTED',completedAt:Date.now()};
    if(pkg.candidateManifestSha256!==manifestSha)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_MANIFEST_SHA_MISMATCH',completedAt:Date.now()};
    const workspace=isolatedCandidateWorkspaceService.get(pkg.workspaceId);
    if(!workspace)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_WORKSPACE_NOT_FOUND',completedAt:Date.now()};
@@ -208,10 +209,12 @@ class DomainIntegrationBootstrapService{
    const operationInstanceId=String(envelope.payload.operationInstanceId||pkg.operationInstanceId||'');
    if(!receipt||receipt==='UNAVAILABLE')return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_REQUIRED',completedAt:Date.now()};
    if(!persistenceReceiptLedgerService.get(receipt))return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_NOT_FOUND',completedAt:Date.now()};
+   const applied=selfCodeSpaceService.applyCandidate(workspace.files.map(file=>({path:file.path,baselineSha256:file.baselineSha256,candidateContent:file.candidateContent})));
    const result=await isolatedCandidateWorkspaceService.commitWithReceipt(workspace.workspaceId,receipt,operationInstanceId);
-   return done({operation:'APPROVE_REVIEWED_CANDIDATE',operationClass:'BUSINESS',status:'SUCCEEDED',packageId,workspaceId:workspace.workspaceId,transactionId:result.transaction.transactionId,candidateManifestSha256:result.transaction.candidateManifestSha256,evidenceIds:[...new Set(result.workspace.files.flatMap(file=>file.evidenceIds))],receiptIds:[receipt]});
+   reviewZipExportService.updateStatus(packageId,'ACCEPTED');
+   return done({operation:'APPROVE_REVIEWED_CANDIDATE',operationClass:'BUSINESS',status:'SUCCEEDED',packageId,workspaceId:workspace.workspaceId,transactionId:result.transaction.transactionId,candidateManifestSha256:result.transaction.candidateManifestSha256,selfCodeRevisionSha256:applied.repoSha256,evidenceIds:[...new Set(result.workspace.files.flatMap(file=>file.evidenceIds))],receiptIds:[receipt]});
   }
-  if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
+if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
    const {reviewZipExportService}=await import('./reviewZipExportService');
    const runId=String(envelope.payload.runId||'');
    const workspaceId=String(envelope.payload.workspaceId||'');
