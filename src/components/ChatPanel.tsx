@@ -2558,7 +2558,7 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                               <div key={sIdx} className="flex items-center gap-1.5">
                                 <span className="text-slate-400 line-through truncate max-w-[120px]">{orig}</span>
                                 <span className="text-slate-500">→</span>
-                                <span className="text-emerald-400 font-bold">{sym}</span>
+                                <span className="text-emerald-400 font-bold">{String(sym)}</span>
                               </div>
                             ))}
                           </div>

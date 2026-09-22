@@ -701,7 +701,7 @@ export default ${fallbackClassName};
       const isDirectiveExecution = !targetInfo.chapter && Boolean(
         targetInfo.reason?.includes('指示') ||
         targetInfo.prompt?.includes('指示') ||
-        explicitTarget?.prompt?.includes('指示')
+        targetInfo?.prompt?.includes('指示')
       );
       logStep('CAUSAL_EXPERIMENT', '因果性検証実験 (Causal Impact Verification)', '外乱要因を排除するため、ベースラインと介入後を複数試行し因果効果を測定中...');
       const causalExperimentResult = evidenceBasedSelfImprovementEngine.runCausalExperiment(

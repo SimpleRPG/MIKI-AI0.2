@@ -647,7 +647,7 @@ export class ConversationEvaluationService {
 
     for (const res of fixedResults) {
       for (const [crit, score] of Object.entries(res.criterionScores)) {
-        criterionTotals[crit as ConversationEvaluationCriterion].sum += score;
+        criterionTotals[crit as ConversationEvaluationCriterion].sum += Number(score);
         criterionTotals[crit as ConversationEvaluationCriterion].count += 1;
       }
     }

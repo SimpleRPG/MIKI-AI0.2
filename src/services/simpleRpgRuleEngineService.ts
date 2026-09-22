@@ -103,7 +103,7 @@ export class SimpleRpgRuleEngineService {
     return { ok: true, action, message: `${action} を決定論的に実行しました。`, character: c, changes };
   }
 
-  private material(name: string, value: number): Item { return { id: `mat_${hash(name).toString(16)}`, name, type: 'misc', rarity: 'common', description: '決定論的に生成された素材', value, icon: 'material' }; }
+  private material(name: string, value: number): Item { return { id: `mat_${hash(name).toString(16)}`, name, type: 'consumable', rarity: 'common', description: '決定論的に生成された素材', value, icon: 'material' }; }
   private fail(action: RpgAction, message: string): RpgActionResult { return { ok: false, action, message, changes: {} }; }
 }
 

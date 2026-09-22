@@ -31,6 +31,7 @@ export interface SimulationRecord { id:string; traceId:string; simulatedAt:numbe
 
 export interface CausalEvent { id:string; traceId:string; kind:'ANSWER'|'ARTIFACT_USE'|'FOLLOWUP'|'CORRECTION'|'GOAL_RESULT'; ref:string; value:number; createdAt:number; }
 export interface CausalAssessment { traceId:string; candidate:string; treatmentEffect:number; counterfactualEffect:number; attributionRisk:number; conclusion:'SUPPORTED'|'INCONCLUSIVE'|'REJECTED'; createdAt:number; }
+export interface VerifiedCausalAssessment extends CausalAssessment { verificationStatus:'VERIFIED'|'UNVERIFIED'|'REJECTED'; evidenceIds:string[]; capabilityIds?:string[]; knowledgeRefs?:string[]; strategyRefs?:string[]; decisionRefs?:string[]; actionRefs?:string[]; }
 
 export type Realization='RULE'|'SEARCH'|'CLASSIFIER'|'SOLVER'|'COMPOSITION'|'SPECIALIST_MODEL';
 export interface RealizationOption { capability:string; method:Realization; proofScore:number; costScore:number; observedSuccess:number; status:'CANDIDATE'|'SELECTED'|'BLOCKED'; reason:string; }
@@ -40,7 +41,7 @@ export interface ReasoningAsset { id:string; kind:'PROBLEM'|'SUBPROBLEM'|'EVIDEN
 export interface IntegrationScenario { id:string; name:string; steps:string[]; disturbances:string[]; requiredArtifacts:string[]; status:'PASS'|'FAIL'|'INCONCLUSIVE'; environment:string; version:string; createdAt:number; }
 
 class OperationalConformanceService {
- private uncertainty:UncertaintyRecord[]=[]; private traces=new Map<string,TraceEvent[]>(); private terminals:TerminalDecision[]=[]; private artifacts=new Map<string,PartialArtifact>(); private checkpoints=new Map<string,ResumeCheckpoint>(); private simulations=new Map<string,SimulationRecord>(); private causal:CausalEvent[]=[]; private assessments:CausalAssessment[]=[]; private realization:RealizationOption[]=[]; private requirements=new Map<string,RequirementType>(); private assets=new Map<string,ReasoningAsset>(); private scenarios:IntegrationScenario[]=[];
+ private uncertainty:UncertaintyRecord[]=[]; private traces=new Map<string,TraceEvent[]>(); private terminals:TerminalDecision[]=[]; private artifacts=new Map<string,PartialArtifact>(); private checkpoints=new Map<string,ResumeCheckpoint>(); private simulations=new Map<string,SimulationRecord>(); private causal:CausalEvent[]=[]; private assessments:CausalAssessment[]=[]; private verifiedCausal:VerifiedCausalAssessment[]=[]; private realization:RealizationOption[]=[]; private requirements=new Map<string,RequirementType>(); private assets=new Map<string,ReasoningAsset>(); private scenarios:IntegrationScenario[]=[];
 
  classifyUncertainty(input:{kind:UncertaintyKind;magnitude?:number;decisive?:boolean;evidence?:string[];confidence?:number}){const magnitude=Math.max(0,Math.min(1,input.magnitude??.5));const decisive=input.decisive??magnitude>=.7;let action:UncertaintyAction='EXECUTE';if(input.kind==='CAPABILITY_BOUNDARY')action='HOMEWORK';else if(input.kind==='SIMULATOR_UNREPRODUCED')action='REJECT';else if(decisive&&magnitude>=.7&&!(input.evidence||[]).length)action='ASK_MINIMAL';else if(magnitude>=.35)action='SEPARATE_UNCONFIRMED';const r:UncertaintyRecord={id:id('unc'),kind:input.kind,magnitude,decisive,action,evidence:input.evidence||[],confidence:Math.max(0,Math.min(1,input.confidence??1-magnitude)),createdAt:now()};this.uncertainty.unshift(r);return clone(r);}
  listUncertainty(limit=100){return clone(this.uncertainty.slice(0,limit));}
@@ -63,6 +64,14 @@ class OperationalConformanceService {
  addCausalEvent(x:Omit<CausalEvent,'id'|'createdAt'>){const r={...x,id:id('cause'),createdAt:now()};this.causal.push(r);return clone(r);}
  assessCausal(input:{traceId:string;candidate:string;treatment:number;counterfactual:number;confounders?:number}){const effect=input.treatment-input.counterfactual;const risk=Math.max(0,Math.min(1,input.confounders??.3));const conclusion:'SUPPORTED'|'INCONCLUSIVE'|'REJECTED'=Math.abs(effect)>=.2&&risk<.5?'SUPPORTED':Math.abs(effect)<.1||risk>=.7?'REJECTED':'INCONCLUSIVE';const r:CausalAssessment={traceId:input.traceId,candidate:input.candidate,treatmentEffect:input.treatment,counterfactualEffect:input.counterfactual,attributionRisk:risk,conclusion,createdAt:now()};this.assessments.unshift(r);return clone(r);}
  listCausal(){return clone(this.assessments);}
+  verifyCausalAssessment(input:{traceId:string;candidate:string;evidenceIds:string[];capabilityIds?:string[];knowledgeRefs?:string[];strategyRefs?:string[];decisionRefs?:string[];actionRefs?:string[];}){
+    const assessment=this.assessments.find(x=>x.traceId===input.traceId&&x.candidate===input.candidate&&x.conclusion==='SUPPORTED');
+    if(!assessment||!input.evidenceIds.length)return null;
+    const verified:VerifiedCausalAssessment={...assessment,verificationStatus:'VERIFIED',evidenceIds:[...new Set(input.evidenceIds.filter(Boolean))],capabilityIds:input.capabilityIds,knowledgeRefs:input.knowledgeRefs,strategyRefs:input.strategyRefs,decisionRefs:input.decisionRefs,actionRefs:input.actionRefs};
+    this.verifiedCausal.unshift(verified);
+    return clone(verified);
+  }
+  listVerifiedCausalAssessments(traceId:string){return clone(this.verifiedCausal.filter(x=>x.traceId===traceId));}
 
  selectRealization(capability:string,options:Array<Omit<RealizationOption,'status'|'reason'>>){const normalized:RealizationOption[]=options.map(x=>({...x,status:'CANDIDATE' as const,reason:''})).map(x=>(x.method as string)==='LOCAL_MODEL'?{...x,status:'BLOCKED' as const,reason:'LOCAL_LLM_RUNTIME_RETIRED'}:x);const eligible=normalized.filter(x=>x.proofScore>=.7);if(!eligible.length)return {capability,status:'BLOCKED',options:clone(normalized),reason:'NO_PROVEN_REALIZATION'};const selected=[...eligible].sort((a,b)=>(b.proofScore+b.observedSuccess-b.costScore)-(a.proofScore+a.observedSuccess-a.costScore))[0];for(const x of normalized)x.status=x===selected?'SELECTED':'BLOCKED';for(const x of normalized)x.reason=x===selected?'best_proven_cost_adjusted':'insufficient proof or dominated cost';this.realization.push(...normalized);return {capability,status:'SELECTED',selected:clone(selected),options:clone(normalized)};}
  listRealizations(){return clone(this.realization);}

@@ -189,7 +189,7 @@ export class SafeDataProcessor implements DataProcessor {
   const handleApprovePairReview = () => {
     const updated = { ...pairReview, userFeedback: userComment, approved: false };
     selfImprovementSuiteService.savePairReview(updated);
-    userFeedbackGovernanceService.record({ subjectType: 'PAIR_REVIEW', subjectId: updated.id, polarity: userComment.trim() ? 'PARTIAL' : 'NEUTRAL', userText: userComment, reason: 'レビューコメントだけでは配備承認にしない', source: 'PAIR_REVIEW' });
+    userFeedbackGovernanceService.record({ subjectType: 'PAIR_REVIEW', subjectId: updated.id, polarity: 'NEUTRAL', userText: userComment, reason: 'レビューコメントだけでは配備承認にしない', source: 'PAIR_REVIEW' });
     setPairReview(updated);
     setReviewStatusNotice('レビュー内容をEvidenceとして保存しました。検証とPromotion Gate後にのみ配備候補になります。');
     setTimeout(() => setReviewStatusNotice(null), 5000);

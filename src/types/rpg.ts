@@ -13,7 +13,7 @@ export interface CharacterStats {
 export interface Item {
   id: string;
   name: string;
-  type: 'weapon' | 'armor' | 'consumable' | 'accessory';
+  type: 'weapon' | 'armor' | 'consumable' | 'accessory' | 'quest';
   rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   description: string;
   value: number;
@@ -25,9 +25,9 @@ export interface Item {
 }
 
 export interface Monster {
-  id: string;
+  id?: string;
   name: string;
-  level: number;
+  level?: number;
   hp: number;
   maxHp: number;
   attack: number;
@@ -37,6 +37,7 @@ export interface Monster {
   xpReward: number;
   goldReward: number;
   icon?: string;
+  lootDrop?: Item;
 }
 
 export interface QuestObjective {
@@ -48,10 +49,13 @@ export interface QuestObjective {
 export interface Quest {
   id: string;
   title: string;
-  desc: string;
-  locationId: string;
+  desc?: string;
+  synopsis?: string;
+  locationId?: string;
+  location?: string;
   rewardXp: number;
   rewardGold: number;
+  rewardItem?: string;
   boss?: Monster;
   objectives: QuestObjective[];
   completed: boolean;
@@ -71,7 +75,7 @@ export interface Character {
   name: string;
   classTitle: string;
   avatar: string;
-  level: number;
+  level?: number;
   xp: number;
   maxXp: number;
   hp: number;
@@ -93,4 +97,6 @@ export interface StoryEntry {
   text: string;
   type?: 'system' | 'combat' | 'dialogue' | 'exploration' | string;
   speaker?: string;
+  rollResult?: any;
+  mikiComment?: string;
 }

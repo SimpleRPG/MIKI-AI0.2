@@ -679,7 +679,7 @@ export function extractConversationState(
   visibleText: string;
   stats: StateExtractionStats;
 } {
-  const preserveAnswerChangeState=<T extends ConversationState>(nextState:T):T=>({...nextState,lastAnswerDecisionSnapshot:prevState?.lastAnswerDecisionSnapshot,answerDecisionHistory:prevState?.answerDecisionHistory,lastAnswerChangeExplanation:prevState?.lastAnswerChangeExplanation});
+  const preserveAnswerChangeState=(nextState:ConversationState):ConversationState=>({...nextState,lastAnswerDecisionSnapshot:prevState?.lastAnswerDecisionSnapshot,answerDecisionHistory:prevState?.answerDecisionHistory,lastAnswerChangeExplanation:prevState?.lastAnswerChangeExplanation});
   const match = rawResponse.match(/<state>([\s\S]*?)<\/state>/);
   const visibleText = rawResponse.replace(/<state>[\s\S]*?<\/state>\s*/, '').trim();
 

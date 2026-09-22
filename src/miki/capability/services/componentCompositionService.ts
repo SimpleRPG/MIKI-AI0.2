@@ -312,7 +312,7 @@ export class ComponentCompositionService {
     return (to.inputs || []).map(x => x.type.toLowerCase()).filter(t => {
       if (outputs.has(t)) return true;
       if (t === 'claim<a>' || t === 'claim<b>' || t === 'claim<t>' || t === 'claim<any>' || t === 'claim') {
-        return [...outputs].some(o => o.startsWith('claim<') || o === 'claim');
+        return [...outputs].some(o => String(o).startsWith('claim<') || o === 'claim');
       }
       return false;
     });

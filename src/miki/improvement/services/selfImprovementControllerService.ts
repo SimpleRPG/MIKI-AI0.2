@@ -103,7 +103,7 @@ export class SelfImprovementControllerService {
       return this.record(
         trigger,
         decision,
-        `queued-for-core:${queued.runId || queued.requestId || 'accepted'}`,
+        `queued-for-core:${queued.runId || queued.id || 'accepted'}`,
         queued.changeSetId
       );
     } catch (error) {

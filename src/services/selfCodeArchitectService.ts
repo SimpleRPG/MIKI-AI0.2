@@ -529,10 +529,7 @@ export class SelfCodeArchitectService {
       implResult = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
         prompt,
         targetFileHint,
-        true, // 物理書き込み & コミットを実行
-        undefined,
-        extConfig?.endpoint,
-        extConfig?.model
+        false, // 候補生成・検証のみ。物理適用はCORE_PROMOTION経由
       );
     } catch (implErr: any) {
       systemLogger.error('SELF_IMPROVEMENT', `[個別提案適用エラー] 実装パイプライン実行例外: ${implErr?.message}`);

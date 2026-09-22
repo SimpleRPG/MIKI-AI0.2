@@ -108,7 +108,7 @@ export class TaskResultFeedbackService {
       operationalConformanceService.verifyCausalAssessment({
         traceId: assessment.traceId,
         candidate: assessment.candidate,
-        evidenceIds: assessment.evidenceIds.length ? assessment.evidenceIds : verifiedTaskEvidenceIds,
+        evidenceIds: verifiedTaskEvidenceIds,
       });
     }
 

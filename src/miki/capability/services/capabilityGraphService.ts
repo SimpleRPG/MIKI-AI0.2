@@ -213,7 +213,7 @@ export class CapabilityGraphService {
     return (to.inputs || []).map(x => x.type.toLowerCase()).filter(t => {
       if (out.has(t)) return true;
       if (t === 'claim<a>' || t === 'claim<b>' || t === 'claim<t>' || t === 'claim<any>' || t === 'claim') {
-        return [...out].some(o => o.startsWith('claim<') || o === 'claim');
+        return [...out].some(o => String(o).startsWith('claim<') || o === 'claim');
       }
       return false;
     });

@@ -1,0 +1,15 @@
+src/miki/conversation/services/conversationStateService.ts(682,82): error TS2322: Type '{ lastAnswerDecisionSnapshot: any; answerDecisionHistory: any; lastAnswerChangeExplanation: any; }' is not assignable to type 'T'.
+src/miki/learning/services/taskResultFeedbackService.ts(108,37): error TS2339: Property 'verifyCausalAssessment' does not exist on type 'OperationalConformanceService'.
+src/miki/learning/services/taskResultFeedbackService.ts(111,33): error TS2339: Property 'evidenceIds' does not exist on type 'CausalAssessment'.
+src/miki/learning/services/taskResultFeedbackService.ts(111,65): error TS2339: Property 'evidenceIds' does not exist on type 'CausalAssessment'.
+src/miki/learning/services/taskResultFeedbackService.ts(118,60): error TS2339: Property 'listVerifiedCausalAssessments' does not exist on type 'OperationalConformanceService'.
+src/miki/unknown/services/unknownResolutionService.ts(67,7): error TS2322: Type 'string' is not assignable to type 'UnknownClassification'.
+src/services/capabilityPluginService.ts(381,7): error TS2322: Type 'unknown[]' is not assignable to type 'string[]'.
+src/services/selfCodeArchitectService.ts(534,9): error TS2554: Expected 1-4 arguments, but got 6.
+src/services/simpleRpgRuleEngineService.ts(106,110): error TS2322: Type '"misc"' is not assignable to type '"weapon" | "armor" | "consumable" | "accessory" | "quest"'.
+src/utils/memoryRetrieval.ts(755,13): error TS2339: Property 'active' does not exist on type '{ conflictWith: any[]; id: string; type?: string; content: string; timestamp?: number; importance?: number; tags?: string[]; }'.
+src/utils/memoryRetrieval.ts(755,35): error TS2339: Property 'active' does not exist on type '{ conflictWith: any[]; id: string; type?: string; content: string; timestamp?: number; importance?: number; tags?: string[]; }'.
+src/utils/memoryRetrieval.ts(761,13): error TS2339: Property 'category' does not exist on type '{ conflictWith: any[]; id: string; type?: string; content: string; timestamp?: number; importance?: number; tags?: string[]; }'.
+src/utils/memoryRetrieval.ts(761,41): error TS2339: Property 'category' does not exist on type '{ conflictWith: any[]; id: string; type?: string; content: string; timestamp?: number; importance?: number; tags?: string[]; }'.
+src/utils/memoryRetrieval.ts(768,20): error TS2339: Property 'category' does not exist on type '{ conflictWith: any[]; id: string; type?: string; content: string; timestamp?: number; importance?: number; tags?: string[]; }'.
+src/utils/memoryRetrieval.ts(768,51): error TS2339: Property 'category' does not exist on type '{ conflictWith: any[]; id: string; type?: string; content: string; timestamp?: number; importance?: number; tags?: string[]; }'.

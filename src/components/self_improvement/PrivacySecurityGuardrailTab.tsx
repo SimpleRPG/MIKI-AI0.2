@@ -260,7 +260,7 @@ export const PrivacySecurityGuardrailTab: React.FC = () => {
                     >
                       <span className="text-slate-400 truncate max-w-[120px]">{orig}</span>
                       <span className="text-blue-500">➔</span>
-                      <span className="font-bold text-indigo-600 dark:text-indigo-400">{sym}</span>
+                      <span className="font-bold text-indigo-600 dark:text-indigo-400">{String(sym)}</span>
                     </div>
                   ))}
                 </div>

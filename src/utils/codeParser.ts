@@ -11,6 +11,7 @@ export interface CodeBlock {
 export interface ZipExtractionResult {
   success: boolean;
   error?: string;
+  rootPrefix?: string;
   projectName: string;
   totalExtracted: number;
   folders: string[];

@@ -378,7 +378,7 @@ export class CapabilityPluginService {
     return {
       hasAllPermissions: missing.length === 0,
       required,
-      granted: Array.from(granted),
+      granted: Array.from(granted) as string[],
       missing,
     };
   }

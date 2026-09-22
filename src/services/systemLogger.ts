@@ -27,7 +27,8 @@ export interface SystemLogEntry {
     | 'STATE_EXTRACTION'
     | 'RESOURCE_GOVERNANCE'
     | 'PERCEPTION'
-    | 'PRIVACY';
+    | 'PRIVACY'
+    | 'SYSTEM';
   message: string;
   details?: any;
   elapsedMs?: number;

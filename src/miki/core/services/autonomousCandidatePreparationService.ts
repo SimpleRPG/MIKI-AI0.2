@@ -74,7 +74,7 @@ class AutonomousCandidatePreparationService {
   const issue=(await import('./autonomousIssueDiscoveryService')).autonomousIssueDiscoveryService.list(500).find(item=>item.id===issueId);
   if(!issue)return {targetPaths:[],missingPaths:[],reason:'AUTONOMOUS_ISSUE_NOT_FOUND'};
   const targetPaths=Array.isArray(run.payload.targetFiles)
-    ? run.payload.targetFiles.filter((value):value is string=>typeof value==='string'&&value.trim()).map(value=>value.trim())
+    ? run.payload.targetFiles.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).map(value=>value.trim())
     : [];
   if(targetPaths.length===0)return {targetPaths:[],missingPaths:[],reason:'CORE_TARGET_FILES_REQUIRED'};
   const missingPaths=targetPaths.filter(path=>!this.files.has(path));

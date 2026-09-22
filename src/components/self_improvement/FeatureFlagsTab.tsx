@@ -23,7 +23,7 @@ export const FeatureFlagsTab: React.FC = () => {
   const handleStateChange = (key: keyof SystemFeatureFlags, newState: FeatureFlagState) => {
     featureFlagsService.setFlagState(key, newState);
     setFlags({ ...featureFlagsService.getAllFlags() });
-    setSuccessMsg(`フラグ [${key}] を「${newState}」に変更しました`);
+    setSuccessMsg(`フラグ [${String(key)}] を「${String(newState)}」に変更しました`);
     setTimeout(() => setSuccessMsg(null), 2500);
   };
 
@@ -86,7 +86,7 @@ export const FeatureFlagsTab: React.FC = () => {
 
           return (
             <div
-              key={key}
+              key={String(key)}
               className={`p-3.5 rounded-xl border text-xs space-y-2.5 transition-all ${
                 isLora
                   ? 'bg-slate-950/90 border-purple-900/50'
@@ -96,9 +96,9 @@ export const FeatureFlagsTab: React.FC = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-slate-200 text-xs">{key}</span>
+                    <span className="font-mono font-bold text-slate-200 text-xs">{String(key)}</span>
                     <span className="text-slate-400 text-xs font-semibold">
-                      ({info?.title || key})
+                      ({info?.title || String(key)})
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-relaxed max-w-xl">

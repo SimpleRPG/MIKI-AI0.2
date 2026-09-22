@@ -372,7 +372,7 @@ export class CapabilityPluginService {
     }
 
     const required = plugin.requiredPermissions || [];
-    const granted = new Set(plugin.grantedPermissions || []);
+    const granted = new Set<string>((plugin.grantedPermissions || []).map(String));
     const missing = required.filter((perm) => !granted.has(perm));
 
     return {

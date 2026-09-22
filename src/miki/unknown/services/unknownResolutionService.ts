@@ -2,6 +2,7 @@ import { storageService } from '../../../services/storageService';
 
 const KEY = 'miki_unknown_resolution_v2';
 
+export type UnknownResolution = UnknownResolutionItem;
 export type ResolutionRoute = 'SOURCE' | 'CODE' | 'TEST' | 'WEB' | 'TOOL' | 'USER' | 'STOP';
 export type UnknownClassification =
   | 'STALE_INFORMATION'
@@ -174,7 +175,7 @@ export class UnknownResolutionService {
     return x.status === 'OPEN' && x.routes.includes('USER') && x.attempts >= 4 && x.attempts < x.budget;
   }
 
-  classify(q: string): string {
+  classify(q: string): UnknownClassification {
     if (/古い|最新|現在|バージョン/.test(q)) return 'STALE_INFORMATION';
     if (/矛盾|違う|一致しない/.test(q)) return 'CONFLICTING_EVIDENCE';
     if (/コード|ファイル|関数|VBA|TypeScript/.test(q)) return 'MISSING_CODE_CONTEXT';

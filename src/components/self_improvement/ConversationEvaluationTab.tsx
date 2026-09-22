@@ -272,7 +272,8 @@ export const ConversationEvaluationTab: React.FC = () => {
                       label: crit,
                       desc: '',
                     };
-                    const isGood = score >= 80;
+                    const numericScore = Number(score);
+                    const isGood = numericScore >= 80;
                     return (
                       <div key={crit} className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80 space-y-1">
                         <div className="flex items-center justify-between text-[11px]">
@@ -282,19 +283,19 @@ export const ConversationEvaluationTab: React.FC = () => {
                               isGood ? 'text-emerald-400' : 'text-amber-400'
                             }`}
                           >
-                            {score}点
+                            {numericScore}点
                           </span>
                         </div>
                         <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full ${
-                              score >= 85
+                              numericScore >= 85
                                 ? 'bg-emerald-500'
-                                : score >= 75
+                                : numericScore >= 75
                                 ? 'bg-cyan-500'
                                 : 'bg-amber-500'
                             }`}
-                            style={{ width: `${score}%` }}
+                            style={{ width: `${numericScore}%` }}
                           />
                         </div>
                         <div className="text-[10px] text-slate-500 truncate">{info.desc}</div>

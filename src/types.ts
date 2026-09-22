@@ -16,12 +16,16 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: number;
+  sender?: string;
   speaker?: {
     name?: string;
     avatar?: string;
     color?: string;
+    roleName?: string;
+    [key: string]: any;
   };
   meta?: any;
+  [key: string]: any;
 }
 
 export interface PersonaConfig {
@@ -110,6 +114,15 @@ export type ComprehensiveCodeVerification = any;
 export type ConsoleLogItem = any;
 export type ContextBudgetPlan = any;
 export type ContextTier = any;
+export type ConversationCorrectionScope = any;
+export type ConversationKnowledgeState = any;
+export type ConversationCompletenessAssessment = any;
+export type ConversationTemporalAnchor = any;
+export type ConversationTemporalReferenceKind = any;
+export type ConversationTemporalContext = any;
+export type ConversationTemporalConsistencyReport = any;
+export type ConversationUnresolvedState = any;
+export type ConversationTurnDependency = any;
 export type ConversationAnswerChangeCause = any;
 export type ConversationAnswerChangeExplanation = any;
 export type ConversationAnswerDecisionSnapshot = any;

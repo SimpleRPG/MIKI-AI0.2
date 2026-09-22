@@ -743,7 +743,7 @@ export function enrichMemoryMetadata(
  * 記憶配列全体の競合を双方向に検出し、相互に conflictWith を補完するヘルパー
  */
 export function detectAndLinkConflicts(memories: MemoryItem[]): MemoryItem[] {
-  const result = memories.map((m) => ({
+  const result: MemoryItem[] = memories.map((m) => ({
     ...m,
     conflictWith: m.conflictWith ? [...m.conflictWith] : [],
   }));

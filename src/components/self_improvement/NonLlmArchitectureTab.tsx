@@ -897,15 +897,18 @@ export const NonLlmArchitectureTab: React.FC = () => {
                     {d.evaluations && Object.keys(d.evaluations).length > 0 && (
                       <div className="mt-2 pt-2 border-t border-slate-700/60 text-xs space-y-1">
                         <span className="font-semibold text-slate-300">遅延評価結果:</span>
-                        {Object.entries(d.evaluations).map(([cp, ev]) => (
-                          <div key={cp} className="flex items-center gap-2 text-slate-400">
-                            <span className="text-slate-500">{cp}:</span>
-                            <span className={ev.outcome === 'SUCCESS' ? 'text-emerald-400' : 'text-red-400'}>
-                              {ev.outcome}
-                            </span>
-                            {ev.feedback && <span>({ev.feedback})</span>}
-                          </div>
-                        ))}
+                        {Object.entries(d.evaluations).map(([cp, rawEv]) => {
+                          const ev = rawEv as { outcome?: string; feedback?: string };
+                          return (
+                            <div key={cp} className="flex items-center gap-2 text-slate-400">
+                              <span className="text-slate-500">{cp}:</span>
+                              <span className={ev.outcome === 'SUCCESS' ? 'text-emerald-400' : 'text-red-400'}>
+                                {ev.outcome}
+                              </span>
+                              {ev.feedback && <span>({ev.feedback})</span>}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

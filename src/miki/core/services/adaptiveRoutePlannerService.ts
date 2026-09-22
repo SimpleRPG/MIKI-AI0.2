@@ -85,7 +85,7 @@ class AdaptiveRoutePlannerService {
     input:Record<string,unknown>
   ):string[] {
     const explicit=Array.isArray(input.targetFiles)
-      ? input.targetFiles.filter((value):value is string=>typeof value==='string'&&value.trim()).map(value=>value.trim())
+      ? input.targetFiles.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).map(value=>value.trim())
       : [];
     if(explicit.length>0)return [...new Set(explicit)].slice(0,3);
 
@@ -430,7 +430,7 @@ class AdaptiveRoutePlannerService {
           taskId:task.taskId,runId:String(input.runId||task.taskId),goal:task.goal,
           candidateRevision:Number(input.candidateRevision||1),
           targetFiles:Array.isArray(input.targetFiles)
-            ? input.targetFiles.filter((value):value is string=>typeof value==='string'&&value.trim()).slice(0,3)
+            ? input.targetFiles.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).slice(0,3)
             : coreTargetPaths,
           requirements:input.requirements,
           prohibitions:input.prohibitions,
@@ -447,7 +447,7 @@ class AdaptiveRoutePlannerService {
         payload:{taskId:task.taskId,runId:String(input.runId||task.taskId),goal:task.goal,
           candidateRevision:Number(candidate.candidateRevision||1)+1,
           targetFiles:Array.isArray(input.targetFiles)
-            ? input.targetFiles.filter((value):value is string=>typeof value==='string'&&value.trim()).slice(0,3)
+            ? input.targetFiles.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).slice(0,3)
             : coreTargetPaths,
           requirements:input.requirements,
           prohibitions:input.prohibitions,

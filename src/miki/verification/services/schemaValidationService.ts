@@ -19,6 +19,20 @@ export class SchemaValidationService {
   /**
    * 記憶アイテム (MemoryItem) のスキーマ検証
    */
+  public migrateUnifiedCognitiveState(input: any): ValidationResult<any> {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return { valid: false, errors: ['Unified cognitive state must be an object'] };
+    }
+
+    const migrated = { ...input, schemaVersion: 2 };
+
+    return {
+      valid: true,
+      data: migrated,
+      errors: [],
+    };
+  }
+
   public validateMemoryItem(input: any): ValidationResult<MemoryItem> {
     const errors: string[] = [];
     if (!input || typeof input !== 'object') {

@@ -315,6 +315,16 @@ class StorageService {
 
   // --- localStorage-compatible synchronous API ---
 
+  public getJson<T = unknown>(key: string, fallback?: T): T | null {
+    const raw = this.getItem(key);
+    if (raw === null) return fallback ?? null;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return fallback ?? null;
+    }
+  }
+
   public getItem(key: string): string | null {
     return this.cache.has(key) ? this.cache.get(key)! : null;
   }

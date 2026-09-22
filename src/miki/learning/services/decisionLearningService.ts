@@ -32,7 +32,7 @@ export class DecisionLearningService {
     const records = unifiedDecisionEngineService.getAllDecisions();
     const counts = new Map<DecisionFailureCause, number>();
     for (const record of records) {
-      for (const evaluation of Object.values(record.evaluations || {})) {
+      for (const evaluation of Object.values(record.evaluations || {}) as Array<{ outcome?: string; cause?: DecisionFailureCause }>) {
         if (!evaluation || (evaluation.outcome !== 'FAILURE' && evaluation.outcome !== 'SUBOPTIMAL') || !evaluation.cause) continue;
         counts.set(evaluation.cause, (counts.get(evaluation.cause) || 0) + 1);
       }
