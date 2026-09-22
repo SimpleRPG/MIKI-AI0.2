@@ -96,9 +96,9 @@ class CoreOrchestratorService {
   return task.taskId||fallbackTaskId;
  }
  private async continueTask(taskId:string,maxCycles:number,reqId:string=taskId):Promise<CoreOrchestrationResult>{
-  let dispatched=0;let cycles=taskBlackboardService.get(taskId)?.lastCycle||0;
-  while(cycles<Math.max(1,Math.min(maxCycles,100))){
-   cycles+=1;taskBlackboardService.setCycle(taskId,cycles);
+  let dispatched=0;let cycles=taskBlackboardService.get(taskId)?.lastCycle||0;let cycleBudget=0;const cycleLimit=Math.max(1,Math.min(maxCycles,100));
+  while(cycleBudget<cycleLimit){
+   cycles+=1;cycleBudget+=1;taskBlackboardService.setCycle(taskId,cycles);
    const currentBeforeState=taskBlackboardService.get(taskId);if(!currentBeforeState||currentBeforeState.status==='PAUSED'||currentBeforeState.status==='CANCELLED')break;
    const currentPayloadEntry=currentBeforeState.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
    const currentPayload=currentPayloadEntry&&typeof currentPayloadEntry==='object'&&!Array.isArray(currentPayloadEntry)?currentPayloadEntry as Record<string,unknown>:{ };
