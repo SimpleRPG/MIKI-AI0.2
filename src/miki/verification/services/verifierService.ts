@@ -1,7 +1,6 @@
 import { ClaimRecord, ClaimVerificationStatus } from '../../../types';
 import { claimDatabaseService } from '../../../services/claimDatabaseService';
 import { evidenceService, EvidenceRecord } from '../../../services/evidenceService';
-import { knowledgeGapService } from '../../../services/knowledgeGapService';
 import { systemLogger } from '../../../services/systemLogger';
 
 export type VerificationOutcome =
@@ -106,10 +105,6 @@ export class VerifierService {
     }
 
     const promoted = outcome === 'SUPPORTED' || outcome === 'DEVICE_VERIFIED';
-
-    if (promoted && params.resolveGapId) {
-      knowledgeGapService.markResolved(params.resolveGapId);
-    }
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
