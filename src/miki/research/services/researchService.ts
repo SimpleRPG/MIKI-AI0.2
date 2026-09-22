@@ -338,6 +338,13 @@ export class ResearchService {
         previousEvidenceIds = currentEvidenceIds;
         previousIndependentClusters = currentIndependentClusters;
 
+        const webPolicySatisfied = webResearchPolicy.stopWhenTargetReached && webResearchPolicyService.isSatisfied(webResearchProgress, webResearchPolicy);
+        if (webPolicySatisfied && !resolved) {
+          continuationAvailable = false;
+          continuationReason = "INSUFFICIENT_VERIFICATION";
+          break;
+        }
+
         if (adaptive && (noNewEvidence || (!meaningfulness.meaningful && pass > 0))) {
           continuationAvailable = false;
           continuationReason = noNewEvidence ? 'NO_NEW_EVIDENCE' : 'LOW_INFORMATION_GAIN';
