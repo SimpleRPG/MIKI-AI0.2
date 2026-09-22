@@ -102,6 +102,24 @@ class SelfCodeSpaceService {
     return this.clone(updated);
   }
 
+  async push(token:string,commitMessage='Update self code space'): Promise<SelfCodeSnapshot> {
+    const snapshot=this.get();
+    if(!snapshot) throw new Error('SELF_CODE_SPACE_NOT_SYNCED');
+    if(!snapshot.dirty) throw new Error('SELF_CODE_SPACE_NOT_DIRTY');
+    if(!token.trim()) throw new Error('GITHUB_TOKEN_REQUIRED');
+    const result=await apiService.pushToGitHubRepo({
+      repoUrl:REPOSITORY,
+      branch:BRANCH,
+      commitMessage,
+      files:snapshot.files.map(file=>({path:file.path,content:file.content})),
+      githubToken:token.trim()
+    });
+    if(!result.success) throw new Error('SELF_CODE_SPACE_PUSH_FAILED');
+    const clean={...snapshot,dirty:false,baseRepoSha256:snapshot.repoSha256,syncedAt:Date.now()};
+    storageService.setItem(KEY,JSON.stringify(clean));
+    return this.clone(clean);
+  }
+
   search(query: string, limit = 20): SelfCodeFile[] {
     const q = query.trim().toLowerCase();
     if (!q) return [];
