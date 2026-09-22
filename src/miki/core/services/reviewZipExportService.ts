@@ -11,12 +11,17 @@ import { persistenceReceiptLedgerService } from './persistenceReceiptLedgerServi
 export type ReviewPackageStatus='READY_FOR_EXTERNAL_REVIEW'|'EXTERNAL_REVIEW_PENDING'|'ACCEPTED'|'REJECTED'|'NEEDS_CHANGES'|'HOLD';
 export type ReviewZipCreateCode='SUCCESS'|'RUN_NOT_FOUND'|'WORKSPACE_NOT_FOUND'|'NO_CANDIDATE_FILES'|'PACKAGE_NOT_FOUND'|'SNAPSHOT_MISMATCH'|'ZIP_BUILD_FAILED'|'ZIP_VERIFY_FAILED'|'SAVE_FAILED';
 export type ReviewPackageCreationMode='NEW_SERIES'|'NEXT_PACKAGE_REVISION';
+export interface ReviewExternalDirectiveContext {
+ directiveId:string|null; sourceHash:string|null; targetFiles:string[];
+ requirements:string[]; prohibitions:string[]; invariants:string[];
+ validationRequirements:string[]; deliveryRequirements:string[]; relatedIssueIds:string[];
+}
 export interface ReviewPackageLedgerRecord {
  packageId:string; candidateId?:string; validationBundleId?:string; packageSeriesId:string; packageRevision:number; candidateRevision:number; workspaceId:string; runId:string;
  transactionId:string; corePlanRevision:string; operationInstanceId:string; persistenceReceiptId:string;
  fileName:string; zipSha256:string; candidateManifestSha256:string; baselineManifestSha256:string; packageManifestSha256:string; packageLedgerReceiptId?:string;
  status:ReviewPackageStatus; createdAt:number;
- inputs:{issueId:string;objective:string;files:Array<{path:string;baselineContent:string;candidateContent:string;baselineSha256:string;candidateSha256:string;evidenceIds:string[]}>};
+ inputs:{issueId:string;objective:string;externalDirective?:ReviewExternalDirectiveContext;files:Array<{path:string;baselineContent:string;candidateContent:string;baselineSha256:string;candidateSha256:string;evidenceIds:string[]}>};
 }
 export interface ReviewZipArtifact extends ReviewPackageLedgerRecord {blob:Blob;size:number;}
 export interface ReviewZipCreateResult {ok:boolean;code:ReviewZipCreateCode;artifact?:ReviewZipArtifact;message:string;}
@@ -25,6 +30,23 @@ const LEGACY_LEDGER_KEY='miki_review_package_ledger_v2';
 const textBytes=(value:string)=>new TextEncoder().encode(value).length;
 class ReviewZipExportService {
  private ledger=new Map<string,ReviewPackageLedgerRecord>();
+ private externalDirectiveContext(run:{payload:Record<string,unknown>}){
+  const value=(key:string):unknown=>{
+   const item=run.payload[key];
+   return Array.isArray(item)?item.filter((x):x is string=>typeof x==='string'&&Boolean(x.trim())):item??null;
+  };
+  return {
+   directiveId:typeof run.payload.directiveId==='string'?run.payload.directiveId:null,
+   sourceHash:typeof run.payload.sourceHash==='string'?run.payload.sourceHash:null,
+   targetFiles:value('targetFiles')||[],
+   requirements:value('requirements')||[],
+   prohibitions:value('prohibitions')||[],
+   invariants:value('invariants')||[],
+   validationRequirements:value('validationRequirements')||[],
+   deliveryRequirements:value('deliveryRequirements')||[],
+   relatedIssueIds:value('relatedIssueIds')||[]
+  };
+ }
  constructor(){this.load();}
  async create(runId:string,workspaceId:string,options:{mode?:ReviewPackageCreationMode;sourcePackageId?:string;corePlanRevision?:number;operationInstanceId?:string;candidateId?:string;candidateManifestSha256?:string;validationBundleId?:string;taskId?:string;externalReviewQuestions?:string[];learningLineage?:unknown}={}):Promise<ReviewZipCreateResult>{
   const run=improvementIntakeRouterService.get(runId); if(!run)return {ok:false,code:'RUN_NOT_FOUND',message:`Run not found: ${runId}`};
@@ -46,8 +68,8 @@ class ReviewZipExportService {
   try{
    const snapshotFiles=workspace.files.map(file=>({...file,evidenceIds:[...file.evidenceIds]}));
    const baselineManifest={formatVersion:1,workspaceId,issueId:workspace.issueId,files:snapshotFiles.map(file=>({path:file.path,size:textBytes(file.baselineContent),sha256:file.baselineSha256}))};
-   const baselineManifestSha256=canonicalSha256(baselineManifest);
-   const candidateManifestBody={formatVersion:3,candidateId,validationBundleId,learningLineage:options.learningLineage??null,packageSeriesId,packageRevision,candidateRevision,workspaceId,runId,issueId:workspace.issueId,transactionId,corePlanRevision,operationInstanceId,persistenceReceiptId,externalDirective:{directiveId:run.payload.directiveId||null,sourceHash:run.payload.sourceHash||null,targetFiles:run.payload.targetFiles||[],requirements:run.payload.requirements||[],prohibitions:run.payload.prohibitions||[],invariants:run.payload.invariants||[],validationRequirements:run.payload.validationRequirements||[],deliveryRequirements:run.payload.deliveryRequirements||[],relatedIssueIds:run.payload.relatedIssueIds||[]},files:snapshotFiles.map(file=>({path:file.path,size:textBytes(file.candidateContent),sha256:file.candidateSha256,evidenceIds:file.evidenceIds}))};
+   const baselineManifestSha256=canonicalSha256(baselineManifest);\n   const externalDirective=this.externalDirectiveContext(run);
+   const candidateManifestBody={formatVersion:3,candidateId,validationBundleId,learningLineage:options.learningLineage??null,packageSeriesId,packageRevision,candidateRevision,workspaceId,runId,issueId:workspace.issueId,transactionId,corePlanRevision,operationInstanceId,persistenceReceiptId,externalDirective:this.externalDirectiveContext(run),files:snapshotFiles.map(file=>({path:file.path,size:textBytes(file.candidateContent),sha256:file.candidateSha256,evidenceIds:file.evidenceIds}))};
    const packageId=`RPK-${canonicalSha256({packageSeriesId,packageRevision,candidateManifestSha256}).slice(0,24)}`;
    const packageManifest={...candidateManifestBody,packageId,baselineManifestSha256,candidateManifestSha256};
    const packageManifestSha256=canonicalSha256(packageManifest);
@@ -67,13 +89,13 @@ class ReviewZipExportService {
    zip.file('package_manifest.json',JSON.stringify({...packageManifest,packageManifestSha256},null,2));
    zip.file('change_history.json',JSON.stringify(changeHistory,null,2));
    zip.file('issue.json',JSON.stringify(issue,null,2));
-   zip.file('validation.json',JSON.stringify({schemaVersion:2,workspaceId,validationManifest,validationSummary:validationManifest,requirements:{validationRequirements:run.payload.validationRequirements||[],deliveryRequirements:run.payload.deliveryRequirements||[]},performed:validation.filter(item=>item.passed).map(item=>({...item,status:'PASSED'})),unperformed:validationManifest.missing.map(stage=>({stage,status:'NOT_RUN'})),shadowEvaluation:shadow??null,disclosure:'NOT_RUN and ENVIRONMENT_UNAVAILABLE are never treated as PASS'},null,2));
+   zip.file('validation.json',JSON.stringify({schemaVersion:2,workspaceId,validationManifest,validationSummary:validationManifest,requirements:{validationRequirements:externalDirective.validationRequirements,deliveryRequirements:externalDirective.deliveryRequirements},performed:validation.filter(item=>item.passed).map(item=>({...item,status:'PASSED'})),unperformed:validationManifest.missing.map(stage=>({stage,status:'NOT_RUN'})),shadowEvaluation:shadow??null,disclosure:'NOT_RUN and ENVIRONMENT_UNAVAILABLE are never treated as PASS'},null,2));
    zip.file('unresolved_checks.json',JSON.stringify({packageId,items:unresolvedChecks,candidateUnknownContext:candidateUnknownContext??null,externalQuestions:candidateUnknownContext?.externalQuestions??[]},null,2));
    zip.file('review_request.json',JSON.stringify(reviewRequest,null,2));
    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
    if(!await this.verify(blob,{packageManifestSha256,baselineManifestSha256,candidateManifestSha256,files:snapshotFiles}))return {ok:false,code:'ZIP_VERIFY_FAILED',message:'Generated ZIP failed entry or SHA verification'};
    const zipSha256=await this.sha(blob); const createdAt=Date.now();
-   const record:ReviewPackageLedgerRecord={packageId,candidateId,validationBundleId,packageSeriesId,packageRevision,candidateRevision,workspaceId,runId,transactionId,corePlanRevision,operationInstanceId,persistenceReceiptId,fileName:`MIKI-AI-review-${packageSeriesId}-r${packageRevision}-${packageId}.zip`,zipSha256,candidateManifestSha256,baselineManifestSha256,packageManifestSha256,status:'EXTERNAL_REVIEW_PENDING',createdAt,inputs:{issueId:workspace.issueId,objective:run.objective,files:snapshotFiles}};
+   const record:ReviewPackageLedgerRecord={packageId,candidateId,validationBundleId,packageSeriesId,packageRevision,candidateRevision,workspaceId,runId,transactionId,corePlanRevision,operationInstanceId,persistenceReceiptId,fileName:`MIKI-AI-review-${packageSeriesId}-r${packageRevision}-${packageId}.zip`,zipSha256,candidateManifestSha256,baselineManifestSha256,packageManifestSha256,status:'EXTERNAL_REVIEW_PENDING',createdAt,inputs:{issueId:workspace.issueId,objective:run.objective,externalDirective:this.externalDirectiveContext(run),files:snapshotFiles}};
    this.ledger.set(packageId,record); if(!this.save()){this.ledger.delete(packageId);return {ok:false,code:'SAVE_FAILED',message:'Review package ledger could not be persisted'};}
    const packageLedgerReceiptId=`PR-PKG-${packageId}`;
    try{
@@ -103,16 +125,32 @@ class ReviewZipExportService {
  private async rebuildFromSnapshot(record:ReviewPackageLedgerRecord):Promise<ReviewZipCreateResult>{
   const zip=new JSZip(); for(const file of record.inputs.files){zip.file(`baseline/${file.path}`,file.baselineContent);zip.file(`candidate/${file.path}`,file.candidateContent);}
   const base={formatVersion:1,workspaceId:record.workspaceId,issueId:record.inputs.issueId,files:record.inputs.files.map(file=>({path:file.path,size:textBytes(file.baselineContent),sha256:file.baselineSha256})),baselineManifestSha256:record.baselineManifestSha256};
-  const manifest={formatVersion:3,packageId:record.packageId,candidateId:record.candidateId,validationBundleId:record.validationBundleId,packageSeriesId:record.packageSeriesId,packageRevision:record.packageRevision,candidateRevision:record.candidateRevision,workspaceId:record.workspaceId,runId:record.runId,issueId:record.inputs.issueId,transactionId:record.transactionId,corePlanRevision:record.corePlanRevision,operationInstanceId:record.operationInstanceId,persistenceReceiptId:record.persistenceReceiptId,files:record.inputs.files.map(file=>({path:file.path,size:textBytes(file.candidateContent),sha256:file.candidateSha256,evidenceIds:file.evidenceIds})),baselineManifestSha256:record.baselineManifestSha256,candidateManifestSha256:record.candidateManifestSha256};
-  zip.file('baseline_manifest.json',JSON.stringify(base,null,2));zip.file('candidate_manifest.json',JSON.stringify(manifest,null,2));zip.file('package_manifest.json',JSON.stringify({...manifest,packageManifestSha256:record.packageManifestSha256},null,2));zip.file('change_history.json',JSON.stringify({packageId:record.packageId,packageSeriesId:record.packageSeriesId,packageRevision:record.packageRevision,candidateRevision:record.candidateRevision,regeneratedFromFrozenSnapshot:true},null,2));zip.file('issue.json',JSON.stringify({issueId:record.inputs.issueId,runId:record.runId,objective:record.inputs.objective},null,2));const frozenValidationManifest=candidateValidationEvidenceService.evaluate(record.workspaceId,record.candidateManifestSha256);zip.file('validation.json',JSON.stringify({schemaVersion:2,workspaceId:record.workspaceId,validationManifest:frozenValidationManifest,validationSummary:frozenValidationManifest,performed:candidateValidationEvidenceService.list(record.workspaceId).filter(item=>item.passed).map(item=>({...item,status:'PASSED'})),unperformed:frozenValidationManifest.missing.map(stage=>({stage,status:'NOT_RUN'})),shadowEvaluation:shadowEvaluationService.latest(record.workspaceId)??null,disclosure:'NOT_RUN and ENVIRONMENT_UNAVAILABLE are never treated as PASS'},null,2));zip.file('unresolved_checks.json',JSON.stringify({packageId:record.packageId,items:frozenValidationManifest.missing.map(stage=>`NOT_RUN:${stage}`)},null,2));zip.file('review_request.json',JSON.stringify({packageId:record.packageId,packageManifestSha256:record.packageManifestSha256,decision:'ACCEPT|REJECT|NEEDS_CHANGES'},null,2));
+  const manifest={formatVersion:3,packageId:record.packageId,candidateId:record.candidateId,validationBundleId:record.validationBundleId,packageSeriesId:record.packageSeriesId,packageRevision:record.packageRevision,candidateRevision:record.candidateRevision,workspaceId:record.workspaceId,runId:record.runId,issueId:record.inputs.issueId,transactionId:record.transactionId,corePlanRevision:record.corePlanRevision,operationInstanceId:record.operationInstanceId,persistenceReceiptId:record.persistenceReceiptId,externalDirective:record.inputs.externalDirective??null,files:record.inputs.files.map(file=>({path:file.path,size:textBytes(file.candidateContent),sha256:file.candidateSha256,evidenceIds:file.evidenceIds})),baselineManifestSha256:record.baselineManifestSha256,candidateManifestSha256:record.candidateManifestSha256};
+  zip.file('baseline_manifest.json',JSON.stringify(base,null,2));zip.file('candidate_manifest.json',JSON.stringify(manifest,null,2));zip.file('package_manifest.json',JSON.stringify({...manifest,packageManifestSha256:record.packageManifestSha256},null,2));zip.file('change_history.json',JSON.stringify({packageId:record.packageId,packageSeriesId:record.packageSeriesId,packageRevision:record.packageRevision,candidateRevision:record.candidateRevision,regeneratedFromFrozenSnapshot:true},null,2));zip.file('issue.json',JSON.stringify({issueId:record.inputs.issueId,runId:record.runId,objective:record.inputs.objective},null,2));const frozenValidationManifest=candidateValidationEvidenceService.evaluate(record.workspaceId,record.candidateManifestSha256);zip.file('validation.json',JSON.stringify({schemaVersion:2,workspaceId:record.workspaceId,validationManifest:frozenValidationManifest,validationSummary:frozenValidationManifest,requirements:{validationRequirements:record.inputs.externalDirective?.validationRequirements??[],deliveryRequirements:record.inputs.externalDirective?.deliveryRequirements??[]},performed:candidateValidationEvidenceService.list(record.workspaceId).filter(item=>item.passed).map(item=>({...item,status:'PASSED'})),unperformed:frozenValidationManifest.missing.map(stage=>({stage,status:'NOT_RUN'})),shadowEvaluation:shadowEvaluationService.latest(record.workspaceId)??null,disclosure:'NOT_RUN and ENVIRONMENT_UNAVAILABLE are never treated as PASS'},null,2));zip.file('unresolved_checks.json',JSON.stringify({packageId:record.packageId,items:frozenValidationManifest.missing.map(stage=>`NOT_RUN:${stage}`)},null,2));zip.file('review_request.json',JSON.stringify({packageId:record.packageId,packageManifestSha256:record.packageManifestSha256,decision:'ACCEPT|REJECT|NEEDS_CHANGES'},null,2));
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});const verified=await this.verify(blob,{packageManifestSha256:record.packageManifestSha256,baselineManifestSha256:record.baselineManifestSha256,candidateManifestSha256:record.candidateManifestSha256,files:record.inputs.files});if(!verified)return {ok:false,code:'ZIP_VERIFY_FAILED',message:'Frozen package snapshot failed ZIP verification'};const zipSha256=await this.sha(blob);const artifact={...this.clone(record),blob,size:blob.size,zipSha256};return {ok:true,code:'SUCCESS',message:'Frozen evaluation ZIP regenerated and verified',artifact};
  }
  private nextPackageRevision(seriesId:string){return this.list().filter(item=>item.packageSeriesId===seriesId).reduce((max,item)=>Math.max(max,item.packageRevision),0)+1;}
  private nextCandidateRevision(runId:string,workspaceId:string){return this.list().filter(item=>item.runId===runId&&item.workspaceId===workspaceId).reduce((max,item)=>Math.max(max,item.candidateRevision),0)+1;}
  private async verify(blob:Blob,expected:{packageManifestSha256:string;baselineManifestSha256:string;candidateManifestSha256:string;files:Array<{path:string;baselineContent:string;candidateContent:string;baselineSha256:string;candidateSha256:string}>}){const zip=await JSZip.loadAsync(blob);for(const path of ['baseline_manifest.json','candidate_manifest.json','package_manifest.json','change_history.json','issue.json','validation.json','unresolved_checks.json','review_request.json'])if(!zip.file(path))return false;const packageManifest=JSON.parse(await zip.file('package_manifest.json')!.async('string'));if(packageManifest.packageManifestSha256!==expected.packageManifestSha256||packageManifest.baselineManifestSha256!==expected.baselineManifestSha256||packageManifest.candidateManifestSha256!==expected.candidateManifestSha256)return false;for(const file of expected.files){for(const [area,content,sha256] of [['baseline',file.baselineContent,file.baselineSha256],['candidate',file.candidateContent,file.candidateSha256]] as const){const entry=zip.file(`${area}/${file.path}`);if(!entry||canonicalSha256(await entry.async('string'))!==sha256||canonicalSha256(content)!==sha256)return false;}}return true;}
  private async sha(blob:Blob){const hash=await crypto.subtle.digest('SHA-256',await blob.arrayBuffer());return [...new Uint8Array(hash)].map(v=>v.toString(16).padStart(2,'0')).join('');}
- private clone(value:ReviewPackageLedgerRecord):ReviewPackageLedgerRecord{return {...value,inputs:{...value.inputs,files:value.inputs.files.map(file=>({...file,evidenceIds:[...file.evidenceIds]}))}};}
+ private clone(value:ReviewPackageLedgerRecord):ReviewPackageLedgerRecord{
+  const directive=value.inputs.externalDirective;
+  return {...value,inputs:{
+    ...value.inputs,
+    externalDirective:directive?{
+      ...directive,
+      targetFiles:[...directive.targetFiles],
+      requirements:[...directive.requirements],
+      prohibitions:[...directive.prohibitions],
+      invariants:[...directive.invariants],
+      validationRequirements:[...directive.validationRequirements],
+      deliveryRequirements:[...directive.deliveryRequirements],
+      relatedIssueIds:[...directive.relatedIssueIds]
+    }:undefined,
+    files:value.inputs.files.map(file=>({...file,evidenceIds:[...file.evidenceIds]}))
+  }};
+}
  private save(){try{storageService.setItem(LEDGER_KEY,JSON.stringify(this.list().slice(0,100)));return true;}catch{return false;}}
- private load(){try{const raw=storageService.getItem(LEDGER_KEY)??storageService.getItem(LEGACY_LEDGER_KEY);const values=raw?JSON.parse(raw):[];if(Array.isArray(values))for(const value of values){const migrated:ReviewPackageLedgerRecord={...value,candidateId:value.candidateId??`CAND-${value.workspaceId}`,validationBundleId:value.validationBundleId??`VAL-CAND-${value.workspaceId}`,packageSeriesId:value.packageSeriesId??`LEGACY-${value.packageId}`,packageRevision:value.packageRevision??1,transactionId:value.transactionId??'UNAVAILABLE',corePlanRevision:value.corePlanRevision??'UNAVAILABLE',operationInstanceId:value.operationInstanceId??'UNAVAILABLE',persistenceReceiptId:value.persistenceReceiptId??'UNAVAILABLE',baselineManifestSha256:value.baselineManifestSha256??canonicalSha256(value.inputs?.files?.map((file:any)=>({path:file.path,sha256:file.baselineSha256}))??[]),packageManifestSha256:value.packageManifestSha256??value.candidateManifestSha256,packageLedgerReceiptId:value.packageLedgerReceiptId,inputs:{...value.inputs,objective:value.inputs?.objective??''}};this.ledger.set(migrated.packageId,migrated);}}catch{this.ledger.clear();}}
+ private load(){try{const raw=storageService.getItem(LEDGER_KEY)??storageService.getItem(LEGACY_LEDGER_KEY);const values=raw?JSON.parse(raw):[];if(Array.isArray(values))for(const value of values){const migrated:ReviewPackageLedgerRecord={...value,candidateId:value.candidateId??`CAND-${value.workspaceId}`,validationBundleId:value.validationBundleId??`VAL-CAND-${value.workspaceId}`,packageSeriesId:value.packageSeriesId??`LEGACY-${value.packageId}`,packageRevision:value.packageRevision??1,transactionId:value.transactionId??'UNAVAILABLE',corePlanRevision:value.corePlanRevision??'UNAVAILABLE',operationInstanceId:value.operationInstanceId??'UNAVAILABLE',persistenceReceiptId:value.persistenceReceiptId??'UNAVAILABLE',baselineManifestSha256:value.baselineManifestSha256??canonicalSha256(value.inputs?.files?.map((file:any)=>({path:file.path,sha256:file.baselineSha256}))??[]),packageManifestSha256:value.packageManifestSha256??value.candidateManifestSha256,packageLedgerReceiptId:value.packageLedgerReceiptId,inputs:{issueId:value.inputs?.issueId??value.workspaceId,objective:value.inputs?.objective??'',externalDirective:value.inputs?.externalDirective,files:Array.isArray(value.inputs?.files)?value.inputs.files:[]}};this.ledger.set(migrated.packageId,migrated);}}catch{this.ledger.clear();}}
 }
 export const reviewZipExportService=new ReviewZipExportService();
