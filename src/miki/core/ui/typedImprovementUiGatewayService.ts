@@ -177,20 +177,7 @@ class TypedImprovementUiGatewayService {
   }
   resumeImprovementTask(taskId:string){return this.sendImprovementCommand({commandType:'RESUME_IMPROVEMENT_TASK',taskId,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-resume'),operationInstanceId:coreResultService.generateRequestId('operation')});}
   async executeDirectiveUntilReviewPackage(directiveId:string){
-    const maxCycles=coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT');
-    let result=await this.executeDirective(directiveId);
-    let cycles=0;
-    while(result.taskId&&cycles<maxCycles){
-      const stage=String(result.currentBusinessStage||result.currentStage||'').toUpperCase();
-      if(['COMPLETED','FAILED','BLOCKED','REJECTED'].includes(stage))break;
-      const task=taskBlackboardService.get(result.taskId);
-      if(task?.status==='PAUSED'){
-        result=await this.resumeImprovementTask(task.taskId);
-      }else{
-        result=this.taskSnapshotResult(task?.taskId||result.taskId,task?.revision||result.taskRevision||0,task?.status||result.currentStage);
-      }
-      cycles++;
-    }
+    const result=await this.executeDirective(directiveId);
     const run=result.taskId
       ? this.getIntakeRuns(100).find(item=>item.taskId===result.taskId)
       : undefined;
@@ -201,7 +188,7 @@ class TypedImprovementUiGatewayService {
       ...result,
       packageId:packageRecord?.packageId,
       packageStatus:packageRecord?.status,
-      cycles
+      cycles:run?.taskId ? undefined : 0
     };
   }
   async saveAutonomyConfig(config:Partial<AutopilotConfig>){const command:ImprovementUiCommand={commandType:'SAVE_AUTONOMY_CONFIG',goal:'自律巡回設定を保存する',config,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-autonomy-config'),operationInstanceId:coreResultService.generateRequestId('operation')};const result=await coreTaskIngressService.submit({kind:'SYSTEM_TASK',goal:command.goal,source:'core',payload:{entry:'TYPED_IMPROVEMENT_UI_GATEWAY',operation:'SAVE_AUTONOMY_CONFIG',config:command.config,commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt}});return this.toCommandResult(command,result);}
