@@ -115,6 +115,18 @@ class AutonomousSelfImprovementLoopService {
       resourceWaitCount: 0,
       evidenceWaitCount: 0,
     };
+    const task=taskBlackboardService.create(trigger,'core',{
+      kind:'SELF_IMPROVEMENT',
+      runId:meta.runId,
+      changeSetId:meta.changeSetId,
+      runType:meta.runType,
+      sourceId:meta.sourceId,
+      priority:meta.priority,
+      orchestrationMode:'SELF_IMPROVEMENT_WORKER',
+      ...(meta.payload||{})
+    });
+    taskBlackboardService.pause(task.taskId,'SELF_IMPROVEMENT_QUEUED');
+    item.taskId=task.taskId;
     this.state.queue.push(item);
     this.state.queue.sort((left, right) =>
       (right.priority || 0) - (left.priority || 0) ||
