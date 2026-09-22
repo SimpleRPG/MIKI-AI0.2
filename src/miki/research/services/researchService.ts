@@ -7,6 +7,7 @@ import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/service
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 import { webTermLearningService } from './webTermLearningService';
 import { researchQueryPlanningService } from './researchQueryPlanningService';
+import { researchQueryOutcomeLearningService } from './researchQueryOutcomeLearningService';
 
 export type { ResearchRoute };
 
