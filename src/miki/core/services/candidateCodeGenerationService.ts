@@ -1,4 +1,5 @@
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
+import { autonomousCandidatePreparationService } from './autonomousCandidatePreparationService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { apiUrl, getCustomApiHeaders } from '../../../services/api';
 import { storageService } from '../../../services/storageService';

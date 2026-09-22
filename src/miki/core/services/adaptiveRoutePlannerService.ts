@@ -80,84 +80,9 @@ class AdaptiveRoutePlannerService {
    * Domain側のCandidatePreparationは、この結果を実行するだけで
    * 独自に対象を再選定してはならない。
    */
-  private resolveCoreTargetPaths(
-    task:BlackboardTask,
-    input:Record<string,unknown>
-  ):string[] {
-    const explicit=Array.isArray(input.targetFiles)
-      ? input.targetFiles.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).map(value=>value.trim())
-      : [];
-    if(explicit.length>0)return [...new Set(explicit)].slice(0,3);
-
-    const target=String(input.target||'').trim();
-    if(target){
-      const normalized=target.toLowerCase();
-      const exact=selfCodeSpaceService.listSourceFiles()
-        .filter(file=>{
-          const path=file.path.toLowerCase();
-          return path===normalized||path.endsWith(`/${normalized}`);
-        })
-        .map(file=>file.path);
-      if(exact.length>0)return exact.slice(0,3);
-    }
-
-    const sourceSnapshot=selfCodeSpaceService.listSourceFiles();
-    if(sourceSnapshot.length===0)return [];
-
-    const results=task.entries.filter(entry=>entry.kind==='RESULT');
-    let issueText=task.goal;
-
-    const discovery=[...results].reverse().find(entry=>{
-      const value=objectValue(entry);
-      return value?.operation==='DISCOVER_IMPROVEMENT_ISSUE';
-    });
-
-    if(discovery){
-      const value=objectValue(discovery);
-      const reply=value?.reply&&typeof value.reply==='object'
-        ? value.reply as Record<string,unknown>
-        : undefined;
-      const data=reply?.data&&typeof reply.data==='object'
-        ? reply.data as Record<string,unknown>
-        : undefined;
-      const issues=Array.isArray(data?.issues)
-        ? data.issues.filter((item):item is Record<string,unknown>=>Boolean(item&&typeof item==='object'))
-        : [];
-      const requestedIssueId=String(input.issueId||'').trim();
-      const issue=issues.find(item=>!requestedIssueId||String(item.id||'')===requestedIssueId)
-        || issues.find(item=>item.resolvedAt===undefined&&!item.queuedAt)
-        || issues[0];
-      if(issue){
-        issueText=[
-          String(issue.title||''),
-          String(issue.detail||''),
-          String(issue.sourceId||''),
-          String(issue.kind||'')
-        ].join(' ');
-      }
-    }
-
-    const terms=[...new Set(
-      issueText
-        .toLowerCase()
-        .split(/[^a-z0-9_\u3040-\u30ff\u3400-\u9fff]+/)
-        .filter(term=>term.length>=3)
-    )].slice(0,40);
-
-    const scored=sourceSnapshot.map(file=>{
-      const hay=`${file.path} ${file.content.slice(0,12000)}`.toLowerCase();
-      const hits=terms.filter(term=>hay.includes(term));
-      const pathHits=terms.filter(term=>file.path.toLowerCase().includes(term));
-      return {
-        path:file.path,
-        score:hits.length+pathHits.length*3
-      };
-    })
-    .filter(item=>item.score>0)
-    .sort((a,b)=>b.score-a.score||a.path.localeCompare(b.path))
-    .slice(0,3);
-
-    return scored.map(item=>item.path);
+  private resolveCoreTargetPaths(task:BlackboardTask,input:Record<string,unknown>):string[] {
+    const explicit=Array.isArray(input.targetFiles)?input.targetFiles.filter((value):value is string=>typeof value==="string"&&Boolean(value.trim())).map(value=>value.trim()):[];
+    return [...new Set(explicit)].slice(0,3);
   }
 
   /**
@@ -182,9 +107,7 @@ class AdaptiveRoutePlannerService {
     );
     const coreTargetPaths=this.resolveCoreTargetPaths(task,input);
     const targetFilesKnown=Boolean(
-      input.targetFiles && Array.isArray(input.targetFiles) && input.targetFiles.length>0 ||
-      (targetText && sourceSnapshot.some(file=>file.path.toLowerCase()===targetText || file.path.toLowerCase().endsWith(`/${targetText}`))) ||
-      coreTargetPaths.length>0 ||
+      Array.isArray(input.targetFiles)&&input.targetFiles.some(value=>typeof value==="string"&&Boolean(value.trim())) ||
       results.some(entry=>this.containsKey(entry,/target.?files|targetPaths|changedFilePaths/i))
     );
 
