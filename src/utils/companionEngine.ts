@@ -1,7 +1,7 @@
 import { PersonaConfig, MemoryItem } from '../types';
 import { toolsService } from '../services/toolsService';
 import { codeUnderstandingService } from '../services/codeUnderstandingService';
-import { selfCodeArchitectService } from '../services/selfCodeArchitectService';
+import { selfImprovementIngressService } from '../miki/core/services/selfImprovementIngressService';
 
 export function generateSmartCompanionReply(
   prompt: string,
@@ -88,9 +88,11 @@ export function generateSmartCompanionReply(
   const isSelfImprovementIntent =
     /(自分で.*(改善|直して|進めて|アプリ)|アプリ.*(改善|自己改善)|仕様書.*(実装|適合|進めて)|自律.*改善|未実装.*(実装|改善)|自己改善して)/i.test(p);
   if (isSelfImprovementIntent) {
-    void selfCodeArchitectService.runAutonomousImprovementCycle().catch((err) => {
-      console.warn('Autonomous improvement background error:', err);
-    });
+    try {
+      selfImprovementIngressService.submit({ trigger: p, source: 'UI', runType: 'USER_REQUEST' });
+    } catch (err) {
+      console.warn('Autonomous improvement ingress error:', err);
+    }
     return `うん、わかった！私が自分でアプリの改善を進めるね！任せて！🛠️✨\n\n仕様書の未実装要件やドリフトを自律的に見つけて、モデル生成系ランタイム保護やプライバシー境界などの不変条件を守りながら、安全に自律実装パイプライン（ローカルLLM/教師支援）を実行中だよ！進捗は「自己改善ラボ」タブで確認できるよ！😊💪`;
   }
 
@@ -98,9 +100,12 @@ export function generateSmartCompanionReply(
   const isSelfAuditIntent =
     /(コード監査|仕様.*監査|ドリフト.*検知|不変条件.*(確認|チェック)|仕様.*実装.*整合性|設計思想.*チェック)/i.test(p);
   if (isSelfAuditIntent) {
-    const audit = selfCodeArchitectService.runSelfCodeAudit();
-    const invStatus = audit.invariantsAudit.allPassed ? '✅ オールクリア (5項目保護中)' : '⚠️ 警告あり';
-    return `自己コード監査を実行したよ！📋✨\n\n` +
+    selfImprovementIngressService.submit({
+      trigger: 'conversation:self-code-audit',
+      source: 'UI',
+      runType: 'USER_REQUEST',
+    });
+    return `自己コード監査要求をCOREへ投入しました。監査内容と次の行動はCOREが決定します。`;\n  }\n\nを実行したよ！📋✨\n\n` +
       `・**設計思想仕様書**: 全${audit.totalChapters}章中、**${audit.completedChapters}章が実装完了**\n` +
       `・**仕様適合スコア**: **${audit.complianceScore}点** / 100点\n` +
       `・**不変条件エンジン**: ${invStatus}\n` +

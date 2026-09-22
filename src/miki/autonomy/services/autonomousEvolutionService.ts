@@ -11,7 +11,7 @@ import { selfImprovementService } from '../../improvement/services/selfImproveme
 import { workingAgendaService } from '../../strategy/services/workingAgendaService';
 import { autonomousSearchService } from '../../research/services/autonomousSearchService';
 import { syntheticDataService } from '../../research/services/syntheticDataService';
-import { selfCodeArchitectService } from '../../selfDevelopment/services/selfCodeArchitectService';
+import { selfImprovementIngressService } from '../../core/services/selfImprovementIngressService';
 import { experienceLinkService } from '../../experience/services/experienceLinkService';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { SelfImprovementProposal } from '../../../types';
@@ -174,13 +174,14 @@ export class AutonomousEvolutionService {
       const appliedProposals: SelfImprovementProposal[] = [];
 
       try {
-        const autoImprovementResult = await selfCodeArchitectService.runAutonomousImprovementCycle();
-        if (autoImprovementResult.success && autoImprovementResult.proposal) {
-          selfCodeImprovementRun = 1;
-          selfCodeImprovementSummaryText = `第${autoImprovementResult.targetChapter.chapterNumber}章「${autoImprovementResult.targetChapter.title}」の改善提案を作成（シミュレーション完了・zip/コミット確認待ち）`;
-          appliedProposals.push(autoImprovementResult.proposal);
-          highlights.push(`【自律改善提案生成】みき自身が第${autoImprovementResult.targetChapter.chapterNumber}章『${autoImprovementResult.targetChapter.title}』の安全変更契約提案を生成・シミュレーション検証完了（※本番自動即時適用は安全弁により停止中）`);
-        }
+        selfImprovementIngressService.submit({
+          trigger: 'idle-autonomous-evolution:self-improvement',
+          source: 'SYSTEM',
+          runType: 'AUTONOMOUS_DISCOVERY',
+        });
+        selfCodeImprovementRun = 1;
+        selfCodeImprovementSummaryText = 'COREへ自己改善要求を投入しました。対象選択と次の行動はCOREが決定します。';
+        highlights.push('【自律改善要求】自己改善要求をCOREへ返し、次の分類・行動の選択をCOREに委譲しました。');
       } catch (archErr: any) {
         systemLogger.warn('SELF_IMPROVEMENT', '自律コード改善サイクルスキップ:', archErr?.message || archErr);
       }
