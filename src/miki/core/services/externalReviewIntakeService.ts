@@ -233,6 +233,8 @@ class ExternalReviewIntakeService {
             operation: 'REGENERATE_FROM_EXTERNAL_REVIEW',
             packageId: record.packageId,
             packageRevision: record.packageRevision,
+            candidateRevision: reviewPackage.candidateRevision + 1,
+            sourcePackageId: record.packageId,
             candidateManifestSha256: record.candidateManifestSha256,
             externalReviewId: record.externalReviewId,
             issueId: reviewPackage.inputs.issueId,
