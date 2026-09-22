@@ -30,21 +30,25 @@ const LEGACY_LEDGER_KEY='miki_review_package_ledger_v2';
 const textBytes=(value:string)=>new TextEncoder().encode(value).length;
 class ReviewZipExportService {
  private ledger=new Map<string,ReviewPackageLedgerRecord>();
- private externalDirectiveContext(run:{payload:Record<string,unknown>}){
-  const value=(key:string):unknown=>{
-   const item=run.payload[key];
-   return Array.isArray(item)?item.filter((x):x is string=>typeof x==='string'&&Boolean(x.trim())):item??null;
+ private externalDirectiveContext(run:{payload:Record<string,unknown>}):ReviewExternalDirectiveContext{
+  const strings=(key:string):string[]=>{
+   const value=run.payload[key];
+   return Array.isArray(value)?value.filter((x):x is string=>typeof x==='string'&&Boolean(x.trim())):[];
+  };
+  const nullable=(key:string):string|null=>{
+   const value=run.payload[key];
+   return typeof value==='string'&&value.trim()?value:null;
   };
   return {
-   directiveId:typeof run.payload.directiveId==='string'?run.payload.directiveId:null,
-   sourceHash:typeof run.payload.sourceHash==='string'?run.payload.sourceHash:null,
-   targetFiles:value('targetFiles')||[],
-   requirements:value('requirements')||[],
-   prohibitions:value('prohibitions')||[],
-   invariants:value('invariants')||[],
-   validationRequirements:value('validationRequirements')||[],
-   deliveryRequirements:value('deliveryRequirements')||[],
-   relatedIssueIds:value('relatedIssueIds')||[]
+   directiveId:nullable('directiveId'),
+   sourceHash:nullable('sourceHash'),
+   targetFiles:strings('targetFiles'),
+   requirements:strings('requirements'),
+   prohibitions:strings('prohibitions'),
+   invariants:strings('invariants'),
+   validationRequirements:strings('validationRequirements'),
+   deliveryRequirements:strings('deliveryRequirements'),
+   relatedIssueIds:strings('relatedIssueIds')
   };
  }
  constructor(){this.load();}
@@ -69,7 +73,7 @@ class ReviewZipExportService {
    const snapshotFiles=workspace.files.map(file=>({...file,evidenceIds:[...file.evidenceIds]}));
    const baselineManifest={formatVersion:1,workspaceId,issueId:workspace.issueId,files:snapshotFiles.map(file=>({path:file.path,size:textBytes(file.baselineContent),sha256:file.baselineSha256}))};
    const baselineManifestSha256=canonicalSha256(baselineManifest);\n   const externalDirective=this.externalDirectiveContext(run);
-   const candidateManifestBody={formatVersion:3,candidateId,validationBundleId,learningLineage:options.learningLineage??null,packageSeriesId,packageRevision,candidateRevision,workspaceId,runId,issueId:workspace.issueId,transactionId,corePlanRevision,operationInstanceId,persistenceReceiptId,externalDirective:this.externalDirectiveContext(run),files:snapshotFiles.map(file=>({path:file.path,size:textBytes(file.candidateContent),sha256:file.candidateSha256,evidenceIds:file.evidenceIds}))};
+   const candidateManifestBody={formatVersion:3,candidateId,validationBundleId,learningLineage:options.learningLineage??null,packageSeriesId,packageRevision,candidateRevision,workspaceId,runId,issueId:workspace.issueId,transactionId,corePlanRevision,operationInstanceId,persistenceReceiptId,externalDirective,files:snapshotFiles.map(file=>({path:file.path,size:textBytes(file.candidateContent),sha256:file.candidateSha256,evidenceIds:file.evidenceIds}))};
    const packageId=`RPK-${canonicalSha256({packageSeriesId,packageRevision,candidateManifestSha256}).slice(0,24)}`;
    const packageManifest={...candidateManifestBody,packageId,baselineManifestSha256,candidateManifestSha256};
    const packageManifestSha256=canonicalSha256(packageManifest);

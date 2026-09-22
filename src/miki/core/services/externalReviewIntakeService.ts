@@ -180,6 +180,10 @@ class ExternalReviewIntakeService {
         externalVerdict: record.externalVerdict,
         userDecision: input.decision,
         reason: input.reason.trim(),
+        workspaceId: reviewPackage.workspaceId,
+        transactionId: reviewPackage.transactionId,
+        persistenceReceiptId: reviewPackage.persistenceReceiptId,
+        operationInstanceId: reviewPackage.operationInstanceId,
       },
       maxCycles: 18,
     });

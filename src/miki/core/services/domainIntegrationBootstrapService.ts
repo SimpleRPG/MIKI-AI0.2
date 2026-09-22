@@ -60,7 +60,7 @@ class DomainIntegrationBootstrapService{
   if(domain==='memory')return ['FLUSH'];
   if(domain==='verification')return ['VALIDATE_CANDIDATE'];
   if(domain==='selfDevelopment')return ['GENERATE_CANDIDATE'];
-  if(domain==='promotion')return ['CREATE_REVIEW_PACKAGE','APPROVE_REVIEWED_CANDIDATE'];
+  if(domain==='promotion')return ['CREATE_REVIEW_PACKAGE','APPROVE_REVIEWED_CANDIDATE','ADOPT_REVIEWED_CANDIDATE'];
   return [];
  }
 
@@ -185,6 +185,26 @@ class DomainIntegrationBootstrapService{
      baselineSnapshotSha256:workspace.baseSnapshotSha256,changedFilePaths,
      unresolvedItems:result.reasons,generationEvidenceIds:[...new Set(workspace.files.flatMap(file=>file.evidenceIds))],
      persistenceReceiptIds:[receipt.receiptId],evidenceIds:[...new Set(workspace.files.flatMap(file=>file.evidenceIds))]});
+  }
+  if(domain==='promotion'&&envelope.command==='ADOPT_REVIEWED_CANDIDATE'){
+   const packageId=String(envelope.payload.packageId||'');
+   const manifestSha=String(envelope.payload.candidateManifestSha256||'');
+   const {reviewZipExportService}=await import('./reviewZipExportService');
+   const {isolatedCandidateWorkspaceService}=await import('./isolatedCandidateWorkspaceService');
+   const {persistenceReceiptLedgerService}=await import('./persistenceReceiptLedgerService');
+   const pkg=reviewZipExportService.list().find(item=>item.packageId===packageId);
+   if(!pkg)return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_FOUND',completedAt:Date.now()};
+   if(pkg.status!=='ACCEPTED')return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_ACCEPTED',completedAt:Date.now()};
+   if(manifestSha!==pkg.candidateManifestSha256)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_MANIFEST_SHA_MISMATCH',completedAt:Date.now()};
+   const workspace=isolatedCandidateWorkspaceService.get(pkg.workspaceId);
+   if(!workspace)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_WORKSPACE_NOT_FOUND',completedAt:Date.now()};
+   const receipt=pkg.persistenceReceiptId;
+   const operationInstanceId=String(envelope.payload.operationInstanceId||pkg.operationInstanceId||'');
+   if(!receipt||receipt==='UNAVAILABLE')return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_REQUIRED',completedAt:Date.now()};
+   const ledgerReceipt=persistenceReceiptLedgerService.get(receipt);
+   if(!ledgerReceipt)return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_NOT_FOUND',completedAt:Date.now()};
+   const result=await isolatedCandidateWorkspaceService.commitWithReceipt(workspace.workspaceId,receipt,operationInstanceId);
+   return done({operation:'ADOPT_REVIEWED_CANDIDATE',operationClass:'BUSINESS',status:'SUCCEEDED',packageId,workspaceId:workspace.workspaceId,transactionId:result.transaction.transactionId,candidateManifestSha256:result.transaction.candidateManifestSha256,evidenceIds:[...new Set(result.workspace.files.flatMap(file=>file.evidenceIds))],receiptIds:[receipt]});
   }
   if(domain==='promotion'&&envelope.command==='APPROVE_REVIEWED_CANDIDATE'){
    const recordId=String(envelope.payload.recordId||'');

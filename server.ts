@@ -1589,6 +1589,9 @@ app.post('/api/candidate-validation/run', async (req, res) => {
   try {
     const sourceFiles = Array.isArray(req.body?.sourceFiles) ? req.body.sourceFiles : [];
     const candidateFiles = Array.isArray(req.body?.candidateFiles) ? req.body.candidateFiles : [];
+    const validationRequirements = Array.isArray(req.body?.validationRequirements)
+      ? req.body.validationRequirements.filter((value:any)=>typeof value==='string'&&value.trim())
+      : [];
     if (!req.body?.workspaceId || !req.body?.candidateSha256 || sourceFiles.length === 0 || candidateFiles.length === 0) return res.status(400).json({ error: 'VALIDATION_INPUT_INCOMPLETE' });
     for (const file of sourceFiles) { const relative = safePath(file.path); const target = path.join(root, relative); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, String(file.content || ''), 'utf8'); }
     const runtimeModules = path.join(process.cwd(), 'node_modules');
@@ -1608,7 +1611,7 @@ app.post('/api/candidate-validation/run', async (req, res) => {
     const passed = stages.length === 4 && stages.every(stage => stage.passed && stage.exitCode === 0);
     const candidateDuration = Date.now() - startedAt;
     const shadow = { baseline: { correctness: 1, durationMs: candidateDuration, exceptionCount: 0, sideEffectCount: 0, outputHash: String(req.body.candidateSha256) }, candidate: { correctness: passed ? 1 : 0, durationMs: candidateDuration, exceptionCount: stages.filter(stage => !stage.passed).length, sideEffectCount: 0, outputHash: String(req.body.candidateSha256) }, passed };
-    res.json({ passed, stages, shadow, reasons: stages.filter(stage => !stage.passed).map(stage => `FAILED_${stage.stage}`) });
+    res.json({ passed, stages, shadow, validationRequirements, reasons: stages.filter(stage => !stage.passed).map(stage => `FAILED_${stage.stage}`) });
   } catch (error: any) { res.status(500).json({ error: error?.message || 'CANDIDATE_VALIDATION_FAILED', stages }); }
   finally { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} }
 });

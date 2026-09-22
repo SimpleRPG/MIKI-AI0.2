@@ -636,6 +636,13 @@ class AdaptiveRoutePlannerService {
     const text=`${task.goal} ${task.entries.map(e=>`${e.key} ${String(e.value)}`).join(' ')}`;
     const operation=String(input.operation||'');
     const routes:PlannedRoute[]=[];
+    if(operation==='DECIDE_CANDIDATE_ADOPTION'){
+      const decision=String(input.userDecision||'').toUpperCase();
+      if(decision==='ACCEPT'){
+        routes.push({target:'promotion',command:'ADOPT_REVIEWED_CANDIDATE',reason:'COREが外部評価後の利用者採用決定をpromotionへ委譲する',payload:{...input,taskId:task.taskId,operation,adaptive:true,priority:100}});
+      }
+      return this.decorateOperations(task,this.uniqueOperations(routes));
+    }
     if(operation==='APPROVE_REVIEWED_CANDIDATE'){
       routes.push({target:'promotion',command:'APPROVE_REVIEWED_CANDIDATE',reason:'COREが明示承認済みCandidateの適用をpromotion経路へ委譲する',payload:{...input,taskId:task.taskId,operation,adaptive:true,priority:100}});
       return this.decorateOperations(task,this.uniqueOperations(routes));
