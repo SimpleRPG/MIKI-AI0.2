@@ -123,7 +123,7 @@ class TypedImprovementUiGatewayService {
     if(existingRun?.taskId){
       const task=taskBlackboardService.get(existingRun.taskId);
       if(task){
-        if(task.status==='PAUSED') return this.resumeImprovementTask(task.taskId);
+        if(task.status!=='COMPLETED'&&task.status!=='FAILED'&&task.status!=='REJECTED') return this.resumeImprovementTask(task.taskId);
         return this.taskSnapshotResult(task.taskId,task.revision,task.status);
       }
     }
