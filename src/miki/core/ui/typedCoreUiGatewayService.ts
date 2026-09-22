@@ -6,6 +6,7 @@ import { externalReviewIntakeService, type ExternalReviewRecord, type ExternalRe
 import { webResearchPolicyService, type WebResearchPolicy, type WebResearchPolicyReceipt } from '../../research/services/webResearchPolicyService';
 import { researchQueryPlanningService, type QueryPlanningPolicy, type ResearchQueryPlan } from '../../research/services/researchQueryPlanningService';
 import { coreCycleSettingsService, type CoreCycleSettings } from '../services/coreCycleSettingsService';
+import { mikiCodeSpaceService } from '../services/mikiCodeSpaceService';
 
 export type UiOperation =
   | 'LIST_EXTERNAL_CONNECTIONS' | 'SAVE_EXTERNAL_CONNECTION_CONFIG' | 'TEST_EXTERNAL_CONNECTION' | 'EXPORT_EXTERNAL_CONNECTION_CONFIG'

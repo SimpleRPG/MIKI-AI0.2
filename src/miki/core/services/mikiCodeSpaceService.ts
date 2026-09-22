@@ -1,86 +1,98 @@
 import { storageService } from '../../../services/storageService';
+import { apiService } from '../../../services/api';
+import { canonicalSha256 } from './canonicalSha256Service';
 
-export interface MikiCodeSpaceFile {
-  path:string;
-  content:string;
-  language:string;
-  contentHash:string;
-  updatedAt:number;
+export interface MikiCodeFile {
+  path: string;
+  content: string;
+  sha256: string;
 }
 
-export interface MikiCodeSpaceManifest {
-  version:1;
-  syncedAt:number;
-  files:MikiCodeSpaceFile[];
+export interface MikiCodeSnapshot {
+  repository: string;
+  branch: string;
+  repoSha256: string;
+  files: MikiCodeFile[];
+  syncedAt: number;
 }
 
-const KEY='miki_code_space_v1';
+const KEY = 'miki_own_code_space_v1';
+const REPOSITORY = 'SimpleRPG/MIKI-AI0.2';
+const BRANCH = 'main';
 
 class MikiCodeSpaceService {
-  private files=new Map<string,MikiCodeSpaceFile>();
+  async sync(token?: string): Promise<MikiCodeSnapshot> {
+    const result = await apiService.importFromGitHub({
+      repoUrl: REPOSITORY,
+      branch: BRANCH,
+      token: token?.trim() || undefined,
+    });
 
-  constructor(){this.load();}
-
-  sync(files:Array<{path:string;content:string;language?:string}>):void{
-    const next=new Map<string,MikiCodeSpaceFile>();
-    for(const file of files){
-      if(!file.path||typeof file.content!=='string')continue;
-      next.set(file.path,{
-        path:file.path,
-        content:file.content,
-        language:file.language||this.language(file.path),
-        contentHash:this.hash(file.content),
-        updatedAt:Date.now()
-      });
+    if (!result.success || !result.files?.length) {
+      throw new Error(result.message || 'MIKI_CODE_SPACE_SYNC_FAILED');
     }
-    this.files=next;
-    this.save();
+
+    const files: MikiCodeFile[] = result.files
+      .filter((file: any) => typeof file.path === 'string' && typeof file.content === 'string')
+      .map((file: any) => ({
+        path: file.path,
+        content: file.content,
+        sha256: canonicalSha256(file.content),
+      }));
+
+    if (!files.length) throw new Error('MIKI_CODE_SPACE_NO_FILES');
+
+    const snapshot: MikiCodeSnapshot = {
+      repository: REPOSITORY,
+      branch: BRANCH,
+      repoSha256: canonicalSha256(files.map(file => ({ path: file.path, sha256: file.sha256 }))),
+      files,
+      syncedAt: Date.now(),
+    };
+
+    storageService.setItem(KEY, JSON.stringify(snapshot));
+    return this.clone(snapshot);
   }
 
-  getFiles():MikiCodeSpaceFile[]{
-    return [...this.files.values()].map(file=>({...file}));
-  }
-
-  getFile(path:string):MikiCodeSpaceFile|undefined{
-    const file=this.files.get(path);
-    return file?{...file}:undefined;
-  }
-
-  getManifest():MikiCodeSpaceManifest{
-    return {version:1,syncedAt:Date.now(),files:this.getFiles()};
-  }
-
-  hasFiles():boolean{return this.files.size>0;}
-
-  private save():void{
-    storageService.setItem(KEY,JSON.stringify(this.getManifest()));
-  }
-
-  private load():void{
-    try{
-      const raw=storageService.getItem(KEY);
-      const data=raw?JSON.parse(raw):undefined;
-      if(Array.isArray(data?.files)){
-        for(const file of data.files)this.files.set(file.path,file);
-      }
-    }catch{
-      this.files.clear();
+  get(): MikiCodeSnapshot | undefined {
+    try {
+      const raw = storageService.getItem(KEY);
+      if (!raw) return undefined;
+      const value = JSON.parse(raw);
+      return value?.files ? this.clone(value) : undefined;
+    } catch {
+      return undefined;
     }
   }
 
-  private language(path:string):string{
-    const ext=path.split('.').pop()?.toLowerCase();
-    return ext==='tsx'?'typescriptreact':ext==='ts'?'typescript':ext||'text';
+  listFiles(): MikiCodeFile[] {
+    return this.get()?.files || [];
   }
 
-  private hash(text:string):string{
-    let hash=2166136261;
-    for(let i=0;i<text.length;i++){
-      hash^=text.charCodeAt(i);
-      hash=Math.imul(hash,16777619);
-    }
-    return `fnv1a-${(hash>>>0).toString(16).padStart(8,'0')}`;
+  readFile(path: string): MikiCodeFile | undefined {
+    return this.listFiles().find(file => file.path === path);
+  }
+
+  search(query: string, limit = 20): MikiCodeFile[] {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return this.listFiles()
+      .filter(file => file.path.toLowerCase().includes(q) || file.content.toLowerCase().includes(q))
+      .slice(0, Math.max(1, limit));
+  }
+
+  context(query: string, limit = 8): string {
+    return this.search(query, limit)
+      .map(file => `=== ${file.path} ===\n${file.content}`)
+      .join('\n\n');
+  }
+
+  private clone(snapshot: MikiCodeSnapshot): MikiCodeSnapshot {
+    return {
+      ...snapshot,
+      files: snapshot.files.map(file => ({ ...file })),
+    };
   }
 }
 
-export const mikiCodeSpaceService=new MikiCodeSpaceService();
+export const mikiCodeSpaceService = new MikiCodeSpaceService();
