@@ -286,6 +286,22 @@ class AutonomousSelfImprovementLoopService {
           await this.acquireThenWaitForEvidence(request, quality.reasons.join(','));
           break;
         }
+        const cycleBudgetPaused = workflow.task.status === 'PAUSED' && workflow.task.entries.some(entry => entry.kind === 'CHECKPOINT' && entry.key === 'coreCycleBudgetExhausted');
+        if (cycleBudgetPaused) {
+          request.attempts -= 1;
+          this.state.status = 'RUNNING';
+          this.state.lastReason = 'CORE_CYCLE_BUDGET_CONTINUE';
+          this.save();
+          continue;
+        }
+        const cycleBudgetPaused = workflow.task.status === 'PAUSED' && workflow.task.entries.some(entry => entry.kind === 'CHECKPOINT' && entry.key === 'coreCycleBudgetExhausted');
+        if (cycleBudgetPaused) {
+          request.attempts -= 1;
+          this.state.status = 'RUNNING';
+          this.state.lastReason = 'CORE_CYCLE_BUDGET_CONTINUE';
+          this.save();
+          continue;
+        }
         this.failOrRetry(request, `WORKFLOW_${workflow.task.status}`);
         if (this.state.status !== 'RUNNING') {
           break;
