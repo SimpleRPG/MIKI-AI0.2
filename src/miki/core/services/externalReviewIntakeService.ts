@@ -222,7 +222,7 @@ class ExternalReviewIntakeService {
       });
       const artifactProjection = reviewLearningArtifactService.deriveAndPersist(learningProjection.episode, decision.decisionId);
       const reusableComponents = artifactProjection.artifacts.flatMap(artifact => reusableComponentFactoryService.extract(artifact, learningProjection.episode));
-      reusableComponentFactoryService.storeCandidates(reusableComponents);if(input.decision==="ACCEPT")reviewLearningArtifactService.generalizeAcceptedPatterns();
+      reusableComponentFactoryService.storeCandidates(reusableComponents);if(input.decision==="ACCEPT"){reviewLearningArtifactService.generalizeAcceptedPatterns();}
       if (input.decision === 'REQUEST_CHANGES' || input.decision === 'PARTIAL_ACCEPT' || input.decision === 'PARTIAL_REJECT') {
         await improvementIntakeRouterService.receive({
           runType: 'REVALIDATION',
