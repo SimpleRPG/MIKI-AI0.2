@@ -148,6 +148,8 @@ export class ResearchService {
       let previousEvidenceIds: string[] = [];
       let previousIndependentClusters: string[] = [];
 
+      let recommendedRevisionQuery: string | undefined;
+
       const buildAdaptiveQuery = (round: number, results: VerificationResult[]): string => {
         if (round === 0) return baseQuery;
         const reasons = results.flatMap(result => Array.isArray(result.reasons) ? result.reasons : [])
@@ -304,7 +306,7 @@ export class ResearchService {
 
         if (queryPlan.status === "READY" && queryPlan.queries[pass]) {
           const revision = researchQueryOutcomeLearningService.recommendRevision(queryPlan.planId, queryPlan.queries[pass].queryId);
-          if (revision.shouldRevise && revision.revisedQuery) nextQuery = revision.revisedQuery;
+          if (revision.shouldRevise && revision.revisedQuery) { recommendedRevisionQuery = revision.revisedQuery; nextQuery = revision.revisedQuery; }
         }
 
         const evidenceFingerprint = [...new Set(evidence.map(item => `${item.source_id}|${item.independence_cluster_id}|${item.url}`))]
