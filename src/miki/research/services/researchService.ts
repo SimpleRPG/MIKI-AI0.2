@@ -8,6 +8,7 @@ import { mikiUnifiedLearningContinuumService } from '../../learning/services/mik
 import { webTermLearningService } from './webTermLearningService';
 import { researchQueryPlanningService } from './researchQueryPlanningService';
 import { researchQueryOutcomeLearningService } from './researchQueryOutcomeLearningService';
+import { webResearchPolicyService } from './webResearchPolicyService';
 
 export type { ResearchRoute };
 
@@ -309,6 +310,9 @@ export class ResearchService {
           const revision = researchQueryOutcomeLearningService.recommendRevision(queryPlan.planId, queryPlan.queries[pass].queryId);
           if (revision.shouldRevise && revision.revisedQuery) { recommendedRevisionQuery = revision.revisedQuery; nextQuery = revision.revisedQuery; }
         }
+
+        const webResearchPolicy = webResearchPolicyService.get();
+        const webResearchProgress = { acceptedIndependentSourceCount: new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)).size, candidateUrlsChecked: results.filter(result => !!result.url).length, renderedPages: readResults.filter(page => page.success && !!page.text.trim()).length, supportingSourceCount: verification.filter(result => result.outcome === "SUPPORTED" || result.outcome === "DEVICE_VERIFIED").length, counterEvidenceSourceCount: queryPlan.status === "READY" && queryPlan.queries[pass]?.intentType === "COUNTEREVIDENCE" ? results.length : 0, primarySourceSatisfied: queryPlan.status === "READY" && queryPlan.queries[pass]?.sourceTierTarget === "PRIMARY", counterEvidenceSearchCompleted: queryPlan.status === "READY" && queryPlan.queries[pass]?.intentType === "COUNTEREVIDENCE", excludedDuplicateCount: 0, rejectedQualityCount: evidence.filter(item => item.status === "REJECTED").length, conflictingEvidence: verification.some(result => result.outcome === "CONTRADICTED") };
 
         const evidenceFingerprint = [...new Set(evidence.map(item => `${item.source_id}|${item.independence_cluster_id}|${item.url}`))]
           .sort()
