@@ -54,7 +54,7 @@ class DomainIntegrationBootstrapService{
   if(domain==='research')return ['RUN_RESEARCH'];
   if(domain==='autonomy')return ['RUN_SELF_IMPROVEMENT','SAVE_AUTONOMY_CONFIG'];
   if(domain==='improvement')return ['RUN_SELF_IMPROVEMENT','DISCOVER_IMPROVEMENT_ISSUE'];
-  if(domain==='learning')return ['LEARN_FROM_CORE_RESULT'];
+  if(domain==='learning')return ['LEARN_FROM_CORE_RESULT','APPROVE_REUSABLE_COMPONENTS'];
   if(domain==='strategy')return ['PLAN_PENDING_IMPROVEMENT_RUN'];
   if(domain==='capability')return ['RESOLVE_CAPABILITY_GAPS'];
   if(domain==='memory')return ['FLUSH'];
