@@ -106,10 +106,7 @@ class AdaptiveRoutePlannerService {
       results.some(entry=>this.containsKey(entry,/repository.?context|repositoryPath|target.?files|targetFiles|sourceSnapshot/i))
     );
     const coreTargetPaths=this.resolveCoreTargetPaths(task,input);
-    const targetFilesKnown=Boolean(
-      Array.isArray(input.targetFiles)&&input.targetFiles.some(value=>typeof value==="string"&&Boolean(value.trim())) ||
-      results.some(entry=>this.containsKey(entry,/target.?files|targetPaths|changedFilePaths/i))
-    );
+    const targetFilesKnown=coreTargetPaths.length>0;
 
     const evidenceIds=new Set<string>();
     for(const entry of [...results,...observations,...task.entries.filter(entry=>entry.kind==='EVIDENCE')]){
