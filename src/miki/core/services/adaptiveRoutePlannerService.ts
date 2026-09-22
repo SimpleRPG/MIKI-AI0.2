@@ -853,15 +853,14 @@ class AdaptiveRoutePlannerService {
   }
 
   private collectUnresolved(task:BlackboardTask,pattern:RegExp):string[] {
-    const found=new Set<string>();
-    for(const entry of task.entries){
-      if(entry.kind!=='ERROR'&&entry.kind!=='OBSERVATION'&&entry.kind!=='RESULT') continue;
+    for(const entry of [...task.entries].reverse()){
+      if(entry.kind!=="ERROR"&&entry.kind!=="OBSERVATION"&&entry.kind!=="RESULT") continue;
       if(!pattern.test(entry.key)&&!pattern.test(JSON.stringify(entry.value||{}))) continue;
-      const value=objectValue(entry);
-      const values=value?.unresolvedItems||value?.unresolvedRequirements||value?.unknowns||value?.reasons;
-      if(Array.isArray(values)) for(const item of values) if(typeof item==='string'&&item) found.add(item);
+      const value=objectValue(entry); if(!value) continue;
+      const values=value.unresolvedItems??value.unresolvedRequirements??value.unknowns;
+      if(Array.isArray(values)) return [...new Set(values.filter((item):item is string=>typeof item==="string"&&item.trim()).map(item=>item.trim()))];
     }
-    return [...found];
+    return [];
   }
 
   private collectValues(task:BlackboardTask,pattern:RegExp):string[] {
