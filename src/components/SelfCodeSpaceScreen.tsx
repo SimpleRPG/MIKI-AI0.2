@@ -8,10 +8,21 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
  const [selected,setSelected]=useState<string>();
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState('');
- const [commitMessage,setCommitMessage]=useState('Update self code space');
+ const [settingsOpen,setSettingsOpen]=useState(false);
+ const [repository,setRepository]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubSettings().repository);
+ const [branch,setBranch]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubSettings().branch);
+ const [commitMessage,setCommitMessage]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubSettings().commitMessage);
 
  const files=useMemo(()=>query?typedCoreUiGatewayService.searchSelfCode(query,100):typedCoreUiGatewayService.listSelfCodeFiles(),[query,snapshot]);
  const current=selected?typedCoreUiGatewayService.readSelfCodeFile(selected):undefined;
+
+ const saveSettings=()=>{
+  try{
+   typedCoreUiGatewayService.saveSelfCodeGitHubSettings({repository,branch,commitMessage});
+   setSettingsOpen(false);
+   setMessage('GitHub設定を保存しました。再同期してください。');
+  }catch(e){setMessage(e instanceof Error?e.message:String(e));}
+ };
 
  const push=async()=>{setBusy(true);setMessage('');try{const result=await typedCoreUiGatewayService.pushSelfCode(commitMessage);if(result.status!=='SUCCESS')throw new Error(result.summary);setSnapshot(result.data);setMessage('GitHubへPUSH完了');}catch(e){setMessage(e instanceof Error?e.message:String(e));}finally{setBusy(false);}};
 
@@ -51,7 +62,18 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
    <button disabled={busy} onClick={sync} className="mt-3 min-h-12 w-full rounded-2xl bg-indigo-600 font-bold disabled:opacity-50">
     <RefreshCw className="mr-2 inline h-4 w-4"/>{busy?'同期中':'GitHubから正本を同期'}
    </button>
-   <input value={commitMessage} onChange={e=>setCommitMessage(e.target.value)} className="mt-2 min-h-12 w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 text-sm" placeholder="コミットメッセージ"/>
+   <button disabled={busy} onClick={()=>setSettingsOpen(v=>!v)} className="mt-2 min-h-12 w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 text-sm font-bold">
+    GitHub PUSH設定 {settingsOpen?'▲':'▼'}
+   </button>
+   {settingsOpen&&<div className="mt-2 rounded-2xl border border-slate-700 bg-slate-950 p-3">
+    <label className="block text-xs text-slate-400">自己コード用リポジトリ</label>
+    <input value={repository} onChange={e=>setRepository(e.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm"/>
+    <label className="mt-2 block text-xs text-slate-400">ブランチ</label>
+    <input value={branch} onChange={e=>setBranch(e.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm"/>
+    <label className="mt-2 block text-xs text-slate-400">コミットメッセージ</label>
+    <input value={commitMessage} onChange={e=>setCommitMessage(e.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm"/>
+    <button disabled={busy} onClick={saveSettings} className="mt-2 min-h-12 w-full rounded-xl bg-slate-700 font-bold">設定を保存</button>
+   </div>}
    <button disabled={busy||!snapshot?.dirty} onClick={push} className="mt-2 min-h-12 w-full rounded-2xl bg-emerald-600 font-bold disabled:opacity-50">
     <UploadCloud className="mr-2 inline h-4 w-4"/>{busy?'処理中':snapshot?.dirty?'自己コードをGitHubへPUSH':'変更なし'}
    </button>

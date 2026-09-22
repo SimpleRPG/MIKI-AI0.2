@@ -31,6 +31,8 @@ class TypedCoreUiGatewayService {
  exportExternalConnections():Blob{return new Blob([externalConnectionUiService.exportSanitized()],{type:'application/json;charset=utf-8'});}
  listWorkspaces():WorkspaceRecord[]{return generalWorkspaceService.list();}
  getSelfCodeSnapshot(){return selfCodeSpaceService.get();}
+ getSelfCodeGitHubSettings(){return selfCodeSpaceService.getGitHubSettings();}
+ saveSelfCodeGitHubSettings(input:{repository:string;branch:string;commitMessage:string}){return selfCodeSpaceService.saveGitHubSettings(input);}
  listSelfCodeFiles(){return selfCodeSpaceService.listFiles();}
  readSelfCodeFile(path:string){return selfCodeSpaceService.readFile(path);}
  searchSelfCode(query:string,limit=20){return selfCodeSpaceService.search(query,limit);}
