@@ -175,6 +175,8 @@ export class ResearchService {
         // Search is only the discovery step. Read the selected result pages before
         // building the final evidence/claim set, so SearXNG -> page content -> Evidence
         // is one Research pipeline rather than two disconnected services.
+        if (queryPlan.status === "READY" && queryPlan.queries[pass]) { researchQueryOutcomeLearningService.record({ queryPlanId: queryPlan.planId, queryId: queryPlan.queries[pass].queryId, queryText: queryPlan.queries[pass].queryText, status: results.length > 0 ? "EVIDENCE_GAINED" : "NO_RESULTS", candidateUrlCount: results.filter(result => !!result.url).length, renderedPageCount: 0, admissibleIndependentSourceCount: new Set(results.map(result => result.independenceClusterId).filter(Boolean)).size, primarySourceCount: 0, counterevidenceChecked: queryPlan.queries[pass].intentType === "COUNTEREVIDENCE", evidenceIds: [], failureReasons: [], environmentApplicability: "CURRENT_ENVIRONMENT", executionTimeMs: 0, attempt: pass + 1 }); }
+
         const readResults = await autonomousSearchService.readSearchResultPages(passQuery, results, {
           maxPages: maxPagesPerPass,
         });
