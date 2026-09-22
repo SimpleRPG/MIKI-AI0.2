@@ -72,7 +72,8 @@ class ReviewZipExportService {
   try{
    const snapshotFiles=workspace.files.map(file=>({...file,evidenceIds:[...file.evidenceIds]}));
    const baselineManifest={formatVersion:1,workspaceId,issueId:workspace.issueId,files:snapshotFiles.map(file=>({path:file.path,size:textBytes(file.baselineContent),sha256:file.baselineSha256}))};
-   const baselineManifestSha256=canonicalSha256(baselineManifest);\n   const externalDirective=this.externalDirectiveContext(run);
+   const baselineManifestSha256=canonicalSha256(baselineManifest);
+   const externalDirective=this.externalDirectiveContext(run);
    const candidateManifestBody={formatVersion:3,candidateId,validationBundleId,learningLineage:options.learningLineage??null,packageSeriesId,packageRevision,candidateRevision,workspaceId,runId,issueId:workspace.issueId,transactionId,corePlanRevision,operationInstanceId,persistenceReceiptId,externalDirective,files:snapshotFiles.map(file=>({path:file.path,size:textBytes(file.candidateContent),sha256:file.candidateSha256,evidenceIds:file.evidenceIds}))};
    const packageId=`RPK-${canonicalSha256({packageSeriesId,packageRevision,candidateManifestSha256}).slice(0,24)}`;
    const packageManifest={...candidateManifestBody,packageId,baselineManifestSha256,candidateManifestSha256};
