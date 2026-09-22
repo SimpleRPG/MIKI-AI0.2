@@ -88,7 +88,8 @@ class AutonomousCandidatePreparationService {
   };
   const implementationPlan=this.buildImplementationPlan(issue,resolution);
   improvementIntakeRouterService.update(runId,{implementationPlan,status:'IN_PROGRESS'});
-  const workspace=await this.prepare(issue.id,aiCandidates||[],resolution.targetPaths);
+  if(!aiCandidates||aiCandidates.length===0)return {targetPaths:resolution.targetPaths,missingPaths:[]};
+  const workspace=await this.prepare(issue.id,aiCandidates,resolution.targetPaths);
   if(!workspace)return {targetPaths:resolution.targetPaths,missingPaths:[],reason:'AUTONOMOUS_AI_CANDIDATE_REQUIRED'};
   improvementIntakeRouterService.update(runId,{workspaceId:workspace.workspaceId,status:'IN_PROGRESS'});
   return {workspaceId:workspace.workspaceId,targetPaths:resolution.targetPaths,missingPaths:[]};

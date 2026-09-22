@@ -211,11 +211,13 @@ class DomainIntegrationBootstrapService{
    const runId=String(envelope.payload.runId||'');
    const workspaceId=String(envelope.payload.workspaceId||'');
    if(!runId||!workspaceId)return {accepted:false,domain,command:envelope.command,error:'RUN_AND_WORKSPACE_REQUIRED',completedAt:Date.now()};
+   const sourcePackageId=String(envelope.payload.sourcePackageId||'');
    const result=await reviewZipExportService.create(runId,workspaceId,{
-     mode:'NEW_SERIES',taskId:String(envelope.payload.taskId||''),
+     mode:sourcePackageId?'NEXT_PACKAGE_REVISION':'NEW_SERIES',sourcePackageId:sourcePackageId||undefined,taskId:String(envelope.payload.taskId||''),
      corePlanRevision:Number(envelope.payload.planRevision||0),
      operationInstanceId:String(envelope.payload.operationInstanceId||''),
      candidateId:String(envelope.payload.candidateId||''),
+     candidateRevision:Number(envelope.payload.candidateRevision||1),
      candidateManifestSha256:String(envelope.payload.candidateManifestSha256||''),
      validationBundleId:String(envelope.payload.validationBundleId||''),
      learningLineage:envelope.payload.learningLineage,
