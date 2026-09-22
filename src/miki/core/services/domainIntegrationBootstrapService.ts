@@ -60,7 +60,7 @@ class DomainIntegrationBootstrapService{
   if(domain==='memory')return ['FLUSH'];
   if(domain==='verification')return ['VALIDATE_CANDIDATE'];
   if(domain==='selfDevelopment')return ['GENERATE_CANDIDATE'];
-  if(domain==='promotion')return ['CREATE_REVIEW_PACKAGE','APPROVE_REVIEWED_CANDIDATE','ADOPT_REVIEWED_CANDIDATE'];
+  if(domain==='promotion')return ['CREATE_REVIEW_PACKAGE','APPROVE_REVIEWED_CANDIDATE'];
   return [];
  }
 
