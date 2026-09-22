@@ -105,12 +105,7 @@ export function generateSmartCompanionReply(
       source: 'UI',
       runType: 'USER_REQUEST',
     });
-    return `自己コード監査要求をCOREへ投入しました。監査内容と次の行動はCOREが決定します。`;\n  }\n\nを実行したよ！📋✨\n\n` +
-      `・**設計思想仕様書**: 全${audit.totalChapters}章中、**${audit.completedChapters}章が実装完了**\n` +
-      `・**仕様適合スコア**: **${audit.complianceScore}点** / 100点\n` +
-      `・**不変条件エンジン**: ${invStatus}\n` +
-      `・**検出ドリフト**: ${audit.drifts.length}件 (最優先: 第${audit.drifts[0]?.chapterNumber ?? 31}章)\n\n` +
-      `「自己改善ラボ → 自己コード改善」タブで詳細な変更契約や監査ログを確認できるよ！改善を進めたい時は「自分でアプリの改善を進めて」と声かけてね！😊`;
+    return `自己コード監査要求をCOREへ投入しました。監査内容と次の行動はCOREが決定します。`;
   }
 
   // 0.1 Self Introduction
