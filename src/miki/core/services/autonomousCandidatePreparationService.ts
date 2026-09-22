@@ -37,7 +37,7 @@ class AutonomousCandidatePreparationService {
 
  async prepare(issueId:string,aiCandidates?:Array<{path:string;candidateContent:string;evidenceIds?:string[]}>,targetPaths?:string[]):Promise<CandidateWorkspace|undefined>{
   const issue=autonomousIssueDiscoveryService.list(500).find(x=>x.id===issueId);if(!issue)return undefined;
-  const resolvedTargetPaths=[...(targetPaths||[])].filter(Boolean);
+  const resolvedTargetPaths=[...(targetPaths||[])].filter(Boolean);const sourceMap=new Map(selfCodeSpaceService.listSourceFiles().map(file=>[file.path,file]));
   if(resolvedTargetPaths.length===0)return undefined;
   const supplied=new Map((aiCandidates||[]).map(x=>[x.path,x]));const drafts:CandidateDraft[]=[];
   for(const path of resolvedTargetPaths){const source=sourceMap.get(path);if(!source)continue;const candidate=supplied.get(path);const candidateContent=candidate?.candidateContent||this.safeTemplate(source.content,issue);if(candidateContent.trim()===source.content.trim())continue;drafts.push({issueId,targetPath:path,baselineContent:source.content,candidateContent,evidenceIds:[...new Set([...source.evidenceIds,...(candidate?.evidenceIds||[])])],generationMode:candidate?'AI_SUPPLIED':'SAFE_TEMPLATE'});}
