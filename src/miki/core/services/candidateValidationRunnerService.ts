@@ -5,6 +5,7 @@ import { candidateValidationEvidenceService, type ValidationStage } from './cand
 import { shadowEvaluationService } from './shadowEvaluationService';
 import { executionEnvironmentRouterService } from './executionEnvironmentRouterService';
 import { candidateWriteGuardService } from './candidateWriteGuardService';
+import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 export interface ValidationRunnerResult { passed:boolean; workspaceId:string; candidateHash?:string; passedChecks?:string[]; failedChecks?:string[]; unexecutedChecks?:string[]; evidenceIds?:string[]; reasons:string[]; rolledBack?:boolean; }
 class CandidateValidationRunnerService {
  async run(workspaceId:string):Promise<ValidationRunnerResult>{
@@ -13,10 +14,14 @@ class CandidateValidationRunnerService {
   const candidateSha256=workspace.candidateRevisionSha256||'';
   if(!candidateSha256)return this.rollbackFailure(workspaceId,workspace.writeGuardId,['CANDIDATE_HASH_MISSING']);
   const sourceFiles=autonomousCandidatePreparationService.getSourceFiles();
+  const run=workspace.runId?improvementIntakeRouterService.get(workspace.runId):undefined;
+  const validationRequirements=Array.isArray(run?.payload.validationRequirements)
+    ? run.payload.validationRequirements.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim()))
+    : [];
   const executionRoutes=['STATIC','TYPECHECK','REGRESSION','COUNTEREXAMPLE','GENERALIZATION','PERSISTENCE','DEVICE'].map(stage=>executionEnvironmentRouterService.route(stage));
   if(executionRoutes.some(route=>route.environment==='MANUAL_REVIEW'))return this.rollbackFailure(workspaceId,workspace.writeGuardId,['VALIDATION_EXECUTION_ENVIRONMENT_MISSING']);
   let response:Response;
-  try{response=await fetch(apiUrl('/api/candidate-validation/run'),{method:'POST',headers:getCustomApiHeaders(),body:JSON.stringify({workspaceId,candidateSha256,sourceFiles,candidateFiles:workspace.files.map(file=>({path:file.path,baselineContent:file.baselineContent,candidateContent:file.candidateContent,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256}))})});}
+  try{response=await fetch(apiUrl('/api/candidate-validation/run'),{method:'POST',headers:getCustomApiHeaders(),body:JSON.stringify({workspaceId,candidateSha256,sourceFiles,validationRequirements,candidateFiles:workspace.files.map(file=>({path:file.path,baselineContent:file.baselineContent,candidateContent:file.candidateContent,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256}))})});}
   catch(error){return this.rollbackFailure(workspaceId,workspace.writeGuardId,[error instanceof Error?`VALIDATION_REQUEST_FAILED:${error.message}`:'VALIDATION_REQUEST_FAILED']);}
   if(!response.ok)return this.rollbackFailure(workspaceId,workspace.writeGuardId,[`VALIDATION_HTTP_${response.status}`]);
   const body=await response.json();

@@ -603,7 +603,7 @@ class AdaptiveRoutePlannerService {
         routes.push({target:'unknown',command:'RESOLVE_UNKNOWN',reason:`COREがPARALLEL仮説で独立Intent ${unit.id} を処理する`,payload:{taskId:task.taskId,question:unit.text,useSearch:/調べ|検索|最新/i.test(unit.text),hasAttachments:Boolean(input.hasAttachments),adaptive:true,priority:90,...perUnit}});
       }
     } else if(selectedUnit?.goal==='BUILD_OR_CHANGE'){
-      routes.push({target:'selfDevelopment',command:'GENERATE_CANDIDATE',reason:`COREがBUILD_OR_CHANGE Intent ${selectedUnit.id} をselfDevelopmentへ委譲する`,payload:{taskId:task.taskId,runId:String(input.runId||task.taskId),goal:selectedUnit.text,candidateRevision:Number(input.candidateRevision||1),requirements:input.requirements,validationRequirements:input.validationRequirements,operationMode:'MULTI_INTENT_BUILD',adaptive:true,priority:80,...intentPayload,intentIds:[selectedUnit.id]}});
+      routes.push({target:'selfDevelopment',command:'GENERATE_CANDIDATE',reason:`COREがBUILD_OR_CHANGE Intent ${selectedUnit.id} をselfDevelopmentへ委譲する`,payload:{taskId:task.taskId,runId:String(input.runId||task.taskId),goal:selectedUnit.text,candidateRevision:Number(input.candidateRevision||1),requirements:input.requirements,prohibitions:input.prohibitions,invariants:input.invariants,validationRequirements:input.validationRequirements,deliveryRequirements:input.deliveryRequirements,operationMode:'MULTI_INTENT_BUILD',adaptive:true,priority:80,...intentPayload,intentIds:[selectedUnit.id]}});
     } else {
       const unknownTerms=conversationResult&&!this.lastOperationFailed(task,'RESOLVE_UNKNOWN')?detectUnknownTermsFromBlackboardValue(objectValue(conversationResult)):[];
       if((/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(focusedText) || unknownTerms.length>0) && !unknownResult){
