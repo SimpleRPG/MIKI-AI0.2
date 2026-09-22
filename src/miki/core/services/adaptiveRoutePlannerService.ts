@@ -368,6 +368,10 @@ class AdaptiveRoutePlannerService {
   }
 
   private planAdaptiveImprovement(task:BlackboardTask,input:Record<string,unknown>):PlannedRoute[] {
+    const learningRoutes=this.planLearningFromCompletedResults(task);
+    if(learningRoutes.length>0)
+      return this.decorateOperations(task,this.uniqueOperations(learningRoutes));
+
     const readiness=this.assessImprovementReadiness(task);
     const coreTargetPaths=this.resolveCoreTargetPaths(task,input);
     task.entries; // keep the decision based solely on the current Blackboard snapshot
