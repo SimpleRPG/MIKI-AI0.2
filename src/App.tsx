@@ -1657,7 +1657,7 @@ export default function App() {
       ]);
 
       try {
-        const improvementTask = await typedImprovementUiGatewayService.startSpecifiedImprovement(text.trim() || 'チャットから自己コード改善を実行する', 'chat-self-improvement');
+        const improvementTask = await typedImprovementUiGatewayService.discoverImprovementTarget(text.trim() || 'チャットから自己コード改善を実行する');
         const correlation = improvementTask.coreResult as { requestId?: string } | undefined;
         const correlationRequestId = correlation?.requestId || coreRequestId;
         const queuedRequest = { id: improvementTask.taskId || 'N/A', source: 'CORE', trigger: text.trim() || 'chat-self-improvement-request' };

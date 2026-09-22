@@ -235,7 +235,9 @@ class ExternalReviewIntakeService {
             packageRevision: record.packageRevision,
             candidateManifestSha256: record.candidateManifestSha256,
             externalReviewId: record.externalReviewId,
-            requestedChanges: [...record.requestedChanges],
+            issueId: reviewPackage.inputs.issueId,
+            targetFiles: reviewPackage.inputs.files.map(file=>file.path),
+            requestedChanges: [...new Set([...record.requestedChanges,input.reason.trim()].filter(Boolean))],
             userReason: input.reason.trim(),
           },
         });

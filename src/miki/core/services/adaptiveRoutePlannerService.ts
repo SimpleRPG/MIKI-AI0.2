@@ -640,6 +640,8 @@ class AdaptiveRoutePlannerService {
       const decision=String(input.userDecision||'').toUpperCase();
       if(decision==='ACCEPT'){
         routes.push({target:'promotion',command:'APPROVE_REVIEWED_CANDIDATE',reason:'COREが外部評価後の利用者採用決定をpromotionへ委譲する',payload:{...input,taskId:task.taskId,operation,adaptive:true,priority:100}});
+      }else{
+        routes.push({target:'strategy',command:'ASSESS_DOMAIN',reason:`COREが外部レビューDecision ${decision||'UNKNOWN'} を受理し、採用経路以外の後続処理を確定する`,payload:{...input,taskId:task.taskId,operation,userDecision:decision,adaptive:true,priority:100}});
       }
       return this.decorateOperations(task,this.uniqueOperations(routes));
     }
@@ -756,6 +758,9 @@ class AdaptiveRoutePlannerService {
     const operation=String(input.operation||'');
     if(operation==='APPROVE_REVIEWED_CANDIDATE'){
       return coreCompletionGateService.evaluate(task,['promotion']);
+    }
+    if(operation==='DECIDE_CANDIDATE_ADOPTION'){
+      return coreCompletionGateService.evaluateCoreOwnedOperation(task,operation,'strategy');
     }
     const coreOwnedAutonomyOperations=new Set(['SAVE_AUTONOMY_CONFIG']);
     if(coreOwnedAutonomyOperations.has(operation)){
