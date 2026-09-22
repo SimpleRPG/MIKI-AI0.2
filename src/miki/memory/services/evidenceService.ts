@@ -107,6 +107,7 @@ export class EvidenceService {
       rejection_reason: synthetic
         ? 'synthetic/offline fallback is not admissible evidence'
         : undefined,
+      metadata: input.metadata,
     };
 
     this.records.set(evidence_id, record);
