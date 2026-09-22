@@ -427,7 +427,6 @@ export default function App() {
       storageService.setItem('gamecraft_workspace_files', JSON.stringify(workspaceFiles));
       // 設計思想 Master v5.0 第2章⑥ 構造記憶 (Structural Memory) のシンボルグラフ自動同期
       structuralMemoryService.syncFromWorkspaceFiles(workspaceFiles);
-      autonomousCandidatePreparationService.syncWorkspaceFiles(workspaceFiles);
     } catch (e) {
       console.warn('Storage quota limit reached for workspace files', e);
     }

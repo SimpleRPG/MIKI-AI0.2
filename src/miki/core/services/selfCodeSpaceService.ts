@@ -73,6 +73,11 @@ class SelfCodeSpaceService {
     return this.listFiles().find(file => file.path === path);
   }
 
+  listSourceFiles() {
+    const syncedAt = this.get()?.syncedAt || Date.now();
+    return this.listFiles().map(file => ({ path: file.path, content: file.content, language: this.language(file.path), evidenceIds: [], updatedAt: syncedAt, contentHash: file.sha256 }));
+  }
+
   search(query: string, limit = 20): SelfCodeFile[] {
     const q = query.trim().toLowerCase();
     if (!q) return [];
@@ -80,6 +85,8 @@ class SelfCodeSpaceService {
       .filter(file => file.path.toLowerCase().includes(q) || file.content.toLowerCase().includes(q))
       .slice(0, Math.max(1, limit));
   }
+
+  private language(path: string): string { const ext = path.split(".").pop()?.toLowerCase(); return ext === "tsx" ? "typescriptreact" : ext === "ts" ? "typescript" : ext === "js" ? "javascript" : ext === "json" ? "json" : ext || "text"; }
 
   private clone(snapshot: SelfCodeSnapshot): SelfCodeSnapshot {
     return {
