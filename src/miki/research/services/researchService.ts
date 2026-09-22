@@ -302,6 +302,11 @@ export class ResearchService {
 
         if (queryPlan.status === "READY" && queryPlan.queries[pass]) { const passEvidenceIds = [...new Set(evidence.filter(item => item.status !== "REJECTED").map(item => item.evidence_id))]; const passClusters = new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)); researchQueryOutcomeLearningService.record({ queryPlanId: queryPlan.planId, queryId: queryPlan.queries[pass].queryId, queryText: queryPlan.queries[pass].queryText, status: passEvidenceIds.length ? "EVIDENCE_GAINED" : results.length ? "LOW_QUALITY_RESULTS" : "NO_RESULTS", candidateUrlCount: results.filter(result => !!result.url).length, renderedPageCount: readResults.filter(page => page.success && !!page.text.trim()).length, admissibleIndependentSourceCount: passClusters.size, primarySourceCount: 0, sourceTierTarget: queryPlan.queries[pass].sourceTierTarget, counterevidenceChecked: queryPlan.queries[pass].intentType === "COUNTEREVIDENCE", evidenceIds: passEvidenceIds, failureReasons: verification.filter(result => result.outcome === "UNRESOLVED").flatMap(result => result.reasons), environmentApplicability: "CURRENT_ENVIRONMENT", executionTimeMs: Date.now() - queryStartedAt, attempt: pass + 1 }); }
 
+        if (queryPlan.status === "READY" && queryPlan.queries[pass]) {
+          const revision = researchQueryOutcomeLearningService.recommendRevision(queryPlan.planId, queryPlan.queries[pass].queryId);
+          if (revision.shouldRevise && revision.revisedQuery) nextQuery = revision.revisedQuery;
+        }
+
         const evidenceFingerprint = [...new Set(evidence.map(item => `${item.source_id}|${item.independence_cluster_id}|${item.url}`))]
           .sort()
           .join('||');
