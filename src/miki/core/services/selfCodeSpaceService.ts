@@ -14,6 +14,8 @@ export interface SelfCodeSnapshot {
   repoSha256: string;
   files: SelfCodeFile[];
   syncedAt: number;
+  dirty?: boolean;
+  baseRepoSha256?: string;
 }
 
 const KEY = 'miki_self_code_space_v1';
@@ -22,6 +24,8 @@ const BRANCH = 'main';
 
 class SelfCodeSpaceService {
   async sync(token?: string): Promise<SelfCodeSnapshot> {
+    const existing=this.get();
+    if(existing?.dirty) throw new Error('SELF_CODE_SPACE_DIRTY_SYNC_REQUIRED');
     const result = await apiService.importFromGitHub({
       repoUrl: REPOSITORY,
       branch: BRANCH,
@@ -48,6 +52,8 @@ class SelfCodeSpaceService {
       repoSha256: canonicalSha256(files.map(file => ({ path: file.path, sha256: file.sha256 }))),
       files,
       syncedAt: Date.now(),
+      dirty: false,
+      baseRepoSha256: canonicalSha256(files.map(file => ({ path: file.path, sha256: file.sha256 }))),
     };
 
     storageService.setItem(KEY, JSON.stringify(snapshot));
@@ -91,7 +97,7 @@ class SelfCodeSpaceService {
       const change=files.find(item=>item.path===file.path);
       return change ? {...file,content:change.candidateContent,sha256:canonicalSha256(change.candidateContent)} : {...file};
     });
-    const updated:SelfCodeSnapshot={...snapshot,files:next,repoSha256:canonicalSha256(next.map(file=>({path:file.path,sha256:file.sha256}))),syncedAt:Date.now()};
+    const updated:SelfCodeSnapshot={...snapshot,files:next,repoSha256:canonicalSha256(next.map(file=>({path:file.path,sha256:file.sha256}))),syncedAt:Date.now(),dirty:true,baseRepoSha256:snapshot.baseRepoSha256||snapshot.repoSha256};
     storageService.setItem(KEY,JSON.stringify(updated));
     return this.clone(updated);
   }
