@@ -10,7 +10,7 @@ import {
 import { systemLogger } from '../../../services/systemLogger';
 import { nonLlmRuntimeService } from '../../../services/nonLlmRuntimeService';
 import { storageService } from '../../../services/storageService';
-import { selfImprovementService } from '../../../services/selfImprovementService';
+import { selfImprovementService } from '../../improvement/services/selfImprovementService';
 import { backgroundWorkerService } from '../../execution/services/backgroundWorkerService';
 
 const REGRESSION_REPORTS_STORAGE_KEY = 'miki_ai_regression_reports';
