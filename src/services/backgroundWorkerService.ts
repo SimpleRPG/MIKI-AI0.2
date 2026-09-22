@@ -32,7 +32,7 @@ import { autonomousEvolutionService } from './autonomousEvolutionService';
 import { memoryAuditService } from './memoryAuditService';
 import { embeddingService } from './embeddingService';
 import { storagePlanningService } from './storagePlanningService';
-import { autonomousGrowthGovernorService } from './autonomousGrowthGovernorService';
+import { autonomousGrowthGovernorService } from '../miki/autonomy/services/autonomousGrowthGovernorService';
 import { autonomousRevalidationLoopService } from './autonomousRevalidationLoopService';
 import { remediationExecutionCoordinatorService } from './remediationExecutionCoordinatorService';
 import { remediationFailureRecoveryService } from './remediationFailureRecoveryService';
