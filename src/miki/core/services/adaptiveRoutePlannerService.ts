@@ -6,6 +6,7 @@ import { coreCompletionGateService, type CoreCompletionAssessment } from './core
 import { EvidenceService } from '../../memory/services/evidenceService';
 import { proposalQuarantineService } from './proposalQuarantineService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
+import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
 import { decomposeMultiIntent, selectMultiIntentHypothesis, type MultiIntentPlan } from '../../unknown/services/multiIntentDecompositionService';
 import { detectUnknownTermsFromBlackboardValue } from '../../unknown/services/unknownTermDetectionService';
 
@@ -107,6 +108,9 @@ class AdaptiveRoutePlannerService {
     );
     const coreTargetPaths=this.resolveCoreTargetPaths(task,input);
     const targetFilesKnown=coreTargetPaths.length>0;
+    const understanding=targetFilesKnown
+      ? selfCodeUnderstandingService.ensure(coreTargetPaths)
+      : {ready:false,reused:false,repoSha256:'',targetPaths:[],relatedPaths:[],reasons:['TARGET_FILES_UNKNOWN']};
 
     const evidenceIds=new Set<string>();
     for(const entry of [...results,...observations,...task.entries.filter(entry=>entry.kind==='EVIDENCE')]){
@@ -135,7 +139,7 @@ class AdaptiveRoutePlannerService {
     const validationResult=this.latestBusinessResult(task,'VALIDATE_CANDIDATE');
     const packageResult=this.latestBusinessResult(task,'CREATE_REVIEW_PACKAGE');
     const candidateGenerationReady=issueEstablished && repositoryContextAvailable && targetFilesKnown
-      && requiredEvidenceSatisfied && unresolvedKnowledge.length===0 && unresolvedCapability.length===0;
+      && understanding.ready && requiredEvidenceSatisfied && unresolvedKnowledge.length===0 && unresolvedCapability.length===0;
     const validationReady=Boolean(candidateResult && this.hasCandidateIdentity(candidateResult));
     const reviewPackageReady=Boolean(validationResult && this.hasValidationIdentity(validationResult));
 
@@ -143,6 +147,7 @@ class AdaptiveRoutePlannerService {
     if(!issueEstablished) blockingReasons.push('IMPROVEMENT_ISSUE_NOT_ESTABLISHED');
     if(!repositoryContextAvailable) blockingReasons.push('REPOSITORY_CONTEXT_MISSING');
     if(!targetFilesKnown) blockingReasons.push('TARGET_FILES_UNKNOWN');
+    if(targetFilesKnown && !understanding.ready) blockingReasons.push(...understanding.reasons);
     if(!requiredEvidenceSatisfied) blockingReasons.push('REQUIRED_EVIDENCE_NOT_SATISFIED');
     if(unresolvedKnowledge.length) blockingReasons.push(`KNOWLEDGE_GAPS:${unresolvedKnowledge.join('|')}`);
     if(unresolvedCapability.length) blockingReasons.push(`CAPABILITY_GAPS:${unresolvedCapability.join('|')}`);
@@ -162,7 +167,11 @@ class AdaptiveRoutePlannerService {
       issueEstablished,repositoryContextAvailable,targetFilesKnown,requiredEvidenceSatisfied,
       unresolvedKnowledge,unresolvedCapability,reusableComponents,
       candidateGenerationReady,validationReady,reviewPackageReady,blockingReasons,
-      recommendedOperations:[...new Set(recommendedOperations)]
+      recommendedOperations:[...new Set(recommendedOperations)],
+      codeUnderstandingReady:understanding.ready,
+      codeUnderstandingReused:understanding.reused,
+      codeUnderstandingSnapshotSha256:understanding.snapshotSha256,
+      relatedCodePaths:understanding.relatedPaths
     };
   }
 
