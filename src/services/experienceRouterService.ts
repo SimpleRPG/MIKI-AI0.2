@@ -10,7 +10,7 @@ import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { regressionBenchmarkService } from './regressionBenchmarkService';
 import { skillsService } from './skillsService';
-import { selfImprovementService } from './selfImprovementService';
+import { selfImprovementService } from '../miki/improvement/services/selfImprovementService';
 
 /**
  * 49章：経験の保存先ルーター (Experience Destination Router)
