@@ -2,7 +2,7 @@ import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { longTermMemoryService } from './longTermMemoryService';
 import { embeddingService } from './embeddingService';
-import { autonomousSearchService } from './autonomousSearchService';
+import { unifiedWebResearchService } from './autonomousSearchService';
 import { classifyClaimEpistemology } from './falsificationService';
 import type {
   MemoryItem,
@@ -191,7 +191,7 @@ class MemoryAuditService {
     let diffsDetected = 0;
     const flaggedMemoryIds: string[] = [];
 
-    const searchConfig = autonomousSearchService.getConfig();
+    const searchConfig = unifiedWebResearchService.getConfig();
     if (!searchConfig.enabled) {
       return {
         memoriesChecked: staleItems.length,
@@ -212,7 +212,7 @@ class MemoryAuditService {
           .trim();
 
         if (cleanQuery.length > 3) {
-          const searchRes = await autonomousSearchService.executeSearch(cleanQuery);
+          const searchRes = await unifiedWebResearchService.executeSearch(cleanQuery);
           if (searchRes.results && searchRes.results.length > 0) {
             const topResult = searchRes.results[0];
             const snippet = topResult.snippet || '';

@@ -1,7 +1,7 @@
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { crossDomainCirculationService } from '../../core/services/crossDomainCirculationService';
 import { unifiedExperienceImprovementBridgeService } from '../../experience/services/unifiedExperienceImprovementBridgeService';
-import { autonomousSearchService } from '../../research/services/autonomousSearchService';
+import { unifiedWebResearchService } from '../../research/services/unifiedWebResearchService';
 import { unknownKnowledgeIntegrationService } from './unknownKnowledgeIntegrationService';
 import {
   unknownResolutionService,
@@ -51,12 +51,12 @@ class UnifiedUnknownResolutionCoordinatorService {
       };
     }
 
-    let decision: ReturnType<typeof autonomousSearchService.detectNeedForSearch> = request.useSearch
-      ? autonomousSearchService.detectNeedForSearch(request.question)
+    let decision: ReturnType<typeof unifiedWebResearchService.detectNeedForSearch> = request.useSearch
+      ? unifiedWebResearchService.detectNeedForSearch(request.question)
       : { needsSearch: false };
     const terms = (request.unknownTerms || []).map((term) => String(term).trim()).filter(Boolean);
     if (request.useSearch && !decision.needsSearch && terms.length > 0) {
-      const searchConfig = autonomousSearchService.getConfig();
+      const searchConfig = unifiedWebResearchService.getConfig();
       if (searchConfig.enabled && searchConfig.autoSearchInChat) {
         decision = { needsSearch: true, query: terms.join(' '), reason: '解析Componentが未解決語を検出', category: 'factual' };
       }
@@ -95,7 +95,7 @@ class UnifiedUnknownResolutionCoordinatorService {
 
     request.onProgress?.(`Web調査: ${query}`, { unknownId: resolution.id, route: 'WEB' });
     try {
-      const result = await autonomousSearchService.executeSearch(query, { maxResults: 5 });
+      const result = await unifiedWebResearchService.executeSearch(query, { maxResults: 5 });
       if (!result.results.length) {
         unknownResolutionService.attempt(resolution.id, 'WEB', undefined, {
           query,

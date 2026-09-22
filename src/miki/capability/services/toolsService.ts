@@ -10,7 +10,7 @@ import {
 import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from '../../../services/storageService';
 import { capabilityPluginService } from './capabilityPluginService';
-import { autonomousSearchService } from '../../research/services/autonomousSearchService';
+import { unifiedWebResearchService } from '../../research/services/unifiedWebResearchService';
 import { selfCodeArchitectService } from '../../selfDevelopment/services/selfCodeArchitectService';
 import { cognitiveDebuggerService } from '../../verification/services/cognitiveDebuggerService';
 import { digitalResearchNoteService } from '../../research/services/digitalResearchNoteService';
@@ -786,7 +786,7 @@ export class ToolsService {
 
     // 5. 自律Web検索判定 (tool_web_search)
     // 最新情報、ドキュメント、事実調査要求
-    const searchCheck = autonomousSearchService.detectNeedForSearch(p);
+    const searchCheck = unifiedWebResearchService.detectNeedForSearch(p);
     if (searchCheck.needsSearch && searchCheck.query) {
       recommendations.push({
         toolId: 'tool_web_search',
@@ -1096,9 +1096,9 @@ export class ToolsService {
           const query = String(params.query || '').trim();
           if (!query) throw new Error('検索クエリが指定されていません');
           const maxResults = params.maxResults ? Number(params.maxResults) : 4;
-          const searchRes = await autonomousSearchService.executeSearch(query, { maxResults });
+          const searchRes = await unifiedWebResearchService.executeSearch(query, { maxResults });
           // 能動学習の実行 (長期記憶・合成データセットへの還元)
-          const record = autonomousSearchService.learnFromSearch(
+          const record = unifiedWebResearchService.learnFromSearch(
             query,
             searchRes.results,
             searchRes.summary,

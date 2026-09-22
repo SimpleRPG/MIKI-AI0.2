@@ -9,7 +9,7 @@ import { systemLogger } from '../../../services/systemLogger';
 import { worldModelService } from '../../selfAwareness/services/worldModelService';
 import { selfImprovementService } from '../../improvement/services/selfImprovementService';
 import { workingAgendaService } from '../../strategy/services/workingAgendaService';
-import { autonomousSearchService } from '../../research/services/autonomousSearchService';
+import { unifiedWebResearchService } from '../../research/services/unifiedWebResearchService';
 import { syntheticDataService } from '../../research/services/syntheticDataService';
 import { selfImprovementIngressService } from '../../core/services/selfImprovementIngressService';
 import { experienceLinkService } from '../../experience/services/experienceLinkService';
@@ -458,10 +458,10 @@ export class AutonomousEvolutionService {
       let thoughtSummary = '';
 
       // 自律Web学習が有効なら調査を試みる
-      const searchConfig = autonomousSearchService.getConfig();
+      const searchConfig = unifiedWebResearchService.getConfig();
       if (searchConfig.enabled) {
         try {
-          const searchRes = await autonomousSearchService.executeSearch(query);
+          const searchRes = await unifiedWebResearchService.executeSearch(query);
           if (searchRes.results && searchRes.results.length > 0) {
             thoughtSummary = `Web検索により最新知見を確認: ${searchRes.results[0].snippet.slice(0, 100)}`;
           }

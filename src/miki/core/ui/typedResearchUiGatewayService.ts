@@ -1,5 +1,5 @@
 import { coreTaskIngressService } from '../services/coreTaskIngressService';
-import { autonomousSearchService, type AutonomousSearchConfig, type AutonomousSearchStats } from '../../research/services/autonomousSearchService';
+import { unifiedWebResearchService, type AutonomousSearchConfig, type AutonomousSearchStats } from '../../research/services/unifiedWebResearchService';
 import { bannedTopicsConfigService, type BannedTopicsConfig } from '../../safety/services/bannedTopicsConfigService';
 import { nativeWorkManagerService } from '../../execution/services/nativeWorkManagerService';
 import { getSearxngBaseUrlItem, setSearxngBaseUrlItem } from '../../../services/api';
@@ -18,9 +18,9 @@ export interface ResearchUiSnapshot {
 class TypedResearchUiGatewayService {
   public snapshot(limit = 20): ResearchUiSnapshot {
     return {
-      config: autonomousSearchService.getConfig(),
-      stats: autonomousSearchService.getStats(),
-      records: autonomousSearchService.getRecentRecords(limit),
+      config: unifiedWebResearchService.getConfig(),
+      stats: unifiedWebResearchService.getStats(),
+      records: unifiedWebResearchService.getRecentRecords(limit),
       bannedTopics: bannedTopicsConfigService.getConfig(),
       searxngUrl: getSearxngBaseUrlItem(),
       androidNative: nativeWorkManagerService.isAndroidNative(),
@@ -43,7 +43,7 @@ class TypedResearchUiGatewayService {
 
   public async saveSearchConfig(patch: Partial<AutonomousSearchConfig>): Promise<AutonomousSearchConfig> {
     await this.authorize('SAVE_AUTONOMOUS_SEARCH_CONFIG', { patch });
-    return autonomousSearchService.saveConfig(patch);
+    return unifiedWebResearchService.saveConfig(patch);
   }
 
   public async setBannedTopicsEnabled(enabled: boolean): Promise<BannedTopicsConfig> {
@@ -75,24 +75,24 @@ class TypedResearchUiGatewayService {
     setSearxngBaseUrlItem(url.trim());
   }
 
-  public async executeSearch(query: string, options: Parameters<typeof autonomousSearchService.executeSearch>[1]) {
+  public async executeSearch(query: string, options: Parameters<typeof unifiedWebResearchService.executeSearch>[1]) {
     await this.authorize('EXECUTE_AUTONOMOUS_SEARCH', { query, options });
-    return autonomousSearchService.executeSearch(query, options);
+    return unifiedWebResearchService.executeSearch(query, options);
   }
 
-  public async learnFromSearch(...args: Parameters<typeof autonomousSearchService.learnFromSearch>) {
+  public async learnFromSearch(...args: Parameters<typeof unifiedWebResearchService.learnFromSearch>) {
     await this.authorize('LEARN_FROM_SEARCH_OUTCOME', { query: args[0] });
-    return autonomousSearchService.learnFromSearch(...args);
+    return unifiedWebResearchService.learnFromSearch(...args);
   }
 
   public async performIdleLearning() {
     await this.authorize('RUN_IDLE_RESEARCH_LEARNING', {});
-    return autonomousSearchService.performIdleAutonomousLearning();
+    return unifiedWebResearchService.performIdleAutonomousLearning();
   }
 
-  public async fetchRenderedPage(url: string, options: Parameters<typeof autonomousSearchService.fetchRenderedPage>[1]) {
+  public async fetchRenderedPage(url: string, options: Parameters<typeof unifiedWebResearchService.fetchRenderedPage>[1]) {
     await this.authorize('FETCH_RENDERED_RESEARCH_PAGE', { url, options });
-    return autonomousSearchService.fetchRenderedPage(url, options);
+    return unifiedWebResearchService.fetchRenderedPage(url, options);
   }
   public listExternalAiResearchBundles(): ExternalAiResearchBundle[] {
     return externalAiResearchBundleService.list();

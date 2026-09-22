@@ -28,7 +28,7 @@ import { capabilityPluginService } from '../../capability/services/capabilityPlu
 import { featureFlagsService } from '../../safety/services/featureFlagsService';
 import { teacherRequestService } from '../../learning/services/teacherRequestService';
 import { workingAgendaService } from '../../strategy/services/workingAgendaService';
-import { autonomousSearchService } from '../../research/services/autonomousSearchService';
+import { unifiedWebResearchService } from '../../research/services/unifiedWebResearchService';
 import { autonomousEvolutionService } from '../../autonomy/services/autonomousEvolutionService';
 import { memoryAuditService } from '../../memory/services/memoryAuditService';
 import { embeddingService } from '../../research/services/embeddingService';
@@ -887,13 +887,13 @@ export class BackgroundWorkerService {
         // Step 6.9: 設計思想 Master v5.0 第13章2節 非会話時・深い睡眠時の自律Web検索能動学習
         if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
         try {
-          const searchConfig = autonomousSearchService.getConfig();
+          const searchConfig = unifiedWebResearchService.getConfig();
           if (searchConfig.enabled && searchConfig.idleSearchEnabled) {
             systemLogger.info(
               'SELF_IMPROVEMENT',
               '🌐 [第13章 能動Web検索学習] 非会話時の自発的Web検索学習を開始します...'
             );
-            const searchLearningResult = await autonomousSearchService.performIdleAutonomousLearning(abortSignal);
+            const searchLearningResult = await unifiedWebResearchService.performIdleAutonomousLearning(abortSignal);
             if (searchLearningResult.learnedCount > 0) {
               weaknessFound.push(
                 `[自律Web学習] ${searchLearningResult.learnedCount}件の課題について最新知見を調査・長期記憶と教材データセットへ反映 (${searchLearningResult.queriesInvestigated.join(', ')})`
@@ -1075,7 +1075,7 @@ export class BackgroundWorkerService {
 
         // --- 作業指示書 v20 & 自動成長強化: Web検索自律学習素材による縦(骨格)・横(言い回し)の自律成長ループ配線 ---
         // 歯止め緩和: 1サイクルあたりの自律Web検索 (弱点カテゴリに応じた複数クエリ・最大8件取得)
-        const searchConfig = autonomousSearchService.getConfig();
+        const searchConfig = unifiedWebResearchService.getConfig();
         if (searchConfig.enabled && !abortSignal.aborted) {
           // 弱点カテゴリまたは未対応課題から検索トピックを特定 (最大3カテゴリからクエリ生成)
           const weaknesses = surfaceVariationGrowthService.detectWeaknessCategories(5);
@@ -1127,7 +1127,7 @@ export class BackgroundWorkerService {
             );
 
             // 2. Web検索実行 (最大8件取得)
-            const searchRes = await autonomousSearchService.executeSearch(webTopic, { maxResults: 8 });
+            const searchRes = await unifiedWebResearchService.executeSearch(webTopic, { maxResults: 8 });
             const searchResults = searchRes.results || [];
 
             systemLogger.info(

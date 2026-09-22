@@ -9,7 +9,7 @@ import { systemLogger } from './systemLogger';
 import { worldModelService } from './worldModelService';
 import { selfImprovementService } from '../miki/improvement/services/selfImprovementService';
 import { workingAgendaService } from './workingAgendaService';
-import { autonomousSearchService } from './autonomousSearchService';
+import { unifiedWebResearchService } from './autonomousSearchService';
 import { syntheticDataService } from './syntheticDataService';
 import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
 import { SelfImprovementProposal } from '../types';
@@ -384,10 +384,10 @@ export class AutonomousEvolutionService {
       let thoughtSummary = '';
 
       // 自律Web学習が有効なら調査を試みる
-      const searchConfig = autonomousSearchService.getConfig();
+      const searchConfig = unifiedWebResearchService.getConfig();
       if (searchConfig.enabled) {
         try {
-          const searchRes = await autonomousSearchService.executeSearch(query);
+          const searchRes = await unifiedWebResearchService.executeSearch(query);
           if (searchRes.results && searchRes.results.length > 0) {
             thoughtSummary = `Web検索により最新知見を確認: ${searchRes.results[0].snippet.slice(0, 100)}`;
           }
