@@ -2,7 +2,7 @@ import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { capabilityGapService } from './capabilityGapService';
 import { simpleRpgCapabilityLearningService } from './simpleRpgCapabilityLearningService';
-import { selfCodeArchitectService } from './selfCodeArchitectService';
+import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
 
 const STATE_KEY = 'miki_autonomous_growth_governor_v1';
 

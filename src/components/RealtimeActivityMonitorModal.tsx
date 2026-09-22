@@ -30,7 +30,6 @@ import { proactiveContextOsService, ContextAwarenessSnapshot } from '../miki/str
 import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
 import {
   autonomousContinuousEvolutionService,
-  AutonomousEvolutionStepEvent,
   AutonomousEvolutionRecord,
 } from '../miki/autonomy/services/autonomousContinuousEvolutionService';
 import { aiderEngineService, AiderCommitRecord } from '../miki/selfDevelopment/services/aiderEngineService';
@@ -62,7 +61,6 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
   const [commits, setCommits] = useState<AiderCommitRecord[]>([]);
   const [isEvolutionBusy, setIsEvolutionBusy] = useState(false);
   const [latestEvolutionRecord, setLatestEvolutionRecord] = useState<AutonomousEvolutionRecord | null>(null);
-  const [recentEvolutionSteps, setRecentEvolutionSteps] = useState<AutonomousEvolutionStepEvent[]>([]);
   const [isRollingBack, setIsRollingBack] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
@@ -100,18 +98,10 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
       if (record) setLatestEvolutionRecord(record);
     });
 
-    const unsubEvolutionSteps = autonomousContinuousEvolutionService.subscribeSteps((step) => {
-      setRecentEvolutionSteps((prev) => [...prev.slice(-25), step]);
-      if (step.phase === 'COMPLETED') {
-        loadCommits();
-      }
-    });
-
     return () => {
       unsubLog();
       unsubStep();
       unsubEvolution();
-      unsubEvolutionSteps();
     };
   }, [isOpen]);
 
@@ -418,22 +408,6 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
               ) : (
                 <div className="text-xs text-slate-400 py-1">
                   現在実行中の自律改善はありません。「自己改善」タブから自律改善サイクルを開始できます。
-                </div>
-              )}
-
-              {/* 直近の自律進化ステップ */}
-              {recentEvolutionSteps.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  <div className="text-[10px] text-slate-400 font-bold">リアルタイム進捗ステップ:</div>
-                  <div className="max-h-28 overflow-y-auto space-y-1 text-[10px] font-mono">
-                    {recentEvolutionSteps.slice(-5).map((st, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-slate-300">
-                        <span className="text-purple-400">[{st.phase}]</span>
-                        <span className="text-slate-200">{st.title}</span>
-                        <span className="text-slate-500 truncate">- {st.detail}</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
             </div>

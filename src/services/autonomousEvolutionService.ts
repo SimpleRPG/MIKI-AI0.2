@@ -11,7 +11,7 @@ import { selfImprovementService } from './selfImprovementService';
 import { workingAgendaService } from './workingAgendaService';
 import { autonomousSearchService } from './autonomousSearchService';
 import { syntheticDataService } from './syntheticDataService';
-import { selfCodeArchitectService } from './selfCodeArchitectService';
+import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
 import { SelfImprovementProposal } from '../types';
 
 const HEURISTIC_RULES_KEY = 'miki_heuristic_rules';
