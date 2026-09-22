@@ -294,27 +294,6 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
           processedCategories: ['improvement', 'core'],
         });
 
-        if (result.packageId) {
-          const regenerated = await typedCoreUiGatewayService.regenerateReviewPackage(
-            result.packageId
-          );
-
-          if (regenerated.ok && regenerated.artifact) {
-            const download = typedCoreUiGatewayService.downloadReviewPackage(
-              regenerated.artifact
-            );
-
-            setActionMessage({
-              text: `指示 [${directiveId}] の実行とレビューZIP作成が完了しました: ${download.fileName}`,
-              type: 'success',
-            });
-          } else {
-            setActionMessage({
-              text: `指示 [${directiveId}] は完了しましたが、レビューZIPの取得に失敗しました: ${regenerated.message}`,
-              type: 'error',
-            });
-          }
-        }
       } else {
         typedImprovementUiGatewayService.updateRequestStatus(reqId, failed ? 'failed' : 'processing', {
           runId: result.taskId,
@@ -794,6 +773,10 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
               )}
             </div>
           </div>
+        )}
+
+        {activeSection === 'review_packages' && (
+          <ReviewPackageLibrary />
         )}
 
         {/* ================= SECTION 2: 作業指示 (DIRECTIVES) ================= */}
