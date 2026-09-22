@@ -129,11 +129,18 @@ class TypedImprovementUiGatewayService {
     }
 
     if(directive?.runId){
-      return this.taskSnapshotResult(
-        existingRun?.taskId || `RUN:${directive.runId}`,
-        0,
-        existingRun?.status || directive.status
-      );
+      const status=existingRun?.status || directive.status || "WAITING";
+      return {
+        commandId:coreResultService.generateRequestId("ui-existing-run"),
+        operationInstanceId:coreResultService.generateRequestId("operation"),
+        currentStage:status,
+        currentBusinessStage:status,
+        stopReason:"IMPROVEMENT_RUN_EXISTS_WITHOUT_ACTIVE_TASK",
+        unresolved:["ACTIVE_TASK_NOT_AVAILABLE"],
+        domainReplyIds:[],evidenceIds:[],persistenceReceiptIds:[],
+        requiredDomains:[],missingDomains:[],failedDomains:[],missingReceipts:[],
+        missingRequiredOperations:[],completionReasons:["RUN_STATE_AVAILABLE"]
+      };
     }
 
     const target=directive?.targetFiles?.find(
@@ -215,10 +222,6 @@ class TypedImprovementUiGatewayService {
     return externalDirectiveIntakeService.receiveTextFile(...args);
   }
   deleteDirective(directiveId:string) { return externalDirectiveIntakeService.deleteDirective(directiveId); }
-  generateRequestId() { return coreResultService.generateRequestId(); }
-  createRequest(...args: Parameters<typeof coreResultService.createRequest>) { return coreResultService.createRequest(...args); }
-  updateRequestStatus(...args: Parameters<typeof coreResultService.updateStatus>) { return coreResultService.updateStatus(...args); }
-  completeRequest(...args: Parameters<typeof coreResultService.complete>) { return coreResultService.complete(...args); }
 }
 
 export const typedImprovementUiGatewayService = new TypedImprovementUiGatewayService();
