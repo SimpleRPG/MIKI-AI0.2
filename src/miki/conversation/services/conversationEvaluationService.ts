@@ -262,7 +262,6 @@ export class ConversationEvaluationService {
     if (!isNativeReady && !isWebReady) {
       const coreResult = await nonLlmCoreService.execute({ prompt, recentMessages: [] });
       return coreResult.replyText;
-      });
     }
 
     try {
@@ -291,7 +290,6 @@ export class ConversationEvaluationService {
     } catch (err: any) {
       const coreResult = await nonLlmCoreService.execute({ prompt, recentMessages: [] });
       return coreResult.replyText;
-      });
     }
   }
 
