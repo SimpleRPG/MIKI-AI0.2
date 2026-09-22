@@ -249,68 +249,23 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   const handleExecuteDirective = async (directiveId: string) => {
     try {
       setIsExecutingAction(true);
-      const reqId = typedImprovementUiGatewayService.generateRequestId();
-      typedImprovementUiGatewayService.createRequest({
-        requestId: reqId,
-        sourceCategory: 'improvement',
-        targetCategory: 'improvement',
-        directiveId,
-        goal: `Execute directive ${directiveId}`,
-        createdAt: Date.now(),
-      });
-      typedImprovementUiGatewayService.updateRequestStatus(reqId, 'processing', {
-        directiveId,
-        route: ['improvement', 'core'],
-        processedCategories: ['improvement', 'core'],
-      });
       setActionMessage({
-        text: `指示 [${directiveId}] (Req: ${reqId}) をCOREへ送信中...`,
+        text: `指示 [${directiveId}] をCOREへ送信中...`,
         type: 'info',
       });
-
       const result = await typedImprovementUiGatewayService.executeDirectiveUntilReviewPackage(directiveId);
       const stage = String(result.currentBusinessStage || result.currentStage || '').toUpperCase();
-      const finished = stage === 'COMPLETED';
-      const failed = ['FAILED', 'BLOCKED', 'REJECTED'].includes(stage);
       const message = result.stopReason || result.completionReasons?.[0] || '';
       const detail = result.nextStage ? ` → 次: ${result.nextStage}` : '';
-
-      const payload = {
-        directiveId,
-        taskId: result.taskId,
-        currentStage: result.currentBusinessStage || result.currentStage,
-        nextStage: result.nextStage,
-        stopReason: result.stopReason,
-        completionReasons: result.completionReasons,
-        missingRequiredOperations: result.missingRequiredOperations,
-        missingReceipts: result.missingReceipts,
-      };
-
-      if (finished) {
-        typedImprovementUiGatewayService.completeRequest(reqId, payload, {
-          runId: result.taskId,
-          directiveId,
-          route: ['improvement', 'core'],
-          processedCategories: ['improvement', 'core'],
-        });
-
-      } else {
-        typedImprovementUiGatewayService.updateRequestStatus(reqId, failed ? 'failed' : 'processing', {
-          runId: result.taskId,
-          directiveId,
-          route: ['improvement', 'core'],
-          processedCategories: ['improvement', 'core'],
-          error: failed ? (message || stage) : undefined,
-          result: payload,
-        });
-      }
+      const finished = stage === 'COMPLETED';
+      const failed = ['FAILED', 'BLOCKED', 'REJECTED'].includes(stage);
 
       setActionMessage({
         text: finished
-          ? `指示 [${directiveId}] の実行が完了しました (Req: ${reqId}, Task: ${result.taskId || '―'})`
+          ? `指示 [${directiveId}] の実行が完了しました (Task: ${result.taskId || '―'})`
           : failed
-            ? `指示 [${directiveId}] は完了せず停止しました (Req: ${reqId}, 状態: ${formatRuntimeStatus(stage)}${message ? `, ${message}` : ''})`
-            : `指示 [${directiveId}] をCOREで受け付けました (Req: ${reqId}, 状態: ${formatRuntimeStatus(stage)}${detail})`,
+            ? `指示 [${directiveId}] は停止しました (状態: ${formatRuntimeStatus(stage)}${message ? `, ${message}` : ''})`
+            : `指示 [${directiveId}] をCOREで受け付けました (Task: ${result.taskId || '―'}, 状態: ${formatRuntimeStatus(stage)}${detail})`,
         type: finished ? 'success' : failed ? 'error' : 'info',
       });
       triggerRefresh();
