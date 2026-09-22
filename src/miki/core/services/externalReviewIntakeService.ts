@@ -222,7 +222,17 @@ class ExternalReviewIntakeService {
       });
       const artifactProjection = reviewLearningArtifactService.deriveAndPersist(learningProjection.episode, decision.decisionId);
       const reusableComponents = artifactProjection.artifacts.flatMap(artifact => reusableComponentFactoryService.extract(artifact, learningProjection.episode));
-      reusableComponentFactoryService.storeCandidates(reusableComponents);if(input.decision==="ACCEPT"){reviewLearningArtifactService.generalizeAcceptedPatterns();}
+      reusableComponentFactoryService.storeCandidates(reusableComponents);
+      if(input.decision==="ACCEPT"){
+        const generalizedArtifactIds=reviewLearningArtifactService.generalizeAcceptedPatterns();
+        await coreTaskIngressService.submit({
+          kind:'SYSTEM_TASK',
+          goal:'COREが一般化された学習から再利用コンポーネント採否を判断する',
+          source:'core',
+          payload:{operation:'APPROVE_REUSABLE_COMPONENTS',decisionId:decision.decisionId,externalReviewId:record.externalReviewId,packageId:record.packageId,generalizedArtifactIds},
+          maxCycles:18,
+        });
+      }
       if (input.decision === 'REQUEST_CHANGES' || input.decision === 'PARTIAL_ACCEPT' || input.decision === 'PARTIAL_REJECT') {
         await improvementIntakeRouterService.receive({
           runType: 'REVALIDATION',
