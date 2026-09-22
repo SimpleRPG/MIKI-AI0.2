@@ -56,6 +56,7 @@ export interface EvidenceRecord {
     research_source_tier_target?: string;
     research_source_tier?: string;
 research_source_role_target?: "PRIMARY"|"OFFICIAL"|"SECONDARY"|"COUNTEREVIDENCE"|"UNCLASSIFIED";
+    research_source_role?: "PRIMARY"|"OFFICIAL"|"SECONDARY"|"COUNTEREVIDENCE"|"UNCLASSIFIED";
     research_intent_type?: string;
   };
 }
