@@ -18,7 +18,6 @@ import { HomeDashboard } from './components/HomeDashboard';
 import { LibraryHub } from './components/LibraryHub';
 import { MemoryModal } from './components/MemoryModal';
 import { ExportModal } from './components/ExportModal';
-import { SelfImprovementModal, SelfImprovementTab } from './components/SelfImprovementModal';
 import { RealtimeActivityMonitorModal } from './components/RealtimeActivityMonitorModal';
 import { WORKSPACE_TEMPLATES } from './data/presets';
 import {
@@ -292,8 +291,6 @@ export default function App() {
 
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
-  const [isSelfImprovementModalOpen, setIsSelfImprovementModalOpen] = useState<boolean>(false);
-  const [selfImprovementTab, setSelfImprovementTab] = useState<SelfImprovementTab>('spec_architect');
   const [isGlobalActivityMonitorOpen, setIsGlobalActivityMonitorOpen] = useState<boolean>(false);
   const [isEvolutionRunning, setIsEvolutionRunning] = useState<boolean>(false);
 
@@ -467,10 +464,7 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = nativeBackgroundService.addActionListener((data) => {
       if (data?.action === 'open_self_improvement') {
-        if (data.tab) {
-          setSelfImprovementTab(data.tab as any);
-        }
-        setIsSelfImprovementModalOpen(true);
+        setActiveTab('improvement');
       }
     });
 
@@ -478,9 +472,8 @@ export default function App() {
       const customEvent = e as CustomEvent;
       if (customEvent.detail?.action === 'open_self_improvement') {
         if (customEvent.detail.tab) {
-          setSelfImprovementTab(customEvent.detail.tab as any);
         }
-        setIsSelfImprovementModalOpen(true);
+        setActiveTab('improvement');
       }
     };
     window.addEventListener('miki:notification-action', handleCustomAction);
@@ -3709,7 +3702,7 @@ export default function App() {
         setUseSearch={setUseSearch}
         fps={fps}
         onOpenActivityMonitor={() => setIsGlobalActivityMonitorOpen(true)}
-        onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
+        onOpenSelfImprovementModal={() => setActiveTab('improvement')}
         isWorking={isLoading || isGenerating || isEvolutionRunning}
       />
 
@@ -3748,7 +3741,7 @@ export default function App() {
               workspaceFiles={workspaceFiles}
               onOpenGamePreview={() => setActiveTab('preview')}
               onOpenExportModal={() => setIsExportModalOpen(true)}
-              onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
+              onOpenSelfImprovementModal={() => setActiveTab('improvement')}
               onExecuteTool={handleExecuteTool}
               onConfirmToolExecution={handleConfirmToolExecution}
               onRejectToolExecution={handleRejectToolExecution}
@@ -3807,10 +3800,7 @@ export default function App() {
 
             {activeTab === 'improvement' && (
               <AutonomousImprovementHome
-                onOpenSelfImprovementModal={(tab) => {
-                  if (tab) setSelfImprovementTab(tab as any);
-                  setIsSelfImprovementModalOpen(true);
-                }}
+                onOpenSelfImprovementModal={() => setActiveTab('improvement')}
                 onOpenActivityMonitor={() => setIsGlobalActivityMonitorOpen(true)}
               />
             )}
@@ -3860,7 +3850,7 @@ export default function App() {
                 workspaceFiles={workspaceFiles}
                 onOpenGamePreview={() => setMobileTab('preview')}
                 onOpenExportModal={() => setIsExportModalOpen(true)}
-                onOpenSelfImprovementModal={() => setIsSelfImprovementModalOpen(true)}
+                onOpenSelfImprovementModal={() => setActiveTab('improvement')}
                 onExecuteTool={handleExecuteTool}
                 onConfirmToolExecution={handleConfirmToolExecution}
                 onRejectToolExecution={handleRejectToolExecution}
@@ -3920,10 +3910,7 @@ export default function App() {
 
             {mobileTab === 'improvement' && (
               <AutonomousImprovementHome
-                onOpenSelfImprovementModal={(tab) => {
-                  if (tab) setSelfImprovementTab(tab as any);
-                  setIsSelfImprovementModalOpen(true);
-                }}
+                onOpenSelfImprovementModal={() => setActiveTab('improvement')}
                 onOpenActivityMonitor={() => setIsGlobalActivityMonitorOpen(true)}
               />
             )}
@@ -4010,15 +3997,7 @@ export default function App() {
         projectName={persona.name + '_Project'}
       />
 
-      <SelfImprovementModal
-        isOpen={isSelfImprovementModalOpen}
-        onClose={() => setIsSelfImprovementModalOpen(false)}
-        memories={memories}
-        chatMessages={messages}
-        workspaceFiles={workspaceFiles}
-        engineMode={engineMode}
-        initialTab={selfImprovementTab}
-      />
+
 
       <RealtimeActivityMonitorModal
         isOpen={isGlobalActivityMonitorOpen}

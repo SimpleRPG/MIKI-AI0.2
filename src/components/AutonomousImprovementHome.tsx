@@ -53,7 +53,6 @@ import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewaySer
 import { isEditableInputActive } from '../utils/isEditableInputActive';
 
 export interface AutonomousImprovementHomeProps {
-  onOpenSelfImprovementModal?: (tab?: string) => void;
   onOpenActivityMonitor?: () => void;
 }
 
@@ -66,7 +65,7 @@ type MainSection =
   | 'history'
   | 'core_18'
   | 'review_packages'
-  | 'details';
+;
 
 const formatRuntimeStatus = (value: string) => {
   switch ((value || '').toUpperCase()) {
@@ -519,7 +518,6 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
           { id: 'history', label: '履歴', icon: Clock, count: canonicalRuns.length },
           { id: 'core_18', label: '18構成 & CORE Result', icon: Boxes, count: coreResults.length },
           { id: 'review_packages', label: '評価用ZIP', icon: UploadCloud },
-          { id: 'details', label: '詳細・専門機能', icon: ExternalLink },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSection === tab.id;
@@ -1362,48 +1360,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
           </div>
         )}
 
-        {/* ================= SECTION 8: 詳細 (DETAILS & SPECIALIZED) ================= */}
-        {activeSection === 'review_packages' && <ReviewPackageLibrary />}
 
-        {activeSection === 'details' && (
-          <div className="space-y-4 max-w-5xl mx-auto">
-            <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
-              <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                <ExternalLink className="w-4 h-4 text-indigo-400" />
-                既存自己改善・詳細専門機能への直接リンク
-              </h3>
-              <p className="text-[11px] text-slate-400">
-                詳細な専門機能はすべてここに集約されており、ワンクリックで展開できます
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
-                {[
-                  { id: 'spec_architect', label: '仕様書アーキテクト', desc: '仕様書ドリフト監査・ルールベース合成' },
-                  { id: 'non_llm_architecture', label: '決定論的アーキテクチャ・設計思想', desc: '自律部品合成・不変条件検証' },
-                  { id: 'answer_plans', label: 'Answer Plan & 解答戦略', desc: '多段階推論・決定論的計画' },
-                  { id: 'capabilities', label: 'Capability Mastery', desc: '自己修復・部品レジストリ' },
-                  { id: 'completion_judge', label: 'Completion Judge', desc: '完了判定・反証テスト' },
-                  { id: 'failure_catalog', label: 'Failure Catalog', desc: '失敗原因分類・再利用' },
-                  { id: 'security_guardrail', label: 'Security & Guardrails', desc: '安全ガード・隔離検証' },
-                  { id: 'vitals', label: 'Vitals & Resource Monitor', desc: 'CPU/メモリ/バッテリー制約' },
-                  { id: 'journal', label: 'Journal & Evolution Log', desc: '自己進化ログ・スナップショット' },
-                ].map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => onOpenSelfImprovementModal?.(item.id)}
-                    className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-indigo-500 transition cursor-pointer space-y-1"
-                  >
-                    <div className="text-xs font-bold text-slate-200 flex items-center justify-between">
-                      <span>{item.label}</span>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
-                    </div>
-                    <p className="text-[11px] text-slate-400">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
