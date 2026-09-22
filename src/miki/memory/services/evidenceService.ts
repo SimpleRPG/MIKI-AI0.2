@@ -51,6 +51,10 @@ export interface EvidenceRecord {
     prompt_sha256?: string;
     response_sha256?: string;
     replay_key?: string;
+    research_query_id?: string;
+    research_query_plan_id?: string;
+    research_source_tier_target?: string;
+    research_intent_type?: string;
   };
 }
 
