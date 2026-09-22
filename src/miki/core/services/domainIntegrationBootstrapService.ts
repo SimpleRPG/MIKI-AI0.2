@@ -146,6 +146,11 @@ class DomainIntegrationBootstrapService{
    mikiUnifiedLearningContinuumService.observe({domain:String(envelope.payload.learningDomain||'system') as any,key,action:String(envelope.payload.sourceOperation||'core-result'),input:String(envelope.payload.input||envelope.payload.goal||'').slice(0,500),outcome,verified,capabilityIds,concepts,lesson});
    return done({operation:'LEARN_FROM_CORE_RESULT',operationClass:'BUSINESS',status:'SUCCEEDED',learningRecorded:true,sourceDomain:String(envelope.payload.sourceDomain||''),sourceOperation:String(envelope.payload.sourceOperation||''),sourceOperationInstanceId:String(envelope.payload.sourceOperationInstanceId||''),verified,evidenceIds,capabilityIds,concepts,lesson});
   }
+  if(domain==='learning'&&envelope.command==='APPROVE_REUSABLE_COMPONENTS'){
+   const {reusableComponentFactoryService}=await import('./reusableComponentFactoryService');
+   const result=reusableComponentFactoryService.approveByCore();
+   return done({operation:'APPROVE_REUSABLE_COMPONENTS',operationClass:'BUSINESS',status:'SUCCEEDED',...result,evidenceIds:[]});
+  }
   if(domain==='memory'&&envelope.command==='FLUSH'){
    if(storageService.getBackendName()==='memory')return {accepted:false,domain,command:envelope.command,error:'MEMORY_ONLY_PERSISTENCE',completedAt:Date.now()};
    await storageService.flushNow();return done({backend:storageService.getBackendName(),persisted:true});

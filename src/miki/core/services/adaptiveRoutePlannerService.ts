@@ -638,6 +638,10 @@ class AdaptiveRoutePlannerService {
     const text=`${task.goal} ${task.entries.map(e=>`${e.key} ${String(e.value)}`).join(' ')}`;
     const operation=String(input.operation||'');
     const routes:PlannedRoute[]=[];
+    if(operation==='APPROVE_REUSABLE_COMPONENTS'){
+      routes.push({target:'learning',command:'APPROVE_REUSABLE_COMPONENTS',reason:'CORE selected learning to approve reusable components from generalized learning',payload:{...input,taskId:task.taskId,operation,adaptive:true,priority:100}});
+      return this.decorateOperations(task,this.uniqueOperations(routes));
+    }
     if(operation==='DECIDE_CANDIDATE_ADOPTION'){
       const decision=String(input.userDecision||'').toUpperCase();
       if(decision==='ACCEPT'){
@@ -646,6 +650,13 @@ class AdaptiveRoutePlannerService {
         routes.push({target:'strategy',command:'ASSESS_DOMAIN',reason:`COREが外部レビューDecision ${decision||'UNKNOWN'} を受理し、採用経路以外の後続処理を確定する`,payload:{...input,taskId:task.taskId,operation,userDecision:decision,adaptive:true,priority:100}});
       }
       return this.decorateOperations(task,this.uniqueOperations(routes));
+    }
+    if(operation==='APPROVE_REUSABLE_COMPONENTS'){
+      const completed=Boolean(this.latestBusinessResult(task,'APPROVE_REUSABLE_COMPONENTS'));
+      const reasons:string[]=[];
+      if(task.entries.some(entry=>entry.kind==='ERROR'))reasons.push('UNRESOLVED_DOMAIN_ERROR');
+      if(task.pendingDomains.length)reasons.push('PENDING_DOMAIN_REMAINS');
+      return {businessCompletion:completed&&reasons.length===0,failClosed:true,requiredDomains:[],missingDomains:completed?[]:['learning'],failedDomains:completed?[]:['learning'],missingReceipts:[],persistenceConfirmed:false,evidenceQualityPassed:true,reasons,missingRequiredOperations:[]};
     }
     if(operation==='APPROVE_REVIEWED_CANDIDATE'){
       routes.push({target:'promotion',command:'APPROVE_REVIEWED_CANDIDATE',reason:'COREが明示承認済みCandidateの適用をpromotion経路へ委譲する',payload:{...input,taskId:task.taskId,operation,adaptive:true,priority:100}});
