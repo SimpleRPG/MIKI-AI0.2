@@ -23,6 +23,7 @@ export interface ResearchQueryOutcome {
   renderedPageCount: number;
   admissibleIndependentSourceCount: number;
   primarySourceCount: number;
+  sourceTierTarget: string;
   counterevidenceChecked: boolean;
   evidenceIds: string[];
   failureReasons: string[];
