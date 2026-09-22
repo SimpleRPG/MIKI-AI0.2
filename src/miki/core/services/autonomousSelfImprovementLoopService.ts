@@ -300,26 +300,6 @@ class AutonomousSelfImprovementLoopService {
     }
   }
 
-  private async resumeCanonicalCoreTask(request: AutonomousImprovementRequest): Promise<boolean> {
-    if (!request.taskId) return false;
-    const workflow = await coreTaskIngressService.resume(
-      request.taskId,
-      coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT')
-    );
-    if (!workflow) return false;
-    const quality = evidenceQualityGateService.evaluate(workflow.task);
-    if (workflow.task.status === 'COMPLETED' && quality.passed) {
-      this.completeCurrent('CORE_SELF_IMPROVEMENT_CYCLE_COMPLETED');
-      return true;
-    }
-    if (!quality.passed) {
-      await this.acquireThenWaitForEvidence(request, quality.reasons.join(','));
-      return false;
-    }
-    this.failOrRetry(request, `CORE_WORKFLOW_${workflow.task.status}`);
-    return false;
-  }
-
   private waitForResource(request: AutonomousImprovementRequest, reason: string): void {
     request.resourceWaitCount = (request.resourceWaitCount || 0) + 1;
     const index = Math.min(request.resourceWaitCount - 1, RESOURCE_WAIT_MS.length - 1);
