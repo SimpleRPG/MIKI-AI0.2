@@ -10,6 +10,7 @@ import {
 import { systemLogger } from '../../../services/systemLogger';
 import { deterministicRuntimeService } from '../../safety/services/deterministicRuntimeService';
 import { storageService } from '../../../services/storageService';
+import { nonLlmCoreService } from '../../safety/services/nonLlmCoreService';
 
 const DUAL_EVAL_REPORTS_KEY = 'miki_ai_dual_eval_reports';
 const FIXED_SCENARIO_RESULTS_KEY = 'miki_ai_fixed_scenario_results';
@@ -259,10 +260,8 @@ export class ConversationEvaluationService {
     const isWebReady = false;
 
     if (!isNativeReady && !isWebReady) {
-      // モデル未ロード時はコンパニオン自律ルールベースで応答を生成（テスト可能状態の担保）
-      return companionEngine.generateAutonomousResponse(prompt, {
-        userName: 'ユーザー',
-        usePlanCache: true,
+      const coreResult = await nonLlmCoreService.execute({ prompt, recentMessages: [] });
+      return coreResult.replyText;
       });
     }
 
@@ -290,10 +289,8 @@ export class ConversationEvaluationService {
       }
       return fullText.trim();
     } catch (err: any) {
-      console.warn('Fallback to companion engine on query error:', err);
-      return companionEngine.generateAutonomousResponse(prompt, {
-        userName: 'ユーザー',
-        usePlanCache: true,
+      const coreResult = await nonLlmCoreService.execute({ prompt, recentMessages: [] });
+      return coreResult.replyText;
       });
     }
   }
