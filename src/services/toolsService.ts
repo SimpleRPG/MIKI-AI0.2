@@ -11,7 +11,7 @@ import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { capabilityPluginService } from './capabilityPluginService';
 import { autonomousSearchService } from './autonomousSearchService';
-import { selfCodeArchitectService } from './selfCodeArchitectService';
+import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
 import { cognitiveDebuggerService } from './cognitiveDebuggerService';
 import { digitalResearchNoteService } from './digitalResearchNoteService';
 import { codebaseReflectionService } from './codebaseReflectionService';
