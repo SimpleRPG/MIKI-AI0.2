@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useState} from 'react';
-import {RefreshCw,Search,FileCode2,ChevronLeft,Database} from 'lucide-react';
+import {RefreshCw,Search,FileCode2,ChevronLeft,Database,UploadCloud} from 'lucide-react';
 import {typedCoreUiGatewayService} from '../miki/core/ui/typedCoreUiGatewayService';
 
 export const SelfCodeSpaceScreen:React.FC=()=>{
@@ -8,9 +8,12 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
  const [selected,setSelected]=useState<string>();
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState('');
+ const [commitMessage,setCommitMessage]=useState('Update self code space');
 
  const files=useMemo(()=>query?typedCoreUiGatewayService.searchSelfCode(query,100):typedCoreUiGatewayService.listSelfCodeFiles(),[query,snapshot]);
  const current=selected?typedCoreUiGatewayService.readSelfCodeFile(selected):undefined;
+
+ const push=async()=>{setBusy(true);setMessage('');try{const result=await typedCoreUiGatewayService.pushSelfCode(commitMessage);if(result.status!=='SUCCESS')throw new Error(result.summary);setSnapshot(result.data);setMessage('GitHubへPUSH完了');}catch(e){setMessage(e instanceof Error?e.message:String(e));}finally{setBusy(false);}};
 
  const sync=async()=>{
   setBusy(true);setMessage('');
@@ -47,6 +50,10 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
    </div>
    <button disabled={busy} onClick={sync} className="mt-3 min-h-12 w-full rounded-2xl bg-indigo-600 font-bold disabled:opacity-50">
     <RefreshCw className="mr-2 inline h-4 w-4"/>{busy?'同期中':'GitHubから正本を同期'}
+   </button>
+   <input value={commitMessage} onChange={e=>setCommitMessage(e.target.value)} className="mt-2 min-h-12 w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 text-sm" placeholder="コミットメッセージ"/>
+   <button disabled={busy||!snapshot?.dirty} onClick={push} className="mt-2 min-h-12 w-full rounded-2xl bg-emerald-600 font-bold disabled:opacity-50">
+    <UploadCloud className="mr-2 inline h-4 w-4"/>{busy?'処理中':snapshot?.dirty?'自己コードをGitHubへPUSH':'変更なし'}
    </button>
   </header>
 

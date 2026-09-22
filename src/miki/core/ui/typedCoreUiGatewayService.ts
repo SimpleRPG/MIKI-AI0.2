@@ -7,6 +7,7 @@ import { webResearchPolicyService, type WebResearchPolicy, type WebResearchPolic
 import { researchQueryPlanningService, type QueryPlanningPolicy, type ResearchQueryPlan } from '../../research/services/researchQueryPlanningService';
 import { coreCycleSettingsService, type CoreCycleSettings } from '../services/coreCycleSettingsService';
 import { selfCodeSpaceService } from '../services/selfCodeSpaceService';
+import { storageService } from '../../../services/storageService';
 
 export type UiOperation =
   | 'LIST_EXTERNAL_CONNECTIONS' | 'SAVE_EXTERNAL_CONNECTION_CONFIG' | 'TEST_EXTERNAL_CONNECTION' | 'EXPORT_EXTERNAL_CONNECTION_CONFIG'
@@ -34,6 +35,7 @@ class TypedCoreUiGatewayService {
  readSelfCodeFile(path:string){return selfCodeSpaceService.readFile(path);}
  searchSelfCode(query:string,limit=20){return selfCodeSpaceService.search(query,limit);}
  async syncSelfCode(token?:string){return selfCodeSpaceService.sync(token);}
+ async pushSelfCode(commitMessage='Update self code space'):Promise<UiCommandResult<any>>{const commandId=id();try{const token=storageService.getItem('miki_github_pat')||'';const snapshot=await selfCodeSpaceService.push(token,commitMessage);return {commandId,taskId:'SELF_CODE_PUSH',status:'SUCCESS',summary:'自己コードをGitHubへPUSHしました',data:snapshot,receiptIds:[],diagnosticIds:[],nextActions:[],completedAt:Date.now()};}catch(e){return this.failed(commandId,e);}}
  async createWorkspace(input:{name:string;workspaceMode:WorkspaceMode;assetKind:string;sourceLocator:string;baseContent:string;trustStatus?:WorkspaceRecord['trustStatus'];targetEnvironment?:string}):Promise<UiCommandResult<WorkspaceRecord>>{const commandId=id();try{const row=await generalWorkspaceService.create(input);return {commandId,taskId:row.coreTaskId,status:'SUCCESS',summary:'Workspaceをcore経由で作成しました',data:row,receiptIds:[row.baseSnapshotId],diagnosticIds:[],nextActions:['SAVE_WORKSPACE_CANDIDATE'],completedAt:Date.now()};}catch(e){return this.failed(commandId,e);}}
  async saveWorkspaceCandidate(workspaceId:string,content:string):Promise<UiCommandResult<WorkspaceRecord>>{const commandId=id();try{const row=await generalWorkspaceService.setCandidate(workspaceId,content);return {commandId,taskId:row.coreTaskId,status:'SUCCESS',summary:'Candidate Revisionを保存しました',data:row,receiptIds:row.candidateRevisionId?[row.candidateRevisionId]:[],diagnosticIds:[],nextActions:['ANALYZE_VBA_WORKSPACE'],completedAt:Date.now()};}catch(e){return this.failed(commandId,e);}}
  analyzeVba(workspaceId:string){return generalWorkspaceService.analyzeVba(workspaceId);}
