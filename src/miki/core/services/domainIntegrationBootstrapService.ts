@@ -186,33 +186,25 @@ class DomainIntegrationBootstrapService{
      unresolvedItems:result.reasons,generationEvidenceIds:[...new Set(workspace.files.flatMap(file=>file.evidenceIds))],
      persistenceReceiptIds:[receipt.receiptId],evidenceIds:[...new Set(workspace.files.flatMap(file=>file.evidenceIds))]});
   }
-  if(domain==='promotion'&&envelope.command==='ADOPT_REVIEWED_CANDIDATE'){
+  if(domain==='promotion'&&envelope.command==='APPROVE_REVIEWED_CANDIDATE'){
    const packageId=String(envelope.payload.packageId||'');
    const manifestSha=String(envelope.payload.candidateManifestSha256||'');
+   if(!packageId||!manifestSha)return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_AND_MANIFEST_REQUIRED',completedAt:Date.now()};
    const {reviewZipExportService}=await import('./reviewZipExportService');
    const {isolatedCandidateWorkspaceService}=await import('./isolatedCandidateWorkspaceService');
    const {persistenceReceiptLedgerService}=await import('./persistenceReceiptLedgerService');
    const pkg=reviewZipExportService.list().find(item=>item.packageId===packageId);
    if(!pkg)return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_FOUND',completedAt:Date.now()};
    if(pkg.status!=='ACCEPTED')return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_ACCEPTED',completedAt:Date.now()};
-   if(manifestSha!==pkg.candidateManifestSha256)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_MANIFEST_SHA_MISMATCH',completedAt:Date.now()};
+   if(pkg.candidateManifestSha256!==manifestSha)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_MANIFEST_SHA_MISMATCH',completedAt:Date.now()};
    const workspace=isolatedCandidateWorkspaceService.get(pkg.workspaceId);
    if(!workspace)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_WORKSPACE_NOT_FOUND',completedAt:Date.now()};
    const receipt=pkg.persistenceReceiptId;
    const operationInstanceId=String(envelope.payload.operationInstanceId||pkg.operationInstanceId||'');
    if(!receipt||receipt==='UNAVAILABLE')return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_REQUIRED',completedAt:Date.now()};
-   const ledgerReceipt=persistenceReceiptLedgerService.get(receipt);
-   if(!ledgerReceipt)return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_NOT_FOUND',completedAt:Date.now()};
+   if(!persistenceReceiptLedgerService.get(receipt))return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_NOT_FOUND',completedAt:Date.now()};
    const result=await isolatedCandidateWorkspaceService.commitWithReceipt(workspace.workspaceId,receipt,operationInstanceId);
-   return done({operation:'ADOPT_REVIEWED_CANDIDATE',operationClass:'BUSINESS',status:'SUCCEEDED',packageId,workspaceId:workspace.workspaceId,transactionId:result.transaction.transactionId,candidateManifestSha256:result.transaction.candidateManifestSha256,evidenceIds:[...new Set(result.workspace.files.flatMap(file=>file.evidenceIds))],receiptIds:[receipt]});
-  }
-  if(domain==='promotion'&&envelope.command==='APPROVE_REVIEWED_CANDIDATE'){
-   const recordId=String(envelope.payload.recordId||'');
-   if(!recordId)return {accepted:false,domain,command:envelope.command,error:'APPROVAL_RECORD_ID_REQUIRED',completedAt:Date.now()};
-   const {autonomousContinuousEvolutionService}=await import('../../autonomy/services/autonomousContinuousEvolutionService');
-   const result=await autonomousContinuousEvolutionService.approveAndDeployRecord(recordId);
-   if(!result.success)return {accepted:false,domain,command:envelope.command,error:result.message,result:{operation:'APPROVE_REVIEWED_CANDIDATE',operationClass:'BUSINESS',...result,evidenceIds:[]},completedAt:Date.now()};
-   return done({operation:'APPROVE_REVIEWED_CANDIDATE',operationClass:'BUSINESS',...result,evidenceIds:[]});
+   return done({operation:'APPROVE_REVIEWED_CANDIDATE',operationClass:'BUSINESS',status:'SUCCEEDED',packageId,workspaceId:workspace.workspaceId,transactionId:result.transaction.transactionId,candidateManifestSha256:result.transaction.candidateManifestSha256,evidenceIds:[...new Set(result.workspace.files.flatMap(file=>file.evidenceIds))],receiptIds:[receipt]});
   }
   if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
    const {reviewZipExportService}=await import('./reviewZipExportService');

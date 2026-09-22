@@ -131,12 +131,6 @@ export interface AutonomousEvolutionRecord {
   afterCode?: string;
   mutationTestResult?: MutationTestResult;
   awaitingApproval?: boolean;
-  pendingApprovalData?: {
-    code: string;
-    targetFile: string;
-    prompt: string;
-    riskReasons: string[];
-  };
   lesson?: {
     title: string;
     rule: string;
@@ -1299,75 +1293,6 @@ export default ${fallbackClassName};
       evidenceBasedSelfImprovementEngine.releaseExecutionLock('AutonomousContinuousEvolutionService');
       this.notifyState();
     }
-  }
-
-  /**
-   * 指示書 1.6: 承認待ちレコードの人手承認 & 物理配備 (Approval Execution)
-   */
-  public async approveAndDeployRecord(recordId: string): Promise<{ success: boolean; message: string }> {
-    const record = this.history.find((r) => r.id === recordId);
-    if (!record || !record.awaitingApproval || !record.pendingApprovalData) {
-      return { success: false, message: '承認対象のレコードが見つかりません。' };
-    }
-
-    const { code, targetFile, prompt } = record.pendingApprovalData;
-    systemLogger.info('SELF_IMPROVEMENT', `[承認ゲート通過] ユーザーにより承認されたレコード ${recordId} の本番配備を開始: ${targetFile}`);
-
-    const beforeSnapshot = selfImprovementExperimentService.snapshot();
-    const deployResult = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
-        prompt,
-        targetFile,
-        true, // 正式配備
-        code,
-        'CORE_PROMOTION'
-    );
-
-    record.applied = deployResult.applied;
-    record.commitHash = deployResult.commitHash;
-    record.awaitingApproval = false;
-    record.pendingApprovalData = undefined;
-
-    const afterSnapshot = selfImprovementExperimentService.snapshot();
-    const expEval = selfImprovementExperimentService.evaluate(
-      'SELF_CODE_IMPROVEMENT',
-      beforeSnapshot,
-      afterSnapshot,
-      deployResult.applied ? 'applied' : 'failed'
-    );
-
-    unifiedMikiExperienceService.observeSelfCodeImprovement({
-      target: record.chapterTitle || targetFile,
-      chapterNumber: record.chapterNumber,
-      targetFile,
-      problem: record.reasoning,
-      rootCause: '承認ゲート承認後の本番配備',
-      hypothesis: prompt,
-      improvementMethod: 'approved_deploy',
-      knowledgeUsed: [record.chapterTitle || ''],
-      changeDetails: {
-        linesCount: deployResult.linesCount,
-        summary: `承認済み配備: ${record.chapterTitle || targetFile} (${deployResult.linesCount}行)`,
-      },
-      metricsBefore: { complianceScore: record.previousScore },
-      metricsAfter: { complianceScore: record.newScore },
-      scoreDelta: expEval.scoreDelta,
-      testResults: {
-        syntaxPassed: deployResult.syntaxCheckPassed ?? true,
-        testsPassed: deployResult.applied,
-      },
-      operationalResult: `承認後配備完了 (Commit: ${deployResult.commitHash || 'N/A'})`,
-      verdict: expEval.verdict,
-      sideEffects: [],
-      rolledBack: false,
-    });
-
-    this.saveHistory();
-    this.notifyState(record);
-
-    return {
-      success: deployResult.applied,
-      message: deployResult.applied ? `配備に成功しました (Commit: ${deployResult.commitHash || 'N/A'})` : '配備に失敗しました',
-    };
   }
 
   /**
