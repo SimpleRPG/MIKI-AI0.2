@@ -58,6 +58,10 @@ export interface ImprovementReadiness {
   reviewPackageReady:boolean;
   blockingReasons:string[];
   recommendedOperations:DomainCommand[];
+  codeUnderstandingReady:boolean;
+  codeUnderstandingReused:boolean;
+  codeUnderstandingSnapshotSha256?:string;
+  relatedCodePaths:string[];
 }
 
 function objectValue(entry:BlackboardEntry):Record<string,unknown>|undefined {

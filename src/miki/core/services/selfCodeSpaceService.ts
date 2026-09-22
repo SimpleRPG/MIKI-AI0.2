@@ -42,8 +42,6 @@ class SelfCodeSpaceService {
     const existing=this.get();
     if(existing?.dirty) throw new Error('SELF_CODE_SPACE_DIRTY_SYNC_REQUIRED');
     const settings=this.getGitHubSettings();
-    const existing=this.get();
-    if(existing?.dirty) throw new Error('SELF_CODE_SPACE_DIRTY_SYNC_REQUIRED');
     const result = await apiService.importFromGitHub({
       repoUrl: settings.repository,
       branch: settings.branch,
