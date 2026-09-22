@@ -152,6 +152,7 @@ export class ResearchService {
 
       const buildAdaptiveQuery = (round: number, results: VerificationResult[]): string => {
         if (round === 0) return baseQuery;
+        if (recommendedRevisionQuery) return recommendedRevisionQuery;
         const reasons = results.flatMap(result => Array.isArray(result.reasons) ? result.reasons : [])
           .map(String)
           .filter(Boolean);
