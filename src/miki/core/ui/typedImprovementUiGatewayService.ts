@@ -175,7 +175,12 @@ class TypedImprovementUiGatewayService {
     while(result.taskId&&cycles<maxCycles){
       const stage=String(result.currentBusinessStage||result.currentStage||'').toUpperCase();
       if(['COMPLETED','FAILED','BLOCKED','REJECTED'].includes(stage))break;
-      result=await this.resumeImprovementTask(result.taskId);
+      const task=taskBlackboardService.get(result.taskId);
+      if(task?.status==='PAUSED'){
+        result=await this.resumeImprovementTask(task.taskId);
+      }else{
+        result=this.taskSnapshotResult(task?.taskId||result.taskId,task?.revision||result.taskRevision||0,task?.status||result.currentStage);
+      }
       cycles++;
     }
     const run=result.taskId
