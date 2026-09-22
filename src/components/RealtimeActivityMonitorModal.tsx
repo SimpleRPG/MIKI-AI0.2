@@ -102,7 +102,7 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
 
     const unsubEvolutionSteps = autonomousContinuousEvolutionService.subscribeSteps((step) => {
       setRecentEvolutionSteps((prev) => [...prev.slice(-25), step]);
-      if (step.phase === 'COMPLETED' || step.phase === 'DEPLOY') {
+      if (step.phase === 'COMPLETED') {
         loadCommits();
       }
     });

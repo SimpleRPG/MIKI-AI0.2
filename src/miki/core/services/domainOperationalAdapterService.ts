@@ -45,7 +45,7 @@ class DomainOperationalAdapterService {
         case 'core':
           return snapshot(domain,'coreOrchestratorService',{authority:'CORE',responsibility:'route-collect-reevaluate-complete'});
         case 'autonomy':
-          return snapshot(domain,'autonomousContinuousEvolutionService',{config:autonomousContinuousEvolutionService.getConfig(),historyCount:autonomousContinuousEvolutionService.getHistory().length,backlogCount:autonomousContinuousEvolutionService.getImprovementBacklog().length});
+          return snapshot(domain,'autonomousContinuousEvolutionService',{config:autonomousContinuousEvolutionService.getConfig(),historyCount:autonomousContinuousEvolutionService.getHistory().length});
         case 'capability':
           return snapshot(domain,'capabilityGapService',{gaps:capabilityGapService.getAllGaps(),profiles:capabilityGapService.getAllProfiles()});
         case 'conversation':
