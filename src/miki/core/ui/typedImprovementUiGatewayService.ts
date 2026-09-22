@@ -145,7 +145,8 @@ class TypedImprovementUiGatewayService {
     });
   }
   resumeImprovementTask(taskId:string){return this.sendImprovementCommand({commandType:'RESUME_IMPROVEMENT_TASK',taskId,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-resume'),operationInstanceId:coreResultService.generateRequestId('operation')});}
-  async executeDirectiveUntilReviewPackage(directiveId:string,maxCycles=64){
+  async executeDirectiveUntilReviewPackage(directiveId:string){
+    const maxCycles=coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT');
     let result=await this.executeDirective(directiveId);
     let cycles=0;
     while(result.taskId&&cycles<maxCycles){
