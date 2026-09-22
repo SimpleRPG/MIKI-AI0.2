@@ -21,6 +21,8 @@ import { selfImprovementRequestEventService } from '../../improvement/services/s
 import { mikiSelfCodingSuperchargerService, MutationTestResult } from '../../selfDevelopment/services/mikiSelfCodingSuperchargerService';
 import { AutonomousVerificationData } from '../../../types';
 import { ChangeSetID, SelfImprovementFailureCategory, CausalExperimentResult, CounterexampleGateResult, GeneralizationGateResult, AdoptionState, DeploymentLifecycleState, NoChangeDecision } from '../../../types/evidenceSelfImprovementTypes';
+export interface AutonomousEvolutionStepEvent {
+  phase:
     | 'AUDIT'
     | 'PROPOSAL'
     | 'SYNTHESIS'
