@@ -52,7 +52,7 @@ class ReviewZipExportService {
   };
  }
  constructor(){this.load();}
- async create(runId:string,workspaceId:string,options:{mode?:ReviewPackageCreationMode;sourcePackageId?:string;corePlanRevision?:number;operationInstanceId?:string;candidateId?:string;candidateManifestSha256?:string;validationBundleId?:string;taskId?:string;externalReviewQuestions?:string[];learningLineage?:unknown}={}):Promise<ReviewZipCreateResult>{
+ async create(runId:string,workspaceId:string,options:{mode?:ReviewPackageCreationMode;sourcePackageId?:string;corePlanRevision?:number;operationInstanceId?:string;candidateId?:string;candidateRevision?:number;candidateManifestSha256?:string;validationBundleId?:string;taskId?:string;externalReviewQuestions?:string[];learningLineage?:unknown}={}):Promise<ReviewZipCreateResult>{
   const run=improvementIntakeRouterService.get(runId); if(!run)return {ok:false,code:'RUN_NOT_FOUND',message:`Run not found: ${runId}`};
   const workspace=isolatedCandidateWorkspaceService.get(workspaceId); if(!workspace)return {ok:false,code:'WORKSPACE_NOT_FOUND',message:`Workspace not found: ${workspaceId}`};
   if(workspace.files.length===0)return {ok:false,code:'NO_CANDIDATE_FILES',message:'Candidate workspace contains no files'};
@@ -61,7 +61,7 @@ class ReviewZipExportService {
   const mode=options.mode??'NEW_SERIES';
   const packageSeriesId=mode==='NEXT_PACKAGE_REVISION'&&source?source.packageSeriesId:`RPS-${canonicalSha256({runId,workspaceId,createdAt:Date.now(),count:this.ledger.size}).slice(0,24)}`;
   const packageRevision=mode==='NEXT_PACKAGE_REVISION'?this.nextPackageRevision(packageSeriesId):1;
-  const candidateRevision=workspace.committedRevision??this.nextCandidateRevision(runId,workspaceId);
+  const candidateRevision=Number.isFinite(Number(options.candidateRevision))?Number(options.candidateRevision):workspace.committedRevision??this.nextCandidateRevision(runId,workspaceId);
   const transactionId=workspace.transactionId??'UNCOMMITTED';
   const persistenceReceiptId=workspace.persistenceReceiptId??'UNAVAILABLE';
   const corePlanRevision=String(options.corePlanRevision??run.payload.corePlanRevision??run.payload.planRevision??'UNAVAILABLE');

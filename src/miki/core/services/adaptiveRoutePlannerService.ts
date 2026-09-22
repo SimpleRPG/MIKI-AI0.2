@@ -482,6 +482,8 @@ class AdaptiveRoutePlannerService {
         payload:{
           taskId:task.taskId,runId:String(input.runId||task.taskId),
           ...candidate,...validation,
+          candidateRevision:Number(input.candidateRevision||0)||undefined,
+          sourcePackageId:typeof input.sourcePackageId==="string"?input.sourcePackageId:typeof input.packageId==="string"?input.packageId:undefined,
           externalReviewQuestions:input.externalReviewQuestions,
           sourceOperationInstanceId:validationOperationInstanceId,
           adaptive:true,priority:60
