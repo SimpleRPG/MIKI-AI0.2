@@ -767,10 +767,18 @@ class AdaptiveRoutePlannerService {
     const unknown=unknownNeeded?this.latestBusinessResult(task,'RESOLVE_UNKNOWN'):undefined;
     const researchNeeded=task.entries.some(e=>e.kind==='RESULT'&&/gapId|researchQuestion|queryPlanId/i.test(e.key));
     const research=researchNeeded?this.latestBusinessResult(task,'RUN_RESEARCH'):undefined;
+    const researchValue=research?objectValue(research):undefined;
+    const researchReply=researchValue?.reply&&typeof researchValue.reply==='object'?researchValue.reply as Record<string,unknown>:undefined;
+    const researchData=(researchReply?.data||researchReply?.result||researchValue) as Record<string,unknown>|undefined;
+    const researchResolved=researchData?.resolved===true;
+    const researchOutcome=String(researchData?.outcome||'');
+    const researchContinuation=researchData?.continuationAvailable===true;
+    const researchTerminal=researchResolved||(researchOutcome==='NOT_FOUND_AFTER_COVERAGE'&&!researchContinuation);
     const reasons:string[]=[];
     if(!analysis) reasons.push('CONVERSATION_ANALYSIS_MISSING');
     if(unknownNeeded&&!unknown) reasons.push('UNKNOWN_RESOLUTION_MISSING');
     if(researchNeeded&&!research) reasons.push('RESEARCH_RESULT_MISSING');
+    if(researchNeeded&&research&&!researchTerminal) reasons.push(`RESEARCH_NOT_TERMINAL:${researchOutcome||'UNRESOLVED'}`);
     if(!final) reasons.push('FINAL_RESPONSE_MISSING');
     return {businessCompletion:reasons.length===0,failClosed:true,requiredDomains:[],missingDomains:[],failedDomains:[],missingReceipts:[],persistenceConfirmed:true,evidenceQualityPassed:true,reasons,missingRequiredOperations:[]};
   }
