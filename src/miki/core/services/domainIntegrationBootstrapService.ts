@@ -58,7 +58,7 @@ class DomainIntegrationBootstrapService{
   if(domain==='strategy')return ['PLAN_PENDING_IMPROVEMENT_RUN'];
   if(domain==='capability')return ['RESOLVE_CAPABILITY_GAPS'];
   if(domain==='memory')return ['FLUSH'];
-  if(domain==='verification')return ['VALIDATE_CANDIDATE'];
+  if(domain==='verification')return ['VALIDATE_CANDIDATE','VERIFY_RESEARCH_CLAIMS'];
   if(domain==='selfDevelopment')return ['GENERATE_CANDIDATE'];
   if(domain==='promotion')return ['CREATE_REVIEW_PACKAGE','APPROVE_REVIEWED_CANDIDATE'];
   return [];
@@ -162,6 +162,13 @@ class DomainIntegrationBootstrapService{
    await storageService.flushNow();return done({backend:storageService.getBackendName(),persisted:true});
   }
 
+  if(domain==='verification'&&envelope.command==='VERIFY_RESEARCH_CLAIMS'){
+   const {verifierService}=await import('../../verification/services/verifierService');
+   const claimIds=Array.isArray(envelope.payload.claimIds)?envelope.payload.claimIds.map(String).filter(Boolean):[];
+   if(claimIds.length===0)return {accepted:false,domain,command:envelope.command,error:'RESEARCH_CLAIM_IDS_REQUIRED',completedAt:Date.now()};
+   const verification=verifierService.verifyMany({claimIds,requireFresh:envelope.payload.requireFresh===true,maxAgeDays:Number.isFinite(Number(envelope.payload.maxAgeDays))?Number(envelope.payload.maxAgeDays):undefined});
+   return done({operation:'VERIFY_RESEARCH_CLAIMS',operationClass:'BUSINESS',status:'SUCCEEDED',verification,verified:verification.length>0&&verification.every(x=>x.outcome==='SUPPORTED'||x.outcome==='DEVICE_VERIFIED'),evidenceIds:[]});
+  }
   if(domain==='selfDevelopment'&&envelope.command==='GENERATE_CANDIDATE'){
    const {candidateCodeGenerationService}=await import('./candidateCodeGenerationService');
    const {improvementIntakeRouterService}=await import('./improvementIntakeRouterService');

@@ -659,6 +659,9 @@ class AdaptiveRoutePlannerService {
       latestResearchData?.continuationAvailable===true ||
       latestResearchValue?.continuationAvailable===true
     );
+    const researchOutcome=String(latestResearchData?.outcome||latestResearchValue?.outcome||'');
+    const researchClaimIds=Array.isArray(latestResearchData?.claimIds)
+      ? latestResearchData.claimIds.map(String).filter(Boolean) : [];
     const researchGapId=String(
       latestResearchData?.gapId ||
       latestResearchValue?.gapId ||
@@ -666,7 +669,14 @@ class AdaptiveRoutePlannerService {
       ''
     );
 
-    if(continuationAvailable && researchGapId){
+    if(researchOutcome==='INSUFFICIENT_VERIFICATION' && researchClaimIds.length>0){
+      routes.push({
+        target:'verification',
+        command:'VERIFY_RESEARCH_CLAIMS',
+        reason:'CORE re-evaluated Research verification insufficiency and selected the Verification domain',
+        payload:{taskId:task.taskId,claimIds:researchClaimIds,gapId:researchGapId,adaptive:true,priority:96}
+      });
+    } else if(continuationAvailable && researchGapId){
       routes.push({
         target:'research',
         command:'RUN_RESEARCH',
