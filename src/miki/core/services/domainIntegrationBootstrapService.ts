@@ -248,8 +248,8 @@ class DomainIntegrationBootstrapService{
    let result;
    try{
     result=await isolatedCandidateWorkspaceService.commitWithReceipt(workspace.workspaceId,receipt,operationInstanceId);
-    if(result.transaction.candidateRevisionSha256!==pkg.candidateManifestSha256)throw new Error(CANDIDATE_REVISION_MANIFEST_MISMATCH);
-    if(result.workspace.candidateRevisionSha256!==pkg.candidateManifestSha256)throw new Error(WORKSPACE_REVISION_MANIFEST_MISMATCH);
+    if(result.transaction.candidateRevisionSha256!==pkg.candidateManifestSha256)throw new Error("CANDIDATE_REVISION_MANIFEST_MISMATCH");
+    if(result.workspace.candidateRevisionSha256!==pkg.candidateManifestSha256)throw new Error("WORKSPACE_REVISION_MANIFEST_MISMATCH");
     reviewZipExportService.updateStatus(packageId,'ACCEPTED');
    }catch(error){
     if(result?.transaction?.transactionId)candidateCommitTransactionService.rollback(result.transaction.transactionId,'PROMOTION_COMPENSATION');
@@ -282,7 +282,7 @@ if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
    };
    if(sourcePackageId){
     const lineage=envelope.payload.learningLineage;
-    const externalReviewId=lineage&&typeof lineage===object&&typeof (lineage as Record<string,unknown>).externalReviewId===string?String((lineage as Record<string,unknown>).externalReviewId):;
+    const externalReviewId=lineage&&typeof lineage===object&&typeof (lineage as Record<string,unknown>).externalReviewId===string?String((lineage as Record<string,unknown>).externalReviewId  ):;
     const source=reviewZipExportService.list().find(item=>item.packageId===sourcePackageId);
     const correctedCandidateRef=result.artifact?.candidateManifestSha256||;
     if(externalReviewId&&source&&correctedCandidateRef)reviewLearningArtifactService.linkCorrectionCandidate({externalReviewId,beforeCandidateRef:source.candidateManifestSha256,correctedCandidateRef});
