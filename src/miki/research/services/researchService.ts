@@ -316,6 +316,7 @@ export class ResearchService {
         // This is a structural sync only; it never promotes an unverified claim.
         cognitiveEvidenceIntegrationService.ingestClaims(claimIds);
         if (resolved) {
+          knowledgeGapService.markResolved(gap.id);
           knowledgeGapService.advanceResolutionPlan(gap.id, 'RESOLVE', 'RESEARCH');
           continuationAvailable = false;
           continuationReason = 'VERIFIED';
