@@ -855,53 +855,11 @@ CORE再評価
 【160. P1 — 実行中のEnvironment Driftを検出し、計画を再検証する】
 
 ============================================================
-【224. P0 — Research正本とWeb検索実装境界の固定】
-============================================================
+【Research正本とWeb探索入口の統合】
 
-Research分類における研究処理の正本は既存ResearchServiceとする。
-
-責務境界は次のとおり固定する。
-
-CORE
-  ↓
-researchService
-  ↓
-unifiedWebResearchService
-  ↓
-autonomousSearchService
-
-1. researchServiceはResearch分類の正規オーケストレーターであり、Knowledge GapからResearch Plan、Query Strategy、複数探索、検索結果ページ読取、Evidence / Claim登録、Verification、Knowledge Gap解決、継続探索、停止条件、Research Outcomeを統合管理する。
-2. unifiedWebResearchServiceはWeb探索の共通境界・Facadeであり、Web検索、検索結果ページ取得、検索設定、検索統計等を既存の低レベル検索実装へ委譲する。Research全体の完了判定やKnowledge Gap解決を独自に持たない。
-3. autonomousSearchServiceはSearXNG / Wikipedia / DuckDuckGo等のProvider探索、URL正規化、Provider結果統合、検索ページ取得等の低レベル検索実装を担当する。Research分類の完了判定、Claimの真偽確定、Knowledge Gapの解決を独自に決定しない。
-4. Search結果はEvidence候補であり、検索したことだけをResearch完了またはKnowledge確定として扱わない。
-5. Verification、Knowledge Gap、Learning、Memory等の既存正本はresearchServiceから既存契約を通じて利用し、Research専用の第二Evidence DB、第二Knowledge DB、第二Orchestratorを作らない。
-6. COREはResearch要求を必要なResearch分類へ配送し、researchServiceから返されたResult / Evidence / unresolvedRequirements / continuation状態をBlackboardへ反映した後、次の分類、再Research、保存、検証、停止または完了を再評価する。
-7. Research Roundの内部上限はResource Governance上の安全上限であり、探索全体の固定回数制限を意味しない。継続可能な場合はresearchServiceがcontinuation状態をCOREへ返し、COREが次cycleで再評価する。
-8. UI、旧互換入口、他DomainからunifiedWebResearchServiceを直接利用している経路は、Research全体の正本を迂回する独自Research判断を持ってはならない。設定・低レベル検索・表示専用操作とResearch orchestrationを分離し、重複する判断経路はresearchServiceへ統合する。
-9. autonomousSearchServiceへの直接依存は低レベル検索実装または明示的な検証用途に限定し、通常のResearch orchestrationを直接実行する経路を新設しない。
-10. 研究系サービスを変更する場合は、まずresearchServiceを正本として既存呼出元、unifiedWebResearchService、autonomousSearchService、Research UI Gateway、CORE入口を調査し、責務重複がないことを確認してから実装する。
-
-確認対象：
-- researchService
-- unifiedWebResearchService
-- autonomousSearchService
-- typedResearchUiGatewayService
-- COREからResearch分類へ入る経路
-- Research結果がCORE Blackboardへ戻る経路
-- autonomousSearchServiceへの直接依存
-- unifiedWebResearchServiceへの直接依存
-- Research完了判定の重複実装
-
-新しいResearch分類、第二CORE、第二Research Orchestrator、第二Knowledge/Evidence正本は追加しない。
-
-============================================================
-【225. P0 — ネット探索入口をResearchServiceへ統合】
-============================================================
-
-Webを使った通常の調査入口はResearch分類の正本であるResearchServiceへ統合する。
+Research分類における研究処理と通常のWeb知識探索の正本は既存ResearchServiceとする。
 
 正規経路：
-
 CORE
   ↓
 ResearchService
@@ -912,100 +870,20 @@ AutonomousSearchService
   ↓
 SearXNG / Wikipedia / DuckDuckGo
 
-1. ResearchServiceはKnowledge Gap、Research Plan、Query、Evidence、
-   Verification、継続条件、Research Outcomeを統合する唯一のResearch入口とする。
+ResearchServiceはKnowledge Gap、Research Plan、Query Strategy、複数探索、検索結果ページ読取、Evidence / Claim登録、Verification、Knowledge Gap解決、継続条件、Research Outcomeを統合管理する唯一のResearchオーケストレーターとする。
 
-2. UI検索、未知解決、Memory freshness確認、Capability調査、
-   Autonomous Evolution、Background Research等が通常の知識探索を行う場合、
-   ResearchServiceの正規入口へ委譲する。
+通常のWeb知識探索はResearchService.executeSearch()を正規入口とする。executeSearch()はKnowledge Gapを正本へ登録し、researchGap()を通じて通常のResearch処理を実行し、既存呼出元が利用できる検索結果候補resultsをResearchResultとして返す。
 
-3. UnifiedWebResearchServiceはWeb探索Facadeとして維持する。
-   検索設定、統計、低レベルのページ取得等の責務は維持してよいが、
-   独自にResearch完了、Knowledge Gap解決、Claim確定を判断しない。
+UI検索、Unknown解決、Memory freshness確認、Capability調査、Autonomous Evolution、Background Research、Memory Audit等の通常の知識探索は、独自のResearch完了判定や検索正本を作らずResearchServiceへ委譲する。
 
-4. AutonomousSearchServiceはProvider探索の低レベル実装として維持する。
-   新規Domainや通常の業務経路から直接Research orchestrationを呼び出さない。
+UnifiedWebResearchServiceはWeb探索Facadeとして維持し、Web検索、検索結果ページ取得、設定、統計、低レベル操作を担当する。ただしResearch全体の完了、Knowledge Gap解決、Claim確定を独自に判断しない。設定・統計・低レベルページ取得などResearch orchestrationを伴わない操作は直接利用してよい。
 
-5. 検索結果はEvidence候補であり、検索結果取得だけでKnowledge確定とはしない。
+AutonomousSearchServiceはSearXNG / Wikipedia / DuckDuckGo等のProvider探索、結果統合、URL正規化等の低レベル実装を担当する。通常のResearch orchestrationから直接利用する経路を新設せず、低レベル実装または明示的な検証用途に限定する。
 
-6. 既存の直接UnifiedWebResearchService検索呼出元は、
-   ResearchServiceの正規入口へ段階的に統合する。
+Search結果はEvidence候補であり、検索したことだけでResearch完了またはKnowledge確定とはしない。Evidence、Claim、Verification、Knowledge Gap、Learning、Memory等の既存正本を再利用し、第二Research Orchestrator、第二Knowledge DB、第二Evidence DB、第二CORE、追加Research分類は作らない。
 
-7. 設定取得、統計取得、低レベルページ取得など、
-   Research orchestrationを伴わない操作まで無理にResearchServiceへ移動しない。
+COREはResearch要求をResearchServiceへ渡し、ResearchServiceから返されたResult / Evidence / continuation状態等をBlackboardへ反映した後、次の分類、再Research、保存、検証、停止または完了を再評価する。Research Roundの内部上限は安全上限であり、探索全体の固定回数制限ではない。
 
-8. Research UIの「検索実行」も通常のResearch入口を使用し、
-   UIだけ別の検索完了判定を持たない。
+既存の直接UnifiedWebResearchService検索呼出元は、必要な戻り値契約を確認しながら段階的にResearchService.executeSearch()へ統合する。呼出元の都合だけでResearch責務をUnified層へ戻さない。
 
-9. Unknown解決からのWeb探索も、Unknown独自の検索正本を作らず、
-   ResearchServiceへResearch要求として渡す。
-
-10. Background、Autonomous Evolution、Memory Audit、Capability等からの
-    Web探索も、同じResearch正本を使用する。
-
-11. この統合によって第二Research Orchestrator、第二Knowledge DB、
-    第二Evidence DB、第二COREは作らない。
-
-12. 実装前に各直接呼出元が必要としている戻り値を確認し、
-    ResearchServiceの結果を既存契約へ安全に適合させる。
-    呼出元の都合だけでResearch責務をUnified層へ戻してはならない。
-
-============================================================
-
-============================================================
-【225. P0 — ネット探索入口をResearchServiceへ統合】
-============================================================
-
-Webを使った通常の調査入口はResearch分類の正本であるResearchServiceへ統合する。
-
-正規経路：
-
-CORE
-  ↓
-ResearchService
-  ↓
-UnifiedWebResearchService
-  ↓
-AutonomousSearchService
-  ↓
-SearXNG / Wikipedia / DuckDuckGo
-
-1. ResearchServiceはKnowledge Gap、Research Plan、Query、Evidence、
-   Verification、継続条件、Research Outcomeを統合する唯一のResearch入口とする。
-
-2. UI検索、未知解決、Memory freshness確認、Capability調査、
-   Autonomous Evolution、Background Research等が通常の知識探索を行う場合、
-   ResearchServiceの正規入口へ委譲する。
-
-3. UnifiedWebResearchServiceはWeb探索Facadeとして維持する。
-   検索設定、統計、低レベルのページ取得等の責務は維持してよいが、
-   独自にResearch完了、Knowledge Gap解決、Claim確定を判断しない。
-
-4. AutonomousSearchServiceはProvider探索の低レベル実装として維持する。
-   新規Domainや通常の業務経路から直接Research orchestrationを呼び出さない。
-
-5. 検索結果はEvidence候補であり、検索結果取得だけでKnowledge確定とはしない。
-
-6. 既存の直接UnifiedWebResearchService検索呼出元は、
-   ResearchServiceの正規入口へ段階的に統合する。
-
-7. 設定取得、統計取得、低レベルページ取得など、
-   Research orchestrationを伴わない操作まで無理にResearchServiceへ移動しない。
-
-8. Research UIの検索実行も通常のResearch入口を使用し、
-   UIだけ別の検索完了判定を持たない。
-
-9. Unknown解決からのWeb探索も、Unknown独自の検索正本を作らず、
-   ResearchServiceへResearch要求として渡す。
-
-10. Background、Autonomous Evolution、Memory Audit、Capability等からの
-    Web探索も、同じResearch正本を使用する。
-
-11. この統合によって第二Research Orchestrator、第二Knowledge DB、
-    第二Evidence DB、第二COREは作らない。
-
-12. 実装前に各直接呼出元が必要としている戻り値を確認し、
-    ResearchServiceの結果を既存契約へ安全に適合させる。
-    呼出元の都合だけでResearch責務をUnified層へ戻してはならない。
-
-============================================================
+研究系サービスを変更する場合は、ResearchServiceを正本として既存呼出元、UnifiedWebResearchService、AutonomousSearchService、Research UI Gateway、CORE入口、Research結果のCORE Blackboard帰還経路、直接検索呼出元、Research完了判定の重複を確認してから実装する。

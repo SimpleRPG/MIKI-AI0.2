@@ -20,8 +20,13 @@ export type ResearchOutcomeState =
   | 'NOT_FOUND_AFTER_COVERAGE'
   | 'CONFIRMED_ABSENCE';
 
+export interface ResearchSearchResult { title:string; snippet:string; source:string; url?:string; publishedDate?:string; sourceId?:string; independenceClusterId?:string; claimText?:string; }
+
+export interface ResearchSearchResult { title:string; snippet:string; source:string; url?:string; publishedDate?:string; sourceId?:string; independenceClusterId?:string; claimText?:string; }
+
 export interface ResearchResult {
   gapId: string;
+  results: ResearchSearchResult[];
   route: ResearchRoute;
   performed: boolean;
   evidence: EvidenceRecord[];
@@ -69,6 +74,20 @@ export class ResearchService {
     return ResearchService.instance;
   }
 
+  public async executeSearch(query: string, options?: { maxResults?: number; sourceRequestId?: string }): Promise<ResearchResult> {
+    const text = query.trim();
+    if (!text) throw new Error("RESEARCH_QUERY_REQUIRED");
+    const gap = knowledgeGapService.detect({ query: text, type: "INSUFFICIENT_EVIDENCE", reason: "通常のWeb知識探索要求をResearchServiceへ統合", priority: 50, sourceRequestId: options?.sourceRequestId });
+    return this.researchGap(gap, { forceRoute: "WEB_SEARCH", query: text, maxPagesPerPass: Math.max(1, Math.min(3, options?.maxResults || 2)) });
+  }
+
+  public async executeSearch(query: string, options?: { maxResults?: number; sourceRequestId?: string }): Promise<ResearchResult> {
+    const text = query.trim();
+    if (!text) throw new Error("RESEARCH_QUERY_REQUIRED");
+    const gap = knowledgeGapService.detect({ query: text, type: "INSUFFICIENT_EVIDENCE", reason: "通常のWeb知識探索要求をResearchServiceへ統合", priority: 50, sourceRequestId: options?.sourceRequestId });
+    return this.researchGap(gap, { forceRoute: "WEB_SEARCH", query: text, maxPagesPerPass: Math.max(1, Math.min(3, options?.maxResults || 2)) });
+  }
+
   public async researchGap(gap: KnowledgeGap, options?: {
     forceRoute?: ResearchRoute;
     requireFresh?: boolean;
@@ -83,6 +102,8 @@ export class ResearchService {
     const claimIds: string[] = [];
     const requiredResearchClaimIds: string[] = [];
     const learnedTermComponentIds: string[] = [];
+    const searchResults: ResearchSearchResult[] = [];
+    const searchResults: ResearchSearchResult[] = [];
 
     knowledgeGapService.buildResolutionPlan(gap);
     knowledgeGapService.advanceResolutionPlan(gap.id, 'COLLECT_EVIDENCE', 'RESEARCH');
@@ -137,6 +158,7 @@ export class ResearchService {
         researchStrategyService.recordOutcome(gap.type, strategy.route, false, Date.now() - startedAt);
         return {
           gapId: gap.id,
+          results: searchResults,
           route: strategy.route,
           performed: false,
           evidence,
@@ -184,6 +206,8 @@ export class ResearchService {
           bypassCache: pass > 0,
         });
         const results = this.normalizeSearchResults(raw);
+        searchResults.push(...results);
+        searchResults.push(...results);
         if (typeof (raw as any)?.summary === 'string') summary = (raw as any).summary;
 
         // Search is only the discovery step. Read the selected result pages before
