@@ -2169,6 +2169,7 @@ app.post('/api/github/import', async (req, res) => {
       repoUrl,
       branch = 'main',
       token,
+      githubToken,
       knownFiles = []
     } = req.body || {};
 
@@ -2191,13 +2192,15 @@ app.post('/api/github/import', async (req, res) => {
     }
 
     const [owner, repo] = match;
+    const authToken = token || githubToken;
+
     const headers: Record<string,string> = {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'MIKI-AI0.2'
     };
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
     }
 
     const api = async (url: string, options: RequestInit = {}) => {
@@ -2233,7 +2236,49 @@ app.post('/api/github/import', async (req, res) => {
       `https://api.github.com/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`
     );
 
-    const manifest = (tree.tree || [])
+    const collectCompleteTree = async (
+      rootTreeSha: string,
+      prefix = ''
+    ): Promise<any[]> => {
+      const response = await api(
+        `https://api.github.com/repos/${owner}/${repo}/git/trees/${rootTreeSha}`
+      );
+
+      const result: any[] = [];
+
+      for (const item of Array.isArray(response.tree) ? response.tree : []) {
+        const itemPath = prefix
+          ? `${prefix}/${item.path}`
+          : item.path;
+
+        if (item.type === 'blob') {
+          result.push({
+            path: itemPath,
+            mode: item.mode,
+            type: 'blob',
+            sha: item.sha,
+            size: item.size
+          });
+          continue;
+        }
+
+        if (item.type === 'tree') {
+          const children = await collectCompleteTree(
+            item.sha,
+            itemPath
+          );
+          result.push(...children);
+        }
+      }
+
+      return result;
+    };
+
+    const completeTreeEntries = tree.truncated === true
+      ? await collectCompleteTree(treeSha)
+      : (Array.isArray(tree.tree) ? tree.tree : []);
+
+    const manifest = completeTreeEntries
       .filter((item: any) => item.type === 'blob')
       .map((item: any) => ({
         path: item.path,
@@ -2306,7 +2351,7 @@ app.post('/api/github/import', async (req, res) => {
       changedFiles,
       files: changedFiles,
       deletedPaths,
-      truncated: tree.truncated === true
+      truncated: false
     });
   } catch (error: any) {
     return res.status(500).json({
@@ -2400,10 +2445,14 @@ app.post('/api/github/push', async (req, res) => {
       (!Array.isArray(files) || files.length === 0) &&
       (!Array.isArray(deletedPaths) || deletedPaths.length === 0)
     ) {
+      const remoteCommit = await api(
+        `https://api.github.com/repos/${owner}/${repo}/git/commits/${remoteCommitSha}`
+      );
+
       return res.json({
         success: true,
         commitSha: remoteCommitSha,
-        treeSha: ref.object.sha,
+        treeSha: remoteCommit.tree.sha,
         changedFilesMeta: []
       });
     }
