@@ -22,8 +22,9 @@ import {
 export const SERVER_UNAVAILABLE_MESSAGE = 'この機能は外部サーバーへの接続が必要です。現在未接続です。';
 
 export function apiUrl(path: string): string {
-  const base = (storageService.getItem('miki_api_base_url') || '').trim().replace(/\/+$/, '');
-  return base ? `${base}${path}` : path;
+  const configured = (storageService.getItem('miki_api_base_url') || '').trim().replace(/\/+$/, '');
+  const base = configured || 'http://127.0.0.1:3000';
+  return `${base}${path}`;
 }
 
 export interface SavedGeminiKeyItem {

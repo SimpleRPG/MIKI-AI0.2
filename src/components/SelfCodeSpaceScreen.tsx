@@ -32,9 +32,9 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
   setBusy(true);setMessage('');
   try{
    const result=await typedCoreUiGatewayService.syncSelfCode(pat);
-   setSnapshot(result.snapshot);
+   setSnapshot(result);
    setSelected(undefined);
-   setMessage(`同期完了: ${result.snapshot.files.length}ファイル / ${result.snapshot.repoSha256.slice(0,16)}`);
+   setMessage(`同期完了: ${result.files.length}ファイル / ${result.repoSha256.slice(0,16)}`);
   }catch(e){setMessage(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
  };
