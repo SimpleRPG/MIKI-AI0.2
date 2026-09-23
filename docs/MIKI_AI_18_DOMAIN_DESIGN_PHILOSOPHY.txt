@@ -276,614 +276,135 @@ GitHub push機能は残すが、自己改善ループから自動pushしない�
 
 過去版の作業指示書、版別実装レポート、移行履歴、修正作業ログ、旧設計思想文書をリポジトリの正本として残さない。必要な実行証跡はCI Artifact、監査JSON、Git履歴へ保存し、ルートへ版別TXTを積み増さない。
 
-【138】P0｜適応型Research継続探索：固定フォールバック／固定3回を最終仕様にしない
 
-目的：
-SearXNG → Wikipedia → DuckDuckGoを「失敗したら次」ではなく並行探索として扱い、
-さらにResearch Round自体も「最大3回で終了」という固定仕様にしない。
-MIKIのCOREがEvidence・Verification・Contradiction・Freshness・Knowledge Gap状態を再評価し、
-必要なら同じKnowledge Gapを次のCORE cycleで再投入する。
+## 18.1 現行設計の維持原則
 
-実装原則：
-1. Provider探索はSearXNG / Wikipedia / DuckDuckGoを並行開始する。
-2. 1 Providerの失敗は他Providerを停止させない。
-3. Provider結果は到着順ではなく決定論的な統合規則で統合する。
-4. 同一URLはcanonicalizeして重複を抑える。
-5. Provider名とEvidenceのsource_id / independence_cluster_idを保持する。
-6. 検索スニペットはEvidence候補であり、Claimの確定ではない。
-7. 検索結果ページ本文も複数URLを並行取得する。
-8. 1回のResearch invocationにはResource Governance上の安全上限を置く。
-9. ただしadaptive Researchでは、その上限を「探索全体の上限」と解釈してはならない。
-10. そのResearch invocationで検証が終わらなければ、
-    ResearchResult.continuationAvailable=true としてCOREへ返す。
-11. COREはcontinuationAvailable=trueを確認したら、同じKnowledge Gapを次cycleで再評価し、
-    RUN_RESEARCHを再選択する。
-12. 次RoundのQueryは固定文言を繰り返すのではなく、
-    Verification理由、反証不足、公式資料不足、互換性不足、Freshness不足などの
-    現在のEvidence状態から決定論的に変化させる。
-13. 新しいEvidenceが全く増えない場合はNO_NEW_EVIDENCEとして一旦停止し、
-    無意味な無限探索をしない。
-14. 「無制限」とは無限HTTPリクエストではなく、
-    Checkpointされた状態からCOREが必要な限りResearch Roundを継続できる
-    論理的に拡張可能な探索を意味する。
-15. Knowledge GapがSUPPORTED / DEVICE_VERIFIED等の検証条件を満たした時点で停止する。
-16. contradiction / stale evidence / permission / safety / environment mismatch等の
-    ブロッキング状態ではResearchを盲目的に反復しない。
-17. これは新しい分類でも第二のCOREでもなく、research分類とCOREの既存再評価機能を強化する。
+この文書は作業履歴を積み上げるログではなく、現在の設計判断を表すLiving Specificationとする。
 
-優先度：
-[P0] Provider並行探索
-[P0] ResearchResultの継続状態
-[P0] COREによるResearch再投入
-[P0] 新Evidenceの有無による停止条件
-[P1] Verification理由からのQuery戦略拡張
-[P1] Knowledge Frontierとの探索優先度統合
+設計変更時は次の順序を必須とする。
 
+1. 現行コードと機械検証結果を調査する。
+2. 現行設計と実装事実の差を分類する。
+3. 設計が正しい場合はコードを設計へ合わせる。
+4. 実装の進展により設計が古くなった場合は、先にこの文書を更新する。
+5. 設計と実装の双方に問題がある場合は、設計を整理してからコードを変更する。
+6. コード変更後に機械検証し、実装結果を再度この文書と照合する。
 
+したがって、この文書だけを無条件の真実とはしない。
+「設計書・現行コード・機械検証」の三者を相互監査し、矛盾が残った状態を実装完了としない。
 
-============================================================
-【164. P1 実装反映 — Environment DriftのCORE再検証ゲート】
-============================================================
+## 18.2 Researchの現行責務境界
 
-既存のexecutionEnvironmentRouterServiceをEnvironment Fingerprintの
-正規取得・比較入口として拡張した。
+Research分類の正本オーケストレーターはResearchServiceとする。
 
-Plan作成時
-↓
-Environment Fingerprint取得
-↓
-CORE Planへsignatureを記録
-↓
-Execution直前に現在Environmentを再取得
-↓
-差分なし → Action dispatch
-差分あり → dispatch中止
-↓
-COREへ戻って再計画
+ResearchServiceは次を統合管理する。
 
-Fingerprintには、既存Task Payloadから渡される
-Git HEAD / target snapshot / implementation / permission / safety /
-runtime / network等の環境情報に加え、既存Storageから取得できる
-SearXNG URL、Web Research Policy、Research Query Planning Policy、
-Storage Backend、Node Runtime情報を含める。
+- Knowledge Gapとの接続
+- Research Plan / Query Strategy
+- Web・ローカル資料等のResearch経路選択
+- 複数検索Round
+- 検索結果取得
+- 結果ページ読取
+- Evidence / Claim登録
+- Verification連携
+- Knowledge Gapの解決状態
+- continuation状態
+- Research Outcome
 
-Environment Drift検出時は、古いPlanをそのまま実行しない。
-次のCORE PlanでPermission / Safety / Evidence条件を再評価する。
+UnifiedWebResearchServiceはResearchそのものの第二正本ではない。
+Web検索技術へのFacadeとして、検索実行、検索結果ページ取得、設定、統計、低レベルWeb操作を担当する。
 
-同一TaskでEnvironment Driftが連続して発生する場合は、
-3回目の再発でENVIRONMENT_DRIFT_REPEATEDとしてPAUSEDへ遷移し、
-環境が安定してからResumeできる状態を保持する。
+AutonomousSearchServiceはProvider探索と結果統合を担当する低レベル実装であり、通常のResearchオーケストレーションを直接担わない。
 
-これは新しいEnvironment管理システムではない。
-既存ExecutionEnvironmentRouterService / Checkpoint / Permission /
-Safety / Plan Revisionへ統合するための再検証ゲートである。
+正規Research経路は、
 
-============================================================
-【165. P1受入条件】
-============================================================
-
-1. Plan生成時のEnvironment SignatureがBlackboardへ残ること。
-2. Execution直前にEnvironment Signatureを再取得すること。
-3. 差分がある場合、古いActionをdispatchしないこと。
-4. Drift時にCORE再計画へ戻ること。
-5. Driftが繰り返された場合、無限再計画せずPAUSEDへ遷移すること。
-6. Environment情報は既存Task Payload / Storage / Runtimeから構成し、
-   第二のCognitiveStateを作らないこと。
-7. Permission / Safety / Evidenceの再評価を次のCORE Planで行えるよう、
-   Driftを明示的なCORE Decisionとして残すこと。
-
-============================================================
-
-
-============================================================
-【166. P2実装反映 — 既存Metricsを1つの脳の長期観測面へ統合】
-============================================================
-
-新しいObservability専用DBは作らず、既存SelfImprovementMetricsServiceを
-長期運転の共通観測面として拡張する。
-
-観測対象：
-・Goal状態
-・Research実行 / 解決 / Evidence取得
-・Knowledge Gap再探索回数
-・No Progress / Oscillation / Repeated Failure / No New Evidence
-・Environment Drift
-・Action Idempotency再利用
-・検索件数 / 無結果率
-・Unified Learning ContinuumのProfile / Verified数 / Confidence
-・Resource Governance Snapshot
-・Capability再利用率
-
-観測値は診断・改善判断の入力であり、独立した第二のCognitiveStateではない。
-
-既存のTaskBlackboard / DomainReplyLedger / AutonomousSearch / UnifiedLearning /
-ResourceGovernanceから同一期間の情報を集約し、
-COREが後続サイクルで利用できる共通スナップショットとして公開する。
-
-UI/APIからは /api/miki/cognitive-observability を通じて参照できるが、
-観測API自身はActionを発行せず、Learning TruthやKnowledge Truthを生成しない。
-
-============================================================
-
-
-============================================================
-【168. P0実装反映 — Task Blackboardを唯一のCognitiveState源として統合する】
-============================================================
-
-新しい認知状態DBは作らない。既存Task Blackboardから、各CORE cycleに
-UnifiedCognitiveStateSnapshotを導出する。
-
-SnapshotはGoal / Input / Constraints / Active Domains / Evidence / Unknown・Gap /
-Capability・Component参照 / 直近Outcome / Learning候補 / State Hashを保持する。
-これにより会話・Research・Execution・Learning・Self-Improvementを別々の状態系統にせず、
-同じTask Blackboard上の一つの認知状態としてCOREが次cycleを再評価できる。
-
-Snapshotは派生投影であり、第二のKnowledge Truth、第二のLearning Truth、第二COREではない。
-
-============================================================
-
-
-============================================================
-【183. P1/P2実装反映 — 自律改善Legacy経路のFail-Closed化と決定論性修正】
-============================================================
-
-AutonomousContinuousEvolutionServiceの旧自律改善経路について、次を正本仕様へ固定する。
-
-1. runFullAutonomousCycleは候補生成・検証・Evidence集約までを行ってよいが、本番コード書込みを自動実行しない。
-2. 自律巡回、明示ターゲット、Legacy互換入口のいずれから呼ばれても、既存Approval/Review待ち境界で停止する。
-3. 手動承認による適用は、自律サイクル自身の自動適用とは区別する。
-4. 外部教師設定を旧AutonomousContinuousEvolutionServiceへ直接渡してコード生成パラメータ化しない。外部AIはResearch/Evidence境界で扱う。
-5. 因果実験は未適用候補の期待スコアを実測成功として扱わない。介入前の段階では効果0として記録し、実適用後のVerification/Evidenceで再評価する。
-6. ターゲット選定のfallbackはMath.randomを使わず、同一状態で同一ターゲットを選ぶ決定論的規則を使用する。
-7. legacy runtime-sentryのレスポンスも「即時適用済み」と申告せず、レビュー待ち候補として表現する。
-
-
-============================================================
-【184. P1実装反映 — 手動承認適用のCORE媒介】
-============================================================
-
-レビュー待ちCandidateの手動承認・適用についても、UIから自律改善サービスへ直接物理書込みを呼ばない。
-
-1. UI承認操作はCore Task Ingressへ入り、COREがAPPROVE_REVIEWED_CANDIDATEを選択する。
-2. Domain CommandはCOREからpromotion分類へ配送する。
-3. promotion分類は既存approveAndDeployRecordを実行境界として利用し、結果をCOREへ返す。
-4. CORE完了Gateがpromotion Resultを回収してからUIへ完了を返す。
-5. 自動巡回サイクルはV183のReview-only境界を維持し、自動適用しない。
-6. 新しい分類・第二CORE・第二Truth DB・第二承認台帳は追加しない。
-
-
-============================================================
-【185. P2実装反映 — 旧作業指示書・版別レポートの正本からの除外】
-============================================================
-
-1. 過去版の作業指示書、版別実装レポート、移行確認TXT、旧UI/Termux手順書はリポジトリの正本から除外する。
-2. 現行の設計判断は `docs/MIKI_AI_18_DOMAIN_DESIGN_PHILOSOPHY.txt` の一文書へ集約する。
-3. 実行証跡はCI Artifact、監査JSON、Git履歴等で保持し、履歴TXTを正本として積み増さない。
-4. Work Directive機能そのものは削除しない。外部指示を受け取るランタイム機能と、古い指示書ファイルを区別する。
-5. `stable_env_manifest.txt` は現行ランタイム方針の互換マニフェストとして維持する。
-
-
-============================================================
-【186. P2実装反映 — 新UIの章番号表示を除去】
-============================================================
-
-1. 新UIの表示文言では「第N章」形式を使用しない。
-2. 内部の `chapterNumber` データは既存仕様レジストリとの互換性のため保持するが、表示ラベルとは分離する。
-3. 新UIでは「対象仕様」「選択した仕様」「関連仕様」など、現在の操作対象が理解できる表示を使用する。
-4. 章番号の除去は実行経路や既存仕様識別子を削除するものではなく、UI表現だけを整理する。
-
-
-============================================================
-【187. P1実装反映 — 自己コード物理適用のCORE承認境界】
-============================================================
-
-1. `mikiSelfCodingSuperchargerService.runAutonomousImplementation` の物理適用は `CORE_PROMOTION` 権限を必須とする。
-2. 既定値は `autoApply=false` とし、UI/Legacyサービスから `true` を渡しただけでは書込みを許可しない。
-3. `CORE_PROMOTION` を渡せる既存経路はレビュー承認済みCandidateのpromotion処理に限定する。
-4. ローカルLLM接続引数はAPIへ渡さず常に未設定にする。
-5. 新しいPermission DBや第二COREは作らず、既存のCORE/promotion境界を利用する。
-
-
-【188. P1実装反映 — Autonomy設定変更のCORE収束】
-自律巡回設定の変更は既存autonomy分類の SAVE_AUTONOMY_CONFIG をCORE Task Ingress経由で扱い、保存とタイマー同期を分離する。設定値は有限範囲へ正規化し、重複タイマーを発生させない。
-
-
-============================================================
-【189. P1実装反映 — SelfDevelopment直接適用呼出のReview-only化】
-============================================================
-
-1. selfCodeArchitectServiceとUltraSelfEvolverSubViewからの `runAutonomousImplementation` 呼出は候補生成・検証用途に限定し、autoApply=falseを渡す。
-2. 物理コード適用は既存のCORE_PROMOTION承認経路だけを使用する。
-3. V187の実行時ガードを呼出側でも補強し、UIやLegacyサービスが誤ってtrueを渡す設計余地を減らす。
-4. ロールバックや検証の読み取り系操作は既存サービスを維持し、物理書込み権限だけを収束させる。
-
-
-============================================================
-【190. P2実装反映 — Termux型検査・本番ビルドゲート】
-============================================================
-
-1. 累積適用後のTermuxでは既存 `npm run lint` を型検査として実行する。
-2. 既存 `npm run build` を本番ビルドとして実行する。
-3. `dist/index.html` と `dist/server.cjs` の生成を確認する。
-4. どれか一つでも失敗した場合、実装完了とは扱わず、原因修正後に再検証する。
-5. 新しいビルドシステムは作らず、既存package.jsonのbuild/lint/start契約を利用する。
-
-
-============================================================
-【191. P1実装反映 — Autonomy設定のCORE計画ルート固定】
-============================================================
-
-1. `SAVE_AUTONOMY_CONFIG` はSYSTEM_TASKの汎用フォールバックに流さず、AdaptiveRoutePlannerが明示的に `autonomy` 分類を選択する。
-2. 完了判定も同じoperationをautonomy所有操作として評価し、設定保存後に不必要なconversation/strategy経路へ逸脱しない。
-3. 既存CORE Task Ingress、DomainRouter、autonomy分類を再利用し、新しい設定DBや第二COREは作らない。
-
-
-============================================================
-【193. P1-P2実装反映 — 18分類・Core入口・自己実装・Local LLM最終静的監査】
-============================================================
-
-累積適用後の機械監査で、次の静的条件を満たすことを要求する。
-1. `crossDomainCirculationService.ts` のMikiDomainはCORE + 17分類の18個ちょうどである。
-2. self-codeの物理適用は `CORE_PROMOTION` 権限が付いた既存promotion経路だけに残る。
-3. self-code serviceに `localLlmEndpoint` / `localLlmModel` / `miki_external_llm_config` を残さない。
-4. executable sourceからlocal generative runtimeへのロード/Worker接続を禁止する。
-5. `SAVE_AUTONOMY_CONFIG` はCORE planner → autonomy domainへ入る。
-6. 監査は新しいDB、CORE、分類、Orchestratorを作らず既存構造を検査するだけとする。
-
-
-============================================================
-【194. P1実装反映 — 旧7領域認知カーネルのCORE互換アダプタ化】
-============================================================
-
-1. 旧 `integratedCognitionControllerService` を認知実行の権威から退役させる。
-2. 既存 `/api/miki/cognition/cycle` の互換入口は維持するが、内部は `coreTaskIngressService` に委譲する。
-3. 旧7領域ラベルはHTTP互換入力としてのみ保持し、実際の分類選択はCORE + 17分類に任せる。
-4. 返却する `decision.route` はCOREが実際に選択・訪問した分類から構成し、旧Controllerの独自判断を持たない。
-5. 新しい脳・Controller・DBは作らない。既存CORE Task Blackboard / Domain Router / CoreResultを使用する。
-
-
-============================================================
-【196. P2実装反映 — 旧Local-LLM表現/旧統合設計ファイルの表面整理】
-============================================================
-
-1. 出荷対象Android HTMLや現行ユーティリティからWebLLM/llama.cpp等の旧ランタイム説明を除去する。
-2. 旧統合設計Markdownは現行の単一設計書と重複するため削除する。
-3. 退役監査マニフェストや退役テストに残るLocal LLM名は、再導入防止という目的のため維持してよい。
-4. 現行の実行コード・UI・利用者向け説明でLocal LLMを利用するよう誤認させる表現は残さない。
-
-
-============================================================
-【197. P1-P2最終監査 — CORE単一権威・18分類・Local LLM退役・外部教師境界】
-============================================================
-
-最終監査では以下を同時に満たすことを要求する。
-1. CORE + 17分類の18ドメイン集合を維持する。
-2. 旧7領域認知カーネルはCORE互換アダプタであり、独自の意思決定Controllerを持たない。
-3. 自己コード物理適用にはCORE_PROMOTION権限が必要で、UI直接呼出はreview-onlyである。
-4. Gemini等の外部AIコード提案はUNTRUSTED_EXTERNAL_AIであり、直接適用不可・CORE審査必須である。
-5. Local LLM接続引数・WebLLM/nativeLlm/gguf runtimeの実行系再導入参照を禁止する。
-6. 監査は既存のCORE/17分類/状態/台帳を検査し、新たな脳・DB・Controllerを作らない。
-
-
-============================================================
-【198. P2実装反映 — 旧LLM移管UIの退役】
-============================================================
-
-1. 旧 `LlmMigrationSubView` を現行UIから除去する。
-2. LLM_ONLY / LLM_FALLBACK / ROLLBACK_TO_LLMを選択する旧画面は出荷UIに存在させない。
-3. 同じUI領域には現在のRuntime Policyを表示し、NON_LLM_ONLY、CORE + 17分類、外部教師の未信頼境界、CORE_PROMOTION適用条件を明示する。
-4. 内部の退役監査サービスや再導入防止テストは、ランタイム選択画面と混同しない範囲で維持できる。
-
-
-============================================================
-【199. P2実装反映 — 旧LLM移管バックエンド退役】
-============================================================
-
-1. 旧 `llmMigrationProtocolService` の実行サービスを退役させ、現行Non-LLM runtimeから参照できない状態にする。
-2. 旧LLM移管証拠専用テスト、旧barrel export、旧packageバックアップを削除する。
-3. Local LLM再導入防止の監査・manifestは維持し、退役監査とランタイム選択UIを混同しない。
-4. 現行の正規経路は `NON_LLM_CORE` と必要時の `EXTERNAL_TEACHER` の2種類だけとする。
-
-
-============================================================
-【201. P0/P1実装反映 — Goal Conflict / Deterministic Tie-Break】
-============================================================
-
-1. 既存AdaptiveRoutePlannerへGoal候補の競合解決を追加し、第二Orchestratorは作らない。
-2. COREが現在Goal、ユーザー要求、背景処理等の候補を同一Blackboard文脈で評価し、SELECT / PAUSE / BLOCK / WAITを決定する。
-3. 優先順位は foreground → priority → safety / permission → dependency satisfaction → deadline → deterministic canonical key の順で評価する。
-4. 配列順・Map挿入順・非同期完了順を最終タイブレークに使用しない。
-5. 選択Goalと保留/阻止Goalの判断は既存BlackboardへDECISIONとして記録し、再評価時に追跡できるようにする。
-6. 実際の17分類ルーティングは従来のAdaptiveRoutePlannerへ渡し、Goal解決専用の別脳を作らない。
-
-
-============================================================
-【202. P1実装反映 — Knowledge/Belief Revision】
-============================================================
-
-1. 既存ClaimDatabaseServiceへBelief Revision規則を追加し、専用Truth DBは作らない。
-2. Claim間の矛盾だけでは新Claimを真実扱いしない。
-3. 独立Evidence、検証状態、Evidence品質、成熟度から既存/候補Claimのconfidenceを決定論的に再評価する。
-4. 独立かつ検証済みの根拠が不足する新ClaimはQUARANTINEDとして隔離できる。
-5. 同程度の根拠しかない場合は両方をUNDER_REVIEWとして保持し、CONFLICTを無理に潰さない。
-6. 明示的commit時にのみ、十分な独立検証根拠を持つ候補から既存ClaimをSUPERSEDEDへ改訂できる。
-7. QUARANTINED Claimは通常の最適主張照合から除外し、自己汚染・自動真実化を防ぐ。
-
-
-============================================================
-【203. P1実装反映 — Foreground / Background干渉制御】
-============================================================
-
-1. 既存TaskBlackboardのPause / Resumeを再利用し、新しいQueue/Task Managerは作らない。
-2. ユーザーのForeground要求が入った時点で、既存のBackground Self-Improvement Worker等をPAUSEDへ移せるようにする。
-3. Background処理自身もCORE cycle境界でForeground要求を検知した場合は停止し、WAITINGとしてCOREへ戻す。
-4. PauseされたTaskは削除せず、既存resume経路から再開可能な状態を保持する。
-5. Foreground保護はCOREの実行制御として扱い、Background Taskがユーザー要求より先に新規Domain操作を追加し続けることを防ぐ。
-
-
-============================================================
-【204. P1実装反映 — 会話Goal継続追跡】
-============================================================
-
-既存ConversationStateへgoalProgressを追加し、複数発話を同一Goalとして追跡する。
-
-activeGoalId / activeGoal / status / completedConditions / remainingConditions / blockedConditions /
-latestUserInstruction / pendingActions / previousGoals / revision を保持する。
-
-話題転換時は旧Goalを破棄せずPAUSEDとしてpreviousGoalsへ残し、新Goalを決定論的IDで開始する。
-Goal専用DB・第二Orchestratorは作らない。
-
-
-============================================================
-【208. P1実装反映 — 会話内の時間・状態整合性検証】
-============================================================
-既存ConversationStateへtemporalContextを追加し、時間軸と状態軸を分離して追跡する。相対日付は日付キーへ正規化し、修正前/修正後・実行前/実行後・旧仕様/現仕様などを状態軸として保持する。NonLLMの最終表面生成前にEntity/Time/State整合性を検査し、直接衝突した場合は断定を避けUNRESOLVEDへ戻す。
-
-
-============================================================
-【209. P1実装反映 — 会話中の候補回答比較と決定論的選択】
-============================================================
-
-既存runtimeConversationCompositionServiceの候補生成をそのまま利用し、候補生成と候補選択を分離した。
-
-候補選択はAccuracy / Goal適合 / Constraint遵守 / Evidence / Unknown処理 / 必要説明量 / Safety / User Stateの
-8軸を固定重みで評価し、最後に意味保持・安全性・Goal適合・説明量・表層重複・主骨格・長さ・文字列キーの順で
-決定論的タイブレークを行う。
-
-選択結果と各候補の評価軸をRuntimeCompositionResultへ保持し、既存COREの回答表層生成経路だけを拡張する。
-新しいCandidate DB / Answer Orchestrator / 第2COREは追加しない。
-
-
-============================================================
-【210. P2実装反映 — ユーザー理解度に応じた説明量の適応】
-============================================================
-
-既存ConversationState / ResponseLength / ConversationStrategy / AnswerContentIRを再利用する。
-
-ユーザー発話と会話状態から、NOVICE / INTERMEDIATE / ADVANCED / VERIFICATION_FOCUSED / UNKNOWNを
-決定論的に推定し、既存の短文・詳細指定を上位制約として維持した上で、標準長だけを説明量へ適応する。
-
-適応理由・Evidence・Confidence・選択された説明量はConversationState.explanationAdaptationへ保存する。
-
-非LLM CoreではAnswerContentIR.detail_levelへ反映し、外部AI経路では既存ResponseLength選択に
-同じ適応判断を重ね、プロンプトとConversationStateの両方へ渡す。
-
-新しい説明専用サービス・DB・分類・COREは追加しない。
-
-
-============================================================
-【211. P3実装反映 — 潜在Unknownの予測】
-============================================================
-
-既存のknowledgeGapServiceを拡張し、Claim / Capability Gap / Failure / Environmentの
-既知構造から、まだKnowledge Gapとして登録されていない未知候補を決定論的に生成する。
-
-PotentialUnknownCandidateは事実・Knowledgeではなく候補として扱い、永続DBへ直接保存しない。
-候補のConfidenceが閾値を満たした場合だけ、既存knowledgeGapServiceへ1件だけ昇格し、
-既存ResearchServiceがEvidence → Verificationへ進めるResearch対象とする。
-
-新しいUnknown DB、Research DB、Orchestrator、COREは作らない。
-
-
-============================================================
-【212. P2実装反映 — 学習による回答変化の原因説明】
-============================================================
-同一入力の再回答比較を既存ConversationStateとMikiConversationLearningServiceへ統合し、Knowledge/Evidence/Capability/Experience/Strategy/Decision/Surfaceの参照差分を原因候補として記録する。差分は因果証明とは扱わず、追跡できない部分は推測で補完しない。
-
-
-============================================================
-【V213実装追跡】
-============================================================
-既存TaskBlackboardのrevisionを使い、非同期CORE結果書込みをappendIfRevisionで原子的に保護する。競合時はstale writeを拒否しCHECKPOINTへ記録する。新しいState DB/Orchestratorは作らない。
-
-
-============================================================
-【215. 会話由来USER_CLAIMと客観的Knowledgeの分離強化】
-============================================================
-
-既存EvidenceServiceへUSER_CLAIM種別を追加し、ユーザー教示を「ユーザーがそう述べた」というEvidenceとして保存する。
-
-USER_CLAIMは客観的事実の検証結果ではない。既存の会話学習による統計だけでSUPPORTED / DEVICE_VERIFIEDへ自動昇格させず、
-独立したWEB / DOCUMENT / EXECUTION等のVerification経路から正規に検証された場合だけKnowledgeとして利用可能な状態へ進める。
-
-新しいClaim DB / Evidence DB / Verification DB / Orchestratorは作らない。既存ClaimDatabaseService、EvidenceService、Verifier経路を再利用する。
-
-
-============================================================
-【216. 自己改善ChangeSetIDの全工程ラインage統一】
-============================================================
-
-既存EvidenceBasedSelfImprovementEngineに存在するChangeSetIDを正本として再利用し、SelfImprovement Ingressで自己改善要求ごとに一度だけ発行する。
-以後のAutonomousImprovementRequest、ImprovementRun、ImprovementExperimentResultへ同じChangeSetIDを引き渡せるようにする。
-
-これにより、Experiment / Candidate / Patch / Test / Canary / Rollback / Git Commitの追跡単位と、自己改善要求・実験結果の記録単位を分離しない。
-新しいChangeSet DB、自己改善Orchestrator、履歴DBは追加しない。
-
-
-============================================================
-【217. 自己改善戦略記憶を実利用結果へ閉ループ接続】
-============================================================
-
-既存EvidenceBasedSelfImprovementEngineのStrategy Memoryを、自己改善の選択・実利用・Outcomeへ接続する。
-
-strategy selection
-↓
-実際の自己改善試行
-↓
-既存SelfImprovementExperimentのBefore/After評価
-↓
-ADOPT / HOLD / REJECT
-↓
-既存Strategy Memoryの成功/失敗統計更新
-↓
-次回のStrategy選択へ反映
-
-Strategy選択だけではLearning Usage EvidenceのappliedCountを増やさない。実際に改善試行で利用した時だけ使用記録を追加する。
-
-既存Strategy Memory / Learning Usage Evidence / SelfImprovementExperimentを再利用し、新しいStrategy DB、Learning DB、Selector Service、Orchestratorは追加しない。
-
-
-============================================================
-【219. 自律Issue発見 → Requirement Contract → ChangeSetID統合】
-============================================================
-
-既存AutonomousIssueDiscoveryServiceが検出したExecution Failure / Knowledge Gap / Capability Gap / Stalled Task / Domain Disconnection / Claim Contradiction / Improvement Debtを、自己改善の候補として明示的なRequirementContractへ変換する。
-
-Issueごとに既存EvidenceBasedSelfImprovementEngineのChangeSetIDを一度だけ発行・保持し、RequirementContract、ImprovementIntakeRun、SelfImprovement Ingress、AutonomousImprovementRequestへ同じIDを引き渡す。
-
-自律発見Issueの候補順序はpriority → kind → sourceId → issueIdで決定し、保存順・ネットワーク順に依存しない。
-
-Issue発見は「改善が成功した」という証明ではない。ContractはUNTESTEDから開始し、既存Candidate / Verification / Promotion / Evidenceの境界を通過して初めて結果を確定する。
-
-新しいIssue DB、Requirement DB、ChangeSet DB、Orchestratorは作らず、既存Issue Discovery / EvidenceBasedSelfImprovementEngine / Intake Routerを接続・拡張する。
-
-
-============================================================
-【220. 自律Issue → 決定論的Implementation Plan → Candidate生成統合】
-============================================================
-
-自律Issue発見後、既存AutonomousCandidatePreparationServiceが対象ファイルを決定し、同じサービス内でImplementation Planを生成する。
-
-Planには、対象ファイル、単一/複数ファイルの最小変更範囲、Issue種別ごとの調査手順、必須検証、禁止された変更拡張、対象決定理由、解決信頼度を記録する。
-
-CandidateCodeGenerationServiceは、自律発見runについてImplementation Planが存在しない場合は生成を開始せず、PlanをCandidate生成契約へそのまま渡す。
-
-Planは実装結果・検証結果ではなく、自己改善のための事前判断である。最終的な採択は既存のRequirementContract / Candidate Validation / Counterexample / Regression / Evidence / CORE Gateで決定する。
-
-対象決定の同点時はtarget pathを最終キーとし、ファイル保存順に依存しない。
-
-新しいPlanner、Issue DB、Candidate DB、Orchestratorは追加しない。既存AutonomousCandidatePreparationService、ImprovementIntakeRouter、CandidateCodeGenerationServiceを拡張する。
-
-
-============================================================
-【221. 自己改善の実行権限をCOREへ完全収束：1つの脳の標準認知サイクル】
-============================================================
-
-自己コード改善の自律キューは、自己改善Candidateの生成・検証・レビュー・再評価を直接実行しない。
-
-自律キューは、
-
-発見された改善課題
-↓
-CORE Task / Blackboard
-↓
-COREによる必要分類の選択
-↓
-improvement / unknown / research / capability / selfDevelopment / verification / promotion等
-↓
-Domain Result
-↓
-CORE再評価
-↓
-Outcome / Experience / Learning
-↓
-共有CognitiveState更新
-↓
-CORE再評価
-
-という1つの脳の循環だけを起動・再開する。
-
-AutonomousSelfImprovementLoopServiceは、キュー・待機・リソース回復・再開などの補助状態を担当してよいが、Candidate生成、Validation、Review Package作成などのBusiness操作を直接呼び出してはならない。
-
-これにより、自己改善だけがCOREを迂回して独自の固定ループを持つことを防ぐ。
-
-既存のCandidate / Verification / Promotion / Learningサービスは削除せず、17分類の専門能力としてCOREから利用する。
-
-新しい第19分類、第二CORE、第二Blackboard、第二CognitiveStateは作らない。
-
-
-============================================================
-【222. 自己改善入口のCORE内分岐を統一：UI / 自律 / 実行失敗を同一認知サイクルへ】
-============================================================
-
-SELF_IMPROVEMENTという同一の認知目的について、入口の違いだけで別の計画器・完了規則へ分岐させない。
-
-UIからの自己改善、AUTOPILOTによる自律改善、実行失敗からの改善要求、SYSTEMからの改善要求は、
-すべて同じCORE Taskへ入り、AdaptiveRoutePlannerの同一の自己改善認知経路を使用する。
-
-SELF_IMPROVEMENT
-↓
-現在のBlackboardを評価
-↓
-Issue / Repository / Target / Knowledge Gap / Capability Gap
-↓
-必要なら Unknown / Research / Capability
-↓
-Candidate
-↓
-Verification
-↓
-Promotion / Review
-↓
-CORE再評価
-
-入口メタデータ（UI / AUTOPILOT / EXECUTION / SYSTEM）は出所情報として保持するが、
-それ自体を別の「脳」や別の固定ルートの選択理由にはしない。
-
-完了判定も同じく、SELF_IMPROVEMENTならAdaptive Completion Gateを使用する。
-これにより「UIだけがAdaptive」「自律Workerだけが別の固定7分類」という二重経路をなくす。
-
-新しいPlanner、Completion Gate、CORE、Blackboard、CognitiveState、分類、Learning正本は追加しない。
-既存AdaptiveRoutePlanner / CoreCompletionGate / TaskBlackboard / Domain Router / 既存17分類の専門能力を再利用する。
-
-
-============================================================
-【223. Knowledge Gapの意味的重複排除と正式未知分類の拡張】
-============================================================
-既存KnowledgeGapServiceを正本として拡張し、query文字列だけでなくtarget/missingContent/conditions/environment/taskId/capabilityIds/claimIdsから決定論的semanticKeyを作り、同じ未解決命題を既存Gapへ統合する。旧Gapの永続形式は維持し、identityのない既存データはqueryから後方互換的に導出できる。正式未知分類を拡張するが、Unknown専用DB、第二Orchestrator、19番目の分類は追加しない。
-
-【160. P1 — 実行中のEnvironment Driftを検出し、計画を再検証する】
-
-============================================================
-【Research正本とWeb探索入口の統合】
-
-Research分類における研究処理と通常のWeb知識探索の正本は既存ResearchServiceとする。
-
-正規経路：
 CORE
-  ↓
-ResearchService
-  ↓
-UnifiedWebResearchService
-  ↓
-AutonomousSearchService
-  ↓
-SearXNG / Wikipedia / DuckDuckGo
+→ Research分類
+→ ResearchService
+→ UnifiedWebResearchService
+→ AutonomousSearchService
+→ Provider
 
-ResearchServiceはKnowledge Gap、Research Plan、Query Strategy、複数探索、検索結果ページ読取、Evidence / Claim登録、Verification、Knowledge Gap解決、継続条件、Research Outcomeを統合管理する唯一のResearchオーケストレーターとする。
+とする。
 
-通常のWeb知識探索はResearchService.executeSearch()を正規入口とする。executeSearch()はKnowledge Gapを正本へ登録し、researchGap()を通じて通常のResearch処理を実行し、既存呼出元が利用できる検索結果候補resultsをResearchResultとして返す。
+UI、Unknown、Memory、Capability、Autonomous Evolution、Background処理等がResearch業務を要求する場合、原則としてCORE Task Ingressから入り、COREがResearch分類を選択する。
 
-UI検索、Unknown解決、Memory freshness確認、Capability調査、Autonomous Evolution、Background Research、Memory Audit等の通常の知識探索は、独自のResearch完了判定や検索正本を作らずResearchServiceへ委譲する。
+ただし既存コードに直接ResearchまたはWeb検索を呼ぶ経路が存在する場合、それを即座に削除・置換してはならない。
+まず呼出元の目的、戻り値契約、副作用、CORE Blackboardへの帰還方法を調査し、次のいずれかに分類する。
 
-UnifiedWebResearchServiceはWeb探索Facadeとして維持し、Web検索、検索結果ページ取得、設定、統計、低レベル操作を担当する。ただしResearch全体の完了、Knowledge Gap解決、Claim確定を独自に判断しない。設定・統計・低レベルページ取得などResearch orchestrationを伴わない操作は直接利用してよい。
+- CORE経路へ統合すべき業務Research
+- Research内部からの正当な利用
+- Web技術への低レベル利用
+- 診断・検証専用利用
+- 互換入口
+- 設計上未定義の経路
 
-AutonomousSearchServiceはSearXNG / Wikipedia / DuckDuckGo等のProvider探索、結果統合、URL正規化等の低レベル実装を担当する。通常のResearch orchestrationから直接利用する経路を新設せず、低レベル実装または明示的な検証用途に限定する。
+業務ResearchをCOREへ統合する場合も、既存結果契約を確認してから変更する。
+ResearchServiceとUnifiedWebResearchServiceの責務を逆転させるための変更は行わない。
 
-Search結果はEvidence候補であり、検索したことだけでResearch完了またはKnowledge確定とはしない。Evidence、Claim、Verification、Knowledge Gap、Learning、Memory等の既存正本を再利用し、第二Research Orchestrator、第二Knowledge DB、第二Evidence DB、第二CORE、追加Research分類は作らない。
+## 18.3 COREとResearchの再評価
 
-COREはResearch要求をResearchServiceへ渡し、ResearchServiceから返されたResult / Evidence / continuation状態等をBlackboardへ反映した後、次の分類、再Research、保存、検証、停止または完了を再評価する。Research Roundの内部上限は安全上限であり、探索全体の固定回数制限ではない。
+COREはResearch結果を最終的な真実として扱わない。
 
-既存の直接UnifiedWebResearchService検索呼出元は、必要な戻り値契約を確認しながら段階的にResearchService.executeSearch()へ統合する。呼出元の都合だけでResearch責務をUnified層へ戻さない。
+Researchから返されたResult、Evidence、Claim、Verification結果、unresolvedRequirements、continuation状態をBlackboardへ反映し、COREが次の処理を再評価する。
 
-研究系サービスを変更する場合は、ResearchServiceを正本として既存呼出元、UnifiedWebResearchService、AutonomousSearchService、Research UI Gateway、CORE入口、Research結果のCORE Blackboard帰還経路、直接検索呼出元、Research完了判定の重複を確認してから実装する。
+次のResearch Roundが必要な場合はCOREが再度Research分類を選択する。
+Research内部の安全上限を、探索全体の固定回数制限とは解釈しない。
+
+ResearchだけでKnowledgeを確定しない。
+検索結果はEvidence候補であり、既存Verification境界を通過した結果だけがKnowledge利用可能状態へ進む。
+
+## 18.4 直接呼出し監査
+
+Research関連変更では、少なくとも次を確認する。
+
+- ResearchService
+- UnifiedWebResearchService
+- AutonomousSearchService
+- CoreTaskIngress
+- CoreOrchestrator
+- AdaptiveRoutePlanner
+- DomainRouter
+- Research UI Gateway
+- Unknown解決
+- Memory / Capability / Autonomy等の直接検索呼出元
+- Research結果のBlackboard帰還
+- Research完了判定
+
+直接呼出しが存在することだけを理由にコードを変更しない。
+その呼出しが現在の18分類設計で正当かを判定してから修正する。
+
+## 18.5 重複実装の扱い
+
+同じ責務の型、関数、配列、Controller、Coordinator、Router、Gate等が重複している場合、それは設計追加ではなく実装不整合の候補として扱う。
+
+特にResearchでは、
+
+- ResearchSearchResultの単一定義
+- ResearchService.executeSearchの単一定義
+- Research検索結果の単一収集
+- 同一結果の意図しない二重登録防止
+
+を必須とする。
+
+## 18.6 実装前後の確認
+
+実装者は変更前に設計書を確認し、変更後には次を確認する。
+
+設計
+→ 実装
+→ 型・import検査
+→ 挙動検査
+→ 成果物検査
+→ GitHub main確認
+→ 設計との再照合
+
+この再照合で設計と実装が一致しない場合、コードだけを都合よく合わせず、設計が古くなっていないかを再判定する。
+
+## 18.7 作業履歴を正本へ追加しない
+
+個別の実装作業、P番号、バージョン番号、修正ログをこの文書へ逐次追加しない。
+
+実装履歴はGit履歴、検証結果、必要な監査Artifactで追跡する。
+この文書には現在有効な設計・制約・受入条件だけを残す。
+
