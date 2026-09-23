@@ -100,21 +100,10 @@ class UnifiedUnknownResolutionCoordinatorService {
       status: 'RESEARCH_REQUIRED',
       evidenceCount: 0,
       query,
+      researchQuestion: query,
+      unresolvedRequirements: [`RESEARCH_REQUIRED:${query}`],
       routes,
     };
-    } catch (error) {
-      unknownResolutionService.attempt(resolution.id, 'WEB', undefined, { query, failureReason: String(error) });
-      unifiedExperienceImprovementBridgeService.ingest({
-        domain: 'research',
-        action: 'unknown_search_failure',
-        summary: query,
-        outcome: 'FAILURE',
-        verified: false,
-        concepts: [resolution.classification, 'SEARCH_FAILURE'],
-        lesson: String(error),
-      });
-      return { effectiveText: request.question, resolution, status: 'SEARCH_FAILED', evidenceCount: 0, query, routes };
-    }
   }
 
   private routes(classification: UnknownClassification, hasAttachments: boolean): ResolutionRoute[] {

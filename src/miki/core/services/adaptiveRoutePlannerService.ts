@@ -344,7 +344,7 @@ class AdaptiveRoutePlannerService {
         routes.push({
           target:'research',command:'RUN_RESEARCH',
           reason:'Core selected research to resolve an explicit knowledge gap',
-          payload:{taskId:task.taskId,goal:task.goal,gapId:this.readStringFromEntries(task,/gapId/i),adaptive:true,priority:90}
+          payload:{taskId:task.taskId,goal:task.goal,gapId:this.readStringFromEntries(task,/gapId/i),query:this.readStringFromEntries(task,/researchQuestion|queryPlanId/i),adaptive:true,priority:90}
         });
       } else {
         routes.push({
