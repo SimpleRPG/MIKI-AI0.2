@@ -695,4 +695,30 @@ Knowledge Gapの永続状態を変更する責務はKnowledge Gapの所有境界
 
 Verification Resultには対象Claim IDs、各ClaimのVerification Outcome、全Required Claimが検証済みか、未解決・反証の有無、Research/Knowledge Gapとの関連識別子、Evidence IDsを保持できる契約を用いる。Verifierが実際に評価したEvidenceとの系譜をCOREへ返せることを原則とする。
 
+### Verification結果とKnowledge Gap所有境界
+
+VerificationによるClaim状態の確定と、Knowledge Gapの永続状態更新は同一責務として扱わない。
+
+VerifierはClaimのEvidenceを評価し、Verification Outcomeを確定する。Claim状態がSUPPORTED、DEVICE_VERIFIED、CONTRADICTED等へ変化した場合、その結果はVerification Eventとして後続のKnowledge連携へ通知できる契約を持つ。
+
+Verification Eventを受け取るUnknown側の連携サービスは、対象Unknown、関連Claim、Evidence、Knowledge Gapの関係を再評価する。関連する必要ClaimがすべてSUPPORTEDまたはDEVICE_VERIFIEDとなった場合に限り、Knowledge Gap所有サービスの正規APIを通じてKnowledge GapをRESOLVEDへ進める。
+
+したがって、COREやVerification DomainがKnowledge GapService.markResolved()を直接呼び出して永続状態を変更しない。また、Research結果だけでKnowledge Gapを永続的に解決済みにしない。
+
+正規の責務境界は、
+
+Verification
+→ Verification Result / Verification Event
+→ Unknown Knowledge Integration
+→ Knowledge Gap所有サービス
+→ Knowledge Gap状態更新
+
+とする。
+
+VerificationがCONTRADICTEDまたはUNRESOLVEDの場合はKnowledge Gapを解決済みにせず、その結果をCOREのBlackboardへ戻す。COREはEvidence、Claim、未解決要件、既存Research結果を再評価し、Research継続、Unknown、別Verification、Execution等の必要な分類を選択する。
+
+Verification ResultをDomain Command経由で返す場合も、claimIds、各ClaimのOutcome、promoted状態、Evidence IDs、Research/Knowledge Gapとの関連識別子を保持し、Verification Eventによる永続状態連携とCOREによるTask状態の再評価を混同しない。
+
+この境界により、Claimの検証、Unknownの解決状態、Knowledge Gapの永続状態、CORE Taskの完了状態を分離しながら、Research → Verification → CORE再評価 → 必要Domainという18分類の循環を維持する。
+
 この境界により、Research → Verification → CORE再評価は一方向の固定手順ではなく、COREがVerification結果を材料として次の必要Domainを選択する18分類の循環として成立する。
