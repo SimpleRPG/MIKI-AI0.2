@@ -853,3 +853,43 @@ CORE再評価
 既存KnowledgeGapServiceを正本として拡張し、query文字列だけでなくtarget/missingContent/conditions/environment/taskId/capabilityIds/claimIdsから決定論的semanticKeyを作り、同じ未解決命題を既存Gapへ統合する。旧Gapの永続形式は維持し、identityのない既存データはqueryから後方互換的に導出できる。正式未知分類を拡張するが、Unknown専用DB、第二Orchestrator、19番目の分類は追加しない。
 
 【160. P1 — 実行中のEnvironment Driftを検出し、計画を再検証する】
+
+============================================================
+【224. P0 — Research正本とWeb検索実装境界の固定】
+============================================================
+
+Research分類における研究処理の正本は既存ResearchServiceとする。
+
+責務境界は次のとおり固定する。
+
+CORE
+  ↓
+researchService
+  ↓
+unifiedWebResearchService
+  ↓
+autonomousSearchService
+
+1. researchServiceはResearch分類の正規オーケストレーターであり、Knowledge GapからResearch Plan、Query Strategy、複数探索、検索結果ページ読取、Evidence / Claim登録、Verification、Knowledge Gap解決、継続探索、停止条件、Research Outcomeを統合管理する。
+2. unifiedWebResearchServiceはWeb探索の共通境界・Facadeであり、Web検索、検索結果ページ取得、検索設定、検索統計等を既存の低レベル検索実装へ委譲する。Research全体の完了判定やKnowledge Gap解決を独自に持たない。
+3. autonomousSearchServiceはSearXNG / Wikipedia / DuckDuckGo等のProvider探索、URL正規化、Provider結果統合、検索ページ取得等の低レベル検索実装を担当する。Research分類の完了判定、Claimの真偽確定、Knowledge Gapの解決を独自に決定しない。
+4. Search結果はEvidence候補であり、検索したことだけをResearch完了またはKnowledge確定として扱わない。
+5. Verification、Knowledge Gap、Learning、Memory等の既存正本はresearchServiceから既存契約を通じて利用し、Research専用の第二Evidence DB、第二Knowledge DB、第二Orchestratorを作らない。
+6. COREはResearch要求を必要なResearch分類へ配送し、researchServiceから返されたResult / Evidence / unresolvedRequirements / continuation状態をBlackboardへ反映した後、次の分類、再Research、保存、検証、停止または完了を再評価する。
+7. Research Roundの内部上限はResource Governance上の安全上限であり、探索全体の固定回数制限を意味しない。継続可能な場合はresearchServiceがcontinuation状態をCOREへ返し、COREが次cycleで再評価する。
+8. UI、旧互換入口、他DomainからunifiedWebResearchServiceを直接利用している経路は、Research全体の正本を迂回する独自Research判断を持ってはならない。設定・低レベル検索・表示専用操作とResearch orchestrationを分離し、重複する判断経路はresearchServiceへ統合する。
+9. autonomousSearchServiceへの直接依存は低レベル検索実装または明示的な検証用途に限定し、通常のResearch orchestrationを直接実行する経路を新設しない。
+10. 研究系サービスを変更する場合は、まずresearchServiceを正本として既存呼出元、unifiedWebResearchService、autonomousSearchService、Research UI Gateway、CORE入口を調査し、責務重複がないことを確認してから実装する。
+
+確認対象：
+- researchService
+- unifiedWebResearchService
+- autonomousSearchService
+- typedResearchUiGatewayService
+- COREからResearch分類へ入る経路
+- Research結果がCORE Blackboardへ戻る経路
+- autonomousSearchServiceへの直接依存
+- unifiedWebResearchServiceへの直接依存
+- Research完了判定の重複実装
+
+新しいResearch分類、第二CORE、第二Research Orchestrator、第二Knowledge/Evidence正本は追加しない。
