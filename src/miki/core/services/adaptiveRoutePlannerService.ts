@@ -567,6 +567,15 @@ class AdaptiveRoutePlannerService {
     const text=`${task.goal} ${task.entries.map(e=>`${e.key} ${String(e.value)}`).join(' ')}`;
     const operation=String(input.operation||'');
     const routes:PlannedRoute[]=[];
+    if(operation==='EXECUTE_AUTONOMOUS_SEARCH'){
+      routes.push({
+        target:'research',
+        command:'RUN_RESEARCH',
+        reason:'CORE selected the research classification for an explicit UI research execution request',
+        payload:{...input,taskId:task.taskId,operation,query:String(input.query||''),adaptive:true,priority:100}
+      });
+      return this.decorateOperations(task,this.uniqueOperations(routes));
+    }
     if(operation==='APPROVE_REUSABLE_COMPONENTS'){
       routes.push({target:'learning',command:'APPROVE_REUSABLE_COMPONENTS',reason:'CORE selected learning to approve reusable components from generalized learning',payload:{...input,taskId:task.taskId,operation,adaptive:true,priority:100}});
       return this.decorateOperations(task,this.uniqueOperations(routes));
@@ -596,6 +605,10 @@ class AdaptiveRoutePlannerService {
       'SAVE_RESEARCH_QUERY_PLANNING_POLICY',
       'SAVE_CORE_CYCLE_SETTINGS'
     ]);
+    const coreOwnedResearchOperations=new Set(['EXECUTE_AUTONOMOUS_SEARCH']);
+    if(coreOwnedResearchOperations.has(operation)){
+      return coreCompletionGateService.evaluateCoreOwnedOperation(task,operation,'research');
+    }
     const coreOwnedAutonomyOperations=new Set(['SAVE_AUTONOMY_CONFIG']);
     if(coreOwnedAutonomyOperations.has(operation)){
       routes.push({

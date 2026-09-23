@@ -1,5 +1,4 @@
 import { coreTaskIngressService } from '../services/coreTaskIngressService';
-import { researchService } from '../../research/services/researchService';
 import { unifiedWebResearchService, type AutonomousSearchConfig, type AutonomousSearchStats } from '../../research/services/unifiedWebResearchService';
 import { bannedTopicsConfigService, type BannedTopicsConfig } from '../../safety/services/bannedTopicsConfigService';
 import { nativeWorkManagerService } from '../../execution/services/nativeWorkManagerService';
@@ -77,8 +76,21 @@ class TypedResearchUiGatewayService {
   }
 
   public async executeSearch(query: string, options: Parameters<typeof unifiedWebResearchService.executeSearch>[1]) {
-    await this.authorize('EXECUTE_AUTONOMOUS_SEARCH', { query, options });
-    return researchService.executeSearch(query, options);
+    const result = await coreTaskIngressService.submit({
+      kind: 'USER_REQUEST',
+      goal: `Research UI requested EXECUTE_AUTONOMOUS_SEARCH: ${query}`,
+      source: 'conversation',
+      payload: { operation: 'EXECUTE_AUTONOMOUS_SEARCH', query, options, sourceScreenId: 'AutonomousSearchTab' },
+      maxCycles: 18,
+    });
+    if (result.task.status !== 'COMPLETED') throw new Error(`CORE_COMPLETION_REQUIRED:${result.task.status}`);
+    const entry = [...result.task.entries].reverse().find(e => e.kind === 'RESULT' && e.key.includes('domainResult:research:RUN_RESEARCH'));
+    const value = entry?.value;
+    if (!value || typeof value !== 'object') throw new Error('RESEARCH_RESULT_MISSING');
+    const reply = (value as Record<string, unknown>).reply;
+    const data = reply && typeof reply === 'object' ? (reply as Record<string, unknown>).data : undefined;
+    if (!data || typeof data !== 'object') throw new Error('RESEARCH_RESULT_DATA_MISSING');
+    return data;
   }
 
   public async learnFromSearch(...args: Parameters<typeof unifiedWebResearchService.learnFromSearch>) {

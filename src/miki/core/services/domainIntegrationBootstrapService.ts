@@ -86,8 +86,14 @@ class DomainIntegrationBootstrapService{
   if(domain==='research'&&envelope.command==='RUN_RESEARCH'){
    const {researchService}=await import('../../research/services/researchService');
    const {knowledgeGapService}=await import('../../unknown/services/knowledgeGapService');
-   const gap=knowledgeGapService.getById(String(envelope.payload.gapId||''));
-   if(!gap)return {accepted:false,domain,command:envelope.command,error:'KNOWLEDGE_GAP_NOT_FOUND',completedAt:Date.now()};
+   const gapId=String(envelope.payload.gapId||'');
+   const gap=gapId?knowledgeGapService.getById(gapId):undefined;
+   const query=typeof envelope.payload.query==='string'?envelope.payload.query.trim():'';
+   if(!gap&&!query)return {accepted:false,domain,command:envelope.command,error:'RESEARCH_QUERY_OR_GAP_REQUIRED',completedAt:Date.now()};
+   if(!gap&&query){
+    const result=await researchService.executeSearch(query, typeof envelope.payload.options==='object'&&envelope.payload.options!==null ? envelope.payload.options as any : undefined);
+    return done({operation:'EXECUTE_AUTONOMOUS_SEARCH',operationClass:'BUSINESS',status:'SUCCEEDED',...result,evidenceIds:[]});
+   }
    const adaptive = envelope.payload.adaptive !== false;
    const requestedQuery = typeof envelope.payload.query === 'string' ? envelope.payload.query.trim() : '';
    const requestedRound = Number.isFinite(Number(envelope.payload.continuationRound))
