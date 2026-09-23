@@ -240,8 +240,17 @@ class DomainIntegrationBootstrapService{
    const operationInstanceId=String(envelope.payload.operationInstanceId||pkg.operationInstanceId||'');
    if(!receipt||receipt==='UNAVAILABLE')return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_REQUIRED',completedAt:Date.now()};
    if(!persistenceReceiptLedgerService.get(receipt))return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_NOT_FOUND',completedAt:Date.now()};
+   const beforeApply=selfCodeSpaceService.get();
+   if(!beforeApply)return {accepted:false,domain,command:envelope.command,error:"SELF_CODE_SPACE_NOT_SYNCED",completedAt:Date.now()};
    const applied=selfCodeSpaceService.applyCandidate(workspace.files.map(file=>({path:file.path,baselineSha256:file.baselineSha256,candidateContent:file.candidateContent})));
-   const result=await isolatedCandidateWorkspaceService.commitWithReceipt(workspace.workspaceId,receipt,operationInstanceId);
+   let result;
+   try{
+    result=await isolatedCandidateWorkspaceService.commitWithReceipt(workspace.workspaceId,receipt,operationInstanceId);
+   }catch(error){
+    try{selfCodeSpaceService.restoreSnapshot(beforeApply,applied.repoSha256);}
+    catch(recoveryError){return {accepted:false,domain,command:envelope.command,error:"SELF_CODE_SPACE_RECOVERY_REQUIRED",completedAt:Date.now()};}
+    throw error;
+   }
    reviewZipExportService.updateStatus(packageId,'ACCEPTED');
    return done({operation:'APPROVE_REVIEWED_CANDIDATE',operationClass:'BUSINESS',status:'SUCCEEDED',packageId,workspaceId:workspace.workspaceId,transactionId:result.transaction.transactionId,candidateManifestSha256:result.transaction.candidateManifestSha256,selfCodeRevisionSha256:applied.repoSha256,evidenceIds:[...new Set(result.workspace.files.flatMap(file=>file.evidenceIds))],receiptIds:[receipt]});
   }

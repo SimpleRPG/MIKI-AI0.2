@@ -138,6 +138,15 @@ class SelfCodeSpaceService {
     return this.clone(clean);
   }
 
+  restoreSnapshot(snapshot: SelfCodeSnapshot, expectedCurrentRepoSha256: string): SelfCodeSnapshot {
+    const current=this.get();
+    if(!current) throw new Error("SELF_CODE_SPACE_NOT_SYNCED");
+    if(current.repoSha256!==expectedCurrentRepoSha256) throw new Error("SELF_CODE_SPACE_RESTORE_CONFLICT");
+    if(snapshot.repository!==current.repository||snapshot.branch!==current.branch) throw new Error("SELF_CODE_SPACE_RESTORE_TARGET_MISMATCH");
+    storageService.setItem(KEY,JSON.stringify(snapshot));
+    return this.clone(snapshot);
+  }
+
   search(query: string, limit = 20): SelfCodeFile[] {
     const q = query.trim().toLowerCase();
     if (!q) return [];
