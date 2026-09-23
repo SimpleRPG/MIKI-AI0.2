@@ -1,6 +1,6 @@
 # MIKI-AI 18分類 設計思想・実装指示
 
-## 1. 文書の目的と正本
+## 文書の目的と正本
 
 この文書は、MIKI-AIの現行アーキテクチャ、責務境界、実装判断、受入条件を定義するLiving Specificationである。
 
@@ -14,9 +14,9 @@
 過去の作業指示書、版別実装レポート、移行履歴、修正ログ、旧設計思想文書は現在の設計の正本にしない。
 作業履歴はGit履歴、CI Artifact、監査JSON等で追跡する。
 
-## 2. 基本原則
+## 基本原則
 
-### 2.1 18分類
+### 18分類
 
 MIKI-AIは、COREと17の専門分類から成る18分類構造を使用する。
 
@@ -42,7 +42,7 @@ MIKI-AIは、COREと17の専門分類から成る18分類構造を使用する�
 COREも分類の一つとしてコード上に存在するが、実行上は18分類全体の中央統括を担当する。
 17専門分類は、それぞれの責務に従って専門処理を担当する。
 
-### 2.2 COREが次の処理を選ぶ
+### COREが次の処理を選ぶ
 
 MIKI-AIは、18分類を固定順序で一周する構造ではない。
 
@@ -59,11 +59,11 @@ MIKI-AIは、18分類を固定順序で一周する構造ではない。
 
 全分類を一括確認する処理は、起動監査・整合性監査・手動診断などに限定する。
 
-## 3. CORE
+## CORE
 
 COREは、MIKI-AIの入口、判断、再評価、終了を統括する。
 
-### 3.1 COREの責務
+### COREの責務
 
 COREは次を管理する。
 
@@ -84,7 +84,7 @@ COREは次を管理する。
 COREは専門分類の内部データを直接書き換えない。
 専門処理は分類の公開入口へDomain Commandとして依頼する。
 
-### 3.2 COREの基本ループ
+### COREの基本ループ
 
 正規の業務処理は次の考え方で動く。
 
@@ -101,7 +101,7 @@ UI / Event / Autonomous Trigger / External Directive
 
 ここで「次の分類」は固定された順番ではなく、その時点のBlackboardからCOREが決定する。
 
-## 4. 17専門分類の責務
+## 17専門分類の責務
 
 ### autonomy
 自律実行、定期実行、バックグラウンド処理、実行予算を担当する。
@@ -155,7 +155,7 @@ Blackboardの状態から計画案、優先度、代替案を作る。
 ### verification
 Evidence、Claim、反証、型、回帰、一般化、永続化、端末検査を担当する。
 
-## 5. 分類間連携
+## 分類間連携
 
 分類間連携は、固定された直結チェーンではなく、COREを中心としたCommand / Result方式を基本とする。
 
@@ -169,11 +169,11 @@ Evidence、Claim、反証、型、回帰、一般化、永続化、端末検査�
 分類が別分類の内部実装を直接操作することは原則として避ける。
 既存の直接呼出しは、発見しただけで即削除せず、責務・契約・副作用・Blackboard帰還方法を確認してから整理する。
 
-## 6. Research
+## Research
 
 Research分類の正規オーケストレーターはResearchServiceとする。
 
-### 6.1 ResearchService
+### ResearchService
 
 ResearchServiceはResearch全体を統合する。
 
@@ -189,7 +189,7 @@ ResearchServiceはResearch全体を統合する。
 - continuation状態
 - Research Outcome
 
-### 6.2 Web検索層
+### Web検索層
 
 UnifiedWebResearchServiceはResearchの第二正本ではない。
 Web検索技術へのFacadeとして、検索実行、結果ページ取得、設定、統計、低レベルWeb操作を担当する。
@@ -207,7 +207,7 @@ CORE
 
 とする。
 
-### 6.3 Research結果とCORE再評価
+### Research結果とCORE再評価
 
 Researchの検索結果は、そのまま最終的な真実にはしない。
 
@@ -218,7 +218,7 @@ Research内部の安全上限を、探索全体の固定回数制限とは解釈
 
 検索結果はEvidence候補であり、既存のVerification境界を通過した結果だけがKnowledge利用可能状態へ進む。
 
-### 6.4 Researchの直接呼出し監査
+### Researchの直接呼出し監査
 
 UI、Unknown、Memory、Capability、Autonomy、Background処理などがResearch業務を要求する場合、原則としてCORE Task Ingressから入り、COREがResearch分類を選択する。
 
@@ -233,7 +233,7 @@ UI、Unknown、Memory、Capability、Autonomy、Background処理などがResearc
 
 結果契約や副作用を確認せずに削除・置換しない。
 
-### 6.5 Research実行境界
+### Research実行境界
 
 COREによる認証・受付と、COREによる業務実行は別物として扱う。
 
@@ -276,7 +276,7 @@ Research結果は再びCOREのBlackboardへ戻し、COREが次のUnknown、Verif
 
 Unknownの「検索が必要」という判定と、Researchの「検索を実行する」という処理を同一処理として扱わない。
 
-## 7. 自己改善
+## 自己改善
 
 自己改善の本番コード自動適用は行わない。
 自律処理の安全な終点は、レビュー待ち累積ZIPの作成までとする。
@@ -308,7 +308,35 @@ Unknownの「検索が必要」という判定と、Researchの「検索を実�
 
 GitHubへのpushは通常機能として残すが、自己改善ループから本番コードを自動pushしない。
 
-## 8. Evidenceと完了条件
+### 自己改善の現在実装境界
+
+自己改善は、本番コードを直接変更する処理ではなく、改善要求をCOREへ渡し、必要な18分類をCOREが選択し、Candidateを隔離して検証し、レビュー可能な成果物まで到達させる自律処理として扱う。
+
+SelfImprovementIngressServiceは入口を正規化し、ChangeSetID等の系譜情報を付与してAutonomousSelfImprovementLoopServiceへ渡す。
+
+AutonomousSelfImprovementLoopServiceは永続Queue、Task、attempt、pause、resume、resource wait、evidence wait、retry、failure recoveryを管理する。専門的な改善判断をこのLoopへ集約しない。
+
+Queueへ入った自己改善TaskはCoreTaskIngressServiceを経由してCOREへ渡す。COREはBlackboardを基準に必要な分類を選択する。自己改善専用の固定順序を作らない。
+
+AutonomousIssueDiscoveryServiceは、実行失敗、Knowledge Gap、Capability Gap、停滞Task、Domain Disconnect、Claim矛盾、Improvement Debt等から改善候補を発見する。発見したIssueは即コード変更せず、自己改善要求としてCOREへ渡す。
+
+コード変更が必要になった場合はIsolatedCandidateWorkspaceServiceでBaselineとCandidateを分離する。CandidateにはworkspaceId、issueId、runId、writeGuard、Baseline hash、Candidate hash、対象ファイル、Evidenceを紐付ける。
+
+CandidateValidationRunnerService等による検証は、単なるファイル生成確認ではなく、static、typecheck、regression、counterexample、generalization、persistence、device、Evidence整合性等を個別のEvidenceとして残す。ComplexityCostGateも候補評価の一部とする。
+
+ShadowEvaluation後の採用可能性はSinglePromotionGateServiceに集約する。Candidate hash、Validation Evidence、Shadow結果を確認し、別経路から採用可能状態へ進めない。
+
+レビュー成果物はReviewZipExportServiceを正規の成果物化経路とする。複数Candidateを累積する場合はCumulativeRevalidationServiceで同一ファイルの競合と累積状態を検査する。
+
+外部AIや利用者からの作業指示はExternalDirectiveIntakeServiceでDirectiveとして正規化する。指示本文をそのまま実行命令とせず、objective、target files、requirements、prohibitions、invariants、validation requirements、delivery requirements、source hash等を保持する。
+
+自己改善の完了状態は「コードを書いた」「Candidateを作った」「Promotion Gateを通った」「ZIPを作った」のどれか一つではない。検証済みCandidate、系譜、hash、Evidence、レビュー成果物が揃い、レビュー待ちとして固定された時点を自律改善サイクルの安全な終点とする。
+
+本番コードへの自動適用および自己改善ループからの本番pushは行わない。採用、拒否、修正、追加調査はレビュー後の別段階としてCOREへ戻せる。
+
+自己改善の自律性とは、本番コードを勝手に書き換えることではなく、発見、要求化、COREによる分類選択、調査、Candidate生成、検証、再計画、待機、成果物化、レビュー引渡しまでを人間の逐次操作なしで進められることを意味する。
+
+## Evidenceと完了条件
 
 次だけでは完了と判定しない。
 
@@ -330,7 +358,7 @@ EXISTENCE
 安全側ではPARTIALから開始する。
 taskId、correlationId、artifactHash、verification Evidence、検証環境、必要な検査結果が揃った場合だけ完了へ進める。
 
-## 9. ユーザー反応
+## ユーザー反応
 
 ユーザー反応は重要なEvidenceだが、単独で最終真実にはしない。
 
@@ -340,7 +368,7 @@ taskId、correlationId、artifactHash、verification Evidence、検証環境、�
 - ユーザーの訂正も、既存Claim、辞書、公式情報、実行結果等と照合する。
 - 未知語や矛盾があればUNKNOWNまたはCONFLICTEDとして追加調査へ戻す。
 
-## 10. Memory
+## Memory
 
 アプリから見た記憶の正本は単一Memory Repository契約とする。
 
@@ -351,7 +379,7 @@ taskId、correlationId、artifactHash、verification Evidence、検証環境、�
 - retrieval、usage、execution success、validation success、ユーザー反応を別指標として扱う。
 - quarantine、discard candidate、inactive、expired、superseded、pending revalidationは、回答、自己改善、クラウド送信、exportから遮断する。
 
-## 11. 会話と言語
+## 会話と言語
 
 日本語解析は役割の異なる決定論的部品を組み合わせる。
 
@@ -363,7 +391,7 @@ Sudachi Native
 通常会話では検証済み部品を制限時間内で組み合わせる。
 未研究の組合せはバックグラウンド研究で候補化し、意味保持、反証、複数観測を経て昇格させる。
 
-## 12. 外部知識と外部AI
+## 外部知識と外部AI
 
 既存Claim、Memory、Web検索、公式資料、実行試験、外部AIの情報源を区別する。
 
@@ -376,7 +404,7 @@ Sudachi Native
 
 外部AIの回答はCLOUD_AI Evidenceとして保存し、直ちに検証済み知識へ昇格させない。
 
-## 13. ローカルLLM
+## ローカルLLM
 
 旧GGUF、llama.cpp、WebLLM等のローカル生成ランタイムは、現在のMIKI-AIの通常経路として使用しない。
 
@@ -385,7 +413,7 @@ Sudachi Native
 ローカルLLM再導入禁止の監査規則と退役試験は保持してよい。
 旧実行コード、旧設定UI、旧モデル読込み、旧案内文、旧互換層は、参照がなくなり安全に退役できることを確認した上で削除する。
 
-## 14. UI
+## UI
 
 スマートフォンを第一対象とする。
 
@@ -402,7 +430,7 @@ Sudachi Native
 UIは表示専用状態までCOREへ集中させない。
 永続状態、業務状態、改善状態、外部作用を伴う操作はCORE経由を原則とする。
 
-## 15. 重複と複雑性
+## 重複と複雑性
 
 同じ責務のController、Coordinator、Router、Gate、Repository、保存キー、イベントを増やさない。
 
@@ -421,7 +449,7 @@ UIは表示専用状態までCOREへ集中させない。
 
 複雑性コストとして、新規ファイル、Public API、保存キー、イベント、依存辺、変更行数を確認する。
 
-## 16. 変更判断
+## 変更判断
 
 設計と実装の不一致は、次の4種類に分類する。
 
@@ -436,7 +464,7 @@ UIは表示専用状態までCOREへ集中させない。
 実装の進展で設計が古くなった場合は、先にこの文書を更新してからコードを変更する。
 双方に問題がある場合は、設計を整理してからコードを変更する。
 
-## 17. 実装・検証・GitHubの流れ
+## 実装・検証・GitHubの流れ
 
 変更は次の順序で確認する。
 
@@ -454,7 +482,7 @@ UIは表示専用状態までCOREへ集中させない。
 
 GitHub mainに存在しない変更を、存在すると仮定して次の変更へ進まない。
 
-## 18. 必須監査項目
+## 必須監査項目
 
 18分類全体に変更を加える場合、または分類境界に関係する変更では、少なくとも次を確認する。
 
@@ -509,7 +537,7 @@ GitHub mainに存在しない変更を、存在すると仮定して次の変更
 - ZIPが破損していない
 - ZIP内TXTと実体が一致している
 
-## 19. Living Specificationとしての維持
+## Living Specificationとしての維持
 
 この文書は作業履歴ではなく、現在有効な設計・制約・受入条件だけを保持する。
 
