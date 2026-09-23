@@ -2165,159 +2165,326 @@ ${activeGameCode}
 // GitHub Import Endpoint
 app.post('/api/github/import', async (req, res) => {
   try {
-    const { repoUrl, branch, githubToken } = req.body;
-    let cleanRepo = repoUrl.replace('https://github.com/', '').replace('.git', '').trim();
-    if (cleanRepo.endsWith('/')) cleanRepo = cleanRepo.slice(0, -1);
+    const {
+      repoUrl,
+      branch = 'main',
+      token,
+      knownFiles = []
+    } = req.body || {};
 
-    const headers: Record<string, string> = {
-      'User-Agent': 'Miki-AI-Studio',
-      'Accept': 'application/vnd.github.v3+json'
+    if (!repoUrl) {
+      return res.status(400).json({
+        error: 'repoUrl is required'
+      });
+    }
+
+    const match = String(repoUrl)
+      .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/\.git$/i, '')
+      .replace(/\/+$/g, '')
+      .split('/');
+
+    if (match.length < 2) {
+      return res.status(400).json({
+        error: 'Invalid GitHub repository'
+      });
+    }
+
+    const [owner, repo] = match;
+    const headers: Record<string,string> = {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'MIKI-AI0.2'
     };
-    if (githubToken) {
-      headers['Authorization'] = `token ${githubToken}`;
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
 
-    const repoRes = await fetch(`https://api.github.com/repos/${cleanRepo}`, { headers });
-    if (!repoRes.ok) {
-      throw new Error(`リポジトリが見つかりません (${repoRes.statusText})`);
-    }
-    const repoInfo = await repoRes.json();
-    const defaultBranch = branch || repoInfo.default_branch || 'main';
+    const api = async (url: string, options: RequestInit = {}) => {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...headers,
+          ...(options.headers || {})
+        }
+      });
 
-    const treeRes = await fetch(`https://api.github.com/repos/${cleanRepo}/git/trees/${defaultBranch}?recursive=1`, { headers });
-    if (!treeRes.ok) {
-      throw new Error(`ツリー情報の取得に失敗しました`);
-    }
-    const treeData = await treeRes.json();
+      if (!response.ok) {
+        throw new Error(
+          `GitHub API ${response.status}: ${await response.text()}`
+        );
+      }
 
-    // 自己コードスペースはGitHub正本の全blobを参照対象にする。
-    // 拡張子・件数による人工的な参照制限は設けない。
-    const fileEntries = (treeData.tree || [])
-      .filter((item: any) => item.type === 'blob');
+      return response.json();
+    };
 
-    const loadedFiles = await Promise.all(
-      fileEntries.map(async (item: any) => {
-        try {
-          const rawRes = await fetch(`https://raw.githubusercontent.com/${cleanRepo}/${defaultBranch}/${item.path}`, { headers });
-          if (rawRes.ok) {
-            const content = await rawRes.text();
-            return { path: item.path, content };
-          }
-        } catch (e) {}
-        return null;
-      })
+    const repoInfo = await api(
+      `https://api.github.com/repos/${owner}/${repo}`
     );
 
-    const validFiles = loadedFiles.filter(Boolean);
+    const branchInfo = await api(
+      `https://api.github.com/repos/${owner}/${repo}/branches/${encodeURIComponent(branch)}`
+    );
 
-    res.json({
-      repoName: cleanRepo,
-      owner: repoInfo.owner?.login || '',
+    const commitSha = branchInfo.commit.sha;
+    const treeSha = branchInfo.commit.commit.tree.sha;
+
+    const tree = await api(
+      `https://api.github.com/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`
+    );
+
+    const manifest = (tree.tree || [])
+      .filter((item: any) => item.type === 'blob')
+      .map((item: any) => ({
+        path: item.path,
+        blobSha: item.sha
+      }));
+
+    const known = new Map(
+      (Array.isArray(knownFiles) ? knownFiles : [])
+        .map((item: any) => [
+          item.path,
+          item
+        ])
+    );
+
+    const changedFiles: Array<{
+      path: string;
+      content: string;
+      blobSha: string;
+    }> = [];
+
+    for (const item of manifest) {
+      const old = known.get(item.path);
+
+      if (old?.blobSha === item.blobSha) {
+        continue;
+      }
+
+      const blob = await api(
+        `https://api.github.com/repos/${owner}/${repo}/git/blobs/${item.blobSha}`
+      );
+
+      let content = '';
+
+      if (blob.encoding === 'base64') {
+        content = Buffer.from(
+          String(blob.content || '').replace(/\n/g, ''),
+          'base64'
+        ).toString('utf8');
+      } else {
+        content = String(blob.content || '');
+      }
+
+      changedFiles.push({
+        path: item.path,
+        content,
+        blobSha: item.blobSha
+      });
+    }
+
+    const remotePaths = new Set(
+      manifest.map((item: any) => item.path)
+    );
+
+    const deletedPaths = (Array.isArray(knownFiles)
+      ? knownFiles
+      : []
+    )
+      .map((item: any) => item.path)
+      .filter((path: string) => !remotePaths.has(path));
+
+    return res.json({
+      success: true,
+      repoName: repoInfo.name,
+      owner,
       stars: repoInfo.stargazers_count || 0,
       description: repoInfo.description || '',
-      branch: defaultBranch,
-      files: validFiles
+      commitSha,
+      treeSha,
+      manifest,
+      changedFiles,
+      files: changedFiles,
+      deletedPaths,
+      truncated: tree.truncated === true
     });
   } catch (error: any) {
-    console.error('Error in /api/github/import:', error);
-    res.status(500).json({ error: error.message || 'GitHub import failed' });
+    return res.status(500).json({
+      error: error?.message || 'GitHub import error'
+    });
   }
 });
 
-// GitHub Push Endpoint
+// GitHub delta PUSH Endpoint
 app.post('/api/github/push', async (req, res) => {
   try {
-    const { repoUrl, branch = 'main', commitMessage, files, githubToken, createRepoIfMissing } = req.body;
-    if (!githubToken) {
-      return res.status(400).json({ error: 'GitHub PATトークンが必要です' });
+    const {
+      repoUrl,
+      branch = 'main',
+      commitMessage,
+      files = [],
+      deletedPaths = [],
+      expectedBaseCommitSha,
+      githubToken
+    } = req.body || {};
+
+    if (!repoUrl || !githubToken) {
+      return res.status(400).json({
+        error: 'repoUrl and githubToken are required'
+      });
     }
 
-    let cleanRepo = repoUrl.replace('https://github.com/', '').replace('.git', '').trim();
-    if (cleanRepo.endsWith('/')) cleanRepo = cleanRepo.slice(0, -1);
+    const match = String(repoUrl)
+      .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/\.git$/i, '')
+      .replace(/\/+$/g, '')
+      .split('/');
 
-    const headers: Record<string, string> = {
-      'User-Agent': 'Miki-AI-Studio',
-      'Accept': 'application/vnd.github.v3+json',
-      'Authorization': `token ${githubToken}`
+    if (match.length < 2) {
+      return res.status(400).json({
+        error: 'Invalid GitHub repository'
+      });
+    }
+
+    const [owner, repo] = match;
+
+    const headers: Record<string,string> = {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${githubToken}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'MIKI-AI0.2'
     };
 
-    // Check user info
-    const userRes = await fetch('https://api.github.com/user', { headers });
-    if (!userRes.ok) {
-      throw new Error('トークンが無効です。GitHub Personal Access Token を確認してください。');
-    }
-    const userData = await userRes.json();
-    const username = userData.login;
-
-    let targetOwner = username;
-    let targetRepoName = cleanRepo;
-    if (cleanRepo.includes('/')) {
-      const parts = cleanRepo.split('/');
-      targetOwner = parts[0];
-      targetRepoName = parts[1];
-    }
-
-    // Check if repo exists
-    let repoCheck = await fetch(`https://api.github.com/repos/${targetOwner}/${targetRepoName}`, { headers });
-    if (!repoCheck.ok && createRepoIfMissing) {
-      const createRes = await fetch('https://api.github.com/user/repos', {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: targetRepoName,
-          description: 'Created with Miki AI Partner & Autonomous Studio',
-          private: false,
-          auto_init: true
-        })
-      });
-      if (!createRes.ok) {
-        throw new Error(`新規リポジトリの作成に失敗しました: ${createRes.statusText}`);
-      }
-      await new Promise(resolve => setTimeout(resolve, 1500));
-    }
-
-    // Push files using Contents API
-    let commitSha = 'sha-' + Date.now().toString(16);
-    for (const f of files) {
-      const filePath = f.path.startsWith('/') ? f.path.slice(1) : f.path;
-      // Check existing sha
-      let existingSha: string | undefined;
-      const getFileRes = await fetch(`https://api.github.com/repos/${targetOwner}/${targetRepoName}/contents/${filePath}?ref=${branch}`, { headers });
-      if (getFileRes.ok) {
-        const fileData = await getFileRes.json();
-        existingSha = fileData.sha;
-      }
-
-      const putRes = await fetch(`https://api.github.com/repos/${targetOwner}/${targetRepoName}/contents/${filePath}`, {
-        method: 'PUT',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: commitMessage || 'Update code by Miki AI',
-          content: Buffer.from(f.content, 'utf8').toString('base64'),
-          branch,
-          ...(existingSha ? { sha: existingSha } : {})
-        })
+    const api = async (
+      url: string,
+      method = 'GET',
+      body?: any
+    ) => {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: body === undefined
+          ? undefined
+          : JSON.stringify(body)
       });
 
-      if (putRes.ok) {
-        const putData = await putRes.json();
-        if (putData.commit?.sha) {
-          commitSha = putData.commit.sha;
+      const text = await response.text();
+
+      if (!response.ok) {
+        throw new Error(
+          `GitHub API ${response.status}: ${text}`
+        );
+      }
+
+      return text ? JSON.parse(text) : {};
+    };
+
+    const ref = await api(
+      `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`
+    );
+
+    const remoteCommitSha = ref.object.sha;
+
+    if (
+      expectedBaseCommitSha &&
+      expectedBaseCommitSha !== remoteCommitSha
+    ) {
+      return res.status(409).json({
+        error: 'GITHUB_SYNC_CONFLICT',
+        message: 'GitHub側が前回同期後に変更されています。',
+        remoteCommitSha
+      });
+    }
+
+    if (
+      (!Array.isArray(files) || files.length === 0) &&
+      (!Array.isArray(deletedPaths) || deletedPaths.length === 0)
+    ) {
+      return res.json({
+        success: true,
+        commitSha: remoteCommitSha,
+        treeSha: ref.object.sha,
+        changedFilesMeta: []
+      });
+    }
+
+    const blobCache = new Map<string,string>();
+
+    for (const file of Array.isArray(files) ? files : []) {
+      const blob = await api(
+        `https://api.github.com/repos/${owner}/${repo}/git/blobs`,
+        'POST',
+        {
+          content: String(file.content ?? ''),
+          encoding: 'utf-8'
         }
-      }
+      );
+
+      blobCache.set(file.path, blob.sha);
     }
 
-    res.json({
+    const treeEntries = [
+      ...(Array.isArray(files)
+        ? files.map((file: any) => ({
+            path: file.path,
+            mode: '100644',
+            type: 'blob',
+            sha: blobCache.get(file.path)
+          }))
+        : []),
+      ...(Array.isArray(deletedPaths)
+        ? deletedPaths.map((path: string) => ({
+            path,
+            mode: '100644',
+            type: 'blob',
+            sha: null
+          }))
+        : [])
+    ];
+
+    const tree = await api(
+      `https://api.github.com/repos/${owner}/${repo}/git/trees`,
+      'POST',
+      {
+        base_tree: remoteCommitSha,
+        tree: treeEntries
+      }
+    );
+
+    const commit = await api(
+      `https://api.github.com/repos/${owner}/${repo}/git/commits`,
+      'POST',
+      {
+        message:
+          String(commitMessage || 'Update via Miki AI Partner Studio'),
+        tree: tree.sha,
+        parents: [remoteCommitSha]
+      }
+    );
+
+    await api(
+      `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`,
+      'PATCH',
+      {
+        sha: commit.sha,
+        force: false
+      }
+    );
+
+    return res.json({
       success: true,
-      commitSha,
-      filesCount: files.length,
-      branch,
-      commitUrl: `https://github.com/${targetOwner}/${targetRepoName}/commit/${commitSha}`,
-      branchUrl: `https://github.com/${targetOwner}/${targetRepoName}/tree/${branch}`
+      commitSha: commit.sha,
+      treeSha: tree.sha,
+      changedFilesMeta: (Array.isArray(files) ? files : [])
+        .map((file: any) => ({
+          path: file.path,
+          blobSha: blobCache.get(file.path)
+        }))
     });
   } catch (error: any) {
-    console.error('Error in /api/github/push:', error);
-    res.status(500).json({ error: error.message || 'GitHub push failed' });
+    return res.status(500).json({
+      error: error?.message || 'GitHub push error'
+    });
   }
 });
 

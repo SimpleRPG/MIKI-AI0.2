@@ -52,9 +52,6 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [fetchedRepo, setFetchedRepo] = useState<GitHubRepoData | null>(null);
-  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(
-    () => new Set(workspaceFiles.map((f) => f.path))
-  );
 
   const [unknownRecords, setUnknownRecords] = useState<UnknownResolution[]>(() => typedGitHubUiGatewayService.unknown.list(8));
   const [domainCoverage, setDomainCoverage] = useState<DomainCoverage[]>(() => typedGitHubUiGatewayService.circulation.getCoverage());
@@ -124,15 +121,6 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
       return next;
     });
   }, [workspaceFiles]);
-
-  const toggleFile = (path: string) => {
-    setSelectedPaths((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  };
 
   const handleImport = async () => {
     if (!repoUrl.trim()) {
@@ -482,14 +470,14 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
                 <button
                   onClick={() =>
                     setSelectedPaths(
-                      selectedPaths.size === workspaceFiles.length
+                      workspaceFiles.length > 0
                         ? new Set()
                         : new Set(workspaceFiles.map((f) => f.path))
                     )
                   }
                   className="text-[10px] text-sky-400 hover:text-sky-300"
                 >
-                  {selectedPaths.size === workspaceFiles.length ? 'すべて解除' : 'すべて選択'}
+                  {workspaceFiles.length > 0 ? 'すべて解除' : 'すべて選択'}
                 </button>
               </div>
               {workspaceFiles.map((f) => (

@@ -10,6 +10,7 @@ import {
 } from '../types';
 import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
+import { githubSyncService } from './githubSyncService';
 import { privacyGuardrailService } from './privacyGuardrailService';
 import {
   nonLlmHardwarePipelineService,
@@ -745,14 +746,32 @@ export const apiService = {
   pushToGitHubRepo,
   importFromGitHub: async (params: { token?: string; repoUrl: string; branch?: string }) => {
     try {
-      const data = await importGitHubRepo(params.repoUrl, params.branch, params.token);
+      const repository = params.repoUrl;
+      const branch = params.branch || 'main';
+      const sync = githubSyncService.get(repository, branch);
+      const data = await importGitHubRepo(
+        repository,
+        branch,
+        params.token,
+        sync ? githubSyncService.knownFiles(repository, branch) : []
+      );
+      githubSyncService.applyImport(repository, branch, {
+        files: data.changedFiles || data.files || [],
+        manifest: data.manifest || [],
+        deletedPaths: data.deletedPaths || [],
+        commitSha: data.commitSha || '',
+        treeSha: data.treeSha || '',
+      });
+
+      const merged = githubSyncService.get(repository, branch);
+
       return {
         success: true,
         repoName: data.repoName,
         owner: data.owner,
         stars: data.stars,
         description: data.description,
-        files: data.files,
+        files: merged?.files || data.files || [],
       };
     } catch (e: any) {
       return {
@@ -764,13 +783,30 @@ export const apiService = {
   },
   pushToGitHub: async (params: { token: string; repoUrl: string; branch?: string; commitMessage: string; files: Array<{ path: string; content: string }> }) => {
     try {
+      const repository = params.repoUrl;
+      const branch = params.branch || 'main';
+      const delta = githubSyncService.preparePush(
+        repository,
+        branch,
+        params.files
+      );
+
       const data = await pushToGitHubRepo({
-        repoUrl: params.repoUrl,
-        branch: params.branch || 'main',
+        repoUrl: repository,
+        branch,
         commitMessage: params.commitMessage,
-        files: params.files,
+        files: delta.changedFiles,
+        deletedPaths: delta.deletedPaths,
+        expectedBaseCommitSha: delta.expectedBaseCommitSha,
         githubToken: params.token,
       });
+
+      githubSyncService.applyPushResult(
+        repository,
+        branch,
+        params.files,
+        data
+      );
       return {
         success: true,
         commitSha: data.commitSha,
