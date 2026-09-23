@@ -8,7 +8,7 @@ import { mikiUnifiedLearningContinuumService } from '../../learning/services/mik
 import { webTermLearningService } from './webTermLearningService';
 import { researchQueryPlanningService } from './researchQueryPlanningService';
 import { researchQueryOutcomeLearningService } from './researchQueryOutcomeLearningService';
-import { webResearchPolicyService } from './webResearchPolicyService';
+import { webResearchPolicyService, WebResearchProgress } from './webResearchPolicyService';
 
 export type { ResearchRoute };
 
@@ -348,7 +348,8 @@ export class ResearchService {
         }
 
         const webResearchPolicy = webResearchPolicyService.get();
-        const webResearchProgress = { acceptedIndependentSourceCount: new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)).size, candidateUrlsChecked: results.filter(result => !!result.url).length, renderedPages: readResults.filter(page => page.success && !!page.text.trim()).length, supportingSourceCount: verification.filter(result => result.outcome === "SUPPORTED" || result.outcome === "DEVICE_VERIFIED").length, counterEvidenceSourceCount: evidence.filter(item => item.status !== "REJECTED" && item.metadata?.research_source_role === "COUNTEREVIDENCE").length, primarySourceSatisfied: evidence.some(item => item.status !== "REJECTED" && (item.metadata?.research_source_role === "PRIMARY" || (item.metadata?.research_source_role === "OFFICIAL" && item.metadata?.research_source_tier_target === "PRIMARY_OR_OFFICIAL"))), counterEvidenceSearchCompleted: queryPlan.status === "READY" && queryPlan.queries.slice(0, pass + 1).some(query => query.intentType === "COUNTEREVIDENCE" && evidence.some(item => item.status !== "REJECTED" && !!item.url)), excludedDuplicateCount: 0, rejectedQualityCount: evidence.filter(item => item.status === "REJECTED").length, conflictingEvidence: verification.some(result => result.outcome === "CONTRADICTED") };
+        let latestWebResearchProgress: WebResearchProgress | undefined;
+        const webResearchProgress: WebResearchProgress = { acceptedIndependentSourceCount: new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)).size, candidateUrlsChecked: results.filter(result => !!result.url).length, renderedPages: readResults.filter(page => page.success && !!page.text.trim()).length, supportingSourceCount: verification.filter(result => result.outcome === "SUPPORTED" || result.outcome === "DEVICE_VERIFIED").length, counterEvidenceSourceCount: evidence.filter(item => item.status !== "REJECTED" && item.metadata?.research_source_role === "COUNTEREVIDENCE").length, primarySourceSatisfied: evidence.some(item => item.status !== "REJECTED" && (item.metadata?.research_source_role === "PRIMARY" || (item.metadata?.research_source_role === "OFFICIAL" && item.metadata?.research_source_tier_target === "PRIMARY_OR_OFFICIAL"))), counterEvidenceSearchCompleted: queryPlan.status === "READY" && queryPlan.queries.slice(0, pass + 1).some(query => query.intentType === "COUNTEREVIDENCE" && evidence.some(item => item.status !== "REJECTED" && !!item.url)), excludedDuplicateCount: 0, rejectedQualityCount: evidence.filter(item => item.status === "REJECTED").length, conflictingEvidence: verification.some(result => result.outcome === "CONTRADICTED") };
 
         const evidenceFingerprint = [...new Set(evidence.map(item => `${item.source_id}|${item.independence_cluster_id}|${item.url}`))]
           .sort()
@@ -412,19 +413,9 @@ export class ResearchService {
       });
       const observedEvidenceCount = evidence.filter(item => item.status !== 'REJECTED').length;
       const hasAnyResults = observedEvidenceCount > 0 || claimIds.length > 0;
-      const coverageSatisfied = webResearchPolicyService.isSatisfied(
-        { acceptedIndependentSourceCount: new Set(evidence.filter(item => item.status !== 'REJECTED' && item.independence_cluster_id).map(item => item.independence_cluster_id)).size,
-          candidateUrlsChecked: searchResults.filter(result => !!result.url).length,
-          renderedPages: evidence.filter(item => item.status !== 'REJECTED' && item.metadata?.fetch_method === 'headless_webview').length,
-          supportingSourceCount: verification.filter(result => result.outcome === 'SUPPORTED' || result.outcome === 'DEVICE_VERIFIED').length,
-          counterEvidenceSourceCount: evidence.filter(item => item.status !== 'REJECTED' && item.metadata?.research_source_role === 'COUNTEREVIDENCE').length,
-          primarySourceSatisfied: evidence.some(item => item.status !== 'REJECTED' && (item.metadata?.research_source_role === 'PRIMARY' || (item.metadata?.research_source_role === 'OFFICIAL' && item.metadata?.research_source_tier_target === 'PRIMARY_OR_OFFICIAL'))),
-          counterEvidenceSearchCompleted: queryPlan.status === 'READY' && queryPlan.queries.some(query => query.intentType === 'COUNTEREVIDENCE'),
-          excludedDuplicateCount: 0,
-          rejectedQualityCount: evidence.filter(item => item.status === 'REJECTED').length,
-          conflictingEvidence: verification.some(result => result.outcome === 'CONTRADICTED') },
-        webResearchPolicyService.get()
-      );
+      const coverageSatisfied = latestWebResearchProgress
+        ? webResearchPolicyService.isSatisfied(latestWebResearchProgress, webResearchPolicyService.get())
+        : false;
       const outcome: ResearchOutcomeState = resolved
         ? 'EVIDENCE_FOUND'
         : hasAnyResults
