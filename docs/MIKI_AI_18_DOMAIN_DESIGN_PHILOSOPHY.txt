@@ -233,6 +233,23 @@ UI、Unknown、Memory、Capability、Autonomy、Background処理などがResearc
 
 結果契約や副作用を確認せずに削除・置換しない。
 
+### 6.5 Research実行境界
+
+COREによる認証・受付と、COREによる業務実行は別物として扱う。
+
+UI Gatewayや専門分類がCORE Task Ingressを呼んだ後、その同じ処理の中でResearchServiceやWeb検索実装を直接実行してはならない。
+CORE Task Ingressへの送信だけを行い、実際のResearch実行はCOREがResearch分類へDomain Commandとして配送する。
+
+Unknown分類は未知状態の分類、検索必要性の判定、Knowledge Gap生成などを担当できる。
+ただしResearch実行そのものはResearch分類の責務とし、UnknownからResearchService.executeSearch等を直接呼び出さない。
+
+Research UI Gatewayは設定・表示・受付の入口として機能できる。
+ただし「COREでauthorizeした後にGateway自身がResearchを実行する」構造はCORE経路とはみなさない。
+Research実行要求はCORE Taskとして渡し、Domain ResultをCOREから受け取る。
+
+ResearchService.executeSearch等の既存直接APIは、Research内部、低レベルWeb層、互換入口、診断経路を除き、業務実行入口として外部分類から直接利用しない。
+既存直接呼出しを整理するときは、結果契約、Evidence、Claim、continuation、エラー、Blackboard帰還を確認してから移行する。
+
 ## 7. 自己改善
 
 自己改善の本番コード自動適用は行わない。
@@ -425,6 +442,10 @@ GitHub mainに存在しない変更を、存在すると仮定して次の変更
 ### 経路
 
 - UI・イベント・自律トリガー・外部指示が必要な業務処理でCOREを迂回していない
+- CORE Task Ingressへの認証・受付だけで、業務実行をCORE経由と誤認していない
+- UI GatewayがCORE受付後に専門サービスを直接実行していない
+- UnknownがResearch実行を直接所有していない
+- Research実行はResearch Domain Commandから開始される
 - Domain CommandがCOREから配送される
 - Domain ResultがBlackboardへ戻る
 - COREがResultを再評価して次の処理を決定する
@@ -435,6 +456,9 @@ GitHub mainに存在しない変更を、存在すると仮定して次の変更
 - UnifiedWebResearchServiceが第二Research正本になっていない
 - AutonomousSearchServiceが低レベルWeb層として維持されている
 - 直接検索呼出しを責務ごとに監査している
+- UI Gatewayからの直接Research実行がない
+- Unknownからの直接Research実行がない
+- CORE認証後の直接Research実行をCORE経路として扱っていない
 - Research結果がCOREの再評価へ戻る
 - Research検索結果だけでKnowledgeを確定していない
 - Research関連の型・関数・結果収集が意図せず重複していない
