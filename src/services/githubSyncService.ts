@@ -315,7 +315,7 @@ class GitHubSyncService {
         previous?.treeSha ||
         ''
       ),
-      complete: previous?.complete === true,
+      complete: true,
       files: nextFiles,
       syncedAt: Date.now(),
     });

@@ -2442,11 +2442,15 @@ app.post('/api/github/push', async (req, res) => {
         : [])
     ];
 
+    const remoteCommit = await api(
+      `https://api.github.com/repos/${owner}/${repo}/git/commits/${remoteCommitSha}`
+    );
+
     const tree = await api(
       `https://api.github.com/repos/${owner}/${repo}/git/trees`,
       'POST',
       {
-        base_tree: remoteCommitSha,
+        base_tree: remoteCommit.tree.sha,
         tree: treeEntries
       }
     );

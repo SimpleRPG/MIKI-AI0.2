@@ -447,6 +447,8 @@ export interface GitHubPushParams {
   files: Array<{ path: string; content: string }>;
   githubToken: string;
   createRepoIfMissing?: boolean;
+  deletedPaths?: string[];
+  expectedBaseCommitSha?: string;
 }
 
 export interface GitHubPushResult {
@@ -693,12 +695,18 @@ export async function sendDebugRequest(
 export async function importGitHubRepo(
   repoUrl: string,
   branch?: string,
-  githubToken?: string
+  githubToken?: string,
+  knownFiles: Array<{ path: string; blobSha?: string; sha256?: string }> = []
 ): Promise<GitHubRepoData> {
   const res = await fetch(apiUrl('/api/github/import'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ repoUrl, branch, githubToken })
+    body: JSON.stringify({
+      repoUrl,
+      branch,
+      githubToken,
+      knownFiles,
+    })
   });
 
   if (!res.ok) {

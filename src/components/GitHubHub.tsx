@@ -110,17 +110,6 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
     } catch (e) {}
   };
 
-  // ワークスペースのファイルが増減したら選択状態を追従させる
-  useEffect(() => {
-    setSelectedPaths((prev) => {
-      const next = new Set(prev);
-      workspaceFiles.forEach((f) => next.add(f.path));
-      Array.from(next).forEach((p) => {
-        if (!workspaceFiles.some((f) => f.path === p)) next.delete(p);
-      });
-      return next;
-    });
-  }, [workspaceFiles]);
 
   const handleImport = async () => {
     if (!repoUrl.trim()) {
@@ -174,14 +163,6 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
       return;
     }
 
-    if (selectedPaths.size === 0) {
-      setStatusMessage({
-        type: 'error',
-        text: 'プッシュするファイルを1件以上選択してください。',
-      });
-      return;
-    }
-
     setIsLoading(true);
     setStatusMessage(null);
 
@@ -191,9 +172,10 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
         repoUrl: repoUrl.trim(),
         branch: branch.trim() || 'main',
         commitMessage: commitMessage.trim() || 'Update via Miki AI Partner Studio',
-        files: workspaceFiles
-          .filter((f) => selectedPaths.has(f.path))
-          .map((f) => ({ path: f.path, content: f.content })),
+        files: workspaceFiles.map((f) => ({
+        path: f.path,
+        content: f.content,
+      })),
       });
 
       if (res.success) {
@@ -458,44 +440,9 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
                 <span>GitHub にプッシュ (保存)</span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                選択したファイル ({selectedPaths.size} / {workspaceFiles.length} 件) を GitHub にコミット＆プッシュします。
+                ワークスペースの変更差分だけを GitHub にコミット＆プッシュします。
               </p>
             </div>
-
-            <div className="max-h-40 overflow-y-auto space-y-1 bg-slate-950 border border-slate-800 rounded-xl p-2">
-              <div className="flex items-center justify-between px-1 pb-1">
-                <span className="text-[10px] text-slate-500">
-                  {selectedPaths.size} / {workspaceFiles.length} 件選択中
-                </span>
-                <button
-                  onClick={() =>
-                    setSelectedPaths(
-                      workspaceFiles.length > 0
-                        ? new Set()
-                        : new Set(workspaceFiles.map((f) => f.path))
-                    )
-                  }
-                  className="text-[10px] text-sky-400 hover:text-sky-300"
-                >
-                  {workspaceFiles.length > 0 ? 'すべて解除' : 'すべて選択'}
-                </button>
-              </div>
-              {workspaceFiles.map((f) => (
-                <label
-                  key={f.path}
-                  className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-slate-900 cursor-pointer text-xs text-slate-300"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedPaths.has(f.path)}
-                    onChange={() => toggleFile(f.path)}
-                    className="accent-sky-500"
-                  />
-                  <span className="truncate">{f.path}</span>
-                </label>
-              ))}
-            </div>
-
             <button
               onClick={handlePush}
               disabled={isLoading}
