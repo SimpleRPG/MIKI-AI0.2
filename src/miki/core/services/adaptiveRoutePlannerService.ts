@@ -608,7 +608,7 @@ class AdaptiveRoutePlannerService {
     ]);
     const coreOwnedResearchOperations=new Set(['EXECUTE_AUTONOMOUS_SEARCH']);
     if(coreOwnedResearchOperations.has(operation)){
-      return coreCompletionGateService.evaluateCoreOwnedOperation(task,operation,'research');
+      routes.push({target:'research',command:'RUN_RESEARCH',reason:'CORE selected research for explicit autonomous search',payload:{...input,taskId:task.taskId,operation,query:String(input.query||''),adaptive:true,priority:100}});return this.decorateOperations(task,this.uniqueOperations(routes));
     }
     const coreOwnedAutonomyOperations=new Set(['SAVE_AUTONOMY_CONFIG']);
     if(coreOwnedAutonomyOperations.has(operation)){
@@ -898,7 +898,7 @@ class AdaptiveRoutePlannerService {
       if(!pattern.test(entry.key)&&!pattern.test(JSON.stringify(entry.value||{}))) continue;
       const value=objectValue(entry); if(!value) continue;
       const values=value.unresolvedItems??value.unresolvedRequirements??value.unknowns;
-      if(Array.isArray(values)) return [...new Set(values.filter((item):item is string=>typeof item==="string"&&item.trim()).map(item=>item.trim()))];
+      if(Array.isArray(values)) return [...new Set(values.filter((item):item is string=>typeof item==="string"&&item.trim().length>0).map(item=>item.trim()))];
     }
     return [];
   }
