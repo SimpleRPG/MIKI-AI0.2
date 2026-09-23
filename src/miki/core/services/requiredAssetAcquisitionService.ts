@@ -4,6 +4,7 @@ import { knowledgeGapService } from '../../unknown/services/knowledgeGapService'
 import { researchService } from '../../research/services/researchService';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { taskBlackboardService } from './taskBlackboardService';
+import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 
 export type RequiredAssetKind = 'EVIDENCE' | 'CAPABILITY' | 'VALIDATION_SCRIPT' | 'RESOURCE_CAPACITY';
 export type RequiredAssetStatus = 'OPEN' | 'ACQUIRING' | 'ACQUIRED' | 'BLOCKED';
@@ -204,10 +205,59 @@ class RequiredAssetAcquisitionService {
       const linkedEvidenceIds = evidenceIds.filter(id => evidenceRecords.some(item => item.evidenceId === id));
       const unlinkedEvidenceIds = evidenceIds.filter(id => !linkedEvidenceIds.includes(id));
 
-      const componentIds = this.extractStringIds(
+      let componentIds = this.extractStringIds(
         researched,
         /component(?:[_-]?ids?)?/i
       );
+
+      /*
+       * ResearchでEvidence/Claimまで到達している場合は、
+       * RequiredAssetだけをACQUIREDにせずKnowledge Componentにも
+       * lineageを残す。
+       *
+       * LOCALとWEBは別々に捨てず、同じKnowledge Componentへ統合する。
+       */
+      if(evidenceIds.length>0){
+        const researchResult=researched as Record<string, unknown>;
+
+        const claimIds=this.extractStringIds(
+          researchResult,
+          /^claim(?:[_-]?ids?)?$/i
+        );
+
+        const sourceUrls=this.extractStringIds(
+          researchResult,
+          /^source(?:[_-]?urls?)?$/i
+        );
+
+        const componentResult=
+          reusableComponentFactoryService.integrateResearchKnowledge({
+            purpose:objective,
+            claimIds,
+            evidenceRefs:evidenceIds,
+            sourceUrls,
+            environmentFingerprint:request.workspaceId||'unknown',
+            contradictionRefs:[],
+            verificationStatus:'UNVERIFIED',
+          });
+
+        componentIds=[
+          ...new Set([
+            ...componentIds,
+            componentResult.component.componentId,
+          ])
+        ];
+
+        if(componentResult.created){
+          reasons.push(
+            `KNOWLEDGE_COMPONENT_CREATED:${componentResult.component.componentId}`
+          );
+        }else if(componentResult.updated){
+          reasons.push(
+            `KNOWLEDGE_COMPONENT_UPDATED:${componentResult.component.componentId}`
+          );
+        }
+      }
 
       request.evidenceIds = [...new Set([...request.evidenceIds, ...evidenceIds])];
       request.status = evidenceIds.length > 0 ? 'ACQUIRED' : 'BLOCKED';
