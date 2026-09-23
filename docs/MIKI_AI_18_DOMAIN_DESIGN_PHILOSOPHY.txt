@@ -169,6 +169,119 @@ Evidence、Claim、反証、型、回帰、一般化、永続化、端末検査�
 分類が別分類の内部実装を直接操作することは原則として避ける。
 既存の直接呼出しは、発見しただけで即削除せず、責務・契約・副作用・Blackboard帰還方法を確認してから整理する。
 
+## 正規責務・接続・重複実装防止基準
+
+MIKI-AIの機能追加・修正では、既存機能を再実装する前に、その責務の正規Ownerと正規Entryを確認する。
+
+### Canonical Owner
+
+各機能には、その機能の正規実装・状態管理・判断責務を担当するCanonical Ownerを一つだけ定める。
+
+同じ判断、検索、検証、永続状態変更、成果物生成を複数のサービスへ独立実装してはならない。
+
+既存サービスがCanonical Ownerである場合、新しいサービスは同じ責務を実装せず、Canonical Ownerへ委譲する。
+
+### Canonical Entry
+
+各業務処理には正規Entryを定める。
+
+UI、Event、Autonomous Trigger、External Directive等の異なる入口が存在しても、同じ業務処理を開始する場合は、可能な限り共通の正規Entryへ集約する。
+
+COREが正規Entryである業務処理について、UI Gatewayや専門分類がCOREを通過した後に同じ業務処理を直接実行してはならない。
+
+### Adapter / Facade
+
+AdapterまたはFacadeは既存Canonical Ownerへの接続を担当する。
+
+Adapter / FacadeにCanonical Ownerと同じ判断ロジック、検索ロジック、Verificationロジック、永続状態変更ロジックを追加しない。
+
+技術差を吸収する必要がある場合も、業務上の正規判断はCanonical Ownerへ委譲する。
+
+### Event Subscriber
+
+Event SubscriberはEventを受け取って必要な再評価・通知・連携を行う。
+
+Event SubscriberがEvent発行元と同じ副作用を独立して再実装してはならない。
+
+特に、Eventによって既に実行された処理をSubscriber側でもう一度直接実行して二重変更する構造を作らない。
+
+永続状態を変更する必要がある場合は、その状態のCanonical Ownerが提供する正規APIへ委譲する。
+
+### COREと専門分類
+
+COREは専門分類の選択、Command配送、Result回収、Blackboard更新、再評価を担当する。
+
+COREに専門分類内部の業務ロジックをコピーしない。
+
+専門分類は自身の責務を担当し、別分類の責務を内部へ取り込まない。
+
+「COREから呼ぶ処理」と「専門分類内部で行う処理」を同じサービスへ二重実装しない。
+
+### 正規責務台帳
+
+重要な業務処理について、次の対応関係を正規基準とする。
+
+| 責務 | Canonical Owner | Canonical Entry | 禁止する重複 |
+|---|---|---|---|
+| Task受付・統括 | CORE / CoreTaskIngressService | Core Task Ingress | UIやDomainによる独自Orchestration |
+| Domain選択・再評価 | CORE / AdaptiveRoutePlanner | CORE再評価 | Domain側の固定次処理選択 |
+| Researchオーケストレーション | ResearchService | CORE → Research Command | UI/Unknown等の独自Research実行 |
+| Web技術実行 | UnifiedWebResearchService / AutonomousSearchService | ResearchServiceからの委譲 | 別サービスでの第二Web検索基盤 |
+| Claim Verification | VerifierService / Verification Domain | CORE → VERIFY_RESEARCH_CLAIMS | Research等への独立Verification実装 |
+| Verification通知 | ClaimVerificationEventService | VerifierからのEvent発行 | 別Event経路の重複 |
+| Knowledge Gap永続状態 | Knowledge Gap所有サービス | Unknown Knowledge Integration等から正規APIへ委譲 | Research/CORE/Verifierによる直接状態管理 |
+| Candidate検証 | CandidateValidationRunnerService等 | 自己改善検証経路 | Candidate生成側への独自検証実装 |
+| Promotion判定 | SinglePromotionGateService | 単一Promotion Gate | 複数箇所の独立採用判定 |
+| Review ZIP生成 | ReviewZipExportService | レビュー成果物化経路 | 各Candidate生成処理での独自ZIP生成 |
+| 外部指示正規化 | ExternalDirectiveIntakeService | External Directive Ingress | 外部指示の各所での独自解釈・直接実行 |
+
+この表は新しい実装を作るための一覧ではなく、既存機能を再利用するための責務境界を示す。
+
+### 新規実装前の必須確認
+
+新しいService、Coordinator、Gateway、Router、Event Subscriber等を追加する前に、少なくとも次を確認する。
+
+1. 同じ目的の既存Serviceが存在しないか
+2. その既存ServiceがCanonical Ownerではないか
+3. 正規Entryが既に存在しないか
+4. 既存のCommand / Result / Event / Blackboard経路を再利用できないか
+5. 同じEvidence、Claim、Knowledge Gap、Candidate、状態を別管理しないか
+6. 新しいEventを追加することで既存Event処理が二重実行されないか
+7. 新しい直接呼出しによってCORE経路を迂回しないか
+8. 既存の互換入口を削除する場合、その呼出し元と副作用を確認したか
+
+### 重複が発見された場合の統合原則
+
+同じ責務が複数箇所に存在する場合、新しい実装を追加して解決しない。
+
+まずCanonical Ownerを決定し、既存処理を次のいずれかへ整理する。
+
+- Canonical Ownerへの委譲
+- Canonical Entryへの接続
+- Adapter / Facadeとしての薄い互換層
+- Event / Resultを利用した正規連携
+- 不要になった旧実装の安全な削除
+
+削除前には呼出し元、戻り値、Evidence、Claim、永続状態、副作用、Error、Retry、Blackboard帰還を確認する。
+
+### 接続の正本
+
+同じ機能について、直接呼出しとCORE Command、または直接副作用とEvent Subscriberを並行して正規経路として扱わない。
+
+複数の技術的入口が必要な場合でも、最終的な業務処理は一つのCanonical Ownerへ収束させる。
+
+これにより、MIKI-AI自身が将来コードを調査・改善するときも、「既に存在する機能を別名のServiceとして再実装する」「既存Eventへさらに別Eventを接続する」「CORE経路と直接経路を二重に動かす」ことを避ける。
+
+### 二重実装と二重接続の受入条件
+
+新しい実装は、既存のCanonical Ownerと同じ責務を独立して持たないこと。
+
+新しい接続は、既存の正規Event、Command、Result、Blackboard経路と同じ副作用を二重に発生させないこと。
+
+既存機能を利用する場合は、原則として新しいロジックを書くのではなく、既存Canonical OwnerまたはCanonical Entryへ接続する。
+
+正規Owner、正規Entry、接続先、禁止される重複が確認できない状態では、実装を開始せず、先に既存コードを調査して設計を確定する。
+
 ## Research
 
 Research分類の正規オーケストレーターはResearchServiceとする。
