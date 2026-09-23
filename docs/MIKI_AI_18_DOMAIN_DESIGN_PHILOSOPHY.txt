@@ -600,3 +600,53 @@ GitHub mainに存在しない変更を、存在すると仮定して次の変更
 変更後は必ずコードと機械検証を再確認し、その結果をこの文書と照合する。
 
 設計・コード・機械検証の三者に矛盾が残っている状態を、実装完了とは扱わない。
+
+## Research探索十分性の追加基準
+
+Researchは「検索APIを呼べたこと」や「一定回数検索したこと」だけで探索完了と判定しない。
+
+探索十分性は、検索量ではなくEvidence Coverageを中心に判断する。
+
+少なくとも次をResearchの進捗として扱う。
+
+- 必要ClaimまたはKnowledge Gapの未解決要件
+- 検索観点のCoverage
+- 独立した情報源の数と独立性
+- 一次情報・公式情報の取得状況
+- 反証・制限情報の探索状況
+- 現在の実行環境への適用可能性
+- 実際の結果ページ本文を読めたか
+- Evidence品質
+- Claim間の矛盾
+- 前回探索からの新規情報量
+- 未解決Requirements
+- 次の探索で得られる情報価値
+
+検索回数、URL数、ページ数、時間予算は安全上の上限であり、それ自体を「十分探索した」という意味にしない。
+
+Researchは必要に応じて複数の検索観点を使用し、結果が不足していればQuery Revision、別観点、公式情報、反証、現在環境確認などへ展開できる。
+
+1回のResearch呼出しで安全な実行上限を設けても、論理的な探索全体はCOREの再評価によって次のCycleへ継続できる。
+
+Researchが検索を十分に行ったがVerificationが不足している場合と、ResearchそのもののCoverageが不足している場合を区別する。
+前者ではVerification等をCOREが選択し、後者ではResearchを再投入できるようにする。
+
+「結果が見つからなかった」と「対象が存在しない」を同一視しない。
+CONFIRMED_ABSENCEを使用する場合は、対象に応じた探索Coverage、一次/公式情報、反証探索、時間・環境条件、未解決要件を満たしたことをEvidenceとして残す。
+
+Research Query PlanはCOREの18分類思想と矛盾する固定分類リストを正本として持たない。
+Research内のQuery Planningは探索観点を計画する責務であり、次にどの18分類を実行するかを決定する権限はCOREにある。
+
+Research監査では、次の実装不整合も必ず確認する。
+
+- 同一public methodの重複定義
+- 同一検索結果の二重追加
+- Search結果とPage本文Evidenceの重複記録
+- 検索未実行なのに成功扱いする経路
+- Search成功だけでKnowledgeを確定する経路
+- Verification不足をResearch不足と誤分類する経路
+- Research結果をCOREの再評価へ戻さない経路
+
+Researchの安全な終端は「検索した」ではなく、
+必要なEvidence Coverageを確認し、Verification境界を通過するか、未解決理由と次に必要な処理をCOREへ返した状態とする。
+
