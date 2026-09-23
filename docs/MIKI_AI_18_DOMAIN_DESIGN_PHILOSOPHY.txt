@@ -232,6 +232,10 @@ Research Outcomeの優先順位は固定する。`EVIDENCE_FOUND`、`INSUFFICIEN
 
 `NOT_FOUND_AFTER_COVERAGE`を返すためのCoverageは、検索回数ではなくWeb Research Policyの状態で判定する。独立情報源、一次・公式情報、反証探索、矛盾の有無など、要求された条件をEvidenceとして確認する。
 
+`Web Research Policy`の`targetMode=AUTO`は固定件数へ変換して探索十分性を判定しない。AUTOでは、Research目的、Knowledge Gap、要求されるClaim、現在のEvidence、独立情報源、一次・公式情報、反証探索、矛盾、環境適用性などを基に、現在のResearch状態に必要なCoverage条件を決定する。固定の検索回数や固定の情報源数だけでAUTOの十分性を確定してはならない。
+
+`NO_NEW_EVIDENCE`および`LOW_INFORMATION_GAIN`は、探索による新規情報の増加が確認できないことを示す状態であり、Claimが存在しないことの証明ではない。これらの状態を理由として`NOT_FOUND_AFTER_COVERAGE`へ自動変換してはならない。`NOT_FOUND_AFTER_COVERAGE`は、別途定義されたCoverage条件がEvidenceとして成立している場合に限って使用する。
+
 Search budget、pass数、HTTP timeout、candidate URL数などは安全上限であり、これらを使い切ったこと自体を探索十分性とはみなさない。
 
 Research Resultには、`resolved`、`outcome`、`verification`、`continuationAvailable`、`continuationReason`、`nextQuery`等を保持し、COREはこれらをBlackboard上で再評価する。
