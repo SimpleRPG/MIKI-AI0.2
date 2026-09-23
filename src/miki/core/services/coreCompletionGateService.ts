@@ -4,6 +4,7 @@ import type { MikiDomain } from './crossDomainCirculationService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { corePlanRevisionService } from './corePlanRevisionService';
 import { domainReplyLedgerService } from './domainReplyLedgerService';
+import { reviewZipExportService } from './reviewZipExportService';
 
 export interface CoreCompletionAssessment {
   businessCompletion: boolean;
@@ -173,7 +174,7 @@ class CoreCompletionGateService {
     const evidenceQualityPassed=replyRecords.length===0?true:quality.passed;
     if(!evidenceQualityPassed) reasons.push(`EVIDENCE_QUALITY_FAILED:${quality.reasons.join(',')}`);
     const isRevalidation=requiredOperations.some(operation=>operation.operation==='GENERATE_CANDIDATE') && requiredOperations.some(operation=>operation.operation==='CREATE_REVIEW_PACKAGE') && task.entries.some(entry=>entry.kind==='RESULT'&&entry.value&&typeof entry.value==='object'&&(entry.value as Record<string,unknown>).operation==='GENERATE_CANDIDATE'&&typeof (entry.value as Record<string,unknown>).externalReviewId==='string');
-    if(isRevalidation){const pkg=task.entries.some(entry=>entry.kind==='RESULT'&&entry.value&&typeof entry.value==='object'&&(entry.value as Record<string,unknown>).operation==='CREATE_REVIEW_PACKAGE'&&typeof (entry.value as Record<string,unknown>).packageId==='string');if(pkg===false) reasons.push('REVALIDATION_REVIEW_PACKAGE_MISSING');}
+    if(isRevalidation){const packageId=task.entries.filter(entry=>entry.kind==='RESULT'&&entry.value&&typeof entry.value==='object').map(entry=>entry.value as Record<string,unknown>).reverse().find(value=>value.operation==='CREATE_REVIEW_PACKAGE'&&typeof value.packageId==='string')?.packageId as string|undefined;const pkg=packageId?reviewZipExportService.list().find(item=>item.packageId===packageId):undefined;if(!pkg) reasons.push('REVALIDATION_REVIEW_PACKAGE_MISSING');else if(pkg.status!=='EXTERNAL_REVIEW_PENDING') reasons.push(`REVALIDATION_REVIEW_NOT_PENDING:${pkg.status}`);}
     const packagePending=requiredOperations.some(operation=>operation.operation==='CREATE_REVIEW_PACKAGE') &&
       !missingRequiredOperations.some(item=>item.startsWith('CREATE_REVIEW_PACKAGE:'));
     return {
