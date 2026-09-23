@@ -170,9 +170,45 @@ class DomainIntegrationBootstrapService{
    const claimIds=Array.isArray(envelope.payload.claimIds)?envelope.payload.claimIds.map(String).filter(Boolean):[];
    if(claimIds.length===0)return {accepted:false,domain,command:envelope.command,error:'RESEARCH_CLAIM_IDS_REQUIRED',completedAt:Date.now()};
    const verification=verifierService.verifyMany({claimIds,requireFresh:envelope.payload.requireFresh===true,maxAgeDays:Number.isFinite(Number(envelope.payload.maxAgeDays))?Number(envelope.payload.maxAgeDays):undefined});
+   const {reusableComponentFactoryService}=await import('./reusableComponentFactoryService');
+   const componentIds=Array.isArray(envelope.payload.knowledgeComponentIds)
+     ? envelope.payload.knowledgeComponentIds.map(String).filter(Boolean)
+     : [];
+   const componentVerification=componentIds.map(componentId=>{
+     const result=reusableComponentFactoryService.verifyResearchKnowledge(componentId,claimIds,{
+       requireFresh:envelope.payload.requireFresh===true,
+       maxAgeDays:Number.isFinite(Number(envelope.payload.maxAgeDays))
+         ? Number(envelope.payload.maxAgeDays)
+         : undefined
+     });
+     return {
+       componentId,
+       verified:result.verified,
+       conflicted:result.conflicted,
+       verificationIds:result.verificationIds,
+       reasons:result.reasons
+     };
+   });
    const evidenceIds=[...new Set(claimIds.flatMap(id=>evidenceService.list({claimId:id}).map(e=>e.evidence_id)))];
    const verified=verification.length===claimIds.length&&verification.every(x=>x.outcome==='SUPPORTED'||x.outcome==='DEVICE_VERIFIED');
-   return done({operation:'VERIFY_RESEARCH_CLAIMS',operationClass:'BUSINESS',status:'SUCCEEDED',claimIds,verification,verified,unresolved:verification.some(x=>x.outcome==='UNRESOLVED'),contradicted:verification.some(x=>x.outcome==='CONTRADICTED'),researchGapId:String(envelope.payload.gapId||''),evidenceIds});
+   const verifiedKnowledgeComponentIds=componentVerification.filter(x=>x.verified).map(x=>x.componentId);
+   const conflictedKnowledgeComponentIds=componentVerification.filter(x=>x.conflicted).map(x=>x.componentId);
+   return done({
+     operation:'VERIFY_RESEARCH_CLAIMS',
+     operationClass:'BUSINESS',
+     status:'SUCCEEDED',
+     claimIds,
+     verification,
+     verified,
+     unresolved:verification.some(x=>x.outcome==='UNRESOLVED'),
+     contradicted:verification.some(x=>x.outcome==='CONTRADICTED'),
+     researchGapId:String(envelope.payload.gapId||''),
+     evidenceIds,
+     knowledgeComponentIds:componentIds,
+     verifiedKnowledgeComponentIds,
+     conflictedKnowledgeComponentIds,
+     componentVerification
+   });
   }
   if(domain==='selfDevelopment'&&envelope.command==='GENERATE_CANDIDATE'){
    const {candidateCodeGenerationService}=await import('./candidateCodeGenerationService');
