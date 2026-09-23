@@ -217,7 +217,16 @@ class DomainIntegrationBootstrapService{
    const {selfCodeSpaceService}=await import('./selfCodeSpaceService');
    const pkg=reviewZipExportService.list().find(item=>item.packageId===packageId);
    if(!pkg)return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_FOUND',completedAt:Date.now()};
-   if(pkg.status!=='ACCEPTED')return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_ACCEPTED',completedAt:Date.now()};
+   const {externalReviewIntakeService}=await import('./externalReviewIntakeService');
+   const externalReviewId=String(envelope.payload.externalReviewId||'');
+   const userAccepted=externalReviewId && externalReviewIntakeService.listDecisions(externalReviewId).some(d=>
+     d.decision==='ACCEPT' &&
+     d.packageId===pkg.packageId &&
+     d.packageRevision===pkg.candidateRevision &&
+     d.packageRevision===pkg.candidateRevision &&
+     d.status!=='BLOCKED');
+   if(pkg.status!=='ACCEPTED' && !(pkg.status==='EXTERNAL_REVIEW_PENDING' && userAccepted))
+    return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_ACCEPTED',completedAt:Date.now()};
    if(pkg.candidateManifestSha256!==manifestSha)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_MANIFEST_SHA_MISMATCH',completedAt:Date.now()};
    const workspace=isolatedCandidateWorkspaceService.get(pkg.workspaceId);
    if(!workspace)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_WORKSPACE_NOT_FOUND',completedAt:Date.now()};

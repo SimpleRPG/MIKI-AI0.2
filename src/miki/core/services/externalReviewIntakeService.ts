@@ -56,7 +56,7 @@ export interface ExternalReviewDecision {
   decidedAt: number;
   coreTaskId: string;
   coreDecisionId: string;
-  status: 'SUBMITTED_TO_CORE' | 'BLOCKED';
+  status: 'PENDING_CORE' | 'SUBMITTED_TO_CORE' | 'BLOCKED';
 }
 
 const RECORDS_KEY = 'miki_external_review_records_v1';
@@ -100,6 +100,16 @@ class ExternalReviewIntakeService {
     if (packageReferences.candidateManifestSha256 && packageReferences.candidateManifestSha256 !== reviewPackage.candidateManifestSha256) mismatchReasons.push('CANDIDATE_MANIFEST_SHA256_MISMATCH');
     if (packageReferences.zipSha256 && packageReferences.zipSha256 !== reviewPackage.zipSha256) mismatchReasons.push('ZIP_SHA256_MISMATCH');
     const mismatch = mismatchReasons.length > 0;
+
+    const decisionId = `ERD-${crypto.randomUUID()}`;
+    let decision: ExternalReviewDecision = {
+      decisionId, externalReviewId: record.externalReviewId, externalAiRole: record.externalAiRole,
+      packageId: record.packageId, packageRevision: record.packageRevision,
+      decision: input.decision, reason: input.reason.trim(), decidedAt: Date.now(),
+      coreTaskId: 'PENDING', coreDecisionId: 'PENDING', status: 'PENDING_CORE'
+    };
+    this.decisions.set(decisionId, decision);
+    this.persistDecisions();
 
     const coreResult = await coreTaskIngressService.submit({
       kind: 'USER_REQUEST',
@@ -188,19 +198,11 @@ class ExternalReviewIntakeService {
       maxCycles: 18,
     });
 
-    const decisionId = `ERD-${crypto.randomUUID()}`;
-    const decision: ExternalReviewDecision = {
-      decisionId,
-      externalReviewId: record.externalReviewId,
-      externalAiRole: record.externalAiRole,
-      packageId: record.packageId,
-      packageRevision: record.packageRevision,
-      decision: input.decision,
-      reason: input.reason.trim(),
-      decidedAt: Date.now(),
+    decision = {
+      ...decision,
       coreTaskId: coreResult.task.taskId,
       coreDecisionId: `CORE-${coreResult.task.taskId}-${coreResult.task.revision}`,
-      status: coreResult.task.status === 'COMPLETED' ? 'SUBMITTED_TO_CORE' : 'BLOCKED',
+      status: coreResult.task.status === 'COMPLETED' ? 'SUBMITTED_TO_CORE' : 'BLOCKED'
     };
     this.decisions.set(decisionId, decision);
     if (coreResult.task.status === 'COMPLETED') {
