@@ -639,19 +639,3 @@ Research内のQuery Planningは探索観点を計画する責務であり、次�
 
 Researchの安全な終端は「検索した」ではなく、
 必要なEvidence Coverageを確認し、Verification境界を通過するか、未解決理由と次に必要な処理をCOREへ返した状態とする。
-
-
-## Research監査で追加確認した実装不整合
-
-ResearchServiceでは同一public methodの重複定義や検索結果の二重追加のような単純な実装不整合も、18分類の能力監査で必ず検出・修正する。
-
-Query PlanningはResearch内の探索観点を計画する責務に限定する。
-Query PlanやUI Gatewayが、COREの代わりにResearch以外の18分類を固定列挙して実行要求する設計は禁止する。
-
-自己改善のEvidence不足時も、research/verification/memoryなどの固定分類を直接要求しない。
-Evidence不足の内容をCOREへ返し、COREがBlackboardとEvidenceから次に必要な分類を選択する。
-
-既存の旧Web検索経路は、機能を壊す目的で一括削除しない。
-各呼出元を18分類上の責務に分類し、CORE経由へ移行可能か、内部専門処理として残す必要があるか、互換層として残すかを個別に監査する。
-
-Build Failureは単独のコンパイル問題として扱わず、同一変更で発生した設計・実装不整合をまとめて確認する。
