@@ -309,7 +309,6 @@ export class ResearchService {
               claimIds,
               requireFresh: options?.requireFresh,
               maxAgeDays: options?.maxAgeDays,
-              resolveGapId: gap.id,
             })
           : [];
         resolved = verification.some((result) => result.promoted);
