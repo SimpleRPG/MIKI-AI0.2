@@ -413,6 +413,7 @@ class AdaptiveRoutePlannerService {
           ...candidate,...validation,
           candidateRevision:Number(input.candidateRevision||0)||undefined,
           sourcePackageId:typeof input.sourcePackageId==="string"?input.sourcePackageId:typeof input.packageId==="string"?input.packageId:undefined,
+          learningLineage:this.extractCandidateIdentity(latestCandidate).learningLineage,
           externalReviewQuestions:input.externalReviewQuestions,
           sourceOperationInstanceId:validationOperationInstanceId,
           adaptive:true,priority:60
