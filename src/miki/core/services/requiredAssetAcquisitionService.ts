@@ -265,7 +265,7 @@ class RequiredAssetAcquisitionService {
       request.updatedAt = Date.now();
       this.save();
 
-      const reasons = evidenceIds.length > 0
+      const acquisitionReasons = evidenceIds.length > 0
         ? [
             `EVIDENCE_ACQUIRED:${gap.id}`,
             ...(localEvidenceIds.length > 0 ? [`LOCAL_EVIDENCE_ACQUIRED:${localEvidenceIds.length}`] : []),
@@ -284,7 +284,7 @@ class RequiredAssetAcquisitionService {
         linkedEvidenceIds,
         unlinkedEvidenceIds,
         componentIds,
-        reasons,
+        reasons: acquisitionReasons,
       };
     } catch (error) {
       request.status = 'BLOCKED';
