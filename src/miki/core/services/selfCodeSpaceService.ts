@@ -1,6 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { apiService } from '../../../services/api';
 import { canonicalSha256 } from './canonicalSha256Service';
+import { githubSyncService } from '../../../services/githubSyncService';
 
 export interface SelfCodeFile {
   path: string;
@@ -82,26 +83,75 @@ class SelfCodeSpaceService {
 
     if (!files.length) throw new Error('SELF_CODE_SPACE_NO_FILES');
 
+    const repoSha256 = canonicalSha256(
+      files.map(file => ({ path: file.path, sha256: file.sha256 }))
+    );
+
     const snapshot: SelfCodeSnapshot = {
       repository: settings.repository,
       branch: settings.branch,
-      repoSha256: canonicalSha256(files.map(file => ({ path: file.path, sha256: file.sha256 }))),
+      repoSha256,
       files,
       syncedAt: Date.now(),
       dirty: false,
-      baseRepoSha256: canonicalSha256(files.map(file => ({ path: file.path, sha256: file.sha256 }))),
+      baseRepoSha256: repoSha256,
     };
 
-    storageService.setItem(KEY, JSON.stringify(snapshot));
-    return this.clone(snapshot);
+    // 正常PULL時の正本は githubSyncService に一本化する。
+    // clean snapshot を別KEYへJSON.stringifyして二重保存しない。
+    storageService.removeItem(KEY);
+
+    return snapshot;
   }
 
   get(): SelfCodeSnapshot | undefined {
     try {
       const raw = storageService.getItem(KEY);
-      if (!raw) return undefined;
-      const value = JSON.parse(raw);
-      return value?.files ? this.clone(value) : undefined;
+
+      // dirty snapshot は自己改善中の作業状態なので最優先で保持する。
+      if (raw) {
+        const value = JSON.parse(raw);
+        if (value?.files && value?.dirty === true) {
+          return this.clone(value);
+        }
+
+        // 旧バージョンのclean snapshotが残っている場合は一度だけ削除。
+        if (value?.files && value?.dirty !== true) {
+          storageService.removeItem(KEY);
+        }
+      }
+
+      // clean状態はGitHub同期サービスを唯一の正本として読む。
+      const settings = this.getGitHubSettings();
+      const sync = githubSyncService.get(
+        settings.repository,
+        settings.branch
+      );
+
+      if (!sync?.complete || !sync.files.length) {
+        return undefined;
+      }
+
+      const repoSha256 = canonicalSha256(
+        sync.files.map(file => ({
+          path: file.path,
+          sha256: file.sha256,
+        }))
+      );
+
+      return {
+        repository: settings.repository,
+        branch: settings.branch,
+        repoSha256,
+        files: sync.files.map(file => ({
+          path: file.path,
+          content: file.content,
+          sha256: file.sha256,
+        })),
+        syncedAt: sync.syncedAt || Date.now(),
+        dirty: false,
+        baseRepoSha256: repoSha256,
+      };
     } catch {
       return undefined;
     }
