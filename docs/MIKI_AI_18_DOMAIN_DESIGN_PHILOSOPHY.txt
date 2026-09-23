@@ -1,16 +1,26 @@
 # MIKI-AI 18分類 設計思想・実装指示
 
-## 1. この文書の位置づけ
+## 1. 文書の目的と正本
 
-この文書を、MIKI-AIの現行アーキテクチャに関する設計思想と実装判断の正本とする。
-過去の作業指示書、版ごとの実装履歴、移行履歴、旧設計思想文書は正本にしない。
-実装事実はコードと機械検証結果で確認し、この文書だけを実装完了の証拠にしてはならない。
+この文書は、MIKI-AIの現行アーキテクチャ、責務境界、実装判断、受入条件を定義するLiving Specificationである。
 
-## 2. 基本構造
+正本の確認は次の三者を相互監査して行う。
+
+- この文書に記載された現在の設計
+- GitHub mainに存在する現行コード
+- 機械検証で確認された実動作・成果物
+
+この文書だけを実装完了の証拠にはしない。
+過去の作業指示書、版別実装レポート、移行履歴、修正ログ、旧設計思想文書は現在の設計の正本にしない。
+作業履歴はGit履歴、CI Artifact、監査JSON等で追跡する。
+
+## 2. 基本原則
+
+### 2.1 18分類
 
 MIKI-AIは、COREと17の専門分類から成る18分類構造を使用する。
 
-1. core
+1. CORE
 2. autonomy
 3. capability
 4. conversation
@@ -29,24 +39,67 @@ MIKI-AIは、COREと17の専門分類から成る18分類構造を使用する�
 17. unknown
 18. verification
 
-COREは18分類の一つとして物理配置されるが、実行上は中央統括を担当する。17専門分類はCOREの下で専門処理を担当する。
+COREも分類の一つとしてコード上に存在するが、実行上は18分類全体の中央統括を担当する。
+17専門分類は、それぞれの責務に従って専門処理を担当する。
 
-## 3. COREの責務
+### 2.2 COREが次の処理を選ぶ
 
-COREは次を一元管理する。
+MIKI-AIは、18分類を固定順序で一周する構造ではない。
 
-- UI、イベント、自己改善、外部指示などの正規入口
-- タスクID、Run ID、correlation ID、causation ID
+現在のBlackboard、目的、Evidence、未解決要件、制約、実行結果をCOREが再評価し、その時点で必要な分類だけを選択する。
+
+したがって、
+
+- 全18分類を毎回呼ばない
+- 分類同士を固定チェーンにしない
+- 次の分類を前の分類が独断で決定しない
+- COREを迂回して業務処理を直結させない
+
+ことを基本とする。
+
+全分類を一括確認する処理は、起動監査・整合性監査・手動診断などに限定する。
+
+## 3. CORE
+
+COREは、MIKI-AIの入口、判断、再評価、終了を統括する。
+
+### 3.1 COREの責務
+
+COREは次を管理する。
+
+- UI、イベント、自律トリガー、外部指示からの正規Task Ingress
+- Task ID、Run ID、Request ID、correlation ID、causation ID
 - Blackboardの生成、読取り、更新、永続化
-- 現在状態に必要な専門分類の選択
-- Domain Commandの配送
-- Domain Resultの回収と正規化
-- Evidence、未解決要件、エラー、再試行可否の統合
-- 結果回収後の再評価と次経路の決定
-- 停止、再開、取消、タイムアウト、循環上限
-- 完了条件とフェイルクローズ
+- 現在状態から必要な専門分類の選択
+- Domain Commandの生成・配送
+- Domain Resultの回収・正規化
+- Evidence、Claim、未解決要件、エラー、再試行情報の統合
+- 実行環境・資源制約の反映
+- 結果回収後のBlackboard更新
+- 次の処理が必要かどうかの再評価
+- 継続、別分類への切替、保存、検証、停止、完了の決定
+- pause、resume、cancel、timeout、cycle上限
+- 完了条件とfail-closed
 
-COREは各分類の内部データを直接書き換えない。専門処理は必ず分類の公開入口へCommandとして依頼する。
+COREは専門分類の内部データを直接書き換えない。
+専門処理は分類の公開入口へDomain Commandとして依頼する。
+
+### 3.2 COREの基本ループ
+
+正規の業務処理は次の考え方で動く。
+
+UI / Event / Autonomous Trigger / External Directive
+→ Core Task Ingress
+→ Core Orchestrator
+→ Blackboard
+→ COREが必要な分類を選択
+→ Domain Command
+→ Domain Result + Evidence + unresolvedRequirements
+→ Blackboard更新
+→ COREが再評価
+→ 次の分類 / 保存 / 検証 / 停止 / 完了
+
+ここで「次の分類」は固定された順番ではなく、その時点のBlackboardからCOREが決定する。
 
 ## 4. 17専門分類の責務
 
@@ -57,7 +110,7 @@ COREは各分類の内部データを直接書き換えない。専門処理は�
 利用可能能力、能力不足、部品選択、Capability Gapを担当する。
 
 ### conversation
-会話入力、意図、照応、否定、訂正、数値・版数、回答候補合成を担当する。
+会話入力、意図、照応、否定、訂正、数値・版数、回答候補の合成を担当する。
 
 ### data
 構造化データ、Schema、テストデータ、決定論モデル情報を担当する。
@@ -78,10 +131,10 @@ COREは各分類の内部データを直接書き換えない。専門処理は�
 記憶Repository、永続化、検索適格性、隔離・削除遮断を担当する。
 
 ### promotion
-Validation済み候補の昇格判定、レビュー待ち状態、定着状態を担当する。
+Validation済み候補の昇格判定、レビュー待ち、定着状態を担当する。
 
 ### research
-ローカル資料、Web、GitHub、外部AI調査バンドル、Evidence取得を担当する。
+ローカル資料、Web、GitHub、外部AI調査、Evidence取得を担当する。
 
 ### safety
 秘密情報、禁止操作、端末資源、危険処理、ロールバック可能性を担当する。
@@ -90,10 +143,11 @@ Validation済み候補の昇格判定、レビュー待ち状態、定着状態�
 自己構成、未確認範囲、制約、不足、接続状態を担当する。
 
 ### selfDevelopment
-対象コード理解、隔離候補生成、部品・テンプレート候補を担当する。
+対象コード理解、隔離Candidate生成、部品・テンプレート候補を担当する。
 
 ### strategy
-Blackboardの状態から計画案、優先度、代替案を作る。最終配送先はCOREが決定する。
+Blackboardの状態から計画案、優先度、代替案を作る。
+最終的な配送先はCOREが決定する。
 
 ### unknown
 未知分類、Knowledge Gap、再利用可能な過去解決、未解決状態を担当する。
@@ -101,220 +155,46 @@ Blackboardの状態から計画案、優先度、代替案を作る。最終配�
 ### verification
 Evidence、Claim、反証、型、回帰、一般化、永続化、端末検査を担当する。
 
-## 5. 正規実行経路
+## 5. 分類間連携
 
-すべての主要な状態変更は次の経路を使用する。
+分類間連携は、固定された直結チェーンではなく、COREを中心としたCommand / Result方式を基本とする。
 
-```text
-UI / Event / Autonomous Trigger / External Directive
-  -> Core Task Ingress
-  -> Core Orchestrator
-  -> Task Blackboard
-  -> 必要な専門分類だけを選択
-  -> Domain Command
-  -> Domain Result + Evidence + unresolvedRequirements
-  -> Coreへ返却
-  -> Blackboard更新
-  -> Coreが再評価
-  -> 次分類 / 保存 / 検証 / 停止 / 完了
-```
-
-表示専用のローカルUI状態までCOREへ集中させない。永続状態、業務状態、改善状態、外部作用を伴う操作はCORE経由を原則とする。
-
-## 6. 分類間連携
-
-分類同士を固定チェーンで直結しない。分類は結果と未解決要件をCOREへ返す。
-
-- Eventは起きた事実を表す。
+- Eventは発生した事実を表す。
 - Commandは一つの分類への実行要求を表す。
 - Resultは観測結果、Evidence、未解決要件、エラーを表す。
-- 次の分類はCOREがBlackboardを再評価して選ぶ。
+- BlackboardはTaskの共有状態を保持する。
+- COREはResultを受けて状態を再評価する。
+- 次の分類はCOREが決定する。
 
-全18分類を毎回形式的に呼ばない。必要な分類だけを呼ぶ。全分類診断は起動監査または手動監査に限定する。
+分類が別分類の内部実装を直接操作することは原則として避ける。
+既存の直接呼出しは、発見しただけで即削除せず、責務・契約・副作用・Blackboard帰還方法を確認してから整理する。
 
-## 7. 自己改善
+## 6. Research
 
-自己改善の本番コード自動適用は行わない。自律範囲はレビュー待ち累積ZIPの作成までとする。
+Research分類の正規オーケストレーターはResearchServiceとする。
 
-```text
-課題自動発見
-  -> 自動発見Run
-  -> 自己改善Ingress
-  -> 永続Queue
-  -> CORE / Blackboard / 必要分類
-  -> 対象ファイルをEvidenceで特定
-  -> 現行Snapshot固定
-  -> 隔離Candidate Workspace
-  -> 候補SHA固定
-  -> STATIC / TYPECHECK / REGRESSION / COUNTEREXAMPLE
-     / GENERALIZATION / PERSISTENCE / DEVICE
-  -> Shadow Evaluation
-  -> 単一Promotion Gate
-  -> レビュー待ち台帳
-  -> 累積レビューZIP
-  -> 外部AIと利用者による手動確認
-```
+### 6.1 ResearchService
 
-自動発見Runと外部AI作業指示Runは別Run、別Task、別Workspaceとして管理する。安全パイプラインだけを共通利用する。
-
-不足時は待機だけにせず、Knowledge Gap、Capability Gap、Validation Script不足、実行環境不足として必要資産を増やす。ただし物理的な資源不足や安全違反を無視して強行しない。
-
-## 8. Evidenceと完了条件
-
-次を完了の証拠にしてはならない。
-
-- ファイルを作成しただけ
-- exportしただけ
-- UI文言を変更しただけ
-- 固定のtrue、success、passed
-- AIの自己申告
-- ユーザーの肯定または否定1回
-- エラーダイアログが表示されなかっただけ
-
-完了には最低限、実在、配線、実動作、成果物証跡が必要である。
-
-```text
-EXISTENCE
-WIRING
-BEHAVIOR
-ARTIFACT
-```
-
-完了判定は安全側のPARTIALから開始し、taskId、correlationId、artifactHash、verification Evidence、検証環境、必須検査PASSが揃った場合だけ完了へ進める。
-
-## 9. ユーザー反応
-
-ユーザー反応は重要なEvidenceだが、唯一の真実にはしない。
-
-- 一回の肯定でVERIFIEDへ昇格しない。
-- 一回の否定で全回答や全部品を破棄しない。
-- どの部分が良かったか、誤っていたか、訂正されたかを分離する。
-- ユーザーが提示した訂正自体も既存Claim、辞書、公式情報、実行結果と照合する。
-- 未知語や矛盾がある場合はUNKNOWNまたはCONFLICTEDとして追加調査へ戻す。
-
-## 10. 記憶
-
-アプリから見た記憶の正本は単一Memory Repository契約とする。
-
-- AndroidはSQLiteをBackendにする。
-- WebはIndexedDBをBackendにする。
-- JSON全件配列は移行・互換・バックアップ用途に限定する。
-- 更新はレコード単位とし、FTSも差分更新する。
-- retrieval、usage、execution success、validation success、ユーザー反応を別指標にする。
-- quarantine、discard candidate、inactive、expired、superseded、pending revalidationは回答、自己改善、クラウド送信、exportから遮断する。
-
-## 11. 会話と言語
-
-日本語解析は次の部品を役割別に合成する。
-
-```text
-Sudachi Native
-+ Intl.Segmenter
-+ 決定論的辞書
-+ N-gram
-```
-
-通常会話では検証済み部品を制限時間内で組み合わせる。未研究の組合せはバックグラウンド研究で候補化し、意味保持、反証、複数観測を経て昇格させる。
-
-## 12. 外部知識と外部AI
-
-既存Claimと記憶、Web検索、公式資料、実行試験、外部AIを区別する。
-
-外部AI調査は関連Knowledge Gapを小規模バンドルにまとめ、自動API、手動コピー、質問TXT、返信TXT取込みを選択可能にする。外部AI回答はCLOUD_AI Evidenceとして保存し、直ちに検証済み知識へ昇格させない。
-
-## 13. ローカルLLM
-
-旧GGUF、llama.cpp、WebLLMなどのローカル生成ランタイムは使用しない。通常処理は決定論的Non-LLM部品を使用し、自由生成が必要な場合だけ明示された外部AI経路を使用する。
-
-ローカルLLM再導入禁止の監査規則と退役試験は保持してよいが、旧実行コード、旧設定UI、旧モデル読込み、旧案内文、旧互換層は参照がなくなり次第削除する。
-
-## 14. UI
-
-スマートフォンを第一対象とする。
-
-- 主要操作は44px相当以上
-- 入力文字は16px以上
-- 1列配置を基本
-- 詳細は折り畳み
-- Queue受付と処理完了を区別
-- 現在分類、待機理由、Evidence不足、再試行、レビュー待ち件数を表示
-- 自己改善の方向と実行間隔を設定可能にする
-
-## 15. 重複と複雑性
-
-同じ責務のController、Coordinator、Router、Gate、保存キー、イベントを増やさない。
-
-新規サービスを作る前に既存サービスを検索し、入出力、副作用、保存先、呼出元を比較する。機能差がなければ正本へ統合する。互換入口は独自処理を持たず、正本へ委譲する。
-
-複雑性コストとして、新規ファイル、Public API、保存キー、イベント、依存辺、変更行数を計測する。
-
-## 16. GitHubと成果物
-
-GitHub push機能は残すが、自己改善ループから自動pushしない。
-
-レビューZIPは差分だけではなく、候補、基準SHA、候補SHA、Validation Evidence、Shadow結果、Promotion判定、競合、依存順を含める。複数候補を累積する場合は、同一ファイル競合、古いbaseline、依存循環を検査する。
-
-## 17. 変更時の必須監査
-
-- 18分類の単一定義
-- 未分類サービス0件
-- UI・イベントのCORE迂回
-- 分類結果が実分類名義でBlackboardへ戻ること
-- COREによる再評価
-- 相対import断線0件
-- 静的import循環
-- 旧ローカル生成経路0件
-- 固定成功値0件
-- 空catchの重要経路0件
-- 記憶隔離・削除の全経路遮断
-- 候補SHAとEvidence SHAの一致
-- ZIP破損検査とZIPTXT一致
-
-## 18. 正本と履歴
-
-現行の設計判断は、この文書、現行コード、機械検証結果で確認する。
-
-過去版の作業指示書、版別実装レポート、移行履歴、修正作業ログ、旧設計思想文書をリポジトリの正本として残さない。必要な実行証跡はCI Artifact、監査JSON、Git履歴へ保存し、ルートへ版別TXTを積み増さない。
-
-
-## 18.1 現行設計の維持原則
-
-この文書は作業履歴を積み上げるログではなく、現在の設計判断を表すLiving Specificationとする。
-
-設計変更時は次の順序を必須とする。
-
-1. 現行コードと機械検証結果を調査する。
-2. 現行設計と実装事実の差を分類する。
-3. 設計が正しい場合はコードを設計へ合わせる。
-4. 実装の進展により設計が古くなった場合は、先にこの文書を更新する。
-5. 設計と実装の双方に問題がある場合は、設計を整理してからコードを変更する。
-6. コード変更後に機械検証し、実装結果を再度この文書と照合する。
-
-したがって、この文書だけを無条件の真実とはしない。
-「設計書・現行コード・機械検証」の三者を相互監査し、矛盾が残った状態を実装完了としない。
-
-## 18.2 Researchの現行責務境界
-
-Research分類の正本オーケストレーターはResearchServiceとする。
-
-ResearchServiceは次を統合管理する。
+ResearchServiceはResearch全体を統合する。
 
 - Knowledge Gapとの接続
 - Research Plan / Query Strategy
-- Web・ローカル資料等のResearch経路選択
+- Research経路選択
 - 複数検索Round
 - 検索結果取得
-- 結果ページ読取
+- 結果ページ読取り
 - Evidence / Claim登録
 - Verification連携
 - Knowledge Gapの解決状態
 - continuation状態
 - Research Outcome
 
-UnifiedWebResearchServiceはResearchそのものの第二正本ではない。
-Web検索技術へのFacadeとして、検索実行、検索結果ページ取得、設定、統計、低レベルWeb操作を担当する。
+### 6.2 Web検索層
 
-AutonomousSearchServiceはProvider探索と結果統合を担当する低レベル実装であり、通常のResearchオーケストレーションを直接担わない。
+UnifiedWebResearchServiceはResearchの第二正本ではない。
+Web検索技術へのFacadeとして、検索実行、結果ページ取得、設定、統計、低レベルWeb操作を担当する。
+
+AutonomousSearchServiceはProvider探索と結果統合を担当する低レベル実装であり、通常のResearchオーケストレーションを担当しない。
 
 正規Research経路は、
 
@@ -327,10 +207,22 @@ CORE
 
 とする。
 
-UI、Unknown、Memory、Capability、Autonomous Evolution、Background処理等がResearch業務を要求する場合、原則としてCORE Task Ingressから入り、COREがResearch分類を選択する。
+### 6.3 Research結果とCORE再評価
 
-ただし既存コードに直接ResearchまたはWeb検索を呼ぶ経路が存在する場合、それを即座に削除・置換してはならない。
-まず呼出元の目的、戻り値契約、副作用、CORE Blackboardへの帰還方法を調査し、次のいずれかに分類する。
+Researchの検索結果は、そのまま最終的な真実にはしない。
+
+Researchから返されたResult、Evidence、Claim、Verification結果、unresolvedRequirements、continuation状態をBlackboardへ反映し、COREが次の処理を再評価する。
+
+次のResearch Roundが必要なら、COREがResearch分類を再選択する。
+Research内部の安全上限を、探索全体の固定回数制限とは解釈しない。
+
+検索結果はEvidence候補であり、既存のVerification境界を通過した結果だけがKnowledge利用可能状態へ進む。
+
+### 6.4 Researchの直接呼出し監査
+
+UI、Unknown、Memory、Capability、Autonomy、Background処理などがResearch業務を要求する場合、原則としてCORE Task Ingressから入り、COREがResearch分類を選択する。
+
+既存の直接Research / Web検索呼出しは、次のいずれかに分類してから整理する。
 
 - CORE経路へ統合すべき業務Research
 - Research内部からの正当な利用
@@ -339,72 +231,241 @@ UI、Unknown、Memory、Capability、Autonomous Evolution、Background処理等�
 - 互換入口
 - 設計上未定義の経路
 
-業務ResearchをCOREへ統合する場合も、既存結果契約を確認してから変更する。
-ResearchServiceとUnifiedWebResearchServiceの責務を逆転させるための変更は行わない。
+結果契約や副作用を確認せずに削除・置換しない。
 
-## 18.3 COREとResearchの再評価
+## 7. 自己改善
 
-COREはResearch結果を最終的な真実として扱わない。
+自己改善の本番コード自動適用は行わない。
+自律処理の安全な終点は、レビュー待ち累積ZIPの作成までとする。
 
-Researchから返されたResult、Evidence、Claim、Verification結果、unresolvedRequirements、continuation状態をBlackboardへ反映し、COREが次の処理を再評価する。
+基本経路は、
 
-次のResearch Roundが必要な場合はCOREが再度Research分類を選択する。
-Research内部の安全上限を、探索全体の固定回数制限とは解釈しない。
+課題自動発見
+→ 自動発見Run
+→ 自己改善Ingress
+→ 永続Queue
+→ CORE / Blackboard / 必要分類
+→ 対象ファイルをEvidenceで特定
+→ 現行Snapshot固定
+→ 隔離Candidate Workspace
+→ Candidate SHA固定
+→ STATIC / TYPECHECK / REGRESSION / COUNTEREXAMPLE
+  / GENERALIZATION / PERSISTENCE / DEVICE
+→ Shadow Evaluation
+→ 単一Promotion Gate
+→ レビュー待ち台帳
+→ 累積レビューZIP
+→ 外部AI・利用者による確認
 
-ResearchだけでKnowledgeを確定しない。
-検索結果はEvidence候補であり、既存Verification境界を通過した結果だけがKnowledge利用可能状態へ進む。
+自動発見Runと外部AI作業指示Runは、別Run、別Task、別Workspaceとして管理する。
+安全パイプラインだけを共通利用する。
 
-## 18.4 直接呼出し監査
+自己改善で不足が発生した場合は、Knowledge Gap、Capability Gap、Validation Script不足、実行環境不足などとして必要資産を増やす。
+ただし物理的資源不足や安全違反を無視して強行しない。
 
-Research関連変更では、少なくとも次を確認する。
+GitHubへのpushは通常機能として残すが、自己改善ループから本番コードを自動pushしない。
 
-- ResearchService
-- UnifiedWebResearchService
-- AutonomousSearchService
-- CoreTaskIngress
-- CoreOrchestrator
-- AdaptiveRoutePlanner
-- DomainRouter
-- Research UI Gateway
-- Unknown解決
-- Memory / Capability / Autonomy等の直接検索呼出元
-- Research結果のBlackboard帰還
-- Research完了判定
+## 8. Evidenceと完了条件
 
-直接呼出しが存在することだけを理由にコードを変更しない。
-その呼出しが現在の18分類設計で正当かを判定してから修正する。
+次だけでは完了と判定しない。
 
-## 18.5 重複実装の扱い
+- ファイルを作成した
+- exportした
+- UI文言を変更した
+- 固定値でtrue / success / passedを返した
+- AIが自己申告した
+- ユーザーが一度肯定した
+- エラーダイアログが表示されなかった
 
-同じ責務の型、関数、配列、Controller、Coordinator、Router、Gate等が重複している場合、それは設計追加ではなく実装不整合の候補として扱う。
+完了には、少なくとも次の4段階の証拠を必要とする。
 
-特にResearchでは、
+EXISTENCE
+→ WIRING
+→ BEHAVIOR
+→ ARTIFACT
 
-- ResearchSearchResultの単一定義
-- ResearchService.executeSearchの単一定義
-- Research検索結果の単一収集
-- 同一結果の意図しない二重登録防止
+安全側ではPARTIALから開始する。
+taskId、correlationId、artifactHash、verification Evidence、検証環境、必要な検査結果が揃った場合だけ完了へ進める。
 
-を必須とする。
+## 9. ユーザー反応
 
-## 18.6 実装前後の確認
+ユーザー反応は重要なEvidenceだが、単独で最終真実にはしない。
 
-実装者は変更前に設計書を確認し、変更後には次を確認する。
+- 一回の肯定でVERIFIEDへ昇格しない。
+- 一回の否定で全回答・全部品を破棄しない。
+- 良かった部分、誤った部分、訂正された部分を分離する。
+- ユーザーの訂正も、既存Claim、辞書、公式情報、実行結果等と照合する。
+- 未知語や矛盾があればUNKNOWNまたはCONFLICTEDとして追加調査へ戻す。
 
-設計
+## 10. Memory
+
+アプリから見た記憶の正本は単一Memory Repository契約とする。
+
+- AndroidはSQLiteをBackendにする。
+- WebはIndexedDBをBackendにする。
+- JSON全件配列は移行・互換・バックアップ用途に限定する。
+- 更新はレコード単位とし、FTSも差分更新する。
+- retrieval、usage、execution success、validation success、ユーザー反応を別指標として扱う。
+- quarantine、discard candidate、inactive、expired、superseded、pending revalidationは、回答、自己改善、クラウド送信、exportから遮断する。
+
+## 11. 会話と言語
+
+日本語解析は役割の異なる決定論的部品を組み合わせる。
+
+Sudachi Native
++ Intl.Segmenter
++ 決定論的辞書
++ N-gram
+
+通常会話では検証済み部品を制限時間内で組み合わせる。
+未研究の組合せはバックグラウンド研究で候補化し、意味保持、反証、複数観測を経て昇格させる。
+
+## 12. 外部知識と外部AI
+
+既存Claim、Memory、Web検索、公式資料、実行試験、外部AIの情報源を区別する。
+
+外部AI調査は関連Knowledge Gapを小規模バンドルにまとめ、次の経路を選択可能にする。
+
+- 自動API
+- 手動コピー
+- 質問TXT
+- 返信TXT取込み
+
+外部AIの回答はCLOUD_AI Evidenceとして保存し、直ちに検証済み知識へ昇格させない。
+
+## 13. ローカルLLM
+
+旧GGUF、llama.cpp、WebLLM等のローカル生成ランタイムは、現在のMIKI-AIの通常経路として使用しない。
+
+通常処理は決定論的Non-LLM部品を使用し、自由生成が必要な場合だけ明示された外部AI経路を使用する。
+
+ローカルLLM再導入禁止の監査規則と退役試験は保持してよい。
+旧実行コード、旧設定UI、旧モデル読込み、旧案内文、旧互換層は、参照がなくなり安全に退役できることを確認した上で削除する。
+
+## 14. UI
+
+スマートフォンを第一対象とする。
+
+- 主要操作は44px相当以上
+- 入力文字は16px以上
+- 1列配置を基本とする
+- 詳細情報は折り畳む
+- Queue受付と処理完了を区別する
+- 現在分類、待機理由、Evidence不足、再試行、レビュー待ち件数を確認できる
+- 自己改善の方向と実行間隔を設定できる
+- Safe Areaとキーボード表示を考慮する
+- 横幅依存の巨大な図や表を主要説明に使用しない
+
+UIは表示専用状態までCOREへ集中させない。
+永続状態、業務状態、改善状態、外部作用を伴う操作はCORE経由を原則とする。
+
+## 15. 重複と複雑性
+
+同じ責務のController、Coordinator、Router、Gate、Repository、保存キー、イベントを増やさない。
+
+新規サービスを作る前に既存サービスを検索し、少なくとも次を比較する。
+
+- 責務
+- 入出力
+- 副作用
+- 保存先
+- 呼出元
+- ライフサイクル
+- 既存の公開契約
+
+機能差がなければ既存の正本へ統合する。
+互換入口が必要な場合も、独自の業務ロジックを持たせず正本へ委譲する。
+
+複雑性コストとして、新規ファイル、Public API、保存キー、イベント、依存辺、変更行数を確認する。
+
+## 16. 変更判断
+
+設計と実装の不一致は、次の4種類に分類する。
+
+1. 設計が正しく、コードが誤っている
+2. 実装が進展し、設計が古くなっている
+3. 設計と実装の双方に問題がある
+4. 単純な実装バグである
+
+判断を飛ばしてコードだけを変更しない。
+
+設計が正しい場合はコードを設計へ合わせる。
+実装の進展で設計が古くなった場合は、先にこの文書を更新してからコードを変更する。
+双方に問題がある場合は、設計を整理してからコードを変更する。
+
+## 17. 実装・検証・GitHubの流れ
+
+変更は次の順序で確認する。
+
+現行GitHub main確認
+→ 設計確認
+→ 不一致分類
+→ 必要なら設計更新
 → 実装
 → 型・import検査
 → 挙動検査
 → 成果物検査
-→ GitHub main確認
+→ GitHub mainへ反映
+→ mainを再取得して確認
 → 設計との再照合
 
-この再照合で設計と実装が一致しない場合、コードだけを都合よく合わせず、設計が古くなっていないかを再判定する。
+GitHub mainに存在しない変更を、存在すると仮定して次の変更へ進まない。
 
-## 18.7 作業履歴を正本へ追加しない
+## 18. 必須監査項目
 
-個別の実装作業、P番号、バージョン番号、修正ログをこの文書へ逐次追加しない。
+18分類全体に変更を加える場合、または分類境界に関係する変更では、少なくとも次を確認する。
 
-実装履歴はGit履歴、検証結果、必要な監査Artifactで追跡する。
-この文書には現在有効な設計・制約・受入条件だけを残す。
+### 構造
 
+- 18分類の定義が一つである
+- 未分類サービスがない
+- 同一責務の重複実装が増えていない
+- COREの責務と専門分類の責務が逆転していない
+
+### 経路
+
+- UI・イベント・自律トリガー・外部指示が必要な業務処理でCOREを迂回していない
+- Domain CommandがCOREから配送される
+- Domain ResultがBlackboardへ戻る
+- COREがResultを再評価して次の処理を決定する
+
+### Research
+
+- ResearchServiceがResearchの正規オーケストレーターである
+- UnifiedWebResearchServiceが第二Research正本になっていない
+- AutonomousSearchServiceが低レベルWeb層として維持されている
+- 直接検索呼出しを責務ごとに監査している
+- Research結果がCOREの再評価へ戻る
+- Research検索結果だけでKnowledgeを確定していない
+- Research関連の型・関数・結果収集が意図せず重複していない
+
+### 自己改善
+
+- 本番コードの自動適用を行わない
+- Candidateとbaselineを識別できる
+- Candidate SHAとEvidence SHAを照合できる
+- Promotion Gateが単一の判定境界として機能する
+- レビュー待ち成果物を累積ZIPとして再現できる
+- 自動pushが自己改善の完了条件になっていない
+
+### 安全・検証
+
+- 相対import断線がない
+- 静的import循環を確認する
+- 旧ローカル生成経路が残っていない
+- 固定成功値がない
+- 重要経路に空catchがない
+- 記憶の隔離・削除遮断が全経路で維持されている
+- ZIPが破損していない
+- ZIP内TXTと実体が一致している
+
+## 19. Living Specificationとしての維持
+
+この文書は作業履歴ではなく、現在有効な設計・制約・受入条件だけを保持する。
+
+個別の実装作業、P番号、版番号、修正ログを逐次追加しない。
+
+設計変更時は、現行コードと機械検証を調査し、設計と実装の差を分類する。
+変更後は必ずコードと機械検証を再確認し、その結果をこの文書と照合する。
+
+設計・コード・機械検証の三者に矛盾が残っている状態を、実装完了とは扱わない。
