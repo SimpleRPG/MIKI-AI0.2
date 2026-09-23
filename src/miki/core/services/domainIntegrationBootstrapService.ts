@@ -164,10 +164,13 @@ class DomainIntegrationBootstrapService{
 
   if(domain==='verification'&&envelope.command==='VERIFY_RESEARCH_CLAIMS'){
    const {verifierService}=await import('../../verification/services/verifierService');
+   const {evidenceService}=await import('../../memory/services/evidenceService');
    const claimIds=Array.isArray(envelope.payload.claimIds)?envelope.payload.claimIds.map(String).filter(Boolean):[];
    if(claimIds.length===0)return {accepted:false,domain,command:envelope.command,error:'RESEARCH_CLAIM_IDS_REQUIRED',completedAt:Date.now()};
    const verification=verifierService.verifyMany({claimIds,requireFresh:envelope.payload.requireFresh===true,maxAgeDays:Number.isFinite(Number(envelope.payload.maxAgeDays))?Number(envelope.payload.maxAgeDays):undefined});
-   return done({operation:'VERIFY_RESEARCH_CLAIMS',operationClass:'BUSINESS',status:'SUCCEEDED',verification,verified:verification.length>0&&verification.every(x=>x.outcome==='SUPPORTED'||x.outcome==='DEVICE_VERIFIED'),evidenceIds:[]});
+   const evidenceIds=[...new Set(claimIds.flatMap(id=>evidenceService.list({claimId:id}).map(e=>e.evidence_id)))];
+   const verified=verification.length===claimIds.length&&verification.every(x=>x.outcome==='SUPPORTED'||x.outcome==='DEVICE_VERIFIED');
+   return done({operation:'VERIFY_RESEARCH_CLAIMS',operationClass:'BUSINESS',status:'SUCCEEDED',claimIds,verification,verified,unresolved:verification.some(x=>x.outcome==='UNRESOLVED'),contradicted:verification.some(x=>x.outcome==='CONTRADICTED'),researchGapId:String(envelope.payload.gapId||''),evidenceIds});
   }
   if(domain==='selfDevelopment'&&envelope.command==='GENERATE_CANDIDATE'){
    const {candidateCodeGenerationService}=await import('./candidateCodeGenerationService');
