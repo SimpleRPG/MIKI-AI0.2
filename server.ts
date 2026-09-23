@@ -2165,6 +2165,17 @@ ${activeGameCode}
 // GitHub Import Endpoint
 app.post('/api/github/import', async (req, res) => {
   try {
+    const pullStartedAt = Date.now();
+    let pullPhase = 'request_received';
+    const pullDiagnostics: Array<{ phase: string; detail: string; elapsedMs: number }> = [];
+
+    const recordPullPhase = (phase: string, detail: string) => {
+      pullPhase = phase;
+      const elapsedMs = Date.now() - pullStartedAt;
+      pullDiagnostics.push({ phase, detail, elapsedMs });
+      console.log(`[GITHUB_PULL] ${phase} | ${detail} | ${elapsedMs}ms`);
+    };
+
     const {
       repoUrl,
       branch = 'main',
@@ -2194,6 +2205,11 @@ app.post('/api/github/import', async (req, res) => {
     const [owner, repo] = match;
     const authToken = token || githubToken;
 
+    recordPullPhase(
+      'request_validated',
+      `repository=${owner}/${repo} branch=${branch} PAT=${authToken ? 'PRESENT' : 'ABSENT'} knownFiles=${Array.isArray(knownFiles) ? knownFiles.length : 0}`
+    );
+
     const headers: Record<string,string> = {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'MIKI-AI0.2'
@@ -2221,10 +2237,13 @@ app.post('/api/github/import', async (req, res) => {
       return response.json();
     };
 
+    recordPullPhase('repo_info_start', 'GitHub repository metadata');
     const repoInfo = await api(
       `https://api.github.com/repos/${owner}/${repo}`
     );
+    recordPullPhase('repo_info_done', `name=${repoInfo.name || repo}`);
 
+    recordPullPhase('branch_start', `branch=${branch}`);
     const branchInfo = await api(
       `https://api.github.com/repos/${owner}/${repo}/branches/${encodeURIComponent(branch)}`
     );
@@ -2232,6 +2251,12 @@ app.post('/api/github/import', async (req, res) => {
     const commitSha = branchInfo.commit.sha;
     const treeSha = branchInfo.commit.commit.tree.sha;
 
+    recordPullPhase(
+      'branch_done',
+      `commitSha=${commitSha.slice(0, 12)} treeSha=${treeSha.slice(0, 12)}`
+    );
+
+    recordPullPhase('tree_start', `treeSha=${treeSha.slice(0, 12)} recursive=true`);
     const tree = await api(
       `https://api.github.com/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`
     );
@@ -2278,12 +2303,21 @@ app.post('/api/github/import', async (req, res) => {
       ? await collectCompleteTree(treeSha)
       : (Array.isArray(tree.tree) ? tree.tree : []);
 
+    recordPullPhase(
+      'tree_done',
+      `entries=${completeTreeEntries.length} truncated=${tree.truncated === true}`
+    );
+
+    recordPullPhase('manifest_start', `treeEntries=${completeTreeEntries.length}`);
+
     const manifest = completeTreeEntries
       .filter((item: any) => item.type === 'blob')
       .map((item: any) => ({
         path: item.path,
         blobSha: item.sha
       }));
+
+    recordPullPhase('manifest_done', `files=${manifest.length}`);
 
     const known = new Map(
       (Array.isArray(knownFiles) ? knownFiles : [])
@@ -2293,18 +2327,43 @@ app.post('/api/github/import', async (req, res) => {
         ])
     );
 
+    const unchangedFiles = manifest.filter(
+      (item: any) => known.get(item.path)?.blobSha === item.blobSha
+    ).length;
+
+    const changedCandidates = manifest.length - unchangedFiles;
+
+    recordPullPhase(
+      'blob_sync_start',
+      `changedCandidates=${changedCandidates} unchanged=${unchangedFiles} total=${manifest.length}`
+    );
+
     const changedFiles: Array<{
       path: string;
       content: string;
       blobSha: string;
     }> = [];
 
+    let scannedFiles = 0;
+
     for (const item of manifest) {
       const old = known.get(item.path);
+      scannedFiles++;
 
       if (old?.blobSha === item.blobSha) {
+        if (scannedFiles === 1 || scannedFiles % 10 === 0 || scannedFiles === manifest.length) {
+          recordPullPhase(
+            'blob_progress',
+            `scanned=${scannedFiles}/${manifest.length} downloadedChanged=${changedFiles.length} unchanged=${unchangedFiles} path=${item.path}`
+          );
+        }
         continue;
       }
+
+      recordPullPhase(
+        'blob_fetch',
+        `scanned=${scannedFiles}/${manifest.length} downloadedChanged=${changedFiles.length} path=${item.path}`
+      );
 
       const blob = await api(
         `https://api.github.com/repos/${owner}/${repo}/git/blobs/${item.blobSha}`
@@ -2326,6 +2385,11 @@ app.post('/api/github/import', async (req, res) => {
         content,
         blobSha: item.blobSha
       });
+
+      recordPullPhase(
+        'blob_progress',
+        `scanned=${scannedFiles}/${manifest.length} downloadedChanged=${changedFiles.length} unchanged=${unchangedFiles} path=${item.path}`
+      );
     }
 
     const remotePaths = new Set(
@@ -2339,6 +2403,11 @@ app.post('/api/github/import', async (req, res) => {
       .map((item: any) => item.path)
       .filter((path: string) => !remotePaths.has(path));
 
+    recordPullPhase(
+      'completed',
+      `manifest=${manifest.length} changed=${changedFiles.length} unchanged=${unchangedFiles} deleted=${deletedPaths.length}`
+    );
+
     return res.json({
       success: true,
       repoName: repoInfo.name,
@@ -2347,6 +2416,11 @@ app.post('/api/github/import', async (req, res) => {
       description: repoInfo.description || '',
       commitSha,
       treeSha,
+      diagnostics: {
+        elapsedMs: Date.now() - pullStartedAt,
+        phase: pullPhase,
+        events: pullDiagnostics,
+      },
       manifest,
       changedFiles,
       files: changedFiles,

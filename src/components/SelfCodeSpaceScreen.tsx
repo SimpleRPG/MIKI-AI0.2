@@ -8,6 +8,7 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
  const [selected,setSelected]=useState<string>();
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState('');
+ const [pullDiagnostics,setPullDiagnostics]=useState<any>(null);
  const [settingsOpen,setSettingsOpen]=useState(false);
  const [repository,setRepository]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubSettings().repository);
  const [branch,setBranch]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubSettings().branch);
@@ -34,6 +35,7 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
    const result=await typedCoreUiGatewayService.syncSelfCode(pat);
    setSnapshot(result);
    setSelected(undefined);
+   setPullDiagnostics((result as any).diagnostics || null);
    setMessage(`同期完了: ${result.files.length}ファイル / ${result.repoSha256.slice(0,16)}`);
   }catch(e){setMessage(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
@@ -85,6 +87,22 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
   </header>
 
   {message&&<div className="my-3 rounded-2xl border border-slate-800 bg-slate-900 p-3 text-xs break-all">{message}</div>}
+
+  {pullDiagnostics&&<div className="my-3 rounded-2xl border border-slate-800 bg-slate-900 p-3">
+   <div className="text-xs font-bold text-indigo-300">GitHub PULL 診断</div>
+   <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-400">
+    <div>総時間: <span className="font-mono text-slate-200">{pullDiagnostics.elapsedMs}ms</span></div>
+    <div>最終状態: <span className="font-mono text-slate-200">{pullDiagnostics.phase}</span></div>
+    <div>診断イベント: <span className="font-mono text-slate-200">{pullDiagnostics.events?.length ?? 0}</span></div>
+   </div>
+   <div className="mt-3 max-h-64 overflow-y-auto space-y-1">
+    {(pullDiagnostics.events || []).map((event:any,index:number)=><div key={`${event.phase}-${index}`} className="rounded-lg border border-slate-800 bg-slate-950 p-2 text-[9px]">
+     <span className="font-bold text-indigo-300">{event.phase}</span>
+     <span className="ml-2 font-mono text-slate-500">{event.elapsedMs}ms</span>
+     <div className="mt-1 break-all text-slate-400">{event.detail}</div>
+    </div>)}
+   </div>
+  </div>}
 
   <div className="mt-3 relative">
    <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500"/>
