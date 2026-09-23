@@ -172,6 +172,8 @@ class CoreCompletionGateService {
     // legacy fixed-domain requirement.
     const evidenceQualityPassed=replyRecords.length===0?true:quality.passed;
     if(!evidenceQualityPassed) reasons.push(`EVIDENCE_QUALITY_FAILED:${quality.reasons.join(',')}`);
+    const isRevalidation=requiredOperations.some(operation=>operation.operation==='GENERATE_CANDIDATE') && requiredOperations.some(operation=>operation.operation==='CREATE_REVIEW_PACKAGE') && task.entries.some(entry=>entry.kind==='RESULT'&&entry.value&&typeof entry.value==='object'&&(entry.value as Record<string,unknown>).operation==='GENERATE_CANDIDATE'&&typeof (entry.value as Record<string,unknown>).externalReviewId==='string');
+    if(isRevalidation){const pkg=task.entries.some(entry=>entry.kind==='RESULT'&&entry.value&&typeof entry.value==='object'&&(entry.value as Record<string,unknown>).operation==='CREATE_REVIEW_PACKAGE'&&typeof (entry.value as Record<string,unknown>).packageId==='string');if(pkg===false) reasons.push('REVALIDATION_REVIEW_PACKAGE_MISSING');}
     const packagePending=requiredOperations.some(operation=>operation.operation==='CREATE_REVIEW_PACKAGE') &&
       !missingRequiredOperations.some(item=>item.startsWith('CREATE_REVIEW_PACKAGE:'));
     return {
