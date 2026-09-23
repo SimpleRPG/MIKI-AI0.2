@@ -1020,7 +1020,7 @@ GitHub mainに存在しない変更を、存在すると仮定して次の変更
 
 自己改善UIの「指示からレビューZIPまで」の操作は、単一の関数呼出しだけで完了したとみなしてはならない。COREが複数Cycleを必要とする場合、COREの再計画・分類実行・結果回収・再評価を継続できる状態であることを確認し、UIは実行中・待機中・レビュー待ち・失敗を区別して表示する。
 
-Review Packageが`EXTERNAL_REVIEW_PENDING`である間は、Candidateを本番コードへ適用してはならない。`APPROVE_REVIEWED_CANDIDATE`による適用は、人間による明示的な採用Decisionが記録され、対象Package、Candidate Manifest SHA、Workspace、必要なPersistence Receiptが一致した`ACCEPTED`状態に限定する。
+Review Packageが`EXTERNAL_REVIEW_PENDING`である間、Candidateを人間の明示的な採用Decisionなしに本番コードへ適用してはならない。`APPROVE_REVIEWED_CANDIDATE`による適用は、対象Package、Candidate Manifest SHA、Workspace、必要なPersistence Receiptが一致し、かつ対象External Reviewに紐づく人間の明示的な採用Decision（`ACCEPT`）が記録されていることを条件とする。適用が正常完了した後、Review Packageを`ACCEPTED`へ遷移させる。
 
 外部指示から開始した自己改善では、directiveId、sourceHash、要求・禁止事項・不変条件・検証条件・納品条件・関連IssueをCORE Task、Improvement Run、Candidate、Validation、Review Packageの系譜で追跡可能にする。途中の分類結果や再計画によってDirectiveの識別情報を失ってはならない。
 

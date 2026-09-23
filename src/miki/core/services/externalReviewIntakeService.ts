@@ -101,16 +101,6 @@ class ExternalReviewIntakeService {
     if (packageReferences.zipSha256 && packageReferences.zipSha256 !== reviewPackage.zipSha256) mismatchReasons.push('ZIP_SHA256_MISMATCH');
     const mismatch = mismatchReasons.length > 0;
 
-    const decisionId = `ERD-${crypto.randomUUID()}`;
-    let decision: ExternalReviewDecision = {
-      decisionId, externalReviewId: record.externalReviewId, externalAiRole: record.externalAiRole,
-      packageId: record.packageId, packageRevision: record.packageRevision,
-      decision: input.decision, reason: input.reason.trim(), decidedAt: Date.now(),
-      coreTaskId: 'PENDING', coreDecisionId: 'PENDING', status: 'PENDING_CORE'
-    };
-    this.decisions.set(decisionId, decision);
-    this.persistDecisions();
-
     const coreResult = await coreTaskIngressService.submit({
       kind: 'USER_REQUEST',
       goal: '外部AI評価返信を対象Packageへ対応付け、正規化して保存可否を判断する',
@@ -175,6 +165,17 @@ class ExternalReviewIntakeService {
     if (!reviewPackage || reviewPackage.candidateRevision !== record.packageRevision || reviewPackage.candidateManifestSha256 !== record.candidateManifestSha256) {
       throw new Error('PACKAGE_REVISION_OR_MANIFEST_MISMATCH');
     }
+
+    const decisionId = `ERD-${crypto.randomUUID()}`;
+    let decision: ExternalReviewDecision = {
+      decisionId, externalReviewId: record.externalReviewId,
+      externalAiRole: record.externalAiRole, packageId: record.packageId,
+      packageRevision: record.packageRevision, decision: input.decision,
+      reason: input.reason.trim(), decidedAt: Date.now(),
+      coreTaskId: 'PENDING', coreDecisionId: 'PENDING', status: 'PENDING_CORE'
+    };
+    this.decisions.set(decisionId, decision);
+    this.persistDecisions();
 
     const coreResult = await coreTaskIngressService.submit({
       kind: 'USER_REQUEST',

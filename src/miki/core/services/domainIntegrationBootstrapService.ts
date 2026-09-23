@@ -219,12 +219,18 @@ class DomainIntegrationBootstrapService{
    if(!pkg)return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_FOUND',completedAt:Date.now()};
    const {externalReviewIntakeService}=await import('./externalReviewIntakeService');
    const externalReviewId=String(envelope.payload.externalReviewId||'');
-   const userAccepted=externalReviewId && externalReviewIntakeService.listDecisions(externalReviewId).some(d=>
-     d.decision==='ACCEPT' &&
-     d.packageId===pkg.packageId &&
-     d.packageRevision===pkg.candidateRevision &&
-     d.packageRevision===pkg.candidateRevision &&
-     d.status!=='BLOCKED');
+   const externalReview=externalReviewId
+     ? externalReviewIntakeService.list().find(r=>r.externalReviewId===externalReviewId)
+     : undefined;
+   const userAccepted=!!externalReview &&
+     externalReview.packageId===pkg.packageId &&
+     externalReview.packageRevision===pkg.candidateRevision &&
+     externalReview.candidateManifestSha256===pkg.candidateManifestSha256 &&
+     externalReviewIntakeService.listDecisions(externalReviewId).some(d=>
+       d.decision==='ACCEPT' &&
+       d.packageId===pkg.packageId &&
+       d.packageRevision===pkg.candidateRevision &&
+       d.status!=='BLOCKED');
    if(pkg.status!=='ACCEPTED' && !(pkg.status==='EXTERNAL_REVIEW_PENDING' && userAccepted))
     return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_ACCEPTED',completedAt:Date.now()};
    if(pkg.candidateManifestSha256!==manifestSha)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_MANIFEST_SHA_MISMATCH',completedAt:Date.now()};
