@@ -15,6 +15,8 @@ import { domainSequentialConnectionService } from './domainSequentialConnectionS
 import { MIKI_DOMAINS } from './domainCatalogService';
 import { persistenceReceiptLedgerService } from './persistenceReceiptLedgerService';
 import { canonicalSha256 } from './canonicalSha256Service';
+import { candidateCommitTransactionService } from './candidateCommitTransactionService';
+import { reviewLearningArtifactService } from './reviewLearningArtifactService';
 
 const BASE_COMMANDS:DomainCommand[]=['HEALTH_CHECK','DESCRIBE','GET_STATUS','ASSESS_DOMAIN','PARTICIPATE','VERIFY_CONNECTION'];
 
@@ -246,12 +248,15 @@ class DomainIntegrationBootstrapService{
    let result;
    try{
     result=await isolatedCandidateWorkspaceService.commitWithReceipt(workspace.workspaceId,receipt,operationInstanceId);
+    if(result.transaction.candidateRevisionSha256!==pkg.candidateManifestSha256)throw new Error(CANDIDATE_REVISION_MANIFEST_MISMATCH);
+    if(result.workspace.candidateRevisionSha256!==pkg.candidateManifestSha256)throw new Error(WORKSPACE_REVISION_MANIFEST_MISMATCH);
+    reviewZipExportService.updateStatus(packageId,'ACCEPTED');
    }catch(error){
+    if(result?.transaction?.transactionId)candidateCommitTransactionService.rollback(result.transaction.transactionId,'PROMOTION_COMPENSATION');
     try{selfCodeSpaceService.restoreSnapshot(beforeApply,applied.repoSha256);}
     catch(recoveryError){return {accepted:false,domain,command:envelope.command,error:"SELF_CODE_SPACE_RECOVERY_REQUIRED",completedAt:Date.now()};}
     throw error;
    }
-   reviewZipExportService.updateStatus(packageId,'ACCEPTED');
    return done({operation:'APPROVE_REVIEWED_CANDIDATE',operationClass:'BUSINESS',status:'SUCCEEDED',packageId,workspaceId:workspace.workspaceId,transactionId:result.transaction.transactionId,candidateManifestSha256:result.transaction.candidateManifestSha256,selfCodeRevisionSha256:applied.repoSha256,evidenceIds:[...new Set(result.workspace.files.flatMap(file=>file.evidenceIds))],receiptIds:[receipt]});
   }
 if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
@@ -275,6 +280,13 @@ if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
      accepted:false,domain,command:envelope.command,error:result.message,
      result:{operation:'CREATE_REVIEW_PACKAGE',operationClass:'BUSINESS',...result,runId,workspaceId,evidenceIds:[]},completedAt:Date.now()
    };
+   if(sourcePackageId){
+    const lineage=envelope.payload.learningLineage;
+    const externalReviewId=lineage&&typeof lineage===object&&typeof (lineage as Record<string,unknown>).externalReviewId===string?String((lineage as Record<string,unknown>).externalReviewId):;
+    const source=reviewZipExportService.list().find(item=>item.packageId===sourcePackageId);
+    const correctedCandidateRef=result.artifact?.candidateManifestSha256||;
+    if(externalReviewId&&source&&correctedCandidateRef)reviewLearningArtifactService.linkCorrectionCandidate({externalReviewId,beforeCandidateRef:source.candidateManifestSha256,correctedCandidateRef});
+   }
    return done({operation:'CREATE_REVIEW_PACKAGE',operationClass:'BUSINESS',...result,runId,workspaceId,evidenceIds:[]});
   }
   if(domain==='verification'&&envelope.command==='VALIDATE_CANDIDATE'){
