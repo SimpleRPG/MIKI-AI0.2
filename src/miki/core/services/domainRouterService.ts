@@ -108,7 +108,7 @@ class DomainRouterService {
       if(Array.isArray(item)){for(const child of item)walk(child,depth+1);return;}
       if(typeof item!=='object')return;
       for(const [key,child] of Object.entries(item as Record<string,unknown>)){
-        if(/evidence(ids?)?/i.test(key)){
+        if(/evidence(?:[_-]?ids?)?$/i.test(key)){
           if(typeof child==='string'&&child)found.add(child);
           if(Array.isArray(child))for(const id of child)if(typeof id==='string'&&id)found.add(id);
         }
