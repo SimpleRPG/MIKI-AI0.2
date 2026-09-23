@@ -38,14 +38,26 @@ class SelfCodeSpaceService {
     if(!next.repository||!next.branch||!next.commitMessage)throw new Error('SELF_CODE_GITHUB_SETTINGS_REQUIRED');
     storageService.setItem(SETTINGS_KEY,JSON.stringify(next));return next;
   }
+
+  getGitHubPat(): string {
+    return storageService.getItem('miki_self_code_github_pat') || '';
+  }
+
+  saveGitHubPat(token: string): string {
+    const value=token.trim();
+    if(value) storageService.setItem('miki_self_code_github_pat',value);
+    else storageService.removeItem('miki_self_code_github_pat');
+    return value;
+  }
   async sync(token?: string): Promise<SelfCodeSnapshot> {
     const existing=this.get();
     if(existing?.dirty) throw new Error('SELF_CODE_SPACE_DIRTY_SYNC_REQUIRED');
     const settings=this.getGitHubSettings();
+    const effectiveToken=(token?.trim() || this.getGitHubPat()).trim();
     const result = await apiService.importFromGitHub({
       repoUrl: settings.repository,
       branch: settings.branch,
-      token: token?.trim() || undefined,
+      token: effectiveToken || undefined,
     });
 
     if (!result.success || !result.files?.length) {

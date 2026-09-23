@@ -12,6 +12,7 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
  const [repository,setRepository]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubSettings().repository);
  const [branch,setBranch]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubSettings().branch);
  const [commitMessage,setCommitMessage]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubSettings().commitMessage);
+ const [pat,setPat]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubPat());
 
  const files=useMemo(()=>query?typedCoreUiGatewayService.searchSelfCode(query,100):typedCoreUiGatewayService.listSelfCodeFiles(),[query,snapshot]);
  const current=selected?typedCoreUiGatewayService.readSelfCodeFile(selected):undefined;
@@ -19,6 +20,7 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
  const saveSettings=()=>{
   try{
    typedCoreUiGatewayService.saveSelfCodeGitHubSettings({repository,branch,commitMessage});
+   typedCoreUiGatewayService.saveSelfCodeGitHubPat(pat);
    setSettingsOpen(false);
    setMessage('GitHub設定を保存しました。再同期してください。');
   }catch(e){setMessage(e instanceof Error?e.message:String(e));}
@@ -29,7 +31,7 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
  const sync=async()=>{
   setBusy(true);setMessage('');
   try{
-   const result=await typedCoreUiGatewayService.syncSelfCode();
+   const result=await typedCoreUiGatewayService.syncSelfCode(pat);
    setSnapshot(result.snapshot);
    setSelected(undefined);
    setMessage(`同期完了: ${result.snapshot.files.length}ファイル / ${result.snapshot.repoSha256.slice(0,16)}`);
@@ -63,13 +65,16 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
     <RefreshCw className="mr-2 inline h-4 w-4"/>{busy?'同期中':'GitHubから正本を同期'}
    </button>
    <button disabled={busy} onClick={()=>setSettingsOpen(v=>!v)} className="mt-2 min-h-12 w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 text-sm font-bold">
-    GitHub PUSH設定 {settingsOpen?'▲':'▼'}
+    GitHub PULL / PUSH設定 {settingsOpen?'▲':'▼'}
    </button>
    {settingsOpen&&<div className="mt-2 rounded-2xl border border-slate-700 bg-slate-950 p-3">
     <label className="block text-xs text-slate-400">自己コード用リポジトリ</label>
     <input value={repository} onChange={e=>setRepository(e.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm"/>
     <label className="mt-2 block text-xs text-slate-400">ブランチ</label>
     <input value={branch} onChange={e=>setBranch(e.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm"/>
+    <label className="mt-2 block text-xs text-slate-400">GitHub PAT</label>
+    <input type="password" value={pat} onChange={e=>setPat(e.target.value)} placeholder="PULL/PUSH用PAT" className="mt-1 min-h-12 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm"/>
+    <p className="mt-1 text-[10px] text-slate-500">PATはリポジトリへ保存せず端末内設定だけに保持します。</p>
     <label className="mt-2 block text-xs text-slate-400">コミットメッセージ</label>
     <input value={commitMessage} onChange={e=>setCommitMessage(e.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm"/>
     <button disabled={busy} onClick={saveSettings} className="mt-2 min-h-12 w-full rounded-xl bg-slate-700 font-bold">設定を保存</button>
