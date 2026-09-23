@@ -2190,10 +2190,10 @@ app.post('/api/github/import', async (req, res) => {
     }
     const treeData = await treeRes.json();
 
-    const allowedExts = ['.html', '.js', '.jsx', '.ts', '.tsx', '.css', '.json', '.txt', '.md', '.wgsl', '.glsl'];
+    // 自己コードスペースはGitHub正本の全blobを参照対象にする。
+    // 拡張子・件数による人工的な参照制限は設けない。
     const fileEntries = (treeData.tree || [])
-      .filter((item: any) => item.type === 'blob' && allowedExts.some(ext => item.path.endsWith(ext)))
-      .slice(0, 150);
+      .filter((item: any) => item.type === 'blob');
 
     const loadedFiles = await Promise.all(
       fileEntries.map(async (item: any) => {

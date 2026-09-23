@@ -159,12 +159,11 @@ class SelfCodeSpaceService {
     return this.clone(snapshot);
   }
 
-  search(query: string, limit = 20): SelfCodeFile[] {
+  search(query: string): SelfCodeFile[] {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return this.listFiles()
-      .filter(file => file.path.toLowerCase().includes(q) || file.content.toLowerCase().includes(q))
-      .slice(0, Math.max(1, limit));
+      .filter(file => file.path.toLowerCase().includes(q) || file.content.toLowerCase().includes(q));
   }
 
   private language(path: string): string { const ext = path.split(".").pop()?.toLowerCase(); return ext === "tsx" ? "typescriptreact" : ext === "ts" ? "typescript" : ext === "js" ? "javascript" : ext === "json" ? "json" : ext || "text"; }

@@ -14,7 +14,7 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
  const [commitMessage,setCommitMessage]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubSettings().commitMessage);
  const [pat,setPat]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubPat());
 
- const files=useMemo(()=>query?typedCoreUiGatewayService.searchSelfCode(query,100):typedCoreUiGatewayService.listSelfCodeFiles(),[query,snapshot]);
+ const files=useMemo(()=>query?typedCoreUiGatewayService.searchSelfCode(query):typedCoreUiGatewayService.listSelfCodeFiles(),[query,snapshot]);
  const current=selected?typedCoreUiGatewayService.readSelfCodeFile(selected):undefined;
 
  const saveSettings=()=>{
