@@ -639,3 +639,18 @@ Research内のQuery Planningは探索観点を計画する責務であり、次�
 
 Researchの安全な終端は「検索した」ではなく、
 必要なEvidence Coverageを確認し、Verification境界を通過するか、未解決理由と次に必要な処理をCOREへ返した状態とする。
+
+## Research完了判定とCORE完了条件
+
+Research結果が存在することだけを、Research完了またはTask完了の根拠にしない。
+
+Researchの完了状態は、Research結果の存在に加えて、探索十分性または明示された終端条件を満たしていることを必要とする。
+
+- continuationAvailable=true のResearch結果は未完了として扱い、COREは追加探索を再評価する。
+- outcome=INSUFFICIENT_SEARCH はCoverage不足として扱い、COREがResearchを再投入できる状態を維持する。
+- outcome=INSUFFICIENT_VERIFICATION はResearch結果の存在だけで完了とせず、COREがVerification等の必要な分類を選択する。
+- outcome=NOT_FOUND_AFTER_COVERAGE は、対象に必要なCoverage条件を満たしたことがEvidenceとして確認できる場合に限り、探索終端として扱える。
+- resolved=true または同等の十分性終端条件を満たさないResearch結果だけでは、Research依存Taskを完了させない。
+- COREのTask完了判定は、Research結果の有無ではなく、Researchの状態、Evidence、Verification、未解決要件、continuation状態をBlackboardから再評価して決定する。
+
+これにより「検索結果が返った」ことと「必要な探索が完了した」ことを明確に分離する。
