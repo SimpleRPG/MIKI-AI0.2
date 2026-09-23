@@ -103,7 +103,7 @@ export class ResearchService {
     const requestedPasses = Number.isFinite(options?.maxPasses)
       ? Math.max(1, Math.floor(options!.maxPasses!))
       : 2;
-    const queryPlan = researchQueryPlanningService.buildPlan(baseQuery);
+    const queryPlan = researchQueryPlanningService.buildPlan(baseQuery, gap.researchClaimIds || []);
     const invocationPassLimit = Math.min(
       queryPlan.policy.maxTotalSearchRequests,
       queryPlan.policy.maxQueriesPerPlan,
