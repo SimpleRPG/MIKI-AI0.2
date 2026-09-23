@@ -44,6 +44,7 @@ export interface KnowledgeGap {
   lastResearchAt?: number;
   resolutionPlan?: KnowledgeGapResolutionPlan;
   researchClaimIds?: string[];
+  researchRequiredClaimIds?: string[];
 }
 
 /**
@@ -287,6 +288,13 @@ export class KnowledgeGapService {
 
   public markResearching(id: string): KnowledgeGap | undefined {
     return this.update(id, { status: 'RESEARCHING', lastResearchAt: Date.now(), attempts: (this.getById(id)?.attempts || 0) + 1 });
+  }
+
+  public attachResearchRequiredClaims(id: string, claimIds: string[]): KnowledgeGap | undefined {
+    const gap = this.getById(id);
+    if (!gap) return undefined;
+    const merged = [...new Set([...(gap.researchRequiredClaimIds || []), ...claimIds].filter(Boolean))];
+    return this.update(id, { researchRequiredClaimIds: merged });
   }
 
   public attachResearchClaims(id: string, claimIds: string[]): KnowledgeGap | undefined {

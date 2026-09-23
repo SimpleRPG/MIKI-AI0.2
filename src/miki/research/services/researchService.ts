@@ -81,6 +81,7 @@ export class ResearchService {
   }): Promise<ResearchResult> {
     const evidence: EvidenceRecord[] = [];
     const claimIds: string[] = [];
+    const requiredResearchClaimIds: string[] = [];
     const learnedTermComponentIds: string[] = [];
 
     knowledgeGapService.buildResolutionPlan(gap);
@@ -297,6 +298,7 @@ export class ResearchService {
         }
 
         if (claimId && !claimIds.includes(claimId)) claimIds.push(claimId);
+        if (claimId && passQuery.intentType !== "COUNTEREVIDENCE" && !requiredResearchClaimIds.includes(claimId)) requiredResearchClaimIds.push(claimId);
       }
 
         // Search is only acquisition. The explicit verifier is the boundary that
@@ -305,6 +307,7 @@ export class ResearchService {
         // resolve the gap without the same verifier boundary.
         knowledgeGapService.advanceResolutionPlan(gap.id, 'VERIFY', 'RESEARCH');
         const persistedResearchClaimIds = knowledgeGapService.attachResearchClaims(gap.id, claimIds)?.researchClaimIds || claimIds;
+        const persistedRequiredResearchClaimIds = knowledgeGapService.attachResearchRequiredClaims(gap.id, requiredResearchClaimIds)?.researchRequiredClaimIds || requiredResearchClaimIds;
         verification = claimIds.length > 0
           ? verifierService.verifyMany({
               claimIds: persistedResearchClaimIds,
@@ -312,7 +315,7 @@ export class ResearchService {
               maxAgeDays: options?.maxAgeDays,
             })
           : [];
-        resolved = verification.some((result) => result.promoted);
+        resolved = persistedRequiredResearchClaimIds.length > 0 && verification.filter((result) => persistedRequiredResearchClaimIds.includes(result.claimId)).length === persistedRequiredResearchClaimIds.length && verification.filter((result) => persistedRequiredResearchClaimIds.includes(result.claimId)).every((result) => result.outcome === "SUPPORTED" || result.outcome === "DEVICE_VERIFIED");
         // Verified or otherwise admissible claims are mirrored into the Knowledge OS.
         // This is a structural sync only; it never promotes an unverified claim.
         cognitiveEvidenceIntegrationService.ingestClaims(claimIds);
