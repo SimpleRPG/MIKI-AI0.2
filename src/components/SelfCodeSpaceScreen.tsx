@@ -6,6 +6,7 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
  const [snapshot,setSnapshot]=useState(typedCoreUiGatewayService.getSelfCodeSnapshot());
  const [query,setQuery]=useState('');
  const [selected,setSelected]=useState<string>();
+ const [fileDisplayLimit,setFileDisplayLimit]=useState(100);
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState('');
  const [pullDiagnostics,setPullDiagnostics]=useState<any>(null);
@@ -16,6 +17,8 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
  const [pat,setPat]=useState(()=>typedCoreUiGatewayService.getSelfCodeGitHubPat());
 
  const files=useMemo(()=>query?typedCoreUiGatewayService.searchSelfCode(query):typedCoreUiGatewayService.listSelfCodeFiles(),[query,snapshot]);
+ const visibleFiles=useMemo(()=>files.slice(0,fileDisplayLimit),[files,fileDisplayLimit]);
+ const diagnosticEvents=useMemo(()=>((pullDiagnostics?.events||[]).slice(-120)),[pullDiagnostics]);
  const current=selected?typedCoreUiGatewayService.readSelfCodeFile(selected):undefined;
 
  const saveSettings=()=>{
@@ -96,7 +99,7 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
     <div>診断イベント: <span className="font-mono text-slate-200">{pullDiagnostics.events?.length ?? 0}</span></div>
    </div>
    <div className="mt-3 max-h-64 overflow-y-auto space-y-1">
-    {(pullDiagnostics.events || []).map((event:any,index:number)=><div key={`${event.phase}-${index}`} className="rounded-lg border border-slate-800 bg-slate-950 p-2 text-[9px]">
+    {diagnosticEvents.map((event:any,index:number)=><div key={`${event.phase}-${index}`} className="rounded-lg border border-slate-800 bg-slate-950 p-2 text-[9px]">
      <span className="font-bold text-indigo-300">{event.phase}</span>
      <span className="ml-2 font-mono text-slate-500">{event.elapsedMs}ms</span>
      <div className="mt-1 break-all text-slate-400">{event.detail}</div>
@@ -106,14 +109,20 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
 
   <div className="mt-3 relative">
    <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500"/>
-   <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ファイル名・コードを検索" className="min-h-12 w-full rounded-2xl border border-slate-700 bg-slate-900 pl-10 pr-3 text-sm"/>
+   <input value={query} onChange={e=>{setQuery(e.target.value);setFileDisplayLimit(100);}} placeholder="ファイル名・コードを検索" className="min-h-12 w-full rounded-2xl border border-slate-700 bg-slate-900 pl-10 pr-3 text-sm"/>
   </div>
 
   <div className="mt-3 space-y-2">
-   {files.map(file=><button key={file.path} onClick={()=>setSelected(file.path)} className="flex min-h-16 w-full items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-3 text-left">
+   <div className="px-1 text-[10px] text-slate-500">
+    表示: {visibleFiles.length} / {files.length} ファイル
+   </div>
+   {visibleFiles.map(file=><button key={file.path} onClick={()=>setSelected(file.path)} className="flex min-h-16 w-full items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-3 text-left">
     <FileCode2 className="h-4 w-4 shrink-0 text-indigo-300"/>
     <div className="min-w-0"><div className="truncate text-xs font-bold">{file.path}</div><div className="mt-1 text-[9px] text-slate-500 font-mono">{file.sha256.slice(0,16)}</div></div>
    </button>)}
+   {visibleFiles.length < files.length&&<button onClick={()=>setFileDisplayLimit(v=>Math.min(v+100,files.length))} className="min-h-12 w-full rounded-2xl border border-slate-700 bg-slate-900 px-3 text-sm font-bold text-slate-300">
+    さらに100件表示（残り {files.length-visibleFiles.length} 件）
+   </button>}
   </div>
  </div>;
 };
