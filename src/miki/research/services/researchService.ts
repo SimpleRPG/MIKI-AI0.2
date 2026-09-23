@@ -308,7 +308,7 @@ export class ResearchService {
         knowledgeGapService.advanceResolutionPlan(gap.id, 'VERIFY', 'RESEARCH');
         const persistedResearchClaimIds = knowledgeGapService.attachResearchClaims(gap.id, claimIds)?.researchClaimIds || claimIds;
         const persistedRequiredResearchClaimIds = knowledgeGapService.attachResearchRequiredClaims(gap.id, requiredResearchClaimIds)?.researchRequiredClaimIds || requiredResearchClaimIds;
-        verification = claimIds.length > 0
+        verification = persistedResearchClaimIds.length > 0
           ? verifierService.verifyMany({
               claimIds: persistedResearchClaimIds,
               requireFresh: options?.requireFresh,
