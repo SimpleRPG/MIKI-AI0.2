@@ -672,14 +672,46 @@ class AdaptiveRoutePlannerService {
 
     const latestVerification=this.latestBusinessResult(task,'VERIFY_RESEARCH_CLAIMS');
     const verificationValue=latestVerification?objectValue(latestVerification):undefined;
-    const verificationItems=Array.isArray(verificationValue?.verification)?verificationValue.verification as Array<Record<string,unknown>>:[];
-    const verificationComplete=researchClaimIds.length>0&&researchClaimIds.every(id=>verificationItems.some(x=>String(x.claimId||'')===id&&(x.outcome==='SUPPORTED'||x.outcome==='DEVICE_VERIFIED')));
+    const verificationItems=Array.isArray(verificationValue?.verification)
+      ? verificationValue.verification as Array<Record<string,unknown>>:[];
+    const verificationComplete=researchClaimIds.length>0&&researchClaimIds.every(id=>
+      verificationItems.some(x=>
+        String(x.claimId||'')===id &&
+        (x.outcome==='SUPPORTED'||x.outcome==='DEVICE_VERIFIED')
+      )
+    );
+
+    const knowledgeComponentIds=this.collectValues(task,/knowledgeComponentIds/i);
+    const verifiedKnowledgeComponentIds=Array.isArray(verificationValue?.verifiedKnowledgeComponentIds)
+      ? verificationValue.verifiedKnowledgeComponentIds.map(String).filter(Boolean)
+      : [];
+
     if(researchOutcome==='INSUFFICIENT_VERIFICATION'&&researchClaimIds.length>0&&!verificationComplete){
       routes.push({
         target:'verification',
         command:'VERIFY_RESEARCH_CLAIMS',
         reason:'CORE re-evaluated Research verification insufficiency and selected the Verification domain',
-        payload:{taskId:task.taskId,claimIds:researchClaimIds,gapId:researchGapId,adaptive:true,priority:96}
+        payload:{
+          taskId:task.taskId,
+          claimIds:researchClaimIds,
+          gapId:researchGapId,
+          knowledgeComponentIds,
+          adaptive:true,
+          priority:96
+        }
+      });
+    } else if(verificationComplete&&verifiedKnowledgeComponentIds.length>0){
+      routes.push({
+        target:'learning',
+        command:'APPROVE_REUSABLE_COMPONENTS',
+        reason:'CORE re-evaluated verified research knowledge and selected reusable-component approval',
+        payload:{
+          taskId:task.taskId,
+          operation:'APPROVE_REUSABLE_COMPONENTS',
+          knowledgeComponentIds:verifiedKnowledgeComponentIds,
+          adaptive:true,
+          priority:94
+        }
       });
     } else if(continuationAvailable && researchGapId){
       routes.push({
