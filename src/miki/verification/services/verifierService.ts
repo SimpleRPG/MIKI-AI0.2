@@ -49,7 +49,6 @@ export class VerifierService {
     executionEvidenceIds?: string[];
     requireFresh?: boolean;
     maxAgeDays?: number;
-    resolveGapId?: string;
   }): VerificationResult {
     const claim = claimDatabaseService.getClaim(params.claimId);
     if (!claim) {
@@ -129,14 +128,12 @@ export class VerifierService {
     claimIds: string[];
     requireFresh?: boolean;
     maxAgeDays?: number;
-    resolveGapId?: string;
   }): VerificationResult[] {
     return params.claimIds.map((claimId) =>
       this.verifyClaim({
         claimId,
         requireFresh: params.requireFresh,
         maxAgeDays: params.maxAgeDays,
-        resolveGapId: params.resolveGapId,
       })
     );
   }
