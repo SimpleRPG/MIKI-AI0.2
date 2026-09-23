@@ -240,7 +240,7 @@ class RequiredAssetAcquisitionService {
         return;
       }
       for (const [key, child] of Object.entries(current as Record<string, unknown>)) {
-        if (/^evidence(ids?)?$/i.test(key)) {
+        if (/^evidence(?:[_-]?ids?)?$/i.test(key)) {
           if (typeof child === 'string' && child.trim()) {
             output.push(child.trim());
           } else if (Array.isArray(child)) {
