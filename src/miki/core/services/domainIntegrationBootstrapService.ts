@@ -226,12 +226,12 @@ class DomainIntegrationBootstrapService{
      : undefined;
    const userAccepted=!!externalReview &&
      externalReview.packageId===pkg.packageId &&
-     externalReview.packageRevision===pkg.candidateRevision &&
+     externalReview.packageRevision===pkg.packageRevision &&
      externalReview.candidateManifestSha256===pkg.candidateManifestSha256 &&
      externalReviewIntakeService.listDecisions(externalReviewId).some(d=>
        d.decision==='ACCEPT' &&
        d.packageId===pkg.packageId &&
-       d.packageRevision===pkg.candidateRevision &&
+       d.packageRevision===pkg.packageRevision &&
        d.status!=='BLOCKED');
    if(pkg.status!=='ACCEPTED' && !(pkg.status==='EXTERNAL_REVIEW_PENDING' && userAccepted))
     return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_ACCEPTED',completedAt:Date.now()};

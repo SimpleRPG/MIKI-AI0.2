@@ -96,7 +96,7 @@ class ExternalReviewIntakeService {
     const packageReferences = this.extractPackageReferences(rawResponse);
     const mismatchReasons: string[] = [];
     if (packageReferences.packageId && packageReferences.packageId !== reviewPackage.packageId) mismatchReasons.push('PACKAGE_ID_MISMATCH');
-    if (packageReferences.packageRevision !== undefined && packageReferences.packageRevision !== reviewPackage.candidateRevision) mismatchReasons.push('PACKAGE_REVISION_MISMATCH');
+    if (packageReferences.packageRevision !== undefined && packageReferences.packageRevision !== reviewPackage.packageRevision) mismatchReasons.push('PACKAGE_REVISION_MISMATCH');
     if (packageReferences.candidateManifestSha256 && packageReferences.candidateManifestSha256 !== reviewPackage.candidateManifestSha256) mismatchReasons.push('CANDIDATE_MANIFEST_SHA256_MISMATCH');
     if (packageReferences.zipSha256 && packageReferences.zipSha256 !== reviewPackage.zipSha256) mismatchReasons.push('ZIP_SHA256_MISMATCH');
     const mismatch = mismatchReasons.length > 0;
@@ -108,7 +108,7 @@ class ExternalReviewIntakeService {
       payload: {
         operation: 'IMPORT_EXTERNAL_AI_REVIEW',
         packageId: reviewPackage.packageId,
-        packageRevision: reviewPackage.candidateRevision,
+        packageRevision: reviewPackage.packageRevision,
         candidateManifestSha256: reviewPackage.candidateManifestSha256,
         zipSha256: reviewPackage.zipSha256,
         rawResponseSha256,
@@ -123,7 +123,7 @@ class ExternalReviewIntakeService {
       externalReviewId,
       externalAiRole: input.externalAiRole || 'REVIEWER',
       packageId: reviewPackage.packageId,
-      packageRevision: reviewPackage.candidateRevision,
+      packageRevision: reviewPackage.packageRevision,
       candidateManifestSha256: reviewPackage.candidateManifestSha256,
       zipSha256: reviewPackage.zipSha256,
       sourceType: input.sourceType,
@@ -162,7 +162,7 @@ class ExternalReviewIntakeService {
     if (record.status === 'MISMATCH') throw new Error('PACKAGE_REVIEW_MISMATCH');
     if (!input.reason.trim() && input.decision === 'REJECT') throw new Error('REJECTION_REASON_REQUIRED');
     const reviewPackage = reviewZipExportService.list().find(item => item.packageId === record.packageId);
-    if (!reviewPackage || reviewPackage.candidateRevision !== record.packageRevision || reviewPackage.candidateManifestSha256 !== record.candidateManifestSha256) {
+    if (!reviewPackage || reviewPackage.packageRevision !== record.packageRevision || reviewPackage.candidateManifestSha256 !== record.candidateManifestSha256) {
       throw new Error('PACKAGE_REVISION_OR_MANIFEST_MISMATCH');
     }
 
@@ -314,7 +314,7 @@ class ExternalReviewIntakeService {
     } catch {
       value = {};
     }
-    const revision = Number(value.packageRevision || value.candidateRevision);
+    const revision = Number(value.packageRevision);
     return {
       packageId: typeof value.packageId === 'string' ? value.packageId : undefined,
       packageRevision: Number.isFinite(revision) && revision > 0 ? revision : undefined,
