@@ -40,7 +40,7 @@ export interface ResearchResult {
 }
 
 /**
- * Evidence acquisition only.
+ * Research orchestration and Evidence acquisition.
  *
  * Invariants:
  * - Search output is Evidence first.
