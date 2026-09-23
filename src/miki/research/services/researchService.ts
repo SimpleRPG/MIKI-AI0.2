@@ -172,6 +172,7 @@ export class ResearchService {
       let previousIndependentClusters: string[] = [];
 
       let recommendedRevisionQuery: string | undefined;
+      let latestWebResearchProgress: WebResearchProgress | undefined;
 
       const buildAdaptiveQuery = (round: number, results: VerificationResult[]): string => {
         if (round === 0) return baseQuery;
@@ -349,8 +350,28 @@ export class ResearchService {
         }
 
         const webResearchPolicy = webResearchPolicyService.get();
-        let latestWebResearchProgress: WebResearchProgress | undefined;
-        const webResearchProgress: WebResearchProgress = { acceptedIndependentSourceCount: new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)).size, candidateUrlsChecked: results.filter(result => !!result.url).length, renderedPages: readResults.filter(page => page.success && !!page.text.trim()).length, supportingSourceCount: verification.filter(result => result.outcome === "SUPPORTED" || result.outcome === "DEVICE_VERIFIED").length, counterEvidenceSourceCount: evidence.filter(item => item.status !== "REJECTED" && item.metadata?.research_source_role === "COUNTEREVIDENCE").length, primarySourceSatisfied: evidence.some(item => item.status !== "REJECTED" && (item.metadata?.research_source_role === "PRIMARY" || (item.metadata?.research_source_role === "OFFICIAL" && item.metadata?.research_source_tier_target === "PRIMARY_OR_OFFICIAL"))), counterEvidenceSearchCompleted: queryPlan.status === "READY" && queryPlan.queries.slice(0, pass + 1).some(query => query.intentType === "COUNTEREVIDENCE" && evidence.some(item => item.status !== "REJECTED" && !!item.url)), excludedDuplicateCount: 0, rejectedQualityCount: evidence.filter(item => item.status === "REJECTED").length, conflictingEvidence: verification.some(result => result.outcome === "CONTRADICTED") };
+        const completedIntentTypes = queryPlan.status === "READY"
+          ? queryPlan.queries.slice(0, pass + 1).filter(query => evidence.some(item => item.status !== "REJECTED" && item.metadata?.research_intent_type === query.intentType && !!item.url)).map(query => query.intentType)
+          : [];
+        const requiredIntentTypes = queryPlan.status === "READY"
+          ? queryPlan.queries.filter(query => query.intentType === "BASELINE" || query.intentType === "OFFICIAL_SPECIFICATION" || query.intentType === "CURRENT_ENVIRONMENT" || query.intentType === "COUNTEREVIDENCE" || query.intentType === "PRIMARY_SOURCE").map(query => query.intentType)
+          : [];
+        const webResearchProgress: WebResearchProgress = {
+          acceptedIndependentSourceCount: new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)).size,
+          candidateUrlsChecked: results.filter(result => !!result.url).length,
+          renderedPages: readResults.filter(page => page.success && !!page.text.trim()).length,
+          supportingSourceCount: verification.filter(result => result.outcome === "SUPPORTED" || result.outcome === "DEVICE_VERIFIED").length,
+          counterEvidenceSourceCount: evidence.filter(item => item.status !== "REJECTED" && item.metadata?.research_source_role === "COUNTEREVIDENCE").length,
+          primarySourceSatisfied: evidence.some(item => item.status !== "REJECTED" && (item.metadata?.research_source_role === "PRIMARY" || (item.metadata?.research_source_role === "OFFICIAL" && item.metadata?.research_source_tier_target === "PRIMARY_OR_OFFICIAL"))),
+          counterEvidenceSearchCompleted: queryPlan.status === "READY" && queryPlan.queries.slice(0, pass + 1).some(query => query.intentType === "COUNTEREVIDENCE" && evidence.some(item => item.status !== "REJECTED" && !!item.url)),
+          excludedDuplicateCount: 0,
+          rejectedQualityCount: evidence.filter(item => item.status === "REJECTED").length,
+          conflictingEvidence: verification.some(result => result.outcome === "CONTRADICTED"),
+          requiredIntentTypes: [...new Set(requiredIntentTypes)],
+          completedIntentTypes: [...new Set(completedIntentTypes)],
+          environmentApplicabilitySatisfied: queryPlan.status !== "READY" || !requiredIntentTypes.includes("CURRENT_ENVIRONMENT") || completedIntentTypes.includes("CURRENT_ENVIRONMENT"),
+        };
+        latestWebResearchProgress = webResearchProgress;
 
         const evidenceFingerprint = [...new Set(evidence.map(item => `${item.source_id}|${item.independence_cluster_id}|${item.url}`))]
           .sort()
@@ -423,6 +444,8 @@ export class ResearchService {
           ? 'INSUFFICIENT_SEARCH'
           : continuationReason === 'INSUFFICIENT_VERIFICATION'
             ? 'INSUFFICIENT_VERIFICATION'
+            : continuationReason === 'NO_NEW_EVIDENCE' || continuationReason === 'LOW_INFORMATION_GAIN'
+            ? 'INSUFFICIENT_SEARCH'
             : hasAnyResults
               ? (coverageSatisfied ? 'NOT_FOUND_AFTER_COVERAGE' : 'INSUFFICIENT_SEARCH')
               : (roundsCompleted > 0 ? 'NO_RESULT' : 'SOURCE_UNAVAILABLE');
