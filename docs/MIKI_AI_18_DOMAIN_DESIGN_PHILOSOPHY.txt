@@ -1016,6 +1016,14 @@ GitHub mainに存在しない変更を、存在すると仮定して次の変更
 - ZIPが破損していない
 - ZIP内TXTと実体が一致している
 
+## 自己改善経路の実装監査補足
+
+自己改善UIの「指示からレビューZIPまで」の操作は、単一の関数呼出しだけで完了したとみなしてはならない。COREが複数Cycleを必要とする場合、COREの再計画・分類実行・結果回収・再評価を継続できる状態であることを確認し、UIは実行中・待機中・レビュー待ち・失敗を区別して表示する。
+
+Review Packageが`EXTERNAL_REVIEW_PENDING`である間は、Candidateを本番コードへ適用してはならない。`APPROVE_REVIEWED_CANDIDATE`による適用は、人間による明示的な採用Decisionが記録され、対象Package、Candidate Manifest SHA、Workspace、必要なPersistence Receiptが一致した`ACCEPTED`状態に限定する。
+
+外部指示から開始した自己改善では、directiveId、sourceHash、要求・禁止事項・不変条件・検証条件・納品条件・関連IssueをCORE Task、Improvement Run、Candidate、Validation、Review Packageの系譜で追跡可能にする。途中の分類結果や再計画によってDirectiveの識別情報を失ってはならない。
+
 ## Living Specificationとしての維持
 
 この文書は作業履歴ではなく、現在有効な設計・制約・受入条件だけを保持する。
