@@ -754,6 +754,59 @@ Verification ResultにUNRESOLVEDまたはCONTRADICTEDが含まれる場合、COR
 
 この制御により、Verification不足を理由に同じVerificationだけを無限に繰り返す経路を作らず、COREが結果を材料として次の処理を選択する。
 
+### Verification Eventの発行責務と正規契約
+
+ClaimVerificationEventServiceはVerification結果を他分類へ通知する共通Event経路として扱う。Event購読機構だけを存在させ、VerifierがEventを発行しない状態を正規構成とはしない。
+
+VerifierがClaimの検証結果を確定し、Claim状態を変更した場合は、そのVerification結果に対応するClaimVerificationEventを正規Event経路へ発行する。
+
+Verification Eventの正規情報として、少なくとも以下を保持する。
+
+- claimId
+- outcome
+- promoted
+- verifiedAt
+
+ここでoutcomeはVerificationResultのSUPPORTED、DEVICE_VERIFIED、CONTRADICTED、UNRESOLVED等の結果を表す。Claim Database上のstatusとVerification Outcomeは意味が異なるため、Event受信側が両者を暗黙に同一視しない。
+
+Eventは永続状態そのものではなく、Claim状態変更を関連分類へ伝える通知である。Event購読側は必要に応じてClaim、Evidence、Unknown、Knowledge Gapの現在状態を正規サービスから再取得して判断する。
+
+VerifierのDomain ResultとVerification Eventは同じVerification結果を異なる目的へ伝えるための二つの経路であり、Event発行だけをCORE Task完了の証拠にしたり、Domain ResultだけでKnowledge Gap永続状態を直接変更したりしない。
+
+### Verification Operation Instanceの再実行条件
+
+同一Task、同一Research Claim集合、同一Evidence状態、同一Verification条件のVerification Operation Instanceを、COREが無条件に再実行してはならない。
+
+Verification ResultがSUPPORTEDまたはDEVICE_VERIFIEDの場合は、そのClaim集合についてVerification依存を解決済みとして扱い、同一条件のVerificationを再実行しない。
+
+Verification ResultがUNRESOLVEDまたはCONTRADICTEDの場合も、結果を受け取っただけで同一Verificationを再実行しない。COREは最新のBlackboard状態を再評価し、Research、Unknown、Execution、別条件のVerification等から必要な次処理を選択する。
+
+同一Claimを再Verificationできるのは、少なくとも次のいずれかによって検証条件が変化した場合とする。
+
+- 新しいEvidenceが追加された
+- Evidenceの状態が変化した
+- Claim状態または反証関係が変化した
+- Research continuationによって新しい調査結果が得られた
+- Verification条件、freshness条件、環境条件等が変更された
+- Executionによる新しい検証Evidenceが生成された
+
+再Verificationを行う場合は、新しいOperation InstanceとしてCORE Blackboard上で識別し、過去のVerification Resultと混同しない。
+
+この識別により、COREは「Verificationが未完了だから再Verificationする」という固定条件ではなく、「前回Verificationから何が変化したため再Verificationが必要なのか」をEvidenceと状態差分から判断する。
+
+### Verification EventとUnknown Integrationの二重処理防止
+
+Verification Eventを受信したUnknown Knowledge IntegrationとCORE Blackboardは、それぞれ異なる責務を持つ。
+
+Unknown Knowledge IntegrationはUnknown、Claim、Evidence、Knowledge Gapの永続的な関係を再評価する。
+COREはTask、Run、Correlation、Research依存、未解決要件を再評価する。
+
+同じEventを理由として両者がKnowledge Gapを直接解決してはならない。Knowledge Gapの永続状態変更はKnowledge Gap所有サービスの正規APIに限定する。
+
+また、Verification Eventの購読順序や非同期処理順序を、COREの最終的なDomain選択根拠にしない。COREの再評価はBlackboardに保存された最新のResult、Evidence、Claim状態、未解決要件を正本として行う。
+
+この制御により、Verification不足を理由に同じVerificationだけを無限に繰り返す経路を作らず、COREが結果を材料として次の処理を選択する。
+
 ### ResearchからKnowledge解決までの責務境界
 
 ResearchはEvidenceとClaimを生成・収集し、VerificationはClaimの検証を担当する。
