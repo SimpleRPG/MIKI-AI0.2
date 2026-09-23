@@ -284,7 +284,7 @@ if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
     const lineage=envelope.payload.learningLineage;
     const externalReviewId=lineage&&typeof lineage===object&&typeof (lineage as Record<string,unknown>).externalReviewId===string?String((lineage as Record<string,unknown>).externalReviewId  ):;
     const source=reviewZipExportService.list().find(item=>item.packageId===sourcePackageId);
-    const correctedCandidateRef=result.artifact?.candidateManifestSha256||;
+    const correctedCandidateRef=result.artifact?.candidateManifestSha256||"";
     if(externalReviewId&&source&&correctedCandidateRef)reviewLearningArtifactService.linkCorrectionCandidate({externalReviewId,beforeCandidateRef:source.candidateManifestSha256,correctedCandidateRef});
    }
    return done({operation:'CREATE_REVIEW_PACKAGE',operationClass:'BUSINESS',...result,runId,workspaceId,evidenceIds:[]});
