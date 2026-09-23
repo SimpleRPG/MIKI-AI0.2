@@ -681,7 +681,7 @@ class AdaptiveRoutePlannerService {
       )
     );
 
-    const knowledgeComponentIds=this.collectValues(task,/knowledgeComponentIds/i);
+    const knowledgeComponentIds=this.stringArrayFromEntries(task,/knowledgeComponentIds/i);
     const verifiedKnowledgeComponentIds=Array.isArray(verificationValue?.verifiedKnowledgeComponentIds)
       ? verificationValue.verifiedKnowledgeComponentIds.map(String).filter(Boolean)
       : [];
