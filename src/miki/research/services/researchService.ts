@@ -298,7 +298,7 @@ export class ResearchService {
         }
 
         if (claimId && !claimIds.includes(claimId)) claimIds.push(claimId);
-        if (claimId && passQuery.intentType !== "COUNTEREVIDENCE" && !requiredResearchClaimIds.includes(claimId)) requiredResearchClaimIds.push(claimId);
+
       }
 
         // Search is only acquisition. The explicit verifier is the boundary that
