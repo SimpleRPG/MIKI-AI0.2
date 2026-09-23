@@ -73,13 +73,10 @@ class SelfCodeSpaceService {
       );
     }
 
-    const files: SelfCodeFile[] = result.files
-      .filter((file: any) => typeof file.path === 'string' && typeof file.content === 'string')
-      .map((file: any) => ({
-        path: file.path,
-        content: file.content,
-        sha256: canonicalSha256(file.content),
-      }));
+    // apiService.importFromGitHub() は githubSyncService の正規化済み
+    // files を返すため、ここで全ファイル内容を filter/map/hash し直さない。
+    // 約970ファイルのPULL時に巨大な文字列配列をもう一つ生成するのを防ぐ。
+    const files = result.files as SelfCodeFile[];
 
     if (!files.length) throw new Error('SELF_CODE_SPACE_NO_FILES');
 
@@ -139,15 +136,14 @@ class SelfCodeSpaceService {
         }))
       );
 
+      // githubSyncService が保持する正規化済みファイル配列をそのまま利用する。
+      // SelfCodeFile と GitHubSyncFile は path/content/sha256 が共通で、
+      // clean PULL状態ではここで再コピーする必要がない。
       return {
         repository: settings.repository,
         branch: settings.branch,
         repoSha256,
-        files: sync.files.map(file => ({
-          path: file.path,
-          content: file.content,
-          sha256: file.sha256,
-        })),
+        files: sync.files as SelfCodeFile[],
         syncedAt: sync.syncedAt || Date.now(),
         dirty: false,
         baseRepoSha256: repoSha256,
@@ -166,8 +162,18 @@ class SelfCodeSpaceService {
   }
 
   listSourceFiles() {
-    const syncedAt = this.get()?.syncedAt || Date.now();
-    return this.listFiles().map(file => ({ path: file.path, content: file.content, language: this.language(file.path), evidenceIds: [], updatedAt: syncedAt, contentHash: file.sha256 }));
+    const snapshot = this.get();
+    if (!snapshot) return [];
+
+    const syncedAt = snapshot.syncedAt || Date.now();
+    return snapshot.files.map(file => ({
+      path: file.path,
+      content: file.content,
+      language: this.language(file.path),
+      evidenceIds: [],
+      updatedAt: syncedAt,
+      contentHash: file.sha256,
+    }));
   }
 
   applyCandidate(files: Array<{path:string; baselineSha256:string; candidateContent:string}>): SelfCodeSnapshot {
