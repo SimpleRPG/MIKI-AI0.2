@@ -2423,7 +2423,6 @@ app.post('/api/github/import', async (req, res) => {
       },
       manifest,
       changedFiles,
-      files: changedFiles,
       deletedPaths,
       truncated: false
     });
