@@ -24,12 +24,29 @@ export interface RequiredAssetRequest {
   lastError?: string;
 }
 
+export interface RequiredAssetAcquisitionDiagnostics {
+  localEvidenceIds: string[];
+  webEvidenceIds: string[];
+  linkedEvidenceIds: string[];
+  unlinkedEvidenceIds: string[];
+  componentIds: string[];
+  state:
+    | 'ACQUIRED_LOCAL_AND_WEB'
+    | 'ACQUIRED_LOCAL'
+    | 'ACQUIRED_WEB'
+    | 'RESEARCH_PROGRESS_UNLINKED'
+    | 'RESEARCH_FAILED'
+    | 'CAPABILITY_GAP'
+    | 'NO_REQUIREMENTS';
+}
+
 export interface RequiredAssetAcquisitionResult {
   progressed: boolean;
   acquired: boolean;
   evidenceIds: string[];
   reasons: string[];
   requests: RequiredAssetRequest[];
+  diagnostics: RequiredAssetAcquisitionDiagnostics;
 }
 
 const STORAGE_KEY = 'miki_required_asset_acquisition_v1';
@@ -52,6 +69,11 @@ class RequiredAssetAcquisitionService {
     const requirements = this.classify(input.reasons);
     const evidenceIds: string[] = [];
     const reasons: string[] = [];
+    const localEvidenceIds: string[] = [];
+    const webEvidenceIds: string[] = [];
+    const linkedEvidenceIds: string[] = [];
+    const unlinkedEvidenceIds: string[] = [];
+    const componentIds: string[] = [];
     let progressed = false;
     let acquired = requirements.length > 0;
 
@@ -67,6 +89,11 @@ class RequiredAssetAcquisitionService {
         progressed = progressed || outcome.progressed;
         acquired = acquired && outcome.acquired;
         evidenceIds.push(...outcome.evidenceIds);
+        localEvidenceIds.push(...outcome.localEvidenceIds);
+        webEvidenceIds.push(...outcome.webEvidenceIds);
+        linkedEvidenceIds.push(...outcome.linkedEvidenceIds);
+        unlinkedEvidenceIds.push(...outcome.unlinkedEvidenceIds);
+        componentIds.push(...outcome.componentIds);
         reasons.push(...outcome.reasons);
       } else {
         const outcome = this.acquireCapabilityRecord(request, input.objective);
@@ -87,12 +114,45 @@ class RequiredAssetAcquisitionService {
       );
     }
 
+    const uniqueLocalEvidenceIds = [...new Set(localEvidenceIds)];
+    const uniqueWebEvidenceIds = [...new Set(webEvidenceIds)];
+    const uniqueLinkedEvidenceIds = [...new Set(linkedEvidenceIds)];
+    const uniqueUnlinkedEvidenceIds = [...new Set(unlinkedEvidenceIds)];
+    const uniqueComponentIds = [...new Set(componentIds)];
+
+    const diagnostics: RequiredAssetAcquisitionDiagnostics = {
+      localEvidenceIds: uniqueLocalEvidenceIds,
+      webEvidenceIds: uniqueWebEvidenceIds,
+      linkedEvidenceIds: uniqueLinkedEvidenceIds,
+      unlinkedEvidenceIds: uniqueUnlinkedEvidenceIds,
+      componentIds: uniqueComponentIds,
+      state:
+        requirements.length === 0
+          ? 'NO_REQUIREMENTS'
+          : uniqueUnlinkedEvidenceIds.length > 0 && !acquired
+            ? 'RESEARCH_PROGRESS_UNLINKED'
+            : uniqueLocalEvidenceIds.length > 0 && uniqueWebEvidenceIds.length > 0
+              ? 'ACQUIRED_LOCAL_AND_WEB'
+              : uniqueLocalEvidenceIds.length > 0
+                ? 'ACQUIRED_LOCAL'
+                : uniqueWebEvidenceIds.length > 0
+                  ? 'ACQUIRED_WEB'
+                  : reasons.some(reason => reason.startsWith('EVIDENCE_ACQUISITION_FAILED'))
+                    ? 'RESEARCH_FAILED'
+                    : requirements.some(item => item.kind !== 'EVIDENCE') && !acquired
+                      ? 'CAPABILITY_GAP'
+                      : acquired
+                        ? 'ACQUIRED_WEB'
+                        : 'RESEARCH_FAILED',
+    };
+
     return {
       progressed,
       acquired,
       evidenceIds: [...new Set(evidenceIds)],
       reasons,
       requests: requirements.map(item => this.find(input.runId, item.kind, item.requirement)).filter((item): item is RequiredAssetRequest => Boolean(item)),
+      diagnostics,
     };
   }
 
@@ -103,7 +163,20 @@ class RequiredAssetAcquisitionService {
       .map(item => ({ ...item, evidenceIds: [...item.evidenceIds], gapIds: [...item.gapIds] }));
   }
 
-  private async acquireEvidence(request: RequiredAssetRequest, objective: string): Promise<{ progressed: boolean; acquired: boolean; evidenceIds: string[]; reasons: string[] }> {
+  private async acquireEvidence(
+    request: RequiredAssetRequest,
+    objective: string
+  ): Promise<{
+    progressed: boolean;
+    acquired: boolean;
+    evidenceIds: string[];
+    localEvidenceIds: string[];
+    webEvidenceIds: string[];
+    linkedEvidenceIds: string[];
+    unlinkedEvidenceIds: string[];
+    componentIds: string[];
+    reasons: string[];
+  }> {
     const gap = knowledgeGapService.detect({
       query: `${objective}\n必要Evidence: ${request.requirement}`,
       reason: request.requirement,
@@ -118,16 +191,50 @@ class RequiredAssetAcquisitionService {
     try {
       const researched = await researchService.researchGap(gap);
       const evidenceIds = this.extractEvidenceIds(researched);
+
+      const evidenceRecords = this.extractEvidenceRecords(researched);
+      const localEvidenceIds = evidenceRecords
+        .filter(item => item.kind === 'LOCAL_CLAIM')
+        .map(item => item.evidenceId);
+
+      const webEvidenceIds = evidenceRecords
+        .filter(item => item.kind !== 'LOCAL_CLAIM' && Boolean(item.url))
+        .map(item => item.evidenceId);
+
+      const linkedEvidenceIds = evidenceIds.filter(id => evidenceRecords.some(item => item.evidenceId === id));
+      const unlinkedEvidenceIds = evidenceIds.filter(id => !linkedEvidenceIds.includes(id));
+
+      const componentIds = this.extractStringIds(
+        researched,
+        /component(?:[_-]?ids?)?/i
+      );
+
       request.evidenceIds = [...new Set([...request.evidenceIds, ...evidenceIds])];
       request.status = evidenceIds.length > 0 ? 'ACQUIRED' : 'BLOCKED';
       request.lastError = evidenceIds.length > 0 ? undefined : 'RESEARCH_RETURNED_NO_EVIDENCE_ID';
       request.updatedAt = Date.now();
       this.save();
+
+      const reasons = evidenceIds.length > 0
+        ? [
+            `EVIDENCE_ACQUIRED:${gap.id}`,
+            ...(localEvidenceIds.length > 0 ? [`LOCAL_EVIDENCE_ACQUIRED:${localEvidenceIds.length}`] : []),
+            ...(webEvidenceIds.length > 0 ? [`WEB_EVIDENCE_ACQUIRED:${webEvidenceIds.length}`] : []),
+            ...(unlinkedEvidenceIds.length > 0 ? [`EVIDENCE_IDS_UNLINKED:${unlinkedEvidenceIds.length}`] : []),
+            ...(componentIds.length > 0 ? [`COMPONENTS_DISCOVERED:${componentIds.length}`] : []),
+          ]
+        : [`EVIDENCE_RESEARCHED_BUT_UNLINKED:${gap.id}`];
+
       return {
         progressed: true,
         acquired: evidenceIds.length > 0,
         evidenceIds,
-        reasons: evidenceIds.length > 0 ? [`EVIDENCE_ACQUIRED:${gap.id}`] : [`EVIDENCE_RESEARCHED_BUT_UNLINKED:${gap.id}`],
+        localEvidenceIds,
+        webEvidenceIds,
+        linkedEvidenceIds,
+        unlinkedEvidenceIds,
+        componentIds,
+        reasons,
       };
     } catch (error) {
       request.status = 'BLOCKED';
@@ -135,7 +242,17 @@ class RequiredAssetAcquisitionService {
       request.updatedAt = Date.now();
       this.save();
       systemLogger.warn('SELF_IMPROVEMENT', '[RequiredAssetAcquisition] evidence acquisition failed', request.lastError);
-      return { progressed: false, acquired: false, evidenceIds: [], reasons: [`EVIDENCE_ACQUISITION_FAILED:${request.lastError}`] };
+      return {
+        progressed: false,
+        acquired: false,
+        evidenceIds: [],
+        localEvidenceIds: [],
+        webEvidenceIds: [],
+        linkedEvidenceIds: [],
+        unlinkedEvidenceIds: [],
+        componentIds: [],
+        reasons: [`EVIDENCE_ACQUISITION_FAILED:${request.lastError}`],
+      };
     }
   }
 
@@ -222,6 +339,91 @@ class RequiredAssetAcquisitionService {
 
   private find(runId: string | undefined, kind: RequiredAssetKind, requirement: string): RequiredAssetRequest | undefined {
     return [...this.requests.values()].find(item => item.runId === runId && item.kind === kind && item.requirement === requirement);
+  }
+
+  private extractEvidenceRecords(value: unknown): Array<{ evidenceId: string; kind?: string; url?: string }> {
+    const output: Array<{ evidenceId: string; kind?: string; url?: string }> = [];
+
+    const visit = (current: unknown, depth: number): void => {
+      if (depth > 6 || current === null || current === undefined || typeof current !== 'object') {
+        return;
+      }
+
+      if (Array.isArray(current)) {
+        for (const item of current) {
+          visit(item, depth + 1);
+        }
+        return;
+      }
+
+      const record = current as Record<string, unknown>;
+      const evidenceId =
+        typeof record.evidence_id === 'string'
+          ? record.evidence_id
+          : typeof record.evidenceId === 'string'
+            ? record.evidenceId
+            : undefined;
+
+      if (evidenceId) {
+        output.push({
+          evidenceId,
+          kind:
+            typeof record.kind === 'string'
+              ? record.kind
+              : typeof record.evidence_kind === 'string'
+                ? record.evidence_kind
+                : undefined,
+          url: typeof record.url === 'string' ? record.url : undefined,
+        });
+      }
+
+      for (const child of Object.values(record)) {
+        visit(child, depth + 1);
+      }
+    };
+
+    visit(value, 0);
+
+    const unique = new Map<string, { evidenceId: string; kind?: string; url?: string }>();
+    for (const item of output) {
+      unique.set(item.evidenceId, item);
+    }
+    return [...unique.values()];
+  }
+
+  private extractStringIds(value: unknown, keyPattern: RegExp): string[] {
+    const output: string[] = [];
+
+    const visit = (current: unknown, depth: number): void => {
+      if (depth > 6 || current === null || current === undefined || typeof current !== 'object') {
+        return;
+      }
+
+      if (Array.isArray(current)) {
+        for (const item of current) {
+          visit(item, depth + 1);
+        }
+        return;
+      }
+
+      for (const [key, child] of Object.entries(current as Record<string, unknown>)) {
+        if (keyPattern.test(key)) {
+          if (typeof child === 'string' && child.trim()) {
+            output.push(child.trim());
+          } else if (Array.isArray(child)) {
+            for (const item of child) {
+              if (typeof item === 'string' && item.trim()) {
+                output.push(item.trim());
+              }
+            }
+          }
+        }
+        visit(child, depth + 1);
+      }
+    };
+
+    visit(value, 0);
+    return [...new Set(output)];
   }
 
   private extractEvidenceIds(value: unknown): string[] {
