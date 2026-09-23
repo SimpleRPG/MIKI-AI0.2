@@ -1,4 +1,5 @@
 import { coreTaskIngressService } from '../services/coreTaskIngressService';
+import { researchService } from '../../research/services/researchService';
 import { unifiedWebResearchService, type AutonomousSearchConfig, type AutonomousSearchStats } from '../../research/services/unifiedWebResearchService';
 import { bannedTopicsConfigService, type BannedTopicsConfig } from '../../safety/services/bannedTopicsConfigService';
 import { nativeWorkManagerService } from '../../execution/services/nativeWorkManagerService';
