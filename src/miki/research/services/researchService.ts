@@ -16,6 +16,7 @@ export type ResearchOutcomeState =
   | 'EVIDENCE_FOUND'
   | 'NO_RESULT'
   | 'INSUFFICIENT_SEARCH'
+  | 'INSUFFICIENT_VERIFICATION'
   | 'SOURCE_UNAVAILABLE'
   | 'NOT_FOUND_AFTER_COVERAGE'
   | 'CONFIRMED_ABSENCE';
@@ -418,9 +419,13 @@ export class ResearchService {
         : false;
       const outcome: ResearchOutcomeState = resolved
         ? 'EVIDENCE_FOUND'
-        : hasAnyResults
-          ? (continuationAvailable ? 'INSUFFICIENT_SEARCH' : coverageSatisfied ? 'NOT_FOUND_AFTER_COVERAGE' : 'INSUFFICIENT_SEARCH')
-          : (roundsCompleted > 0 ? 'NO_RESULT' : 'SOURCE_UNAVAILABLE');
+        : continuationAvailable
+          ? 'INSUFFICIENT_SEARCH'
+          : continuationReason === 'INSUFFICIENT_VERIFICATION'
+            ? 'INSUFFICIENT_VERIFICATION'
+            : hasAnyResults
+              ? (coverageSatisfied ? 'NOT_FOUND_AFTER_COVERAGE' : 'INSUFFICIENT_SEARCH')
+              : (roundsCompleted > 0 ? 'NO_RESULT' : 'SOURCE_UNAVAILABLE');
 
       researchStrategyService.recordOutcome(gap.type, 'WEB_SEARCH', resolved, Date.now() - startedAt);
       return {

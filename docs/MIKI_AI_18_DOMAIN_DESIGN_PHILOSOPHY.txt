@@ -228,6 +228,8 @@ Researchの終端状態は「検索結果が返った」ことだけでは決定
 - `NOT_FOUND_AFTER_COVERAGE` は、要求された探索CoverageをEvidenceとして確認したうえで、なお必要なClaimを解決できなかった場合だけ許可する。
 - `NO_RESULT`、`SOURCE_UNAVAILABLE`、`NO_NEW_EVIDENCE`、`LOW_INFORMATION_GAIN`等は、探索結果が得られなかったことや探索継続余地が小さいことを意味するだけで、存在しないことの証明にはならない。
 
+Research Outcomeの優先順位は固定する。`EVIDENCE_FOUND`、`INSUFFICIENT_SEARCH`、`INSUFFICIENT_VERIFICATION`、`NOT_FOUND_AFTER_COVERAGE`の順で状態を確定し、上位の状態を下位の状態へ変換してはならない。特にCoverageを満たしていてもVerification不足なら`NOT_FOUND_AFTER_COVERAGE`にはしない。
+
 `NOT_FOUND_AFTER_COVERAGE`を返すためのCoverageは、検索回数ではなくWeb Research Policyの状態で判定する。独立情報源、一次・公式情報、反証探索、矛盾の有無など、要求された条件をEvidenceとして確認する。
 
 Search budget、pass数、HTTP timeout、candidate URL数などは安全上限であり、これらを使い切ったこと自体を探索十分性とはみなさない。
