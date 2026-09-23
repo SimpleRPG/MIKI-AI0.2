@@ -759,21 +759,86 @@ export const apiService = {
       const repository = params.repoUrl;
       const branch = params.branch || 'main';
       const sync = githubSyncService.get(repository, branch);
-      const data = await importGitHubRepo(
-        repository,
-        branch,
-        params.token,
-        sync ? githubSyncService.knownFiles(repository, branch) : []
-      );
-      githubSyncService.applyImport(repository, branch, {
-        files: data.changedFiles || data.files || [],
-        manifest: data.manifest || [],
-        deletedPaths: data.deletedPaths || [],
-        commitSha: data.commitSha || '',
-        treeSha: data.treeSha || '',
-      });
+      const knownFiles = sync
+        ? githubSyncService.knownFiles(repository, branch)
+        : [];
+
+      let data: any;
+      try {
+        data = await importGitHubRepo(
+          repository,
+          branch,
+          params.token,
+          knownFiles
+        );
+      } catch (e: any) {
+        const error = new Error(
+          `GITHUB_PULL_HTTP_ERROR:${repository}:${branch}:knownFiles=${knownFiles.length}:${e?.message || e}`
+        );
+        throw error;
+      }
+
+      if (!data || typeof data !== 'object') {
+        throw new Error(
+          `GITHUB_PULL_INVALID_RESPONSE:${repository}:${branch}`
+        );
+      }
+
+      const manifest = Array.isArray(data.manifest) ? data.manifest : [];
+      const changedFiles = Array.isArray(data.changedFiles)
+        ? data.changedFiles
+        : Array.isArray(data.files)
+          ? data.files
+          : [];
+      const deletedPaths = Array.isArray(data.deletedPaths)
+        ? data.deletedPaths
+        : [];
+
+      if (!data.commitSha || !data.treeSha) {
+        throw new Error(
+          `GITHUB_PULL_INVALID_RESPONSE:${repository}:${branch}:commitSha=${String(data.commitSha || '')}:treeSha=${String(data.treeSha || '')}`
+        );
+      }
+
+      if (manifest.length === 0) {
+        throw new Error(
+          `GITHUB_SYNC_MANIFEST_INVALID:${repository}:${branch}:manifest=0:knownFiles=${knownFiles.length}:changedFiles=${changedFiles.length}`
+        );
+      }
+
+      try {
+        githubSyncService.applyImport(repository, branch, {
+          files: changedFiles,
+          manifest,
+          deletedPaths,
+          commitSha: data.commitSha,
+          treeSha: data.treeSha,
+        });
+      } catch (e: any) {
+        throw new Error(
+          `GITHUB_SYNC_MERGE_FAILED:${repository}:${branch}:knownFiles=${knownFiles.length}:manifest=${manifest.length}:changedFiles=${changedFiles.length}:deleted=${deletedPaths.length}:reason=${e?.message || e}`
+        );
+      }
 
       const merged = githubSyncService.get(repository, branch);
+
+      if (!merged) {
+        throw new Error(
+          `GITHUB_SYNC_STATE_INVALID:${repository}:${branch}:mergedStateMissing`
+        );
+      }
+
+      if (!merged.complete) {
+        throw new Error(
+          `GITHUB_SYNC_STATE_INCOMPLETE:${repository}:${branch}:mergedFiles=${merged.files.length}`
+        );
+      }
+
+      if (!merged.files.length) {
+        throw new Error(
+          `GITHUB_SYNC_STATE_INVALID:${repository}:${branch}:mergedFiles=0:manifest=${manifest.length}`
+        );
+      }
 
       return {
         success: true,
@@ -781,12 +846,24 @@ export const apiService = {
         owner: data.owner,
         stars: data.stars,
         description: data.description,
-        files: merged?.files || data.files || [],
+        files: merged.files,
+        diagnostics: {
+          repository,
+          branch,
+          knownFiles: knownFiles.length,
+          manifest: manifest.length,
+          changedFiles: changedFiles.length,
+          deletedPaths: deletedPaths.length,
+          mergedFiles: merged.files.length,
+          commitSha: data.commitSha,
+          treeSha: data.treeSha,
+          hadPreviousSync: Boolean(sync),
+        },
       };
     } catch (e: any) {
       return {
         success: false,
-        message: e.message || 'GitHub import error',
+        message: `SELF_CODE_SPACE_PULL_FAILED:${e?.message || e}`,
         files: [],
       };
     }

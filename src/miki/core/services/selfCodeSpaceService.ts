@@ -60,8 +60,16 @@ class SelfCodeSpaceService {
       token: effectiveToken || undefined,
     });
 
-    if (!result.success || !result.files?.length) {
-      throw new Error(result.message || 'SELF_CODE_SPACE_SYNC_FAILED');
+    if (!result.success) {
+      throw new Error(
+        result.message || 'SELF_CODE_SPACE_PULL_FAILED'
+      );
+    }
+
+    if (!result.files?.length) {
+      throw new Error(
+        `SELF_CODE_SPACE_PULL_EMPTY:repository=${settings.repository}:branch=${settings.branch}`
+      );
     }
 
     const files: SelfCodeFile[] = result.files

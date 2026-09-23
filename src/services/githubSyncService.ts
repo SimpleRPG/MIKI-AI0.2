@@ -122,7 +122,11 @@ class GitHubSyncService {
   }> {
     const state = this.get(repository, branch);
 
-    if (!state?.complete) {
+    if (!state) {
+      return [];
+    }
+
+    if (!state.complete) {
       return [];
     }
 
@@ -182,7 +186,9 @@ class GitHubSyncService {
       const content = changed?.content ?? old?.content;
 
       if (content === undefined) {
-        throw new Error(`GITHUB_SYNC_CONTENT_BASE_MISSING:${meta.path}`);
+        throw new Error(
+          `GITHUB_SYNC_CONTENT_BASE_MISSING:${meta.path}:previous=${Boolean(old)}:changed=${Boolean(changed)}:manifestBlobSha=${meta.blobSha}`
+        );
       }
 
       merged.push({
