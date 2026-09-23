@@ -21,7 +21,7 @@ export interface UnifiedUnknownRequest {
 export interface UnifiedUnknownResult {
   effectiveText: string;
   resolution: ReturnType<typeof unknownResolutionService.open>;
-  status: 'REUSED_SUPPORTED' | 'LOCAL_EVIDENCE' | 'RESEARCHED_UNVERIFIED' | 'NO_EVIDENCE' | 'SEARCH_FAILED' | 'USER_STOPPED';
+  status: 'REUSED_SUPPORTED' | 'LOCAL_EVIDENCE' | 'RESEARCHED_UNVERIFIED' | 'NO_EVIDENCE' | 'RESEARCH_REQUIRED' | 'SEARCH_FAILED' | 'USER_STOPPED';
   evidenceCount: number;
   query?: string;
   provider?: string;
@@ -97,7 +97,7 @@ class UnifiedUnknownResolutionCoordinatorService {
     return {
       effectiveText: request.question,
       resolution,
-      status: 'NO_EVIDENCE',
+      status: 'RESEARCH_REQUIRED',
       evidenceCount: 0,
       query,
       routes,
