@@ -8,6 +8,7 @@ import { webTermLearningService } from './webTermLearningService';
 import { researchQueryPlanningService } from './researchQueryPlanningService';
 import { researchQueryOutcomeLearningService } from './researchQueryOutcomeLearningService';
 import { webResearchPolicyService, WebResearchProgress } from './webResearchPolicyService';
+import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 
 export type { ResearchRoute };
 
@@ -40,6 +41,8 @@ export interface ResearchResult {
   nextQuery?: string;
   researchQuery?: string;
   continuationRound?: number;
+  routes?: ResearchRoute[];
+  localClaimIds?: string[];
 }
 
 /**
@@ -127,35 +130,98 @@ export class ResearchService {
       : researchStrategyService.chooseRoute(gap.type, gap.query);
 
     try {
-      if (strategy.route === 'LOCAL_CLAIM') {
-        researchStrategyService.recordOutcome(gap.type, strategy.route, false, Date.now() - startedAt);
-        return {
-          gapId: gap.id,
-          route: 'LOCAL_CLAIM',
-          performed: false,
-          evidence,
-          claimIds,
-          resolved: false,
-          reason: `Local Claim経路を選択しましたが、現在のResearchServiceにはローカルClaimから検証する安全な入口がないため保留しました。 ${strategy.reason}`,
-          outcome: 'INSUFFICIENT_SEARCH',
-        };
+      /*
+       * LOCAL is a real Research strand.
+       *
+       * Important: LOCAL does not replace WEB.
+       * Existing claims are collected as local evidence first, then WEB
+       * research continues so freshness / official source / counterevidence
+       * can be compared against the local knowledge.
+       */
+      const localClaimIds: string[] = [];
+      const localMatch = claimDatabaseService.findBestMatchingClaim(baseQuery);
+
+      if (localMatch.hasMatch) {
+        const localClaims = [
+          ...(localMatch.supportingClaims || []),
+          ...(localMatch.contradictingClaims || []),
+        ];
+
+        const seenLocalClaims = new Set<string>();
+
+        for (const claim of localClaims) {
+          if (seenLocalClaims.has(claim.claim_id)) continue;
+          seenLocalClaims.add(claim.claim_id);
+
+          const localEvidence = evidenceService.recordLocalClaimEvidence({
+            title: `LOCAL Claim [${claim.status}]`,
+            statement: claim.statement,
+            sourceId: claim.claim_id,
+            independenceClusterId: claim.independence_cluster_id,
+            metadata: {
+              environment: 'MIKI-AI0.2 local claim database',
+              observed_at: Date.now(),
+              result_summary: `LOCAL Claim DBからResearch queryへの既存知識照合: ${localMatch.confidence}`,
+            },
+          });
+
+          evidence.push(localEvidence);
+
+          if (!localClaimIds.includes(claim.claim_id)) {
+            localClaimIds.push(claim.claim_id);
+          }
+
+          if (evidenceService.attachEvidenceToClaim(
+            localEvidence.evidence_id,
+            claim.claim_id,
+          )) {
+            if (!claimIds.includes(claim.claim_id)) {
+              claimIds.push(claim.claim_id);
+            }
+          }
+        }
+
+        if (localClaims.length > 0) {
+          researchStrategyService.recordOutcome(
+            gap.type,
+            'LOCAL_CLAIM',
+            true,
+            Date.now() - startedAt,
+          );
+        }
+      } else {
+        researchStrategyService.recordOutcome(
+          gap.type,
+          'LOCAL_CLAIM',
+          false,
+          Date.now() - startedAt,
+        );
       }
 
-      // 自動検索判定がfalseでも、Knowledge Gapとして明示的に登録された調査は、
+      // LOCALだけで終了しない。
+      // LOCAL knowledgeを現在のWeb evidenceで補強・更新・反証する。
+      // 自動検索判定がfalseでもKnowledge Gapとして明示的に登録された調査は、
       // StrategyがWEB_SEARCHを選択した場合に限り実行する。
       const need = unifiedWebResearchService.detectNeedForSearch(gap.query);
       if (!need.needsSearch && strategy.route !== 'WEB_SEARCH') {
-        researchStrategyService.recordOutcome(gap.type, strategy.route, false, Date.now() - startedAt);
+        const hasLocalEvidence = evidence.some(
+          item => item.kind === 'LOCAL_CLAIM' && item.status !== 'REJECTED'
+        );
+
         return {
           gapId: gap.id,
           results: searchResults,
-          route: strategy.route,
-          performed: false,
+          route: 'LOCAL_CLAIM',
+          routes: ['LOCAL_CLAIM'],
+          localClaimIds,
+          performed: hasLocalEvidence,
           evidence,
           claimIds,
           resolved: false,
-          reason: `Research Strategy=${strategy.route}。安全な実行入口がないため外部調査は行いませんでした。`,
-          outcome: 'SOURCE_UNAVAILABLE',
+          reason: hasLocalEvidence
+            ? `LOCAL Claimから既存知識を取得しました。Web検索対象としての必要性は低いため、LOCAL結果をCOREへ返します。`
+            : `LOCAL Claimにも該当知識がなく、今回のResearchでは外部検索を実行しませんでした。`,
+          outcome: hasLocalEvidence ? 'EVIDENCE_FOUND' : 'SOURCE_UNAVAILABLE',
         };
       }
 
@@ -434,6 +500,8 @@ export class ResearchService {
       return {
         gapId: gap.id,
         route: 'WEB_SEARCH',
+        routes: ['LOCAL_CLAIM', 'WEB_SEARCH'],
+        localClaimIds,
         performed: evidence.some((e) => e.status !== 'REJECTED'),
         evidence,
         claimIds,

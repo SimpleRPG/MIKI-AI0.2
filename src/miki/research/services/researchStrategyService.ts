@@ -120,15 +120,12 @@ export class ResearchStrategyService {
   }
 
   private defaultRoutes(type: KnowledgeGapType, query: string): ResearchRoute[] {
-    // 現時点で実際に実行可能なResearch経路だけを優先候補にする。
-    // CLOUD_AIは直接毎回送信せず、External AI Research Bundleへ短時間集約して利用する。
-    if (/端末|実機|component|部品|実装|コード/i.test(query) || type === 'WEAK_COMPONENT' || type === 'UNKNOWN_CAPABILITY') {
-      return ['WEB_SEARCH', 'LOCAL_CLAIM'];
-    }
-    if (type === 'CONTRADICTION' || type === 'STALE_INFORMATION' || type === 'INSUFFICIENT_EVIDENCE' || type === 'UNKNOWN_TERM') {
-      return ['WEB_SEARCH', 'LOCAL_CLAIM'];
-    }
-    return ['WEB_SEARCH'];
+    // LOCALとWEBは排他的な代替経路ではなく、同じResearch質問を補完する証拠源。
+    // Strategyの学習結果は「どちらかを捨てる」ためではなく、
+    // 実行順・深度・予算を決めるために利用する。
+    //
+    // CLOUD_AIは通常Researchの一次経路にはしない。
+    return ['WEB_SEARCH', 'LOCAL_CLAIM'];
   }
 
   private score(type: KnowledgeGapType, route: ResearchRoute): number {

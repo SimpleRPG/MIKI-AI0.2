@@ -333,7 +333,29 @@ class AutonomousSelfImprovementLoopService {
       reasons: reason.split(',').filter(Boolean),
       objective: request.trigger,
     });
-    this.waitForEvidence(request, acquired.reasons.join(',') || reason, acquired.progressed);
+
+    /*
+     * progressed !== acquired.
+     *
+     * Research may have made progress while still failing to acquire the
+     * required asset. Only the unresolved case should enter WAITING_EVIDENCE.
+     * If the required asset was acquired, return to the normal CORE cycle.
+     */
+    if (acquired.acquired) {
+      request.evidenceWaitCount = 0;
+      this.state.status = 'IDLE';
+      this.state.lastReason =
+        acquired.reasons.join(',') || 'REQUIRED_ASSET_ACQUIRED_CORE_REEVALUATION';
+      this.state.retryAt = undefined;
+      this.save();
+      return;
+    }
+
+    this.waitForEvidence(
+      request,
+      acquired.reasons.join(',') || reason,
+      acquired.progressed,
+    );
   }
 
   private waitForEvidence(request: AutonomousImprovementRequest, reason: string, progressed = false): void {

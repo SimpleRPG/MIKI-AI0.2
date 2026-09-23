@@ -5,7 +5,7 @@ import type { WebFetchMethod } from '../../../types';
 
 const EVIDENCE_STORAGE_KEY = 'miki_evidence_db_v1';
 
-export type EvidenceKind = 'WEB' | 'USER_OBSERVATION' | 'USER_CLAIM' | 'EXECUTION' | 'DOCUMENT' | 'CLOUD_AI';
+export type EvidenceKind = 'WEB' | 'LOCAL_CLAIM' | 'USER_OBSERVATION' | 'USER_CLAIM' | 'EXECUTION' | 'DOCUMENT' | 'CLOUD_AI';
 export type EvidenceStatus = 'DISCOVERED' | 'ADMISSIBLE' | 'REJECTED';
 
 export interface EvidenceRecord {
@@ -184,6 +184,44 @@ export class EvidenceService {
     this.records.set(evidence_id, record);
     this.save();
     return record;
+  }
+
+  /**
+   * LOCAL Claim DBから得た既存知識をResearch Evidenceとして記録する。
+   *
+   * LOCAL Claimは外部Web証拠ではないためWEBとは分離する。
+   * また、LOCAL知識だけでSUPPORTEDへ昇格させない。
+   * WEB / EXECUTION等との照合を後段で行う。
+   */
+  public recordLocalClaimEvidence(input: {
+    title: string;
+    statement: string;
+    sourceId?: string;
+    independenceClusterId?: string;
+    metadata?: EvidenceRecord['metadata'];
+  }): EvidenceRecord {
+    const now = Date.now();
+    const evidence_id = `EVD-${String(this.counter++).padStart(6, '0')}`;
+    const sourceId = input.sourceId || `local_claim_${now}`;
+
+    const record: EvidenceRecord = {
+      evidence_id,
+      kind: 'LOCAL_CLAIM',
+      status: 'DISCOVERED',
+      title: input.title.trim() || 'Local Claim',
+      snippet: input.statement.trim(),
+      source: 'local_claim_database',
+      source_id: sourceId,
+      independence_cluster_id:
+        input.independenceClusterId || `cluster_local_claim_${sourceId}`,
+      created_at: now,
+      claim_ids: [],
+      metadata: input.metadata,
+    };
+
+    this.records.set(evidence_id, record);
+    this.save();
+    return { ...record, claim_ids: [...record.claim_ids] };
   }
 
   public recordExecutionEvidence(input: {
