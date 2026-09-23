@@ -1,4 +1,4 @@
-# MIKI-AI 18分類 設計思想・実装指示
+# MIKI-AI 18分類 設計・実装基準書
 
 ## 文書の目的と正本
 
@@ -307,6 +307,59 @@ Unknownの「検索が必要」という判定と、Researchの「検索を実�
 ただし物理的資源不足や安全違反を無視して強行しない。
 
 GitHubへのpushは通常機能として残すが、自己改善ループから本番コードを自動pushしない。
+
+### 自己改善の実装責務分離
+
+ImprovementIntakeRouterServiceはRunの正規化・重複抑制・系譜を担当する。
+SelfImprovementIngressServiceは正規Ingress、AutonomousSelfImprovementLoopServiceはQueue、Task、attempt、resource/evidence wait、pause/resume、復旧を担当する。
+AutonomousIssueDiscoveryServiceはIssue発見、CandidateCodeGenerationServiceはCandidate生成、IsolatedCandidateWorkspaceServiceはBaseline/Candidate分離、CandidateValidationRunnerServiceとCandidateValidationEvidenceServiceは検証、ShadowEvaluationServiceはShadow評価、SinglePromotionGateServiceは唯一のPromotion判定、CumulativeRevalidationServiceは累積Candidateの再検証、ReviewZipExportServiceはレビュー成果物化、ExternalDirectiveIntakeServiceは外部指示の正規化を担当する。
+
+これらの責務を一つの自己改善Controllerへ統合しない。
+Loopは専門判断を持たず、Candidate生成はPromotion判断を持たず、Review ZIP生成は採用判断を持たない。
+
+### 自己改善RunとCORE Task
+
+RunとCORE Taskは同一IDとして扱わない。
+Runは改善要求のライフサイクル、TaskはCOREのオーケストレーション単位とする。
+runId、taskId、ChangeSetID、sourceId、workspaceId、operationInstanceId等で系譜を接続する。
+
+Adaptive Route Plannerの業務OperationにはoperationInstanceIdとdedupeKeyを持たせる。
+同一Operationの誤重複実行は防ぐが、新しい入力・Revision・Attemptが必要な場合は新しいOperation Instanceとして再実行できる。
+
+### 自己改善の完了判定
+
+自己改善Taskでは固定された18分類の全通過を完了条件にしない。
+CorePlanRevisionServiceのrequiredOperationsを基準にCoreCompletionGateServiceがPlan、必須Operation、失敗、pending、Domain Error、Reply lineage、persistence receipt、Evidence qualityを確認する。
+
+Candidate生成とReview Package生成は、処理結果が返っただけでは完了としない。
+必要なpersistence receiptとlineageが確認できることを完了条件に含める。
+
+### 自己改善の開始源
+
+自己改善はUIだけを入口としない。
+AUTONOMOUS_DISCOVERY、EXTERNAL_DIRECTIVE、USER_REQUEST、EXECUTION_FAILURE、REVALIDATIONをRunTypeとして区別する。
+実行失敗、検証上の矛盾・未解決、自己改善要求Event等からも正規Ingressへ接続できる。
+
+### 外部指示の境界
+
+ExternalDirectiveIntakeServiceは外部指示を直接実行しない。
+directiveId、sourceHash、objective、targetFiles、requirements、prohibitions、invariants、validationRequirements、deliveryRequirements、relatedIssueIdsを保持してから改善Runへ渡す。
+
+外部指示はCOREの判断を置き換えない。
+COREがBlackboardとEvidenceを再評価し、必要なResearch、Unknown、Verification、SelfDevelopment等を選択する。
+
+### Candidateからレビューまでの状態境界
+
+Candidate生成成功、Validation成功、Shadow Evaluation成功、Promotion Gate通過、Review ZIP生成、本番採用、本番適用は別状態である。
+
+ReviewZipExportServiceはBaseline/Candidate manifest、hash、Validation、Shadow、Issue、Directive、系譜、未解決事項を保持し、ZIP自体も検証する。
+累積PackageではpackageSeriesId、packageRevision、candidateRevisionを保持する。
+
+### 本番反映境界
+
+SinglePromotionGateServiceのallowedはCandidateが検証条件を満たしたことを示すだけで、本番書込み権限を意味しない。
+本番反映はレビュー結果、明示的承認、対象SHA、現在Baselineとの一致を確認する別境界とする。
+自己改善Loop、Candidate生成、Review ZIP生成から本番コードを直接変更・pushしない。
 
 ### 自己改善の現在実装境界
 
