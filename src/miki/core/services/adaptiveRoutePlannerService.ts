@@ -787,7 +787,12 @@ class AdaptiveRoutePlannerService {
     const researchResolved=researchData?.resolved===true;
     const researchOutcome=String(researchData?.outcome||'');
     const researchContinuation=researchData?.continuationAvailable===true;
-    const researchTerminal=researchResolved||(researchOutcome==='NOT_FOUND_AFTER_COVERAGE'&&!researchContinuation);
+    const researchClaimIds=Array.isArray(researchData?.claimIds)?researchData.claimIds.map(String).filter(Boolean):[];
+    const verification=this.latestBusinessResult(task,'VERIFY_RESEARCH_CLAIMS');
+    const verificationValue=verification?objectValue(verification):undefined;
+    const verificationItems=Array.isArray(verificationValue?.verification)?verificationValue.verification as Array<Record<string,unknown>>:[];
+    const verificationComplete=researchClaimIds.length>0&&researchClaimIds.every(id=>verificationItems.some(x=>String(x.claimId||'')===id&&(x.outcome==='SUPPORTED'||x.outcome==='DEVICE_VERIFIED')));
+    const researchTerminal=researchResolved||verificationComplete||(researchOutcome==='NOT_FOUND_AFTER_COVERAGE'&&!researchContinuation);
     const reasons:string[]=[];
     if(!analysis) reasons.push('CONVERSATION_ANALYSIS_MISSING');
     if(unknownNeeded&&!unknown) reasons.push('UNKNOWN_RESOLUTION_MISSING');
