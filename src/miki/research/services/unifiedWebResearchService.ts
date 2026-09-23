@@ -14,15 +14,6 @@ export class UnifiedWebResearchService {
     return this.instance;
   }
 
-  public async executePlannedSearch(
-    query: string,
-    options?: Parameters<typeof autonomousSearchService.executeSearch>[1],
-  ) {
-    const normalized = String(query || ).trim();
-    if (!normalized) throw new Error(RESEARCH_QUERY_REQUIRED);
-    return autonomousSearchService.executeSearch(normalized, options);
-  }
-
   public async executeSearch(
     query: string,
     options?: Parameters<typeof autonomousSearchService.executeSearch>[1],
