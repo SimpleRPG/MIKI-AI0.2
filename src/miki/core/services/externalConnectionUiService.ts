@@ -9,7 +9,7 @@ export interface ExternalConnectionView {config:ExternalConnectionConfig;status:
 const CONFIG_KEY='miki_external_connection_config_v1';const SECRET_KEY='miki_external_connection_secret_refs_v1';const STATUS_KEY='miki_external_connection_status_v1';
 const defaults:ExternalConnectionConfig[]=[
 {id:'termux',enabled:false,name:'Termux Bridge',baseUrl:'',path:'/health',timeoutMs:8000,retryCount:1,inheritTermux:false},
-{id:'searxng',enabled:false,name:'SearXNG',baseUrl:'',path:'/search',timeoutMs:12000,retryCount:1,inheritTermux:true},
+{id:'searxng',enabled:true,name:'SearXNG',baseUrl:'http://127.0.0.1:8888',path:'/search',timeoutMs:12000,retryCount:1,inheritTermux:true},
 {id:'github',enabled:false,name:'GitHub',baseUrl:'',path:'',timeoutMs:15000,retryCount:1,inheritTermux:true,repositoryUrl:'',branch:'main'},
 {id:'gemini',enabled:false,name:'Gemini API',baseUrl:'',path:'',timeoutMs:30000,retryCount:1,inheritTermux:false,model:'',roles:['REVIEWER']},
 {id:'teacher',enabled:false,name:'外部教師API',baseUrl:'',path:'/health',timeoutMs:30000,retryCount:1,inheritTermux:false},

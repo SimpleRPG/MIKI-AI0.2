@@ -2,6 +2,7 @@ import { capabilityGapService } from '../../capability/services/capabilityGapSer
 import { crossDomainCirculationService } from '../../core/services/crossDomainCirculationService';
 import { unifiedExperienceImprovementBridgeService } from '../../experience/services/unifiedExperienceImprovementBridgeService';
 import { unknownKnowledgeIntegrationService } from './unknownKnowledgeIntegrationService';
+import { unifiedWebResearchService } from '../../research/services/unifiedWebResearchService';
 import {
   unknownResolutionService,
   type ResolutionRoute,
@@ -56,7 +57,7 @@ class UnifiedUnknownResolutionCoordinatorService {
     const terms = (request.unknownTerms || []).map((term) => String(term).trim()).filter(Boolean);
     if (request.useSearch && !decision.needsSearch && terms.length > 0) {
       const searchConfig = unifiedWebResearchService.getConfig();
-      if (searchConfig.enabled && searchConfig.autoSearchInChat) {
+      if (searchConfig.enabled && (searchConfig.autoSearchInChat || searchConfig.idleSearchEnabled)) {
         decision = { needsSearch: true, query: terms.join(' '), reason: '解析Componentが未解決語を検出', category: 'factual' };
       }
     }
