@@ -250,7 +250,7 @@ Research実行要求はCORE Taskとして渡し、Domain ResultをCOREから受�
 ResearchService.executeSearch等の既存直接APIは、Research内部、低レベルWeb層、互換入口、診断経路を除き、業務実行入口として外部分類から直接利用しない。
 既存直接呼出しを整理するときは、結果契約、Evidence、Claim、continuation、エラー、Blackboard帰還を確認してから移行する。
 
-## 6.7 会話からUnknown/ResearchへのCORE経路
+### 会話からUnknown/ResearchへのCORE経路
 
 Chat UIはUnknown DomainやResearch Domainを直接実行しない。
 
@@ -259,7 +259,7 @@ COREがBlackboardを基準にUnknownを選択し、Unknown ResultにResearch要�
 
 UIはCORE Taskの完了結果を受け取り、Domain内部サービスの直接実行結果を会話処理の入口として使用しない。
 
-## 6.6 UnknownからResearchへの要求契約
+### UnknownからResearchへの要求契約
 
 Unknownが検索の必要性を判定した場合、Unknown自身はResearchを実行しない。
 
