@@ -250,6 +250,23 @@ Research実行要求はCORE Taskとして渡し、Domain ResultをCOREから受�
 ResearchService.executeSearch等の既存直接APIは、Research内部、低レベルWeb層、互換入口、診断経路を除き、業務実行入口として外部分類から直接利用しない。
 既存直接呼出しを整理するときは、結果契約、Evidence、Claim、continuation、エラー、Blackboard帰還を確認してから移行する。
 
+## 6.6 UnknownからResearchへの要求契約
+
+Unknownが検索の必要性を判定した場合、Unknown自身はResearchを実行しない。
+
+Unknown Domain Resultには、少なくとも次を返す。
+
+- status: RESEARCH_REQUIRED
+- researchQuestion: COREがResearchへ渡す検索要求
+- unresolvedRequirements: Research実行が必要であることを示す未解決要件
+
+COREはこのResultをBlackboardへ記録し、再評価時にresearchQuestionをResearch Domain Commandのqueryへ変換する。
+
+Research Domain CommandはCOREからResearchへ配送する。
+Research結果は再びCOREのBlackboardへ戻し、COREが次のUnknown、Verification、Learning、Conversation等の必要分類を再評価する。
+
+Unknownの「検索が必要」という判定と、Researchの「検索を実行する」という処理を同一処理として扱わない。
+
 ## 7. 自己改善
 
 自己改善の本番コード自動適用は行わない。
