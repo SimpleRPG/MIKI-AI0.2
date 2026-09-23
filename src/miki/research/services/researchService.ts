@@ -1,4 +1,4 @@
-import { autonomousSearchService } from './autonomousSearchService';
+import { unifiedWebResearchService } from './unifiedWebResearchService';
 import { knowledgeGapService, KnowledgeGap } from '../../unknown/services/knowledgeGapService';
 import { evidenceService, EvidenceRecord } from '../../memory/services/evidenceService';
 import { verifierService, VerificationResult } from '../../verification/services/verifierService';
@@ -132,7 +132,7 @@ export class ResearchService {
 
       // 自動検索判定がfalseでも、Knowledge Gapとして明示的に登録された調査は、
       // StrategyがWEB_SEARCHを選択した場合に限り実行する。
-      const need = autonomousSearchService.detectNeedForSearch(gap.query);
+      const need = unifiedWebResearchService.detectNeedForSearch(gap.query);
       if (!need.needsSearch && strategy.route !== 'WEB_SEARCH') {
         researchStrategyService.recordOutcome(gap.type, strategy.route, false, Date.now() - startedAt);
         return {
@@ -180,7 +180,7 @@ export class ResearchService {
         const passQuery = plannedQuery || buildAdaptiveQuery(pass, verification);
         nextQuery = passQuery;
         const queryStartedAt = Date.now();
-        const raw = await autonomousSearchService.executeSearch(passQuery, {
+        const raw = await unifiedWebResearchService.executePlannedSearch(passQuery, {
           bypassCache: pass > 0,
         });
         const results = this.normalizeSearchResults(raw);
@@ -189,7 +189,7 @@ export class ResearchService {
         // Search is only the discovery step. Read the selected result pages before
         // building the final evidence/claim set, so SearXNG -> page content -> Evidence
         // is one Research pipeline rather than two disconnected services.
-        const readResults = await autonomousSearchService.readSearchResultPages(passQuery, results, {
+        const readResults = await unifiedWebResearchService.readSearchResultPages(passQuery, results, {
           maxPages: maxPagesPerPass,
         });
 
