@@ -721,4 +721,59 @@ Verification ResultをDomain Command経由で返す場合も、claimIds、各Cla
 
 この境界により、Claimの検証、Unknownの解決状態、Knowledge Gapの永続状態、CORE Taskの完了状態を分離しながら、Research → Verification → CORE再評価 → 必要Domainという18分類の循環を維持する。
 
+### Verification EventとCORE再評価の接続
+
+Verification Resultは、COREのBlackboardへ返すDomain Resultと、Claim状態変更を他分類へ伝えるVerification Eventを、それぞれの目的に応じて扱う。
+
+VerifierがClaimの検証結果によってClaim状態を変更した場合、対応するClaimVerificationEventを正規Event経路へ発行する。Eventには少なくともClaim ID、Verification Outcome、promoted状態、検証時刻等を含め、購読側が対象Claimの最新状態を再取得できるようにする。
+
+Unknown側のVerification Event購読処理は、Eventを受けてUnknownとEvidenceの関係を再評価し、関連Claimが必要条件を満たした場合だけKnowledge Gap所有サービスの正規APIによって永続Knowledge Gapを解決する。
+
+COREが受け取るVerification Domain ResultとVerification Eventによる永続状態更新は同一状態として扱わない。
+
+- Domain Resultは現在のTask、Run、Correlation、Claimに対するCOREの再評価材料
+- Verification EventはClaim状態変更を関連Domainへ伝える事実通知
+- Unknown Knowledge IntegrationはEventを基にUnknownとKnowledge Gapを再評価
+- Knowledge Gap所有サービスが永続Knowledge Gap状態を変更
+- CORE BlackboardはTask上のResearch依存解決状態を保持
+
+Eventを発行したことだけをCORE Task完了の証拠にしない。また、CORE Taskが完了したことだけを永続Knowledge Gap解決の証拠にしない。
+
+### Verification再実行の制御
+
+同一Task、同一Research Claim集合、同一Evidence状態に対して、同じVerification Commandを無条件に繰り返してはならない。
+
+ResearchがINSUFFICIENT_VERIFICATIONを返した場合、COREはVerificationを選択できる。
+その後のVerification Resultが必要ClaimをすべてSUPPORTEDまたはDEVICE_VERIFIEDとした場合、Research依存を解決済みとして扱い、同じVerificationを再実行しない。
+
+Verification ResultにUNRESOLVEDまたはCONTRADICTEDが含まれる場合、COREはその結果をBlackboardへ記録し、同じClaim集合・同じEvidence状態に対する同一Verificationを自動反復しない。
+
+その場合の次経路は固定しない。COREは最新のEvidence、Claim状態、未解決要件、Research continuation、反証、環境条件、実行可能性等を再評価し、必要に応じてResearch、Unknown、別のVerification、Execution、その他の分類を選択する。
+
+新しいEvidence、Claim変更、Verification条件変更、Research continuation、実行結果などによって検証条件が変化した場合は、新しいOperation Instanceとして再検証できる。
+
+この制御により、Verification不足を理由に同じVerificationだけを無限に繰り返す経路を作らず、COREが結果を材料として次の処理を選択する。
+
+### ResearchからKnowledge解決までの責務境界
+
+ResearchはEvidenceとClaimを生成・収集し、VerificationはClaimの検証を担当する。
+VerificationがClaimをSUPPORTEDまたはDEVICE_VERIFIEDへ進めた場合、その状態変更はVerification Eventによって関連するUnknown Knowledge Integrationへ通知できる。
+
+Unknown Knowledge Integrationは関連Claim全体の状態を確認し、必要なClaimがすべて検証済みである場合にKnowledge Gap所有サービスへ状態更新を依頼する。
+
+したがって、ResearchService、Verification Domain、CORE、Unknown Knowledge Integration、Knowledge GapServiceのいずれも、別分類の永続状態を直接横取りして更新しない。
+
+正規の概念経路は、
+
+Research
+→ Evidence / Claim
+→ Verification
+→ Verification Result + Verification Event
+→ CORE再評価 / Unknown Knowledge Integration
+→ Knowledge Gap所有サービス
+
+とする。
+
+この経路では、検索成功、Verification成功、Unknown解決、Knowledge Gap解決、CORE Task完了をそれぞれ独立した状態として保持する。どれか一つの成功だけを他の状態の成功として自動的に扱わない。
+
 この境界により、Research → Verification → CORE再評価は一方向の固定手順ではなく、COREがVerification結果を材料として次の必要Domainを選択する18分類の循環として成立する。
