@@ -92,76 +92,16 @@ class UnifiedUnknownResolutionCoordinatorService {
       }
     }
 
-    request.onProgress?.(`Web調査: ${query}`, { unknownId: resolution.id, route: 'WEB' });
-    try {
-      const result = await researchService.executeSearch(query, { maxResults: 5 });
-      if (!result.results.length) {
-        unknownResolutionService.attempt(resolution.id, 'WEB', undefined, {
-          query,
-          provider: result.provider,
-          resultCount: 0,
-          failureReason: 'NO_RESULTS',
-        });
-        const experience = unifiedExperienceImprovementBridgeService.ingest({
-          domain: 'research',
-          action: 'unknown_search_no_results',
-          summary: query,
-          outcome: 'BLOCKED',
-          verified: false,
-          sourceFingerprint: result.provider,
-          concepts: [resolution.classification, 'NO_RESULTS'],
-          lesson: '検索経路を変更する必要がある',
-        });
-        const gap = capabilityGapService.recordGap({
-          capabilityId: 'CAP-UNKNOWN-RESEARCH',
-          description: `未知調査で結果を取得できない: ${query}`,
-          gap_type: 'failure',
-          impact: 'MEDIUM',
-          current_workaround: 'ローカル資料・コード・ユーザー確認へ切り替える',
-          candidate_solution: '検索プロバイダーと検索語のフェイルオーバーを改善する',
-          source: 'observed',
-          experienceId: experience.id,
-          samplePrompt: request.question,
-        });
-        unknownResolutionService.link(resolution.id, { experienceIds: [experience.id], capabilityGapIds: [gap.gap_id] });
-        return { effectiveText: request.question, resolution, status: 'NO_EVIDENCE', evidenceCount: 0, query, provider: result.provider, routes };
-      }
-
-      const experience = unifiedExperienceImprovementBridgeService.ingest({
-        domain: 'research',
-        action: 'unknown_search_results',
-        summary: query,
-        outcome: 'SUCCESS',
-        verified: false,
-        sourceFingerprint: result.provider,
-        concepts: [resolution.classification, 'WEB_RESEARCH'],
-        lesson: `${result.results.length}件の未検証候補を取得した`,
-      });
-      crossDomainCirculationService.record('unknown', 'research', 'WEB_RESEARCH_COMPLETED', result.provider);
-      const integrated = unknownKnowledgeIntegrationService.ingestWeb({
-        unknownId: resolution.id,
-        question: request.question,
-        results: result.results,
-        experienceId: experience.id,
-      });
-      unknownResolutionService.attempt(
-        resolution.id,
-        'WEB',
-        `取得${result.results.length}件・Claim検証待ち`,
-        { query, provider: result.provider, resultCount: result.results.length, evidenceIds: integrated.evidenceIds },
-      );
-      const researchText = result.results
-        .map((item) => `${item.title}\n${item.snippet}\n${item.url}`)
-        .join('\n\n');
-      return {
-        effectiveText: `${request.question}\n\n【Web調査結果・未検証】\n${researchText}`,
-        resolution,
-        status: 'RESEARCHED_UNVERIFIED',
-        evidenceCount: integrated.evidenceIds.length,
-        query,
-        provider: result.provider,
-        routes,
-      };
+    request.onProgress?.(`Web調査が必要: ${query}`, { unknownId: resolution.id, route: 'WEB' });
+    unknownResolutionService.attempt(resolution.id, 'WEB', `Research実行待ち: ${query}`, { query });
+    return {
+      effectiveText: request.question,
+      resolution,
+      status: 'NO_EVIDENCE',
+      evidenceCount: 0,
+      query,
+      routes,
+    };
     } catch (error) {
       unknownResolutionService.attempt(resolution.id, 'WEB', undefined, { query, failureReason: String(error) });
       unifiedExperienceImprovementBridgeService.ingest({
