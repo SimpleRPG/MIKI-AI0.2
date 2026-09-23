@@ -669,7 +669,11 @@ class AdaptiveRoutePlannerService {
       ''
     );
 
-    if(researchOutcome==='INSUFFICIENT_VERIFICATION' && researchClaimIds.length>0){
+    const latestVerification=this.latestBusinessResult(task,'VERIFY_RESEARCH_CLAIMS');
+    const verificationValue=latestVerification?objectValue(latestVerification):undefined;
+    const verificationItems=Array.isArray(verificationValue?.verification)?verificationValue.verification as Array<Record<string,unknown>>:[];
+    const verificationComplete=researchClaimIds.length>0&&researchClaimIds.every(id=>verificationItems.some(x=>String(x.claimId||'')===id&&(x.outcome==='SUPPORTED'||x.outcome==='DEVICE_VERIFIED')));
+    if(researchOutcome==='INSUFFICIENT_VERIFICATION'&&researchClaimIds.length>0&&!verificationComplete){
       routes.push({
         target:'verification',
         command:'VERIFY_RESEARCH_CLAIMS',
