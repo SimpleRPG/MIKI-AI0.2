@@ -218,6 +218,24 @@ Research内部の安全上限を、探索全体の固定回数制限とは解釈
 
 検索結果はEvidence候補であり、既存のVerification境界を通過した結果だけがKnowledge利用可能状態へ進む。
 
+### Research終端状態と探索十分性
+
+Researchの終端状態は「検索結果が返った」ことだけでは決定しない。
+
+- `EVIDENCE_FOUND` は、必要なResearch ClaimがVerificationを通過し、Knowledge Gapを解決できた状態を表す。
+- `INSUFFICIENT_SEARCH` は、現在の探索では必要条件を満たせず、追加探索またはCOREによる別処理が必要な状態を表す。
+- `INSUFFICIENT_VERIFICATION` は、探索Coverageが一定条件を満たしても、Claimの検証が完了していない状態を表す。
+- `NOT_FOUND_AFTER_COVERAGE` は、要求された探索CoverageをEvidenceとして確認したうえで、なお必要なClaimを解決できなかった場合だけ許可する。
+- `NO_RESULT`、`SOURCE_UNAVAILABLE`、`NO_NEW_EVIDENCE`、`LOW_INFORMATION_GAIN`等は、探索結果が得られなかったことや探索継続余地が小さいことを意味するだけで、存在しないことの証明にはならない。
+
+`NOT_FOUND_AFTER_COVERAGE`を返すためのCoverageは、検索回数ではなくWeb Research Policyの状態で判定する。独立情報源、一次・公式情報、反証探索、矛盾の有無など、要求された条件をEvidenceとして確認する。
+
+Search budget、pass数、HTTP timeout、candidate URL数などは安全上限であり、これらを使い切ったこと自体を探索十分性とはみなさない。
+
+Research Resultには、`resolved`、`outcome`、`verification`、`continuationAvailable`、`continuationReason`、`nextQuery`等を保持し、COREはこれらをBlackboard上で再評価する。
+
+COREの完了判定でもResearch Resultの存在だけを完了条件にしない。`resolved=true`、または要求CoverageがEvidenceとして成立した`NOT_FOUND_AFTER_COVERAGE`以外はResearch依存Taskの完了根拠にしてはならない。
+
 ### Researchの直接呼出し監査
 
 UI、Unknown、Memory、Capability、Autonomy、Background処理などがResearch業務を要求する場合、原則としてCORE Task Ingressから入り、COREがResearch分類を選択する。

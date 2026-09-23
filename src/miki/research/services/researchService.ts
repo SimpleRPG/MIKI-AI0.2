@@ -412,10 +412,23 @@ export class ResearchService {
       });
       const observedEvidenceCount = evidence.filter(item => item.status !== 'REJECTED').length;
       const hasAnyResults = observedEvidenceCount > 0 || claimIds.length > 0;
+      const coverageSatisfied = webResearchPolicyService.isSatisfied(
+        { acceptedIndependentSourceCount: new Set(evidence.filter(item => item.status !== 'REJECTED' && item.independence_cluster_id).map(item => item.independence_cluster_id)).size,
+          candidateUrlsChecked: searchResults.filter(result => !!result.url).length,
+          renderedPages: evidence.filter(item => item.status !== 'REJECTED' && item.metadata?.fetch_method === 'headless_webview').length,
+          supportingSourceCount: verification.filter(result => result.outcome === 'SUPPORTED' || result.outcome === 'DEVICE_VERIFIED').length,
+          counterEvidenceSourceCount: evidence.filter(item => item.status !== 'REJECTED' && item.metadata?.research_source_role === 'COUNTEREVIDENCE').length,
+          primarySourceSatisfied: evidence.some(item => item.status !== 'REJECTED' && (item.metadata?.research_source_role === 'PRIMARY' || (item.metadata?.research_source_role === 'OFFICIAL' && item.metadata?.research_source_tier_target === 'PRIMARY_OR_OFFICIAL'))),
+          counterEvidenceSearchCompleted: queryPlan.status === 'READY' && queryPlan.queries.some(query => query.intentType === 'COUNTEREVIDENCE'),
+          excludedDuplicateCount: 0,
+          rejectedQualityCount: evidence.filter(item => item.status === 'REJECTED').length,
+          conflictingEvidence: verification.some(result => result.outcome === 'CONTRADICTED') },
+        webResearchPolicyService.get()
+      );
       const outcome: ResearchOutcomeState = resolved
         ? 'EVIDENCE_FOUND'
         : hasAnyResults
-          ? (continuationAvailable ? 'INSUFFICIENT_SEARCH' : 'NOT_FOUND_AFTER_COVERAGE')
+          ? (continuationAvailable ? 'INSUFFICIENT_SEARCH' : coverageSatisfied ? 'NOT_FOUND_AFTER_COVERAGE' : 'INSUFFICIENT_SEARCH')
           : (roundsCompleted > 0 ? 'NO_RESULT' : 'SOURCE_UNAVAILABLE');
 
       researchStrategyService.recordOutcome(gap.type, 'WEB_SEARCH', resolved, Date.now() - startedAt);
