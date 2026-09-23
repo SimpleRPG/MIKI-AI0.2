@@ -1,7 +1,7 @@
 /**
  * MIKI / selfDevelopment
  *
- * 16分類における「selfDevelopment」機能の統合入口。
+ * 18分類における「selfDevelopment」機能の統合入口。
  * 既存の専門サービスを段階的に接続する。
  *
  * 現段階では受け皿のみを定義し、
