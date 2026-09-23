@@ -280,7 +280,7 @@ class AutonomousSelfImprovementLoopService {
             'DECISION',
             'core',
             'evidence-recovery-required',
-            { reasons: quality.reasons, requestedDomains: ['research', 'verification', 'memory'] },
+            { reasons: quality.reasons, requestedDomains: [] },
             quality.evidenceIds
           );
           await this.acquireThenWaitForEvidence(request, quality.reasons.join(','));

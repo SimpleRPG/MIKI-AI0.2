@@ -54,8 +54,8 @@ export interface ResearchResult {
  */
 function assessResearchSourceRole(query: { intentType?: string; sourceTierTarget?: string; siteOrDomainConstraints?: string[] }, page: { url: string }): "PRIMARY"|"OFFICIAL"|"SECONDARY"|"COUNTEREVIDENCE"|"UNCLASSIFIED" {
   if (query.intentType === "COUNTEREVIDENCE") return "COUNTEREVIDENCE";
-  const host = (() => { try { return new URL(page.url).hostname.toLowerCase().replace(/^www\\./, ""); } catch { return ""; } })();
-  const constraints = (query.siteOrDomainConstraints || []).map(v => v.toLowerCase().replace(/^https?:\\/\\//, "").replace(/^www\\./, "").split("/")[0]).filter(Boolean);
+  const host = (() => { try { return new URL(page.url).hostname.toLowerCase().replace(/^www\./, ""); } catch { return ""; } })();
+  const constraints = (query.siteOrDomainConstraints || []).map(v => v.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]).filter(Boolean);
   if (host && constraints.some(domain => host === domain || host.endsWith("." + domain))) return "OFFICIAL";
   return "UNCLASSIFIED";
 }
@@ -70,13 +70,6 @@ export class ResearchService {
       ResearchService.instance = new ResearchService();
     }
     return ResearchService.instance;
-  }
-
-  public async executeSearch(query: string, options?: { maxResults?: number; sourceRequestId?: string }): Promise<ResearchResult> {
-    const text = query.trim();
-    if (!text) throw new Error("RESEARCH_QUERY_REQUIRED");
-    const gap = knowledgeGapService.detect({ query: text, type: "INSUFFICIENT_EVIDENCE", reason: "通常のWeb知識探索要求をResearchServiceへ統合", priority: 50, sourceRequestId: options?.sourceRequestId });
-    return this.researchGap(gap, { forceRoute: "WEB_SEARCH", query: text, maxPagesPerPass: Math.max(1, Math.min(3, options?.maxResults || 2)) });
   }
 
   public async executeSearch(query: string, options?: { maxResults?: number; sourceRequestId?: string }): Promise<ResearchResult> {
@@ -203,7 +196,6 @@ export class ResearchService {
           bypassCache: pass > 0,
         });
         const results = this.normalizeSearchResults(raw);
-        searchResults.push(...results);
         searchResults.push(...results);
         if (typeof (raw as any)?.summary === 'string') summary = (raw as any).summary;
 
