@@ -454,10 +454,12 @@ export interface GitHubPushParams {
 export interface GitHubPushResult {
   success: boolean;
   commitSha: string;
-  filesCount: number;
-  branch: string;
-  commitUrl: string;
-  branchUrl: string;
+  treeSha?: string;
+  changedFilesMeta?: Array<{
+    path: string;
+    blobSha?: string;
+    sha256?: string;
+  }>;
 }
 
 export async function checkServerHealth(): Promise<{ status: string }> {
