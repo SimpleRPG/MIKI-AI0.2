@@ -1136,3 +1136,125 @@ UI変更はGalaxy S25実機での利用を基準に判定する。
 - Galaxy S25専用化を理由に既存機能を削除しない
 
 UI実装では、まずGalaxy S25上での情報配置と操作経路を決定し、その後にコンポーネントを実装する。画面幅に合わせて既存PC UIを単純に縮小する方式を基本としない。
+
+## 2026-09-23 自己コード改善・外部レビュー再改善の設計更新
+
+今回の現行mainコード確認により、自己コード改善の基本閉ループを次のように定義する。
+
+改善要求（発見・ユーザー指示・外部指示）
+→ CORE
+→ 必要な専門分類
+→ Candidate
+→ Validation
+→ Review ZIP
+→ 外部評価
+→ 利用者Decision
+→ CORE再評価
+→ 必要ならREVALIDATION
+→ 新Candidate
+→ Validation
+→ 新Review ZIP
+
+### 外部レビューによる再改善
+
+外部評価で REQUEST_CHANGES / PARTIAL_ACCEPT / PARTIAL_REJECT が返された場合、外部レビューの修正要求をLearning Artifactだけに埋め込んではならない。
+
+REVALIDATIONでは、次の情報を同一Task系譜として保持する。
+
+- externalReviewId
+- sourcePackageId
+- source package revision
+- candidate revision
+- requestedChanges
+- userReason
+- targetFiles
+- issueId
+- review decision
+
+これらをCOREが再評価し、今回採用する実装要求を決定する。
+
+### CORE判断とCandidate生成
+
+外部レビューのrequestedChangesは、そのまま実装命令として実行しない。
+
+COREは外部レビュー情報、現在のBaseline、Evidence、制約、不変条件、ユーザーDecisionを統合して、今回の実装要求と対象範囲を確定する。
+
+Candidate生成には少なくとも次を明示的に渡す。
+
+- 今回採用する修正要求
+- 外部レビュー由来であること
+- 元Candidate / Review Packageとの系譜
+- candidateRevision
+- targetFiles
+- requirements
+- prohibitions
+- invariants
+- validationRequirements
+- deliveryRequirements
+
+過去のCORRECTION_PAIR等のLearning Artifactは補助情報として利用するが、今回の修正要求の代替にはしない。
+
+### REVALIDATION完了条件
+
+REVALIDATIONは新Candidate生成だけでは完了としない。
+
+1. 外部レビュー修正要求を復元できる。
+2. COREが実装要求と対象範囲を確定している。
+3. Candidate revisionが進んでいる。
+4. Candidateが隔離Workspaceで生成されている。
+5. Validationが実行され、未実行項目をPASSとして扱わない。
+6. 新Review ZIPが生成される。
+7. 新Packageが元Packageのrevision系譜を保持する。
+8. 外部レビュー再提出待ちで停止する。
+9. 明示的な採用承認なしに本番反映へ進まない。
+
+### 本番反映境界
+
+Candidate生成、Validation、Review ZIP生成から本番コードを直接変更・pushしない。
+
+本番反映は別のPromotion境界で行い、少なくとも以下を確認する。
+
+- 外部レビューがACCEPT
+- 利用者による採用Decision
+- Package revision一致
+- Candidate manifest / ZIP等のSHA一致
+- Persistence receipt確認
+- 現在BaselineとCandidateの対応確認
+
+REJECT / REQUEST_CHANGESは本番反映経路へ到達してはならない。
+
+### 2026-09-23時点の現行コード照合
+
+現行mainでは以下を確認済み。
+
+- CORE中心の18分類適応ルーティング
+- 固定SELF_IMPROVEMENT_FLOWの除去
+- 外部Review DecisionからCORE Task Ingressへの接続
+- REQUEST_CHANGES系からREVALIDATIONへの復帰
+- requestedChanges / sourcePackageId / candidateRevision等のTask payload保持
+- Review ZIPのrevision・凍結Snapshot管理
+- Candidateから本番反映までのPromotion/承認境界
+
+### 残作業
+
+次の4点を既存Canonical Ownerを再利用して実装する。
+
+1. REVALIDATIONのrequestedChangesをCOREの実装計画へ明示的に変換する。
+2. Candidate生成ContractへrequestedChanges、externalReviewId、sourcePackageId、candidateRevision等を直接渡す。
+3. 新Candidate / 新Packageを元のCORRECTION_PAIRの修正結果として明示的に関連付ける。
+4. REVALIDATION完了判定をValidation + Review Package生成 + 再レビュー待ちまで拡張する。
+
+新しい自己改善Orchestratorや第二のCandidate/Review基盤は作らない。
+
+Canonical Ownerは以下を維持する。
+
+CORE
+→ improvementIntakeRouterService
+→ adaptiveRoutePlannerService
+→ candidateCodeGenerationService
+→ candidate validation
+→ reviewZipExportService
+→ externalReviewIntakeService
+→ CORE
+
+設計・コード・機械検証の三者が一致するまで、この設計更新を実装完了とは扱わない。
