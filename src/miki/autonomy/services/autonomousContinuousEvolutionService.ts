@@ -17,6 +17,7 @@ async function calculateArtifactSha256(source: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((value) => value.toString(16).padStart(2, '0')).join('');
 }
 import { systemLogger } from '../../../services/systemLogger';
+import { storageService } from "../../../services/storageService";
 import { selfImprovementRequestEventService } from '../../improvement/services/selfImprovementRequestEventService';
 import { mikiSelfCodingSuperchargerService, MutationTestResult } from '../../selfDevelopment/services/mikiSelfCodingSuperchargerService';
 import { AutonomousVerificationData } from '../../../types';
