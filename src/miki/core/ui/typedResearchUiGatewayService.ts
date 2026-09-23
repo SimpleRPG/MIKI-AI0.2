@@ -77,7 +77,7 @@ class TypedResearchUiGatewayService {
 
   public async executeSearch(query: string, options: Parameters<typeof unifiedWebResearchService.executeSearch>[1]) {
     await this.authorize('EXECUTE_AUTONOMOUS_SEARCH', { query, options });
-    return unifiedWebResearchService.executeSearch(query, options);
+    return researchService.executeSearch(query, options);
   }
 
   public async learnFromSearch(...args: Parameters<typeof unifiedWebResearchService.learnFromSearch>) {

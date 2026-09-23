@@ -95,7 +95,7 @@ class UnifiedUnknownResolutionCoordinatorService {
 
     request.onProgress?.(`Web調査: ${query}`, { unknownId: resolution.id, route: 'WEB' });
     try {
-      const result = await unifiedWebResearchService.executeSearch(query, { maxResults: 5 });
+      const result = await researchService.executeSearch(query, { maxResults: 5 });
       if (!result.results.length) {
         unknownResolutionService.attempt(resolution.id, 'WEB', undefined, {
           query,
