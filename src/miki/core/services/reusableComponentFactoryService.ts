@@ -2,6 +2,7 @@ import { storageService } from '../../../services/storageService';
 import { canonicalSha256Object } from './canonicalSha256Service';
 import { reviewLearningArtifactService, type ReviewLearningArtifact } from './reviewLearningArtifactService';
 import type { ReviewLearningEpisode } from './reviewDecisionLearningService';
+import { verifierService } from '../../verification/services/verifierService';
 
 export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
@@ -84,6 +85,55 @@ class ReusableComponentFactoryService{
   const component=this.identify(body) as KnowledgeComponentArtifact;
   this.storeCandidates([component]);
   return {component,created:true,updated:false};
+ }
+ verifyResearchKnowledge(componentId:string,claimIds:string[],options?:{requireFresh?:boolean;maxAgeDays?:number}):{component:KnowledgeComponentArtifact|undefined;verified:boolean;conflicted:boolean;verificationIds:string[];reasons:string[]}{
+  const item=this.list().find(x=>x.componentId===componentId);
+  if(!item||item.componentKind!=='KNOWLEDGE'){
+    return {component:undefined,verified:false,conflicted:false,verificationIds:[],reasons:['KNOWLEDGE_COMPONENT_NOT_FOUND']};
+  }
+
+  const ids=[...new Set(claimIds.filter(Boolean))];
+  if(ids.length===0){
+    return {component:item,verified:false,conflicted:false,verificationIds:[],reasons:['NO_CLAIMS_TO_VERIFY']};
+  }
+
+  const results=verifierService.verifyMany({
+    claimIds:ids,
+    requireFresh:options?.requireFresh,
+    maxAgeDays:options?.maxAgeDays,
+  });
+
+  const verificationIds=results.map(result=>result.claimId);
+  const reasons=results.flatMap(result=>result.reasons);
+  const conflicted=results.some(result=>result.outcome==='CONTRADICTED');
+  const verified=results.length===ids.length&&
+    results.every(result=>result.promoted&&
+      (result.outcome==='SUPPORTED'||result.outcome==='DEVICE_VERIFIED'));
+
+  item.contradictionRefs=[
+    ...new Set([
+      ...item.contradictionRefs,
+      ...results.filter(result=>result.outcome==='CONTRADICTED').map(result=>result.claimId),
+    ])
+  ];
+
+  if(conflicted){
+    item.verificationStatus='CONFLICT';
+    item.lifecycleStatus='CONFLICT';
+  }else if(verified){
+    item.verificationStatus='VERIFIED';
+    if(['CANDIDATE','VERIFIED'].includes(item.lifecycleStatus)){
+      item.lifecycleStatus='VERIFIED';
+    }
+    item.lastConfirmedAt=Date.now();
+  }else{
+    item.verificationStatus='UNVERIFIED';
+  }
+
+  item.updatedAt=Date.now();
+  storageService.setItem(COMPONENT_KEY,JSON.stringify(this.list()));
+
+  return {component:item,verified,conflicted,verificationIds,reasons};
  }
  storeCandidates(items:AnyReusableComponent[]):{componentIds:string[];persistenceReceiptId:string;reloaded:boolean}{const existing=this.list();const merged=[...items,...existing.filter(item=>!items.some(next=>next.canonicalSha256===item.canonicalSha256))].slice(0,1000);storageService.setItem(COMPONENT_KEY,JSON.stringify(merged));const loaded=this.list();const reloaded=items.every(item=>loaded.some(saved=>saved.componentId===item.componentId&&saved.canonicalSha256===item.canonicalSha256));if(!reloaded)throw new Error('COMPONENT_REPOSITORY_PERSISTENCE_FAILED');return {componentIds:items.map(x=>x.componentId),persistenceReceiptId:`CPR-${canonicalSha256Object({ids:items.map(x=>x.componentId),at:Date.now()}).slice(0,20)}`,reloaded};}
  retrieve(input:{purpose:string;environmentFingerprint:string;kinds?:ReusableComponentKind[]}):{candidates:AnyReusableComponent[];excludedComponentIds:string[];exclusionReasons:Record<string,string>}{const words=this.words(input.purpose);const excludedComponentIds:string[]=[];const exclusionReasons:Record<string,string>={};const candidates=this.list().filter(item=>{if(input.kinds&&!input.kinds.includes(item.componentKind)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='KIND_NOT_SELECTED';return false;}if(!['MIKI_APPROVED','ACTIVE','USER_APPROVED'].includes(item.lifecycleStatus)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='NOT_MIKI_APPROVED';return false;}if(item.environmentFingerprint!=='unknown'&&item.environmentFingerprint!==input.environmentFingerprint){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='ENVIRONMENT_REVALIDATION_REQUIRED';return false;}const hay=this.words([item.purpose,...item.appliesWhen,item.componentType].join(' '));const matched=words.some(word=>hay.includes(word));if(!matched){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='PURPOSE_NOT_MATCHED';}return matched;});return {candidates,excludedComponentIds,exclusionReasons};}

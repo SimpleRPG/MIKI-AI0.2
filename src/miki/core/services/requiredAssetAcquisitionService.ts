@@ -241,6 +241,13 @@ class RequiredAssetAcquisitionService {
             verificationStatus:'UNVERIFIED',
           });
 
+        const verificationResult=
+          reusableComponentFactoryService.verifyResearchKnowledge(
+            componentResult.component.componentId,
+            claimIds,
+            { requireFresh:false },
+          );
+
         componentIds=[
           ...new Set([
             ...componentIds,
@@ -255,6 +262,16 @@ class RequiredAssetAcquisitionService {
         }else if(componentResult.updated){
           reasons.push(
             `KNOWLEDGE_COMPONENT_UPDATED:${componentResult.component.componentId}`
+          );
+        }
+
+        if(verificationResult.verified){
+          reasons.push(
+            `KNOWLEDGE_COMPONENT_VERIFIED:${componentResult.component.componentId}`
+          );
+        }else if(verificationResult.conflicted){
+          reasons.push(
+            `KNOWLEDGE_COMPONENT_CONFLICT:${componentResult.component.componentId}`
           );
         }
       }
