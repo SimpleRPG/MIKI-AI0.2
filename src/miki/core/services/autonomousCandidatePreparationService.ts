@@ -6,7 +6,7 @@ export interface TargetResolution { issueId:string; targetPaths:string[]; eviden
 export interface CandidateDraft { issueId:string; targetPath:string; baselineContent:string; candidateContent:string; evidenceIds:string[]; generationMode:'AI_SUPPLIED'|'SAFE_TEMPLATE'; }
 export interface AutonomousImplementationPlan {
  version:1;
- source:'AUTONOMOUS_ISSUE';
+ source:'AUTONOMOUS_ISSUE'|'REVIEW_REVALIDATION';
  issueId:string;
  targetPaths:string[];
  changeScope:'MINIMAL_SINGLE_FILE'|'MINIMAL_MULTI_FILE';
