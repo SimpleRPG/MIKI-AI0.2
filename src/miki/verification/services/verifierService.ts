@@ -2,6 +2,7 @@ import { ClaimRecord, ClaimVerificationStatus } from '../../../types';
 import { claimDatabaseService } from '../../../services/claimDatabaseService';
 import { evidenceService, EvidenceRecord } from '../../../services/evidenceService';
 import { systemLogger } from '../../../services/systemLogger';
+import { claimVerificationEventService } from './claimVerificationEventService';
 
 export type VerificationOutcome =
   | 'SUPPORTED'
@@ -104,6 +105,13 @@ export class VerifierService {
     }
 
     const promoted = outcome === 'SUPPORTED' || outcome === 'DEVICE_VERIFIED';
+
+    claimVerificationEventService.publish({
+      claimId: claim.claim_id,
+      outcome,
+      promoted,
+      verifiedAt: Date.now(),
+    });
 
     systemLogger.info(
       'SELF_IMPROVEMENT',

@@ -1,7 +1,6 @@
 import { unifiedWebResearchService } from './unifiedWebResearchService';
 import { knowledgeGapService, KnowledgeGap } from '../../unknown/services/knowledgeGapService';
 import { evidenceService, EvidenceRecord } from '../../memory/services/evidenceService';
-import { verifierService, VerificationResult } from '../../verification/services/verifierService';
 import { researchStrategyService, ResearchRoute } from './researchStrategyService';
 import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/services/cognitiveEvidenceIntegrationService';
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
@@ -161,7 +160,7 @@ export class ResearchService {
       }
 
       let summary: string | undefined;
-      let verification: VerificationResult[] = [];
+      let verification: unknown[] = [];
       let resolved = false;
       let continuationAvailable = false;
       let continuationReason = '';
@@ -316,31 +315,12 @@ export class ResearchService {
 
       }
 
-        // Search is only acquisition. The explicit verifier is the boundary that
-        // may promote a Claim or resolve a Knowledge Gap. A second independent
-        // pass is allowed when the first pass is insufficient; it still cannot
-        // resolve the gap without the same verifier boundary.
+        // ResearchはEvidence/Claimの収集までを担当し、VerificationはCORE経由で実行する。
         knowledgeGapService.advanceResolutionPlan(gap.id, 'VERIFY', 'RESEARCH');
-        const persistedResearchClaimIds = knowledgeGapService.attachResearchClaims(gap.id, claimIds)?.researchClaimIds || claimIds;
-        const persistedRequiredResearchClaimIds = knowledgeGapService.attachResearchRequiredClaims(gap.id, requiredResearchClaimIds)?.researchRequiredClaimIds || requiredResearchClaimIds;
-        verification = persistedResearchClaimIds.length > 0
-          ? verifierService.verifyMany({
-              claimIds: persistedResearchClaimIds,
-              requireFresh: options?.requireFresh,
-              maxAgeDays: options?.maxAgeDays,
-            })
-          : [];
-        resolved = persistedRequiredResearchClaimIds.length > 0 && verification.filter((result) => persistedRequiredResearchClaimIds.includes(result.claimId)).length === persistedRequiredResearchClaimIds.length && verification.filter((result) => persistedRequiredResearchClaimIds.includes(result.claimId)).every((result) => result.outcome === "SUPPORTED" || result.outcome === "DEVICE_VERIFIED");
-        // Verified or otherwise admissible claims are mirrored into the Knowledge OS.
-        // This is a structural sync only; it never promotes an unverified claim.
-        cognitiveEvidenceIntegrationService.ingestClaims(claimIds);
-        if (resolved) {
-          knowledgeGapService.markResolved(gap.id);
-          knowledgeGapService.advanceResolutionPlan(gap.id, 'RESOLVE', 'RESEARCH');
-          continuationAvailable = false;
-          continuationReason = 'VERIFIED';
-          break;
-        }
+        knowledgeGapService.attachResearchClaims(gap.id, claimIds);
+        knowledgeGapService.attachResearchRequiredClaims(gap.id, requiredResearchClaimIds);
+        verification = [];
+        resolved = false;
 
         if (queryPlan.status === "READY" && queryPlan.queries[pass]) { const passEvidenceIds = [...new Set(evidence.filter(item => item.status !== "REJECTED").map(item => item.evidence_id))]; const passClusters = new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)); researchQueryOutcomeLearningService.record({ queryPlanId: queryPlan.planId, queryId: queryPlan.queries[pass].queryId, queryText: queryPlan.queries[pass].queryText, status: passEvidenceIds.length ? "EVIDENCE_GAINED" : results.length ? "LOW_QUALITY_RESULTS" : "NO_RESULTS", candidateUrlCount: results.filter(result => !!result.url).length, renderedPageCount: readResults.filter(page => page.success && !!page.text.trim()).length, admissibleIndependentSourceCount: passClusters.size, primarySourceCount: passEvidenceIds.filter(id => { const item = evidence.find(e => e.evidence_id === id); return item?.status !== "REJECTED" && (item?.metadata?.research_source_role === "PRIMARY" || item?.metadata?.research_source_role === "OFFICIAL"); }).length, sourceTierTarget: queryPlan.queries[pass].sourceTierTarget, counterevidenceChecked: queryPlan.queries[pass].intentType === "COUNTEREVIDENCE", evidenceIds: passEvidenceIds, failureReasons: verification.filter(result => result.outcome === "UNRESOLVED").flatMap(result => result.reasons), environmentApplicability: "CURRENT_ENVIRONMENT", executionTimeMs: Date.now() - queryStartedAt, attempt: pass + 1 }); }
 

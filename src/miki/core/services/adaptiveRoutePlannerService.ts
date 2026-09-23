@@ -748,10 +748,9 @@ class AdaptiveRoutePlannerService {
 
     const text=`${task.goal} ${String(input.kind||'')}`;
     const isUnknown=/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(text);
-    const required=isUnknown
-      ? ['conversation','unknown','research','verification','experience','learning','memory'] as MikiDomain[]
-      : ['conversation','strategy','safety','experience','memory'] as MikiDomain[];
-    return coreCompletionGateService.evaluate(task,required);
+    // 通常Taskも固定Domain一覧では完了判定しない。
+    // CORE Plan RevisionとBlackboardの最新状態から必要な処理だけを判定する。
+    return coreCompletionGateService.evaluate(task,[]);
   }
 
   private evaluateConversationCompletion(task:BlackboardTask):CoreCompletionAssessment {
