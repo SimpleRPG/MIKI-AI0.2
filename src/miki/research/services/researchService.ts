@@ -304,9 +304,10 @@ export class ResearchService {
         // pass is allowed when the first pass is insufficient; it still cannot
         // resolve the gap without the same verifier boundary.
         knowledgeGapService.advanceResolutionPlan(gap.id, 'VERIFY', 'RESEARCH');
+        const persistedResearchClaimIds = knowledgeGapService.attachResearchClaims(gap.id, claimIds)?.researchClaimIds || claimIds;
         verification = claimIds.length > 0
           ? verifierService.verifyMany({
-              claimIds,
+              claimIds: persistedResearchClaimIds,
               requireFresh: options?.requireFresh,
               maxAgeDays: options?.maxAgeDays,
             })
