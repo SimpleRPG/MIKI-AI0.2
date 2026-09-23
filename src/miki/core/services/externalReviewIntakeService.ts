@@ -208,7 +208,7 @@ class ExternalReviewIntakeService {
     this.decisions.set(decisionId, decision);
     if (coreResult.task.status === 'COMPLETED') {
       const packageStatus: ReviewPackageStatus = input.decision === 'ACCEPT'
-        ? 'ACCEPTED'
+        ? 'EXTERNAL_REVIEW_PENDING'
         : input.decision === 'REJECT'
           ? 'REJECTED'
           : input.decision === 'REQUEST_CHANGES' || input.decision === 'PARTIAL_ACCEPT' || input.decision === 'PARTIAL_REJECT'
