@@ -22,8 +22,6 @@ export type ResearchOutcomeState =
 
 export interface ResearchSearchResult { title:string; snippet:string; source:string; url?:string; publishedDate?:string; sourceId?:string; independenceClusterId?:string; claimText?:string; }
 
-export interface ResearchSearchResult { title:string; snippet:string; source:string; url?:string; publishedDate?:string; sourceId?:string; independenceClusterId?:string; claimText?:string; }
-
 export interface ResearchResult {
   gapId: string;
   results: ResearchSearchResult[];
@@ -102,7 +100,6 @@ export class ResearchService {
     const claimIds: string[] = [];
     const requiredResearchClaimIds: string[] = [];
     const learnedTermComponentIds: string[] = [];
-    const searchResults: ResearchSearchResult[] = [];
     const searchResults: ResearchSearchResult[] = [];
 
     knowledgeGapService.buildResolutionPlan(gap);
