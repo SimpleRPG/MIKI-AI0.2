@@ -67,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
     setTimeout(() => setUrlCopied(false), 2500);
   };
   return (
-    <header className="h-13 sm:h-14 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-4 flex items-center justify-between gap-3 select-none z-30 shrink-0">
+    <header className="hidden md:flex h-13 sm:h-14 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-4 flex items-center justify-between gap-3 select-none z-30 shrink-0">
       {/* Brand & Persona Identity */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {/* Logo / Partner Avatar */}
