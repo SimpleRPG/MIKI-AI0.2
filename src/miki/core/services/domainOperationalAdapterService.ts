@@ -8,7 +8,7 @@ import { unifiedMikiExperienceService } from '../../experience/services/unifiedM
 import { autonomousCurriculumService } from '../../learning/services/autonomousCurriculumService';
 import { causalMemoryLedgerService } from '../../memory/services/causalMemoryLedgerService';
 import { heuristicGraduationService } from '../../promotion/services/heuristicGraduationService';
-import { autonomousSearchService } from '../../research/services/autonomousSearchService';
+import { unifiedWebResearchService } from '../../research/services/unifiedWebResearchService';
 import { resourceGovernanceService } from '../../safety/services/resourceGovernanceService';
 import { mikiCognitiveVitalsService } from '../../selfAwareness/services/mikiCognitiveVitalsService';
 import { codebaseReflectionService } from '../../selfDevelopment/services/codebaseReflectionService';
@@ -66,7 +66,7 @@ class DomainOperationalAdapterService {
         case 'promotion':
           return snapshot(domain,'heuristicGraduationService',{stats:heuristicGraduationService.getGraduationStats()});
         case 'research':
-          return snapshot(domain,'autonomousSearchService',{config:autonomousSearchService.getConfig(),stats:autonomousSearchService.getStats(),recent:autonomousSearchService.getRecentRecords(20)});
+          return snapshot(domain,'autonomousSearchService',{config:unifiedWebResearchService.getConfig(),stats:unifiedWebResearchService.getStats(),recent:unifiedWebResearchService.getRecentRecords(20)});
         case 'safety':
           return snapshot(domain,'resourceGovernanceService',{resources:resourceGovernanceService.getSnapshot()});
         case 'selfAwareness':

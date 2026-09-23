@@ -17,7 +17,7 @@ import { componentCompositionService } from './componentCompositionService';
 import { unifiedDecisionEngineService } from './unifiedDecisionEngineService';
 import { affectionDynamicsService } from './affectionDynamicsService';
 import { systemLogger } from './systemLogger';
-import { autonomousSearchService } from './autonomousSearchService';
+import { unifiedWebResearchService } from '../miki/research/services/unifiedWebResearchService';
 import { knowledgeGapService } from './knowledgeGapService';
 import { researchService } from './researchService';
 import { capabilityReuseService } from './capabilityReuseService';
@@ -310,7 +310,7 @@ export class NonLlmCoreService {
       let researchSummary: string | undefined;
       let researchNextAction = 'この知識ギャップを調査キューに残し、公式資料・再現実験などで証拠を補います。';
 
-      const searchNeed = autonomousSearchService.detectNeedForSearch(prompt);
+      const searchNeed = unifiedWebResearchService.detectNeedForSearch(prompt);
       if (searchNeed.needsSearch) {
         researchPerformed = true;
         t = performance.now();

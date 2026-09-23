@@ -28,7 +28,7 @@ import { componentCompositionService } from '../../capability/services/component
 import { unifiedDecisionEngineService } from '../../strategy/services/unifiedDecisionEngineService';
 import { affectionDynamicsService } from '../../selfAwareness/services/affectionDynamicsService';
 import { systemLogger } from '../../../services/systemLogger';
-import { autonomousSearchService } from '../../research/services/autonomousSearchService';
+import { unifiedWebResearchService } from '../../research/services/unifiedWebResearchService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
 import { researchService } from '../../research/services/researchService';
 import { capabilityReuseService } from '../../capability/services/capabilityReuseService';
@@ -482,7 +482,7 @@ export class NonLlmCoreService {
       let researchSummary: string | undefined;
       let researchNextAction = 'この知識ギャップを調査キューに残し、公式資料・再現実験などで証拠を補います。';
 
-      const searchNeed = autonomousSearchService.detectNeedForSearch(prompt);
+      const searchNeed = unifiedWebResearchService.detectNeedForSearch(prompt);
       if (searchNeed.needsSearch) {
         researchPerformed = true;
         t = performance.now();

@@ -7,7 +7,7 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { taskBlackboardService } from '../../core/services/taskBlackboardService';
 import { domainReplyLedgerService } from '../../core/services/domainReplyLedgerService';
-import { autonomousSearchService } from '../../research/services/autonomousSearchService';
+import { unifiedWebResearchService } from '../../research/services/unifiedWebResearchService';
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 import { resourceGovernanceService, ResourceSnapshot } from '../../safety/services/resourceGovernanceService';
 
@@ -86,9 +86,9 @@ export class SelfImprovementMetricsService {
     },0);
 
     const gaps=knowledgeGapService.listOpen(500);
-    const allSearchRecords=autonomousSearchService.getRecentRecords(500).filter(record=>record.timestamp>=cutoff);
+    const allSearchRecords=unifiedWebResearchService.getRecentRecords(500).filter(record=>record.timestamp>=cutoff);
     const noResultRecords=allSearchRecords.filter(record=>record.results.length===0).length;
-    const searchStats=autonomousSearchService.getStats();
+    const searchStats=unifiedWebResearchService.getStats();
 
     const guardEntries=tasks.flatMap(task=>task.entries).filter(entry=>entry.createdAt>=cutoff&&entry.kind==='DECISION');
     const guardCount=(name:string)=>guardEntries.filter(entry=>entry.key===name || (entry.key.startsWith('coreCycleGuard:') && JSON.stringify(entry.value).includes(name))).length;
