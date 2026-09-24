@@ -18,6 +18,10 @@ export interface BackgroundBudgetDecision {
   maxDurationMs: number;
   reductionRatio: number;
   reason: string;
+  elapsedMs: number;
+  cycleExceeded: boolean;
+  durationExceeded: boolean;
+  resourceMode: ResourceMode;
 }
 
 export interface ResourceSnapshot {
@@ -78,8 +82,36 @@ class ResourceGovernanceService {
    * 固定Queueや別Task Managerは作らず、CORE cycle単位で縮退/停止を判断する。
    */
   assessBackgroundBudget(background:boolean, foregroundActive:boolean, cycle:number, startedAt:number, now=Date.now()):BackgroundBudgetDecision {
-    if(!background) return {allowed:true,maxCycles:Number.MAX_SAFE_INTEGER,maxDurationMs:Number.MAX_SAFE_INTEGER,reductionRatio:0,reason:'FOREGROUND_OR_UNSCOPED'};
-    if(foregroundActive) return {allowed:false,maxCycles:0,maxDurationMs:0,reductionRatio:1,reason:'FOREGROUND_REQUEST_ACTIVE'};
+    const resourceMode=this.snapshot.mode;
+
+    if(!background){
+      return {
+        allowed:true,
+        maxCycles:Number.MAX_SAFE_INTEGER,
+        maxDurationMs:Number.MAX_SAFE_INTEGER,
+        reductionRatio:0,
+        reason:'FOREGROUND_OR_UNSCOPED',
+        elapsedMs:Math.max(0,now-startedAt),
+        cycleExceeded:false,
+        durationExceeded:false,
+        resourceMode,
+      };
+    }
+
+    if(foregroundActive){
+      return {
+        allowed:false,
+        maxCycles:0,
+        maxDurationMs:0,
+        reductionRatio:1,
+        reason:'FOREGROUND_REQUEST_ACTIVE',
+        elapsedMs:Math.max(0,now-startedAt),
+        cycleExceeded:true,
+        durationExceeded:true,
+        resourceMode,
+      };
+    }
+
     const elapsed=Math.max(0,now-startedAt);
     const profile:Record<ResourceMode,{maxCycles:number;maxDurationMs:number;reductionRatio:number}>={
       NORMAL:{maxCycles:6,maxDurationMs:60_000,reductionRatio:0},
@@ -87,11 +119,23 @@ class ResourceGovernanceService {
       CLEANUP:{maxCycles:1,maxDurationMs:15_000,reductionRatio:.8},
       STOP_COLLECTION:{maxCycles:0,maxDurationMs:0,reductionRatio:1},
     };
-    const p=profile[this.snapshot.mode];
-    if(cycle>p.maxCycles || elapsed>p.maxDurationMs){
-      return {allowed:false,...p,reason:this.snapshot.mode==='NORMAL'?'BACKGROUND_BUDGET_EXCEEDED':'RESOURCE_MODE_BUDGET_EXCEEDED'};
-    }
-    return {allowed:true,...p,reason:this.snapshot.mode==='NORMAL'?'BACKGROUND_BUDGET_ALLOWED':'BACKGROUND_BUDGET_REDUCED'};
+
+    const p=profile[resourceMode];
+    const cycleExceeded=cycle>p.maxCycles;
+    const durationExceeded=elapsed>p.maxDurationMs;
+    const allowed=!cycleExceeded&&!durationExceeded;
+
+    return {
+      allowed,
+      ...p,
+      reason:allowed
+        ? (resourceMode==='NORMAL'?'BACKGROUND_BUDGET_ALLOWED':'BACKGROUND_BUDGET_REDUCED')
+        : (resourceMode==='NORMAL'?'BACKGROUND_BUDGET_EXCEEDED':'RESOURCE_MODE_BUDGET_EXCEEDED'),
+      elapsedMs:elapsed,
+      cycleExceeded,
+      durationExceeded,
+      resourceMode,
+    };
   }
 
   budgetFor(tier:ResourceTier, critical=false): CapabilityBudget {

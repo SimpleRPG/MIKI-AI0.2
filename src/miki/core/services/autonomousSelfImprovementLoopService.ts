@@ -351,26 +351,70 @@ class AutonomousSelfImprovementLoopService {
       return;
     }
 
+    const evidenceWaitBefore= request.evidenceWaitCount || 0;
+    const evidenceDecision={
+      schemaVersion:1,
+      requestId:request.id,
+      runId:request.runId,
+      taskId:request.taskId,
+      workspaceId:request.workspaceId,
+      originalReason:reason,
+      acquired:acquired.acquired,
+      progressed:acquired.progressed,
+      evidenceCount:acquired.evidenceIds.length,
+      evidenceIds:[...acquired.evidenceIds],
+      reasons:[...acquired.reasons],
+      diagnostics:acquired.diagnostics,
+      evidenceWaitCountBefore:evidenceWaitBefore,
+      recordedAt:Date.now(),
+    };
+
     systemLogger.info(
       'SELF_IMPROVEMENT',
       '[AutonomousLoop] WAITING_EVIDENCE decision',
-      JSON.stringify({
-        requestId: request.id,
-        runId: request.runId,
-        taskId: request.taskId,
-        acquired: acquired.acquired,
-        progressed: acquired.progressed,
-        evidenceCount: acquired.evidenceIds.length,
-        reason: acquired.reasons.join(',') || reason,
-        diagnostics: acquired.diagnostics,
-      }),
+      JSON.stringify(evidenceDecision),
     );
+
+    if(request.taskId){
+      taskBlackboardService.append(
+        request.taskId,
+        'CHECKPOINT',
+        'core',
+        'evidenceRecoveryDiagnostic',
+        evidenceDecision,
+        acquired.evidenceIds,
+      );
+    }
 
     this.waitForEvidence(
       request,
       acquired.reasons.join(',') || reason,
       acquired.progressed,
     );
+
+    if(request.taskId){
+      const retryAt=this.state.retryAt;
+      taskBlackboardService.append(
+        request.taskId,
+        'CHECKPOINT',
+        'core',
+        'evidenceRecoveryWaitScheduled',
+        {
+          schemaVersion:1,
+          requestId:request.id,
+          runId:request.runId,
+          taskId:request.taskId,
+          acquired:acquired.acquired,
+          progressed:acquired.progressed,
+          evidenceWaitCountBefore:evidenceWaitBefore,
+          evidenceWaitCountAfter:request.evidenceWaitCount || 0,
+          retryAt,
+          waitDurationMs:retryAt ? Math.max(0,retryAt-Date.now()) : 0,
+          reason:acquired.reasons.join(',') || reason,
+        },
+        acquired.evidenceIds,
+      );
+    }
   }
 
   private waitForEvidence(request: AutonomousImprovementRequest, reason: string, progressed = false): void {

@@ -110,9 +110,84 @@ class CoreOrchestratorService {
    }
    if(isBackground){
     const budgetCycle=taskBlackboardService.backgroundBudgetCycle(taskId);
-    const budget=resourceGovernanceService.assessBackgroundBudget(true,false,budgetCycle,currentBeforeState.createdAt);
-    taskBlackboardService.append(taskId,'CHECKPOINT','core',`backgroundBudgetCycle:${cycles}`,{revision:currentBeforeState.revision,cycle:cycles,budgetCycle,allowed:budget.allowed,maxCycles:budget.maxCycles,maxDurationMs:budget.maxDurationMs,reductionRatio:budget.reductionRatio,reason:budget.reason,resourceMode:resourceGovernanceService.getSnapshot().mode});
-    if(!budget.allowed){taskBlackboardService.pause(taskId,`BACKGROUND_BUDGET:${budget.reason}`);coreResultService.waiting(reqId,{error:`Background task paused by resource budget: ${budget.reason}`});break;}
+    const budgetCheckedAt=Date.now();
+    const resourceSnapshot=resourceGovernanceService.getSnapshot();
+    const budget=resourceGovernanceService.assessBackgroundBudget(
+      true,
+      false,
+      budgetCycle,
+      currentBeforeState.createdAt,
+      budgetCheckedAt
+    );
+
+    const budgetDiagnostic={
+      schemaVersion:1,
+      taskId,
+      requestId:reqId,
+      cycle:cycles,
+      budgetCycle,
+      taskCreatedAt:currentBeforeState.createdAt,
+      checkedAt:budgetCheckedAt,
+      elapsedMs:budget.elapsedMs,
+      background:true,
+      orchestrationMode:currentPayload.orchestrationMode,
+      executionPriority:currentPayload.executionPriority,
+      resourceMode:budget.resourceMode,
+      quotaBytes:resourceSnapshot.quotaBytes,
+      usageBytes:resourceSnapshot.usageBytes,
+      freeBytes:resourceSnapshot.freeBytes,
+      freeGb:resourceSnapshot.freeGb,
+      measuredAt:resourceSnapshot.measuredAt,
+      maxCycles:budget.maxCycles,
+      maxDurationMs:budget.maxDurationMs,
+      reductionRatio:budget.reductionRatio,
+      cycleExceeded:budget.cycleExceeded,
+      durationExceeded:budget.durationExceeded,
+      allowed:budget.allowed,
+      reason:budget.reason,
+      taskStatusBefore:currentBeforeState.status,
+      visitedDomains:currentBeforeState.visitedDomains,
+      pendingDomains:currentBeforeState.pendingDomains,
+      evidenceIds:[...new Set(currentBeforeState.entries.flatMap(entry=>entry.evidenceIds||[]))],
+      unknowns:[...new Set(
+        currentBeforeState.entries
+          .flatMap(entry=>Array.isArray((entry.value as any)?.unknowns)?(entry.value as any).unknowns:[])
+          .filter((value):value is string=>typeof value==='string')
+      )],
+    };
+
+    taskBlackboardService.append(
+      taskId,
+      'CHECKPOINT',
+      'core',
+      `backgroundBudgetDiagnostic:${cycles}`,
+      budgetDiagnostic
+    );
+
+    if(!budget.allowed){
+      const pauseReason=`BACKGROUND_BUDGET:${budget.reason}`;
+      taskBlackboardService.pause(taskId,pauseReason);
+
+      const pausedTask=taskBlackboardService.get(taskId);
+      taskBlackboardService.append(
+        taskId,
+        'CHECKPOINT',
+        'core',
+        `backgroundBudgetPause:${cycles}`,
+        {
+          ...budgetDiagnostic,
+          pauseReason,
+          taskStatusAfter:pausedTask?.status,
+          pausedAt:Date.now(),
+        }
+      );
+
+      coreResultService.waiting(reqId,{
+        error:`Background task paused by resource budget: ${budget.reason}`,
+        budgetDiagnostic,
+      });
+      break;
+    }
    }
    taskBlackboardService.append(taskId,'CHECKPOINT','core',`coreCycle:${cycles}`,{revision:currentBeforeState.revision,cycle:cycles});
    const stateBase=taskBlackboardService.get(taskId)!;
