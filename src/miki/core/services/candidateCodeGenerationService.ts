@@ -7,6 +7,7 @@ import { reviewLearningArtifactService } from './reviewLearningArtifactService';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 import { candidateUnknownResolutionService } from './candidateUnknownResolutionService';
 import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
+import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
 export interface CandidateGenerationFile { path:string; candidateContent:string; evidenceIds:string[]; }
 export interface CandidateGenerationOutcome { accepted:boolean; runId:string; workspaceId?:string; files:CandidateGenerationFile[]; reasons:string[]; responseHash?:string; attemptCount?:number; learningLineage?:{sourcePackageId?:string;externalReviewId?:string;candidateRevision:number;requestedChanges:string[];userReason?:string;usedLearningArtifactIds:string[];ignoredLearningArtifactIds:string[];appliedFailurePatternIds:string[];appliedCorrectionPairIds:string[];appliedComponentPatternIds:string[];learningContextSha256:string;componentPackId?:string;usedKnowledgeComponentIds?:string[];usedCodeComponentIds?:string[];usedConversationComponentIds?:string[];excludedComponentIds?:string[];componentContextSha256?:string}; }
 class CandidateCodeGenerationService {
@@ -116,23 +117,68 @@ class CandidateCodeGenerationService {
       };
     }
 
-    const reason='CODE_COMPOSITION_CONNECTED_AWAITING_IMPLEMENTATION_MATERIALIZATION';
-    this.record(runId,{
-      attemptCount:1,
-      status:'BLOCKED',
-      reason,
-      responseHash:canonicalSha256(JSON.stringify({
+    if(!synthesisPlan.deterministic || composition.verified!==true || composition.executable!==true){
+      const reason='CODE_COMPOSITION_NOT_VERIFIED_OR_EXECUTABLE';
+      this.record(runId,{
+        attemptCount:1,
+        status:'BLOCKED',
+        reason,
+        responseHash:canonicalSha256(JSON.stringify({
+          runId,componentIds,deterministic:synthesisPlan.deterministic,
+          verified:composition.verified,executable:composition.executable
+        }))
+      });
+      return {accepted:false,runId,files:[],reasons:[reason],attemptCount:1};
+    }
+
+    const materialized=this.materializeComposition(
+      runId,
+      targetFiles,
+      componentIds
+    );
+
+    if(!materialized.accepted){
+      this.record(runId,{
+        attemptCount:1,
+        status:'BLOCKED',
+        reason:materialized.reason,
+        responseHash:canonicalSha256(JSON.stringify({
+          runId,componentIds,reason:materialized.reason
+        }))
+      });
+      return {
+        accepted:false,
         runId,
-        componentIds,
-        composition
-      }))
-    });
+        files:[],
+        reasons:[materialized.reason],
+        attemptCount:1
+      };
+    }
+
+    const prepared=await autonomousCandidatePreparationService.prepareForRun(
+      runId,
+      materialized.files
+    );
+
+    if(!prepared.workspaceId){
+      const reason=prepared.reason||'CANDIDATE_WORKSPACE_NOT_CREATED';
+      this.record(runId,{
+        attemptCount:1,
+        status:'BLOCKED',
+        reason,
+        responseHash:canonicalSha256(JSON.stringify({
+          runId,componentIds,reason
+        }))
+      });
+      return {accepted:false,runId,files:[],reasons:[reason],attemptCount:1};
+    }
 
     return {
-      accepted:false,
+      accepted:true,
       runId,
-      files:[],
-      reasons:[reason],
+      workspaceId:prepared.workspaceId,
+      files:materialized.files,
+      reasons:[],
       attemptCount:1
     };
   this.record(runId,{
@@ -153,6 +199,60 @@ class CandidateCodeGenerationService {
   const prepared=await autonomousCandidatePreparationService.prepareForRun(runId,files);if(!prepared.workspaceId)return {accepted:false,runId,files:[],reasons:[prepared.reason||'CANDIDATE_WORKSPACE_NOT_CREATED'],responseHash:canonicalSha256(responseText),attemptCount};
   return {accepted:true,runId,workspaceId:prepared.workspaceId,files,reasons:[],responseHash:canonicalSha256(responseText),attemptCount,learningLineage:{sourcePackageId:typeof run.payload.sourcePackageId==='string'?run.payload.sourcePackageId:undefined,externalReviewId:typeof run.payload.externalReviewId==='string'?run.payload.externalReviewId:undefined,candidateRevision:Number(run.payload.candidateRevision||1),requestedChanges:this.strings(run.payload.requestedChanges),userReason:typeof run.payload.userReason==='string'?run.payload.userReason:undefined,usedLearningArtifactIds:learningContext.usedLearningArtifactIds,ignoredLearningArtifactIds:learningContext.ignoredArtifactIds,appliedFailurePatternIds:learningContext.appliedFailurePatternIds,appliedCorrectionPairIds:learningContext.appliedCorrectionPairIds,appliedComponentPatternIds:learningContext.appliedComponentPatternIds,learningContextSha256:learningContext.learningContextSha256,componentPackId:componentPack.componentPackId,usedKnowledgeComponentIds:componentPack.usedKnowledgeComponentIds,usedCodeComponentIds:componentPack.usedCodeComponentIds,usedConversationComponentIds:componentPack.usedConversationComponentIds,excludedComponentIds:componentPack.excludedComponentIds,componentContextSha256:componentPack.componentContextSha256}};
  }
+ private materializeComposition(
+  runId:string,
+  targetFiles:Array<{path:string;content:string;language:string}>,
+  componentIds:string[]
+):{accepted:true;files:CandidateGenerationFile[]}|{accepted:false;reason:string}{
+  const targets=new Map(targetFiles.map(file=>[file.path,file]));
+  const files:CandidateGenerationFile[]=[];
+  const usedTargets=new Set<string>();
+
+  for(const componentId of componentIds){
+    const artifact=componentArtifactStoreService.get(componentId);
+    if(!artifact)return {accepted:false,reason:`CODE_COMPONENT_ARTIFACT_NOT_FOUND:${componentId}`};
+
+    const implementation=artifact.implementation_txt.trim();
+    if(!implementation)return {accepted:false,reason:`CODE_COMPONENT_IMPLEMENTATION_EMPTY:${componentId}`};
+
+    const targetMatch=implementation.match(/^TARGET_PATH:\s*(.+)$/m);
+    const begin=implementation.indexOf('FILE_CONTENT_BEGIN');
+    const end=implementation.indexOf('FILE_CONTENT_END');
+
+    if(!targetMatch||begin<0||end<=begin){
+      return {
+        accepted:false,
+        reason:`CODE_COMPONENT_MATERIALIZATION_CONTRACT_MISSING:${componentId}`
+      };
+    }
+
+    const targetPath=targetMatch[1].trim();
+    const target=targets.get(targetPath);
+    if(!target)return {accepted:false,reason:`CODE_COMPONENT_TARGET_NOT_REQUESTED:${targetPath}`};
+    if(usedTargets.has(targetPath))return {accepted:false,reason:`CODE_COMPONENT_TARGET_DUPLICATE:${targetPath}`};
+
+    const content=implementation
+      .slice(begin+'FILE_CONTENT_BEGIN'.length,end)
+      .replace(/^\r?\n/,'')
+      .replace(/\r?\n$/,'')
+      .trim();
+
+    if(!content)return {accepted:false,reason:`CODE_COMPONENT_FILE_CONTENT_EMPTY:${componentId}`};
+    if(content===target.content.trim())return {accepted:false,reason:`CODE_COMPONENT_NO_CHANGE:${targetPath}`};
+
+    usedTargets.add(targetPath);
+    files.push({
+      path:targetPath,
+      candidateContent:content,
+      evidenceIds:[`component-artifact:${componentId}:${artifact.implementation_hash}`]
+    });
+  }
+
+  if(files.length===0)return {accepted:false,reason:'CODE_COMPOSITION_MATERIALIZATION_EMPTY'};
+
+  return {accepted:true,files};
+ }
+
  private extractResponseText(body:unknown):string{if(typeof body==='string')return body;if(!body||typeof body!=='object')return '';const object=body as Record<string,unknown>;for(const key of ['response','text','content','message','answer']){const value=object[key];if(typeof value==='string')return value;if(value&&typeof value==='object'){const nested=value as Record<string,unknown>;if(typeof nested.content==='string')return nested.content;if(typeof nested.text==='string')return nested.text;}}return '';}
  private parse(text:string):CandidateGenerationFile[]|undefined{const cleaned=text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');const start=cleaned.indexOf('{');const end=cleaned.lastIndexOf('}');const options=[cleaned,start>=0&&end>start?cleaned.slice(start,end+1):''];for(const option of options){if(!option)continue;try{const value=JSON.parse(option);if(!value||!Array.isArray(value.files))continue;const files:CandidateGenerationFile[]=[];for(const row of value.files){if(typeof row?.path!=='string'||typeof row?.candidateContent!=='string')return undefined;files.push({path:row.path,candidateContent:row.candidateContent,evidenceIds:Array.isArray(row.evidenceIds)?row.evidenceIds.filter((x:unknown):x is string=>typeof x==='string'):[]});}return files;}catch{continue;}}return undefined;}
  private record(runId:string,value:Record<string,unknown>):void{const key='miki_candidate_generation_ledger_v2';let ledger:Record<string,unknown>;try{const raw=storageService.getItem(key);const parsed:unknown=raw?JSON.parse(raw):{};ledger=parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed as Record<string,unknown>:{};}catch(error){throw new Error(`PERSISTENCE_FAILED:CANDIDATE_LEDGER_READ:${error instanceof Error?error.message:String(error)}`);}const record={runId,...value};try{storageService.setItem(key,JSON.stringify({...ledger,[runId]:record}));const reloadedRaw=storageService.getItem(key);const reloaded:unknown=reloadedRaw?JSON.parse(reloadedRaw):undefined;if(!reloaded||typeof reloaded!=='object'||Array.isArray(reloaded)||(reloaded as Record<string,unknown>)[runId]===undefined)throw new Error('RELOAD_MISSING');const expected=canonicalSha256(record);const actual=canonicalSha256((reloaded as Record<string,unknown>)[runId]);if(actual!==expected)throw new Error('RELOAD_HASH_MISMATCH');}catch(error){throw new Error(`PERSISTENCE_FAILED:CANDIDATE_LEDGER_WRITE:${error instanceof Error?error.message:String(error)}`);}}
