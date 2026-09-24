@@ -60,3 +60,5 @@ export * from './core/services/proposalQuarantineService';
 export * from './core/services/canonicalSha256Service';
 
 export * from './core/services/externalReviewIntakeService';
+
+export * from './core/services/universalSynthesisService';
