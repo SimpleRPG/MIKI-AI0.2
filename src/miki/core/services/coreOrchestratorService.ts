@@ -322,8 +322,19 @@ class CoreOrchestratorService {
 
       for (const hit of recalledMemories.values()) {
         memoryRefs.add(String(hit.memory.id));
+        const memoryLifecycle=String(hit.memory.lifecycleStatus||'');
+        const memoryApproved=String(hit.memory.approved===true);
+        const memoryVerificationStatus=String(hit.memory.verificationStatus||(
+          hit.memory.approved===true ? 'VERIFIED' : 'UNVERIFIED'
+        ));
+        const memoryEvidenceIds=Array.isArray(hit.memory.evidenceIds)
+          ? hit.memory.evidenceIds.map(String).filter(Boolean).slice(0,24).join(',')
+          : '';
+        const memoryClaimIds=Array.isArray(hit.memory.claimIds)
+          ? hit.memory.claimIds.map(String).filter(Boolean).slice(0,24).join(',')
+          : '';
         semanticContext.push(
-          `MEMORY_RECALL|memoryId=${hit.memory.id}|score=${hit.score}|content=${String(hit.memory.content||'')}`
+          `MEMORY_RECALL|memoryId=${hit.memory.id}|score=${hit.score}|lifecycleStatus=${memoryLifecycle}|approved=${memoryApproved}|verificationStatus=${memoryVerificationStatus}|sourceRef=${String(hit.memory.sourceRef||'')}|researchGapId=${String(hit.memory.researchGapId||'')}|evidenceIds=${memoryEvidenceIds}|claimIds=${memoryClaimIds}|content=${String(hit.memory.content||'')}`
         );
       }
 

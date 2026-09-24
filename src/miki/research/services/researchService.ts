@@ -487,7 +487,11 @@ export class ResearchService {
           summary,
           {
             triggerType: 'working_agenda',
-            provider: 'core-research',
+            sourceRef: `research_gap:${gap.id}`,
+            evidenceIds: [...new Set(evidence.filter(item => item.status !== 'REJECTED').map(item => item.evidence_id))],
+            claimIds: [...new Set(claimIds)],
+            researchGapId: gap.id,
+            verificationStatus: resolved ? 'VERIFIED' : 'UNVERIFIED',
           }
         );
       }

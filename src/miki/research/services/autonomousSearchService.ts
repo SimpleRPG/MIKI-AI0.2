@@ -774,6 +774,11 @@ export class AutonomousSearchService {
       triggerType: 'in_conversation' | 'idle_autonomous' | 'working_agenda' | 'capability_gap';
       resolvedAgendaId?: string;
       provider?: string;
+      sourceRef?: string;
+      evidenceIds?: string[];
+      claimIds?: string[];
+      researchGapId?: string;
+      verificationStatus?: 'VERIFIED' | 'UNVERIFIED';
     }
   ): AutonomousSearchLearningRecord {
     const triggerType = options?.triggerType || 'in_conversation';
@@ -808,10 +813,20 @@ export class AutonomousSearchService {
           createdAt: Date.now(),
           updatedAt: Date.now(),
           source: 'auto',
+          sourceRef: options?.sourceRef || `web_search:${query}`,
+          rawSourceId: options?.researchGapId,
+          rawExcerpt: knowledgeContent,
           tags: ['web_search', 'autonomous_learning', query.slice(0, 20)],
           memoryType: 'semantic',
+          memoryScope: 'long_term',
+          longTermType: 'general_rule',
           destination: 'long_term_memory',
+          lifecycleStatus: 'CANDIDATE',
           approved: false, // 未検証: 自動昇格防止
+          verificationStatus: options?.verificationStatus || 'UNVERIFIED',
+          researchGapId: options?.researchGapId,
+          evidenceIds: [...new Set((options?.evidenceIds || []).map(String).filter(Boolean))],
+          claimIds: [...new Set((options?.claimIds || []).map(String).filter(Boolean))],
         };
         storageService.saveMemoryItem(memItem);
         integratedToMemory = true;
