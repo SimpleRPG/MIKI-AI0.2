@@ -177,11 +177,28 @@ class UniversalSynthesisService {
     }
 
     if (executableIds.length === 0) {
-      unresolved.push('実行可能な既存Componentがありません。');
+      if (reusableComponentIds.length > 0) {
+        unresolved.push(
+          `実行可能Component不足: 再利用可能なReusable Component ${reusableComponentIds.length}件を候補として取得しました。検証・適応後に再合成が必要です。`,
+        );
+      } else if (reusablePack.unresolvedComponentNeeds.length > 0) {
+        unresolved.push(...reusablePack.unresolvedComponentNeeds);
+      } else {
+        unresolved.push('実行可能な既存Componentがありません。');
+      }
+    }
+
+    if (reusablePack.excludedComponentIds.length > 0) {
+      unresolved.push(
+        ...reusablePack.excludedComponentIds.map(
+          id => `REUSABLE_COMPONENT_EXCLUDED:${id}:${reusablePack.exclusionReasons[id] || 'UNKNOWN'}`,
+        ),
+      );
     }
 
     const uniqueUnresolved = [...new Set(unresolved)];
     const passed = Boolean(compositionPlan?.executable);
+    const hasReusableCandidates = reusableComponentIds.length > 0;
     const generatedAt = Date.now();
     const synthesisId = `SYN-${this.hash(
       `${request.requestId}|${request.goal}|${generatedAt}`,
@@ -258,7 +275,9 @@ class UniversalSynthesisService {
         ? compositionPlan!.steps.length > 1
           ? 'COMPOSE_MULTIPLE'
           : 'REUSE_AS_IS'
-        : 'ESCALATE_UNKNOWN',
+        : hasReusableCandidates
+          ? 'ADAPT_EXISTING'
+          : 'ESCALATE_UNKNOWN',
       compositionPlan,
       usedComponentIds:
         compositionPlan?.steps.map(step => step.component_id) || [],
@@ -278,9 +297,11 @@ class UniversalSynthesisService {
       },
       nextCoreAction: passed
         ? 'RE_EVALUATE'
-        : uniqueUnresolved.length > 0
-          ? 'RESEARCH_COMPONENT_GAP'
-          : 'RE_EVALUATE',
+        : hasReusableCandidates
+          ? 'VERIFY_CANDIDATE'
+          : uniqueUnresolved.length > 0
+            ? 'RESEARCH_COMPONENT_GAP'
+            : 'RE_EVALUATE',
     };
   }
 
