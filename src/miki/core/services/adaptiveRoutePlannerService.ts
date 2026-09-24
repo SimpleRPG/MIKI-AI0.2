@@ -783,6 +783,73 @@ class AdaptiveRoutePlannerService {
 
   private planLearningFromCompletedResults(task:BlackboardTask):PlannedRoute[] {
     const routes:PlannedRoute[]=[]; const sources=['research','execution','verification'] as const;
+
+    // ResearchでClaimが生成された場合、学習より先に独立Verificationへ戻す。
+    // Verification結果がResearchより後に存在し、必要なClaimをすべて対象としている場合だけ通過する。
+    const latestResearch = task.entries
+      .map((entry,index)=>({entry,index}))
+      .filter(({entry}) =>
+        entry.domain==='research' &&
+        entry.kind==='RESULT' &&
+        objectValue(entry)?.operation==='RUN_RESEARCH'
+      )
+      .at(-1);
+
+    if(latestResearch){
+      const researchValue=objectValue(latestResearch.entry);
+      const researchClaimIds=this.stringArrayFromValue(
+        researchValue,
+        /claim(?:[_-]?ids?)/i
+      );
+
+      if(researchClaimIds.length>0){
+        const latestVerification = [...successfulBusinessEntries(task)]
+          .map((entry,index)=>({entry,index}))
+          .reverse()
+          .find(({entry})=>objectValue(entry)?.operation==='VERIFY_RESEARCH_CLAIMS');
+
+        const verificationClaimIds=latestVerification
+          ? this.stringArrayFromValue(
+              objectValue(latestVerification.entry),
+              /claim(?:[_-]?ids?)/i
+            )
+          : [];
+
+        const verificationAfterResearch=Boolean(
+          latestVerification &&
+          task.entries.indexOf(latestVerification.entry)>latestResearch.index
+        );
+
+        const verifiedAllResearchClaims=
+          verificationAfterResearch &&
+          researchClaimIds.every(id=>verificationClaimIds.includes(id));
+
+        if(!verifiedAllResearchClaims){
+          const researchComponentIds=this.stringArrayFromValue(
+            researchValue,
+            /component(?:[_-]?ids?)/i
+          );
+
+          routes.push({
+            target:'verification',
+            command:'VERIFY_RESEARCH_CLAIMS',
+            reason:'CORE selected independent verification for Claims produced by Research before learning',
+            payload:{
+              taskId:task.taskId,
+              claimIds:researchClaimIds,
+              gapId:String(researchValue?.gapId||''),
+              knowledgeComponentIds:researchComponentIds,
+              requireFresh:false,
+              adaptive:true,
+              priority:95
+            }
+          });
+
+          return this.decorateOperations(task,this.uniqueOperations(routes));
+        }
+      }
+    }
+
     for(const entry of [...successfulBusinessEntries(task)].reverse()){
       if(!sources.includes(entry.domain as typeof sources[number])) continue; const value=objectValue(entry); if(!value) continue;
       const sourceOperation=String(value.operation||''); const sourceOperationInstanceId=String(value.operationInstanceId||'');
