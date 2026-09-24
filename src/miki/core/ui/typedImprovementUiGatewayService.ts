@@ -146,6 +146,20 @@ class TypedImprovementUiGatewayService {
       coreResult:result,
       coreDecisions:task.entries.filter(x=>x.domain==='core'&&(x.kind==='DECISION'||x.kind==='RESULT')),
       diagnosticLogs,
+      checkpoints: task.entries
+        .filter(x => x.kind === 'CHECKPOINT' && x.domain === 'core')
+        .map(x => ({
+          id: x.id,
+          key: x.key,
+          cycle: typeof x.value === 'object' && x.value !== null
+            ? (x.value as Record<string, unknown>).cycle
+            : undefined,
+          stage: typeof x.value === 'object' && x.value !== null
+            ? (x.value as Record<string, unknown>).stage
+            : undefined,
+          value: x.value,
+          evidenceIds: x.evidenceIds || []
+        })),
       replies,
       evidenceIds:[...new Set([...replies.flatMap(x=>x.evidenceIds),...(Array.isArray(resultPayload.evidenceIds)?resultPayload.evidenceIds.filter((x):x is string=>typeof x==='string'):[])])],
       unknowns:[...new Set([...replies.flatMap(x=>x.unknowns),...(Array.isArray(resultPayload.unknowns)?resultPayload.unknowns.filter((x):x is string=>typeof x==='string'):[])])],
