@@ -12,6 +12,8 @@ import { priorityOneRuntimeReadModelService } from '../services/priorityOneRunti
 export type { PriorityOneRuntimeItem, PriorityOneAllowedAction } from '../services/priorityOneRuntimeReadModelService';
 import { selfImprovementControllerService } from '../../improvement/services/selfImprovementControllerService';
 import { autonomousSelfImprovementLoopService } from '../services/autonomousSelfImprovementLoopService';
+import { domainReplyLedgerService } from '../services/domainReplyLedgerService';
+import { persistenceReceiptLedgerService } from '../services/persistenceReceiptLedgerService';
 import type { AutopilotConfig } from '../../autonomy/services/autonomousContinuousEvolutionService';
 
 export type { AutonomousLoopState, AutonomousImprovementRequest } from '../services/autonomousSelfImprovementLoopService';
@@ -85,6 +87,39 @@ class TypedImprovementUiGatewayService {
   getWorkspaces() { return isolatedCandidateWorkspaceService.list(); }
   getValidationEvidence() { return candidateValidationEvidenceService.list(); }
   getCoreResults(limit = 50) { return coreResultService.list(limit); }
+
+  getImprovementRunDetail(taskId:string){
+    const task=taskBlackboardService.get(taskId);
+    if(!task)return undefined;
+    const result=coreResultService.list(200).find(x=>(x.result as any)?.taskId===taskId);
+    const replies=domainReplyLedgerService.listByTask(taskId);
+    const intake=this.getIntakeRuns(200).find(x=>x.taskId===taskId);
+    const workspaces=isolatedCandidateWorkspaceService.list().filter(x=>x.runId===taskId);
+    const validation=workspaces.flatMap(x=>candidateValidationEvidenceService.list(x.workspaceId));
+    const packages=reviewZipExportService.list().filter(x=>x.runId===taskId);
+    const replyReceiptIds=[...new Set(replies.flatMap(x=>x.receiptIds))];
+    const resultPayload=result?.result&&typeof result.result==='object'?result.result as Record<string,unknown>:{};
+    const receiptIds=[...new Set([
+      ...replyReceiptIds,
+      ...(Array.isArray(resultPayload.persistenceReceiptIds)?resultPayload.persistenceReceiptIds.filter((x):x is string=>typeof x==='string'):[])
+    ])];
+    const receipts=receiptIds.map(id=>persistenceReceiptLedgerService.get(id)).filter(Boolean);
+    return {
+      task,
+      intake,
+      coreResult:result,
+      coreDecisions:task.entries.filter(x=>x.domain==='core'&&(x.kind==='DECISION'||x.kind==='RESULT')),
+      replies,
+      evidenceIds:[...new Set([...replies.flatMap(x=>x.evidenceIds),...(Array.isArray(resultPayload.evidenceIds)?resultPayload.evidenceIds.filter((x):x is string=>typeof x==='string'):[])])],
+      unknowns:[...new Set([...replies.flatMap(x=>x.unknowns),...(Array.isArray(resultPayload.unknowns)?resultPayload.unknowns.filter((x):x is string=>typeof x==='string'):[])])],
+      receipts,
+      workspaces,
+      validation,
+      packages,
+      improvementExecuted:workspaces.some(x=>x.transactionId||x.committedRevision!==undefined),
+      changedFiles:workspaces.flatMap(x=>x.files.filter(f=>f.baselineSha256!==f.candidateSha256).map(f=>f.path))
+    };
+  }
   subscribeCore(listener: () => void) { return coreResultService.subscribeAll(listener); }
 
   requestWithResult(command:ImprovementUiCommand){ return this.sendImprovementCommand(command); }
