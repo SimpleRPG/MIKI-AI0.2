@@ -105,13 +105,29 @@ class RequiredAssetAcquisitionService {
     }
 
     if (input.taskId && progressed) {
+      const blackboardEvidenceIds = [...new Set(evidenceIds)];
+
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        '[RequiredAssetAcquisition] BLACKBOARD_APPEND',
+        JSON.stringify({
+          taskId: input.taskId,
+          evidenceCount: blackboardEvidenceIds.length,
+          evidenceIds: blackboardEvidenceIds,
+          reasonCount: reasons.length,
+        }),
+      );
+
       taskBlackboardService.append(
         input.taskId,
         'EVIDENCE',
         'core',
         'required-assets-acquired',
-        { requirements: requirements.map(item => item.requirement), reasons },
-        [...new Set(evidenceIds)]
+        {
+          requirements: requirements.map(item => item.requirement),
+          reasons,
+        },
+        blackboardEvidenceIds
       );
     }
 
@@ -190,9 +206,53 @@ class RequiredAssetAcquisitionService {
       request.gapIds.push(gap.id);
     }
     try {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        '[RequiredAssetAcquisition] researchGap START',
+        JSON.stringify({
+          gapId: gap.id,
+          runId: request.runId,
+          taskId: request.taskId,
+          workspaceId: request.workspaceId,
+          objectiveLength: objective.length,
+          requirement: request.requirement,
+        }),
+      );
+
       const researched = await researchService.researchGap(gap);
 
-      const evidenceRecords = this.extractEvidenceRecords(researched);
+      const researchRecord =
+        researched && typeof researched === 'object'
+          ? researched as Record<string, unknown>
+          : {};
+
+      const researchEvidenceIds =
+        this.extractEvidenceIds(researched);
+
+      const evidenceRecords =
+        this.extractEvidenceRecords(researched);
+
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        '[RequiredAssetAcquisition] researchGap RESULT',
+        JSON.stringify({
+          gapId: gap.id,
+          runId: request.runId,
+          taskId: request.taskId,
+          resultKeys: Object.keys(researchRecord),
+          researchEvidenceIdCount: researchEvidenceIds.length,
+          evidenceRecordCount: evidenceRecords.length,
+          evidenceRecordIds: evidenceRecords.map(record => record.evidenceId),
+          claimIdCount: this.extractStringIds(
+            researched,
+            /^claim(?:[_-]?ids?)?$/i,
+          ).length,
+          sourceUrlCount: this.extractStringIds(
+            researched,
+            /^source(?:[_-]?urls?)?$/i,
+          ).length,
+        }),
+      );
 
       // EvidenceRecord が取得できた場合は、その evidence_id/evidenceId
       // もRequiredAssetの正式なEvidence IDとして統合する。
@@ -200,10 +260,24 @@ class RequiredAssetAcquisitionService {
       // WAITING_EVIDENCEへ誤って落とさないよう、EvidenceRecordを正規化する。
       const evidenceIds = [
         ...new Set([
-          ...this.extractEvidenceIds(researched),
+          ...researchEvidenceIds,
           ...evidenceRecords.map(record => record.evidenceId),
         ]),
       ];
+
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        '[RequiredAssetAcquisition] EVIDENCE_NORMALIZATION',
+        JSON.stringify({
+          gapId: gap.id,
+          runId: request.runId,
+          taskId: request.taskId,
+          extractedEvidenceIds: researchEvidenceIds,
+          evidenceRecordIds: evidenceRecords.map(record => record.evidenceId),
+          mergedEvidenceIds: evidenceIds,
+          mergedEvidenceCount: evidenceIds.length,
+        }),
+      );
       const localEvidenceIds = evidenceRecords
         .filter(item => item.kind === 'LOCAL_CLAIM')
         .map(item => item.evidenceId);
@@ -213,7 +287,24 @@ class RequiredAssetAcquisitionService {
         .map(item => item.evidenceId);
 
       const linkedEvidenceIds = evidenceIds.filter(id => evidenceRecords.some(item => item.evidenceId === id));
-      const unlinkedEvidenceIds = evidenceIds.filter(id => !linkedEvidenceIds.includes(id));
+      const unlinkedEvidenceIds = evidenceIds.filter(
+        id => !linkedEvidenceIds.includes(id),
+      );
+
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        '[RequiredAssetAcquisition] EVIDENCE_LINK_STATUS',
+        JSON.stringify({
+          gapId: gap.id,
+          runId: request.runId,
+          taskId: request.taskId,
+          evidenceCount: evidenceIds.length,
+          linkedCount: linkedEvidenceIds.length,
+          unlinkedCount: unlinkedEvidenceIds.length,
+          linkedEvidenceIds,
+          unlinkedEvidenceIds,
+        }),
+      );
 
       let componentIds = this.extractStringIds(
         researched,
@@ -286,8 +377,29 @@ class RequiredAssetAcquisitionService {
         }
       }
 
-      request.evidenceIds = [...new Set([...request.evidenceIds, ...evidenceIds])];
+      request.evidenceIds = [
+        ...new Set([...request.evidenceIds, ...evidenceIds]),
+      ];
       request.status = evidenceIds.length > 0 ? 'ACQUIRED' : 'BLOCKED';
+
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        '[RequiredAssetAcquisition] ACQUISITION_DECISION',
+        JSON.stringify({
+          gapId: gap.id,
+          runId: request.runId,
+          taskId: request.taskId,
+          acquired: evidenceIds.length > 0,
+          progressed: true,
+          evidenceCount: evidenceIds.length,
+          localEvidenceCount: localEvidenceIds.length,
+          webEvidenceCount: webEvidenceIds.length,
+          linkedEvidenceCount: linkedEvidenceIds.length,
+          unlinkedEvidenceCount: unlinkedEvidenceIds.length,
+          componentCount: componentIds.length,
+          componentIds,
+        }),
+      );
       request.lastError = evidenceIds.length > 0 ? undefined : 'RESEARCH_RETURNED_NO_EVIDENCE_ID';
       request.updatedAt = Date.now();
       this.save();
