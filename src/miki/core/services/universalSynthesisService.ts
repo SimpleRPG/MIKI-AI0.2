@@ -37,6 +37,7 @@ export interface UniversalSynthesisRequest {
     verificationRefs?: string[];
     recentDecisions?: string[];
     unresolvedRefs?: string[];
+    semanticContext?: string[];
     validatedCandidate?: Record<string, unknown>;
     validationResult?: Record<string, unknown>;
     priorSynthesisId?: string;
@@ -120,6 +121,7 @@ class UniversalSynthesisService {
       request.requiredOutput || '',
       inputTerms,
       context.currentState || '',
+      ...(context.semanticContext || []),
       ...(context.visitedDomains || []),
       ...(context.pendingDomains || []),
       ...(context.recentDecisions || []),
@@ -324,6 +326,7 @@ class UniversalSynthesisService {
       priorSynthesisId:context.priorSynthesisId || '',
       recentDecisions:[...(context.recentDecisions || [])],
       unresolvedRefs:[...(context.unresolvedRefs || [])],
+      semanticContext:[...(context.semanticContext || [])],
     });
 
     const artifactPayload = {
