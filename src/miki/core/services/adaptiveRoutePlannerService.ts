@@ -86,8 +86,75 @@ class AdaptiveRoutePlannerService {
    * 独自に対象を再選定してはならない。
    */
   private resolveCoreTargetPaths(task:BlackboardTask,input:Record<string,unknown>):string[] {
-    const explicit=Array.isArray(input.targetFiles)?input.targetFiles.filter((value):value is string=>typeof value==="string"&&Boolean(value.trim())).map(value=>value.trim()):this.stringArrayFromEntries(task,/target.?files|targetPaths|changedFilePaths/i);
-    return [...new Set(explicit)].slice(0,3);
+    const explicit=Array.isArray(input.targetFiles)
+      ? input.targetFiles
+        .filter((value):value is string=>typeof value==="string"&&Boolean(value.trim()))
+        .map(value=>value.trim())
+      : [];
+
+    const fromEntries=explicit.length>0
+      ? []
+      : this.stringArrayFromEntries(task,/target.?files|targetPaths|changedFilePaths/i);
+
+    const discovered:string[]=[...explicit,...fromEntries];
+
+    // ASSESS_DOMAIN is intentionally observational. CORE must promote the
+    // observed targetFiles into the next planning snapshot instead of
+    // dispatching ASSESS_DOMAIN repeatedly.
+    if(discovered.length===0){
+      for(const entry of [...task.entries].reverse()){
+        if(entry.kind!=='RESULT'&&entry.kind!=='OBSERVATION') continue;
+        if(entry.domain!=='selfDevelopment') continue;
+
+        const value=objectValue(entry);
+        if(!value) continue;
+
+        const operation=String(value.operation||'');
+        const reply=value.reply&&typeof value.reply==='object'
+          ? value.reply as Record<string,unknown>
+          : undefined;
+
+        const dataCandidate=reply?.data||reply?.result||value.result;
+        const data=dataCandidate&&typeof dataCandidate==='object'&&!Array.isArray(dataCandidate)
+          ? dataCandidate as Record<string,unknown>
+          : undefined;
+
+        if(operation!=='ASSESS_DOMAIN' && String(data?.operation||'')!=='ASSESS_DOMAIN') continue;
+
+        if(Array.isArray(data?.targetFiles)){
+          discovered.push(
+            ...data.targetFiles
+              .filter((value):value is string=>typeof value==='string'&&Boolean(value.trim()))
+              .map(value=>value.trim())
+          );
+          break;
+        }
+      }
+    }
+
+    return [...new Set(discovered)].slice(0,3);
+  }
+
+  private resolveCoreRunId(task:BlackboardTask,input:Record<string,unknown>):string {
+    const explicit=String(input.runId||'').trim();
+    if(explicit) return explicit;
+
+    const decision=[...task.entries].reverse().find(entry=>
+      entry.kind==='DECISION' &&
+      entry.domain==='core' &&
+      entry.key==='coreSelfImprovementRun'
+    );
+
+    const decisionValue=decision?objectValue(decision):undefined;
+    const decisionRunId=String(decisionValue?.runId||'').trim();
+    if(decisionRunId) return decisionRunId;
+
+    const linkedRuns=task.entries
+      .filter(entry=>entry.domain==='core'&&/improvementRun|runId/i.test(entry.key))
+      .map(entry=>String(objectValue(entry)?.runId||'').trim())
+      .filter(Boolean);
+
+    return linkedRuns[linkedRuns.length-1]||task.taskId;
   }
 
   /**
@@ -371,7 +438,7 @@ class AdaptiveRoutePlannerService {
         target:'selfDevelopment',command:'GENERATE_CANDIDATE',
         reason:'Core readiness assessment satisfied candidate-generation preconditions',
         payload:{
-          taskId:task.taskId,runId:String(input.runId||task.taskId),goal:task.goal,
+          taskId:task.taskId,runId:this.resolveCoreRunId(task,input),goal:task.goal,
           candidateRevision:Number(input.candidateRevision||1),
           targetFiles:coreTargetPaths,
           requirements:input.requirements,
@@ -386,7 +453,7 @@ class AdaptiveRoutePlannerService {
       routes.push({
         target:'selfDevelopment',command:'GENERATE_CANDIDATE',
         reason:'Validation rejected the candidate; Core requests a new Candidate Revision',
-        payload:{taskId:task.taskId,runId:String(input.runId||task.taskId),goal:task.goal,
+        payload:{taskId:task.taskId,runId:this.resolveCoreRunId(task,input),goal:task.goal,
           candidateRevision:Number(candidate.candidateRevision||1)+1,
           targetFiles:coreTargetPaths,
           requirements:input.requirements,
@@ -402,7 +469,7 @@ class AdaptiveRoutePlannerService {
         target:'verification',command:'VALIDATE_CANDIDATE',
         reason:'Core re-evaluated the successful Candidate output and selected validation',
         payload:{
-          taskId:task.taskId,runId:String(input.runId||task.taskId),
+          taskId:task.taskId,runId:this.resolveCoreRunId(task,input),
           ...candidate,
           sourceOperationInstanceId:candidateOperationInstanceId,
           adaptive:true,priority:70
@@ -416,7 +483,7 @@ class AdaptiveRoutePlannerService {
         target:'promotion',command:'CREATE_REVIEW_PACKAGE',
         reason:'Core re-evaluated successful Validation and selected external review packaging',
         payload:{
-          taskId:task.taskId,runId:String(input.runId||task.taskId),
+          taskId:task.taskId,runId:this.resolveCoreRunId(task,input),
           ...candidate,...validation,
           candidateRevision:Number(input.candidateRevision||0)||undefined,
           sourcePackageId:typeof input.sourcePackageId==="string"?input.sourcePackageId:typeof input.packageId==="string"?input.packageId:undefined,
@@ -542,7 +609,7 @@ class AdaptiveRoutePlannerService {
         routes.push({target:'unknown',command:'RESOLVE_UNKNOWN',reason:`COREがPARALLEL仮説で独立Intent ${unit.id} を処理する`,payload:{taskId:task.taskId,question:unit.text,useSearch:/調べ|検索|最新/i.test(unit.text),hasAttachments:Boolean(input.hasAttachments),adaptive:true,priority:90,...perUnit}});
       }
     } else if(selectedUnit?.goal==='BUILD_OR_CHANGE'){
-      routes.push({target:'selfDevelopment',command:'GENERATE_CANDIDATE',reason:`COREがBUILD_OR_CHANGE Intent ${selectedUnit.id} をselfDevelopmentへ委譲する`,payload:{taskId:task.taskId,runId:String(input.runId||task.taskId),goal:selectedUnit.text,candidateRevision:Number(input.candidateRevision||1),requirements:input.requirements,prohibitions:input.prohibitions,invariants:input.invariants,validationRequirements:input.validationRequirements,deliveryRequirements:input.deliveryRequirements,operationMode:'MULTI_INTENT_BUILD',adaptive:true,priority:80,...intentPayload,intentIds:[selectedUnit.id]}});
+      routes.push({target:'selfDevelopment',command:'GENERATE_CANDIDATE',reason:`COREがBUILD_OR_CHANGE Intent ${selectedUnit.id} をselfDevelopmentへ委譲する`,payload:{taskId:task.taskId,runId:this.resolveCoreRunId(task,input),goal:selectedUnit.text,candidateRevision:Number(input.candidateRevision||1),requirements:input.requirements,prohibitions:input.prohibitions,invariants:input.invariants,validationRequirements:input.validationRequirements,deliveryRequirements:input.deliveryRequirements,operationMode:'MULTI_INTENT_BUILD',adaptive:true,priority:80,...intentPayload,intentIds:[selectedUnit.id]}});
     } else {
       const unknownTerms=conversationResult&&!this.lastOperationFailed(task,'RESOLVE_UNKNOWN')?detectUnknownTermsFromBlackboardValue(objectValue(conversationResult)):[];
       if((/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(focusedText) || unknownTerms.length>0) && !unknownResult){

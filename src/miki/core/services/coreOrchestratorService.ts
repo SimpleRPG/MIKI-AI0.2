@@ -3,6 +3,7 @@ import { coreLineageReadModelService } from './coreLineageReadModelService';
 import { domainRouterService } from './domainRouterService';
 import { taskBlackboardService, type BlackboardTask } from './taskBlackboardService';
 import { adaptiveRoutePlannerService } from './adaptiveRoutePlannerService';
+import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 import type { MikiDomain } from './crossDomainCirculationService';
 import { negativeKnowledgeService } from './negativeKnowledgeService';
 import { plateauDetectorService } from './plateauDetectorService';
@@ -33,6 +34,55 @@ class CoreOrchestratorService {
   if(payload.kind==='USER_REQUEST' || payload.foreground===true){
    taskBlackboardService.pauseBackgroundTasksForForeground(created.taskId);
   }
+  // CORE owns the self-improvement run identity.
+  // Candidate preparation requires a real ImprovementIntakeRun.
+  if(payload.kind==='SELF_IMPROVEMENT'){
+   const existingRunId=String(payload.runId||'').trim();
+   const existingRun=existingRunId
+    ? improvementIntakeRouterService.get(existingRunId)
+    : undefined;
+
+   if(existingRun){
+    improvementIntakeRouterService.update(existingRun.runId,{taskId:created.taskId});
+    taskBlackboardService.append(
+     created.taskId,
+     'DECISION',
+     'core',
+     'coreSelfImprovementRun',
+     {
+      runId:existingRun.runId,
+      runType:existingRun.runType,
+      sourceId:existingRun.sourceId,
+      status:existingRun.status,
+      linkedBy:'CORE'
+     }
+    );
+   }else{
+    const run=await improvementIntakeRouterService.ensureForCoreTask({
+     taskId:created.taskId,
+     objective:goal,
+     payload,
+     sourceId:typeof payload.sourceId==='string'
+      ? payload.sourceId
+      : created.taskId
+    });
+
+    taskBlackboardService.append(
+     created.taskId,
+     'DECISION',
+     'core',
+     'coreSelfImprovementRun',
+     {
+      runId:run.runId,
+      runType:run.runType,
+      sourceId:run.sourceId,
+      status:run.status,
+      linkedBy:'CORE'
+     }
+    );
+   }
+  }
+
   const requestId=typeof payload.requestId==='string'?payload.requestId:created.taskId;
   coreResultService.createRequest({
    requestId,
