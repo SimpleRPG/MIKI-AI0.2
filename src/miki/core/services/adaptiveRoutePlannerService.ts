@@ -132,7 +132,16 @@ class AdaptiveRoutePlannerService {
       }
     }
 
-    return [...new Set(discovered)].slice(0,3);
+    const sourcePaths=selfCodeSpaceService.listSourceFiles().map(file=>file.path);
+    const canonicalized=discovered.map(target=>{
+      const normalized=String(target||'').trim().replace(/^\.\//,'');
+      if(!normalized)return '';
+      if(sourcePaths.includes(normalized))return normalized;
+      const suffixMatches=sourcePaths.filter(path=>path.endsWith('/'+normalized));
+      return suffixMatches.length===1?suffixMatches[0]:normalized;
+    }).filter(Boolean);
+
+    return [...new Set(canonicalized)].slice(0,3);
   }
 
   private resolveCoreRunId(task:BlackboardTask,input:Record<string,unknown>):string {
