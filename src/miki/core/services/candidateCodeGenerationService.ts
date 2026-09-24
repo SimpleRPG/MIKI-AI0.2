@@ -1,7 +1,6 @@
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 import { autonomousCandidatePreparationService } from './autonomousCandidatePreparationService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
-import { apiUrl, getCustomApiHeaders } from '../../../services/api';
 import { storageService } from '../../../services/storageService';
 import { canonicalSha256 } from './canonicalSha256Service';
 import { reviewLearningArtifactService } from './reviewLearningArtifactService';
@@ -24,10 +23,19 @@ class CandidateCodeGenerationService {
   const selectedComponents=reusableComponentFactoryService.list().filter(x=>[...componentPack.usedKnowledgeComponentIds,...componentPack.usedCodeComponentIds,...componentPack.usedConversationComponentIds].includes(x.componentId)).map(x=>({componentId:x.componentId,componentKind:x.componentKind,componentType:x.componentType,purpose:x.purpose,interfaceContract:x.interfaceContract,inputs:x.inputs,outputs:x.outputs,prerequisites:x.prerequisites,dependencies:x.dependencies,appliesWhen:x.appliesWhen,doesNotApplyWhen:x.doesNotApplyWhen,lifecycleStatus:x.lifecycleStatus,sourceLearningArtifactIds:x.sourceLearningArtifactIds}));
   const contract={formatVersion:5,implementationPlan,unknownContext,runId:run.runId,runType:run.runType,objective:run.objective,externalReviewId:typeof run.payload.externalReviewId==='string'?run.payload.externalReviewId:undefined,sourcePackageId:typeof run.payload.sourcePackageId==='string'?run.payload.sourcePackageId:undefined,sourcePackageRevision:Number(run.payload.packageRevision||0)||undefined,candidateRevision:Number(run.payload.candidateRevision||1),requestedChanges:this.strings(run.payload.requestedChanges),userReason:typeof run.payload.userReason==='string'?run.payload.userReason:undefined,learningContext,componentPack,selectedComponents,targets:targetFiles.map(file=>({path:file.path,language:file.language,baselineContent:file.content})),requirements:this.strings(run.payload.requirements),prohibitions:this.strings(run.payload.prohibitions),invariants:this.strings(run.payload.invariants),validationRequirements:this.strings(run.payload.validationRequirements),deliveryRequirements:this.strings(run.payload.deliveryRequirements),responseContract:{files:[{path:'must equal one requested target path',candidateContent:'complete file content without markdown fences',evidenceIds:['optional evidence ids']}],summary:'short description'}};
   const prompt=['You are a code candidate generator operating in an isolated workspace.','Return JSON only. Do not use markdown fences. Do not omit file content. Do not claim tests were run. Preserve all invariants and prohibitions. Use resolved unknown context where verified. Keep unverified items explicit and do not invent missing facts.',JSON.stringify(contract)].join('\n');
-  let responseText='';let parsed:CandidateGenerationFile[]|undefined;let attemptCount=0;let lastReason='CODE_GENERATION_NOT_STARTED';
-  while(attemptCount<2&&!parsed){attemptCount+=1;const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),90000);try{const response=await fetch(apiUrl('/api/chat'),{method:'POST',headers:getCustomApiHeaders(),signal:controller.signal,body:JSON.stringify({prompt:attemptCount===1?prompt:`${prompt}\nPrevious response was rejected: ${lastReason}. Return corrected JSON only.`,history:[],useSearch:false,engineMode:'cloud',speakerMode:false,workspaceFiles:targetFiles.map(file=>({path:file.path,name:file.path.split('/').pop()||file.path,content:file.content,language:file.language})),attachedFiles:[],memories:[],activeGameCode:''})});if(!response.ok){lastReason=`CODE_GENERATION_HTTP_${response.status}`;continue;}const body=await response.json();responseText=this.extractResponseText(body);if(!responseText.trim()){lastReason='CODE_GENERATION_EMPTY_RESPONSE';continue;}parsed=this.parse(responseText);if(!parsed)lastReason='CODE_GENERATION_RESPONSE_INVALID_JSON';}catch(error){lastReason=error instanceof Error&&error.name==='AbortError'?'CODE_GENERATION_TIMEOUT':`CODE_GENERATION_REQUEST_FAILED:${error instanceof Error?error.message:String(error)}`;}finally{clearTimeout(timer);}}
-  this.record(runId,{attemptCount,status:parsed?'PARSED':'FAILED',reason:parsed?undefined:lastReason,responseHash:responseText?canonicalSha256(responseText):undefined,updatedAt:Date.now()});
-  if(!parsed)return {accepted:false,runId,files:[],reasons:[lastReason],responseHash:responseText?canonicalSha256(responseText):undefined,attemptCount};
+  const reason='CODE_GENERATION_NON_LLM_PATH_REQUIRED';
+  this.record(runId,{
+    attemptCount:0,
+    status:'BLOCKED',
+    reason,
+    updatedAt:Date.now()
+  });
+  return {
+    accepted:false,
+    runId,
+    files:[],
+    reasons:[reason]
+  };
   const targetSet=new Set(targetPaths);const reasons:string[]=[];const files:CandidateGenerationFile[]=[];
   for(const item of parsed){if(!targetSet.has(item.path)){reasons.push(`UNEXPECTED_TARGET:${item.path}`);continue;}const baseline=sources.get(item.path)?.content||'';if(!item.candidateContent.trim()||item.candidateContent.trim()===baseline.trim()){reasons.push(`UNCHANGED_OR_EMPTY:${item.path}`);continue;}for(const prohibition of this.strings(run.payload.prohibitions)){if(prohibition&&item.candidateContent.includes(prohibition))reasons.push(`PROHIBITION_TEXT_PRESENT:${prohibition}`);}files.push({path:item.path,candidateContent:item.candidateContent,evidenceIds:item.evidenceIds});}
   if(reasons.length>0||files.length===0)return {accepted:false,runId,files:[],reasons:reasons.length?reasons:['NO_VALID_CANDIDATE_FILES'],responseHash:canonicalSha256(responseText),attemptCount};
