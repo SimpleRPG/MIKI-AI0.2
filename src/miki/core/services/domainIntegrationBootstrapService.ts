@@ -18,6 +18,7 @@ import { canonicalSha256 } from './canonicalSha256Service';
 import { candidateCommitTransactionService } from './candidateCommitTransactionService';
 import { reviewLearningArtifactService } from './reviewLearningArtifactService';
 import { EvidenceService } from '../../memory/services/evidenceService';
+import { selfCodeSpaceService } from './selfCodeSpaceService';
 
 const BASE_COMMANDS:DomainCommand[]=['HEALTH_CHECK','DESCRIBE','GET_STATUS','ASSESS_DOMAIN','PARTICIPATE','VERIFY_CONNECTION'];
 
@@ -73,6 +74,50 @@ class DomainIntegrationBootstrapService{
   if(envelope.command==='VERIFY_CONNECTION')return done(domainSequentialConnectionService.verify(domain,envelope.correlationId,envelope.evidenceIds[0]));
   if(envelope.command==='HEALTH_CHECK'||envelope.command==='DESCRIBE'||envelope.command==='GET_STATUS')return done({domain,registered:true,commands:domainRouterService.getRegistrations().find(x=>x.domain===domain)?.commands||[]});
   if(envelope.command==='ASSESS_DOMAIN'){
+   if(
+    domain==='selfDevelopment' &&
+    String(envelope.payload.requestedAssessment||'')==='REPOSITORY_CONTEXT'
+   ){
+    try{
+     const snapshot=await selfCodeSpaceService.sync();
+     if(!snapshot.files.length){
+      return {
+       accepted:false,
+       domain,
+       command:envelope.command,
+       error:'SOURCE_SNAPSHOT_REFRESH_EMPTY',
+       result:{
+        operation:'ASSESS_DOMAIN',
+        operationClass:'DIAGNOSTIC',
+        status:'FAILED',
+        repository:snapshot.repository,
+        branch:snapshot.branch,
+        repoSha256:snapshot.repoSha256,
+        targetFiles:[],
+        evidenceIds:[]
+       },
+       completedAt:Date.now()
+      };
+     }
+    }catch(error){
+     const reason=error instanceof Error?error.message:String(error);
+     return {
+      accepted:false,
+      domain,
+      command:envelope.command,
+      error:'SOURCE_SNAPSHOT_REFRESH_FAILED:'+reason,
+      result:{
+       operation:'ASSESS_DOMAIN',
+       operationClass:'DIAGNOSTIC',
+       status:'FAILED',
+       refreshAttempted:true,
+       evidenceIds:[]
+      },
+      completedAt:Date.now()
+     };
+    }
+   }
+
    const {domainOperationalAdapterService}=await import('./domainOperationalAdapterService');
    const operational=domainOperationalAdapterService.inspect(domain,envelope.payload);
    if(!operational.available)return {accepted:false,domain,command:envelope.command,result:operational,error:operational.unresolvedRequirements.join(','),completedAt:Date.now()};
