@@ -390,6 +390,76 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
   };
 
+  const copyImprovementRunDetail = async (detail: any) => {
+    const task = detail?.task;
+    if (!task) return;
+
+    const compact = (value: any): string => {
+      if (value === undefined || value === null || value === '') return '―';
+      if (Array.isArray(value)) {
+        return value.length ? value.map((item) => compact(item)).join(', ') : '―';
+      }
+      if (typeof value === 'object') {
+        return Object.entries(value)
+          .map(([key, item]) => `${key}=${compact(item)}`)
+          .join('|');
+      }
+      return String(value);
+    };
+
+    const lines = [
+      'MIKI-AI0.2 RUN DETAIL',
+      `taskId=${task.taskId || '―'}`,
+      `status=${task.status || '―'}`,
+      `goal=${compact(task.goal)}`,
+      `source=${compact(task.source)}`,
+      `createdAt=${task.createdAt || '―'}`,
+      `updatedAt=${task.updatedAt || '―'}`,
+      `lastCycle=${task.lastCycle ?? '―'}`,
+      `resumeCount=${task.resumeCount ?? '―'}`,
+      `visitedDomains=${compact(task.visitedDomains)}`,
+      `pendingDomains=${compact(task.pendingDomains)}`,
+      `pausedReason=${compact(task.pausedReason)}`,
+      `evidenceIds=${compact(detail.evidenceIds)}`,
+      `unknowns=${compact(detail.unknowns)}`,
+      `coreResult=${compact(detail.coreResult)}`,
+      `coreDecisions=${compact(detail.coreDecisions)}`,
+      `domainReplies=${compact(detail.replies)}`,
+      `receipts=${compact(detail.receipts)}`,
+      `workspaces=${compact(detail.workspaces)}`,
+      `validation=${compact(detail.validation)}`,
+      `packages=${compact(detail.packages)}`,
+      `improvementExecuted=${detail.improvementExecuted ? 'true' : 'false'}`,
+      `changedFiles=${compact(detail.changedFiles)}`,
+      `diagnosticLogs=${compact(detail.diagnosticLogs)}`,
+    ];
+
+    const text = lines.join('\\n');
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setActionMessage({
+        text: '実行詳細をAI用テキストとしてコピーしました。',
+        type: 'success',
+      });
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      textarea.remove();
+
+      setActionMessage({
+        text: '実行詳細をAI用テキストとしてコピーしました。',
+        type: 'success',
+      });
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-950 text-slate-100 overflow-hidden select-none">
       {/* Top Banner / Breadcrumb */}
@@ -1109,9 +1179,24 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
             const task = detail.task;
             return (
               <div className="mb-3 p-4 rounded-xl bg-slate-950 border border-indigo-500/40 text-xs space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <b className="text-indigo-300">実行詳細</b>
-                  <button onClick={() => setSelectedRunId(null)} className="text-slate-400 hover:text-white">閉じる</button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => copyImprovementRunDetail(detail)}
+                      className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold flex items-center gap-1.5 transition"
+                      title="この実行の詳細をAI用テキストとしてコピー"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      AI用テキストをコピー
+                    </button>
+                    <button
+                      onClick={() => setSelectedRunId(null)}
+                      className="text-slate-400 hover:text-white"
+                    >
+                      閉じる
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
