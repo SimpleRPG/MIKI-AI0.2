@@ -4,6 +4,7 @@ import {
 } from '../../capability/services/componentCompositionService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { capabilityConfidenceService } from '../../capability/services/capabilityConfidenceService';
+import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 import { coreResultService, type CoreResult } from './coreResultService';
 
 export type SynthesisSelectionMode =
@@ -35,6 +36,7 @@ export interface SynthesisResult {
   usedComponentIds: string[];
   adaptedComponentIds: string[];
   candidateComponentIds: string[];
+  reusableComponentIds: string[];
   validation: {
     status: 'NOT_RUN' | 'PASSED' | 'BLOCKED';
     reasons: string[];
@@ -66,6 +68,19 @@ class UniversalSynthesisService {
     const components = requestedIds
       .map(id => componentRegistryService.getComponent(id))
       .filter(Boolean);
+
+    // Research/learning components live in the reusable-component repository.
+    // CORE synthesis must inspect that repository as well as the executable registry.
+    const reusablePack = reusableComponentFactoryService.plan({
+      taskId: request.taskId || request.requestId,
+      purpose: request.goal,
+      environmentFingerprint: environment,
+    });
+    const reusableComponentIds = [
+      ...reusablePack.usedKnowledgeComponentIds,
+      ...reusablePack.usedCodeComponentIds,
+      ...reusablePack.usedConversationComponentIds,
+    ];
 
     const executableIds = components
       .filter(component =>
@@ -125,16 +140,19 @@ class UniversalSynthesisService {
       usedComponentIds:
         compositionPlan?.steps.map(step => step.component_id) || [],
       adaptedComponentIds: [],
-      candidateComponentIds: [],
+      candidateComponentIds: reusablePack.createdComponentIds,
+      reusableComponentIds,
       validation: {
         status: passed ? 'PASSED' : 'BLOCKED',
         reasons: compositionPlan?.reasons || uniqueUnresolved,
       },
       unresolved: uniqueUnresolved,
-      evidenceRefs:
-        compositionPlan?.steps.map(
+      evidenceRefs: [
+        ...(compositionPlan?.steps.map(
           step => `component:${step.component_id}`,
-        ) || [],
+        ) || []),
+        ...reusableComponentIds.map(id => `reusable-component:${id}`),
+      ],
       lineage: {
         source: 'CORE',
         generatedAt: Date.now(),
@@ -143,7 +161,7 @@ class UniversalSynthesisService {
         ? 'RE_EVALUATE'
         : uniqueUnresolved.length > 0
           ? 'RESEARCH_COMPONENT_GAP'
-          : 'VERIFY_CANDIDATE',
+          : 'RE_EVALUATE',
     };
   }
 
