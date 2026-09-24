@@ -18,6 +18,7 @@ import { canonicalSha256 } from './canonicalSha256Service';
 import { candidateCommitTransactionService } from './candidateCommitTransactionService';
 import { reviewLearningArtifactService } from './reviewLearningArtifactService';
 import { EvidenceService } from '../../memory/services/evidenceService';
+import { initializeResearchMemoryVerificationSubscriber } from '../../memory/services/researchMemoryVerificationSubscriberService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
 
 const BASE_COMMANDS:DomainCommand[]=['HEALTH_CHECK','DESCRIBE','GET_STATUS','ASSESS_DOMAIN','PARTICIPATE','VERIFY_CONNECTION'];
@@ -29,6 +30,7 @@ class DomainIntegrationBootstrapService{
  async initialize():Promise<void>{
   if(this.initialized)return;
   this.initialized=true;
+  initializeResearchMemoryVerificationSubscriber();
   // Register every domain before the fail-closed audit. The previous order
   // audited an empty router on a cold start and could not prove connectivity.
   for(const domain of MIKI_DOMAINS)domainRouterService.register(domain,[...BASE_COMMANDS,...this.extraCommands(domain)],(envelope)=>this.handle(domain,envelope));

@@ -25,6 +25,7 @@ export * from './memory/services/knowledgeHalfLifeService';
 export * from './memory/services/longTermMemoryService';
 export * from './memory/services/memoryAuditService';
 export * from './memory/services/memoryPromotionService';
+export * from './memory/services/researchMemoryVerificationSubscriberService';
 export * from './memory/services/metaMemoryService';
 export * from './memory/services/mikiBrainCapsuleService';
 export * from './memory/services/mikiIntrospectionJournalService';
