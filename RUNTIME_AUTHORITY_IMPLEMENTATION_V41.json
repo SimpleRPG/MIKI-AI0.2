@@ -1,48 +1,39 @@
 {
   "version": "v41",
-  "base": "MIKI-AI0.2-main_core-authority-fail-closed-v40.zip.txt",
-  "implemented": [
-    "backgroundWorkerService direct selfImprovementController execution replaced with selfImprovementIngressService queue submission",
-    "autonomousGrowthGovernorService direct autonomous evolution execution replaced with selfImprovementIngressService queue submission",
-    "queue acceptance is reported as queued, not applied or completed",
-    "direct runtime authority audit added"
+  "status": "SUPERSEDED_BY_CORE_CANONICAL_SELF_IMPROVEMENT",
+  "canonicalRuntimeAuthority": {
+    "ingress": "src/miki/core/services/selfImprovementIngressService.ts",
+    "queue": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
+    "coreIngress": "src/miki/core/services/coreTaskIngressService.ts",
+    "orchestrator": "src/miki/core/services/coreOrchestratorService.ts",
+    "planner": "src/miki/core/services/adaptiveRoutePlannerService.ts",
+    "domainRouter": "src/miki/core/services/domainRouterService.ts"
+  },
+  "flow": [
+    "selfImprovementIngressService.submit",
+    "autonomousSelfImprovementLoopService.enqueue",
+    "coreTaskIngressService.submit/resume",
+    "coreOrchestratorService",
+    "adaptiveRoutePlannerService",
+    "domainRouterService",
+    "CORE re-evaluation",
+    "Completion Gate",
+    "CoreResult"
   ],
-  "authorizedDirectCalls": [
-    {
-      "file": "src/miki/core/services/domainIntegrationBootstrapService.ts",
-      "call": "selfImprovementControllerService.runOnce"
-    },
-    {
-      "file": "src/miki/improvement/services/selfImprovementControllerService.ts",
-      "call": "autonomousContinuousEvolutionService.runFullAutonomousCycle"
-    },
-    {
-      "file": "src/miki/improvement/services/selfImprovementControllerService.ts",
-      "call": "autonomousContinuousEvolutionService.runFullAutonomousCycle"
-    }
+  "controllerRole": {
+    "file": "src/miki/improvement/services/selfImprovementControllerService.ts",
+    "role": "Compatibility Facade",
+    "planningAuthority": "CORE",
+    "directEvolutionAuthority": false
+  },
+  "obsoleteAuthorityClaims": [
+    "selfImprovementControllerService -> autonomousContinuousEvolutionService.runFullAutonomousCycle",
+    "domainIntegrationBootstrapService -> canonical self-improvement execution through controller"
   ],
-  "tests": [
-    {
-      "command": "node scripts/test_runtime_authority_convergence_v41.mjs",
-      "exitCode": 0,
-      "stdout": "{\n  \"version\": \"v41\",\n  \"passed\": true,\n  \"checks\": {\n    \"backgroundUsesIngress\": true,\n    \"backgroundNoDirectController\": true,\n    \"governorUsesIngress\": true,\n    \"governorNoDirectEvolution\": true,\n    \"coreDomainHandlerOwnsControllerCall\": true,\n    \"controllerOwnsEvolutionCall\": true,\n    \"queueAcknowledgedNotApplied\": true,\n    \"backgroundQueueAcknowledged\": true\n  },\n  \"remainingAuthorizedDirectCalls\": [\n    \"domainIntegrationBootstrapService -> selfImprovementControllerService\",\n    \"selfImprovementControllerService -> autonomousContinuousEvolutionService\"\n  ]\n}",
-      "stderr": ""
-    },
-    {
-      "command": "node scripts/test_core_authority_fail_closed_v40.mjs",
-      "exitCode": 0,
-      "stdout": "{\n  \"version\": \"v40\",\n  \"passed\": true,\n  \"checks\": {\n    \"completionGateCalled\": true,\n    \"completionOnlyAfterGate\": true,\n    \"finalRecheck\": true,\n    \"noEarlyCoreComplete\": true,\n    \"failClosedTrue\": true,\n    \"requiresDomainSuccess\": true,\n    \"requiresReceipt\": true,\n    \"requiresPersistence\": true,\n    \"rejectsErrors\": true,\n    \"plannerDelegates\": true\n  }\n}",
-      "stderr": ""
-    },
-    {
-      "command": "node scripts/test_core_write_receipt_v39.mjs",
-      "exitCode": 0,
-      "stdout": "PASS core ingress imported\nPASS decision endpoint present\nPASS decision uses core ingress\nPASS decision requires completion\nPASS receipt bound to hash and evidence\nPASS receipt expires\nPASS receipt single use\nPASS dry run emits evidence\nPASS client requests decision before write\nPASS client sends decision id",
-      "stderr": ""
-    }
-  ],
-  "limitations": [
-    "The newly attached v23 directive was not available as file content in the execution sandbox; implementation followed the next P0 runtime-authority item already identified from the available v19 directive and v40 source.",
-    "Full TypeScript, Vite, APK, and device execution were not performed because node_modules is absent."
-  ]
+  "verification": {
+    "sourceOfTruth": "repository main branch",
+    "typescriptBuild": "not run by design",
+    "lint": "not run by design",
+    "runtimeArchitectureCheck": "static repository inspection"
+  }
 }
