@@ -17,6 +17,8 @@ import { githubSyncService } from '../../../services/githubSyncService';
 import { sha256HexFromText } from './canonicalSha256Service';
 import { coreExecutionTraceService } from './coreExecutionTraceService';
 import { universalSynthesisService } from './universalSynthesisService';
+import { longTermMemoryService } from '../../memory/services/longTermMemoryService';
+import { storageService } from '../../../services/storageService';
 
 export interface CoreOrchestrationResult { task:BlackboardTask; cycles:number; dispatched:number; coreResult?:CoreResult; }
 
@@ -147,10 +149,10 @@ class CoreOrchestratorService {
   return {task:finalTask,cycles,dispatched:replyRecords.length,coreResult};
  }
 
- private buildSynthesisContext(
+ private async buildSynthesisContext(
   task:BlackboardTask,
   payload:Record<string,unknown>
- ):NonNullable<Parameters<typeof universalSynthesisService.synthesize>[0]['synthesisContext']>{
+ ):Promise<NonNullable<Parameters<typeof universalSynthesisService.synthesize>[0]['synthesisContext']>>{
   const evidenceRefs=new Set<string>();
   const knowledgeRefs=new Set<string>();
   const memoryRefs=new Set<string>();
@@ -224,6 +226,49 @@ class CoreOrchestratorService {
           }
         }
       }
+    }
+  }
+
+  const recallQuery = [
+    task.goal,
+    typeof payload.input === 'string' ? payload.input : '',
+    ...semanticContext.slice(-24),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+
+  if (recallQuery) {
+    try {
+      const memories = storageService.getMemories();
+      const recall = await longTermMemoryService.searchPipeline(
+        recallQuery,
+        memories,
+        null,
+        [],
+        {
+          limit:12,
+          onlyApprovedForFacts:false,
+          minScoreThreshold:6.0,
+        }
+      );
+
+      for (const hit of recall.scoredMemories) {
+        memoryRefs.add(String(hit.memory.id));
+        semanticContext.push(
+          `MEMORY_RECALL|memoryId=${hit.memory.id}|score=${hit.score}|content=${String(hit.memory.content||'')}`
+        );
+      }
+
+      for (const excerpt of recall.retrievedRawExcerpts) {
+        semanticContext.push(
+          `MEMORY_EVIDENCE|memoryId=${excerpt.memoryId}|sourceRef=${String(excerpt.sourceRef||'')}|excerpt=${String(excerpt.rawExcerpt||'')}`
+        );
+      }
+    } catch (error) {
+      unresolvedRefs.push(
+        `memory-recall-error:${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -588,7 +633,7 @@ class CoreOrchestratorService {
         availableComponentIds:Array.isArray(route.payload.availableComponentIds)
           ? route.payload.availableComponentIds.map(String) : undefined,
         maxComponents:Number(route.payload.maxComponents||4),
-        synthesisContext:this.buildSynthesisContext(current, route.payload)
+        synthesisContext:await this.buildSynthesisContext(current, route.payload)
       });
 
       dispatched+=1;
