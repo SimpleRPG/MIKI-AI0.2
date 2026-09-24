@@ -1,0 +1,210 @@
+MIKI-AI0.2
+知識永続性・Evidence Lineage・Generalized Artifact再利用
+作業指示書
+
+目的:
+MIKIが確認・学習したコードや知識を後続処理で失わないようにする。
+
+最優先1:
+src/miki/core/services/reusableComponentFactoryService.ts
+
+generalizeAcceptedPatterns()を修正する。
+
+既存Generalized Artifactを再利用する場合、
+既存Artifact IDを必ず後続処理へ返す。
+
+既存Artifactが存在するのに新規Artifactを重複作成しない。
+
+既存ArtifactのLifecycle、supersededBy、履歴を破壊しない。
+
+generalizedArtifactIds
+→ approvalArtifactIds
+→ knowledgeComponentIds
+まで既存Artifact IDを維持する。
+
+最優先2:
+External Review → Evidence → Knowledge Component
+のEvidence IDを統一する。
+
+対象:
+src/miki/core/services/externalReviewIntakeService.ts
+src/miki/core/services/reusableComponentFactoryService.ts
+
+EvidenceService.recordCloudAiEvidence()で生成された正式な
+EVD-* Evidence IDをKnowledge Component.evidenceRefsへ渡す。
+
+rawResponseSha256を正式Evidence IDとして使用しない。
+
+SHA256は内容整合性・ハッシュ情報として必要なら保持する。
+
+必須Lineage:
+
+External Review
+→ Evidence(EVD-*)
+→ Learning Episode
+→ Learning Artifact
+→ Generalized Artifact
+→ Knowledge Component
+→ CORE
+→ Blackboard
+→ CORE Lineage
+
+Evidence IDが途中で別IDへ変換されないこと。
+
+追加修正:
+
+EVIDENCE_RESEARCHED_BUT_UNLINKEDが発生した場合、
+単にWAITING_EVIDENCEで停止しない。
+
+必ず以下を特定する。
+
+- Gap ID
+- Evidence ID
+- Artifact ID
+- Knowledge Component ID
+- Claim ID
+- CORE Lineage ID
+- 欠落しているリンク
+- 修復可能か
+- 必要な修復Action
+- 再検証対象
+
+修復可能な場合:
+
+Evidence Research
+→ Linkage Diagnosis
+→ Link Repair
+→ Evidence Verification
+→ Knowledge Verification
+→ CORE Re-evaluation
+
+までCORE Loop内で実行する。
+
+修復不能の場合のみWAITING_EVIDENCEへ移行する。
+
+WAITING_EVIDENCEの場合も、
+Action=NONEだけで終了させず、
+待機理由・不足Evidence・不足Link・次回Actionを保持する。
+
+診断例:
+
+WAITING_EVIDENCE
+Reason:
+EVIDENCE_RESEARCHED_BUT_UNLINKED
+
+Gap ID:
+GAP-xxxx
+
+Evidence:
+EVD-xxxx
+
+Broken Link:
+Evidence → Artifact
+
+Required Action:
+LINK_EVIDENCE_TO_ARTIFACT
+
+Retry:
+YES
+
+再処理時に同一Evidence・Artifact・Knowledgeを不要に複製しない。
+
+Artifact → Evidence Lineageも可能な範囲で正式Evidence IDを保持する。
+
+Evidence Package IDとEvidence IDを混同しない。
+
+Memory / Claim / Learning Artifactの既存Lifecycle・Supersession履歴を削除しない。
+
+既存の
+SUPERSEDED
+replacedBy
+supersededFrom
+supersededAt
+を維持する。
+
+Researchの既存状態
+EVIDENCE_FOUND
+INSUFFICIENT_SEARCH
+INSUFFICIENT_VERIFICATION
+NOT_FOUND_AFTER_COVERAGE
+NO_RESULT
+SOURCE_UNAVAILABLE
+を壊さない。
+
+検索結果0件だけで「存在しない」と確定しない。
+
+Blackboard / CORE Lineageは作り直さない。
+既存Evidence ID保持機構を利用する。
+
+17分類 + CORE構成を維持する。
+旧Conversation Brain / Self Improvement Brain等の独立構造を復活させない。
+
+必須テスト:
+
+1. 新規Generalized Artifact生成
+2. 既存Generalized Artifact再利用
+3. External ReviewのEVD-*がKnowledge Componentまで到達
+4. Blackboard.evidenceIdsまで到達
+5. CORE Lineageまで同一Evidence IDで到達
+6. EVIDENCE_RESEARCHED_BUT_UNLINKEDの原因特定
+7. 修復可能なLinkage Gapの自動修復
+8. 修復後の再検証
+9. 同一入力再処理時の重複防止
+10. Code Revision → Evidence → Knowledge → 再検証
+11. Search 0件時の不存在誤判定防止
+
+禁止:
+
+- Memory全体の作り直し
+- EvidenceServiceの置換
+- Blackboardの別系統化
+- CORE Lineageの別系統化
+- 履歴削除
+- SHA256を正式Evidence IDとして使用
+- 既存Artifactの不要な再生成
+- 検索0件＝不存在という判定
+- 17分類 + COREを迂回する独立Brain
+- 旧アーキテクチャの復活
+- 今回と無関係なUI変更
+
+完了条件:
+
+[ ] Existing Generalized ArtifactのID欠落なし
+[ ] Knowledge ComponentまでID維持
+[ ] External ReviewのEVD-*を維持
+[ ] evidenceRefsが正式Evidence ID
+[ ] BlackboardまでEvidence ID維持
+[ ] CORE LineageまでEvidence ID維持
+[ ] Linkage Gapの具体的原因を診断可能
+[ ] 修復可能なGapをCORE Loopで修復
+[ ] 修復後に再検証
+[ ] Lifecycle履歴維持
+[ ] Supersession履歴維持
+[ ] Research状態維持
+[ ] 重複生成防止
+[ ] TypeScript検証
+[ ] 関連テスト
+[ ] git diff確認
+[ ] 目的外変更なし
+
+最終目標:
+
+Knowledge
+↕
+Artifact
+↕
+Evidence
+↕
+Claim
+↕
+Source / Code Revision
+↕
+Lifecycle / Supersession
+↕
+CORE Blackboard / Lineage
+
+を後から追跡できる状態にする。
+
+「記憶容量」ではなく、
+Knowledge Identity / Evidence / Artifact / Revision /
+Lifecycle / Lineageを失わないことを保証する。
