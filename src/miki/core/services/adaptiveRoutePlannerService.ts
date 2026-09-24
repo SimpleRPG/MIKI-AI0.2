@@ -389,6 +389,49 @@ class AdaptiveRoutePlannerService {
     const entry=String(input.entry||'');
     const selfImprovement=kind==='SELF_IMPROVEMENT';
 
+    const memoryAssessment=[...task.entries]
+      .reverse()
+      .find(entry =>
+        entry.domain==='core' &&
+        entry.kind==='DECISION' &&
+        String(entry.key).startsWith('coreMemoryContextAssessment:')
+      );
+
+    const memoryAssessmentValue=memoryAssessment
+      ? objectValue(memoryAssessment)
+      : undefined;
+
+    if(String(memoryAssessmentValue?.status||'').toUpperCase()==='CONTEXT_INSUFFICIENT'){
+      const assessmentIndex=memoryAssessment
+        ? task.entries.indexOf(memoryAssessment)
+        : -1;
+
+      const unknownAfterAssessment=task.entries.some((entry,index) =>
+        index>assessmentIndex &&
+        entry.kind==='RESULT' &&
+        entry.domain==='unknown' &&
+        objectValue(entry)?.operation==='RESOLVE_UNKNOWN'
+      );
+
+      if(!unknownAfterAssessment){
+        return this.decorateOperations(task,this.uniqueOperations([{
+          target:'unknown',
+          command:'RESOLVE_UNKNOWN',
+          reason:'CORE memory context is insufficient, so unknown-resolution is required before committing the next CORE judgement',
+          payload:{
+            taskId:task.taskId,
+            question:task.goal,
+            useSearch:true,
+            hasAttachments:Boolean(input.hasAttachments),
+            contextRecovery:true,
+            contextRecoveryReason:'CONTEXT_INSUFFICIENT',
+            adaptive:true,
+            priority:100
+          }
+        }]));
+      }
+    }
+
     // All SELF_IMPROVEMENT tasks use the same adaptive CORE cognition,
     // regardless of whether the task originated from UI, AUTOPILOT,
     // execution-failure recovery, or another CORE/system ingress. The

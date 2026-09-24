@@ -439,6 +439,326 @@ class CoreOrchestratorService {
   }
   return task.taskId||fallbackTaskId;
  }
+ private async assessCoreMemoryContext(
+  task:BlackboardTask,
+  payload:Record<string,unknown>,
+  cycle:number
+ ):Promise<void>{
+  const memories=storageService.getMemories();
+  const decisionHints=task.entries
+    .filter(entry=>entry.kind==='DECISION')
+    .slice(-12)
+    .map(entry=>String(entry.key||''))
+    .filter(Boolean);
+
+  const unresolvedHints=this.collectUnresolved(
+    task,
+    /unknown|gap|missing|unresolved|blocked/i
+  ).slice(-12);
+
+  const recallQuery=[
+    task.goal,
+    typeof payload.input==='string' ? payload.input : '',
+    ...decisionHints,
+    ...unresolvedHints,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+
+  if(!recallQuery){
+    taskBlackboardService.append(
+      task.taskId,
+      'DECISION',
+      'core',
+      `coreMemoryContextAssessment:${cycle}`,
+      {
+        schemaVersion:1,
+        status:'NO_RECALL_QUERY',
+        cycle,
+        reason:'CORE could not construct a persistent-memory recall query from the current task context'
+      }
+    );
+    return;
+  }
+
+  if(memories.length===0){
+    taskBlackboardService.append(
+      task.taskId,
+      'DECISION',
+      'core',
+      `coreMemoryContextAssessment:${cycle}`,
+      {
+        schemaVersion:1,
+        status:'NO_PERSISTED_MEMORY',
+        cycle,
+        queryHash:sha256HexFromText(recallQuery),
+        reason:'No persisted long-term memories are currently available'
+      }
+    );
+    return;
+  }
+
+  try{
+    const initialRecall=await longTermMemoryService.searchPipeline(
+      recallQuery,
+      memories,
+      null,
+      [],
+      {
+        limit:12,
+        onlyApprovedForFacts:false,
+        minScoreThreshold:6.0,
+      }
+    );
+
+    const recalledIds=new Set<string>(
+      initialRecall.scoredMemories.map(hit=>String(hit.memory.id))
+    );
+
+    let additionalRecallPerformed=false;
+
+    if(initialRecall.scoredMemories.length>0){
+      const relatedHints=initialRecall.scoredMemories
+        .flatMap(hit=>[
+          ...(Array.isArray(hit.memory.semanticKeywords)
+            ? hit.memory.semanticKeywords.map(String)
+            : []),
+          String(hit.memory.sourceRef||'')
+        ])
+        .filter(Boolean);
+
+      const relatedRecallQuery=[
+        task.goal,
+        typeof payload.input==='string' ? payload.input : '',
+        ...relatedHints,
+        ...unresolvedHints,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+
+      if(relatedRecallQuery && relatedRecallQuery!==recallQuery){
+        const relatedRecall=await longTermMemoryService.searchPipeline(
+          relatedRecallQuery,
+          memories,
+          null,
+          [],
+          {
+            limit:12,
+            onlyApprovedForFacts:false,
+            minScoreThreshold:6.0,
+          }
+        );
+
+        for(const hit of relatedRecall.scoredMemories){
+          recalledIds.add(String(hit.memory.id));
+        }
+
+        additionalRecallPerformed=true;
+      }
+    }
+
+    const status=recalledIds.size>0
+      ? 'SUFFICIENT'
+      : 'CONTEXT_INSUFFICIENT';
+
+    taskBlackboardService.append(
+      task.taskId,
+      'DECISION',
+      'core',
+      `coreMemoryContextAssessment:${cycle}`,
+      {
+        schemaVersion:1,
+        status,
+        cycle,
+        queryHash:sha256HexFromText(recallQuery),
+        initialHits:initialRecall.scoredMemories.length,
+        mergedHits:recalledIds.size,
+        additionalRecall:additionalRecallPerformed,
+        memoryIds:[...recalledIds].slice(0,24),
+        reason:status==='SUFFICIENT'
+          ? 'CORE persistent-memory context is sufficient for the current cycle'
+          : 'CORE persistent-memory context is insufficient after initial and related-memory recall'
+      }
+    );
+  }catch(error){
+    taskBlackboardService.append(
+      task.taskId,
+      'DECISION',
+      'core',
+      `coreMemoryContextAssessment:${cycle}`,
+      {
+        schemaVersion:1,
+        status:'CONTEXT_INSUFFICIENT',
+        cycle,
+        queryHash:sha256HexFromText(recallQuery),
+        reason:`CORE memory context assessment failed: ${error instanceof Error ? error.message : String(error)}`
+      }
+    );
+  }
+ }
+
+ private async assessCoreMemoryContext(
+  task:BlackboardTask,
+  payload:Record<string,unknown>,
+  cycle:number
+ ):Promise<void>{
+  const memories=storageService.getMemories();
+  const decisionHints=task.entries
+    .filter(entry=>entry.kind==='DECISION')
+    .slice(-12)
+    .map(entry=>String(entry.key||''))
+    .filter(Boolean);
+
+  const unresolvedHints=this.collectUnresolved(
+    task,
+    /unknown|gap|missing|unresolved|blocked/i
+  ).slice(-12);
+
+  const recallQuery=[
+    task.goal,
+    typeof payload.input==='string' ? payload.input : '',
+    ...decisionHints,
+    ...unresolvedHints,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+
+  if(!recallQuery){
+    taskBlackboardService.append(
+      task.taskId,
+      'DECISION',
+      'core',
+      `coreMemoryContextAssessment:${cycle}`,
+      {
+        schemaVersion:1,
+        status:'NO_RECALL_QUERY',
+        cycle,
+        reason:'CORE could not construct a persistent-memory recall query from the current task context'
+      }
+    );
+    return;
+  }
+
+  if(memories.length===0){
+    taskBlackboardService.append(
+      task.taskId,
+      'DECISION',
+      'core',
+      `coreMemoryContextAssessment:${cycle}`,
+      {
+        schemaVersion:1,
+        status:'NO_PERSISTED_MEMORY',
+        cycle,
+        queryHash:sha256HexFromText(recallQuery),
+        reason:'No persisted long-term memories are currently available'
+      }
+    );
+    return;
+  }
+
+  try{
+    const initialRecall=await longTermMemoryService.searchPipeline(
+      recallQuery,
+      memories,
+      null,
+      [],
+      {
+        limit:12,
+        onlyApprovedForFacts:false,
+        minScoreThreshold:6.0,
+      }
+    );
+
+    const recalledIds=new Set<string>(
+      initialRecall.scoredMemories.map(hit=>String(hit.memory.id))
+    );
+
+    let additionalRecallPerformed=false;
+
+    if(initialRecall.scoredMemories.length>0){
+      const relatedHints=initialRecall.scoredMemories
+        .flatMap(hit=>[
+          ...(Array.isArray(hit.memory.semanticKeywords)
+            ? hit.memory.semanticKeywords.map(String)
+            : []),
+          String(hit.memory.sourceRef||'')
+        ])
+        .filter(Boolean);
+
+      const relatedRecallQuery=[
+        task.goal,
+        typeof payload.input==='string' ? payload.input : '',
+        ...relatedHints,
+        ...unresolvedHints,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+
+      if(relatedRecallQuery && relatedRecallQuery!==recallQuery){
+        const relatedRecall=await longTermMemoryService.searchPipeline(
+          relatedRecallQuery,
+          memories,
+          null,
+          [],
+          {
+            limit:12,
+            onlyApprovedForFacts:false,
+            minScoreThreshold:6.0,
+          }
+        );
+
+        for(const hit of relatedRecall.scoredMemories){
+          recalledIds.add(String(hit.memory.id));
+        }
+
+        additionalRecallPerformed=true;
+      }
+    }
+
+    const status=recalledIds.size>0
+      ? 'SUFFICIENT'
+      : 'CONTEXT_INSUFFICIENT';
+
+    taskBlackboardService.append(
+      task.taskId,
+      'DECISION',
+      'core',
+      `coreMemoryContextAssessment:${cycle}`,
+      {
+        schemaVersion:1,
+        status,
+        cycle,
+        queryHash:sha256HexFromText(recallQuery),
+        initialHits:initialRecall.scoredMemories.length,
+        mergedHits:recalledIds.size,
+        additionalRecall:additionalRecallPerformed,
+        memoryIds:[...recalledIds].slice(0,24),
+        reason:status==='SUFFICIENT'
+          ? 'CORE persistent-memory context is sufficient for the current cycle'
+          : 'CORE persistent-memory context is insufficient after initial and related-memory recall'
+      }
+    );
+  }catch(error){
+    taskBlackboardService.append(
+      task.taskId,
+      'DECISION',
+      'core',
+      `coreMemoryContextAssessment:${cycle}`,
+      {
+        schemaVersion:1,
+        status:'CONTEXT_INSUFFICIENT',
+        cycle,
+        queryHash:sha256HexFromText(recallQuery),
+        reason:`CORE memory context assessment failed: ${error instanceof Error ? error.message : String(error)}`
+      }
+    );
+  }
+ }
+
  private async continueTask(taskId:string,maxCycles:number,reqId:string=taskId):Promise<CoreOrchestrationResult>{
   let dispatched=0;let cycles=taskBlackboardService.get(taskId)?.lastCycle||0;let cycleBudget=0;const cycleLimit=Math.max(1,Math.min(maxCycles,100));
   while(cycleBudget<cycleLimit){
@@ -560,6 +880,7 @@ class CoreOrchestratorService {
     continue;
 
    }
+   await this.assessCoreMemoryContext(stateBase,currentPayload,cycles);
    const current=taskBlackboardService.get(taskId)!;
    const plateau=plateauDetectorService.evaluate(current);
    if(plateau.plateau){
