@@ -17,7 +17,27 @@ class ImprovementIntakeRouterService{
     this.runs.set(run.runId,run);const queued=selfImprovementIngressService.submitRun({...run,changeSetId:input.changeSetId});run.status='QUEUED';run.taskId=queued.taskId;run.updatedAt=Date.now();this.save();return this.clone(run);}
  async ensureForCoreTask(input:{taskId:string;objective:string;payload?:Record<string,unknown>;sourceId?:string}):Promise<ImprovementIntakeRun>{
   const existing=[...this.runs.values()].find(run=>run.taskId===input.taskId);
-  if(existing)return this.clone(existing);
+  if(existing){
+    const incoming={...(input.payload||{}),taskId:input.taskId};
+    existing.payload={...existing.payload,...incoming};
+    const incomingTargets=Array.isArray(incoming.targetFiles)
+      ? incoming.targetFiles.filter((x):x is string=>typeof x==='string'&&x.trim().length>0).map(x=>x.trim())
+      : [];
+    if(incomingTargets.length>0){
+      existing.payload.targetFiles=[...new Set(incomingTargets)];
+      if(existing.implementationPlan){
+        existing.implementationPlan={
+          ...existing.implementationPlan,
+          targetPaths:[...new Set(incomingTargets)]
+        };
+      }
+    }
+    existing.objective=input.objective.trim()||existing.objective;
+    existing.updatedAt=Date.now();
+    this.runs.set(existing.runId,existing);
+    this.save();
+    return this.clone(existing);
+  }
   const now=Date.now();this.sequence+=1;
   const payload={...(input.payload||{}),taskId:input.taskId};
   const sourceId=input.sourceId||input.taskId;
