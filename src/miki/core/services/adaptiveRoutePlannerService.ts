@@ -1,5 +1,5 @@
 import type { MikiDomain } from './crossDomainCirculationService';
-import { type BlackboardTask, type BlackboardEntry } from './taskBlackboardService';
+import { taskBlackboardService, type BlackboardTask, type BlackboardEntry } from './taskBlackboardService';
 import type { DomainCommand } from './domainRouterService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { coreCompletionGateService, type CoreCompletionAssessment } from './coreCompletionGateService';
@@ -705,21 +705,66 @@ class AdaptiveRoutePlannerService {
       String(objectValue(entry)?.status || '').toUpperCase() === 'SUCCEEDED'
     );
 
-    const synthesisBlocked = task.entries
-      .filter(entry =>
+    const synthesisEntries = task.entries
+      .map((entry, index) => ({entry, index}))
+      .filter(({entry}) =>
         entry.domain === 'core' &&
         (entry.kind === 'ERROR' || entry.kind === 'RESULT') &&
-        objectValue(entry)?.operation === 'SYNTHESIZE_UNIVERSAL' &&
-        String(objectValue(entry)?.status || '').toUpperCase() === 'BLOCKED'
+        objectValue(entry)?.operation === 'SYNTHESIZE_UNIVERSAL'
+      );
+
+    const latestSynthesis = synthesisEntries.at(-1);
+
+    const synthesisBlocked = latestSynthesis &&
+      String(objectValue(latestSynthesis.entry)?.status || '').toUpperCase() === 'BLOCKED'
+      ? objectValue(latestSynthesis.entry)
+      : undefined;
+
+    const latestResearch = task.entries
+      .map((entry, index) => ({entry, index}))
+      .filter(({entry}) =>
+        entry.domain === 'research' &&
+        (entry.kind === 'RESULT' || entry.kind === 'ERROR') &&
+        (
+          objectValue(entry)?.operation === 'RUN_RESEARCH' ||
+          /research/i.test(entry.key)
+        )
       )
-      .map(entry => objectValue(entry))
-      .pop();
+      .at(-1);
+
+    const researchCompletedAfterBlockedSynthesis = Boolean(
+      synthesisBlocked &&
+      latestSynthesis &&
+      latestResearch &&
+      latestResearch.index > latestSynthesis.index &&
+      latestResearch.entry.kind === 'RESULT'
+    );
 
     const synthesisGapResearchAlreadyRequested = task.entries.some(entry =>
       entry.domain === 'research' &&
       entry.kind === 'DECISION' &&
       entry.key === 'synthesisComponentGapResearchRequested'
     );
+
+    if (synthesisRequested && !synthesisAlreadyCompleted && researchCompletedAfterBlockedSynthesis) {
+      routes.push({
+        target: 'core',
+        command: 'SYNTHESIZE_UNIVERSAL' as DomainCommand,
+        reason: 'CORE re-evaluated completed component-gap research and retried universal synthesis',
+        payload: {
+          ...input,
+          taskId: task.taskId,
+          requestId: String(input.requestId || task.taskId),
+          goal: task.goal,
+          requiredOutput: typeof input.requiredOutput === 'string' ? input.requiredOutput : '',
+          adaptive: true,
+          synthesisRetry: true,
+          priority: 100
+        }
+      });
+
+      return this.decorateOperations(task, this.uniqueOperations(routes));
+    }
 
     if (
       synthesisBlocked &&
