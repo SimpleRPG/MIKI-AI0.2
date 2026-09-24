@@ -159,27 +159,56 @@ class CoreOrchestratorService {
   const verificationRefs=new Set<string>();
   const recentDecisions:string[]=[];
   const unresolvedRefs:string[]=[];
+  const semanticContext:string[]=[];
 
-  for(const entry of task.entries.slice(-80)){
+  for(const entry of task.entries){
     for(const id of entry.evidenceIds||[]) evidenceRefs.add(String(id));
 
     const key=String(entry.key||'').toLowerCase();
     const value=entry.value;
 
-    if(/knowledge|research|unknown|claim/.test(key)) {
+    const category =
+      /knowledge|research|unknown|claim/.test(key)
+        ? 'KNOWLEDGE'
+        : /memory/.test(key)
+          ? 'MEMORY'
+          : /experience|learning|episode|pattern/.test(key)
+            ? 'EXPERIENCE'
+            : /failure|negative|error/.test(key)||entry.kind==='ERROR'
+              ? 'FAILURE_EXPERIENCE'
+              : /verif|validation|audit|check/.test(key)
+                ? 'VERIFICATION'
+                : entry.kind==='DECISION'
+                  ? 'DECISION'
+                  : '';
+
+    if(category==='KNOWLEDGE') {
       knowledgeRefs.add(entry.id);
     }
-    if(/memory/.test(key)) {
+    if(category==='MEMORY') {
       memoryRefs.add(entry.id);
     }
-    if(/experience|learning|episode|pattern/.test(key)) {
+    if(category==='EXPERIENCE') {
       experienceRefs.add(entry.id);
     }
-    if(/failure|negative|error/.test(key)||entry.kind==='ERROR') {
+    if(category==='FAILURE_EXPERIENCE') {
       failureExperienceRefs.add(entry.id);
     }
-    if(/verif|validation|audit|check/.test(key)) {
+    if(category==='VERIFICATION') {
       verificationRefs.add(entry.id);
+    }
+
+    if(category){
+      let serialized='';
+      try {
+        serialized=JSON.stringify(value);
+      } catch {
+        serialized=String(value ?? '');
+      }
+
+      semanticContext.push(
+        `${category}|domain=${entry.domain}|kind=${entry.kind}|key=${entry.key}|value=${serialized}`
+      );
     }
     if(entry.kind==='DECISION') {
       recentDecisions.push(entry.key);
@@ -216,7 +245,8 @@ class CoreOrchestratorService {
     failureExperienceRefs:[...failureExperienceRefs].slice(-40),
     verificationRefs:[...verificationRefs].slice(-40),
     recentDecisions:[...new Set(recentDecisions)].slice(-40),
-    unresolvedRefs:[...new Set(unresolvedRefs)].slice(-40),
+    unresolvedRefs:[...new Set(unresolvedRefs)],
+    semanticContext,
     validatedCandidate:
       payload.validatedCandidate &&
       typeof payload.validatedCandidate === 'object' &&
