@@ -15,6 +15,7 @@ import { executionEnvironmentRouterService } from './executionEnvironmentRouterS
 import { schemaValidationService } from '../../verification/services/schemaValidationService';
 import { githubSyncService } from '../../../services/githubSyncService';
 import { sha256HexFromText } from './canonicalSha256Service';
+import { coreExecutionTraceService } from './coreExecutionTraceService';
 
 export interface CoreOrchestrationResult { task:BlackboardTask; cycles:number; dispatched:number; coreResult?:CoreResult; }
 
@@ -31,6 +32,17 @@ const DIAGNOSTIC_COMMANDS=new Set(['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GE
 class CoreOrchestratorService {
  async run(goal:string,source:MikiDomain='core',payload:Record<string,unknown>={},maxCycles=18):Promise<CoreOrchestrationResult>{
   const created=taskBlackboardService.create(goal,source,payload);
+  coreExecutionTraceService.record(created.taskId,0,'RUN_START',{
+    goal,
+    source,
+    payloadKind:payload.kind,
+    requestId:payload.requestId,
+    runId:payload.runId,
+    foreground:payload.foreground,
+    background:payload.background,
+    orchestrationMode:payload.orchestrationMode,
+    executionPriority:payload.executionPriority
+  });
   if(payload.kind==='USER_REQUEST' || payload.foreground===true){
    taskBlackboardService.pauseBackgroundTasksForForeground(created.taskId);
   }
@@ -152,6 +164,15 @@ class CoreOrchestratorService {
   let dispatched=0;let cycles=taskBlackboardService.get(taskId)?.lastCycle||0;let cycleBudget=0;const cycleLimit=Math.max(1,Math.min(maxCycles,100));
   while(cycleBudget<cycleLimit){
    cycles+=1;cycleBudget+=1;taskBlackboardService.setCycle(taskId,cycles);
+   coreExecutionTraceService.record(taskId,cycles,'CYCLE_START',{
+     cycleBudget,
+     cycleLimit,
+     maxCycles,
+     status:taskBlackboardService.get(taskId)?.status,
+     revision:taskBlackboardService.get(taskId)?.revision,
+     visitedDomains:taskBlackboardService.get(taskId)?.visitedDomains,
+     pendingDomains:taskBlackboardService.get(taskId)?.pendingDomains
+   });
    const currentBeforeState=taskBlackboardService.get(taskId);if(!currentBeforeState||currentBeforeState.status==='PAUSED'||currentBeforeState.status==='CANCELLED')break;
    const currentPayloadEntry=currentBeforeState.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
    const currentPayload=currentPayloadEntry&&typeof currentPayloadEntry==='object'&&!Array.isArray(currentPayloadEntry)?currentPayloadEntry as Record<string,unknown>:{ };
@@ -263,6 +284,38 @@ class CoreOrchestratorService {
    const current=taskBlackboardService.get(taskId)!;
    const plateau=plateauDetectorService.evaluate(current);
    if(plateau.plateau){
+    coreExecutionTraceService.record(taskId,cycles,'CYCLE_GUARD',{
+      plateau:true,
+      repeatedRoutes:plateau.repeatedRoutes,
+      unchangedCycles:plateau.unchangedCycles,
+      oscillation:plateau.oscillation,
+      repeatedFailure:plateau.repeatedFailure,
+      sameResearchQuery:plateau.sameResearchQuery,
+      reason:plateau.reason,
+      revision:current.revision,
+      entryCount:current.entries.length,
+      evidenceIds:[...new Set(
+        current.entries.flatMap(entry=>entry.evidenceIds||[])
+      )]
+    });
+    if(plateau.reason==='NO_PROGRESS'){
+      coreExecutionTraceService.record(taskId,cycles,'NO_PROGRESS',{
+        reason:plateau.reason,
+        repeatedRoutes:plateau.repeatedRoutes,
+        unchangedCycles:plateau.unchangedCycles,
+        oscillation:plateau.oscillation,
+        repeatedFailure:plateau.repeatedFailure,
+        sameResearchQuery:plateau.sameResearchQuery,
+        revision:current.revision,
+        entryCount:current.entries.length,
+        lastEntries:current.entries.slice(-12).map(entry=>({
+          kind:entry.kind,
+          domain:entry.domain,
+          key:entry.key,
+          evidenceIds:entry.evidenceIds
+        }))
+      });
+    }
     taskBlackboardService.append(taskId,'DECISION','core',`coreCycleGuard:${cycles}`,plateau);
     taskBlackboardService.pause(taskId,plateau.reason);
     coreResultService.waiting(reqId,{error:plateau.reason});
@@ -287,6 +340,21 @@ class CoreOrchestratorService {
    for(const route of routes) route.payload={...route.payload,environmentSignature:planEnvironment.signature};
    taskBlackboardService.append(taskId,'DECISION','core',`coreEnvironmentPlan:${cycles}`,planEnvironment);
    taskBlackboardService.append(taskId,'DECISION','core',`corePlan:${cycles}`,routes.map(route=>({target:route.target,command:route.command,reason:route.reason,environmentSignature:route.payload.environmentSignature})));
+   coreExecutionTraceService.record(taskId,cycles,'PLAN',{
+     routeCount:routes.length,
+     routes:routes.map(route=>({
+       target:route.target,
+       command:route.command,
+       reason:route.reason,
+       operationInstanceId:route.payload.operationInstanceId,
+       dedupeKey:route.payload.dedupeKey,
+       idempotencyKey:route.payload.idempotencyKey,
+       attempt:route.payload.attempt,
+       planRevision:route.payload.planRevision,
+       planSha256:route.payload.planSha256,
+       environmentSignature:route.payload.environmentSignature
+     }))
+   });
    const proposedRequirements=routes.filter(route=>!DIAGNOSTIC_COMMANDS.has(route.command)).map(route=>{
     const operationInstanceId=String(route.payload.operationInstanceId||'');
     const dedupeKey=String(route.payload.dedupeKey||`${taskId}:${route.command}`);
@@ -384,11 +452,60 @@ class CoreOrchestratorService {
       operationInstanceId:route.payload.operationInstanceId,attempt:route.payload.attempt||0,cycle:cycles
     });
     const envelope=domainRouterService.create('core',route.target,route.command,{...route.payload,taskId,requestId:reqId},{correlationId:taskId,causationId:taskId,depth:cycles});
+    coreExecutionTraceService.record(taskId,cycles,'DISPATCH_START',{
+      target:route.target,
+      command:route.command,
+      operationInstanceId:route.payload.operationInstanceId,
+      dedupeKey:route.payload.dedupeKey,
+      idempotencyKey:route.payload.idempotencyKey,
+      attempt:route.payload.attempt,
+      envelopeId:envelope.envelopeId,
+      correlationId:envelope.correlationId,
+      causationId:envelope.causationId,
+      depth:envelope.depth,
+      payloadKeys:Object.keys(route.payload)
+    });
     const reply=await domainRouterService.dispatch(envelope);dispatched+=1;
+    coreExecutionTraceService.record(taskId,cycles,'DISPATCH_RESULT',{
+      target:route.target,
+      command:route.command,
+      envelopeId:envelope.envelopeId,
+      accepted:reply.accepted,
+      error:reply.error,
+      normalized:reply.normalized,
+      result:reply.result
+    });
     const operationId=this.readPayloadString(current,'operationId')||this.readPayloadString(current,'operation')||taskId;
     const replyRecord=domainReplyLedgerService.record(taskId,operationId,envelope,reply);
+    coreExecutionTraceService.record(taskId,cycles,'REPLY_LEDGER',{
+      operationId,
+      replyId:replyRecord.replyId,
+      envelopeId:envelope.envelopeId,
+      evidenceIds:replyRecord.evidenceIds,
+      receiptIds:replyRecord.receiptIds,
+      accepted:replyRecord.accepted,
+      normalizedStatus:replyRecord.normalized?.status,
+      normalizedOperationClass:replyRecord.normalized?.operationClass
+    });
     const operationClass=reply.normalized?.operationClass||'BUSINESS';
     const resultKind=operationClass==='DIAGNOSTIC'?'OBSERVATION':(reply.accepted?'RESULT':'ERROR');
+
+    coreExecutionTraceService.record(taskId,cycles,'REPLY_NORMALIZED',{
+      command:route.command,
+      target:route.target,
+      accepted:reply.accepted,
+      operationClass,
+      normalizedStatus:reply.normalized?.status,
+      normalizedOperation:reply.normalized?.operation,
+      normalizedEvidenceIds:reply.normalized?.evidenceIds,
+      normalizedReceiptIds:reply.normalized?.receiptIds,
+      resultKind,
+      normalizedKeys:reply.normalized ? Object.keys(reply.normalized) : [],
+      rawResultType:typeof reply.result,
+      rawResultKeys:reply.result && typeof reply.result==='object'
+        ? Object.keys(reply.result as Record<string,unknown>)
+        : []
+    });
     const proposalKey=typeof route.payload.dedupeKey==='string'?route.payload.dedupeKey:'';
     const operationSucceeded=reply.accepted&&reply.normalized?.status==='SUCCEEDED'&&operationClass==='BUSINESS';
     const actionCompletedStatus=operationClass==='DIAGNOSTIC'
@@ -400,6 +517,15 @@ class CoreOrchestratorService {
       replyId:replyRecord.replyId,cycle:cycles
     });
     const expectedRevision=taskBlackboardService.get(taskId)?.revision ?? -1;
+    coreExecutionTraceService.record(taskId,cycles,'BLACKBOARD_WRITE',{
+      kind:resultKind,
+      target:route.target,
+      command:route.command,
+      operationClass,
+      evidenceIds:replyRecord.evidenceIds,
+      expectedRevision,
+      currentRevision:taskBlackboardService.get(taskId)?.revision
+    });
     const resultWrite=taskBlackboardService.appendIfRevision(taskId,expectedRevision,resultKind,route.target,`${resultKind==='OBSERVATION'?'domainObservation':'domainResult'}:${route.target}:${route.command}`,{schemaVersion:3,collectedBy:'core',coreCollected:true,sourceDomain:route.target,producerId:'domainRouterService',dispatchId:envelope.envelopeId,replyId:replyRecord.replyId,operation:route.command,operationInstanceId:route.payload.operationInstanceId,planRevision:route.payload.planRevision,intentPlanKey:route.payload.intentPlanKey,intentHypothesisId:route.payload.intentHypothesisId,intentHypothesisKind:route.payload.intentHypothesisKind,intentIds:Array.isArray(route.payload.intentIds)?route.payload.intentIds.map(String):[],planSha256:route.payload.planSha256,idempotencyKey:typeof route.payload.idempotencyKey==='string'?route.payload.idempotencyKey:'',operationClass,reply:reply.normalized||reply.error,auditTag:'coreCollected:'},replyRecord.evidenceIds);
     if(!resultWrite){
       const latest=taskBlackboardService.get(taskId);
@@ -415,8 +541,42 @@ class CoreOrchestratorService {
    }
    taskBlackboardService.setPending(taskId,[]);
    const reevaluated=taskBlackboardService.get(taskId);if(!reevaluated)break;
+   coreExecutionTraceService.record(taskId,cycles,'REEVALUATION_INPUT',{
+     revision:reevaluated.revision,
+     visitedDomains:[...reevaluated.visitedDomains],
+     pendingDomains:[...reevaluated.pendingDomains],
+     entryCount:reevaluated.entries.length,
+     observations:reevaluated.entries
+       .filter(entry=>entry.kind==='OBSERVATION')
+       .slice(-10)
+       .map(entry=>({
+         key:entry.key,
+         domain:entry.domain,
+         evidenceIds:entry.evidenceIds,
+         operation:typeof entry.value==='object'&&entry.value!==null
+           ?(entry.value as Record<string,unknown>).operation
+           :undefined,
+         operationClass:typeof entry.value==='object'&&entry.value!==null
+           ?(entry.value as Record<string,unknown>).operationClass
+           :undefined
+       })),
+     evidenceIds:[...new Set(
+       reevaluated.entries.flatMap(entry=>entry.evidenceIds||[])
+     )]
+   });
    taskBlackboardService.append(taskId,'DECISION','core',`coreReevaluation:${cycles}`,{revision:reevaluated.revision,visitedDomains:[...reevaluated.visitedDomains]});
    const completion=adaptiveRoutePlannerService.assessCompletion(reevaluated);
+   coreExecutionTraceService.record(taskId,cycles,'COMPLETION_ASSESSMENT',{
+     businessCompletion:completion.businessCompletion,
+     failClosed:completion.failClosed,
+     requiredDomains:completion.requiredDomains,
+     missingDomains:completion.missingDomains,
+     failedDomains:completion.failedDomains,
+     missingReceipts:completion.missingReceipts,
+     persistenceConfirmed:completion.persistenceConfirmed,
+     evidenceQualityPassed:completion.evidenceQualityPassed,
+     reasons:completion.reasons
+   });
    taskBlackboardService.append(taskId,'DECISION','core',`coreCompletionAssessment:${cycles}`,completion);
    if(completion.businessCompletion){
     taskBlackboardService.append(taskId,'RESULT','core','coreCompletion',{completedBy:'core',cycle:cycles,failClosed:true,requiredDomains:completion.requiredDomains});
