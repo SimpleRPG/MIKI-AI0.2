@@ -76,7 +76,14 @@ class DomainOperationalAdapterService {
           const tokens=query.split(/[\\s/._:-]+/).filter(x=>x.length>=2).slice(0,12);
           const files=selfCodeSpaceService.listSourceFiles();
           const ranked=files.map(file=>({file,score:tokens.reduce((n,t)=>n+(file.path.toLowerCase().includes(t)?5:0)+(file.content.toLowerCase().includes(t)?1:0),0)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.file.path.localeCompare(b.file.path)).slice(0,3).map(x=>x.file.path);
-          return snapshot(domain,'selfDevelopmentOperationalAdapter',{architecture:codebaseReflectionService.getArchitectureOverview(),modules:codebaseReflectionService.getAllModules(),targetFiles:ranked,query});
+          const repositoryContextAssessment=String(context.requestedAssessment||'')==='REPOSITORY_CONTEXT';
+          const canonicalCoreTargets=[
+            'src/miki/core/services/coreOrchestratorService.ts',
+            'src/miki/core/services/adaptiveRoutePlannerService.ts',
+            'src/miki/core/services/domainRouterService.ts'
+          ];
+          const targetFiles=ranked.length>0?ranked:(repositoryContextAssessment?canonicalCoreTargets:[]);
+          return snapshot(domain,'selfDevelopmentOperationalAdapter',{architecture:codebaseReflectionService.getArchitectureOverview(),modules:codebaseReflectionService.getAllModules(),targetFiles,query,requestedAssessment:context.requestedAssessment});
         }
         case 'strategy':
           return snapshot(domain,'planOrchestratorService',{runs:planOrchestratorService.listRuns()});
