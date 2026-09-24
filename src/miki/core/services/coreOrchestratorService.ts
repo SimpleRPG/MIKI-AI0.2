@@ -559,9 +559,29 @@ class CoreOrchestratorService {
       }
     }
 
-    const status=recalledIds.size>0
-      ? 'SUFFICIENT'
-      : 'CONTEXT_INSUFFICIENT';
+    const currentContextEntries=task.entries.filter(entry =>
+      entry.kind==='EVIDENCE' ||
+      entry.kind==='CLAIM' ||
+      (
+        entry.kind==='RESULT' &&
+        (
+          entry.domain==='research' ||
+          entry.domain==='verification' ||
+          entry.domain==='unknown'
+        )
+      )
+    );
+
+    const currentContextEvidenceIds=currentContextEntries
+      .flatMap(entry=>entry.evidenceIds||[])
+      .filter(Boolean);
+
+    const currentContextAvailable=currentContextEntries.length>0;
+
+    const status=
+      recalledIds.size>0 || currentContextAvailable
+        ? 'SUFFICIENT'
+        : 'CONTEXT_INSUFFICIENT';
 
     taskBlackboardService.append(
       task.taskId,
@@ -576,10 +596,16 @@ class CoreOrchestratorService {
         initialHits:initialRecall.scoredMemories.length,
         mergedHits:recalledIds.size,
         additionalRecall:additionalRecallPerformed,
+        currentContextEntries:currentContextEntries.length,
+        currentContextEvidenceIds:[...new Set(currentContextEvidenceIds)].slice(0,24),
         memoryIds:[...recalledIds].slice(0,24),
         reason:status==='SUFFICIENT'
-          ? 'CORE persistent-memory context is sufficient for the current cycle'
-          : 'CORE persistent-memory context is insufficient after initial and related-memory recall'
+          ? (
+              recalledIds.size>0
+                ? 'CORE context is sufficient through persistent memory recall'
+                : 'CORE context is sufficient through current task Evidence/Research/Verification state'
+            )
+          : 'CORE context is insufficient after current-task context inspection and persistent-memory recall'
       }
     );
   }catch(error){
