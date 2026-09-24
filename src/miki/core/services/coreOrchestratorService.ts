@@ -485,6 +485,7 @@ class CoreOrchestratorService {
           operationClass:'BUSINESS',
           status:succeeded?'SUCCEEDED':'BLOCKED',
           synthesisId:synthesis.synthesisId,
+          synthesisArtifact:synthesis.synthesisArtifact,
           selectionMode:synthesis.selectionMode,
           usedComponentIds:synthesis.usedComponentIds,
           adaptedComponentIds:synthesis.adaptedComponentIds,
@@ -528,6 +529,7 @@ class CoreOrchestratorService {
         {
           schemaVersion: 1,
           synthesisId: synthesis.synthesisId,
+          synthesisArtifact: synthesis.synthesisArtifact,
           synthesisStatus: synthesis.validation.status,
           selectionMode: synthesis.selectionMode,
           usedComponentIds: synthesis.usedComponentIds,
