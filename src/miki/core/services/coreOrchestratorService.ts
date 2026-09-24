@@ -496,6 +496,12 @@ class CoreOrchestratorService {
           evidenceRefs:synthesis.evidenceRefs,
           lineage:synthesis.lineage,
           nextCoreAction:synthesis.nextCoreAction,
+          reply:{
+            status:succeeded?'SUCCEEDED':'BLOCKED',
+            operationClass:'BUSINESS',
+            operation:'SYNTHESIZE_UNIVERSAL',
+            data:synthesis
+          },
           operationInstanceId:route.payload.operationInstanceId,
           planRevision:route.payload.planRevision,
           planSha256:route.payload.planSha256,

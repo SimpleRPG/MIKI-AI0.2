@@ -3,6 +3,7 @@ import { taskBlackboardService, type BlackboardTask, type BlackboardEntry } from
 import type { DomainCommand } from './domainRouterService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { coreCompletionGateService, type CoreCompletionAssessment } from './coreCompletionGateService';
+import { corePlanRevisionService } from './corePlanRevisionService';
 import { EvidenceService } from '../../memory/services/evidenceService';
 import { proposalQuarantineService } from './proposalQuarantineService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
@@ -954,14 +955,19 @@ class AdaptiveRoutePlannerService {
         );
       }
 
-      // A clean synthesis is now explicitly handed to Completion Gate.
+      // A clean synthesis is handed to Completion Gate only when no other
+      // CORE-required business operation remains.
       if (
         synthesisStatus === 'SUCCEEDED' &&
         String(validation?.status || '').toUpperCase() === 'PASSED' &&
         unresolved.length === 0 &&
         (nextCoreAction === '' || nextCoreAction === 'RE_EVALUATE')
       ) {
-        return [];
+        const remainingRequiredOperations = corePlanRevisionService
+          .missingOperations(task)
+          .filter(operation => operation.operation !== 'SYNTHESIZE_UNIVERSAL');
+
+        if (remainingRequiredOperations.length === 0) return [];
       }
 
       // If the synthesis itself says what CORE needs next, honor that
@@ -1216,6 +1222,18 @@ class AdaptiveRoutePlannerService {
     if(isUiConversation) return this.evaluateConversationCompletion(task);
 
     const operation=String(input.operation||'');
+    const hasUniversalSynthesis = task.entries.some(entry =>
+      entry.domain === 'core' &&
+      (entry.kind === 'RESULT' || entry.kind === 'ERROR') &&
+      objectValue(entry)?.operation === 'SYNTHESIZE_UNIVERSAL'
+    );
+    if(
+      operation==='SYNTHESIZE' ||
+      input.synthesisRequested===true ||
+      hasUniversalSynthesis
+    ){
+      return coreCompletionGateService.evaluateUniversalSynthesisCompletion(task);
+    }
     if(operation==='APPROVE_REVIEWED_CANDIDATE'){
       return coreCompletionGateService.evaluate(task,['promotion']);
     }
