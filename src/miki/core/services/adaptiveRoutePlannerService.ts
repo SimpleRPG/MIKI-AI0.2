@@ -886,6 +886,64 @@ class AdaptiveRoutePlannerService {
       }]));
     }
 
+    const researchComponentIds = this.stringArrayFromValue(
+      latestResearchValue,
+      /component(?:[_-]?ids?)/i
+    );
+    const researchEvidenceIds = this.stringArrayFromValue(
+      latestResearchValue,
+      /evidence(?:[_-]?ids?)/i
+    );
+
+    const reusableApprovalAlreadyRequested = Boolean(
+      synthesisBlocked &&
+      researchComponentIds.length > 0 &&
+      task.entries.some(entry =>
+        entry.domain === 'core' &&
+        entry.kind === 'DECISION' &&
+        entry.key === `synthesisReusableApprovalRequested:${blockedSynthesisId}`
+      )
+    );
+
+    if (
+      synthesisBlocked &&
+      researchCompletedAfterBlockedSynthesis &&
+      researchComponentIds.length > 0 &&
+      !reusableApprovalAlreadyRequested
+    ) {
+      taskBlackboardService.append(
+        task.taskId,
+        'DECISION',
+        'core',
+        `synthesisReusableApprovalRequested:${blockedSynthesisId}`,
+        {
+          operation: 'APPROVE_REUSABLE_COMPONENTS',
+          synthesisId: blockedSynthesisId,
+          componentIds: researchComponentIds,
+          evidenceIds: researchEvidenceIds,
+          reason: 'CORE selected the approval gate for verified research-created reusable components before retrying synthesis'
+        },
+        researchEvidenceIds
+      );
+
+      return this.decorateOperations(task, this.uniqueOperations([{
+        target: 'learning',
+        command: 'APPROVE_REUSABLE_COMPONENTS',
+        reason: 'CORE selected reusable-component approval before retrying universal synthesis',
+        payload: {
+          ...input,
+          taskId: task.taskId,
+          operation: 'APPROVE_REUSABLE_COMPONENTS',
+          knowledgeComponentIds: researchComponentIds,
+          componentIds: researchComponentIds,
+          evidenceIds: researchEvidenceIds,
+          synthesisId: blockedSynthesisId,
+          adaptive: true,
+          priority: 100
+        }
+      }]));
+    }
+
     if (synthesisRequested && !synthesisAlreadyCompleted && researchCompletedAfterBlockedSynthesis) {
       routes.push({
         target: 'core',
@@ -1487,6 +1545,31 @@ class AdaptiveRoutePlannerService {
       if(value) for(const [key,item] of Object.entries(value)) if(pattern.test(key)&&typeof item==='string') return item;
     }
     return '';
+  }
+
+  private stringArrayFromValue(value:unknown,pattern:RegExp):string[] {
+    const found=new Set<string>();
+
+    const walk=(item:unknown,depth:number):void=>{
+      if(depth>6||!item||typeof item!=='object') return;
+
+      if(Array.isArray(item)){
+        for(const child of item) walk(child,depth+1);
+        return;
+      }
+
+      for(const [key,child] of Object.entries(item as Record<string,unknown>)){
+        if(pattern.test(key)&&Array.isArray(child)){
+          for(const id of child){
+            if(typeof id==='string'&&id.trim()) found.add(id.trim());
+          }
+        }
+        walk(child,depth+1);
+      }
+    };
+
+    walk(value,0);
+    return [...found];
   }
 
   private stringArrayFromValue(value:unknown,pattern:RegExp):string[] {
