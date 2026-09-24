@@ -820,11 +820,16 @@ class AdaptiveRoutePlannerService {
           task.entries.indexOf(latestVerification.entry)>latestResearch.index
         );
 
-        const verifiedAllResearchClaims=
+        const verificationValue=latestVerification
+          ? objectValue(latestVerification.entry)
+          : undefined;
+
+        const verificationVerified=
           verificationAfterResearch &&
+          verificationValue?.verified===true &&
           researchClaimIds.every(id=>verificationClaimIds.includes(id));
 
-        if(!verifiedAllResearchClaims){
+        if(!verificationAfterResearch){
           const researchComponentIds=this.stringArrayFromValue(
             researchValue,
             /component(?:[_-]?ids?)/i
@@ -847,6 +852,45 @@ class AdaptiveRoutePlannerService {
 
           return this.decorateOperations(task,this.uniqueOperations(routes));
         }
+
+        if(!verificationVerified){
+          const continuationAvailable=
+            researchValue?.continuationAvailable===true;
+
+          const continuationQuery=String(
+            researchValue?.nextQuery||
+            researchValue?.researchQuery||
+            ''
+          ).trim();
+
+          const gapId=String(
+            researchValue?.gapId||
+            verificationValue?.researchGapId||
+            ''
+          ).trim();
+
+          if(continuationAvailable && (gapId || continuationQuery)){
+            routes.push({
+              target:'research',
+              command:'RUN_RESEARCH',
+              reason:'CORE verification was unresolved or contradicted; Research continuation is available',
+              payload:{
+                taskId:task.taskId,
+                gapId,
+                query:continuationQuery,
+                continuationRound:Number(researchValue?.continuationRound||0)+1,
+                adaptive:true,
+                priority:94
+              }
+            });
+
+            return this.decorateOperations(task,this.uniqueOperations(routes));
+          }
+
+          // Verification failed without an available Research continuation.
+          // Do not learn the unverified/contradicted result.
+          return [];
+        }
       }
     }
 
@@ -858,7 +902,19 @@ class AdaptiveRoutePlannerService {
       const alreadyLearned=task.entries.some(existing=>existing.kind==='RESULT'&&objectValue(existing)?.operation==='LEARN_FROM_CORE_RESULT'&&String(objectValue(existing)?.sourceOperationInstanceId||'')===sourceOperationInstanceId);
       if(alreadyLearned) continue;
       const reply=value.reply&&typeof value.reply==='object'?value.reply as Record<string,unknown>:{}; const data=reply.data&&typeof reply.data==='object'?reply.data as Record<string,unknown>:{};
-      const verified=entry.domain==='research'?data.resolved===true:entry.domain==='verification'?(data.validationStatus==='PASSED'||data.passed===true||data.verified===true):(data.passed===true||data.verified===true);
+      const verified=entry.domain==='research'
+        ? data.resolved===true
+        : entry.domain==='verification'
+          ? (sourceOperation==='VERIFY_RESEARCH_CLAIMS'
+              ? data.verified===true
+              : (data.validationStatus==='PASSED'||data.passed===true||data.verified===true))
+          : (data.passed===true||data.verified===true);
+
+      if(entry.domain==='verification' &&
+         sourceOperation==='VERIFY_RESEARCH_CLAIMS' &&
+         data.verified!==true){
+        continue;
+      }
       const rawOutcome=String(reply.status||'SUCCEEDED').toUpperCase(); const outcome=rawOutcome==='FAILED'||rawOutcome==='REJECTED'?'FAILURE':'SUCCESS';
       const capabilityIds=Array.isArray(data.capabilityIds)?data.capabilityIds.map(String).filter(Boolean):[]; const concepts=`${task.goal} ${sourceOperation}`.split(/[^\p{L}\p{N}_-]+/u).filter(Boolean).slice(0,12);
       routes.push({target:'learning',command:'LEARN_FROM_CORE_RESULT',reason:`CORE selected learning from evidence-producing ${entry.domain}:${sourceOperation}`,payload:{taskId:task.taskId,sourceDomain:entry.domain,sourceOperation,sourceOperationInstanceId,evidenceIds,outcome,verified,learningDomain:'system',key:`${entry.domain}:${sourceOperation}:${sourceOperationInstanceId}`,input:task.goal,concepts,capabilityIds,lesson:`${entry.domain}:${sourceOperation} -> unified learning; verified=${verified}`,adaptive:true,priority:90}}); break;
