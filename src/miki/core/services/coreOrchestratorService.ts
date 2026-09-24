@@ -23,6 +23,7 @@ export interface UnifiedCognitiveStateSnapshot {
   environmentSignature?:string; invariantsVersion:1; stateHash:string;
 }
 
+const DIAGNOSTIC_COMMANDS=new Set(['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION','DISCOVER_IMPROVEMENT_ISSUE']);
 
 class CoreOrchestratorService {
  async run(goal:string,source:MikiDomain='core',payload:Record<string,unknown>={},maxCycles=18):Promise<CoreOrchestrationResult>{
@@ -234,7 +235,7 @@ class CoreOrchestratorService {
    for(const route of routes) route.payload={...route.payload,environmentSignature:planEnvironment.signature};
    taskBlackboardService.append(taskId,'DECISION','core',`coreEnvironmentPlan:${cycles}`,planEnvironment);
    taskBlackboardService.append(taskId,'DECISION','core',`corePlan:${cycles}`,routes.map(route=>({target:route.target,command:route.command,reason:route.reason,environmentSignature:route.payload.environmentSignature})));
-   const proposedRequirements=routes.map(route=>{
+   const proposedRequirements=routes.filter(route=>!DIAGNOSTIC_COMMANDS.has(route.command)).map(route=>{
     const operationInstanceId=String(route.payload.operationInstanceId||'');
     const dedupeKey=String(route.payload.dedupeKey||`${taskId}:${route.command}`);
     const proposalSha256=String(route.payload.proposalSha256||route.payload.inputHash||dedupeKey);
@@ -257,8 +258,18 @@ class CoreOrchestratorService {
       operationInstanceIds:plan.revision.requiredOperations.map(item=>item.operationInstanceId)
     });
     for(const route of routes){
-      const required=plan.revision.requiredOperations.find(item=>item.operationInstanceId===String(route.payload.operationInstanceId||''));
+      const operationInstanceId=String(route.payload.operationInstanceId||'');
+      const dedupeKey=String(route.payload.dedupeKey||`${taskId}:${route.command}`);
+      const idempotencyKey=String(route.payload.idempotencyKey||dedupeKey);
+      const required=plan.revision.requiredOperations.find(item=>item.operationInstanceId===operationInstanceId);
+      route.payload={...route.payload,dedupeKey,idempotencyKey};
       if(required) route.payload={...route.payload,operationInstanceId:required.operationInstanceId,planRevision:plan.revision.planRevision,planSha256:plan.revision.planSha256};
+    }
+   }else{
+    for(const route of routes){
+      const dedupeKey=String(route.payload.dedupeKey||`${taskId}:${route.command}`);
+      const idempotencyKey=String(route.payload.idempotencyKey||dedupeKey);
+      route.payload={...route.payload,dedupeKey,idempotencyKey};
     }
    }
    if(routes.length===0)break;
@@ -291,6 +302,9 @@ class CoreOrchestratorService {
     if(idempotencyKey){
       const prior=domainReplyLedgerService.findSucceededByIdempotencyKey(idempotencyKey);
       if(prior){
+        const diagnostic=DIAGNOSTIC_COMMANDS.has(route.command);
+        const operationClass=diagnostic?'DIAGNOSTIC':'BUSINESS';
+        const status=diagnostic?'OBSERVED':'SUCCEEDED';
         taskBlackboardService.append(taskId,'DECISION','core','actionIdempotencyReused',{
           schemaVersion:1,status:'REUSED_SUCCEEDED',idempotencyKey,reusedFromReplyId:prior.replyId,
           target:route.target,command:route.command,reason:'既に成功した同一Idempotency KeyのActionを再実行せず既存結果を再利用'
@@ -300,13 +314,13 @@ class CoreOrchestratorService {
           producerId:'domainReplyLedgerService',operation:route.command,
           operationInstanceId:route.payload.operationInstanceId,planRevision:route.payload.planRevision,
           planSha256:route.payload.planSha256,idempotencyKey,
-          operationClass:'BUSINESS',status:'SUCCEEDED',
-          reply:{status:'SUCCEEDED',operationClass:'BUSINESS',reused:true,reusedFromReplyId:prior.replyId,
+          operationClass,status,
+          reply:{status,operationClass,reused:true,reusedFromReplyId:prior.replyId,
             data:{summary:prior.summary,evidenceIds:prior.evidenceIds,receiptIds:prior.receiptIds}}
         };
-        taskBlackboardService.append(taskId,'RESULT',route.target,`domainResult:${route.target}:${route.command}`,reusedValue,prior.evidenceIds);
+        taskBlackboardService.append(taskId,diagnostic?'OBSERVATION':'RESULT',route.target,`domainResult:${route.target}:${route.command}`,reusedValue,prior.evidenceIds);
         const proposalKey=typeof route.payload.dedupeKey==='string'?route.payload.dedupeKey:'';
-        if(proposalKey)taskBlackboardService.append(taskId,'DECISION','core',`proposedOperationSucceeded:${proposalKey}`,{
+        if(proposalKey&&!diagnostic)taskBlackboardService.append(taskId,'DECISION','core',`proposedOperationSucceeded:${proposalKey}`,{
           schemaVersion:1,operation:route.command,operationClass:'BUSINESS',status:'OPERATION_SUCCEEDED',
           dedupeKey:proposalKey,idempotencyKey,reusedFromReplyId:prior.replyId,completedAt:prior.completedAt
         });
@@ -421,7 +435,7 @@ class CoreOrchestratorService {
    if(Array.isArray(values)) return [...new Set(values.filter((item):item is string=>typeof item==="string"&&item.trim()).map(item=>item.trim()))];
   }
   return [];
- }
+}
 private collectValues(task:BlackboardTask,pattern:RegExp):string[] {
   const found=new Set<string>();
   for(const entry of task.entries){
