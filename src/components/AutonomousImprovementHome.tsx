@@ -1104,33 +1104,78 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
               ) : (
                 <div className="divide-y divide-slate-800 border border-slate-800 rounded-xl overflow-hidden">
                   {selectedRunId && (() => {
-            const task = coreRuntimes.find((x) => x.taskId === selectedRunId);
-            const result = coreResults.find((x) => (x.result as any)?.taskId === selectedRunId);
-            return task ? (
-              <div className="mb-3 p-4 rounded-xl bg-slate-950 border border-indigo-500/40 text-xs space-y-2">
-                <div className="flex justify-between">
+            const detail = typedImprovementUiGatewayService.getImprovementRunDetail(selectedRunId);
+            if (!detail) return null;
+            const task = detail.task;
+            return (
+              <div className="mb-3 p-4 rounded-xl bg-slate-950 border border-indigo-500/40 text-xs space-y-3">
+                <div className="flex items-center justify-between">
                   <b className="text-indigo-300">実行詳細</b>
-                  <button onClick={() => setSelectedRunId(null)} className="text-slate-400">閉じる</button>
+                  <button onClick={() => setSelectedRunId(null)} className="text-slate-400 hover:text-white">閉じる</button>
                 </div>
-                <div>Run ID: <span className="font-mono">{task.taskId}</span></div>
-                <div>状態: {formatRuntimeStatus(task.taskStatus)}</div>
-                <div>開始: {fmtTime((task as any).createdAt)}</div>
-                <div>更新: {fmtTime(task.updatedAt)}</div>
-                <div>CORE訪問分類: {((task as any).visitedDomains || []).join(' → ') || 'なし'}</div>
-                <div>待機分類: {((task as any).pendingDomains || []).join(', ') || 'なし'}</div>
-                <div>再開回数: {(task as any).resumeCount ?? 0}</div>
-                <div>最終サイクル: {(task as any).lastCycle ?? 0}</div>
-                <div>停止理由: {(task as any).pausedReason || 'なし'}</div>
-                <div>CORE結果: {result ? 'あり' : 'なし'}</div>
-                <div>履歴エントリ: {((task as any).entries || []).length}件</div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div>Run ID<br/><span className="font-mono text-indigo-300">{task.taskId}</span></div>
+                  <div>状態<br/><span className="text-slate-200">{formatRuntimeStatus(task.status)}</span></div>
+                  <div>開始<br/><span className="text-slate-300">{fmtTime(task.createdAt)}</span></div>
+                  <div>更新<br/><span className="text-slate-300">{fmtTime(task.updatedAt)}</span></div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                  <div className="text-slate-500 mb-1">CORE経路</div>
+                  <div className="text-indigo-300">
+                    {(task.visitedDomains || []).join(' → ') || 'なし'}
+                  </div>
+                  {!!task.pendingDomains?.length && (
+                    <div className="text-amber-300 mt-1">待機: {task.pendingDomains.join(', ')}</div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div>サイクル<br/><b>{task.lastCycle ?? 0}</b></div>
+                  <div>再開<br/><b>{task.resumeCount ?? 0}</b></div>
+                  <div>Evidence<br/><b>{detail.evidenceIds.length}件</b></div>
+                  <div>Domain Reply<br/><b>{detail.replies.length}件</b></div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                  <div className="text-slate-500 mb-1">停止理由 / CORE判断</div>
+                  <div>{task.pausedReason || 'なし'}</div>
+                  {detail.coreDecisions.map((x) => (
+                    <div key={x.id} className="text-slate-400 mt-1">{x.key}: {String(x.value ?? '')}</div>
+                  ))}
+                </div>
+
+                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                  <div className="text-slate-500 mb-1">Evidence / Unknown</div>
+                  <div>Evidence ID: {detail.evidenceIds.join(', ') || 'なし'}</div>
+                  <div className="mt-1">Unknown: {detail.unknowns.join(', ') || 'なし'}</div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                  <div className="text-slate-500 mb-1">改善実行</div>
+                  <div className={detail.improvementExecuted ? 'text-emerald-300' : 'text-amber-300'}>
+                    {detail.improvementExecuted ? '実際に候補変更・トランザクション実行あり' : 'コード変更は未実行'}
+                  </div>
+                  <div className="mt-1">変更ファイル: {detail.changedFiles.join(', ') || 'なし'}</div>
+                  <div className="mt-1">検証証拠: {detail.validation.length}件 / Review Package: {detail.packages.length}件</div>
+                </div>
+
+                <div className="text-[10px] text-slate-500">
+                  Blackboard: {task.entries?.length || 0}件 / Persistence Receipt: {detail.receipts.length}件 / CORE Result: {detail.coreResult ? 'あり' : 'なし'}
+                </div>
               </div>
-            ) : null;
+            );
           })()}
 
           {canonicalRuns.map((run) => (
                     <div
                       key={run.run_id}
-                      className="p-3.5 bg-slate-900/40 hover:bg-slate-800/40 transition text-xs space-y-1.5"
+                      className="p-3.5 bg-slate-900/40 hover:bg-slate-800/40 transition text-xs space-y-1.5 cursor-pointer"
+                      onClick={() => setSelectedRunId(run.run_id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedRunId(run.run_id); }}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -1149,12 +1194,15 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                         </span>
                       </div>
 
-                      <div className="text-slate-200">{run.trigger}</div>
+                      <div className="text-slate-300">
+                        実行履歴をタップして詳細を表示
+                      </div>
 
-                      {run.result && (
-                        <div className="text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded border border-slate-800/60">
-                          {run.result}
-                        </div>
+                      <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1">
+                        <span>Run ID: {run.run_id}</span>
+                        <span>詳細を見る ›</span>
+                      </div>
+                    </div>
                       )}
 
                       <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1">
