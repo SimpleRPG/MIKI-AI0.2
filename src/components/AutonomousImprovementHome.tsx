@@ -102,6 +102,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 }) => {
   const [activeSection, setActiveSection] = useState<MainSection>('status');
   const [refreshTick, setRefreshTick] = useState(0);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   // States from services
   const [coreRuntimes, setCoreRuntimes] = useState<PriorityOneRuntimeItem[]>(() =>
@@ -1102,7 +1103,31 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-800 border border-slate-800 rounded-xl overflow-hidden">
-                  {canonicalRuns.map((run) => (
+                  {selectedRunId && (() => {
+            const task = coreRuntimes.find((x) => x.taskId === selectedRunId);
+            const result = coreResults.find((x) => (x.result as any)?.taskId === selectedRunId);
+            return task ? (
+              <div className="mb-3 p-4 rounded-xl bg-slate-950 border border-indigo-500/40 text-xs space-y-2">
+                <div className="flex justify-between">
+                  <b className="text-indigo-300">実行詳細</b>
+                  <button onClick={() => setSelectedRunId(null)} className="text-slate-400">閉じる</button>
+                </div>
+                <div>Run ID: <span className="font-mono">{task.taskId}</span></div>
+                <div>状態: {formatRuntimeStatus(task.taskStatus)}</div>
+                <div>開始: {fmtTime((task as any).createdAt)}</div>
+                <div>更新: {fmtTime(task.updatedAt)}</div>
+                <div>CORE訪問分類: {((task as any).visitedDomains || []).join(' → ') || 'なし'}</div>
+                <div>待機分類: {((task as any).pendingDomains || []).join(', ') || 'なし'}</div>
+                <div>再開回数: {(task as any).resumeCount ?? 0}</div>
+                <div>最終サイクル: {(task as any).lastCycle ?? 0}</div>
+                <div>停止理由: {(task as any).pausedReason || 'なし'}</div>
+                <div>CORE結果: {result ? 'あり' : 'なし'}</div>
+                <div>履歴エントリ: {((task as any).entries || []).length}件</div>
+              </div>
+            ) : null;
+          })()}
+
+          {canonicalRuns.map((run) => (
                     <div
                       key={run.run_id}
                       className="p-3.5 bg-slate-900/40 hover:bg-slate-800/40 transition text-xs space-y-1.5"
