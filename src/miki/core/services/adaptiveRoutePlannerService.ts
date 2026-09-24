@@ -705,7 +705,68 @@ class AdaptiveRoutePlannerService {
       String(objectValue(entry)?.status || '').toUpperCase() === 'SUCCEEDED'
     );
 
-    if (synthesisRequested && !synthesisAlreadyCompleted) {
+    const synthesisBlocked = task.entries
+      .filter(entry =>
+        entry.domain === 'core' &&
+        (entry.kind === 'ERROR' || entry.kind === 'RESULT') &&
+        objectValue(entry)?.operation === 'SYNTHESIZE_UNIVERSAL' &&
+        String(objectValue(entry)?.status || '').toUpperCase() === 'BLOCKED'
+      )
+      .map(entry => objectValue(entry))
+      .pop();
+
+    const synthesisGapResearchAlreadyRequested = task.entries.some(entry =>
+      entry.domain === 'research' &&
+      entry.kind === 'DECISION' &&
+      entry.key === 'synthesisComponentGapResearchRequested'
+    );
+
+    if (
+      synthesisBlocked &&
+      String(synthesisBlocked.nextCoreAction || '').toUpperCase() === 'RESEARCH_COMPONENT_GAP' &&
+      !synthesisGapResearchAlreadyRequested
+    ) {
+      const unresolved = Array.isArray(synthesisBlocked.unresolved)
+        ? synthesisBlocked.unresolved.map(String).filter(Boolean)
+        : [];
+
+      taskBlackboardService.append(
+        task.taskId,
+        'DECISION',
+        'core',
+        'synthesisComponentGapResearchRequested',
+        {
+          operation: 'SYNTHESIZE_UNIVERSAL',
+          nextCoreAction: 'RESEARCH_COMPONENT_GAP',
+          unresolved,
+          reason: 'CORE re-evaluated blocked synthesis and selected research for the unresolved component gap'
+        }
+      );
+
+      routes.push({
+        target: 'research',
+        command: 'RUN_RESEARCH',
+        reason: 'CORE selected research to resolve an unresolved universal synthesis component gap',
+        payload: {
+          ...input,
+          taskId: task.taskId,
+          operation: 'RUN_RESEARCH',
+          query: [
+            task.goal,
+            typeof input.requiredOutput === 'string' ? input.requiredOutput : '',
+            ...unresolved
+          ].filter(Boolean).join(' '),
+          synthesisGap: true,
+          unresolved,
+          adaptive: true,
+          priority: 100
+        }
+      });
+
+      return this.decorateOperations(task, this.uniqueOperations(routes));
+    }
+
+    if (synthesisRequested && !synthesisAlreadyCompleted && !synthesisBlocked) {
       routes.push({
         target:'core',
         command:'SYNTHESIZE_UNIVERSAL' as DomainCommand,
