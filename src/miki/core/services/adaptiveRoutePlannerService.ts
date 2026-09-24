@@ -152,7 +152,6 @@ class AdaptiveRoutePlannerService {
       }
     }
 
-    const sourcePaths=selfCodeSpaceService.listSourceFiles().map(file=>file.path);
     const canonicalized=discovered.map(target=>{
       const normalized=String(target||'').trim().replace(/^\.\//,'');
       if(!normalized)return '';
