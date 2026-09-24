@@ -5815,12 +5815,26 @@ README、docs、model_manifest、旧設計コメント等には過去のロー�
 これらが検査する禁止語・禁止経路は、実行コードから消すことが目的であり、テスト側の禁止語を消してテストを通すことは変更完了とは認めない。
 
 【自律改善アーキテクチャ】
-SelfImprovementControllerService.runOnce() は現在のcanonicalな自己改善実行経路として扱う。
-runOnce()は selfImprovementExecutionCoordinatorService.runExclusive()、operational guard、EvidenceBasedSelfImprovementEngineのロック、WorkDirectiveIngestionService、AutonomousContinuousEvolutionService、Requirement Contract / Evidence評価等を通る。
-runOnceInternal()ではPending Work Directiveを先に確認し、存在すればEXECUTE_DIRECTIVEとして優先する。
+自己改善の実行権限はCOREが持つ。
+SelfImprovementControllerServiceはCompatibility Facadeであり、自己改善の計画・対象決定・実行順序を独自に決定しない。
 
-一方、selfImprovementIngressService.submit() は現在、SelfImprovementControllerService.runOnce()を直接呼ばず、autonomousSelfImprovementLoopService.enqueue()へ送る。
-そのため、UIから「指示を登録した」ことと「canonical controllerがその指示を実行した」ことを同一状態として扱わない。
+正規入口はselfImprovementIngressServiceであり、
+selfImprovementIngressService.submit()
+→ autonomousSelfImprovementLoopService.enqueue()
+→ coreTaskIngressService
+→ CORE
+→ adaptiveRoutePlannerService
+→ 必要な17分類
+→ CORE再評価
+の経路で自己改善を実行する。
+
+AutonomousSelfImprovementLoopServiceはQueue、attempt、resource/evidence wait、pause/resume、再開・復旧を担当する。
+COREは各cycleの結果を受け取り、次に必要な分類・処理を再選択する。
+
+SelfImprovementControllerService.runOnce()はCompatibility Facadeとして既存UI/APIとの互換性を維持するために存在し、内部では正規CORE入口へ委譲する。
+したがって、SelfImprovementControllerServiceを自己改善の独立したcanonical実行系として扱ってはならない。
+
+Work DirectiveやExternal Directiveも直接コード変更を行わず、正規のCORE自己改善入口へ統合して扱う。
 
 【AutonomousSelfImprovementLoop】
 AutonomousSelfImprovementLoopServiceは以下の状態を持つ。
