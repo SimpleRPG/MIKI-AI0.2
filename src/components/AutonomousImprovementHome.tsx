@@ -390,6 +390,79 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
   };
 
+
+  const copyTextToClipboard = async (
+    text: string,
+    successMessage: string
+  ) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setActionMessage({
+        text: successMessage,
+        type: 'success',
+      });
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      textarea.remove();
+
+      setActionMessage({
+        text: successMessage,
+        type: 'success',
+      });
+    }
+  };
+
+  const formatCheckpoint = (checkpoint: any): string => {
+    const compact = (value: any): string => {
+      if (value === undefined || value === null || value === '') return '―';
+
+      if (Array.isArray(value)) {
+        return value.length ? value.map(compact).join(', ') : '―';
+      }
+
+      if (typeof value === 'object') {
+        return Object.entries(value)
+          .map(([key, item]) => `${key}=${compact(item)}`)
+          .join('|');
+      }
+
+      return String(value);
+    };
+
+    return [
+      `C${checkpoint.cycle ?? '―'} / ${checkpoint.stage || '―'}`,
+      `key=${checkpoint.key || '―'}`,
+      `evidenceIds=${compact(checkpoint.evidenceIds)}`,
+      `value=${compact(checkpoint.value)}`,
+    ].join(' | ');
+  };
+
+  const copyAllCheckpoints = async (detail: any) => {
+    const checkpoints = Array.isArray(detail?.checkpoints)
+      ? detail.checkpoints
+      : [];
+
+    if (!checkpoints.length) {
+      setActionMessage({
+        text: 'コピー対象のチェックポイントがありません。',
+        type: 'info',
+      });
+      return;
+    }
+
+    await copyTextToClipboard(
+      checkpoints.map(formatCheckpoint).join('\n'),
+      `全チェックポイント（${checkpoints.length}件）をコピーしました。`
+    );
+  };
+
   const copyImprovementRunDetail = async (detail: any) => {
     const task = detail?.task;
     if (!task) return;
@@ -432,6 +505,11 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       `improvementExecuted=${detail.improvementExecuted ? 'true' : 'false'}`,
       `changedFiles=${compact(detail.changedFiles)}`,
       `diagnosticLogs=${compact(detail.diagnosticLogs)}`,
+      '',
+      '===== CORE CHECKPOINT TRACE =====',
+      ...(Array.isArray(detail.checkpoints)
+        ? detail.checkpoints.map(formatCheckpoint)
+        : []),
     ];
 
     const text = lines.join('\\n');
@@ -1191,6 +1269,15 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                       AI用テキストをコピー
                     </button>
                     <button
+                      onClick={() => copyAllCheckpoints(detail)}
+                      disabled={!detail.checkpoints?.length}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-white text-[11px] font-semibold flex items-center gap-1.5 transition"
+                      title="この実行のCOREチェックポイントをすべてコピー"
+                    >
+                      <ListTree className="w-3.5 h-3.5" />
+                      全チェックポイントをコピー
+                    </button>
+                    <button
                       onClick={() => setSelectedRunId(null)}
                       className="text-slate-400 hover:text-white"
                     >
@@ -1249,6 +1336,41 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                           className="font-mono text-[10px] leading-4 text-slate-300 break-all"
                         >
                           {log}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="text-slate-500">
+                      CORE実行チェックポイント ({detail.checkpoints?.length || 0}件)
+                    </div>
+                  </div>
+
+                  {!detail.checkpoints?.length ? (
+                    <div className="text-slate-500">
+                      チェックポイントなし
+                    </div>
+                  ) : (
+                    <div className="space-y-1 max-h-[500px] overflow-y-auto">
+                      {detail.checkpoints.map((checkpoint: any, index: number) => (
+                        <div
+                          key={checkpoint.id || `checkpoint-${index}`}
+                          className="p-1.5 rounded bg-slate-950 border border-slate-800/70"
+                        >
+                          <div className="font-mono text-[10px] leading-4 text-slate-300 break-all">
+                            <div className="text-indigo-300">
+                              C{checkpoint.cycle ?? '―'} / {checkpoint.stage || '―'}
+                            </div>
+                            <div className="text-slate-500">
+                              {checkpoint.key || '―'}
+                            </div>
+                            <div className="text-slate-400">
+                              {formatCheckpoint(checkpoint)}
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
