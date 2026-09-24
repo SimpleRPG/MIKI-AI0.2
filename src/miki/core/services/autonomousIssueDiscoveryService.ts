@@ -14,7 +14,8 @@ import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 export type DiscoveredIssueKind='EXECUTION_FAILURE'|'KNOWLEDGE_GAP'|'CAPABILITY_GAP'|'STALLED_TASK'|'DOMAIN_DISCONNECTED'|'CLAIM_CONTRADICTION'|'IMPROVEMENT_DEBT';
 export interface DiscoveredIssue { id:string; fingerprint:string; changeSetId?:ChangeSetID; requirementContractId?:string; kind:DiscoveredIssueKind; title:string; detail:string; sourceId:string; priority:number; discoveredAt:number; lastSeenAt:number; occurrences:number; queuedAt?:number; resolvedAt?:number; }
 export interface DiscoveryConfig { enabled:boolean; intervalMinutes:number; maxIssuesPerScan:number; minimumPriority:number; }
-export interface DiscoveryScanResult { scannedAt:number; discovered:number; queued:number; skipped:number; issues:DiscoveredIssue[]; }
+export type DiscoveryScanMode='AUTONOMOUS'|'DIAGNOSTIC';
+export interface DiscoveryScanResult { scannedAt:number; mode:DiscoveryScanMode; discovered:number; queued:number; skipped:number; issues:DiscoveredIssue[]; }
 const KEY='miki_autonomous_issue_discovery_v1';
 const CONFIG_KEY='miki_autonomous_issue_discovery_config_v1';
 const DEFAULT_CONFIG:DiscoveryConfig={enabled:true,intervalMinutes:180,maxIssuesPerScan:5,minimumPriority:40};
@@ -27,8 +28,8 @@ class AutonomousIssueDiscoveryService{
  getConfig():DiscoveryConfig{return {...this.config};}
  list(limit=100):DiscoveredIssue[]{return [...this.issues.values()].sort((a,b)=>b.priority-a.priority||b.lastSeenAt-a.lastSeenAt||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,limit).map(x=>({...x}));}
  recordContradiction(claimId:string,detail:string):DiscoveredIssue{return this.upsert('CLAIM_CONTRADICTION',claimId,`Claim矛盾: ${claimId}`,detail,95);}
- async scan():Promise<DiscoveryScanResult>{
-  if(this.scanning)return {scannedAt:Date.now(),discovered:0,queued:0,skipped:0,issues:[]};this.scanning=true;
+ async scan(mode:DiscoveryScanMode='AUTONOMOUS'):Promise<DiscoveryScanResult>{
+  if(this.scanning)return {scannedAt:Date.now(),mode,discovered:0,queued:0,skipped:0,issues:[]};this.scanning=true;
   try{
    const before=this.issues.size;
    for(const event of executionEventBusService.list('execution.failed').slice(0,50))this.upsert('EXECUTION_FAILURE',event.event_id,`実行失敗: ${event.component_id}`,`${event.test_case_id} / ${event.error_message||event.output_summary||event.type}`,90);
@@ -37,25 +38,40 @@ class AutonomousIssueDiscoveryService{
    for(const task of taskBlackboardService.list(100).filter(item=>item.status==='FAILED'||item.status==='WAITING'||item.status==='PAUSED'))this.upsert('STALLED_TASK',task.taskId,`停滞タスク: ${task.goal}`,task.pausedReason||task.status,65);
    for(const domain of crossDomainCirculationService.getDisconnectedDomains())this.upsert('DOMAIN_DISCONNECTED',domain,`18分類未循環: ${domain}`,`${domain}分類のIN/OUT実績が不足`,45);
    for(const debt of improvementDebtService.listOpen().slice(0,50))this.upsert('IMPROVEMENT_DEBT',debt.debtId,`改善負債: ${debt.kind}`,debt.detail,75);
-   const candidates=this.list(200).filter(item=>!item.resolvedAt&&!item.queuedAt&&item.priority>=this.config.minimumPriority).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);let queued=0;
-   for(const issue of candidates){
-    const queuedRun=await improvementIntakeRouterService.receive({
+
+   let queued=0;
+   if(mode==='AUTONOMOUS'){
+    const candidates=this.list(200).filter(item=>!item.resolvedAt&&!item.queuedAt&&item.priority>=this.config.minimumPriority).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);
+    for(const issue of candidates){
+     const queuedRun=await improvementIntakeRouterService.receive({
       runType:'AUTONOMOUS_DISCOVERY',
       sourceId:issue.id,
       objective:issue.title,
       priority:issue.priority,
       payload:{
-        issueId:issue.id,
-        kind:issue.kind,
-        detail:issue.detail,
-        fingerprint:issue.fingerprint
+       issueId:issue.id,
+       kind:issue.kind,
+       detail:issue.detail,
+       fingerprint:issue.fingerprint
       }
-    });
-    issue.changeSetId=queuedRun.changeSetId;
-    issue.queuedAt=Date.now();
-    this.issues.set(issue.fingerprint,issue);
-    queued+=1;}
-   this.save();const issues=this.list(200);return {scannedAt:Date.now(),discovered:Math.max(0,this.issues.size-before),queued,skipped:Math.max(0,issues.filter(x=>!x.resolvedAt&&!x.queuedAt).length),issues};
+     });
+     issue.changeSetId=queuedRun.changeSetId;
+     issue.queuedAt=Date.now();
+     this.issues.set(issue.fingerprint,issue);
+     queued+=1;
+    }
+   }
+
+   this.save();
+   const issues=this.list(200);
+   return {
+    scannedAt:Date.now(),
+    mode,
+    discovered:Math.max(0,this.issues.size-before),
+    queued,
+    skipped:Math.max(0,issues.filter(x=>!x.resolvedAt&&!x.queuedAt).length),
+    issues
+   };
   }finally{this.scanning=false;}
  }
  private upsert(kind:DiscoveredIssueKind,sourceId:string,title:string,detail:string,priority:number):DiscoveredIssue{const fingerprint=this.fingerprint(`${kind}|${sourceId}|${title}`);const now=Date.now();const old=this.issues.get(fingerprint);const directedPriority=selfImprovementDirectionService.score(kind,title,detail,priority);const issue:DiscoveredIssue={id:old?.id||`ISSUE-${fingerprint.slice(4)}`,fingerprint,changeSetId:old?.changeSetId,requirementContractId:old?.requirementContractId,kind,title,detail,sourceId,priority:Math.max(directedPriority,old?.priority||0),discoveredAt:old?.discoveredAt||now,lastSeenAt:now,occurrences:(old?.occurrences||0)+1,queuedAt:old?.queuedAt,resolvedAt:old?.resolvedAt};this.issues.set(fingerprint,issue);return {...issue};}

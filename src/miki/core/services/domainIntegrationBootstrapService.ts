@@ -137,13 +137,14 @@ class DomainIntegrationBootstrapService{
    return done({operation:'RESOLVE_CAPABILITY_GAPS',operationClass:'BUSINESS',gapIds:gaps.map((gap)=>gap.gap_id),unresolvedRequirements:gaps.map((gap)=>gap.description),mutationApplied:false,evidenceIds:[]});
   }
   if(domain==='improvement'&&envelope.command==='DISCOVER_IMPROVEMENT_ISSUE'){
-   const result=await autonomousIssueDiscoveryService.scan();
+   const result=await autonomousIssueDiscoveryService.scan('DIAGNOSTIC');
    const taskId=String(envelope.payload.taskId||'').trim();
    const evidence=EvidenceService.getInstance().recordExecutionEvidence({
     title:'Improvement issue discovery diagnostic',
     snippet:JSON.stringify({
      taskId,
      operation:'DISCOVER_IMPROVEMENT_ISSUE',
+     mode:result.mode,
      discovered:result.discovered,
      queued:result.queued,
      skipped:result.skipped,
