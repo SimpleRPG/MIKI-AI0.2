@@ -166,6 +166,37 @@ const persistenceConfirmed =
         ? artifact.compositionPlan as Record<string, unknown>
         : undefined;
 
+    const validatedCandidate =
+      artifact?.validatedCandidate &&
+      typeof artifact.validatedCandidate === 'object' &&
+      !Array.isArray(artifact.validatedCandidate)
+        ? artifact.validatedCandidate as Record<string, unknown>
+        : undefined;
+
+    const validationResult =
+      artifact?.validationResult &&
+      typeof artifact.validationResult === 'object' &&
+      !Array.isArray(artifact.validationResult)
+        ? artifact.validationResult as Record<string, unknown>
+        : undefined;
+
+    const validatedCandidateReady = Boolean(
+      validatedCandidate &&
+      String(validatedCandidate.candidateId || '').trim() &&
+      String(validatedCandidate.workspaceId || '').trim() &&
+      String(validatedCandidate.candidateRevision || '').trim() &&
+      String(validatedCandidate.candidateManifestSha256 || '').trim() &&
+      String(validatedCandidate.baselineSnapshotSha256 || '').trim() &&
+      Array.isArray(validatedCandidate.changedFilePaths) &&
+      validatedCandidate.changedFilePaths.length > 0 &&
+      Array.isArray(validatedCandidate.persistenceReceiptIds) &&
+      validatedCandidate.persistenceReceiptIds.length > 0 &&
+      validationResult &&
+      String(validationResult.validationStatus || '').toUpperCase() === 'PASSED' &&
+      validationResult.reviewEligibility === true &&
+      String(validationResult.validationBundleId || '').trim()
+    );
+
     if (!artifact) {
       reasons.push('SYNTHESIS_ARTIFACT_MISSING');
     } else {
@@ -202,9 +233,11 @@ const persistenceConfirmed =
         !compositionPlan ||
         compositionPlan.executable !== true
       ) {
-        reasons.push(
-          'SYNTHESIS_ARTIFACT_PLAN_NOT_EXECUTABLE'
-        );
+        if (!validatedCandidateReady) {
+          reasons.push(
+            'SYNTHESIS_ARTIFACT_PLAN_NOT_EXECUTABLE'
+          );
+        }
       }
     }
 

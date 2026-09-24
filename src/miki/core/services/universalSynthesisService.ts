@@ -166,6 +166,37 @@ class UniversalSynthesisService {
       ...reusablePack.usedConversationComponentIds,
     ];
 
+    const validatedCandidate =
+      context.validatedCandidate &&
+      typeof context.validatedCandidate === 'object' &&
+      !Array.isArray(context.validatedCandidate)
+        ? context.validatedCandidate
+        : undefined;
+
+    const validationResult =
+      context.validationResult &&
+      typeof context.validationResult === 'object' &&
+      !Array.isArray(context.validationResult)
+        ? context.validationResult
+        : undefined;
+
+    const validatedCandidateReady = Boolean(
+      validatedCandidate &&
+      String(validatedCandidate.candidateId || '').trim() &&
+      String(validatedCandidate.workspaceId || '').trim() &&
+      String(validatedCandidate.candidateRevision || '').trim() &&
+      String(validatedCandidate.candidateManifestSha256 || '').trim() &&
+      String(validatedCandidate.baselineSnapshotSha256 || '').trim() &&
+      Array.isArray(validatedCandidate.changedFilePaths) &&
+      validatedCandidate.changedFilePaths.length > 0 &&
+      Array.isArray(validatedCandidate.persistenceReceiptIds) &&
+      validatedCandidate.persistenceReceiptIds.length > 0 &&
+      validationResult &&
+      String(validationResult.validationStatus || '').toUpperCase() === 'PASSED' &&
+      validationResult.reviewEligibility === true &&
+      String(validationResult.validationBundleId || '').trim(),
+    );
+
     const executableIds = components
       .filter(component =>
         ['ANALYZED', 'DEVICE_TESTED', 'VERIFIED'].includes(component!.status) &&
@@ -221,8 +252,15 @@ class UniversalSynthesisService {
       );
     }
 
-    const uniqueUnresolved = [...new Set(unresolved)];
-    const passed = Boolean(compositionPlan?.executable);
+    const uniqueUnresolved = validatedCandidateReady
+      ? []
+      : [...new Set(unresolved)];
+
+    const passed = Boolean(
+      compositionPlan?.executable ||
+      validatedCandidateReady
+    );
+
     const hasReusableCandidates = reusableComponentIds.length > 0;
     const hasCodeReusableCandidates = reusableComponentIds.some(id => {
       const item = reusablePack.usedCodeComponentIds.includes(id);
@@ -244,20 +282,6 @@ class UniversalSynthesisService {
         ...reusableComponentIds.map(id => `reusable-component:${id}`),
       ]),
     ];
-
-    const validatedCandidate =
-      context.validatedCandidate &&
-      typeof context.validatedCandidate === 'object' &&
-      !Array.isArray(context.validatedCandidate)
-        ? context.validatedCandidate
-        : undefined;
-
-    const validationResult =
-      context.validationResult &&
-      typeof context.validationResult === 'object' &&
-      !Array.isArray(context.validationResult)
-        ? context.validationResult
-        : undefined;
 
     const candidateRefs = validatedCandidate
       ? [
@@ -345,13 +369,15 @@ class UniversalSynthesisService {
       requestId: request.requestId,
       taskId: request.taskId,
       goal: request.goal,
-      selectionMode: passed
-        ? compositionPlan!.steps.length > 1
-          ? 'COMPOSE_MULTIPLE'
-          : 'REUSE_AS_IS'
-        : hasReusableCandidates
-          ? 'ADAPT_EXISTING'
-          : 'ESCALATE_UNKNOWN',
+      selectionMode: validatedCandidateReady
+        ? 'REUSE_AS_IS'
+        : passed
+          ? compositionPlan!.steps.length > 1
+            ? 'COMPOSE_MULTIPLE'
+            : 'REUSE_AS_IS'
+          : hasReusableCandidates
+            ? 'ADAPT_EXISTING'
+            : 'ESCALATE_UNKNOWN',
       compositionPlan,
       usedComponentIds:
         compositionPlan?.steps.map(step => step.component_id) || [],
@@ -361,7 +387,9 @@ class UniversalSynthesisService {
       synthesisArtifact,
       validation: {
         status: passed ? 'PASSED' : 'BLOCKED',
-        reasons: compositionPlan?.reasons || uniqueUnresolved,
+        reasons: validatedCandidateReady
+          ? ['検証済みCandidateをUniversal Synthesisの成果物として再利用し、COREへ再評価を返します。']
+          : compositionPlan?.reasons || uniqueUnresolved,
       },
       unresolved: uniqueUnresolved,
       evidenceRefs,
