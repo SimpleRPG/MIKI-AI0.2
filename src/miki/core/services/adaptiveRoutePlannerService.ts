@@ -689,6 +689,9 @@ class AdaptiveRoutePlannerService {
     const verifiedKnowledgeComponentIds=Array.isArray(verificationData?.verifiedKnowledgeComponentIds)
       ? verificationData.verifiedKnowledgeComponentIds.map(String).filter(Boolean)
       : [];
+    const verificationEvidenceIds=Array.isArray(verificationData?.evidenceIds)
+      ? verificationData.evidenceIds.map(String).filter(Boolean)
+      : [];
 
     if(researchOutcome==='INSUFFICIENT_VERIFICATION'&&researchClaimIds.length>0&&!verificationComplete){
       routes.push({
@@ -713,6 +716,7 @@ class AdaptiveRoutePlannerService {
           taskId:task.taskId,
           operation:'APPROVE_REUSABLE_COMPONENTS',
           knowledgeComponentIds:verifiedKnowledgeComponentIds,
+          evidenceIds:verificationEvidenceIds,
           adaptive:true,
           priority:94
         }

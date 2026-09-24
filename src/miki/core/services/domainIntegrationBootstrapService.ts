@@ -156,8 +156,16 @@ class DomainIntegrationBootstrapService{
   }
   if(domain==='learning'&&envelope.command==='APPROVE_REUSABLE_COMPONENTS'){
    const {reusableComponentFactoryService}=await import('./reusableComponentFactoryService');
-   const result=reusableComponentFactoryService.approveByCore();
-   return done({operation:'APPROVE_REUSABLE_COMPONENTS',operationClass:'BUSINESS',status:'SUCCEEDED',...result,evidenceIds:[]});
+   const componentIds=Array.isArray(envelope.payload.knowledgeComponentIds)
+     ? envelope.payload.knowledgeComponentIds.map(String).filter(Boolean)
+     : [];
+   const evidenceIds=Array.isArray(envelope.payload.evidenceIds)
+     ? envelope.payload.evidenceIds.map(String).filter(Boolean)
+     : [];
+   if(componentIds.length===0)return {accepted:false,domain,command:envelope.command,error:'KNOWLEDGE_COMPONENT_IDS_REQUIRED',completedAt:Date.now()};
+   if(evidenceIds.length===0)return {accepted:false,domain,command:envelope.command,error:'APPROVAL_EVIDENCE_REQUIRED',completedAt:Date.now()};
+   const result=reusableComponentFactoryService.approveByCore(componentIds);
+   return done({operation:'APPROVE_REUSABLE_COMPONENTS',operationClass:'BUSINESS',status:'SUCCEEDED',...result,evidenceIds});
   }
   if(domain==='memory'&&envelope.command==='FLUSH'){
    if(storageService.getBackendName()==='memory')return {accepted:false,domain,command:envelope.command,error:'MEMORY_ONLY_PERSISTENCE',completedAt:Date.now()};
