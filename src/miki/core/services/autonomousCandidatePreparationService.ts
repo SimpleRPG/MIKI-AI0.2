@@ -52,15 +52,81 @@ class AutonomousCandidatePreparationService {
    for(const path of targetPaths){const source=sourceMap.get(path);const candidate=supplied.get(path);if(!source||!candidate||candidate.candidateContent.trim()===source.content.trim())continue;drafts.push({path,baselineContent:source.content,candidateContent:candidate.candidateContent,evidenceIds:[...new Set([...source.evidenceIds,...(candidate.evidenceIds||[])])]});}
    if(drafts.length===0)return {targetPaths,missingPaths:[],reason:'EXTERNAL_DIRECTIVE_AI_CANDIDATE_REQUIRED'};const workspace=await isolatedCandidateWorkspaceService.create(runId,drafts,runId);improvementIntakeRouterService.update(runId,{workspaceId:workspace.workspaceId,status:'IN_PROGRESS'});return {workspaceId:workspace.workspaceId,targetPaths,missingPaths:[]};
   }
+  const targetPaths=Array.isArray(run.payload.targetFiles)
+    ? run.payload.targetFiles
+      .filter((value):value is string=>typeof value==='string'&&Boolean(value.trim()))
+      .map(value=>value.trim())
+    : [];
+  if(targetPaths.length===0)return {targetPaths:[],missingPaths:[],reason:'CORE_TARGET_FILES_REQUIRED'};
+
+  const missingPaths=targetPaths.filter(path=>!sourceMap.has(path));
+  if(missingPaths.length>0)return {targetPaths,missingPaths,reason:'CORE_TARGET_FILES_NOT_FOUND'};
+
+  // New UI SELF_IMPROVEMENT is a CORE-owned USER_REQUEST.
+  // It already has authoritative targetFiles from CORE, so it must not
+  // require an autonomous DiscoveredIssue just to create a candidate.
+  if(run.runType==='USER_REQUEST'){
+   const supplied=new Map(
+    (aiCandidates||[]).map(candidate=>[candidate.path,candidate])
+   );
+
+   if(aiCandidates&&aiCandidates.length>0){
+    const drafts=targetPaths
+     .map(path=>{
+      const source=sourceMap.get(path);
+      const candidate=supplied.get(path);
+      if(!source||!candidate||candidate.candidateContent.trim()===source.content.trim())return undefined;
+      return {
+       path,
+       baselineContent:source.content,
+       candidateContent:candidate.candidateContent,
+       evidenceIds:[...new Set([
+        ...source.evidenceIds,
+        ...(candidate.evidenceIds||[])
+       ])]
+      };
+     })
+     .filter((value):value is {
+      path:string;
+      baselineContent:string;
+      candidateContent:string;
+      evidenceIds:string[]
+     }=>Boolean(value));
+
+    if(drafts.length===0){
+     return {
+      targetPaths,
+      missingPaths:[],
+      reason:'CORE_AI_CANDIDATE_REQUIRED'
+     };
+    }
+
+    const workspace=await isolatedCandidateWorkspaceService.create(
+     run.runId,
+     drafts,
+     run.runId
+    );
+    improvementIntakeRouterService.update(runId,{
+     workspaceId:workspace.workspaceId,
+     status:'IN_PROGRESS'
+    });
+
+    return {
+     workspaceId:workspace.workspaceId,
+     targetPaths,
+     missingPaths:[]
+    };
+   }
+
+   return {
+    targetPaths:[...new Set(targetPaths)].slice(0,3),
+    missingPaths:[]
+   };
+  }
+
   const issueId=typeof run.payload.issueId==='string'?run.payload.issueId:run.sourceId;
   const issue=(await import('./autonomousIssueDiscoveryService')).autonomousIssueDiscoveryService.list(500).find(item=>item.id===issueId);
   if(!issue)return {targetPaths:[],missingPaths:[],reason:'AUTONOMOUS_ISSUE_NOT_FOUND'};
-  const targetPaths=Array.isArray(run.payload.targetFiles)
-    ? run.payload.targetFiles.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).map(value=>value.trim())
-    : [];
-  if(targetPaths.length===0)return {targetPaths:[],missingPaths:[],reason:'CORE_TARGET_FILES_REQUIRED'};
-  const missingPaths=targetPaths.filter(path=>!sourceMap.has(path));
-  if(missingPaths.length>0)return {targetPaths,missingPaths,reason:'CORE_TARGET_FILES_NOT_FOUND'};
   const resolution:TargetResolution={
     issueId:issue.id,
     targetPaths:[...new Set(targetPaths)].slice(0,3),
