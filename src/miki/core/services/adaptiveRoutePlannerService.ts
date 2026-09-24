@@ -699,13 +699,6 @@ class AdaptiveRoutePlannerService {
       operation === 'SYNTHESIZE' ||
       typeof input.requiredOutput === 'string' && Boolean(input.requiredOutput.trim());
 
-    const synthesisAlreadyCompleted = task.entries.some(entry =>
-      entry.domain === 'core' &&
-      entry.kind === 'RESULT' &&
-      objectValue(entry)?.operation === 'SYNTHESIZE_UNIVERSAL' &&
-      String(objectValue(entry)?.status || '').toUpperCase() === 'SUCCEEDED'
-    );
-
     const synthesisEntries = task.entries
       .map((entry, index) => ({entry, index}))
       .filter(({entry}) =>
@@ -715,6 +708,56 @@ class AdaptiveRoutePlannerService {
       );
 
     const latestSynthesis = synthesisEntries.at(-1);
+
+    const latestCandidate = this.latestBusinessResult(task,'GENERATE_CANDIDATE');
+    const latestValidation = this.latestBusinessResult(task,'VALIDATE_CANDIDATE');
+
+    const latestCandidateIndex = latestCandidate
+      ? task.entries.indexOf(latestCandidate)
+      : -1;
+
+    const latestValidationIndex = latestValidation
+      ? task.entries.indexOf(latestValidation)
+      : -1;
+
+    const latestSynthesisIndex = latestSynthesis?.index ?? -1;
+
+    const candidateProducedAfterLatestSynthesis =
+      Boolean(
+        latestCandidate &&
+        latestCandidateIndex > latestSynthesisIndex
+      );
+
+    const validationPassedAfterCandidate =
+      Boolean(
+        candidateProducedAfterLatestSynthesis &&
+        latestValidation &&
+        latestValidationIndex > latestCandidateIndex &&
+        this.hasValidationIdentity(latestValidation)
+      );
+
+    const validationRejectedAfterCandidate =
+      Boolean(
+        candidateProducedAfterLatestSynthesis &&
+        latestValidation &&
+        latestValidationIndex > latestCandidateIndex &&
+        !this.hasValidationIdentity(latestValidation)
+      );
+
+    const candidateAwaitingValidation =
+      Boolean(
+        candidateProducedAfterLatestSynthesis &&
+        !validationPassedAfterCandidate &&
+        !validationRejectedAfterCandidate &&
+        (!latestValidation || latestValidationIndex <= latestCandidateIndex)
+      );
+
+    const synthesisAlreadyCompleted = task.entries.some(entry =>
+      entry.domain === 'core' &&
+      entry.kind === 'RESULT' &&
+      objectValue(entry)?.operation === 'SYNTHESIZE_UNIVERSAL' &&
+      String(objectValue(entry)?.status || '').toUpperCase() === 'SUCCEEDED'
+    ) && !validationPassedAfterCandidate;
 
     const synthesisBlocked = latestSynthesis &&
       String(objectValue(latestSynthesis.entry)?.status || '').toUpperCase() === 'BLOCKED'
@@ -989,6 +1032,112 @@ class AdaptiveRoutePlannerService {
               typeof input.requiredOutput === 'string' ? input.requiredOutput : '',
               ...unresolved
             ].filter(Boolean).join(' '),
+            adaptive: true,
+            priority: 100
+          }
+        }]));
+      }
+
+      if (validationPassedAfterCandidate) {
+        const candidateIdentity = this.extractCandidateIdentity(latestCandidate!);
+        const validationIdentity = this.extractValidationIdentity(latestValidation!);
+
+        return this.decorateOperations(task, this.uniqueOperations([{
+          target: 'core',
+          command: 'SYNTHESIZE_UNIVERSAL' as DomainCommand,
+          reason: 'CORE received a validated Candidate and must re-synthesize before completion',
+          payload: {
+            ...input,
+            taskId: task.taskId,
+            requestId: String(input.requestId || task.taskId),
+            goal: task.goal,
+            requiredOutput: typeof input.requiredOutput === 'string'
+              ? input.requiredOutput
+              : '',
+            availableComponentIds: Array.isArray(input.availableComponentIds)
+              ? input.availableComponentIds.map(String)
+              : undefined,
+            validatedCandidate: candidateIdentity,
+            validationResult: validationIdentity,
+            priorSynthesisId: String(
+              synthesisResult?.synthesisId ||
+              value?.synthesisId ||
+              ''
+            ),
+            synthesisReevaluation: true,
+            synthesisRequested: true,
+            adaptive: true,
+            priority: 100
+          }
+        }]));
+      }
+
+      if (validationRejectedAfterCandidate) {
+        const candidateIdentity = this.extractCandidateIdentity(latestCandidate!);
+        const resolvedTargetFiles = this.resolveCoreTargetPaths(task, input);
+
+        if (resolvedTargetFiles.length === 0) {
+          return this.decorateOperations(task, this.uniqueOperations([{
+            target: 'selfDevelopment',
+            command: 'ASSESS_DOMAIN',
+            reason: 'Validated Candidate was rejected and CORE needs a refreshed repository target snapshot',
+            payload: {
+              taskId: task.taskId,
+              goal: task.goal,
+              kind: 'SELF_IMPROVEMENT',
+              adaptive: true,
+              requestedAssessment: 'REPOSITORY_CONTEXT',
+              target: input.target,
+              priority: 100
+            }
+          }]));
+        }
+
+        return this.decorateOperations(task, this.uniqueOperations([{
+          target: 'selfDevelopment',
+          command: 'GENERATE_CANDIDATE',
+          reason: 'CORE rejected the Candidate during validation and requests the next Candidate revision',
+          payload: {
+            ...input,
+            taskId: task.taskId,
+            runId: this.resolveCoreRunId(task, input),
+            goal: task.goal,
+            synthesisId: String(
+              synthesisResult?.synthesisId ||
+              value?.synthesisId ||
+              ''
+            ),
+            targetFiles: resolvedTargetFiles,
+            requirements: input.requirements,
+            prohibitions: input.prohibitions,
+            invariants: input.invariants,
+            validationRequirements: input.validationRequirements,
+            candidateRevision: Number(
+              candidateIdentity.candidateRevision ||
+              input.candidateRevision ||
+              1
+            ) + 1,
+            adaptive: true,
+            priority: 100
+          }
+        }]));
+      }
+
+      if (candidateAwaitingValidation) {
+        const candidateIdentity = this.extractCandidateIdentity(latestCandidate!);
+        const candidateOperationInstanceId =
+          this.operationInstanceFor(task,'GENERATE_CANDIDATE');
+
+        return this.decorateOperations(task, this.uniqueOperations([{
+          target: 'verification',
+          command: 'VALIDATE_CANDIDATE',
+          reason: 'CORE re-evaluated the generated Candidate and selected Candidate validation',
+          payload: {
+            ...input,
+            taskId: task.taskId,
+            runId: this.resolveCoreRunId(task, input),
+            ...candidateIdentity,
+            sourceOperationInstanceId: candidateOperationInstanceId,
             adaptive: true,
             priority: 100
           }
