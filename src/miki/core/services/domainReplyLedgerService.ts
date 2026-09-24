@@ -110,6 +110,131 @@ class DomainReplyLedgerService {
     return this.clone(record);
   }
 
+  recordCoreOwned(
+    taskId: string,
+    operationId: string,
+    input: {
+      command: DomainCommand;
+      operationInstanceId: string;
+      corePlanRevision: number;
+      idempotencyKey?: string;
+      status: 'SUCCEEDED' | 'REJECTED' | 'FAILED' | 'OBSERVED';
+      summary: string;
+      evidenceIds?: string[];
+      unknowns?: string[];
+      data?: unknown;
+    }
+  ): DomainReplyLedgerRecord {
+    const existing = [...this.records.values()]
+      .filter(record =>
+        record.taskId === taskId &&
+        record.operationInstanceId === input.operationInstanceId &&
+        record.command === input.command
+      )
+      .sort((left, right) =>
+        right.completedAt - left.completedAt ||
+        right.replyId.localeCompare(left.replyId)
+      )[0];
+
+    if (existing) return this.clone(existing);
+
+    const completedAt = Date.now();
+    const dispatchId =
+      `CORE-${completedAt}-${input.operationInstanceId}`;
+    const replyId = `DREPLY-${dispatchId}`;
+
+    const evidenceIds = [...new Set(
+      (input.evidenceIds || []).filter(
+        value => typeof value === 'string' && value.trim().length > 0
+      )
+    )];
+
+    const unknowns = [...new Set(
+      (input.unknowns || []).filter(
+        value => typeof value === 'string' && value.trim().length > 0
+      )
+    )];
+
+    const knowledgeIds = this.collectStrings(
+      input.data,
+      /^(?:knowledgeIds?|knowledge_refs?)$/i
+    );
+    const capabilityIds = this.collectStrings(
+      input.data,
+      /^(?:capabilityIds?|capability_refs?)$/i
+    );
+    const permissionClasses = this.collectStrings(
+      input.data,
+      /^(?:permission|permissionClass|permission_class)$/i
+    );
+
+    const record: DomainReplyLedgerRecord = {
+      replyId,
+      taskId,
+      operationId,
+      operationInstanceId: input.operationInstanceId,
+      corePlanRevision: input.corePlanRevision,
+      dispatchId,
+      envelopeId: dispatchId,
+      correlationId: taskId,
+      classificationId: 'core',
+      command: input.command,
+      status: input.status,
+      evidenceIds,
+      unknowns,
+      receiptIds: [],
+      retryable: false,
+      summary: input.summary,
+      idempotencyKey: String(input.idempotencyKey || ''),
+      failure: input.status === 'FAILED' || input.status === 'REJECTED'
+        ? input.summary
+        : undefined,
+      completedAt,
+      actionLineage: {
+        actionId: input.operationInstanceId || dispatchId,
+        knowledgeIds: [...new Set(knowledgeIds)].sort(),
+        capabilityIds: [...new Set(capabilityIds)].sort(),
+        evidenceIds: [...new Set(evidenceIds)].sort(),
+        permissionClasses: [...new Set(permissionClasses)].sort(),
+        outcome: input.status,
+      },
+    };
+
+    this.records.set(replyId, record);
+
+    const contentSha256 = canonicalSha256Object({
+      taskId,
+      operationId,
+      operationInstanceId: record.operationInstanceId,
+      corePlanRevision: record.corePlanRevision,
+      dispatchId: record.dispatchId,
+      classificationId: record.classificationId,
+      command: record.command,
+      status: record.status,
+      summary: record.summary,
+      idempotencyKey: record.idempotencyKey,
+    });
+
+    for (const evidenceId of evidenceIds) {
+      EvidenceService.getInstance().bindExecutionLineage(evidenceId, {
+        taskId,
+        corePlanRevision: record.corePlanRevision,
+        operationInstanceId: record.operationInstanceId,
+        replyId,
+        contentSha256,
+        verificationStatus: record.status === 'SUCCEEDED'
+          ? 'VERIFIED'
+          : record.status === 'FAILED' || record.status === 'REJECTED'
+            ? 'REJECTED'
+            : 'UNVERIFIED',
+        operationClass: 'BUSINESS',
+      });
+    }
+
+    this.persist();
+    return this.clone(record);
+  }
+
   get(replyId: string): DomainReplyLedgerRecord | undefined {
     const record = this.records.get(replyId);
     return record ? this.clone(record) : undefined;

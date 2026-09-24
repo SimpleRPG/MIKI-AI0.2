@@ -474,6 +474,31 @@ class CoreOrchestratorService {
       dispatched+=1;
 
       const succeeded=synthesis.validation.status==='PASSED';
+
+      const coreReplyRecord=domainReplyLedgerService.recordCoreOwned(
+        taskId,
+        reqId,
+        {
+          command:'SYNTHESIZE_UNIVERSAL',
+          operationInstanceId:String(route.payload.operationInstanceId||''),
+          corePlanRevision:Number(route.payload.planRevision||0),
+          idempotencyKey:typeof route.payload.idempotencyKey==='string'
+            ? route.payload.idempotencyKey
+            : undefined,
+          status:succeeded?'SUCCEEDED':'FAILED',
+          summary:succeeded
+            ? 'CORE-owned universal synthesis completed and returned for re-evaluation'
+            : synthesis.validation.reasons.join('|') || 'CORE-owned universal synthesis blocked',
+          evidenceIds:[],
+          unknowns:synthesis.unresolved,
+          data:{
+            synthesisId:synthesis.synthesisId,
+            componentIds:synthesis.usedComponentIds,
+            candidateComponentIds:synthesis.candidateComponentIds
+          }
+        }
+      );
+
       taskBlackboardService.append(
         taskId,
         succeeded ? 'RESULT' : 'ERROR',
@@ -505,7 +530,8 @@ class CoreOrchestratorService {
           operationInstanceId:route.payload.operationInstanceId,
           planRevision:route.payload.planRevision,
           planSha256:route.payload.planSha256,
-          idempotencyKey:route.payload.idempotencyKey
+          idempotencyKey:route.payload.idempotencyKey,
+          coreReplyId:coreReplyRecord.replyId
         },
         synthesis.evidenceRefs
       );
