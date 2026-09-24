@@ -12,6 +12,8 @@ import { resourceGovernanceService } from '../../safety/services/resourceGoverna
 import { canonicalSha256Object } from './canonicalSha256Service';
 import { executionEnvironmentRouterService } from './executionEnvironmentRouterService';
 import { schemaValidationService } from '../../verification/services/schemaValidationService';
+import { githubSyncService } from '../../../services/githubSyncService';
+import { sha256HexFromText } from './canonicalSha256Service';
 
 export interface CoreOrchestrationResult { task:BlackboardTask; cycles:number; dispatched:number; coreResult?:CoreResult; }
 
@@ -425,9 +427,30 @@ class CoreOrchestratorService {
  }
  private readEnvironmentHints(task:BlackboardTask):Record<string,unknown>{
   const value=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
-  return value&&typeof value==='object'&&!Array.isArray(value)
-    ? (value as Record<string,unknown>)
+  const payload=value&&typeof value==='object'&&!Array.isArray(value)
+    ? {...(value as Record<string,unknown>)}
     : {};
+
+  const repository=typeof payload.repository==='string'&&payload.repository.trim()
+    ? payload.repository.trim()
+    : 'SimpleRPG/MIKI-AI0.2';
+  const branch=typeof payload.branch==='string'&&payload.branch.trim()
+    ? payload.branch.trim()
+    : 'main';
+
+  const sync=githubSyncService.get(repository,branch);
+  if(sync?.complete&&sync.files.length){
+    const targetSnapshotSha256=sha256HexFromText(
+      JSON.stringify(
+        sync.files.map(file=>({path:file.path,sha256:file.sha256}))
+      )
+    );
+
+    if(!payload.gitHead&&sync.commitSha)payload.gitHead=sync.commitSha;
+    if(!payload.targetSnapshotSha256)payload.targetSnapshotSha256=targetSnapshotSha256;
+  }
+
+  return payload;
  }
  private collectUnresolved(task:BlackboardTask,pattern:RegExp):string[] {
   for(const entry of [...task.entries].reverse()){
