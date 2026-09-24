@@ -280,7 +280,7 @@ class AutonomousSelfImprovementLoopService {
             'DECISION',
             'core',
             'evidence-recovery-required',
-            { reasons: quality.reasons, requestedDomains: [] },
+            { reasons: quality.reasons, requestedDomains: [...new Set(quality.reasons.flatMap((reason:string)=>{ const r=reason.toUpperCase(); if(r.includes('EVIDENCE_ID_MISSING')) return ['research','unknown']; if(r.includes('INDEPENDENT_DOMAIN_CONFIRMATION_MISSING')||r.includes('OBSERVED_RESULT_MISSING')) return ['verification']; return ['research','verification']; }))] },
             quality.evidenceIds
           );
           await this.acquireThenWaitForEvidence(request, quality.reasons.join(','));

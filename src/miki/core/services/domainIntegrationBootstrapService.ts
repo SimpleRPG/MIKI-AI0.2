@@ -137,7 +137,7 @@ class DomainIntegrationBootstrapService{
   }
   if(domain==='improvement'&&envelope.command==='DISCOVER_IMPROVEMENT_ISSUE'){
    const result=await autonomousIssueDiscoveryService.scan();
-   return done({operation:'DISCOVER_IMPROVEMENT_ISSUE',operationClass:'BUSINESS',...result,mutationApplied:false,evidenceIds:[]});
+   return done({operation:'DISCOVER_IMPROVEMENT_ISSUE',operationClass:'DIAGNOSTIC',...result,mutationApplied:false,evidenceIds:Array.isArray((result as any)?.evidenceIds)?(result as any).evidenceIds:[]});
   }
   if(domain==='learning'&&envelope.command==='LEARN_FROM_CORE_RESULT'){
    const {mikiUnifiedLearningContinuumService}=await import('../../learning/services/mikiUnifiedLearningContinuumService');
