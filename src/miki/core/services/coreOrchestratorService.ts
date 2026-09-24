@@ -339,8 +339,11 @@ class CoreOrchestratorService {
     const resultKind=operationClass==='DIAGNOSTIC'?'OBSERVATION':(reply.accepted?'RESULT':'ERROR');
     const proposalKey=typeof route.payload.dedupeKey==='string'?route.payload.dedupeKey:'';
     const operationSucceeded=reply.accepted&&reply.normalized?.status==='SUCCEEDED'&&operationClass==='BUSINESS';
+    const actionCompletedStatus=operationClass==='DIAGNOSTIC'
+      ? (reply.accepted&&String(reply.normalized?.status||'').toUpperCase()==='OBSERVED'?'OBSERVED':'FAILED')
+      : (operationSucceeded?'SUCCEEDED':'FAILED');
     if(typeof route.payload.idempotencyKey==='string'&&route.payload.idempotencyKey)taskBlackboardService.append(taskId,'DECISION','core','actionCompleted',{
-      schemaVersion:1,status:operationSucceeded?'SUCCEEDED':'FAILED',idempotencyKey:String(route.payload.idempotencyKey),
+      schemaVersion:1,status:actionCompletedStatus,idempotencyKey:String(route.payload.idempotencyKey),
       target:route.target,command:route.command,operationInstanceId:route.payload.operationInstanceId,
       replyId:replyRecord.replyId,cycle:cycles
     });
