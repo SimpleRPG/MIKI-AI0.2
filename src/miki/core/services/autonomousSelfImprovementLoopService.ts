@@ -270,11 +270,17 @@ class AutonomousSelfImprovementLoopService {
         this.state.lastTaskId = workflow.task.taskId;
 
         const quality = evidenceQualityGateService.evaluate(workflow.task);
-        if (workflow.task.status === 'COMPLETED' && quality.passed) {
+        const hasBusinessResult = workflow.task.entries.some(entry => {
+          if (entry.kind !== 'RESULT' || !entry.value || typeof entry.value !== 'object') return false;
+          const value = entry.value as Record<string, unknown>;
+          return value.operationClass === 'BUSINESS';
+        });
+        const evidenceGateRequired = hasBusinessResult;
+        if (workflow.task.status === 'COMPLETED' && (!evidenceGateRequired || quality.passed)) {
           this.completeCurrent('IMPROVEMENT_CYCLE_COMPLETED');
           continue;
         }
-        if (!quality.passed) {
+        if (evidenceGateRequired && !quality.passed) {
           taskBlackboardService.append(
             workflow.task.taskId,
             'DECISION',
