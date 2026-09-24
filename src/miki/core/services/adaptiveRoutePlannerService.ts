@@ -732,16 +732,30 @@ class AdaptiveRoutePlannerService {
       )
       .at(-1);
 
+    const latestResearchValue = latestResearch
+      ? objectValue(latestResearch.entry)
+      : undefined;
+
+    const researchSucceeded =
+      latestResearch?.entry.kind === 'RESULT' &&
+      String(
+        latestResearchValue?.status ||
+        (latestResearchValue?.reply && typeof latestResearchValue.reply === 'object'
+          ? (latestResearchValue.reply as Record<string, unknown>).status
+          : '') ||
+        ''
+      ).toUpperCase() === 'SUCCEEDED';
+
     const researchCompletedAfterBlockedSynthesis = Boolean(
       synthesisBlocked &&
       latestSynthesis &&
       latestResearch &&
       latestResearch.index > latestSynthesis.index &&
-      latestResearch.entry.kind === 'RESULT'
+      researchSucceeded
     );
 
     const synthesisGapResearchAlreadyRequested = task.entries.some(entry =>
-      entry.domain === 'research' &&
+      entry.domain === 'core' &&
       entry.kind === 'DECISION' &&
       entry.key === 'synthesisComponentGapResearchRequested'
     );
