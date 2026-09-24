@@ -754,11 +754,21 @@ class AdaptiveRoutePlannerService {
       researchSucceeded
     );
 
-    const synthesisGapResearchAlreadyRequested = task.entries.some(entry =>
-      entry.domain === 'core' &&
-      entry.kind === 'DECISION' &&
-      entry.key === 'synthesisComponentGapResearchRequested'
-    );
+    const blockedSynthesisId = synthesisBlocked
+      ? String(synthesisBlocked.synthesisId || '').trim()
+      : '';
+
+    const synthesisGapResearchAlreadyRequested = task.entries.some(entry => {
+      if (entry.domain !== 'core' || entry.kind !== 'DECISION') return false;
+      if (!String(entry.key).startsWith('synthesisComponentGapResearchRequested:')) return false;
+      const value = objectValue(entry);
+      const requestedSynthesisId = String(value?.synthesisId || '').trim();
+      return Boolean(
+        blockedSynthesisId &&
+        requestedSynthesisId &&
+        requestedSynthesisId === blockedSynthesisId
+      );
+    });
 
     if (synthesisRequested && !synthesisAlreadyCompleted && researchCompletedAfterBlockedSynthesis) {
       routes.push({
@@ -789,13 +799,17 @@ class AdaptiveRoutePlannerService {
         ? synthesisBlocked.unresolved.map(String).filter(Boolean)
         : [];
 
+      const researchMarkerKey =
+        `synthesisComponentGapResearchRequested:${blockedSynthesisId || latestSynthesis?.index || 'unknown'}`;
+
       taskBlackboardService.append(
         task.taskId,
         'DECISION',
         'core',
-        'synthesisComponentGapResearchRequested',
+        researchMarkerKey,
         {
           operation: 'SYNTHESIZE_UNIVERSAL',
+          synthesisId: blockedSynthesisId,
           nextCoreAction: 'RESEARCH_COMPONENT_GAP',
           unresolved,
           reason: 'CORE re-evaluated blocked synthesis and selected research for the unresolved component gap'
@@ -810,12 +824,13 @@ class AdaptiveRoutePlannerService {
           ...input,
           taskId: task.taskId,
           operation: 'RUN_RESEARCH',
+          synthesisId: blockedSynthesisId,
+          synthesisGap: true,
           query: [
             task.goal,
             typeof input.requiredOutput === 'string' ? input.requiredOutput : '',
             ...unresolved
           ].filter(Boolean).join(' '),
-          synthesisGap: true,
           unresolved,
           adaptive: true,
           priority: 100
@@ -823,6 +838,113 @@ class AdaptiveRoutePlannerService {
       });
 
       return this.decorateOperations(task, this.uniqueOperations(routes));
+    }
+
+    // A successful synthesis is itself an intermediate CORE result.
+    // Do not fall through to an unrelated generic route: CORE must explicitly
+    // evaluate the synthesis before Completion Gate / CoreResult.
+    if (synthesisRequested && synthesisAlreadyCompleted && latestSynthesis) {
+      const value = objectValue(latestSynthesis.entry);
+      const synthesisStatus = String(value?.status || '').toUpperCase();
+      const synthesisResult =
+        value?.result && typeof value.result === 'object'
+          ? value.result as Record<string, unknown>
+          : value;
+
+      const validation =
+        synthesisResult?.validation && typeof synthesisResult.validation === 'object'
+          ? synthesisResult.validation as Record<string, unknown>
+          : undefined;
+
+      const unresolved = Array.isArray(synthesisResult?.unresolved)
+        ? synthesisResult.unresolved.map(String).filter(Boolean)
+        : [];
+
+      const nextCoreAction = String(
+        synthesisResult?.nextCoreAction || value?.nextCoreAction || ''
+      ).toUpperCase();
+
+      const synthesisEvaluationKey =
+        `coreSynthesisPostEvaluation:${String(synthesisResult?.synthesisId || value?.synthesisId || latestSynthesis.index)}`;
+
+      const alreadyEvaluated = task.entries.some(entry =>
+        entry.domain === 'core' &&
+        entry.kind === 'DECISION' &&
+        entry.key === synthesisEvaluationKey
+      );
+
+      if (!alreadyEvaluated) {
+        taskBlackboardService.append(
+          task.taskId,
+          'DECISION',
+          'core',
+          synthesisEvaluationKey,
+          {
+            operation: 'SYNTHESIZE_UNIVERSAL',
+            synthesisId: String(synthesisResult?.synthesisId || value?.synthesisId || ''),
+            synthesisStatus,
+            validationStatus: String(validation?.status || ''),
+            unresolved,
+            nextCoreAction,
+            phase: 'POST_SYNTHESIS_REEVALUATION',
+            completionBlocked:
+              synthesisStatus !== 'SUCCEEDED' ||
+              String(validation?.status || '').toUpperCase() !== 'PASSED' ||
+              unresolved.length > 0,
+            reason: 'CORE must evaluate the synthesized artifact before accepting task completion'
+          }
+        );
+      }
+
+      // A clean synthesis is now explicitly handed to Completion Gate.
+      if (
+        synthesisStatus === 'SUCCEEDED' &&
+        String(validation?.status || '').toUpperCase() === 'PASSED' &&
+        unresolved.length === 0 &&
+        (nextCoreAction === '' || nextCoreAction === 'RE_EVALUATE')
+      ) {
+        return [];
+      }
+
+      // If the synthesis itself says what CORE needs next, honor that
+      // decision instead of falling through to an unrelated route.
+      if (nextCoreAction === 'RESEARCH_COMPONENT_GAP') {
+        return this.decorateOperations(task, this.uniqueOperations([{
+          target: 'research',
+          command: 'RUN_RESEARCH',
+          reason: 'CORE post-synthesis re-evaluation selected component-gap research',
+          payload: {
+            ...input,
+            taskId: task.taskId,
+            operation: 'RUN_RESEARCH',
+            synthesisId: String(synthesisResult?.synthesisId || value?.synthesisId || ''),
+            synthesisGap: true,
+            unresolved,
+            query: [
+              task.goal,
+              typeof input.requiredOutput === 'string' ? input.requiredOutput : '',
+              ...unresolved
+            ].filter(Boolean).join(' '),
+            adaptive: true,
+            priority: 100
+          }
+        }]));
+      }
+
+      if (nextCoreAction === 'VERIFY_CANDIDATE') {
+        return this.decorateOperations(task, this.uniqueOperations([{
+          target: 'verification',
+          command: 'VERIFY_RESEARCH_CLAIMS',
+          reason: 'CORE post-synthesis re-evaluation selected verification',
+          payload: {
+            ...input,
+            taskId: task.taskId,
+            synthesisId: String(synthesisResult?.synthesisId || value?.synthesisId || ''),
+            adaptive: true,
+            priority: 100
+          }
+        }]));
+      }
     }
 
     if (synthesisRequested && !synthesisAlreadyCompleted && !synthesisBlocked) {
