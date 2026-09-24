@@ -346,6 +346,38 @@ class CoreOrchestratorService {
 
       if (recallStatus === 'CONTEXT_INSUFFICIENT') {
         unresolvedRefs.push('CONTEXT_INSUFFICIENT:long-term-memory');
+
+        taskBlackboardService.append(
+          task.taskId,
+          'DECISION',
+          'core',
+          `coreMemoryRecallCheck:${task.lastCycle}:${sha256HexFromText(recallQuery)}`,
+          {
+            schemaVersion:1,
+            status:'CONTEXT_INSUFFICIENT',
+            recallQueryHash:sha256HexFromText(recallQuery),
+            initialHits:initialRecall.scoredMemories.length,
+            mergedHits:recalledMemories.size,
+            additionalRecall:additionalRecallPerformed,
+            reason:'CORE long-term memory recall remained insufficient after initial and related-memory retrieval'
+          }
+        );
+      } else {
+        taskBlackboardService.append(
+          task.taskId,
+          'DECISION',
+          'core',
+          `coreMemoryRecallCheck:${task.lastCycle}:${sha256HexFromText(recallQuery)}`,
+          {
+            schemaVersion:1,
+            status:recallStatus,
+            recallQueryHash:sha256HexFromText(recallQuery),
+            initialHits:initialRecall.scoredMemories.length,
+            mergedHits:recalledMemories.size,
+            additionalRecall:additionalRecallPerformed,
+            reason:'CORE long-term memory recall completed'
+          }
+        );
       }
     } catch (error) {
       unresolvedRefs.push(

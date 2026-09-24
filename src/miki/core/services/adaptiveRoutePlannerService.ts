@@ -1308,6 +1308,75 @@ class AdaptiveRoutePlannerService {
     const routesFromAssessment=[...this.adoptAssessmentProposals(task)];
     routes.push(...routesFromAssessment);
 
+    const latestMemoryRecallChecks = task.entries
+      .map((entry,index)=>({entry,index}))
+      .filter(({entry}) =>
+        entry.domain==='core' &&
+        entry.kind==='DECISION' &&
+        String(entry.key).startsWith('coreMemoryRecallCheck:')
+      );
+
+    const latestMemoryRecallCheck = latestMemoryRecallChecks.at(-1);
+    const memoryRecallValue = latestMemoryRecallCheck
+      ? objectValue(latestMemoryRecallCheck.entry)
+      : undefined;
+
+    const memoryContextInsufficient =
+      String(memoryRecallValue?.status||'').toUpperCase()==='CONTEXT_INSUFFICIENT';
+
+    if(memoryContextInsufficient && latestMemoryRecallCheck){
+      const unknownEntries = task.entries
+        .map((entry,index)=>({entry,index}))
+        .filter(({entry}) =>
+          entry.kind==='RESULT' &&
+          objectValue(entry)?.operation==='RESOLVE_UNKNOWN'
+        );
+
+      const latestUnknown = unknownEntries.at(-1);
+
+      if(!latestUnknown || latestUnknown.index <= latestMemoryRecallCheck.index){
+        return this.decorateOperations(task,this.uniqueOperations([{
+          target:'unknown',
+          command:'RESOLVE_UNKNOWN',
+          reason:'CORE detected insufficient long-term memory context and selected unknown resolution before accepting synthesis completion',
+          payload:{
+            taskId:task.taskId,
+            question:task.goal,
+            useSearch:true,
+            hasAttachments:Boolean(input.hasAttachments),
+            contextRecovery:true,
+            contextRecoveryReason:'CONTEXT_INSUFFICIENT',
+            adaptive:true,
+            priority:100
+          }
+        }]));
+      }
+
+      if(
+        latestUnknown.index > latestMemoryRecallCheck.index &&
+        synthesisRequested
+      ){
+        return this.decorateOperations(task,this.uniqueOperations([{
+          target:'core',
+          command:'SYNTHESIZE_UNIVERSAL' as DomainCommand,
+          reason:'CORE received the context-recovery result and re-runs universal synthesis so memory context can be rebuilt',
+          payload:{
+            ...input,
+            taskId:task.taskId,
+            requestId:String(input.requestId||task.taskId),
+            goal:task.goal,
+            requiredOutput:typeof input.requiredOutput==='string'
+              ? input.requiredOutput
+              : '',
+            contextRecoveryRetry:true,
+            synthesisRequested:true,
+            adaptive:true,
+            priority:100
+          }
+        }]));
+      }
+    }
+
     const isUnknown=/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(text);
     const isSelfImprovement=kind==='SELF_IMPROVEMENT';
 
