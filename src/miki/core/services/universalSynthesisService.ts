@@ -121,13 +121,6 @@ class UniversalSynthesisService {
       ...(context.experienceRefs || []),
       ...(context.failureExperienceRefs || []),
       ...(context.verificationRefs || []),
-      context.validatedCandidate
-        ? JSON.stringify(context.validatedCandidate)
-        : '',
-      context.validationResult
-        ? JSON.stringify(context.validationResult)
-        : '',
-      context.priorSynthesisId || '',
     ].filter(Boolean).join(' ');
 
     const selectionQuery=[request.goal, contextTerms]
@@ -258,6 +251,13 @@ class UniversalSynthesisService {
           validatedCandidate.candidateRevision,
           ...(Array.isArray(validatedCandidate.persistenceReceiptIds)
             ? validatedCandidate.persistenceReceiptIds
+            : []),
+          ...(Array.isArray(validatedCandidate.generationEvidenceIds)
+            ? validatedCandidate.generationEvidenceIds
+            : []),
+          validationResult?.validationBundleId,
+          ...(Array.isArray(validationResult?.persistenceReceiptIds)
+            ? validationResult.persistenceReceiptIds
             : []),
           ...(Array.isArray(validationResult?.evidenceIds)
             ? validationResult.evidenceIds
