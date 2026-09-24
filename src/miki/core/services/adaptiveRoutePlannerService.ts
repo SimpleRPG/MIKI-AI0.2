@@ -996,13 +996,37 @@ class AdaptiveRoutePlannerService {
       }
 
       if (nextCoreAction === 'GENERATE_CANDIDATE') {
+        const resolvedTargetFiles = this.resolveCoreTargetPaths(task, input);
+
+        // Universal Synthesis must reuse the existing CORE Candidate
+        // generation path. If the synthesis result does not yet contain
+        // a complete repository target snapshot, let CORE observe it first
+        // instead of dispatching an incomplete Candidate request.
+        if (resolvedTargetFiles.length === 0) {
+          return this.decorateOperations(task, this.uniqueOperations([{
+            target: 'selfDevelopment',
+            command: 'ASSESS_DOMAIN',
+            reason: 'CORE post-synthesis Candidate generation requires a complete repository target snapshot',
+            payload: {
+              taskId: task.taskId,
+              goal: task.goal,
+              kind: 'SELF_IMPROVEMENT',
+              adaptive: true,
+              requestedAssessment: 'REPOSITORY_CONTEXT',
+              target: input.target,
+              priority: 100
+            }
+          }]));
+        }
+
         return this.decorateOperations(task, this.uniqueOperations([{
           target: 'selfDevelopment',
           command: 'GENERATE_CANDIDATE',
-          reason: 'CORE post-synthesis re-evaluation selected existing Candidate generation for reusable CODE components',
+          reason: 'CORE post-synthesis re-evaluation selected the existing Candidate generation path',
           payload: {
             ...input,
             taskId: task.taskId,
+            runId: this.resolveCoreRunId(task, input),
             goal: task.goal,
             synthesisId: String(
               synthesisResult?.synthesisId ||
@@ -1014,9 +1038,7 @@ class AdaptiveRoutePlannerService {
             )
               ? synthesisResult.reusableComponentIds.map(String)
               : [],
-            targetFiles: Array.isArray(input.targetFiles)
-              ? input.targetFiles.map(String)
-              : [],
+            targetFiles: resolvedTargetFiles,
             requirements: input.requirements,
             prohibitions: input.prohibitions,
             invariants: input.invariants,
