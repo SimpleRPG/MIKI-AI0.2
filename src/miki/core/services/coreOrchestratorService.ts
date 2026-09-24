@@ -518,6 +518,29 @@ class CoreOrchestratorService {
         }
       );
 
+      // SynthesisResult must return to CORE and be re-evaluated
+      // before Completion Gate / CoreResult.
+      taskBlackboardService.append(
+        taskId,
+        'DECISION',
+        'core',
+        `coreSynthesisReevaluation:${cycles}`,
+        {
+          schemaVersion: 1,
+          synthesisId: synthesis.synthesisId,
+          synthesisStatus: synthesis.validation.status,
+          selectionMode: synthesis.selectionMode,
+          usedComponentIds: synthesis.usedComponentIds,
+          adaptedComponentIds: synthesis.adaptedComponentIds,
+          candidateComponentIds: synthesis.candidateComponentIds,
+          unresolved: synthesis.unresolved,
+          nextCoreAction: synthesis.nextCoreAction,
+          reEvaluateBeforeCompletion: true,
+          reason: 'SynthesisResult must be evaluated by CORE before Completion Gate / CoreResult'
+        },
+        synthesis.evidenceRefs
+      );
+
       coreResultService.recordCategoryStep(
         reqId,
         'core' as any,
@@ -706,7 +729,11 @@ class CoreOrchestratorService {
   const lineage=coreLineageReadModelService.verify(task,{replyIds:replyRecords.map(record=>record.replyId),evidenceIds:[...new Set(replyRecords.flatMap(record=>record.evidenceIds))],receiptIds:[...new Set(replyRecords.flatMap(record=>record.receiptIds))],decisionId:lastDecision?.id});
   const plan=corePlanRevisionService.latest(task);
   const currentOperation=plan?.requiredOperations.find(operation=>operation.status==='RUNNING')||plan?.requiredOperations.find(operation=>operation.status==='PENDING'||operation.status==='BLOCKED');
-  return {taskId:task.taskId,operationId:this.readPayloadString(task,'operationId')||task.taskId,commandId:this.readPayloadString(task,'commandId'),cycles,dispatched,status:'WAITING',taskRevision:task.revision,corePlanRevision:plan?.planRevision,currentOperationInstanceId:currentOperation?.operationInstanceId,currentBusinessStage:currentOperation?.operation,nextOperationInstanceId:plan?.requiredOperations.find(operation=>operation.status==='PENDING'&&operation.operationInstanceId!==currentOperation?.operationInstanceId)?.operationInstanceId,requiredDomains:completion.requiredDomains,missingDomains:completion.missingDomains,failedDomains:completion.failedDomains,missingReceipts:completion.missingReceipts,missingRequiredOperations:completion.missingRequiredOperations,completionReasons:completion.reasons,replyIds:lineage.verifiedReplyIds,evidenceIds:lineage.verifiedEvidenceIds,persistenceReceiptIds:lineage.verifiedReceiptIds,decisionId:lineage.verifiedDecisionId,lineageVerified:lineage.lineageVerified,rejectedLineageIds:{replyIds:lineage.rejectedReplyIds,evidenceIds:lineage.rejectedEvidenceIds,receiptIds:lineage.rejectedReceiptIds,decisionIds:lineage.rejectedDecisionIds},unknowns:[...new Set(replyRecords.flatMap(record=>record.unknowns))]};
+  const synthesisResults=task.entries
+    .filter(entry=>entry.domain==='core'&&(entry.kind==='RESULT'||entry.kind==='ERROR')&&objectValue(entry)?.operation==='SYNTHESIZE_UNIVERSAL')
+    .map(entry=>objectValue(entry))
+    .filter(Boolean);
+  return {taskId:task.taskId,operationId:this.readPayloadString(task,'operationId')||task.taskId,commandId:this.readPayloadString(task,'commandId'),cycles,dispatched,status:'WAITING',taskRevision:task.revision,corePlanRevision:plan?.planRevision,currentOperationInstanceId:currentOperation?.operationInstanceId,currentBusinessStage:currentOperation?.operation,nextOperationInstanceId:plan?.requiredOperations.find(operation=>operation.status==='PENDING'&&operation.operationInstanceId!==currentOperation?.operationInstanceId)?.operationInstanceId,requiredDomains:completion.requiredDomains,missingDomains:completion.missingDomains,failedDomains:completion.failedDomains,missingReceipts:completion.missingReceipts,missingRequiredOperations:completion.missingRequiredOperations,completionReasons:completion.reasons,replyIds:lineage.verifiedReplyIds,evidenceIds:lineage.verifiedEvidenceIds,persistenceReceiptIds:lineage.verifiedReceiptIds,decisionId:lineage.verifiedDecisionId,lineageVerified:lineage.lineageVerified,rejectedLineageIds:{replyIds:lineage.rejectedReplyIds,evidenceIds:lineage.rejectedEvidenceIds,receiptIds:lineage.rejectedReceiptIds,decisionIds:lineage.rejectedDecisionIds},unknowns:[...new Set(replyRecords.flatMap(record=>record.unknowns))],synthesisResults,latestSynthesisResult:synthesisResults.at(-1)||null};
  }
  private buildRuntimeCirculationResult(task:BlackboardTask,cycles:number,dispatched:number,requiredDomains:MikiDomain[]):Record<string,unknown>{
   const replyRecords=domainReplyLedgerService.listByTask(task.taskId);
@@ -719,7 +746,11 @@ class CoreOrchestratorService {
   const lineage=coreLineageReadModelService.verify(task,{replyIds,evidenceIds,receiptIds:persistenceReceiptIds,decisionId:decision?.id});
   const plan=corePlanRevisionService.latest(task);
   const currentOperation=plan?.requiredOperations.find(operation=>operation.status==='RUNNING')||plan?.requiredOperations.find(operation=>operation.status==='PENDING'||operation.status==='BLOCKED');
-  return {taskId:task.taskId,operationId:this.readPayloadString(task,'operationId')||this.readPayloadString(task,'operation')||task.taskId,commandId:this.readPayloadString(task,'uiCommandId')||this.readPayloadString(task,'commandId'),cycles,dispatched,status:'COMPLETED',taskRevision:task.revision,corePlanRevision:plan?.planRevision,currentOperationInstanceId:currentOperation?.operationInstanceId,currentBusinessStage:currentOperation?.operation,nextOperationInstanceId:plan?.requiredOperations.find(operation=>operation.status==='PENDING'&&operation.operationInstanceId!==currentOperation?.operationInstanceId)?.operationInstanceId,requiredDomains,selectedClassificationIds:[...task.visitedDomains],replyIds:lineage.verifiedReplyIds,evidenceIds:lineage.verifiedEvidenceIds,decisionId:lineage.verifiedDecisionId,persistenceReceiptIds:lineage.verifiedReceiptIds,lineageVerified:lineage.lineageVerified,rejectedLineageIds:{replyIds:lineage.rejectedReplyIds,evidenceIds:lineage.rejectedEvidenceIds,receiptIds:lineage.rejectedReceiptIds,decisionIds:lineage.rejectedDecisionIds},unknowns,failures,cognitiveState:this.latestUnifiedCognitiveState(task)};
+  const synthesisResults=task.entries
+    .filter(entry=>entry.domain==='core'&&(entry.kind==='RESULT'||entry.kind==='ERROR')&&objectValue(entry)?.operation==='SYNTHESIZE_UNIVERSAL')
+    .map(entry=>objectValue(entry))
+    .filter(Boolean);
+  return {taskId:task.taskId,operationId:this.readPayloadString(task,'operationId')||this.readPayloadString(task,'operation')||task.taskId,commandId:this.readPayloadString(task,'uiCommandId')||this.readPayloadString(task,'commandId'),cycles,dispatched,status:'COMPLETED',taskRevision:task.revision,corePlanRevision:plan?.planRevision,currentOperationInstanceId:currentOperation?.operationInstanceId,currentBusinessStage:currentOperation?.operation,nextOperationInstanceId:plan?.requiredOperations.find(operation=>operation.status==='PENDING'&&operation.operationInstanceId!==currentOperation?.operationInstanceId)?.operationInstanceId,requiredDomains,selectedClassificationIds:[...task.visitedDomains],replyIds:lineage.verifiedReplyIds,evidenceIds:lineage.verifiedEvidenceIds,decisionId:lineage.verifiedDecisionId,persistenceReceiptIds:lineage.verifiedReceiptIds,lineageVerified:lineage.lineageVerified,rejectedLineageIds:{replyIds:lineage.rejectedReplyIds,evidenceIds:lineage.rejectedEvidenceIds,receiptIds:lineage.rejectedReceiptIds,decisionIds:lineage.rejectedDecisionIds},unknowns,failures,synthesisResults,latestSynthesisResult:synthesisResults.at(-1)||null,cognitiveState:this.latestUnifiedCognitiveState(task)};
  }
  private readEnvironmentHints(task:BlackboardTask):Record<string,unknown>{
   const value=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
