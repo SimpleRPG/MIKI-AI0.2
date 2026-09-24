@@ -1169,50 +1169,43 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
           })()}
 
           {canonicalRuns.map((run) => (
-                    <div
-                      key={run.run_id}
-                      className="p-3.5 bg-slate-900/40 hover:bg-slate-800/40 transition text-xs space-y-1.5 cursor-pointer"
-                      onClick={() => setSelectedRunId(run.run_id)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedRunId(run.run_id); }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-indigo-300 font-bold text-[11px]">
-                            {run.run_id}
-                          </span>
-                          <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">
-                            状態: {formatRuntimeStatus(run.verdict)}
-                          </span>
-                          <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">
-                            次の操作: {formatRuntimeAction(run.decision.action)}
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                          {formatRuntimeStatus(run.verdict)}
-                        </span>
-                      </div>
+            <div
+              key={run.run_id}
+              className="p-3.5 bg-slate-900/40 hover:bg-slate-800/40 transition text-xs space-y-1.5 cursor-pointer"
+              onClick={() => setSelectedRunId(run.run_id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') setSelectedRunId(run.run_id);
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-indigo-300 font-bold text-[11px]">
+                    {run.run_id}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">
+                    状態: {formatRuntimeStatus(run.verdict)}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">
+                    次の操作: {formatRuntimeAction(run.decision.action)}
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                  {formatRuntimeStatus(run.verdict)}
+                </span>
+              </div>
 
-                      <div className="text-slate-300">
-                        実行履歴をタップして詳細を表示
-                      </div>
+              <div className="text-slate-300">
+                実行履歴をタップして詳細を表示
+              </div>
 
-                      <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1">
-                        <span>Run ID: {run.run_id}</span>
-                        <span>詳細を見る ›</span>
-                      </div>
-                    </div>
-                      )}
-
-                      <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1">
-                        <span>実行時刻: {fmtTime(run.created_at)}</span>
-                        {run.score_delta !== undefined && (
-                          <span>スコア変化: {run.score_delta > 0 ? `+${run.score_delta}` : run.score_delta}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1">
+                <span>Run ID: {run.run_id}</span>
+                <span>詳細を見る ›</span>
+              </div>
+            </div>
+          ))}
                 </div>
               )}
             </div>
