@@ -191,9 +191,19 @@ class RequiredAssetAcquisitionService {
     }
     try {
       const researched = await researchService.researchGap(gap);
-      const evidenceIds = this.extractEvidenceIds(researched);
 
       const evidenceRecords = this.extractEvidenceRecords(researched);
+
+      // EvidenceRecord が取得できた場合は、その evidence_id/evidenceId
+      // もRequiredAssetの正式なEvidence IDとして統合する。
+      // ResearchResult内の evidenceIds とEvidenceRecordの形が異なっても
+      // WAITING_EVIDENCEへ誤って落とさないよう、EvidenceRecordを正規化する。
+      const evidenceIds = [
+        ...new Set([
+          ...this.extractEvidenceIds(researched),
+          ...evidenceRecords.map(record => record.evidenceId),
+        ]),
+      ];
       const localEvidenceIds = evidenceRecords
         .filter(item => item.kind === 'LOCAL_CLAIM')
         .map(item => item.evidenceId);
