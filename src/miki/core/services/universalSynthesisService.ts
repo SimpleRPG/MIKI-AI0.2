@@ -6,6 +6,7 @@ import { componentRegistryService } from '../../capability/services/componentReg
 import { capabilityConfidenceService } from '../../capability/services/capabilityConfidenceService';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 import { coreResultService, type CoreResult } from './coreResultService';
+import { canonicalSha256Object } from './canonicalSha256Service';
 
 export type SynthesisSelectionMode =
   | 'REUSE_AS_IS'
@@ -26,6 +27,21 @@ export interface UniversalSynthesisRequest {
   maxComponents?: number;
 }
 
+export interface SynthesisArtifact {
+  artifactId: string;
+  synthesisId: string;
+  goal: string;
+  environment: string;
+  inputContract: { types: string[] };
+  outputContract: { types: string[] };
+  componentIds: string[];
+  adaptedComponentIds: string[];
+  compositionPlan?: CompositionPlan;
+  evidenceRefs: string[];
+  lineage: { source: 'CORE'; generatedAt: number };
+  artifactHash: string;
+}
+
 export interface SynthesisResult {
   synthesisId: string;
   requestId: string;
@@ -37,6 +53,7 @@ export interface SynthesisResult {
   adaptedComponentIds: string[];
   candidateComponentIds: string[];
   reusableComponentIds: string[];
+  synthesisArtifact: SynthesisArtifact;
   validation: {
     status: 'NOT_RUN' | 'PASSED' | 'BLOCKED';
     reasons: string[];
@@ -123,11 +140,49 @@ class UniversalSynthesisService {
 
     const uniqueUnresolved = [...new Set(unresolved)];
     const passed = Boolean(compositionPlan?.executable);
+    const generatedAt = Date.now();
+    const synthesisId = `SYN-${this.hash(
+      `${request.requestId}|${request.goal}|${generatedAt}`,
+    )}`;
+    const componentIds = compositionPlan?.steps.map(step => step.component_id) || [];
+    const inputContract = { types: this.inputTypes(request.input) };
+    const outputContract = {
+      types: compositionPlan?.steps.at(-1)?.output_types || [],
+    };
+    const evidenceRefs = [
+      ...componentIds.map(id => `component:${id}`),
+      ...reusableComponentIds.map(id => `reusable-component:${id}`),
+    ];
+    const artifactPayload = {
+      synthesisId,
+      requestId: request.requestId,
+      taskId: request.taskId,
+      goal: request.goal,
+      environment,
+      inputContract,
+      outputContract,
+      componentIds,
+      adaptedComponentIds: [] as string[],
+      compositionPlan,
+      evidenceRefs,
+    };
+    const synthesisArtifact: SynthesisArtifact = {
+      artifactId: `SYNART-${this.hash(`${synthesisId}|artifact`)}`,
+      synthesisId,
+      goal: request.goal,
+      environment,
+      inputContract,
+      outputContract,
+      componentIds,
+      adaptedComponentIds: [],
+      compositionPlan,
+      evidenceRefs,
+      lineage: { source: 'CORE', generatedAt },
+      artifactHash: canonicalSha256Object(artifactPayload),
+    };
 
     return {
-      synthesisId: `SYN-${this.hash(
-        `${request.requestId}|${request.goal}|${Date.now()}`,
-      )}`,
+      synthesisId,
       requestId: request.requestId,
       taskId: request.taskId,
       goal: request.goal,
@@ -142,17 +197,13 @@ class UniversalSynthesisService {
       adaptedComponentIds: [],
       candidateComponentIds: reusablePack.createdComponentIds,
       reusableComponentIds,
+      synthesisArtifact,
       validation: {
         status: passed ? 'PASSED' : 'BLOCKED',
         reasons: compositionPlan?.reasons || uniqueUnresolved,
       },
       unresolved: uniqueUnresolved,
-      evidenceRefs: [
-        ...(compositionPlan?.steps.map(
-          step => `component:${step.component_id}`,
-        ) || []),
-        ...reusableComponentIds.map(id => `reusable-component:${id}`),
-      ],
+      evidenceRefs,
       lineage: {
         source: 'CORE',
         generatedAt: Date.now(),
@@ -180,20 +231,14 @@ class UniversalSynthesisService {
 
     const result = this.synthesize(request);
 
-    if (result.validation.status === 'PASSED') {
-      return coreResultService.complete(
-        request.requestId,
-        result,
-        {
-          route: ['core'],
-          processedCategories: [],
-        },
-      );
-    }
-
+    // Synthesis is a CORE capability, not the completion authority.
+    // Even a valid artifact must return to CORE for re-evaluation before
+    // Completion Gate is allowed to produce the final CoreResult.
     return coreResultService.inconclusive(
       request.requestId,
-      result.unresolved.join('; ') || 'SYNTHESIS_BLOCKED',
+      result.validation.status === 'PASSED'
+        ? 'SYNTHESIS_REQUIRES_CORE_REEVALUATION'
+        : result.unresolved.join('; ') || 'SYNTHESIS_BLOCKED',
       {
         result,
         route: ['core'],
