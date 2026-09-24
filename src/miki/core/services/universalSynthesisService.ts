@@ -25,6 +25,19 @@ export interface UniversalSynthesisRequest {
   environment?: string;
   availableComponentIds?: string[];
   maxComponents?: number;
+  synthesisContext?: {
+    currentState?: string;
+    visitedDomains?: string[];
+    pendingDomains?: string[];
+    evidenceRefs?: string[];
+    knowledgeRefs?: string[];
+    memoryRefs?: string[];
+    experienceRefs?: string[];
+    failureExperienceRefs?: string[];
+    verificationRefs?: string[];
+    recentDecisions?: string[];
+    unresolvedRefs?: string[];
+  };
 }
 
 export interface SynthesisArtifact {
@@ -38,6 +51,15 @@ export interface SynthesisArtifact {
   adaptedComponentIds: string[];
   compositionPlan?: CompositionPlan;
   evidenceRefs: string[];
+  contextRefs: {
+    evidenceRefs: string[];
+    knowledgeRefs: string[];
+    memoryRefs: string[];
+    experienceRefs: string[];
+    failureExperienceRefs: string[];
+    verificationRefs: string[];
+  };
+  contextFingerprint: string;
   lineage: { source: 'CORE'; generatedAt: number };
   artifactHash: string;
 }
@@ -75,10 +97,30 @@ class UniversalSynthesisService {
     request: UniversalSynthesisRequest,
   ): SynthesisResult {
     const environment = request.environment || 'universal';
+    const context=request.synthesisContext || {};
+    const contextTerms=[
+      request.goal,
+      request.requiredOutput || '',
+      context.currentState || '',
+      ...(context.visitedDomains || []),
+      ...(context.pendingDomains || []),
+      ...(context.recentDecisions || []),
+      ...(context.unresolvedRefs || []),
+      ...(context.knowledgeRefs || []),
+      ...(context.memoryRefs || []),
+      ...(context.experienceRefs || []),
+      ...(context.failureExperienceRefs || []),
+      ...(context.verificationRefs || []),
+    ].filter(Boolean).join(' ');
+
+    const selectionQuery=[request.goal, contextTerms]
+      .filter(Boolean)
+      .join(' ');
+
     const requestedIds = [...new Set(
       request.availableComponentIds?.filter(Boolean) ||
       capabilityConfidenceService
-        .findRelevant(request.goal, environment, request.maxComponents || 4)
+        .findRelevant(selectionQuery, environment, request.maxComponents || 4)
         .map(item => item.componentId)
     )];
 
@@ -90,7 +132,7 @@ class UniversalSynthesisService {
     // CORE synthesis must inspect that repository as well as the executable registry.
     const reusablePack = reusableComponentFactoryService.plan({
       taskId: request.taskId || request.requestId,
-      purpose: request.goal,
+      purpose: selectionQuery,
       environmentFingerprint: environment,
     });
     const reusableComponentIds = [
@@ -150,9 +192,31 @@ class UniversalSynthesisService {
       types: compositionPlan?.steps.at(-1)?.output_types || [],
     };
     const evidenceRefs = [
-      ...componentIds.map(id => `component:${id}`),
-      ...reusableComponentIds.map(id => `reusable-component:${id}`),
+      ...new Set([
+        ...(context.evidenceRefs || []),
+        ...componentIds.map(id => `component:${id}`),
+        ...reusableComponentIds.map(id => `reusable-component:${id}`),
+      ]),
     ];
+
+    const contextRefs={
+      evidenceRefs:[...(context.evidenceRefs || [])],
+      knowledgeRefs:[...(context.knowledgeRefs || [])],
+      memoryRefs:[...(context.memoryRefs || [])],
+      experienceRefs:[...(context.experienceRefs || [])],
+      failureExperienceRefs:[...(context.failureExperienceRefs || [])],
+      verificationRefs:[...(context.verificationRefs || [])],
+    };
+
+    const contextFingerprint=canonicalSha256Object({
+      currentState:context.currentState || '',
+      visitedDomains:[...(context.visitedDomains || [])],
+      pendingDomains:[...(context.pendingDomains || [])],
+      ...contextRefs,
+      recentDecisions:[...(context.recentDecisions || [])],
+      unresolvedRefs:[...(context.unresolvedRefs || [])],
+    });
+
     const artifactPayload = {
       synthesisId,
       requestId: request.requestId,
@@ -165,6 +229,8 @@ class UniversalSynthesisService {
       adaptedComponentIds: [] as string[],
       compositionPlan,
       evidenceRefs,
+      contextRefs,
+      contextFingerprint,
     };
     const synthesisArtifact: SynthesisArtifact = {
       artifactId: `SYNART-${this.hash(`${synthesisId}|artifact`)}`,
@@ -177,6 +243,8 @@ class UniversalSynthesisService {
       adaptedComponentIds: [],
       compositionPlan,
       evidenceRefs,
+      contextRefs,
+      contextFingerprint,
       lineage: { source: 'CORE', generatedAt },
       artifactHash: canonicalSha256Object(artifactPayload),
     };

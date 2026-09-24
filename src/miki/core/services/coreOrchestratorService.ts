@@ -147,6 +147,79 @@ class CoreOrchestratorService {
   return {task:finalTask,cycles,dispatched:replyRecords.length,coreResult};
  }
 
+ private buildSynthesisContext(
+  task:BlackboardTask,
+  payload:Record<string,unknown>
+ ):NonNullable<Parameters<typeof universalSynthesisService.synthesize>[0]['synthesisContext']>{
+  const evidenceRefs=new Set<string>();
+  const knowledgeRefs=new Set<string>();
+  const memoryRefs=new Set<string>();
+  const experienceRefs=new Set<string>();
+  const failureExperienceRefs=new Set<string>();
+  const verificationRefs=new Set<string>();
+  const recentDecisions:string[]=[];
+  const unresolvedRefs:string[]=[];
+
+  for(const entry of task.entries.slice(-80)){
+    for(const id of entry.evidenceIds||[]) evidenceRefs.add(String(id));
+
+    const key=String(entry.key||'').toLowerCase();
+    const value=entry.value;
+
+    if(/knowledge|research|unknown|claim/.test(key)) {
+      knowledgeRefs.add(entry.id);
+    }
+    if(/memory/.test(key)) {
+      memoryRefs.add(entry.id);
+    }
+    if(/experience|learning|episode|pattern/.test(key)) {
+      experienceRefs.add(entry.id);
+    }
+    if(/failure|negative|error/.test(key)||entry.kind==='ERROR') {
+      failureExperienceRefs.add(entry.id);
+    }
+    if(/verif|validation|audit|check/.test(key)) {
+      verificationRefs.add(entry.id);
+    }
+    if(entry.kind==='DECISION') {
+      recentDecisions.push(entry.key);
+    }
+
+    if(entry.kind==='ERROR' || /unresolved|unknown|missing|blocked/.test(key)){
+      unresolvedRefs.push(entry.id);
+      if(typeof value==='object'&&value!==null){
+        const v=value as Record<string,unknown>;
+        if(Array.isArray(v.unresolved)){
+          for(const item of v.unresolved.slice(0,12)){
+            unresolvedRefs.push(String(item));
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    currentState:[
+      `status=${task.status}`,
+      `revision=${task.revision}`,
+      `cycle=${task.lastCycle}`,
+      `resumeCount=${task.resumeCount}`,
+      `goal=${task.goal}`,
+      `operation=${String(payload.operation||payload.command||'')}`,
+    ].join('|'),
+    visitedDomains:[...task.visitedDomains].map(String),
+    pendingDomains:[...task.pendingDomains].map(String),
+    evidenceRefs:[...evidenceRefs].slice(-80),
+    knowledgeRefs:[...knowledgeRefs].slice(-40),
+    memoryRefs:[...memoryRefs].slice(-40),
+    experienceRefs:[...experienceRefs].slice(-40),
+    failureExperienceRefs:[...failureExperienceRefs].slice(-40),
+    verificationRefs:[...verificationRefs].slice(-40),
+    recentDecisions:[...new Set(recentDecisions)].slice(-40),
+    unresolvedRefs:[...new Set(unresolvedRefs)].slice(-40),
+  };
+ }
+
  private resolveRequestId(task?:BlackboardTask,fallbackTaskId:string=''):string{
   if(!task)return fallbackTaskId;
   const accepted=task.entries.find(e=>e.key==='coreAccepted');
@@ -468,7 +541,8 @@ class CoreOrchestratorService {
         environment:String(route.payload.environment||'universal'),
         availableComponentIds:Array.isArray(route.payload.availableComponentIds)
           ? route.payload.availableComponentIds.map(String) : undefined,
-        maxComponents:Number(route.payload.maxComponents||4)
+        maxComponents:Number(route.payload.maxComponents||4),
+        synthesisContext:this.buildSynthesisContext(current, route.payload)
       });
 
       dispatched+=1;
