@@ -479,6 +479,18 @@ export class ResearchService {
             ? 'Research requires another CORE cycle with a new evidence query.'
             : continuationReason || 'Research stopped without sufficient verification.'
       });
+
+      if (searchResults.length > 0 || summary) {
+        unifiedWebResearchService.learnFromSearch(
+          baseQuery,
+          searchResults,
+          summary,
+          {
+            triggerType: 'working_agenda',
+            provider: 'core-research',
+          }
+        );
+      }
       const observedEvidenceCount = evidence.filter(item => item.status !== 'REJECTED').length;
       const hasAnyResults = observedEvidenceCount > 0 || claimIds.length > 0;
       const coverageSatisfied = latestWebResearchProgress
