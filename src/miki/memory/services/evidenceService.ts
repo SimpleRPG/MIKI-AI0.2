@@ -45,6 +45,7 @@ export interface EvidenceRecord {
     reply_id?: string;
     content_sha256?: string;
     verification_status?: 'VERIFIED' | 'REJECTED' | 'UNVERIFIED';
+    operation_class?: 'BUSINESS' | 'DIAGNOSTIC';
     fetch_method?: WebFetchMethod;
     trust_boundary?: 'UNTRUSTED_EXTERNAL_WEB' | 'UNTRUSTED_EXTERNAL_AI' | 'LOCAL_EXECUTION';
     external_bundle_id?: string;
@@ -252,12 +253,22 @@ export class EvidenceService {
     return record;
   }
 
-  public bindExecutionLineage(evidenceId: string, lineage: { taskId: string; corePlanRevision: number; operationInstanceId: string; replyId: string; contentSha256: string; verificationStatus: 'VERIFIED' | 'REJECTED' | 'UNVERIFIED' }): EvidenceRecord | undefined {
+  public bindExecutionLineage(evidenceId: string, lineage: { taskId: string; corePlanRevision: number; operationInstanceId: string; replyId: string; contentSha256: string; verificationStatus: 'VERIFIED' | 'REJECTED' | 'UNVERIFIED'; operationClass: 'BUSINESS' | 'DIAGNOSTIC' }): EvidenceRecord | undefined {
     const evidence = this.records.get(evidenceId);
     if (!evidence || evidence.kind !== 'EXECUTION' || evidence.status === 'REJECTED') return undefined;
-    if (!lineage.taskId || lineage.corePlanRevision <= 0 || !lineage.operationInstanceId || !lineage.replyId || !/^[a-f0-9]{64}$/i.test(lineage.contentSha256)) return undefined;
+    const requiresBusinessPlan = lineage.operationClass === 'BUSINESS';
+    if (!lineage.taskId || !Number.isFinite(lineage.corePlanRevision) || lineage.corePlanRevision < 0 || (requiresBusinessPlan && lineage.corePlanRevision <= 0) || !lineage.operationInstanceId || !lineage.replyId || !/^[a-f0-9]{64}$/i.test(lineage.contentSha256)) return undefined;
     evidence.source_id = lineage.taskId;
-    evidence.metadata = { ...evidence.metadata, task_id: lineage.taskId, core_plan_revision: lineage.corePlanRevision, operation_instance_id: lineage.operationInstanceId, reply_id: lineage.replyId, content_sha256: lineage.contentSha256.toLowerCase(), verification_status: lineage.verificationStatus };
+    evidence.metadata = {
+      ...evidence.metadata,
+      task_id: lineage.taskId,
+      core_plan_revision: lineage.corePlanRevision,
+      operation_instance_id: lineage.operationInstanceId,
+      reply_id: lineage.replyId,
+      content_sha256: lineage.contentSha256.toLowerCase(),
+      verification_status: lineage.verificationStatus,
+      operation_class: lineage.operationClass
+    };
     this.save();
     return { ...evidence, claim_ids: [...evidence.claim_ids], metadata: evidence.metadata ? { ...evidence.metadata } : undefined };
   }

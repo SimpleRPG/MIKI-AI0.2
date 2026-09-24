@@ -18,7 +18,7 @@ export interface DomainContractValidation {
   normalized?: NormalizedDomainResult;
   contractSha256: string;
 }
-const DIAGNOSTIC=new Set<DomainCommand>(['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION','DISCOVER_IMPROVEMENT_ISSUE']);
+const DIAGNOSTIC=new Set<DomainCommand>(['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION','DISCOVER_IMPROVEMENT_ISSUE','RUN_SELF_IMPROVEMENT']);
 class DomainContractRegistryService{
  private manifests=new Map<MikiDomain,DomainCapabilityManifest>();
  register(domain:MikiDomain,commands:DomainCommand[],responsibilities:string[]=[]):DomainCapabilityManifest{const base={domain,commands:[...new Set(commands)].sort(),responsibilities:[...new Set(responsibilities)].sort(),inputContractVersion:1 as const,outputContractVersion:1 as const,requiresEvidenceForBusinessSuccess:true,registeredAt:Date.now()};const manifest={...base,manifestSha256:canonicalSha256Object(base)};this.manifests.set(domain,manifest);return this.clone(manifest);}

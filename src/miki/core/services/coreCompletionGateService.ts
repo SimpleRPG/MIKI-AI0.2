@@ -135,10 +135,12 @@ class CoreCompletionGateService {
   private evaluateAdaptivePlan(task: BlackboardTask): CoreCompletionAssessment {
     const plan=corePlanRevisionService.latest(task);
     const requiredOperations=plan?.requiredOperations||[];
+    const replyRecords=domainReplyLedgerService.listByTask(task.taskId);
+    const diagnosticOnly=replyRecords.length>0 && replyRecords.every(record=>record.status==='OBSERVED' || ['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION','DISCOVER_IMPROVEMENT_ISSUE','RUN_SELF_IMPROVEMENT'].includes(record.command));
+    const businessReplyRecords=replyRecords.filter(record=>!(record.status==='OBSERVED' || ['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION','DISCOVER_IMPROVEMENT_ISSUE','RUN_SELF_IMPROVEMENT'].includes(record.command)));
     const missingRequiredOperations=corePlanRevisionService.missingOperations(task)
       .map(item=>`${item.operation}:${item.operationInstanceId}`);
     const failedOperations=requiredOperations.filter(item=>item.status==='FAILED').map(item=>item.operationInstanceId);
-    const replyRecords=domainReplyLedgerService.listByTask(task.taskId);
     const lastDecision=task.entries.filter(entry=>entry.domain==='core'&&entry.kind==='DECISION').at(-1);
     const lineage=coreLineageReadModelService.verify(task,{
       replyIds:replyRecords.map(record=>record.replyId),
@@ -147,8 +149,9 @@ class CoreCompletionGateService {
       decisionId:lastDecision?.id
     });
     const reasons:string[]=[];
-    if(!plan) reasons.push('CORE_PLAN_REVISION_MISSING');
-    if(requiredOperations.length===0) reasons.push('REQUIRED_OPERATION_MISSING');
+    if(!plan && !diagnosticOnly) reasons.push('CORE_PLAN_REVISION_MISSING');
+    if(requiredOperations.length===0 && !diagnosticOnly) reasons.push('REQUIRED_OPERATION_MISSING');
+    if(diagnosticOnly) reasons.push('DIAGNOSTIC_STAGE_IN_PROGRESS');
     if(missingRequiredOperations.length) reasons.push(`REQUIRED_BUSINESS_OPERATION_MISSING:${missingRequiredOperations.join(',')}`);
     if(failedOperations.length) reasons.push(`REQUIRED_OPERATION_FAILED:${failedOperations.join(',')}`);
     if(task.entries.some(entry=>entry.kind==='ERROR')) reasons.push('UNRESOLVED_DOMAIN_ERROR');
@@ -171,7 +174,7 @@ class CoreCompletionGateService {
     // Evidence quality is still a safety gate when evidence exists, but an
     // adaptive plan with no evidence-producing operation is not forced into a
     // legacy fixed-domain requirement.
-    const evidenceQualityPassed=replyRecords.length===0?true:quality.passed;
+    const evidenceQualityPassed=businessReplyRecords.length===0?true:quality.passed;
     if(!evidenceQualityPassed) reasons.push(`EVIDENCE_QUALITY_FAILED:${quality.reasons.join(',')}`);
     const isRevalidation=requiredOperations.some(operation=>operation.operation==='GENERATE_CANDIDATE') && requiredOperations.some(operation=>operation.operation==='CREATE_REVIEW_PACKAGE') && task.entries.some(entry=>entry.kind==='RESULT'&&entry.value&&typeof entry.value==='object'&&(entry.value as Record<string,unknown>).operation==='GENERATE_CANDIDATE'&&typeof (entry.value as Record<string,unknown>).externalReviewId==='string');
     if(isRevalidation){const packageId=task.entries.filter(entry=>entry.kind==='RESULT'&&entry.value&&typeof entry.value==='object').map(entry=>entry.value as Record<string,unknown>).reverse().find(value=>value.operation==='CREATE_REVIEW_PACKAGE'&&typeof value.packageId==='string')?.packageId as string|undefined;const pkg=packageId?reviewZipExportService.list().find(item=>item.packageId===packageId):undefined;if(!pkg) reasons.push('REVALIDATION_REVIEW_PACKAGE_MISSING');else if(pkg.status!=='EXTERNAL_REVIEW_PENDING') reasons.push(`REVALIDATION_REVIEW_NOT_PENDING:${pkg.status}`);}

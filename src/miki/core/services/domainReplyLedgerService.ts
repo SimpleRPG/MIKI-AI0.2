@@ -93,7 +93,19 @@ class DomainReplyLedgerService {
     };
     this.records.set(replyId, record);
     const contentSha256 = canonicalSha256Object({ taskId, operationId, operationInstanceId: record.operationInstanceId, corePlanRevision: record.corePlanRevision, dispatchId: record.dispatchId, classificationId: record.classificationId, command: record.command, status: record.status, summary: record.summary, idempotencyKey: record.idempotencyKey });
-    for (const evidenceId of evidenceIds) EvidenceService.getInstance().bindExecutionLineage(evidenceId, { taskId, corePlanRevision: record.corePlanRevision, operationInstanceId: record.operationInstanceId, replyId, contentSha256, verificationStatus: record.status === 'SUCCEEDED' ? 'VERIFIED' : record.status === 'FAILED' || record.status === 'REJECTED' ? 'REJECTED' : 'UNVERIFIED' });
+    for (const evidenceId of evidenceIds) EvidenceService.getInstance().bindExecutionLineage(evidenceId, {
+      taskId,
+      corePlanRevision: record.corePlanRevision,
+      operationInstanceId: record.operationInstanceId,
+      replyId,
+      contentSha256,
+      verificationStatus: record.status === 'SUCCEEDED'
+        ? 'VERIFIED'
+        : record.status === 'FAILED' || record.status === 'REJECTED'
+          ? 'REJECTED'
+          : 'UNVERIFIED',
+      operationClass: normalized?.operationClass || 'BUSINESS'
+    });
     this.persist();
     return this.clone(record);
   }
