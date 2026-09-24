@@ -241,7 +241,33 @@ class CoreOrchestratorService {
   if (recallQuery) {
     try {
       const memories = storageService.getMemories();
-      const recall = await longTermMemoryService.searchPipeline(
+      const recalledMemories = new Map<string, { memory: typeof memories[number]; score: number }>();
+      const recalledExcerpts = new Map<string, { sourceRef?: string; rawExcerpt?: string }>();
+
+      const collectRecall = (result: Awaited<ReturnType<typeof longTermMemoryService.searchPipeline>>) => {
+        for (const hit of result.scoredMemories) {
+          const memoryId = String(hit.memory.id);
+          const prior = recalledMemories.get(memoryId);
+          if (!prior || Number(hit.score) > prior.score) {
+            recalledMemories.set(memoryId, {
+              memory: hit.memory,
+              score: Number(hit.score),
+            });
+          }
+        }
+
+        for (const excerpt of result.retrievedRawExcerpts) {
+          const memoryId = String(excerpt.memoryId);
+          if (!recalledExcerpts.has(memoryId)) {
+            recalledExcerpts.set(memoryId, {
+              sourceRef: String(excerpt.sourceRef || ''),
+              rawExcerpt: String(excerpt.rawExcerpt || ''),
+            });
+          }
+        }
+      };
+
+      const initialRecall = await longTermMemoryService.searchPipeline(
         recallQuery,
         memories,
         null,
@@ -253,17 +279,73 @@ class CoreOrchestratorService {
         }
       );
 
-      for (const hit of recall.scoredMemories) {
+      collectRecall(initialRecall);
+
+      let additionalRecallPerformed = false;
+
+      if (initialRecall.scoredMemories.length > 0) {
+        const relatedHints = initialRecall.scoredMemories
+          .flatMap((hit) =>
+            Array.isArray(hit.memory.semanticKeywords)
+              ? hit.memory.semanticKeywords.map(String)
+              : []
+          )
+          .filter(Boolean);
+
+        const relatedRecallQuery = [
+          task.goal,
+          typeof payload.input === 'string' ? payload.input : '',
+          ...relatedHints,
+          ...unresolvedRefs.slice(-8),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+
+        if (relatedRecallQuery && relatedRecallQuery !== recallQuery) {
+          const relatedRecall = await longTermMemoryService.searchPipeline(
+            relatedRecallQuery,
+            memories,
+            null,
+            [],
+            {
+              limit:12,
+              onlyApprovedForFacts:false,
+              minScoreThreshold:6.0,
+            }
+          );
+
+          collectRecall(relatedRecall);
+          additionalRecallPerformed = true;
+        }
+      }
+
+      for (const hit of recalledMemories.values()) {
         memoryRefs.add(String(hit.memory.id));
         semanticContext.push(
           `MEMORY_RECALL|memoryId=${hit.memory.id}|score=${hit.score}|content=${String(hit.memory.content||'')}`
         );
       }
 
-      for (const excerpt of recall.retrievedRawExcerpts) {
+      for (const [memoryId, excerpt] of recalledExcerpts) {
         semanticContext.push(
-          `MEMORY_EVIDENCE|memoryId=${excerpt.memoryId}|sourceRef=${String(excerpt.sourceRef||'')}|excerpt=${String(excerpt.rawExcerpt||'')}`
+          `MEMORY_EVIDENCE|memoryId=${memoryId}|sourceRef=${String(excerpt.sourceRef||'')}|excerpt=${String(excerpt.rawExcerpt||'')}`
         );
+      }
+
+      const recallStatus =
+        memories.length === 0
+          ? 'NO_PERSISTED_MEMORY'
+          : recalledMemories.size === 0
+            ? 'CONTEXT_INSUFFICIENT'
+            : 'SUFFICIENT';
+
+      semanticContext.push(
+        `MEMORY_RECALL_CHECK|status=${recallStatus}|initialHits=${initialRecall.scoredMemories.length}|mergedHits=${recalledMemories.size}|additionalRecall=${additionalRecallPerformed}|queryHash=${sha256HexFromText(recallQuery)}`
+      );
+
+      if (recallStatus === 'CONTEXT_INSUFFICIENT') {
+        unresolvedRefs.push('CONTEXT_INSUFFICIENT:long-term-memory');
       }
     } catch (error) {
       unresolvedRefs.push(
