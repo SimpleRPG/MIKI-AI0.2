@@ -517,6 +517,7 @@ class CoreOrchestratorService {
       replyId:replyRecord.replyId,cycle:cycles
     });
     const expectedRevision=taskBlackboardService.get(taskId)?.revision ?? -1;
+    const resultWrite=taskBlackboardService.appendIfRevision(taskId,expectedRevision,resultKind,route.target,`${resultKind==='OBSERVATION'?'domainObservation':'domainResult'}:${route.target}:${route.command}`,{schemaVersion:3,collectedBy:'core',coreCollected:true,sourceDomain:route.target,producerId:'domainRouterService',dispatchId:envelope.envelopeId,replyId:replyRecord.replyId,operation:route.command,operationInstanceId:route.payload.operationInstanceId,planRevision:route.payload.planRevision,intentPlanKey:route.payload.intentPlanKey,intentHypothesisId:route.payload.intentHypothesisId,intentHypothesisKind:route.payload.intentHypothesisKind,intentIds:Array.isArray(route.payload.intentIds)?route.payload.intentIds.map(String):[],planSha256:route.payload.planSha256,idempotencyKey:typeof route.payload.idempotencyKey==='string'?route.payload.idempotencyKey:'',operationClass,reply:reply.normalized||reply.error,auditTag:'coreCollected:'},replyRecord.evidenceIds);
     coreExecutionTraceService.record(taskId,cycles,'BLACKBOARD_WRITE',{
       kind:resultKind,
       target:route.target,
@@ -524,9 +525,9 @@ class CoreOrchestratorService {
       operationClass,
       evidenceIds:replyRecord.evidenceIds,
       expectedRevision,
-      currentRevision:taskBlackboardService.get(taskId)?.revision
+      currentRevision:taskBlackboardService.get(taskId)?.revision,
+      writeSucceeded:Boolean(resultWrite)
     });
-    const resultWrite=taskBlackboardService.appendIfRevision(taskId,expectedRevision,resultKind,route.target,`${resultKind==='OBSERVATION'?'domainObservation':'domainResult'}:${route.target}:${route.command}`,{schemaVersion:3,collectedBy:'core',coreCollected:true,sourceDomain:route.target,producerId:'domainRouterService',dispatchId:envelope.envelopeId,replyId:replyRecord.replyId,operation:route.command,operationInstanceId:route.payload.operationInstanceId,planRevision:route.payload.planRevision,intentPlanKey:route.payload.intentPlanKey,intentHypothesisId:route.payload.intentHypothesisId,intentHypothesisKind:route.payload.intentHypothesisKind,intentIds:Array.isArray(route.payload.intentIds)?route.payload.intentIds.map(String):[],planSha256:route.payload.planSha256,idempotencyKey:typeof route.payload.idempotencyKey==='string'?route.payload.idempotencyKey:'',operationClass,reply:reply.normalized||reply.error,auditTag:'coreCollected:'},replyRecord.evidenceIds);
     if(!resultWrite){
       const latest=taskBlackboardService.get(taskId);
       if(latest)taskBlackboardService.append(taskId,'CHECKPOINT','core',`coreRevisionConflict:${cycles}:${route.command}`,{schemaVersion:1,expectedRevision,currentRevision:latest.revision,operationInstanceId:route.payload.operationInstanceId,replyId:replyRecord.replyId,replanRequired:true});
