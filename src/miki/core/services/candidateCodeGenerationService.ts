@@ -6,6 +6,7 @@ import { canonicalSha256 } from './canonicalSha256Service';
 import { reviewLearningArtifactService } from './reviewLearningArtifactService';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 import { candidateUnknownResolutionService } from './candidateUnknownResolutionService';
+import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
 export interface CandidateGenerationFile { path:string; candidateContent:string; evidenceIds:string[]; }
 export interface CandidateGenerationOutcome { accepted:boolean; runId:string; workspaceId?:string; files:CandidateGenerationFile[]; reasons:string[]; responseHash?:string; attemptCount?:number; learningLineage?:{sourcePackageId?:string;externalReviewId?:string;candidateRevision:number;requestedChanges:string[];userReason?:string;usedLearningArtifactIds:string[];ignoredLearningArtifactIds:string[];appliedFailurePatternIds:string[];appliedCorrectionPairIds:string[];appliedComponentPatternIds:string[];learningContextSha256:string;componentPackId?:string;usedKnowledgeComponentIds?:string[];usedCodeComponentIds?:string[];usedConversationComponentIds?:string[];excludedComponentIds?:string[];componentContextSha256?:string}; }
 class CandidateCodeGenerationService {
@@ -23,7 +24,117 @@ class CandidateCodeGenerationService {
   const selectedComponents=reusableComponentFactoryService.list().filter(x=>[...componentPack.usedKnowledgeComponentIds,...componentPack.usedCodeComponentIds,...componentPack.usedConversationComponentIds].includes(x.componentId)).map(x=>({componentId:x.componentId,componentKind:x.componentKind,componentType:x.componentType,purpose:x.purpose,interfaceContract:x.interfaceContract,inputs:x.inputs,outputs:x.outputs,prerequisites:x.prerequisites,dependencies:x.dependencies,appliesWhen:x.appliesWhen,doesNotApplyWhen:x.doesNotApplyWhen,lifecycleStatus:x.lifecycleStatus,sourceLearningArtifactIds:x.sourceLearningArtifactIds}));
   const contract={formatVersion:5,implementationPlan,unknownContext,runId:run.runId,runType:run.runType,objective:run.objective,externalReviewId:typeof run.payload.externalReviewId==='string'?run.payload.externalReviewId:undefined,sourcePackageId:typeof run.payload.sourcePackageId==='string'?run.payload.sourcePackageId:undefined,sourcePackageRevision:Number(run.payload.packageRevision||0)||undefined,candidateRevision:Number(run.payload.candidateRevision||1),requestedChanges:this.strings(run.payload.requestedChanges),userReason:typeof run.payload.userReason==='string'?run.payload.userReason:undefined,learningContext,componentPack,selectedComponents,targets:targetFiles.map(file=>({path:file.path,language:file.language,baselineContent:file.content})),requirements:this.strings(run.payload.requirements),prohibitions:this.strings(run.payload.prohibitions),invariants:this.strings(run.payload.invariants),validationRequirements:this.strings(run.payload.validationRequirements),deliveryRequirements:this.strings(run.payload.deliveryRequirements),responseContract:{files:[{path:'must equal one requested target path',candidateContent:'complete file content without markdown fences',evidenceIds:['optional evidence ids']}],summary:'short description'}};
   const prompt=['You are a code candidate generator operating in an isolated workspace.','Return JSON only. Do not use markdown fences. Do not omit file content. Do not claim tests were run. Preserve all invariants and prohibitions. Use resolved unknown context where verified. Keep unverified items explicit and do not invent missing facts.',JSON.stringify(contract)].join('\n');
-  const reason='CODE_GENERATION_NON_LLM_PATH_REQUIRED';
+  const compositionPrompt=[
+      run.objective,
+      ...this.strings(run.payload.requirements),
+      ...this.strings(run.payload.requestedChanges)
+    ].filter(Boolean).join('\\n');
+
+    /*
+     * 既存の決定論的コード合成経路をここで接続する。
+     * 新しい合成エンジンやLLM生成器は作らない。
+     */
+    const compiledRequest:any={
+      goal:run.objective,
+      targetFiles:targetFiles.map(file=>file.path),
+      environment:'ANDROID',
+      requirements:this.strings(run.payload.requirements),
+      prohibitions:this.strings(run.payload.prohibitions),
+      invariants:this.strings(run.payload.invariants),
+      validationRequirements:this.strings(run.payload.validationRequirements),
+      deliveryRequirements:this.strings(run.payload.deliveryRequirements)
+    };
+
+    const synthesisPlan=nonLlmCodeSynthesisService.plan(
+      compiledRequest,
+      compositionPrompt
+    );
+
+    const composition=synthesisPlan.composition;
+    const componentIds=Array.isArray(synthesisPlan.componentIds)
+      ? synthesisPlan.componentIds
+      : [];
+
+    if(!composition || componentIds.length===0){
+      const reason='CODE_COMPOSITION_PLAN_UNAVAILABLE';
+      this.record(runId,{
+        attemptCount:1,
+        status:'BLOCKED',
+        reason,
+        responseHash:canonicalSha256(JSON.stringify({
+          runId,
+          reason,
+          componentIds,
+          synthesisPlan
+        }))
+      });
+      return {
+        accepted:false,
+        runId,
+        files:[],
+        reasons:[reason],
+        attemptCount:1
+      };
+    }
+
+    /*
+     * CompositionPlanは「何を組み合わせるか」を確定する。
+     * 未検証の新規コードを捏造して完成品扱いしない。
+     * したがって、現段階では検証済みComponentの実装本文だけを
+     * targetに対応付けられる場合のみ候補化する。
+     */
+    const registryCandidates=componentIds.map(id=>{
+      const item=selectedComponents.find(x=>x.componentId===id);
+      return item ? {
+        componentId:item.componentId,
+        componentKind:item.componentKind,
+        purpose:item.purpose,
+        interfaceContract:item.interfaceContract
+      } : undefined;
+    }).filter(Boolean);
+
+    const unresolved=componentIds.filter(
+      id=>!registryCandidates.some((x:any)=>x.componentId===id)
+    );
+
+    if(unresolved.length>0){
+      const reason=`CODE_COMPOSITION_COMPONENT_UNRESOLVED:${unresolved.join(',')}`;
+      this.record(runId,{
+        attemptCount:1,
+        status:'BLOCKED',
+        reason,
+        responseHash:canonicalSha256(JSON.stringify({
+          runId,componentIds,unresolved
+        }))
+      });
+      return {
+        accepted:false,
+        runId,
+        files:[],
+        reasons:[reason],
+        attemptCount:1
+      };
+    }
+
+    const reason='CODE_COMPOSITION_CONNECTED_AWAITING_IMPLEMENTATION_MATERIALIZATION';
+    this.record(runId,{
+      attemptCount:1,
+      status:'BLOCKED',
+      reason,
+      responseHash:canonicalSha256(JSON.stringify({
+        runId,
+        componentIds,
+        composition
+      }))
+    });
+
+    return {
+      accepted:false,
+      runId,
+      files:[],
+      reasons:[reason],
+      attemptCount:1
+    };
   this.record(runId,{
     attemptCount:0,
     status:'BLOCKED',
