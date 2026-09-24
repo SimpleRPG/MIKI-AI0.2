@@ -351,6 +351,21 @@ class AutonomousSelfImprovementLoopService {
       return;
     }
 
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      '[AutonomousLoop] WAITING_EVIDENCE decision',
+      JSON.stringify({
+        requestId: request.id,
+        runId: request.runId,
+        taskId: request.taskId,
+        acquired: acquired.acquired,
+        progressed: acquired.progressed,
+        evidenceCount: acquired.evidenceIds.length,
+        reason: acquired.reasons.join(',') || reason,
+        diagnostics: acquired.diagnostics,
+      }),
+    );
+
     this.waitForEvidence(
       request,
       acquired.reasons.join(',') || reason,
