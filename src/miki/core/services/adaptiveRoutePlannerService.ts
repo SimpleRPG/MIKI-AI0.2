@@ -672,8 +672,12 @@ class AdaptiveRoutePlannerService {
 
     const latestVerification=this.latestBusinessResult(task,'VERIFY_RESEARCH_CLAIMS');
     const verificationValue=latestVerification?objectValue(latestVerification):undefined;
-    const verificationItems=Array.isArray(verificationValue?.verification)
-      ? verificationValue.verification as Array<Record<string,unknown>>:[];
+    const verificationReply=verificationValue?.reply && typeof verificationValue.reply==='object'
+      ? verificationValue.reply as Record<string,unknown>
+      : undefined;
+    const verificationData=(verificationReply?.data||verificationReply?.result) as Record<string,unknown>|undefined;
+    const verificationItems=Array.isArray(verificationData?.verification)
+      ? verificationData.verification as Array<Record<string,unknown>>:[];
     const verificationComplete=researchClaimIds.length>0&&researchClaimIds.every(id=>
       verificationItems.some(x=>
         String(x.claimId||'')===id &&
@@ -682,8 +686,8 @@ class AdaptiveRoutePlannerService {
     );
 
     const knowledgeComponentIds=this.stringArrayFromEntries(task,/knowledgeComponentIds/i);
-    const verifiedKnowledgeComponentIds=Array.isArray(verificationValue?.verifiedKnowledgeComponentIds)
-      ? verificationValue.verifiedKnowledgeComponentIds.map(String).filter(Boolean)
+    const verifiedKnowledgeComponentIds=Array.isArray(verificationData?.verifiedKnowledgeComponentIds)
+      ? verificationData.verifiedKnowledgeComponentIds.map(String).filter(Boolean)
       : [];
 
     if(researchOutcome==='INSUFFICIENT_VERIFICATION'&&researchClaimIds.length>0&&!verificationComplete){
