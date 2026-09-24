@@ -199,6 +199,10 @@ class UniversalSynthesisService {
     const uniqueUnresolved = [...new Set(unresolved)];
     const passed = Boolean(compositionPlan?.executable);
     const hasReusableCandidates = reusableComponentIds.length > 0;
+    const hasCodeReusableCandidates = reusableComponentIds.some(id => {
+      const item = reusablePack.usedCodeComponentIds.includes(id);
+      return item;
+    });
     const generatedAt = Date.now();
     const synthesisId = `SYN-${this.hash(
       `${request.requestId}|${request.goal}|${generatedAt}`,
@@ -297,11 +301,13 @@ class UniversalSynthesisService {
       },
       nextCoreAction: passed
         ? 'RE_EVALUATE'
-        : hasReusableCandidates
-          ? 'VERIFY_CANDIDATE'
-          : uniqueUnresolved.length > 0
-            ? 'RESEARCH_COMPONENT_GAP'
-            : 'RE_EVALUATE',
+        : hasCodeReusableCandidates
+          ? 'GENERATE_CANDIDATE'
+          : hasReusableCandidates
+            ? 'VERIFY_CANDIDATE'
+            : uniqueUnresolved.length > 0
+              ? 'RESEARCH_COMPONENT_GAP'
+              : 'RE_EVALUATE',
     };
   }
 

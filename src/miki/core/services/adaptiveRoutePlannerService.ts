@@ -995,6 +995,39 @@ class AdaptiveRoutePlannerService {
         }]));
       }
 
+      if (nextCoreAction === 'GENERATE_CANDIDATE') {
+        return this.decorateOperations(task, this.uniqueOperations([{
+          target: 'selfDevelopment',
+          command: 'GENERATE_CANDIDATE',
+          reason: 'CORE post-synthesis re-evaluation selected existing Candidate generation for reusable CODE components',
+          payload: {
+            ...input,
+            taskId: task.taskId,
+            goal: task.goal,
+            synthesisId: String(
+              synthesisResult?.synthesisId ||
+              value?.synthesisId ||
+              ''
+            ),
+            reusableComponentIds: Array.isArray(
+              synthesisResult?.reusableComponentIds
+            )
+              ? synthesisResult.reusableComponentIds.map(String)
+              : [],
+            targetFiles: Array.isArray(input.targetFiles)
+              ? input.targetFiles.map(String)
+              : [],
+            requirements: input.requirements,
+            prohibitions: input.prohibitions,
+            invariants: input.invariants,
+            validationRequirements: input.validationRequirements,
+            candidateRevision: Number(input.candidateRevision || 1),
+            adaptive: true,
+            priority: 100
+          }
+        }]));
+      }
+
       if (nextCoreAction === 'VERIFY_CANDIDATE') {
         return this.decorateOperations(task, this.uniqueOperations([{
           target: 'verification',
