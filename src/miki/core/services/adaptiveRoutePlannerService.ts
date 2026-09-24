@@ -692,6 +692,39 @@ class AdaptiveRoutePlannerService {
     const text=`${task.goal} ${task.entries.map(e=>`${e.key} ${String(e.value)}`).join(' ')}`;
     const operation=String(input.operation||'');
     const routes:PlannedRoute[]=[];
+
+    const synthesisRequested =
+      input.synthesisRequested === true ||
+      operation === 'SYNTHESIZE' ||
+      typeof input.requiredOutput === 'string' && Boolean(input.requiredOutput.trim());
+
+    const synthesisAlreadyCompleted = task.entries.some(entry =>
+      entry.domain === 'core' &&
+      entry.kind === 'RESULT' &&
+      objectValue(entry)?.operation === 'SYNTHESIZE_UNIVERSAL' &&
+      String(objectValue(entry)?.status || '').toUpperCase() === 'SUCCEEDED'
+    );
+
+    if (synthesisRequested && !synthesisAlreadyCompleted) {
+      routes.push({
+        target:'core',
+        command:'SYNTHESIZE_UNIVERSAL' as DomainCommand,
+        reason:'CORE selected the universal synthesis engine for a synthesis-required request',
+        payload:{
+          ...input,
+          taskId:task.taskId,
+          requestId:String(input.requestId || task.taskId),
+          goal:task.goal,
+          requiredOutput:typeof input.requiredOutput==='string' ? input.requiredOutput : '',
+          availableComponentIds:Array.isArray(input.availableComponentIds)
+            ? input.availableComponentIds.map(String)
+            : undefined,
+          adaptive:true,
+          priority:100
+        }
+      });
+      return this.decorateOperations(task,this.uniqueOperations(routes));
+    }
     if(operation==='EXECUTE_AUTONOMOUS_SEARCH'){
       routes.push({
         target:'research',

@@ -3,6 +3,7 @@ import {
   type CompositionPlan,
 } from '../../capability/services/componentCompositionService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
+import { capabilityConfidenceService } from '../../capability/services/capabilityConfidenceService';
 import { coreResultService, type CoreResult } from './coreResultService';
 
 export type SynthesisSelectionMode =
@@ -55,7 +56,12 @@ class UniversalSynthesisService {
     request: UniversalSynthesisRequest,
   ): SynthesisResult {
     const environment = request.environment || 'universal';
-    const requestedIds = [...new Set(request.availableComponentIds || [])];
+    const requestedIds = [...new Set(
+      request.availableComponentIds?.filter(Boolean) ||
+      capabilityConfidenceService
+        .findRelevant(request.goal, environment, request.maxComponents || 4)
+        .map(item => item.componentId)
+    )];
 
     const components = requestedIds
       .map(id => componentRegistryService.getComponent(id))

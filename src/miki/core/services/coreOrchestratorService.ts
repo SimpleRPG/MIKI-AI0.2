@@ -16,6 +16,7 @@ import { schemaValidationService } from '../../verification/services/schemaValid
 import { githubSyncService } from '../../../services/githubSyncService';
 import { sha256HexFromText } from './canonicalSha256Service';
 import { coreExecutionTraceService } from './coreExecutionTraceService';
+import { universalSynthesisService } from './universalSynthesisService';
 
 export interface CoreOrchestrationResult { task:BlackboardTask; cycles:number; dispatched:number; coreResult?:CoreResult; }
 
@@ -451,6 +452,90 @@ class CoreOrchestratorService {
       schemaVersion:1,status:'STARTED',idempotencyKey,target:route.target,command:route.command,
       operationInstanceId:route.payload.operationInstanceId,attempt:route.payload.attempt||0,cycle:cycles
     });
+
+    // CORE-owned universal synthesis.
+    // This is intentionally not dispatched through a 17-domain adapter.
+    // The synthesis engine is a reusable CORE capability, not a 19th domain.
+    if(route.command==='SYNTHESIZE_UNIVERSAL'){
+      const synthesis=universalSynthesisService.synthesize({
+        requestId:reqId,
+        taskId,
+        goal:String(route.payload.goal||current.goal),
+        input:route.payload.input,
+        constraints:Array.isArray(route.payload.constraints)
+          ? route.payload.constraints.map(String) : [],
+        requiredOutput:String(route.payload.requiredOutput||''),
+        environment:String(route.payload.environment||'universal'),
+        availableComponentIds:Array.isArray(route.payload.availableComponentIds)
+          ? route.payload.availableComponentIds.map(String) : undefined,
+        maxComponents:Number(route.payload.maxComponents||4)
+      });
+
+      dispatched+=1;
+
+      const succeeded=synthesis.validation.status==='PASSED';
+      taskBlackboardService.append(
+        taskId,
+        succeeded ? 'RESULT' : 'ERROR',
+        'core',
+        'coreUniversalSynthesis',
+        {
+          schemaVersion:1,
+          operation:'SYNTHESIZE_UNIVERSAL',
+          operationClass:'BUSINESS',
+          status:succeeded?'SUCCEEDED':'BLOCKED',
+          synthesisId:synthesis.synthesisId,
+          selectionMode:synthesis.selectionMode,
+          usedComponentIds:synthesis.usedComponentIds,
+          adaptedComponentIds:synthesis.adaptedComponentIds,
+          candidateComponentIds:synthesis.candidateComponentIds,
+          compositionPlan:synthesis.compositionPlan,
+          validation:synthesis.validation,
+          unresolved:synthesis.unresolved,
+          evidenceRefs:synthesis.evidenceRefs,
+          lineage:synthesis.lineage,
+          nextCoreAction:synthesis.nextCoreAction,
+          operationInstanceId:route.payload.operationInstanceId,
+          planRevision:route.payload.planRevision,
+          planSha256:route.payload.planSha256,
+          idempotencyKey:route.payload.idempotencyKey
+        },
+        synthesis.evidenceRefs
+      );
+
+      coreExecutionTraceService.record(
+        taskId,
+        cycles,
+        'CORE_SYNTHESIS',
+        {
+          operation:'SYNTHESIZE_UNIVERSAL',
+          synthesisId:synthesis.synthesisId,
+          status:synthesis.validation.status,
+          selectionMode:synthesis.selectionMode,
+          usedComponentIds:synthesis.usedComponentIds,
+          unresolved:synthesis.unresolved,
+          nextCoreAction:synthesis.nextCoreAction
+        }
+      );
+
+      coreResultService.recordCategoryStep(
+        reqId,
+        'core' as any,
+        succeeded ? 'processing' : 'failed'
+      );
+
+      if(!succeeded){
+        negativeKnowledgeService.record(
+          'core',
+          'SYNTHESIZE_UNIVERSAL' as DomainCommand,
+          synthesis.unresolved.join('; ') || 'SYNTHESIS_BLOCKED',
+          ['research','strategy','capability']
+        );
+      }
+
+      continue;
+    }
+
     const envelope=domainRouterService.create('core',route.target,route.command,{...route.payload,taskId,requestId:reqId},{correlationId:taskId,causationId:taskId,depth:cycles});
     coreExecutionTraceService.record(taskId,cycles,'DISPATCH_START',{
       target:route.target,
