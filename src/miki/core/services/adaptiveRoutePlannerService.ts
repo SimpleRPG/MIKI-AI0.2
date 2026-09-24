@@ -101,7 +101,14 @@ class AdaptiveRoutePlannerService {
     const issueEstablished=Boolean(
       String(input.target||'').trim() ||
       String(input.issueId||'').trim() ||
-      results.some(entry=>/improvement|selfAwareness|DISCOVER_IMPROVEMENT_ISSUE/i.test(entry.domain+':'+entry.key))
+      results.some(entry=>/improvement|selfAwareness|DISCOVER_IMPROVEMENT_ISSUE/i.test(entry.domain+':'+entry.key)) ||
+      observations.some(entry=>{
+        const value=objectValue(entry);
+        const operation=String(value?.operation||entry.key||'');
+        const operationClass=String(value?.operationClass||'');
+        return operationClass==='DIAGNOSTIC' &&
+          /DISCOVER_IMPROVEMENT_ISSUE|IMPROVEMENT_ASSESSMENT/i.test(operation);
+      })
     );
 
     const sourceSnapshot=selfCodeSpaceService.listSourceFiles();
@@ -1005,7 +1012,19 @@ class AdaptiveRoutePlannerService {
           attempt:Number(existingPending.attempt||0)
         }};
       }
-      const prior=task.entries.filter(entry=>entry.kind==='RESULT'&&objectValue(entry)?.operation===route.command).length;
+      const diagnosticCommand=route.command==='DISCOVER_IMPROVEMENT_ISSUE' ||
+        route.command==='IMPROVEMENT_ASSESSMENT';
+      const prior=task.entries.filter(entry=>{
+        if(entry.kind==='RESULT'){
+          return objectValue(entry)?.operation===route.command;
+        }
+        if(diagnosticCommand && entry.kind==='OBSERVATION'){
+          const value=objectValue(entry);
+          return String(value?.operation||entry.key||'')===route.command &&
+            String(value?.operationClass||'DIAGNOSTIC')==='DIAGNOSTIC';
+        }
+        return false;
+      }).length;
       const attempt=prior+1;
       const intentSuffix=Array.isArray(route.payload.intentIds)&&route.payload.intentIds.length>0
         ? `-${route.payload.intentIds.map(String).join('-')}` : '';
