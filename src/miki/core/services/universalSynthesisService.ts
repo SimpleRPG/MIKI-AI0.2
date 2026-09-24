@@ -108,9 +108,17 @@ class UniversalSynthesisService {
   ): SynthesisResult {
     const environment = request.environment || 'universal';
     const context=request.synthesisContext || {};
+    const inputTerms =
+      typeof request.input === 'string'
+        ? request.input
+        : request.input === undefined || request.input === null
+          ? ''
+          : JSON.stringify(request.input);
+
     const contextTerms=[
       request.goal,
       request.requiredOutput || '',
+      inputTerms,
       context.currentState || '',
       ...(context.visitedDomains || []),
       ...(context.pendingDomains || []),
@@ -127,12 +135,19 @@ class UniversalSynthesisService {
       .filter(Boolean)
       .join(' ');
 
-    const requestedIds = [...new Set(
-      request.availableComponentIds?.filter(Boolean) ||
-      capabilityConfidenceService
-        .findRelevant(selectionQuery, environment, request.maxComponents || 4)
-        .map(item => item.componentId)
+    const suppliedComponentIds = [...new Set(
+      request.availableComponentIds?.filter(Boolean) || []
     )];
+
+    const requestedIds = suppliedComponentIds.length > 0
+      ? suppliedComponentIds
+      : [
+          ...new Set(
+            capabilityConfidenceService
+              .findRelevant(selectionQuery, environment, request.maxComponents || 4)
+              .map(item => item.componentId)
+          )
+        ];
 
     const components = requestedIds
       .map(id => componentRegistryService.getComponent(id))
