@@ -37,6 +37,9 @@ export interface UniversalSynthesisRequest {
     verificationRefs?: string[];
     recentDecisions?: string[];
     unresolvedRefs?: string[];
+    validatedCandidate?: Record<string, unknown>;
+    validationResult?: Record<string, unknown>;
+    priorSynthesisId?: string;
   };
 }
 
@@ -58,8 +61,12 @@ export interface SynthesisArtifact {
     experienceRefs: string[];
     failureExperienceRefs: string[];
     verificationRefs: string[];
+    candidateRefs: string[];
   };
   contextFingerprint: string;
+  validatedCandidate?: Record<string, unknown>;
+  validationResult?: Record<string, unknown>;
+  priorSynthesisId?: string;
   lineage: { source: 'CORE'; generatedAt: number };
   artifactHash: string;
 }
@@ -86,6 +93,9 @@ export interface SynthesisResult {
     source: 'CORE';
     generatedAt: number;
   };
+  validatedCandidate?: Record<string, unknown>;
+  validationResult?: Record<string, unknown>;
+  priorSynthesisId?: string;
   nextCoreAction:
     | 'RE_EVALUATE'
     | 'RESEARCH_COMPONENT_GAP'
@@ -111,6 +121,13 @@ class UniversalSynthesisService {
       ...(context.experienceRefs || []),
       ...(context.failureExperienceRefs || []),
       ...(context.verificationRefs || []),
+      context.validatedCandidate
+        ? JSON.stringify(context.validatedCandidate)
+        : '',
+      context.validationResult
+        ? JSON.stringify(context.validationResult)
+        : '',
+      context.priorSynthesisId || '',
     ].filter(Boolean).join(' ');
 
     const selectionQuery=[request.goal, contextTerms]
@@ -220,6 +237,34 @@ class UniversalSynthesisService {
       ]),
     ];
 
+    const validatedCandidate =
+      context.validatedCandidate &&
+      typeof context.validatedCandidate === 'object' &&
+      !Array.isArray(context.validatedCandidate)
+        ? context.validatedCandidate
+        : undefined;
+
+    const validationResult =
+      context.validationResult &&
+      typeof context.validationResult === 'object' &&
+      !Array.isArray(context.validationResult)
+        ? context.validationResult
+        : undefined;
+
+    const candidateRefs = validatedCandidate
+      ? [
+          validatedCandidate.candidateId,
+          validatedCandidate.workspaceId,
+          validatedCandidate.candidateRevision,
+          ...(Array.isArray(validatedCandidate.persistenceReceiptIds)
+            ? validatedCandidate.persistenceReceiptIds
+            : []),
+          ...(Array.isArray(validationResult?.evidenceIds)
+            ? validationResult.evidenceIds
+            : []),
+        ].filter(Boolean).map(String)
+      : [];
+
     const contextRefs={
       evidenceRefs:[...(context.evidenceRefs || [])],
       knowledgeRefs:[...(context.knowledgeRefs || [])],
@@ -227,6 +272,7 @@ class UniversalSynthesisService {
       experienceRefs:[...(context.experienceRefs || [])],
       failureExperienceRefs:[...(context.failureExperienceRefs || [])],
       verificationRefs:[...(context.verificationRefs || [])],
+      candidateRefs,
     };
 
     const contextFingerprint=canonicalSha256Object({
@@ -234,6 +280,9 @@ class UniversalSynthesisService {
       visitedDomains:[...(context.visitedDomains || [])],
       pendingDomains:[...(context.pendingDomains || [])],
       ...contextRefs,
+      validatedCandidate,
+      validationResult,
+      priorSynthesisId:context.priorSynthesisId || '',
       recentDecisions:[...(context.recentDecisions || [])],
       unresolvedRefs:[...(context.unresolvedRefs || [])],
     });
@@ -252,6 +301,9 @@ class UniversalSynthesisService {
       evidenceRefs,
       contextRefs,
       contextFingerprint,
+      validatedCandidate,
+      validationResult,
+      priorSynthesisId:context.priorSynthesisId || undefined,
     };
     const synthesisArtifact: SynthesisArtifact = {
       artifactId: `SYNART-${this.hash(`${synthesisId}|artifact`)}`,
@@ -266,6 +318,9 @@ class UniversalSynthesisService {
       evidenceRefs,
       contextRefs,
       contextFingerprint,
+      validatedCandidate,
+      validationResult,
+      priorSynthesisId:context.priorSynthesisId || undefined,
       lineage: { source: 'CORE', generatedAt },
       artifactHash: canonicalSha256Object(artifactPayload),
     };
@@ -299,6 +354,9 @@ class UniversalSynthesisService {
         source: 'CORE',
         generatedAt: Date.now(),
       },
+      validatedCandidate,
+      validationResult,
+      priorSynthesisId:context.priorSynthesisId || undefined,
       nextCoreAction: passed
         ? 'RE_EVALUATE'
         : hasCodeReusableCandidates

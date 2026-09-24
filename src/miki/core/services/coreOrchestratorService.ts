@@ -217,6 +217,22 @@ class CoreOrchestratorService {
     verificationRefs:[...verificationRefs].slice(-40),
     recentDecisions:[...new Set(recentDecisions)].slice(-40),
     unresolvedRefs:[...new Set(unresolvedRefs)].slice(-40),
+    validatedCandidate:
+      payload.validatedCandidate &&
+      typeof payload.validatedCandidate === 'object' &&
+      !Array.isArray(payload.validatedCandidate)
+        ? payload.validatedCandidate as Record<string, unknown>
+        : undefined,
+    validationResult:
+      payload.validationResult &&
+      typeof payload.validationResult === 'object' &&
+      !Array.isArray(payload.validationResult)
+        ? payload.validationResult as Record<string, unknown>
+        : undefined,
+    priorSynthesisId:
+      typeof payload.priorSynthesisId === 'string'
+        ? payload.priorSynthesisId
+        : undefined,
   };
  }
 
