@@ -1153,6 +1153,24 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                 </div>
 
                 <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                  <div className="text-slate-500 mb-1">CORE診断ログ (AI圧縮)</div>
+                  {detail.diagnosticLogs.length === 0 ? (
+                    <div className="text-slate-500">診断ログなし</div>
+                  ) : (
+                    <div className="space-y-1 max-h-[360px] overflow-y-auto">
+                      {detail.diagnosticLogs.map((log, index) => (
+                        <div
+                          key={`${index}-${log}`}
+                          className="font-mono text-[10px] leading-4 text-slate-300 break-all"
+                        >
+                          {log}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
                   <div className="text-slate-500 mb-1">改善実行</div>
                   <div className={detail.improvementExecuted ? 'text-emerald-300' : 'text-amber-300'}>
                     {detail.improvementExecuted ? '実際に候補変更・トランザクション実行あり' : 'コード変更は未実行'}

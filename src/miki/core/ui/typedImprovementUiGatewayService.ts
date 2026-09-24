@@ -104,11 +104,48 @@ class TypedImprovementUiGatewayService {
       ...(Array.isArray(resultPayload.persistenceReceiptIds)?resultPayload.persistenceReceiptIds.filter((x):x is string=>typeof x==='string'):[])
     ])];
     const receipts=receiptIds.map(id=>persistenceReceiptLedgerService.get(id)).filter(Boolean);
+
+    const diagnosticEntries=task.entries.filter(x =>
+      x.domain==='core' &&
+      (
+        x.key.startsWith('backgroundBudgetDiagnostic:') ||
+        x.key.startsWith('backgroundBudgetPause:') ||
+        x.key==='evidenceRecoveryDiagnostic' ||
+        x.key==='evidenceRecoveryWaitScheduled' ||
+        x.key.startsWith('coreCycleGuard:')
+      )
+    );
+
+    const diagnosticLogs=diagnosticEntries.map(x => {
+      const value=x.value;
+      if(!value || typeof value!=='object') {
+        return `${x.key}|v=${String(value ?? '')}`;
+      }
+      const v=value as Record<string,unknown>;
+      const compactKeys=[
+        'cycle','budgetCycle','resourceMode','elapsedMs','maxCycles','maxDurationMs',
+        'cycleExceeded','durationExceeded','allowed','reason','freeGb',
+        'taskStatusBefore','taskStatusAfter','pauseReason',
+        'originalReason','acquired','progressed','evidenceCount',
+        'evidenceIds','reasons','evidenceWaitCountBefore','evidenceWaitCountAfter',
+        'retryAt','waitDurationMs','requestId','runId','workspaceId'
+      ];
+      const parts=compactKeys
+        .filter(key => key in v)
+        .map(key => {
+          const raw=v[key];
+          const rendered=Array.isArray(raw) ? raw.join(',') : typeof raw==='object' ? JSON.stringify(raw) : String(raw);
+          return `${key}=${rendered}`;
+        });
+      return `${x.key}|${parts.join('|')}`;
+    });
+
     return {
       task,
       intake,
       coreResult:result,
       coreDecisions:task.entries.filter(x=>x.domain==='core'&&(x.kind==='DECISION'||x.kind==='RESULT')),
+      diagnosticLogs,
       replies,
       evidenceIds:[...new Set([...replies.flatMap(x=>x.evidenceIds),...(Array.isArray(resultPayload.evidenceIds)?resultPayload.evidenceIds.filter((x):x is string=>typeof x==='string'):[])])],
       unknowns:[...new Set([...replies.flatMap(x=>x.unknowns),...(Array.isArray(resultPayload.unknowns)?resultPayload.unknowns.filter((x):x is string=>typeof x==='string'):[])])],
