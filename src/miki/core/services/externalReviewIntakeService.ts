@@ -6,6 +6,7 @@ import { reviewDecisionLearningService } from './reviewDecisionLearningService';
 import { reviewLearningArtifactService } from './reviewLearningArtifactService';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
+import { EvidenceService } from '../../memory/services/evidenceService';
 
 export type ExternalAiRole = 'REVIEWER' | 'UNKNOWN_COMPONENT_AUTHOR' | 'TEACHER';
 export type ExternalReviewSourceType = 'PASTED_TEXT' | 'IMPORTED_TXT' | 'IMPORTED_JSON';
@@ -228,11 +229,32 @@ class ExternalReviewIntakeService {
       reusableComponentFactoryService.storeCandidates(reusableComponents);
       if(input.decision==="ACCEPT"){
         const generalizedArtifactIds=reviewLearningArtifactService.generalizeAcceptedPatterns();
+        const generalizedSet=new Set(generalizedArtifactIds);
+        const generalizedSourceArtifactIds=new Set(
+          reviewLearningArtifactService.list()
+            .filter(artifact=>artifact.lifecycleStatus==='SUPERSEDED'&&artifact.supersededBy&&generalizedSet.has(artifact.supersededBy))
+            .map(artifact=>artifact.artifactId)
+        );
+        const approvalArtifactIds=new Set([...generalizedArtifactIds,...generalizedSourceArtifactIds]);
+        const knowledgeComponentIds=reusableComponentFactoryService.list()
+          .filter(component=>component.componentKind==='KNOWLEDGE'&&component.sourceLearningArtifactIds.some(id=>approvalArtifactIds.has(id)))
+          .map(component=>component.componentId);
+        const evidence=EvidenceService.getInstance().recordCloudAiEvidence({
+          title:`External AI review accepted: ${record.packageId}`,
+          snippet:record.rawResponse.slice(0,4000),
+          source:'external_review',
+          sourceId:record.externalReviewId,
+          metadata:{
+            external_bundle_id:record.packageId,
+            response_sha256:record.rawResponseSha256,
+            trust_boundary:'UNTRUSTED_EXTERNAL_AI'
+          }
+        });
         await coreTaskIngressService.submit({
           kind:'SYSTEM_TASK',
           goal:'COREが一般化された学習から再利用コンポーネント採否を判断する',
           source:'core',
-          payload:{operation:'APPROVE_REUSABLE_COMPONENTS',decisionId:decision.decisionId,externalReviewId:record.externalReviewId,packageId:record.packageId,generalizedArtifactIds},
+          payload:{operation:'APPROVE_REUSABLE_COMPONENTS',decisionId:decision.decisionId,externalReviewId:record.externalReviewId,packageId:record.packageId,generalizedArtifactIds,knowledgeComponentIds,evidenceIds:[evidence.evidence_id]},
           maxCycles:18,
         });
       }
