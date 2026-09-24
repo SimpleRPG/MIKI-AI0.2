@@ -6656,13 +6656,23 @@ CORE
 ↓
 汎用合成機
 ↓
-既存部品探索
+既存部品探索 ＋ 未知・不足探索
 ↓
-再利用 / 適応 / 複数部品合成 / 必要な候補生成
+既存部品の再利用 / 適応 / 複数部品合成
+＋
+Researchによる不足知識・不足実装方法の探索
 ↓
-Verification
+両方の探索結果を統合評価
 ↓
-SynthesisResult
+不足部品が必要な場合は新規CODE Componentを生成
+↓
+新規ComponentをVerification
+↓
+Registryへ登録
+↓
+登録されたComponentを含めて再Composition
+↓
+Candidate / SynthesisResult
 ↓
 CORE
 ↓
@@ -6675,6 +6685,48 @@ Completion Gate
 CoreResult
 ↓
 UI
+
+【既存部品探索と新規部品生成の統合】
+
+汎用合成機は「既存部品を使うか、新規部品を作るか」という
+排他的な二択・単純分岐として設計しない。
+
+既存部品探索と未知・不足探索を同一合成サイクル内で評価する。
+
+・既存部品から再利用可能な部品を探索する
+・既存部品を現在の目的へ適応できるか評価する
+・複数の既存部品を組み合わせられるか評価する
+・同時に、Knowledge / Capability / Implementation Patternの不足を検出する
+・不足がある場合はResearchによって必要な知識・実装方法を探索する
+・既存部品だけでは目的を満たせない場合、新規CODE Component候補を生成する
+・新規CODE Component候補をVerificationへ送る
+・検証済みComponentをRegistryへ登録する
+・登録した新規Componentを既存Component群と同じ合成材料として扱う
+・新規Componentを含めてCompositionを再実行する
+
+したがって、汎用合成機は、
+
+既存部品
+＋
+Research Knowledge
+＋
+新規CODE Component
+＋
+Memory / Experience / Evidence
+
+を同一の合成コンテキストへ投入し、目的達成に必要な成果物を
+段階的に構成する。
+
+新規Componentの生成は汎用合成機とは別のシステムではない。
+既存部品だけでは不足する場合に、汎用合成機自身が不足材料を補充し、
+その材料をRegistryへ戻して再合成するための内部機能である。
+
+また、新規Componentを生成した時点で合成を終了してはならない。
+「生成 → Verification → Registry登録 → 再Composition → Candidate」
+までを一つの合成サイクルとして扱う。
+
+これにより、汎用合成機は既存部品への固定や新規生成への固定を避け、
+現在利用可能な部品と新たに獲得した知識・部品を継続的に組み合わせられる。
 
 【汎用合成機の責務】
 
