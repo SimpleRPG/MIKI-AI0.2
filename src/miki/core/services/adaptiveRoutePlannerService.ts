@@ -389,47 +389,9 @@ class AdaptiveRoutePlannerService {
     const entry=String(input.entry||'');
     const selfImprovement=kind==='SELF_IMPROVEMENT';
 
-    const memoryAssessment=[...task.entries]
-      .reverse()
-      .find(entry =>
-        entry.domain==='core' &&
-        entry.kind==='DECISION' &&
-        String(entry.key).startsWith('coreMemoryContextAssessment:')
-      );
-
-    const memoryAssessmentValue=memoryAssessment
-      ? objectValue(memoryAssessment)
-      : undefined;
-
-    if(String(memoryAssessmentValue?.status||'').toUpperCase()==='CONTEXT_INSUFFICIENT'){
-      const assessmentIndex=memoryAssessment
-        ? task.entries.indexOf(memoryAssessment)
-        : -1;
-
-      const unknownAfterAssessment=task.entries.some((entry,index) =>
-        index>assessmentIndex &&
-        entry.kind==='RESULT' &&
-        entry.domain==='unknown' &&
-        objectValue(entry)?.operation==='RESOLVE_UNKNOWN'
-      );
-
-      if(!unknownAfterAssessment){
-        return this.decorateOperations(task,this.uniqueOperations([{
-          target:'unknown',
-          command:'RESOLVE_UNKNOWN',
-          reason:'CORE memory context is insufficient, so unknown-resolution is required before committing the next CORE judgement',
-          payload:{
-            taskId:task.taskId,
-            question:task.goal,
-            useSearch:true,
-            hasAttachments:Boolean(input.hasAttachments),
-            contextRecovery:true,
-            contextRecoveryReason:'CONTEXT_INSUFFICIENT',
-            adaptive:true,
-            priority:100
-          }
-        }]));
-      }
+    const memoryRecovery=this.planMemoryRecovery(task,input);
+    if(memoryRecovery.length>0){
+      return this.decorateOperations(task,this.uniqueOperations(memoryRecovery));
     }
 
     // All SELF_IMPROVEMENT tasks use the same adaptive CORE cognition,
@@ -444,6 +406,110 @@ class AdaptiveRoutePlannerService {
     if(learningRoutes.length>0) return this.decorateOperations(task,this.uniqueOperations(learningRoutes));
 
     return this.planGeneral(task,input,kind);
+  }
+
+  private planMemoryRecovery(task:BlackboardTask,input:Record<string,unknown>):PlannedRoute[] {
+    const latestAssessment=[...task.entries]
+      .map((entry,index)=>({entry,index}))
+      .reverse()
+      .find(({entry}) =>
+        entry.domain==='core' &&
+        entry.kind==='DECISION' &&
+        String(entry.key).startsWith('coreMemoryContextAssessment:')
+      );
+
+    const assessmentValue=latestAssessment
+      ? objectValue(latestAssessment.entry)
+      : undefined;
+
+    if(String(assessmentValue?.status||'').toUpperCase()!=='CONTEXT_INSUFFICIENT'){
+      return [];
+    }
+
+    const latestUnknown=this.latestBusinessResult(task,'RESOLVE_UNKNOWN');
+    const unknownIndex=latestUnknown
+      ? task.entries.indexOf(latestUnknown)
+      : -1;
+
+    const assessmentIndex=latestAssessment?.index ?? -1;
+
+    if(!latestUnknown || unknownIndex<assessmentIndex){
+      return [{
+        target:'unknown',
+        command:'RESOLVE_UNKNOWN',
+        reason:'CORE memory context is insufficient and no context-recovery UNKNOWN result exists for the current assessment',
+        payload:{
+          taskId:task.taskId,
+          question:task.goal,
+          useSearch:true,
+          hasAttachments:Boolean(input.hasAttachments),
+          contextRecovery:true,
+          contextRecoveryReason:'CONTEXT_INSUFFICIENT',
+          adaptive:true,
+          priority:100
+        }
+      }];
+    }
+
+    const unknownValue=objectValue(latestUnknown);
+    const unknownReply=
+      unknownValue?.reply &&
+      typeof unknownValue.reply==='object'
+        ? unknownValue.reply as Record<string,unknown>
+        : undefined;
+
+    const unknownData=
+      unknownReply?.data &&
+      typeof unknownReply.data==='object'
+        ? unknownReply.data as Record<string,unknown>
+        : unknownReply?.result &&
+          typeof unknownReply.result==='object'
+            ? unknownReply.result as Record<string,unknown>
+            : undefined;
+
+    const unknownStatus=String(
+      unknownData?.status ||
+      unknownValue?.status ||
+      unknownReply?.status ||
+      ''
+    ).toUpperCase();
+
+    const researchQuery=String(
+      unknownData?.researchQuestion ||
+      unknownData?.query ||
+      unknownValue?.researchQuestion ||
+      unknownValue?.query ||
+      task.goal ||
+      ''
+    ).trim();
+
+    if(
+      (unknownStatus==='RESEARCH_REQUIRED' || unknownStatus==='SEARCH_FAILED') &&
+      researchQuery
+    ){
+      const latestResearch=this.latestBusinessResult(task,'RUN_RESEARCH');
+      const researchIndex=latestResearch
+        ? task.entries.indexOf(latestResearch)
+        : -1;
+
+      if(researchIndex<=unknownIndex){
+        return [{
+          target:'research',
+          command:'RUN_RESEARCH',
+          reason:'CORE context recovery produced a research-required unknown; CORE now routes the query to Research',
+          payload:{
+            taskId:task.taskId,
+            query:researchQuery,
+            contextRecovery:true,
+            contextRecoveryReason:'UNKNOWN_REQUIRES_RESEARCH',
+            adaptive:true,
+            priority:99
+          }
+        }];
+      }
+    }
+
+    return [];
   }
 
   private planAdaptiveImprovement(task:BlackboardTask,input:Record<string,unknown>):PlannedRoute[] {
@@ -1350,75 +1416,6 @@ class AdaptiveRoutePlannerService {
 
     const routesFromAssessment=[...this.adoptAssessmentProposals(task)];
     routes.push(...routesFromAssessment);
-
-    const latestMemoryRecallChecks = task.entries
-      .map((entry,index)=>({entry,index}))
-      .filter(({entry}) =>
-        entry.domain==='core' &&
-        entry.kind==='DECISION' &&
-        String(entry.key).startsWith('coreMemoryRecallCheck:')
-      );
-
-    const latestMemoryRecallCheck = latestMemoryRecallChecks.at(-1);
-    const memoryRecallValue = latestMemoryRecallCheck
-      ? objectValue(latestMemoryRecallCheck.entry)
-      : undefined;
-
-    const memoryContextInsufficient =
-      String(memoryRecallValue?.status||'').toUpperCase()==='CONTEXT_INSUFFICIENT';
-
-    if(memoryContextInsufficient && latestMemoryRecallCheck){
-      const unknownEntries = task.entries
-        .map((entry,index)=>({entry,index}))
-        .filter(({entry}) =>
-          entry.kind==='RESULT' &&
-          objectValue(entry)?.operation==='RESOLVE_UNKNOWN'
-        );
-
-      const latestUnknown = unknownEntries.at(-1);
-
-      if(!latestUnknown || latestUnknown.index <= latestMemoryRecallCheck.index){
-        return this.decorateOperations(task,this.uniqueOperations([{
-          target:'unknown',
-          command:'RESOLVE_UNKNOWN',
-          reason:'CORE detected insufficient long-term memory context and selected unknown resolution before accepting synthesis completion',
-          payload:{
-            taskId:task.taskId,
-            question:task.goal,
-            useSearch:true,
-            hasAttachments:Boolean(input.hasAttachments),
-            contextRecovery:true,
-            contextRecoveryReason:'CONTEXT_INSUFFICIENT',
-            adaptive:true,
-            priority:100
-          }
-        }]));
-      }
-
-      if(
-        latestUnknown.index > latestMemoryRecallCheck.index &&
-        synthesisRequested
-      ){
-        return this.decorateOperations(task,this.uniqueOperations([{
-          target:'core',
-          command:'SYNTHESIZE_UNIVERSAL' as DomainCommand,
-          reason:'CORE received the context-recovery result and re-runs universal synthesis so memory context can be rebuilt',
-          payload:{
-            ...input,
-            taskId:task.taskId,
-            requestId:String(input.requestId||task.taskId),
-            goal:task.goal,
-            requiredOutput:typeof input.requiredOutput==='string'
-              ? input.requiredOutput
-              : '',
-            contextRecoveryRetry:true,
-            synthesisRequested:true,
-            adaptive:true,
-            priority:100
-          }
-        }]));
-      }
-    }
 
     const isUnknown=/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(text);
     const isSelfImprovement=kind==='SELF_IMPROVEMENT';
