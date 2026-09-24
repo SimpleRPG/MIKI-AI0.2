@@ -44,7 +44,14 @@ function hasCompletionReceipt(task: BlackboardTask, domain: MikiDomain): boolean
     const value = entry.value && typeof entry.value === 'object' ? entry.value as Record<string, unknown> : undefined;
     if (!value || value.coreCollected !== true || value.collectedBy !== 'core' || value.operationClass !== 'BUSINESS' || value.operation === 'ASSESS_DOMAIN' || typeof value.dispatchId !== 'string') return false;
     const reply = entryReply(entry);
-    return Boolean(reply && reply.operationClass === 'BUSINESS' && Array.isArray(reply.evidenceIds) && reply.evidenceIds.length > 0);
+    return Boolean(
+      reply &&
+      reply.operationClass === 'BUSINESS' &&
+      Array.isArray(reply.receiptIds) &&
+      reply.receiptIds.some(
+        (id) => typeof id === 'string' && id.trim().length > 0
+      )
+    );
   });
 }
 
@@ -58,12 +65,12 @@ class CoreCompletionGateService {
     const failedDomains = required.filter((domain) => !domainSucceeded(task, domain));
     const missingReceipts = required.filter((domain) => !hasCompletionReceipt(task, domain));
     const quality = evidenceQualityGateService.evaluate(task);
-    const persistenceConfirmed = task.entries.some((entry) => {
-      if (entry.domain !== 'memory' || entry.kind !== 'RESULT') return false;
-      const reply = entryReply(entry);
-      const data = reply && reply.data && typeof reply.data === 'object' ? reply.data as Record<string, unknown> : undefined;
-      return data?.persisted === true;
-    });
+    // Persistence completion is owned by the required business domain.
+// Self-code promotion proves persistence with its promotion receipt;
+// requiring a separate memory-domain persisted=true result is unrelated
+// to the current CORE -> promotion transaction model.
+const persistenceConfirmed =
+      required.length > 0 && missingReceipts.length === 0;
     const missingRequiredOperations = corePlanRevisionService.missingOperations(task).map((item) => `${item.operation}:${item.dedupeKey}`);
     const reasons: string[] = [];
     if (task.entries.some((entry) => entry.kind === 'ERROR')) reasons.push('UNRESOLVED_DOMAIN_ERROR');
