@@ -307,7 +307,9 @@ class DomainIntegrationBootstrapService{
    const workspace=isolatedCandidateWorkspaceService.get(pkg.workspaceId);
    if(!workspace)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_WORKSPACE_NOT_FOUND',completedAt:Date.now()};
    const receipt=pkg.persistenceReceiptId;
+   const taskId=String(envelope.payload.taskId||'').trim();
    const operationInstanceId=String(envelope.payload.operationInstanceId||pkg.operationInstanceId||'');
+   if(!taskId)return {accepted:false,domain,command:envelope.command,error:'TASK_ID_REQUIRED',completedAt:Date.now()};
    if(!receipt||receipt==='UNAVAILABLE')return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_REQUIRED',completedAt:Date.now()};
    if(!persistenceReceiptLedgerService.get(receipt))return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_NOT_FOUND',completedAt:Date.now()};
    const beforeApply=selfCodeSpaceService.get();
@@ -315,7 +317,7 @@ class DomainIntegrationBootstrapService{
    const applied=selfCodeSpaceService.applyCandidate(workspace.files.map(file=>({path:file.path,baselineSha256:file.baselineSha256,candidateContent:file.candidateContent})));
    let result;
    try{
-    result=await isolatedCandidateWorkspaceService.commitWithReceipt(workspace.workspaceId,receipt,operationInstanceId);
+    result=await isolatedCandidateWorkspaceService.commitWithReceipt(workspace.workspaceId,receipt,operationInstanceId,taskId);
     if(result.transaction.candidateRevisionSha256!==pkg.candidateManifestSha256)throw new Error("CANDIDATE_REVISION_MANIFEST_MISMATCH");
     if(result.workspace.candidateRevisionSha256!==pkg.candidateManifestSha256)throw new Error("WORKSPACE_REVISION_MANIFEST_MISMATCH");
     reviewZipExportService.updateStatus(packageId,'ACCEPTED');

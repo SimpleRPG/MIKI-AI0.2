@@ -8,10 +8,11 @@ const KEY='miki_candidate_commit_transactions_v1';
 class CandidateCommitTransactionService{
  private rows=new Map<string,CandidateCommitTransaction>();private sequence=0;
  constructor(){this.load();this.recoverIncomplete();}
- async commit(input:{issueId:string;workspaceId:string;guardId:string;files:Array<{path:string;baselineContent:string;candidateContent:string;baselineSha256:string;candidateSha256:string;evidenceIds:string[]}>;receiptId:string;previousTransactionId?:string;operationInstanceId:string;}):Promise<CandidateCommitTransaction>{
+ async commit(input:{issueId:string;taskId:string;workspaceId:string;guardId:string;files:Array<{path:string;baselineContent:string;candidateContent:string;baselineSha256:string;candidateSha256:string;evidenceIds:string[]}>;receiptId:string;previousTransactionId?:string;operationInstanceId:string;}):Promise<CandidateCommitTransaction>{
   if(!input.receiptId.trim())throw new Error('PERSISTENCE_RECEIPT_REQUIRED');
   if(!input.operationInstanceId.trim())throw new Error('OPERATION_INSTANCE_REQUIRED');
-  const receipt=persistenceReceiptLedgerService.get(input.receiptId);if(!receipt||receipt.taskId!==input.issueId||receipt.operationInstanceId!==input.operationInstanceId)throw new Error('PERSISTENCE_RECEIPT_LINEAGE_MISMATCH');
+  if(!input.taskId.trim())throw new Error('TASK_ID_REQUIRED');
+  const receipt=persistenceReceiptLedgerService.get(input.receiptId);if(!receipt||receipt.taskId!==input.taskId||receipt.operationInstanceId!==input.operationInstanceId)throw new Error('PERSISTENCE_RECEIPT_LINEAGE_MISMATCH');
   this.assertCrypto();this.assertPaths(input.files.map(file=>file.path));
   const now=Date.now();this.sequence+=1;const transactionId=`CTX-${now}-${String(this.sequence).padStart(6,'0')}`;
   const revision=this.nextRevision(input.issueId);
