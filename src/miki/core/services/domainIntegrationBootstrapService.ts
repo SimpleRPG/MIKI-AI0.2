@@ -17,6 +17,7 @@ import { persistenceReceiptLedgerService } from './persistenceReceiptLedgerServi
 import { canonicalSha256 } from './canonicalSha256Service';
 import { candidateCommitTransactionService } from './candidateCommitTransactionService';
 import { reviewLearningArtifactService } from './reviewLearningArtifactService';
+import { EvidenceService } from '../../memory/services/evidenceService';
 
 const BASE_COMMANDS:DomainCommand[]=['HEALTH_CHECK','DESCRIBE','GET_STATUS','ASSESS_DOMAIN','PARTICIPATE','VERIFY_CONNECTION'];
 
@@ -137,7 +138,29 @@ class DomainIntegrationBootstrapService{
   }
   if(domain==='improvement'&&envelope.command==='DISCOVER_IMPROVEMENT_ISSUE'){
    const result=await autonomousIssueDiscoveryService.scan();
-   return done({operation:'DISCOVER_IMPROVEMENT_ISSUE',operationClass:'DIAGNOSTIC',...result,mutationApplied:false,evidenceIds:Array.isArray((result as any)?.evidenceIds)?(result as any).evidenceIds:[]});
+   const taskId=String(envelope.payload.taskId||'').trim();
+   const evidence=EvidenceService.getInstance().recordExecutionEvidence({
+    title:'Improvement issue discovery diagnostic',
+    snippet:JSON.stringify({
+     taskId,
+     operation:'DISCOVER_IMPROVEMENT_ISSUE',
+     discovered:result.discovered,
+     queued:result.queued,
+     skipped:result.skipped,
+     issues:result.issues.slice(0,20)
+    }),
+    source:'autonomousIssueDiscoveryService',
+    sourceId:taskId||envelope.correlationId,
+    independenceClusterId:`improvement_discovery_${envelope.correlationId}`,
+    metadata:{assertion_status:'INCONCLUSIVE'}
+   });
+   return done({
+    operation:'DISCOVER_IMPROVEMENT_ISSUE',
+    operationClass:'DIAGNOSTIC',
+    ...result,
+    mutationApplied:false,
+    evidenceIds:[evidence.evidence_id]
+   });
   }
   if(domain==='learning'&&envelope.command==='LEARN_FROM_CORE_RESULT'){
    const {mikiUnifiedLearningContinuumService}=await import('../../learning/services/mikiUnifiedLearningContinuumService');
