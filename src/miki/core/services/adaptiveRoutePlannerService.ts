@@ -92,11 +92,31 @@ class AdaptiveRoutePlannerService {
         .map(value=>value.trim())
       : [];
 
-    const fromEntries=explicit.length>0
-      ? []
-      : this.stringArrayFromEntries(task,/target.?files|targetPaths|changedFilePaths/i);
+    const sourcePaths=selfCodeSpaceService.listSourceFiles().map(file=>file.path);
+    const explicitCanonical=explicit.map(target=>{
+      const normalized=String(target||'').trim().replace(/^\.\//,'');
+      if(!normalized)return '';
+      if(sourcePaths.includes(normalized))return normalized;
+      const suffixMatches=sourcePaths.filter(path=>path.endsWith('/'+normalized));
+      return suffixMatches.length===1?suffixMatches[0]:'';
+    }).filter(Boolean);
 
-    const discovered:string[]=[...explicit,...fromEntries];
+    // CORE must not treat a stale/missing explicit target as a valid
+    // candidate-generation snapshot. If any explicit target is missing,
+    // fall back to observations so ASSESS_DOMAIN can refresh the planning
+    // snapshot before GENERATE_CANDIDATE is selected again.
+    const explicitSnapshotComplete=
+      explicit.length>0 &&
+      explicitCanonical.length===explicit.length;
+
+    const fromEntries=!explicitSnapshotComplete
+      ? this.stringArrayFromEntries(task,/target.?files|targetPaths|changedFilePaths/i)
+      : [];
+
+    const discovered:string[]=[
+      ...(explicitSnapshotComplete?explicitCanonical:[]),
+      ...fromEntries
+    ];
 
     // ASSESS_DOMAIN is intentionally observational. CORE must promote the
     // observed targetFiles into the next planning snapshot instead of
@@ -441,6 +461,28 @@ class AdaptiveRoutePlannerService {
         target:'capability',command:'RESOLVE_CAPABILITY_GAPS',
         reason:'Core selected capability resolution before candidate generation',
         payload:{taskId:task.taskId,gapIds:this.stringArrayFromEntries(task,/gapIds/i),adaptive:true,priority:85}
+      });
+    } else if(
+      !latestCandidate &&
+      (
+        this.latestOperationError(task,'GENERATE_CANDIDATE')==='SOURCE_SNAPSHOT_INCOMPLETE' ||
+        this.latestOperationError(task,'GENERATE_CANDIDATE')==='CORE_TARGET_FILES_NOT_FOUND' ||
+        this.latestOperationError(task,'GENERATE_CANDIDATE')==='CORE_TARGET_FILES_REQUIRED'
+      )
+    ) {
+      routes.push({
+        target:'selfDevelopment',
+        command:'ASSESS_DOMAIN',
+        reason:'Core received an incomplete candidate source snapshot; repository context must be re-observed before candidate generation',
+        payload:{
+          taskId:task.taskId,
+          goal:task.goal,
+          kind:'SELF_IMPROVEMENT',
+          adaptive:true,
+          requestedAssessment:'REPOSITORY_CONTEXT',
+          target:input.target,
+          priority:95
+        }
       });
     } else if(!latestCandidate && readiness.candidateGenerationReady) {
       routes.push({
@@ -983,14 +1025,25 @@ class AdaptiveRoutePlannerService {
     };
   }
 
-  private lastOperationFailed(task:BlackboardTask,operation:string):boolean {
-    return task.entries.some(entry=>{
-      if(entry.kind!=='ERROR') return false;
+  private latestOperationError(task:BlackboardTask,operation:string):string {
+    for(const entry of [...task.entries].reverse()){
+      if(entry.kind!=='ERROR') continue;
       const value=objectValue(entry);
+      if(String(value?.operation||'')!==operation) continue;
+      const error=String(value?.error||'');
+      if(error)return error;
       const reply=value?.reply;
-      const command=value?.operation;
-      return command===operation && (reply===undefined || typeof reply==='string' || (typeof reply==='object'&&reply!==null));
-    }) && ![...successfulBusinessEntries(task)].some(entry=>objectValue(entry)?.operation===operation);
+      if(reply&&typeof reply==='object'){
+        const replyError=String((reply as Record<string,unknown>).error||'');
+        if(replyError)return replyError;
+      }
+    }
+    return '';
+  }
+
+  private lastOperationFailed(task:BlackboardTask,operation:string):boolean {
+    return Boolean(this.latestOperationError(task,operation))
+      && ![...successfulBusinessEntries(task)].some(entry=>objectValue(entry)?.operation===operation);
   }
 
   private successfulOperationInstanceFor(task:BlackboardTask,operation:string):string {
@@ -1091,7 +1144,7 @@ class AdaptiveRoutePlannerService {
       const diagnosticCommand=route.command==='DISCOVER_IMPROVEMENT_ISSUE' ||
         route.command==='IMPROVEMENT_ASSESSMENT';
       const prior=task.entries.filter(entry=>{
-        if(entry.kind==='RESULT'){
+        if(entry.kind==='RESULT'||entry.kind==='ERROR'){
           return objectValue(entry)?.operation===route.command;
         }
         if(diagnosticCommand && entry.kind==='OBSERVATION'){
