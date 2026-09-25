@@ -2,10 +2,9 @@ import { storageService } from '../../../services/storageService';
 import { canonicalSha256 } from './canonicalSha256Service';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 import { researchQueryPlanningService } from '../../research/services/researchQueryPlanningService';
-import { unifiedWebResearchService } from '../../research/services/unifiedWebResearchService';
+import { ResearchService } from '../../research/services/researchService';
 import {
   WebImplementationMaterial,
-  WebMaterialPatternExtractor,
 } from '../../research/services/webMaterialPatternExtractor';
 import { unifiedUnknownResolutionCoordinatorService } from '../../unknown/services/unifiedUnknownResolutionCoordinatorService';
 import { requestTypeCompilerService } from '../../../services/requestTypeCompilerService';
@@ -93,34 +92,12 @@ class CandidateUnknownResolutionService {
        */
       if (entry.kind === 'MISSING_IMPLEMENTATION_PATTERN') {
         try {
-          const search = await unifiedWebResearchService.executeSearch(
-            entry.question,
-            { maxResults: 4, preferredProvider: 'auto' },
+          collectedMaterials.push(
+            ...(await ResearchService.getInstance().collectImplementationMaterials(
+              entry.question,
+              { maxResults: 4, maxPages: 3 },
+            )),
           );
-
-          if (search.results.length > 0) {
-            const pages =
-              await unifiedWebResearchService.readSearchResultPages(
-                entry.question,
-                search.results,
-                { maxPages: 3 },
-              );
-
-            for (const page of pages) {
-              if (!page.success || !page.text.trim()) continue;
-
-              const materials =
-                WebMaterialPatternExtractor.extractImplementationMaterialsFromWebText({
-                  text: page.text,
-                  sourceQuery: entry.question,
-                  sourceUrl: page.url,
-                  provider: search.provider,
-                  fetchMethod: 'headless_webview',
-                });
-
-              collectedMaterials.push(...materials);
-            }
-          }
         } catch {
           // Research失敗はUNKNOWNのまま保持し、コードを推測して埋めない。
         }

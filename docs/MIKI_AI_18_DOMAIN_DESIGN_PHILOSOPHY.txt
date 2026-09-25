@@ -1347,3 +1347,86 @@ CORE
 
 Construction Graphの未解決slotや契約不一致を推測で埋めない。
 不足はUnknown/Researchへ戻し、Evidence・Component・Verificationを経て再評価する。
+
+
+### 2026-09-26 Autonomous Multi-File Construction / Research Ownership
+
+既存のCORE自律改善ループを拡張し、別のSelf-Improvement Orchestratorは追加しない。
+
+正規経路は、
+
+CORE
+→ selfDevelopment / CandidateCodeGenerationService
+→ ReusableComponentFactoryService
+→ Construction Graph
+→ Candidate CODE Component
+→ verification
+→ CORE再評価
+→ 成功なら Candidate Validation
+→ Promotion / Review境界
+
+とする。
+
+#### Multi-file Construction
+
+複数のtarget fileを持つCandidateでは、単一Construction Graphのrootを複数ファイルへコピーしない。
+
+`ReusableComponentFactoryService.buildConstructionGraphBundle()` がtarget fileごとに既存Construction Graphを構築し、各Graphを独立して契約検証する。
+
+全targetが次を満たす場合だけ一括Candidate化する。
+
+- Graphに未解決slotがない
+- Construction contract errorがない
+- Rendererが成功する
+- 空実装でない
+- target fileの既存内容と異なる
+- 複数target間で同一sourceを重複生成していない
+
+一つでも失敗した場合は部分Candidateを作らず、既存の
+`CONSTRUCTION_GAP → Unknown → Research → CORE再評価`
+へ戻す。
+
+#### Research Ownership
+
+自律コード改善が実装材料を必要とする場合でも、Candidate/Unknown側からWeb検索基盤を直接業務実行しない。
+
+実装材料の収集は `ResearchService.collectImplementationMaterials()` をCanonical Ownerとし、
+
+`CandidateUnknownResolutionService`
+→ `ResearchService`
+→ `UnifiedWebResearchService`
+→ Provider
+
+へ委譲する。
+
+Search結果は実装コードそのものを完成品として扱わず、ページ本文から抽出されたImplementation MaterialをCandidate生成材料として扱う。
+
+#### Module Construction Knowledge
+
+初期Construction Knowledge / CODE Componentへ以下を追加する。
+
+- default export
+- type-only import
+- namespace import
+- re-export
+- module boundary
+- module dependency / cyclic import avoidance
+
+`module-specifier` は自然言語から勝手に推測せず、要求に明示された `from "./..."` / `import "./..."` 等のmodule specifierだけを決定論的に利用する。
+
+#### Autonomous Retry
+
+Candidate verification失敗時は既存 `AdaptiveRoutePlannerService` が
+
+`VERIFY_CODE_COMPONENT failure`
+→ failureFeedback
+→ Candidate Revision + 1
+→ `GENERATE_CANDIDATE`
+
+へ戻す。
+
+Researchで解決した場合もCOREが再評価し、次のCandidate生成へ戻す。
+
+新しいretry orchestrator、第二Research基盤、第二Promotion Gateは作らない。
+
+最終的なProduction適用は既存Promotion / External Review / User ACCEPT境界を維持する。

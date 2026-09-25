@@ -9,6 +9,11 @@ import { javascriptCodeKnowledge, additionalJavascriptCodeKnowledge, additionalJ
 import { typescriptCodeKnowledge, additionalTypescriptCodeKnowledge, additionalTypescriptCodeComponents } from '../data/codeKnowledge/typescript';
 import { webCodeKnowledge, additionalWebCodeKnowledge, additionalWebCodeComponents } from '../data/codeKnowledge/web';
 import { testingCodeKnowledge, additionalTestingCodeKnowledge, additionalTestingCodeComponents } from '../data/codeKnowledge/testing';
+import {
+  moduleCodeKnowledge,
+  additionalModuleCodeKnowledge,
+  additionalModuleCodeComponents,
+} from '../data/codeKnowledge/modules';
 export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
 export type ComponentSelectionMode='REUSE_AS_IS'|'ADAPT_EXISTING'|'COMPOSE_MULTIPLE'|'CREATE_NEW'|'ESCALATE_UNKNOWN';
@@ -47,6 +52,7 @@ class ReusableComponentFactoryService{
       ...additionalTypescriptCodeComponents,
       ...additionalWebCodeComponents,
       ...additionalTestingCodeComponents,
+      ...additionalModuleCodeComponents,
     ];
 
     for (const definition of definitions) {
@@ -91,6 +97,10 @@ class ReusableComponentFactoryService{
       ...additionalWebCodeKnowledge,
       ...testingCodeKnowledge,
       ...additionalTestingCodeKnowledge,
+    ...moduleCodeKnowledge,
+    ...additionalModuleCodeKnowledge,
+      ...moduleCodeKnowledge,
+      ...additionalModuleCodeKnowledge,
     ];
 
     const existing=this.list();
@@ -586,6 +596,20 @@ class ReusableComponentFactoryService{
       if(op)return {targetNodeId:'',slotName:slot.name,value:op,valueKind:'logical-operator'};
     }
 
+    if(slot.inputKinds.includes('module-specifier')){
+      const moduleMatch=goal.match(
+        /(?:from|import)\\s+["']([^"']+)["']/i
+      );
+      if(moduleMatch?.[1]){
+        return {
+          targetNodeId:'',
+          slotName:slot.name,
+          value:JSON.stringify(moduleMatch[1]),
+          valueKind:'module-specifier',
+        };
+      }
+    }
+
     if(slot.inputKinds.includes('identifier')){
       const value=
         slot.name==='error' ? 'error' :
@@ -852,6 +876,61 @@ class ReusableComponentFactoryService{
     bindings,
     unresolvedSlots:[...new Set(graphUnresolved)],
     contractErrors:[...new Set(constructionContractErrors)],
+  };
+ }
+
+ public buildConstructionGraphBundle(input:{
+  goal:string;
+  componentIds:string[];
+  targetPaths:string[];
+  preserveAllNodes?:boolean;
+ }):{
+  accepted:boolean;
+  items:Array<{targetPath:string;graph:CodeConstructionGraph}>;
+  errors:string[];
+ }{
+  const targetPaths=[...new Set(
+    input.targetPaths
+      .map(path=>String(path||'').trim().replace(/^\.\//,''))
+      .filter(Boolean)
+  )];
+
+  if(targetPaths.length===0){
+    return {
+      accepted:false,
+      items:[],
+      errors:['CONSTRUCTION_BUNDLE_TARGETS_EMPTY'],
+    };
+  }
+
+  const items=targetPaths.map(targetPath=>{
+    const graph=this.buildConstructionGraph({
+      goal:[
+        input.goal,
+        `Target file: ${targetPath}`,
+        'Generate only the content for this target file.',
+        'Respect existing module boundaries and explicit import/export contracts.',
+      ].join('\\n'),
+      componentIds:input.componentIds,
+      preserveAllNodes:input.preserveAllNodes,
+    });
+
+    return {targetPath,graph};
+  });
+
+  const errors=items.flatMap(item=>[
+    ...(item.graph.contractErrors||[]).map(
+      value=>`${item.targetPath}:${value}`
+    ),
+    ...(item.graph.unresolvedSlots||[]).map(
+      value=>`${item.targetPath}:${value}`
+    ),
+  ]);
+
+  return {
+    accepted:errors.length===0 && items.length===targetPaths.length,
+    items,
+    errors:[...new Set(errors)],
   };
  }
 

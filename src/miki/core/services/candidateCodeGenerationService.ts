@@ -147,6 +147,140 @@ class CandidateCodeGenerationService {
     ],
   };
 
+  /*
+   * 複数targetは、単一Graphのrootを無理に複数ファイルへ
+   * コピーしない。
+   *
+   * Factoryの既存Construction Graph機構をtargetごとに再利用し、
+   * 全targetが決定論的に構築できた場合だけ一括Candidate化する。
+   * 1ファイルでも不足する場合は部分生成せず、既存の
+   * CONSTRUCTION_GAP -> Unknown -> Researchへ戻す。
+   */
+  if(targetFiles.length>1){
+    const bundle=reusableComponentFactoryService.buildConstructionGraphBundle({
+      goal:run.objective,
+      componentIds:codeKnowledgePack.usedKnowledgeComponentIds,
+      targetPaths:targetFiles.map(file=>file.path),
+      preserveAllNodes:Boolean(run.payload.constructionBindings),
+    });
+
+    if(bundle.accepted){
+      const renderedBundle=bundle.items.map(item=>{
+        const validation=
+          ComponentCompositionService.getInstance()
+            .validateConstructionGraph(item.graph);
+        const render=
+          validation.valid
+            ? codeConstructionRendererService.render(item.graph)
+            : {
+                accepted:false,
+                errors:[
+                  ...validation.errors,
+                  ...validation.unresolvedSlots.map(
+                    slot=>`UNRESOLVED_SLOT:${slot}`
+                  ),
+                ],
+              };
+
+        return {
+          ...item,
+          validation,
+          render,
+        };
+      });
+
+      const bundleValid=
+        renderedBundle.length===targetFiles.length &&
+        renderedBundle.every(item=>
+          item.validation.valid &&
+          item.render.accepted &&
+          typeof item.render.source==='string' &&
+          item.render.source.trim().length>0
+        );
+
+      const targetContent=new Map(
+        targetFiles.map(file=>[file.path,file.content.trim()])
+      );
+
+      const generatedSources=renderedBundle.map(item=>
+        item.render.source!.trim()
+      );
+
+      const duplicateSource=
+        new Set(generatedSources).size!==generatedSources.length;
+
+      const changedEverywhere=renderedBundle.every(item=>
+        item.render.source!.trim()!==(targetContent.get(item.targetPath)||'')
+      );
+
+      if(bundleValid&&!duplicateSource&&changedEverywhere){
+        const createdBundleIds:string[]=[];
+
+        for(const item of renderedBundle){
+          const created=
+            reusableComponentFactoryService.createCodeComponentCandidate({
+              purpose:run.objective,
+              implementation:item.render.source!,
+              targetPath:item.targetPath,
+              tests:[
+                `ConstructionGraph=${item.graph.graphId}`,
+                ...effectiveValidationRequirements,
+              ].filter(Boolean).join('\\n'),
+              validation:[
+                `CONSTRUCTION_GRAPH=${item.graph.graphId}`,
+                `ROOT_NODE=${item.render.rootNodeId||''}`,
+                ...effectiveValidationRequirements,
+              ].filter(Boolean).join('\\n'),
+              componentType:'CONSTRUCTION_GRAPH_MULTI_FILE_CODE_COMPONENT',
+              supportedEnvironments:['ANDROID'],
+              entryPoint:item.targetPath,
+              sourceEpisodeIds:[],
+            });
+
+          if(!created.accepted||!created.componentId){
+            return {
+              accepted:false,
+              runId,
+              files:[],
+              reasons:[
+                'CONSTRUCTION_GRAPH_MULTI_FILE_CANDIDATE_CREATION_FAILED'
+              ],
+              attemptCount:1,
+            };
+          }
+
+          createdBundleIds.push(created.componentId);
+        }
+
+        const reason=
+          'CONSTRUCTION_GRAPH_MULTI_FILE_CODE_COMPONENT_CANDIDATES_CREATED_AWAITING_VERIFICATION';
+
+        this.record(runId,{
+          attemptCount:1,
+          status:'BLOCKED',
+          reason,
+          createdCodeComponentIds:createdBundleIds,
+          unknownContext,
+          responseHash:canonicalSha256(JSON.stringify({
+            runId,
+            reason,
+            graphIds:renderedBundle.map(item=>item.graph.graphId),
+            createdBundleIds,
+          })),
+        });
+
+        return {
+          accepted:false,
+          runId,
+          files:[],
+          reasons:[reason],
+          attemptCount:1,
+          createdCodeComponentIds:createdBundleIds,
+        };
+      }
+    }
+  }
+
   const constructionValidation =
     ComponentCompositionService.getInstance()
       .validateConstructionGraph(resolvedConstructionGraph);

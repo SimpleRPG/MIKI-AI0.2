@@ -9,6 +9,10 @@ import { researchQueryPlanningService } from './researchQueryPlanningService';
 import { researchQueryOutcomeLearningService } from './researchQueryOutcomeLearningService';
 import { webResearchPolicyService, WebResearchProgress } from './webResearchPolicyService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
+import {
+  WebMaterialPatternExtractor,
+  type WebImplementationMaterial,
+} from './webMaterialPatternExtractor';
 
 export type { ResearchRoute };
 
@@ -80,6 +84,59 @@ export class ResearchService {
     if (!text) throw new Error("RESEARCH_QUERY_REQUIRED");
     const gap = knowledgeGapService.detect({ query: text, type: "INSUFFICIENT_EVIDENCE", reason: "通常のWeb知識探索要求をResearchServiceへ統合", priority: 50, sourceRequestId: options?.sourceRequestId });
     return this.researchGap(gap, { forceRoute: "WEB_SEARCH", query: text, maxPagesPerPass: Math.max(1, Math.min(3, options?.maxResults || 2)) });
+  }
+
+  /**
+   * 自律コード改善が必要とする実装材料をResearch正規経路から収集する。
+   *
+   * Candidate/Unknown側からUnifiedWebResearchServiceを直接呼ばない。
+   * Search -> page read -> implementation material extractionをResearch側へ集約し、
+   * Candidate側は結果だけを利用する。
+   */
+  public async collectImplementationMaterials(
+    query: string,
+    options?: { maxResults?: number; maxPages?: number },
+  ): Promise<WebImplementationMaterial[]> {
+    const text = query.trim();
+    if (!text) return [];
+
+    const maxResults = Math.max(1, Math.min(6, options?.maxResults ?? 4));
+    const maxPages = Math.max(1, Math.min(4, options?.maxPages ?? 3));
+
+    const raw = await unifiedWebResearchService.executePlannedSearch(text);
+    const results = this.normalizeSearchResults(raw).slice(0, maxResults);
+    if (results.length === 0) return [];
+
+    const pages = await unifiedWebResearchService.readSearchResultPages(
+      text,
+      results,
+      { maxPages },
+    );
+
+    const materials: WebImplementationMaterial[] = [];
+
+    for (const page of pages) {
+      if (!page.success || !page.text.trim()) continue;
+
+      const source = String(page.result.source || '').toLowerCase();
+      const provider =
+        source.includes('searxng') ? 'searxng' :
+        source.includes('wikipedia') ? 'wikipedia' :
+        source.includes('duckduckgo') ? 'duckduckgo' :
+        'headless_webview';
+
+      materials.push(
+        ...WebMaterialPatternExtractor.extractImplementationMaterialsFromWebText({
+          text: page.text,
+          sourceQuery: text,
+          sourceUrl: page.url,
+          provider,
+          fetchMethod: 'headless_webview',
+        }),
+      );
+    }
+
+    return materials;
   }
 
   public async researchGap(gap: KnowledgeGap, options?: {
