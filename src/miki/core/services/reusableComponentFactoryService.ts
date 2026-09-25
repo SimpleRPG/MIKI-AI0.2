@@ -428,6 +428,7 @@ class ReusableComponentFactoryService{
   componentId?:string;
   decision?:string;
   reason?:string;
+  matchedRegistryComponentId?:string;
   component?:AnyReusableComponent;
 }{
   const implementation=input.implementation.trim();
@@ -453,6 +454,7 @@ class ReusableComponentFactoryService{
       accepted:false,
       decision:decision.decision,
       reason:decision.reason,
+      matchedRegistryComponentId:decision.matchedComponentId,
     };
   }
 
@@ -580,6 +582,164 @@ class ReusableComponentFactoryService{
     componentId:componentPackage.component_id,
     decision:'NEW',
     component:artifact,
+  };
+ }
+
+
+ /**
+  * ConstructionProfileを持つKnowledgeのうち、まだCODE Componentへ接続されていない
+  *ものを、既存のConstructionProfileだけから決定論的にCandidate化する。
+  *
+  * これは監査ではなく、監査結果を受けた既存Factory側の補完処理である。
+  * Researchや新しいCode Generatorはここでは起動しない。
+  */
+ public materializeMissingConstructionComponents(input?:{
+  knowledgeIds?:string[];
+  supportedEnvironments?:string[];
+ }):{
+  createdComponentIds:string[];
+  alreadyLinkedKnowledgeIds:string[];
+  unresolvedKnowledgeIds:string[];
+  rejectedReasons:Record<string,string>;
+ }{
+  const requested=new Set(
+   (input?.knowledgeIds||[])
+    .map(value=>String(value||'').trim())
+    .filter(Boolean)
+  );
+  const definitions=buildBuiltInCodeComponentDefinitions();
+  const knowledgeArtifacts=this.list()
+   .filter((item):item is KnowledgeComponentArtifact =>
+    item.componentKind==='KNOWLEDGE' &&
+    Boolean(item.constructionProfile)
+   )
+   .sort((a,b)=>a.componentId.localeCompare(b.componentId));
+
+  const createdComponentIds:string[]=[];
+  const alreadyLinkedKnowledgeIds:string[]=[];
+  const unresolvedKnowledgeIds:string[]=[];
+  const rejectedReasons:Record<string,string>={};
+
+  for(const knowledgeArtifact of knowledgeArtifacts){
+   const sourceKnowledgeId=knowledgeArtifact.appliesWhen[0];
+   if(!sourceKnowledgeId)continue;
+
+   if(
+    requested.size>0 &&
+    !requested.has(sourceKnowledgeId) &&
+    !requested.has(knowledgeArtifact.componentId)
+   ){
+    continue;
+   }
+
+   const canonicalKnowledgeId=
+    CONSTRUCTION_KNOWLEDGE_ID_ALIASES[sourceKnowledgeId]||sourceKnowledgeId;
+   const definition=definitions.find(candidate=>
+    candidate.knowledgeId===sourceKnowledgeId ||
+    candidate.knowledgeId===canonicalKnowledgeId
+   );
+
+   if(!definition){
+    unresolvedKnowledgeIds.push(sourceKnowledgeId);
+    continue;
+   }
+
+   const linked=this.list().find(component=>
+    component.componentKind==='CODE' &&
+    (
+     component.appliesWhen.includes(definition.knowledgeId) ||
+     component.appliesWhen.includes(sourceKnowledgeId) ||
+     component.appliesWhen.includes(canonicalKnowledgeId)
+    )
+   );
+
+   if(linked){
+    alreadyLinkedKnowledgeIds.push(sourceKnowledgeId);
+    continue;
+   }
+
+   const result=this.createCodeComponentCandidate({
+    purpose:definition.purpose,
+    implementation:definition.implementation,
+    targetPath:definition.targetPath,
+    tests:definition.tests,
+    validation:definition.validation,
+    componentType:definition.componentType,
+    inputs:definition.inputs,
+    outputs:definition.outputs,
+    prerequisites:definition.prerequisites,
+    dependencies:definition.dependencies,
+    supportedEnvironments:
+     input?.supportedEnvironments||definition.supportedEnvironments,
+    entryPoint:definition.entryPoint,
+    securityClass:definition.securityClass,
+    exports:definition.exports,
+    imports:definition.imports,
+    publicInterfaces:definition.publicInterfaces,
+    knowledgeComponentId:definition.knowledgeId,
+   });
+
+   if(result.accepted&&result.componentId){
+    createdComponentIds.push(result.componentId);
+    continue;
+   }
+
+   if(result.decision==='DUPLICATE'&&result.matchedRegistryComponentId){
+    const registryComponent=
+     componentRegistryService.getComponent(result.matchedRegistryComponentId);
+
+    if(registryComponent){
+     const now=Date.now();
+     const artifact=this.identify({
+      purpose:definition.purpose,
+      interfaceContract:{
+       input:definition.inputs,
+       output:definition.outputs,
+      },
+      inputs:definition.inputs,
+      outputs:definition.outputs,
+      prerequisites:definition.prerequisites,
+      dependencies:definition.dependencies,
+      appliesWhen:[definition.knowledgeId],
+      doesNotApplyWhen:[],
+      sourceEpisodeIds:[],
+      sourceLearningArtifactIds:[],
+      environmentFingerprint:
+       (input?.supportedEnvironments||definition.supportedEnvironments).join(','),
+      lifecycleStatus:'CANDIDATE' as const,
+      usageCount:0,
+      successCount:0,
+      failureCount:0,
+      createdAt:now,
+      updatedAt:now,
+      componentKind:'CODE' as const,
+      componentType:definition.componentType,
+      exports:definition.exports,
+      imports:definition.imports,
+      publicInterfaces:definition.publicInterfaces,
+      coreIngressPoints:[],
+      domainOwnership:['selfDevelopment'],
+      persistenceKeys:[],
+      uiEventEntrypoints:[],
+      testReferences:[definition.targetPath],
+      requiredValidation:['tests','validation','registry lifecycle','implementation hash'],
+      registryComponentId:registryComponent.component_id,
+     }) as CodeComponentArtifact;
+     this.storeCandidates([artifact]);
+     createdComponentIds.push(artifact.componentId);
+     continue;
+    }
+   }
+
+   rejectedReasons[sourceKnowledgeId]=
+    result.reason||result.decision||'CODE_COMPONENT_MATERIALIZATION_FAILED';
+  }
+
+  return {
+   createdComponentIds:[...new Set(createdComponentIds)],
+   alreadyLinkedKnowledgeIds:[...new Set(alreadyLinkedKnowledgeIds)].sort(),
+   unresolvedKnowledgeIds:[...new Set(unresolvedKnowledgeIds)].sort(),
+   rejectedReasons,
   };
  }
 

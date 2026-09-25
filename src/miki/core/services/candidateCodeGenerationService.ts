@@ -116,19 +116,92 @@ class CandidateCodeGenerationService {
       ? [`Reusable CODE KNOWLEDGE guidance (guidance only; never executable CODE):\n${knowledgeHints}`]
       : [];
 
-  const constructionConnectivityAudit =
-    reusableComponentFactoryService.auditConstructionConnectivity({
-      componentIds:codeKnowledgePack.usedKnowledgeComponentIds,
-    });
+  /*
+   * Construction Graphの監査は不足を発見するだけで、生成責務を持たない。
+   *
+   * 1. 現在選択されているKnowledgeを監査
+   * 2. 監査が示したcompatible producerを選択集合へ追加
+   * 3. 既存KnowledgeのConstructionProfileから不足CODE ComponentをFactoryで補完
+   * 4. 補完後に再監査
+   * 5. それでも解けない不足だけをUnknown / Researchへ返す
+   */
+  let constructionKnowledgeComponentIds=[
+   ...new Set(codeKnowledgePack.usedKnowledgeComponentIds)
+  ];
+
+  let constructionConnectivityAudit =
+   reusableComponentFactoryService.auditConstructionConnectivity({
+    componentIds:constructionKnowledgeComponentIds,
+   });
+
+  const initialSelectedConstructionKnowledgeIds=new Set(
+   reusableComponentFactoryService
+    .list()
+    .filter(item=>
+     item.componentKind==='KNOWLEDGE' &&
+     constructionKnowledgeComponentIds.includes(item.componentId)
+    )
+    .flatMap(item=>item.appliesWhen)
+  );
+
+  const producerKnowledgeIds=[
+   ...new Set(
+    constructionConnectivityAudit.selectionProducerGaps
+     .filter(item=>initialSelectedConstructionKnowledgeIds.has(item.knowledgeId))
+     .flatMap(item=>item.producerKnowledgeIds)
+   )
+  ];
+
+  if(producerKnowledgeIds.length>0){
+   const producerKnowledgeComponentIds=
+    reusableComponentFactoryService
+     .list()
+     .filter(item=>
+      item.componentKind==='KNOWLEDGE' &&
+      Boolean(item.constructionProfile) &&
+      item.appliesWhen.some(id=>producerKnowledgeIds.includes(id))
+     )
+     .map(item=>item.componentId);
+
+   constructionKnowledgeComponentIds=[
+    ...new Set([
+     ...constructionKnowledgeComponentIds,
+     ...producerKnowledgeComponentIds,
+    ])
+   ];
+  }
+
+  const selectedConstructionKnowledgeIds=[
+   ...new Set(
+    reusableComponentFactoryService
+     .list()
+     .filter(item=>
+      item.componentKind==='KNOWLEDGE' &&
+      constructionKnowledgeComponentIds.includes(item.componentId)
+     )
+     .flatMap(item=>item.appliesWhen)
+   )
+  ];
+
+  const constructionMaterialization=
+   reusableComponentFactoryService.materializeMissingConstructionComponents({
+    knowledgeIds:selectedConstructionKnowledgeIds,
+    supportedEnvironments:['ANDROID','MIKI_RUNTIME'],
+   });
+
+  constructionConnectivityAudit =
+   reusableComponentFactoryService.auditConstructionConnectivity({
+    componentIds:constructionKnowledgeComponentIds,
+   });
 
   const constructionGraph =
-    reusableComponentFactoryService.buildConstructionGraph({
-      goal:run.objective,
-      componentIds:codeKnowledgePack.usedKnowledgeComponentIds,
-      preserveAllNodes:Boolean(
-        run.payload.constructionBindings
-      ),
-    });
+   reusableComponentFactoryService.buildConstructionGraph({
+    goal:run.objective,
+    componentIds:constructionKnowledgeComponentIds,
+    preserveAllNodes:Boolean(
+     run.payload.constructionBindings
+    ),
+   });
 
   const explicitBindings=this.parseConstructionBindings(
     constructionGraph,
@@ -165,7 +238,7 @@ class CandidateCodeGenerationService {
   if(targetFiles.length>1){
     const bundle=reusableComponentFactoryService.buildConstructionGraphBundle({
       goal:run.objective,
-      componentIds:codeKnowledgePack.usedKnowledgeComponentIds,
+      componentIds:constructionKnowledgeComponentIds,
       targetPaths:targetFiles.map(file=>file.path),
       preserveAllNodes:Boolean(run.payload.constructionBindings),
     });
@@ -335,25 +408,61 @@ class CandidateCodeGenerationService {
           errors:constructionValidation.errors,
         };
 
+  const selectedConstructionKnowledgeIdSet=
+   new Set(selectedConstructionKnowledgeIds);
+
+  const scopedMissingConstructionDefinitions=
+   constructionConnectivityAudit.missingConstructionDefinitionKnowledgeIds
+    .filter(id=>selectedConstructionKnowledgeIdSet.has(id));
+
+  const scopedMissingCodeComponents=
+   constructionConnectivityAudit.missingCodeComponentKnowledgeIds
+    .filter(id=>selectedConstructionKnowledgeIdSet.has(id));
+
+  const scopedUnlinkedConstructionKnowledge=
+   constructionConnectivityAudit.unlinkedConstructionKnowledgeIds
+    .filter(id=>selectedConstructionKnowledgeIdSet.has(id));
+
+  const scopedMissingProducerSlots=
+   constructionConnectivityAudit.missingProducerSlots
+    .filter(item=>selectedConstructionKnowledgeIdSet.has(item.knowledgeId));
+
+  const scopedSelectionProducerGaps=
+   constructionConnectivityAudit.selectionProducerGaps
+    .filter(item=>selectedConstructionKnowledgeIdSet.has(item.knowledgeId));
+
   const constructionGapRequirements=[
-    ...constructionConnectivityAudit.missingCodeComponentKnowledgeIds.map(
-      id=>`CODE_COMPONENT_MISSING:${id}`
-    ),
-    ...constructionConnectivityAudit.unlinkedConstructionKnowledgeIds.map(
-      id=>`CODE_COMPONENT_UNLINKED:${id}`
-    ),
-    ...constructionConnectivityAudit.missingProducerSlots.map(
-      item=>
-        `NO_COMPATIBLE_PRODUCER:${item.knowledgeId}:${item.slotName}:${item.inputKinds.join('|')}`
-    ),
-    ...constructionValidation.errors,
-    ...constructionValidation.unresolvedSlots.map(
-      slot => `UNRESOLVED_SLOT:${slot}`
-    ),
+   ...scopedMissingConstructionDefinitions.map(
+    id=>`CONSTRUCTION_DEFINITION_MISSING:${id}`
+   ),
+   ...scopedMissingCodeComponents.map(
+    id=>`CODE_COMPONENT_MISSING:${id}`
+   ),
+   ...scopedUnlinkedConstructionKnowledge.map(
+    id=>`CODE_COMPONENT_UNLINKED:${id}`
+   ),
+   ...scopedMissingProducerSlots.map(
+    item=>
+     `NO_COMPATIBLE_PRODUCER:${item.knowledgeId}:${item.slotName}:${item.inputKinds.join('|')}`
+   ),
+   ...scopedSelectionProducerGaps.map(
+    item=>
+     `SELECTION_PRODUCER_GAP:${item.knowledgeId}:${item.slotName}:${item.producerKnowledgeIds.join('|')}`
+   ),
+   ...constructionMaterialization.unresolvedKnowledgeIds.map(
+    id=>`CONSTRUCTION_MATERIALIZATION_UNRESOLVED:${id}`
+   ),
+   ...Object.entries(constructionMaterialization.rejectedReasons).map(
+    ([id,reason])=>`CONSTRUCTION_MATERIALIZATION_REJECTED:${id}:${reason}`
+   ),
+   ...constructionValidation.errors,
+   ...constructionValidation.unresolvedSlots.map(
+    slot=>`UNRESOLVED_SLOT:${slot}`
+   ),
   ]
-    .filter(Boolean)
-    .map(value => `CONSTRUCTION_GAP:${value}`)
-    .slice(0,12);
+   .filter(Boolean)
+   .map(value=>`CONSTRUCTION_GAP:${value}`)
+   .slice(0,12);
 
   const unknownContext=await candidateUnknownResolutionService.resolve({
     runId:run.runId,
