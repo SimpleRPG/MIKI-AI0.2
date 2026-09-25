@@ -29,6 +29,7 @@ export const typescriptCodeKnowledge: CodeKnowledgeSeed[] = [
     constructionProfile: {
       kind: 'TYPE',
       syntaxTemplate: 'interface {name} {\\n{members}\\n}',
+      outputKinds: ['type-declaration'],
       slots: [
         {name: 'name', inputKinds: ['identifier'], required: true},
         {name: 'members', inputKinds: ['property-signature'], required: true, multiple: true},
@@ -150,6 +151,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeSeed[] = [
     constructionProfile: {
       kind: 'EXPRESSION',
       syntaxTemplate: 'function {name}(value: unknown): value is {type} {\\n{returnExpression}\\n}',
+      outputKinds: ['statement'],
       slots: [
         {name: 'name', inputKinds: ['identifier'], required: true},
         {name: 'type', inputKinds: ['type-expression'], required: true},

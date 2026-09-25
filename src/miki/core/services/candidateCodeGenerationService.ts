@@ -732,6 +732,118 @@ class CandidateCodeGenerationService {
   return false;
  }
 
+ private parseConstructionBindings(
+  graph:CodeConstructionGraph,
+  value:unknown,
+):CodeConstructionBinding[]{
+  const raw =
+    Array.isArray(value)
+      ? value
+      : value &&
+        typeof value==='object' &&
+        Array.isArray((value as Record<string,unknown>).bindings)
+        ? (value as Record<string,unknown>).bindings
+        : [];
+
+  const nodes=new Map(
+    graph.nodes.map(node=>[node.nodeId,node])
+  );
+
+  return raw
+    .filter(
+      (item):item is Record<string,unknown> =>
+        Boolean(item) &&
+        typeof item==='object' &&
+        !Array.isArray(item)
+    )
+    .map(item=>{
+      const targetNodeId=
+        typeof item.targetNodeId==='string'
+          ? item.targetNodeId.trim()
+          : '';
+
+      const slotName=
+        typeof item.slotName==='string'
+          ? item.slotName.trim()
+          : '';
+
+      if(!targetNodeId||!slotName)return undefined;
+
+      const target=nodes.get(targetNodeId);
+      if(!target)return undefined;
+
+      const slot=target.profile.slots.find(
+        candidate=>candidate.name===slotName
+      );
+      if(!slot)return undefined;
+
+      const sourceNodeId=
+        typeof item.sourceNodeId==='string'
+          ? item.sourceNodeId.trim()
+          : '';
+
+      const hasValue=typeof item.value==='string';
+      const value=hasValue
+        ? String(item.value)
+        : undefined;
+
+      /*
+       * sourceNodeId と literal value を同時に指定した場合は
+       * どちらを採用するか推測しない。
+       */
+      if(sourceNodeId&&hasValue)return undefined;
+
+      if(sourceNodeId){
+        const source=nodes.get(sourceNodeId);
+        if(!source||sourceNodeId===targetNodeId)return undefined;
+
+        const outputs=source.profile.outputKinds||[];
+        const compatible=outputs.some(
+          output=>slot.inputKinds.includes(output)
+        );
+
+        /*
+         * 明示Bindingでも契約不一致なら採用しない。
+         * 不足状態は後段のValidation/Researchへ残す。
+         */
+        if(!compatible)return undefined;
+
+        return {
+          targetNodeId,
+          slotName,
+          sourceNodeId,
+        } as CodeConstructionBinding;
+      }
+
+      if(hasValue){
+        const valueKind=
+          typeof item.valueKind==='string'
+            ? item.valueKind.trim()
+            : undefined;
+
+        if(
+          valueKind &&
+          !slot.inputKinds.includes(valueKind)
+        ){
+          return undefined;
+        }
+
+        return {
+          targetNodeId,
+          slotName,
+          value,
+          ...(valueKind ? {valueKind}:{}),
+        } as CodeConstructionBinding;
+      }
+
+      return undefined;
+    })
+    .filter(
+      (item):item is CodeConstructionBinding =>
+        Boolean(item)
+    );
+ }
+
  private parseImplementationCandidates(
   value:unknown,
   targetPaths:string[],

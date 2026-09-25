@@ -458,10 +458,45 @@ class ReusableComponentFactoryService{
 
   const graphId=`CGRAPH-${canonicalSha256Object(graphBase).slice(0,20)}`;
 
+  /*
+   * sourceとして参照されているNodeは子側なのでroot候補から除外する。
+   * 複数のroot候補が残る場合は、より多くのbindingを受けるNodeを
+   * 優先し、それでも同数ならnodeId順で決定する。
+   */
+  const sourcedNodeIds=new Set(
+    bindings
+      .map(binding=>binding.sourceNodeId)
+      .filter((value):value is string=>typeof value==='string')
+  );
+
+  const incomingBindingCount=new Map(
+    nodes.map(node=>[node.nodeId,0])
+  );
+
+  for(const binding of bindings){
+    incomingBindingCount.set(
+      binding.targetNodeId,
+      (incomingBindingCount.get(binding.targetNodeId)||0)+1
+    );
+  }
+
+  const rootCandidates=nodes
+    .filter(node=>!sourcedNodeIds.has(node.nodeId))
+    .sort((a,b)=>{
+      const countDiff=
+        (incomingBindingCount.get(b.nodeId)||0)-
+        (incomingBindingCount.get(a.nodeId)||0);
+
+      if(countDiff!==0)return countDiff;
+      return a.nodeId.localeCompare(b.nodeId);
+    });
+
   return {
     graphId,
     goal:input.goal,
-    rootNodeId:nodes[0]?.nodeId,
+    rootNodeId:
+      rootCandidates[0]?.nodeId ||
+      nodes[0]?.nodeId,
     nodes,
     bindings,
   };

@@ -29,6 +29,7 @@ export const javascriptCodeKnowledge: CodeKnowledgeSeed[] = [
     constructionProfile: {
       kind: 'STATEMENT',
       syntaxTemplate: 'if ({condition}) {\\n{thenBody}\\n} else {\\n{elseBody}\\n}',
+      outputKinds: ['statement'],
       slots: [
         {name: 'condition', inputKinds: ['boolean-expression'], required: true},
         {name: 'thenBody', inputKinds: ['statement'], required: true, multiple: true},
@@ -101,6 +102,7 @@ export const javascriptCodeKnowledge: CodeKnowledgeSeed[] = [
     constructionProfile: {
       kind: 'ASYNC',
       syntaxTemplate: 'const {result} = await {operation};',
+      outputKinds: ['statement'],
       slots: [
         {name: 'result', inputKinds: ['identifier'], required: false},
         {name: 'operation', inputKinds: ['promise-expression'], required: true},

@@ -98,6 +98,7 @@ export const commonCodeKnowledge: CodeKnowledgeSeed[] = [
     constructionProfile: {
       kind: 'DECLARATION',
       syntaxTemplate: 'function {name}({parameters}) {\\n{body}\\n}',
+      outputKinds: ['statement'],
       slots: [
         {name: 'name', inputKinds: ['identifier'], required: true},
         {name: 'parameters', inputKinds: ['parameter'], required: false, multiple: true},
