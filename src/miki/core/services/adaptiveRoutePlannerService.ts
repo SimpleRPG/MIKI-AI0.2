@@ -566,10 +566,6 @@ class AdaptiveRoutePlannerService {
         ? objectValue(latestResolution.entry)
         : undefined;
 
-      /*
-       * まず既存UNKNOWN解決器へ渡す。
-       * 同じ失敗をGENERATE_CANDIDATEへ直接再投入しない。
-       */
       if(!latestResolution){
         routes.push({
           target:'unknown',
@@ -590,12 +586,6 @@ class AdaptiveRoutePlannerService {
         return this.decorateOperations(task,this.uniqueOperations(routes));
       }
 
-      /*
-       * UNKNOWNが既存のResearch基盤へ渡すべき状態なら、
-       * 既存RUN_RESEARCHへ接続する。
-       *
-       * ここでもCandidateを直接繰り返さない。
-       */
       const resolutionStatus=String(resolutionValue?.status||'').toUpperCase();
       const researchQuestion=String(
         resolutionValue?.researchQuestion ||
@@ -603,10 +593,7 @@ class AdaptiveRoutePlannerService {
         ''
       ).trim();
 
-      if(
-        resolutionStatus==='RESEARCH_REQUIRED' &&
-        researchQuestion
-      ){
+      if(resolutionStatus==='RESEARCH_REQUIRED' && researchQuestion){
         routes.push({
           target:'research',
           command:'RUN_RESEARCH',
@@ -624,22 +611,15 @@ class AdaptiveRoutePlannerService {
         return this.decorateOperations(task,this.uniqueOperations(routes));
       }
 
-      /*
-       * UNKNOWN/Researchが処理済みならCOREへ戻し、
-       * 次のCandidate生成判断へ進ませる。
-       *
-       * ただし同じ失敗を無条件で繰り返さないため、
-       * 元の失敗情報をfailureFeedbackとしてCandidate側へ渡す。
-       */
       const latestResearchAfterResolution=[...task.entries]
         .map((entry,index)=>({entry,index}))
         .reverse()
         .find(({entry,index})=>{
-          if(index<=errorIndex) return false;
+          if(index<=latestResolution.index) return false;
           if(entry.domain!=='research') return false;
           if(entry.kind!=='RESULT' && entry.kind!=='OBSERVATION') return false;
-          return String(objectValue(entry)?.operation||'')==='EXECUTE_AUTONOMOUS_SEARCH' ||
-            String(objectValue(entry)?.operation||'')==='RUN_RESEARCH';
+          const operation=String(objectValue(entry)?.operation||'');
+          return operation==='EXECUTE_AUTONOMOUS_SEARCH' || operation==='RUN_RESEARCH';
         });
 
       const researchValue=latestResearchAfterResolution
@@ -655,8 +635,7 @@ class AdaptiveRoutePlannerService {
 
       const unknownResolved=[
         'REUSED_SUPPORTED',
-        'LOCAL_EVIDENCE',
-        'RESEARCHED_UNVERIFIED'
+        'LOCAL_EVIDENCE'
       ].includes(resolutionStatus);
 
       if(unknownResolved || researchCompleted){
@@ -694,6 +673,8 @@ class AdaptiveRoutePlannerService {
 
         return this.decorateOperations(task,this.uniqueOperations(routes));
       }
+
+      return this.decorateOperations(task,this.uniqueOperations(routes));
     }
 
     // GENERATE_CANDIDATE が新規CODE Component Candidateを作成した場合、
