@@ -526,6 +526,59 @@ class AdaptiveRoutePlannerService {
     const latestValidation=this.latestBusinessResult(task,'VALIDATE_CANDIDATE');
     const latestPackage=this.latestBusinessResult(task,'CREATE_REVIEW_PACKAGE');
 
+    /*
+     * GENERATE_CANDIDATE の生成前依存解決失敗は、
+     * Candidate/Canary の検証失敗とは別のCORE再評価経路として扱う。
+     *
+     * CODE_COMPOSITION_COMPONENT_UNRESOLVED は retryable=false でも
+     * 同じ GENERATE_CANDIDATE を再投入してはいけない。
+     * まず未解決ComponentをUNKNOWN/Research側へ渡し、
+     * その結果をCOREが再評価してからCandidate生成へ戻す。
+     */
+    const latestCandidateGenerationError=this.latestOperationError(task,'GENERATE_CANDIDATE');
+
+    if(latestCandidateGenerationError.startsWith('CODE_COMPOSITION_COMPONENT_UNRESOLVED:')){
+      const unresolved=latestCandidateGenerationError
+        .slice('CODE_COMPOSITION_COMPONENT_UNRESOLVED:'.length)
+        .split(',')
+        .map(value=>value.trim())
+        .filter(Boolean);
+
+      const errorIndex=[...task.entries].map((entry,index)=>({entry,index})).reverse()
+        .find(({entry})=>{
+          if(entry.kind!=='ERROR') return false;
+          const value=objectValue(entry);
+          return String(value?.operation||'')==='GENERATE_CANDIDATE'
+            && String(value?.error||'')===latestCandidateGenerationError;
+        })?.index ?? -1;
+
+      const resolutionAfterError=[...task.entries].some((entry,index)=>{
+        if(index<=errorIndex) return false;
+        if(entry.domain!=='unknown' && entry.domain!=='research' && entry.domain!=='capability' && entry.domain!=='learning')
+          return false;
+        return entry.kind==='RESULT' || entry.kind==='OBSERVATION' || entry.kind==='EVIDENCE';
+      });
+
+      if(!resolutionAfterError){
+        routes.push({
+          target:'unknown',
+          command:'RESOLVE_UNKNOWN',
+          reason:'CORE detected a non-retryable CODE composition component gap; resolve missing components before repeating Candidate generation',
+          payload:{
+            taskId:task.taskId,
+            question:unresolved.join(', '),
+            unresolvedComponents:unresolved,
+            componentGap:true,
+            useSearch:true,
+            adaptive:true,
+            priority:92
+          }
+        });
+
+        return this.decorateOperations(task,this.uniqueOperations(routes));
+      }
+    }
+
     // GENERATE_CANDIDATE が新規CODE Component Candidateを作成した場合、
     // Candidate Workspace検証とは別に、CODE Component自身のExecution Verificationへ進む。
     // 未検証Componentを通常の再合成へ混入させない。
