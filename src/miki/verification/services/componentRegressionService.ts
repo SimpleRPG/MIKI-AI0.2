@@ -44,7 +44,7 @@ export class ComponentRegressionService {
     return this.instance;
   }
 
-  public plan(componentId: string, environment: ExecutionEnvironment): RegressionSuite | undefined {
+  public plan(componentId: string, environment: ExecutionEnvironment, decisionId?: string): RegressionSuite | undefined {
     const component = componentRegistryService.getComponent(componentId);
     if (!component) return undefined;
 

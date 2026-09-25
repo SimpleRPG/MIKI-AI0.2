@@ -1280,6 +1280,68 @@ Knowledge
 この2つをMIKIの会話・学習・研究・部品探索・自己改善の共通設計思想とする。
 
 ============================================================
+【実装照合追記：CODE Component検証とCandidate Workspace検証の分離】
+
+新規CODE Componentを生成した場合、
+
+CORE
+↓
+selfDevelopment / GENERATE_CANDIDATE
+↓
+CODE Component Candidate
+↓
+CORE
+↓
+verification / VERIFY_CODE_COMPONENT
+↓
+既存ComponentRegressionService
+↓
+既存ComponentPromotionService
+↓
+Execution Evidence
+↓
+DEVICE_TESTED
+↓
+必要なCanary / Promotion
+↓
+VERIFIED
+↓
+Reusable Componentとして再評価
+↓
+CORE
+↓
+再合成
+
+を正規経路とする。
+
+ここで、
+
+VALIDATE_CANDIDATE
+
+は自己改善対象ファイルのCandidate Workspaceを検証する処理であり、
+
+VERIFY_CODE_COMPONENT
+
+はComponent Registryへ登録されたCODE Component自体の実行・Regression・Promotion境界を検証する処理である。
+
+この2つを同じ検証処理として扱わない。
+
+また、ComponentRegistryは
+src/miki/capability/services/componentRegistryService.ts
+を正規実体とし、
+src/services/componentRegistryService.ts
+は互換Facadeとして同じRegistry singletonへ接続する。
+
+実行結果にdecisionIdとしてCORE taskIdを保持できる場合、
+Execution EventはCORE Blackboardへ戻し、
+COREが再評価して次の処理を選択する。
+
+新規CODE Componentを生成しただけでは再合成へ進めない。
+少なくとも実行検証・実装hash・Artifact整合性・Regression等の既存Gateを通過させる。
+
+VERIFIEDへの直接遷移は禁止し、
+既存のCanary / Promotion Gateを維持する。
+
 【39. GitHub実装照合結果：既存機能と不足機能を分離する】
 ============================================================
 

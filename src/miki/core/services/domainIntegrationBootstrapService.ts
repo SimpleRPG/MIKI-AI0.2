@@ -20,6 +20,12 @@ import { reviewLearningArtifactService } from './reviewLearningArtifactService';
 import { EvidenceService } from '../../memory/services/evidenceService';
 import { initializeResearchMemoryVerificationSubscriber } from '../../memory/services/researchMemoryVerificationSubscriberService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
+import { componentPromotionService } from '../../promotion/services/componentPromotionService';
+import { componentRegressionService } from '../../verification/services/componentRegressionService';
+import { componentRegistryService } from '../../capability/services/componentRegistryService';
+import { taskBlackboardService } from './taskBlackboardService';
+import { coreOrchestratorService } from './coreOrchestratorService';
+import type { ExecutionEvent } from '../../execution/services/executionEventBusService';
 
 const BASE_COMMANDS:DomainCommand[]=['HEALTH_CHECK','DESCRIBE','GET_STATUS','ASSESS_DOMAIN','PARTICIPATE','VERIFY_CONNECTION'];
 
@@ -42,8 +48,8 @@ class DomainIntegrationBootstrapService{
   const recovery=blackboardRecoveryService.recoverInterrupted();
   if(recovery.recovered.length>0)systemLogger.info('SELF_IMPROVEMENT',`[DomainIntegration] interrupted tasks recovered: ${recovery.recovered.length}`);
   this.unsubscribers.push(
-   executionEventBusService.subscribe('execution.completed',e=>{crossDomainCirculationService.record('execution','learning','EXECUTION_COMPLETED',e.event_id);crossDomainCirculationService.record('execution','experience','EXECUTION_EXPERIENCE',e.event_id);}),
-   executionEventBusService.subscribe('execution.failed',e=>{crossDomainCirculationService.record('execution','safety','EXECUTION_FAILED',e.event_id);crossDomainCirculationService.record('safety','improvement','FAILURE_REQUIRES_IMPROVEMENT',e.event_id);selfImprovementIngressService.submit({trigger:`execution.failed:${e.event_id}:${e.component_id}`,source:'EXECUTION'});}),
+   executionEventBusService.subscribe('execution.completed',e=>{crossDomainCirculationService.record('execution','learning','EXECUTION_COMPLETED',e.event_id);crossDomainCirculationService.record('execution','experience','EXECUTION_EXPERIENCE',e.event_id);void this.bridgeExecutionEventToCore(e);}),
+   executionEventBusService.subscribe('execution.failed',e=>{crossDomainCirculationService.record('execution','safety','EXECUTION_FAILED',e.event_id);crossDomainCirculationService.record('safety','improvement','FAILURE_REQUIRES_IMPROVEMENT',e.event_id);void this.bridgeExecutionEventToCore(e);selfImprovementIngressService.submit({trigger:`execution.failed:${e.event_id}:${e.component_id}`,source:'EXECUTION'});}),
    claimVerificationEventService.subscribe(e=>{crossDomainCirculationService.record('verification',(e.outcome==='SUPPORTED'||e.outcome==='DEVICE_VERIFIED')?'promotion':'unknown',`CLAIM_${e.outcome}`,e.claimId);if(e.outcome==='CONTRADICTED'||e.outcome==='UNRESOLVED'){autonomousIssueDiscoveryService.recordContradiction(e.claimId,e.outcome);selfImprovementIngressService.submit({trigger:`claim.${e.outcome}:${e.claimId}`,source:'SYSTEM'});}}),
    selfImprovementRequestEventService.subscribe(e=>{crossDomainCirculationService.record(e.source==='AUTOPILOT'?'autonomy':'conversation','improvement','SELF_IMPROVEMENT_REQUESTED',e.trigger);selfImprovementIngressService.submit({trigger:e.trigger,source:e.source});}),
   );
@@ -53,6 +59,48 @@ class DomainIntegrationBootstrapService{
  dispose():void{
   for(const domain of MIKI_DOMAINS)domainRouterService.unregister(domain);conversationCompositionResearchSchedulerService.dispose();autonomousIssueDiscoveryService.dispose();autonomousSelfImprovementLoopService.dispose();for(const unsubscribe of this.unsubscribers)unsubscribe();this.unsubscribers=[];this.initialized=false;}
  getStatus(){return {initialized:this.initialized,registered:domainRouterService.getRegistrations(),missing:domainRouterService.getMissingDomains([...MIKI_DOMAINS]),coverage:crossDomainCirculationService.getCoverage(),connectivityAudit:domainParticipationService.getLastAudit()};}
+
+ private async bridgeExecutionEventToCore(event:ExecutionEvent):Promise<void>{
+  try{
+   const {executionRunnerService}=await import('../../execution/services/executionRunnerService');
+   const request=executionRunnerService.getRequest(event.request_id);
+   const taskId=String(request?.decision_id||'').trim();
+   if(!taskId)return;
+
+   const task=taskBlackboardService.get(taskId);
+   if(!task)return;
+
+   taskBlackboardService.append(
+     taskId,
+     'RESULT',
+     'execution',
+     'componentVerificationExecution',
+     {
+       operation:'VERIFY_CODE_COMPONENT',
+       operationClass:'BUSINESS',
+       requestId:event.request_id,
+       componentId:event.component_id,
+       eventType:event.type,
+       passed:event.passed===true,
+       outputSummary:event.output_summary||'',
+       implementationHash:event.implementation_hash,
+       environment:event.environment,
+       testCaseId:event.test_case_id,
+       evidenceId:request?.evidence_id,
+       coreCollected:true,
+       collectedBy:'core'
+     },
+     request?.evidence_id?[request.evidence_id]:[]
+   );
+
+   if(task.status!=='COMPLETED'&&task.status!=='CANCELLED'){
+     taskBlackboardService.setStatus(taskId,'ROUTING');
+     await coreOrchestratorService.resumeFromExecutionEvent(taskId);
+   }
+  }catch(error){
+   systemLogger.warn('SELF_IMPROVEMENT',`[DomainIntegration] execution -> CORE bridge failed: ${String(error)}`);
+  }
+ }
 
  private extraCommands(domain:MikiDomain):DomainCommand[]{
   if(domain==='conversation')return ['ANALYZE_TEXT'];
@@ -64,7 +112,7 @@ class DomainIntegrationBootstrapService{
   if(domain==='strategy')return ['PLAN_PENDING_IMPROVEMENT_RUN'];
   if(domain==='capability')return ['RESOLVE_CAPABILITY_GAPS'];
   if(domain==='memory')return ['FLUSH'];
-  if(domain==='verification')return ['VALIDATE_CANDIDATE','VERIFY_RESEARCH_CLAIMS'];
+  if(domain==='verification')return ['VALIDATE_CANDIDATE','VERIFY_RESEARCH_CLAIMS','VERIFY_CODE_COMPONENT'];
   if(domain==='selfDevelopment')return ['GENERATE_CANDIDATE'];
   if(domain==='promotion')return ['CREATE_REVIEW_PACKAGE','APPROVE_REVIEWED_CANDIDATE'];
   return [];
@@ -241,6 +289,84 @@ class DomainIntegrationBootstrapService{
   if(domain==='memory'&&envelope.command==='FLUSH'){
    if(storageService.getBackendName()==='memory')return {accepted:false,domain,command:envelope.command,error:'MEMORY_ONLY_PERSISTENCE',completedAt:Date.now()};
    await storageService.flushNow();return done({backend:storageService.getBackendName(),persisted:true});
+  }
+
+  if(domain==='verification'&&envelope.command==='VERIFY_CODE_COMPONENT'){
+   const componentIds=Array.isArray(envelope.payload.componentIds)
+     ? envelope.payload.componentIds.map(String).filter(Boolean)
+     : [];
+   const environment=String(envelope.payload.environment||'ANDROID') as 'ANDROID'|'TERMUX'|'EXCEL_WINDOWS'|'EXCEL_MAC'|'EXTERNAL_RUNNER';
+   const decisionId=String(envelope.payload.taskId||envelope.payload.decisionId||'').trim();
+
+   if(componentIds.length===0)return {
+     accepted:false,domain,command:envelope.command,
+     error:'CODE_COMPONENT_IDS_REQUIRED',completedAt:Date.now()
+   };
+
+   const results=componentIds.map(componentId=>{
+     const component=componentRegistryService.getComponent(componentId);
+     if(!component)return {
+       componentId,accepted:false,status:'FAILED',
+       reason:'CODE_COMPONENT_NOT_FOUND'
+     };
+
+     const existing=componentRegressionService.list()
+       .filter(suite =>
+         suite.component_id===componentId &&
+         suite.implementation_hash===component.implementation_hash &&
+         suite.environment===environment
+       )
+       .sort((a,b)=>b.created_at-a.created_at)[0];
+
+     const suite=existing || componentPromotionService.createGate(
+       componentId,
+       environment,
+       decisionId || undefined
+     );
+
+     if(!suite)return {
+       componentId,accepted:false,status:'FAILED',
+       reason:'COMPONENT_REGRESSION_GATE_CREATE_FAILED'
+     };
+
+     const refreshed=componentRegressionService.refresh(suite.suite_id) || suite;
+
+     if(refreshed.status==='PASSED'){
+       const gate=componentPromotionService.validateForLimited(refreshed.suite_id);
+       return {
+         componentId,
+         accepted:gate.accepted,
+         status:gate.accepted?'DEVICE_TESTED':'FAILED',
+         suiteId:refreshed.suite_id,
+         previousStatus:gate.previousStatus,
+         nextStatus:gate.nextStatus,
+         reason:gate.reason
+       };
+     }
+
+     return {
+       componentId,
+       accepted:true,
+       status:'WAITING_EXECUTION',
+       suiteId:refreshed.suite_id,
+       suiteStatus:refreshed.status,
+       requestIds:refreshed.request_ids,
+       reason:'Regression Suiteを作成済み。外部/Android Runnerの実行結果待ち。'
+     };
+   });
+
+   const succeeded=results.length>0 && results.every(x=>x.status==='DEVICE_TESTED'||x.status==='VERIFIED');
+   const failed=results.some(x=>x.status==='FAILED');
+
+   return done({
+     operation:'VERIFY_CODE_COMPONENT',
+     operationClass:'BUSINESS',
+     status:succeeded?'SUCCEEDED':failed?'FAILED':'WAITING_EXECUTION',
+     componentIds,
+     results,
+     taskId:decisionId||undefined,
+     evidenceIds:[]
+   });
   }
 
   if(domain==='verification'&&envelope.command==='VERIFY_RESEARCH_CLAIMS'){

@@ -114,6 +114,20 @@ class CoreOrchestratorService {
   coreResultService.updateStatus(requestId,'processing',{route:['core']});
   return this.continueTask(created.taskId,maxCycles,requestId);
  }
+ async resumeFromExecutionEvent(taskId:string,maxCycles=18):Promise<CoreOrchestrationResult|undefined>{
+  const currentTask=taskBlackboardService.get(taskId);
+  if(!currentTask)return undefined;
+  if(currentTask.status==='COMPLETED'||currentTask.status==='CANCELLED')return undefined;
+  const reqId=this.resolveRequestId(currentTask,taskId);
+  taskBlackboardService.setStatus(taskId,'ROUTING');
+  taskBlackboardService.append(taskId,'DECISION','core','coreExecutionEventResumed',{
+    mode:'CORE_18_DOMAIN_ORCHESTRATION',
+    requestId:reqId,
+    source:'executionEvent'
+  });
+  coreResultService.updateStatus(reqId,'processing',{route:['core','execution']});
+  return this.continueTask(taskId,maxCycles,reqId);
+ }
  async resume(taskId:string,maxCycles=18):Promise<CoreOrchestrationResult|undefined>{
   const currentTask=taskBlackboardService.get(taskId);
   const reqId=this.resolveRequestId(currentTask,taskId);

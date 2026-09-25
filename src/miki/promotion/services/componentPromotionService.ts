@@ -32,13 +32,13 @@ export class ComponentPromotionService {
     return this.instance;
   }
 
-  public createGate(componentId: string, environment: RegressionSuite['environment']): RegressionSuite | undefined {
+  public createGate(componentId: string, environment: RegressionSuite['environment'], decisionId?: string): RegressionSuite | undefined {
     const component = componentRegistryService.getComponent(componentId);
     if (!component) return undefined;
     if (!component.implementation_hash) return undefined;
     const artifact = componentArtifactStoreService.get(componentId, component.version);
     if (!artifact || artifact.implementation_hash !== component.implementation_hash) return undefined;
-    return componentRegressionService.plan(componentId, environment);
+    return componentRegressionService.plan(componentId, environment, decisionId);
   }
 
   /**
