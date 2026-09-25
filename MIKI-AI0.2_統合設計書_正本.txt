@@ -7881,3 +7881,61 @@ Canary FAIL時は新規ComponentをREJECTEDへ隔離し、
 存在しない旧版へのRollbackを試みない。
 
 ============================================================
+
+
+【実装確定追記：2026-09-25 自律コード改善 Candidate Failure Feedback循環】
+============================================================
+
+新規CODE ComponentのVerification / Canary失敗は、
+単純な再検証ではなくCOREによる次Candidate Revision生成へ戻す。
+
+正規経路：
+
+Candidate Revision N
+↓
+CODE Component Candidate
+↓
+VERIFY_CODE_COMPONENT
+↓
+Regression / Execution / Canary
+↓
+FAIL
+↓
+CORE Blackboardへ失敗結果を収集
+↓
+adaptiveRoutePlannerService
+↓
+failureFeedbackを生成
+↓
+GENERATE_CANDIDATE
+↓
+ImprovementIntakeRun.payloadへfailureFeedbackを同期
+↓
+candidateCodeGenerationService
+↓
+failureFeedbackをCandidate Unknown Resolution / Research / Compositionへ投入
+↓
+Candidate Revision N+1
+↓
+Verification
+
+failureFeedbackには最低限、
+
+・sourceOperation
+・status
+・componentIds
+・reasons
+・result
+・retryOfCandidateRevision
+
+を保持する。
+
+失敗したNEW_COMPONENTはREJECTEDとして隔離し、
+同一Componentを再検証して成功扱いにする経路を作らない。
+
+次Candidateは、失敗情報を制約・要求として利用して生成しなければならない。
+
+failureFeedbackはCOREの判断結果であり、
+Domain側が独自判断で再試行条件を生成してはならない。
+
+============================================================

@@ -1244,6 +1244,39 @@ class CoreOrchestratorService {
       continue;
     }
 
+    if(
+      route.target==='selfDevelopment' &&
+      route.command==='GENERATE_CANDIDATE'
+    ){
+      const runId=String(route.payload.runId||'').trim();
+      const existingRun=runId
+        ? improvementIntakeRouterService.get(runId)
+        : undefined;
+
+      if(existingRun){
+        await improvementIntakeRouterService.ensureForCoreTask({
+          taskId,
+          objective:current.goal,
+          payload:{
+            ...route.payload,
+            taskId,
+            runId
+          },
+          sourceId:existingRun.sourceId
+        });
+      }else{
+        await improvementIntakeRouterService.ensureForCoreTask({
+          taskId,
+          objective:current.goal,
+          payload:{
+            ...route.payload,
+            taskId
+          },
+          sourceId:taskId
+        });
+      }
+    }
+
     const envelope=domainRouterService.create('core',route.target,route.command,{...route.payload,taskId,requestId:reqId},{correlationId:taskId,causationId:taskId,depth:cycles});
     coreExecutionTraceService.record(taskId,cycles,'DISPATCH_START',{
       target:route.target,
