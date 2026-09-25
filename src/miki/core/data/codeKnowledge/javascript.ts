@@ -4974,6 +4974,59 @@ syntaxTemplate: "readFile({path}, 'utf8')",
       "constraints": [],
       "adaptationRules": []
     }
+  },
+  {
+    "id": "code.javascript.error-cause",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Errorへ原因情報を保持する",
+    "summary": "Error options causeによるエラー来歴保持。",
+    "concepts": [
+      "Error",
+      "cause",
+      "error chain"
+    ],
+    "inputs": [
+      "string-expression",
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "エラー原因を保持する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.javascript.error-cause"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "new Error({message}, { cause: {cause} })",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "message",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "cause",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
   }
 
 ];
@@ -8447,6 +8500,33 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
     "publicInterfaces": [],
     "tests": "CONTRACT_TEST:code.javascript.logical-assignment",
     "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.logical-assignment"
+  },
+  {
+    "knowledgeId": "code.javascript.error-cause",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Errorへ原因情報を保持する",
+    "implementation": "new Error({message}, { cause: {cause} })",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "string-expression",
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.javascript.error-cause",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.javascript.error-cause",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.error-cause"
   }
 
 ];

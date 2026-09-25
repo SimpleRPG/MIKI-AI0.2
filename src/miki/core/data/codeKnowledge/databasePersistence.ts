@@ -464,6 +464,164 @@ export const databasePersistenceCodeKnowledge: CodeKnowledgeDefinition[] = [
       "constraints": [],
       "adaptationRules": []
     }
+  },
+  {
+    "id": "code.database-persistence.delete",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "永続化データを条件に基づき削除する",
+    "summary": "Repository delete操作。",
+    "concepts": [
+      "delete",
+      "persistence"
+    ],
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "appliesWhen": [
+      "不要な永続データを削除する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.database-persistence.delete"
+    ],
+    "constructionProfile": {
+      "kind": "ASYNC",
+      "syntaxTemplate": "{repository}.delete({id})",
+      "outputKinds": [
+        "promise-expression"
+      ],
+      "slots": [
+        {
+          "name": "repository",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "id",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.database-persistence.find-one",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "永続化層から単一レコードを取得する",
+    "summary": "単一レコード検索。",
+    "concepts": [
+      "findOne",
+      "repository",
+      "query"
+    ],
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "appliesWhen": [
+      "キーや条件から単一データを取得する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.database-persistence.find-one"
+    ],
+    "constructionProfile": {
+      "kind": "ASYNC",
+      "syntaxTemplate": "{repository}.findOne({query})",
+      "outputKinds": [
+        "promise-expression"
+      ],
+      "slots": [
+        {
+          "name": "repository",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "query",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.database-persistence.batch",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "複数レコードをまとめて処理する",
+    "summary": "Batch persistence operation。",
+    "concepts": [
+      "batch",
+      "bulk",
+      "persistence"
+    ],
+    "inputs": [
+      "identifier",
+      "array-expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "appliesWhen": [
+      "大量のレコードをまとめて処理する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.database-persistence.batch"
+    ],
+    "constructionProfile": {
+      "kind": "ASYNC",
+      "syntaxTemplate": "{repository}.batch({records})",
+      "outputKinds": [
+        "promise-expression"
+      ],
+      "slots": [
+        {
+          "name": "repository",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "records",
+          "inputKinds": [
+            "array-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
   }
 
 ];
@@ -796,6 +954,87 @@ export const databasePersistenceCodeComponents: CodeComponentDefinition[] = [
     "publicInterfaces": [],
     "tests": "CONTRACT_TEST:code.database-persistence.pagination",
     "validation": "VALIDATE_CODE_CONSTRUCTION:code.database-persistence.pagination"
+  },
+  {
+    "knowledgeId": "code.database-persistence.delete",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "永続化データを条件に基づき削除する",
+    "implementation": "{repository}.delete({id})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.database-persistence.delete",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.database-persistence.delete",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.database-persistence.delete"
+  },
+  {
+    "knowledgeId": "code.database-persistence.find-one",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "永続化層から単一レコードを取得する",
+    "implementation": "{repository}.findOne({query})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.database-persistence.find-one",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.database-persistence.find-one",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.database-persistence.find-one"
+  },
+  {
+    "knowledgeId": "code.database-persistence.batch",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "複数レコードをまとめて処理する",
+    "implementation": "{repository}.batch({records})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "array-expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.database-persistence.batch",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.database-persistence.batch",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.database-persistence.batch"
   }
 
 ];

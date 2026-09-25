@@ -327,7 +327,106 @@ export const asyncConcurrencyCodeKnowledge: CodeKnowledgeDefinition[] = [
         constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
         adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
       },
-    },
+    },,
+  {
+    "id": "code.async-concurrency.debounce",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "短時間に集中した処理をまとめる",
+    "summary": "debounceによるイベント処理制御。",
+    "concepts": [
+      "debounce",
+      "timer",
+      "event"
+    ],
+    "inputs": [
+      "function-expression",
+      "expression"
+    ],
+    "outputs": [
+      "function-expression"
+    ],
+    "appliesWhen": [
+      "検索入力等の高頻度イベントを抑制する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.async-concurrency.debounce"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "debounce({handler}, {delay})",
+      "outputKinds": [
+        "function-expression"
+      ],
+      "slots": [
+        {
+          "name": "handler",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "delay",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.async-concurrency.all-settled",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "複数非同期処理の成功失敗をすべて収集する",
+    "summary": "Promise.allSettledによる結果収集。",
+    "concepts": [
+      "Promise.allSettled",
+      "concurrency",
+      "settled"
+    ],
+    "inputs": [
+      "array-expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "appliesWhen": [
+      "一部失敗しても全処理結果を確認する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.async-concurrency.all-settled"
+    ],
+    "constructionProfile": {
+      "kind": "ASYNC",
+      "syntaxTemplate": "Promise.allSettled({operations})",
+      "outputKinds": [
+        "promise-expression"
+      ],
+      "slots": [
+        {
+          "name": "operations",
+          "inputKinds": [
+            "array-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
 ];
 
 export const asyncConcurrencyCodeComponents: CodeComponentDefinition[] = [
@@ -596,5 +695,59 @@ export const asyncConcurrencyCodeComponents: CodeComponentDefinition[] = [
     publicInterfaces: [],
     tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.async-concurrency.stream-pipeline\\ninputs=['input']\\noutputs=['promise']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=await pipeline({source}, {destination});",
     validation: "VALIDATION_SPEC:\\nknowledge=code.async-concurrency.stream-pipeline\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },,
+  {
+    "knowledgeId": "code.async-concurrency.debounce",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "短時間に集中した処理をまとめる",
+    "implementation": "debounce({handler}, {delay})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "function-expression",
+      "expression"
+    ],
+    "outputs": [
+      "function-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.async-concurrency.debounce",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.async-concurrency.debounce",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.async-concurrency.debounce"
   },
+  {
+    "knowledgeId": "code.async-concurrency.all-settled",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "複数非同期処理の成功失敗をすべて収集する",
+    "implementation": "Promise.allSettled({operations})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "array-expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.async-concurrency.all-settled",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.async-concurrency.all-settled",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.async-concurrency.all-settled"
+  }
+
 ];

@@ -600,6 +600,173 @@ export const nodeRuntimeCodeKnowledge: CodeKnowledgeDefinition[] = [
       "constraints": [],
       "adaptationRules": []
     }
+  },
+  {
+    "id": "code.node.process-argv",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Node.jsのコマンドライン引数を取得する",
+    "summary": "process.argvによるCLI入力取得。",
+    "concepts": [
+      "process.argv",
+      "CLI"
+    ],
+    "inputs": [],
+    "outputs": [
+      "array-expression"
+    ],
+    "appliesWhen": [
+      "CLI引数を解析する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.node.process-argv"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "process.argv",
+      "outputKinds": [
+        "array-expression"
+      ],
+      "slots": [],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.node.process-exit-code",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Node.jsプロセスの終了コードを設定する",
+    "summary": "process.exitCodeによる終了状態設定。",
+    "concepts": [
+      "process.exitCode",
+      "exit code"
+    ],
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "appliesWhen": [
+      "CLIやバッチ処理の終了状態を示す"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.node.process-exit-code"
+    ],
+    "constructionProfile": {
+      "kind": "STATEMENT",
+      "syntaxTemplate": "process.exitCode = {code};",
+      "outputKinds": [
+        "statement"
+      ],
+      "slots": [
+        {
+          "name": "code",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.node.url",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Node.js URL APIを利用する",
+    "summary": "URL標準APIによるURL操作。",
+    "concepts": [
+      "URL",
+      "URLSearchParams"
+    ],
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "Node.js側でURLを解析・構成する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.node.url"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "new URL({value})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "value",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.node.buffer",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Bufferを利用してバイト列を扱う",
+    "summary": "Node.js Buffer API。",
+    "concepts": [
+      "Buffer",
+      "bytes",
+      "encoding"
+    ],
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "バイナリデータをNode.jsで扱う"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.node.buffer"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "Buffer.from({value})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "value",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
   }
 
 ];
@@ -1103,6 +1270,108 @@ export const nodeRuntimeCodeComponents: CodeComponentDefinition[] = [
     "publicInterfaces": [],
     "tests": "CONTRACT_TEST:code.node.stream-pipeline",
     "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.stream-pipeline"
+  },
+  {
+    "knowledgeId": "code.node.process-argv",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Node.jsのコマンドライン引数を取得する",
+    "implementation": "process.argv",
+    "targetPath": "generated.ts",
+    "inputs": [],
+    "outputs": [
+      "array-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.node.process-argv",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.node.process-argv",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.process-argv"
+  },
+  {
+    "knowledgeId": "code.node.process-exit-code",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Node.jsプロセスの終了コードを設定する",
+    "implementation": "process.exitCode = {code};",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.node.process-exit-code",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.node.process-exit-code",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.process-exit-code"
+  },
+  {
+    "knowledgeId": "code.node.url",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Node.js URL APIを利用する",
+    "implementation": "new URL({value})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.node.url",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.node.url",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.url"
+  },
+  {
+    "knowledgeId": "code.node.buffer",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Bufferを利用してバイト列を扱う",
+    "implementation": "Buffer.from({value})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.node.buffer",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.node.buffer",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.buffer"
   }
 
 ];

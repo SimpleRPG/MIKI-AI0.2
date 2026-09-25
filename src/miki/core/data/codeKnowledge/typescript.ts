@@ -2999,7 +2999,120 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
       constraints: ['type parameter must satisfy constraint'],
       adaptationRules: ['add constraint only when implementation requires it'],
     },
+  },,
+  {
+    "id": "code.typescript.indexed-access-type",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "型から特定プロパティの型を取得する",
+    "summary": "Indexed access type。",
+    "concepts": [
+      "indexed access",
+      "property type"
+    ],
+    "inputs": [
+      "type",
+      "expression"
+    ],
+    "outputs": [
+      "type"
+    ],
+    "appliesWhen": [
+      "型の特定メンバーへアクセスする"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.typescript.indexed-access-type"
+    ],
+    "constructionProfile": {
+      "kind": "TYPE",
+      "syntaxTemplate": "{source}[{key}]",
+      "outputKinds": [
+        "type"
+      ],
+      "slots": [
+        {
+          "name": "source",
+          "inputKinds": [
+            "type"
+          ],
+          "required": true
+        },
+        {
+          "name": "key",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
   },
+  {
+    "id": "code.typescript.function-overload",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "関数の複数入力シグネチャを定義する",
+    "summary": "Function overloadによる入力契約。",
+    "concepts": [
+      "overload",
+      "signature",
+      "implementation"
+    ],
+    "inputs": [
+      "identifier",
+      "type"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "appliesWhen": [
+      "入力型ごとに関数シグネチャを定義する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.typescript.function-overload"
+    ],
+    "constructionProfile": {
+      "kind": "DECLARATION",
+      "syntaxTemplate": "function {name}({parameters}): {returnType};",
+      "outputKinds": [
+        "statement"
+      ],
+      "slots": [
+        {
+          "name": "name",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "parameters",
+          "inputKinds": [
+            "parameter"
+          ],
+          "required": false
+        },
+        {
+          "name": "returnType",
+          "inputKinds": [
+            "type"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
 ];
 
 export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
@@ -5019,6 +5132,86 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
     "publicInterfaces": [],
     "tests": "CONTRACT_TEST:code.typescript.mapped-type",
     "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.mapped-type"
+  },
+  {
+    "knowledgeId": "code.typescript.indexed-access-type",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "型から特定プロパティの型を取得する",
+    "implementation": "{source}[{key}]",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "type",
+      "expression"
+    ],
+    "outputs": [
+      "type"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.typescript.indexed-access-type",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.typescript.indexed-access-type",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.indexed-access-type"
+  },
+  {
+    "knowledgeId": "code.typescript.template-literal-type",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "文字列リテラル型を組み合わせて型を生成する",
+    "implementation": "`${{source}}`",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "type"
+    ],
+    "outputs": [
+      "type"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.typescript.template-literal-type",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.typescript.template-literal-type",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.template-literal-type"
+  },
+  {
+    "knowledgeId": "code.typescript.function-overload",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "関数の複数入力シグネチャを定義する",
+    "implementation": "function {name}({parameters}): {returnType};",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "type"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.typescript.function-overload",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.typescript.function-overload",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.function-overload"
   }
 
 ];

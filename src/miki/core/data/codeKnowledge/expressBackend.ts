@@ -501,6 +501,145 @@ export const expressBackendCodeKnowledge: CodeKnowledgeDefinition[] = [
       "constraints": [],
       "adaptationRules": []
     }
+  },
+  {
+    "id": "code.express.json-middleware",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "JSONリクエストボディを解析する",
+    "summary": "Express JSON middleware。",
+    "concepts": [
+      "express.json",
+      "middleware",
+      "JSON"
+    ],
+    "inputs": [],
+    "outputs": [
+      "middleware-expression"
+    ],
+    "appliesWhen": [
+      "JSON APIのリクエスト本文を解析する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.express.json-middleware"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "express.json()",
+      "outputKinds": [
+        "middleware-expression"
+      ],
+      "slots": [],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.express.response-status-send",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "HTTPステータスと本文を返す",
+    "summary": "Response.status/sendによる応答。",
+    "concepts": [
+      "status",
+      "send",
+      "HTTP response"
+    ],
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "appliesWhen": [
+      "HTTP APIレスポンスを明示する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.express.response-status-send"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "{response}.status({status}).send({body})",
+      "outputKinds": [
+        "statement"
+      ],
+      "slots": [
+        {
+          "name": "response",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "status",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "body",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.express.static-middleware",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "静的ファイルを配信する",
+    "summary": "Express static middleware。",
+    "concepts": [
+      "express.static",
+      "static files"
+    ],
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "middleware-expression"
+    ],
+    "appliesWhen": [
+      "静的アセットを配信する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.express.static-middleware"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "express.static({root})",
+      "outputKinds": [
+        "middleware-expression"
+      ],
+      "slots": [
+        {
+          "name": "root",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
   }
 
 ];
@@ -892,6 +1031,83 @@ export const expressBackendCodeComponents: CodeComponentDefinition[] = [
     "publicInterfaces": [],
     "tests": "CONTRACT_TEST:code.express.response-cookie",
     "validation": "VALIDATE_CODE_CONSTRUCTION:code.express.response-cookie"
+  },
+  {
+    "knowledgeId": "code.express.json-middleware",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "JSONリクエストボディを解析する",
+    "implementation": "express.json()",
+    "targetPath": "generated.ts",
+    "inputs": [],
+    "outputs": [
+      "middleware-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.express.json-middleware",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.express.json-middleware",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.express.json-middleware"
+  },
+  {
+    "knowledgeId": "code.express.response-status-send",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "HTTPステータスと本文を返す",
+    "implementation": "{response}.status({status}).send({body})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.express.response-status-send",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.express.response-status-send",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.express.response-status-send"
+  },
+  {
+    "knowledgeId": "code.express.static-middleware",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "静的ファイルを配信する",
+    "implementation": "express.static({root})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "middleware-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.express.static-middleware",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.express.static-middleware",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.express.static-middleware"
   }
 
 ];

@@ -638,6 +638,132 @@ export const reactUiAccessibilityCodeKnowledge: CodeKnowledgeDefinition[] = [
       "constraints": [],
       "adaptationRules": []
     }
+  },
+  {
+    "id": "code.react-ui.list-key",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Reactリスト要素へ安定したkeyを付与する",
+    "summary": "リストレンダリングの識別キー。",
+    "concepts": [
+      "key",
+      "list rendering",
+      "identity"
+    ],
+    "inputs": [
+      "expression",
+      "jsx-child"
+    ],
+    "outputs": [
+      "jsx-child"
+    ],
+    "appliesWhen": [
+      "配列からUIリストを生成する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.react-ui.list-key"
+    ],
+    "constructionProfile": {
+      "kind": "STATEMENT",
+      "syntaxTemplate": "<>{items}</>",
+      "outputKinds": [
+        "jsx-child"
+      ],
+      "slots": [
+        {
+          "name": "items",
+          "inputKinds": [
+            "jsx-child"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.react-ui.lazy",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "コンポーネントを遅延ロードする",
+    "summary": "React.lazyによるcode splitting。",
+    "concepts": [
+      "React.lazy",
+      "lazy loading",
+      "Suspense"
+    ],
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "component-expression"
+    ],
+    "appliesWhen": [
+      "大きなUI部品を遅延ロードする"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.react-ui.lazy"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "lazy({loader})",
+      "outputKinds": [
+        "component-expression"
+      ],
+      "slots": [
+        {
+          "name": "loader",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.react-ui.use-id",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "アクセシビリティ用の安定したIDを生成する",
+    "summary": "useIdによる一意ID生成。",
+    "concepts": [
+      "useId",
+      "accessibility",
+      "id"
+    ],
+    "inputs": [],
+    "outputs": [
+      "string-expression"
+    ],
+    "appliesWhen": [
+      "labelとinput等を安定したIDで関連付ける"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.react-ui.use-id"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "useId()",
+      "outputKinds": [
+        "string-expression"
+      ],
+      "slots": [],
+      "constraints": [],
+      "adaptationRules": []
+    }
   }
 
 ];
@@ -1178,6 +1304,83 @@ export const reactUiAccessibilityCodeComponents: CodeComponentDefinition[] = [
     "publicInterfaces": [],
     "tests": "CONTRACT_TEST:code.react-ui.controlled-input",
     "validation": "VALIDATE_CODE_CONSTRUCTION:code.react-ui.controlled-input"
+  },
+  {
+    "knowledgeId": "code.react-ui.list-key",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Reactリスト要素へ安定したkeyを付与する",
+    "implementation": "<>{items}</>",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression",
+      "jsx-child"
+    ],
+    "outputs": [
+      "jsx-child"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.react-ui.list-key",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.react-ui.list-key",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.react-ui.list-key"
+  },
+  {
+    "knowledgeId": "code.react-ui.lazy",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "コンポーネントを遅延ロードする",
+    "implementation": "lazy({loader})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "component-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.react-ui.lazy",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.react-ui.lazy",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.react-ui.lazy"
+  },
+  {
+    "knowledgeId": "code.react-ui.use-id",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "アクセシビリティ用の安定したIDを生成する",
+    "implementation": "useId()",
+    "targetPath": "generated.ts",
+    "inputs": [],
+    "outputs": [
+      "string-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.react-ui.use-id",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.react-ui.use-id",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.react-ui.use-id"
   }
 
 ];

@@ -395,6 +395,149 @@ export const dataValidationCodeKnowledge: CodeKnowledgeDefinition[] = [
       "constraints": [],
       "adaptationRules": []
     }
+  },
+  {
+    "id": "code.data-validation.coerce",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "入力値を検証前に安全な型へ変換する",
+    "summary": "検証前のcoercion処理。",
+    "concepts": [
+      "coercion",
+      "normalization",
+      "validation"
+    ],
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "文字列等の入力を期待型へ正規化する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.data-validation.coerce"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "coerce({input})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "input",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.data-validation.assert",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "検証失敗時に明示的に処理を停止する",
+    "summary": "assertによる契約検証。",
+    "concepts": [
+      "assertion",
+      "contract",
+      "validation"
+    ],
+    "inputs": [
+      "boolean-expression",
+      "string-expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "appliesWhen": [
+      "必須条件を実行時に保証する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.data-validation.assert"
+    ],
+    "constructionProfile": {
+      "kind": "STATEMENT",
+      "syntaxTemplate": "assert({condition}, {message})",
+      "outputKinds": [
+        "statement"
+      ],
+      "slots": [
+        {
+          "name": "condition",
+          "inputKinds": [
+            "boolean-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "message",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.data-validation.normalize",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "入力値を検証可能な正規形へ整える",
+    "summary": "入力正規化処理。",
+    "concepts": [
+      "normalization",
+      "trim",
+      "canonicalization"
+    ],
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "検証前の入力を正規化する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.data-validation.normalize"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "normalize({input})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "input",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
   }
 
 ];
@@ -681,6 +824,85 @@ export const dataValidationCodeComponents: CodeComponentDefinition[] = [
     "publicInterfaces": [],
     "tests": "CONTRACT_TEST:code.data-validation.discriminated-union",
     "validation": "VALIDATE_CODE_CONSTRUCTION:code.data-validation.discriminated-union"
+  },
+  {
+    "knowledgeId": "code.data-validation.coerce",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "入力値を検証前に安全な型へ変換する",
+    "implementation": "coerce({input})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.data-validation.coerce",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.data-validation.coerce",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.data-validation.coerce"
+  },
+  {
+    "knowledgeId": "code.data-validation.assert",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "検証失敗時に明示的に処理を停止する",
+    "implementation": "assert({condition}, {message})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "boolean-expression",
+      "string-expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.data-validation.assert",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.data-validation.assert",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.data-validation.assert"
+  },
+  {
+    "knowledgeId": "code.data-validation.normalize",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "入力値を検証可能な正規形へ整える",
+    "implementation": "normalize({input})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.data-validation.normalize",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.data-validation.normalize",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.data-validation.normalize"
   }
 
 ];

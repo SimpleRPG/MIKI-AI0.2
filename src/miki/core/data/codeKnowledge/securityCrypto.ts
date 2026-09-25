@@ -508,6 +508,138 @@ export const securityCryptoCodeKnowledge: CodeKnowledgeDefinition[] = [
       "constraints": [],
       "adaptationRules": []
     }
+  },
+  {
+    "id": "code.security-crypto.safe-encoding",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "バイナリ値を安全なエンコーディングへ変換する",
+    "summary": "Buffer/base64等の安全な表現変換。",
+    "concepts": [
+      "encoding",
+      "base64",
+      "bytes"
+    ],
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "appliesWhen": [
+      "バイナリを保存・伝送可能な文字列表現へ変換する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.security-crypto.safe-encoding"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "{value}.toString('base64')",
+      "outputKinds": [
+        "string-expression"
+      ],
+      "slots": [
+        {
+          "name": "value",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.security-crypto.hash",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "入力から不可逆ハッシュを生成する",
+    "summary": "暗号学的ハッシュ。",
+    "concepts": [
+      "hash",
+      "SHA-256",
+      "digest"
+    ],
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "appliesWhen": [
+      "データ完全性確認等のハッシュを生成する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.security-crypto.hash"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "crypto.createHash({algorithm}).update({data}).digest('hex')",
+      "outputKinds": [
+        "string-expression"
+      ],
+      "slots": [
+        {
+          "name": "algorithm",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "data",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.security-crypto.random-uuid",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "衝突しにくい識別子を生成する",
+    "summary": "crypto.randomUUIDによるUUID生成。",
+    "concepts": [
+      "randomUUID",
+      "identifier",
+      "entropy"
+    ],
+    "inputs": [],
+    "outputs": [
+      "string-expression"
+    ],
+    "appliesWhen": [
+      "新規識別子を安全に生成する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.security-crypto.random-uuid"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "crypto.randomUUID()",
+      "outputKinds": [
+        "string-expression"
+      ],
+      "slots": [],
+      "constraints": [],
+      "adaptationRules": []
+    }
   }
 
 ];
@@ -877,6 +1009,82 @@ export const securityCryptoCodeComponents: CodeComponentDefinition[] = [
     "publicInterfaces": [],
     "tests": "CONTRACT_TEST:code.security-crypto.hmac",
     "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.hmac"
+  },
+  {
+    "knowledgeId": "code.security-crypto.safe-encoding",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "バイナリ値を安全なエンコーディングへ変換する",
+    "implementation": "{value}.toString('base64')",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.safe-encoding",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.safe-encoding",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.safe-encoding"
+  },
+  {
+    "knowledgeId": "code.security-crypto.hash",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "入力から不可逆ハッシュを生成する",
+    "implementation": "crypto.createHash({algorithm}).update({data}).digest('hex')",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.hash",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.hash",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.hash"
+  },
+  {
+    "knowledgeId": "code.security-crypto.random-uuid",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "衝突しにくい識別子を生成する",
+    "implementation": "crypto.randomUUID()",
+    "targetPath": "generated.ts",
+    "inputs": [],
+    "outputs": [
+      "string-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.random-uuid",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.random-uuid",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.random-uuid"
   }
 
 ];

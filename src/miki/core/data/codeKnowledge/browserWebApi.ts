@@ -525,6 +525,130 @@ export const browserWebApiCodeKnowledge: CodeKnowledgeDefinition[] = [
       "constraints": [],
       "adaptationRules": []
     }
+  },
+  {
+    "id": "code.browser-web-api.url",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "URLを解析・構成する",
+    "summary": "URL Web API。",
+    "concepts": [
+      "URL",
+      "URLSearchParams"
+    ],
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "URLを安全に分解・構成する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.browser-web-api.url"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "new URL({value})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "value",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.browser-web-api.abort-controller",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "非同期ブラウザ処理を中断可能にする",
+    "summary": "AbortControllerによるキャンセル。",
+    "concepts": [
+      "AbortController",
+      "AbortSignal",
+      "abort"
+    ],
+    "inputs": [],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "fetch等の処理へキャンセル制御を付与する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.browser-web-api.abort-controller"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "new AbortController()",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.browser-web-api.intersection-observer",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "要素の可視領域変化を監視する",
+    "summary": "IntersectionObserverによる可視状態監視。",
+    "concepts": [
+      "IntersectionObserver",
+      "visibility",
+      "viewport"
+    ],
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "スクロール連動UIや遅延処理を構成する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.browser-web-api.intersection-observer"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "new IntersectionObserver({callback})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "callback",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
   }
 
 ];
@@ -971,6 +1095,58 @@ export const browserWebApiCodeComponents: CodeComponentDefinition[] = [
     "publicInterfaces": [],
     "tests": "CONTRACT_TEST:code.browser-web-api.local-storage",
     "validation": "VALIDATE_CODE_CONSTRUCTION:code.browser-web-api.local-storage"
+  },
+  {
+    "knowledgeId": "code.browser-web-api.url",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "URLを解析・構成する",
+    "implementation": "new URL({value})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.browser-web-api.url",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.browser-web-api.url",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.browser-web-api.url"
+  },
+  {
+    "knowledgeId": "code.browser-web-api.intersection-observer",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "要素の可視領域変化を監視する",
+    "implementation": "new IntersectionObserver({callback})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.browser-web-api.intersection-observer",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.browser-web-api.intersection-observer",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.browser-web-api.intersection-observer"
   }
 
 ];

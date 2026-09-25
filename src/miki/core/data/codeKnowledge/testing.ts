@@ -992,6 +992,130 @@ export const additionalTestingCodeKnowledge: CodeKnowledgeDefinition[] = [
       "constraints": [],
       "adaptationRules": []
     }
+  },
+  {
+    "id": "code.testing.fake-timer",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "時間依存処理をテスト用時計で制御する",
+    "summary": "Fake timerによる時間制御。",
+    "concepts": [
+      "fake timer",
+      "clock",
+      "timer"
+    ],
+    "inputs": [],
+    "outputs": [
+      "statement"
+    ],
+    "appliesWhen": [
+      "setTimeout等を決定的にテストする"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.testing.fake-timer"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "useFakeTimers()",
+      "outputKinds": [
+        "statement"
+      ],
+      "slots": [],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.testing.expect-error",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "例外発生をテストする",
+    "summary": "throw/error contract assertion。",
+    "concepts": [
+      "error assertion",
+      "throw"
+    ],
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "appliesWhen": [
+      "不正入力等で例外が発生する契約を検証する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.testing.expect-error"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "expect({operation}).toThrow()",
+      "outputKinds": [
+        "statement"
+      ],
+      "slots": [
+        {
+          "name": "operation",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.testing.fixture",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "テスト用の初期データを構成する",
+    "summary": "再利用可能なtest fixture。",
+    "concepts": [
+      "fixture",
+      "test data",
+      "setup"
+    ],
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "テストデータを標準化する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.testing.fixture"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "createFixture({factory})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "factory",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
   }
 
 ];
@@ -1471,6 +1595,82 @@ export const additionalTestingCodeComponents: CodeComponentDefinition[] = [
     "publicInterfaces": [],
     "tests": "CONTRACT_TEST:code.testing.parameterized-case",
     "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.parameterized-case"
+  },
+  {
+    "knowledgeId": "code.testing.fake-timer",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "時間依存処理をテスト用時計で制御する",
+    "implementation": "useFakeTimers()",
+    "targetPath": "generated.ts",
+    "inputs": [],
+    "outputs": [
+      "statement"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.testing.fake-timer",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.testing.fake-timer",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.fake-timer"
+  },
+  {
+    "knowledgeId": "code.testing.expect-error",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "例外発生をテストする",
+    "implementation": "expect({operation}).toThrow()",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.testing.expect-error",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.testing.expect-error",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.expect-error"
+  },
+  {
+    "knowledgeId": "code.testing.fixture",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "テスト用の初期データを構成する",
+    "implementation": "createFixture({factory})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.testing.fixture",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.testing.fixture",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.fixture"
   }
 
 ];
