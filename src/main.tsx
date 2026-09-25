@@ -51,13 +51,10 @@ window.addEventListener('beforeunload', flushOnHide);
 
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 
-// App.tsx and several services (backgroundWorkerService, skillsService,
-// selfImprovementService, etc.) read persisted state synchronously on first
-// render/construction via storageService. Wait for it to finish hydrating
-// from SQLite/IndexedDB (and migrating any pre-existing localStorage data)
-// before mounting, so that first render already sees real data instead of
-// an empty cache.
-storageService.ready.finally(() => {
+// 初期Knowledge / ComponentはAPKに同梱されたCatalogから即時利用できる。
+// 永続StorageのHydrate完了をUI表示のブロッキング条件にしない。
+// Hydrate後に同じAppを再描画し、学習済み・探索済みのRuntime Stateを反映する。
+const renderApp = () => {
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
@@ -65,5 +62,10 @@ storageService.ready.finally(() => {
       </ErrorBoundary>
     </React.StrictMode>
   );
-});
+};
 
+renderApp();
+
+void storageService.ready.finally(() => {
+  renderApp();
+});
