@@ -303,7 +303,7 @@ class DomainIntegrationBootstrapService{
      error:'CODE_COMPONENT_IDS_REQUIRED',completedAt:Date.now()
    };
 
-   const results=componentIds.map(componentId=>{
+   const results=await Promise.all(componentIds.map(async componentId=>{
      const component=componentRegistryService.getComponent(componentId);
      if(!component)return {
        componentId,accepted:false,status:'FAILED',
@@ -333,6 +333,32 @@ class DomainIntegrationBootstrapService{
 
      if(refreshed.status==='PASSED'){
        const gate=componentPromotionService.validateForLimited(refreshed.suite_id);
+
+       if(gate.accepted){
+         const {reusableComponentFactoryService}=await import('./reusableComponentFactoryService');
+         const linked=reusableComponentFactoryService.findCodeComponentByRegistryId(componentId);
+         if(linked){
+           const {safeImprovementPipelineService}=await import('../../improvement/services/safeImprovementPipelineService');
+           const canary=safeImprovementPipelineService.startNewCodeComponentCanary(
+             componentId,
+             environment,
+             refreshed.suite_id,
+           );
+           if(canary){
+             return {
+               componentId,
+               accepted:canary.stage==='CANARY'||canary.stage==='ADOPTED',
+               status:canary.stage,
+               suiteId:refreshed.suite_id,
+               canaryRunId:canary.run_id,
+               previousStatus:gate.previousStatus,
+               nextStatus:gate.nextStatus,
+               reason:canary.reason,
+             };
+           }
+         }
+       }
+
        return {
          componentId,
          accepted:gate.accepted,
@@ -353,7 +379,7 @@ class DomainIntegrationBootstrapService{
        requestIds:refreshed.request_ids,
        reason:'Regression Suiteを作成済み。外部/Android Runnerの実行結果待ち。'
      };
-   });
+   }));
 
    const succeeded=results.length>0 && results.every(x=>x.status==='DEVICE_TESTED'||x.status==='VERIFIED');
    const failed=results.some(x=>x.status==='FAILED');

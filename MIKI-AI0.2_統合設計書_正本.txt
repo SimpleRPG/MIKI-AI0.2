@@ -7794,3 +7794,90 @@ Execution成功だけではVERIFIEDへ直接遷移しない。
 この処理は新しいOrchestrator、Result DB、Blackboard、分類を追加せず、
 既存CORE + 17分類、Blackboard、Execution Event、Component Verification、
 Component Regression、Component Promotionを接続して実現する。
+
+【実装確定追記：2026-09-25 自律コード改善 A/B接続】
+============================================================
+
+今回の自律コード改善接続は、新しいCanary/Reusableサービスを新設せず、
+既存のSafeImprovement / ImprovementCanaryRollback / ComponentPromotion /
+ReusableComponentFactoryを接続して完成させる。
+
+■ A. 新規CODE ComponentのCanary
+
+GENERATE_CANDIDATE
+↓
+CODE Component CANDIDATE
+↓
+既存 VERIFY_CODE_COMPONENT
+↓
+既存 Regression
+↓
+DEVICE_TESTED
+↓
+既存 SafeImprovementPipeline
+↓
+既存 ImprovementCanaryRollbackService（mode=NEW_COMPONENT）
+↓
+実利用Execution Evidence
+↓
+Canary PASS / FAIL
+↓
+PASS: ComponentPromotionServiceでVERIFIED
+↓
+FAIL: 旧版RollbackではなくComponent RegistryのREJECTEDへ隔離
+
+NEW_COMPONENTには復元対象となる旧版が存在しないため、
+既存Rollback処理を新規Rollback実装として複製しない。
+modeだけで既存Canary境界内の失敗処理を分岐する。
+
+■ B. Registry CODE ComponentとReusable Componentの正本リンク
+
+createCodeComponentCandidate()で作成されるRegistry Component（CC-*）と
+CODE Reusable Candidate（RC-CODE-*）をregistryComponentIdで明示的に関連付ける。
+
+VERIFIEDになったRegistry Componentについてのみ、
+実行Evidenceを確認したうえで既存ReusableComponentFactoryの
+MIKI_APPROVEDライフサイクルへ遷移する。
+
+retrieve()の承認条件を緩めてVERIFIEDを直接利用可能にする変更は禁止する。
+
+正規経路：
+VERIFIED Registry CODE
+↓
+実行Evidence
+↓
+linked CODE Reusable Candidate
+↓
+MIKI_APPROVED
+↓
+既存 retrieve()
+↓
+Universal Synthesis
+
+■ 重複実装禁止
+
+新しいCanaryService、RollbackService、Reusable承認Service、
+新しいRegistry、Result DB、独立Orchestratorは作らない。
+
+既存の
+・safeImprovementPipelineService
+・improvementCanaryRollbackService
+・componentRegressionService
+・componentPromotionService
+・componentRegistryService
+・reusableComponentFactoryService
+・evidenceService
+・CORE / Blackboard / Execution Event
+を接続して実現する。
+
+■ 完了条件
+
+新規CODE Componentについて、
+Regression PASS後に既存Canaryへ接続できること、
+Canary PASSでVERIFIEDへ進み、実行Evidenceを伴ってCODE Reusableが
+MIKI_APPROVEDになり、既存retrieve()/Universal Synthesisで再利用可能になること。
+
+Canary FAIL時は新規ComponentをREJECTEDへ隔離し、
+存在しない旧版へのRollbackを試みない。
+
+============================================================

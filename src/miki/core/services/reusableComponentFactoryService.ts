@@ -9,7 +9,7 @@ import type { ComponentSecurityClass } from '../../../types';
 export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
 export type ComponentSelectionMode='REUSE_AS_IS'|'ADAPT_EXISTING'|'COMPOSE_MULTIPLE'|'CREATE_NEW'|'ESCALATE_UNKNOWN';
-export interface ReusableComponentArtifact {componentId:string;componentKind:ReusableComponentKind;componentType:string;purpose:string;interfaceContract:Record<string,unknown>;inputs:string[];outputs:string[];prerequisites:string[];dependencies:string[];appliesWhen:string[];doesNotApplyWhen:string[];sourceEpisodeIds:string[];sourceLearningArtifactIds:string[];canonicalSha256:string;environmentFingerprint:string;lifecycleStatus:ReusableComponentLifecycle;usageCount:number;successCount:number;failureCount:number;lastUsedAt?:number;lastConfirmedAt?:number;supersededBy?:string;createdAt:number;updatedAt:number;}
+export interface ReusableComponentArtifact {componentId:string;registryComponentId?:string;componentKind:ReusableComponentKind;componentType:string;purpose:string;interfaceContract:Record<string,unknown>;inputs:string[];outputs:string[];prerequisites:string[];dependencies:string[];appliesWhen:string[];doesNotApplyWhen:string[];sourceEpisodeIds:string[];sourceLearningArtifactIds:string[];canonicalSha256:string;environmentFingerprint:string;lifecycleStatus:ReusableComponentLifecycle;usageCount:number;successCount:number;failureCount:number;lastUsedAt?:number;lastConfirmedAt?:number;supersededBy?:string;createdAt:number;updatedAt:number;}
 export interface KnowledgeComponentArtifact extends ReusableComponentArtifact {componentKind:'KNOWLEDGE';claimIds:string[];evidenceRefs:string[];sourceUrls:string[];sourceArtifactIds:string[];verificationStatus:'UNVERIFIED'|'VERIFIED'|'CONFLICT';contradictionRefs:string[];freshnessPolicy:string;}
 export interface CodeComponentArtifact extends ReusableComponentArtifact {componentKind:'CODE';exports:string[];imports:string[];publicInterfaces:string[];coreIngressPoints:string[];domainOwnership:string[];persistenceKeys:string[];uiEventEntrypoints:string[];testReferences:string[];requiredValidation:string[];}
 export interface ConversationComponentArtifact extends ReusableComponentArtifact {componentKind:'CONVERSATION';atomic:boolean;conversationState:string[];requiredInformation:string[];responseStructure:string[];prohibitedPatterns:string[];clarificationConditions:string[];verbosityConditions:string[];toolResultOrder:string[];}
@@ -307,6 +307,7 @@ class ReusableComponentFactoryService{
     uiEventEntrypoints:input.uiEventEntrypoints||[],
     testReferences:[targetPath],
     requiredValidation:['tests','validation','registry lifecycle','implementation hash'],
+    registryComponentId:componentPackage.component_id,
   }) as CodeComponentArtifact;
 
   this.storeCandidates([artifact]);
@@ -323,6 +324,34 @@ class ReusableComponentFactoryService{
  retrieve(input:{purpose:string;environmentFingerprint:string;kinds?:ReusableComponentKind[]}):{candidates:AnyReusableComponent[];excludedComponentIds:string[];exclusionReasons:Record<string,string>}{const words=this.words(input.purpose);const excludedComponentIds:string[]=[];const exclusionReasons:Record<string,string>={};const candidates=this.list().filter(item=>{if(input.kinds&&!input.kinds.includes(item.componentKind)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='KIND_NOT_SELECTED';return false;}if(!['MIKI_APPROVED','ACTIVE','USER_APPROVED'].includes(item.lifecycleStatus)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='NOT_MIKI_APPROVED';return false;}if(item.environmentFingerprint!=='unknown'&&item.environmentFingerprint!==input.environmentFingerprint){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='ENVIRONMENT_REVALIDATION_REQUIRED';return false;}const hay=this.words([item.purpose,...item.appliesWhen,item.componentType].join(' '));const matched=words.some(word=>hay.includes(word));if(!matched){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='PURPOSE_NOT_MATCHED';}return matched;});return {candidates,excludedComponentIds,exclusionReasons};}
  plan(input:{taskId:string;purpose:string;environmentFingerprint:string;requiredKinds?:ReusableComponentKind[]}):ComponentPack{const found=this.retrieve({purpose:input.purpose,environmentFingerprint:input.environmentFingerprint,kinds:input.requiredKinds});const knowledge=found.candidates.filter(x=>x.componentKind==='KNOWLEDGE').map(x=>x.componentId);const code=found.candidates.filter(x=>x.componentKind==='CODE').map(x=>x.componentId);const conversation=found.candidates.filter(x=>x.componentKind==='CONVERSATION').map(x=>x.componentId);const unresolved=(input.requiredKinds||[]).filter(kind=>!found.candidates.some(x=>x.componentKind===kind)).map(kind=>`${kind}_COMPONENT_REQUIRED`);const context={taskId:input.taskId,knowledge,code,conversation,excluded:found.excludedComponentIds,environmentFingerprint:input.environmentFingerprint,unresolved};const componentContextSha256=canonicalSha256Object(context);return {componentPackId:`CPACK-${componentContextSha256.slice(0,20)}`,knowledgePackId:`KPACK-${canonicalSha256Object(knowledge).slice(0,20)}`,usedKnowledgeComponentIds:knowledge,usedCodeComponentIds:code,usedConversationComponentIds:conversation,adaptedComponentIds:[],createdComponentIds:[],excludedComponentIds:found.excludedComponentIds,exclusionReasons:found.exclusionReasons,environmentFingerprint:input.environmentFingerprint,unresolvedComponentNeeds:unresolved,componentContextSha256,packSha256:canonicalSha256Object({...context,componentContextSha256})};}
  recordUsage(input:Omit<ComponentUsageReceipt,'usageReceiptId'|'createdAt'|'receiptSha256'>):ComponentUsageReceipt{const createdAt=Date.now();const base={...input,componentIds:[...input.componentIds],createdAt};const receiptSha256=canonicalSha256Object(base);const receipt={...base,usageReceiptId:`CUR-${receiptSha256.slice(0,20)}`,receiptSha256};const receipts=this.read<ComponentUsageReceipt>(RECEIPT_KEY);storageService.setItem(RECEIPT_KEY,JSON.stringify([receipt,...receipts.filter(x=>x.usageReceiptId!==receipt.usageReceiptId)].slice(0,2000)));this.updateOutcome(receipt.componentIds,receipt.outcome);return receipt;}
+ findCodeComponentByRegistryId(registryComponentId:string):CodeComponentArtifact|undefined{
+  return this.list().find(item =>
+    item.componentKind==='CODE' &&
+    item.registryComponentId===registryComponentId
+  ) as CodeComponentArtifact|undefined;
+ }
+ approveCodeComponentForRegistry(registryComponentId:string,evidenceIds:string[]):{accepted:boolean;componentId:string;reason:string}{
+  const registryComponent=componentRegistryService.getComponent(registryComponentId);
+  if(!registryComponent)return {accepted:false,componentId:registryComponentId,reason:'REGISTRY_COMPONENT_NOT_FOUND'};
+  if(registryComponent.status!=='VERIFIED')return {accepted:false,componentId:registryComponentId,reason:`REGISTRY_COMPONENT_NOT_VERIFIED:${registryComponent.status}`};
+  if(evidenceIds.length===0)return {accepted:false,componentId:registryComponentId,reason:'CODE_REUSABLE_APPROVAL_EVIDENCE_REQUIRED'};
+
+  const linked=this.findCodeComponentByRegistryId(registryComponentId);
+  if(!linked)return {accepted:false,componentId:registryComponentId,reason:'LINKED_CODE_REUSABLE_NOT_FOUND'};
+  if(['MIKI_APPROVED','ACTIVE'].includes(linked.lifecycleStatus)){
+    return {accepted:true,componentId:linked.componentId,reason:'CODE_REUSABLE_ALREADY_APPROVED'};
+  }
+  if(!['CANDIDATE','VERIFIED'].includes(linked.lifecycleStatus)){
+    return {accepted:false,componentId:linked.componentId,reason:`CODE_REUSABLE_LIFECYCLE_NOT_APPROVABLE:${linked.lifecycleStatus}`};
+  }
+
+  linked.lifecycleStatus='MIKI_APPROVED';
+  linked.lastConfirmedAt=Date.now();
+  linked.updatedAt=Date.now();
+  this.storeCandidates([linked]);
+  return {accepted:true,componentId:linked.componentId,reason:'CODE_REUSABLE_MIKI_APPROVED_FROM_VERIFIED_REGISTRY'};
+ }
+
  updateLifecycle(componentId:string,status:ReusableComponentLifecycle,supersededBy?:string):AnyReusableComponent|undefined{const items=this.list();const item=items.find(x=>x.componentId===componentId);if(!item)return undefined;if(status==='ACTIVE'&&!['VERIFIED','USER_APPROVED','MIKI_APPROVED','REVALIDATION_REQUIRED'].includes(item.lifecycleStatus))throw new Error('COMPONENT_ACTIVE_GATE_FAILED');item.lifecycleStatus=status;item.supersededBy=supersededBy;item.updatedAt=Date.now();storageService.setItem(COMPONENT_KEY,JSON.stringify(items));return item;}
  approveByCore(componentIds?:string[]):{approvedComponentIds:string[];rejectedComponentIds:string[];reasons:Record<string,string>;changed:boolean}{const approvedComponentIds:string[]=[],rejectedComponentIds:string[]=[],reasons:Record<string,string>={};const requestedIds=componentIds&&componentIds.length>0?new Set(componentIds):undefined;const artifacts=reviewLearningArtifactService.list();const activeGeneralized=(id:string)=>{const a=artifacts.find(x=>x.artifactId===id);return Boolean(a&&a.artifactType==='ARCHIVED')?false:Boolean(a&&a.artifactType==='ACCEPTED_PATTERN'&&a.lifecycleStatus==='ACTIVE'&&a.scope==='GENERALIZED');};for(const item of this.list()){
 if(requestedIds&&!requestedIds.has(item.componentId))continue;

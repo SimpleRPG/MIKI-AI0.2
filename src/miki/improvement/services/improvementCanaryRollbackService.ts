@@ -8,6 +8,7 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 
 export type CanaryStatus = 'PENDING' | 'RUNNING' | 'PASSED' | 'FAILED' | 'ROLLED_BACK';
+export type CanaryMode = 'REPLACEMENT' | 'NEW_COMPONENT';
 
 export interface ImprovementCanaryRecord {
   canary_id: string;
@@ -22,6 +23,7 @@ export interface ImprovementCanaryRecord {
   min_samples: number;
   max_failure_rate: number;
   status: CanaryStatus;
+  mode: CanaryMode;
   sample_count: number;
   success_count: number;
   failure_count: number;
@@ -76,6 +78,7 @@ export class ImprovementCanaryRollbackService {
     before: ImprovementExperimentSnapshot;
     minSamples?: number;
     maxFailureRate?: number;
+    mode?: CanaryMode;
   }): ImprovementCanaryRecord {
     const now = Date.now();
     const record: ImprovementCanaryRecord = {
@@ -91,6 +94,7 @@ export class ImprovementCanaryRollbackService {
       adopted_at: now,
       min_samples: Math.max(1, params.minSamples ?? 3),
       max_failure_rate: Math.max(0, Math.min(1, params.maxFailureRate ?? 0.20)),
+      mode: params.mode ?? 'REPLACEMENT',
       status: 'PENDING',
       sample_count: 0,
       success_count: 0,
@@ -105,7 +109,7 @@ export class ImprovementCanaryRollbackService {
 
   public setCanaryHash(runId: string, canaryHash: string): ImprovementCanaryRecord | undefined {
     const r = this.records.get(runId);
-    if (!r || !canaryHash || canaryHash === r.before_hash) return r;
+    if (!r || !canaryHash || (canaryHash === r.before_hash && r.mode !== 'NEW_COMPONENT')) return r;
     r.canary_hash = canaryHash;
     r.adopted_at = Date.now();
     r.status = 'RUNNING';
@@ -152,6 +156,25 @@ export class ImprovementCanaryRollbackService {
     if (current.implementation_hash !== r.canary_hash) {
       return { accepted: false, reason: '現在版hashがCanary hashと一致しません。別変更が入ったため自動Rollbackを停止します。' };
     }
+
+    // NEW_COMPONENTには戻すべき旧版が存在しない。既存Rollback基盤を再利用し、
+    // 失敗時は安全にREJECTEDへ隔離する。
+    if (r.mode === 'NEW_COMPONENT') {
+      const rejected = componentRegistryService.advanceComponentStatus(
+        r.component_id,
+        'REJECTED',
+        `NEW_COMPONENT Canary失敗のため隔離: ${reason}`,
+      );
+      if (!rejected.success) return { accepted: false, reason: rejected.message };
+      r.status = 'ROLLED_BACK';
+      r.rollback_reason = reason;
+      r.rolled_back_at = Date.now();
+      r.updated_at = Date.now();
+      this.save();
+      systemLogger.warn('SELF_IMPROVEMENT', `🛡️ [Canary] ${r.component_id} new-component reject: ${reason}`);
+      return { accepted: true, reason: `新規ComponentをREJECTEDへ隔離しました: ${reason}` };
+    }
+
     const restored = componentRegistryService.rollbackToSnapshot(r.baseline, reason);
     if (!restored.success) return { accepted: false, reason: restored.message };
     r.status = 'ROLLED_BACK';

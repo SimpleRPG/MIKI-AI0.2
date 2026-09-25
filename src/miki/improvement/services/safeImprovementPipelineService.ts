@@ -9,6 +9,8 @@ import { improvementCanaryRollbackService } from './improvementCanaryRollbackSer
 import { selfImprovementExperimentService } from './selfImprovementExperimentService';
 import { unifiedValidationCoordinatorService } from '../../verification/services/unifiedValidationCoordinatorService';
 import { crossDomainCirculationService } from '../../core/services/crossDomainCirculationService';
+import { evidenceService } from '../../memory/services/evidenceService';
+import { reusableComponentFactoryService } from '../../core/services/reusableComponentFactoryService';
 
 export type SafeImprovementStage = 'PROPOSED' | 'REGRESSION_PLANNED' | 'WAITING_RESULTS' | 'PASSED' | 'CANARY' | 'REJECTED' | 'ADOPTED' | 'ROLLED_BACK';
 
@@ -26,6 +28,7 @@ export interface SafeImprovementRun {
   base_component_id?: string;
   canary_id?: string;
   before_snapshot_at?: number;
+  new_component_mode?: boolean;
 }
 
 /**
@@ -52,6 +55,41 @@ export class SafeImprovementPipelineService {
     componentImprovementCandidateService.markTesting(candidateId);
     this.runs.set(run.run_id, run); this.save();
     return run;
+  }
+
+  public startNewCodeComponentCanary(
+    componentId: string,
+    environment: ExecutionEnvironment,
+    suiteId: string,
+  ): SafeImprovementRun | undefined {
+    const linked = reusableComponentFactoryService.findCodeComponentByRegistryId(componentId);
+    if (!linked) return undefined;
+
+    const existing = this.list().find(run =>
+      run.component_id === componentId &&
+      run.environment === environment &&
+      run.new_component_mode === true &&
+      (run.stage === 'CANARY' || run.stage === 'ADOPTED')
+    );
+    if (existing) return existing;
+
+    const component = componentRegistryService.getComponent(componentId);
+    if (!component) return undefined;
+    if (component.status !== 'DEVICE_TESTED') return undefined;
+
+    const suite = componentRegressionService.get(suiteId);
+    if (!suite || suite.status !== 'PASSED') return undefined;
+
+    const run = this.propose(componentId, environment);
+    run.suite_id = suiteId;
+    run.new_component_mode = true;
+    run.stage = 'PASSED';
+    run.reason = '新規CODE ComponentのRegression PASSを既存SafeImprovement/Canary境界へ接続します。';
+    run.updated_at = Date.now();
+    this.runs.set(run.run_id, run);
+    this.save();
+    this.adopt(run.run_id);
+    return this.runs.get(run.run_id);
   }
 
   public propose(componentId: string, environment: ExecutionEnvironment): SafeImprovementRun {
@@ -113,6 +151,50 @@ export class SafeImprovementPipelineService {
   public adopt(runId: string): ComponentPromotionResult {
     const run = this.refresh(runId);
     if (!run) return { componentId: '', accepted: false, reason: 'Safe Improvement Runが存在しません。' };
+    if (run.new_component_mode) {
+      if (!run.suite_id) return { componentId: run.component_id, accepted: false, reason: 'Regression Suiteが未作成です。' };
+      if (run.stage !== 'PASSED') return { componentId: run.component_id, accepted: false, suiteId: run.suite_id, reason: `現在stage=${run.stage}。Regression PASSが必要です。` };
+
+      const limited = componentPromotionService.validateForLimited(run.suite_id);
+      if (!limited.accepted) {
+        run.stage = 'REJECTED';
+        run.reason = limited.reason;
+        run.updated_at = Date.now();
+        this.save();
+        return limited;
+      }
+
+      const component = componentRegistryService.getComponent(run.component_id);
+      if (!component || component.status !== 'DEVICE_TESTED') {
+        run.stage = 'REJECTED';
+        run.reason = '新規CODE ComponentはDEVICE_TESTED後でなければCanaryへ進めません。';
+        run.updated_at = Date.now();
+        this.save();
+        return { ...limited, accepted: false, reason: run.reason };
+      }
+
+      const before = selfImprovementExperimentService.snapshot();
+      const canary = improvementCanaryRollbackService.begin({
+        runId: run.run_id,
+        component,
+        environment: run.environment,
+        before,
+        minSamples: 3,
+        maxFailureRate: 0.20,
+        mode: 'NEW_COMPONENT',
+      });
+      improvementCanaryRollbackService.setCanaryHash(run.run_id, component.implementation_hash);
+      run.canary_id = canary.canary_id;
+      run.before_snapshot_at = before.createdAt;
+      run.stage = 'CANARY';
+      run.reason = `新規CODE Componentを既存Canaryへ接続しました。${canary.min_samples}件以上の実利用Evidenceを待機します。`;
+      run.updated_at = Date.now();
+      this.runs.set(run.run_id, run);
+      this.save();
+      systemLogger.info('SELF_IMPROVEMENT', `🛡️ [SafeImprovement] ${run.component_id}: NEW_COMPONENT CANARY`);
+      return { ...limited, accepted: true, reason: run.reason };
+    }
+
     if (run.candidate_id) {
       const validation = unifiedValidationCoordinatorService.canPromote(run.candidate_id, run.implementation_hash);
       if (!validation.allowed) {
@@ -185,8 +267,33 @@ export class SafeImprovementPipelineService {
         run.stage = 'REJECTED';
         run.reason = `${evaluation.reason} Canaryは通過しましたが正式昇格を停止: ${promoted.reason}`;
       } else {
-        run.stage = 'ADOPTED';
-        run.reason = `${evaluation.reason} Canary通過。正式VERIFIEDへ昇格しました。`;
+        const promotionEvidenceIds = evidenceService.list()
+          .filter(e =>
+            e.kind === 'EXECUTION' &&
+            e.status !== 'REJECTED' &&
+            e.metadata?.component_id === run.component_id &&
+            e.metadata?.implementation_hash === run.implementation_hash &&
+            e.metadata?.environment === run.environment &&
+            e.metadata?.passed === true
+          )
+          .map(e => e.evidence_id);
+
+        if (run.new_component_mode) {
+          const approved = reusableComponentFactoryService.approveCodeComponentForRegistry(
+            run.component_id,
+            promotionEvidenceIds,
+          );
+          if (!approved.accepted) {
+            run.stage = 'REJECTED';
+            run.reason = `${evaluation.reason} VERIFIED後のCODE Reusable承認を停止: ${approved.reason}`;
+          } else {
+            run.stage = 'ADOPTED';
+            run.reason = `${evaluation.reason} Canary通過 → VERIFIED → CODE Reusable MIKI_APPROVED。`;
+          }
+        } else {
+          run.stage = 'ADOPTED';
+          run.reason = `${evaluation.reason} Canary通過。正式VERIFIEDへ昇格しました。`;
+        }
       }
     } else if (evaluation.status === 'FAILED') {
       const rollback = improvementCanaryRollbackService.rollback(runId, evaluation.reason);
