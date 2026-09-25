@@ -769,8 +769,32 @@ class AdaptiveRoutePlannerService {
           return String(value?.operation||'')==='VERIFY_RESEARCH_CLAIMS';
         });
 
-      const researchVerificationValue=latestResearchVerification
+      const researchVerificationEnvelope=latestResearchVerification
         ? objectValue(latestResearchVerification.entry)
+        : undefined;
+
+      const researchVerificationValue=researchVerificationEnvelope
+        ? (
+          researchVerificationEnvelope.result &&
+          typeof researchVerificationEnvelope.result==='object' &&
+          !Array.isArray(researchVerificationEnvelope.result)
+            ? researchVerificationEnvelope.result as Record<string,unknown>
+            : researchVerificationEnvelope.reply &&
+              typeof researchVerificationEnvelope.reply==='object' &&
+              !Array.isArray(researchVerificationEnvelope.reply)
+              ? (
+                (researchVerificationEnvelope.reply as Record<string,unknown>).data &&
+                typeof (researchVerificationEnvelope.reply as Record<string,unknown>).data==='object' &&
+                !Array.isArray((researchVerificationEnvelope.reply as Record<string,unknown>).data)
+                  ? (researchVerificationEnvelope.reply as Record<string,unknown>).data as Record<string,unknown>
+                  : (researchVerificationEnvelope.reply as Record<string,unknown>).result &&
+                    typeof (researchVerificationEnvelope.reply as Record<string,unknown>).result==='object' &&
+                    !Array.isArray((researchVerificationEnvelope.reply as Record<string,unknown>).result)
+                    ? (researchVerificationEnvelope.reply as Record<string,unknown>).result as Record<string,unknown>
+                    : researchVerificationEnvelope.reply as Record<string,unknown>
+              )
+              : researchVerificationEnvelope
+        )
         : undefined;
 
       const researchVerificationClaimIds=researchVerificationValue
@@ -908,16 +932,38 @@ class AdaptiveRoutePlannerService {
         'LOCAL_EVIDENCE'
       ].includes(resolutionStatus);
 
-      if(unknownResolved || researchResolutionCompleted){
+      /*
+       * Research自身がresolved=trueでなくても、生成された全Claimが
+       * VERIFY_RESEARCH_CLAIMSで検証済みならCOREとして知識解決済みとする。
+       * Research execution successだけではCandidate再生成しない。
+       */
+      const researchVerificationResolved =
+        researchVerificationSucceeded &&
+        researchClaimIds.length>0 &&
+        researchHasEvidence;
+
+      const unknownOrResearchResolved =
+        unknownResolved ||
+        researchResolutionCompleted ||
+        researchVerificationResolved;
+
+      if(unknownOrResearchResolved){
+        const previousCandidate=this.extractCandidateIdentity(latestCandidate);
+        const previousRevision=Math.max(
+          Number(previousCandidate.candidateRevision||0),
+          Number(input.candidateRevision||0),
+          1
+        );
+
         routes.push({
           target:'selfDevelopment',
           command:'GENERATE_CANDIDATE',
-          reason:'CORE completed the existing Unknown/Research resolution path and re-evaluated Candidate generation with the original component-gap failure as feedback',
+          reason:'CORE completed Unknown/Research resolution and re-evaluated Candidate generation using verified Research evidence as feedback',
           payload:{
             taskId:task.taskId,
             runId:this.resolveCoreRunId(task,input),
             goal:task.goal,
-            candidateRevision:Number(input.candidateRevision||1)+1,
+            candidateRevision:previousRevision+1,
             targetFiles:coreTargetPaths,
             requirements:input.requirements,
             prohibitions:input.prohibitions,
@@ -934,9 +980,12 @@ class AdaptiveRoutePlannerService {
                 unknownResolutionStatus:resolutionStatus,
                 researchCompleted,
                 researchHasEvidence,
-                researchEvidenceIds
+                researchEvidenceIds,
+                researchClaimIds,
+                researchVerificationSucceeded,
+                researchVerificationClaimIds
               },
-              retryOfCandidateRevision:Number(input.candidateRevision||1)
+              retryOfCandidateRevision:previousRevision
             },
             adaptive:true,
             priority:80
