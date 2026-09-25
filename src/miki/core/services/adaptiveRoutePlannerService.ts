@@ -547,9 +547,34 @@ class AdaptiveRoutePlannerService {
         return String(value?.operation||'') === 'VERIFY_CODE_COMPONENT';
       });
 
-    const codeComponentVerificationExists =
+    const latestCodeComponentVerificationValue =
+      latestCodeComponentVerification
+        ? objectValue(latestCodeComponentVerification.entry)
+        : undefined;
+
+    const latestCodeComponentVerificationStatus =
+      String(latestCodeComponentVerificationValue?.status || '').toUpperCase();
+
+    const codeComponentVerificationWaiting =
       createdCodeComponentIds.length > 0 &&
-      Boolean(latestCodeComponentVerification);
+      Boolean(latestCodeComponentVerification) &&
+      (
+        latestCodeComponentVerificationStatus === 'WAITING_EXECUTION' ||
+        latestCodeComponentVerificationStatus === 'PROCESSING' ||
+        latestCodeComponentVerificationStatus === 'ACCEPTED'
+      );
+
+    const codeComponentVerificationSucceeded =
+      createdCodeComponentIds.length > 0 &&
+      Boolean(latestCodeComponentVerification) &&
+      (
+        latestCodeComponentVerificationStatus === 'SUCCEEDED' ||
+        latestCodeComponentVerificationStatus === 'DEVICE_TESTED' ||
+        latestCodeComponentVerificationStatus === 'VERIFIED'
+      );
+
+    const codeComponentVerificationExists =
+      codeComponentVerificationSucceeded;
 
     if(
       createdCodeComponentIds.length > 0 &&
@@ -558,7 +583,9 @@ class AdaptiveRoutePlannerService {
       routes.push({
         target:'verification',
         command:'VERIFY_CODE_COMPONENT',
-        reason:'CORE detected newly created CODE Component Candidates and selected their execution verification before reuse',
+        reason:codeComponentVerificationWaiting
+          ? 'CORE received the CODE Component execution continuation and re-evaluates the existing Regression Gate'
+          : 'CORE detected newly created CODE Component Candidates and selected their execution verification before reuse',
         payload:{
           taskId:task.taskId,
           runId:this.resolveCoreRunId(task,input),

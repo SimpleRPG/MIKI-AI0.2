@@ -7737,3 +7737,60 @@ CORE再評価
 UNKNOWN / IMPLEMENTATION_MATERIAL_INSUFFICIENT
 
 としてCOREへ返し、追加Researchまたは補助的なExternal Teacher経路へ進む。
+
+
+============================================================
+【実装照合追記：2026-09-25 CODE Component Execution Event再評価】
+============================================================
+
+新規CODE Componentの検証は、初回VERIFY_CODE_COMPONENT実行だけで完了扱いにしない。
+
+正規経路：
+
+GENERATE_CANDIDATE
+↓
+CODE Component Candidate
+↓
+VERIFY_CODE_COMPONENT
+↓
+Regression Suite作成
+↓
+WAITING_EXECUTION
+↓
+Android / Runner
+↓
+Execution Event
+↓
+CORE resume
+↓
+adaptiveRoutePlannerService再評価
+↓
+既存VERIFY_CODE_COMPONENTを再評価・再実行
+↓
+ComponentRegressionService.refresh()
+↓
+Regression PASS
+↓
+ComponentPromotionService.validateForLimited()
+↓
+DEVICE_TESTED
+↓
+CORE再評価
+↓
+必要なCandidate Workspace検証・Review・Canary等へ進む
+
+重要：
+VERIFY_CODE_COMPONENTの存在だけを「検証成功」と判定してはならない。
+
+WAITING_EXECUTION / PROCESSING / ACCEPTED は未完了状態として扱い、
+Execution Event後のCORE再評価で既存Regression Gateを再取得する。
+
+SUCCEEDED / DEVICE_TESTED / VERIFIED等の成功状態になった場合のみ、
+CODE Component Execution Verificationの完了として扱う。
+
+Execution成功だけではVERIFIEDへ直接遷移しない。
+正式VERIFIEDへの昇格は既存Canary / Promotion Gateを通過した場合だけ許可する。
+
+この処理は新しいOrchestrator、Result DB、Blackboard、分類を追加せず、
+既存CORE + 17分類、Blackboard、Execution Event、Component Verification、
+Component Regression、Component Promotionを接続して実現する。
