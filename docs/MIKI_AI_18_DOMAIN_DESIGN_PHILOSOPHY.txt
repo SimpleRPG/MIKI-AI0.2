@@ -1258,3 +1258,16 @@ CORE
 → CORE
 
 設計・コード・機械検証の三者が一致するまで、この設計更新を実装完了とは扱わない。
+
+### 2026-09-26 Code Construction Vocabulary Expansion 2
+
+既存の汎用合成機とConstruction Graphをそのまま利用し、生成可能なコード構文・API部品を追加する。
+
+追加範囲:
+- JavaScript: if/else、switch、while/for、break/continue、try/catch/finally、throw、ternary、optional chaining、nullish coalescing、destructuring、Array/String/Object/Promise、async/arrow function、JSON
+- TypeScript: union/intersection、generic function/constraint、typeof/keyof、optional property、narrowing、type assertion、utility types、declare、module import/export
+- React/TSX: Function Component、state functional update、effect、memo/callback、基本JSX要素、画像・リンク・form、context
+- Express: Router route、request header、response type/cookie/status/send、static、Router接続
+
+これらはすべて既存Knowledge + CODE_CONSTRUCTIONとして登録し、既存Construction Graph → renderer経路から利用する。
+新しいコード生成エンジン、第二の合成機、19個目の分類は作らない。

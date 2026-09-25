@@ -1069,8 +1069,799 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/functions.html"],
   sourceArtifactIds: ["typescript-return-type"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "{type}", outputKinds: ["type-expression"], slots: [{ name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
+{
+  "id": "code.typescript.union-type",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数候補を表すUnion Typeを構成する",
+  "summary": "複数候補を表すUnion Typeを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "union",
+    "type",
+    "identifier",
+    "type-expression"
+  ],
+  "inputs": [
+    "identifier",
+    "type-expression",
+    "type-expression"
+  ],
+  "outputs": [
+    "type-expression"
+  ],
+  "appliesWhen": [
+    "複数候補を表すUnion Typeを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.union-type"
+  ],
+  "constructionProfile": {
+    "kind": "TYPE",
+    "syntaxTemplate": "type {name} = {left} | {right};",
+    "outputKinds": [
+      "type-expression"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "left",
+        "inputKinds": [
+          "type-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "right",
+        "inputKinds": [
+          "type-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.intersection-type",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数型を同時に満たすIntersection Typeを構成する",
+  "summary": "複数型を同時に満たすIntersection Typeを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "intersection",
+    "type",
+    "identifier",
+    "type-expression"
+  ],
+  "inputs": [
+    "identifier",
+    "type-expression",
+    "type-expression"
+  ],
+  "outputs": [
+    "type-expression"
+  ],
+  "appliesWhen": [
+    "複数型を同時に満たすIntersection Typeを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.intersection-type"
+  ],
+  "constructionProfile": {
+    "kind": "TYPE",
+    "syntaxTemplate": "type {name} = {left} & {right};",
+    "outputKinds": [
+      "type-expression"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "left",
+        "inputKinds": [
+          "type-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "right",
+        "inputKinds": [
+          "type-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.generic-interface-constraint",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Generic Interfaceに型制約を付ける",
+  "summary": "Generic Interfaceに型制約を付ける。既存Construction Graphで再利用する。",
+  "concepts": [
+    "generic",
+    "interface",
+    "constraint",
+    "identifier",
+    "type-expression",
+    "statement"
+  ],
+  "inputs": [
+    "identifier",
+    "type-expression",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Generic Interfaceに型制約を付ける"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.generic-interface-constraint"
+  ],
+  "constructionProfile": {
+    "kind": "DECLARATION",
+    "syntaxTemplate": "interface {name}<T extends {constraint}> {\\n{body}\\n}",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "constraint",
+        "inputKinds": [
+          "type-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "body",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.typeof-type-query",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "既存valueの型をType位置で取得する",
+  "summary": "既存valueの型をType位置で取得する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "typeof",
+    "type",
+    "query",
+    "identifier",
+    "type-expression"
+  ],
+  "inputs": [
+    "identifier",
+    "identifier"
+  ],
+  "outputs": [
+    "type-expression"
+  ],
+  "appliesWhen": [
+    "既存valueの型をType位置で取得する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.typeof-type-query"
+  ],
+  "constructionProfile": {
+    "kind": "TYPE",
+    "syntaxTemplate": "type {name} = typeof {value};",
+    "outputKinds": [
+      "type-expression"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "value",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.keyof-type-query",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Typeのproperty key Unionを取得する",
+  "summary": "Typeのproperty key Unionを取得する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "keyof",
+    "type",
+    "query",
+    "identifier",
+    "type-expression"
+  ],
+  "inputs": [
+    "identifier"
+  ],
+  "outputs": [
+    "type-expression"
+  ],
+  "appliesWhen": [
+    "Typeのproperty key Unionを取得する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.keyof-type-query"
+  ],
+  "constructionProfile": {
+    "kind": "TYPE",
+    "syntaxTemplate": "type {name}<T> = keyof T;",
+    "outputKinds": [
+      "type-expression"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.union-narrowing",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "UnionをtypeofでNarrowingする",
+  "summary": "UnionをtypeofでNarrowingする。既存Construction Graphで再利用する。",
+  "concepts": [
+    "union",
+    "narrowing",
+    "identifier",
+    "string-expression",
+    "statement"
+  ],
+  "inputs": [
+    "identifier",
+    "string-expression",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "UnionをtypeofでNarrowingする"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.union-narrowing"
+  ],
+  "constructionProfile": {
+    "kind": "STATEMENT",
+    "syntaxTemplate": "if (typeof {value} === '{typeName}') {\\n{body}\\n}",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "value",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "typeName",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "body",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.instanceof-narrowing",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "instanceofによる型Narrowingを構成する",
+  "summary": "instanceofによる型Narrowingを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "instanceof",
+    "narrowing",
+    "expression",
+    "identifier",
+    "statement"
+  ],
+  "inputs": [
+    "expression",
+    "identifier",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "instanceofによる型Narrowingを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.instanceof-narrowing"
+  ],
+  "constructionProfile": {
+    "kind": "STATEMENT",
+    "syntaxTemplate": "if ({value} instanceof {constructor}) {\\n{body}\\n}",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "value",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "constructor",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "body",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.as-type-assertion",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "値を指定型として扱うType Assertionを構成する",
+  "summary": "値を指定型として扱うType Assertionを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "as",
+    "type",
+    "assertion",
+    "expression",
+    "type-expression"
+  ],
+  "inputs": [
+    "expression",
+    "type-expression"
+  ],
+  "outputs": [
+    "expression"
+  ],
+  "appliesWhen": [
+    "値を指定型として扱うType Assertionを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.as-type-assertion"
+  ],
+  "constructionProfile": {
+    "kind": "EXPRESSION",
+    "syntaxTemplate": "{value} as {type}",
+    "outputKinds": [
+      "expression"
+    ],
+    "slots": [
+      {
+        "name": "value",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "type",
+        "inputKinds": [
+          "type-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.const-type-parameter",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Generic parameterをconstとして推論する",
+  "summary": "Generic parameterをconstとして推論する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "const",
+    "type",
+    "parameter",
+    "identifier",
+    "statement"
+  ],
+  "inputs": [
+    "identifier",
+    "parameter"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Generic parameterをconstとして推論する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.const-type-parameter"
+  ],
+  "constructionProfile": {
+    "kind": "DECLARATION",
+    "syntaxTemplate": "function {name}<const T>({parameter}: T): T {\\n  return {parameter};\\n}",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "parameter",
+        "inputKinds": [
+          "parameter"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.this-type",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "現在のObject型をThisTypeで表現する",
+  "summary": "現在のObject型をThisTypeで表現する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "this",
+    "type",
+    "type-expression"
+  ],
+  "inputs": [
+    "type-expression"
+  ],
+  "outputs": [
+    "type-expression"
+  ],
+  "appliesWhen": [
+    "現在のObject型をThisTypeで表現する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.this-type"
+  ],
+  "constructionProfile": {
+    "kind": "TYPE",
+    "syntaxTemplate": "ThisType<{type}>",
+    "outputKinds": [
+      "type-expression"
+    ],
+    "slots": [
+      {
+        "name": "type",
+        "inputKinds": [
+          "type-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.declare-const",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "外部runtime値の型宣言を構成する",
+  "summary": "外部runtime値の型宣言を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "declare",
+    "const",
+    "identifier",
+    "type-expression",
+    "statement"
+  ],
+  "inputs": [
+    "identifier",
+    "type-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "外部runtime値の型宣言を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.declare-const"
+  ],
+  "constructionProfile": {
+    "kind": "DECLARATION",
+    "syntaxTemplate": "declare const {name}: {type};",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "type",
+        "inputKinds": [
+          "type-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.namespace-import",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Module全体をnamespaceとしてimportする",
+  "summary": "Module全体をnamespaceとしてimportする。既存Construction Graphで再利用する。",
+  "concepts": [
+    "namespace",
+    "import",
+    "identifier",
+    "string-expression",
+    "statement"
+  ],
+  "inputs": [
+    "identifier",
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Module全体をnamespaceとしてimportする"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.namespace-import"
+  ],
+  "constructionProfile": {
+    "kind": "MODULE",
+    "syntaxTemplate": "import * as {name} from {module};",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "module",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.typescript.namespace-export",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "namespace全体をexportする",
+  "summary": "namespace全体をexportする。既存Construction Graphで再利用する。",
+  "concepts": [
+    "namespace",
+    "export",
+    "string-expression",
+    "statement"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "namespace全体をexportする"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://www.typescriptlang.org/docs/handbook/"
+  ],
+  "sourceArtifactIds": [
+    "ts:code.typescript.namespace-export"
+  ],
+  "constructionProfile": {
+    "kind": "MODULE",
+    "syntaxTemplate": "export * from {module};",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "module",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+}
 ];
 
 export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
@@ -2013,6 +2804,397 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.return-type",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.return-type",
-}
+},
 
+{
+  "knowledgeId": "code.typescript.union-type",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数候補を表すUnion Typeを構成する",
+  "implementation": "type {name} = {left} | {right};",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier",
+    "type-expression",
+    "type-expression"
+  ],
+  "outputs": [
+    "type-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.union-type",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.union-type",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.union-type"
+},
+
+{
+  "knowledgeId": "code.typescript.intersection-type",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数型を同時に満たすIntersection Typeを構成する",
+  "implementation": "type {name} = {left} & {right};",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier",
+    "type-expression",
+    "type-expression"
+  ],
+  "outputs": [
+    "type-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.intersection-type",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.intersection-type",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.intersection-type"
+},
+
+{
+  "knowledgeId": "code.typescript.generic-interface-constraint",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Generic Interfaceに型制約を付ける",
+  "implementation": "interface {name}<T extends {constraint}> {\\n{body}\\n}",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier",
+    "type-expression",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.generic-interface-constraint",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.generic-interface-constraint",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.generic-interface-constraint"
+},
+
+{
+  "knowledgeId": "code.typescript.typeof-type-query",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "既存valueの型をType位置で取得する",
+  "implementation": "type {name} = typeof {value};",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier",
+    "identifier"
+  ],
+  "outputs": [
+    "type-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.typeof-type-query",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.typeof-type-query",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.typeof-type-query"
+},
+
+{
+  "knowledgeId": "code.typescript.keyof-type-query",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Typeのproperty key Unionを取得する",
+  "implementation": "type {name}<T> = keyof T;",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier"
+  ],
+  "outputs": [
+    "type-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.keyof-type-query",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.keyof-type-query",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.keyof-type-query"
+},
+
+{
+  "knowledgeId": "code.typescript.union-narrowing",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "UnionをtypeofでNarrowingする",
+  "implementation": "if (typeof {value} === '{typeName}') {\\n{body}\\n}",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier",
+    "string-expression",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.union-narrowing",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.union-narrowing",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.union-narrowing"
+},
+
+{
+  "knowledgeId": "code.typescript.instanceof-narrowing",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "instanceofによる型Narrowingを構成する",
+  "implementation": "if ({value} instanceof {constructor}) {\\n{body}\\n}",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "expression",
+    "identifier",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.instanceof-narrowing",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.instanceof-narrowing",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.instanceof-narrowing"
+},
+
+{
+  "knowledgeId": "code.typescript.as-type-assertion",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "値を指定型として扱うType Assertionを構成する",
+  "implementation": "{value} as {type}",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "expression",
+    "type-expression"
+  ],
+  "outputs": [
+    "expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.as-type-assertion",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.as-type-assertion",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.as-type-assertion"
+},
+
+{
+  "knowledgeId": "code.typescript.const-type-parameter",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Generic parameterをconstとして推論する",
+  "implementation": "function {name}<const T>({parameter}: T): T {\\n  return {parameter};\\n}",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier",
+    "parameter"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.const-type-parameter",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.const-type-parameter",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.const-type-parameter"
+},
+
+{
+  "knowledgeId": "code.typescript.this-type",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "現在のObject型をThisTypeで表現する",
+  "implementation": "ThisType<{type}>",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "type-expression"
+  ],
+  "outputs": [
+    "type-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.this-type",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.this-type",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.this-type"
+},
+
+{
+  "knowledgeId": "code.typescript.declare-const",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "外部runtime値の型宣言を構成する",
+  "implementation": "declare const {name}: {type};",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier",
+    "type-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.declare-const",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.declare-const",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.declare-const"
+},
+
+{
+  "knowledgeId": "code.typescript.namespace-import",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Module全体をnamespaceとしてimportする",
+  "implementation": "import * as {name} from {module};",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier",
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.namespace-import",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.namespace-import",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.namespace-import"
+},
+
+{
+  "knowledgeId": "code.typescript.namespace-export",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "namespace全体をexportする",
+  "implementation": "export * from {module};",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.typescript.namespace-export",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.typescript.namespace-export",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.namespace-export"
+}
 ];

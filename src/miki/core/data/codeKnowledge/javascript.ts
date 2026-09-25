@@ -2470,8 +2470,830 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://nodejs.org/api/process.html"],
   sourceArtifactIds: ["node-process-env"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "process.env[{name}]", outputKinds: ["string-expression"], slots: [{ name: "name", inputKinds: ["string-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
+{
+  "id": "code.javascript.if-else-statement",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "if/else条件分岐を構成する",
+  "summary": "if/else条件分岐を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "if",
+    "else",
+    "statement",
+    "boolean-expression"
+  ],
+  "inputs": [
+    "boolean-expression",
+    "statement",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "if/else条件分岐を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.if-else-statement"
+  ],
+  "constructionProfile": {
+    "kind": "STATEMENT",
+    "syntaxTemplate": "if ({condition}) {\\n{thenBody}\\n} else {\\n{elseBody}\\n}",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "condition",
+        "inputKinds": [
+          "boolean-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "thenBody",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true
+      },
+      {
+        "name": "elseBody",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.for-statement",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "初期化・条件・更新を持つfor反復を構成する",
+  "summary": "初期化・条件・更新を持つfor反復を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "for",
+    "statement",
+    "boolean-expression",
+    "expression"
+  ],
+  "inputs": [
+    "statement",
+    "boolean-expression",
+    "expression",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "初期化・条件・更新を持つfor反復を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.for-statement"
+  ],
+  "constructionProfile": {
+    "kind": "STATEMENT",
+    "syntaxTemplate": "for ({initializer}; {condition}; {update}) {\\n{body}\\n}",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "initializer",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": false
+      },
+      {
+        "name": "condition",
+        "inputKinds": [
+          "boolean-expression"
+        ],
+        "required": false
+      },
+      {
+        "name": "update",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": false
+      },
+      {
+        "name": "body",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.try-catch-finally",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "catchとfinallyを含む例外処理を構成する",
+  "summary": "catchとfinallyを含む例外処理を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "try",
+    "catch",
+    "finally",
+    "statement",
+    "identifier"
+  ],
+  "inputs": [
+    "statement",
+    "identifier",
+    "statement",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "catchとfinallyを含む例外処理を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.try-catch-finally"
+  ],
+  "constructionProfile": {
+    "kind": "STATEMENT",
+    "syntaxTemplate": "try {\\n{tryBody}\\n} catch ({error}) {\\n{catchBody}\\n} finally {\\n{finallyBody}\\n}",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "tryBody",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true
+      },
+      {
+        "name": "error",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "catchBody",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true
+      },
+      {
+        "name": "finallyBody",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.ternary",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "条件によって2つの式から値を選択する",
+  "summary": "条件によって2つの式から値を選択する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "ternary",
+    "boolean-expression",
+    "expression"
+  ],
+  "inputs": [
+    "boolean-expression",
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "expression"
+  ],
+  "appliesWhen": [
+    "条件によって2つの式から値を選択する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.ternary"
+  ],
+  "constructionProfile": {
+    "kind": "EXPRESSION",
+    "syntaxTemplate": "({condition}) ? ({whenTrue}) : ({whenFalse})",
+    "outputKinds": [
+      "expression"
+    ],
+    "slots": [
+      {
+        "name": "condition",
+        "inputKinds": [
+          "boolean-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "whenTrue",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "whenFalse",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.object-destructuring",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Objectから複数propertyをdestructureする",
+  "summary": "Objectから複数propertyをdestructureする。既存Construction Graphで再利用する。",
+  "concepts": [
+    "object",
+    "destructuring",
+    "identifier",
+    "object-expression",
+    "statement"
+  ],
+  "inputs": [
+    "identifier",
+    "object-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Objectから複数propertyをdestructureする"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.object-destructuring"
+  ],
+  "constructionProfile": {
+    "kind": "DECLARATION",
+    "syntaxTemplate": "const { {properties} } = {object};",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "properties",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true,
+        "multiple": true
+      },
+      {
+        "name": "object",
+        "inputKinds": [
+          "object-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.array-destructuring",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Arrayから値をdestructureする",
+  "summary": "Arrayから値をdestructureする。既存Construction Graphで再利用する。",
+  "concepts": [
+    "array",
+    "destructuring",
+    "identifier",
+    "array-expression",
+    "statement"
+  ],
+  "inputs": [
+    "identifier",
+    "array-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Arrayから値をdestructureする"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.array-destructuring"
+  ],
+  "constructionProfile": {
+    "kind": "DECLARATION",
+    "syntaxTemplate": "const [{items}] = {array};",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "items",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true,
+        "multiple": true
+      },
+      {
+        "name": "array",
+        "inputKinds": [
+          "array-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.array-flat",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ネストしたArrayを指定深度まで平坦化する",
+  "summary": "ネストしたArrayを指定深度まで平坦化する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "array",
+    "flat",
+    "array-expression",
+    "number-expression"
+  ],
+  "inputs": [
+    "array-expression",
+    "number-expression"
+  ],
+  "outputs": [
+    "array-expression"
+  ],
+  "appliesWhen": [
+    "ネストしたArrayを指定深度まで平坦化する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.array-flat"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "{array}.flat({depth})",
+    "outputKinds": [
+      "array-expression"
+    ],
+    "slots": [
+      {
+        "name": "array",
+        "inputKinds": [
+          "array-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "depth",
+        "inputKinds": [
+          "number-expression"
+        ],
+        "required": false
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.array-flat-map",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "mapしてから配列を平坦化する",
+  "summary": "mapしてから配列を平坦化する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "array",
+    "flat",
+    "map",
+    "array-expression",
+    "function-expression"
+  ],
+  "inputs": [
+    "array-expression",
+    "function-expression"
+  ],
+  "outputs": [
+    "array-expression"
+  ],
+  "appliesWhen": [
+    "mapしてから配列を平坦化する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.array-flat-map"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "{array}.flatMap({mapper})",
+    "outputKinds": [
+      "array-expression"
+    ],
+    "slots": [
+      {
+        "name": "array",
+        "inputKinds": [
+          "array-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "mapper",
+        "inputKinds": [
+          "function-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.string-replace-all",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "文字列中の一致箇所をすべて置換する",
+  "summary": "文字列中の一致箇所をすべて置換する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "string",
+    "replace",
+    "all",
+    "string-expression"
+  ],
+  "inputs": [
+    "string-expression",
+    "string-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "appliesWhen": [
+    "文字列中の一致箇所をすべて置換する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.string-replace-all"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "{text}.replaceAll({search}, {replacement})",
+    "outputKinds": [
+      "string-expression"
+    ],
+    "slots": [
+      {
+        "name": "text",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "search",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "replacement",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.promise-all",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数Promiseをすべて待機する",
+  "summary": "複数Promiseをすべて待機する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "promise",
+    "all",
+    "array-expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "array-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "複数Promiseをすべて待機する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.promise-all"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "Promise.all({promises})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "promises",
+        "inputKinds": [
+          "array-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.promise-all-settled",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数Promiseの成功失敗結果をすべて待機する",
+  "summary": "複数Promiseの成功失敗結果をすべて待機する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "promise",
+    "all",
+    "settled",
+    "array-expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "array-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "複数Promiseの成功失敗結果をすべて待機する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.promise-all-settled"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "Promise.allSettled({promises})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "promises",
+        "inputKinds": [
+          "array-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.async-function",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "async functionを構成する",
+  "summary": "async functionを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "async",
+    "function",
+    "identifier",
+    "parameter",
+    "statement"
+  ],
+  "inputs": [
+    "identifier",
+    "parameter",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "async functionを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.async-function"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "async function {name}({parameters}) {\\n{body}\\n}",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "parameters",
+        "inputKinds": [
+          "parameter"
+        ],
+        "required": false,
+        "multiple": true
+      },
+      {
+        "name": "body",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.javascript.object-assign",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数Objectを結合してtargetへ代入する",
+  "summary": "複数Objectを結合してtargetへ代入する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "object",
+    "assign",
+    "object-expression"
+  ],
+  "inputs": [
+    "object-expression",
+    "object-expression"
+  ],
+  "outputs": [
+    "object-expression"
+  ],
+  "appliesWhen": [
+    "複数Objectを結合してtargetへ代入する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.object-assign"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "Object.assign({target}, {sources})",
+    "outputKinds": [
+      "object-expression"
+    ],
+    "slots": [
+      {
+        "name": "target",
+        "inputKinds": [
+          "object-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "sources",
+        "inputKinds": [
+          "object-expression"
+        ],
+        "required": true,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+}
 ];
 
 export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
@@ -4551,6 +5373,461 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.node-env-access",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.node-env-access",
-}
+},
 
+{
+  "knowledgeId": "code.javascript.if-else-statement",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "if/else条件分岐を構成する",
+  "implementation": "if ({condition}) {\\n{thenBody}\\n} else {\\n{elseBody}\\n}",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "boolean-expression",
+    "statement",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.if-else-statement",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.if-else-statement",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.if-else-statement"
+},
+
+{
+  "knowledgeId": "code.javascript.for-statement",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "初期化・条件・更新を持つfor反復を構成する",
+  "implementation": "for ({initializer}; {condition}; {update}) {\\n{body}\\n}",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "statement",
+    "boolean-expression",
+    "expression",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.for-statement",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.for-statement",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.for-statement"
+},
+
+{
+  "knowledgeId": "code.javascript.try-catch-finally",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "catchとfinallyを含む例外処理を構成する",
+  "implementation": "try {\\n{tryBody}\\n} catch ({error}) {\\n{catchBody}\\n} finally {\\n{finallyBody}\\n}",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "statement",
+    "identifier",
+    "statement",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.try-catch-finally",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.try-catch-finally",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.try-catch-finally"
+},
+
+{
+  "knowledgeId": "code.javascript.ternary",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "条件によって2つの式から値を選択する",
+  "implementation": "({condition}) ? ({whenTrue}) : ({whenFalse})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "boolean-expression",
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.ternary",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.ternary",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.ternary"
+},
+
+{
+  "knowledgeId": "code.javascript.optional-chaining",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "存在する場合だけpropertyを参照する",
+  "implementation": "{object}?.{property}",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "object-expression",
+    "identifier"
+  ],
+  "outputs": [
+    "expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.optional-chaining",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.optional-chaining",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.optional-chaining"
+},
+
+{
+  "knowledgeId": "code.javascript.nullish-coalescing",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "nullまたはundefinedの場合に代替値を使う",
+  "implementation": "({value}) ?? ({fallback})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.nullish-coalescing",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.nullish-coalescing",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.nullish-coalescing"
+},
+
+{
+  "knowledgeId": "code.javascript.object-destructuring",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Objectから複数propertyをdestructureする",
+  "implementation": "const { {properties} } = {object};",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier",
+    "object-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.object-destructuring",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.object-destructuring",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.object-destructuring"
+},
+
+{
+  "knowledgeId": "code.javascript.array-destructuring",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Arrayから値をdestructureする",
+  "implementation": "const [{items}] = {array};",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier",
+    "array-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.array-destructuring",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.array-destructuring",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.array-destructuring"
+},
+
+{
+  "knowledgeId": "code.javascript.array-flat",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ネストしたArrayを指定深度まで平坦化する",
+  "implementation": "{array}.flat({depth})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "array-expression",
+    "number-expression"
+  ],
+  "outputs": [
+    "array-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.array-flat",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.array-flat",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.array-flat"
+},
+
+{
+  "knowledgeId": "code.javascript.array-flat-map",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "mapしてから配列を平坦化する",
+  "implementation": "{array}.flatMap({mapper})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "array-expression",
+    "function-expression"
+  ],
+  "outputs": [
+    "array-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.array-flat-map",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.array-flat-map",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.array-flat-map"
+},
+
+{
+  "knowledgeId": "code.javascript.string-replace-all",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "文字列中の一致箇所をすべて置換する",
+  "implementation": "{text}.replaceAll({search}, {replacement})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression",
+    "string-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.string-replace-all",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.string-replace-all",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.string-replace-all"
+},
+
+{
+  "knowledgeId": "code.javascript.promise-all",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数Promiseをすべて待機する",
+  "implementation": "Promise.all({promises})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "array-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.promise-all",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.promise-all",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.promise-all"
+},
+
+{
+  "knowledgeId": "code.javascript.promise-all-settled",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数Promiseの成功失敗結果をすべて待機する",
+  "implementation": "Promise.allSettled({promises})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "array-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.promise-all-settled",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.promise-all-settled",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.promise-all-settled"
+},
+
+{
+  "knowledgeId": "code.javascript.async-function",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "async functionを構成する",
+  "implementation": "async function {name}({parameters}) {\\n{body}\\n}",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier",
+    "parameter",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.async-function",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.async-function",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.async-function"
+},
+
+{
+  "knowledgeId": "code.javascript.object-assign",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数Objectを結合してtargetへ代入する",
+  "implementation": "Object.assign({target}, {sources})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "object-expression",
+    "object-expression"
+  ],
+  "outputs": [
+    "object-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.object-assign",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.object-assign",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.object-assign"
+}
 ];

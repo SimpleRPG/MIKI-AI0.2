@@ -585,8 +585,905 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://expressjs.com/en/api.html#app.listen"],
   sourceArtifactIds: ["express-listen"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "app.listen({port}, {callback})", outputKinds: ["statement"], slots: [{ name: "port", inputKinds: ["number-expression"], required: true, multiple: false }, { name: "callback", inputKinds: ["function-expression"], required: false, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
+{
+  "id": "code.web.react-use-state-functional-update",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "useStateのfunctional updateを構成する",
+  "summary": "useStateのfunctional updateを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "react",
+    "use",
+    "state",
+    "functional",
+    "update",
+    "identifier",
+    "expression",
+    "statement"
+  ],
+  "inputs": [
+    "identifier",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "useStateのfunctional updateを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://react.dev/learn"
+  ],
+  "sourceArtifactIds": [
+    "react:code.web.react-use-state-functional-update"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "set{setter}(previous => {nextValue})",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "setter",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "nextValue",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.react-use-effect-empty-deps",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "mount相当でEffectを一度実行する",
+  "summary": "mount相当でEffectを一度実行する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "react",
+    "use",
+    "effect",
+    "empty",
+    "deps",
+    "statement"
+  ],
+  "inputs": [
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "mount相当でEffectを一度実行する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://react.dev/learn"
+  ],
+  "sourceArtifactIds": [
+    "react:code.web.react-use-effect-empty-deps"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "useEffect(() => {\\n{body}\\n}, []);",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "body",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.react-use-memo-value",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "useMemoで計算値をmemoizeする",
+  "summary": "useMemoで計算値をmemoizeする。既存Construction Graphで再利用する。",
+  "concepts": [
+    "react",
+    "use",
+    "memo",
+    "value",
+    "identifier",
+    "expression",
+    "statement"
+  ],
+  "inputs": [
+    "identifier",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "useMemoで計算値をmemoizeする"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://react.dev/learn"
+  ],
+  "sourceArtifactIds": [
+    "react:code.web.react-use-memo-value"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "const {name} = useMemo(() => {value}, [{dependencies}]);",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      },
+      {
+        "name": "value",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "dependencies",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": false,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.react-div",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "基本的なdiv JSX要素を構成する",
+  "summary": "基本的なdiv JSX要素を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "react",
+    "div",
+    "jsx-attribute",
+    "jsx-child",
+    "jsx-expression"
+  ],
+  "inputs": [
+    "jsx-attribute",
+    "jsx-child"
+  ],
+  "outputs": [
+    "jsx-expression"
+  ],
+  "appliesWhen": [
+    "基本的なdiv JSX要素を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://react.dev/learn"
+  ],
+  "sourceArtifactIds": [
+    "react:code.web.react-div"
+  ],
+  "constructionProfile": {
+    "kind": "EXPRESSION",
+    "syntaxTemplate": "<div {attributes}>{children}</div>",
+    "outputKinds": [
+      "jsx-expression"
+    ],
+    "slots": [
+      {
+        "name": "attributes",
+        "inputKinds": [
+          "jsx-attribute"
+        ],
+        "required": false,
+        "multiple": true
+      },
+      {
+        "name": "children",
+        "inputKinds": [
+          "jsx-child"
+        ],
+        "required": false,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.react-span",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "基本的なspan JSX要素を構成する",
+  "summary": "基本的なspan JSX要素を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "react",
+    "span",
+    "jsx-attribute",
+    "jsx-child",
+    "jsx-expression"
+  ],
+  "inputs": [
+    "jsx-attribute",
+    "jsx-child"
+  ],
+  "outputs": [
+    "jsx-expression"
+  ],
+  "appliesWhen": [
+    "基本的なspan JSX要素を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://react.dev/learn"
+  ],
+  "sourceArtifactIds": [
+    "react:code.web.react-span"
+  ],
+  "constructionProfile": {
+    "kind": "EXPRESSION",
+    "syntaxTemplate": "<span {attributes}>{children}</span>",
+    "outputKinds": [
+      "jsx-expression"
+    ],
+    "slots": [
+      {
+        "name": "attributes",
+        "inputKinds": [
+          "jsx-attribute"
+        ],
+        "required": false,
+        "multiple": true
+      },
+      {
+        "name": "children",
+        "inputKinds": [
+          "jsx-child"
+        ],
+        "required": false,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.react-image",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "alt属性付き画像JSXを構成する",
+  "summary": "alt属性付き画像JSXを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "react",
+    "image",
+    "string-expression",
+    "jsx-expression"
+  ],
+  "inputs": [
+    "string-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "jsx-expression"
+  ],
+  "appliesWhen": [
+    "alt属性付き画像JSXを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://react.dev/learn"
+  ],
+  "sourceArtifactIds": [
+    "react:code.web.react-image"
+  ],
+  "constructionProfile": {
+    "kind": "EXPRESSION",
+    "syntaxTemplate": "<img src={src} alt={alt} />",
+    "outputKinds": [
+      "jsx-expression"
+    ],
+    "slots": [
+      {
+        "name": "src",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "alt",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.react-anchor",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "リンクJSX要素を構成する",
+  "summary": "リンクJSX要素を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "react",
+    "anchor",
+    "string-expression",
+    "jsx-child",
+    "jsx-expression"
+  ],
+  "inputs": [
+    "string-expression",
+    "jsx-child"
+  ],
+  "outputs": [
+    "jsx-expression"
+  ],
+  "appliesWhen": [
+    "リンクJSX要素を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://react.dev/learn"
+  ],
+  "sourceArtifactIds": [
+    "react:code.web.react-anchor"
+  ],
+  "constructionProfile": {
+    "kind": "EXPRESSION",
+    "syntaxTemplate": "<a href={href}>{children}</a>",
+    "outputKinds": [
+      "jsx-expression"
+    ],
+    "slots": [
+      {
+        "name": "href",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "children",
+        "inputKinds": [
+          "jsx-child"
+        ],
+        "required": false,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.react-form-submit",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "React formのsubmit handlerを構成する",
+  "summary": "React formのsubmit handlerを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "react",
+    "form",
+    "submit",
+    "function-expression",
+    "jsx-child",
+    "jsx-expression"
+  ],
+  "inputs": [
+    "function-expression",
+    "jsx-child"
+  ],
+  "outputs": [
+    "jsx-expression"
+  ],
+  "appliesWhen": [
+    "React formのsubmit handlerを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://react.dev/learn"
+  ],
+  "sourceArtifactIds": [
+    "react:code.web.react-form-submit"
+  ],
+  "constructionProfile": {
+    "kind": "EXPRESSION",
+    "syntaxTemplate": "<form onSubmit={handler}>{children}</form>",
+    "outputKinds": [
+      "jsx-expression"
+    ],
+    "slots": [
+      {
+        "name": "handler",
+        "inputKinds": [
+          "function-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "children",
+        "inputKinds": [
+          "jsx-child"
+        ],
+        "required": false,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.express-router-route",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "RouterへHTTP GET routeを登録する",
+  "summary": "RouterへHTTP GET routeを登録する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "express",
+    "router",
+    "route",
+    "string-expression",
+    "function-expression",
+    "statement"
+  ],
+  "inputs": [
+    "string-expression",
+    "function-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "RouterへHTTP GET routeを登録する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://expressjs.com/en/guide/"
+  ],
+  "sourceArtifactIds": [
+    "express:code.web.express-router-route"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "router.get({path}, {handler});",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "handler",
+        "inputKinds": [
+          "function-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.express-request-header",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Express request headerを取得する",
+  "summary": "Express request headerを取得する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "express",
+    "request",
+    "header",
+    "string-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "appliesWhen": [
+    "Express request headerを取得する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://expressjs.com/en/guide/"
+  ],
+  "sourceArtifactIds": [
+    "express:code.web.express-request-header"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "req.get({name})",
+    "outputKinds": [
+      "string-expression"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.express-response-type",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Express response Content-Typeを設定する",
+  "summary": "Express response Content-Typeを設定する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "express",
+    "response",
+    "type",
+    "string-expression",
+    "statement"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Express response Content-Typeを設定する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://expressjs.com/en/guide/"
+  ],
+  "sourceArtifactIds": [
+    "express:code.web.express-response-type"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "res.type({type})",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "type",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.express-response-cookie",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Express response cookieを設定する",
+  "summary": "Express response cookieを設定する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "express",
+    "response",
+    "cookie",
+    "string-expression",
+    "expression",
+    "statement"
+  ],
+  "inputs": [
+    "string-expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Express response cookieを設定する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://expressjs.com/en/guide/"
+  ],
+  "sourceArtifactIds": [
+    "express:code.web.express-response-cookie"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "res.cookie({name}, {value});",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "value",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.express-status-send",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Express response statusとsendを組み合わせる",
+  "summary": "Express response statusとsendを組み合わせる。既存Construction Graphで再利用する。",
+  "concepts": [
+    "express",
+    "status",
+    "send",
+    "number-expression",
+    "expression",
+    "statement"
+  ],
+  "inputs": [
+    "number-expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Express response statusとsendを組み合わせる"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://expressjs.com/en/guide/"
+  ],
+  "sourceArtifactIds": [
+    "express:code.web.express-status-send"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "res.status({status}).send({body});",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "status",
+        "inputKinds": [
+          "number-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "body",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.express-static",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Expressで静的ファイル配信middlewareを登録する",
+  "summary": "Expressで静的ファイル配信middlewareを登録する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "express",
+    "static",
+    "string-expression",
+    "statement"
+  ],
+  "inputs": [
+    "string-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Expressで静的ファイル配信middlewareを登録する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://expressjs.com/en/guide/"
+  ],
+  "sourceArtifactIds": [
+    "express:code.web.express-static"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "app.use({path}, express.static({directory}));",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "directory",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+},
+
+{
+  "id": "code.web.express-router-use",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Express Routerをmiddlewareとして接続する",
+  "summary": "Express Routerをmiddlewareとして接続する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "express",
+    "router",
+    "use",
+    "string-expression",
+    "identifier",
+    "statement"
+  ],
+  "inputs": [
+    "string-expression",
+    "identifier"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Express Routerをmiddlewareとして接続する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://expressjs.com/en/guide/"
+  ],
+  "sourceArtifactIds": [
+    "express:code.web.express-router-use"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "app.use({path}, {router});",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "router",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse compatible existing nodes before creating an equivalent node"
+    ]
+  }
+}
 ];
 
 export const additionalWebCodeComponents: CodeComponentDefinition[] = [
@@ -1166,6 +2063,505 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.express-listen",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.express-listen",
-}
+},
 
+{
+  "knowledgeId": "code.web.react-use-state-functional-update",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "useStateのfunctional updateを構成する",
+  "implementation": "set{setter}(previous => {nextValue})",
+  "targetPath": "generated.tsx",
+  "inputs": [
+    "identifier",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "react"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.web.react-use-state-functional-update",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "react"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.react-use-state-functional-update",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.react-use-state-functional-update"
+},
+
+{
+  "knowledgeId": "code.web.react-use-effect-empty-deps",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "mount相当でEffectを一度実行する",
+  "implementation": "useEffect(() => {\\n{body}\\n}, []);",
+  "targetPath": "generated.tsx",
+  "inputs": [
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "react"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.web.react-use-effect-empty-deps",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "react"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.react-use-effect-empty-deps",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.react-use-effect-empty-deps"
+},
+
+{
+  "knowledgeId": "code.web.react-use-memo-value",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "useMemoで計算値をmemoizeする",
+  "implementation": "const {name} = useMemo(() => {value}, [{dependencies}]);",
+  "targetPath": "generated.tsx",
+  "inputs": [
+    "identifier",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "react"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.web.react-use-memo-value",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "react"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.react-use-memo-value",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.react-use-memo-value"
+},
+
+{
+  "knowledgeId": "code.web.react-div",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "基本的なdiv JSX要素を構成する",
+  "implementation": "<div {attributes}>{children}</div>",
+  "targetPath": "generated.tsx",
+  "inputs": [
+    "jsx-attribute",
+    "jsx-child"
+  ],
+  "outputs": [
+    "jsx-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "react"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.web.react-div",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "react"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.react-div",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.react-div"
+},
+
+{
+  "knowledgeId": "code.web.react-span",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "基本的なspan JSX要素を構成する",
+  "implementation": "<span {attributes}>{children}</span>",
+  "targetPath": "generated.tsx",
+  "inputs": [
+    "jsx-attribute",
+    "jsx-child"
+  ],
+  "outputs": [
+    "jsx-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "react"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.web.react-span",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "react"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.react-span",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.react-span"
+},
+
+{
+  "knowledgeId": "code.web.react-image",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "alt属性付き画像JSXを構成する",
+  "implementation": "<img src={src} alt={alt} />",
+  "targetPath": "generated.tsx",
+  "inputs": [
+    "string-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "jsx-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "react"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.web.react-image",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "react"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.react-image",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.react-image"
+},
+
+{
+  "knowledgeId": "code.web.react-anchor",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "リンクJSX要素を構成する",
+  "implementation": "<a href={href}>{children}</a>",
+  "targetPath": "generated.tsx",
+  "inputs": [
+    "string-expression",
+    "jsx-child"
+  ],
+  "outputs": [
+    "jsx-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "react"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.web.react-anchor",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "react"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.react-anchor",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.react-anchor"
+},
+
+{
+  "knowledgeId": "code.web.react-form-submit",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "React formのsubmit handlerを構成する",
+  "implementation": "<form onSubmit={handler}>{children}</form>",
+  "targetPath": "generated.tsx",
+  "inputs": [
+    "function-expression",
+    "jsx-child"
+  ],
+  "outputs": [
+    "jsx-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "react"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME",
+    "ANDROID"
+  ],
+  "entryPoint": "CodeConstruction/code.web.react-form-submit",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "react"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.react-form-submit",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.react-form-submit"
+},
+
+{
+  "knowledgeId": "code.web.express-router-route",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "RouterへHTTP GET routeを登録する",
+  "implementation": "router.get({path}, {handler});",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression",
+    "function-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "express"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.web.express-router-route",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "express"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.express-router-route",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.express-router-route"
+},
+
+{
+  "knowledgeId": "code.web.express-request-header",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Express request headerを取得する",
+  "implementation": "req.get({name})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "express"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.web.express-request-header",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "express"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.express-request-header",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.express-request-header"
+},
+
+{
+  "knowledgeId": "code.web.express-response-type",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Express response Content-Typeを設定する",
+  "implementation": "res.type({type})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "express"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.web.express-response-type",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "express"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.express-response-type",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.express-response-type"
+},
+
+{
+  "knowledgeId": "code.web.express-response-cookie",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Express response cookieを設定する",
+  "implementation": "res.cookie({name}, {value});",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "express"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.web.express-response-cookie",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "express"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.express-response-cookie",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.express-response-cookie"
+},
+
+{
+  "knowledgeId": "code.web.express-status-send",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Express response statusとsendを組み合わせる",
+  "implementation": "res.status({status}).send({body});",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "number-expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "express"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.web.express-status-send",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "express"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.express-status-send",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.express-status-send"
+},
+
+{
+  "knowledgeId": "code.web.express-static",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Expressで静的ファイル配信middlewareを登録する",
+  "implementation": "app.use({path}, express.static({directory}));",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "express"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.web.express-static",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "express"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.express-static",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.express-static"
+},
+
+{
+  "knowledgeId": "code.web.express-router-use",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Express Routerをmiddlewareとして接続する",
+  "implementation": "app.use({path}, {router});",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression",
+    "identifier"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [
+    "compatible input contract"
+  ],
+  "dependencies": [
+    "express"
+  ],
+  "supportedEnvironments": [
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.web.express-router-use",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "express"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.web.express-router-use",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.web.express-router-use"
+}
 ];
