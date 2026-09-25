@@ -1578,3 +1578,23 @@ ReusableComponentFactoryServiceが既存ConstructionProfileからCODE Constructi
 
 新しいコード生成エンジン、第二のConstruction Graph、第二のResearch基盤は追加しない。
 
+### 2026-09-26 Generic Code Construction Domain Expansion
+
+MIKIの汎用コード構築Knowledgeを既存のJavaScript/TypeScript/Web基礎だけに限定しない。
+以下の不足領域を `platformCodeKnowledge` としてKnowledge + ConstructionProfileで登録し、
+既存ReusableComponentFactoryServiceのMaterialization経路からCODE Componentとして利用可能にする。
+
+- Node.js Runtime API
+- JavaScript Standard API
+- Async / Concurrency
+- Browser / Web API
+- Express / Backend
+- Data Validation / Serialization
+- Database / Persistence
+- Security / Crypto
+- Build / Tooling
+- React / UI / Accessibility
+
+既存Knowledge・Componentと同一目的の重複実装は作らず、既存部品は従来どおり優先して再利用する。
+新規領域のKnowledgeにはConstructionProfileを持たせ、Construction Graphから直接候補化できるようにする。
+

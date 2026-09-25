@@ -14,6 +14,7 @@ import {
   additionalModuleCodeKnowledge,
   additionalModuleCodeComponents,
 } from '../data/codeKnowledge/modules';
+import { platformCodeKnowledge } from '../data/codeKnowledge/platformCodeKnowledge';
 import {
   autonomousConstructionKnowledge,
   additionalAutonomousConstructionComponents,
@@ -73,6 +74,7 @@ function buildBuiltInCodeComponentDefinitions(): CodeComponentDefinition[] {
     ...moduleCodeKnowledge,
     ...additionalModuleCodeKnowledge,
     ...autonomousConstructionKnowledge,
+    ...platformCodeKnowledge,
   ];
 
   const explicitIds = new Set(
@@ -1036,6 +1038,7 @@ class ReusableComponentFactoryService{
     ...moduleCodeKnowledge,
     ...additionalModuleCodeKnowledge,
     ...autonomousConstructionKnowledge,
+    ...platformCodeKnowledge,
   ];
 
   const definitions:CodeComponentDefinition[] = buildBuiltInCodeComponentDefinitions();
