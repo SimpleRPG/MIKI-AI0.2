@@ -379,20 +379,59 @@ class DomainIntegrationBootstrapService{
          const linked=reusableComponentFactoryService.findCodeComponentByRegistryId(componentId);
          if(linked){
            const {safeImprovementPipelineService}=await import('../../improvement/services/safeImprovementPipelineService');
+
+           // 新規CODE ComponentのCanaryが既に進行中/完了済みなら、
+           // COREが同じCanaryを再生成せず現在状態を再評価する。
+           const existingCanary=safeImprovementPipelineService.list()
+             .filter(run =>
+               run.new_component_mode===true &&
+               run.component_id===componentId &&
+               run.environment===environment &&
+               run.implementation_hash===component.implementation_hash
+             )
+             .sort((a,b)=>b.updated_at-a.updated_at)[0];
+
+           if(existingCanary?.stage==='ADOPTED'){
+             return {
+               componentId,
+               accepted:true,
+               status:'VERIFIED',
+               suiteId:refreshed.suite_id,
+               canaryRunId:existingCanary.run_id,
+               previousStatus:gate.previousStatus,
+               nextStatus:'VERIFIED',
+               reason:existingCanary.reason,
+             };
+           }
+
+           if(existingCanary?.stage==='CANARY'){
+             return {
+               componentId,
+               accepted:true,
+               status:'WAITING_EXECUTION',
+               suiteId:refreshed.suite_id,
+               canaryRunId:existingCanary.run_id,
+               previousStatus:gate.previousStatus,
+               nextStatus:'CANARY',
+               reason:existingCanary.reason,
+             };
+           }
+
            const canary=safeImprovementPipelineService.startNewCodeComponentCanary(
              componentId,
              environment,
              refreshed.suite_id,
            );
+
            if(canary){
              return {
                componentId,
                accepted:canary.stage==='CANARY'||canary.stage==='ADOPTED',
-               status:canary.stage,
+               status:canary.stage==='CANARY'?'WAITING_EXECUTION':canary.stage,
                suiteId:refreshed.suite_id,
                canaryRunId:canary.run_id,
                previousStatus:gate.previousStatus,
-               nextStatus:gate.nextStatus,
+               nextStatus:canary.stage,
                reason:canary.reason,
              };
            }

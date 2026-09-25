@@ -812,7 +812,7 @@ class CoreOrchestratorService {
 
  private async continueTask(taskId:string,maxCycles:number,reqId:string=taskId):Promise<CoreOrchestrationResult>{
   let dispatched=0;let cycles=taskBlackboardService.get(taskId)?.lastCycle||0;let cycleBudget=0;const cycleLimit=Math.max(1,Math.min(maxCycles,100));
-  while(cycleBudget<cycleLimit){
+  coreCycle: while(cycleBudget<cycleLimit){
    cycles+=1;cycleBudget+=1;taskBlackboardService.setCycle(taskId,cycles);
    coreExecutionTraceService.record(taskId,cycles,'CYCLE_START',{
      cycleBudget,
@@ -1300,10 +1300,16 @@ class CoreOrchestratorService {
         : []
     });
     const proposalKey=typeof route.payload.dedupeKey==='string'?route.payload.dedupeKey:'';
-    const operationSucceeded=reply.accepted&&reply.normalized?.status==='SUCCEEDED'&&operationClass==='BUSINESS';
+    const normalizedStatus=String(reply.normalized?.status||'').toUpperCase();
+    const waitingForExternalExecution=
+      reply.accepted &&
+      operationClass==='BUSINESS' &&
+      ['WAITING_EXECUTION','WAITING_CANARY','CANARY'].includes(normalizedStatus);
+
+    const operationSucceeded=reply.accepted&&normalizedStatus==='SUCCEEDED'&&operationClass==='BUSINESS';
     const actionCompletedStatus=operationClass==='DIAGNOSTIC'
-      ? (reply.accepted&&String(reply.normalized?.status||'').toUpperCase()==='OBSERVED'?'OBSERVED':'FAILED')
-      : (operationSucceeded?'SUCCEEDED':'FAILED');
+      ? (reply.accepted&&normalizedStatus==='OBSERVED'?'OBSERVED':'FAILED')
+      : (operationSucceeded?'SUCCEEDED':waitingForExternalExecution?'WAITING':'FAILED');
     if(typeof route.payload.idempotencyKey==='string'&&route.payload.idempotencyKey)taskBlackboardService.append(taskId,'DECISION','core','actionCompleted',{
       schemaVersion:1,status:actionCompletedStatus,idempotencyKey:String(route.payload.idempotencyKey),
       target:route.target,command:route.command,operationInstanceId:route.payload.operationInstanceId,
@@ -1330,7 +1336,46 @@ class CoreOrchestratorService {
         const latest=taskBlackboardService.get(taskId); if(latest)taskBlackboardService.append(taskId,'CHECKPOINT','core',`coreRevisionConflict:proposal:${cycles}:${route.command}`,{schemaVersion:1,currentRevision:latest.revision,operationInstanceId:route.payload.operationInstanceId,replyId:replyRecord.replyId,replanRequired:true});
       }
     }
-    coreResultService.recordCategoryStep(reqId,route.target as any,reply.accepted?'processing':'failed');
+    coreResultService.recordCategoryStep(
+      reqId,
+      route.target as any,
+      reply.accepted?'processing':'failed'
+    );
+
+    if(waitingForExternalExecution){
+      taskBlackboardService.append(
+        taskId,
+        'CHECKPOINT',
+        'core',
+        `externalExecutionWaiting:${cycles}:${route.command}`,
+        {
+          schemaVersion:1,
+          status:'WAITING_EXTERNAL_EXECUTION',
+          operation:route.command,
+          operationInstanceId:route.payload.operationInstanceId,
+          runId:typeof (reply.result as any)?.runId==='string'
+            ? (reply.result as any).runId
+            : typeof (reply.result as any)?.canaryRunId==='string'
+              ? (reply.result as any).canaryRunId
+              : undefined,
+          normalizedStatus,
+          reason:typeof (reply.result as any)?.reason==='string'
+            ? (reply.result as any).reason
+            : '外部実行/Canary Evidence待ちのためCOREを一時停止'
+        }
+      );
+
+      taskBlackboardService.pause(taskId,'WAITING_EXTERNAL_EXECUTION');
+      coreResultService.waiting(reqId,{
+        error:'WAITING_EXTERNAL_EXECUTION',
+        operation:route.command,
+        operationInstanceId:route.payload.operationInstanceId,
+        normalizedStatus
+      });
+
+      break coreCycle;
+    }
+
     if(!reply.accepted)negativeKnowledgeService.record(route.target,route.command,reply.error||route.reason,['research','strategy','safety']);
    }
    taskBlackboardService.setPending(taskId,[]);
