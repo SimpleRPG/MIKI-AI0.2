@@ -829,7 +829,53 @@ class CoreOrchestratorService {
    const planningTask=goalDecision.selectedGoal!==current.goal
      ? {...current,goal:goalDecision.selectedGoal}
      : current;
-   const routes=adaptiveRoutePlannerService.plan(planningTask).filter(route=>negativeKnowledgeService.canRetry(route.target,route.command,route.reason));
+   const routes=adaptiveRoutePlannerService.plan(planningTask).filter(route=>{
+     const latestFailure=[...planningTask.entries]
+       .reverse()
+       .find(entry=>{
+         if(entry.kind!=='ERROR') return false;
+
+         const value=entry.value&&typeof entry.value==='object'
+           ? entry.value as Record<string,unknown>
+           : {};
+
+         return String(value.operation||'')===route.command;
+       });
+
+     const failureValue=latestFailure?.value&&typeof latestFailure.value==='object'
+       ? latestFailure.value as Record<string,unknown>
+       : undefined;
+
+     const failureReply=failureValue?.reply&&typeof failureValue.reply==='object'
+       ? failureValue.reply as Record<string,unknown>
+       : undefined;
+
+     const failureNormalized=failureValue?.normalized&&typeof failureValue.normalized==='object'
+       ? failureValue.normalized as Record<string,unknown>
+       : undefined;
+
+     const replyNormalized=failureReply?.normalized&&typeof failureReply.normalized==='object'
+       ? failureReply.normalized as Record<string,unknown>
+       : undefined;
+
+     const retryReason=String(
+       failureValue?.error||
+       failureValue?.summary||
+       failureNormalized?.error||
+       failureNormalized?.summary||
+       failureReply?.error||
+       failureReply?.summary||
+       replyNormalized?.error||
+       replyNormalized?.summary||
+       route.reason
+     ).trim();
+
+     return negativeKnowledgeService.canRetry(
+       route.target,
+       route.command,
+       retryReason
+     );
+   });
    for(const route of routes) route.payload={...route.payload,environmentSignature:planEnvironment.signature};
    taskBlackboardService.append(taskId,'DECISION','core',`coreEnvironmentPlan:${cycles}`,planEnvironment);
    taskBlackboardService.append(taskId,'DECISION','core',`corePlan:${cycles}`,routes.map(route=>({target:route.target,command:route.command,reason:route.reason,environmentSignature:route.payload.environmentSignature})));

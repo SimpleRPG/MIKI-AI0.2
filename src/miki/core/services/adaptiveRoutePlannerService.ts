@@ -2154,16 +2154,59 @@ class AdaptiveRoutePlannerService {
   private latestOperationError(task:BlackboardTask,operation:string):string {
     for(const entry of [...task.entries].reverse()){
       if(entry.kind!=='ERROR') continue;
+
       const value=objectValue(entry);
       if(String(value?.operation||'')!==operation) continue;
-      const error=String(value?.error||'');
-      if(error)return error;
+
+      const directError=String(value?.error||'').trim();
+      if(directError)return directError;
+
+      const directSummary=String(value?.summary||'').trim();
+      if(directSummary)return directSummary;
+
+      const normalized=value?.normalized;
+      if(normalized&&typeof normalized==='object'){
+        const normalizedRecord=normalized as Record<string,unknown>;
+
+        const normalizedError=String(
+          normalizedRecord.error||''
+        ).trim();
+        if(normalizedError)return normalizedError;
+
+        const normalizedSummary=String(
+          normalizedRecord.summary||''
+        ).trim();
+        if(normalizedSummary)return normalizedSummary;
+      }
+
       const reply=value?.reply;
       if(reply&&typeof reply==='object'){
-        const replyError=String((reply as Record<string,unknown>).error||'');
+        const replyRecord=reply as Record<string,unknown>;
+
+        const replyError=String(replyRecord.error||'').trim();
         if(replyError)return replyError;
+
+        const replySummary=String(replyRecord.summary||'').trim();
+        if(replySummary)return replySummary;
+
+        const replyNormalized=replyRecord.normalized;
+        if(replyNormalized&&typeof replyNormalized==='object'){
+          const replyNormalizedRecord=
+            replyNormalized as Record<string,unknown>;
+
+          const replyNormalizedError=String(
+            replyNormalizedRecord.error||''
+          ).trim();
+          if(replyNormalizedError)return replyNormalizedError;
+
+          const replyNormalizedSummary=String(
+            replyNormalizedRecord.summary||''
+          ).trim();
+          if(replyNormalizedSummary)return replyNormalizedSummary;
+        }
       }
     }
+
     return '';
   }
 
