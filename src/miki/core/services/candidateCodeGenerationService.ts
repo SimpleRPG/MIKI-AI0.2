@@ -10,6 +10,11 @@ import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLl
 import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { ComponentCompositionService } from '../../capability/services/componentCompositionService';
+import { codeConstructionRendererService } from './codeConstructionRendererService';
+import type {
+  CodeConstructionBinding,
+  CodeConstructionGraph,
+} from '../data/codeKnowledge/common';
 export interface CandidateGenerationFile { path:string; candidateContent:string; evidenceIds:string[]; }
 export interface CandidateGenerationOutcome { accepted:boolean; runId:string; workspaceId?:string; files:CandidateGenerationFile[]; reasons:string[]; responseHash?:string; attemptCount?:number; createdCodeComponentIds?:string[]; learningLineage?:{sourcePackageId?:string;externalReviewId?:string;candidateRevision:number;requestedChanges:string[];userReason?:string;usedLearningArtifactIds:string[];ignoredLearningArtifactIds:string[];appliedFailurePatternIds:string[];appliedCorrectionPairIds:string[];appliedComponentPatternIds:string[];learningContextSha256:string;componentPackId?:string;usedKnowledgeComponentIds?:string[];usedCodeComponentIds?:string[];usedConversationComponentIds?:string[];excludedComponentIds?:string[];componentContextSha256?:string}; }
 class CandidateCodeGenerationService {
@@ -290,15 +295,105 @@ class CandidateCodeGenerationService {
         componentIds:codeKnowledgePack.usedKnowledgeComponentIds,
       });
 
+    const explicitBindings=this.parseConstructionBindings(
+      constructionGraph,
+      run.payload.constructionBindings,
+    );
+
+    const explicitBindingKeys=new Set(
+      explicitBindings.map(binding =>
+        `${binding.targetNodeId}::${binding.slotName}`
+      )
+    );
+
+    const resolvedConstructionGraph:CodeConstructionGraph={
+      ...constructionGraph,
+      bindings:[
+        ...constructionGraph.bindings.filter(binding =>
+          !explicitBindingKeys.has(
+            `${binding.targetNodeId}::${binding.slotName}`
+          )
+        ),
+        ...explicitBindings,
+      ],
+    };
+
     const constructionValidation =
       ComponentCompositionService.getInstance()
-        .validateConstructionGraph(constructionGraph);
+        .validateConstructionGraph(resolvedConstructionGraph);
+
+    const constructionRender =
+      constructionValidation.valid
+        ? codeConstructionRendererService.render(
+            resolvedConstructionGraph
+          )
+        : {
+            accepted:false,
+            errors:constructionValidation.errors,
+          };
+
+    if(
+      constructionRender.accepted &&
+      typeof constructionRender.source==='string' &&
+      targetFiles.length===1
+    ){
+      const target=targetFiles[0];
+
+      const created=
+        reusableComponentFactoryService.createCodeComponentCandidate({
+          purpose:run.objective,
+          implementation:constructionRender.source,
+          targetPath:target.path,
+          tests:[
+            `ConstructionGraph=${resolvedConstructionGraph.graphId}`,
+            ...effectiveValidationRequirements,
+          ].filter(Boolean).join('\n'),
+          validation:[
+            `CONSTRUCTION_GRAPH=${resolvedConstructionGraph.graphId}`,
+            `ROOT_NODE=${constructionRender.rootNodeId||''}`,
+            ...effectiveValidationRequirements,
+          ].filter(Boolean).join('\n'),
+          componentType:'CONSTRUCTION_GRAPH_CODE_COMPONENT',
+          supportedEnvironments:['ANDROID'],
+          entryPoint:target.path,
+          sourceEpisodeIds:[],
+        });
+
+      if(created.accepted && created.componentId){
+        const reason=
+          'CONSTRUCTION_GRAPH_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION';
+
+        this.record(runId,{
+          attemptCount:1,
+          status:'BLOCKED',
+          reason,
+          createdCodeComponentIds:[created.componentId],
+          unknownContext,
+          responseHash:canonicalSha256(JSON.stringify({
+            runId,
+            reason,
+            graphId:resolvedConstructionGraph.graphId,
+            componentId:created.componentId,
+          }))
+        });
+
+        return {
+          accepted:false,
+          runId,
+          files:[],
+          reasons:[reason],
+          attemptCount:1,
+          createdCodeComponentIds:[created.componentId],
+        };
+      }
+    }
 
     const constructionGraphHint = [
-      `ConstructionGraph=${constructionGraph.graphId}`,
-      `nodes=${constructionGraph.nodes.length}`,
-      `bindings=${constructionGraph.bindings.length}`,
+      `ConstructionGraph=${resolvedConstructionGraph.graphId}`,
+      `nodes=${resolvedConstructionGraph.nodes.length}`,
+      `bindings=${resolvedConstructionGraph.bindings.length}`,
       `valid=${constructionValidation.valid}`,
+      `rendered=${constructionRender.accepted}`,
       constructionValidation.errors.length
         ? `errors=${constructionValidation.errors.join(' | ')}`
         : '',
