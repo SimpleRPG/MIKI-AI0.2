@@ -552,26 +552,143 @@ class AdaptiveRoutePlannerService {
             && String(value?.error||'')===latestCandidateGenerationError;
         })?.index ?? -1;
 
-      const resolutionAfterError=[...task.entries].some((entry,index)=>{
-        if(index<=errorIndex) return false;
-        if(entry.domain!=='unknown' && entry.domain!=='research' && entry.domain!=='capability' && entry.domain!=='learning')
-          return false;
-        return entry.kind==='RESULT' || entry.kind==='OBSERVATION' || entry.kind==='EVIDENCE';
-      });
+      const latestResolution=[...task.entries]
+        .map((entry,index)=>({entry,index}))
+        .reverse()
+        .find(({entry,index})=>{
+          if(index<=errorIndex) return false;
+          if(entry.domain!=='unknown') return false;
+          if(entry.kind!=='RESULT' && entry.kind!=='OBSERVATION') return false;
+          return String(objectValue(entry)?.operation||'')==='RESOLVE_UNKNOWN';
+        });
 
-      if(!resolutionAfterError){
+      const resolutionValue=latestResolution
+        ? objectValue(latestResolution.entry)
+        : undefined;
+
+      /*
+       * まず既存UNKNOWN解決器へ渡す。
+       * 同じ失敗をGENERATE_CANDIDATEへ直接再投入しない。
+       */
+      if(!latestResolution){
         routes.push({
           target:'unknown',
           command:'RESOLVE_UNKNOWN',
-          reason:'CORE detected a non-retryable CODE composition component gap; resolve missing components before repeating Candidate generation',
+          reason:'CORE analyzed a non-retryable code-composition failure and is resolving the missing components before candidate regeneration',
           payload:{
             taskId:task.taskId,
-            question:unresolved.join(', '),
+            question:`Resolve missing code components: ${unresolved.join(', ')}`,
+            unknownTerms:unresolved,
             unresolvedComponents:unresolved,
             componentGap:true,
             useSearch:true,
             adaptive:true,
             priority:92
+          }
+        });
+
+        return this.decorateOperations(task,this.uniqueOperations(routes));
+      }
+
+      /*
+       * UNKNOWNが既存のResearch基盤へ渡すべき状態なら、
+       * 既存RUN_RESEARCHへ接続する。
+       *
+       * ここでもCandidateを直接繰り返さない。
+       */
+      const resolutionStatus=String(resolutionValue?.status||'').toUpperCase();
+      const researchQuestion=String(
+        resolutionValue?.researchQuestion ||
+        resolutionValue?.query ||
+        ''
+      ).trim();
+
+      if(
+        resolutionStatus==='RESEARCH_REQUIRED' &&
+        researchQuestion
+      ){
+        routes.push({
+          target:'research',
+          command:'RUN_RESEARCH',
+          reason:'CORE re-evaluated UNKNOWN resolution and selected existing Research infrastructure for unresolved code components',
+          payload:{
+            taskId:task.taskId,
+            query:researchQuestion,
+            unresolvedComponents:unresolved,
+            componentGap:true,
+            adaptive:true,
+            priority:94
+          }
+        });
+
+        return this.decorateOperations(task,this.uniqueOperations(routes));
+      }
+
+      /*
+       * UNKNOWN/Researchが処理済みならCOREへ戻し、
+       * 次のCandidate生成判断へ進ませる。
+       *
+       * ただし同じ失敗を無条件で繰り返さないため、
+       * 元の失敗情報をfailureFeedbackとしてCandidate側へ渡す。
+       */
+      const latestResearchAfterResolution=[...task.entries]
+        .map((entry,index)=>({entry,index}))
+        .reverse()
+        .find(({entry,index})=>{
+          if(index<=errorIndex) return false;
+          if(entry.domain!=='research') return false;
+          if(entry.kind!=='RESULT' && entry.kind!=='OBSERVATION') return false;
+          return String(objectValue(entry)?.operation||'')==='EXECUTE_AUTONOMOUS_SEARCH' ||
+            String(objectValue(entry)?.operation||'')==='RUN_RESEARCH';
+        });
+
+      const researchValue=latestResearchAfterResolution
+        ? objectValue(latestResearchAfterResolution.entry)
+        : undefined;
+
+      const researchCompleted=Boolean(
+        researchValue &&
+        ['SUCCEEDED','COMPLETED','RESOLVED','VERIFIED'].includes(
+          String(researchValue.status||'').toUpperCase()
+        )
+      );
+
+      const unknownResolved=[
+        'REUSED_SUPPORTED',
+        'LOCAL_EVIDENCE',
+        'RESEARCHED_UNVERIFIED'
+      ].includes(resolutionStatus);
+
+      if(unknownResolved || researchCompleted){
+        routes.push({
+          target:'selfDevelopment',
+          command:'GENERATE_CANDIDATE',
+          reason:'CORE completed the existing Unknown/Research resolution path and re-evaluated Candidate generation with the original component-gap failure as feedback',
+          payload:{
+            taskId:task.taskId,
+            runId:this.resolveCoreRunId(task,input),
+            goal:task.goal,
+            candidateRevision:Number(input.candidateRevision||1)+1,
+            targetFiles:coreTargetPaths,
+            requirements:input.requirements,
+            prohibitions:input.prohibitions,
+            invariants:input.invariants,
+            validationRequirements:input.validationRequirements,
+            failureFeedback:{
+              sourceOperation:'GENERATE_CANDIDATE',
+              status:'REJECTED',
+              componentIds:unresolved,
+              reasons:[latestCandidateGenerationError],
+              unresolvedComponents:unresolved,
+              result:{
+                error:latestCandidateGenerationError,
+                unknownResolutionStatus:resolutionStatus,
+                researchCompleted
+              },
+              retryOfCandidateRevision:Number(input.candidateRevision||1)
+            },
+            adaptive:true,
+            priority:80
           }
         });
 
