@@ -7524,3 +7524,48 @@ Verification
 設計上できる限り防止する。
 
 ======================================================================
+
+
+【汎用合成機・新規CODE Component Candidate生成接続】
+
+汎用合成機は、既存Componentの再利用だけで処理を終了してはならない。
+既存部品探索と未知・不足探索を同一サイクルで実行し、不足が
+MISSING_IMPLEMENTATION_PATTERN と判定された場合はCREATE経路へ接続する。
+
+CREATE経路では、外部Teacher / UNKNOWN_COMPONENT_AUTHOR等から
+明示的に提供された実装材料のみを使用して
+reusableComponentFactoryService.createCodeComponentCandidate()を呼び出す。
+
+実装材料には少なくとも以下を要求する。
+
+- targetPath
+- candidateContent
+- tests
+- validation
+
+実装材料が存在しない場合、Research結果や説明文からコードを推測・捏造してはならない。
+その場合は不足状態をCOREへ返し、外部Teacherまたは追加Researchによる実装材料取得を待つ。
+
+新規CODE Componentは直ちに完成品・ACTIVE部品として扱わず、
+
+CREATE
+↓
+CODE Component CANDIDATE
+↓
+既存Verification
+↓
+VERIFIED
+↓
+Universal Synthesisへ再投入
+↓
+既存Componentとの再合成
+
+の順序を必須とする。
+
+Gemini等の外部AIはこの経路の通常ランタイムには入れない。
+外部AIによる部品作成・教師的情報は明示的な外部入力として受け取り、
+COREの検証・採否・再合成経路を通過させる。
+
+implementationCandidatesは外部から供給された実装材料を表す。
+このデータが存在しない場合、candidateCodeGenerationServiceは
+新規コードを生成せず、CREATE不足状態を返す。
