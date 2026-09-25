@@ -1537,3 +1537,23 @@ Unknown → Research → Knowledge Integrationを経て新しい再利用部品�
 
 新しい部品を追加するときも、既存Canonical Ownerや既存Construction Graph機構と
 重複するサービスを作らない。
+
+### 2026-09-26 Construction Vocabulary Registration Correction
+
+既存Knowledgeと既存CODE Componentの重複生成を避けるため、Construction Graphの不足は、まず既存Componentとの正規aliasおよび既存Bridgeを解決する。
+
+今回の現行main照合では、以下を新規Componentとして重複実装せず、既存Componentへ接続する。
+
+- code.common.variables → code.javascript.const-declaration
+- code.common.functions → code.javascript.function-declaration
+- JavaScript Node fs/path系 → 既存 code.node.*
+- code.typescript.interfaces → code.typescript.interface
+- code.typescript.type-guards → code.typescript.type-guard-component
+
+既に存在する constructionBridges.ts のCODE Componentは、ReusableComponentFactoryServiceのBuilt-in Seed、Construction Graph definitions、Vocabulary Auditへ正式登録する。
+
+対象はJavaScript control-flow、JavaScript arrays、JavaScript promise、React link、Express PUT route、Express DELETE routeとする。
+
+Construction Vocabulary不足は、同一機能の新規Componentを増殖させず、既存Knowledge → alias / Bridge → CODE Component → Construction Graphという正規経路で解決する。
+
+新しいCode Generator、第二のConstruction Graph、第二のResearch基盤、第二のCandidate生成経路は追加しない。

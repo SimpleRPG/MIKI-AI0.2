@@ -58,6 +58,7 @@ class ReusableComponentFactoryService{
       ...additionalTestingCodeComponents,
       ...additionalModuleCodeComponents,
       ...additionalAutonomousConstructionComponents,
+      ...additionalConstructionBridgeCodeComponents,
     ];
 
     for (const definition of definitions) {
@@ -482,6 +483,7 @@ class ReusableComponentFactoryService{
     ...additionalTestingCodeComponents,
     ...additionalModuleCodeComponents,
     ...additionalAutonomousConstructionComponents,
+    ...additionalConstructionBridgeCodeComponents,
   ];
 
   const constructionContractErrors:string[]=[];
@@ -967,6 +969,7 @@ class ReusableComponentFactoryService{
     ...additionalTestingCodeComponents,
     ...additionalModuleCodeComponents,
     ...additionalAutonomousConstructionComponents,
+    ...additionalConstructionBridgeCodeComponents,
   ];
 
   const knowledgeIds=new Set(
