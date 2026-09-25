@@ -1,4 +1,4 @@
-import type { CodeKnowledgeDefinition } from './common';
+import type { CodeKnowledgeDefinition, CodeComponentDefinition } from './common';
 
 export const testingCodeKnowledge: CodeKnowledgeDefinition[] = [
   {
@@ -133,5 +133,1106 @@ export const additionalTestingCodeKnowledge: CodeKnowledgeDefinition[] = [
     doesNotApplyWhen: [],
     sourceUrls: ['https://vitest.dev/guide/learn/testing-in-practice'],
     sourceArtifactIds: ['vitest-failure-feedback'],
-  },
+  },,
+{
+  "id": "code.testing.describe",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest test suiteを構成する",
+  "summary": "Vitest test suiteを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "describe",
+    "string-expression",
+    "statement"
+  ],
+  "inputs": [
+    "string-expression",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Vitest test suiteを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.describe"
+  ],
+  "constructionProfile": {
+    "kind": "DECLARATION",
+    "syntaxTemplate": "describe({name}, () => {\\n{body}\\n});",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "body",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.it",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest test caseを構成する",
+  "summary": "Vitest test caseを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "it",
+    "string-expression",
+    "statement"
+  ],
+  "inputs": [
+    "string-expression",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Vitest test caseを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.it"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "it({name}, async () => {\\n{body}\\n});",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "body",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.expect",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest Assertion対象を構成する",
+  "summary": "Vitest Assertion対象を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "expect",
+    "expression",
+    "assertion-expression"
+  ],
+  "inputs": [
+    "expression"
+  ],
+  "outputs": [
+    "assertion-expression"
+  ],
+  "appliesWhen": [
+    "Vitest Assertion対象を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.expect"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "expect({actual})",
+    "outputKinds": [
+      "assertion-expression"
+    ],
+    "slots": [
+      {
+        "name": "actual",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.expect-to-be",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "厳密一致Assertionを構成する",
+  "summary": "厳密一致Assertionを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "expect",
+    "to",
+    "be",
+    "expression",
+    "statement"
+  ],
+  "inputs": [
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "厳密一致Assertionを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.expect-to-be"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "expect({actual}).toBe({expected})",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "actual",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "expected",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.expect-to-equal",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "構造一致Assertionを構成する",
+  "summary": "構造一致Assertionを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "expect",
+    "to",
+    "equal",
+    "expression",
+    "statement"
+  ],
+  "inputs": [
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "構造一致Assertionを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.expect-to-equal"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "expect({actual}).toEqual({expected})",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "actual",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "expected",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.expect-to-throw",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "例外Assertionを構成する",
+  "summary": "例外Assertionを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "expect",
+    "to",
+    "throw",
+    "function-expression",
+    "statement"
+  ],
+  "inputs": [
+    "function-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "例外Assertionを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.expect-to-throw"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "expect({operation}).toThrow()",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "operation",
+        "inputKinds": [
+          "function-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.expect-resolves",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Promise成功Assertionを構成する",
+  "summary": "Promise成功Assertionを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "expect",
+    "resolves",
+    "promise-expression",
+    "expression",
+    "statement"
+  ],
+  "inputs": [
+    "promise-expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Promise成功Assertionを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.expect-resolves"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "await expect({operation}).resolves.toEqual({expected})",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "operation",
+        "inputKinds": [
+          "promise-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "expected",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.expect-rejects",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Promise失敗Assertionを構成する",
+  "summary": "Promise失敗Assertionを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "expect",
+    "rejects",
+    "promise-expression",
+    "statement"
+  ],
+  "inputs": [
+    "promise-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Promise失敗Assertionを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.expect-rejects"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "await expect({operation}).rejects.toThrow()",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "operation",
+        "inputKinds": [
+          "promise-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.before-each",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "各test前のsetupを構成する",
+  "summary": "各test前のsetupを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "before",
+    "each",
+    "statement"
+  ],
+  "inputs": [
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "各test前のsetupを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.before-each"
+  ],
+  "constructionProfile": {
+    "kind": "DECLARATION",
+    "syntaxTemplate": "beforeEach(() => {\\n{body}\\n});",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "body",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.after-each",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "各test後のcleanupを構成する",
+  "summary": "各test後のcleanupを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "after",
+    "each",
+    "statement"
+  ],
+  "inputs": [
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "各test後のcleanupを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.after-each"
+  ],
+  "constructionProfile": {
+    "kind": "DECLARATION",
+    "syntaxTemplate": "afterEach(() => {\\n{body}\\n});",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "body",
+        "inputKinds": [
+          "statement"
+        ],
+        "required": true,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.vi-fn",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest mock functionを構成する",
+  "summary": "Vitest mock functionを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "vi",
+    "fn",
+    "function-expression"
+  ],
+  "inputs": [
+    "function-expression"
+  ],
+  "outputs": [
+    "function-expression"
+  ],
+  "appliesWhen": [
+    "Vitest mock functionを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.vi-fn"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "vi.fn({implementation})",
+    "outputKinds": [
+      "function-expression"
+    ],
+    "slots": [
+      {
+        "name": "implementation",
+        "inputKinds": [
+          "function-expression"
+        ],
+        "required": false
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.vi-spy-on",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest spyを構成する",
+  "summary": "Vitest spyを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "vi",
+    "spy",
+    "on",
+    "object-expression",
+    "string-expression",
+    "mock-expression"
+  ],
+  "inputs": [
+    "object-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "mock-expression"
+  ],
+  "appliesWhen": [
+    "Vitest spyを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.vi-spy-on"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "vi.spyOn({object}, {method})",
+    "outputKinds": [
+      "mock-expression"
+    ],
+    "slots": [
+      {
+        "name": "object",
+        "inputKinds": [
+          "object-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "method",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.testing.vi-mock",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest module mockを構成する",
+  "summary": "Vitest module mockを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "vi",
+    "mock",
+    "string-expression",
+    "statement"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Vitest module mockを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://vitest.dev/api/"
+  ],
+  "sourceArtifactIds": [
+    "testing:code.testing.vi-mock"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "vi.mock({module})",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "module",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+}
+];
+
+export const additionalTestingCodeComponents: CodeComponentDefinition[] = [
+{
+  "knowledgeId": "code.testing.describe",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest test suiteを構成する",
+  "implementation": "describe({name}, () => {\\n{body}\\n});",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "string-expression",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.describe",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.describe",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.describe"
+},
+{
+  "knowledgeId": "code.testing.it",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest test caseを構成する",
+  "implementation": "it({name}, async () => {\\n{body}\\n});",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "string-expression",
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.it",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.it",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.it"
+},
+{
+  "knowledgeId": "code.testing.expect",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest Assertion対象を構成する",
+  "implementation": "expect({actual})",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "expression"
+  ],
+  "outputs": [
+    "assertion-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.expect",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.expect",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.expect"
+},
+{
+  "knowledgeId": "code.testing.expect-to-be",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "厳密一致Assertionを構成する",
+  "implementation": "expect({actual}).toBe({expected})",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.expect-to-be",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.expect-to-be",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.expect-to-be"
+},
+{
+  "knowledgeId": "code.testing.expect-to-equal",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "構造一致Assertionを構成する",
+  "implementation": "expect({actual}).toEqual({expected})",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.expect-to-equal",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.expect-to-equal",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.expect-to-equal"
+},
+{
+  "knowledgeId": "code.testing.expect-to-throw",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "例外Assertionを構成する",
+  "implementation": "expect({operation}).toThrow()",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "function-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.expect-to-throw",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.expect-to-throw",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.expect-to-throw"
+},
+{
+  "knowledgeId": "code.testing.expect-resolves",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Promise成功Assertionを構成する",
+  "implementation": "await expect({operation}).resolves.toEqual({expected})",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "promise-expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.expect-resolves",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.expect-resolves",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.expect-resolves"
+},
+{
+  "knowledgeId": "code.testing.expect-rejects",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Promise失敗Assertionを構成する",
+  "implementation": "await expect({operation}).rejects.toThrow()",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "promise-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.expect-rejects",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.expect-rejects",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.expect-rejects"
+},
+{
+  "knowledgeId": "code.testing.before-each",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "各test前のsetupを構成する",
+  "implementation": "beforeEach(() => {\\n{body}\\n});",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.before-each",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.before-each",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.before-each"
+},
+{
+  "knowledgeId": "code.testing.after-each",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "各test後のcleanupを構成する",
+  "implementation": "afterEach(() => {\\n{body}\\n});",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "statement"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.after-each",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.after-each",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.after-each"
+},
+{
+  "knowledgeId": "code.testing.vi-fn",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest mock functionを構成する",
+  "implementation": "vi.fn({implementation})",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "function-expression"
+  ],
+  "outputs": [
+    "function-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.vi-fn",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.vi-fn",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.vi-fn"
+},
+{
+  "knowledgeId": "code.testing.vi-spy-on",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest spyを構成する",
+  "implementation": "vi.spyOn({object}, {method})",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "object-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "mock-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.vi-spy-on",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.vi-spy-on",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.vi-spy-on"
+},
+{
+  "knowledgeId": "code.testing.vi-mock",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Vitest module mockを構成する",
+  "implementation": "vi.mock({module})",
+  "targetPath": "generated.test.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "vitest"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.testing.vi-mock",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "vitest"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.testing.vi-mock",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.vi-mock"
+}
 ];

@@ -3293,6 +3293,1409 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
       "reuse compatible existing nodes before creating an equivalent node"
     ]
   }
+},
+{
+  "id": "code.javascript.promise-resolve",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Promiseを成功状態へ変換する",
+  "summary": "Promiseを成功状態へ変換する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "promise",
+    "resolve",
+    "expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "Promiseを成功状態へ変換する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.promise-resolve"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "Promise.resolve({value})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "value",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.promise-reject",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Promiseを失敗状態へ変換する",
+  "summary": "Promiseを失敗状態へ変換する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "promise",
+    "reject",
+    "expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "Promiseを失敗状態へ変換する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.promise-reject"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "Promise.reject({error})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "error",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.abort-controller",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "非同期処理のキャンセル制御を構成する",
+  "summary": "非同期処理のキャンセル制御を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "abort",
+    "controller",
+    "identifier",
+    "statement"
+  ],
+  "inputs": [
+    "identifier"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "非同期処理のキャンセル制御を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.abort-controller"
+  ],
+  "constructionProfile": {
+    "kind": "DECLARATION",
+    "syntaxTemplate": "const {name} = new AbortController();",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "identifier"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.throw-error",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Error objectを生成して送出する",
+  "summary": "Error objectを生成して送出する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "throw",
+    "error",
+    "string-expression",
+    "statement"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Error objectを生成して送出する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.throw-error"
+  ],
+  "constructionProfile": {
+    "kind": "STATEMENT",
+    "syntaxTemplate": "throw new Error({message});",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "message",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.logical-assignment-or",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "OR論理代入を構成する",
+  "summary": "OR論理代入を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "logical",
+    "assignment",
+    "or",
+    "expression",
+    "statement"
+  ],
+  "inputs": [
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "OR論理代入を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.logical-assignment-or"
+  ],
+  "constructionProfile": {
+    "kind": "STATEMENT",
+    "syntaxTemplate": "{target} ||= {value};",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "target",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "value",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.logical-assignment-and",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "AND論理代入を構成する",
+  "summary": "AND論理代入を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "logical",
+    "assignment",
+    "and",
+    "expression",
+    "statement"
+  ],
+  "inputs": [
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "AND論理代入を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.logical-assignment-and"
+  ],
+  "constructionProfile": {
+    "kind": "STATEMENT",
+    "syntaxTemplate": "{target} &&= {value};",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "target",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "value",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.logical-assignment-nullish",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Nullish論理代入を構成する",
+  "summary": "Nullish論理代入を構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "logical",
+    "assignment",
+    "nullish",
+    "expression",
+    "statement"
+  ],
+  "inputs": [
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "appliesWhen": [
+    "Nullish論理代入を構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.logical-assignment-nullish"
+  ],
+  "constructionProfile": {
+    "kind": "STATEMENT",
+    "syntaxTemplate": "{target} ??= {value};",
+    "outputKinds": [
+      "statement"
+    ],
+    "slots": [
+      {
+        "name": "target",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "value",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.array-concat",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数Arrayを結合する",
+  "summary": "複数Arrayを結合する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "array",
+    "concat",
+    "array-expression",
+    "expression"
+  ],
+  "inputs": [
+    "array-expression",
+    "expression"
+  ],
+  "outputs": [
+    "array-expression"
+  ],
+  "appliesWhen": [
+    "複数Arrayを結合する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.array-concat"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "{array}.concat({items})",
+    "outputKinds": [
+      "array-expression"
+    ],
+    "slots": [
+      {
+        "name": "array",
+        "inputKinds": [
+          "array-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "items",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": false,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.string-slice",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "文字列の一部を抽出する",
+  "summary": "文字列の一部を抽出する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "string",
+    "slice",
+    "string-expression",
+    "number-expression"
+  ],
+  "inputs": [
+    "string-expression",
+    "number-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "appliesWhen": [
+    "文字列の一部を抽出する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.string-slice"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "{text}.slice({start}, {end})",
+    "outputKinds": [
+      "string-expression"
+    ],
+    "slots": [
+      {
+        "name": "text",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "start",
+        "inputKinds": [
+          "number-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "end",
+        "inputKinds": [
+          "number-expression"
+        ],
+        "required": false
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.string-to-lower-case",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "文字列を小文字化する",
+  "summary": "文字列を小文字化する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "string",
+    "to",
+    "lower",
+    "case",
+    "string-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "appliesWhen": [
+    "文字列を小文字化する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.string-to-lower-case"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "{text}.toLowerCase()",
+    "outputKinds": [
+      "string-expression"
+    ],
+    "slots": [
+      {
+        "name": "text",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.string-to-upper-case",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "文字列を大文字化する",
+  "summary": "文字列を大文字化する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "string",
+    "to",
+    "upper",
+    "case",
+    "string-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "appliesWhen": [
+    "文字列を大文字化する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.string-to-upper-case"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "{text}.toUpperCase()",
+    "outputKinds": [
+      "string-expression"
+    ],
+    "slots": [
+      {
+        "name": "text",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.object-from-entries",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "entry配列からObjectを構成する",
+  "summary": "entry配列からObjectを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "object",
+    "from",
+    "entries",
+    "array-expression",
+    "object-expression"
+  ],
+  "inputs": [
+    "array-expression"
+  ],
+  "outputs": [
+    "object-expression"
+  ],
+  "appliesWhen": [
+    "entry配列からObjectを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.object-from-entries"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "Object.fromEntries({entries})",
+    "outputKinds": [
+      "object-expression"
+    ],
+    "slots": [
+      {
+        "name": "entries",
+        "inputKinds": [
+          "array-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.javascript.dynamic-import",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "動的Module importを構成する",
+  "summary": "動的Module importを構成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "dynamic",
+    "import",
+    "string-expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "動的Module importを構成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.javascript.dynamic-import"
+  ],
+  "constructionProfile": {
+    "kind": "MODULE",
+    "syntaxTemplate": "import({module})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "module",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.fs-read-file",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイルを非同期で読み込む",
+  "summary": "ファイルを非同期で読み込む。既存Construction Graphで再利用する。",
+  "concepts": [
+    "fs",
+    "read",
+    "file",
+    "string-expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "string-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "ファイルを非同期で読み込む"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.fs-read-file"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "fs.readFile({path}, {encoding})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "encoding",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.fs-write-file",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイルへ非同期で書き込む",
+  "summary": "ファイルへ非同期で書き込む。既存Construction Graphで再利用する。",
+  "concepts": [
+    "fs",
+    "write",
+    "file",
+    "string-expression",
+    "expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "string-expression",
+    "expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "ファイルへ非同期で書き込む"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.fs-write-file"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "fs.writeFile({path}, {data}, {encoding})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "data",
+        "inputKinds": [
+          "expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "encoding",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": false
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.fs-readdir",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ディレクトリ内容を取得する",
+  "summary": "ディレクトリ内容を取得する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "fs",
+    "readdir",
+    "string-expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "ディレクトリ内容を取得する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.fs-readdir"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "fs.readdir({path})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.fs-stat",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイル状態を取得する",
+  "summary": "ファイル状態を取得する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "fs",
+    "stat",
+    "string-expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "ファイル状態を取得する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.fs-stat"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "fs.stat({path})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.fs-mkdir",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ディレクトリを作成する",
+  "summary": "ディレクトリを作成する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "fs",
+    "mkdir",
+    "string-expression",
+    "object-expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "string-expression",
+    "object-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "ディレクトリを作成する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.fs-mkdir"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "fs.mkdir({path}, {options})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "options",
+        "inputKinds": [
+          "object-expression"
+        ],
+        "required": false
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.fs-rename",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイルまたはディレクトリを移動する",
+  "summary": "ファイルまたはディレクトリを移動する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "fs",
+    "rename",
+    "string-expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "string-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "ファイルまたはディレクトリを移動する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.fs-rename"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "fs.rename({from}, {to})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "from",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "to",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.fs-rm",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイルまたはディレクトリを削除する",
+  "summary": "ファイルまたはディレクトリを削除する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "fs",
+    "rm",
+    "string-expression",
+    "object-expression",
+    "promise-expression"
+  ],
+  "inputs": [
+    "string-expression",
+    "object-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "appliesWhen": [
+    "ファイルまたはディレクトリを削除する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.fs-rm"
+  ],
+  "constructionProfile": {
+    "kind": "ASYNC",
+    "syntaxTemplate": "fs.rm({path}, {options})",
+    "outputKinds": [
+      "promise-expression"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      },
+      {
+        "name": "options",
+        "inputKinds": [
+          "object-expression"
+        ],
+        "required": false
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.path-join",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "パスを安全に結合する",
+  "summary": "パスを安全に結合する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "path",
+    "join",
+    "string-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "appliesWhen": [
+    "パスを安全に結合する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.path-join"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "path.join({parts})",
+    "outputKinds": [
+      "string-expression"
+    ],
+    "slots": [
+      {
+        "name": "parts",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.path-resolve",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "絶対パスを解決する",
+  "summary": "絶対パスを解決する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "path",
+    "resolve",
+    "string-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "appliesWhen": [
+    "絶対パスを解決する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.path-resolve"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "path.resolve({parts})",
+    "outputKinds": [
+      "string-expression"
+    ],
+    "slots": [
+      {
+        "name": "parts",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true,
+        "multiple": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.path-dirname",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "親ディレクトリを取得する",
+  "summary": "親ディレクトリを取得する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "path",
+    "dirname",
+    "string-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "appliesWhen": [
+    "親ディレクトリを取得する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.path-dirname"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "path.dirname({path})",
+    "outputKinds": [
+      "string-expression"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.path-basename",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイル名部分を取得する",
+  "summary": "ファイル名部分を取得する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "path",
+    "basename",
+    "string-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "appliesWhen": [
+    "ファイル名部分を取得する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.path-basename"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "path.basename({path})",
+    "outputKinds": [
+      "string-expression"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.path-extname",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "拡張子を取得する",
+  "summary": "拡張子を取得する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "path",
+    "extname",
+    "string-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "appliesWhen": [
+    "拡張子を取得する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.path-extname"
+  ],
+  "constructionProfile": {
+    "kind": "CALL",
+    "syntaxTemplate": "path.extname({path})",
+    "outputKinds": [
+      "string-expression"
+    ],
+    "slots": [
+      {
+        "name": "path",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
+},
+{
+  "id": "code.node.process-env",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "環境変数を取得する",
+  "summary": "環境変数を取得する。既存Construction Graphで再利用する。",
+  "concepts": [
+    "process",
+    "env",
+    "string-expression"
+  ],
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "appliesWhen": [
+    "環境変数を取得する"
+  ],
+  "doesNotApplyWhen": [],
+  "sourceUrls": [
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference"
+  ],
+  "sourceArtifactIds": [
+    "js:code.node.process-env"
+  ],
+  "constructionProfile": {
+    "kind": "EXPRESSION",
+    "syntaxTemplate": "process.env[{name}]",
+    "outputKinds": [
+      "string-expression"
+    ],
+    "slots": [
+      {
+        "name": "name",
+        "inputKinds": [
+          "string-expression"
+        ],
+        "required": true
+      }
+    ],
+    "constraints": [
+      "inputs must satisfy the declared construction contract"
+    ],
+    "adaptationRules": [
+      "reuse an existing compatible construction node before creating an equivalent one"
+    ]
+  }
 }
 ];
 
@@ -5829,5 +7232,740 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   "publicInterfaces": [],
   "tests": "CONTRACT_TEST:code.javascript.object-assign",
   "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.object-assign"
+},
+{
+  "knowledgeId": "code.javascript.promise-resolve",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Promiseを成功状態へ変換する",
+  "implementation": "Promise.resolve({value})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.promise-resolve",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.promise-resolve",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.promise-resolve"
+},
+{
+  "knowledgeId": "code.javascript.promise-reject",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Promiseを失敗状態へ変換する",
+  "implementation": "Promise.reject({error})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.promise-reject",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.promise-reject",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.promise-reject"
+},
+{
+  "knowledgeId": "code.javascript.abort-controller",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "非同期処理のキャンセル制御を構成する",
+  "implementation": "const {name} = new AbortController();",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "identifier"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.abort-controller",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.abort-controller",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.abort-controller"
+},
+{
+  "knowledgeId": "code.javascript.throw-error",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Error objectを生成して送出する",
+  "implementation": "throw new Error({message});",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.throw-error",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.throw-error",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.throw-error"
+},
+{
+  "knowledgeId": "code.javascript.logical-assignment-or",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "OR論理代入を構成する",
+  "implementation": "{target} ||= {value};",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.logical-assignment-or",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.logical-assignment-or",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.logical-assignment-or"
+},
+{
+  "knowledgeId": "code.javascript.logical-assignment-and",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "AND論理代入を構成する",
+  "implementation": "{target} &&= {value};",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.logical-assignment-and",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.logical-assignment-and",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.logical-assignment-and"
+},
+{
+  "knowledgeId": "code.javascript.logical-assignment-nullish",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "Nullish論理代入を構成する",
+  "implementation": "{target} ??= {value};",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "expression",
+    "expression"
+  ],
+  "outputs": [
+    "statement"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.logical-assignment-nullish",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.logical-assignment-nullish",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.logical-assignment-nullish"
+},
+{
+  "knowledgeId": "code.javascript.array-concat",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "複数Arrayを結合する",
+  "implementation": "{array}.concat({items})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "array-expression",
+    "expression"
+  ],
+  "outputs": [
+    "array-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.array-concat",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.array-concat",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.array-concat"
+},
+{
+  "knowledgeId": "code.javascript.string-slice",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "文字列の一部を抽出する",
+  "implementation": "{text}.slice({start}, {end})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression",
+    "number-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.string-slice",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.string-slice",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.string-slice"
+},
+{
+  "knowledgeId": "code.javascript.string-to-lower-case",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "文字列を小文字化する",
+  "implementation": "{text}.toLowerCase()",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.string-to-lower-case",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.string-to-lower-case",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.string-to-lower-case"
+},
+{
+  "knowledgeId": "code.javascript.string-to-upper-case",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "文字列を大文字化する",
+  "implementation": "{text}.toUpperCase()",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.string-to-upper-case",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.string-to-upper-case",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.string-to-upper-case"
+},
+{
+  "knowledgeId": "code.javascript.object-from-entries",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "entry配列からObjectを構成する",
+  "implementation": "Object.fromEntries({entries})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "array-expression"
+  ],
+  "outputs": [
+    "object-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.object-from-entries",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.object-from-entries",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.object-from-entries"
+},
+{
+  "knowledgeId": "code.javascript.dynamic-import",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "動的Module importを構成する",
+  "implementation": "import({module})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.javascript.dynamic-import",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.javascript.dynamic-import",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.dynamic-import"
+},
+{
+  "knowledgeId": "code.node.fs-read-file",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイルを非同期で読み込む",
+  "implementation": "fs.readFile({path}, {encoding})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:fs/promises"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.fs-read-file",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:fs/promises"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.fs-read-file",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.fs-read-file"
+},
+{
+  "knowledgeId": "code.node.fs-write-file",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイルへ非同期で書き込む",
+  "implementation": "fs.writeFile({path}, {data}, {encoding})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression",
+    "expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:fs/promises"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.fs-write-file",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:fs/promises"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.fs-write-file",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.fs-write-file"
+},
+{
+  "knowledgeId": "code.node.fs-readdir",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ディレクトリ内容を取得する",
+  "implementation": "fs.readdir({path})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:fs/promises"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.fs-readdir",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:fs/promises"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.fs-readdir",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.fs-readdir"
+},
+{
+  "knowledgeId": "code.node.fs-stat",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイル状態を取得する",
+  "implementation": "fs.stat({path})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:fs/promises"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.fs-stat",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:fs/promises"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.fs-stat",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.fs-stat"
+},
+{
+  "knowledgeId": "code.node.fs-mkdir",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ディレクトリを作成する",
+  "implementation": "fs.mkdir({path}, {options})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression",
+    "object-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:fs/promises"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.fs-mkdir",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:fs/promises"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.fs-mkdir",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.fs-mkdir"
+},
+{
+  "knowledgeId": "code.node.fs-rename",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイルまたはディレクトリを移動する",
+  "implementation": "fs.rename({from}, {to})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression",
+    "string-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:fs/promises"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.fs-rename",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:fs/promises"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.fs-rename",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.fs-rename"
+},
+{
+  "knowledgeId": "code.node.fs-rm",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイルまたはディレクトリを削除する",
+  "implementation": "fs.rm({path}, {options})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression",
+    "object-expression"
+  ],
+  "outputs": [
+    "promise-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:fs/promises"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.fs-rm",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:fs/promises"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.fs-rm",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.fs-rm"
+},
+{
+  "knowledgeId": "code.node.path-join",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "パスを安全に結合する",
+  "implementation": "path.join({parts})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:path"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.path-join",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:path"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.path-join",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.path-join"
+},
+{
+  "knowledgeId": "code.node.path-resolve",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "絶対パスを解決する",
+  "implementation": "path.resolve({parts})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:path"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.path-resolve",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:path"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.path-resolve",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.path-resolve"
+},
+{
+  "knowledgeId": "code.node.path-dirname",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "親ディレクトリを取得する",
+  "implementation": "path.dirname({path})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:path"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.path-dirname",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:path"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.path-dirname",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.path-dirname"
+},
+{
+  "knowledgeId": "code.node.path-basename",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "ファイル名部分を取得する",
+  "implementation": "path.basename({path})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:path"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.path-basename",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:path"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.path-basename",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.path-basename"
+},
+{
+  "knowledgeId": "code.node.path-extname",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "拡張子を取得する",
+  "implementation": "path.extname({path})",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [
+    "node:path"
+  ],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.path-extname",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [
+    "node:path"
+  ],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.path-extname",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.path-extname"
+},
+{
+  "knowledgeId": "code.node.process-env",
+  "componentType": "CODE_CONSTRUCTION",
+  "purpose": "環境変数を取得する",
+  "implementation": "process.env[{name}]",
+  "targetPath": "generated.ts",
+  "inputs": [
+    "string-expression"
+  ],
+  "outputs": [
+    "string-expression"
+  ],
+  "prerequisites": [],
+  "dependencies": [],
+  "supportedEnvironments": [
+    "ANDROID",
+    "MIKI_RUNTIME"
+  ],
+  "entryPoint": "CodeConstruction/code.node.process-env",
+  "securityClass": "READ_ONLY",
+  "exports": [],
+  "imports": [],
+  "publicInterfaces": [],
+  "tests": "CONTRACT_TEST:code.node.process-env",
+  "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.process-env"
 }
 ];

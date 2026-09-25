@@ -8,7 +8,7 @@ import { commonCodeKnowledge, additionalCommonCodeKnowledge, type CodeConstructi
 import { javascriptCodeKnowledge, additionalJavascriptCodeKnowledge, additionalJavascriptCodeComponents } from '../data/codeKnowledge/javascript';
 import { typescriptCodeKnowledge, additionalTypescriptCodeKnowledge, additionalTypescriptCodeComponents } from '../data/codeKnowledge/typescript';
 import { webCodeKnowledge, additionalWebCodeKnowledge, additionalWebCodeComponents } from '../data/codeKnowledge/web';
-import { testingCodeKnowledge, additionalTestingCodeKnowledge } from '../data/codeKnowledge/testing';
+import { testingCodeKnowledge, additionalTestingCodeKnowledge, additionalTestingCodeComponents } from '../data/codeKnowledge/testing';
 export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
 export type ComponentSelectionMode='REUSE_AS_IS'|'ADAPT_EXISTING'|'COMPOSE_MULTIPLE'|'CREATE_NEW'|'ESCALATE_UNKNOWN';
@@ -35,6 +35,7 @@ class ReusableComponentFactoryService{
       ...additionalJavascriptCodeComponents,
       ...additionalTypescriptCodeComponents,
       ...additionalWebCodeComponents,
+      ...additionalTestingCodeComponents,
     ];
 
     for (const definition of definitions) {
