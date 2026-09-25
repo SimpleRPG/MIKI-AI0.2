@@ -4847,4 +4847,25 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   "tests": "CONTRACT_TEST:code.typescript.import-type",
   "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.import-type"
 }
+
+{
+  knowledgeId: 'code.typescript.generic-function-constraint',
+  componentType: 'CODE_CONSTRUCTION',
+  purpose: 'Generic関数へ型制約を付ける',
+  implementation: 'function {name}<{typeParameter} extends {constraint}>({parameters}) {\n{body}\n}',
+  targetPath: 'generated.ts',
+  inputs: ['identifier', 'type-parameter', 'type-expression', 'parameter', 'statement'],
+  outputs: ['statement'],
+  prerequisites: ['valid TypeScript generic type parameter', 'valid TypeScript constraint'],
+  dependencies: ['TypeScript'],
+  supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+  entryPoint: 'CodeConstruction/code.typescript.generic-function-constraint',
+  securityClass: 'READ_ONLY',
+  exports: [],
+  imports: [],
+  publicInterfaces: [],
+  tests: 'GENERIC_FUNCTION_CONSTRAINT_CONTRACT_TEST',
+  validation: 'VALIDATE_TYPESCRIPT_GENERIC_CONSTRAINT',
+},
+
 ];

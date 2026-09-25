@@ -115,6 +115,62 @@ class CandidateCodeGenerationService {
       ? [`Reusable CODE KNOWLEDGE guidance (guidance only; never executable CODE):\n${knowledgeHints}`]
       : [];
 
+  const constructionGraph =
+    reusableComponentFactoryService.buildConstructionGraph({
+      goal:run.objective,
+      componentIds:codeKnowledgePack.usedKnowledgeComponentIds,
+      preserveAllNodes:Boolean(
+        run.payload.constructionBindings
+      ),
+    });
+
+  const explicitBindings=this.parseConstructionBindings(
+    constructionGraph,
+    run.payload.constructionBindings,
+  );
+
+  const explicitBindingKeys=new Set(
+    explicitBindings.map(binding =>
+      `${binding.targetNodeId}::${binding.slotName}`
+    )
+  );
+
+  const resolvedConstructionGraph:CodeConstructionGraph={
+    ...constructionGraph,
+    bindings:[
+      ...constructionGraph.bindings.filter(binding =>
+        !explicitBindingKeys.has(
+          `${binding.targetNodeId}::${binding.slotName}`
+        )
+      ),
+      ...explicitBindings,
+    ],
+  };
+
+  const constructionValidation =
+    ComponentCompositionService.getInstance()
+      .validateConstructionGraph(resolvedConstructionGraph);
+
+  const constructionRender =
+    constructionValidation.valid
+      ? codeConstructionRendererService.render(
+          resolvedConstructionGraph
+        )
+      : {
+          accepted:false,
+          errors:constructionValidation.errors,
+        };
+
+  const constructionGapRequirements=[
+    ...constructionValidation.errors,
+    ...constructionValidation.unresolvedSlots.map(
+      slot => `UNRESOLVED_SLOT:${slot}`
+    ),
+  ]
+    .filter(Boolean)
+    .map(value => `CONSTRUCTION_GAP:${value}`)
+    .slice(0,12);
+
   const unknownContext=await candidateUnknownResolutionService.resolve({
     runId:run.runId,
     taskId:run.taskId||run.runId,
@@ -129,6 +185,7 @@ class CandidateCodeGenerationService {
     requirements:[
       ...effectiveRequirements,
       ...knowledgeRequirement,
+      ...constructionGapRequirements,
     ],
     validationRequirements:effectiveValidationRequirements
   });
@@ -281,59 +338,6 @@ class CandidateCodeGenerationService {
     const reusableComponentIds = [
       ...componentPack.usedCodeComponentIds,
     ];
-
-    /*
-     * CODE KnowledgeのConstruction Profileから構築グラフを作る。
-     *
-     * ここでは未検証コードを生成しない。
-     * Graphは構造判断のための決定論的中間表現であり、
-     * 実行可能CODE Componentとは別物。
-     */
-    const constructionGraph =
-      reusableComponentFactoryService.buildConstructionGraph({
-        goal:run.objective,
-        componentIds:codeKnowledgePack.usedKnowledgeComponentIds,
-        preserveAllNodes:Boolean(
-          run.payload.constructionBindings
-        ),
-      });
-
-    const explicitBindings=this.parseConstructionBindings(
-      constructionGraph,
-      run.payload.constructionBindings,
-    );
-
-    const explicitBindingKeys=new Set(
-      explicitBindings.map(binding =>
-        `${binding.targetNodeId}::${binding.slotName}`
-      )
-    );
-
-    const resolvedConstructionGraph:CodeConstructionGraph={
-      ...constructionGraph,
-      bindings:[
-        ...constructionGraph.bindings.filter(binding =>
-          !explicitBindingKeys.has(
-            `${binding.targetNodeId}::${binding.slotName}`
-          )
-        ),
-        ...explicitBindings,
-      ],
-    };
-
-    const constructionValidation =
-      ComponentCompositionService.getInstance()
-        .validateConstructionGraph(resolvedConstructionGraph);
-
-    const constructionRender =
-      constructionValidation.valid
-        ? codeConstructionRendererService.render(
-            resolvedConstructionGraph
-          )
-        : {
-            accepted:false,
-            errors:constructionValidation.errors,
-          };
 
     if(
       constructionRender.accepted &&

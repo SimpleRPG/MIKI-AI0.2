@@ -39,6 +39,45 @@ export interface CodeConstructionGraph {
   rootNodeId?: string;
   nodes: CodeConstructionNode[];
   bindings: CodeConstructionBinding[];
+  unresolvedSlots?: string[];
+  contractErrors?: string[];
+}
+
+export function normalizeConstructionKind(kind: string): string {
+  return String(kind || '').trim().toLowerCase();
+}
+
+/**
+ * Construction Graph専用の決定論的I/O互換判定。
+ * 完全一致を基本とし、安全に一般化できる型だけを明示的に互換扱いする。
+ */
+export function isCompatibleConstructionKind(
+  actualKind: string,
+  expectedKind: string,
+): boolean {
+  const actual = normalizeConstructionKind(actualKind);
+  const expected = normalizeConstructionKind(expectedKind);
+
+  if (!actual || !expected) return false;
+  if (actual === expected) return true;
+
+  // expression は具体的 expression 型を受け取れる一般契約。
+  if (
+    expected === 'expression' &&
+    (actual === 'expression' || actual.endsWith('-expression'))
+  ) {
+    return true;
+  }
+
+  // JSX child は JSX expression / text を子として利用できる。
+  if (
+    expected === 'jsx-child' &&
+    ['jsx-child', 'jsx-expression', 'jsx-text'].includes(actual)
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export interface CodeKnowledgeDefinition {

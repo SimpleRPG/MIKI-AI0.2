@@ -1312,3 +1312,38 @@ Construction Graphの接続は既存のinputKinds/outputKinds契約を使用し�
 Regression / Canary / Promotion境界は変更しない。
 
 一時的なconstructionExpansion.tsは正規Knowledge層として使用せず削除する。
+
+### 2026-09-26 Construction Graph Gap Routing and Contract Normalization
+
+既存のReusable Component Factory、Construction Graph、ComponentComposition、
+CandidateUnknownResolutionService、Research基盤を変更せず、
+Construction Graphの不足状態を既存CORE/Unknown/Research経路へ明示的に返せるようにする。
+
+今回の実装:
+
+- Node.js fs/path系でKnowledge IDと既存CODE Component ID体系が異なる箇所をFactory内の正規aliasで接続する。
+- Testing CODE Component定義をConstruction GraphのComponent候補集合へ追加する。
+- TypeScript generic-function-constraintのKnowledgeに対応するCODE Componentを追加する。
+- Construction kind互換判定をcommon.tsへ集約し、FactoryとComponentCompositionの両方で同一契約を使用する。
+- Construction GraphはunresolvedSlotsとcontractErrorsを返し、Knowledgeだけ存在してCODE Componentへ接続できない状態を黙って通さない。
+- CandidateCodeGenerationServiceはGraphをResearch前に決定論的に診断し、CONSTRUCTION_GAPを既存CandidateUnknownResolutionServiceへ渡す。
+- CandidateUnknownResolutionServiceはConstruction Gap単位で既存Research基盤を利用して実装材料を探索する。
+- 新しい合成機、第二のResearch基盤、第二のUnknown基盤、19個目の分類は追加しない。
+- Researchで得た実装材料から生成されるCODE Componentは従来どおりCandidate/Verification境界を通過し、本番へ直接反映しない。
+
+これにより正規経路は、
+
+CORE
+→ selfDevelopment / CandidateCodeGeneration
+→ Reusable Component Factory
+→ Construction Graph
+→ Construction Gap
+→ 既存Unknown / Research
+→ Implementation Material / CODE Component Candidate
+→ Verification
+→ CORE
+
+となる。
+
+Construction Graphの未解決slotや契約不一致を推測で埋めない。
+不足はUnknown/Researchへ戻し、Evidence・Component・Verificationを経て再評価する。

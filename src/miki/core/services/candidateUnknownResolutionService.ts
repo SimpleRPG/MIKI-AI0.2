@@ -325,7 +325,25 @@ class CandidateUnknownResolutionService {
       hasChangeIntent ||
       (hasRepositoryWork && input.validationRequirements.length > 0);
 
-    if (implementationResearchRequired) {
+    const constructionGapQuestions = [
+      ...new Set(
+        input.requirements
+          .filter(value => /^CONSTRUCTION_GAP:/i.test(value))
+          .map(value => value.replace(/^CONSTRUCTION_GAP:/i, '').trim())
+          .filter(Boolean)
+      ),
+    ].slice(0, 6);
+
+    if (constructionGapQuestions.length > 0) {
+      for (const gap of constructionGapQuestions) {
+        rows.push({
+          kind: 'MISSING_IMPLEMENTATION_PATTERN',
+          question:
+            `Find a reusable implementation pattern and source material for ` +
+            `construction gap "${gap}" needed by objective: ${input.objective}`,
+        });
+      }
+    } else if (implementationResearchRequired) {
       rows.push({
         kind: 'MISSING_IMPLEMENTATION_PATTERN',
         question:

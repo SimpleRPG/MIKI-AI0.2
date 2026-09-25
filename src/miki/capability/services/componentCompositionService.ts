@@ -2,7 +2,7 @@ import { ComponentTxtPackage } from '../../../types';
 import { capabilityGraphService, ComponentPlan } from './capabilityGraphService';
 import { componentRegistryService } from './componentRegistryService';
 import { systemLogger } from '../../../services/systemLogger';
-import type { CodeConstructionGraph } from '../../core/data/codeKnowledge/common';
+import { isCompatibleConstructionKind, type CodeConstructionGraph } from '../../core/data/codeKnowledge/common';
 
 export type CompositionFailurePolicy = 'STOP' | 'RETRY_ONCE' | 'SKIP_OPTIONAL';
 
@@ -50,8 +50,8 @@ export class ComponentCompositionService {
     errors:string[];
     unresolvedSlots:string[];
   }{
-    const errors:string[]=[];
-    const unresolvedSlots:string[]=[];
+    const errors:string[]=[...(graph.contractErrors || [])];
+    const unresolvedSlots:string[]=[...(graph.unresolvedSlots || [])];
     const nodes=new Map(graph.nodes.map(node=>[node.nodeId,node]));
 
     if(!graph.nodes.length){
@@ -94,7 +94,9 @@ export class ComponentCompositionService {
 
             const outputs=source.profile.outputKinds||[];
             const compatible=outputs.some(output=>
-              slot.inputKinds.includes(output)
+              slot.inputKinds.some(expected =>
+                isCompatibleConstructionKind(output, expected)
+              )
             );
 
             if(!compatible){

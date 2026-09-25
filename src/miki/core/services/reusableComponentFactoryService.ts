@@ -23,6 +23,17 @@ interface ConstructionSearchState { nodes:Set<string>; bindings:CodeConstruction
 interface ConstructionGraphPlan { nodeIds:string[]; bindings:CodeConstructionBinding[]; rootNodeId?:string; score:number; unresolved:string[]; }
 
 const COMPONENT_KEY='miki_reusable_component_repository_v1';const RECEIPT_KEY='miki_component_usage_receipts_v1';
+
+const CONSTRUCTION_KNOWLEDGE_ID_ALIASES:Record<string,string>={
+  'code.javascript.node-readdir':'code.node.fs-readdir',
+  'code.javascript.node-stat':'code.node.fs-stat',
+  'code.javascript.node-rename':'code.node.fs-rename',
+  'code.javascript.node-rm':'code.node.fs-rm',
+  'code.javascript.node-path-resolve':'code.node.path-resolve',
+  'code.javascript.node-path-dirname':'code.node.path-dirname',
+  'code.javascript.node-path-basename':'code.node.path-basename',
+  'code.javascript.node-path-extname':'code.node.path-extname',
+};
 class ReusableComponentFactoryService{
   constructor(){
     this.seedBuiltInCodeKnowledge();
@@ -454,19 +465,42 @@ class ReusableComponentFactoryService{
     ...additionalJavascriptCodeComponents,
     ...additionalTypescriptCodeComponents,
     ...additionalWebCodeComponents,
+    ...additionalTestingCodeComponents,
   ];
+
+  const constructionContractErrors:string[]=[];
 
   const nodes:CodeConstructionNode[]=selected.map(item=>{
     const profile=item.constructionProfile as CodeConstructionProfile;
+    const sourceKnowledgeId=item.appliesWhen[0];
+    const canonicalKnowledgeId=
+      CONSTRUCTION_KNOWLEDGE_ID_ALIASES[sourceKnowledgeId]||sourceKnowledgeId;
+
     const definition=definitions.find(candidate=>
-      candidate.knowledgeId===item.appliesWhen[0]
+      candidate.knowledgeId===canonicalKnowledgeId
     );
+
+    if(!definition){
+      constructionContractErrors.push(
+        `CONSTRUCTION_DEFINITION_MISSING:${sourceKnowledgeId}`
+      );
+    }
+
     const linkedCodeComponent=definition
       ? this.list().find(component=>
         component.componentKind==='CODE' &&
-        component.appliesWhen.includes(definition.knowledgeId)
+        (
+          component.appliesWhen.includes(definition.knowledgeId) ||
+          component.appliesWhen.includes(sourceKnowledgeId)
+        )
       ) as CodeComponentArtifact|undefined
       : undefined;
+
+    if(definition&&!linkedCodeComponent){
+      constructionContractErrors.push(
+        `CONSTRUCTION_CODE_COMPONENT_MISSING:${sourceKnowledgeId}`
+      );
+    }
 
     const digest=canonicalSha256Object({
       componentId:item.componentId,
@@ -564,6 +598,15 @@ class ReusableComponentFactoryService{
       if(value)return {targetNodeId:'',slotName:slot.name,value,valueKind:'identifier'};
     }
 
+    if(slot.inputKinds.includes('type-parameter')){
+      return {
+        targetNodeId:'',
+        slotName:slot.name,
+        value:'T',
+        valueKind:'type-parameter',
+      };
+    }
+
     if(slot.inputKinds.includes('parameter')){
       const value=has(/要素|各要素|\bitem\b/) ? 'item' : has(/値|\bvalue\b/) ? 'value' : undefined;
       if(value)return {targetNodeId:'',slotName:slot.name,value,valueKind:'parameter'};
@@ -598,7 +641,11 @@ class ReusableComponentFactoryService{
               result.push(node.nodeId+':'+slot.name+':SOURCE');
               continue;
             }
-            if(!(source.profile.outputKinds||[]).some(output=>slot.inputKinds.includes(output))){
+            if(!(source.profile.outputKinds||[]).some(output=>
+              slot.inputKinds.some(expected=>
+                isCompatibleConstructionKind(output,expected)
+              )
+            )){
               result.push(node.nodeId+':'+slot.name+':TYPE');
             }
           }else if(binding.value===undefined){
@@ -795,12 +842,84 @@ class ReusableComponentFactoryService{
       return a.nodeId.localeCompare(b.nodeId);
     });
 
+  const graphUnresolved=unresolved(plannedNodes,bindings);
+
   return {
     graphId,
     goal:input.goal,
     rootNodeId:plan?.rootNodeId||rootCandidates[0]?.nodeId||plannedNodes[0]?.nodeId,
     nodes:plannedNodes,
     bindings,
+    unresolvedSlots:[...new Set(graphUnresolved)],
+    contractErrors:[...new Set(constructionContractErrors)],
+  };
+ }
+
+ public auditConstructionVocabulary():{
+  missingCodeComponentKnowledgeIds:string[];
+  orphanCodeComponentKnowledgeIds:string[];
+}{
+  const knowledge=[
+    ...commonCodeKnowledge,
+    ...additionalCommonCodeKnowledge,
+    ...javascriptCodeKnowledge,
+    ...additionalJavascriptCodeKnowledge,
+    ...typescriptCodeKnowledge,
+    ...additionalTypescriptCodeKnowledge,
+    ...webCodeKnowledge,
+    ...additionalWebCodeKnowledge,
+    ...testingCodeKnowledge,
+    ...additionalTestingCodeKnowledge,
+  ];
+
+  const definitions:CodeComponentDefinition[]=[
+    ...additionalJavascriptCodeComponents,
+    ...additionalTypescriptCodeComponents,
+    ...additionalWebCodeComponents,
+    ...additionalTestingCodeComponents,
+  ];
+
+  const knowledgeIds=new Set(
+    knowledge.map(item=>item.id)
+  );
+
+  const canonicalDefinitionIds=new Set(
+    definitions.map(item=>item.knowledgeId)
+  );
+
+  const aliasValues=new Set(
+    Object.values(CONSTRUCTION_KNOWLEDGE_ID_ALIASES)
+  );
+
+  const constructionKnowledgeIds=
+    knowledge
+      .filter(item=>Boolean(item.constructionProfile))
+      .map(item=>item.id);
+
+  const missingCodeComponentKnowledgeIds=[
+    ...new Set(
+      constructionKnowledgeIds.filter(id=>{
+        const canonical=
+          CONSTRUCTION_KNOWLEDGE_ID_ALIASES[id]||id;
+        return !canonicalDefinitionIds.has(canonical);
+      })
+    ),
+  ].sort();
+
+  const orphanCodeComponentKnowledgeIds=[
+    ...new Set(
+      definitions
+        .map(item=>item.knowledgeId)
+        .filter(id=>
+          !knowledgeIds.has(id)&&
+          !aliasValues.has(id)
+        )
+    ),
+  ].sort();
+
+  return {
+    missingCodeComponentKnowledgeIds,
+    orphanCodeComponentKnowledgeIds,
   };
  }
 
