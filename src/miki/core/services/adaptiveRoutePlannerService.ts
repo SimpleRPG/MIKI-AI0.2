@@ -666,6 +666,45 @@ class AdaptiveRoutePlannerService {
         researchResolved &&
         researchHasEvidence;
 
+      const researchContinuationAvailable = Boolean(
+        researchValue?.continuationAvailable === true
+      );
+
+      const researchNextQuery = String(
+        researchValue?.nextQuery ||
+        ''
+      ).trim();
+
+      /*
+       * Researchが未解決でも、ResearchServiceが次ラウンドを要求している場合は
+       * COREが次のResearchを選択する。
+       *
+       * Evidence不足のままGENERATE_CANDIDATEへ戻さず、
+       * continuationAvailable + nextQuery をCOREの次経路として扱う。
+       */
+      if(
+        !researchResolutionCompleted &&
+        researchContinuationAvailable &&
+        researchNextQuery
+      ){
+        routes.push({
+          target:'research',
+          command:'RUN_RESEARCH',
+          reason:'CORE re-evaluated incomplete Research and selected the next existing Research continuation round',
+          payload:{
+            taskId:task.taskId,
+            query:researchNextQuery,
+            unresolvedComponents:unresolved,
+            componentGap:true,
+            adaptive:true,
+            continuationRound:Number(researchValue?.continuationRound||0)+1,
+            priority:94
+          }
+        });
+
+        return this.decorateOperations(task,this.uniqueOperations(routes));
+      }
+
       const unknownResolved=[
         'REUSED_SUPPORTED',
         'LOCAL_EVIDENCE'
