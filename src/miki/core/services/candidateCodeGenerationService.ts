@@ -348,7 +348,6 @@ class CandidateCodeGenerationService {
     };
 
  }
- }
  private materializeComposition(
   runId:string,
   targetFiles:Array<{path:string;content:string;language:string}>,
