@@ -4,7 +4,7 @@ import { reviewLearningArtifactService, type ReviewLearningArtifact } from './re
 import type { ReviewLearningEpisode } from './reviewDecisionLearningService';
 import { verifierService } from '../../verification/services/verifierService';
 import { componentRegistryService } from '../../../services/componentRegistryService';
-import { commonCodeKnowledge, additionalCommonCodeKnowledge, type CodeConstructionProfile, type CodeComponentDefinition, type CodeConstructionBinding, type CodeConstructionGraph, type CodeConstructionNode } from '../data/codeKnowledge/common';
+import { commonCodeKnowledge, additionalCommonCodeKnowledge, type CodeConstructionProfile, type CodeComponentDefinition, type CodeKnowledgeDefinition, type CodeConstructionBinding, type CodeConstructionGraph, type CodeConstructionNode } from '../data/codeKnowledge/common';
 import { javascriptCodeKnowledge, additionalJavascriptCodeKnowledge, additionalJavascriptCodeComponents } from '../data/codeKnowledge/javascript';
 import { typescriptCodeKnowledge, additionalTypescriptCodeKnowledge, additionalTypescriptCodeComponents } from '../data/codeKnowledge/typescript';
 import { webCodeKnowledge, additionalWebCodeKnowledge, additionalWebCodeComponents } from '../data/codeKnowledge/web';
@@ -47,6 +47,94 @@ const CONSTRUCTION_KNOWLEDGE_ID_ALIASES:Record<string,string>={
   'code.typescript.interfaces':'code.typescript.interface',
   'code.typescript.type-guards':'code.typescript.type-guard-component',
 };
+
+function buildBuiltInCodeComponentDefinitions(): CodeComponentDefinition[] {
+  const explicitDefinitions: CodeComponentDefinition[] = [
+    ...additionalJavascriptCodeComponents,
+    ...additionalTypescriptCodeComponents,
+    ...additionalWebCodeComponents,
+    ...additionalTestingCodeComponents,
+    ...additionalModuleCodeComponents,
+    ...additionalAutonomousConstructionComponents,
+    ...additionalConstructionBridgeCodeComponents,
+  ];
+
+  const allKnowledge: CodeKnowledgeDefinition[] = [
+    ...commonCodeKnowledge,
+    ...additionalCommonCodeKnowledge,
+    ...javascriptCodeKnowledge,
+    ...additionalJavascriptCodeKnowledge,
+    ...typescriptCodeKnowledge,
+    ...additionalTypescriptCodeKnowledge,
+    ...webCodeKnowledge,
+    ...additionalWebCodeKnowledge,
+    ...testingCodeKnowledge,
+    ...additionalTestingCodeKnowledge,
+    ...moduleCodeKnowledge,
+    ...additionalModuleCodeKnowledge,
+    ...autonomousConstructionKnowledge,
+  ];
+
+  const explicitIds = new Set(
+    explicitDefinitions.map(item => item.knowledgeId)
+  );
+
+  const generatedIds = new Set<string>();
+
+  const generatedDefinitions = allKnowledge
+    .filter(item => Boolean(item.constructionProfile))
+    .filter(item => {
+      const canonicalId =
+        CONSTRUCTION_KNOWLEDGE_ID_ALIASES[item.id] || item.id;
+
+      if (explicitIds.has(item.id) || explicitIds.has(canonicalId)) {
+        return false;
+      }
+
+      const aliasedCanonicalId = CONSTRUCTION_KNOWLEDGE_ID_ALIASES[item.id];
+      if (
+        aliasedCanonicalId &&
+        allKnowledge.some(candidate => candidate.id === aliasedCanonicalId)
+      ) {
+        return false;
+      }
+
+      if (generatedIds.has(item.id)) {
+        return false;
+      }
+
+      generatedIds.add(item.id);
+      return true;
+    })
+    .map(item => {
+      const profile = item.constructionProfile!;
+      return {
+        knowledgeId: item.id,
+        componentType: 'CODE_CONSTRUCTION',
+        purpose: item.purpose,
+        implementation: profile.syntaxTemplate,
+        targetPath: 'generated.ts',
+        inputs: item.inputs,
+        outputs:
+          profile.outputKinds && profile.outputKinds.length > 0
+            ? profile.outputKinds
+            : item.outputs,
+        prerequisites: profile.constraints,
+        dependencies: [],
+        supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+        entryPoint: `CodeConstruction/${item.id}`,
+        securityClass: 'READ_ONLY',
+        exports: [],
+        imports: [],
+        publicInterfaces: [],
+        tests: `CONTRACT_TEST:${item.id}`,
+        validation: `VALIDATE_CODE_CONSTRUCTION:${item.id}`,
+      } satisfies CodeComponentDefinition;
+    });
+
+  return [...explicitDefinitions, ...generatedDefinitions];
+}
+
 class ReusableComponentFactoryService{
   constructor(){
     this.seedBuiltInCodeKnowledge();
@@ -55,15 +143,7 @@ class ReusableComponentFactoryService{
 
 
   private seedBuiltInCodeComponents(): void {
-    const definitions: CodeComponentDefinition[] = [
-      ...additionalJavascriptCodeComponents,
-      ...additionalTypescriptCodeComponents,
-      ...additionalWebCodeComponents,
-      ...additionalTestingCodeComponents,
-      ...additionalModuleCodeComponents,
-      ...additionalAutonomousConstructionComponents,
-      ...additionalConstructionBridgeCodeComponents,
-    ];
+    const definitions: CodeComponentDefinition[] = buildBuiltInCodeComponentDefinitions();
 
     for (const definition of definitions) {
       const existing = this.list().some(item =>
@@ -480,15 +560,7 @@ class ReusableComponentFactoryService{
     )
     .sort((a,b)=>a.componentId.localeCompare(b.componentId));
 
-  const definitions:CodeComponentDefinition[]=[
-    ...additionalJavascriptCodeComponents,
-    ...additionalTypescriptCodeComponents,
-    ...additionalWebCodeComponents,
-    ...additionalTestingCodeComponents,
-    ...additionalModuleCodeComponents,
-    ...additionalAutonomousConstructionComponents,
-    ...additionalConstructionBridgeCodeComponents,
-  ];
+  const definitions:CodeComponentDefinition[] = buildBuiltInCodeComponentDefinitions();
 
   const constructionContractErrors:string[]=[];
 
@@ -966,15 +1038,7 @@ class ReusableComponentFactoryService{
     ...autonomousConstructionKnowledge,
   ];
 
-  const definitions:CodeComponentDefinition[]=[
-    ...additionalJavascriptCodeComponents,
-    ...additionalTypescriptCodeComponents,
-    ...additionalWebCodeComponents,
-    ...additionalTestingCodeComponents,
-    ...additionalModuleCodeComponents,
-    ...additionalAutonomousConstructionComponents,
-    ...additionalConstructionBridgeCodeComponents,
-  ];
+  const definitions:CodeComponentDefinition[] = buildBuiltInCodeComponentDefinitions();
 
   const knowledgeIds=new Set(
     knowledge.map(item=>item.id)

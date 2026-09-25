@@ -1557,3 +1557,24 @@ Unknown → Research → Knowledge Integrationを経て新しい再利用部品�
 Construction Vocabulary不足は、同一機能の新規Componentを増殖させず、既存Knowledge → alias / Bridge → CODE Component → Construction Graphという正規経路で解決する。
 
 新しいCode Generator、第二のConstruction Graph、第二のResearch基盤、第二のCandidate生成経路は追加しない。
+
+### 2026-09-26 Construction Profile Component Materialization
+
+ConstructionProfileを持つKnowledgeが、明示的CODE Componentまたは正規aliasで既存Componentへ接続できない場合、
+ReusableComponentFactoryServiceが既存ConstructionProfileからCODE Construction Component候補を決定論的に補完生成する。
+
+補完Componentの契約はKnowledge側のConstructionProfileをそのまま使用する。
+
+- syntaxTemplate → implementation
+- slots / inputs → Component inputs
+- outputKinds → Component outputs
+- constraints → prerequisites
+- 既存explicit Componentがある場合は重複生成しない
+- 正規alias先に既存Componentがある場合も重複生成しない
+- autonomousConstructionの既存動的Component生成とは統合し、重複させない
+
+これにより、Knowledgeだけ存在してConstruction Graphへ接続できないconstructionProfileを残さず、
+既存のReusableComponentFactory → Construction Graph → Candidate / Verification経路をそのまま利用する。
+
+新しいコード生成エンジン、第二のConstruction Graph、第二のResearch基盤は追加しない。
+
