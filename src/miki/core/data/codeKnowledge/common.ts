@@ -77,6 +77,14 @@ export function isCompatibleConstructionKind(
     return true;
   }
 
+  // Iterableな式は、for-of等のiterable-expression入力へ接続できる。
+  if (
+    expected === 'iterable-expression' &&
+    ['array-expression', 'string-expression', 'iterable-expression'].includes(actual)
+  ) {
+    return true;
+  }
+
   return false;
 }
 
