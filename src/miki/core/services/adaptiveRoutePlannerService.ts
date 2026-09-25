@@ -76,59 +76,52 @@ function readNestedResolutionValue(
 ):unknown {
   if(!value) return undefined;
 
-  const direct=value[key];
-  if(direct!==undefined) return direct;
+  /*
+   * RESOLVE_UNKNOWN is stored inside a normalized CORE envelope.
+   * The envelope may expose status=OBSERVED while the actual
+   * resolution payload contains status=RESEARCH_REQUIRED.
+   *
+   * Resolution-specific values must therefore be read from the
+   * inner payload before falling back to the outer envelope.
+   */
+  const nestedRecords:Record<string,unknown>[]=[];
+
+  const pushRecord=(candidate:unknown)=>{
+    if(candidate && typeof candidate==='object' && !Array.isArray(candidate)){
+      nestedRecords.push(candidate as Record<string,unknown>);
+    }
+  };
 
   const reply=value.reply;
   if(reply && typeof reply==='object' && !Array.isArray(reply)){
     const replyValue=reply as Record<string,unknown>;
+    pushRecord(replyValue.data);
+    pushRecord(replyValue.result);
 
-    if(replyValue[key]!==undefined) return replyValue[key];
-
-    const replyData=replyValue.data;
-    if(replyData && typeof replyData==='object' && !Array.isArray(replyData)){
-      const data=replyData as Record<string,unknown>;
-      if(data[key]!==undefined) return data[key];
+    const normalized=replyValue.normalized;
+    if(normalized && typeof normalized==='object' && !Array.isArray(normalized)){
+      const normalizedValue=normalized as Record<string,unknown>;
+      pushRecord(normalizedValue.data);
+      pushRecord(normalizedValue);
     }
 
-    const replyResult=replyValue.result;
-    if(replyResult && typeof replyResult==='object' && !Array.isArray(replyResult)){
-      const result=replyResult as Record<string,unknown>;
-      if(result[key]!==undefined) return result[key];
-    }
-
-    const replyNormalized=replyValue.normalized;
-    if(replyNormalized && typeof replyNormalized==='object' && !Array.isArray(replyNormalized)){
-      const normalized=replyNormalized as Record<string,unknown>;
-      if(normalized[key]!==undefined) return normalized[key];
-
-      const normalizedData=normalized.data;
-      if(normalizedData && typeof normalizedData==='object' && !Array.isArray(normalizedData)){
-        const data=normalizedData as Record<string,unknown>;
-        if(data[key]!==undefined) return data[key];
-      }
-    }
+    pushRecord(replyValue);
   }
 
   const normalized=value.normalized;
   if(normalized && typeof normalized==='object' && !Array.isArray(normalized)){
     const normalizedValue=normalized as Record<string,unknown>;
-    if(normalizedValue[key]!==undefined) return normalizedValue[key];
-
-    const normalizedData=normalizedValue.data;
-    if(normalizedData && typeof normalizedData==='object' && !Array.isArray(normalizedData)){
-      const data=normalizedData as Record<string,unknown>;
-      if(data[key]!==undefined) return data[key];
-    }
+    pushRecord(normalizedValue.data);
+    pushRecord(normalizedValue);
   }
 
-  const data=value.data;
-  if(data && typeof data==='object' && !Array.isArray(data)){
-    const dataValue=data as Record<string,unknown>;
-    if(dataValue[key]!==undefined) return dataValue[key];
+  pushRecord(value.data);
+
+  for(const record of nestedRecords){
+    if(record[key]!==undefined) return record[key];
   }
 
-  return undefined;
+  return value[key];
 }
 
 function successfulBusinessEntries(task:BlackboardTask):BlackboardEntry[] {
