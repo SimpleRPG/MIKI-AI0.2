@@ -127,7 +127,7 @@ export const javascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
     doesNotApplyWhen: [],
     sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Guide/Modules'],
     sourceArtifactIds: ['mdn-javascript-modules'],
-  },
+  }
 ];
 
 export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
@@ -1930,7 +1930,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions"],
   sourceArtifactIds: ["mdn-js-parameter"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "{name}", outputKinds: ["parameter"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.default-parameter",
@@ -1945,7 +1945,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Default_parameters"],
   sourceArtifactIds: ["mdn-js-default-parameter"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "{name} = {value}", outputKinds: ["parameter"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "value", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.rest-parameter",
@@ -1960,7 +1960,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/rest_parameters"],
   sourceArtifactIds: ["mdn-js-rest-parameter"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "...{name}", outputKinds: ["parameter"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.object-spread",
@@ -1975,7 +1975,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax"],
   sourceArtifactIds: ["mdn-js-object-spread"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "{ ...{inputObject} }", outputKinds: ["object-expression"], slots: [{ name: "inputObject", inputKinds: ["object-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.array-spread",
@@ -1990,7 +1990,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax"],
   sourceArtifactIds: ["mdn-js-array-spread"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "[...{inputArray}]", outputKinds: ["array-expression"], slots: [{ name: "inputArray", inputKinds: ["array-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.strict-equality",
@@ -2005,7 +2005,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Strict_equality"],
   sourceArtifactIds: ["mdn-js-strict-equality"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "{left} === {right}", outputKinds: ["boolean-expression"], slots: [{ name: "left", inputKinds: ["expression"], required: true, multiple: false }, { name: "right", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.logical-not",
@@ -2020,7 +2020,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Logical_NOT"],
   sourceArtifactIds: ["mdn-js-logical-not"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "!{condition}", outputKinds: ["boolean-expression"], slots: [{ name: "condition", inputKinds: ["boolean-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.modulo",
@@ -2035,7 +2035,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Remainder"],
   sourceArtifactIds: ["mdn-js-modulo"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "{left} % {right}", outputKinds: ["number-expression"], slots: [{ name: "left", inputKinds: ["number-expression"], required: true, multiple: false }, { name: "right", inputKinds: ["number-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.increment",
@@ -2050,7 +2050,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Increment"],
   sourceArtifactIds: ["mdn-js-increment"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "{value}++", outputKinds: ["number-expression"], slots: [{ name: "value", inputKinds: ["identifier"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.decrement",
@@ -2065,7 +2065,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Decrement"],
   sourceArtifactIds: ["mdn-js-decrement"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "{value}--", outputKinds: ["number-expression"], slots: [{ name: "value", inputKinds: ["identifier"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.new-expression",
@@ -2080,7 +2080,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/new"],
   sourceArtifactIds: ["mdn-js-new-expression"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "new {name}({arguments})", outputKinds: ["expression"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "arguments", inputKinds: ["expression"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.map-constructor",
@@ -2095,7 +2095,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map"],
   sourceArtifactIds: ["mdn-js-map-constructor"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "new Map()", outputKinds: ["expression"], slots: [{ name: "arguments", inputKinds: ["expression"], required: false, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.map-set",
@@ -2110,7 +2110,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/set"],
   sourceArtifactIds: ["mdn-js-map-set"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "{map}.set({key}, {value})", outputKinds: ["expression"], slots: [{ name: "map", inputKinds: ["expression"], required: true, multiple: false }, { name: "key", inputKinds: ["expression"], required: true, multiple: false }, { name: "value", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.map-get",
@@ -2125,7 +2125,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/get"],
   sourceArtifactIds: ["mdn-js-map-get"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "{map}.get({key})", outputKinds: ["expression"], slots: [{ name: "map", inputKinds: ["expression"], required: true, multiple: false }, { name: "key", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.set-constructor",
@@ -2140,7 +2140,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set"],
   sourceArtifactIds: ["mdn-js-set-constructor"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "new Set({values})", outputKinds: ["expression"], slots: [{ name: "values", inputKinds: ["expression"], required: false, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.set-add",
@@ -2155,7 +2155,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set/add"],
   sourceArtifactIds: ["mdn-js-set-add"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "{set}.add({value})", outputKinds: ["expression"], slots: [{ name: "set", inputKinds: ["expression"], required: true, multiple: false }, { name: "value", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.set-has",
@@ -2170,7 +2170,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set/has"],
   sourceArtifactIds: ["mdn-js-set-has"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "{set}.has({value})", outputKinds: ["boolean-expression"], slots: [{ name: "set", inputKinds: ["expression"], required: true, multiple: false }, { name: "value", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.promise-then",
@@ -2185,7 +2185,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/then"],
   sourceArtifactIds: ["mdn-js-promise-then"],
   constructionProfile: { kind: "ASYNC", syntaxTemplate: "{promise}.then({handler})", outputKinds: ["promise-expression"], slots: [{ name: "promise", inputKinds: ["promise-expression"], required: true, multiple: false }, { name: "handler", inputKinds: ["function-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.promise-catch",
@@ -2200,7 +2200,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch"],
   sourceArtifactIds: ["mdn-js-promise-catch"],
   constructionProfile: { kind: "ASYNC", syntaxTemplate: "{promise}.catch({handler})", outputKinds: ["promise-expression"], slots: [{ name: "promise", inputKinds: ["promise-expression"], required: true, multiple: false }, { name: "handler", inputKinds: ["function-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.promise-finally",
@@ -2215,7 +2215,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/finally"],
   sourceArtifactIds: ["mdn-js-promise-finally"],
   constructionProfile: { kind: "ASYNC", syntaxTemplate: "{promise}.finally({handler})", outputKinds: ["promise-expression"], slots: [{ name: "promise", inputKinds: ["promise-expression"], required: true, multiple: false }, { name: "handler", inputKinds: ["function-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.set-timeout",
@@ -2230,7 +2230,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/API/setTimeout"],
   sourceArtifactIds: ["mdn-js-set-timeout"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "setTimeout({handler}, {delay})", outputKinds: ["timer-expression"], slots: [{ name: "handler", inputKinds: ["function-expression"], required: true, multiple: false }, { name: "delay", inputKinds: ["number-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.clear-timeout",
@@ -2245,7 +2245,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/API/clearTimeout"],
   sourceArtifactIds: ["mdn-js-clear-timeout"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "clearTimeout({timer})", outputKinds: ["expression"], slots: [{ name: "timer", inputKinds: ["timer-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.date-now",
@@ -2260,7 +2260,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/now"],
   sourceArtifactIds: ["mdn-js-date-now"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "Date.now()", outputKinds: ["number-expression"], slots: [], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.regexp-test",
@@ -2275,7 +2275,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/test"],
   sourceArtifactIds: ["mdn-js-regexp-test"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "{pattern}.test({text})", outputKinds: ["boolean-expression"], slots: [{ name: "pattern", inputKinds: ["regexp-expression"], required: true, multiple: false }, { name: "text", inputKinds: ["string-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.console-log",
@@ -2290,7 +2290,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/API/console/log_static"],
   sourceArtifactIds: ["mdn-js-console-log"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "console.log({value})", outputKinds: ["statement"], slots: [{ name: "value", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.console-error",
@@ -2305,7 +2305,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/API/console/error_static"],
   sourceArtifactIds: ["mdn-js-console-error"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "console.error({error})", outputKinds: ["statement"], slots: [{ name: "error", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.error-constructor",
@@ -2320,7 +2320,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error"],
   sourceArtifactIds: ["mdn-js-error-constructor"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "new Error({message})", outputKinds: ["expression"], slots: [{ name: "message", inputKinds: ["string-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.import-named",
@@ -2335,7 +2335,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import"],
   sourceArtifactIds: ["mdn-js-import-named"],
   constructionProfile: { kind: "MODULE", syntaxTemplate: "import { {name} } from {module}", outputKinds: ["statement"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "module", inputKinds: ["string-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.import-default",
@@ -2350,7 +2350,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import"],
   sourceArtifactIds: ["mdn-js-import-default"],
   constructionProfile: { kind: "MODULE", syntaxTemplate: "import {name} from {module}", outputKinds: ["statement"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "module", inputKinds: ["string-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.export-named",
@@ -2365,7 +2365,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/export"],
   sourceArtifactIds: ["mdn-js-export-named"],
   constructionProfile: { kind: "MODULE", syntaxTemplate: "export {value}", outputKinds: ["statement"], slots: [{ name: "value", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.export-default",
@@ -2380,7 +2380,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/export"],
   sourceArtifactIds: ["mdn-js-export-default"],
   constructionProfile: { kind: "MODULE", syntaxTemplate: "export default {value}", outputKinds: ["statement"], slots: [{ name: "value", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.class-declaration",
@@ -2395,7 +2395,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes"],
   sourceArtifactIds: ["mdn-js-class-declaration"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "class {name} {\\n{body}\\n}", outputKinds: ["statement"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "body", inputKinds: ["statement"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.class-method",
@@ -2410,7 +2410,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Method_definitions"],
   sourceArtifactIds: ["mdn-js-class-method"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "{name}({parameters}) {\\n{body}\\n}", outputKinds: ["statement"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "parameters", inputKinds: ["parameter"], required: false, multiple: true }, { name: "body", inputKinds: ["statement"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.node-write-file",
@@ -2425,7 +2425,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://nodejs.org/api/fs.html"],
   sourceArtifactIds: ["node-fs-write-file"],
   constructionProfile: { kind: "ASYNC", syntaxTemplate: "writeFile({path}, {content}, 'utf8')", outputKinds: ["promise-expression"], slots: [{ name: "path", inputKinds: ["string-expression"], required: true, multiple: false }, { name: "content", inputKinds: ["string-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.node-mkdir",
@@ -2440,7 +2440,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://nodejs.org/api/fs.html"],
   sourceArtifactIds: ["node-fs-mkdir"],
   constructionProfile: { kind: "ASYNC", syntaxTemplate: "mkdir({path}, {options})", outputKinds: ["promise-expression"], slots: [{ name: "path", inputKinds: ["string-expression"], required: true, multiple: false }, { name: "options", inputKinds: ["expression"], required: false, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.node-path-join",
@@ -2455,7 +2455,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://nodejs.org/api/path.html"],
   sourceArtifactIds: ["node-path-join"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "join({parts})", outputKinds: ["string-expression"], slots: [{ name: "parts", inputKinds: ["string-expression"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.javascript.node-env-access",
@@ -3831,7 +3831,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.parameter",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.parameter",
-}
+},
 
 {
   knowledgeId: "code.javascript.default-parameter",
@@ -3851,7 +3851,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.default-parameter",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.default-parameter",
-}
+},
 
 {
   knowledgeId: "code.javascript.rest-parameter",
@@ -3871,7 +3871,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.rest-parameter",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.rest-parameter",
-}
+},
 
 {
   knowledgeId: "code.javascript.object-spread",
@@ -3891,7 +3891,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.object-spread",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.object-spread",
-}
+},
 
 {
   knowledgeId: "code.javascript.array-spread",
@@ -3911,7 +3911,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.array-spread",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.array-spread",
-}
+},
 
 {
   knowledgeId: "code.javascript.strict-equality",
@@ -3931,7 +3931,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.strict-equality",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.strict-equality",
-}
+},
 
 {
   knowledgeId: "code.javascript.logical-not",
@@ -3951,7 +3951,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.logical-not",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.logical-not",
-}
+},
 
 {
   knowledgeId: "code.javascript.modulo",
@@ -3971,7 +3971,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.modulo",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.modulo",
-}
+},
 
 {
   knowledgeId: "code.javascript.increment",
@@ -3991,7 +3991,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.increment",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.increment",
-}
+},
 
 {
   knowledgeId: "code.javascript.decrement",
@@ -4011,7 +4011,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.decrement",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.decrement",
-}
+},
 
 {
   knowledgeId: "code.javascript.new-expression",
@@ -4031,7 +4031,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.new-expression",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.new-expression",
-}
+},
 
 {
   knowledgeId: "code.javascript.map-constructor",
@@ -4051,7 +4051,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.map-constructor",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.map-constructor",
-}
+},
 
 {
   knowledgeId: "code.javascript.map-set",
@@ -4071,7 +4071,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.map-set",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.map-set",
-}
+},
 
 {
   knowledgeId: "code.javascript.map-get",
@@ -4091,7 +4091,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.map-get",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.map-get",
-}
+},
 
 {
   knowledgeId: "code.javascript.set-constructor",
@@ -4111,7 +4111,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.set-constructor",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.set-constructor",
-}
+},
 
 {
   knowledgeId: "code.javascript.set-add",
@@ -4131,7 +4131,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.set-add",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.set-add",
-}
+},
 
 {
   knowledgeId: "code.javascript.set-has",
@@ -4151,7 +4151,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.set-has",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.set-has",
-}
+},
 
 {
   knowledgeId: "code.javascript.promise-then",
@@ -4171,7 +4171,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.promise-then",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.promise-then",
-}
+},
 
 {
   knowledgeId: "code.javascript.promise-catch",
@@ -4191,7 +4191,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.promise-catch",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.promise-catch",
-}
+},
 
 {
   knowledgeId: "code.javascript.promise-finally",
@@ -4211,7 +4211,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.promise-finally",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.promise-finally",
-}
+},
 
 {
   knowledgeId: "code.javascript.set-timeout",
@@ -4231,7 +4231,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.set-timeout",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.set-timeout",
-}
+},
 
 {
   knowledgeId: "code.javascript.clear-timeout",
@@ -4251,7 +4251,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.clear-timeout",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.clear-timeout",
-}
+},
 
 {
   knowledgeId: "code.javascript.date-now",
@@ -4271,7 +4271,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.date-now",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.date-now",
-}
+},
 
 {
   knowledgeId: "code.javascript.regexp-test",
@@ -4291,7 +4291,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.regexp-test",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.regexp-test",
-}
+},
 
 {
   knowledgeId: "code.javascript.console-log",
@@ -4311,7 +4311,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.console-log",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.console-log",
-}
+},
 
 {
   knowledgeId: "code.javascript.console-error",
@@ -4331,7 +4331,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.console-error",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.console-error",
-}
+},
 
 {
   knowledgeId: "code.javascript.error-constructor",
@@ -4351,7 +4351,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.error-constructor",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.error-constructor",
-}
+},
 
 {
   knowledgeId: "code.javascript.import-named",
@@ -4371,7 +4371,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.import-named",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.import-named",
-}
+},
 
 {
   knowledgeId: "code.javascript.import-default",
@@ -4391,7 +4391,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.import-default",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.import-default",
-}
+},
 
 {
   knowledgeId: "code.javascript.export-named",
@@ -4411,7 +4411,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.export-named",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.export-named",
-}
+},
 
 {
   knowledgeId: "code.javascript.export-default",
@@ -4431,7 +4431,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.export-default",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.export-default",
-}
+},
 
 {
   knowledgeId: "code.javascript.class-declaration",
@@ -4451,7 +4451,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.class-declaration",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.class-declaration",
-}
+},
 
 {
   knowledgeId: "code.javascript.class-method",
@@ -4471,7 +4471,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.class-method",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.class-method",
-}
+},
 
 {
   knowledgeId: "code.javascript.node-write-file",
@@ -4491,7 +4491,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.node-write-file",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.node-write-file",
-}
+},
 
 {
   knowledgeId: "code.javascript.node-mkdir",
@@ -4511,7 +4511,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.node-mkdir",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.node-mkdir",
-}
+},
 
 {
   knowledgeId: "code.javascript.node-path-join",
@@ -4531,7 +4531,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.javascript.node-path-join",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.javascript.node-path-join",
-}
+},
 
 {
   knowledgeId: "code.javascript.node-env-access",

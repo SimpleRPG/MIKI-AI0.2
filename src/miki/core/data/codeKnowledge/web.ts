@@ -65,7 +65,7 @@ export const webCodeKnowledge: CodeKnowledgeDefinition[] = [
     doesNotApplyWhen: ['完全に内部だけの処理'],
     sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API'],
     sourceArtifactIds: ['mdn-fetch-api'],
-  },
+  }
 ];
 
 export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
@@ -195,7 +195,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/learn/writing-markup-with-jsx"],
   sourceArtifactIds: ["react-jsx-text"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "{text}", outputKinds: ["string-expression"], slots: [{ name: "text", inputKinds: ["string-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.jsx-attribute",
@@ -210,7 +210,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/learn/writing-markup-with-jsx"],
   sourceArtifactIds: ["react-jsx-attribute"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "{name}={value}", outputKinds: ["jsx-attribute"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "value", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.jsx-element",
@@ -225,7 +225,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/learn/writing-markup-with-jsx"],
   sourceArtifactIds: ["react-jsx-element"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "<{name} {attributes}>{children}</{name}>", outputKinds: ["jsx-expression"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "attributes", inputKinds: ["jsx-attribute"], required: false, multiple: true }, { name: "children", inputKinds: ["jsx-child"], required: false, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.jsx-fragment",
@@ -240,7 +240,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react/Fragment"],
   sourceArtifactIds: ["react-jsx-fragment"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "<>{children}</>", outputKinds: ["jsx-expression"], slots: [{ name: "children", inputKinds: ["jsx-child"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-component-props",
@@ -255,7 +255,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/learn/passing-props-to-a-component"],
   sourceArtifactIds: ["react-component-props"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "function {name}(props: {propsType}) {\\n  return ({body});\\n}", outputKinds: ["statement"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "propsType", inputKinds: ["type-expression"], required: true, multiple: false }, { name: "body", inputKinds: ["jsx-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-use-state",
@@ -270,7 +270,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react/useState"],
   sourceArtifactIds: ["react-use-state"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "useState({initialValue})", outputKinds: ["expression"], slots: [{ name: "initialValue", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-use-effect",
@@ -285,7 +285,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react/useEffect"],
   sourceArtifactIds: ["react-use-effect"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "useEffect({effect}, {dependencies})", outputKinds: ["expression"], slots: [{ name: "effect", inputKinds: ["function-expression"], required: true, multiple: false }, { name: "dependencies", inputKinds: ["expression"], required: false, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-use-memo",
@@ -300,7 +300,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react/useMemo"],
   sourceArtifactIds: ["react-use-memo"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "useMemo({factory}, {dependencies})", outputKinds: ["expression"], slots: [{ name: "factory", inputKinds: ["function-expression"], required: true, multiple: false }, { name: "dependencies", inputKinds: ["expression"], required: false, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-use-callback",
@@ -315,7 +315,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react/useCallback"],
   sourceArtifactIds: ["react-use-callback"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "useCallback({callback}, {dependencies})", outputKinds: ["function-expression"], slots: [{ name: "callback", inputKinds: ["function-expression"], required: true, multiple: false }, { name: "dependencies", inputKinds: ["expression"], required: false, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-use-ref",
@@ -330,7 +330,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react/useRef"],
   sourceArtifactIds: ["react-use-ref"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "useRef({initialValue})", outputKinds: ["expression"], slots: [{ name: "initialValue", inputKinds: ["expression"], required: false, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-use-context",
@@ -345,7 +345,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react/useContext"],
   sourceArtifactIds: ["react-use-context"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "useContext({context})", outputKinds: ["expression"], slots: [{ name: "context", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-use-reducer",
@@ -360,7 +360,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react/useReducer"],
   sourceArtifactIds: ["react-use-reducer"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "useReducer({reducer}, {initialState})", outputKinds: ["expression"], slots: [{ name: "reducer", inputKinds: ["function-expression"], required: true, multiple: false }, { name: "initialState", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-event-handler",
@@ -375,7 +375,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/learn/responding-to-events"],
   sourceArtifactIds: ["react-event-handler"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "({event}) => {\\n{body}\\n}", outputKinds: ["function-expression"], slots: [{ name: "event", inputKinds: ["parameter"], required: true, multiple: false }, { name: "body", inputKinds: ["statement"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-conditional-render",
@@ -390,7 +390,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/learn/conditional-rendering"],
   sourceArtifactIds: ["react-conditional-render"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "{condition} ? {whenTrue} : {whenFalse}", outputKinds: ["jsx-expression"], slots: [{ name: "condition", inputKinds: ["boolean-expression"], required: true, multiple: false }, { name: "whenTrue", inputKinds: ["jsx-expression"], required: true, multiple: false }, { name: "whenFalse", inputKinds: ["jsx-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-list-render",
@@ -405,7 +405,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/learn/rendering-lists"],
   sourceArtifactIds: ["react-list-render"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "{items}.map(({item}) => ({body}))", outputKinds: ["jsx-expression"], slots: [{ name: "items", inputKinds: ["array-expression"], required: true, multiple: false }, { name: "item", inputKinds: ["identifier"], required: true, multiple: false }, { name: "body", inputKinds: ["jsx-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-form",
@@ -420,7 +420,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react-dom/components/form"],
   sourceArtifactIds: ["react-form"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "<form onSubmit={handler}>{body}</form>", outputKinds: ["jsx-expression"], slots: [{ name: "handler", inputKinds: ["function-expression"], required: true, multiple: false }, { name: "body", inputKinds: ["jsx-child"], required: false, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-input",
@@ -435,7 +435,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react-dom/components/input"],
   sourceArtifactIds: ["react-input"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "<input value={value} onChange={handler} />", outputKinds: ["jsx-expression"], slots: [{ name: "value", inputKinds: ["expression"], required: true, multiple: false }, { name: "handler", inputKinds: ["function-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-button",
@@ -450,7 +450,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react-dom/components/button"],
   sourceArtifactIds: ["react-button"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "<button onClick={handler}>{body}</button>", outputKinds: ["jsx-expression"], slots: [{ name: "handler", inputKinds: ["function-expression"], required: true, multiple: false }, { name: "body", inputKinds: ["jsx-child"], required: false, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.react-memo",
@@ -465,7 +465,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://react.dev/reference/react/memo"],
   sourceArtifactIds: ["react-memo"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "memo({component})", outputKinds: ["expression"], slots: [{ name: "component", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.express-app",
@@ -480,7 +480,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://expressjs.com/en/starter/hello-world.html"],
   sourceArtifactIds: ["express-app"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "const {name} = express();", outputKinds: ["expression"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.express-route-get",
@@ -495,7 +495,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://expressjs.com/en/guide/routing.html"],
   sourceArtifactIds: ["express-route-get"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "app.get({path}, {handler})", outputKinds: ["statement"], slots: [{ name: "path", inputKinds: ["string-expression"], required: true, multiple: false }, { name: "handler", inputKinds: ["function-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.express-route-post",
@@ -510,7 +510,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://expressjs.com/en/guide/routing.html"],
   sourceArtifactIds: ["express-route-post"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "app.post({path}, {handler})", outputKinds: ["statement"], slots: [{ name: "path", inputKinds: ["string-expression"], required: true, multiple: false }, { name: "handler", inputKinds: ["function-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.express-middleware",
@@ -525,7 +525,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://expressjs.com/en/guide/using-middleware.html"],
   sourceArtifactIds: ["express-middleware"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "app.use({middleware})", outputKinds: ["statement"], slots: [{ name: "middleware", inputKinds: ["function-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.express-json",
@@ -540,7 +540,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://expressjs.com/en/api.html#express.json"],
   sourceArtifactIds: ["express-json"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "app.use(express.json())", outputKinds: ["statement"], slots: [], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.express-response-json",
@@ -555,7 +555,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://expressjs.com/en/api.html#res.json"],
   sourceArtifactIds: ["express-response-json"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "res.json({body})", outputKinds: ["statement"], slots: [{ name: "body", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.express-response-status",
@@ -570,7 +570,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://expressjs.com/en/api.html#res.status"],
   sourceArtifactIds: ["express-response-status"],
   constructionProfile: { kind: "CALL", syntaxTemplate: "res.status({status})", outputKinds: ["expression"], slots: [{ name: "status", inputKinds: ["number-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.web.express-listen",
@@ -646,7 +646,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.jsx-text",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.jsx-text",
-}
+},
 
 {
   knowledgeId: "code.web.jsx-attribute",
@@ -666,7 +666,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.jsx-attribute",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.jsx-attribute",
-}
+},
 
 {
   knowledgeId: "code.web.jsx-element",
@@ -686,7 +686,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.jsx-element",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.jsx-element",
-}
+},
 
 {
   knowledgeId: "code.web.jsx-fragment",
@@ -706,7 +706,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.jsx-fragment",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.jsx-fragment",
-}
+},
 
 {
   knowledgeId: "code.web.react-component-props",
@@ -726,7 +726,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-component-props",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-component-props",
-}
+},
 
 {
   knowledgeId: "code.web.react-use-state",
@@ -746,7 +746,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-use-state",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-use-state",
-}
+},
 
 {
   knowledgeId: "code.web.react-use-effect",
@@ -766,7 +766,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-use-effect",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-use-effect",
-}
+},
 
 {
   knowledgeId: "code.web.react-use-memo",
@@ -786,7 +786,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-use-memo",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-use-memo",
-}
+},
 
 {
   knowledgeId: "code.web.react-use-callback",
@@ -806,7 +806,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-use-callback",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-use-callback",
-}
+},
 
 {
   knowledgeId: "code.web.react-use-ref",
@@ -826,7 +826,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-use-ref",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-use-ref",
-}
+},
 
 {
   knowledgeId: "code.web.react-use-context",
@@ -846,7 +846,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-use-context",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-use-context",
-}
+},
 
 {
   knowledgeId: "code.web.react-use-reducer",
@@ -866,7 +866,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-use-reducer",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-use-reducer",
-}
+},
 
 {
   knowledgeId: "code.web.react-event-handler",
@@ -886,7 +886,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-event-handler",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-event-handler",
-}
+},
 
 {
   knowledgeId: "code.web.react-conditional-render",
@@ -906,7 +906,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-conditional-render",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-conditional-render",
-}
+},
 
 {
   knowledgeId: "code.web.react-list-render",
@@ -926,7 +926,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-list-render",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-list-render",
-}
+},
 
 {
   knowledgeId: "code.web.react-form",
@@ -946,7 +946,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-form",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-form",
-}
+},
 
 {
   knowledgeId: "code.web.react-input",
@@ -966,7 +966,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-input",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-input",
-}
+},
 
 {
   knowledgeId: "code.web.react-button",
@@ -986,7 +986,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-button",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-button",
-}
+},
 
 {
   knowledgeId: "code.web.react-memo",
@@ -1006,7 +1006,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.react-memo",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.react-memo",
-}
+},
 
 {
   knowledgeId: "code.web.express-app",
@@ -1026,7 +1026,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.express-app",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.express-app",
-}
+},
 
 {
   knowledgeId: "code.web.express-route-get",
@@ -1046,7 +1046,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.express-route-get",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.express-route-get",
-}
+},
 
 {
   knowledgeId: "code.web.express-route-post",
@@ -1066,7 +1066,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.express-route-post",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.express-route-post",
-}
+},
 
 {
   knowledgeId: "code.web.express-middleware",
@@ -1086,7 +1086,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.express-middleware",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.express-middleware",
-}
+},
 
 {
   knowledgeId: "code.web.express-json",
@@ -1106,7 +1106,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.express-json",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.express-json",
-}
+},
 
 {
   knowledgeId: "code.web.express-response-json",
@@ -1126,7 +1126,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.express-response-json",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.express-response-json",
-}
+},
 
 {
   knowledgeId: "code.web.express-response-status",
@@ -1146,7 +1146,7 @@ export const additionalWebCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.web.express-response-status",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.web.express-response-status",
-}
+},
 
 {
   knowledgeId: "code.web.express-listen",

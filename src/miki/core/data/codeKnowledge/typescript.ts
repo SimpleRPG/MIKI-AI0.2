@@ -338,7 +338,7 @@ export const typescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
       constraints: ['runtime check must support the claimed predicate'],
       adaptationRules: ['compose primitive checks for object contracts'],
     },
-  },
+  }
 ];
 
 export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
@@ -694,7 +694,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/functions.html"],
   sourceArtifactIds: ["typescript-typed-parameter"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "{name}: {type}", outputKinds: ["parameter"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.optional-parameter",
@@ -709,7 +709,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/functions.html"],
   sourceArtifactIds: ["typescript-optional-parameter"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "{name}?: {type}", outputKinds: ["parameter"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.rest-parameter",
@@ -724,7 +724,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/functions.html"],
   sourceArtifactIds: ["typescript-rest-parameter"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "...{name}: {type}[]", outputKinds: ["parameter"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.default-parameter",
@@ -739,7 +739,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/functions.html"],
   sourceArtifactIds: ["typescript-default-parameter"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "{name}: {type} = {value}", outputKinds: ["parameter"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "type", inputKinds: ["type-expression"], required: true, multiple: false }, { name: "value", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.property-signature",
@@ -754,7 +754,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/objects.html"],
   sourceArtifactIds: ["typescript-property-signature"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "{name}: {type};", outputKinds: ["property-signature"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.method-signature",
@@ -769,7 +769,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/objects.html"],
   sourceArtifactIds: ["typescript-method-signature"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "{name}({parameters}): {returnType};", outputKinds: ["method-signature"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "parameters", inputKinds: ["parameter"], required: false, multiple: true }, { name: "returnType", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.constructor",
@@ -784,7 +784,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/classes.html"],
   sourceArtifactIds: ["typescript-constructor"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "constructor({parameters}) {\\n{body}\\n}", outputKinds: ["statement"], slots: [{ name: "parameters", inputKinds: ["parameter"], required: false, multiple: true }, { name: "body", inputKinds: ["statement"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.class-property",
@@ -799,7 +799,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/classes.html"],
   sourceArtifactIds: ["typescript-class-property"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "{name}: {type};", outputKinds: ["statement"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.class-method",
@@ -814,7 +814,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/classes.html"],
   sourceArtifactIds: ["typescript-class-method"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "{name}({parameters}): {returnType} {\\n{body}\\n}", outputKinds: ["statement"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "parameters", inputKinds: ["parameter"], required: false, multiple: true }, { name: "returnType", inputKinds: ["type-expression"], required: true, multiple: false }, { name: "body", inputKinds: ["statement"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.generic-interface",
@@ -829,7 +829,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/generics.html"],
   sourceArtifactIds: ["typescript-generic-interface"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "interface {name}<{parameter}> {\\n{members}\\n}", outputKinds: ["type-declaration"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "parameter", inputKinds: ["type-parameter"], required: true, multiple: false }, { name: "members", inputKinds: ["property-signature"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.generic-type-alias",
@@ -844,7 +844,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/generics.html"],
   sourceArtifactIds: ["typescript-generic-type-alias"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "type {name}<{parameter}> = {type};", outputKinds: ["type-declaration"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "parameter", inputKinds: ["type-parameter"], required: true, multiple: false }, { name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.keyof-type",
@@ -859,7 +859,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/keyof-types.html"],
   sourceArtifactIds: ["typescript-keyof"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "keyof {type}", outputKinds: ["type-expression"], slots: [{ name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.typeof-type",
@@ -874,7 +874,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/typeof-types.html"],
   sourceArtifactIds: ["typescript-typeof-type"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "typeof {value}", outputKinds: ["type-expression"], slots: [{ name: "value", inputKinds: ["identifier"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.as-const",
@@ -889,7 +889,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/everyday-types.html"],
   sourceArtifactIds: ["typescript-as-const"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "{value} as const", outputKinds: ["expression"], slots: [{ name: "value", inputKinds: ["expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.satisfies",
@@ -904,7 +904,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/objects.html"],
   sourceArtifactIds: ["typescript-satisfies"],
   constructionProfile: { kind: "EXPRESSION", syntaxTemplate: "{value} satisfies {type}", outputKinds: ["expression"], slots: [{ name: "value", inputKinds: ["expression"], required: true, multiple: false }, { name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.readonly-array",
@@ -919,7 +919,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/objects.html"],
   sourceArtifactIds: ["typescript-readonly-array"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "readonly {type}[]", outputKinds: ["type-expression"], slots: [{ name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.index-signature",
@@ -934,7 +934,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/objects.html"],
   sourceArtifactIds: ["typescript-index-signature"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "[{name}: string]: {type};", outputKinds: ["property-signature"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.required-type",
@@ -949,7 +949,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/utility-types.html"],
   sourceArtifactIds: ["typescript-required-type"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "Required<{type}>", outputKinds: ["type-expression"], slots: [{ name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.readonly-type",
@@ -964,7 +964,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/utility-types.html"],
   sourceArtifactIds: ["typescript-readonly-type"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "Readonly<{type}>", outputKinds: ["type-expression"], slots: [{ name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.nonnullable-type",
@@ -979,7 +979,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/utility-types.html"],
   sourceArtifactIds: ["typescript-nonnullable-type"],
   constructionProfile: { kind: "TYPE", syntaxTemplate: "NonNullable<{type}>", outputKinds: ["type-expression"], slots: [{ name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.abstract-class",
@@ -994,7 +994,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/classes.html"],
   sourceArtifactIds: ["typescript-abstract-class"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "abstract class {name} {\\n{body}\\n}", outputKinds: ["statement"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "body", inputKinds: ["statement"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.getter",
@@ -1009,7 +1009,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/classes.html"],
   sourceArtifactIds: ["typescript-getter"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "get {name}(): {type} {\\n{body}\\n}", outputKinds: ["statement"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "type", inputKinds: ["type-expression"], required: true, multiple: false }, { name: "body", inputKinds: ["statement"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.setter",
@@ -1024,7 +1024,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/classes.html"],
   sourceArtifactIds: ["typescript-setter"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "set {name}({parameter}) {\\n{body}\\n}", outputKinds: ["statement"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "parameter", inputKinds: ["parameter"], required: true, multiple: false }, { name: "body", inputKinds: ["statement"], required: true, multiple: true }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.overload",
@@ -1039,7 +1039,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/functions.html"],
   sourceArtifactIds: ["typescript-overload"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "function {name}({parameters}): {returnType};", outputKinds: ["statement"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "parameters", inputKinds: ["parameter"], required: false, multiple: true }, { name: "returnType", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.parameter-property",
@@ -1054,7 +1054,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   sourceUrls: ["https://www.typescriptlang.org/docs/handbook/2/classes.html"],
   sourceArtifactIds: ["typescript-parameter-property"],
   constructionProfile: { kind: "DECLARATION", syntaxTemplate: "private readonly {name}: {type}", outputKinds: ["parameter"], slots: [{ name: "name", inputKinds: ["identifier"], required: true, multiple: false }, { name: "type", inputKinds: ["type-expression"], required: true, multiple: false }], constraints: ["inputs must satisfy the construction contract"], adaptationRules: ["prefer the simplest compatible construction"] },
-}
+},
 
 {
   id: "code.typescript.return-type",
@@ -1513,7 +1513,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.typed-parameter",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.typed-parameter",
-}
+},
 
 {
   knowledgeId: "code.typescript.optional-parameter",
@@ -1533,7 +1533,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.optional-parameter",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.optional-parameter",
-}
+},
 
 {
   knowledgeId: "code.typescript.rest-parameter",
@@ -1553,7 +1553,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.rest-parameter",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.rest-parameter",
-}
+},
 
 {
   knowledgeId: "code.typescript.default-parameter",
@@ -1573,7 +1573,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.default-parameter",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.default-parameter",
-}
+},
 
 {
   knowledgeId: "code.typescript.property-signature",
@@ -1593,7 +1593,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.property-signature",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.property-signature",
-}
+},
 
 {
   knowledgeId: "code.typescript.method-signature",
@@ -1613,7 +1613,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.method-signature",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.method-signature",
-}
+},
 
 {
   knowledgeId: "code.typescript.constructor",
@@ -1633,7 +1633,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.constructor",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.constructor",
-}
+},
 
 {
   knowledgeId: "code.typescript.class-property",
@@ -1653,7 +1653,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.class-property",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.class-property",
-}
+},
 
 {
   knowledgeId: "code.typescript.class-method",
@@ -1673,7 +1673,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.class-method",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.class-method",
-}
+},
 
 {
   knowledgeId: "code.typescript.generic-interface",
@@ -1693,7 +1693,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.generic-interface",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.generic-interface",
-}
+},
 
 {
   knowledgeId: "code.typescript.generic-type-alias",
@@ -1713,7 +1713,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.generic-type-alias",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.generic-type-alias",
-}
+},
 
 {
   knowledgeId: "code.typescript.keyof-type",
@@ -1733,7 +1733,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.keyof-type",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.keyof-type",
-}
+},
 
 {
   knowledgeId: "code.typescript.typeof-type",
@@ -1753,7 +1753,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.typeof-type",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.typeof-type",
-}
+},
 
 {
   knowledgeId: "code.typescript.as-const",
@@ -1773,7 +1773,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.as-const",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.as-const",
-}
+},
 
 {
   knowledgeId: "code.typescript.satisfies",
@@ -1793,7 +1793,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.satisfies",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.satisfies",
-}
+},
 
 {
   knowledgeId: "code.typescript.readonly-array",
@@ -1813,7 +1813,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.readonly-array",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.readonly-array",
-}
+},
 
 {
   knowledgeId: "code.typescript.index-signature",
@@ -1833,7 +1833,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.index-signature",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.index-signature",
-}
+},
 
 {
   knowledgeId: "code.typescript.required-type",
@@ -1853,7 +1853,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.required-type",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.required-type",
-}
+},
 
 {
   knowledgeId: "code.typescript.readonly-type",
@@ -1873,7 +1873,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.readonly-type",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.readonly-type",
-}
+},
 
 {
   knowledgeId: "code.typescript.nonnullable-type",
@@ -1893,7 +1893,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.nonnullable-type",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.nonnullable-type",
-}
+},
 
 {
   knowledgeId: "code.typescript.abstract-class",
@@ -1913,7 +1913,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.abstract-class",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.abstract-class",
-}
+},
 
 {
   knowledgeId: "code.typescript.getter",
@@ -1933,7 +1933,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.getter",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.getter",
-}
+},
 
 {
   knowledgeId: "code.typescript.setter",
@@ -1953,7 +1953,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.setter",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.setter",
-}
+},
 
 {
   knowledgeId: "code.typescript.overload",
@@ -1973,7 +1973,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.overload",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.overload",
-}
+},
 
 {
   knowledgeId: "code.typescript.parameter-property",
@@ -1993,7 +1993,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   publicInterfaces: [],
   tests: "CONTRACT_TEST:code.typescript.parameter-property",
   validation: "VALIDATE_CODE_CONSTRUCTION:code.typescript.parameter-property",
-}
+},
 
 {
   knowledgeId: "code.typescript.return-type",
