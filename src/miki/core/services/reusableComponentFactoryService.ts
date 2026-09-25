@@ -4,6 +4,22 @@ import { reviewLearningArtifactService, type ReviewLearningArtifact } from './re
 import type { ReviewLearningEpisode } from './reviewDecisionLearningService';
 import { verifierService } from '../../verification/services/verifierService';
 import { componentRegistryService } from '../../../services/componentRegistryService';
+import { commonCodeKnowledge, additionalCommonCodeKnowledge } from '../data/codeKnowledge/common';
+import { javascriptCodeKnowledge, additionalJavascriptCodeKnowledge } from '../data/codeKnowledge/javascript';
+import { typescriptCodeKnowledge, additionalTypescriptCodeKnowledge } from '../data/codeKnowledge/typescript';
+import { webCodeKnowledge, additionalWebCodeKnowledge } from '../data/codeKnowledge/web';
+import { testingCodeKnowledge, additionalTestingCodeKnowledge } from '../data/codeKnowledge/testing';
+export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
+export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
+export type ComponentSelectionMode='REUSE_AS_IS'|'ADAPT_EXISTING'|'COMPOSE_MULTIPLE'|'CREATE_NEW'|'ESCALATE_UNKNOWN';
+export interface ReusableComponentArtifact {componentId:string;registryComponentId?:string;componentKind:ReusableComponentKind;componentType:string;purpose:string;interfaceContract:Record<string,unknown>;inputs:string[];outputs:string[];prerequisites:string[];dependencies:string[];appliesWhen:string[];doesNotApplyWhen:string[];sourceEpisodeIds:string[];sourceLearningArtifactIds:string[];canonicalSha256:string;environmentFingerprint:string;lifecycleStatus:ReusableComponentLifecycle;usageCount:number;successCount:number;failureCount:number;lastUsedAt?:number;lastConfirmedAt?:number;supersededBy?:string;createdAt:number;updatedAt:number;}
+export interface KnowledgeComponentArtifact extends ReusableComponentArtifact {componentKind:'KNOWLEDGE';claimIds:string[];evidenceRefs:string[];sourceUrls:string[];sourceArtifactIds:string[];verificationStatus:'UNVERIFIED'|'VERIFIED'|'CONFLICT';contradictionRefs:string[];freshnessPolicy:string;}
+export interface CodeComponentArtifact extends ReusableComponentArtifact {componentKind:'CODE';exports:string[];imports:string[];publicInterfaces:string[];coreIngressPoints:string[];domainOwnership:string[];persistenceKeys:string[];uiEventEntrypoints:string[];testReferences:string[];requiredValidation:string[];}
+export interface ConversationComponentArtifact extends ReusableComponentArtifact {componentKind:'CONVERSATION';atomic:boolean;conversationState:string[];requiredInformation:string[];responseStructure:string[];prohibitedPatterns:string[];clarificationConditions:string[];verbosityConditions:string[];toolResultOrder:string[];}
+export type AnyReusableComponent=KnowledgeComponentArtifact|CodeComponentArtifact|ConversationComponentArtifact;
+export interface ComponentUsageReceipt {usageReceiptId:string;componentIds:string[];taskId:string;candidateId?:string;conversationPlanId?:string;selectionMode:ComponentSelectionMode;validationResult:'PASSED'|'FAILED'|'NOT_RUN';outcome:'SUCCEEDED'|'FAILED'|'PENDING';coreDecisionId:string;createdAt:number;receiptSha256:string;}
+export interface ComponentPack {componentPackId:string;knowledgePackId:string;usedKnowledgeComponentIds:string[];usedCodeComponentIds:string[];usedConversationComponentIds:string[];adaptedComponentIds:string[];createdComponentIds:string[];excludedComponentIds:string[];exclusionReasons:Record<string,string>;environmentFingerprint:string;unresolvedComponentNeeds:string[];componentContextSha256:string;packSha256:string;}
+const COMPONENT_KEY='miki_reusable_component_repository_v1';const RECEIPT_KEY='miki_component_usage_receipts_v1';
 class ReusableComponentFactoryService{
   constructor(){
     this.seedBuiltInCodeKnowledge();
@@ -12,23 +28,24 @@ class ReusableComponentFactoryService{
   private seedBuiltInCodeKnowledge():void{
     const seeds=[
       ...commonCodeKnowledge,
+      ...additionalCommonCodeKnowledge,
       ...javascriptCodeKnowledge,
+      ...additionalJavascriptCodeKnowledge,
       ...typescriptCodeKnowledge,
+      ...additionalTypescriptCodeKnowledge,
       ...webCodeKnowledge,
+      ...additionalWebCodeKnowledge,
       ...testingCodeKnowledge,
+      ...additionalTestingCodeKnowledge,
     ];
 
     const existing=this.list();
-    const existingIds=new Set(existing.map(item=>item.componentId));
     const now=Date.now();
 
     const components=seeds
       .filter(seed=>!existing.some(item =>
         item.componentKind==='KNOWLEDGE' &&
-        (
-          item.sourceArtifactIds.includes(seed.sourceArtifactIds[0] || '') ||
-          item.appliesWhen.includes(seed.id)
-        )
+        item.appliesWhen.includes(seed.id)
       ))
       .map(seed=>this.identify({
         componentKind:'KNOWLEDGE' as const,
@@ -62,33 +79,12 @@ class ReusableComponentFactoryService{
         freshnessPolicy:'REVALIDATE_ON_SOURCE_CHANGE',
       }));
 
-    if(components.length===0)return;
-
-    this.storeCandidates(components);
-
-    // Built-in seedはRegistryのコード部品ではなく、再利用可能なKNOWLEDGE Component。
-    // そのためコード実装・実機検証済みとは扱わない。
-    void existingIds;
+    if(components.length>0){
+      this.storeCandidates(components);
+    }
   }
 
-import { commonCodeKnowledge } from '../data/codeKnowledge/common';
-import { javascriptCodeKnowledge } from '../data/codeKnowledge/javascript';
-import { typescriptCodeKnowledge } from '../data/codeKnowledge/typescript';
-import { webCodeKnowledge } from '../data/codeKnowledge/web';
-import { testingCodeKnowledge } from '../data/codeKnowledge/testing';
 
-export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
-export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
-export type ComponentSelectionMode='REUSE_AS_IS'|'ADAPT_EXISTING'|'COMPOSE_MULTIPLE'|'CREATE_NEW'|'ESCALATE_UNKNOWN';
-export interface ReusableComponentArtifact {componentId:string;registryComponentId?:string;componentKind:ReusableComponentKind;componentType:string;purpose:string;interfaceContract:Record<string,unknown>;inputs:string[];outputs:string[];prerequisites:string[];dependencies:string[];appliesWhen:string[];doesNotApplyWhen:string[];sourceEpisodeIds:string[];sourceLearningArtifactIds:string[];canonicalSha256:string;environmentFingerprint:string;lifecycleStatus:ReusableComponentLifecycle;usageCount:number;successCount:number;failureCount:number;lastUsedAt?:number;lastConfirmedAt?:number;supersededBy?:string;createdAt:number;updatedAt:number;}
-export interface KnowledgeComponentArtifact extends ReusableComponentArtifact {componentKind:'KNOWLEDGE';claimIds:string[];evidenceRefs:string[];sourceUrls:string[];sourceArtifactIds:string[];verificationStatus:'UNVERIFIED'|'VERIFIED'|'CONFLICT';contradictionRefs:string[];freshnessPolicy:string;}
-export interface CodeComponentArtifact extends ReusableComponentArtifact {componentKind:'CODE';exports:string[];imports:string[];publicInterfaces:string[];coreIngressPoints:string[];domainOwnership:string[];persistenceKeys:string[];uiEventEntrypoints:string[];testReferences:string[];requiredValidation:string[];}
-export interface ConversationComponentArtifact extends ReusableComponentArtifact {componentKind:'CONVERSATION';atomic:boolean;conversationState:string[];requiredInformation:string[];responseStructure:string[];prohibitedPatterns:string[];clarificationConditions:string[];verbosityConditions:string[];toolResultOrder:string[];}
-export type AnyReusableComponent=KnowledgeComponentArtifact|CodeComponentArtifact|ConversationComponentArtifact;
-export interface ComponentUsageReceipt {usageReceiptId:string;componentIds:string[];taskId:string;candidateId?:string;conversationPlanId?:string;selectionMode:ComponentSelectionMode;validationResult:'PASSED'|'FAILED'|'NOT_RUN';outcome:'SUCCEEDED'|'FAILED'|'PENDING';coreDecisionId:string;createdAt:number;receiptSha256:string;}
-export interface ComponentPack {componentPackId:string;knowledgePackId:string;usedKnowledgeComponentIds:string[];usedCodeComponentIds:string[];usedConversationComponentIds:string[];adaptedComponentIds:string[];createdComponentIds:string[];excludedComponentIds:string[];exclusionReasons:Record<string,string>;environmentFingerprint:string;unresolvedComponentNeeds:string[];componentContextSha256:string;packSha256:string;}
-const COMPONENT_KEY='miki_reusable_component_repository_v1';const RECEIPT_KEY='miki_component_usage_receipts_v1';
-class ReusableComponentFactoryService{
  extract(artifact:ReviewLearningArtifact,episode:ReviewLearningEpisode,environmentFingerprint='unknown'):AnyReusableComponent[]{const components:AnyReusableComponent[]=[];const common={purpose:this.purpose(artifact),interfaceContract:{input:'task context',output:'bounded reusable guidance'},inputs:['task context'],outputs:['reusable guidance'],prerequisites:[],dependencies:[],appliesWhen:this.appliesWhen(artifact),doesNotApplyWhen:this.doesNotApplyWhen(artifact),sourceEpisodeIds:[episode.episodeId],sourceLearningArtifactIds:[artifact.artifactId],environmentFingerprint,lifecycleStatus:'CANDIDATE' as const,usageCount:0,successCount:0,failureCount:0,createdAt:Date.now(),updatedAt:Date.now()};
   const knowledgeBody={...common,componentKind:'KNOWLEDGE' as const,componentType:artifact.artifactType==='FAILURE_PATTERN'?'FAILURE_KNOWLEDGE':artifact.artifactType==='CORRECTION_PAIR'?'PROCEDURE':artifact.artifactType==='ACCEPTED_PATTERN'?'RULE':'UNKNOWN_BOUNDARY',claimIds:[],evidenceRefs:[episode.rawResponseSha256],sourceUrls:[],sourceArtifactIds:[artifact.artifactId],verificationStatus:'UNVERIFIED' as const,contradictionRefs:[],freshnessPolicy:'REVALIDATE_ON_ENVIRONMENT_CHANGE'};components.push(this.identify(knowledgeBody) as KnowledgeComponentArtifact);
   if(artifact.artifactType==='ACCEPTED_PATTERN'||artifact.artifactType==='CORRECTION_PAIR'){const codeBody={...common,componentKind:'CODE' as const,componentType:artifact.artifactType==='ACCEPTED_PATTERN'?'SERVICE_SKELETON':'MIGRATION_STEP',interfaceContract:{input:'repository map and target contract',output:'isolated candidate bundle'},outputs:['isolated candidate bundle'],exports:[],imports:[],publicInterfaces:[],coreIngressPoints:[],domainOwnership:['selfDevelopment'],persistenceKeys:[],uiEventEntrypoints:[],testReferences:[],requiredValidation:['interface consistency','domain contract','core ingress','tests']};components.push(this.identify(codeBody) as CodeComponentArtifact);}
