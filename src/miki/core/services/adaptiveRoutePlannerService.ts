@@ -804,13 +804,21 @@ class AdaptiveRoutePlannerService {
           )
         : [];
 
+      const researchVerificationEvidenceIds=
+        researchVerificationValue
+          ? this.stringArrayFromValue(
+              researchVerificationValue,
+              /evidence(?:[_-]?ids?)/i
+            )
+          : [];
+
       const researchVerificationSucceeded=
         researchClaimIds.length>0 &&
         latestResearchVerification!==undefined &&
         researchClaimIds.every(id=>researchVerificationClaimIds.includes(id)) &&
         researchVerificationValue?.verified===true;
 
-      const researchVerificationPending=
+      const researchVerificationPending
         researchClaimIds.length>0 &&
         latestResearchVerification!==undefined &&
         !researchVerificationSucceeded &&
@@ -831,10 +839,15 @@ class AdaptiveRoutePlannerService {
        * ResearchがClaimを生成したがVerification不足の場合、
        * COREがVerification Domainへ明示的に再ルーティングする。
        */
+      const researchExplicitlyResolved =
+        researchResolved ||
+        String(researchValue?.status||'').toUpperCase()==='VERIFIED';
+
       if(
         researchClaimIds.length>0 &&
-        researchOutcome==='INSUFFICIENT_VERIFICATION' &&
-        !researchVerificationSucceeded
+        !researchExplicitlyResolved &&
+        !researchVerificationSucceeded &&
+        !latestResearchVerification
       ){
         routes.push({
           target:'verification',
@@ -940,7 +953,10 @@ class AdaptiveRoutePlannerService {
       const researchVerificationResolved =
         researchVerificationSucceeded &&
         researchClaimIds.length>0 &&
-        researchHasEvidence;
+        (
+          researchHasEvidence ||
+          researchVerificationEvidenceIds.length>0
+        );
 
       const unknownOrResearchResolved =
         unknownResolved ||
@@ -983,7 +999,8 @@ class AdaptiveRoutePlannerService {
                 researchEvidenceIds,
                 researchClaimIds,
                 researchVerificationSucceeded,
-                researchVerificationClaimIds
+                researchVerificationClaimIds,
+                researchVerificationEvidenceIds
               },
               retryOfCandidateRevision:previousRevision
             },
