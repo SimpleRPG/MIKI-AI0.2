@@ -573,8 +573,70 @@ class AdaptiveRoutePlannerService {
         latestCodeComponentVerificationStatus === 'VERIFIED'
       );
 
+    const codeComponentVerificationFailed =
+      createdCodeComponentIds.length > 0 &&
+      Boolean(latestCodeComponentVerification) &&
+      (
+        latestCodeComponentVerificationStatus === 'FAILED' ||
+        latestCodeComponentVerificationStatus === 'REJECTED' ||
+        latestCodeComponentVerificationStatus === 'ROLLED_BACK'
+      );
+
     const codeComponentVerificationExists =
       codeComponentVerificationSucceeded;
+
+    /*
+     * NEW_COMPONENT Canary/Regression failure must return to CORE rather
+     * than repeatedly verifying the rejected component.
+     *
+     * The failed component remains isolated as REJECTED by the safety
+     * boundary. CORE owns the next decision: create a new Candidate
+     * Revision using the failure information as input.
+     */
+    if(
+      codeComponentVerificationFailed &&
+      latestCandidate &&
+      !codeComponentVerificationSucceeded
+    ){
+      const candidate=this.extractCandidateIdentity(latestCandidate);
+      const failureValue=latestCodeComponentVerificationValue || {};
+      const failureResults=Array.isArray(failureValue.results)
+        ? failureValue.results
+        : [];
+      const failureReasons=failureResults
+        .filter((item): item is Record<string,unknown> => Boolean(item && typeof item==='object'))
+        .map(item=>String(item.reason||''))
+        .filter(Boolean);
+
+      routes.push({
+        target:'selfDevelopment',
+        command:'GENERATE_CANDIDATE',
+        reason:'CODE Component verification/Canary failed; CORE isolates the failed NEW_COMPONENT and generates the next Candidate Revision',
+        payload:{
+          taskId:task.taskId,
+          runId:this.resolveCoreRunId(task,input),
+          goal:task.goal,
+          candidateRevision:Number(candidate.candidateRevision||1)+1,
+          targetFiles:coreTargetPaths,
+          requirements:input.requirements,
+          prohibitions:input.prohibitions,
+          invariants:input.invariants,
+          validationRequirements:input.validationRequirements,
+          failureFeedback:{
+            sourceOperation:'VERIFY_CODE_COMPONENT',
+            status:latestCodeComponentVerificationStatus,
+            componentIds:createdCodeComponentIds,
+            reasons:failureReasons,
+            result:failureValue,
+            retryOfCandidateRevision:Number(candidate.candidateRevision||1),
+          },
+          adaptive:true,
+          priority:85
+        }
+      });
+
+      return this.decorateOperations(task,this.uniqueOperations(routes));
+    }
 
     if(
       createdCodeComponentIds.length > 0 &&
