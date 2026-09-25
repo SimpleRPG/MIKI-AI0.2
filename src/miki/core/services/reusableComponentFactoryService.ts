@@ -42,6 +42,10 @@ const CONSTRUCTION_KNOWLEDGE_ID_ALIASES:Record<string,string>={
   'code.javascript.node-path-dirname':'code.node.path-dirname',
   'code.javascript.node-path-basename':'code.node.path-basename',
   'code.javascript.node-path-extname':'code.node.path-extname',
+  'code.common.variables':'code.javascript.const-declaration',
+  'code.common.functions':'code.javascript.function-declaration',
+  'code.typescript.interfaces':'code.typescript.interface',
+  'code.typescript.type-guards':'code.typescript.type-guard-component',
 };
 class ReusableComponentFactoryService{
   constructor(){
