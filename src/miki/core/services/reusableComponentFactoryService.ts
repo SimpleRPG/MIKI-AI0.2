@@ -840,7 +840,11 @@ class ReusableComponentFactoryService{
       for(const currentState of states){
         const sources=nodes
           .filter(source=>source.nodeId!==node.nodeId&&!stack.includes(source.nodeId))
-          .filter(source=>(source.profile.outputKinds||[]).some(output=>slot.inputKinds.includes(output)))
+          .filter(source=>(source.profile.outputKinds||[]).some(output=>
+             slot.inputKinds.some(expected=>
+               isCompatibleConstructionKind(output,expected)
+             )
+           ))
           .sort((a,b)=>{
             const scoreDiff=goalScore(b)-goalScore(a);
             return scoreDiff!==0?scoreDiff:a.nodeId.localeCompare(b.nodeId);
@@ -958,7 +962,11 @@ class ReusableComponentFactoryService{
       for(const slot of target.profile.slots){
         const candidates=plannedNodes
           .filter(source=>source.nodeId!==target.nodeId)
-          .filter(source=>(source.profile.outputKinds||[]).some(output=>slot.inputKinds.includes(output)))
+          .filter(source=>(source.profile.outputKinds||[]).some(output=>
+             slot.inputKinds.some(expected=>
+               isCompatibleConstructionKind(output,expected)
+             )
+           ))
           .sort((a,b)=>a.nodeId.localeCompare(b.nodeId));
         if(candidates.length===1){
           bindings.push({
@@ -1058,6 +1066,310 @@ class ReusableComponentFactoryService{
     errors:[...new Set(errors)],
   };
  }
+
+
+  public auditConstructionConnectivity(input?:{
+   componentIds?:string[];
+  }):{
+   accepted:boolean;
+   duplicateKnowledgeIds:string[];
+   missingConstructionDefinitionKnowledgeIds:string[];
+   missingCodeComponentKnowledgeIds:string[];
+   orphanCodeComponentKnowledgeIds:string[];
+   unlinkedConstructionKnowledgeIds:string[];
+   missingProducerSlots:Array<{
+    knowledgeId:string;
+    slotName:string;
+    inputKinds:string[];
+   }>;
+   selectionProducerGaps:Array<{
+    knowledgeId:string;
+    slotName:string;
+    inputKinds:string[];
+    producerKnowledgeIds:string[];
+   }>;
+   plannerCompatibilityEdges:Array<{
+    sourceKnowledgeId:string;
+    sourceOutputKind:string;
+    targetKnowledgeId:string;
+    slotName:string;
+    expectedKind:string;
+   }>;
+   recommendations:string[];
+  }{
+   const knowledge:CodeKnowledgeDefinition[]=[
+    ...commonCodeKnowledge,
+    ...additionalCommonCodeKnowledge,
+    ...javascriptCodeKnowledge,
+    ...additionalJavascriptCodeKnowledge,
+    ...typescriptCodeKnowledge,
+    ...additionalTypescriptCodeKnowledge,
+    ...webCodeKnowledge,
+    ...additionalWebCodeKnowledge,
+    ...testingCodeKnowledge,
+    ...additionalTestingCodeKnowledge,
+    ...moduleCodeKnowledge,
+    ...additionalModuleCodeKnowledge,
+    ...autonomousConstructionKnowledge,
+    ...nodeRuntimeCodeKnowledge,
+    ...javascriptStandardApiCodeKnowledge,
+    ...asyncConcurrencyCodeKnowledge,
+    ...browserWebApiCodeKnowledge,
+    ...expressBackendCodeKnowledge,
+    ...dataValidationCodeKnowledge,
+    ...databasePersistenceCodeKnowledge,
+    ...securityCryptoCodeKnowledge,
+    ...buildToolingCodeKnowledge,
+    ...reactUiAccessibilityCodeKnowledge,
+   ];
+
+   const counts=new Map<string,number>();
+
+   for(const item of knowledge){
+    counts.set(item.id,(counts.get(item.id)||0)+1);
+   }
+
+   const duplicateKnowledgeIds=[...counts.entries()]
+    .filter(([,count])=>count>1)
+    .map(([id])=>id)
+    .sort();
+
+   const uniqueKnowledge=[
+    ...new Map(knowledge.map(item=>[item.id,item])).values()
+   ];
+
+   const definitions=buildBuiltInCodeComponentDefinitions();
+
+   const definitionIds=new Set(
+    definitions.map(item=>item.knowledgeId)
+   );
+
+   const missingConstructionDefinitionKnowledgeIds=
+    uniqueKnowledge
+     .filter(item=>Boolean(item.constructionProfile))
+     .filter(item=>{
+      const canonical=
+       CONSTRUCTION_KNOWLEDGE_ID_ALIASES[item.id]||item.id;
+      return !definitionIds.has(canonical);
+     })
+     .map(item=>item.id)
+     .sort();
+
+   const vocabulary=this.auditConstructionVocabulary();
+
+   const reusableCode=this.list().filter(
+    item=>item.componentKind==='CODE'
+   ) as CodeComponentArtifact[];
+
+   const unlinkedConstructionKnowledgeIds=
+    uniqueKnowledge
+     .filter(item=>Boolean(item.constructionProfile))
+     .filter(item=>{
+      const canonical=
+       CONSTRUCTION_KNOWLEDGE_ID_ALIASES[item.id]||item.id;
+
+      return !reusableCode.some(component=>
+       component.appliesWhen.includes(item.id) ||
+       component.appliesWhen.includes(canonical)
+      );
+     })
+     .map(item=>item.id)
+     .sort();
+
+   const selectedIds=new Set(input?.componentIds||[]);
+
+   const selectedKnowledgeIds=new Set(
+    this.list()
+     .filter(item=>
+      selectedIds.has(item.componentId) &&
+      item.componentKind==='KNOWLEDGE'
+     )
+     .flatMap(item=>item.appliesWhen)
+   );
+
+   const externallyBindableKinds=new Set([
+    'identifier',
+    'parameter',
+    'parameters',
+    'type-parameter',
+    'module-specifier',
+    'arithmetic-operator',
+    'comparison-operator',
+    'logical-operator',
+    'operator',
+    'token',
+    'pattern',
+    'text',
+    'name',
+    'path',
+    'parts',
+    'property-assignment',
+    'property-signature',
+    'type-property',
+    'type',
+    'declaration',
+    'members',
+    'keytype',
+    'value',
+    'array-expression',
+    'object-expression',
+    'string-expression',
+    'boolean-expression',
+    'expression',
+   ]);
+
+   const missingProducerSlots:Array<{
+    knowledgeId:string;
+    slotName:string;
+    inputKinds:string[];
+   }> = [];
+
+   const selectionProducerGaps:Array<{
+    knowledgeId:string;
+    slotName:string;
+    inputKinds:string[];
+    producerKnowledgeIds:string[];
+   }> = [];
+
+   const plannerCompatibilityEdges:Array<{
+    sourceKnowledgeId:string;
+    sourceOutputKind:string;
+    targetKnowledgeId:string;
+    slotName:string;
+    expectedKind:string;
+   }> = [];
+
+   for(const item of uniqueKnowledge){
+    const profile=item.constructionProfile;
+
+    if(!profile)continue;
+
+    for(const slot of profile.slots){
+     if(!slot.required)continue;
+
+     const producers=uniqueKnowledge
+      .filter(source=>
+       source.id!==item.id &&
+       Boolean(source.constructionProfile)
+      )
+      .filter(source=>
+       (source.constructionProfile!.outputKinds||[]).some(output=>
+        slot.inputKinds.some(expected=>
+         isCompatibleConstructionKind(output,expected)
+        )
+       )
+      )
+      .map(source=>source.id)
+      .sort();
+
+     for(const sourceId of producers.slice(0,16)){
+      const source=uniqueKnowledge.find(
+       candidate=>candidate.id===sourceId
+      );
+
+      if(!source?.constructionProfile)continue;
+
+      for(const output of source.constructionProfile.outputKinds||[]){
+       for(const expected of slot.inputKinds){
+        if(
+         output!==expected &&
+         isCompatibleConstructionKind(output,expected) &&
+         plannerCompatibilityEdges.length<128
+        ){
+         plannerCompatibilityEdges.push({
+          sourceKnowledgeId:source.id,
+          sourceOutputKind:output,
+          targetKnowledgeId:item.id,
+          slotName:slot.name,
+          expectedKind:expected,
+         });
+        }
+       }
+      }
+     }
+
+     const externallyBindable=slot.inputKinds.some(kind=>
+      externallyBindableKinds.has(kind.trim().toLowerCase())
+     );
+
+     if(producers.length===0&&!externallyBindable){
+      missingProducerSlots.push({
+       knowledgeId:item.id,
+       slotName:slot.name,
+       inputKinds:[...slot.inputKinds],
+      });
+     }
+
+     if(
+      selectedIds.size>0 &&
+      producers.length>0 &&
+      !externallyBindable &&
+      !producers.some(id=>selectedKnowledgeIds.has(id))
+     ){
+      selectionProducerGaps.push({
+       knowledgeId:item.id,
+       slotName:slot.name,
+       inputKinds:[...slot.inputKinds],
+       producerKnowledgeIds:producers.slice(0,12),
+      });
+     }
+    }
+   }
+
+   const recommendations=new Set<string>();
+
+   for(const id of missingConstructionDefinitionKnowledgeIds){
+    recommendations.add('ADD_CONSTRUCTION_DEFINITION:'+id);
+   }
+
+   for(const id of vocabulary.missingCodeComponentKnowledgeIds){
+    recommendations.add('ADD_CODE_COMPONENT:'+id);
+   }
+
+   for(const id of unlinkedConstructionKnowledgeIds){
+    recommendations.add('LINK_CODE_COMPONENT:'+id);
+   }
+
+   for(const item of missingProducerSlots){
+    recommendations.add(
+     'ADD_CONSTRUCTION_KNOWLEDGE_OR_BRIDGE:'+
+     item.knowledgeId+':'+
+     item.slotName+':'+
+     item.inputKinds.join('|')
+    );
+   }
+
+   for(const item of selectionProducerGaps){
+    recommendations.add(
+     'EXPAND_SELECTED_CONSTRUCTION_COMPONENTS:'+
+     item.knowledgeId+':'+item.slotName
+    );
+   }
+
+   for(const id of duplicateKnowledgeIds){
+    recommendations.add('REVIEW_DUPLICATE_KNOWLEDGE_ID:'+id);
+   }
+
+   return {
+    accepted:
+     missingConstructionDefinitionKnowledgeIds.length===0 &&
+     vocabulary.missingCodeComponentKnowledgeIds.length===0 &&
+     unlinkedConstructionKnowledgeIds.length===0 &&
+     missingProducerSlots.length===0,
+
+    duplicateKnowledgeIds,
+    missingConstructionDefinitionKnowledgeIds,
+    missingCodeComponentKnowledgeIds:
+     vocabulary.missingCodeComponentKnowledgeIds,
+    orphanCodeComponentKnowledgeIds:
+     vocabulary.orphanCodeComponentKnowledgeIds,
+    unlinkedConstructionKnowledgeIds,
+    missingProducerSlots,
+    selectionProducerGaps,
+    plannerCompatibilityEdges,
+    recommendations:[...recommendations].sort(),
+   };
+  }
 
  public auditConstructionVocabulary():{
   missingCodeComponentKnowledgeIds:string[];

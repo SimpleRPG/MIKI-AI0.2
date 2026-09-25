@@ -5028,10 +5028,60 @@ syntaxTemplate: "readFile({path}, 'utf8')",
       "adaptationRules": []
     }
   }
+,
+  {
+    id: 'code.javascript.array-from',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: 'Iterableを配列へ変換して後続のArray系Componentへ接続する',
+    summary: 'Array.fromを使い、Iterableな入力をarray-expressionへ変換する。',
+    concepts: ['Array.from', 'iterable', 'array'],
+    inputs: ['iterable-expression'],
+    outputs: ['array-expression'],
+    appliesWhen: ['Iterableを配列化する', '配列操作へ接続する'],
+    doesNotApplyWhen: ['入力がすでに配列で変換が不要な場合'],
+    sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/from'],
+    sourceArtifactIds: ['mdn-array-from'],
+    constructionProfile: {
+      kind: 'CALL',
+      syntaxTemplate: 'Array.from({iterable})',
+      outputKinds: ['array-expression'],
+      slots: [
+        {
+          name: 'iterable',
+          inputKinds: ['iterable-expression'],
+          required: true,
+        },
+      ],
+      constraints: ['iterable must be convertible to an array'],
+      adaptationRules: [
+        'reuse the original iterable when downstream code already accepts iterable-expression',
+      ],
+    },
+  }
 
 ];
 
 export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
+  {
+    knowledgeId: 'code.javascript.array-from',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: 'Iterableを配列へ変換する',
+    implementation: 'Array.from({iterable})',
+    targetPath: 'generated.ts',
+    inputs: ['iterable-expression'],
+    outputs: ['array-expression'],
+    prerequisites: ['iterable is available'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.javascript.array-from',
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\nknowledge=code.javascript.array-from\ninputs=['iterable-expression']\noutputs=['array-expression']\nimplementation_template='Array.from({iterable})'",
+    validation: "VALIDATION_SPEC:\nrequiredValidation=['syntax', 'iterable contract']\ndependencies=[]\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\ninitialStatus=CANDIDATE\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+
   {
     knowledgeId: 'code.javascript.const-declaration',
     componentType: 'CODE_CONSTRUCTION',

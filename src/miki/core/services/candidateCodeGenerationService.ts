@@ -11,9 +11,10 @@ import { componentArtifactStoreService } from '../../capability/services/compone
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { ComponentCompositionService } from '../../capability/services/componentCompositionService';
 import { codeConstructionRendererService } from './codeConstructionRendererService';
-import type {
-  CodeConstructionBinding,
-  CodeConstructionGraph,
+import {
+  isCompatibleConstructionKind,
+  type CodeConstructionBinding,
+  type CodeConstructionGraph,
 } from '../data/codeKnowledge/common';
 export interface CandidateGenerationFile { path:string; candidateContent:string; evidenceIds:string[]; }
 export interface CandidateGenerationOutcome { accepted:boolean; runId:string; workspaceId?:string; files:CandidateGenerationFile[]; reasons:string[]; responseHash?:string; attemptCount?:number; createdCodeComponentIds?:string[]; learningLineage?:{sourcePackageId?:string;externalReviewId?:string;candidateRevision:number;requestedChanges:string[];userReason?:string;usedLearningArtifactIds:string[];ignoredLearningArtifactIds:string[];appliedFailurePatternIds:string[];appliedCorrectionPairIds:string[];appliedComponentPatternIds:string[];learningContextSha256:string;componentPackId?:string;usedKnowledgeComponentIds?:string[];usedCodeComponentIds?:string[];usedConversationComponentIds?:string[];excludedComponentIds?:string[];componentContextSha256?:string}; }
@@ -114,6 +115,11 @@ class CandidateCodeGenerationService {
     knowledgeHints
       ? [`Reusable CODE KNOWLEDGE guidance (guidance only; never executable CODE):\n${knowledgeHints}`]
       : [];
+
+  const constructionConnectivityAudit =
+    reusableComponentFactoryService.auditConstructionConnectivity({
+      componentIds:codeKnowledgePack.usedKnowledgeComponentIds,
+    });
 
   const constructionGraph =
     reusableComponentFactoryService.buildConstructionGraph({
@@ -330,6 +336,16 @@ class CandidateCodeGenerationService {
         };
 
   const constructionGapRequirements=[
+    ...constructionConnectivityAudit.missingCodeComponentKnowledgeIds.map(
+      id=>`CODE_COMPONENT_MISSING:${id}`
+    ),
+    ...constructionConnectivityAudit.unlinkedConstructionKnowledgeIds.map(
+      id=>`CODE_COMPONENT_UNLINKED:${id}`
+    ),
+    ...constructionConnectivityAudit.missingProducerSlots.map(
+      item=>
+        `NO_COMPATIBLE_PRODUCER:${item.knowledgeId}:${item.slotName}:${item.inputKinds.join('|')}`
+    ),
     ...constructionValidation.errors,
     ...constructionValidation.unresolvedSlots.map(
       slot => `UNRESOLVED_SLOT:${slot}`
@@ -974,7 +990,9 @@ class CandidateCodeGenerationService {
 
         const outputs=source.profile.outputKinds||[];
         const compatible=outputs.some(
-          output=>slot.inputKinds.includes(output)
+          output=>slot.inputKinds.some(
+          expected=>isCompatibleConstructionKind(output,expected)
+        )
         );
 
         /*
