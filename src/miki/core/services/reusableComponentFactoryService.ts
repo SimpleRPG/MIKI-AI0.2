@@ -4,7 +4,7 @@ import { reviewLearningArtifactService, type ReviewLearningArtifact } from './re
 import type { ReviewLearningEpisode } from './reviewDecisionLearningService';
 import { verifierService } from '../../verification/services/verifierService';
 import { componentRegistryService } from '../../../services/componentRegistryService';
-import { commonCodeKnowledge, additionalCommonCodeKnowledge, type CodeConstructionProfile, type CodeComponentDefinition } from '../data/codeKnowledge/common';
+import { commonCodeKnowledge, additionalCommonCodeKnowledge, type CodeConstructionProfile, type CodeComponentDefinition, type CodeConstructionBinding, type CodeConstructionGraph, type CodeConstructionNode } from '../data/codeKnowledge/common';
 import { javascriptCodeKnowledge, additionalJavascriptCodeKnowledge, additionalJavascriptCodeComponents } from '../data/codeKnowledge/javascript';
 import { typescriptCodeKnowledge, additionalTypescriptCodeKnowledge, additionalTypescriptCodeComponents } from '../data/codeKnowledge/typescript';
 import { webCodeKnowledge, additionalWebCodeKnowledge, additionalWebCodeComponents } from '../data/codeKnowledge/web';
@@ -19,6 +19,9 @@ export interface ConversationComponentArtifact extends ReusableComponentArtifact
 export type AnyReusableComponent=KnowledgeComponentArtifact|CodeComponentArtifact|ConversationComponentArtifact;
 export interface ComponentUsageReceipt {usageReceiptId:string;componentIds:string[];taskId:string;candidateId?:string;conversationPlanId?:string;selectionMode:ComponentSelectionMode;validationResult:'PASSED'|'FAILED'|'NOT_RUN';outcome:'SUCCEEDED'|'FAILED'|'PENDING';coreDecisionId:string;createdAt:number;receiptSha256:string;}
 export interface ComponentPack {componentPackId:string;knowledgePackId:string;usedKnowledgeComponentIds:string[];usedCodeComponentIds:string[];usedConversationComponentIds:string[];adaptedComponentIds:string[];createdComponentIds:string[];excludedComponentIds:string[];exclusionReasons:Record<string,string>;environmentFingerprint:string;unresolvedComponentNeeds:string[];componentContextSha256:string;packSha256:string;}
+interface ConstructionSearchState { nodes:Set<string>; bindings:CodeConstructionBinding[]; score:number; externalBindings:number; }
+interface ConstructionGraphPlan { nodeIds:string[]; bindings:CodeConstructionBinding[]; rootNodeId?:string; score:number; unresolved:string[]; }
+
 const COMPONENT_KEY='miki_reusable_component_repository_v1';const RECEIPT_KEY='miki_component_usage_receipts_v1';
 class ReusableComponentFactoryService{
   constructor(){
@@ -435,6 +438,7 @@ class ReusableComponentFactoryService{
  buildConstructionGraph(input:{
   goal:string;
   componentIds:string[];
+  preserveAllNodes?:boolean;
  }):CodeConstructionGraph{
   const selected=[...new Set(input.componentIds)]
     .map(id=>this.list().find(item=>item.componentId===id))
@@ -453,21 +457,14 @@ class ReusableComponentFactoryService{
 
   const nodes:CodeConstructionNode[]=selected.map(item=>{
     const profile=item.constructionProfile as CodeConstructionProfile;
-
-    /*
-     * CODE Knowledgeと既存CODE ComponentをknowledgeIdで接続する。
-     * 新しいRegistryや合成機は作らず、既存ReusableComponentFactoryと
-     * Component RegistryのリンクをConstruction Nodeへ引き継ぐ。
-     */
     const definition=definitions.find(candidate=>
       candidate.knowledgeId===item.appliesWhen[0]
     );
-
     const linkedCodeComponent=definition
       ? this.list().find(component=>
-          component.componentKind==='CODE' &&
-          component.appliesWhen.includes(definition.knowledgeId)
-        ) as CodeComponentArtifact|undefined
+        component.componentKind==='CODE' &&
+        component.appliesWhen.includes(definition.knowledgeId)
+      ) as CodeComponentArtifact|undefined
       : undefined;
 
     const digest=canonicalSha256Object({
@@ -479,7 +476,7 @@ class ReusableComponentFactoryService{
     });
 
     return {
-      nodeId:`CGN-${digest.slice(0,20)}`,
+      nodeId:'CGN-'+digest.slice(0,20),
       knowledgeComponentId:item.componentId,
       codeComponentId:linkedCodeComponent?.componentId,
       registryComponentId:linkedCodeComponent?.registryComponentId,
@@ -490,82 +487,318 @@ class ReusableComponentFactoryService{
     };
   });
 
-  const bindings:CodeConstructionBinding[]=[];
+  const goalScore=(node:CodeConstructionNode):number=>{
+    const goal=input.goal.normalize('NFKC').toLowerCase();
+    const metadata=[
+      node.purpose,
+      ...node.profile.constraints,
+      ...(node.profile.outputKinds||[]),
+      ...node.profile.slots.map(slot=>slot.name),
+    ].join(' ').normalize('NFKC').toLowerCase();
+    let score=0;
+    for(const token of goal.match(/[a-z][a-z0-9_-]*/g)||[]){
+      if(token.length>=2&&metadata.includes(token))score+=7;
+    }
+    const compact=goal.replace(/[^\w\u3040-\u30ff\u3400-\u9fff]+/g,'');
+    const stops=new Set(['する','して','です','ます','こと','もの','その','これ','それ','ため','よう','まで','だけ','など','場合','でき','から']);
+    const fragments:string[]=[];
+    for(let length=6;length>=2;length-=1){
+      for(let i=0;i+length<=compact.length;i+=1){
+        const fragment=compact.slice(i,i+length);
+        if(!/[\u3040-\u30ff\u3400-\u9fff]/.test(fragment))continue;
+        if(stops.has(fragment)||!metadata.includes(fragment))continue;
+        if(fragments.some(longer=>longer.includes(fragment)))continue;
+        fragments.push(fragment);
+      }
+    }
+    for(const fragment of fragments)score+=Math.min(18,fragment.length*3);
+    return score;
+  };
 
-  /*
-   * 自動接続は「候補が1つだけ」の場合に限定する。
-   * 複数候補から意味を推測して接続しない。
-   */
-  for(const target of nodes){
-    for(const slot of target.profile.slots){
-      const candidates=nodes
-        .filter(source=>source.nodeId!==target.nodeId)
-        .filter(source=>{
-          const outputs=source.profile.outputKinds||[];
-          return outputs.some(output=>
-            slot.inputKinds.includes(output)
-          );
-        })
-        .sort((a,b)=>a.nodeId.localeCompare(b.nodeId));
+  const inferExternal=(slot:{name:string;inputKinds:string[]}):CodeConstructionBinding|undefined=>{
+    const goal=input.goal.normalize('NFKC').toLowerCase();
+    const has=(pattern:RegExp)=>pattern.test(goal);
 
-      if(candidates.length===1){
-        bindings.push({
-          targetNodeId:target.nodeId,
-          slotName:slot.name,
-          sourceNodeId:candidates[0].nodeId,
+    if(slot.inputKinds.includes('array-expression') &&
+      (has(/配列.{0,8}から/)||has(/配列.{0,8}(入力|受け取|与え)/)||has(/array.{0,12}(from|input)/))){
+      return {targetNodeId:'',slotName:slot.name,value:'inputArray',valueKind:'array-expression'};
+    }
+    if(slot.inputKinds.includes('object-expression') &&
+      (has(/オブジェクト.{0,8}から/)||has(/object.{0,12}(from|input)/))){
+      return {targetNodeId:'',slotName:slot.name,value:'inputObject',valueKind:'object-expression'};
+    }
+    if(slot.inputKinds.includes('string-expression') &&
+      (has(/文字列.{0,8}から/)||has(/テキスト.{0,8}(入力|から)/)||has(/string.{0,12}(from|input)/))){
+      return {targetNodeId:'',slotName:slot.name,value:'inputText',valueKind:'string-expression'};
+    }
+
+    const compareKind=slot.inputKinds.includes('comparison-operator')
+      ? 'comparison-operator'
+      : slot.inputKinds.includes('operator') ? 'operator' : undefined;
+    if(compareKind){
+      const op=
+        has(/以上|greater than|at least/) ? '>=' :
+        has(/以下|less than|at most/) ? '<=' :
+        has(/超える|より大き|greater than/) ? '>' :
+        has(/未満|より小さ|less than/) ? '<' :
+        has(/等しい|一致|同じ|equal|equals/) ? '===' :
+        undefined;
+      if(op)return {targetNodeId:'',slotName:slot.name,value:op,valueKind:compareKind};
+    }
+
+    if(slot.inputKinds.includes('logical-operator')){
+      const op=has(/かつ|両方|and/) ? '&&' : has(/または|どちらか|or/) ? '||' : undefined;
+      if(op)return {targetNodeId:'',slotName:slot.name,value:op,valueKind:'logical-operator'};
+    }
+
+    if(slot.inputKinds.includes('identifier')){
+      const value=
+        slot.name==='error' ? 'error' :
+        has(/名前|名称|\bname\b/) ? 'name' :
+        has(/タイトル|\btitle\b/) ? 'title' :
+        has(/パス|\bpath\b/) ? 'path' :
+        has(/識別子|\bid\b/) ? 'id' :
+        has(/\burl\b/) ? 'url' :
+        undefined;
+      if(value)return {targetNodeId:'',slotName:slot.name,value,valueKind:'identifier'};
+    }
+
+    if(slot.inputKinds.includes('parameter')){
+      const value=has(/要素|各要素|\bitem\b/) ? 'item' : has(/値|\bvalue\b/) ? 'value' : undefined;
+      if(value)return {targetNodeId:'',slotName:slot.name,value,valueKind:'parameter'};
+    }
+
+    if(slot.inputKinds.includes('expression')&&has(/入力|input/)){
+      return {targetNodeId:'',slotName:slot.name,value:'inputValue',valueKind:'expression'};
+    }
+    return undefined;
+  };
+
+  const unresolved=(graphNodes:CodeConstructionNode[],bindings:CodeConstructionBinding[]):string[]=>{
+    const nodeMap=new Map(graphNodes.map(node=>[node.nodeId,node]));
+    const result:string[]=[];
+    for(const node of graphNodes){
+      for(const slot of node.profile.slots){
+        const own=bindings.filter(binding=>
+          binding.targetNodeId===node.nodeId&&binding.slotName===slot.name
+        );
+        if(slot.required&&own.length===0){
+          result.push(node.nodeId+':'+slot.name);
+          continue;
+        }
+        if(slot.multiple!==true&&own.length>1){
+          result.push(node.nodeId+':'+slot.name+':MULTIPLE');
+          continue;
+        }
+        for(const binding of own){
+          if(binding.sourceNodeId){
+            const source=nodeMap.get(binding.sourceNodeId);
+            if(!source){
+              result.push(node.nodeId+':'+slot.name+':SOURCE');
+              continue;
+            }
+            if(!(source.profile.outputKinds||[]).some(output=>slot.inputKinds.includes(output))){
+              result.push(node.nodeId+':'+slot.name+':TYPE');
+            }
+          }else if(binding.value===undefined){
+            result.push(node.nodeId+':'+slot.name+':VALUE');
+          }else if(binding.valueKind&&!slot.inputKinds.includes(binding.valueKind)){
+            result.push(node.nodeId+':'+slot.name+':VALUE_TYPE');
+          }
+        }
+      }
+    }
+    return result.sort();
+  };
+
+  type SearchState=ConstructionSearchState;
+  const dedupe=(states:SearchState[],limit=96):SearchState[]=>{
+    const best=new Map<string,SearchState>();
+    for(const state of states){
+      const key=[...state.nodes].sort().join(',')+'||'+state.bindings
+        .map(binding=>binding.targetNodeId+'|'+binding.slotName+'|'+(binding.sourceNodeId||'')+'|'+(binding.value||''))
+        .sort().join('|');
+      const old=best.get(key);
+      if(!old||state.score>old.score)best.set(key,state);
+    }
+    return [...best.values()].sort((a,b)=>b.score-a.score).slice(0,limit);
+  };
+
+  const expand=(node:CodeConstructionNode,state:SearchState,stack:string[],depth:number):SearchState[]=>{
+    if(depth>10||stack.includes(node.nodeId))return [];
+    const base:SearchState={
+      nodes:new Set(state.nodes),
+      bindings:[...state.bindings],
+      score:state.score,
+      externalBindings:state.externalBindings,
+    };
+    if(!base.nodes.has(node.nodeId)){
+      base.nodes.add(node.nodeId);
+      base.score+=goalScore(node);
+    }
+
+    let states:SearchState[]=[base];
+    for(const slot of node.profile.slots.filter(item=>item.required)){
+      const next:SearchState[]=[];
+      for(const currentState of states){
+        const sources=nodes
+          .filter(source=>source.nodeId!==node.nodeId&&!stack.includes(source.nodeId))
+          .filter(source=>(source.profile.outputKinds||[]).some(output=>slot.inputKinds.includes(output)))
+          .sort((a,b)=>{
+            const scoreDiff=goalScore(b)-goalScore(a);
+            return scoreDiff!==0?scoreDiff:a.nodeId.localeCompare(b.nodeId);
+          })
+          .slice(0,4);
+        const external=inferExternal(slot);
+        const options:Array<{kind:'SOURCE';node:CodeConstructionNode;score:number}|{kind:'VALUE';binding:CodeConstructionBinding;score:number}>=
+          sources.map(source=>({kind:'SOURCE' as const,node:source,score:goalScore(source)}));
+        if(external)options.push({
+          kind:'VALUE',
+          binding:{...external,targetNodeId:node.nodeId},
+          score:10,
         });
+        options.sort((a,b)=>{
+          if(b.score!==a.score)return b.score-a.score;
+          const ak=a.kind==='SOURCE'?a.node.nodeId:'VALUE:'+String(a.binding.value||'');
+          const bk=b.kind==='SOURCE'?b.node.nodeId:'VALUE:'+String(b.binding.value||'');
+          return ak.localeCompare(bk);
+        });
+        if(options.length===0)return [];
+        for(const option of options.slice(0,3)){
+          if(option.kind==='VALUE'){
+            next.push({
+              nodes:new Set(currentState.nodes),
+              bindings:[...currentState.bindings,option.binding],
+              score:currentState.score+option.score,
+              externalBindings:currentState.externalBindings+1,
+            });
+          }else if(currentState.nodes.has(option.node.nodeId)){
+            next.push({
+              nodes:new Set(currentState.nodes),
+              bindings:[...currentState.bindings,{
+                targetNodeId:node.nodeId,
+                slotName:slot.name,
+                sourceNodeId:option.node.nodeId,
+              }],
+              score:currentState.score+option.score+2,
+              externalBindings:currentState.externalBindings,
+            });
+          }else{
+            const childStates=expand(option.node,currentState,[...stack,node.nodeId],depth+1);
+            for(const child of childStates){
+              next.push({
+                nodes:new Set(child.nodes),
+                bindings:[...child.bindings,{
+                  targetNodeId:node.nodeId,
+                  slotName:slot.name,
+                  sourceNodeId:option.node.nodeId,
+                }],
+                score:child.score+2,
+                externalBindings:child.externalBindings,
+              });
+            }
+          }
+        }
+      }
+      if(next.length===0)return [];
+      states=dedupe(next);
+    }
+
+    return states.map(item=>({
+      ...item,
+      score:item.score-item.nodes.size-item.externalBindings*2,
+    }));
+  };
+
+  let plan:ConstructionGraphPlan|undefined;
+  if(!input.preserveAllNodes&&nodes.length>0){
+    const roots=nodes
+      .map(node=>({node,score:goalScore(node)}))
+      .sort((a,b)=>b.score!==a.score?b.score-a.score:a.node.nodeId.localeCompare(b.node.nodeId))
+      .slice(0,8);
+    if(roots[0]?.score>0){
+      const plans:ConstructionGraphPlan[]=[];
+      for(const root of roots){
+        const states=expand(root.node,{
+          nodes:new Set<string>(),
+          bindings:[],
+          score:root.score*3,
+          externalBindings:0,
+        },[],0);
+        for(const state of states){
+          const selectedNodes=nodes.filter(node=>state.nodes.has(node.nodeId)).sort((a,b)=>a.nodeId.localeCompare(b.nodeId));
+          const bindings=[...state.bindings].sort((a,b)=>{
+            const ak=a.targetNodeId+'|'+a.slotName+'|'+(a.sourceNodeId||'')+'|'+(a.value||'');
+            const bk=b.targetNodeId+'|'+b.slotName+'|'+(b.sourceNodeId||'')+'|'+(b.value||'');
+            return ak.localeCompare(bk);
+          });
+          const gaps=unresolved(selectedNodes,bindings);
+          plans.push({
+            nodeIds:selectedNodes.map(node=>node.nodeId),
+            bindings,
+            rootNodeId:root.node.nodeId,
+            score:state.score-gaps.length*30+(gaps.length===0?100:0),
+            unresolved:gaps,
+          });
+        }
+      }
+      plan=plans.sort((a,b)=>{
+        if((a.unresolved.length===0)!==(b.unresolved.length===0))return a.unresolved.length===0?-1:1;
+        if(b.score!==a.score)return b.score-a.score;
+        if(a.nodeIds.length!==b.nodeIds.length)return a.nodeIds.length-b.nodeIds.length;
+        return (a.rootNodeId||'').localeCompare(b.rootNodeId||'');
+      })[0];
+    }
+  }
+
+  const plannedNodes=plan&&plan.nodeIds.length>0
+    ? nodes.filter(node=>plan.nodeIds.includes(node.nodeId))
+    : nodes;
+  let bindings:CodeConstructionBinding[]=plan?[...plan.bindings]:[];
+
+  if(!plan){
+    for(const target of plannedNodes){
+      for(const slot of target.profile.slots){
+        const candidates=plannedNodes
+          .filter(source=>source.nodeId!==target.nodeId)
+          .filter(source=>(source.profile.outputKinds||[]).some(output=>slot.inputKinds.includes(output)))
+          .sort((a,b)=>a.nodeId.localeCompare(b.nodeId));
+        if(candidates.length===1){
+          bindings.push({
+            targetNodeId:target.nodeId,
+            slotName:slot.name,
+            sourceNodeId:candidates[0].nodeId,
+          });
+        }
       }
     }
   }
 
-  const graphBase={
-    goal:input.goal,
-    nodes,
-    bindings,
-  };
-
-  const graphId=`CGRAPH-${canonicalSha256Object(graphBase).slice(0,20)}`;
-
-  /*
-   * sourceとして参照されているNodeは子側なのでroot候補から除外する。
-   * 複数のroot候補が残る場合は、より多くのbindingを受けるNodeを
-   * 優先し、それでも同数ならnodeId順で決定する。
-   */
+  const graphBase={goal:input.goal,nodes:plannedNodes,bindings};
+  const graphId='CGRAPH-'+canonicalSha256Object(graphBase).slice(0,20);
   const sourcedNodeIds=new Set(
-    bindings
-      .map(binding=>binding.sourceNodeId)
+    bindings.map(binding=>binding.sourceNodeId)
       .filter((value):value is string=>typeof value==='string')
   );
-
-  const incomingBindingCount=new Map(
-    nodes.map(node=>[node.nodeId,0])
-  );
-
+  const incomingBindingCount=new Map(plannedNodes.map(node=>[node.nodeId,0]));
   for(const binding of bindings){
-    incomingBindingCount.set(
-      binding.targetNodeId,
-      (incomingBindingCount.get(binding.targetNodeId)||0)+1
-    );
+    incomingBindingCount.set(binding.targetNodeId,(incomingBindingCount.get(binding.targetNodeId)||0)+1);
   }
-
-  const rootCandidates=nodes
+  const rootCandidates=plannedNodes
     .filter(node=>!sourcedNodeIds.has(node.nodeId))
     .sort((a,b)=>{
-      const countDiff=
-        (incomingBindingCount.get(b.nodeId)||0)-
-        (incomingBindingCount.get(a.nodeId)||0);
-
+      const countDiff=(incomingBindingCount.get(b.nodeId)||0)-(incomingBindingCount.get(a.nodeId)||0);
       if(countDiff!==0)return countDiff;
+      const scoreDiff=goalScore(b)-goalScore(a);
+      if(scoreDiff!==0)return scoreDiff;
       return a.nodeId.localeCompare(b.nodeId);
     });
 
   return {
     graphId,
     goal:input.goal,
-    rootNodeId:
-      rootCandidates[0]?.nodeId ||
-      nodes[0]?.nodeId,
-    nodes,
+    rootNodeId:plan?.rootNodeId||rootCandidates[0]?.nodeId||plannedNodes[0]?.nodeId,
+    nodes:plannedNodes,
     bindings,
   };
  }

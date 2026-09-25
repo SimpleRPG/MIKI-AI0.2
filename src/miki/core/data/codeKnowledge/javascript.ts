@@ -951,7 +951,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
     publicInterfaces: [],
     tests: "CONTRACT_TEST_SPEC:\nknowledge=code.javascript.node-read-file\ninputs=['string-expression']\noutputs=['promise-expression']\nprerequisites=['Node.js runtime', 'filesystem permission']\nimplementation_template=\"readFile({path}, 'utf8')\"",
     validation: "VALIDATION_SPEC:\nrequiredValidation=['Node API contract', 'filesystem policy']\ndependencies=['node:fs/promises']\nsupportedEnvironments=['MIKI_RUNTIME']\ninitialStatus=CANDIDATE\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
-  }
+  },
 
   {
     knowledgeId: 'code.javascript.arrow-function',

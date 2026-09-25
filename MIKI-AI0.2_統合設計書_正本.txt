@@ -8233,3 +8233,47 @@ Verification / Regression / Canary / Promotion
 複数候補が存在する場合の自動接続は、既存Construction Graphの
 「候補が1つだけの場合のみ自動Bindingする」規則を維持する。
 ============================================================
+
+
+============================================================
+【2026-09-26 Construction Graph 多候補決定的探索を実装】
+============================================================
+
+既存の
+CODE Knowledge
+↓
+ReusableComponentFactory
+↓
+Construction Graph
+↓
+codeConstructionRendererService
+↓
+Candidate Workspace
+↓
+Verification / Regression / Canary / Promotion
+
+という経路を維持したまま、Construction Graphの自動接続を拡張した。
+
+従来の「候補が1つだけの場合のみ自動Binding」は、
+探索で決定できない場合の安全側fallbackとして残す。
+
+新しい通常探索では、以下を決定論的に行う。
+
+・自然言語goalとKnowledge/Construction Profileの一致度を計算する
+・goal一致度の高い終端候補から後方へrequired slotを探索する
+・inputKind / outputKindの互換性だけを接続条件にする
+・複数候補を上位候補からbeam状に探索する
+・循環を禁止する
+・goalから外部入力であることを明示的に導出できる場合だけ、inputArray / inputObject / inputText / inputValue等をBindingする
+・比較演算子、論理演算子、identifier、parameter等もgoalから導出できる場合だけBindingする
+・未解決required slotを持つ計画は完全計画より下位にする
+・同点時はnodeIdとBinding順で固定する
+・完全な計画を決められない場合は既存の単一候補Binding規則へfallbackする
+
+この探索はLLMによるコード生成ではなく、既存のConstruction Graphを複数候補について探索・検証する決定的な合成処理である。
+意味を無制限に推測してコードを捏造せず、部品から導出できない必須条件は未解決のまま後段Validationへ渡す。
+
+明示的constructionBindingsが指定されている場合は、既存の全Node構成を保持し、上位CORE/指示側の明示Bindingを後段で優先する。
+
+新しい19番目の分類、新しいLLM runtime、新しいコード生成エンジンは追加しない。
+============================================================

@@ -293,6 +293,9 @@ class CandidateCodeGenerationService {
       reusableComponentFactoryService.buildConstructionGraph({
         goal:run.objective,
         componentIds:codeKnowledgePack.usedKnowledgeComponentIds,
+        preserveAllNodes:Boolean(
+          run.payload.constructionBindings
+        ),
       });
 
     const explicitBindings=this.parseConstructionBindings(
