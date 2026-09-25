@@ -4966,5 +4966,59 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
       adaptationRules: [],
     },
   },
+  {
+    "knowledgeId": "code.typescript.conditional-type",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "条件型を定義する",
+    "implementation": "{condition} extends {check} ? {whenTrue} : {whenFalse}",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "type",
+      "type",
+      "type"
+    ],
+    "outputs": [
+      "type"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.typescript.conditional-type",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.typescript.conditional-type",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.conditional-type"
+  },
+  {
+    "knowledgeId": "code.typescript.mapped-type",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "キーごとに型変換を行う",
+    "implementation": "{\n  [K in keyof {source}]: {valueType}\n}",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "type"
+    ],
+    "outputs": [
+      "type"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.typescript.mapped-type",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.typescript.mapped-type",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.mapped-type"
+  }
 
 ];

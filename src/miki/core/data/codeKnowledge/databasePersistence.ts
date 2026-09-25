@@ -305,6 +305,167 @@ export const databasePersistenceCodeKnowledge: CodeKnowledgeDefinition[] = [
         adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
       },
     },
+  {
+    "id": "code.database-persistence.transaction",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "複数DB操作を1トランザクションとして実行する",
+    "summary": "汎用トランザクション境界。",
+    "concepts": [
+      "transaction",
+      "atomicity",
+      "rollback"
+    ],
+    "inputs": [
+      "identifier",
+      "function-expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "appliesWhen": [
+      "複数永続化操作を原子的に扱う"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.database-persistence.transaction"
+    ],
+    "constructionProfile": {
+      "kind": "ASYNC",
+      "syntaxTemplate": "{db}.transaction(async (tx) => { {body} })",
+      "outputKinds": [
+        "promise-expression"
+      ],
+      "slots": [
+        {
+          "name": "db",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "body",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.database-persistence.upsert",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "存在時更新・未存在時作成を1操作として扱う",
+    "summary": "汎用upsert操作。",
+    "concepts": [
+      "upsert",
+      "insert",
+      "update"
+    ],
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "appliesWhen": [
+      "キーの存在に応じて作成または更新する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.database-persistence.upsert"
+    ],
+    "constructionProfile": {
+      "kind": "ASYNC",
+      "syntaxTemplate": "{repository}.upsert({record})",
+      "outputKinds": [
+        "promise-expression"
+      ],
+      "slots": [
+        {
+          "name": "repository",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "record",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.database-persistence.pagination",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "大量データをページ単位で取得する",
+    "summary": "limit/offset等によるページング。",
+    "concepts": [
+      "pagination",
+      "limit",
+      "offset",
+      "cursor"
+    ],
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "appliesWhen": [
+      "大量データを分割取得する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.database-persistence.pagination"
+    ],
+    "constructionProfile": {
+      "kind": "ASYNC",
+      "syntaxTemplate": "{repository}.findPage({page})",
+      "outputKinds": [
+        "promise-expression"
+      ],
+      "slots": [
+        {
+          "name": "repository",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "page",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
 ];
 
 export const databasePersistenceCodeComponents: CodeComponentDefinition[] = [
@@ -555,4 +716,86 @@ export const databasePersistenceCodeComponents: CodeComponentDefinition[] = [
     tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.database.repository-persistence\\ninputs=['input']\\noutputs=['entity/result']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=await {repository}.{operation}({entity});",
     validation: "VALIDATION_SPEC:\\nknowledge=code.database.repository-persistence\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
   },
+  {
+    "knowledgeId": "code.database-persistence.transaction",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "トランザクション境界を構成する",
+    "implementation": "{db}.transaction(async (tx) => { {body} })",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "function-expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.database-persistence.transaction",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.database-persistence.transaction",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.database-persistence.transaction"
+  },
+  {
+    "knowledgeId": "code.database-persistence.upsert",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "upsert操作を構成する",
+    "implementation": "{repository}.upsert({record})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.database-persistence.upsert",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.database-persistence.upsert",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.database-persistence.upsert"
+  },
+  {
+    "knowledgeId": "code.database-persistence.pagination",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "ページングされた検索を構成する",
+    "implementation": "{repository}.findPage({page})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.database-persistence.pagination",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.database-persistence.pagination",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.database-persistence.pagination"
+  }
+
 ];

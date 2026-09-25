@@ -328,6 +328,181 @@ export const expressBackendCodeKnowledge: CodeKnowledgeDefinition[] = [
         adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
       },
     },
+  {
+    "id": "code.express.request-header",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "HTTPリクエストヘッダを取得する",
+    "summary": "Express Request#getによるヘッダ取得。",
+    "concepts": [
+      "Request",
+      "get",
+      "header"
+    ],
+    "inputs": [
+      "identifier",
+      "string-expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "appliesWhen": [
+      "リクエストヘッダを読む"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.express.request-header"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "{request}.get({name})",
+      "outputKinds": [
+        "string-expression"
+      ],
+      "slots": [
+        {
+          "name": "request",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "name",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.express.route-params",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "ルートパラメータを取得する",
+    "summary": "Express req.paramsの利用。",
+    "concepts": [
+      "params",
+      "route parameter"
+    ],
+    "inputs": [
+      "identifier",
+      "string-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "URLパスパラメータを利用する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.express.route-params"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "{request}.params.{name}",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "request",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "name",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.express.response-cookie",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "HTTPレスポンスCookieを設定する",
+    "summary": "Express Response#cookieによるCookie設定。",
+    "concepts": [
+      "cookie",
+      "Response",
+      "httpOnly",
+      "secure"
+    ],
+    "inputs": [
+      "identifier",
+      "string-expression",
+      "expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "appliesWhen": [
+      "セッション等のCookieを設定する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.express.response-cookie"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "{response}.cookie({name}, {value}, {options})",
+      "outputKinds": [
+        "statement"
+      ],
+      "slots": [
+        {
+          "name": "response",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "name",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "value",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "options",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": false
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
 ];
 
 export const expressBackendCodeComponents: CodeComponentDefinition[] = [
@@ -636,5 +811,87 @@ export const expressBackendCodeComponents: CodeComponentDefinition[] = [
     tests: 'CONTRACT_TEST:code.express.error-middleware',
     validation: 'VALIDATE_CODE_CONSTRUCTION:code.express.error-middleware',
   },
+  {
+    "knowledgeId": "code.express.request-header",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "HTTPリクエストヘッダを取得する",
+    "implementation": "{request}.get({name})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "string-expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.express.request-header",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.express.request-header",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.express.request-header"
+  },
+  {
+    "knowledgeId": "code.express.route-params",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "ルートパラメータを取得する",
+    "implementation": "{request}.params.{name}",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "string-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.express.route-params",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.express.route-params",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.express.route-params"
+  },
+  {
+    "knowledgeId": "code.express.response-cookie",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Cookieをレスポンスへ追加する",
+    "implementation": "{response}.cookie({name}, {value}, {options})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "string-expression",
+      "expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.express.response-cookie",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.express.response-cookie",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.express.response-cookie"
+  }
 
 ];

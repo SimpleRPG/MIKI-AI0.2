@@ -374,6 +374,159 @@ export const browserWebApiCodeKnowledge: CodeKnowledgeDefinition[] = [
         adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
       },
     },
+  {
+    "id": "code.browser-web-api.fetch",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "HTTPリクエストをブラウザから実行する",
+    "summary": "Fetch APIによるHTTP通信。",
+    "concepts": [
+      "fetch",
+      "Request",
+      "Response"
+    ],
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "appliesWhen": [
+      "ブラウザからHTTP APIを呼び出す"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.browser-web-api.fetch"
+    ],
+    "constructionProfile": {
+      "kind": "ASYNC",
+      "syntaxTemplate": "fetch({url})",
+      "outputKinds": [
+        "promise-expression"
+      ],
+      "slots": [
+        {
+          "name": "url",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.browser-web-api.blob",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "バイナリデータをBlobとして扱う",
+    "summary": "Blobによるバイナリデータ表現。",
+    "concepts": [
+      "Blob",
+      "binary",
+      "MIME"
+    ],
+    "inputs": [
+      "expression",
+      "string-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "ファイルやバイナリデータをBlob化する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.browser-web-api.blob"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "new Blob([{parts}], {type})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "parts",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "type",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": false
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.browser-web-api.local-storage",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "ブラウザの永続的なキー値ストレージを利用する",
+    "summary": "localStorageによる簡易永続化。",
+    "concepts": [
+      "localStorage",
+      "getItem",
+      "setItem",
+      "removeItem"
+    ],
+    "inputs": [
+      "string-expression",
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "ブラウザ内へ小規模データを保存する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.browser-web-api.local-storage"
+    ],
+    "constructionProfile": {
+      "kind": "STATEMENT",
+      "syntaxTemplate": "localStorage.setItem({key}, {value})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "key",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "value",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
 ];
 
 export const browserWebApiCodeComponents: CodeComponentDefinition[] = [
@@ -739,5 +892,85 @@ export const browserWebApiCodeComponents: CodeComponentDefinition[] = [
     tests: 'CONTRACT_TEST:code.browser-web-api.url-search-params',
     validation: 'VALIDATE_CODE_CONSTRUCTION:code.browser-web-api.url-search-params',
   },
+  {
+    "knowledgeId": "code.browser-web-api.fetch",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Fetch APIでHTTPリクエストを送る",
+    "implementation": "fetch({url})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.browser-web-api.fetch",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.browser-web-api.fetch",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.browser-web-api.fetch"
+  },
+  {
+    "knowledgeId": "code.browser-web-api.blob",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Blob値を構成する",
+    "implementation": "new Blob([{parts}], {type})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression",
+      "string-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.browser-web-api.blob",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.browser-web-api.blob",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.browser-web-api.blob"
+  },
+  {
+    "knowledgeId": "code.browser-web-api.local-storage",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "キー値ストレージを利用する",
+    "implementation": "localStorage.setItem({key}, {value})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "string-expression",
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.browser-web-api.local-storage",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.browser-web-api.local-storage",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.browser-web-api.local-storage"
+  }
 
 ];

@@ -489,6 +489,157 @@ export const reactUiAccessibilityCodeKnowledge: CodeKnowledgeDefinition[] = [
         adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
       },
     },
+  {
+    "id": "code.react-ui.memo",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "不要な再レンダーを避けるためコンポーネントをメモ化する",
+    "summary": "React.memoによるコンポーネントメモ化。",
+    "concepts": [
+      "React.memo",
+      "memoization",
+      "props"
+    ],
+    "inputs": [
+      "component-expression"
+    ],
+    "outputs": [
+      "component-expression"
+    ],
+    "appliesWhen": [
+      "propsが同一なら再利用したいコンポーネント"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.react-ui.memo"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "memo({component})",
+      "outputKinds": [
+        "component-expression"
+      ],
+      "slots": [
+        {
+          "name": "component",
+          "inputKinds": [
+            "component-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.react-ui.use-layout-effect",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "DOM反映直前の副作用処理を構成する",
+    "summary": "useLayoutEffectによる同期的レイアウト副作用。",
+    "concepts": [
+      "useLayoutEffect",
+      "layout",
+      "effect"
+    ],
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "appliesWhen": [
+      "DOM計測やレイアウト同期が必要なUI"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.react-ui.use-layout-effect"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "useLayoutEffect({effect}, [{dependencies}])",
+      "outputKinds": [
+        "statement"
+      ],
+      "slots": [
+        {
+          "name": "effect",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "dependencies",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": false
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.react-ui.controlled-input",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Reactのcontrolled inputを構成する",
+    "summary": "value/onChangeによる入力値制御。",
+    "concepts": [
+      "controlled input",
+      "value",
+      "onChange"
+    ],
+    "inputs": [
+      "expression",
+      "function-expression"
+    ],
+    "outputs": [
+      "jsx-child"
+    ],
+    "appliesWhen": [
+      "入力値をReact state等で制御する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.react-ui.controlled-input"
+    ],
+    "constructionProfile": {
+      "kind": "STATEMENT",
+      "syntaxTemplate": "<input value={value} onChange={onChange} />",
+      "outputKinds": [
+        "jsx-child"
+      ],
+      "slots": [
+        {
+          "name": "value",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "onChange",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
 ];
 
 export const reactUiAccessibilityCodeComponents: CodeComponentDefinition[] = [
@@ -949,5 +1100,84 @@ export const reactUiAccessibilityCodeComponents: CodeComponentDefinition[] = [
     tests: 'CONTRACT_TEST:code.react-ui.use-context',
     validation: 'VALIDATE_CODE_CONSTRUCTION:code.react-ui.use-context',
   },
+  {
+    "knowledgeId": "code.react-ui.memo",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "コンポーネントをメモ化する",
+    "implementation": "memo({component})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "component-expression"
+    ],
+    "outputs": [
+      "component-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.react-ui.memo",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.react-ui.memo",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.react-ui.memo"
+  },
+  {
+    "knowledgeId": "code.react-ui.use-layout-effect",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "レイアウト効果を登録する",
+    "implementation": "useLayoutEffect({effect}, [{dependencies}])",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.react-ui.use-layout-effect",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.react-ui.use-layout-effect",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.react-ui.use-layout-effect"
+  },
+  {
+    "knowledgeId": "code.react-ui.controlled-input",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "controlled inputを構成する",
+    "implementation": "<input value={value} onChange={onChange} />",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression",
+      "function-expression"
+    ],
+    "outputs": [
+      "jsx-child"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.react-ui.controlled-input",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.react-ui.controlled-input",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.react-ui.controlled-input"
+  }
 
 ];

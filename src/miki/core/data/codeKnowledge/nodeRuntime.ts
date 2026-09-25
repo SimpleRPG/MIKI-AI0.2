@@ -443,6 +443,165 @@ export const nodeRuntimeCodeKnowledge: CodeKnowledgeDefinition[] = [
         adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
       },
     },
+  {
+    "id": "code.node.event-emitter",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Node.js内のイベント購読と発火を構成する",
+    "summary": "EventEmitterによるイベント駆動。",
+    "concepts": [
+      "EventEmitter",
+      "on",
+      "emit"
+    ],
+    "inputs": [
+      "identifier",
+      "function-expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "appliesWhen": [
+      "Node.jsでイベント駆動処理を構成する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.node.event-emitter"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "{emitter}.on({event}, {handler})",
+      "outputKinds": [
+        "statement"
+      ],
+      "slots": [
+        {
+          "name": "emitter",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "event",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "handler",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.node.child-process-spawn",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "子プロセスを起動する",
+    "summary": "child_process.spawnによるプロセス起動。",
+    "concepts": [
+      "child_process",
+      "spawn",
+      "process"
+    ],
+    "inputs": [
+      "string-expression",
+      "array-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "外部コマンドを子プロセスとして起動する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.node.child-process-spawn"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "spawn({command}, {args})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "command",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "args",
+          "inputKinds": [
+            "array-expression"
+          ],
+          "required": false
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.node.stream-pipeline",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Node.jsストリームを安全に連結する",
+    "summary": "stream.pipelineによるストリーム接続。",
+    "concepts": [
+      "stream",
+      "pipeline",
+      "backpressure"
+    ],
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "appliesWhen": [
+      "複数ストリームを連結する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.node.stream-pipeline"
+    ],
+    "constructionProfile": {
+      "kind": "ASYNC",
+      "syntaxTemplate": "pipeline({streams})",
+      "outputKinds": [
+        "promise-expression"
+      ],
+      "slots": [
+        {
+          "name": "streams",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
 ];
 
 export const nodeRuntimeCodeComponents: CodeComponentDefinition[] = [
@@ -865,5 +1024,85 @@ export const nodeRuntimeCodeComponents: CodeComponentDefinition[] = [
     tests: 'CONTRACT_TEST:code.node-runtime.process-env',
     validation: 'VALIDATE_CODE_CONSTRUCTION:code.node-runtime.process-env',
   },
+  {
+    "knowledgeId": "code.node.event-emitter",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "イベント購読を登録する",
+    "implementation": "{emitter}.on({event}, {handler})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "function-expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.node.event-emitter",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.node.event-emitter",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.event-emitter"
+  },
+  {
+    "knowledgeId": "code.node.child-process-spawn",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Node.jsから子プロセスを生成する",
+    "implementation": "spawn({command}, {args})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "string-expression",
+      "array-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.node.child-process-spawn",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.node.child-process-spawn",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.child-process-spawn"
+  },
+  {
+    "knowledgeId": "code.node.stream-pipeline",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "ストリームの入出力を連結する",
+    "implementation": "pipeline({streams})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "promise-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.node.stream-pipeline",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.node.stream-pipeline",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.stream-pipeline"
+  }
 
 ];

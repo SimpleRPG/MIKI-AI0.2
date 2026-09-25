@@ -4869,6 +4869,113 @@ syntaxTemplate: "readFile({path}, 'utf8')",
       adaptationRules: ['normalize case separately when needed'],
     },
   },
+  {
+    "id": "code.javascript.array-flat-map",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "Arrayの各要素を変換して平坦化する",
+    "summary": "Array.flatMapによる変換と平坦化。",
+    "concepts": [
+      "Array.flatMap",
+      "array",
+      "callback"
+    ],
+    "inputs": [
+      "array-expression",
+      "function-expression"
+    ],
+    "outputs": [
+      "array-expression"
+    ],
+    "appliesWhen": [
+      "配列を変換しつつ一段階平坦化する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.javascript.array-flat-map"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "{array}.flatMap({callback})",
+      "outputKinds": [
+        "array-expression"
+      ],
+      "slots": [
+        {
+          "name": "array",
+          "inputKinds": [
+            "array-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "callback",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.javascript.logical-assignment",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "nullishや論理値に応じて変数を条件付き更新する",
+    "summary": "論理代入演算子による条件付き代入。",
+    "concepts": [
+      "&&=",
+      "||=",
+      "??="
+    ],
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "appliesWhen": [
+      "既存値に応じて再代入する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.javascript.logical-assignment"
+    ],
+    "constructionProfile": {
+      "kind": "STATEMENT",
+      "syntaxTemplate": "{target} ??= {value};",
+      "outputKinds": [
+        "statement"
+      ],
+      "slots": [
+        {
+          "name": "target",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "value",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
 ];
 
 export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
@@ -8287,5 +8394,59 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
       adaptationRules: [],
     },
   },
+  {
+    "knowledgeId": "code.javascript.array-flat-map",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "配列を一括変換して平坦化する",
+    "implementation": "{array}.flatMap({callback})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "array-expression",
+      "function-expression"
+    ],
+    "outputs": [
+      "array-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.javascript.array-flat-map",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.javascript.array-flat-map",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.array-flat-map"
+  },
+  {
+    "knowledgeId": "code.javascript.logical-assignment",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "条件付き再代入を構成する",
+    "implementation": "{target} ??= {value};",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "identifier",
+      "expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.javascript.logical-assignment",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.javascript.logical-assignment",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.javascript.logical-assignment"
+  }
 
 ];

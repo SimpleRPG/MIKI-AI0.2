@@ -835,7 +835,165 @@ export const additionalTestingCodeKnowledge: CodeKnowledgeDefinition[] = [
       "reuse an existing compatible construction node before creating an equivalent one"
     ]
   }
-}
+},
+  {
+    "id": "code.testing.mock-function",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "依存処理をモック関数へ置き換える",
+    "summary": "テスト用mock関数。",
+    "concepts": [
+      "mock",
+      "stub",
+      "test double"
+    ],
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "function-expression"
+    ],
+    "appliesWhen": [
+      "外部依存をテスト用実装に差し替える"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.testing.mock-function"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "mockFn({implementation})",
+      "outputKinds": [
+        "function-expression"
+      ],
+      "slots": [
+        {
+          "name": "implementation",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.testing.spy",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "既存処理の呼び出しを監視する",
+    "summary": "spyによる呼び出し記録。",
+    "concepts": [
+      "spy",
+      "call count",
+      "arguments"
+    ],
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "実処理を残したまま呼び出しを検証する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.testing.spy"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "spyOn({target}, {method})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "target",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "method",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.testing.parameterized-case",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "入力ケース集合から同一テストを反復する",
+    "summary": "パラメータ化テスト。",
+    "concepts": [
+      "parameterized test",
+      "test cases",
+      "table test"
+    ],
+    "inputs": [
+      "array-expression",
+      "function-expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "appliesWhen": [
+      "複数ケースで同じ契約を検証する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.testing.parameterized-case"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "test.each({cases})({testName}, {testBody})",
+      "outputKinds": [
+        "statement"
+      ],
+      "slots": [
+        {
+          "name": "cases",
+          "inputKinds": [
+            "array-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "testName",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "testBody",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
 ];
 
 export const additionalTestingCodeComponents: CodeComponentDefinition[] = [
@@ -1234,5 +1392,85 @@ export const additionalTestingCodeComponents: CodeComponentDefinition[] = [
   "publicInterfaces": [],
   "tests": "CONTRACT_TEST:code.testing.vi-mock",
   "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.vi-mock"
-}
+},
+  {
+    "knowledgeId": "code.testing.mock-function",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "モック関数を構成する",
+    "implementation": "mockFn({implementation})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "function-expression"
+    ],
+    "outputs": [
+      "function-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.testing.mock-function",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.testing.mock-function",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.mock-function"
+  },
+  {
+    "knowledgeId": "code.testing.spy",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "スパイを構成する",
+    "implementation": "spyOn({target}, {method})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.testing.spy",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.testing.spy",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.spy"
+  },
+  {
+    "knowledgeId": "code.testing.parameterized-case",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "テストケースを反復して検証する",
+    "implementation": "test.each({cases})({testName}, {testBody})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "array-expression",
+      "function-expression"
+    ],
+    "outputs": [
+      "statement"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.testing.parameterized-case",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.testing.parameterized-case",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.testing.parameterized-case"
+  }
+
 ];

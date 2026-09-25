@@ -351,6 +351,165 @@ export const securityCryptoCodeKnowledge: CodeKnowledgeDefinition[] = [
         adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
       },
     },
+  {
+    "id": "code.security-crypto.random-bytes",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "安全な乱数バイト列を生成する",
+    "summary": "暗号学的乱数バイト生成。",
+    "concepts": [
+      "cryptographic random",
+      "entropy",
+      "bytes"
+    ],
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "トークンやnonce等の安全な乱数が必要"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.security-crypto.random-bytes"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "crypto.randomBytes({length})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "length",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.security-crypto.timing-safe-equal",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "タイミング攻撃を避けて秘密値を比較する",
+    "summary": "timingSafeEqualによる比較。",
+    "concepts": [
+      "timingSafeEqual",
+      "side-channel",
+      "buffer"
+    ],
+    "inputs": [
+      "expression",
+      "expression"
+    ],
+    "outputs": [
+      "boolean-expression"
+    ],
+    "appliesWhen": [
+      "秘密情報の比較を安全に行う"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.security-crypto.timing-safe-equal"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "crypto.timingSafeEqual({left}, {right})",
+      "outputKinds": [
+        "boolean-expression"
+      ],
+      "slots": [
+        {
+          "name": "left",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "right",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.security-crypto.hmac",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "HMACでメッセージ認証値を生成する",
+    "summary": "HMACによるメッセージ認証。",
+    "concepts": [
+      "HMAC",
+      "authentication",
+      "digest"
+    ],
+    "inputs": [
+      "string-expression",
+      "string-expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "appliesWhen": [
+      "署名・認証用MACを生成する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.security-crypto.hmac"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "crypto.createHmac({algorithm}, {key}).update({data}).digest('hex')",
+      "outputKinds": [
+        "string-expression"
+      ],
+      "slots": [
+        {
+          "name": "algorithm",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "key",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "data",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
 ];
 
 export const securityCryptoCodeComponents: CodeComponentDefinition[] = [
@@ -639,4 +798,85 @@ export const securityCryptoCodeComponents: CodeComponentDefinition[] = [
     tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.authorization\\ninputs=['input']\\noutputs=['boolean']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=authorize({identity}, {permission});",
     validation: "VALIDATION_SPEC:\\nknowledge=code.security.authorization\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
   },
+  {
+    "knowledgeId": "code.security-crypto.random-bytes",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "暗号学的乱数を生成する",
+    "implementation": "crypto.randomBytes({length})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.random-bytes",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.random-bytes",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.random-bytes"
+  },
+  {
+    "knowledgeId": "code.security-crypto.timing-safe-equal",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "タイミング差を抑えた比較を行う",
+    "implementation": "crypto.timingSafeEqual({left}, {right})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression",
+      "expression"
+    ],
+    "outputs": [
+      "boolean-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.timing-safe-equal",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.timing-safe-equal",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.timing-safe-equal"
+  },
+  {
+    "knowledgeId": "code.security-crypto.hmac",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "HMAC値を生成する",
+    "implementation": "crypto.createHmac({algorithm}, {key}).update({data}).digest('hex')",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "string-expression",
+      "string-expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.hmac",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.hmac",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.hmac"
+  }
+
 ];

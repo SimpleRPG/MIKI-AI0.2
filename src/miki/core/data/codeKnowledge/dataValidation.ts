@@ -282,6 +282,121 @@ export const dataValidationCodeKnowledge: CodeKnowledgeDefinition[] = [
         adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
       },
     },
+  {
+    "id": "code.data-validation.safe-parse-result",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "例外を外へ投げず成功/失敗結果として扱う",
+    "summary": "安全なparse結果の標準化。",
+    "concepts": [
+      "safe parse",
+      "success",
+      "failure"
+    ],
+    "inputs": [
+      "function-expression",
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "入力解析の成功失敗を値として扱う"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.data-validation.safe-parse-result"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "(() => { try { return { success: true, data: ({parser})({input}) }; } catch (error) { return { success: false, error }; } })()",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "parser",
+          "inputKinds": [
+            "function-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "input",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.data-validation.discriminated-union",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "判別キーで入力バリアントを検証する",
+    "summary": "discriminated unionによる入力分岐。",
+    "concepts": [
+      "discriminator",
+      "union",
+      "validation"
+    ],
+    "inputs": [
+      "expression",
+      "string-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "入力の種類を判別して適切な形を選択する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.data-validation.discriminated-union"
+    ],
+    "constructionProfile": {
+      "kind": "STATEMENT",
+      "syntaxTemplate": "switch ({value}.{key}) { {cases} }",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "value",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "key",
+          "inputKinds": [
+            "identifier"
+          ],
+          "required": true
+        },
+        {
+          "name": "cases",
+          "inputKinds": [
+            "statement"
+          ],
+          "required": true,
+          "multiple": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
 ];
 
 export const dataValidationCodeComponents: CodeComponentDefinition[] = [
@@ -513,4 +628,59 @@ export const dataValidationCodeComponents: CodeComponentDefinition[] = [
     tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.data-validation.validation-error\\ninputs=['input']\\noutputs=['error']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=throw new ValidationError({message}, {issues});",
     validation: "VALIDATION_SPEC:\\nknowledge=code.data-validation.validation-error\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
   },
+  {
+    "knowledgeId": "code.data-validation.safe-parse-result",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "解析結果をResult形式へ包む",
+    "implementation": "(() => { try { return { success: true, data: ({parser})({input}) }; } catch (error) { return { success: false, error }; } })()",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "function-expression",
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.data-validation.safe-parse-result",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.data-validation.safe-parse-result",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.data-validation.safe-parse-result"
+  },
+  {
+    "knowledgeId": "code.data-validation.discriminated-union",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "判別キーを使った入力検証を構成する",
+    "implementation": "switch ({value}.{key}) { {cases} }",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression",
+      "string-expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.data-validation.discriminated-union",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.data-validation.discriminated-union",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.data-validation.discriminated-union"
+  }
+
 ];
