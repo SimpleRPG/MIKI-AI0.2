@@ -31,6 +31,44 @@ class CandidateCodeGenerationService {
    * 実装本文が無い場合は絶対に生成・捏造しない。
    */
   const createdCodeComponentIds:string[]=[];
+
+  /*
+   * 通常経路:
+   * MIKI自身がResearchで収集したImplementation Materialを
+   * CODE Component Candidateへ変換する。
+   *
+   * Research本文そのものからコードを推測しない。
+   * 明示的なcodeExamplesだけをCandidate化し、Verification待ちにする。
+   */
+  const researchedCandidates=this.parseImplementationMaterials(
+    unknownContext.implementationMaterials,
+    targetPaths,
+    this.strings(run.payload.validationRequirements),
+  );
+
+  for(const candidate of researchedCandidates){
+    const created=reusableComponentFactoryService.createCodeComponentCandidate({
+      purpose:run.objective,
+      implementation:candidate.candidateContent,
+      targetPath:candidate.path,
+      tests:candidate.tests,
+      validation:candidate.validation,
+      componentType:'RESEARCHED_IMPLEMENTATION_COMPONENT',
+      dependencies:candidate.dependencies,
+      supportedEnvironments:['ANDROID'],
+      entryPoint:candidate.path,
+      sourceEpisodeIds:candidate.sourceEpisodeIds,
+    });
+
+    if(created.accepted&&created.componentId){
+      createdCodeComponentIds.push(created.componentId);
+    }
+  }
+
+  /*
+   * 外部Teacher / UNKNOWN_COMPONENT_AUTHORから明示的に供給された
+   * implementationCandidatesは補助経路としてのみ残す。
+   */
   const suppliedCandidates=this.parseImplementationCandidates(
     run.payload.implementationCandidates,
     targetPaths,
@@ -64,6 +102,31 @@ class CandidateCodeGenerationService {
     if(created.accepted&&created.componentId){
       createdCodeComponentIds.push(created.componentId);
     }
+  }
+
+  if(createdCodeComponentIds.length>0){
+    const reason='NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION';
+    this.record(runId,{
+      attemptCount:1,
+      status:'BLOCKED',
+      reason,
+      createdCodeComponentIds,
+      unknownContext,
+      responseHash:canonicalSha256(JSON.stringify({
+        runId,
+        reason,
+        createdCodeComponentIds,
+      }))
+    });
+
+    return {
+      accepted:false,
+      runId,
+      files:[],
+      reasons:[reason],
+      attemptCount:1,
+      createdCodeComponentIds
+    };
   }
 
   const learningContext=reviewLearningArtifactService.retrieve({objective:run.objective,packageId:typeof run.payload.packageId==='string'?run.payload.packageId:undefined});
@@ -298,6 +361,99 @@ class CandidateCodeGenerationService {
  private extractResponseText(body:unknown):string{if(typeof body==='string')return body;if(!body||typeof body!=='object')return '';const object=body as Record<string,unknown>;for(const key of ['response','text','content','message','answer']){const value=object[key];if(typeof value==='string')return value;if(value&&typeof value==='object'){const nested=value as Record<string,unknown>;if(typeof nested.content==='string')return nested.content;if(typeof nested.text==='string')return nested.text;}}return '';}
  private parse(text:string):CandidateGenerationFile[]|undefined{const cleaned=text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');const start=cleaned.indexOf('{');const end=cleaned.lastIndexOf('}');const options=[cleaned,start>=0&&end>start?cleaned.slice(start,end+1):''];for(const option of options){if(!option)continue;try{const value=JSON.parse(option);if(!value||!Array.isArray(value.files))continue;const files:CandidateGenerationFile[]=[];for(const row of value.files){if(typeof row?.path!=='string'||typeof row?.candidateContent!=='string')return undefined;files.push({path:row.path,candidateContent:row.candidateContent,evidenceIds:Array.isArray(row.evidenceIds)?row.evidenceIds.filter((x:unknown):x is string=>typeof x==='string'):[]});}return files;}catch{continue;}}return undefined;}
  private record(runId:string,value:Record<string,unknown>):void{const key='miki_candidate_generation_ledger_v2';let ledger:Record<string,unknown>;try{const raw=storageService.getItem(key);const parsed:unknown=raw?JSON.parse(raw):{};ledger=parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed as Record<string,unknown>:{};}catch(error){throw new Error(`PERSISTENCE_FAILED:CANDIDATE_LEDGER_READ:${error instanceof Error?error.message:String(error)}`);}const record={runId,...value};try{storageService.setItem(key,JSON.stringify({...ledger,[runId]:record}));const reloadedRaw=storageService.getItem(key);const reloaded:unknown=reloadedRaw?JSON.parse(reloadedRaw):undefined;if(!reloaded||typeof reloaded!=='object'||Array.isArray(reloaded)||(reloaded as Record<string,unknown>)[runId]===undefined)throw new Error('RELOAD_MISSING');const expected=canonicalSha256(record);const actual=canonicalSha256((reloaded as Record<string,unknown>)[runId]);if(actual!==expected)throw new Error('RELOAD_HASH_MISMATCH');}catch(error){throw new Error(`PERSISTENCE_FAILED:CANDIDATE_LEDGER_WRITE:${error instanceof Error?error.message:String(error)}`);}}
+ private parseImplementationMaterials(
+  materials: import('../../research/services/webMaterialPatternExtractor').WebImplementationMaterial[],
+  targetPaths:string[],
+  validationRequirements:string[],
+):Array<{
+  path:string;
+  candidateContent:string;
+  tests:string;
+  validation:string;
+  dependencies:string[];
+  sourceEpisodeIds:string[];
+}>{
+  if(materials.length===0||targetPaths.length===0||validationRequirements.length===0){
+    return [];
+  }
+
+  const allowed=new Set(targetPaths);
+  const output:Array<{
+    path:string;
+    candidateContent:string;
+    tests:string;
+    validation:string;
+    dependencies:string[];
+    sourceEpisodeIds:string[];
+  }>=[];
+
+  const languageForPath=(path:string):string=>{
+    const lower=path.toLowerCase();
+    if(lower.endsWith('.ts')||lower.endsWith('.tsx'))return 'ts';
+    if(lower.endsWith('.js')||lower.endsWith('.jsx'))return 'js';
+    if(lower.endsWith('.mjs')||lower.endsWith('.cjs'))return 'js';
+    if(lower.endsWith('.kt'))return 'kt';
+    if(lower.endsWith('.java'))return 'java';
+    if(lower.endsWith('.py'))return 'py';
+    if(lower.endsWith('.go'))return 'go';
+    if(lower.endsWith('.rs'))return 'rs';
+    return '';
+  };
+
+  for(const material of materials){
+    for(const example of material.codeExamples){
+      const explicitPath=example.targetPath&&allowed.has(example.targetPath)
+        ? example.targetPath
+        : undefined;
+
+      const path=explicitPath||(
+        targetPaths.length===1 &&
+        this.codeLanguageMatchesTarget(example.language,targetPaths[0])
+          ? targetPaths[0]
+          : ''
+      );
+
+      if(!path||!allowed.has(path)||!example.code.trim())continue;
+
+      const tests=material.testClues.length>0
+        ? material.testClues.join('\\n')
+        : `Validate implementation for ${path} against the current target contract.`;
+
+      const validation=validationRequirements.join('\\n');
+
+      output.push({
+        path,
+        candidateContent:example.code.trim(),
+        tests,
+        validation,
+        dependencies:material.dependencies,
+        sourceEpisodeIds:[material.sourceId],
+      });
+
+      if(output.length>=targetPaths.length)break;
+    }
+
+    if(output.length>=targetPaths.length)break;
+  }
+
+  return output.filter((item,index,array)=>
+    array.findIndex(other=>other.path===item.path&&other.candidateContent===item.candidateContent)===index
+  );
+ }
+
+ private codeLanguageMatchesTarget(language:string,targetPath:string):boolean{
+  const l=String(language||'').toLowerCase();
+  const p=targetPath.toLowerCase();
+  if((p.endsWith('.ts')||p.endsWith('.tsx'))&&['ts','typescript','tsx'].includes(l))return true;
+  if((p.endsWith('.js')||p.endsWith('.jsx')||p.endsWith('.mjs')||p.endsWith('.cjs'))&&['js','javascript','jsx','mjs','cjs'].includes(l))return true;
+  if(p.endsWith('.kt')&&['kt','kotlin'].includes(l))return true;
+  if(p.endsWith('.java')&&l==='java')return true;
+  if(p.endsWith('.py')&&['py','python'].includes(l))return true;
+  if(p.endsWith('.go')&&['go','golang'].includes(l))return true;
+  if(p.endsWith('.rs')&&['rs','rust'].includes(l))return true;
+  return false;
+ }
+
  private parseImplementationCandidates(
   value:unknown,
   targetPaths:string[],

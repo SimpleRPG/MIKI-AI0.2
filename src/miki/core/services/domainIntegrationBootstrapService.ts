@@ -299,8 +299,24 @@ class DomainIntegrationBootstrapService{
      payload:{...(envelope.payload),taskId},sourceId:taskId
    });
    const result=await candidateCodeGenerationService.generate(run.runId);
-   if(!result.accepted||!result.workspaceId)return {
-     accepted:false,domain,command:envelope.command,error:result.reasons.join('|')||'CANDIDATE_GENERATION_FAILED',
+
+   const awaitingVerification=
+     result.reasons.includes('NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION');
+
+   if(!result.accepted){
+     return {
+       accepted:awaitingVerification,
+       domain,
+       command:envelope.command,
+       status:awaitingVerification?'PENDING_VERIFICATION':'FAILED',
+       error:awaitingVerification?undefined:(result.reasons.join('|')||'CANDIDATE_GENERATION_FAILED'),
+       result:{operation:'GENERATE_CANDIDATE',operationClass:'BUSINESS',...result,runId:run.runId,evidenceIds:[]},
+       completedAt:Date.now()
+     };
+   }
+
+   if(!result.workspaceId)return {
+     accepted:false,domain,command:envelope.command,error:'CANDIDATE_WORKSPACE_NOT_CREATED',
      result:{operation:'GENERATE_CANDIDATE',operationClass:'BUSINESS',...result,runId:run.runId,evidenceIds:[]},completedAt:Date.now()
    };
    const {isolatedCandidateWorkspaceService}=await import('./isolatedCandidateWorkspaceService');

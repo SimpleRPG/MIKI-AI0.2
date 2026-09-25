@@ -61,6 +61,30 @@ export interface WebExtractedSkeletonPattern {
   fetchMethod?: WebFetchMethod;
 }
 
+
+export interface WebImplementationCodeExample {
+  language: string;
+  code: string;
+  targetPath?: string;
+  sourceUrl: string;
+}
+
+export interface WebImplementationMaterial {
+  materialId: string;
+  sourceQuery: string;
+  sourceUrl: string;
+  sourceId: string;
+  provider?: string;
+  fetchMethod?: WebFetchMethod;
+  implementationApproach: string;
+  codeExamples: WebImplementationCodeExample[];
+  dependencies: string[];
+  constraints: string[];
+  testClues: string[];
+  evidenceText: string;
+  extractedAt: number;
+}
+
 export class WebMaterialPatternExtractor {
   /**
    * 固有名詞・具体的数値・個別事実主張を除去し、汎用的な「言い回し骨組み」へ抽象化する
@@ -256,4 +280,133 @@ export class WebMaterialPatternExtractor {
       fetchMethod,
     };
   }
+  /**
+   * 実装方法探索用のWeb本文から、実装材料だけを抽出する。
+   *
+   * Research本文そのものを実行可能コードとして扱わない。
+   * 実装材料として扱えるのは、明示的なコードブロックと、
+   * 依存関係・制約・テスト手掛かり等の構造化情報のみ。
+   */
+  public static extractImplementationMaterialsFromWebText(params: {
+    text: string;
+    sourceQuery: string;
+    sourceUrl: string;
+    provider?: string;
+    fetchMethod?: WebFetchMethod;
+  }): WebImplementationMaterial[] {
+    const { text, sourceQuery, sourceUrl, provider, fetchMethod } = params;
+
+    if (!text || !sourceUrl) return [];
+
+    if (
+      bannedTopicsConfigService.checkBanned(sourceQuery).isBanned ||
+      bannedTopicsConfigService.checkBanned(text).isBanned
+    ) {
+      return [];
+    }
+
+    const codeExamples: WebImplementationCodeExample[] = [];
+    const fencePattern = /```([^\n`]*)\n([\s\S]*?)\n```/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = fencePattern.exec(text)) !== null && codeExamples.length < 4) {
+      const info = String(match[1] || '').trim();
+      const code = String(match[2] || '').trim();
+
+      if (code.length < 20 || code.length > 12000) continue;
+
+      const language =
+        (info.split(/\s+/)[0] || 'text')
+          .replace(/[{}]/g, '')
+          .toLowerCase();
+
+      const pathMatch = info.match(
+        /(?:^|\s)([A-Za-z0-9_./-]+\.(?:ts|tsx|js|jsx|mjs|cjs|json|kt|java|py|go|rs|cs|cpp|c|sh))(?:\s|$)/i
+      );
+
+      codeExamples.push({
+        language,
+        code,
+        targetPath: pathMatch?.[1],
+        sourceUrl,
+      });
+    }
+
+    const dependencySet = new Set<string>();
+    const dependencyPatterns = [
+      /(?:npm|pnpm|yarn)\s+(?:install|add)\s+([^\n]+)/gi,
+      /(?:pip|pip3)\s+install\s+([^\n]+)/gi,
+      /implementation\s+['"]([^'"]+)['"]/gi,
+      /import\s+.+?\s+from\s+['"]([^'"]+)['"]/g,
+      /require\s*['"]([^'"]+)['"]\s*/g,
+    ];
+
+    for (const pattern of dependencyPatterns) {
+      let dependencyMatch: RegExpExecArray | null;
+      while ((dependencyMatch = pattern.exec(text)) !== null) {
+        const value = String(dependencyMatch[1] || '').trim();
+        if (value) dependencySet.add(value.slice(0, 300));
+      }
+    }
+
+    const constraints = text
+      .split(/(?<=[。！？.!?])\s+|\n/)
+      .map(line => line.trim())
+      .filter(line =>
+        /(?:必要|必須|前提|制約|注意|互換|対応|version|バージョン|permission|権限|requires|requirement|constraint)/i.test(line)
+      )
+      .map(line => line.slice(0, 500))
+      .filter((line, index, array) => array.indexOf(line) === index)
+      .slice(0, 8);
+
+    const testClues = text
+      .split(/(?<=[。！？.!?])\s+|\n/)
+      .map(line => line.trim())
+      .filter(line =>
+        /(?:test|tests|testing|verify|verification|validate|validation|assert|テスト|検証|確認|期待結果)/i.test(line)
+      )
+      .map(line => line.slice(0, 500))
+      .filter((line, index, array) => array.indexOf(line) === index)
+      .slice(0, 8);
+
+    const approachLines = text
+      .split(/\n/)
+      .map(line => line.trim())
+      .filter(line =>
+        /(?:implementation|implement|algorithm|approach|architecture|pattern|procedure|実装|アルゴリズム|方式|構成|手順|設計)/i.test(line)
+      )
+      .map(line => line.replace(/^#+\s*/, '').replace(/^[-*]\s*/, '').trim())
+      .filter(Boolean)
+      .slice(0, 8);
+
+    if (
+      codeExamples.length === 0 &&
+      dependencySet.size === 0 &&
+      constraints.length === 0 &&
+      testClues.length === 0 &&
+      approachLines.length === 0
+    ) {
+      return [];
+    }
+
+    return [{
+      materialId: `IM-${Math.abs(
+        Array.from(`${sourceQuery}|${sourceUrl}`)
+          .reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0)
+      ).toString(16)}-${Date.now().toString(36)}`,
+      sourceQuery,
+      sourceUrl,
+      sourceId: sourceUrl,
+      provider,
+      fetchMethod,
+      implementationApproach: approachLines.join('\n'),
+      codeExamples,
+      dependencies: Array.from(dependencySet).slice(0, 12),
+      constraints,
+      testClues,
+      evidenceText: text.slice(0, 1600),
+      extractedAt: Date.now(),
+    }];
+  }
+
 }

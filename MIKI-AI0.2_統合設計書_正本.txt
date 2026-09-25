@@ -7532,40 +7532,146 @@ Verification
 既存部品探索と未知・不足探索を同一サイクルで実行し、不足が
 MISSING_IMPLEMENTATION_PATTERN と判定された場合はCREATE経路へ接続する。
 
-CREATE経路では、外部Teacher / UNKNOWN_COMPONENT_AUTHOR等から
-明示的に提供された実装材料のみを使用して
-reusableComponentFactoryService.createCodeComponentCandidate()を呼び出す。
+【MIKI自身による実装材料収集】
 
-実装材料には少なくとも以下を要求する。
+MISSING_IMPLEMENTATION_PATTERN が発生した場合、MIKIは通常、
+外部Teacherを待つのではなく、既存のResearch基盤を利用して
+実装材料を自律的に収集する。
+
+正規経路：
+
+CORE
+↓
+未知・不足検出
+↓
+既存Component / Knowledge探索
+↓
+不足判定
+↓
+ResearchQueryPlanningService
+↓
+IMPLEMENTATION_EXAMPLE等の実装目的Query
+↓
+AutonomousSearchService
+↓
+SearXNG / Wikipedia / DuckDuckGo
+↓
+検索結果
+↓
+既存readSearchResultPages / fetchRenderedPage
+↓
+Web本文取得
+↓
+既存WebMaterialPatternExtractorによる実装材料抽出
+↓
+Implementation Material
+↓
+既存部品との再利用可能性評価
+↓
+不足していればCODE Component Candidate化
+↓
+Verification
+↓
+Registry
+↓
+Universal Synthesisへ再投入
+↓
+CORE再評価
+
+Implementation Materialには、取得元・URL・検索Query・取得方法・
+実装方式・明示的コード例・依存関係・制約・テスト手掛かり等を保持する。
+
+Research本文そのものを実行可能コードとして扱ってはならない。
+
+特に、説明文からコードを推測してCandidateを作成してはならない。
+CODE Component Candidateへ接続できるのは、Research結果から明示的に取得できた
+コード例等の実装材料に限定する。
+
+【新規CODE Componentの扱い】
+
+実装材料が取得でき、現在のtargetPathと互換する明示的コード例が存在する場合、
+reusableComponentFactoryService.createCodeComponentCandidate()へ接続する。
+
+最低限必要な情報：
 
 - targetPath
 - candidateContent
 - tests
 - validation
+- source / Lineage
 
-実装材料が存在しない場合、Research結果や説明文からコードを推測・捏造してはならない。
-その場合は不足状態をCOREへ返し、外部Teacherまたは追加Researchによる実装材料取得を待つ。
-
-新規CODE Componentは直ちに完成品・ACTIVE部品として扱わず、
+新規CODE Componentは直ちに完成品・ACTIVE部品として扱わない。
 
 CREATE
 ↓
 CODE Component CANDIDATE
 ↓
-既存Verification
+Verification
 ↓
 VERIFIED
 ↓
 Universal Synthesisへ再投入
 ↓
 既存Componentとの再合成
+↓
+CORE再評価
 
-の順序を必須とする。
+新規Candidate生成直後に通常の合成へ混入させず、Verificationを完了してから
+再利用可能Componentとして扱う。
 
-Gemini等の外部AIはこの経路の通常ランタイムには入れない。
-外部AIによる部品作成・教師的情報は明示的な外部入力として受け取り、
-COREの検証・採否・再合成経路を通過させる。
+【外部Teacher / Geminiの位置付け】
 
-implementationCandidatesは外部から供給された実装材料を表す。
-このデータが存在しない場合、candidateCodeGenerationServiceは
-新規コードを生成せず、CREATE不足状態を返す。
+Gemini等の外部AIは通常ランタイムの必須経路ではない。
+
+MIKI自身のResearchで十分な実装材料を取得できない場合に限り、
+External Teacher / UNKNOWN_COMPONENT_AUTHOR等を補助的な外部入力経路として利用できる。
+
+外部から提供されたimplementationCandidatesも、Research自律経路の代替ではなく
+補助入力として扱い、同じCODE Component CANDIDATE → Verification → Registry
+→ Universal Synthesis再投入の経路を通す。
+
+ローカルLLMを通常生成経路へ戻さない。
+
+【重複実装禁止】
+
+新しい独立した「実装材料収集サービス」や新しい検索エンジンを作らない。
+
+既存の、
+
+- researchQueryPlanningService
+- autonomousSearchService
+- unifiedWebResearchService
+- readSearchResultPages
+- fetchRenderedPage
+- WebMaterialPatternExtractor
+- unifiedUnknownResolutionCoordinatorService
+- componentRegistryService
+- reusableComponentFactoryService
+- componentCompositionService
+- nonLlmCodeSynthesisService
+
+を既存責務に沿って再利用する。
+
+実装材料収集は既存Research経路の拡張として扱い、
+Universal Synthesisを別の脳として新設しない。
+
+【Verification前の安全境界】
+
+検索結果・Web本文・Research説明はEvidence / Implementation Materialであり、
+そのまま実行コードではない。
+
+明示的なコード例をCandidate化した場合でも、
+
+Candidate
+↓
+Verification
+↓
+CORE再評価
+
+を必須とする。
+
+実装材料が不足している場合は推測で埋めず、
+
+UNKNOWN / IMPLEMENTATION_MATERIAL_INSUFFICIENT
+
+としてCOREへ返し、追加Researchまたは補助的なExternal Teacher経路へ進む。
