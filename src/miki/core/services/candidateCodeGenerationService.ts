@@ -98,7 +98,10 @@ class CandidateCodeGenerationService {
       `inputs=${item.inputs.join(' / ')}`,
       `outputs=${item.outputs.join(' / ')}`,
       `doesNotApplyWhen=${item.doesNotApplyWhen.join(' / ')}`,
-    ].join(' ; '))
+      item.componentKind === 'KNOWLEDGE' && item.constructionProfile
+        ? `construction=${JSON.stringify(item.constructionProfile)}`
+        : '',
+    ].filter(Boolean).join(' ; '))
     .join('\n');
 
   const knowledgeRequirement =

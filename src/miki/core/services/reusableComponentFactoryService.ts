@@ -4,7 +4,7 @@ import { reviewLearningArtifactService, type ReviewLearningArtifact } from './re
 import type { ReviewLearningEpisode } from './reviewDecisionLearningService';
 import { verifierService } from '../../verification/services/verifierService';
 import { componentRegistryService } from '../../../services/componentRegistryService';
-import { commonCodeKnowledge, additionalCommonCodeKnowledge } from '../data/codeKnowledge/common';
+import { commonCodeKnowledge, additionalCommonCodeKnowledge, type CodeConstructionProfile } from '../data/codeKnowledge/common';
 import { javascriptCodeKnowledge, additionalJavascriptCodeKnowledge } from '../data/codeKnowledge/javascript';
 import { typescriptCodeKnowledge, additionalTypescriptCodeKnowledge } from '../data/codeKnowledge/typescript';
 import { webCodeKnowledge, additionalWebCodeKnowledge } from '../data/codeKnowledge/web';
@@ -13,7 +13,7 @@ export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
 export type ComponentSelectionMode='REUSE_AS_IS'|'ADAPT_EXISTING'|'COMPOSE_MULTIPLE'|'CREATE_NEW'|'ESCALATE_UNKNOWN';
 export interface ReusableComponentArtifact {componentId:string;registryComponentId?:string;componentKind:ReusableComponentKind;componentType:string;purpose:string;interfaceContract:Record<string,unknown>;inputs:string[];outputs:string[];prerequisites:string[];dependencies:string[];appliesWhen:string[];doesNotApplyWhen:string[];sourceEpisodeIds:string[];sourceLearningArtifactIds:string[];canonicalSha256:string;environmentFingerprint:string;lifecycleStatus:ReusableComponentLifecycle;usageCount:number;successCount:number;failureCount:number;lastUsedAt?:number;lastConfirmedAt?:number;supersededBy?:string;createdAt:number;updatedAt:number;}
-export interface KnowledgeComponentArtifact extends ReusableComponentArtifact {componentKind:'KNOWLEDGE';claimIds:string[];evidenceRefs:string[];sourceUrls:string[];sourceArtifactIds:string[];verificationStatus:'UNVERIFIED'|'VERIFIED'|'CONFLICT';contradictionRefs:string[];freshnessPolicy:string;}
+export interface KnowledgeComponentArtifact extends ReusableComponentArtifact {componentKind:'KNOWLEDGE';claimIds:string[];evidenceRefs:string[];sourceUrls:string[];sourceArtifactIds:string[];verificationStatus:'UNVERIFIED'|'VERIFIED'|'CONFLICT';contradictionRefs:string[];freshnessPolicy:string;constructionProfile?:CodeConstructionProfile;}
 export interface CodeComponentArtifact extends ReusableComponentArtifact {componentKind:'CODE';exports:string[];imports:string[];publicInterfaces:string[];coreIngressPoints:string[];domainOwnership:string[];persistenceKeys:string[];uiEventEntrypoints:string[];testReferences:string[];requiredValidation:string[];}
 export interface ConversationComponentArtifact extends ReusableComponentArtifact {componentKind:'CONVERSATION';atomic:boolean;conversationState:string[];requiredInformation:string[];responseStructure:string[];prohibitedPatterns:string[];clarificationConditions:string[];verbosityConditions:string[];toolResultOrder:string[];}
 export type AnyReusableComponent=KnowledgeComponentArtifact|CodeComponentArtifact|ConversationComponentArtifact;
@@ -74,6 +74,7 @@ class ReusableComponentFactoryService{
         evidenceRefs:[],
         sourceUrls:seed.sourceUrls,
         sourceArtifactIds:seed.sourceArtifactIds,
+        constructionProfile:seed.constructionProfile,
         verificationStatus:'UNVERIFIED' as const,
         contradictionRefs:[],
         freshnessPolicy:'REVALIDATE_ON_SOURCE_CHANGE',

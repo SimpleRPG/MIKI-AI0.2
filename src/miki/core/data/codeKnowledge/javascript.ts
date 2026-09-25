@@ -26,6 +26,23 @@ export const javascriptCodeKnowledge: CodeKnowledgeSeed[] = [
     doesNotApplyWhen: [],
     sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Guide/Control_flow_and_error_handling'],
     sourceArtifactIds: ['mdn-javascript-control-flow'],
+    constructionProfile: {
+      kind: 'STATEMENT',
+      syntaxTemplate: 'if ({condition}) {\\n{thenBody}\\n} else {\\n{elseBody}\\n}',
+      slots: [
+        {name: 'condition', inputKinds: ['boolean-expression'], required: true},
+        {name: 'thenBody', inputKinds: ['statement'], required: true, multiple: true},
+        {name: 'elseBody', inputKinds: ['statement'], required: false, multiple: true},
+      ],
+      constraints: [
+        'condition must be boolean-compatible',
+        'branches must contain valid statements'
+      ],
+      adaptationRules: [
+        'omit else when no alternate branch is required',
+        'use switch when multiple discrete cases are clearer'
+      ],
+    },
   },
   {
     id: 'code.javascript.arrays',
@@ -39,6 +56,22 @@ export const javascriptCodeKnowledge: CodeKnowledgeSeed[] = [
     doesNotApplyWhen: ['キーによる一意検索が主目的の場合'],
     sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Guide/Indexed_collections'],
     sourceArtifactIds: ['mdn-javascript-arrays'],
+    constructionProfile: {
+      kind: 'EXPRESSION',
+      syntaxTemplate: '{array}.{operation}({callback})',
+      slots: [
+        {name: 'array', inputKinds: ['array-expression'], required: true},
+        {name: 'operation', inputKinds: ['map|filter|reduce|find|forEach'], required: true},
+        {name: 'callback', inputKinds: ['function-expression'], required: true},
+      ],
+      constraints: [
+        'operation must match the intended output contract'
+      ],
+      adaptationRules: [
+        'use forEach when no transformed collection is required',
+        'use map/filter/reduce according to output semantics'
+      ],
+    },
   },
   {
     id: 'code.javascript.objects',
@@ -65,6 +98,20 @@ export const javascriptCodeKnowledge: CodeKnowledgeSeed[] = [
     doesNotApplyWhen: ['完全な同期処理'],
     sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Guide/Using_promises'],
     sourceArtifactIds: ['mdn-javascript-promises'],
+    constructionProfile: {
+      kind: 'ASYNC',
+      syntaxTemplate: 'const {result} = await {operation};',
+      slots: [
+        {name: 'result', inputKinds: ['identifier'], required: false},
+        {name: 'operation', inputKinds: ['promise-expression'], required: true},
+      ],
+      constraints: [
+        'await must be inside an async function or supported async context'
+      ],
+      adaptationRules: [
+        'use Promise.all for independent concurrent operations'
+      ],
+    },
   },
   {
     id: 'code.javascript.modules',

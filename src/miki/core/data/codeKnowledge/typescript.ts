@@ -26,6 +26,20 @@ export const typescriptCodeKnowledge: CodeKnowledgeSeed[] = [
     doesNotApplyWhen: [],
     sourceUrls: ['https://www.typescriptlang.org/docs/handbook/2/objects.html'],
     sourceArtifactIds: ['typescript-handbook-object-types'],
+    constructionProfile: {
+      kind: 'TYPE',
+      syntaxTemplate: 'interface {name} {\\n{members}\\n}',
+      slots: [
+        {name: 'name', inputKinds: ['identifier'], required: true},
+        {name: 'members', inputKinds: ['property-signature'], required: true, multiple: true},
+      ],
+      constraints: [
+        'members must form a valid object contract'
+      ],
+      adaptationRules: [
+        'use type alias when unions/intersections are the primary abstraction'
+      ],
+    },
   },
   {
     id: 'code.typescript.unions-and-narrowing',
@@ -133,6 +147,21 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeSeed[] = [
     doesNotApplyWhen: ['型がコンパイル時点で確定している場合'],
     sourceUrls: ['https://www.typescriptlang.org/docs/handbook/2/narrowing.html'],
     sourceArtifactIds: ['typescript-handbook-type-guards'],
+    constructionProfile: {
+      kind: 'EXPRESSION',
+      syntaxTemplate: 'function {name}(value: unknown): value is {type} {\\n{returnExpression}\\n}',
+      slots: [
+        {name: 'name', inputKinds: ['identifier'], required: true},
+        {name: 'type', inputKinds: ['type-expression'], required: true},
+        {name: 'returnExpression', inputKinds: ['boolean-expression'], required: true},
+      ],
+      constraints: [
+        'the predicate must correspond to the runtime check'
+      ],
+      adaptationRules: [
+        'use typeof/in/instanceof according to the runtime value shape'
+      ],
+    },
   },
   {
     id: 'code.typescript.strictness',

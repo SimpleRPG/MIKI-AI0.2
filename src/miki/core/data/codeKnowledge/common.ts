@@ -1,3 +1,18 @@
+export interface CodeConstructionSlot {
+  name: string;
+  inputKinds: string[];
+  required: boolean;
+  multiple?: boolean;
+}
+
+export interface CodeConstructionProfile {
+  kind: 'STATEMENT'|'EXPRESSION'|'DECLARATION'|'TYPE'|'CALL'|'MODULE'|'ASYNC';
+  syntaxTemplate: string;
+  slots: CodeConstructionSlot[];
+  constraints: string[];
+  adaptationRules: string[];
+}
+
 export interface CodeKnowledgeSeed {
   id: string;
   componentType: string;
@@ -10,6 +25,7 @@ export interface CodeKnowledgeSeed {
   doesNotApplyWhen: string[];
   sourceUrls: string[];
   sourceArtifactIds: string[];
+  constructionProfile?: CodeConstructionProfile;
 }
 
 export const commonCodeKnowledge: CodeKnowledgeSeed[] = [
@@ -25,6 +41,21 @@ export const commonCodeKnowledge: CodeKnowledgeSeed[] = [
     doesNotApplyWhen: ['単なる一時的な式評価だけで名前付けが不要な場合'],
     sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Guide/Grammar_and_types'],
     sourceArtifactIds: ['mdn-javascript-guide-grammar-types'],
+    constructionProfile: {
+      kind: 'DECLARATION',
+      syntaxTemplate: 'const {name} = {value};',
+      slots: [
+        {name: 'name', inputKinds: ['identifier'], required: true},
+        {name: 'value', inputKinds: ['expression'], required: true},
+      ],
+      constraints: [
+        'name must be a valid identifier',
+        'prefer const when reassignment is unnecessary'
+      ],
+      adaptationRules: [
+        'use let when reassignment is required'
+      ],
+    },
   },
   {
     id: 'code.common.functions',
@@ -38,6 +69,22 @@ export const commonCodeKnowledge: CodeKnowledgeSeed[] = [
     doesNotApplyWhen: ['極端に単純で分離による意味が増えない式'],
     sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Guide/Functions'],
     sourceArtifactIds: ['mdn-javascript-guide-functions'],
+    constructionProfile: {
+      kind: 'DECLARATION',
+      syntaxTemplate: 'function {name}({parameters}) {\\n{body}\\n}',
+      slots: [
+        {name: 'name', inputKinds: ['identifier'], required: true},
+        {name: 'parameters', inputKinds: ['parameter'], required: false, multiple: true},
+        {name: 'body', inputKinds: ['statement'], required: true, multiple: true},
+      ],
+      constraints: [
+        'parameters must be declared before use',
+        'return values must satisfy the function contract'
+      ],
+      adaptationRules: [
+        'use an arrow function when expression-style or callback form is required'
+      ],
+    },
   },
   {
     id: 'code.common.collections',

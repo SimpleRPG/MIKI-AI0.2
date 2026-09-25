@@ -7982,3 +7982,85 @@ Built-in CODE KnowledgeのenvironmentFingerprintは"universal"を許可し、
 Verification/Canary/Promotionの経路内で再利用可能な実装知識として扱う。
 ============================================================
 
+
+
+【実装確定追記：2026-09-25 CODE Knowledge Construction Profile基盤】
+============================================================
+
+既存53個のCODE Knowledgeは、単なる説明文だけではコード構築に必要な
+「どの構文を使い、どの入力をどの場所へ接続するか」を十分に表現できない。
+
+ただし、これを実行可能CODE ComponentとしてRegistryへ直接登録してはならない。
+既存CapabilityGraph / ComponentCompositionの実行可能CODE Component責務と衝突するためである。
+
+そのため、KNOWLEDGE Component内に任意のConstruction Profileを保持できるようにする。
+
+Construction Profile：
+
+- kind
+- syntaxTemplate
+- slots
+- constraints
+- adaptationRules
+
+slotsには、
+
+- name
+- inputKinds
+- required
+- multiple
+
+を保持する。
+
+例：
+
+IF
+  syntaxTemplate:
+    if ({condition}) {
+      {thenBody}
+    } else {
+      {elseBody}
+    }
+
+  slots:
+    condition -> boolean-expression
+    thenBody  -> statement[]
+    elseBody  -> statement[] optional
+
+このProfileは実行コードではなく、CORE / CODE合成が構築構造を決定するための
+決定論的な構造知識である。
+
+現在の初期実装では、変数、関数、if、Array操作、await、TypeScript interface、
+TypeScript type guard等の基礎構造へProfileを付与する。
+
+正規経路：
+
+CODE Knowledge
+↓
+ReusableComponentFactory
+↓
+Construction Profile
+↓
+必要構造・slot・制約を決定
+↓
+既存CODE Component / 構築対象との接続
+↓
+CODE Component Candidate
+↓
+既存Verification / Regression / Canary / Promotion
+
+重要：
+
+Construction Profile自体をCapabilityGraphの実行可能CODE候補として扱わない。
+また、新しい独立合成機・独立Registry・独立Orchestratorを作らない。
+
+今後の拡張では、Construction Profileを利用して、
+「ifが必要」→「IF構造を選択」→「conditionへBoolean Expressionを接続」
+→「thenBodyへStatement Componentを接続」
+というConstruction Graphを既存ComponentCompositionへ接続する。
+
+これにより、CODE Knowledgeと実行可能CODE Componentを混同せず、
+知識から構造を決定し、その構造から検証可能なCODE Component Candidateを
+生成する経路を形成する。
+
+============================================================
