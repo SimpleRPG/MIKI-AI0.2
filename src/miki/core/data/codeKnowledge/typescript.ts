@@ -2971,7 +2971,35 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
       "reuse an existing compatible construction node before creating an equivalent one"
     ]
   }
-}
+},
+
+  {
+    id: 'code.typescript.generic-function-constraint',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: 'Generic関数へ型制約を付ける',
+    summary: '型パラメータへextends制約を付与する。',
+    concepts: ['TypeScript', 'generic', 'constraint', 'extends'],
+    inputs: ['identifier', 'type-parameter', 'type-expression', 'parameter', 'statement'],
+    outputs: ['statement'],
+    appliesWhen: ['Generic関数に型条件が必要'],
+    doesNotApplyWhen: ['型制約が不要'],
+    sourceUrls: ['https://www.typescriptlang.org/docs/handbook/2/generics.html#generic-constraints'],
+    sourceArtifactIds: ['typescript-generic-constraints'],
+    constructionProfile: {
+      kind: 'DECLARATION',
+      syntaxTemplate: 'function {name}<{typeParameter} extends {constraint}>({parameters}) {\\n{body}\\n}',
+      outputKinds: ['statement'],
+      slots: [
+        { name: 'name', inputKinds: ['identifier'], required: true },
+        { name: 'typeParameter', inputKinds: ['type-parameter'], required: true },
+        { name: 'constraint', inputKinds: ['type-expression'], required: true },
+        { name: 'parameters', inputKinds: ['parameter'], required: false, multiple: true },
+        { name: 'body', inputKinds: ['statement'], required: true, multiple: true },
+      ],
+      constraints: ['type parameter must satisfy constraint'],
+      adaptationRules: ['add constraint only when implementation requires it'],
+    },
+  },
 ];
 
 export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [

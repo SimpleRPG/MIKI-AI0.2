@@ -1294,3 +1294,21 @@ Construction Graphの接続は既存のinputKinds/outputKinds契約を使用し�
 
 コード構築部品の生成結果は従来どおりCandidateとして扱い、
 検証・Review・Promotion境界を迂回して本番コードへ自動適用しない。
+
+
+### 2026-09-26 Code Construction Gap Fill
+
+最新mainの既存実装とCODE Construction要求を再照合し、
+不足していた構築語彙を既存Knowledgeへ直接追加する。
+
+追加:
+- Node.js fs/promises: readdir / stat / rename / rm
+- Node.js path: resolve / dirname / basename / extname
+- TypeScript: generic function constraint
+- React/TSX: anchor link
+- Express: PUT / DELETE route
+
+既存のConstruction Graph、ComponentComposition、Candidate Verification、
+Regression / Canary / Promotion境界は変更しない。
+
+一時的なconstructionExpansion.tsは正規Knowledge層として使用せず削除する。

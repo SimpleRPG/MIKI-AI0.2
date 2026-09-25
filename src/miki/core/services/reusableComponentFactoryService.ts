@@ -9,7 +9,6 @@ import { javascriptCodeKnowledge, additionalJavascriptCodeKnowledge, additionalJ
 import { typescriptCodeKnowledge, additionalTypescriptCodeKnowledge, additionalTypescriptCodeComponents } from '../data/codeKnowledge/typescript';
 import { webCodeKnowledge, additionalWebCodeKnowledge, additionalWebCodeComponents } from '../data/codeKnowledge/web';
 import { testingCodeKnowledge, additionalTestingCodeKnowledge, additionalTestingCodeComponents } from '../data/codeKnowledge/testing';
-import { constructionExpansionKnowledge, constructionExpansionComponents } from '../data/codeKnowledge/constructionExpansion';
 export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
 export type ComponentSelectionMode='REUSE_AS_IS'|'ADAPT_EXISTING'|'COMPOSE_MULTIPLE'|'CREATE_NEW'|'ESCALATE_UNKNOWN';
@@ -37,7 +36,6 @@ class ReusableComponentFactoryService{
       ...additionalTypescriptCodeComponents,
       ...additionalWebCodeComponents,
       ...additionalTestingCodeComponents,
-      ...constructionExpansionComponents,
     ];
 
     for (const definition of definitions) {
@@ -82,7 +80,6 @@ class ReusableComponentFactoryService{
       ...additionalWebCodeKnowledge,
       ...testingCodeKnowledge,
       ...additionalTestingCodeKnowledge,
-      ...constructionExpansionKnowledge,
     ];
 
     const existing=this.list();

@@ -2475,7 +2475,80 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
       "reuse an existing compatible construction node before creating an equivalent one"
     ]
   }
-}
+},
+
+  {
+    id: 'code.web.react-link',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: 'React/JSXのリンク要素を構成する',
+    summary: 'hrefとchildrenからanchor linkを構成する。',
+    concepts: ['React', 'JSX', 'anchor', 'link'],
+    inputs: ['string-expression', 'jsx-child'],
+    outputs: ['jsx-expression'],
+    appliesWhen: ['画面にリンクを表示する'],
+    doesNotApplyWhen: ['Router固有APIが必要'],
+    sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/HTML/Element/a'],
+    sourceArtifactIds: ['mdn-anchor-element'],
+    constructionProfile: {
+      kind: 'EXPRESSION',
+      syntaxTemplate: '<a href={href}>{children}</a>',
+      outputKinds: ['jsx-expression'],
+      slots: [
+        { name: 'href', inputKinds: ['string-expression'], required: true },
+        { name: 'children', inputKinds: ['jsx-child'], required: true },
+      ],
+      constraints: ['href must satisfy navigation/security policy'],
+      adaptationRules: ['use router component only when explicitly required'],
+    },
+  },
+  {
+    id: 'code.web.express-route-put',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: 'Express PUT routeを登録する',
+    summary: 'resource更新用PUT routeを構成する。',
+    concepts: ['Express', 'Router', 'PUT', 'route'],
+    inputs: ['string-expression', 'function-expression'],
+    outputs: ['statement'],
+    appliesWhen: ['resource更新endpoint'],
+    doesNotApplyWhen: ['読み取り専用endpoint'],
+    sourceUrls: ['https://expressjs.com/en/guide/routing.html'],
+    sourceArtifactIds: ['express-put-route'],
+    constructionProfile: {
+      kind: 'CALL',
+      syntaxTemplate: 'router.put({path}, {handler});',
+      outputKinds: ['statement'],
+      slots: [
+        { name: 'path', inputKinds: ['string-expression'], required: true },
+        { name: 'handler', inputKinds: ['function-expression'], required: true },
+      ],
+      constraints: ['router must be Express Router-compatible'],
+      adaptationRules: ['use app.put when application boundary owns route'],
+    },
+  },
+  {
+    id: 'code.web.express-route-delete',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: 'Express DELETE routeを登録する',
+    summary: 'resource削除用DELETE routeを構成する。',
+    concepts: ['Express', 'Router', 'DELETE', 'route'],
+    inputs: ['string-expression', 'function-expression'],
+    outputs: ['statement'],
+    appliesWhen: ['resource削除endpoint'],
+    doesNotApplyWhen: ['削除を行わないendpoint'],
+    sourceUrls: ['https://expressjs.com/en/guide/routing.html'],
+    sourceArtifactIds: ['express-delete-route'],
+    constructionProfile: {
+      kind: 'CALL',
+      syntaxTemplate: 'router.delete({path}, {handler});',
+      outputKinds: ['statement'],
+      slots: [
+        { name: 'path', inputKinds: ['string-expression'], required: true },
+        { name: 'handler', inputKinds: ['function-expression'], required: true },
+      ],
+      constraints: ['router must be Express Router-compatible'],
+      adaptationRules: ['use app.delete when application boundary owns route'],
+    },
+  },
 ];
 
 export const additionalWebCodeComponents: CodeComponentDefinition[] = [
