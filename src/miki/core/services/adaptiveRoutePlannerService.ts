@@ -1015,15 +1015,37 @@ class AdaptiveRoutePlannerService {
       return this.decorateOperations(task,this.uniqueOperations(routes));
     }
 
-    // GENERATE_CANDIDATE が新規CODE Component Candidateを作成した場合、
-    // Candidate Workspace検証とは別に、CODE Component自身のExecution Verificationへ進む。
-    // 未検証Componentを通常の再合成へ混入させない。
-    const createdCodeComponentIds = latestCandidate
-      ? this.stringArrayFromValue(objectValue(latestCandidate), /createdCodeComponentIds/i)
+    // GENERATE_CANDIDATE の通常成功結果と、
+    // NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION のような
+    // BLOCKED/PENDING結果は別物として扱う。
+    //
+    // latestBusinessResult() は成功Business Resultだけを返すため、
+    // 新規CODE Component Candidateを作成した時点の結果を取りこぼす。
+    // COREは「Candidate生成成功」だけでなく「Candidate生成試行」も観測し、
+    // createdCodeComponentIds が存在する場合だけExecution Verificationへ進める。
+    const latestCandidateGenerationAttempt = [...task.entries]
+      .map((entry,index)=>({entry,index}))
+      .reverse()
+      .find(({entry}) => {
+        if(entry.kind!=='RESULT' && entry.kind!=='OBSERVATION') return false;
+        const value=objectValue(entry);
+        return String(value?.operation||'') === 'GENERATE_CANDIDATE';
+      });
+
+    const latestCandidateGenerationAttemptValue =
+      latestCandidateGenerationAttempt
+        ? objectValue(latestCandidateGenerationAttempt.entry)
+        : undefined;
+
+    const createdCodeComponentIds = latestCandidateGenerationAttemptValue
+      ? this.stringArrayFromValue(
+          latestCandidateGenerationAttemptValue,
+          /createdCodeComponentIds/i
+        )
       : [];
 
-    const latestCandidateIndex = latestCandidate
-      ? task.entries.indexOf(latestCandidate)
+    const latestCandidateIndex = latestCandidateGenerationAttempt
+      ? latestCandidateGenerationAttempt.index
       : -1;
 
     const latestCodeComponentVerification = [...task.entries]
@@ -1084,10 +1106,12 @@ class AdaptiveRoutePlannerService {
      */
     if(
       codeComponentVerificationFailed &&
-      latestCandidate &&
+      latestCandidateGenerationAttempt &&
       !codeComponentVerificationSucceeded
     ){
-      const candidate=this.extractCandidateIdentity(latestCandidate);
+      const candidate=this.extractCandidateIdentity(
+        latestCandidateGenerationAttempt.entry
+      );
       const failureValue=latestCodeComponentVerificationValue || {};
       const failureResults=Array.isArray(failureValue.results)
         ? failureValue.results
