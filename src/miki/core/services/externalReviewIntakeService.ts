@@ -208,14 +208,17 @@ class ExternalReviewIntakeService {
     };
     this.decisions.set(decisionId, decision);
     if (coreResult.task.status === 'COMPLETED') {
-      const packageStatus: ReviewPackageStatus = input.decision === 'ACCEPT'
-        ? 'EXTERNAL_REVIEW_PENDING'
-        : input.decision === 'REJECT'
-          ? 'REJECTED'
-          : input.decision === 'REQUEST_CHANGES' || input.decision === 'PARTIAL_ACCEPT' || input.decision === 'PARTIAL_REJECT'
-            ? 'NEEDS_CHANGES'
-            : 'HOLD';
-      reviewZipExportService.updateStatus(record.packageId, packageStatus);
+      // ACCEPTEDは、promotion側でCandidate適用・Transaction・Manifest/Revision整合性を
+      // すべて確認した後にだけ確定する。ここでは二重に状態を書き換えない。
+      if(input.decision !== 'ACCEPT'){
+        const packageStatus: ReviewPackageStatus =
+          input.decision === 'REJECT'
+            ? 'REJECTED'
+            : input.decision === 'REQUEST_CHANGES' || input.decision === 'PARTIAL_ACCEPT' || input.decision === 'PARTIAL_REJECT'
+              ? 'NEEDS_CHANGES'
+              : 'HOLD';
+        reviewZipExportService.updateStatus(record.packageId, packageStatus);
+      }
       const learningProjection = reviewDecisionLearningService.project({
         record,
         decision: input.decision,

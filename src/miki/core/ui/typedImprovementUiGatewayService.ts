@@ -209,7 +209,10 @@ class TypedImprovementUiGatewayService {
     if(existingRun?.taskId){
       const task=taskBlackboardService.get(existingRun.taskId);
       if(task){
-        if(task.status!=='COMPLETED'&&task.status!=='FAILED'&&task.status!=='REJECTED') return this.resumeImprovementTask(task.taskId);
+        // 作業指示書は取り込み時点で
+        // ImprovementIntakeRouter -> selfImprovementIngress -> AutonomousSelfImprovementLoop
+        // に登録済み。UIはここでCOREを直接resumeせず、現在状態だけを返す。
+        // 継続実行は自律改善Loopが担当し、必要時の手動再開だけResume操作から行う。
         return this.taskSnapshotResult(task.taskId,task.revision,task.status);
       }
     }
@@ -270,28 +273,21 @@ class TypedImprovementUiGatewayService {
   }
   resumeImprovementTask(taskId:string){return this.sendImprovementCommand({commandType:'RESUME_IMPROVEMENT_TASK',taskId,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-resume'),operationInstanceId:coreResultService.generateRequestId('operation')});}
   async executeDirectiveUntilReviewPackage(directiveId:string){
-    let result=await this.executeDirective(directiveId);
-    let cycles=0;
-    for(;cycles<8;cycles++){
-      const run=result.taskId
-        ? this.getIntakeRuns(100).find(item=>item.taskId===result.taskId)
-        : undefined;
-      const packageRecord=run
-        ? reviewZipExportService.list().find(item=>item.runId===run.runId)
-        : undefined;
-      if(packageRecord)return {...result,packageId:packageRecord.packageId,packageStatus:packageRecord.status,cycles:cycles+1};
-      if(!result.taskId)break;
-      const task=taskBlackboardService.get(result.taskId);
-      if(!task||['COMPLETED','FAILED','REJECTED','PAUSED','CANCELLED'].includes(task.status))break;
-      result=await this.resumeImprovementTask(result.taskId);
-    }
+    // 取り込み済み作業指示書は既に自律改善Queueへ登録されている。
+    // UIからCORE resumeを反復せず、正規Queue/Loopの開始状態だけを返す。
+    const result=await this.executeDirective(directiveId);
     const run=result.taskId
       ? this.getIntakeRuns(100).find(item=>item.taskId===result.taskId)
       : undefined;
     const packageRecord=run
       ? reviewZipExportService.list().find(item=>item.runId===run.runId)
       : undefined;
-    return {...result,packageId:packageRecord?.packageId,packageStatus:packageRecord?.status,cycles};
+    return {
+      ...result,
+      packageId:packageRecord?.packageId,
+      packageStatus:packageRecord?.status,
+      cycles:0
+    };
   }
   async saveAutonomyConfig(config:Partial<AutopilotConfig>){const command:ImprovementUiCommand={commandType:'SAVE_AUTONOMY_CONFIG',goal:'自律巡回設定を保存する',config,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-autonomy-config'),operationInstanceId:coreResultService.generateRequestId('operation')};const result=await coreTaskIngressService.submit({kind:'SYSTEM_TASK',goal:command.goal,source:'core',payload:{entry:'TYPED_IMPROVEMENT_UI_GATEWAY',operation:'SAVE_AUTONOMY_CONFIG',config:command.config,commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt}});return this.toCommandResult(command,result);}
 
