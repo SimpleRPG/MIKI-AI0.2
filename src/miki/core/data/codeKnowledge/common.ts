@@ -8,9 +8,34 @@ export interface CodeConstructionSlot {
 export interface CodeConstructionProfile {
   kind: 'STATEMENT'|'EXPRESSION'|'DECLARATION'|'TYPE'|'CALL'|'MODULE'|'ASYNC';
   syntaxTemplate: string;
+  outputKinds?: string[];
   slots: CodeConstructionSlot[];
   constraints: string[];
   adaptationRules: string[];
+}
+
+export interface CodeConstructionNode {
+  nodeId: string;
+  knowledgeComponentId: string;
+  componentType: string;
+  purpose: string;
+  profile: CodeConstructionProfile;
+}
+
+export interface CodeConstructionBinding {
+  targetNodeId: string;
+  slotName: string;
+  sourceNodeId?: string;
+  value?: string;
+  valueKind?: string;
+}
+
+export interface CodeConstructionGraph {
+  graphId: string;
+  goal: string;
+  rootNodeId?: string;
+  nodes: CodeConstructionNode[];
+  bindings: CodeConstructionBinding[];
 }
 
 export interface CodeKnowledgeSeed {
@@ -44,6 +69,7 @@ export const commonCodeKnowledge: CodeKnowledgeSeed[] = [
     constructionProfile: {
       kind: 'DECLARATION',
       syntaxTemplate: 'const {name} = {value};',
+      outputKinds: ['statement'],
       slots: [
         {name: 'name', inputKinds: ['identifier'], required: true},
         {name: 'value', inputKinds: ['expression'], required: true},
