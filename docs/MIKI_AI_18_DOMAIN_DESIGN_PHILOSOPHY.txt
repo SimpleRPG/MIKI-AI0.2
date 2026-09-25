@@ -1235,18 +1235,48 @@ REJECT / REQUEST_CHANGESは本番反映経路へ到達してはならない。
 - Review ZIPのrevision・凍結Snapshot管理
 - Candidateから本番反映までのPromotion/承認境界
 
-### 残作業
+### 2026-09-26 REVALIDATION Contract / Learning Lineage Closure
 
-次の4点を既存Canonical Ownerを再利用して実装する。
+最新mainの実装を再照合した結果、REVALIDATIONの基本契約は既存Canonical Owner上で実装済みである。
 
-1. REVALIDATIONのrequestedChangesをCOREの実装計画へ明示的に変換する。
-2. Candidate生成ContractへrequestedChanges、externalReviewId、sourcePackageId、candidateRevision等を直接渡す。
-3. 新Candidate / 新Packageを元のCORRECTION_PAIRの修正結果として明示的に関連付ける。
-4. REVALIDATION完了判定をValidation + Review Package生成 + 再レビュー待ちまで拡張する。
+- `externalReviewIntakeService`
+  - REQUEST_CHANGES / PARTIAL_ACCEPT / PARTIAL_REJECTをREVALIDATIONへ戻す。
+  - `requestedChanges`
+  - `externalReviewId`
+  - `sourcePackageId`
+  - `candidateRevision`
+  - `userReason`
+  - `targetFiles`
+  を既存Improvement Run payloadへ保持する。
 
-新しい自己改善Orchestratorや第二のCandidate/Review基盤は作らない。
+- `candidateCodeGenerationService`
+  - 既存Improvement Run payloadをCandidate生成へ使用する。
+  - `CandidateGenerationOutcome.learningLineage` を既に定義済み。
+  - Review Learning Artifactは既存 `reviewLearningArtifactService` から取得する。
 
-Canonical Ownerは以下を維持する。
+- `reviewLearningArtifactService`
+  - ACCEPT / REJECT / REQUEST_CHANGES等のDecisionから学習Artifactを生成する。
+  - CORRECTION_PAIRを保持する。
+  - `linkCorrectionCandidate()` により修正版Candidateを既存Correction Pairへ関連付ける。
+
+- `reviewZipExportService`
+  - `NEXT_PACKAGE_REVISION` を使用して元Packageから次Revisionを生成する。
+  - Candidate manifest、Validation、Learning lineage等をPackageへ保持する。
+
+したがって、以下は新規実装対象ではない。
+
+1. REVALIDATION専用Orchestrator
+2. 第二のCandidate生成基盤
+3. 第二のReview Package基盤
+4. 第二のLearning / Research基盤
+5. 19個目の分類
+
+今回の残存差分は、既存Learning Artifact取得結果をCandidate Compositionへ実際に接続し、成功Candidateの `learningLineage` にその利用履歴を保持することで閉じる。
+
+Learning Artifactは実行可能CODEとして扱わない。
+Accepted Pattern、Failure Pattern、Correction Pair等を既存Compositionの制約・修正知識として利用し、未解決Conflictは命令として扱わない。
+
+Canonical Ownerは変更しない。
 
 CORE
 → improvementIntakeRouterService
@@ -1256,8 +1286,6 @@ CORE
 → reviewZipExportService
 → externalReviewIntakeService
 → CORE
-
-設計・コード・機械検証の三者が一致するまで、この設計更新を実装完了とは扱わない。
 
 ### 2026-09-26 Code Construction Vocabulary Expansion 2
 
