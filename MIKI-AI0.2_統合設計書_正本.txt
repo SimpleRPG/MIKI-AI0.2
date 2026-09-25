@@ -8168,3 +8168,68 @@ CANDIDATEをruntime実行可能Componentとして扱わない。
 残る課題は個々のKnowledge / Componentの追加・検証・承認、および
 複数Componentを目的に応じて選択・接続する既存Composition条件の充実である。
 上位のCOREから合成機への経路を新設する必要はない。
+
+============================================================
+【2026-09-26 CODE Construction 基礎部品追加】
+============================================================
+
+既存のCODE Knowledge → CODE Component → Construction Graph経路を拡張するため、
+JavaScriptの基本構築部品を既存javascript.tsへ直接追加する。
+
+追加したKnowledge / Component：
+
+- code.javascript.arrow-function
+- code.javascript.function-call
+- code.javascript.return
+- code.javascript.assignment
+- code.javascript.comparison
+- code.javascript.logical
+- code.javascript.array-literal
+- code.javascript.object-literal
+- code.javascript.property-access
+- code.javascript.try-catch
+- code.javascript.throw
+- code.javascript.json-stringify
+- code.javascript.template-literal
+
+これらは既存の、
+
+CodeKnowledge
+↓
+ReusableComponentFactory
+↓
+CODE Component Candidate
+↓
+Construction Graph
+↓
+codeConstructionRendererService
+↓
+Candidate Workspace
+↓
+Verification / Regression / Canary / Promotion
+
+の経路へ直接追加する。
+
+新しい合成機、19番目の分類、official専用層は追加しない。
+
+今回の追加は、
+・関数の定義と呼び出し
+・値の返却
+・状態更新
+・条件式
+・論理式
+・配列／Object構築
+・プロパティ参照
+・例外処理
+・JSON変換
+・文字列構築
+
+という、自然言語の作業指示を基本的なJavaScript構造へ分解する際に必要な
+下位構造を増やすことを目的とする。
+
+初期CODE Componentは既存LifecycleどおりCANDIDATEであり、
+追加直後にruntime実行可能Componentへ昇格させない。
+
+複数候補が存在する場合の自動接続は、既存Construction Graphの
+「候補が1つだけの場合のみ自動Bindingする」規則を維持する。
+============================================================
