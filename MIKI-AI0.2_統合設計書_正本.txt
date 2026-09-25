@@ -7939,3 +7939,46 @@ failureFeedbackはCOREの判断結果であり、
 Domain側が独自判断で再試行条件を生成してはならない。
 
 ============================================================
+
+
+【実装確定追記：2026-09-25 CODE Knowledge → 自律コード改善接続】
+============================================================
+
+codeKnowledgeは実行可能CODE Componentへ直接変換して実行するのではなく、
+既存ReusableComponentFactoryのKNOWLEDGE Componentとして保持する。
+
+自律コード改善では、
+
+codeKnowledge
+↓
+ReusableComponentFactory.plan(KNOWLEDGE)
+↓
+自律コード改善の意味解決・UNKNOWN Resolutionへ実装知識を供給
+↓
+Research Query / Implementation Material
+↓
+CODE Component Candidate
+↓
+既存 NonLlmCodeSynthesis / CapabilityGraph(CODEのみ)
+↓
+ComponentComposition
+↓
+Candidate Workspace
+↓
+既存 VERIFY_CODE_COMPONENT / Regression / Canary / Promotion
+
+の順で利用する。
+
+KNOWLEDGE Componentは実行可能CODEとしてCapabilityGraphへ渡さない。
+CapabilityGraphのコード合成対象は従来どおりVERIFIED CODE Componentだけとする。
+
+Built-in CODE KnowledgeのenvironmentFingerprintは"universal"を許可し、
+具体的な実行環境(ANDROID等)によって知識そのものを除外しない。
+ただし実行可能CODE Componentのsupported_environments判定は従来どおり厳密に行う。
+
+これにより、
+「コード知識は存在するが自律コード改善では実際に使われない」
+状態を避け、既存CORE + 17分類、Research、CODE Component、
+Verification/Canary/Promotionの経路内で再利用可能な実装知識として扱う。
+============================================================
+

@@ -48,6 +48,64 @@ class CandidateCodeGenerationService {
   const effectiveValidationRequirements =
     this.strings(run.payload.validationRequirements);
 
+  /*
+   * Built-in CODE KNOWLEDGEを「実行可能CODE」として扱わず、
+   * 自律コード改善の意味解決・Research・CODE合成条件へ
+   * 汎用的な実装知識として渡す。
+   *
+   * これにより、
+   * CODE KNOWLEDGE
+   *   → UNKNOWN / Researchの意味補強
+   *   → Implementation Material収集
+   *   → CODE Component Candidate
+   *   → CODE-only Composition
+   * の流れを既存基盤上で成立させる。
+   */
+  const environmentFingerprint =
+    typeof run.payload.environmentFingerprint === 'string'
+      ? run.payload.environmentFingerprint
+      : 'unknown';
+
+  const knowledgeSelectionPurpose = [
+    run.objective,
+    ...effectiveRequirements,
+    ...this.strings(run.payload.requestedChanges),
+    ...targetPaths,
+    ...effectiveValidationRequirements,
+  ].filter(Boolean).join(' / ');
+
+  const codeKnowledgePack = reusableComponentFactoryService.plan({
+    taskId: run.taskId || run.runId,
+    purpose: knowledgeSelectionPurpose,
+    environmentFingerprint,
+    requiredKinds: ['KNOWLEDGE'],
+  });
+
+  const codeKnowledge = reusableComponentFactoryService
+    .list()
+    .filter(item =>
+      item.componentKind === 'KNOWLEDGE' &&
+      codeKnowledgePack.usedKnowledgeComponentIds.includes(item.componentId)
+    )
+    .slice(0, 8);
+
+  const knowledgeHints = codeKnowledge
+    .map(item => [
+      `component=${item.componentId}`,
+      `type=${item.componentType}`,
+      `purpose=${item.purpose}`,
+      `appliesWhen=${item.appliesWhen.join(' / ')}`,
+      `inputs=${item.inputs.join(' / ')}`,
+      `outputs=${item.outputs.join(' / ')}`,
+      `doesNotApplyWhen=${item.doesNotApplyWhen.join(' / ')}`,
+    ].join(' ; '))
+    .join('\n');
+
+  const knowledgeRequirement =
+    knowledgeHints
+      ? [`Reusable CODE KNOWLEDGE guidance (guidance only; never executable CODE):\n${knowledgeHints}`]
+      : [];
+
   const unknownContext=await candidateUnknownResolutionService.resolve({
     runId:run.runId,
     taskId:run.taskId||run.runId,
@@ -59,7 +117,10 @@ class CandidateCodeGenerationService {
       : 'unknown',
     targetPaths,
     sourcePaths:targetFiles.map(file=>file.path),
-    requirements:effectiveRequirements,
+    requirements:[
+      ...effectiveRequirements,
+      ...knowledgeRequirement,
+    ],
     validationRequirements:effectiveValidationRequirements
   });
 
@@ -172,12 +233,21 @@ class CandidateCodeGenerationService {
   }
 
   const learningContext=reviewLearningArtifactService.retrieve({objective:run.objective,packageId:typeof run.payload.packageId==='string'?run.payload.packageId:undefined});
-  const componentPack=reusableComponentFactoryService.plan({taskId:run.taskId||run.runId,purpose:run.objective,environmentFingerprint:typeof run.payload.environmentFingerprint==='string'?run.payload.environmentFingerprint:'unknown',requiredKinds:['KNOWLEDGE','CODE']});
-  const selectedComponents=reusableComponentFactoryService.list().filter(x=>[...componentPack.usedKnowledgeComponentIds,...componentPack.usedCodeComponentIds,...componentPack.usedConversationComponentIds].includes(x.componentId)).map(x=>({componentId:x.componentId,componentKind:x.componentKind,componentType:x.componentType,purpose:x.purpose,interfaceContract:x.interfaceContract,inputs:x.inputs,outputs:x.outputs,prerequisites:x.prerequisites,dependencies:x.dependencies,appliesWhen:x.appliesWhen,doesNotApplyWhen:x.doesNotApplyWhen,lifecycleStatus:x.lifecycleStatus,sourceLearningArtifactIds:x.sourceLearningArtifactIds}));
+  const componentPack=reusableComponentFactoryService.plan({
+    taskId:run.taskId||run.runId,
+    purpose:[run.objective,knowledgeHints].filter(Boolean).join(' / '),
+    environmentFingerprint,
+    requiredKinds:['KNOWLEDGE','CODE']
+  });
+
   const compositionPrompt=[
       run.objective,
       ...effectiveRequirements,
       ...this.strings(run.payload.requestedChanges),
+      ...(knowledgeHints ? [
+        'Reusable CODE KNOWLEDGE guidance:',
+        knowledgeHints
+      ] : []),
       ...(failureFeedbackText ? [
         'Failure-driven correction constraints:',
         failureFeedbackText
