@@ -3,6 +3,8 @@ import { canonicalSha256Object } from './canonicalSha256Service';
 import { reviewLearningArtifactService, type ReviewLearningArtifact } from './reviewLearningArtifactService';
 import type { ReviewLearningEpisode } from './reviewDecisionLearningService';
 import { verifierService } from '../../verification/services/verifierService';
+import { componentRegistryService } from '../../../services/componentRegistryService';
+import type { ComponentSecurityClass } from '../../../types';
 
 export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
@@ -135,6 +137,188 @@ class ReusableComponentFactoryService{
 
   return {component:item,verified,conflicted,verificationIds,reasons};
  }
+ createCodeComponentCandidate(input:{
+  purpose:string;
+  implementation:string;
+  targetPath:string;
+  tests:string;
+  validation:string;
+  componentType?:string;
+  inputs?:string[];
+  outputs?:string[];
+  prerequisites?:string[];
+  dependencies?:string[];
+  supportedEnvironments?:string[];
+  entryPoint?:string;
+  securityClass?:ComponentSecurityClass;
+  exports?:string[];
+  imports?:string[];
+  publicInterfaces?:string[];
+  coreIngressPoints?:string[];
+  domainOwnership?:string[];
+  persistenceKeys?:string[];
+  uiEventEntrypoints?:string[];
+  sourceEpisodeIds?:string[];
+  sourceLearningArtifactIds?:string[];
+}):{
+  accepted:boolean;
+  componentId?:string;
+  decision?:string;
+  reason?:string;
+  component?:AnyReusableComponent;
+}{
+  const implementation=input.implementation.trim();
+  const targetPath=input.targetPath.trim();
+  const tests=input.tests.trim();
+  const validation=input.validation.trim();
+
+  if(!input.purpose.trim())return {accepted:false,reason:'CODE_COMPONENT_PURPOSE_MISSING'};
+  if(!implementation)return {accepted:false,reason:'CODE_COMPONENT_IMPLEMENTATION_MISSING'};
+  if(!targetPath)return {accepted:false,reason:'CODE_COMPONENT_TARGET_PATH_MISSING'};
+  if(!tests)return {accepted:false,reason:'CODE_COMPONENT_TESTS_MISSING'};
+  if(!validation)return {accepted:false,reason:'CODE_COMPONENT_VALIDATION_MISSING'};
+
+  const decision=componentRegistryService.evaluateNewComponentCandidate({
+    purpose:input.purpose.trim(),
+    implementationCode:implementation,
+    entryPoint:input.entryPoint||targetPath,
+    securityClass:input.securityClass||('STANDARD' as ComponentSecurityClass),
+  });
+
+  if(decision.decision!=='NEW'){
+    return {
+      accepted:false,
+      decision:decision.decision,
+      reason:decision.reason,
+    };
+  }
+
+  const now=Date.now();
+  const implementationTxt=[
+    `TARGET_PATH: ${targetPath}`,
+    'FILE_CONTENT_BEGIN',
+    implementation,
+    'FILE_CONTENT_END',
+  ].join('\\n');
+
+  const implementationHash=(() => {
+    let hash=0;
+    const clean=implementation.trim();
+    for(let i=0;i<clean.length;i++){
+      const char=clean.charCodeAt(i);
+      hash=((hash<<5)-hash)+char;
+      hash|=0;
+    }
+    return `h_${Math.abs(hash).toString(16).padStart(8,'0')}`;
+  })();
+
+  const base={
+    component_id:`CC-${implementationHash}-${now.toString(36)}`,
+    version:'1.0.0',
+    status:'CANDIDATE',
+    purpose:input.purpose.trim(),
+    inputs:input.inputs||[],
+    outputs:input.outputs||[],
+    preconditions:input.prerequisites||[],
+    postconditions:[],
+    side_effects:[],
+    dependencies:input.dependencies||[],
+    supported_environments:input.supportedEnvironments||['ANDROID'],
+    entry_point:input.entryPoint||targetPath,
+    failure_behavior:'RETURN_BLOCKED_RESULT',
+    security_class:input.securityClass||('STANDARD' as ComponentSecurityClass),
+    idempotent:false,
+    deterministic:true,
+    component_txt:[
+      `PURPOSE: ${input.purpose.trim()}`,
+      `TARGET_PATH: ${targetPath}`,
+      `ENTRY_POINT: ${input.entryPoint||targetPath}`,
+      'STATUS: CANDIDATE',
+    ].join('\\n'),
+    implementation_txt:implementationTxt,
+    tests_txt:tests,
+    validation_txt:validation,
+    implementation_hash:implementationHash,
+    validation_hash:'',
+    test_count:1,
+    validation_count:1,
+    created_at:now,
+    updated_at:now,
+    source_episode_ids:input.sourceEpisodeIds||[],
+    source_learning_artifact_ids:input.sourceLearningArtifactIds||[],
+  };
+
+  const componentPackage={
+    ...base,
+    componentType:input.componentType||'RESEARCHED_CODE_COMPONENT',
+    exports:input.exports||[],
+    imports:input.imports||[],
+    publicInterfaces:input.publicInterfaces||[],
+    coreIngressPoints:input.coreIngressPoints||[],
+    domainOwnership:input.domainOwnership||['selfDevelopment'],
+    persistenceKeys:input.persistenceKeys||[],
+    uiEventEntrypoints:input.uiEventEntrypoints||[],
+  } as ComponentTxtPackage;
+
+  componentRegistryService.registerComponent(componentPackage);
+
+  const registered=componentRegistryService.getComponent(componentPackage.component_id);
+  if(!registered){
+    return {
+      accepted:false,
+      decision:'PERSISTENCE_FAILED',
+      reason:'CODE_COMPONENT_REGISTRY_PERSISTENCE_FAILED',
+    };
+  }
+
+  const common={
+    purpose:input.purpose.trim(),
+    interfaceContract:{
+      input:input.inputs||['task context'],
+      output:input.outputs||['candidate implementation'],
+    },
+    inputs:input.inputs||[],
+    outputs:input.outputs||[],
+    prerequisites:input.prerequisites||[],
+    dependencies:input.dependencies||[],
+    appliesWhen:[input.purpose.trim()],
+    doesNotApplyWhen:[],
+    sourceEpisodeIds:input.sourceEpisodeIds||[],
+    sourceLearningArtifactIds:input.sourceLearningArtifactIds||[],
+    environmentFingerprint:(input.supportedEnvironments||['ANDROID']).join(','),
+    lifecycleStatus:'CANDIDATE' as const,
+    usageCount:0,
+    successCount:0,
+    failureCount:0,
+    createdAt:now,
+    updatedAt:now,
+  };
+
+  const artifact=this.identify({
+    ...common,
+    componentKind:'CODE' as const,
+    componentType:input.componentType||'RESEARCHED_CODE_COMPONENT',
+    exports:input.exports||[],
+    imports:input.imports||[],
+    publicInterfaces:input.publicInterfaces||[],
+    coreIngressPoints:input.coreIngressPoints||[],
+    domainOwnership:input.domainOwnership||['selfDevelopment'],
+    persistenceKeys:input.persistenceKeys||[],
+    uiEventEntrypoints:input.uiEventEntrypoints||[],
+    testReferences:[targetPath],
+    requiredValidation:['tests','validation','registry lifecycle','implementation hash'],
+  }) as CodeComponentArtifact;
+
+  this.storeCandidates([artifact]);
+
+  return {
+    accepted:true,
+    componentId:componentPackage.component_id,
+    decision:'NEW',
+    component:artifact,
+  };
+ }
+
  storeCandidates(items:AnyReusableComponent[]):{componentIds:string[];persistenceReceiptId:string;reloaded:boolean}{const existing=this.list();const merged=[...items,...existing.filter(item=>!items.some(next=>next.canonicalSha256===item.canonicalSha256))].slice(0,1000);storageService.setItem(COMPONENT_KEY,JSON.stringify(merged));const loaded=this.list();const reloaded=items.every(item=>loaded.some(saved=>saved.componentId===item.componentId&&saved.canonicalSha256===item.canonicalSha256));if(!reloaded)throw new Error('COMPONENT_REPOSITORY_PERSISTENCE_FAILED');return {componentIds:items.map(x=>x.componentId),persistenceReceiptId:`CPR-${canonicalSha256Object({ids:items.map(x=>x.componentId),at:Date.now()}).slice(0,20)}`,reloaded};}
  retrieve(input:{purpose:string;environmentFingerprint:string;kinds?:ReusableComponentKind[]}):{candidates:AnyReusableComponent[];excludedComponentIds:string[];exclusionReasons:Record<string,string>}{const words=this.words(input.purpose);const excludedComponentIds:string[]=[];const exclusionReasons:Record<string,string>={};const candidates=this.list().filter(item=>{if(input.kinds&&!input.kinds.includes(item.componentKind)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='KIND_NOT_SELECTED';return false;}if(!['MIKI_APPROVED','ACTIVE','USER_APPROVED'].includes(item.lifecycleStatus)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='NOT_MIKI_APPROVED';return false;}if(item.environmentFingerprint!=='unknown'&&item.environmentFingerprint!==input.environmentFingerprint){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='ENVIRONMENT_REVALIDATION_REQUIRED';return false;}const hay=this.words([item.purpose,...item.appliesWhen,item.componentType].join(' '));const matched=words.some(word=>hay.includes(word));if(!matched){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='PURPOSE_NOT_MATCHED';}return matched;});return {candidates,excludedComponentIds,exclusionReasons};}
  plan(input:{taskId:string;purpose:string;environmentFingerprint:string;requiredKinds?:ReusableComponentKind[]}):ComponentPack{const found=this.retrieve({purpose:input.purpose,environmentFingerprint:input.environmentFingerprint,kinds:input.requiredKinds});const knowledge=found.candidates.filter(x=>x.componentKind==='KNOWLEDGE').map(x=>x.componentId);const code=found.candidates.filter(x=>x.componentKind==='CODE').map(x=>x.componentId);const conversation=found.candidates.filter(x=>x.componentKind==='CONVERSATION').map(x=>x.componentId);const unresolved=(input.requiredKinds||[]).filter(kind=>!found.candidates.some(x=>x.componentKind===kind)).map(kind=>`${kind}_COMPONENT_REQUIRED`);const context={taskId:input.taskId,knowledge,code,conversation,excluded:found.excludedComponentIds,environmentFingerprint:input.environmentFingerprint,unresolved};const componentContextSha256=canonicalSha256Object(context);return {componentPackId:`CPACK-${componentContextSha256.slice(0,20)}`,knowledgePackId:`KPACK-${canonicalSha256Object(knowledge).slice(0,20)}`,usedKnowledgeComponentIds:knowledge,usedCodeComponentIds:code,usedConversationComponentIds:conversation,adaptedComponentIds:[],createdComponentIds:[],excludedComponentIds:found.excludedComponentIds,exclusionReasons:found.exclusionReasons,environmentFingerprint:input.environmentFingerprint,unresolvedComponentNeeds:unresolved,componentContextSha256,packSha256:canonicalSha256Object({...context,componentContextSha256})};}
