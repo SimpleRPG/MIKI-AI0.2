@@ -4846,7 +4846,7 @@ export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
   "publicInterfaces": [],
   "tests": "CONTRACT_TEST:code.typescript.import-type",
   "validation": "VALIDATE_CODE_CONSTRUCTION:code.typescript.import-type"
-}
+},
 
 {
   knowledgeId: 'code.typescript.generic-function-constraint',
