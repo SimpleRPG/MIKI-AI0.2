@@ -338,7 +338,7 @@ export class WebMaterialPatternExtractor {
       /(?:pip|pip3)\s+install\s+([^\n]+)/gi,
       /implementation\s+['"]([^'"]+)['"]/gi,
       /import\s+.+?\s+from\s+['"]([^'"]+)['"]/g,
-      /require\s*['"]([^'"]+)['"]\s*/g,
+      /require\(\s*['"]([^'"]+)['"]\s*\)/g,
     ];
 
     for (const pattern of dependencyPatterns) {
