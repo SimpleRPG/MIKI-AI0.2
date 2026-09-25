@@ -1665,3 +1665,40 @@ MIKIの汎用コード構築Knowledgeを既存のJavaScript/TypeScript/Web基礎
 既存Knowledge・Componentと同一目的の重複実装は作らず、既存部品は従来どおり優先して再利用する。
 新規領域のKnowledgeにはConstructionProfileを持たせ、Construction Graphから直接候補化できるようにする。
 
+
+
+### 2026-09-26 Source Context Consistency Contract
+
+自律コード改善では、最新Repository Snapshotを受け取っていることだけではなく、
+そのSnapshotを前提として作成されたImprovement Runと、Candidate生成時の現在Snapshotが
+同一であることを生成開始前に確認する。
+
+既存の `selfCodeSpaceService` が保持する現在Sourceの
+`path + contentHash` 集合から `sourceSnapshotSha256` を算出し、
+`improvementIntakeRouterService` がRun作成時に記録する。
+
+`candidateCodeGenerationService` は生成開始時に現在Snapshotを再計算し、
+Runの `sourceSnapshotSha256` と一致しない場合は
+`SOURCE_CONTEXT_CONFLICT` としてCandidate生成を停止する。
+
+SnapshotがRunに存在しない場合も
+`SOURCE_CONTEXT_CONTRACT_REQUIRED` として生成を停止する。
+
+この契約は既存のSnapshot、SelfCodeSpace、Candidate Write Guardを利用する。
+新しいRepository同期サービス、Snapshot Store、Candidate Generator、Orchestratorは追加しない。
+
+責務は以下に固定する。
+
+- `selfCodeSpaceService`: 現在Repository Sourceの正本
+- `improvementIntakeRouterService`: Run作成時のSource Context固定
+- `candidateCodeGenerationService`: 生成開始前のSource Context整合性検証
+- `candidateWriteGuardService` / `isolatedCandidateWorkspaceService`: Candidate適用時のbaseline競合検証
+
+過去のLearning Artifact、会話履歴、以前のCandidate、古い修正案は
+現在Repositoryの事実として扱わない。
+
+Source Contextが一致しない場合、古い情報を推測で補正して生成を続行せず、
+COREへ失敗結果を返して再評価・再取得経路へ戻す。
+
+これは既存18分類/COREResult/Construction Graph/Research経路を変更せず、
+既存Candidate生成境界へ現在Sourceとの整合性ゲートを追加するものである。

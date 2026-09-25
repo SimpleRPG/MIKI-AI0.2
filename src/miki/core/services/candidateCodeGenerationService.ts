@@ -21,9 +21,42 @@ export interface CandidateGenerationOutcome { accepted:boolean; runId:string; wo
 class CandidateCodeGenerationService {
  async generate(runId:string):Promise<CandidateGenerationOutcome>{
   const run=improvementIntakeRouterService.get(runId);if(!run)return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND']};
+  const currentSourceFiles=selfCodeSpaceService.listSourceFiles();
+  if(currentSourceFiles.length===0)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_EMPTY']};
+
+  const currentSourceSnapshotSha256=canonicalSha256(
+    currentSourceFiles.map(file=>({
+      path:file.path,
+      sha256:file.contentHash
+    }))
+  );
+
+  const runSourceSnapshotSha256=
+    typeof run.payload.sourceSnapshotSha256==='string'
+      ? run.payload.sourceSnapshotSha256.trim()
+      : '';
+
+  if(!runSourceSnapshotSha256){
+    return {
+      accepted:false,
+      runId,
+      files:[],
+      reasons:['SOURCE_CONTEXT_CONTRACT_REQUIRED']
+    };
+  }
+
+  if(runSourceSnapshotSha256!==currentSourceSnapshotSha256){
+    return {
+      accepted:false,
+      runId,
+      files:[],
+      reasons:['SOURCE_CONTEXT_CONFLICT']
+    };
+  }
+
   const probe=await autonomousCandidatePreparationService.prepareForRun(runId,[]);const targetPaths=probe.targetPaths;
   if(targetPaths.length===0)return {accepted:false,runId,files:[],reasons:[probe.reason||'TARGET_FILES_NOT_RESOLVED']};
-  const sources=new Map(selfCodeSpaceService.listSourceFiles().map(file=>[file.path,file]));const targetFiles=targetPaths.map(path=>sources.get(path)).filter((value):value is NonNullable<typeof value>=>Boolean(value));
+  const sources=new Map(currentSourceFiles.map(file=>[file.path,file]));const targetFiles=targetPaths.map(path=>sources.get(path)).filter((value):value is NonNullable<typeof value>=>Boolean(value));
   if(targetFiles.length!==targetPaths.length)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
   const implementationPlan=run.implementationPlan;
   if(run.runType==='AUTONOMOUS_DISCOVERY'&&!implementationPlan)return {accepted:false,runId,files:[],reasons:['AUTONOMOUS_IMPLEMENTATION_PLAN_REQUIRED']};
@@ -698,6 +731,7 @@ class CandidateCodeGenerationService {
      */
     const compiledRequest:any={
       goal:run.objective,
+      sourceSnapshotSha256:currentSourceSnapshotSha256,
       targetFiles:targetFiles.map(file=>file.path),
       environment:'ANDROID',
       requirements:this.strings(run.payload.requirements),

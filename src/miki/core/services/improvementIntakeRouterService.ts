@@ -1,5 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { selfImprovementIngressService } from './selfImprovementIngressService';
+import { selfCodeSpaceService } from './selfCodeSpaceService';
+import { canonicalSha256 } from './canonicalSha256Service';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 import type { AutonomousImplementationPlan } from './autonomousCandidatePreparationService';
 export type ImprovementRunType='AUTONOMOUS_DISCOVERY'|'EXTERNAL_DIRECTIVE'|'USER_REQUEST'|'EXECUTION_FAILURE'|'REVALIDATION';
@@ -8,7 +10,24 @@ export interface ImprovementIntakeRun { runId:string; changeSetId?:ChangeSetID; 
 const KEY='miki_improvement_intake_runs_v1';
 class ImprovementIntakeRouterService{
  private runs=new Map<string,ImprovementIntakeRun>();private sequence=0;constructor(){this.load();}
- async receive(input:{runType:ImprovementRunType;sourceId:string;objective:string;payload?:Record<string,unknown>;priority?:number;relatedRunIds?:string[];changeSetId?:ChangeSetID}):Promise<ImprovementIntakeRun>{const now=Date.now();this.sequence+=1;const prefix=input.runType==='AUTONOMOUS_DISCOVERY'?'AUTO':input.runType==='EXTERNAL_DIRECTIVE'?'EXT':input.runType==='EXECUTION_FAILURE'?'EXEC':input.runType==='REVALIDATION'?'REVAL':'USER';const sourceHash=await this.sha(JSON.stringify({sourceId:input.sourceId,objective:input.objective,payload:input.payload||{}}));const duplicate=[...this.runs.values()].find(x=>x.runType===input.runType&&x.sourceHash===sourceHash&&x.status!=='COMPLETED'&&x.status!=='REJECTED');if(duplicate)return this.clone(duplicate);const run:ImprovementIntakeRun={runId:`RUN-${prefix}-${now}-${String(this.sequence).padStart(6,'0')}`,changeSetId:input.changeSetId,runType:input.runType,sourceId:input.sourceId,objective:input.objective.trim(),sourceHash,payload:{...(input.payload||{})},priority:Math.max(0,Math.min(100,input.priority??50)),status:'VALIDATED',createdAt:now,updatedAt:now,relatedRunIds:[...(input.relatedRunIds||[])]};
+
+ private currentSourceSnapshotSha256():string{
+  const files=selfCodeSpaceService.listSourceFiles();
+  if(!files.length)return '';
+  return canonicalSha256(
+   files.map(file=>({
+    path:file.path,
+    sha256:file.contentHash
+   }))
+  );
+ }
+ async receive(input:{runType:ImprovementRunType;sourceId:string;objective:string;payload?:Record<string,unknown>;priority?:number;relatedRunIds?:string[];changeSetId?:ChangeSetID}):Promise<ImprovementIntakeRun>{const now=Date.now();this.sequence+=1;const prefix=input.runType==='AUTONOMOUS_DISCOVERY'?'AUTO':input.runType==='EXTERNAL_DIRECTIVE'?'EXT':input.runType==='EXECUTION_FAILURE'?'EXEC':input.runType==='REVALIDATION'?'REVAL':'USER';const sourceSnapshotSha256=this.currentSourceSnapshotSha256();
+    if(!sourceSnapshotSha256)throw new Error('SOURCE_SNAPSHOT_REQUIRED');
+    const payloadWithSourceSnapshot={
+      ...(input.payload||{}),
+      sourceSnapshotSha256
+    };
+    const sourceHash=await this.sha(JSON.stringify({sourceId:input.sourceId,objective:input.objective,payload:payloadWithSourceSnapshot}));const duplicate=[...this.runs.values()].find(x=>x.runType===input.runType&&x.sourceHash===sourceHash&&x.status!=='COMPLETED'&&x.status!=='REJECTED');if(duplicate)return this.clone(duplicate);const run:ImprovementIntakeRun={runId:`RUN-${prefix}-${now}-${String(this.sequence).padStart(6,'0')}`,changeSetId:input.changeSetId,runType:input.runType,sourceId:input.sourceId,objective:input.objective.trim(),sourceHash,payload:payloadWithSourceSnapshot,priority:Math.max(0,Math.min(100,input.priority??50)),status:'VALIDATED',createdAt:now,updatedAt:now,relatedRunIds:[...(input.relatedRunIds||[])]};
     if(input.runType==='REVALIDATION'){
       const p=input.payload||{};
       const targets=Array.isArray(p.targetFiles)?p.targetFiles.filter((x):x is string=>typeof x==='string'&&x.trim().length>0).map(x=>x.trim()):[];
@@ -18,7 +37,13 @@ class ImprovementIntakeRouterService{
  async ensureForCoreTask(input:{taskId:string;objective:string;payload?:Record<string,unknown>;sourceId?:string}):Promise<ImprovementIntakeRun>{
   const existing=[...this.runs.values()].find(run=>run.taskId===input.taskId);
   if(existing){
-    const incoming={...(input.payload||{}),taskId:input.taskId};
+    const sourceSnapshotSha256=this.currentSourceSnapshotSha256();
+    if(!sourceSnapshotSha256)throw new Error('SOURCE_SNAPSHOT_REQUIRED');
+    const incoming={
+      ...(input.payload||{}),
+      taskId:input.taskId,
+      sourceSnapshotSha256
+    };
     existing.payload={...existing.payload,...incoming};
     const incomingTargets=Array.isArray(incoming.targetFiles)
       ? incoming.targetFiles.filter((x):x is string=>typeof x==='string'&&x.trim().length>0).map(x=>x.trim())
@@ -39,7 +64,13 @@ class ImprovementIntakeRouterService{
     return this.clone(existing);
   }
   const now=Date.now();this.sequence+=1;
-  const payload={...(input.payload||{}),taskId:input.taskId};
+  const sourceSnapshotSha256=this.currentSourceSnapshotSha256();
+  if(!sourceSnapshotSha256)throw new Error('SOURCE_SNAPSHOT_REQUIRED');
+  const payload={
+    ...(input.payload||{}),
+    taskId:input.taskId,
+    sourceSnapshotSha256
+  };
   const sourceId=input.sourceId||input.taskId;
   const sourceHash=await this.sha(JSON.stringify({sourceId,objective:input.objective,payload}));
   const run:ImprovementIntakeRun={
