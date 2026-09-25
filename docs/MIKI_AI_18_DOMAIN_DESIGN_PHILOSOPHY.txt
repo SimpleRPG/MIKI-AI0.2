@@ -1478,3 +1478,62 @@ Multi-file専用のVerification Orchestratorを新設しない。
 
 この修正ではResearch、CORE、AdaptiveRoutePlanner、
 ComponentComposition、Candidate Validation等の既存責務境界を変更しない。
+
+
+### 2026-09-26 Autonomous Construction Essentials
+
+MIKIが自律的にコードを構築できることを目的として、既存のReusable Component
+基盤へ汎用コード構築Knowledge / CODE Componentを追加する。
+
+これは第二の合成機、第二のCode Generator、第二のResearch基盤を作るものではない。
+
+既存の正規経路、
+
+CORE
+→ selfDevelopment
+→ CandidateCodeGenerationService
+→ ReusableComponentFactoryService
+→ Construction Graph
+→ CODE Component Candidate
+→ Verification
+→ CORE再評価
+
+をそのまま使用する。
+
+追加するKnowledge / CODE Componentは、一般的なコード構築で頻出する最小構成単位を
+対象とする。
+
+- named import / named export
+- arrow function
+- if / for-of
+- try/catch
+- Array.filter / reduce
+- object spread
+- optional chaining / nullish coalescing
+- TypeScript interface / type alias
+- async function
+- Promise.all
+- fetch
+- JSON.parse / JSON.stringify
+
+これらは「完成した業務コード」をKnowledgeとして保存するのではなく、
+Construction Graphが他のComponentと接続できる構築単位として保持する。
+
+MIKIが新しいコードを作る場合は、可能な限り既存CODE Componentを再利用し、
+必要な部品をConstruction Graphで接続し、それでも不足するKnowledgeがある場合に
+Unknown → Research → Knowledge Integrationを経て新しい再利用部品候補を形成する。
+
+したがって、目標は「最初から全コードを知っているMIKI」ではなく、
+
+既知の部品を再利用
+→ 部品を組み合わせる
+→ 構築できない部分をUnknownとして特定
+→ Researchで不足知識を取得
+→ Verificationで確認
+→ 再利用可能なKnowledge / CODE Component候補へ変換
+→ 次回以降のConstruction Graphで再利用
+
+という循環によって、MIKI自身が構築可能範囲を継続的に拡張することである。
+
+新しい部品を追加するときも、既存Canonical Ownerや既存Construction Graph機構と
+重複するサービスを作らない。

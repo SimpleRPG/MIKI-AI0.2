@@ -14,6 +14,10 @@ import {
   additionalModuleCodeKnowledge,
   additionalModuleCodeComponents,
 } from '../data/codeKnowledge/modules';
+import {
+  autonomousConstructionKnowledge,
+  additionalAutonomousConstructionComponents,
+} from '../data/codeKnowledge/autonomousConstruction';
 export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
 export type ComponentSelectionMode='REUSE_AS_IS'|'ADAPT_EXISTING'|'COMPOSE_MULTIPLE'|'CREATE_NEW'|'ESCALATE_UNKNOWN';
@@ -53,6 +57,7 @@ class ReusableComponentFactoryService{
       ...additionalWebCodeComponents,
       ...additionalTestingCodeComponents,
       ...additionalModuleCodeComponents,
+      ...additionalAutonomousConstructionComponents,
     ];
 
     for (const definition of definitions) {
@@ -99,6 +104,7 @@ class ReusableComponentFactoryService{
       ...additionalTestingCodeKnowledge,
       ...moduleCodeKnowledge,
       ...additionalModuleCodeKnowledge,
+      ...autonomousConstructionKnowledge,
     ];
 
     const existing=this.list();
@@ -475,6 +481,7 @@ class ReusableComponentFactoryService{
     ...additionalWebCodeComponents,
     ...additionalTestingCodeComponents,
     ...additionalModuleCodeComponents,
+    ...additionalAutonomousConstructionComponents,
   ];
 
   const constructionContractErrors:string[]=[];
@@ -950,6 +957,7 @@ class ReusableComponentFactoryService{
     ...additionalTestingCodeKnowledge,
     ...moduleCodeKnowledge,
     ...additionalModuleCodeKnowledge,
+    ...autonomousConstructionKnowledge,
   ];
 
   const definitions:CodeComponentDefinition[]=[
@@ -958,6 +966,7 @@ class ReusableComponentFactoryService{
     ...additionalWebCodeComponents,
     ...additionalTestingCodeComponents,
     ...additionalModuleCodeComponents,
+    ...additionalAutonomousConstructionComponents,
   ];
 
   const knowledgeIds=new Set(
