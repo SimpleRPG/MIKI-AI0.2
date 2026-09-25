@@ -19,7 +19,48 @@ class CandidateCodeGenerationService {
   if(targetFiles.length!==targetPaths.length)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
   const implementationPlan=run.implementationPlan;
   if(run.runType==='AUTONOMOUS_DISCOVERY'&&!implementationPlan)return {accepted:false,runId,files:[],reasons:['AUTONOMOUS_IMPLEMENTATION_PLAN_REQUIRED']};
-  const unknownContext=await candidateUnknownResolutionService.resolve({runId:run.runId,taskId:run.taskId||run.runId,objective:run.objective,environmentFingerprint:typeof run.payload.environmentFingerprint==='string'?run.payload.environmentFingerprint:'unknown',targetPaths,sourcePaths:targetFiles.map(file=>file.path),requirements:this.strings(run.payload.requirements),validationRequirements:this.strings(run.payload.validationRequirements)});
+  const failureFeedback =
+    run.payload.failureFeedback &&
+    typeof run.payload.failureFeedback === 'object'
+      ? run.payload.failureFeedback as Record<string,unknown>
+      : undefined;
+
+  const failureFeedbackText = failureFeedback
+    ? [
+        'Previous Candidate verification failure must be corrected in this revision.',
+        `sourceOperation=${String(failureFeedback.sourceOperation||'VERIFY_CODE_COMPONENT')}`,
+        `status=${String(failureFeedback.status||'FAILED')}`,
+        `retryOfCandidateRevision=${String(failureFeedback.retryOfCandidateRevision||'')}`,
+        `componentIds=${this.strings(failureFeedback.componentIds).join(',')}`,
+        `reasons=${this.strings(failureFeedback.reasons).join(' | ')}`,
+        typeof failureFeedback.result==='object'
+          ? `result=${JSON.stringify(failureFeedback.result)}`
+          : `result=${String(failureFeedback.result||'')}`,
+      ].join('\n')
+    : '';
+
+  const effectiveRequirements = [
+    ...this.strings(run.payload.requirements),
+    ...(failureFeedbackText ? [failureFeedbackText] : []),
+  ];
+
+  const effectiveValidationRequirements =
+    this.strings(run.payload.validationRequirements);
+
+  const unknownContext=await candidateUnknownResolutionService.resolve({
+    runId:run.runId,
+    taskId:run.taskId||run.runId,
+    objective:failureFeedbackText
+      ? `${run.objective}\n${failureFeedbackText}`
+      : run.objective,
+    environmentFingerprint:typeof run.payload.environmentFingerprint==='string'
+      ? run.payload.environmentFingerprint
+      : 'unknown',
+    targetPaths,
+    sourcePaths:targetFiles.map(file=>file.path),
+    requirements:effectiveRequirements,
+    validationRequirements:effectiveValidationRequirements
+  });
 
   /*
    * CREATE判定を実際のCODE Component Candidateへ接続する。
@@ -134,8 +175,12 @@ class CandidateCodeGenerationService {
   const selectedComponents=reusableComponentFactoryService.list().filter(x=>[...componentPack.usedKnowledgeComponentIds,...componentPack.usedCodeComponentIds,...componentPack.usedConversationComponentIds].includes(x.componentId)).map(x=>({componentId:x.componentId,componentKind:x.componentKind,componentType:x.componentType,purpose:x.purpose,interfaceContract:x.interfaceContract,inputs:x.inputs,outputs:x.outputs,prerequisites:x.prerequisites,dependencies:x.dependencies,appliesWhen:x.appliesWhen,doesNotApplyWhen:x.doesNotApplyWhen,lifecycleStatus:x.lifecycleStatus,sourceLearningArtifactIds:x.sourceLearningArtifactIds}));
   const compositionPrompt=[
       run.objective,
-      ...this.strings(run.payload.requirements),
-      ...this.strings(run.payload.requestedChanges)
+      ...effectiveRequirements,
+      ...this.strings(run.payload.requestedChanges),
+      ...(failureFeedbackText ? [
+        'Failure-driven correction constraints:',
+        failureFeedbackText
+      ] : [])
     ].filter(Boolean).join('\\n');
 
     /*

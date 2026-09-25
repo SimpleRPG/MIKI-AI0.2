@@ -110,6 +110,36 @@ class DomainIntegrationBootstrapService{
    const task=taskBlackboardService.get(taskId);
    if(!task)return;
 
+   const matchingCanary=safeImprovementPipelineService.list()
+     .filter(run =>
+       run.new_component_mode===true &&
+       run.component_id===event.component_id &&
+       run.environment===event.environment &&
+       run.implementation_hash===event.implementation_hash
+     )
+     .sort((a,b)=>b.updated_at-a.updated_at)[0];
+
+   const canaryState=matchingCanary
+     ? safeImprovementPipelineService.get(matchingCanary.run_id)
+     : undefined;
+
+   const canaryStatus=
+     canaryState?.stage==='ADOPTED'
+       ? 'VERIFIED'
+       : canaryState?.stage==='ROLLED_BACK'
+         ? 'FAILED'
+         : canaryState?.stage==='REJECTED'
+           ? 'FAILED'
+           : event.passed===true
+             ? 'WAITING_EXECUTION'
+             : 'FAILED';
+
+   const canaryReason=
+     canaryState?.reason ||
+     (event.passed===true
+       ? 'Execution completed; Canary remains under CORE evaluation.'
+       : 'Execution failed; CORE must re-evaluate the NEW_COMPONENT Canary.');
+
    taskBlackboardService.append(
      taskId,
      'RESULT',
@@ -118,6 +148,7 @@ class DomainIntegrationBootstrapService{
      {
        operation:'VERIFY_CODE_COMPONENT',
        operationClass:'BUSINESS',
+       status:canaryStatus,
        requestId:event.request_id,
        componentId:event.component_id,
        eventType:event.type,
@@ -127,6 +158,10 @@ class DomainIntegrationBootstrapService{
        environment:event.environment,
        testCaseId:event.test_case_id,
        evidenceId:request?.evidence_id,
+       canaryRunId:matchingCanary?.run_id,
+       canaryStatus:canaryState?.stage,
+       canaryReason,
+       failureReason:event.passed===true?undefined:(event.output_summary||canaryReason),
        coreCollected:true,
        collectedBy:'core'
      },
