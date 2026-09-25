@@ -8277,3 +8277,20 @@ Verification / Regression / Canary / Promotion
 
 新しい19番目の分類、新しいLLM runtime、新しいコード生成エンジンは追加しない。
 ============================================================
+
+【実装確定追記：2026-09-26 JavaScript Array Construction Knowledge/Component拡張】
+============================================================
+
+・既存のArray map/filter CODE Componentは再利用し、重複登録しない。
+・既存map/filterに対応するConstruction Knowledgeを追加する。
+・Array find/someについてConstruction KnowledgeとCODE Component定義を追加する。
+・これによりConstruction Graphは、配列処理について
+  inputArray → filter/map/find/some → callback → property access → return
+  のような複合構成を候補として探索できる基盤を持つ。
+・既存ComponentCompositionServiceとは責務を分離する。
+  Construction GraphはKnowledge/Construction Profileから候補構造を探索し、
+  ComponentCompositionServiceはRegistry上の実行可能ComponentのComposition/検証を担当する。
+・新しい合成機・19番目の分類・LLM runtime経路は追加しない。
+・CODE Componentは既存の検証・承認Lifecycleを維持する。
+・旧src/services配下の同名Composition/Synthesis実装については、
+  新MIKI経路との参照関係を確認してから削除可否を判断する。

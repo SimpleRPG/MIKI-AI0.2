@@ -780,6 +780,63 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   },
 ];
 
+  {
+    id: 'code.javascript.array-find',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '条件に合う配列要素を最初の1件として取得する',
+    summary: 'Array.findを使って条件に一致する最初の要素を取得する。',
+    concepts: ['Array.find', 'find', 'predicate', 'callback'],
+    inputs: ['array-expression', 'function-expression'],
+    outputs: ['expression'],
+    appliesWhen: ['最初に条件を満たす要素を取得する', 'findを使う'],
+    doesNotApplyWhen: ['一致するすべての要素を取得する場合'],
+    sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find'],
+    sourceArtifactIds: ['mdn-array-find'],
+    constructionProfile: {
+      kind: 'EXPRESSION',
+      syntaxTemplate: '{array}.find({predicate})',
+      outputKinds: ['expression'],
+      slots: [
+        {name: 'array', inputKinds: ['array-expression'], required: true},
+        {name: 'predicate', inputKinds: ['function-expression'], required: true},
+      ],
+      constraints: [
+        'predicate must produce a boolean-compatible result'
+      ],
+      adaptationRules: [
+        'use filter when multiple matching elements are required'
+      ],
+    },
+  },
+  {
+    id: 'code.javascript.array-some',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '配列に条件を満たす要素が存在するか判定する',
+    summary: 'Array.someを使って少なくとも1件の条件一致をbooleanで判定する。',
+    concepts: ['Array.some', 'some', 'predicate', 'boolean'],
+    inputs: ['array-expression', 'function-expression'],
+    outputs: ['boolean-expression'],
+    appliesWhen: ['条件を満たす要素が存在するか判定する', 'someを使う'],
+    doesNotApplyWhen: ['一致する要素自体が必要な場合'],
+    sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/some'],
+    sourceArtifactIds: ['mdn-array-some'],
+    constructionProfile: {
+      kind: 'EXPRESSION',
+      syntaxTemplate: '{array}.some({predicate})',
+      outputKinds: ['boolean-expression'],
+      slots: [
+        {name: 'array', inputKinds: ['array-expression'], required: true},
+        {name: 'predicate', inputKinds: ['function-expression'], required: true},
+      ],
+      constraints: [
+        'predicate must produce a boolean-compatible result'
+      ],
+      adaptationRules: [
+        'use find when the matching element itself is required'
+      ],
+    },
+  },
+
 export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   {
     knowledgeId: 'code.javascript.const-declaration',
@@ -1199,5 +1256,44 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
     publicInterfaces: [],
     tests: "CONTRACT_TEST_SPEC:\nknowledge=code.javascript.template-literal\ninputs=['expression']\noutputs=['string-expression','expression']\nimplementation_template='`{parts}`'",
     validation: "VALIDATION_SPEC:\nrequiredValidation=['template literal syntax','interpolation contract']\ndependencies=[]\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\ninitialStatus=CANDIDATE\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+
+  {
+    knowledgeId: 'code.javascript.array-find',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '条件に合う配列要素を最初の1件として取得する',
+    implementation: '{array}.find({predicate})',
+    targetPath: 'generated.ts',
+    inputs: ['array-expression', 'function-expression'],
+    outputs: ['expression'],
+    prerequisites: ['array expression', 'predicate function'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.javascript.array-find',
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\nknowledge=code.javascript.array-find\ninputs=['array-expression', 'function-expression']\noutputs=['expression']\nimplementation_template='{array}.find({predicate})'",
+    validation: "VALIDATION_SPEC:\nrequiredValidation=['expression syntax', 'predicate contract']\ndependencies=[]\nsupportedEnvironments=['MIKI_RUNTIME', 'ANDROID']\ninitialStatus=CANDIDATE\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: 'code.javascript.array-some',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '条件を満たす配列要素が存在するか判定する',
+    implementation: '{array}.some({predicate})',
+    targetPath: 'generated.ts',
+    inputs: ['array-expression', 'function-expression'],
+    outputs: ['boolean-expression'],
+    prerequisites: ['array expression', 'predicate function'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.javascript.array-some',
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\nknowledge=code.javascript.array-some\ninputs=['array-expression', 'function-expression']\noutputs=['boolean-expression']\nimplementation_template='{array}.some({predicate})'",
+    validation: "VALIDATION_SPEC:\nrequiredValidation=['expression syntax', 'predicate contract']\ndependencies=[]\nsupportedEnvironments=['MIKI_RUNTIME', 'ANDROID']\ninitialStatus=CANDIDATE\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
   },
 ];
