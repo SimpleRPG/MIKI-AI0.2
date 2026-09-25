@@ -84,11 +84,25 @@ export class CapabilityGraphService {
    * COMPONENT_ID → ENTRY_POINT → tags/purpose → I/O → composability の順で候補を評価。
    * スコア計算は決定論的で、LLM呼び出しを必要としない。
    */
-  public plan(goal: string, maxComponents = 4, excludedComponentIds: string[] = [], environment?: string): ComponentPlan | undefined {
+  public plan(
+    goal: string,
+    maxComponents = 4,
+    excludedComponentIds: string[] = [],
+    environment?: string,
+    allowedComponentKinds?: string[],
+  ): ComponentPlan | undefined {
     const query = goal.trim().toLowerCase();
     if (!query) return undefined;
     const excluded = new Set(excludedComponentIds);
-    const all = componentRegistryService.getAllComponents().filter(c => c.status === 'VERIFIED' && !excluded.has(c.component_id) && this.supportsEnvironment(c, environment));
+    const allowedKinds = allowedComponentKinds
+      ? new Set(allowedComponentKinds.map(String))
+      : undefined;
+    const all = componentRegistryService.getAllComponents().filter(c =>
+      c.status === 'VERIFIED' &&
+      !excluded.has(c.component_id) &&
+      (!allowedKinds || allowedKinds.has(String(c.componentKind || ''))) &&
+      this.supportsEnvironment(c, environment)
+    );
     if (!all.length) return undefined;
 
     const learned = capabilityLearningService.findPreferredComponentSets(goal, environment);

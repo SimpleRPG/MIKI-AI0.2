@@ -53,6 +53,7 @@ export class NonLlmCodeSynthesisService {
       6,
       [],
       environment,
+      ['CODE'],
     );
 
     const graphComposition = graph

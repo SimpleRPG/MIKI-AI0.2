@@ -10,6 +10,7 @@ import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
 import { decomposeMultiIntent, selectMultiIntentHypothesis, type MultiIntentPlan } from '../../unknown/services/multiIntentDecompositionService';
 import { detectUnknownTermsFromBlackboardValue } from '../../unknown/services/unknownTermDetectionService';
+import { componentRegistryService } from '../../capability/services/componentRegistryService';
 
 export interface PlannedRoute {
   target:MikiDomain;
@@ -122,6 +123,46 @@ function readNestedResolutionValue(
   }
 
   return value[key];
+}
+
+function buildCodeComponentGapMeaning(componentIds:string[]):string {
+  const descriptions=componentIds.map(id=>{
+    const component=componentRegistryService.getComponent(id);
+
+    if(!component){
+      return [
+        `componentId=${id}`,
+        'registryStatus=MISSING',
+        'meaning=必要なCODE Componentの実装能力・I/O契約・検証方法を特定する必要がある'
+      ].join(' | ');
+    }
+
+    const inputs=(component.inputs||[])
+      .map(item=>`${item.name}:${item.type}`)
+      .join(', ') || 'none';
+
+    const outputs=(component.outputs||[])
+      .map(item=>`${item.name}:${item.type}`)
+      .join(', ') || 'none';
+
+    return [
+      `componentId=${component.component_id}`,
+      `componentKind=${String(component.componentKind||'UNSPECIFIED')}`,
+      `purpose=${component.purpose}`,
+      `entryPoint=${component.entry_point}`,
+      `inputs=${inputs}`,
+      `outputs=${outputs}`,
+      `dependencies=${(component.dependencies||[]).join(', ')||'none'}`,
+      `status=${component.status}`
+    ].join(' | ');
+  });
+
+  return [
+    '自律コード改善で必要なCODE Componentの実装能力を解決する。',
+    'Component IDそのものを検索意図として扱わず、既存Componentの目的・入口・I/O・依存・状態から必要能力を意味化する。',
+    '既存CODE Componentで再利用または適応できる場合はそれを優先し、存在しない場合のみ実装パターン・契約・依存・テスト方法をResearchで調査する。',
+    `unresolvedComponentMetadata=${descriptions.join(' || ')}`
+  ].join(' ');
 }
 
 function successfulBusinessEntries(task:BlackboardTask):BlackboardEntry[] {
@@ -621,16 +662,19 @@ class AdaptiveRoutePlannerService {
         : undefined;
 
       if(!latestResolution){
+        const componentGapMeaning=buildCodeComponentGapMeaning(unresolved);
+
         routes.push({
           target:'unknown',
           command:'RESOLVE_UNKNOWN',
-          reason:'CORE analyzed a non-retryable code-composition failure and is resolving the missing components before candidate regeneration',
+          reason:'CORE converts unresolved CODE Component references into a semantic implementation gap before UNKNOWN/Research',
           payload:{
             taskId:task.taskId,
-            question:`Resolve missing code components: ${unresolved.join(', ')}`,
-            unknownTerms:unresolved,
+            question:componentGapMeaning,
+            unknownTerms:[componentGapMeaning],
             unresolvedComponents:unresolved,
             componentGap:true,
+            componentGapMeaning,
             useSearch:true,
             adaptive:true,
             priority:92
