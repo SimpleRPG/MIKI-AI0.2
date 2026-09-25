@@ -26,6 +26,7 @@ import { componentRegistryService } from '../../capability/services/componentReg
 import { taskBlackboardService } from './taskBlackboardService';
 import { coreOrchestratorService } from './coreOrchestratorService';
 import type { ExecutionEvent } from '../../execution/services/executionEventBusService';
+import { safeImprovementPipelineService } from '../../improvement/services/safeImprovementPipelineService';
 
 const BASE_COMMANDS:DomainCommand[]=['HEALTH_CHECK','DESCRIBE','GET_STATUS','ASSESS_DOMAIN','PARTICIPATE','VERIFY_CONNECTION'];
 
@@ -48,8 +49,8 @@ class DomainIntegrationBootstrapService{
   const recovery=blackboardRecoveryService.recoverInterrupted();
   if(recovery.recovered.length>0)systemLogger.info('SELF_IMPROVEMENT',`[DomainIntegration] interrupted tasks recovered: ${recovery.recovered.length}`);
   this.unsubscribers.push(
-   executionEventBusService.subscribe('execution.completed',e=>{crossDomainCirculationService.record('execution','learning','EXECUTION_COMPLETED',e.event_id);crossDomainCirculationService.record('execution','experience','EXECUTION_EXPERIENCE',e.event_id);void this.bridgeExecutionEventToCore(e);}),
-   executionEventBusService.subscribe('execution.failed',e=>{crossDomainCirculationService.record('execution','safety','EXECUTION_FAILED',e.event_id);crossDomainCirculationService.record('safety','improvement','FAILURE_REQUIRES_IMPROVEMENT',e.event_id);void this.bridgeExecutionEventToCore(e);selfImprovementIngressService.submit({trigger:`execution.failed:${e.event_id}:${e.component_id}`,source:'EXECUTION'});}),
+   executionEventBusService.subscribe('execution.completed',e=>{crossDomainCirculationService.record('execution','learning','EXECUTION_COMPLETED',e.event_id);crossDomainCirculationService.record('execution','experience','EXECUTION_EXPERIENCE',e.event_id);void this.handleExecutionEvent(e);}),
+   executionEventBusService.subscribe('execution.failed',e=>{crossDomainCirculationService.record('execution','safety','EXECUTION_FAILED',e.event_id);crossDomainCirculationService.record('safety','improvement','FAILURE_REQUIRES_IMPROVEMENT',e.event_id);void this.handleExecutionEvent(e);selfImprovementIngressService.submit({trigger:`execution.failed:${e.event_id}:${e.component_id}`,source:'EXECUTION'});}),
    claimVerificationEventService.subscribe(e=>{crossDomainCirculationService.record('verification',(e.outcome==='SUPPORTED'||e.outcome==='DEVICE_VERIFIED')?'promotion':'unknown',`CLAIM_${e.outcome}`,e.claimId);if(e.outcome==='CONTRADICTED'||e.outcome==='UNRESOLVED'){autonomousIssueDiscoveryService.recordContradiction(e.claimId,e.outcome);selfImprovementIngressService.submit({trigger:`claim.${e.outcome}:${e.claimId}`,source:'SYSTEM'});}}),
    selfImprovementRequestEventService.subscribe(e=>{crossDomainCirculationService.record(e.source==='AUTOPILOT'?'autonomy':'conversation','improvement','SELF_IMPROVEMENT_REQUESTED',e.trigger);selfImprovementIngressService.submit({trigger:e.trigger,source:e.source});}),
   );
@@ -59,6 +60,45 @@ class DomainIntegrationBootstrapService{
  dispose():void{
   for(const domain of MIKI_DOMAINS)domainRouterService.unregister(domain);conversationCompositionResearchSchedulerService.dispose();autonomousIssueDiscoveryService.dispose();autonomousSelfImprovementLoopService.dispose();for(const unsubscribe of this.unsubscribers)unsubscribe();this.unsubscribers=[];this.initialized=false;}
  getStatus(){return {initialized:this.initialized,registered:domainRouterService.getRegistrations(),missing:domainRouterService.getMissingDomains([...MIKI_DOMAINS]),coverage:crossDomainCirculationService.getCoverage(),connectivityAudit:domainParticipationService.getLastAudit()};}
+
+ private async handleExecutionEvent(event:ExecutionEvent):Promise<void>{
+  try{
+   // 新規CODE Componentだけを対象にする。
+   // candidate_idを持つ通常の改善Canaryは既存Coordinatorの責務。
+   const canaryRuns=safeImprovementPipelineService.list().filter(run=>
+    run.new_component_mode===true &&
+    run.stage==='CANARY' &&
+    run.component_id===event.component_id &&
+    run.environment===event.environment &&
+    run.implementation_hash===event.implementation_hash
+   );
+
+   for(const run of canaryRuns){
+    // evaluate()側がExecution Event履歴を再走査するため、
+    // observerの購読順序に依存せず今回のEvidenceを評価対象にできる。
+    const evaluation=safeImprovementPipelineService.evaluateCanary(run.run_id);
+
+    if(evaluation?.ready){
+     systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `[DomainIntegration] NEW_COMPONENT Canary evaluated: run=${run.run_id} status=${evaluation.status} samples=${evaluation.sample_count??0}`
+     );
+    }
+   }
+
+   // Canary評価・Promotion・Reusable承認を反映した後、
+   // 既存のExecution -> Blackboard -> CORE再評価経路へ戻す。
+   await this.bridgeExecutionEventToCore(event);
+  }catch(error){
+   systemLogger.warn(
+    'SELF_IMPROVEMENT',
+    `[DomainIntegration] Canary evaluation bridge failed: ${String(error)}`
+   );
+
+   // Canary評価だけの失敗で既存COREのExecution Event処理を停止させない。
+   await this.bridgeExecutionEventToCore(event);
+  }
+ }
 
  private async bridgeExecutionEventToCore(event:ExecutionEvent):Promise<void>{
   try{
