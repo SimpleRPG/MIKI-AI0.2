@@ -8294,3 +8294,102 @@ Verification / Regression / Canary / Promotion
 ・CODE Componentは既存の検証・承認Lifecycleを維持する。
 ・旧src/services配下の同名Composition/Synthesis実装については、
   新MIKI経路との参照関係を確認してから削除可否を判断する。
+
+
+============================================================
+【2026-09-26 Construction Graph → ComponentComposition → UniversalSynthesis 統合境界】
+============================================================
+
+Construction GraphとComponentCompositionServiceは同一責務ではない。
+統合は「一つのServiceへまとめる」ことではなく、COREから一つの合成経路として接続することを意味する。
+
+1. reusableComponentFactoryService
+・Knowledge / CODE候補を探索する。
+・自然言語の目的から複数候補を決定的に探索する。
+・候補のI/O、required slot、制約、目的一致を使ってConstruction Graphを構成する。
+・この段階では実行可能Registry Componentであることを保証しない。
+
+2. ComponentCompositionService
+・Registry上のComponentを対象とする。
+・実行可能なComponentをA→B→CのCompositionPlanへ変換する。
+・Lifecycle、deterministic、security、I/O、依存、環境契約を検証する。
+・Construction GraphについてはvalidateConstructionGraphを担当し、
+  Graphの構造がComponent構成として妥当かを確認する。
+
+3. universalSynthesisService
+・CORE側の統合窓口とする。
+・Reusable Component探索とRegistry Component合成を同じSynthesis結果へ統合する。
+・既存Componentだけで完了できる場合はComponentCompositionServiceを利用する。
+・実行可能Componentが不足する場合はReusable Component候補を返し、
+  candidate / adaptation / research / verification等へ戻す。
+・新しい19番目の分類や別の合成エンジンを作らない。
+
+4. 自律コード改善
+目的
+↓
+Knowledge / CODE Component探索
+↓
+Construction Graph
+↓
+Graph binding / Graph validation
+↓
+renderer
+↓
+Candidate Workspace
+↓
+Candidate verification
+↓
+必要に応じてRegistry Component化
+
+この経路と通常の実行Component Compositionは競合しない。
+前者は「コードを構成する方法」を決める工程、
+後者は「検証済み実行Componentを実行可能な計画へ組み合わせる」工程である。
+
+------------------------------------------------------------
+【2026-09-26 JavaScript Construction Knowledge拡張】
+------------------------------------------------------------
+
+既存の
+・array-map
+・array-filter
+・array-find
+・array-some
+は再利用し、重複Componentを作らない。
+
+追加したKnowledge / CODE Component：
+・code.javascript.array-every
+・code.javascript.array-reduce
+・code.javascript.array-includes
+・code.javascript.array-find-index
+・code.javascript.string-includes
+・code.javascript.string-split
+
+これにより、Construction Graphで、
+
+array
+↓
+filter / map / find / some / every / findIndex / includes
+↓
+callback / property-access / comparison / logical
+↓
+return
+
+や、
+
+string
+↓
+split
+↓
+map / filter / includes
+
+などの基本的な組み合わせを候補として扱える。
+
+全Componentは既存のLifecycle Gate
+CANDIDATE
+→ ANALYZED
+→ CLOUD_TESTED
+→ DEVICE_TESTED
+→ VERIFIED
+を維持する。
+
+============================================================

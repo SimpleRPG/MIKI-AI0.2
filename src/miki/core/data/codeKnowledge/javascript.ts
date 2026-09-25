@@ -778,9 +778,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
       ],
     },
   },
-];
-
-  {
+{
     id: 'code.javascript.array-find',
     componentType: 'CODE_CONSTRUCTION',
     purpose: '条件に合う配列要素を最初の1件として取得する',
@@ -836,6 +834,180 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
       ],
     },
   },
+
+
+  {
+    id: 'code.javascript.array-every',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '配列のすべての要素が条件を満たすか判定する',
+    summary: 'Array.prototype.everyによる全要素条件判定。',
+    concepts: ['Array.every', 'predicate', 'boolean', 'array'],
+    inputs: ['array-expression', 'function-expression'],
+    outputs: ['boolean-expression'],
+    appliesWhen: ['すべての要素が条件を満たすか判定する', 'everyを使う'],
+    doesNotApplyWhen: ['1件でも一致すればよい場合'],
+    sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/every'],
+    sourceArtifactIds: ['mdn-array-every'],
+    constructionProfile: {
+      kind: 'EXPRESSION',
+      syntaxTemplate: '{array}.every({predicate})',
+      outputKinds: ['boolean-expression'],
+      slots: [
+        {name: 'array', inputKinds: ['array-expression'], required: true},
+        {name: 'predicate', inputKinds: ['function-expression'], required: true},
+      ],
+      constraints: [
+        'predicate must produce a truthy/falsy result'
+      ],
+      adaptationRules: [
+        'use some when only one matching element is sufficient'
+      ],
+    },
+  },
+  {
+    id: 'code.javascript.array-reduce',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '配列を畳み込んで単一の値へ変換する',
+    summary: 'Array.prototype.reduceによる累積処理。',
+    concepts: ['Array.reduce', 'reducer', 'accumulator', 'array'],
+    inputs: ['array-expression', 'function-expression', 'expression'],
+    outputs: ['expression'],
+    appliesWhen: ['配列を集約する', '合計値を計算する', '累積結果を作る', 'reduceを使う'],
+    doesNotApplyWhen: ['単純な要素変換だけが目的の場合'],
+    sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce'],
+    sourceArtifactIds: ['mdn-array-reduce'],
+    constructionProfile: {
+      kind: 'EXPRESSION',
+      syntaxTemplate: '{array}.reduce({reducer}, {initialValue})',
+      outputKinds: ['expression'],
+      slots: [
+        {name: 'array', inputKinds: ['array-expression'], required: true},
+        {name: 'reducer', inputKinds: ['function-expression'], required: true},
+        {name: 'initialValue', inputKinds: ['expression'], required: true},
+      ],
+      constraints: [
+        'reducer must return the next accumulator value',
+        'initialValue is required for deterministic construction'
+      ],
+      adaptationRules: [
+        'prefer map or filter when a reducer is unnecessary'
+      ],
+    },
+  },
+  {
+    id: 'code.javascript.array-includes',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '配列に指定した値が含まれるか判定する',
+    summary: 'Array.prototype.includesによる値存在判定。',
+    concepts: ['Array.includes', 'membership', 'boolean', 'array'],
+    inputs: ['array-expression', 'expression'],
+    outputs: ['boolean-expression'],
+    appliesWhen: ['配列に値が存在するか判定する', 'includesを使う'],
+    doesNotApplyWhen: ['条件関数による複雑な探索が必要な場合'],
+    sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/includes'],
+    sourceArtifactIds: ['mdn-array-includes'],
+    constructionProfile: {
+      kind: 'EXPRESSION',
+      syntaxTemplate: '{array}.includes({value})',
+      outputKinds: ['boolean-expression'],
+      slots: [
+        {name: 'array', inputKinds: ['array-expression'], required: true},
+        {name: 'value', inputKinds: ['expression'], required: true},
+      ],
+      constraints: [
+        'value must be comparable with the array element values'
+      ],
+      adaptationRules: [
+        'use some when predicate-based matching is required'
+      ],
+    },
+  },
+  {
+    id: 'code.javascript.array-find-index',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '条件に合う配列要素の最初の位置を取得する',
+    summary: 'Array.prototype.findIndexによる最初の一致位置の取得。',
+    concepts: ['Array.findIndex', 'index', 'predicate', 'array'],
+    inputs: ['array-expression', 'function-expression'],
+    outputs: ['number-expression'],
+    appliesWhen: ['条件に合う要素の位置を取得する', 'findIndexを使う'],
+    doesNotApplyWhen: ['要素そのものが必要な場合'],
+    sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findIndex'],
+    sourceArtifactIds: ['mdn-array-find-index'],
+    constructionProfile: {
+      kind: 'EXPRESSION',
+      syntaxTemplate: '{array}.findIndex({predicate})',
+      outputKinds: ['number-expression'],
+      slots: [
+        {name: 'array', inputKinds: ['array-expression'], required: true},
+        {name: 'predicate', inputKinds: ['function-expression'], required: true},
+      ],
+      constraints: [
+        'predicate must produce a boolean-compatible result'
+      ],
+      adaptationRules: [
+        'use find when the element itself is required'
+      ],
+    },
+  },
+  {
+    id: 'code.javascript.string-includes',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '文字列に指定した文字列が含まれるか判定する',
+    summary: 'String.prototype.includesによる部分文字列判定。',
+    concepts: ['String.includes', 'string', 'boolean', 'search'],
+    inputs: ['string-expression', 'string-expression'],
+    outputs: ['boolean-expression'],
+    appliesWhen: ['文字列を検索する', '部分文字列の存在を判定する'],
+    doesNotApplyWhen: ['正規表現による複雑な検索が必要な場合'],
+    sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/includes'],
+    sourceArtifactIds: ['mdn-string-includes'],
+    constructionProfile: {
+      kind: 'EXPRESSION',
+      syntaxTemplate: '{text}.includes({search})',
+      outputKinds: ['boolean-expression'],
+      slots: [
+        {name: 'text', inputKinds: ['string-expression'], required: true},
+        {name: 'search', inputKinds: ['string-expression'], required: true},
+      ],
+      constraints: [
+        'comparison is case-sensitive'
+      ],
+      adaptationRules: [
+        'use startsWith when only the prefix matters'
+      ],
+    },
+  },
+  {
+    id: 'code.javascript.string-split',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '文字列を区切って配列へ分割する',
+    summary: 'String.prototype.splitによる文字列分割。',
+    concepts: ['String.split', 'string', 'array', 'separator'],
+    inputs: ['string-expression', 'string-expression'],
+    outputs: ['array-expression'],
+    appliesWhen: ['文字列を区切り文字で分割する', 'splitを使う'],
+    doesNotApplyWhen: ['単純な文字列検索だけが必要な場合'],
+    sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/split'],
+    sourceArtifactIds: ['mdn-string-split'],
+    constructionProfile: {
+      kind: 'EXPRESSION',
+      syntaxTemplate: '{text}.split({separator})',
+      outputKinds: ['array-expression'],
+      slots: [
+        {name: 'text', inputKinds: ['string-expression'], required: true},
+        {name: 'separator', inputKinds: ['string-expression'], required: true},
+      ],
+      constraints: [
+        'separator must be a valid split pattern'
+      ],
+      adaptationRules: [
+        'use includes when an array result is not required'
+      ],
+    },
+  },
+
+];
 
 export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   {
@@ -1296,4 +1468,120 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
     tests: "CONTRACT_TEST_SPEC:\nknowledge=code.javascript.array-some\ninputs=['array-expression', 'function-expression']\noutputs=['boolean-expression']\nimplementation_template='{array}.some({predicate})'",
     validation: "VALIDATION_SPEC:\nrequiredValidation=['expression syntax', 'predicate contract']\ndependencies=[]\nsupportedEnvironments=['MIKI_RUNTIME', 'ANDROID']\ninitialStatus=CANDIDATE\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
   },
+
+  {
+    knowledgeId: 'code.javascript.array-every',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '配列のすべての要素が条件を満たすか判定する',
+    implementation: '{array}.every({predicate})',
+    targetPath: 'generated.ts',
+    inputs: ['array-expression', 'function-expression'],
+    outputs: ['boolean-expression'],
+    prerequisites: ['array expression', 'predicate function'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.javascript.array-every',
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.javascript.array-every\\ninputs=['array-expression', 'function-expression']\\noutputs=['boolean-expression']\\nimplementation_template='{array}.every({predicate})'",
+    validation: "VALIDATION_SPEC:\\nrequiredValidation=['expression syntax', 'predicate contract']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: 'code.javascript.array-reduce',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '配列を畳み込んで単一の値へ変換する',
+    implementation: '{array}.reduce({reducer}, {initialValue})',
+    targetPath: 'generated.ts',
+    inputs: ['array-expression', 'function-expression', 'expression'],
+    outputs: ['expression'],
+    prerequisites: ['array expression', 'reducer function', 'initial value'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.javascript.array-reduce',
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.javascript.array-reduce\\ninputs=['array-expression', 'function-expression', 'expression']\\noutputs=['expression']\\nimplementation_template='{array}.reduce({reducer}, {initialValue})'",
+    validation: "VALIDATION_SPEC:\\nrequiredValidation=['expression syntax', 'reducer contract', 'initial value contract']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: 'code.javascript.array-includes',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '配列に指定した値が含まれるか判定する',
+    implementation: '{array}.includes({value})',
+    targetPath: 'generated.ts',
+    inputs: ['array-expression', 'expression'],
+    outputs: ['boolean-expression'],
+    prerequisites: ['array expression', 'search value'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.javascript.array-includes',
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.javascript.array-includes\\ninputs=['array-expression', 'expression']\\noutputs=['boolean-expression']\\nimplementation_template='{array}.includes({value})'",
+    validation: "VALIDATION_SPEC:\\nrequiredValidation=['expression syntax', 'membership contract']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: 'code.javascript.array-find-index',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '条件に合う配列要素の最初の位置を取得する',
+    implementation: '{array}.findIndex({predicate})',
+    targetPath: 'generated.ts',
+    inputs: ['array-expression', 'function-expression'],
+    outputs: ['number-expression'],
+    prerequisites: ['array expression', 'predicate function'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.javascript.array-find-index',
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.javascript.array-find-index\\ninputs=['array-expression', 'function-expression']\\noutputs=['number-expression']\\nimplementation_template='{array}.findIndex({predicate})'",
+    validation: "VALIDATION_SPEC:\\nrequiredValidation=['expression syntax', 'predicate contract']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: 'code.javascript.string-includes',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '文字列に指定した文字列が含まれるか判定する',
+    implementation: '{text}.includes({search})',
+    targetPath: 'generated.ts',
+    inputs: ['string-expression', 'string-expression'],
+    outputs: ['boolean-expression'],
+    prerequisites: ['string expression', 'search string'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.javascript.string-includes',
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.javascript.string-includes\\ninputs=['string-expression', 'string-expression']\\noutputs=['boolean-expression']\\nimplementation_template='{text}.includes({search})'",
+    validation: "VALIDATION_SPEC:\\nrequiredValidation=['expression syntax', 'string search contract']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: 'code.javascript.string-split',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: '文字列を区切って配列へ分割する',
+    implementation: '{text}.split({separator})',
+    targetPath: 'generated.ts',
+    inputs: ['string-expression', 'string-expression'],
+    outputs: ['array-expression'],
+    prerequisites: ['string expression', 'separator string'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.javascript.string-split',
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.javascript.string-split\\ninputs=['string-expression', 'string-expression']\\noutputs=['array-expression']\\nimplementation_template='{text}.split({separator})'",
+    validation: "VALIDATION_SPEC:\\nrequiredValidation=['expression syntax', 'separator contract']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+
 ];
