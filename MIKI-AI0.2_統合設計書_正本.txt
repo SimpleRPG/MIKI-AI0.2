@@ -8107,3 +8107,64 @@ officialCodeComponentSeeds
 初期CODE ComponentはCANDIDATEで登録し、
 ANALYZED → CLOUD_TESTED / DEVICE_TESTED → VERIFIEDの既存Lifecycleを通す。
 ============================================================
+
+
+============================================================
+【88. CODE Knowledge → CODE Component → Construction Graph 接続完了記録】
+============================================================
+
+2026-09-26 最新GitHub main実装照合後の接続修正。
+
+既存の正規経路：
+
+CORE
+→ selfDevelopment / GENERATE_CANDIDATE
+→ candidateCodeGenerationService
+→ reusableComponentFactoryService
+→ Construction Graph
+→ codeConstructionRendererService
+→ Candidate Workspace
+
+を維持する。
+
+今回の不足部分は、既存CODE KnowledgeからConstruction Graph Nodeを作成する際に、
+既存CODE ComponentおよびComponent RegistryとのリンクをNodeへ引き継いでいなかった点である。
+
+既存CodeComponentDefinitionのknowledgeIdと、
+createCodeComponentCandidate()が保存するCODE Reusable Componentの
+appliesWhen / registryComponentIdを利用して、
+
+CODE Knowledge
+→ CodeComponentDefinition
+→ existing CODE Component
+→ Construction Node
+→ Renderer
+
+を接続する。
+
+Construction Nodeには既存の
+codeComponentId
+registryComponentId
+implementationTemplate
+を保持する。
+
+RendererはimplementationTemplateを優先し、
+未接続の場合のみConstruction ProfileのsyntaxTemplateへフォールバックする。
+
+新しい19番目の分類、新しい合成機、新しいofficial専用Component層は作らない。
+
+初期CODE Componentは既存Registry lifecycleのCANDIDATEとして扱う。
+CANDIDATEをruntime実行可能Componentとして扱わない。
+
+実行利用可能性は既存のVerification / Regression / Canary / Promotion
+境界を通過した場合のみ成立する。
+
+[COMPLETED] COREからGENERATE_CANDIDATEへの既存経路
+[COMPLETED] KnowledgeからConstruction Graphへの既存経路
+[COMPLETED] Knowledgeと既存CODE Componentの接続
+[COMPLETED] CODE Component implementationTemplateのRenderer接続
+[COMPLETED] 既存Registry / Verification境界の維持
+
+残る課題は個々のKnowledge / Componentの追加・検証・承認、および
+複数Componentを目的に応じて選択・接続する既存Composition条件の充実である。
+上位のCOREから合成機への経路を新設する必要はない。

@@ -445,10 +445,35 @@ class ReusableComponentFactoryService{
     )
     .sort((a,b)=>a.componentId.localeCompare(b.componentId));
 
+  const definitions:CodeComponentDefinition[]=[
+    ...additionalJavascriptCodeComponents,
+    ...additionalTypescriptCodeComponents,
+    ...additionalWebCodeComponents,
+  ];
+
   const nodes:CodeConstructionNode[]=selected.map(item=>{
     const profile=item.constructionProfile as CodeConstructionProfile;
+
+    /*
+     * CODE Knowledgeと既存CODE ComponentをknowledgeIdで接続する。
+     * 新しいRegistryや合成機は作らず、既存ReusableComponentFactoryと
+     * Component RegistryのリンクをConstruction Nodeへ引き継ぐ。
+     */
+    const definition=definitions.find(candidate=>
+      candidate.knowledgeId===item.appliesWhen[0]
+    );
+
+    const linkedCodeComponent=definition
+      ? this.list().find(component=>
+          component.componentKind==='CODE' &&
+          component.appliesWhen.includes(definition.knowledgeId)
+        ) as CodeComponentArtifact|undefined
+      : undefined;
+
     const digest=canonicalSha256Object({
       componentId:item.componentId,
+      codeComponentId:linkedCodeComponent?.componentId||'',
+      registryComponentId:linkedCodeComponent?.registryComponentId||'',
       purpose:item.purpose,
       profile,
     });
@@ -456,6 +481,9 @@ class ReusableComponentFactoryService{
     return {
       nodeId:`CGN-${digest.slice(0,20)}`,
       knowledgeComponentId:item.componentId,
+      codeComponentId:linkedCodeComponent?.componentId,
+      registryComponentId:linkedCodeComponent?.registryComponentId,
+      implementationTemplate:definition?.implementation,
       componentType:item.componentType,
       purpose:item.purpose,
       profile,

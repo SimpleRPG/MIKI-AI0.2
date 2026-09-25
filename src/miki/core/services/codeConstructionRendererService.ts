@@ -72,7 +72,13 @@ class CodeConstructionRendererService {
       };
     }
 
-    let template=node.profile.syntaxTemplate;
+    /*
+     * 既存CODE Componentの実装を優先し、
+     * CODE Componentへ未接続の場合だけKnowledgeのConstruction Profileへ戻す。
+     */
+    let template=
+      node.implementationTemplate?.trim() ||
+      node.profile.syntaxTemplate;
     const errors:string[]=[];
     const nextStack=[...stack,nodeId];
 
