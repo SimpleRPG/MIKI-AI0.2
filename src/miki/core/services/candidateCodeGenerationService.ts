@@ -8,6 +8,7 @@ import { reusableComponentFactoryService } from './reusableComponentFactoryServi
 import { candidateUnknownResolutionService } from './candidateUnknownResolutionService';
 import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
 import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
+import { componentRegistryService } from '../../capability/services/componentRegistryService';
 export interface CandidateGenerationFile { path:string; candidateContent:string; evidenceIds:string[]; }
 export interface CandidateGenerationOutcome { accepted:boolean; runId:string; workspaceId?:string; files:CandidateGenerationFile[]; reasons:string[]; responseHash?:string; attemptCount?:number; createdCodeComponentIds?:string[]; learningLineage?:{sourcePackageId?:string;externalReviewId?:string;candidateRevision:number;requestedChanges:string[];userReason?:string;usedLearningArtifactIds:string[];ignoredLearningArtifactIds:string[];appliedFailurePatternIds:string[];appliedCorrectionPairIds:string[];appliedComponentPatternIds:string[];learningContextSha256:string;componentPackId?:string;usedKnowledgeComponentIds?:string[];usedCodeComponentIds?:string[];usedConversationComponentIds?:string[];excludedComponentIds?:string[];componentContextSha256?:string}; }
 class CandidateCodeGenerationService {
@@ -249,13 +250,31 @@ class CandidateCodeGenerationService {
      * したがって、現段階では検証済みComponentの実装本文だけを
      * targetに対応付けられる場合のみ候補化する。
      */
+    /*
+     * CapabilityGraphが選択したComponentは、ReusableComponentFactoryの
+     * reusable packに入っていない既存Registry Componentでも正規候補である。
+     *
+     * ここでReusableComponentだけを照合すると、
+     * Registry VERIFIED → CapabilityGraph選択済みなのに
+     * CODE_COMPOSITION_COMPONENT_UNRESOLVEDになる。
+     *
+     * CODE合成の存在確認はComponent Registryを正本として行い、
+     * materializeComposition()では既存Artifact Storeを使用する。
+     */
     const registryCandidates=componentIds.map(id=>{
-      const item=selectedComponents.find(x=>x.componentId===id);
+      const item=componentRegistryService.getComponent(id);
       return item ? {
-        componentId:item.componentId,
+        componentId:item.component_id,
         componentKind:item.componentKind,
         purpose:item.purpose,
-        interfaceContract:item.interfaceContract
+        interfaceContract:{
+          inputs:item.inputs,
+          outputs:item.outputs,
+          preconditions:item.preconditions,
+          postconditions:item.postconditions,
+          dependencies:item.dependencies,
+          entryPoint:item.entry_point
+        }
       } : undefined;
     }).filter(Boolean);
 
