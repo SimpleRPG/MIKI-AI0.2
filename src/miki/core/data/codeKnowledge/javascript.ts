@@ -8349,7 +8349,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
   "publicInterfaces": [],
   "tests": "CONTRACT_TEST:code.node.process-env",
   "validation": "VALIDATE_CODE_CONSTRUCTION:code.node.process-env"
-}
+},
 
   {
     id: 'code.javascript.destructuring',
