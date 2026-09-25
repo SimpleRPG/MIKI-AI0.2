@@ -4,7 +4,78 @@ import { reviewLearningArtifactService, type ReviewLearningArtifact } from './re
 import type { ReviewLearningEpisode } from './reviewDecisionLearningService';
 import { verifierService } from '../../verification/services/verifierService';
 import { componentRegistryService } from '../../../services/componentRegistryService';
-import type { ComponentSecurityClass } from '../../../types';
+class ReusableComponentFactoryService{
+  constructor(){
+    this.seedBuiltInCodeKnowledge();
+  }
+
+  private seedBuiltInCodeKnowledge():void{
+    const seeds=[
+      ...commonCodeKnowledge,
+      ...javascriptCodeKnowledge,
+      ...typescriptCodeKnowledge,
+      ...webCodeKnowledge,
+      ...testingCodeKnowledge,
+    ];
+
+    const existing=this.list();
+    const existingIds=new Set(existing.map(item=>item.componentId));
+    const now=Date.now();
+
+    const components=seeds
+      .filter(seed=>!existing.some(item =>
+        item.componentKind==='KNOWLEDGE' &&
+        (
+          item.sourceArtifactIds.includes(seed.sourceArtifactIds[0] || '') ||
+          item.appliesWhen.includes(seed.id)
+        )
+      ))
+      .map(seed=>this.identify({
+        componentKind:'KNOWLEDGE' as const,
+        componentType:seed.componentType,
+        purpose:seed.purpose,
+        interfaceContract:{
+          input:seed.inputs,
+          output:seed.outputs,
+        },
+        inputs:seed.inputs,
+        outputs:seed.outputs,
+        prerequisites:[],
+        dependencies:[],
+        appliesWhen:[seed.id,...seed.appliesWhen],
+        doesNotApplyWhen:seed.doesNotApplyWhen,
+        sourceEpisodeIds:[],
+        sourceLearningArtifactIds:[],
+        environmentFingerprint:'universal',
+        lifecycleStatus:'USER_APPROVED' as const,
+        usageCount:0,
+        successCount:0,
+        failureCount:0,
+        createdAt:now,
+        updatedAt:now,
+        claimIds:[],
+        evidenceRefs:[],
+        sourceUrls:seed.sourceUrls,
+        sourceArtifactIds:seed.sourceArtifactIds,
+        verificationStatus:'UNVERIFIED' as const,
+        contradictionRefs:[],
+        freshnessPolicy:'REVALIDATE_ON_SOURCE_CHANGE',
+      }));
+
+    if(components.length===0)return;
+
+    this.storeCandidates(components);
+
+    // Built-in seedはRegistryのコード部品ではなく、再利用可能なKNOWLEDGE Component。
+    // そのためコード実装・実機検証済みとは扱わない。
+    void existingIds;
+  }
+
+import { commonCodeKnowledge } from '../data/codeKnowledge/common';
+import { javascriptCodeKnowledge } from '../data/codeKnowledge/javascript';
+import { typescriptCodeKnowledge } from '../data/codeKnowledge/typescript';
+import { webCodeKnowledge } from '../data/codeKnowledge/web';
+import { testingCodeKnowledge } from '../data/codeKnowledge/testing';
 
 export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
