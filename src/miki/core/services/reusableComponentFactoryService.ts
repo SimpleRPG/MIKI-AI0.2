@@ -292,6 +292,18 @@ class ReusableComponentFactoryService{
   ):boolean{
     if(persisted.componentKind!==builtIn.componentKind)return false;
 
+    // 未検証Candidate/Draft/ConflictではBuilt-inを隠さない。
+    // 検証・承認済みのPersistent Componentだけが同一identityをShadowする。
+    const shadowingStatuses:ReusableComponentLifecycle[]=[
+      'VERIFIED',
+      'USER_APPROVED',
+      'MIKI_APPROVED',
+      'ACTIVE',
+      'REVALIDATION_REQUIRED',
+    ];
+
+    if(!shadowingStatuses.includes(persisted.lifecycleStatus))return false;
+
     const identity=builtIn.appliesWhen[0];
     return Boolean(identity)&&persisted.appliesWhen.includes(identity);
   }
@@ -454,6 +466,7 @@ class ReusableComponentFactoryService{
   uiEventEntrypoints?:string[];
   sourceEpisodeIds?:string[];
   sourceLearningArtifactIds?:string[];
+  persist?:boolean;
 }):{
   accepted:boolean;
   componentId?:string;
@@ -606,7 +619,9 @@ class ReusableComponentFactoryService{
     registryComponentId:componentPackage.component_id,
   }) as CodeComponentArtifact;
 
-  this.storeCandidates([artifact]);
+  if(input.persist!==false){
+    this.storeCandidates([artifact]);
+  }
 
   return {
     accepted:true,
@@ -647,6 +662,7 @@ class ReusableComponentFactoryService{
    .sort((a,b)=>a.componentId.localeCompare(b.componentId));
 
   const createdComponentIds:string[]=[];
+  const materializedArtifacts:CodeComponentArtifact[]=[];
   const alreadyLinkedKnowledgeIds:string[]=[];
   const unresolvedKnowledgeIds:string[]=[];
   const rejectedReasons:Record<string,string>={};
@@ -709,10 +725,14 @@ class ReusableComponentFactoryService{
     imports:definition.imports,
     publicInterfaces:definition.publicInterfaces,
     knowledgeComponentId:definition.knowledgeId,
+    persist:false,
    });
 
    if(result.accepted&&result.componentId){
     createdComponentIds.push(result.componentId);
+    if(result.component?.componentKind==='CODE'){
+     materializedArtifacts.push(result.component);
+    }
     continue;
    }
 
@@ -757,7 +777,7 @@ class ReusableComponentFactoryService{
       requiredValidation:['tests','validation','registry lifecycle','implementation hash'],
       registryComponentId:registryComponent.component_id,
      }) as CodeComponentArtifact;
-     this.storeCandidates([artifact]);
+     materializedArtifacts.push(artifact);
      createdComponentIds.push(artifact.componentId);
      continue;
     }
@@ -765,6 +785,10 @@ class ReusableComponentFactoryService{
 
    rejectedReasons[sourceKnowledgeId]=
     result.reason||result.decision||'CODE_COMPONENT_MATERIALIZATION_FAILED';
+  }
+
+  if(materializedArtifacts.length>0){
+   this.storeCandidates(materializedArtifacts);
   }
 
   return {
