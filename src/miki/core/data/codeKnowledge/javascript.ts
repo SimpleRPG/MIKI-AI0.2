@@ -207,7 +207,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['statement'],
         appliesWhen: ['値を定義する', '再代入しない値を宣言する'],
         doesNotApplyWhen: ['再代入が必要な変数'],
-        sourceUrls: [mdn('Grammar_and_types')],
+        sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Grammar_and_types'],
         sourceArtifactIds: ['mdn-const-declaration'],
         constructionProfile: {
           kind: 'DECLARATION',
@@ -231,7 +231,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['statement'],
         appliesWhen: ['再利用可能な処理を定義する'],
         doesNotApplyWhen: ['単一式だけで関数化が不要な場合'],
-        sourceUrls: [mdn('Functions')],
+        sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Functions'],
         sourceArtifactIds: ['mdn-functions'],
         constructionProfile: {
           kind: 'DECLARATION',
@@ -256,7 +256,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['statement'],
         appliesWhen: ['条件分岐が必要'],
         doesNotApplyWhen: ['条件評価自体が不要'],
-        sourceUrls: [mdn('Statements/if...else')],
+        sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Statements/if...else'],
         sourceArtifactIds: ['mdn-if-else'],
         constructionProfile: {
           kind: 'STATEMENT',
@@ -281,7 +281,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['statement'],
         appliesWhen: ['配列やiterableを順次処理する'],
         doesNotApplyWhen: ['indexが必要な特別な処理'],
-        sourceUrls: [mdn('Statements/for...of')],
+        sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Statements/for...of'],
         sourceArtifactIds: ['mdn-for-of'],
         constructionProfile: {
           kind: 'STATEMENT',
@@ -306,7 +306,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['array-expression'],
         appliesWhen: ['各要素を変換して新しい配列を作る'],
         doesNotApplyWhen: ['副作用だけが目的の反復'],
-        sourceUrls: [mdn('Reference/Global_Objects/Array/map')],
+        sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Reference/Global_Objects/Array/map'],
         sourceArtifactIds: ['mdn-array-map'],
         constructionProfile: {
           kind: 'EXPRESSION',
@@ -330,7 +330,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['array-expression'],
         appliesWhen: ['条件に一致する要素を抽出する'],
         doesNotApplyWhen: ['要素変換が主目的'],
-        sourceUrls: [mdn('Reference/Global_Objects/Array/filter')],
+        sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Reference/Global_Objects/Array/filter'],
         sourceArtifactIds: ['mdn-array-filter'],
         constructionProfile: {
           kind: 'EXPRESSION',
@@ -354,7 +354,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['statement'],
         appliesWhen: ['Promise結果を順序立てて扱う'],
         doesNotApplyWhen: ['同期処理のみで完結する'],
-        sourceUrls: [mdn('Statements/async_function')],
+        sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Statements/async_function'],
         sourceArtifactIds: ['mdn-async-function'],
         constructionProfile: {
           kind: 'ASYNC',
@@ -378,7 +378,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['expression'],
         appliesWhen: ['JSON文字列をオブジェクトへ変換する'],
         doesNotApplyWhen: ['入力がJSONではない'],
-        sourceUrls: [mdn('Reference/Global_Objects/JSON/parse')],
+        sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse'],
         sourceArtifactIds: ['mdn-json-parse'],
         constructionProfile: {
           kind: 'CALL',
@@ -401,7 +401,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['promise-expression'],
         appliesWhen: ['Node.js環境でファイルを読む'],
         doesNotApplyWhen: ['ブラウザ専用環境'],
-        sourceUrls: [node('fs')],
+        sourceUrls: ['https://nodejs.org/api/fs'],
         sourceArtifactIds: ['node-fs-readfile'],
         constructionProfile: {
           kind: 'CALL',
@@ -573,7 +573,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
     knowledgeId: 'code.javascript.node-read-file',
     componentType: 'CODE_CONSTRUCTION',
     purpose: 'Node.js fs/promisesでファイルを非同期読み込みする',
-    implementation: 'readFile({path}, \\',
+    implementation: "readFile({path}, 'utf8')",
     targetPath: 'generated.ts',
     inputs: ['string-expression'],
     outputs: ['promise-expression'],
@@ -585,7 +585,7 @@ export const additionalJavascriptCodeComponents: CodeComponentDefinition[] = [
     exports: [],
     imports: ['node:fs/promises'],
     publicInterfaces: [],
-    tests: "CONTRACT_TEST_SPEC:\nknowledge=code.javascript.node-read-file\ninputs=['string-expression']\noutputs=['promise-expression']\nprerequisites=['Node.js runtime', 'filesystem permission']\nimplementation_template='readFile({path}, \\\\'",
+    tests: "CONTRACT_TEST_SPEC:\nknowledge=code.javascript.node-read-file\ninputs=['string-expression']\noutputs=['promise-expression']\nprerequisites=['Node.js runtime', 'filesystem permission']\nimplementation_template=\"readFile({path}, 'utf8')\"",
     validation: "VALIDATION_SPEC:\nrequiredValidation=['Node API contract', 'filesystem policy']\ndependencies=['node:fs/promises']\nsupportedEnvironments=['MIKI_RUNTIME']\ninitialStatus=CANDIDATE\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
-  },
+  }
 ];

@@ -189,7 +189,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['type-declaration'],
         appliesWhen: ['オブジェクト構造の公開契約を定義する'],
         doesNotApplyWhen: ['単純なunion/type aliasが適切'],
-        sourceUrls: [ts('2/everyday-types')],
+        sourceUrls: ['https://www.typescriptlang.org/docs/handbook/2/everyday-types'],
         sourceArtifactIds: ['typescript-interface'],
         constructionProfile: {
           kind: 'TYPE',

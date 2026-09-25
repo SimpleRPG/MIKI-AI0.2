@@ -145,7 +145,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['promise-expression'],
         appliesWhen: ['HTTPリソースを取得する'],
         doesNotApplyWhen: ['ネットワークアクセスが許可されていない'],
-        sourceUrls: [mdn('API/Fetch_API')],
+        sourceUrls: ['https://developer.mozilla.org/ja/docs/Web/JavaScript/API/Fetch_API'],
         sourceArtifactIds: ['mdn-fetch-api'],
         constructionProfile: {
           kind: 'CALL',
@@ -168,7 +168,7 @@ export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
         outputs: ['statement'],
         appliesWhen: ['React UIコンポーネントを構成する'],
         doesNotApplyWhen: ['Reactを使用しない処理'],
-        sourceUrls: [react('learn/your-first-component')],
+        sourceUrls: ['https://react.dev/learn/your-first-component'],
         sourceArtifactIds: ['react-your-first-component'],
         constructionProfile: {
           kind: 'DECLARATION',
