@@ -41,7 +41,7 @@ export interface CodeConstructionGraph {
   bindings: CodeConstructionBinding[];
 }
 
-export interface CodeKnowledgeSeed {
+export interface CodeKnowledgeDefinition {
   id: string;
   componentType: string;
   purpose: string;
@@ -56,7 +56,27 @@ export interface CodeKnowledgeSeed {
   constructionProfile?: CodeConstructionProfile;
 }
 
-export const commonCodeKnowledge: CodeKnowledgeSeed[] = [
+export interface CodeComponentDefinition {
+  knowledgeId: string;
+  componentType: string;
+  purpose: string;
+  implementation: string;
+  targetPath: string;
+  inputs: string[];
+  outputs: string[];
+  prerequisites: string[];
+  dependencies: string[];
+  supportedEnvironments: string[];
+  entryPoint: string;
+  securityClass: 'READ_ONLY'|'STANDARD';
+  exports: string[];
+  imports: string[];
+  publicInterfaces: string[];
+  tests: string;
+  validation: string;
+}
+
+export const commonCodeKnowledge: CodeKnowledgeDefinition[] = [
   {
     id: 'code.common.variables',
     componentType: 'CODE_CONCEPT',
@@ -170,7 +190,7 @@ export const commonCodeKnowledge: CodeKnowledgeSeed[] = [
   },
 ];
 
-export const additionalCommonCodeKnowledge: CodeKnowledgeSeed[] = [
+export const additionalCommonCodeKnowledge: CodeKnowledgeDefinition[] = [
   {
     id: 'code.common.immutability',
     componentType: 'CODE_DESIGN_CONCEPT',

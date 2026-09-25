@@ -1,6 +1,6 @@
-import type { CodeKnowledgeSeed } from './common';
+import type { CodeKnowledgeDefinition, CodeComponentDefinition } from './common';
 
-export const typescriptCodeKnowledge: CodeKnowledgeSeed[] = [
+export const typescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   {
     id: 'code.typescript.everyday-types',
     componentType: 'LANGUAGE_CONCEPT',
@@ -96,7 +96,7 @@ export const typescriptCodeKnowledge: CodeKnowledgeSeed[] = [
   },
 ];
 
-export const additionalTypescriptCodeKnowledge: CodeKnowledgeSeed[] = [
+export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
   {
     id: 'code.typescript.utility-types',
     componentType: 'TYPE_SYSTEM_CONCEPT',
@@ -177,5 +177,52 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeSeed[] = [
     doesNotApplyWhen: ['既存コードとの段階的移行が必要な場合は設定を段階導入する'],
     sourceUrls: ['https://www.typescriptlang.org/tsconfig/strict.html'],
     sourceArtifactIds: ['typescript-tsconfig-strict'],
+  },
+
+  {
+        id: 'code.typescript.interface',
+        componentType: 'CODE_CONSTRUCTION',
+        purpose: 'TypeScriptのオブジェクト契約をinterfaceで定義する',
+        summary: 'interfaceによる構造型契約。',
+        concepts: ['interface', 'type', 'property', 'contract'],
+        inputs: ['identifier', 'property-signature'],
+        outputs: ['type-declaration'],
+        appliesWhen: ['オブジェクト構造の公開契約を定義する'],
+        doesNotApplyWhen: ['単純なunion/type aliasが適切'],
+        sourceUrls: [ts('2/everyday-types')],
+        sourceArtifactIds: ['typescript-interface'],
+        constructionProfile: {
+          kind: 'TYPE',
+          syntaxTemplate: 'interface {name} {\\n{members}\\n}',
+          outputKinds: ['type-declaration'],
+          slots: [
+            { name: 'name', inputKinds: ['identifier'], required: true },
+            { name: 'members', inputKinds: ['property-signature'], required: true, multiple: true },
+          ],
+          constraints: ['member signatures must be valid TypeScript'],
+          adaptationRules: ['use type alias for unions and mapped-type-heavy contracts'],
+        },
+      },
+];
+
+export const additionalTypescriptCodeComponents: CodeComponentDefinition[] = [
+  {
+    knowledgeId: 'code.typescript.interface',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: 'TypeScriptのオブジェクト契約をinterfaceで定義する',
+    implementation: 'interface {name} {\\n{members}\\n}',
+    targetPath: 'generated.ts',
+    inputs: ['identifier', 'property-signature'],
+    outputs: ['type-declaration'],
+    prerequisites: ['valid TypeScript member signatures'],
+    dependencies: ['TypeScript'],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.typescript.interface',
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\nknowledge=code.typescript.interface\ninputs=['identifier', 'property-signature']\noutputs=['type-declaration']\nprerequisites=['valid TypeScript member signatures']\nimplementation_template='interface {name} {\\\\n{members}\\\\n}'",
+    validation: "VALIDATION_SPEC:\nrequiredValidation=['TypeScript syntax', 'property contract']\ndependencies=['TypeScript']\nsupportedEnvironments=['MIKI_RUNTIME', 'ANDROID']\ninitialStatus=CANDIDATE\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
   },
 ];

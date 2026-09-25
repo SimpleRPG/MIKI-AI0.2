@@ -4,10 +4,10 @@ import { reviewLearningArtifactService, type ReviewLearningArtifact } from './re
 import type { ReviewLearningEpisode } from './reviewDecisionLearningService';
 import { verifierService } from '../../verification/services/verifierService';
 import { componentRegistryService } from '../../../services/componentRegistryService';
-import { commonCodeKnowledge, additionalCommonCodeKnowledge, type CodeConstructionProfile } from '../data/codeKnowledge/common';
-import { javascriptCodeKnowledge, additionalJavascriptCodeKnowledge } from '../data/codeKnowledge/javascript';
-import { typescriptCodeKnowledge, additionalTypescriptCodeKnowledge } from '../data/codeKnowledge/typescript';
-import { webCodeKnowledge, additionalWebCodeKnowledge } from '../data/codeKnowledge/web';
+import { commonCodeKnowledge, additionalCommonCodeKnowledge, type CodeConstructionProfile, type CodeComponentDefinition } from '../data/codeKnowledge/common';
+import { javascriptCodeKnowledge, additionalJavascriptCodeKnowledge, additionalJavascriptCodeComponents } from '../data/codeKnowledge/javascript';
+import { typescriptCodeKnowledge, additionalTypescriptCodeKnowledge, additionalTypescriptCodeComponents } from '../data/codeKnowledge/typescript';
+import { webCodeKnowledge, additionalWebCodeKnowledge, additionalWebCodeComponents } from '../data/codeKnowledge/web';
 import { testingCodeKnowledge, additionalTestingCodeKnowledge } from '../data/codeKnowledge/testing';
 export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
@@ -23,6 +23,45 @@ const COMPONENT_KEY='miki_reusable_component_repository_v1';const RECEIPT_KEY='m
 class ReusableComponentFactoryService{
   constructor(){
     this.seedBuiltInCodeKnowledge();
+    this.seedBuiltInCodeComponents();
+  }
+
+
+  private seedBuiltInCodeComponents(): void {
+    const definitions: CodeComponentDefinition[] = [
+      ...additionalJavascriptCodeComponents,
+      ...additionalTypescriptCodeComponents,
+      ...additionalWebCodeComponents,
+    ];
+
+    for (const definition of definitions) {
+      const existing = this.list().some(item =>
+        item.componentKind === 'CODE' &&
+        item.appliesWhen.includes(definition.knowledgeId)
+      );
+
+      if (existing) continue;
+
+      this.createCodeComponentCandidate({
+        purpose: definition.purpose,
+        implementation: definition.implementation,
+        targetPath: definition.targetPath,
+        tests: definition.tests,
+        validation: definition.validation,
+        componentType: definition.componentType,
+        inputs: definition.inputs,
+        outputs: definition.outputs,
+        prerequisites: definition.prerequisites,
+        dependencies: definition.dependencies,
+        supportedEnvironments: definition.supportedEnvironments,
+        entryPoint: definition.entryPoint,
+        securityClass: definition.securityClass,
+        exports: definition.exports,
+        imports: definition.imports,
+        publicInterfaces: definition.publicInterfaces,
+        knowledgeComponentId: definition.knowledgeId,
+      });
+    }
   }
 
   private seedBuiltInCodeKnowledge():void{
@@ -222,6 +261,7 @@ class ReusableComponentFactoryService{
   exports?:string[];
   imports?:string[];
   publicInterfaces?:string[];
+  knowledgeComponentId?:string;
   coreIngressPoints?:string[];
   domainOwnership?:string[];
   persistenceKeys?:string[];
@@ -349,7 +389,7 @@ class ReusableComponentFactoryService{
     outputs:input.outputs||[],
     prerequisites:input.prerequisites||[],
     dependencies:input.dependencies||[],
-    appliesWhen:[input.purpose.trim()],
+    appliesWhen:[...(input.knowledgeComponentId ? [input.knowledgeComponentId] : []), input.purpose.trim()],
     doesNotApplyWhen:[],
     sourceEpisodeIds:input.sourceEpisodeIds||[],
     sourceLearningArtifactIds:input.sourceLearningArtifactIds||[],

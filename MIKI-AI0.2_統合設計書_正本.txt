@@ -8064,3 +8064,46 @@ Construction Profile自体をCapabilityGraphの実行可能CODE候補として�
 生成する経路を形成する。
 
 ============================================================
+
+============================================================
+【CODE Knowledge / CODE Component 直接追加規約】
+============================================================
+
+公式ドキュメント・公式API資料・教科書・標準仕様などから
+CODEの知識や部品を追加する場合、official専用の恒久的な上位層を作らない。
+
+外部資料
+↓
+既存 CODE Knowledge
+↓
+既存 CODE Component
+↓
+既存 ReusableComponentFactory
+↓
+既存 ComponentRegistry
+↓
+既存 Verification / Composition
+
+CODE Knowledgeは既存のcommon / javascript / typescript / web / testing等の
+Knowledge構造へ直接追加する。
+
+CODE Componentは既存のCodeComponentArtifact、
+ReusableComponentFactoryService、ComponentRegistryの経路へ直接追加する。
+
+officialCodeKnowledge
+officialCodeComponents
+officialCodeComponentSeeds
+などの専用恒久層は禁止。
+
+公式由来情報は既存のsourceUrls / sourceArtifactIds等の
+来歴フィールドで保持する。
+
+追加要求を受けた場合は、まず既存の型・配列・下位分類・Registryを確認し、
+既存構造へ直接追加できるかを優先する。
+
+既存構造で不足する場合のみ、汎用的な型・下位構造を追加する。
+出典専用構造は作らない。
+
+初期CODE ComponentはCANDIDATEで登録し、
+ANALYZED → CLOUD_TESTED / DEVICE_TESTED → VERIFIEDの既存Lifecycleを通す。
+============================================================

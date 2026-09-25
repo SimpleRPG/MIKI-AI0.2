@@ -1,6 +1,6 @@
-import type { CodeKnowledgeSeed } from './common';
+import type { CodeKnowledgeDefinition } from './common';
 
-export const testingCodeKnowledge: CodeKnowledgeSeed[] = [
+export const testingCodeKnowledge: CodeKnowledgeDefinition[] = [
   {
     id: 'code.testing.contract',
     componentType: 'TESTING_CONCEPT',
@@ -68,7 +68,7 @@ export const testingCodeKnowledge: CodeKnowledgeSeed[] = [
   },
 ];
 
-export const additionalTestingCodeKnowledge: CodeKnowledgeSeed[] = [
+export const additionalTestingCodeKnowledge: CodeKnowledgeDefinition[] = [
   {
     id: 'code.testing.fixtures',
     componentType: 'TESTING_CONCEPT',

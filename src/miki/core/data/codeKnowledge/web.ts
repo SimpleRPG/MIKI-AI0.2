@@ -1,6 +1,6 @@
-import type { CodeKnowledgeSeed } from './common';
+import type { CodeKnowledgeDefinition, CodeComponentDefinition } from './common';
 
-export const webCodeKnowledge: CodeKnowledgeSeed[] = [
+export const webCodeKnowledge: CodeKnowledgeDefinition[] = [
   {
     id: 'code.web.fetch',
     componentType: 'WEB_API_CONCEPT',
@@ -68,7 +68,7 @@ export const webCodeKnowledge: CodeKnowledgeSeed[] = [
   },
 ];
 
-export const additionalWebCodeKnowledge: CodeKnowledgeSeed[] = [
+export const additionalWebCodeKnowledge: CodeKnowledgeDefinition[] = [
   {
     id: 'code.web.json',
     componentType: 'WEB_DATA_CONCEPT',
@@ -133,5 +133,94 @@ export const additionalWebCodeKnowledge: CodeKnowledgeSeed[] = [
     doesNotApplyWhen: [],
     sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods'],
     sourceArtifactIds: ['mdn-http-methods'],
+  },
+
+  {
+        id: 'code.web.fetch-request',
+        componentType: 'CODE_CONSTRUCTION',
+        purpose: 'HTTPリソースをFetch APIで取得する',
+        summary: 'fetchによるHTTPリクエスト開始。',
+        concepts: ['fetch', 'HTTP', 'Promise', 'Request'],
+        inputs: ['url-expression'],
+        outputs: ['promise-expression'],
+        appliesWhen: ['HTTPリソースを取得する'],
+        doesNotApplyWhen: ['ネットワークアクセスが許可されていない'],
+        sourceUrls: [mdn('API/Fetch_API')],
+        sourceArtifactIds: ['mdn-fetch-api'],
+        constructionProfile: {
+          kind: 'CALL',
+          syntaxTemplate: 'fetch({url})',
+          outputKinds: ['promise-expression'],
+          slots: [
+            { name: 'url', inputKinds: ['string-expression'], required: true },
+          ],
+          constraints: ['network policy must permit the request'],
+          adaptationRules: ['add RequestInit only when required by the target contract'],
+        },
+      },
+  {
+        id: 'code.web.react-function-component',
+        componentType: 'CODE_CONSTRUCTION',
+        purpose: 'Reactの関数コンポーネントを構成する',
+        summary: 'React公式ドキュメントの関数コンポーネント構造。',
+        concepts: ['React', 'component', 'JSX', 'props'],
+        inputs: ['identifier', 'jsx-expression'],
+        outputs: ['statement'],
+        appliesWhen: ['React UIコンポーネントを構成する'],
+        doesNotApplyWhen: ['Reactを使用しない処理'],
+        sourceUrls: [react('learn/your-first-component')],
+        sourceArtifactIds: ['react-your-first-component'],
+        constructionProfile: {
+          kind: 'DECLARATION',
+          syntaxTemplate: 'function {name}() {\\n  return ({body});\\n}',
+          outputKinds: ['statement'],
+          slots: [
+            { name: 'name', inputKinds: ['identifier'], required: true },
+            { name: 'body', inputKinds: ['jsx-expression'], required: true },
+          ],
+          constraints: ['component must return renderable JSX'],
+          adaptationRules: ['add props parameter when component contract requires it'],
+        },
+      },
+];
+
+export const additionalWebCodeComponents: CodeComponentDefinition[] = [
+  {
+    knowledgeId: 'code.web.fetch-request',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: 'HTTPリソースをFetch APIで取得する',
+    implementation: 'fetch({url})',
+    targetPath: 'generated.ts',
+    inputs: ['url-expression'],
+    outputs: ['promise-expression'],
+    prerequisites: ['network permission', 'valid URL expression'],
+    dependencies: ['Fetch API'],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.web.fetch-request',
+    securityClass: 'STANDARD',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\nknowledge=code.web.fetch-request\ninputs=['url-expression']\noutputs=['promise-expression']\nprerequisites=['network permission', 'valid URL expression']\nimplementation_template='fetch({url})'",
+    validation: "VALIDATION_SPEC:\nrequiredValidation=['URL contract', 'network policy']\ndependencies=['Fetch API']\nsupportedEnvironments=['MIKI_RUNTIME', 'ANDROID']\ninitialStatus=CANDIDATE\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: 'code.web.react-function-component',
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: 'Reactの関数コンポーネントを構成する',
+    implementation: 'function {name}() {\\n  return ({body});\\n}',
+    targetPath: 'generated.tsx',
+    inputs: ['identifier', 'jsx-expression'],
+    outputs: ['statement'],
+    prerequisites: ['React runtime', 'JSX-compatible target'],
+    dependencies: ['react'],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: 'CodeConstruction/code.web.react-function-component',
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: ['react'],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\nknowledge=code.web.react-function-component\ninputs=['identifier', 'jsx-expression']\noutputs=['statement']\nprerequisites=['React runtime', 'JSX-compatible target']\nimplementation_template='function {name}() {\\\\n  return ({body});\\\\n}'",
+    validation: "VALIDATION_SPEC:\nrequiredValidation=['JSX syntax', 'React component contract']\ndependencies=['react']\nsupportedEnvironments=['MIKI_RUNTIME', 'ANDROID']\ninitialStatus=CANDIDATE\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
   },
 ];
