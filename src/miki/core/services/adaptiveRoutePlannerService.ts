@@ -653,8 +653,18 @@ class AdaptiveRoutePlannerService {
 
       const researchHasEvidence = researchEvidenceIds.length > 0;
 
+      const researchResolved = Boolean(
+        researchValue &&
+        (
+          researchValue.resolved === true ||
+          String(researchValue.status||'').toUpperCase() === 'VERIFIED'
+        )
+      );
+
       const researchResolutionCompleted =
-        researchCompleted && researchHasEvidence;
+        (researchCompleted || researchResolved) &&
+        researchResolved &&
+        researchHasEvidence;
 
       const unknownResolved=[
         'REUSED_SUPPORTED',

@@ -265,7 +265,18 @@ class DomainIntegrationBootstrapService{
    if(!gap&&!query)return {accepted:false,domain,command:envelope.command,error:'RESEARCH_QUERY_OR_GAP_REQUIRED',completedAt:Date.now()};
    if(!gap&&query){
     const result=await researchService.executeSearch(query, typeof envelope.payload.options==='object'&&envelope.payload.options!==null ? envelope.payload.options as any : undefined);
-    return done({operation:'EXECUTE_AUTONOMOUS_SEARCH',operationClass:'BUSINESS',status:'SUCCEEDED',...result,evidenceIds:[]});
+    return done({
+      operation:'EXECUTE_AUTONOMOUS_SEARCH',
+      operationClass:'BUSINESS',
+      status:result.resolved===true?'VERIFIED':'SUCCEEDED',
+      ...result,
+      evidenceIds:Array.isArray(result.evidence)
+        ? [...new Set(result.evidence
+            .filter((item:any)=>item && item.status!=='REJECTED')
+            .map((item:any)=>String(item.evidence_id||''))
+            .filter(Boolean))]
+        : []
+    });
    }
    const adaptive = envelope.payload.adaptive !== false;
    const requestedQuery = typeof envelope.payload.query === 'string' ? envelope.payload.query.trim() : '';
