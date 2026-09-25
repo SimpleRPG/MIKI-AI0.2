@@ -526,6 +526,52 @@ class AdaptiveRoutePlannerService {
     const latestValidation=this.latestBusinessResult(task,'VALIDATE_CANDIDATE');
     const latestPackage=this.latestBusinessResult(task,'CREATE_REVIEW_PACKAGE');
 
+    // GENERATE_CANDIDATE が新規CODE Component Candidateを作成した場合、
+    // Candidate Workspace検証とは別に、CODE Component自身のExecution Verificationへ進む。
+    // 未検証Componentを通常の再合成へ混入させない。
+    const createdCodeComponentIds = latestCandidate
+      ? this.stringArrayFromValue(objectValue(latestCandidate), /createdCodeComponentIds/i)
+      : [];
+
+    const latestCandidateIndex = latestCandidate
+      ? task.entries.indexOf(latestCandidate)
+      : -1;
+
+    const latestCodeComponentVerification = [...task.entries]
+      .map((entry,index)=>({entry,index}))
+      .reverse()
+      .find(({entry,index}) => {
+        if(index <= latestCandidateIndex) return false;
+        if(entry.kind!=='RESULT' && entry.kind!=='OBSERVATION') return false;
+        const value=objectValue(entry);
+        return String(value?.operation||'') === 'VERIFY_CODE_COMPONENT';
+      });
+
+    const codeComponentVerificationExists =
+      createdCodeComponentIds.length > 0 &&
+      Boolean(latestCodeComponentVerification);
+
+    if(
+      createdCodeComponentIds.length > 0 &&
+      !codeComponentVerificationExists
+    ){
+      routes.push({
+        target:'verification',
+        command:'VERIFY_CODE_COMPONENT',
+        reason:'CORE detected newly created CODE Component Candidates and selected their execution verification before reuse',
+        payload:{
+          taskId:task.taskId,
+          runId:this.resolveCoreRunId(task,input),
+          componentIds:createdCodeComponentIds,
+          environment:'ANDROID',
+          adaptive:true,
+          priority:100
+        }
+      });
+
+      return this.decorateOperations(task,this.uniqueOperations(routes));
+    }
+
     // First operation: establish/assess the current state. It is the only
     // unconditional starting point; Candidate/Validation/Package are never
     // injected together.
@@ -1883,56 +1929,6 @@ class AdaptiveRoutePlannerService {
       if(value) for(const [key,item] of Object.entries(value)) if(pattern.test(key)&&typeof item==='string') return item;
     }
     return '';
-  }
-
-  private stringArrayFromValue(value:unknown,pattern:RegExp):string[] {
-    const found=new Set<string>();
-
-    const walk=(item:unknown,depth:number):void=>{
-      if(depth>6||!item||typeof item!=='object') return;
-
-      if(Array.isArray(item)){
-        for(const child of item) walk(child,depth+1);
-        return;
-      }
-
-      for(const [key,child] of Object.entries(item as Record<string,unknown>)){
-        if(pattern.test(key)&&Array.isArray(child)){
-          for(const id of child){
-            if(typeof id==='string'&&id.trim()) found.add(id.trim());
-          }
-        }
-        walk(child,depth+1);
-      }
-    };
-
-    walk(value,0);
-    return [...found];
-  }
-
-  private stringArrayFromValue(value:unknown,pattern:RegExp):string[] {
-    const found=new Set<string>();
-
-    const walk=(item:unknown,depth:number):void=>{
-      if(depth>6||!item||typeof item!=='object') return;
-
-      if(Array.isArray(item)){
-        for(const child of item) walk(child,depth+1);
-        return;
-      }
-
-      for(const [key,child] of Object.entries(item as Record<string,unknown>)){
-        if(pattern.test(key)&&Array.isArray(child)){
-          for(const id of child){
-            if(typeof id==='string'&&id.trim()) found.add(id.trim());
-          }
-        }
-        walk(child,depth+1);
-      }
-    };
-
-    walk(value,0);
-    return [...found];
   }
 
   private stringArrayFromValue(value:unknown,pattern:RegExp):string[] {

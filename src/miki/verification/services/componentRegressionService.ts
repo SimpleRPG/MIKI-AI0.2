@@ -71,6 +71,7 @@ export class ComponentRegressionService {
         inputSummary: `${testCase.test_case_id}: ${testCase.description}; expected=${testCase.expected_summary}`,
         expectedSummary: testCase.expected_summary,
         artifactSnapshotKey: artifactSnapshotKey,
+        decisionId,
       });
       requestIds.push(request.request_id);
       caseBindings.push({ test_case_id: testCase.test_case_id, request_id: request.request_id });
