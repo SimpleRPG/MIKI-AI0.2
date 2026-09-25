@@ -1,6 +1,6 @@
 import { componentRegistryService } from '../../../services/componentRegistryService';
 import { componentTestCaseService, ComponentTestCase } from './componentTestCaseService';
-import { executionRunnerService, ExecutionEnvironment, ExecutionRequest } from '../../../services/executionRunnerService';
+import { executionRunnerService, ExecutionEnvironment, ExecutionRequest } from '../../execution/services/executionRunnerService';
 import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from '../../../services/storageService';
 import { componentArtifactStoreService } from '../../../services/componentArtifactStoreService';
