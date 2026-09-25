@@ -9,6 +9,7 @@ import { candidateUnknownResolutionService } from './candidateUnknownResolutionS
 import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
 import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
+import { ComponentCompositionService } from '../../capability/services/componentCompositionService';
 export interface CandidateGenerationFile { path:string; candidateContent:string; evidenceIds:string[]; }
 export interface CandidateGenerationOutcome { accepted:boolean; runId:string; workspaceId?:string; files:CandidateGenerationFile[]; reasons:string[]; responseHash?:string; attemptCount?:number; createdCodeComponentIds?:string[]; learningLineage?:{sourcePackageId?:string;externalReviewId?:string;candidateRevision:number;requestedChanges:string[];userReason?:string;usedLearningArtifactIds:string[];ignoredLearningArtifactIds:string[];appliedFailurePatternIds:string[];appliedCorrectionPairIds:string[];appliedComponentPatternIds:string[];learningContextSha256:string;componentPackId?:string;usedKnowledgeComponentIds?:string[];usedCodeComponentIds?:string[];usedConversationComponentIds?:string[];excludedComponentIds?:string[];componentContextSha256?:string}; }
 class CandidateCodeGenerationService {
@@ -276,9 +277,55 @@ class CandidateCodeGenerationService {
       ...componentPack.usedCodeComponentIds,
     ];
 
+    /*
+     * CODE KnowledgeのConstruction Profileから構築グラフを作る。
+     *
+     * ここでは未検証コードを生成しない。
+     * Graphは構造判断のための決定論的中間表現であり、
+     * 実行可能CODE Componentとは別物。
+     */
+    const constructionGraph =
+      reusableComponentFactoryService.buildConstructionGraph({
+        goal:run.objective,
+        componentIds:codeKnowledgePack.usedKnowledgeComponentIds,
+      });
+
+    const constructionValidation =
+      ComponentCompositionService.getInstance()
+        .validateConstructionGraph(constructionGraph);
+
+    const constructionGraphHint = [
+      `ConstructionGraph=${constructionGraph.graphId}`,
+      `nodes=${constructionGraph.nodes.length}`,
+      `bindings=${constructionGraph.bindings.length}`,
+      `valid=${constructionValidation.valid}`,
+      constructionValidation.errors.length
+        ? `errors=${constructionValidation.errors.join(' | ')}`
+        : '',
+      constructionValidation.unresolvedSlots.length
+        ? `unresolvedSlots=${constructionValidation.unresolvedSlots.join(' | ')}`
+        : '',
+    ].filter(Boolean).join('\n');
+
+    /*
+     * Graphが未完成でも即座に捏造して補完しない。
+     * 未解決slotは既存CORE/UNKNOWN/Research経路へ
+     * 不足情報として渡せるよう、合成要求へ明示する。
+     */
+    const constructionRequirements = [
+      'Construction Graph is deterministic structural guidance only.',
+      constructionGraphHint,
+      ...(constructionValidation.unresolvedSlots.length
+        ? [
+            'Unresolved construction slots must not be guessed.',
+            `Resolve or research these slots: ${constructionValidation.unresolvedSlots.join(', ')}`,
+          ]
+        : []),
+    ].join('\n');
+
     const synthesisPlan=nonLlmCodeSynthesisService.plan(
       compiledRequest,
-      compositionPrompt,
+      `${compositionPrompt}\n\n${constructionRequirements}` ,
       reusableComponentIds
     );
 

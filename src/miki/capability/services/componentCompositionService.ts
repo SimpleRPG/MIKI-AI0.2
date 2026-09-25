@@ -2,6 +2,7 @@ import { ComponentTxtPackage } from '../../../types';
 import { capabilityGraphService, ComponentPlan } from './capabilityGraphService';
 import { componentRegistryService } from './componentRegistryService';
 import { systemLogger } from '../../../services/systemLogger';
+import type { CodeConstructionGraph } from '../../core/data/codeKnowledge/common';
 
 export type CompositionFailurePolicy = 'STOP' | 'RETRY_ONCE' | 'SKIP_OPTIONAL';
 
@@ -42,6 +43,83 @@ export class ComponentCompositionService {
   public static getInstance(): ComponentCompositionService {
     if (!this.instance) this.instance = new ComponentCompositionService();
     return this.instance;
+  }
+
+  public validateConstructionGraph(graph:CodeConstructionGraph):{
+    valid:boolean;
+    errors:string[];
+    unresolvedSlots:string[];
+  }{
+    const errors:string[]=[];
+    const unresolvedSlots:string[]=[];
+    const nodes=new Map(graph.nodes.map(node=>[node.nodeId,node]));
+
+    if(!graph.nodes.length){
+      errors.push('CONSTRUCTION_GRAPH_EMPTY');
+      return {valid:false,errors,unresolvedSlots};
+    }
+
+    for(const node of graph.nodes){
+      const bindings=graph.bindings.filter(
+        binding=>binding.targetNodeId===node.nodeId
+      );
+
+      for(const slot of node.profile.slots){
+        const slotBindings=bindings.filter(
+          binding=>binding.slotName===slot.name
+        );
+
+        if(slot.multiple!==true && slotBindings.length>1){
+          errors.push(
+            `CONSTRUCTION_SLOT_MULTIPLE_BINDINGS:${node.nodeId}:${slot.name}`
+          );
+          continue;
+        }
+
+        if(slot.required && slotBindings.length===0){
+          unresolvedSlots.push(`${node.nodeId}:${slot.name}`);
+          continue;
+        }
+
+        for(const binding of slotBindings){
+          if(binding.sourceNodeId){
+            const source=nodes.get(binding.sourceNodeId);
+
+            if(!source){
+              errors.push(
+                `CONSTRUCTION_SOURCE_NODE_NOT_FOUND:${binding.sourceNodeId}`
+              );
+              continue;
+            }
+
+            const outputs=source.profile.outputKinds||[];
+            const compatible=outputs.some(output=>
+              slot.inputKinds.includes(output)
+            );
+
+            if(!compatible){
+              errors.push(
+                `CONSTRUCTION_SLOT_TYPE_MISMATCH:${source.nodeId}->${node.nodeId}:${slot.name}`
+              );
+            }
+          }else if(binding.value!==undefined){
+            if(binding.valueKind && !slot.inputKinds.includes(binding.valueKind)){
+              errors.push(
+                `CONSTRUCTION_VALUE_TYPE_MISMATCH:${node.nodeId}:${slot.name}`
+              );
+            }
+          }else{
+            unresolvedSlots.push(`${node.nodeId}:${slot.name}`);
+          }
+        }
+      }
+    }
+
+    return {
+      valid:errors.length===0 && unresolvedSlots.length===0,
+      errors,
+      unresolvedSlots,
+    };
   }
 
   public compose(goal: string, maxComponents = 4, excludedComponentIds: string[] = [], environment?: string): CompositionPlan | undefined {

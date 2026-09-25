@@ -391,6 +391,82 @@ class ReusableComponentFactoryService{
  storeCandidates(items:AnyReusableComponent[]):{componentIds:string[];persistenceReceiptId:string;reloaded:boolean}{const existing=this.list();const merged=[...items,...existing.filter(item=>!items.some(next=>next.canonicalSha256===item.canonicalSha256))].slice(0,1000);storageService.setItem(COMPONENT_KEY,JSON.stringify(merged));const loaded=this.list();const reloaded=items.every(item=>loaded.some(saved=>saved.componentId===item.componentId&&saved.canonicalSha256===item.canonicalSha256));if(!reloaded)throw new Error('COMPONENT_REPOSITORY_PERSISTENCE_FAILED');return {componentIds:items.map(x=>x.componentId),persistenceReceiptId:`CPR-${canonicalSha256Object({ids:items.map(x=>x.componentId),at:Date.now()}).slice(0,20)}`,reloaded};}
  retrieve(input:{purpose:string;environmentFingerprint:string;kinds?:ReusableComponentKind[]}):{candidates:AnyReusableComponent[];excludedComponentIds:string[];exclusionReasons:Record<string,string>}{const words=this.words(input.purpose);const excludedComponentIds:string[]=[];const exclusionReasons:Record<string,string>={};const candidates=this.list().filter(item=>{if(input.kinds&&!input.kinds.includes(item.componentKind)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='KIND_NOT_SELECTED';return false;}if(!['MIKI_APPROVED','ACTIVE','USER_APPROVED'].includes(item.lifecycleStatus)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='NOT_MIKI_APPROVED';return false;}if(item.environmentFingerprint!=='unknown'&&item.environmentFingerprint!=='universal'&&item.environmentFingerprint!==input.environmentFingerprint){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='ENVIRONMENT_REVALIDATION_REQUIRED';return false;}const hay=this.words([item.purpose,...item.appliesWhen,item.componentType].join(' '));const matched=words.some(word=>hay.includes(word));if(!matched){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='PURPOSE_NOT_MATCHED';}return matched;});return {candidates,excludedComponentIds,exclusionReasons};}
  plan(input:{taskId:string;purpose:string;environmentFingerprint:string;requiredKinds?:ReusableComponentKind[]}):ComponentPack{const found=this.retrieve({purpose:input.purpose,environmentFingerprint:input.environmentFingerprint,kinds:input.requiredKinds});const knowledge=found.candidates.filter(x=>x.componentKind==='KNOWLEDGE').map(x=>x.componentId);const code=found.candidates.filter(x=>x.componentKind==='CODE').map(x=>x.componentId);const conversation=found.candidates.filter(x=>x.componentKind==='CONVERSATION').map(x=>x.componentId);const unresolved=(input.requiredKinds||[]).filter(kind=>!found.candidates.some(x=>x.componentKind===kind)).map(kind=>`${kind}_COMPONENT_REQUIRED`);const context={taskId:input.taskId,knowledge,code,conversation,excluded:found.excludedComponentIds,environmentFingerprint:input.environmentFingerprint,unresolved};const componentContextSha256=canonicalSha256Object(context);return {componentPackId:`CPACK-${componentContextSha256.slice(0,20)}`,knowledgePackId:`KPACK-${canonicalSha256Object(knowledge).slice(0,20)}`,usedKnowledgeComponentIds:knowledge,usedCodeComponentIds:code,usedConversationComponentIds:conversation,adaptedComponentIds:[],createdComponentIds:[],excludedComponentIds:found.excludedComponentIds,exclusionReasons:found.exclusionReasons,environmentFingerprint:input.environmentFingerprint,unresolvedComponentNeeds:unresolved,componentContextSha256,packSha256:canonicalSha256Object({...context,componentContextSha256})};}
+
+ buildConstructionGraph(input:{
+  goal:string;
+  componentIds:string[];
+ }):CodeConstructionGraph{
+  const selected=[...new Set(input.componentIds)]
+    .map(id=>this.list().find(item=>item.componentId===id))
+    .filter((item):item is KnowledgeComponentArtifact =>
+      Boolean(item) &&
+      item.componentKind==='KNOWLEDGE' &&
+      Boolean(item.constructionProfile)
+    )
+    .sort((a,b)=>a.componentId.localeCompare(b.componentId));
+
+  const nodes:CodeConstructionNode[]=selected.map(item=>{
+    const profile=item.constructionProfile as CodeConstructionProfile;
+    const digest=canonicalSha256Object({
+      componentId:item.componentId,
+      purpose:item.purpose,
+      profile,
+    });
+
+    return {
+      nodeId:`CGN-${digest.slice(0,20)}`,
+      knowledgeComponentId:item.componentId,
+      componentType:item.componentType,
+      purpose:item.purpose,
+      profile,
+    };
+  });
+
+  const bindings:CodeConstructionBinding[]=[];
+
+  /*
+   * 自動接続は「候補が1つだけ」の場合に限定する。
+   * 複数候補から意味を推測して接続しない。
+   */
+  for(const target of nodes){
+    for(const slot of target.profile.slots){
+      const candidates=nodes
+        .filter(source=>source.nodeId!==target.nodeId)
+        .filter(source=>{
+          const outputs=source.profile.outputKinds||[];
+          return outputs.some(output=>
+            slot.inputKinds.includes(output)
+          );
+        })
+        .sort((a,b)=>a.nodeId.localeCompare(b.nodeId));
+
+      if(candidates.length===1){
+        bindings.push({
+          targetNodeId:target.nodeId,
+          slotName:slot.name,
+          sourceNodeId:candidates[0].nodeId,
+        });
+      }
+    }
+  }
+
+  const graphBase={
+    goal:input.goal,
+    nodes,
+    bindings,
+  };
+
+  const graphId=`CGRAPH-${canonicalSha256Object(graphBase).slice(0,20)}`;
+
+  return {
+    graphId,
+    goal:input.goal,
+    rootNodeId:nodes[0]?.nodeId,
+    nodes,
+    bindings,
+  };
+ }
+
  recordUsage(input:Omit<ComponentUsageReceipt,'usageReceiptId'|'createdAt'|'receiptSha256'>):ComponentUsageReceipt{const createdAt=Date.now();const base={...input,componentIds:[...input.componentIds],createdAt};const receiptSha256=canonicalSha256Object(base);const receipt={...base,usageReceiptId:`CUR-${receiptSha256.slice(0,20)}`,receiptSha256};const receipts=this.read<ComponentUsageReceipt>(RECEIPT_KEY);storageService.setItem(RECEIPT_KEY,JSON.stringify([receipt,...receipts.filter(x=>x.usageReceiptId!==receipt.usageReceiptId)].slice(0,2000)));this.updateOutcome(receipt.componentIds,receipt.outcome);return receipt;}
  findCodeComponentByRegistryId(registryComponentId:string):CodeComponentArtifact|undefined{
   return this.list().find(item =>
