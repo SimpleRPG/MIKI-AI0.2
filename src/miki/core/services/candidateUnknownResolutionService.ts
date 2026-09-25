@@ -277,8 +277,9 @@ class CandidateUnknownResolutionService {
 
     if (
       input.requirements.some(value =>
-        /component|pattern|実装|部品/i.test(value),
-      )
+        /component|pattern|implementation|implement|algorithm|code|コード|実装|実装方法|実装例|部品|修正|追加|生成|作成/i.test(value),
+      ) ||
+      /component|pattern|implementation|implement|algorithm|code|コード|実装|実装方法|実装例|部品|修正|追加|生成|作成/i.test(input.objective)
     ) {
       rows.push({
         kind: 'MISSING_IMPLEMENTATION_PATTERN',
