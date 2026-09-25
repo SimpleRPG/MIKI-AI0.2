@@ -679,8 +679,34 @@ class AdaptiveRoutePlannerService {
           return operation==='EXECUTE_AUTONOMOUS_SEARCH' || operation==='RUN_RESEARCH';
         });
 
-      const researchValue=latestResearchAfterResolution
+      const researchEnvelope=latestResearchAfterResolution
         ? objectValue(latestResearchAfterResolution.entry)
+        : undefined;
+
+      // RUN_RESEARCH is persisted through a DomainReply/normalized envelope.
+      // CORE must inspect the actual Research payload before the outer envelope.
+      const researchValue=researchEnvelope
+        ? (
+          researchEnvelope.result &&
+          typeof researchEnvelope.result==='object' &&
+          !Array.isArray(researchEnvelope.result)
+            ? researchEnvelope.result as Record<string,unknown>
+            : researchEnvelope.reply &&
+              typeof researchEnvelope.reply==='object' &&
+              !Array.isArray(researchEnvelope.reply)
+              ? (
+                (researchEnvelope.reply as Record<string,unknown>).data &&
+                typeof (researchEnvelope.reply as Record<string,unknown>).data==='object' &&
+                !Array.isArray((researchEnvelope.reply as Record<string,unknown>).data)
+                  ? (researchEnvelope.reply as Record<string,unknown>).data as Record<string,unknown>
+                  : (researchEnvelope.reply as Record<string,unknown>).result &&
+                    typeof (researchEnvelope.reply as Record<string,unknown>).result==='object' &&
+                    !Array.isArray((researchEnvelope.reply as Record<string,unknown>).result)
+                    ? (researchEnvelope.reply as Record<string,unknown>).result as Record<string,unknown>
+                    : researchEnvelope.reply as Record<string,unknown>
+              )
+              : researchEnvelope
+        )
         : undefined;
 
       const researchCompleted=Boolean(
@@ -708,6 +734,10 @@ class AdaptiveRoutePlannerService {
         ? this.stringArrayFromValue(researchValue, /evidence(?:[_-]?ids?)/i)
         : [];
 
+      const researchClaimIds = researchValue
+        ? this.stringArrayFromValue(researchValue, /claim(?:[_-]?ids?)/i)
+        : [];
+
       const researchHasEvidence = researchEvidenceIds.length > 0;
 
       const researchResolved = Boolean(
@@ -723,6 +753,47 @@ class AdaptiveRoutePlannerService {
         researchResolved &&
         researchHasEvidence;
 
+      const researchOutcome=String(
+        researchValue?.outcome||''
+      ).toUpperCase();
+
+      const latestResearchVerification=[...task.entries]
+        .map((entry,index)=>({entry,index}))
+        .reverse()
+        .find(({entry,index})=>{
+          if(index<=latestResearchAfterResolution!.index) return false;
+          if(entry.domain!=='verification') return false;
+          if(entry.kind!=='RESULT' && entry.kind!=='OBSERVATION') return false;
+
+          const value=objectValue(entry);
+          return String(value?.operation||'')==='VERIFY_RESEARCH_CLAIMS';
+        });
+
+      const researchVerificationValue=latestResearchVerification
+        ? objectValue(latestResearchVerification.entry)
+        : undefined;
+
+      const researchVerificationClaimIds=researchVerificationValue
+        ? this.stringArrayFromValue(
+            researchVerificationValue,
+            /claim(?:[_-]?ids?)/i
+          )
+        : [];
+
+      const researchVerificationSucceeded=
+        researchClaimIds.length>0 &&
+        latestResearchVerification!==undefined &&
+        researchClaimIds.every(id=>researchVerificationClaimIds.includes(id)) &&
+        researchVerificationValue?.verified===true;
+
+      const researchVerificationPending=
+        researchClaimIds.length>0 &&
+        latestResearchVerification!==undefined &&
+        !researchVerificationSucceeded &&
+        ['SUCCEEDED','COMPLETED'].includes(
+          String(researchVerificationValue?.status||'').toUpperCase()
+        );
+
       const researchContinuationAvailable = Boolean(
         researchValue?.continuationAvailable === true
       );
@@ -731,6 +802,76 @@ class AdaptiveRoutePlannerService {
         researchValue?.nextQuery ||
         ''
       ).trim();
+
+      /*
+       * ResearchがClaimを生成したがVerification不足の場合、
+       * COREがVerification Domainへ明示的に再ルーティングする。
+       */
+      if(
+        researchClaimIds.length>0 &&
+        researchOutcome==='INSUFFICIENT_VERIFICATION' &&
+        !researchVerificationSucceeded
+      ){
+        routes.push({
+          target:'verification',
+          command:'VERIFY_RESEARCH_CLAIMS',
+          reason:'CORE re-evaluated Research Claims with insufficient verification and selected independent Claim Verification',
+          payload:{
+            taskId:task.taskId,
+            claimIds:researchClaimIds,
+            gapId:String(researchValue?.gapId||''),
+            evidenceIds:researchEvidenceIds,
+            requireFresh:false,
+            adaptive:true,
+            priority:96
+          }
+        });
+
+        return this.decorateOperations(
+          task,
+          this.uniqueOperations(routes)
+        );
+      }
+
+      /*
+       * Verificationが完了しても未検証Claimが残る場合は、
+       * Researchの継続条件があればCOREから次ラウンドへ戻す。
+       */
+      if(
+        researchVerificationPending &&
+        researchVerificationValue?.verified!==true
+      ){
+        const continuationGapId=String(
+          researchValue?.gapId ||
+          researchVerificationValue?.researchGapId ||
+          ''
+        ).trim();
+
+        if(
+          researchContinuationAvailable &&
+          (continuationGapId || researchNextQuery)
+        ){
+          routes.push({
+            target:'research',
+            command:'RUN_RESEARCH',
+            reason:'CORE re-evaluated unresolved Claim Verification and selected the next Research continuation',
+            payload:{
+              taskId:task.taskId,
+              gapId:continuationGapId,
+              query:researchNextQuery,
+              continuationRound:
+                Number(researchValue?.continuationRound||0)+1,
+              adaptive:true,
+              priority:94
+            }
+          });
+
+          return this.decorateOperations(
+            task,
+            this.uniqueOperations(routes)
+          );
+        }
+      }
 
       /*
        * Researchが未解決でも、ResearchServiceが次ラウンドを要求している場合は
