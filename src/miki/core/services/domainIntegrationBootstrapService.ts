@@ -27,6 +27,9 @@ import { taskBlackboardService } from './taskBlackboardService';
 import { coreOrchestratorService } from './coreOrchestratorService';
 import type { ExecutionEvent } from '../../execution/services/executionEventBusService';
 import { safeImprovementPipelineService } from '../../improvement/services/safeImprovementPipelineService';
+import { executionRunnerService } from '../../execution/services/executionRunnerService';
+import { androidNativeRunnerAdapterService } from '../../execution/services/androidNativeRunnerAdapterService';
+import { externalRunnerAdapterService } from '../../execution/services/externalRunnerAdapterService';
 
 const BASE_COMMANDS:DomainCommand[]=['HEALTH_CHECK','DESCRIBE','GET_STATUS','ASSESS_DOMAIN','PARTICIPATE','VERIFY_CONNECTION'];
 
@@ -416,6 +419,43 @@ class DomainIntegrationBootstrapService{
      };
 
      const refreshed=componentRegressionService.refresh(suite.suite_id) || suite;
+
+     /*
+      * NEW_COMPONENT のRegression Suiteは通常Candidate用の
+      * ImprovementRegressionCoordinatorへcandidate_idなしでは登録されない。
+      * そのため、ここで既存のExecutionRunner/Native/External Adapterを再利用し、
+      * Suite内の先頭QUEUED Requestを1件だけSUBMITTEDへ進める。
+      *
+      * 既にSUBMITTEDが存在する場合は二重投入しない。
+      * 実行完了後は既存Execution Event -> CORE再評価経路で次Requestへ進む。
+      */
+     const activeRegressionRequest=refreshed.request_ids
+       .map(requestId=>executionRunnerService.getRequest(requestId))
+       .find(request=>request?.status==='SUBMITTED');
+
+     if(!activeRegressionRequest){
+       const nextRegressionRequest=refreshed.request_ids
+         .map(requestId=>executionRunnerService.getRequest(requestId))
+         .find(request=>request?.status==='QUEUED');
+
+       if(nextRegressionRequest){
+         const submitted=executionRunnerService.markSubmitted(nextRegressionRequest.request_id);
+
+         if(submitted?.status==='SUBMITTED'){
+           if(
+             submitted.environment==='ANDROID' &&
+             androidNativeRunnerAdapterService.isAvailable()
+           ){
+             void androidNativeRunnerAdapterService.dispatch(submitted);
+           }else if(
+             submitted.environment!=='TERMUX' &&
+             externalRunnerAdapterService.isEnabled()
+           ){
+             void externalRunnerAdapterService.dispatch(submitted);
+           }
+         }
+       }
+     }
 
      if(refreshed.status==='PASSED'){
        const gate=componentPromotionService.validateForLimited(refreshed.suite_id);
