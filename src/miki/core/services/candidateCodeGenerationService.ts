@@ -44,9 +44,14 @@ class CandidateCodeGenerationService {
       deliveryRequirements:this.strings(run.payload.deliveryRequirements)
     };
 
+    const reusableComponentIds = [
+      ...componentPack.usedCodeComponentIds,
+    ];
+
     const synthesisPlan=nonLlmCodeSynthesisService.plan(
       compiledRequest,
-      compositionPrompt
+      compositionPrompt,
+      reusableComponentIds
     );
 
     const composition=synthesisPlan.composition;
