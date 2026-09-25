@@ -405,7 +405,7 @@ export const additionalJavascriptCodeKnowledge: CodeKnowledgeDefinition[] = [
         sourceArtifactIds: ['node-fs-readfile'],
         constructionProfile: {
           kind: 'CALL',
-          syntaxTemplate: 'readFile({path}, \\'utf8\\')',
+syntaxTemplate: "readFile({path}, 'utf8')",
           outputKinds: ['promise-expression'],
           slots: [
             { name: 'path', inputKinds: ['string-expression'], required: true },
