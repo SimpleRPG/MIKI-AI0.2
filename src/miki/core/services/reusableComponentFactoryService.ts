@@ -14,11 +14,21 @@ import {
   additionalModuleCodeKnowledge,
   additionalModuleCodeComponents,
 } from '../data/codeKnowledge/modules';
-import { platformCodeKnowledge } from '../data/codeKnowledge/platformCodeKnowledge';
+import { additionalConstructionBridgeCodeComponents } from '../data/codeKnowledge/constructionBridges';
 import {
   autonomousConstructionKnowledge,
   additionalAutonomousConstructionComponents,
 } from '../data/codeKnowledge/autonomousConstruction';
+import { nodeRuntimeCodeKnowledge, nodeRuntimeCodeComponents } from '../data/codeKnowledge/nodeRuntime';
+import { javascriptStandardApiCodeKnowledge, javascriptStandardApiCodeComponents } from '../data/codeKnowledge/javascriptStandardApi';
+import { asyncConcurrencyCodeKnowledge, asyncConcurrencyCodeComponents } from '../data/codeKnowledge/asyncConcurrency';
+import { browserWebApiCodeKnowledge, browserWebApiCodeComponents } from '../data/codeKnowledge/browserWebApi';
+import { expressBackendCodeKnowledge, expressBackendCodeComponents } from '../data/codeKnowledge/expressBackend';
+import { dataValidationCodeKnowledge, dataValidationCodeComponents } from '../data/codeKnowledge/dataValidation';
+import { databasePersistenceCodeKnowledge, databasePersistenceCodeComponents } from '../data/codeKnowledge/databasePersistence';
+import { securityCryptoCodeKnowledge, securityCryptoCodeComponents } from '../data/codeKnowledge/securityCrypto';
+import { buildToolingCodeKnowledge, buildToolingCodeComponents } from '../data/codeKnowledge/buildTooling';
+import { reactUiAccessibilityCodeKnowledge, reactUiAccessibilityCodeComponents } from '../data/codeKnowledge/reactUiAccessibility';
 export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
 export type ComponentSelectionMode='REUSE_AS_IS'|'ADAPT_EXISTING'|'COMPOSE_MULTIPLE'|'CREATE_NEW'|'ESCALATE_UNKNOWN';
@@ -58,6 +68,16 @@ function buildBuiltInCodeComponentDefinitions(): CodeComponentDefinition[] {
     ...additionalModuleCodeComponents,
     ...additionalAutonomousConstructionComponents,
     ...additionalConstructionBridgeCodeComponents,
+    ...nodeRuntimeCodeComponents,
+    ...javascriptStandardApiCodeComponents,
+    ...asyncConcurrencyCodeComponents,
+    ...browserWebApiCodeComponents,
+    ...expressBackendCodeComponents,
+    ...dataValidationCodeComponents,
+    ...databasePersistenceCodeComponents,
+    ...securityCryptoCodeComponents,
+    ...buildToolingCodeComponents,
+    ...reactUiAccessibilityCodeComponents,
   ];
 
   const allKnowledge: CodeKnowledgeDefinition[] = [
@@ -74,7 +94,16 @@ function buildBuiltInCodeComponentDefinitions(): CodeComponentDefinition[] {
     ...moduleCodeKnowledge,
     ...additionalModuleCodeKnowledge,
     ...autonomousConstructionKnowledge,
-    ...platformCodeKnowledge,
+    ...nodeRuntimeCodeKnowledge,
+    ...javascriptStandardApiCodeKnowledge,
+    ...asyncConcurrencyCodeKnowledge,
+    ...browserWebApiCodeKnowledge,
+    ...expressBackendCodeKnowledge,
+    ...dataValidationCodeKnowledge,
+    ...databasePersistenceCodeKnowledge,
+    ...securityCryptoCodeKnowledge,
+    ...buildToolingCodeKnowledge,
+    ...reactUiAccessibilityCodeKnowledge,
   ];
 
   const explicitIds = new Set(
@@ -192,6 +221,16 @@ class ReusableComponentFactoryService{
       ...moduleCodeKnowledge,
       ...additionalModuleCodeKnowledge,
       ...autonomousConstructionKnowledge,
+    ...nodeRuntimeCodeKnowledge,
+    ...javascriptStandardApiCodeKnowledge,
+    ...asyncConcurrencyCodeKnowledge,
+    ...browserWebApiCodeKnowledge,
+    ...expressBackendCodeKnowledge,
+    ...dataValidationCodeKnowledge,
+    ...databasePersistenceCodeKnowledge,
+    ...securityCryptoCodeKnowledge,
+    ...buildToolingCodeKnowledge,
+    ...reactUiAccessibilityCodeKnowledge,
     ];
 
     const existing=this.list();
@@ -1038,7 +1077,16 @@ class ReusableComponentFactoryService{
     ...moduleCodeKnowledge,
     ...additionalModuleCodeKnowledge,
     ...autonomousConstructionKnowledge,
-    ...platformCodeKnowledge,
+    ...nodeRuntimeCodeKnowledge,
+    ...javascriptStandardApiCodeKnowledge,
+    ...asyncConcurrencyCodeKnowledge,
+    ...browserWebApiCodeKnowledge,
+    ...expressBackendCodeKnowledge,
+    ...dataValidationCodeKnowledge,
+    ...databasePersistenceCodeKnowledge,
+    ...securityCryptoCodeKnowledge,
+    ...buildToolingCodeKnowledge,
+    ...reactUiAccessibilityCodeKnowledge,
   ];
 
   const definitions:CodeComponentDefinition[] = buildBuiltInCodeComponentDefinitions();
