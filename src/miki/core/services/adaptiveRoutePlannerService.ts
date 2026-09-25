@@ -633,12 +633,35 @@ class AdaptiveRoutePlannerService {
         )
       );
 
+      /*
+       * Research execution success alone is not a resolution.
+       * CORE may regenerate a Candidate only when the research result
+       * actually carries persisted evidence. This prevents:
+       *
+       * GENERATE_CANDIDATE
+       *   -> CODE_COMPOSITION_COMPONENT_UNRESOLVED
+       *   -> UNKNOWN
+       *   -> RESEARCH(SUCCEEDED without evidence)
+       *   -> GENERATE_CANDIDATE
+       *   -> same unresolved component
+       *
+       * from becoming another blind retry loop.
+       */
+      const researchEvidenceIds = researchValue
+        ? this.stringArrayFromValue(researchValue, /evidence(?:[_-]?ids?)/i)
+        : [];
+
+      const researchHasEvidence = researchEvidenceIds.length > 0;
+
+      const researchResolutionCompleted =
+        researchCompleted && researchHasEvidence;
+
       const unknownResolved=[
         'REUSED_SUPPORTED',
         'LOCAL_EVIDENCE'
       ].includes(resolutionStatus);
 
-      if(unknownResolved || researchCompleted){
+      if(unknownResolved || researchResolutionCompleted){
         routes.push({
           target:'selfDevelopment',
           command:'GENERATE_CANDIDATE',
@@ -662,7 +685,9 @@ class AdaptiveRoutePlannerService {
               result:{
                 error:latestCandidateGenerationError,
                 unknownResolutionStatus:resolutionStatus,
-                researchCompleted
+                researchCompleted,
+                researchHasEvidence,
+                researchEvidenceIds
               },
               retryOfCandidateRevision:Number(input.candidateRevision||1)
             },
