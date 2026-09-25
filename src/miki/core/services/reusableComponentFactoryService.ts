@@ -167,46 +167,53 @@ function buildBuiltInCodeComponentDefinitions(): CodeComponentDefinition[] {
 }
 
 class ReusableComponentFactoryService{
-  constructor(){
-    this.seedBuiltInCodeKnowledge();
-    this.seedBuiltInCodeComponents();
+  private builtInCatalogCache?:AnyReusableComponent[];
+
+  constructor(){}
+
+
+  private buildBuiltInCodeCatalog():CodeComponentArtifact[]{
+    return buildBuiltInCodeComponentDefinitions().map(definition=>this.identify({
+      componentKind:'CODE' as const,
+      componentType:definition.componentType,
+      purpose:definition.purpose,
+      interfaceContract:{
+        input:definition.inputs,
+        output:definition.outputs,
+      },
+      inputs:definition.inputs,
+      outputs:definition.outputs,
+      prerequisites:definition.prerequisites,
+      dependencies:definition.dependencies,
+      appliesWhen:[definition.knowledgeId],
+      doesNotApplyWhen:[],
+      sourceEpisodeIds:[],
+      sourceLearningArtifactIds:[],
+      environmentFingerprint:definition.supportedEnvironments.join(','),
+      lifecycleStatus:'USER_APPROVED' as const,
+      usageCount:0,
+      successCount:0,
+      failureCount:0,
+      createdAt:0,
+      updatedAt:0,
+      exports:definition.exports,
+      imports:definition.imports,
+      publicInterfaces:definition.publicInterfaces,
+      coreIngressPoints:[],
+      domainOwnership:['selfDevelopment'],
+      persistenceKeys:[],
+      uiEventEntrypoints:[],
+      testReferences:[definition.tests],
+      requiredValidation:[
+        'tests',
+        'validation',
+        'construction profile',
+      ],
+    }) as CodeComponentArtifact);
   }
 
 
-  private seedBuiltInCodeComponents(): void {
-    const definitions: CodeComponentDefinition[] = buildBuiltInCodeComponentDefinitions();
-
-    for (const definition of definitions) {
-      const existing = this.list().some(item =>
-        item.componentKind === 'CODE' &&
-        item.appliesWhen.includes(definition.knowledgeId)
-      );
-
-      if (existing) continue;
-
-      this.createCodeComponentCandidate({
-        purpose: definition.purpose,
-        implementation: definition.implementation,
-        targetPath: definition.targetPath,
-        tests: definition.tests,
-        validation: definition.validation,
-        componentType: definition.componentType,
-        inputs: definition.inputs,
-        outputs: definition.outputs,
-        prerequisites: definition.prerequisites,
-        dependencies: definition.dependencies,
-        supportedEnvironments: definition.supportedEnvironments,
-        entryPoint: definition.entryPoint,
-        securityClass: definition.securityClass,
-        exports: definition.exports,
-        imports: definition.imports,
-        publicInterfaces: definition.publicInterfaces,
-        knowledgeComponentId: definition.knowledgeId,
-      });
-    }
-  }
-
-  private seedBuiltInCodeKnowledge():void{
+  private buildBuiltInKnowledgeCatalog():KnowledgeComponentArtifact[]{
     const seeds=[
       ...commonCodeKnowledge,
       ...additionalCommonCodeKnowledge,
@@ -221,63 +228,87 @@ class ReusableComponentFactoryService{
       ...moduleCodeKnowledge,
       ...additionalModuleCodeKnowledge,
       ...autonomousConstructionKnowledge,
-    ...nodeRuntimeCodeKnowledge,
-    ...javascriptStandardApiCodeKnowledge,
-    ...asyncConcurrencyCodeKnowledge,
-    ...browserWebApiCodeKnowledge,
-    ...expressBackendCodeKnowledge,
-    ...dataValidationCodeKnowledge,
-    ...databasePersistenceCodeKnowledge,
-    ...securityCryptoCodeKnowledge,
-    ...buildToolingCodeKnowledge,
-    ...reactUiAccessibilityCodeKnowledge,
+      ...nodeRuntimeCodeKnowledge,
+      ...javascriptStandardApiCodeKnowledge,
+      ...asyncConcurrencyCodeKnowledge,
+      ...browserWebApiCodeKnowledge,
+      ...expressBackendCodeKnowledge,
+      ...dataValidationCodeKnowledge,
+      ...databasePersistenceCodeKnowledge,
+      ...securityCryptoCodeKnowledge,
+      ...buildToolingCodeKnowledge,
+      ...reactUiAccessibilityCodeKnowledge,
     ];
 
-    const existing=this.list();
-    const now=Date.now();
-
-    const components=seeds
-      .filter(seed=>!existing.some(item =>
-        item.componentKind==='KNOWLEDGE' &&
-        item.appliesWhen.includes(seed.id)
-      ))
-      .map(seed=>this.identify({
-        componentKind:'KNOWLEDGE' as const,
-        componentType:seed.componentType,
-        purpose:seed.purpose,
-        interfaceContract:{
-          input:seed.inputs,
-          output:seed.outputs,
-        },
-        inputs:seed.inputs,
-        outputs:seed.outputs,
-        prerequisites:[],
-        dependencies:[],
-        appliesWhen:[seed.id,...seed.appliesWhen],
-        doesNotApplyWhen:seed.doesNotApplyWhen,
-        sourceEpisodeIds:[],
-        sourceLearningArtifactIds:[],
-        environmentFingerprint:'universal',
-        lifecycleStatus:'USER_APPROVED' as const,
-        usageCount:0,
-        successCount:0,
-        failureCount:0,
-        createdAt:now,
-        updatedAt:now,
-        claimIds:[],
-        evidenceRefs:[],
-        sourceUrls:seed.sourceUrls,
-        sourceArtifactIds:seed.sourceArtifactIds,
-        constructionProfile:seed.constructionProfile,
-        verificationStatus:'UNVERIFIED' as const,
-        contradictionRefs:[],
-        freshnessPolicy:'REVALIDATE_ON_SOURCE_CHANGE',
-      }));
-
-    if(components.length>0){
-      this.storeCandidates(components);
-    }
+    return seeds.map(seed=>this.identify({
+      componentKind:'KNOWLEDGE' as const,
+      componentType:seed.componentType,
+      purpose:seed.purpose,
+      interfaceContract:{
+        input:seed.inputs,
+        output:seed.outputs,
+      },
+      inputs:seed.inputs,
+      outputs:seed.outputs,
+      prerequisites:[],
+      dependencies:[],
+      appliesWhen:[seed.id,...seed.appliesWhen],
+      doesNotApplyWhen:seed.doesNotApplyWhen,
+      sourceEpisodeIds:[],
+      sourceLearningArtifactIds:[],
+      environmentFingerprint:'universal',
+      lifecycleStatus:'USER_APPROVED' as const,
+      usageCount:0,
+      successCount:0,
+      failureCount:0,
+      createdAt:0,
+      updatedAt:0,
+      claimIds:[],
+      evidenceRefs:[],
+      sourceUrls:seed.sourceUrls,
+      sourceArtifactIds:seed.sourceArtifactIds,
+      constructionProfile:seed.constructionProfile,
+      verificationStatus:'UNVERIFIED' as const,
+      contradictionRefs:[],
+      freshnessPolicy:'REVALIDATE_ON_SOURCE_CHANGE',
+    }) as KnowledgeComponentArtifact);
   }
+
+
+  private builtInCatalog():AnyReusableComponent[]{
+    if(!this.builtInCatalogCache){
+      this.builtInCatalogCache=[
+        ...this.buildBuiltInKnowledgeCatalog(),
+        ...this.buildBuiltInCodeCatalog(),
+      ];
+    }
+    return this.builtInCatalogCache;
+  }
+
+
+  private isBuiltInShadowed(
+    persisted:AnyReusableComponent,
+    builtIn:AnyReusableComponent
+  ):boolean{
+    if(persisted.componentKind!==builtIn.componentKind)return false;
+
+    const identity=builtIn.appliesWhen[0];
+    return Boolean(identity)&&persisted.appliesWhen.includes(identity);
+  }
+
+
+  private mergedCatalog():AnyReusableComponent[]{
+    const persisted=this.read<AnyReusableComponent>(COMPONENT_KEY);
+
+    const builtIn=this.builtInCatalog().filter(item=>
+      !persisted.some(saved=>this.isBuiltInShadowed(saved,item))
+    );
+
+    return [...persisted,...builtIn];
+  }
+
+
+
 
 
  extract(artifact:ReviewLearningArtifact,episode:ReviewLearningEpisode,environmentFingerprint='unknown'):AnyReusableComponent[]{const components:AnyReusableComponent[]=[];const common={purpose:this.purpose(artifact),interfaceContract:{input:'task context',output:'bounded reusable guidance'},inputs:['task context'],outputs:['reusable guidance'],prerequisites:[],dependencies:[],appliesWhen:this.appliesWhen(artifact),doesNotApplyWhen:this.doesNotApplyWhen(artifact),sourceEpisodeIds:[episode.episodeId],sourceLearningArtifactIds:[artifact.artifactId],environmentFingerprint,lifecycleStatus:'CANDIDATE' as const,usageCount:0,successCount:0,failureCount:0,createdAt:Date.now(),updatedAt:Date.now()};
@@ -290,7 +321,7 @@ class ReusableComponentFactoryService{
   const sourceUrls=[...new Set(input.sourceUrls||[])];
   const sourceArtifactIds=[...new Set(input.sourceArtifactIds||[])];
   const contradictionRefs=[...new Set(input.contradictionRefs||[])];
-  const items=this.list();
+  const items=this.read<AnyReusableComponent>(COMPONENT_KEY);
   const existing=items.find(item=>
     item.componentKind==='KNOWLEDGE'&&
     item.purpose===input.purpose&&
@@ -351,7 +382,7 @@ class ReusableComponentFactoryService{
   return {component,created:true,updated:false};
  }
  verifyResearchKnowledge(componentId:string,claimIds:string[],options?:{requireFresh?:boolean;maxAgeDays?:number}):{component:KnowledgeComponentArtifact|undefined;verified:boolean;conflicted:boolean;verificationIds:string[];reasons:string[]}{
-  const item=this.list().find(x=>x.componentId===componentId);
+  const item=this.read<AnyReusableComponent>(COMPONENT_KEY).find(x=>x.componentId===componentId);
   if(!item||item.componentKind!=='KNOWLEDGE'){
     return {component:undefined,verified:false,conflicted:false,verificationIds:[],reasons:['KNOWLEDGE_COMPONENT_NOT_FOUND']};
   }
@@ -395,7 +426,7 @@ class ReusableComponentFactoryService{
   }
 
   item.updatedAt=Date.now();
-  storageService.setItem(COMPONENT_KEY,JSON.stringify(this.list()));
+  storageService.setItem(COMPONENT_KEY,JSON.stringify(this.read<AnyReusableComponent>(COMPONENT_KEY)));
 
   return {component:item,verified,conflicted,verificationIds,reasons};
  }
@@ -646,6 +677,7 @@ class ReusableComponentFactoryService{
 
    const linked=this.list().find(component=>
     component.componentKind==='CODE' &&
+    Boolean(component.registryComponentId) &&
     (
      component.appliesWhen.includes(definition.knowledgeId) ||
      component.appliesWhen.includes(sourceKnowledgeId) ||
@@ -743,7 +775,7 @@ class ReusableComponentFactoryService{
   };
  }
 
- storeCandidates(items:AnyReusableComponent[]):{componentIds:string[];persistenceReceiptId:string;reloaded:boolean}{const existing=this.list();const merged=[...items,...existing.filter(item=>!items.some(next=>next.canonicalSha256===item.canonicalSha256))].slice(0,1000);storageService.setItem(COMPONENT_KEY,JSON.stringify(merged));const loaded=this.list();const reloaded=items.every(item=>loaded.some(saved=>saved.componentId===item.componentId&&saved.canonicalSha256===item.canonicalSha256));if(!reloaded)throw new Error('COMPONENT_REPOSITORY_PERSISTENCE_FAILED');return {componentIds:items.map(x=>x.componentId),persistenceReceiptId:`CPR-${canonicalSha256Object({ids:items.map(x=>x.componentId),at:Date.now()}).slice(0,20)}`,reloaded};}
+ storeCandidates(items:AnyReusableComponent[]):{componentIds:string[];persistenceReceiptId:string;reloaded:boolean}{const existing=this.read<AnyReusableComponent>(COMPONENT_KEY);const merged=[...items,...existing.filter(item=>!items.some(next=>next.canonicalSha256===item.canonicalSha256))].slice(0,1000);storageService.setItem(COMPONENT_KEY,JSON.stringify(merged));const loaded=this.read<AnyReusableComponent>(COMPONENT_KEY);const reloaded=items.every(item=>loaded.some(saved=>saved.componentId===item.componentId&&saved.canonicalSha256===item.canonicalSha256));if(!reloaded)throw new Error('COMPONENT_REPOSITORY_PERSISTENCE_FAILED');return {componentIds:items.map(x=>x.componentId),persistenceReceiptId:`CPR-${canonicalSha256Object({ids:items.map(x=>x.componentId),at:Date.now()}).slice(0,20)}`,reloaded};}
  retrieve(input:{purpose:string;environmentFingerprint:string;kinds?:ReusableComponentKind[]}):{candidates:AnyReusableComponent[];excludedComponentIds:string[];exclusionReasons:Record<string,string>}{const words=this.words(input.purpose);const excludedComponentIds:string[]=[];const exclusionReasons:Record<string,string>={};const candidates=this.list().filter(item=>{if(input.kinds&&!input.kinds.includes(item.componentKind)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='KIND_NOT_SELECTED';return false;}if(!['MIKI_APPROVED','ACTIVE','USER_APPROVED'].includes(item.lifecycleStatus)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='NOT_MIKI_APPROVED';return false;}if(item.environmentFingerprint!=='unknown'&&item.environmentFingerprint!=='universal'&&item.environmentFingerprint!==input.environmentFingerprint){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='ENVIRONMENT_REVALIDATION_REQUIRED';return false;}const hay=this.words([item.purpose,...item.appliesWhen,item.componentType].join(' '));const matched=words.some(word=>hay.includes(word));if(!matched){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='PURPOSE_NOT_MATCHED';}return matched;});return {candidates,excludedComponentIds,exclusionReasons};}
  plan(input:{taskId:string;purpose:string;environmentFingerprint:string;requiredKinds?:ReusableComponentKind[]}):ComponentPack{const found=this.retrieve({purpose:input.purpose,environmentFingerprint:input.environmentFingerprint,kinds:input.requiredKinds});const knowledge=found.candidates.filter(x=>x.componentKind==='KNOWLEDGE').map(x=>x.componentId);const code=found.candidates.filter(x=>x.componentKind==='CODE').map(x=>x.componentId);const conversation=found.candidates.filter(x=>x.componentKind==='CONVERSATION').map(x=>x.componentId);const unresolved=(input.requiredKinds||[]).filter(kind=>!found.candidates.some(x=>x.componentKind===kind)).map(kind=>`${kind}_COMPONENT_REQUIRED`);const context={taskId:input.taskId,knowledge,code,conversation,excluded:found.excludedComponentIds,environmentFingerprint:input.environmentFingerprint,unresolved};const componentContextSha256=canonicalSha256Object(context);return {componentPackId:`CPACK-${componentContextSha256.slice(0,20)}`,knowledgePackId:`KPACK-${canonicalSha256Object(knowledge).slice(0,20)}`,usedKnowledgeComponentIds:knowledge,usedCodeComponentIds:code,usedConversationComponentIds:conversation,adaptedComponentIds:[],createdComponentIds:[],excludedComponentIds:found.excludedComponentIds,exclusionReasons:found.exclusionReasons,environmentFingerprint:input.environmentFingerprint,unresolvedComponentNeeds:unresolved,componentContextSha256,packSha256:canonicalSha256Object({...context,componentContextSha256})};}
 
@@ -784,6 +816,7 @@ class ReusableComponentFactoryService{
     const linkedCodeComponent=definition
       ? this.list().find(component=>
         component.componentKind==='CODE' &&
+        Boolean(component.registryComponentId) &&
         (
           component.appliesWhen.includes(definition.knowledgeId) ||
           component.appliesWhen.includes(sourceKnowledgeId)
@@ -1636,7 +1669,7 @@ class ReusableComponentFactoryService{
   return {accepted:true,componentId:linked.componentId,reason:'CODE_REUSABLE_MIKI_APPROVED_FROM_VERIFIED_REGISTRY'};
  }
 
- updateLifecycle(componentId:string,status:ReusableComponentLifecycle,supersededBy?:string):AnyReusableComponent|undefined{const items=this.list();const item=items.find(x=>x.componentId===componentId);if(!item)return undefined;if(status==='ACTIVE'&&!['VERIFIED','USER_APPROVED','MIKI_APPROVED','REVALIDATION_REQUIRED'].includes(item.lifecycleStatus))throw new Error('COMPONENT_ACTIVE_GATE_FAILED');item.lifecycleStatus=status;item.supersededBy=supersededBy;item.updatedAt=Date.now();storageService.setItem(COMPONENT_KEY,JSON.stringify(items));return item;}
+ updateLifecycle(componentId:string,status:ReusableComponentLifecycle,supersededBy?:string):AnyReusableComponent|undefined{const items=this.read<AnyReusableComponent>(COMPONENT_KEY);const item=items.find(x=>x.componentId===componentId);if(!item)return undefined;if(status==='ACTIVE'&&!['VERIFIED','USER_APPROVED','MIKI_APPROVED','REVALIDATION_REQUIRED'].includes(item.lifecycleStatus))throw new Error('COMPONENT_ACTIVE_GATE_FAILED');item.lifecycleStatus=status;item.supersededBy=supersededBy;item.updatedAt=Date.now();storageService.setItem(COMPONENT_KEY,JSON.stringify(items));return item;}
  approveByCore(componentIds?:string[]):{approvedComponentIds:string[];rejectedComponentIds:string[];reasons:Record<string,string>;changed:boolean}{const approvedComponentIds:string[]=[],rejectedComponentIds:string[]=[],reasons:Record<string,string>={};const requestedIds=componentIds&&componentIds.length>0?new Set(componentIds):undefined;const artifacts=reviewLearningArtifactService.list();const activeGeneralized=(id:string)=>{const a=artifacts.find(x=>x.artifactId===id);return Boolean(a&&a.artifactType==='ARCHIVED')?false:Boolean(a&&a.artifactType==='ACCEPTED_PATTERN'&&a.lifecycleStatus==='ACTIVE'&&a.scope==='GENERALIZED');};for(const item of this.list()){
 if(requestedIds&&!requestedIds.has(item.componentId))continue;
 if(item.lifecycleStatus==='VERIFIED'&&item.componentKind==='KNOWLEDGE'&&item.verificationStatus==='VERIFIED'){
@@ -1656,8 +1689,8 @@ approvedComponentIds.push(item.componentId);
 rejectedComponentIds.push(item.componentId);
 reasons[item.componentId]='SOURCE_LEARNING_NOT_GENERALIZED';
 }
-}return {approvedComponentIds,rejectedComponentIds,reasons,changed:approvedComponentIds.length>0};} list():AnyReusableComponent[]{return this.read<AnyReusableComponent>(COMPONENT_KEY);}
- private updateOutcome(ids:string[],outcome:ComponentUsageReceipt['outcome']):void{const items=this.list();for(const item of items){if(!ids.includes(item.componentId))continue;item.usageCount+=1;item.lastUsedAt=Date.now();if(outcome==='SUCCEEDED'){item.successCount+=1;item.lastConfirmedAt=Date.now();}if(outcome==='FAILED')item.failureCount+=1;item.updatedAt=Date.now();}storageService.setItem(COMPONENT_KEY,JSON.stringify(items));}
+}return {approvedComponentIds,rejectedComponentIds,reasons,changed:approvedComponentIds.length>0};} list():AnyReusableComponent[]{return this.mergedCatalog();}
+ private updateOutcome(ids:string[],outcome:ComponentUsageReceipt['outcome']):void{const items=this.read<AnyReusableComponent>(COMPONENT_KEY);for(const item of items){if(!ids.includes(item.componentId))continue;item.usageCount+=1;item.lastUsedAt=Date.now();if(outcome==='SUCCEEDED'){item.successCount+=1;item.lastConfirmedAt=Date.now();}if(outcome==='FAILED')item.failureCount+=1;item.updatedAt=Date.now();}storageService.setItem(COMPONENT_KEY,JSON.stringify(items));}
  private identify(body:Record<string,unknown>&{componentKind:ReusableComponentKind}):AnyReusableComponent{const canonicalSha256=canonicalSha256Object(body);return {...body,componentId:`RC-${body.componentKind}-${canonicalSha256.slice(0,18)}`,canonicalSha256} as AnyReusableComponent;}
  private purpose(a:ReviewLearningArtifact):string{if(a.artifactType==='FAILURE_PATTERN')return `${a.symptom}: ${a.preferredAlternative}`;if(a.artifactType==='CORRECTION_PAIR')return a.correctionReason;if(a.artifactType==='ACCEPTED_PATTERN')return a.acceptedApproach;return a.reconsiderWhen.join(' ');}
  private appliesWhen(a:ReviewLearningArtifact):string[]{if(a.artifactType==='FAILURE_PATTERN')return [...a.appliesWhen];if(a.artifactType==='ACCEPTED_PATTERN')return [...a.applicableContext];return [a.packageId];}

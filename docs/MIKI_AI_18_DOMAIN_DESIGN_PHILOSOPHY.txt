@@ -1702,3 +1702,71 @@ COREへ失敗結果を返して再評価・再取得経路へ戻す。
 
 これは既存18分類/COREResult/Construction Graph/Research経路を変更せず、
 既存Candidate生成境界へ現在Sourceとの整合性ゲートを追加するものである。
+
+
+### 2026-09-26 Built-in Catalog / Persistent Storage Separation
+
+APKに同梱される初期Knowledge / CODE Componentは、
+起動時のPersistent StorageへのSeed登録ではなく、
+既存のCode Knowledge / Code Component定義から構成される
+読み取り専用Built-in Catalogとして扱う。
+
+Canonical Ownerは既存ReusableComponentFactoryServiceとし、
+新しいCatalog Service、第二Repository、第二Construction Graphは追加しない。
+
+既存の `ReusableComponentFactoryService.list()` は、
+
+`Persistent Storage + Built-in Catalog`
+
+を統合して参照できるようにする。
+
+Persistent Storageには、MIKIが学習・Research・改善によって生成した
+Knowledge / CODE Componentと、その可変Runtime Stateを保持する。
+
+Built-in CatalogはPersistent Storageへコピーしない。
+
+既存環境に過去のSeed済みデータが残っている場合は削除せず、
+Built-in項目と意味的に同一のPersistent項目を優先し、
+同じ項目を二重表示しない。
+
+CODE Componentについて、Built-in Catalog上の定義は
+Construction Vocabularyとして即時参照できるが、
+実行Registryへ起動時に登録しない。
+
+「必要になった時」の判定は新しい判定Serviceを作らず、
+既存CandidateCodeGenerationServiceのConstruction経路を正本とする。
+
+既存経路は、
+
+Knowledge selection
+→ Construction Connectivity Audit
+→ compatible producer selection
+→ selectedConstructionKnowledgeIds確定
+→ materializeMissingConstructionComponents()
+→ Construction re-audit
+→ Construction Graph
+
+である。
+
+`materializeMissingConstructionComponents()` は、
+選択されたConstruction Knowledgeについて
+Registry接続済みCODE Componentが存在しない場合だけ、
+既存 `createCodeComponentCandidate()` 経路を使って
+CODE ComponentをCandidate化し、既存ComponentRegistryへ接続する。
+
+そのため、単なるCatalog存在だけではmaterializationされず、
+実際のConstruction要求に必要な部品だけが遅延接続される。
+
+再監査後も解決できない不足だけを既存Construction Gap
+→ Unknown / Research経路へ返す。
+
+`buildConstructionGraph()` 自体には生成・登録副作用を追加しない。
+Graphは既にmaterializeされたRegistry接続済みCODE Componentだけを
+実行可能なConstruction Componentとして扱う。
+
+`storeCandidates()`、Research更新、Verification更新、
+Lifecycle更新、Usage更新はBuilt-in Catalogを
+Persistent Storageへ丸ごと書き戻さない。
+
+新しいCatalog管理Service、第二のGenerator、
+第二のConstruction Graph、19番目の分類は追加しない。
