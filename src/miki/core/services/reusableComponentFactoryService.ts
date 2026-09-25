@@ -97,8 +97,6 @@ class ReusableComponentFactoryService{
       ...additionalWebCodeKnowledge,
       ...testingCodeKnowledge,
       ...additionalTestingCodeKnowledge,
-    ...moduleCodeKnowledge,
-    ...additionalModuleCodeKnowledge,
       ...moduleCodeKnowledge,
       ...additionalModuleCodeKnowledge,
     ];
@@ -476,6 +474,7 @@ class ReusableComponentFactoryService{
     ...additionalTypescriptCodeComponents,
     ...additionalWebCodeComponents,
     ...additionalTestingCodeComponents,
+    ...additionalModuleCodeComponents,
   ];
 
   const constructionContractErrors:string[]=[];
@@ -949,6 +948,8 @@ class ReusableComponentFactoryService{
     ...additionalWebCodeKnowledge,
     ...testingCodeKnowledge,
     ...additionalTestingCodeKnowledge,
+    ...moduleCodeKnowledge,
+    ...additionalModuleCodeKnowledge,
   ];
 
   const definitions:CodeComponentDefinition[]=[
@@ -956,6 +957,7 @@ class ReusableComponentFactoryService{
     ...additionalTypescriptCodeComponents,
     ...additionalWebCodeComponents,
     ...additionalTestingCodeComponents,
+    ...additionalModuleCodeComponents,
   ];
 
   const knowledgeIds=new Set(

@@ -1430,3 +1430,51 @@ Researchで解決した場合もCOREが再評価し、次のCandidate生成へ�
 新しいretry orchestrator、第二Research基盤、第二Promotion Gateは作らない。
 
 最終的なProduction適用は既存Promotion / External Review / User ACCEPT境界を維持する。
+
+
+### 2026-09-26 Multi-file Construction Graph Integration Correction
+
+Multi-file CODE Component生成は、既存の単一ファイルConstruction Graph実装を
+別系統へ複製せず、同じReusableComponentFactoryService、
+Construction Graph、ComponentCompositionService、
+Candidate Validation境界を使用する。
+
+Multi-file Graphで明示的なconstructionBindingsが指定された場合、
+binding情報を単なる自然言語Goalへ埋め込むだけではなく、
+既存CandidateCodeGenerationService.parseConstructionBindings()
+による正規Binding解決を各target Graphへ適用する。
+
+これにより、
+
+CandidateCodeGenerationService
+→ ReusableComponentFactoryService.buildConstructionGraphBundle()
+→ targetごとのConstruction Graph
+→ parseConstructionBindings()
+→ Construction Graph Validation
+→ Renderer
+→ CODE Component Candidate
+→ Verification
+→ CORE再評価
+
+という既存経路を維持する。
+
+Module CODE Knowledgeについては、
+
+- moduleCodeKnowledge
+- additionalModuleCodeKnowledge
+- additionalModuleCodeComponents
+
+をConstruction Vocabulary、Graph definition、Built-in Seedの各対応箇所へ
+一貫して登録する。
+
+同一Module KnowledgeをSeedへ重複登録しない。
+
+Multi-file生成のPending理由
+CONSTRUCTION_GRAPH_MULTI_FILE_CODE_COMPONENT_CANDIDATES_CREATED_AWAITING_VERIFICATION
+は、既存の
+NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION
+と同じVerification待ち境界へ接続し、
+Multi-file専用のVerification Orchestratorを新設しない。
+
+この修正ではResearch、CORE、AdaptiveRoutePlanner、
+ComponentComposition、Candidate Validation等の既存責務境界を変更しない。

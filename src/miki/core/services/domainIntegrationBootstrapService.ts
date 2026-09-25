@@ -618,7 +618,10 @@ class DomainIntegrationBootstrapService{
    const result=await candidateCodeGenerationService.generate(run.runId);
 
    const awaitingVerification=
-     result.reasons.includes('NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION');
+     result.reasons.some(reason =>
+       reason==='NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION' ||
+       reason==='CONSTRUCTION_GRAPH_MULTI_FILE_CODE_COMPONENT_CANDIDATES_CREATED_AWAITING_VERIFICATION'
+     );
 
    if(!result.accepted){
      return {

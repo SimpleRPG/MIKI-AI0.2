@@ -165,7 +165,41 @@ class CandidateCodeGenerationService {
     });
 
     if(bundle.accepted){
-      const renderedBundle=bundle.items.map(item=>{
+      /*
+       * Multi-fileでもsingle-fileと同じ明示Binding解決を使う。
+       * constructionBindingsをGoal文字列へ埋め込むだけにはしない。
+       */
+      const resolvedBundle=bundle.items.map(item=>{
+        const explicitBindings=this.parseConstructionBindings(
+          item.graph,
+          run.payload.constructionBindings,
+        );
+
+        const explicitBindingKeys=new Set(
+          explicitBindings.map(binding =>
+            `${binding.targetNodeId}::${binding.slotName}`
+          )
+        );
+
+        const graph:CodeConstructionGraph={
+          ...item.graph,
+          bindings:[
+            ...item.graph.bindings.filter(binding =>
+              !explicitBindingKeys.has(
+                `${binding.targetNodeId}::${binding.slotName}`
+              )
+            ),
+            ...explicitBindings,
+          ],
+        };
+
+        return {
+          ...item,
+          graph,
+        };
+      });
+
+      const renderedBundle=resolvedBundle.map(item=>{
         const validation=
           ComponentCompositionService.getInstance()
             .validateConstructionGraph(item.graph);
