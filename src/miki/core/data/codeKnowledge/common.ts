@@ -17,6 +17,8 @@ export interface CodeConstructionProfile {
 export interface CodeConstructionNode {
   nodeId: string;
   knowledgeComponentId: string;
+  codeComponentId?: string;
+  registryComponentId?: string;
   componentType: string;
   purpose: string;
   profile: CodeConstructionProfile;
