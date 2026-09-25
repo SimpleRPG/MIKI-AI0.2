@@ -8,6 +8,9 @@ import {
   WebMaterialPatternExtractor,
 } from '../../research/services/webMaterialPatternExtractor';
 import { unifiedUnknownResolutionCoordinatorService } from '../../unknown/services/unifiedUnknownResolutionCoordinatorService';
+import { requestTypeCompilerService } from '../../../services/requestTypeCompilerService';
+import { latentIntentMiningService } from '../../unknown/services/latentIntentMiningService';
+import { decomposeMultiIntent } from '../../unknown/services/multiIntentDecompositionService';
 
 export type CandidateUnknownKind =
   | 'MISSING_KNOWLEDGE'
@@ -275,15 +278,61 @@ class CandidateUnknownResolutionService {
       });
     }
 
-    if (
-      input.requirements.some(value =>
-        /component|pattern|implementation|implement|algorithm|code|コード|実装|実装方法|実装例|部品|修正|追加|生成|作成/i.test(value),
-      ) ||
-      /component|pattern|implementation|implement|algorithm|code|コード|実装|実装方法|実装例|部品|修正|追加|生成|作成/i.test(input.objective)
-    ) {
+    /*
+     * 実装必要性は固定語の有無だけで判定しない。
+     *
+     * 既存の要求型コンパイル・潜在意図・複数意図分解を使って、
+     * 「何をしたいか」「何を変更/生成する必要があるか」
+     * 「現在のRepository作業なのか」を構造化して判断する。
+     */
+    const semanticText = [
+      input.objective,
+      ...input.requirements,
+      ...input.targetPaths,
+      ...input.sourcePaths,
+    ].filter(Boolean).join(' / ');
+
+    const compiled = requestTypeCompilerService.compile(semanticText);
+
+    const latent = latentIntentMiningService.inferLatentGoal(
+      semanticText,
+      input.requirements.slice(-4),
+    );
+
+    const multiIntent = decomposeMultiIntent(semanticText);
+
+    const hasBuildLikeGoal =
+      compiled.category === 'CODE_SYNTHESIS' ||
+      /実装|作成|生成|修正|デバッグ|リファクタ|自動化|component|implementation|code|build|create|modify|fix|debug|refactor|automate/i.test(
+        compiled.goal + ' ' + latent.surfaceIntent + ' ' + latent.latentGoal,
+      );
+
+    const hasExecutableDeliverable =
+      compiled.deliverables.some(value =>
+        /source|code|component|module|implementation|コード|部品|実装/i.test(value),
+      );
+
+    const hasChangeIntent = multiIntent.units.some(unit =>
+      unit.action === 'CREATE' || unit.action === 'MODIFY',
+    );
+
+    const hasRepositoryWork =
+      input.targetPaths.length > 0 || input.sourcePaths.length > 0;
+
+    const implementationResearchRequired =
+      hasBuildLikeGoal ||
+      hasExecutableDeliverable ||
+      hasChangeIntent ||
+      (hasRepositoryWork && input.validationRequirements.length > 0);
+
+    if (implementationResearchRequired) {
       rows.push({
         kind: 'MISSING_IMPLEMENTATION_PATTERN',
-        question: `Select reusable, adaptable, or new implementation component for ${input.objective}`,
+        question:
+          `Determine the implementation approach required by the structured goal ` +
+          `(${compiled.goal}), latent intent (${latent.surfaceIntent}), target (${compiled.target}), ` +
+          `deliverables (${compiled.deliverables.join(', ')}), and current repository context ` +
+          `for: ${input.objective}`,
       });
     }
 
