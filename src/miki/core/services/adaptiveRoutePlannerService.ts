@@ -818,7 +818,7 @@ class AdaptiveRoutePlannerService {
         researchClaimIds.every(id=>researchVerificationClaimIds.includes(id)) &&
         researchVerificationValue?.verified===true;
 
-      const researchVerificationPending
+      const researchVerificationPending=
         researchClaimIds.length>0 &&
         latestResearchVerification!==undefined &&
         !researchVerificationSucceeded &&
