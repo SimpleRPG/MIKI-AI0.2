@@ -1,0 +1,75 @@
+{
+  "version": "v265",
+  "base": "v264",
+  "auditFinding": "Stage 53-60 services existed, but production-scale planning and gates were not invoked by unifiedDevelopmentCompletionService.",
+  "connectedPath": [
+    "Feature Acceptance",
+    "Stage 41-50 Governance",
+    "Production Scale Detection",
+    "Incremental Impact Selection",
+    "Wave Planning",
+    "Repository Build DAG",
+    "Risk and Cost Planning",
+    "Capability Proof Gate",
+    "Runtime Workspace Reservation",
+    "Durable Job Gate",
+    "Evaluation Package Export",
+    "Runtime Cleanup and Job Finalization"
+  ],
+  "reviewBlocking": [
+    "Build graph cycle",
+    "Wave goal coverage incomplete",
+    "Required full-test evidence missing",
+    "Runtime workspace mismatch",
+    "High/critical risk capability proof missing or stale",
+    "High/critical production job incomplete"
+  ],
+  "smallChangeBehavior": "Existing synchronous completion remains unchanged.",
+  "truthBoundary": [
+    "The normal completion route is now connected and guarded.",
+    "Real host isolation, cgroups, filesystem namespace, remote mTLS, physical agents, and actual job execution still require host adapters.",
+    "High and critical production-scale changes remain blocked if those proofs or completed jobs are absent."
+  ],
+  "checks": [
+    {
+      "command": "node scripts/verify_production_scale_pipeline_connection.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"checks\": 61,\n  \"position\": \"PRE_REVIEW_ZIP\",\n  \"manifestEvidence\": true,\n  \"postReviewCleanup\": true\n}\n"
+    },
+    {
+      "command": "node scripts/verify_production_scale_stages53_60.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stages\": [\n    53,\n    54,\n    55,\n    56,\n    57,\n    58,\n    59,\n    60\n  ],\n  \"checks\": 132,\n  \"stage52Preserved\": \"AUTONOMOUS_CAPABILITY_INNOVATION\"\n}\n"
+    },
+    {
+      "command": "node scripts/verify_autonomous_capability_innovation_stage52.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": 52,\n  \"checks\": 58,\n  \"discoverySources\": 4,\n  \"reviewBoundary\": \"REVIEW_ZIP\",\n  \"formalAdoption\": \"HUMAN_ONLY\"\n}\n"
+    },
+    {
+      "command": "node scripts/verify_runtime_depth_stage51.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": 51,\n  \"checks\": 74,\n  \"proofTiers\": [\n    \"STATIC\",\n    \"SANDBOX\",\n    \"DEVICE\"\n  ],\n  \"runtimeEndpoint\": \"/api/self-code/runtime-proof\"\n}\n"
+    },
+    {
+      "command": "node scripts/verify_stages_41_50_connections.mjs",
+      "exitCode": 0,
+      "tail": "pletionService.complete\",\n  \"preReviewPosition\": \"after feature acceptance, before evaluation package export\",\n  \"postReviewPosition\": \"after package export and save\",\n  \"reviewBlocking\": true,\n  \"ledgerAndLearning\": true,\n  \"checks\": 48\n}\n"
+    },
+    {
+      "command": "node scripts/verify_stages_41_50.mjs",
+      "exitCode": 0,
+      "tail": " \"stages\": [\n    41,\n    42,\n    43,\n    44,\n    45,\n    46,\n    47,\n    48,\n    49,\n    50\n  ],\n  \"extras\": [\n    \"ARCHITECTURE_FITNESS\",\n    \"ASSUMPTION_LEDGER\",\n    \"DEAD_CODE_CANDIDATE\",\n    \"PRIVACY_SECRET_FLOW\"\n  ],\n  \"checks\": 164\n}\n"
+    },
+    {
+      "command": "node scripts/verify_stages_35_40.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stages\": [\n    35,\n    36,\n    37,\n    38,\n    39,\n    40\n  ],\n  \"checks\": 126\n}\n"
+    },
+    {
+      "command": "node scripts/check_imports.mjs",
+      "exitCode": 0,
+      "tail": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 856, 総相対import数: 3069, 未解決エラー数: 0\n\n"
+    }
+  ]
+}

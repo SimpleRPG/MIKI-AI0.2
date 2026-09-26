@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 12,
+  "implementation": "AUTONOMOUS_FEATURE_DEVELOPMENT_STAGE12",
+  "date": "2026-09-26",
+  "implemented": [
+    "free-form feature objective decomposition",
+    "use cases and acceptance criteria",
+    "architecture task graph",
+    "new artifact construction plan",
+    "component reuse priority with Construction Graph fallback",
+    "repository script-aware executable test plan",
+    "unified autonomous development plan"
+  ],
+  "architecture": {
+    "existingRepositoryUnderstandingReused": true,
+    "existingComponentReusePreserved": true,
+    "existingConstructionGraphPreserved": true,
+    "existingValidationPipelinePreserved": true,
+    "newTopLevelCore": false,
+    "automaticRuntimeWrite": false,
+    "duplicateDesignChapterAdded": false
+  },
+  "validation": {
+    "checks": [
+      {
+        "cmd": "node scripts/verify_autonomous_feature_development_stage12.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"AUTONOMOUS_FEATURE_DEVELOPMENT\",\n  \"checks\": 20,\n  \"files\": [\n    \"src/miki/selfDevelopment/services/featureDevelopmentPlannerService.ts\",\n    \"src/miki/selfDevelopment/services/newFeatureConstructionPlanService.ts\",\n    \"src/miki/selfDevelopment/services/executableFeatureTestPlanService.ts\",\n    \"src/miki/selfDevelopment/services/autonomousFeatureDevelopmentPlanService.ts\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_candidate_development_completion_stage11.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"CANDIDATE_DEVELOPMENT_COMPLETION\",\n  \"checks\": 10,\n  \"file\": \"src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts\"\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_candidate_repair_retry_loop_stage10.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"CANDIDATE_REPAIR_RETRY_LOOP\",\n  \"checks\": 12,\n  \"file\": \"src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts\"\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_validation_repair_loop_stage9.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"VALIDATION_REPAIR_LOOP\",\n  \"checks\": 10,\n  \"files\": [\n    \"src/miki/core/services/candidateValidationRunnerService.ts\",\n    \"src/miki/selfDevelopment/services/candidateRepairRevisionService.ts\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_remaining_development_capabilities_stage8.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"REMAINING_DEVELOPMENT_CAPABILITIES\",\n  \"checks\": 8,\n  \"files\": [\n    \"src/miki/selfDevelopment/services/deterministicDiagnosticRepairService.ts\",\n    \"src/miki/selfDevelopment/services/contractTestIntentService.ts\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_contract_propagation_stage5.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"MULTI_FILE_CONTRACT_PROPAGATION\",\n  \"checks\": 18,\n  \"propagationId\": \"PROP-09b643ebc080c00769ebe14a\",\n  \"files\": [\n    \"src/caller.ts\",\n    \"src/consumer.ts\",\n    \"src/generator.ts\",\n    \"src/result.ts\",\n    \"src/validator.ts\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_ast_candidate_transformation_stage3.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"DETERMINISTIC_AST_CANDIDATE_TRANSFORMATION\",\n  \"checks\": 16,\n  \"candidateSha256\": \"1110c2f80f1d9cf8d8ce7896898ee37f8641ccd331bc17fcaa9cd6d62de7107a\"\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_integrated_generation_plan_stage4.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"INTEGRATED_GENERATION_PLAN\",\n  \"checks\": 14,\n  \"planId\": \"GENPLAN-441c4b9b76e3ed3bd0a20c6e\",\n  \"strategies\": [\n    \"AST_TRANSFORM\",\n    \"COMPONENT_REUSE\",\n    \"CONSTRUCTION_GRAPH\",\n    \"CAPABILITY_GAP\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_self_code_understanding_stage1.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"SELF_CODE_UNDERSTANDING_AND_REQUIREMENT_CONTRACT\",\n  \"checks\": 24\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/check_imports.mjs",
+        "exit": 0,
+        "stdout": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 709, 総相対import数: 2805, 未解決エラー数: 0\n\n",
+        "stderr": ""
+      }
+    ],
+    "fullTypeScriptExitCode": 2,
+    "fullTypeScriptDiagnosticLines": 218,
+    "newImplementationDiagnostics": [],
+    "note": "Repository-wide diagnostics pre-exist; stage-12 services have zero diagnostics."
+  },
+  "changedFiles": [
+    "src/miki/selfDevelopment/services/featureDevelopmentPlannerService.ts",
+    "src/miki/selfDevelopment/services/newFeatureConstructionPlanService.ts",
+    "src/miki/selfDevelopment/services/executableFeatureTestPlanService.ts",
+    "src/miki/selfDevelopment/services/autonomousFeatureDevelopmentPlanService.ts",
+    "scripts/verify_autonomous_feature_development_stage12.mjs",
+    "package.json",
+    "MIKI-AI0.2_統合設計書_正本.txt"
+  ]
+}

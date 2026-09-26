@@ -1,0 +1,18 @@
+{
+  "version": "v41",
+  "passed": false,
+  "checks": {
+    "backgroundUsesIngress": true,
+    "backgroundNoDirectController": true,
+    "governorUsesIngress": true,
+    "governorNoDirectEvolution": true,
+    "coreDomainHandlerOwnsControllerCall": false,
+    "controllerOwnsEvolutionCall": false,
+    "queueAcknowledgedNotApplied": true,
+    "backgroundQueueAcknowledged": true
+  },
+  "remainingAuthorizedDirectCalls": [
+    "domainIntegrationBootstrapService -> selfImprovementControllerService",
+    "selfImprovementControllerService -> autonomousContinuousEvolutionService"
+  ]
+}

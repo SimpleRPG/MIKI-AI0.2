@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 3,
+  "implementation": "DETERMINISTIC_AST_CANDIDATE_STAGE3",
+  "date": "2026-09-26",
+  "goal": "Natural-language instructions become deterministic AST operations and isolated candidates without local LLM or normal-path external AI.",
+  "implemented": [
+    "ADD_IMPORT",
+    "ADD_INTERFACE_FIELD",
+    "ADD_PARAMETER",
+    "ADD_OBJECT_PROPERTY",
+    "baseline SHA guard",
+    "post-transform AST parse",
+    "Candidate Workspace integration",
+    "strict Japanese/English natural-language operation compiler"
+  ],
+  "architecture": {
+    "coreAuthorityPreserved": true,
+    "runtimeSourceDirectWrite": false,
+    "newOrchestrator": false,
+    "newBlackboard": false,
+    "newCandidateWorkspace": false,
+    "newComponentRegistry": false,
+    "newCodeKnowledgeStore": false,
+    "localLlmAdded": false,
+    "externalAiNormalPathAdded": false
+  },
+  "duplicateAudit": [
+    {
+      "existing": "codeConstructionRendererService",
+      "decision": "PRESERVED_FOR_CONSTRUCTION_GRAPH_NEW_SOURCE"
+    },
+    {
+      "existing": "candidateCodeGenerationService",
+      "decision": "EXTENDED_CANONICAL_PIPELINE"
+    },
+    {
+      "existing": "specContractCompilerService",
+      "decision": "EXTENDED_FOR_STRICT_NATURAL_LANGUAGE_COMPILATION"
+    },
+    {
+      "existing": "Code Knowledge and Code Components",
+      "decision": "PRESERVED_AS_FALLBACK_AND_REUSE_SOURCES"
+    }
+  ],
+  "validation": {
+    "astRuntimeChecks": 12,
+    "understandingContractChecks": 24,
+    "importResolutionFiles": 691,
+    "relativeImports": 2772,
+    "unresolvedImports": 0,
+    "fullTypeScriptExitCode": 2,
+    "fullTypeScriptDiagnosticLines": 218,
+    "newServiceDiagnostics": [],
+    "newPlannerRegionDiagnostics": [],
+    "note": "Repository-wide TypeScript diagnostics pre-exist; new stage-3 service and newly added planner region have zero diagnostics."
+  },
+  "changedFiles": [
+    "src/miki/selfDevelopment/services/astCandidateTransformationService.ts",
+    "src/miki/selfDevelopment/services/specContractCompilerService.ts",
+    "src/miki/core/services/candidateCodeGenerationService.ts",
+    "src/miki/core/services/adaptiveRoutePlannerService.ts",
+    "scripts/verify_ast_candidate_transformation_stage3.mjs",
+    "package.json",
+    "MIKI-AI0.2_統合設計書_正本.txt"
+  ]
+}

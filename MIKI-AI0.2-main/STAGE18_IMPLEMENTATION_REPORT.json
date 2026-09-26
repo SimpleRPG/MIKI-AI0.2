@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 18,
+  "implementation": "DISPATCH_EVIDENCE_PACKAGE_DIAGNOSTICS_STAGE18",
+  "newImplementationDiagnostics": [],
+  "repositoryDiagnostics": {
+    "total": 195,
+    "missingDependency": 84,
+    "code": 111,
+    "tscExit": 2
+  },
+  "note": "Missing dependency diagnostics are environment/package-install diagnostics and are not treated as repaired code."
+}

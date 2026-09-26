@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 27,
+  "implementation": "WORKER_SEMANTIC_GATE_STRUCTURAL_SPECIALIZED_STAGE27",
+  "implemented": [
+    "Node Worker and VM execution endpoint with timeout and memory limits",
+    "semantic final ZIP hard gate",
+    "official dependency restore and tsc zero operational gate",
+    "multi-intent structural merge conflict detection and rollback receipt",
+    "AST transformations for imports arrays object properties and functions",
+    "UI API performance security specialized executors"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_priority_completion_stage27.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_execution_evidence_review_tsc_stage26.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_architecture_integration_stage25.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    }
+  ],
+  "tscZeroStatus": "OPERATIONAL_GATE_IMPLEMENTED_NOT_PROVEN_HERE",
+  "reason": "Official project dependencies were unavailable in the shared offline validation environment. No ambient declarations or diagnostic suppression were added."
+}

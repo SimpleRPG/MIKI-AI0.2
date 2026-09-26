@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 21,
+  "implementation": "CROSS_FILE_EXECUTION_MIGRATION_REPAIR_STAGE21",
+  "deliverables": [
+    "Item Expansion executor creates executable candidate files, verification and result manifest",
+    "Review ZIP receives manifest because it is a candidate workspace file",
+    "Naming convention extractor",
+    "Criterion revision applies to feature and executable test plan with lineage",
+    "Migration executor creates migrate rollback and roundtrip test candidate",
+    "Bounded repository TypeScript repair loop"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_execution_and_repair_stage21.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_review_safety_and_planning_stage20.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_unified_autonomous_completion_stage17.mjs",
+      "exit": 0
+    }
+  ],
+  "newImplementationDiagnostics": [],
+  "repositoryTscExit": 2,
+  "repositoryDiagnosticLines": 220,
+  "safety": [
+    "candidate workspace only",
+    "no runtime direct overwrite",
+    "bounded retries",
+    "repeated diagnostic stop",
+    "no environment diagnostic masking"
+  ]
+}

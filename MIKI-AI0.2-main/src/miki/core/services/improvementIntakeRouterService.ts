@@ -1,0 +1,91 @@
+import { storageService } from '../../../services/storageService';
+import { selfImprovementIngressService } from './selfImprovementIngressService';
+import { selfCodeSpaceService } from './selfCodeSpaceService';
+import { canonicalSha256 } from './canonicalSha256Service';
+import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
+import type { AutonomousImplementationPlan } from './autonomousCandidatePreparationService';
+export type ImprovementRunType='AUTONOMOUS_DISCOVERY'|'EXTERNAL_DIRECTIVE'|'USER_REQUEST'|'EXECUTION_FAILURE'|'REVALIDATION';
+export type ImprovementIntakeStatus='RECEIVED'|'VALIDATED'|'QUEUED'|'IN_PROGRESS'|'COMPLETED'|'REJECTED';
+export interface ImprovementIntakeRun { runId:string; changeSetId?:ChangeSetID; implementationPlan?:AutonomousImplementationPlan; runType:ImprovementRunType; sourceId:string; objective:string; sourceHash:string; payload:Record<string,unknown>; priority:number; status:ImprovementIntakeStatus; createdAt:number; updatedAt:number; taskId?:string; workspaceId?:string; relatedRunIds:string[]; }
+const KEY='miki_improvement_intake_runs_v1';
+class ImprovementIntakeRouterService{
+ private runs=new Map<string,ImprovementIntakeRun>();private sequence=0;constructor(){this.load();}
+
+ private currentSourceSnapshotSha256():string{
+  const files=selfCodeSpaceService.listSourceFiles();
+  if(!files.length)return '';
+  return canonicalSha256(
+   files.map(file=>({
+    path:file.path,
+    sha256:file.contentHash
+   }))
+  );
+ }
+ async receive(input:{runType:ImprovementRunType;sourceId:string;objective:string;payload?:Record<string,unknown>;priority?:number;relatedRunIds?:string[];changeSetId?:ChangeSetID}):Promise<ImprovementIntakeRun>{const now=Date.now();this.sequence+=1;const prefix=input.runType==='AUTONOMOUS_DISCOVERY'?'AUTO':input.runType==='EXTERNAL_DIRECTIVE'?'EXT':input.runType==='EXECUTION_FAILURE'?'EXEC':input.runType==='REVALIDATION'?'REVAL':'USER';const sourceSnapshotSha256=this.currentSourceSnapshotSha256();
+    if(!sourceSnapshotSha256)throw new Error('SOURCE_SNAPSHOT_REQUIRED');
+    const payloadWithSourceSnapshot={
+      ...(input.payload||{}),
+      sourceSnapshotSha256
+    };
+    const sourceHash=await this.sha(JSON.stringify({sourceId:input.sourceId,objective:input.objective,payload:payloadWithSourceSnapshot}));const duplicate=[...this.runs.values()].find(x=>x.runType===input.runType&&x.sourceHash===sourceHash&&x.status!=='COMPLETED'&&x.status!=='REJECTED');if(duplicate)return this.clone(duplicate);const run:ImprovementIntakeRun={runId:`RUN-${prefix}-${now}-${String(this.sequence).padStart(6,'0')}`,changeSetId:input.changeSetId,runType:input.runType,sourceId:input.sourceId,objective:input.objective.trim(),sourceHash,payload:payloadWithSourceSnapshot,priority:Math.max(0,Math.min(100,input.priority??50)),status:'VALIDATED',createdAt:now,updatedAt:now,relatedRunIds:[...(input.relatedRunIds||[])]};
+    if(input.runType==='REVALIDATION'){
+      const p=input.payload||{};
+      const targets=Array.isArray(p.targetFiles)?p.targetFiles.filter((x):x is string=>typeof x==='string'&&x.trim().length>0).map(x=>x.trim()):[];
+      run.implementationPlan={version:1,source:'REVIEW_REVALIDATION',issueId:typeof p.issueId==='string'?p.issueId:input.sourceId,targetPaths:targets,changeScope:targets.length<=1?'MINIMAL_SINGLE_FILE':'MINIMAL_MULTI_FILE',investigationSteps:['元Review Packageと外部修正要求を確認する','現在Baselineと対象範囲を再確認する','既存CORE/Validation/Promotion境界を確認する'],requiredValidation:['TypeScript/構文検査','既存単体・回帰テスト','Counterexample/境界値検証','RequirementContract評価','既存CORE/安全ゲート通過'],forbiddenExpansion:['対象外ファイルへの変更','新しいDB/Blackboard/Truth Storeの追加','新しいOrchestrator/Queue/最上位司令塔の追加','未検証外部コードの直接実行・採用'],rationale:['REVALIDATION from external review',...((Array.isArray(p.requestedChanges)?p.requestedChanges:[]).filter((x):x is string=>typeof x==='string')).slice(0,8)],confidence:1};
+    }
+    this.runs.set(run.runId,run);const queued=selfImprovementIngressService.submitRun({...run,changeSetId:input.changeSetId});run.status='QUEUED';run.taskId=queued.taskId;run.updatedAt=Date.now();this.save();return this.clone(run);}
+ async ensureForCoreTask(input:{taskId:string;objective:string;payload?:Record<string,unknown>;sourceId?:string}):Promise<ImprovementIntakeRun>{
+  const existing=[...this.runs.values()].find(run=>run.taskId===input.taskId);
+  if(existing){
+    const sourceSnapshotSha256=this.currentSourceSnapshotSha256();
+    if(!sourceSnapshotSha256)throw new Error('SOURCE_SNAPSHOT_REQUIRED');
+    const incoming={
+      ...(input.payload||{}),
+      taskId:input.taskId,
+      sourceSnapshotSha256
+    };
+    existing.payload={...existing.payload,...incoming};
+    const incomingTargets=Array.isArray(incoming.targetFiles)
+      ? incoming.targetFiles.filter((x):x is string=>typeof x==='string'&&x.trim().length>0).map(x=>x.trim())
+      : [];
+    if(incomingTargets.length>0){
+      existing.payload.targetFiles=[...new Set(incomingTargets)];
+      if(existing.implementationPlan){
+        existing.implementationPlan={
+          ...existing.implementationPlan,
+          targetPaths:[...new Set(incomingTargets)]
+        };
+      }
+    }
+    existing.objective=input.objective.trim()||existing.objective;
+    existing.updatedAt=Date.now();
+    this.runs.set(existing.runId,existing);
+    this.save();
+    return this.clone(existing);
+  }
+  const now=Date.now();this.sequence+=1;
+  const sourceSnapshotSha256=this.currentSourceSnapshotSha256();
+  if(!sourceSnapshotSha256)throw new Error('SOURCE_SNAPSHOT_REQUIRED');
+  const payload={
+    ...(input.payload||{}),
+    taskId:input.taskId,
+    sourceSnapshotSha256
+  };
+  const sourceId=input.sourceId||input.taskId;
+  const sourceHash=await this.sha(JSON.stringify({sourceId,objective:input.objective,payload}));
+  const run:ImprovementIntakeRun={
+    runId:`RUN-USER-${now}-${String(this.sequence).padStart(6,'0')}`,
+    runType:'USER_REQUEST',sourceId,objective:input.objective.trim(),sourceHash,payload,
+    priority:50,status:'IN_PROGRESS',createdAt:now,updatedAt:now,taskId:input.taskId,relatedRunIds:[]
+  };
+  this.runs.set(run.runId,run);this.save();return this.clone(run);
+ }
+
+ update(runId:string,patch:Partial<Pick<ImprovementIntakeRun,'status'|'taskId'|'workspaceId'|'relatedRunIds'|'implementationPlan'>>){const run=this.runs.get(runId);if(!run)return undefined;Object.assign(run,patch,{updatedAt:Date.now()});this.save();return this.clone(run);}
+ reject(runId:string){const run=this.runs.get(runId);if(!run)return undefined;if(run.status==='COMPLETED'||run.status==='REJECTED')return this.clone(run);run.status='REJECTED';run.updatedAt=Date.now();this.save();return this.clone(run);}
+ get(runId:string){const run=this.runs.get(runId);return run?this.clone(run):undefined;}list(limit=200){return [...this.runs.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,limit).map(x=>this.clone(x));}
+ private clone(x:ImprovementIntakeRun):ImprovementIntakeRun{return {...x,payload:{...x.payload},relatedRunIds:[...x.relatedRunIds],implementationPlan:x.implementationPlan?{...x.implementationPlan,targetPaths:[...x.implementationPlan.targetPaths],investigationSteps:[...x.implementationPlan.investigationSteps],requiredValidation:[...x.implementationPlan.requiredValidation],forbiddenExpansion:[...x.implementationPlan.forbiddenExpansion],rationale:[...x.implementationPlan.rationale]}:undefined};}
+ private async sha(text:string){const data=new TextEncoder().encode(text);if(typeof crypto!=='undefined'&&crypto.subtle){const hash=await crypto.subtle.digest('SHA-256',data);return [...new Uint8Array(hash)].map(v=>v.toString(16).padStart(2,'0')).join('');}let h=2166136261;for(const v of data){h^=v;h=Math.imul(h,16777619);}return `fallback-${(h>>>0).toString(16).padStart(8,'0')}`;}
+ private save(){storageService.setItem(KEY,JSON.stringify(this.list(500)));}private load(){try{const raw=storageService.getItem(KEY);const rows=raw?JSON.parse(raw):[];if(Array.isArray(rows))for(const row of rows)this.runs.set(row.runId,row);}catch{this.runs.clear();}}
+}
+export const improvementIntakeRouterService=new ImprovementIntakeRouterService();

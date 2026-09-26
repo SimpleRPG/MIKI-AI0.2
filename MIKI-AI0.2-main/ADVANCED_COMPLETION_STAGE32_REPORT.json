@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 32,
+  "implementation": "ADVANCED_COMPLETION_STAGE32",
+  "implemented": [
+    "multi-domain detection",
+    "repository AST/JSX/call graph",
+    "symbol-anchored operations",
+    "executable gate contracts",
+    "test IDs and evidence kinds",
+    "thresholds/timeouts/retries",
+    "continuation batching over limits",
+    "advanced multi-domain handoff"
+  ],
+  "limitations": [
+    "runtime adapters are still required for browser screenshots, physical-device metrics, live external APIs, production databases, and separate repository roots",
+    "repository-wide tsc=0 remains dependent on the formal dependency environment"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_advanced_completion_stage32.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"ADVANCED_COMPLETION\",\n  \"checks\": 72\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_advanced_handoff_stage31.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"ADVANCED_PIPELINE_HANDOFF\",\n  \"checks\": 31\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_advanced_depth_stage30.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"ADVANCED_DEVELOPMENT_DEPTH\",\n  \"domains\": 7,\n  \"checks\": 63\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_workspace_completion_stage29.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"WORKSPACE_COMPLETION\",\n  \"checks\": 42\n}\n"
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0,
+      "tail": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 804, 総相対import数: 2988, 未解決エラー数: 0\n\n"
+    }
+  ]
+}

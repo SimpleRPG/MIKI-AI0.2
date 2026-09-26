@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 29,
+  "implementation": "WORKSPACE_COMPLETION_STAGE29",
+  "features": [
+    "different-symbol same-file AST merge",
+    "persistent rollback audit",
+    "workspace repository tsc gate",
+    "workspace to review ZIP E2E gate",
+    "rejected candidate canonical isolation check",
+    "immutable workspace revision lineage",
+    "directive queue completion wait",
+    "review ZIP ZIPTXT SHA return"
+  ],
+  "terminalStates": [
+    "REVIEW_PACKAGE_READY",
+    "FAILED",
+    "BLOCKED",
+    "WAITING_USER",
+    "WAITING_EXTERNAL",
+    "NO_PROGRESS",
+    "TIMEOUT"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_workspace_completion_stage29.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"WORKSPACE_COMPLETION\",\n  \"checks\": 42\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_autonomous_e2e_stage28.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"AUTONOMOUS_E2E_PROOF\",\n  \"scenarios\": 7,\n  \"apiDeferred\": true\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_priority_completion_stage27.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"PRIORITY_COMPLETION\",\n  \"checks\": 48\n}\n"
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0,
+      "tail": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 796, 総相対import数: 2978, 未解決エラー数: 0\n\n"
+    }
+  ]
+}

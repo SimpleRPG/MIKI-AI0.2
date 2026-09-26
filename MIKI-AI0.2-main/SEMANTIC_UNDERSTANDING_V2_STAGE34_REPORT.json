@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 34,
+  "implementation": "SEMANTIC_UNDERSTANDING_V2_STAGE34",
+  "implemented": [
+    "Semantic Frame v2",
+    "cause and solution hypothesis separation",
+    "support and refutation evidence",
+    "clarification gate",
+    "semantic coverage gate",
+    "multi-intent preflight integration",
+    "canonical design document update"
+  ],
+  "compatibility": "Existing deterministic semantics, concept ontology, specialized dispatcher, multi-intent transaction, workspace, validation, repair and review package flows are preserved.",
+  "checks": [
+    {
+      "cmd": "node scripts/verify_semantic_understanding_v2_stage34.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"SEMANTIC_UNDERSTANDING_V2\",\n  \"checks\": 58\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_workspace_repository_stage33.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"WORKSPACE_MULTI_REPOSITORY\",\n  \"checks\": 44\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_advanced_completion_stage32.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"ADVANCED_COMPLETION\",\n  \"checks\": 72\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_advanced_handoff_stage31.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"ADVANCED_PIPELINE_HANDOFF\",\n  \"checks\": 31\n}\n"
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0,
+      "tail": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 813, 総相対import数: 3001, 未解決エラー数: 0\n\n"
+    }
+  ]
+}

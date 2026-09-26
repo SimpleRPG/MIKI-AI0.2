@@ -1,0 +1,13 @@
+{
+  "version": "v63",
+  "passed": true,
+  "checks": {
+    "stageEndpointBlocked": true,
+    "stageWriteRemoved": true,
+    "rollbackEndpointBlocked": true,
+    "rollbackWriteRemoved": true,
+    "bothRequireCoreIngress": true,
+    "noBrokenProposalVariable": true
+  },
+  "mode": "FAIL_CLOSED_NO_UNREACHABLE_MUTATION_CODE"
+}

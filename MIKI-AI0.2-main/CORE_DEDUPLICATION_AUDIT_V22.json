@@ -1,0 +1,21 @@
+{
+  "version": "v22",
+  "passed": true,
+  "checks": {
+    "singleDomainCatalog": true,
+    "bootstrapUsesCatalog": true,
+    "participationUsesCatalog": true,
+    "connectionUsesCatalog": true,
+    "obsoleteParallelFilesRemoved": true,
+    "obsoleteCommandRemoved": true,
+    "singleExecutionAuthority": true
+  },
+  "literalOwners": [
+    "src/miki/core/services/domainCatalogService.ts"
+  ],
+  "removedObsoleteFiles": [
+    "src/miki/core/services/domainStageExecutionService.ts",
+    "src/miki/core/services/domainRuntimeAdapterService.ts",
+    "src/miki/core/services/domainServiceBindingRegistryService.ts"
+  ]
+}

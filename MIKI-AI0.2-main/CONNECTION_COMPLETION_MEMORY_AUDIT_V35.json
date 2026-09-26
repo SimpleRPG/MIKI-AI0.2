@@ -1,0 +1,63 @@
+{
+  "version": 35,
+  "checks": [
+    {
+      "name": "completion defaults fail-closed",
+      "passed": true
+    },
+    {
+      "name": "manual completion requires artifact hash",
+      "passed": true
+    },
+    {
+      "name": "manual completion requires verification evidence",
+      "passed": true
+    },
+    {
+      "name": "manual completion requires correlation id",
+      "passed": true
+    },
+    {
+      "name": "proofless UI completion removed",
+      "passed": true
+    },
+    {
+      "name": "completion proof retained in result type",
+      "passed": true
+    },
+    {
+      "name": "fixed same-problem pass removed",
+      "passed": true
+    },
+    {
+      "name": "fixed cross-domain pass removed",
+      "passed": true
+    },
+    {
+      "name": "fixed regression pass removed",
+      "passed": true
+    },
+    {
+      "name": "virtual training requires observed evidence",
+      "passed": true
+    },
+    {
+      "name": "virtual training id has no random",
+      "passed": true
+    },
+    {
+      "name": "memory structured sync has no full-table memory delete",
+      "passed": true
+    },
+    {
+      "name": "memory fts sync has no full-table delete",
+      "passed": true
+    },
+    {
+      "name": "memory sync compares record payload",
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "failed": []
+}

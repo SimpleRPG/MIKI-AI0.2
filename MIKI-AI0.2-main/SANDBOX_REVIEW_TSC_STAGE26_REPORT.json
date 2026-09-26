@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 26,
+  "implementation": "SANDBOX_REVIEW_TSC_RESOLUTION_STAGE26",
+  "llmUsed": false,
+  "implemented": [
+    "generated component sandbox execution evidence and verified promotion",
+    "semantic transaction files automatically included in evaluation ZIP when transactionId is present",
+    "repository TypeScript restoration classification bounded repair rerun and zero-exit gate",
+    "specialized generation and original autonomous generation remain executable branches"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_execution_evidence_review_tsc_stage26.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"EXECUTION_EVIDENCE_REVIEW_TSC\",\n  \"checks\": 28\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_architecture_integration_stage25.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"ARCHITECTURE_INTEGRATION\",\n  \"checks\": 24\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_deterministic_semantics_components_stage24.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"DETERMINISTIC_SEMANTICS_COMPONENTS\",\n  \"checks\": 40\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_natural_language_unified_entry_stage23.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"NATURAL_LANGUAGE_UNIFIED_ENTRY\",\n  \"checks\": 26\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_specialized_pipeline_stage22.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"SPECIALIZED_PIPELINE\",\n  \"checks\": 32\n}\n"
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0,
+      "tail": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 778, 総相対import数: 2951, 未解決エラー数: 0\n\n"
+    }
+  ],
+  "newImplementationDiagnostics": [],
+  "repositoryTscExitInSharedEnvironment": 2,
+  "repositoryDiagnosticLinesInSharedEnvironment": 220,
+  "note": "Repository TypeScript resolution is implemented as an operational restore-classify-repair-rerun gate; the current shared offline dependency environment is not the target project dependency installation."
+}

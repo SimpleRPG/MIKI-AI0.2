@@ -1,0 +1,39 @@
+{
+  "version": "v41",
+  "status": "SUPERSEDED_BY_CORE_CANONICAL_SELF_IMPROVEMENT",
+  "canonicalRuntimeAuthority": {
+    "ingress": "src/miki/core/services/selfImprovementIngressService.ts",
+    "queue": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
+    "coreIngress": "src/miki/core/services/coreTaskIngressService.ts",
+    "orchestrator": "src/miki/core/services/coreOrchestratorService.ts",
+    "planner": "src/miki/core/services/adaptiveRoutePlannerService.ts",
+    "domainRouter": "src/miki/core/services/domainRouterService.ts"
+  },
+  "flow": [
+    "selfImprovementIngressService.submit",
+    "autonomousSelfImprovementLoopService.enqueue",
+    "coreTaskIngressService.submit/resume",
+    "coreOrchestratorService",
+    "adaptiveRoutePlannerService",
+    "domainRouterService",
+    "CORE re-evaluation",
+    "Completion Gate",
+    "CoreResult"
+  ],
+  "controllerRole": {
+    "file": "src/miki/improvement/services/selfImprovementControllerService.ts",
+    "role": "Compatibility Facade",
+    "planningAuthority": "CORE",
+    "directEvolutionAuthority": false
+  },
+  "obsoleteAuthorityClaims": [
+    "selfImprovementControllerService -> autonomousContinuousEvolutionService.runFullAutonomousCycle",
+    "domainIntegrationBootstrapService -> canonical self-improvement execution through controller"
+  ],
+  "verification": {
+    "sourceOfTruth": "repository main branch",
+    "typescriptBuild": "not run by design",
+    "lint": "not run by design",
+    "runtimeArchitectureCheck": "static repository inspection"
+  }
+}

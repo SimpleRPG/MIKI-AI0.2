@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 27,
+  "implementation": "WORKER_TRANSACTION_EXECUTORS_STAGE27",
+  "implemented": [
+    "real child-process component execution with memory and timeout bounds",
+    "semantic evidence final ZIP hard gate",
+    "multi-intent baseline and candidate conflict detection with rollback token",
+    "actual TypeScript AST array object and import operations",
+    "UI API performance and security specialized planning executors connected to original implementation pipeline",
+    "repository TypeScript zero-exit resolver retained"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_worker_transaction_executors_stage27.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_execution_evidence_review_tsc_stage26.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_architecture_integration_stage25.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    }
+  ],
+  "newImplementationDiagnostics": [],
+  "repositoryTscExitInSharedEnvironment": 2,
+  "repositoryDiagnosticLinesInSharedEnvironment": 221,
+  "limitations": [
+    "Shared offline environment lacks the repository formal dependency installation, so repository-wide tsc=0 is not claimed. The in-product resolver now restores dependencies, repairs code diagnostics, reruns tsc, and only passes on exit code 0.",
+    "Common specialized executors perform deterministic repository grounding and mandatory checks, then require the original autonomous implementation pipeline for repository-specific code generation."
+  ]
+}

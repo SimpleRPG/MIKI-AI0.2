@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 15,
+  "implementation": "AUTONOMOUS_COMPLETION_STAGE15",
+  "implemented": [
+    "integration patch guarded candidate application",
+    "allowlisted test runner",
+    "test result evidence recording",
+    "automatic acceptance evidence mapping",
+    "CORE UI persistence path verification",
+    "feature plan revision",
+    "runtime evaluation ZIP and byte-identical ZIPTXT export"
+  ],
+  "validation": {
+    "checks": [
+      {
+        "cmd": "node scripts/verify_autonomous_completion_stage15.mjs",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/verify_feature_wiring_and_acceptance_stage14.mjs",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/verify_autonomous_feature_construction_execution_stage13.mjs",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/check_imports.mjs",
+        "exit": 0
+      }
+    ],
+    "fullTypeScriptExitCode": 2,
+    "repositoryDiagnostics": 218,
+    "newImplementationDiagnostics": []
+  }
+}

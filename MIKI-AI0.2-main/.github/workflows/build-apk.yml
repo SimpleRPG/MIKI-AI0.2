@@ -1,0 +1,77 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Install Japanese morphology (Sudachi) dependency
+        run: bash scripts/install_android_japanese_morphology.sh
+
+      - name: Install Android WorkManager / headless-fetch plugin
+        run: bash scripts/install_android_workmanager.sh
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Copy model manifest into assets
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp model_manifest.json android/app/src/main/assets/model_manifest.json
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore persistent signing keystore
+        working-directory: android
+        run: |
+          echo "${{ secrets.MIKI_KEYSTORE_BASE64 }}" | base64 -d > app/miki-ai-release.keystore
+
+      - name: Build Android APK
+        working-directory: android
+        env:
+          MIKI_KEYSTORE_PATH: ${{ github.workspace }}/android/app/miki-ai-release.keystore
+          MIKI_KEYSTORE_PASSWORD: ${{ secrets.MIKI_KEYSTORE_PASSWORD }}
+          MIKI_KEY_ALIAS: ${{ secrets.MIKI_KEY_ALIAS }}
+          MIKI_KEY_PASSWORD: ${{ secrets.MIKI_KEY_PASSWORD }}
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: miki-ai-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 28,
+  "implementation": "AUTONOMOUS_E2E_PROOF_STAGE28",
+  "apiDeferred": true,
+  "implementedScenarios": [
+    "UI addition with parse and accessibility evidence",
+    "Item addition with AST uniqueness evidence",
+    "Save schema migration with rollback function",
+    "Performance change with linear scan removal check",
+    "Security fix with unknown input and runtime guard",
+    "Multi-intent workspace and rollback receipt",
+    "Intentional parse failure and baseline hash rollback"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_autonomous_e2e_stage28.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_priority_completion_stage27.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    }
+  ],
+  "scopeNote": "API change proof intentionally deferred by user direction. These are deterministic repository-local proof fixtures, not yet proof against an external production repository."
+}

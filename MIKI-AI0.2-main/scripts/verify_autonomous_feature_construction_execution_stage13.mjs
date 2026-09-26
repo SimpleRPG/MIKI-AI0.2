@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import ts from 'typescript';
+const file='src/miki/selfDevelopment/services/autonomousFeatureConstructionExecutorService.ts';
+const source=fs.readFileSync(file,'utf8');
+const parsed=ts.createSourceFile(file,source,ts.ScriptTarget.ES2022,true,ts.ScriptKind.TS);
+if((parsed.parseDiagnostics||[]).length)throw new Error('EXECUTOR_PARSE_FAILED');
+const output=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,jsx:ts.JsxEmit.ReactJSX},reportDiagnostics:true});
+if((output.diagnostics||[]).length)throw new Error('EXECUTOR_TRANSPILE_FAILED');
+for(const text of ['codeConstructionRendererService.render','isolatedCandidateWorkspaceService.create','NEW_ARTIFACT_PATH_ALREADY_EXISTS','CONSTRUCTION_ARTIFACT_COUNT_MISMATCH','validateSyntax','baselineContent:\'\'','ISOLATED_CANDIDATE_ONLY'])if(!source.includes(text))throw new Error(`EXECUTION_CONDITION_MISSING:${text}`);
+const design=fs.readFileSync('MIKI-AI0.2_統合設計書_正本.txt','utf8');if((design.match(/【169\. 現行正本/g)||[]).length!==1)throw new Error('CANONICAL_DESIGN_DUPLICATED');
+console.log(JSON.stringify({passed:true,stage:'AUTONOMOUS_FEATURE_CONSTRUCTION_EXECUTION',checks:14,file},null,2));

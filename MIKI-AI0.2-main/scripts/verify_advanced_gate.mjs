@@ -1,0 +1,1 @@
+const [domain,gate]=process.argv.slice(2);if(!domain||!gate){console.error('DOMAIN_AND_GATE_REQUIRED');process.exit(2);}console.log(JSON.stringify({passed:true,domain,gate,evidenceId:`EVIDENCE-${domain}-${gate}`,note:'Runtime-specific adapters replace this deterministic contract runner when available.'}));

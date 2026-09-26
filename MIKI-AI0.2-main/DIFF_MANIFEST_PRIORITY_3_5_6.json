@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "packageType": "CHANGED_OR_ADDED_FILES_ONLY",
+  "baseArchive": "MIKI-AI0.2-main_priority2-implemented-v119.zip",
+  "targetScope": ["PRIORITY_3", "PRIORITY_5", "PRIORITY_6"],
+  "removedFiles": [],
+  "files": [
+    "PRIORITY_3_IMPLEMENTATION_V120.md",
+    "MERGE_PRIORITY3_WITH_1_2_5_6_V122.md",
+    "scripts/test_priority5_6_v120.mjs",
+    "scripts/test_priority5_6_completion_v121.mjs",
+    "src/miki/core/services/externalReviewIntakeService.ts",
+    "src/miki/core/services/reviewLearningArtifactService.ts",
+    "src/miki/core/ui/typedImprovementUiGatewayService.ts"
+  ],
+  "note": "candidateCodeGenerationService.ts is not included because it was byte-identical between the Priority 3 branch and the merged authority."
+}

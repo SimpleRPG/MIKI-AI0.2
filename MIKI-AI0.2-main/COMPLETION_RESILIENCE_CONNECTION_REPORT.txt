@@ -1,0 +1,51 @@
+Completion Resilience Connection Report
+Version: v270
+Date: 2026-09-26
+Base: v269
+
+Connected to mandatory completion path:
+- Semantic Intent Frame and compiled contract
+- Application/Process Enforcement downgrade decision
+- Host resource preflight before tests
+- Candidate artifact secret, executable and binary scan
+- Test failure taxonomy
+- Same-candidate failed-test reruns and flaky classification
+- Partial-success/readiness persistence
+- Review manifest resilience evidence
+- Final Review Package readiness checkpoint
+
+New executable fixture injections:
+- Workspace disappearance
+- Absolute path rejection
+- Parent path escape
+- Symlink escape
+- Lockfile corruption
+- Evidence hash-chain tampering
+- Candidate SHA mismatch
+- ZIP SHA mismatch
+- ZIP/ZIPTXT byte mismatch
+- Manifest absence
+- Write failure
+- Stale proof
+
+Safety behavior:
+- Preflight failure stops before test execution
+- Resource absence becomes a readiness/resource state
+- Artifact secret or executable detection blocks Review ZIP
+- Flaky test suspicion is separated from direct candidate repair
+- Kernel enforcement is not claimed or required for bounded completion
+- Critical operations remain prohibited without stronger enforcement
+
+Verification:
+- Completion connection checks: 73 PASS
+- Failure resilience checks: 214 PASS
+- Browser E2E regression checks: 88 PASS
+- Executable fixture injections: 12 PASS
+- TypeScript parse checks: PASS
+- Relative imports: 881 files, 3106 imports, 0 unresolved
+- Deprecated identifier scan: PASS, no active-text occurrence
+
+Truth boundary:
+- Full Vite build remains unavailable because the existing node_modules has no runnable Vite binary.
+- Android Kotlin compile remains unavailable because the Gradle distribution cannot be downloaded in the isolated container.
+- Galaxy S25 end-to-end device execution remains required for device-level proof.

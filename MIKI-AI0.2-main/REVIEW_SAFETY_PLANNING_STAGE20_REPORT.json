@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 20,
+  "implementation": "REVIEW_SAFETY_PLANNING_STAGE20",
+  "checks": [
+    {
+      "cmd": "node scripts/verify_review_safety_and_planning_stage20.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_unified_autonomous_completion_stage17.mjs",
+      "exit": 0
+    }
+  ],
+  "newImplementationDiagnostics": [
+    "src/miki/selfDevelopment/services/developmentReviewLifecycleService.ts(19,822): error TS2345: Argument of type '{ episodeSha256: string; packageId: string; packageRevision: number; candidateManifestSha256: string; externalReviewId: string; externalAiRole: \"OTHER\"; rawResponseSha256: string; decision: \"REJECT\"; ... 10 more ...; episodeId: string; }' is not assignable to parameter of type 'ReviewLearningEpisode'."
+  ],
+  "repositoryTscExit": 2,
+  "repositoryDiagnosticLines": 223,
+  "capabilityExample": {
+    "request": "既存の回復アイテムと同系統のアイテムを5種類増やして",
+    "behavior": [
+      "既存Item familyと使用箇所を検索",
+      "型・master data・registry・UI・保存・localization・test fixtureを影響対象化",
+      "5件の一意名称とkeyを計画",
+      "同一Candidate内で変更",
+      "追加数、一意性、生成、保存Round Trip、UI表示、既存回帰を検証",
+      "Review ZIPに追加名と変更ファイルを記録"
+    ]
+  }
+}

@@ -1,0 +1,157 @@
+import { FeatureFlagState, SystemFeatureFlags } from '../../../types';
+import { storageService } from '../../../services/storageService';
+import { systemLogger } from '../../../services/systemLogger';
+
+const FLAGS_STORAGE_KEY = 'miki_system_feature_flags_v32';
+
+/**
+ * 設計思想 31章: 機能フラグ初期定義
+ */
+export const DEFAULT_FEATURE_FLAGS: SystemFeatureFlags = {
+  CHAT_CORE: 'STABLE',
+  SHORT_TERM_CONTEXT: 'STABLE',
+  LONG_TERM_RETRIEVAL: 'LIMITED',
+  ANSWER_PLAN_CACHE: 'STABLE',
+  TEACHER_ROUTER: 'DEVELOPMENT',
+  MULTI_STEP_REASONING: 'SHADOW',
+  LORA_TRAINING: 'DISABLED', // 非LLM化に伴い退役 (DISABLED固定)
+  DETERMINISTIC_CAPABILITY_EVOLUTION: 'STABLE',
+  CODE_UNDERSTANDING: 'DEVELOPMENT',
+  VBA_DESIGN_ASSISTANT: 'DEVELOPMENT',
+  EXPERIENCE_ROUTER: 'STABLE',
+  SKILL_GRADUATION: 'STABLE',
+  VBA_STATIC_VERIFIER: 'STABLE',
+  AUTONOMOUS_SEARCH: 'STABLE',
+  PRIVACY_GUARDRAIL: 'STABLE',
+  ABSTRACT_SANITIZER: 'STABLE',
+};
+
+export const FEATURE_FLAG_DESCRIPTIONS: Record<keyof SystemFeatureFlags, { title: string; desc: string }> = {
+  CHAT_CORE: {
+    title: '基盤チャット・ストリーミング (Chat Core)',
+    desc: 'ローカルモデルの安定起動、ストリーミング出力、会話ログ保存（1〜5章）。',
+  },
+  SHORT_TERM_CONTEXT: {
+    title: '会話状態管理 (Short-Term Context)',
+    desc: '話題、最上位目的、確定事項、訂正イベント、無効化前提の追跡（7章）。',
+  },
+  LONG_TERM_RETRIEVAL: {
+    title: '長期記憶・7段階検索 (Long-Term Retrieval)',
+    desc: '完全一致検索、全文検索、メタデータ一致、関連原文の再取得（8章）。',
+  },
+  ANSWER_PLAN_CACHE: {
+    title: '回答骨格と思考節約 (Answer Plan Cache)',
+    desc: '状況分類に基づく定型骨格の適用、思考手順の定型化と推論計算量削減（9章）。',
+  },
+  TEACHER_ROUTER: {
+    title: '外部教師ルーター (Teacher Router)',
+    desc: '不確実性駆動の教師送信、無料枠予算管理、対策骨格の生成要請（10〜15, 20章）。',
+  },
+  MULTI_STEP_REASONING: {
+    title: '多段推論 (Multi-Step Reasoning)',
+    desc: '直接回答で解けない複雑問題の分解。過剰思考を抑制するためシャドウ運用（6章）。',
+  },
+  LORA_TRAINING: {
+    title: '旧LoRA追加学習 (Retired)',
+    desc: '非LLM化に伴い退役。決定論的能力進化 (Deterministic Capability Evolution) へ移行。',
+  },
+  DETERMINISTIC_CAPABILITY_EVOLUTION: {
+    title: '決定論的能力進化 (Deterministic Capability Evolution)',
+    desc: '検証済みの修正対を重み更新ではなく決定論的な回答骨格・規則・能力パッチへコンパイル。',
+  },
+  CODE_UNDERSTANDING: {
+    title: 'コード理解AI (Code Understanding)',
+    desc: '構文抽出、呼出関係、中間JSON表現(CodeIR)、読解確認質問、矛盾検査（22〜25章）。',
+  },
+  VBA_DESIGN_ASSISTANT: {
+    title: '抽象VBA設計支援 (VBA Design Assistant)',
+    desc: '抽象要件整理、決定表化、構成案、テストケース、外部Copilot用指示書生成（26章）。',
+  },
+  EXPERIENCE_ROUTER: {
+    title: '経験保存先ルーター (Experience Router)',
+    desc: '対話や生成結果を9分類（作業・長期・案件記憶・スキル・検索・評価・教材・隔離・破棄）へ自動仕分け（49章）。',
+  },
+  SKILL_GRADUATION: {
+    title: '技能卒業＆多様性再試験 (Skill Graduation)',
+    desc: '多文脈での再試験による過学習防止、長期安定稼働した技能のLoRA教材化とプロンプト卒業（50章）。',
+  },
+  VBA_STATIC_VERIFIER: {
+    title: 'VBA静的検証器 (VBA Static Verifier)',
+    desc: '8大スキャナーによる構文・ブロック・禁止パターン(Goto/行ラベル/単行If)検査およびSHA-256配送完全性保証（63・64章）。',
+  },
+  AUTONOMOUS_SEARCH: {
+    title: '自律型Web検索＆能動学習 (Autonomous Web Search)',
+    desc: '最新情報・技術仕様のオンデマンドWeb検索、および非会話アイドル時の能動的自律調査と多層記憶・教材への還元（13章）。',
+  },
+  PRIVACY_GUARDRAIL: {
+    title: 'セキュリティ境界・プライバシー監査 (Privacy Guardrail)',
+    desc: '外部送信（教師API・Web検索・クラウド）前の個人情報・パス・認証情報のリアルタイム監査と遮断（11章）。',
+  },
+  ABSTRACT_SANITIZER: {
+    title: '抽象シンボル自動サニタイザー (Abstract Symbol Sanitizer)',
+    desc: '実在企業名・個人名・社内パス・本番SQL接続をWORKSHEET_AやPROCESS_MAIN等の抽象シンボルに自動置換（10章2節）。',
+  },
+};
+
+class FeatureFlagsService {
+  private flags: SystemFeatureFlags;
+
+  constructor() {
+    this.flags = this.loadFlags();
+  }
+
+  private loadFlags(): SystemFeatureFlags {
+    try {
+      const raw = storageService.getItem(FLAGS_STORAGE_KEY);
+      if (raw) {
+        return { ...DEFAULT_FEATURE_FLAGS, ...JSON.parse(raw) };
+      }
+    } catch (e) {
+      console.warn('Failed to load feature flags:', e);
+    }
+    return { ...DEFAULT_FEATURE_FLAGS };
+  }
+
+  public saveFlags(): void {
+    try {
+      storageService.setItem(FLAGS_STORAGE_KEY, JSON.stringify(this.flags));
+    } catch (e) {
+      console.warn('Failed to save feature flags:', e);
+    }
+  }
+
+  public getFlags(): SystemFeatureFlags {
+    return { ...this.flags };
+  }
+
+  public getAllFlags(): SystemFeatureFlags {
+    return this.getFlags();
+  }
+
+  public getFlag(key: keyof SystemFeatureFlags): FeatureFlagState {
+    return this.flags[key] ?? 'DISABLED';
+  }
+
+  public setFlag(key: keyof SystemFeatureFlags, state: FeatureFlagState): void {
+    const old = this.flags[key];
+    this.flags[key] = state;
+    this.saveFlags();
+    systemLogger.info('FEATURE_FLAGS', `機能フラグ更新: ${String(key)} [${String(old)} -> ${String(state)}]`);
+  }
+
+  public setFlagState(key: keyof SystemFeatureFlags, state: FeatureFlagState): void {
+    this.setFlag(key, state);
+  }
+
+  public isEnabled(key: keyof SystemFeatureFlags): boolean {
+    const state = this.flags[key];
+    return state === 'DEVELOPMENT' || state === 'LIMITED' || state === 'STABLE';
+  }
+
+  public resetToDefaults(): void {
+    this.flags = { ...DEFAULT_FEATURE_FLAGS };
+    this.saveFlags();
+  }
+}
+
+export const featureFlagsService = new FeatureFlagsService();

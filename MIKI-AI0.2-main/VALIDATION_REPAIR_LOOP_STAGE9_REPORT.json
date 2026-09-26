@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 9,
+  "implementation": "VALIDATION_REPAIR_LOOP_STAGE9",
+  "date": "2026-09-26",
+  "implemented": [
+    "contract test intents sent to candidate validation API",
+    "structured diagnostics converted to deterministic repair plans",
+    "validation result exposes repair plans and retry recommendation",
+    "repair plans converted to isolated AST repair revision candidates",
+    "TS2339 remains fail-closed for contract replanning"
+  ],
+  "architecture": {
+    "existingValidationRunnerExtended": true,
+    "existingAstTransformerReused": true,
+    "existingWorkspaceBoundaryPreserved": true,
+    "directRuntimeWrite": false,
+    "automaticVerifiedPromotion": false,
+    "newValidationSystem": false,
+    "duplicateDesignChapterAdded": false
+  },
+  "validation": {
+    "checks": [
+      {
+        "cmd": "node scripts/verify_validation_repair_loop_stage9.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"VALIDATION_REPAIR_LOOP\",\n  \"checks\": 10,\n  \"files\": [\n    \"src/miki/core/services/candidateValidationRunnerService.ts\",\n    \"src/miki/selfDevelopment/services/candidateRepairRevisionService.ts\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_remaining_development_capabilities_stage8.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"REMAINING_DEVELOPMENT_CAPABILITIES\",\n  \"checks\": 8,\n  \"files\": [\n    \"src/miki/selfDevelopment/services/deterministicDiagnosticRepairService.ts\",\n    \"src/miki/selfDevelopment/services/contractTestIntentService.ts\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_contract_propagation_stage5.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"MULTI_FILE_CONTRACT_PROPAGATION\",\n  \"checks\": 18,\n  \"propagationId\": \"PROP-09b643ebc080c00769ebe14a\",\n  \"files\": [\n    \"src/caller.ts\",\n    \"src/consumer.ts\",\n    \"src/generator.ts\",\n    \"src/result.ts\",\n    \"src/validator.ts\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_ast_candidate_transformation_stage3.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"DETERMINISTIC_AST_CANDIDATE_TRANSFORMATION\",\n  \"checks\": 16,\n  \"candidateSha256\": \"1110c2f80f1d9cf8d8ce7896898ee37f8641ccd331bc17fcaa9cd6d62de7107a\"\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_integrated_generation_plan_stage4.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"INTEGRATED_GENERATION_PLAN\",\n  \"checks\": 14,\n  \"planId\": \"GENPLAN-441c4b9b76e3ed3bd0a20c6e\",\n  \"strategies\": [\n    \"AST_TRANSFORM\",\n    \"COMPONENT_REUSE\",\n    \"CONSTRUCTION_GRAPH\",\n    \"CAPABILITY_GAP\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_self_code_understanding_stage1.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"SELF_CODE_UNDERSTANDING_AND_REQUIREMENT_CONTRACT\",\n  \"checks\": 24\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/check_imports.mjs",
+        "exit": 0,
+        "stdout": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 700, 総相対import数: 2787, 未解決エラー数: 0\n\n",
+        "stderr": ""
+      }
+    ],
+    "fullTypeScriptExitCode": 2,
+    "fullTypeScriptDiagnosticLines": 218,
+    "newImplementationDiagnostics": [],
+    "note": "Repository-wide diagnostics pre-exist; stage-9 implementation regions have zero diagnostics."
+  },
+  "changedFiles": [
+    "src/miki/core/services/candidateValidationRunnerService.ts",
+    "src/miki/selfDevelopment/services/candidateRepairRevisionService.ts",
+    "scripts/verify_validation_repair_loop_stage9.mjs",
+    "package.json",
+    "MIKI-AI0.2_統合設計書_正本.txt"
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 14,
+  "implementation": "FEATURE_WIRING_AND_ACCEPTANCE_STAGE14",
+  "date": "2026-09-26",
+  "implemented": [
+    "artifact imports",
+    "typed dependency wiring",
+    "CORE command patch candidate",
+    "React tree patch candidate",
+    "storageService integration",
+    "acceptance-specific executable test body",
+    "whole-candidate TypeScript Program diagnostics",
+    "import cycle detection",
+    "test command and criterion registration",
+    "acceptance evidence completeness gate"
+  ],
+  "architecture": {
+    "existingWorkspaceReused": true,
+    "existingValidationRunnerExtended": true,
+    "existingReviewExportReused": true,
+    "directCoreMutation": false,
+    "directUiMutation": false,
+    "integrationPatchCandidatesOnly": true,
+    "partialSuccessAccepted": false,
+    "duplicateDesignChapterAdded": false
+  },
+  "validation": {
+    "checks": [
+      {
+        "cmd": "node scripts/verify_feature_wiring_and_acceptance_stage14.mjs",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/verify_autonomous_feature_construction_execution_stage13.mjs",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/verify_autonomous_feature_development_stage12.mjs",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/verify_candidate_development_completion_stage11.mjs",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/verify_candidate_repair_retry_loop_stage10.mjs",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/verify_validation_repair_loop_stage9.mjs",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/check_imports.mjs",
+        "exit": 0
+      }
+    ],
+    "fullTypeScriptExitCode": 2,
+    "fullTypeScriptDiagnosticLines": 218,
+    "newImplementationDiagnostics": [],
+    "note": "Repository-wide diagnostics pre-exist; stage-14 implementation services have zero diagnostics. Existing server dependency diagnostics remain."
+  },
+  "changedFiles": [
+    "src/miki/selfDevelopment/services/featureArtifactWiringService.ts",
+    "src/miki/selfDevelopment/services/featureCandidateAnalysisService.ts",
+    "src/miki/selfDevelopment/services/autonomousFeatureWiringPipelineService.ts",
+    "src/miki/selfDevelopment/services/featureAcceptanceEvidenceGateService.ts",
+    "src/miki/core/services/candidateValidationRunnerService.ts",
+    "server.ts",
+    "scripts/verify_feature_wiring_and_acceptance_stage14.mjs",
+    "package.json",
+    "MIKI-AI0.2_統合設計書_正本.txt"
+  ]
+}

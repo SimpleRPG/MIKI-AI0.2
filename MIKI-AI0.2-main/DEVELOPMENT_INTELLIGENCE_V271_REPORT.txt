@@ -1,0 +1,26 @@
+MIKI-AI Development Intelligence v271
+Base: v270
+Date: 2026-09-26
+
+Implemented:
+1. Existing World Model development projection through CORE gateway
+   Repository, Candidate, Workspace, Job, Build, Test, Browser E2E, Evidence, Readiness, Review ZIP fact types
+   OBSERVED, DERIVED, PREDICTED, UNKNOWN, STALE, CONTRADICTED truth states
+   Candidate SHA, repository revision and workspace binding
+   Projection included in Review ZIP manifest
+2. Type-resolved TypeScript Program Graph
+   TypeChecker symbols and resolved signatures
+   Dependency Injection, Event Bus, Decorator, Generic, dynamic import, string plugin and generated-code edges
+   Full-Test fallback when dynamic or generated dependencies remain
+3. Code-only runners
+   test:property deterministic property runner
+   test:mutation reversible source mutation runner
+   test:db Node built-in SQLite in-memory migration and rollback runner
+4. Repair Strategy automatic selection
+   Historical success and regression rates
+   sample-size weighting, repeat penalty, risk penalty and deterministic fallback
+
+Root requirement: NONE
+System package installation: NONE when Node.js provides node:sqlite
+External test library installation: NONE for the included runners
+Production database compatibility proof still requires the target DB or compatible container/remote runner.

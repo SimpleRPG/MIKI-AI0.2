@@ -1,0 +1,16 @@
+{
+  "version": "v48",
+  "passed": true,
+  "checks": {
+    "evidenceStoreLookup": true,
+    "rejectedEvidenceBlocked": true,
+    "executionEvidenceRequired": true,
+    "taskBindingRequired": true,
+    "componentBindingRequired": true,
+    "dependencySuccessRequired": true,
+    "invalidProposalQuarantined": true,
+    "quarantinePersisted": true,
+    "quarantineDeduplicated": true,
+    "validEvidenceForwarded": true
+  }
+}

@@ -1,0 +1,4 @@
+import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
+export interface VersionedKnowledge{knowledgeId:string;kind:'API'|'LIBRARY'|'RUNTIME'|'ANDROID_SDK'|'BROWSER'|'SECURITY'|'LICENSE'|'SCHEMA';sourceVersion:string;observedAt:number;verifiedAt:number;environment:string;expiresAt:number;revalidateAt:number;contentHash:string;}
+class SpecificationDriftMonitorService{evaluate(previous:VersionedKnowledge,current:VersionedKnowledge){const changes=Object.keys(previous).filter(key=>JSON.stringify((previous as any)[key])!==JSON.stringify((current as any)[key]));return {driftId:`DRIFT-${canonicalSha256({previous,current}).slice(0,22)}`,drifted:previous.contentHash!==current.contentHash||previous.sourceVersion!==current.sourceVersion,changes,stale:Date.now()>=previous.expiresAt,revalidationDue:Date.now()>=previous.revalidateAt,affectedCandidates:[] as string[]};}}
+export const specificationDriftMonitorService=new SpecificationDriftMonitorService();

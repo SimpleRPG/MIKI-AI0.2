@@ -1,0 +1,6 @@
+import fs from 'node:fs';import ts from 'typescript';
+const files=['integrationPatchAstApplierService.ts','unifiedDevelopmentCompletionService.ts','developmentStrategyDecisionService.ts','developmentFailureRoutingService.ts','evaluationPackageStoreService.ts','unifiedInstructionDevelopmentService.ts'].map(x=>`src/miki/selfDevelopment/services/${x}`);
+for(const file of files){const source=fs.readFileSync(file,'utf8');const parsed=ts.createSourceFile(file,source,ts.ScriptTarget.ES2022,true,ts.ScriptKind.TS);if(((parsed).parseDiagnostics||[]).length)throw new Error(`PARSE:${file}`);}
+const all=files.map(file=>fs.readFileSync(file,'utf8')).join('\n');for(const value of ['updateSwitchStatement','createJsxFragment','allowlist-test-run','testResultEvidenceRecorderService.record','developmentFailureRoutingService.classify','evaluationPackageStoreService.save','developmentStrategyDecisionService.decide'])if(!all.includes(value))throw new Error(`MISSING:${value}`);
+const server=fs.readFileSync('server.ts','utf8');for(const value of ["/api/self-code/allowlist-test-run","shell:false","SIGKILL","TEST_COMMAND_FORBIDDEN_TOKEN"])if(!server.includes(value))throw new Error(`SERVER_MISSING:${value}`);
+console.log(JSON.stringify({passed:true,stage:'UNIFIED_AUTONOMOUS_COMPLETION',checks:28,files},null,2));

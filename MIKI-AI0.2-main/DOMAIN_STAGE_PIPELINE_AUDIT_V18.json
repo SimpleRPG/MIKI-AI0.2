@@ -1,0 +1,14 @@
+{
+  "version": "v63-adaptive-core",
+  "passed": true,
+  "checks": {
+    "ingressToCore": true,
+    "adaptiveRouting": true,
+    "notFixedSequential": true,
+    "routerDispatch": true,
+    "blackboardReevaluation": true,
+    "replyContract": true,
+    "completionFailClosed": true,
+    "noObsoleteStageService": true
+  }
+}

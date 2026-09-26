@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 22,
+  "implementation": "SPECIALIZED_PIPELINE_REGISTRY_ASSET_REPAIR_STAGE22",
+  "checks": [
+    {
+      "cmd": "node scripts/verify_specialized_pipeline_stage22.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_execution_and_repair_stage21.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    }
+  ],
+  "newImplementationDiagnostics": [],
+  "repositoryTscExit": 2,
+  "repositoryDiagnosticLines": 220,
+  "implemented": [
+    "UI lifecycle dispatcher to specialized item and migration executors",
+    "AST array/object registry anchor integration",
+    "item reachability gate",
+    "manifest ZIP inclusion verifier",
+    "item tier/attribute planner",
+    "criterion revision service retained",
+    "migration target locator for Store Serializer Reader",
+    "repository tsc endpoint with dependency restore",
+    "artifact adapters for TS JS JSON YAML CSV Unity and safe refusal for binary Unreal/media"
+  ]
+}

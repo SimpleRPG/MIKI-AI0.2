@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 2,
+  "implementation": "SELF_CODE_UNDERSTANDING_REINFORCEMENT_AND_REQUIREMENT_CONTRACT",
+  "date": "2026-09-26",
+  "architecture": {
+    "coreAuthorityPreserved": true,
+    "newOrchestrator": false,
+    "newBlackboard": false,
+    "newResultDb": false,
+    "newRepositoryIndex": false,
+    "newComponentRegistry": false,
+    "newCodeKnowledgeStore": false,
+    "localLlmAdded": false,
+    "externalAiNormalPathAdded": false
+  },
+  "implemented": [
+    "Execution path projection",
+    "impact scope classification",
+    "unresolved edge reporting",
+    "repository snapshot access",
+    "improvement requirement contract",
+    "planner readiness integration",
+    "Code Knowledge reference IDs",
+    "Code Component reuse IDs"
+  ],
+  "duplicateAudit": [
+    {
+      "existing": "selfCodeUnderstandingService",
+      "decision": "EXPANDED_CANONICAL"
+    },
+    {
+      "existing": "specContractCompilerService",
+      "decision": "EXPANDED_CANONICAL"
+    },
+    {
+      "existing": "codeKnowledge/*",
+      "decision": "REFERENCED_NOT_DUPLICATED"
+    },
+    {
+      "existing": "Component Registry / Artifact Store / Composition Service",
+      "decision": "REFERENCED_NOT_DUPLICATED"
+    }
+  ],
+  "validation": {
+    "checks": 24,
+    "verifierExitCode": 0,
+    "importCheckExitCode": 0,
+    "fullTypeScriptExitCode": 2,
+    "fullTypeScriptDiagnosticLines": 218,
+    "changedRegionDiagnostics": [],
+    "note": "Repository-wide diagnostics pre-exist; changed implementation regions have zero diagnostics."
+  },
+  "changedFiles": [
+    "src/miki/core/services/selfCodeUnderstandingService.ts",
+    "src/miki/selfDevelopment/services/specContractCompilerService.ts",
+    "src/miki/core/services/adaptiveRoutePlannerService.ts",
+    "scripts/verify_self_code_understanding_stage1.mjs",
+    "package.json",
+    "MIKI-AI0.2_統合設計書_正本.txt"
+  ]
+}

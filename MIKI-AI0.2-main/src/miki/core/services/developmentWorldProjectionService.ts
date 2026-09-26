@@ -1,0 +1,12 @@
+import { storageService } from '../../../services/storageService';
+import { canonicalSha256 } from './canonicalSha256Service';
+export type WorldFactStatus='OBSERVED'|'DERIVED'|'PREDICTED'|'UNKNOWN'|'STALE'|'CONTRADICTED';
+export interface DevelopmentWorldObservation{kind:'REPOSITORY'|'CANDIDATE'|'WORKSPACE'|'JOB'|'BUILD'|'TEST'|'BROWSER_E2E'|'EVIDENCE'|'READINESS'|'REVIEW_ZIP';entityId:string;status:WorldFactStatus;revision?:string;candidateSha256?:string;workspaceId?:string;value:unknown;evidenceIds:string[];observedAt:number;expiresAt?:number;}
+export interface DevelopmentWorldProjection{projectionId:string;repositoryRevision:string;candidateSha256:string;workspaceId:string;facts:DevelopmentWorldObservation[];blockingFacts:DevelopmentWorldObservation[];readyForReview:boolean;createdAt:number;}
+const KEY='miki_development_world_projection_v1';
+class DevelopmentWorldProjectionService{
+ observe(input:Omit<DevelopmentWorldObservation,'observedAt'> & {observedAt?:number}){const item={...input,observedAt:input.observedAt||Date.now()};const rows=this.list().filter(row=>!(row.kind===item.kind&&row.entityId===item.entityId));rows.push(item);storageService.setItem(KEY,JSON.stringify(rows.slice(-3000)));return item;}
+ project(input:{repositoryRevision:string;candidateSha256:string;workspaceId:string}){const now=Date.now();const facts=this.list().filter(row=>(!row.revision||row.revision===input.repositoryRevision)&&(!row.candidateSha256||row.candidateSha256===input.candidateSha256)&&(!row.workspaceId||row.workspaceId===input.workspaceId)).map(row=>row.expiresAt&&row.expiresAt<now?{...row,status:'STALE' as const}:row);const required:DevelopmentWorldObservation['kind'][]=['REPOSITORY','CANDIDATE','WORKSPACE','BUILD','TEST','EVIDENCE','READINESS'];const blockingFacts=facts.filter(row=>['STALE','CONTRADICTED','UNKNOWN'].includes(row.status)||((row.kind==='BUILD'||row.kind==='TEST'||row.kind==='READINESS')&&(row.value as any)?.passed===false));const readyForReview=required.every(kind=>facts.some(row=>row.kind===kind&&['OBSERVED','DERIVED'].includes(row.status)))&&!blockingFacts.length;const base={...input,facts,blockingFacts,readyForReview,createdAt:now};return {...base,projectionId:`DWP-${canonicalSha256(base).slice(0,24)}`};}
+ list():DevelopmentWorldObservation[]{try{const value=JSON.parse(storageService.getItem(KEY)||'[]');return Array.isArray(value)?value:[];}catch{return [];}}
+}
+export const developmentWorldProjectionService=new DevelopmentWorldProjectionService();

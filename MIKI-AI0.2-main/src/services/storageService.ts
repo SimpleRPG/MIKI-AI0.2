@@ -1,0 +1,646 @@
+import { Capacitor } from '@capacitor/core';
+import type { MemoryItem, MemoryType, MemoryDestination } from '../types';
+
+/**
+ * Synchronous-facade persistent storage, backed by:
+ *  - Android/iOS (native): real SQLite via @capacitor-community/sqlite — no
+ *    practical size ceiling (bounded only by device free space), unlike
+ *    localStorage's ~5-10MB per-origin cap baked into the WebView. This is
+ *    the "SQLite/Room的な構造" the design doc calls for.
+ *  - Browser / web preview build: IndexedDB, whose quota Chromium sizes
+ *    against actual free disk space rather than an arbitrary small constant.
+ *  - Last-resort fallback (neither available): in-memory only. Data is not
+ *    lost mid-session but will not survive a restart. This should not
+ *    normally be hit on a real device or browser.
+ *
+ * The rest of the app was written against localStorage's *synchronous*
+ * getItem/setItem API across call sites. Rather than making every one of
+ * those call sites async (a large, risky rewrite touching React state
+ * initializers, constructors, etc.), this service hydrates an in-memory
+ * cache from the real backend once at startup (await `storageService.ready`
+ * before rendering — see main.tsx), then serves every read/write
+ * synchronously from that cache, mirroring localStorage's API. Writes are
+ * mirrored to the real backend in the background (debounced ~400ms), so
+ * nothing is lost on restart, but nothing is capped either.
+ *
+ * Any pre-existing localStorage data (from before this migration) is copied
+ * in automatically, once, on first run.
+ *
+ * In addition to the generic key-value store, it supports 7-tier structured
+ * memory persistence (raw, structural, semantic, episodic, procedural, meta, working)
+ * with approved state, source reference, and metadata.
+ */
+class StorageService {
+  private cache = new Map<string, string>();
+  private dirtyKeys = new Set<string>();
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private backend: 'sqlite' | 'indexeddb' | 'memory' = 'memory';
+  private ftsAvailable: boolean = false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private sqlite: any = null; // SQLiteDBConnection (native only, loaded dynamically)
+  private idb: IDBDatabase | null = null;
+  private readonly STORE = 'kv_store';
+  private readonly MEMORIES_STORE = 'memories_store';
+  private readonly DB_NAME = 'mikiai_kv';
+
+  /** Resolves once the persistent backend has been hydrated into the cache. */
+  public readonly ready: Promise<void>;
+
+  constructor() {
+    this.ready = this.init().catch((e) => {
+      console.warn('storageService: init failed, continuing with in-memory storage only', e);
+      this.backend = 'memory';
+    });
+  }
+
+  private async init(): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await this.initSqlite();
+        this.backend = 'sqlite';
+      } catch (e) {
+        console.warn('storageService: native SQLite unavailable, falling back to IndexedDB', e);
+        try {
+          await this.initIndexedDb();
+          this.backend = 'indexeddb';
+        } catch (e2) {
+          console.warn('storageService: IndexedDB also unavailable, using in-memory storage', e2);
+          this.backend = 'memory';
+        }
+      }
+    } else {
+      try {
+        await this.initIndexedDb();
+        this.backend = 'indexeddb';
+      } catch (e) {
+        console.warn('storageService: IndexedDB unavailable, using in-memory storage', e);
+        this.backend = 'memory';
+      }
+    }
+    await this.migrateFromLegacyLocalStorage();
+  }
+
+  private async initSqlite(): Promise<void> {
+    // Dynamic import so a pure web/browser build never needs this package at
+    // runtime (it is only exercised on native Android/iOS).
+    const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite');
+    const sqliteConnection = new SQLiteConnection(CapacitorSQLite);
+    const isConnResult = await sqliteConnection.isConnection(this.DB_NAME, false);
+    this.sqlite = isConnResult.result
+      ? await sqliteConnection.retrieveConnection(this.DB_NAME, false)
+      : await sqliteConnection.createConnection(this.DB_NAME, false, 'no-encryption', 1, false);
+    await this.sqlite.open();
+    await this.sqlite.execute(
+      `CREATE TABLE IF NOT EXISTS ${this.STORE} (key TEXT PRIMARY KEY NOT NULL, value TEXT);`
+    );
+    await this.sqlite.execute(
+      `CREATE TABLE IF NOT EXISTS ${this.MEMORIES_STORE} (
+        id TEXT PRIMARY KEY NOT NULL,
+        category TEXT,
+        memory_type TEXT,
+        content TEXT,
+        approved INTEGER,
+        source_ref TEXT,
+        raw_excerpt TEXT,
+        created_at INTEGER,
+        updated_at INTEGER,
+        json_payload TEXT
+      );`
+    );
+    try {
+      await this.sqlite.execute(
+        `CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+          id UNINDEXED,
+          content,
+          tags,
+          content='${this.MEMORIES_STORE}',
+          content_rowid='rowid'
+        );`
+      );
+      this.ftsAvailable = true;
+    } catch (e) {
+      console.warn('storageService: FTS5 unavailable on this build, memory search will use JS fallback only', e);
+      this.ftsAvailable = false;
+    }
+    const res = await this.sqlite.query(`SELECT key, value FROM ${this.STORE};`);
+    for (const row of res.values || []) {
+      this.cache.set(row.key, row.value);
+    }
+  }
+
+  private initIndexedDb(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (typeof indexedDB === 'undefined') {
+        reject(new Error('IndexedDB unavailable in this environment'));
+        return;
+      }
+      const req = indexedDB.open(this.DB_NAME, 2);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(this.STORE)) {
+          req.result.createObjectStore(this.STORE);
+        }
+        if (!req.result.objectStoreNames.contains(this.MEMORIES_STORE)) {
+          req.result.createObjectStore(this.MEMORIES_STORE, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = () => {
+        this.idb = req.result;
+        const tx = this.idb.transaction(this.STORE, 'readonly');
+        const store = tx.objectStore(this.STORE);
+        const cursorReq = store.openCursor();
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (cursor) {
+            this.cache.set(String(cursor.key), cursor.value as string);
+            cursor.continue();
+          } else {
+            resolve();
+          }
+        };
+        cursorReq.onerror = () => reject(cursorReq.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  private async migrateFromLegacyLocalStorage(): Promise<void> {
+    const FLAG = '__miki_storage_migrated_v1';
+    if (this.cache.get(FLAG) === '1') return;
+    if (typeof localStorage === 'undefined') return;
+
+    try {
+      let migratedCount = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || key === FLAG) continue;
+        // Never clobber anything the new backend already has (e.g. from a
+        // previous, partially-completed migration).
+        if (this.cache.has(key)) continue;
+        const value = localStorage.getItem(key);
+        if (value !== null) {
+          this.cache.set(key, value);
+          this.dirtyKeys.add(key);
+          migratedCount++;
+        }
+      }
+      this.cache.set(FLAG, '1');
+      this.dirtyKeys.add(FLAG);
+      if (migratedCount > 0) {
+        await this.flush();
+        console.info(
+          `storageService: migrated ${migratedCount} key(s) from localStorage into ${this.backend} storage`
+        );
+      }
+    } catch (e) {
+      console.warn('storageService: legacy localStorage migration failed (non-fatal)', e);
+    }
+  }
+
+  private scheduleFlush(): void {
+    if (this.flushTimer) return;
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null;
+      this.flush().catch((e) => console.warn('storageService: background flush failed', e));
+    }, 400);
+  }
+
+  private async flush(): Promise<void> {
+    if (this.dirtyKeys.size === 0) return;
+    const keys = Array.from(this.dirtyKeys);
+    this.dirtyKeys.clear();
+
+    try {
+      if (this.backend === 'sqlite' && this.sqlite) {
+        for (const key of keys) {
+          if (this.cache.has(key)) {
+            const val = this.cache.get(key)!;
+            await this.sqlite.run(`INSERT OR REPLACE INTO ${this.STORE} (key, value) VALUES (?, ?);`, [
+              key,
+              val,
+            ]);
+
+            // If updating memories, also sync structured SQLite table & FTS index
+            if (key === 'gamecraft_memories') {
+              try {
+                const memList: MemoryItem[] = JSON.parse(val);
+                if (Array.isArray(memList)) {
+                  await this.sqlite.run(`DELETE FROM ${this.MEMORIES_STORE};`);
+                  if (this.ftsAvailable) {
+                    try {
+                      await this.sqlite.run(`DELETE FROM memories_fts;`);
+                    } catch (ftsDelErr) {
+                      console.warn('storageService: memories_fts DELETE failed', ftsDelErr);
+                    }
+                  }
+                  for (const mem of memList) {
+                    await this.sqlite.run(
+                      `INSERT OR REPLACE INTO ${this.MEMORIES_STORE} (id, category, memory_type, content, approved, source_ref, raw_excerpt, created_at, updated_at, json_payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+                      [
+                        mem.id,
+                        mem.category || 'chat',
+                        mem.memoryType || 'semantic',
+                        mem.content,
+                        mem.approved ? 1 : 0,
+                        mem.sourceRef || '',
+                        mem.rawExcerpt || '',
+                        mem.createdAt || Date.now(),
+                        mem.updatedAt || Date.now(),
+                        JSON.stringify(mem),
+                      ]
+                    );
+                    if (this.ftsAvailable) {
+                      try {
+                        await this.sqlite.run(
+                          `INSERT INTO memories_fts (rowid, id, content, tags) VALUES ((SELECT rowid FROM ${this.MEMORIES_STORE} WHERE id = ?), ?, ?, ?);`,
+                          [mem.id, mem.id, mem.content, (mem.tags || []).join(' ')]
+                        );
+                      } catch (ftsInsErr) {
+                        console.warn('storageService: memories_fts INSERT failed', ftsInsErr);
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                console.warn('storageService: sqlite structured memories sync skipped', e);
+              }
+            }
+          } else {
+            await this.sqlite.run(`DELETE FROM ${this.STORE} WHERE key = ?;`, [key]);
+          }
+        }
+      } else if (this.backend === 'indexeddb' && this.idb) {
+        await new Promise<void>((resolve, reject) => {
+          const tx = this.idb!.transaction(
+            this.idb!.objectStoreNames.contains(this.MEMORIES_STORE)
+              ? [this.STORE, this.MEMORIES_STORE]
+              : [this.STORE],
+            'readwrite'
+          );
+          const store = tx.objectStore(this.STORE);
+          const memoriesStore = this.idb!.objectStoreNames.contains(this.MEMORIES_STORE)
+            ? tx.objectStore(this.MEMORIES_STORE)
+            : null;
+
+          for (const key of keys) {
+            if (this.cache.has(key)) {
+              const val = this.cache.get(key)!;
+              store.put(val, key);
+
+              // If updating memories, sync structured IndexedDB store
+              if (key === 'gamecraft_memories' && memoriesStore) {
+                try {
+                  const memList: MemoryItem[] = JSON.parse(val);
+                  if (Array.isArray(memList)) {
+                    for (const mem of memList) {
+                      memoriesStore.put(mem);
+                    }
+                  }
+                } catch {}
+              }
+            } else {
+              store.delete(key);
+            }
+          }
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      }
+      // backend === 'memory': nothing to persist beyond the in-memory cache.
+    } catch (e) {
+      // Put the keys back so the next scheduled flush retries them.
+      keys.forEach((k) => this.dirtyKeys.add(k));
+      throw e;
+    }
+  }
+
+  // --- localStorage-compatible synchronous API ---
+
+  public getJson<T = unknown>(key: string, fallback?: T): T | null {
+    const raw = this.getItem(key);
+    if (raw === null) return fallback ?? null;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return fallback ?? null;
+    }
+  }
+
+  public getItem(key: string): string | null {
+    return this.cache.has(key) ? this.cache.get(key)! : null;
+  }
+
+  public setItem(key: string, value: string): void {
+    this.cache.set(key, value);
+    this.dirtyKeys.add(key);
+    this.scheduleFlush();
+  }
+
+  public removeItem(key: string): void {
+    if (!this.cache.has(key)) return;
+    this.cache.delete(key);
+    this.dirtyKeys.add(key);
+    this.scheduleFlush();
+  }
+
+  /** Equivalent of `Object.keys(localStorage)`. */
+  public keys(): string[] {
+    return Array.from(this.cache.keys());
+  }
+
+  /** Equivalent of `localStorage.key(index)`. */
+  public key(index: number): string | null {
+    return this.keys()[index] ?? null;
+  }
+
+  /** Equivalent of `localStorage.length`. */
+  public get length(): number {
+    return this.cache.size;
+  }
+
+  /** Force any pending debounced writes to persist immediately. */
+  public async flushNow(): Promise<void> {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    await this.flush();
+  }
+
+  public getBackendName(): 'sqlite' | 'indexeddb' | 'memory' {
+    return this.backend;
+  }
+
+  // --- 7-Tier Hierarchical Memory Dedicated Methods ---
+
+  public getMemories(): MemoryItem[] {
+    const raw = this.getItem('gamecraft_memories');
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public setMemories(memories: MemoryItem[]): void {
+    this.setItem('gamecraft_memories', JSON.stringify(memories));
+  }
+
+  public getMemoriesByType(type: MemoryType): MemoryItem[] {
+    return this.getMemories().filter((m) => m.memoryType === type);
+  }
+
+  public getMemoriesByDestination(destination: MemoryDestination): MemoryItem[] {
+    return this.getMemories().filter((m) => m.destination === destination);
+  }
+
+  public getApprovedMemories(): MemoryItem[] {
+    return this.getMemories().filter(
+      (m) =>
+        m.approved !== false &&
+        m.active !== false &&
+        m.destination !== 'quarantine' &&
+        m.destination !== 'discard_candidate'
+    );
+  }
+
+  public getUnapprovedMemories(): MemoryItem[] {
+    return this.getMemories().filter(
+      (m) => m.approved === false && m.active !== false && m.destination !== 'quarantine' && m.destination !== 'discard_candidate'
+    );
+  }
+
+  /**
+   * 49章 隔離された記憶 (出典不明・正解未確認・未承認ハイリスク)
+   * プロンプト注入から完全に除外される
+   */
+  public getQuarantinedMemories(): MemoryItem[] {
+    return this.getMemories().filter((m) => m.destination === 'quarantine');
+  }
+
+  /**
+   * 49章 破棄候補の記憶 (重複・低評価・誤り判定)
+   * 自動削除ではなくユーザーの一括確認対象
+   */
+  public getDiscardCandidateMemories(): MemoryItem[] {
+    return this.getMemories().filter((m) => m.destination === 'discard_candidate');
+  }
+
+  /**
+   * 49章 プロジェクト記憶 (特定案件・ファイル限定)
+   */
+  public getProjectMemories(projectScopeId?: string): MemoryItem[] {
+    return this.getMemories().filter((m) => {
+      if (m.destination !== 'project_memory') return false;
+      if (projectScopeId && m.projectScopeId && m.projectScopeId !== projectScopeId) return false;
+      return true;
+    });
+  }
+
+  public getConflictedMemories(): MemoryItem[] {
+    return this.getMemories().filter((m) => m.active !== false && Array.isArray(m.conflictWith) && m.conflictWith.length > 0);
+  }
+
+  public batchDeleteMemories(ids: string[]): void {
+    const idSet = new Set(ids);
+    const current = this.getMemories();
+    const filtered = current.filter((m) => !idSet.has(m.id));
+    this.setMemories(filtered);
+  }
+
+  public saveMemoryItem(item: MemoryItem): void {
+    const current = this.getMemories();
+    const idx = current.findIndex((m) => m.id === item.id);
+    let next: MemoryItem[];
+    if (idx >= 0) {
+      next = [...current];
+      next[idx] = { ...next[idx], ...item, updatedAt: Date.now() };
+    } else {
+      next = [item, ...current];
+    }
+    this.setMemories(next);
+  }
+
+  public deleteMemoryItem(id: string): void {
+    const current = this.getMemories();
+    const filtered = current.filter((m) => m.id !== id);
+    this.setMemories(filtered);
+  }
+
+  public resolveConflict(keepId: string, discardId: string): void {
+    const now = Date.now();
+    const current = this.getMemories();
+    const updated = current.map((m) => {
+      if (m.id === keepId) {
+        return {
+          ...m,
+          active: true,
+          approved: true,
+          conflictWith: (m.conflictWith || []).filter((cid) => cid !== discardId),
+          updatedAt: now,
+        };
+      }
+      if (m.id === discardId) {
+        return {
+          ...m,
+          active: false,
+          conflictWith: (m.conflictWith || []).filter((cid) => cid !== keepId),
+          updatedAt: now,
+        };
+      }
+      return m;
+    });
+    this.setMemories(updated);
+  }
+
+  /**
+   * 8.2 / 12章 記憶の置換 (SUPERSEDED 置換関係の履歴保存)
+   */
+  public supersedeMemory(
+    oldMemoryId: string,
+    newContent: string,
+    reason: string,
+    customProps?: Partial<MemoryItem>
+  ): { updatedMemories: MemoryItem[]; newMemory: MemoryItem } {
+    const now = Date.now();
+    const newMemoryId = `mem_long_${now}_${Math.random().toString(36).slice(2, 6)}`;
+    const current = this.getMemories();
+    const oldMemory = current.find((m) => m.id === oldMemoryId);
+
+    const newMemory: MemoryItem = {
+      id: newMemoryId,
+      category: customProps?.category || oldMemory?.category || 'preference',
+      content: newContent,
+      importance: customProps?.importance ?? oldMemory?.importance ?? 4,
+      pinned: customProps?.pinned ?? oldMemory?.pinned ?? false,
+      active: true,
+      approved: true,
+      lifecycleStatus: 'ACTIVE',
+      memoryScope: 'long_term',
+      longTermType: customProps?.longTermType || oldMemory?.longTermType || 'preference',
+      supersededFrom: oldMemoryId,
+      sourceRef: customProps?.sourceRef || `superseded_from_${oldMemoryId}`,
+      rawExcerpt: customProps?.rawExcerpt || newContent,
+      createdAt: now,
+      updatedAt: now,
+      useCount: 0,
+    };
+
+    const updatedMemories = current.map((m) => {
+      if (m.id === oldMemoryId) {
+        return {
+          ...m,
+          active: false,
+          lifecycleStatus: 'SUPERSEDED' as const,
+          replacedBy: newMemoryId,
+          replacementReason: reason,
+          supersededAt: now,
+          updatedAt: now,
+        };
+      }
+      return m;
+    });
+
+    updatedMemories.unshift(newMemory);
+    this.setMemories(updatedMemories);
+    return { updatedMemories, newMemory };
+  }
+
+  public dismissConflict(idA: string, idB: string): void {
+    const now = Date.now();
+    const current = this.getMemories();
+    const updated = current.map((m) => {
+      if (m.id === idA) {
+        return {
+          ...m,
+          conflictWith: (m.conflictWith || []).filter((cid) => cid !== idB),
+          updatedAt: now,
+        };
+      }
+      if (m.id === idB) {
+        return {
+          ...m,
+          conflictWith: (m.conflictWith || []).filter((cid) => cid !== idA),
+          updatedAt: now,
+        };
+      }
+      return m;
+    });
+    this.setMemories(updated);
+  }
+
+  /**
+   * クラウドAPI（Google Gemini）への送信に関する同意フラグ
+   */
+  public isCloudConsentAccepted(): boolean {
+    return this.getItem('miki_cloud_consent_accepted') === 'true';
+  }
+
+  public setCloudConsentAccepted(accepted: boolean): void {
+    this.setItem('miki_cloud_consent_accepted', accepted ? 'true' : 'false');
+  }
+
+  /**
+   * クラウド送信時に個人情報（profile / relationship）を除外するかどうか（デフォルト: true / 除外する）
+   */
+  public isCloudFilterPrivateMemories(): boolean {
+    return this.getItem('miki_cloud_filter_private_memories') !== 'false';
+  }
+
+  public setCloudFilterPrivateMemories(enabled: boolean): void {
+    this.setItem('miki_cloud_filter_private_memories', enabled ? 'true' : 'false');
+  }
+
+  /**
+   * クラウドAI（教師役Gemini）送信用の安全な記憶フィルタリング
+   * - フィルタが有効な場合、profile / relationship カテゴリを完全除外
+   * - 未承認（approved: false）やアーカイブ済み（active: false）も除外
+   */
+  public filterMemoriesForCloud(memories: MemoryItem[]): MemoryItem[] {
+    const filterPrivate = this.isCloudFilterPrivateMemories();
+    return memories.filter((m) => {
+      if (m.active === false) return false;
+      if (m.approved === false) return false;
+      if (filterPrivate && (m.category === 'profile' || m.category === 'relationship')) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  /**
+   * FTS5全文検索で候補となる記憶IDを関連度順に返す(ネイティブ/SQLite backendのみ)。
+   * IndexedDB/メモリのみのbackendでは常に null を返す
+   * (呼び出し側はnullなら従来のJS全件スキャンにフォールバックすること)。
+   */
+  public async searchMemoriesFTS(query: string, limit: number = 50): Promise<string[] | null> {
+    if (this.backend !== 'sqlite' || !this.sqlite || !this.ftsAvailable) return null;
+    try {
+      // FTS5のクエリ構文で危険な記号(",-,*など)をエスケープしつつトークン化
+      const sanitized = query
+        .replace(/["*]/g, ' ')
+        .trim()
+        .split(/\s+/)
+        .filter((t) => t.length > 0)
+        .map((t) => `"${t}"`)
+        .join(' OR ');
+      if (!sanitized) return null;
+      const res = await this.sqlite.query(
+        `SELECT id, rank FROM memories_fts WHERE memories_fts MATCH ? ORDER BY rank LIMIT ?;`,
+        [sanitized, limit]
+      );
+      return (res.values || []).map((r: any) => r.id);
+    } catch (e) {
+      console.warn('storageService: FTS5 search failed, caller should fall back to JS scan', e);
+      return null;
+    }
+  }
+
+  /** 現在のbackendがFTS5対応(SQLite)かどうか */
+  public supportsFTS(): boolean {
+    return this.backend === 'sqlite' && this.ftsAvailable;
+  }
+}
+
+export const storageService = new StorageService();

@@ -1,0 +1,33 @@
+MIKI-AI0.2 FINAL INTEGRATED SOURCE
+==================================
+Base repository: SimpleRPG/MIKI-AI0.2
+Base commit: a0423bb7ea155e51eebc8c0a14c8a38550b2898a
+Integrated range: V160 -> V223
+Architecture: existing CORE + 17 classifications / 18 domains
+Local LLM runtime: not used by MIKI-AI
+
+Integration notes
+-----------------
+V160-V223 were integrated against the uploaded current source tree rather than replayed as a user-facing patch script. Where historical patch anchors differed from the current source, the intended behavior was integrated directly into the current implementation while preserving the existing CORE/Blackboard/Result/Evidence architecture.
+
+Validation performed
+--------------------
+- git diff --check: PASS
+- node --check across scripts/*.mjs: PASS
+- test_no_local_llm_boundary.mjs: PASS
+- test_architecture_final_audit_v193.mjs: PASS
+- test_final_runtime_architecture_audit_v197.mjs: PASS
+- test_legacy_llm_migration_ui_retired_v198.mjs: PASS
+- test_legacy_llm_migration_backend_retired_v199.mjs: PASS
+- test_external_teacher_skill_quarantine_v200.mjs: PASS
+- test_goal_conflict_determinism_v201.mjs: PASS
+- test_belief_revision_rules_v202.mjs: PASS
+- test_foreground_background_core_guard_v203.mjs: PASS
+- test_dialogue_repair_unresolved_v205.mjs: PASS
+- test_conversation_outcome_cause_v206.mjs: PASS
+- test_no_local_llm_selfcode_args_v192.mjs: PASS
+- test_stale_local_llm_surface_cleanup_v196.mjs: PASS
+
+TypeScript note
+---------------
+A full tsc --noEmit run could not complete cleanly in the staging environment because node_modules/dependencies are not installed, and the existing base tree also contains unrelated type errors. No syntax errors remained in the files repaired during the integration. Run npm ci && npm run lint in Termux after installing dependencies.

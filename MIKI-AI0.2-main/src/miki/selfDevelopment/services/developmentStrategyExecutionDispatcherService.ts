@@ -1,0 +1,11 @@
+import type { DevelopmentStrategyDecision } from './developmentStrategyDecisionService';
+import { astCandidateTransformationService } from './astCandidateTransformationService';
+import { componentCompositionService } from '../../capability/services/componentCompositionService';
+import { capabilityGapService } from '../../capability/services/capabilityGapService';
+import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
+export interface StrategyExecutionRequest { decision:DevelopmentStrategyDecision; instruction:string; targetPath?:string; baselineContent?:string; operations?:any[]; componentIds?:string[]; }
+export interface StrategyExecutionResult { strategy:DevelopmentStrategyDecision['strategy']; executed:boolean; output?:unknown; reasons:string[]; }
+class DevelopmentStrategyExecutionDispatcherService{
+ public execute(request:StrategyExecutionRequest):StrategyExecutionResult{const {decision}=request;if(decision.strategy==='EXISTING_SYMBOL_AST_CHANGE'||decision.strategy==='EXISTING_COMPONENT_EXTENSION'){if(!request.targetPath||request.baselineContent===undefined)return {strategy:decision.strategy,executed:false,reasons:['AST_TARGET_REQUIRED']};return {strategy:decision.strategy,executed:true,output:astCandidateTransformationService.transform({path:request.targetPath,baselineContent:request.baselineContent,expectedBaselineSha256:canonicalSha256(request.baselineContent),operations:request.operations||[]}),reasons:[]};}if(decision.strategy==='COMPONENT_COMPOSITION'){return {strategy:decision.strategy,executed:true,output:componentCompositionService.compose(request.instruction,4,[],undefined),reasons:[]};}if(decision.strategy==='CAPABILITY_GAP'){return {strategy:decision.strategy,executed:true,output:capabilityGapService.recordGap({description:request.instruction,gap_type:'failure',capabilityId:'self_development',impact:'HIGH',current_workaround:'人手評価',candidate_solution:'Strategy再計画',evidenceIds:[decision.decisionId]}),reasons:[]};}return {strategy:decision.strategy,executed:true,output:{continueWith:decision.strategy},reasons:[]};}
+}
+export const developmentStrategyExecutionDispatcherService=new DevelopmentStrategyExecutionDispatcherService();

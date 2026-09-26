@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 30,
+  "implementation": "ADVANCED_DEVELOPMENT_DEPTH_STAGE30",
+  "domains": [
+    "COMPLEX_UI",
+    "LARGE_STATE",
+    "EXTERNAL_API",
+    "ADVANCED_PERFORMANCE",
+    "THREAT_MODEL",
+    "COMPLEX_DB_MIGRATION",
+    "MULTI_REPOSITORY"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_advanced_depth_stage30.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"ADVANCED_DEVELOPMENT_DEPTH\",\n  \"domains\": 7,\n  \"checks\": 63\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_workspace_completion_stage29.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"WORKSPACE_COMPLETION\",\n  \"checks\": 42\n}\n"
+    },
+    {
+      "cmd": "node scripts/verify_autonomous_e2e_stage28.mjs",
+      "exit": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": \"AUTONOMOUS_E2E_PROOF\",\n  \"scenarios\": 7,\n  \"apiDeferred\": true\n}\n"
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0,
+      "tail": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 798, 総相対import数: 2982, 未解決エラー数: 0\n\n"
+    }
+  ],
+  "scope": "Repository evidence discovery, blocking preconditions, domain acceptance gates, isolated workspace planning, and handoff to original autonomous candidate pipeline."
+}

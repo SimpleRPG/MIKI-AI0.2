@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import ts from 'typescript';
+const file='src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts';
+const source=fs.readFileSync(file,'utf8');
+const parsed=ts.createSourceFile(file,source,ts.ScriptTarget.ES2022,true,ts.ScriptKind.TS);
+if((parsed.parseDiagnostics||[]).length)throw new Error('COMPLETION_SERVICE_PARSE_FAILED');
+const output=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext},reportDiagnostics:true});
+if((output.diagnostics||[]).length)throw new Error('COMPLETION_SERVICE_TRANSPILE_FAILED');
+for(const text of ['candidateRepairRetryLoopService.run','reviewCandidateExportService.create','capabilityGapService.recordGap','REVIEW_PACKAGE_GATE_REJECTED','cap_autonomous_code_repair','DEVCOMP-'])if(!source.includes(text))throw new Error(`COMPLETION_CONNECTION_MISSING:${text}`);
+const design=fs.readFileSync('MIKI-AI0.2_統合設計書_正本.txt','utf8');
+if((design.match(/【169\. 現行正本/g)||[]).length!==1)throw new Error('CANONICAL_DESIGN_DUPLICATED');
+console.log(JSON.stringify({passed:true,stage:'CANDIDATE_DEVELOPMENT_COMPLETION',checks:10,file},null,2));

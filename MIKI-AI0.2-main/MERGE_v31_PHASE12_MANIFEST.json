@@ -1,0 +1,17 @@
+{
+  "base": "phase11 cumulative",
+  "phase": "phase12-adaptive-blackboard-core",
+  "implemented": [
+    "persistent Task Blackboard",
+    "adaptive route planner",
+    "workflow orchestrator with repeated core redistribution",
+    "governance kernel for trace, duplicate, depth, persistence and self-improvement reentry",
+    "DomainRouter governance enforcement",
+    "blackboard task count in UI"
+  ],
+  "truth_boundary": [
+    "rules are deterministic initial routing rules",
+    "not all 17 domain-specific commands are implemented",
+    "completion requires observed results and memory visit"
+  ]
+}

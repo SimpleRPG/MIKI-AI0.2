@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 17,
+  "checks": [
+    {
+      "cmd": "node scripts/verify_unified_autonomous_completion_stage17.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_unified_instruction_development_stage16.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_autonomous_completion_stage15.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_feature_wiring_and_acceptance_stage14.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    }
+  ],
+  "tscExit": 2,
+  "repositoryDiagnosticLines": 220,
+  "newImplementationDiagnostics": []
+}

@@ -1,0 +1,65 @@
+{
+  "version": "v263",
+  "stage": 52,
+  "base": "v262",
+  "feature": "Autonomous Capability Innovation",
+  "implemented": [
+    "Periodic autonomous discovery",
+    "Capability gap discovery",
+    "Weak proof maturity discovery",
+    "Failure-pattern discovery",
+    "Verified external research observation ingestion",
+    "Deterministic duplicate suppression",
+    "Exploration budget and multi-candidate queue",
+    "Foreground-aware execution hold",
+    "Existing unified development pipeline handoff",
+    "Candidate Workspace only",
+    "Review ZIP as final autonomous boundary",
+    "Human-only formal adoption",
+    "Outcome learning feedback"
+  ],
+  "defaultBudget": {
+    "intervalMinutes": 360,
+    "maxCandidatesPerCycle": 8,
+    "maxEstimatedCostPerCycle": 32,
+    "minimumPriority": 55
+  },
+  "checks": [
+    {
+      "command": "node scripts/verify_autonomous_capability_innovation_stage52.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": 52,\n  \"checks\": 58,\n  \"discoverySources\": 4,\n  \"reviewBoundary\": \"REVIEW_ZIP\",\n  \"formalAdoption\": \"HUMAN_ONLY\"\n}\n"
+    },
+    {
+      "command": "node scripts/verify_runtime_depth_stage51.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": 51,\n  \"checks\": 74,\n  \"proofTiers\": [\n    \"STATIC\",\n    \"SANDBOX\",\n    \"DEVICE\"\n  ],\n  \"runtimeEndpoint\": \"/api/self-code/runtime-proof\"\n}\n"
+    },
+    {
+      "command": "node scripts/verify_stages_41_50_connections.mjs",
+      "exitCode": 0,
+      "tail": "ete\",\n  \"preReviewPosition\": \"after feature acceptance, before evaluation package export\",\n  \"postReviewPosition\": \"after package export and save\",\n  \"reviewBlocking\": true,\n  \"ledgerAndLearning\": true,\n  \"checks\": 48\n}\n"
+    },
+    {
+      "command": "node scripts/verify_stages_41_50.mjs",
+      "exitCode": 0,
+      "tail": "\n    42,\n    43,\n    44,\n    45,\n    46,\n    47,\n    48,\n    49,\n    50\n  ],\n  \"extras\": [\n    \"ARCHITECTURE_FITNESS\",\n    \"ASSUMPTION_LEDGER\",\n    \"DEAD_CODE_CANDIDATE\",\n    \"PRIVACY_SECRET_FLOW\"\n  ],\n  \"checks\": 164\n}\n"
+    },
+    {
+      "command": "node scripts/verify_stages_35_40.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stages\": [\n    35,\n    36,\n    37,\n    38,\n    39,\n    40\n  ],\n  \"checks\": 126\n}\n"
+    },
+    {
+      "command": "node scripts/check_imports.mjs",
+      "exitCode": 0,
+      "tail": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 846, 総相対import数: 3052, 未解決エラー数: 0\n\n"
+    }
+  ],
+  "truthBoundary": [
+    "External research must be ingested as OFFICIAL or VERIFIED_SNAPSHOT evidence.",
+    "The service does not treat external content as executable instructions.",
+    "A candidate can reach REVIEW_READY only through the existing completion and governance gates.",
+    "No automatic formal adoption or direct live-code mutation."
+  ]
+}

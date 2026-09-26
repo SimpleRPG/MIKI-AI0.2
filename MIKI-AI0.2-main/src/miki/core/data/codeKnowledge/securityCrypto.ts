@@ -1,0 +1,1090 @@
+import type { CodeComponentDefinition, CodeKnowledgeDefinition } from './common';
+
+/**
+ * Security / Crypto
+ * Knowledge と直接再利用可能な CODE Component を同一カテゴリで管理する。
+ * platformCodeKnowledge.ts から分離した静的な登録元。
+ */
+export const securityCryptoCodeKnowledge: CodeKnowledgeDefinition[] = [
+  {
+      id: 'code.security.hashing',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'Password/data hashing',
+      summary: 'Password/data hashingをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['hashing', 'hashing'],
+      inputs: ['input'],
+      outputs: ['hash'],
+      appliesWhen: ['security', 'hashing'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'hash({algorithm}, {value});',
+        outputKinds: ['hash'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.hmac',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'HMAC',
+      summary: 'HMACをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['HMAC', 'hmac'],
+      inputs: ['input'],
+      outputs: ['signature'],
+      appliesWhen: ['security', 'hmac'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'createHmac({algorithm}, {secret}).update({value}).digest();',
+        outputKinds: ['signature'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.encryption',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'Symmetric encryption',
+      summary: 'Symmetric encryptionをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['encryption', 'encryption'],
+      inputs: ['input'],
+      outputs: ['ciphertext'],
+      appliesWhen: ['security', 'encryption'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: '{cipher}.encrypt({plaintext}, {key});',
+        outputKinds: ['ciphertext'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.decryption',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'Symmetric decryption',
+      summary: 'Symmetric decryptionをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['decryption', 'decryption'],
+      inputs: ['input'],
+      outputs: ['plaintext'],
+      appliesWhen: ['security', 'decryption'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: '{cipher}.decrypt({ciphertext}, {key});',
+        outputKinds: ['plaintext'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.secure-random',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'Secure random value',
+      summary: 'Secure random valueをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['secure random', 'secure-random'],
+      inputs: ['input'],
+      outputs: ['random bytes'],
+      appliesWhen: ['security', 'secure-random'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'crypto.randomBytes({size});',
+        outputKinds: ['random bytes'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.secret-boundary',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'Secret access boundary',
+      summary: 'Secret access boundaryをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['secret boundary', 'secret-boundary'],
+      inputs: ['input'],
+      outputs: ['secret'],
+      appliesWhen: ['security', 'secret-boundary'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'const {secret} = getSecret({name});',
+        outputKinds: ['secret'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.input-sanitization',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'Input sanitization',
+      summary: 'Input sanitizationをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['sanitization', 'input-sanitization'],
+      inputs: ['input'],
+      outputs: ['sanitized input'],
+      appliesWhen: ['security', 'input-sanitization'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'const {safe} = sanitize({input});',
+        outputKinds: ['sanitized input'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.xss-boundary',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'XSS-safe output boundary',
+      summary: 'XSS-safe output boundaryをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['XSS', 'xss-boundary'],
+      inputs: ['input'],
+      outputs: ['safe output'],
+      appliesWhen: ['security', 'xss-boundary'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'const {safeHtml} = escapeHtml({input});',
+        outputKinds: ['safe output'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.csrf',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'CSRF protection',
+      summary: 'CSRF protectionをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['CSRF', 'csrf'],
+      inputs: ['input'],
+      outputs: ['token'],
+      appliesWhen: ['security', 'csrf'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'const {token} = createCsrfToken({session});',
+        outputKinds: ['token'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.ssrf',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'SSRF-safe URL validation',
+      summary: 'SSRF-safe URL validationをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['SSRF', 'ssrf'],
+      inputs: ['input'],
+      outputs: ['safe URL'],
+      appliesWhen: ['security', 'ssrf'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'const {safeUrl} = validateOutboundUrl({url});',
+        outputKinds: ['safe URL'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.path-traversal',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'Safe filesystem path',
+      summary: 'Safe filesystem pathをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['path traversal', 'path-traversal'],
+      inputs: ['input'],
+      outputs: ['safe path'],
+      appliesWhen: ['security', 'path-traversal'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'const {safePath} = resolveSafePath({root}, {input});',
+        outputKinds: ['safe path'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.command-injection',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'Safe process invocation',
+      summary: 'Safe process invocationをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['command injection', 'command-injection'],
+      inputs: ['input'],
+      outputs: ['process result'],
+      appliesWhen: ['security', 'command-injection'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'execFile({command}, {args});',
+        outputKinds: ['process result'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.sql-injection',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'SQL injection boundary',
+      summary: 'SQL injection boundaryをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['SQL injection', 'sql-injection'],
+      inputs: ['input'],
+      outputs: ['statement'],
+      appliesWhen: ['security', 'sql-injection'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'db.prepare({parameterizedSql});',
+        outputKinds: ['statement'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.authentication',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'Authentication boundary',
+      summary: 'Authentication boundaryをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['authentication', 'authentication'],
+      inputs: ['input'],
+      outputs: ['identity'],
+      appliesWhen: ['security', 'authentication'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'const {identity} = authenticate({credentials});',
+        outputKinds: ['identity'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+      id: 'code.security.authorization',
+      componentType: 'CODE_PLATFORM_KNOWLEDGE',
+      purpose: 'Authorization boundary',
+      summary: 'Authorization boundaryをMIKIの汎用コード構築語彙として扱う。',
+      concepts: ['authorization', 'authorization'],
+      inputs: ['input'],
+      outputs: ['boolean'],
+      appliesWhen: ['security', 'authorization'],
+      doesNotApplyWhen: [],
+      sourceUrls: ['https://developer.mozilla.org/en-US/docs/Web/JavaScript'],
+      sourceArtifactIds: ['platform-catalog-security'],
+      constructionProfile: {
+        kind: 'CALL',
+        syntaxTemplate: 'authorize({identity}, {permission});',
+        outputKinds: ['boolean'],
+        slots: [
+          {name: 'input', inputKinds: ['expression'], required: true},
+        ],
+        constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
+        adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
+      },
+    },
+  {
+    "id": "code.security-crypto.random-bytes",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "安全な乱数バイト列を生成する",
+    "summary": "暗号学的乱数バイト生成。",
+    "concepts": [
+      "cryptographic random",
+      "entropy",
+      "bytes"
+    ],
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "appliesWhen": [
+      "トークンやnonce等の安全な乱数が必要"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.security-crypto.random-bytes"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "crypto.randomBytes({length})",
+      "outputKinds": [
+        "expression"
+      ],
+      "slots": [
+        {
+          "name": "length",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.security-crypto.timing-safe-equal",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "タイミング攻撃を避けて秘密値を比較する",
+    "summary": "timingSafeEqualによる比較。",
+    "concepts": [
+      "timingSafeEqual",
+      "side-channel",
+      "buffer"
+    ],
+    "inputs": [
+      "expression",
+      "expression"
+    ],
+    "outputs": [
+      "boolean-expression"
+    ],
+    "appliesWhen": [
+      "秘密情報の比較を安全に行う"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.security-crypto.timing-safe-equal"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "crypto.timingSafeEqual({left}, {right})",
+      "outputKinds": [
+        "boolean-expression"
+      ],
+      "slots": [
+        {
+          "name": "left",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "right",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.security-crypto.hmac",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "HMACでメッセージ認証値を生成する",
+    "summary": "HMACによるメッセージ認証。",
+    "concepts": [
+      "HMAC",
+      "authentication",
+      "digest"
+    ],
+    "inputs": [
+      "string-expression",
+      "string-expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "appliesWhen": [
+      "署名・認証用MACを生成する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "generated-code.security-crypto.hmac"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "crypto.createHmac({algorithm}, {key}).update({data}).digest('hex')",
+      "outputKinds": [
+        "string-expression"
+      ],
+      "slots": [
+        {
+          "name": "algorithm",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "key",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "data",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.security-crypto.safe-encoding",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "バイナリ値を安全なエンコーディングへ変換する",
+    "summary": "Buffer/base64等の安全な表現変換。",
+    "concepts": [
+      "encoding",
+      "base64",
+      "bytes"
+    ],
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "appliesWhen": [
+      "バイナリを保存・伝送可能な文字列表現へ変換する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.security-crypto.safe-encoding"
+    ],
+    "constructionProfile": {
+      "kind": "EXPRESSION",
+      "syntaxTemplate": "{value}.toString('base64')",
+      "outputKinds": [
+        "string-expression"
+      ],
+      "slots": [
+        {
+          "name": "value",
+          "inputKinds": [
+            "expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.security-crypto.hash",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "入力から不可逆ハッシュを生成する",
+    "summary": "暗号学的ハッシュ。",
+    "concepts": [
+      "hash",
+      "SHA-256",
+      "digest"
+    ],
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "appliesWhen": [
+      "データ完全性確認等のハッシュを生成する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.security-crypto.hash"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "crypto.createHash({algorithm}).update({data}).digest('hex')",
+      "outputKinds": [
+        "string-expression"
+      ],
+      "slots": [
+        {
+          "name": "algorithm",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        },
+        {
+          "name": "data",
+          "inputKinds": [
+            "string-expression"
+          ],
+          "required": true
+        }
+      ],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  },
+  {
+    "id": "code.security-crypto.random-uuid",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "衝突しにくい識別子を生成する",
+    "summary": "crypto.randomUUIDによるUUID生成。",
+    "concepts": [
+      "randomUUID",
+      "identifier",
+      "entropy"
+    ],
+    "inputs": [],
+    "outputs": [
+      "string-expression"
+    ],
+    "appliesWhen": [
+      "新規識別子を安全に生成する"
+    ],
+    "doesNotApplyWhen": [],
+    "sourceUrls": [
+      "https://developer.mozilla.org/"
+    ],
+    "sourceArtifactIds": [
+      "construction-code.security-crypto.random-uuid"
+    ],
+    "constructionProfile": {
+      "kind": "CALL",
+      "syntaxTemplate": "crypto.randomUUID()",
+      "outputKinds": [
+        "string-expression"
+      ],
+      "slots": [],
+      "constraints": [],
+      "adaptationRules": []
+    }
+  }
+
+];
+
+export const securityCryptoCodeComponents: CodeComponentDefinition[] = [
+  {
+    knowledgeId: "code.security.hashing",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "Password/data hashing",
+    implementation: "hash({algorithm}, {value});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['hash'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.hashing",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.hashing\\ninputs=['input']\\noutputs=['hash']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=hash({algorithm}, {value});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.hashing\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.hmac",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "HMAC",
+    implementation: "createHmac({algorithm}, {secret}).update({value}).digest();",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['signature'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.hmac",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.hmac\\ninputs=['input']\\noutputs=['signature']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=createHmac({algorithm}, {secret}).update({value}).digest();",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.hmac\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.encryption",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "Symmetric encryption",
+    implementation: "{cipher}.encrypt({plaintext}, {key});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['ciphertext'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.encryption",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.encryption\\ninputs=['input']\\noutputs=['ciphertext']\\nprerequisites=constructionProfile.constraints\\nimplementation_template={cipher}.encrypt({plaintext}, {key});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.encryption\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.decryption",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "Symmetric decryption",
+    implementation: "{cipher}.decrypt({ciphertext}, {key});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['plaintext'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.decryption",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.decryption\\ninputs=['input']\\noutputs=['plaintext']\\nprerequisites=constructionProfile.constraints\\nimplementation_template={cipher}.decrypt({ciphertext}, {key});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.decryption\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.secure-random",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "Secure random value",
+    implementation: "crypto.randomBytes({size});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['random bytes'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.secure-random",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.secure-random\\ninputs=['input']\\noutputs=['random bytes']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=crypto.randomBytes({size});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.secure-random\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.secret-boundary",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "Secret access boundary",
+    implementation: "const {secret} = getSecret({name});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['secret'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.secret-boundary",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.secret-boundary\\ninputs=['input']\\noutputs=['secret']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=const {secret} = getSecret({name});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.secret-boundary\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.input-sanitization",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "Input sanitization",
+    implementation: "const {safe} = sanitize({input});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['sanitized input'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.input-sanitization",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.input-sanitization\\ninputs=['input']\\noutputs=['sanitized input']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=const {safe} = sanitize({input});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.input-sanitization\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.xss-boundary",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "XSS-safe output boundary",
+    implementation: "const {safeHtml} = escapeHtml({input});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['safe output'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.xss-boundary",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.xss-boundary\\ninputs=['input']\\noutputs=['safe output']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=const {safeHtml} = escapeHtml({input});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.xss-boundary\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.csrf",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "CSRF protection",
+    implementation: "const {token} = createCsrfToken({session});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['token'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.csrf",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.csrf\\ninputs=['input']\\noutputs=['token']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=const {token} = createCsrfToken({session});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.csrf\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.ssrf",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "SSRF-safe URL validation",
+    implementation: "const {safeUrl} = validateOutboundUrl({url});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['safe URL'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.ssrf",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.ssrf\\ninputs=['input']\\noutputs=['safe URL']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=const {safeUrl} = validateOutboundUrl({url});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.ssrf\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.path-traversal",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "Safe filesystem path",
+    implementation: "const {safePath} = resolveSafePath({root}, {input});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['safe path'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.path-traversal",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.path-traversal\\ninputs=['input']\\noutputs=['safe path']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=const {safePath} = resolveSafePath({root}, {input});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.path-traversal\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.command-injection",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "Safe process invocation",
+    implementation: "execFile({command}, {args});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['process result'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.command-injection",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.command-injection\\ninputs=['input']\\noutputs=['process result']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=execFile({command}, {args});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.command-injection\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.sql-injection",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "SQL injection boundary",
+    implementation: "db.prepare({parameterizedSql});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['statement'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.sql-injection",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.sql-injection\\ninputs=['input']\\noutputs=['statement']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=db.prepare({parameterizedSql});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.sql-injection\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.authentication",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "Authentication boundary",
+    implementation: "const {identity} = authenticate({credentials});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['identity'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.authentication",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.authentication\\ninputs=['input']\\noutputs=['identity']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=const {identity} = authenticate({credentials});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.authentication\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    knowledgeId: "code.security.authorization",
+    componentType: 'CODE_CONSTRUCTION',
+    purpose: "Authorization boundary",
+    implementation: "authorize({identity}, {permission});",
+    targetPath: 'generated.ts',
+    inputs: ['input'],
+    outputs: ['boolean'],
+    prerequisites: ['Use the canonical API or architecture represented by this knowledge item.'],
+    dependencies: [],
+    supportedEnvironments: ['MIKI_RUNTIME', 'ANDROID'],
+    entryPoint: "CodeConstruction/code.security.authorization",
+    securityClass: 'READ_ONLY',
+    exports: [],
+    imports: [],
+    publicInterfaces: [],
+    tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.security.authorization\\ninputs=['input']\\noutputs=['boolean']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=authorize({identity}, {permission});",
+    validation: "VALIDATION_SPEC:\\nknowledge=code.security.authorization\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
+  },
+  {
+    "knowledgeId": "code.security-crypto.random-bytes",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "暗号学的乱数を生成する",
+    "implementation": "crypto.randomBytes({length})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.random-bytes",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.random-bytes",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.random-bytes"
+  },
+  {
+    "knowledgeId": "code.security-crypto.timing-safe-equal",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "タイミング差を抑えた比較を行う",
+    "implementation": "crypto.timingSafeEqual({left}, {right})",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression",
+      "expression"
+    ],
+    "outputs": [
+      "boolean-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.timing-safe-equal",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.timing-safe-equal",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.timing-safe-equal"
+  },
+  {
+    "knowledgeId": "code.security-crypto.hmac",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "HMAC値を生成する",
+    "implementation": "crypto.createHmac({algorithm}, {key}).update({data}).digest('hex')",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "string-expression",
+      "string-expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.hmac",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.hmac",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.hmac"
+  },
+  {
+    "knowledgeId": "code.security-crypto.safe-encoding",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "バイナリ値を安全なエンコーディングへ変換する",
+    "implementation": "{value}.toString('base64')",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.safe-encoding",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.safe-encoding",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.safe-encoding"
+  },
+  {
+    "knowledgeId": "code.security-crypto.hash",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "入力から不可逆ハッシュを生成する",
+    "implementation": "crypto.createHash({algorithm}).update({data}).digest('hex')",
+    "targetPath": "generated.ts",
+    "inputs": [
+      "string-expression"
+    ],
+    "outputs": [
+      "string-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.hash",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.hash",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.hash"
+  },
+  {
+    "knowledgeId": "code.security-crypto.random-uuid",
+    "componentType": "CODE_CONSTRUCTION",
+    "purpose": "衝突しにくい識別子を生成する",
+    "implementation": "crypto.randomUUID()",
+    "targetPath": "generated.ts",
+    "inputs": [],
+    "outputs": [
+      "string-expression"
+    ],
+    "prerequisites": [],
+    "dependencies": [],
+    "supportedEnvironments": [
+      "ANDROID",
+      "MIKI_RUNTIME"
+    ],
+    "entryPoint": "CodeConstruction/code.security-crypto.random-uuid",
+    "securityClass": "READ_ONLY",
+    "exports": [],
+    "imports": [],
+    "publicInterfaces": [],
+    "tests": "CONTRACT_TEST:code.security-crypto.random-uuid",
+    "validation": "VALIDATE_CODE_CONSTRUCTION:code.security-crypto.random-uuid"
+  }
+
+];

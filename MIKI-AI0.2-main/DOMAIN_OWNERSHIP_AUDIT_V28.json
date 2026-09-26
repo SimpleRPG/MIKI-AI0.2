@@ -1,0 +1,107 @@
+{
+  "passed": true,
+  "domainCount": 18,
+  "details": [
+    {
+      "domain": "core",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "autonomy",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "capability",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "conversation",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "data",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "execution",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "experience",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "improvement",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "learning",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "memory",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "promotion",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "research",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "safety",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "selfAwareness",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "selfDevelopment",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "strategy",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "unknown",
+      "dirExists": true,
+      "barrelExists": true
+    },
+    {
+      "domain": "verification",
+      "dirExists": true,
+      "barrelExists": true
+    }
+  ],
+  "legacyGateways": [
+    "api.ts",
+    "chapter69_90PlatformServices.ts",
+    "mikiApi.ts",
+    "simpleRpgApi.ts",
+    "storageService.ts",
+    "systemLogger.ts"
+  ],
+  "strayLegacyServices": [],
+  "duplicateReflectionEntries": 1,
+  "failures": []
+}

@@ -1,0 +1,585 @@
+// materials-core.js
+// 素材（木材・鉱石…）と中間素材の在庫・名称ヘルパー＋ITEM_META連携
+
+// =======================
+// 素材キーとティア上限
+// =======================
+
+// 通常採取で扱う素材のキー
+// game-core-4.js の target と一致させる前提: wood / ore / sand / cloth / leather / water
+window.MATERIAL_KEYS = window.MATERIAL_KEYS || [
+  "wood",
+  "ore",
+  "sand",
+  "cloth",
+  "leather",
+  "water"
+];
+
+// 将来的に T10 まで拡張する前提だが、
+// いまは既存仕様に合わせて T3 までにしておく。
+// T を増やすときは、ここを 10 に変更して、
+// T3 まで固定で回しているループを「MATERIAL_MAX_T まで」に変えればOK。
+window.MATERIAL_MAX_T = window.MATERIAL_MAX_T || 10;
+
+const MATERIAL_KEYS   = window.MATERIAL_KEYS;
+const MATERIAL_MAX_T  = window.MATERIAL_MAX_T;
+
+// =======================
+// 星屑の結晶などレア素材用専用在庫
+// =======================
+//
+// 一次素材配列（materials[key][tier-1]）とは別に、
+// parseMaterialId で扱えないレアID（例: "starShard"）を管理する。
+window.rareGatherItems = window.rareGatherItems || {};
+// { [itemId: string]: number }
+
+// =======================
+// 副産物素材専用在庫
+// =======================
+//
+// gather() の副産物ドロップで得られる Tier付き素材（resin/crystal/essence/thread/boneChip/sand）。
+// ID形式: "T<tier>_<baseId>"  例: "T3_resin"
+// parseTieredId で解析可能なので intermediate と同じ構造で管理する。
+window.byproductMats = window.byproductMats || {};
+// { [id: string]: number }  例: { "T3_resin": 5, "T1_crystal": 2 }
+
+// =======================
+// 在庫本体（一次素材）
+// =======================
+//
+// materials[key] = [T1個数, T2個数, T3個数, ...] という配列で管理。
+// index 0 → T1, index 1 → T2, ... index (tier-1) が T◯ に対応する。
+
+// 既に window.materials がオブジェクト形式で存在する場合（旧セーブ互換）
+//   { wood:{t1,t2,t3}, ... } から配列形式に移行する。
+// 何も無い場合は 0 で初期化。
+(function initMaterials() {
+  const prev = window.materials;
+
+  const newMaterials = {};
+
+  MATERIAL_KEYS.forEach(key => {
+    const arr = new Array(MATERIAL_MAX_T).fill(0);
+
+    // 旧形式があれば可能な範囲でマイグレーション
+    if (prev && prev[key]) {
+      const src = prev[key];
+      if (Array.isArray(src)) {
+        for (let i = 0; i < Math.min(src.length, MATERIAL_MAX_T); i++) {
+          arr[i] = src[i] || 0;
+        }
+      } else {
+        // 旧仕様の t1/t2/t3 を見る
+        if (typeof src.t1 === "number" && MATERIAL_MAX_T >= 1) arr[0] = src.t1;
+        if (typeof src.t2 === "number" && MATERIAL_MAX_T >= 2) arr[1] = src.t2;
+        if (typeof src.t3 === "number" && MATERIAL_MAX_T >= 3) arr[2] = src.t3;
+      }
+    }
+
+    // 草(herb)から砂(sand)へのマイグレーション（旧セーブデータ互換）
+    if (key === "sand" && prev && prev.herb && (!prev.sand || (Array.isArray(prev.sand) && prev.sand.every(v => v === 0)))) {
+      const src = prev.herb;
+      if (Array.isArray(src)) {
+        for (let i = 0; i < Math.min(src.length, MATERIAL_MAX_T); i++) {
+          arr[i] = src[i] || 0;
+        }
+      } else if (typeof src === "object") {
+        if (typeof src.t1 === "number") arr[0] = src.t1;
+        if (typeof src.t2 === "number") arr[1] = src.t2;
+        if (typeof src.t3 === "number") arr[2] = src.t3;
+      }
+    }
+
+    newMaterials[key] = arr;
+  });
+
+  // window.materials を新形式に置き換え
+  window.materials = newMaterials;
+})();
+
+// ★修正ポイント: ここでブロックスコープの const を定義すると、
+// 同じファイルが二重ロードされたときに
+// "Identifier 'materials' has already been declared" になる。
+// 仕様はそのままに、直接 window から参照する形に変更する。
+function getMaterialsRoot() {
+  return window.materials;
+}
+
+// =======================
+// 在庫操作ヘルパー（一次素材）
+// =======================
+
+// tier: 1〜MATERIAL_MAX_T
+function getMatTierCount(key, tier) {
+  const materials = getMaterialsRoot();
+  const m = materials && materials[key];
+  if (!m) return 0;
+  const idx = tier - 1;
+  if (idx < 0 || idx >= MATERIAL_MAX_T) return 0;
+  return m[idx] || 0;
+}
+
+// amount（±）を加算
+function addMatTierCount(key, tier, amount) {
+  amount = amount | 0;
+  if (!amount) return;
+
+  const materials = getMaterialsRoot();
+  const m = materials && materials[key];
+  if (!m) return;
+
+  const idx = tier - 1;
+  if (idx < 0 || idx >= MATERIAL_MAX_T) return;
+
+  const next = (m[idx] || 0) + amount;
+  m[idx] = Math.max(0, next);
+}
+
+// 素材キーごとの合計（全ティアの合計）を返す
+function getMatTotal(key) {
+  const materials = getMaterialsRoot();
+  const m = materials && materials[key];
+  if (!m) return 0;
+  return m.reduce((sum, v) => sum + (v || 0), 0);
+}
+
+// =======================
+// 表記・名前ヘルパー（一次素材）
+// =======================
+
+// ベース名（ティア抜きの名前）
+const MATERIAL_BASE_NAMES = {
+  wood:    "木材",
+  ore:     "鉱石",
+  sand:    "砂",
+  herb:    "薬草",
+  cloth:   "布",
+  leather: "皮",
+  water:   "水"
+};
+
+// 「T1木材」などの表記を作るヘルパー
+function formatMaterialName(key, tier) {
+  const base = MATERIAL_BASE_NAMES[key] || key;
+  return `T${tier}${base}`;
+}
+
+// 「木材」など、ティア抜きの名前が欲しい場合用
+function getMaterialBaseName(key) {
+  return MATERIAL_BASE_NAMES[key] || key;
+}
+
+// =======================
+// 旧コード互換用の薄いラッパ（一次素材）
+// =======================
+//
+// 既存の game-core-1.js には getMatTotal(key) が既にあるが、
+// そちらを削ってこちらの実装を使う形に揃える想定。
+// 他ファイルで t1/t2/t3 に直接アクセスしている箇所は、
+// 順次 addMatTierCount / getMatTierCount に差し替えていく。
+
+// 一応グローバルに露出しておく
+window.getMatTierCount     = window.getMatTierCount     || getMatTierCount;
+window.addMatTierCount     = window.addMatTierCount     || addMatTierCount;
+window.getMatTotal         = window.getMatTotal         || getMatTotal;
+window.formatMaterialName  = window.formatMaterialName  || formatMaterialName;
+window.getMaterialBaseName = window.getMaterialBaseName || getMaterialBaseName;
+
+// =======================
+// Tier付きIDユーティリティ（一次素材・中間素材共通）
+// =======================
+
+// "T1_wood" / "T2_woodPlank" など → { baseId, tier }
+function parseTieredId(id) {
+  if (typeof id !== "string") return null;
+  const match = id.match(/^T(\d+)_(.+)$/);
+  if (!match) return null;
+  const tier = parseInt(match[1], 10) || 0;
+  if (!tier) return null;
+  return {
+    baseId: match[2],
+    tier: tier
+  };
+}
+
+// 旧の parseMaterialId 互換（一次素材用）
+// IDパーサー: 'T1_wood' → { key: 'wood', tier: 1 }
+function parseMaterialId(id) {
+  const parsed = parseTieredId(id);
+  if (!parsed) return null;
+  return { key: parsed.baseId, tier: parsed.tier };
+}
+
+// グローバル露出
+window.parseTieredId   = window.parseTieredId   || parseTieredId;
+window.parseMaterialId = window.parseMaterialId || parseMaterialId;
+
+// =======================
+// ITEM_META連携ストレージ（一次素材）
+// =======================
+//
+// storageKind: "materials" 向けに、IDベースの薄いラッパを追加する。
+// 仕様:
+//   ID 形式: "T1_wood" のように、T<ティア>_<素材キー> を前提とする。
+//   既存の materials 構造・セーブデータ形式には一切手を入れない。
+//   例外として、RARE_GATHER_ITEM_ID のようなレア素材は
+//   T形式ではないので rareGatherItems で別管理する。
+
+if (typeof window.registerStorageImpl === "function") {
+  window.registerStorageImpl("materials", {
+    // ITEM_META 経由での在庫取得: getItemCountByMeta(id) などから呼ばれる想定
+    getCount(id) {
+      // 星屑の結晶など T形式でないレア素材を特別扱い
+      if (typeof RARE_GATHER_ITEM_ID === "string" && id === RARE_GATHER_ITEM_ID) {
+        const rare = window.rareGatherItems || {};
+        return rare[id] || 0;
+      }
+
+      const parsed = parseMaterialId(id);
+      if (!parsed || !parsed.key || !parsed.tier) return 0;
+      return getMatTierCount(parsed.key, parsed.tier);
+    },
+
+    // 在庫増加: addItemByMeta(id, amount)
+    add(id, amount) {
+      amount = amount | 0;
+      if (!amount) return;
+
+      // 星屑の結晶など T形式でないレア素材を特別扱い
+      if (typeof RARE_GATHER_ITEM_ID === "string" && id === RARE_GATHER_ITEM_ID) {
+        window.rareGatherItems = window.rareGatherItems || {};
+        const rare = window.rareGatherItems;
+        rare[id] = (rare[id] || 0) + amount;
+        if (rare[id] < 0) rare[id] = 0;
+        return;
+      }
+
+      const parsed = parseMaterialId(id);
+      if (!parsed || !parsed.key || !parsed.tier) return;
+      addMatTierCount(parsed.key, parsed.tier, amount);
+    },
+
+    // 在庫減少: removeItemByMeta(id, amount)
+    remove(id, amount) {
+      amount = amount | 0;
+      if (!amount) return;
+
+      // 星屑の結晶など T形式でないレア素材を特別扱い
+      if (typeof RARE_GATHER_ITEM_ID === "string" && id === RARE_GATHER_ITEM_ID) {
+        window.rareGatherItems = window.rareGatherItems || {};
+        const rare = window.rareGatherItems;
+        const cur  = rare[id] || 0;
+        const next = cur - amount;
+        rare[id]   = next > 0 ? next : 0;
+        return;
+      }
+
+      const parsed = parseMaterialId(id);
+      if (!parsed || !parsed.key || !parsed.tier) return;
+      // マイナス加算で対応（0未満にはならないのは addMatTierCount 側の仕様どおり）
+      addMatTierCount(parsed.key, parsed.tier, -amount);
+    }
+  });
+}
+
+// =======================
+// 中間素材ヘルパー（intermediateMats ベース）
+// =======================
+//
+// 在庫構造自体は従来どおり intermediateMats[id] を利用し、
+// Tier 付きID（T1_woodPlank など）から操作する薄いラッパを提供する。
+
+function getIntermediateTierCountById(id) {
+  if (!window.intermediateMats) return 0;
+  return window.intermediateMats[id] || 0;
+}
+
+function addIntermediateTierCountById(id, amount) {
+  amount = amount | 0;
+  if (!amount) return;
+  if (!window.intermediateMats) window.intermediateMats = {};
+  const cur = window.intermediateMats[id] || 0;
+  window.intermediateMats[id] = Math.max(0, cur + amount);
+}
+
+// baseId + tier で扱いたい場合用（例: "woodPlank", 1）
+function getIntermediateTierCount(baseId, tier) {
+  const id = `T${tier}_${baseId}`;
+  return getIntermediateTierCountById(id);
+}
+
+function addIntermediateTierCount(baseId, tier, amount) {
+  const id = `T${tier}_${baseId}`;
+  addIntermediateTierCountById(id, amount);
+}
+
+// グローバル露出
+window.getIntermediateTierCount     = window.getIntermediateTierCount     || getIntermediateTierCount;
+window.addIntermediateTierCount     = window.addIntermediateTierCount     || addIntermediateTierCount;
+window.getIntermediateTierCountById = window.getIntermediateTierCountById || getIntermediateTierCountById;
+window.addIntermediateTierCountById = window.addIntermediateTierCountById || addIntermediateTierCountById;
+
+// =======================
+// ITEM_META連携ストレージ（中間素材）
+// =======================
+//
+// storageKind: "intermediate" 向けに、intermediateMats を操作する実装。
+
+if (typeof window.registerStorageImpl === "function") {
+  window.registerStorageImpl("intermediate", {
+    getCount(id) {
+      return getIntermediateTierCountById(id);
+    },
+    add(id, amount) {
+      addIntermediateTierCountById(id, amount);
+    },
+    remove(id, amount) {
+      amount = amount | 0;
+      if (!amount) return;
+      addIntermediateTierCountById(id, -amount);
+    }
+  });
+}
+
+// =======================
+// ITEM_META連携ストレージ（副産物素材）
+// =======================
+//
+// storageKind: "byproduct" 向けに、byproductMats を操作する実装。
+// ID形式は "T3_resin" など parseTieredId 対応の Tier付きID。
+
+if (typeof window.registerStorageImpl === "function") {
+  window.registerStorageImpl("byproduct", {
+    getCount(id) {
+      return (window.byproductMats && window.byproductMats[id]) || 0;
+    },
+    add(id, amount) {
+      amount = amount | 0;
+      if (!amount) return;
+      window.byproductMats = window.byproductMats || {};
+      window.byproductMats[id] = Math.max(0, (window.byproductMats[id] || 0) + amount);
+    },
+    remove(id, amount) {
+      amount = amount | 0;
+      if (!amount) return;
+      window.byproductMats = window.byproductMats || {};
+      window.byproductMats[id] = Math.max(0, (window.byproductMats[id] || 0) - amount);
+    }
+  });
+}
+
+// =======================
+// ITEM_META連携ストレージ（料理素材）
+// =======================
+//
+// storageKind: "cooking" 向けに、cookingMats を操作する実装。
+// cook-data.js 側で window.cookingMats を初期化している前提。
+// 仕様:
+//   - 旧データ: cookingMats[id] = number
+//   - 新データ: cookingMats[id] = { total, quality: {0,1,2} }
+//   - getCount は常に total を返す。
+//   - add/remove は品質不明操作なので、増加は普通品質に寄せる。
+//     減少は 普通→銀→金 の順に削る簡易ルールにする。
+
+if (typeof window.registerStorageImpl === "function") {
+  window.registerStorageImpl("cooking", {
+    getCount(id) {
+      if (!window.cookingMats) return 0;
+      const entry = window.cookingMats[id];
+      if (!entry) return 0;
+      if (typeof entry === "number") return entry; // 旧形式互換
+      if (entry && typeof entry === "object" && typeof entry.total === "number") {
+        return entry.total;
+      }
+      return 0;
+    },
+    add(id, amount) {
+      amount = amount | 0;
+      if (!amount) return;
+
+      window.cookingMats = window.cookingMats || {};
+      const prev = window.cookingMats[id];
+
+      let entry;
+      if (prev && typeof prev === "object" && "total" in prev) {
+        entry = prev;
+        entry.quality = entry.quality || { 0: 0, 1: 0, 2: 0 };
+      } else {
+        const total = typeof prev === "number" ? prev : 0;
+        entry = {
+          total: total,
+          quality: { 0: 0, 1: 0, 2: 0 }
+        };
+      }
+
+      const before = entry.total || 0;
+      const after = Math.max(0, before + amount);
+      const diff = after - before;
+      entry.total = after;
+
+      // 品質内訳: ここからの増加分は普通品質に寄せる
+      if (diff > 0) {
+        entry.quality[0] = (entry.quality[0] || 0) + diff;
+      } else if (diff < 0) {
+        // 減る場合は普通→銀→金の順で削る
+        let remain = -diff;
+        const q = entry.quality;
+        const order = [0, 1, 2];
+        for (let i = 0; i < order.length && remain > 0; i++) {
+          const k = order[i];
+          const curQ = q[k] || 0;
+          if (curQ <= 0) continue;
+          const dec = Math.min(curQ, remain);
+          q[k] = curQ - dec;
+          remain -= dec;
+        }
+        entry.quality = q;
+      }
+
+      window.cookingMats[id] = entry;
+
+      // 互換ビュー cookingMatsQuality も更新
+      window.cookingMatsQuality = window.cookingMatsQuality || {};
+      const qEntry = window.cookingMatsQuality[id] || { 0: 0, 1: 0, 2: 0 };
+      qEntry[0] = entry.quality[0] || 0;
+      qEntry[1] = entry.quality[1] || 0;
+      qEntry[2] = entry.quality[2] || 0;
+      window.cookingMatsQuality[id] = qEntry;
+    },
+    remove(id, amount) {
+      amount = amount | 0;
+      if (!amount) return;
+
+      window.cookingMats = window.cookingMats || {};
+      const prev = window.cookingMats[id];
+
+      let entry;
+      if (prev && typeof prev === "object" && "total" in prev) {
+        entry = prev;
+        entry.quality = entry.quality || { 0: 0, 1: 0, 2: 0 };
+      } else {
+        const total = typeof prev === "number" ? prev : 0;
+        // 全部「普通品質」として初期化しておく
+        entry = {
+          total: total,
+          quality: { 0: total, 1: 0, 2: 0 }
+        };
+      }
+
+      const before = entry.total || 0;
+      const after = Math.max(0, before - amount);
+      const diff = before - after; // 実際に減った数
+      entry.total = after;
+
+      if (diff > 0) {
+        let remain = diff;
+        const q = entry.quality;
+        const order = [0, 1, 2];
+        for (let i = 0; i < order.length && remain > 0; i++) {
+          const k = order[i];
+          const curQ = q[k] || 0;
+          if (curQ <= 0) continue;
+          const dec = Math.min(curQ, remain);
+          q[k] = curQ - dec;
+          remain -= dec;
+        }
+        entry.quality = q;
+      }
+
+      window.cookingMats[id] = entry;
+
+      // 互換ビュー cookingMatsQuality も更新
+      window.cookingMatsQuality = window.cookingMatsQuality || {};
+      const qEntry = window.cookingMatsQuality[id] || { 0: 0, 1: 0, 2: 0 };
+      qEntry[0] = entry.quality[0] || 0;
+      qEntry[1] = entry.quality[1] || 0;
+      qEntry[2] = entry.quality[2] || 0;
+      window.cookingMatsQuality[id] = qEntry;
+    }
+  });
+}
+
+// =======================
+// 素材・中間素材の ITEM_META 登録
+// =======================
+
+(function () {
+  const defs = {};
+
+  // 通常素材の T1〜T◯（MATERIAL_MAX_T まで）
+  const baseKeys = ["wood", "ore", "sand", "herb", "cloth", "leather", "water"];
+
+  baseKeys.forEach(key => {
+    for (let tier = 1; tier <= MATERIAL_MAX_T; tier++) {
+      const id = `T${tier}_${key}`;
+      defs[id] = {
+        name: formatMaterialName(key, tier), // 例: T1木材, T1砂
+        category: "material",
+        storageKind: "materials",
+        tier: tier
+      };
+    }
+  });
+
+  // 中間素材（craft-item-data.js 側で定義されている想定）
+  // 例: { id: "T1_woodPlank", name: "T1板材", ... }
+  if (Array.isArray(window.INTERMEDIATE_MATERIALS)) {
+    window.INTERMEDIATE_MATERIALS.forEach(m => {
+      const id = m.id;
+      if (!id) return;
+      const parsed = parseTieredId(id);
+      const tier = parsed ? parsed.tier : null;
+
+      defs[id] = {
+        name: m.name || id,
+        category: "material",
+        storageKind: "intermediate",
+        tier: tier
+      };
+    });
+  }
+
+  // 星屑の結晶などレア素材（定数名は実装に合わせて）
+  if (typeof RARE_GATHER_ITEM_ID === "string") {
+    defs[RARE_GATHER_ITEM_ID] = {
+      name: "星屑の結晶",
+      category: "material",
+      // 一次素材扱いにしたいなら "materials"、中間扱いなら "intermediate" に変える
+      storageKind: "materials"
+    };
+  }
+
+  // 副産物素材（T1〜T10）
+  // gather() のドロップで得られる。storageKind: "byproduct" で管理。
+  const BYPRODUCT_DEFS = [
+    { baseId: "resin",    baseName: "樹脂",   sourceKey: "wood"    },
+    { baseId: "crystal",  baseName: "水晶",   sourceKey: "ore"     },
+    { baseId: "amber",    baseName: "琥珀",   sourceKey: "sand"    },
+    { baseId: "thread",   baseName: "金糸",   sourceKey: "cloth"   },
+    { baseId: "boneChip", baseName: "骨片",   sourceKey: "leather" },
+    { baseId: "streamStone", baseName: "清流石", sourceKey: "water" },
+    { baseId: "salt",     baseName: "海塩",   sourceKey: "water"   },
+    { baseId: "essence",  baseName: "精油",   sourceKey: "herb"    },
+    { baseId: "sand",     baseName: "砂",     sourceKey: "water"   }
+  ];
+  BYPRODUCT_DEFS.forEach(bp => {
+    for (let tier = 1; tier <= (window.MATERIAL_MAX_T || 10); tier++) {
+      const id = `T${tier}_${bp.baseId}`;
+      defs[id] = {
+        name: `T${tier}${bp.baseName}`,
+        category: "byproduct",
+        storageKind: "byproduct",
+        storageTab: "materials",
+        tier: tier,
+        tags: ["byproduct", bp.sourceKey]
+      };
+    }
+  });
+  window.BYPRODUCT_DEFS = BYPRODUCT_DEFS;
+
+  // ITEM_META に登録
+  if (typeof registerItemDefs === "function") {
+    registerItemDefs(defs);
+  }
+})();

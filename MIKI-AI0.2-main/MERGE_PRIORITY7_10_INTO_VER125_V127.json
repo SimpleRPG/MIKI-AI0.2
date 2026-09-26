@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "mergeVersion": "v127",
+  "base": "ビービー_Ver125_優先度11-12-13統合.txt",
+  "incoming": ["ビービー_優先度7_完了差分_v123.zip.txt", "ビービー_優先度10_差分_v121.zip.txt"],
+  "mergedPriorities": [7, 10],
+  "packageJsonPolicy": "PRESERVE_BASE_AND_ADD_MISSING_SCRIPTS",
+  "status": "MERGED_STATICALLY"
+}

@@ -1,0 +1,92 @@
+{
+  "version": "v266",
+  "base": "v265",
+  "stage": 61,
+  "implemented": [
+    "Production Scale Worker Loop",
+    "Durable Job claim, lease, heartbeat, retry, cancel awareness and stale resume",
+    "Candidate workspace materialization on host",
+    "workspaceId and candidateSha256 mandatory runtime endpoint",
+    "Candidate-specific cwd enforcement",
+    "realpath and relative-path boundary checks",
+    "fixed command allowlist",
+    "process group timeout kill",
+    "Node memory ceiling",
+    "hash-chained incremental evidence journal",
+    "PRODUCTION_SCALE_E2E SANDBOX proof producer",
+    "Coverage graph registry",
+    "TypeScript syntax/program graph index"
+  ],
+  "runtimeTruthBoundary": {
+    "enforced": [
+      "candidate cwd",
+      "realpath boundary",
+      "relative path boundary",
+      "command allowlist",
+      "timeout process-group kill on POSIX",
+      "Node heap ceiling",
+      "evidence hash chain"
+    ],
+    "declaredButNotKernelEnforced": [
+      "network policy",
+      "CPU quota",
+      "disk quota",
+      "process count quota"
+    ],
+    "notImplementedInThisHost": [
+      "cgroups",
+      "mount namespace",
+      "network namespace",
+      "mTLS remote agent",
+      "Galaxy device agent",
+      "actual mutation/property/browser/DB runner scripts"
+    ]
+  },
+  "checks": [
+    {
+      "command": "node scripts/verify_worker_runtime_stage61.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": 61,\n  \"checks\": 96,\n  \"workerLoop\": true,\n  \"workspaceCwd\": true,\n  \"evidenceJournal\": true,\n  \"proofProducer\": true,\n  \"networkNamespaceEnforced\": false\n}\n"
+    },
+    {
+      "command": "node scripts/verify_production_scale_pipeline_connection.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"checks\": 61,\n  \"position\": \"PRE_REVIEW_ZIP\",\n  \"manifestEvidence\": true,\n  \"postReviewCleanup\": true\n}\n"
+    },
+    {
+      "command": "node scripts/verify_production_scale_stages53_60.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stages\": [\n    53,\n    54,\n    55,\n    56,\n    57,\n    58,\n    59,\n    60\n  ],\n  \"checks\": 132,\n  \"stage52Preserved\": \"AUTONOMOUS_CAPABILITY_INNOVATION\"\n}\n"
+    },
+    {
+      "command": "node scripts/verify_autonomous_capability_innovation_stage52.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": 52,\n  \"checks\": 58,\n  \"discoverySources\": 4,\n  \"reviewBoundary\": \"REVIEW_ZIP\",\n  \"formalAdoption\": \"HUMAN_ONLY\"\n}\n"
+    },
+    {
+      "command": "node scripts/verify_runtime_depth_stage51.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stage\": 51,\n  \"checks\": 74,\n  \"proofTiers\": [\n    \"STATIC\",\n    \"SANDBOX\",\n    \"DEVICE\"\n  ],\n  \"runtimeEndpoint\": \"/api/self-code/runtime-proof\"\n}\n"
+    },
+    {
+      "command": "node scripts/verify_stages_41_50_connections.mjs",
+      "exitCode": 0,
+      "tail": "nifiedDevelopmentCompletionService.complete\",\n  \"preReviewPosition\": \"after feature acceptance, before evaluation package export\",\n  \"postReviewPosition\": \"after package export and save\",\n  \"reviewBlocking\": true,\n  \"ledgerAndLearning\": true,\n  \"checks\": 48\n}\n"
+    },
+    {
+      "command": "node scripts/verify_stages_41_50.mjs",
+      "exitCode": 0,
+      "tail": "\n  \"passed\": true,\n  \"stages\": [\n    41,\n    42,\n    43,\n    44,\n    45,\n    46,\n    47,\n    48,\n    49,\n    50\n  ],\n  \"extras\": [\n    \"ARCHITECTURE_FITNESS\",\n    \"ASSUMPTION_LEDGER\",\n    \"DEAD_CODE_CANDIDATE\",\n    \"PRIVACY_SECRET_FLOW\"\n  ],\n  \"checks\": 164\n}\n"
+    },
+    {
+      "command": "node scripts/verify_stages_35_40.mjs",
+      "exitCode": 0,
+      "tail": "{\n  \"passed\": true,\n  \"stages\": [\n    35,\n    36,\n    37,\n    38,\n    39,\n    40\n  ],\n  \"checks\": 126\n}\n"
+    },
+    {
+      "command": "node scripts/check_imports.mjs",
+      "exitCode": 0,
+      "tail": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 863, 総相対import数: 3076, 未解決エラー数: 0\n\n"
+    }
+  ]
+}

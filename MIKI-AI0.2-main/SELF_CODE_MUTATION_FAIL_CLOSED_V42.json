@@ -1,0 +1,13 @@
+{
+  "version": "v42",
+  "passed": false,
+  "checks": {
+    "stageEndpointBlocked": true,
+    "stageGuardBeforeWrite": false,
+    "rollbackEndpointBlocked": true,
+    "rollbackGuardBeforeWrite": false,
+    "bothRequireCoreIngress": true,
+    "noBrokenProposalVariable": true
+  },
+  "mode": "FAIL_CLOSED_UNTIL_DECISION_COMMAND_INTEGRATION"
+}

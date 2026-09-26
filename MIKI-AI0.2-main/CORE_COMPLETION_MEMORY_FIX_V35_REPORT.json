@@ -1,0 +1,38 @@
+{
+  "version": "v35",
+  "base": "MIKI-AI0.2-main_GitHubActions_core-orchestration-v34.zip.txt",
+  "changes": [
+    "completionJudgeServiceの初期状態をPARTIALへ変更",
+    "手動完了をtaskId/correlationId/artifactHash/verificationEvidenceId/verificationEnvironmentId必須へ変更",
+    "ChatPanelから証拠なし手動完了操作を撤去",
+    "仮想学習試験の固定trueを撤去しobservedEvidence必須へ変更",
+    "記憶SQLite/FTS同期を全削除・全再挿入からレコード差分更新へ変更",
+    "相対import全件監査を実施"
+  ],
+  "tests": [
+    {
+      "command": "node scripts/test_connection_completion_memory_v35.mjs",
+      "exitCode": 0,
+      "stdout": "PASS completion defaults fail-closed\nPASS manual completion requires artifact hash\nPASS manual completion requires verification evidence\nPASS manual completion requires correlation id\nPASS proofless UI completion removed\nPASS completion proof retained in result type\nPASS fixed same-problem pass removed\nPASS fixed cross-domain pass removed\nPASS fixed regression pass removed\nPASS virtual training requires observed evidence\nPASS virtual training id has no random\nPASS memory structured sync has no full-table memory delete\nPASS memory fts sync has no full-table delete\nPASS memory sync compares record payload\n",
+      "stderr": ""
+    },
+    {
+      "command": "node scripts/test_ui_event_core_integration_v34.mjs",
+      "exitCode": 0,
+      "stdout": "PASS UI_SELF_IMPROVEMENT_BYPASS_ZERO []\nPASS INGRESS_TO_WORKER\nPASS WORKER_TO_CORE_INGRESS\nPASS CORE_INGRESS_TO_ORCHESTRATOR\nPASS CORE_OWNS_BLACKBOARD\nPASS EXECUTION_EVENT_CORE_BRIDGE\nPASS CLAIM_EVENT_CORE_BRIDGE\nPASS SELF_IMPROVEMENT_EVENT_BRIDGE\n",
+      "stderr": ""
+    }
+  ],
+  "relativeImportMissing": [],
+  "tsc": {
+    "exitCode": 2,
+    "targetFileDiagnostics": {
+      "completionJudgeService.ts": 0,
+      "virtualTrainingService.ts": 0,
+      "types.ts": 0,
+      "storageService.ts": 2
+    },
+    "storageServiceDiagnosticsReason": "@capacitor/coreおよび@capacitor-community/sqliteの依存未導入。今回変更部分の構文診断は0件。",
+    "fullLog": "v35_tsc_after2.log"
+  }
+}

@@ -1,0 +1,39 @@
+Release: failure-resilience
+Version: v269
+Date: 2026-09-26
+Base: v268
+
+Implemented:
+- Semantic Intent Frame and four contract compiler
+- Semantic Change Graph, contradiction and counterexample generation
+- Enforcement level detection: KERNEL/PROCESS/APPLICATION/OBSERVATIONAL/NONE
+- Kernel-unavailable Application Enforcement, capability token and downgrade gate
+- Unified Failure Taxonomy with 16 classes and required metadata
+- Environment failure / candidate failure separation
+- Diagnostic-signature retry and no-progress gate
+- Failure Injection Suite with 34 cases
+- Child process environment allowlist and dedicated HOME/TMPDIR
+- Filesystem before/after audit, symlink and oversized-output rejection
+- stdout/stderr bounded retention and truncation evidence
+- Preflight state READY/WAITING_RESOURCE/BLOCKED
+- Review readiness and partial-success persistence/resume identity checks
+- Repair before/after quality comparison and regression rejection
+- Repair strategy success/regression history
+- Flaky test classification with seed, counts, duration distribution and environment fingerprint
+- Production Scale Worker failure taxonomy and cause-change retry integration
+
+Kernel Enforcement policy:
+- Kernel Enforcement is optional for low/medium bounded candidate analysis.
+- When unavailable, Application Enforcement claims only identity/hash/allowlist/review-gate guarantees.
+- Critical operations including canonical promotion, running-code modification, unknown binary, root operation, secret access and unbounded shell remain blocked without Kernel Enforcement.
+
+Verification:
+- Release structural/parse checks: 214 PASS
+- Stage 63 regression: 88 PASS
+- Relative import resolution: 878 files, 3094 imports, 0 unresolved
+- ZIP integrity and ZIP/ZIPTXT byte equality verified at delivery
+
+Truth boundary:
+- Full TypeScript build remains unavailable in this container because repository node_modules lacks runnable Vite.
+- Android Kotlin compile remains unavailable because Gradle distribution download requires external network.
+- Kernel controls such as cgroup, network namespace, seccomp and Landlock are not claimed.

@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 40,
+  "version": "v259",
+  "implementation": "STAGES_35_40_INTEGRATION",
+  "implemented": {
+    "35": [
+      "Semantic Frame revision persistence",
+      "post-validation semantic coverage enforcement",
+      "review-ready block",
+      "semantic repair directive",
+      "invariant stop"
+    ],
+    "36": [
+      "WAITING_USER lifecycle state",
+      "question persistence",
+      "answer/reanalysis",
+      "resume token",
+      "question-hash deduplication"
+    ],
+    "37": [
+      "target-limited evidence",
+      "call/import graph distance",
+      "runtime reproduction recipes",
+      "refutation scoring",
+      "irrelevant evidence exclusion"
+    ],
+    "38": [
+      "UI",
+      "STATE",
+      "API",
+      "PERFORMANCE",
+      "SECURITY",
+      "MIGRATION",
+      "MULTI_REPOSITORY transformations with parse/idempotency/rollback"
+    ],
+    "39": [
+      "Browser API adapter",
+      "benchmark",
+      "mock API",
+      "security sandbox",
+      "test DB roundtrip",
+      "multi-repository build API adapter"
+    ],
+    "40": [
+      "success",
+      "question",
+      "failure",
+      "repair",
+      "rollback",
+      "review gate proof paths"
+    ]
+  },
+  "verification": [
+    {
+      "command": "node scripts/verify_stages_35_40.mjs",
+      "exitCode": 0,
+      "stdoutTail": "{\n  \"passed\": true,\n  \"stages\": [\n    35,\n    36,\n    37,\n    38,\n    39,\n    40\n  ],\n  \"checks\": 126\n}\n"
+    },
+    {
+      "command": "node scripts/verify_semantic_understanding_v2_stage34.mjs",
+      "exitCode": 0,
+      "stdoutTail": "{\n  \"passed\": true,\n  \"stage\": \"SEMANTIC_UNDERSTANDING_V2\",\n  \"checks\": 58\n}\n"
+    },
+    {
+      "command": "node scripts/verify_workspace_repository_stage33.mjs",
+      "exitCode": 0,
+      "stdoutTail": "{\n  \"passed\": true,\n  \"stage\": \"WORKSPACE_MULTI_REPOSITORY\",\n  \"checks\": 44\n}\n"
+    },
+    {
+      "command": "node scripts/check_imports.mjs",
+      "exitCode": 0,
+      "stdoutTail": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 822, 総相対import数: 3011, 未解決エラー数: 0\n\n"
+    }
+  ],
+  "truthfulLimitations": [
+    "External runtime E2E was not completed in this container because formal npm dependencies are not installed; @capacitor/core is unavailable.",
+    "Repository-wide formal tsc=0 was not proven here because the TypeScript compiler package is not installed in this extracted environment.",
+    "Browser and multi-repository build adapters require their self-code API endpoints and actual environments.",
+    "Stage 40 structural proof is complete; production repository and device execution remain dynamic environment proofs."
+  ]
+}

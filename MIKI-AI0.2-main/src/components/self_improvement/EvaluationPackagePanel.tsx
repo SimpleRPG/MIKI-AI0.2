@@ -1,0 +1,4 @@
+import React,{useMemo,useState} from 'react';
+import { evaluationPackageStoreService } from '../../miki/selfDevelopment/services/evaluationPackageStoreService';
+import { evaluationPackageDownloadService } from '../../miki/selfDevelopment/services/evaluationPackageDownloadService';
+export default function EvaluationPackagePanel(){const [version,setVersion]=useState(0);const rows=useMemo(()=>evaluationPackageStoreService.list(),[version]);return <section><h3>評価Package</h3><button onClick={()=>setVersion(value=>value+1)}>再読込</button><ul>{rows.map(row=><li key={`${row.packageId}:${row.revision}`}><strong>{row.packageId}</strong> r{row.revision} SHA-256 {row.zipSha256}<button onClick={()=>evaluationPackageDownloadService.download(row.packageId,row.revision)}>ZIP・ZIPTXT・SHA取得</button></li>)}</ul></section>;}

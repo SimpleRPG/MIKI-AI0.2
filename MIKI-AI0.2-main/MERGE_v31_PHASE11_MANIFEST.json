@@ -1,0 +1,17 @@
+{
+  "base": "phase10 cumulative",
+  "phase": "phase11-18-domain-router-integration",
+  "findings": [
+    "existing connectors: executionEventBus, experienceRouter, executionLearningCoordinator, improvementRegressionCoordinator, remediationExecutionCoordinator, unknown coordinator, validation coordinator"
+  ],
+  "implemented": [
+    "core DomainRouter with envelope, depth limit, handlers and persisted history",
+    "all 18 domains registered with explicit entries",
+    "core invokes domain entries through registered handlers",
+    "existing execution, claim verification and self-improvement events bridged into core circulation",
+    "specialized commands for conversation, unknown, research, improvement/autonomy, memory and verification",
+    "App lifecycle integration",
+    "UI shows entry registration separately from observed circulation"
+  ],
+  "truth_boundary": "registration complete; business workflows are not claimed complete until domain-specific events occur"
+}

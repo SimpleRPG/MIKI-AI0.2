@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 19,
+  "implementation": "UI_CORE_REVIEW_LIFECYCLE_STAGE19",
+  "flow": [
+    "instruction UI",
+    "runAutonomousImplementation",
+    "unified plan/construction/wiring/completion",
+    "evaluation package",
+    "review decision",
+    "promotion or rejection or revised child request",
+    "new candidate and package"
+  ],
+  "dataStructureCapability": {
+    "availableParts": [
+      "repository understanding",
+      "AST symbol and type analysis",
+      "contract propagation",
+      "schema and persistence knowledge",
+      "migration-safe candidate workspace",
+      "validation evidence and review package"
+    ],
+    "expectedBehavior": "A request to improve data structure is classified as existing-symbol AST change or feature replan; related interfaces, payloads, stores, callsites, persistence and tests are traced and changed as one candidate."
+  },
+  "checks": [
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_unified_autonomous_completion_stage17.mjs",
+      "exit": 0
+    }
+  ],
+  "newImplementationDiagnostics": []
+}

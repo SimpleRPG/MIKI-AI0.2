@@ -1,0 +1,28 @@
+MIKI-AI0.2 V224 build repair verification
+
+Source base:
+MIKI-AI0.2_V224_BUILD_REPAIR_VERIFIED.zip
+
+Applied source repairs:
+- conversationComponentPipelineService.ts: removed impossible composed-ID type comparison.
+- multiIntentDecompositionService.ts: canonical SHA-256 deterministic signature.
+- knowledgeGapService.ts: KnowledgeGapResolutionPlan + phase advancement.
+- actionLineageService.ts: unified DomainReplyLedger facade.
+- claimEvidenceService.ts: Claim/Evidence verification facade.
+- runtimeConversationCompositionService.ts: concurrency inFlight guard and result declaration cleanup.
+- executionEnvironmentRouterService.ts: expanded Environment Drift fingerprint / requiresReplan.
+- researchStrategyService.ts: ResearchMeaningfulnessAssessment / assessMeaningfulness.
+- researchService.ts: resolution-plan phase transitions and NO_NEW_EVIDENCE boundary.
+- domainReplyLedgerService.ts: explicit backward-compatible actionLineage migration branch.
+- docs/MIKI_AI_18_DOMAIN_DESIGN_PHILOSOPHY.txt: Environment Drift P1 execution marker.
+- scripts/test_action_lineage_v176.mjs: restored missing V176 boundary test referenced by P123 gate.
+
+Static verification completed in the working environment:
+PASS - P123 5/6: 7 deterministic implementation checks.
+PASS - P123 6/6: 5 original V160/V223 boundary audits.
+
+Not rerun in this container:
+- npm ci / npm run lint / npm run build: the working container has no package registry access and the supplied ZIP does not include a usable node_modules tree.
+- P0 runtime E2E: the container cannot resolve the project's TypeScript ESM loader/import setup.
+
+These last environment-dependent checks were already observed passing in the user's Termux run before this source repair sequence (lint, production build, and P0 runtime E2E).

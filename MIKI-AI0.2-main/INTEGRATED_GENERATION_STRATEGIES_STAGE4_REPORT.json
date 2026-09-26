@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 4,
+  "implementation": "INTEGRATED_GENERATION_STRATEGIES_STAGE4",
+  "date": "2026-09-26",
+  "implemented": [
+    "single deterministic generation plan",
+    "AST to Component fallback",
+    "Component to Construction fallback",
+    "Capability Gap final boundary",
+    "shared deterministic plan and step IDs",
+    "AST failure evidence forwarded into existing non-LLM synthesis"
+  ],
+  "architecture": {
+    "candidateGeneratorRemainsCanonical": true,
+    "existingNonLlmSynthesisPreserved": true,
+    "codeKnowledgePreserved": true,
+    "codeComponentsPreserved": true,
+    "constructionGraphPreserved": true,
+    "newTopLevelOrchestrator": false,
+    "localLlmAdded": false,
+    "externalAiNormalPathAdded": false
+  },
+  "validation": {
+    "checks": [
+      {
+        "cmd": "node scripts/verify_integrated_generation_plan_stage4.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"INTEGRATED_GENERATION_PLAN\",\n  \"checks\": 14,\n  \"planId\": \"GENPLAN-441c4b9b76e3ed3bd0a20c6e\",\n  \"strategies\": [\n    \"AST_TRANSFORM\",\n    \"COMPONENT_REUSE\",\n    \"CONSTRUCTION_GRAPH\",\n    \"CAPABILITY_GAP\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_ast_candidate_transformation_stage3.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"DETERMINISTIC_AST_CANDIDATE_TRANSFORMATION\",\n  \"checks\": 12,\n  \"candidateSha256\": \"f9b01e57f21a13c10e97686f01e6ebc7659e3ae4c5daca45ac426e44c696c9e7\"\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_self_code_understanding_stage1.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"SELF_CODE_UNDERSTANDING_AND_REQUIREMENT_CONTRACT\",\n  \"checks\": 24\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/check_imports.mjs",
+        "exit": 0,
+        "stdout": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 693, 総相対import数: 2775, 未解決エラー数: 0\n\n",
+        "stderr": ""
+      }
+    ],
+    "fullTypeScriptExitCode": 2,
+    "fullTypeScriptDiagnosticLines": 218,
+    "newServiceDiagnostics": [],
+    "newCandidateIntegrationRegionDiagnostics": [],
+    "note": "Repository-wide TypeScript diagnostics pre-exist; new integrated planner and changed candidate integration region have zero diagnostics."
+  },
+  "changedFiles": [
+    "src/miki/selfDevelopment/services/integratedGenerationPlanService.ts",
+    "src/miki/core/services/candidateCodeGenerationService.ts",
+    "scripts/verify_integrated_generation_plan_stage4.mjs",
+    "package.json",
+    "MIKI-AI0.2_統合設計書_正本.txt"
+  ]
+}

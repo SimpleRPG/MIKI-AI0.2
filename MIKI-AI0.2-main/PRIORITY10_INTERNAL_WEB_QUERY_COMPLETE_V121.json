@@ -1,0 +1,68 @@
+{
+  "version": "v121",
+  "targetPriority": 10,
+  "completionScope": "Priority 10 internal Fixture/Mock cycle through evidence, claims, terms, knowledge component, query outcome, coverage and revision pair",
+  "status": "COMPLETE_INTERNAL_FIXTURE_MOCK",
+  "externalBuildAndDeviceScope": "Priority 15, not claimed",
+  "features": [
+    "APK fetchRenderedPage structured contract fields synchronized",
+    "HTML main/navigation/advertisement/menu/footer separation",
+    "Markdown, CSS selector, XPath and multiple page processing",
+    "Evidence, Claim, learned terms and Knowledge Component generation",
+    "Query Outcome, Coverage and Revision Pair generation",
+    "Galaxy S25, Android, Termux, PC, Windows environment distinction"
+  ],
+  "changedFiles": [
+    {
+      "path": "package.json",
+      "sha256": "a191ae7f3eea4ea21dc87c6bc5246336e56bf9e2c3928fb026de920e88fd6a67"
+    },
+    {
+      "path": "src/miki/execution/services/nativeWorkManagerService.ts",
+      "sha256": "1b3d937ab9c291d666fc1fe68dee0c8a830227f1f7926d2e01bcce7f9eaf0d83"
+    },
+    {
+      "path": "src/miki/research.ts",
+      "sha256": "07dc32d8b1b303881815094fceeb203301af7b0e5662c8ffe6ce3d6a08a7c38e"
+    },
+    {
+      "path": "src/miki/research/index.ts",
+      "sha256": "881baae31593df261e26f90afdeae591456e5cc6f3c5a79ebd079277c9bc8299"
+    },
+    {
+      "path": "src/miki/research/services/internalWebQueryLearningCycleService.ts",
+      "sha256": "435ebc81e28b5a34203811c2dd4e1e2cb4c960f4a7033fe7f53fe8a184f011a0"
+    },
+    {
+      "path": "scripts/test_priority10_internal_web_query_cycle_v121.mjs",
+      "sha256": "d864079f4ba588dbb9e4726fbc3d99ad5a0bcc92b9c52988e9d24f2abbf487de"
+    },
+    {
+      "path": "scripts/test_priority10_fixture_runtime_v121.mjs",
+      "sha256": "0927dc76ef8ea41969b0752f261ee30abaacc1bc97615fca385e2d7e41303dff"
+    }
+  ],
+  "tests": [
+    {
+      "command": "node --experimental-strip-types scripts/test_priority10_fixture_runtime_v121.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/test_priority10_internal_web_query_cycle_v121.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/test_query_outcome_learning_v79.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/test_query_pattern_reuse_v81.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/check_imports.mjs",
+      "exitCode": 0
+    }
+  ],
+  "generatedAt": "2026-09-18T16:31:00+09:00"
+}

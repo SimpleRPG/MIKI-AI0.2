@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 25,
+  "implementation": "AUTONOMOUS_PIPELINE_INTEGRATION_AUDIT_STAGE25B",
+  "corrections": [
+    "generic requests fall through to original autonomous code improvement pipeline",
+    "specialized requests use specialized dispatcher inside transaction coordinator",
+    "duplicate specialized dispatch removed",
+    "manifest-only generic candidate removed",
+    "generated components remain ANALYZED until runtime execution evidence exists",
+    "architecture audit detects duplicate service filenames and UI bypasses"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_architecture_integration_stage25.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_deterministic_semantics_components_stage24.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_natural_language_unified_entry_stage23.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_specialized_pipeline_stage22.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    }
+  ],
+  "newImplementationDiagnostics": [],
+  "repositoryTscExit": 2,
+  "repositoryDiagnosticLines": 220,
+  "remaining": [
+    "runtime execution evidence runner for generated components",
+    "semantic transaction evidence merge into final Review package",
+    "repository-wide pre-existing TypeScript diagnostics"
+  ]
+}

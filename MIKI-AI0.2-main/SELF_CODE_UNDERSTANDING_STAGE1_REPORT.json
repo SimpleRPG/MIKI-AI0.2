@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "implementation": "SELF_CODE_UNDERSTANDING_STAGE1",
+  "date": "2026-09-26",
+  "architecture": {
+    "coreAuthorityPreserved": true,
+    "newOrchestrator": false,
+    "newBlackboard": false,
+    "newResultDb": false,
+    "localLlmAdded": false,
+    "externalAiNormalPathAdded": false
+  },
+  "duplicateAudit": [
+    {
+      "existing": "src/miki/core/services/selfCodeUnderstandingService.ts",
+      "decision": "EXPANDED_CANONICAL"
+    },
+    {
+      "existing": "src/autonomous_modules/chapter_31_collocation_ast_refactor.ts",
+      "decision": "NOT_REUSED_AS_AUTHORITY",
+      "reason": "legacy autonomous module"
+    },
+    {
+      "existing": "src/components/chat/DependencyGraphModal.tsx",
+      "decision": "NOT_DUPLICATED",
+      "reason": "UI visualization only"
+    },
+    {
+      "existing": "src/miki/core/data/codeKnowledge/*",
+      "decision": "NOT_DUPLICATED",
+      "reason": "verified construction knowledge, not repository index"
+    }
+  ],
+  "implemented": [
+    "TypeScript AST parsing",
+    "symbol index",
+    "call relations",
+    "extends and implements relations",
+    "command contracts",
+    "event publish and subscribe contracts",
+    "storage read and write contracts",
+    "contract-based related-file expansion",
+    "incremental content-hash reuse",
+    "schema v2 migration boundary",
+    "parse-diagnostic fail closed"
+  ],
+  "validation": {
+    "fixtureChecks": 16,
+    "fixturePassed": true,
+    "targetTypeScriptDiagnostics": 0,
+    "fullTypeScriptExitCode": 2,
+    "fullTypeScriptDiagnosticLines": 220,
+    "fullTypeScriptNote": "existing repository diagnostics and unavailable staged dependencies remain; changed target has zero diagnostics",
+    "importCheckExitCode": 0
+  },
+  "changedFiles": [
+    {
+      "path": "src/miki/core/services/selfCodeUnderstandingService.ts",
+      "status": "MODIFIED",
+      "sha256": "0b94615cf9330498c4261e5a42c287faed64ccb5b792f3a96a6abe855eb706f4",
+      "bytes": 16630
+    },
+    {
+      "path": "scripts/verify_self_code_understanding_stage1.mjs",
+      "status": "ADDED",
+      "sha256": "01a4ee1814aa97019215d0c6401ccc13e487038bc54f9537cfdd0fa8169189ad",
+      "bytes": 2390
+    },
+    {
+      "path": "package.json",
+      "status": "MODIFIED",
+      "sha256": "286e628e7b6f6204034403d2e6881bd7341d8c3b67555c948eac02e9980d84e1",
+      "bytes": 2246
+    },
+    {
+      "path": "MIKI-AI0.2_統合設計書_正本.txt",
+      "status": "MODIFIED",
+      "sha256": "89d46dff9e1c8ae0738433dbb9e673cbd01aebaaa0999a2d29521079dbe41cf0",
+      "bytes": 275395
+    }
+  ]
+}

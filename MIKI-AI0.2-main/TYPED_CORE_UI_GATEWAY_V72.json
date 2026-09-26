@@ -1,0 +1,30 @@
+{
+  "version": "v72",
+  "source": "MIKI-AI0.2-main_ui-shell-v69.zip.txt",
+  "dedicatedTestExitCode": 0,
+  "implemented": [
+    "P0-REVISION-06 Typed Core UI Gateway foundation",
+    "P0-V69-UI-03 primary screens gateway migration",
+    "P0-V69-UI-05 Gemini multi-key panel foundation",
+    "P0-FATAL-04 Workspace path boundary policy",
+    "P0-FATAL-05 Workspace execution broker authorization"
+  ],
+  "notCompleted": [
+    "P0-FATAL-01 backend authentication/CORS hardening",
+    "P0-FATAL-02 Android Keystore physical adapter",
+    "P0-FATAL-08 lockfile and full build",
+    "P0-V69-UI-02 App.tsx service extraction",
+    "P0-V69-UI-08 complete UI refresh",
+    "Galaxy S25 runtime E2E"
+  ],
+  "legacyUiFilesWithSelectedDirectImports": 5,
+  "legacyExamples": [
+    "src/App.tsx",
+    "src/components/GitHubHub.tsx",
+    "src/components/MemoryModal.tsx",
+    "src/components/self_improvement/ExperienceRouterTab.tsx",
+    "src/components/self_improvement/UltraSelfEvolverSubView.tsx"
+  ],
+  "fullTypeScriptBuild": "NOT_RUN_DEPENDENCIES_UNRESOLVED",
+  "runtimeE2E": "NOT_RUN"
+}

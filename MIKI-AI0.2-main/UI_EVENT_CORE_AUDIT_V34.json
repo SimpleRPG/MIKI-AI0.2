@@ -1,0 +1,28 @@
+{
+  "version": "v34",
+  "base": "v33",
+  "ui_files_scanned": 69,
+  "ui_service_imports_observed": 253,
+  "direct_ui_self_improvement_runOnce": [],
+  "changed_files": [
+    "src/App.tsx",
+    "src/components/chat/AutonomousSelfImprovementModal.tsx",
+    "src/components/self_improvement/AutonomousImprovementSettingsPanel.tsx",
+    "src/components/self_improvement/EvidenceBasedLoopSubView.tsx",
+    "src/components/self_improvement/NonLlmArchitectureTab.tsx",
+    "src/components/self_improvement/SelfCodeArchitectTab.tsx"
+  ],
+  "exact_duplicate_ts_tsx_pairs": [],
+  "verified_connections": [
+    "UI self-improvement -> selfImprovementIngressService",
+    "selfImprovementIngressService -> autonomousSelfImprovementLoopService",
+    "worker -> coreTaskIngressService",
+    "coreTaskIngressService -> coreOrchestratorService",
+    "execution/claim/self-improvement event bridges present in domain bootstrap"
+  ],
+  "not_claimed": [
+    "all 248 UI service imports converted to core ingress",
+    "all domain write APIs dynamically executed",
+    "Vite/APK/device execution"
+  ]
+}

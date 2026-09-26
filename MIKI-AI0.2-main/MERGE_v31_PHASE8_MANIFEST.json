@@ -1,0 +1,18 @@
+{
+  "base": "phase7 cumulative",
+  "phase": "phase8-canonical-self-improvement-wiring",
+  "implemented": [
+    "Canonical controller wrapped by execution coordinator",
+    "Operational guard and persistent flush connected",
+    "memory-only cannot complete",
+    "Autopilot timer emits request event instead of direct evolution",
+    "self-improvement request event subscribed by canonical controller"
+  ],
+  "deferred": [
+    "Direct manual UI runFullAutonomousCycle callsites",
+    "Unified validation bundle enforcement",
+    "remaining Math.random IDs",
+    "secure secret storage",
+    "full local-LLM compatibility removal"
+  ]
+}

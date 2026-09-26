@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 16,
+  "implementation": "UNIFIED_INSTRUCTION_DEVELOPMENT_STAGE16",
+  "entrypoint": "mikiSelfCodingSuperchargerService.runAutonomousImplementation",
+  "instructionSources": [
+    "NATURAL_LANGUAGE",
+    "WORK_INSTRUCTION"
+  ],
+  "singlePipeline": [
+    "autonomousFeatureDevelopmentPlanService",
+    "autonomousFeatureConstructionExecutorService",
+    "autonomousFeatureWiringPipelineService",
+    "existing autonomous-implement API"
+  ],
+  "newImplementationDiagnostics": [],
+  "repositoryDiagnostics": 220
+}

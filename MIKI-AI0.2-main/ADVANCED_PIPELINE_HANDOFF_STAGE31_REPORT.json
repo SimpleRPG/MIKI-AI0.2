@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 31,
+  "implementation": "ADVANCED_PIPELINE_HANDOFF_STAGE31",
+  "correction": "Advanced and common specialized planners no longer terminate lifecycle with a planning-only workspace. requiresOriginalPipeline now carries deterministic preflight evidence into the original autonomous implementation pipeline.",
+  "handoffFields": [
+    "TRANSACTION_ID",
+    "DOMAIN",
+    "PREFLIGHT_WORKSPACE_ID",
+    "TARGET_PATHS",
+    "ACCEPTANCE_GATES",
+    "CANDIDATE_OPERATIONS",
+    "BLOCKED_REASONS"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_advanced_handoff_stage31.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_advanced_depth_stage30.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_workspace_completion_stage29.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    }
+  ]
+}

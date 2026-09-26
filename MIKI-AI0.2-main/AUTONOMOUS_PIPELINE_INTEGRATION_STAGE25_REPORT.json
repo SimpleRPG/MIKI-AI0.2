@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 25,
+  "implementation": "AUTONOMOUS_PIPELINE_INTEGRATION_AUDIT_STAGE25",
+  "corrections": [
+    "generic requests now fall through to original autonomous code improvement pipeline",
+    "specialized requests still use specialized executor through transaction coordinator",
+    "removed duplicate specialized dispatch in lifecycle",
+    "generated components cannot become VERIFIED without execution evidence",
+    "removed manifest-only generic candidate that bypassed actual implementation",
+    "added architecture duplicate and bypass audit"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_architecture_integration_stage25.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_deterministic_semantics_components_stage24.mjs",
+      "exit": 1
+    },
+    {
+      "cmd": "node scripts/verify_natural_language_unified_entry_stage23.mjs",
+      "exit": 1
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    }
+  ],
+  "newImplementationDiagnostics": [],
+  "repositoryTscExit": 2,
+  "repositoryDiagnosticLines": 220,
+  "remaining": [
+    "runtime execution evidence runner for generated atomic components",
+    "merge semantic transaction manifest into final original-pipeline review package",
+    "repository-wide existing TypeScript diagnostics"
+  ]
+}

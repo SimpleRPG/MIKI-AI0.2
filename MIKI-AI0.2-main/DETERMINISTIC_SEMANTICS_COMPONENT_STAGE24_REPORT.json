@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 24,
+  "implementation": "DETERMINISTIC_SEMANTICS_COMPONENT_SYNTHESIS_STAGE24",
+  "llmUsed": false,
+  "implemented": [
+    "problem goal target constraint decomposition",
+    "concept ontology connected to repository vocabulary",
+    "repository grounded hypothesis scoring",
+    "missing capability contract synthesis",
+    "verified atomic template composition",
+    "generated component static verification and registry registration",
+    "resume token persistence",
+    "multi-intent candidate transaction coordinator",
+    "code knowledge pack extension",
+    "lifecycle integration"
+  ],
+  "checks": [
+    {
+      "cmd": "node scripts/verify_deterministic_semantics_components_stage24.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_natural_language_unified_entry_stage23.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify_specialized_pipeline_stage22.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/check_imports.mjs",
+      "exit": 0
+    }
+  ],
+  "newImplementationDiagnostics": [],
+  "repositoryTscExit": 2,
+  "repositoryDiagnosticLines": 220
+}

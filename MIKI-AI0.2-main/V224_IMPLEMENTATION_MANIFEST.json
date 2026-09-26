@@ -1,0 +1,38 @@
+{
+  "version": "V224",
+  "base": "MIKI-AI0.2 commit 4d114ab / previous P0 implementation",
+  "architecture_constraints": [
+    "no local LLM",
+    "no 19th classification",
+    "no second CORE",
+    "no second Blackboard",
+    "no second persistent DB for new features",
+    "no second Orchestrator"
+  ],
+  "included_previous_p0": [
+    "scripts/run_p0_gate.sh",
+    "scripts/test_p0_runtime_e2e.ts"
+  ],
+  "v224_implementation": [
+    "src/miki/unknown/services/multiIntentDecompositionService.ts",
+    "src/miki/core/services/coreTaskIngressService.ts",
+    "src/miki/unknown/services/knowledgeGapService.ts",
+    "src/miki/improvement/services/selfImprovementControllerService.ts",
+    "src/miki/conversation/services/runtimeConversationCompositionService.ts",
+    "src/miki/core/services/executionEnvironmentRouterService.ts",
+    "src/miki/research/services/researchStrategyService.ts",
+    "src/miki/research/services/researchService.ts",
+    "src/miki/core/services/actionLineageService.ts",
+    "src/miki/research/services/claimEvidenceService.ts"
+  ],
+  "checks": [
+    "test_multi_intent_decomposition_v224.mjs",
+    "test_knowledge_gap_resolution_plan_v224.mjs",
+    "test_action_lineage_service_v224.mjs",
+    "test_claim_evidence_service_v224.mjs",
+    "test_runtime_conversation_composition_v224.mjs",
+    "test_environment_drift_v224.mjs",
+    "test_research_meaningfulness_v224.mjs"
+  ],
+  "build_verification": "npm ci timed out in the working environment; static V224 checks passed"
+}

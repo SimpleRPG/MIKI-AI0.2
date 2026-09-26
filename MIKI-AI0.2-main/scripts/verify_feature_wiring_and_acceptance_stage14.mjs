@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import ts from 'typescript';
+const files=['src/miki/selfDevelopment/services/featureArtifactWiringService.ts','src/miki/selfDevelopment/services/featureCandidateAnalysisService.ts','src/miki/selfDevelopment/services/autonomousFeatureWiringPipelineService.ts','src/miki/selfDevelopment/services/featureAcceptanceEvidenceGateService.ts','src/miki/core/services/candidateValidationRunnerService.ts'];
+for(const file of files){const source=fs.readFileSync(file,'utf8');const parsed=ts.createSourceFile(file,source,ts.ScriptTarget.ES2022,true,file.endsWith('.tsx')?ts.ScriptKind.TSX:ts.ScriptKind.TS);if(((parsed).parseDiagnostics||[]).length)throw new Error(`PARSE_FAILED:${file}`);const out=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,jsx:ts.JsxEmit.ReactJSX},reportDiagnostics:true});if((out.diagnostics||[]).length)throw new Error(`TRANSPILE_FAILED:${file}`);}
+const wiring=fs.readFileSync(files[0],'utf8');for(const text of ['storageService','CORE_COMMAND','REACT_TREE','testBody','dependencyArtifactIds'])if(!wiring.includes(text))throw new Error(`WIRING_MISSING:${text}`);
+const analysis=fs.readFileSync(files[1],'utf8');for(const text of ['ts.createProgram','getPreEmitDiagnostics','cycles','imports'])if(!analysis.includes(text))throw new Error(`ANALYSIS_MISSING:${text}`);
+const gate=fs.readFileSync(files[3],'utf8');for(const text of ['ACCEPTANCE_EVIDENCE_MISSING','ACCEPTANCE_CRITERION_FAILED','reviewCandidateExportService.create'])if(!gate.includes(text))throw new Error(`GATE_MISSING:${text}`);
+const runner=fs.readFileSync(files[4],'utf8');for(const text of ['testCommands','acceptanceCriterionIds'])if(!runner.includes(text))throw new Error(`VALIDATION_REGISTRATION_MISSING:${text}`);
+const server=fs.readFileSync('server.ts','utf8');for(const text of ['testCommands','acceptanceCriterionIds'])if(!server.includes(text))throw new Error(`SERVER_REGISTRATION_MISSING:${text}`);
+const design=fs.readFileSync('MIKI-AI0.2_統合設計書_正本.txt','utf8');if((design.match(/【169\. 現行正本/g)||[]).length!==1)throw new Error('CANONICAL_DESIGN_DUPLICATED');
+console.log(JSON.stringify({passed:true,stage:'FEATURE_WIRING_AND_ACCEPTANCE',checks:24,files},null,2));

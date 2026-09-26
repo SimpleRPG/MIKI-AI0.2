@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 6,
+  "implementation": "END_TO_END_CONTRACT_PROPAGATION_STAGE6",
+  "date": "2026-09-26",
+  "implemented": [
+    "consumer parameter propagation",
+    "validation guard propagation",
+    "fail-closed guard AST operation",
+    "strict natural-language extraction for consumer and validator",
+    "consolidated design authority chapter 169",
+    "historical chapters marked as implementation history"
+  ],
+  "architecture": {
+    "existingRepositoryIndexReused": true,
+    "existingSpecCompilerReused": true,
+    "existingAstTransformerExtended": true,
+    "existingContractPropagationExtended": true,
+    "existingCandidateGeneratorReused": true,
+    "newTopLevelOrchestrator": false,
+    "duplicateDesignAuthority": false,
+    "localLlmAdded": false,
+    "externalAiNormalPathAdded": false
+  },
+  "validation": {
+    "checks": [
+      {
+        "cmd": "node scripts/verify_contract_propagation_stage5.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"MULTI_FILE_CONTRACT_PROPAGATION\",\n  \"checks\": 16,\n  \"propagationId\": \"PROP-cfe68becaa3debcb7d3ebf63\",\n  \"files\": [\n    \"src/consumer.ts\",\n    \"src/generator.ts\",\n    \"src/result.ts\",\n    \"src/validator.ts\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_ast_candidate_transformation_stage3.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"DETERMINISTIC_AST_CANDIDATE_TRANSFORMATION\",\n  \"checks\": 14,\n  \"candidateSha256\": \"78dd596af4c62b3859e26f8bbd760e395623488d2b09bddc05069cf84bd6b2b7\"\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_integrated_generation_plan_stage4.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"INTEGRATED_GENERATION_PLAN\",\n  \"checks\": 14,\n  \"planId\": \"GENPLAN-441c4b9b76e3ed3bd0a20c6e\",\n  \"strategies\": [\n    \"AST_TRANSFORM\",\n    \"COMPONENT_REUSE\",\n    \"CONSTRUCTION_GRAPH\",\n    \"CAPABILITY_GAP\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/verify_self_code_understanding_stage1.mjs",
+        "exit": 0,
+        "stdout": "{\n  \"passed\": true,\n  \"stage\": \"SELF_CODE_UNDERSTANDING_AND_REQUIREMENT_CONTRACT\",\n  \"checks\": 24\n}\n",
+        "stderr": ""
+      },
+      {
+        "cmd": "node scripts/check_imports.mjs",
+        "exit": 0,
+        "stdout": "🔍 [check:imports] 全相対importの解決機械検査を開始します...\n\n✅ PASS: 全ての相対importが正常に解決されました！\n総検査ファイル数: 695, 総相対import数: 2779, 未解決エラー数: 0\n\n",
+        "stderr": ""
+      }
+    ],
+    "fullTypeScriptExitCode": 2,
+    "fullTypeScriptDiagnosticLines": 218,
+    "newImplementationDiagnostics": [],
+    "candidateParserRegionDiagnostics": [],
+    "note": "Repository-wide TypeScript diagnostics pre-exist; stage-6 implementation regions have zero diagnostics."
+  },
+  "changedFiles": [
+    "src/miki/selfDevelopment/services/astCandidateTransformationService.ts",
+    "src/miki/selfDevelopment/services/contractPropagationService.ts",
+    "src/miki/selfDevelopment/services/specContractCompilerService.ts",
+    "src/miki/core/services/candidateCodeGenerationService.ts",
+    "scripts/verify_contract_propagation_stage5.mjs",
+    "scripts/verify_ast_candidate_transformation_stage3.mjs",
+    "package.json",
+    "MIKI-AI0.2_統合設計書_正本.txt"
+  ]
+}

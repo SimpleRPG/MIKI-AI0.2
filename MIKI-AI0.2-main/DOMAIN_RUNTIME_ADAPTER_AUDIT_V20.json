@@ -1,0 +1,63 @@
+{
+  "version": "v20",
+  "passed": true,
+  "checks": {
+    "firstSixReal": true,
+    "remainingMarkedContractOnly": true,
+    "stageExecutesAdapter": true,
+    "workflowExported": true,
+    "adapterExported": true
+  },
+  "realRuntimeAdapters": [
+    {
+      "order": 1,
+      "domain": "core",
+      "operation": "taskBlackboardService.get",
+      "implemented": true
+    },
+    {
+      "order": 2,
+      "domain": "autonomy",
+      "operation": "capabilitySloService.evaluate",
+      "implemented": true
+    },
+    {
+      "order": 3,
+      "domain": "capability",
+      "operation": "capabilityGapService.getAllGaps/getAllProfiles",
+      "implemented": true
+    },
+    {
+      "order": 4,
+      "domain": "conversation",
+      "operation": "defaultConversationState/formatConversationStateForPrompt",
+      "implemented": true
+    },
+    {
+      "order": 5,
+      "domain": "data",
+      "operation": "deterministicModelCatalog manifest",
+      "implemented": true
+    },
+    {
+      "order": 6,
+      "domain": "execution",
+      "operation": "executionRunnerService.listRequests",
+      "implemented": true
+    }
+  ],
+  "remainingDomains": [
+    "experience",
+    "improvement",
+    "learning",
+    "memory",
+    "promotion",
+    "research",
+    "safety",
+    "selfAwareness",
+    "selfDevelopment",
+    "strategy",
+    "unknown",
+    "verification"
+  ]
+}
