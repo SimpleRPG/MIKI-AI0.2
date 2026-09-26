@@ -2258,16 +2258,16 @@ class AdaptiveRoutePlannerService {
      * 同じTaskの次cycleでResearchを再選択する。これは固定チェーンではなく、
      * Evidence/Verificationの状態に応じた再評価である。
      */
-    const latestResearch=this.latestBusinessResult(task,'RUN_RESEARCH');
-    const latestResearchValue=latestResearch?objectValue(latestResearch):undefined;
-    const latestResearchReply=latestResearchValue?.reply &&
-      typeof latestResearchValue.reply==='object'
-      ? latestResearchValue.reply as Record<string,unknown>
+    const latestResearchBusiness=this.latestBusinessResult(task,'RUN_RESEARCH');
+    const latestResearchBusinessValue=latestResearchBusiness?objectValue(latestResearchBusiness):undefined;
+    const latestResearchReply=latestResearchBusinessValue?.reply &&
+      typeof latestResearchBusinessValue.reply==='object'
+      ? latestResearchBusinessValue.reply as Record<string,unknown>
       : undefined;
     const latestResearchData=(
       latestResearchReply?.data ||
       latestResearchReply?.result ||
-      latestResearchValue
+      latestResearchBusinessValue
     ) as Record<string,unknown>|undefined;
     const researchClaimIds=Array.isArray(latestResearchData?.claimIds)
       ? latestResearchData.claimIds.map(String).filter(Boolean)
