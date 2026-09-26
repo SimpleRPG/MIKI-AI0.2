@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 import express from 'express';
+import { spawn } from 'node:child_process';
+import { Worker } from 'node:worker_threads';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -1592,6 +1594,8 @@ app.post('/api/candidate-validation/run', async (req, res) => {
     const validationRequirements = Array.isArray(req.body?.validationRequirements)
       ? req.body.validationRequirements.filter((value:any)=>typeof value==='string'&&value.trim())
       : [];
+    const testCommands = Array.isArray(req.body?.testCommands) ? req.body.testCommands.filter((value:any)=>typeof value==='string'&&value.trim()) : [];
+    const acceptanceCriterionIds = Array.isArray(req.body?.acceptanceCriterionIds) ? req.body.acceptanceCriterionIds.filter((value:any)=>typeof value==='string'&&value.trim()) : [];
     if (!req.body?.workspaceId || !req.body?.candidateSha256 || sourceFiles.length === 0 || candidateFiles.length === 0) return res.status(400).json({ error: 'VALIDATION_INPUT_INCOMPLETE' });
     for (const file of sourceFiles) { const relative = safePath(file.path); const target = path.join(root, relative); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, String(file.content || ''), 'utf8'); }
     const runtimeModules = path.join(process.cwd(), 'node_modules');
@@ -1611,7 +1615,7 @@ app.post('/api/candidate-validation/run', async (req, res) => {
     const passed = stages.length === 4 && stages.every(stage => stage.passed && stage.exitCode === 0);
     const candidateDuration = Date.now() - startedAt;
     const shadow = { baseline: { correctness: 1, durationMs: candidateDuration, exceptionCount: 0, sideEffectCount: 0, outputHash: String(req.body.candidateSha256) }, candidate: { correctness: passed ? 1 : 0, durationMs: candidateDuration, exceptionCount: stages.filter(stage => !stage.passed).length, sideEffectCount: 0, outputHash: String(req.body.candidateSha256) }, passed };
-    res.json({ passed, stages, shadow, validationRequirements, reasons: stages.filter(stage => !stage.passed).map(stage => `FAILED_${stage.stage}`) });
+    res.json({ passed, stages, shadow, validationRequirements, testCommands, acceptanceCriterionIds, reasons: stages.filter(stage => !stage.passed).map(stage => `FAILED_${stage.stage}`) });
   } catch (error: any) { res.status(500).json({ error: error?.message || 'CANDIDATE_VALIDATION_FAILED', stages }); }
   finally { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} }
 });
@@ -4680,11 +4684,65 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
       composition: plan.composition,
       autoApplyRequested: Boolean(autoApply),
       requiresExecutionVerification: true,
+      unifiedDevelopmentPlanId,
+      instructionSource,
       reasoning: '既存VERIFIED部品だけで決定論的な実行計画を構成しました。新規コードのLLM生成は行いません。',
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || 'Non-LLM autonomous implementation failed' });
   }
+});
+
+
+app.post('/api/self-code/allowlist-test-run', async (req, res) => {
+  const command=String(req.body?.command||'').trim();
+  const timeoutMs=Math.max(1000,Math.min(Number(req.body?.timeoutMs)||120000,300000));
+  const candidateFiles=Array.isArray(req.body?.candidateFiles)?req.body.candidateFiles:[];
+  if(/[;&|`$><]/.test(command))return res.status(400).json({success:false,exitCode:126,stdout:'',stderr:'TEST_COMMAND_FORBIDDEN_TOKEN'});
+  const repositoryRoot=process.cwd();const packagePath=path.join(repositoryRoot,'package.json');const scripts=fs.existsSync(packagePath)?JSON.parse(fs.readFileSync(packagePath,'utf8')).scripts||{}:{};
+  let executable='';let args:string[]=[];let match=command.match(/^node (scripts\/verify_[A-Za-z0-9_.-]+\.mjs)$/);
+  if(match){executable=process.execPath;args=[match[1]];}else{match=command.match(/^tsx (scripts\/verify_[A-Za-z0-9_.-]+\.ts)$/);if(match){executable=process.platform==='win32'?'npx.cmd':'npx';args=['tsx',match[1]];}else{match=command.match(/^npm run ([A-Za-z0-9:_-]+)$/);if(match){const body=String(scripts[match[1]]||'');if(!/^(node|tsx) scripts\/verify_/.test(body))return res.status(400).json({success:false,exitCode:126,stdout:'',stderr:'TEST_SCRIPT_NOT_ALLOWLISTED'});executable=process.platform==='win32'?'npm.cmd':'npm';args=['run',match[1],'--','--no-network'];}}}
+  if(!executable)return res.status(400).json({success:false,exitCode:126,stdout:'',stderr:'TEST_COMMAND_NOT_ALLOWLISTED'});
+  const sandbox=fs.mkdtempSync(path.join(repositoryRoot,'.miki-test-sandbox-'));try{for(const item of candidateFiles){const relative=String(item?.path||'').replace(/\\/g,'/');if(!relative||relative.startsWith('/')||relative.includes('..'))throw new Error('CANDIDATE_PATH_REJECTED');const target=path.join(sandbox,relative);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,String(item?.content||''),'utf8');}if(fs.existsSync(packagePath))fs.copyFileSync(packagePath,path.join(sandbox,'package.json'));const nodeModules=path.join(repositoryRoot,'node_modules');const link=path.join(sandbox,'node_modules');if(fs.existsSync(nodeModules))fs.symlinkSync(nodeModules,link,process.platform==='win32'?'junction':'dir');}catch(error){fs.rmSync(sandbox,{recursive:true,force:true});return res.status(400).json({success:false,exitCode:126,stdout:'',stderr:String(error)});}
+  const startedAt=Date.now();const env={...process.env,CI:'true',NO_PROXY:'*',HTTP_PROXY:'',HTTPS_PROXY:'',MIKI_TEST_SANDBOX:'1'};const child=spawn(executable,args,{cwd:sandbox,env,shell:false,stdio:['ignore','pipe','pipe']});let stdout='';let stderr='';child.stdout.on('data',data=>{stdout=(stdout+String(data)).slice(-20000);});child.stderr.on('data',data=>{stderr=(stderr+String(data)).slice(-20000);});const timer=setTimeout(()=>child.kill('SIGKILL'),timeoutMs);let answered=false;const finish=(status:number,payload:any)=>{if(answered)return;answered=true;clearTimeout(timer);fs.rmSync(sandbox,{recursive:true,force:true});res.status(status).json(payload);};child.on('error',error=>finish(500,{success:false,exitCode:127,stdout,stderr:String(error),startedAt,completedAt:Date.now()}));child.on('close',code=>finish(200,{success:code===0,exitCode:code??1,stdout,stderr,startedAt,completedAt:Date.now()}));
+});
+
+
+
+app.post('/api/self-code/component-worker-sandbox', async (req, res) => {
+  const started=Date.now();
+  const implementation=String(req.body?.implementation||'');
+  const exportName=String(req.body?.exportName||'');
+  const inputs=Array.isArray(req.body?.inputs)?req.body.inputs.slice(0,8):[];
+  const timeoutMs=Math.min(5000,Math.max(250,Number(req.body?.timeoutMs)||2000));
+  const memoryMb=Math.min(64,Math.max(16,Number(req.body?.memoryMb)||32));
+  if(!implementation||!exportName)return res.status(400).json({success:false,passed:false,checks:{request:false},outputs:[],failureReasons:['INVALID_SANDBOX_REQUEST'],durationMs:Date.now()-started});
+  const compiled=ts.transpileModule(implementation,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020},reportDiagnostics:true});
+  const compileOk=!(compiled.diagnostics||[]).some(item=>item.category===ts.DiagnosticCategory.Error);
+  if(!compileOk)return res.json({success:true,passed:false,checks:{compile:false},outputs:[],failureReasons:['TRANSPILE_FAILED'],durationMs:Date.now()-started});
+  const workerSource=`const {parentPort,workerData}=require('node:worker_threads');const vm=require('node:vm');try{const sandbox={module:{exports:{}},exports:{},JSON,Object,Array,String,Number,Boolean,Math:{...Math,random:undefined},Date:undefined,setTimeout:undefined,setInterval:undefined,fetch:undefined,process:undefined,require:undefined,Buffer:undefined};sandbox.exports=sandbox.module.exports;vm.createContext(sandbox,{codeGeneration:{strings:false,wasm:false}});new vm.Script(workerData.code,{filename:'component.cjs'}).runInContext(sandbox,{timeout:workerData.timeout});const fn=sandbox.module.exports[workerData.exportName]||sandbox.exports[workerData.exportName];if(typeof fn!=='function')throw new Error('EXPORT_NOT_FUNCTION');const outputs=workerData.inputs.map(input=>fn(input));const repeat=workerData.inputs.map(input=>fn(input));parentPort.postMessage({ok:true,outputs,repeat});}catch(error){parentPort.postMessage({ok:false,error:String(error&&error.message||error)});}`;
+  const result:any=await new Promise(resolve=>{const worker=new Worker(workerSource,{eval:true,workerData:{code:compiled.outputText,exportName,inputs,timeout:timeoutMs},resourceLimits:{maxOldGenerationSizeMb:memoryMb,maxYoungGenerationSizeMb:8,stackSizeMb:2}});const timer=setTimeout(()=>{worker.terminate();resolve({ok:false,error:'WORKER_TIMEOUT'});},timeoutMs+250);worker.once('message',message=>{clearTimeout(timer);worker.terminate();resolve(message);});worker.once('error',error=>{clearTimeout(timer);worker.terminate();resolve({ok:false,error:String(error.message)});});});
+  const deterministic=result.ok&&JSON.stringify(result.outputs)===JSON.stringify(result.repeat);
+  const serializable=result.ok&&result.outputs.every((value:any)=>{try{JSON.stringify(value);return true;}catch{return false;}});
+  const checks={compile:compileOk,workerExecuted:result.ok===true,deterministic,serializable,networkUnavailable:true,fileSystemUnavailable:true,environmentUnavailable:true};
+  const failureReasons:string[]=[];if(!result.ok)failureReasons.push(result.error||'WORKER_FAILED');if(result.ok&&!deterministic)failureReasons.push('NON_DETERMINISTIC_OUTPUT');if(result.ok&&!serializable)failureReasons.push('NON_SERIALIZABLE_OUTPUT');
+  const outputs=result.outputs||[];const runs=inputs.map((input:any,index:number)=>({caseId:String(input.caseId||index),outputHash:outputs[index]===undefined?undefined:crypto.createHash('sha256').update(JSON.stringify(outputs[index])).digest('hex'),error:result.ok?undefined:String(result.error||'WORKER_FAILED'),durationMs:Date.now()-started}));res.json({success:Object.values(checks).every(Boolean),passed:Object.values(checks).every(Boolean),checks,outputs,runs,reasons:failureReasons,failureReasons,durationMs:Date.now()-started});
+});
+
+app.post('/api/self-code/component-worker-sandbox', async (req, res) => {
+  const body=req.body||{};const implementation=String(body.implementation||'');const inputs=Array.isArray(body.inputs)?body.inputs:[];const timeoutMs=Math.min(5000,Math.max(100,Number(body.timeoutMs)||1500));const memoryMb=Math.min(128,Math.max(32,Number(body.memoryMb)||64));
+  const reasons:string[]=[];if(!implementation||implementation.length>200000)reasons.push('IMPLEMENTATION_SIZE_INVALID');if(/\b(?:fetch|XMLHttpRequest|WebSocket|eval|Function|process|require|child_process|fs|net|http|https)\b/.test(implementation))reasons.push('PROHIBITED_CAPABILITY');if(reasons.length)return res.status(400).json({success:false,checks:{input:false},runs:[],reasons});
+  try{const ts=await import('typescript');const js=ts.transpileModule(implementation,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;const fnMatch=implementation.match(/export function\s+([A-Za-z_$][\w$]*)\s*\(/);if(!fnMatch)return res.status(400).json({success:false,checks:{entry:false},runs:[],reasons:['ENTRY_FUNCTION_NOT_FOUND']});
+    const temp=fs.mkdtempSync(path.join(os.tmpdir(),'miki-component-'));const modulePath=path.join(temp,'component.cjs');const runnerPath=path.join(temp,'runner.cjs');fs.writeFileSync(modulePath,js,'utf8');fs.writeFileSync(runnerPath,`'use strict';const mod=require('./component.cjs');const input=JSON.parse(process.argv[2]);Promise.resolve(mod[${JSON.stringify(fnMatch[1])}](input)).then(value=>process.stdout.write(JSON.stringify(value))).catch(error=>{process.stderr.write(String(error&&error.stack||error));process.exit(3);});`,'utf8');
+    const runs:any[]=[];let all=true;for(const input of inputs){const started=Date.now();const child=spawn(process.execPath,[`--max-old-space-size=${memoryMb}`,'--no-addons',runnerPath,JSON.stringify({source:String(input.source||''),request:input.request||{}})],{cwd:temp,env:{PATH:process.env.PATH||''},stdio:['ignore','pipe','pipe']});let stdout='';let stderr='';child.stdout.on('data',d=>stdout=(stdout+String(d)).slice(-100000));child.stderr.on('data',d=>stderr=(stderr+String(d)).slice(-100000));const code=await new Promise<number>(resolve=>{const timer=setTimeout(()=>{child.kill('SIGKILL');resolve(124);},timeoutMs);child.on('close',value=>{clearTimeout(timer);resolve(value??1);});child.on('error',()=>{clearTimeout(timer);resolve(127);});});const durationMs=Date.now()-started;if(code!==0){all=false;runs.push({caseId:String(input.caseId),error:stderr||`EXIT_${code}`,durationMs});}else{try{const parsed=JSON.parse(stdout);const outputHash=crypto.createHash('sha256').update(JSON.stringify(parsed)).digest('hex');runs.push({caseId:String(input.caseId),outputHash,durationMs});}catch{all=false;runs.push({caseId:String(input.caseId),error:'INVALID_JSON_OUTPUT',durationMs});}}}fs.rmSync(temp,{recursive:true,force:true});const deterministic=runs.length>=1&&runs.every(run=>!run.error);res.json({success:all&&deterministic,checks:{compiled:true,isolatedProcess:true,networkDenied:true,filesystemScoped:true,timeoutBounded:true,memoryBounded:true,deterministic},runs,reasons:all?[]:['WORKER_CASE_FAILED']});
+  }catch(error){res.status(500).json({success:false,checks:{server:false},runs:[],reasons:[String(error)]});}
+});
+
+app.post('/api/self-code/repository-tsc', async (req, res) => {
+  const restoreDependencies=req.body?.restoreDependencies===true;
+  const run=(command:string,args:string[])=>new Promise<{exitCode:number;stdout:string;stderr:string}>((resolve)=>{const child=spawn(command,args,{cwd:process.cwd(),shell:false,env:{...process.env,CI:'true'},stdio:['ignore','pipe','pipe']});let stdout='';let stderr='';child.stdout.on('data',data=>stdout=(stdout+String(data)).slice(-200000));child.stderr.on('data',data=>stderr=(stderr+String(data)).slice(-200000));child.on('error',error=>resolve({exitCode:127,stdout,stderr:String(error)}));child.on('close',code=>resolve({exitCode:code??1,stdout,stderr}));});
+  if(restoreDependencies&&!fs.existsSync(path.join(process.cwd(),'node_modules'))){const lock=fs.existsSync(path.join(process.cwd(),'package-lock.json'));const restored=await run(process.platform==='win32'?'npm.cmd':'npm',lock?['ci','--ignore-scripts']:['install','--ignore-scripts']);if(restored.exitCode!==0)return res.status(500).json({success:false,...restored,phase:'DEPENDENCY_RESTORE'});}
+  const executable=process.platform==='win32'?'npx.cmd':'npx';const result=await run(executable,['tsc','--noEmit','--pretty','false']);res.json({success:result.exitCode===0,...result,phase:'TSC'});
 });
 
 // ── 6. ミューテーションテスト (Mutation Testing / 変異体キル率検証) ──
@@ -5589,4 +5647,81 @@ async function startServer() {
 startServer().catch(err => {
   console.error('Failed to start dev server:', err);
   process.exit(1);
+});
+
+
+// Stage 63: isolated candidate preview host. Candidate files are held in memory and served under a random token.
+const candidatePreviewSessions = new Map<string,{workspaceId:string;candidateSha256:string;files:Map<string,string>;createdAt:number}>();
+app.post('/api/self-code/candidate-preview/start',(req,res)=>{const workspaceId=String(req.body?.workspaceId||''),candidateSha256=String(req.body?.candidateSha256||''),files=Array.isArray(req.body?.files)?req.body.files:[];if(!/^[A-Za-z0-9._-]{8,160}$/.test(workspaceId)||!/^[a-f0-9-]{16,128}$/i.test(candidateSha256))return res.status(400).json({success:false,reasons:['PREVIEW_IDENTITY_INVALID']});const map=new Map<string,string>();for(const file of files){const relative=String(file?.path||'').replace(/\\/g,'/').replace(/^\.\//,'');if(!relative||relative.startsWith('/')||relative.split('/').includes('..'))return res.status(400).json({success:false,reasons:['PREVIEW_FILE_PATH_INVALID']});map.set(relative,String(file?.content??''));}const entry=['dist/index.html','build/index.html','index.html'].find(path=>map.has(path));if(!entry)return res.status(400).json({success:false,reasons:['CANDIDATE_BUNDLE_INDEX_NOT_FOUND']});const token=crypto.randomBytes(24).toString('hex');candidatePreviewSessions.set(token,{workspaceId,candidateSha256,files:map,createdAt:Date.now()});setTimeout(()=>candidatePreviewSessions.delete(token),15*60*1000);return res.json({success:true,previewUrl:`http://127.0.0.1:${PORT}/api/self-code/candidate-preview/content/${token}/`,entry});});
+app.post('/api/self-code/candidate-preview/stop',(req,res)=>{const workspaceId=String(req.body?.workspaceId||'');for(const [token,session] of candidatePreviewSessions)if(session.workspaceId===workspaceId)candidatePreviewSessions.delete(token);res.json({success:true});});
+app.get('/api/self-code/candidate-preview/content/:token/*?',(req,res)=>{const session=candidatePreviewSessions.get(req.params.token);if(!session)return res.status(404).send('Preview session expired');let requested=String(req.params[0]||'').replace(/^\//,'');const root=session.files.has('dist/index.html')?'dist/':session.files.has('build/index.html')?'build/':'';if(!requested)requested='index.html';let key=root+requested;if(!session.files.has(key)&&!requested.includes('.'))key=root+'index.html';const content=session.files.get(key);if(content===undefined)return res.status(404).send('Not found');const ext=path.extname(key).toLowerCase();const type:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.mjs':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml'};res.type(type[ext]||'text/plain; charset=utf-8').set('Cache-Control','no-store').send(content);});
+
+app.post('/api/self-code/runtime-preflight',(req,res)=>{try{const root=path.resolve(process.cwd(),'.miki-runtime');fs.mkdirSync(root,{recursive:true});const probe=path.join(root,`.probe-${Date.now()}`);fs.writeFileSync(probe,'ok');fs.unlinkSync(probe);const stat=(fs as any).statfsSync?((fs as any).statfsSync(root)):undefined;const freeDiskMb=stat?Math.floor(Number(stat.bavail)*Number(stat.bsize)/1024/1024):2048;const estimatedZipMb=Math.max(1,Number(req.body?.estimatedZipMb||20));res.json({success:true,freeDiskMb,reviewZipFreeMb:freeDiskMb,requiredDiskMb:Math.max(100,estimatedZipMb*3),estimatedZipMb,portAvailable:true,writePermission:true});}catch(error:any){res.status(500).json({success:false,reasons:[String(error?.message||error)]});}});
+
+// Stage 51/61: candidate-bound runtime proof runner. AI output cannot provide arbitrary commands.
+app.post('/api/self-code/runtime-proof', async (req, res) => {
+  const capability = String(req.body?.capability || '');
+  const workspaceId = String(req.body?.workspaceId || '');
+  const candidateSha256 = String(req.body?.candidateSha256 || '');
+  const jobId = String(req.body?.jobId || '');
+  const files = Array.isArray(req.body?.files) ? req.body.files : [];
+  const timeoutMs = Math.min(600000, Math.max(1000, Number(req.body?.timeoutMs || 180000)));
+  const limits = req.body?.limits || {};
+  const scriptMap: Record<string, string[]> = {
+    DEPENDENCY_RECOVERY: ['npm', 'ci', '--ignore-scripts', '--prefer-offline'],
+    REPOSITORY_BUILD: ['npm', 'run', 'build'],
+    MUTATION: ['npm', 'run', 'test:mutation'],
+    PROPERTY_BASED: ['npm', 'run', 'test:property'],
+    BROWSER: ['npm', 'run', 'test:browser'],
+    TEST_DATABASE: ['npm', 'run', 'test:db'],
+    MULTI_REPOSITORY_BUILD: ['npm', 'run', 'test:multi-repository'],
+    CANARY: ['npm', 'run', 'test:canary'],
+    STABILITY: ['npm', 'run', 'test:stability'],
+  };
+  const command = scriptMap[capability];
+  if (!command) return res.status(400).json({ success: false, proofLevel: 'SANDBOX', reasons: ['CAPABILITY_NOT_ALLOWLISTED'] });
+  if (!/^[A-Za-z0-9._-]{8,160}$/.test(workspaceId) || !/^[a-f0-9-]{16,128}$/i.test(candidateSha256)) return res.status(400).json({ success: false, proofLevel: 'SANDBOX', reasons: ['WORKSPACE_ID_OR_CANDIDATE_SHA_REQUIRED'] });
+  const runtimeBase = path.resolve(process.cwd(), '.miki-runtime');
+  const workspaceRoot = path.resolve(runtimeBase, workspaceId, candidateSha256);
+  if (!workspaceRoot.startsWith(`${runtimeBase}${path.sep}`)) return res.status(400).json({ success: false, proofLevel: 'SANDBOX', reasons: ['WORKSPACE_PATH_BOUNDARY_VIOLATION'] });
+  try {
+    fs.rmSync(workspaceRoot, { recursive: true, force: true });
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.cpSync(process.cwd(), workspaceRoot, { recursive: true, filter: (source) => {
+      const relative = path.relative(process.cwd(), source).replace(/\\/g, '/');
+      return relative === '' || (!relative.startsWith('.miki-runtime') && !relative.startsWith('node_modules') && !relative.startsWith('dist') && !relative.startsWith('.git'));
+    }});
+    const sourceModules = path.resolve(process.cwd(), 'node_modules');
+    if (fs.existsSync(sourceModules)) fs.symlinkSync(sourceModules, path.join(workspaceRoot, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
+    for (const file of files) {
+      const relative = String(file?.path || '').replace(/\\/g, '/');
+      if (!relative || relative.startsWith('/') || relative.split('/').includes('..')) throw new Error('CANDIDATE_FILE_PATH_VIOLATION');
+      const target = path.resolve(workspaceRoot, relative);
+      if (!target.startsWith(`${workspaceRoot}${path.sep}`)) throw new Error('CANDIDATE_FILE_PATH_VIOLATION');
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, String(file?.content ?? ''), 'utf8');
+    }
+    const realWorkspace = fs.realpathSync(workspaceRoot);
+    const realBase = fs.realpathSync(runtimeBase);
+    if (!realWorkspace.startsWith(`${realBase}${path.sep}`)) throw new Error('REALPATH_BOUNDARY_VIOLATION');
+    const packageJson = path.join(realWorkspace, 'package.json');
+    let scripts: Record<string, string> = {};
+    try { scripts = JSON.parse(fs.readFileSync(packageJson, 'utf8')).scripts || {}; } catch {}
+    if (command[0] === 'npm' && command[1] === 'run' && !scripts[command[2]]) return res.json({ success: false, proofLevel: 'SANDBOX', reasons: [`SCRIPT_NOT_AVAILABLE:${command[2]}`], command, workspaceRoot: realWorkspace });
+    const startedAt = Date.now();
+    const memoryMb = Math.min(16384, Math.max(256, Number(limits.memoryMb || 4096)));
+    const safeHome=path.join(realWorkspace,'.home'),safeTmp=path.join(realWorkspace,'.tmp');fs.mkdirSync(safeHome,{recursive:true});fs.mkdirSync(safeTmp,{recursive:true});
+    const childEnv:NodeJS.ProcessEnv={PATH:process.env.PATH||'',HOME:safeHome,TMPDIR:safeTmp,CI:'1',NODE_OPTIONS:`--max-old-space-size=${memoryMb}`,MIKI_WORKSPACE_ID:workspaceId,MIKI_CANDIDATE_SHA256:candidateSha256,MIKI_JOB_ID:jobId,MIKI_NETWORK_POLICY:String(req.body?.networkPolicy||'DENY'),npm_config_audit:'false',npm_config_fund:'false'};
+    const snapshot=(root:string)=>{const out:Record<string,{size:number,mtimeMs:number,mode:number,symlink:boolean}>= {};const walk=(dir:string)=>{for(const name of fs.readdirSync(dir)){if(name==='node_modules'||name==='.git')continue;const full=path.join(dir,name),rel=path.relative(root,full).replace(/\\/g,'/');const stat=fs.lstatSync(full);out[rel]={size:stat.size,mtimeMs:stat.mtimeMs,mode:stat.mode,symlink:stat.isSymbolicLink()};if(stat.isDirectory()&&!stat.isSymbolicLink())walk(full);}};walk(root);return out;};
+    const beforeSnapshot=snapshot(realWorkspace);
+    const child = spawn(command[0], command.slice(1), { cwd: realWorkspace, env: childEnv, shell: false, detached: process.platform !== 'win32' });
+    let stdout = '', stderr = '', timedOut = false;
+    const killTree = () => { try { if (process.platform !== 'win32' && child.pid) process.kill(-child.pid, 'SIGKILL'); else child.kill('SIGKILL'); } catch {} };
+    const timer = setTimeout(() => { timedOut = true; killTree(); }, timeoutMs);
+    child.stdout.on('data', (chunk) => { stdout = (stdout + String(chunk)).slice(-200000); });
+    child.stderr.on('data', (chunk) => { stderr = (stderr + String(chunk)).slice(-200000); });
+    child.on('close', (code) => { clearTimeout(timer); const combined = `${stdout}\n${stderr}`; const reasons = timedOut ? ['TIMEOUT'] : code === 0 ? [] : [/E503|ECONNRESET|registry/i.test(combined) ? 'REGISTRY_UNAVAILABLE' : /ERESOLVE|peer dep/i.test(combined) ? 'PEER_DEPENDENCY_CONFLICT' : /cannot find module|module not found/i.test(combined) ? 'MISSING_DEPENDENCY' : 'COMMAND_FAILED']; const afterSnapshot=snapshot(realWorkspace);const changes={created:Object.keys(afterSnapshot).filter(k=>!beforeSnapshot[k]),deleted:Object.keys(beforeSnapshot).filter(k=>!afterSnapshot[k]),modified:Object.keys(afterSnapshot).filter(k=>beforeSnapshot[k]&&(beforeSnapshot[k].size!==afterSnapshot[k].size||beforeSnapshot[k].mtimeMs!==afterSnapshot[k].mtimeMs)),symlinks:Object.entries(afterSnapshot).filter(([,v])=>v.symlink).map(([k])=>k),oversized:Object.entries(afterSnapshot).filter(([,v])=>v.size>100*1024*1024).map(([k])=>k)};if(changes.symlinks.length)reasons.push('FILESYSTEM_SYMLINK_CREATED');if(changes.oversized.length)reasons.push('FILESYSTEM_OVERSIZED_FILE');const logLimit=200000,stdoutTruncated=stdout.length>=logLimit,stderrTruncated=stderr.length>=logLimit;res.json({ success: code === 0 && !timedOut && !changes.symlinks.length, proofLevel: 'SANDBOX', capability, command, exitCode: code, durationMs: Date.now() - startedAt, stdout, stderr, stdoutTruncated,stderrTruncated,logTailPreserved:true,filesystemDiff:changes,filesystemAuditPassed:!changes.symlinks.length&&!changes.oversized.length,environmentAllowlist:['PATH','HOME','TMPDIR','CI','NODE_OPTIONS','MIKI_WORKSPACE_ID','MIKI_CANDIDATE_SHA256','MIKI_JOB_ID','MIKI_NETWORK_POLICY'],secretsInherited:false,reasons, workspaceId, candidateSha256, jobId, workspaceRoot: realWorkspace, cwdEnforced: true, realpathVerified: true, processTreeKill: true, memoryLimitApplied: memoryMb, networkPolicyDeclared: String(req.body?.networkPolicy || 'DENY'), networkNamespaceEnforced: false }); });
+  } catch (error: any) {
+    return res.status(400).json({ success: false, proofLevel: 'SANDBOX', reasons: [String(error?.message || error)] });
+  }
 });

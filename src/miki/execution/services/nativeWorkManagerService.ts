@@ -27,6 +27,8 @@ export interface NativeWorkManagerPluginInterface {
     renderWaitMs?: number;
   }): Promise<{ success: boolean; text: string; url: string; length?: number; html?: string; markdown?: string; navigationText?: string; advertisementText?: string; menuText?: string; footerText?: string }>;
 
+  runCandidateBrowserE2E(options: { url:string; scenarios:any[]; timeoutMs?:number }): Promise<{success:boolean;results:any[];consoleErrors:string[];network:any[];screenshots:any[];domSnapshots:any[];reasons:string[]}>;
+
   addListener(
     eventName: 'autonomousCycleTriggered',
     listenerFunc: (data: { triggerSource: string; timestamp: number }) => void
@@ -65,6 +67,7 @@ const NativeWorkManagerPlugin = registerPlugin<NativeWorkManagerPluginInterface>
           return { success: false, text: '', url: options.url, length: 0 };
         }
       },
+      async runCandidateBrowserE2E(options: {url:string;scenarios:any[];timeoutMs?:number}) { return {success:false,results:[],consoleErrors:[],network:[],screenshots:[],domSnapshots:[],reasons:['NATIVE_INDEPENDENT_WEBVIEW_REQUIRED']}; },
       async addListener() {
         return { remove: async () => {} };
       },
@@ -226,6 +229,11 @@ class NativeWorkManagerService {
       };
     }
   }
+  public async runCandidateBrowserE2E(options:{url:string;scenarios:any[];timeoutMs?:number}){
+    if(!this.isAndroidNative())return {success:false,results:[],consoleErrors:[],network:[],screenshots:[],domSnapshots:[],reasons:['ANDROID_NATIVE_REQUIRED']};
+    try{return await NativeWorkManagerPlugin.runCandidateBrowserE2E(options);}catch(e){return {success:false,results:[],consoleErrors:[],network:[],screenshots:[],domSnapshots:[],reasons:[e instanceof Error?e.message:String(e)]};}
+  }
+
 }
 
 export const nativeWorkManagerService = new NativeWorkManagerService();

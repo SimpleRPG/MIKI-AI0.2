@@ -55,6 +55,8 @@ import {
 import { storageService } from '../../services/storageService';
 import { WebCodeSearchResult, ToolDefinition } from '../../types';
 import { AUTONOMOUS_TASK_SCHEDULER_SAMPLE } from './samples/autonomousTaskSchedulerSample';
+import DevelopmentReviewLifecyclePanel from './DevelopmentReviewLifecyclePanel';
+import { developmentReviewLifecycleService } from '../../miki/selfDevelopment/services/developmentReviewLifecycleService';
 
 export const UltraSelfEvolverSubView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
@@ -196,19 +198,22 @@ export const UltraSelfEvolverSubView: React.FC = () => {
     const stepTimer3 = setTimeout(() => setImplementStep(4), 2200); // 4: 構文検証・適用
 
     try {
-      const res = await mikiSelfCodingSuperchargerService.runAutonomousImplementation(
-        implementPrompt,
-        targetFileHint.trim() || undefined,
-        false,
-        undefined
+      const lifecycleResult = await developmentReviewLifecycleService.start(
+        developmentReviewLifecycleService.create(
+          implementPrompt,
+          targetFileHint.trim() ? [targetFileHint.trim()] : []
+        )
       );
+      const res = lifecycleResult.implementation;
       clearTimeout(stepTimer1);
       clearTimeout(stepTimer2);
       clearTimeout(stepTimer3);
       setImplementStep(5); // 5: 完了
-      setImplementationResult(res);
+      setImplementationResult(res || null);
 
-      if (res.success) {
+      if (!res) {
+        setImplementNotice(lifecycleResult.accepted ? `候補作成完了: ${lifecycleResult.request.workspaceId || 'Workspace生成済み'}。Review画面で確認してください。` : `実装停止: ${lifecycleResult.reasons.join(' / ')}`);
+      } else if (res.success) {
         setImplementNotice(`🎉 自律実装完了: ${res.targetFile} へ安全に適用されました！`);
         // 記憶に教訓を自動定着
         if (res.lesson) {
@@ -504,6 +509,8 @@ export const UltraSelfEvolverSubView: React.FC = () => {
 
       {/* ── 0.1 自律自己実装スタジオ (タブ1) ── */}
       {activeTab === 'auto_implement' && (
+        <>
+          <DevelopmentReviewLifecyclePanel />
         <div className="space-y-5">
           {/* 通知バナー */}
           {implementNotice && (
@@ -737,6 +744,7 @@ export const UltraSelfEvolverSubView: React.FC = () => {
             </div>
           )}
         </div>
+        </>
       )}
 
       {/* ── 0.2 コードベース ASTシンボル地図 (タブ2) ── */}

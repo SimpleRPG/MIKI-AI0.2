@@ -5,6 +5,10 @@
  */
 import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from '../../../services/storageService';
+import { selfCodeUnderstandingService, type ImpactScopeRecord } from '../../core/services/selfCodeUnderstandingService';
+import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
+import type { AstCandidateOperation } from './astCandidateTransformationService';
+import { contractPropagationService } from './contractPropagationService';
 
 export type ContractStatus = 'VALID' | 'INVALIDATED' | 'BLOCKED_SPEC_CONFLICT';
 export type Norm = 'MUST' | 'MUST_NOT' | 'SHOULD' | 'MAY' | 'UNKNOWN';
@@ -28,6 +32,20 @@ export interface SpecContract {
   compiledAt: number;
   status: ContractStatus;
   clauses: SpecContractClause[];
+}
+
+export interface ImprovementRequirementContract {
+  schemaVersion:2; contractId:string; objective:string; targetPaths:string[];
+  requirements:string[]; prohibitions:string[]; invariants:string[];
+  validationRequirements:string[]; deliveryRequirements:string[];
+  impactScopes:ImpactScopeRecord[]; executionPathCount:number; repositorySnapshotSha256?:string;
+  reusableComponentIds:string[]; codeKnowledgeIds:string[]; unresolved:string[];
+  status:'READY'|'BLOCKED'; createdAt:number;
+}
+export interface ImprovementRequirementInput {
+  objective:string; targetPaths:string[]; requirements?:string[]; prohibitions?:string[];
+  invariants?:string[]; validationRequirements?:string[]; deliveryRequirements?:string[];
+  reusableComponentIds?:string[]; codeKnowledgeIds?:string[];
 }
 
 export type SpecFileReader = (specPath: string) => string | null;
@@ -93,6 +111,64 @@ export class SpecContractCompilerService {
     const currentHash = hash(source); const invalidated = !!this.contract && this.contract.sourceHash !== currentHash;
     if (invalidated && this.contract) { this.contract.status='INVALIDATED'; this.save(); }
     return {valid:!invalidated, currentHash, contractHash:this.contract?.sourceHash||null, invalidated, clauseCount:this.contract?.clauses.length||0};
+  }
+
+
+  public compileImprovementRequirement(input:ImprovementRequirementInput):ImprovementRequirementContract {
+    const clean=(values:string[]|undefined)=>[...new Set((values||[]).map(value=>value.trim()).filter(Boolean))];
+    const targetPaths=clean(input.targetPaths).sort(); const objective=input.objective.trim();
+    const requirements=clean(input.requirements); const prohibitions=clean(input.prohibitions);
+    const invariants=clean(input.invariants); const validationRequirements=clean(input.validationRequirements);
+    const deliveryRequirements=clean(input.deliveryRequirements);
+    const understanding=selfCodeUnderstandingService.ensure(targetPaths); const unresolved:string[]=[]; const blockers:string[]=[];
+    if(!objective){unresolved.push('OBJECTIVE_REQUIRED');blockers.push('OBJECTIVE_REQUIRED');} if(targetPaths.length===0){unresolved.push('TARGET_PATHS_REQUIRED');blockers.push('TARGET_PATHS_REQUIRED');}
+    if(!understanding.ready){unresolved.push(...understanding.reasons);blockers.push(...understanding.reasons);}
+    if(understanding.unresolvedEdges.length>0)unresolved.push(...understanding.unresolvedEdges.map(value=>`UNRESOLVED_EDGE:${value}`));
+    if(requirements.length===0){unresolved.push('REQUIREMENTS_REQUIRED');blockers.push('REQUIREMENTS_REQUIRED');}
+    if(validationRequirements.length===0){unresolved.push('VALIDATION_REQUIREMENTS_REQUIRED');blockers.push('VALIDATION_REQUIREMENTS_REQUIRED');}
+    const reusableComponentIds=clean(input.reusableComponentIds).sort(); const codeKnowledgeIds=clean(input.codeKnowledgeIds).sort();
+    const seed={objective,targetPaths,requirements,prohibitions,invariants,validationRequirements,deliveryRequirements,repositorySnapshotSha256:understanding.snapshotSha256,reusableComponentIds,codeKnowledgeIds};
+    return {schemaVersion:2,contractId:`IMPROVEMENT-${canonicalSha256(seed).slice(0,24)}`,objective,targetPaths,requirements,prohibitions,invariants,
+      validationRequirements,deliveryRequirements,impactScopes:understanding.impactScopes,executionPathCount:understanding.executionPaths.length,
+      repositorySnapshotSha256:understanding.snapshotSha256,reusableComponentIds,codeKnowledgeIds,unresolved:[...new Set(unresolved)].sort(),
+      status:blockers.length===0?'READY':'BLOCKED',createdAt:Date.now()};
+  }
+
+
+  public compileContractPropagationOperations(objective:string,targetPaths:string[]):Array<{path:string;operations:AstCandidateOperation[]}>{
+    const text=objective.trim();
+    const match=text.match(/([A-Za-z_$][\w$]*)\s*[:：]\s*([^\s、。]+)\s*を\s*(?:interface|インターフェース)\s*([A-Za-z_$][\w$]*)\s*(?:と|、)\s*(?:object|オブジェクト|変数)\s*([A-Za-z_$][\w$]*)\s*(?:へ|に)\s*(?:値\s*)?([^\s、。]+)\s*として?伝播/i);
+    if(!match)return [];
+    const consumer=text.match(/(?:consumer|コンシューマ|関数|メソッド)\s+([A-Za-z_$][\w$]*)\s*(?:へ|に)\s*引数/i);
+    const validator=text.match(/(?:validator|検証関数|関数|メソッド)\s+([A-Za-z_$][\w$]*)\s*(?:へ|に)\s*条件\s*([^、。]+?)\s*失敗\s*([^、。]+)$/i);
+    const plan=contractPropagationService.plan({
+      fieldName:match[1],fieldType:match[2],interfaceNames:[match[3]],producerObjectNames:[match[4]],producerExpression:match[5],targetPaths,
+      consumerFunctions:consumer?[consumer[1]]:[],validationFunctions:validator?[validator[1]]:[],
+      validationCondition:validator?.[2]?.trim(),validationFailureStatement:validator?.[3]?.trim(),
+      callSiteCallees:consumer?[consumer[1]]:[],callArgumentExpression:match[1]
+    });
+    return plan.unresolved.length===0?plan.transformations:[];
+  }
+
+  public compileAllDeterministicAstOperations(objective:string,targetPaths:string[]):Array<{path:string;operations:AstCandidateOperation[]}>{
+    const rows=[...this.compileDeterministicAstOperations(objective,targetPaths),...this.compileContractPropagationOperations(objective,targetPaths)];
+    const combined=new Map<string,AstCandidateOperation[]>();
+    for(const row of rows){const current=combined.get(row.path)||[];for(const operation of row.operations){if(!current.some(item=>canonicalSha256(item)===canonicalSha256(operation)))current.push(operation);}combined.set(row.path,current);}
+    return [...combined.entries()].map(([path,operations])=>({path,operations})).sort((a,b)=>a.path.localeCompare(b.path));
+  }
+
+  public compileDeterministicAstOperations(objective:string,targetPaths:string[]):Array<{path:string;operations:AstCandidateOperation[]}>{
+    if(targetPaths.length!==1)return [];
+    const text=objective.trim();const operations:AstCandidateOperation[]=[];
+    const interfaceField=text.match(/(?:interface|インターフェース)\s+([A-Za-z_$][\w$]*)\s*(?:に|へ)\s*([A-Za-z_$][\w$]*)\s*[:：]\s*([^\s、。]+)\s*(?:フィールド|項目)?を追加/i);
+    if(interfaceField)operations.push({kind:'ADD_INTERFACE_FIELD',interfaceName:interfaceField[1],fieldName:interfaceField[2],fieldType:interfaceField[3]});
+    const parameter=text.match(/(?:function|関数|メソッド)\s+([A-Za-z_$][\w$]*)\s*(?:に|へ)\s*([A-Za-z_$][\w$]*)\s*[:：]\s*([^\s、。]+)\s*(?:引数|パラメータ)を追加/i);
+    if(parameter)operations.push({kind:'ADD_PARAMETER',functionName:parameter[1],parameterName:parameter[2],parameterType:parameter[3]});
+    const property=text.match(/(?:object|オブジェクト|変数)\s+([A-Za-z_$][\w$]*)\s*(?:に|へ)\s*([A-Za-z_$][\w$]*)\s*=\s*([^、。]+?)\s*(?:プロパティ|項目)?を追加/i);
+    if(property)operations.push({kind:'ADD_OBJECT_PROPERTY',variableName:property[1],propertyName:property[2],expression:property[3].trim()});
+    const importMatch=text.match(/(?:from\s+['"]([^'"]+)['"]\s+)?import\s*\{([^}]+)\}\s*(?:from\s+['"]([^'"]+)['"])?\s*を追加/i);
+    if(importMatch){const moduleSpecifier=(importMatch[1]||importMatch[3]||'').trim();const namedImports=importMatch[2].split(',').map(value=>value.trim()).filter(Boolean);if(moduleSpecifier&&namedImports.length>0)operations.push({kind:'ADD_IMPORT',moduleSpecifier,namedImports});}
+    return operations.length>0?[{path:targetPaths[0],operations}]:[];
   }
 }
 export const specContractCompilerService = new SpecContractCompilerService();

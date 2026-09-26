@@ -7,6 +7,7 @@ import { candidateValidationEvidenceService } from '../services/candidateValidat
 import { coreResultService } from '../services/coreResultService';
 import { coreTaskIngressService, type CoreTaskIngressRequest } from '../services/coreTaskIngressService';
 import { coreCycleSettingsService } from '../services/coreCycleSettingsService';
+import { directiveReviewPackageCompletionService } from '../services/directiveReviewPackageCompletionService';
 import { taskBlackboardService } from '../services/taskBlackboardService';
 import { priorityOneRuntimeReadModelService } from '../services/priorityOneRuntimeReadModelService';
 export type { PriorityOneRuntimeItem, PriorityOneAllowedAction } from '../services/priorityOneRuntimeReadModelService';
@@ -273,31 +274,21 @@ class TypedImprovementUiGatewayService {
   }
   resumeImprovementTask(taskId:string){return this.sendImprovementCommand({commandType:'RESUME_IMPROVEMENT_TASK',taskId,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-resume'),operationInstanceId:coreResultService.generateRequestId('operation')});}
   async executeDirectiveUntilReviewPackage(directiveId:string){
-    // 取り込み済み作業指示書は既に自律改善Queueへ登録されている。
-    // UIからCORE resumeを反復せず、正規Queue/Loopの開始状態だけを返す。
     const result=await this.executeDirective(directiveId);
     const run=result.taskId
       ? this.getIntakeRuns(100).find(item=>item.taskId===result.taskId)
       : undefined;
-    const packageRecord=run
-      ? reviewZipExportService.list().find(item=>item.runId===run.runId)
-      : undefined;
-    return {
-      ...result,
-      packageId:packageRecord?.packageId,
-      packageStatus:packageRecord?.status,
-      cycles:0
-    };
+    if(!result.taskId||!run){
+      return {...result,terminalState:'BLOCKED' as const,cycles:0,completedAt:Date.now(),reasons:['DIRECTIVE_RUN_OR_TASK_NOT_FOUND']};
+    }
+    const completion=await directiveReviewPackageCompletionService.wait(run.runId,result.taskId,{
+      maxCycles:coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'),
+      timeoutMs:120000,
+      pollMs:100,
+      noProgressLimit:4
+    });
+    return {...result,...completion};
   }
-  async saveAutonomyConfig(config:Partial<AutopilotConfig>){const command:ImprovementUiCommand={commandType:'SAVE_AUTONOMY_CONFIG',goal:'自律巡回設定を保存する',config,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-autonomy-config'),operationInstanceId:coreResultService.generateRequestId('operation')};const result=await coreTaskIngressService.submit({kind:'SYSTEM_TASK',goal:command.goal,source:'core',payload:{entry:'TYPED_IMPROVEMENT_UI_GATEWAY',operation:'SAVE_AUTONOMY_CONFIG',config:command.config,commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt}});return this.toCommandResult(command,result);}
-
-  private toCommandResult(command:ImprovementUiCommand,result:Awaited<ReturnType<typeof coreTaskIngressService.submit>>|undefined):ImprovementUiCommandResult{
-    if(!result)return {commandId:command.commandId,operationInstanceId:command.operationInstanceId,currentStage:'NOT_FOUND',stopReason:'TASK_NOT_FOUND',unresolved:['TASK_NOT_FOUND'],domainReplyIds:[],evidenceIds:[],persistenceReceiptIds:[],requiredDomains:[],missingDomains:[],failedDomains:[],missingReceipts:[],missingRequiredOperations:[],completionReasons:['TASK_NOT_FOUND']};
-    const corePayload=result.coreResult?.result as Record<string,unknown>|undefined;
-    return {commandId:command.commandId,operationInstanceId:command.operationInstanceId,taskId:result.task.taskId,taskRevision:result.task.revision,corePlanRevision:typeof corePayload?.corePlanRevision==='number'?corePayload.corePlanRevision:undefined,planRevision:typeof corePayload?.corePlanRevision==='number'?corePayload.corePlanRevision:undefined,currentOperationInstanceId:typeof corePayload?.currentOperationInstanceId==='string'?corePayload.currentOperationInstanceId:undefined,currentBusinessStage:typeof corePayload?.currentBusinessStage==='string'?corePayload.currentBusinessStage:undefined,nextOperationInstanceId:typeof corePayload?.nextOperationInstanceId==='string'?corePayload.nextOperationInstanceId:undefined,currentStage:typeof corePayload?.currentBusinessStage==='string'?corePayload.currentBusinessStage:result.task.status,nextStage:typeof corePayload?.nextOperationInstanceId==='string'?corePayload.nextOperationInstanceId:(result.task.status==='COMPLETED'?undefined:'CORE_REPLAN'),stopReason:result.coreResult?.error,unresolved:this.stringArray(corePayload?.unknowns),domainReplyIds:this.stringArray(corePayload?.replyIds),evidenceIds:this.stringArray(corePayload?.evidenceIds),persistenceReceiptIds:this.stringArray(corePayload?.persistenceReceiptIds),decisionId:typeof corePayload?.decisionId==='string'?corePayload.decisionId:undefined,requiredDomains:this.stringArray(corePayload?.requiredDomains),missingDomains:this.stringArray(corePayload?.missingDomains),failedDomains:this.stringArray(corePayload?.failedDomains),missingReceipts:this.stringArray(corePayload?.missingReceipts),missingRequiredOperations:this.stringArray(corePayload?.missingRequiredOperations),completionReasons:this.stringArray(corePayload?.completionReasons),coreResult:result.coreResult};
-  }
-
-  private stringArray(value:unknown):string[]{return Array.isArray(value)?value.filter((item):item is string=>typeof item==='string'):[];}
 
   listRestoredPriorityOneRuntime(){return priorityOneRuntimeReadModelService.list();}
   getLatestCoreRuntime(){const items=priorityOneRuntimeReadModelService.list();return items[items.length-1];}

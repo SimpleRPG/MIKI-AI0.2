@@ -1,6 +1,14 @@
 package com.miki.ai
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.util.Base64
+import android.webkit.ConsoleMessage
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import org.json.JSONArray
+import java.io.ByteArrayOutputStream
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -214,6 +222,69 @@ class MikiWorkManagerPlugin : Plugin() {
      * - タイムアウト(既定10秒)制御
      * - 同時実行を排他制御(1件ずつ順次処理)し、終了後は必ずWebViewを即時破棄してメモリ/バッテリー解放
      */
+    @PluginMethod
+    fun runCandidateBrowserE2E(call: PluginCall) {
+        val url = call.getString("url") ?: run { call.reject("url is required"); return }
+        val scenarios = call.getArray("scenarios") ?: JSONArray()
+        val timeoutMs = (call.getInt("timeoutMs") ?: 120000).coerceIn(5000, 180000)
+        if (!url.startsWith("http://127.0.0.1:") && !url.startsWith("http://localhost:")) { call.reject("Candidate preview URL must be loopback"); return }
+        val handler = Handler(Looper.getMainLooper())
+        handler.post {
+            val wv = WebView(context)
+            val consoleErrors = JSONArray()
+            val network = JSONArray()
+            wv.settings.javaScriptEnabled = true
+            wv.settings.domStorageEnabled = true
+            wv.settings.allowFileAccess = false
+            wv.settings.allowContentAccess = false
+            wv.webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                    if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) consoleErrors.put(message.message())
+                    return true
+                }
+            }
+            wv.webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): android.webkit.WebResourceResponse? {
+                    request?.let { network.put(JSONObject().put("url", it.url.toString()).put("method", it.method).put("at", System.currentTimeMillis())) }
+                    return super.shouldInterceptRequest(view, request)
+                }
+                override fun onPageFinished(view: WebView?, loadedUrl: String?) {
+                    val scenarioJson = JSONObject.quote(scenarios.toString())
+                    val script = """
+                    (function(){const scenarios=JSON.parse($scenarioJson);window.__MIKI_E2E_DONE__=false;window.__MIKI_E2E_RESULT__=null;
+                    const sleep=ms=>new Promise(r=>setTimeout(r,ms));const one=async(sc)=>{const steps=[];let passed=true;history.replaceState({},'',sc.path||'/');for(let i=0;i<(sc.steps||[]).length;i++){const a=sc.steps[i],t=Date.now();try{if(a.type==='WAIT'){await sleep(Number(a.value||250));}else if(a.type==='ASSERT_URL'){if(!location.href.includes(a.expected||''))throw Error('ASSERT_URL_FAILED');}else if(a.type==='ASSERT_NO_CONSOLE_ERRORS'){}else{let el=null,limit=Date.now()+Number(a.timeoutMs||5000);while(Date.now()<limit&&!el){el=document.querySelector(a.selector||'');if(!el)await sleep(50);}if(!el)throw Error('ELEMENT_TIMEOUT:'+a.selector);if(a.type==='CLICK')el.click();else if(a.type==='FILL'){el.focus();el.value=a.value||'';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}else if(a.type==='CHECK'){if(!el.checked)el.click();}else if(a.type==='SELECT'){el.value=a.value||'';el.dispatchEvent(new Event('change',{bubbles:true}));}else if(a.type==='ASSERT_VISIBLE'){const r=el.getBoundingClientRect();if(r.width<=0||r.height<=0)throw Error('ASSERT_VISIBLE_FAILED');}else if(a.type==='ASSERT_TEXT'){if(!(el.textContent||'').includes(a.expected||''))throw Error('ASSERT_TEXT_FAILED');}else if(a.type==='ASSERT_VALUE'){if(el.value!==(a.expected||''))throw Error('ASSERT_VALUE_FAILED');}}steps.push({index:i,type:a.type,passed:true,durationMs:Date.now()-t});}catch(e){passed=false;steps.push({index:i,type:a.type,passed:false,durationMs:Date.now()-t,error:String(e&&e.message||e)});break;}}return {scenarioId:sc.scenarioId,passed,steps,finalUrl:location.href,dom:document.documentElement.outerHTML};};(async()=>{const results=[];for(const sc of scenarios)results.push(await one(sc));window.__MIKI_E2E_RESULT__=results;window.__MIKI_E2E_DONE__=true;})();return true;})()
+                    """.trimIndent()
+                    view?.evaluateJavascript(script, null)
+                    pollE2EResult(view!!, call, scenarios, consoleErrors, network, System.currentTimeMillis(), timeoutMs, handler)
+                }
+            }
+            wv.layout(0,0,1080,1920)
+            wv.loadUrl(url)
+        }
+    }
+
+    private fun pollE2EResult(wv: WebView, call: PluginCall, scenarios: JSONArray, consoleErrors: JSONArray, network: JSONArray, startedAt: Long, timeoutMs: Int, handler: Handler) {
+        if (System.currentTimeMillis() - startedAt > timeoutMs) { wv.destroy(); call.reject("BROWSER_E2E_TIMEOUT"); return }
+        wv.evaluateJavascript("JSON.stringify({done:window.__MIKI_E2E_DONE__===true,result:window.__MIKI_E2E_RESULT__})") { raw ->
+            try {
+                val decoded = if (raw != null && raw.startsWith("\"")) JSONObject("{\"v\":$raw}").getString("v") else raw
+                val state = JSONObject(decoded ?: "{}")
+                if (!state.optBoolean("done")) { handler.postDelayed({ pollE2EResult(wv,call,scenarios,consoleErrors,network,startedAt,timeoutMs,handler) },250); return@evaluateJavascript }
+                val results = state.optJSONArray("result") ?: JSONArray()
+                val bitmap = Bitmap.createBitmap(1080,1920,Bitmap.Config.ARGB_8888); wv.draw(Canvas(bitmap)); val out=ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.PNG,100,out); val shot=Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP)
+                val screenshots=JSONArray(); val domSnapshots=JSONArray(); var passed=true
+                for(i in 0 until results.length()){val r=results.getJSONObject(i);if(!r.optBoolean("passed"))passed=false;val id=r.optString("scenarioId");screenshots.put(JSONObject().put("scenarioId",id).put("base64",shot).put("differenceRatio",compareBaseline(scenarios,id,bitmap)));domSnapshots.put(JSONObject().put("scenarioId",id).put("html",r.optString("dom")));r.remove("dom")}
+                val reasons=JSONArray();if(consoleErrors.length()>0){passed=false;reasons.put("BROWSER_CONSOLE_ERRORS")}
+                wv.destroy();call.resolve(JSObject().put("success",passed).put("results",results).put("consoleErrors",consoleErrors).put("network",network).put("screenshots",screenshots).put("domSnapshots",domSnapshots).put("reasons",reasons))
+            } catch(e:Exception){wv.destroy();call.reject("BROWSER_E2E_RESULT_PARSE_FAILED:${e.message}")}
+        }
+    }
+
+    private fun compareBaseline(scenarios: JSONArray, scenarioId: String, actual: Bitmap): Double {
+        for(i in 0 until scenarios.length()){val sc=scenarios.optJSONObject(i)?:continue;if(sc.optString("scenarioId")!=scenarioId)continue;val encoded=sc.optString("baselineScreenshotBase64");if(encoded.isBlank())return 0.0;return try{val bytes=Base64.decode(encoded,Base64.DEFAULT);val baseline=android.graphics.BitmapFactory.decodeByteArray(bytes,0,bytes.size)?:return 1.0;val width=minOf(actual.width,baseline.width);val height=minOf(actual.height,baseline.height);var different=0L;var total=0L;var y=0;while(y<height){var x=0;while(x<width){val a=actual.getPixel(x,y);val b=baseline.getPixel(x,y);val delta=kotlin.math.abs(android.graphics.Color.red(a)-android.graphics.Color.red(b))+kotlin.math.abs(android.graphics.Color.green(a)-android.graphics.Color.green(b))+kotlin.math.abs(android.graphics.Color.blue(a)-android.graphics.Color.blue(b));if(delta>30)different++;total++;x+=4};y+=4};baseline.recycle();if(total==0L)1.0 else different.toDouble()/total.toDouble()}catch(e:Exception){1.0}}
+        return 0.0
+    }
+
     @PluginMethod
     fun fetchRenderedPage(call: PluginCall) {
         val url = call.getString("url")

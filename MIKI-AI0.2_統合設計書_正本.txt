@@ -8393,3 +8393,338 @@ CANDIDATE
 を維持する。
 
 ============================================================
+
+
+## ============================================================
+【164. 実装履歴：自律コード改善・第一段階 コード意味索引】
+
+2026-09-26、既存の `selfCodeUnderstandingService` を正本として拡張し、重複するCode Understanding Service、第二CORE、第二Blackboard、第二Result DBは追加していない。
+
+実装範囲：
+- TypeScript Compiler APIによるTS/TSX/JS/JSX構文木解析
+- Class / Interface / Type / Function / Method / Property / Variable / EnumのSymbol索引
+- import / importedByに加え、CALLS / EXTENDS / IMPLEMENTS関係の抽出
+- Domain Command文字列の宣言・利用索引
+- Event publish / subscribeの索引
+- Storage read / writeとStorage Keyの索引
+- Status等の契約文字列の索引
+- 同一Command / Event / Storage Keyを介した関連ファイル探索
+- contentHashを利用した未変更ファイル解析結果の再利用
+- schemaVersion=2による旧スナップショットとの明示的分離
+- parse diagnosticを含むfail-closedなready判定
+- 対象範囲のSymbol ID、実行関係、契約値をCORE側へ返却
+
+重複回避：
+- `chapter_31_collocation_ast_refactor.ts` は旧自律生成モジュールであり、現行COREの自己コード理解正本には採用しない。
+- `DependencyGraphModal.tsx` はUI表示部品であり、解析正本にはしない。
+- `codeKnowledge`配下は検証済み知識・構築部品であり、リポジトリ実体索引とは責務が異なるため統合先を増設しない。
+- 現行 `selfCodeUnderstandingService.ensure()` の公開入口と `adaptiveRoutePlannerService` からの呼出しを維持する。
+
+第一段階で未実装の範囲：
+- TypeCheckerを利用した完全な型解決
+- 動的Runtime値によるEvent / Commandの完全解決
+- Requirement Contract Compiler
+- AST変換によるCandidate生成
+- 複数ファイル契約伝播と自動修復
+
+本段階の目的は、Candidate生成能力を追加する前に、既存コードのSymbol・呼出し・Command・Event・Storage接続を決定論的に観測できる基盤を既存正本へ統合することである。
+
+## ============================================================
+【165. 実装履歴：第一段階補強と第二段階要求契約接続】
+
+2026-09-26、既存正本を拡張して実装した。重複するRepository Index、Requirement Compiler、Component Registry、Code Knowledge Store、Orchestrator、Blackboard、Result DBは追加していない。
+
+第一段階補強：
+- 既存 `selfCodeUnderstandingService` の出力に Execution Path、Impact Scope、Unresolved Edge を追加した。
+- 対象ファイル、import/importedBy、CALLS、Command、Event、Storage契約を同一Snapshot上で関連付ける。
+- 影響範囲を MUST_CHANGE / MUST_INSPECT / CONTRACT_DEPENDENCY / TEST_ONLY / POSSIBLY_RELATED に分類する。
+- 未解決CALLSを黙って成功扱いせず unresolvedEdges として返す。
+- Snapshotの公開読取は既存サービスへ追加し、第二の索引サービスを作らない。
+
+Code Knowledge / Code Component境界：
+- Repository Indexは現行ソース実体の観測に限定する。
+- Code Knowledgeは既存 `src/miki/core/data/codeKnowledge/*` を正本とし複製しない。
+- Code Componentは既存Component Registry / Artifact Store / Composition Serviceを正本とし複製しない。
+- Requirement ContractはRepository Indexの影響範囲と既存Component/Knowledge参照候補を保持するが、存在だけでVERIFIEDへ昇格しない。
+
+第二段階：
+- 既存 `specContractCompilerService` を要求契約の正本として拡張する。
+- 自然言語原文を直接Candidate生成へ渡さず、目的、要件、禁止、不変条件、検証、成果物、対象、影響範囲、未解決事項へ射影する。
+- Repository Indexがreadyでない、対象が存在しない、目的・要件・検証条件が欠落する場合はContractをBLOCKEDとしてfail closedする。未解決Edgeは契約へ保持し、後続の調査対象とする。
+- 外部AIまたはローカルLLMを通常経路へ追加しない。
+- 本段階はCandidate生成を開始せず、次段階のAST変換が参照する追跡可能な契約を確定する。
+
+## ============================================================
+【166. 実装履歴：第三段階 決定論的AST Candidate生成】
+
+2026-09-26、Requirement ContractからCandidate Workspaceへ進む最初の決定論的コード変更経路を実装した。
+
+重複回避：
+- 新しいCORE、Planner、Blackboard、Candidate Workspace、Validation、Component Registry、Code Knowledge Storeは作らない。
+- 既存 `candidateCodeGenerationService`、`autonomousCandidatePreparationService`、`isolatedCandidateWorkspaceService` を正規経路として使用する。
+- 既存 `codeConstructionRendererService` はConstruction Graphから新規ソースを実体化する責務のため維持し、既存ファイルへのAST編集とは責務を分離する。
+- AST編集だけを担う `astCandidateTransformationService` を追加し、稼働ソースへ直接書き込まない。
+
+初期対応Operation：
+- ADD_IMPORT
+- ADD_INTERFACE_FIELD
+- ADD_PARAMETER
+- ADD_OBJECT_PROPERTY
+
+安全条件：
+- baseline SHA-256一致必須
+- 対象ファイルはImprovement RunのtargetFiles内だけ
+- 既存構文エラー時は停止
+- Operation対象Symbolが見つからない場合は停止
+- 同一要素が既に存在する場合は停止し、重複追加しない
+- 変換後ASTを再解析し、構文診断がある場合はCandidate化しない
+- 変換結果はCandidate Workspaceへ隔離し、既存Validation / Review Package経路へ渡す
+- 稼働中Self Code Spaceを直接変更しない
+
+自然言語接続：
+- 既存 `specContractCompilerService` に厳格な決定論的Operationコンパイルを追加した。
+- 対象ファイルが1件に確定し、自然言語が明示的な構文に一致する場合だけOperationを生成する。
+- 対応例は「interface Result に workspaceId:string フィールドを追加」「関数 run に revision:number 引数を追加」など。
+- 曖昧な指示、複数対象、未知の操作は推測せず従来のCode Knowledge / Code Component / Construction Graph / Capability Gap経路へ戻す。
+- ローカルLLMおよび外部AIを通常経路へ追加しない。
+
+本段階は最終目標の一部であり、自由な自然言語から任意のプログラムを生成できる完成状態ではない。今後、検証済みOperation種類、契約伝播、診断修復、成功変換のKnowledge/Component昇格を段階的に拡張する。
+
+## ============================================================
+【167. 実装履歴：第四段階 統合生成計画と生成方式の協働】
+
+2026-09-26、AST変換、検証済みCode Component、Construction Graph、Capability Gapを単一の決定論的生成計画で扱う統合を実装した。
+
+重複回避：
+- CORE、Adaptive Route Planner、Candidate Generator、Candidate Workspace、Validation、Code Knowledge、Component Registry、Artifact Store、Construction Graphは既存正本を維持する。
+- 新しい上位Orchestratorを追加せず、`integratedGenerationPlanService` はCandidate生成内の戦略計画だけを担当する。
+- 実装生成は既存 `candidateCodeGenerationService` が引き続き唯一の正式入口である。
+
+統合順序：
+1. AST_TRANSFORM
+2. COMPONENT_REUSE
+3. CONSTRUCTION_GRAPH
+4. CAPABILITY_GAP
+
+動作：
+- 明示的AST Operationが成功すれば既存Candidate Workspaceへ保存する。
+- AST Operationが対象Symbol不存在、重複、構文条件、Workspace条件等で失敗しても、即座にCandidate生成全体を失敗させない。
+- AST失敗理由を保持し、既存Code Knowledge / Code Component / nonLlmCodeSynthesis / Construction Graph経路へ継続する。
+- 既存Component IDとCode Knowledge IDを同じGeneration Planへ含める。
+- 既存合成で解決できない場合だけCapability Gapとして停止する。
+- 各計画とStepは内容ハッシュ由来の決定論的IDを持つ。
+- ローカルLLMおよび外部AIを通常経路へ追加しない。
+
+最終目標への位置：
+自然言語指令から単一の生成方式だけを使うのではなく、局所AST編集、既存部品再利用、部品合成を一つの改善作業で協働させる基盤となる。次段階では、複数ファイル契約伝播、診断修復、成功変換のKnowledge / Component昇格を同計画へ追加する。
+
+## ============================================================
+【168. 実装履歴：第五段階 複数ファイル契約伝播】
+
+2026-09-26、Repository Index上で一意に解決できるInterfaceとProducer Objectへ、同じ契約フィールドを複数ファイルに伝播する決定論的経路を実装した。
+
+重複回避：
+- 既存 `selfCodeUnderstandingService` をSymbol解決の正本として使用する。
+- 既存 `specContractCompilerService` を自然言語からのOperationコンパイル正本として使用する。
+- 既存 `astCandidateTransformationService` を実ファイル候補の変更手段として使用する。
+- 既存 `integratedGenerationPlanService`、`candidateCodeGenerationService`、Candidate Workspace、Validationへ接続する。
+- 新しいRepository Index、Requirement Compiler、Candidate Generator、Workspace、Component Registryは作らない。
+
+初期伝播契約：
+- Interfaceへ同一フィールドと型を追加する。
+- Producer Objectへ同一フィールドと値式を追加する。
+- Repository Snapshot内でSymbolが一意の場合だけOperation化する。
+- Symbol未検出または同名複数の場合は推測せずunresolvedとして停止する。
+- 同一Operationは内容ハッシュで重複排除する。
+- 複数ファイルのOperationは同一Integrated Generation PlanとCandidate Workspaceへ渡す。
+
+自然言語の厳格形式例：
+`candidateRevision:number を interface CandidateResult と object response へ revision として伝播`
+
+第169章でConsumer引数とValidation Guardまで拡張済み。Command Payloadの一般化とTest Case自動生成は後続対象とする。ローカルLLMおよび外部AIを通常経路へ追加しない。
+
+
+## ============================================================
+【169. 現行正本：自律コード開発パイプライン統合仕様】
+
+本章を第164章から第168章の実装履歴に対する現行正本とする。過去章は経緯と検証記録として残すが、重複箇所の現行判定は本章を優先する。
+
+AI単独開発計画：
+- featureDevelopmentPlannerServiceが自由記述要求をUse Case、Acceptance Criteria、MODEL / SERVICE / CORE_ROUTE / UI / PERSISTENCE / VALIDATION / TEST / EXPORTタスクへ分解する。
+- newFeatureConstructionPlanServiceが新規型、Service、Route、React Component、Store、Test、ExporterのArtifact Planを作り、既存Component再利用を優先し、不足時だけConstruction Graphを使う。
+- executableFeatureTestPlanServiceがRepositoryの既存script方式に合わせ、NODE_MJSまたはTSX_SCRIPTの実行可能Test Plan、Fixture契約、Assertion、実行Commandを作る。
+- autonomousFeatureDevelopmentPlanServiceが3計画を同一Development Planへ統合し、未解決条件またはTest Plan空の場合はreadyにしない。
+- autonomousFeatureConstructionExecutorServiceがArtifact PlanをCodeConstructionGraphへ変換し、既存codeConstructionRendererServiceでType / Service / Route / React Component / Store / Test / Exporterを生成する。全Artifactの構文検査と新規Path衝突検査に合格した場合だけ、既存isolatedCandidateWorkspaceServiceへ一括登録する。部分成功は受理しない。
+- featureArtifactWiringServiceがArtifact間Import、Type / Store / Service / Route / UIの依存、storageService接続、Acceptance Criteria別Test本文を生成する。CORE CommandとReact画面ツリーについては既存ファイルを直接変更せず、明示Anchor付きIntegration Patch Candidateを作る。
+- featureCandidateAnalysisServiceが生成Artifact全体を単一TypeScript Programとして診断し、同時に相対Import Graphの循環を検出する。診断または循環が1件でもあればWorkspace登録を拒否する。
+- Candidate ValidationへtestCommandsとacceptanceCriterionIdsを登録する。featureAcceptanceEvidenceGateServiceは必須Acceptance CriteriaのEvidenceが全件成功し、既存Promotion Gateも通過した場合だけReview Packageを許可する。
+
+現行経路：
+1. COREが自然言語指令を受領する。
+2. 既存specContractCompilerServiceがRequirement Contractと決定論的Operationを作る。
+3. 既存selfCodeUnderstandingServiceがRepository Symbol、実行関係、影響範囲を解決する。
+4. contractPropagationServiceがInterface、Producer Object、Consumer Function、Validation Functionへ同一契約を伝播する。
+5. integratedGenerationPlanServiceがAST_TRANSFORM、COMPONENT_REUSE、CONSTRUCTION_GRAPH、CAPABILITY_GAPを同一計画で選択する。
+6. candidateCodeGenerationServiceが唯一の正式生成入口としてCandidateを作る。
+7. 既存Candidate Workspace、Validation、Review Packageを通す。
+
+現行の決定論的AST Operation：
+- ADD_IMPORT
+- ADD_INTERFACE_FIELD
+- ADD_PARAMETER
+- ADD_OBJECT_PROPERTY
+- ADD_VALIDATION_GUARD
+- ADD_CALL_ARGUMENT
+
+契約伝播：
+- Interfaceへfield/typeを追加する。
+- Producer Objectへfield/expressionを追加する。
+- Consumer Functionへ同名parameter/typeを追加する。
+- Validation Function先頭へ明示条件のfail-closed guardを追加する。
+- Consumer呼出し箇所へ同じ契約値の実引数を追加する。
+- SymbolはRepository Snapshot内で一意の場合だけ採用し、未検出・同名複数・既存要素重複では推測しない。
+
+重複実装禁止：
+- CORE、Planner、Repository Index、Requirement Compiler、Candidate Generator、Workspace、Validation、Review Package、Code Knowledge Store、Component Registry、Artifact Store、Construction Graphを新設しない。
+- 専門Serviceは既存正本に不足する単一責務だけを持ち、上位authorityにならない。
+- Code KnowledgeとCode Componentは既存正本を参照し、同じ定義または実装を別Storeへ複製しない。
+
+実装状況と後続拡張：
+- Command Payloadの発行側・中継側・受信側を型付きに一般化する。呼出し側実引数の基本伝播は実装済み。
+- Requirement ContractからNORMAL / MISSING / MISMATCH / BOUNDARY / REGRESSIONのTest Intentを生成し、Candidate Validation APIへ送る接続は実装済み。Component ID確定後の正式回帰登録は既存componentTestCaseServiceを使用する。
+- Candidate Validation APIが返すTypeScript診断をTS2304 / TS2554の決定論的Repair Planへ変換し、ASTによるRepair Revision候補を作る接続は実装済み。TS2339は契約文脈必須としてfail closedし、複数ファイル契約伝播へ戻す。
+- Repair Revisionを新しい隔離Candidate Workspaceとして登録し、自動再Validationする制限付きRetry Loopは実装済み。既定3回、上限5回。同一診断署名の再発、受理可能Planなし、上限到達で停止する。
+- Retry Loop成功時は既存singlePromotionGateとreviewCandidateExportServiceを通過した場合だけReview Packageを作成する。失敗時は既存capabilityGapServiceへ構造化Gapを記録する。Review Package Gate不合格を成功扱いしない。
+- 成功変換の正式昇格は既存Review Learning、Component Improvement Candidate、Verification、Canary、Promotion Gateを正本として使用する。検証前の自動昇格は禁止し、候補化だけを許可する。
+
+Stage 17 統合完了：
+- 統一入口から構造的AST統合、Allowlist Test実行、Criterion Evidence記録、Acceptance Gate、失敗経路分類、必要時Replan、評価Package生成・永続化まで連続実行する。
+- COREはSwitch Caseを、ReactはReturn JSXをTypeScript AST Nodeとして更新する。コメント候補への退避を実適用とは扱わない。
+- Test実行はExpressの固定Endpointでshell=false、Command Allowlist、時間上限、出力上限、Proxy無効化を適用する。
+- 既存変更、新規Artifact、Component再利用、Integration Patch、Capability Gapを統一Strategy Decisionで選択する。
+
+統合入口固定：
+- 自然言語要求と作業指示書を別開発系統に分けない。既存mikiSelfCodingSuperchargerService.runAutonomousImplementationを唯一の自己コード開発入口とし、両方をunifiedInstructionDevelopmentServiceへ渡す。
+- 入力種別は監査情報として保持するだけで、Feature Plan、Construction、Wiring、Validation、Reviewの実装経路は共通化する。
+
+Stage 15 自律完了機能：
+- Integration PatchはBaseline SHA、構文、Anchor、重複を検証してCandidate内容を生成する。
+- Test Commandはnode/tsxのverifyスクリプトまたはpackage.json登録済みverify scriptだけをAllowlist実行する。
+- Test結果を既存Candidate Validation Evidenceへ記録し、Acceptance Criterionへ自動対応付けする。
+- CORE / UI / Persistence / Serviceの実行経路を静的に検証する。
+- 局所修復不能時はFeature Plan Revisionを生成し、再利用可能Artifact Pathを継承する。
+- JSZipで評価用ZIPを生成し、同一バイト列のZIPTXTとManifest、SHA-256を返す。
+
+通常経路でローカルLLMまたは外部AIを使用しない。稼働中コードを直接変更せず、Candidate Workspaceと既存Promotion境界を維持する。
+
+============================================================
+【Semantic Understanding v2 固定設計 2026-09-26】
+============================================================
+
+自然言語の開発指示は、既存の決定論的Intent解析を削除せず、その前段でSemantic Frame v2へ正規化する。
+
+入力
+↓
+Semantic Frame v2
+  Problem / Goal / Target / Actor / Trigger / Condition
+  Prohibition / Exception / Priority / Quantity
+  Quality Attribute / Success Metric / Failure Behavior
+  Compatibility Requirement / Invariant / Unknown
+↓
+Cause Hypothesis
+  Repository支持Evidence
+  Repository反証Evidence
+  Confidence
+  Rejected判定
+↓
+Solution Hypothesis
+  Causeとの対応
+  必須Evidence
+  Invariant Risk
+  Executable判定
+↓
+Clarification Gate
+  明確ならREADY
+  曖昧・競合時だけWAITING_USER
+↓
+既存Multi-Intent Transaction
+↓
+既存Candidate Workspace / Validation / Repair / Review ZIP
+↓
+Semantic Coverage Gate
+  Goal coverage
+  Uncovered goal
+  Invariant violation
+  Evidence path
+
+固定原則:
+1. 原因仮説と解決仮説を混同しない。
+2. 支持Evidenceだけでなく反証Evidenceを保存する。
+3. 曖昧さが実装結果へ影響する場合だけ質問する。
+4. Build成功だけを意味達成としない。
+5. 禁止事項、互換性、例外、優先順位をSemantic Invariantとして保持する。
+6. 既存の決定論的意味解析、Concept Ontology、Multi-Intent、CORE経路を置換せず前後に接続する。
+
+============================================================
+【Stage 35-40 固定設計 2026-09-26】
+============================================================
+
+Stage 35 Semantic Enforcement:
+Semantic FrameはinstructionIdとrevisionで永続化する。Validation後、Review Package生成前にSemantic Coverageを必須実行し、未達Goal、Invariant違反、Evidence不足をRepair入力へ返す。Coverage不合格時はREVIEW_READYへ遷移しない。
+
+Stage 36 Clarification Lifecycle:
+WAITING_USERを正式Lifecycle状態とする。質問、理由、Question Hash、回答Revision、Resume Tokenを永続化する。同一未回答質問の重複発行を禁止し、回答後はSemantic Frameを再解析する。
+
+Stage 37 Relevant Causal Analysis:
+原因Evidenceは対象Path、Target Term、Call Graph距離4以内へ限定する。到達不能EvidenceはexcludedEvidenceへ分離し、支持、反証、Runtime Reproductionを保存する。
+
+Stage 38 Concrete Transformation Executors:
+UI、State、API、Performance、Security、Migration、Multi-RepositoryのOperationは、Parse検査、冪等Marker、Rollback Payloadを持つ具体Transformationとして実行する。
+
+Stage 39 Runtime Adapters:
+Browser、Benchmark、Mock API、Security Sandbox、Test DB、Multi-Repository Buildを共通Evidence形式で実行する。Adapterが利用不能なら成功扱いにせず、環境不足として停止する。
+
+Stage 40 Real E2E Proof:
+SUCCESS、QUESTION、FAILURE、REPAIR、ROLLBACK、REVIEW ZIPの6経路を実行対象とする。Repository-local実行と外部実環境証明を区別し、外部依存不足時は未証明として記録する。
+
+============================================================
+【Stage 41-50 統合実装設計 2026-09-26】
+============================================================
+Stage 41: GoalはRevision、状態、Foreground/Background、Deadline、Risk、Dependency、Invariantを持つ。決定順はForeground、Security、安全Invariant、Deadline、Risk、Priority、Dependency、canonical Goal ID、Revisionとし、旧Revision CandidateをReview対象にしない。
+Stage 42: Changed SymbolからType、Producer、Serializer、Storage、Reader、Service、Route、UI、Test、Generated Codeを追跡し、影響未確認種別が残る場合はReview Gateを閉じる。
+Stage 43: RepositoryごとにPackage Manager、Lockfile Hash、Node、Java、Android SDK、Offline Cache、Environment Fingerprintを保持する。依存修復はLockfileを優先し、最新版への無断更新を禁止する。
+Stage 44: Acceptance Criterionごとに正常、境界、不正、Property、Metamorphic、Mutation、Race、Timeout/Retry/Cancellation、Persistence破損、Migration二重実行、Rollback同値性を多対多Test Matrixへ展開する。未検証Criterionまたは生存MutationがあればReviewを禁止する。
+Stage 45: 外部仕様KnowledgeはsourceVersion、observedAt、verifiedAt、environment、expiresAt、revalidateAt、contentHashを持ち、失効時は再評価対象とする。
+Stage 46: Run、Goal Revision、Candidate Revision、Operation、Repository Revision、Validation、Evidence期限、Repair Fingerprint、Lease、Pause/Cancel/SupersedeをCheckpointへ保存する。Stale Baselineと重複Workerを拒否する。
+Stage 47: Strategy、Repair、Failure Class、Repository、Environment、Component、Cause Hypothesis、Test検出能力、採否、再修正理由をOutcomeへ接続し、Repository固有Sample不足時の過剰一般化を禁止する。
+Stage 48: RepositoryごとにSBOM、Provenance、Integrity、Lock Hash、Typosquatting、Install Script、License、Vulnerabilityを評価し、Trust Gate不合格依存をReview対象にしない。
+Stage 49: Input、Semantic Frame、Goal Revision、Repository Revision、Environment、Tool Version、Lock Hash、Operation、Test Plan、Runtime Evidence、Repair、Candidate、Review Package、ZIPTXT同一性、Decision TraceをLedgerへ保存する。
+Stage 50: 採用CandidateはDry RunとCanary Workspaceで、部分適用禁止、前後SHA、起動、Smoke、Stability Window、Crash、Error、Performanceを検査し、失敗時はRollback Requiredとする。稼働中コードを直接更新しない。
+補助Gate: Architecture Fitness、Assumption Ledger、Dead Code Candidate、Privacy/Secret FlowをReview前に評価する。Dead Codeは自動削除せずCandidate化する。
+
+【Stage 41-50 実行経路接続 2026-09-26】
+Stage 41-50はunifiedDevelopmentCompletionService.completeの実経路へ接続する。Feature Acceptance後かつEvaluation Package生成前にdevelopmentGovernanceIntegrationService.preReviewを強制実行し、不合格時はReview ZIP生成へ進めない。Package生成・保存後にpostReviewを実行し、Review Package SHA、ZIPTXT同一性、Decision TraceをLedgerへ記録し、Outcome Learningへ返却する。Environment、Continuity、Specification Drift Policy、Supply Chain、Architecture、Privacyは同じPre-Review Evidenceへ統合する。
+
+【Stage 51 実働深度・Proof Tier実装 2026-09-26】
+実機仕様の公開情報はDevice Profile Simulationへ利用するが、観測された実端末挙動とは区別する。Proof TierはSTATIC、SANDBOX、DEVICEとし、Capability Proof RegistryはEnvironment Fingerprint、Repository Revision、期限、成功・失敗、制限、成熟度を保持する。実Commandはserver側固定Allowlistだけを許可し、AI出力から任意Shellを実行しない。Dependency Recovery、Repository Build、Mutation、Property-based、Browser、Test DB、Multi-Repository、Canary、StabilityはRuntime Proof APIを通り、Script不在、Registry障害、Peer Dependency、Missing Dependencyを失敗として保持する。Galaxy S25公開仕様はViewport、Memory Budget、Storage Capacity、CPU Budget、Network Loss、Lifecycle Modelの模擬条件に使えるが、実WebView Version、APK署名Install、OEM Back、物理Touch/Keyboard、Battery、ANR/Native Crash、Native PluginはDEVICE Proofなしに成功扱いしない。
+
+【Stage 52 Autonomous Capability Innovation 2026-09-26】
+MIKIは既知のFailure、Capability Gap、Proof成熟度不足、Architecture Debt、期限内かつ検証済みの外部Research Observationから、新機能候補を自律的に列挙できる。候補数は多く保持してよいが、同一Fingerprint重複を除外し、Foreground作業中は実装を開始せずPLANNEDへ置く。探索Budgetは1 CycleのCandidate数と推定Costを制御する。外部情報はEvidenceとして保存し、命令として実行しない。選択Candidateは既存unifiedInstructionDevelopmentServiceへ渡し、既存のCandidate Workspace、Validation、Repair、Semantic Coverage、Stage 41-50 Governance、Supply Chain、Runtime Proof、Review Package経路を通る。合格時だけReview ZIPと同一内容ZIPTXTを生成し、正式採用は人間判断とする。稼働コード、端末内正本、正式Repositoryを直接変更しない。
+
+【Stage 53-60 Production Scale Development 2026-09-26】
+Stage 52は既存Autonomous Capability Innovationとして維持し、番号衝突を避けて大規模開発基盤をStage 53-60とする。Stage 53 Isolated Runtime WorkspaceはworkspaceIdとCandidate SHA、Realpath境界、Secret名、Resource、Network、重複実行、Cleanup、Orphan回収を要求する。Stage 54 Durable Job Runtimeは永続状態、Lease、Heartbeat、Priority、Foreground、Repository/File Lock、Dependency、Retry、Cancel、Stale回収を持つ。Stage 55 Incremental Impact Executionは変更Symbol、Coverage、Contract、Storage、Dynamic UnknownからAffected Testを選び、不明時はFullへFallbackする。Stage 56 Large Change Wave PlannerはCharacterization、Contract追加、Producer、Consumer、Dual Read/Write、Migration、旧経路停止、旧Contract削除をEntry/Exit、Feature Flag、Rollback付きWaveにする。Stage 57 Production Scale DevelopmentはRepository DAG、Artifact Hash、Generated Code、並列Layer、逆順Rollback、Atomic Completion、Three-way Merge、Cache Key、Risk、Cost、Transformation Coverage、Characterizationを扱う。Stage 58 Remote Execution ProtocolはAgent Identity、Nonce、期限、Job署名、Evidence署名、Replay防止、Device Fingerprint、Result/Log Hashを要求する。Stage 59 Capability Proofは開発判断へ強制利用し、要求Proof未達時はReviewを止める。Stage 60 Production Scale E2Eは専用Workspace、永続Job、Build、Test、Repair、Rollback、Review ZIPを長時間実行し、成功時のみReview ZIPを許可する。
+
+【Stage 53-60 正規Completion接続 2026-09-26】
+大規模変更判定時は、unifiedDevelopmentCompletionServiceのFeature AcceptanceおよびStage 41-50 Governance後、Evaluation Package生成前にproductionScalePipelineIntegrationService.preReviewを必須実行する。Incremental Impact、Wave、Build DAG、Risk、Cost、Capability Proof、Runtime Workspace、Durable Jobを一括照合し、不合格・高Risk Job未完了・Proof不足時はReview ZIPを生成しない。合格EvidenceはManifestへ収録し、Package生成後にRuntime Workspace解放、Job完了、Evidence Hash確定を行う。小規模変更は既存の同期Completionを維持する。
+
+【Stage 61 Worker Runtime and Host Sandbox Connection 2026-09-26】
+永続Production Scale JobはBootstrap時にProduction Scale Workerへ接続し、WorkerはClaim、Lease、Heartbeat、Cancel確認、Retry、再起動後Stale回収を実行する。Candidate Workspaceのファイル一式、workspaceId、candidateSha256、jobIdをHost Runtime Endpointへ渡し、Endpointは.miki-runtime配下へSnapshotを物理化し、OS realpath、安全な相対Path、Candidate専用cwd、固定Command Allowlist、Process Group Timeout Kill、Node Memory上限を強制する。Network Policyは宣言およびEvidence化するが、Network Namespace未導入時はnetworkNamespaceEnforced=falseとしDEVICE/SANDBOX完全隔離を主張しない。Job Evidence JournalはHash Chainで開始、Heartbeat、Checkpoint、Result、Rollbackを逐次保存する。成功JobはPRODUCTION_SCALE_E2E SANDBOX Proofを生成しCapability Proof Registryへ登録する。Coverage GraphとTypeScript Program GraphはAffected Test Selectionの次期入力として保存する。
+
+【Stage 63 Candidate Browser E2E 2026-09-26】
+UI変更時はCandidate BundleをToken付きLoopback Preview URLで自動起動し、Android Native Pluginの独立Headless WebViewへ読み込む。別Workspace Bundleと別OriginはPreview Tokenで分離する。Scenarioはbrowser-e2e.scenarios.jsonを優先し、未定義時はSmoke Scenarioを生成する。独立WebViewはClick、Fill、Check、Select、Wait、Visible/Text/Value/URL/Console Assertionを実行し、Console Error、Network Request、DOM Snapshot、PNG Screenshot、Baseline Pixel Differenceを収集する。EvidenceはTrace ZIPへ格納してSHA-256を確定し、UI変更ではReview ZIP生成前に必須Gateとする。Review ZIPはEVIDENCE.json、TRACE.zip.txt、Screenshot、DOM、Console、Network結果を欠く場合は生成しない。
+
+【Stage 64-71 Semantic Application Enforcement / Release failure-resilience】
+Stage 64はActor、Target、Desired State、Required/Forbidden Behavior、Pre/Postcondition、Invariant、Side Effect、Dependency、Failure Semantics、Evidence、AcceptanceをSemantic Intent Frameへ正規化する。Stage 65はIntent、Behavioral、Structural、Operational Contractへコンパイルする。Stage 66はRequirement、Contract、Implementation、Evidence、GateをSemantic Change Graphで接続する。Stage 67はTarget、Ordering、Side Effect、Failure Policy、Evidence、Security Assumptionの矛盾とCounterexampleを生成する。Stage 68はKERNEL、PROCESS、APPLICATION、OBSERVATIONAL、NONEを検出する。Stage 69はKernel Enforcement不在時にWorkspace/Candidate-bound Capability Token、Operation Allowlist、Hash、Review GateでApplication Enforcementを行う。Stage 70は高危険操作をKernel不在時に禁止し、降格をEvidenceへ明記する。Stage 71はSemantic Evidence未達ではReview ZIPを生成しない。
+
+【Stage 72-85 Failure Resilience / Priority failure-resilience】
+Failure TaxonomyはENVIRONMENT、DEPENDENCY、SOURCE、SEMANTIC、TRANSFORMATION、VALIDATION、TEST、RUNTIME、RESOURCE、PERMISSION、SECURITY、NETWORK、PERSISTENCE、CONCURRENCY、REVIEW_PACKAGE、DEVICEに統一する。全FailureはID、Code、Stage、Retry/Repair/User/Environment Action、Candidate/Workspace/Job/Revision、Observation、Occurrence、Evidence、Next Action、Diagnostic Signatureを持つ。Environment FailureはCandidate Repairへ送らない。Retryは原因Signatureまたは品質Metricsが変化・改善した時だけ継続し、同一原因・同一Metricsでは停止する。Candidate ProcessはEnvironment Allowlist、専用HOME/TMPDIR、Filesystem Snapshot/Diff、SymlinkとOversized File監査、Log上限とTruncation Evidenceを用いる。Preflight、Readiness Dashboard、Partial Success Resume、Repair Before/After、Strategy Success/Regression、Flaky Testを正規管理する。Failure Injection SuiteはWorker、Workspace、Build、Evidence、Review ZIPの34障害を検証する。

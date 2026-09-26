@@ -3,6 +3,7 @@ import { AutonomousVerificationData } from '../../../types';
 import { callSelfCodeApi, isApiFailure } from './selfCodeApiClient';
 import { skillIrCompilerService } from './skillIrCompilerService';
 import { storageService } from '../../../services/storageService';
+import { unifiedInstructionDevelopmentService } from './unifiedInstructionDevelopmentService';
 
 export interface CouncilCheckItem {
   label: string;
@@ -164,6 +165,7 @@ export interface SelfImplementationResult {
     rule: string;
   };
   error?: string;
+  unifiedDevelopment?: { source:'NATURAL_LANGUAGE'|'WORK_INSTRUCTION'; developmentPlanId:string; workspaceId?:string; candidateSha256?:string; reviewPackageId?:string; evaluationPackageId?:string; ready:boolean; reasons:string[]; };
 }
 
 export interface DiffLine {
@@ -376,6 +378,12 @@ class MikiSelfCodingSuperchargerService {
         error: 'CORE_PROMOTION_AUTHORITY_REQUIRED',
       };
     }
+    const packageScripts: Record<string,string> = {};
+    const unifiedDevelopment = await unifiedInstructionDevelopmentService.prepare(
+      prompt,
+      targetFileHint ? [targetFileHint] : [],
+      packageScripts,
+    );
     const res = await callSelfCodeApi<SelfImplementationResult>('/api/self-code/autonomous-implement', {
       method: 'POST',
       body: {
@@ -384,6 +392,8 @@ class MikiSelfCodingSuperchargerService {
         autoApply,
         codeOverride,
         authority,
+        unifiedDevelopmentPlanId: unifiedDevelopment.plan.developmentPlanId,
+        instructionSource: unifiedDevelopment.source,
       },
     });
     if (isApiFailure(res)) {
@@ -421,7 +431,8 @@ class MikiSelfCodingSuperchargerService {
         console.warn('Skill IR compilation warning:', e);
       }
     }
-    systemLogger.info('SELF_IMPROVEMENT', `[自律自己実装] ${res.targetFile} へ適用完了 (Commit: ${res.commitHash || 'N/A'}, Method: ${res.generationMethod || 'unknown'})`);
+    res.unifiedDevelopment={source:unifiedDevelopment.source,developmentPlanId:unifiedDevelopment.plan.developmentPlanId,workspaceId:unifiedDevelopment.wiring?.workspaceId||unifiedDevelopment.construction?.workspaceId,candidateSha256:unifiedDevelopment.completion?.candidateSha256,reviewPackageId:unifiedDevelopment.completion?.reviewPackageId,evaluationPackageId:unifiedDevelopment.completion?.storedPackage?.packageId,ready:unifiedDevelopment.ready,reasons:[...unifiedDevelopment.reasons]};
+    systemLogger.info('SELF_IMPROVEMENT', `[自律自己実装] ${res.targetFile} / UnifiedPlan ${unifiedDevelopment.plan.developmentPlanId} (Source: ${unifiedDevelopment.source})`);
     return res;
   }
 

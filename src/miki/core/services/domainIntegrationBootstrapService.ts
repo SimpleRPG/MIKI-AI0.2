@@ -1,3 +1,4 @@
+import { productionScaleWorkerService } from '../../selfDevelopment/services/productionScaleWorkerService';
 import { domainParticipationService } from './domainParticipationService';
 import { storageService } from '../../../services/storageService';
 import { conversationCompositionResearchSchedulerService } from '../../conversation/services/conversationCompositionResearchSchedulerService';
@@ -11,6 +12,7 @@ import { blackboardRecoveryService } from './blackboardRecoveryService';
 import { autonomousSelfImprovementLoopService } from './autonomousSelfImprovementLoopService';
 import { selfImprovementIngressService } from './selfImprovementIngressService';
 import { autonomousIssueDiscoveryService } from './autonomousIssueDiscoveryService';
+import { autonomousCapabilityInnovationService } from '../../selfDevelopment/services/autonomousCapabilityInnovationService';
 import { domainSequentialConnectionService } from './domainSequentialConnectionService';
 import { MIKI_DOMAINS } from './domainCatalogService';
 import { persistenceReceiptLedgerService } from './persistenceReceiptLedgerService';
@@ -39,6 +41,7 @@ class DomainIntegrationBootstrapService{
 
  async initialize():Promise<void>{
   if(this.initialized)return;
+  productionScaleWorkerService.initialize();
   this.initialized=true;
   initializeResearchMemoryVerificationSubscriber();
   // Register every domain before the fail-closed audit. The previous order
@@ -47,7 +50,7 @@ class DomainIntegrationBootstrapService{
   const connectivityAudit=await domainParticipationService.auditAll();
   if(!connectivityAudit.passed){this.dispose();throw new Error('DOMAIN_CONNECTIVITY_AUDIT_FAILED');}
   autonomousSelfImprovementLoopService.initialize();
-  autonomousIssueDiscoveryService.initialize();
+  autonomousIssueDiscoveryService.initialize();autonomousCapabilityInnovationService.initialize();
   conversationCompositionResearchSchedulerService.initialize();
   const recovery=blackboardRecoveryService.recoverInterrupted();
   if(recovery.recovered.length>0)systemLogger.info('SELF_IMPROVEMENT',`[DomainIntegration] interrupted tasks recovered: ${recovery.recovered.length}`);
@@ -61,7 +64,7 @@ class DomainIntegrationBootstrapService{
  }
 
  dispose():void{
-  for(const domain of MIKI_DOMAINS)domainRouterService.unregister(domain);conversationCompositionResearchSchedulerService.dispose();autonomousIssueDiscoveryService.dispose();autonomousSelfImprovementLoopService.dispose();for(const unsubscribe of this.unsubscribers)unsubscribe();this.unsubscribers=[];this.initialized=false;}
+  for(const domain of MIKI_DOMAINS)domainRouterService.unregister(domain);conversationCompositionResearchSchedulerService.dispose();autonomousIssueDiscoveryService.dispose();autonomousCapabilityInnovationService.dispose();productionScaleWorkerService.dispose();autonomousSelfImprovementLoopService.dispose();for(const unsubscribe of this.unsubscribers)unsubscribe();this.unsubscribers=[];this.initialized=false;}
  getStatus(){return {initialized:this.initialized,registered:domainRouterService.getRegistrations(),missing:domainRouterService.getMissingDomains([...MIKI_DOMAINS]),coverage:crossDomainCirculationService.getCoverage(),connectivityAudit:domainParticipationService.getLastAudit()};}
 
  private async handleExecutionEvent(event:ExecutionEvent):Promise<void>{

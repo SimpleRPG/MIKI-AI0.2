@@ -8,6 +8,7 @@ import { EvidenceService } from '../../memory/services/evidenceService';
 import { proposalQuarantineService } from './proposalQuarantineService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
+import { specContractCompilerService } from '../../selfDevelopment/services/specContractCompilerService';
 import { decomposeMultiIntent, selectMultiIntentHypothesis, type MultiIntentPlan } from '../../unknown/services/multiIntentDecompositionService';
 import { detectUnknownTermsFromBlackboardValue } from '../../unknown/services/unknownTermDetectionService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
@@ -312,7 +313,17 @@ class AdaptiveRoutePlannerService {
     const targetFilesKnown=coreTargetPaths.length>0;
     const understanding=targetFilesKnown
       ? selfCodeUnderstandingService.ensure(coreTargetPaths)
-      : {ready:false,reused:false,repoSha256:'',targetPaths:[],relatedPaths:[],reasons:['TARGET_FILES_UNKNOWN']};
+      : {ready:false,reused:false,repoSha256:'',targetPaths:[],relatedPaths:[],reasons:['TARGET_FILES_UNKNOWN'],snapshotSha256:undefined,symbolIds:[],executionRelations:[],contractValues:[],executionPaths:[],impactScopes:[],unresolvedEdges:[]};
+    const arrayOf=(value:unknown):string[]=>Array.isArray(value)?value.filter((item):item is string=>typeof item==='string'&&item.trim().length>0):[];
+    const requirementContract=targetFilesKnown
+      ? specContractCompilerService.compileImprovementRequirement({
+          objective:task.goal,targetPaths:coreTargetPaths,
+          requirements:arrayOf(input.requirements).length>0?arrayOf(input.requirements):[task.goal],prohibitions:arrayOf(input.prohibitions),
+          invariants:arrayOf(input.invariants),validationRequirements:arrayOf(input.validationRequirements).length>0?arrayOf(input.validationRequirements):['EXISTING_CANDIDATE_VALIDATION_PIPELINE'],
+          deliveryRequirements:arrayOf(input.deliveryRequirements),reusableComponentIds:arrayOf(input.reusableComponentIds),
+          codeKnowledgeIds:arrayOf(input.codeKnowledgeIds)
+        })
+      : undefined;
 
     const evidenceIds=new Set<string>();
     for(const entry of [...results,...observations,...task.entries.filter(entry=>entry.kind==='EVIDENCE')]){
@@ -341,11 +352,13 @@ class AdaptiveRoutePlannerService {
     const validationResult=this.latestBusinessResult(task,'VALIDATE_CANDIDATE');
     const packageResult=this.latestBusinessResult(task,'CREATE_REVIEW_PACKAGE');
     const candidateGenerationReady=issueEstablished && repositoryContextAvailable && targetFilesKnown
+      && requirementContract?.status==='READY'
       && understanding.ready && requiredEvidenceSatisfied && unresolvedKnowledge.length===0 && unresolvedCapability.length===0;
     const validationReady=Boolean(candidateResult && this.hasCandidateIdentity(candidateResult));
     const reviewPackageReady=Boolean(validationResult && this.hasValidationIdentity(validationResult));
 
     const blockingReasons:string[]=[];
+    if(requirementContract?.status==='BLOCKED')blockingReasons.push(...requirementContract.unresolved.map(reason=>`REQUIREMENT_CONTRACT:${reason}`));
     if(!issueEstablished) blockingReasons.push('IMPROVEMENT_ISSUE_NOT_ESTABLISHED');
     if(!repositoryContextAvailable) blockingReasons.push('REPOSITORY_CONTEXT_MISSING');
     if(!targetFilesKnown) blockingReasons.push('TARGET_FILES_UNKNOWN');
@@ -1025,6 +1038,7 @@ class AdaptiveRoutePlannerService {
             goal:task.goal,
             candidateRevision:previousRevision+1,
             targetFiles:coreTargetPaths,
+            astTransformations:specContractCompilerService.compileAllDeterministicAstOperations(task.goal,coreTargetPaths),
             requirements:input.requirements,
             prohibitions:input.prohibitions,
             invariants:input.invariants,
@@ -1175,6 +1189,7 @@ class AdaptiveRoutePlannerService {
           goal:task.goal,
           candidateRevision:Number(candidate.candidateRevision||1)+1,
           targetFiles:coreTargetPaths,
+          astTransformations:specContractCompilerService.compileAllDeterministicAstOperations(task.goal,coreTargetPaths),
           requirements:input.requirements,
           prohibitions:input.prohibitions,
           invariants:input.invariants,
@@ -1293,6 +1308,7 @@ class AdaptiveRoutePlannerService {
           taskId:task.taskId,runId:this.resolveCoreRunId(task,input),goal:task.goal,
           candidateRevision:Number(input.candidateRevision||1),
           targetFiles:coreTargetPaths,
+          astTransformations:specContractCompilerService.compileAllDeterministicAstOperations(task.goal,coreTargetPaths),
           requirements:input.requirements,
           prohibitions:input.prohibitions,
           invariants:input.invariants,
@@ -1308,6 +1324,7 @@ class AdaptiveRoutePlannerService {
         payload:{taskId:task.taskId,runId:this.resolveCoreRunId(task,input),goal:task.goal,
           candidateRevision:Number(candidate.candidateRevision||1)+1,
           targetFiles:coreTargetPaths,
+          astTransformations:specContractCompilerService.compileAllDeterministicAstOperations(task.goal,coreTargetPaths),
           requirements:input.requirements,
           prohibitions:input.prohibitions,
           invariants:input.invariants,

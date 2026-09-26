@@ -1,0 +1,26 @@
+MIKI-AI Code-Only Quality v272
+Base: v271
+Date: 2026-09-26
+
+Implemented:
+- Deterministic domain property subject and eight property assertions
+- Reversible mutation runner with seven material mutations
+- Default mutation score gate: 0.80
+- Measured mutation result: 7 killed, 0 survived, score 1.00
+- Mandatory source restoration after every mutation and at final cleanup
+- Existing Node built-in SQLite in-memory database runner retained
+- Historical repair strategy selection connected to candidateRepairRetryLoopService
+- Strategy ranking uses sample-size weighted success, regression, repeat and risk penalties
+
+Environment requirements:
+- ROOT: not required
+- Android root: not required
+- Kernel sandbox: not required
+- Additional npm test packages: not required
+- Node.js: required
+- node:sqlite capable Node.js: required only for the included DB runner
+
+Truth boundary:
+- The measured score applies to the included deterministic property subject, not automatically to every repository symbol.
+- Repository-specific mutation coverage requires target selection and properties or tests for those targets.
+- Vendor-specific database compatibility still requires the actual compatible database environment.

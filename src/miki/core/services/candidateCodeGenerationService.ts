@@ -11,6 +11,8 @@ import { componentArtifactStoreService } from '../../capability/services/compone
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { ComponentCompositionService } from '../../capability/services/componentCompositionService';
 import { codeConstructionRendererService } from './codeConstructionRendererService';
+import { astCandidateTransformationService, type AstCandidateOperation } from '../../selfDevelopment/services/astCandidateTransformationService';
+import { integratedGenerationPlanService } from '../../selfDevelopment/services/integratedGenerationPlanService';
 import {
   isCompatibleConstructionKind,
   type CodeConstructionBinding,
@@ -60,6 +62,42 @@ class CandidateCodeGenerationService {
   if(targetFiles.length!==targetPaths.length)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
   const implementationPlan=run.implementationPlan;
   if(run.runType==='AUTONOMOUS_DISCOVERY'&&!implementationPlan)return {accepted:false,runId,files:[],reasons:['AUTONOMOUS_IMPLEMENTATION_PLAN_REQUIRED']};
+  const astTransformations=this.parseAstTransformations(run.payload.astTransformations,targetPaths);
+  const integratedPlan=integratedGenerationPlanService.plan({
+    objective:run.objective,targetPaths,astTransformations,
+    reusableComponentIds:this.strings(run.payload.reusableComponentIds),
+    codeKnowledgeIds:this.strings(run.payload.codeKnowledgeIds),
+    requirementContractId:typeof run.payload.requirementContractId==='string'?run.payload.requirementContractId:undefined,
+    repositorySnapshotSha256:runSourceSnapshotSha256,
+    priorFailureReasons:this.strings(run.payload.generationFailureReasons)
+  });
+  if(integratedPlan.unresolved.length>0)return {accepted:false,runId,files:[],reasons:integratedPlan.unresolved};
+  const astFallbackReasons:string[]=[];
+  const astStep=integratedPlan.steps.find(step=>step.strategy==='AST_TRANSFORM');
+  if(astStep){
+    const generated:CandidateGenerationFile[]=[];
+    for(const target of targetFiles){
+      const operations=astStep.astOperations.filter(item=>item.path===target.path).flatMap(item=>item.operations);
+      if(operations.length===0)continue;
+      const outcome=astCandidateTransformationService.transform({path:target.path,baselineContent:target.content,expectedBaselineSha256:canonicalSha256(target.content),operations});
+      if(!outcome.accepted||!outcome.candidateContent){astFallbackReasons.push(...outcome.reasons.map(reason=>`${target.path}:${reason}`));continue;}
+      generated.push({path:target.path,candidateContent:outcome.candidateContent,evidenceIds:[...target.evidenceIds]});
+    }
+    if(astFallbackReasons.length===0&&generated.length>0){
+      const prepared=await autonomousCandidatePreparationService.prepareForRun(runId,generated);
+      if(prepared.workspaceId){
+        return {
+          accepted:true,runId,workspaceId:prepared.workspaceId,files:generated,reasons:[],attemptCount:1,
+          responseHash:canonicalSha256({
+            planId:integratedPlan.planId,
+            files:generated.map(file=>({path:file.path,sha256:canonicalSha256(file.candidateContent)}))
+          })
+        };
+      }
+      astFallbackReasons.push(prepared.reason||'AST_CANDIDATE_WORKSPACE_NOT_CREATED');
+    }
+    if(generated.length===0&&astFallbackReasons.length===0)astFallbackReasons.push('AST_TRANSFORMATION_TARGETS_NOT_RESOLVED');
+  }
   const failureFeedback =
     run.payload.failureFeedback &&
     typeof run.payload.failureFeedback === 'object'
@@ -709,6 +747,7 @@ class CandidateCodeGenerationService {
 
   const compositionPrompt=[
       run.objective,
+      ...(astFallbackReasons.length>0?[`AST strategy failed; continue with Component/Construction strategies: ${astFallbackReasons.join(' | ')}`]:[]),
       ...effectiveRequirements,
       ...this.strings(run.payload.requestedChanges),
       ...(knowledgeHints ? [
@@ -731,6 +770,9 @@ class CandidateCodeGenerationService {
      */
     const compiledRequest:any={
       goal:run.objective,
+      integratedGenerationPlanId:integratedPlan.planId,
+      generationStrategies:integratedPlan.steps.map(step=>step.strategy),
+      astFallbackReasons,
       sourceSnapshotSha256:currentSourceSnapshotSha256,
       targetFiles:targetFiles.map(file=>file.path),
       environment:'ANDROID',
@@ -1321,6 +1363,24 @@ class CandidateCodeGenerationService {
     );
  }
 
+ private parseAstTransformations(value:unknown,targetPaths:string[]):Array<{path:string;operations:AstCandidateOperation[]}>{
+  if(!Array.isArray(value))return [];const allowed=new Set(targetPaths);const output:Array<{path:string;operations:AstCandidateOperation[]}>=[];
+  for(const row of value){
+    if(!row||typeof row!=='object'||Array.isArray(row))continue;const record=row as Record<string,unknown>;const path=typeof record.path==='string'?record.path.trim():'';
+    if(!allowed.has(path)||!Array.isArray(record.operations))continue;const operations:AstCandidateOperation[]=[];
+    for(const raw of record.operations){
+      if(!raw||typeof raw!=='object'||Array.isArray(raw))continue;const item=raw as Record<string,unknown>;const kind=typeof item.kind==='string'?item.kind:'';
+      if(kind==='ADD_IMPORT'&&typeof item.moduleSpecifier==='string'&&Array.isArray(item.namedImports))operations.push({kind,moduleSpecifier:item.moduleSpecifier,namedImports:item.namedImports.filter((entry):entry is string=>typeof entry==='string')});
+      if(kind==='ADD_INTERFACE_FIELD'&&typeof item.interfaceName==='string'&&typeof item.fieldName==='string'&&typeof item.fieldType==='string')operations.push({kind,interfaceName:item.interfaceName,fieldName:item.fieldName,fieldType:item.fieldType,optional:item.optional===true});
+      if(kind==='ADD_PARAMETER'&&typeof item.functionName==='string'&&typeof item.parameterName==='string'&&typeof item.parameterType==='string')operations.push({kind,functionName:item.functionName,parameterName:item.parameterName,parameterType:item.parameterType,optional:item.optional===true});
+      if(kind==='ADD_OBJECT_PROPERTY'&&typeof item.variableName==='string'&&typeof item.propertyName==='string'&&typeof item.expression==='string')operations.push({kind,variableName:item.variableName,propertyName:item.propertyName,expression:item.expression});
+      if(kind==='ADD_VALIDATION_GUARD'&&typeof item.functionName==='string'&&typeof item.condition==='string'&&typeof item.failureStatement==='string')operations.push({kind,functionName:item.functionName,condition:item.condition,failureStatement:item.failureStatement});
+      if(kind==='ADD_CALL_ARGUMENT'&&typeof item.calleeName==='string'&&typeof item.argumentExpression==='string')operations.push({kind,calleeName:item.calleeName,argumentExpression:item.argumentExpression});
+    }
+    if(operations.length>0)output.push({path,operations});
+  }
+  return output;
+ }
  private strings(value:unknown):string[]{return Array.isArray(value)?value.filter((item):item is string=>typeof item==='string'):[];}
 }
 export const candidateCodeGenerationService=new CandidateCodeGenerationService();

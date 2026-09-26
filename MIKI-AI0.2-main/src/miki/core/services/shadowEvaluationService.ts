@@ -1,8 +1,0 @@
-import { storageService } from '../../../services/storageService';
-export interface ShadowMeasurement { correctness:number; durationMs:number; exceptionCount:number; sideEffectCount:number; outputHash:string; }
-export interface ShadowEvaluation { evaluationId:string; workspaceId:string; baseline:ShadowMeasurement; candidate:ShadowMeasurement; passed:boolean; reasons:string[]; evaluatedAt:number; }
-const KEY='miki_shadow_evaluations_v1';
-class ShadowEvaluationService{private rows:ShadowEvaluation[]=[];constructor(){this.load();}
- compare(workspaceId:string,baseline:ShadowMeasurement,candidate:ShadowMeasurement):ShadowEvaluation{const reasons:string[]=[];if(candidate.correctness<baseline.correctness)reasons.push('CORRECTNESS_REGRESSION');if(candidate.exceptionCount>baseline.exceptionCount)reasons.push('EXCEPTION_REGRESSION');if(candidate.sideEffectCount>baseline.sideEffectCount)reasons.push('SIDE_EFFECT_REGRESSION');if(candidate.durationMs>Math.max(baseline.durationMs*1.25,baseline.durationMs+1000))reasons.push('PERFORMANCE_REGRESSION');const row={evaluationId:`SHADOW-${workspaceId}-${Date.now()}`,workspaceId,baseline,candidate,passed:reasons.length===0&&candidate.correctness>0,reasons,evaluatedAt:Date.now()};this.rows.push(row);this.save();return {...row,reasons:[...row.reasons]};}
- latest(workspaceId:string){return [...this.rows].reverse().find(x=>x.workspaceId===workspaceId);}private save(){storageService.setItem(KEY,JSON.stringify(this.rows.slice(-500)));}private load(){try{const raw=storageService.getItem(KEY);this.rows=raw?JSON.parse(raw):[];}catch{this.rows=[];}}}
-export const shadowEvaluationService=new ShadowEvaluationService();

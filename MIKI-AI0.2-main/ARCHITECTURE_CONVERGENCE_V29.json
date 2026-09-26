@@ -1,7 +1,0 @@
-{
-  "version": 29,
-  "passed": true,
-  "domainCount": 18,
-  "failures": [],
-  "policy": "core plans and collects; 17 specialist domains execute; active local generative runtime is unavailable"
-}

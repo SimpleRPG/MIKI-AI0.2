@@ -1,7 +1,0 @@
-{
-  "version": "v197",
-  "passed": true,
-  "domainCount": 18,
-  "failures": [],
-  "policy": "single CORE authority; selected work through 17 classifications; review-only self-code; external teacher is untrusted evidence; local generative runtime retired"
-}
