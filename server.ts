@@ -4684,8 +4684,6 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
       composition: plan.composition,
       autoApplyRequested: Boolean(autoApply),
       requiresExecutionVerification: true,
-      unifiedDevelopmentPlanId,
-      instructionSource,
       reasoning: '既存VERIFIED部品だけで決定論的な実行計画を構成しました。新規コードのLLM生成は行いません。',
     });
   } catch (err: any) {

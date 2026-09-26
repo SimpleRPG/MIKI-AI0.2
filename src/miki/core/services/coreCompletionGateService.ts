@@ -19,6 +19,11 @@ export interface CoreCompletionAssessment {
   missingRequiredOperations: string[];
 }
 
+function objectValue(entry: BlackboardEntry): Record<string, unknown> | undefined {
+  if (!entry.value || typeof entry.value !== 'object' || Array.isArray(entry.value)) return undefined;
+  return entry.value as Record<string, unknown>;
+}
+
 function entryReply(entry: BlackboardEntry): Record<string, unknown> | undefined {
   if (!entry.value || typeof entry.value !== 'object') return undefined;
   const value = entry.value as Record<string, unknown>;

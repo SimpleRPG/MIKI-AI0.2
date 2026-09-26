@@ -104,6 +104,7 @@ export interface CodeKnowledgeDefinition {
 }
 
 export interface CodeComponentDefinition {
+  id?: string;
   knowledgeId: string;
   componentType: string;
   purpose: string;
