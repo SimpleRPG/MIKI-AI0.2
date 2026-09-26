@@ -99,6 +99,7 @@ export interface SynthesisResult {
   priorSynthesisId?: string;
   nextCoreAction:
     | 'RE_EVALUATE'
+    | 'GENERATE_CANDIDATE'
     | 'RESEARCH_COMPONENT_GAP'
     | 'VERIFY_CANDIDATE';
 }

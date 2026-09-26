@@ -1,3 +1,4 @@
+import type { ComponentSecurityClass, ComponentTxtPackage } from '../../../types';
 import { storageService } from '../../../services/storageService';
 import { canonicalSha256Object } from './canonicalSha256Service';
 import { reviewLearningArtifactService, type ReviewLearningArtifact } from './reviewLearningArtifactService';
@@ -334,7 +335,7 @@ class ReusableComponentFactoryService{
   const sourceArtifactIds=[...new Set(input.sourceArtifactIds||[])];
   const contradictionRefs=[...new Set(input.contradictionRefs||[])];
   const items=this.read<AnyReusableComponent>(COMPONENT_KEY);
-  const existing=items.find(item=>
+  const existing=items.find((item):item is KnowledgeComponentArtifact=>
     item.componentKind==='KNOWLEDGE'&&
     item.purpose===input.purpose&&
     (input.environmentFingerprint===undefined||
@@ -394,7 +395,7 @@ class ReusableComponentFactoryService{
   return {component,created:true,updated:false};
  }
  verifyResearchKnowledge(componentId:string,claimIds:string[],options?:{requireFresh?:boolean;maxAgeDays?:number}):{component:KnowledgeComponentArtifact|undefined;verified:boolean;conflicted:boolean;verificationIds:string[];reasons:string[]}{
-  const item=this.read<AnyReusableComponent>(COMPONENT_KEY).find(x=>x.componentId===componentId);
+  const item=this.read<AnyReusableComponent>(COMPONENT_KEY).find((x):x is KnowledgeComponentArtifact=>x.componentId===componentId&&x.componentKind==='KNOWLEDGE');
   if(!item||item.componentKind!=='KNOWLEDGE'){
     return {component:undefined,verified:false,conflicted:false,verificationIds:[],reasons:['KNOWLEDGE_COMPONENT_NOT_FOUND']};
   }
@@ -1694,7 +1695,7 @@ class ReusableComponentFactoryService{
  }
 
  updateLifecycle(componentId:string,status:ReusableComponentLifecycle,supersededBy?:string):AnyReusableComponent|undefined{const items=this.read<AnyReusableComponent>(COMPONENT_KEY);const item=items.find(x=>x.componentId===componentId);if(!item)return undefined;if(status==='ACTIVE'&&!['VERIFIED','USER_APPROVED','MIKI_APPROVED','REVALIDATION_REQUIRED'].includes(item.lifecycleStatus))throw new Error('COMPONENT_ACTIVE_GATE_FAILED');item.lifecycleStatus=status;item.supersededBy=supersededBy;item.updatedAt=Date.now();storageService.setItem(COMPONENT_KEY,JSON.stringify(items));return item;}
- approveByCore(componentIds?:string[]):{approvedComponentIds:string[];rejectedComponentIds:string[];reasons:Record<string,string>;changed:boolean}{const approvedComponentIds:string[]=[],rejectedComponentIds:string[]=[],reasons:Record<string,string>={};const requestedIds=componentIds&&componentIds.length>0?new Set(componentIds):undefined;const artifacts=reviewLearningArtifactService.list();const activeGeneralized=(id:string)=>{const a=artifacts.find(x=>x.artifactId===id);return Boolean(a&&a.artifactType==='ARCHIVED')?false:Boolean(a&&a.artifactType==='ACCEPTED_PATTERN'&&a.lifecycleStatus==='ACTIVE'&&a.scope==='GENERALIZED');};for(const item of this.list()){
+ approveByCore(componentIds?:string[]):{approvedComponentIds:string[];rejectedComponentIds:string[];reasons:Record<string,string>;changed:boolean}{const approvedComponentIds:string[]=[],rejectedComponentIds:string[]=[],reasons:Record<string,string>={};const requestedIds=componentIds&&componentIds.length>0?new Set(componentIds):undefined;const artifacts=reviewLearningArtifactService.list();const activeGeneralized=(id:string)=>{const a=artifacts.find(x=>x.artifactId===id);return Boolean(a&&a.lifecycleStatus!=='ARCHIVED'&&a.artifactType==='ACCEPTED_PATTERN'&&a.lifecycleStatus==='ACTIVE'&&a.scope==='GENERALIZED');};for(const item of this.list()){
 if(requestedIds&&!requestedIds.has(item.componentId))continue;
 if(item.lifecycleStatus==='VERIFIED'&&item.componentKind==='KNOWLEDGE'&&item.verificationStatus==='VERIFIED'){
 this.updateLifecycle(item.componentId,'MIKI_APPROVED');
