@@ -2258,6 +2258,24 @@ class AdaptiveRoutePlannerService {
      * 同じTaskの次cycleでResearchを再選択する。これは固定チェーンではなく、
      * Evidence/Verificationの状態に応じた再評価である。
      */
+    const latestResearch=this.latestBusinessResult(task,'RUN_RESEARCH');
+    const latestResearchValue=latestResearch?objectValue(latestResearch):undefined;
+    const latestResearchReply=latestResearchValue?.reply &&
+      typeof latestResearchValue.reply==='object'
+      ? latestResearchValue.reply as Record<string,unknown>
+      : undefined;
+    const latestResearchData=(
+      latestResearchReply?.data ||
+      latestResearchReply?.result ||
+      latestResearchValue
+    ) as Record<string,unknown>|undefined;
+    const researchClaimIds=Array.isArray(latestResearchData?.claimIds)
+      ? latestResearchData.claimIds.map(String).filter(Boolean)
+      : [];
+    const researchGapId=String(latestResearchData?.gapId||'').trim();
+    const researchOutcome=String(latestResearchData?.outcome||'').toUpperCase();
+    const continuationAvailable=latestResearchData?.continuationAvailable===true;
+
     const latestVerification=this.latestBusinessResult(task,'VERIFY_RESEARCH_CLAIMS');
     const verificationValue=latestVerification?objectValue(latestVerification):undefined;
     const verificationReply=verificationValue?.reply && typeof verificationValue.reply==='object'
@@ -2684,8 +2702,7 @@ class AdaptiveRoutePlannerService {
           attempt:Number(existingPending.attempt||0)
         }};
       }
-      const diagnosticCommand=route.command==='DISCOVER_IMPROVEMENT_ISSUE' ||
-        route.command==='IMPROVEMENT_ASSESSMENT';
+      const diagnosticCommand=route.command==='DISCOVER_IMPROVEMENT_ISSUE';
       const prior=task.entries.filter(entry=>{
         if(entry.kind==='RESULT'||entry.kind==='ERROR'){
           return objectValue(entry)?.operation===route.command;

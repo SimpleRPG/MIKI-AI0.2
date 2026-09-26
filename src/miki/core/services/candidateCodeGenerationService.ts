@@ -1192,13 +1192,13 @@ class CandidateCodeGenerationService {
   graph:CodeConstructionGraph,
   value:unknown,
 ):CodeConstructionBinding[]{
-  const raw =
+  const raw:unknown[] =
     Array.isArray(value)
       ? value
       : value &&
         typeof value==='object' &&
         Array.isArray((value as Record<string,unknown>).bindings)
-        ? (value as Record<string,unknown>).bindings
+        ? (value as Record<string,unknown>).bindings as unknown[]
         : [];
 
   const nodes=new Map(

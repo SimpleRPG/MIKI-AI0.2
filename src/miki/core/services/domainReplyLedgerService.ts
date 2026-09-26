@@ -1,7 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import type { MikiDomain } from './crossDomainCirculationService';
-import type { DomainEnvelope, DomainReply } from './domainRouterService';
+import type { DomainCommand, DomainEnvelope, DomainReply } from './domainRouterService';
 import { EvidenceService } from '../../memory/services/evidenceService';
 import { canonicalSha256Object } from './canonicalSha256Service';
 

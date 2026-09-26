@@ -1,6 +1,6 @@
 import { corePlanRevisionService } from './corePlanRevisionService';
 import { coreLineageReadModelService } from './coreLineageReadModelService';
-import { domainRouterService } from './domainRouterService';
+import { domainRouterService, type DomainCommand } from './domainRouterService';
 import { taskBlackboardService, type BlackboardTask } from './taskBlackboardService';
 import { adaptiveRoutePlannerService } from './adaptiveRoutePlannerService';
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
@@ -750,7 +750,7 @@ class CoreOrchestratorService {
 
       coreResultService.waiting(reqId,{
         error:`Background task paused by resource budget: ${budget.reason}`,
-        budgetDiagnostic,
+        result:{budgetDiagnostic},
       });
       break;
     }
@@ -1197,9 +1197,9 @@ class CoreOrchestratorService {
       envelopeId:envelope.envelopeId,
       evidenceIds:replyRecord.evidenceIds,
       receiptIds:replyRecord.receiptIds,
-      accepted:replyRecord.accepted,
-      normalizedStatus:replyRecord.normalized?.status,
-      normalizedOperationClass:replyRecord.normalized?.operationClass
+      accepted:reply.accepted,
+      normalizedStatus:reply.normalized?.status,
+      normalizedOperationClass:reply.normalized?.operationClass
     });
     const operationClass=reply.normalized?.operationClass||'BUSINESS';
     const resultKind=operationClass==='DIAGNOSTIC'?'OBSERVATION':(reply.accepted?'RESULT':'ERROR');
@@ -1210,9 +1210,9 @@ class CoreOrchestratorService {
       accepted:reply.accepted,
       operationClass,
       normalizedStatus:reply.normalized?.status,
-      normalizedOperation:reply.normalized?.operation,
+      normalizedOperation:reply.normalized?.command,
       normalizedEvidenceIds:reply.normalized?.evidenceIds,
-      normalizedReceiptIds:reply.normalized?.receiptIds,
+      normalizedReceiptIds:replyRecord.receiptIds,
       resultKind,
       normalizedKeys:reply.normalized ? Object.keys(reply.normalized) : [],
       rawResultType:typeof reply.result,
@@ -1289,9 +1289,11 @@ class CoreOrchestratorService {
       taskBlackboardService.pause(taskId,'WAITING_EXTERNAL_EXECUTION');
       coreResultService.waiting(reqId,{
         error:'WAITING_EXTERNAL_EXECUTION',
-        operation:route.command,
-        operationInstanceId:route.payload.operationInstanceId,
-        normalizedStatus
+        result:{
+          operation:route.command,
+          operationInstanceId:route.payload.operationInstanceId,
+          normalizedStatus
+        }
       });
 
       break coreCycle;
@@ -1436,7 +1438,7 @@ class CoreOrchestratorService {
    if(!pattern.test(entry.key)&&!pattern.test(JSON.stringify(entry.value||{}))) continue;
    const value=entry.value&&typeof entry.value==="object"&&!Array.isArray(entry.value)?entry.value as Record<string,unknown>:undefined;
    const values=value?.unresolvedItems??value?.unresolvedRequirements??value?.unknowns;
-   if(Array.isArray(values)) return [...new Set(values.filter((item):item is string=>typeof item==="string"&&item.trim()).map(item=>item.trim()))];
+   if(Array.isArray(values)) return [...new Set(values.filter((item):item is string=>typeof item==="string"&&Boolean(item.trim())).map(item=>item.trim()))];
   }
   return [];
 }

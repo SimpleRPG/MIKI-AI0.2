@@ -22,7 +22,7 @@ class CodeConstructionRendererService {
     const rootNodeId=graph.rootNodeId||graph.nodes[0].nodeId;
     const rendered=this.renderNode(graph,rootNodeId,[]);
 
-    if(!rendered.ok){
+    if(rendered.ok===false){
       return {
         accepted:false,
         rootNodeId,
@@ -111,7 +111,7 @@ class CodeConstructionRendererService {
       for(const binding of bindings){
         const value=this.renderBinding(graph,binding,nextStack);
 
-        if(!value.ok){
+        if(value.ok===false){
           errors.push(...value.errors);
           continue;
         }

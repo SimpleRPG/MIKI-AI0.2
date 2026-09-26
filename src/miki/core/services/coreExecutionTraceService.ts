@@ -13,6 +13,7 @@ export type CoreTraceStage =
   | 'REEVALUATION_INPUT'
   | 'COMPLETION_ASSESSMENT'
   | 'CYCLE_GUARD'
+  | 'CORE_SYNTHESIS'
   | 'NO_PROGRESS';
 
 class CoreExecutionTraceService {

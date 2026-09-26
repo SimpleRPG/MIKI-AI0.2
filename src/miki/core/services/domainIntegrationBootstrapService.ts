@@ -125,9 +125,7 @@ class DomainIntegrationBootstrapService{
      )
      .sort((a,b)=>b.updated_at-a.updated_at)[0];
 
-   const canaryState=matchingCanary
-     ? safeImprovementPipelineService.get(matchingCanary.run_id)
-     : undefined;
+   const canaryState=matchingCanary;
 
    const canaryStatus=
      canaryState?.stage==='ADOPTED'
@@ -738,7 +736,7 @@ if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
    };
    if(sourcePackageId){
     const lineage=envelope.payload.learningLineage;
-    const externalReviewId=lineage&&typeof lineage===object&&typeof (lineage as Record<string,unknown>).externalReviewId===string?String((lineage as Record<string,unknown>).externalReviewId):'';
+    const externalReviewId=lineage&&typeof lineage===object&&typeof (lineage as Record<string,unknown>).externalReviewId==='string'?String((lineage as Record<string,unknown>).externalReviewId):'';
     const source=reviewZipExportService.list().find(item=>item.packageId===sourcePackageId);
     const correctedCandidateRef=result.artifact?.candidateManifestSha256||"";
     if(externalReviewId&&source&&correctedCandidateRef)reviewLearningArtifactService.linkCorrectionCandidate({externalReviewId,beforeCandidateRef:source.candidateManifestSha256,correctedCandidateRef});

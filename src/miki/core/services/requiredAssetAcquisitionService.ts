@@ -223,7 +223,7 @@ class RequiredAssetAcquisitionService {
 
       const researchRecord =
         researched && typeof researched === 'object'
-          ? researched as Record<string, unknown>
+          ? researched as unknown as Record<string, unknown>
           : {};
 
       const researchEvidenceIds =
@@ -319,7 +319,8 @@ class RequiredAssetAcquisitionService {
        * LOCALとWEBは別々に捨てず、同じKnowledge Componentへ統合する。
        */
       if(evidenceIds.length>0){
-        const researchResult=researched as Record<string, unknown>;
+        const researchResult=researched as unknown as Record<string, unknown>;
+        const componentReasons:string[]=[];
 
         const claimIds=this.extractStringIds(
           researchResult,
@@ -357,21 +358,21 @@ class RequiredAssetAcquisitionService {
         ];
 
         if(componentResult.created){
-          reasons.push(
+          componentReasons.push(
             `KNOWLEDGE_COMPONENT_CREATED:${componentResult.component.componentId}`
           );
         }else if(componentResult.updated){
-          reasons.push(
+          componentReasons.push(
             `KNOWLEDGE_COMPONENT_UPDATED:${componentResult.component.componentId}`
           );
         }
 
         if(verificationResult.verified){
-          reasons.push(
+          componentReasons.push(
             `KNOWLEDGE_COMPONENT_VERIFIED:${componentResult.component.componentId}`
           );
         }else if(verificationResult.conflicted){
-          reasons.push(
+          componentReasons.push(
             `KNOWLEDGE_COMPONENT_CONFLICT:${componentResult.component.componentId}`
           );
         }
@@ -411,6 +412,7 @@ class RequiredAssetAcquisitionService {
             ...(webEvidenceIds.length > 0 ? [`WEB_EVIDENCE_ACQUIRED:${webEvidenceIds.length}`] : []),
             ...(unlinkedEvidenceIds.length > 0 ? [`EVIDENCE_IDS_UNLINKED:${unlinkedEvidenceIds.length}`] : []),
             ...(componentIds.length > 0 ? [`COMPONENTS_DISCOVERED:${componentIds.length}`] : []),
+            ...componentReasons,
           ]
         : [`EVIDENCE_RESEARCHED_BUT_UNLINKED:${gap.id}`];
 
