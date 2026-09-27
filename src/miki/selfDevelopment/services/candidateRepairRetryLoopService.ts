@@ -56,7 +56,11 @@ class CandidateRepairRetryLoopService {
         const repaired=repairedByPath.get(file.path);
         return {path:file.path,baselineContent:file.candidateContent,candidateContent:repaired?.candidateContent||file.candidateContent,evidenceIds:[...file.evidenceIds,...(repaired?.appliedRepairPlanIds||[])]};
       });
-      const next=await isolatedCandidateWorkspaceService.create(`${workspace.issueId}:repair:${revision.revisionId}`,nextFiles,workspace.runId);
+      const next=await isolatedCandidateWorkspaceService.create(
+        `${workspace.issueId}:repair:${revision.revisionId}`,
+        nextFiles,
+        workspace.runId
+      );
       workspaceId=next.workspaceId;
     }
     return {passed:false,initialWorkspaceId,finalWorkspaceId:workspaceId,attempts,stopReason:'REPAIR_LOOP_TERMINATED'};

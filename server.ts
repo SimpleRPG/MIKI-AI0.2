@@ -1580,44 +1580,368 @@ app.post('/api/search', async (req, res) => {
 
 app.post('/api/candidate-validation/run', async (req, res) => {
   const startedAt = Date.now();
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'miki-candidate-'));
+  const runtimeRoot = path.join(process.cwd(), '.miki-runtime', 'candidate-validation');
+  fs.mkdirSync(runtimeRoot, { recursive: true });
+  const workspaceId = String(req.body?.workspaceId || '').replace(/[^A-Za-z0-9_.-]/g, '_');
+  const root = path.join(runtimeRoot, `${workspaceId}-${Date.now()}`);
   const stages: any[] = [];
+
   const safePath = (value: string) => {
     const normalized = String(value || '').replace(/\\/g, '/');
-    if (!normalized || normalized.startsWith('/') || normalized.includes('..') || normalized.includes('\0')) throw new Error(`UNSAFE_PATH:${normalized}`);
+    if (!normalized || normalized.startsWith('/') || normalized.includes('..') || normalized.includes('\0')) {
+      throw new Error(`UNSAFE_PATH:${normalized}`);
+    }
     return normalized;
   };
-  const record = (stage: string, command: string, passed: boolean, exitCode: number, log: string, stageStarted: number) => stages.push({ stage, command, passed, exitCode, startedAt: stageStarted, completedAt: Date.now(), logRef: log.slice(-12000) });
+
+  const record = (
+    stage: string,
+    command: string,
+    passed: boolean,
+    exitCode: number,
+    log: string,
+    stageStarted: number
+  ) => {
+    stages.push({
+      stage,
+      command,
+      passed,
+      exitCode,
+      startedAt: stageStarted,
+      completedAt: Date.now(),
+      logRef: String(log || '').slice(-12000),
+    });
+  };
+
+  const runAllowedCommand = (
+    command: string,
+    cwd: string,
+    extraEnv: Record<string,string> = {}
+  ): {exitCode:number;stdout:string;stderr:string} => {
+    const trimmed = String(command || '').trim();
+    if (!trimmed || /[;&|`$><]/.test(trimmed)) {
+      return {exitCode:126,stdout:'',stderr:'TEST_COMMAND_FORBIDDEN'};
+    }
+
+    const packagePath = path.join(cwd, 'package.json');
+    const scripts = fs.existsSync(packagePath)
+      ? JSON.parse(fs.readFileSync(packagePath, 'utf8')).scripts || {}
+      : {};
+
+    let executable = '';
+    let args: string[] = [];
+
+    let match = trimmed.match(/^node (scripts\/verify_[A-Za-z0-9_.-]+\.mjs)$/);
+    if (match) {
+      executable = process.execPath;
+      args = [match[1]];
+    } else {
+      match = trimmed.match(/^tsx (scripts\/verify_[A-Za-z0-9_.-]+\.ts)$/);
+      if (match) {
+        executable = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+        args = ['tsx', match[1]];
+      } else {
+        match = trimmed.match(/^npm run ([A-Za-z0-9:_-]+)$/);
+        if (match) {
+          const body = String(scripts[match[1]] || '');
+          if (!/^(node|tsx) scripts\/verify_/.test(body)) {
+            return {exitCode:126,stdout:'',stderr:'TEST_SCRIPT_NOT_ALLOWLISTED'};
+          }
+          executable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+          args = ['run', match[1]];
+        }
+      }
+    }
+
+    if (!executable) {
+      return {exitCode:126,stdout:'',stderr:'TEST_COMMAND_NOT_ALLOWLISTED'};
+    }
+
+    const env = {
+      ...process.env,
+      CI: 'true',
+      NO_PROXY: '*',
+      HTTP_PROXY: '',
+      HTTPS_PROXY: '',
+      MIKI_TEST_SANDBOX: '1',
+      ...extraEnv,
+    };
+
+    const child = spawnSync(executable, args, {
+      cwd,
+      env,
+      shell: false,
+      encoding: 'utf8',
+      timeout: 180000,
+      maxBuffer: 400000,
+    });
+
+    return {
+      exitCode: child.status ?? 1,
+      stdout: String(child.stdout || ''),
+      stderr: String(child.stderr || ''),
+    };
+  };
+
   try {
     const sourceFiles = Array.isArray(req.body?.sourceFiles) ? req.body.sourceFiles : [];
     const candidateFiles = Array.isArray(req.body?.candidateFiles) ? req.body.candidateFiles : [];
     const validationRequirements = Array.isArray(req.body?.validationRequirements)
-      ? req.body.validationRequirements.filter((value:any)=>typeof value==='string'&&value.trim())
+      ? req.body.validationRequirements.filter((value:any)=>typeof value === 'string' && value.trim())
       : [];
-    const testCommands = Array.isArray(req.body?.testCommands) ? req.body.testCommands.filter((value:any)=>typeof value==='string'&&value.trim()) : [];
-    const acceptanceCriterionIds = Array.isArray(req.body?.acceptanceCriterionIds) ? req.body.acceptanceCriterionIds.filter((value:any)=>typeof value==='string'&&value.trim()) : [];
-    if (!req.body?.workspaceId || !req.body?.candidateSha256 || sourceFiles.length === 0 || candidateFiles.length === 0) return res.status(400).json({ error: 'VALIDATION_INPUT_INCOMPLETE' });
-    for (const file of sourceFiles) { const relative = safePath(file.path); const target = path.join(root, relative); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, String(file.content || ''), 'utf8'); }
+    const testCommands = Array.isArray(req.body?.testCommands)
+      ? req.body.testCommands.filter((value:any)=>typeof value === 'string' && value.trim())
+      : [];
+    const acceptanceCriterionIds = Array.isArray(req.body?.acceptanceCriterionIds)
+      ? req.body.acceptanceCriterionIds.filter((value:any)=>typeof value === 'string' && value.trim())
+      : [];
+
+    if (!req.body?.workspaceId || !req.body?.candidateSha256 || sourceFiles.length === 0 || candidateFiles.length === 0) {
+      return res.status(400).json({error:'VALIDATION_INPUT_INCOMPLETE'});
+    }
+
+    for (const file of sourceFiles) {
+      const relative = safePath(file.path);
+      const target = path.join(root, relative);
+      fs.mkdirSync(path.dirname(target), {recursive:true});
+      fs.writeFileSync(target, String(file.content || ''), 'utf8');
+    }
+
+    const packagePath = path.join(process.cwd(), 'package.json');
+    if (fs.existsSync(packagePath) && !fs.existsSync(path.join(root, 'package.json'))) {
+      fs.copyFileSync(packagePath, path.join(root, 'package.json'));
+    }
+
+    const tsconfigPath = path.join(process.cwd(), 'tsconfig.json');
+    if (fs.existsSync(tsconfigPath) && !fs.existsSync(path.join(root, 'tsconfig.json'))) {
+      fs.copyFileSync(tsconfigPath, path.join(root, 'tsconfig.json'));
+    }
+
     const runtimeModules = path.join(process.cwd(), 'node_modules');
     const isolatedModules = path.join(root, 'node_modules');
-    if (fs.existsSync(runtimeModules) && !fs.existsSync(isolatedModules)) fs.symlinkSync(runtimeModules, isolatedModules, 'junction');
-    for (const file of candidateFiles) { const relative = safePath(file.path); const target = path.join(root, relative); if (!fs.existsSync(target)) throw new Error(`TARGET_NOT_IN_SNAPSHOT:${relative}`); fs.writeFileSync(target, String(file.candidateContent || ''), 'utf8'); }
-    let stageStart = Date.now(); let staticErrors: string[] = [];
-    for (const file of candidateFiles) { const relative = safePath(file.path); if (/\.(ts|tsx)$/.test(relative)) { const code = fs.readFileSync(path.join(root, relative), 'utf8'); const result = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX }, reportDiagnostics: true, fileName: relative }); for (const diagnostic of result.diagnostics || []) if (diagnostic.category === ts.DiagnosticCategory.Error) staticErrors.push(`${relative}:${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`); } }
-    record('STATIC', 'typescript.transpileModule', staticErrors.length === 0, staticErrors.length === 0 ? 0 : 1, staticErrors.join('\n') || 'PASS', stageStart);
-    const packageJsonPath = path.join(root, 'package.json'); const pkg = fs.existsSync(packageJsonPath) ? JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) : { scripts: {} };
-    const runScript = (stage: string, names: string[]) => { const name = names.find(item => pkg.scripts?.[item]); const t = Date.now(); if (!name) { record(stage, `npm run ${names.join('|')}`, false, 2, 'REQUIRED_SCRIPT_NOT_FOUND', t); return; } const result = spawnSync('npm', ['run', name], { cwd: root, encoding: 'utf8', timeout: 180000, env: { ...process.env, CI: '1' } }); record(stage, `npm run ${name}`, result.status === 0, result.status ?? 1, `${result.stdout || ''}\n${result.stderr || ''}`, t); };
-    runScript('TYPECHECK', ['lint']);
-    stageStart = Date.now(); let persistencePassed = true; const persistenceLog: string[] = [];
-    for (const file of candidateFiles) { const relative = safePath(file.path); const content = fs.readFileSync(path.join(root, relative), 'utf8'); if (content !== String(file.candidateContent || '')) { persistencePassed = false; persistenceLog.push(`MISMATCH:${relative}`); } }
-    record('PERSISTENCE', 'write-read candidate equality', persistencePassed, persistencePassed ? 0 : 1, persistenceLog.join('\n') || 'PASS', stageStart);
-    runScript('DEVICE', ['android:verify-contract', 'android:verify-workmanager-contract']);
-    const passed = stages.length === 4 && stages.every(stage => stage.passed && stage.exitCode === 0);
+    if (fs.existsSync(runtimeModules) && !fs.existsSync(isolatedModules)) {
+      fs.symlinkSync(runtimeModules, isolatedModules, process.platform === 'win32' ? 'junction' : 'dir');
+    }
+
+    for (const file of candidateFiles) {
+      const relative = safePath(file.path);
+      const target = path.join(root, relative);
+      if (!fs.existsSync(target)) {
+        throw new Error(`TARGET_NOT_IN_SNAPSHOT:${relative}`);
+      }
+      fs.writeFileSync(target, String(file.candidateContent || ''), 'utf8');
+    }
+
+    // 1. STATIC
+    let stageStart = Date.now();
+    const staticErrors: string[] = [];
+
+    for (const file of candidateFiles) {
+      const relative = safePath(file.path);
+      if (/\.(ts|tsx)$/.test(relative)) {
+        const code = fs.readFileSync(path.join(root, relative), 'utf8');
+        const result = ts.transpileModule(code, {
+          compilerOptions: {
+            target: ts.ScriptTarget.ES2022,
+            jsx: ts.JsxEmit.ReactJSX,
+          },
+          reportDiagnostics: true,
+          fileName: relative,
+        });
+
+        for (const diagnostic of result.diagnostics || []) {
+          if (diagnostic.category === ts.DiagnosticCategory.Error) {
+            staticErrors.push(`${relative}:${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`);
+          }
+        }
+      }
+    }
+
+    record(
+      'STATIC',
+      'typescript.transpileModule',
+      staticErrors.length === 0,
+      staticErrors.length === 0 ? 0 : 1,
+      staticErrors.join('\n') || 'PASS',
+      stageStart
+    );
+
+    // 2. TYPECHECK
+    stageStart = Date.now();
+    const tsc = path.join(root, 'node_modules', 'typescript', 'bin', 'tsc');
+    if (fs.existsSync(tsc) && fs.existsSync(path.join(root, 'tsconfig.json'))) {
+      const result = spawnSync(process.execPath, [tsc, '--noEmit', '--pretty', 'false'], {
+        cwd: root,
+        env: {...process.env, CI:'true', NO_PROXY:'*', HTTP_PROXY:'', HTTPS_PROXY:''},
+        shell: false,
+        encoding: 'utf8',
+        timeout: 180000,
+        maxBuffer: 400000,
+      });
+      record(
+        'TYPECHECK',
+        'typescript tsc --noEmit',
+        result.status === 0,
+        result.status ?? 1,
+        `${result.stdout || ''}\n${result.stderr || ''}`,
+        stageStart
+      );
+    } else {
+      record('TYPECHECK', 'typescript tsc --noEmit', false, 2, 'TSC_OR_TSCONFIG_NOT_AVAILABLE', stageStart);
+    }
+
+    // 3. REGRESSION
+    stageStart = Date.now();
+    if (testCommands.length === 0) {
+      record('REGRESSION', 'candidate test plan', false, 2, 'REGRESSION_TEST_COMMANDS_MISSING', stageStart);
+    } else {
+      const regressionResults = testCommands.map(command => ({
+        command,
+        ...runAllowedCommand(command, root),
+      }));
+      const passed = regressionResults.every(item => item.exitCode === 0);
+      record(
+        'REGRESSION',
+        regressionResults.map(item => item.command).join(' && '),
+        passed,
+        passed ? 0 : regressionResults.find(item => item.exitCode !== 0)?.exitCode ?? 1,
+        regressionResults.map(item => `${item.command}\n${item.stdout}\n${item.stderr}`).join('\n'),
+        stageStart
+      );
+    }
+
+    // 4. COUNTEREXAMPLE
+    // 既存のFailure Resilience verify経路をCandidate Workspace上で実行する。
+    stageStart = Date.now();
+    const counterexampleCommand = 'npm run verify:failure-resilience';
+    const counterexample = runAllowedCommand(counterexampleCommand, root, {
+      MIKI_VALIDATION_STAGE: 'COUNTEREXAMPLE',
+    });
+    record(
+      'COUNTEREXAMPLE',
+      counterexampleCommand,
+      counterexample.exitCode === 0,
+      counterexample.exitCode,
+      `${counterexample.stdout}\n${counterexample.stderr}`,
+      stageStart
+    );
+
+    // 5. GENERALIZATION
+    // 既存のCode-only quality/property系の検証をCandidate Workspace上で実行する。
+    stageStart = Date.now();
+    const generalizationCommand = 'npm run verify:code-only-quality';
+    const generalization = runAllowedCommand(generalizationCommand, root, {
+      MIKI_VALIDATION_STAGE: 'GENERALIZATION',
+    });
+    record(
+      'GENERALIZATION',
+      generalizationCommand,
+      generalization.exitCode === 0,
+      generalization.exitCode,
+      `${generalization.stdout}\n${generalization.stderr}`,
+      stageStart
+    );
+
+    // 6. PERSISTENCE
+    stageStart = Date.now();
+    let persistencePassed = true;
+    const persistenceLog: string[] = [];
+
+    for (const file of candidateFiles) {
+      const relative = safePath(file.path);
+      const content = fs.readFileSync(path.join(root, relative), 'utf8');
+      if (content !== String(file.candidateContent || '')) {
+        persistencePassed = false;
+        persistenceLog.push(`MISMATCH:${relative}`);
+      }
+    }
+
+    record(
+      'PERSISTENCE',
+      'write-read candidate equality',
+      persistencePassed,
+      persistencePassed ? 0 : 1,
+      persistenceLog.join('\n') || 'PASS',
+      stageStart
+    );
+
+    // 7. DEVICE
+    stageStart = Date.now();
+    const deviceCommands = [
+      'npm run android:verify-contract',
+      'npm run android:verify-workmanager-contract',
+    ];
+    const deviceResults = deviceCommands.map(command => ({
+      command,
+      ...runAllowedCommand(command, root),
+    }));
+    const devicePassed = deviceResults.every(item => item.exitCode === 0);
+
+    record(
+      'DEVICE',
+      deviceResults.map(item => item.command).join(' && '),
+      devicePassed,
+      devicePassed ? 0 : deviceResults.find(item => item.exitCode !== 0)?.exitCode ?? 1,
+      deviceResults.map(item => `${item.command}\n${item.stdout}\n${item.stderr}`).join('\n'),
+      stageStart
+    );
+
+    const requiredStages = [
+      'STATIC',
+      'TYPECHECK',
+      'REGRESSION',
+      'COUNTEREXAMPLE',
+      'GENERALIZATION',
+      'PERSISTENCE',
+      'DEVICE',
+    ];
+
+    const passed =
+      stages.length === requiredStages.length &&
+      requiredStages.every(stage =>
+        stages.some(row => row.stage === stage && row.passed && row.exitCode === 0)
+      );
+
     const candidateDuration = Date.now() - startedAt;
-    const shadow = { baseline: { correctness: 1, durationMs: candidateDuration, exceptionCount: 0, sideEffectCount: 0, outputHash: String(req.body.candidateSha256) }, candidate: { correctness: passed ? 1 : 0, durationMs: candidateDuration, exceptionCount: stages.filter(stage => !stage.passed).length, sideEffectCount: 0, outputHash: String(req.body.candidateSha256) }, passed };
-    res.json({ passed, stages, shadow, validationRequirements, testCommands, acceptanceCriterionIds, reasons: stages.filter(stage => !stage.passed).map(stage => `FAILED_${stage.stage}`) });
-  } catch (error: any) { res.status(500).json({ error: error?.message || 'CANDIDATE_VALIDATION_FAILED', stages }); }
-  finally { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} }
+    const shadow = {
+      baseline: {
+        correctness: 1,
+        durationMs: candidateDuration,
+        exceptionCount: 0,
+        sideEffectCount: 0,
+        outputHash: String(req.body.candidateSha256),
+      },
+      candidate: {
+        correctness: passed ? 1 : 0,
+        durationMs: candidateDuration,
+        exceptionCount: stages.filter(stage => !stage.passed).length,
+        sideEffectCount: 0,
+        outputHash: String(req.body.candidateSha256),
+      },
+      passed,
+    };
+
+    res.json({
+      passed,
+      stages,
+      shadow,
+      validationRequirements,
+      testCommands,
+      acceptanceCriterionIds,
+      reasons: stages
+        .filter(stage => !stage.passed)
+        .map(stage => `FAILED_${stage.stage}`),
+    });
+  } catch (error:any) {
+    res.status(500).json({
+      error: error?.message || 'CANDIDATE_VALIDATION_FAILED',
+      stages,
+    });
+  } finally {
+    try {
+      fs.rmSync(root, {recursive:true, force:true});
+    } catch {}
+  }
 });
 
 app.post('/api/chat', async (req, res) => {
