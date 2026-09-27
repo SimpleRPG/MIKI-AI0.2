@@ -109,15 +109,70 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     typedImprovementUiGatewayService.listRestoredPriorityOneRuntime()
   );
   const coreRuntime = coreRuntimes[coreRuntimes.length - 1];
+
+  // 履歴の正規データ源は既存SelfImprovementControllerServiceの永続履歴。
+  // PriorityOneRuntimeは同一taskIdが存在する場合だけ現在状態を上書きする。
+  const [persistedRuns, setPersistedRuns] = useState(() =>
+    typedImprovementUiGatewayService.getRuns()
+  );
+
   const [loopState, setLoopState] = useState(() =>
     typedImprovementUiGatewayService.getLoopState()
   );
-  const canonicalRuns = coreRuntimes.map((item) => ({
-    run_id: item.taskId,
-    verdict: item.waitingPackageIds.length > 0 ? 'WAIT_EXTERNAL_FEEDBACK' : item.taskStatus,
-    taskStatus: item.taskStatus,
-    decision: { action: item.allowedActions[0] || 'NONE' },
-  })).reverse();
+
+  const canonicalRuns = useMemo(() => {
+    const runtimeByTaskId = new Map(
+      coreRuntimes.map((item) => [item.taskId, item])
+    );
+
+    const persisted = persistedRuns.map((run) => {
+      const runtime = run.taskId
+        ? runtimeByTaskId.get(run.taskId)
+        : undefined;
+
+      return {
+        ...run,
+        run_id: run.run_id || run.taskId || '―',
+        taskId: run.taskId,
+        verdict: runtime
+          ? (
+              runtime.waitingPackageIds.length > 0
+                ? 'WAIT_EXTERNAL_FEEDBACK'
+                : runtime.taskStatus
+            )
+          : (run.verdict || run.result || 'RECORDED'),
+        taskStatus: runtime?.taskStatus || run.result || 'RECORDED',
+        decision: {
+          action: runtime?.allowedActions?.[0]
+            || run.decision?.action
+            || 'NONE',
+        },
+      };
+    });
+
+    const persistedTaskIds = new Set(
+      persistedRuns
+        .map((run) => run.taskId)
+        .filter(Boolean)
+    );
+
+    // 永続履歴にまだ存在しない実行中Runtimeだけを補助表示する。
+    const runtimeOnly = coreRuntimes
+      .filter((item) => !persistedTaskIds.has(item.taskId))
+      .map((item) => ({
+        run_id: item.taskId,
+        taskId: item.taskId,
+        verdict: item.waitingPackageIds.length > 0
+          ? 'WAIT_EXTERNAL_FEEDBACK'
+          : item.taskStatus,
+        taskStatus: item.taskStatus,
+        decision: {
+          action: item.allowedActions[0] || 'NONE',
+        },
+      }));
+
+    return [...runtimeOnly, ...persisted].slice(0, 100);
+  }, [persistedRuns, coreRuntimes]);
   const [externalDirectives, setExternalDirectives] = useState<ExternalDirective[]>(() =>
     typedImprovementUiGatewayService.getExternalDirectives()
   );
@@ -164,6 +219,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     const timer = setInterval(() => {
       if (isEditableInputActive()) return;
       setCoreRuntimes(typedImprovementUiGatewayService.listRestoredPriorityOneRuntime());
+      setPersistedRuns(typedImprovementUiGatewayService.getRuns());
       setLoopState(typedImprovementUiGatewayService.getLoopState());
       setExternalDirectives(typedImprovementUiGatewayService.getExternalDirectives());
       setIntakeRuns(typedImprovementUiGatewayService.getIntakeRuns(50));
@@ -180,6 +236,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 
   const triggerRefresh = () => {
     setCoreRuntimes(typedImprovementUiGatewayService.listRestoredPriorityOneRuntime());
+    setPersistedRuns(typedImprovementUiGatewayService.getRuns());
     setLoopState(typedImprovementUiGatewayService.getLoopState());
     setExternalDirectives(typedImprovementUiGatewayService.getExternalDirectives());
     setIntakeRuns(typedImprovementUiGatewayService.getIntakeRuns(50));
@@ -1397,11 +1454,13 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
             <div
               key={run.run_id}
               className="p-3.5 bg-slate-900/40 hover:bg-slate-800/40 transition text-xs space-y-1.5 cursor-pointer"
-              onClick={() => setSelectedRunId(run.run_id)}
-              role="button"
-              tabIndex={0}
+              onClick={() => run.taskId && setSelectedRunId(run.taskId)}
+              role={run.taskId ? 'button' : undefined}
+              tabIndex={run.taskId ? 0 : -1}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') setSelectedRunId(run.run_id);
+                if (run.taskId && (e.key === 'Enter' || e.key === ' ')) {
+                  setSelectedRunId(run.taskId);
+                }
               }}
             >
               <div className="flex items-center justify-between">
@@ -1422,12 +1481,14 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
               </div>
 
               <div className="text-slate-300">
-                実行履歴をタップして詳細を表示
+                {run.taskId
+                  ? '実行履歴をタップして詳細を表示'
+                  : '永続履歴として保存済み（詳細Taskは未保持）'}
               </div>
 
               <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1">
                 <span>Run ID: {run.run_id}</span>
-                <span>詳細を見る ›</span>
+                <span>{run.taskId ? '詳細を見る ›' : '永続履歴'}</span>
               </div>
             </div>
           ))}
