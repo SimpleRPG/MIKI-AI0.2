@@ -69,8 +69,12 @@ class TaskBlackboardService{
  setStatus(taskId:string,status:BlackboardStatus):BlackboardTask|undefined{const task=this.tasks.get(taskId);if(!task)return undefined;task.status=status;task.revision+=1;task.updatedAt=Date.now();this.save();return this.clone(task);}
 
  pause(taskId:string,reason='USER_REQUESTED'):BlackboardTask|undefined{const task=this.tasks.get(taskId);if(!task||task.status==='COMPLETED'||task.status==='CANCELLED')return undefined;task.status='PAUSED';task.pausedReason=reason;task.revision+=1;task.updatedAt=Date.now();this.save();return this.clone(task);}
- resume(taskId:string):BlackboardTask|undefined{
-  const task=this.tasks.get(taskId);if(!task||task.status!=='PAUSED')return undefined;
+ resume(taskId:string,allowRoutingRecovery=false):BlackboardTask|undefined{
+  const task=this.tasks.get(taskId);
+  if(!task)return undefined;
+  const paused=task.status==='PAUSED';
+  const routingRecovery=allowRoutingRecovery&&task.status==='ROUTING';
+  if(!paused&&!routingRecovery)return undefined;
   task.status='ROUTING';
   task.pausedReason=undefined;
   task.resumeCount+=1;

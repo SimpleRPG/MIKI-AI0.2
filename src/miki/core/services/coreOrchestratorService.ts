@@ -159,11 +159,11 @@ class CoreOrchestratorService {
   coreResultService.updateStatus(reqId,'processing',{route:['core','execution']});
   return this.continueTask(taskId,maxCycles,reqId);
  }
- async resume(taskId:string,maxCycles=18):Promise<CoreOrchestrationResult|undefined>{
+ async resume(taskId:string,maxCycles=18,allowRoutingRecovery=false):Promise<CoreOrchestrationResult|undefined>{
   const currentTask=taskBlackboardService.get(taskId);
   const reqId=this.resolveRequestId(currentTask,taskId);
-  const resumed=taskBlackboardService.resume(taskId);if(!resumed)return undefined;
-  taskBlackboardService.append(taskId,'DECISION','core','coreResumed',{mode:'CORE_18_DOMAIN_ORCHESTRATION',requestId:reqId});
+  const resumed=taskBlackboardService.resume(taskId,allowRoutingRecovery);if(!resumed)return undefined;
+  taskBlackboardService.append(taskId,'DECISION','core','coreResumed',{mode:'CORE_18_DOMAIN_ORCHESTRATION',requestId:reqId,recovery:allowRoutingRecovery&&currentTask?.status==='ROUTING'});
   coreResultService.updateStatus(reqId,'processing',{route:['core']});
   return this.continueTask(taskId,maxCycles,reqId);
  }
