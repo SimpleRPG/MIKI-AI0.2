@@ -16,6 +16,7 @@ export interface GitHubSyncState {
   complete: boolean;
   files: GitHubSyncFile[];
   syncedAt: number;
+  source?: 'GITHUB' | 'BUNDLED_SEED';
 }
 
 const KEY_PREFIX = 'miki_github_sync_v2_';
@@ -77,6 +78,10 @@ class GitHubSyncService {
         commitSha: String(value.commitSha || ''),
         treeSha: String(value.treeSha || ''),
         complete: value.complete === true,
+        source:
+          value.source === 'BUNDLED_SEED'
+            ? 'BUNDLED_SEED'
+            : 'GITHUB',
         files: value.files
           .filter(
             (file: any) =>
@@ -214,6 +219,32 @@ class GitHubSyncService {
       complete: true,
       files: merged.sort((a, b) => a.path.localeCompare(b.path)),
       syncedAt: Date.now(),
+      source: 'GITHUB',
+    });
+  }
+
+  applyBundledSeed(
+    repository: string,
+    branch: string,
+    input: {
+      files: Array<{
+        path: string;
+        content: string;
+        sha256: string;
+      }>;
+      commitSha: string;
+      seedRevision: string;
+    }
+  ): GitHubSyncState {
+    return this.save({
+      repository: normalizeRepository(repository),
+      branch: branch.trim(),
+      commitSha: String(input.commitSha || ''),
+      treeSha: String(input.seedRevision || ''),
+      complete: true,
+      files: normalizeFiles(input.files),
+      syncedAt: Date.now(),
+      source: 'BUNDLED_SEED',
     });
   }
 
@@ -324,6 +355,7 @@ class GitHubSyncService {
       complete: true,
       files: nextFiles,
       syncedAt: Date.now(),
+      source: 'GITHUB',
     });
   }
 }

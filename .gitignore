@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.log
 miki_termux.pid
+
+public/self-code-seed.zip

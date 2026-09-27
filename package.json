@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && node build-server.mjs",
+    "build": "node scripts/prepare_self_code_seed.mjs && vite build && node build-server.mjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
@@ -45,7 +45,8 @@
     "test:db": "node scripts/run_code_only_db.mjs",
     "test:mutation": "node scripts/run_code_only_mutation.mjs",
     "verify:development-intelligence": "node scripts/verify_development_intelligence_v271.mjs",
-    "verify:code-only-quality": "node scripts/verify_code_only_quality_v272.mjs"
+    "verify:code-only-quality": "node scripts/verify_code_only_quality_v272.mjs",
+    "verify:self-code-bundled-seed": "node scripts/verify_bundled_self_code_seed.mjs"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.0",

@@ -8728,3 +8728,45 @@ Stage 64はActor、Target、Desired State、Required/Forbidden Behavior、Pre/Po
 
 【Stage 72-85 Failure Resilience / Priority failure-resilience】
 Failure TaxonomyはENVIRONMENT、DEPENDENCY、SOURCE、SEMANTIC、TRANSFORMATION、VALIDATION、TEST、RUNTIME、RESOURCE、PERMISSION、SECURITY、NETWORK、PERSISTENCE、CONCURRENCY、REVIEW_PACKAGE、DEVICEに統一する。全FailureはID、Code、Stage、Retry/Repair/User/Environment Action、Candidate/Workspace/Job/Revision、Observation、Occurrence、Evidence、Next Action、Diagnostic Signatureを持つ。Environment FailureはCandidate Repairへ送らない。Retryは原因Signatureまたは品質Metricsが変化・改善した時だけ継続し、同一原因・同一Metricsでは停止する。Candidate ProcessはEnvironment Allowlist、専用HOME/TMPDIR、Filesystem Snapshot/Diff、SymlinkとOversized File監査、Log上限とTruncation Evidenceを用いる。Preflight、Readiness Dashboard、Partial Success Resume、Repair Before/After、Strategy Success/Regression、Flaky Testを正規管理する。Failure Injection SuiteはWorker、Workspace、Build、Evidence、Review ZIPの34障害を検証する。
+
+============================================================
+【170. 現行正本：自己コードWorkspaceのアプリ同梱SeedとPULLフォールバック】
+
+2026-09-27、自己コードWorkspaceの初期コード取得経路を、アプリ同梱Seed優先へ変更する。
+
+目的：
+- アプリ起動のたびにGitHub PULLを必須にしない。
+- アプリ更新後、そのアプリを構成するコードを自己コードWorkspaceの初期参照コードとして利用できるようにする。
+- GitHub障害時にも自己コード参照を維持する。
+- 新しいWorkspace、Repository Index、同期基盤、DB、Orchestratorを追加しない。
+
+同梱方式：
+- ビルド時にGit管理対象ファイルから自己コードSeed ZIPを生成する。
+- ZIPは `public/self-code-seed.zip` として生成し、Vite/Capacitorのアプリassetへ同梱する。
+- `node_modules`、`dist`、Android生成物等はSeedへ含めない。
+- バイナリは自己コード参照用テキストSeedから除外する。
+- ZIP内にmanifestを保持し、appVersion、commitSha、seedRevision、各ファイルSHA-256を記録する。
+
+起動経路：
+1. `selfCodeSpaceService.initializeBundledSeed()` を起動時に実行する。
+2. 同梱ZIPを読み込み、manifestと各ファイルのSHA-256を検証する。
+3. cleanな既存Workspaceがなく、または同梱Seedが新しい場合は、既存 `githubSyncService` のclean snapshot保管経路へSeedを投入する。
+4. Seedが正常ならGitHub PULLを実行しない。
+5. 既存SelfCodeWorkspaceがdirtyの場合は、自己改善途中の変更を破棄せず保持する。
+6. 同梱Seed取得・展開・検証に失敗した場合のみ、既存 `selfCodeSpaceService.sync()` のGitHub PULLをフォールバックとして実行する。
+7. SeedとGitHub PULLの両方が失敗した場合は既存Workspaceがあれば保持し、なければ自己コードWorkspace未初期化としてfail closedする。
+
+重要な不変条件：
+- 稼働中コードを直接変更しない。
+- Candidate生成、Candidate Workspace、Validation、Review Package、Canary、Promotion Gateは既存正本を使用する。
+- GitHub PULLは削除せず、Seed失敗時および明示的な同期操作の既存経路として残す。
+- Seedは実行可能コードではなく自己コード参照用のWorkspaceソースである。
+- 新しい19番目の分類、新しい上位Orchestrator、新しいResult DB、Blackboardを作らない。
+- アプリ更新時のcleanな旧Seedは新しい同梱Seedへ更新できる。
+- dirty Workspaceは自動上書きしない。
+
+検証要求：
+- Seed生成スクリプトの構文を検査する。
+- SelfCodeSpaceService / GitHubSyncService / App startupの構文を検査する。
+- manifest、ファイル数、seedRevision、ZIP生成を決定論的に検査する。
+- 既存自己コード検証経路を壊していないことを確認する。

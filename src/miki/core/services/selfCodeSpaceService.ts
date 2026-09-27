@@ -21,6 +21,7 @@ export interface SelfCodeSnapshot {
 
 const KEY = 'miki_self_code_space_v1';
 const SETTINGS_KEY = 'miki_self_code_github_settings_v1';
+const SEED_APPLIED_KEY = 'miki_self_code_seed_revision_v1';
 const DEFAULT_REPOSITORY = 'SimpleRPG/MIKI-AI0.2';
 const DEFAULT_BRANCH = 'main';
 export interface SelfCodeGitHubSettings { repository:string; branch:string; commitMessage:string; }
@@ -50,6 +51,162 @@ class SelfCodeSpaceService {
     else storageService.removeItem('miki_self_code_github_pat');
     return value;
   }
+  async initializeBundledSeed(): Promise<{
+    status:
+      | 'SEEDED'
+      | 'ALREADY_CURRENT'
+      | 'PRESERVED_DIRTY'
+      | 'FALLBACK_GITHUB'
+      | 'NO_SOURCE';
+    seedRevision?: string;
+    error?: string;
+  }> {
+    const existing = this.get();
+
+    try {
+      const response = await fetch('/self-code-seed.zip', {
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        throw new Error(`BUNDLED_SELF_CODE_SEED_HTTP_${response.status}`);
+      }
+
+      const bytes = await response.arrayBuffer();
+      const JSZipModule = await import('jszip');
+      const JSZipCtor = JSZipModule.default || JSZipModule;
+      const zip = await JSZipCtor.loadAsync(bytes);
+
+      const manifestEntry = zip.file('self-code-seed.manifest.json');
+      if (!manifestEntry) {
+        throw new Error('BUNDLED_SELF_CODE_SEED_MANIFEST_MISSING');
+      }
+
+      const manifest = JSON.parse(await manifestEntry.async('text'));
+
+      if (
+        manifest?.schemaVersion !== 1 ||
+        !Array.isArray(manifest.files) ||
+        !manifest.seedRevision ||
+        !manifest.commitSha
+      ) {
+        throw new Error('BUNDLED_SELF_CODE_SEED_MANIFEST_INVALID');
+      }
+
+      const files: SelfCodeFile[] = [];
+
+      for (const item of manifest.files) {
+        const filePath = String(item?.path || '').replace(/^\/+/, '');
+        const expectedSha = String(item?.sha256 || '');
+        if (!filePath || !expectedSha) {
+          throw new Error('BUNDLED_SELF_CODE_SEED_FILE_MANIFEST_INVALID');
+        }
+
+        const entry = zip.file(filePath);
+        if (!entry) {
+          throw new Error(`BUNDLED_SELF_CODE_SEED_FILE_MISSING:${filePath}`);
+        }
+
+        const content = await entry.async('text');
+        const actualSha = canonicalSha256(content);
+
+        if (actualSha !== expectedSha) {
+          throw new Error(`BUNDLED_SELF_CODE_SEED_SHA_MISMATCH:${filePath}`);
+        }
+
+        files.push({
+          path: filePath,
+          content,
+          sha256: actualSha,
+        });
+      }
+
+      if (!files.length) {
+        throw new Error('BUNDLED_SELF_CODE_SEED_EMPTY');
+      }
+
+      const repoSha256 = canonicalSha256(
+        files.map(file => ({ path: file.path, sha256: file.sha256 }))
+      );
+
+      if (repoSha256 !== String(manifest.seedRevision)) {
+        throw new Error('BUNDLED_SELF_CODE_SEED_REVISION_MISMATCH');
+      }
+
+      const appliedRevision =
+        storageService.getItem(SEED_APPLIED_KEY) || '';
+
+      if (
+        existing?.dirty === true
+      ) {
+        return {
+          status: 'PRESERVED_DIRTY',
+          seedRevision: manifest.seedRevision,
+        };
+      }
+
+      if (
+        existing &&
+        existing.repoSha256 === repoSha256 &&
+        appliedRevision === manifest.seedRevision
+      ) {
+        return {
+          status: 'ALREADY_CURRENT',
+          seedRevision: manifest.seedRevision,
+        };
+      }
+
+      const settings = this.getGitHubSettings();
+
+      githubSyncService.applyBundledSeed(
+        settings.repository,
+        settings.branch,
+        {
+          files,
+          commitSha: String(manifest.commitSha),
+          seedRevision: String(manifest.seedRevision),
+        }
+      );
+
+      storageService.setItem(
+        SEED_APPLIED_KEY,
+        String(manifest.seedRevision)
+      );
+
+      return {
+        status: 'SEEDED',
+        seedRevision: manifest.seedRevision,
+      };
+    } catch (error) {
+      // Bundled seed is the preferred startup source.
+      // Existing GitHub PULL remains the compatibility fallback.
+      try {
+        const fallback = await this.sync();
+        return {
+          status: 'FALLBACK_GITHUB',
+          seedRevision: fallback.repoSha256,
+          error: String(error),
+        };
+      } catch (fallbackError) {
+        // If both sources fail, preserve any existing usable workspace.
+        if (existing) {
+          return {
+            status: 'NO_SOURCE',
+            seedRevision: existing.repoSha256,
+            error:
+              `${String(error)}|GITHUB_FALLBACK:${String(fallbackError)}`,
+          };
+        }
+
+        return {
+          status: 'NO_SOURCE',
+          error:
+            `${String(error)}|GITHUB_FALLBACK:${String(fallbackError)}`,
+        };
+      }
+    }
+  }
+
   async sync(token?: string): Promise<SelfCodeSnapshot> {
     const existing=this.get();
     if(existing?.dirty) throw new Error('SELF_CODE_SPACE_DIRTY_SYNC_REQUIRED');

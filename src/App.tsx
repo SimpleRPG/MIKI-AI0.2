@@ -5,6 +5,7 @@ import { typedCoreUiGatewayService } from './miki/core/ui/typedCoreUiGatewayServ
 import { improvementCanaryRollbackService } from './miki/improvement/services/improvementCanaryRollbackService';
 import React, { useState, useEffect, useRef } from 'react';
 import { appRuntimeLifecycleService } from './app/appRuntimeLifecycleService';
+import { selfCodeSpaceService } from './miki/core/services/selfCodeSpaceService';
 import { Header } from './components/Header';
 import { ChatPanel } from './components/ChatPanel';
 import { GamePreview } from './components/GamePreview';
@@ -293,8 +294,15 @@ export default function App() {
   const [isEvolutionRunning, setIsEvolutionRunning] = useState<boolean>(false);
 
   useEffect(() => {
-    appRuntimeLifecycleService.initialize();
+    let disposed = false;
+
+    void (async () => {
+      await selfCodeSpaceService.initializeBundledSeed();
+      if (!disposed) appRuntimeLifecycleService.initialize();
+    })();
+
     return () => {
+      disposed = true;
       appRuntimeLifecycleService.dispose();
     };
   }, []);
