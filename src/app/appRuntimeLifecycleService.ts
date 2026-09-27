@@ -39,7 +39,14 @@ class AppRuntimeLifecycleService {
     this.initialized = true;
 
     crossDomainCirculationService.initialize();
-    void domainIntegrationBootstrapService.initialize();
+    void domainIntegrationBootstrapService.initialize().catch((error) => {
+      // Bootstrap失敗をWebViewのunhandledrejectionへ再伝播させず、
+      // 既存SystemLoggerへ記録して他のruntime初期化を維持する。
+      systemLogger.warn(
+        'SYSTEM',
+        `[DomainIntegration] bootstrap failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    });
     capabilityLearningService.initialize();
     initializeChapter69to90();
     componentArtifactStoreService.reconcile(componentRegistryService.getAllComponents());

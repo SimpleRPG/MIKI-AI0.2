@@ -52,6 +52,7 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [fetchedRepo, setFetchedRepo] = useState<GitHubRepoData | null>(null);
+  const [fetchedFileCount, setFetchedFileCount] = useState(0);
 
   const [unknownRecords, setUnknownRecords] = useState<UnknownResolution[]>(() => typedGitHubUiGatewayService.unknown.list(8));
   const [domainCoverage, setDomainCoverage] = useState<DomainCoverage[]>(() => typedGitHubUiGatewayService.circulation.getCoverage());
@@ -137,9 +138,12 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
           stars: res.stars || 0,
           description: res.description || 'Imported GitHub Repository',
           branch: branch.trim() || 'main',
-          files: res.files,
+          // 完全なファイル本文は既存githubSyncServiceへ同期済み。
+          // WebViewのReact stateへ970件級の全文を二重保持しない。
+          files: [],
         };
         setFetchedRepo(repoData);
+        setFetchedFileCount(res.files.length);
         setStatusMessage({
           type: 'success',
           text: `「${repoData.repoName}」から ${res.files.length} 件のファイルを取得しました！`,
@@ -474,7 +478,7 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
             </div>
 
             <div className="text-xs text-slate-300">
-              取得ファイル数: <strong>{fetchedRepo.files.length} 件</strong>
+              取得ファイル数: <strong>{fetchedFileCount} 件</strong>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2.5 pt-2">

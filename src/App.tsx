@@ -3442,8 +3442,39 @@ export default function App() {
   };
 
   // GitHub Load Repo Into Workspace
+  //
+  // GitHub PULLの完全な正本は既存SelfCodeSpace/GitHubSync側に保持する。
+  // Android WebViewで数百〜数千ファイルの全文をReact stateへ同時に複製すると、
+  // JSON/DOM/構造記憶同期が重なってメモリ・CPU負荷が急増するため、
+  // 通常Workspaceには実行・解析に必要な代表ファイルだけを投影する。
   const handleLoadRepoIntoWorkspace = (repoData: GitHubRepoData) => {
-    const newFiles: WorkspaceFile[] = repoData.files.map((rf) => {
+    const syncedFiles =
+      repoData.files.length > 0
+        ? repoData.files
+        : selfCodeSpaceService.listFiles();
+
+    const priorityPath = (path: string): number => {
+      const normalized = path.replace(/^\.\//, '');
+
+      if (normalized === 'index.html') return 0;
+      if (normalized === 'package.json') return 1;
+      if (normalized === 'src/main.tsx') return 2;
+      if (normalized === 'src/App.tsx') return 3;
+      if (/^(vite|vitest|tsconfig|capacitor)\.[^/]+$/i.test(normalized)) return 4;
+      if (/^(src|app|pages|components)\/.*\.(tsx|jsx|ts|js|html|css|scss)$/i.test(normalized)) return 10;
+      if (/\.(html|css|scss|js|jsx|ts|tsx|json)$/i.test(normalized)) return 20;
+      return 50;
+    };
+
+    const selectedFiles = [...syncedFiles]
+      .sort(
+        (a, b) =>
+          priorityPath(a.path) - priorityPath(b.path) ||
+          a.path.localeCompare(b.path)
+      )
+      .slice(0, 160);
+
+    const newFiles: WorkspaceFile[] = selectedFiles.map((rf) => {
       let lang = 'javascript';
       if (rf.path.endsWith('.html')) lang = 'html';
       else if (rf.path.endsWith('.css')) lang = 'css';
@@ -3465,9 +3496,9 @@ export default function App() {
       setMobileTab('preview');
       setConsoleLogs([]);
 
-      // Notify agent in chat
-      handleSendMessage(
-        `GitHubリポジトリ「${repoData.repoName}」を取り込んだよ！このリポジトリの構成を分析して、何ができるか教えて！`
+      systemLogger.info(
+        'SYSTEM',
+        `[GitHub Workspace] ${syncedFiles.length}ファイルの正本同期を維持し、${newFiles.length}ファイルだけを対話Workspaceへ投影しました。`
       );
     }
   };
