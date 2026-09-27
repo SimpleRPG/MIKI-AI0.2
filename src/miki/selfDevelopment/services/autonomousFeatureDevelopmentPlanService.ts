@@ -6,8 +6,9 @@ export interface AutonomousFeatureDevelopmentPlan { developmentPlanId:string; fe
 class AutonomousFeatureDevelopmentPlanService {
   public plan(objective:string,targetPaths:string[],packageScripts:Record<string,string>):AutonomousFeatureDevelopmentPlan {
     const feature=featureDevelopmentPlannerService.plan(objective,targetPaths);
-    const construction=newFeatureConstructionPlanService.plan(feature);
     const tests=executableFeatureTestPlanService.plan(feature,packageScripts);
+    const testExtension=tests.framework==='TSX_SCRIPT'?'ts':'mjs';
+    const construction=newFeatureConstructionPlanService.plan(feature,testExtension);
     const reasons=[...feature.unresolved,...construction.unresolved];
     if(tests.cases.length===0)reasons.push('EXECUTABLE_TEST_PLAN_EMPTY');
     const seed={featurePlanId:feature.planId,constructionPlanId:construction.constructionPlanId,testPlanId:tests.testPlanId};

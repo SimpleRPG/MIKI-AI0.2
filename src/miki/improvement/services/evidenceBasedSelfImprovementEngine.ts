@@ -410,15 +410,16 @@ export class EvidenceBasedSelfImprovementEngine {
     for (const tc of testCases) {
       try {
         const res = testRunner(tc.input);
-        // エラーを適切にハンドリングしてクラッシュしなかったか
-        const passed = res.success || !tc.expectSuccess;
+        // 期待値と実結果が一致した場合だけ合格。
+        const passed = tc.expectSuccess ? res.success : !res.success;
         findings.push({
           testType: tc.type,
           inputSample: tc.label,
           expectedBehavior: tc.expectSuccess ? '正常応答' : '安全なエラー捕捉',
           actualOutcome: res.success ? '成功' : '安全に捕捉',
-          passed: true,
+          passed,
         });
+        if (!passed) failureCount++;
       } catch (err: any) {
         // 想定外の未捕捉クラッシュは反例失敗
         failureCount++;
