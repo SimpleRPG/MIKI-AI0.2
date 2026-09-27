@@ -8858,3 +8858,38 @@ Android OS全体のRAM使用量をWebView JavaScript APIだけから直接取得
 この機構は既存のCORE経路を変更せず、
 既存のSystemLogger / storageService / 診断レポートを利用する。
 
+============================================================
+【実装更新 2026-09-27：TASK履歴の起動復元・自律改善開始時の永続境界】
+============================================================
+
+自律改善TASKが強制終了・異常終了後に履歴から消える問題について、
+既存のStorage / Blackboard / SelfImprovementController構造を変更せずに、
+起動順序と永続化境界を固定する。
+
+【起動順序】
+- `storageService.ready` のHydrate完了前に、Storage-backed Singleton群を生成しない。
+- `src/main.tsx` は `App` および `ErrorBoundary` をStorage Hydrate完了後にdynamic importする。
+- これにより `taskBlackboardService`、`improvementIntakeRouterService`、
+  `autonomousSelfImprovementLoopService` 等がHydrate前の空cacheを
+  起動時の正本状態として固定する競合を防ぐ。
+- Storage backendがSQLite / IndexedDB / memoryのいずれであっても、
+  既存 `storageService.ready` を唯一の起動Hydrate境界として扱う。
+
+【自律改善TASKの永続境界】
+- `SELF_IMPROVEMENT` TASKは `taskBlackboardService.create()` 直後、
+  重いselfDevelopment / candidate generation / research等へ進む前に、
+  既存 `SelfImprovementControllerService.recordCanonicalRun()` へ
+  taskId付きで記録する。
+- 記録後は `storageService.flushNow()` を実行し、
+  `miki_task_blackboard_v1` と `miki_self_improvement_runs_v1` を
+  同じ起動済みStorage backendへ即時確定する。
+- 後続のCORE実行結果は既存の `recordCanonicalRun()` 更新経路で
+  同一taskIdの履歴を更新する。
+- 新しいHistory DB、Task Manager、Blackboard、Orchestratorは追加しない。
+
+【履歴表示】
+- SelfImprovementControllerService.listRuns()を正規永続履歴源とする。
+- PriorityOneRuntimeReadModelは同一taskIdのRuntime状態を上書き表示する。
+- これにより、自律改善開始直後に強制終了されても、
+  Runtime-only TASKとして履歴から消失しない。
+

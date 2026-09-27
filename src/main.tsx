@@ -1,7 +1,5 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
-import { ErrorBoundary } from './components/ErrorBoundary';
 import { storageService } from './services/storageService';
 import './index.css';
 
@@ -51,10 +49,18 @@ window.addEventListener('beforeunload', flushOnHide);
 
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 
-// 初期Knowledge / ComponentはAPKに同梱されたCatalogから即時利用できる。
-// 永続StorageのHydrate完了をUI表示のブロッキング条件にしない。
-// Hydrate後に同じAppを再描画し、学習済み・探索済みのRuntime Stateを反映する。
-const renderApp = () => {
+root.render(
+  <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300 text-sm">
+    MIKI 起動中...
+  </div>
+);
+
+const renderApp = async () => {
+  const [{ default: App }, { ErrorBoundary }] = await Promise.all([
+    import('./App'),
+    import('./components/ErrorBoundary'),
+  ]);
+
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
@@ -64,14 +70,16 @@ const renderApp = () => {
   );
 };
 
-renderApp();
-
-void storageService.ready.finally(() => {
-  renderApp();
-  // Existing SystemLogger is the canonical diagnostic path.
-  // Start persistent runtime-memory/process-gap telemetry only after the
-  // persistent storage backend has been hydrated.
-  void import('./services/systemLogger').then(({ systemLogger }) => {
+// Storage-backed Singleton群はApp import時に生成される。
+// そのため、AppをStorage Hydrate完了後に初めてロードし、
+// taskBlackboardService / improvementIntakeRouterService等が空cacheを
+// 初期状態として固定してしまう起動競合を防止する。
+void storageService.ready
+  .then(renderApp)
+  .then(() => import('./services/systemLogger'))
+  .then(({ systemLogger }) => {
     systemLogger.initializeRuntimeMemoryDiagnostics();
+  })
+  .catch((error) => {
+    console.error('MIKI application bootstrap failed', error);
   });
-});

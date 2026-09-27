@@ -46,6 +46,32 @@ class CoreOrchestratorService {
     orchestrationMode:payload.orchestrationMode,
     executionPriority:payload.executionPriority
   });
+
+  // 自律改善TASKは重いselfDevelopment系処理へ進む前に、
+  // 既存の正規SelfImprovementController履歴へtaskId付きで確定記録する。
+  // その直後にflushすることで、強制終了しても「Runtimeだけに存在するTASK」
+  // にならないよう、TASK BlackboardとCanonical Historyを同じ永続境界で確定させる。
+  if(payload.kind==='SELF_IMPROVEMENT'){
+   try{
+    const { selfImprovementControllerService } = await import('../../improvement/services/selfImprovementControllerService');
+    const directiveId=typeof payload.directiveId==='string'&&payload.directiveId.trim()
+      ? payload.directiveId.trim()
+      : undefined;
+    selfImprovementControllerService.recordCanonicalRun(
+      created.taskId,
+      directiveId ? `CORE_SELF_IMPROVEMENT:${directiveId}` : 'CORE_SELF_IMPROVEMENT',
+      `status=${created.status};taskRevision=${created.revision};cycle=${created.lastCycle};phase=TASK_CREATED`,
+      {
+       action:'AUTONOMOUS_CODE_EVOLUTION',
+       reason:'Canonical CORE self-improvement TASK persisted immediately at creation boundary'
+      }
+    );
+    await storageService.flushNow();
+   }catch(error){
+    console.warn('[CORE] failed to persist initial self-improvement canonical history',error);
+   }
+  }
+
   if(payload.kind==='USER_REQUEST' || payload.foreground===true){
    taskBlackboardService.pauseBackgroundTasksForForeground(created.taskId);
   }
