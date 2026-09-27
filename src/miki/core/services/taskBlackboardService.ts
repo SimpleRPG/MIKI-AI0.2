@@ -25,7 +25,17 @@ class TaskBlackboardService{
  setStatus(taskId:string,status:BlackboardStatus):BlackboardTask|undefined{const task=this.tasks.get(taskId);if(!task)return undefined;task.status=status;task.revision+=1;task.updatedAt=Date.now();this.save();return this.clone(task);}
 
  pause(taskId:string,reason='USER_REQUESTED'):BlackboardTask|undefined{const task=this.tasks.get(taskId);if(!task||task.status==='COMPLETED'||task.status==='CANCELLED')return undefined;task.status='PAUSED';task.pausedReason=reason;task.revision+=1;task.updatedAt=Date.now();this.save();return this.clone(task);}
- resume(taskId:string):BlackboardTask|undefined{const task=this.tasks.get(taskId);if(!task||task.status!=='PAUSED')return undefined;task.status='ROUTING';task.pausedReason=undefined;task.resumeCount+=1;task.revision+=1;task.updatedAt=Date.now();this.save();return this.clone(task);}
+ resume(taskId:string):BlackboardTask|undefined{
+  const task=this.tasks.get(taskId);if(!task||task.status!=='PAUSED')return undefined;
+  task.status='ROUTING';
+  task.pausedReason=undefined;
+  task.resumeCount+=1;
+  task.revision+=1;
+  task.updatedAt=Date.now();
+  this.reallocateBackgroundBudgetWindow(taskId,'TASK_RESUMED');
+  this.save();
+  return this.clone(task);
+ }
  cancel(taskId:string):BlackboardTask|undefined{const task=this.tasks.get(taskId);if(!task||task.status==='COMPLETED')return undefined;task.status='CANCELLED';task.pendingDomains=[];task.revision+=1;task.updatedAt=Date.now();this.save();return this.clone(task);}
  setCycle(taskId:string,cycle:number):void{const task=this.tasks.get(taskId);if(!task)return;task.lastCycle=cycle;task.updatedAt=Date.now();this.save();}
  setPending(taskId:string,domains:MikiDomain[]):void{const task=this.tasks.get(taskId);if(!task)return;task.pendingDomains=[...new Set(domains)];task.updatedAt=Date.now();this.save();}
@@ -36,14 +46,19 @@ class TaskBlackboardService{
   const markerAt=lastMarker?.createdAt||task.createdAt;
   return task.entries.filter(entry=>entry.kind==='CHECKPOINT'&&entry.key.startsWith('backgroundBudgetCycle:')&&entry.createdAt>=markerAt).length+1;
  }
+ backgroundBudgetWindowStartedAt(taskId:string):number {
+  const task=this.tasks.get(taskId);if(!task)return Date.now();
+  const markers=task.entries.filter(entry=>entry.kind==='CHECKPOINT'&&entry.key.startsWith('backgroundBudgetReallocated:'));
+  return markers.at(-1)?.createdAt||task.createdAt;
+ }
  resumePausedBackgroundAfterForeground():string[]{
   if(this.hasActiveForegroundTask(''))return [];
   const resumed:string[]=[];
   for(const task of this.tasks.values()){
    if(task.status!=='PAUSED'||task.pausedReason!=='FOREGROUND_USER_REQUEST_ACTIVE')continue;
    task.status='ROUTING';task.pausedReason=undefined;task.resumeCount+=1;task.revision+=1;task.updatedAt=Date.now();
-   task.entries.push({id:`BBE-${Date.now()}-${String(++this.sequence).padStart(6,'0')}`,taskId:task.taskId,kind:'CHECKPOINT',domain:'core',key:`backgroundBudgetReallocated:${task.resumeCount}`,value:{reason:'FOREGROUND_USER_REQUEST_COMPLETED',resumeCount:task.resumeCount,reallocatedAt:Date.now(),reallocationPolicy:'RESET_BACKGROUND_BUDGET_WINDOW'},evidenceIds:[],createdAt:Date.now()});
-   task.revision+=1;
+   this.reallocateBackgroundBudgetWindow(task.taskId,'FOREGROUND_USER_REQUEST_COMPLETED');
+
    resumed.push(task.taskId);
   }
   if(resumed.length)this.save();

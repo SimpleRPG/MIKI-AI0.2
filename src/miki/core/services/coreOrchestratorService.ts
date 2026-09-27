@@ -145,7 +145,12 @@ class CoreOrchestratorService {
   if(!currentTask)return undefined;
   if(currentTask.status==='COMPLETED'||currentTask.status==='CANCELLED')return undefined;
   const reqId=this.resolveRequestId(currentTask,taskId);
-  taskBlackboardService.setStatus(taskId,'ROUTING');
+  if(currentTask.status==='PAUSED'){
+   const resumed=taskBlackboardService.resume(taskId);
+   if(!resumed)return undefined;
+  }else{
+   taskBlackboardService.setStatus(taskId,'ROUTING');
+  }
   taskBlackboardService.append(taskId,'DECISION','core','coreExecutionEventResumed',{
     mode:'CORE_18_DOMAIN_ORCHESTRATION',
     requestId:reqId,
@@ -707,7 +712,7 @@ class CoreOrchestratorService {
       true,
       false,
       cycles,
-      currentBeforeState.createdAt,
+      taskBlackboardService.backgroundBudgetWindowStartedAt(taskId),
       budgetCheckedAt,
       cycleLimit
     );
@@ -719,6 +724,7 @@ class CoreOrchestratorService {
       cycle:cycles,
       budgetCycle:cycles,
       taskCreatedAt:currentBeforeState.createdAt,
+      budgetWindowStartedAt:taskBlackboardService.backgroundBudgetWindowStartedAt(taskId),
       checkedAt:budgetCheckedAt,
       elapsedMs:budget.elapsedMs,
       background:true,
