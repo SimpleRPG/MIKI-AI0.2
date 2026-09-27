@@ -8827,6 +8827,21 @@ Background自律処理のCycle上限は、ResourceModeごとの独自固定値�
 - Foreground割込み後のBackground pause/resumeとbudget window再配分を壊していないこと。
 
 ============================================================
+【実装更新 2026-09-27：Background resume時のbudget window再配分実装復元】
+
+`taskBlackboardService` の既存 `resume()` / Foreground後のBackground resume経路が
+`reallocateBackgroundBudgetWindow()` を呼び出す設計になっていることを確認したが、
+呼出し先の実装が欠落していたため、再開時にCORE Cycle開始前で例外停止する状態が発生していた。
+
+今回の修正：
+- 新しいTask Manager / Service / Orchestrator / Result DB / Blackboardは追加しない。
+- 既存 `TaskBlackboardService` に `reallocateBackgroundBudgetWindow()` を復元する。
+- 再配分時は既存Checkpoint形式 `backgroundBudgetReallocated:<resumeCount>` を記録する。
+- `RESET_BACKGROUND_BUDGET_WINDOW` を再配分ポリシーとして記録する。
+- Background budgetの開始時刻は既存 `backgroundBudgetWindowStartedAt()` がこのCheckpointを基準に取得する。
+- 自己改善QueueからのresumeとForeground完了後のBackground resumeの双方で同じ既存処理を利用する。
+- これにより `SELF_IMPROVEMENT_QUEUED → ROUTING → CYCLE_START` の正規CORE経路を遮断しない。
+
 【実装更新 2026-09-27：メモリ不足・異常終了の診断証拠】
 ============================================================
 

@@ -83,6 +83,29 @@ class TaskBlackboardService{
  cancel(taskId:string):BlackboardTask|undefined{const task=this.tasks.get(taskId);if(!task||task.status==='COMPLETED')return undefined;task.status='CANCELLED';task.pendingDomains=[];task.revision+=1;task.updatedAt=Date.now();this.save();return this.clone(task);}
  setCycle(taskId:string,cycle:number):void{const task=this.tasks.get(taskId);if(!task)return;task.lastCycle=cycle;task.updatedAt=Date.now();this.save();}
  setPending(taskId:string,domains:MikiDomain[]):void{const task=this.tasks.get(taskId);if(!task)return;task.pendingDomains=[...new Set(domains)];task.updatedAt=Date.now();this.save();}
+ reallocateBackgroundBudgetWindow(taskId:string,reason:string):void{
+  const task=this.tasks.get(taskId);
+  if(!task)return;
+  this.sequence+=1;
+  const now=Date.now();
+  task.entries.push({
+   id:`BBE-${now}-${String(this.sequence).padStart(6,'0')}`,
+   taskId:task.taskId,
+   kind:'CHECKPOINT',
+   domain:'core',
+   key:`backgroundBudgetReallocated:${task.resumeCount}`,
+   value:{
+    reason,
+    resumeCount:task.resumeCount,
+    reallocatedAt:now,
+    reallocationPolicy:'RESET_BACKGROUND_BUDGET_WINDOW'
+   },
+   evidenceIds:[],
+   createdAt:now
+  });
+  task.revision+=1;
+  task.updatedAt=now;
+ }
  backgroundBudgetCycle(taskId:string):number {
   const task=this.tasks.get(taskId);if(!task)return 0;
   const markers=task.entries.filter(entry=>entry.kind==='CHECKPOINT'&&entry.key.startsWith('backgroundBudgetReallocated:'));
