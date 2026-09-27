@@ -134,6 +134,10 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
         ...run,
         run_id: run.run_id || run.taskId || '―',
         taskId: run.taskId,
+        title: run.taskId
+          ? (typedImprovementUiGatewayService.getTaskTitle(run.taskId)
+            || (typeof (run as any).trigger === 'string' ? (run as any).trigger : '作業タスク'))
+          : (typeof (run as any).trigger === 'string' ? (run as any).trigger : '永続履歴'),
         verdict: runtime
           ? (
               runtime.waitingPackageIds.length > 0
@@ -162,6 +166,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       .map((item) => ({
         run_id: item.taskId,
         taskId: item.taskId,
+        title: typedImprovementUiGatewayService.getTaskTitle(item.taskId) || '作業タスク',
         verdict: item.waitingPackageIds.length > 0
           ? 'WAIT_EXTERNAL_FEEDBACK'
           : item.taskStatus,
@@ -736,10 +741,16 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                   </span>
                 </div>
                 <div className="text-xs space-y-1 text-slate-300 pt-1 border-t border-slate-800/60">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-500 shrink-0">現在の作業:</span>
+                    <span className="text-indigo-300 text-[11px] font-semibold text-right truncate">
+                      {canonicalRuns[0]?.title || '作業なし'}
+                    </span>
+                  </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">直近Run ID:</span>
-                    <span className="font-mono text-indigo-300 text-[11px]">
-                      {canonicalRuns[0]?.run_id || 'なし'}
+                    <span className="text-slate-500">Task ID:</span>
+                    <span className="font-mono text-slate-400 text-[10px]">
+                      {canonicalRuns[0]?.taskId || canonicalRuns[0]?.run_id || 'なし'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -1343,8 +1354,17 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                   </div>
                 </div>
 
+                <div className="p-3 rounded-lg bg-indigo-950/30 border border-indigo-500/30">
+                  <div className="text-slate-500 mb-1">現在の作業</div>
+                  <div className="text-indigo-200 font-bold text-sm">
+                    {task.title || task.goal || '作業タスク'}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    Task ID: <span className="font-mono text-slate-400">{task.taskId}</span>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <div>Run ID<br/><span className="font-mono text-indigo-300">{task.taskId}</span></div>
                   <div>状態<br/><span className="text-slate-200">{formatRuntimeStatus(task.status)}</span></div>
                   <div>開始<br/><span className="text-slate-300">{fmtTime(task.createdAt)}</span></div>
                   <div>更新<br/><span className="text-slate-300">{fmtTime(task.updatedAt)}</span></div>

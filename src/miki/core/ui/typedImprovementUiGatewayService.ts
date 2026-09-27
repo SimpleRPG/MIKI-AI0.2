@@ -27,6 +27,7 @@ export type { CoreResult } from '../services/coreResultService';
 
 type ImprovementDirectiveContext = {
   directiveId?:string;
+  title?:string;
   sourceHash?:string;
   targetFiles?:string[];
   requirements?:string[];
@@ -91,6 +92,10 @@ class TypedImprovementUiGatewayService {
   getWorkspaces() { return isolatedCandidateWorkspaceService.list(); }
   getValidationEvidence() { return candidateValidationEvidenceService.list(); }
   getCoreResults(limit = 50) { return coreResultService.list(limit); }
+
+  getTaskTitle(taskId:string):string|undefined{
+    return taskBlackboardService.get(taskId)?.title;
+  }
 
   getImprovementRunDetail(taskId:string){
     const task=taskBlackboardService.get(taskId);
@@ -228,8 +233,12 @@ class TypedImprovementUiGatewayService {
       (item)=>item.directiveId===directiveId
     );
     const directive=externalDirective;
+    const directiveTitle=directive?.title?.trim()
+      || workDirective?.title?.trim()
+      || undefined;
     const goal=directive?.objective?.trim()
       || workDirective?.goal?.trim()
+      || directiveTitle
       || `指示書 ${directiveId} を実行し、評価可能な候補まで進める`;
 
     const targetFiles=directive?.targetFiles
@@ -241,6 +250,7 @@ class TypedImprovementUiGatewayService {
 
     const directiveContext:ImprovementDirectiveContext={
       directiveId,
+      title:directiveTitle,
       sourceHash:directive?.sourceHash,
       targetFiles,
       requirements:directive?.requirements

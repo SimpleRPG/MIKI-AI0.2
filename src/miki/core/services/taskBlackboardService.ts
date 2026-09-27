@@ -4,15 +4,59 @@ import type { MikiDomain } from './crossDomainCirculationService';
 export type BlackboardStatus='OPEN'|'ROUTING'|'WAITING'|'PAUSED'|'COMPLETED'|'FAILED'|'CANCELLED';
 export type BlackboardEntryKind='INPUT'|'OBSERVATION'|'EVIDENCE'|'CLAIM'|'DECISION'|'RESULT'|'ERROR'|'CHECKPOINT';
 export interface BlackboardEntry { id:string; taskId:string; kind:BlackboardEntryKind; domain:MikiDomain; key:string; value:unknown; evidenceIds:string[]; createdAt:number; }
-export interface BlackboardTask { taskId:string; goal:string; source:MikiDomain; status:BlackboardStatus; revision:number; createdAt:number; updatedAt:number; visitedDomains:MikiDomain[]; pendingDomains:MikiDomain[]; entries:BlackboardEntry[]; pausedReason?:string; resumeCount:number; lastCycle:number; }
+export interface BlackboardTask { taskId:string; title?:string; goal:string; source:MikiDomain; status:BlackboardStatus; revision:number; createdAt:number; updatedAt:number; visitedDomains:MikiDomain[]; pendingDomains:MikiDomain[]; entries:BlackboardEntry[]; pausedReason?:string; resumeCount:number; lastCycle:number; }
 const KEY='miki_task_blackboard_v1';
+
+function summarizeTaskTitle(
+ goal:string,
+ payload?:Record<string,unknown>
+):string{
+ const directiveContext=payload?.directiveContext;
+ const contextTitle=
+  directiveContext&&typeof directiveContext==='object'&&!Array.isArray(directiveContext)
+   ? (directiveContext as Record<string,unknown>).title
+   : undefined;
+
+ const candidates=[
+  payload?.title,
+  payload?.directiveTitle,
+  contextTitle,
+  goal
+ ];
+
+ for(const candidate of candidates){
+  if(typeof candidate!=='string')continue;
+  let value=candidate
+   .replace(/^#+\s*/,'')
+   .replace(/^\s*(?:目的|作業内容|指示内容|goal|objective)\s*[:：]\s*/i,'')
+   .replace(/[\t ]+/g,' ')
+   .replace(/^[-*]\s*/,'')
+   .trim();
+
+  if(!value)continue;
+
+  // 自動生成された日付だけの汎用タイトルは、goal側へフォールバックする。
+  if(/^作業指示(?:書)?\s*[（(].*[）)]\s*(?:受領)?$/u.test(value)){
+   continue;
+  }
+
+  value=value.split(/[。！？!?\n]/u)[0].trim();
+  if(!value)continue;
+
+  return value.length>64
+   ? `${value.slice(0,61).trim()}…`
+   : value;
+ }
+
+ return '作業タスク';
+}
 const MAX_TASKS=200;
 class TaskBlackboardService{
  private tasks=new Map<string,BlackboardTask>(); private sequence=0;
  constructor(){this.load();}
  create(goal:string,source:MikiDomain,payload?:Record<string,unknown>):BlackboardTask{
   const now=Date.now();this.sequence+=1;const taskId=`TASK-${now}-${String(this.sequence).padStart(6,'0')}`;
-  const task:BlackboardTask={taskId,goal:goal.trim(),source,status:'OPEN',revision:1,createdAt:now,updatedAt:now,visitedDomains:[],pendingDomains:[],entries:[],resumeCount:0,lastCycle:0};
+  const task:BlackboardTask={taskId,title:summarizeTaskTitle(goal,payload),goal:goal.trim(),source,status:'OPEN',revision:1,createdAt:now,updatedAt:now,visitedDomains:[],pendingDomains:[],entries:[],resumeCount:0,lastCycle:0};
   this.tasks.set(taskId,task);if(payload)this.append(taskId,'INPUT',source,'payload',payload);this.save();return this.clone(task);
  }
  append(taskId:string,kind:BlackboardEntryKind,domain:MikiDomain,key:string,value:unknown,evidenceIds:string[]=[]):BlackboardEntry|undefined{
@@ -99,6 +143,32 @@ class TaskBlackboardService{
  list(limit=50):BlackboardTask[]{return [...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,limit).map(t=>this.clone(t));}
  private clone(t:BlackboardTask):BlackboardTask{return {...t,visitedDomains:[...t.visitedDomains],pendingDomains:[...t.pendingDomains],entries:t.entries.map(e=>({...e,evidenceIds:[...e.evidenceIds]}))};}
  private save():void{const all=[...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,MAX_TASKS);storageService.setItem(KEY,JSON.stringify(all));}
- private load():void{try{const raw=storageService.getItem(KEY);const all=raw?JSON.parse(raw):[];if(Array.isArray(all))for(const t of all)this.tasks.set(t.taskId,t);}catch{this.tasks.clear();}}
+ private load():void{
+  try{
+   const raw=storageService.getItem(KEY);
+   const all=raw?JSON.parse(raw):[];
+   if(!Array.isArray(all))return;
+   let migrated=false;
+   for(const t of all){
+    if(!t||typeof t!=='object'||typeof t.taskId!=='string')continue;
+    const task=t as BlackboardTask;
+    if(!task.title||!task.title.trim()){
+     const payload=task.entries?.find(
+      entry=>entry.kind==='INPUT'&&entry.key==='payload'
+     )?.value;
+     const payloadObject=
+      payload&&typeof payload==='object'&&!Array.isArray(payload)
+       ? payload as Record<string,unknown>
+       : undefined;
+     task.title=summarizeTaskTitle(task.goal,payloadObject);
+     migrated=true;
+    }
+    this.tasks.set(task.taskId,task);
+   }
+   if(migrated)this.save();
+  }catch{
+   this.tasks.clear();
+  }
+}
 }
 export const taskBlackboardService=new TaskBlackboardService();
