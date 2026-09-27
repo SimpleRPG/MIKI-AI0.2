@@ -96,6 +96,23 @@ const formatRuntimeAction = (value: string) => {
   }
 };
 
+const normalizeRepeatedDiagnosticPrefix = (value: string) => {
+  let text = String(value || '').trim();
+  const prefixes = ['停滞タスク:', '改善負債:', '能力不足:', '知識不足:', '実行失敗:', '18分類未循環:', 'Claim矛盾:'];
+
+  for (const prefix of prefixes) {
+    const escaped = prefix.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+    const repeated = new RegExp(`^(?:${escaped}\\s*)+`, 'u');
+    const match = text.match(repeated);
+    if (match) {
+      const rest = text.slice(match[0].length).trim();
+      text = `${prefix}${rest ? ` ${rest}` : ''}`;
+    }
+  }
+
+  return text || '作業タスク';
+};
+
 export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps> = ({
   onOpenSelfImprovementModal,
   onOpenActivityMonitor,
@@ -135,9 +152,13 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
         run_id: run.run_id || '―',
         taskId: run.taskId,
         title: run.taskId
-          ? (typedImprovementUiGatewayService.getTaskTitle(run.taskId)
-            || (typeof (run as any).trigger === 'string' ? (run as any).trigger : '作業タスク'))
-          : (typeof (run as any).trigger === 'string' ? (run as any).trigger : '永続履歴'),
+          ? normalizeRepeatedDiagnosticPrefix(
+              typedImprovementUiGatewayService.getTaskTitle(run.taskId)
+                || (typeof (run as any).trigger === 'string' ? (run as any).trigger : '作業タスク')
+            )
+          : normalizeRepeatedDiagnosticPrefix(
+              typeof (run as any).trigger === 'string' ? (run as any).trigger : '永続履歴'
+            ),
         verdict: runtime
           ? (
               runtime.waitingPackageIds.length > 0
@@ -166,7 +187,9 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       .map((item) => ({
         run_id: '―',
         taskId: item.taskId,
-        title: typedImprovementUiGatewayService.getTaskTitle(item.taskId) || '作業タスク',
+        title: normalizeRepeatedDiagnosticPrefix(
+          typedImprovementUiGatewayService.getTaskTitle(item.taskId) || '作業タスク'
+        ),
         verdict: item.waitingPackageIds.length > 0
           ? 'WAIT_EXTERNAL_FEEDBACK'
           : item.taskStatus,
@@ -1367,7 +1390,9 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                 <div className="p-3 rounded-lg bg-indigo-950/30 border border-indigo-500/30">
                   <div className="text-slate-500 mb-1">現在の作業</div>
                   <div className="text-indigo-200 font-bold text-sm">
-                    {task.title || detail.title || task.goal || '作業タスク'}
+                    {normalizeRepeatedDiagnosticPrefix(
+                      task.title || detail.title || task.goal || '作業タスク'
+                    )}
                   </div>
                   <div className="text-[10px] text-slate-500 mt-1 space-y-0.5">
                     <div>
@@ -1501,7 +1526,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-indigo-200 font-bold text-[11px] truncate">
-                    {run.title || '作業タスク'}
+                    {normalizeRepeatedDiagnosticPrefix(run.title || '作業タスク')}
                   </span>
                   <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">
                     状態: {formatRuntimeStatus(run.verdict)}
