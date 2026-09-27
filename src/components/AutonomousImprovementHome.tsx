@@ -132,7 +132,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 
       return {
         ...run,
-        run_id: run.run_id || run.taskId || '―',
+        run_id: run.run_id || '―',
         taskId: run.taskId,
         title: run.taskId
           ? (typedImprovementUiGatewayService.getTaskTitle(run.taskId)
@@ -164,7 +164,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     const runtimeOnly = coreRuntimes
       .filter((item) => !persistedTaskIds.has(item.taskId))
       .map((item) => ({
-        run_id: item.taskId,
+        run_id: '―',
         taskId: item.taskId,
         title: typedImprovementUiGatewayService.getTaskTitle(item.taskId) || '作業タスク',
         verdict: item.waitingPackageIds.length > 0
@@ -544,6 +544,8 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 
     const lines = [
       'MIKI-AI0.2 RUN DETAIL',
+      `title=${compact(task.title || detail.title || task.goal)}`,
+      `runId=${compact(detail.runId)}`,
       `taskId=${task.taskId || '―'}`,
       `status=${task.status || '―'}`,
       `goal=${compact(task.goal)}`,
@@ -748,9 +750,17 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                     </span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-slate-500">Run ID:</span>
+                    <span className="font-mono text-slate-400 text-[10px]">
+                      {canonicalRuns[0]?.run_id && canonicalRuns[0].run_id !== '―'
+                        ? canonicalRuns[0].run_id
+                        : 'なし'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-slate-500">Task ID:</span>
                     <span className="font-mono text-slate-400 text-[10px]">
-                      {canonicalRuns[0]?.taskId || canonicalRuns[0]?.run_id || 'なし'}
+                      {canonicalRuns[0]?.taskId || 'なし'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -1357,10 +1367,15 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                 <div className="p-3 rounded-lg bg-indigo-950/30 border border-indigo-500/30">
                   <div className="text-slate-500 mb-1">現在の作業</div>
                   <div className="text-indigo-200 font-bold text-sm">
-                    {task.title || task.goal || '作業タスク'}
+                    {task.title || detail.title || task.goal || '作業タスク'}
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-1">
-                    Task ID: <span className="font-mono text-slate-400">{task.taskId}</span>
+                  <div className="text-[10px] text-slate-500 mt-1 space-y-0.5">
+                    <div>
+                      Run ID: <span className="font-mono text-slate-400">{detail.runId || '―'}</span>
+                    </div>
+                    <div>
+                      Task ID: <span className="font-mono text-slate-400">{task.taskId || '―'}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -1472,7 +1487,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 
           {canonicalRuns.map((run) => (
             <div
-              key={run.run_id}
+              key={`${run.run_id || 'no-run'}:${run.taskId || 'no-task'}`}
               className="p-3.5 bg-slate-900/40 hover:bg-slate-800/40 transition text-xs space-y-1.5 cursor-pointer"
               onClick={() => run.taskId && setSelectedRunId(run.taskId)}
               role={run.taskId ? 'button' : undefined}
@@ -1485,8 +1500,8 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-indigo-300 font-bold text-[11px]">
-                    {run.run_id}
+                  <span className="text-indigo-200 font-bold text-[11px] truncate">
+                    {run.title || '作業タスク'}
                   </span>
                   <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">
                     状態: {formatRuntimeStatus(run.verdict)}
@@ -1506,9 +1521,13 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                   : '永続履歴として保存済み（詳細Taskは未保持）'}
               </div>
 
-              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1">
-                <span>Run ID: {run.run_id}</span>
-                <span>{run.taskId ? '詳細を見る ›' : '永続履歴'}</span>
+              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1 gap-2">
+                <span className="truncate">
+                  Run ID: {run.run_id && run.run_id !== '―' ? run.run_id : '―'}
+                  {' · '}
+                  Task ID: {run.taskId || '―'}
+                </span>
+                <span className="shrink-0">{run.taskId ? '詳細を見る ›' : '永続履歴'}</span>
               </div>
             </div>
           ))}

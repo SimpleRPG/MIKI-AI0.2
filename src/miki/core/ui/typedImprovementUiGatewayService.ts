@@ -103,6 +103,7 @@ class TypedImprovementUiGatewayService {
     const result=coreResultService.list(200).find(x=>(x.result as any)?.taskId===taskId);
     const replies=domainReplyLedgerService.listByTask(taskId);
     const intake=this.getIntakeRuns(200).find(x=>x.taskId===taskId);
+    const canonicalRun=this.getRuns().find(run=>run.taskId===taskId);
     const workspaces=isolatedCandidateWorkspaceService.list().filter(x=>x.runId===taskId);
     const validation=workspaces.flatMap(x=>candidateValidationEvidenceService.list(x.workspaceId));
     const packages=reviewZipExportService.list().filter(x=>x.runId===taskId);
@@ -152,6 +153,7 @@ class TypedImprovementUiGatewayService {
     return {
       task,
       intake,
+      runId:canonicalRun?.run_id,
       coreResult:result,
       coreDecisions:task.entries.filter(x=>x.domain==='core'&&(x.kind==='DECISION'||x.kind==='RESULT')),
       diagnosticLogs,

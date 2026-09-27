@@ -6441,6 +6441,15 @@ Failed
 
 Run ID / Request ID / Directive IDを可能な限り保持し、
 CORE Resultには関連IDを格納する。
+UIでTaskをユーザーへ表示する場合は、内部taskIdを主表示名にせず、
+Directiveのtitleを優先した作業タイトルを主表示とする。
+Directive titleがない場合は既存goal等から決定論的に短い表示タイトルを生成する。
+taskIdはBlackboard・内部照合・永続履歴・Resume等の識別子として保持し、
+UIでは作業タイトルの補助情報としてTask IDを表示する。
+run_idはSelfImprovementController等が保持する実行識別子としてtaskIdと混同せず、
+UIではRun IDとしてTask IDとは別に表示する。
+Directive title、run_id、taskIdはそれぞれ別の状態源・識別子として扱い、
+表示専用の新規DBやTask管理層を追加しない。
 
 「自己改善開始」という1個の曖昧な状態だけで、
 受付・Queue投入・Controller実行・検証完了を表現しない。
