@@ -69,6 +69,7 @@ for (const record of treeOutput.split('\0')) {
 
 const zip = new JSZip();
 const manifestFiles = [];
+const ZIP_DATE = new Date(0);
 
 for (const relativePath of files) {
   const absolutePath = path.join(root, relativePath);
@@ -105,7 +106,10 @@ for (const relativePath of files) {
     );
   }
 
-  zip.file(relativePath, content);
+  zip.file(relativePath, content, {
+    date: ZIP_DATE,
+    createFolders: false,
+  });
 
   manifestFiles.push({
     path: relativePath,
@@ -116,9 +120,33 @@ for (const relativePath of files) {
 
 manifestFiles.sort((a, b) => a.path.localeCompare(b.path));
 
+const revisionFiles = manifestFiles.map(({ path, sha256 }) => ({
+  path,
+  sha256,
+}));
+
+const canonicalize = (value) => {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalize).join(',')}]`;
+  }
+
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(
+        ([key, item]) =>
+          `${JSON.stringify(key)}:${canonicalize(item)}`
+      )
+      .join(',')}}`;
+  }
+
+  return JSON.stringify(value);
+};
+
 const seedRevision = crypto
   .createHash('sha256')
-  .update(JSON.stringify(manifestFiles))
+  .update(canonicalize(revisionFiles))
   .digest('hex');
 
 const manifest = {
@@ -126,14 +154,17 @@ const manifest = {
   appVersion: String(packageJson.version || ''),
   commitSha,
   seedRevision,
-  generatedAt: new Date().toISOString(),
   fileCount: manifestFiles.length,
   files: manifestFiles
 };
 
 zip.file(
   'self-code-seed.manifest.json',
-  JSON.stringify(manifest, null, 2)
+  JSON.stringify(manifest, null, 2),
+  {
+    date: ZIP_DATE,
+    createFolders: false,
+  }
 );
 
 fs.mkdirSync(outputDir, { recursive: true });

@@ -8750,6 +8750,8 @@ Failure TaxonomyはENVIRONMENT、DEPENDENCY、SOURCE、SEMANTIC、TRANSFORMATION
 - Seed manifestにはGit blob SHAも保持し、Seed適用後の明示PULLで未変更ファイルを再取得しない。
 - Seed展開中は取得・検証・適用の状態を既存SelfCodeWorkspace UIへ通知する。
 - GitHub PULLの既存Blob取得は意味・結果を変更せず、有限並列で実行して不要な直列待ちを減らす。
+- 明示的なGitHub PULLでは、既存 `recordPullPhase()` の処理段階を `progressId` でUIへ逐次通知し、repo情報取得、branch取得、tree取得、manifest生成、blob取得計画、blob取得進捗、完了/失敗を処理中に表示できるようにする。
+- PULL進捗通知のために新しいService、DB、Workspace、Orchestratorは追加せず、既存GitHub PULL/API/UI経路へ接続する。
 
 起動経路：
 1. `selfCodeSpaceService.initializeBundledSeed()` を起動時に実行する。

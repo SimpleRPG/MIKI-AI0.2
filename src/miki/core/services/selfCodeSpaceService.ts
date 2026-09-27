@@ -1,5 +1,8 @@
 import { storageService } from '../../../services/storageService';
-import { apiService } from '../../../services/api';
+import {
+  apiService,
+  type GitHubPullProgressUpdate,
+} from '../../../services/api';
 import { canonicalSha256, sha256HexFromText } from './canonicalSha256Service';
 import { githubSyncService } from '../../../services/githubSyncService';
 
@@ -298,7 +301,15 @@ class SelfCodeSpaceService {
       });
 
       try {
-        const fallback = await this.sync();
+        const fallback = await this.sync(
+          undefined,
+          progress => {
+            report({
+              phase: 'FALLBACK',
+              detail: `GitHub PULL: ${progress.detail}`,
+            });
+          }
+        );
 
         return {
           status: 'FALLBACK_GITHUB',
@@ -324,16 +335,24 @@ class SelfCodeSpaceService {
     }
   }
 
-  async sync(token?: string): Promise<SelfCodeSnapshot> {
+  async sync(
+    token?: string,
+    onProgress?: (
+      progress: GitHubPullProgressUpdate
+    ) => void | Promise<void>
+  ): Promise<SelfCodeSnapshot> {
     const existing=this.get();
     if(existing?.dirty) throw new Error('SELF_CODE_SPACE_DIRTY_SYNC_REQUIRED');
     const settings=this.getGitHubSettings();
     const effectiveToken=(token?.trim() || this.getGitHubPat()).trim();
-    const result = await apiService.importFromGitHub({
-      repoUrl: settings.repository,
-      branch: settings.branch,
-      token: effectiveToken || undefined,
-    });
+    const result = await apiService.importFromGitHub(
+      {
+        repoUrl: settings.repository,
+        branch: settings.branch,
+        token: effectiveToken || undefined,
+      },
+      onProgress
+    );
 
     if (!result.success) {
       throw new Error(

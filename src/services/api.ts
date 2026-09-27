@@ -694,29 +694,95 @@ export async function sendDebugRequest(
   }
 }
 
+export interface GitHubPullProgressUpdate {
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'NOT_FOUND';
+  progressId: string;
+  phase: string;
+  detail: string;
+  elapsedMs: number;
+  events?: Array<{
+    phase: string;
+    detail: string;
+    elapsedMs: number;
+  }>;
+}
+
 export async function importGitHubRepo(
   repoUrl: string,
   branch?: string,
   githubToken?: string,
-  knownFiles: Array<{ path: string; blobSha?: string; sha256?: string }> = []
+  knownFiles: Array<{ path: string; blobSha?: string; sha256?: string }> = [],
+  onProgress?: (
+    progress: GitHubPullProgressUpdate
+  ) => void | Promise<void>
 ): Promise<GitHubRepoData> {
-  const res = await fetch(apiUrl('/api/github/import'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      repoUrl,
-      branch,
-      githubToken,
-      knownFiles,
-    })
-  });
+  const progressId =
+    globalThis.crypto?.randomUUID?.() ||
+    `pull-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `GitHub import failed (${res.status})`);
+  let polling = true;
+
+  const progressTask = (async () => {
+    if (!onProgress) return;
+
+    for (let attempt = 0; polling && attempt < 480; attempt += 1) {
+      try {
+        const progressRes = await fetch(
+          apiUrl(
+            `/api/github/import/progress/${encodeURIComponent(progressId)}`
+          ),
+          { cache: 'no-store' }
+        );
+
+        if (progressRes.ok) {
+          const progress =
+            (await progressRes.json()) as GitHubPullProgressUpdate;
+
+          try {
+            await onProgress(progress);
+          } catch {}
+
+          if (
+            progress.status === 'COMPLETED' ||
+            progress.status === 'FAILED'
+          ) {
+            break;
+          }
+        }
+      } catch {}
+
+      if (polling) {
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+    }
+  })();
+
+  try {
+    const res = await fetch(apiUrl('/api/github/import'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        repoUrl,
+        branch,
+        githubToken,
+        knownFiles,
+        progressId,
+      })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(
+        errData.error ||
+        `GitHub import failed (${res.status})`
+      );
+    }
+
+    return await res.json();
+  } finally {
+    polling = false;
+    await progressTask;
   }
-
-  return await res.json();
 }
 
 export async function pushToGitHubRepo(params: GitHubPushParams): Promise<GitHubPushResult> {
@@ -754,7 +820,12 @@ export const apiService = {
   sendDebugRequest,
   importGitHubRepo,
   pushToGitHubRepo,
-  importFromGitHub: async (params: { token?: string; repoUrl: string; branch?: string }) => {
+  importFromGitHub: async (
+    params: { token?: string; repoUrl: string; branch?: string },
+    onProgress?: (
+      progress: GitHubPullProgressUpdate
+    ) => void | Promise<void>
+  ) => {
     try {
       const repository = params.repoUrl;
       const branch = params.branch || 'main';
@@ -769,7 +840,8 @@ export const apiService = {
           repository,
           branch,
           params.token,
-          knownFiles
+          knownFiles,
+          onProgress
         );
       } catch (e: any) {
         const error = new Error(

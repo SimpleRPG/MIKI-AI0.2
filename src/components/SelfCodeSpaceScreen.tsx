@@ -37,7 +37,13 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
   setMessage('GitHub PULLを開始しています…');
   setPullDiagnostics(null);
   try{
-   const result=await typedCoreUiGatewayService.syncSelfCode(pat);
+   const result=await typedCoreUiGatewayService.syncSelfCode(
+    pat,
+    progress=>{
+     setPullDiagnostics(progress);
+     setMessage(progress.detail);
+    }
+   );
    setSnapshot(result);
    setSelected(undefined);
    setPullDiagnostics((result as any).diagnostics || null);
@@ -139,9 +145,13 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
   {pullDiagnostics&&<div className="my-3 rounded-2xl border border-slate-800 bg-slate-900 p-3">
    <div className="text-xs font-bold text-indigo-300">GitHub PULL 診断</div>
    <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-400">
-    <div>総時間: <span className="font-mono text-slate-200">{pullDiagnostics.elapsedMs}ms</span></div>
-    <div>最終状態: <span className="font-mono text-slate-200">{pullDiagnostics.phase}</span></div>
+    <div>状態: <span className="font-mono text-slate-200">{pullDiagnostics.status || 'COMPLETED'}</span></div>
+    <div>現在処理: <span className="font-mono text-slate-200">{pullDiagnostics.phase}</span></div>
+    <div>経過: <span className="font-mono text-slate-200">{pullDiagnostics.elapsedMs}ms</span></div>
     <div>診断イベント: <span className="font-mono text-slate-200">{pullDiagnostics.events?.length ?? 0}</span></div>
+   </div>
+   <div className="mt-2 break-all text-[10px] text-slate-300">
+    {pullDiagnostics.detail || ''}
    </div>
    <div className="mt-3 max-h-64 overflow-y-auto space-y-1">
     {diagnosticEvents.map((event:any,index:number)=><div key={`${event.phase}-${index}`} className="rounded-lg border border-slate-800 bg-slate-950 p-2 text-[9px]">

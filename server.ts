@@ -2491,17 +2491,95 @@ ${activeGameCode}
 });
 
 // GitHub Import Endpoint
+type GitHubPullProgressState = {
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED';
+  progressId: string;
+  phase: string;
+  detail: string;
+  elapsedMs: number;
+  events: Array<{
+    phase: string;
+    detail: string;
+    elapsedMs: number;
+  }>;
+  updatedAt: number;
+};
+
+const githubPullProgress = new Map<string, GitHubPullProgressState>();
+const GITHUB_PULL_PROGRESS_TTL_MS = 5 * 60 * 1000;
+
+function expireGitHubPullProgress(progressId: string) {
+  const timer = setTimeout(() => {
+    githubPullProgress.delete(progressId);
+  }, GITHUB_PULL_PROGRESS_TTL_MS);
+
+  if (typeof (timer as any)?.unref === 'function') {
+    (timer as any).unref();
+  }
+}
+
+app.get('/api/github/import/progress/:progressId', (req, res) => {
+  const progressId = String(req.params.progressId || '');
+  const state = githubPullProgress.get(progressId);
+
+  if (!state) {
+    return res.status(404).json({
+      status: 'NOT_FOUND',
+      progressId,
+    });
+  }
+
+  return res.json(state);
+});
+
 app.post('/api/github/import', async (req, res) => {
+  const requestedProgressId =
+    typeof req.body?.progressId === 'string' &&
+    /^[A-Za-z0-9_-]{16,128}$/.test(req.body.progressId)
+      ? req.body.progressId
+      : '';
+
+  const progressId =
+    requestedProgressId ||
+    crypto.randomUUID();
+
+  const progressState: GitHubPullProgressState = {
+    status: 'RUNNING',
+    progressId,
+    phase: 'request_received',
+    detail: 'GitHub PULLを開始しています…',
+    elapsedMs: 0,
+    events: [],
+    updatedAt: Date.now(),
+  };
+
+  githubPullProgress.set(progressId, progressState);
+
   try {
     const pullStartedAt = Date.now();
     let pullPhase = 'request_received';
-    const pullDiagnostics: Array<{ phase: string; detail: string; elapsedMs: number }> = [];
+    const pullDiagnostics: Array<{
+      phase: string;
+      detail: string;
+      elapsedMs: number;
+    }> = [];
 
     const recordPullPhase = (phase: string, detail: string) => {
       pullPhase = phase;
       const elapsedMs = Date.now() - pullStartedAt;
-      pullDiagnostics.push({ phase, detail, elapsedMs });
-      console.log(`[GITHUB_PULL] ${phase} | ${detail} | ${elapsedMs}ms`);
+      const event = { phase, detail, elapsedMs };
+
+      pullDiagnostics.push(event);
+
+      progressState.phase = phase;
+      progressState.detail = detail;
+      progressState.elapsedMs = elapsedMs;
+      progressState.events = pullDiagnostics.slice(-200);
+      progressState.updatedAt = Date.now();
+
+      console.log(
+        `[GITHUB_PULL] ${phase} | ${detail} | ${elapsedMs}ms`
+      );
     };
 
     const {
@@ -2753,6 +2831,10 @@ app.post('/api/github/import', async (req, res) => {
       `manifest=${manifest.length} changed=${changedFiles.length} unchanged=${unchangedFiles} deleted=${deletedPaths.length}`
     );
 
+    progressState.status = 'COMPLETED';
+    progressState.updatedAt = Date.now();
+    expireGitHubPullProgress(progressId);
+
     return res.json({
       success: true,
       repoName: repoInfo.name,
@@ -2762,6 +2844,8 @@ app.post('/api/github/import', async (req, res) => {
       commitSha,
       treeSha,
       diagnostics: {
+        status: 'COMPLETED',
+        progressId,
         elapsedMs: Date.now() - pullStartedAt,
         phase: pullPhase,
         events: pullDiagnostics,
@@ -2772,8 +2856,18 @@ app.post('/api/github/import', async (req, res) => {
       truncated: false
     });
   } catch (error: any) {
+    progressState.status = 'FAILED';
+    progressState.phase = 'failed';
+    progressState.detail =
+      error?.message || 'GitHub import error';
+    progressState.elapsedMs = Date.now() -
+      Number(progressState.updatedAt || Date.now());
+    progressState.updatedAt = Date.now();
+    expireGitHubPullProgress(progressId);
+
     return res.status(500).json({
-      error: error?.message || 'GitHub import error'
+      error: error?.message || 'GitHub import error',
+      progressId,
     });
   }
 });

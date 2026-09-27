@@ -80,6 +80,8 @@ for (const text of [
 for (const text of [
   'ls-tree',
   'blobSha',
+  'const revisionFiles = manifestFiles.map',
+  'const canonicalize = (value)',
 ]) {
   if (!seed.includes(text)) {
     throw new Error(
@@ -116,6 +118,8 @@ for (const text of [
   'data.diagnostics',
   'CONCURRENCY = 8',
   'Promise.all',
+  'progressId',
+  '/api/github/import/progress/:progressId',
 ]) {
   if (!(api + server).includes(text)) {
     throw new Error(
