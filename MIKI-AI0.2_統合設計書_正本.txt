@@ -5915,7 +5915,13 @@ queue entryにはrequest id、trigger、source、runId、runType、sourceId、pr
 
 drain()はPreflight、Resource Governance、Core Task、Candidate Code Generation、Complexity Gate、Constraint Validation、Candidate Validation、Review ZIP Export、Integrity Audit、Cumulative Revalidation等へ進む構造を持つ。
 
-現在確認できた範囲ではAutonomousSelfImprovementLoopService.drain()はWorkDirectiveIngestionService.getPendingDirective()やSelfImprovementControllerService.runOnce()を直接呼んでいない。このため、pending directiveをcanonical controllerで実行する経路が必要なら、別途明示的な接続を設計・実装する。
+【実装確定追記：2026-09-27 WorkDirective → CORE Canonical Ingress接続】
+WorkDirectiveIngestionServiceで取り込んだ作業指示書は、UIのexecuteDirective()から既存のCORE Canonical Ingressへ接続する。
+通常のWorkDirectiveは既存coreTaskIngressService / CORE Planner / ImprovementIntakeRouter / AutonomousSelfImprovementLoopを使用し、
+対象ファイルが明示されていれば既存START_SPECIFIED_IMPROVEMENT、対象ファイルが明示されていなければ既存DISCOVER_IMPROVEMENT_TARGETへ渡す。
+WorkDirective用の新規Run DB、Queue、Orchestrator、Blackboard、分類は追加しない。
+ExternalDirectiveIntakeServiceの既存経路も変更せず、WorkDirectiveとExternal Directiveを同じUI入口から正規CORE経路へ接続する。
+Directive状態とRun/Queue状態は引き続き別管理とし、WorkDirectiveの実行開始時だけ既存Directive statusをIN_PROGRESSへ更新する。
 
 【Run / Queue / Directiveを混同しない】
 Run、Queue Request、Directiveは別の状態源として扱う。

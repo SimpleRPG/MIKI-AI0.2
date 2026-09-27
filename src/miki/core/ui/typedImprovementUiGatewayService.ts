@@ -186,40 +186,61 @@ class TypedImprovementUiGatewayService {
   }
 
   async executeDirective(directiveId:string){
-    const directive=externalDirectiveIntakeService.list().find(
+    const externalDirective=externalDirectiveIntakeService.list().find(
       (item)=>item.directiveId===directiveId
     );
+    const workDirective=workDirectiveIngestionService.getAllDirectives().find(
+      (item)=>item.directiveId===directiveId
+    );
+    const directive=externalDirective;
     const goal=directive?.objective?.trim()
+      || workDirective?.goal?.trim()
       || `指示書 ${directiveId} を実行し、評価可能な候補まで進める`;
+
+    const targetFiles=directive?.targetFiles
+      || workDirective?.targets?.filter((item):item is string=>
+        typeof item==='string' &&
+        /\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|txt)$/i.test(item.trim())
+      )
+      || [];
 
     const directiveContext:ImprovementDirectiveContext={
       directiveId,
       sourceHash:directive?.sourceHash,
-      targetFiles:directive?.targetFiles || [],
-      requirements:directive?.requirements || [],
-      prohibitions:directive?.prohibitions || [],
+      targetFiles,
+      requirements:directive?.requirements
+        || workDirective?.requirements
+        || [],
+      prohibitions:directive?.prohibitions
+        || workDirective?.forbiddenBehaviors
+        || [],
       invariants:directive?.invariants || [],
-      validationRequirements:directive?.validationRequirements || [],
-      deliveryRequirements:directive?.deliveryRequirements || [],
+      validationRequirements:directive?.validationRequirements
+        || workDirective?.completionCriteria
+        || [],
+      deliveryRequirements:directive?.deliveryRequirements
+        || workDirective?.acceptanceCriteria
+        || [],
       relatedIssueIds:directive?.relatedIssueIds || []
     };
 
-    const existingRun=directive?.runId
-      ? this.getIntakeRuns(100).find(item=>item.runId===directive.runId)
-      : undefined;
+    const existingRunId=directive?.runId;
+    const existingRun=existingRunId
+      ? this.getIntakeRuns(100).find(item=>item.runId===existingRunId)
+      : this.getIntakeRuns(200).find(item=>
+          item.runType==='USER_REQUEST' &&
+          String(item.payload?.directiveId||'')===directiveId
+        );
+
     if(existingRun?.taskId){
       const task=taskBlackboardService.get(existingRun.taskId);
       if(task){
-        // 作業指示書は取り込み時点で
-        // ImprovementIntakeRouter -> selfImprovementIngress -> AutonomousSelfImprovementLoop
-        // に登録済み。UIはここでCOREを直接resumeせず、現在状態だけを返す。
-        // 継続実行は自律改善Loopが担当し、必要時の手動再開だけResume操作から行う。
         return this.taskSnapshotResult(task.taskId,task.revision,task.status);
       }
     }
 
-    if(directive?.runId){
-      const status=existingRun?.status || directive.status || "WAITING";
+    if(existingRun){
+      const status=existingRun.status || directive?.status || workDirective?.status || "WAITING";
       return {
         commandId:coreResultService.generateRequestId("ui-existing-run"),
         operationInstanceId:coreResultService.generateRequestId("operation"),
@@ -233,7 +254,16 @@ class TypedImprovementUiGatewayService {
       };
     }
 
-    const target=directive?.targetFiles?.find(
+    if(workDirective){
+      workDirectiveIngestionService.markStatus(
+        directiveId,
+        'IN_PROGRESS',
+        undefined,
+        'CORE canonical ingressへ接続し、自律コード改善タスクとして実行開始'
+      );
+    }
+
+    const target=targetFiles.find(
       (item)=>typeof item==='string' && item.trim()
     );
 
