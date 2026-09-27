@@ -19,6 +19,32 @@ export interface GitHubSyncState {
   source?: 'GITHUB' | 'BUNDLED_SEED';
 }
 
+export type GitHubSyncDiagnosticStatus =
+  | 'READY'
+  | 'KEY_MISSING'
+  | 'JSON_INVALID'
+  | 'STATE_INVALID'
+  | 'INCOMPLETE'
+  | 'FILES_EMPTY';
+
+export interface GitHubSyncDiagnostic {
+  status: GitHubSyncDiagnosticStatus;
+  diagnosticCode: string;
+  key: string;
+  repository: string;
+  branch: string;
+  backend: ReturnType<typeof storageService.getBackendName>;
+  rawPresent: boolean;
+  complete: boolean;
+  fileCount: number;
+  source?: GitHubSyncState['source'];
+  commitSha?: string;
+  treeSha?: string;
+  syncedAt?: number;
+  error?: string;
+}
+
+
 const KEY_PREFIX = 'miki_github_sync_v2_';
 
 function normalizeRepository(repository: string): string {
@@ -117,6 +143,160 @@ class GitHubSyncService {
   }
 
   private save(state: GitHubSyncState): GitHubSyncState {
+
+  diagnose(repository: string, branch: string): GitHubSyncDiagnostic {
+    const key = makeKey(repository, branch);
+    const normalizedRepository = normalizeRepository(repository);
+    const normalizedBranch = branch.trim();
+
+    let raw: string | null = null;
+
+    try {
+      raw = storageService.getItem(key);
+    } catch (error) {
+      return {
+        status: 'JSON_INVALID',
+        diagnosticCode: 'SELF_CODE_SYNC_STORAGE_READ_FAILED',
+        key,
+        repository: normalizedRepository,
+        branch: normalizedBranch,
+        backend: storageService.getBackendName(),
+        rawPresent: false,
+        complete: false,
+        fileCount: 0,
+        error: String(error),
+      };
+    }
+
+    if (!raw) {
+      return {
+        status: 'KEY_MISSING',
+        diagnosticCode: 'SELF_CODE_SYNC_KEY_MISSING',
+        key,
+        repository: normalizedRepository,
+        branch: normalizedBranch,
+        backend: storageService.getBackendName(),
+        rawPresent: false,
+        complete: false,
+        fileCount: 0,
+      };
+    }
+
+    let value: any;
+    try {
+      value = JSON.parse(raw);
+    } catch (error) {
+      return {
+        status: 'JSON_INVALID',
+        diagnosticCode: 'SELF_CODE_SYNC_STATE_JSON_INVALID',
+        key,
+        repository: normalizedRepository,
+        branch: normalizedBranch,
+        backend: storageService.getBackendName(),
+        rawPresent: true,
+        complete: false,
+        fileCount: 0,
+        error: String(error),
+      };
+    }
+
+    if (!value || typeof value !== 'object') {
+      return {
+        status: 'STATE_INVALID',
+        diagnosticCode: 'SELF_CODE_SYNC_STATE_INVALID',
+        key,
+        repository: normalizedRepository,
+        branch: normalizedBranch,
+        backend: storageService.getBackendName(),
+        rawPresent: true,
+        complete: false,
+        fileCount: 0,
+      };
+    }
+
+    if (value.complete !== true) {
+      return {
+        status: 'INCOMPLETE',
+        diagnosticCode: 'SELF_CODE_SYNC_STATE_INCOMPLETE',
+        key,
+        repository: normalizedRepository,
+        branch: normalizedBranch,
+        backend: storageService.getBackendName(),
+        rawPresent: true,
+        complete: false,
+        fileCount: Array.isArray(value.files) ? value.files.length : 0,
+        source:
+          value.source === 'BUNDLED_SEED'
+            ? 'BUNDLED_SEED'
+            : 'GITHUB',
+        commitSha: String(value.commitSha || ''),
+        treeSha: String(value.treeSha || ''),
+        syncedAt: Number(value.syncedAt || 0),
+      };
+    }
+
+    if (!Array.isArray(value.files)) {
+      return {
+        status: 'STATE_INVALID',
+        diagnosticCode: 'SELF_CODE_SYNC_STATE_INVALID',
+        key,
+        repository: normalizedRepository,
+        branch: normalizedBranch,
+        backend: storageService.getBackendName(),
+        rawPresent: true,
+        complete: true,
+        fileCount: 0,
+      };
+    }
+
+    const validFiles = value.files.filter(
+      (file: any) =>
+        file &&
+        typeof file.path === 'string' &&
+        typeof file.content === 'string'
+    );
+
+    if (!validFiles.length) {
+      return {
+        status: 'FILES_EMPTY',
+        diagnosticCode: 'SELF_CODE_SYNC_FILES_EMPTY',
+        key,
+        repository: normalizedRepository,
+        branch: normalizedBranch,
+        backend: storageService.getBackendName(),
+        rawPresent: true,
+        complete: true,
+        fileCount: 0,
+        source:
+          value.source === 'BUNDLED_SEED'
+            ? 'BUNDLED_SEED'
+            : 'GITHUB',
+        commitSha: String(value.commitSha || ''),
+        treeSha: String(value.treeSha || ''),
+        syncedAt: Number(value.syncedAt || 0),
+      };
+    }
+
+    return {
+      status: 'READY',
+      diagnosticCode: 'SELF_CODE_WORKSPACE_READY',
+      key,
+      repository: normalizedRepository,
+      branch: normalizedBranch,
+      backend: storageService.getBackendName(),
+      rawPresent: true,
+      complete: true,
+      fileCount: validFiles.length,
+      source:
+        value.source === 'BUNDLED_SEED'
+          ? 'BUNDLED_SEED'
+          : 'GITHUB',
+      commitSha: String(value.commitSha || ''),
+      treeSha: String(value.treeSha || ''),
+      syncedAt: Number(value.syncedAt || 0),
+    };
+  }
+
     storageService.setItem(
       makeKey(state.repository, state.branch),
       JSON.stringify(state)
