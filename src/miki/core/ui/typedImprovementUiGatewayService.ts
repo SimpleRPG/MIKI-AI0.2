@@ -181,7 +181,21 @@ class TypedImprovementUiGatewayService {
   async sendImprovementCommand(command:ImprovementUiCommand):Promise<ImprovementUiCommandResult>{
     if(command.commandType==='RESUME_IMPROVEMENT_TASK'){
       const resumed=await coreTaskIngressService.resume(command.taskId,coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'));
-      return this.toCommandResult(command,resumed);
+      const commandResult=this.toCommandResult(command,resumed);
+
+      if(commandResult.taskId){
+        selfImprovementControllerService.recordCanonicalRun(
+          commandResult.taskId,
+          'RESUME_IMPROVEMENT_TASK',
+          `status=${commandResult.currentStage || 'UNKNOWN'};taskRevision=${commandResult.taskRevision ?? '―'};cycle=${resumed?.cycle ?? resumed?.lastCycle ?? '―'}`,
+          {
+            action:'AUTONOMOUS_CODE_EVOLUTION',
+            reason:'Canonical CORE resume persisted to existing SelfImprovementController history'
+          }
+        );
+      }
+
+      return commandResult;
     }
     const request:CoreTaskIngressRequest={kind:'SELF_IMPROVEMENT',goal:command.goal,source:'core',payload:{...('directiveContext' in command ? (command.directiveContext||{}) : {}),commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt,entry:'TYPED_IMPROVEMENT_UI_GATEWAY',mode:command.commandType,...(command.commandType==='START_SPECIFIED_IMPROVEMENT'?{target:command.target,targetFiles:[command.target]}:command.commandType==='COMMIT_CANDIDATE_TRANSACTION'?{workspaceId:command.workspaceId,persistenceReceiptId:command.persistenceReceiptId}:command.commandType==='IMPORT_EXTERNAL_FEEDBACK'?{packageId:command.packageId,rawResponse:command.rawResponse,sourceType:command.sourceType}:command.commandType==='SUBMIT_REVIEW_DECISION'?{externalReviewId:command.externalReviewId,decision:command.decision,reason:command.reason}:{autonomousDiscovery:true})}};
     const result=await coreTaskIngressService.submit(request);
