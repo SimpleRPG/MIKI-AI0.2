@@ -69,36 +69,6 @@ export interface SelfCodeWorkspaceDiagnostic {
 }
 
 
-const WORKSPACE_DIAGNOSTIC_KEY = 'miki_self_code_workspace_diagnostic_v1';
-
-export interface SelfCodeWorkspaceDiagnostic {
-  status:
-    | 'READY'
-    | 'DIRTY'
-    | 'KEY_MISSING'
-    | 'JSON_INVALID'
-    | 'STATE_INVALID'
-    | 'INCOMPLETE'
-    | 'FILES_EMPTY'
-    | 'PERSISTENT_BACKEND_MEMORY'
-    | 'NO_SOURCE';
-  diagnosticCode: string;
-  summary: string;
-  nextAction: string;
-  backend: ReturnType<typeof storageService.getBackendName>;
-  repository: string;
-  branch: string;
-  fileCount: number;
-  syncKey?: string;
-  commitSha?: string;
-  treeSha?: string;
-  seedRevision?: string;
-  seedError?: string;
-  fallbackError?: string;
-  recordedAt: number;
-}
-
-
 class SelfCodeSpaceService {
   getGitHubSettings(): SelfCodeGitHubSettings {
     try {
