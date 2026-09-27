@@ -44,7 +44,7 @@ class AutonomousIssueDiscoveryService{
 
    let queued=0;
    if(mode==='AUTONOMOUS'){
-    const candidates=this.list(200).filter(item=>!item.resolvedAt&&!item.queuedAt&&item.priority>=this.config.minimumPriority).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);
+    const candidates=this.list(200).filter(item=>!item.resolvedAt&&!item.queuedAt&&item.priority>=this.config.minimumPriority&&this.isActionableIssue(item)).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);
     for(const issue of candidates){
      const queuedRun=await improvementIntakeRouterService.receive({
       runType:'AUTONOMOUS_DISCOVERY',
@@ -81,6 +81,16 @@ class AutonomousIssueDiscoveryService{
   if(status==='FAILED'||status==='WAITING')return true;
   if(status!=='PAUSED')return false;
   return pausedReason!=='SELF_IMPROVEMENT_QUEUED'&&pausedReason!=='FOREGROUND_USER_REQUEST_ACTIVE';
+ }
+ private isActionableIssue(issue:DiscoveredIssue):boolean{
+  if(issue.kind!=='STALLED_TASK')return true;
+  const task=taskBlackboardService.get(issue.sourceId);
+  if(!task||!this.isStallCandidate(task.status,task.pausedReason)){
+   issue.resolvedAt=Date.now();
+   this.issues.set(issue.fingerprint,issue);
+   return false;
+  }
+  return true;
  }
  private normalizeDiagnosticPrefixes(value:string):string{
   let text=String(value||'').trim();
