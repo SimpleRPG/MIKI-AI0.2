@@ -5947,6 +5947,7 @@ UIではDirective statusとRun statusを同じステータス欄に押し込め�
 SelfImprovementControllerServiceにはlistRuns()があり、miki_self_improvement_runs_v1から最大100件の履歴を取得する。
 run記録にはSIR-形式のrun_id等がある。
 この履歴を新しい独立DBへ二重化するのではなく、既存サービスをUIのデータ源として利用する。
+Canonical CORE実行についても既存SelfImprovementControllerService.recordCanonicalRun()を介して同じmiki_self_improvement_runs_v1へtaskId付きで永続記録する。UIの「履歴」はPriorityOneRuntimeReadModelだけを履歴源にせず、SelfImprovementControllerService.listRuns()を正規の永続履歴源とし、現在実行中のRuntime情報は同一taskIdが存在する場合だけ状態を上書き表示する。これによりCORE実行完了後やアプリ再起動後も履歴を失わない。
 
 【18構成（CORE＋17分類）とUI入口アーキテクチャ】
 - 現行アーキテクチャは「17分類」だけではなく、**COREを18個目の統括層として含む18構成（CORE＋17分類）**として扱う。

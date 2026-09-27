@@ -28,6 +28,7 @@ export interface ImprovementDecision {
 
 export interface ImprovementRun {
   run_id: string;
+  taskId?: string;
   changeSetId?: ChangeSetID;
   trigger: string;
   decision: ImprovementDecision;
@@ -131,6 +132,64 @@ export class SelfImprovementControllerService {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Canonical CORE実行を既存のSelfImprovementController履歴へ永続記録する。
+   * 新しい履歴DBは作らず、正本設計書で指定された既存storageKeyを再利用する。
+   */
+  public recordCanonicalRun(
+    taskId: string,
+    trigger: string,
+    result: string,
+    decision: ImprovementDecision = {
+      action: 'AUTONOMOUS_CODE_EVOLUTION',
+      reason: 'Canonical CORE execution'
+    }
+  ): ImprovementRun {
+    const history = this.listRuns();
+    const existingIndex = history.findIndex((item) => item.taskId === taskId);
+
+    if (existingIndex >= 0) {
+      const existing = history[existingIndex];
+      const updated: ImprovementRun = {
+        ...existing,
+        trigger,
+        decision,
+        result,
+        created_at: existing.created_at || Date.now(),
+        taskId
+      };
+      history.splice(existingIndex, 1);
+      history.unshift(updated);
+      try {
+        storageService.setItem(this.storageKey, JSON.stringify(history.slice(0, 100)));
+      } catch {}
+      return updated;
+    }
+
+    const run: ImprovementRun = {
+      run_id: `SIR-${this.hash(`${taskId}|${trigger}|${Date.now()}`)}`,
+      taskId,
+      trigger,
+      decision,
+      result,
+      created_at: Date.now()
+    };
+
+    history.unshift(run);
+    history.splice(100);
+
+    try {
+      storageService.setItem(this.storageKey, JSON.stringify(history));
+    } catch {}
+
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `[SelfImprovement Canonical History] ${taskId}: ${result}`
+    );
+
+    return run;
   }
 
   private record(

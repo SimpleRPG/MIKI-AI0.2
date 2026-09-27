@@ -82,6 +82,9 @@ export interface ImprovementUiCommandResult {
 class TypedImprovementUiGatewayService {
   getLoopState() { return autonomousSelfImprovementLoopService.getState(); }
   getRuns() { return selfImprovementControllerService.listRuns(); }
+  recordCanonicalRun(taskId:string, trigger:string, result:string, decision?:Parameters<typeof selfImprovementControllerService.recordCanonicalRun>[3]){
+    return selfImprovementControllerService.recordCanonicalRun(taskId, trigger, result, decision);
+  }
   getStructuredDirectives() { return workDirectiveIngestionService.getAllDirectives(); }
   getExternalDirectives() { return externalDirectiveIntakeService.list(); }
   getIntakeRuns(limit = 50) { return improvementIntakeRouterService.list(limit); }
@@ -182,7 +185,25 @@ class TypedImprovementUiGatewayService {
     }
     const request:CoreTaskIngressRequest={kind:'SELF_IMPROVEMENT',goal:command.goal,source:'core',payload:{...('directiveContext' in command ? (command.directiveContext||{}) : {}),commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt,entry:'TYPED_IMPROVEMENT_UI_GATEWAY',mode:command.commandType,...(command.commandType==='START_SPECIFIED_IMPROVEMENT'?{target:command.target,targetFiles:[command.target]}:command.commandType==='COMMIT_CANDIDATE_TRANSACTION'?{workspaceId:command.workspaceId,persistenceReceiptId:command.persistenceReceiptId}:command.commandType==='IMPORT_EXTERNAL_FEEDBACK'?{packageId:command.packageId,rawResponse:command.rawResponse,sourceType:command.sourceType}:command.commandType==='SUBMIT_REVIEW_DECISION'?{externalReviewId:command.externalReviewId,decision:command.decision,reason:command.reason}:{autonomousDiscovery:true})}};
     const result=await coreTaskIngressService.submit(request);
-    return this.toCommandResult(command,result);
+    const commandResult=this.toCommandResult(command,result);
+
+    if(commandResult.taskId){
+      selfImprovementControllerService.recordCanonicalRun(
+        commandResult.taskId,
+        command.goal,
+        `status=${commandResult.currentStage || 'UNKNOWN'};taskRevision=${commandResult.taskRevision ?? '―'};cycle=${result?.cycle ?? result?.lastCycle ?? '―'}`,
+        {
+          action: command.commandType === 'START_SPECIFIED_IMPROVEMENT'
+            ? 'AUTONOMOUS_CODE_EVOLUTION'
+            : command.commandType === 'DISCOVER_IMPROVEMENT_TARGET'
+              ? 'AUTONOMOUS_CODE_EVOLUTION'
+              : 'EXECUTE_DIRECTIVE',
+          reason: 'Canonical CORE execution persisted to existing SelfImprovementController history'
+        }
+      );
+    }
+
+    return commandResult;
   }
 
   async executeDirective(directiveId:string){
