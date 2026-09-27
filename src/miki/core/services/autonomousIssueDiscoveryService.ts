@@ -35,7 +35,10 @@ class AutonomousIssueDiscoveryService{
    for(const event of executionEventBusService.list('execution.failed').slice(0,50))this.upsert('EXECUTION_FAILURE',event.event_id,`実行失敗: ${event.component_id}`,`${event.test_case_id} / ${event.error_message||event.output_summary||event.type}`,90);
    for(const gap of knowledgeGapService.listOpen(50))this.upsert('KNOWLEDGE_GAP',gap.id,`知識不足: ${gap.query}`,gap.reason||gap.query,70);
    for(const gap of capabilityGapService.getAllGaps().filter(item=>item.status==='OPEN').slice(0,50))this.upsert('CAPABILITY_GAP',gap.gap_id,`能力不足: ${gap.capabilityId}`,gap.description||gap.current_workaround||gap.capabilityId,80);
-   for(const task of taskBlackboardService.list(100).filter(item=>item.status==='FAILED'||item.status==='WAITING'||item.status==='PAUSED'))this.upsert('STALLED_TASK',task.taskId,`停滞タスク: ${task.goal}`,task.pausedReason||task.status,65);
+   for(const task of taskBlackboardService.list(100).filter(item=>this.isStallCandidate(item.status,item.pausedReason))){
+    const goal=this.normalizeDiagnosticPrefixes(task.goal);
+    this.upsert('STALLED_TASK',task.taskId,`停滞タスク: ${goal}`,task.pausedReason||task.status,65);
+   }
    for(const domain of crossDomainCirculationService.getDisconnectedDomains())this.upsert('DOMAIN_DISCONNECTED',domain,`18分類未循環: ${domain}`,`${domain}分類のIN/OUT実績が不足`,45);
    for(const debt of improvementDebtService.listOpen().slice(0,50))this.upsert('IMPROVEMENT_DEBT',debt.debtId,`改善負債: ${debt.kind}`,debt.detail,75);
 
@@ -73,6 +76,28 @@ class AutonomousIssueDiscoveryService{
     issues
    };
   }finally{this.scanning=false;}
+ }
+ private isStallCandidate(status:string,pausedReason?:string):boolean{
+  if(status==='FAILED'||status==='WAITING')return true;
+  if(status!=='PAUSED')return false;
+  return pausedReason!=='SELF_IMPROVEMENT_QUEUED'&&pausedReason!=='FOREGROUND_USER_REQUEST_ACTIVE';
+ }
+ private normalizeDiagnosticPrefixes(value:string):string{
+  let text=String(value||'').trim();
+  const prefixes=['停滞タスク:','改善負債:','能力不足:','知識不足:','実行失敗:','18分類未循環:','Claim矛盾:'];
+  let changed=true;
+  while(changed){
+   changed=false;
+   for(const prefix of prefixes){
+    const pattern=new RegExp(`^${prefix.replace(/[.*+?^${}()|[\\]\\]/g,'\\\\$&')}\\s*`,'u');
+    const match=text.match(pattern);
+    if(match){
+     text=text.slice(match[0].length).trim();
+     changed=true;
+    }
+   }
+  }
+  return text||'作業タスク';
  }
  private upsert(kind:DiscoveredIssueKind,sourceId:string,title:string,detail:string,priority:number):DiscoveredIssue{const fingerprint=this.fingerprint(`${kind}|${sourceId}|${title}`);const now=Date.now();const old=this.issues.get(fingerprint);const directedPriority=selfImprovementDirectionService.score(kind,title,detail,priority);const issue:DiscoveredIssue={id:old?.id||`ISSUE-${fingerprint.slice(4)}`,fingerprint,changeSetId:old?.changeSetId,requirementContractId:old?.requirementContractId,kind,title,detail,sourceId,priority:Math.max(directedPriority,old?.priority||0),discoveredAt:old?.discoveredAt||now,lastSeenAt:now,occurrences:(old?.occurrences||0)+1,queuedAt:old?.queuedAt,resolvedAt:old?.resolvedAt};this.issues.set(fingerprint,issue);return {...issue};}
 
