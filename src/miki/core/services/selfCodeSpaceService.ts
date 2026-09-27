@@ -1,12 +1,20 @@
 import { storageService } from '../../../services/storageService';
 import { apiService } from '../../../services/api';
-import { canonicalSha256 } from './canonicalSha256Service';
+import { canonicalSha256, sha256HexFromText } from './canonicalSha256Service';
 import { githubSyncService } from '../../../services/githubSyncService';
 
 export interface SelfCodeFile {
   path: string;
   content: string;
   sha256: string;
+  blobSha?: string;
+}
+
+export interface SelfCodeSeedProgress {
+  phase: 'FETCH' | 'VERIFY' | 'APPLY' | 'FALLBACK' | 'COMPLETE';
+  completed?: number;
+  total?: number;
+  detail: string;
 }
 
 export interface SelfCodeSnapshot {
@@ -52,7 +60,10 @@ class SelfCodeSpaceService {
     else storageService.removeItem('miki_self_code_github_pat');
     return value;
   }
-  async initializeBundledSeed(overwrite = false): Promise<{
+  async initializeBundledSeed(
+    overwrite = false,
+    onProgress?: (progress: SelfCodeSeedProgress) => void
+  ): Promise<{
     status:
       | 'SEEDED'
       | 'ALREADY_CURRENT'
@@ -64,7 +75,30 @@ class SelfCodeSpaceService {
   }> {
     const existing = this.get();
 
+    const report = (progress: SelfCodeSeedProgress) => {
+      try {
+        onProgress?.(progress);
+      } catch {}
+    };
+
+    if (existing?.dirty === true && !overwrite) {
+      report({
+        phase: 'COMPLETE',
+        detail: '変更中のWorkspaceを保持しました。',
+      });
+
+      return {
+        status: 'PRESERVED_DIRTY',
+        seedRevision: existing.repoSha256,
+      };
+    }
+
     try {
+      report({
+        phase: 'FETCH',
+        detail: 'アプリ同梱Seedを取得しています…',
+      });
+
       const response = await fetch('/self-code-seed.zip', {
         cache: 'no-store',
       });
@@ -74,16 +108,25 @@ class SelfCodeSpaceService {
       }
 
       const bytes = await response.arrayBuffer();
+
+      report({
+        phase: 'FETCH',
+        detail: `Seed取得完了: ${(bytes.byteLength / 1024 / 1024).toFixed(1)}MB`,
+      });
+
       const JSZipModule = await import('jszip');
       const JSZipCtor = JSZipModule.default || JSZipModule;
       const zip = await JSZipCtor.loadAsync(bytes);
 
       const manifestEntry = zip.file('self-code-seed.manifest.json');
+
       if (!manifestEntry) {
         throw new Error('BUNDLED_SELF_CODE_SEED_MANIFEST_MISSING');
       }
 
-      const manifest = JSON.parse(await manifestEntry.async('text'));
+      const manifest = JSON.parse(
+        await manifestEntry.async('text')
+      );
 
       if (
         manifest?.schemaVersion !== 1 ||
@@ -91,72 +134,131 @@ class SelfCodeSpaceService {
         !manifest.seedRevision ||
         !manifest.commitSha
       ) {
-        throw new Error('BUNDLED_SELF_CODE_SEED_MANIFEST_INVALID');
+        throw new Error(
+          'BUNDLED_SELF_CODE_SEED_MANIFEST_INVALID'
+        );
       }
 
+      const total = manifest.files.length;
       const files: SelfCodeFile[] = [];
 
+      report({
+        phase: 'VERIFY',
+        completed: 0,
+        total,
+        detail: `Seed検証 0/${total}`,
+      });
+
       for (const item of manifest.files) {
-        const filePath = String(item?.path || '').replace(/^\/+/, '');
+        const filePath = String(item?.path || '')
+          .replace(/^\/+/, '');
+
         const expectedSha = String(item?.sha256 || '');
+        const blobSha =
+          typeof item?.blobSha === 'string'
+            ? item.blobSha
+            : undefined;
+
         if (!filePath || !expectedSha) {
-          throw new Error('BUNDLED_SELF_CODE_SEED_FILE_MANIFEST_INVALID');
+          throw new Error(
+            'BUNDLED_SELF_CODE_SEED_FILE_MANIFEST_INVALID'
+          );
         }
 
         const entry = zip.file(filePath);
+
         if (!entry) {
-          throw new Error(`BUNDLED_SELF_CODE_SEED_FILE_MISSING:${filePath}`);
+          throw new Error(
+            `BUNDLED_SELF_CODE_SEED_FILE_MISSING:${filePath}`
+          );
         }
 
         const content = await entry.async('text');
-        const actualSha = canonicalSha256(content);
+
+        // Seed生成側と同じ生テキストSHA-256を使用する。
+        const actualSha = sha256HexFromText(content);
 
         if (actualSha !== expectedSha) {
-          throw new Error(`BUNDLED_SELF_CODE_SEED_SHA_MISMATCH:${filePath}`);
+          throw new Error(
+            `BUNDLED_SELF_CODE_SEED_SHA_MISMATCH:${filePath}`
+          );
         }
 
         files.push({
           path: filePath,
           content,
           sha256: actualSha,
+          blobSha,
         });
+
+        if (
+          files.length === 1 ||
+          files.length % 25 === 0 ||
+          files.length === total
+        ) {
+          report({
+            phase: 'VERIFY',
+            completed: files.length,
+            total,
+            detail: `Seed検証 ${files.length}/${total}`,
+          });
+
+          // UIへ描画機会を返す。
+          await new Promise(resolve =>
+            setTimeout(resolve, 0)
+          );
+        }
       }
 
       if (!files.length) {
-        throw new Error('BUNDLED_SELF_CODE_SEED_EMPTY');
+        throw new Error(
+          'BUNDLED_SELF_CODE_SEED_EMPTY'
+        );
       }
 
       const repoSha256 = canonicalSha256(
-        files.map(file => ({ path: file.path, sha256: file.sha256 }))
+        files.map(file => ({
+          path: file.path,
+          sha256: file.sha256,
+        }))
       );
 
-      if (repoSha256 !== String(manifest.seedRevision)) {
-        throw new Error('BUNDLED_SELF_CODE_SEED_REVISION_MISMATCH');
+      if (
+        repoSha256 !== String(manifest.seedRevision)
+      ) {
+        throw new Error(
+          'BUNDLED_SELF_CODE_SEED_REVISION_MISMATCH'
+        );
       }
 
       const appliedRevision =
         storageService.getItem(SEED_APPLIED_KEY) || '';
 
       if (
-        existing?.dirty === true &&
-        !overwrite
-      ) {
-        return {
-          status: 'PRESERVED_DIRTY',
-          seedRevision: manifest.seedRevision,
-        };
-      }
-
-      if (
         existing &&
         existing.repoSha256 === repoSha256 &&
-        appliedRevision === manifest.seedRevision
+        appliedRevision === manifest.seedRevision &&
+        existing.files.every(file => Boolean(file.blobSha))
       ) {
+        report({
+          phase: 'COMPLETE',
+          completed: total,
+          total,
+          detail: `Seedは最新状態です（${total}ファイル）。`,
+        });
+
         return {
           status: 'ALREADY_CURRENT',
           seedRevision: manifest.seedRevision,
         };
       }
+
+      report({
+        phase: 'APPLY',
+        completed: total,
+        total,
+        detail: `SelfCodeWorkspaceへ${total}ファイルを展開しています…`,
+      });
 
       const settings = this.getGitHubSettings();
 
@@ -175,35 +277,48 @@ class SelfCodeSpaceService {
         String(manifest.seedRevision)
       );
 
+      report({
+        phase: 'COMPLETE',
+        completed: total,
+        total,
+        detail: `Seed展開完了: ${total}ファイル`,
+      });
+
       return {
         status: 'SEEDED',
         seedRevision: manifest.seedRevision,
       };
     } catch (error) {
-      // Bundled seed is the preferred startup source.
-      // Existing GitHub PULL remains the compatibility fallback.
+      const reason = String(error);
+
+      report({
+        phase: 'FALLBACK',
+        detail:
+          `Seed処理に失敗。既存GitHub PULLへフォールバックします。${reason}`,
+      });
+
       try {
         const fallback = await this.sync();
+
         return {
           status: 'FALLBACK_GITHUB',
           seedRevision: fallback.repoSha256,
-          error: String(error),
+          error: reason,
         };
       } catch (fallbackError) {
-        // If both sources fail, preserve any existing usable workspace.
         if (existing) {
           return {
             status: 'NO_SOURCE',
             seedRevision: existing.repoSha256,
             error:
-              `${String(error)}|GITHUB_FALLBACK:${String(fallbackError)}`,
+              `${reason}|GITHUB_FALLBACK:${String(fallbackError)}`,
           };
         }
 
         return {
           status: 'NO_SOURCE',
           error:
-            `${String(error)}|GITHUB_FALLBACK:${String(fallbackError)}`,
+            `${reason}|GITHUB_FALLBACK:${String(fallbackError)}`,
         };
       }
     }

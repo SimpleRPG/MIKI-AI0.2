@@ -8746,6 +8746,10 @@ Failure TaxonomyはENVIRONMENT、DEPENDENCY、SOURCE、SEMANTIC、TRANSFORMATION
 - `node_modules`、`dist`、Android生成物等はSeedへ含めない。
 - バイナリは自己コード参照用テキストSeedから除外する。
 - ZIP内にmanifestを保持し、appVersion、commitSha、seedRevision、各ファイルSHA-256を記録する。
+- SeedのファイルSHA-256は生成側と展開側で同じ生テキストSHA-256方式を使用する。
+- Seed manifestにはGit blob SHAも保持し、Seed適用後の明示PULLで未変更ファイルを再取得しない。
+- Seed展開中は取得・検証・適用の状態を既存SelfCodeWorkspace UIへ通知する。
+- GitHub PULLの既存Blob取得は意味・結果を変更せず、有限並列で実行して不要な直列待ちを減らす。
 
 起動経路：
 1. `selfCodeSpaceService.initializeBundledSeed()` を起動時に実行する。

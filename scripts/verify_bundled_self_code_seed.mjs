@@ -4,6 +4,10 @@ import ts from 'typescript';
 const files = [
   'src/miki/core/services/selfCodeSpaceService.ts',
   'src/services/githubSyncService.ts',
+  'src/services/api.ts',
+  'src/components/SelfCodeSpaceScreen.tsx',
+  'src/miki/core/ui/typedCoreUiGatewayService.ts',
+  'server.ts',
   'src/App.tsx',
   'scripts/prepare_self_code_seed.mjs',
 ];
@@ -37,7 +41,21 @@ const sync = fs.readFileSync(
   'src/services/githubSyncService.ts',
   'utf8'
 );
+const api = fs.readFileSync('src/services/api.ts', 'utf8');
+const screen = fs.readFileSync(
+  'src/components/SelfCodeSpaceScreen.tsx',
+  'utf8'
+);
+const gateway = fs.readFileSync(
+  'src/miki/core/ui/typedCoreUiGatewayService.ts',
+  'utf8'
+);
+const server = fs.readFileSync('server.ts', 'utf8');
 const app = fs.readFileSync('src/App.tsx', 'utf8');
+const seed = fs.readFileSync(
+  'scripts/prepare_self_code_seed.mjs',
+  'utf8'
+);
 const design = fs.readFileSync(
   'MIKI-AI0.2_統合設計書_正本.txt',
   'utf8'
@@ -50,9 +68,35 @@ for (const text of [
   'BUNDLED_SELF_CODE_SEED_SHA_MISMATCH',
   'FALLBACK_GITHUB',
   'applyBundledSeed',
+  'sha256HexFromText',
+  'blobSha',
+  'onProgress',
 ]) {
-  if (!(selfCode + sync).includes(text)) {
+  if (!(selfCode + sync + screen + gateway).includes(text)) {
     throw new Error(`BUNDLED_SEED_CONTRACT_MISSING:${text}`);
+  }
+}
+
+for (const text of [
+  'ls-tree',
+  'blobSha',
+]) {
+  if (!seed.includes(text)) {
+    throw new Error(
+      `BUNDLED_SELF_CODE_SEED_GIT_IDENTITY_MISSING:${text}`
+    );
+  }
+}
+
+for (const text of [
+  'data.diagnostics',
+  'CONCURRENCY = 8',
+  'Promise.all',
+]) {
+  if (!(api + server).includes(text)) {
+    throw new Error(
+      `GITHUB_PULL_PERFORMANCE_CONTRACT_MISSING:${text}`
+    );
   }
 }
 

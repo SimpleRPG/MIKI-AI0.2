@@ -30,7 +30,16 @@ class TypedCoreUiGatewayService {
  exportExternalConnections():Blob{return new Blob([externalConnectionUiService.exportSanitized()],{type:'application/json;charset=utf-8'});}
  listWorkspaces():WorkspaceRecord[]{return generalWorkspaceService.list();}
  getSelfCodeSnapshot(){return selfCodeSpaceService.get();}
- async overwriteSelfCodeWithBundledSeed(){return selfCodeSpaceService.initializeBundledSeed(true);}
+ async overwriteSelfCodeWithBundledSeed(
+  onProgress?: Parameters<
+    typeof selfCodeSpaceService.initializeBundledSeed
+  >[1]
+){
+  return selfCodeSpaceService.initializeBundledSeed(
+    true,
+    onProgress
+  );
+}
  getSelfCodeGitHubSettings(){return selfCodeSpaceService.getGitHubSettings();}
  getSelfCodeGitHubPat(){return selfCodeSpaceService.getGitHubPat();}
  saveSelfCodeGitHubPat(token:string){return selfCodeSpaceService.saveGitHubPat(token);}

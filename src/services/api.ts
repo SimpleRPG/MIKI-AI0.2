@@ -848,6 +848,7 @@ export const apiService = {
         description: data.description,
         files: merged.files,
         diagnostics: {
+          ...(data.diagnostics || {}),
           repository,
           branch,
           knownFiles: knownFiles.length,

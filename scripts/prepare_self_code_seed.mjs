@@ -34,6 +34,39 @@ const files = execFileSync(
     file !== 'public/self-code-seed.zip'
   );
 
+const treeOutput = execFileSync(
+  'git',
+  ['ls-tree', '-r', '-z', 'HEAD', '--full-tree'],
+  { cwd: root, encoding: 'utf8' }
+);
+
+const blobShaByPath = new Map();
+
+for (const record of treeOutput.split('\\0')) {
+  if (!record) continue;
+
+  const tab = record.indexOf('\\t');
+  if (tab < 0) continue;
+
+  const header = record
+    .slice(0, tab)
+    .trim()
+    .split(/\\s+/);
+
+  const relativePath = record.slice(tab + 1);
+
+  if (
+    header[1] === 'blob' &&
+    header[2] &&
+    relativePath
+  ) {
+    blobShaByPath.set(
+      relativePath,
+      header[2]
+    );
+  }
+}
+
 const zip = new JSZip();
 const manifestFiles = [];
 
@@ -64,8 +97,21 @@ for (const relativePath of files) {
     .update(buffer)
     .digest('hex');
 
+  const blobSha = blobShaByPath.get(relativePath);
+
+  if (!blobSha) {
+    throw new Error(
+      `SELF_CODE_SEED_BLOB_SHA_MISSING:${relativePath}`
+    );
+  }
+
   zip.file(relativePath, content);
-  manifestFiles.push({ path: relativePath, sha256 });
+
+  manifestFiles.push({
+    path: relativePath,
+    sha256,
+    blobSha,
+  });
 }
 
 manifestFiles.sort((a, b) => a.path.localeCompare(b.path));

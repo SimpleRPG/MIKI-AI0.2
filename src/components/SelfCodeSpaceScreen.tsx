@@ -33,7 +33,9 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
  const push=async()=>{setBusy(true);setMessage('');try{const result=await typedCoreUiGatewayService.pushSelfCode(commitMessage);if(result.status!=='SUCCESS')throw new Error(result.summary);setSnapshot(result.data);setMessage('GitHubへPUSH完了');}catch(e){setMessage(e instanceof Error?e.message:String(e));}finally{setBusy(false);}};
 
  const sync=async()=>{
-  setBusy(true);setMessage('');
+  setBusy(true);
+  setMessage('GitHub PULLを開始しています…');
+  setPullDiagnostics(null);
   try{
    const result=await typedCoreUiGatewayService.syncSelfCode(pat);
    setSnapshot(result);
@@ -78,14 +80,16 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
     </span>
    </div>
    <button disabled={busy} onClick={sync} className="mt-3 min-h-12 w-full rounded-2xl bg-indigo-600 font-bold disabled:opacity-50">
-    <RefreshCw className="mr-2 inline h-4 w-4"/>{busy?'同期中':'GitHubから正本を同期'}
+    <RefreshCw className="mr-2 inline h-4 w-4"/>{busy?'PULL処理中…':'GitHubから正本を同期'}
    </button>
    <button disabled={busy} onClick={async()=>{
     setBusy(true);
-    setMessage('');
+    setMessage('同梱Seed: 取得を開始しています…');
     setPullDiagnostics(null);
     try{
-     const result=await typedCoreUiGatewayService.overwriteSelfCodeWithBundledSeed();
+     const result=await typedCoreUiGatewayService.overwriteSelfCodeWithBundledSeed(
+      progress=>setMessage(progress.detail)
+     );
      const next=typedCoreUiGatewayService.getSelfCodeSnapshot();
 
      if(result.status==='SEEDED' || result.status==='ALREADY_CURRENT'){
@@ -107,7 +111,7 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
      setBusy(false);
     }
    }} className="mt-2 min-h-12 w-full rounded-2xl border border-amber-700 bg-amber-950/40 px-3 text-sm font-bold text-amber-200">
-    展開上書き
+    {busy?'展開処理中…':'展開上書き'}
    </button>
 
    <button disabled={busy} onClick={()=>setSettingsOpen(v=>!v)} className="mt-2 min-h-12 w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 text-sm font-bold">

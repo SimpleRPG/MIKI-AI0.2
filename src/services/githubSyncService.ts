@@ -38,7 +38,11 @@ function hashContent(content: string): string {
 }
 
 function normalizeFiles(
-  files: Array<{ path: string; content: string }>
+  files: Array<{
+    path: string;
+    content: string;
+    blobSha?: string;
+  }>
 ): GitHubSyncFile[] {
   const map = new Map<string, GitHubSyncFile>();
 
@@ -54,6 +58,10 @@ function normalizeFiles(
       path,
       content: file.content,
       sha256: hashContent(file.content),
+      blobSha:
+        typeof file.blobSha === 'string' && file.blobSha
+          ? file.blobSha
+          : undefined,
     });
   }
 
@@ -231,6 +239,7 @@ class GitHubSyncService {
         path: string;
         content: string;
         sha256: string;
+        blobSha?: string;
       }>;
       commitSha: string;
       seedRevision: string;

@@ -2672,25 +2672,23 @@ app.post('/api/github/import', async (req, res) => {
       blobSha: string;
     }> = [];
 
-    let scannedFiles = 0;
+    const changedItems = manifest.filter(
+      (item: any) =>
+        known.get(item.path)?.blobSha !== item.blobSha
+    );
 
-    for (const item of manifest) {
-      const old = known.get(item.path);
-      scannedFiles++;
+    const CONCURRENCY = 8;
+    let completedFetches = 0;
 
-      if (old?.blobSha === item.blobSha) {
-        if (scannedFiles === 1 || scannedFiles % 10 === 0 || scannedFiles === manifest.length) {
-          recordPullPhase(
-            'blob_progress',
-            `scanned=${scannedFiles}/${manifest.length} downloadedChanged=${changedFiles.length} unchanged=${unchangedFiles} path=${item.path}`
-          );
-        }
-        continue;
-      }
+    recordPullPhase(
+      'blob_sync_plan',
+      `download=${changedItems.length} unchanged=${unchangedFiles} total=${manifest.length} concurrency=${CONCURRENCY}`
+    );
 
+    const fetchBlob = async (item: any) => {
       recordPullPhase(
         'blob_fetch',
-        `scanned=${scannedFiles}/${manifest.length} downloadedChanged=${changedFiles.length} path=${item.path}`
+        `download=${completedFetches}/${changedItems.length} path=${item.path}`
       );
 
       const blob = await api(
@@ -2701,23 +2699,42 @@ app.post('/api/github/import', async (req, res) => {
 
       if (blob.encoding === 'base64') {
         content = Buffer.from(
-          String(blob.content || '').replace(/\n/g, ''),
+          String(blob.content || '').replace(/\\n/g, ''),
           'base64'
         ).toString('utf8');
       } else {
         content = String(blob.content || '');
       }
 
-      changedFiles.push({
-        path: item.path,
-        content,
-        blobSha: item.blobSha
-      });
+      completedFetches += 1;
 
       recordPullPhase(
         'blob_progress',
-        `scanned=${scannedFiles}/${manifest.length} downloadedChanged=${changedFiles.length} unchanged=${unchangedFiles} path=${item.path}`
+        `downloaded=${completedFetches}/${changedItems.length} unchanged=${unchangedFiles} path=${item.path}`
       );
+
+      return {
+        path: item.path,
+        content,
+        blobSha: item.blobSha,
+      };
+    };
+
+    for (
+      let index = 0;
+      index < changedItems.length;
+      index += CONCURRENCY
+    ) {
+      const batch = changedItems.slice(
+        index,
+        index + CONCURRENCY
+      );
+
+      const results = await Promise.all(
+        batch.map(fetchBlob)
+      );
+
+      changedFiles.push(...results);
     }
 
     const remotePaths = new Set(
