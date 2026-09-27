@@ -143,6 +143,13 @@ class GitHubSyncService {
   }
 
   private save(state: GitHubSyncState): GitHubSyncState {
+    storageService.setItem(
+      makeKey(state.repository, state.branch),
+      JSON.stringify(state)
+    );
+
+    return state;
+  }
 
   diagnose(repository: string, branch: string): GitHubSyncDiagnostic {
     const key = makeKey(repository, branch);
@@ -183,6 +190,7 @@ class GitHubSyncService {
     }
 
     let value: any;
+
     try {
       value = JSON.parse(raw);
     } catch (error) {
@@ -295,14 +303,6 @@ class GitHubSyncService {
       treeSha: String(value.treeSha || ''),
       syncedAt: Number(value.syncedAt || 0),
     };
-  }
-
-    storageService.setItem(
-      makeKey(state.repository, state.branch),
-      JSON.stringify(state)
-    );
-
-    return state;
   }
 
   knownFiles(

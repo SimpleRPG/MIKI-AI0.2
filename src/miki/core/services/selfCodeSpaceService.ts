@@ -5,6 +5,7 @@ import {
 } from '../../../services/api';
 import { canonicalSha256, sha256HexFromText } from './canonicalSha256Service';
 import { githubSyncService } from '../../../services/githubSyncService';
+import type { GitHubSyncDiagnosticStatus } from '../../../services/githubSyncService';
 
 export interface SelfCodeFile {
   path: string;
@@ -68,6 +69,36 @@ export interface SelfCodeWorkspaceDiagnostic {
 }
 
 
+const WORKSPACE_DIAGNOSTIC_KEY = 'miki_self_code_workspace_diagnostic_v1';
+
+export interface SelfCodeWorkspaceDiagnostic {
+  status:
+    | 'READY'
+    | 'DIRTY'
+    | 'KEY_MISSING'
+    | 'JSON_INVALID'
+    | 'STATE_INVALID'
+    | 'INCOMPLETE'
+    | 'FILES_EMPTY'
+    | 'PERSISTENT_BACKEND_MEMORY'
+    | 'NO_SOURCE';
+  diagnosticCode: string;
+  summary: string;
+  nextAction: string;
+  backend: ReturnType<typeof storageService.getBackendName>;
+  repository: string;
+  branch: string;
+  fileCount: number;
+  syncKey?: string;
+  commitSha?: string;
+  treeSha?: string;
+  seedRevision?: string;
+  seedError?: string;
+  fallbackError?: string;
+  recordedAt: number;
+}
+
+
 class SelfCodeSpaceService {
   getGitHubSettings(): SelfCodeGitHubSettings {
     try {
@@ -93,6 +124,158 @@ class SelfCodeSpaceService {
     else storageService.removeItem('miki_self_code_github_pat');
     return value;
   }
+
+  getWorkspaceDiagnostic(): SelfCodeWorkspaceDiagnostic {
+    const settings = this.getGitHubSettings();
+    const backend = storageService.getBackendName();
+
+    if (backend === 'memory') {
+      const diagnostic: SelfCodeWorkspaceDiagnostic = {
+        status: 'PERSISTENT_BACKEND_MEMORY',
+        diagnosticCode: 'SELF_CODE_PERSISTENT_BACKEND_MEMORY',
+        summary: '永続Storageではなくmemory backendで動作しています。',
+        nextAction: 'Storage初期化・永続化状態を確認してから自己コードWorkspaceを再同期します。',
+        backend,
+        repository: settings.repository,
+        branch: settings.branch,
+        fileCount: 0,
+        recordedAt: Date.now(),
+      };
+      this.saveWorkspaceDiagnostic(diagnostic);
+      return diagnostic;
+    }
+
+    const raw = storageService.getItem(KEY);
+
+    if (raw) {
+      try {
+        const value = JSON.parse(raw);
+
+        if (value?.files && value?.dirty === true) {
+          const diagnostic: SelfCodeWorkspaceDiagnostic = {
+            status: 'DIRTY',
+            diagnosticCode: 'SELF_CODE_WORKSPACE_DIRTY',
+            summary: '自己コードWorkspaceに未反映の変更があります。',
+            nextAction: '変更内容を保持したまま検証・PUSH判断を行います。',
+            backend,
+            repository: settings.repository,
+            branch: settings.branch,
+            fileCount: Array.isArray(value.files) ? value.files.length : 0,
+            recordedAt: Date.now(),
+          };
+          this.saveWorkspaceDiagnostic(diagnostic);
+          return diagnostic;
+        }
+      } catch (error) {
+        const diagnostic: SelfCodeWorkspaceDiagnostic = {
+          status: 'JSON_INVALID',
+          diagnosticCode: 'SELF_CODE_SYNC_STATE_JSON_INVALID',
+          summary: '自己コードWorkspaceの作業状態JSONを読み取れません。',
+          nextAction: 'clean snapshotの診断を確認し、必要ならSeed再適用またはGitHub PULLを行います。',
+          backend,
+          repository: settings.repository,
+          branch: settings.branch,
+          fileCount: 0,
+          seedError: String(error),
+          recordedAt: Date.now(),
+        };
+        this.saveWorkspaceDiagnostic(diagnostic);
+        return diagnostic;
+      }
+    }
+
+    const sync = githubSyncService.diagnose(
+      settings.repository,
+      settings.branch
+    );
+
+    const mapped: Record<
+      GitHubSyncDiagnosticStatus,
+      {
+        status: SelfCodeWorkspaceDiagnostic['status'];
+        diagnosticCode: string;
+        summary: string;
+        nextAction: string;
+      }
+    > = {
+      READY: {
+        status: 'READY',
+        diagnosticCode: 'SELF_CODE_WORKSPACE_READY',
+        summary: '自己コードWorkspaceは正常なclean snapshotです。',
+        nextAction: 'そのまま自己改善処理へ進めます。',
+      },
+      KEY_MISSING: {
+        status: 'KEY_MISSING',
+        diagnosticCode: 'SELF_CODE_SYNC_KEY_MISSING',
+        summary: 'GitHub同期のclean snapshotキーがStorageに存在しません。',
+        nextAction: '同梱Seed再適用またはGitHub PULLを実行します。',
+      },
+      JSON_INVALID: {
+        status: 'JSON_INVALID',
+        diagnosticCode: 'SELF_CODE_SYNC_STATE_JSON_INVALID',
+        summary: 'GitHub同期状態のJSONを読み取れません。',
+        nextAction: '同梱Seed再適用またはGitHub PULLでclean snapshotを再構築します。',
+      },
+      STATE_INVALID: {
+        status: 'STATE_INVALID',
+        diagnosticCode: 'SELF_CODE_SYNC_STATE_INVALID',
+        summary: 'GitHub同期状態の構造が不正です。',
+        nextAction: '同梱Seed再適用またはGitHub PULLでclean snapshotを再構築します。',
+      },
+      INCOMPLETE: {
+        status: 'INCOMPLETE',
+        diagnosticCode: 'SELF_CODE_SYNC_STATE_INCOMPLETE',
+        summary: 'GitHub同期状態は存在しますがcompleteではありません。',
+        nextAction: '同期処理を再実行してcompleteなsnapshotを作成します。',
+      },
+      FILES_EMPTY: {
+        status: 'FILES_EMPTY',
+        diagnosticCode: 'SELF_CODE_SYNC_FILES_EMPTY',
+        summary: '同期状態はcompleteですが有効なソースファイルがありません。',
+        nextAction: 'Seed内容またはGitHub PULL結果を再確認して再同期します。',
+      },
+    };
+
+    const state = mapped[sync.status];
+
+    const diagnostic: SelfCodeWorkspaceDiagnostic = {
+      status: state.status,
+      diagnosticCode: state.diagnosticCode,
+      summary: state.summary,
+      nextAction: state.nextAction,
+      backend,
+      repository: sync.repository,
+      branch: sync.branch,
+      fileCount: sync.fileCount,
+      syncKey: sync.key,
+      commitSha: sync.commitSha,
+      treeSha: sync.treeSha,
+      recordedAt: Date.now(),
+    };
+
+    this.saveWorkspaceDiagnostic(diagnostic);
+    return diagnostic;
+  }
+
+  getLastWorkspaceDiagnostic(): SelfCodeWorkspaceDiagnostic | undefined {
+    try {
+      const raw = storageService.getItem(WORKSPACE_DIAGNOSTIC_KEY);
+      if (!raw) return undefined;
+      return JSON.parse(raw) as SelfCodeWorkspaceDiagnostic;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private saveWorkspaceDiagnostic(
+    diagnostic: SelfCodeWorkspaceDiagnostic
+  ): void {
+    storageService.setItem(
+      WORKSPACE_DIAGNOSTIC_KEY,
+      JSON.stringify(diagnostic)
+    );
+  }
+
 
   getWorkspaceDiagnostic(): SelfCodeWorkspaceDiagnostic {
     const settings = this.getGitHubSettings();
