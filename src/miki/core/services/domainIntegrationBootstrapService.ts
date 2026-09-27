@@ -207,39 +207,19 @@ class DomainIntegrationBootstrapService{
     domain==='selfDevelopment' &&
     String(envelope.payload.requestedAssessment||'')==='REPOSITORY_CONTEXT'
    ){
-    try{
-     const snapshot=await selfCodeSpaceService.sync();
-     if(!snapshot.files.length){
-      return {
-       accepted:false,
-       domain,
-       command:envelope.command,
-       error:'SOURCE_SNAPSHOT_REFRESH_EMPTY',
-       result:{
-        operation:'ASSESS_DOMAIN',
-        operationClass:'DIAGNOSTIC',
-        status:'FAILED',
-        repository:snapshot.repository,
-        branch:snapshot.branch,
-        repoSha256:snapshot.repoSha256,
-        targetFiles:[],
-        evidenceIds:[]
-       },
-       completedAt:Date.now()
-      };
-     }
-    }catch(error){
-     const reason=error instanceof Error?error.message:String(error);
+    const workspaceFiles=selfCodeSpaceService.listSourceFiles();
+    if(!workspaceFiles.length){
      return {
       accepted:false,
       domain,
       command:envelope.command,
-      error:'SOURCE_SNAPSHOT_REFRESH_FAILED:'+reason,
+      error:'SOURCE_SNAPSHOT_EMPTY',
       result:{
        operation:'ASSESS_DOMAIN',
        operationClass:'DIAGNOSTIC',
        status:'FAILED',
-       refreshAttempted:true,
+       source:'SELF_CODE_WORKSPACE',
+       targetFiles:[],
        evidenceIds:[]
       },
       completedAt:Date.now()
