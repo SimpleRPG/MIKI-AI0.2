@@ -675,15 +675,15 @@ class CoreOrchestratorService {
     coreResultService.waiting(reqId,{error:'Background task paused for foreground user request'});break;
    }
    if(isBackground){
-    const budgetCycle=taskBlackboardService.backgroundBudgetCycle(taskId);
     const budgetCheckedAt=Date.now();
     const resourceSnapshot=resourceGovernanceService.getSnapshot();
     const budget=resourceGovernanceService.assessBackgroundBudget(
       true,
       false,
-      budgetCycle,
+      cycles,
       currentBeforeState.createdAt,
-      budgetCheckedAt
+      budgetCheckedAt,
+      cycleLimit
     );
 
     const budgetDiagnostic={
@@ -691,7 +691,7 @@ class CoreOrchestratorService {
       taskId,
       requestId:reqId,
       cycle:cycles,
-      budgetCycle,
+      budgetCycle:cycles,
       taskCreatedAt:currentBeforeState.createdAt,
       checkedAt:budgetCheckedAt,
       elapsedMs:budget.elapsedMs,

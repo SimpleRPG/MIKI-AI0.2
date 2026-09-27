@@ -8781,3 +8781,31 @@ Failure TaxonomyはENVIRONMENT、DEPENDENCY、SOURCE、SEMANTIC、TRANSFORMATION
 - SelfCodeSpaceService / GitHubSyncService / App startupの構文を検査する。
 - manifest、ファイル数、seedRevision、ZIP生成を決定論的に検査する。
 - 既存自己コード検証経路を壊していないことを確認する。
+
+
+======================================================================
+【設計確定：Background自律処理のCycle上限はCORE Cycle設定を使用】
+======================================================================
+
+Background自律処理のCycle上限は、ResourceModeごとの独自固定値を持たず、
+既存のCORE Cycle設定を唯一のCycle上限として使用する。
+
+- `coreCycleSettingsService` の `selfImprovementMaxCycles` 等から
+  `coreTaskIngressService` / `coreOrchestratorService` が決定した `cycleLimit` を正本とする。
+- `resourceGovernanceService.assessBackgroundBudget()` は同じ `cycleLimit` を受け取り、
+  Background budget の `maxCycles` に使用する。
+- `NORMAL=6`、`CONSERVE=2`、`CLEANUP=1` 等のResourceMode固有Cycle上限は持たない。
+- ResourceModeによる `maxDurationMs`、`reductionRatio`、
+  Foreground要求による一時停止、`STOP_COLLECTION` 等の資源・安全制御は維持する。
+- Background budget診断の `budgetCycle` は専用checkpoint数をCycle上限の基準にせず、
+  実際のCORE `cycles` を記録する。
+- `taskBlackboardService.backgroundBudgetCycle()` はForeground割込み後の
+  Background budget window再配分という既存機能のために残す。
+- 新しいService、Task Manager、Orchestrator、Result DB、Blackboardは追加しない。
+- 会話・自己改善・研究その他の処理が同一CORE認知Cycle設定から制御される状態を維持する。
+
+検証観点：
+- COREの `cycleLimit` とBackground budget `maxCycles` が一致すること。
+- `NORMAL=6` / `CONSERVE=2` / `CLEANUP=1` の独自Cycle上限が残っていないこと。
+- ResourceModeの時間・資源による縮退・停止判定が残っていること。
+- Foreground割込み後のBackground pause/resumeとbudget window再配分を壊していないこと。

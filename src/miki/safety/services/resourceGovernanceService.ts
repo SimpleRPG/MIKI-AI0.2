@@ -81,7 +81,14 @@ class ResourceGovernanceService {
    * 既存ResourceGovernanceの予算判断をBackground自律処理へ接続する。
    * 固定Queueや別Task Managerは作らず、CORE cycle単位で縮退/停止を判断する。
    */
-  assessBackgroundBudget(background:boolean, foregroundActive:boolean, cycle:number, startedAt:number, now=Date.now()):BackgroundBudgetDecision {
+  assessBackgroundBudget(
+    background:boolean,
+    foregroundActive:boolean,
+    cycle:number,
+    startedAt:number,
+    now=Date.now(),
+    coreCycleLimit:number
+  ):BackgroundBudgetDecision {
     const resourceMode=this.snapshot.mode;
 
     if(!background){
@@ -113,21 +120,24 @@ class ResourceGovernanceService {
     }
 
     const elapsed=Math.max(0,now-startedAt);
-    const profile:Record<ResourceMode,{maxCycles:number;maxDurationMs:number;reductionRatio:number}>={
-      NORMAL:{maxCycles:6,maxDurationMs:60_000,reductionRatio:0},
-      CONSERVE:{maxCycles:2,maxDurationMs:20_000,reductionRatio:.5},
-      CLEANUP:{maxCycles:1,maxDurationMs:15_000,reductionRatio:.8},
-      STOP_COLLECTION:{maxCycles:0,maxDurationMs:0,reductionRatio:1},
+    const profile:Record<ResourceMode,{maxDurationMs:number;reductionRatio:number}>={
+      NORMAL:{maxDurationMs:60_000,reductionRatio:0},
+      CONSERVE:{maxDurationMs:20_000,reductionRatio:.5},
+      CLEANUP:{maxDurationMs:15_000,reductionRatio:.8},
+      STOP_COLLECTION:{maxDurationMs:0,reductionRatio:1},
     };
 
     const p=profile[resourceMode];
-    const cycleExceeded=cycle>p.maxCycles;
+    const maxCycles=Math.max(1,Math.min(100,Math.floor(coreCycleLimit)));
+    const cycleExceeded=cycle>maxCycles;
     const durationExceeded=elapsed>p.maxDurationMs;
     const allowed=!cycleExceeded&&!durationExceeded;
 
     return {
       allowed,
-      ...p,
+      maxCycles,
+      maxDurationMs:p.maxDurationMs,
+      reductionRatio:p.reductionRatio,
       reason:allowed
         ? (resourceMode==='NORMAL'?'BACKGROUND_BUDGET_ALLOWED':'BACKGROUND_BUDGET_REDUCED')
         : (resourceMode==='NORMAL'?'BACKGROUND_BUDGET_EXCEEDED':'RESOURCE_MODE_BUDGET_EXCEEDED'),
