@@ -17,6 +17,7 @@ export interface SelfCodeSnapshot {
   syncedAt: number;
   dirty?: boolean;
   baseRepoSha256?: string;
+  source?: 'BUNDLED_SEED' | 'GITHUB';
 }
 
 const KEY = 'miki_self_code_space_v1';
