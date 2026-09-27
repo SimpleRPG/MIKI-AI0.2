@@ -68,4 +68,10 @@ renderApp();
 
 void storageService.ready.finally(() => {
   renderApp();
+  // Existing SystemLogger is the canonical diagnostic path.
+  // Start persistent runtime-memory/process-gap telemetry only after the
+  // persistent storage backend has been hydrated.
+  void import('./services/systemLogger').then(({ systemLogger }) => {
+    systemLogger.initializeRuntimeMemoryDiagnostics();
+  });
 });

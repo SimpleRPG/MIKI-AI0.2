@@ -8816,3 +8816,45 @@ Background自律処理のCycle上限は、ResourceModeごとの独自固定値�
 - `NORMAL=6` / `CONSERVE=2` / `CLEANUP=1` の独自Cycle上限が残っていないこと。
 - ResourceModeの時間・資源による縮退・停止判定が残っていること。
 - Foreground割込み後のBackground pause/resumeとbudget window再配分を壊していないこと。
+
+============================================================
+【実装更新 2026-09-27：メモリ不足・異常終了の診断証拠】
+============================================================
+
+既存のSystemLoggerを診断の正規窓口として、実行中の資源状態を追跡可能にする。
+
+追加するのは新しい分類・DB・Blackboard・Orchestratorではなく、
+既存SystemLogger + storageServiceによる診断記録である。
+
+記録項目：
+・JS Heap使用量
+・JS Heap割当量
+・JS Heap上限
+・JS Heap使用率
+・navigator.deviceMemory（公開される場合）
+・CPUコア数
+・visibility状態
+・10秒間隔のHeartbeat
+・前回セッションの正常終了有無
+・直前Heartbeatからのプロセス断絶時間
+
+判定：
+・JS Heap使用率 < 70%：NORMAL
+・70%以上：ELEVATED
+・85%以上：NEAR_LIMIT
+・performance.memory非公開：UNAVAILABLE
+
+重要：
+PROCESS_GAP_WITHOUT_CLEAN_SHUTDOWNはAndroid OOMの確定判定ではない。
+クラッシュ、強制終了、OSによるプロセス回収、その他の異常終了を含む
+「正常終了記録なし」の証拠として扱う。
+
+Android OS全体のRAM使用量をWebView JavaScript APIだけから直接取得できない場合、
+推測で「メモリ不足」と断定しない。
+
+診断レポートには、現在のメモリ状態・直前の保存済みHeartbeat・
+前回プロセス断絶の有無を含める。
+
+この機構は既存のCORE経路を変更せず、
+既存のSystemLogger / storageService / 診断レポートを利用する。
+

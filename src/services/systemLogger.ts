@@ -47,6 +47,35 @@ export interface StepExecutionSnapshot {
   details?: any;
 }
 
+export interface RuntimeMemorySample {
+  timestamp: number;
+  visibility: string;
+  usedJSHeapMB?: number;
+  totalJSHeapMB?: number;
+  jsHeapLimitMB?: number;
+  jsHeapUsageRatio?: number;
+  deviceMemoryGB?: number;
+  hardwareConcurrency?: number;
+  pressure: 'NORMAL' | 'ELEVATED' | 'NEAR_LIMIT' | 'UNAVAILABLE';
+}
+
+interface RuntimeMemoryDiagnosticsState {
+  version: 1;
+  sessionId: string;
+  state: 'RUNNING' | 'SHUTTING_DOWN';
+  startedAt: number;
+  lastHeartbeatAt: number;
+  lastSample?: RuntimeMemorySample;
+  previousSessionGap?: {
+    detectedAt: number;
+    previousSessionId: string;
+    previousLastHeartbeatAt: number;
+    gapMs: number;
+    reason: 'PROCESS_GAP_WITHOUT_CLEAN_SHUTDOWN';
+  };
+  samples: RuntimeMemorySample[];
+}
+
 class SystemLogger {
   private logs: SystemLogEntry[] = [];
   private maxLogs = 1000;
@@ -56,6 +85,10 @@ class SystemLogger {
   private currentSessionSteps: StepExecutionSnapshot[] = [];
   private logListeners: Set<(entry: SystemLogEntry) => void> = new Set();
   private stepListeners: Set<(step: StepExecutionSnapshot, allSteps: StepExecutionSnapshot[]) => void> = new Set();
+  private runtimeMemoryTimer: ReturnType<typeof setInterval> | null = null;
+  private runtimeMemoryInitialized = false;
+  private runtimeMemoryVisibilityHandler: (() => void) | null = null;
+  private readonly runtimeMemoryStorageKey = 'miki_runtime_memory_diagnostics_v1';
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -68,6 +101,185 @@ class SystemLogger {
         this.logs = [];
       }
     }
+  }
+
+  /**
+   * Android/WebView resource diagnostics.
+   *
+   * This deliberately records evidence rather than declaring that an Android
+   * process was killed by OOM. JS heap metrics are available only on runtimes
+   * that expose performance.memory. A missing metric is reported as
+   * UNAVAILABLE, never guessed.
+   */
+  public initializeRuntimeMemoryDiagnostics(): void {
+    if (this.runtimeMemoryInitialized || typeof window === 'undefined') return;
+    this.runtimeMemoryInitialized = true;
+
+    const now = Date.now();
+    const sessionId = `RMS-${now}-${Math.random().toString(36).slice(2, 8)}`;
+    const previousRaw = storageService.getItem(this.runtimeMemoryStorageKey);
+
+    let previous: RuntimeMemoryDiagnosticsState | undefined;
+    try {
+      if (previousRaw) {
+        const parsed = JSON.parse(previousRaw);
+        if (parsed && parsed.version === 1) previous = parsed;
+      }
+    } catch {}
+
+    const state: RuntimeMemoryDiagnosticsState = {
+      version: 1,
+      sessionId,
+      state: 'RUNNING',
+      startedAt: now,
+      lastHeartbeatAt: now,
+      samples: [],
+    };
+
+    if (
+      previous &&
+      previous.state === 'RUNNING' &&
+      previous.lastHeartbeatAt > 0 &&
+      now >= previous.lastHeartbeatAt
+    ) {
+      state.previousSessionGap = {
+        detectedAt: now,
+        previousSessionId: previous.sessionId,
+        previousLastHeartbeatAt: previous.lastHeartbeatAt,
+        gapMs: now - previous.lastHeartbeatAt,
+        reason: 'PROCESS_GAP_WITHOUT_CLEAN_SHUTDOWN',
+      };
+    }
+
+    const persist = async () => {
+      state.lastHeartbeatAt = Date.now();
+      state.lastSample = this.collectRuntimeMemorySample();
+      state.samples = [...state.samples, state.lastSample].slice(-120);
+      try {
+        storageService.setItem(this.runtimeMemoryStorageKey, JSON.stringify(state));
+        await storageService.flushNow();
+      } catch {}
+    };
+
+    void persist();
+
+    this.runtimeMemoryTimer = setInterval(() => {
+      void persist();
+    }, 10000);
+
+    this.runtimeMemoryVisibilityHandler = () => {
+      void persist();
+    };
+    document.addEventListener('visibilitychange', this.runtimeMemoryVisibilityHandler);
+
+    window.addEventListener('pagehide', () => {
+      state.state = 'SHUTTING_DOWN';
+      state.lastHeartbeatAt = Date.now();
+      state.lastSample = this.collectRuntimeMemorySample();
+      state.samples = [...state.samples, state.lastSample].slice(-120);
+      try {
+        storageService.setItem(this.runtimeMemoryStorageKey, JSON.stringify(state));
+        void storageService.flushNow();
+      } catch {}
+    }, { once: true });
+
+    this.info('SYSTEM', '[Runtime Memory Diagnostics] started', {
+      sessionId,
+      previousProcessGapDetected: Boolean(state.previousSessionGap),
+      previousProcessGapMs: state.previousSessionGap?.gapMs ?? null,
+      initialMemory: state.lastSample ?? null,
+    });
+  }
+
+  private collectRuntimeMemorySample(): RuntimeMemorySample {
+    const now = Date.now();
+    const perfMemory =
+      typeof performance !== 'undefined'
+        ? (performance as any).memory
+        : undefined;
+
+    const usedJSHeapMB =
+      perfMemory && Number.isFinite(perfMemory.usedJSHeapSize)
+        ? Number((perfMemory.usedJSHeapSize / (1024 * 1024)).toFixed(1))
+        : undefined;
+
+    const totalJSHeapMB =
+      perfMemory && Number.isFinite(perfMemory.totalJSHeapSize)
+        ? Number((perfMemory.totalJSHeapSize / (1024 * 1024)).toFixed(1))
+        : undefined;
+
+    const jsHeapLimitMB =
+      perfMemory && Number.isFinite(perfMemory.jsHeapSizeLimit)
+        ? Number((perfMemory.jsHeapSizeLimit / (1024 * 1024)).toFixed(1))
+        : undefined;
+
+    const jsHeapUsageRatio =
+      usedJSHeapMB !== undefined &&
+      jsHeapLimitMB !== undefined &&
+      jsHeapLimitMB > 0
+        ? Number((usedJSHeapMB / jsHeapLimitMB).toFixed(4))
+        : undefined;
+
+    let pressure: RuntimeMemorySample['pressure'] = 'UNAVAILABLE';
+    if (jsHeapUsageRatio !== undefined) {
+      pressure =
+        jsHeapUsageRatio >= 0.85
+          ? 'NEAR_LIMIT'
+          : jsHeapUsageRatio >= 0.70
+            ? 'ELEVATED'
+            : 'NORMAL';
+    }
+
+    return {
+      timestamp: now,
+      visibility:
+        typeof document !== 'undefined'
+          ? document.visibilityState
+          : 'unknown',
+      usedJSHeapMB,
+      totalJSHeapMB,
+      jsHeapLimitMB,
+      jsHeapUsageRatio,
+      deviceMemoryGB:
+        typeof navigator !== 'undefined' &&
+        Number.isFinite((navigator as any).deviceMemory)
+          ? Number((navigator as any).deviceMemory)
+          : undefined,
+      hardwareConcurrency:
+        typeof navigator !== 'undefined'
+          ? navigator.hardwareConcurrency || undefined
+          : undefined,
+      pressure,
+    };
+  }
+
+  public getRuntimeMemoryDiagnostics(): {
+    current: RuntimeMemorySample;
+    previousProcessGapDetected: boolean;
+    previousProcessGapMs?: number;
+    previousSessionId?: string;
+    recentSamples: RuntimeMemorySample[];
+  } {
+    const current = this.collectRuntimeMemorySample();
+    let saved: RuntimeMemoryDiagnosticsState | undefined;
+
+    try {
+      const raw = storageService.getItem(this.runtimeMemoryStorageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.version === 1) saved = parsed;
+      }
+    } catch {}
+
+    return {
+      current,
+      previousProcessGapDetected: Boolean(saved?.previousSessionGap),
+      previousProcessGapMs: saved?.previousSessionGap?.gapMs,
+      previousSessionId: saved?.previousSessionGap?.previousSessionId,
+      recentSamples: Array.isArray(saved?.samples)
+        ? saved!.samples.slice(-20)
+        : [],
+    };
   }
 
   public startSession(): number {
@@ -333,6 +545,19 @@ class SystemLogger {
       jsHeapStr = `JSヒープ使用: ${usedMB} MB / 割当: ${totalMB} MB (上限: ${limitMB} MB)`;
     }
 
+    const runtimeMemoryDiagnostics = this.getRuntimeMemoryDiagnostics();
+    const runtimeCurrent = runtimeMemoryDiagnostics.current;
+    const runtimeMemoryStr =
+      runtimeCurrent.usedJSHeapMB !== undefined &&
+      runtimeCurrent.jsHeapLimitMB !== undefined
+        ? `${runtimeCurrent.usedJSHeapMB} MB / ${runtimeCurrent.jsHeapLimitMB} MB (${Math.round((runtimeCurrent.jsHeapUsageRatio || 0) * 100)}%, ${runtimeCurrent.pressure})`
+        : 'JS Heap計測API非公開 (判定不能)';
+
+    const previousProcessGapStr =
+      runtimeMemoryDiagnostics.previousProcessGapDetected
+        ? `検出あり / 直前Heartbeatから ${Math.round((runtimeMemoryDiagnostics.previousProcessGapMs || 0) / 1000)} 秒`
+        : '検出なし';
+
     // Storage estimate
     let storageStr = '取得不可';
     if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
@@ -402,6 +627,8 @@ class SystemLogger {
 - CPU コア数          : ${cores}
 - 通信環境ステータス  : ${networkStr}
 - JavaScriptヒープ    : ${jsHeapStr}
+- 実行中メモリ監視    : ${runtimeMemoryStr}
+- 前回プロセス断絶    : ${previousProcessGapStr}
 - ブラウザ保存容量    : ${storageStr}
 - WebGPU 対応状況     : ${webgpuStr}
 - GPU アダプタ情報    : ${adapterInfoStr}
@@ -413,7 +640,17 @@ class SystemLogger {
 - GGUFアクティブモデル: ${activeGgufModel}
 
 ================================================================================
-【2. GPULLM (WebGPU旧ローカル生成ランタイム) から返事が返ってこない主な理由と対策】
+【2. メモリ・プロセス終了の診断】
+--------------------------------------------------------------------------------
+- JS Heap使用率は実行中に10秒間隔で保存されます。
+- 70%以上はELEVATED、85%以上はNEAR_LIMITとして記録します。
+- 前回セッションがRUNNINGのまま再起動された場合はPROCESS_GAP_WITHOUT_CLEAN_SHUTDOWNとして記録します。
+- PROCESS_GAPはAndroid OOMの確定証拠ではありません。クラッシュ、強制終了、OSによるプロセス回収、その他の異常終了を含む「正常終了なし」の証拠です。
+- performance.memoryがWebViewから公開されない場合、メモリ不足とは判定せず「判定不能」とします。
+- Android OS全体のRAM使用量はWebView JavaScript APIだけでは直接取得できません。
+
+================================================================================
+【3. GPULLM (WebGPU旧ローカル生成ランタイム) から返事が返ってこない主な理由と対策】
 --------------------------------------------------------------------------------
 Q. なぜチャット送信後にGPUから返事が来ない、またはCPUルールベースに切り替わるのか？
 
