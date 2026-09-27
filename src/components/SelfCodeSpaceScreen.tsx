@@ -66,9 +66,50 @@ export const SelfCodeSpaceScreen:React.FC=()=>{
    <div className="mt-3 text-[10px] text-slate-500 font-mono break-all">
     {snapshot?`${snapshot.repository} · ${snapshot.branch} · ${snapshot.files.length} files · ${snapshot.repoSha256}`:'未同期'}
    </div>
+
+   <div className="mt-2 rounded-2xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs">
+    <span className="text-slate-500">現在のWorkspace:</span>{' '}
+    <span className={snapshot?.source==='BUNDLED_SEED'?'text-emerald-300':'text-slate-300'}>
+     {snapshot?.source==='BUNDLED_SEED'
+      ?'アプリ同梱Seedから展開'
+      :snapshot?.source==='GITHUB'
+       ?'GitHub PULL'
+       :'未初期化'}
+    </span>
+   </div>
    <button disabled={busy} onClick={sync} className="mt-3 min-h-12 w-full rounded-2xl bg-indigo-600 font-bold disabled:opacity-50">
     <RefreshCw className="mr-2 inline h-4 w-4"/>{busy?'同期中':'GitHubから正本を同期'}
    </button>
+   <button disabled={busy} onClick={async()=>{
+    setBusy(true);
+    setMessage('');
+    setPullDiagnostics(null);
+    try{
+     const result=await typedCoreUiGatewayService.overwriteSelfCodeWithBundledSeed();
+     const next=typedCoreUiGatewayService.getSelfCodeSnapshot();
+
+     if(result.status==='SEEDED' || result.status==='ALREADY_CURRENT'){
+      setSnapshot(next);
+      setSelected(undefined);
+      setMessage('アプリ同梱Seedを展開してWorkspaceを上書きしました。');
+     }else if(result.status==='PRESERVED_DIRTY'){
+      setMessage('Workspaceは変更中のため自動上書きを保護しました。');
+     }else if(result.status==='FALLBACK_GITHUB'){
+      setSnapshot(next);
+      setSelected(undefined);
+      setMessage('同梱Seedに失敗したためGitHub PULLへフォールバックしました。');
+     }else{
+      setMessage(result.error || '同梱Seedの展開に失敗しました。');
+     }
+    }catch(e){
+     setMessage(e instanceof Error?e.message:String(e));
+    }finally{
+     setBusy(false);
+    }
+   }} className="mt-2 min-h-12 w-full rounded-2xl border border-amber-700 bg-amber-950/40 px-3 text-sm font-bold text-amber-200">
+    展開上書き
+   </button>
+
    <button disabled={busy} onClick={()=>setSettingsOpen(v=>!v)} className="mt-2 min-h-12 w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 text-sm font-bold">
     GitHub PULL / PUSH設定 {settingsOpen?'▲':'▼'}
    </button>

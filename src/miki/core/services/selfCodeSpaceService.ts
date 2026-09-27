@@ -52,7 +52,7 @@ class SelfCodeSpaceService {
     else storageService.removeItem('miki_self_code_github_pat');
     return value;
   }
-  async initializeBundledSeed(): Promise<{
+  async initializeBundledSeed(overwrite = false): Promise<{
     status:
       | 'SEEDED'
       | 'ALREADY_CURRENT'
@@ -138,7 +138,8 @@ class SelfCodeSpaceService {
         storageService.getItem(SEED_APPLIED_KEY) || '';
 
       if (
-        existing?.dirty === true
+        existing?.dirty === true &&
+        !overwrite
       ) {
         return {
           status: 'PRESERVED_DIRTY',
@@ -305,6 +306,7 @@ class SelfCodeSpaceService {
         syncedAt: sync.syncedAt || Date.now(),
         dirty: false,
         baseRepoSha256: repoSha256,
+        source: sync.source === 'BUNDLED_SEED' ? 'BUNDLED_SEED' : 'GITHUB',
       };
     } catch {
       return undefined;

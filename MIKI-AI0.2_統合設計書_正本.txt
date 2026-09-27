@@ -8764,6 +8764,11 @@ Failure TaxonomyはENVIRONMENT、DEPENDENCY、SOURCE、SEMANTIC、TRANSFORMATION
 - 新しい19番目の分類、新しい上位Orchestrator、新しいResult DB、Blackboardを作らない。
 - アプリ更新時のcleanな旧Seedは新しい同梱Seedへ更新できる。
 - dirty Workspaceは自動上書きしない。
+- 自己コードスペースのGitHub正本同期領域には、ユーザーが明示的に実行できる「展開上書き」操作を置く。
+- 「展開上書き」はアプリ同梱SeedをSelfCodeWorkspaceへ再展開する明示操作であり、自動起動処理とは区別する。
+- 「展開上書き」を実行した場合は、既存Workspaceのdirty状態に関係なく同梱Seedを適用できる。
+- 画面には現在のWorkspace取得元を `BUNDLED_SEED` / `GITHUB` として表示する。
+
 
 検証要求：
 - Seed生成スクリプトの構文を検査する。
