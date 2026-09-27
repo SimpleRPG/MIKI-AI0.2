@@ -42,16 +42,16 @@ const treeOutput = execFileSync(
 
 const blobShaByPath = new Map();
 
-for (const record of treeOutput.split('\\0')) {
+for (const record of treeOutput.split('\0')) {
   if (!record) continue;
 
-  const tab = record.indexOf('\\t');
+  const tab = record.indexOf('\t');
   if (tab < 0) continue;
 
   const header = record
     .slice(0, tab)
     .trim()
-    .split(/\\s+/);
+    .split(/\s+/);
 
   const relativePath = record.slice(tab + 1);
 

@@ -88,6 +88,30 @@ for (const text of [
   }
 }
 
+for (const pattern of [
+  "treeOutput.split('\\0')",
+  "record.indexOf('\\t')",
+  ".split(/\\s+/)",
+]) {
+  if (!seed.includes(pattern)) {
+    throw new Error(
+      `BUNDLED_SELF_CODE_SEED_GIT_TREE_PARSER_MISSING:${pattern}`
+    );
+  }
+}
+
+for (const brokenPattern of [
+  "treeOutput.split('\\\\0')",
+  "record.indexOf('\\\\t')",
+  ".split(/\\\\s+/)",
+]) {
+  if (seed.includes(brokenPattern)) {
+    throw new Error(
+      `BUNDLED_SELF_CODE_SEED_GIT_TREE_PARSER_BROKEN:${brokenPattern}`
+    );
+  }
+}
+
 for (const text of [
   'data.diagnostics',
   'CONCURRENCY = 8',
