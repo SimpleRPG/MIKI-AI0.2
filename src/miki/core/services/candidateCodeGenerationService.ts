@@ -74,10 +74,49 @@ class CandidateCodeGenerationService {
         ...(
           failureFeedback.result &&
           typeof failureFeedback.result === 'object'
-            ? this.strings((failureFeedback.result as Record<string,unknown>).failedChecks)
+            ? [
+                ...this.strings((failureFeedback.result as Record<string,unknown>).reasons),
+                ...this.strings((failureFeedback.result as Record<string,unknown>).failedChecks),
+                ...this.strings((failureFeedback.result as Record<string,unknown>).unexecutedChecks),
+                ...(
+                  String((failureFeedback.result as Record<string,unknown>).reason||'').trim()
+                    ? [String((failureFeedback.result as Record<string,unknown>).reason).trim()]
+                    : []
+                ),
+                ...(
+                  String((failureFeedback.result as Record<string,unknown>).error||'').trim()
+                    ? [String((failureFeedback.result as Record<string,unknown>).error).trim()]
+                    : []
+                ),
+                ...(
+                  String((failureFeedback.result as Record<string,unknown>).summary||'').trim()
+                    ? [String((failureFeedback.result as Record<string,unknown>).summary).trim()]
+                    : []
+                ),
+                ...(
+                  Array.isArray((failureFeedback.result as Record<string,unknown>).results)
+                    ? (failureFeedback.result as Record<string,unknown>).results
+                        .filter((item): item is Record<string,unknown> => Boolean(item && typeof item==='object'))
+                        .flatMap(item=>[
+                          ...(
+                            String(item.reason||'').trim()
+                              ? [String(item.reason).trim()]
+                              : []
+                          ),
+                          ...(
+                            String(item.error||'').trim()
+                              ? [String(item.error).trim()]
+                              : []
+                          ),
+                          ...this.strings(item.failedChecks),
+                          ...this.strings(item.unexecutedChecks),
+                        ])
+                    : []
+                ),
+              ]
             : []
         ),
-      ]
+      ].filter(Boolean)
     : [];
 
   const astTransformations=this.parseAstTransformations(run.payload.astTransformations,targetPaths);

@@ -1174,10 +1174,42 @@ class AdaptiveRoutePlannerService {
       const failureResults=Array.isArray(failureValue.results)
         ? failureValue.results
         : [];
-      const failureReasons=failureResults
-        .filter((item): item is Record<string,unknown> => Boolean(item && typeof item==='object'))
-        .map(item=>String(item.reason||''))
-        .filter(Boolean);
+      const failureReasons=[
+        ...this.stringArrayFromValue(failureValue,/reasons/i),
+        ...this.stringArrayFromValue(failureValue,/failedChecks/i),
+        ...this.stringArrayFromValue(failureValue,/unexecutedChecks/i),
+        ...(
+          String(failureValue.reason||'').trim()
+            ? [String(failureValue.reason).trim()]
+            : []
+        ),
+        ...(
+          String(failureValue.error||'').trim()
+            ? [String(failureValue.error).trim()]
+            : []
+        ),
+        ...(
+          String(failureValue.summary||'').trim()
+            ? [String(failureValue.summary).trim()]
+            : []
+        ),
+        ...failureResults
+          .filter((item): item is Record<string,unknown> => Boolean(item && typeof item==='object'))
+          .flatMap(item=>[
+            ...(
+              String(item.reason||'').trim()
+                ? [String(item.reason).trim()]
+                : []
+            ),
+            ...(
+              String(item.error||'').trim()
+                ? [String(item.error).trim()]
+                : []
+            ),
+            ...this.stringArrayFromValue(item,/failedChecks/i),
+            ...this.stringArrayFromValue(item,/unexecutedChecks/i),
+          ]),
+      ].filter(Boolean);
 
       routes.push({
         target:'selfDevelopment',
