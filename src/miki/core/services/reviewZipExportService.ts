@@ -9,7 +9,7 @@ import { candidateUnknownResolutionService } from './candidateUnknownResolutionS
 import { persistenceReceiptLedgerService } from './persistenceReceiptLedgerService';
 
 export type ReviewPackageStatus='READY_FOR_EXTERNAL_REVIEW'|'EXTERNAL_REVIEW_PENDING'|'ACCEPTED'|'REJECTED'|'NEEDS_CHANGES'|'HOLD';
-export type ReviewZipCreateCode='SUCCESS'|'RUN_NOT_FOUND'|'WORKSPACE_NOT_FOUND'|'NO_CANDIDATE_FILES'|'PACKAGE_NOT_FOUND'|'SNAPSHOT_MISMATCH'|'ZIP_BUILD_FAILED'|'ZIP_VERIFY_FAILED'|'SAVE_FAILED';
+export type ReviewZipCreateCode='SUCCESS'|'RUN_NOT_FOUND'|'WORKSPACE_NOT_FOUND'|'NO_CANDIDATE_FILES'|'PACKAGE_NOT_FOUND'|'SNAPSHOT_MISMATCH'|'REVIEW_GATE_BLOCKED'|'ZIP_BUILD_FAILED'|'ZIP_VERIFY_FAILED'|'SAVE_FAILED';
 export type ReviewPackageCreationMode='NEW_SERIES'|'NEXT_PACKAGE_REVISION';
 export interface ReviewExternalDirectiveContext {
  directiveId:string|null; sourceHash:string|null; targetFiles:string[];
@@ -68,6 +68,13 @@ class ReviewZipExportService {
   const operationInstanceId=String(options.operationInstanceId??run.payload.operationInstanceId??'UNAVAILABLE');
   const candidateId=String(options.candidateId||`CAND-${workspace.workspaceId}`);
   const candidateManifestSha256=String(options.candidateManifestSha256||workspace.candidateRevisionSha256);
+  if(candidateManifestSha256!==workspace.candidateRevisionSha256){
+    return {
+      ok:false,
+      code:'SNAPSHOT_MISMATCH',
+      message:'Review package candidate manifest does not match the current candidate workspace revision'
+    };
+  }
   const validationBundleId=String(options.validationBundleId||`VAL-${candidateId}`);
   try{
    const snapshotFiles=workspace.files.map(file=>({...file,evidenceIds:[...file.evidenceIds]}));
@@ -79,8 +86,35 @@ class ReviewZipExportService {
    const packageManifest={...candidateManifestBody,packageId,baselineManifestSha256,candidateManifestSha256};
    const packageManifestSha256=canonicalSha256(packageManifest);
    const validation=candidateValidationEvidenceService.list(workspaceId);
-   const validationManifest=candidateValidationEvidenceService.evaluate(workspaceId,workspace.candidateRevisionSha256);
-   const shadow=shadowEvaluationService.latest(workspaceId);
+   const validationManifest=candidateValidationEvidenceService.evaluate(
+     workspaceId,
+     workspace.candidateRevisionSha256
+   );
+   const shadow=shadowEvaluationService.latest(
+     workspaceId,
+     workspace.candidateRevisionSha256
+   );
+
+   if(!validationManifest.passed){
+     const reasons=[
+       ...validationManifest.missing.map(item=>`MISSING:${item}`),
+       ...validationManifest.failed.map(item=>`FAILED:${item}`)
+     ];
+     return {
+       ok:false,
+       code:'REVIEW_GATE_BLOCKED',
+       message:`Current candidate validation is not passed${reasons.length?`:${reasons.join('|')}`:''}`
+     };
+   }
+
+   if(!shadow?.passed){
+     return {
+       ok:false,
+       code:'REVIEW_GATE_BLOCKED',
+       message:`Current candidate shadow evaluation is not passed${shadow?.reasons?.length?`:${shadow.reasons.join('|')}`:':SHADOW_EVALUATION_MISSING'}`
+     };
+   }
+
    const candidateUnknownContext=candidateUnknownResolutionService.get(runId);
    const unresolvedChecks=[...[...validationManifest.missing.map(item=>`MISSING:${item}`),...validationManifest.failed.map(item=>`FAILED:${item}`)],...(candidateUnknownContext?.candidateNotes??[])];
    const changedFiles=snapshotFiles.filter(file=>file.baselineSha256!==file.candidateSha256).map(file=>file.path);
