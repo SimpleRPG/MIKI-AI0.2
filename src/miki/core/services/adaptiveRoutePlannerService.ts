@@ -1329,6 +1329,7 @@ class AdaptiveRoutePlannerService {
           prohibitions:input.prohibitions,
           invariants:input.invariants,
           validationRequirements:input.validationRequirements,
+          failureFeedback:this.buildValidationFailureFeedback(task,candidate),
           adaptive:true,priority:75}
       });
     } else if(latestCandidate && !latestValidation && readiness.validationReady) {
@@ -2053,6 +2054,10 @@ class AdaptiveRoutePlannerService {
             prohibitions: input.prohibitions,
             invariants: input.invariants,
             validationRequirements: input.validationRequirements,
+            failureFeedback: this.buildValidationFailureFeedback(
+              task,
+              candidateIdentity
+            ),
             candidateRevision: Number(
               candidateIdentity.candidateRevision ||
               input.candidateRevision ||
@@ -2515,6 +2520,77 @@ class AdaptiveRoutePlannerService {
       evidenceIds:this.stringArray(value.evidenceIds),
       persistenceReceiptIds:this.stringArray(value.persistenceReceiptIds),
       reviewEligibility:value.reviewEligibility
+    };
+  }
+
+  private buildValidationFailureFeedback(
+    task:BlackboardTask,
+    candidateIdentity:Record<string,unknown>
+  ):Record<string,unknown>|undefined {
+    const candidateId=String(candidateIdentity.candidateId||'').trim();
+    const candidateRevision=Number(candidateIdentity.candidateRevision||0);
+    const candidateIndex=[...task.entries].map((entry,index)=>({entry,index})).reverse()
+      .find(({entry})=>{
+        const value=objectValue(entry);
+        return entry.kind==='RESULT' &&
+          value?.operation==='GENERATE_CANDIDATE' &&
+          (!candidateId || String(value.candidateId||'')===candidateId);
+      })?.index ?? -1;
+
+    const validationEntry=[...task.entries]
+      .map((entry,index)=>({entry,index}))
+      .reverse()
+      .find(({entry,index})=>{
+        if(index<=candidateIndex) return false;
+        if(entry.kind!=='RESULT'&&entry.kind!=='ERROR') return false;
+        const value=objectValue(entry);
+        return String(value?.operation||'')==='VALIDATE_CANDIDATE';
+      });
+
+    if(!validationEntry) return undefined;
+
+    const value=objectValue(validationEntry.entry)||{};
+    const validationIdentity=this.extractValidationIdentity(value);
+    const reasons=[
+      ...this.stringArray(value.reasons),
+      ...this.stringArray(value.failedChecks),
+      ...this.stringArray(value.unexecutedChecks)
+    ];
+
+    const normalized=value.normalized;
+    if(normalized&&typeof normalized==='object'){
+      const normalizedValue=normalized as Record<string,unknown>;
+      reasons.push(...this.stringArray(normalizedValue.reasons));
+      reasons.push(...this.stringArray(normalizedValue.failedChecks));
+      reasons.push(...this.stringArray(normalizedValue.unexecutedChecks));
+    }
+
+    const error=String(
+      value.error||
+      value.summary||
+      (validationEntry.entry.kind==='ERROR' ? validationEntry.entry.key : '')
+    ).trim();
+
+    if(error) reasons.push(error);
+
+    const uniqueReasons=[...new Set(reasons.filter(Boolean))];
+
+    return {
+      sourceOperation:'VALIDATE_CANDIDATE',
+      status:String(
+        validationIdentity.validationStatus||
+        value.status||
+        'FAILED'
+      ).toUpperCase(),
+      retryOfCandidateRevision:candidateRevision,
+      candidateId:candidateId||undefined,
+      validationBundleId:validationIdentity.validationBundleId,
+      componentIds:this.stringArray(value.componentIds),
+      reasons:uniqueReasons,
+      result:{
+        ...validationIdentity,
+        error:error||undefined
+      }
     };
   }
 
