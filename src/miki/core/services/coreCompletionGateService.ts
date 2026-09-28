@@ -39,7 +39,7 @@ function domainSucceeded(task: BlackboardTask, domain: MikiDomain): boolean {
     const reply = entryReply(entry);
     if (!reply || reply.operationClass !== 'BUSINESS') return false;
     const status = String(reply.status || '').toUpperCase();
-    return status === 'SUCCEEDED' || status === 'SUCCESS' || status === 'COMPLETED';
+    return status === 'SUCCEEDED' || status === 'SUCCESS' || status === 'COMPLETED' || status === 'ALREADY_APPLIED';
   });
 }
 

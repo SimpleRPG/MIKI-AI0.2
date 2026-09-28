@@ -666,7 +666,11 @@ class DomainIntegrationBootstrapService{
       candidateManifestSha256:pkg.candidateManifestSha256,
       workspaceId:pkg.workspaceId,
       idempotent:true,
-      evidenceIds:[]
+      evidenceIds:[],
+      receiptIds:[
+        pkg.persistenceReceiptId,
+        pkg.packageLedgerReceiptId
+      ].filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
     });
    }
 
