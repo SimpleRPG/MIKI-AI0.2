@@ -162,10 +162,37 @@ class CandidateCodeGenerationService {
   const codeKnowledge = reusableComponentFactoryService
     .list()
     .filter(item =>
-      item.componentKind === 'KNOWLEDGE' &&
+      Boolean(item) &&
+      item.componentKind === KNOWLEDGE &&
+      typeof item.componentType === string &&
+      item.componentType.trim().length > 0 &&
       codeKnowledgePack.usedKnowledgeComponentIds.includes(item.componentId)
     )
     .slice(0, 8);
+
+  const resolvedKnowledgeIds = new Set(
+    codeKnowledge.map(item => item.componentId)
+  );
+  const unresolvedKnowledgeComponentIds =
+    codeKnowledgePack.usedKnowledgeComponentIds.filter(
+      id => !resolvedKnowledgeIds.has(id)
+    );
+
+  if(unresolvedKnowledgeComponentIds.length>0){
+    const reason=`CODE_COMPOSITION_COMPONENT_UNRESOLVED:${unresolvedKnowledgeComponentIds.join(,)}`;
+    return {
+      accepted:false,
+      runId,
+      files:[],
+      reasons:[reason],
+      attemptCount:1,
+      responseHash:canonicalSha256(JSON.stringify({
+        runId,
+        reason,
+        unresolvedKnowledgeComponentIds
+      }))
+    };
+  }
 
   const knowledgeHints = codeKnowledge
     .map(item => [
