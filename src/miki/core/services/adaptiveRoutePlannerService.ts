@@ -2582,11 +2582,24 @@ class AdaptiveRoutePlannerService {
     if(!validationEntry) return undefined;
 
     const value=objectValue(validationEntry.entry)||{};
-    const validationIdentity=this.extractValidationIdentity(value);
+    const nestedResult =
+      value.result &&
+      typeof value.result==='object' &&
+      !Array.isArray(value.result)
+        ? value.result as Record<string,unknown>
+        : undefined;
+    const validationIdentity=this.extractValidationIdentity(
+      nestedResult ? {...value,...nestedResult} : value
+    );
     const reasons=[
       ...this.stringArray(value.reasons),
       ...this.stringArray(value.failedChecks),
-      ...this.stringArray(value.unexecutedChecks)
+      ...this.stringArray(value.unexecutedChecks),
+      ...(nestedResult ? [
+        ...this.stringArray(nestedResult.reasons),
+        ...this.stringArray(nestedResult.failedChecks),
+        ...this.stringArray(nestedResult.unexecutedChecks),
+      ] : [])
     ];
 
     const normalized=value.normalized;
@@ -2600,6 +2613,8 @@ class AdaptiveRoutePlannerService {
     const error=String(
       value.error||
       value.summary||
+      nestedResult?.error||
+      nestedResult?.summary||
       (validationEntry.entry.kind==='ERROR' ? validationEntry.entry.key : '')
     ).trim();
 
@@ -2611,6 +2626,7 @@ class AdaptiveRoutePlannerService {
       sourceOperation:'VALIDATE_CANDIDATE',
       status:String(
         validationIdentity.validationStatus||
+        nestedResult?.validationStatus||
         value.status||
         'FAILED'
       ).toUpperCase(),
@@ -2621,6 +2637,7 @@ class AdaptiveRoutePlannerService {
       reasons:uniqueReasons,
       result:{
         ...validationIdentity,
+        ...(nestedResult||{}),
         error:error||undefined
       }
     };
