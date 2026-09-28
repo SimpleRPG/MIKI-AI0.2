@@ -356,10 +356,10 @@ class AdaptiveRoutePlannerService {
       && understanding.ready && requiredEvidenceSatisfied && unresolvedKnowledge.length===0 && unresolvedCapability.length===0;
     const validationReady=Boolean(candidateResult && this.hasCandidateIdentity(candidateResult));
     const reviewPackageReady=Boolean(
-      latestCandidate &&
+      candidateResult &&
       validationResult &&
       this.hasValidationIdentity(validationResult) &&
-      this.validationMatchesCandidate(latestCandidate,validationResult)
+      this.validationMatchesCandidate(candidateResult,validationResult)
     );
 
     const blockingReasons:string[]=[];
