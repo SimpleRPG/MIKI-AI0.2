@@ -361,6 +361,11 @@ class AdaptiveRoutePlannerService {
       this.hasValidationIdentity(validationResult) &&
       this.validationMatchesCandidate(candidateResult,validationResult)
     );
+    const currentReviewPackageReady=Boolean(
+      candidateResult &&
+      packageResult &&
+      this.packageMatchesCandidate(candidateResult,packageResult)
+    );
 
     const blockingReasons:string[]=[];
     if(requirementContract?.status==='BLOCKED')blockingReasons.push(...requirementContract.unresolved.map(reason=>`REQUIREMENT_CONTRACT:${reason}`));
@@ -381,7 +386,7 @@ class AdaptiveRoutePlannerService {
     else if(unresolvedCapability.length) recommendedOperations.push('RESOLVE_CAPABILITY_GAPS','ASSESS_DOMAIN');
     else if(!candidateResult) recommendedOperations.push('GENERATE_CANDIDATE');
     else if(!validationResult) recommendedOperations.push('VALIDATE_CANDIDATE');
-    else if(!packageResult) recommendedOperations.push('CREATE_REVIEW_PACKAGE');
+    else if(!currentReviewPackageReady) recommendedOperations.push('CREATE_REVIEW_PACKAGE');
 
     return {
       issueEstablished,repositoryContextAvailable,targetFilesKnown,requiredEvidenceSatisfied,
@@ -1400,7 +1405,7 @@ class AdaptiveRoutePlannerService {
       latestCandidate &&
       latestValidation &&
       this.validationMatchesCandidate(latestCandidate,latestValidation) &&
-      !latestPackage &&
+      (!latestPackage || !this.packageMatchesCandidate(latestCandidate,latestPackage)) &&
       readiness.reviewPackageReady
     ) {
       const candidate=this.extractCandidateIdentity(latestCandidate!);
@@ -1420,7 +1425,10 @@ class AdaptiveRoutePlannerService {
           adaptive:true,priority:60
         }
       });
-    } else if(latestPackage) {
+    } else if(
+      latestPackage &&
+      this.packageMatchesCandidate(latestCandidate,latestPackage)
+    ) {
       // External feedback is a separate UI ingress/Task. Do not manufacture a
       // fixed post-package route here.
       return [];
@@ -2548,6 +2556,47 @@ class AdaptiveRoutePlannerService {
     const identity=this.extractValidationIdentity(value);
     return identity.validationStatus==='PASSED' && identity.reviewEligibility===true
       && Boolean(identity.validationBundleId);
+  }
+
+  private packageMatchesCandidate(
+    candidateEntry:BlackboardEntry,
+    packageEntry:BlackboardEntry
+  ):boolean {
+    const candidate=this.extractCandidateIdentity(candidateEntry);
+    const value=objectValue(packageEntry);
+    if(!value) return false;
+
+    const artifact=value.artifact && typeof value.artifact==='object' && !Array.isArray(value.artifact)
+      ? value.artifact as Record<string,unknown>
+      : undefined;
+
+    const candidateId=String(candidate.candidateId||'').trim();
+    const packageCandidateId=String(
+      value.candidateId ??
+      artifact?.candidateId ??
+      ''
+    ).trim();
+
+    const candidateHash=String(candidate.candidateManifestSha256||'').trim();
+    const packageHash=String(
+      value.candidateManifestSha256 ??
+      artifact?.candidateManifestSha256 ??
+      ''
+    ).trim();
+
+    if(!candidateId || !packageCandidateId || candidateId!==packageCandidateId)return false;
+    if(!candidateHash || !packageHash || candidateHash!==packageHash)return false;
+
+    const candidateWorkspace=String(candidate.workspaceId||'').trim();
+    const packageWorkspace=String(
+      value.workspaceId ??
+      artifact?.workspaceId ??
+      ''
+    ).trim();
+
+    if(candidateWorkspace && packageWorkspace && candidateWorkspace!==packageWorkspace)return false;
+
+    return true;
   }
 
   private validationMatchesCandidate(
