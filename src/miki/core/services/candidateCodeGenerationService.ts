@@ -62,6 +62,24 @@ class CandidateCodeGenerationService {
   if(targetFiles.length!==targetPaths.length)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
   const implementationPlan=run.implementationPlan;
   if(run.runType==='AUTONOMOUS_DISCOVERY'&&!implementationPlan)return {accepted:false,runId,files:[],reasons:['AUTONOMOUS_IMPLEMENTATION_PLAN_REQUIRED']};
+  const failureFeedback =
+    run.payload.failureFeedback &&
+    typeof run.payload.failureFeedback === 'object'
+      ? run.payload.failureFeedback as Record<string,unknown>
+      : undefined;
+
+  const failureFeedbackReasons = failureFeedback
+    ? [
+        ...this.strings(failureFeedback.reasons),
+        ...(
+          failureFeedback.result &&
+          typeof failureFeedback.result === 'object'
+            ? this.strings((failureFeedback.result as Record<string,unknown>).failedChecks)
+            : []
+        ),
+      ]
+    : [];
+
   const astTransformations=this.parseAstTransformations(run.payload.astTransformations,targetPaths);
   const integratedPlan=integratedGenerationPlanService.plan({
     objective:run.objective,targetPaths,astTransformations,
@@ -69,7 +87,10 @@ class CandidateCodeGenerationService {
     codeKnowledgeIds:this.strings(run.payload.codeKnowledgeIds),
     requirementContractId:typeof run.payload.requirementContractId==='string'?run.payload.requirementContractId:undefined,
     repositorySnapshotSha256:runSourceSnapshotSha256,
-    priorFailureReasons:this.strings(run.payload.generationFailureReasons)
+    priorFailureReasons:[
+      ...this.strings(run.payload.generationFailureReasons),
+      ...failureFeedbackReasons,
+    ]
   });
   if(integratedPlan.unresolved.length>0)return {accepted:false,runId,files:[],reasons:integratedPlan.unresolved};
   const astFallbackReasons:string[]=[];
@@ -83,7 +104,7 @@ class CandidateCodeGenerationService {
       if(!outcome.accepted||!outcome.candidateContent){astFallbackReasons.push(...outcome.reasons.map(reason=>`${target.path}:${reason}`));continue;}
       generated.push({path:target.path,candidateContent:outcome.candidateContent,evidenceIds:[...target.evidenceIds]});
     }
-    if(astFallbackReasons.length===0&&generated.length>0){
+    if(astFallbackReasons.length===0&&generated.length>0&&!failureFeedback){
       const prepared=await autonomousCandidatePreparationService.prepareForRun(runId,generated);
       if(prepared.workspaceId){
         return {
@@ -98,12 +119,6 @@ class CandidateCodeGenerationService {
     }
     if(generated.length===0&&astFallbackReasons.length===0)astFallbackReasons.push('AST_TRANSFORMATION_TARGETS_NOT_RESOLVED');
   }
-  const failureFeedback =
-    run.payload.failureFeedback &&
-    typeof run.payload.failureFeedback === 'object'
-      ? run.payload.failureFeedback as Record<string,unknown>
-      : undefined;
-
   const failureFeedbackText = failureFeedback
     ? [
         'Previous Candidate verification failure must be corrected in this revision.',
