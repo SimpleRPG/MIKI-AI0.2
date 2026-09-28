@@ -1348,7 +1348,14 @@ class AdaptiveRoutePlannerService {
           adaptive:true,priority:80
         }
       });
-    } else if(latestCandidate && this.lastOperationFailed(task,'VALIDATE_CANDIDATE')) {
+    } else if(
+      latestCandidate &&
+      this.lastOperationFailedAfter(
+        task,
+        'VALIDATE_CANDIDATE',
+        task.entries.lastIndexOf(latestCandidate)
+      )
+    ) {
       const candidate=this.extractCandidateIdentity(latestCandidate!);
       routes.push({
         target:'selfDevelopment',command:'GENERATE_CANDIDATE',
@@ -2705,6 +2712,28 @@ class AdaptiveRoutePlannerService {
   private lastOperationFailed(task:BlackboardTask,operation:string):boolean {
     return Boolean(this.latestOperationError(task,operation))
       && ![...successfulBusinessEntries(task)].some(entry=>objectValue(entry)?.operation===operation);
+  }
+
+  private lastOperationFailedAfter(
+    task:BlackboardTask,
+    operation:string,
+    afterIndex:number
+  ):boolean {
+    for(let index=task.entries.length-1;index>afterIndex;index-=1){
+      const entry=task.entries[index];
+      const value=objectValue(entry);
+      if(String(value?.operation||'')!==operation)continue;
+
+      if(entry.kind==='RESULT'){
+        return false;
+      }
+
+      if(entry.kind==='ERROR'){
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private successfulOperationInstanceFor(task:BlackboardTask,operation:string):string {
