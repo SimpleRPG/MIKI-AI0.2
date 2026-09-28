@@ -651,6 +651,23 @@ class DomainIntegrationBootstrapService{
    const {selfCodeSpaceService}=await import('./selfCodeSpaceService');
    const pkg=reviewZipExportService.list().find(item=>item.packageId===packageId);
    if(!pkg)return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_FOUND',completedAt:Date.now()};
+
+   // ACCEPTED は「承認された」だけではなく、
+   // Self Code SpaceへのCandidate適用・Transaction・整合性確認まで完了した状態。
+   // 同じReview Packageを再送しても再適用せず、Promotionを冪等に扱う。
+   if(pkg.status==='ACCEPTED'){
+    return done({
+      operation:'APPROVE_REVIEWED_CANDIDATE',
+      operationClass:'BUSINESS',
+      status:'ALREADY_APPLIED',
+      packageId,
+      candidateManifestSha256:pkg.candidateManifestSha256,
+      workspaceId:pkg.workspaceId,
+      idempotent:true,
+      evidenceIds:[]
+    });
+   }
+
    const {externalReviewIntakeService}=await import('./externalReviewIntakeService');
    const externalReviewId=String(envelope.payload.externalReviewId||'');
    const externalReview=externalReviewId
