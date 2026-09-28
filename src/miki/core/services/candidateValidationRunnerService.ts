@@ -38,7 +38,7 @@ class CandidateValidationRunnerService {
     .map((item:TypeScriptDiagnosticInput)=>deterministicDiagnosticRepairService.plan(item));
   const stages=Array.isArray(body.stages)?body.stages:[];
   for(const row of stages)candidateValidationEvidenceService.record({workspaceId,candidateSha256,stage:row.stage as ValidationStage,passed:Boolean(row.passed),command:String(row.command||''),exitCode:Number(row.exitCode??1),startedAt:Number(row.startedAt||Date.now()),completedAt:Number(row.completedAt||Date.now()),logRef:String(row.logRef||'')});
-  if(body.shadow?.baseline&&body.shadow?.candidate)shadowEvaluationService.compare(workspaceId,body.shadow.baseline,body.shadow.candidate);
+  if(body.shadow?.baseline&&body.shadow?.candidate)shadowEvaluationService.compare(workspaceId,body.shadow.baseline,body.shadow.candidate,candidateSha256);
   const evaluation=candidateValidationEvidenceService.evaluate(workspaceId,candidateSha256);
   const reasons=[...evaluation.missing.map(value=>`MISSING_${value}`),...evaluation.failed.map(value=>`FAILED_${value}`),...(Array.isArray(body.reasons)?body.reasons:[])];
   const passed=evaluation.passed&&Boolean(body.shadow?.passed);
