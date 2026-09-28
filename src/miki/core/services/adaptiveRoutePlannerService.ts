@@ -355,7 +355,12 @@ class AdaptiveRoutePlannerService {
       && requirementContract?.status==='READY'
       && understanding.ready && requiredEvidenceSatisfied && unresolvedKnowledge.length===0 && unresolvedCapability.length===0;
     const validationReady=Boolean(candidateResult && this.hasCandidateIdentity(candidateResult));
-    const reviewPackageReady=Boolean(validationResult && this.hasValidationIdentity(validationResult));
+    const reviewPackageReady=Boolean(
+      latestCandidate &&
+      validationResult &&
+      this.hasValidationIdentity(validationResult) &&
+      this.validationMatchesCandidate(latestCandidate,validationResult)
+    );
 
     const blockingReasons:string[]=[];
     if(requirementContract?.status==='BLOCKED')blockingReasons.push(...requirementContract.unresolved.map(reason=>`REQUIREMENT_CONTRACT:${reason}`));
@@ -1371,7 +1376,14 @@ class AdaptiveRoutePlannerService {
           failureFeedback:this.buildValidationFailureFeedback(task,candidate),
           adaptive:true,priority:75}
       });
-    } else if(latestCandidate && !latestValidation && readiness.validationReady) {
+    } else if(
+      latestCandidate &&
+      (
+        !latestValidation ||
+        !this.validationMatchesCandidate(latestCandidate,latestValidation)
+      ) &&
+      readiness.validationReady
+    ) {
       const candidate=this.extractCandidateIdentity(latestCandidate!);
       const candidateOperationInstanceId=this.operationInstanceFor(task,'GENERATE_CANDIDATE');
       routes.push({
@@ -1384,7 +1396,13 @@ class AdaptiveRoutePlannerService {
           adaptive:true,priority:70
         }
       });
-    } else if(latestValidation && !latestPackage && readiness.reviewPackageReady) {
+    } else if(
+      latestCandidate &&
+      latestValidation &&
+      this.validationMatchesCandidate(latestCandidate,latestValidation) &&
+      !latestPackage &&
+      readiness.reviewPackageReady
+    ) {
       const candidate=this.extractCandidateIdentity(latestCandidate!);
       const validation=this.extractValidationIdentity(latestValidation);
       const validationOperationInstanceId=this.operationInstanceFor(task,'VALIDATE_CANDIDATE');
@@ -2532,6 +2550,35 @@ class AdaptiveRoutePlannerService {
       && Boolean(identity.validationBundleId);
   }
 
+  private validationMatchesCandidate(
+    candidateEntry:BlackboardEntry,
+    validationEntry:BlackboardEntry
+  ):boolean {
+    const candidate=this.extractCandidateIdentity(candidateEntry);
+    const validation=this.extractValidationIdentity(validationEntry);
+
+    const candidateId=String(candidate.candidateId||'').trim();
+    const validationCandidateId=String(validation.candidateId||'').trim();
+    if(candidateId && validationCandidateId && candidateId!==validationCandidateId)return false;
+
+    const candidateHash=String(candidate.candidateManifestSha256||'').trim();
+    const validationHash=String(validation.candidateManifestSha256||'').trim();
+    if(candidateHash && validationHash && candidateHash!==validationHash)return false;
+
+    const candidateWorkspace=String(candidate.workspaceId||'').trim();
+    const validationWorkspace=String(validation.workspaceId||'').trim();
+    if(candidateWorkspace && validationWorkspace && candidateWorkspace!==validationWorkspace)return false;
+
+    return Boolean(
+      candidateId &&
+      validationCandidateId &&
+      candidateId===validationCandidateId &&
+      candidateHash &&
+      validationHash &&
+      candidateHash===validationHash
+    );
+  }
+
   private extractCandidateIdentity(entry:BlackboardEntry|Record<string,unknown>):Record<string,unknown> {
     const value=entry instanceof Object && 'value' in entry ? objectValue(entry as BlackboardEntry)||{} : entry as Record<string,unknown>;
     return {
@@ -2553,6 +2600,9 @@ class AdaptiveRoutePlannerService {
     return {
       validationBundleId:value.validationBundleId,
       validationStatus:value.validationStatus,
+      candidateId:value.candidateId,
+      candidateManifestSha256:value.candidateManifestSha256||value.candidateHash,
+      workspaceId:value.workspaceId,
       passedChecks:this.stringArray(value.passedChecks),
       failedChecks:this.stringArray(value.failedChecks),
       unexecutedChecks:this.stringArray(value.unexecutedChecks),
