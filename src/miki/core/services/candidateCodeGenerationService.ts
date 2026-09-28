@@ -179,7 +179,7 @@ class CandidateCodeGenerationService {
     );
 
   if(unresolvedKnowledgeComponentIds.length>0){
-    const reason=`CODE_COMPOSITION_COMPONENT_UNRESOLVED:${unresolvedKnowledgeComponentIds.join(,)}`;
+    const reason=`CODE_COMPOSITION_COMPONENT_UNRESOLVED:${unresolvedKnowledgeComponentIds.join(',')}`;
     return {
       accepted:false,
       runId,
