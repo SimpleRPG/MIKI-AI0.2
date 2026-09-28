@@ -40,8 +40,11 @@ class CandidateValidationRunnerService {
   for(const row of stages)candidateValidationEvidenceService.record({workspaceId,candidateSha256,stage:row.stage as ValidationStage,passed:Boolean(row.passed),command:String(row.command||''),exitCode:Number(row.exitCode??1),startedAt:Number(row.startedAt||Date.now()),completedAt:Number(row.completedAt||Date.now()),logRef:String(row.logRef||'')});
   if(body.shadow?.baseline&&body.shadow?.candidate)shadowEvaluationService.compare(workspaceId,body.shadow.baseline,body.shadow.candidate,candidateSha256);
   const evaluation=candidateValidationEvidenceService.evaluate(workspaceId,candidateSha256);
+  const shadowEvaluation=shadowEvaluationService.latest(workspaceId,candidateSha256);
   const reasons=[...evaluation.missing.map(value=>`MISSING_${value}`),...evaluation.failed.map(value=>`FAILED_${value}`),...(Array.isArray(body.reasons)?body.reasons:[])];
-  const passed=evaluation.passed&&Boolean(body.shadow?.passed);
+  if(!shadowEvaluation)reasons.push('SHADOW_EVALUATION_MISSING');
+  else if(!shadowEvaluation.passed)reasons.push(...(shadowEvaluation.reasons.length?shadowEvaluation.reasons:['SHADOW_NOT_PASSED']));
+  const passed=evaluation.passed&&Boolean(shadowEvaluation?.passed);
   if(!passed){
     const failed=this.rollbackFailure(workspaceId,workspace.writeGuardId,reasons.length>0?reasons:['VALIDATION_FAILED']);
     return {...failed,repairPlans,testIntents,retryRecommended:repairPlans.some(plan=>plan.accepted)};
