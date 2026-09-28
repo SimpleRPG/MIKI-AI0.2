@@ -651,6 +651,8 @@ class DomainIntegrationBootstrapService{
    const {selfCodeSpaceService}=await import('./selfCodeSpaceService');
    const pkg=reviewZipExportService.list().find(item=>item.packageId===packageId);
    if(!pkg)return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_FOUND',completedAt:Date.now()};
+   // Package identity must be checked before any idempotent ACCEPTED fast path.
+   if(pkg.candidateManifestSha256!==manifestSha)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_MANIFEST_SHA_MISMATCH',completedAt:Date.now()};
 
    // ACCEPTED は「承認された」だけではなく、
    // Self Code SpaceへのCandidate適用・Transaction・整合性確認まで完了した状態。
@@ -684,7 +686,6 @@ class DomainIntegrationBootstrapService{
        d.status!=='BLOCKED');
    if(pkg.status!=='ACCEPTED' && !(pkg.status==='EXTERNAL_REVIEW_PENDING' && userAccepted))
     return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_ACCEPTED',completedAt:Date.now()};
-   if(pkg.candidateManifestSha256!==manifestSha)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_MANIFEST_SHA_MISMATCH',completedAt:Date.now()};
    const workspace=isolatedCandidateWorkspaceService.get(pkg.workspaceId);
    if(!workspace)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_WORKSPACE_NOT_FOUND',completedAt:Date.now()};
    if(workspace.candidateRevisionSha256!==pkg.candidateManifestSha256)return {accepted:false,domain,command:envelope.command,error:'CURRENT_WORKSPACE_REVISION_MISMATCH',completedAt:Date.now()};
