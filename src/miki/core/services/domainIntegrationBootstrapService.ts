@@ -670,6 +670,7 @@ class DomainIntegrationBootstrapService{
    if(pkg.candidateManifestSha256!==manifestSha)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_MANIFEST_SHA_MISMATCH',completedAt:Date.now()};
    const workspace=isolatedCandidateWorkspaceService.get(pkg.workspaceId);
    if(!workspace)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_WORKSPACE_NOT_FOUND',completedAt:Date.now()};
+   if(workspace.candidateRevisionSha256!==pkg.candidateManifestSha256)return {accepted:false,domain,command:envelope.command,error:'CURRENT_WORKSPACE_REVISION_MISMATCH',completedAt:Date.now()};
    const receipt=pkg.persistenceReceiptId;
    const taskId=String(envelope.payload.taskId||'').trim();
    const operationInstanceId=String(envelope.payload.operationInstanceId||pkg.operationInstanceId||'');
