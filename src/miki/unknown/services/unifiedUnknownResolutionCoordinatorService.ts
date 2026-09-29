@@ -20,6 +20,8 @@ export interface UnifiedUnknownRequest {
 }
 
 export interface UnifiedUnknownResult {
+  researchQuestion?: string;
+  unresolvedRequirements?: string[];
   effectiveText: string;
   resolution: ReturnType<typeof unknownResolutionService.open>;
   status: 'REUSED_SUPPORTED' | 'LOCAL_EVIDENCE' | 'RESEARCHED_UNVERIFIED' | 'NO_EVIDENCE' | 'RESEARCH_REQUIRED' | 'SEARCH_FAILED' | 'USER_STOPPED';

@@ -1,11 +1,14 @@
 import { storageService } from '../../../services/storageService';
 import { canonicalSha256 } from './canonicalSha256Service';
 import { coreTaskIngressService } from './coreTaskIngressService';
+import type { CoreOrchestrationResult } from './coreOrchestratorService';
+import { lifecycleTransitionPolicyService } from './lifecycleTransitionPolicyService';
 import { reviewZipExportService, type ReviewPackageStatus } from './reviewZipExportService';
 import { reviewDecisionLearningService } from './reviewDecisionLearningService';
 import { reviewLearningArtifactService } from './reviewLearningArtifactService';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
+import { externalDirectiveIntakeService, type ExternalDirectiveStatus } from './externalDirectiveIntakeService';
 import { EvidenceService } from '../../memory/services/evidenceService';
 
 export type ExternalAiRole = 'REVIEWER' | 'UNKNOWN_COMPONENT_AUTHOR' | 'TEACHER';
@@ -161,44 +164,60 @@ class ExternalReviewIntakeService {
     const record = this.records.get(input.externalReviewId);
     if (!record) throw new Error('EXTERNAL_REVIEW_NOT_FOUND');
     if (record.status === 'MISMATCH') throw new Error('PACKAGE_REVIEW_MISMATCH');
-    if (!input.reason.trim() && input.decision === 'REJECT') throw new Error('REJECTION_REASON_REQUIRED');
+    const normalizedReason=input.reason.trim();
+    const existingDecisions=this.listDecisions(record.externalReviewId).filter(item=>item.packageId===record.packageId&&item.packageRevision===record.packageRevision&&item.status!=='BLOCKED');
+    const identicalDecision=existingDecisions.find(item=>item.decision===input.decision&&item.reason===normalizedReason);
+    if(identicalDecision)return {...identicalDecision};
+    if(existingDecisions.length>0)throw new Error('REVIEW_DECISION_ALREADY_FINALIZED');
+    if (!normalizedReason && input.decision === 'REJECT') throw new Error('REJECTION_REASON_REQUIRED');
+    if (!normalizedReason && (input.decision === 'REQUEST_CHANGES' || input.decision === 'PARTIAL_ACCEPT' || input.decision === 'PARTIAL_REJECT')) throw new Error('CHANGE_SCOPE_OR_REASON_REQUIRED');
+    if((input.decision === 'PARTIAL_ACCEPT' || input.decision === 'PARTIAL_REJECT')&&!reviewZipExportService.list().some(item=>item.packageId===record.packageId&&item.inputs.files.some(file=>normalizedReason.includes(file.path))))throw new Error('PARTIAL_DECISION_TARGET_FILE_REQUIRED');
     const reviewPackage = reviewZipExportService.list().find(item => item.packageId === record.packageId);
     if (!reviewPackage || reviewPackage.packageRevision !== record.packageRevision || reviewPackage.candidateManifestSha256 !== record.candidateManifestSha256) {
       throw new Error('PACKAGE_REVISION_OR_MANIFEST_MISMATCH');
     }
+    if(!lifecycleTransitionPolicyService.isDecisionEligiblePackageStatus(reviewPackage.status))throw new Error(`REVIEW_PACKAGE_NOT_DECISION_ELIGIBLE:${reviewPackage.status}`);
 
     const decisionId = `ERD-${crypto.randomUUID()}`;
     let decision: ExternalReviewDecision = {
       decisionId, externalReviewId: record.externalReviewId,
       externalAiRole: record.externalAiRole, packageId: record.packageId,
       packageRevision: record.packageRevision, decision: input.decision,
-      reason: input.reason.trim(), decidedAt: Date.now(),
+      reason: normalizedReason, decidedAt: Date.now(),
       coreTaskId: 'PENDING', coreDecisionId: 'PENDING', status: 'PENDING_CORE'
     };
     this.decisions.set(decisionId, decision);
     this.persistDecisions();
 
-    const coreResult = await coreTaskIngressService.submit({
-      kind: 'USER_REQUEST',
-      goal: '外部AI評価を参考資料として使用し、利用者の候補採否Decisionを処理する',
-      source: 'conversation',
-      payload: {
-        operation: 'DECIDE_CANDIDATE_ADOPTION',
-        externalReviewId: record.externalReviewId,
-        packageId: record.packageId,
-        packageRevision: record.packageRevision,
-        candidateManifestSha256: record.candidateManifestSha256,
-        rawResponseSha256: record.rawResponseSha256,
-        externalVerdict: record.externalVerdict,
-        userDecision: input.decision,
-        reason: input.reason.trim(),
-        workspaceId: reviewPackage.workspaceId,
-        transactionId: reviewPackage.transactionId,
-        persistenceReceiptId: reviewPackage.persistenceReceiptId,
-        operationInstanceId: reviewPackage.operationInstanceId,
-      },
-      maxCycles: 18,
-    });
+    let coreResult:CoreOrchestrationResult;
+    try{
+      coreResult=await coreTaskIngressService.submit({
+        kind:'USER_REQUEST',
+        goal:'外部AI評価を参考資料として使用し、利用者の候補採否Decisionを処理する',
+        source:'conversation',
+        payload:{
+          operation:'DECIDE_CANDIDATE_ADOPTION',
+          externalReviewId:record.externalReviewId,
+          packageId:record.packageId,
+          packageRevision:record.packageRevision,
+          candidateManifestSha256:record.candidateManifestSha256,
+          rawResponseSha256:record.rawResponseSha256,
+          externalVerdict:record.externalVerdict,
+          userDecision:input.decision,
+          reason:normalizedReason,
+          workspaceId:reviewPackage.workspaceId,
+          transactionId:reviewPackage.transactionId,
+          persistenceReceiptId:reviewPackage.persistenceReceiptId,
+          operationInstanceId:reviewPackage.operationInstanceId,
+        },
+        maxCycles:18,
+      });
+    }catch(error){
+      decision={...decision,status:'BLOCKED',coreTaskId:'FAILED_BEFORE_TASK',coreDecisionId:'FAILED_BEFORE_CORE_DECISION'};
+      this.decisions.set(decisionId,decision);
+      this.persistDecisions();
+      throw error;
+    }
 
     decision = {
       ...decision,
@@ -208,6 +227,42 @@ class ExternalReviewIntakeService {
     };
     this.decisions.set(decisionId, decision);
     if (coreResult.task.status === 'COMPLETED') {
+      const originatingRun=improvementIntakeRouterService.get(reviewPackage.runId);
+      const originatingDirective=originatingRun?.runType==='EXTERNAL_DIRECTIVE'
+        ? externalDirectiveIntakeService.get(originatingRun.sourceId)
+        : undefined;
+      const directiveStatus:ExternalDirectiveStatus=input.decision==='ACCEPT'
+        ? 'ADOPTION_PENDING'
+        : input.decision==='REJECT'
+          ? 'REJECTED'
+          : input.decision==='REQUEST_CHANGES'
+            ? 'CHANGES_REQUESTED'
+            : input.decision==='HOLD'
+              ? 'HOLD'
+              : input.decision==='PARTIAL_ACCEPT'
+                ? 'PARTIALLY_ACCEPTED'
+                : 'PARTIALLY_REJECTED';
+      if(originatingDirective){externalDirectiveIntakeService.updateStatus(originatingDirective.directiveId,directiveStatus,originatingDirective.runId);externalDirectiveIntakeService.updateMetadata(originatingDirective.directiveId,{activePackageId:reviewPackage.packageId,activePackageRevision:reviewPackage.packageRevision,activeExternalReviewId:record.externalReviewId,adoptionTaskId:input.decision==='ACCEPT'?decision.coreTaskId:undefined});}
+      if(input.decision==='REQUEST_CHANGES'&&originatingRun){
+        const revisionResult=await coreTaskIngressService.submit({
+          kind:'SELF_IMPROVEMENT',
+          goal:`${originatingRun.objective}
+外部評価の修正要求を反映する`,
+          source:'core',
+          payload:{
+            ...originatingRun.payload,
+            operation:'REVISE_REVIEWED_CANDIDATE',
+            parentRunId:originatingRun.runId,
+            sourcePackageId:reviewPackage.packageId,
+            externalReviewId:record.externalReviewId,
+            requestedChanges:[...record.requestedChanges],
+            reviewReason:normalizedReason,
+            candidateRevision:reviewPackage.candidateRevision+1,
+          },
+          maxCycles:18,
+        });
+        if(originatingDirective)externalDirectiveIntakeService.updateMetadata(originatingDirective.directiveId,{revisionTaskId:revisionResult.task.taskId});
+      }
       // ACCEPTEDは、promotion側でCandidate適用・Transaction・Manifest/Revision整合性を
       // すべて確認した後にだけ確定する。ここでは二重に状態を書き換えない。
       if(input.decision !== 'ACCEPT'){
@@ -222,7 +277,7 @@ class ExternalReviewIntakeService {
       const learningProjection = reviewDecisionLearningService.project({
         record,
         decision: input.decision,
-        reason: input.reason.trim(),
+        reason: normalizedReason,
         coreTaskId: decision.coreTaskId,
         coreDecisionId: decision.coreDecisionId,
         userDecisionId: decision.decisionId,
@@ -277,8 +332,8 @@ class ExternalReviewIntakeService {
             externalReviewId: record.externalReviewId,
             issueId: reviewPackage.inputs.issueId,
             targetFiles: reviewPackage.inputs.files.map(file=>file.path),
-            requestedChanges: [...new Set([...record.requestedChanges,input.reason.trim()].filter(Boolean))],
-            userReason: input.reason.trim(),
+            requestedChanges: [...new Set([...record.requestedChanges,normalizedReason].filter(Boolean))],
+            userReason: normalizedReason,
           },
         });
       }
@@ -367,8 +422,24 @@ class ExternalReviewIntakeService {
     try {
       const records = storageService.getJson<ExternalReviewRecord[]>(RECORDS_KEY, []);
       if (Array.isArray(records)) for (const record of records) if (record?.externalReviewId) this.records.set(record.externalReviewId, record);
-      const decisions = storageService.getJson<ExternalReviewDecision[]>(DECISIONS_KEY, []);
-      if (Array.isArray(decisions)) for (const decision of decisions) if (decision?.decisionId) this.decisions.set(decision.decisionId, decision);
+      const decisions=storageService.getJson<ExternalReviewDecision[]>(DECISIONS_KEY,[]);
+      let recoveredPending=false;
+      if(Array.isArray(decisions)){
+        const now=Date.now();
+        for(const stored of decisions){
+          if(!stored?.decisionId)continue;
+          const decision={...stored};
+          const pendingAge=now-Number(decision.decidedAt||0);
+          if(decision.status==='PENDING_CORE'&&pendingAge>15*60*1000){
+            decision.status='BLOCKED';
+            decision.coreTaskId=decision.coreTaskId==='PENDING'?'STALE_PENDING_RECOVERED':decision.coreTaskId;
+            decision.coreDecisionId=decision.coreDecisionId==='PENDING'?'STALE_PENDING_RECOVERED':decision.coreDecisionId;
+            recoveredPending=true;
+          }
+          this.decisions.set(decision.decisionId,decision);
+        }
+      }
+      if(recoveredPending)this.persistDecisions();
     } catch {
       this.records.clear();
       this.decisions.clear();

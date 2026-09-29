@@ -30,7 +30,6 @@ export * from './execution/services/storagePlanningService';
 export * from './execution/services/taskExecutionOrchestratorService';
 export * from './execution/services/taskLineageService';
 export * from './execution/services/universalIoService';
-export * from './execution/services/workDirectiveIngestionService';
 export * from './execution/services/workManagerService';
 export * from './execution/services/workflowSynthesisService';
 export * from './execution/services/selfImprovementExecutionCoordinatorService';

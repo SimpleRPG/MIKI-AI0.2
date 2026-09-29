@@ -2,7 +2,6 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { KnowledgeGap } from '../../unknown/services/knowledgeGapService';
-import { MikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 
 export interface VerifiedKnowledgePromotion {
   promotionId: string;
@@ -91,7 +90,7 @@ export class VerifiedKnowledgePromotionService {
   }
 
   /** LearningContinuumへ「検証済み知識が存在する」というメタ経験だけを記録する。 */
-  public recordIntoContinuum(promotion: VerifiedKnowledgePromotion, continuum: MikiUnifiedLearningContinuumService): void {
+  public recordIntoContinuum(promotion: VerifiedKnowledgePromotion, continuum: { observe(input:{domain:'research';key:string;outcome:'SUCCESS';verified:true;capabilityIds:string[];concepts:string[]}):unknown }): void {
     continuum.observe({
       domain: 'research',
       key: promotion.claimId,

@@ -4,24 +4,6 @@
 
 export type ChangeSetID = string;
 
-export interface StructuredDirective {
-  directiveId: string;
-  title: string;
-  rawText: string;
-  goal: string;
-  targets: string[];
-  requirements: string[];
-  forbiddenBehaviors: string[];
-  forbiddenItems?: string[];
-  completionCriteria: string[];
-  acceptanceCriteria?: string[];
-  parsedAt: number;
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED';
-  executionChangeSetId?: string;
-  resultSummary?: string;
-}
-
 export interface RequirementContract {
   contractId: string;
   requirementId: string;

@@ -2,7 +2,7 @@ import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 import { selfCodeUnderstandingService } from '../../core/services/selfCodeUnderstandingService';
 
 export type FeatureTaskKind='MODEL'|'SERVICE'|'CORE_ROUTE'|'UI'|'PERSISTENCE'|'VALIDATION'|'TEST'|'EXPORT';
-export interface FeatureAcceptanceCriterion { criterionId:string; statement:string; evidenceKind:'STATIC'|'TYPECHECK'|'REGRESSION'|'UI'|'PERSISTENCE'|'EXPORT'; required:boolean; }
+export interface FeatureAcceptanceCriterion { description?:string; criterionId:string; statement:string; evidenceKind:'STATIC'|'TYPECHECK'|'REGRESSION'|'UI'|'PERSISTENCE'|'EXPORT'; required:boolean; }
 export interface FeatureImplementationTask { taskId:string; kind:FeatureTaskKind; objective:string; targetPaths:string[]; dependencies:string[]; reuseRequired:boolean; }
 export interface FeatureDevelopmentPlan { schemaVersion:1; planId:string; objective:string; useCases:string[]; acceptanceCriteria:FeatureAcceptanceCriterion[]; tasks:FeatureImplementationTask[]; repositorySnapshotSha256?:string; unresolved:string[]; }
 

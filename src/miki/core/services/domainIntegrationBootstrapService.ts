@@ -688,7 +688,7 @@ class DomainIntegrationBootstrapService{
        d.packageId===pkg.packageId &&
        d.packageRevision===pkg.packageRevision &&
        d.status!=='BLOCKED');
-   if(pkg.status!=='ACCEPTED' && !(pkg.status==='EXTERNAL_REVIEW_PENDING' && userAccepted))
+   if(!(pkg.status==='EXTERNAL_REVIEW_PENDING' && userAccepted))
     return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_NOT_ACCEPTED',completedAt:Date.now()};
    const workspace=isolatedCandidateWorkspaceService.get(pkg.workspaceId);
    if(!workspace)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_WORKSPACE_NOT_FOUND',completedAt:Date.now()};
@@ -699,6 +699,13 @@ class DomainIntegrationBootstrapService{
    if(!taskId)return {accepted:false,domain,command:envelope.command,error:'TASK_ID_REQUIRED',completedAt:Date.now()};
    if(!receipt||receipt==='UNAVAILABLE')return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_REQUIRED',completedAt:Date.now()};
    if(!persistenceReceiptLedgerService.get(receipt))return {accepted:false,domain,command:envelope.command,error:'PERSISTENCE_RECEIPT_NOT_FOUND',completedAt:Date.now()};
+   const {improvementIntakeRouterService}=await import('./improvementIntakeRouterService');
+   const {externalDirectiveIntakeService}=await import('./externalDirectiveIntakeService');
+   const originatingRun=improvementIntakeRouterService.get(pkg.runId);
+   const originatingDirective=originatingRun?.runType==='EXTERNAL_DIRECTIVE'?externalDirectiveIntakeService.get(originatingRun.sourceId):undefined;
+   if(originatingDirective?.activePackageId&&originatingDirective.activePackageId!==pkg.packageId)return {accepted:false,domain,command:envelope.command,error:'DIRECTIVE_ACTIVE_PACKAGE_MISMATCH',completedAt:Date.now()};
+   if(originatingDirective?.activePackageRevision!==undefined&&originatingDirective.activePackageRevision!==pkg.packageRevision)return {accepted:false,domain,command:envelope.command,error:'DIRECTIVE_ACTIVE_REVISION_MISMATCH',completedAt:Date.now()};
+   if(originatingDirective&&originatingDirective.status!=='ADOPTION_PENDING')return {accepted:false,domain,command:envelope.command,error:'DIRECTIVE_NOT_ADOPTION_PENDING',completedAt:Date.now()};
    const beforeApply=selfCodeSpaceService.get();
    if(!beforeApply)return {accepted:false,domain,command:envelope.command,error:"SELF_CODE_SPACE_NOT_SYNCED",completedAt:Date.now()};
    const applied=selfCodeSpaceService.applyCandidate(workspace.files.map(file=>({path:file.path,baselineSha256:file.baselineSha256,candidateContent:file.candidateContent})));
@@ -708,7 +715,13 @@ class DomainIntegrationBootstrapService{
     if(result.transaction.candidateRevisionSha256!==pkg.candidateManifestSha256)throw new Error("CANDIDATE_REVISION_MANIFEST_MISMATCH");
     if(result.workspace.candidateRevisionSha256!==pkg.candidateManifestSha256)throw new Error("WORKSPACE_REVISION_MANIFEST_MISMATCH");
     reviewZipExportService.updateStatus(packageId,'ACCEPTED');
+    if(originatingDirective){
+      externalDirectiveIntakeService.updateStatus(originatingDirective.directiveId,'ACCEPTED',originatingRun?.runId);
+      externalDirectiveIntakeService.updateMetadata(originatingDirective.directiveId,{activePackageId:pkg.packageId,activePackageRevision:pkg.packageRevision,activeExternalReviewId:externalReviewId,adoptionTaskId:taskId,promotedAt:Date.now()});
+    }
    }catch(error){
+    try{reviewZipExportService.updateStatus(packageId,'EXTERNAL_REVIEW_PENDING','PROMOTION_COMPENSATION');}catch{}
+    if(originatingDirective){try{externalDirectiveIntakeService.updateStatus(originatingDirective.directiveId,'ADOPTION_PENDING',originatingRun?.runId,'PROMOTION_COMPENSATION');}catch{}}
     if(result?.transaction?.transactionId)candidateCommitTransactionService.rollback(result.transaction.transactionId,'PROMOTION_COMPENSATION');
     try{selfCodeSpaceService.restoreSnapshot(beforeApply,applied.repoSha256);}
     catch(recoveryError){return {accepted:false,domain,command:envelope.command,error:"SELF_CODE_SPACE_RECOVERY_REQUIRED",completedAt:Date.now()};}
@@ -739,7 +752,7 @@ if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
    };
    if(sourcePackageId){
     const lineage=envelope.payload.learningLineage;
-    const externalReviewId=lineage&&typeof lineage===object&&typeof (lineage as Record<string,unknown>).externalReviewId==='string'?String((lineage as Record<string,unknown>).externalReviewId):'';
+    const externalReviewId=lineage&&typeof lineage==='object'&&typeof (lineage as Record<string,unknown>).externalReviewId==='string'?String((lineage as Record<string,unknown>).externalReviewId):'';
     const source=reviewZipExportService.list().find(item=>item.packageId===sourcePackageId);
     const correctedCandidateRef=result.artifact?.candidateManifestSha256||"";
     if(externalReviewId&&source&&correctedCandidateRef)reviewLearningArtifactService.linkCorrectionCandidate({externalReviewId,beforeCandidateRef:source.candidateManifestSha256,correctedCandidateRef});

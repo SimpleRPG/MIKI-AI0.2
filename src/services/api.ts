@@ -454,6 +454,7 @@ export interface GitHubPushParams {
 export interface GitHubPushResult {
   success: boolean;
   commitSha: string;
+  commitUrl?: string;
   treeSha?: string;
   changedFilesMeta?: Array<{
     path: string;

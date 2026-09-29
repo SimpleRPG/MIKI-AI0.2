@@ -1,5 +1,5 @@
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
-export interface TestExecutionResult { executionId:string; command:string; passed:boolean; exitCode:number; stdout:string; stderr:string; startedAt:number; completedAt:number; }
+export interface TestExecutionResult { testId?:string; executionId:string; command:string; passed:boolean; exitCode:number; stdout:string; stderr:string; startedAt:number; completedAt:number; }
 export type SafeCommandExecutor=(command:string,timeoutMs:number)=>Promise<{exitCode:number;stdout:string;stderr:string}>;
 class AllowlistTestRunnerService {
  public async run(commands:string[],allowedScripts:Record<string,string>,executor:SafeCommandExecutor,timeoutMs=120000):Promise<TestExecutionResult[]>{const results:TestExecutionResult[]=[];for(const command of commands){if(!this.allowed(command,allowedScripts))throw new Error(`TEST_COMMAND_NOT_ALLOWLISTED:${command}`);const startedAt=Date.now();const output=await executor(command,Math.max(1000,Math.min(timeoutMs,300000)));const completedAt=Date.now();results.push({executionId:`TEST-${canonicalSha256({command,startedAt,output}).slice(0,24)}`,command,passed:output.exitCode===0,exitCode:output.exitCode,stdout:output.stdout.slice(-20000),stderr:output.stderr.slice(-20000),startedAt,completedAt});}return results;}

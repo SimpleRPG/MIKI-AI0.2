@@ -39,7 +39,7 @@ class ImprovementIntakeRouterService{
   if(existing){
     const sourceSnapshotSha256=this.currentSourceSnapshotSha256();
     if(!sourceSnapshotSha256)throw new Error('SOURCE_SNAPSHOT_REQUIRED');
-    const incoming={
+    const incoming:Record<string,unknown>={
       ...(input.payload||{}),
       taskId:input.taskId,
       sourceSnapshotSha256

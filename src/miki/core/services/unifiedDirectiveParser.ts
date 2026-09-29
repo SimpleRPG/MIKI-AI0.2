@@ -56,13 +56,32 @@ const prefixedAll = (lines: string[], labels: string[]): string[] => {
   }));
 };
 
+const sectionHeadingLabels = [
+  'title', 'タイトル', 'objective', 'goal', 'purpose', '目的', '概要', '目標',
+  'target_file', 'target_files', 'target', '対象ファイル', '対象',
+  'requirement', 'requirements', '要件', '要求事項', '実装要求',
+  'prohibition', 'prohibitions', 'forbidden', '禁止', '禁止事項',
+  'invariant', 'invariants', '不変条件',
+  'validation', 'verify', 'verification', '検証条件', '検証', '受入条件',
+  'delivery', 'delivery_requirement', '納品条件', '納品',
+  'issue', 'issues', 'issue_id', '関連issue',
+];
+
+const normalizedHeading = (line: string): string =>
+  line.replace(/^#{1,6}\s*/, '').replace(/[：:=]\s*$/, '').trim().toLowerCase();
+
+const isSectionHeading = (line: string): boolean => {
+  if (/^#{1,6}\s+/.test(line)) return true;
+  return sectionHeadingLabels.includes(normalizedHeading(line));
+};
+
 const sectionAll = (lines: string[], patterns: RegExp[]): string[] => {
   const result: string[] = [];
   for (let i = 0; i < lines.length; i += 1) {
-    const heading = lines[i].replace(/^#{1,6}\s*/, '').trim();
+    const heading = normalizedHeading(lines[i]);
     if (!patterns.some((pattern) => pattern.test(heading))) continue;
     for (let j = i + 1; j < lines.length; j += 1) {
-      if (/^#{1,6}\s+/.test(lines[j])) break;
+      if (isSectionHeading(lines[j])) break;
       const value = stripBullet(lines[j]);
       if (value) result.push(value);
     }
@@ -150,6 +169,6 @@ export const parseDirectiveText = (rawText: string, sourceFileName = 'pasted-dir
     invariants: unique([...prefixedAll(lines, ['INVARIANT', 'INVARIANTS', '不変条件']), ...sectionAll(lines, [/不変条件|invariant/i])]),
     validationRequirements: unique([...prefixedAll(lines, ['VALIDATION', 'VERIFY', 'VERIFICATION', '検証条件', '検証']), ...sectionAll(lines, [/検証|validation|verification|受入/i])]),
     deliveryRequirements: unique([...prefixedAll(lines, ['DELIVERY', 'DELIVERY_REQUIREMENT', '納品条件', '納品']), ...sectionAll(lines, [/納品|delivery|提出/i])]),
-    relatedIssueIds: unique(prefixedAll(lines, ['ISSUE', 'ISSUES', 'ISSUE_ID', '関連Issue'])),
+    relatedIssueIds: unique([...prefixedAll(lines, ['ISSUE', 'ISSUES', 'ISSUE_ID', '関連Issue']), ...sectionAll(lines, [/^(issue|issues|issue_id|関連issue)$/i])]),
   };
 };

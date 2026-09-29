@@ -19,7 +19,6 @@
     "android:prepare": "npx cap add android && bash scripts/install_android_native_runner.sh && bash scripts/install_android_japanese_morphology.sh && bash scripts/install_android_workmanager.sh && npx cap sync android",
     "android:verify-japanese-contract": "tsx scripts/verify_android_japanese_morphology_contract.ts",
     "android:verify-voice-contract": "tsx scripts/verify_android_voice_contract.ts",
-    "verify:p0-gate": "bash scripts/run_p0_gate.sh",
     "verify:self-code-understanding:stage1": "node scripts/verify_self_code_understanding_stage1.mjs",
     "verify:self-code-understanding": "node scripts/verify_self_code_understanding_stage1.mjs",
     "verify:ast-candidate": "node scripts/verify_ast_candidate_transformation_stage3.mjs",
@@ -46,7 +45,12 @@
     "test:mutation": "node scripts/run_code_only_mutation.mjs",
     "verify:development-intelligence": "node scripts/verify_development_intelligence_v271.mjs",
     "verify:code-only-quality": "node scripts/verify_code_only_quality_v272.mjs",
-    "verify:self-code-bundled-seed": "node scripts/verify_bundled_self_code_seed.mjs"
+    "verify:self-code-bundled-seed": "node scripts/verify_bundled_self_code_seed.mjs",
+    "build:diagnose": "node scripts/diagnose_production_build.mjs",
+    "verify:browser-boundary": "node scripts/verify_browser_boundary.mjs",
+    "analyze:bundle-graph": "node scripts/analyze_static_bundle_graph.mjs",
+    "verify:production-artifacts": "node scripts/verify_production_artifacts.mjs",
+    "build:verified": "npm run build && npm run verify:production-artifacts"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.0",

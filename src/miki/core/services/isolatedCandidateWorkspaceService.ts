@@ -1,7 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { candidateWriteGuardService } from './candidateWriteGuardService';
 import { candidateCommitTransactionService, type CandidateCommitTransaction } from './candidateCommitTransactionService';
-export type CandidateWorkspaceStatus='ISOLATED'|'VALIDATING'|'SHADOW_PASSED'|'PROMOTABLE'|'EXPORTED'|'REJECTED';
+export type CandidateWorkspaceStatus='ISOLATED'|'VALIDATING'|'SHADOW_PASSED'|'PROMOTABLE'|'EXPORTED'|'REJECTED'|'DISCARDED';
 export interface CandidateFile { path:string; baselineContent:string; candidateContent:string; baselineSha256:string; candidateSha256:string; evidenceIds:string[]; }
 export interface CandidateWorkspace { workspaceId:string; runId?:string; issueId:string; writeGuardId:string; transactionId?:string; committedRevision?:number; persistenceReceiptId?:string; baseSnapshotSha256:string; candidateRevisionSha256:string; status:CandidateWorkspaceStatus; files:CandidateFile[]; createdAt:number; updatedAt:number; }
 const KEY='miki_isolated_candidate_workspaces_v1';

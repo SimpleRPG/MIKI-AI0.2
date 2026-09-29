@@ -1,4 +1,3 @@
-import { workDirectiveIngestionService } from '../../execution/services/workDirectiveIngestionService';
 import { externalDirectiveIntakeService } from '../services/externalDirectiveIntakeService';
 import { improvementIntakeRouterService } from '../services/improvementIntakeRouterService';
 import { isolatedCandidateWorkspaceService } from '../services/isolatedCandidateWorkspaceService';
@@ -9,6 +8,7 @@ import { coreTaskIngressService, type CoreTaskIngressRequest } from '../services
 import { coreCycleSettingsService } from '../services/coreCycleSettingsService';
 import { directiveReviewPackageCompletionService } from '../services/directiveReviewPackageCompletionService';
 import { taskBlackboardService } from '../services/taskBlackboardService';
+import { selfCodeSpaceService } from '../services/selfCodeSpaceService';
 import { priorityOneRuntimeReadModelService } from '../services/priorityOneRuntimeReadModelService';
 export type { PriorityOneRuntimeItem, PriorityOneAllowedAction } from '../services/priorityOneRuntimeReadModelService';
 import { selfImprovementControllerService } from '../../improvement/services/selfImprovementControllerService';
@@ -16,6 +16,7 @@ import { autonomousSelfImprovementLoopService } from '../services/autonomousSelf
 import { domainReplyLedgerService } from '../services/domainReplyLedgerService';
 import { persistenceReceiptLedgerService } from '../services/persistenceReceiptLedgerService';
 import type { AutopilotConfig } from '../../autonomy/services/autonomousContinuousEvolutionService';
+import { naturalLanguageToReviewPackageService } from '../../selfDevelopment/services/naturalLanguageToReviewPackageService';
 
 export type { AutonomousLoopState, AutonomousImprovementRequest } from '../services/autonomousSelfImprovementLoopService';
 export type { ImprovementRun } from '../../improvement/services/selfImprovementControllerService';
@@ -39,7 +40,7 @@ type ImprovementDirectiveContext = {
 };
 
 export type ImprovementUiCommand =
-  | { commandType:'START_SPECIFIED_IMPROVEMENT'; goal:string; target:string; context?:Record<string,unknown>; directiveId?:string; runId?:string; requirements?:string[]; prohibitions?:string[]; invariants?:string[]; validationRequirements?:string[]; deliveryRequirements?:string[]; requestedAt:number; commandId:string; operationInstanceId:string; }
+  | { commandType:'START_SPECIFIED_IMPROVEMENT'; goal:string; target:string; directiveContext?:ImprovementDirectiveContext; context?:Record<string,unknown>; directiveId?:string; runId?:string; requirements?:string[]; prohibitions?:string[]; invariants?:string[]; validationRequirements?:string[]; deliveryRequirements?:string[]; requestedAt:number; commandId:string; operationInstanceId:string; }
   | { commandType:'DISCOVER_IMPROVEMENT_TARGET'; goal:string; directiveContext?:ImprovementDirectiveContext; requestedAt:number; commandId:string; operationInstanceId:string; }
   | { commandType:'RESUME_IMPROVEMENT_TASK'; taskId:string; requestedAt:number; commandId:string; operationInstanceId:string; }
   | { commandType:'IMPORT_EXTERNAL_FEEDBACK'; goal:string; packageId:string; rawResponse:string; sourceType:'PASTED_TEXT'|'IMPORTED_TXT'|'IMPORTED_JSON'; requestedAt:number; commandId:string; operationInstanceId:string; }
@@ -86,7 +87,6 @@ class TypedImprovementUiGatewayService {
   recordCanonicalRun(taskId:string, trigger:string, result:string, decision?:Parameters<typeof selfImprovementControllerService.recordCanonicalRun>[3]){
     return selfImprovementControllerService.recordCanonicalRun(taskId, trigger, result, decision);
   }
-  getStructuredDirectives() { return workDirectiveIngestionService.getAllDirectives(); }
   getExternalDirectives() { return externalDirectiveIntakeService.list(); }
   getIntakeRuns(limit = 50) { return improvementIntakeRouterService.list(limit); }
   getWorkspaces() { return isolatedCandidateWorkspaceService.list(); }
@@ -186,6 +186,13 @@ class TypedImprovementUiGatewayService {
 
   requestWithResult(command:ImprovementUiCommand){ return this.sendImprovementCommand(command); }
   async sendImprovementCommand(command:ImprovementUiCommand):Promise<ImprovementUiCommandResult>{
+    if(command.commandType==='START_SPECIFIED_IMPROVEMENT'||command.commandType==='DISCOVER_IMPROVEMENT_TARGET'){
+      const diagnostic=selfCodeSpaceService.getWorkspaceDiagnostic();
+      const sourceFiles=selfCodeSpaceService.listSourceFiles();
+      if(sourceFiles.length===0||['JSON_INVALID','STATE_INVALID','INCOMPLETE','FILES_EMPTY','NO_SOURCE'].includes(diagnostic.status)){
+        throw new Error(`SELF_CODE_PREFLIGHT_FAILED:${diagnostic.diagnosticCode}:${diagnostic.nextAction}`);
+      }
+    }
     if(command.commandType==='RESUME_IMPROVEMENT_TASK'){
       const resumed=await coreTaskIngressService.resume(command.taskId,coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'));
       const commandResult=this.toCommandResult(command,resumed);
@@ -194,7 +201,7 @@ class TypedImprovementUiGatewayService {
         selfImprovementControllerService.recordCanonicalRun(
           commandResult.taskId,
           'RESUME_IMPROVEMENT_TASK',
-          `status=${commandResult.currentStage || 'UNKNOWN'};taskRevision=${commandResult.taskRevision ?? '―'};cycle=${resumed?.cycle ?? resumed?.lastCycle ?? '―'}`,
+          `status=${commandResult.currentStage || 'UNKNOWN'};taskRevision=${commandResult.taskRevision ?? '―'};cycle=${resumed?.cycles ?? '―'}`,
           {
             action:'AUTONOMOUS_CODE_EVOLUTION',
             reason:'Canonical CORE resume persisted to existing SelfImprovementController history'
@@ -204,7 +211,12 @@ class TypedImprovementUiGatewayService {
 
       return commandResult;
     }
-    const request:CoreTaskIngressRequest={kind:'SELF_IMPROVEMENT',goal:command.goal,source:'core',payload:{...('directiveContext' in command ? (command.directiveContext||{}) : {}),commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt,entry:'TYPED_IMPROVEMENT_UI_GATEWAY',mode:command.commandType,...(command.commandType==='START_SPECIFIED_IMPROVEMENT'?{target:command.target,targetFiles:[command.target]}:command.commandType==='COMMIT_CANDIDATE_TRANSACTION'?{workspaceId:command.workspaceId,persistenceReceiptId:command.persistenceReceiptId}:command.commandType==='IMPORT_EXTERNAL_FEEDBACK'?{packageId:command.packageId,rawResponse:command.rawResponse,sourceType:command.sourceType}:command.commandType==='SUBMIT_REVIEW_DECISION'?{externalReviewId:command.externalReviewId,decision:command.decision,reason:command.reason}:{autonomousDiscovery:true})}};
+    const suppliedContext='directiveContext' in command ? (command.directiveContext||{}) : {};
+    const suppliedTargets='targetFiles' in suppliedContext&&Array.isArray(suppliedContext.targetFiles)?suppliedContext.targetFiles:[];
+    const nlPlan=(command.commandType==='START_SPECIFIED_IMPROVEMENT'||command.commandType==='DISCOVER_IMPROVEMENT_TARGET')
+      ? naturalLanguageToReviewPackageService.compile(command.goal,suppliedTargets)
+      : undefined;
+    const request:CoreTaskIngressRequest={kind:'SELF_IMPROVEMENT',goal:command.goal,source:'core',payload:{...suppliedContext,...(nlPlan?{naturalLanguagePlanId:nlPlan.planId,naturalLanguagePlan:nlPlan,requirements:[...nlPlan.requirements,...(('requirements' in suppliedContext&&Array.isArray(suppliedContext.requirements))?suppliedContext.requirements:[])],prohibitions:[...nlPlan.prohibitions,...(('prohibitions' in suppliedContext&&Array.isArray(suppliedContext.prohibitions))?suppliedContext.prohibitions:[])],invariants:[...nlPlan.invariants,...(('invariants' in suppliedContext&&Array.isArray(suppliedContext.invariants))?suppliedContext.invariants:[])],validationRequirements:[...nlPlan.validationRequirements,...(('validationRequirements' in suppliedContext&&Array.isArray(suppliedContext.validationRequirements))?suppliedContext.validationRequirements:[])],deliveryRequirements:[...nlPlan.deliveryRequirements,...(('deliveryRequirements' in suppliedContext&&Array.isArray(suppliedContext.deliveryRequirements))?suppliedContext.deliveryRequirements:[])]}:{}),commandId:command.commandId,operationInstanceId:command.operationInstanceId,requestedAt:command.requestedAt,entry:'TYPED_IMPROVEMENT_UI_GATEWAY',mode:command.commandType,...(command.commandType==='START_SPECIFIED_IMPROVEMENT'?{target:command.target,targetFiles:suppliedTargets.length?suppliedTargets:(nlPlan?.targetFiles.length?nlPlan.targetFiles:[command.target])}:command.commandType==='COMMIT_CANDIDATE_TRANSACTION'?{workspaceId:command.workspaceId,persistenceReceiptId:command.persistenceReceiptId}:command.commandType==='IMPORT_EXTERNAL_FEEDBACK'?{packageId:command.packageId,rawResponse:command.rawResponse,sourceType:command.sourceType}:command.commandType==='SUBMIT_REVIEW_DECISION'?{externalReviewId:command.externalReviewId,decision:command.decision,reason:command.reason}:{autonomousDiscovery:true,targetFiles:nlPlan?.targetFiles||[]})}};
     const result=await coreTaskIngressService.submit(request);
     const commandResult=this.toCommandResult(command,result);
 
@@ -212,7 +224,7 @@ class TypedImprovementUiGatewayService {
       selfImprovementControllerService.recordCanonicalRun(
         commandResult.taskId,
         command.goal,
-        `status=${commandResult.currentStage || 'UNKNOWN'};taskRevision=${commandResult.taskRevision ?? '―'};cycle=${result?.cycle ?? result?.lastCycle ?? '―'}`,
+        `status=${commandResult.currentStage || 'UNKNOWN'};taskRevision=${commandResult.taskRevision ?? '―'};cycle=${result?.cycles ?? '―'}`,
         {
           action: command.commandType === 'START_SPECIFIED_IMPROVEMENT'
             ? 'AUTONOMOUS_CODE_EVOLUTION'
@@ -227,51 +239,69 @@ class TypedImprovementUiGatewayService {
     return commandResult;
   }
 
+
+  private toCommandResult(command:ImprovementUiCommand,result:Awaited<ReturnType<typeof coreTaskIngressService.submit>>):ImprovementUiCommandResult{
+    const task=result.task;
+    const core=(result.coreResult&&typeof result.coreResult==='object') ? result.coreResult as unknown as Record<string,unknown> : {};
+    const strings=(value:unknown):string[]=>Array.isArray(value)?value.filter((item):item is string=>typeof item==='string'):[];
+    return {
+      commandId:command.commandId,
+      operationInstanceId:command.operationInstanceId,
+      taskId:task?.taskId,
+      taskRevision:task?.revision,
+      corePlanRevision:typeof core.corePlanRevision==='number'?core.corePlanRevision:undefined,
+      planRevision:typeof core.planRevision==='number'?core.planRevision:undefined,
+      currentOperationInstanceId:typeof core.currentOperationInstanceId==='string'?core.currentOperationInstanceId:undefined,
+      currentBusinessStage:typeof core.currentBusinessStage==='string'?core.currentBusinessStage:undefined,
+      nextOperationInstanceId:typeof core.nextOperationInstanceId==='string'?core.nextOperationInstanceId:undefined,
+      currentStage:typeof core.status==='string'?core.status:(task?.status||'WAITING'),
+      nextStage:typeof core.nextStage==='string'?core.nextStage:undefined,
+      stopReason:typeof core.stopReason==='string'?core.stopReason:undefined,
+      unresolved:strings(core.unresolved),
+      domainReplyIds:strings(core.domainReplyIds),
+      evidenceIds:strings(core.evidenceIds),
+      persistenceReceiptIds:strings(core.persistenceReceiptIds),
+      decisionId:typeof core.decisionId==='string'?core.decisionId:undefined,
+      requiredDomains:strings(core.requiredDomains),
+      missingDomains:strings(core.missingDomains),
+      failedDomains:strings(core.failedDomains),
+      missingReceipts:strings(core.missingReceipts),
+      missingRequiredOperations:strings(core.missingRequiredOperations),
+      completionReasons:strings(core.completionReasons),
+      coreResult:result.coreResult
+    };
+  }
+
   async executeDirective(directiveId:string){
     const externalDirective=externalDirectiveIntakeService.list().find(
       (item)=>item.directiveId===directiveId
     );
-    const workDirective=workDirectiveIngestionService.getAllDirectives().find(
-      (item)=>item.directiveId===directiveId
-    );
     const directive=externalDirective;
-    const directiveTitle=directive?.title?.trim()
-      || workDirective?.title?.trim()
-      || undefined;
-    const goal=directive?.objective?.trim()
-      || workDirective?.goal?.trim()
+    if(!directive){
+      throw new Error('EXTERNAL_DIRECTIVE_NOT_FOUND');
+    }
+    const directiveTitle=directive.title?.trim() || undefined;
+    const goal=directive.objective?.trim()
       || directiveTitle
       || `指示書 ${directiveId} を実行し、評価可能な候補まで進める`;
 
-    const targetFiles=directive?.targetFiles
-      || workDirective?.targets?.filter((item):item is string=>
-        typeof item==='string' &&
-        /\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|txt)$/i.test(item.trim())
-      )
-      || [];
+    const targetFiles=directive.targetFiles || [];
 
     const directiveContext:ImprovementDirectiveContext={
       directiveId,
       title:directiveTitle,
       sourceHash:directive?.sourceHash,
       targetFiles,
-      requirements:directive?.requirements
-        || workDirective?.requirements
-        || [],
-      prohibitions:directive?.prohibitions
-        || workDirective?.forbiddenBehaviors
-        || [],
-      invariants:directive?.invariants || [],
-      validationRequirements:directive?.validationRequirements
-        || workDirective?.completionCriteria
-        || [],
-      deliveryRequirements:directive?.deliveryRequirements
-        || workDirective?.acceptanceCriteria
-        || [],
-      relatedIssueIds:directive?.relatedIssueIds || []
+      requirements:directive.requirements || [],
+      prohibitions:directive.prohibitions || [],
+      invariants:directive.invariants || [],
+      validationRequirements:directive.validationRequirements || [],
+      deliveryRequirements:directive.deliveryRequirements || [],
+      relatedIssueIds:directive.relatedIssueIds || []
     };
 
-    const existingRunId=directive?.runId;
+    externalDirectiveIntakeService.updateStatus(directiveId,'IN_PROGRESS',directive.runId);
+    const existingRunId=directive.runId;
     const existingRun=existingRunId
       ? this.getIntakeRuns(100).find(item=>item.runId===existingRunId)
       : this.getIntakeRuns(200).find(item=>
@@ -287,7 +317,7 @@ class TypedImprovementUiGatewayService {
     }
 
     if(existingRun){
-      const status=existingRun.status || directive?.status || workDirective?.status || "WAITING";
+      const status=existingRun.status || directive.status || "WAITING";
       return {
         commandId:coreResultService.generateRequestId("ui-existing-run"),
         operationInstanceId:coreResultService.generateRequestId("operation"),
@@ -299,15 +329,6 @@ class TypedImprovementUiGatewayService {
         requiredDomains:[],missingDomains:[],failedDomains:[],missingReceipts:[],
         missingRequiredOperations:[],completionReasons:["RUN_STATE_AVAILABLE"]
       };
-    }
-
-    if(workDirective){
-      workDirectiveIngestionService.markStatus(
-        directiveId,
-        'IN_PROGRESS',
-        undefined,
-        'CORE canonical ingressへ接続し、自律コード改善タスクとして実行開始'
-      );
     }
 
     const target=targetFiles.find(
@@ -364,19 +385,26 @@ class TypedImprovementUiGatewayService {
       pollMs:100,
       noProgressLimit:4
     });
+    const directiveStatus=completion.terminalState==='REVIEW_PACKAGE_READY'
+      ? 'REVIEW_READY'
+      : completion.terminalState==='FAILED'||completion.terminalState==='BLOCKED'
+        ? 'VALIDATION_FAILED'
+        : 'IN_PROGRESS';
+    externalDirectiveIntakeService.updateStatus(directiveId,directiveStatus,run.runId);
     return {...result,...completion};
+  }
+
+  importExternalFeedback(packageId:string,rawResponse:string,sourceType:'PASTED_TEXT'|'IMPORTED_TXT'|'IMPORTED_JSON'='PASTED_TEXT'){
+    return this.sendImprovementCommand({commandType:'IMPORT_EXTERNAL_FEEDBACK',goal:'外部AI評価をCOREへ取り込む',packageId,rawResponse,sourceType,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-review-import'),operationInstanceId:coreResultService.generateRequestId('operation')});
+  }
+  submitReviewDecision(externalReviewId:string,decision:'ACCEPT'|'REJECT'|'REQUEST_CHANGES'|'HOLD'|'PARTIAL_ACCEPT'|'PARTIAL_REJECT',reason:string){
+    return this.sendImprovementCommand({commandType:'SUBMIT_REVIEW_DECISION',goal:'利用者の外部評価採否をCOREで処理する',externalReviewId,decision,reason,requestedAt:Date.now(),commandId:coreResultService.generateRequestId('ui-review-decision'),operationInstanceId:coreResultService.generateRequestId('operation')});
   }
 
   listRestoredPriorityOneRuntime(){return priorityOneRuntimeReadModelService.list();}
   getLatestCoreRuntime(){const items=priorityOneRuntimeReadModelService.list();return items[items.length-1];}
   isCoreRuntimeBusy(){const latest=this.getLatestCoreRuntime();return Boolean(latest&&(latest.taskStatus==='running'||latest.operationStatus==='RUNNING'));}
 
-  ingestDirective(...args: Parameters<typeof workDirectiveIngestionService.ingestDirective>) {
-    return workDirectiveIngestionService.ingestDirective(...args);
-  }
-  ingestDirectiveText(...args: Parameters<typeof workDirectiveIngestionService.ingestDirectiveText>) {
-    return workDirectiveIngestionService.ingestDirectiveText(...args);
-  }
   receiveDirectiveFile(...args: Parameters<typeof externalDirectiveIntakeService.receiveTextFile>) {
     return externalDirectiveIntakeService.receiveTextFile(...args);
   }

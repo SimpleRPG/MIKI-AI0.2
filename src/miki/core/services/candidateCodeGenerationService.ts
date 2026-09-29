@@ -13,6 +13,8 @@ import { ComponentCompositionService } from '../../capability/services/component
 import { codeConstructionRendererService } from './codeConstructionRendererService';
 import { astCandidateTransformationService, type AstCandidateOperation } from '../../selfDevelopment/services/astCandidateTransformationService';
 import { integratedGenerationPlanService } from '../../selfDevelopment/services/integratedGenerationPlanService';
+import { taskBlackboardService } from './taskBlackboardService';
+import { generationCapabilityExpansionService } from '../../selfDevelopment/services/generationCapabilityExpansionService';
 import {
   isCompatibleConstructionKind,
   type CodeConstructionBinding,
@@ -95,7 +97,7 @@ class CandidateCodeGenerationService {
                 ),
                 ...(
                   Array.isArray((failureFeedback.result as Record<string,unknown>).results)
-                    ? (failureFeedback.result as Record<string,unknown>).results
+                    ? ((failureFeedback.result as Record<string,unknown>).results as unknown[])
                         .filter((item): item is Record<string,unknown> => Boolean(item && typeof item==='object'))
                         .flatMap(item=>[
                           ...(
@@ -172,8 +174,25 @@ class CandidateCodeGenerationService {
       ].join('\n')
     : '';
 
+  const blackboardTask=run.taskId ? taskBlackboardService.get(run.taskId) : undefined;
+  const acquiredAssetEntry=blackboardTask?.entries
+    .filter(entry=>entry.key==='required-assets-acquired')
+    .at(-1);
+  const acquiredAssetValue=acquiredAssetEntry?.value && typeof acquiredAssetEntry.value==='object' && !Array.isArray(acquiredAssetEntry.value)
+    ? acquiredAssetEntry.value as Record<string,unknown>
+    : {};
+  const acquiredEvidenceIds=[...new Set([
+    ...this.strings(acquiredAssetValue.evidenceIds),
+    ...(acquiredAssetEntry?.evidenceIds||[]),
+  ])];
+  const acquiredComponentIds=[...new Set(this.strings(acquiredAssetValue.componentIds))];
+  const acquiredRequirements=this.strings(acquiredAssetValue.requirements);
+  const acquiredReasons=this.strings(acquiredAssetValue.reasons);
+
   const effectiveRequirements = [
     ...this.strings(run.payload.requirements),
+    ...acquiredRequirements,
+    ...acquiredReasons.map(reason=>`ACQUIRED_ASSET_CONTEXT:${reason}`),
     ...(failureFeedbackText ? [failureFeedbackText] : []),
   ];
 
@@ -217,16 +236,17 @@ class CandidateCodeGenerationService {
     .list()
     .filter(item =>
       Boolean(item) &&
-      item.componentKind === KNOWLEDGE &&
-      typeof item.componentType === string &&
+      item.componentKind === 'KNOWLEDGE' &&
+      typeof item.componentType === 'string' &&
       item.componentType.trim().length > 0 &&
       codeKnowledgePack.usedKnowledgeComponentIds.includes(item.componentId)
     )
     .slice(0, 8);
 
-  const resolvedKnowledgeIds = new Set(
-    codeKnowledge.map(item => item.componentId)
-  );
+  const resolvedKnowledgeIds = new Set([
+    ...codeKnowledge.map(item => item.componentId),
+    ...acquiredComponentIds,
+  ]);
   const unresolvedKnowledgeComponentIds =
     codeKnowledgePack.usedKnowledgeComponentIds.filter(
       id => !resolvedKnowledgeIds.has(id)
@@ -525,7 +545,7 @@ class CandidateCodeGenerationService {
           status:'BLOCKED',
           reason,
           createdCodeComponentIds:createdBundleIds,
-          unknownContext,
+          unknownContext: undefined,
           responseHash:canonicalSha256(JSON.stringify({
             runId,
             reason,
@@ -616,6 +636,71 @@ class CandidateCodeGenerationService {
    .map(value=>`CONSTRUCTION_GAP:${value}`)
    .slice(0,12);
 
+
+  const capabilityExpansion=generationCapabilityExpansionService.plan({
+    objective:run.objective,
+    targetPaths,
+    requirements:effectiveRequirements,
+    constructionGaps:constructionGapRequirements,
+  });
+  effectiveRequirements.push(...capabilityExpansion.componentRequirements,...capabilityExpansion.algorithmPatterns,...capabilityExpansion.implementationContracts,...capabilityExpansion.decompositionSteps,...capabilityExpansion.safeFallbacks);
+  effectiveValidationRequirements.push(...capabilityExpansion.validationRequirements,...capabilityExpansion.validationProfiles);
+  if(run.taskId){
+    taskBlackboardService.append(run.taskId,'OBSERVATION','core','generation-capability-expansion',capabilityExpansion,acquiredEvidenceIds);
+  }
+
+  const candidateInputManifest={
+    schemaVersion:1,
+    runId:run.runId,
+    taskId:run.taskId||run.runId,
+    objective:run.objective,
+    directiveId:typeof run.payload.directiveId==='string'?run.payload.directiveId:'',
+    directiveTitle:typeof run.payload.title==='string'?run.payload.title:'',
+    directiveSourceHash:typeof run.payload.sourceHash==='string'?run.payload.sourceHash:'',
+    relatedIssueIds:this.strings(run.payload.relatedIssueIds),
+    targetPaths,
+    sourcePaths:targetFiles.map(file=>file.path),
+    requirements:effectiveRequirements,
+    prohibitions:this.strings(run.payload.prohibitions),
+    invariants:this.strings(run.payload.invariants),
+    validationRequirements:effectiveValidationRequirements,
+    deliveryRequirements:this.strings(run.payload.deliveryRequirements),
+    selectedKnowledgeComponentIds:codeKnowledge.map(item=>item.componentId),
+    acquiredKnowledgeComponentIds:acquiredComponentIds,
+    acquiredEvidenceIds,
+    sourceSnapshotSha256:typeof run.payload.sourceSnapshotSha256==='string'?run.payload.sourceSnapshotSha256:'',
+    environmentFingerprint,
+    capabilityExpansionPlanId:capabilityExpansion.planId,
+    algorithmPatterns:capabilityExpansion.algorithmPatterns,
+    apiResearchQuestions:capabilityExpansion.apiResearchQuestions,
+    adapterDecisions:capabilityExpansion.adapterDecisions,
+    implementationContracts:capabilityExpansion.implementationContracts,
+    validationProfiles:capabilityExpansion.validationProfiles,
+    decompositionSteps:capabilityExpansion.decompositionSteps,
+  };
+  const candidateInputManifestSha256=canonicalSha256(candidateInputManifest);
+  const handoffIssues:string[]=[];
+  if(!candidateInputManifest.sourceSnapshotSha256)handoffIssues.push('SOURCE_SNAPSHOT_SHA256_MISSING');
+  if(candidateInputManifest.sourcePaths.length===0)handoffIssues.push('SOURCE_PATHS_MISSING');
+  if(acquiredAssetEntry&&this.strings(acquiredAssetValue.evidenceIds).length>0&&acquiredEvidenceIds.length===0)handoffIssues.push('ACQUIRED_EVIDENCE_HANDOFF_EMPTY');
+  if(run.runType==='EXTERNAL_DIRECTIVE'&&candidateInputManifest.requirements.length===0)handoffIssues.push('DIRECTIVE_REQUIREMENTS_MISSING');
+  if(handoffIssues.length>0){
+    if(run.taskId){
+      taskBlackboardService.append(run.taskId,'ERROR','core','candidate-input-handoff-broken',{
+        manifestSha256:candidateInputManifestSha256,
+        issues:handoffIssues,
+        candidateInputManifest,
+      },acquiredEvidenceIds);
+    }
+    return {accepted:false,runId,files:[],reasons:handoffIssues.map(issue=>`INFORMATION_HANDOFF_BROKEN:${issue}`),attemptCount:1,responseHash:candidateInputManifestSha256};
+  }
+  if(run.taskId){
+    taskBlackboardService.append(run.taskId,'EVIDENCE','core','candidate-input-manifest',{
+      ...candidateInputManifest,
+      manifestSha256:candidateInputManifestSha256,
+    },acquiredEvidenceIds);
+  }
+
   const unknownContext=await candidateUnknownResolutionService.resolve({
     runId:run.runId,
     taskId:run.taskId||run.runId,
@@ -631,6 +716,8 @@ class CandidateCodeGenerationService {
       ...effectiveRequirements,
       ...knowledgeRequirement,
       ...constructionGapRequirements,
+      ...acquiredComponentIds.map(id=>`ACQUIRED_KNOWLEDGE_COMPONENT:${id}`),
+      ...acquiredEvidenceIds.map(id=>`ACQUIRED_EVIDENCE:${id}`),
     ],
     validationRequirements:effectiveValidationRequirements
   });
@@ -1076,16 +1163,16 @@ class CandidateCodeGenerationService {
       this.record(runId,{
         attemptCount:1,
         status:'BLOCKED',
-        reason:materialized.reason,
+        reason:('reason' in materialized ? materialized.reason : 'MATERIALIZATION_FAILED'),
         responseHash:canonicalSha256(JSON.stringify({
-          runId,componentIds,reason:materialized.reason
+          runId,componentIds,reason:('reason' in materialized ? materialized.reason : 'MATERIALIZATION_FAILED')
         }))
       });
       return {
         accepted:false,
         runId,
         files:[],
-        reasons:[materialized.reason],
+        reasons:[('reason' in materialized ? materialized.reason : 'MATERIALIZATION_FAILED')],
         attemptCount:1
       };
     }

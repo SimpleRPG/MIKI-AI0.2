@@ -1003,7 +1003,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
           {/* みき全方位認知ヘルス＆内省日誌ボタン */}
           <button
-            onClick={() => setIsAutonomousImprovementModalOpen(true)}
+            onClick={() => setIsAutonomousDevStudioOpen(true)}
             className="px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all bg-slate-900 hover:bg-slate-800/90 text-purple-300 hover:text-white border-purple-900/40 hover:border-purple-700 shrink-0 shadow-xs cursor-pointer"
             title="みきの全方位認知ヘルスレーダー（健康度スコア）＆内省日誌を開く"
           >
@@ -3549,7 +3549,7 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
 
           <button
             type="button"
-            onClick={() => setIsAutonomousImprovementModalOpen(true)}
+            onClick={() => setIsAutonomousDevStudioOpen(true)}
             className="p-2 rounded-lg transition-colors shrink-0 text-slate-400 hover:text-emerald-300 hover:bg-slate-900"
             title="みき自律コード改善・オートパイロット"
           >

@@ -5,6 +5,9 @@ import { researchService } from '../../research/services/researchService';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { taskBlackboardService } from './taskBlackboardService';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
+import { missingAssetSynthesisService } from './missingAssetSynthesisService';
+import { missingAssetValidationService } from './missingAssetValidationService';
+import { missingCapabilityRecoveryService } from './missingCapabilityRecoveryService';
 
 export type RequiredAssetKind = 'EVIDENCE' | 'CAPABILITY' | 'VALIDATION_SCRIPT' | 'RESOURCE_CAPACITY';
 export type RequiredAssetStatus = 'OPEN' | 'ACQUIRING' | 'ACQUIRED' | 'BLOCKED';
@@ -67,7 +70,10 @@ class RequiredAssetAcquisitionService {
     reasons: string[];
     objective: string;
   }): Promise<RequiredAssetAcquisitionResult> {
-    const requirements = this.classify(input.reasons);
+    const recoveryPlans=missingCapabilityRecoveryService.planAll(input.reasons);
+    if(input.taskId&&recoveryPlans.length>0){taskBlackboardService.append(input.taskId,'DECISION','core','missing-capability-recovery-plans',{plans:recoveryPlans},[]);}
+    const expandedReasons=[...input.reasons,...recoveryPlans.flatMap(plan=>plan.actions.map(action=>`RECOVERY_ACTION_REQUIRED:${action}:${plan.reason}`))];
+    const requirements = this.classify(expandedReasons);
     const evidenceIds: string[] = [];
     const reasons: string[] = [];
     const localEvidenceIds: string[] = [];
@@ -124,8 +130,20 @@ class RequiredAssetAcquisitionService {
         'core',
         'required-assets-acquired',
         {
+          schemaVersion: 2,
           requirements: requirements.map(item => item.requirement),
-          reasons,
+          reasons: [...new Set(reasons)],
+          evidenceIds: blackboardEvidenceIds,
+          localEvidenceIds: [...new Set(localEvidenceIds)],
+          webEvidenceIds: [...new Set(webEvidenceIds)],
+          linkedEvidenceIds: [...new Set(linkedEvidenceIds)],
+          unlinkedEvidenceIds: [...new Set(unlinkedEvidenceIds)],
+          componentIds: [...new Set(componentIds)],
+          runId: input.runId,
+          taskId: input.taskId,
+          workspaceId: input.workspaceId,
+          objective: input.objective,
+          recordedAt: Date.now(),
         },
         blackboardEvidenceIds
       );
@@ -135,6 +153,13 @@ class RequiredAssetAcquisitionService {
     const uniqueWebEvidenceIds = [...new Set(webEvidenceIds)];
     const uniqueLinkedEvidenceIds = [...new Set(linkedEvidenceIds)];
     const uniqueUnlinkedEvidenceIds = [...new Set(unlinkedEvidenceIds)];
+    const draftAssets=missingAssetSynthesisService.synthesize({runId:input.runId,taskId:input.taskId,objective:input.objective,requirements:expandedReasons,evidenceIds});
+    const draftValidations=missingAssetValidationService.validateAll(draftAssets);
+    for(const validation of draftValidations){missingAssetSynthesisService.updateValidation(validation.draftId,{status:validation.status,validationId:validation.validationId,validationReasons:validation.reasons});}
+    const verifiedDrafts=draftAssets.filter(draft=>draftValidations.some(validation=>validation.draftId===draft.draftId&&validation.passed));
+    const researchDrafts=draftValidations.filter(validation=>validation.status==='RESEARCH_REQUIRED');
+    if(input.taskId&&draftAssets.length>0){taskBlackboardService.append(input.taskId,'OBSERVATION','core','missing-asset-validation-results',{draftIds:draftAssets.map(item=>item.draftId),verifiedDraftIds:verifiedDrafts.map(item=>item.draftId),validations:draftValidations},evidenceIds);}
+    reasons.push(...researchDrafts.flatMap(item=>item.reasons),...draftValidations.filter(item=>item.status==='REJECTED').flatMap(item=>item.reasons));
     const uniqueComponentIds = [...new Set(componentIds)];
 
     const diagnostics: RequiredAssetAcquisitionDiagnostics = {
@@ -318,10 +343,9 @@ class RequiredAssetAcquisitionService {
        *
        * LOCALとWEBは別々に捨てず、同じKnowledge Componentへ統合する。
        */
+      const componentReasons:string[]=[];
       if(evidenceIds.length>0){
         const researchResult=researched as unknown as Record<string, unknown>;
-        const componentReasons:string[]=[];
-
         const claimIds=this.extractStringIds(
           researchResult,
           /^claim(?:[_-]?ids?)?$/i

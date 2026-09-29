@@ -6,6 +6,7 @@ import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/service
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 import { webTermLearningService } from './webTermLearningService';
 import { researchQueryPlanningService } from './researchQueryPlanningService';
+import type { VerificationResult } from '../../verification/services/verifierService';
 import { researchQueryOutcomeLearningService } from './researchQueryOutcomeLearningService';
 import { webResearchPolicyService, WebResearchProgress } from './webResearchPolicyService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
@@ -283,7 +284,7 @@ export class ResearchService {
       }
 
       let summary: string | undefined;
-      let verification: unknown[] = [];
+      let verification: VerificationResult[] = [];
       let resolved = false;
       let continuationAvailable = false;
       let continuationReason = '';
@@ -355,10 +356,10 @@ export class ResearchService {
               environment: 'MIKI-AI0.2 research page reader',
               result_summary: `検索結果URLを実際に読み取り、本文${page.text.length}文字を取得`,
               research_query_id: queryPlan.status === "READY" ? queryPlan.queries[pass]?.queryId : undefined,
-              research_query_plan_id: queryPlan.status === "READY" ? queryPlan.planId : undefined,
+              research_query_plan_id: queryPlan.status === "READY" ? queryPlan.queryPlanId : undefined,
               research_source_tier_target: queryPlan.status === "READY" ? queryPlan.queries[pass]?.sourceTierTarget : undefined,
               research_intent_type: queryPlan.status === "READY" ? queryPlan.queries[pass]?.intentType : undefined,
-              research_source_role_target: queryPlan.status === "READY" ? ({ COUNTEREVIDENCE: "COUNTEREVIDENCE", PRIMARY_SOURCE: "PRIMARY", OFFICIAL_SPECIFICATION: "OFFICIAL" } as Record<string,string>)[queryPlan.queries[pass]?.intentType || ""] || "UNCLASSIFIED" : "UNCLASSIFIED",
+              research_source_role_target: queryPlan.status === "READY" ? ({ COUNTEREVIDENCE: "COUNTEREVIDENCE", PRIMARY_SOURCE: "PRIMARY", OFFICIAL_SPECIFICATION: "OFFICIAL" } as Record<string,'PRIMARY'|'OFFICIAL'|'SECONDARY'|'COUNTEREVIDENCE'|'UNCLASSIFIED'>)[queryPlan.queries[pass]?.intentType || ""] || "UNCLASSIFIED" : "UNCLASSIFIED",
               research_source_role: queryPlan.status === "READY" ? assessResearchSourceRole(queryPlan.queries[pass], { url: page.url }) : "UNCLASSIFIED",
               research_source_provider: String(page.result.source || ""),
               research_source_engine: String((page.result as any).engine || ""),
@@ -445,10 +446,10 @@ export class ResearchService {
         verification = [];
         resolved = false;
 
-        if (queryPlan.status === "READY" && queryPlan.queries[pass]) { const passEvidenceIds = [...new Set(evidence.filter(item => item.status !== "REJECTED").map(item => item.evidence_id))]; const passClusters = new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)); researchQueryOutcomeLearningService.record({ queryPlanId: queryPlan.planId, queryId: queryPlan.queries[pass].queryId, queryText: queryPlan.queries[pass].queryText, status: passEvidenceIds.length ? "EVIDENCE_GAINED" : results.length ? "LOW_QUALITY_RESULTS" : "NO_RESULTS", candidateUrlCount: results.filter(result => !!result.url).length, renderedPageCount: readResults.filter(page => page.success && !!page.text.trim()).length, admissibleIndependentSourceCount: passClusters.size, primarySourceCount: passEvidenceIds.filter(id => { const item = evidence.find(e => e.evidence_id === id); return item?.status !== "REJECTED" && (item?.metadata?.research_source_role === "PRIMARY" || item?.metadata?.research_source_role === "OFFICIAL"); }).length, sourceTierTarget: queryPlan.queries[pass].sourceTierTarget, counterevidenceChecked: queryPlan.queries[pass].intentType === "COUNTEREVIDENCE", evidenceIds: passEvidenceIds, failureReasons: verification.filter(result => result.outcome === "UNRESOLVED").flatMap(result => result.reasons), environmentApplicability: "CURRENT_ENVIRONMENT", executionTimeMs: Date.now() - queryStartedAt, attempt: pass + 1 }); }
+        if (queryPlan.status === "READY" && queryPlan.queries[pass]) { const passEvidenceIds = [...new Set(evidence.filter(item => item.status !== "REJECTED").map(item => item.evidence_id))]; const passClusters = new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)); researchQueryOutcomeLearningService.record({ queryPlanId: queryPlan.queryPlanId, queryId: queryPlan.queries[pass].queryId, queryText: queryPlan.queries[pass].queryText, status: passEvidenceIds.length ? "EVIDENCE_GAINED" : results.length ? "LOW_QUALITY_RESULTS" : "NO_RESULTS", candidateUrlCount: results.filter(result => !!result.url).length, renderedPageCount: readResults.filter(page => page.success && !!page.text.trim()).length, admissibleIndependentSourceCount: passClusters.size, primarySourceCount: passEvidenceIds.filter(id => { const item = evidence.find(e => e.evidence_id === id); return item?.status !== "REJECTED" && (item?.metadata?.research_source_role === "PRIMARY" || item?.metadata?.research_source_role === "OFFICIAL"); }).length, sourceTierTarget: queryPlan.queries[pass].sourceTierTarget, counterevidenceChecked: queryPlan.queries[pass].intentType === "COUNTEREVIDENCE", evidenceIds: passEvidenceIds, failureReasons: verification.filter(result => result.outcome === "UNRESOLVED").flatMap(result => result.reasons), environmentApplicability: "CURRENT_ENVIRONMENT", executionTimeMs: Date.now() - queryStartedAt, attempt: pass + 1 }); }
 
         if (queryPlan.status === "READY" && queryPlan.queries[pass]) {
-          const revision = researchQueryOutcomeLearningService.recommendRevision(queryPlan.planId, queryPlan.queries[pass].queryId);
+          const revision = researchQueryOutcomeLearningService.recommendRevision(queryPlan.queryPlanId, queryPlan.queries[pass].queryId);
           if (revision.shouldRevise && revision.revisedQuery) { recommendedRevisionQuery = revision.revisedQuery; nextQuery = revision.revisedQuery; }
         }
 
@@ -572,6 +573,7 @@ export class ResearchService {
       researchStrategyService.recordOutcome(gap.type, 'WEB_SEARCH', resolved, Date.now() - startedAt);
       return {
         gapId: gap.id,
+        results: [],
         route: 'WEB_SEARCH',
         routes: ['LOCAL_CLAIM', 'WEB_SEARCH'],
         localClaimIds,
@@ -613,6 +615,7 @@ export class ResearchService {
 
       return {
         gapId: gap.id,
+        results: [],
         route: 'WEB_SEARCH',
         performed: false,
         evidence,

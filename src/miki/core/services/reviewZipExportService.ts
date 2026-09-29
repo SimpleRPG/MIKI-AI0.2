@@ -7,6 +7,7 @@ import { shadowEvaluationService } from './shadowEvaluationService';
 import { canonicalSha256 } from './canonicalSha256Service';
 import { candidateUnknownResolutionService } from './candidateUnknownResolutionService';
 import { persistenceReceiptLedgerService } from './persistenceReceiptLedgerService';
+import { lifecycleTransitionPolicyService, type LifecycleTransitionContext } from './lifecycleTransitionPolicyService';
 
 export type ReviewPackageStatus='READY_FOR_EXTERNAL_REVIEW'|'EXTERNAL_REVIEW_PENDING'|'ACCEPTED'|'REJECTED'|'NEEDS_CHANGES'|'HOLD';
 export type ReviewZipCreateCode='SUCCESS'|'RUN_NOT_FOUND'|'WORKSPACE_NOT_FOUND'|'NO_CANDIDATE_FILES'|'PACKAGE_NOT_FOUND'|'SNAPSHOT_MISMATCH'|'REVIEW_GATE_BLOCKED'|'ZIP_BUILD_FAILED'|'ZIP_VERIFY_FAILED'|'SAVE_FAILED';
@@ -159,7 +160,7 @@ class ReviewZipExportService {
  async createNextPackage(packageId:string):Promise<ReviewZipCreateResult>{const source=this.ledger.get(packageId);if(!source)return {ok:false,code:'PACKAGE_NOT_FOUND',message:`Package not found: ${packageId}`};return this.create(source.runId,source.workspaceId,{mode:'NEXT_PACKAGE_REVISION',sourcePackageId:packageId});}
  async createNewSeries(packageId:string):Promise<ReviewZipCreateResult>{const source=this.ledger.get(packageId);if(!source)return {ok:false,code:'PACKAGE_NOT_FOUND',message:`Package not found: ${packageId}`};return this.create(source.runId,source.workspaceId,{mode:'NEW_SERIES',sourcePackageId:packageId});}
  list(){return [...this.ledger.values()].sort((a,b)=>b.createdAt-a.createdAt).map(value=>this.clone(value));}
- updateStatus(packageId:string,status:ReviewPackageStatus){const item=this.ledger.get(packageId);if(!item)return undefined;item.status=status;if(!this.save())throw new Error('REVIEW_PACKAGE_STATUS_SAVE_FAILED');return this.clone(item);}
+ updateStatus(packageId:string,status:ReviewPackageStatus,context:LifecycleTransitionContext='NORMAL'){const current=this.ledger.get(packageId);if(!current)return undefined;lifecycleTransitionPolicyService.assert('REVIEW_PACKAGE',current.status,status,context);const next={...current,status};this.ledger.set(packageId,next);if(!this.save()){this.ledger.set(packageId,current);throw new Error('REVIEW_PACKAGE_STATUS_SAVE_FAILED');}return this.clone(next);}
  download(artifact:ReviewZipArtifact){const url=URL.createObjectURL(artifact.blob);const anchor=document.createElement('a');anchor.href=url;anchor.download=artifact.fileName;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return {fileName:artifact.fileName,size:artifact.size,sha256:artifact.zipSha256};}
  private async rebuildFromSnapshot(record:ReviewPackageLedgerRecord):Promise<ReviewZipCreateResult>{
   const zip=new JSZip(); for(const file of record.inputs.files){zip.file(`baseline/${file.path}`,file.baselineContent);zip.file(`candidate/${file.path}`,file.candidateContent);}
@@ -182,7 +183,7 @@ class ReviewZipExportService {
     return {
       ok:false,
       code:'REVIEW_GATE_BLOCKED',
-      message:`Frozen candidate shadow evaluation is not passed${frozenShadow?.reasons?.length?`:${frozenShadow.reasons.join('|')}:SHADOW_EVALUATION_MISSING'}`
+      message:`Frozen candidate shadow evaluation is not passed${frozenShadow?.reasons?.length ? `:${frozenShadow.reasons.join('|')}` : ':SHADOW_EVALUATION_MISSING'}`
     };
   }
   zip.file('baseline_manifest.json',JSON.stringify(base,null,2));zip.file('candidate_manifest.json',JSON.stringify(manifest,null,2));zip.file('package_manifest.json',JSON.stringify({...manifest,packageManifestSha256:record.packageManifestSha256},null,2));zip.file('change_history.json',JSON.stringify({packageId:record.packageId,packageSeriesId:record.packageSeriesId,packageRevision:record.packageRevision,candidateRevision:record.candidateRevision,regeneratedFromFrozenSnapshot:true},null,2));zip.file('issue.json',JSON.stringify({issueId:record.inputs.issueId,runId:record.runId,objective:record.inputs.objective},null,2));zip.file('validation.json',JSON.stringify({schemaVersion:2,workspaceId:record.workspaceId,validationManifest:frozenValidationManifest,validationSummary:frozenValidationManifest,requirements:{validationRequirements:record.inputs.externalDirective?.validationRequirements??[],deliveryRequirements:record.inputs.externalDirective?.deliveryRequirements??[]},performed:candidateValidationEvidenceService.list(record.workspaceId).filter(item=>item.candidateSha256===record.candidateManifestSha256&&item.passed).map(item=>({...item,status:'PASSED'})),unperformed:frozenValidationManifest.missing.map(stage=>({stage,status:'NOT_RUN'})),shadowEvaluation:frozenShadow,disclosure:'NOT_RUN and ENVIRONMENT_UNAVAILABLE are never treated as PASS'},null,2));zip.file('unresolved_checks.json',JSON.stringify({packageId:record.packageId,items:frozenValidationManifest.missing.map(stage=>`NOT_RUN:${stage}`)},null,2));zip.file('review_request.json',JSON.stringify({packageId:record.packageId,packageManifestSha256:record.packageManifestSha256,decision:'ACCEPT|REJECT|NEEDS_CHANGES'},null,2));

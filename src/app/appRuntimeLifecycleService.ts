@@ -1,3 +1,4 @@
+import { systemLogger } from '../services/systemLogger';
 import { crossDomainCirculationService } from '../miki/core/services/crossDomainCirculationService';
 import { domainIntegrationBootstrapService } from '../miki/core/services/domainIntegrationBootstrapService';
 import { capabilityLearningService } from '../miki/capability/services/capabilityLearningService';

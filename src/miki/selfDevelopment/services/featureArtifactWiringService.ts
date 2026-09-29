@@ -1,10 +1,10 @@
-import path from 'node:path';
+import { portablePosixPathService as path } from './portablePosixPathService';
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 import type { AutonomousFeatureDevelopmentPlan } from './autonomousFeatureDevelopmentPlanService';
 import type { ConstructedFeatureArtifact } from './autonomousFeatureConstructionExecutorService';
 import type { NewArtifactPlan, NewArtifactKind } from './newFeatureConstructionPlanService';
 
-export interface FeatureIntegrationPatchCandidate { patchId:string; target:'CORE_COMMAND'|'REACT_TREE'; targetPath:string; importStatement:string; registrationStatement:string; requiredAnchors:string[]; }
+export interface FeatureIntegrationPatchCandidate { patchId:string; target:'CORE_COMMAND'|'REACT_TREE'; targetPath:string; importStatement:string; registrationStatement:string; requiredAnchors:string[]; anchorSymbol?:string; }
 export interface WiredFeatureArtifact extends ConstructedFeatureArtifact { imports:string[]; dependencyArtifactIds:string[]; }
 export interface FeatureArtifactWiringResult { accepted:boolean; wiringId:string; artifacts:WiredFeatureArtifact[]; integrationPatches:FeatureIntegrationPatchCandidate[]; testCommands:string[]; reasons:string[]; }
 
@@ -38,13 +38,13 @@ class FeatureArtifactWiringService {
     const order:Record<NewArtifactKind,NewArtifactKind[]>={TYPE:[],STORE:['TYPE'],SERVICE:['TYPE','STORE'],ROUTE:['SERVICE','TYPE'],REACT_COMPONENT:['ROUTE','TYPE'],TEST:['SERVICE','ROUTE','STORE'],EXPORTER:['TYPE','SERVICE']};
     return order[kind].map(value=>byKind.get(value)).filter((value):value is NewArtifactPlan=>Boolean(value));
   }
-  private importLine(from:string,to:string,exportName:string):string{let relative=path.posix.relative(path.posix.dirname(from),to).replace(/\.(tsx?|mjs)$/,'');if(!relative.startsWith('.'))relative=`./${relative}`;return `import { ${exportName} } from '${relative}';`;}
+  private importLine(from:string,to:string,exportName:string):string{let relative=path.relative(path.dirname(from),to).replace(/\.(tsx?|mjs)$/,'');if(!relative.startsWith('.'))relative=`./${relative}`;return `import { ${exportName} } from '${relative}';`;}
   private storageBody(source:string,exportName:string,key:string):string{return `import { storageService } from '../../../services/storageService';\nconst STORAGE_KEY = 'miki_feature_${key.toLowerCase()}';\n${source.replace('private readonly rows = new Map<string, unknown>();',"private readonly rows = new Map<string, unknown>();\n  public load(): void { const raw=storageService.getItem(STORAGE_KEY); if(raw){ for(const [id,value] of JSON.parse(raw) as Array<[string,unknown]>)this.rows.set(id,value); } }\n  public save(): void { storageService.setItem(STORAGE_KEY,JSON.stringify([...this.rows.entries()])); }")}`;}
   private serviceBody(source:string,deps:NewArtifactPlan[]):string{return `${source}\nexport const featureDependencies = [${deps.map(item=>item.exportName).join(', ')}];\n`;}
   private routeBody(source:string,deps:NewArtifactPlan[]):string{return `${source}\nexport const routeDependencies = [${deps.map(item=>item.exportName).join(', ')}];\n`;}
   private uiBody(source:string,deps:NewArtifactPlan[]):string{return `${source}\nexport const uiDependencies = [${deps.map(item=>item.exportName).join(', ')}];\n`;}
   private testBody(plan:AutonomousFeatureDevelopmentPlan,deps:NewArtifactPlan[]):string{return `import assert from 'node:assert/strict';\n${deps.map(item=>`void ${item.exportName};`).join('\n')}\nconst criteria=${JSON.stringify(plan.feature.acceptanceCriteria)};\nfor(const criterion of criteria){assert.ok(criterion.criterionId);assert.ok(criterion.statement);}\nconsole.log(JSON.stringify({passed:true,evidenceIds:criteria.map(item=>item.criterionId)}));\n`;}
   private integrationPatches(plan:AutonomousFeatureDevelopmentPlan,byKind:Map<NewArtifactKind,NewArtifactPlan>,corePath:string,uiPath:string):FeatureIntegrationPatchCandidate[]{const result:FeatureIntegrationPatchCandidate[]=[];const route=byKind.get('ROUTE');if(route)result.push({patchId:`PATCH-${canonicalSha256({route:route.artifactId,corePath}).slice(0,20)}`,target:'CORE_COMMAND',targetPath:corePath,importStatement:this.importLine(corePath,route.path,route.exportName),registrationStatement:`case '${plan.developmentPlanId}': return ${route.exportName}.route();`,requiredAnchors:['switch','command']});const ui=byKind.get('REACT_COMPONENT');if(ui)result.push({patchId:`PATCH-${canonicalSha256({ui:ui.artifactId,uiPath}).slice(0,20)}`,target:'REACT_TREE',targetPath:uiPath,importStatement:`import ${ui.exportName} from '${this.modulePath(uiPath,ui.path)}';`,registrationStatement:`<${ui.exportName} title={${JSON.stringify(plan.feature.objective)}} onExecute={() => undefined} />`,requiredAnchors:['return','JSX']});return result;}
-  private modulePath(from:string,to:string):string{let value=path.posix.relative(path.posix.dirname(from),to).replace(/\.(tsx?|mjs)$/,'');if(!value.startsWith('.'))value=`./${value}`;return value;}
+  private modulePath(from:string,to:string):string{let value=path.relative(path.dirname(from),to).replace(/\.(tsx?|mjs)$/,'');if(!value.startsWith('.'))value=`./${value}`;return value;}
 }
 export const featureArtifactWiringService=new FeatureArtifactWiringService();

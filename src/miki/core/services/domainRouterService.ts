@@ -30,6 +30,7 @@ export interface DomainReply {
   domain: MikiDomain;
   command: DomainCommand;
   result?: unknown;
+  status?: 'PENDING_VERIFICATION'|'FAILED'|'SUCCEEDED';
   normalized?: NormalizedDomainResult;
   error?: string;
   completedAt: number;
