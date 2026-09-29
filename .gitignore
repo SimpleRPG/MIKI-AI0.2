@@ -4,3 +4,6 @@ dist/
 miki_termux.pid
 
 public/self-code-seed.zip
+
+# Vite generated cache
+.vite/
