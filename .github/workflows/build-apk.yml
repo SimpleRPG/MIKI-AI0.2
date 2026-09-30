@@ -29,6 +29,12 @@ jobs:
         with:
           packages: 'platform-tools'
 
+      - name: Install Android NDK
+        run: sdkmanager --install "ndk;27.2.12479018"
+
+      - name: Set Android NDK path
+        run: echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: npm install
 
@@ -55,8 +61,6 @@ jobs:
           targets: aarch64-linux-android,x86_64-linux-android
 
       - name: Build Rust native core
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
         run: npm run build:rust-android
 
       - name: Grant execute permission for gradlew
