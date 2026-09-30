@@ -7,3 +7,10 @@ public/self-code-seed.zip
 
 # Vite generated cache
 .vite/
+
+native/miki-native-core/target/
+android/app/src/main/jniLibs/**/*.so
+
+android/app/src/main/assets/public/
+
+MIKI-AI0.2-main_code-only-quality-full-*.zip

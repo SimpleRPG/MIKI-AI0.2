@@ -1,0 +1,7 @@
+import {readFileSync} from 'node:fs';const failures=[];
+const rust=readFileSync('native/miki-native-core/src/lib.rs','utf8');const plugin=readFileSync('android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt','utf8');const adapter=readFileSync('src/miki/execution/services/androidNativeRunnerAdapterService.ts','utf8');const contract=readFileSync('src/miki/execution/services/nativeOperationContractService.ts','utf8');const evaluation=readFileSync('src/miki/selfDevelopment/services/evaluationPackageExportService.ts','utf8');
+for(const term of ['nativeScanWorkspace','WalkDir::new','follow_links(false)','ScanReceipt'])if(!rust.includes(term))failures.push(`RUST_SCAN_MISSING:${term}`);
+for(const term of ['scanWorkspace','RUST_SCAN_FILE_COUNT_MISMATCH','RUST_SCAN_ENTRY_MISMATCH'])if(!plugin.includes(term))failures.push(`PLUGIN_SCAN_MISSING:${term}`);
+if(!adapter.includes('scanWorkspace'))failures.push('ADAPTER_SCAN_MISSING');if(!contract.includes("SCAN_REPOSITORY:'SHADOW'"))failures.push('SCAN_NOT_SHADOW');
+for(const term of ['CONTEXT_CLOSURE_RECEIPT_NOT_FOUND','CONTEXT_CLOSURE_RECEIPT_INCOMPLETE','review/CONTEXT_CLOSURE_RECEIPT.json','contextClosure:contextReceipt'])if(!evaluation.includes(term))failures.push(`CONTEXT_EXPORT_MISSING:${term}`);
+console.log(JSON.stringify({passed:failures.length===0,phase:'RUST_SCAN_CONTEXT_EXPORT_5',checks:14,failures},null,2));if(failures.length)process.exitCode=1;

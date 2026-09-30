@@ -35,3 +35,6 @@ export * from './execution/services/workflowSynthesisService';
 export * from './execution/services/selfImprovementExecutionCoordinatorService';
 
 export * from './execution/services/workspaceExecutionBrokerService';
+
+export * from './execution/services/nativeOperationsService';
+export * from './execution/services/nativeOperationRuntimePolicyService';

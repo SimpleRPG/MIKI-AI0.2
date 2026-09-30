@@ -1,0 +1,11 @@
+import {readFileSync} from 'node:fs';
+const understanding=readFileSync('src/miki/core/services/selfCodeUnderstandingService.ts','utf8');
+const compiler=readFileSync('src/miki/selfDevelopment/services/specContractCompilerService.ts','utf8');
+const receipt=readFileSync('src/miki/core/services/contextClosureReceiptService.ts','utf8');
+const failures=[];
+for(const term of ['ContextClosureReceipt','CLOSED','INCOMPLETE','UNDERSTANDING_SNAPSHOT_REQUIRED','MAX_RECEIPTS'])if(!receipt.includes(term))failures.push(`RECEIPT_TERM_MISSING:${term}`);
+if(!compiler.includes("blockers.push(...edgeReasons)"))failures.push('UNRESOLVED_EDGES_DO_NOT_BLOCK');
+if(!compiler.includes("CONTEXT_CLOSURE_INCOMPLETE"))failures.push('CONTEXT_GATE_NOT_CONNECTED');
+if(!compiler.includes('contextReceiptId:contextReceipt.receiptId'))failures.push('CONTEXT_RECEIPT_NOT_PROPAGATED');
+if(!understanding.includes('snapshotChanged||targetFingerprintChanged'))failures.push('UNCHANGED_SNAPSHOT_WRITE_NOT_SUPPRESSED');
+console.log(JSON.stringify({passed:failures.length===0,phase:1,checks:9,failures},null,2));if(failures.length)process.exitCode=1;

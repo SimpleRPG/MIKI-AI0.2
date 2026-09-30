@@ -1,0 +1,16 @@
+import{readFileSync}from'node:fs';
+const failures=[];
+const contract=readFileSync('src/miki/execution/services/nativeOperationContractService.ts','utf8');
+const dispatcher=readFileSync('src/miki/execution/services/nativeOperationDispatcherService.ts','utf8');
+const adapter=readFileSync('src/miki/execution/services/androidNativeRunnerAdapterService.ts','utf8');
+const receipt=readFileSync('src/miki/execution/services/nativeOperationReceiptService.ts','utf8');
+const operations=['HEALTH','SCAN_REPOSITORY','HASH_FILES','BUILD_ZIP','COPY_ZIPTXT','COMPARE_REVISIONS','SEARCH_TEXT','VERIFY_ARTIFACTS','GIT_BLOB_SHA'];
+for(const operation of operations)if(!contract.includes(`${operation}:'RUST_ONLY'`))failures.push(`NOT_RUST_ONLY:${operation}`);
+for(const method of ['executeNativeHealth','executeScanRepository','executeHashFiles','executeBuildZip','executeCopyZipTxt','executeCompareRevisions','executeSearchText','executeVerifyArtifacts','executeGitBlobSha'])if(!adapter.includes(`public async ${method}`))failures.push(`CANONICAL_ENTRY_MISSING:${method}`);
+for(const raw of ['searchWorkspaceText','verifyPackageArtifact','compareRevisions','buildWorkspaceZip','copyZipTxt','gitBlobShaWorkspaceFile','scanWorkspace','hashWorkspaceFiles','hashWorkspaceFile','nativeCoreHealth'])if(!adapter.includes(`private async ${raw}`))failures.push(`RAW_NATIVE_NOT_PRIVATE:${raw}`);
+if(!dispatcher.includes('executeRustOnly'))failures.push('RUST_ONLY_DISPATCH_MISSING');
+if(receipt.includes('recordHashShadow')||receipt.includes('recordScanShadow'))failures.push('LEGACY_RECEIPT_METHOD_REMAINS');
+if(adapter.includes('TFallback')||adapter.includes('fallback:()=>')||dispatcher.includes('executeFallback')||dispatcher.includes('TYPESCRIPT_FALLBACK'))failures.push('TYPESCRIPT_FALLBACK_API_REMAINS');
+for(const legacy of ['TYPESCRIPT_ONLY','SHADOW','RUST_PRIMARY','TYPESCRIPT_FALLBACK'])if(contract.includes(`'${legacy}'`))failures.push(`LEGACY_MODE_REMAINS:${legacy}`);
+console.log(JSON.stringify({passed:failures.length===0,phase:'RUST_FULL_MIGRATION_18',operations,canonicalEntries:9,privateNativeMethods:10,legacyReceiptMethods:0,typescriptFallbackApis:0,failures},null,2));
+if(failures.length)process.exitCode=1;

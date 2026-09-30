@@ -74,11 +74,17 @@ dotenv.config();
 mikiCategoryInteractionRuntime.start();
 
 const app = express();
-const PORT = 3000;
+const requestedPort=Number.parseInt(process.env.PORT||'3000',10);
+const PORT=Number.isInteger(requestedPort)&&requestedPort>0&&requestedPort<=65535?requestedPort:3000;
 const LOG_FILE = path.join(process.cwd(), 'server_debug.log');
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+app.get('/api/health', (_req, res) => {
+  res.json({ status:'ok', service:'miki-ai', phase:'INSTRUCTION_TO_ADOPTION', timestamp:new Date().toISOString() });
+});
+
 
 // Multi-Key Pool & Rotation Manager with Quota Fallback (設計思想: 複数プロジェクト対応)
 interface ExtractedApiKey {
@@ -1613,6 +1619,22 @@ app.post('/api/candidate-validation/run', async (req, res) => {
     });
   };
 
+  const runAllowedCommandAsync = async (
+    command: string,
+    cwd: string,
+    extraEnv: Record<string,string> = {}
+  ): Promise<{exitCode:number;stdout:string;stderr:string}> => {
+    const trimmed=String(command||'').trim();
+    if(!trimmed||/[;&|`$><]/.test(trimmed))return {exitCode:126,stdout:'',stderr:'TEST_COMMAND_FORBIDDEN'};
+    const packagePath=path.join(cwd,'package.json');
+    const scripts=fs.existsSync(packagePath)?JSON.parse(fs.readFileSync(packagePath,'utf8')).scripts||{}:{};
+    let executable='';let args:string[]=[];
+    let match=trimmed.match(/^npm run ([A-Za-z0-9:_-]+)$/);
+    if(match){if(typeof scripts[match[1]]!=='string')return {exitCode:127,stdout:'',stderr:'TEST_SCRIPT_NOT_FOUND'};executable=process.platform==='win32'?'npm.cmd':'npm';args=['run',match[1],'--silent'];}
+    else {match=trimmed.match(/^node ([A-Za-z0-9_./-]+)$/);if(!match)return {exitCode:126,stdout:'',stderr:'TEST_COMMAND_NOT_ALLOWLISTED'};executable=process.execPath;args=[safePath(match[1])];}
+    return await new Promise(resolve=>{const child=spawn(executable,args,{cwd,env:{...process.env,...extraEnv,CI:'true',NO_PROXY:'*',HTTP_PROXY:'',HTTPS_PROXY:''},shell:false,stdio:['ignore','pipe','pipe']});let stdout='';let stderr='';child.stdout.on('data',data=>stdout=(stdout+String(data)).slice(-400000));child.stderr.on('data',data=>stderr=(stderr+String(data)).slice(-400000));const timer=setTimeout(()=>{child.kill('SIGKILL');resolve({exitCode:124,stdout,stderr:`${stderr}\nCOMMAND_TIMEOUT`});},180000);child.on('close',code=>{clearTimeout(timer);resolve({exitCode:code??1,stdout,stderr});});child.on('error',error=>{clearTimeout(timer);resolve({exitCode:127,stdout,stderr:String(error)});});});
+  };
+
   const runAllowedCommand = (
     command: string,
     cwd: string,
@@ -1810,81 +1832,24 @@ app.post('/api/candidate-validation/run', async (req, res) => {
       );
     }
 
-    // 4. COUNTEREXAMPLE
-    // 既存のFailure Resilience verify経路をCandidate Workspace上で実行する。
-    stageStart = Date.now();
-    const counterexampleCommand = 'npm run verify:failure-resilience';
-    const counterexample = runAllowedCommand(counterexampleCommand, root, {
-      MIKI_VALIDATION_STAGE: 'COUNTEREXAMPLE',
-    });
-    record(
-      'COUNTEREXAMPLE',
-      counterexampleCommand,
-      counterexample.exitCode === 0,
-      counterexample.exitCode,
-      `${counterexample.stdout}\n${counterexample.stderr}`,
-      stageStart
-    );
-
-    // 5. GENERALIZATION
-    // 既存のCode-only quality/property系の検証をCandidate Workspace上で実行する。
-    stageStart = Date.now();
-    const generalizationCommand = 'npm run verify:code-only-quality';
-    const generalization = runAllowedCommand(generalizationCommand, root, {
-      MIKI_VALIDATION_STAGE: 'GENERALIZATION',
-    });
-    record(
-      'GENERALIZATION',
-      generalizationCommand,
-      generalization.exitCode === 0,
-      generalization.exitCode,
-      `${generalization.stdout}\n${generalization.stderr}`,
-      stageStart
-    );
-
-    // 6. PERSISTENCE
-    stageStart = Date.now();
-    let persistencePassed = true;
-    const persistenceLog: string[] = [];
-
-    for (const file of candidateFiles) {
-      const relative = safePath(file.path);
-      const content = fs.readFileSync(path.join(root, relative), 'utf8');
-      if (content !== String(file.candidateContent || '')) {
-        persistencePassed = false;
-        persistenceLog.push(`MISMATCH:${relative}`);
-      }
-    }
-
-    record(
-      'PERSISTENCE',
-      'write-read candidate equality',
-      persistencePassed,
-      persistencePassed ? 0 : 1,
-      persistenceLog.join('\n') || 'PASS',
-      stageStart
-    );
-
-    // 7. DEVICE
-    stageStart = Date.now();
-    const deviceCommands = [
-      'npm run android:verify-contract',
-      'npm run android:verify-workmanager-contract',
-    ];
-    const deviceResults = deviceCommands.map(command => ({
-      command,
-      ...runAllowedCommand(command, root),
-    }));
-    const devicePassed = deviceResults.every(item => item.exitCode === 0);
-
-    record(
-      'DEVICE',
-      deviceResults.map(item => item.command).join(' && '),
-      devicePassed,
-      devicePassed ? 0 : deviceResults.find(item => item.exitCode !== 0)?.exitCode ?? 1,
-      deviceResults.map(item => `${item.command}\n${item.stdout}\n${item.stderr}`).join('\n'),
-      stageStart
-    );
+    // 4-7. Independent validation stages execute in a bounded parallel batch.
+    // Typecheck and regression remain strict prerequisites. Audit records are still emitted per stage.
+    const parallelStageStarted=Date.now();
+    const counterexampleCommand='npm run verify:failure-resilience';
+    const generalizationCommand='npm run verify:code-only-quality';
+    const deviceCommands=['npm run android:verify-contract','npm run android:verify-workmanager-contract'];
+    const persistencePromise=Promise.resolve().then(()=>{const persistenceStarted=Date.now();let passed=true;const log:string[]=[];for(const file of candidateFiles){const relative=safePath(file.path);const content=fs.readFileSync(path.join(root,relative),'utf8');if(content!==String(file.candidateContent||'')){passed=false;log.push(`MISMATCH:${relative}`);}}return {stage:'PERSISTENCE',command:'write-read candidate equality',passed,exitCode:passed?0:1,log:log.join('\n')||'PASS',startedAt:persistenceStarted};});
+    const [counterexample,generalization,persistence,deviceResults]=await Promise.all([
+      runAllowedCommandAsync(counterexampleCommand,root,{MIKI_VALIDATION_STAGE:'COUNTEREXAMPLE'}),
+      runAllowedCommandAsync(generalizationCommand,root,{MIKI_VALIDATION_STAGE:'GENERALIZATION'}),
+      persistencePromise,
+      Promise.all(deviceCommands.map(async command=>({command,...await runAllowedCommandAsync(command,root,{MIKI_VALIDATION_STAGE:'DEVICE'})}))),
+    ]);
+    record('COUNTEREXAMPLE',counterexampleCommand,counterexample.exitCode===0,counterexample.exitCode,`${counterexample.stdout}\n${counterexample.stderr}`,parallelStageStarted);
+    record('GENERALIZATION',generalizationCommand,generalization.exitCode===0,generalization.exitCode,`${generalization.stdout}\n${generalization.stderr}`,parallelStageStarted);
+    record(persistence.stage,persistence.command,persistence.passed,persistence.exitCode,persistence.log,persistence.startedAt);
+    const devicePassed=deviceResults.every(item=>item.exitCode===0);
+    record('DEVICE',deviceResults.map(item=>item.command).join(' && '),devicePassed,devicePassed?0:deviceResults.find(item=>item.exitCode!==0)?.exitCode??1,deviceResults.map(item=>`${item.command}\n${item.stdout}\n${item.stderr}`).join('\n'),parallelStageStarted);
 
     const requiredStages = [
       'STATIC',

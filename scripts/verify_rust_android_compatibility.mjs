@@ -1,0 +1,12 @@
+import {readFileSync} from 'node:fs';
+const rust=readFileSync('native/miki-native-core/src/lib.rs','utf8');
+const kotlin=readFileSync('android/app/src/main/java/com/miki/ai/MIKINativeCore.kt','utf8');
+const plugin=readFileSync('android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt','utf8');
+const build=readFileSync('scripts/build_rust_android.sh','utf8');const failures=[];
+for(const value of ['aarch64-linux-android','arm64-v8a','libmiki_native_core.so'])if(!build.includes(value))failures.push(`GALAXY_S25_ARM64_BUILD_MISSING:${value}`);
+if(!rust.includes('nativeSha256File'))failures.push('RUST_STREAMING_SHA256_MISSING');
+if(!rust.includes('BufReader::with_capacity'))failures.push('RUST_HASH_NOT_STREAMING');
+if(!plugin.includes('WORKSPACE_PATH_ESCAPE_REJECTED'))failures.push('NATIVE_PATH_BOUNDARY_MISSING');
+if(!plugin.includes('File(context.filesDir, "miki/workspaces")'))failures.push('APP_PRIVATE_WORKSPACE_ROOT_MISSING');
+if(!kotlin.includes('EXPECTED_API_VERSION = 8'))failures.push('RUST_API_VERSION_NOT_CURRENT');
+console.log(JSON.stringify({passed:failures.length===0,device:'Galaxy S25',abi:'arm64-v8a',phase:'RUST_HASH_FILES_2',checks:9,failures},null,2));if(failures.length)process.exitCode=1;

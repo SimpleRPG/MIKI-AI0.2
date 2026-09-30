@@ -5,20 +5,25 @@ import { typedCoreUiGatewayService } from './miki/core/ui/typedCoreUiGatewayServ
 import { improvementCanaryRollbackService } from './miki/improvement/services/improvementCanaryRollbackService';
 import React, { useState, useEffect, useRef } from 'react';
 import { appRuntimeLifecycleService } from './app/appRuntimeLifecycleService';
+import { startupPhaseSchedulerService } from './app/startupPhaseSchedulerService';
 import { selfCodeSpaceService } from './miki/core/services/selfCodeSpaceService';
 import { Header } from './components/Header';
 import { ChatPanel } from './components/ChatPanel';
 import { GamePreview } from './components/GamePreview';
-import { CodeEditor } from './components/CodeEditor';
+const loadCodeEditor = () => import('./components/CodeEditor');
+const loadImprovementHome = () => import('./components/AutonomousImprovementHome');
+const loadMemoryModal = () => import('./components/MemoryModal');
+const loadActivityMonitor = () => import('./components/RealtimeActivityMonitorModal');
+const CodeEditor = React.lazy(() => loadCodeEditor().then(module => ({ default: module.CodeEditor })));
 import { GitHubHub } from './components/GitHubHub';
-import { AutonomousImprovementHome } from './components/AutonomousImprovementHome';
+const AutonomousImprovementHome = React.lazy(() => loadImprovementHome().then(module => ({ default: module.AutonomousImprovementHome })));
 import { ExternalConnectionsScreen } from './components/ExternalConnectionsScreen';
 import { WorkspaceScreen } from './components/WorkspaceScreen';
 import { HomeDashboard } from './components/HomeDashboard';
 import { LibraryHub } from './components/LibraryHub';
-import { MemoryModal } from './components/MemoryModal';
+const MemoryModal = React.lazy(() => loadMemoryModal().then(module => ({ default: module.MemoryModal })));
 import { ExportModal } from './components/ExportModal';
-import { RealtimeActivityMonitorModal } from './components/RealtimeActivityMonitorModal';
+const RealtimeActivityMonitorModal = React.lazy(() => loadActivityMonitor().then(module => ({ default: module.RealtimeActivityMonitorModal })));
 import { WORKSPACE_TEMPLATES } from './data/presets';
 import {
   ChatMessage,
@@ -294,11 +299,14 @@ export default function App() {
   const [isEvolutionRunning, setIsEvolutionRunning] = useState<boolean>(false);
 
   useEffect(() => {
+    startupPhaseSchedulerService.registerIdle(() => loadMemoryModal());
+    startupPhaseSchedulerService.registerIdle(() => loadImprovementHome());
+    startupPhaseSchedulerService.registerIdle(() => loadActivityMonitor());
     let disposed = false;
 
     void (async () => {
       await selfCodeSpaceService.initializeBundledSeed();
-      if (!disposed) appRuntimeLifecycleService.initialize();
+      if (!disposed) { appRuntimeLifecycleService.initialize(); startupPhaseSchedulerService.startIdle(); }
     })();
 
     return () => {
@@ -3730,13 +3738,13 @@ export default function App() {
         memories={memories}
         engineMode={engineMode}
         onRestartGame={handleRestartGame}
-        onOpenMemoryModal={() => setIsMemoryModalOpen(true)}
+        onOpenMemoryModal={() => { void loadMemoryModal(); setIsMemoryModalOpen(true); }}
         onOpenExportModal={() => setIsExportModalOpen(true)}
         onNewBlankProject={handleNewBlankProject}
         useSearch={useSearch}
         setUseSearch={setUseSearch}
         fps={fps}
-        onOpenActivityMonitor={() => setIsGlobalActivityMonitorOpen(true)}
+        onOpenActivityMonitor={() => { void loadActivityMonitor(); setIsGlobalActivityMonitorOpen(true); }}
         onOpenSelfImprovementModal={() => setActiveTab('improvement')}
         isWorking={isLoading || isGenerating || isEvolutionRunning}
       />
@@ -3836,7 +3844,7 @@ export default function App() {
             {activeTab === 'improvement' && (
               <AutonomousImprovementHome
                 onOpenSelfImprovementModal={() => setActiveTab('improvement')}
-                onOpenActivityMonitor={() => setIsGlobalActivityMonitorOpen(true)}
+                onOpenActivityMonitor={() => { void loadActivityMonitor(); setIsGlobalActivityMonitorOpen(true); }}
               />
             )}
           </div>
@@ -3946,11 +3954,11 @@ export default function App() {
             {mobileTab === 'improvement' && (
               <AutonomousImprovementHome
                 onOpenSelfImprovementModal={() => setActiveTab('improvement')}
-                onOpenActivityMonitor={() => setIsGlobalActivityMonitorOpen(true)}
+                onOpenActivityMonitor={() => { void loadActivityMonitor(); setIsGlobalActivityMonitorOpen(true); }}
               />
             )}
 
-            {mobileTab === 'library' && <LibraryHub onOpenMemory={() => setIsMemoryModalOpen(true)} />}
+            {mobileTab === 'library' && <LibraryHub onOpenMemory={() => { void loadMemoryModal(); setIsMemoryModalOpen(true); }} />}
 
             {mobileTab === 'settings' && <ExternalConnectionsScreen />}
 
@@ -3962,7 +3970,7 @@ export default function App() {
                     <span>{persona.name}の性格・記憶カンペ</span>
                   </h3>
                   <button
-                    onClick={() => setIsMemoryModalOpen(true)}
+                    onPointerEnter={() => { void loadMemoryModal(); }} onTouchStart={() => { void loadMemoryModal(); }} onClick={() => setIsMemoryModalOpen(true)}
                     className="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white rounded-lg text-xs font-bold shadow-md shadow-pink-600/30"
                   >
                     設定モーダルを開く
@@ -4006,7 +4014,7 @@ export default function App() {
               { id: 'library', label: 'ライブラリ', Icon: Library },
               { id: 'settings', label: '設定', Icon: Settings },
             ].map(({ id, label, Icon }) => (
-              <button key={id} onClick={() => setMobileTab(id as typeof mobileTab)} aria-current={mobileTab === id ? 'page' : undefined} className={`min-h-12 flex-1 rounded-xl py-1.5 flex flex-col items-center justify-center gap-1 transition-all ${mobileTab === id ? 'bg-indigo-500/10 text-indigo-300 font-bold' : 'text-slate-400 hover:text-slate-200'}`}>
+              <button key={id} onPointerEnter={() => { if (id === 'improvement') void loadImprovementHome(); }} onTouchStart={() => { if (id === 'improvement') void loadImprovementHome(); }} onClick={() => setMobileTab(id as typeof mobileTab)} aria-current={mobileTab === id ? 'page' : undefined} className={`min-h-12 flex-1 rounded-xl py-1.5 flex flex-col items-center justify-center gap-1 transition-all ${mobileTab === id ? 'bg-indigo-500/10 text-indigo-300 font-bold' : 'text-slate-400 hover:text-slate-200'}`}>
                 <Icon className="h-5 w-5" />
                 <span className="text-[10px] leading-none">{label}</span>
               </button>

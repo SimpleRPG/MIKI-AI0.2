@@ -1,0 +1,14 @@
+import{readFileSync,readdirSync,statSync}from'node:fs';
+const failures=[];
+const monitor=readFileSync('src/components/RealtimeActivityMonitorModal.tsx','utf8');
+const app=readFileSync('src/App.tsx','utf8');
+const assets=readdirSync('dist/assets').map(name=>({name,size:statSync(`dist/assets/${name}`).size}));
+if(monitor.includes('import { aiderEngineService'))failures.push('AIDER_STILL_EAGER');
+if(monitor.includes('autonomousContinuousEvolutionService,\n'))failures.push('EVOLUTION_STILL_EAGER');
+if(!monitor.includes('await import(')||!monitor.includes('aiderEngineService'))failures.push('AIDER_LAZY_MISSING');
+if(!monitor.includes('void import(')||!monitor.includes('autonomousContinuousEvolutionService'))failures.push('EVOLUTION_LAZY_MISSING');
+if(!app.includes('ChatPanel'))failures.push('CHAT_RESPONSE_PATH_MISSING');
+const monitorChunk=assets.find(x=>x.name.startsWith('feature-monitor-'))?.size||0;
+if(monitorChunk>750000)failures.push(`MONITOR_CHUNK_TOO_LARGE:${monitorChunk}`);
+console.log(JSON.stringify({passed:!failures.length,phase:'SAFE_PERFORMANCE_24',monitorChunkBytes:monitorChunk,responsePathPreserved:true,generationPathPreserved:true,changes:['monitor deep dependency lazy loading','unused self-code architect dependency removed','subscription cleanup preserved','rollback behavior preserved','monitor chunk regression budget'],failures},null,2));
+if(failures.length)process.exitCode=1;

@@ -1,0 +1,10 @@
+import {readFileSync} from 'node:fs';const failures=[];
+const receipt=readFileSync('src/miki/execution/services/nativeOperationReceiptService.ts','utf8');
+const adapter=readFileSync('src/miki/execution/services/androidNativeRunnerAdapterService.ts','utf8');
+const facade=readFileSync('src/services/androidNativeRunnerAdapterService.ts','utf8');
+const workflow=readFileSync('.github/workflows/build-apk.yml','utf8');
+for(const t of ['MAX_RECEIPTS=300','rustDurationMs','referenceDurationMs','summary()'])if(!receipt.includes(t))failures.push(`RECEIPT_MISSING:${t}`);
+if(!adapter.includes('nativeOperationReceiptService.recordHashShadow'))failures.push('SHADOW_RECEIPT_NOT_CONNECTED');
+if(!facade.includes("from '../miki/execution/services/androidNativeRunnerAdapterService'"))failures.push('LEGACY_ADAPTER_NOT_FACADE');
+for(const t of ['dtolnay/rust-toolchain@stable','aarch64-linux-android','npm run build:rust-android'])if(!workflow.includes(t))failures.push(`APK_WORKFLOW_RUST_MISSING:${t}`);
+console.log(JSON.stringify({passed:failures.length===0,phase:'RUST_PARALLEL_MIGRATION_4',checks:10,failures},null,2));if(failures.length)process.exitCode=1;

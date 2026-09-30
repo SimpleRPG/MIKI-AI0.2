@@ -1,0 +1,14 @@
+import {readFileSync,existsSync} from 'node:fs';
+const read=p=>readFileSync(p,'utf8');const failures=[];
+const main=read('src/main.tsx'),storage=read('src/services/storageService.ts'),styles=read('android/app/src/main/res/values/styles.xml'),activity=read('android/app/src/main/java/com/miki/ai/MainActivity.java'),layout=read('android/app/src/main/res/layout/activity_main.xml'),colors=read('android/app/src/main/res/values/colors.xml');
+if(!main.includes("startupRecoveryService.renderFatal(rootElement, error)"))failures.push('NO_VISIBLE_BOOTSTRAP_FAILURE_UI');
+if(!main.includes("ROOT_ELEMENT_NOT_FOUND"))failures.push('NO_ROOT_GUARD');
+if(!storage.includes("SQLITE_INIT")||!storage.includes("INDEXEDDB_INIT"))failures.push('NO_STORAGE_STARTUP_TIMEOUT');
+if(!styles.includes('postSplashScreenTheme'))failures.push('NO_POST_SPLASH_THEME');
+if(!styles.includes('windowSplashScreenAnimatedIcon'))failures.push('NO_SPLASH_ICON');
+if(activity.indexOf('registerPlugin(')>activity.indexOf('super.onCreate'))failures.push('PLUGIN_REGISTRATION_AFTER_SUPER');
+for(const plugin of ['MikiWorkManagerPlugin','MIKIJapaneseMorphologyPlugin','MIKINativeRunnerPlugin'])if(!activity.includes(`registerPlugin(${plugin}.class)`))failures.push(`PLUGIN_NOT_REGISTERED:${plugin}`);
+if(!existsSync('android/app/src/main/assets/public/index.html'))failures.push('ANDROID_WEB_ASSET_INDEX_MISSING');
+if(!layout.includes('android:id="@+id/webview"'))failures.push('CAPACITOR_WEBVIEW_ID_MISSING');
+for(const color of ['colorPrimary','colorPrimaryDark','colorAccent','miki_startup_background'])if(!colors.includes(`name="${color}"`))failures.push(`ANDROID_COLOR_MISSING:${color}`);
+console.log(JSON.stringify({passed:failures.length===0,checks:10,failures},null,2));if(failures.length)process.exitCode=1;

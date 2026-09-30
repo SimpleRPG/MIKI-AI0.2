@@ -1,24 +1,4 @@
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
-
-function stableVendorChunk(id: string): string | undefined {
-  if (!id.includes('/node_modules/')) return undefined
-  if (id.includes('/node_modules/typescript/')) return 'vendor-typescript'
-  if (id.includes('/node_modules/sql.js/')) return 'vendor-sqljs'
-  if (id.includes('/node_modules/jszip/')) return 'vendor-jszip'
-  if (id.includes('/node_modules/react/') || id.includes('/node_modules/react-dom/')) return 'vendor-react'
-  if (id.includes('/node_modules/recharts/') || id.includes('/node_modules/d3-')) return 'vendor-charts'
-  return 'vendor-common'
-}
-
-export default defineConfig({
-  plugins: [tailwindcss()],
-  build: {
-    sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks: stableVendorChunk,
-      },
-    },
-  },
-})
+function stableVendorChunk(id:string):string|undefined{if(!id.includes('/node_modules/')){if(id.includes('/codeKnowledge/'))return'knowledge';if(id.includes('/components/MemoryModal'))return'feature-memory';if(id.includes('/components/CodeEditor'))return'feature-code-editor';if(id.includes('/components/AutonomousImprovementHome'))return'feature-improvement';if(id.includes('/components/RealtimeActivityMonitorModal'))return'feature-monitor';return undefined}if(id.includes('/typescript/'))return'vendor-typescript';if(id.includes('/sql.js/'))return'vendor-sqljs';if(id.includes('/jszip/'))return'vendor-jszip';if(id.includes('/react/')||id.includes('/react-dom/'))return'vendor-react';if(id.includes('/recharts/')||id.includes('/d3-'))return'vendor-charts';return'vendor-common'}
+export default defineConfig({plugins:[tailwindcss()],build:{sourcemap:false,chunkSizeWarningLimit:1200,rollupOptions:{output:{manualChunks:stableVendorChunk}}}})

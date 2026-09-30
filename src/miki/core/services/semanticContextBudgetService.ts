@@ -1,0 +1,3 @@
+export interface RankedContext<T>{item:T;score:number;reason:string;}
+class SemanticContextBudgetService{rank<T>(items:T[],query:string,read:(item:T)=>string,limit=40):RankedContext<T>[] {const tokens=[...new Set(query.toLowerCase().split(/[^\p{L}\p{N}_]+/u).filter(x=>x.length>1))];return items.map(item=>{const text=read(item).toLowerCase();let score=0;for(const token of tokens)if(text.includes(token))score+=token.length>5?3:1;return{item,score,reason:score?'LEXICAL_SEMANTIC_OVERLAP':'FALLBACK_CONTEXT'};}).sort((a,b)=>b.score-a.score).slice(0,limit);}}
+export const semanticContextBudgetService=new SemanticContextBudgetService();

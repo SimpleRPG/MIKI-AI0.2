@@ -1,0 +1,5 @@
+import type { PrioritizedRequirement } from './requirementPriorityResolverService';
+import type { AcceptanceTestCase } from './acceptanceTestMatrixService';
+export interface RequirementTraceRow { requirementId:string; requirement:string; priority:number; plannedTests:string[]; status:'PLANNED'|'UNTRACED'; }
+class RequirementTraceabilityMatrixService {create(requirements:PrioritizedRequirement[],tests:AcceptanceTestCase[]):RequirementTraceRow[]{return requirements.map((requirement,index)=>{const tokens=requirement.text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(value=>value.length>1);const plannedTests=tests.filter(test=>tokens.some(token=>test.criterion.toLowerCase().includes(token)||test.oracle.toLowerCase().includes(token))).map(test=>test.id);return{requirementId:`REQ-${String(index+1).padStart(3,'0')}`,requirement:requirement.text,priority:requirement.priority,plannedTests,status:plannedTests.length?'PLANNED':'UNTRACED'};});}}
+export const requirementTraceabilityMatrixService=new RequirementTraceabilityMatrixService();

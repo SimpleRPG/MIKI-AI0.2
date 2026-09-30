@@ -1,0 +1,3 @@
+export type CodeKnowledgeDomain='javascript'|'typescript'|'web';
+class CodeKnowledgeLoaderService{private readonly cache=new Map<CodeKnowledgeDomain,Promise<unknown>>();load(domain:CodeKnowledgeDomain):Promise<unknown>{const existing=this.cache.get(domain);if(existing)return existing;const promise=domain==='javascript'?import('../data/codeKnowledge/javascript'):domain==='typescript'?import('../data/codeKnowledge/typescript'):import('../data/codeKnowledge/web');this.cache.set(domain,promise);return promise;}isLoaded(domain:CodeKnowledgeDomain){return this.cache.has(domain);}}
+export const codeKnowledgeLoaderService=new CodeKnowledgeLoaderService();

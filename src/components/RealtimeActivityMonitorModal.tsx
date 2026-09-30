@@ -27,12 +27,8 @@ import {
   StepExecutionSnapshot,
 } from '../services/systemLogger';
 import { proactiveContextOsService, ContextAwarenessSnapshot } from '../miki/strategy/services/proactiveContextOsService';
-import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
-import {
-  autonomousContinuousEvolutionService,
-  AutonomousEvolutionRecord,
-} from '../miki/autonomy/services/autonomousContinuousEvolutionService';
-import { aiderEngineService, AiderCommitRecord } from '../miki/selfDevelopment/services/aiderEngineService';
+import type { AutonomousEvolutionRecord } from '../miki/autonomy/services/autonomousContinuousEvolutionService';
+import type { AiderCommitRecord } from '../miki/selfDevelopment/services/aiderEngineService';
 
 interface RealtimeActivityMonitorModalProps {
   isOpen: boolean;
@@ -66,6 +62,7 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
 
   const loadCommits = async () => {
     try {
+      const { aiderEngineService } = await import('../miki/selfDevelopment/services/aiderEngineService');
       const list = await aiderEngineService.fetchCommits();
       setCommits(list);
     } catch {
@@ -92,16 +89,22 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
       setSteps([...allSteps]);
     });
 
-    // 2. 自律改善サービス サブスクライブ
-    const unsubEvolution = autonomousContinuousEvolutionService.subscribe((record, isRunning) => {
-      setIsEvolutionBusy(isRunning);
-      if (record) setLatestEvolutionRecord(record);
+    // 2. 自律改善サービスはMonitor表示時だけ遅延ロードする。
+    let unsubEvolution: (() => void) | undefined;
+    let cancelled = false;
+    void import('../miki/autonomy/services/autonomousContinuousEvolutionService').then(({ autonomousContinuousEvolutionService }) => {
+      if (cancelled) return;
+      unsubEvolution = autonomousContinuousEvolutionService.subscribe((record, isRunning) => {
+        setIsEvolutionBusy(isRunning);
+        if (record) setLatestEvolutionRecord(record);
+      });
     });
 
     return () => {
+      cancelled = true;
       unsubLog();
       unsubStep();
-      unsubEvolution();
+      unsubEvolution?.();
     };
   }, [isOpen]);
 
@@ -116,6 +119,7 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
   const handleRollback = async (hash: string) => {
     setIsRollingBack(hash);
     try {
+      const { aiderEngineService } = await import('../miki/selfDevelopment/services/aiderEngineService');
       const res = await aiderEngineService.rollbackCommit(hash);
       if (res.success) {
         setActionNotice(`✅ コミット [${hash}] を復元しました: ${res.restoredFiles?.join(', ') || res.message}`);

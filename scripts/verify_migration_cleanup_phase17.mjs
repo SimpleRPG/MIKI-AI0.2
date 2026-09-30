@@ -1,0 +1,6 @@
+import{existsSync,readFileSync}from'node:fs';const failures=[];
+const adapter=readFileSync('src/miki/execution/services/androidNativeRunnerAdapterService.ts','utf8');const plugin=readFileSync('android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt','utf8');
+for(const old of ['compareRevisionsShadow','buildWorkspaceZipShadow','copyZipTxtShadow','gitBlobShaWorkspaceFileShadow','scanWorkspaceShadow','hashWorkspaceFilesShadow'])if(adapter.includes(old)||plugin.includes(old))failures.push(`SHADOW_NAME_REMAINS:${old}`);
+for(const current of ['compareRevisions','buildWorkspaceZip','copyZipTxt','scanWorkspace','hashWorkspaceFiles'])if(!adapter.includes(current)||!plugin.includes(current))failures.push(`PRIMARY_NAME_MISSING:${current}`);
+for(const path of ['MIKI-AI0.2-main_code-only-quality-full-v272.zip','public/self-code-seed.zip','dist','android/app/src/main/assets/public'])if(existsSync(path))failures.push(`GENERATED_DUPLICATE_REMAINS:${path}`);
+console.log(JSON.stringify({passed:failures.length===0,phase:'MIGRATION_CLEANUP_17',removedGenerated:['legacy root archive','public self-code seed','dist','android bundled web assets'],renamedNativeApis:6,failures},null,2));if(failures.length)process.exitCode=1;

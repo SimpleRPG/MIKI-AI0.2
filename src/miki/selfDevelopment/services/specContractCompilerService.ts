@@ -6,6 +6,7 @@
 import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from '../../../services/storageService';
 import { selfCodeUnderstandingService, type ImpactScopeRecord } from '../../core/services/selfCodeUnderstandingService';
+import { contextClosureReceiptService } from '../../core/services/contextClosureReceiptService';
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 import type { AstCandidateOperation } from './astCandidateTransformationService';
 import { contractPropagationService } from './contractPropagationService';
@@ -40,6 +41,7 @@ export interface ImprovementRequirementContract {
   validationRequirements:string[]; deliveryRequirements:string[];
   impactScopes:ImpactScopeRecord[]; executionPathCount:number; repositorySnapshotSha256?:string;
   reusableComponentIds:string[]; codeKnowledgeIds:string[]; unresolved:string[];
+  contextReceiptId:string; contextStatus:'CLOSED'|'INCOMPLETE';
   status:'READY'|'BLOCKED'; createdAt:number;
 }
 export interface ImprovementRequirementInput {
@@ -120,10 +122,11 @@ export class SpecContractCompilerService {
     const requirements=clean(input.requirements); const prohibitions=clean(input.prohibitions);
     const invariants=clean(input.invariants); const validationRequirements=clean(input.validationRequirements);
     const deliveryRequirements=clean(input.deliveryRequirements);
-    const understanding=selfCodeUnderstandingService.ensure(targetPaths); const unresolved:string[]=[]; const blockers:string[]=[];
+    const understanding=selfCodeUnderstandingService.ensure(targetPaths); const contextReceipt=contextClosureReceiptService.create(understanding); const unresolved:string[]=[]; const blockers:string[]=[];
     if(!objective){unresolved.push('OBJECTIVE_REQUIRED');blockers.push('OBJECTIVE_REQUIRED');} if(targetPaths.length===0){unresolved.push('TARGET_PATHS_REQUIRED');blockers.push('TARGET_PATHS_REQUIRED');}
     if(!understanding.ready){unresolved.push(...understanding.reasons);blockers.push(...understanding.reasons);}
-    if(understanding.unresolvedEdges.length>0)unresolved.push(...understanding.unresolvedEdges.map(value=>`UNRESOLVED_EDGE:${value}`));
+    if(understanding.unresolvedEdges.length>0){const edgeReasons=understanding.unresolvedEdges.map(value=>`UNRESOLVED_EDGE:${value}`);unresolved.push(...edgeReasons);blockers.push(...edgeReasons);}
+    if(contextReceipt.status!=='CLOSED'){unresolved.push(...contextReceipt.unresolved);blockers.push('CONTEXT_CLOSURE_INCOMPLETE');}
     if(requirements.length===0){unresolved.push('REQUIREMENTS_REQUIRED');blockers.push('REQUIREMENTS_REQUIRED');}
     if(validationRequirements.length===0){unresolved.push('VALIDATION_REQUIREMENTS_REQUIRED');blockers.push('VALIDATION_REQUIREMENTS_REQUIRED');}
     const reusableComponentIds=clean(input.reusableComponentIds).sort(); const codeKnowledgeIds=clean(input.codeKnowledgeIds).sort();
@@ -131,6 +134,7 @@ export class SpecContractCompilerService {
     return {schemaVersion:2,contractId:`IMPROVEMENT-${canonicalSha256(seed).slice(0,24)}`,objective,targetPaths,requirements,prohibitions,invariants,
       validationRequirements,deliveryRequirements,impactScopes:understanding.impactScopes,executionPathCount:understanding.executionPaths.length,
       repositorySnapshotSha256:understanding.snapshotSha256,reusableComponentIds,codeKnowledgeIds,unresolved:[...new Set(unresolved)].sort(),
+      contextReceiptId:contextReceipt.receiptId,contextStatus:contextReceipt.status,
       status:blockers.length===0?'READY':'BLOCKED',createdAt:Date.now()};
   }
 

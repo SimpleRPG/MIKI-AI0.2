@@ -380,7 +380,9 @@ class SelfCodeUnderstandingService {
       createdAt:previous?.createdAt||now,updatedAt:now,
       targetFingerprints:{...(previous?.targetFingerprints||{}),[key]:fingerprint}
     };
-    storageService.setItem(KEY,JSON.stringify(snapshot));
+    const targetFingerprintChanged=previous?.targetFingerprints?.[key]!==fingerprint;
+    const snapshotChanged=previous?.snapshotSha256!==snapshot.snapshotSha256;
+    if(!previous||snapshotChanged||targetFingerprintChanged)storageService.setItem(KEY,JSON.stringify(snapshot));
 
     const targetSet=new Set(targets);
     const contractOwners=new Map<string,Set<string>>();

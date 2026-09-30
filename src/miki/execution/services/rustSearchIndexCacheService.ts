@@ -1,0 +1,3 @@
+interface SearchCacheEntry{revision:string;query:string;limit:number;value:unknown;createdAt:number;}
+class RustSearchIndexCacheService{private readonly cache=new Map<string,SearchCacheEntry>();get(revision:string,query:string,limit:number){return this.cache.get(`${revision}\0${query}\0${limit}`)?.value;}set(revision:string,query:string,limit:number,value:unknown){this.cache.set(`${revision}\0${query}\0${limit}`,{revision,query,limit,value,createdAt:Date.now()});if(this.cache.size>100){const first=this.cache.keys().next().value;if(first)this.cache.delete(first);}}invalidateRevision(revision:string){for(const[key,row]of this.cache)if(row.revision===revision)this.cache.delete(key);}}
+export const rustSearchIndexCacheService=new RustSearchIndexCacheService();

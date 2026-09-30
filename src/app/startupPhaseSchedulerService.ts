@@ -1,0 +1,3 @@
+type StartupTask=()=>void|Promise<void>;
+class StartupPhaseSchedulerService{private idle:StartupTask[]=[];private onDemand=new Map<string,StartupTask>();registerIdle(task:StartupTask){this.idle.push(task);}registerOnDemand(key:string,task:StartupTask){this.onDemand.set(key,task);}startIdle(){const run=async()=>{for(const task of this.idle.splice(0))await task();};if('requestIdleCallback'in globalThis)(globalThis as any).requestIdleCallback(()=>void run(),{timeout:3000});else setTimeout(()=>void run(),750);}async runOnDemand(key:string){const task=this.onDemand.get(key);if(task){this.onDemand.delete(key);await task();}}}
+export const startupPhaseSchedulerService=new StartupPhaseSchedulerService();

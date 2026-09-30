@@ -6,7 +6,7 @@ import { storageService } from './storageService';
 import { systemLogger } from './systemLogger';
 import { ExecutionEnvironment, executionRunnerService, ExecutionRequest } from './executionRunnerService';
 import { externalRunnerAdapterService } from './externalRunnerAdapterService';
-import { androidNativeRunnerAdapterService } from './androidNativeRunnerAdapterService';
+import { androidNativeRunnerAdapterService } from '../miki/execution/services/androidNativeRunnerAdapterService';
 
 export type ImprovementRegressionCoordinatorStatus = 'WAITING' | 'RUNNING' | 'CANARY' | 'ADOPTED' | 'REJECTED' | 'ROLLED_BACK';
 

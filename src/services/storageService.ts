@@ -53,15 +53,22 @@ class StorageService {
     });
   }
 
+  private withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${label}_TIMEOUT_${timeoutMs}MS`)), timeoutMs);
+      promise.then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
+    });
+  }
+
   private async init(): Promise<void> {
     if (Capacitor.isNativePlatform()) {
       try {
-        await this.initSqlite();
+        await this.withTimeout(this.initSqlite(), 12000, 'SQLITE_INIT');
         this.backend = 'sqlite';
       } catch (e) {
         console.warn('storageService: native SQLite unavailable, falling back to IndexedDB', e);
         try {
-          await this.initIndexedDb();
+          await this.withTimeout(this.initIndexedDb(), 8000, 'INDEXEDDB_INIT');
           this.backend = 'indexeddb';
         } catch (e2) {
           console.warn('storageService: IndexedDB also unavailable, using in-memory storage', e2);
@@ -70,7 +77,7 @@ class StorageService {
       }
     } else {
       try {
-        await this.initIndexedDb();
+        await this.withTimeout(this.initIndexedDb(), 8000, 'INDEXEDDB_INIT');
         this.backend = 'indexeddb';
       } catch (e) {
         console.warn('storageService: IndexedDB unavailable, using in-memory storage', e);

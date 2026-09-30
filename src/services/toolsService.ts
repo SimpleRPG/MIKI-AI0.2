@@ -12,7 +12,7 @@ import { storageService } from './storageService';
 import { capabilityPluginService } from './capabilityPluginService';
 import { unifiedWebResearchService } from '../miki/research/services/unifiedWebResearchService';
 import { selfCodeArchitectService } from '../miki/selfDevelopment/services/selfCodeArchitectService';
-import { cognitiveDebuggerService } from './cognitiveDebuggerService';
+import { cognitiveDebuggerService } from '../miki/verification/services/cognitiveDebuggerService';
 import { digitalResearchNoteService } from './digitalResearchNoteService';
 import { codebaseReflectionService } from '../miki/selfDevelopment/services/codebaseReflectionService';
 import { apiUrl } from './api';

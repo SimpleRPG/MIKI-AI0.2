@@ -1,0 +1,12 @@
+import {readFileSync} from 'node:fs';
+const failures=[];
+const rust=readFileSync('native/miki-native-core/src/lib.rs','utf8');
+const core=readFileSync('android/app/src/main/java/com/miki/ai/MIKINativeCore.kt','utf8');
+const plugin=readFileSync('android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt','utf8');
+const adapter=readFileSync('src/miki/execution/services/androidNativeRunnerAdapterService.ts','utf8');
+for(const term of ['BufRead','reader.lines()','character_window','expected_bytes: jlong','API_VERSION: jint = 8'])if(!rust.includes(term))failures.push(`RUST_FIX_MISSING:${term}`);
+for(const term of ['EXPECTED_API_VERSION = 8','expectedBytes: Long'])if(!core.includes(term))failures.push(`CORE_FIX_MISSING:${term}`);
+for(const term of ['JSArray(MIKINativeCore.searchWorkspaceText','call.getLong("byte_length")','Thread {','ARTIFACT_PATH_INVALID'])if(!plugin.includes(term))failures.push(`PLUGIN_FIX_MISSING:${term}`);
+for(const term of ['searchWorkspaceText?:','verifyPackageArtifact?:','public async searchWorkspaceText','public async verifyPackageArtifact'])if(!adapter.includes(term))failures.push(`ADAPTER_FIX_MISSING:${term}`);
+console.log(JSON.stringify({passed:failures.length===0,phase:'RUST_SEARCH_ARTIFACT_FIX_13',checks:15,failures},null,2));
+if(failures.length)process.exitCode=1;

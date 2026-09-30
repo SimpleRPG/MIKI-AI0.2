@@ -1,0 +1,2 @@
+import{useMemo}from'react';
+export function useVirtualWindow<T>(items:T[],scrollTop:number,viewportHeight:number,rowHeight:number,overscan=8){return useMemo(()=>{const start=Math.max(0,Math.floor(scrollTop/rowHeight)-overscan);const count=Math.ceil(viewportHeight/rowHeight)+overscan*2;const end=Math.min(items.length,start+count);return{items:items.slice(start,end),start,end,totalHeight:items.length*rowHeight,offsetTop:start*rowHeight};},[items,scrollTop,viewportHeight,rowHeight,overscan]);}

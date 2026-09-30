@@ -1,0 +1,14 @@
+import {readFileSync,existsSync} from 'node:fs';
+const read=path=>readFileSync(path,'utf8');const failures=[];
+const contract=read('src/miki/execution/services/nativeOperationContractService.ts');
+const rust=read('native/miki-native-core/src/lib.rs');const kotlin=read('android/app/src/main/java/com/miki/ai/MIKINativeCore.kt');const plugin=read('android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt');
+for(const operation of ['HEALTH','SCAN_REPOSITORY','HASH_FILES','BUILD_ZIP','COPY_ZIPTXT','COMPARE_REVISIONS','SEARCH_TEXT','VERIFY_ARTIFACTS'])if(!contract.includes(`'${operation}'`))failures.push(`OPERATION_CONTRACT_MISSING:${operation}`);
+for(const mode of ['TYPESCRIPT_ONLY','SHADOW','RUST_PRIMARY','TYPESCRIPT_FALLBACK','RUST_ONLY'])if(!contract.includes(`'${mode}'`))failures.push(`MIGRATION_MODE_MISSING:${mode}`);
+if(!rust.includes('Java_com_miki_ai_MIKINativeCore_nativeApiVersion'))failures.push('JNI_API_VERSION_ENTRY_MISSING');
+if(!rust.includes('Java_com_miki_ai_MIKINativeCore_nativeAbiMagic'))failures.push('JNI_ABI_MAGIC_ENTRY_MISSING');
+if(!rust.includes('Java_com_miki_ai_MIKINativeCore_nativeSha256File'))failures.push('JNI_SHA256_FILE_ENTRY_MISSING');
+if(!kotlin.includes('System.loadLibrary("miki_native_core")'))failures.push('KOTLIN_RUST_LIBRARY_LOAD_MISSING');
+if(!kotlin.includes('RUST_LIBRARY_NOT_LOADED'))failures.push('RUST_FAIL_CLOSED_MISSING');
+if(!plugin.includes('fun nativeCoreHealth'))failures.push('CAPACITOR_RUST_HEALTH_MISSING');
+if(!existsSync('scripts/build_rust_android.sh'))failures.push('ANDROID_RUST_BUILD_SCRIPT_MISSING');
+console.log(JSON.stringify({passed:failures.length===0,phase:'RUST_FOUNDATION_1',checks:23,failures},null,2));if(failures.length)process.exitCode=1;

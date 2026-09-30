@@ -14,6 +14,14 @@ import { codeConstructionRendererService } from './codeConstructionRendererServi
 import { astCandidateTransformationService, type AstCandidateOperation } from '../../selfDevelopment/services/astCandidateTransformationService';
 import { integratedGenerationPlanService } from '../../selfDevelopment/services/integratedGenerationPlanService';
 import { taskBlackboardService } from './taskBlackboardService';
+import { semanticRequirementCompilerService } from './semanticRequirementCompilerService';
+import { codeGenerationQualityPlannerService } from './codeGenerationQualityPlannerService';
+import { requirementConsistencyGraphService } from './requirementConsistencyGraphService';
+import { acceptanceTestMatrixService } from './acceptanceTestMatrixService';
+import { changeScopeImpactService } from './changeScopeImpactService';
+import { requirementPriorityResolverService } from './requirementPriorityResolverService';
+import { generationTaskDagService } from './generationTaskDagService';
+import { requirementTraceabilityMatrixService } from './requirementTraceabilityMatrixService';
 import { generationCapabilityExpansionService } from '../../selfDevelopment/services/generationCapabilityExpansionService';
 import {
   isCompatibleConstructionKind,
@@ -196,8 +204,34 @@ class CandidateCodeGenerationService {
     ...(failureFeedbackText ? [failureFeedbackText] : []),
   ];
 
-  const effectiveValidationRequirements =
-    this.strings(run.payload.validationRequirements);
+  const semanticContract=semanticRequirementCompilerService.compile(effectiveRequirements);
+  const semanticTargetPaths=this.strings(run.payload.targetPaths);
+  const generationQualityPlan=codeGenerationQualityPlannerService.plan(semanticContract,semanticTargetPaths);
+  const requirementConflicts=requirementConsistencyGraphService.analyze(semanticContract);
+  const acceptanceTestMatrix=acceptanceTestMatrixService.create(semanticContract);
+  const changeImpactPlan=changeScopeImpactService.plan(semanticTargetPaths,semanticContract.constraints.length);
+  const prioritizedRequirements=requirementPriorityResolverService.resolve(semanticContract);
+  const generationTaskDag=generationTaskDagService.build(semanticTargetPaths,acceptanceTestMatrix);
+  const requirementTraceability=requirementTraceabilityMatrixService.create(prioritizedRequirements,acceptanceTestMatrix);
+  const taskDagHasCycle=generationTaskDagService.hasCycle(generationTaskDag);
+  taskBlackboardService.append(runId,'OBSERVATION','core','semantic-requirement-contract',semanticContract,[]);
+  taskBlackboardService.append(runId,'OBSERVATION','core','code-generation-quality-plan',generationQualityPlan,[]);
+  taskBlackboardService.append(runId,'OBSERVATION','core','requirement-consistency-graph',requirementConflicts,[]);
+  taskBlackboardService.append(runId,'OBSERVATION','core','acceptance-test-matrix',acceptanceTestMatrix,[]);
+  taskBlackboardService.append(runId,'OBSERVATION','core','change-impact-plan',changeImpactPlan,[]);
+  taskBlackboardService.append(runId,'OBSERVATION','core','prioritized-requirements',prioritizedRequirements,[]);
+  taskBlackboardService.append(runId,'OBSERVATION','core','generation-task-dag',generationTaskDag,[]);
+  taskBlackboardService.append(runId,'OBSERVATION','core','requirement-traceability-matrix',requirementTraceability,[]);
+
+  const effectiveValidationRequirements = [
+    ...this.strings(run.payload.validationRequirements),
+    ...generationQualityPlan.requiredChecks,
+    ...semanticContract.acceptanceCriteria.map(item=>`ACCEPTANCE:${item}`),
+    ...acceptanceTestMatrix.map(test=>`TEST:${test.id}:${test.scenario}:${test.oracle}`),
+    ...requirementConflicts.map(conflict=>`CONFLICT:${conflict.severity}:${conflict.kind}:${conflict.left} <> ${conflict.right}`),
+    ...requirementTraceability.filter(row=>row.status==='UNTRACED').map(row=>`UNTRACED:${row.requirementId}:${row.requirement}`),
+    ...(taskDagHasCycle?['GENERATION_TASK_DAG_CYCLE']:[]),
+  ];
 
   /*
    * Built-in CODE KNOWLEDGEを「実行可能CODE」として扱わず、

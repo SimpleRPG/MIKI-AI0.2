@@ -8,64 +8,47 @@ const root = process.cwd();
 const outputDir = path.join(root, 'public');
 const outputFile = path.join(outputDir, 'self-code-seed.zip');
 
-const commitSha = execFileSync(
-  'git',
-  ['rev-parse', 'HEAD'],
-  { cwd: root, encoding: 'utf8' }
-).trim();
-
-const packageJson = JSON.parse(
-  fs.readFileSync(path.join(root, 'package.json'), 'utf8')
-);
-
-const files = execFileSync(
-  'git',
-  ['ls-files', '-z'],
-  { cwd: root, encoding: 'utf8' }
-)
-  .split('\0')
-  .filter(Boolean)
-  .filter(file =>
-    !file.startsWith('.git/') &&
-    !file.startsWith('node_modules/') &&
-    !file.startsWith('dist/') &&
-    !file.startsWith('android/.gradle/') &&
-    !file.startsWith('android/app/build/') &&
-    file !== 'public/self-code-seed.zip'
-  );
-
-const treeOutput = execFileSync(
-  'git',
-  ['ls-tree', '-r', '-z', 'HEAD', '--full-tree'],
-  { cwd: root, encoding: 'utf8' }
-);
-
+const excludedPrefixes = ['.git/', 'node_modules/', 'dist/', 'android/.gradle/', 'android/app/build/'];
+const isIncluded = file => !excludedPrefixes.some(prefix => file.startsWith(prefix)) && file !== 'public/self-code-seed.zip';
+const hasGitRepository = fs.existsSync(path.join(root, '.git'));
+let commitSha = 'ARCHIVE_WITHOUT_GIT_METADATA';
+let files = [];
 const blobShaByPath = new Map();
 
-for (const record of treeOutput.split('\0')) {
-  if (!record) continue;
-
-  const tab = record.indexOf('\t');
-  if (tab < 0) continue;
-
-  const header = record
-    .slice(0, tab)
-    .trim()
-    .split(/\s+/);
-
-  const relativePath = record.slice(tab + 1);
-
-  if (
-    header[1] === 'blob' &&
-    header[2] &&
-    relativePath
-  ) {
-    blobShaByPath.set(
-      relativePath,
-      header[2]
-    );
+if (hasGitRepository) {
+  commitSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  files = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean).filter(isIncluded);
+  const treeOutput = execFileSync('git', ['ls-tree', '-r', '-z', 'HEAD', '--full-tree'], { cwd: root, encoding: 'utf8' });
+  for (const record of treeOutput.split('\0')) {
+    if (!record) continue;
+    const tab = record.indexOf('\t');
+    if (tab < 0) continue;
+    const header = record.slice(0, tab).trim().split(/\s+/);
+    const relativePath = record.slice(tab + 1);
+    if (header[1] === 'blob' && header[2] && relativePath) blobShaByPath.set(relativePath, header[2]);
+  }
+} else {
+  const visit = directory => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      const relative = path.relative(root, absolute).split(path.sep).join('/');
+      if (entry.isDirectory()) {
+        if (!excludedPrefixes.some(prefix => `${relative}/`.startsWith(prefix))) visit(absolute);
+      } else if (entry.isFile() && isIncluded(relative)) {
+        files.push(relative);
+      }
+    }
+  };
+  visit(root);
+  files.sort((left, right) => left.localeCompare(right));
+  for (const relative of files) {
+    const buffer = fs.readFileSync(path.join(root, relative));
+    const header = Buffer.from(`blob ${buffer.length}\0`, 'utf8');
+    blobShaByPath.set(relative, crypto.createHash('sha1').update(header).update(buffer).digest('hex'));
   }
 }
+
+const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 const zip = new JSZip();
 const manifestFiles = [];

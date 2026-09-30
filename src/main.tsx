@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { storageService } from './services/storageService';
+import { startupRecoveryService } from './services/startupRecoveryService';
 import './index.css';
 
 // Prevent WebGPU / background abort recoverable notices from triggering parent frame tab shifts
@@ -47,39 +48,43 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', flushOnHide);
 window.addEventListener('beforeunload', flushOnHide);
 
-const root = ReactDOM.createRoot(document.getElementById('root')!);
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error('ROOT_ELEMENT_NOT_FOUND');
+}
+const root = ReactDOM.createRoot(rootElement);
+startupRecoveryService.update('STORAGE_WAIT', 'Waiting for persistent storage hydration');
 
 root.render(
-  <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300 text-sm">
+  <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-200 text-sm" role="status" aria-live="polite">
     MIKI 起動中...
   </div>
 );
 
 const renderApp = async () => {
+  startupRecoveryService.update('APP_IMPORT', 'Loading application modules');
   const [{ default: App }, { ErrorBoundary }] = await Promise.all([
     import('./App'),
     import('./components/ErrorBoundary'),
   ]);
-
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
-        <App />
+        <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-200">MIKI 読み込み中...</div>}>
+          <App />
+        </React.Suspense>
       </ErrorBoundary>
     </React.StrictMode>
   );
+  startupRecoveryService.update('APP_RENDERED', 'Application root rendered');
+  window.setTimeout(() => startupRecoveryService.clear(), 3000);
 };
 
-// Storage-backed Singleton群はApp import時に生成される。
-// そのため、AppをStorage Hydrate完了後に初めてロードし、
-// taskBlackboardService / improvementIntakeRouterService等が空cacheを
-// 初期状態として固定してしまう起動競合を防止する。
 void storageService.ready
   .then(renderApp)
   .then(() => import('./services/systemLogger'))
-  .then(({ systemLogger }) => {
-    systemLogger.initializeRuntimeMemoryDiagnostics();
-  })
+  .then(({ systemLogger }) => systemLogger.initializeRuntimeMemoryDiagnostics())
   .catch((error) => {
     console.error('MIKI application bootstrap failed', error);
+    startupRecoveryService.renderFatal(rootElement, error);
   });
