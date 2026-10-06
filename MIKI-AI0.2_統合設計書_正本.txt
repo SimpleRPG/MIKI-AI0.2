@@ -10904,3 +10904,13 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 否定・禁止入力と肯定的実施主張の矛盾を検査する。実行結果が存在しない状態で「実装済み」「完了」「成功」と断定した回答をExecution Consistency違反として拒否する。
 - Surface Grammar and Style Serviceで助詞・文法検査を行い、Semantic Preservation、Execution Consistency、Grammarの結果をReceiptへ記録する。
 - CoreTaskIngressの回答確定は、P216で修復・検証したFinal AnswerだけをCore OrchestratorとGraph Learningへ渡す。
+
+
+#### P216 Rust Native構文修正
+
+- Android Rust build の実測ログで、`native/miki-native-core/src/graph_store.rs` において `let` 文へカンマ区切りで複数代入を記述していたため Rust 構文エラーが発生した。
+- 同じ構文エラーが `native/miki-native-core/src/cognitive_graph.rs` にも存在した。
+- `graph_store.rs` は `graph_sha256`、`snapshot`、`tmp`、`final_path` を個別の `let` 文へ分離する。
+- `cognitive_graph.rs` は `selected` と `frontier` を個別の `let` 文へ分離する。
+- この修正は P216 の意味理解、回答計画、データフロー、API 契約を変更せず、Rust の構文だけを正規化する。
+- 修正後は `cargo check --manifest-path native/miki-native-core/Cargo.toml` と `npm run build:rust-android` を実行し、実測結果を確認する。
