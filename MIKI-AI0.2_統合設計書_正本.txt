@@ -10914,3 +10914,7 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - `cognitive_graph.rs` は `selected` と `frontier` を個別の `let` 文へ分離する。
 - この修正は P216 の意味理解、回答計画、データフロー、API 契約を変更せず、Rust の構文だけを正規化する。
 - 修正後は `cargo check --manifest-path native/miki-native-core/Cargo.toml` と `npm run build:rust-android` を実行し、実測結果を確認する。
+- 2026-10-06 CI #817で追加確認されたRust Native修正として、`native/miki-native-core/src/graph_store.rs` の `manifest` と `mtmp` のカンマ区切り `let` を個別の `let` 文へ分離した。
+- 同CIで確認された `native/miki-native-core/src/domains/data/mod.rs` の `indexes.insert(field.clone(),map)` には文末 `;` を追加した。
+- 同CIで確認された `native/miki-native-core/src/domains/memory/mod.rs` の `baseline_records.into_iter()` では `v.id` を `v.id.clone()` とし、Record本体の所有権を保持するよう修正した。
+- 上記3件はいずれもRustの構文・所有権修正であり、P216の意味仕様、Graph仕様、Domain契約は変更しない。
