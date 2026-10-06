@@ -20,8 +20,9 @@ for(const color of ['colorPrimary','colorPrimaryDark','colorAccent','miki_startu
 
 if(!activity.includes('mountNativeStartupStatus()'))failures.push('NATIVE_STARTUP_STATUS_MISSING');
 if(!activity.includes('findViewById(android.R.id.content)'))failures.push('NATIVE_STARTUP_CONTENT_ROOT_MISSING');
-if(!activity.includes('getViewTreeObserver().addOnDrawListener'))failures.push('NATIVE_STARTUP_WEBVIEW_HANDOFF_MISSING');
-if(!activity.includes('removeOnDrawListener'))failures.push('NATIVE_STARTUP_HANDOFF_LISTENER_NOT_REMOVED');
+if(!activity.includes('getViewTreeObserver().addOnPreDrawListener'))failures.push('NATIVE_STARTUP_WEBVIEW_HANDOFF_MISSING');
+if(!activity.includes('removeOnPreDrawListener'))failures.push('NATIVE_STARTUP_HANDOFF_LISTENER_NOT_REMOVED');
+if(activity.includes('addOnDrawListener')||activity.includes('removeOnDrawListener'))failures.push('NATIVE_STARTUP_ILLEGAL_ON_DRAW_LISTENER_REMAINS');
 if(!activity.includes('MIKI 起動中'))failures.push('NATIVE_STARTUP_STATUS_TEXT_MISSING');
 
 const startupRecovery=read('src/services/startupRecoveryService.ts');

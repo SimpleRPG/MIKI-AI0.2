@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-06
-正本Revision：2026-10-06-P219
+正本Revision：2026-10-06-P220
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -29,7 +29,7 @@ MIKI-AI0.2 統合設計書・実装正本
 
 ■ 正本メタデータ
 
-- Revision: 2026-10-06-P219
+- Revision: 2026-10-06-P220
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -10956,5 +10956,14 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - `MIKIJapaneseMorphologyPlugin.load()` の非同期初期化方針はP218を継承する。Native形態素解析状態は `INITIALIZING`、`READY`、`FAILED` の実状態を既存Plugin契約から取得する。
 - Native表示とWeb表示の間に第三の起動Runtime、第三の状態DB、第二Orchestrator、第二Blackboardを作らない。
 - P219は起動可視化の表示責務を整理するだけであり、Sudachi API、辞書Version、形態素解析結果、CORE + 17分類、P211/P212/P213/P214/P215/P216のGraph意味契約を変更しない。
+- 正本設計書は本ファイル一つだけとする。
+
+# P220 Android起動handoffクラッシュ修正
+
+- P219実装の実機症状「起動直後にAndroidホームへ戻る」をソース監査で追跡した結果、`android/app/src/main/java/com/miki/ai/MainActivity.java` のNative起動表示handoffが `ViewTreeObserver.OnDrawListener.onDraw()` 内で `removeOnDrawListener(this)` を実行していた。これは描画中のOnDrawListener自身を変更する実装であり、AndroidのViewTreeObserver契約に反する。
+- targetSdkVersionは36であり、この不正な描画中Listener変更がUIスレッド例外として扱われる環境では、未処理例外によりActivityプロセスが終了し、起動直後にホームへ戻る経路になる。実機のadb logcatは今回の調査時点で接続端末が無かったため、実機スタックトレース自体は未取得であり、ここではソース上で確定できるクラッシュ原因として記録する。
+- P220では `OnDrawListener` を使用せず、Android公式の初回描画前フックである `ViewTreeObserver.OnPreDrawListener` を使用する。`onPreDraw()` 内で `removeOnPreDrawListener(this)` を行い、その後handoff overlayをrootから撤去して `true` を返す。これにより不正なOnDraw中Listener変更を行わず、WebViewの初回描画を妨げない。
+- `scripts/verify_android_startup_blackout_fix.mjs` は `addOnPreDrawListener` / `removeOnPreDrawListener` を正規契約として検査し、`addOnDrawListener` / `removeOnDrawListener` が残っていれば失敗させる。再発防止のため、P219の旧検証条件を残さない。
+- P220はNative起動表示のhandoff実装と検証契約だけを修正し、startupRecoveryServiceの唯一Authority、MIKIJapaneseMorphologyPluginの非同期初期化、Sudachi API、辞書Version、CORE + 17分類、Graph意味契約は変更しない。
 - 正本設計書は本ファイル一つだけとする。
 

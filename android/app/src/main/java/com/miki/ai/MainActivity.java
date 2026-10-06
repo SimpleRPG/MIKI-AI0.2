@@ -74,22 +74,20 @@ public class MainActivity extends BridgeActivity {
             return;
         }
 
-        webView.getViewTreeObserver().addOnDrawListener(new ViewTreeObserver.OnDrawListener() {
+        webView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
             private boolean handedOff = false;
 
             @Override
-            public void onDraw() {
-                if (handedOff) {
-                    return;
-                }
-                handedOff = true;
-                webView.getViewTreeObserver().removeOnDrawListener(this);
-                root.post(() -> {
+            public boolean onPreDraw() {
+                if (!handedOff) {
+                    handedOff = true;
+                    webView.getViewTreeObserver().removeOnPreDrawListener(this);
+                    root.removeView(overlay);
                     if (nativeStartupStatusView == overlay) {
-                        root.removeView(overlay);
                         nativeStartupStatusView = null;
                     }
-                });
+                }
+                return true;
             }
         });
     }
