@@ -17,4 +17,15 @@ if(!morphology.includes('Thread {'))failures.push('MORPHOLOGY_ASYNC_INIT_MISSING
 if(!existsSync('android/app/src/main/assets/public/index.html'))failures.push('ANDROID_WEB_ASSET_INDEX_MISSING');
 if(!layout.includes('android:id="@+id/webview"'))failures.push('CAPACITOR_WEBVIEW_ID_MISSING');
 for(const color of ['colorPrimary','colorPrimaryDark','colorAccent','miki_startup_background'])if(!colors.includes(`name="${color}"`))failures.push(`ANDROID_COLOR_MISSING:${color}`);
+
+if(!activity.includes('mountNativeStartupStatus()'))failures.push('NATIVE_STARTUP_STATUS_MISSING');
+if(!activity.includes('findViewById(android.R.id.content)'))failures.push('NATIVE_STARTUP_CONTENT_ROOT_MISSING');
+if(!activity.includes('getViewTreeObserver().addOnDrawListener'))failures.push('NATIVE_STARTUP_WEBVIEW_HANDOFF_MISSING');
+if(!activity.includes('removeOnDrawListener'))failures.push('NATIVE_STARTUP_HANDOFF_LISTENER_NOT_REMOVED');
+if(!activity.includes('MIKI 起動中'))failures.push('NATIVE_STARTUP_STATUS_TEXT_MISSING');
+
+const startupRecovery=read('src/services/startupRecoveryService.ts');
+if(startupRecovery.includes('const widths:Record<StartupPhase,string>'))failures.push('FAKE_STARTUP_PROGRESS_PERCENTAGES_REMAIN');
+if(startupRecovery.includes('data-role="progress"'))failures.push('FAKE_STARTUP_PROGRESS_BAR_REMAINS');
+if(!startupRecovery.includes('data-role="activity"'))failures.push('STARTUP_ACTIVITY_INDICATOR_MISSING');
 console.log(JSON.stringify({passed:failures.length===0,checks:10,failures},null,2));if(failures.length)process.exitCode=1;

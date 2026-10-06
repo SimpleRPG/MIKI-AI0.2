@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-06
-正本Revision：2026-10-06-P217
+正本Revision：2026-10-06-P219
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -29,7 +29,7 @@ MIKI-AI0.2 統合設計書・実装正本
 
 ■ 正本メタデータ
 
-- Revision: 2026-10-06-P218
+- Revision: 2026-10-06-P219
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -10946,4 +10946,15 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - CapacitorのNative PluginとWebView間は既存のPlugin契約を使用し、新しい第二の起動Runtimeや第二の状態管理Authorityを作らない。
 - 正本設計書は本ファイル一つだけとし、本P218も既存P156の非ブロッキング起動方針、P214/P215のCheckpoint・実機検証方針、P217のAndroid Native修正へ統合する。
 
+# P219 Android起動表示引き継ぎ・架空進捗表示撤去
+
+- P218の実装監査で、`src/services/startupRecoveryService.ts` に固定された `8% / 18% / 32% / 45% / 58% / 72% / 88% / 100%` の起動進捗表示が残っていた。これらは実測値ではないため、P218の「架空の進捗率・架空の完了状態を表示しない」という不変条件に反する。P219で数値進捗バーを撤去し、現在フェーズ、実メッセージ、実経過時間、処理中インジケータだけを表示する。
+- Web側の `startupRecoveryService` はJS entry到達後の唯一の起動状態Authorityとして維持する。Native側へ第二の起動状態機械を作らない。
+- `MainActivity` はWebView/JSへ制御が渡る前後のNative表示面だけを担当し、`android.R.id.content` 上へ「MIKI 起動中 / Android Nativeを起動しています」を表示する。これは状態Authorityではなく、WebView初回描画までの可視化用handoff surfaceである。
+- Native起動表示は `R.id.webview` の最初の描画を検知して自身を撤去する。WebViewが初回描画へ到達しない場合は、黒画面ではなくNative起動表示を残す。
+- WebView初回描画後は既存 `src/main.tsx` の `startupRecoveryService` が `STORAGE_WAIT`、`APP_IMPORT`、`APP_RENDERED`、`SELF_CODE_SEED`、`RUNTIME_INIT`、`NATIVE_MORPHOLOGY`、`READY`、`FAILED` を実処理に応じて表示する。
+- `MIKIJapaneseMorphologyPlugin.load()` の非同期初期化方針はP218を継承する。Native形態素解析状態は `INITIALIZING`、`READY`、`FAILED` の実状態を既存Plugin契約から取得する。
+- Native表示とWeb表示の間に第三の起動Runtime、第三の状態DB、第二Orchestrator、第二Blackboardを作らない。
+- P219は起動可視化の表示責務を整理するだけであり、Sudachi API、辞書Version、形態素解析結果、CORE + 17分類、P211/P212/P213/P214/P215/P216のGraph意味契約を変更しない。
+- 正本設計書は本ファイル一つだけとする。
 

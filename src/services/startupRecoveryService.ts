@@ -54,6 +54,9 @@ class StartupRecoveryService{
   box.setAttribute('role','status');
   box.setAttribute('aria-live','polite');
   box.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#020617;color:#e2e8f0;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,sans-serif';
+  const style=document.createElement('style');
+  style.textContent='@keyframes miki-startup-pulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}';
+  document.head.append(style);
 
   const panel=document.createElement('section');
   panel.style.cssText='width:min(720px,100%);border:1px solid #334155;background:#0f172a;border-radius:18px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.45)';
@@ -75,15 +78,19 @@ class StartupRecoveryService{
   elapsed.dataset.role='elapsed';
   elapsed.style.cssText='font-size:12px;color:#94a3b8;font-variant-numeric:tabular-nums';
 
-  const bar=document.createElement('div');
-  bar.style.cssText='height:4px;background:#1e293b;border-radius:999px;overflow:hidden;margin-top:18px';
+  const activity=document.createElement('div');
+  activity.dataset.role='activity';
+  activity.style.cssText='display:flex;align-items:center;gap:10px;margin-top:18px;font-size:12px;color:#94a3b8';
 
-  const progress=document.createElement('div');
-  progress.dataset.role='progress';
-  progress.style.cssText='height:100%;width:20%;background:#8b5cf6;border-radius:999px;transition:width .25s ease';
+  const spinner=document.createElement('span');
+  spinner.textContent='●';
+  spinner.style.cssText='display:inline-block;animation:miki-startup-pulse 1s ease-in-out infinite';
 
-  bar.append(progress);
-  panel.append(title,phase,message,elapsed,bar);
+  const activityText=document.createElement('span');
+  activityText.textContent='処理中です。表示されている処理状態を確認してください。';
+
+  activity.append(spinner,activityText);
+  panel.append(title,phase,message,elapsed,activity);
   box.append(panel);
   document.body.append(box);
 
@@ -102,7 +109,7 @@ class StartupRecoveryService{
   const phase=this.overlay.querySelector<HTMLElement>('[data-role="phase"]');
   const message=this.overlay.querySelector<HTMLElement>('[data-role="message"]');
   const elapsed=this.overlay.querySelector<HTMLElement>('[data-role="elapsed"]');
-  const progress=this.overlay.querySelector<HTMLElement>('[data-role="progress"]');
+  const activity=this.overlay.querySelector<HTMLElement>('[data-role="activity"]');
 
   if(phase)phase.textContent=`現在の処理：${this.phaseLabel(this.diagnostic.phase)}`;
   if(message)message.textContent=this.diagnostic.message;
@@ -112,22 +119,8 @@ class StartupRecoveryService{
    elapsed.textContent=`経過時間：${seconds}秒`;
   }
 
-  if(progress){
-   const widths:Record<StartupPhase,string>={
-    ENTRY:'8%',
-    STORAGE_WAIT:'18%',
-    APP_IMPORT:'32%',
-    APP_RENDERED:'45%',
-    SELF_CODE_SEED:'58%',
-    RUNTIME_INIT:'72%',
-    NATIVE_MORPHOLOGY:'88%',
-    READY:'100%',
-    FAILED:'100%'
-   };
-   progress.style.width=widths[this.diagnostic.phase];
-   if(this.diagnostic.phase==='FAILED'){
-    progress.style.background='#e11d48';
-   }
+  if(activity){
+   activity.style.color=this.diagnostic.phase==='FAILED'?'#fda4af':'#94a3b8';
   }
  }
 
