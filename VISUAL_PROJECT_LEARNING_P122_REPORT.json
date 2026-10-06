@@ -1,0 +1,100 @@
+{
+  "phase": "VISUAL_PROJECT_LEARNING_P122",
+  "passed": true,
+  "checks": {
+    "initial": true,
+    "proposal": true,
+    "approvalBlocked": true,
+    "incremental": true,
+    "coatEdited": true,
+    "bodyPreserved": true,
+    "rollback": true,
+    "memoryPreserved": true,
+    "manifest": true
+  },
+  "proposal": {
+    "proposalId": "VP-dde77111b7f82a2ac2df50da",
+    "projectId": "avatar-main",
+    "baseRevision": 1,
+    "mode": "PROPOSE",
+    "memoryIds": [
+      "VM-fdbad557684903ae42afea35"
+    ],
+    "targetLayerIds": [
+      "coat-layer"
+    ],
+    "targetMotionKinds": [],
+    "reasons": [
+      "GROWING_EVIDENCE_REQUIRES_REVIEW"
+    ],
+    "proposalSha256": "dde77111b7f82a2ac2df50dafd2a488c96b1b484fa0fd1f5c12f8b6a0acfd775"
+  },
+  "manifest": {
+    "projectId": "avatar-main",
+    "currentRevision": 3,
+    "projectSha256": "88e68c48131b0dd5343635ac8332c953d70d8087057aaad37148fdbe5624d677",
+    "revisionSha256": "3f0dbdebe48ca423fb0677669df6c09dd2d57acd0e12350c0c377c82a58ea5dc",
+    "memorySha256List": [
+      "d0a834b2ab7a8dc040642b5fc9c219693e717498f0b33cf4b515b02f40a0818a",
+      "fdbad557684903ae42afea35b793aa7d3e3ba26d65622cefc54ca02ecccfbbc6"
+    ],
+    "outputPaths": [
+      "visual/projects/avatar-main/project.json",
+      "visual/projects/avatar-main/revisions/r0003/revision.json",
+      "visual/projects/avatar-main/receipts/learning-memory.json"
+    ],
+    "manifestSha256": "5e9bb3db98f0d6d3ef6c63156e21f665d387aa775f11410f969c79f2a39d1058"
+  },
+  "current": {
+    "revision": 3,
+    "createdAt": 1790926389131,
+    "reason": "ROLLBACK_TO_1",
+    "layers": [
+      {
+        "layerId": "body-layer",
+        "kind": "BODY_SHAPE",
+        "assetIds": [
+          "body"
+        ],
+        "parameters": {
+          "width": 0.5
+        },
+        "locked": false
+      },
+      {
+        "layerId": "coat-layer",
+        "kind": "OUTERWEAR",
+        "assetIds": [
+          "coat"
+        ],
+        "parameters": {
+          "sway": 0.1,
+          "color": "blue"
+        },
+        "locked": false
+      }
+    ],
+    "motionTrends": [],
+    "quality": {
+      "width": 256,
+      "height": 256,
+      "paletteSize": 1024,
+      "paletteIndexBits": 16,
+      "frameCount": 8,
+      "directions": 4,
+      "estimatedIndexBytes": 4194304,
+      "warnings": [],
+      "specSha256": "566045bf2a2cb89b4214837da687388a3bf378f2bf9b6c141362c7681b3776e2"
+    },
+    "memoryIds": [
+      "VM-d0a834b2ab7a8dc040642b5f"
+    ],
+    "changedLayerIds": [
+      "body-layer",
+      "coat-layer"
+    ],
+    "changedMotionKinds": [],
+    "revisionSha256": "3f0dbdebe48ca423fb0677669df6c09dd2d57acd0e12350c0c377c82a58ea5dc",
+    "parentRevision": 2
+  }
+}

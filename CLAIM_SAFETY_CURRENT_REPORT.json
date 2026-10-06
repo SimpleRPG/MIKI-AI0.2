@@ -1,0 +1,14 @@
+{
+  "phase": "CLAIM_SAFETY_CURRENT",
+  "passed": true,
+  "claimId": "CLM-000005",
+  "evaluation": {
+    "eligible": false,
+    "reason": "USER_CLAIM_REQUIRES_INDEPENDENT_VERIFICATION",
+    "confidence": 65,
+    "uses": 1,
+    "failures": 0,
+    "verified": 0
+  },
+  "expectation": "Repeated user assertion remains CANDIDATE until independent verification"
+}

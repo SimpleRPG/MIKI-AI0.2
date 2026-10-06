@@ -3,6 +3,8 @@ import { coreLineageReadModelService } from './coreLineageReadModelService';
 import { domainRouterService, type DomainCommand } from './domainRouterService';
 import { taskBlackboardService, type BlackboardTask } from './taskBlackboardService';
 import { adaptiveRoutePlannerService } from './adaptiveRoutePlannerService';
+import { rustCoreDecisionKernelService } from './rustCoreDecisionKernelService';
+import { rustDomainParticipationKernelService } from './rustDomainParticipationKernelService';
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 import type { MikiDomain } from './crossDomainCirculationService';
 import { negativeKnowledgeService } from './negativeKnowledgeService';
@@ -16,11 +18,32 @@ import { schemaValidationService } from '../../verification/services/schemaValid
 import { githubSyncService } from '../../../services/githubSyncService';
 import { sha256HexFromText } from './canonicalSha256Service';
 import { coreExecutionTraceService } from './coreExecutionTraceService';
+import { canonicalServiceAliasRegistryService } from './canonicalServiceAliasRegistryService';
+import { residualCapabilityIntegrationService } from './residualCapabilityIntegrationService';
+import { complexCapabilityContractService } from './complexCapabilityContractService';
+import { finalResidualServiceIntegrationService } from './finalResidualServiceIntegrationService';
+import { actionLineageService } from './actionLineageService';
+import { cumulativeRevalidationService } from './cumulativeRevalidationService';
+import { candidateConstraintValidationService } from './candidateConstraintValidationService';
+import { candidateGovernanceCoordinatorService } from './candidateGovernanceCoordinatorService';
+import { candidateAutoRebaseService } from './candidateAutoRebaseService';
 import { universalSynthesisService } from './universalSynthesisService';
 import { longTermMemoryService } from '../../memory/services/longTermMemoryService';
+import { memoryContextBridgeService } from '../../memory/services/memoryContextBridgeService';
+import { advancedPipelineHandoffAuditService } from '../../selfDevelopment/services/advancedPipelineHandoffAuditService';
+import { candidateDevelopmentCompletionService } from '../../selfDevelopment/services/candidateDevelopmentCompletionService';
+import { acceptanceEvidenceMatrixService } from '../../selfDevelopment/services/acceptanceEvidenceMatrixService';
+import { reviewManifestInclusionGateService } from '../../selfDevelopment/services/reviewManifestInclusionGateService';
+import { workspaceTscAndIsolationE2EService } from '../../selfDevelopment/services/workspaceTscAndIsolationE2EService';
+import { canaryPostReviewVerificationService } from '../../selfDevelopment/services/canaryPostReviewVerificationService';
+import { autonomousE2EProofSuiteService } from '../../selfDevelopment/services/autonomousE2EProofSuiteService';
 import { storageService } from '../../../services/storageService';
 
 export interface CoreOrchestrationResult { task:BlackboardTask; cycles:number; dispatched:number; coreResult?:CoreResult; }
+
+export interface CoreImprovementGateEvidence { semantic:boolean; scope:boolean; contract:boolean; dependency:boolean; staticVerification:boolean; typecheck:boolean; regression:boolean; resource:boolean; packageIntegrity:boolean; externalEvaluation?:boolean; }
+export interface CoreImprovementDecisionInput { instruction:string; baselineSha256:string; candidateSha256?:string; targetPaths:string[]; evidence:CoreImprovementGateEvidence; repairAttempt:number; maxRepairAttempts:number; currentFailureSignature?:string; previousFailureSignatures:string[]; reviewPackageId?:string; externalVerdict?:'ADOPT'|'HOLD'|'REJECT'; }
+export interface CoreImprovementDecision { nextAction:'ANALYZE'|'BUILD'|'REPAIR'|'RUN_REGRESSION'|'BUILD_REVIEW_PACKAGE'|'WAIT_EXTERNAL_EVALUATION'|'PREPARE_ADOPTION'|'STOP'; reasons:string[]; canMutateCanonical:false; requiresExternalEvaluation:true; }
 
 export interface UnifiedCognitiveStateSnapshot {
   schemaVersion:2; taskId:string; cycle:number; revision:number; goal:string; input:string; source:string;
@@ -33,6 +56,24 @@ export interface UnifiedCognitiveStateSnapshot {
 const DIAGNOSTIC_COMMANDS=new Set(['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION','DISCOVER_IMPROVEMENT_ISSUE','RUN_SELF_IMPROVEMENT']);
 
 class CoreOrchestratorService {
+ public decideSelfCodeImprovementNextAction(input:CoreImprovementDecisionInput):CoreImprovementDecision {
+  const reasons:string[]=[];let nextAction:CoreImprovementDecision['nextAction']='ANALYZE';const e=input.evidence;
+  if(!input.instruction.trim()||!input.targetPaths.length){nextAction='STOP';reasons.push('EMPTY_INTENT_OR_TARGET');}
+  else if(!e.semantic||!e.scope){nextAction='ANALYZE';reasons.push(!e.semantic?'SEMANTIC_GATE_PENDING':'SCOPE_GATE_PENDING');}
+  else if(!input.candidateSha256){nextAction='BUILD';reasons.push('CANDIDATE_REQUIRED');}
+  else if(input.candidateSha256===input.baselineSha256){nextAction='STOP';reasons.push('NO_EFFECTIVE_CHANGE');}
+  else if(!e.contract||!e.dependency||!e.staticVerification||!e.typecheck||!e.resource){
+   const repeated=Boolean(input.currentFailureSignature&&input.previousFailureSignatures.includes(input.currentFailureSignature));
+   if(repeated||input.repairAttempt>=input.maxRepairAttempts){nextAction='STOP';reasons.push(repeated?'REPEATED_FAILURE_SIGNATURE':'REPAIR_BUDGET_EXHAUSTED');}
+   else{nextAction='REPAIR';reasons.push('PRE_REGRESSION_GATE_FAILED');}
+  }
+  else if(!e.regression){nextAction='RUN_REGRESSION';reasons.push('REGRESSION_REQUIRED');}
+  else if(!input.reviewPackageId||!e.packageIntegrity){nextAction='BUILD_REVIEW_PACKAGE';reasons.push('REVIEW_PACKAGE_REQUIRED');}
+  else if(input.externalVerdict==='REJECT'){nextAction='STOP';reasons.push('EXTERNAL_REJECT');}
+  else if(input.externalVerdict!=='ADOPT'||e.externalEvaluation!==true){nextAction='WAIT_EXTERNAL_EVALUATION';reasons.push(input.externalVerdict==='HOLD'?'EXTERNAL_HOLD':'EXTERNAL_EVALUATION_REQUIRED');}
+  else{nextAction='PREPARE_ADOPTION';reasons.push('ALL_GATES_PASSED');}
+  return{nextAction,reasons,canMutateCanonical:false,requiresExternalEvaluation:true};
+ }
  async run(goal:string,source:MikiDomain='core',payload:Record<string,unknown>={},maxCycles=18):Promise<CoreOrchestrationResult>{
   const created=taskBlackboardService.create(goal,source,payload);
   coreExecutionTraceService.record(created.taskId,0,'RUN_START',{
@@ -52,6 +93,89 @@ class CoreOrchestratorService {
   // その直後にflushすることで、強制終了しても「Runtimeだけに存在するTASK」
   // にならないよう、TASK BlackboardとCanonical Historyを同じ永続境界で確定させる。
   if(payload.kind==='SELF_IMPROVEMENT'){
+   const governancePreflight=candidateGovernanceCoordinatorService.preflight({
+    invariantChange:payload.invariantChange&&typeof payload.invariantChange==='object'?payload.invariantChange as never:undefined,
+    candidates:Array.isArray(payload.candidateAlternatives)?payload.candidateAlternatives as never:undefined
+   });
+   coreExecutionTraceService.record(created.taskId,0,'CANDIDATE_GOVERNANCE_PREFLIGHT',governancePreflight);
+   if(!governancePreflight.allowed){taskBlackboardService.post(created.taskId,'OBSERVATION','core','CANDIDATE_GOVERNANCE_BLOCKED',governancePreflight,[]);}
+   const autoRebase=payload.autoRebase&&typeof payload.autoRebase==='object'?payload.autoRebase as Parameters<typeof candidateAutoRebaseService.rebase>[0]:undefined;
+   if(autoRebase){const rebaseResult=candidateAutoRebaseService.rebase(autoRebase);coreExecutionTraceService.record(created.taskId,0,'CANDIDATE_AUTO_REBASE',{...rebaseResult});taskBlackboardService.post(created.taskId,rebaseResult.accepted?'RESULT':'OBSERVATION','core',rebaseResult.accepted?'CANDIDATE_REBASED':'CANDIDATE_REBASE_CONFLICT',rebaseResult,rebaseResult.invalidatedEvidenceIds);}
+
+   const finalResidual=finalResidualServiceIntegrationService.inspect({capability:typeof payload.capability==='string'?payload.capability:undefined,claimText:typeof payload.claimText==='string'?payload.claimText:undefined,searchQuery:typeof payload.searchQuery==='string'?payload.searchQuery:undefined,searchFiles:Array.isArray(payload.searchFiles)?payload.searchFiles as Array<{path:string;content:string}>:undefined,workspacePaths:Array.isArray(payload.workspacePaths)?payload.workspacePaths.filter((value):value is string=>typeof value==='string'):undefined,unknown:payload.unknown&&typeof payload.unknown==='object'?payload.unknown as Record<string,unknown>:undefined});
+   coreExecutionTraceService.record(created.taskId,0,'FINAL_RESIDUAL_SERVICE_INTEGRATION',finalResidual);
+   const rejectedPaths=finalResidual.paths.filter(item=>!item.decision.allowed);
+   if(rejectedPaths.length){taskBlackboardService.post(created.taskId,'OBSERVATION','core','WORKSPACE_PATH_BOUNDARY_GAPS',{rejectedPaths},[]);}
+   const complexRequest=payload.complexCapability&&typeof payload.complexCapability==='object'?payload.complexCapability as Record<string,unknown>:undefined;
+   if(complexRequest&&typeof complexRequest.capability==='string'){
+    const contractCheck=complexCapabilityContractService.validate(complexRequest.capability,complexRequest);
+    coreExecutionTraceService.record(created.taskId,0,'COMPLEX_CAPABILITY_CONTRACT_CHECK',contractCheck);
+    if(!contractCheck.accepted){taskBlackboardService.post(created.taskId,'OBSERVATION','core','COMPLEX_CAPABILITY_INPUT_GAPS',contractCheck,[]);}
+    else{taskBlackboardService.post(created.taskId,'OBSERVATION','core','COMPLEX_CAPABILITY_READY',{capability:complexRequest.capability,consumer:contractCheck.contract?.consumer,rollbackTarget:contractCheck.contract?.rollbackTarget,invalidationTargets:contractCheck.contract?.invalidationTargets},contractCheck.evidenceIds);}
+   }
+   coreExecutionTraceService.record(created.taskId,0,'SERVICE_CONNECTIVITY_AUDIT_25',{records:canonicalServiceAliasRegistryService.list(),parallelAuthoritiesBlocked:canonicalServiceAliasRegistryService.list().filter(item=>item.classification==='DUPLICATE_CONSOLIDATED').map(item=>item.service)});
+   const residualSnapshot=residualCapabilityIntegrationService.snapshot({workspaceId:typeof payload.workspaceId==='string'?payload.workspaceId:undefined,candidateSha256:typeof payload.candidateSha256==='string'?payload.candidateSha256:undefined,preloadTypeScript:payload.preloadTypeScript===true,vbaRequirement:typeof payload.vbaRequirement==='string'?payload.vbaRequirement:undefined});
+   coreExecutionTraceService.record(created.taskId,0,'RESIDUAL_CAPABILITY_INFORMATION_FLOW',residualSnapshot);
+   const runId=typeof payload.runId==='string'?payload.runId:'';
+   const workspaceId=typeof payload.workspaceId==='string'?payload.workspaceId:'';
+   if(runId&&workspaceId){
+    const constraintValidation=candidateConstraintValidationService.validate(runId,workspaceId);
+    coreExecutionTraceService.record(created.taskId,0,'CANDIDATE_CONSTRAINT_VALIDATION',{passed:constraintValidation.passed,reasons:constraintValidation.reasons,runId,workspaceId});
+    if(!constraintValidation.passed){
+     taskBlackboardService.post(created.taskId,'OBSERVATION','core','CANDIDATE_CONSTRAINT_GAPS',{runId,workspaceId,reasons:constraintValidation.reasons},[]);
+    }
+   }
+   const acceptanceBindings=Array.isArray(payload.acceptanceBindings)?payload.acceptanceBindings:[];
+   const acceptanceTests=Array.isArray(payload.acceptanceTests)?payload.acceptanceTests:[];
+   const candidateSha256=typeof payload.candidateSha256==='string'?payload.candidateSha256:'';
+   if(acceptanceBindings.length&&candidateSha256){
+    const acceptanceMatrix=acceptanceEvidenceMatrixService.evaluate(acceptanceBindings as never[],acceptanceTests as never[],candidateSha256);
+    const acceptancePassed=acceptanceMatrix.every(row=>row.passed);
+    coreExecutionTraceService.record(created.taskId,0,'ACCEPTANCE_EVIDENCE_MATRIX',{passed:acceptancePassed,rows:acceptanceMatrix,candidateSha256});
+    if(!acceptancePassed){taskBlackboardService.post(created.taskId,'OBSERVATION','core','ACCEPTANCE_EVIDENCE_GAPS',{candidateSha256,rows:acceptanceMatrix},[]);}
+   }
+   if(payload.completeCandidate===true&&workspaceId){
+    const maxRepairAttempts=typeof payload.maxRepairAttempts==='number'?payload.maxRepairAttempts:3;
+    const completion=await candidateDevelopmentCompletionService.complete(workspaceId,maxRepairAttempts);
+    coreExecutionTraceService.record(created.taskId,0,'CANDIDATE_DEVELOPMENT_COMPLETION',{passed:completion.passed,completionId:completion.completionId,finalWorkspaceId:completion.finalWorkspaceId,reasons:completion.reasons,reviewPackageId:completion.reviewPackage?.workspaceId});
+    taskBlackboardService.post(created.taskId,completion.passed?'RESULT':'OBSERVATION','core','CANDIDATE_DEVELOPMENT_COMPLETION',{passed:completion.passed,completionId:completion.completionId,finalWorkspaceId:completion.finalWorkspaceId,reasons:completion.reasons,reviewPackageId:completion.reviewPackage?.workspaceId},[completion.completionId]);
+   }
+   if(payload.runWorkspaceE2E===true&&runId&&workspaceId){
+    const workspaceE2E=await workspaceTscAndIsolationE2EService.verify(runId,workspaceId);
+    coreExecutionTraceService.record(created.taskId,0,'WORKSPACE_TSC_ISOLATION_E2E',workspaceE2E);
+    if(!workspaceE2E.passed){taskBlackboardService.post(created.taskId,'OBSERVATION','core','WORKSPACE_TSC_ISOLATION_GAPS',workspaceE2E,[]);}
+   }
+   if(payload.runAutonomousProofSuite===true){
+    const proofResults=await autonomousE2EProofSuiteService.runAll();
+    const proofPassed=proofResults.every(result=>result.passed);
+    coreExecutionTraceService.record(created.taskId,0,'AUTONOMOUS_E2E_PROOF_SUITE',{passed:proofPassed,results:proofResults});
+    if(!proofPassed){taskBlackboardService.post(created.taskId,'OBSERVATION','core','AUTONOMOUS_E2E_PROOF_GAPS',{results:proofResults},[]);}
+   }
+   const reviewZipBase64=typeof payload.reviewZipBase64==='string'?payload.reviewZipBase64:'';
+   const expectedManifestId=typeof payload.expectedManifestId==='string'?payload.expectedManifestId:'';
+   if(reviewZipBase64&&expectedManifestId){
+    const manifestGate=await reviewManifestInclusionGateService.verify(reviewZipBase64,expectedManifestId);
+    coreExecutionTraceService.record(created.taskId,0,'REVIEW_MANIFEST_INCLUSION_GATE',manifestGate);
+    if(!manifestGate.passed){taskBlackboardService.post(created.taskId,'OBSERVATION','core','REVIEW_MANIFEST_GAPS',manifestGate,[]);}
+   }
+   const cumulativeWorkspaceIds=Array.isArray(payload.cumulativeWorkspaceIds)?payload.cumulativeWorkspaceIds.filter((value):value is string=>typeof value==='string'):[];
+   if(payload.runCumulativeRevalidation===true&&cumulativeWorkspaceIds.length){
+    const cumulative=await cumulativeRevalidationService.run(cumulativeWorkspaceIds);
+    coreExecutionTraceService.record(created.taskId,0,'CUMULATIVE_REVALIDATION',{...cumulative});
+    if(!cumulative.passed){taskBlackboardService.post(created.taskId,'OBSERVATION','core','CUMULATIVE_REVALIDATION_GAPS',cumulative,[]);}
+   }
+   const reviewPackageSha=typeof payload.reviewPackageSha==='string'?payload.reviewPackageSha:'';
+   const canaryChecks=payload.canaryChecks&&typeof payload.canaryChecks==='object'?payload.canaryChecks:undefined;
+   if(payload.runCanaryVerification===true&&workspaceId&&reviewPackageSha&&canaryChecks){
+    const canary=await canaryPostReviewVerificationService.dryRun(workspaceId,reviewPackageSha,canaryChecks as never);
+    coreExecutionTraceService.record(created.taskId,0,'CANARY_POST_REVIEW_VERIFICATION',canary);
+    if(!canary.passed){taskBlackboardService.post(created.taskId,'OBSERVATION','core','CANARY_VERIFICATION_GAPS',canary,[]);}
+   }
+   const handoffAudit=advancedPipelineHandoffAuditService.audit();
+   coreExecutionTraceService.record(created.taskId,0,'SELF_IMPROVEMENT_HANDOFF_AUDIT',{passed:handoffAudit.passed,reasons:handoffAudit.reasons,checks:handoffAudit.checks});
+   if(!handoffAudit.passed){
+    taskBlackboardService.post(created.taskId,'OBSERVATION','core','SELF_IMPROVEMENT_HANDOFF_GAPS',{reasons:handoffAudit.reasons,checks:handoffAudit.checks},[]);
+   }
    try{
     const { selfImprovementControllerService } = await import('../../improvement/services/selfImprovementControllerService');
     const directiveId=typeof payload.directiveId==='string'&&payload.directiveId.trim()
@@ -847,7 +971,7 @@ class CoreOrchestratorService {
     break;
    }
    const planEnvironment=executionEnvironmentRouterService.capture(this.readEnvironmentHints(current));
-   const goalDecision=adaptiveRoutePlannerService.resolveGoalConflicts(current);
+   const goalDecision=await rustCoreDecisionKernelService.resolveGoalConflicts(current);
    if(goalDecision.conflictDetected){
     taskBlackboardService.append(taskId,'DECISION','core',`goalConflictResolution:${cycles}`,{
       selectedGoalId:goalDecision.selectedGoalId,
@@ -855,13 +979,13 @@ class CoreOrchestratorService {
       pausedGoalIds:goalDecision.pausedGoalIds,
       blockedGoalIds:goalDecision.blockedGoalIds,
       decisions:goalDecision.decisions,
-      ruleVersion:'V201'
+      ruleVersion:'RUST_CORE_KERNEL_V1'
     });
    }
    const planningTask=goalDecision.selectedGoal!==current.goal
      ? {...current,goal:goalDecision.selectedGoal}
      : current;
-   const routes=adaptiveRoutePlannerService.plan(planningTask).filter(route=>{
+   let routes=adaptiveRoutePlannerService.plan(planningTask).filter(route=>{
      const latestFailure=[...planningTask.entries]
        .reverse()
        .find(entry=>{
@@ -907,6 +1031,14 @@ class CoreOrchestratorService {
        route.command,
        retryReason
      );
+   });
+   const domainParticipation=await rustDomainParticipationKernelService.rank(routes);
+   routes=domainParticipation.routes;
+   taskBlackboardService.append(taskId,'DECISION','core',`rustDomainParticipation:${cycles}`,{
+     participatingDomains:domainParticipation.participatingDomains,
+     skippedDuplicateIndexes:domainParticipation.skippedDuplicateIndexes,
+     workerDomainCount:17,
+     ruleVersion:'RUST_DOMAIN_KERNEL_V1'
    });
    for(const route of routes) route.payload={...route.payload,environmentSignature:planEnvironment.signature};
    taskBlackboardService.append(taskId,'DECISION','core',`coreEnvironmentPlan:${cycles}`,planEnvironment);
@@ -1511,7 +1643,11 @@ private collectValues(task:BlackboardTask,pattern:RegExp):string[] {
   const intentUnits=Array.isArray(intentPlanValue?.units)?intentPlanValue.units.filter((item):item is Record<string,unknown>=>Boolean(item&&typeof item==='object')):[];
   const completedIntentIds=new Set(task.entries.filter(entry=>entry.kind==='RESULT').flatMap(entry=>{ const value=entry.value&&typeof entry.value==='object'&&!Array.isArray(entry.value)?entry.value as Record<string,unknown>:{}; return Array.isArray(value.intentIds)?value.intentIds.filter((x):x is string=>typeof x==='string'):[]; }));
   const pendingIntentIds=intentUnits.map(unit=>typeof unit.id==='string'?unit.id:'').filter(id=>Boolean(id)&&!completedIntentIds.has(id));
-  const base={schemaVersion:2 as const,taskId:task.taskId,cycle,revision:task.revision,goal:task.goal,input,source:String(task.source),constraints:[...new Set(constraints)],activeDomains:[...task.visitedDomains],requiredDomains:[...new Set(requiredDomains)],pendingIntentIds:[...new Set(pendingIntentIds)],evidenceIds,unknowns,capabilityRefs,recentOutcomes,learningCandidates,environmentSignature:undefined as string|undefined,invariantsVersion:1 as const};
+  const governedMemory=memoryContextBridgeService.cognitiveEvidence({scopeType:'TASK',scopeId:task.taskId,limit:80});
+  const actionLineage=actionLineageService.summarizeTask(task.taskId);
+  const lineageEvidenceIds=[...new Set(actionLineage.actions.flatMap(action=>action.evidenceIds))];
+  const lineageUnknowns=actionLineage.failed+actionLineage.rejected>0?[`ACTION_LINEAGE_FAILURES:${actionLineage.failed+actionLineage.rejected}`]:[];
+  const base={schemaVersion:2 as const,taskId:task.taskId,cycle,revision:task.revision,goal:task.goal,input,source:String(task.source),constraints:[...new Set([...constraints,...governedMemory.constraints])],activeDomains:[...task.visitedDomains],requiredDomains:[...new Set(requiredDomains)],pendingIntentIds:[...new Set(pendingIntentIds)],evidenceIds:[...new Set([...evidenceIds,...governedMemory.evidenceIds,...governedMemory.memoryIds,...lineageEvidenceIds])],unknowns:[...new Set([...unknowns,...lineageUnknowns])],capabilityRefs,recentOutcomes,learningCandidates,environmentSignature:undefined as string|undefined,invariantsVersion:1 as const};
   return {...base,stateHash:canonicalSha256Object(base)};
  }
 

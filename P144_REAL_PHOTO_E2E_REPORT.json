@@ -1,0 +1,116 @@
+{
+  "phase": "REAL_PHOTO_E2E_P144",
+  "passed": true,
+  "checks": {
+    "realPhotoSource": true,
+    "sourceShaLinked": true,
+    "rgbaAnalyzed": true,
+    "faceRegion": true,
+    "segmentation": true,
+    "profileCreated": true,
+    "persistenceRoundTrip": true,
+    "generationModel": true,
+    "realPng": true,
+    "resemblanceReport": true,
+    "receipt": true
+  },
+  "input": {
+    "file": "P144_REAL_PHOTO_INPUT/real-photo.png",
+    "width": 512,
+    "height": 512,
+    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3",
+    "license": "No known copyright restrictions; public domain according to scikit-image documentation"
+  },
+  "analysis": {
+    "analysisSha256": "e2f34747ea8739f6db0f5f68a46180331ab18c91f094c9d49d8447a524058f59",
+    "faceBox": {
+      "x": 158.1,
+      "y": 10.200000000000001,
+      "width": 193.8,
+      "height": 112.2,
+      "confidence": 1
+    },
+    "bodyBox": {
+      "x": 0,
+      "y": 0,
+      "width": 510,
+      "height": 510,
+      "confidence": 1
+    },
+    "masks": {
+      "hairCoverage": 0.15968594625212412,
+      "surfaceCoverage": 0.0401378312039776,
+      "garmentCoverage": 0.4157750645100384,
+      "backgroundCoverage": 0.03021240234375
+    },
+    "landmarkConfidence": 0.09100870768229168,
+    "segmentationConfidence": 0.45504353841145834
+  },
+  "profile": {
+    "profileSha256": "4ed7e08b87533abcdea0b0b0e39250d13b81da2b21e34a4df9cd0526284d200c",
+    "revision": 1,
+    "evidenceCoverage": 0.02171057977062511,
+    "unresolvedFeatures": [
+      "face.jawTaper",
+      "face.eyeSpacing",
+      "face.eyeSize",
+      "face.noseLength",
+      "face.mouthWidth",
+      "hair.parting",
+      "hair.wave"
+    ]
+  },
+  "model": {
+    "modelSha256": "b722aed4f641cb5f2a2a61a43c3b7408a48483e0e4df8df5b2576558b145598c"
+  },
+  "generation": {
+    "pngSha256": "42ffd82261fd6b6c7289c9fe78f46ca27d30aeadd5a7e7b37adefda26761bc6c",
+    "receiptSha256": "fb1ed4a3bb6166af4a080b542381339c4e2c540ce7a566b2b550105f05c46fdd",
+    "buffers": {
+      "depthSha256": "82814c3c414a3b42e14882797436f37f2dc440325b28b630feeb8ba773c30916",
+      "normalSha256": "3628a52a320a38dd309e6cbe86545502ec8ca8c93d2677d1f364de5f03d94e44",
+      "materialSha256": "82814c3c414a3b42e14882797436f37f2dc440325b28b630feeb8ba773c30916"
+    }
+  },
+  "resemblance": {
+    "overallScore": 0.7554276449426562,
+    "geometryScore": 1,
+    "colorScore": 1,
+    "coveragePenalty": 0.9782894202293749,
+    "photoScores": [
+      {
+        "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3",
+        "score": 1,
+        "usedFields": [
+          "face.widthRatio",
+          "face.heightRatio",
+          "body.headToBody",
+          "body.shoulderRatio",
+          "body.torsoRatio",
+          "body.armRatio",
+          "body.legRatio",
+          "hair.volume",
+          "hair.length",
+          "hair.baseColor",
+          "hair.highlightColor",
+          "appearance.surfaceColor",
+          "appearance.garmentColor",
+          "appearance.pantsColor",
+          "appearance.shoeColor"
+        ]
+      }
+    ],
+    "unresolved": [
+      "face.jawTaper",
+      "face.eyeSpacing",
+      "face.eyeSize",
+      "face.noseLength",
+      "face.mouthWidth",
+      "hair.parting",
+      "hair.wave"
+    ],
+    "profileSha256": "4ed7e08b87533abcdea0b0b0e39250d13b81da2b21e34a4df9cd0526284d200c",
+    "reportSha256": "e54bf8699eff7ab31cb30c9db48da84426e2aba39ed35a06ddf7117de1f3b4e2"
+  },
+  "truthBoundary": "A real public-domain photograph was processed end-to-end. This validates the input-to-output path for this one source image; it does not establish general real-person likeness accuracy or multi-view reconstruction."
+}

@@ -1,0 +1,205 @@
+{
+  "phase": "PHASE_83",
+  "passed": true,
+  "executedAt": "2026-10-02T02:20:18.317Z",
+  "implemented": [
+    "UNIFIED_CANDIDATE_LIFECYCLE_GRAPH",
+    "POST_ADOPTION_CASCADE_INVALIDATION_TRANSACTION",
+    "CANONICAL_PROTECTED_INVARIANT_REGISTRY",
+    "UNIFIED_MULTI_OBJECTIVE_CANDIDATE_SELECTOR"
+  ],
+  "checks": [
+    {
+      "name": "UNIFIED_CANDIDATE_LIFECYCLE_GRAPH",
+      "passed": true,
+      "detail": {
+        "trace": {
+          "node": {
+            "candidateId": "child",
+            "revision": 2,
+            "parentCandidateIds": [
+              "root"
+            ],
+            "state": "VALIDATED",
+            "artifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "metadata": {},
+            "createdAt": 1790907618311,
+            "updatedAt": 1790907618312
+          },
+          "ancestors": [
+            {
+              "candidateId": "root",
+              "revision": 1,
+              "parentCandidateIds": [],
+              "state": "ADOPTED",
+              "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "metadata": {},
+              "createdAt": 1790907618309,
+              "updatedAt": 1790907618311
+            }
+          ],
+          "descendants": [],
+          "transitions": [
+            {
+              "transitionId": "bf6896c01ac3964ea6d8ab0595ecf37c397e2b89ad1f07dddbf1908a4725ac95",
+              "candidateId": "child",
+              "to": "GENERATED",
+              "reason": "REGISTERED",
+              "evidenceIds": [],
+              "ordinal": 5,
+              "at": 1790907618312
+            },
+            {
+              "transitionId": "4db768547c7a099be23a3558236aefdf5b88c8798e93813783ebe7ad76f010bc",
+              "candidateId": "child",
+              "from": "GENERATED",
+              "to": "VALIDATED",
+              "reason": "test",
+              "evidenceIds": [],
+              "ordinal": 6,
+              "at": 1790907618312
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "CANONICAL_PROTECTED_INVARIANT_REGISTRY",
+      "passed": true,
+      "detail": {
+        "blocked": {
+          "allowed": false,
+          "registryVersion": 1,
+          "registrySha256": "d94c9587898f576d366ff4017999c3ea1eb9affccb40ff652f75322b9d9e64ee",
+          "violations": [
+            {
+              "invariantId": "CORE_ROUTE_AUTHORITY",
+              "reason": "PROTECTED_PATH_TOUCHED_WITHOUT_PRESERVATION",
+              "severity": "CRITICAL"
+            }
+          ],
+          "evaluatedInvariantIds": [
+            "CANDIDATE_REQUIRES_EVIDENCE",
+            "CORE_ROUTE_AUTHORITY",
+            "NO_RUNTIME_SELF_REWRITE",
+            "ROLLBACK_HASH_INTEGRITY"
+          ]
+        },
+        "allowed": {
+          "allowed": true,
+          "registryVersion": 1,
+          "registrySha256": "d94c9587898f576d366ff4017999c3ea1eb9affccb40ff652f75322b9d9e64ee",
+          "violations": [],
+          "evaluatedInvariantIds": [
+            "CANDIDATE_REQUIRES_EVIDENCE",
+            "CORE_ROUTE_AUTHORITY",
+            "NO_RUNTIME_SELF_REWRITE",
+            "ROLLBACK_HASH_INTEGRITY"
+          ]
+        },
+        "registry": {
+          "registryId": "MIKI_CANONICAL_PROTECTED_INVARIANTS",
+          "version": 1,
+          "invariants": [
+            {
+              "id": "CANDIDATE_REQUIRES_EVIDENCE",
+              "kind": "CONTRACT",
+              "selector": "CANDIDATE_REQUIRES_EVIDENCE",
+              "description": "Candidate adoption requires validation evidence and rollback material.",
+              "severity": "CRITICAL",
+              "required": true,
+              "tags": [
+                "candidate",
+                "evidence"
+              ]
+            },
+            {
+              "id": "CORE_ROUTE_AUTHORITY",
+              "kind": "PATH",
+              "selector": "src/miki/core/",
+              "description": "All entry routes remain governed by CORE.",
+              "severity": "CRITICAL",
+              "required": true,
+              "tags": [
+                "core",
+                "routing"
+              ]
+            },
+            {
+              "id": "NO_RUNTIME_SELF_REWRITE",
+              "kind": "BEHAVIOR",
+              "selector": "NO_RUNTIME_SELF_REWRITE",
+              "description": "Running application code must not rewrite its own canonical source.",
+              "severity": "CRITICAL",
+              "required": true,
+              "tags": [
+                "adoption",
+                "safety"
+              ]
+            },
+            {
+              "id": "ROLLBACK_HASH_INTEGRITY",
+              "kind": "CONTRACT",
+              "selector": "ROLLBACK_HASH_INTEGRITY",
+              "description": "Rollback must restore the exact pre-adoption hash.",
+              "severity": "CRITICAL",
+              "required": true,
+              "tags": [
+                "hash",
+                "rollback"
+              ]
+            }
+          ],
+          "createdAt": 1790907618306,
+          "sha256": "d94c9587898f576d366ff4017999c3ea1eb9affccb40ff652f75322b9d9e64ee"
+        }
+      }
+    },
+    {
+      "name": "UNIFIED_MULTI_OBJECTIVE_CANDIDATE_SELECTOR",
+      "passed": true,
+      "detail": {
+        "selectedCandidateId": "safe-fast",
+        "paretoFront": [
+          "safe-fast"
+        ],
+        "scores": {
+          "safe-fast": 0.20499999999999996
+        },
+        "rejected": {
+          "unsafe-fast": [
+            "HARD_LIMIT_safetyRisk"
+          ]
+        },
+        "decisionSha256": "ebe47c24dbe39f84bd414777b2d92ad015e7162cdbafc229a1fbb6aecb32ecac"
+      }
+    },
+    {
+      "name": "POST_ADOPTION_CASCADE_INVALIDATION_TRANSACTION",
+      "passed": true,
+      "detail": {
+        "transactionId": "5313539b7c3ee16e73da01028f525e10ab49131c943b849e9907e3da28940f9a",
+        "rootCandidateId": "root",
+        "invalidatedCandidateIds": [
+          "root",
+          "child"
+        ],
+        "adapterReceipts": {
+          "test-cache": [
+            "cache-cleared"
+          ]
+        },
+        "status": "COMMITTED",
+        "reason": "POST_ADOPTION_DEPENDENCY_INVALIDATION",
+        "startedAt": 1790907618314,
+        "completedAt": 1790907618316
+      }
+    },
+    {
+      "name": "CORE_CONNECTION",
+      "passed": true,
+      "detail": {}
+    }
+  ],
+  "failures": []
+}

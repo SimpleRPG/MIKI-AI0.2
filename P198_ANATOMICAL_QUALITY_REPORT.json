@@ -1,0 +1,143 @@
+{
+  "phase": "ANATOMICAL_PROCEDURAL_PERSON_P198",
+  "passed": true,
+  "checks": {
+    "fiveViews": true,
+    "headRange": true,
+    "legRange": true,
+    "hands": true,
+    "chair": true,
+    "eyes": true,
+    "faceDetail": true,
+    "foreground": true,
+    "depth": true,
+    "png": true,
+    "localOnly": true
+  },
+  "views": [
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": 0
+      },
+      "metrics": {
+        "headPixels": 37903,
+        "torsoPixels": 66773,
+        "legPixels": 61304,
+        "handPixels": 5380,
+        "chairPixels": 31322,
+        "eyePixels": 1528,
+        "faceDetailPixels": 2188,
+        "foregroundRatio": 0.25772349039713544,
+        "headTorsoRatio": 0.5676396148143711,
+        "legsTorsoRatio": 0.9180956374582541,
+        "handSeparation": 1,
+        "chairPresent": 1,
+        "depthFinite": 1
+      },
+      "renderSha256": "d75ef7c7e54a1a16b49c663f38d693c640a1341c994dffc1d6390927d49dccb3"
+    },
+    {
+      "view": {
+        "yaw": 20,
+        "pitch": 0
+      },
+      "metrics": {
+        "headPixels": 42957,
+        "torsoPixels": 63151,
+        "legPixels": 64377,
+        "handPixels": 5750,
+        "chairPixels": 76159,
+        "eyePixels": 1530,
+        "faceDetailPixels": 2060,
+        "foregroundRatio": 0.32093556722005206,
+        "headTorsoRatio": 0.6802267580877579,
+        "legsTorsoRatio": 1.0194137860049721,
+        "handSeparation": 1,
+        "chairPresent": 1,
+        "depthFinite": 1
+      },
+      "renderSha256": "471ae474b65e3baecb898a10173a5ff0fc206d17ff6f7357f0b2baf95da06805"
+    },
+    {
+      "view": {
+        "yaw": -20,
+        "pitch": 0
+      },
+      "metrics": {
+        "headPixels": 43707,
+        "torsoPixels": 63258,
+        "legPixels": 64751,
+        "handPixels": 5509,
+        "chairPixels": 69850,
+        "eyePixels": 1543,
+        "faceDetailPixels": 2061,
+        "foregroundRatio": 0.31417210896809894,
+        "headTorsoRatio": 0.6909323721900787,
+        "legsTorsoRatio": 1.0236017578804262,
+        "handSeparation": 1,
+        "chairPresent": 1,
+        "depthFinite": 1
+      },
+      "renderSha256": "8e61d99b657cd7922295e7dcb25a51b6d39f6f8fb528f978c8e9d62da877ab92"
+    },
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": 12
+      },
+      "metrics": {
+        "headPixels": 35488,
+        "torsoPixels": 67498,
+        "legPixels": 59160,
+        "handPixels": 6064,
+        "chairPixels": 34218,
+        "eyePixels": 1407,
+        "faceDetailPixels": 1750,
+        "foregroundRatio": 0.2574005126953125,
+        "headTorsoRatio": 0.5257637263326321,
+        "legsTorsoRatio": 0.8764704139381908,
+        "handSeparation": 1,
+        "chairPresent": 1,
+        "depthFinite": 1
+      },
+      "renderSha256": "54a7737232f904dd200d419c503482af8a27cb4949a56ba531d358c44b0d5489"
+    },
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": -12
+      },
+      "metrics": {
+        "headPixels": 41211,
+        "torsoPixels": 59703,
+        "legPixels": 61004,
+        "handPixels": 4601,
+        "chairPixels": 31106,
+        "eyePixels": 1676,
+        "faceDetailPixels": 2089,
+        "foregroundRatio": 0.2512931823730469,
+        "headTorsoRatio": 0.6902668207627758,
+        "legsTorsoRatio": 1.0217911997722058,
+        "handSeparation": 1,
+        "chairPresent": 1,
+        "depthFinite": 1
+      },
+      "renderSha256": "067e16610fa4418a3a59c26771295db35ea1362d61ef17e8a292f3dadcbc16e6"
+    }
+  ],
+  "improvements": [
+    "tapered torso polygon",
+    "separate upper and lower limbs",
+    "seated hip-knee-ankle chain",
+    "proportional head and jaw volumes",
+    "separate finger capsules",
+    "sclera iris pupil eyelid layers",
+    "nose bridge tip wings nostrils",
+    "separate upper and lower lips",
+    "chair seat back and legs",
+    "local anti-aliasing and procedural optical variation"
+  ],
+  "truthBoundary": "P198 replaces oversized abstract blobs with proportion-constrained anatomical procedural surfaces. It is materially more figurative, but it is still a local rule-based 2.5D render and not indistinguishable from a photograph.",
+  "deviceE2E": "DEFERRED_BY_USER"
+}

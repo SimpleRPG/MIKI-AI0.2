@@ -1,0 +1,58 @@
+{
+  "phase": "FAILURE_REPRODUCTION_P112",
+  "passed": true,
+  "checks": {
+    "minimalReproduces": true,
+    "irrelevantRemoved": true,
+    "dependencyPreserved": true,
+    "hashPresent": true,
+    "freshReplayAccepted": true,
+    "contaminatedReplayRejected": true
+  },
+  "minimized": {
+    "originalEventIds": [
+      "request",
+      "read-a",
+      "read-b",
+      "edit",
+      "validate"
+    ],
+    "minimalEventIds": [
+      "request",
+      "read-a",
+      "edit"
+    ],
+    "reproductionRuns": 3,
+    "reproductionPasses": 3,
+    "reproductionRate": 1,
+    "threshold": 1,
+    "reproduced": true,
+    "removedEventIds": [
+      "read-b",
+      "validate"
+    ],
+    "resultSha256": "6021d568d4420ac98e43f3bc38c392fb1774bc1479d5c2998dbe7be8c7920669"
+  },
+  "clean": {
+    "failureId": "F-1",
+    "historicalEvidenceSha256": "H",
+    "fixtureSha256": "FX",
+    "expectedFailureSignature": "SIG",
+    "observedFailureSignature": "SIG",
+    "reproduced": true,
+    "reasons": [],
+    "reproductionSha256": "96e0ba5b7b0a6d79b0ac96551ed5e7ce3bc41ede1ab50acddf034e2ad3c323c6"
+  },
+  "contaminated": {
+    "failureId": "F-2",
+    "historicalEvidenceSha256": "H",
+    "fixtureSha256": "FX",
+    "expectedFailureSignature": "SIG",
+    "observedFailureSignature": "SIG",
+    "reproduced": false,
+    "reasons": [
+      "REPLAY_WORKER_CONTAMINATED"
+    ],
+    "reproductionSha256": "f057869000bb11753d8efc6c86cfeb0a6946744b30f82488189b66ab29224031"
+  }
+}

@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(MikiWorkManagerPlugin.class);
         registerPlugin(MIKIJapaneseMorphologyPlugin.class);
         registerPlugin(MIKINativeRunnerPlugin.class);
+        registerPlugin(MIKIGraphStorePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

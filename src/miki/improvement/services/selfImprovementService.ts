@@ -532,7 +532,6 @@ class SelfImprovementService {
           `🚨 [再発失敗自動検知] 同種失敗が${recurrenceCheck.recurrenceCount}回再現しました。外部教師自動発火パイプラインを非同期起動します: 「${userMessage.slice(0, 30)}...」`
         );
 
-        // 循環参照回避のため動的importで非同期呼び出し
         import('../../learning/services/teacherRequestService')
           .then(({ teacherRequestService }) => {
             teacherRequestService
@@ -808,36 +807,6 @@ class SelfImprovementService {
     }
 
     return newCandidate;
-  }
-
-  /**
-   * 外部教師UI向けの能力候補一覧を取得する互換API。
-   * 非LLM学習アーキテクチャでは trainingSamples が正規の保存先。
-   */
-  public getCapabilityCandidates(): CapabilityLearningCandidate[] {
-    return [...this.trainingSamples];
-  }
-
-  /**
-   * @deprecated 非LLM学習アーキテクチャ移行に伴い非推奨。registerCapabilityCandidate を使用してください。
-   */
-  public addTrainingSample(sample: {
-    instruction: string;
-    inputContext?: string;
-    outputTarget: string;
-    category?: CapabilityLearningCandidate['category'];
-    reliability?: CapabilityLearningCandidate['reliability'];
-    source?: CapabilityLearningCandidate['source'];
-    approved?: boolean;
-    split?: 'train' | 'validation' | 'test';
-    originalFailureOutput?: string;
-    failureReason?: string;
-    verifiedEffective?: boolean;
-    verificationNote?: string;
-    experienceId?: string;
-    evidenceIds?: string[];
-  }): CapabilityLearningCandidate | null {
-    return this.registerCapabilityCandidate(sample);
   }
 
   /**

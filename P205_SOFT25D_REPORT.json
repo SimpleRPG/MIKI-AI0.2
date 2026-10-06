@@ -1,0 +1,663 @@
+{
+  "phase": "SOFT_25D_CHARACTER_P200_P205",
+  "passed": true,
+  "checks": {
+    "allPassed": true,
+    "identityStable": true,
+    "graphInternalSha": true,
+    "ruleInternalSha": true,
+    "fileHashesPreserved": true,
+    "subjectSeparation": true,
+    "featureRules": true,
+    "correlations": true,
+    "constraints": true,
+    "occlusionRules": true,
+    "sourceList": true,
+    "styleProfile": true,
+    "hairTaper": true,
+    "requiredGates": true,
+    "distinctViews": true,
+    "noExternal": true
+  },
+  "knowledgePreservation": {
+    "graphSha256": "381504c78eca1dc4fc2733590701939dff9db73afc10826600e15e401e891808",
+    "ruleBookSha256": "31f5bbe195379f6fb4c97f4505336c1054293b7f18aabc53bcadba8dc2748887",
+    "graphFileSha256": "4b5746bd08afe23d3359bcdadbe6214949c0edfe5b61db88fba03fcaf9d43516",
+    "ruleBookFileSha256": "3913078446a480b38d58ac5e8d20e8ec17bdce6943c3570b13bb552c768db9b3",
+    "observationsFileSha256": "9194af04874d2db0eac4ea9751614de05bdb2b36985406371483876035fe68d1",
+    "observedSubjects": 10,
+    "syntheticSubjects": 10,
+    "featureRules": 50,
+    "correlations": 10,
+    "constraints": 6,
+    "occlusionRules": 6,
+    "sourceSha256List": [
+      "0ed47db0638724230fa10e5f92929309a808cccacb268c047c05375160987f57",
+      "17e683d1c446291eb9712a43c3f4641ec5bd757908ba0a1cc8fc4cd61c6ce98b",
+      "2df136a7ddf6cb8066191843784e6b1bd082ea9f8a3583615ef810b02c288587",
+      "2e12b5714377b6ad7e21624e1818904fa22860f99d887c44584164ac1e8fdb1b",
+      "312c367c4f9d01f35ebc3c48051b4f836c9112c5aac37950fedf4117f4c5e7fe",
+      "549d3938000a6b69eebb61658482b7051e013f0a61fc3a3254142df1e47fd2ab",
+      "685f7ef8aebe8677aa99e670dd5d4e57a057382df74f0fff5e2d1b5ba4065b55",
+      "7ae66fdb26510eccdf970517ee9b8f92abf7eb8c623593bebb38bb7b0dd26193",
+      "7ce36c56583f1784adab63f91c1d6899a5c0dba89dea3981f050d60b9dab0f5d",
+      "7ee27dd9d11d989d86afbec40b063410e252c26b03734f15321af4c1156b2af5",
+      "838c4ee117b31d0265e9e5d9a18afda0290de30c15cab0ef422df7aec75f0746",
+      "8caf22b54d8131c2205cd0c92a3bea4c71c09f0c091645d221db591d2198f3f6",
+      "a07ed39a61be1e119b2e293fb87f21c275bb9e063034f9cab4d8b64c2e7d9f38",
+      "a7e1676e3b10a99f15bea40c0d526b29bacda6697c359e9617e6f1f05e965755",
+      "b07b18ca356d1836ab07d02daad80b518e36b5a5f88ea8a52f9713a6d55df8fd",
+      "b60637033d278101df078094aa587ab3151129bb21eca88e6e7458ccc8c28b9a",
+      "c6a30d8b215fd1cee48058059a6a2c05f2a9731fd861c6830ad43154c59c8578",
+      "d2dc16a8551a60338c90b8075773c475e6a0c621c62d0939a793f2bc80ffb3ca",
+      "d932ffabdd70982cd84a731384f0a12ecf06effb28260d10be260b6049e3deff",
+      "e2bfc8c7a718df25aef37ab435271e038c74ad7e52b061bb27e3c740dc7a7f28"
+    ],
+    "knowledgeSha256": "81cd314303e7cf163e54cb851b8554b465292a3e5f95955c3a630819f6f5a3ce"
+  },
+  "styleProfile": {
+    "styleId": "SOFT_25D",
+    "face": {
+      "eyeScale": 0.84,
+      "noseContrast": 0.38,
+      "lipScale": 0.86,
+      "neckBlend": 0.82
+    },
+    "hair": {
+      "baseVolume": 0.91,
+      "clumpCount": 19,
+      "rootWidth": 0.016,
+      "middleWidth": 0.01,
+      "tipWidth": 0.0024
+    },
+    "body": {
+      "limbTaper": 0.74,
+      "jointSoftness": 0.84
+    },
+    "hand": {
+      "fingerRatios": [
+        0.72,
+        0.92,
+        1,
+        0.9,
+        0.68
+      ],
+      "thumbAngle": 38,
+      "minimumGap": 2
+    },
+    "garment": {
+      "bodyOffset": 0.026,
+      "wrinkleStrength": 0.5389165366132059,
+      "contactCompression": 0.62
+    },
+    "palette": {
+      "skin": [
+        134,
+        124,
+        120
+      ],
+      "hair": [
+        47,
+        36,
+        31
+      ],
+      "garment": [
+        75,
+        104,
+        112
+      ],
+      "background": [
+        225,
+        222,
+        216
+      ]
+    },
+    "requiredGates": [
+      "STYLE_CONSISTENCY",
+      "SILHOUETTE_QUALITY",
+      "FACE_READABILITY",
+      "HAND_READABILITY",
+      "LIMB_CONTINUITY",
+      "IDENTITY_STABILITY",
+      "MULTIVIEW_COHERENCE"
+    ],
+    "minimumScore": 0.74,
+    "styleSha256": "9926e2ce4e9b7cb1f41bc1c00dbac59298c27cbfa85211358d920600f2f20262"
+  },
+  "views": [
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": 0
+      },
+      "totalScore": 0.9938622974729794,
+      "passed": true,
+      "repairPasses": 0,
+      "failures": [],
+      "renderSha256": "91c7bd6aa237aa4485c2269cf2bb4697b4ca23837fc0225004b465c6d046dae3",
+      "identitySha256": "62ef6596dba5f0e941bfdf9a83d933bc321ae85a8d861a38b8e77a0ec4b2399d",
+      "receiptSha256": "d766e8b67fdb7f0650035a94d4475f45f8b202d5801f5a67c8aeb52d7d713f21",
+      "gates": [
+        {
+          "name": "STYLE_CONSISTENCY",
+          "score": 0.9776167128544021,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "SILHOUETTE_QUALITY",
+          "score": 0.9974676106770832,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "FACE_READABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "FACIAL_PROPORTION",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAIR_FLOW",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAIR_TAPER",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAND_READABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "LIMB_CONTINUITY",
+          "score": 0.9328501385632062,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "JOINT_SHAPE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "GARMENT_COHERENCE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "CONTACT_COHERENCE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "POSE_STABILITY",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "IDENTITY_STABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "COLOR_HARMONY",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "MULTIVIEW_COHERENCE",
+          "score": 1,
+          "required": true,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "view": {
+        "yaw": 22,
+        "pitch": 0
+      },
+      "totalScore": 0.9777146895378444,
+      "passed": true,
+      "repairPasses": 0,
+      "failures": [],
+      "renderSha256": "bf1873e649798ccf6bb7052ba43c9b52fcd01184d457e056713ca54c48186122",
+      "identitySha256": "62ef6596dba5f0e941bfdf9a83d933bc321ae85a8d861a38b8e77a0ec4b2399d",
+      "receiptSha256": "2d750bc87a1e148855de2bd1c9643b4cd3bc47c7e65b1d19825e258e5d65a1e5",
+      "gates": [
+        {
+          "name": "STYLE_CONSISTENCY",
+          "score": 0.9767487299726456,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "SILHOUETTE_QUALITY",
+          "score": 0.7587254231770835,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "FACE_READABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "FACIAL_PROPORTION",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAIR_FLOW",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAIR_TAPER",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAND_READABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "LIMB_CONTINUITY",
+          "score": 0.9302461899179367,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "JOINT_SHAPE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "GARMENT_COHERENCE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "CONTACT_COHERENCE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "POSE_STABILITY",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "IDENTITY_STABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "COLOR_HARMONY",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "MULTIVIEW_COHERENCE",
+          "score": 1,
+          "required": true,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "view": {
+        "yaw": -22,
+        "pitch": 0
+      },
+      "totalScore": 0.9734854080941612,
+      "passed": true,
+      "repairPasses": 0,
+      "failures": [],
+      "renderSha256": "03cf6f64a4a9069163fcf3a1b610cf933cbf3bd1fc8249121906b731962c6136",
+      "identitySha256": "62ef6596dba5f0e941bfdf9a83d933bc321ae85a8d861a38b8e77a0ec4b2399d",
+      "receiptSha256": "b9b42f88804e20e041621905cf9255b69178c0b99b30c04ce6bd8a3eae06d139",
+      "gates": [
+        {
+          "name": "STYLE_CONSISTENCY",
+          "score": 0.9643968515467692,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "SILHOUETTE_QUALITY",
+          "score": 0.7522597656250001,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "FACE_READABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "FACIAL_PROPORTION",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAIR_FLOW",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAIR_TAPER",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAND_READABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "LIMB_CONTINUITY",
+          "score": 0.8931905546403075,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "JOINT_SHAPE",
+          "score": 0.9924339496003416,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "GARMENT_COHERENCE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "CONTACT_COHERENCE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "POSE_STABILITY",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "IDENTITY_STABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "COLOR_HARMONY",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "MULTIVIEW_COHERENCE",
+          "score": 1,
+          "required": true,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": 12
+      },
+      "totalScore": 0.9924216986779832,
+      "passed": true,
+      "repairPasses": 0,
+      "failures": [],
+      "renderSha256": "6bc452b798c02d1369b5a7467bc4a72611a7507a141a8053ec44eeec37191dc8",
+      "identitySha256": "62ef6596dba5f0e941bfdf9a83d933bc321ae85a8d861a38b8e77a0ec4b2399d",
+      "receiptSha256": "27207073be9ff5d18c3f672df1c07ccdbb747e2abb0e2ca43be3e65c55c59573",
+      "gates": [
+        {
+          "name": "STYLE_CONSISTENCY",
+          "score": 0.9726989644434788,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "SILHOUETTE_QUALITY",
+          "score": 0.9955296223958333,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "FACE_READABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "FACIAL_PROPORTION",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAIR_FLOW",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAIR_TAPER",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAND_READABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "LIMB_CONTINUITY",
+          "score": 0.9180968933304366,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "JOINT_SHAPE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "GARMENT_COHERENCE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "CONTACT_COHERENCE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "POSE_STABILITY",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "IDENTITY_STABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "COLOR_HARMONY",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "MULTIVIEW_COHERENCE",
+          "score": 1,
+          "required": true,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": -12
+      },
+      "totalScore": 0.9923503678650067,
+      "passed": true,
+      "repairPasses": 0,
+      "failures": [],
+      "renderSha256": "3e2e26374ff932ba6c29baad642d9ae015594560418e3737234b85bbd4df2ca2",
+      "identitySha256": "62ef6596dba5f0e941bfdf9a83d933bc321ae85a8d861a38b8e77a0ec4b2399d",
+      "receiptSha256": "fbe55842f1bad31a6a13e555b872fdd180781e2d79f8243178f2daad7264b9c3",
+      "gates": [
+        {
+          "name": "STYLE_CONSISTENCY",
+          "score": 0.973170731707317,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "SILHOUETTE_QUALITY",
+          "score": 0.9925725911458333,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "FACE_READABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "FACIAL_PROPORTION",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAIR_FLOW",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAIR_TAPER",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "HAND_READABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "LIMB_CONTINUITY",
+          "score": 0.9195121951219513,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "JOINT_SHAPE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "GARMENT_COHERENCE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "CONTACT_COHERENCE",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "POSE_STABILITY",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "IDENTITY_STABILITY",
+          "score": 1,
+          "required": true,
+          "passed": true
+        },
+        {
+          "name": "COLOR_HARMONY",
+          "score": 1,
+          "required": false,
+          "passed": true
+        },
+        {
+          "name": "MULTIVIEW_COHERENCE",
+          "score": 1,
+          "required": true,
+          "passed": true
+        }
+      ]
+    }
+  ],
+  "implemented": {
+    "P200": "StyleProfile Palette Identity State separation",
+    "P201": "Face readability Hair base/clump/taper constraints",
+    "P202": "Body continuity Hand finger ratio quality gates",
+    "P203": "Garment and chair contact coherence gates",
+    "P204": "Five-view identity and projection coherence",
+    "P205": "Bounded repair and fail-closed quality adoption"
+  },
+  "truthBoundary": "The P190-P199 learned graph, observations, rule book, correlations, constraints, occlusion rules and source hashes are preserved unchanged. SOFT_25D is an additive style and quality layer."
+}

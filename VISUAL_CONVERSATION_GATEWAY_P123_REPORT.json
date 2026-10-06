@@ -1,0 +1,105 @@
+{
+  "phase": "VISUAL_CONVERSATION_GATEWAY_P123",
+  "passed": true,
+  "checks": {
+    "multiProject": true,
+    "create": true,
+    "edit": true,
+    "variant": true,
+    "research": true,
+    "scoped": true,
+    "imageCard": true,
+    "selfImprovement": true
+  },
+  "intents": {
+    "create": {
+      "action": "CREATE_NEW_PROJECT",
+      "outputKind": "PIXEL_ART",
+      "query": "夜の街の人物を64×64、1024色のドット絵で作って",
+      "needsResearch": false,
+      "mediaKinds": [
+        "IMAGE"
+      ],
+      "width": 64,
+      "height": 64,
+      "paletteSize": 1024,
+      "preserveOriginal": false,
+      "intentSha256": "fa3f1f18d496f728745c9e8a198f24bc3d2ba6471c3d7a36f258a624dc81b5ff"
+    },
+    "edit": {
+      "action": "EDIT_EXISTING_PROJECT",
+      "outputKind": "CANVAS",
+      "projectId": "avatar-a",
+      "query": "さっきの人物のコートを長くして",
+      "needsResearch": false,
+      "mediaKinds": [
+        "IMAGE"
+      ],
+      "preserveOriginal": false,
+      "intentSha256": "1b5f2222a3219be6b1f2d1b83ba72cd185b4b6558ec093331de2e56e79d5ec86"
+    },
+    "variant": {
+      "action": "CREATE_VARIANT",
+      "outputKind": "CANVAS",
+      "projectId": "avatar-a",
+      "query": "元を残して冬服版を作って",
+      "needsResearch": false,
+      "mediaKinds": [
+        "IMAGE"
+      ],
+      "preserveOriginal": true,
+      "intentSha256": "396e0d6da063002cd1cbf305a60f8d8a8c1e97f8b90100e5317073870ea18ede"
+    },
+    "research": {
+      "action": "RESEARCH_REFERENCES",
+      "outputKind": "CANVAS",
+      "query": "歩行動画と参考画像を探して",
+      "needsResearch": true,
+      "mediaKinds": [
+        "VIDEO",
+        "IMAGE"
+      ],
+      "preserveOriginal": false,
+      "intentSha256": "482ea63982967ff3e02b70a707b9e7cb17bf00ea6d2f77f2f68a7441883027d0"
+    }
+  },
+  "deliveries": [
+    {
+      "type": "IMAGE_CARD",
+      "title": "coat",
+      "previewUrl": "https://example.test/t.png",
+      "mediaUrl": "https://example.test/a.png",
+      "sourcePageUrl": "https://example.test/page",
+      "license": "CC0",
+      "attribution": "CC0",
+      "verified": true,
+      "payloadSha256": "3f04c8a07eb4dc2132b2235b5e5f7714630b5d864974cd0c1639af9a7d8bbcca"
+    }
+  ],
+  "evidence": {
+    "evidenceKind": "VISUAL_SELF_CODE_IMPROVEMENT",
+    "projectId": "avatar-a",
+    "projectSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "referenceSha256List": [
+      "3f04c8a07eb4dc2132b2235b5e5f7714630b5d864974cd0c1639af9a7d8bbcca"
+    ],
+    "uses": [
+      "CANVAS_CANDIDATE",
+      "PIXEL_ART_CANDIDATE",
+      "AVATAR_CANDIDATE",
+      "VISUAL_REGRESSION_FIXTURE"
+    ],
+    "directProductionMutation": false,
+    "evidenceSha256": "3ebb986543486fb317336646928c4781b1907771a11d719d3b9d0e682913cf6e"
+  },
+  "registry": [
+    {
+      "projectId": "avatar-a",
+      "sha": "7f724674f3b2aa872da7ce0dd7e5b7cffa8ea040bb3710622691f4706af50ffa"
+    },
+    {
+      "projectId": "forest",
+      "sha": "daed78a72df45fbf049e23d88dffc9a0a3e1e9a7dad148aac62d93f9848ff9e9"
+    }
+  ]
+}

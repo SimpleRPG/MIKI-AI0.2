@@ -1,0 +1,1 @@
+{"cases":[{"id":"EMPTY_INPUT","expected":"SAFE_RESULT_OR_VALIDATION_ERROR"},{"id":"MAX_MINUS_ONE","expected":"ACCEPT"},{"id":"MAX_EXACT","expected":"ACCEPT"},{"id":"MAX_PLUS_ONE","expected":"REJECT"},{"id":"MISSING_RECEIPT","expected":"REQUIRED_EVIDENCE_MISSING"},{"id":"OWNER_MISMATCH","expected":"OWNERSHIP_MISMATCH"},{"id":"NATIVE_UNAVAILABLE","expected":"NO_PERSISTENCE"}]}

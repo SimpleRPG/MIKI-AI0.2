@@ -1,0 +1,31 @@
+MIKI-AI Meaning Understanding Deep Audit Phase 84
+
+Final judgment: NOT YET at a reliable general-conversation level.
+
+What works
+- Japanese tokenization pipeline and dictionary fallback exist.
+- Dialogue-act classification covers common explicit phrases.
+- Semantic frames represent targets, exclusions, conditions, action chains and mutations.
+- Answer IR and surface-generation meaning-preservation gates exist.
+- Unknown or unresolved meaning normally falls back instead of pretending certainty.
+
+Measured weaknesses
+- Intent diagnostic exact match: 7/12 (58.3%). Some labels are adjacent rather than entirely wrong, but the result shows dependence on phrase patterns.
+- Complex semantic instructions ready without clarification: 0/10.
+- Four short continuity prompts all remained not ready.
+- Hybrid checks for "これでどう？", "もっと良くして", "問題ない？", and "既存機能は消さないで実装して" all required fallback.
+- Existing anaphora shadow benchmark: 85% topic match and 75% response-text match among unique-resolution test cases.
+- Existing conversation learning/reasoning regression failed because a second consistent affirmation did not promote the claim from CANDIDATE to SUPPORTED.
+
+Structural causes
+1. Reference resolution chooses a recent history line using a small keyword regex. It does not maintain typed discourse entities, salience, relation roles, or competing referents.
+2. Dialogue-act recognition is regex-first and single-label. Mixed requests such as confirmation plus continuation or prohibition plus implementation lose secondary intent.
+3. Semantic parsing is tuned toward operational instructions. Everyday implication, paraphrase, irony, unstated premises, preference nuance and broad world knowledge are not demonstrated.
+4. Clarification is conservative, which is safe, but it causes many ordinary instructions to remain WAITING_USER.
+5. Vocabulary entries and morphology improve segmentation but do not themselves supply compositional word-sense disambiguation or pragmatic understanding.
+6. The answer surface can preserve an already-built IR, but good wording does not prove that the incoming user meaning was understood correctly.
+
+Operational recommendation
+- Current state is suitable for constrained, explicit, domain-oriented dialogue with fallback.
+- Do not certify it as autonomous natural conversation or human-level meaning understanding.
+- The next implementation priority should be a typed discourse model, multi-intent semantic representation, ambiguity calibration, compositional negation/scope handling, and turn-level semantic E2E corpus with expected frames and replies.

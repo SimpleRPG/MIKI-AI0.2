@@ -1,0 +1,40 @@
+{
+  "phase": "FACE_EVIDENCE_TO_RENDERER_P147",
+  "passed": true,
+  "checks": {
+    "realPng": true,
+    "upperBody": true,
+    "fieldsConnected": true,
+    "suppressed": true,
+    "receipt": true,
+    "evidenceLinked": true,
+    "profileLinked": true,
+    "featureChangeChangesPng": true
+  },
+  "artifact": {
+    "pngSha256": "ab0920c171cd45673d54f23625d4f7fbe1549d64bb22828ca1eb4ebffa545800",
+    "receiptSha256": "f0cbd19f89423fa9f7911575c95ea648e14e82ea37e462c8b58c10867c46938b",
+    "connectedFields": [
+      "face.eyeSpacing",
+      "face.eyeSize",
+      "face.noseLength",
+      "face.mouthWidth",
+      "face.jawTaper",
+      "palette.hair",
+      "palette.surface",
+      "palette.garment",
+      "scope.UPPER_BODY",
+      "suppressed.lower-arms",
+      "suppressed.hands",
+      "suppressed.legs",
+      "suppressed.feet"
+    ],
+    "suppressedRegions": [
+      "lower-arms",
+      "hands",
+      "legs",
+      "feet"
+    ]
+  },
+  "truthBoundary": "P146 evidence is connected to P147 pixels. Landmark quality remains rule-based and must not be represented as identity recognition or photorealistic reconstruction."
+}

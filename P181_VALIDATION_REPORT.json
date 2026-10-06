@@ -1,0 +1,57 @@
+{
+  "phase": "ITERATIVE_PERSON_QUALITY_P181",
+  "passed": true,
+  "checks": {
+    "frontQuality": true,
+    "angledQuality": true,
+    "color": true,
+    "observed": true,
+    "borderLeakage": true,
+    "distinct": true,
+    "realPixels": true
+  },
+  "front": {
+    "candidateId": "P181-f30ff340d96e89b015c1",
+    "parameters": {
+      "yaw": 0,
+      "pitch": 0,
+      "feather": 14,
+      "saturation": 0.92
+    },
+    "metrics": {
+      "sourceColorSimilarity": 0.8796030795750528,
+      "edgeRetention": 0.40237430167597765,
+      "foregroundContinuity": 0.9960770873183858,
+      "observedPixelRatio": 0.4118175506591797,
+      "artifactPenalty": 0,
+      "borderLeakage": 0,
+      "qualityScore": 0.8425421145079292
+    }
+  },
+  "angled": {
+    "candidateId": "P181-ca00dc25a42642f62807",
+    "parameters": {
+      "yaw": 24,
+      "pitch": 10,
+      "feather": 14,
+      "saturation": 0.92
+    },
+    "metrics": {
+      "sourceColorSimilarity": 0.8784159369560411,
+      "edgeRetention": 0.39727653631284915,
+      "foregroundContinuity": 0.9972539573469855,
+      "observedPixelRatio": 0.3788938522338867,
+      "artifactPenalty": 0,
+      "borderLeakage": 0,
+      "qualityScore": 0.8272515452839347
+    }
+  },
+  "qualityGate": {
+    "front": 0.55,
+    "angled": 0.5,
+    "color": 0.45,
+    "observed": 0.2,
+    "borderLeakage": 0.08
+  },
+  "truthBoundary": "P181 selects the best candidate from nine render parameter combinations and refuses completion if objective quality gates fail. It is an image-based 2.5D portrait renderer, not unseen true 3D reconstruction."
+}

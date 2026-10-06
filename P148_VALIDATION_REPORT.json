@@ -1,0 +1,119 @@
+{
+  "phase": "ROBUST_REGION_DIFFERENT_REAL_PHOTO_E2E_P148",
+  "passed": true,
+  "checks": {
+    "differentSource": true,
+    "realPhoto": true,
+    "maskCounts": true,
+    "backgroundRejected": true,
+    "consistency": true,
+    "robustSha": true,
+    "png": true,
+    "receipt": true
+  },
+  "input": {
+    "width": 512,
+    "height": 512,
+    "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+    "view": "THREE_QUARTER",
+    "source": "scikit-image data.camera sample",
+    "license": "Used from scikit-image sample data under project licensing; see bundled and linked license documentation",
+    "synthetic": false,
+    "realPhotograph": true,
+    "faceBox": {
+      "x": 180,
+      "y": 55,
+      "width": 165,
+      "height": 180,
+      "confidence": 0.4
+    }
+  },
+  "robustEvidence": {
+    "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+    "palette": {
+      "hair": "#1e1e1e",
+      "surface": "#949494",
+      "garment": "#909090"
+    },
+    "masks": {
+      "hairPixels": 826,
+      "surfacePixels": 1607,
+      "garmentPixels": 17052,
+      "backgroundRejected": 12739
+    },
+    "consistency": {
+      "eyeOrder": true,
+      "faceBounds": true,
+      "paletteSeparated": true,
+      "accepted": true
+    },
+    "confidence": 1,
+    "evidenceSha256": "655cacd7c87e41c1341a2ca10e3953468344469ddee690b986c61ee4f9de832f"
+  },
+  "faceEvidence": {
+    "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+    "faceBox": {
+      "x": 180,
+      "y": 55,
+      "width": 165,
+      "height": 180,
+      "confidence": 0.4
+    },
+    "landmarks": {
+      "leftEye": {
+        "x": 0.388671875,
+        "y": 0.251953125,
+        "confidence": 0.9
+      },
+      "rightEye": {
+        "x": 0.525390625,
+        "y": 0.232421875,
+        "confidence": 0.85
+      },
+      "noseTip": {
+        "x": 0.5126953125,
+        "y": 0.332421875,
+        "confidence": 0.52
+      },
+      "mouthLeft": {
+        "x": 0.4546875,
+        "y": 0.38515625000000003,
+        "confidence": 0.48
+      },
+      "mouthRight": {
+        "x": 0.570703125,
+        "y": 0.38515625000000003,
+        "confidence": 0.48
+      },
+      "chin": {
+        "x": 0.5126953125,
+        "y": 0.451953125,
+        "confidence": 0.58
+      },
+      "hairline": {
+        "x": 0.5126953125,
+        "y": 0.135546875,
+        "confidence": 0.56
+      }
+    },
+    "ratios": {
+      "eyeSpacing": 0.42424242424242425,
+      "eyeSize": 0.09,
+      "noseLength": 0.2566666666666666,
+      "mouthWidth": 0.3599999999999999,
+      "jawTaper": 0.42
+    },
+    "palette": {
+      "hair": "#1e1e1e",
+      "surface": "#949494",
+      "garment": "#909090"
+    },
+    "confidence": 0.6242857142857143,
+    "evidenceSha256": "e9d767db4181bd9ed78bfcbb5a6e2cd94205a220513e0f5fd9758b188fe71cd2"
+  },
+  "artifact": {
+    "pngSha256": "0b2c84202697487861a99523241a3cc819aaa66c128d63f8a952300b969d7cec",
+    "receiptSha256": "51e8dd297f392d0208c6f607b1611a0203b47b20a44da7118f71a18b087b58a9"
+  },
+  "truthBoundary": "Different real sample photograph processed. Robust masks use trimmed median clusters and consistency checks; this remains rule-based, not identity recognition or photorealistic reconstruction."
+}

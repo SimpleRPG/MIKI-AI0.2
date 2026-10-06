@@ -1,0 +1,82 @@
+{
+  "passed": true,
+  "phase": "ALTERNATIVE_BUNDLES_E2E_81",
+  "bundles": [
+    {
+      "bundle": "new-three-features",
+      "passed": true,
+      "evidence": {
+        "rebaseStatus": "REBASED",
+        "consensusVerdict": "ACCEPT",
+        "goodReliability": 0.6,
+        "badReliability": 0.3333333333333333
+      }
+    },
+    {
+      "bundle": "candidate-lineage-alternatives",
+      "passed": true,
+      "parts": [
+        "candidateRevision",
+        "packageRevision",
+        "sourcePackageId",
+        "externalReviewId",
+        "CORRECTION_PAIR",
+        "episodeId"
+      ],
+      "unifiedLineage": true
+    },
+    {
+      "bundle": "post-adoption-rollback-alternatives",
+      "passed": true,
+      "parts": [
+        "beforeSnapshot",
+        "rollbackRequired",
+        "ROLLED_BACK",
+        "restore",
+        "candidateSha256"
+      ],
+      "cascadeRollback": true
+    },
+    {
+      "bundle": "self-protection-alternatives",
+      "passed": true,
+      "parts": [
+        "candidateWriteGuardService",
+        "isolatedCandidateWorkspaceService",
+        "coreTaskIngressService",
+        "lifecycleTransitionPolicyService",
+        "CANDIDATE_SHA"
+      ],
+      "protectedRegistry": true
+    },
+    {
+      "bundle": "multi-objective-alternatives",
+      "passed": true,
+      "evidence": {
+        "complexity": {
+          "passed": true,
+          "reasons": [],
+          "metrics": {
+            "files": 1,
+            "addedLines": 1,
+            "imports": 0,
+            "publicApis": 1,
+            "storageKeys": 0,
+            "events": 0
+          }
+        },
+        "budget": {
+          "tier": "LIGHT",
+          "maxDurationMs": 15000,
+          "maxStorageBytes": 5242880,
+          "backgroundAllowed": true,
+          "reason": "ALLOWED"
+        }
+      },
+      "multiObjective": true
+    }
+  ],
+  "gapCount": 0,
+  "gaps": [],
+  "interpretation": "Alternative bundles are individually reachable, but four cross-bundle orchestration capabilities are missing."
+}

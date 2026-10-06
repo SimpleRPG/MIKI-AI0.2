@@ -527,7 +527,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "userProficiencyService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx",
+      "SelfCodeSpaceScreen.tsx",
       "ChatPanel.tsx"
     ],
     "invariantGuarantees": [
@@ -615,7 +615,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx",
+      "SelfCodeSpaceScreen.tsx",
       "SelfImprovementModal.tsx"
     ],
     "invariantGuarantees": [
@@ -692,7 +692,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "chapter_36.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -718,7 +718,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "chapter_37.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -744,7 +744,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "chapter_38.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -771,7 +771,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
     ],
     "responsibleComponents": [
       "NonLlmArchitectureTab.tsx",
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -795,7 +795,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -819,7 +819,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -843,7 +843,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -867,7 +867,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -891,7 +891,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -941,7 +941,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -965,7 +965,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1118,7 +1118,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1142,7 +1142,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1183,7 +1183,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1232,7 +1232,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1256,7 +1256,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1280,7 +1280,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1304,7 +1304,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1328,7 +1328,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1352,7 +1352,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1376,7 +1376,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1400,7 +1400,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1424,7 +1424,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1466,7 +1466,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1490,7 +1490,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1514,7 +1514,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1538,7 +1538,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1562,7 +1562,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1586,7 +1586,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1610,7 +1610,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1634,7 +1634,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1658,7 +1658,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1682,7 +1682,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1723,7 +1723,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1747,7 +1747,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1787,7 +1787,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1811,7 +1811,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1835,7 +1835,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1859,7 +1859,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1883,7 +1883,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1907,7 +1907,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1931,7 +1931,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -1981,7 +1981,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2005,7 +2005,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2029,7 +2029,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2053,7 +2053,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2077,7 +2077,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2101,7 +2101,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2125,7 +2125,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2149,7 +2149,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2173,7 +2173,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2197,7 +2197,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2221,7 +2221,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2245,7 +2245,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2269,7 +2269,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2293,7 +2293,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2317,7 +2317,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2341,7 +2341,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2365,7 +2365,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2389,7 +2389,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2413,7 +2413,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2437,7 +2437,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2461,7 +2461,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2485,7 +2485,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2509,7 +2509,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2533,7 +2533,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2557,7 +2557,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2581,7 +2581,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2605,7 +2605,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2629,7 +2629,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2653,7 +2653,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2677,7 +2677,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2701,7 +2701,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2824,7 +2824,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2864,7 +2864,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2888,7 +2888,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2912,7 +2912,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2936,7 +2936,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2960,7 +2960,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -2984,7 +2984,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3008,7 +3008,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3032,7 +3032,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3056,7 +3056,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3080,7 +3080,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3104,7 +3104,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3128,7 +3128,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3152,7 +3152,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3176,7 +3176,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3200,7 +3200,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3224,7 +3224,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3248,7 +3248,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3272,7 +3272,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3296,7 +3296,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3320,7 +3320,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3344,7 +3344,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3368,7 +3368,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3392,7 +3392,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3416,7 +3416,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3457,7 +3457,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3481,7 +3481,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3505,7 +3505,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3529,7 +3529,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3553,7 +3553,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3577,7 +3577,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3601,7 +3601,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3625,7 +3625,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3649,7 +3649,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3673,7 +3673,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3697,7 +3697,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3779,7 +3779,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "selfCodeArchitectService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx"
+      "SelfCodeSpaceScreen.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3807,8 +3807,8 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "toolsService.ts"
     ],
     "responsibleComponents": [
-      "UltraSelfEvolverSubView.tsx",
-      "SuperchargerToolsSubView.tsx"
+      "DevelopmentReviewLifecyclePanel.tsx",
+      "typedImprovementUiGatewayService.ts"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",
@@ -3836,8 +3836,8 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "autonomousSoftwareFactoryService.ts"
     ],
     "responsibleComponents": [
-      "SelfCodeArchitectTab.tsx",
-      "UltraSelfEvolverSubView.tsx"
+      "SelfCodeSpaceScreen.tsx",
+      "DevelopmentReviewLifecyclePanel.tsx"
     ],
     "invariantGuarantees": [
       "モデル重みの不変性",

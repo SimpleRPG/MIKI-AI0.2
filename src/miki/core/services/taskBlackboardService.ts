@@ -59,6 +59,9 @@ class TaskBlackboardService{
   const task:BlackboardTask={taskId,title:summarizeTaskTitle(goal,payload),goal:goal.trim(),source,status:'OPEN',revision:1,createdAt:now,updatedAt:now,visitedDomains:[],pendingDomains:[],entries:[],resumeCount:0,lastCycle:0};
   this.tasks.set(taskId,task);if(payload)this.append(taskId,'INPUT',source,'payload',payload);this.save();return this.clone(task);
  }
+ post(taskId:string,kind:BlackboardEntryKind,domain:MikiDomain,key:string,value:unknown,evidenceIds:string[]=[]):BlackboardEntry|undefined{
+  return this.append(taskId,kind,domain,key,value,evidenceIds);
+ }
  append(taskId:string,kind:BlackboardEntryKind,domain:MikiDomain,key:string,value:unknown,evidenceIds:string[]=[]):BlackboardEntry|undefined{
   const task=this.tasks.get(taskId);if(!task)return undefined;this.sequence+=1;
   const entry:BlackboardEntry={id:`BBE-${Date.now()}-${String(this.sequence).padStart(6,'0')}`,taskId,kind,domain,key,value,evidenceIds:[...evidenceIds],createdAt:Date.now()};

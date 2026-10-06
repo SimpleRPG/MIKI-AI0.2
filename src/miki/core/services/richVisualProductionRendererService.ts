@@ -1,0 +1,40 @@
+import { canonicalSha256Object } from './canonicalSha256Service';
+
+export interface RgbaImage{width:number;height:number;rgba:Uint8Array;}
+export interface IndexedPixelArt{width:number;height:number;palette:string[];indices:number[];}
+export interface CharacterStyle{skin:string;hair:string;coat:string;pants:string;boots:string;outline:string;accent:string;}
+export interface RichVisualArtifact{kind:'CHARACTER'|'WALK_STRIP'|'SCENE';width:number;height:number;rgba:Uint8Array;png:Uint8Array;sha256:string;metadataSha256:string;}
+export interface SceneSpec{width:number;height:number;characterStyle:CharacterStyle;frame:number;seed:number;}
+
+const hex=(value:string)=>{const v=value.replace('#','');return [parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16),v.length>=8?parseInt(v.slice(6,8),16):255];};
+class Surface{
+ readonly rgba:Uint8Array;constructor(readonly width:number,readonly height:number,fill='#00000000'){this.rgba=new Uint8Array(width*height*4);this.clear(fill);} clear(c:string){const q=hex(c);for(let i=0;i<this.rgba.length;i+=4)this.rgba.set(q,i);} px(x:number,y:number,c:string){if(x<0||y<0||x>=this.width||y>=this.height)return;this.rgba.set(hex(c),(y*this.width+x)*4);} rect(x:number,y:number,w:number,h:number,c:string){for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)this.px(xx,yy,c);} ellipse(cx:number,cy:number,rx:number,ry:number,c:string){for(let y=-ry;y<=ry;y++)for(let x=-rx;x<=rx;x++)if((x*x)/(rx*rx)+(y*y)/(ry*ry)<=1)this.px(cx+x,cy+y,c);} line(x0:number,y0:number,x1:number,y1:number,c:string){let dx=Math.abs(x1-x0),sx=x0<x1?1:-1,dy=-Math.abs(y1-y0),sy=y0<y1?1:-1,e=dx+dy;for(;;){this.px(x0,y0,c);if(x0===x1&&y0===y1)break;const e2=2*e;if(e2>=dy){e+=dy;x0+=sx;}if(e2<=dx){e+=dx;y0+=sy;}}} blit(src:RgbaImage,dx:number,dy:number){for(let y=0;y<src.height;y++)for(let x=0;x<src.width;x++){const si=(y*src.width+x)*4;if(src.rgba[si+3]){const di=((dy+y)*this.width+(dx+x))*4;if(di>=0&&di+3<this.rgba.length)this.rgba.set(src.rgba.subarray(si,si+4),di);}}}}
+
+class RichVisualProductionRendererService{
+ async character(style:CharacterStyle,frame=0,direction:'DOWN'|'UP'|'LEFT'|'RIGHT'='DOWN',width=48,height=64):Promise<RichVisualArtifact>{
+  const s=new Surface(width,height);const cx=Math.floor(width/2);const bob=[0,1,0,-1,0,1,0,-1][frame%8];const step=[-2,-1,0,1,2,1,0,-1][frame%8];
+  s.ellipse(cx,53+bob,12,3,'#00000066');
+  s.ellipse(cx,14+bob,9,10,style.outline);s.ellipse(cx,15+bob,8,9,style.skin);
+  s.rect(cx-9,5+bob,18,6,style.hair);s.rect(cx-10,8+bob,4,12,style.hair);s.rect(cx+7,8+bob,3,13,style.hair);s.px(cx-6,13+bob,'#f4f6ff');s.px(cx+5,13+bob,'#f4f6ff');s.px(cx-5,14+bob,'#29406c');s.px(cx+4,14+bob,'#29406c');
+  s.rect(cx-8,24+bob,16,23,style.outline);s.rect(cx-7,25+bob,14,21,style.coat);s.rect(cx-5,26+bob,10,2,style.accent);s.rect(cx-1,28+bob,2,17,'#c9b36b');
+  const arm=direction==='UP'?-step:step;s.line(cx-8,27+bob,cx-13,39+bob+arm,style.outline);s.line(cx-7,28+bob,cx-12,39+bob+arm,style.coat);s.line(cx+8,27+bob,cx+13,39+bob-arm,style.outline);s.line(cx+7,28+bob,cx+12,39+bob-arm,style.coat);
+  s.line(cx-5,46+bob,cx-7-step,57,style.outline);s.line(cx-4,46+bob,cx-6-step,56,style.pants);s.line(cx+5,46+bob,cx+7+step,57,style.outline);s.line(cx+4,46+bob,cx+6+step,56,style.pants);s.rect(cx-10-step,57,7,3,style.boots);s.rect(cx+4+step,57,7,3,style.boots);
+  if(direction==='LEFT'||direction==='RIGHT'){const mask=new Surface(width,height);mask.clear('#00000000');for(let y=0;y<height;y++)for(let x=0;x<width;x++){const srcX=direction==='LEFT'?x:width-1-x;const si=(y*width+srcX)*4;if(s.rgba[si+3])mask.rgba.set(s.rgba.subarray(si,si+4),(y*width+x)*4);}return this.artifact('CHARACTER',mask,{frame,direction,style});}
+  return this.artifact('CHARACTER',s,{frame,direction,style});
+ }
+ async walkStrip(style:CharacterStyle,directions:('DOWN'|'UP'|'LEFT'|'RIGHT')[]=['DOWN','UP','LEFT','RIGHT'],frames=8):Promise<RichVisualArtifact>{const fw=48,fh=64,s=new Surface(fw*frames,fh*directions.length);for(let d=0;d<directions.length;d++)for(let f=0;f<frames;f++){const a=await this.character(style,f,directions[d],fw,fh);s.blit(a,f*fw,d*fh);}return this.artifact('WALK_STRIP',s,{frames,directions,style});}
+ async scene(spec:SceneSpec):Promise<RichVisualArtifact>{const s=new Surface(spec.width,spec.height,'#071321ff');const horizon=Math.floor(spec.height*.48);for(let y=0;y<horizon;y++){const t=y/horizon;const r=Math.round(7+9*t),g=Math.round(18+22*t),b=Math.round(35+35*t);s.rect(0,y,spec.width,1,`#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}ff`);}for(let x=0;x<spec.width;x+=32){const h=25+((x*17+spec.seed*13)%55);s.rect(x,horizon-h,30,h,'#0b1929ff');for(let wy=horizon-h+8;wy<horizon-6;wy+=12)for(let wx=x+6;wx<x+26;wx+=10)if((wx+wy+spec.seed)%3===0)s.rect(wx,wy,4,6,'#d89b4cff');}
+ s.rect(0,horizon,spec.width,spec.height-horizon,'#182235ff');for(let y=horizon;y<spec.height;y+=12)s.line(0,y,spec.width-1,y,'#253249ff');for(let x=0;x<spec.width;x+=24)s.line(x,horizon,x-20,spec.height-1,'#202c40ff');
+ const waterY=Math.floor(spec.height*.68);s.rect(Math.floor(spec.width*.55),waterY,Math.floor(spec.width*.45),spec.height-waterY,'#09233bff');for(let y=waterY+4;y<spec.height;y+=7)for(let x=Math.floor(spec.width*.56);x<spec.width;x+=18)s.rect(x+((y+spec.frame)%6),y,10,1,'#2d6588ff');
+ s.rect(Math.floor(spec.width*.45),horizon-4,Math.floor(spec.width*.5),9,'#25344bff');for(let x=Math.floor(spec.width*.45);x<spec.width*.95;x+=18)s.rect(x,horizon-11,14,8,'#30415aff');
+ const c=await this.character(spec.characterStyle,spec.frame,'DOWN',48,64);s.blit(c,Math.floor(spec.width*.42),horizon+10);return this.artifact('SCENE',s,spec);}
+ fromIndexed(pixel:IndexedPixelArt,scale=1):RgbaImage{const s=new Surface(pixel.width*scale,pixel.height*scale);for(let y=0;y<pixel.height;y++)for(let x=0;x<pixel.width;x++){const idx=pixel.indices[y*pixel.width+x];if(idx>=0)s.rect(x*scale,y*scale,scale,scale,pixel.palette[idx]);}return s;}
+ async png(image:RgbaImage):Promise<Uint8Array>{const raw=new Uint8Array((image.width*4+1)*image.height);for(let y=0;y<image.height;y++){const o=y*(image.width*4+1);raw[o]=0;raw.set(image.rgba.subarray(y*image.width*4,(y+1)*image.width*4),o+1);}const compressed=await this.deflate(raw);const signature=Uint8Array.from([137,80,78,71,13,10,26,10]);const ihdr=new Uint8Array(13);new DataView(ihdr.buffer).setUint32(0,image.width);new DataView(ihdr.buffer).setUint32(4,image.height);ihdr.set([8,6,0,0,0],8);return this.concat(signature,this.chunk('IHDR',ihdr),this.chunk('IDAT',compressed),this.chunk('IEND',new Uint8Array()));}
+ private async artifact(kind:RichVisualArtifact['kind'],surface:Surface,metadata:unknown):Promise<RichVisualArtifact>{const png=await this.png(surface);return{kind,width:surface.width,height:surface.height,rgba:surface.rgba,png,sha256:await this.shaBytes(png),metadataSha256:canonicalSha256Object(metadata)};}
+ private async shaBytes(data:Uint8Array){const hash=await crypto.subtle.digest('SHA-256',data.slice().buffer);return Array.from(new Uint8Array(hash)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+ private async deflate(data:Uint8Array){const cs=new CompressionStream('deflate');const writer=cs.writable.getWriter();await writer.write(data.slice().buffer);await writer.close();return new Uint8Array(await new Response(cs.readable).arrayBuffer());}
+ private chunk(type:string,data:Uint8Array){const t=new TextEncoder().encode(type);const out=new Uint8Array(12+data.length);new DataView(out.buffer).setUint32(0,data.length);out.set(t,4);out.set(data,8);new DataView(out.buffer).setUint32(8+data.length,this.crc(this.concat(t,data)));return out;}
+ private crc(data:Uint8Array){let c=0xffffffff;for(const b of data){c^=b;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xedb88320:0);}return(c^0xffffffff)>>>0;}
+ private concat(...parts:Uint8Array[]){const out=new Uint8Array(parts.reduce((n,p)=>n+p.length,0));let o=0;for(const p of parts){out.set(p,o);o+=p.length;}return out;}
+}
+export const richVisualProductionRendererService=new RichVisualProductionRendererService();

@@ -12,7 +12,6 @@ import { latentIntentMiningService } from './latentIntentMiningService';
 import { answerContentIrService } from './answerContentIrService';
 import { componentRegistryService } from './componentRegistryService';
 import { capabilityGraphService } from './capabilityGraphService';
-import { simpleRpgReferenceService } from './simpleRpgReferenceService';
 import { componentCompositionService } from './componentCompositionService';
 import { unifiedDecisionEngineService } from './unifiedDecisionEngineService';
 import { affectionDynamicsService } from './affectionDynamicsService';
@@ -139,8 +138,6 @@ export class NonLlmCoreService {
     t = performance.now();
     const latent = latentIntentMiningService.inferLatentGoal(prompt, recentMessages.slice(-4).map((m) => m.content));
     const compiled = requestTypeCompilerService.compile(prompt, nextState);
-    const simpleRpgReference = simpleRpgReferenceService.describeForPlanning(prompt);
-    simpleRpgReferenceService.recordReferenceUse(simpleRpgReference.matched.map((x) => x.id));
     const implementationSelection = implementationSelectionService.select(compiled);
     stages.request = Math.round(performance.now() - t);
     nextState.topLevelGoal = compiled.goal;
@@ -252,7 +249,6 @@ export class NonLlmCoreService {
     let skeleton: AnswerSkeletonType = 'GENERAL_ANSWER';
     let status: NonLlmCoreResult['status'] = 'RESOLVED';
     let reason = implementationSelection.reason;
-    if (simpleRpgReference.matched.length > 0) reason += `; ${simpleRpgReference.note}`;
     let verifiedResearchClaimId: string | undefined;
     let verifiedResearchOutcome: 'SUPPORTED' | 'DEVICE_VERIFIED' | undefined;
 

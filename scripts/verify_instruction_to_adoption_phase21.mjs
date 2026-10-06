@@ -3,7 +3,7 @@ const failures=[];
 const lifecycle=readFileSync('src/miki/selfDevelopment/services/developmentReviewLifecycleService.ts','utf8');
 const instruction=readFileSync('src/miki/selfDevelopment/services/unifiedInstructionDevelopmentService.ts','utf8');
 const completion=readFileSync('src/miki/selfDevelopment/services/unifiedDevelopmentCompletionService.ts','utf8');
-const ui=readFileSync('src/components/self_improvement/UltraSelfEvolverSubView.tsx','utf8');
+const ui=readFileSync('src/miki/core/ui/typedImprovementUiGatewayService.ts','utf8');
 const reviewUi=readFileSync('src/components/self_improvement/DevelopmentReviewLifecyclePanel.tsx','utf8');
 const server=readFileSync('server.ts','utf8');
 const checks={
@@ -23,7 +23,7 @@ const checks={
  rejectCompletion:lifecycle.includes("transition(request,'REJECTED')")&&lifecycle.includes('persistRejection'),
  revisionLoop:lifecycle.includes("transition(request,'REVISION_REQUESTED')")&&lifecycle.includes('parentRevisionId=request.instructionId'),
  postDecisionState:lifecycle.includes("state:'COMPLETED'")||lifecycle.includes("transition(request,'COMPLETED')"),
- packageDownload:reviewUi.includes('evaluationPackageDownloadService.download'),
+ packageDownload:ui.includes('downloadDevelopmentEvaluationPackage')&&reviewUi.includes('downloadDevelopmentEvaluationPackage'),
 };
 for(const[name,passed]of Object.entries(checks))if(!passed)failures.push(name);
 console.log(JSON.stringify({passed:!failures.length,phase:'INSTRUCTION_TO_ADOPTION_21',checks,flow:['startup','instruction intake','strategy and plan','construction','wiring','validation','evaluation ZIP/ZIPTXT store','review ready','accept/reject/request changes','promotion or rejection completion'],failures},null,2));if(failures.length)process.exitCode=1;

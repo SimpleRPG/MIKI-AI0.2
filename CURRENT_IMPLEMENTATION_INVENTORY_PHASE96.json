@@ -1,0 +1,293 @@
+{
+  "generatedAt": "2026-10-02",
+  "domains": [
+    {
+      "domain": "autonomy",
+      "serviceCount": 10,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/autonomy.ts"
+    },
+    {
+      "domain": "capability",
+      "serviceCount": 21,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/capability.ts"
+    },
+    {
+      "domain": "conversation",
+      "serviceCount": 31,
+      "canonicalEntry": "hybridConversationEngineService",
+      "pipeline": [
+        "conversationComponentPipelineService",
+        "typedDiscourseModelService",
+        "semanticUnderstandingV2OrchestratorService",
+        "answerContentIrService",
+        "runtimeConversationCompositionService"
+      ],
+      "facade": "src/miki/conversation.ts"
+    },
+    {
+      "domain": "data",
+      "serviceCount": 5,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/data.ts"
+    },
+    {
+      "domain": "execution",
+      "serviceCount": 30,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/execution.ts"
+    },
+    {
+      "domain": "experience",
+      "serviceCount": 8,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/experience.ts"
+    },
+    {
+      "domain": "improvement",
+      "serviceCount": 18,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/improvement.ts"
+    },
+    {
+      "domain": "learning",
+      "serviceCount": 16,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/learning.ts"
+    },
+    {
+      "domain": "memory",
+      "serviceCount": 27,
+      "canonicalEntry": "claimDatabaseService",
+      "pipeline": [
+        "evidenceService",
+        "claimDatabaseService",
+        "memoryPromotionService",
+        "memoryAuditService"
+      ],
+      "facade": "src/miki/memory.ts"
+    },
+    {
+      "domain": "promotion",
+      "serviceCount": 7,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/promotion.ts"
+    },
+    {
+      "domain": "research",
+      "serviceCount": 30,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/research.ts"
+    },
+    {
+      "domain": "safety",
+      "serviceCount": 23,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/safety.ts"
+    },
+    {
+      "domain": "selfAwareness",
+      "serviceCount": 14,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/selfAwareness.ts"
+    },
+    {
+      "domain": "selfDevelopment",
+      "serviceCount": 170,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/selfDevelopment.ts"
+    },
+    {
+      "domain": "strategy",
+      "serviceCount": 22,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/strategy.ts"
+    },
+    {
+      "domain": "unknown",
+      "serviceCount": 13,
+      "canonicalEntry": "unifiedUnknownResolutionCoordinatorService",
+      "pipeline": [
+        "unknownResolutionService",
+        "unknownKnowledgeIntegrationService",
+        "unifiedUnknownResolutionCoordinatorService"
+      ],
+      "facade": "src/miki/unknown.ts"
+    },
+    {
+      "domain": "verification",
+      "serviceCount": 29,
+      "canonicalEntry": "NOT_DECLARED",
+      "pipeline": [],
+      "facade": "src/miki/verification.ts"
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "Central deterministic chat execution",
+      "owner": "CORE",
+      "implementation": "src/miki/safety/services/nonLlmCoreService.ts",
+      "entry": "nonLlmCoreService.execute",
+      "status": "USED",
+      "notes": "Normal UI/runtime callers use this central executor."
+    },
+    {
+      "name": "Conversation interpretation",
+      "owner": "conversation",
+      "implementation": "src/miki/conversation/services/hybridConversationEngineService.ts",
+      "entry": "hybridConversationEngineService.interpret",
+      "status": "USED",
+      "notes": "Dialogue act, Japanese analysis, continuity, pragmatics and vocabulary assessment."
+    },
+    {
+      "name": "Typed discourse/reference resolution",
+      "owner": "conversation",
+      "implementation": "src/miki/conversation/services/typedDiscourseModelService.ts",
+      "entry": "typedDiscourseModelService.resolve",
+      "status": "USED",
+      "notes": "Resolves active/deferred/rejected discourse entities and multiple intents."
+    },
+    {
+      "name": "Long-context compression/restoration",
+      "owner": "conversation",
+      "implementation": "src/miki/conversation/services/conversationContinuityService.ts",
+      "entry": "conversationContinuityService.compress/restore",
+      "status": "USED",
+      "notes": "Uses semanticContextBudgetService and checksum validation."
+    },
+    {
+      "name": "Unknown vocabulary assessment",
+      "owner": "conversation",
+      "implementation": "src/miki/conversation/services/conversationUnknownVocabularyService.ts",
+      "entry": "conversationUnknownVocabularyService.assess",
+      "status": "USED",
+      "notes": "Dictionary-first term assessment and research handoff metadata."
+    },
+    {
+      "name": "Normal-chat unknown return",
+      "owner": "conversation/unknown/research",
+      "implementation": "src/miki/conversation/services/unknownResearchConversationBridgeService.ts",
+      "entry": "unknownResearchConversationBridgeService.resolveAndRespond",
+      "status": "USED",
+      "notes": "Called by canonical NonLlmCore for explicit unknown inquiries."
+    },
+    {
+      "name": "Unified unknown resolution",
+      "owner": "unknown",
+      "implementation": "src/miki/unknown/services/unifiedUnknownResolutionCoordinatorService.ts",
+      "entry": "unifiedUnknownResolutionCoordinatorService.resolveForChat",
+      "status": "USED",
+      "notes": "Supported reuse, local evidence, research and no-evidence statuses."
+    },
+    {
+      "name": "Claim authority",
+      "owner": "memory",
+      "implementation": "src/miki/memory/services/claimDatabaseService.ts",
+      "entry": "claimDatabaseService",
+      "status": "USED",
+      "notes": "Canonical Claim singleton; legacy path is compatibility facade."
+    },
+    {
+      "name": "Evidence storage/lineage",
+      "owner": "memory",
+      "implementation": "src/miki/memory/services/evidenceService.ts",
+      "entry": "evidenceService",
+      "status": "USED",
+      "notes": "Evidence is kept separate from claim truth and promotion."
+    },
+    {
+      "name": "Claim verification events",
+      "owner": "verification",
+      "implementation": "src/miki/verification/services/claimVerificationEventService.ts",
+      "entry": "claimVerificationEventService",
+      "status": "USED",
+      "notes": "Records verification events and status changes."
+    },
+    {
+      "name": "Runtime response composition",
+      "owner": "conversation",
+      "implementation": "src/miki/conversation/services/runtimeConversationCompositionService.ts",
+      "entry": "runtimeConversationCompositionService.compose",
+      "status": "USED",
+      "notes": "Compositional and template fallback candidates share semantic-preservation gates."
+    },
+    {
+      "name": "Clause-level realization",
+      "owner": "conversation",
+      "implementation": "src/miki/conversation/services/compositionalRealizationService.ts",
+      "entry": "compositionalRealizationService.realize",
+      "status": "USED",
+      "notes": "Condition placement, reference choice, comparison, exception priority, tone and paragraph planning."
+    },
+    {
+      "name": "Japanese dictionary",
+      "owner": "research",
+      "implementation": "src/miki/research/services/japaneseDictionaryService.ts",
+      "entry": "japaneseDictionaryService",
+      "status": "USED",
+      "notes": "Built-in/personal/imported lookup before unknown classification."
+    },
+    {
+      "name": "Web term learning",
+      "owner": "research",
+      "implementation": "src/miki/research/services/webTermLearningService.ts",
+      "entry": "webTermLearningService",
+      "status": "AVAILABLE",
+      "notes": "Stores evidence-linked unverified reusable term candidates."
+    },
+    {
+      "name": "Rust memory kernel",
+      "owner": "memory",
+      "implementation": "src/miki/memory/services/rustMemoryKernelService.ts",
+      "entry": "rustMemoryKernelService.search",
+      "status": "NOT_CONNECTED",
+      "notes": "Native contract exists; no canonical production caller confirmed."
+    },
+    {
+      "name": "Memory search receipt",
+      "owner": "memory",
+      "implementation": "src/miki/memory/services/memorySearchReceiptService.ts",
+      "entry": "memorySearchReceiptService.persist",
+      "status": "NOT_CONNECTED",
+      "notes": "Receipt persistence exists; not connected to a canonical memory search facade."
+    },
+    {
+      "name": "Knowledge-use policy",
+      "owner": "conversation",
+      "implementation": "src/miki/conversation/services/conversationKnowledgeUsePolicyService.ts",
+      "entry": "conversationKnowledgeUsePolicyService.classify",
+      "status": "PARTIAL",
+      "notes": "Classification exists; not yet mandatory in every answer-planning path."
+    },
+    {
+      "name": "Android Japanese morphology",
+      "owner": "conversation/native",
+      "implementation": "android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt",
+      "entry": "native plugin",
+      "status": "CONTRACT_READY",
+      "notes": "Device execution requires Galaxy S25 evidence."
+    },
+    {
+      "name": "Android native runner",
+      "owner": "execution/native",
+      "implementation": "android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt",
+      "entry": "native plugin",
+      "status": "CONTRACT_READY",
+      "notes": "Device execution requires ADB/device evidence."
+    }
+  ]
+}

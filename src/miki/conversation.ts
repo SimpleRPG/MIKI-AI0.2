@@ -9,7 +9,17 @@
  */
 
 export function conversation() {
-  // TODO: conversation 関連の既存機能を段階的に統合
+  return {
+    category: 'conversation' as const,
+    canonicalEntry: 'hybridConversationEngineService',
+    pipeline: [
+      'conversationComponentPipelineService',
+      'typedDiscourseModelService',
+      'semanticUnderstandingV2OrchestratorService',
+      'answerContentIrService',
+      'runtimeConversationCompositionService'
+    ] as const
+  };
 }
 
 // === MIKI CATEGORY SERVICE EXPORTS ===
@@ -33,3 +43,14 @@ export * from './conversation/services/conversationCompositionResearchSchedulerS
 export * from './conversation/services/conversationFeedbackEvidenceService';
 export * from './conversation/services/conversationLearningEpisodeService';
 export * from './conversation/services/coreResultAnswerContentIrService';
+
+export * from './conversation/services/typedDiscourseModelService';
+
+export * from './conversation/services/conversationContinuityService';
+export * from './conversation/services/conversationPragmaticsService';
+export * from './conversation/services/conversationKnowledgeUsePolicyService';
+
+export * from './conversation/services/conversationUnknownVocabularyService';
+export * from './conversation/services/compositionalRealizationService';
+
+export * from './conversation/services/unknownResearchConversationBridgeService';

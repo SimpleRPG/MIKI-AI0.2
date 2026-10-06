@@ -1,0 +1,45 @@
+{
+  "phase": "LOCAL_LAYERED_PERSON_25D_P192",
+  "passed": true,
+  "checks": {
+    "noProviderFile": true,
+    "noProviderScript": true,
+    "graphBound": true,
+    "layerCount": true,
+    "depthLayers": true,
+    "skeleton": true,
+    "contacts": true,
+    "contactPass": true,
+    "deterministic": true,
+    "seedVariation": true,
+    "fullCanvas": true,
+    "depthEdges": true,
+    "modelSha": true,
+    "renderSha": true,
+    "localOnly": true
+  },
+  "model": {
+    "modelId": "P192-25D-192001",
+    "width": 768,
+    "height": 1024,
+    "controlPoints": 17,
+    "patches": 16,
+    "joints": 11,
+    "contacts": 4,
+    "modelSha256": "fe4140b4869cded400c396b44c2336b0150bcd4e2f6835f1cb4136f13162053d"
+  },
+  "render": {
+    "opaquePixels": 786432,
+    "depthTransitions": 4303,
+    "contactErrors": [],
+    "renderSha256": "3010c065c8e9807ee546cec5ac887046c1a0405544797b37ca8224101b46a07b"
+  },
+  "architecture": {
+    "network": "FORBIDDEN",
+    "externalProvider": "REMOVED",
+    "generation": "LOCAL_LAYERED_2_5D",
+    "learning": "P190_GRAPH_STRUCTURE_PRIOR",
+    "renderer": "TYPE_SCRIPT_CPU_DEPTH_COMPOSITOR"
+  },
+  "truthBoundary": "P192 creates a local layered 2.5D model and raster output from graph-derived structure. It is not a neural photorealistic generator."
+}

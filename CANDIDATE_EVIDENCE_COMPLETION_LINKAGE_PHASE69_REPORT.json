@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "phase": "CANDIDATE_EVIDENCE_COMPLETION_LINKAGE_69",
+  "constraintGateConnected": true,
+  "acceptanceMatrixConnected": true,
+  "candidateCompletionConnected": true,
+  "completionExplicitOnly": true,
+  "servicesScanned": 332,
+  "remainingSingleReferenceServices": 0,
+  "requiredStillDisconnected": [],
+  "failures": []
+}

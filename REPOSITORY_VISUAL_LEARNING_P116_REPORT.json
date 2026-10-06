@@ -1,0 +1,65 @@
+{
+  "phase": "REPOSITORY_VISUAL_LEARNING_P116",
+  "passed": true,
+  "checks": {
+    "grid": true,
+    "palette": true,
+    "motion": true,
+    "local": true,
+    "gplRejected": true
+  },
+  "grid": {
+    "cellSize": 1,
+    "error": 0,
+    "sourceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "receiptSha256": "adb38be0e9260dc332321323f0f35dbc66f1c78bd59908c5430d03261fe2a141"
+  },
+  "palette": {
+    "palette": [
+      "#dcdcdc",
+      "#141414"
+    ],
+    "sourceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "colorSpace": "OKLAB",
+    "paletteSha256": "ca77961bdb31e95aaa199ed396ceba229e9642c8d4cb6b005709a2563a9d18e0"
+  },
+  "motion": {
+    "durationMs": 100,
+    "tracks": [
+      {
+        "name": "wrist",
+        "visibleFrames": 2,
+        "totalMotion": 0.223606797749979,
+        "averageMotion": 0.223606797749979
+      }
+    ],
+    "sourceSha256List": [
+      "a",
+      "b"
+    ],
+    "motionSha256": "b6e1094589356a3bf9561c235f6586c25798c41cc79f3e1e816b087cb4b233b5"
+  },
+  "adoption": {
+    "adoptedConcepts": [
+      "proper-pixel-art:grid-recovery-not-code-copy",
+      "quantette:perceptual-oklab-quantization",
+      "image-q:alpha-aware-indexed-palette",
+      "mediapipe-pose:landmark-trajectory-contract",
+      "video-to-pixel-art:canvas-frame-pipeline"
+    ],
+    "rejectedConcepts": [
+      "external-model-training",
+      "cloud-upload",
+      "source-image-output",
+      "GPL-libimagequant-linking",
+      "heavy-clothing-model-bundling"
+    ],
+    "licenses": [
+      "MIT-concept-review",
+      "Apache-2.0-documentation-review",
+      "repository-specific-license-gate"
+    ],
+    "localOnly": true,
+    "receiptSha256": "dfbfb1c92446cbaa11e13f66be153659047149df68e41788d69bb073ba1712a3"
+  }
+}

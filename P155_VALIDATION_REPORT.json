@@ -1,0 +1,166 @@
+{
+  "phase": "CORE_COGNITIVE_GRAPH_COMMIT_P155",
+  "passed": true,
+  "checks": {
+    "workersSubmit": true,
+    "coreRejects": true,
+    "distinctKinds": true,
+    "singleGraph": true,
+    "ownerParticipant": true,
+    "context": true,
+    "bounded": true,
+    "verification": true,
+    "commitSha": true
+  },
+  "receipt": {
+    "commitId": "GC-52990359183c492cd785e19b",
+    "acceptedCandidateIds": [
+      "MC-b107a9edab559244a32b0571",
+      "MC-4dc4f89c72571017db035413",
+      "MC-436ee0261ebadb6d65927207",
+      "MC-2864d14e6f2e41a8854861f9"
+    ],
+    "rejected": [
+      {
+        "candidateId": "MC-d33d4c885890d107cd2b9f7e",
+        "reasons": [
+          "CORE_CANNOT_OWN_SEMANTIC_CONTENT"
+        ]
+      }
+    ],
+    "graphSha256": "2ec3e11ca3b4420601485dfe50fb6139f74c1fb87c5cb7e329ba8c9c29d53e81",
+    "semanticCounts": {
+      "LEGACY": 16,
+      "OBSERVATION": 1,
+      "MEMORY": 1,
+      "EXPERIENCE": 1,
+      "KNOWLEDGE": 1
+    },
+    "ownerCounts": {
+      "legacy": 16,
+      "data": 1,
+      "memory": 1,
+      "experience": 1,
+      "learning": 1
+    },
+    "commitSha256": "52990359183c492cd785e19b7df0f0d069bc2445760140471e106a86d91add67"
+  },
+  "cognitiveNodes": [
+    {
+      "nodeId": "N-080fecdc286df1b12b7274a3",
+      "domain": "VISUAL",
+      "kind": "COGNITIVE_OBSERVATION",
+      "subjectId": "visual:black-region",
+      "payload": {
+        "classification": "DARK_REGION",
+        "semanticKind": "OBSERVATION",
+        "ownerDomain": "data",
+        "participantDomains": [
+          "conversation",
+          "learning",
+          "verification"
+        ]
+      },
+      "confidence": 0.9,
+      "uncertainty": 0.1,
+      "sourceRefs": [
+        "N-7e41f1a080ed94b33299efe6"
+      ],
+      "nodeSha256": "080fecdc286df1b12b7274a32c9d5e02f10b5806c66bf83c96df84645e3407a2"
+    },
+    {
+      "nodeId": "N-65e4aa9e7dfe6f7ce536a814",
+      "domain": "MEMORY",
+      "kind": "COGNITIVE_MEMORY",
+      "subjectId": "visual:black-region",
+      "payload": {
+        "remember": "region confirmed as garment",
+        "semanticKind": "MEMORY",
+        "ownerDomain": "memory",
+        "participantDomains": [
+          "conversation",
+          "experience",
+          "learning"
+        ]
+      },
+      "confidence": 0.9,
+      "uncertainty": 0.1,
+      "sourceRefs": [
+        "N-7e41f1a080ed94b33299efe6"
+      ],
+      "nodeSha256": "65e4aa9e7dfe6f7ce536a814554f552d2275c0b9231b04d649f6edd8c7b7f101"
+    },
+    {
+      "nodeId": "N-9484f25b09dd4b6f73220076",
+      "domain": "EXPERIENCE",
+      "kind": "COGNITIVE_EXPERIENCE",
+      "subjectId": "visual:black-region",
+      "payload": {
+        "situation": "dark region",
+        "decision": "background",
+        "result": "incorrect",
+        "reuseCondition": "do not use luminance alone",
+        "semanticKind": "EXPERIENCE",
+        "ownerDomain": "experience",
+        "participantDomains": [
+          "conversation",
+          "improvement",
+          "learning",
+          "memory",
+          "verification"
+        ]
+      },
+      "confidence": 0.9,
+      "uncertainty": 0.1,
+      "sourceRefs": [
+        "N-7e41f1a080ed94b33299efe6"
+      ],
+      "nodeSha256": "9484f25b09dd4b6f73220076df44901b19fbcf050ffe890e3bd0961ce43fb3e1"
+    },
+    {
+      "nodeId": "N-abeda503d352e30ab373f826",
+      "domain": "MEMORY",
+      "kind": "COGNITIVE_KNOWLEDGE",
+      "subjectId": "visual:black-region",
+      "payload": {
+        "rule": "person-connected dark regions require contextual classification",
+        "semanticKind": "KNOWLEDGE",
+        "ownerDomain": "learning",
+        "participantDomains": [
+          "experience",
+          "memory",
+          "verification"
+        ]
+      },
+      "confidence": 0.9,
+      "uncertainty": 0.1,
+      "sourceRefs": [
+        "N-7e41f1a080ed94b33299efe6"
+      ],
+      "nodeSha256": "abeda503d352e30ab373f826f56360ed2ccacdd32175d8631c2efa0872e96f15"
+    }
+  ],
+  "context": {
+    "taskId": "TASK-P155",
+    "seedNodeIds": [
+      "N-080fecdc286df1b12b7274a3"
+    ],
+    "activeSubjectIds": [
+      "visual:black-region"
+    ],
+    "nodeIdsBySemanticKind": {
+      "OBSERVATION": [
+        "N-080fecdc286df1b12b7274a3"
+      ]
+    },
+    "conflicts": [],
+    "unknowns": [],
+    "participantDomains": [
+      "conversation",
+      "learning",
+      "verification"
+    ],
+    "contextSha256": "b01e16e07a3bd6a3dd88d94460f51975e2e042d34d4dd51ebb60af75298b802a"
+  },
+  "truthBoundary": "The graph is one core-managed cognitive substrate. Memory and experience remain semantic node kinds, not physical graph owners. Worker domains submit candidates; only core commits."
+}

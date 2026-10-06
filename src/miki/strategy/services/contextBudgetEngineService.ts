@@ -46,7 +46,7 @@ class ContextBudgetEngineService {
     systemLogger.info('INFERENCE', `StructuralBudget: thermalState=${state}`);
   }
 
-  /** 端末のモデル容量ではなく、実行単位の上限を決める互換API。 */
+  /** 端末状態から実行単位の初期構造予算を決定する正規API。 */
   public selectInitialTier(deviceRamGB: number, _hardwareHintA: number, _hardwareHintB: number): ContextTier {
     if (deviceRamGB >= 12) this.currentTier = 32768;
     else if (deviceRamGB >= 8) this.currentTier = 16384;

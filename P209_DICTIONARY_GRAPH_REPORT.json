@@ -1,0 +1,37 @@
+{
+  "phase": "P209",
+  "status": "PASS",
+  "dictionaryEntries": 118,
+  "stringTableEntries": 220,
+  "compactionRatio": 0.4319,
+  "graphFirstDualRead": true,
+  "legacyFallback": true,
+  "deduplicatedMerge": true,
+  "nfkcNormalization": true,
+  "sourceShaPreserved": true,
+  "fixedSemanticFilesAudited": 69,
+  "fixedSemanticCandidatesAudited": 649,
+  "capacity": {
+    "compactBytes": 5132,
+    "uncompressedBytes": 11882,
+    "shardTargetBytes": 65536,
+    "maxResidentShards": 1
+  },
+  "checks": [
+    "MIGRATION",
+    "COMPACTION",
+    "GRAPH_LOOKUP",
+    "DUAL_READ",
+    "LEGACY_FALLBACK",
+    "DEDUPLICATION",
+    "SOURCE_SHA",
+    "FIXED_SEMANTIC_AUDIT",
+    "TYPESCRIPT_COMPILE"
+  ],
+  "typescriptCompile": "PASS",
+  "productionBuild": "PASS",
+  "buildWarnings": [
+    "EXISTING_CIRCULAR_CHUNK_WARNING",
+    "EXISTING_LARGE_CHUNK_WARNING"
+  ]
+}

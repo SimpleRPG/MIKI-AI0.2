@@ -1,0 +1,163 @@
+{
+  "phase": "CONVERSATION_DEEP_REALIZATION_92",
+  "passed": true,
+  "checks": [
+    {
+      "name": "NATURAL_ORDER_ELLIPSIS_PARAGRAPH",
+      "passed": true,
+      "detail": {
+        "surfaceText": "確認したところ、理由は保守性が高いです。\n既存機能を維持できる場合、候補Aを採用します。\n\nただし、実機未検証です。\n加えて、軽微な注意があります。\n\n次にその対象を端末で確認します。",
+        "mode": "COMPOSITIONAL",
+        "clauses": [
+          "確認したところ、理由は保守性が高いです。",
+          "既存機能を維持できる場合、候補Aを採用します。",
+          "ただし、実機未検証です。",
+          "加えて、軽微な注意があります。",
+          "次にその対象を端末で確認します。"
+        ],
+        "paragraphs": [
+          "確認したところ、理由は保守性が高いです。\n既存機能を維持できる場合、候補Aを採用します。",
+          "ただし、実機未検証です。\n加えて、軽微な注意があります。",
+          "次にその対象を端末で確認します。"
+        ],
+        "decisions": [
+          "CONDITION_FRONTED",
+          "REASON_FIRST",
+          "EXCEPTIONS_PRIORITY_SORTED",
+          "REPEATED_TARGET_OMITTED",
+          "WARM_TONE",
+          "PARAGRAPH_PLANNED"
+        ]
+      }
+    },
+    {
+      "name": "CONTEXTUAL_REFERENCE",
+      "passed": true,
+      "detail": {
+        "surfaceText": "既存機能を維持できる場合、それを採用します。\n理由は保守性が高いです。\nただし、実機未検証です。\n\n加えて、軽微な注意があります。\n次に候補Aを端末で確認します。",
+        "mode": "COMPOSITIONAL",
+        "clauses": [
+          "既存機能を維持できる場合、それを採用します。",
+          "理由は保守性が高いです。",
+          "ただし、実機未検証です。",
+          "加えて、軽微な注意があります。",
+          "次に候補Aを端末で確認します。"
+        ],
+        "paragraphs": [
+          "既存機能を維持できる場合、それを採用します。\n理由は保守性が高いです。\nただし、実機未検証です。",
+          "加えて、軽微な注意があります。\n次に候補Aを端末で確認します。"
+        ],
+        "decisions": [
+          "CONTEXTUAL_DEMONSTRATIVE",
+          "CONDITION_FRONTED",
+          "EXCEPTIONS_PRIORITY_SORTED",
+          "PARAGRAPH_PLANNED"
+        ]
+      }
+    },
+    {
+      "name": "SYMMETRIC_COMPARISON",
+      "passed": true,
+      "detail": {
+        "surfaceText": "候補Aは高速、単純。\n候補Bは堅牢、拡張可能。\n速度ならその対象、拡張性なら候補Bです。\n\n比較結果です。\n理由は保守性が高いです。\n次にその対象を端末で確認します。",
+        "mode": "COMPOSITIONAL",
+        "clauses": [
+          "候補Aは高速、単純。",
+          "候補Bは堅牢、拡張可能。",
+          "速度ならその対象、拡張性なら候補Bです。",
+          "比較結果です。",
+          "理由は保守性が高いです。",
+          "次にその対象を端末で確認します。"
+        ],
+        "paragraphs": [
+          "候補Aは高速、単純。\n候補Bは堅牢、拡張可能。\n速度ならその対象、拡張性なら候補Bです。",
+          "比較結果です。\n理由は保守性が高いです。\n次にその対象を端末で確認します。"
+        ],
+        "decisions": [
+          "SYMMETRIC_COMPARISON",
+          "REPEATED_TARGET_OMITTED",
+          "PARAGRAPH_PLANNED"
+        ]
+      }
+    },
+    {
+      "name": "EXCEPTION_PRIORITY",
+      "passed": true,
+      "detail": {
+        "surfaceText": "既存機能を維持できる場合、候補Aを採用します。\n理由は保守性が高いです。\nただし、実機未検証です。\n\n加えて、軽微な注意があります。\n次にその対象を端末で確認します。",
+        "mode": "COMPOSITIONAL",
+        "clauses": [
+          "既存機能を維持できる場合、候補Aを採用します。",
+          "理由は保守性が高いです。",
+          "ただし、実機未検証です。",
+          "加えて、軽微な注意があります。",
+          "次にその対象を端末で確認します。"
+        ],
+        "paragraphs": [
+          "既存機能を維持できる場合、候補Aを採用します。\n理由は保守性が高いです。\nただし、実機未検証です。",
+          "加えて、軽微な注意があります。\n次にその対象を端末で確認します。"
+        ],
+        "decisions": [
+          "CONDITION_FRONTED",
+          "EXCEPTIONS_PRIORITY_SORTED",
+          "REPEATED_TARGET_OMITTED",
+          "PARAGRAPH_PLANNED"
+        ]
+      }
+    },
+    {
+      "name": "UNKNOWN_RESULT_RETURN_TO_CONVERSATION",
+      "passed": true,
+      "detail": {
+        "resolution": {
+          "effectiveText": "FoobarnativeXとは何か",
+          "resolution": {
+            "id": "UNK-1791275920143",
+            "question": "FoobarnativeXとは何か",
+            "classification": "UNKNOWN_TERM",
+            "routes": [
+              "SOURCE",
+              "CODE",
+              "TEST",
+              "WEB",
+              "TOOL",
+              "USER",
+              "STOP"
+            ],
+            "budget": 6,
+            "attempts": 1,
+            "attemptHistory": [
+              {
+                "route": "WEB",
+                "evidenceIds": [],
+                "attemptedAt": 1791275920144
+              }
+            ],
+            "evidenceIds": [],
+            "experienceIds": [],
+            "capabilityGapIds": [],
+            "knowledgeGapIds": [],
+            "claimIds": [],
+            "status": "OPEN",
+            "confidence": 0,
+            "verificationStatus": "UNVERIFIED",
+            "createdAt": 1791275920143,
+            "updatedAt": 1791275920144,
+            "currentRoute": "WEB"
+          },
+          "status": "NO_EVIDENCE",
+          "evidenceCount": 0,
+          "routes": [
+            "WEB",
+            "SOURCE",
+            "TOOL",
+            "USER"
+          ]
+        },
+        "surfaceText": "「FoobarnativeX」は現時点で確認できません\n\n【次工程の確認】\n・検索または追加資料で確認します\n\n※ランタイム環境の特性による差異に備え、事前テストをおすすめします。 引き続きご支援申し上げますので、よろしくお願いいたします。",
+        "status": "NO_EVIDENCE",
+        "returnedToConversation": true
+      }
+    }
+  ]
+}

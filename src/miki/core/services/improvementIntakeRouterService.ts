@@ -11,6 +11,11 @@ const KEY='miki_improvement_intake_runs_v1';
 class ImprovementIntakeRouterService{
  private runs=new Map<string,ImprovementIntakeRun>();private sequence=0;constructor(){this.load();}
 
+
+ prioritize<T extends {id:string;severity:number;frequency:number;confidence:number;cost:number;blocked?:boolean}>(items:T[]):T[]{
+  return [...items].filter(item=>!item.blocked).sort((a,b)=>(b.severity*b.frequency*b.confidence/Math.max(1,b.cost))-(a.severity*a.frequency*a.confidence/Math.max(1,a.cost))||a.id.localeCompare(b.id));
+ }
+
  private currentSourceSnapshotSha256():string{
   const files=selfCodeSpaceService.listSourceFiles();
   if(!files.length)return '';

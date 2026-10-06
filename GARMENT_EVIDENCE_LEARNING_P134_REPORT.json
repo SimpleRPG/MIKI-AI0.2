@@ -1,0 +1,356 @@
+{
+  "phase": "GARMENT_EVIDENCE_LEARNING_P134",
+  "passed": true,
+  "checks": {
+    "similarNeedsConfirmation": true,
+    "darkNeedsConfirmation": true,
+    "lightNeedsConfirmation": true,
+    "distinctPresent": true,
+    "gapsLearned": true,
+    "userResolution": true,
+    "shaValid": true
+  },
+  "samples": {
+    "similar": {
+      "regionId": "torso-upper",
+      "presence": "GARMENT_CONFIRMATION_REQUIRED",
+      "confirmationRequired": true,
+      "confirmationReason": [
+        "APPEARANCE_GARMENT_COLOR_SIMILAR"
+      ],
+      "absenceDecisionAllowed": false,
+      "appearanceGarmentColorDistance": 1.4142135623730951,
+      "appearanceGarmentSimilarity": 0.9967980529433017,
+      "nonColorEvidenceScore": 0.7842424242424243,
+      "kind": "SHIRT",
+      "layer": "TOP",
+      "coverageRatio": 0.64,
+      "occlusionRatio": 0.08,
+      "gapState": "GAPS_OBSERVED",
+      "gapObservationComplete": true,
+      "zeroGapConfidence": 0.92,
+      "gaps": [
+        {
+          "kind": "NECK_OPENING",
+          "contour": [
+            {
+              "x": 0.42,
+              "y": 0.2
+            },
+            {
+              "x": 0.58,
+              "y": 0.2
+            }
+          ],
+          "widthRatio": 0.16,
+          "depthHint": 0.12,
+          "confidence": 0.88
+        },
+        {
+          "kind": "HEM_GAP",
+          "contour": [
+            {
+              "x": 0.35,
+              "y": 0.68
+            },
+            {
+              "x": 0.65,
+              "y": 0.68
+            }
+          ],
+          "widthRatio": 0.3,
+          "depthHint": 0.16,
+          "confidence": 0.8
+        }
+      ],
+      "learnedDifferences": {
+        "paletteDistance": 1.4142135623730951,
+        "boundaryConfidence": 0.84,
+        "textureDifference": 0.76,
+        "seamConfidence": 0.88,
+        "wrinkleConfidence": 0.7,
+        "layerOverlapConfidence": 0.81,
+        "motionLagConfidence": 0.64,
+        "gapCount": 2,
+        "meanGapWidthRatio": 0.22999999999999998,
+        "zeroGapConfirmed": false
+      },
+      "sourceSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "profileSha256": "d1260e82ec9070c4914fef97c0b22014c0e0367c3f3058b5f641f674046dbe7d"
+    },
+    "dark": {
+      "regionId": "torso-upper",
+      "presence": "GARMENT_CONFIRMATION_REQUIRED",
+      "confirmationRequired": true,
+      "confirmationReason": [
+        "APPEARANCE_GARMENT_COLOR_SIMILAR"
+      ],
+      "absenceDecisionAllowed": false,
+      "appearanceGarmentColorDistance": 3.741657386773941,
+      "appearanceGarmentSimilarity": 0.9915284443767811,
+      "nonColorEvidenceScore": 0.7842424242424243,
+      "kind": "SHIRT",
+      "layer": "TOP",
+      "coverageRatio": 0.64,
+      "occlusionRatio": 0.08,
+      "gapState": "GAPS_OBSERVED",
+      "gapObservationComplete": true,
+      "zeroGapConfidence": 0.92,
+      "gaps": [
+        {
+          "kind": "NECK_OPENING",
+          "contour": [
+            {
+              "x": 0.42,
+              "y": 0.2
+            },
+            {
+              "x": 0.58,
+              "y": 0.2
+            }
+          ],
+          "widthRatio": 0.16,
+          "depthHint": 0.12,
+          "confidence": 0.88
+        },
+        {
+          "kind": "HEM_GAP",
+          "contour": [
+            {
+              "x": 0.35,
+              "y": 0.68
+            },
+            {
+              "x": 0.65,
+              "y": 0.68
+            }
+          ],
+          "widthRatio": 0.3,
+          "depthHint": 0.16,
+          "confidence": 0.8
+        }
+      ],
+      "learnedDifferences": {
+        "paletteDistance": 3.741657386773941,
+        "boundaryConfidence": 0.84,
+        "textureDifference": 0.76,
+        "seamConfidence": 0.88,
+        "wrinkleConfidence": 0.7,
+        "layerOverlapConfidence": 0.81,
+        "motionLagConfidence": 0.64,
+        "gapCount": 2,
+        "meanGapWidthRatio": 0.22999999999999998,
+        "zeroGapConfirmed": false
+      },
+      "sourceSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "profileSha256": "ea4a268628d80faf7a3a228fcbe431811c9bec6a67f232ed3e79c8d225d00cdf"
+    },
+    "light": {
+      "regionId": "torso-upper",
+      "presence": "GARMENT_CONFIRMATION_REQUIRED",
+      "confirmationRequired": true,
+      "confirmationReason": [
+        "APPEARANCE_GARMENT_COLOR_SIMILAR"
+      ],
+      "absenceDecisionAllowed": false,
+      "appearanceGarmentColorDistance": 23.345235059857508,
+      "appearanceGarmentSimilarity": 0.9471436219559323,
+      "nonColorEvidenceScore": 0.7842424242424243,
+      "kind": "SHIRT",
+      "layer": "TOP",
+      "coverageRatio": 0.64,
+      "occlusionRatio": 0.08,
+      "gapState": "GAPS_OBSERVED",
+      "gapObservationComplete": true,
+      "zeroGapConfidence": 0.92,
+      "gaps": [
+        {
+          "kind": "NECK_OPENING",
+          "contour": [
+            {
+              "x": 0.42,
+              "y": 0.2
+            },
+            {
+              "x": 0.58,
+              "y": 0.2
+            }
+          ],
+          "widthRatio": 0.16,
+          "depthHint": 0.12,
+          "confidence": 0.88
+        },
+        {
+          "kind": "HEM_GAP",
+          "contour": [
+            {
+              "x": 0.35,
+              "y": 0.68
+            },
+            {
+              "x": 0.65,
+              "y": 0.68
+            }
+          ],
+          "widthRatio": 0.3,
+          "depthHint": 0.16,
+          "confidence": 0.8
+        }
+      ],
+      "learnedDifferences": {
+        "paletteDistance": 23.345235059857508,
+        "boundaryConfidence": 0.84,
+        "textureDifference": 0.76,
+        "seamConfidence": 0.88,
+        "wrinkleConfidence": 0.7,
+        "layerOverlapConfidence": 0.81,
+        "motionLagConfidence": 0.64,
+        "gapCount": 2,
+        "meanGapWidthRatio": 0.22999999999999998,
+        "zeroGapConfirmed": false
+      },
+      "sourceSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "profileSha256": "8532abea89e2944cf77d69ec04d0f710ad7973d7b8597e910ea46209a4075d44"
+    },
+    "distinct": {
+      "regionId": "torso-upper",
+      "presence": "GARMENT_PRESENT",
+      "confirmationRequired": false,
+      "confirmationReason": [],
+      "absenceDecisionAllowed": false,
+      "appearanceGarmentColorDistance": 167.64844168676305,
+      "appearanceGarmentSimilarity": 0.6204240655716717,
+      "nonColorEvidenceScore": 0.7842424242424243,
+      "kind": "SHIRT",
+      "layer": "TOP",
+      "coverageRatio": 0.64,
+      "occlusionRatio": 0.08,
+      "gapState": "GAPS_OBSERVED",
+      "gapObservationComplete": true,
+      "zeroGapConfidence": 0.92,
+      "gaps": [
+        {
+          "kind": "NECK_OPENING",
+          "contour": [
+            {
+              "x": 0.42,
+              "y": 0.2
+            },
+            {
+              "x": 0.58,
+              "y": 0.2
+            }
+          ],
+          "widthRatio": 0.16,
+          "depthHint": 0.12,
+          "confidence": 0.88
+        },
+        {
+          "kind": "HEM_GAP",
+          "contour": [
+            {
+              "x": 0.35,
+              "y": 0.68
+            },
+            {
+              "x": 0.65,
+              "y": 0.68
+            }
+          ],
+          "widthRatio": 0.3,
+          "depthHint": 0.16,
+          "confidence": 0.8
+        }
+      ],
+      "learnedDifferences": {
+        "paletteDistance": 167.64844168676305,
+        "boundaryConfidence": 0.84,
+        "textureDifference": 0.76,
+        "seamConfidence": 0.88,
+        "wrinkleConfidence": 0.7,
+        "layerOverlapConfidence": 0.81,
+        "motionLagConfidence": 0.64,
+        "gapCount": 2,
+        "meanGapWidthRatio": 0.22999999999999998,
+        "zeroGapConfirmed": false
+      },
+      "sourceSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "profileSha256": "b9398911aadb3cf69a3cbfe588fbde252d9759df691eb6027290287e64c1800d"
+    },
+    "resolved": {
+      "regionId": "torso-upper",
+      "presence": "GARMENT_PRESENT",
+      "confirmationRequired": false,
+      "confirmationReason": [
+        "APPEARANCE_GARMENT_COLOR_SIMILAR",
+        "USER_CONFIRMED"
+      ],
+      "absenceDecisionAllowed": false,
+      "appearanceGarmentColorDistance": 1.4142135623730951,
+      "appearanceGarmentSimilarity": 0.9967980529433017,
+      "nonColorEvidenceScore": 0.7842424242424243,
+      "kind": "SHIRT",
+      "layer": "TOP",
+      "coverageRatio": 0.64,
+      "occlusionRatio": 0.08,
+      "gapState": "GAPS_OBSERVED",
+      "gapObservationComplete": true,
+      "zeroGapConfidence": 0.92,
+      "gaps": [
+        {
+          "kind": "NECK_OPENING",
+          "contour": [
+            {
+              "x": 0.42,
+              "y": 0.2
+            },
+            {
+              "x": 0.58,
+              "y": 0.2
+            }
+          ],
+          "widthRatio": 0.16,
+          "depthHint": 0.12,
+          "confidence": 0.88
+        },
+        {
+          "kind": "HEM_GAP",
+          "contour": [
+            {
+              "x": 0.35,
+              "y": 0.68
+            },
+            {
+              "x": 0.65,
+              "y": 0.68
+            }
+          ],
+          "widthRatio": 0.3,
+          "depthHint": 0.16,
+          "confidence": 0.8
+        }
+      ],
+      "learnedDifferences": {
+        "paletteDistance": 1.4142135623730951,
+        "boundaryConfidence": 0.84,
+        "textureDifference": 0.76,
+        "seamConfidence": 0.88,
+        "wrinkleConfidence": 0.7,
+        "layerOverlapConfidence": 0.81,
+        "motionLagConfidence": 0.64,
+        "gapCount": 2,
+        "meanGapWidthRatio": 0.22999999999999998,
+        "zeroGapConfirmed": false
+      },
+      "sourceSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "confirmationContract": {
+        "questionId": "GARMENT-0a921908503465685fd94fce",
+        "regionId": "torso-upper",
+        "sourceSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "profileSha256BeforeAnswer": "d1260e82ec9070c4914fef97c0b22014c0e0367c3f3058b5f641f674046dbe7d",
+        "consumed": true
+      },
+      "profileSha256": "2c5a8fef8ec4430e4acb1674851215acb350880e828c4eacae31ddcea69f9bb4"
+    }
+  }
+}

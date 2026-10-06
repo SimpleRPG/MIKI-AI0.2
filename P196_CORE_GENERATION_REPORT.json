@@ -1,0 +1,154 @@
+{
+  "phase": "CORE_LOCAL_PERSON_GENERATION_P196",
+  "passed": true,
+  "checks": {
+    "coreRoute": true,
+    "rendered": true,
+    "quality": true,
+    "parts": true,
+    "views": true,
+    "identity": true,
+    "expression": true,
+    "fingerJoints": true,
+    "fingerPatches": true,
+    "materials": true,
+    "repairLoop": true,
+    "receipt": true,
+    "localOnly": true
+  },
+  "views": [
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": 0,
+        "roll": 0
+      },
+      "score": 1,
+      "passed": true,
+      "failures": [],
+      "modelSha256": "632f5f33a5c16f3fe864018c4650748e69abe09564e481fd944718f76b60709f",
+      "synthesisSha256": "9e1aea9d733d7eaee5f2b56b0dafa8f4ea90a148949a9a685fead085f7f45801",
+      "receiptSha256": "7d4573ec3a60180fb405d696ca15223837cccf6bff5db18cf2b10cd1e2833bef"
+    },
+    {
+      "view": {
+        "yaw": 25,
+        "pitch": 0,
+        "roll": 0
+      },
+      "score": 1,
+      "passed": true,
+      "failures": [],
+      "modelSha256": "ac09c2efb5730935de4864fd9b50966ee392d47af8b2e71bc003f9553db7a312",
+      "synthesisSha256": "7ca92f5125b54592e03118ca71f020a731d75e3086138dff5e5a750008e8a7ff",
+      "receiptSha256": "6f60b41fe32af9eaad638922dcf52ee02929b9cb09b17c9e03add85a8cc8e05c"
+    },
+    {
+      "view": {
+        "yaw": -25,
+        "pitch": 0,
+        "roll": 0
+      },
+      "score": 0.9874999999999999,
+      "passed": true,
+      "failures": [],
+      "modelSha256": "2118992fd2bd21b076806902b77a4381fd964612bf28e30ca0bcec0e23a3774b",
+      "synthesisSha256": "995afc8ef2ea436e48e15cc3d67fe59e6d845f045f1f16005a38aa34b89455b8",
+      "receiptSha256": "8ad59bef8b5853be94bc158ab5de09b3476d173e64fa792005843265e8b25f14"
+    },
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": 15,
+        "roll": 0
+      },
+      "score": 0.995,
+      "passed": true,
+      "failures": [],
+      "modelSha256": "232cf9a61b475b50d27014fc6757e05dc03c71c9a8a0adf71c7897d04f6f5eea",
+      "synthesisSha256": "7a53706aaa508025f1edec6566e28146ceff9e57bf31cef4ffe2f9929c9c8158",
+      "receiptSha256": "20f3f1aea4c8b6080b31dfb5d348cc8ae686dcd67fab896b3cfdb7277146bb3b"
+    },
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": -15,
+        "roll": 0
+      },
+      "score": 0.995,
+      "passed": true,
+      "failures": [],
+      "modelSha256": "a5e5cd4869b7d6a42e9ff1100f77f944ac35359831937ef331da718dd1d5f93b",
+      "synthesisSha256": "48a294406dd0dacc10815a9abffaf2be004e25727cd4d0d2b17b3b1a0db78a36",
+      "receiptSha256": "6ea3e51fba4ee7fbf4cfd180f5e81d4a3a1fb6a66cc3fa022d6e79c592807c97"
+    }
+  ],
+  "frontParts": [
+    {
+      "part": "eyes",
+      "controlPoints": 8,
+      "patches": 2,
+      "visiblePixels": 3574,
+      "depthMin": 0.15000000000000002,
+      "depthMax": 0.21999999999999997,
+      "passed": true
+    },
+    {
+      "part": "nose",
+      "controlPoints": 5,
+      "patches": 1,
+      "visiblePixels": 1372,
+      "depthMin": 0.09999999999999998,
+      "depthMax": 0.18,
+      "passed": true
+    },
+    {
+      "part": "lips",
+      "controlPoints": 2,
+      "patches": 1,
+      "visiblePixels": 1372,
+      "depthMin": 0.10999999999999999,
+      "depthMax": 0.12,
+      "passed": true
+    },
+    {
+      "part": "ears",
+      "controlPoints": 2,
+      "patches": 1,
+      "visiblePixels": 1631,
+      "depthMin": 0.34,
+      "depthMax": 0.34,
+      "passed": true
+    },
+    {
+      "part": "fingers",
+      "controlPoints": 30,
+      "patches": 30,
+      "visiblePixels": 1090,
+      "depthMin": 0.14,
+      "depthMax": 0.15600000000000003,
+      "passed": true
+    },
+    {
+      "part": "neck",
+      "controlPoints": 2,
+      "patches": 1,
+      "visiblePixels": 3669,
+      "depthMin": 0.38,
+      "depthMax": 0.38,
+      "passed": true
+    }
+  ],
+  "architecture": {
+    "p194ToP193": true,
+    "pixelPartEvidence": true,
+    "yawPitchProjection": true,
+    "expression": true,
+    "independentFingerJoints": true,
+    "learnedMaterials": true,
+    "repairLoop": true,
+    "coreRoute": true,
+    "deviceE2E": "DEFERRED_BY_USER",
+    "externalProvider": false
+  }
+}

@@ -50,6 +50,7 @@ import {
 } from '../miki/core/mikiInteractionBus';
 import { ReviewPackageLibrary } from './ReviewPackageLibrary';
 import { SelfCodeSpaceScreen } from './SelfCodeSpaceScreen';
+import DevelopmentReviewLifecyclePanel from './self_improvement/DevelopmentReviewLifecyclePanel';
 import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewayService';
 import { isEditableInputActive } from '../utils/isEditableInputActive';
 
@@ -988,7 +989,10 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
         )}
 
         {activeSection === 'review_packages' && (
-          <ReviewPackageLibrary />
+          <div className="space-y-4">
+            <DevelopmentReviewLifecyclePanel />
+            <ReviewPackageLibrary />
+          </div>
         )}
 
         {/* ================= SECTION 2: 作業指示 (DIRECTIVES) ================= */}

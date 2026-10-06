@@ -1,0 +1,282 @@
+{
+  "phase": "CONVERSATION_MEANING_85",
+  "passed": true,
+  "results": [
+    {
+      "text": "それを続けて",
+      "passed": true,
+      "referent": "候補A",
+      "intents": [
+        {
+          "kind": "CONTINUE",
+          "scope": "候補A",
+          "confidence": 0.9
+        }
+      ],
+      "resolvedText": "「候補A」を続けて",
+      "semanticDiscourse": {
+        "resolvedText": "「候補A」を続けて",
+        "entities": [
+          {
+            "id": "1:候補A",
+            "label": "候補A",
+            "kind": "CANDIDATE",
+            "turnId": "1",
+            "salience": 1.02,
+            "status": "ACTIVE",
+            "sourceText": "候補Aを実装して検証する"
+          },
+          {
+            "id": "2:候補B",
+            "label": "候補B",
+            "kind": "CANDIDATE",
+            "turnId": "2",
+            "salience": 1,
+            "status": "DEFERRED",
+            "sourceText": "候補Bは保留する"
+          }
+        ],
+        "referent": {
+          "id": "1:候補A",
+          "label": "候補A",
+          "kind": "CANDIDATE",
+          "turnId": "1",
+          "salience": 1.02,
+          "status": "ACTIVE",
+          "sourceText": "候補Aを実装して検証する"
+        },
+        "ambiguous": false,
+        "intents": [
+          {
+            "kind": "CONTINUE",
+            "scope": "候補A",
+            "confidence": 0.9
+          }
+        ],
+        "constraints": {
+          "preserve": [],
+          "prohibit": [],
+          "conditions": []
+        }
+      }
+    },
+    {
+      "text": "前の条件は残して",
+      "passed": true,
+      "intents": [
+        {
+          "kind": "PRESERVE",
+          "scope": "CURRENT_FOCUS",
+          "confidence": 0.9
+        }
+      ],
+      "resolvedText": "前の条件は残して",
+      "semanticDiscourse": {
+        "resolvedText": "前の条件は残して",
+        "entities": [
+          {
+            "id": "1:候補A",
+            "label": "候補A",
+            "kind": "CANDIDATE",
+            "turnId": "1",
+            "salience": 1.02,
+            "status": "ACTIVE",
+            "sourceText": "候補Aを実装して検証する"
+          },
+          {
+            "id": "2:候補B",
+            "label": "候補B",
+            "kind": "CANDIDATE",
+            "turnId": "2",
+            "salience": 1,
+            "status": "DEFERRED",
+            "sourceText": "候補Bは保留する"
+          }
+        ],
+        "ambiguous": true,
+        "intents": [
+          {
+            "kind": "PRESERVE",
+            "scope": "CURRENT_FOCUS",
+            "confidence": 0.9
+          }
+        ],
+        "constraints": {
+          "preserve": [
+            "前の条件"
+          ],
+          "prohibit": [],
+          "conditions": []
+        }
+      }
+    },
+    {
+      "text": "もっと良くして",
+      "passed": true,
+      "intents": [
+        {
+          "kind": "IMPROVE",
+          "scope": "CURRENT_FOCUS",
+          "confidence": 0.9
+        }
+      ],
+      "resolvedText": "もっと良くして",
+      "semanticDiscourse": {
+        "resolvedText": "もっと良くして",
+        "entities": [
+          {
+            "id": "1:候補A",
+            "label": "候補A",
+            "kind": "CANDIDATE",
+            "turnId": "1",
+            "salience": 1.02,
+            "status": "ACTIVE",
+            "sourceText": "候補Aを実装して検証する"
+          },
+          {
+            "id": "2:候補B",
+            "label": "候補B",
+            "kind": "CANDIDATE",
+            "turnId": "2",
+            "salience": 1,
+            "status": "DEFERRED",
+            "sourceText": "候補Bは保留する"
+          }
+        ],
+        "ambiguous": false,
+        "intents": [
+          {
+            "kind": "IMPROVE",
+            "scope": "CURRENT_FOCUS",
+            "confidence": 0.9
+          }
+        ],
+        "constraints": {
+          "preserve": [],
+          "prohibit": [],
+          "conditions": []
+        }
+      }
+    },
+    {
+      "text": "既存機能は消さないで実装して",
+      "passed": true,
+      "intents": [
+        {
+          "kind": "IMPLEMENT",
+          "scope": "CURRENT_FOCUS",
+          "confidence": 0.9
+        },
+        {
+          "kind": "PRESERVE",
+          "scope": "CURRENT_FOCUS",
+          "confidence": 0.9
+        },
+        {
+          "kind": "PROHIBIT",
+          "scope": "CURRENT_FOCUS",
+          "confidence": 0.9
+        }
+      ],
+      "resolvedText": "既存機能は消さないで実装して",
+      "semanticDiscourse": {
+        "resolvedText": "既存機能は消さないで実装して",
+        "entities": [
+          {
+            "id": "1:候補A",
+            "label": "候補A",
+            "kind": "CANDIDATE",
+            "turnId": "1",
+            "salience": 1.02,
+            "status": "ACTIVE",
+            "sourceText": "候補Aを実装して検証する"
+          },
+          {
+            "id": "2:候補B",
+            "label": "候補B",
+            "kind": "CANDIDATE",
+            "turnId": "2",
+            "salience": 1,
+            "status": "DEFERRED",
+            "sourceText": "候補Bは保留する"
+          }
+        ],
+        "ambiguous": false,
+        "intents": [
+          {
+            "kind": "IMPLEMENT",
+            "scope": "CURRENT_FOCUS",
+            "confidence": 0.9
+          },
+          {
+            "kind": "PRESERVE",
+            "scope": "CURRENT_FOCUS",
+            "confidence": 0.9
+          },
+          {
+            "kind": "PROHIBIT",
+            "scope": "CURRENT_FOCUS",
+            "confidence": 0.9
+          }
+        ],
+        "constraints": {
+          "preserve": [
+            "既存機能"
+          ],
+          "prohibit": [
+            "既存機能"
+          ],
+          "conditions": []
+        }
+      }
+    },
+    {
+      "text": "問題ない？",
+      "passed": true,
+      "intents": [
+        {
+          "kind": "CONFIRM",
+          "scope": "CURRENT_FOCUS",
+          "confidence": 0.9
+        }
+      ],
+      "resolvedText": "問題ない？",
+      "semanticDiscourse": {
+        "resolvedText": "問題ない？",
+        "entities": [
+          {
+            "id": "1:候補A",
+            "label": "候補A",
+            "kind": "CANDIDATE",
+            "turnId": "1",
+            "salience": 1.02,
+            "status": "ACTIVE",
+            "sourceText": "候補Aを実装して検証する"
+          },
+          {
+            "id": "2:候補B",
+            "label": "候補B",
+            "kind": "CANDIDATE",
+            "turnId": "2",
+            "salience": 1,
+            "status": "DEFERRED",
+            "sourceText": "候補Bは保留する"
+          }
+        ],
+        "ambiguous": false,
+        "intents": [
+          {
+            "kind": "CONFIRM",
+            "scope": "CURRENT_FOCUS",
+            "confidence": 0.9
+          }
+        ],
+        "constraints": {
+          "preserve": [],
+          "prohibit": [],
+          "conditions": []
+        }
+      }
+    }
+  ]
+}

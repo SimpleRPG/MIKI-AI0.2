@@ -1,0 +1,28 @@
+{
+  "passed": true,
+  "phase": "RUST_MIGRATION_COMPLETION_GATE_51",
+  "generatedAt": "2026-10-01T08:04:44.349Z",
+  "requiredOperations": [
+    "SCAN_REPOSITORY",
+    "HASH_FILES",
+    "BUILD_ZIP",
+    "COPY_ZIPTXT",
+    "COMPARE_REVISIONS",
+    "SEARCH_TEXT",
+    "VERIFY_ARTIFACTS"
+  ],
+  "rustOnlyOperationCount": 7,
+  "rustDomainCount": 17,
+  "jniDeclarationCount": 18,
+  "jniExportCount": 18,
+  "jniExactMatch": true,
+  "scannedTypeScriptFiles": 855,
+  "scannedAndroidSourceFiles": 6,
+  "directNativeDeclarationsOutsideGateway": 0,
+  "directNativeCallsOutsideGateway": 0,
+  "legacyTypeScriptImplementations": 0,
+  "failClosedNativeGateway": true,
+  "failures": [],
+  "warnings": [],
+  "completionVerdict": "STATIC_MIGRATION_GATE_PASSED"
+}

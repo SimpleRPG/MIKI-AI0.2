@@ -1,0 +1,141 @@
+{
+  "phase": "VISUAL_BODY_25D_P128",
+  "passed": true,
+  "checks": {
+    "geometry": true,
+    "uncertainty": true,
+    "notHealth": true,
+    "layers": true,
+    "repos": true,
+    "noBundled": true,
+    "selfImprovement": true
+  },
+  "body": {
+    "shoulderToHeight": 0.26373626373626374,
+    "waistToHeight": 0.20912420912420915,
+    "hipToHeight": 0.15384615384615383,
+    "torsoToHeight": 0.31868131868131877,
+    "legToHeight": 0.4616692645626374,
+    "silhouetteConfidence": 0.8500000000000001,
+    "poseConfidence": 0.9000000000000001,
+    "garmentBulk": 0.2,
+    "uncertainty": 0.26249999999999996,
+    "notHealthAssessment": true,
+    "estimateSha256": "1caea6ce7ab93d1a57f276966f149a7796b7ebd2a135c4468e163f07960c88ba"
+  },
+  "scene": {
+    "width": 8,
+    "height": 8,
+    "layers": [
+      {
+        "id": "DEPTH_LAYER_1",
+        "kind": "BACKGROUND",
+        "near": 0,
+        "far": 0.19047619047619047,
+        "parallax": 0.08,
+        "maskThreshold": [
+          0,
+          0.19047619047619047
+        ],
+        "occlusionOrder": 0
+      },
+      {
+        "id": "DEPTH_LAYER_2",
+        "kind": "MIDGROUND",
+        "near": 0.19047619047619047,
+        "far": 0.5396825396825397,
+        "parallax": 0.22,
+        "maskThreshold": [
+          0.19047619047619047,
+          0.5396825396825397
+        ],
+        "occlusionOrder": 1
+      },
+      {
+        "id": "DEPTH_LAYER_3",
+        "kind": "SUBJECT",
+        "near": 0.5396825396825397,
+        "far": 0.8095238095238095,
+        "parallax": 0.48,
+        "maskThreshold": [
+          0.5396825396825397,
+          0.8095238095238095
+        ],
+        "occlusionOrder": 2
+      },
+      {
+        "id": "DEPTH_LAYER_4",
+        "kind": "FOREGROUND",
+        "near": 0.8095238095238095,
+        "far": 1,
+        "parallax": 0.78,
+        "maskThreshold": [
+          0.8095238095238095,
+          1
+        ],
+        "occlusionOrder": 3
+      }
+    ],
+    "camera": {
+      "maxOffsetX": 24,
+      "maxOffsetY": 14,
+      "focusDepth": 0.6349206349206349
+    },
+    "depthSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sceneSha256": "e9c2cf026dd649e70802af2284c54d19ff8d908ccaf61f833be4d4fcf62208bb"
+  },
+  "repositories": [
+    {
+      "name": "Depth Anything V2 Small",
+      "url": "https://github.com/DepthAnything/Depth-Anything-V2",
+      "license": "Apache-2.0 code/small weights; verify artifact",
+      "adoption": "OPTIONAL_ADAPTER",
+      "reason": "monocular relative depth for 2.5D",
+      "bundled": false
+    },
+    {
+      "name": "MediaPipe Pose",
+      "url": "https://github.com/google-ai-edge/mediapipe",
+      "license": "Apache-2.0",
+      "adoption": "CONCEPT",
+      "reason": "pose landmark contract and mobile deployment patterns",
+      "bundled": false
+    },
+    {
+      "name": "MMPose RTMPose",
+      "url": "https://github.com/open-mmlab/mmpose",
+      "license": "Apache-2.0 code; verify model/data",
+      "adoption": "OPTIONAL_ADAPTER",
+      "reason": "whole-body keypoints when runtime permits",
+      "bundled": false
+    },
+    {
+      "name": "Image Super-Resolution",
+      "url": "https://github.com/idealo/image-super-resolution",
+      "license": "Apache-2.0",
+      "adoption": "CONCEPT",
+      "reason": "residual dense reconstruction and evaluation concepts; archived repository",
+      "bundled": false
+    },
+    {
+      "name": "Monodepth2",
+      "url": "https://github.com/nianticlabs/monodepth2",
+      "license": "non-commercial",
+      "adoption": "REJECTED",
+      "reason": "license incompatible with unrestricted adoption",
+      "bundled": false
+    }
+  ],
+  "evidence": {
+    "evidenceKind": "VISUAL_BODY_25D",
+    "bodyEstimateSha256": "1caea6ce7ab93d1a57f276966f149a7796b7ebd2a135c4468e163f07960c88ba",
+    "sceneSha256": "e9c2cf026dd649e70802af2284c54d19ff8d908ccaf61f833be4d4fcf62208bb",
+    "uses": [
+      "BODY_GEOMETRY_REGRESSION",
+      "DEPTH_LAYER_REGRESSION",
+      "PARALLAX_RENDERER_CANDIDATE"
+    ],
+    "directProductionMutation": false,
+    "evidenceSha256": "59340e0d473600468b1b6b24819d44cbc9be1724c53534af4a5c5982f26e0c24"
+  }
+}

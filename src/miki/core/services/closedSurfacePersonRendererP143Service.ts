@@ -1,0 +1,47 @@
+import { canonicalSha256Object } from './canonicalSha256Service';
+import type { PersonGenerationModelP141, P141Point } from './personGenerationModelP141Service';
+
+export interface P143Artifact {
+  width:number; height:number; png:Uint8Array; pngSha256:string;
+  modelSha256:string; receiptSha256:string; layers:string[];
+  buffers:{depthSha256:string;normalSha256:string;materialSha256:string};
+}
+
+type Pt={x:number;y:number};
+const rgb=(h:string)=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+const color=(a:string,b:string,t:number)=>'#'+rgb(a).map((v,i)=>Math.round(v*(1-t)+rgb(b)[i]*t).toString(16).padStart(2,'0')).join('');
+class Canvas {
+ readonly rgba:Uint8Array; readonly depth:Float32Array; readonly normal:Int16Array; readonly material:Uint8Array;
+ constructor(readonly w:number,readonly h:number){this.rgba=new Uint8Array(w*h*4);this.depth=new Float32Array(w*h);this.normal=new Int16Array(w*h*2);this.material=new Uint8Array(w*h);}
+ blend(x:number,y:number,c:string,a:number,z:number,nx=0,ny=0,mat=0){x=Math.round(x);y=Math.round(y);if(x<0||y<0||x>=this.w||y>=this.h)return;const p=y*this.w+x;if(this.rgba[p*4+3]&&z<this.depth[p])return;const q=rgb(c),i=p*4;for(let k=0;k<3;k++)this.rgba[i+k]=Math.round(q[k]*a+this.rgba[i+k]*(1-a));this.rgba[i+3]=Math.max(this.rgba[i+3],Math.round(255*a));this.depth[p]=z;this.normal[p*2]=Math.round(nx*32767);this.normal[p*2+1]=Math.round(ny*32767);this.material[p]=mat;}
+ ellipse(cx:number,cy:number,rx:number,ry:number,c:string,z:number,mat:number,a=1){const x0=Math.floor(cx-rx),x1=Math.ceil(cx+rx),y0=Math.floor(cy-ry),y1=Math.ceil(cy+ry);for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const nx=(x-cx)/rx,ny=(y-cy)/ry,d=nx*nx+ny*ny;if(d<=1)this.blend(x,y,c,a,z,nx,ny,mat);}}
+ polygon(points:Pt[],c:string,z:number,mat:number,a=1){const ys=points.map(p=>p.y);for(let y=Math.floor(Math.min(...ys));y<=Math.ceil(Math.max(...ys));y++){const xs:number[]=[];for(let i=0,j=points.length-1;i<points.length;j=i++){const u=points[i],v=points[j];if((u.y>y)!==(v.y>y))xs.push(u.x+(y-u.y)*(v.x-u.x)/(v.y-u.y));}xs.sort((u,v)=>u-v);for(let i=0;i+1<xs.length;i+=2)for(let x=Math.ceil(xs[i]);x<=Math.floor(xs[i+1]);x++)this.blend(x,y,c,a,z,0,0,mat);}}
+ capsule(a:Pt,b:Pt,r0:number,r1:number,c:string,z:number,mat:number,light:string){const n=Math.max(8,Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)));for(let i=0;i<=n;i++){const t=i/n,r=r0*(1-t)+r1*t,cx=a.x+(b.x-a.x)*t,cy=a.y+(b.y-a.y)*t;this.ellipse(cx,cy,r,r*1.05,c,z,mat);this.ellipse(cx-r*.18,cy-r*.2,r*.24,r*.62,light,z+.006,mat,.22);}}
+ line(a:Pt,b:Pt,c:string,width:number,z:number,mat:number,a0=1){const n=Math.max(2,Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)));for(let i=0;i<=n;i++){const t=i/n;this.ellipse(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,width,width,c,z,mat,a0);}}
+}
+class ClosedSurfacePersonRendererP143Service {
+ async render(m:PersonGenerationModelP141):Promise<P143Artifact>{this.verify(m);const w=1024,h=1536,c=new Canvas(w,h);const skin=m.palette.skin,skinS=m.palette.skinShadow,skinH=m.palette.skinHighlight,hair=m.palette.hair,hairH=m.palette.hairHighlight,cloth=m.garment.baseColor,clothS=m.garment.shadowColor,clothH=m.garment.highlightColor,pants=m.palette.pants,shoe=m.palette.shoes;const layers=['contact-shadow','rear-hair-mass','rear-limbs','legs-feet','torso-volume','garment-surface','front-limbs','neck-ears','face-volume','facial-features','front-hair-clusters','material-and-rim-light'];
+ c.ellipse(w*.5,h*.925,w*.17,h*.018,'#050607',.05,0,.28);
+ // rear hair, neck, legs
+ c.ellipse(w*.5,h*.165,w*.105,h*.145,hair,.26,3);c.capsule({x:w*.43,y:h*.60},{x:w*.425,y:h*.88},w*.041,w*.034,pants,.32,4,color(pants,'#ffffff',.11));c.capsule({x:w*.57,y:h*.60},{x:w*.575,y:h*.88},w*.041,w*.034,color(pants,'#ffffff',.05),.33,4,color(pants,'#ffffff',.15));c.ellipse(w*.415,h*.908,w*.066,h*.025,shoe,.37,5);c.ellipse(w*.585,h*.908,w*.066,h*.025,shoe,.38,5);
+ // torso body and garment curved closed surface
+ c.ellipse(w*.5,h*.435,w*.158,h*.205,color(cloth,clothS,.28),.42,6);const garment=[{x:w*.36,y:h*.305},{x:w*.42,y:h*.285},{x:w*.5,y:h*.30},{x:w*.58,y:h*.285},{x:w*.64,y:h*.305},{x:w*.615,y:h*.61},{x:w*.385,y:h*.61}];c.polygon(garment,cloth,.48,7);for(let i=0;i<9;i++){const x=w*(.395+i*.026);c.polygon([{x,y:h*.322},{x:x+w*.022,y:h*.322},{x:x+w*.012,y:h*.595},{x:x-w*.006,y:h*.595}],i%2?color(cloth,clothH,.34):color(cloth,clothS,.32),.488,7,.20);}
+ // arms with anatomical taper and elbows
+ const arm=(side:number)=>{const sh={x:w*(.5+side*.145),y:h*.32},el={x:w*(.5+side*.205),y:h*.48},wr={x:w*(.5+side*.205),y:h*.685};c.capsule(sh,el,w*.034,w*.029,cloth,.50,7,clothH);c.ellipse(el.x,el.y,w*.031,h*.025,clothS,.51,7);c.capsule(el,wr,w*.028,w*.021,cloth,.52,7,clothH);c.ellipse(wr.x,wr.y,w*.030,h*.041,skin,.56,2);const dir=side;for(let f=-2;f<=2;f++)c.line({x:wr.x+f*w*.006,y:wr.y+h*.022},{x:wr.x+(f*w*.006)+dir*w*.003,y:wr.y+h*(.052+Math.abs(f)*.002)},color(skin,skinS,.28),w*.0022,.57,2,.72);};arm(-1);arm(1);
+ // shoulder and collar
+ c.polygon([{x:w*.435,y:h*.305},{x:w*.5,y:h*.35},{x:w*.565,y:h*.305},{x:w*.535,y:h*.285},{x:w*.5,y:h*.318},{x:w*.465,y:h*.285}],color(cloth,'#ffffff',.25),.53,7);c.ellipse(w*.5,h*.275,w*.039,h*.068,skin,.54,2);
+ // ears and face layered volume
+ c.ellipse(w*.401,h*.164,w*.020,h*.043,skinS,.59,2);c.ellipse(w*.599,h*.164,w*.020,h*.043,skinS,.59,2);c.ellipse(w*.5,h*.165,w*.096,h*.119,skin,.61,2);c.ellipse(w*.465,h*.174,w*.050,h*.086,skinS,.615,2,.11);c.ellipse(w*.540,h*.153,w*.042,h*.076,skinH,.62,2,.15);
+ // eyes, brows, eyelids
+ for(const side of [-1,1]){const ex=w*(.5+side*.037),ey=h*.145;c.ellipse(ex,ey,w*.020,h*.0075,'#f4f0e9',.66,1);c.ellipse(ex,ey,w*.0068,h*.0072,'#5b4438',.67,1);c.ellipse(ex,ey,w*.0028,h*.0042,'#131212',.68,1);c.line({x:ex-side*w*.020,y:ey-h*.012},{x:ex+side*w*.019,y:ey-h*.014},hair,w*.0033,.69,3,.82);c.line({x:ex-side*w*.020,y:ey+h*.001},{x:ex+side*w*.019,y:ey},color(skinS,hair,.28),w*.0016,.69,2,.48);}
+ // nose, lips, chin, cheek
+ c.line({x:w*.5,y:h*.152},{x:w*.494,y:h*.191},skinS,w*.0022,.67,2,.52);c.line({x:w*.485,y:h*.196},{x:w*.505,y:h*.200},skinS,w*.0017,.67,2,.46);c.line({x:w*.474,y:h*.216},{x:w*.526,y:h*.216},color(skinS,'#954f59',.58),w*.0022,.68,2,.80);c.line({x:w*.481,y:h*.220},{x:w*.519,y:h*.220},color(skin,'#c66f7a',.55),w*.0028,.69,2,.68);c.line({x:w*.475,y:h*.241},{x:w*.525,y:h*.241},skinS,w*.0014,.67,2,.20);c.ellipse(w*.55,h*.177,w*.024,h*.044,skinH,.665,2,.10);
+ // directional hair clusters, no central curtain
+ c.ellipse(w*.5,h*.073,w*.108,h*.050,hair,.70,3);for(let i=0;i<10;i++){const side=i<5?-1:1,k=i%5,t=k/4,start={x:w*(.5+side*.008),y:h*.075},end={x:w*(.5+side*(.055+.045*t)),y:h*(.115+.12*t)};c.line(start,end,i%3===0?hairH:color(hair,'#ffffff',.07),w*.0052,.72+i*.002,3,.66);}c.polygon([{x:w*.397,y:h*.076},{x:w*.455,y:h*.096},{x:w*.447,y:h*.245},{x:w*.408,y:h*.222}],hair,.71,3);c.polygon([{x:w*.603,y:h*.076},{x:w*.545,y:h*.096},{x:w*.553,y:h*.245},{x:w*.592,y:h*.222}],hair,.71,3);
+ // garment seams and rim light
+ c.line({x:w*.385,y:h*.605},{x:w*.615,y:h*.605},color(clothS,'#000000',.28),w*.0028,.70,7,.45);c.line({x:w*.36,y:h*.31},{x:w*.385,y:h*.60},clothH,w*.0018,.70,7,.32);c.line({x:w*.64,y:h*.31},{x:w*.615,y:h*.60},clothS,w*.0018,.70,7,.32);
+ const png=await this.png(w,h,c.rgba),depthSha256=canonicalSha256Object(Array.from(c.depth.filter((_,i)=>i%4096===0))),normalSha256=canonicalSha256Object(Array.from(c.normal.filter((_,i)=>i%4096===0))),materialSha256=canonicalSha256Object(Array.from(c.material.filter((_,i)=>i%4096===0))),receipt={modelSha256:m.modelSha256,profileSha256:m.profileSha256,sourceSha256List:m.sourceSha256List,layers,buffers:{depthSha256,normalSha256,materialSha256},width:w,height:h};return{width:w,height:h,png,pngSha256:await this.sha(png),modelSha256:m.modelSha256,receiptSha256:canonicalSha256Object(receipt),layers,buffers:{depthSha256,normalSha256,materialSha256}};}
+ private verify(m:PersonGenerationModelP141){const c=structuredClone(m);c.modelSha256='';if(canonicalSha256Object(c)!==m.modelSha256)throw new Error('P143_MODEL_SHA_MISMATCH');}
+ private async png(w:number,h:number,p:Uint8Array){const raw=new Uint8Array((w*4+1)*h);for(let y=0;y<h;y++){const o=y*(w*4+1);raw[o]=0;raw.set(p.subarray(y*w*4,(y+1)*w*4),o+1);}const cs=new CompressionStream('deflate'),wr=cs.writable.getWriter();await wr.write(raw.slice().buffer);await wr.close();const d=new Uint8Array(await new Response(cs.readable).arrayBuffer()),sig=Uint8Array.from([137,80,78,71,13,10,26,10]),ih=new Uint8Array(13),v=new DataView(ih.buffer);v.setUint32(0,w);v.setUint32(4,h);ih.set([8,6,0,0,0],8);return this.cat(sig,this.chunk('IHDR',ih),this.chunk('IDAT',d),this.chunk('IEND',new Uint8Array()));}
+ private chunk(t:string,d:Uint8Array){const b=new TextEncoder().encode(t),o=new Uint8Array(12+d.length),v=new DataView(o.buffer);v.setUint32(0,d.length);o.set(b,4);o.set(d,8);v.setUint32(8+d.length,this.crc(this.cat(b,d)));return o;}private crc(d:Uint8Array){let c=0xffffffff;for(const b of d){c^=b;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xedb88320:0);}return(c^0xffffffff)>>>0;}private cat(...a:Uint8Array[]){const o=new Uint8Array(a.reduce((n,x)=>n+x.length,0));let p=0;for(const x of a){o.set(x,p);p+=x.length;}return o;}private async sha(d:Uint8Array){const h=await crypto.subtle.digest('SHA-256',d.slice().buffer);return[...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('');}}
+export const closedSurfacePersonRendererP143Service=new ClosedSurfacePersonRendererP143Service();

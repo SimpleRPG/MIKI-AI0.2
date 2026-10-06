@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { storageService } from './services/storageService';
 import { startupRecoveryService } from './services/startupRecoveryService';
+import { nonBlockingStartupP156Service } from './services/nonBlockingStartupP156Service';
 import './index.css';
 
 // Prevent WebGPU / background abort recoverable notices from triggering parent frame tab shifts
@@ -80,8 +81,13 @@ const renderApp = async () => {
   window.setTimeout(() => startupRecoveryService.clear(), 3000);
 };
 
-void storageService.ready
-  .then(renderApp)
+void nonBlockingStartupP156Service.awaitWithoutBlocking(storageService.ready)
+  .then((outcome) => {
+    if (outcome.mode === 'LIMITED') {
+      startupRecoveryService.update('APP_IMPORT', 'Persistent storage unavailable; continuing in limited mode');
+    }
+    return renderApp();
+  })
   .then(() => import('./services/systemLogger'))
   .then(({ systemLogger }) => systemLogger.initializeRuntimeMemoryDiagnostics())
   .catch((error) => {

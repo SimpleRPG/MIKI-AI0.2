@@ -1,0 +1,61 @@
+MIKI-AI Conversation Recursive Audit Phase 86
+
+Scope
+- Recursively inspected TypeScript/TSX imports around conversation, dialogue, semantic, claim, anaphora, persona, surface generation, Japanese analysis, memory bridge and unknown research.
+- 864 source files indexed.
+- 80 directly conversation-adjacent files identified.
+- 29 canonical conversation seeds identified.
+- Bidirectional dependency closure reached 851 files, confirming that conversation behavior depends on almost the entire application rather than only src/miki/conversation.
+
+Confirmed architecture
+1. Input analysis
+   - Japanese morphology/dictionary composition
+   - conversation component pipeline
+   - dialogue act and conversation state
+   - legacy anaphora history/resolver
+   - Phase 85 typed discourse model
+2. Meaning and planning
+   - semantic frame V2
+   - causal/solution hypotheses
+   - clarification gate
+   - semantic execution plan
+   - taskboard and memory context bridge
+3. Knowledge and truth
+   - Claim database
+   - Evidence and claim attachment
+   - Verification events
+   - Claim maturity and relations
+   - Unknown/research scheduling
+4. Answer generation
+   - AnswerContentIR
+   - autonomous composition plan
+   - runtime candidate generation and selection
+   - grammar/style and surface diversity
+   - meaning-preservation checks
+5. Learning and repair
+   - conversation feedback evidence
+   - learning episode
+   - live repair
+   - unified learning continuum
+
+Problems found and handled
+- The category entry src/miki/conversation.ts was still a TODO-only receiver. It now declares the canonical high-level conversation pipeline.
+- typedDiscourseModelService was connected internally but not exported by the category facade. It is now exported from both conversation facades.
+- Two different ClaimDatabaseService implementations existed and legacy services imported the older src/services copy. This could create divergent in-memory Claim maps even though both used the same storage key. The legacy path is now a compatibility re-export of the canonical miki/memory authority. Runtime identity E2E confirmed both imports return the same singleton.
+- formalSemanticsKernelService already uses the correct compatibility re-export pattern; no parallel authority remained there.
+- semanticContextBudgetService is implemented and behaves correctly but has no direct production importer. It remains a confirmed unconnected capability.
+- Existing anaphora modules are connected through conversationStateService. They are not orphaned.
+- The old conversation-learning regression conflicts with the later safety rule that repeated USER_CLAIM affirmation is not independent evidence. The runtime safety rule is retained.
+
+Verification
+- Phase 85 conversation meaning: PASS
+- Phase 86 recursive runtime checks: PASS
+- Semantic phases 61, 62 and 67: PASS
+- TypeScript: PASS
+- Relative imports: PASS
+- Production and server build: PASS
+
+Residual limits
+- Android-native conversation and Japanese morphology still require Galaxy S25 device E2E.
+- semanticContextBudgetService still needs a chosen production consumer before it is considered connected.
+- General human-level conversation is not certified. The architecture is broad, but corpus-level pragmatic and long-context accuracy remains unproven.

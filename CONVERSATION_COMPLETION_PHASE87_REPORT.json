@@ -1,0 +1,188 @@
+{
+  "phase": "CONVERSATION_COMPLETION_87",
+  "passed": true,
+  "checks": [
+    {
+      "name": "LONG_CONTEXT_COMPRESSION_RESTORE",
+      "passed": true,
+      "detail": {
+        "original": 80,
+        "retained": 24,
+        "summary": "話題23:ACTIVE / 話題22:ACTIVE / 話題21:ACTIVE / 話題19:ACTIVE / 話題18:ACTIVE / 話題17:ACTIVE / 話題8:ACTIVE / 話題7:ACTIVE / 話題6:ACTIVE / 話題5:ACTIVE / 既存機能:ACTIVE / 話題4:ACTIVE / 話題3:ACTIVE / 話題2:ACTIVE / 候補A:ACTIVE / 話題1:ACTIVE / 話題16:ACTIVE / 話題15:ACTIVE / 話題14:ACTIVE / 話題13:ACTIVE",
+        "constraints": [
+          "既存機能は消さない"
+        ]
+      }
+    },
+    {
+      "name": "CONTEXT_INTEGRITY",
+      "passed": true,
+      "detail": {}
+    },
+    {
+      "name": "TOPIC_RETURN_RESELECTION",
+      "passed": true,
+      "detail": {
+        "selected": {
+          "id": "t21:候補A",
+          "label": "候補A",
+          "kind": "CANDIDATE",
+          "turnId": "t21",
+          "salience": 0.30000000000000004,
+          "status": "ACTIVE",
+          "sourceText": "候補Aを実装して検証する"
+        },
+        "ambiguous": false,
+        "candidates": [
+          {
+            "id": "t21:候補A",
+            "label": "候補A",
+            "kind": "CANDIDATE",
+            "turnId": "t21",
+            "salience": 0.30000000000000004,
+            "status": "ACTIVE",
+            "sourceText": "候補Aを実装して検証する"
+          }
+        ],
+        "reason": "EXPLICIT_MENTION"
+      }
+    },
+    {
+      "name": "AMBIGUITY_TIE",
+      "passed": true,
+      "detail": {
+        "ambiguous": true,
+        "candidates": [
+          {
+            "id": "a:候補Y",
+            "label": "候補Y",
+            "kind": "CANDIDATE",
+            "turnId": "a",
+            "salience": 1.2,
+            "status": "ACTIVE",
+            "sourceText": "候補Yを確認"
+          },
+          {
+            "id": "a:候補X",
+            "label": "候補X",
+            "kind": "CANDIDATE",
+            "turnId": "a",
+            "salience": 1.02,
+            "status": "ACTIVE",
+            "sourceText": "候補Xを確認"
+          }
+        ],
+        "reason": "SALience_TIE"
+      }
+    },
+    {
+      "name": "CLAIM_PREFERENCE_SEPARATION",
+      "passed": true,
+      "detail": {
+        "pref": {
+          "use": "USER_PREFERENCE",
+          "mayPersonalize": true,
+          "mayStateAsExternalFact": false,
+          "requiresIndependentEvidence": false
+        },
+        "fact": {
+          "use": "EXTERNAL_FACT",
+          "mayPersonalize": false,
+          "mayStateAsExternalFact": false,
+          "requiresIndependentEvidence": true
+        }
+      }
+    },
+    {
+      "name": "PRAGMATICS",
+      "passed": true,
+      "detail": [
+        {
+          "text": "これ直してもらえる？",
+          "act": "INDIRECT_REQUEST",
+          "result": {
+            "literal": "これ直してもらえる？",
+            "intendedActs": [
+              "INDIRECT_REQUEST"
+            ],
+            "confidence": 0.8,
+            "requiresClarification": false,
+            "signals": [
+              "ABILITY_AS_REQUEST"
+            ]
+          }
+        },
+        {
+          "text": "できれば短くして",
+          "act": "SOFT_REQUEST",
+          "result": {
+            "literal": "できれば短くして",
+            "intendedActs": [
+              "SOFT_REQUEST"
+            ],
+            "confidence": 0.8,
+            "requiresClarification": false,
+            "signals": [
+              "HEDGE"
+            ]
+          }
+        },
+        {
+          "text": "さすが、また失敗したね",
+          "act": "POSSIBLE_IRONY",
+          "result": {
+            "literal": "さすが、また失敗したね",
+            "intendedActs": [
+              "POSSIBLE_IRONY"
+            ],
+            "confidence": 0.45,
+            "requiresClarification": true,
+            "signals": [
+              "POSITIVE_NEGATIVE_CONTRAST"
+            ]
+          }
+        },
+        {
+          "text": "つまり採用できる？",
+          "act": "IMPLICATION",
+          "result": {
+            "literal": "つまり採用できる？",
+            "intendedActs": [
+              "INDIRECT_REQUEST",
+              "IMPLICATION"
+            ],
+            "confidence": 0.8,
+            "requiresClarification": false,
+            "signals": [
+              "ABILITY_AS_REQUEST",
+              "INFERENCE_SIGNAL"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "LONG_CONVERSATION_ERROR_RECOVERY",
+      "passed": true,
+      "detail": {
+        "length": 4,
+        "last": {
+          "turnId": "recovery:t4",
+          "text": "訂正後の対象は候補A",
+          "entities": []
+        }
+      }
+    },
+    {
+      "name": "LARGE_CORPUS_120_TURNS",
+      "passed": true,
+      "detail": {
+        "turns": 120,
+        "passed": 120,
+        "failures": []
+      }
+    }
+  ],
+  "deviceStatus": "NOT_DEVICE_VERIFIED",
+  "deviceReason": "Galaxy S25 and Android native plugins are not available in this container"
+}

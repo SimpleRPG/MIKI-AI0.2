@@ -17,6 +17,9 @@ import { domainReplyLedgerService } from '../services/domainReplyLedgerService';
 import { persistenceReceiptLedgerService } from '../services/persistenceReceiptLedgerService';
 import type { AutopilotConfig } from '../../autonomy/services/autonomousContinuousEvolutionService';
 import { naturalLanguageToReviewPackageService } from '../../selfDevelopment/services/naturalLanguageToReviewPackageService';
+import { developmentReviewLifecycleService } from '../../selfDevelopment/services/developmentReviewLifecycleService';
+import { evaluationPackageDownloadService } from '../../selfDevelopment/services/evaluationPackageDownloadService';
+import { mikiSelfCodingSuperchargerService } from '../../selfDevelopment/services/mikiSelfCodingSuperchargerService';
 
 export type { AutonomousLoopState, AutonomousImprovementRequest } from '../services/autonomousSelfImprovementLoopService';
 export type { ImprovementRun } from '../../improvement/services/selfImprovementControllerService';
@@ -92,6 +95,30 @@ class TypedImprovementUiGatewayService {
   getWorkspaces() { return isolatedCandidateWorkspaceService.list(); }
   getValidationEvidence() { return candidateValidationEvidenceService.list(); }
   getCoreResults(limit = 50) { return coreResultService.list(limit); }
+
+  getDevelopmentReviewRequests() { return developmentReviewLifecycleService.list(); }
+  getDevelopmentReviewPackages() { return developmentReviewLifecycleService.packages(); }
+  async startDevelopmentReview(text:string, targetPaths:string[] = []) {
+    const normalized=text.trim();
+    if(!normalized)throw new Error('DEVELOPMENT_INSTRUCTION_REQUIRED');
+    return developmentReviewLifecycleService.start(developmentReviewLifecycleService.create(normalized,targetPaths));
+  }
+  async decideDevelopmentReview(instructionId:string, decision:'ACCEPT'|'REJECT'|'REQUEST_CHANGES', reason:string) {
+    return developmentReviewLifecycleService.decide({ instructionId, decision, reason });
+  }
+  downloadDevelopmentEvaluationPackage(packageId:string, revision:number) {
+    return evaluationPackageDownloadService.download(packageId,revision);
+  }
+
+  runCouncilReview(code:string,fileName:string,chapter:number){return mikiSelfCodingSuperchargerService.runCouncilReview(code,fileName,chapter);}
+  generateAndRunUnitTests(code:string,specification:string,chapter:number){return mikiSelfCodingSuperchargerService.generateAndRunUnitTests(code,specification,chapter);}
+  fetchImprovementLessons(filter?:string){return mikiSelfCodingSuperchargerService.fetchLessons(filter);}
+  recordImprovementLesson(input:Parameters<typeof mikiSelfCodingSuperchargerService.recordLesson>[0]){return mikiSelfCodingSuperchargerService.recordLesson(input);}
+  scanImprovementDeadCode(){return mikiSelfCodingSuperchargerService.scanDeadCode();}
+  generateImprovementPromptToPatch(prompt:string){return mikiSelfCodingSuperchargerService.generatePromptToPatch(prompt);}
+  fetchImprovementSnapshots(){return mikiSelfCodingSuperchargerService.fetchSnapshots();}
+  fetchImprovementGapRecommendations(){return mikiSelfCodingSuperchargerService.fetchGapRecommendations();}
+  rollbackImprovementSnapshot(snapshotId:string){return mikiSelfCodingSuperchargerService.rollbackSnapshot(snapshotId);}
 
   getTaskTitle(taskId:string):string|undefined{
     return taskBlackboardService.get(taskId)?.title;

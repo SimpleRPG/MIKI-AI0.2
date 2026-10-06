@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "phase": "CORE_AUTHORITY_CONSOLIDATION_64",
+  "coreOwnsImprovementDecision": true,
+  "parallelAuthorities": 0,
+  "repairHardLimit": true,
+  "priorityOwnedByCoreIntake": true,
+  "failures": []
+}

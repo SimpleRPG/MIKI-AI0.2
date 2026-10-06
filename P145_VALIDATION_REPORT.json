@@ -1,0 +1,56 @@
+{
+  "phase": "OBSERVATION_SCOPE_AND_DIRECT_PERCEPTUAL_P145",
+  "passed": true,
+  "checks": {
+    "scopeSha": true,
+    "unobservedTracked": true,
+    "observedOnly": true,
+    "directPixelsCompared": true,
+    "metricSha": true,
+    "metricBounded": true,
+    "truthLimits": true
+  },
+  "scope": {
+    "scope": "UPPER_BODY",
+    "observedRegions": [
+      "head",
+      "face",
+      "hair",
+      "torso",
+      "garment",
+      "upper-arms"
+    ],
+    "unobservedRegions": [
+      "arms",
+      "hands",
+      "legs",
+      "feet"
+    ],
+    "generationMode": "OBSERVED_ONLY",
+    "confidence": 1,
+    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3",
+    "reportSha256": "7e9e5bee2c09d127df39fd849173542a17a87d48e4aaf58798730bdf1b938cec"
+  },
+  "comparison": {
+    "colorHistogramSimilarity": 0.2939358808418947,
+    "luminanceSimilarity": 0.9708760137641086,
+    "edgeDensitySimilarity": 0.8517204892505688,
+    "spatialColorSimilarity": 0.7318663108497665,
+    "coverageAdjustedScore": 0.6603094729647168,
+    "inputSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3",
+    "generatedSha256": "42ffd82261fd6b6c7289c9fe78f46ca27d30aeadd5a7e7b37adefda26761bc6c",
+    "metricVersion": "P145_RULE_BASED_V1",
+    "limitations": [
+      "Not face recognition",
+      "Not identity verification",
+      "Not a learned perceptual metric",
+      "Different framing lowers comparability"
+    ],
+    "reportSha256": "80f0f8e83b85adfdb890a08f6addbdcbffaf9c94b572174873f171ef882d5ea1"
+  },
+  "interpretation": {
+    "inputScope": "UPPER_BODY",
+    "perceptualScore": 0.6603094729647168,
+    "warning": "This score compares coarse visual statistics. It is not identity, face recognition, or proof that the generated person resembles the photographed person."
+  }
+}

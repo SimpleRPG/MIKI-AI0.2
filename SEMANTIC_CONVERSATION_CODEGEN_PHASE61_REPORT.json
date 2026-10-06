@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "phase": "SEMANTIC_CONVERSATION_CODEGEN_LINKAGE_61",
+  "typescriptFilesScanned": 631,
+  "conversationSemanticLink": true,
+  "continuationTaskLink": true,
+  "codegenSemanticGate": true,
+  "exactDuplicateGroups": 0,
+  "failures": []
+}

@@ -1,0 +1,28 @@
+{
+  "phase": "REALISTIC_PERSON_SURFACE_P142",
+  "passed": true,
+  "checks": {
+    "realPng": true,
+    "largeOutput": true,
+    "layers": true,
+    "receipt": true,
+    "modelLinked": true
+  },
+  "pngSha256": "e7a7cde3262141664bd450a050849480d96afe826eb9898c31623f6308898a79",
+  "receiptSha256": "572b0eb19840f5b86428906cc5afb5a6f30057b12d57a07f3fc1220aa5b43d03",
+  "surfaceLayers": [
+    "contact-shadow",
+    "back-hair",
+    "rear-body",
+    "garment-back",
+    "torso-surface",
+    "garment-front",
+    "arms-hands",
+    "face-surface",
+    "front-hair",
+    "facial-features",
+    "material-light",
+    "selective-contour"
+  ],
+  "truth": "This is a strengthened rule-based illustration renderer, not photorealistic neural rendering."
+}

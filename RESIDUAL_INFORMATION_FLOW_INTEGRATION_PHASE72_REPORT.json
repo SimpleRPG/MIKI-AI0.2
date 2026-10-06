@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "phase": "RESIDUAL_INFORMATION_FLOW_INTEGRATION_72",
+  "memoryRepositoryConnected": true,
+  "storageAuthorityConnected": true,
+  "workspaceRevisionConnected": true,
+  "postPromotionStabilityConnected": true,
+  "typescriptLazyConnected": true,
+  "vbaDesignExplicitConnected": true,
+  "servicesScanned": 332,
+  "remainingSingleReferenceServices": 0,
+  "remaining": [],
+  "failures": []
+}

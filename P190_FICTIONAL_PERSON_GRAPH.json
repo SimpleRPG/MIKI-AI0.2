@@ -1,0 +1,452 @@
+{
+  "nodes": [
+    {
+      "nodeId": "P190N-2dbac47ee7e05d3291b71f60",
+      "kind": "FICTIONAL_PERSON_OBSERVATION",
+      "subjectId": "fictional-seat-01",
+      "payload": {
+        "subjectId": "fictional-seat-01",
+        "sourceSha256": "d2dc16a8551a60338c90b8075773c475e6a0c621c62d0939a793f2bc80ffb3ca",
+        "foregroundRatio": 0.3409288045399856,
+        "bboxNorm": [
+          0,
+          0,
+          0.9130781499202552,
+          0.9992025518341308
+        ],
+        "seatBandOccupancy": 0.5100409586333698,
+        "floorContactOccupancy": 0.4468223424173081,
+        "leftRightBalance": 0.3746607347715381,
+        "luminanceMean": 0.5111556459076727,
+        "synthetic": true
+      },
+      "sourceRefs": [
+        "d2dc16a8551a60338c90b8075773c475e6a0c621c62d0939a793f2bc80ffb3ca"
+      ],
+      "confidence": 0.82,
+      "uncertainty": 0.18,
+      "nodeSha256": "2dbac47ee7e05d3291b71f60769952d5497ade4b32a291949639e78cde68a8fc"
+    },
+    {
+      "nodeId": "P190N-e80a6b2ff295b14683b42aeb",
+      "kind": "FICTIONAL_PERSON_OBSERVATION",
+      "subjectId": "fictional-seat-02",
+      "payload": {
+        "subjectId": "fictional-seat-02",
+        "sourceSha256": "2df136a7ddf6cb8066191843784e6b1bd082ea9f8a3583615ef810b02c288587",
+        "foregroundRatio": 0.19845712221688047,
+        "bboxNorm": [
+          0.0861244019138756,
+          0.018341307814992026,
+          0.9952153110047847,
+          1
+        ],
+        "seatBandOccupancy": 0.3470383146025741,
+        "floorContactOccupancy": 0.13760314818667221,
+        "leftRightBalance": 0.017008411997079836,
+        "luminanceMean": 0.4412783580455812,
+        "synthetic": true
+      },
+      "sourceRefs": [
+        "2df136a7ddf6cb8066191843784e6b1bd082ea9f8a3583615ef810b02c288587"
+      ],
+      "confidence": 0.82,
+      "uncertainty": 0.18,
+      "nodeSha256": "e80a6b2ff295b14683b42aebd773d0af950128b0f4280681ed5e5aa27ee5c56f"
+    },
+    {
+      "nodeId": "P190N-78050bcd9fb10599b447300f",
+      "kind": "FICTIONAL_PERSON_OBSERVATION",
+      "subjectId": "fictional-seat-03",
+      "payload": {
+        "subjectId": "fictional-seat-03",
+        "sourceSha256": "b07b18ca356d1836ab07d02daad80b518e36b5a5f88ea8a52f9713a6d55df8fd",
+        "foregroundRatio": 0.42320014549931445,
+        "bboxNorm": [
+          0,
+          0.007974481658692184,
+          1,
+          1
+        ],
+        "seatBandOccupancy": 0.6417894630868927,
+        "floorContactOccupancy": 0.5212768416429744,
+        "leftRightBalance": -0.22974774183537716,
+        "luminanceMean": 0.4402677133077151,
+        "synthetic": true
+      },
+      "sourceRefs": [
+        "b07b18ca356d1836ab07d02daad80b518e36b5a5f88ea8a52f9713a6d55df8fd"
+      ],
+      "confidence": 0.82,
+      "uncertainty": 0.18,
+      "nodeSha256": "78050bcd9fb10599b447300f93e2fd83adce17f93d387198b6f89e41d68b2abc"
+    },
+    {
+      "nodeId": "P190N-704c6e5ea2015e84d3d16eff",
+      "kind": "FICTIONAL_PERSON_OBSERVATION",
+      "subjectId": "fictional-seat-04",
+      "payload": {
+        "subjectId": "fictional-seat-04",
+        "sourceSha256": "7ee27dd9d11d989d86afbec40b063410e252c26b03734f15321af4c1156b2af5",
+        "foregroundRatio": 0.3764705732723864,
+        "bboxNorm": [
+          0,
+          0.005582137161084529,
+          1,
+          1
+        ],
+        "seatBandOccupancy": 0.47935642488886065,
+        "floorContactOccupancy": 0.5288930494880152,
+        "leftRightBalance": 0.14211111365480544,
+        "luminanceMean": 0.5226740216530661,
+        "synthetic": true
+      },
+      "sourceRefs": [
+        "7ee27dd9d11d989d86afbec40b063410e252c26b03734f15321af4c1156b2af5"
+      ],
+      "confidence": 0.82,
+      "uncertainty": 0.18,
+      "nodeSha256": "704c6e5ea2015e84d3d16eff51da8b277e6c5858f5806be625e3dab2b78c9f53"
+    },
+    {
+      "nodeId": "P190N-2823eec85bcaa3e7d1e3828a",
+      "kind": "FICTIONAL_PERSON_OBSERVATION",
+      "subjectId": "fictional-seat-05",
+      "payload": {
+        "subjectId": "fictional-seat-05",
+        "sourceSha256": "7ae66fdb26510eccdf970517ee9b8f92abf7eb8c623593bebb38bb7b0dd26193",
+        "foregroundRatio": 0.3912125536401537,
+        "bboxNorm": [
+          0,
+          0.008771929824561403,
+          1,
+          1
+        ],
+        "seatBandOccupancy": 0.5988305859786888,
+        "floorContactOccupancy": 0.509011742135312,
+        "leftRightBalance": 0.014493970172640536,
+        "luminanceMean": 0.4417668634671261,
+        "synthetic": true
+      },
+      "sourceRefs": [
+        "7ae66fdb26510eccdf970517ee9b8f92abf7eb8c623593bebb38bb7b0dd26193"
+      ],
+      "confidence": 0.82,
+      "uncertainty": 0.18,
+      "nodeSha256": "2823eec85bcaa3e7d1e3828a611cc5d5c8218f7a46a5adda4baec4360aabb761"
+    },
+    {
+      "nodeId": "P190N-a32a59b5ede4572a51d71e4d",
+      "kind": "FICTIONAL_PERSON_OBSERVATION",
+      "subjectId": "fictional-seat-06",
+      "payload": {
+        "subjectId": "fictional-seat-06",
+        "sourceSha256": "d932ffabdd70982cd84a731384f0a12ecf06effb28260d10be260b6049e3deff",
+        "foregroundRatio": 0.4256554464310697,
+        "bboxNorm": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "seatBandOccupancy": 0.386269585167994,
+        "floorContactOccupancy": 0.6122668330906317,
+        "leftRightBalance": -0.11253557992414703,
+        "luminanceMean": 0.5108656832718896,
+        "synthetic": true
+      },
+      "sourceRefs": [
+        "d932ffabdd70982cd84a731384f0a12ecf06effb28260d10be260b6049e3deff"
+      ],
+      "confidence": 0.82,
+      "uncertainty": 0.18,
+      "nodeSha256": "a32a59b5ede4572a51d71e4d11b39bb1a0f172a1edac076571e6ef354901b782"
+    },
+    {
+      "nodeId": "P190N-dbc6a53bad0a77006ac49baa",
+      "kind": "FICTIONAL_PERSON_OBSERVATION",
+      "subjectId": "fictional-seat-07",
+      "payload": {
+        "subjectId": "fictional-seat-07",
+        "sourceSha256": "2e12b5714377b6ad7e21624e1818904fa22860f99d887c44584164ac1e8fdb1b",
+        "foregroundRatio": 0.41364793744546957,
+        "bboxNorm": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "seatBandOccupancy": 0.3478172174622603,
+        "floorContactOccupancy": 0.5693519866860828,
+        "leftRightBalance": -0.016597605366177548,
+        "luminanceMean": 0.4437072899267176,
+        "synthetic": true
+      },
+      "sourceRefs": [
+        "2e12b5714377b6ad7e21624e1818904fa22860f99d887c44584164ac1e8fdb1b"
+      ],
+      "confidence": 0.82,
+      "uncertainty": 0.18,
+      "nodeSha256": "dbc6a53bad0a77006ac49baa27b7e4e18e978067d85b358b2385d89c64082dd0"
+    },
+    {
+      "nodeId": "P190N-36a5871be688cbf491038e28",
+      "kind": "FICTIONAL_PERSON_OBSERVATION",
+      "subjectId": "fictional-seat-08",
+      "payload": {
+        "subjectId": "fictional-seat-08",
+        "sourceSha256": "a7e1676e3b10a99f15bea40c0d526b29bacda6697c359e9617e6f1f05e965755",
+        "foregroundRatio": 0.3361918098130639,
+        "bboxNorm": [
+          0,
+          0.003987240829346092,
+          0.8732057416267942,
+          0.9952153110047847
+        ],
+        "seatBandOccupancy": 0.533058332935934,
+        "floorContactOccupancy": 0.46528211173520095,
+        "leftRightBalance": 0.210593723688662,
+        "luminanceMean": 0.5860585182975492,
+        "synthetic": true
+      },
+      "sourceRefs": [
+        "a7e1676e3b10a99f15bea40c0d526b29bacda6697c359e9617e6f1f05e965755"
+      ],
+      "confidence": 0.82,
+      "uncertainty": 0.18,
+      "nodeSha256": "36a5871be688cbf491038e288555221c33b86881fab128ed70f95e9fca36308a"
+    },
+    {
+      "nodeId": "P190N-2da6cc0e62ce284d972bb68f",
+      "kind": "FICTIONAL_PERSON_OBSERVATION",
+      "subjectId": "fictional-seat-09",
+      "payload": {
+        "subjectId": "fictional-seat-09",
+        "sourceSha256": "a07ed39a61be1e119b2e293fb87f21c275bb9e063034f9cab4d8b64c2e7d9f38",
+        "foregroundRatio": 0.5263043428492937,
+        "bboxNorm": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "seatBandOccupancy": 0.4465603755689435,
+        "floorContactOccupancy": 0.7820886207613896,
+        "leftRightBalance": 0.03789341412106462,
+        "luminanceMean": 0.5238978063980871,
+        "synthetic": true
+      },
+      "sourceRefs": [
+        "a07ed39a61be1e119b2e293fb87f21c275bb9e063034f9cab4d8b64c2e7d9f38"
+      ],
+      "confidence": 0.82,
+      "uncertainty": 0.18,
+      "nodeSha256": "2da6cc0e62ce284d972bb68f65a108af68465a00937c854c31dac798a54fc28f"
+    },
+    {
+      "nodeId": "P190N-7bd0d6170beca203047a75fa",
+      "kind": "FICTIONAL_PERSON_OBSERVATION",
+      "subjectId": "fictional-seat-10",
+      "payload": {
+        "subjectId": "fictional-seat-10",
+        "sourceSha256": "838c4ee117b31d0265e9e5d9a18afda0290de30c15cab0ef422df7aec75f0746",
+        "foregroundRatio": 0.4538319482917821,
+        "bboxNorm": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "seatBandOccupancy": 0.5904984448436101,
+        "floorContactOccupancy": 0.5595716894343896,
+        "leftRightBalance": -0.21296063124317977,
+        "luminanceMean": 0.4214978515276088,
+        "synthetic": true
+      },
+      "sourceRefs": [
+        "838c4ee117b31d0265e9e5d9a18afda0290de30c15cab0ef422df7aec75f0746"
+      ],
+      "confidence": 0.82,
+      "uncertainty": 0.18,
+      "nodeSha256": "7bd0d6170beca203047a75fafb5f46581d1dd61dd3cf326ed08a7e1c6caceb09"
+    },
+    {
+      "nodeId": "P190N-96b46ff176478964e1b9fff3",
+      "kind": "SEATED_STRUCTURE_PRIOR",
+      "subjectId": "GENERAL:SEATED_STRUCTURE",
+      "payload": {
+        "sampleCount": 10,
+        "summary": {
+          "foregroundRatio": {
+            "mean": 0.38859006839994,
+            "stdDev": 0.08230600898862066,
+            "min": 0.19845712221688047,
+            "max": 0.5263043428492937
+          },
+          "seatBandOccupancy": {
+            "mean": 0.48812597031691285,
+            "stdDev": 0.10030896665563645,
+            "min": 0.3470383146025741,
+            "max": 0.6417894630868927
+          },
+          "floorContactOccupancy": {
+            "mean": 0.5132168365577976,
+            "stdDev": 0.1534675422881894,
+            "min": 0.13760314818667221,
+            "max": 0.7820886207613896
+          },
+          "leftRightBalance": {
+            "mean": 0.02249198100369091,
+            "stdDev": 0.17688084233194756,
+            "min": -0.22974774183537716,
+            "max": 0.3746607347715381
+          },
+          "luminanceMean": {
+            "mean": 0.4843169751803014,
+            "stdDev": 0.05100289779385865,
+            "min": 0.4214978515276088,
+            "max": 0.5860585182975492
+          }
+        },
+        "usage": "STRUCTURE_ONLY",
+        "forbiddenTransfer": [
+          "source_pixels",
+          "individual_face_texture",
+          "individual_clothing_texture"
+        ]
+      },
+      "sourceRefs": [
+        "d2dc16a8551a60338c90b8075773c475e6a0c621c62d0939a793f2bc80ffb3ca",
+        "2df136a7ddf6cb8066191843784e6b1bd082ea9f8a3583615ef810b02c288587",
+        "b07b18ca356d1836ab07d02daad80b518e36b5a5f88ea8a52f9713a6d55df8fd",
+        "7ee27dd9d11d989d86afbec40b063410e252c26b03734f15321af4c1156b2af5",
+        "7ae66fdb26510eccdf970517ee9b8f92abf7eb8c623593bebb38bb7b0dd26193",
+        "d932ffabdd70982cd84a731384f0a12ecf06effb28260d10be260b6049e3deff",
+        "2e12b5714377b6ad7e21624e1818904fa22860f99d887c44584164ac1e8fdb1b",
+        "a7e1676e3b10a99f15bea40c0d526b29bacda6697c359e9617e6f1f05e965755",
+        "a07ed39a61be1e119b2e293fb87f21c275bb9e063034f9cab4d8b64c2e7d9f38",
+        "838c4ee117b31d0265e9e5d9a18afda0290de30c15cab0ef422df7aec75f0746"
+      ],
+      "confidence": 0.84,
+      "uncertainty": 0.16,
+      "nodeSha256": "96b46ff176478964e1b9fff3d603d0cbdef3986301089ca072a70eb156dcae91"
+    },
+    {
+      "nodeId": "P190N-9f1a1bffd14a6040b1ad80cd",
+      "kind": "FICTIONAL_CHARACTER_PROFILE",
+      "subjectId": "FICTIONAL-SEATED-001",
+      "payload": {
+        "characterId": "FICTIONAL-SEATED-001",
+        "origin": "CREATIVE_SYNTHESIS",
+        "seatedStructure": {
+          "foregroundRatio": 0.373046,
+          "seatBandOccupancy": 0.50277,
+          "floorContactOccupancy": 0.467027,
+          "leftRightBalance": -0.017319
+        },
+        "novelty": {
+          "usesNoSourcePixels": true,
+          "noSingleObservationDominates": true,
+          "structureOnly": true
+        }
+      },
+      "sourceRefs": [
+        "96b46ff176478964e1b9fff3d603d0cbdef3986301089ca072a70eb156dcae91"
+      ],
+      "confidence": 0.78,
+      "uncertainty": 0.22,
+      "nodeSha256": "9f1a1bffd14a6040b1ad80cd9038ca07f739768ffed2a59185abe1b748b97180"
+    }
+  ],
+  "edges": [
+    {
+      "edgeId": "P190E-71de2993231588b4d63bed47",
+      "from": "P190N-2dbac47ee7e05d3291b71f60",
+      "to": "P190N-96b46ff176478964e1b9fff3",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.82,
+      "edgeSha256": "71de2993231588b4d63bed47285c2999f4ca0fad13d2374a3623c86523bfd374"
+    },
+    {
+      "edgeId": "P190E-6c4f44a8c0c572a029b7f599",
+      "from": "P190N-e80a6b2ff295b14683b42aeb",
+      "to": "P190N-96b46ff176478964e1b9fff3",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.82,
+      "edgeSha256": "6c4f44a8c0c572a029b7f599c97c94b67a21469f1d27099089968bce04f56c48"
+    },
+    {
+      "edgeId": "P190E-61c64e6bb0c3b2e3186aa4e2",
+      "from": "P190N-78050bcd9fb10599b447300f",
+      "to": "P190N-96b46ff176478964e1b9fff3",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.82,
+      "edgeSha256": "61c64e6bb0c3b2e3186aa4e255ac0cd6e5f664aed82039b5de3fcf8014c8d544"
+    },
+    {
+      "edgeId": "P190E-4d3238bdd8dafe294a9481ee",
+      "from": "P190N-704c6e5ea2015e84d3d16eff",
+      "to": "P190N-96b46ff176478964e1b9fff3",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.82,
+      "edgeSha256": "4d3238bdd8dafe294a9481eeccdebeba02a814a11635eaa5c6047c1c62db6ab2"
+    },
+    {
+      "edgeId": "P190E-052d7e0866dbc813a391e7fc",
+      "from": "P190N-2823eec85bcaa3e7d1e3828a",
+      "to": "P190N-96b46ff176478964e1b9fff3",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.82,
+      "edgeSha256": "052d7e0866dbc813a391e7fcc71353ce34d11a282d550cb5b023314603c9d6b3"
+    },
+    {
+      "edgeId": "P190E-905cba606cfe8bb3e630403e",
+      "from": "P190N-a32a59b5ede4572a51d71e4d",
+      "to": "P190N-96b46ff176478964e1b9fff3",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.82,
+      "edgeSha256": "905cba606cfe8bb3e630403e46f80e43ab2c83ceeb7e9d289525f317b34d09b4"
+    },
+    {
+      "edgeId": "P190E-d8a94e4d5b7e204ed2c5a671",
+      "from": "P190N-dbc6a53bad0a77006ac49baa",
+      "to": "P190N-96b46ff176478964e1b9fff3",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.82,
+      "edgeSha256": "d8a94e4d5b7e204ed2c5a671397fa6f242a12d179feadec45d7eae01c7d8962f"
+    },
+    {
+      "edgeId": "P190E-8047f9cb358e56577341678a",
+      "from": "P190N-36a5871be688cbf491038e28",
+      "to": "P190N-96b46ff176478964e1b9fff3",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.82,
+      "edgeSha256": "8047f9cb358e56577341678a0a4b93e19832bf9f1c35beb53a0adb6619c29472"
+    },
+    {
+      "edgeId": "P190E-507dd3765fde991a7a988003",
+      "from": "P190N-2da6cc0e62ce284d972bb68f",
+      "to": "P190N-96b46ff176478964e1b9fff3",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.82,
+      "edgeSha256": "507dd3765fde991a7a988003aa9547db735bcf1f8b561f1d0c4a885ab2c2eb7c"
+    },
+    {
+      "edgeId": "P190E-303ae0c38c310e68d09c26f2",
+      "from": "P190N-7bd0d6170beca203047a75fa",
+      "to": "P190N-96b46ff176478964e1b9fff3",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.82,
+      "edgeSha256": "303ae0c38c310e68d09c26f24917cf0a82a7d0c2a1e005c13374f2bbb4e255c3"
+    },
+    {
+      "edgeId": "P190E-54a1177911711375931f465a",
+      "from": "P190N-96b46ff176478964e1b9fff3",
+      "to": "P190N-9f1a1bffd14a6040b1ad80cd",
+      "type": "SUPPORTS_CHARACTER",
+      "confidence": 0.78,
+      "edgeSha256": "54a1177911711375931f465a5e015525f3255f6c6db0d7ad6304850888651595"
+    }
+  ],
+  "graphSha256": "381504c78eca1dc4fc2733590701939dff9db73afc10826600e15e401e891808"
+}

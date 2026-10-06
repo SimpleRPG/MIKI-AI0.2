@@ -1,0 +1,109 @@
+{
+  "phase": "HEAD_POSE_OCCLUSION_P149",
+  "passed": true,
+  "checks": {
+    "sha": true,
+    "bounded": true,
+    "visibility": true,
+    "policies": true,
+    "yawChanges": true,
+    "asymmetry": true
+  },
+  "pose": {
+    "yaw": 26.464285714285715,
+    "pitch": 10.58032786885244,
+    "roll": -8.130102354155978,
+    "visibility": {
+      "leftEye": 0.5335714285714286,
+      "rightEye": 0.85,
+      "nose": 0.52,
+      "mouth": 0.48,
+      "leftCheek": 0.4446428571428571,
+      "rightCheek": 0.92
+    },
+    "occluders": [],
+    "renderPolicy": {
+      "projectedFace": true,
+      "asymmetricFeatures": true,
+      "hideLowVisibility": true,
+      "depthOcclusion": true
+    },
+    "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+    "poseSha256": "058bdaa8ae73f66c39f93e542530b6bdd8b3fed0f16d329f56787c14bd558dfd"
+  },
+  "variants": [
+    {
+      "yaw": -21.07857142857142,
+      "pitch": 10.58032786885244,
+      "roll": -8.130102354155978,
+      "visibility": {
+        "leftEye": 0.9,
+        "rightEye": 0.574357142857143,
+        "nose": 0.52,
+        "mouth": 0.48,
+        "leftCheek": 0.92,
+        "rightCheek": 0.5067857142857144
+      },
+      "occluders": [],
+      "renderPolicy": {
+        "projectedFace": true,
+        "asymmetricFeatures": true,
+        "hideLowVisibility": true,
+        "depthOcclusion": true
+      },
+      "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+      "poseSha256": "de5c37f1d1a0132c16ab9c3d3ada3c82da432b42ea444b8f70e3b5f99ed2329c"
+    },
+    {
+      "yaw": 0,
+      "pitch": 10.58032786885244,
+      "roll": -8.130102354155978,
+      "visibility": {
+        "leftEye": 0.9,
+        "rightEye": 0.85,
+        "nose": 0.52,
+        "mouth": 0.48,
+        "leftCheek": 0.75,
+        "rightCheek": 0.92
+      },
+      "occluders": [],
+      "renderPolicy": {
+        "projectedFace": true,
+        "asymmetricFeatures": true,
+        "hideLowVisibility": true,
+        "depthOcclusion": true
+      },
+      "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+      "poseSha256": "4597fde26d3a240118c91276388ebda68d84b0b160366479b2ce62f80ea25017"
+    },
+    {
+      "yaw": 55,
+      "pitch": 10.58032786885244,
+      "roll": -8.130102354155978,
+      "visibility": {
+        "leftEye": 0.13846153846153847,
+        "rightEye": 0.85,
+        "nose": 0.52,
+        "mouth": 0.48,
+        "leftCheek": 0.11538461538461539,
+        "rightCheek": 0.92
+      },
+      "occluders": [
+        {
+          "side": "LEFT",
+          "strength": 0.8615384615384616,
+          "kind": "OBJECT_OR_HAND"
+        }
+      ],
+      "renderPolicy": {
+        "projectedFace": true,
+        "asymmetricFeatures": true,
+        "hideLowVisibility": true,
+        "depthOcclusion": true
+      },
+      "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+      "poseSha256": "23964de555366fdcbfcf9b8162deab79c74172c9259aedf8a596eb0b43448a4d"
+    }
+  ],
+  "truthBoundary": "Pose and visibility are rule-based projections from detected landmarks. Hidden features are suppressed rather than mirrored. This is not 3D face reconstruction."
+}

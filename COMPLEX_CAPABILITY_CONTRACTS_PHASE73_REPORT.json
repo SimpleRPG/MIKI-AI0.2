@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "phase": "COMPLEX_CAPABILITY_CONTRACTS_73",
+  "contracts": 26,
+  "remoteApprovalFailClosed": true,
+  "workspaceAndShaGates": true,
+  "informationFlowToCore": true,
+  "rollbackDeclared": true,
+  "invalidationDeclared": true,
+  "failures": []
+}

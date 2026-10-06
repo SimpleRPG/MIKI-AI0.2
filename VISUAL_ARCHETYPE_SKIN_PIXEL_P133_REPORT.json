@@ -1,0 +1,54 @@
+{
+  "phase": "VISUAL_ARCHETYPE_SKIN_PIXEL_P133",
+  "passed": true,
+  "checks": {
+    "unknownOnly": true,
+    "skin": true,
+    "pixelHd": true,
+    "hardGrid": true,
+    "detail": true,
+    "sha": true
+  },
+  "archetypeBlend": {
+    "headToHeight": 0.1255,
+    "shoulderWidth": 0.247,
+    "ribcageWidth": 0.2455,
+    "ribcageDepth": 0.16,
+    "chestSurfaceWidth": 0.26,
+    "chestProjection": 0.0875,
+    "abdomenWidth": 0.22550000000000003,
+    "abdomenProjection": 0.07,
+    "waistWidth": 0.20249999999999999,
+    "pelvisWidth": 0.2505,
+    "pelvisDepth": 0.16749999999999998,
+    "upperArmWidth": 0.0673,
+    "forearmWidth": 0.0529,
+    "thighWidth": 0.1071,
+    "calfWidth": 0.072,
+    "legToHeight": 0.502,
+    "torsoToHeight": 0.311
+  },
+  "pixelPlan": {
+    "mode": "PIXEL_HD",
+    "logicalWidth": 256,
+    "logicalHeight": 256,
+    "outputWidth": 2048,
+    "outputHeight": 2048,
+    "integerScale": 8,
+    "paletteLimit": 96,
+    "edgeMode": "HARD_GRID",
+    "dither": "NONE",
+    "detailPasses": [
+      "silhouette",
+      "anatomy",
+      "material",
+      "subpixel-cluster",
+      "selective-highlight",
+      "palette-harmony"
+    ],
+    "tileSize": 64,
+    "frameConsistency": true,
+    "planSha256": "4eb42e4c304f9db192e7285737826b7d51b77ed20d7675c808ffce692a4930d7"
+  },
+  "profileSha256": "245c0f10fbb08ae6d1e48fdcf24ebfedffd334ced08e3527ca5ca52e5c128e02"
+}

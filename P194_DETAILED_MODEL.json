@@ -1,0 +1,1024 @@
+{
+  "modelId": "P192-25D-194001",
+  "width": 768,
+  "height": 1024,
+  "seed": 194001,
+  "controlPoints": [
+    {
+      "id": "head",
+      "x": 0.49608131940476596,
+      "y": 0.20999280835385437,
+      "depth": 0.35,
+      "radius": 0.085
+    },
+    {
+      "id": "neck",
+      "x": 0.49608131940476596,
+      "y": 0.29,
+      "depth": 0.4,
+      "radius": 0.035
+    },
+    {
+      "id": "shoulderL",
+      "x": 0.36608131940476596,
+      "y": 0.34,
+      "depth": 0.46,
+      "radius": 0.045
+    },
+    {
+      "id": "shoulderR",
+      "x": 0.626081319404766,
+      "y": 0.34,
+      "depth": 0.46,
+      "radius": 0.045
+    },
+    {
+      "id": "elbowL",
+      "x": 0.31608131940476597,
+      "y": 0.48,
+      "depth": 0.56,
+      "radius": 0.04
+    },
+    {
+      "id": "elbowR",
+      "x": 0.6760813194047659,
+      "y": 0.48,
+      "depth": 0.56,
+      "radius": 0.04
+    },
+    {
+      "id": "handL",
+      "x": 0.41608131940476595,
+      "y": 0.58,
+      "depth": 0.72,
+      "radius": 0.038
+    },
+    {
+      "id": "handR",
+      "x": 0.5760813194047659,
+      "y": 0.58,
+      "depth": 0.72,
+      "radius": 0.038
+    },
+    {
+      "id": "pelvis",
+      "x": 0.49608131940476596,
+      "y": 0.56,
+      "depth": 0.52,
+      "radius": 0.1
+    },
+    {
+      "id": "kneeL",
+      "x": 0.396081319404766,
+      "y": 0.73,
+      "depth": 0.63,
+      "radius": 0.055
+    },
+    {
+      "id": "kneeR",
+      "x": 0.5960813194047659,
+      "y": 0.73,
+      "depth": 0.61,
+      "radius": 0.055
+    },
+    {
+      "id": "footL",
+      "x": 0.386081319404766,
+      "y": 0.91,
+      "depth": 0.68,
+      "radius": 0.065
+    },
+    {
+      "id": "footR",
+      "x": 0.606081319404766,
+      "y": 0.91,
+      "depth": 0.66,
+      "radius": 0.065
+    },
+    {
+      "id": "seatL",
+      "x": 0.276081319404766,
+      "y": 0.61,
+      "depth": 0.76,
+      "radius": 0.02
+    },
+    {
+      "id": "seatR",
+      "x": 0.7160813194047659,
+      "y": 0.61,
+      "depth": 0.76,
+      "radius": 0.02
+    },
+    {
+      "id": "backTop",
+      "x": 0.6760813194047659,
+      "y": 0.27,
+      "depth": 0.82,
+      "radius": 0.02
+    },
+    {
+      "id": "backBottom",
+      "x": 0.6760813194047659,
+      "y": 0.61,
+      "depth": 0.82,
+      "radius": 0.02
+    },
+    {
+      "id": "orbitL",
+      "x": 0.4718336427404684,
+      "y": 0.19799280835385435,
+      "depth": 0.22,
+      "radius": 0.018
+    },
+    {
+      "id": "orbitR",
+      "x": 0.5203289960690636,
+      "y": 0.19799280835385435,
+      "depth": 0.22,
+      "radius": 0.018
+    },
+    {
+      "id": "eyeballL",
+      "x": 0.47008131940476594,
+      "y": 0.19999280835385436,
+      "depth": 0.17,
+      "radius": 0.012
+    },
+    {
+      "id": "eyeballR",
+      "x": 0.522081319404766,
+      "y": 0.19999280835385436,
+      "depth": 0.17,
+      "radius": 0.012
+    },
+    {
+      "id": "upperLidL",
+      "x": 0.47008131940476594,
+      "y": 0.19499280835385435,
+      "depth": 0.15,
+      "radius": 0.011
+    },
+    {
+      "id": "lowerLidL",
+      "x": 0.47008131940476594,
+      "y": 0.20499280835385436,
+      "depth": 0.15,
+      "radius": 0.011
+    },
+    {
+      "id": "upperLidR",
+      "x": 0.522081319404766,
+      "y": 0.19499280835385435,
+      "depth": 0.15,
+      "radius": 0.011
+    },
+    {
+      "id": "lowerLidR",
+      "x": 0.522081319404766,
+      "y": 0.20499280835385436,
+      "depth": 0.15,
+      "radius": 0.011
+    },
+    {
+      "id": "noseRoot",
+      "x": 0.49608131940476596,
+      "y": 0.20799280835385436,
+      "depth": 0.18,
+      "radius": 0.01
+    },
+    {
+      "id": "noseBridge",
+      "x": 0.49608131940476596,
+      "y": 0.22399280835385438,
+      "depth": 0.14,
+      "radius": 0.011
+    },
+    {
+      "id": "noseTip",
+      "x": 0.49608131940476596,
+      "y": 0.24299280835385437,
+      "depth": 0.1,
+      "radius": 0.014
+    },
+    {
+      "id": "noseWingL",
+      "x": 0.48408131940476595,
+      "y": 0.24699280835385437,
+      "depth": 0.13,
+      "radius": 0.008
+    },
+    {
+      "id": "noseWingR",
+      "x": 0.508081319404766,
+      "y": 0.24699280835385437,
+      "depth": 0.13,
+      "radius": 0.008
+    },
+    {
+      "id": "nostrilL",
+      "x": 0.48908131940476596,
+      "y": 0.24999280835385437,
+      "depth": 0.08,
+      "radius": 0.004
+    },
+    {
+      "id": "nostrilR",
+      "x": 0.503081319404766,
+      "y": 0.24999280835385437,
+      "depth": 0.08,
+      "radius": 0.004
+    },
+    {
+      "id": "cheekL",
+      "x": 0.455081319404766,
+      "y": 0.23599280835385436,
+      "depth": 0.25,
+      "radius": 0.027
+    },
+    {
+      "id": "cheekR",
+      "x": 0.537081319404766,
+      "y": 0.23599280835385436,
+      "depth": 0.25,
+      "radius": 0.027
+    },
+    {
+      "id": "upperLip",
+      "x": 0.49608131940476596,
+      "y": 0.26199280835385436,
+      "depth": 0.12,
+      "radius": 0.016
+    },
+    {
+      "id": "lowerLip",
+      "x": 0.49608131940476596,
+      "y": 0.26999280835385436,
+      "depth": 0.11,
+      "radius": 0.017
+    },
+    {
+      "id": "chin",
+      "x": 0.49608131940476596,
+      "y": 0.2929928083538544,
+      "depth": 0.2,
+      "radius": 0.024
+    },
+    {
+      "id": "earL",
+      "x": 0.41308131940476595,
+      "y": 0.21599280835385437,
+      "depth": 0.34,
+      "radius": 0.018
+    },
+    {
+      "id": "earR",
+      "x": 0.5790813194047659,
+      "y": 0.21599280835385437,
+      "depth": 0.34,
+      "radius": 0.018
+    },
+    {
+      "id": "neckBlendL",
+      "x": 0.46808131940476594,
+      "y": 0.30999280835385434,
+      "depth": 0.38,
+      "radius": 0.027
+    },
+    {
+      "id": "neckBlendR",
+      "x": 0.524081319404766,
+      "y": 0.30999280835385434,
+      "depth": 0.38,
+      "radius": 0.027
+    },
+    {
+      "id": "handLFinger1",
+      "x": 0.43208131940476596,
+      "y": 0.598,
+      "depth": 0.16,
+      "radius": 0.006
+    },
+    {
+      "id": "handLFinger2",
+      "x": 0.42408131940476596,
+      "y": 0.599,
+      "depth": 0.166,
+      "radius": 0.006
+    },
+    {
+      "id": "handLFinger3",
+      "x": 0.41608131940476595,
+      "y": 0.6,
+      "depth": 0.17200000000000001,
+      "radius": 0.006
+    },
+    {
+      "id": "handLFinger4",
+      "x": 0.40808131940476594,
+      "y": 0.601,
+      "depth": 0.178,
+      "radius": 0.006
+    },
+    {
+      "id": "handLFinger5",
+      "x": 0.40008131940476593,
+      "y": 0.602,
+      "depth": 0.184,
+      "radius": 0.006
+    },
+    {
+      "id": "handRFinger1",
+      "x": 0.5600813194047659,
+      "y": 0.598,
+      "depth": 0.16,
+      "radius": 0.006
+    },
+    {
+      "id": "handRFinger2",
+      "x": 0.5680813194047659,
+      "y": 0.599,
+      "depth": 0.166,
+      "radius": 0.006
+    },
+    {
+      "id": "handRFinger3",
+      "x": 0.5760813194047659,
+      "y": 0.6,
+      "depth": 0.17200000000000001,
+      "radius": 0.006
+    },
+    {
+      "id": "handRFinger4",
+      "x": 0.5840813194047659,
+      "y": 0.601,
+      "depth": 0.178,
+      "radius": 0.006
+    },
+    {
+      "id": "handRFinger5",
+      "x": 0.5920813194047659,
+      "y": 0.602,
+      "depth": 0.184,
+      "radius": 0.006
+    }
+  ],
+  "patches": [
+    {
+      "patchId": "bg",
+      "kind": "BACKGROUND",
+      "depth": 0.99,
+      "opacity": 1,
+      "color": [
+        224,
+        220,
+        214,
+        255
+      ],
+      "controlPointIds": [],
+      "curvature": 0,
+      "material": "BACKGROUND"
+    },
+    {
+      "patchId": "chair-back",
+      "kind": "CHAIR_BACK",
+      "depth": 0.83,
+      "opacity": 1,
+      "color": [
+        102,
+        63,
+        38,
+        255
+      ],
+      "controlPointIds": [
+        "backTop",
+        "backBottom"
+      ],
+      "curvature": 0.04,
+      "material": "WOOD"
+    },
+    {
+      "patchId": "rear-hair",
+      "kind": "REAR_HAIR",
+      "depth": 0.42,
+      "opacity": 1,
+      "color": [
+        38,
+        30,
+        28,
+        255
+      ],
+      "controlPointIds": [
+        "head",
+        "neck"
+      ],
+      "curvature": 0.5,
+      "material": "HAIR"
+    },
+    {
+      "patchId": "torso",
+      "kind": "TORSO",
+      "depth": 0.5,
+      "opacity": 1,
+      "color": [
+        86,
+        112,
+        118,
+        255
+      ],
+      "controlPointIds": [
+        "shoulderL",
+        "shoulderR",
+        "pelvis"
+      ],
+      "curvature": 0.34,
+      "material": "GARMENT"
+    },
+    {
+      "patchId": "head",
+      "kind": "HEAD",
+      "depth": 0.37,
+      "opacity": 1,
+      "color": [
+        204,
+        166,
+        142,
+        255
+      ],
+      "controlPointIds": [
+        "head",
+        "neck"
+      ],
+      "curvature": 0.61,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "face",
+      "kind": "FACE_SURFACE",
+      "depth": 0.3,
+      "opacity": 1,
+      "color": [
+        218,
+        179,
+        154,
+        255
+      ],
+      "controlPointIds": [
+        "head"
+      ],
+      "curvature": 0.72,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "garment",
+      "kind": "GARMENT",
+      "depth": 0.48,
+      "opacity": 1,
+      "color": [
+        82,
+        110,
+        116,
+        255
+      ],
+      "controlPointIds": [
+        "shoulderL",
+        "shoulderR",
+        "pelvis",
+        "kneeL",
+        "kneeR"
+      ],
+      "curvature": 0.26,
+      "material": "GARMENT"
+    },
+    {
+      "patchId": "arms",
+      "kind": "ARMS",
+      "depth": 0.55,
+      "opacity": 1,
+      "color": [
+        200,
+        161,
+        140,
+        255
+      ],
+      "controlPointIds": [
+        "shoulderL",
+        "elbowL",
+        "handL",
+        "shoulderR",
+        "elbowR",
+        "handR"
+      ],
+      "curvature": 0.3,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "hands",
+      "kind": "HANDS",
+      "depth": 0.24,
+      "opacity": 1,
+      "color": [
+        215,
+        175,
+        150,
+        255
+      ],
+      "controlPointIds": [
+        "handL",
+        "handR"
+      ],
+      "curvature": 0.7,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "thighs",
+      "kind": "THIGHS",
+      "depth": 0.58,
+      "opacity": 1,
+      "color": [
+        73,
+        79,
+        86,
+        255
+      ],
+      "controlPointIds": [
+        "pelvis",
+        "kneeL",
+        "kneeR"
+      ],
+      "curvature": 0.22,
+      "material": "GARMENT"
+    },
+    {
+      "patchId": "lower",
+      "kind": "LOWER_LEGS",
+      "depth": 0.6,
+      "opacity": 1,
+      "color": [
+        66,
+        71,
+        78,
+        255
+      ],
+      "controlPointIds": [
+        "kneeL",
+        "kneeR",
+        "footL",
+        "footR"
+      ],
+      "curvature": 0.18,
+      "material": "GARMENT"
+    },
+    {
+      "patchId": "feet",
+      "kind": "FEET",
+      "depth": 0.28,
+      "opacity": 1,
+      "color": [
+        60,
+        48,
+        42,
+        255
+      ],
+      "controlPointIds": [
+        "footL",
+        "footR"
+      ],
+      "curvature": 0.3,
+      "material": "GARMENT"
+    },
+    {
+      "patchId": "seat",
+      "kind": "CHAIR_SEAT",
+      "depth": 0.78,
+      "opacity": 1,
+      "color": [
+        111,
+        68,
+        40,
+        255
+      ],
+      "controlPointIds": [
+        "seatL",
+        "seatR"
+      ],
+      "curvature": 0.03,
+      "material": "WOOD"
+    },
+    {
+      "patchId": "chair-front",
+      "kind": "CHAIR_FRONT",
+      "depth": 0.2,
+      "opacity": 1,
+      "color": [
+        96,
+        58,
+        35,
+        255
+      ],
+      "controlPointIds": [
+        "seatL",
+        "seatR",
+        "footL",
+        "footR"
+      ],
+      "curvature": 0.02,
+      "material": "WOOD"
+    },
+    {
+      "patchId": "front-hair",
+      "kind": "FRONT_HAIR",
+      "depth": 0.18,
+      "opacity": 1,
+      "color": [
+        42,
+        32,
+        28,
+        255
+      ],
+      "controlPointIds": [
+        "head"
+      ],
+      "curvature": 0.58,
+      "material": "HAIR"
+    },
+    {
+      "patchId": "shadow",
+      "kind": "CONTACT_SHADOW",
+      "depth": 0.1,
+      "opacity": 0.3137254901960784,
+      "color": [
+        20,
+        18,
+        16,
+        80
+      ],
+      "controlPointIds": [
+        "footL",
+        "footR"
+      ],
+      "curvature": 0.1,
+      "material": "SHADOW"
+    },
+    {
+      "patchId": "eye-socket-l",
+      "kind": "FACE_SURFACE",
+      "depth": 0.23,
+      "opacity": 1,
+      "color": [
+        205,
+        164,
+        142,
+        255
+      ],
+      "controlPointIds": [
+        "orbitL",
+        "eyeballL",
+        "upperLidL",
+        "lowerLidL"
+      ],
+      "curvature": 0.72,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "eye-socket-r",
+      "kind": "FACE_SURFACE",
+      "depth": 0.23,
+      "opacity": 1,
+      "color": [
+        205,
+        164,
+        142,
+        255
+      ],
+      "controlPointIds": [
+        "orbitR",
+        "eyeballR",
+        "upperLidR",
+        "lowerLidR"
+      ],
+      "curvature": 0.72,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "nose-volume",
+      "kind": "FACE_SURFACE",
+      "depth": 0.12,
+      "opacity": 1,
+      "color": [
+        205,
+        164,
+        142,
+        255
+      ],
+      "controlPointIds": [
+        "noseRoot",
+        "noseBridge",
+        "noseTip",
+        "noseWingL",
+        "noseWingR"
+      ],
+      "curvature": 0.88,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "mouth-volume",
+      "kind": "FACE_SURFACE",
+      "depth": 0.11,
+      "opacity": 1,
+      "color": [
+        205,
+        164,
+        142,
+        255
+      ],
+      "controlPointIds": [
+        "upperLip",
+        "lowerLip"
+      ],
+      "curvature": 0.78,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "cheeks-jaw",
+      "kind": "FACE_SURFACE",
+      "depth": 0.26,
+      "opacity": 1,
+      "color": [
+        205,
+        164,
+        142,
+        255
+      ],
+      "controlPointIds": [
+        "cheekL",
+        "cheekR",
+        "chin"
+      ],
+      "curvature": 0.65,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "ears",
+      "kind": "FACE_SURFACE",
+      "depth": 0.34,
+      "opacity": 1,
+      "color": [
+        205,
+        164,
+        142,
+        255
+      ],
+      "controlPointIds": [
+        "earL",
+        "earR"
+      ],
+      "curvature": 0.57,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "neck-blend",
+      "kind": "HEAD",
+      "depth": 0.39,
+      "opacity": 1,
+      "color": [
+        205,
+        164,
+        142,
+        255
+      ],
+      "controlPointIds": [
+        "neckBlendL",
+        "neckBlendR",
+        "chin"
+      ],
+      "curvature": 0.61,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "handL-palm",
+      "kind": "HANDS",
+      "depth": 0.18,
+      "opacity": 1,
+      "color": [
+        205,
+        164,
+        142,
+        255
+      ],
+      "controlPointIds": [
+        "handL",
+        "handLFinger1",
+        "handLFinger2",
+        "handLFinger3",
+        "handLFinger4",
+        "handLFinger5"
+      ],
+      "curvature": 0.55,
+      "material": "SKIN"
+    },
+    {
+      "patchId": "handR-palm",
+      "kind": "HANDS",
+      "depth": 0.18,
+      "opacity": 1,
+      "color": [
+        205,
+        164,
+        142,
+        255
+      ],
+      "controlPointIds": [
+        "handR",
+        "handRFinger1",
+        "handRFinger2",
+        "handRFinger3",
+        "handRFinger4",
+        "handRFinger5"
+      ],
+      "curvature": 0.55,
+      "material": "SKIN"
+    }
+  ],
+  "joints": [
+    {
+      "jointId": "root",
+      "x": 0.49608131940476596,
+      "y": 0.56,
+      "depth": 0.52,
+      "minAngle": -12,
+      "maxAngle": 12,
+      "angle": 0
+    },
+    {
+      "jointId": "spine",
+      "parentId": "root",
+      "x": 0.49608131940476596,
+      "y": 0.29,
+      "depth": 0.4,
+      "minAngle": -18,
+      "maxAngle": 18,
+      "angle": -2
+    },
+    {
+      "jointId": "head",
+      "parentId": "spine",
+      "x": 0.49608131940476596,
+      "y": 0.20999280835385437,
+      "depth": 0.35,
+      "minAngle": -28,
+      "maxAngle": 28,
+      "angle": 3
+    },
+    {
+      "jointId": "shoulderL",
+      "parentId": "spine",
+      "x": 0.36608131940476596,
+      "y": 0.34,
+      "depth": 0.46,
+      "minAngle": -55,
+      "maxAngle": 55,
+      "angle": 16
+    },
+    {
+      "jointId": "elbowL",
+      "parentId": "shoulderL",
+      "x": 0.31608131940476597,
+      "y": 0.48,
+      "depth": 0.56,
+      "minAngle": 0,
+      "maxAngle": 145,
+      "angle": 72
+    },
+    {
+      "jointId": "shoulderR",
+      "parentId": "spine",
+      "x": 0.626081319404766,
+      "y": 0.34,
+      "depth": 0.46,
+      "minAngle": -55,
+      "maxAngle": 55,
+      "angle": -14
+    },
+    {
+      "jointId": "elbowR",
+      "parentId": "shoulderR",
+      "x": 0.6760813194047659,
+      "y": 0.48,
+      "depth": 0.56,
+      "minAngle": 0,
+      "maxAngle": 145,
+      "angle": 70
+    },
+    {
+      "jointId": "hipL",
+      "parentId": "root",
+      "x": 0.49608131940476596,
+      "y": 0.56,
+      "depth": 0.52,
+      "minAngle": -35,
+      "maxAngle": 35,
+      "angle": 8
+    },
+    {
+      "jointId": "kneeL",
+      "parentId": "hipL",
+      "x": 0.396081319404766,
+      "y": 0.73,
+      "depth": 0.63,
+      "minAngle": 35,
+      "maxAngle": 145,
+      "angle": 94
+    },
+    {
+      "jointId": "hipR",
+      "parentId": "root",
+      "x": 0.49608131940476596,
+      "y": 0.56,
+      "depth": 0.52,
+      "minAngle": -35,
+      "maxAngle": 35,
+      "angle": -6
+    },
+    {
+      "jointId": "kneeR",
+      "parentId": "hipR",
+      "x": 0.5960813194047659,
+      "y": 0.73,
+      "depth": 0.61,
+      "minAngle": 35,
+      "maxAngle": 145,
+      "angle": 92
+    }
+  ],
+  "contacts": [
+    {
+      "contactId": "pelvis-seat",
+      "a": "pelvis",
+      "b": "seatL",
+      "targetDistance": 0.24,
+      "tolerance": 0.08
+    },
+    {
+      "contactId": "left-foot-floor",
+      "a": "footL",
+      "b": "floor",
+      "targetDistance": 0.09,
+      "tolerance": 0.035
+    },
+    {
+      "contactId": "right-foot-floor",
+      "a": "footR",
+      "b": "floor",
+      "targetDistance": 0.09,
+      "tolerance": 0.035
+    },
+    {
+      "contactId": "back-chair",
+      "a": "neck",
+      "b": "backTop",
+      "targetDistance": 0.19,
+      "tolerance": 0.1
+    }
+  ],
+  "graphSha256": "381504c78eca1dc4fc2733590701939dff9db73afc10826600e15e401e891808",
+  "modelSha256": "310882062c43d76ad2df949a3f0c5f2fb2fefd73049f9c96150ea701911785c3",
+  "facialControlPoints": [
+    "orbitL",
+    "orbitR",
+    "eyeballL",
+    "eyeballR",
+    "upperLidL",
+    "lowerLidL",
+    "upperLidR",
+    "lowerLidR",
+    "noseRoot",
+    "noseBridge",
+    "noseTip",
+    "noseWingL",
+    "noseWingR",
+    "nostrilL",
+    "nostrilR",
+    "cheekL",
+    "cheekR",
+    "upperLip",
+    "lowerLip",
+    "chin",
+    "earL",
+    "earR",
+    "neckBlendL",
+    "neckBlendR"
+  ],
+  "fingerControlPoints": [
+    "handLFinger1",
+    "handLFinger2",
+    "handLFinger3",
+    "handLFinger4",
+    "handLFinger5",
+    "handRFinger1",
+    "handRFinger2",
+    "handRFinger3",
+    "handRFinger4",
+    "handRFinger5"
+  ],
+  "identityInvariantSha256": "825e2b29e0336bed6fb5e672b86510a63ff7b1a1c4e9e52c731d865058b04489"
+}

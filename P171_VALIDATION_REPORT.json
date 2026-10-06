@@ -1,0 +1,119 @@
+{
+  "phase": "FULL_PERSON_AND_NATIVE_GRAPH_P171",
+  "passed": true,
+  "checks": {
+    "learningInGraph": true,
+    "generalPrior": true,
+    "diverseSources": true,
+    "textureAtlas": true,
+    "mesh": true,
+    "face3d": true,
+    "hands": true,
+    "skeleton": true,
+    "garmentMaterial": true,
+    "hairIntersections": true,
+    "rustStore": true,
+    "nativeBridge": true,
+    "hashes": true
+  },
+  "learningGraph": {
+    "nodes": 6,
+    "edges": 5,
+    "graphSha256": "9497c0febd3524482108d086978158f42d41e6255a1962e5c9ba2d3365c9f56d",
+    "generalPrior": {
+      "nodeId": "VKN-2d4e6c419d4bdebf928a87e5",
+      "personScope": "GENERAL",
+      "feature": "earDepth",
+      "value": 0.2323076923076923,
+      "origin": "CROSS_PERSON_LEARNED_PRIOR",
+      "poseBucket": "YAW_20_40",
+      "sourceSha256": "b2109e22d8e67c68eebcd5c2e621f0a2c9403bb6a51a486a27b149337df90f03",
+      "confidence": 0.78,
+      "uncertainty": 0.1372074017375144,
+      "validated": true,
+      "createdAt": 1004,
+      "nodeSha256": "2d4e6c419d4bdebf928a87e513780a45e00b9c15623294548fd83c0eebec2bd8"
+    }
+  },
+  "surface": {
+    "vertices": 1152,
+    "triangles": 2048,
+    "joints": 40,
+    "handJoints": {
+      "left": [
+        "fingerL_0_0",
+        "fingerL_0_1",
+        "fingerL_0_2",
+        "fingerL_1_0",
+        "fingerL_1_1",
+        "fingerL_1_2",
+        "fingerL_2_0",
+        "fingerL_2_1",
+        "fingerL_2_2",
+        "fingerL_3_0",
+        "fingerL_3_1",
+        "fingerL_3_2",
+        "fingerL_4_0",
+        "fingerL_4_1",
+        "fingerL_4_2"
+      ],
+      "right": [
+        "fingerR_0_0",
+        "fingerR_0_1",
+        "fingerR_0_2",
+        "fingerR_1_0",
+        "fingerR_1_1",
+        "fingerR_1_2",
+        "fingerR_2_0",
+        "fingerR_2_1",
+        "fingerR_2_2",
+        "fingerR_3_0",
+        "fingerR_3_1",
+        "fingerR_3_2",
+        "fingerR_4_0",
+        "fingerR_4_1",
+        "fingerR_4_2"
+      ]
+    },
+    "hairStrands": 96,
+    "textureAtlas": {
+      "width": 2048,
+      "height": 2048,
+      "channels": [
+        "ALBEDO",
+        "ROUGHNESS",
+        "NORMAL",
+        "OCCLUSION"
+      ],
+      "tiles": {
+        "face": {
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 1024,
+          "sourceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "origin": "PERSON_OBSERVED"
+        },
+        "hair": {
+          "x": 1024,
+          "y": 0,
+          "width": 1024,
+          "height": 1024,
+          "sourceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "origin": "PERSON_OBSERVED"
+        },
+        "garment": {
+          "x": 0,
+          "y": 1024,
+          "width": 2048,
+          "height": 1024,
+          "sourceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "origin": "PERSON_OBSERVED"
+        }
+      },
+      "atlasSha256": "f9f3883dc63509e2a4a16837e588e700e204063bb7e1a92ebfa08886f91893df"
+    },
+    "surfaceSha256": "4627d23998c01eaeeae6ffe1a5873624b486bee41d7ffbb15e1249e95d5df910"
+  },
+  "truthBoundary": "Learning evidence is stored as graph nodes and generalized only from at least three validated distinct person scopes. Rust file IO and Android native bridge are implemented in source; device execution and Cargo compilation remain environment-dependent."
+}

@@ -1,0 +1,125 @@
+{
+  "phase": "CONTINUOUS_SURFACE_PERSON_P199",
+  "passed": true,
+  "checks": {
+    "views": true,
+    "continuous": true,
+    "depthJumps": true,
+    "face": true,
+    "hair": true,
+    "hands": true,
+    "wrinkles": true,
+    "chair": true,
+    "foreground": true,
+    "color": true,
+    "localOnly": true
+  },
+  "views": [
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": 0
+      },
+      "metrics": {
+        "bodyPixels": 140866,
+        "facePixels": 2687,
+        "hairPixels": 13263,
+        "handPixels": 5063,
+        "wrinklePixels": 1607,
+        "chairPixels": 18378,
+        "foregroundRatio": 0.22920862833658853,
+        "depthJumpRatio": 0.06714986143679386,
+        "colorBins": 267,
+        "continuousSurfaceScore": 0.9328501385632062
+      },
+      "sha256": "158f632b195bc69f0e3e42d1f179f153637f24618617fb39616beb4afa6e6d25"
+    },
+    {
+      "view": {
+        "yaw": 22,
+        "pitch": 0
+      },
+      "metrics": {
+        "bodyPixels": 142783,
+        "facePixels": 3747,
+        "hairPixels": 15245,
+        "handPixels": 5771,
+        "wrinklePixels": 1012,
+        "chairPixels": 72629,
+        "foregroundRatio": 0.30539830525716144,
+        "depthJumpRatio": 0.0697538100820633,
+        "colorBins": 290,
+        "continuousSurfaceScore": 0.9302461899179367
+      },
+      "sha256": "d1d57979fb23d3f4738f9f45f95da60a6456e633f184a5bfeac7e373d1cb4198"
+    },
+    {
+      "view": {
+        "yaw": -22,
+        "pitch": 0
+      },
+      "metrics": {
+        "bodyPixels": 143901,
+        "facePixels": 3747,
+        "hairPixels": 15177,
+        "handPixels": 5410,
+        "wrinklePixels": 1015,
+        "chairPixels": 73529,
+        "foregroundRatio": 0.3074188232421875,
+        "depthJumpRatio": 0.10680944535969247,
+        "colorBins": 267,
+        "continuousSurfaceScore": 0.8931905546403075
+      },
+      "sha256": "73c5e72915fcff300894d6a8dc58f1566297740ce8b8af67df1b2c6c16caae50"
+    },
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": 12
+      },
+      "metrics": {
+        "bodyPixels": 136060,
+        "facePixels": 2423,
+        "hairPixels": 14518,
+        "handPixels": 6124,
+        "wrinklePixels": 2063,
+        "chairPixels": 22853,
+        "foregroundRatio": 0.2313969930013021,
+        "depthJumpRatio": 0.08190310666956332,
+        "colorBins": 242,
+        "continuousSurfaceScore": 0.9180968933304366
+      },
+      "sha256": "f539ff62388bb9050548aae0b05fb973513b05b86ec94b51c72df8b4cb3b7e58"
+    },
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": -12
+      },
+      "metrics": {
+        "bodyPixels": 136001,
+        "facePixels": 2876,
+        "hairPixels": 12438,
+        "handPixels": 4033,
+        "wrinklePixels": 1153,
+        "chairPixels": 23706,
+        "foregroundRatio": 0.2276789347330729,
+        "depthJumpRatio": 0.08048780487804878,
+        "colorBins": 253,
+        "continuousSurfaceScore": 0.9195121951219513
+      },
+      "sha256": "3d98135eca2ebf9f61db628f25f6f99954199454ee0881c5c4ed95366b2707ce"
+    }
+  ],
+  "implemented": [
+    "continuous depth field for head torso pelvis and limbs",
+    "cross-section-like limb taper through capsule chains",
+    "face volume embedded into head surface",
+    "hair base clumps and fine strands",
+    "body-following garment wrinkle normal changes",
+    "unified scene lighting and material response",
+    "continuity quality gates"
+  ],
+  "truthBoundary": "P199 substantially reduces disconnected primitive appearance and targets polished 3D illustration quality. It remains a non-neural local procedural renderer and does not claim photographic indistinguishability.",
+  "deviceE2E": "DEFERRED_BY_USER"
+}

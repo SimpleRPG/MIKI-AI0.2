@@ -1,0 +1,9 @@
+import type { ConversationSemanticContext } from '../../selfDevelopment/services/semanticExecutionPlanCompiler';
+import { scopedVersionedMemoryService, type GovernedMemoryRecord, type GovernedScopeType } from './scopedVersionedMemoryService';
+export interface MemoryContextRequest{scopeType?:GovernedScopeType;scopeId?:string;target?:string;subject?:string;limit?:number;}
+class MemoryContextBridgeService{
+ semanticContext(request:MemoryContextRequest={}):ConversationSemanticContext[]{return scopedVersionedMemoryService.retrieve({...request,limit:request.limit??12}).filter(item=>item.kind!=='ARTIFACT'&&item.kind!=='EVIDENCE').map(item=>({turnId:item.source.turnIds.at(-1)||item.id,text:`[${item.kind}|${item.scope.type}:${item.scope.id}|${item.id}] ${item.content}`,entities:[item.subject,...(item.scope.targets||[])]}));}
+ cognitiveEvidence(request:MemoryContextRequest={}):{memoryIds:string[];evidenceIds:string[];constraints:string[];artifacts:Array<{id:string;sha256?:string;revision?:string}>}{const records=scopedVersionedMemoryService.retrieve({...request,limit:request.limit??50});return{memoryIds:records.map(item=>item.id),evidenceIds:[...new Set(records.flatMap(item=>item.source.evidenceIds))],constraints:records.filter(item=>item.kind==='CONSTRAINT'||item.kind==='DECISION').map(item=>item.content),artifacts:records.filter(item=>item.kind==='ARTIFACT').map(item=>({id:item.id,sha256:item.source.artifactSha256,revision:item.source.repositoryRevision}))};}
+ invalidateCorrection(sourceIds:string[],reason:string):GovernedMemoryRecord[]{const changed=new Map<string,GovernedMemoryRecord>();for(const id of sourceIds)for(const item of scopedVersionedMemoryService.invalidateBySource(id,reason))changed.set(item.id,item);return[...changed.values()];}
+}
+export const memoryContextBridgeService=new MemoryContextBridgeService();

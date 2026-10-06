@@ -1,3 +1,4 @@
+import { semanticDictionaryGraphP209Service } from '../../core/services/semanticDictionaryGraphP209Service';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 
@@ -73,6 +74,11 @@ class JapaneseDictionaryService {
   public static getInstance(): JapaneseDictionaryService { return this.instance ||= new JapaneseDictionaryService(); }
 
   public lookup(surface: string): JapaneseDictionaryEntry[] {
+    const graph = semanticDictionaryGraphP209Service.lookup(surface);
+    const graphEntries: JapaneseDictionaryEntry[] = graph.entries.map(entry => ({
+      surface: entry.surface, normalized: entry.normalized, lemma: entry.lemma, reading: entry.reading,
+      pos: entry.pos, source: 'BUILTIN', priority: entry.priority, semanticIds: entry.semanticIds,
+    }));
     const key = normalize(surface);
     if (!key) return [];
     const results = [
@@ -81,8 +87,9 @@ class JapaneseDictionaryService {
       ...this.builtinEntries.filter(e => e.normalized === key),
     ];
     const seen = new Set<string>();
-    return results.filter(e => { const id = `${e.source}|${e.normalized}|${e.lemma || ''}|${e.reading || ''}`; if (seen.has(id)) return false; seen.add(id); return true; })
+    const legacyEntries = results.filter(e => { const id = `${e.source}|${e.normalized}|${e.lemma || ''}|${e.reading || ''}`; if (seen.has(id)) return false; seen.add(id); return true; })
       .sort((a,b) => b.priority - a.priority);
+    return [...graphEntries, ...legacyEntries.filter(entry => !graphEntries.some(graphEntry => graphEntry.normalized === entry.normalized && graphEntry.pos === entry.pos))];
   }
 
   public has(surface: string): boolean { return this.lookup(surface).length > 0; }

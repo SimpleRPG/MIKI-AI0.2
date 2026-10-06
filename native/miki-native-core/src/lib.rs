@@ -1,3 +1,42 @@
+mod graph_store;
+mod cognitive_graph;
+mod semantic_graph;
+#[path = "domains/remaining_shared.rs"]
+mod remaining_shared;
+#[path = "domains/promotion/mod.rs"]
+mod promotion_domain;
+#[path = "domains/unknown/mod.rs"]
+mod unknown_domain;
+#[path = "domains/research/mod.rs"]
+mod research_domain;
+#[path = "domains/learning/mod.rs"]
+mod learning_domain;
+#[path = "domains/strategy/mod.rs"]
+mod strategy_domain;
+#[path = "domains/capability/mod.rs"]
+mod capability_domain;
+#[path = "domains/improvement/mod.rs"]
+mod improvement_domain;
+#[path = "domains/autonomy/mod.rs"]
+mod autonomy_domain;
+#[path = "domains/self_awareness/mod.rs"]
+mod self_awareness_domain;
+#[path = "domains/experience/mod.rs"]
+mod experience_domain;
+#[path = "domains/safety/mod.rs"]
+mod safety_domain;
+#[path = "domains/conversation/mod.rs"]
+mod conversation_domain;
+#[path = "domains/self_development/mod.rs"]
+mod self_development_domain;
+#[path = "domains/memory/mod.rs"]
+mod memory_domain;
+#[path = "domains/execution/mod.rs"]
+mod execution_domain;
+#[path = "domains/data/mod.rs"]
+mod data_domain;
+#[path = "domains/verification/mod.rs"]
+mod verification_domain;
 use jni::objects::{JClass, JString};
 use jni::sys::{jint, jlong, jstring};
 use jni::JNIEnv;
@@ -399,4 +438,73 @@ mod tests {
         assert_eq!(miki_native_api_version(), 8);
         assert_eq!(miki_native_abi_magic(), 0x4D49_4B49);
     }
+}
+
+#[derive(serde::Deserialize)]
+struct CoreGoalInput { id:String, goal:String, priority:f64, foreground:bool, safety_required:bool, permission_granted:bool, deadline_at:Option<u64>, depends_on:Vec<String>, conflicts_with:Vec<String>, status:String }
+#[derive(serde::Deserialize)] struct CoreDecisionRequest { now:u64, goals:Vec<CoreGoalInput> }
+#[derive(Serialize)] struct CoreGoalDecisionRow { goal_id:String, action:&'static str, reason:String, comparison_key:String }
+#[derive(Serialize)] struct CoreDecisionResult { selected_goal_id:String, selected_goal:String, conflict_detected:bool, paused_goal_ids:Vec<String>, blocked_goal_ids:Vec<String>, decisions:Vec<CoreGoalDecisionRow>, engine:&'static str, api_version:i32 }
+fn core_decide_json(source:&str)->Result<String,String>{
+ let request:CoreDecisionRequest=serde_json::from_str(source).map_err(|e|format!("CORE_DECISION_JSON:{e}"))?;
+ if request.goals.is_empty()||request.goals.len()>10_000{return Err("CORE_GOAL_COUNT_INVALID".into())}
+ let completed:std::collections::HashSet<String>=request.goals.iter().filter(|g|g.status=="COMPLETED").map(|g|g.id.clone()).collect();
+ let mut blocked=Vec::new();let mut actionable:Vec<&CoreGoalInput>=Vec::new();
+ for goal in &request.goals { if goal.status=="COMPLETED"||goal.status=="CANCELLED"{continue} if !goal.permission_granted || goal.depends_on.iter().any(|id|!completed.contains(id)){blocked.push(goal.id.clone())}else{actionable.push(goal)} }
+ if actionable.is_empty(){return Err("CORE_NO_ACTIONABLE_GOAL".into())}
+ actionable.sort_by(|a,b|{let a_deadline=a.deadline_at.unwrap_or(u64::MAX);let b_deadline=b.deadline_at.unwrap_or(u64::MAX);b.safety_required.cmp(&a.safety_required).then_with(||b.foreground.cmp(&a.foreground)).then_with(||b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal)).then_with(||a_deadline.cmp(&b_deadline)).then_with(||a.id.cmp(&b.id))});
+ let selected=actionable[0];let conflict_ids:std::collections::HashSet<String>=selected.conflicts_with.iter().cloned().collect();let mut paused=Vec::new();let mut decisions=Vec::new();
+ for goal in &request.goals {let action=if goal.id==selected.id{"SELECT"}else if blocked.contains(&goal.id){"BLOCK"}else if conflict_ids.contains(&goal.id)||goal.conflicts_with.contains(&selected.id){paused.push(goal.id.clone());"PAUSE"}else{"WAIT"};decisions.push(CoreGoalDecisionRow{goal_id:goal.id.clone(),action,reason:match action{"SELECT"=>"highest deterministic rank","BLOCK"=>"permission or dependency unsatisfied","PAUSE"=>"conflicts with selected goal",_=>"lower deterministic rank"}.into(),comparison_key:format!("{}|{}|{:020.6}|{:020}|{}",if goal.safety_required{1}else{0},if goal.foreground{1}else{0},goal.priority,goal.deadline_at.unwrap_or(u64::MAX),goal.id)});}
+ let conflict_detected=request.goals.len()>1||!blocked.is_empty()||!paused.is_empty();
+ serde_json::to_string(&CoreDecisionResult{selected_goal_id:selected.id.clone(),selected_goal:selected.goal.clone(),conflict_detected,paused_goal_ids:paused,blocked_goal_ids:blocked,decisions,engine:"RUST",api_version:API_VERSION}).map_err(|e|format!("CORE_DECISION_RESULT:{e}"))
+}
+#[no_mangle] pub extern "system" fn Java_com_miki_ai_MIKINativeCore_nativeDecideCoreGoals(mut env:JNIEnv,_class:JClass,request:JString)->jstring{let result=(||->Result<String,String>{let value:String=env.get_string(&request).map_err(|e|format!("JNI_CORE_DECISION:{e}"))?.into();core_decide_json(&value)})();let value=match result{Ok(v)=>v,Err(e)=>format!("ERROR:{e}")};env.new_string(value).map(|s|s.into_raw()).unwrap_or(ptr::null_mut())}
+
+#[derive(serde::Deserialize)] struct DomainRouteInput { target:String, command:String, reason:String, priority:Option<i64>, dedupe_key:Option<String> }
+#[derive(serde::Deserialize)] struct DomainRouteRequest { routes:Vec<DomainRouteInput> }
+#[derive(Serialize)] struct DomainRouteOutput { selected_indexes:Vec<usize>, participating_domains:Vec<String>, skipped_duplicate_indexes:Vec<usize>, engine:&'static str, api_version:i32 }
+fn domain_order(domain:&str)->usize{match domain{"autonomy"=>1,"capability"=>2,"conversation"=>3,"data"=>4,"execution"=>5,"experience"=>6,"improvement"=>7,"learning"=>8,"memory"=>9,"promotion"=>10,"research"=>11,"safety"=>12,"selfAwareness"=>13,"selfDevelopment"=>14,"strategy"=>15,"unknown"=>16,"verification"=>17,_=>usize::MAX}}
+fn rank_domain_routes_json(source:&str)->Result<String,String>{let request:DomainRouteRequest=serde_json::from_str(source).map_err(|e|format!("DOMAIN_ROUTE_JSON:{e}"))?;if request.routes.len()>10000{return Err("DOMAIN_ROUTE_COUNT_INVALID".into())}let mut indexed:Vec<(usize,&DomainRouteInput)>=request.routes.iter().enumerate().collect();for(_,route)in&indexed{if domain_order(&route.target)==usize::MAX{return Err(format!("UNKNOWN_WORKER_DOMAIN:{}",route.target))}if route.command.trim().is_empty(){return Err("DOMAIN_ROUTE_COMMAND_REQUIRED".into())}}indexed.sort_by(|(ai,a),(bi,b)|{b.priority.unwrap_or(0).cmp(&a.priority.unwrap_or(0)).then_with(||domain_order(&a.target).cmp(&domain_order(&b.target))).then_with(||a.command.cmp(&b.command)).then_with(||a.reason.cmp(&b.reason)).then_with(||ai.cmp(bi))});let mut selected=Vec::new();let mut skipped=Vec::new();let mut seen=std::collections::HashSet::new();let mut domains=Vec::new();for(index,route)in indexed{let key=route.dedupe_key.clone().unwrap_or_else(||format!("{}:{}",route.target,route.command));if seen.insert(key){selected.push(index);if !domains.contains(&route.target){domains.push(route.target.clone())}}else{skipped.push(index)}}Ok(serde_json::to_string(&DomainRouteOutput{selected_indexes:selected,participating_domains:domains,skipped_duplicate_indexes:skipped,engine:"RUST",api_version:API_VERSION}).map_err(|e|format!("DOMAIN_ROUTE_RESULT:{e}"))?)}
+#[no_mangle] pub extern "system" fn Java_com_miki_ai_MIKINativeCore_nativeRankDomainRoutes(mut env:JNIEnv,_class:JClass,request:JString)->jstring{let result=(||->Result<String,String>{let value:String=env.get_string(&request).map_err(|e|format!("JNI_DOMAIN_ROUTE:{e}"))?.into();rank_domain_routes_json(&value)})();let value=match result{Ok(v)=>v,Err(e)=>format!("ERROR:{e}")};env.new_string(value).map(|s|s.into_raw()).unwrap_or(ptr::null_mut())}
+
+#[no_mangle]
+pub extern "system" fn Java_com_miki_ai_MIKINativeCore_nativeVerifyVbaCode(mut env:JNIEnv,_class:JClass,request:JString)->jstring{let result=(||->Result<String,String>{let value:String=env.get_string(&request).map_err(|e|format!("JNI_VBA_VERIFY:{e}"))?.into();verification_domain::verify_json(&value)})();let value=match result{Ok(v)=>v,Err(e)=>format!("ERROR:{e}")};env.new_string(value).map(|s|s.into_raw()).unwrap_or(ptr::null_mut())}
+
+#[no_mangle]
+pub extern "system" fn Java_com_miki_ai_MIKINativeCore_nativeProcessDataRecords(mut env:JNIEnv,_class:JClass,request:JString)->jstring{let result=(||->Result<String,String>{let value:String=env.get_string(&request).map_err(|e|format!("JNI_DATA_PROCESS:{e}"))?.into();data_domain::process_json(&value)})();let value=match result{Ok(v)=>v,Err(e)=>format!("ERROR:{e}")};env.new_string(value).map(|s|s.into_raw()).unwrap_or(ptr::null_mut())}
+
+#[no_mangle]
+pub extern "system" fn Java_com_miki_ai_MIKINativeCore_nativePlanExecution(mut env:JNIEnv,_class:JClass,request:JString)->jstring{let result=(||->Result<String,String>{let value:String=env.get_string(&request).map_err(|e|format!("JNI_EXECUTION_PLAN:{e}"))?.into();execution_domain::plan_json(&value)})();let value=match result{Ok(v)=>v,Err(e)=>format!("ERROR:{e}")};env.new_string(value).map(|s|s.into_raw()).unwrap_or(ptr::null_mut())}
+
+#[no_mangle]
+pub extern "system" fn Java_com_miki_ai_MIKINativeCore_nativeSearchMemory(mut env:JNIEnv,_class:JClass,request:JString)->jstring{let result=(||->Result<String,String>{let value:String=env.get_string(&request).map_err(|e|format!("JNI_MEMORY_SEARCH:{e}"))?.into();memory_domain::search_json(&value)})();let value=match result{Ok(v)=>v,Err(e)=>format!("ERROR:{e}")};env.new_string(value).map(|s|s.into_raw()).unwrap_or(ptr::null_mut())}
+
+#[no_mangle]
+pub extern "system" fn Java_com_miki_ai_MIKINativeCore_nativeAnalyzeCandidate(mut env:JNIEnv,_class:JClass,request:JString)->jstring{let result=(||->Result<String,String>{let value:String=env.get_string(&request).map_err(|e|format!("JNI_SELF_DEVELOPMENT:{e}"))?.into();self_development_domain::analyze_json(&value)})();let value=match result{Ok(v)=>v,Err(e)=>format!("ERROR:{e}")};env.new_string(value).map(|s|s.into_raw()).unwrap_or(ptr::null_mut())}
+
+#[no_mangle]
+pub extern "system" fn Java_com_miki_ai_MIKINativeCore_nativeAnalyzeOwnedDomain(mut env:JNIEnv,_class:JClass,domain:JString,request:JString)->jstring{let result=(||->Result<String,String>{let d:String=env.get_string(&domain).map_err(|e|format!("JNI_DOMAIN:{e}"))?.into();let v:String=env.get_string(&request).map_err(|e|format!("JNI_REQUEST:{e}"))?.into();match d.as_str(){"promotion"=>promotion_domain::analyze_json(&v),"unknown"=>unknown_domain::analyze_json(&v),"research"=>research_domain::analyze_json(&v),"learning"=>learning_domain::analyze_json(&v),"strategy"=>strategy_domain::analyze_json(&v),"capability"=>capability_domain::analyze_json(&v),"improvement"=>improvement_domain::analyze_json(&v),"autonomy"=>autonomy_domain::analyze_json(&v),"selfAwareness"=>self_awareness_domain::analyze_json(&v),"experience"=>experience_domain::analyze_json(&v),"safety"=>safety_domain::analyze_json(&v),"conversation"=>conversation_domain::analyze_json(&v),_=>Err("UNKNOWN_OWNED_DOMAIN".into())}})();let value=match result{Ok(v)=>v,Err(e)=>format!("ERROR:{e}")};env.new_string(value).map(|s|s.into_raw()).unwrap_or(ptr::null_mut())}
+
+#[no_mangle]
+pub extern "C" fn miki_cognitive_graph_api_version() -> jint { 1 }
+
+pub fn miki_cognitive_graph_context_json(input: &str) -> Result<String, String> {
+    cognitive_graph::build_context_json(input)
+}
+
+pub fn miki_cognitive_graph_startup_recovery(manifest_ok: bool, native_ok: bool) -> String {
+    serde_json::to_string(&cognitive_graph::startup_recovery(manifest_ok, native_ok)).unwrap_or_else(|_| "{\"mode\":\"LIMITED\"}".to_string())
+}
+
+pub fn miki_graph_store_commit_json(root: &str, input: &str) -> Result<String, String> { graph_store::commit_json(root,input) }
+
+#[no_mangle]
+pub extern "system" fn Java_com_miki_ai_MIKINativeCore_nativeGraphStoreCommit(mut env: JNIEnv, _class: JClass, root: JString, payload: JString) -> jstring {
+    let result = (|| -> Result<String, String> {
+        let root_value: String = env.get_string(&root).map_err(|e| format!("JNI_GRAPH_ROOT:{e}"))?.into();
+        let payload_value: String = env.get_string(&payload).map_err(|e| format!("JNI_GRAPH_PAYLOAD:{e}"))?.into();
+        graph_store::commit_json(&root_value, &payload_value)
+    })();
+    let value = match result { Ok(v) => v, Err(e) => format!("ERROR:{e}") };
+    env.new_string(value).map(|s| s.into_raw()).unwrap_or(ptr::null_mut())
 }

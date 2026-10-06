@@ -1,0 +1,28 @@
+{
+  "phase": "ADOPTION_RECEIPT_INTEGRATION_P101",
+  "passed": true,
+  "accepted": {
+    "readinessId": "ADOPTREADY-3c8faf6c8b615c43c32fb752",
+    "readyForHumanDecision": true,
+    "readyForFormalAdoption": true,
+    "reasons": [],
+    "hashBindings": {
+      "candidate": true,
+      "reviewPackage": true,
+      "identity": true
+    }
+  },
+  "rejected": {
+    "readinessId": "ADOPTREADY-526567df88e29547a4f6f21f",
+    "readyForHumanDecision": true,
+    "readyForFormalAdoption": false,
+    "reasons": [
+      "HUMAN_APPROVAL_RECEIPT_NOT_ACTIVE"
+    ],
+    "hashBindings": {
+      "candidate": true,
+      "reviewPackage": true,
+      "identity": true
+    }
+  }
+}

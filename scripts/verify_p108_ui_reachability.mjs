@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root=process.cwd();
+const exts=['.ts','.tsx'];
+const files=[];
+const walk=d=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else if(exts.includes(path.extname(p)))files.push(path.relative(root,p).replaceAll('\\','/'));}};
+walk(path.join(root,'src'));
+const fileSet=new Set(files);
+const resolve=(from,spec)=>{if(!spec.startsWith('.'))return null;const base=path.posix.normalize(path.posix.join(path.posix.dirname(from),spec));for(const c of [base,base+'.ts',base+'.tsx',base+'/index.ts',base+'/index.tsx'])if(fileSet.has(c))return c;return null;};
+const edges=new Map(files.map(f=>[f,[]]));
+const importPattern=/(?:import|export)\s+(?:[^'"()]*?\s+from\s+)?['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+for(const f of files){const text=fs.readFileSync(f,'utf8');for(const m of text.matchAll(importPattern)){const target=resolve(f,m[1]||m[2]);if(target)edges.get(f).push(target);}}
+const roots=['src/main.tsx','src/App.tsx'].filter(x=>fileSet.has(x));const reached=new Set();const visit=f=>{if(reached.has(f))return;reached.add(f);for(const n of edges.get(f)||[])visit(n);};roots.forEach(visit);
+const uiFiles=files.filter(f=>f.startsWith('src/components/')&&f.endsWith('.tsx'));
+const exempt=new Set(['src/components/ErrorBoundary.tsx']);
+const unreachable=uiFiles.filter(f=>!reached.has(f)&&!exempt.has(f));
+const deleted='src/components/ExternalAiResearchBundlesPanel.tsx';
+const gateway='src/miki/core/ui/typedResearchUiGatewayService.ts';
+const checks={deletedPanelAbsent:!fs.existsSync(deleted),deletedNameUnreferenced:!files.some(f=>fs.readFileSync(f,'utf8').includes('ExternalAiResearchBundlesPanel')),researchGatewayPreserved:fs.existsSync(gateway),productionRootsPresent:roots.length===2,unreachableUiCount:unreachable.length};
+const report={phase:'UI_REACHABILITY_P108',passed:checks.deletedPanelAbsent&&checks.deletedNameUnreferenced&&checks.researchGatewayPreserved&&checks.productionRootsPresent,checks,roots,reachedUiCount:uiFiles.filter(f=>reached.has(f)).length,unreachableUi:unreachable};
+fs.writeFileSync('UI_REACHABILITY_P108_REPORT.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));if(!report.passed)process.exit(1);

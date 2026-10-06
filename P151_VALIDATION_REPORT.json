@@ -1,0 +1,147 @@
+{
+  "phase": "UNIFIED_ALL_DATA_GRAPH_P151",
+  "passed": true,
+  "checks": {
+    "sha": true,
+    "domains": true,
+    "connected": true,
+    "noDangling": true,
+    "provenance": true,
+    "experiencePath": true
+  },
+  "graph": {
+    "nodes": [
+      {
+        "nodeId": "N-039f481f09132dc560f091f1",
+        "domain": "EXPERIENCE",
+        "kind": "CORRECTION",
+        "subjectId": "experience:user-correction",
+        "payload": {
+          "correction": "all learned data participates through graph provenance"
+        },
+        "confidence": 0.95,
+        "uncertainty": 0.05,
+        "sourceRefs": [],
+        "nodeSha256": "039f481f09132dc560f091f1bcfc95859987a2f7118065af56bf3595fea3a14a"
+      },
+      {
+        "nodeId": "N-0f6414a17d397aec27d22922",
+        "domain": "VISUAL",
+        "kind": "COMPLETION_PROFILE",
+        "subjectId": "visual:p150",
+        "payload": {
+          "profileSha256": "9fed7aa003a3121016b4c8d96f371c24ebbf466d7ed8b9b6b47f26a771e12493"
+        },
+        "confidence": 0.8,
+        "uncertainty": 0.2,
+        "sourceRefs": [
+          "9fed7aa003a3121016b4c8d96f371c24ebbf466d7ed8b9b6b47f26a771e12493"
+        ],
+        "nodeSha256": "0f6414a17d397aec27d2292265d48829a1923a13b942b7a71c1452f09c095214"
+      },
+      {
+        "nodeId": "N-3876b03fcf37c89cf6a6812d",
+        "domain": "PERSON",
+        "kind": "PERSON_PROFILE",
+        "subjectId": "person:test",
+        "payload": {
+          "scope": "UPPER_BODY"
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [],
+        "nodeSha256": "3876b03fcf37c89cf6a6812ddf0525f29a4c84640cf653dabb03ee809baf15d7"
+      },
+      {
+        "nodeId": "N-756aed47f28909816334a1b2",
+        "domain": "MEMORY",
+        "kind": "LEARNED_FACT",
+        "subjectId": "memory:visual-completion",
+        "payload": {
+          "fact": "hidden regions can use cross-person learned priors"
+        },
+        "confidence": 0.72,
+        "uncertainty": 0.28,
+        "sourceRefs": [],
+        "nodeSha256": "756aed47f28909816334a1b2d31abf1bb002164bcb2fd63ceaf4d8a1b7414b30"
+      },
+      {
+        "nodeId": "N-7c33395831fbb39555fc272e",
+        "domain": "VALIDATION",
+        "kind": "E2E_RESULT",
+        "subjectId": "validation:p151",
+        "payload": {
+          "passed": true
+        },
+        "confidence": 1,
+        "uncertainty": 0,
+        "sourceRefs": [],
+        "nodeSha256": "7c33395831fbb39555fc272eceba3d9fd29a925477e1256ea728f94a2440751a"
+      },
+      {
+        "nodeId": "N-da2d29b00bab665a8669252a",
+        "domain": "CONVERSATION",
+        "kind": "TURN",
+        "subjectId": "conversation:p151",
+        "payload": {
+          "message": "implement unified graph"
+        },
+        "confidence": 1,
+        "uncertainty": 0,
+        "sourceRefs": [],
+        "nodeSha256": "da2d29b00bab665a8669252a7882a424b3e6797d72ca9e6feaff62eeadaae282"
+      }
+    ],
+    "edges": [
+      {
+        "edgeId": "E-34fd87185458235c7772b7e5",
+        "from": "N-756aed47f28909816334a1b2",
+        "to": "N-0f6414a17d397aec27d22922",
+        "type": "SUPPORTS_COMPLETION",
+        "confidence": 0.72,
+        "sourceRefs": [],
+        "edgeSha256": "34fd87185458235c7772b7e54c6eb424f171aa22916f33f8534b889c3972d8e1"
+      },
+      {
+        "edgeId": "E-822c7cd52ac9251dcaeadadb",
+        "from": "N-da2d29b00bab665a8669252a",
+        "to": "N-039f481f09132dc560f091f1",
+        "type": "CREATES_EXPERIENCE",
+        "confidence": 1,
+        "sourceRefs": [],
+        "edgeSha256": "822c7cd52ac9251dcaeadadbe297586183a233e3580fe542eb15b8133cd375d0"
+      },
+      {
+        "edgeId": "E-a721b4fc4e7961a0fd343b79",
+        "from": "N-0f6414a17d397aec27d22922",
+        "to": "N-3876b03fcf37c89cf6a6812d",
+        "type": "DESCRIBES",
+        "confidence": 0.8,
+        "sourceRefs": [
+          "9fed7aa003a3121016b4c8d96f371c24ebbf466d7ed8b9b6b47f26a771e12493"
+        ],
+        "edgeSha256": "a721b4fc4e7961a0fd343b798806a0da400b72d9712feed1ca9f69465cb49414"
+      },
+      {
+        "edgeId": "E-eef0b6e5c70143198b839cf1",
+        "from": "N-039f481f09132dc560f091f1",
+        "to": "N-756aed47f28909816334a1b2",
+        "type": "UPDATES",
+        "confidence": 0.95,
+        "sourceRefs": [],
+        "edgeSha256": "eef0b6e5c70143198b839cf1f5504a5e5ea6f6ac2e68f1127bb40392a6e593c2"
+      },
+      {
+        "edgeId": "E-f881e04ff62336a02f3ca329",
+        "from": "N-7c33395831fbb39555fc272e",
+        "to": "N-0f6414a17d397aec27d22922",
+        "type": "VALIDATES",
+        "confidence": 1,
+        "sourceRefs": [],
+        "edgeSha256": "f881e04ff62336a02f3ca329f9d58dffc6eb6e50450750c665bd0904ea7b46b3"
+      }
+    ],
+    "graphSha256": "450be5984505db61049ce3a1060786e86336338dbf08576425fbbc392ccf5a59"
+  },
+  "truthBoundary": "All imported artifacts are graph nodes with typed edges and provenance. Existing legacy services are bridged by adapters; physical migration of every historical record requires subsequent ingestion runs."
+}

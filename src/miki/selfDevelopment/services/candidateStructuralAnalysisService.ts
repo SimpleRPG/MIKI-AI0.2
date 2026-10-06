@@ -1,0 +1,1 @@
+import{rustSelfDevelopmentKernelService}from'./rustSelfDevelopmentKernelService';class CandidateStructuralAnalysisService{analyze(input:Parameters<typeof rustSelfDevelopmentKernelService.analyze>[0]){return rustSelfDevelopmentKernelService.analyze(input);}}export const candidateStructuralAnalysisService=new CandidateStructuralAnalysisService();

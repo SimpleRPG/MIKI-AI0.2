@@ -1,0 +1,167 @@
+{
+  "phase": "FINAL_PIXEL_QUALITY_P197",
+  "passed": true,
+  "checks": {
+    "allPassed": true,
+    "anatomy": true,
+    "optical": true,
+    "parts": true,
+    "actualRaster": true,
+    "separateEyes": true,
+    "nostrils": true,
+    "lips": true,
+    "fingers": true,
+    "hair": true,
+    "wrinkles": true,
+    "multiview": true,
+    "png": true,
+    "localOnly": true
+  },
+  "views": [
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": 0,
+        "roll": 0
+      },
+      "anatomyScore": 1,
+      "opticalScore": 0.9666666666666668,
+      "finalScore": 0.9906666666666667,
+      "passed": true,
+      "refinementSha256": "268d74f398f58d0e827686d995957793e6844534b399568f4f52ac5f9c02cd4d"
+    },
+    {
+      "view": {
+        "yaw": 25,
+        "pitch": 0,
+        "roll": 0
+      },
+      "anatomyScore": 1,
+      "opticalScore": 0.9666666666666668,
+      "finalScore": 0.9906666666666667,
+      "passed": true,
+      "refinementSha256": "9a6a8a90186ccb7cb2c956fdf2993e815b9f66aba8093e265c31a7e0ed005f7c"
+    },
+    {
+      "view": {
+        "yaw": -25,
+        "pitch": 0,
+        "roll": 0
+      },
+      "anatomyScore": 1,
+      "opticalScore": 0.9666666666666668,
+      "finalScore": 0.9906666666666667,
+      "passed": true,
+      "refinementSha256": "d9d9831fab599f61e1818f77ed050307735968bfad351206211602d9fd146c05"
+    },
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": 15,
+        "roll": 0
+      },
+      "anatomyScore": 1,
+      "opticalScore": 0.9666666666666668,
+      "finalScore": 0.9906666666666667,
+      "passed": true,
+      "refinementSha256": "a59b5fe4ee2554af503ec04c623226ddd83b1de903650d39aeb7a6508fa2c13d"
+    },
+    {
+      "view": {
+        "yaw": 0,
+        "pitch": -15,
+        "roll": 0
+      },
+      "anatomyScore": 1,
+      "opticalScore": 0.9666666666666668,
+      "finalScore": 0.9906666666666667,
+      "passed": true,
+      "refinementSha256": "79bfdaa7ab328ba7256b9614d72cd14f55b7cdce9e7fbda95d92be3e24f46132"
+    }
+  ],
+  "frontEvidence": [
+    {
+      "part": "left-eye",
+      "label": 11,
+      "pixels": 360,
+      "components": 1,
+      "edgePixels": 72,
+      "depthOrdered": true,
+      "passed": true
+    },
+    {
+      "part": "right-eye",
+      "label": 12,
+      "pixels": 358,
+      "components": 1,
+      "edgePixels": 60,
+      "depthOrdered": true,
+      "passed": true
+    },
+    {
+      "part": "nose",
+      "label": 21,
+      "pixels": 667,
+      "components": 1,
+      "edgePixels": 129,
+      "depthOrdered": true,
+      "passed": true
+    },
+    {
+      "part": "lips",
+      "label": 31,
+      "pixels": 876,
+      "components": 3,
+      "edgePixels": 103,
+      "depthOrdered": true,
+      "passed": true
+    },
+    {
+      "part": "ears",
+      "label": 41,
+      "pixels": 680,
+      "components": 158,
+      "edgePixels": 317,
+      "depthOrdered": true,
+      "passed": true
+    },
+    {
+      "part": "neck",
+      "label": 51,
+      "pixels": 3895,
+      "components": 1,
+      "edgePixels": 233,
+      "depthOrdered": true,
+      "passed": true
+    },
+    {
+      "part": "fingers",
+      "label": 101,
+      "pixels": 2005,
+      "components": 12,
+      "edgePixels": 620,
+      "depthOrdered": true,
+      "passed": true
+    },
+    {
+      "part": "hair",
+      "label": 200,
+      "pixels": 5202,
+      "components": 334,
+      "edgePixels": 3299,
+      "depthOrdered": true,
+      "passed": true
+    },
+    {
+      "part": "garment-wrinkles",
+      "label": 300,
+      "pixels": 4957,
+      "components": 452,
+      "edgePixels": 4957,
+      "depthOrdered": true,
+      "passed": true
+    }
+  ],
+  "truthBoundary": "P197 verifies actual raster labels, boundaries, components, depth, material and optical diversity. It improves local procedural rendering but does not claim indistinguishable photographic quality.",
+  "deviceE2E": "DEFERRED_BY_USER"
+}

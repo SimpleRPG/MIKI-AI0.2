@@ -1,0 +1,28 @@
+MIKI-AI Conversation Meaning Phase 85
+
+Claim system review
+- ClaimDatabaseService, ClaimEvidenceService, ClaimVerificationEventService, MikiConversationLearningService, AnswerPlanService and Claim relations were inspected.
+- User-taught statements are intentionally stored as USER_CLAIM/CANDIDATE with user-claim evidence marked UNVERIFIED.
+- evaluateCandidatePromotion explicitly blocks automatic CANDIDATE -> SUPPORTED promotion for USER_CLAIM until independent verification exists.
+- The old conversation-learning regression expected promotion after a second user affirmation. That expectation conflicts with the newer independent-verification safety rule. The runtime behavior is the safer behavior; the old regression is stale and must not be used as evidence that user repetition proves an external fact.
+
+Implemented in Phase 85
+- Typed discourse entities with kind, status, recency salience, source turn and source text.
+- Active/deferred/rejected/completed discourse status.
+- Reference resolution for this/that/previous process/previous condition/previous result/remaining work.
+- Multi-intent extraction instead of one dialogue label only.
+- Simultaneous IMPLEMENT + PRESERVE + PROHIBIT interpretation.
+- Explicit preservation, prohibition and condition constraints.
+- Connection into SemanticUnderstandingV2OrchestratorService.
+
+Dynamic checks passed
+- "それを続けて" resolved to active candidate A while deferred candidate B was excluded.
+- "前の条件は残して" retained PRESERVE intent.
+- "もっと良くして" retained IMPROVE intent.
+- "既存機能は消さないで実装して" produced IMPLEMENT + PRESERVE + PROHIBIT.
+- "問題ない？" produced CONFIRM intent.
+
+Current certification
+- This materially improves short follow-up understanding.
+- It is not yet certified as unrestricted human-level conversation.
+- Claim truth governance remains deliberately stricter than conversational agreement.

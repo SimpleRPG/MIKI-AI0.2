@@ -1,0 +1,881 @@
+{
+  "passed": true,
+  "phase": "SEMANTIC_RUNTIME_REGRESSION_62",
+  "executed": 20,
+  "passedCount": 20,
+  "failedCount": 0,
+  "results": [
+    {
+      "id": "colon-chain",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "支給先コード",
+            "value": "07070",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "支給先コードを07070に変更"
+          },
+          {
+            "actionId": "A2",
+            "operation": "UPDATE",
+            "targetSet": "PREVIOUS_MUTATION_ROWS",
+            "field": "購買担当者コード",
+            "value": "6L",
+            "valueType": "STRING",
+            "dependsOn": [
+              "A1"
+            ],
+            "executionOrder": 2,
+            "sameTransaction": true,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "購買担当者コードを6Lに設定"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "07070",
+            "kind": "BUSINESS_CODE",
+            "preserveLeadingZeros": true,
+            "confidence": 0.9
+          },
+          {
+            "value": "L",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          }
+        ],
+        "resolvedText": "支給先コードを07070に変更:購買担当者コードを6Lに設定",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "semicolon-chain",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "支給先コード",
+            "value": "07070",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "支給先コードを07070に変更"
+          },
+          {
+            "actionId": "A2",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "購買担当者コード",
+            "value": "6L",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 2,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "購買担当者コードを6Lに設定"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "07070",
+            "kind": "BUSINESS_CODE",
+            "preserveLeadingZeros": true,
+            "confidence": 0.9
+          },
+          {
+            "value": "L",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          }
+        ],
+        "resolvedText": "支給先コードを07070に変更;購買担当者コードを6Lに設定",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "mixed-chain",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "A",
+            "value": "1",
+            "valueType": "NUMBER",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "Aを1に変更"
+          },
+          {
+            "actionId": "A2",
+            "operation": "UPDATE",
+            "targetSet": "PREVIOUS_MUTATION_ROWS",
+            "field": "B",
+            "value": "2",
+            "valueType": "NUMBER",
+            "dependsOn": [
+              "A1"
+            ],
+            "executionOrder": 2,
+            "sameTransaction": true,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "Bを2に変更"
+          },
+          {
+            "actionId": "A3",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "C",
+            "value": "3",
+            "valueType": "NUMBER",
+            "dependsOn": [],
+            "executionOrder": 3,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "Cを3に変更"
+          },
+          {
+            "actionId": "A4",
+            "operation": "UPDATE",
+            "targetSet": "PREVIOUS_MUTATION_ROWS",
+            "field": "D",
+            "value": "4",
+            "valueType": "NUMBER",
+            "dependsOn": [
+              "A3"
+            ],
+            "executionOrder": 4,
+            "sameTransaction": true,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "Dを4に変更"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "A",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          },
+          {
+            "value": "B",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          },
+          {
+            "value": "C",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          },
+          {
+            "value": "D",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          }
+        ],
+        "resolvedText": "Aを1に変更:Bを2に変更;Cを3に変更:Dを4に変更",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "leading-zero",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "仕入先コード",
+            "value": "04242",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "仕入先コードを04242に変更"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "04242",
+            "kind": "BUSINESS_CODE",
+            "preserveLeadingZeros": true,
+            "confidence": 0.9
+          }
+        ],
+        "resolvedText": "仕入先コードを04242に変更",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "number-value",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "手配数",
+            "value": "0",
+            "valueType": "NUMBER",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "手配数を0に変更"
+          }
+        ],
+        "typedTerms": [],
+        "resolvedText": "手配数を0に変更",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "date-value",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "納入予定日",
+            "value": "2026-10-01",
+            "valueType": "DATE",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "納入予定日を2026-10-01に変更"
+          }
+        ],
+        "typedTerms": [],
+        "resolvedText": "納入予定日を2026-10-01に変更",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "boolean-value",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": false,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "出図時手配不要フラグ",
+            "value": "true",
+            "valueType": "BOOLEAN",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "出図時手配不要フラグをtrueに設定"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "true",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          }
+        ],
+        "resolvedText": "出図時手配不要フラグをtrueに設定",
+        "unknowns": [
+          "GOAL_UNRESOLVED"
+        ]
+      }
+    },
+    {
+      "id": "db-column",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": false,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "VERIFY",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "DS_PJ_SEQNO",
+            "value": "確認",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "DS_PJ_SEQNOを確認"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "DS_PJ_SEQNO",
+            "kind": "DB_COLUMN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.9
+          }
+        ],
+        "resolvedText": "DS_PJ_SEQNOを確認",
+        "unknowns": [
+          "GOAL_UNRESOLVED"
+        ]
+      }
+    },
+    {
+      "id": "field",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": false,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "VERIFY",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "PROJECT_ID",
+            "value": "確認",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "PROJECT_IDを確認"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "PROJECT_ID",
+            "kind": "FIELD",
+            "preserveLeadingZeros": false,
+            "confidence": 0.9
+          }
+        ],
+        "resolvedText": "PROJECT_IDを確認",
+        "unknowns": [
+          "GOAL_UNRESOLVED"
+        ]
+      }
+    },
+    {
+      "id": "duration",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "入庫予定日",
+            "value": "3W前倒し",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "入庫予定日を3W前倒しに変更"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "3W",
+            "kind": "DURATION",
+            "preserveLeadingZeros": false,
+            "confidence": 0.9
+          }
+        ],
+        "resolvedText": "入庫予定日を3W前倒しに変更",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "quoted-separator",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "備考",
+            "value": "「A:B;C」",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "備考を「A:B;C」に変更"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "A",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          },
+          {
+            "value": "B",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          },
+          {
+            "value": "C",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          }
+        ],
+        "resolvedText": "備考を「A:B;C」に変更",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "url-not-chain",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "URL",
+            "value": "https://example.com/a:b",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "URLをhttps://example.com/a:bに変更"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "URL",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          },
+          {
+            "value": "https",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          },
+          {
+            "value": "example.com/a",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          },
+          {
+            "value": "b",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          }
+        ],
+        "resolvedText": "URLをhttps://example.com/a:bに変更",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "time-not-chain",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "開始時刻",
+            "value": "12:30",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "開始時刻を12:30に変更"
+          }
+        ],
+        "typedTerms": [],
+        "resolvedText": "開始時刻を12:30に変更",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "conversation-reference",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": false,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "支給先コード",
+            "value": "07070",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "支給先コードを07070に変更"
+          },
+          {
+            "actionId": "A2",
+            "operation": "UNKNOWN",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "valueType": "UNKNOWN",
+            "dependsOn": [],
+            "executionOrder": 2,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "後続指示"
+          },
+          {
+            "actionId": "A3",
+            "operation": "UPDATE",
+            "targetSet": "PREVIOUS_MUTATION_ROWS",
+            "valueType": "UNKNOWN",
+            "dependsOn": [
+              "A2"
+            ],
+            "executionOrder": 3,
+            "sameTransaction": true,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "それも変更して"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "07070",
+            "kind": "BUSINESS_CODE",
+            "preserveLeadingZeros": true,
+            "confidence": 0.9
+          }
+        ],
+        "resolvedText": "支給先コードを07070に変更\n後続指示:それも変更して",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "unresolved-reference",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": false,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "それ",
+            "value": "変更して",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "それを変更して"
+          }
+        ],
+        "typedTerms": [],
+        "resolvedText": "それを変更して",
+        "unknowns": [
+          "REFERENCE_UNRESOLVED:それ"
+        ]
+      }
+    },
+    {
+      "id": "exclusion",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "支給先コード",
+            "value": "07070",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "支給先コードを07070に変更"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "07070",
+            "kind": "BUSINESS_CODE",
+            "preserveLeadingZeros": true,
+            "confidence": 0.9
+          }
+        ],
+        "resolvedText": "処理対象外の行は変更しない。支給先コードを07070に変更",
+        "unknowns": []
+      }
+    },
+    {
+      "id": "continue",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": false,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UNKNOWN",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "一致後も次の条件評価",
+            "value": "続ける",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": true,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "一致後も次の条件評価を続ける"
+          }
+        ],
+        "typedTerms": [],
+        "resolvedText": "一致後も次の条件評価を続ける",
+        "unknowns": [
+          "GOAL_UNRESOLVED"
+        ]
+      }
+    },
+    {
+      "id": "stop",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": false,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UNKNOWN",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "一致後は以降の評価",
+            "value": "停止する",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": true,
+            "rollbackOnFailure": true,
+            "source": "一致後は以降の評価を停止する"
+          }
+        ],
+        "typedTerms": [],
+        "resolvedText": "一致後は以降の評価を停止する",
+        "unknowns": [
+          "GOAL_UNRESOLVED"
+        ]
+      }
+    },
+    {
+      "id": "unknown-operation",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": false,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UNKNOWN",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "対象",
+            "value": "いい感じにする",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "対象をいい感じにする"
+          }
+        ],
+        "typedTerms": [],
+        "resolvedText": "対象をいい感じにする",
+        "unknowns": [
+          "GOAL_UNRESOLVED"
+        ]
+      }
+    },
+    {
+      "id": "multiple-update-fields",
+      "passed": true,
+      "errors": [],
+      "actual": {
+        "ready": true,
+        "mutations": [
+          {
+            "actionId": "A1",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "支給先コード",
+            "value": "07070",
+            "valueType": "STRING",
+            "dependsOn": [],
+            "executionOrder": 1,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "支給先コードを07070に変更"
+          },
+          {
+            "actionId": "A2",
+            "operation": "UPDATE",
+            "targetSet": "PREVIOUS_MUTATION_ROWS",
+            "field": "購買担当者コード",
+            "value": "6L",
+            "valueType": "STRING",
+            "dependsOn": [
+              "A1"
+            ],
+            "executionOrder": 2,
+            "sameTransaction": true,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "購買担当者コードを6Lに設定"
+          },
+          {
+            "actionId": "A3",
+            "operation": "UPDATE",
+            "targetSet": "ALL_MATCHED_ROWS",
+            "field": "手配数",
+            "value": "0",
+            "valueType": "NUMBER",
+            "dependsOn": [],
+            "executionOrder": 3,
+            "sameTransaction": false,
+            "continueAfter": false,
+            "stopAfter": false,
+            "rollbackOnFailure": true,
+            "source": "手配数を0に変更"
+          }
+        ],
+        "typedTerms": [
+          {
+            "value": "07070",
+            "kind": "BUSINESS_CODE",
+            "preserveLeadingZeros": true,
+            "confidence": 0.9
+          },
+          {
+            "value": "L",
+            "kind": "UNKNOWN",
+            "preserveLeadingZeros": false,
+            "confidence": 0.45
+          }
+        ],
+        "resolvedText": "支給先コードを07070に変更:購買担当者コードを6Lに設定;手配数を0に変更",
+        "unknowns": []
+      }
+    }
+  ]
+}

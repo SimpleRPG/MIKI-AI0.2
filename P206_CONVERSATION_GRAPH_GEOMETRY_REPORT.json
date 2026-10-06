@@ -1,0 +1,93 @@
+{
+  "phase": "CONVERSATION_GRAPH_GEOMETRY_P206",
+  "passed": true,
+  "checks": {
+    "intent": true,
+    "conversationSource": true,
+    "coreIngress": true,
+    "graphMutations": true,
+    "splines": true,
+    "ribbons": true,
+    "hands": true,
+    "garment": true,
+    "contacts": true,
+    "localOnly": true
+  },
+  "intent": {
+    "operation": "GENERATE_SOFT25D_CHARACTER",
+    "prompt": "椅子に座った創作キャラクターを右向きで生成して",
+    "seed": 1598652198,
+    "yaw": 22,
+    "pitch": 0,
+    "pose": "SEATED",
+    "style": "SOFT_25D",
+    "intentSha256": "9be3215287324ba3b51f7b7aecbda37a2a47d14204160a36815c1031a53cd62e"
+  },
+  "geometry": {
+    "bodySplineCount": 4,
+    "hairRibbonCount": 18,
+    "fingerCount": 10,
+    "wrinkleFields": 4,
+    "contacts": 6,
+    "geometrySha256": "2609a9e407092f1b6539636727df389fef5b1593789797e731e8fb1217f02a49"
+  },
+  "graphMutations": [
+    {
+      "semanticKind": "OBSERVATION",
+      "ownerDomain": "conversation",
+      "participantDomains": [
+        "learning",
+        "memory"
+      ],
+      "subjectId": "conversation-person:9be3215287324ba3b51f7b7aecbda37a2a47d14204160a36815c1031a53cd62e",
+      "payload": {
+        "prompt": "椅子に座った創作キャラクターを右向きで生成して",
+        "intentSha256": "9be3215287324ba3b51f7b7aecbda37a2a47d14204160a36815c1031a53cd62e",
+        "seed": 1598652198,
+        "view": {
+          "yaw": 22,
+          "pitch": 0
+        }
+      }
+    },
+    {
+      "semanticKind": "EXPERIENCE",
+      "ownerDomain": "experience",
+      "participantDomains": [
+        "conversation",
+        "learning",
+        "memory",
+        "verification",
+        "improvement"
+      ],
+      "subjectId": "character:1598652198",
+      "payload": {
+        "renderSha256": "2609a9e407092f1b6539636727df389fef5b1593789797e731e8fb1217f02a49",
+        "qualityScore": 0.88,
+        "passed": true,
+        "style": "SOFT_25D",
+        "pose": "SEATED"
+      }
+    },
+    {
+      "semanticKind": "VALIDATION",
+      "ownerDomain": "verification",
+      "participantDomains": [
+        "conversation",
+        "learning",
+        "memory"
+      ],
+      "subjectId": "character:1598652198",
+      "payload": {
+        "passed": true,
+        "renderSha256": "2609a9e407092f1b6539636727df389fef5b1593789797e731e8fb1217f02a49"
+      }
+    }
+  ],
+  "priorAudit": {
+    "generalConversationToCore": true,
+    "p205NormalAppRoute": false,
+    "p206ConversationToPersonCore": true,
+    "p206ResultToGraph": true
+  }
+}

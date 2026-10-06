@@ -1,4 +1,4 @@
-import { WorkingAgendaItem } from '../../../types';
+import type { WorkingAgendaItem } from '../../../types';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 

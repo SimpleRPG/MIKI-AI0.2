@@ -418,7 +418,7 @@ class SkillsService {
   }
 
   /**
-   * 50章: 技能の卒業 (official_matured → selfImprovementService.addTrainingSample への自動投入)
+   * 50章: 技能の卒業 (official_matured → selfImprovementService.registerCapabilityCandidate への自動投入)
    * 49章の保存先ルーターでいう「LoRA教材」区分へ正式に橋渡しする
    */
   public graduateSkillToTrainingDataset(skill: SkillItem): void {
@@ -439,7 +439,7 @@ class SkillsService {
       else if (skill.category === 'coding' || skill.category === 'debug') cat = 'code';
       else if (skill.category === 'retrieval') cat = 'retrieval';
 
-      const sample = selfImprovementService.addTrainingSample({
+      const sample = selfImprovementService.registerCapabilityCandidate({
         instruction,
         inputContext,
         outputTarget,

@@ -1,0 +1,19 @@
+{
+  "phase": "P210",
+  "status": "PASS",
+  "criticalPreserved": {
+    "public/self-code-seed.zip": true,
+    "P190_FICTIONAL_PERSON_GRAPH.json": true,
+    "P194_RULE_BOOK.json": true,
+    "P195_TWENTY_SUBJECT_RULE_BOOK.json": true,
+    "MIKI-AI0.2_統合設計書_正本.txt": true,
+    "package.json": true,
+    "package-lock.json": true
+  },
+  "nodeModulesExcluded": true,
+  "distExcluded": true,
+  "androidWebAssetDuplicateExcluded": true,
+  "packageCleanupManifestSha256": "736fc5abd7de6c7d2ae94ccf6167f1c7c5ec165bc69dbd8aacd99a16f5f8d92e",
+  "lint": "PASS",
+  "productionBuild": "PASS"
+}

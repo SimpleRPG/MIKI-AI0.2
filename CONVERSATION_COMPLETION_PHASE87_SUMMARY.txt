@@ -1,0 +1,37 @@
+MIKI-AI Conversation Completion Phase 87
+
+Implemented
+1. semanticContextBudgetService is now connected to the production HybridConversationEngine through ConversationContinuityService.
+2. Long-context compression and checksum-verified restoration retain query-relevant turns and mandatory constraints.
+3. Topic-return focus reselection supports explicit mention and previous-topic recovery.
+4. Near-equal focus candidates are surfaced as ambiguity instead of silently selecting one.
+5. Claim, user preference, user instruction and session context have separate usage policies.
+6. A current Claim safety regression replaces the obsolete expectation that repeated user assertion is independent evidence.
+7. A 120-turn deterministic conversation corpus validates continuation, improvement, preservation, implementation, confirmation, rollback, explanation and comparison intents.
+8. Galaxy S25 readiness checks verify Android plugin contracts. DEVICE_VERIFIED remains false until real ADB/device execution.
+9. Pragmatics detects indirect requests, hedges, implication, possible irony, figurative signals and reluctant acceptance. Low-confidence irony/figurative readings require clarification.
+10. Long-conversation recovery rolls history back before the failed turn and appends an explicit correction turn.
+11. Recursive review findings from Phase 86 remain applied, including the single canonical Claim authority and conversation category entry.
+
+Dynamic evidence
+- 80-turn history compressed to 24 retained turns.
+- Mandatory prohibition "既存機能は消さない" survived compression.
+- Tampered snapshot checksum was rejected.
+- Topic return selected candidate A.
+- Equal-salience candidate ambiguity was detected.
+- USER_PREFERENCE remained usable for personalization without becoming external fact.
+- USER_CLAIM external fact remained blocked pending independent verification.
+- 120/120 corpus intent cases passed.
+
+Verification
+- Conversation Phases 85, 86, 87: PASS
+- Current Claim safety: PASS
+- Galaxy S25 native contract readiness: PASS
+- Galaxy S25 device execution: NOT RUN / NOT DEVICE_VERIFIED
+- Semantic Phases 61, 62, 67: PASS
+- Phase 83 regression: PASS
+- TypeScript and imports: PASS
+- Production and server build: PASS
+
+Remaining boundary
+The only item in the requested list that cannot be completed in this container is real Galaxy S25 execution. The required plugin files and morphology self-test entry exist, but MIKINativeRunner does not expose an equivalent named selfTest marker and actual DEVICE_VERIFIED evidence requires the physical device/ADB run.

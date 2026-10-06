@@ -1,0 +1,204 @@
+{
+  "phase": "VISUAL_TRUTH_SIZE_P124",
+  "passed": true,
+  "checks": {
+    "truthBlocked": true,
+    "noDistWarning": true,
+    "noAndroidCopyWarning": true,
+    "smallerThanFull": true
+  },
+  "truth": {
+    "requested": "P123 visual demo fidelity",
+    "receipts": [
+      {
+        "capability": "INTENT_PARSE",
+        "implemented": true,
+        "verified": true,
+        "evidence": [
+          "P123"
+        ],
+        "limitations": []
+      },
+      {
+        "capability": "MEDIA_REFERENCE",
+        "implemented": true,
+        "verified": true,
+        "evidence": [
+          "P119",
+          "P120"
+        ],
+        "limitations": []
+      },
+      {
+        "capability": "PROJECT_COMPOSITION",
+        "implemented": true,
+        "verified": true,
+        "evidence": [
+          "P122",
+          "P123"
+        ],
+        "limitations": []
+      },
+      {
+        "capability": "RECT_CIRCLE_TEXT_CANVAS",
+        "implemented": true,
+        "verified": true,
+        "evidence": [
+          "P110"
+        ],
+        "limitations": []
+      },
+      {
+        "capability": "INDEXED_PIXEL_DATA",
+        "implemented": true,
+        "verified": true,
+        "evidence": [
+          "P113",
+          "P114"
+        ],
+        "limitations": []
+      },
+      {
+        "capability": "RICH_PIXEL_CHARACTER",
+        "implemented": false,
+        "verified": false,
+        "evidence": [],
+        "limitations": [
+          "Detailed anatomy/garment sprite synthesis not implemented"
+        ]
+      },
+      {
+        "capability": "RICH_SCENE",
+        "implemented": false,
+        "verified": false,
+        "evidence": [],
+        "limitations": [
+          "Rich generated background renderer not implemented"
+        ]
+      },
+      {
+        "capability": "PNG_BINARY",
+        "implemented": false,
+        "verified": false,
+        "evidence": [],
+        "limitations": [
+          "Production preview binary adapter not connected"
+        ]
+      },
+      {
+        "capability": "ANIMATED_PREVIEW",
+        "implemented": false,
+        "verified": false,
+        "evidence": [],
+        "limitations": [
+          "Conversation animation preview not connected"
+        ]
+      }
+    ],
+    "claimLevel": "BASIC_RENDERABLE",
+    "allowedClaims": [
+      "通常会話のVisual Intentを構造化できる",
+      "SearXNG由来の画像Card・動画Linkを構造化できる",
+      "複数Visual ProjectとRevisionを構成できる",
+      "基礎CanvasまたはIndexed Pixel Dataを生成できる"
+    ],
+    "blockedClaims": [
+      "完成PNG/WebPを生成済みと表明しない",
+      "デモ画像と同等の詳細成果物が出ると表明しない"
+    ],
+    "receiptSha256": "f3af1e8bff7cc338764048db8af36c1b938f91591abdca137f64cdbb11f10b6b"
+  },
+  "size": {
+    "totalBytes": 67432186,
+    "includedBytes": 21661004,
+    "excludedBytes": 45771182,
+    "excludedGroups": {
+      "ANDROID_WEB_COPY": 14286100,
+      "BUILD_DIST": 31485082
+    },
+    "largestIncluded": [
+      {
+        "path": "public/self-code-seed.zip",
+        "bytes": 6515113
+      },
+      {
+        "path": "CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json",
+        "bytes": 1278987
+      },
+      {
+        "path": "MIKI-AI0.2_統合設計書_正本.txt",
+        "bytes": 578063
+      },
+      {
+        "path": "src/miki/core/data/codeKnowledge/javascript.ts",
+        "bytes": 310784
+      },
+      {
+        "path": "server.ts",
+        "bytes": 253982
+      },
+      {
+        "path": "src/components/ChatPanel.tsx",
+        "bytes": 220627
+      },
+      {
+        "path": "src/components/MemoryModal.tsx",
+        "bytes": 211569
+      },
+      {
+        "path": "package-lock.json",
+        "bytes": 198662
+      },
+      {
+        "path": "src/App.tsx",
+        "bytes": 188740
+      },
+      {
+        "path": "src/miki/core/data/codeKnowledge/typescript.ts",
+        "bytes": 164450
+      },
+      {
+        "path": "src/miki/core/services/adaptiveRoutePlannerService.ts",
+        "bytes": 133742
+      },
+      {
+        "path": "src/miki/core/data/codeKnowledge/web.ts",
+        "bytes": 124470
+      },
+      {
+        "path": "src/data/specificationRegistryData.ts",
+        "bytes": 120868
+      },
+      {
+        "path": "DESIGN_DOCUMENT_READING_PHASE95_INDEX.json",
+        "bytes": 110176
+      },
+      {
+        "path": "docs/MIKI_AI_18_DOMAIN_DESIGN_PHILOSOPHY.txt",
+        "bytes": 93879
+      },
+      {
+        "path": "src/components/AutonomousImprovementHome.tsx",
+        "bytes": 88400
+      },
+      {
+        "path": "src/miki/core/services/coreOrchestratorService.ts",
+        "bytes": 87635
+      },
+      {
+        "path": "src/miki/execution/services/backgroundWorkerService.ts",
+        "bytes": 72458
+      },
+      {
+        "path": "src/miki/core/services/reusableComponentFactoryService.ts",
+        "bytes": 72433
+      },
+      {
+        "path": "reference/simple-rpg/guild2.js",
+        "bytes": 71466
+      }
+    ],
+    "warnings": [],
+    "auditSha256": "1a8cf94267e6eaf7fa1ec93156027f27e81cddb0b25739377a2e5ae668d13f11"
+  }
+}

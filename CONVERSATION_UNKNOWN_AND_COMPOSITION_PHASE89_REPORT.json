@@ -1,0 +1,70 @@
+{
+  "phase": "CONVERSATION_UNKNOWN_AND_COMPOSITION_89",
+  "passed": true,
+  "checks": [
+    {
+      "name": "UNKNOWN_TERM_TO_RESEARCH",
+      "passed": true,
+      "detail": {
+        "unknowns": [
+          {
+            "term": "FoobarnativeX",
+            "normalized": "foobarnativex",
+            "reason": "DICTIONARY_MISS",
+            "researchChoice": "SEARCH",
+            "query": "FoobarnativeX 意味 用語 定義",
+            "gapId": "TERM-GAP-7a22f4471d0d329efe"
+          }
+        ],
+        "knownTerms": [],
+        "requiresResearch": true,
+        "queries": [
+          "FoobarnativeX 意味 用語 定義"
+        ]
+      }
+    },
+    {
+      "name": "UNKNOWN_LOCAL_ONLY",
+      "passed": true,
+      "detail": {
+        "unknowns": [
+          {
+            "term": "FoobarnativeX",
+            "normalized": "foobarnativex",
+            "reason": "DICTIONARY_MISS",
+            "researchChoice": "LOCAL_ONLY",
+            "query": "FoobarnativeX 意味 用語 定義",
+            "gapId": "TERM-GAP-7a22f4471d0d329efe"
+          }
+        ],
+        "knownTerms": [],
+        "requiresResearch": false,
+        "queries": []
+      }
+    },
+    {
+      "name": "COMPOSITIONAL_REALIZATION",
+      "passed": true,
+      "detail": {
+        "surfaceText": "既存機能を維持できる場合、候補Aを採用します。\n理由は安全性の基準を満たしています。\nただし、実機検証は未完了です。\n\n次にGalaxy S25で確認します。",
+        "mode": "COMPOSITIONAL",
+        "clauses": [
+          "既存機能を維持できる場合、候補Aを採用します。",
+          "理由は安全性の基準を満たしています。",
+          "ただし、実機検証は未完了です。",
+          "次にGalaxy S25で確認します。"
+        ],
+        "paragraphs": [
+          "既存機能を維持できる場合、候補Aを採用します。\n理由は安全性の基準を満たしています。\nただし、実機検証は未完了です。",
+          "次にGalaxy S25で確認します。"
+        ],
+        "decisions": [
+          "CONDITION_FRONTED",
+          "PARAGRAPH_PLANNED"
+        ]
+      }
+    }
+  ],
+  "webExecution": "NOT_EXECUTED_IN_OFFLINE_TEST",
+  "researchHandoff": "Search queries and deterministic gap IDs are produced for the existing research route"
+}

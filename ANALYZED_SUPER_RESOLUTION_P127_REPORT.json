@@ -1,0 +1,53 @@
+{
+  "phase": "ANALYZED_SUPER_RESOLUTION_P127",
+  "passed": true,
+  "checks": {
+    "dimensions": true,
+    "analysis": true,
+    "sourceHash": true,
+    "outputHash": true,
+    "different": true,
+    "provenance": true,
+    "noExternalRoute": true,
+    "noExternalService": true
+  },
+  "source": {
+    "width": 160,
+    "height": 90
+  },
+  "output": {
+    "width": 640,
+    "height": 360,
+    "pngBytes": 37233,
+    "sourceSha256": "5c9566a51a4c4f1f22678bc8d59f48c0625512a1734abbb44b2728edc4d3fc1e",
+    "outputSha256": "15633afeda1d15028d03cfc862e2c66b5f7272b23a1279f0558bb4d89785a6ce"
+  },
+  "analysis": {
+    "width": 160,
+    "height": 90,
+    "meanLuma": 38.4820069444399,
+    "contrast": 32.80275800621209,
+    "edgeDensity": 0.03208333333333333,
+    "noiseEstimate": 3.362297597222181,
+    "darkRatio": 0.82625,
+    "brightRatio": 0.012638888888888889,
+    "dominantChannels": [
+      27.37909722222222,
+      39.94423611111111,
+      56.69104166666666
+    ],
+    "analysisSha256": "2cf78a7b5fb9f2ba3337d0adad2216910710ee7273014241fad55517770fb2e8"
+  },
+  "options": {
+    "scale": 4,
+    "detail": 0.9,
+    "denoise": 0.2,
+    "sharpen": 0.75,
+    "localContrast": 0.65,
+    "preserveAlpha": true
+  },
+  "limitations": [
+    "Reconstructs detail from source structure; does not recover unknowable original detail",
+    "Does not invent a different person, garment, or scene"
+  ]
+}

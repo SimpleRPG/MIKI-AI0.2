@@ -1,0 +1,1 @@
+{"input":{"items":[{"id":"A"}],"baseline":[],"context":{},"required":[],"receipts":[]},"expected":{"requiredFields":["features","result_sha256","engine","owner_domain","receipt_version"],"engine":"RUST"}}

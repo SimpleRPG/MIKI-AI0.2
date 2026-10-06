@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "phase": "FINAL_RESIDUAL_SERVICE_INTEGRATION_74",
+  "servicesIntegrated": 9,
+  "allServicesScanned": 540,
+  "singleReferenceServices": [],
+  "claimEvidenceConnected": true,
+  "nativeSearchConnected": true,
+  "repositoryFingerprintCacheRegistered": true,
+  "unknownFingerprintConnected": true,
+  "pathBoundaryFailClosed": true,
+  "operationalGovernanceConnected": true,
+  "failures": []
+}

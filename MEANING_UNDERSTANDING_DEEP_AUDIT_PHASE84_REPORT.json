@@ -1,0 +1,804 @@
+{
+  "phase": "MEANING_UNDERSTANDING_DEEP_AUDIT_84",
+  "executedAt": "2026-10-02T01:10:10.044Z",
+  "intentAccuracy": 0.5833333333333334,
+  "intent": [
+    {
+      "text": "こんにちは",
+      "expected": "CASUAL_CHAT",
+      "actual": "CASUAL_CHAT",
+      "passed": true
+    },
+    {
+      "text": "違う、AではなくBです",
+      "expected": "CORRECTION",
+      "actual": "CORRECTION",
+      "passed": true
+    },
+    {
+      "text": "この処理を実装して",
+      "expected": "REQUEST_ARTIFACT",
+      "actual": "REQUEST_ARTIFACT",
+      "passed": true
+    },
+    {
+      "text": "AとBならどっちがおすすめ？",
+      "expected": "REQUEST_RECOMMENDATION",
+      "actual": "REQUEST_RECOMMENDATION",
+      "passed": true
+    },
+    {
+      "text": "なぜ失敗したの？",
+      "expected": "REQUEST_EXPLANATION",
+      "actual": "REQUEST_EXPLANATION",
+      "passed": true
+    },
+    {
+      "text": "さらに詳しく",
+      "expected": "FOLLOW_UP",
+      "actual": "CONTINUATION",
+      "passed": false
+    },
+    {
+      "text": "どういう意味？",
+      "expected": "REQUEST_EXPLANATION",
+      "actual": "QUESTION",
+      "passed": false
+    },
+    {
+      "text": "ありがとう",
+      "expected": "CASUAL_CHAT",
+      "actual": "CASUAL_CHAT",
+      "passed": true
+    },
+    {
+      "text": "これで進めて",
+      "expected": "REQUEST_ARTIFACT",
+      "actual": "QUESTION",
+      "passed": false
+    },
+    {
+      "text": "本当に問題ない？",
+      "expected": "QUESTION",
+      "actual": "CONFIRMATION",
+      "passed": false
+    },
+    {
+      "text": "Aの場合だけ変更して",
+      "expected": "QUESTION",
+      "actual": "FEEDBACK",
+      "passed": false
+    },
+    {
+      "text": "その行は触らないで",
+      "expected": "QUESTION",
+      "actual": "QUESTION",
+      "passed": true
+    }
+  ],
+  "semantic": [
+    {
+      "text": "Aの場合だけBを更新して、それ以外は変更しない",
+      "resolvedText": "候補Aを実装して検証する\n後続指示:Aの場合だけBを更新して、それ以外は変更しない",
+      "ready": false,
+      "clarification": "WAITING_USER",
+      "conflicts": [
+        "EXCLUSION_TARGET_UNRESOLVED"
+      ],
+      "targets": [
+        "候補A",
+        "候補B"
+      ],
+      "targetSets": [],
+      "exclusionSets": [
+        "後続指示:Aの場合だけBを更新して、それ以外は変更しない"
+      ],
+      "actionChains": [
+        {
+          "segments": [
+            "候補Aを実装して検証する"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "候補Aを実装して検証する"
+        },
+        {
+          "segments": [
+            "後続指示",
+            "Aの場合だけBを更新して、それ以外は変更しない"
+          ],
+          "separators": [
+            ":"
+          ],
+          "scope": "PREVIOUS_MUTATION_ROWS",
+          "source": "後続指示:Aの場合だけBを更新して、それ以外は変更しない"
+        }
+      ],
+      "mutations": [
+        {
+          "actionId": "A1",
+          "operation": "VERIFY",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "field": "候補A",
+          "value": "実装して検証する",
+          "valueType": "STRING",
+          "dependsOn": [],
+          "executionOrder": 1,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "候補Aを実装して検証する"
+        },
+        {
+          "actionId": "A2",
+          "operation": "UNKNOWN",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "valueType": "UNKNOWN",
+          "dependsOn": [],
+          "executionOrder": 2,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "後続指示"
+        }
+      ],
+      "typedTerms": [
+        {
+          "value": "A",
+          "kind": "UNKNOWN",
+          "preserveLeadingZeros": false,
+          "confidence": 0.45
+        },
+        {
+          "value": "B",
+          "kind": "UNKNOWN",
+          "preserveLeadingZeros": false,
+          "confidence": 0.45
+        }
+      ]
+    },
+    {
+      "text": "処理対象外が1の行には一切触らない",
+      "resolvedText": "処理対象外が1の行には一切触らない",
+      "ready": false,
+      "clarification": "WAITING_USER",
+      "conflicts": [],
+      "targets": [
+        "候補A",
+        "候補B"
+      ],
+      "targetSets": [
+        "処理対象外が1の行には一切触らない"
+      ],
+      "exclusionSets": [
+        "処理対象外が1の行には一切触らない"
+      ],
+      "actionChains": [
+        {
+          "segments": [
+            "処理対象外が1の行には一切触らない"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "処理対象外が1の行には一切触らない"
+        }
+      ],
+      "mutations": [],
+      "typedTerms": []
+    },
+    {
+      "text": "Aを変更した行だけ、続けてBも更新する",
+      "resolvedText": "Aを変更した行だけ、続けてBも更新する",
+      "ready": false,
+      "clarification": "WAITING_USER",
+      "conflicts": [],
+      "targets": [
+        "候補A",
+        "候補B"
+      ],
+      "targetSets": [
+        "Aを変更した行だけ、続けてBも更新する"
+      ],
+      "exclusionSets": [],
+      "actionChains": [
+        {
+          "segments": [
+            "Aを変更した行だけ、続けてBも更新する"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "Aを変更した行だけ、続けてBも更新する"
+        }
+      ],
+      "mutations": [
+        {
+          "actionId": "A1",
+          "operation": "UPDATE",
+          "targetSet": "PREVIOUS_MUTATION_ROWS",
+          "valueType": "UNKNOWN",
+          "dependsOn": [],
+          "executionOrder": 1,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "Aを変更した行だけ、続けてBも更新する"
+        }
+      ],
+      "typedTerms": [
+        {
+          "value": "A",
+          "kind": "UNKNOWN",
+          "preserveLeadingZeros": false,
+          "confidence": 0.45
+        },
+        {
+          "value": "B",
+          "kind": "UNKNOWN",
+          "preserveLeadingZeros": false,
+          "confidence": 0.45
+        }
+      ]
+    },
+    {
+      "text": "同じPROJECT_IDをまとめて、重複は除外して",
+      "resolvedText": "同じPROJECT_IDをまとめて、重複は除外して",
+      "ready": false,
+      "clarification": "WAITING_USER",
+      "conflicts": [
+        "EXCLUSION_TARGET_UNRESOLVED"
+      ],
+      "targets": [
+        "候補A",
+        "候補B",
+        "PROJECT_ID"
+      ],
+      "targetSets": [],
+      "exclusionSets": [
+        "同じPROJECT_IDをまとめて、重複は除外して"
+      ],
+      "actionChains": [
+        {
+          "segments": [
+            "同じPROJECT_IDをまとめて、重複は除外して"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "同じPROJECT_IDをまとめて、重複は除外して"
+        }
+      ],
+      "mutations": [
+        {
+          "actionId": "A1",
+          "operation": "UNKNOWN",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "valueType": "UNKNOWN",
+          "dependsOn": [],
+          "executionOrder": 1,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "同じPROJECT_IDをまとめて、重複は除外して"
+        }
+      ],
+      "typedTerms": [
+        {
+          "value": "PROJECT_ID",
+          "kind": "FIELD",
+          "preserveLeadingZeros": false,
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "text": "失敗したら元に戻して、成功した場合だけ保存する",
+      "resolvedText": "失敗したら元に戻して、成功した場合だけ保存する",
+      "ready": false,
+      "clarification": "WAITING_USER",
+      "conflicts": [],
+      "targets": [
+        "候補A",
+        "候補B"
+      ],
+      "targetSets": [],
+      "exclusionSets": [],
+      "actionChains": [
+        {
+          "segments": [
+            "失敗したら元に戻して、成功した場合だけ保存する"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "失敗したら元に戻して、成功した場合だけ保存する"
+        }
+      ],
+      "mutations": [
+        {
+          "actionId": "A1",
+          "operation": "UNKNOWN",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "valueType": "UNKNOWN",
+          "dependsOn": [],
+          "executionOrder": 1,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "失敗したら元に戻して、成功した場合だけ保存する"
+        }
+      ],
+      "typedTerms": []
+    },
+    {
+      "text": "03000は条件によって03100か06000に変える",
+      "resolvedText": "03000は条件によって03100か06000に変える",
+      "ready": false,
+      "clarification": "WAITING_USER",
+      "conflicts": [],
+      "targets": [
+        "候補A",
+        "候補B"
+      ],
+      "targetSets": [],
+      "exclusionSets": [],
+      "actionChains": [
+        {
+          "segments": [
+            "03000は条件によって03100か06000に変える"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "03000は条件によって03100か06000に変える"
+        }
+      ],
+      "mutations": [
+        {
+          "actionId": "A1",
+          "operation": "UNKNOWN",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "valueType": "UNKNOWN",
+          "dependsOn": [],
+          "executionOrder": 1,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "03000は条件によって03100か06000に変える"
+        }
+      ],
+      "typedTerms": [
+        {
+          "value": "03000",
+          "kind": "BUSINESS_CODE",
+          "preserveLeadingZeros": true,
+          "confidence": 0.9
+        },
+        {
+          "value": "03100",
+          "kind": "BUSINESS_CODE",
+          "preserveLeadingZeros": true,
+          "confidence": 0.9
+        },
+        {
+          "value": "06000",
+          "kind": "BUSINESS_CODE",
+          "preserveLeadingZeros": true,
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "text": "それを続けて。ただし前の条件は残して",
+      "resolvedText": "候補Aを実装して検証する\n後続指示:それを続けて。ただし前の条件は残して",
+      "ready": false,
+      "clarification": "WAITING_USER",
+      "conflicts": [
+        "EXCLUSION_TARGET_UNRESOLVED"
+      ],
+      "targets": [
+        "候補A",
+        "候補B"
+      ],
+      "targetSets": [],
+      "exclusionSets": [
+        "ただし前の条件は残して"
+      ],
+      "actionChains": [
+        {
+          "segments": [
+            "候補Aを実装して検証する"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "候補Aを実装して検証する"
+        },
+        {
+          "segments": [
+            "後続指示",
+            "それを続けて"
+          ],
+          "separators": [
+            ":"
+          ],
+          "scope": "PREVIOUS_MUTATION_ROWS",
+          "source": "後続指示:それを続けて"
+        },
+        {
+          "segments": [
+            "ただし前の条件は残して"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "ただし前の条件は残して"
+        }
+      ],
+      "mutations": [
+        {
+          "actionId": "A1",
+          "operation": "VERIFY",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "field": "候補A",
+          "value": "実装して検証する",
+          "valueType": "STRING",
+          "dependsOn": [],
+          "executionOrder": 1,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "候補Aを実装して検証する"
+        },
+        {
+          "actionId": "A2",
+          "operation": "UNKNOWN",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "valueType": "UNKNOWN",
+          "dependsOn": [],
+          "executionOrder": 2,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "後続指示"
+        },
+        {
+          "actionId": "A3",
+          "operation": "UNKNOWN",
+          "targetSet": "PREVIOUS_MUTATION_ROWS",
+          "field": "それ",
+          "value": "続けて",
+          "valueType": "STRING",
+          "dependsOn": [
+            "A2"
+          ],
+          "executionOrder": 3,
+          "sameTransaction": true,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "それを続けて"
+        },
+        {
+          "actionId": "A4",
+          "operation": "UNKNOWN",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "valueType": "UNKNOWN",
+          "dependsOn": [],
+          "executionOrder": 4,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "ただし前の条件は残して"
+        }
+      ],
+      "typedTerms": [
+        {
+          "value": "A",
+          "kind": "UNKNOWN",
+          "preserveLeadingZeros": false,
+          "confidence": 0.45
+        }
+      ]
+    },
+    {
+      "text": "できれば直して、無理なら理由だけ教えて",
+      "resolvedText": "できれば直して、無理なら理由だけ教えて",
+      "ready": false,
+      "clarification": "WAITING_USER",
+      "conflicts": [],
+      "targets": [
+        "候補A",
+        "候補B"
+      ],
+      "targetSets": [],
+      "exclusionSets": [],
+      "actionChains": [
+        {
+          "segments": [
+            "できれば直して、無理なら理由だけ教えて"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "できれば直して、無理なら理由だけ教えて"
+        }
+      ],
+      "mutations": [
+        {
+          "actionId": "A1",
+          "operation": "UNKNOWN",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "valueType": "UNKNOWN",
+          "dependsOn": [],
+          "executionOrder": 1,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "できれば直して、無理なら理由だけ教えて"
+        }
+      ],
+      "typedTerms": []
+    },
+    {
+      "text": "AではなくB。Cはそのまま",
+      "resolvedText": "候補Aを実装して検証する\n後続指示:AではなくB。Cはそのまま",
+      "ready": false,
+      "clarification": "WAITING_USER",
+      "conflicts": [],
+      "targets": [
+        "候補A",
+        "候補B"
+      ],
+      "targetSets": [],
+      "exclusionSets": [],
+      "actionChains": [
+        {
+          "segments": [
+            "候補Aを実装して検証する"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "候補Aを実装して検証する"
+        },
+        {
+          "segments": [
+            "後続指示",
+            "AではなくB"
+          ],
+          "separators": [
+            ":"
+          ],
+          "scope": "PREVIOUS_MUTATION_ROWS",
+          "source": "後続指示:AではなくB"
+        },
+        {
+          "segments": [
+            "Cはそのまま"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "Cはそのまま"
+        }
+      ],
+      "mutations": [
+        {
+          "actionId": "A1",
+          "operation": "VERIFY",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "field": "候補A",
+          "value": "実装して検証する",
+          "valueType": "STRING",
+          "dependsOn": [],
+          "executionOrder": 1,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "候補Aを実装して検証する"
+        },
+        {
+          "actionId": "A2",
+          "operation": "UNKNOWN",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "valueType": "UNKNOWN",
+          "dependsOn": [],
+          "executionOrder": 2,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "後続指示"
+        },
+        {
+          "actionId": "A3",
+          "operation": "UNKNOWN",
+          "targetSet": "PREVIOUS_MUTATION_ROWS",
+          "valueType": "UNKNOWN",
+          "dependsOn": [
+            "A2"
+          ],
+          "executionOrder": 3,
+          "sameTransaction": true,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "AではなくB"
+        },
+        {
+          "actionId": "A4",
+          "operation": "UNKNOWN",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "valueType": "UNKNOWN",
+          "dependsOn": [],
+          "executionOrder": 4,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "Cはそのまま"
+        }
+      ],
+      "typedTerms": [
+        {
+          "value": "A",
+          "kind": "UNKNOWN",
+          "preserveLeadingZeros": false,
+          "confidence": 0.45
+        },
+        {
+          "value": "B",
+          "kind": "UNKNOWN",
+          "preserveLeadingZeros": false,
+          "confidence": 0.45
+        },
+        {
+          "value": "C",
+          "kind": "UNKNOWN",
+          "preserveLeadingZeros": false,
+          "confidence": 0.45
+        }
+      ]
+    },
+    {
+      "text": "昨日の結果と今日の結果を比較して",
+      "resolvedText": "昨日の結果と今日の結果を比較して",
+      "ready": false,
+      "clarification": "WAITING_USER",
+      "conflicts": [],
+      "targets": [
+        "候補A",
+        "候補B"
+      ],
+      "targetSets": [],
+      "exclusionSets": [],
+      "actionChains": [
+        {
+          "segments": [
+            "昨日の結果と今日の結果を比較して"
+          ],
+          "separators": [],
+          "scope": "SINGLE",
+          "source": "昨日の結果と今日の結果を比較して"
+        }
+      ],
+      "mutations": [
+        {
+          "actionId": "A1",
+          "operation": "UNKNOWN",
+          "targetSet": "ALL_MATCHED_ROWS",
+          "field": "昨日の結果と今日の結果",
+          "value": "比較して",
+          "valueType": "STRING",
+          "dependsOn": [],
+          "executionOrder": 1,
+          "sameTransaction": false,
+          "continueAfter": false,
+          "stopAfter": false,
+          "rollbackOnFailure": true,
+          "source": "昨日の結果と今日の結果を比較して"
+        }
+      ],
+      "typedTerms": []
+    }
+  ],
+  "references": [
+    {
+      "text": "それを続けて",
+      "resolvedText": "候補Aを実装して検証する\n後続指示:それを続けて",
+      "ready": false
+    },
+    {
+      "text": "前の処理は残して",
+      "resolvedText": "候補Aを実装して検証する\n後続指示:前の処理は残して",
+      "ready": false
+    },
+    {
+      "text": "残りも進めて",
+      "resolvedText": "候補Aを実装して検証する\n後続指示:残りも進めて",
+      "ready": false
+    },
+    {
+      "text": "さっきの条件を戻して",
+      "resolvedText": "候補Aを実装して検証する\n後続指示:さっきの条件を戻して",
+      "ready": false
+    }
+  ],
+  "hybrid": [
+    {
+      "text": "これでどう？",
+      "dialogueAct": "QUESTION",
+      "stage": "QUESTION",
+      "anaphora": {
+        "detectedExpression": "これ",
+        "resolved": null,
+        "candidates": [],
+        "confidence": "unresolved"
+      },
+      "deterministic": false,
+      "llmFallbackNeeded": true,
+      "reason": "意味制約未確定: REFERENCE_UNRESOLVED:これ",
+      "semanticReady": false,
+      "resolvedText": "候補Aを実装して検証する\n後続指示:これでどう？"
+    },
+    {
+      "text": "もっと良くして",
+      "dialogueAct": "REQUEST",
+      "stage": "QUESTION",
+      "anaphora": {
+        "detectedExpression": null,
+        "resolved": null,
+        "candidates": [],
+        "confidence": "unresolved"
+      },
+      "deterministic": false,
+      "llmFallbackNeeded": true,
+      "reason": "意味制約未確定: GOAL_UNRESOLVED",
+      "semanticReady": false,
+      "resolvedText": "もっと良くして"
+    },
+    {
+      "text": "問題ない？",
+      "dialogueAct": "QUESTION",
+      "stage": "QUESTION",
+      "anaphora": {
+        "detectedExpression": null,
+        "resolved": null,
+        "candidates": [],
+        "confidence": "unresolved"
+      },
+      "deterministic": false,
+      "llmFallbackNeeded": true,
+      "reason": "意味制約未確定: GOAL_UNRESOLVED,NO_EXECUTABLE_SOLUTION",
+      "semanticReady": false,
+      "resolvedText": "問題ない？"
+    },
+    {
+      "text": "既存機能は消さないで実装して",
+      "dialogueAct": "REQUEST_ARTIFACT",
+      "stage": "DECISION",
+      "anaphora": {
+        "detectedExpression": null,
+        "resolved": null,
+        "candidates": [],
+        "confidence": "unresolved"
+      },
+      "deterministic": false,
+      "llmFallbackNeeded": true,
+      "reason": "意味制約未確定: ",
+      "semanticReady": false,
+      "resolvedText": "既存機能は消さないで実装して"
+    }
+  ],
+  "existingRegression": {
+    "conversationLearningAndReasoning": "FAIL: second consistent affirmation did not promote claim from CANDIDATE to SUPPORTED",
+    "anaphoraShadow": {
+      "uniqueTopicMatch": 0.85,
+      "uniqueResponseTextMatch": 0.75
+    }
+  },
+  "conclusion": "NOT_YET_GENERAL_CONVERSATION_LEVEL"
+}

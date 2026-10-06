@@ -1,0 +1,67 @@
+{
+  "phase": "VISUAL_STYLE_LEARNING_P113",
+  "passed": true,
+  "checks": {
+    "profileHash": true,
+    "faceTrendIncluded": true,
+    "identityRecognitionDisabled": true,
+    "provenanceRetained": true,
+    "pixelCandidateHash": true,
+    "pixelDimensions": true,
+    "transparencyPreserved": true
+  },
+  "profile": {
+    "sampleCount": 1,
+    "dominantPalette": [
+      "#ff0000",
+      "#00ff00",
+      "#0000ff"
+    ],
+    "averageSaturation": 1,
+    "averageLuminance": 0.3333333333333333,
+    "transparentPixelRatio": 0.25,
+    "faceTrend": {
+      "faceWidthRatio": 0.72,
+      "faceHeightRatio": 0.91,
+      "eyeSpacingRatio": 0.31,
+      "eyeSizeRatio": 0.18,
+      "noseLengthRatio": 0.22,
+      "mouthWidthRatio": 0.36,
+      "outlineStrength": 0.7,
+      "shadingSteps": 4
+    },
+    "provenanceSha256List": [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ],
+    "profileSha256": "60cf3b7200e9fb6898dcfe833e47ad9a71d9ab69abb36a2debabcc0d34b825f7"
+  },
+  "candidate": {
+    "width": 4,
+    "height": 4,
+    "palette": [
+      "#ff0000",
+      "#00ff00",
+      "#0000ff"
+    ],
+    "indices": [
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      1,
+      1,
+      2,
+      2,
+      -1,
+      -1,
+      2,
+      2,
+      -1,
+      -1
+    ],
+    "sourceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "candidateSha256": "e63640a4134ff1ca25c5478c31906e79654e99a9a0ef953203191f034ea67a28"
+  }
+}

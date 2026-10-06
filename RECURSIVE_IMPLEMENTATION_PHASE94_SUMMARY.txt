@@ -1,0 +1,44 @@
+MIKI-AI Recursive Implementation Phase 94
+
+Deep finding converted into runtime implementation
+- Phase 93 proved that unknownResearchConversationBridgeService was only barrel-exported and directly tested, not called by the normal chat execution path.
+- Phase 94 connects it inside the canonical miki/safety NonLlmCoreService immediately after HybridConversationEngine interpretation.
+
+Normal chat route
+1. HybridConversationEngine interprets the user input.
+2. Conversation unknown-vocabulary assessment is read from semantic output, with a direct dictionary-first assessment fallback.
+3. The bridge is entered only when unknown terms exist and the user explicitly asks for meaning, definition, an explanation, usage, search or investigation.
+4. Search is enabled only for explicit investigation/freshness wording; ordinary definition questions remain local-first.
+5. UnifiedUnknownResolutionCoordinator executes.
+6. The bridge converts the resolution result into AnswerContentIR and RuntimeConversationComposition output.
+7. NonLlmCore returns the response with knowledgeGapId, evidence count, research status and usedComponents provenance.
+
+Dynamic proof through the real canonical chat executor
+Input: FoobarnativeXとは何か教えて
+- NonLlmCoreService.execute was called, not the bridge directly.
+- usedComponents contains unknownResearchConversationBridgeService.
+- reason is unknown_research_no_evidence.
+- knowledgeGapId is present.
+- currentTopic became FoobarnativeX.
+- The reply returned through normal runtime composition and explicitly said the term could not yet be confirmed.
+
+Safety behavior
+- Unknown terms in ordinary statements do not automatically trigger research; explicit inquiry wording is required.
+- A request containing 調べ, 検索, 最新 or 現在 may enable search.
+- No-evidence and unverified outcomes remain UNRESOLVED rather than being promoted to facts.
+- External bytes remain zero in the offline no-search verification.
+
+Verification
+- Phase 94 canonical normal-chat unknown return: PASS
+- Phase 92 deep realization and bridge: PASS
+- Phase 91 runtime composition: PASS
+- Phase 89 unknown vocabulary: PASS
+- TypeScript: PASS
+- Relative imports: PASS
+- Production/server build: PASS
+
+Remaining priorities
+- Connect ConversationKnowledgeUsePolicy into every answer-planning path.
+- Connect memorySearchReceiptService and rustMemoryKernelService through a guarded native/fallback memory search facade.
+- Resolve or formally deprecate the seven completely orphaned legacy services.
+- Audit 23 duplicate service basenames for divergent singleton state and storage keys.

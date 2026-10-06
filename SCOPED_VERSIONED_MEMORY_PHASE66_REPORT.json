@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "phase": "SCOPED_VERSIONED_MEMORY_66",
+  "dynamicCases": 5,
+  "memoryKinds": 8,
+  "lifecycleStates": 6,
+  "typescriptFilesScanned": 619,
+  "failures": []
+}

@@ -3,6 +3,12 @@ import { classifyDialogueAct, inferConversationStage, resolveAnaphora } from './
 import { conversationComponentPipelineService } from './conversationComponentPipelineService';
 import { answerContentIrService } from './answerContentIrService';
 import { runtimeConversationCompositionService } from './runtimeConversationCompositionService';
+import { semanticUnderstandingV2OrchestratorService, type ConversationSemanticContext } from '../../selfDevelopment/services/semanticUnderstandingV2OrchestratorService';
+import { conversationTaskboardService } from './conversationTaskboardService';
+import { memoryContextBridgeService } from '../../memory/services/memoryContextBridgeService';
+import { conversationContinuityService } from './conversationContinuityService';
+import { conversationPragmaticsService } from './conversationPragmaticsService';
+import { conversationUnknownVocabularyService } from './conversationUnknownVocabularyService';
 
 export interface ConversationInterpretation {
   dialogueAct: ReturnType<typeof classifyDialogueAct>;
@@ -13,11 +19,13 @@ export interface ConversationInterpretation {
   deterministic: boolean;
   llmFallbackNeeded: boolean;
   reason: string;
+  semantic: ReturnType<typeof semanticUnderstandingV2OrchestratorService.analyze>;
+  continuationTaskIds: string[];
 }
 
 /** 第92/94章: 会話を意味処理と表層生成へ分解し、既知領域ではLLMを呼ばない。 */
 export class HybridConversationEngineService {
-  interpret(input: string, state: ConversationState): ConversationInterpretation {
+  interpret(input: string, state: ConversationState, semanticHistory: ConversationSemanticContext[] = []): ConversationInterpretation {
     const text = input.trim();
     const dialogueAct = classifyDialogueAct(text);
     const stage = inferConversationStage(text, state.stage);
@@ -27,9 +35,18 @@ export class HybridConversationEngineService {
     if (dialogueAct === 'CORRECTION') skeleton = 'CORRECTION';
     else if (dialogueAct === 'REQUEST_ARTIFACT') skeleton = 'TASK_COMPLETION';
     else if (dialogueAct === 'REQUEST_RECOMMENDATION') skeleton = 'RECOMMENDATION';
-    const blocking = anaphora.confidence === 'ambiguous';
+    const memoryHistory = memoryContextBridgeService.semanticContext({scopeType:'CONVERSATION',scopeId:state.conversationId||'active',limit:12});
+    const compressedSnapshot=conversationContinuityService.compress(semanticHistory,text,24);
+    const restoredSemanticHistory=conversationContinuityService.restore(compressedSnapshot);
+    const pragmatics=conversationPragmaticsService.interpret(text);
+    const vocabulary=conversationUnknownVocabularyService.assess(text,{allowResearch:true});
+    const mergedSemanticHistory = [...restoredSemanticHistory, ...memoryHistory].filter((item,index,all)=>all.findIndex(other=>other.turnId===item.turnId&&other.text===item.text)===index).slice(-32);
+    const semantic = semanticUnderstandingV2OrchestratorService.analyze(text, analysis.contentTokens, undefined, mergedSemanticHistory);
+    const continuationTaskIds = conversationTaskboardService.resolveContinuation(text).map((task) => task.id);
+    const blocking = anaphora.confidence === 'ambiguous' || !semantic.ready;
     const known = dialogueAct !== 'CASUAL_CHAT' || analysis.contentTokens.length > 0;
-    return { dialogueAct, stage, anaphora, tokens: analysis.contentTokens, skeleton, deterministic: known && !blocking, llmFallbackNeeded: blocking || !known, reason: blocking ? '参照解決が曖昧' : known ? '規則・辞書・状態から解釈可能' : '未知表現のためフォールバック候補' };
+    const reason = !semantic.ready ? `意味制約未確定: ${semantic.clarification.reasons.join(',') || semantic.frame.unknowns.join(',')}` : blocking ? '参照解決が曖昧' : known ? '規則・辞書・状態から解釈可能' : '未知表現のためフォールバック候補';
+    return { dialogueAct, stage, anaphora, tokens: analysis.contentTokens, skeleton, deterministic: known && !blocking, llmFallbackNeeded: blocking || !known, reason, semantic, continuationTaskIds };
   }
 
   render(ir: Parameters<typeof answerContentIrService.generateSurfaceTextFromIR>[0], skeleton: AnswerSkeletonType) {

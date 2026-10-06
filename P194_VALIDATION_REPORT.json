@@ -1,0 +1,43 @@
+{
+  "phase": "DETAILED_HUMAN_RULE_LEARNING_P194",
+  "passed": true,
+  "checks": {
+    "subjects": true,
+    "featureRules": true,
+    "correlations": true,
+    "constraints": true,
+    "occlusion": true,
+    "eyes": true,
+    "nose": true,
+    "lips": true,
+    "cheekJawEar": true,
+    "neckBlend": true,
+    "fingers": true,
+    "viewIdentity": true,
+    "modelSha": true,
+    "ruleSha": true,
+    "localOnly": true
+  },
+  "learned": {
+    "subjects": 10,
+    "featureRules": 45,
+    "correlations": 10,
+    "constraints": 6,
+    "occlusionRules": 6,
+    "ruleBookSha256": "49ea6270bd4cd3d6bfb4e99a1a22405d60dfe00772353a21b19432e5534a70bb"
+  },
+  "model": {
+    "controlPoints": 51,
+    "patches": 25,
+    "facialControlPoints": 24,
+    "fingerControlPoints": 10,
+    "identityInvariantSha256": "825e2b29e0336bed6fb5e672b86510a63ff7b1a1c4e9e52c731d865058b04489",
+    "modelSha256": "310882062c43d76ad2df949a3f0c5f2fb2fefd73049f9c96150ea701911785c3"
+  },
+  "architecture": {
+    "externalProvider": false,
+    "neuralWeights": false,
+    "explicitRules": true,
+    "sourcePixelCopy": false
+  }
+}

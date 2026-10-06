@@ -1,0 +1,7 @@
+import fs from'node:fs';import{visualStyleLearningService as learning}from'../src/miki/core/services/visualStyleLearningService.ts';import{pixelArtCandidateService as pixel}from'../src/miki/core/services/pixelArtCandidateService.ts';
+const provenance={assetId:'A1',contentSha256:'a'.repeat(64),mediaKind:'IMAGE',license:'CC0',sourceLabel:'fixture',identityRecognitionAllowed:false};
+const frame={width:2,height:2,rgba:[255,0,0,255,0,255,0,255,0,0,255,255,0,0,0,0],provenance};
+const face={faceWidthRatio:.72,faceHeightRatio:.91,eyeSpacingRatio:.31,eyeSizeRatio:.18,noseLengthRatio:.22,mouthWidthRatio:.36,outlineStrength:.7,shadingSteps:4};
+const profile=learning.learn([{frame,faceStructure:face}],4);const candidate=pixel.generate(frame,4,4,profile.dominantPalette);
+const checks={profileHash:profile.profileSha256.length===64,faceTrendIncluded:profile.faceTrend?.eyeSpacingRatio===face.eyeSpacingRatio,identityRecognitionDisabled:provenance.identityRecognitionAllowed===false,provenanceRetained:profile.provenanceSha256List[0]===provenance.contentSha256,pixelCandidateHash:candidate.candidateSha256.length===64,pixelDimensions:candidate.indices.length===16,transparencyPreserved:candidate.indices.includes(-1)};
+const report={phase:'VISUAL_STYLE_LEARNING_P113',passed:Object.values(checks).every(Boolean),checks,profile,candidate};fs.writeFileSync('VISUAL_STYLE_LEARNING_P113_REPORT.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));if(!report.passed)process.exit(1);

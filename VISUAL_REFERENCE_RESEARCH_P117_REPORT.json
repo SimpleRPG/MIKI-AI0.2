@@ -1,0 +1,148 @@
+{
+  "phase": "VISUAL_REFERENCE_RESEARCH_P117",
+  "passed": true,
+  "checks": {
+    "openverse": true,
+    "wikimedia": true,
+    "pixabayBlocked": true,
+    "accepted": true,
+    "ndRejected": true,
+    "suggestion": true,
+    "noOriginal": true,
+    "hash": true
+  },
+  "packet": {
+    "query": {
+      "query": "forest pixel art",
+      "media": "IMAGE",
+      "purpose": "SCENE",
+      "allowModification": true,
+      "commercialUse": true,
+      "limit": 8
+    },
+    "candidates": [
+      {
+        "provider": "OPENVERSE",
+        "id": "1",
+        "title": "forest",
+        "pageUrl": "https://example/a",
+        "previewUrl": "https://example/a.jpg",
+        "license": "CC0",
+        "tags": [
+          "forest",
+          "green",
+          "mist"
+        ],
+        "media": "IMAGE",
+        "sourceVerified": true
+      },
+      {
+        "provider": "WIKIMEDIA_COMMONS",
+        "id": "2",
+        "title": "woods",
+        "pageUrl": "https://example/b",
+        "previewUrl": "https://example/b.jpg",
+        "license": "CC-BY-SA-4.0",
+        "attribution": "Creator / CC-BY-SA-4.0",
+        "tags": [
+          "forest",
+          "green"
+        ],
+        "media": "IMAGE",
+        "sourceVerified": true
+      },
+      {
+        "provider": "OPENVERSE",
+        "id": "3",
+        "title": "locked",
+        "pageUrl": "https://example/c",
+        "previewUrl": "https://example/c.jpg",
+        "license": "CC-BY-ND-4.0",
+        "tags": [
+          "forest"
+        ],
+        "media": "IMAGE",
+        "sourceVerified": true
+      }
+    ],
+    "accepted": [
+      {
+        "provider": "OPENVERSE",
+        "id": "1",
+        "title": "forest",
+        "pageUrl": "https://example/a",
+        "previewUrl": "https://example/a.jpg",
+        "license": "CC0",
+        "tags": [
+          "forest",
+          "green",
+          "mist"
+        ],
+        "media": "IMAGE",
+        "sourceVerified": true
+      },
+      {
+        "provider": "WIKIMEDIA_COMMONS",
+        "id": "2",
+        "title": "woods",
+        "pageUrl": "https://example/b",
+        "previewUrl": "https://example/b.jpg",
+        "license": "CC-BY-SA-4.0",
+        "attribution": "Creator / CC-BY-SA-4.0",
+        "tags": [
+          "forest",
+          "green"
+        ],
+        "media": "IMAGE",
+        "sourceVerified": true
+      }
+    ],
+    "rejected": [
+      {
+        "candidate": {
+          "provider": "OPENVERSE",
+          "id": "3",
+          "title": "locked",
+          "pageUrl": "https://example/c",
+          "previewUrl": "https://example/c.jpg",
+          "license": "CC-BY-ND-4.0",
+          "tags": [
+            "forest"
+          ],
+          "media": "IMAGE",
+          "sourceVerified": true
+        },
+        "reason": "LICENSE_NO_DERIVATIVES"
+      }
+    ],
+    "trendHints": [
+      "場面の傾向「forest」",
+      "場面の傾向「green」",
+      "場面の傾向「mist」"
+    ],
+    "packetSha256": "b8098b5051d6b44e9488d5bc9ece37e08df5282af9424e793e452a5199cff084"
+  },
+  "suggestions": [
+    "候補1: 場面の傾向「forest」。こういう方向をCanvasまたはドット絵候補に反映しますか？",
+    "候補2: 場面の傾向「green」。こういう方向をCanvasまたはドット絵候補に反映しますか？",
+    "候補3: 場面の傾向「mist」。こういう方向をCanvasまたはドット絵候補に反映しますか？"
+  ],
+  "plan": {
+    "storeOriginalMedia": false,
+    "outputs": [
+      "PALETTE_PROFILE",
+      "SHAPE_TREND",
+      "POSE_MOTION",
+      "CLOTHING_TREND",
+      "PIXEL_GRID_HINT"
+    ],
+    "sourcePageUrls": [
+      "https://example/a",
+      "https://example/b"
+    ],
+    "attributions": [
+      "Creator / CC-BY-SA-4.0"
+    ],
+    "packetSha256": "b8098b5051d6b44e9488d5bc9ece37e08df5282af9424e793e452a5199cff084"
+  }
+}

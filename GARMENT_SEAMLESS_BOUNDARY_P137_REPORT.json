@@ -1,0 +1,56 @@
+{
+  "phase": "GARMENT_SEAMLESS_BOUNDARY_P137",
+  "passed": true,
+  "checks": {
+    "noArtificialOutline": true,
+    "neverBlack": true,
+    "observedSignalsPreserved": true,
+    "explicitRequestOnly": true,
+    "sha": true
+  },
+  "seamless": {
+    "mode": "NO_ARTIFICIAL_BOUNDARY",
+    "drawBlackOutline": false,
+    "drawBoundary": false,
+    "boundaryColor": null,
+    "boundaryOpacity": 0,
+    "allowedSignals": [],
+    "reason": [
+      "EXACT_COLOR_MATCH",
+      "ZERO_GAPS_CONFIRMED",
+      "NO_OBSERVED_BOUNDARY_SIGNAL"
+    ],
+    "policySha256": "4c0b8d3e8eb9228b1204691d023914fc545c2f97efa774000efc3452eeaf57aa"
+  },
+  "observed": {
+    "mode": "OBSERVED_BOUNDARY_ONLY",
+    "drawBlackOutline": false,
+    "drawBoundary": true,
+    "boundaryColor": "#f3f3f3",
+    "boundaryOpacity": 0.8,
+    "allowedSignals": [
+      "OBSERVED_SEAM",
+      "OBSERVED_SHADOW",
+      "OBSERVED_TEXTURE",
+      "OBSERVED_THICKNESS"
+    ],
+    "reason": [
+      "OBSERVED_SIGNAL_ONLY"
+    ],
+    "policySha256": "c247f5dd5b1d9cc45c58d3353166caf2b0f747486b6975e390658affb90aa4e8"
+  },
+  "explicit": {
+    "mode": "STRUCTURAL_BOUNDARY",
+    "drawBlackOutline": false,
+    "drawBoundary": true,
+    "boundaryColor": "#000000",
+    "boundaryOpacity": 0.8,
+    "allowedSignals": [
+      "USER_REQUESTED_OUTLINE"
+    ],
+    "reason": [
+      "USER_REQUESTED_OUTLINE"
+    ],
+    "policySha256": "862861be4e15d2ac5db78bb13591e36863de80a03beeccdbdf51135b49c1a43e"
+  }
+}

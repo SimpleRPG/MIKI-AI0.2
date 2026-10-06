@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "phase": "COMPATIBILITY_SURFACE_REDUCTION_60",
+  "typescriptFilesScanned": 619,
+  "unusedCompatibilityApisRemoved": 1,
+  "misleadingLegacyDocumentationRemoved": 1,
+  "exactDuplicateGroups": 0,
+  "failures": []
+}

@@ -1,0 +1,407 @@
+{
+  "nodes": [
+    {
+      "nodeId": "p207:turn:f6f17ac45f7e388acb",
+      "kind": "CONVERSATION_TURN",
+      "label": "使える会話部品を作り、反例を調べて良い条件と悪い条件をグラフに登録して",
+      "payload": {
+        "text": "使える会話部品を作り、反例を調べて良い条件と悪い条件をグラフに登録して",
+        "usedComponentIds": [
+          "conversation.analysis.intl_segmenter",
+          "conversation.analysis.dictionary_ngram",
+          "conversation.analysis.composed"
+        ],
+        "mode": "SYNCHRONOUS_COMPOSITION"
+      },
+      "confidence": 1,
+      "createdAt": 1791270028666,
+      "sha256": "7125eb33e8b82ace82f48418f351fe705b27d718b81ff4a25571360df9926c83"
+    },
+    {
+      "nodeId": "p207:intent:7d4de9514df270a419",
+      "kind": "INTENT",
+      "label": "RESEARCH_AND_ANSWER",
+      "payload": {
+        "sourceTurnId": "p207:turn:f6f17ac45f7e388acb"
+      },
+      "confidence": 0.88,
+      "createdAt": 1791270028666,
+      "sha256": "02acbe090fc5458691952311115d3c31cab2d06aaf02ebc82995e88e338e9dce"
+    },
+    {
+      "nodeId": "p207:capability:50877d1e6f6637a0fc",
+      "kind": "CAPABILITY",
+      "label": "会話意図解析と根拠付き応答構成",
+      "payload": {
+        "language": "ja",
+        "requiresCounterExamples": true
+      },
+      "confidence": 0.9,
+      "createdAt": 1791270028666,
+      "sha256": "b63b77882adde517d3c63a7172a24bf450b6a1511426416c715405437ee6179f"
+    },
+    {
+      "nodeId": "p207:component-0:915be13b1e1f830dd8",
+      "kind": "COMPONENT",
+      "label": "conversation.analysis.sudachi",
+      "payload": {
+        "componentId": "conversation.analysis.sudachi",
+        "available": false,
+        "verified": false,
+        "reason": "conversation.analysis.sudachi unavailable"
+      },
+      "confidence": 0.35,
+      "createdAt": 1791270028666,
+      "sha256": "4aab742bfc4ba5aa74dd1828ea69bf82c90909b06cf18c20789fbd9ed1cbbfd3"
+    },
+    {
+      "nodeId": "p207:component-1:102c8d2b908a17edf5",
+      "kind": "COMPONENT",
+      "label": "conversation.analysis.intl_segmenter",
+      "payload": {
+        "componentId": "conversation.analysis.intl_segmenter",
+        "available": true,
+        "verified": false,
+        "reason": "Intl.Segmenter result included"
+      },
+      "confidence": 0.35,
+      "createdAt": 1791270028666,
+      "sha256": "9c37ca5e9199bb80825da483fe2b0a7a0c715a6f39d64a1eac2a7aebaef0b61b"
+    },
+    {
+      "nodeId": "p207:component-2:adf77d27ab1d3f131e",
+      "kind": "COMPONENT",
+      "label": "conversation.analysis.dictionary_ngram",
+      "payload": {
+        "componentId": "conversation.analysis.dictionary_ngram",
+        "available": true,
+        "verified": false,
+        "reason": "Deterministic dictionary and N-gram result included"
+      },
+      "confidence": 0.35,
+      "createdAt": 1791270028666,
+      "sha256": "152c5b46c11cf6214e8d3ed91d8f0ba24c83916eaec7385c8f4a08abde55c41f"
+    },
+    {
+      "nodeId": "p207:component-3:5a9d19c0ecb07b130a",
+      "kind": "COMPONENT",
+      "label": "conversation.analysis.composed",
+      "payload": {
+        "componentId": "conversation.analysis.composed",
+        "available": true,
+        "verified": false,
+        "reason": "Available analysis Components were validated through the common Component Composition contract."
+      },
+      "confidence": 0.35,
+      "createdAt": 1791270028666,
+      "sha256": "a46ffa3a9b62f0e38c790f6e73a99529b69e7d5006e9ac4ae90894bfd287c4ef"
+    },
+    {
+      "nodeId": "p207:plan:5cdca441267a259d7b",
+      "kind": "COMPOSITION_PLAN",
+      "label": "COMPOSE",
+      "payload": {
+        "planId": "plan:p207:intent:7d4de9514df270a419",
+        "intentId": "p207:intent:7d4de9514df270a419",
+        "capabilityIds": [
+          "p207:capability:50877d1e6f6637a0fc"
+        ],
+        "componentIds": [
+          "conversation.analysis.intl_segmenter",
+          "conversation.analysis.dictionary_ngram",
+          "conversation.analysis.composed"
+        ],
+        "decision": "COMPOSE",
+        "reason": "反例を保持し、既存部品を条件付き合成する",
+        "planSha256": "f59f7d8cc3d6fb2d96230251605d5b6a1182fb27c362fc1b0a03083ca3c3c3b6"
+      },
+      "confidence": 0.9,
+      "createdAt": 1791270028666,
+      "sha256": "280d60269af78033512dc34f34b36079a191f3ba6aa27594a8ecd11174050353"
+    },
+    {
+      "nodeId": "p207:positive-GENERAL_JA:6aa5db44df7e651b8b",
+      "kind": "POSITIVE_EXAMPLE",
+      "label": "一般的な日本語要求",
+      "payload": {
+        "caseId": "GENERAL_JA",
+        "input": "部品をグラフ化して",
+        "expected": "CREATE_OR_COMPOSE_COMPONENT",
+        "actual": "CREATE_OR_COMPOSE_COMPONENT",
+        "passed": true,
+        "scope": "一般的な日本語要求",
+        "severity": "LOW",
+        "confidence": 0.95
+      },
+      "confidence": 0.95,
+      "createdAt": 1791270028666,
+      "sha256": "da9dffaea20a1e47fc7c56b1edc40e5141f337bfd5ca9392f17628aac322083b"
+    },
+    {
+      "nodeId": "p207:counter-PROPER_NOUN_ONLY:4be5c555c69da2052e",
+      "kind": "COUNTEREXAMPLE",
+      "label": "短い固有名詞だけの入力",
+      "payload": {
+        "caseId": "PROPER_NOUN_ONLY",
+        "input": "MIKI",
+        "expected": "固有名詞として保持",
+        "actual": "一般語候補として分割",
+        "passed": false,
+        "scope": "短い固有名詞だけの入力",
+        "severity": "HIGH",
+        "confidence": 0.9
+      },
+      "confidence": 0.9,
+      "createdAt": 1791270028666,
+      "sha256": "ec6dbc65cb8870d30f942ee2c8821989115fdbfe711e6a319261b1565e0c26d5"
+    },
+    {
+      "nodeId": "p207:failure-PROPER_NOUN_ONLY:b898fefcc6934a31de",
+      "kind": "FAILURE_PATTERN",
+      "label": "短い固有名詞だけの入力: expected=固有名詞として保持; actual=一般語候補として分割",
+      "payload": {
+        "caseId": "PROPER_NOUN_ONLY",
+        "severity": "HIGH",
+        "expected": "固有名詞として保持",
+        "actual": "一般語候補として分割"
+      },
+      "confidence": 0.9,
+      "createdAt": 1791270028666,
+      "sha256": "ab819315984f7e4025785f1cee5f56020fa654996676df47ce4f61a6872c11b1"
+    },
+    {
+      "nodeId": "p207:repair-PROPER_NOUN_ONLY:8dc34aef30a5354425",
+      "kind": "REPAIR_ACTION",
+      "label": "単独利用を禁止し、検証済み部品との合成を必須化",
+      "payload": {
+        "caseId": "PROPER_NOUN_ONLY",
+        "action": "ADD_GUARD_OR_COMPOSE_VERIFIED_COMPONENT"
+      },
+      "confidence": 0.82,
+      "createdAt": 1791270028666,
+      "sha256": "2b38bef33b05cdd68d4242acc4b3f27e815e509a3d134a23aa4573a8b6d49b09"
+    },
+    {
+      "nodeId": "p207:reuse-PROPER_NOUN_ONLY:02584a3b5dbc13cae4",
+      "kind": "REUSE_CONDITION",
+      "label": "反例 PROPER_NOUN_ONLY に該当しない、または修復部品を併用する",
+      "payload": {
+        "caseId": "PROPER_NOUN_ONLY"
+      },
+      "confidence": 0.86,
+      "createdAt": 1791270028666,
+      "sha256": "a83cd454322d4cc0abd858b4aea88a5d687fa81c1cd8a8b653a4982ce4940e55"
+    },
+    {
+      "nodeId": "p207:counter-ELLIPSIS_CONTEXT:d1ef9ea479efe312de",
+      "kind": "COUNTEREXAMPLE",
+      "label": "省略・文脈参照",
+      "payload": {
+        "caseId": "ELLIPSIS_CONTEXT",
+        "input": "それの続き",
+        "expected": "前会話参照",
+        "actual": "単独要求として解析",
+        "passed": false,
+        "scope": "省略・文脈参照",
+        "severity": "MEDIUM",
+        "confidence": 0.88
+      },
+      "confidence": 0.88,
+      "createdAt": 1791270028666,
+      "sha256": "2ed35a4065246685f3b57deac384eec48ea8212d66b036efa44b682079ee4138"
+    },
+    {
+      "nodeId": "p207:failure-ELLIPSIS_CONTEXT:2fb2e4fc8c894933fc",
+      "kind": "FAILURE_PATTERN",
+      "label": "省略・文脈参照: expected=前会話参照; actual=単独要求として解析",
+      "payload": {
+        "caseId": "ELLIPSIS_CONTEXT",
+        "severity": "MEDIUM",
+        "expected": "前会話参照",
+        "actual": "単独要求として解析"
+      },
+      "confidence": 0.88,
+      "createdAt": 1791270028666,
+      "sha256": "fa9906a6e26bb5d03ffeb3a691e52fd24f2f12916952ea6c7a760ca648e3fefb"
+    },
+    {
+      "nodeId": "p207:repair-ELLIPSIS_CONTEXT:87737259e3e5d6bdc3",
+      "kind": "REPAIR_ACTION",
+      "label": "反例条件をGuardへ追加して再検証",
+      "payload": {
+        "caseId": "ELLIPSIS_CONTEXT",
+        "action": "ADD_GUARD_OR_COMPOSE_VERIFIED_COMPONENT"
+      },
+      "confidence": 0.82,
+      "createdAt": 1791270028666,
+      "sha256": "0325d897b5698e28fcba00e81bc842eba5f0ddd15818f4c5f1e483fa9cd7d535"
+    },
+    {
+      "nodeId": "p207:reuse-ELLIPSIS_CONTEXT:c594a5edea9cabd39e",
+      "kind": "REUSE_CONDITION",
+      "label": "反例 ELLIPSIS_CONTEXT に該当しない、または修復部品を併用する",
+      "payload": {
+        "caseId": "ELLIPSIS_CONTEXT"
+      },
+      "confidence": 0.86,
+      "createdAt": 1791270028666,
+      "sha256": "82f690b55b0c8b8580261d6172e726b4eac0a7b8610e1e0515358cd6288d56d5"
+    },
+    {
+      "nodeId": "p207:validation:5f0c1b1bde250db358",
+      "kind": "VALIDATION",
+      "label": "CONDITIONAL_PASS",
+      "payload": {
+        "positiveCount": 1,
+        "counterExampleCount": 2,
+        "failClosed": true
+      },
+      "confidence": 0.78,
+      "createdAt": 1791270028666,
+      "sha256": "ee956a0516337cb2fd7146a28a43014138f085406c59fd1c470989d5120e82a6"
+    }
+  ],
+  "edges": [
+    {
+      "edgeId": "p207e:297f521771493cc17f51",
+      "from": "p207:turn:f6f17ac45f7e388acb",
+      "to": "p207:intent:7d4de9514df270a419",
+      "type": "EXPRESSES",
+      "sha256": "e04a888555bebfda543ac8d2d17ef47996890dc68e4e4fde1ed363d3fb3caa53"
+    },
+    {
+      "edgeId": "p207e:b1e7a35e1a96e75f095e",
+      "from": "p207:intent:7d4de9514df270a419",
+      "to": "p207:capability:50877d1e6f6637a0fc",
+      "type": "REQUIRES",
+      "sha256": "f722bdcd26d4f58bdf6f2b4620529486d4da03024e39e0dd0f0f7809a39c685f"
+    },
+    {
+      "edgeId": "p207e:15aea9a7fb36d8a7bb8b",
+      "from": "p207:capability:50877d1e6f6637a0fc",
+      "to": "p207:component-0:915be13b1e1f830dd8",
+      "type": "SELECTS",
+      "sha256": "f68d3de3f0cfb9d935f072df0c69360421fb790795083304110b0a637417e040"
+    },
+    {
+      "edgeId": "p207e:0ee2f58eb392e754dfbb",
+      "from": "p207:capability:50877d1e6f6637a0fc",
+      "to": "p207:component-1:102c8d2b908a17edf5",
+      "type": "SELECTS",
+      "sha256": "fdbdff6c19daff23aa6b72846bde50fee574389d780f6ae553a73b50d4ac3e06"
+    },
+    {
+      "edgeId": "p207e:412887637ce6c3723eab",
+      "from": "p207:capability:50877d1e6f6637a0fc",
+      "to": "p207:component-2:adf77d27ab1d3f131e",
+      "type": "SELECTS",
+      "sha256": "37c45f2fe976a1441ec8aae8d7efbb7540c76e53fe6fe6762368a2d4fe85eeff"
+    },
+    {
+      "edgeId": "p207e:680e7862f7b654858d66",
+      "from": "p207:capability:50877d1e6f6637a0fc",
+      "to": "p207:component-3:5a9d19c0ecb07b130a",
+      "type": "SELECTS",
+      "sha256": "97761d671c36add80aee694bab0c1d9000a14c4e6790ded470c1373b1145b12e"
+    },
+    {
+      "edgeId": "p207e:8787f68cff25b3e590ab",
+      "from": "p207:intent:7d4de9514df270a419",
+      "to": "p207:plan:5cdca441267a259d7b",
+      "type": "TRIGGERS",
+      "sha256": "2ecfe9a7cb298d820d08d87df81ec1cc00725b10f7753df700166424ccd3d0e6"
+    },
+    {
+      "edgeId": "p207e:88853cb247e20750f272",
+      "from": "p207:plan:5cdca441267a259d7b",
+      "to": "p207:component-1:102c8d2b908a17edf5",
+      "type": "USES",
+      "sha256": "4594aa4c46bfae550e023d40241715aa98334e0d99b11f08af973cc7aa612a39"
+    },
+    {
+      "edgeId": "p207e:3e0ec5576bf8a61c53d4",
+      "from": "p207:plan:5cdca441267a259d7b",
+      "to": "p207:component-2:adf77d27ab1d3f131e",
+      "type": "USES",
+      "sha256": "d392488354b8ade152bccd7d16458cce663bfdcb55342ae324ba368a3d60cb50"
+    },
+    {
+      "edgeId": "p207e:8c73f376ccfbdc80cb94",
+      "from": "p207:plan:5cdca441267a259d7b",
+      "to": "p207:component-3:5a9d19c0ecb07b130a",
+      "type": "USES",
+      "sha256": "cc7a839407ee2a1a2ca14bef266426d849c97b4d7853334fa71051ea88df5577"
+    },
+    {
+      "edgeId": "p207e:e14fa3ec898904e6055b",
+      "from": "p207:plan:5cdca441267a259d7b",
+      "to": "p207:positive-GENERAL_JA:6aa5db44df7e651b8b",
+      "type": "PRODUCES",
+      "sha256": "22e5a0981235f9de5d3dd6112215b8afb432c5ddff91bfb72f71a8c55bcb3822"
+    },
+    {
+      "edgeId": "p207e:a85d1941a5b76d372298",
+      "from": "p207:plan:5cdca441267a259d7b",
+      "to": "p207:counter-PROPER_NOUN_ONLY:4be5c555c69da2052e",
+      "type": "FAILED_ON",
+      "sha256": "d0f7bdfbd48c0bc5e2c1496f4f31b87b2e38a066a6d757e55bb2c30b709da50c"
+    },
+    {
+      "edgeId": "p207e:51c5182d58dd00b0b6aa",
+      "from": "p207:counter-PROPER_NOUN_ONLY:4be5c555c69da2052e",
+      "to": "p207:failure-PROPER_NOUN_ONLY:b898fefcc6934a31de",
+      "type": "FAILED_BECAUSE",
+      "sha256": "b2106c3eec995b87dfabeb28be7f7efae6b858c5e4f42f20cb306c83eeaf04a7"
+    },
+    {
+      "edgeId": "p207e:1f19f62a43abb08bd476",
+      "from": "p207:failure-PROPER_NOUN_ONLY:b898fefcc6934a31de",
+      "to": "p207:repair-PROPER_NOUN_ONLY:8dc34aef30a5354425",
+      "type": "REPAIRED_BY",
+      "sha256": "24374f13b89f268ae6accdf550efb5a9444ca6731308cadf85557516c7242077"
+    },
+    {
+      "edgeId": "p207e:c89ac1d7590e37741c3d",
+      "from": "p207:plan:5cdca441267a259d7b",
+      "to": "p207:reuse-PROPER_NOUN_ONLY:02584a3b5dbc13cae4",
+      "type": "VALID_WHEN",
+      "sha256": "e23994e1431e36904b14525371e9775bb092d14139b22efcd3d46f83b3c3db49"
+    },
+    {
+      "edgeId": "p207e:3af4391d6376c6fab00c",
+      "from": "p207:plan:5cdca441267a259d7b",
+      "to": "p207:counter-ELLIPSIS_CONTEXT:d1ef9ea479efe312de",
+      "type": "FAILED_ON",
+      "sha256": "84516f4d1c4e63232b213be7109f3dbfdcc860e3f6105ea4134b2d20b86bc529"
+    },
+    {
+      "edgeId": "p207e:9fce74a8ddc2940bb63e",
+      "from": "p207:counter-ELLIPSIS_CONTEXT:d1ef9ea479efe312de",
+      "to": "p207:failure-ELLIPSIS_CONTEXT:2fb2e4fc8c894933fc",
+      "type": "FAILED_BECAUSE",
+      "sha256": "b869b6a4673b87b279aefabc6f23a4528055c61b97d2b339c68f7d4282a1fe21"
+    },
+    {
+      "edgeId": "p207e:bc9300074b6cfe3490df",
+      "from": "p207:failure-ELLIPSIS_CONTEXT:2fb2e4fc8c894933fc",
+      "to": "p207:repair-ELLIPSIS_CONTEXT:87737259e3e5d6bdc3",
+      "type": "REPAIRED_BY",
+      "sha256": "14108ee439eb8d4e462aad414ef76d9a6134d9b7b29309e0654e188f90d9067f"
+    },
+    {
+      "edgeId": "p207e:b519db372bc158e9dfa9",
+      "from": "p207:plan:5cdca441267a259d7b",
+      "to": "p207:reuse-ELLIPSIS_CONTEXT:c594a5edea9cabd39e",
+      "type": "VALID_WHEN",
+      "sha256": "4af822aa20ad685a04a67fbfbb1377ae792e92234b4177b52606a719525af499"
+    },
+    {
+      "edgeId": "p207e:a65e2e91bc72a1ce4114",
+      "from": "p207:plan:5cdca441267a259d7b",
+      "to": "p207:validation:5f0c1b1bde250db358",
+      "type": "EVALUATED_BY",
+      "sha256": "698fdc85a5f986a699811c7b553a57a07bbe3b40aa1d27773e479900460109c9"
+    }
+  ],
+  "graphSha256": "33e9e0819d470e68425863c3e1f5605d50caa0028dc0617b4ad3661b56a40f77"
+}

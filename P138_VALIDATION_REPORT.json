@@ -1,0 +1,75 @@
+{
+  "phase": "PERSON_VISUAL_PRODUCTION_P138",
+  "passed": true,
+  "checks": {
+    "normalAnalysisConnected": true,
+    "absenceRequiresConfirmation": true,
+    "confirmationSingleUse": true,
+    "gapStateSeparated": true,
+    "profileContainsGarments": true,
+    "profileShaVerified": true,
+    "noArtificialBoundaryPixels": true,
+    "realPngFourQualities": true
+  },
+  "question": "対象領域では外観と衣服候補の差を確定できません。衣服あり、衣服なし、不明のまま、のどれとして扱いますか？",
+  "profileSha256": "aba70e264e4a2e45595060b7129c3532fd0aba8abac0f546473f192339466e37",
+  "boundaryPolicySha256": "4c0b8d3e8eb9228b1204691d023914fc545c2f97efa774000efc3452eeaf57aa",
+  "artifacts": [
+    {
+      "quality": "PIXEL_NATIVE",
+      "width": 64,
+      "height": 96,
+      "sha256": "53c2f504923456f0f5d7c45f8794d7134fdd5f708b85a054cda611480a33f3ae",
+      "bytes": 489
+    },
+    {
+      "quality": "PIXEL_ILLUSTRATION",
+      "width": 256,
+      "height": 384,
+      "sha256": "4354382e9cdfbac68ee9670bc7611fbeb61b226ed0f5c0c384d6e7b9a71565a4",
+      "bytes": 2517
+    },
+    {
+      "quality": "ILLUSTRATION_2D",
+      "width": 512,
+      "height": 768,
+      "sha256": "08130842e92b286adc575ebd114891dac595e593ab14002df1c62dc6d9a835e7",
+      "bytes": 8140
+    },
+    {
+      "quality": "ILLUSTRATION_25D",
+      "width": 768,
+      "height": 1152,
+      "sha256": "017dd880b481a580268a0ea446f525b043a983d885865ff9836d620348d70e1b",
+      "bytes": 18206
+    }
+  ],
+  "revision": "P138",
+  "baseRevision": "P137",
+  "baseZipSha256": "9c84f9ad16ab6cf60349539dda8bf07e71d3e5153d5a67ba0a860169fcaa714b",
+  "validation": {
+    "typescript": "PASS",
+    "relativeImports": "PASS",
+    "productionBuild": "PASS",
+    "serverBuild": "PASS",
+    "p134Regression": "PASS",
+    "p135Regression": "PASS",
+    "p136Regression": "PASS",
+    "p137Regression": "PASS",
+    "zipExpansion": "PASS",
+    "zipZipTxtBinaryIdentity": "PASS"
+  },
+  "truthBoundary": {
+    "implemented": [
+      "P138 composed garment evidence/profile/policy path",
+      "single-use confirmation contract",
+      "NO_ARTIFICIAL_BOUNDARY applied to generated pixels",
+      "four real PNG outputs including 2.5D candidate"
+    ],
+    "notClaimed": [
+      "Galaxy S25 device E2E",
+      "all historical visual call sites migrated",
+      "photorealistic rendering"
+    ]
+  }
+}

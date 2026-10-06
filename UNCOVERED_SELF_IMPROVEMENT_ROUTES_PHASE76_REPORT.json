@@ -1,0 +1,174 @@
+{
+  "passed": true,
+  "phase": "UNCOVERED_SELF_IMPROVEMENT_ROUTES_76",
+  "routeCases": 12,
+  "routePassed": 12,
+  "failClosedCases": 7,
+  "readyCases": 5,
+  "coreFailureRoutesChecked": 11,
+  "results": [
+    {
+      "id": "unknown-capability",
+      "passed": true,
+      "accepted": false,
+      "reasons": [
+        "UNKNOWN_COMPLEX_CAPABILITY"
+      ]
+    },
+    {
+      "id": "runtime-proof-no-workspace",
+      "passed": true,
+      "accepted": false,
+      "reasons": [
+        "WORKSPACE_ID_REQUIRED"
+      ],
+      "consumer": "runtimeCoverageGraphService",
+      "rollbackTarget": "candidate workspace baseline",
+      "invalidationTargets": [
+        "coverage evidence",
+        "acceptance evidence",
+        "adoption readiness"
+      ]
+    },
+    {
+      "id": "runtime-proof-no-sha",
+      "passed": true,
+      "accepted": false,
+      "reasons": [
+        "CANDIDATE_SHA_REQUIRED"
+      ],
+      "consumer": "runtimeCoverageGraphService",
+      "rollbackTarget": "candidate workspace baseline",
+      "invalidationTargets": [
+        "coverage evidence",
+        "acceptance evidence",
+        "adoption readiness"
+      ]
+    },
+    {
+      "id": "runtime-proof-no-evidence",
+      "passed": true,
+      "accepted": false,
+      "reasons": [
+        "EVIDENCE_IDS_REQUIRED"
+      ],
+      "consumer": "runtimeCoverageGraphService",
+      "rollbackTarget": "candidate workspace baseline",
+      "invalidationTargets": [
+        "coverage evidence",
+        "acceptance evidence",
+        "adoption readiness"
+      ]
+    },
+    {
+      "id": "runtime-proof-ready",
+      "passed": true,
+      "accepted": true,
+      "reasons": [],
+      "consumer": "runtimeCoverageGraphService",
+      "rollbackTarget": "candidate workspace baseline",
+      "invalidationTargets": [
+        "coverage evidence",
+        "acceptance evidence",
+        "adoption readiness"
+      ]
+    },
+    {
+      "id": "remote-no-approval",
+      "passed": true,
+      "accepted": false,
+      "reasons": [
+        "REMOTE_USER_APPROVAL_REQUIRED"
+      ],
+      "consumer": "runIntegrityAuditorService",
+      "rollbackTarget": "remote job cancellation and local workspace baseline",
+      "invalidationTargets": [
+        "remote result",
+        "attestation",
+        "candidate evidence",
+        "review package"
+      ]
+    },
+    {
+      "id": "remote-ready",
+      "passed": true,
+      "accepted": true,
+      "reasons": [],
+      "consumer": "runIntegrityAuditorService",
+      "rollbackTarget": "remote job cancellation and local workspace baseline",
+      "invalidationTargets": [
+        "remote result",
+        "attestation",
+        "candidate evidence",
+        "review package"
+      ]
+    },
+    {
+      "id": "multi-intent-no-evidence",
+      "passed": true,
+      "accepted": false,
+      "reasons": [
+        "EVIDENCE_IDS_REQUIRED"
+      ],
+      "consumer": "candidateConstraintValidationService",
+      "rollbackTarget": "fragment parent workspaces",
+      "invalidationTargets": [
+        "merged workspace",
+        "validation evidence",
+        "review package"
+      ]
+    },
+    {
+      "id": "multi-intent-ready",
+      "passed": true,
+      "accepted": true,
+      "reasons": [],
+      "consumer": "candidateConstraintValidationService",
+      "rollbackTarget": "fragment parent workspaces",
+      "invalidationTargets": [
+        "merged workspace",
+        "validation evidence",
+        "review package"
+      ]
+    },
+    {
+      "id": "production-e2e-ready",
+      "passed": true,
+      "accepted": true,
+      "reasons": [],
+      "consumer": "runtimeProofOrchestratorService",
+      "rollbackTarget": "runtime adapter rollback token",
+      "invalidationTargets": [
+        "runtime proof",
+        "canary",
+        "adoption readiness"
+      ]
+    },
+    {
+      "id": "governance-no-sha",
+      "passed": true,
+      "accepted": false,
+      "reasons": [
+        "CANDIDATE_SHA_REQUIRED"
+      ],
+      "consumer": "core adoption decision",
+      "rollbackTarget": "stop adoption and preserve candidate",
+      "invalidationTargets": [
+        "adoption readiness"
+      ]
+    },
+    {
+      "id": "governance-ready",
+      "passed": true,
+      "accepted": true,
+      "reasons": [],
+      "consumer": "core adoption decision",
+      "rollbackTarget": "stop adoption and preserve candidate",
+      "invalidationTargets": [
+        "adoption readiness"
+      ]
+    }
+  ],
+  "missingCoreTokens": [],
+  "failures": []
+}

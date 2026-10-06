@@ -1,0 +1,18 @@
+{
+  "phase": "PERSISTENT_VISUAL_MEMORY_P130",
+  "passed": true,
+  "checks": {
+    "saved": true,
+    "deduplicated": true,
+    "restartRead": true,
+    "demandQuery": true,
+    "usage": true,
+    "tamperRejected": true
+  },
+  "record": {
+    "memoryId": "VM-c8be010c54f74807f3d3e22f",
+    "scope": "VISUAL_LIBRARY",
+    "recordSha256": "2ea180964adc1c60fe121415f9bb6b7051e88cf8091e42bb4de24828fa70251c"
+  },
+  "tamperReason": "ENVELOPE_SHA"
+}

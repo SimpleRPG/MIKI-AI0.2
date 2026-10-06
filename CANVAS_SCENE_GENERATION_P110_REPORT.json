@@ -1,0 +1,19 @@
+{
+  "phase": "CANVAS_SCENE_GENERATION_P110",
+  "passed": true,
+  "checks": {
+    "passed": true,
+    "tsxParses": true,
+    "highDpi": true,
+    "frameCleanup": true,
+    "camera": true,
+    "accessible": true
+  },
+  "candidate": {
+    "formatVersion": 1,
+    "specSha256": "ac3f38c33e925cf3da451f9cf6a7ca9bb92e28d0353588c48819c6fbb024b7b8",
+    "componentPath": "src/components/generated/ExplorationScene.tsx",
+    "validation": [],
+    "passed": true
+  }
+}

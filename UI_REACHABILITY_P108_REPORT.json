@@ -1,0 +1,17 @@
+{
+  "phase": "UI_REACHABILITY_P108",
+  "passed": true,
+  "checks": {
+    "deletedPanelAbsent": true,
+    "deletedNameUnreferenced": true,
+    "researchGatewayPreserved": true,
+    "productionRootsPresent": true,
+    "unreachableUiCount": 0
+  },
+  "roots": [
+    "src/main.tsx",
+    "src/App.tsx"
+  ],
+  "reachedUiCount": 34,
+  "unreachableUi": []
+}

@@ -26,6 +26,7 @@ object MIKINativeCore {
 
     private external fun nativeApiVersion(): Int
     private external fun nativeAbiMagic(): Int
+    private external fun nativeGraphStoreCommit(root: String, payload: String): String
     private external fun nativeSha256File(path: String): String
     private external fun nativeScanWorkspace(root: String): String
     private external fun nativeGitBlobSha1File(path: String): String
@@ -34,6 +35,14 @@ object MIKINativeCore {
     private external fun nativeCompareRevisions(requestJson: String): String
     private external fun nativeSearchWorkspaceText(root: String, query: String, limit: Int): String
     private external fun nativeVerifyArtifact(path: String, expectedSha256: String, expectedBytes: Long): String
+    private external fun nativeAnalyzeOwnedDomain(domain: String, requestJson: String): String
+    private external fun nativeAnalyzeCandidate(requestJson: String): String
+    private external fun nativeSearchMemory(requestJson: String): String
+    private external fun nativePlanExecution(requestJson: String): String
+    private external fun nativeProcessDataRecords(requestJson: String): String
+    private external fun nativeVerifyVbaCode(requestJson: String): String
+    private external fun nativeRankDomainRoutes(requestJson: String): String
+    private external fun nativeDecideCoreGoals(requestJson: String): String
 
     fun searchWorkspaceText(root: File, query: String, limit: Int): String = nativeSearchWorkspaceText(root.canonicalPath, query, limit)
 
@@ -82,6 +91,22 @@ object MIKINativeCore {
         return nativeSha256File(path.canonicalPath)
     }
 
+    fun decideCoreGoals(requestJson: String): String { val health=health(); if(!health.available||!health.compatible) throw IllegalStateException(health.reason ?: "RUST_NATIVE_CORE_UNAVAILABLE"); val result=nativeDecideCoreGoals(requestJson); if(result.startsWith("ERROR:")) throw IllegalStateException(result); return result }
+
+    fun rankDomainRoutes(requestJson: String): String { val health=health(); if(!health.available||!health.compatible) throw IllegalStateException(health.reason ?: "RUST_NATIVE_CORE_UNAVAILABLE"); val result=nativeRankDomainRoutes(requestJson); if(result.startsWith("ERROR:")) throw IllegalStateException(result); return result }
+
+    fun verifyVbaCode(requestJson: String): String { val health=health(); if(!health.available||!health.compatible) throw IllegalStateException(health.reason ?: "RUST_NATIVE_CORE_UNAVAILABLE"); val result=nativeVerifyVbaCode(requestJson); if(result.startsWith("ERROR:")) throw IllegalStateException(result); return result }
+
+    fun processDataRecords(requestJson: String): String { val health=health(); if(!health.available||!health.compatible) throw IllegalStateException(health.reason ?: "RUST_NATIVE_CORE_UNAVAILABLE"); val result=nativeProcessDataRecords(requestJson); if(result.startsWith("ERROR:")) throw IllegalStateException(result); return result }
+
+    fun planExecution(requestJson: String): String { val health=health(); if(!health.available||!health.compatible) throw IllegalStateException(health.reason ?: "RUST_NATIVE_CORE_UNAVAILABLE"); val result=nativePlanExecution(requestJson); if(result.startsWith("ERROR:")) throw IllegalStateException(result); return result }
+
+    fun searchMemory(requestJson: String): String { val health=health(); if(!health.available||!health.compatible) throw IllegalStateException(health.reason ?: "RUST_NATIVE_CORE_UNAVAILABLE"); val result=nativeSearchMemory(requestJson); if(result.startsWith("ERROR:")) throw IllegalStateException(result); return result }
+
+    fun analyzeCandidate(requestJson: String): String { val health=health(); if(!health.available||!health.compatible) throw IllegalStateException(health.reason ?: "RUST_NATIVE_CORE_UNAVAILABLE"); val result=nativeAnalyzeCandidate(requestJson); if(result.startsWith("ERROR:")) throw IllegalStateException(result); return result }
+
+    fun analyzeOwnedDomain(domain: String, requestJson: String): String { val health=health(); if(!health.available||!health.compatible) throw IllegalStateException(health.reason ?: "RUST_NATIVE_CORE_UNAVAILABLE"); val result=nativeAnalyzeOwnedDomain(domain,requestJson); if(result.startsWith("ERROR:")) throw IllegalStateException(result); return result }
+
     fun health(): NativeCoreHealth {
         val failure = loadFailure
         if (failure != null) {
@@ -110,6 +135,16 @@ object MIKINativeCore {
             )
         }
     }
+    fun isAvailable(): Boolean { val health = health(); return health.available && health.compatible }
+
+    fun graphStoreCommit(root: String, payload: String): String {
+        val health = health()
+        if (!health.available || !health.compatible) throw IllegalStateException(health.reason ?: "RUST_NATIVE_CORE_UNAVAILABLE")
+        val result = nativeGraphStoreCommit(root, payload)
+        if (result.startsWith("ERROR:")) throw IllegalStateException(result)
+        return result
+    }
+
 }
 
 data class NativeCoreHealth(

@@ -1,0 +1,30 @@
+{
+  "phase": "RPG_LEGACY_REMOVAL_P106",
+  "passed": true,
+  "checks": {
+    "removedFilesAbsent": true,
+    "legacyApiAbsent": true,
+    "simpleRpgSymbolsAbsent": true,
+    "gamePreviewPreserved": true
+  },
+  "removed": [
+    "src/components/ActionControls.tsx",
+    "src/components/CharacterCard.tsx",
+    "src/components/CharacterCreationModal.tsx",
+    "src/components/CombatArena.tsx",
+    "src/components/DiceRollOverlay.tsx",
+    "src/components/InventoryModal.tsx",
+    "src/components/Navbar.tsx",
+    "src/components/QuestJournal.tsx",
+    "src/components/StoryLog.tsx",
+    "src/components/WorldMapModal.tsx",
+    "src/types/rpg.ts",
+    "src/data/initialState.ts",
+    "src/miki/data/simpleRpgReferenceService.ts",
+    "src/miki/execution/services/simpleRpgRuleEngineService.ts",
+    "src/miki/learning/services/simpleRpgCapabilityLearningService.ts",
+    "src/services/simpleRpgReferenceService.ts",
+    "src/services/simpleRpgRuleEngineService.ts",
+    "src/services/simpleRpgCapabilityLearningService.ts"
+  ]
+}

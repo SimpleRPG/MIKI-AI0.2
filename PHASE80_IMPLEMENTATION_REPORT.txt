@@ -1,0 +1,39 @@
+MIKI-AI Phase 80 不足3機能実装レポート
+
+実装:
+1. Candidate陳腐化検出後の自動Rebase
+- Baseline/Current/Candidateの三者比較
+- 非競合変更の自動合成
+- 両側変更競合のFail-Closed
+- Rebase後Candidate ID/SHA発行
+- 旧Evidence失効対象の返却
+- CORE SELF_IMPROVEMENT経路へ接続
+
+2. 複数外部評価者の合議・競合解決
+- Reviewer ID、Domain、Candidate SHA単位のOpinion
+- Quorum判定
+- 信頼度加重Verdict
+- 競合時HOLD
+- Reasons/Requested Changesの重複統合
+- ExternalReviewIntakeServiceへbuildConsensusを接続
+
+3. 評価者別・分野別の信頼度管理
+- Reviewer ID x Domain別Profile
+- Correct/Incorrect/Partial/Regression/Correction集計
+- 少数標本を抑制する平滑化済みReliability
+- 永続化
+- ExternalReviewIntakeServiceへrecordReviewerOutcomeを接続
+
+検証:
+- TypeScript tsc --noEmit: PASS
+- 相対Import: 1020 files / 3223 imports / unresolved 0
+- Phase 80 dynamic test: PASS
+- Auto Rebase clean path: REBASED
+- Auto Rebase conflict path: CONFLICT
+- Reviewer reliability learning: PASS
+- Multi reviewer conflict/quorum/consensus: PASS
+- Phase 75 autonomous improvement E2E: PASS
+- Phase 76 uncovered routes: PASS
+
+環境注記:
+Node.js環境ではIndexedDBが利用できないため既存のin-memory fallbackを使用。機能失敗ではない。

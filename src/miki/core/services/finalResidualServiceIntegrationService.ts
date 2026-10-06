@@ -1,0 +1,11 @@
+import { approvalPermissionService, blindComparisonLabService, capabilitySloService, cognitiveStateCheckpointService } from '../../autonomy/services/operationalGovernanceService';
+import { claimEvidenceService } from '../../research/services/claimEvidenceService';
+import { nativeSearchArtifactService } from '../../execution/services/nativeSearchArtifactService';
+import { repositoryFingerprintCacheService } from '../../execution/services/repositoryFingerprintCacheService';
+import { unknownFingerprintService } from '../../unknown/services/unknownFingerprintService';
+import { workspacePathBoundaryService, type WorkspaceArchiveLimits } from '../../safety/services/workspacePathBoundaryService';
+export interface FinalResidualInput{capability?:string;claimText?:string;searchQuery?:string;searchFiles?:Array<{path:string;content:string}>;workspacePaths?:string[];unknown?:Record<string,unknown>;}
+class FinalResidualServiceIntegrationService{
+ inspect(input:FinalResidualInput={}){const capability=input.capability||'self-improvement';const slo=capabilitySloService.evaluate(capability);const claims=input.claimText?claimEvidenceService.extractClaimSentences(input.claimText):[];const search=input.searchQuery&&input.searchFiles?nativeSearchArtifactService.searchText(input.searchQuery,input.searchFiles):[];const limits:WorkspaceArchiveLimits={maxFiles:100000,maxTotalBytes:1024*1024*1024,maxSingleFileBytes:128*1024*1024,allowedExtensions:[],allowNestedArchives:false};const paths=(input.workspacePaths||[]).map(path=>({path,decision:workspacePathBoundaryService.validateRelativePath(path,limits)}));const unknown=input.unknown?unknownFingerprintService.create(input.unknown as never):undefined;return{capability,slo,claims,search,paths,unknown,connectedServices:['capabilitySloService','approvalPermissionService','cognitiveStateCheckpointService','blindComparisonLabService','claimEvidenceService','nativeSearchArtifactService','repositoryFingerprintCacheService','unknownFingerprintService','workspacePathBoundaryService'],authority:{approval:'approvalPermissionService',checkpoint:'cognitiveStateCheckpointService',comparison:'blindComparisonLabService'},cache:{repositoryFingerprintCacheAvailable:Boolean(repositoryFingerprintCacheService)}};}
+}
+export const finalResidualServiceIntegrationService=new FinalResidualServiceIntegrationService();

@@ -1,3 +1,4 @@
+import { formalAdoptionAuthorizationService, type FormalAdoptionAuthorization } from '../../selfDevelopment/services/formalAdoptionAuthorizationService';
 import type { MikiDomain } from './crossDomainCirculationService';
 import { taskBlackboardService, type BlackboardTask, type BlackboardEntry } from './taskBlackboardService';
 import type { DomainCommand } from './domainRouterService';
@@ -2262,6 +2263,11 @@ class AdaptiveRoutePlannerService {
     if(operation==='DECIDE_CANDIDATE_ADOPTION'){
       const decision=String(input.userDecision||'').toUpperCase();
       if(decision==='ACCEPT'){
+        const authorization=input.adoptionAuthorization as FormalAdoptionAuthorization|undefined;
+        if(!authorization||formalAdoptionAuthorizationService.validate(authorization).length>0){
+          routes.push({target:'strategy',command:'ASSESS_DOMAIN',reason:'Formal adoption authorization is missing or invalid',payload:{...input,taskId:task.taskId,operation,authorizationBlocked:true,adaptive:true,priority:100}});
+          return this.decorateOperations(task,this.uniqueOperations(routes));
+        }
         routes.push({target:'promotion',command:'APPROVE_REVIEWED_CANDIDATE',reason:'COREが外部評価後の利用者採用決定をpromotionへ委譲する',payload:{...input,taskId:task.taskId,operation,adaptive:true,priority:100}});
       }else{
         routes.push({target:'strategy',command:'ASSESS_DOMAIN',reason:`COREが外部レビューDecision ${decision||'UNKNOWN'} を受理し、採用経路以外の後続処理を確定する`,payload:{...input,taskId:task.taskId,operation,userDecision:decision,adaptive:true,priority:100}});

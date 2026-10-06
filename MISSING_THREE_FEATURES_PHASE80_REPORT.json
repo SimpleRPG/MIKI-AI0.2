@@ -1,0 +1,64 @@
+{
+  "passed": true,
+  "phase": "MISSING_THREE_FEATURES_80",
+  "autoRebase": {
+    "clean": "REBASED",
+    "conflict": "CONFLICT"
+  },
+  "reviewerReliability": {
+    "r1": {
+      "reviewerId": "r1",
+      "domain": "CODE",
+      "sampleCount": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "partial": 0,
+      "regressionCaused": 0,
+      "correctionRequired": 0,
+      "reliability": 0.6,
+      "updatedAt": 1790901897748
+    },
+    "r2": {
+      "reviewerId": "r2",
+      "domain": "CODE",
+      "sampleCount": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "partial": 0,
+      "regressionCaused": 0,
+      "correctionRequired": 0,
+      "reliability": 0.4,
+      "updatedAt": 1790901897748
+    }
+  },
+  "consensus": {
+    "consensusId": "CONSENSUS-e428162d8972f9821f74742a",
+    "candidateManifestSha256": "sha",
+    "verdict": "HOLD",
+    "confidence": 0.6,
+    "quorumReached": true,
+    "reviewCount": 2,
+    "weightedScores": {
+      "ACCEPT": 0.6,
+      "REJECT": 0.4,
+      "REQUEST_CHANGES": 0,
+      "HOLD": 0
+    },
+    "conflicts": [
+      "ACCEPT",
+      "REJECT"
+    ],
+    "mergedReasons": [
+      "ok",
+      "risk"
+    ],
+    "mergedRequestedChanges": [
+      "fix"
+    ],
+    "sourceReviewIds": [
+      "e1",
+      "e2"
+    ]
+  },
+  "failures": []
+}

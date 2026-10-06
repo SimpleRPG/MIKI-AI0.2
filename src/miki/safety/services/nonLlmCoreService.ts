@@ -19,11 +19,12 @@ import { claimDatabaseService } from '../../memory/services/claimDatabaseService
 import { longTermMemoryService } from '../../memory/services/longTermMemoryService';
 import { latentIntentMiningService } from '../../unknown/services/latentIntentMiningService';
 import { answerContentIrService } from '../../conversation/services/answerContentIrService';
+import { unknownResearchConversationBridgeService } from '../../conversation/services/unknownResearchConversationBridgeService';
+import { conversationUnknownVocabularyService } from '../../conversation/services/conversationUnknownVocabularyService';
 import { conversationStrategyService } from '../../strategy/services/conversationStrategyService';
 import { adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { capabilityGraphService } from '../../capability/services/capabilityGraphService';
-import { simpleRpgReferenceService } from '../../data/simpleRpgReferenceService';
 import { componentCompositionService } from '../../capability/services/componentCompositionService';
 import { unifiedDecisionEngineService } from '../../strategy/services/unifiedDecisionEngineService';
 import { affectionDynamicsService } from '../../selfAwareness/services/affectionDynamicsService';
@@ -156,6 +157,25 @@ export class NonLlmCoreService {
     let t = performance.now();
     const interpretation = hybridConversationEngineService.interpret(prompt, state);
     const dialogueAct = interpretation.dialogueAct;
+    const vocabulary = (interpretation.semantic as any)?.vocabulary || conversationUnknownVocabularyService.assess(prompt, { allowResearch: true });
+    const unknownTerms = Array.isArray(vocabulary?.unknowns)
+      ? vocabulary.unknowns.map((item: any) => String(item.term || '')).filter(Boolean).slice(0, 3)
+      : [];
+    const explicitUnknownInquiry = unknownTerms.length > 0 && /意味|定義|とは|何|調べ|検索|教えて|使い方/.test(prompt);
+    if (explicitUnknownInquiry) {
+      const researched = await unknownResearchConversationBridgeService.resolveAndRespond({
+        question: prompt,
+        unknownTerms,
+        useSearch: /調べ|検索|最新|現在/.test(prompt),
+      });
+      const nextState = { ...state, currentTopic: unknownTerms.join('、') };
+      const status: NonLlmCoreResult['status'] = ['REUSED_SUPPORTED', 'LOCAL_EVIDENCE'].includes(researched.status) ? 'RESOLVED' : 'UNRESOLVED';
+      const result = this.buildResult(status, `unknown_research_${researched.status.toLowerCase()}`, researched.surfaceText, nextState, dialogueAct, researched.resolution.evidenceCount, ['unknownResearchConversationBridgeService'], started, stages);
+      result.researchPerformed = researched.status === 'RESEARCHED_UNVERIFIED' || researched.resolution.evidenceCount > 0;
+      result.researchEvidenceCount = researched.resolution.evidenceCount;
+      result.knowledgeGapId = researched.resolution.resolution.id;
+      return result;
+    }
     const stage = interpretation.stage;
     const anaphora = interpretation.anaphora;
     stages.dialogue = Math.round(performance.now() - t);
@@ -205,8 +225,6 @@ export class NonLlmCoreService {
     t = performance.now();
     const latent = latentIntentMiningService.inferLatentGoal(prompt, recentMessages.slice(-4).map((m) => m.content));
     const compiled = requestTypeCompilerService.compile(prompt, nextState);
-    const simpleRpgReference = simpleRpgReferenceService.describeForPlanning(prompt);
-    simpleRpgReferenceService.recordReferenceUse(simpleRpgReference.matched.map((x) => x.id));
     const implementationSelection = implementationSelectionService.select(compiled);
     stages.request = Math.round(performance.now() - t);
     nextState.topLevelGoal=compiled.goal; nextState.lastPrompt=prompt; nextState.lastDialogueAct=dialogueAct; nextState.lastTopic=nextState.currentTopic; const continuousGoalState=updateConversationGoalProgress(nextState,prompt,state); const conversationConsistency=evaluateConversationConsistency(prompt,continuousGoalState,state,params.messageId); nextState=conversationConsistency.repairedState; nextState.conversationCompleteness=assessConversationCompleteness(nextState); nextState.knowledgeState=classifyConversationKnowledgeState(prompt,nextState); nextState.temporalContext=buildConversationTemporalContext(prompt,nextState,state); if(conversationConsistency.turnDependency && /(?:違う|それじゃない|ではなく|じゃない)/i.test(prompt)) nextState.correctionScope=inferConversationCorrectionScope(prompt).scope; if(previousTurnEvaluation.conversationOutcome) nextState.conversationOutcome=previousTurnEvaluation.conversationOutcome;
@@ -367,7 +385,6 @@ export class NonLlmCoreService {
     let skeleton: AnswerSkeletonType = 'GENERAL_ANSWER';
     let status: NonLlmCoreResult['status'] = 'RESOLVED';
     let reason = implementationSelection.reason;
-    if (simpleRpgReference.matched.length > 0) reason += `; ${simpleRpgReference.note}`;
     if (potentialUnknowns.length > 0) reason += `; potential_unknowns=${potentialUnknowns.length}${potentialUnknownGapId ? `; promoted_gap=${potentialUnknownGapId}` : ''}`;
     let verifiedResearchClaimId: string | undefined;
     let verifiedResearchOutcome: 'SUPPORTED' | 'DEVICE_VERIFIED' | undefined;

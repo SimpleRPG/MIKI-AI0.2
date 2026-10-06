@@ -1,0 +1,19 @@
+{
+  "phase": "GALAXY_S25_CONVERSATION_READINESS",
+  "contractReady": true,
+  "deviceVerified": false,
+  "requiredDevice": "Galaxy S25",
+  "checks": [
+    {
+      "path": "android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt",
+      "present": true,
+      "hasSelfTest": true
+    },
+    {
+      "path": "android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt",
+      "present": true,
+      "hasSelfTest": false
+    }
+  ],
+  "reason": "Contract-only verification. ADB/device execution is required for DEVICE_VERIFIED."
+}

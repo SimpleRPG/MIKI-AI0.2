@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "phase": "SERVICE_AUDIT_CONSOLIDATION_71",
+  "audited": 25,
+  "duplicatesConsolidated": 4,
+  "classifications": {
+    "DUPLICATE_CONSOLIDATED": 4,
+    "MISSING_CONNECTION": 13,
+    "OBSOLETE_APP_ONLY": 1,
+    "DYNAMIC_ENTRY": 2,
+    "UI_OR_MANUAL": 3,
+    "DIAGNOSTIC_ONLY": 2
+  },
+  "duplicateMappings": [
+    {
+      "service": "aiderEngineService",
+      "canonical": "repositoryRepairOrchestratorService"
+    },
+    {
+      "service": "atomicAstTemplateExecutionService",
+      "canonical": "atomicAstTransformationComponentService"
+    },
+    {
+      "service": "codeUnderstandingService",
+      "canonical": "semanticUnderstandingV2OrchestratorService"
+    },
+    {
+      "service": "conversationEvaluationService",
+      "canonical": "dialogueEvaluationService"
+    }
+  ],
+  "failures": []
+}

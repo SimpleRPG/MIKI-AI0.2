@@ -1,4 +1,4 @@
-import { AbstractSymbolMapping } from '../../../types';
+import type { AbstractSymbolMapping } from '../../../types';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 

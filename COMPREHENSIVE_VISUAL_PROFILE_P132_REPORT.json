@@ -1,0 +1,23 @@
+{
+  "phase": "COMPREHENSIVE_VISUAL_PROFILE_P132",
+  "passed": true,
+  "checks": {
+    "ribcageSeparate": true,
+    "chestSeparate": true,
+    "abdomen": true,
+    "legs": true,
+    "unknownTracked": true,
+    "completeness": true,
+    "persisted": true,
+    "sha": true
+  },
+  "profile": {
+    "profileId": "VP-db5a856d814d089658c59980",
+    "revision": 1,
+    "completeness": 0.26479674796747965,
+    "unknownCount": 84,
+    "conflictCount": 0,
+    "profileSha256": "2bb594f66a8f15adb1f3b1e78c3923a75035566a2dadd02c1ce4ef23553d7d5a"
+  },
+  "memoryId": "VM-cd765312743b3fa137922807"
+}

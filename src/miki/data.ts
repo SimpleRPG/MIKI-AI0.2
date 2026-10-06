@@ -12,3 +12,7 @@ export function data() {
 // === MIKI CATEGORY SERVICE EXPORTS ===
 // data 配下のサービスを、この17分類の管理入口から公開する。
 export * from './data/services/deterministicModelCatalog';
+export * from './data/services/rustDataKernelService';
+export * from './data/services/dataProcessingService';
+export * from './data/services/dataReceiptService';
+export * from './data/services/dataEvidenceContractService';

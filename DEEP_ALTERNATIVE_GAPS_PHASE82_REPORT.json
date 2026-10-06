@@ -1,0 +1,52 @@
+{
+  "passed": true,
+  "phase": "DEEP_ALTERNATIVE_GAPS_82",
+  "checks": [
+    {
+      "bundle": "candidate-lineage",
+      "partsPresent": true,
+      "existingReadModelScope": true,
+      "candidateGraphApi": false
+    },
+    {
+      "bundle": "post-adoption-rollback",
+      "codeRollback": true,
+      "memoryInvalidation": true,
+      "cascadeApi": false
+    },
+    {
+      "bundle": "self-protection",
+      "guardsPresent": true,
+      "protectedRegistry": false
+    },
+    {
+      "bundle": "multi-objective-selection",
+      "independentGates": true,
+      "candidateVectorSelector": false
+    }
+  ],
+  "confirmedGapCount": 4,
+  "gaps": [
+    {
+      "id": "UNIFIED_CANDIDATE_LIFECYCLE_GRAPH",
+      "confirmed": true,
+      "reason": "Core lineage verifies task replies/evidence/receipts/decision, while candidate learning lineage is embedded in generation outcomes; no API traverses candidate -> package -> review -> correction -> derived candidate."
+    },
+    {
+      "id": "POST_ADOPTION_CASCADE_INVALIDATION_TRANSACTION",
+      "confirmed": true,
+      "reason": "Rollback and memory invalidation are separate capabilities; no transaction discovers lineage descendants and invalidates candidate, memory, review evidence, canary and readiness atomically."
+    },
+    {
+      "id": "CANONICAL_PROTECTED_INVARIANT_REGISTRY",
+      "confirmed": true,
+      "reason": "Guards validate target sets and forbidden code behaviors, but no canonical versioned registry defines protected safety paths, symbols and invariants for every candidate write route."
+    },
+    {
+      "id": "UNIFIED_MULTI_OBJECTIVE_CANDIDATE_SELECTOR",
+      "confirmed": true,
+      "reason": "Existing engines select request implementation or execution routes and gate complexity; none compares multiple code candidates using one vector spanning performance, memory, safety, compatibility, change surface, rollback cost and Rust migration value."
+    }
+  ],
+  "conclusion": "All four Phase 81 gaps remain confirmed after inspecting the nearest existing alternatives."
+}

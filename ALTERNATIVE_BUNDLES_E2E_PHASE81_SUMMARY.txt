@@ -1,0 +1,31 @@
+MIKI-AI Phase 81 代替機能群 E2E監査
+
+確認したまとまり:
+1. Phase 80の自動Rebase・複数評価者合議・評価者信頼度
+2. Candidate Revision / Package Revision / External Review / Correction Pairによる系譜代替群
+3. Snapshot / Canary / Workspace Rollback / ROLLED_BACKによる採用後取消し代替群
+4. Candidate Write Guard / Isolated Workspace / Core Ingress / Lifecycle Policyによる自己保護代替群
+5. Complexity Cost Gate / Resource Governanceによる多目的評価代替群
+
+結果:
+各代替群を構成する既存部品は到達可能で、代表動作は正常だった。
+一方、まとまり全体を一つの機能として完結させる横断機能が4件不足していた。
+
+不足機能:
+1. UNIFIED_CANDIDATE_LINEAGE_GRAPH
+Candidate Revision、Package、External Review、Correction EpisodeをCandidate ID起点で親子グラフとして一括追跡する機能。
+
+2. POST_ADOPTION_CASCADE_INVALIDATION
+採用取消し時に、派生Candidate、昇格記憶、Review Evidence、Adoption Readinessを一つのTransactionで失効する機能。
+
+3. CENTRAL_PROTECTED_INVARIANT_REGISTRY
+保護対象の安全ファイル、Symbol、Invariantを正規Registryで管理し、すべてのCandidate書込み経路へ強制する機能。
+
+4. UNIFIED_MULTI_OBJECTIVE_CANDIDATE_SELECTOR
+性能、メモリ、安全性、互換性、変更範囲、保守コスト、Rust移行価値を候補間で一括比較する正規Selector。
+
+検証:
+- Phase 81代替群E2E: PASS
+- TypeScript: PASS
+- 相対Import: 1021 files / 3223 imports / unresolved 0
+- 発見した横断不足: 4件

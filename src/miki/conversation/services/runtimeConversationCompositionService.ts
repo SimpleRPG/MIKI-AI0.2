@@ -8,6 +8,7 @@ import { coreResultAnswerContentIrService, CoreResultAnswerContent } from './cor
 import { conversationLearningEpisodeService } from './conversationLearningEpisodeService';
 import type { ConversationFeedbackScope } from './conversationFeedbackEvidenceService';
 import { systemLogger } from '../../../services/systemLogger';
+import { compositionalRealizationService } from './compositionalRealizationService';
 
 export interface RuntimeConversationCompositionOptions { maxCandidates?: number; timeBudgetMs?: number; assembledCode?: string; }
 export interface RuntimeConversationConcurrencyState { inFlight: boolean; startedAt?: number; }
@@ -196,6 +197,12 @@ export class RuntimeConversationCompositionService {
     const maxCandidates = Math.max(1, Math.min(8, options.maxCandidates || DEFAULT_MAX_CANDIDATES));
     const timeBudgetMs = Math.max(2, Math.min(50, options.timeBudgetMs || DEFAULT_TIME_BUDGET_MS));
     const candidates: RuntimeConversationCandidate[] = [];
+    const compositional = compositionalRealizationService.realize(ir);
+    if (compositional.mode === 'COMPOSITIONAL') {
+      const compositionalInspection = answerContentIrService.verifySemanticPreservation(ir, compositional.surfaceText);
+      const compositionalDiversity = conversationSurfaceDiversityService.assess(compositional.surfaceText);
+      candidates.push({ skeleton: primarySkeleton, surfaceText: compositional.surfaceText, semanticPreserved: compositionalInspection.isPreserved, repetitionScore: compositionalDiversity.repetitionScore, score: 0, elapsedMs: performance.now() - startedAt });
+    }
     for (const skeleton of uniqueSkeletons(primarySkeleton).slice(0, maxCandidates)) {
       if (candidates.length > 0 && performance.now() - startedAt >= timeBudgetMs) break;
       const candidateStartedAt = performance.now();

@@ -25,7 +25,6 @@ export * from './execution/services/nativeBackgroundService';
 export * from './execution/services/nativeWorkManagerService';
 export * from './execution/services/personalApiGatewayService';
 export * from './execution/services/remediationExecutionCoordinatorService';
-export * from './execution/services/simpleRpgRuleEngineService';
 export * from './execution/services/storagePlanningService';
 export * from './execution/services/taskExecutionOrchestratorService';
 export * from './execution/services/taskLineageService';

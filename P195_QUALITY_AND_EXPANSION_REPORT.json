@@ -1,0 +1,32 @@
+{
+  "phase": "TWENTY_SUBJECT_RULE_SPACE_P195",
+  "passed": true,
+  "checks": {
+    "twentySubjects": true,
+    "uniqueIds": true,
+    "uniqueSha": true,
+    "tenAdded": true,
+    "provenance": true,
+    "notMisrepresented": true,
+    "featureRules": true,
+    "qualityNotOverclaimed": true
+  },
+  "subjectCount": 20,
+  "originalObservedSubjects": 10,
+  "addedRuleSpaceSubjects": 10,
+  "quality": {
+    "rating": "NOT_PHOTO_QUALITY",
+    "structuralReadiness": 0.58,
+    "photographicReadiness": 0.18,
+    "productionRouteConnected": false,
+    "p194RenderedThroughP193": false,
+    "realMultiViewEvidence": false,
+    "expressionDeformation": false,
+    "pixelLevelAnatomyGate": false,
+    "androidDeviceE2E": false,
+    "evidenceBased": true
+  },
+  "warning": "The added ten are deterministic synthetic rule-space subjects. They expand structural variation and stress testing, but do not add independent photographic knowledge and must not be counted as proof of visual quality.",
+  "ruleBookSha256": "31f5bbe195379f6fb4c97f4505336c1054293b7f18aabc53bcadba8dc2748887",
+  "previousP194Passed": true
+}

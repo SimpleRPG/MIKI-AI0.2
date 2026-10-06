@@ -1,0 +1,56 @@
+{
+  "phase": "PROCEDURAL_RULE_PIXEL_SYNTHESIS_P193",
+  "passed": true,
+  "checks": {
+    "tenSources": true,
+    "rules": true,
+    "correlations": true,
+    "materials": true,
+    "noSourcePixels": true,
+    "deterministic": true,
+    "seedVariation": true,
+    "colorDiversity": true,
+    "surfaceCoverage": true,
+    "normalBuffer": true,
+    "materialBuffer": true,
+    "depthBuffer": true,
+    "faceRules": true,
+    "hairRules": true,
+    "wrinkleRules": true,
+    "aoRules": true,
+    "localOnly": true,
+    "sha": true
+  },
+  "ruleSet": {
+    "rules": 5,
+    "materials": [
+      "SKIN",
+      "HAIR",
+      "GARMENT",
+      "WOOD",
+      "BACKGROUND",
+      "SHADOW"
+    ],
+    "correlations": {
+      "seatFloor": 0.16646333357675794,
+      "balanceForeground": -0.3779538113469047,
+      "luminanceForeground": 0.018835008485606958
+    },
+    "ruleSetSha256": "fcf01ed5d1a03e32781ca98610a52e0805d8560c62a6d0a223e6fad5ef604134"
+  },
+  "synthesis": {
+    "width": 768,
+    "height": 1024,
+    "newPixelRatio": 1,
+    "colorCount": 89,
+    "surfaceCoverage": 1,
+    "synthesisSha256": "3f7e6f99971da1faf39b704deabb37f1e28faa5e66ddd7ea4e1d48b0c2280133"
+  },
+  "architecture": {
+    "learning": "EXPLICIT_RULES_AND_DISTRIBUTIONS",
+    "generation": "NEW_PIXELS_FROM_RULES",
+    "neuralWeights": false,
+    "sourcePixelCopy": false,
+    "network": false
+  }
+}

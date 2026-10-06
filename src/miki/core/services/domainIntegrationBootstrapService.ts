@@ -1,3 +1,19 @@
+import { conversationRustKernelService } from '../../conversation/services/conversationRustKernelService';
+import { safetyRustKernelService } from '../../safety/services/safetyRustKernelService';
+import { experienceRustKernelService } from '../../experience/services/experienceRustKernelService';
+import { selfAwarenessRustKernelService } from '../../selfAwareness/services/selfAwarenessRustKernelService';
+import { autonomyRustKernelService } from '../../autonomy/services/autonomyRustKernelService';
+import { improvementRustKernelService } from '../../improvement/services/improvementRustKernelService';
+import { capabilityRustKernelService } from '../../capability/services/capabilityRustKernelService';
+import { strategyRustKernelService } from '../../strategy/services/strategyRustKernelService';
+import { learningRustKernelService } from '../../learning/services/learningRustKernelService';
+import { researchRustKernelService } from '../../research/services/researchRustKernelService';
+import { unknownRustKernelService } from '../../unknown/services/unknownRustKernelService';
+import { promotionRustKernelService } from '../../promotion/services/promotionRustKernelService';
+import { candidateStructuralAnalysisService } from '../../selfDevelopment/services/candidateStructuralAnalysisService';
+import { memoryRustSearchService } from '../../memory/services/memoryRustSearchService';
+import { executionPlanningService } from '../../execution/services/executionPlanningService';
+import { dataProcessingService } from '../../data/services/dataProcessingService';
 import { productionScaleWorkerService } from '../../selfDevelopment/services/productionScaleWorkerService';
 import { domainParticipationService } from './domainParticipationService';
 import { storageService } from '../../../services/storageService';
@@ -190,15 +206,62 @@ class DomainIntegrationBootstrapService{
   if(domain==='learning')return ['LEARN_FROM_CORE_RESULT','APPROVE_REUSABLE_COMPONENTS'];
   if(domain==='strategy')return ['PLAN_PENDING_IMPROVEMENT_RUN'];
   if(domain==='capability')return ['RESOLVE_CAPABILITY_GAPS'];
-  if(domain==='memory')return ['FLUSH'];
+  if(domain==='memory')return ['FLUSH','SEARCH_MEMORY_INDEX'];
+  if(domain==='data')return ['PROCESS_DATA_RECORDS'];
+  if(domain==='execution')return ['PLAN_EXECUTION_GRAPH'];
   if(domain==='verification')return ['VALIDATE_CANDIDATE','VERIFY_RESEARCH_CLAIMS','VERIFY_CODE_COMPONENT'];
-  if(domain==='selfDevelopment')return ['GENERATE_CANDIDATE'];
+  if(domain==='selfDevelopment')return ['GENERATE_CANDIDATE','ANALYZE_CANDIDATE_STRUCTURE'];
   if(domain==='promotion')return ['CREATE_REVIEW_PACKAGE','APPROVE_REVIEWED_CANDIDATE'];
+  if(['promotion','unknown','research','learning','strategy','capability','improvement','autonomy','selfAwareness','experience','safety','conversation'].includes(domain))return ['ANALYZE_OWNED_DOMAIN'];
   return [];
  }
 
  private async handle(domain:MikiDomain,envelope:DomainEnvelope):Promise<DomainReply>{
   const done=(result:unknown):DomainReply=>({accepted:true,domain,command:envelope.command,result,completedAt:Date.now()});
+  if(envelope.command==='ANALYZE_OWNED_DOMAIN'&&['promotion','unknown','research','learning','strategy','capability','improvement','autonomy','selfAwareness','experience','safety','conversation'].includes(domain)){
+   const service=({promotion:promotionRustKernelService,unknown:unknownRustKernelService,research:researchRustKernelService,learning:learningRustKernelService,strategy:strategyRustKernelService,capability:capabilityRustKernelService,improvement:improvementRustKernelService,autonomy:autonomyRustKernelService,selfAwareness:selfAwarenessRustKernelService,experience:experienceRustKernelService,safety:safetyRustKernelService,conversation:conversationRustKernelService} as Record<string,{analyze:(input:any)=>Promise<any>} >)[domain];
+   const result=await service.analyze({items:Array.isArray(envelope.payload.items)?envelope.payload.items:[],baseline:Array.isArray(envelope.payload.baseline)?envelope.payload.baseline:[],context:envelope.payload.context&&typeof envelope.payload.context==='object'?envelope.payload.context as Record<string,unknown>:{},required:Array.isArray(envelope.payload.required)?envelope.payload.required.map(String):[],receipts:Array.isArray(envelope.payload.receipts)?envelope.payload.receipts.map(String):[]});
+   return done({operation:'ANALYZE_OWNED_DOMAIN',operationClass:'BUSINESS',...result});
+  }
+  if(domain==='selfDevelopment'&&envelope.command==='ANALYZE_CANDIDATE_STRUCTURE'){
+   const result=await candidateStructuralAnalysisService.analyze({candidateId:String(envelope.payload.candidateId||''),baseline:Array.isArray(envelope.payload.baseline)?envelope.payload.baseline as any[]:[],candidate:Array.isArray(envelope.payload.candidate)?envelope.payload.candidate as any[]:[],requirements:Array.isArray(envelope.payload.requirements)?envelope.payload.requirements.map(String):[],requirementLinks:envelope.payload.requirementLinks&&typeof envelope.payload.requirementLinks==='object'?envelope.payload.requirementLinks as Record<string,string[]>:{},allowedPaths:Array.isArray(envelope.payload.allowedPaths)?envelope.payload.allowedPaths.map(String):[],requiredContracts:Array.isArray(envelope.payload.requiredContracts)?envelope.payload.requiredContracts.map(String):[],knownCandidateHashes:Array.isArray(envelope.payload.knownCandidateHashes)?envelope.payload.knownCandidateHashes.map(String):[],manifest:envelope.payload.manifest&&typeof envelope.payload.manifest==='object'?envelope.payload.manifest as Record<string,unknown>:{}});
+   return done({operation:'ANALYZE_CANDIDATE_STRUCTURE',operationClass:'BUSINESS',...result});
+  }
+  if(domain==='memory'&&envelope.command==='SEARCH_MEMORY_INDEX'){
+   const records=Array.isArray(envelope.payload.records)?envelope.payload.records as any[]:[];
+   const query=String(envelope.payload.query||'');
+   const outcome=await memoryRustSearchService.search(records,query,{
+    baselineRecords:Array.isArray(envelope.payload.baselineRecords)?envelope.payload.baselineRecords as any[]:[],now:Number(envelope.payload.now)||Date.now(),
+    ngramSize:Number(envelope.payload.ngramSize)||3,limit:Number(envelope.payload.limit)||50,duplicateThreshold:Number(envelope.payload.duplicateThreshold)||0.92,
+    halfLifeMs:Number(envelope.payload.halfLifeMs)||2592000000,requiredReceiptIds:Array.isArray(envelope.payload.requiredReceiptIds)?envelope.payload.requiredReceiptIds.map(String):[],
+    availableReceiptIds:Array.isArray(envelope.payload.availableReceiptIds)?envelope.payload.availableReceiptIds.map(String):[]
+   },String(envelope.payload.taskId||envelope.correlationId));
+   return done({operation:'SEARCH_MEMORY_INDEX',operationClass:'BUSINESS',...outcome.result,receiptId:outcome.receiptId});
+  }
+  if(domain==='execution'&&envelope.command==='PLAN_EXECUTION_GRAPH'){
+   const nodes=Array.isArray(envelope.payload.nodes)?envelope.payload.nodes as any[]:[];
+   const result=await executionPlanningService.plan(nodes,{
+    receipts:Array.isArray(envelope.payload.receipts)?envelope.payload.receipts.map(String):[],
+    completedIdempotencyKeys:Array.isArray(envelope.payload.completedIdempotencyKeys)?envelope.payload.completedIdempotencyKeys.map(String):[],
+    pausedNodeId:typeof envelope.payload.pausedNodeId==='string'?envelope.payload.pausedNodeId:undefined,
+    resumeToken:typeof envelope.payload.resumeToken==='string'?envelope.payload.resumeToken:undefined
+   });
+   return done({operation:'PLAN_EXECUTION_GRAPH',operationClass:'BUSINESS',...result});
+  }
+  if(domain==='data'&&envelope.command==='PROCESS_DATA_RECORDS'){
+   const records=Array.isArray(envelope.payload.records)?envelope.payload.records:[];
+   const outcome=await dataProcessingService.normalizeDeduplicateAndIndex(records,{
+    baselineRecords:Array.isArray(envelope.payload.baselineRecords)?envelope.payload.baselineRecords:[],
+    dedupeKeys:Array.isArray(envelope.payload.dedupeKeys)?envelope.payload.dedupeKeys.map(String):[],
+    indexFields:Array.isArray(envelope.payload.indexFields)?envelope.payload.indexFields.map(String):[],
+    requiredFields:Array.isArray(envelope.payload.requiredFields)?envelope.payload.requiredFields.map(String):[],
+    schema:Array.isArray(envelope.payload.schema)?envelope.payload.schema as any:[],trimStrings:envelope.payload.trimStrings!==false,lowercaseKeys:envelope.payload.lowercaseKeys===true,
+    normalizeNumbers:envelope.payload.normalizeNumbers===true,normalizeBooleans:envelope.payload.normalizeBooleans===true,normalizeDates:envelope.payload.normalizeDates===true,
+    duplicatePolicy:typeof envelope.payload.duplicatePolicy==='string'?envelope.payload.duplicatePolicy as any:'KEEP_FIRST',chunkSize:Number(envelope.payload.chunkSize)||10000,memoryLimitBytes:Number(envelope.payload.memoryLimitBytes)||268435456,
+    cancelAfterRows:Number.isFinite(Number(envelope.payload.cancelAfterRows))?Number(envelope.payload.cancelAfterRows):undefined,sqliteColumns:Array.isArray(envelope.payload.sqliteColumns)?envelope.payload.sqliteColumns.map(String):[]
+   },{taskId:String(envelope.payload.taskId||envelope.correlationId),operationInstanceId:String(envelope.payload.operationInstanceId||envelope.envelopeId)});
+   return done({operation:'PROCESS_DATA_RECORDS',operationClass:'BUSINESS',...outcome.result,evidenceContract:outcome.evidenceContract,receiptId:outcome.receiptId});
+  }
   if(envelope.command==='PARTICIPATE')return done(domainParticipationService.assess(domain,envelope.payload));
   if(envelope.command==='VERIFY_CONNECTION')return done(domainSequentialConnectionService.verify(domain,envelope.correlationId,envelope.evidenceIds[0]));
   if(envelope.command==='HEALTH_CHECK'||envelope.command==='DESCRIBE'||envelope.command==='GET_STATUS')return done({domain,registered:true,commands:domainRouterService.getRegistrations().find(x=>x.domain===domain)?.commands||[]});
@@ -445,8 +508,6 @@ class DomainIntegrationBootstrapService{
          const {reusableComponentFactoryService}=await import('./reusableComponentFactoryService');
          const linked=reusableComponentFactoryService.findCodeComponentByRegistryId(componentId);
          if(linked){
-           const {safeImprovementPipelineService}=await import('../../improvement/services/safeImprovementPipelineService');
-
            // 新規CODE ComponentのCanaryが既に進行中/完了済みなら、
            // COREが同じCanaryを再生成せず現在状態を再評価する。
            const existingCanary=safeImprovementPipelineService.list()
@@ -642,6 +703,11 @@ class DomainIntegrationBootstrapService{
      persistenceReceiptIds:[receipt.receiptId],evidenceIds:[...new Set(workspace.files.flatMap(file=>file.evidenceIds))]});
   }
   if(domain==='promotion'&&envelope.command==='APPROVE_REVIEWED_CANDIDATE'){
+   const {formalAdoptionAuthorizationService}=await import('../../selfDevelopment/services/formalAdoptionAuthorizationService');
+   const {formalAdoptionAuthorizationLedgerService}=await import('../../selfDevelopment/services/formalAdoptionAuthorizationLedgerService');
+   const adoptionAuthorization=envelope.payload.adoptionAuthorization;
+   if(!adoptionAuthorization||formalAdoptionAuthorizationService.validate(adoptionAuthorization as never).length>0)return {accepted:false,domain,command:envelope.command,error:'PROMOTION_AUTHORIZATION_INVALID',completedAt:Date.now()};
+   try{formalAdoptionAuthorizationLedgerService.claim((adoptionAuthorization as {authorizationId:string}).authorizationId,String(envelope.payload.taskId||''));}catch(error){return {accepted:false,domain,command:envelope.command,error:error instanceof Error?error.message:'PROMOTION_AUTHORIZATION_CLAIM_FAILED',completedAt:Date.now()};}
    const packageId=String(envelope.payload.packageId||'');
    const manifestSha=String(envelope.payload.candidateManifestSha256||'');
    if(!packageId||!manifestSha)return {accepted:false,domain,command:envelope.command,error:'REVIEW_PACKAGE_AND_MANIFEST_REQUIRED',completedAt:Date.now()};
@@ -727,6 +793,7 @@ class DomainIntegrationBootstrapService{
     catch(recoveryError){return {accepted:false,domain,command:envelope.command,error:"SELF_CODE_SPACE_RECOVERY_REQUIRED",completedAt:Date.now()};}
     throw error;
    }
+   formalAdoptionAuthorizationLedgerService.consume((adoptionAuthorization as {authorizationId:string}).authorizationId);
    return done({operation:'APPROVE_REVIEWED_CANDIDATE',operationClass:'BUSINESS',status:'SUCCEEDED',packageId,workspaceId:workspace.workspaceId,transactionId:result.transaction.transactionId,candidateManifestSha256:result.transaction.candidateManifestSha256,selfCodeRevisionSha256:applied.repoSha256,evidenceIds:[...new Set(result.workspace.files.flatMap(file=>file.evidenceIds))],receiptIds:[receipt]});
   }
 if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){

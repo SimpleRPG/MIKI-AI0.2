@@ -1,7 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
-import { simpleRpgCapabilityLearningService } from '../../learning/services/simpleRpgCapabilityLearningService';
 import { selfCodeArchitectService } from '../../selfDevelopment/services/selfCodeArchitectService';
 import { selfImprovementIngressService } from '../../core/services/selfImprovementIngressService';
 
@@ -13,7 +12,7 @@ export interface AutonomousGrowthCycleResult {
   startedAt: number;
   finishedAt: number;
   sourceChanged: boolean;
-  audits: { simpleRpg: ReturnType<typeof simpleRpgCapabilityLearningService.audit>; selfCode: { passed: boolean; complianceScore: number } };
+  audits: { selfCode: { passed: boolean; complianceScore: number } };
   gapsObserved: number;
   actions: string[];
   blockedActions: string[];
@@ -55,10 +54,7 @@ export class AutonomousGrowthGovernorService {
     try {
       if (options?.signal?.aborted) throw new Error('中断要求');
 
-      // 1) 現行ゲームを観測・再監査。更新検知時は旧能力をそのまま信用しない。
-      const simpleRpg = simpleRpgCapabilityLearningService.audit();
-      if (simpleRpg.sourceChanged) actions.push('SimpleRPG source fingerprint changed: capability re-audit completed');
-      actions.push(`SimpleRPG audit pass=${simpleRpg.passed.length} fail=${simpleRpg.failed.length}`);
+      // 1) 現行RepositoryとCapability Gapを観測する。Repository内容の取得はGitHub pull後の正本Workspaceを使用する。
 
       if (options?.signal?.aborted) throw new Error('中断要求');
 
@@ -97,7 +93,7 @@ export class AutonomousGrowthGovernorService {
       this.state = { lastCycleAt: Date.now(), lastCycleId: cycleId, cycleCount: this.state.cycleCount + 1 };
       this.save();
       systemLogger.info('SELF_IMPROVEMENT', `🧠 [AutonomousGrowthGovernor] cycle=${cycleId} completed`);
-      return { ok: blockedActions.length === 0, cycleId, startedAt, finishedAt: Date.now(), sourceChanged: simpleRpg.sourceChanged, audits: { simpleRpg, selfCode }, gapsObserved: gaps.length, actions, blockedActions };
+      return { ok: blockedActions.length === 0, cycleId, startedAt, finishedAt: Date.now(), sourceChanged: false, audits: { selfCode }, gapsObserved: gaps.length, actions, blockedActions };
     } finally { this.running = false; }
   }
 }

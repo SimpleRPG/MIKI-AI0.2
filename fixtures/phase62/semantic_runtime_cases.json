@@ -1,0 +1,22 @@
+[
+  {"id":"colon-chain","input":"支給先コードを07070に変更:購買担当者コードを6Lに設定","expect":{"mutationCount":2,"secondTargetSet":"PREVIOUS_MUTATION_ROWS","secondDependsOn":["A1"],"secondSameTransaction":true,"firstValue":"07070","firstValueType":"STRING"}},
+  {"id":"semicolon-chain","input":"支給先コードを07070に変更;購買担当者コードを6Lに設定","expect":{"mutationCount":2,"secondTargetSet":"ALL_MATCHED_ROWS","secondDependsOn":[],"secondSameTransaction":false}},
+  {"id":"mixed-chain","input":"Aを1に変更:Bを2に変更;Cを3に変更:Dを4に変更","expect":{"mutationCount":4,"targets":["ALL_MATCHED_ROWS","PREVIOUS_MUTATION_ROWS","ALL_MATCHED_ROWS","PREVIOUS_MUTATION_ROWS"],"dependencies":[[],["A1"],[],["A3"]]}},
+  {"id":"leading-zero","input":"仕入先コードを04242に変更","expect":{"firstValue":"04242","firstValueType":"STRING","businessCode":"04242","preserveLeadingZeros":true}},
+  {"id":"number-value","input":"手配数を0に変更","expect":{"firstValue":"0","firstValueType":"NUMBER"}},
+  {"id":"date-value","input":"納入予定日を2026-10-01に変更","expect":{"firstValue":"2026-10-01","firstValueType":"DATE"}},
+  {"id":"boolean-value","input":"出図時手配不要フラグをtrueに設定","expect":{"firstValue":"true","firstValueType":"BOOLEAN"}},
+  {"id":"db-column","input":"DS_PJ_SEQNOを確認","expect":{"term":"DS_PJ_SEQNO","termKind":"DB_COLUMN"}},
+  {"id":"field","input":"PROJECT_IDを確認","expect":{"term":"PROJECT_ID","termKind":"FIELD"}},
+  {"id":"duration","input":"入庫予定日を3W前倒しに変更","expect":{"term":"3W","termKind":"DURATION"}},
+  {"id":"quoted-separator","input":"備考を「A:B;C」に変更","expect":{"mutationCount":1,"firstValue":"「A:B;C」"}},
+  {"id":"url-not-chain","input":"URLをhttps://example.com/a:bに変更","expect":{"mutationCount":1}},
+  {"id":"time-not-chain","input":"開始時刻を12:30に変更","expect":{"mutationCount":1}},
+  {"id":"conversation-reference","input":"それも変更して","history":[{"turnId":"t1","text":"支給先コードを07070に変更","entities":["支給先コード"]}],"expect":{"resolvedContains":"支給先コードを07070に変更","resolvedContains2":"後続指示:それも変更して"}},
+  {"id":"unresolved-reference","input":"それを変更して","expect":{"ready":false}},
+  {"id":"exclusion","input":"処理対象外の行は変更しない。支給先コードを07070に変更","expect":{"exclusionMinimum":1,"mutationCount":1}},
+  {"id":"continue","input":"一致後も次の条件評価を続ける","expect":{"continuationMinimum":1}},
+  {"id":"stop","input":"一致後は以降の評価を停止する","expect":{"stopMinimum":1}},
+  {"id":"unknown-operation","input":"対象をいい感じにする","expect":{"ready":false,"hasUnknownMutation":true}},
+  {"id":"multiple-update-fields","input":"支給先コードを07070に変更:購買担当者コードを6Lに設定;手配数を0に変更","expect":{"mutationCount":3,"fields":["支給先コード","購買担当者コード","手配数"]}}
+]

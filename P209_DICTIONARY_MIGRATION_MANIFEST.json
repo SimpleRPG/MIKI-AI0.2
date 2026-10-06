@@ -1,0 +1,362 @@
+{
+  "phase": "P209",
+  "schemaVersion": 1,
+  "sourcePath": "src/miki/research/services/japaneseDictionaryService.ts",
+  "sourceSha256": "0fe21e34ffef43e8de0d9a5f1bb8f17d246a849dad246000f52ccf634bc0933c",
+  "entryCount": 118,
+  "stringCount": 220,
+  "uncompressedBytes": 11882,
+  "compactBytes": 5132,
+  "shardTargetBytes": 65536,
+  "fixedSemanticFiles": 69,
+  "fixedSemanticCandidateCount": 649,
+  "compactionRatio": 0.4319,
+  "sha256": "45059058f8436fd678359fe1141aa81f82c876942459fe8b7e891b7600dcc70c",
+  "candidates": [
+    {
+      "path": "src/miki/conversation/services/compositionalRealizationService.ts",
+      "sha256": "d021ec46031470ff8b098aee17db935b1e3ea004e539f0ef28581d994ffe28b2",
+      "fixedSemanticCandidateCount": 2
+    },
+    {
+      "path": "src/miki/conversation/services/conversationComponentCompositionService.ts",
+      "sha256": "53e1a769ed9626dd8378648ecda31bda2a056c40ef4f564ae4c3285c078747a0",
+      "fixedSemanticCandidateCount": 14
+    },
+    {
+      "path": "src/miki/conversation/services/conversationCompositionResearchSchedulerService.ts",
+      "sha256": "4618aeb07fef94dc01a0378cc808ee795215e1c999d3758e5edc92ef8267e87f",
+      "fixedSemanticCandidateCount": 2
+    },
+    {
+      "path": "src/miki/conversation/services/conversationContinuityService.ts",
+      "sha256": "e247d6a5cedcc25592f583a310893f096022c59e59ea64caeacfa7b2728c6140",
+      "fixedSemanticCandidateCount": 2
+    },
+    {
+      "path": "src/miki/conversation/services/conversationEvaluationService.ts",
+      "sha256": "2d63c5980de09c0f3fd1b0185342746b2588f4ccd1e3cc0c92e84de6405a1b3b",
+      "fixedSemanticCandidateCount": 27
+    },
+    {
+      "path": "src/miki/conversation/services/conversationFeedbackEvidenceService.ts",
+      "sha256": "0c751ad2e850282aed8b1934b52b4433eb26f409c37c4972ac7b3664bf5678f3",
+      "fixedSemanticCandidateCount": 4
+    },
+    {
+      "path": "src/miki/conversation/services/conversationLearningEpisodeService.ts",
+      "sha256": "8698e47169361111f869c96d642ad67c34691b237a086a99261322e6a01b4adf",
+      "fixedSemanticCandidateCount": 5
+    },
+    {
+      "path": "src/miki/conversation/services/conversationPragmaticsService.ts",
+      "sha256": "de112539706f3858e95d5660fbc88a53806b41ee6085b77e0ae35b2b56061d54",
+      "fixedSemanticCandidateCount": 4
+    },
+    {
+      "path": "src/miki/conversation/services/conversationStateService.ts",
+      "sha256": "8fe47eaaa789961a94991ee5b151331e5833955fb08cd514a56413f4d61628a6",
+      "fixedSemanticCandidateCount": 24
+    },
+    {
+      "path": "src/miki/conversation/services/conversationSurfaceDiversityService.ts",
+      "sha256": "bc8407d49832d565d429751f3b0f5ce899584006ceeb86e81302f4e3cd1f096b",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/conversation/services/conversationTaskboardService.ts",
+      "sha256": "8688615c9f9d509300077a410c3cc1ad7012ee66839dabf6174bfd50626786f3",
+      "fixedSemanticCandidateCount": 3
+    },
+    {
+      "path": "src/miki/conversation/services/conversationUnknownVocabularyService.ts",
+      "sha256": "b2a157543a6ac41018d558212d7d97cf1716ad513bc608f3c9afcc47767cd0db",
+      "fixedSemanticCandidateCount": 5
+    },
+    {
+      "path": "src/miki/conversation/services/coreResultAnswerContentIrService.ts",
+      "sha256": "b0c0dd2f2486ac998e70b56f1de1199dc4af061ea623ca76c55da1784609b502",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/conversation/services/dialogueEvaluationService.ts",
+      "sha256": "c021aabad77c8128b36529d9973bfd4bad6748e0e427dccd1e69e8e0b3fe0fbb",
+      "fixedSemanticCandidateCount": 30
+    },
+    {
+      "path": "src/miki/conversation/services/japaneseAnalysisCompositionService.ts",
+      "sha256": "b9788b6845ead8e4d5ffab9ec701bc16db309b219e9bd2ba2e1fb5ac4c9a2d2a",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/conversation/services/runtimeConversationCompositionService.ts",
+      "sha256": "aeceb5f743144ac3b119b91f916d66652069369bc94fc9ff0a19c68d60cca1f3",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/conversation/services/surfaceGrammarAndStyleService.ts",
+      "sha256": "be7e9d0dad8e661f297f9bcd0587491d19c040f92a7f9e9960bc35b000ca665c",
+      "fixedSemanticCandidateCount": 29
+    },
+    {
+      "path": "src/miki/conversation/services/surfaceVariationGrowthService.ts",
+      "sha256": "4a3bb315e431074e92f5a45898ad83664a45c4252e820b3de0c2581abd082b1a",
+      "fixedSemanticCandidateCount": 22
+    },
+    {
+      "path": "src/miki/conversation/services/surfaceVariationService.ts",
+      "sha256": "7934ba31aa180c46630cf70b15796dc8ddf0bc98d38fe8cc8fc07dccfd863ff2",
+      "fixedSemanticCandidateCount": 4
+    },
+    {
+      "path": "src/miki/conversation/services/typedDiscourseModelService.ts",
+      "sha256": "3997e1695f19beb7b3f61d663c8ac5a47c088a869e73cdb77658995c84a8f89d",
+      "fixedSemanticCandidateCount": 6
+    },
+    {
+      "path": "src/miki/research/services/autonomousSearchService.ts",
+      "sha256": "9049f831e244f891439fe45412bcafcd7b9b0d64761b927aec1c3c98a73e479b",
+      "fixedSemanticCandidateCount": 24
+    },
+    {
+      "path": "src/miki/research/services/claimEvidenceService.ts",
+      "sha256": "39a3107ae523bfa4bb0dd38e85e393615edcf7b7909d0e4750f8fe3ed2b6b98c",
+      "fixedSemanticCandidateCount": 3
+    },
+    {
+      "path": "src/miki/research/services/dataUnderstandingService.ts",
+      "sha256": "6d911744f8d4f5f7e42bcb6f5f1e5d0dcaa07f94161f375e2431fc41dd862dfe",
+      "fixedSemanticCandidateCount": 4
+    },
+    {
+      "path": "src/miki/research/services/externalAiResearchBundleService.ts",
+      "sha256": "6c73c01ef78ff0f2c25045a630d7be9af69db25d58eabce8f2d318378a52135c",
+      "fixedSemanticCandidateCount": 2
+    },
+    {
+      "path": "src/miki/research/services/internalWebQueryLearningCycleService.ts",
+      "sha256": "435ebc81e28b5a34203811c2dd4e1e2cb4c960f4a7033fe7f53fe8a184f011a0",
+      "fixedSemanticCandidateCount": 24
+    },
+    {
+      "path": "src/miki/research/services/japaneseAnalysisService.ts",
+      "sha256": "9253341ff908315df506812f7834a4b22dfe6068fc93d3c8bf94a9d1b1f420ed",
+      "fixedSemanticCandidateCount": 8
+    },
+    {
+      "path": "src/miki/research/services/queryPatternRepositoryService.ts",
+      "sha256": "b26c86340110c21701a105fe74830e64cb26821280d7a5a0254b37430ddf2b6f",
+      "fixedSemanticCandidateCount": 4
+    },
+    {
+      "path": "src/miki/research/services/queryPatternSelectionService.ts",
+      "sha256": "5cd69198cb0f0e263e8c9989e3fba0ae28ebad07538016dec7be782c8ead7463",
+      "fixedSemanticCandidateCount": 2
+    },
+    {
+      "path": "src/miki/research/services/researchQueryOutcomeLearningService.ts",
+      "sha256": "543efdc6ea5bb29aa75d25a17ef0852f9071b23c18fb9db340406b4149990345",
+      "fixedSemanticCandidateCount": 2
+    },
+    {
+      "path": "src/miki/research/services/researchQueryPlanningService.ts",
+      "sha256": "8c32e10dbc345b638a64b1825a34f78f675b8665eec349b7f331a8a1831e17d6",
+      "fixedSemanticCandidateCount": 8
+    },
+    {
+      "path": "src/miki/research/services/researchService.ts",
+      "sha256": "20ab201b05daa12d0b8252ec92a1ee0dde00e03215836d90dfa5851e3e249bfe",
+      "fixedSemanticCandidateCount": 21
+    },
+    {
+      "path": "src/miki/research/services/researchStrategyService.ts",
+      "sha256": "88dd12e1c20638c1f2226a95baf76ddf73bbfb7d3de5febd18df8faba89cfb40",
+      "fixedSemanticCandidateCount": 6
+    },
+    {
+      "path": "src/miki/research/services/researchToRemediationService.ts",
+      "sha256": "ae43b1232c993a77e121d3a9d0acd531464b5abb03c9ff34cde470372815bdf6",
+      "fixedSemanticCandidateCount": 8
+    },
+    {
+      "path": "src/miki/research/services/searxngMediaFetchService.ts",
+      "sha256": "f26acd7c48a6629e3f7a759bd0dba42c40087699a49f9d62ea581910ac36c511",
+      "fixedSemanticCandidateCount": 8
+    },
+    {
+      "path": "src/miki/research/services/syntheticDataService.ts",
+      "sha256": "4511b264d220d5a04c1505bea3640a2e76c7e57c81286e937a1fbc5488a11fbe",
+      "fixedSemanticCandidateCount": 12
+    },
+    {
+      "path": "src/miki/research/services/visualReferenceResearchService.ts",
+      "sha256": "2da06fd555f961ac29aec7cf9091aeda64132508978f3ea9bb89cdd93d0237da",
+      "fixedSemanticCandidateCount": 2
+    },
+    {
+      "path": "src/miki/research/services/webMaterialPatternExtractor.ts",
+      "sha256": "caff894195342520c351b6c14ee0f66846bbc99d43906922792ea93a00ffd0bc",
+      "fixedSemanticCandidateCount": 28
+    },
+    {
+      "path": "src/miki/research/services/webResearchPolicyService.ts",
+      "sha256": "ebf50682592aba1b26743d6b0f22295f27d08afe631b8fcfc85c90f71ee0f9ad",
+      "fixedSemanticCandidateCount": 2
+    },
+    {
+      "path": "src/miki/research/services/webTermLearningService.ts",
+      "sha256": "5871ccd84bae6725c928ac8221a3a98c29c5f3acad60412fb526dd44d69e301a",
+      "fixedSemanticCandidateCount": 3
+    },
+    {
+      "path": "src/miki/learning/services/mikiConversationLearningService.ts",
+      "sha256": "1eebad8ad7d94f97fc6f13e8036881c28089ab59dbbf931f653f5ca6403c205a",
+      "fixedSemanticCandidateCount": 6
+    },
+    {
+      "path": "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts",
+      "sha256": "e1a90b44d5bbc341d686fc0391400648d0885479f4c5881a3b8dc85edd7cb622",
+      "fixedSemanticCandidateCount": 3
+    },
+    {
+      "path": "src/miki/learning/services/taskResultFeedbackService.ts",
+      "sha256": "35801b99c406c67330809205f89cdf219f377843f1cfe69fee5f5932bdddfa13",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/learning/services/teacherRequestService.ts",
+      "sha256": "05a97def2297d79bd9038d64238d8d753251327c75ebd8f351a2f64397fb1b4f",
+      "fixedSemanticCandidateCount": 77
+    },
+    {
+      "path": "src/miki/learning/services/uncertaintyTeacherService.ts",
+      "sha256": "dff8e2bc35bdaac9439cc6f191b4039085787a4f55eb9366f973d0f01f5dc64d",
+      "fixedSemanticCandidateCount": 5
+    },
+    {
+      "path": "src/miki/learning/services/userProficiencyService.ts",
+      "sha256": "1caed5e5ba64a37dcb5413eb39b06d043574bb3a85e7192729a63609e27b4942",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/unknown/services/counterexampleContractRefinementService.ts",
+      "sha256": "1b4a87bd32407522e0fd68238a3cb0021ca8da74b46ac85b92874cc11eb2bf11",
+      "fixedSemanticCandidateCount": 2
+    },
+    {
+      "path": "src/miki/unknown/services/counterfactualReasoningService.ts",
+      "sha256": "0e37dd9c3487c9b6079dc81d36b70e6ca1abf2d272cfe2abba178abebd3d1038",
+      "fixedSemanticCandidateCount": 9
+    },
+    {
+      "path": "src/miki/unknown/services/knowledgeGapService.ts",
+      "sha256": "826bd7628ea8fa80cd78b6f890c2c36d6e1fcb47d1d3a80c55e2ce05c4d1847b",
+      "fixedSemanticCandidateCount": 29
+    },
+    {
+      "path": "src/miki/unknown/services/latentIntentMiningService.ts",
+      "sha256": "95b5fd3ad994d67ef617aa9228036bb48724a450fcce0114b41dcab597f5e063",
+      "fixedSemanticCandidateCount": 17
+    },
+    {
+      "path": "src/miki/unknown/services/multiIntentDecompositionService.ts",
+      "sha256": "05014a514367a4f75a92ccc58dd895bcc7d529e2fe464b8cf61f92c4743e1c65",
+      "fixedSemanticCandidateCount": 5
+    },
+    {
+      "path": "src/miki/unknown/services/unifiedUnknownResolutionCoordinatorService.ts",
+      "sha256": "9b04595d151546ea4cbbf6127c9c9ee44d61c495b3ef709ba6bfe990271f3ac3",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/unknown/services/unknownFingerprintService.ts",
+      "sha256": "d07fc644ac67f42197b8aead8358fa2b02aa4e261f6cec38f0a6c3f82843a51c",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/unknown/services/unknownResolutionService.ts",
+      "sha256": "8db8fce2fdb27d5c03c50518c78c9f387ed1d9d8d28dc95b8c1a74dc32a2d065",
+      "fixedSemanticCandidateCount": 11
+    },
+    {
+      "path": "src/miki/unknown/services/unknownTaskDecompositionService.ts",
+      "sha256": "48e146ca15e70b8fac2bd7cb8b1ee2c61f513ef00fe47ffb440ed7659b93c11b",
+      "fixedSemanticCandidateCount": 2
+    },
+    {
+      "path": "src/miki/unknown/services/unknownTermDetectionService.ts",
+      "sha256": "f9dd6ac5daf33cb8ed832cbb1b6f7a6d9099dd2ca38708c91feb81c86dc91ba0",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/capability/services/capabilityCompositionProofService.ts",
+      "sha256": "2482fd836c812fca15c36a7bfe74e8dfd76b528918c89716af094a94834c93c6",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/capability/services/capabilityConfidenceService.ts",
+      "sha256": "b53ad6a7f2220ef53a1c8bbc0803897e926d3e98c04a187d40f75c12bbcf6435",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/capability/services/capabilityGapService.ts",
+      "sha256": "f44a83aad842f89cb110894b360445025f414acda57a60b3af0acf37aecd76e4",
+      "fixedSemanticCandidateCount": 4
+    },
+    {
+      "path": "src/miki/capability/services/capabilityGraphService.ts",
+      "sha256": "80b69afcacba7abd4027ccfbb9b963105a93b72e848b7574670ef0f54023a6af",
+      "fixedSemanticCandidateCount": 9
+    },
+    {
+      "path": "src/miki/capability/services/capabilityImplementationRegistryService.ts",
+      "sha256": "6b33eca5ce528ab39b1525056d90f96d40055481dfe7773cfb64d651cff0bb99",
+      "fixedSemanticCandidateCount": 2
+    },
+    {
+      "path": "src/miki/capability/services/capabilityPluginService.ts",
+      "sha256": "71d2ec9728be94a7501ef1396dc4391c2f8242d57551e256c554839e11472920",
+      "fixedSemanticCandidateCount": 20
+    },
+    {
+      "path": "src/miki/capability/services/capabilityReuseService.ts",
+      "sha256": "5c2c4e8d4d0522c02d4e339850538e97a09c2a5fab19907c06f6ff8989656f5a",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/capability/services/capabilityTraceabilityService.ts",
+      "sha256": "10b72fcf6be89f8e4881768a4887538835a0620ec956f2419463a2a56de811fd",
+      "fixedSemanticCandidateCount": 1
+    },
+    {
+      "path": "src/miki/capability/services/componentCompositionService.ts",
+      "sha256": "6d87d40f811617cec6bbc59d75bdd4208e9b071d28fba9ee3b73b16436739a8d",
+      "fixedSemanticCandidateCount": 7
+    },
+    {
+      "path": "src/miki/capability/services/componentRegistryService.ts",
+      "sha256": "014054a2c02b079383d949a3baf13e4a5744414449d284d428d75f7546280f22",
+      "fixedSemanticCandidateCount": 12
+    },
+    {
+      "path": "src/miki/capability/services/deterministicCapabilityEvolutionService.ts",
+      "sha256": "63285eb97bf9fe75ee8f1e2cf3b714259815f0f61264a0f77c38cc0067fd2b4b",
+      "fixedSemanticCandidateCount": 5
+    },
+    {
+      "path": "src/miki/capability/services/dynamicToolFactoryService.ts",
+      "sha256": "9965efa6fbe9806d10d7a952fd3a1608e577546db30af1af40f0744f314d5ce7",
+      "fixedSemanticCandidateCount": 4
+    },
+    {
+      "path": "src/miki/capability/services/skillsService.ts",
+      "sha256": "132ddb9b003a78300d4120f8f5e507c5dd031ed2b691368bf1c151ac84b06399",
+      "fixedSemanticCandidateCount": 39
+    },
+    {
+      "path": "src/miki/capability/services/toolsService.ts",
+      "sha256": "757cc9fe6efe5dc3b8049581eff0d44b56d616d60eae1f1597094f792a4ba474",
+      "fixedSemanticCandidateCount": 14
+    }
+  ]
+}

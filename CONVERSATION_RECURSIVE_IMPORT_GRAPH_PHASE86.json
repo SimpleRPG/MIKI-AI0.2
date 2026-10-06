@@ -1,0 +1,797 @@
+{
+  "sourceFiles": 864,
+  "conversationAdjacentFiles": 80,
+  "seedFiles": 29,
+  "bidirectionalClosureFiles": 851,
+  "orphans": [
+    {
+      "file": "src/miki/core/services/semanticContextBudgetService.ts",
+      "imports": 0,
+      "importedBy": 0,
+      "importers": []
+    }
+  ],
+  "rows": [
+    {
+      "file": "src/autonomous_modules/anaphora_history_stack.ts",
+      "imports": 0,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/conversation/services/conversationStateService.ts",
+        "src/services/conversationStateService.ts"
+      ]
+    },
+    {
+      "file": "src/autonomous_modules/anaphora_resolver_sample.ts",
+      "imports": 0,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/conversation/services/conversationStateService.ts",
+        "src/services/conversationStateService.ts"
+      ]
+    },
+    {
+      "file": "src/components/PersonaSettingsPanel.tsx",
+      "imports": 1,
+      "importedBy": 1,
+      "importers": [
+        "src/components/ExternalConnectionsScreen.tsx"
+      ]
+    },
+    {
+      "file": "src/components/chat/ConversationBranchModal.tsx",
+      "imports": 1,
+      "importedBy": 1,
+      "importers": [
+        "src/components/ChatPanel.tsx"
+      ]
+    },
+    {
+      "file": "src/components/chat/ConversationTaskboardModal.tsx",
+      "imports": 1,
+      "importedBy": 1,
+      "importers": [
+        "src/components/ChatPanel.tsx"
+      ]
+    },
+    {
+      "file": "src/miki/conversation.ts",
+      "imports": 19,
+      "importedBy": 1,
+      "importers": [
+        "src/miki/index.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/index.ts",
+      "imports": 1,
+      "importedBy": 0,
+      "importers": []
+    },
+    {
+      "file": "src/miki/conversation/services/answerContentIrService.ts",
+      "imports": 8,
+      "importedBy": 8,
+      "importers": [
+        "src/App.tsx",
+        "src/miki/conversation.ts",
+        "src/miki/conversation/services/conversationComponentCompositionService.ts",
+        "src/miki/conversation/services/hybridConversationEngineService.ts",
+        "src/miki/conversation/services/runtimeConversationCompositionService.ts",
+        "src/miki/conversation/services/surfaceVariationGrowthService.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts",
+        "src/miki/selfAwareness/services/mikiReasoningTemplateService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/autonomousAnswerCompositionPlanService.ts",
+      "imports": 2,
+      "importedBy": 1,
+      "importers": [
+        "src/miki/conversation/services/runtimeConversationCompositionService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationBranchService.ts",
+      "imports": 3,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/core/ui/typedChatUiGatewayService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationComponentCompositionService.ts",
+      "imports": 13,
+      "importedBy": 4,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/conversation/services/conversationCompositionResearchSchedulerService.ts",
+        "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationComponentPipelineService.ts",
+      "imports": 5,
+      "importedBy": 3,
+      "importers": [
+        "src/miki/conversation/services/hybridConversationEngineService.ts",
+        "src/miki/core/services/domainIntegrationBootstrapService.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationCompositionResearchSchedulerService.ts",
+      "imports": 6,
+      "importedBy": 3,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/core/services/domainIntegrationBootstrapService.ts",
+        "src/miki/core/services/domainOperationalAdapterService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationEvaluationService.ts",
+      "imports": 5,
+      "importedBy": 1,
+      "importers": [
+        "src/miki/conversation.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationFeedbackEvidenceService.ts",
+      "imports": 3,
+      "importedBy": 4,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/conversation/services/conversationComponentCompositionService.ts",
+        "src/miki/conversation/services/conversationLearningEpisodeService.ts",
+        "src/miki/conversation/services/runtimeConversationCompositionService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationLearningEpisodeService.ts",
+      "imports": 3,
+      "importedBy": 3,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/conversation/services/conversationComponentCompositionService.ts",
+        "src/miki/conversation/services/runtimeConversationCompositionService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationRustKernelService.ts",
+      "imports": 0,
+      "importedBy": 1,
+      "importers": [
+        "src/miki/core/services/domainIntegrationBootstrapService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationStateService.ts",
+      "imports": 5,
+      "importedBy": 9,
+      "importers": [
+        "src/App.tsx",
+        "src/miki/capability/services/skillsService.ts",
+        "src/miki/conversation.ts",
+        "src/miki/conversation/services/dialogueEvaluationService.ts",
+        "src/miki/conversation/services/hybridConversationEngineService.ts",
+        "src/miki/learning/services/uncertaintyTeacherService.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts",
+        "src/miki/strategy/services/answerPlanService.ts",
+        "src/miki/strategy/services/responseDesignService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationSurfaceDiversityService.ts",
+      "imports": 1,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/conversation/index.ts",
+        "src/miki/conversation/services/runtimeConversationCompositionService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationTaskboardService.ts",
+      "imports": 3,
+      "importedBy": 3,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/conversation/services/hybridConversationEngineService.ts",
+        "src/miki/core/ui/typedChatUiGatewayService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/coreResultAnswerContentIrService.ts",
+      "imports": 2,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/conversation/services/runtimeConversationCompositionService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/dialogueEvaluationService.ts",
+      "imports": 6,
+      "importedBy": 2,
+      "importers": [
+        "src/App.tsx",
+        "src/miki/conversation.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/hybridConversationEngineService.ts",
+      "imports": 8,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/japaneseAnalysisCompositionService.ts",
+      "imports": 2,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/conversation/services/conversationComponentPipelineService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/liveConversationRepairService.ts",
+      "imports": 3,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/core/ui/typedChatUiGatewayService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/personaProfileService.ts",
+      "imports": 3,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/conversation/services/runtimeConversationCompositionService.ts",
+        "src/miki/core/ui/typedPersonaUiGatewayService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/runtimeConversationCompositionService.ts",
+      "imports": 10,
+      "importedBy": 3,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/conversation/services/hybridConversationEngineService.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/speechRecognitionService.ts",
+      "imports": 0,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/core/ui/typedChatUiGatewayService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/surfaceGrammarAndStyleService.ts",
+      "imports": 3,
+      "importedBy": 3,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/conversation/services/answerContentIrService.ts",
+        "src/miki/conversation/services/surfaceVariationGrowthService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/surfaceVariationGrowthService.ts",
+      "imports": 11,
+      "importedBy": 4,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/execution/services/backgroundWorkerService.ts",
+        "src/miki/research/services/autonomousSearchService.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/surfaceVariationService.ts",
+      "imports": 4,
+      "importedBy": 6,
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/conversation/services/answerContentIrService.ts",
+        "src/miki/conversation/services/conversationComponentCompositionService.ts",
+        "src/miki/conversation/services/surfaceGrammarAndStyleService.ts",
+        "src/miki/conversation/services/surfaceVariationGrowthService.ts",
+        "src/miki/strategy/services/answerPlanService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/typedDiscourseModelService.ts",
+      "imports": 0,
+      "importedBy": 1,
+      "importers": [
+        "src/miki/selfDevelopment/services/semanticUnderstandingV2OrchestratorService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/core/data/codeKnowledge/deterministicDevelopmentSemantics.ts",
+      "imports": 0,
+      "importedBy": 1,
+      "importers": [
+        "src/miki/selfDevelopment/services/deterministicGoalSemanticsService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/core/services/semanticContextBudgetService.ts",
+      "imports": 0,
+      "importedBy": 0,
+      "importers": []
+    },
+    {
+      "file": "src/miki/core/services/semanticRequirementCompilerService.ts",
+      "imports": 0,
+      "importedBy": 4,
+      "importers": [
+        "src/miki/core/services/acceptanceTestMatrixService.ts",
+        "src/miki/core/services/candidateCodeGenerationService.ts",
+        "src/miki/core/services/requirementConsistencyGraphService.ts",
+        "src/miki/core/services/requirementPriorityResolverService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/core/ui/typedPersonaUiGatewayService.ts",
+      "imports": 2,
+      "importedBy": 1,
+      "importers": [
+        "src/components/PersonaSettingsPanel.tsx"
+      ]
+    },
+    {
+      "file": "src/miki/data/surfaceVariationData.ts",
+      "imports": 0,
+      "importedBy": 3,
+      "importers": [
+        "src/miki/conversation/services/surfaceVariationGrowthService.ts",
+        "src/miki/conversation/services/surfaceVariationService.ts",
+        "src/miki/data/skeletonVariationData.ts"
+      ]
+    },
+    {
+      "file": "src/miki/execution/services/personalApiGatewayService.ts",
+      "imports": 3,
+      "importedBy": 3,
+      "importers": [
+        "src/App.tsx",
+        "src/app/appRuntimeLifecycleService.ts",
+        "src/miki/execution.ts"
+      ]
+    },
+    {
+      "file": "src/miki/learning/services/mikiConversationLearningService.ts",
+      "imports": 6,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/learning.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/learning/services/taskConversationFeedbackService.ts",
+      "imports": 4,
+      "importedBy": 3,
+      "importers": [
+        "src/App.tsx",
+        "src/app/appRuntimeLifecycleService.ts",
+        "src/miki/learning.ts"
+      ]
+    },
+    {
+      "file": "src/miki/memory/services/claimDatabaseService.ts",
+      "imports": 3,
+      "importedBy": 16,
+      "importers": [
+        "src/App.tsx",
+        "src/miki/conversation/services/conversationComponentCompositionService.ts",
+        "src/miki/conversation/services/conversationCompositionResearchSchedulerService.ts",
+        "src/miki/conversation/services/conversationFeedbackEvidenceService.ts",
+        "src/miki/learning/services/mikiConversationLearningService.ts",
+        "src/miki/memory.ts",
+        "src/miki/memory/services/evidenceService.ts",
+        "src/miki/promotion/services/verifiedCapabilityPromotionService.ts",
+        "src/miki/promotion/services/verifiedKnowledgePromotionService.ts",
+        "src/miki/research/services/claimEvidenceService.ts",
+        "src/miki/research/services/researchService.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts",
+        "src/miki/safety/services/nonLlmHardwarePipelineService.ts",
+        "src/miki/safety/services/remediationFailureRecoveryService.ts",
+        "src/miki/selfAwareness/services/cognitiveEvidenceIntegrationService.ts",
+        "src/miki/selfAwareness/services/mikiReasoningTemplateService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/memory/services/memoryContextBridgeService.ts",
+      "imports": 2,
+      "importedBy": 3,
+      "importers": [
+        "src/miki/conversation/services/hybridConversationEngineService.ts",
+        "src/miki/core/services/coreOrchestratorService.ts",
+        "src/miki/memory.ts"
+      ]
+    },
+    {
+      "file": "src/miki/memory/services/semanticCacheService.ts",
+      "imports": 1,
+      "importedBy": 1,
+      "importers": [
+        "src/miki/memory.ts"
+      ]
+    },
+    {
+      "file": "src/miki/research/services/claimEvidenceService.ts",
+      "imports": 3,
+      "importedBy": 1,
+      "importers": [
+        "src/miki/core/services/finalResidualServiceIntegrationService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/research/services/japaneseAnalysisService.ts",
+      "imports": 3,
+      "importedBy": 4,
+      "importers": [
+        "src/miki/conversation/services/conversationComponentPipelineService.ts",
+        "src/miki/conversation/services/japaneseAnalysisCompositionService.ts",
+        "src/miki/research.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/research/services/japaneseDictionaryService.ts",
+      "imports": 2,
+      "importedBy": 4,
+      "importers": [
+        "src/miki/conversation/services/conversationFeedbackEvidenceService.ts",
+        "src/miki/research.ts",
+        "src/miki/research/services/japaneseAnalysisService.ts",
+        "src/miki/research/services/webTermLearningService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/research/services/japaneseMorphologyService.ts",
+      "imports": 0,
+      "importedBy": 4,
+      "importers": [
+        "src/miki/conversation/services/japaneseAnalysisCompositionService.ts",
+        "src/miki/research.ts",
+        "src/miki/research/services/japaneseAnalysisService.ts",
+        "src/services/japaneseAnalysisService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/research/services/unknownResearchControlService.ts",
+      "imports": 0,
+      "importedBy": 1,
+      "importers": [
+        "src/miki/research.ts"
+      ]
+    },
+    {
+      "file": "src/miki/safety/services/nonLlmCoreService.ts",
+      "imports": 43,
+      "importedBy": 4,
+      "importers": [
+        "src/App.tsx",
+        "src/miki/conversation/services/conversationEvaluationService.ts",
+        "src/miki/safety.ts",
+        "src/miki/safety/services/deterministicRuntimeService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/safety/services/nonLlmHardwarePipelineService.ts",
+      "imports": 8,
+      "importedBy": 2,
+      "importers": [
+        "src/components/self_improvement/non_llm_views/HardwarePipelineSubView.tsx",
+        "src/miki/safety.ts"
+      ]
+    },
+    {
+      "file": "src/miki/safety/services/nonLlmRuntimePolicyService.ts",
+      "imports": 0,
+      "importedBy": 2,
+      "importers": [
+        "src/App.tsx",
+        "src/miki/safety.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfAwareness/services/persistentPersonalityService.ts",
+      "imports": 1,
+      "importedBy": 1,
+      "importers": [
+        "src/miki/selfAwareness.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/deterministicGoalSemanticsService.ts",
+      "imports": 2,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/selfDevelopment/services/multiIntentDevelopmentTransactionCoordinatorService.ts",
+        "src/miki/selfDevelopment/services/repositoryGroundedHypothesisService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/nonLlmCodeSynthesisService.ts",
+      "imports": 4,
+      "importedBy": 3,
+      "importers": [
+        "src/miki/core/services/candidateCodeGenerationService.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts",
+        "src/miki/selfDevelopment.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/semanticApplicationEnforcementService.ts",
+      "imports": 1,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/selfDevelopment/services/completionResilienceIntegrationService.ts",
+        "src/miki/selfDevelopment/services/failureInjectionSuiteService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/semanticClarificationGateService.ts",
+      "imports": 2,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/selfDevelopment/services/realE2EProofSuiteService.ts",
+        "src/miki/selfDevelopment/services/semanticUnderstandingV2OrchestratorService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/semanticCoverageGateService.ts",
+      "imports": 1,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/selfDevelopment/services/realE2EProofSuiteService.ts",
+        "src/miki/selfDevelopment/services/semanticEnforcementService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/semanticEnforcementService.ts",
+      "imports": 4,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/selfDevelopment/services/developmentReviewLifecycleService.ts",
+        "src/miki/selfDevelopment/services/unifiedDevelopmentCompletionService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/semanticExecutionPlanCompiler.ts",
+      "imports": 1,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/memory/services/memoryContextBridgeService.ts",
+        "src/miki/selfDevelopment/services/semanticUnderstandingV2OrchestratorService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/semanticFrameStoreService.ts",
+      "imports": 3,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/selfDevelopment/services/semanticEnforcementService.ts",
+        "src/miki/selfDevelopment/services/semanticUnderstandingV2OrchestratorService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/semanticFrameV2Service.ts",
+      "imports": 1,
+      "importedBy": 8,
+      "importers": [
+        "src/miki/selfDevelopment/services/causalSolutionHypothesisService.ts",
+        "src/miki/selfDevelopment/services/realE2EProofSuiteService.ts",
+        "src/miki/selfDevelopment/services/relevantCausalAnalysisService.ts",
+        "src/miki/selfDevelopment/services/semanticClarificationGateService.ts",
+        "src/miki/selfDevelopment/services/semanticCoverageGateService.ts",
+        "src/miki/selfDevelopment/services/semanticExecutionPlanCompiler.ts",
+        "src/miki/selfDevelopment/services/semanticFrameStoreService.ts",
+        "src/miki/selfDevelopment/services/semanticUnderstandingV2OrchestratorService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/semanticReviewPackageGateService.ts",
+      "imports": 1,
+      "importedBy": 1,
+      "importers": [
+        "src/miki/selfDevelopment/services/evaluationPackageExportService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/semanticTransactionReviewEvidenceService.ts",
+      "imports": 2,
+      "importedBy": 2,
+      "importers": [
+        "src/miki/selfDevelopment/services/evaluationPackageExportService.ts",
+        "src/miki/selfDevelopment/services/multiIntentDevelopmentTransactionCoordinatorService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/selfDevelopment/services/semanticUnderstandingV2OrchestratorService.ts",
+      "imports": 6,
+      "importedBy": 5,
+      "importers": [
+        "src/miki/conversation/services/hybridConversationEngineService.ts",
+        "src/miki/core/services/candidateConstraintValidationService.ts",
+        "src/miki/selfDevelopment/services/clarificationLifecycleService.ts",
+        "src/miki/selfDevelopment/services/multiIntentDevelopmentTransactionCoordinatorService.ts",
+        "src/miki/selfDevelopment/services/unifiedDevelopmentCompletionService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/strategy/services/conversationStrategyService.ts",
+      "imports": 3,
+      "importedBy": 5,
+      "importers": [
+        "src/App.tsx",
+        "src/miki/conversation/services/answerContentIrService.ts",
+        "src/miki/execution/services/backgroundWorkerService.ts",
+        "src/miki/safety/services/nonLlmCoreService.ts",
+        "src/miki/strategy.ts"
+      ]
+    },
+    {
+      "file": "src/miki/strategy/services/responseSurfacePolicyService.ts",
+      "imports": 2,
+      "importedBy": 4,
+      "importers": [
+        "src/App.tsx",
+        "src/miki/conversation/services/answerContentIrService.ts",
+        "src/miki/conversation/services/surfaceVariationService.ts",
+        "src/miki/strategy.ts"
+      ]
+    },
+    {
+      "file": "src/miki/verification/services/claimVerificationEventService.ts",
+      "imports": 0,
+      "importedBy": 5,
+      "importers": [
+        "src/miki/core/services/domainIntegrationBootstrapService.ts",
+        "src/miki/memory/services/researchMemoryVerificationSubscriberService.ts",
+        "src/miki/verification.ts",
+        "src/miki/verification/services/unknownVerificationSubscriberService.ts",
+        "src/miki/verification/services/verifierService.ts"
+      ]
+    },
+    {
+      "file": "src/miki/verification/services/formalSemanticsKernelService.ts",
+      "imports": 1,
+      "importedBy": 5,
+      "importers": [
+        "src/miki/capability/services/capabilityCompositionProofService.ts",
+        "src/miki/execution/services/executableExplanationService.ts",
+        "src/miki/improvement/services/deterministicSelfImprovementLabService.ts",
+        "src/miki/verification.ts",
+        "src/services/formalSemanticsKernelService.ts"
+      ]
+    },
+    {
+      "file": "src/services/answerContentIrService.ts",
+      "imports": 3,
+      "importedBy": 2,
+      "importers": [
+        "src/services/hybridConversationEngineService.ts",
+        "src/services/nonLlmCoreService.ts"
+      ]
+    },
+    {
+      "file": "src/services/claimDatabaseService.ts",
+      "imports": 3,
+      "importedBy": 6,
+      "importers": [
+        "src/miki/memory/services/researchMemoryVerificationSubscriberService.ts",
+        "src/miki/unknown/services/unknownKnowledgeIntegrationService.ts",
+        "src/miki/verification/services/verifierService.ts",
+        "src/services/nonLlmCoreService.ts",
+        "src/services/nonLlmHardwarePipelineService.ts",
+        "src/services/remediationFailureRecoveryService.ts"
+      ]
+    },
+    {
+      "file": "src/services/conversationStateService.ts",
+      "imports": 4,
+      "importedBy": 4,
+      "importers": [
+        "src/services/answerPlanService.ts",
+        "src/services/hybridConversationEngineService.ts",
+        "src/services/nonLlmCoreService.ts",
+        "src/services/skillsService.ts"
+      ]
+    },
+    {
+      "file": "src/services/formalSemanticsKernelService.ts",
+      "imports": 1,
+      "importedBy": 3,
+      "importers": [
+        "src/services/capabilityCompositionProofService.ts",
+        "src/services/deterministicSelfImprovementLabService.ts",
+        "src/services/executableExplanationService.ts"
+      ]
+    },
+    {
+      "file": "src/services/hybridConversationEngineService.ts",
+      "imports": 4,
+      "importedBy": 1,
+      "importers": [
+        "src/services/nonLlmCoreService.ts"
+      ]
+    },
+    {
+      "file": "src/services/japaneseAnalysisService.ts",
+      "imports": 3,
+      "importedBy": 3,
+      "importers": [
+        "src/services/hybridConversationEngineService.ts",
+        "src/services/nonLlmCoreService.ts",
+        "src/utils/memoryRetrieval.ts"
+      ]
+    },
+    {
+      "file": "src/services/japaneseDictionaryService.ts",
+      "imports": 2,
+      "importedBy": 1,
+      "importers": [
+        "src/services/japaneseAnalysisService.ts"
+      ]
+    },
+    {
+      "file": "src/services/nonLlmCodeSynthesisService.ts",
+      "imports": 4,
+      "importedBy": 1,
+      "importers": [
+        "src/services/nonLlmCoreService.ts"
+      ]
+    },
+    {
+      "file": "src/services/nonLlmCoreService.ts",
+      "imports": 30,
+      "importedBy": 1,
+      "importers": [
+        "src/services/nonLlmRuntimeService.ts"
+      ]
+    },
+    {
+      "file": "src/services/nonLlmHardwarePipelineService.ts",
+      "imports": 8,
+      "importedBy": 1,
+      "importers": [
+        "src/services/api.ts"
+      ]
+    },
+    {
+      "file": "src/services/nonLlmRuntimeService.ts",
+      "imports": 2,
+      "importedBy": 4,
+      "importers": [
+        "src/miki/verification/services/regressionBenchmarkService.ts",
+        "src/services/embeddingService.ts",
+        "src/services/longTermMemoryService.ts",
+        "src/services/syntheticDataService.ts"
+      ]
+    },
+    {
+      "file": "src/services/responseSurfacePolicyService.ts",
+      "imports": 2,
+      "importedBy": 1,
+      "importers": [
+        "src/services/answerContentIrService.ts"
+      ]
+    }
+  ]
+}

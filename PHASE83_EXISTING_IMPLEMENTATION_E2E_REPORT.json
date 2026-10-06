@@ -1,0 +1,186 @@
+{
+  "phase": "PHASE83_EXISTING_IMPLEMENTATION_E2E",
+  "passed": true,
+  "executedAt": "2026-10-02T01:01:21.226Z",
+  "checks": [
+    {
+      "name": "EXISTING_BLACKBOARD_AND_GOVERNANCE_PREFLIGHT",
+      "passed": true,
+      "detail": {
+        "taskId": "TASK-1790902881129-000001",
+        "governance": {
+          "allowed": true,
+          "invariantEvaluation": {
+            "allowed": true,
+            "registryVersion": 1,
+            "registrySha256": "d94c9587898f576d366ff4017999c3ea1eb9affccb40ff652f75322b9d9e64ee",
+            "violations": [],
+            "evaluatedInvariantIds": [
+              "CANDIDATE_REQUIRES_EVIDENCE",
+              "CORE_ROUTE_AUTHORITY",
+              "NO_RUNTIME_SELF_REWRITE",
+              "ROLLBACK_HASH_INTEGRITY"
+            ]
+          },
+          "selection": {
+            "selectedCandidateId": "existing-safe",
+            "paretoFront": [
+              "existing-safe"
+            ],
+            "scores": {
+              "existing-safe": 0.18499999999999994
+            },
+            "rejected": {
+              "existing-unsafe": [
+                "HARD_LIMIT_safetyRisk"
+              ]
+            },
+            "decisionSha256": "b7adbcf411fa34c8abf691ec1ae58bfdb650683ab7e76f11047eeab5c3902c49"
+          }
+        },
+        "preflight": {
+          "id": "BBE-1790902881133-000003",
+          "taskId": "TASK-1790902881129-000001",
+          "kind": "CHECKPOINT",
+          "domain": "core",
+          "key": "CANDIDATE_GOVERNANCE_PREFLIGHT",
+          "value": {
+            "allowed": true,
+            "invariantEvaluation": {
+              "allowed": true,
+              "registryVersion": 1,
+              "registrySha256": "d94c9587898f576d366ff4017999c3ea1eb9affccb40ff652f75322b9d9e64ee",
+              "violations": [],
+              "evaluatedInvariantIds": [
+                "CANDIDATE_REQUIRES_EVIDENCE",
+                "CORE_ROUTE_AUTHORITY",
+                "NO_RUNTIME_SELF_REWRITE",
+                "ROLLBACK_HASH_INTEGRITY"
+              ]
+            },
+            "selection": {
+              "selectedCandidateId": "existing-safe",
+              "paretoFront": [
+                "existing-safe"
+              ],
+              "scores": {
+                "existing-safe": 0.18499999999999994
+              },
+              "rejected": {
+                "existing-unsafe": [
+                  "HARD_LIMIT_safetyRisk"
+                ]
+              },
+              "decisionSha256": "b7adbcf411fa34c8abf691ec1ae58bfdb650683ab7e76f11047eeab5c3902c49"
+            }
+          },
+          "evidenceIds": [],
+          "createdAt": 1790902881133
+        }
+      }
+    },
+    {
+      "name": "EXISTING_WRITE_GUARD_COMPATIBILITY",
+      "passed": true,
+      "detail": {
+        "guardId": "CWG-1790902881217-000001",
+        "issueId": "PHASE83-E2E",
+        "baseSnapshotSha256": "8ff37bc961b4884ba760a86781ab54a17a6d4f6407fd07c60f7671242ea42f40",
+        "candidateRevisionSha256": "9b4e3b671da052575e3530a89d8675c900388edd8eb154267407e9741135f770",
+        "targetPaths": [
+          "src/miki/core/services/coreOrchestratorService.ts"
+        ],
+        "targetSetSha256": "139d0e302e35de06f23913864e6c8de93d8e97ff221f81d4926c2ca3fee47771",
+        "stageGuardBeforeWrite": true,
+        "rollbackGuardBeforeWrite": true,
+        "status": "STAGED",
+        "createdAt": 1790902881217
+      }
+    },
+    {
+      "name": "CASCADE_TO_EXISTING_SCOPED_MEMORY",
+      "passed": true,
+      "detail": {
+        "receipt": {
+          "transactionId": "d2fda9c7cd6b800338456c0ad783f9370237b71df0ad53788df17cc55a34bc87",
+          "rootCandidateId": "existing-root",
+          "invalidatedCandidateIds": [
+            "existing-root",
+            "existing-child"
+          ],
+          "adapterReceipts": {
+            "existing-scoped-memory": [
+              "MEM-a6949db82c959c590524e0e3"
+            ]
+          },
+          "status": "COMMITTED",
+          "reason": "E2E_EXISTING_INVALIDATION",
+          "startedAt": 1790902881226,
+          "completedAt": 1790902881226
+        },
+        "memoryBefore": {
+          "subject": "phase83-existing-candidate",
+          "content": "derived readiness evidence",
+          "kind": "EVIDENCE",
+          "scope": {
+            "type": "TASK",
+            "id": "TASK-1790902881129-000001"
+          },
+          "source": {
+            "turnIds": [],
+            "fileIds": [],
+            "evidenceIds": [
+              "existing-root"
+            ]
+          },
+          "confidence": 1,
+          "id": "MEM-a6949db82c959c590524e0e3",
+          "status": "ACTIVE",
+          "createdAt": 1790902881218,
+          "updatedAt": 1790902881218
+        },
+        "memoryAfter": {
+          "subject": "phase83-existing-candidate",
+          "content": "derived readiness evidence",
+          "kind": "EVIDENCE",
+          "scope": {
+            "type": "TASK",
+            "id": "TASK-1790902881129-000001"
+          },
+          "source": {
+            "turnIds": [],
+            "fileIds": [],
+            "evidenceIds": [
+              "existing-root"
+            ]
+          },
+          "confidence": 1,
+          "id": "MEM-a6949db82c959c590524e0e3",
+          "status": "INVALIDATED",
+          "createdAt": 1790902881218,
+          "updatedAt": 1790902881226,
+          "invalidationReason": "E2E_EXISTING_INVALIDATION"
+        }
+      }
+    },
+    {
+      "name": "LIFECYCLE_TO_EXISTING_TASK_ID",
+      "passed": true,
+      "detail": {
+        "root": {
+          "candidateId": "existing-root",
+          "revision": 1,
+          "parentCandidateIds": [],
+          "state": "INVALIDATED",
+          "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "metadata": {
+            "taskId": "TASK-1790902881129-000001"
+          },
+          "createdAt": 1790902881218,
+          "updatedAt": 1790902881226
+        }
+      }
+    }
+  ],
+  "failures": []
+}

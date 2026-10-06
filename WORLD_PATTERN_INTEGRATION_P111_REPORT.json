@@ -1,0 +1,39 @@
+{
+  "phase": "WORLD_PATTERN_INTEGRATION_P111",
+  "passed": true,
+  "checks": {
+    "trajectoryPassed": true,
+    "hashPresent": true,
+    "replayDeterministic": true,
+    "failureDetectorsClean": true,
+    "firstClaimAllowed": true,
+    "collisionBlocked": true,
+    "releaseAllowsNext": true
+  },
+  "replay": {
+    "trajectoryId": "TRAJ-f93195f9a3fe499f195d58fc",
+    "baseRevision": "BASE-1",
+    "steps": [
+      {
+        "sequence": 1,
+        "kind": "PLAN",
+        "result": "INFO",
+        "reason": "scoped"
+      },
+      {
+        "sequence": 2,
+        "kind": "EDIT",
+        "path": "src/a.ts",
+        "outputSha256": "abc",
+        "result": "PASS"
+      },
+      {
+        "sequence": 3,
+        "kind": "VALIDATE",
+        "result": "PASS",
+        "reason": "typecheck"
+      }
+    ],
+    "replaySha256": "8f3f7087b865625beedbce637ecdf4dfc2ea220d5f40afc9a8d09ff1a9511462"
+  }
+}

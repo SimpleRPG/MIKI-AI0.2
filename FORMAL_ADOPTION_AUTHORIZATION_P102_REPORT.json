@@ -1,0 +1,36 @@
+{
+  "phase": "FORMAL_ADOPTION_AUTHORIZATION_P102",
+  "passed": true,
+  "allowed": {
+    "authorizationId": "ADOPT-AUTH-e2a3a326af4d51f712188d20",
+    "authorized": true,
+    "reasons": [],
+    "candidateId": "C102",
+    "candidateHash": "CH102",
+    "reviewPackageHash": "RH102",
+    "baseRevision": "B102",
+    "approvalReceiptSha256": "2a302689d44c97a119cc4091f4ce563d2684ba15678294cd48d32f51737e3eba",
+    "readinessId": "ADOPTREADY-8cbe28b7e1e3abb2a1d1db92",
+    "issuedAt": 1790914407523,
+    "authorizationSha256": "767938f18b921ab9bf74a6503edb11ecaaaca780d6bbb27e5c8061ddfe16d690"
+  },
+  "staleBase": {
+    "authorizationId": "ADOPT-AUTH-63fc5e4a5a6dd36e09816dea",
+    "authorized": false,
+    "reasons": [
+      "HUMAN_APPROVAL_BASE_REVISION_MISMATCH",
+      "CURRENT_BASE_REVISION_MISMATCH"
+    ],
+    "candidateId": "C102",
+    "candidateHash": "CH102",
+    "reviewPackageHash": "RH102",
+    "baseRevision": "B103",
+    "approvalReceiptSha256": "2a302689d44c97a119cc4091f4ce563d2684ba15678294cd48d32f51737e3eba",
+    "readinessId": "ADOPTREADY-3228e7771781e23271ad8298",
+    "issuedAt": 1790914407530,
+    "authorizationSha256": "e6abb132ad596fcd454762d8276b8cb9405274c92caf0bd61953f3f6214adf5a"
+  },
+  "tamperedValidation": [
+    "ADOPTION_AUTHORIZATION_HASH_INVALID"
+  ]
+}

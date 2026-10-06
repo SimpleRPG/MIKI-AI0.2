@@ -1,0 +1,14 @@
+{
+  "actionChains": [
+    {"input":"A:B","segments":["A","B"],"scope":"PREVIOUS_MUTATION_ROWS"},
+    {"input":"A；B","segments":["A","B"],"scope":"ALL_MATCHED_ROWS"},
+    {"input":"A:B;C","segments":["A","B","C"],"scope":"MIXED"},
+    {"input":"URL=https://example.com/a:b","segments":["URL=https://example.com/a:b"],"scope":"SINGLE"},
+    {"input":"実行時刻12:30に開始","segments":["実行時刻12:30に開始"],"scope":"SINGLE"},
+    {"input":"A:「B;C」","segments":["A","「B;C」"],"scope":"PREVIOUS_MUTATION_ROWS"}
+  ],
+  "conflicts": [
+    {"input":"条件Aなら次条件へ進む。条件Bなら以降を停止する。","mustNotContain":"CONTINUE_STOP_PRIORITY_UNRESOLVED"},
+    {"input":"条件Aなら次条件へ進み、同じ条件で以降を停止する。","mustContain":"CONTINUE_STOP_PRIORITY_UNRESOLVED"}
+  ]
+}

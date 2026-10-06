@@ -1,0 +1,396 @@
+{
+  "phase": "P210",
+  "policy": "CANONICAL_SOURCE_MINIMAL_NO_KNOWLEDGE_LOSS",
+  "removedCount": 61,
+  "removedBytes": 66433831,
+  "categories": {
+    "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE": 23,
+    "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE": 11,
+    "LARGE_E2E_INPUT_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE": 6,
+    "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB": 21
+  },
+  "removed": [
+    {
+      "path": "android/app/src/main/assets/public/index.html",
+      "bytes": 1976,
+      "sha256": "5dcca21a250cc8a22b8de8b6cb6740cd5aaf159123d08ef74c709de0d663addd",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/server.cjs",
+      "bytes": 6367919,
+      "sha256": "f494692b327d8d24037af67acca0292bfa2745a1efc2e11a505e2644c423036d",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/miki-asset-manifest.json",
+      "bytes": 3753,
+      "sha256": "a5f4e5a546d5accbaa62b73712b5687b0e826b18ec8b5638d6e483f7cdc0e95f",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/self-code-seed.zip",
+      "bytes": 4463361,
+      "sha256": "0efa96fe8ab01931af4cfc8645ee19774fa18f330c73c0067028afee5ec4abfb",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/server.cjs.map",
+      "bytes": 10295418,
+      "sha256": "9ceeea45c63e7f26abcd4a935c576fe9c8d611f76d33fffd4ae9775928f8d7c3",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/aiderEngineService-VZutJ-EM.js",
+      "bytes": 2558,
+      "sha256": "c929e49100801cb9d55a2e3339d4b3a6c825dcc633df7fca91ee66c3ebfd4216",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/vendor-typescript-DHuFL5ao.js",
+      "bytes": 3597963,
+      "sha256": "e06f5dced527a9af22691dc69073b6a3ea0a6d82dd3e6a2c9ab1dda3f2ac41a3",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/knowledge-CIsQ_PCD.js",
+      "bytes": 920301,
+      "sha256": "c92c749b90f25e7d110913ac80806b942100ec1b2bde2072d0598498a06d39d3",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/autonomousContinuousEvolutionService-rkn4lyy5.js",
+      "bytes": 4083,
+      "sha256": "2a9e36a07b0d8c6e3d1186be56ad945812cee3420da98dbf2088ce3901403a9a",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/vendor-jszip-B1fuKjAD.js",
+      "bytes": 97709,
+      "sha256": "1ad62bfde8d0bd6468cb801d288404ccd7209e343eda2041652cefd193ddf924",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/index-BKreIwCX.css",
+      "bytes": 165983,
+      "sha256": "9614b2151040e02a5cc4916988f66081cb82c4e7c918ebc1f67bbfcd5738869f",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/feature-memory-CIcHEaHH.js",
+      "bytes": 135863,
+      "sha256": "c8351e6c0dc4d3d1e96a37a0c27fe86d5a6c08704e2a292c6d94fb9b6dbf4b39",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/domainOperationalAdapterService-C9S5gfWZ.js",
+      "bytes": 9992,
+      "sha256": "5e1fc93f67919670e5b8833a679f5f1a2c2ef7eb9235cea05089d8e7e08b702d",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/feature-improvement-DIIm6d_s.js",
+      "bytes": 201412,
+      "sha256": "d4b47b976c23464544e6ba80167791cd8fc1a5cff1e888b1f584fd3d94e4f269",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/feature-code-editor-D6l-gpBX.js",
+      "bytes": 2054590,
+      "sha256": "14dbaeea9c3336d282717ecf5ffaad0689676d43e4a392f83eb9d941ccf856a0",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/feature-monitor-UROLgbbP.js",
+      "bytes": 52294,
+      "sha256": "c2108157782b3331fa75792dcc539aed3be25fd484c3de7ebbc9011f073ace87",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/index-Dkfdv6VN.js",
+      "bytes": 6295,
+      "sha256": "478e4eb2091b8f31559c72f70a515b47310599f2d70703ded362a8e55f9599a3",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/candidateCodeGenerationService-Dr4JccDC.js",
+      "bytes": 46728,
+      "sha256": "3bfe103c5b18283ac79205d68d3fbe80ed6d0d9a29b055320317f0cccc6e5f13",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/vendor-common-BiFsDokm.js",
+      "bytes": 98321,
+      "sha256": "ce5c3de65119c5be2d74bcb197ccb01975c847474b9edea8456b3145d9502746",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/App-kWW01qxB.js",
+      "bytes": 686275,
+      "sha256": "9eb174a7943bdc28e1ac25a68700d49ac7745452a16d65182aca80117aff3b74",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/ErrorBoundary-vVNO2lKT.js",
+      "bytes": 2586,
+      "sha256": "269d9b7a674aa3a15a67ebe68e86d00757d21bd633c7d48f3010c7ad853e605e",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/improvementAssessmentService-C1LxWb1I.js",
+      "bytes": 2930,
+      "sha256": "bfb7154f55c1d41ec004443fb5615ad37fe10293ed1e2f39803349bb0874bef5",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "android/app/src/main/assets/public/assets/vendor-react-CXt2faRK.js",
+      "bytes": 219827,
+      "sha256": "7362c67dbe37328e3bb99dd292d5a2c0393058e4fd904731c00e9b3f929d62a7",
+      "reason": "REGENERABLE_ANDROID_WEB_ASSET_DUPLICATE"
+    },
+    {
+      "path": "P190_SYNTHETIC_SEATED_TRAINING/manifest.json",
+      "bytes": 7048,
+      "sha256": "2bda4bed5ac5038931cdeb0a7bfe84cf8146f6a2110c25833542df7e43b0641d",
+      "reason": "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P190_SYNTHETIC_SEATED_TRAINING/3831486f70.png",
+      "bytes": 1971559,
+      "sha256": "d2dc16a8551a60338c90b8075773c475e6a0c621c62d0939a793f2bc80ffb3ca",
+      "reason": "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P190_SYNTHETIC_SEATED_TRAINING/8ba2943fc3.png",
+      "bytes": 2047787,
+      "sha256": "7ae66fdb26510eccdf970517ee9b8f92abf7eb8c623593bebb38bb7b0dd26193",
+      "reason": "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P190_SYNTHETIC_SEATED_TRAINING/39aed11e3d.png",
+      "bytes": 2042930,
+      "sha256": "2df136a7ddf6cb8066191843784e6b1bd082ea9f8a3583615ef810b02c288587",
+      "reason": "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P190_SYNTHETIC_SEATED_TRAINING/7197cca433.png",
+      "bytes": 2057824,
+      "sha256": "7ee27dd9d11d989d86afbec40b063410e252c26b03734f15321af4c1156b2af5",
+      "reason": "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P190_SYNTHETIC_SEATED_TRAINING/bbbcae23ad.png",
+      "bytes": 1970227,
+      "sha256": "a7e1676e3b10a99f15bea40c0d526b29bacda6697c359e9617e6f1f05e965755",
+      "reason": "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P190_SYNTHETIC_SEATED_TRAINING/efa248c4ed.png",
+      "bytes": 2096470,
+      "sha256": "a07ed39a61be1e119b2e293fb87f21c275bb9e063034f9cab4d8b64c2e7d9f38",
+      "reason": "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P190_SYNTHETIC_SEATED_TRAINING/b20a795638.png",
+      "bytes": 2034111,
+      "sha256": "2e12b5714377b6ad7e21624e1818904fa22860f99d887c44584164ac1e8fdb1b",
+      "reason": "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P190_SYNTHETIC_SEATED_TRAINING/a32b3e4f7f.png",
+      "bytes": 2086429,
+      "sha256": "d932ffabdd70982cd84a731384f0a12ecf06effb28260d10be260b6049e3deff",
+      "reason": "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P190_SYNTHETIC_SEATED_TRAINING/f16a87108e.png",
+      "bytes": 2203418,
+      "sha256": "838c4ee117b31d0265e9e5d9a18afda0290de30c15cab0ef422df7aec75f0746",
+      "reason": "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P190_SYNTHETIC_SEATED_TRAINING/671088a0ff.png",
+      "bytes": 2107750,
+      "sha256": "b07b18ca356d1836ab07d02daad80b518e36b5a5f88ea8a52f9713a6d55df8fd",
+      "reason": "LARGE_TRAINING_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P144_REAL_PHOTO_INPUT/real-photo.png",
+      "bytes": 488812,
+      "sha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3",
+      "reason": "LARGE_E2E_INPUT_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P144_REAL_PHOTO_INPUT/real-photo.json",
+      "bytes": 342,
+      "sha256": "d896326110485488d13868b2863e3328339b0c7953077945082408318c04976d",
+      "reason": "LARGE_E2E_INPUT_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P144_REAL_PHOTO_INPUT/real-photo.rgba",
+      "bytes": 1048576,
+      "sha256": "0df3c62c654dd5432e753a8d273e73ad3fb7d5826848b395afaead620b89bdd0",
+      "reason": "LARGE_E2E_INPUT_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P148_DIFFERENT_REAL_PHOTO/camera-person.rgba",
+      "bytes": 1048576,
+      "sha256": "5abe2c520704849955def341705002da5a744cd40ab52e1ee12f9ed303f5b341",
+      "reason": "LARGE_E2E_INPUT_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P148_DIFFERENT_REAL_PHOTO/camera-person.json",
+      "bytes": 471,
+      "sha256": "6e9a2fc7b78e98a1b5b7cbc93750e15f0dc3d93e8d2c87e858b146bb1a88cde8",
+      "reason": "LARGE_E2E_INPUT_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P148_DIFFERENT_REAL_PHOTO/camera-person.png",
+      "bytes": 259612,
+      "sha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+      "reason": "LARGE_E2E_INPUT_BLOB_MOVED_OUT_OF_CANONICAL_SOURCE"
+    },
+    {
+      "path": "P197_FINAL_PIXEL_FRONT.png",
+      "bytes": 853816,
+      "sha256": "cbb4be8e18b3e940906f354b21226ade8bb9329235d5e46a11388771009a2339",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P160_GRAPH_LEARNED_PERSON.png",
+      "bytes": 21426,
+      "sha256": "78ec755923702704d1d3365cf2c1b288e1eb085bc0e0cb8a0ff42c5b87fe842f",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P205_SOFT25D_FRONT.png",
+      "bytes": 580483,
+      "sha256": "6b6a6e747dae92d192a4346b232eda63b00891c89fb3581d1753dafe36c6415f",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P141_ILLUSTRATION_2D.png",
+      "bytes": 26659,
+      "sha256": "32de700de3636499e25e37130bc5c9af9a8802eb65a0d5eef39a3644fb62a1b5",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P141_ILLUSTRATION_25D.png",
+      "bytes": 46584,
+      "sha256": "cca97adc041da53f1f1fa658e788acf51755665990d975d91916ea8c07060878",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P180_REAL_TEXTURE_ATLAS.png",
+      "bytes": 666339,
+      "sha256": "82e2c877b91e66788f0f441c1dccaef2e6d498298b1f3e949f35fa63af8fdf28",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P181_QUALITY_FRONT.png",
+      "bytes": 1111946,
+      "sha256": "9529570c409a7bf9dd5c03ce69cd2d106d313e975ca8820c8830ab6c1788dead",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P140_RAW_PHOTO_PREVIEW.png",
+      "bytes": 28177,
+      "sha256": "ab940f9174c8e40b17c4e1c507c31ee2bf57c000b77cb2086e4d29e81042622b",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P148_DIFFERENT_PHOTO_GENERATED.png",
+      "bytes": 20255,
+      "sha256": "0b2c84202697487861a99523241a3cc819aaa66c128d63f8a952300b969d7cec",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P143_CLOSED_SURFACE.png",
+      "bytes": 41057,
+      "sha256": "643f784ad89eaa2e2782cfee8fd7dc442736a5d96bc39a56a42eaabe06032791",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P141_PIXEL_ILLUSTRATION.png",
+      "bytes": 7889,
+      "sha256": "8af76d1d5fcfdc26f3acf80b7c1e388bb132334b564f0df104ed66dd572573fe",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P139_MULTI_PHOTO_LEARNED_PREVIEW.png",
+      "bytes": 24007,
+      "sha256": "82f054350a2693d0ef978219d3b43fe78e7b3639430083f2251b8e8569bba65c",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P181_QUALITY_ANGLED.png",
+      "bytes": 1036220,
+      "sha256": "7da2799d25eb95ab946888f7f12baeb28632b764c6e628ffa3d420b7e432347c",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P142_REALISTIC_SURFACE.png",
+      "bytes": 43711,
+      "sha256": "e7a7cde3262141664bd450a050849480d96afe826eb9898c31623f6308898a79",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P144_REAL_PHOTO_GENERATED.png",
+      "bytes": 39401,
+      "sha256": "42ffd82261fd6b6c7289c9fe78f46ca27d30aeadd5a7e7b37adefda26761bc6c",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P198_ANATOMICAL_FRONT.png",
+      "bytes": 744408,
+      "sha256": "f8a23a6c21027791ed7c2d1d8306b50e137a46219f365bd960e777a0e80f1695",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P180_REAL_MESH_PERSON.png",
+      "bytes": 289085,
+      "sha256": "361755245ac1532f9f5a7624b34d396a74f4a5fe7c1d6a4f80c1bc05b0d7d60a",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P147_CONNECTED_FACE.png",
+      "bytes": 21774,
+      "sha256": "ab0920c171cd45673d54f23625d4f7fbe1549d64bb22828ca1eb4ebffa545800",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P199_CONTINUOUS_SURFACE_FRONT.png",
+      "bytes": 580483,
+      "sha256": "6b6a6e747dae92d192a4346b232eda63b00891c89fb3581d1753dafe36c6415f",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P145_SOURCE.rgba",
+      "bytes": 1048576,
+      "sha256": "0df3c62c654dd5432e753a8d273e73ad3fb7d5826848b395afaead620b89bdd0",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    },
+    {
+      "path": "P145_GENERATED.rgba",
+      "bytes": 6291456,
+      "sha256": "b928e4313315575afd7ea0848024e581bf9dac4407279b2a25204e276a00ec85",
+      "reason": "REGENERABLE_PREVIEW_OR_INTERMEDIATE_BLOB"
+    }
+  ],
+  "preservedPrinciples": [
+    "SOURCE_CODE",
+    "RUST_SOURCE",
+    "ANDROID_NATIVE_SOURCE",
+    "UNIFIED_DESIGN_SPEC",
+    "GRAPH_AND_RULE_JSON",
+    "VALIDATION_SCRIPTS",
+    "PACKAGE_LOCK",
+    "PUBLIC_SELF_CODE_SEED"
+  ],
+  "notes": [
+    "Removed blobs are not claimed as deleted knowledge. Their SHA-256 values remain in this manifest.",
+    "Android public assets must be regenerated by the existing build/sync workflow.",
+    "P190 derived graph/rule assets remain in the canonical package."
+  ],
+  "manifestSha256": "656c6b040d509ddd5d182391a78cb0988b052ca721a6f597e5283fec693d5d63"
+}

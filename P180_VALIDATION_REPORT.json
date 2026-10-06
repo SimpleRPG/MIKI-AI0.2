@@ -1,0 +1,41 @@
+{
+  "phase": "REAL_PERSON_MESH_TEXTURE_GRAPH_E2E_P180",
+  "passed": true,
+  "checks": {
+    "realSources": true,
+    "realRgba": true,
+    "texturePixels": true,
+    "personDeformation": true,
+    "meshRendered": true,
+    "skinningChanges": true,
+    "realPng": true,
+    "graphFeedback": true,
+    "receipt": true,
+    "nonEmpty": true
+  },
+  "inputSources": [
+    "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+    "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+  ],
+  "artifact": {
+    "pngSha256": "361755245ac1532f9f5a7624b34d396a74f4a5fe7c1d6a4f80c1bc05b0d7d60a",
+    "atlasSha256": "82e2c877b91e66788f0f441c1dccaef2e6d498298b1f3e949f35fa63af8fdf28",
+    "receiptSha256": "620c5f993a2444e943d666f166d303d00617636503ae02dbd2a09fa6ac44b663",
+    "width": 1024,
+    "height": 1536,
+    "metrics": {
+      "triangleCount": 2048,
+      "vertexCount": 1152,
+      "atlasObservedRatio": 1,
+      "opaqueCoverage": 0.16958300272623697,
+      "zVisiblePixels": 457431,
+      "personSpecificDisplacement": 0.00047776819958456816
+    }
+  },
+  "graphMutationCount": 3,
+  "limitations": [
+    "Rule-based person-specific mesh deformation, not neural photorealistic reconstruction.",
+    "Two existing real photographs are fused although they are not verified as the same person; E2E validates mechanics and provenance, not identity fusion quality.",
+    "Rust native execution remains uncompiled because Cargo is unavailable in this environment."
+  ]
+}

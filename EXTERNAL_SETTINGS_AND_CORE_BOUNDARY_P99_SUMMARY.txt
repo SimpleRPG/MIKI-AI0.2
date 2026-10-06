@@ -1,0 +1,16 @@
+MIKI-AI P99 External Settings and CORE Boundary
+
+Correction to P98
+P98 over-classified every direct UI-to-domain import as a CORE bypass. The full design distinguishes configuration/display/manual transport from business execution. External connection settings, API-key settings, connection status, repository map, code search, read-only diagnostics, candidate display and package download do not inherently require a CORE task.
+
+Implemented boundary
+- Side-effecting self-improvement actions now use typedImprovementUiGatewayService.
+- DevelopmentReviewLifecyclePanel no longer directly imports lifecycle or package services.
+- UltraSelfEvolverSubView routes review start, snapshot reads, gap reads and rollback through the gateway.
+- SuperchargerToolsSubView routes council review, unit tests, lesson write/read, dead-code scan and prompt-to-patch through the gateway.
+- Type-only imports remain permitted.
+- Explicit external/read-only exceptions remain for Aider connection/repo-map, code search and the legacy Cloud Gateway settings/read model.
+- A static architecture verifier rejects unclassified new direct imports.
+
+Design rule
+Configuration/read-only/display/manual download may use a dedicated UI adapter. Candidate generation, mutation, test execution, review transitions, rollback, promotion and production adoption must use the CORE-owned improvement gateway and retain run/task lineage.

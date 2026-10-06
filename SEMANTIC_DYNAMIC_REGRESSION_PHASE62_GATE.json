@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "phase": "SEMANTIC_DYNAMIC_REGRESSION_62",
+  "runtimeCases": 20,
+  "runtimePassed": 20,
+  "defectsFoundAndFixed": 2,
+  "canonicalCompilerExtracted": true,
+  "failures": []
+}

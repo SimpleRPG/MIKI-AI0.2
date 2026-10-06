@@ -1,0 +1,8 @@
+{
+  "phase": "LEGACY_UI_LEDGER_HARDENING_P105",
+  "passed": true,
+  "legacyRemoved": true,
+  "releasedStatus": "ISSUED",
+  "visibleCount": 0,
+  "quarantinedCount": 1
+}

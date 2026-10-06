@@ -1,0 +1,1047 @@
+{
+  "phase": "ALL_EXISTING_DATA_INGESTION_P152",
+  "passed": true,
+  "checks": {
+    "receipt": true,
+    "allDomains": true,
+    "noUnresolved": true,
+    "idempotent": true,
+    "nodeStable": true,
+    "edgeStable": true,
+    "legacyPreserved": true,
+    "chain": true
+  },
+  "receipt": {
+    "inputCount": 10,
+    "nodeCount": 16,
+    "edgeCount": 14,
+    "domainCounts": {
+      "EXPERIENCE": 2,
+      "VISUAL": 3,
+      "REQUIREMENT": 1,
+      "PERSON": 3,
+      "MEMORY": 2,
+      "CODE": 1,
+      "VALIDATION": 2,
+      "CONVERSATION": 2
+    },
+    "unresolvedLinks": [],
+    "graphSha256": "cbaf516fc6876726d4680975b1a300c1b75304506163580b1e0f3a9beca417f4",
+    "receiptSha256": "21ff6b2aa125689da8984cfa16674b92f557a8646c4e198fcebfb62bb1c469f4"
+  },
+  "graph": {
+    "nodes": [
+      {
+        "nodeId": "N-039f481f09132dc560f091f1",
+        "domain": "EXPERIENCE",
+        "kind": "CORRECTION",
+        "subjectId": "experience:user-correction",
+        "payload": {
+          "correction": "all learned data participates through graph provenance"
+        },
+        "confidence": 0.95,
+        "uncertainty": 0.05,
+        "sourceRefs": [],
+        "nodeSha256": "039f481f09132dc560f091f1bcfc95859987a2f7118065af56bf3595fea3a14a"
+      },
+      {
+        "nodeId": "N-0f6414a17d397aec27d22922",
+        "domain": "VISUAL",
+        "kind": "COMPLETION_PROFILE",
+        "subjectId": "visual:p150",
+        "payload": {
+          "profileSha256": "9fed7aa003a3121016b4c8d96f371c24ebbf466d7ed8b9b6b47f26a771e12493"
+        },
+        "confidence": 0.8,
+        "uncertainty": 0.2,
+        "sourceRefs": [
+          "9fed7aa003a3121016b4c8d96f371c24ebbf466d7ed8b9b6b47f26a771e12493"
+        ],
+        "nodeSha256": "0f6414a17d397aec27d2292265d48829a1923a13b942b7a71c1452f09c095214"
+      },
+      {
+        "nodeId": "N-1e36a6cbe3172cfa61bdac33",
+        "domain": "REQUIREMENT",
+        "kind": "REQUIREMENT_DIRECTIVE",
+        "subjectId": "requirement:p152",
+        "payload": {
+          "artifactId": "requirement:p152",
+          "requirement": "all data connected"
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [],
+        "nodeSha256": "1e36a6cbe3172cfa61bdac33730e0f6c22f88677d1831f7d7111fda54afb6f72"
+      },
+      {
+        "nodeId": "N-3876b03fcf37c89cf6a6812d",
+        "domain": "PERSON",
+        "kind": "PERSON_PROFILE",
+        "subjectId": "person:test",
+        "payload": {
+          "scope": "UPPER_BODY"
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [],
+        "nodeSha256": "3876b03fcf37c89cf6a6812ddf0525f29a4c84640cf653dabb03ee809baf15d7"
+      },
+      {
+        "nodeId": "N-5747885c19cd5c047093f6ec",
+        "domain": "VISUAL",
+        "kind": "POSE_EVIDENCE",
+        "subjectId": "visual:p149",
+        "payload": {
+          "artifactId": "pose:p149",
+          "phase": "HEAD_POSE_OCCLUSION_P149",
+          "passed": true,
+          "checks": {
+            "sha": true,
+            "bounded": true,
+            "visibility": true,
+            "policies": true,
+            "yawChanges": true,
+            "asymmetry": true
+          },
+          "pose": {
+            "yaw": 26.464285714285715,
+            "pitch": 10.58032786885244,
+            "roll": -8.130102354155978,
+            "visibility": {
+              "leftEye": 0.5335714285714286,
+              "rightEye": 0.85,
+              "nose": 0.52,
+              "mouth": 0.48,
+              "leftCheek": 0.4446428571428571,
+              "rightCheek": 0.92
+            },
+            "occluders": [],
+            "renderPolicy": {
+              "projectedFace": true,
+              "asymmetricFeatures": true,
+              "hideLowVisibility": true,
+              "depthOcclusion": true
+            },
+            "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+            "poseSha256": "058bdaa8ae73f66c39f93e542530b6bdd8b3fed0f16d329f56787c14bd558dfd"
+          },
+          "variants": [
+            {
+              "yaw": -21.07857142857142,
+              "pitch": 10.58032786885244,
+              "roll": -8.130102354155978,
+              "visibility": {
+                "leftEye": 0.9,
+                "rightEye": 0.574357142857143,
+                "nose": 0.52,
+                "mouth": 0.48,
+                "leftCheek": 0.92,
+                "rightCheek": 0.5067857142857144
+              },
+              "occluders": [],
+              "renderPolicy": {
+                "projectedFace": true,
+                "asymmetricFeatures": true,
+                "hideLowVisibility": true,
+                "depthOcclusion": true
+              },
+              "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+              "poseSha256": "de5c37f1d1a0132c16ab9c3d3ada3c82da432b42ea444b8f70e3b5f99ed2329c"
+            },
+            {
+              "yaw": 0,
+              "pitch": 10.58032786885244,
+              "roll": -8.130102354155978,
+              "visibility": {
+                "leftEye": 0.9,
+                "rightEye": 0.85,
+                "nose": 0.52,
+                "mouth": 0.48,
+                "leftCheek": 0.75,
+                "rightCheek": 0.92
+              },
+              "occluders": [],
+              "renderPolicy": {
+                "projectedFace": true,
+                "asymmetricFeatures": true,
+                "hideLowVisibility": true,
+                "depthOcclusion": true
+              },
+              "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+              "poseSha256": "4597fde26d3a240118c91276388ebda68d84b0b160366479b2ce62f80ea25017"
+            },
+            {
+              "yaw": 55,
+              "pitch": 10.58032786885244,
+              "roll": -8.130102354155978,
+              "visibility": {
+                "leftEye": 0.13846153846153847,
+                "rightEye": 0.85,
+                "nose": 0.52,
+                "mouth": 0.48,
+                "leftCheek": 0.11538461538461539,
+                "rightCheek": 0.92
+              },
+              "occluders": [
+                {
+                  "side": "LEFT",
+                  "strength": 0.8615384615384616,
+                  "kind": "OBJECT_OR_HAND"
+                }
+              ],
+              "renderPolicy": {
+                "projectedFace": true,
+                "asymmetricFeatures": true,
+                "hideLowVisibility": true,
+                "depthOcclusion": true
+              },
+              "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+              "poseSha256": "23964de555366fdcbfcf9b8162deab79c74172c9259aedf8a596eb0b43448a4d"
+            }
+          ],
+          "truthBoundary": "Pose and visibility are rule-based projections from detected landmarks. Hidden features are suppressed rather than mirrored. This is not 3D face reconstruction."
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [
+          "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+          "058bdaa8ae73f66c39f93e542530b6bdd8b3fed0f16d329f56787c14bd558dfd"
+        ],
+        "nodeSha256": "5747885c19cd5c047093f6ec689b393a8832f8c8fce1797b1ccb6b93ed8b5fab"
+      },
+      {
+        "nodeId": "N-756aed47f28909816334a1b2",
+        "domain": "MEMORY",
+        "kind": "LEARNED_FACT",
+        "subjectId": "memory:visual-completion",
+        "payload": {
+          "fact": "hidden regions can use cross-person learned priors"
+        },
+        "confidence": 0.72,
+        "uncertainty": 0.28,
+        "sourceRefs": [],
+        "nodeSha256": "756aed47f28909816334a1b2d31abf1bb002164bcb2fd63ceaf4d8a1b7414b30"
+      },
+      {
+        "nodeId": "N-79352ede1756cbe8fb990d53",
+        "domain": "CODE",
+        "kind": "CODE_COMPONENT",
+        "subjectId": "code:unifiedGraphIngestionP152Service",
+        "payload": {
+          "artifactId": "code:p152",
+          "path": "src/miki/core/services/unifiedGraphIngestionP152Service.ts"
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [],
+        "nodeSha256": "79352ede1756cbe8fb990d5373db5f73cfc5b3dfbaa0540c446b4a8a552e5303"
+      },
+      {
+        "nodeId": "N-7c33395831fbb39555fc272e",
+        "domain": "VALIDATION",
+        "kind": "E2E_RESULT",
+        "subjectId": "validation:p151",
+        "payload": {
+          "passed": true
+        },
+        "confidence": 1,
+        "uncertainty": 0,
+        "sourceRefs": [],
+        "nodeSha256": "7c33395831fbb39555fc272eceba3d9fd29a925477e1256ea728f94a2440751a"
+      },
+      {
+        "nodeId": "N-7e41f1a080ed94b33299efe6",
+        "domain": "CONVERSATION",
+        "kind": "CONVERSATION_TURN",
+        "subjectId": "conversation:p152",
+        "payload": {
+          "artifactId": "conversation:p152",
+          "intent": "connect all data"
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [],
+        "nodeSha256": "7e41f1a080ed94b33299efe6bd2aac31120646e5636afcd1e6cb47fd7581f6b2"
+      },
+      {
+        "nodeId": "N-8406911bbe055bd04ae17796",
+        "domain": "PERSON",
+        "kind": "PERSON_PROFILE",
+        "subjectId": "person:p144",
+        "payload": {
+          "artifactId": "profile:p144",
+          "format": "MIKI_PERSON_PROFILE_P139",
+          "profile": {
+            "profileId": "PERSON-c57e258f5f1b8831583b",
+            "subject": "P144 real-photo E2E subject",
+            "revision": 1,
+            "sourceObservations": [
+              {
+                "observationId": "RAW-f8e7c7686bcd49e2",
+                "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3",
+                "view": "FRONT",
+                "width": 512,
+                "height": 512,
+                "quality": 0.45504353841145834,
+                "occlusion": 0.7556478277585544,
+                "lightingBias": [
+                  -3,
+                  -18.66666666666667,
+                  -21
+                ],
+                "face": {
+                  "widthRatio": {
+                    "value": 0.38,
+                    "confidence": 0.3094296061197917,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "heightRatio": {
+                    "value": 0.88,
+                    "confidence": 0.3003287353515625,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "jawTaper": {
+                    "value": 0.38,
+                    "confidence": 0.1365130615234375,
+                    "observed": false,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "eyeSpacing": {
+                    "value": 0.42,
+                    "confidence": 0.09100870768229168,
+                    "observed": false,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "eyeSize": {
+                    "value": 0.075,
+                    "confidence": 0.09100870768229168,
+                    "observed": false,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "noseLength": {
+                    "value": 0.22,
+                    "confidence": 0.09100870768229168,
+                    "observed": false,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "mouthWidth": {
+                    "value": 0.35,
+                    "confidence": 0.09100870768229168,
+                    "observed": false,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  }
+                },
+                "hair": {
+                  "volume": {
+                    "value": 0.47905783875637237,
+                    "confidence": 0.28212699381510414,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "length": {
+                    "value": 0.3832462710050979,
+                    "confidence": 0.2502739461263021,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "parting": {
+                    "value": 0.5,
+                    "confidence": 0.06825653076171875,
+                    "observed": false,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "wave": {
+                    "value": 0.2,
+                    "confidence": 0.06825653076171875,
+                    "observed": false,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "baseColor": {
+                    "value": "#a0948a",
+                    "confidence": 0.31853047688802083,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "highlightColor": {
+                    "value": "#a0948a",
+                    "confidence": 0.20476959228515626,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  }
+                },
+                "body": {
+                  "headToBody": {
+                    "value": 0.22,
+                    "confidence": 0.34583308919270833,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "shoulderRatio": {
+                    "value": 1,
+                    "confidence": 0.32763134765625,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "torsoRatio": {
+                    "value": 0.36,
+                    "confidence": 0.2502739461263021,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "armRatio": {
+                    "value": 0.31,
+                    "confidence": 0.15926523844401042,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "legRatio": {
+                    "value": 0.42,
+                    "confidence": 0.2639252522786458,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  }
+                },
+                "appearance": {
+                  "surfaceColor": {
+                    "value": "#ac9784",
+                    "confidence": 0.3094296061197917,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "garmentColor": {
+                    "value": "#94746d",
+                    "confidence": 0.3549339599609375,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "pantsColor": {
+                    "value": "#874d42",
+                    "confidence": 0.32763134765625,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  },
+                  "shoeColor": {
+                    "value": "#5f362c",
+                    "confidence": 0.29122786458333333,
+                    "observed": true,
+                    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                  }
+                },
+                "observationSha256": "f78cae66fff8033aee87f55ba5101b3750e38d9aaaf0b650760849e37cfee71d"
+              }
+            ],
+            "face": {
+              "widthRatio": {
+                "value": 0.38,
+                "confidence": 0.03440574929751607,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "heightRatio": {
+                "value": 0.88,
+                "confidence": 0.03339381549464794,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "jawTaper": {
+                "value": null,
+                "confidence": 0,
+                "sources": [],
+                "state": "UNKNOWN",
+                "spread": 0
+              },
+              "eyeSpacing": {
+                "value": null,
+                "confidence": 0,
+                "sources": [],
+                "state": "UNKNOWN",
+                "spread": 0
+              },
+              "eyeSize": {
+                "value": null,
+                "confidence": 0,
+                "sources": [],
+                "state": "UNKNOWN",
+                "spread": 0
+              },
+              "noseLength": {
+                "value": null,
+                "confidence": 0,
+                "sources": [],
+                "state": "UNKNOWN",
+                "spread": 0
+              },
+              "mouthWidth": {
+                "value": null,
+                "confidence": 0,
+                "sources": [],
+                "state": "UNKNOWN",
+                "spread": 0
+              }
+            },
+            "hair": {
+              "volume": {
+                "value": 0.47905783875637237,
+                "confidence": 0.031369947888911696,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "length": {
+                "value": 0.3832462710050979,
+                "confidence": 0.027828179578873284,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "parting": {
+                "value": null,
+                "confidence": 0,
+                "sources": [],
+                "state": "UNKNOWN",
+                "spread": 0
+              },
+              "wave": {
+                "value": null,
+                "confidence": 0,
+                "sources": [],
+                "state": "UNKNOWN",
+                "spread": 0
+              },
+              "baseColor": {
+                "value": "#a0948a",
+                "confidence": 0.03541768310038417,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "highlightColor": {
+                "value": "#a0948a",
+                "confidence": 0.022768510564532687,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              }
+            },
+            "body": {
+              "headToBody": {
+                "value": 0.22,
+                "confidence": 0.038453484508988535,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "shoulderRatio": {
+                "value": 1,
+                "confidence": 0.0364296169032523,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "torsoRatio": {
+                "value": 0.36,
+                "confidence": 0.027828179578873284,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "armRatio": {
+                "value": 0.31,
+                "confidence": 0.017708841550192086,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "legRatio": {
+                "value": 0.42,
+                "confidence": 0.02934608028317546,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              }
+            },
+            "appearance": {
+              "surfaceColor": {
+                "value": "#ac9784",
+                "confidence": 0.03440574929751607,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "garmentColor": {
+                "value": "#94746d",
+                "confidence": 0.03946541831185666,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "pantsColor": {
+                "value": "#874d42",
+                "confidence": 0.0364296169032523,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              },
+              "shoeColor": {
+                "value": "#5f362c",
+                "confidence": 0.032381881691779815,
+                "sources": [
+                  "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3"
+                ],
+                "state": "OBSERVED",
+                "spread": 0
+              }
+            },
+            "unresolvedFeatures": [
+              "face.jawTaper",
+              "face.eyeSpacing",
+              "face.eyeSize",
+              "face.noseLength",
+              "face.mouthWidth",
+              "hair.parting",
+              "hair.wave"
+            ],
+            "evidenceCoverage": 0.02171057977062511,
+            "createdAt": 1791252009688,
+            "updatedAt": 1791252009688,
+            "profileSha256": "4ed7e08b87533abcdea0b0b0e39250d13b81da2b21e34a4df9cd0526284d200c"
+          },
+          "recordSha256": "ba9de56e75e91055c5fcdf5ea242f01cc1ebec0ddec31ee5370b4606093ff267",
+          "envelopeSha256": "4888b4368d5eba9bbd1abdc605b6e197c50bde14128f3aa838307071061e7806"
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [
+          null
+        ],
+        "nodeSha256": "8406911bbe055bd04ae17796b8eda0904077a48fed5f6e2ad791c60ba3e2e525"
+      },
+      {
+        "nodeId": "N-8f1c5dadc65873834828bd81",
+        "domain": "VALIDATION",
+        "kind": "VALIDATION_RESULT",
+        "subjectId": "validation:p152",
+        "payload": {
+          "artifactId": "validation:p152",
+          "passed": true
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [],
+        "nodeSha256": "8f1c5dadc65873834828bd813b014f63c69cb92a1687ef6905cefa58c70cac05"
+      },
+      {
+        "nodeId": "N-a06aac84027aca483d995952",
+        "domain": "PERSON",
+        "kind": "VISUAL_COMPLETION_PROFILE",
+        "subjectId": "visual:p150",
+        "payload": {
+          "artifactId": "completion:p150",
+          "features": {
+            "eyeSpacing": {
+              "value": 0.406864,
+              "confidence": 0.675,
+              "origin": "MULTI_VIEW_FUSED",
+              "sourceSha256List": [
+                "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3",
+                "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77"
+              ],
+              "uncertainty": 0.09700054399129626
+            },
+            "jawTaper": {
+              "value": 0.42,
+              "confidence": 0.6264,
+              "origin": "MULTI_VIEW_FUSED",
+              "sourceSha256List": [
+                "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3",
+                "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77"
+              ],
+              "uncertainty": 0.08
+            },
+            "farCheek": {
+              "value": 0.36,
+              "confidence": 0.4446428571428571,
+              "origin": "OBSERVED",
+              "sourceSha256List": [
+                "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77"
+              ],
+              "uncertainty": 0.22
+            },
+            "earDepth": {
+              "value": 0.195,
+              "confidence": 0.28,
+              "origin": "SYMMETRY_PRIOR",
+              "sourceSha256List": [
+                "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3",
+                "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77"
+              ],
+              "uncertainty": 0.72
+            }
+          },
+          "viewCoverage": {
+            "front": 0.5,
+            "left": 0,
+            "right": 0.5,
+            "upper": 0.5,
+            "lower": 0
+          },
+          "minimumConfidenceToRender": 0.2,
+          "unknownPolicy": "KEEP_UNKNOWN",
+          "profileSha256": "9fed7aa003a3121016b4c8d96f371c24ebbf466d7ed8b9b6b47f26a771e12493"
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [
+          "9fed7aa003a3121016b4c8d96f371c24ebbf466d7ed8b9b6b47f26a771e12493"
+        ],
+        "nodeSha256": "a06aac84027aca483d995952aba780454bb705130b6bc9dacbe155e4e030c1fd"
+      },
+      {
+        "nodeId": "N-a98b7449611e17be88e5e648",
+        "domain": "EXPERIENCE",
+        "kind": "USER_CORRECTION_EXPERIENCE",
+        "subjectId": "experience:p152",
+        "payload": {
+          "artifactId": "experience:p152",
+          "rule": "all learned artifacts must enter unified graph"
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [],
+        "nodeSha256": "a98b7449611e17be88e5e6487b3b5d66ad6ba0ba36bd1d2e6dd17115dfbdee73"
+      },
+      {
+        "nodeId": "N-ad3ed8f81520e8394ae41731",
+        "domain": "VISUAL",
+        "kind": "REAL_PHOTO_OBSERVATION",
+        "subjectId": "visual:p148",
+        "payload": {
+          "artifactId": "photo:p148",
+          "phase": "ROBUST_REGION_DIFFERENT_REAL_PHOTO_E2E_P148",
+          "passed": true,
+          "checks": {
+            "differentSource": true,
+            "realPhoto": true,
+            "maskCounts": true,
+            "backgroundRejected": true,
+            "consistency": true,
+            "robustSha": true,
+            "png": true,
+            "receipt": true
+          },
+          "input": {
+            "width": 512,
+            "height": 512,
+            "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+            "view": "THREE_QUARTER",
+            "source": "scikit-image data.camera sample",
+            "license": "Used from scikit-image sample data under project licensing; see bundled and linked license documentation",
+            "synthetic": false,
+            "realPhotograph": true,
+            "faceBox": {
+              "x": 180,
+              "y": 55,
+              "width": 165,
+              "height": 180,
+              "confidence": 0.4
+            }
+          },
+          "robustEvidence": {
+            "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+            "palette": {
+              "hair": "#1e1e1e",
+              "surface": "#949494",
+              "garment": "#909090"
+            },
+            "masks": {
+              "hairPixels": 826,
+              "surfacePixels": 1607,
+              "garmentPixels": 17052,
+              "backgroundRejected": 12739
+            },
+            "consistency": {
+              "eyeOrder": true,
+              "faceBounds": true,
+              "paletteSeparated": true,
+              "accepted": true
+            },
+            "confidence": 1,
+            "evidenceSha256": "655cacd7c87e41c1341a2ca10e3953468344469ddee690b986c61ee4f9de832f"
+          },
+          "faceEvidence": {
+            "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+            "faceBox": {
+              "x": 180,
+              "y": 55,
+              "width": 165,
+              "height": 180,
+              "confidence": 0.4
+            },
+            "landmarks": {
+              "leftEye": {
+                "x": 0.388671875,
+                "y": 0.251953125,
+                "confidence": 0.9
+              },
+              "rightEye": {
+                "x": 0.525390625,
+                "y": 0.232421875,
+                "confidence": 0.85
+              },
+              "noseTip": {
+                "x": 0.5126953125,
+                "y": 0.332421875,
+                "confidence": 0.52
+              },
+              "mouthLeft": {
+                "x": 0.4546875,
+                "y": 0.38515625000000003,
+                "confidence": 0.48
+              },
+              "mouthRight": {
+                "x": 0.570703125,
+                "y": 0.38515625000000003,
+                "confidence": 0.48
+              },
+              "chin": {
+                "x": 0.5126953125,
+                "y": 0.451953125,
+                "confidence": 0.58
+              },
+              "hairline": {
+                "x": 0.5126953125,
+                "y": 0.135546875,
+                "confidence": 0.56
+              }
+            },
+            "ratios": {
+              "eyeSpacing": 0.42424242424242425,
+              "eyeSize": 0.09,
+              "noseLength": 0.2566666666666666,
+              "mouthWidth": 0.3599999999999999,
+              "jawTaper": 0.42
+            },
+            "palette": {
+              "hair": "#1e1e1e",
+              "surface": "#949494",
+              "garment": "#909090"
+            },
+            "confidence": 0.6242857142857143,
+            "evidenceSha256": "e9d767db4181bd9ed78bfcbb5a6e2cd94205a220513e0f5fd9758b188fe71cd2"
+          },
+          "artifact": {
+            "pngSha256": "0b2c84202697487861a99523241a3cc819aaa66c128d63f8a952300b969d7cec",
+            "receiptSha256": "51e8dd297f392d0208c6f607b1611a0203b47b20a44da7118f71a18b087b58a9"
+          },
+          "truthBoundary": "Different real sample photograph processed. Robust masks use trimmed median clusters and consistency checks; this remains rule-based, not identity recognition or photorealistic reconstruction."
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [
+          "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77"
+        ],
+        "nodeSha256": "ad3ed8f81520e8394ae417310de68763cb1f6491ab448d5d4b091248d0903b37"
+      },
+      {
+        "nodeId": "N-b95950121944511af8508c19",
+        "domain": "MEMORY",
+        "kind": "LEARNED_VISUAL_KNOWLEDGE",
+        "subjectId": "memory:p152",
+        "payload": {
+          "artifactId": "memory:p152",
+          "crossPersonCompletion": true
+        },
+        "confidence": 0.7,
+        "uncertainty": 0.3,
+        "sourceRefs": [],
+        "nodeSha256": "b95950121944511af8508c191290ef1ba2f73eaf219358e7513373311b321503"
+      },
+      {
+        "nodeId": "N-da2d29b00bab665a8669252a",
+        "domain": "CONVERSATION",
+        "kind": "TURN",
+        "subjectId": "conversation:p151",
+        "payload": {
+          "message": "implement unified graph"
+        },
+        "confidence": 1,
+        "uncertainty": 0,
+        "sourceRefs": [],
+        "nodeSha256": "da2d29b00bab665a8669252a7882a424b3e6797d72ca9e6feaff62eeadaae282"
+      }
+    ],
+    "edges": [
+      {
+        "edgeId": "E-34fd87185458235c7772b7e5",
+        "from": "N-756aed47f28909816334a1b2",
+        "to": "N-0f6414a17d397aec27d22922",
+        "type": "SUPPORTS_COMPLETION",
+        "confidence": 0.72,
+        "sourceRefs": [],
+        "edgeSha256": "34fd87185458235c7772b7e54c6eb424f171aa22916f33f8534b889c3972d8e1"
+      },
+      {
+        "edgeId": "E-4a0aaefd0dfe72d50e9f6d62",
+        "from": "N-1e36a6cbe3172cfa61bdac33",
+        "to": "N-79352ede1756cbe8fb990d53",
+        "type": "IMPLEMENTED_BY",
+        "confidence": 0.7,
+        "sourceRefs": [],
+        "edgeSha256": "4a0aaefd0dfe72d50e9f6d62cf12066616e0db0babb9913e3ff487630d42f1a8"
+      },
+      {
+        "edgeId": "E-69ba90dd835f1c57f0ea0f0b",
+        "from": "N-ad3ed8f81520e8394ae41731",
+        "to": "N-5747885c19cd5c047093f6ec",
+        "type": "PRODUCES",
+        "confidence": 0.7,
+        "sourceRefs": [
+          "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77"
+        ],
+        "edgeSha256": "69ba90dd835f1c57f0ea0f0b98eeff836ae5df4e6024d395795cedced9424b1f"
+      },
+      {
+        "edgeId": "E-6e6c5b44d91233aff2def65d",
+        "from": "N-5747885c19cd5c047093f6ec",
+        "to": "N-a06aac84027aca483d995952",
+        "type": "SUPPORTS_COMPLETION",
+        "confidence": 0.7,
+        "sourceRefs": [
+          "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+          "058bdaa8ae73f66c39f93e542530b6bdd8b3fed0f16d329f56787c14bd558dfd"
+        ],
+        "edgeSha256": "6e6c5b44d91233aff2def65d546a7a3386aabba158457673ab544ecb8ac476f4"
+      },
+      {
+        "edgeId": "E-822c7cd52ac9251dcaeadadb",
+        "from": "N-da2d29b00bab665a8669252a",
+        "to": "N-039f481f09132dc560f091f1",
+        "type": "CREATES_EXPERIENCE",
+        "confidence": 1,
+        "sourceRefs": [],
+        "edgeSha256": "822c7cd52ac9251dcaeadadbe297586183a233e3580fe542eb15b8133cd375d0"
+      },
+      {
+        "edgeId": "E-88147f45b206f232d1f7a9bb",
+        "from": "N-a06aac84027aca483d995952",
+        "to": "N-8f1c5dadc65873834828bd81",
+        "type": "VALIDATED_BY",
+        "confidence": 0.7,
+        "sourceRefs": [
+          "9fed7aa003a3121016b4c8d96f371c24ebbf466d7ed8b9b6b47f26a771e12493"
+        ],
+        "edgeSha256": "88147f45b206f232d1f7a9bbd555c7510ba6eee0badb7bbfab5f77164806d8bf"
+      },
+      {
+        "edgeId": "E-944ae563f30510bc2059edc8",
+        "from": "N-8406911bbe055bd04ae17796",
+        "to": "N-ad3ed8f81520e8394ae41731",
+        "type": "RELATED_OBSERVATION",
+        "confidence": 0.7,
+        "sourceRefs": [
+          null
+        ],
+        "edgeSha256": "944ae563f30510bc2059edc85975fbd2a20a4831240be9d2bb31d42b9d7c7164"
+      },
+      {
+        "edgeId": "E-982de8b6cf645275eeb756bd",
+        "from": "N-79352ede1756cbe8fb990d53",
+        "to": "N-8f1c5dadc65873834828bd81",
+        "type": "VALIDATED_BY",
+        "confidence": 0.7,
+        "sourceRefs": [],
+        "edgeSha256": "982de8b6cf645275eeb756bdc9e90726a3438ce57fe61cd2ed8e148c0748a2c1"
+      },
+      {
+        "edgeId": "E-a721b4fc4e7961a0fd343b79",
+        "from": "N-0f6414a17d397aec27d22922",
+        "to": "N-3876b03fcf37c89cf6a6812d",
+        "type": "DESCRIBES",
+        "confidence": 0.8,
+        "sourceRefs": [
+          "9fed7aa003a3121016b4c8d96f371c24ebbf466d7ed8b9b6b47f26a771e12493"
+        ],
+        "edgeSha256": "a721b4fc4e7961a0fd343b798806a0da400b72d9712feed1ca9f69465cb49414"
+      },
+      {
+        "edgeId": "E-a940e06d9a2c710679dd1fe2",
+        "from": "N-a98b7449611e17be88e5e648",
+        "to": "N-b95950121944511af8508c19",
+        "type": "UPDATES",
+        "confidence": 0.7,
+        "sourceRefs": [],
+        "edgeSha256": "a940e06d9a2c710679dd1fe23e7e0d714f73347771e8b21ed606118f42882f50"
+      },
+      {
+        "edgeId": "E-cc20b6de43ef8543b5a5bb64",
+        "from": "N-7e41f1a080ed94b33299efe6",
+        "to": "N-a98b7449611e17be88e5e648",
+        "type": "CREATES_EXPERIENCE",
+        "confidence": 0.7,
+        "sourceRefs": [],
+        "edgeSha256": "cc20b6de43ef8543b5a5bb6488bf8e51e7cfab14c9b108ec513ba935eef8abb6"
+      },
+      {
+        "edgeId": "E-eef0b6e5c70143198b839cf1",
+        "from": "N-039f481f09132dc560f091f1",
+        "to": "N-756aed47f28909816334a1b2",
+        "type": "UPDATES",
+        "confidence": 0.95,
+        "sourceRefs": [],
+        "edgeSha256": "eef0b6e5c70143198b839cf1f5504a5e5ea6f6ac2e68f1127bb40392a6e593c2"
+      },
+      {
+        "edgeId": "E-ef0bcca9e84b76fac41cf66a",
+        "from": "N-b95950121944511af8508c19",
+        "to": "N-a06aac84027aca483d995952",
+        "type": "SUPPORTS_COMPLETION",
+        "confidence": 0.7,
+        "sourceRefs": [],
+        "edgeSha256": "ef0bcca9e84b76fac41cf66a4cbc0a955d66a79137a55c3899bdc9ac690ee012"
+      },
+      {
+        "edgeId": "E-f881e04ff62336a02f3ca329",
+        "from": "N-7c33395831fbb39555fc272e",
+        "to": "N-0f6414a17d397aec27d22922",
+        "type": "VALIDATES",
+        "confidence": 1,
+        "sourceRefs": [],
+        "edgeSha256": "f881e04ff62336a02f3ca329f9d58dffc6eb6e50450750c665bd0904ea7b46b3"
+      }
+    ],
+    "graphSha256": "cbaf516fc6876726d4680975b1a300c1b75304506163580b1e0f3a9beca417f4"
+  },
+  "truthBoundary": "P152 connects imported current artifacts and preserves legacy graph content. Future writes must invoke this ingestion path; external stores not presented to the process cannot be migrated automatically."
+}

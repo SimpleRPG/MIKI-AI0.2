@@ -1,0 +1,145 @@
+{
+  "rules": [
+    {
+      "ruleId": "P193R-61bf25f01524277f15e6",
+      "feature": "foregroundRatio",
+      "mean": 0.38859006839994,
+      "stdDev": 0.08230600898862066,
+      "min": 0.19845712221688047,
+      "max": 0.5263043428492937,
+      "sourceCount": 10,
+      "confidence": 0.87,
+      "ruleSha256": "61bf25f01524277f15e62c29075dd773bac1e0b8a3720f383872e2e501d855b5"
+    },
+    {
+      "ruleId": "P193R-bfe03fe71cd689992e3e",
+      "feature": "seatBandOccupancy",
+      "mean": 0.48812597031691285,
+      "stdDev": 0.10030896665563645,
+      "min": 0.3470383146025741,
+      "max": 0.6417894630868927,
+      "sourceCount": 10,
+      "confidence": 0.87,
+      "ruleSha256": "bfe03fe71cd689992e3e93c31d9da35fabd9a9ba30a69a3120cb6a36fdbf5297"
+    },
+    {
+      "ruleId": "P193R-3044fb29b7ef206d5986",
+      "feature": "floorContactOccupancy",
+      "mean": 0.5132168365577976,
+      "stdDev": 0.1534675422881894,
+      "min": 0.13760314818667221,
+      "max": 0.7820886207613896,
+      "sourceCount": 10,
+      "confidence": 0.87,
+      "ruleSha256": "3044fb29b7ef206d5986ba6a39db21d85a47c7a049eea095d991e40109d9896b"
+    },
+    {
+      "ruleId": "P193R-fc1440ef7317310add21",
+      "feature": "leftRightBalance",
+      "mean": 0.02249198100369091,
+      "stdDev": 0.17688084233194756,
+      "min": -0.22974774183537716,
+      "max": 0.3746607347715381,
+      "sourceCount": 10,
+      "confidence": 0.87,
+      "ruleSha256": "fc1440ef7317310add21519b96698b18f947f031b5c78060924505dd3256f461"
+    },
+    {
+      "ruleId": "P193R-92349ef7ec0e05ef18bb",
+      "feature": "luminanceMean",
+      "mean": 0.4843169751803014,
+      "stdDev": 0.05100289779385865,
+      "min": 0.4214978515276088,
+      "max": 0.5860585182975492,
+      "sourceCount": 10,
+      "confidence": 0.87,
+      "ruleSha256": "92349ef7ec0e05ef18bb2908defc8db7aecaf51c3b865056fc849c586615967f"
+    }
+  ],
+  "correlations": {
+    "seatFloor": 0.16646333357675794,
+    "balanceForeground": -0.3779538113469047,
+    "luminanceForeground": 0.018835008485606958
+  },
+  "materials": {
+    "SKIN": {
+      "base": [
+        205,
+        164,
+        142
+      ],
+      "variation": 0.11,
+      "roughness": 0.58,
+      "specular": 0.18,
+      "microScale": 0.018
+    },
+    "HAIR": {
+      "base": [
+        43,
+        33,
+        29
+      ],
+      "variation": 0.16,
+      "roughness": 0.42,
+      "specular": 0.3,
+      "microScale": 0.01
+    },
+    "GARMENT": {
+      "base": [
+        76,
+        102,
+        112
+      ],
+      "variation": 0.14,
+      "roughness": 0.72,
+      "specular": 0.08,
+      "microScale": 0.026
+    },
+    "WOOD": {
+      "base": [
+        103,
+        64,
+        39
+      ],
+      "variation": 0.12,
+      "roughness": 0.64,
+      "specular": 0.12,
+      "microScale": 0.032
+    },
+    "BACKGROUND": {
+      "base": [
+        224,
+        220,
+        214
+      ],
+      "variation": 0.025,
+      "roughness": 0.9,
+      "specular": 0.02,
+      "microScale": 0.05
+    },
+    "SHADOW": {
+      "base": [
+        24,
+        21,
+        19
+      ],
+      "variation": 0.04,
+      "roughness": 0.95,
+      "specular": 0,
+      "microScale": 0.04
+    }
+  },
+  "sourceSha256List": [
+    "2df136a7ddf6cb8066191843784e6b1bd082ea9f8a3583615ef810b02c288587",
+    "2e12b5714377b6ad7e21624e1818904fa22860f99d887c44584164ac1e8fdb1b",
+    "7ae66fdb26510eccdf970517ee9b8f92abf7eb8c623593bebb38bb7b0dd26193",
+    "7ee27dd9d11d989d86afbec40b063410e252c26b03734f15321af4c1156b2af5",
+    "838c4ee117b31d0265e9e5d9a18afda0290de30c15cab0ef422df7aec75f0746",
+    "a07ed39a61be1e119b2e293fb87f21c275bb9e063034f9cab4d8b64c2e7d9f38",
+    "a7e1676e3b10a99f15bea40c0d526b29bacda6697c359e9617e6f1f05e965755",
+    "b07b18ca356d1836ab07d02daad80b518e36b5a5f88ea8a52f9713a6d55df8fd",
+    "d2dc16a8551a60338c90b8075773c475e6a0c621c62d0939a793f2bc80ffb3ca",
+    "d932ffabdd70982cd84a731384f0a12ecf06effb28260d10be260b6049e3deff"
+  ],
+  "ruleSetSha256": "fcf01ed5d1a03e32781ca98610a52e0805d8560c62a6d0a223e6fad5ef604134"
+}

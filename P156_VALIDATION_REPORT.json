@@ -1,0 +1,343 @@
+{
+  "phase": "DOMAIN_DISTRIBUTION_STARTUP_RUST_GRAPH_P156",
+  "passed": true,
+  "checks": {
+    "all17": true,
+    "filtered": true,
+    "needsDiffer": true,
+    "conversationHasMemory": true,
+    "verificationHasEvidence": true,
+    "startupShell": true,
+    "limitedMode": true,
+    "storageNotBlocking": true,
+    "rustGraph": true,
+    "rustBounded": true,
+    "rustLimited": true
+  },
+  "dispatchReceipt": {
+    "taskId": "TASK-P156",
+    "projections": {
+      "autonomy": {
+        "domain": "autonomy",
+        "taskId": "TASK-P156",
+        "nodeIds": [],
+        "semanticKinds": [],
+        "activeSubjectIds": [],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "3c96c354f6a57bd23de2e9b6ed0ab88a84dd6fc3cb8b2de3b7334bf969ca8bc5"
+      },
+      "capability": {
+        "domain": "capability",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-abeda503d352e30ab373f826"
+        ],
+        "semanticKinds": [
+          "KNOWLEDGE"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "cc9ad72959d27d76ac6fd5351bd1e3f3d9a25af3521da30ce16e5f01792d363f"
+      },
+      "conversation": {
+        "domain": "conversation",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-080fecdc286df1b12b7274a3",
+          "N-65e4aa9e7dfe6f7ce536a814",
+          "N-9484f25b09dd4b6f73220076",
+          "N-abeda503d352e30ab373f826"
+        ],
+        "semanticKinds": [
+          "EXPERIENCE",
+          "KNOWLEDGE",
+          "MEMORY",
+          "OBSERVATION"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "73323fc5ecb45e0e0e439e141e5194da8b27c0f950c2dca941905cbea4ac6ee0"
+      },
+      "data": {
+        "domain": "data",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-080fecdc286df1b12b7274a3"
+        ],
+        "semanticKinds": [
+          "OBSERVATION"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "02983cbd60f4b54f5d229c2a8166275272f897557380c354564fcf9b8c683a4a"
+      },
+      "execution": {
+        "domain": "execution",
+        "taskId": "TASK-P156",
+        "nodeIds": [],
+        "semanticKinds": [],
+        "activeSubjectIds": [],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "bbd32f302d46a33d8d922ea4e351daff3cd0cd9a7674af4d11c71fc30a931939"
+      },
+      "experience": {
+        "domain": "experience",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-9484f25b09dd4b6f73220076",
+          "N-080fecdc286df1b12b7274a3"
+        ],
+        "semanticKinds": [
+          "EXPERIENCE",
+          "OBSERVATION"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "cedcfa25ef224ed7461951e563b562d437051bba9a2143825d1deb73d5a12148"
+      },
+      "improvement": {
+        "domain": "improvement",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-9484f25b09dd4b6f73220076",
+          "N-abeda503d352e30ab373f826"
+        ],
+        "semanticKinds": [
+          "EXPERIENCE",
+          "KNOWLEDGE"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "bd8bc0600612492dc1df8de4dffafb9c3b1f2e73c2ddac5edb65de759ca1d703"
+      },
+      "learning": {
+        "domain": "learning",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-abeda503d352e30ab373f826",
+          "N-080fecdc286df1b12b7274a3",
+          "N-9484f25b09dd4b6f73220076"
+        ],
+        "semanticKinds": [
+          "EXPERIENCE",
+          "KNOWLEDGE",
+          "OBSERVATION"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "ee4cb0cfd759303e8094ad8f2040b33e01ccb8c3b24034dbbb3dae6bef16a048"
+      },
+      "memory": {
+        "domain": "memory",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-65e4aa9e7dfe6f7ce536a814",
+          "N-9484f25b09dd4b6f73220076",
+          "N-abeda503d352e30ab373f826"
+        ],
+        "semanticKinds": [
+          "EXPERIENCE",
+          "KNOWLEDGE",
+          "MEMORY"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "c40f1808a12bf7c00f1b8607d87a1c330234f13a74d4ce215952aee974fb66f5"
+      },
+      "promotion": {
+        "domain": "promotion",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-abeda503d352e30ab373f826"
+        ],
+        "semanticKinds": [
+          "KNOWLEDGE"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "a690fbe628a764dd8ac13595d53b81e0af4712b7db4e967b2f1d10d4a99e2320"
+      },
+      "research": {
+        "domain": "research",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-080fecdc286df1b12b7274a3",
+          "N-abeda503d352e30ab373f826"
+        ],
+        "semanticKinds": [
+          "KNOWLEDGE",
+          "OBSERVATION"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "55a148b1e00f98a585dad6de5c12d3edeb2c8571e62194ed626aed772b72842e"
+      },
+      "safety": {
+        "domain": "safety",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-080fecdc286df1b12b7274a3"
+        ],
+        "semanticKinds": [
+          "OBSERVATION"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "396c46455febac0a624fbacce072e6b5daa18e2a37e838d26000984db72267ec"
+      },
+      "selfAwareness": {
+        "domain": "selfAwareness",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-65e4aa9e7dfe6f7ce536a814",
+          "N-9484f25b09dd4b6f73220076",
+          "N-abeda503d352e30ab373f826"
+        ],
+        "semanticKinds": [
+          "EXPERIENCE",
+          "KNOWLEDGE",
+          "MEMORY"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "87f792544dd7b27f06dd4cbd5cf40cdceeb1be37b52e9bf83f1bac3c4084293b"
+      },
+      "selfDevelopment": {
+        "domain": "selfDevelopment",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-9484f25b09dd4b6f73220076",
+          "N-abeda503d352e30ab373f826"
+        ],
+        "semanticKinds": [
+          "EXPERIENCE",
+          "KNOWLEDGE"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "524815cfa959b4bdef22c84b0fbccbb5c1cf813b7b5866b5f586175ea3e99bc7"
+      },
+      "strategy": {
+        "domain": "strategy",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-65e4aa9e7dfe6f7ce536a814",
+          "N-abeda503d352e30ab373f826"
+        ],
+        "semanticKinds": [
+          "KNOWLEDGE",
+          "MEMORY"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "140e87cca76c41e3772f2508468bfd5ff74fa45724cc75d43d2a3d851ae8fd29"
+      },
+      "unknown": {
+        "domain": "unknown",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-080fecdc286df1b12b7274a3"
+        ],
+        "semanticKinds": [
+          "OBSERVATION"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "1d7e6b981d43d964c99652d95a9987445a78365d806a8ab2abcb91f979dc6628"
+      },
+      "verification": {
+        "domain": "verification",
+        "taskId": "TASK-P156",
+        "nodeIds": [
+          "N-080fecdc286df1b12b7274a3",
+          "N-9484f25b09dd4b6f73220076",
+          "N-abeda503d352e30ab373f826"
+        ],
+        "semanticKinds": [
+          "EXPERIENCE",
+          "KNOWLEDGE",
+          "OBSERVATION"
+        ],
+        "activeSubjectIds": [
+          "visual:black-region"
+        ],
+        "conflictIds": [],
+        "unknownIds": [],
+        "maxNodes": 24,
+        "projectionSha256": "056e9ce95ec22fb51c370a9ddb9e728faddb16b8bc98b9003719f1ba882590a4"
+      }
+    },
+    "candidateIds": [],
+    "missingDomains": [],
+    "receiptSha256": "d42b968ba8b9912cee1e06fa8ca5e1e9863b6d7adc95d80c8dc5fc8d88a9f089"
+  },
+  "startup": {
+    "shellBeforeStorageWait": true,
+    "limitedMode": true
+  },
+  "rust": {
+    "boundedContext": true,
+    "recovery": true
+  },
+  "truthBoundary": "P156 connects bounded projections for all 17 worker domains, makes storage hydration non-blocking for UI shell rendering, and adds a Rust bounded graph context/recovery kernel. Android cold-start behavior still requires device execution."
+}

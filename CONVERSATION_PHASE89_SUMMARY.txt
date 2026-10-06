@@ -1,0 +1,25 @@
+MIKI-AI Conversation Phase 89
+
+Reconfirmed existing routes
+- unknownResearchControlService chooses SEARCH or LOCAL_ONLY.
+- japaneseDictionaryService provides builtin, personal and imported dictionary lookup.
+- researchService and adaptiveRoutePlanner contain unknown/research execution routes.
+- webTermLearningService converts researched web evidence into unverified reusable term components linked to evidence and Claim IDs.
+
+Implemented
+- conversationUnknownVocabularyService now runs inside HybridConversationEngineService.
+- It extracts candidate technical terms, checks the Japanese dictionary, generates deterministic TERM-GAP IDs and research queries, and respects SEARCH versus LOCAL_ONLY policy.
+- Common request words such as meaning, term, definition, usage and tell-me are excluded from unknown-term candidates.
+- Unknown assessment is attached to the semantic result, so downstream CORE/research routing can consume the queries and gap IDs.
+- compositionalRealizationService builds clauses from AnswerContentIR conclusion, reasons, conditions, exceptions and next actions without selecting a complete stored response sentence.
+- Existing templates remain available as fallback only when the IR contains no realizable content.
+
+Dynamic proof
+- Unknown FoobarnativeX -> DICTIONARY_MISS -> SEARCH -> deterministic gap ID -> query "FoobarnativeX 意味 用語 定義".
+- Research disabled -> LOCAL_ONLY and no query handoff.
+- Compositional realization generated five clauses from dynamic IR and preserved reason, condition, exception and next action.
+
+Honest boundary
+- The offline E2E proves creation of the research handoff, not live Internet retrieval.
+- Live research remains the responsibility of the existing research/adaptive route in an environment with an available search provider.
+- webTermLearningService keeps researched terms UNVERIFIED and evidence-linked; research output does not become trusted dictionary fact automatically.

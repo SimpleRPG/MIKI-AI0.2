@@ -120,11 +120,13 @@ export class ConversationTaskboardService {
         const matchedLine = lines[0] || userText;
         const cleanSnippet = matchedLine.replace(kw.regex, '').trim().slice(0, 40) || '会話中のタスク項目';
 
-        // 重複チェック
-        const isDuplicate = this.tasks.some(
-          (t) => t.category === kw.category && t.title.includes(cleanSnippet.slice(0, 15))
-        );
-        if (isDuplicate) continue;
+        const title = `${kw.titlePrefix}${cleanSnippet}`;
+        const equivalent = this.findEquivalentTask(title, cleanSnippet);
+        if (equivalent) {
+          equivalent.updatedAt = Date.now();
+          if (equivalent.status === 'COMPLETED') equivalent.status = 'BACKLOG';
+          continue;
+        }
 
         const card: ConversationTaskCard = {
           id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -159,6 +161,15 @@ export class ConversationTaskboardService {
   /**
    * 手動でタスクカードを追加
    */
+  private taskFingerprint(title: string, goal: string): string {
+    return `${title}|${goal}`.normalize('NFKC').toLowerCase().replace(/[\s、。・:：;；_\-【】]/g, '');
+  }
+
+  private findEquivalentTask(title: string, goal: string): ConversationTaskCard | undefined {
+    const key = this.taskFingerprint(title, goal);
+    return this.tasks.find((task) => this.taskFingerprint(task.title, task.goal) === key);
+  }
+
   public addTask(params: {
     title: string;
     goal: string;
@@ -166,6 +177,13 @@ export class ConversationTaskboardService {
     priority: 'HIGH' | 'MEDIUM' | 'LOW';
     completionCriteria: string;
   }): ConversationTaskCard {
+    const equivalent = this.findEquivalentTask(params.title, params.goal);
+    if (equivalent) {
+      equivalent.updatedAt = Date.now();
+      if (equivalent.status === 'COMPLETED') equivalent.status = 'BACKLOG';
+      this.saveState();
+      return equivalent;
+    }
     const card: ConversationTaskCard = {
       id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       title: params.title,
@@ -196,6 +214,54 @@ export class ConversationTaskboardService {
     }
     this.saveState();
     return true;
+  }
+
+  public completeWithEvidence(taskId: string, evidenceIds: string[], verificationLevel: 'IMPLEMENTED' | 'STATIC_VERIFIED' | 'COMPILED' | 'TESTED' | 'ADOPTED'): ConversationTaskCard | undefined {
+    const task = this.tasks.find((item) => item.id === taskId);
+    if (!task) return undefined;
+    const sufficient = verificationLevel === 'TESTED' || verificationLevel === 'ADOPTED';
+    task.evidenceIds = [...new Set([...(task.evidenceIds || []), ...evidenceIds])];
+    task.completionJudgePassed = sufficient && task.evidenceIds.length > 0;
+    task.status = task.completionJudgePassed ? 'COMPLETED' : 'IN_PROGRESS';
+    task.updatedAt = Date.now();
+    this.saveState();
+    return task;
+  }
+
+  public reopenByCorrection(taskId: string, reason: string): ConversationTaskCard | undefined {
+    const task = this.tasks.find((item) => item.id === taskId);
+    if (!task) return undefined;
+    task.status = 'IN_PROGRESS';
+    task.completionJudgePassed = false;
+    task.completionCriteria = `${task.completionCriteria} | CORRECTION:${reason}`;
+    task.updatedAt = Date.now();
+    this.saveState();
+    return task;
+  }
+
+  public classifyWorkState(): Record<'COMPLETED' | 'PARTIAL' | 'PENDING' | 'ACTIONABLE_NOW' | 'EXTERNAL_REQUIRED', ConversationTaskCard[]> {
+    const groups = { COMPLETED: [], PARTIAL: [], PENDING: [], ACTIONABLE_NOW: [], EXTERNAL_REQUIRED: [] } as Record<'COMPLETED' | 'PARTIAL' | 'PENDING' | 'ACTIONABLE_NOW' | 'EXTERNAL_REQUIRED', ConversationTaskCard[]>;
+    for (const task of this.tasks) {
+      const text = `${task.title} ${task.goal} ${task.completionCriteria}`;
+      if (task.status === 'COMPLETED' && task.completionJudgePassed) groups.COMPLETED.push(task);
+      else if (/外部環境|実機|cargo test|環境が必要/.test(text)) groups.EXTERNAL_REQUIRED.push(task);
+      else if (task.status === 'IN_PROGRESS') groups.PARTIAL.push(task);
+      else if (/実装|対応|修正|強化/.test(text)) groups.ACTIONABLE_NOW.push(task);
+      else groups.PENDING.push(task);
+    }
+    return groups;
+  }
+
+  public resolveContinuation(utterance: string): ConversationTaskCard[] {
+    if (!/(続けて|他には|残り|全部実装|進めて)/.test(utterance)) return [];
+    const groups = this.classifyWorkState();
+    const seen = new Set<string>();
+    return [...groups.PARTIAL, ...groups.ACTIONABLE_NOW, ...groups.PENDING].filter((task) => {
+      const key = `${task.title}|${task.goal}`.normalize('NFKC').toLowerCase().replace(/[\s、。・:：;；_-]+/g, '');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   /**

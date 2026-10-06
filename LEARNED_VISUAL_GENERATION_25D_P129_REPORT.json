@@ -1,0 +1,45 @@
+{
+  "phase": "LEARNED_VISUAL_GENERATION_25D_P129",
+  "passed": true,
+  "checks": {
+    "memoryConsumed": true,
+    "palette": true,
+    "texture": true,
+    "depth": true,
+    "png": true,
+    "sha": true
+  },
+  "plan": {
+    "bodyScale": {
+      "shoulder": 0.24,
+      "waist": 0.18,
+      "hip": 0.2,
+      "torso": 0.31,
+      "leg": 0.48
+    },
+    "palette": [
+      "#183153",
+      "#d5b47a"
+    ],
+    "texture": {
+      "grain": 0.25,
+      "contrast": 0.7,
+      "detail": 0.8
+    },
+    "depthEnabled": false,
+    "memoryIds": [
+      "palette",
+      "texture"
+    ],
+    "confidence": 0.9,
+    "planSha256": "ddc4b063734d9b35ffecb687efee6109bf9d6e10d11bd91d96693262e6944e88"
+  },
+  "render": {
+    "width": 320,
+    "height": 180,
+    "cameraX": 12,
+    "cameraY": 4,
+    "renderSha256": "f276e20e79f083a4d4e41a9e3e8341ce20dccacfcf8b06ffd7ddd8f478a7a460",
+    "pngBytes": 4653
+  }
+}

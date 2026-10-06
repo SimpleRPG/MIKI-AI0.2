@@ -1,0 +1,1 @@
+{"verification":{"maxCodeBytes":20000000},"data":{"maxRecords":1000000,"defaultMemoryLimitBytes":268435456},"execution":{"maxNodes":100000},"memory":{"maxRecords":500000},"selfDevelopment":{"maxArtifacts":200000},"remainingDomains":{"maxItems":500000}}

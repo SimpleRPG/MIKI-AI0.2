@@ -1,0 +1,59 @@
+{
+  "phase": "HIGH_FIDELITY_VISUAL_P126",
+  "passed": true,
+  "checks": {
+    "valid": true,
+    "realism": true,
+    "reference": true,
+    "result": true,
+    "evidence": true
+  },
+  "captured": {
+    "prompt": "A realistic night street exploration scene with one fully dressed character in a long coat\nRendering profile: photorealistic, physically plausible materials, natural anatomy, cinematic but realistic lighting, high detail. Output 1536x1024. Preserve requested subject, clothing, pose, and scene constraints. Do not include text, signatures, logos, borders, or watermarks.",
+    "mode": "REALISTIC",
+    "width": 1536,
+    "height": 1024,
+    "quality": "MAX",
+    "references": [
+      {
+        "mimeType": "image/png",
+        "base64": "[OMITTED]",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "role": "STYLE"
+      }
+    ],
+    "projectId": "scene-realistic-001",
+    "requestSha256": "ced528c583a595b3247f83472e179de848c2747224a034cf53ad54079399cfb4"
+  },
+  "result": {
+    "provider": "GEMINI_IMAGE",
+    "model": "gemini-3.1-flash-image",
+    "mimeType": "image/png",
+    "base64": "[OMITTED]",
+    "bytes": 3,
+    "projectId": "scene-realistic-001",
+    "requestSha256": "ced528c583a595b3247f83472e179de848c2747224a034cf53ad54079399cfb4",
+    "externalGeneration": true,
+    "directProductionMutation": false,
+    "providerReceiptSha256": "68756e166fa3a44c34ef7be1471db9b0a9c2dfa5836489966b5f4cb9a2dd6b13"
+  },
+  "evidence": {
+    "evidenceKind": "HIGH_FIDELITY_VISUAL",
+    "projectId": "scene-realistic-001",
+    "requestSha256": "ced528c583a595b3247f83472e179de848c2747224a034cf53ad54079399cfb4",
+    "providerReceiptSha256": "68756e166fa3a44c34ef7be1471db9b0a9c2dfa5836489966b5f4cb9a2dd6b13",
+    "mimeType": "image/png",
+    "bytes": 3,
+    "uses": [
+      "VISUAL_REGRESSION_FIXTURE",
+      "CANVAS_CANDIDATE",
+      "PIXEL_ART_SOURCE"
+    ],
+    "directProductionMutation": false,
+    "evidenceSha256": "dd692809068c74567c3583f131c81c5bd14156cbd570b64ab1e77cebdea21f83"
+  },
+  "networkE2E": {
+    "attempted": false,
+    "reason": "API_KEY_NOT_AVAILABLE_IN_BUILD_SANDBOX"
+  }
+}

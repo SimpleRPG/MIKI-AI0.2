@@ -1,0 +1,16 @@
+{
+  "phase": "P213",
+  "status": "PASS",
+  "componentKinds": 14,
+  "gapKinds": 13,
+  "builtinPhraseComponents": 4,
+  "builtinGrammarComponents": 5,
+  "builtinIntentComponents": 4,
+  "builtinConstraintComponents": 3,
+  "learnedGraphReuse": true,
+  "positiveAndCounterexampleReuse": true,
+  "gapToUnknown": true,
+  "gapToResearch": true,
+  "runtimeIntegrated": true,
+  "capacityPolicy": "compact definitions and 512-char learned surface cap"
+}

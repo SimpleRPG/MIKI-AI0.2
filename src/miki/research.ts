@@ -41,3 +41,5 @@ export { internalWebQueryLearningCycleService } from './research/services/intern
 export type { ResearchEnvironmentKind, WebContentKind, RenderedPageInput, RenderedPageSections, InternalResearchEvidence, InternalResearchClaim, LearnedTerm, InternalKnowledgeComponent, InternalWebQueryCycleResult } from './research/services/internalWebQueryLearningCycleService';
 
 export * from "./research/services/webTermLearningService";
+export * from './research/services/visualReferenceResearchService';
+export * from './research/services/searxngMediaFetchService';

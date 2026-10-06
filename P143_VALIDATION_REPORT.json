@@ -1,0 +1,36 @@
+{
+  "phase": "CLOSED_SURFACE_PERSON_P143",
+  "passed": true,
+  "checks": {
+    "realPng": true,
+    "largeOutput": true,
+    "layers": true,
+    "depth": true,
+    "normal": true,
+    "material": true,
+    "receipt": true,
+    "modelLinked": true
+  },
+  "pngSha256": "643f784ad89eaa2e2782cfee8fd7dc442736a5d96bc39a56a42eaabe06032791",
+  "receiptSha256": "ab70748ce868005592549e4ba68fbb409568227e64f706eac3d150e8c0e94b83",
+  "buffers": {
+    "depthSha256": "82814c3c414a3b42e14882797436f37f2dc440325b28b630feeb8ba773c30916",
+    "normalSha256": "3628a52a320a38dd309e6cbe86545502ec8ca8c93d2677d1f364de5f03d94e44",
+    "materialSha256": "82814c3c414a3b42e14882797436f37f2dc440325b28b630feeb8ba773c30916"
+  },
+  "layers": [
+    "contact-shadow",
+    "rear-hair-mass",
+    "rear-limbs",
+    "legs-feet",
+    "torso-volume",
+    "garment-surface",
+    "front-limbs",
+    "neck-ears",
+    "face-volume",
+    "facial-features",
+    "front-hair-clusters",
+    "material-and-rim-light"
+  ],
+  "truth": "P143 is a stronger closed-surface rule-based illustration renderer. Real-photo likeness is not claimed without real-photo E2E."
+}

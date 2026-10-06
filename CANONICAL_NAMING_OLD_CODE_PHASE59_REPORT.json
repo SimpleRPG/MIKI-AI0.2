@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "phase": "CANONICAL_NAMING_AND_OLD_CODE_CLEANUP_59",
+  "typescriptFilesScanned": 619,
+  "canonicalFilesRenamed": 1,
+  "deprecatedWrappersRemoved": 1,
+  "oldFilesRemoved": 2,
+  "exactDuplicateGroups": 0,
+  "failures": []
+}

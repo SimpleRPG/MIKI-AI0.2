@@ -1,0 +1,24 @@
+{
+  "phase": "ORPHAN_UI_CLEANUP_P107",
+  "passed": true,
+  "checks": {
+    "removedFilesAbsent": true,
+    "removedNamesUnreferenced": true,
+    "canonicalGatewayPresent": true,
+    "reviewPanelPresent": true,
+    "selfImprovementSurfacePresent": true
+  },
+  "removed": [
+    "src/components/ExternalTeacherTab.tsx",
+    "src/components/PluginConsentDialog.tsx",
+    "src/components/ProgressiveList.tsx",
+    "src/components/VRAMMonitor.tsx",
+    "src/components/common/DestructiveActionConfirmDialog.tsx",
+    "src/components/self_improvement/SuperchargerToolsSubView.tsx",
+    "src/components/self_improvement/UltraSelfEvolverSubView.tsx",
+    "src/components/self_improvement/non_llm_views/AutonomousHardeningSubView.tsx",
+    "src/components/self_improvement/non_llm_views/CloudGatewaySubView.tsx",
+    "src/components/self_improvement/non_llm_views/HardwarePipelineSubView.tsx",
+    "src/components/self_improvement/samples/autonomousTaskSchedulerSample.ts"
+  ]
+}

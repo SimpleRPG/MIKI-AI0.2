@@ -1,0 +1,54 @@
+{
+  "phase": "MULTI_PHOTO_PERSON_LEARNING_P139",
+  "passed": true,
+  "checks": {
+    "threePhotosIndividuallyHashed": true,
+    "eachPhotoRetained": true,
+    "weightedFusionApplied": true,
+    "profileRevisionCreated": true,
+    "persistentRoundTrip": true,
+    "tamperRejected": true,
+    "profileFieldsReachPixels": true,
+    "sourceLineageInReceipt": true,
+    "differentLearningChangesPng": true,
+    "realPng": true
+  },
+  "profileSha256": "2ece7e3a76855b0a2e26bb5f88892df539bcc3dd786b1b651e438a063a62618a",
+  "evidenceCoverage": 0.7122603781298518,
+  "unresolvedFeatures": [],
+  "artifact": {
+    "pngSha256": "82f054350a2693d0ef978219d3b43fe78e7b3639430083f2251b8e8569bba65c",
+    "bytes": 24007,
+    "renderReceiptSha256": "be1ff04c3f418a6465dff723a7ac25b53d3e5a65b0bc79ec1b955bfdc8b61473",
+    "appliedFields": [
+      "face.widthRatio",
+      "face.heightRatio",
+      "face.jawTaper",
+      "face.eyeSpacing",
+      "face.eyeSize",
+      "face.noseLength",
+      "face.mouthWidth",
+      "hair.volume",
+      "hair.length",
+      "hair.parting",
+      "hair.wave",
+      "hair.baseColor",
+      "hair.highlightColor",
+      "body.headToBody",
+      "body.shoulderRatio",
+      "body.torsoRatio",
+      "body.armRatio",
+      "body.legRatio",
+      "appearance.surfaceColor",
+      "appearance.garmentColor",
+      "appearance.pantsColor",
+      "appearance.shoeColor"
+    ],
+    "sourceSha256List": [
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "2222222222222222222222222222222222222222222222222222222222222222",
+      "3333333333333333333333333333333333333333333333333333333333333333"
+    ]
+  },
+  "fixtureDisclosure": "Synthetic observations are used because no user photographs were supplied. This verifies multi-photo fusion and rendering lineage, not resemblance to a real person."
+}

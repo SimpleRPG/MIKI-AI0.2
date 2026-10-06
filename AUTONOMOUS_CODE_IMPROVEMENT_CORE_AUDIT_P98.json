@@ -1,0 +1,74 @@
+{
+  "phase": "AUTONOMOUS_CODE_IMPROVEMENT_CORE_AUDIT_P98",
+  "conclusion": "CORE_CONNECTED_WITH_BYPASSES_AND_AUTHORITY_DRIFT",
+  "corePathConfirmed": true,
+  "confirmedCanonicalPath": [
+    "typedImprovementUiGatewayService",
+    "selfImprovementIngressService / improvementIntakeRouterService",
+    "autonomousSelfImprovementLoopService",
+    "coreTaskIngressService",
+    "coreOrchestratorService",
+    "taskBlackboardService",
+    "selfDevelopment domain",
+    "validation/evidence",
+    "review ZIP",
+    "human adoption boundary"
+  ],
+  "findings": [
+    {
+      "severity": "HIGH",
+      "id": "UI_DIRECT_DOMAIN_BYPASS",
+      "detail": "Self-improvement UI components directly import and invoke selfDevelopment/improvement services instead of exclusively using the typed CORE UI gateway.",
+      "examples": [
+        "src/components/self_improvement/DevelopmentReviewLifecyclePanel.tsx -> developmentReviewLifecycleService",
+        "src/components/self_improvement/UltraSelfEvolverSubView.tsx -> developmentReviewLifecycleService/aiderEngineService/codeSearchService",
+        "src/components/self_improvement/SuperchargerToolsSubView.tsx -> aiderEngineService/mikiSelfCodingSuperchargerService",
+        "src/components/self_improvement/non_llm_views/CloudGatewaySubView.tsx -> improvementProposalService"
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "id": "MULTIPLE_ENTRY_AUTHORITIES",
+      "detail": "typedImprovementUiGatewayService coexists with direct service calls and multiple lifecycle entry services, so CORE is not the exclusive authority for every self-improvement UI action."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": "DIRECT_REVIEW_LIFECYCLE_START",
+      "detail": "UI can call developmentReviewLifecycleService.start/create directly, which can create review lifecycle state without a clearly demonstrated preceding CORE task/re-evaluation boundary."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": "TOOL_ACTIONS_OUTSIDE_CORE_TASK_IDENTITY",
+      "detail": "Council review, generated tests, dead-code scan, prompt-to-patch, snapshot rollback and code search are exposed as direct tool actions. Some may be read-only or bounded, but their receipts are not uniformly proven to share one CORE-owned task/run identity."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": "ORPHAN_PROMOTION_UI",
+      "detail": "PromotionGateSubView.tsx is marked ORPHAN in the complete inventory, so the visible promotion gate may not be part of the active UI path."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": "SELF_DEVELOPMENT_ORPHANS",
+      "detail": "The P97 inventory reports 22 ORPHAN and 9 AVAILABLE_EXPORT_ONLY files in selfDevelopment, indicating implemented capability that is not proven to participate in the canonical production loop."
+    },
+    {
+      "severity": "LOW",
+      "id": "CORE_LOOP_IS_REAL",
+      "detail": "autonomousSelfImprovementLoopService is initialized by domainIntegrationBootstrapService, persists state, creates CORE tasks, uses taskBlackboardService, and submits/resumes through coreTaskIngressService. This is not merely a facade."
+    },
+    {
+      "severity": "LOW",
+      "id": "HUMAN_ADOPTION_BOUNDARY_PRESENT",
+      "detail": "Design and verification scripts preserve REVIEW_ZIP and HUMAN_ONLY formal adoption boundaries."
+    }
+  ],
+  "requiredRepairs": [
+    "Make typedImprovementUiGatewayService the exclusive write/action gateway for self-improvement UI.",
+    "Add gateway methods for review lifecycle, code search, council review, generated tests, dead-code scan, prompt-to-patch and rollback, each requiring CORE task/run identity and receipt.",
+    "Convert direct UI imports to gateway calls; retain direct domain imports only inside CORE/domain integration layers.",
+    "Require developmentReviewLifecycleService.start to validate a CORE-owned taskId/runId and candidate lineage.",
+    "Unify all candidate/review/promotion actions under the same taskBlackboard and improvementIntakeRouter identity.",
+    "Connect or formally retire PromotionGateSubView and audit all 31 non-USED selfDevelopment files.",
+    "Add a static gate that fails build when self_improvement UI imports miki selfDevelopment/improvement service implementations directly."
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "phase": "CANDIDATE_ADOPTION_READINESS_P100",
+  "passed": true,
+  "before": {
+    "readinessId": "ADOPTREADY-13f0c96228149c83efe461e0",
+    "readyForHumanDecision": true,
+    "readyForFormalAdoption": false,
+    "reasons": [
+      "HUMAN_APPROVAL_REQUIRED"
+    ],
+    "hashBindings": {
+      "candidate": true,
+      "reviewPackage": true,
+      "identity": true
+    }
+  },
+  "after": {
+    "readinessId": "ADOPTREADY-08c264820131d5d03e11079e",
+    "readyForHumanDecision": true,
+    "readyForFormalAdoption": true,
+    "reasons": [],
+    "hashBindings": {
+      "candidate": true,
+      "reviewPackage": true,
+      "identity": true
+    }
+  },
+  "mismatch": {
+    "readinessId": "ADOPTREADY-060805c3c7b48f353c191b38",
+    "readyForHumanDecision": false,
+    "readyForFormalAdoption": false,
+    "reasons": [
+      "REVIEW_CANDIDATE_HASH_MISMATCH"
+    ],
+    "hashBindings": {
+      "candidate": false,
+      "reviewPackage": true,
+      "identity": true
+    }
+  }
+}

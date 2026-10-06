@@ -1,0 +1,57 @@
+{
+  "phase": "TEN_SYNTHETIC_PERSON_GRAPH_LEARNING_P190",
+  "passed": true,
+  "checks": {
+    "tenSubjects": true,
+    "tenSources": true,
+    "allSynthetic": true,
+    "observationNodes": true,
+    "prior": true,
+    "generalizationEdges": true,
+    "creativeProfile": true,
+    "noPixels": true,
+    "provenance": true,
+    "graphSha": true
+  },
+  "training": {
+    "count": 10,
+    "synthetic": true,
+    "distinctSubjectScopes": 10,
+    "distinctSourceSha256": 10
+  },
+  "graph": {
+    "nodes": 12,
+    "edges": 11,
+    "graphSha256": "381504c78eca1dc4fc2733590701939dff9db73afc10826600e15e401e891808"
+  },
+  "characterProfile": {
+    "nodeId": "P190N-9f1a1bffd14a6040b1ad80cd",
+    "kind": "FICTIONAL_CHARACTER_PROFILE",
+    "subjectId": "FICTIONAL-SEATED-001",
+    "payload": {
+      "characterId": "FICTIONAL-SEATED-001",
+      "origin": "CREATIVE_SYNTHESIS",
+      "seatedStructure": {
+        "foregroundRatio": 0.373046,
+        "seatBandOccupancy": 0.50277,
+        "floorContactOccupancy": 0.467027,
+        "leftRightBalance": -0.017319
+      },
+      "novelty": {
+        "usesNoSourcePixels": true,
+        "noSingleObservationDominates": true,
+        "structureOnly": true
+      }
+    },
+    "sourceRefs": [
+      "96b46ff176478964e1b9fff3d603d0cbdef3986301089ca072a70eb156dcae91"
+    ],
+    "confidence": 0.78,
+    "uncertainty": 0.22,
+    "nodeSha256": "9f1a1bffd14a6040b1ad80cd9038ca07f739768ffed2a59185abe1b748b97180"
+  },
+  "qualityDecision": {
+    "status": "NOT_YET_ACCEPTED_AS_MIKI_GENERATED_IMAGE",
+    "reason": "Training and graph synthesis pass, but MIKI still lacks a learned image generator capable of producing a new photorealistic person without copying or warping source pixels."
+  }
+}

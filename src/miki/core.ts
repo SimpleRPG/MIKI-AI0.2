@@ -62,3 +62,40 @@ export * from './core/services/canonicalSha256Service';
 export * from './core/services/externalReviewIntakeService';
 
 export * from './core/services/universalSynthesisService';
+
+export * from './core/services/canonicalServiceAliasRegistryService';
+
+export * from './core/services/residualCapabilityIntegrationService';
+
+export * from './core/services/complexCapabilityContractService';
+
+export * from './core/services/finalResidualServiceIntegrationService';
+export * from './core/services/candidateAutoRebaseService';
+export * from './core/services/reviewerReliabilityService';
+export * from './core/services/multiReviewerConsensusService';
+
+export * from './core/services/canvasSceneCandidateGeneratorService';
+export * from './core/services/autonomousImprovementTrajectoryService';
+export * from './core/services/candidateEditCollisionService';
+export * from './core/services/failureTraceMinimizationService';
+export * from './core/services/freshFailureReproductionService';
+export * from './core/services/visualStyleLearningService';
+export * from './core/services/pixelArtCandidateService';
+export * from './core/services/visualAssetPipelineService';
+export * from './core/services/bodyTypeTrendService';
+export * from './core/services/repositoryBackedVisualLearningService';
+export * from './core/services/visualAssetLibraryService';
+export * from './core/services/adaptiveVisualLearningService';
+export * from './core/services/visualProjectLearningCompositionService';
+export * from './core/services/visualConversationProjectGatewayService';
+export * from './core/services/visualOutputTruthAndSizeGateService';
+export * from './core/services/richVisualProductionRendererService';
+export * from './core/services/analyzedImageSuperResolutionService';
+export * from './core/services/visualLearningBody25dService';
+export * from './core/services/learnedVisualGeneration25dService';
+export * from './core/services/persistentVisualMemoryStoreService';
+export * from './core/services/faceBodyVisualMemoryService';
+export * from './core/services/comprehensiveVisualProfileService';
+export * from './core/services/visualArchetypePixelFidelityService';
+export * from './core/services/garmentEvidenceLearningService';
+export * from './core/services/garmentBoundaryRenderingPolicyService';

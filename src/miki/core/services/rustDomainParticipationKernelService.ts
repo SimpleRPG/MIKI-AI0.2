@@ -1,0 +1,6 @@
+import{registerPlugin}from'@capacitor/core';
+import type{PlannedRoute}from'./adaptiveRoutePlannerService';
+interface DomainRoutePlugin{rankDomainRoutes(input:{routes:Array<{target:string;command:string;reason:string;priority:number;dedupe_key:string}>}):Promise<{selected_indexes:number[];participating_domains:string[];skipped_duplicate_indexes:number[];engine:'RUST';api_version:number}>;}
+const NativeDomainRouter=registerPlugin<DomainRoutePlugin>('MIKINativeRunner');
+class RustDomainParticipationKernelService{async rank(routes:PlannedRoute[]):Promise<{routes:PlannedRoute[];participatingDomains:string[];skippedDuplicateIndexes:number[]}>{if(!routes.length)return{routes:[],participatingDomains:[],skippedDuplicateIndexes:[]};const result=await NativeDomainRouter.rankDomainRoutes({routes:routes.map(route=>({target:route.target,command:route.command,reason:route.reason,priority:Number(route.payload.priority)||0,dedupe_key:String(route.payload.dedupeKey||`${route.target}:${route.command}`)}))});if(result.engine!=='RUST')throw new Error('RUST_DOMAIN_ROUTER_REQUIRED');return{routes:result.selected_indexes.map(index=>routes[index]).filter(Boolean),participatingDomains:result.participating_domains,skippedDuplicateIndexes:result.skipped_duplicate_indexes};}}
+export const rustDomainParticipationKernelService=new RustDomainParticipationKernelService();

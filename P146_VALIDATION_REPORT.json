@@ -1,0 +1,107 @@
+{
+  "phase": "REAL_PHOTO_FACE_FEATURES_P146",
+  "passed": true,
+  "checks": {
+    "evidenceSha": true,
+    "eyesSeparated": true,
+    "ratiosBounded": true,
+    "palette": true,
+    "observedOnly": true,
+    "profileSha": true
+  },
+  "evidence": {
+    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3",
+    "faceBox": {
+      "x": 158.1,
+      "y": 10.200000000000001,
+      "width": 193.8,
+      "height": 112.2,
+      "confidence": 1
+    },
+    "landmarks": {
+      "leftEye": {
+        "x": 0.384765625,
+        "y": 0.08203125,
+        "confidence": 0.9
+      },
+      "rightEye": {
+        "x": 0.533203125,
+        "y": 0.1171875,
+        "confidence": 0.9
+      },
+      "noseTip": {
+        "x": 0.498046875,
+        "y": 0.16017187500000002,
+        "confidence": 0.52
+      },
+      "mouthLeft": {
+        "x": 0.42991406249999997,
+        "y": 0.19304296875000002,
+        "confidence": 0.48
+      },
+      "mouthRight": {
+        "x": 0.5661796875,
+        "y": 0.19304296875000002,
+        "confidence": 0.48
+      },
+      "chin": {
+        "x": 0.498046875,
+        "y": 0.2346796875,
+        "confidence": 0.58
+      },
+      "hairline": {
+        "x": 0.498046875,
+        "y": 0.037453125000000004,
+        "confidence": 0.56
+      }
+    },
+    "ratios": {
+      "eyeSpacing": 0.39215686274509803,
+      "eyeSize": 0.09,
+      "noseLength": 0.2763636363636364,
+      "mouthWidth": 0.36000000000000015,
+      "jawTaper": 0.42
+    },
+    "palette": {
+      "hair": "#bbafa3",
+      "surface": "#8c7658",
+      "garment": "#a9998f"
+    },
+    "confidence": 0.6314285714285715,
+    "evidenceSha256": "bc9c8a4e20736d1a6a19ddc8de8e61cfdf6087ca13c099867bb1fab973bfc5e2"
+  },
+  "observedOnlyProfile": {
+    "baseProfileSha256": "5fa2430064995b32863b298f37b180182efa5f28618239bbeb4d2da683e8e13e",
+    "sourceSha256": "f8e7c7686bcd49e209c2ac12319c437b779f1de37f481406dd0aa327e65752b3",
+    "scope": "UPPER_BODY",
+    "faceRatios": {
+      "eyeSpacing": 0.39215686274509803,
+      "eyeSize": 0.09,
+      "noseLength": 0.2763636363636364,
+      "mouthWidth": 0.36000000000000015,
+      "jawTaper": 0.42
+    },
+    "palette": {
+      "hair": "#bbafa3",
+      "surface": "#8c7658",
+      "garment": "#a9998f"
+    },
+    "observedRegions": [
+      "head",
+      "face",
+      "hair",
+      "torso",
+      "garment",
+      "upper-arms"
+    ],
+    "suppressedRegions": [
+      "lower-arms",
+      "hands",
+      "legs",
+      "feet"
+    ],
+    "evidenceSha256": "bc9c8a4e20736d1a6a19ddc8de8e61cfdf6087ca13c099867bb1fab973bfc5e2",
+    "profileSha256": "63804c2bd8c659f1c1cca6709173adacca61bc6c2c337ecbe122e11e10c2ab0c"
+  },
+  "truthBoundary": "Rule-based local evidence extraction from one real photograph. This is not identity recognition and does not prove general landmark accuracy."
+}

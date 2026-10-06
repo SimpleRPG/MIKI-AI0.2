@@ -23,7 +23,7 @@ import { syntheticDataService } from '../../research/services/syntheticDataServi
 import { longTermMemoryService } from '../../memory/services/longTermMemoryService';
 import { experienceLinkService } from '../../experience/services/experienceLinkService';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
-import { virtualTrainingService } from '../../learning/services/virtualTrainingService';
+import { capabilityEvaluationService } from '../../learning/services/capabilityEvaluationService';
 import { capabilityPluginService } from '../../capability/services/capabilityPluginService';
 import { featureFlagsService } from '../../safety/services/featureFlagsService';
 import { teacherRequestService } from '../../learning/services/teacherRequestService';
@@ -805,13 +805,13 @@ export class BackgroundWorkerService {
         // Step 6.6: 設計思想 16章 仮想学習試験 & LoRA検討の発動条件判定
         if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
         try {
-          const loraAssessment = virtualTrainingService.evaluateLoraTriggerCondition();
+          const loraAssessment = capabilityEvaluationService.evaluateSufficiencyCondition();
           if (loraAssessment.triggered) {
             weaknessFound.push(
               `[16章 LoRA発動条件検知] 言い換え再発または能力停滞を検出 ➔ 仮想学習シミュレーションを実行`
             );
             // 仮想学習試験の実行 (LoRA不要判定を優先検証)
-            const trial = await virtualTrainingService.runVirtualTrainingTrial('cap_correction');
+            const trial = await capabilityEvaluationService.runCapabilityEvaluationTrial('cap_correction');
             weaknessFound.push(`[仮想学習判定: ${trial.verdict}] ${trial.verdictDetails}`);
           } else {
             systemLogger.info(

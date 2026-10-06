@@ -1,0 +1,156 @@
+{
+  "phase": "CONVERSATION_RESEARCH_COMPONENT_GRAPH_P207",
+  "passed": true,
+  "checks": {
+    "graph": true,
+    "nodes": true,
+    "components": true,
+    "positive": true,
+    "counter": true,
+    "failure": true,
+    "repair": true,
+    "reuse": true,
+    "research": true,
+    "candidates": true,
+    "conditionalPlan": true,
+    "edges": true,
+    "mutations": true,
+    "failClosed": true,
+    "noExternal": true
+  },
+  "summary": {
+    "nodeCount": 18,
+    "edgeCount": 20,
+    "positiveCount": 1,
+    "counterExampleCount": 2,
+    "researchTaskCount": 2,
+    "candidateComponentCount": 2,
+    "graphSha256": "33e9e0819d470e68425863c3e1f5605d50caa0028dc0617b4ad3661b56a40f77",
+    "receiptSha256": "7fd9271fdfa2cf8c10e13256ab2b506a4df773ce0350bc4b03c2067b131d169f"
+  },
+  "plan": {
+    "planId": "plan:p207:intent:7d4de9514df270a419",
+    "intentId": "p207:intent:7d4de9514df270a419",
+    "capabilityIds": [
+      "p207:capability:50877d1e6f6637a0fc"
+    ],
+    "componentIds": [
+      "conversation.analysis.intl_segmenter",
+      "conversation.analysis.dictionary_ngram",
+      "conversation.analysis.composed"
+    ],
+    "decision": "COMPOSE",
+    "reason": "反例を保持し、既存部品を条件付き合成する",
+    "planSha256": "f59f7d8cc3d6fb2d96230251605d5b6a1182fb27c362fc1b0a03083ca3c3c3b6"
+  },
+  "researchTasks": [
+    "反例 PROPER_NOUN_ONLY の原因・再現条件・代替部品を調査",
+    "反例 ELLIPSIS_CONTEXT の原因・再現条件・代替部品を調査"
+  ],
+  "candidateComponents": [
+    "conversation.guard.proper_noun_only",
+    "conversation.guard.ellipsis_context"
+  ],
+  "mutations": [
+    {
+      "semanticKind": "OBSERVATION",
+      "ownerDomain": "conversation",
+      "participantDomains": [
+        "learning",
+        "memory",
+        "research"
+      ],
+      "subjectId": "p207:turn:f6f17ac45f7e388acb",
+      "payload": {
+        "turnSha256": "7125eb33e8b82ace82f48418f351fe705b27d718b81ff4a25571360df9926c83",
+        "intent": "RESEARCH_AND_ANSWER"
+      }
+    },
+    {
+      "semanticKind": "KNOWLEDGE",
+      "ownerDomain": "learning",
+      "participantDomains": [
+        "conversation",
+        "memory",
+        "research",
+        "verification"
+      ],
+      "subjectId": "plan:p207:intent:7d4de9514df270a419",
+      "payload": {
+        "plan": {
+          "planId": "plan:p207:intent:7d4de9514df270a419",
+          "intentId": "p207:intent:7d4de9514df270a419",
+          "capabilityIds": [
+            "p207:capability:50877d1e6f6637a0fc"
+          ],
+          "componentIds": [
+            "conversation.analysis.intl_segmenter",
+            "conversation.analysis.dictionary_ngram",
+            "conversation.analysis.composed"
+          ],
+          "decision": "COMPOSE",
+          "reason": "反例を保持し、既存部品を条件付き合成する",
+          "planSha256": "f59f7d8cc3d6fb2d96230251605d5b6a1182fb27c362fc1b0a03083ca3c3c3b6"
+        },
+        "positiveCases": [
+          "GENERAL_JA"
+        ],
+        "counterExamples": [
+          "PROPER_NOUN_ONLY",
+          "ELLIPSIS_CONTEXT"
+        ]
+      }
+    },
+    {
+      "semanticKind": "RESEARCH",
+      "ownerDomain": "research",
+      "participantDomains": [
+        "conversation",
+        "learning",
+        "memory"
+      ],
+      "subjectId": "plan:p207:intent:7d4de9514df270a419",
+      "payload": {
+        "tasks": [
+          "反例 PROPER_NOUN_ONLY の原因・再現条件・代替部品を調査",
+          "反例 ELLIPSIS_CONTEXT の原因・再現条件・代替部品を調査"
+        ],
+        "status": "OPEN"
+      }
+    },
+    {
+      "semanticKind": "CAPABILITY",
+      "ownerDomain": "capability",
+      "participantDomains": [
+        "conversation",
+        "learning",
+        "verification",
+        "improvement"
+      ],
+      "subjectId": "plan:p207:intent:7d4de9514df270a419",
+      "payload": {
+        "candidateComponents": [
+          "conversation.guard.proper_noun_only",
+          "conversation.guard.ellipsis_context"
+        ],
+        "decision": "COMPOSE"
+      }
+    },
+    {
+      "semanticKind": "VALIDATION",
+      "ownerDomain": "verification",
+      "participantDomains": [
+        "conversation",
+        "learning",
+        "memory",
+        "improvement"
+      ],
+      "subjectId": "plan:p207:intent:7d4de9514df270a419",
+      "payload": {
+        "passed": false,
+        "conditional": true,
+        "failClosed": true
+      }
+    }
+  ]
+}

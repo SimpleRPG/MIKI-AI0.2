@@ -424,7 +424,7 @@ export class ExperienceRouterService {
    * LoRA教材 (lora_dataset) の記憶をモデル学習教材へ連携する
    */
   public exportToLoraDataset(item: MemoryItem): void {
-    selfImprovementService.addTrainingSample({
+    selfImprovementService.registerCapabilityCandidate({
       instruction: `ユーザーからの質問・文脈: ${item.sourceRef || item.category}`,
       outputTarget: item.content,
       category: item.category === 'vba' ? 'vba' : 'code',

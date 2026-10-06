@@ -1,0 +1,133 @@
+{
+  "nodeKinds": [
+    "CODE:CODE_COMPONENT",
+    "CONVERSATION:CONVERSATION_TURN",
+    "CONVERSATION:TURN",
+    "EXPERIENCE:CORRECTION",
+    "EXPERIENCE:USER_CORRECTION_EXPERIENCE",
+    "MEMORY:LEARNED_FACT",
+    "MEMORY:LEARNED_VISUAL_KNOWLEDGE",
+    "PERSON:PERSON_PROFILE",
+    "PERSON:VISUAL_COMPLETION_PROFILE",
+    "REQUIREMENT:REQUIREMENT_DIRECTIVE",
+    "VALIDATION:E2E_RESULT",
+    "VALIDATION:VALIDATION_RESULT",
+    "VISUAL:COMPLETION_PROFILE",
+    "VISUAL:POSE_EVIDENCE",
+    "VISUAL:REAL_PHOTO_OBSERVATION"
+  ],
+  "edgeRules": [
+    {
+      "type": "CREATES_EXPERIENCE",
+      "fromDomains": [
+        "CONVERSATION"
+      ],
+      "toDomains": [
+        "EXPERIENCE"
+      ],
+      "transitive": false,
+      "maxDepth": 3,
+      "allowCycles": false
+    },
+    {
+      "type": "DESCRIBES",
+      "fromDomains": [
+        "VISUAL"
+      ],
+      "toDomains": [
+        "PERSON"
+      ],
+      "transitive": false,
+      "maxDepth": 3,
+      "allowCycles": false
+    },
+    {
+      "type": "IMPLEMENTED_BY",
+      "fromDomains": [
+        "REQUIREMENT"
+      ],
+      "toDomains": [
+        "CODE"
+      ],
+      "transitive": false,
+      "maxDepth": 3,
+      "allowCycles": false
+    },
+    {
+      "type": "PRODUCES",
+      "fromDomains": [
+        "VISUAL"
+      ],
+      "toDomains": [
+        "VISUAL"
+      ],
+      "transitive": false,
+      "maxDepth": 3,
+      "allowCycles": false
+    },
+    {
+      "type": "RELATED_OBSERVATION",
+      "fromDomains": [
+        "PERSON"
+      ],
+      "toDomains": [
+        "VISUAL"
+      ],
+      "transitive": false,
+      "maxDepth": 3,
+      "allowCycles": false
+    },
+    {
+      "type": "SUPPORTS_COMPLETION",
+      "fromDomains": [
+        "MEMORY",
+        "VISUAL"
+      ],
+      "toDomains": [
+        "PERSON",
+        "VISUAL"
+      ],
+      "transitive": true,
+      "maxDepth": 6,
+      "allowCycles": false
+    },
+    {
+      "type": "UPDATES",
+      "fromDomains": [
+        "EXPERIENCE"
+      ],
+      "toDomains": [
+        "MEMORY"
+      ],
+      "transitive": true,
+      "maxDepth": 3,
+      "allowCycles": false
+    },
+    {
+      "type": "VALIDATED_BY",
+      "fromDomains": [
+        "CODE",
+        "PERSON"
+      ],
+      "toDomains": [
+        "VALIDATION"
+      ],
+      "transitive": false,
+      "maxDepth": 3,
+      "allowCycles": false
+    },
+    {
+      "type": "VALIDATES",
+      "fromDomains": [
+        "VALIDATION"
+      ],
+      "toDomains": [
+        "VISUAL"
+      ],
+      "transitive": false,
+      "maxDepth": 3,
+      "allowCycles": false
+    }
+  ],
+  "ontologySha256": "ca94fd2d92a4053a276f6b435d7b2a1cf4ceb22b50fd1d6fe503e83073257dc2"
+}

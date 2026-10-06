@@ -4,12 +4,11 @@
  * 18分類における「memory」機能の統合入口。
  * 既存の専門サービスを段階的に接続する。
  *
- * 現段階では受け皿のみを定義し、
- * 既存機能の移動・削除は行わない。
+ * 正規入口と主要パイプラインを公開し、既存専門サービスを互換維持する。
  */
 
 export function memory() {
-  // TODO: memory 関連の既存機能を段階的に統合
+  return { category: 'memory' as const, canonicalEntry: 'claimDatabaseService', pipeline: ['evidenceService','claimDatabaseService','memoryPromotionService','memoryAuditService'] as const };
 }
 
 // === MIKI CATEGORY SERVICE EXPORTS ===
@@ -36,3 +35,6 @@ export * from './memory/services/wordAssociationGraphService';
 export * from './memory/services/memoryEligibilityPolicyService';
 export * from './memory/services/memoryRecordRepositoryService';
 export * from './memory/services/strictMemoryPromotionGateService';
+
+export * from './memory/services/scopedVersionedMemoryService';
+export * from './memory/services/memoryContextBridgeService';

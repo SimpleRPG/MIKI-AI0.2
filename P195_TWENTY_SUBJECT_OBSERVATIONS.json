@@ -1,0 +1,1457 @@
+{
+  "count": 20,
+  "observedCount": 10,
+  "ruleSpaceSyntheticCount": 10,
+  "subjects": [
+    {
+      "subjectId": "fictional-seat-01",
+      "sourceSha256": "d2dc16a8551a60338c90b8075773c475e6a0c621c62d0939a793f2bc80ffb3ca",
+      "face": {
+        "widthRatio": 0.4388646288209607,
+        "heightRatio": 0.23904382470119523,
+        "surfaceCurvature": 0.08357053447960243,
+        "edgeDensity": 0.09821724709784412,
+        "leftRightAsymmetry": 0.17377499514657363,
+        "eyeSpacingRatio": 0.34497512437810945,
+        "eyeApertureRatio": 0.056114273793061366,
+        "noseLengthRatio": 0.2296923331178677,
+        "noseWidthRatio": 0.16879912203687447,
+        "mouthWidthRatio": 0.3239469320066335,
+        "jawTaper": 0.8691588785046729,
+        "earOffsetRatio": 0.456066249271986
+      },
+      "body": {
+        "headToBody": 0.137265625,
+        "shoulderRatio": 0.208984375,
+        "torsoRatio": 0.529296875,
+        "hipRatio": 0.693359375,
+        "kneeRatio": 0.779296875,
+        "ankleRatio": 0.890625,
+        "armLengthRatio": 0.38265625,
+        "legLengthRatio": 0.424375
+      },
+      "skin": {
+        "meanRgb": [
+          0.5751292556823725,
+          0.5321102006308327,
+          0.5223443241309791
+        ],
+        "stdRgb": [
+          0.23924901159823345,
+          0.24819131216560922,
+          0.2523845955155529
+        ],
+        "spatialLowFrequency": 0.18041186374471668,
+        "microContrast": 0.4501355049064606
+      },
+      "hair": {
+        "flowAngle": 0.011211710050702095,
+        "density": 0.571856164932251,
+        "lengthRatio": 0.3108203125,
+        "strandVariance": 0.8296594619750977
+      },
+      "garment": {
+        "wrinkleAngle": -0.3311360776424408,
+        "wrinkleDensity": 0.7806747436523438,
+        "roughnessProxy": 0.5733983986368676
+      },
+      "lighting": {
+        "gradientX": 0.2858470005824114,
+        "gradientY": -0.010330303113634032,
+        "ambient": 0.40683075139663394,
+        "shadowContrast": 0.24453553166688846
+      },
+      "hands": {
+        "palmWidthRatio": 0.110625,
+        "fingerLengthRatio": 0.44724609374999996,
+        "fingerSpread": 0.11475499902931473
+      },
+      "view": {
+        "yawProxy": 0.34754999029314726,
+        "pitchProxy": -0.010330303113634032,
+        "selfOcclusion": 0.5975399711198872
+      }
+    },
+    {
+      "subjectId": "fictional-seat-02",
+      "sourceSha256": "2df136a7ddf6cb8066191843784e6b1bd082ea9f8a3583615ef810b02c288587",
+      "face": {
+        "widthRatio": 0.4375,
+        "heightRatio": 0.23828920570264767,
+        "surfaceCurvature": 0.02920943833090516,
+        "edgeDensity": 0.040293040293040296,
+        "leftRightAsymmetry": 0.02245540951423297,
+        "eyeSpacingRatio": 0.316,
+        "eyeApertureRatio": 0.055389459177745404,
+        "noseLengthRatio": 0.19077647286257876,
+        "noseWidthRatio": 0.15430745697078616,
+        "mouthWidthRatio": 0.3129877551020408,
+        "jawTaper": 1.3116883116883118,
+        "earOffsetRatio": 0.43336831142713494
+      },
+      "body": {
+        "headToBody": 0.13425781250000002,
+        "shoulderRatio": 0.150390625,
+        "torsoRatio": 0.16796875,
+        "hipRatio": 0.4140625,
+        "kneeRatio": 0.24609375,
+        "ankleRatio": 0.150390625,
+        "armLengthRatio": 0.34955078125,
+        "legLengthRatio": 0.453984375
+      },
+      "skin": {
+        "meanRgb": [
+          0.2529823553352965,
+          0.24139960257607318,
+          0.24790466613996026
+        ],
+        "stdRgb": [
+          0.09261915492159381,
+          0.0736871664858251,
+          0.06782347472007723
+        ],
+        "spatialLowFrequency": 0.04382728168701812,
+        "microContrast": 0.436765403192827
+      },
+      "hair": {
+        "flowAngle": 0.20091544091701508,
+        "density": 0.6520426750183106,
+        "lengthRatio": 0.3186328125,
+        "strandVariance": 0.7246644496917725
+      },
+      "garment": {
+        "wrinkleAngle": 1.0756556987762451,
+        "wrinkleDensity": 1,
+        "roughnessProxy": 0.8487737761443905
+      },
+      "lighting": {
+        "gradientX": -0.057301053031327105,
+        "gradientY": -0.02838838165307042,
+        "ambient": 0.288125063754346,
+        "shadowContrast": 0.07775399895857067
+      },
+      "hands": {
+        "palmWidthRatio": 0.081015625,
+        "fingerLengthRatio": 0.44958984375,
+        "fingerSpread": 0.0844910819028466
+      },
+      "view": {
+        "yawProxy": -0.04491081902846594,
+        "pitchProxy": -0.02838838165307042,
+        "selfOcclusion": 0.7066700610997964
+      }
+    },
+    {
+      "subjectId": "fictional-seat-03",
+      "sourceSha256": "b07b18ca356d1836ab07d02daad80b518e36b5a5f88ea8a52f9713a6d55df8fd",
+      "face": {
+        "widthRatio": 0.439453125,
+        "heightRatio": 0.23865877712031558,
+        "surfaceCurvature": 0.06917642678504249,
+        "edgeDensity": 0.08624426078971534,
+        "leftRightAsymmetry": 0.012737789476940486,
+        "eyeSpacingRatio": 0.34657777777777776,
+        "eyeApertureRatio": 0.0559223523571339,
+        "noseLengthRatio": 0.22558925466706178,
+        "noseWidthRatio": 0.16541930967428295,
+        "mouthWidthRatio": 0.3207703703703704,
+        "jawTaper": 0.5968992248062015,
+        "earOffsetRatio": 0.4319106684215411
+      },
+      "body": {
+        "headToBody": 0.1386328125,
+        "shoulderRatio": 0.251953125,
+        "torsoRatio": 0.462890625,
+        "hipRatio": 0.67578125,
+        "kneeRatio": 0.583984375,
+        "ankleRatio": 0.5078125,
+        "armLengthRatio": 0.37357421874999996,
+        "legLengthRatio": 0.4396875
+      },
+      "skin": {
+        "meanRgb": [
+          0.3863993229982535,
+          0.4076241920092188,
+          0.45877585120365866
+        ],
+        "stdRgb": [
+          0.1978320512196345,
+          0.18186803480719885,
+          0.19075096985350756
+        ],
+        "spatialLowFrequency": 0.10413584011865924,
+        "microContrast": 0.45351280777019365
+      },
+      "hair": {
+        "flowAngle": -0.048683442175388336,
+        "density": 0.46097497940063475,
+        "lengthRatio": 0.2951953125,
+        "strandVariance": 0.6719145774841309
+      },
+      "garment": {
+        "wrinkleAngle": 0.3883250951766968,
+        "wrinkleDensity": 0.7999473571777344,
+        "roughnessProxy": 0.7766353570205363
+      },
+      "lighting": {
+        "gradientX": 0.0009027175559760103,
+        "gradientY": 0.11768226008071714,
+        "ambient": 0.3482811349791524,
+        "shadowContrast": 0.18183935403690865
+      },
+      "hands": {
+        "palmWidthRatio": 0.0953125,
+        "fingerLengthRatio": 0.44255859375,
+        "fingerSpread": 0.0825475578953881
+      },
+      "view": {
+        "yawProxy": 0.025475578953880973,
+        "pitchProxy": 0.11768226008071714,
+        "selfOcclusion": 0.5662868281558185
+      }
+    },
+    {
+      "subjectId": "fictional-seat-04",
+      "sourceSha256": "7ee27dd9d11d989d86afbec40b063410e252c26b03734f15321af4c1156b2af5",
+      "face": {
+        "widthRatio": 0.439453125,
+        "heightRatio": 0.23968565815324164,
+        "surfaceCurvature": 0.05945426169076334,
+        "edgeDensity": 0.06939890710382514,
+        "leftRightAsymmetry": 0.09228176364118851,
+        "eyeSpacingRatio": 0.3476444444444444,
+        "eyeApertureRatio": 0.055792723489210175,
+        "noseLengthRatio": 0.23069674525777792,
+        "noseWidthRatio": 0.1646305368048859,
+        "mouthWidthRatio": 0.3194814814814815,
+        "jawTaper": 0.6136363636363636,
+        "earOffsetRatio": 0.44384226454617826
+      },
+      "body": {
+        "headToBody": 0.1391796875,
+        "shoulderRatio": 0.2578125,
+        "torsoRatio": 0.61328125,
+        "hipRatio": 0.69921875,
+        "kneeRatio": 0.720703125,
+        "ankleRatio": 0.31640625,
+        "armLengthRatio": 0.3762109375,
+        "legLengthRatio": 0.44734375
+      },
+      "skin": {
+        "meanRgb": [
+          0.5007955998428515,
+          0.4585793778349227,
+          0.4483201542912247
+        ],
+        "stdRgb": [
+          0.20208699373204841,
+          0.19205963146689198,
+          0.18774457334980374
+        ],
+        "spatialLowFrequency": 0.13439954708271776,
+        "microContrast": 0.45390942045956184
+      },
+      "hair": {
+        "flowAngle": 0.09214392304420471,
+        "density": 0.44333038330078123,
+        "lengthRatio": 0.2991015625,
+        "strandVariance": 0.6287077903747559
+      },
+      "garment": {
+        "wrinkleAngle": -0.6662750244140625,
+        "wrinkleDensity": 0.6239410945347377,
+        "roughnessProxy": 0.622179962419832
+      },
+      "lighting": {
+        "gradientX": -0.051020887101395775,
+        "gradientY": 0.17472632327360393,
+        "ambient": 0.40880006687050835,
+        "shadowContrast": 0.19254656903859746
+      },
+      "hands": {
+        "palmWidthRatio": 0.08765624999999999,
+        "fingerLengthRatio": 0.44373046875,
+        "fingerSpread": 0.0984563527282377
+      },
+      "view": {
+        "yawProxy": -0.18456352728237702,
+        "pitchProxy": 0.17472632327360393,
+        "selfOcclusion": 0.592330243123772
+      }
+    },
+    {
+      "subjectId": "fictional-seat-05",
+      "sourceSha256": "7ae66fdb26510eccdf970517ee9b8f92abf7eb8c623593bebb38bb7b0dd26193",
+      "face": {
+        "widthRatio": 0.439453125,
+        "heightRatio": 0.23865877712031558,
+        "surfaceCurvature": 0.07914835682332022,
+        "edgeDensity": 0.0983287419651056,
+        "leftRightAsymmetry": 0.24173295588988153,
+        "eyeSpacingRatio": 0.3469333333333333,
+        "eyeApertureRatio": 0.05605531142431094,
+        "noseLengthRatio": 0.22774161980998875,
+        "noseWidthRatio": 0.1725530643331713,
+        "mouthWidthRatio": 0.3238814814814815,
+        "jawTaper": 0.71875,
+        "earOffsetRatio": 0.4662599433834822
+      },
+      "body": {
+        "headToBody": 0.1386328125,
+        "shoulderRatio": 0.25,
+        "torsoRatio": 0.357421875,
+        "hipRatio": 0.77734375,
+        "kneeRatio": 0.751953125,
+        "ankleRatio": 0.68359375,
+        "armLengthRatio": 0.3891015625,
+        "legLengthRatio": 0.43265624999999996
+      },
+      "skin": {
+        "meanRgb": [
+          0.6593259511334377,
+          0.5693244746934586,
+          0.5034938331622824
+        ],
+        "stdRgb": [
+          0.23674404345218028,
+          0.23355981705152912,
+          0.21848764562405348
+        ],
+        "spatialLowFrequency": 0.16889426417217604,
+        "microContrast": 0.441002157990314
+      },
+      "hair": {
+        "flowAngle": 0.0172023493796587,
+        "density": 0.553241777420044,
+        "lengthRatio": 0.30984375,
+        "strandVariance": 0.7896667003631592
+      },
+      "garment": {
+        "wrinkleAngle": 0.2628720700740814,
+        "wrinkleDensity": 0.7968157087053571,
+        "roughnessProxy": 0.6856046046401637
+      },
+      "lighting": {
+        "gradientX": 0.3189125412470265,
+        "gradientY": 0.03834314082645812,
+        "ambient": 0.4109659207641614,
+        "shadowContrast": 0.23195161259896266
+      },
+      "hands": {
+        "palmWidthRatio": 0.10234375,
+        "fingerLengthRatio": 0.446953125,
+        "fingerSpread": 0.1283465911779763
+      },
+      "view": {
+        "yawProxy": 0.48346591177976306,
+        "pitchProxy": 0.03834314082645812,
+        "selfOcclusion": 0.5890463202662721
+      }
+    },
+    {
+      "subjectId": "fictional-seat-06",
+      "sourceSha256": "d932ffabdd70982cd84a731384f0a12ecf06effb28260d10be260b6049e3deff",
+      "face": {
+        "widthRatio": 0.439453125,
+        "heightRatio": 0.23828125,
+        "surfaceCurvature": 0.06825875654444338,
+        "edgeDensity": 0.08284153005464481,
+        "leftRightAsymmetry": 0.14348159400130278,
+        "eyeSpacingRatio": 0.3398222222222222,
+        "eyeApertureRatio": 0.05591011675392591,
+        "noseLengthRatio": 0.2166369604997295,
+        "noseWidthRatio": 0.1717902925104468,
+        "mouthWidthRatio": 0.3208888888888889,
+        "jawTaper": 0.9327731092436975,
+        "earOffsetRatio": 0.4515222391001954
+      },
+      "body": {
+        "headToBody": 0.14,
+        "shoulderRatio": 0.46484375,
+        "torsoRatio": 0.46875,
+        "hipRatio": 0.650390625,
+        "kneeRatio": 0.73828125,
+        "ankleRatio": 0.7734375,
+        "armLengthRatio": 0.33783203125,
+        "legLengthRatio": 0.42906249999999996
+      },
+      "skin": {
+        "meanRgb": [
+          0.5419584985178042,
+          0.5104099432122576,
+          0.5114351226829529
+        ],
+        "stdRgb": [
+          0.1966369136963197,
+          0.19546654977939468,
+          0.20175870389352638
+        ],
+        "spatialLowFrequency": 0.13656131094629806,
+        "microContrast": 0.4440958818392532
+      },
+      "hair": {
+        "flowAngle": 0.013630048371851444,
+        "density": 0.49376816749572755,
+        "lengthRatio": 0.436796875,
+        "strandVariance": 0.7087783336639404
+      },
+      "garment": {
+        "wrinkleAngle": 0.8157325983047485,
+        "wrinkleDensity": 0.85558226449149,
+        "roughnessProxy": 0.5732411349611637
+      },
+      "lighting": {
+        "gradientX": -0.21670836294767448,
+        "gradientY": 0.10708584563077839,
+        "ambient": 0.5746889866645742,
+        "shadowContrast": 0.19438778850967697
+      },
+      "hands": {
+        "palmWidthRatio": 0.10593749999999999,
+        "fingerLengthRatio": 0.48503906249999995,
+        "fingerSpread": 0.10869631880026057
+      },
+      "view": {
+        "yawProxy": -0.28696318800260556,
+        "pitchProxy": 0.10708584563077839,
+        "selfOcclusion": 0.5385589599609375
+      }
+    },
+    {
+      "subjectId": "fictional-seat-07",
+      "sourceSha256": "2e12b5714377b6ad7e21624e1818904fa22860f99d887c44584164ac1e8fdb1b",
+      "face": {
+        "widthRatio": 0.439453125,
+        "heightRatio": 0.23828125,
+        "surfaceCurvature": 0.06308776197390001,
+        "edgeDensity": 0.09475409836065574,
+        "leftRightAsymmetry": 0.01453897023773959,
+        "eyeSpacingRatio": 0.3522666666666667,
+        "eyeApertureRatio": 0.055841170159652,
+        "noseLengthRatio": 0.22562626172051636,
+        "noseWidthRatio": 0.1611852137576342,
+        "mouthWidthRatio": 0.32235555555555556,
+        "jawTaper": 0.8298611111111112,
+        "earOffsetRatio": 0.43218084553566094
+      },
+      "body": {
+        "headToBody": 0.14,
+        "shoulderRatio": 0.5625,
+        "torsoRatio": 0.52734375,
+        "hipRatio": 0.4765625,
+        "kneeRatio": 0.490234375,
+        "ankleRatio": 0.62109375,
+        "armLengthRatio": 0.322890625,
+        "legLengthRatio": 0.43515624999999997
+      },
+      "skin": {
+        "meanRgb": [
+          0.47074938390656806,
+          0.453908211007536,
+          0.42739983570841816
+        ],
+        "stdRgb": [
+          0.17864664307989914,
+          0.18539591747909284,
+          0.18159632585087976
+        ],
+        "spatialLowFrequency": 0.11969951141650227,
+        "microContrast": 0.4564198457816685
+      },
+      "hair": {
+        "flowAngle": -0.07707551121711731,
+        "density": 0.43859038352966306,
+        "lengthRatio": 0.4533984375,
+        "strandVariance": 0.5781011581420898
+      },
+      "garment": {
+        "wrinkleAngle": -0.021852636709809303,
+        "wrinkleDensity": 0.8380307878766741,
+        "roughnessProxy": 0.6254559125692216
+      },
+      "lighting": {
+        "gradientX": -0.026892729745314748,
+        "gradientY": 0.08238282130025976,
+        "ambient": 0.42844496683367256,
+        "shadowContrast": 0.181401560733682
+      },
+      "hands": {
+        "palmWidthRatio": 0.09984375,
+        "fingerLengthRatio": 0.49001953125,
+        "fingerSpread": 0.08290779404754792
+      },
+      "view": {
+        "yawProxy": 0.02907794047547918,
+        "pitchProxy": 0.08238282130025976,
+        "selfOcclusion": 0.5211639404296875
+      }
+    },
+    {
+      "subjectId": "fictional-seat-08",
+      "sourceSha256": "a7e1676e3b10a99f15bea40c0d526b29bacda6697c359e9617e6f1f05e965755",
+      "face": {
+        "widthRatio": 0.43847874720357943,
+        "heightRatio": 0.23785166240409208,
+        "surfaceCurvature": 0.08655190943944269,
+        "edgeDensity": 0.09913320166776388,
+        "leftRightAsymmetry": 0.0956924705366019,
+        "eyeSpacingRatio": 0.36448979591836733,
+        "eyeApertureRatio": 0.05615402545919257,
+        "noseLengthRatio": 0.23268578133398446,
+        "noseWidthRatio": 0.18103836909453608,
+        "mouthWidthRatio": 0.31732507288629735,
+        "jawTaper": 0.07086614173228346,
+        "earOffsetRatio": 0.44435387058049025
+      },
+      "body": {
+        "headToBody": 0.1069140625,
+        "shoulderRatio": 0.49609375,
+        "torsoRatio": 0.69921875,
+        "hipRatio": 0.75,
+        "kneeRatio": 0.755859375,
+        "ankleRatio": 0.666015625,
+        "armLengthRatio": 0.3480859375,
+        "legLengthRatio": 0.433359375
+      },
+      "skin": {
+        "meanRgb": [
+          0.7821722237282009,
+          0.7422726079679184,
+          0.7108772541274575
+        ],
+        "stdRgb": [
+          0.22130319018733677,
+          0.23909414172992988,
+          0.2474359549795942
+        ],
+        "spatialLowFrequency": 0.1691012747137012,
+        "microContrast": 0.4543818061038894
+      },
+      "hair": {
+        "flowAngle": -0.36567750573158264,
+        "density": 0.6284109115600586,
+        "lengthRatio": 0.237578125,
+        "strandVariance": 0.8261733055114746
+      },
+      "garment": {
+        "wrinkleAngle": -0.9527687430381775,
+        "wrinkleDensity": 0.9809574672154018,
+        "roughnessProxy": 0.637936013864485
+      },
+      "lighting": {
+        "gradientX": 0.25165131656236145,
+        "gradientY": 0.13683336424301462,
+        "ambient": 0.5578484789914278,
+        "shadowContrast": 0.23454961086054762
+      },
+      "hands": {
+        "palmWidthRatio": 0.101640625,
+        "fingerLengthRatio": 0.42527343749999996,
+        "fingerSpread": 0.09913849410732038
+      },
+      "view": {
+        "yawProxy": 0.1913849410732038,
+        "pitchProxy": 0.13683336424301462,
+        "selfOcclusion": 0.5542319641600439
+      }
+    },
+    {
+      "subjectId": "fictional-seat-09",
+      "sourceSha256": "a07ed39a61be1e119b2e293fb87f21c275bb9e063034f9cab4d8b64c2e7d9f38",
+      "face": {
+        "widthRatio": 0.439453125,
+        "heightRatio": 0.23828125,
+        "surfaceCurvature": 0.07485974342804684,
+        "edgeDensity": 0.10626593806921676,
+        "leftRightAsymmetry": 0.04601764069910569,
+        "eyeSpacingRatio": 0.3512,
+        "eyeApertureRatio": 0.055998129912373955,
+        "noseLengthRatio": 0.22981573280139808,
+        "noseWidthRatio": 0.16123134683381551,
+        "mouthWidthRatio": 0.32382222222222223,
+        "jawTaper": 0.9191919191919192,
+        "earOffsetRatio": 0.43690264610486584
+      },
+      "body": {
+        "headToBody": 0.14,
+        "shoulderRatio": 0.580078125,
+        "torsoRatio": 0.798828125,
+        "hipRatio": 0.6875,
+        "kneeRatio": 0.66015625,
+        "ankleRatio": 0.98828125,
+        "armLengthRatio": 0.32611328125,
+        "legLengthRatio": 0.42046875
+      },
+      "skin": {
+        "meanRgb": [
+          0.5568754598378514,
+          0.4943409407478839,
+          0.4586786670952534
+        ],
+        "stdRgb": [
+          0.21613480432062754,
+          0.2104206333564302,
+          0.20019663101499194
+        ],
+        "spatialLowFrequency": 0.1433408150897631,
+        "microContrast": 0.44664142466782164
+      },
+      "hair": {
+        "flowAngle": -0.020190242677927017,
+        "density": 0.5036457538604736,
+        "lengthRatio": 0.4866015625,
+        "strandVariance": 0.6847262382507324
+      },
+      "garment": {
+        "wrinkleAngle": -0.06821247935295105,
+        "wrinkleDensity": 0.8284778050013951,
+        "roughnessProxy": 0.6381321221024914
+      },
+      "lighting": {
+        "gradientX": 0.031919698098301655,
+        "gradientY": 0.0009368200504236146,
+        "ambient": 0.49262083352596076,
+        "shadowContrast": 0.2101161917135845
+      },
+      "hands": {
+        "palmWidthRatio": 0.11453125,
+        "fingerLengthRatio": 0.49998046874999996,
+        "fingerSpread": 0.08920352813982114
+      },
+      "view": {
+        "yawProxy": 0.09203528139821138,
+        "pitchProxy": 0.0009368200504236146,
+        "selfOcclusion": 0.4382209777832031
+      }
+    },
+    {
+      "subjectId": "fictional-seat-10",
+      "sourceSha256": "838c4ee117b31d0265e9e5d9a18afda0290de30c15cab0ef422df7aec75f0746",
+      "face": {
+        "widthRatio": 0.439453125,
+        "heightRatio": 0.23921568627450981,
+        "surfaceCurvature": 0.07745601584677962,
+        "edgeDensity": 0.09515482695810565,
+        "leftRightAsymmetry": 0.016226301923641828,
+        "eyeSpacingRatio": 0.35404444444444444,
+        "eyeApertureRatio": 0.05603274687795706,
+        "noseLengthRatio": 0.2308678872946332,
+        "noseWidthRatio": 0.16092153005464482,
+        "mouthWidthRatio": 0.3231111111111111,
+        "jawTaper": 0.2523364485981308,
+        "earOffsetRatio": 0.4324339452885463
+      },
+      "body": {
+        "headToBody": 0.139453125,
+        "shoulderRatio": 0.626953125,
+        "torsoRatio": 0.615234375,
+        "hipRatio": 0.673828125,
+        "kneeRatio": 0.49609375,
+        "ankleRatio": 0.6015625,
+        "armLengthRatio": 0.31703125,
+        "legLengthRatio": 0.4359375
+      },
+      "skin": {
+        "meanRgb": [
+          0.5342417943497982,
+          0.46643994428372443,
+          0.4224956605593057
+        ],
+        "stdRgb": [
+          0.21473945596246946,
+          0.20173417579037978,
+          0.19110189208621328
+        ],
+        "spatialLowFrequency": 0.13173990347495046,
+        "microContrast": 0.4584975625720792
+      },
+      "hair": {
+        "flowAngle": -0.08938783407211304,
+        "density": 0.5397512912750244,
+        "lengthRatio": 0.2991015625,
+        "strandVariance": 0.7341057777404785
+      },
+      "garment": {
+        "wrinkleAngle": 0.3386807143688202,
+        "wrinkleDensity": 0.8006522587367466,
+        "roughnessProxy": 0.6768093951915723
+      },
+      "lighting": {
+        "gradientX": -0.050928942953940966,
+        "gradientY": 0.045134705166530065,
+        "ambient": 0.4847081267363879,
+        "shadowContrast": 0.20314649890520997
+      },
+      "hands": {
+        "palmWidthRatio": 0.0990625,
+        "fingerLengthRatio": 0.44373046875,
+        "fingerSpread": 0.08324526038472836
+      },
+      "view": {
+        "yawProxy": -0.032452603847283656,
+        "pitchProxy": 0.045134705166530065,
+        "selfOcclusion": 0.5218175551470587
+      }
+    },
+    {
+      "subjectId": "fictional-seat-11",
+      "sourceSha256": "17e683d1c446291eb9712a43c3f4641ec5bd757908ba0a1cc8fc4cd61c6ce98b",
+      "face": {
+        "widthRatio": 0.38663870897739777,
+        "heightRatio": 0.21799796915851827,
+        "surfaceCurvature": 0.0912687652875189,
+        "edgeDensity": 0.08957002102202112,
+        "leftRightAsymmetry": 0.16641106034574454,
+        "eyeSpacingRatio": 0.3862475128925993,
+        "eyeApertureRatio": 0.06128332810110867,
+        "noseLengthRatio": 0.25717243397537115,
+        "noseWidthRatio": 0.1861684116459805,
+        "mouthWidthRatio": 0.3627035341238359,
+        "jawTaper": 0.8225038874588065,
+        "earOffsetRatio": 0.5029950879351006
+      },
+      "body": {
+        "headToBody": 0.12093069377579518,
+        "shoulderRatio": 0.21903461372650201,
+        "torsoRatio": 0.4663093058230008,
+        "hipRatio": 0.6561410064919936,
+        "kneeRatio": 0.6967408419789178,
+        "ankleRatio": 0.7846385367353814,
+        "armLengthRatio": 0.42203126064450175,
+        "legLengthRatio": 0.4680428354064789
+      },
+      "skin": {
+        "meanRgb": [
+          0.5830827909350563,
+          0.5106881132025627,
+          0.48084280206533636
+        ],
+        "stdRgb": [
+          0.2542740288913282,
+          0.25162358122724293,
+          0.24222390913090355
+        ],
+        "spatialLowFrequency": 0.16244469293299604,
+        "microContrast": 0.471782909328846
+      },
+      "hair": {
+        "flowAngle": 0.010023980014997075,
+        "density": 0.5824005266209566,
+        "lengthRatio": 0.2834551236908703,
+        "strandVariance": 0.9150307322642438
+      },
+      "garment": {
+        "wrinkleAngle": -0.3707527800706531,
+        "wrinkleDensity": 0.8044968817879548,
+        "roughnessProxy": 0.5908955393733029
+      },
+      "lighting": {
+        "gradientX": 0.2995936292244225,
+        "gradientY": -0.010827096294507716,
+        "ambient": 0.37101262794201256,
+        "shadowContrast": 0.23417302979967694
+      },
+      "hands": {
+        "palmWidthRatio": 0.12386003538884487,
+        "fingerLengthRatio": 0.4282934759034419,
+        "fingerSpread": 0.12027366584497556
+      },
+      "view": {
+        "yawProxy": 0.3288940896446785,
+        "pitchProxy": -0.009100972821462187,
+        "selfOcclusion": 0.6262761833768178
+      },
+      "provenance": {
+        "kind": "DETERMINISTIC_RULE_SPACE_SUBJECT",
+        "parentSubjectId": "fictional-seat-01",
+        "externalProvider": false,
+        "sourcePixelCopy": false,
+        "qualityEvidence": false
+      }
+    },
+    {
+      "subjectId": "fictional-seat-12",
+      "sourceSha256": "8caf22b54d8131c2205cd0c92a3bea4c71c09f0c091645d221db591d2198f3f6",
+      "face": {
+        "widthRatio": 0.42410096075070697,
+        "heightRatio": 0.2097784673163271,
+        "surfaceCurvature": 0.02576062161736843,
+        "edgeDensity": 0.03547207357238291,
+        "leftRightAsymmetry": 0.024235946191682213,
+        "eyeSpacingRatio": 0.31013730472686224,
+        "eyeApertureRatio": 0.04884951512261269,
+        "noseLengthRatio": 0.1872370287939796,
+        "noseWidthRatio": 0.1706458881604707,
+        "mouthWidthRatio": 0.30718094550588027,
+        "jawTaper": 1.4376327215605949,
+        "earOffsetRatio": 0.4792543526790657
+      },
+      "body": {
+        "headToBody": 0.13014598233037322,
+        "shoulderRatio": 0.16364307482287876,
+        "torsoRatio": 0.16282447600250358,
+        "hipRatio": 0.45381954955822923,
+        "kneeRatio": 0.27058631110906145,
+        "ankleRatio": 0.14578470525805554,
+        "armLengthRatio": 0.3865620281389617,
+        "legLengthRatio": 0.5020532928458414
+      },
+      "skin": {
+        "meanRgb": [
+          0.246068400527412,
+          0.258783456395763,
+          0.266409260988431
+        ],
+        "stdRgb": [
+          0.08428629007516994,
+          0.07167331165263399,
+          0.0727076309386265
+        ],
+        "spatialLowFrequency": 0.04869738492881876,
+        "microContrast": 0.47525325168858495
+      },
+      "hair": {
+        "flowAngle": 0.22091161601050693,
+        "density": 0.6282824219528946,
+        "lengthRatio": 0.2805091520861867,
+        "strandVariance": 0.8013936012138612
+      },
+      "garment": {
+        "wrinkleAngle": 1.0556992380777035,
+        "wrinkleDensity": 0.9409765538380858,
+        "roughnessProxy": 0.7986762228644875
+      },
+      "lighting": {
+        "gradientX": -0.062350432473002926,
+        "gradientY": -0.03088997111990087,
+        "ambient": 0.25365158313226166,
+        "shadowContrast": 0.08391927716809675
+      },
+      "hands": {
+        "palmWidthRatio": 0.07951255562741202,
+        "fingerLengthRatio": 0.485238768615884,
+        "fingerSpread": 0.09193645174154642
+      },
+      "view": {
+        "yawProxy": -0.04922302227752951,
+        "pitchProxy": -0.02751894841879979,
+        "selfOcclusion": 0.768941958208115
+      },
+      "provenance": {
+        "kind": "DETERMINISTIC_RULE_SPACE_SUBJECT",
+        "parentSubjectId": "fictional-seat-02",
+        "externalProvider": false,
+        "sourcePixelCopy": false,
+        "qualityEvidence": false
+      }
+    },
+    {
+      "subjectId": "fictional-seat-13",
+      "sourceSha256": "c6a30d8b215fd1cee48058059a6a2c05f2a9731fd861c6830ad43154c59c8578",
+      "face": {
+        "widthRatio": 0.4882853136802271,
+        "heightRatio": 0.2208649408963886,
+        "surfaceCurvature": 0.0732733485935874,
+        "edgeDensity": 0.07981409186711086,
+        "leftRightAsymmetry": 0.01138770210511273,
+        "eyeSpacingRatio": 0.3061107742865267,
+        "eyeApertureRatio": 0.05923431158377921,
+        "noseLengthRatio": 0.19924907436255856,
+        "noseWidthRatio": 0.16642055623135252,
+        "mouthWidthRatio": 0.2833166831175462,
+        "jawTaper": 0.5264221413550404,
+        "earOffsetRatio": 0.43452492833212947
+      },
+      "body": {
+        "headToBody": 0.15403774028898898,
+        "shoulderRatio": 0.28051901613027386,
+        "torsoRatio": 0.5143271970765059,
+        "hipRatio": 0.5959904083106959,
+        "kneeRatio": 0.59124590926486,
+        "ankleRatio": 0.5642408069193735,
+        "armLengthRatio": 0.37583538101134595,
+        "legLengthRatio": 0.44234883135501757
+      },
+      "skin": {
+        "meanRgb": [
+          0.4019253622320571,
+          0.37152744024227713,
+          0.4630543259874305
+        ],
+        "stdRgb": [
+          0.21090679905786605,
+          0.18917573457716994,
+          0.1738592089053504
+        ],
+        "spatialLowFrequency": 0.10159531482255282,
+        "microContrast": 0.5049310923933679
+      },
+      "hair": {
+        "flowAngle": -0.04928879481600978,
+        "density": 0.4856717639272074,
+        "lengthRatio": 0.27318624537883596,
+        "strandVariance": 0.6759815280636945
+      },
+      "garment": {
+        "wrinkleAngle": 0.34298360478162687,
+        "wrinkleDensity": 0.866864273002859,
+        "roughnessProxy": 0.8416021855827464
+      },
+      "lighting": {
+        "gradientX": 0.0010050656869047203,
+        "gradientY": 0.13102481588124687,
+        "ambient": 0.32231411398591986,
+        "shadowContrast": 0.16256607149200716
+      },
+      "hands": {
+        "palmWidthRatio": 0.08418365240050692,
+        "fingerLengthRatio": 0.39565149344053263,
+        "fingerSpread": 0.09190661844250232
+      },
+      "view": {
+        "yawProxy": 0.022467626473322386,
+        "pitchProxy": 0.13075915497952378,
+        "selfOcclusion": 0.6304911831587867
+      },
+      "provenance": {
+        "kind": "DETERMINISTIC_RULE_SPACE_SUBJECT",
+        "parentSubjectId": "fictional-seat-03",
+        "externalProvider": false,
+        "sourcePixelCopy": false,
+        "qualityEvidence": false
+      }
+    },
+    {
+      "subjectId": "fictional-seat-14",
+      "sourceSha256": "7ce36c56583f1784adab63f91c1d6899a5c0dba89dea3981f050d60b9dab0f5d",
+      "face": {
+        "widthRatio": 0.46547940555999856,
+        "heightRatio": 0.24407785483461963,
+        "surfaceCurvature": 0.06196087109172757,
+        "edgeDensity": 0.07067062962498576,
+        "leftRightAsymmetry": 0.10326622972709865,
+        "eyeSpacingRatio": 0.3603889194127699,
+        "eyeApertureRatio": 0.058144961347798854,
+        "noseLengthRatio": 0.2391539748847618,
+        "noseWidthRatio": 0.14822443498978477,
+        "mouthWidthRatio": 0.33119351602899444,
+        "jawTaper": 0.6843175124008491,
+        "earOffsetRatio": 0.39961157974546185
+      },
+      "body": {
+        "headToBody": 0.14742249973424668,
+        "shoulderRatio": 0.2886545415050098,
+        "torsoRatio": 0.6496023704259536,
+        "hipRatio": 0.7797576284243471,
+        "kneeRatio": 0.6405557010724796,
+        "ankleRatio": 0.335145172003199,
+        "armLengthRatio": 0.338719989196195,
+        "legLengthRatio": 0.4027641279487929
+      },
+      "skin": {
+        "meanRgb": [
+          0.47471491350593253,
+          0.49819516555445925,
+          0.4109278103966112
+        ],
+        "stdRgb": [
+          0.2011346748746353,
+          0.18205745291771125,
+          0.20396346482816882
+        ],
+        "spatialLowFrequency": 0.1231234966111657,
+        "microContrast": 0.5082104849359885
+      },
+      "hair": {
+        "flowAngle": 0.08189684930969206,
+        "density": 0.41254640496944345,
+        "lengthRatio": 0.3045825449681607,
+        "strandVariance": 0.56605450489674
+      },
+      "garment": {
+        "wrinkleAngle": -0.6907003402974649,
+        "wrinkleDensity": 0.5598122673656645,
+        "roughnessProxy": 0.5582321448653008
+      },
+      "lighting": {
+        "gradientX": -0.05712450239391909,
+        "gradientY": 0.1956287873295448,
+        "ambient": 0.4162912547492082,
+        "shadowContrast": 0.2154657371830912
+      },
+      "hands": {
+        "palmWidthRatio": 0.09086968516858876,
+        "fingerLengthRatio": 0.4965485131062078,
+        "fingerSpread": 0.11023466028615748
+      },
+      "view": {
+        "yawProxy": -0.2058223100100485,
+        "pitchProxy": 0.18507435825625612,
+        "selfOcclusion": 0.6631905541757805
+      },
+      "provenance": {
+        "kind": "DETERMINISTIC_RULE_SPACE_SUBJECT",
+        "parentSubjectId": "fictional-seat-04",
+        "externalProvider": false,
+        "sourcePixelCopy": false,
+        "qualityEvidence": false
+      }
+    },
+    {
+      "subjectId": "fictional-seat-15",
+      "sourceSha256": "0ed47db0638724230fa10e5f92929309a808cccacb268c047c05375160987f57",
+      "face": {
+        "widthRatio": 0.3973190450107028,
+        "heightRatio": 0.2623959753187209,
+        "surfaceCurvature": 0.07018370244429069,
+        "edgeDensity": 0.10810859948716478,
+        "leftRightAsymmetry": 0.21351425853581307,
+        "eyeSpacingRatio": 0.3854695606046286,
+        "eyeApertureRatio": 0.0497062662489378,
+        "noseLengthRatio": 0.2530384188687819,
+        "noseWidthRatio": 0.15381450722868686,
+        "mouthWidthRatio": 0.35985718395842475,
+        "jawTaper": 0.6555263128502707,
+        "earOffsetRatio": 0.4156260203732522
+      },
+      "body": {
+        "headToBody": 0.12534091473270972,
+        "shoulderRatio": 0.27645699348427993,
+        "torsoRatio": 0.32315282327537165,
+        "hipRatio": 0.7089659579195863,
+        "kneeRatio": 0.8211648324445239,
+        "ankleRatio": 0.6180518477944266,
+        "armLengthRatio": 0.3468467241027388,
+        "legLengthRatio": 0.3856715506637822
+      },
+      "skin": {
+        "meanRgb": [
+          0.700691228589608,
+          0.5317646912415944,
+          0.5382509876201648
+        ],
+        "stdRgb": [
+          0.22269587262077087,
+          0.24821306499109577,
+          0.20407346000351498
+        ],
+        "spatialLowFrequency": 0.18882542716644485,
+        "microContrast": 0.4876725228723265
+      },
+      "hair": {
+        "flowAngle": 0.018785698039355304,
+        "density": 0.5995213645933455,
+        "lengthRatio": 0.3406610641295337,
+        "strandVariance": 0.7039121261662392
+      },
+      "garment": {
+        "wrinkleAngle": 0.2920710453882167,
+        "wrinkleDensity": 0.888570378800465,
+        "roughnessProxy": 0.7645531289064024
+      },
+      "lighting": {
+        "gradientX": 0.35266240935033744,
+        "gradientY": 0.04240091773450785,
+        "ambient": 0.45184092914087454,
+        "shadowContrast": 0.2048747403842369
+      },
+      "hands": {
+        "palmWidthRatio": 0.11371176117351064,
+        "fingerLengthRatio": 0.39477805056962084,
+        "fingerSpread": 0.14192925088407735
+      },
+      "view": {
+        "yawProxy": 0.44093861083517544,
+        "pitchProxy": 0.03466686030706741,
+        "selfOcclusion": 0.6513838988951675
+      },
+      "provenance": {
+        "kind": "DETERMINISTIC_RULE_SPACE_SUBJECT",
+        "parentSubjectId": "fictional-seat-05",
+        "externalProvider": false,
+        "sourcePixelCopy": false,
+        "qualityEvidence": false
+      }
+    },
+    {
+      "subjectId": "fictional-seat-16",
+      "sourceSha256": "312c367c4f9d01f35ebc3c48051b4f836c9112c5aac37950fedf4117f4c5e7fe",
+      "face": {
+        "widthRatio": 0.4025832416935376,
+        "heightRatio": 0.26612228428565415,
+        "surfaceCurvature": 0.07529061674159376,
+        "edgeDensity": 0.09252082239731724,
+        "leftRightAsymmetry": 0.15774312277060082,
+        "eyeSpacingRatio": 0.3215110366261858,
+        "eyeApertureRatio": 0.06166984846488932,
+        "noseLengthRatio": 0.2049635638491783,
+        "noseWidthRatio": 0.16971332223275767,
+        "mouthWidthRatio": 0.30359791844638523,
+        "jawTaper": 0.9720991016638528,
+        "earOffsetRatio": 0.44606326783574096
+      },
+      "body": {
+        "headToBody": 0.12825407450930124,
+        "shoulderRatio": 0.49937518892644184,
+        "torsoRatio": 0.4294221244731068,
+        "hipRatio": 0.6778112876835849,
+        "kneeRatio": 0.7565426821080509,
+        "ankleRatio": 0.7085465053806261,
+        "armLengthRatio": 0.3337475915677349,
+        "legLengthRatio": 0.42387507033358385
+      },
+      "skin": {
+        "meanRgb": [
+          0.5029868970629928,
+          0.5265492197622207,
+          0.5209229070847788
+        ],
+        "stdRgb": [
+          0.2142796303614511,
+          0.18141077891025428,
+          0.20813835923097265
+        ],
+        "spatialLowFrequency": 0.13003729315357818,
+        "microContrast": 0.47708604212691225
+      },
+      "hair": {
+        "flowAngle": 0.01396718845630031,
+        "density": 0.44642644597438513,
+        "lengthRatio": 0.4878326857183909,
+        "strandVariance": 0.700209097818437
+      },
+      "garment": {
+        "wrinkleAngle": 0.7717771709444761,
+        "wrinkleDensity": 0.7529529680364927,
+        "roughnessProxy": 0.5044793842543577
+      },
+      "lighting": {
+        "gradientX": -0.23280678655770864,
+        "gradientY": 0.11504083768624994,
+        "ambient": 0.6418362581402621,
+        "shadowContrast": 0.21370920083107764
+      },
+      "hands": {
+        "palmWidthRatio": 0.10022909985066669,
+        "fingerLengthRatio": 0.5332501141838437,
+        "fingerSpread": 0.11677094666000967
+      },
+      "view": {
+        "yawProxy": -0.2990616415755266,
+        "pitchProxy": 0.09810140017443843,
+        "selfOcclusion": 0.5785664158731212
+      },
+      "provenance": {
+        "kind": "DETERMINISTIC_RULE_SPACE_SUBJECT",
+        "parentSubjectId": "fictional-seat-06",
+        "externalProvider": false,
+        "sourcePixelCopy": false,
+        "qualityEvidence": false
+      }
+    },
+    {
+      "subjectId": "fictional-seat-17",
+      "sourceSha256": "549d3938000a6b69eebb61658482b7051e013f0a61fc3a3254142df1e47fd2ab",
+      "face": {
+        "widthRatio": 0.4720983928926446,
+        "heightRatio": 0.25241718169951965,
+        "surfaceCurvature": 0.06190292477838365,
+        "edgeDensity": 0.1003753441056558,
+        "leftRightAsymmetry": 0.01353215116728214,
+        "eyeSpacingRatio": 0.31608160200033175,
+        "eyeApertureRatio": 0.054792429589750564,
+        "noseLengthRatio": 0.2024497830941529,
+        "noseWidthRatio": 0.17668401922672167,
+        "mouthWidthRatio": 0.28924297997835047,
+        "jawTaper": 0.8402752177213683,
+        "earOffsetRatio": 0.47373730531425334
+      },
+      "body": {
+        "headToBody": 0.15040005690019898,
+        "shoulderRatio": 0.5795390147585779,
+        "torsoRatio": 0.5665180714711735,
+        "hipRatio": 0.4825429859090284,
+        "kneeRatio": 0.4337198187745696,
+        "ankleRatio": 0.667232395288271,
+        "armLengthRatio": 0.353938255660415,
+        "legLengthRatio": 0.4769988105561363
+      },
+      "skin": {
+        "meanRgb": [
+          0.5081132240548026,
+          0.4581803552592179,
+          0.39044662524778423
+        ],
+        "stdRgb": [
+          0.1662846147249554,
+          0.2001109732213622,
+          0.18330549453476044
+        ],
+        "spatialLowFrequency": 0.11195436791034938,
+        "microContrast": 0.47024552487212484
+      },
+      "hair": {
+        "flowAngle": -0.06819019322552693,
+        "density": 0.4850055152069116,
+        "lengthRatio": 0.4802961029485778,
+        "strandVariance": 0.6336886229139573
+      },
+      "garment": {
+        "wrinkleAngle": -0.019607919433670844,
+        "wrinkleDensity": 0.935969188954065,
+        "roughnessProxy": 0.6985512605058234
+      },
+      "lighting": {
+        "gradientX": -0.02770735306803273,
+        "gradientY": 0.08487832727001693,
+        "ambient": 0.45386227846924504,
+        "shadowContrast": 0.16883956027760214
+      },
+      "hands": {
+        "palmWidthRatio": 0.08958773405484657,
+        "fingerLengthRatio": 0.45608583437245387,
+        "fingerSpread": 0.08541920227221868
+      },
+      "view": {
+        "yawProxy": 0.029442845841044386,
+        "pitchProxy": 0.08850272150827136,
+        "selfOcclusion": 0.5369508205587898
+      },
+      "provenance": {
+        "kind": "DETERMINISTIC_RULE_SPACE_SUBJECT",
+        "parentSubjectId": "fictional-seat-07",
+        "externalProvider": false,
+        "sourcePixelCopy": false,
+        "qualityEvidence": false
+      }
+    },
+    {
+      "subjectId": "fictional-seat-18",
+      "sourceSha256": "685f7ef8aebe8677aa99e670dd5d4e57a057382df74f0fff5e2d1b5ba4065b55",
+      "face": {
+        "widthRatio": 0.4836498198373104,
+        "heightRatio": 0.22923672346884663,
+        "surfaceCurvature": 0.07971905882818205,
+        "edgeDensity": 0.09554261722453963,
+        "leftRightAsymmetry": 0.09858046238580094,
+        "eyeSpacingRatio": 0.38993624492008555,
+        "eyeApertureRatio": 0.05172093935319458,
+        "noseLengthRatio": 0.24893047990838923,
+        "noseWidthRatio": 0.20113960954855045,
+        "mouthWidthRatio": 0.33947876929862747,
+        "jawTaper": 0.0662876439187159,
+        "earOffsetRatio": 0.4936918316098796
+      },
+      "body": {
+        "headToBody": 0.1179281034622009,
+        "shoulderRatio": 0.48677672385939336,
+        "torsoRatio": 0.771250658375373,
+        "hipRatio": 0.7015442314730767,
+        "kneeRatio": 0.819025702792089,
+        "ankleRatio": 0.7346270237597826,
+        "armLengthRatio": 0.38673497727727946,
+        "legLengthRatio": 0.4814765837632295
+      },
+      "skin": {
+        "meanRgb": [
+          0.7157282955277772,
+          0.7063052182923492,
+          0.7554326705904952
+        ],
+        "stdRgb": [
+          0.22338607639408573,
+          0.21878358415154445,
+          0.23544625561986476
+        ],
+        "spatialLowFrequency": 0.18938836141651696,
+        "microContrast": 0.4458481626841003
+      },
+      "hair": {
+        "flowAngle": -0.3962367684161721,
+        "density": 0.5572346186305386,
+        "lengthRatio": 0.22897309353401057,
+        "strandVariance": 0.9179058390834159
+      },
+      "garment": {
+        "wrinkleAngle": -1.0192852312955938,
+        "wrinkleDensity": 0.8768791417679143,
+        "roughnessProxy": 0.5702518233825734
+      },
+      "lighting": {
+        "gradientX": 0.24692510927849706,
+        "gradientY": 0.1342635273290053,
+        "ambient": 0.537643320309518,
+        "shadowContrast": 0.24162830117546613
+      },
+      "hands": {
+        "palmWidthRatio": 0.10873655199035263,
+        "fingerLengthRatio": 0.4381081591274563,
+        "fingerSpread": 0.09727659614723062
+      },
+      "view": {
+        "yawProxy": 0.17902000186762776,
+        "pitchProxy": 0.15092962289718667,
+        "selfOcclusion": 0.5438230571781703
+      },
+      "provenance": {
+        "kind": "DETERMINISTIC_RULE_SPACE_SUBJECT",
+        "parentSubjectId": "fictional-seat-08",
+        "externalProvider": false,
+        "sourcePixelCopy": false,
+        "qualityEvidence": false
+      }
+    },
+    {
+      "subjectId": "fictional-seat-19",
+      "sourceSha256": "e2bfc8c7a718df25aef37ab435271e038c74ad7e52b061bb27e3c740dc7a7f28",
+      "face": {
+        "widthRatio": 0.41845889181126195,
+        "heightRatio": 0.21241659012602804,
+        "surfaceCurvature": 0.08384066984652924,
+        "edgeDensity": 0.09473111380440843,
+        "leftRightAsymmetry": 0.046605685435729946,
+        "eyeSpacingRatio": 0.38347329791630796,
+        "eyeApertureRatio": 0.06271622780164922,
+        "noseLengthRatio": 0.2509345016241605,
+        "noseWidthRatio": 0.164149108638985,
+        "mouthWidthRatio": 0.3535796568739838,
+        "jawTaper": 1.0138849578191236,
+        "earOffsetRatio": 0.4448091598096493
+      },
+      "body": {
+        "headToBody": 0.13331170384458338,
+        "shoulderRatio": 0.542544234763205,
+        "torsoRatio": 0.7606652744480272,
+        "hipRatio": 0.7583246696875175,
+        "kneeRatio": 0.6844297686569029,
+        "ankleRatio": 0.9410675522511046,
+        "armLengthRatio": 0.33201486859560775,
+        "legLengthRatio": 0.4280778637555395
+      },
+      "skin": {
+        "meanRgb": [
+          0.6061629931294872,
+          0.5325353413022318,
+          0.471327655705821
+        ],
+        "stdRgb": [
+          0.2281766664440984,
+          0.2290443916646558,
+          0.2156644785759272
+        ],
+        "spatialLowFrequency": 0.13342802026655465,
+        "microContrast": 0.4177415412104205
+      },
+      "hair": {
+        "flowAngle": -0.020932624852344147,
+        "density": 0.563080842794762,
+        "lengthRatio": 0.4337825349508084,
+        "strandVariance": 0.6971175511324923
+      },
+      "garment": {
+        "wrinkleAngle": -0.07448082123156094,
+        "wrinkleDensity": 0.9016777686155195,
+        "roughnessProxy": 0.6945141372113062
+      },
+      "lighting": {
+        "gradientX": 0.029854337600845746,
+        "gradientY": 0.0008762032137790182,
+        "ambient": 0.43914843355331695,
+        "shadowContrast": 0.21280119943539735
+      },
+      "hands": {
+        "palmWidthRatio": 0.12505602548968436,
+        "fingerLengthRatio": 0.5063695595116452,
+        "fingerSpread": 0.08343162382273471
+      },
+      "view": {
+        "yawProxy": 0.10151654453221291,
+        "pitchProxy": 0.0008920648365552897,
+        "selfOcclusion": 0.4098659384002308
+      },
+      "provenance": {
+        "kind": "DETERMINISTIC_RULE_SPACE_SUBJECT",
+        "parentSubjectId": "fictional-seat-09",
+        "externalProvider": false,
+        "sourcePixelCopy": false,
+        "qualityEvidence": false
+      }
+    },
+    {
+      "subjectId": "fictional-seat-20",
+      "sourceSha256": "b60637033d278101df078094aa587ab3151129bb21eca88e6e7458ccc8c28b9a",
+      "face": {
+        "widthRatio": 0.3887786103501501,
+        "heightRatio": 0.21259247262234598,
+        "surfaceCurvature": 0.07166009467312065,
+        "edgeDensity": 0.08456468829456823,
+        "leftRightAsymmetry": 0.01534861015252598,
+        "eyeSpacingRatio": 0.3242819487390203,
+        "eyeApertureRatio": 0.051839897807451615,
+        "noseLengthRatio": 0.21146014170803332,
+        "noseWidthRatio": 0.146050504744027,
+        "mouthWidthRatio": 0.29594900418436826,
+        "jawTaper": 0.22214058777992257,
+        "earOffsetRatio": 0.39247200766980395
+      },
+      "body": {
+        "headToBody": 0.12337241235111432,
+        "shoulderRatio": 0.5643942193430821,
+        "torsoRatio": 0.5442900544902102,
+        "hipRatio": 0.5931944298246413,
+        "kneeRatio": 0.4374986405989992,
+        "ankleRatio": 0.5321947199459833,
+        "armLengthRatio": 0.28773386672626494,
+        "legLengthRatio": 0.39565179308342985
+      },
+      "skin": {
+        "meanRgb": [
+          0.4861790348410189,
+          0.42457751502739316,
+          0.38506899556112645
+        ],
+        "stdRgb": [
+          0.1955783995523505,
+          0.18358527527705454,
+          0.17395072496116115
+        ],
+        "spatialLowFrequency": 0.126100418561741,
+        "microContrast": 0.4127475621061376
+      },
+      "hair": {
+        "flowAngle": -0.07882997093319227,
+        "density": 0.4750067335823106,
+        "lengthRatio": 0.2658134243927205,
+        "strandVariance": 0.6662658460809775
+      },
+      "garment": {
+        "wrinkleAngle": 0.31020975976104714,
+        "wrinkleDensity": 0.748768370845436,
+        "roughnessProxy": 0.6329507756713953
+      },
+      "lighting": {
+        "gradientX": -0.045847129321602585,
+        "gradientY": 0.04063105465459465,
+        "ambient": 0.43076313584547066,
+        "shadowContrast": 0.1921581658112526
+      },
+      "hands": {
+        "palmWidthRatio": 0.09073488103271175,
+        "fingerLengthRatio": 0.41972878414879033,
+        "fingerSpread": 0.07493884610408531
+      },
+      "view": {
+        "yawProxy": -0.0285691604747344,
+        "pitchProxy": 0.03993010165352061,
+        "selfOcclusion": 0.4697493320202207
+      },
+      "provenance": {
+        "kind": "DETERMINISTIC_RULE_SPACE_SUBJECT",
+        "parentSubjectId": "fictional-seat-10",
+        "externalProvider": false,
+        "sourcePixelCopy": false,
+        "qualityEvidence": false
+      }
+    }
+  ]
+}

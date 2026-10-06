@@ -1,0 +1,15 @@
+{
+  "phase": "VISUAL_PIPELINE_P114",
+  "passed": true,
+  "checks": {
+    "body": true,
+    "formats": true,
+    "keyframe": true,
+    "sheet": true,
+    "tileMap": true,
+    "renderer": true,
+    "animation": true,
+    "similarityReceipt": true,
+    "reviewManifest": true
+  }
+}

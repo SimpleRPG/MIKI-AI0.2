@@ -1,0 +1,44 @@
+import { canonicalSha256Object } from './canonicalSha256Service';
+import type { P190Graph } from './fictionalPersonGraphLearningP190Service';
+
+export type P192LayerKind = 'BACKGROUND'|'CHAIR_BACK'|'REAR_HAIR'|'TORSO'|'HEAD'|'FACE_SURFACE'|'GARMENT'|'ARMS'|'HANDS'|'THIGHS'|'LOWER_LEGS'|'FEET'|'CHAIR_SEAT'|'CHAIR_FRONT'|'FRONT_HAIR'|'CONTACT_SHADOW';
+export interface P192ControlPoint { id:string; x:number; y:number; depth:number; radius:number; }
+export interface P192SurfacePatch { patchId:string; kind:P192LayerKind; depth:number; opacity:number; color:[number,number,number,number]; controlPointIds:string[]; curvature:number; material:'SKIN'|'HAIR'|'GARMENT'|'WOOD'|'SHADOW'|'BACKGROUND'; }
+export interface P192Joint { jointId:string; parentId?:string; x:number; y:number; depth:number; minAngle:number; maxAngle:number; angle:number; }
+export interface P192Contact { contactId:string; a:string; b:string; targetDistance:number; tolerance:number; }
+export interface P192Person25DModel { modelId:string; width:number; height:number; seed:number; controlPoints:P192ControlPoint[]; patches:P192SurfacePatch[]; joints:P192Joint[]; contacts:P192Contact[]; graphSha256:string; modelSha256:string; }
+export interface P192RenderResult { width:number; height:number; rgba:Uint8Array; opaquePixels:number; depthTransitions:number; contactErrors:string[]; renderSha256:string; }
+
+class LayeredPerson25DModelP192Service {
+ build(graph:P190Graph,seed:number,width=768,height=1024):P192Person25DModel {
+  const profile=graph.nodes.find(n=>n.kind==='FICTIONAL_CHARACTER_PROFILE');
+  const prior=graph.nodes.find(n=>n.kind==='SEATED_STRUCTURE_PRIOR');
+  if(!profile||!prior) throw new Error('P192_GRAPH_PROFILE_REQUIRED');
+  const rnd=this.random(seed), cx=.5+(rnd()-.5)*.05, headY=.20+(rnd()-.5)*.025, shoulderY=.34, hipY=.56, kneeY=.73, footY=.91;
+  const cp=(id:string,x:number,y:number,depth:number,radius:number):P192ControlPoint=>({id,x,y,depth,radius});
+  const controlPoints=[cp('head',cx,headY,.35,.085),cp('neck',cx,.29,.40,.035),cp('shoulderL',cx-.13,shoulderY,.46,.045),cp('shoulderR',cx+.13,shoulderY,.46,.045),cp('elbowL',cx-.18,.48,.56,.04),cp('elbowR',cx+.18,.48,.56,.04),cp('handL',cx-.08,.58,.72,.038),cp('handR',cx+.08,.58,.72,.038),cp('pelvis',cx,hipY,.52,.10),cp('kneeL',cx-.10,kneeY,.63,.055),cp('kneeR',cx+.10,kneeY,.61,.055),cp('footL',cx-.11,footY,.68,.065),cp('footR',cx+.11,footY,.66,.065),cp('seatL',cx-.22,.61,.76,.02),cp('seatR',cx+.22,.61,.76,.02),cp('backTop',cx+.18,.27,.82,.02),cp('backBottom',cx+.18,.61,.82,.02)];
+  const joint=(jointId:string,parentId:string|undefined,p:P192ControlPoint,minAngle:number,maxAngle:number,angle:number):P192Joint=>({jointId,parentId,x:p.x,y:p.y,depth:p.depth,minAngle,maxAngle,angle});
+  const m=new Map(controlPoints.map(x=>[x.id,x]));
+  const joints=[joint('root',undefined,m.get('pelvis')!,-12,12,0),joint('spine','root',m.get('neck')!,-18,18,-2),joint('head','spine',m.get('head')!,-28,28,3),joint('shoulderL','spine',m.get('shoulderL')!,-55,55,16),joint('elbowL','shoulderL',m.get('elbowL')!,0,145,72),joint('shoulderR','spine',m.get('shoulderR')!,-55,55,-14),joint('elbowR','shoulderR',m.get('elbowR')!,0,145,70),joint('hipL','root',m.get('pelvis')!,-35,35,8),joint('kneeL','hipL',m.get('kneeL')!,35,145,94),joint('hipR','root',m.get('pelvis')!,-35,35,-6),joint('kneeR','hipR',m.get('kneeR')!,35,145,92)];
+  const patch=(patchId:string,kind:P192LayerKind,depth:number,color:[number,number,number,number],ids:string[],curvature:number,material:P192SurfacePatch['material']):P192SurfacePatch=>({patchId,kind,depth,opacity:color[3]/255,color,controlPointIds:ids,curvature,material});
+  const patches=[patch('bg','BACKGROUND',.99,[224,220,214,255],[],0,'BACKGROUND'),patch('chair-back','CHAIR_BACK',.83,[102,63,38,255],['backTop','backBottom'],.04,'WOOD'),patch('rear-hair','REAR_HAIR',.42,[38,30,28,255],['head','neck'],.50,'HAIR'),patch('torso','TORSO',.50,[86,112,118,255],['shoulderL','shoulderR','pelvis'],.34,'GARMENT'),patch('head','HEAD',.37,[204,166,142,255],['head','neck'],.61,'SKIN'),patch('face','FACE_SURFACE',.30,[218,179,154,255],['head'],.72,'SKIN'),patch('garment','GARMENT',.48,[82,110,116,255],['shoulderL','shoulderR','pelvis','kneeL','kneeR'],.26,'GARMENT'),patch('arms','ARMS',.55,[200,161,140,255],['shoulderL','elbowL','handL','shoulderR','elbowR','handR'],.30,'SKIN'),patch('hands','HANDS',.24,[215,175,150,255],['handL','handR'],.70,'SKIN'),patch('thighs','THIGHS',.58,[73,79,86,255],['pelvis','kneeL','kneeR'],.22,'GARMENT'),patch('lower','LOWER_LEGS',.60,[66,71,78,255],['kneeL','kneeR','footL','footR'],.18,'GARMENT'),patch('feet','FEET',.28,[60,48,42,255],['footL','footR'],.30,'GARMENT'),patch('seat','CHAIR_SEAT',.78,[111,68,40,255],['seatL','seatR'],.03,'WOOD'),patch('chair-front','CHAIR_FRONT',.20,[96,58,35,255],['seatL','seatR','footL','footR'],.02,'WOOD'),patch('front-hair','FRONT_HAIR',.18,[42,32,28,255],['head'],.58,'HAIR'),patch('shadow','CONTACT_SHADOW',.10,[20,18,16,80],['footL','footR'],.10,'SHADOW')];
+  const contacts=[{contactId:'pelvis-seat',a:'pelvis',b:'seatL',targetDistance:.24,tolerance:.08},{contactId:'left-foot-floor',a:'footL',b:'floor',targetDistance:.09,tolerance:.035},{contactId:'right-foot-floor',a:'footR',b:'floor',targetDistance:.09,tolerance:.035},{contactId:'back-chair',a:'neck',b:'backTop',targetDistance:.19,tolerance:.10}];
+  const core:any={modelId:`P192-25D-${seed}`,width,height,seed,controlPoints,patches,joints,contacts,graphSha256:graph.graphSha256,modelSha256:''};
+  core.modelSha256=canonicalSha256Object({...core,modelSha256:''});return core;
+ }
+ render(model:P192Person25DModel):P192RenderResult {
+  const check={...model,modelSha256:''};if(canonicalSha256Object(check)!==model.modelSha256)throw new Error('P192_MODEL_SHA_MISMATCH');
+  const rgba=new Uint8Array(model.width*model.height*4),depth=new Float32Array(model.width*model.height);depth.fill(1e9);let opaquePixels=0,depthTransitions=0;
+  const cp=new Map(model.controlPoints.map(x=>[x.id,x]));
+  for(const patch of [...model.patches].sort((a,b)=>b.depth-a.depth)){if(patch.kind==='BACKGROUND'){this.fill(rgba,patch.color);continue;}const points=patch.controlPointIds.map(id=>cp.get(id)!).filter(Boolean);if(!points.length)continue;this.paintPatch(rgba,depth,model.width,model.height,patch,points);}
+  for(let i=3;i<rgba.length;i+=4)if(rgba[i]>0)opaquePixels++;
+  for(let y=1;y<model.height;y++)for(let x=1;x<model.width;x++){const i=y*model.width+x;if(Math.abs(depth[i]-depth[i-1])>.08||Math.abs(depth[i]-depth[i-model.width])>.08)depthTransitions++;}
+  const contactErrors=this.contacts(model,cp),renderSha256=canonicalSha256Object({modelSha256:model.modelSha256,opaquePixels,depthTransitions,contactErrors,rgbaHead:Array.from(rgba.slice(0,2048)),rgbaTail:Array.from(rgba.slice(-2048))});
+  return{width:model.width,height:model.height,rgba,opaquePixels,depthTransitions,contactErrors,renderSha256};
+ }
+ private paintPatch(rgba:Uint8Array,depth:Float32Array,w:number,h:number,p:P192SurfacePatch,points:P192ControlPoint[]){const xs=points.map(q=>q.x*w),ys=points.map(q=>q.y*h),r=Math.max(...points.map(q=>q.radius*Math.min(w,h)),12),minX=Math.max(0,Math.floor(Math.min(...xs)-r*2)),maxX=Math.min(w-1,Math.ceil(Math.max(...xs)+r*2)),minY=Math.max(0,Math.floor(Math.min(...ys)-r*2)),maxY=Math.min(h-1,Math.ceil(Math.max(...ys)+r*2));for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++){let field=0;for(let i=0;i<points.length;i++){const q=points[i],dx=x-q.x*w,dy=y-q.y*h,rr=Math.max(10,q.radius*Math.min(w,h)*(p.kind==='GARMENT'||p.kind==='THIGHS'?2.1:1.45));field=Math.max(field,1-(dx*dx+dy*dy)/(rr*rr));if(i){const a=points[i-1],vx=(q.x-a.x)*w,vy=(q.y-a.y)*h,l2=vx*vx+vy*vy||1,t=Math.max(0,Math.min(1,((x-a.x*w)*vx+(y-a.y*h)*vy)/l2)),px=a.x*w+vx*t,py=a.y*h+vy*t,dd=(x-px)**2+(y-py)**2;field=Math.max(field,1-dd/(rr*rr));}}if(field<=0)continue;const idx=y*w+x,z=p.depth-p.curvature*field*.05;if(z>=depth[idx])continue;depth[idx]=z;const shade=.70+.30*Math.max(0,Math.min(1,field)),a=(p.color[3]/255)*Math.min(1,field*2.4),di=idx*4;for(let c=0;c<3;c++)rgba[di+c]=Math.round(p.color[c]*shade*a+rgba[di+c]*(1-a));rgba[di+3]=Math.max(rgba[di+3],Math.round(255*a));}}
+ private contacts(model:P192Person25DModel,cp:Map<string,P192ControlPoint>){const errors:string[]=[];for(const c of model.contacts){const a=cp.get(c.a);if(!a)continue;if(c.b==='floor'){const d=1-a.y;if(Math.abs(d-c.targetDistance)>c.tolerance)errors.push(c.contactId);continue;}const b=cp.get(c.b);if(!b)continue;const d=Math.hypot(a.x-b.x,a.y-b.y);if(Math.abs(d-c.targetDistance)>c.tolerance)errors.push(c.contactId);}return errors;}
+ private fill(r:Uint8Array,c:[number,number,number,number]){for(let i=0;i<r.length;i+=4){r[i]=c[0];r[i+1]=c[1];r[i+2]=c[2];r[i+3]=c[3];}}
+ private random(seed:number){let s=seed>>>0;return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};}
+}
+export const layeredPerson25DModelP192Service=new LayeredPerson25DModelP192Service();

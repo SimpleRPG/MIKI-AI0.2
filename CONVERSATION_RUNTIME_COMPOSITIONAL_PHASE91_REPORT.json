@@ -1,0 +1,47 @@
+{
+  "phase": "CONVERSATION_RUNTIME_COMPOSITIONAL_91",
+  "passed": true,
+  "selectedText": "既存機能を維持できる場合、候補Aを採用します。\n理由は安全性の基準を満たしています。\nただし、実機検証は未完了です。\n\n次にGalaxy S25で確認します。",
+  "candidatesEvaluated": 2,
+  "selection": {
+    "method": "DETERMINISTIC_WEIGHTED_SELECTION_V1",
+    "selectedCandidateId": "runtime-candidate-1-d0d62e95",
+    "selectedSkeleton": "GENERAL_ANSWER",
+    "selectedScore": 97.07,
+    "evaluatedCandidates": [
+      {
+        "candidateId": "runtime-candidate-1-d0d62e95",
+        "skeleton": "GENERAL_ANSWER",
+        "score": 97.07,
+        "criteria": {
+          "accuracy": 100,
+          "goalFit": 100,
+          "constraintCompliance": 100,
+          "evidenceSupport": 100,
+          "unknownHandling": 95,
+          "detailFit": 79,
+          "safety": 100,
+          "userStateFit": 85
+        },
+        "tieBreakKey": "d0d62e95"
+      },
+      {
+        "candidateId": "runtime-candidate-2-a4d8ea3b",
+        "skeleton": "GENERAL_ANSWER",
+        "score": 59.75,
+        "criteria": {
+          "accuracy": 0,
+          "goalFit": 100,
+          "constraintCompliance": 0,
+          "evidenceSupport": 100,
+          "unknownHandling": 95,
+          "detailFit": 100,
+          "safety": 100,
+          "userStateFit": 85
+        },
+        "tieBreakKey": "a4d8ea3b"
+      }
+    ]
+  },
+  "templateFallbackAvailable": true
+}

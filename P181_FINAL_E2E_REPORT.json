@@ -1,0 +1,112 @@
+{
+  "phase": "P181_FINAL_QUALITY_LOOP_E2E",
+  "passed": true,
+  "iterations": [
+    {
+      "revision": "P180",
+      "result": "PASS_MECHANICS_BUT_LOW_VISUAL_FIDELITY",
+      "actions": [
+        "real texture fusion",
+        "mesh deformation",
+        "skinning",
+        "z-buffer",
+        "graph feedback"
+      ]
+    },
+    {
+      "revision": "P181-A",
+      "result": "FAIL_BORDER_LEAKAGE",
+      "actions": [
+        "added anatomy mask",
+        "added border leakage gate"
+      ]
+    },
+    {
+      "revision": "P181-B",
+      "result": "PASS",
+      "actions": [
+        "added inner viewport",
+        "re-ran nine candidate search",
+        "passed quality gates"
+      ]
+    }
+  ],
+  "quality": {
+    "phase": "ITERATIVE_PERSON_QUALITY_P181",
+    "passed": true,
+    "checks": {
+      "frontQuality": true,
+      "angledQuality": true,
+      "color": true,
+      "observed": true,
+      "borderLeakage": true,
+      "distinct": true,
+      "realPixels": true
+    },
+    "front": {
+      "candidateId": "P181-f30ff340d96e89b015c1",
+      "parameters": {
+        "yaw": 0,
+        "pitch": 0,
+        "feather": 14,
+        "saturation": 0.92
+      },
+      "metrics": {
+        "sourceColorSimilarity": 0.8796030795750528,
+        "edgeRetention": 0.40237430167597765,
+        "foregroundContinuity": 0.9960770873183858,
+        "observedPixelRatio": 0.4118175506591797,
+        "artifactPenalty": 0,
+        "borderLeakage": 0,
+        "qualityScore": 0.8425421145079292
+      }
+    },
+    "angled": {
+      "candidateId": "P181-ca00dc25a42642f62807",
+      "parameters": {
+        "yaw": 24,
+        "pitch": 10,
+        "feather": 14,
+        "saturation": 0.92
+      },
+      "metrics": {
+        "sourceColorSimilarity": 0.8784159369560411,
+        "edgeRetention": 0.39727653631284915,
+        "foregroundContinuity": 0.9972539573469855,
+        "observedPixelRatio": 0.3788938522338867,
+        "artifactPenalty": 0,
+        "borderLeakage": 0,
+        "qualityScore": 0.8272515452839347
+      }
+    },
+    "qualityGate": {
+      "front": 0.55,
+      "angled": 0.5,
+      "color": 0.45,
+      "observed": 0.2,
+      "borderLeakage": 0.08
+    },
+    "truthBoundary": "P181 selects the best candidate from nine render parameter combinations and refuses completion if objective quality gates fail. It is an image-based 2.5D portrait renderer, not unseen true 3D reconstruction."
+  },
+  "mesh": {
+    "pngSha256": "361755245ac1532f9f5a7624b34d396a74f4a5fe7c1d6a4f80c1bc05b0d7d60a",
+    "atlasSha256": "82e2c877b91e66788f0f441c1dccaef2e6d498298b1f3e949f35fa63af8fdf28",
+    "receiptSha256": "620c5f993a2444e943d666f166d303d00617636503ae02dbd2a09fa6ac44b663",
+    "width": 1024,
+    "height": 1536,
+    "metrics": {
+      "triangleCount": 2048,
+      "vertexCount": 1152,
+      "atlasObservedRatio": 1,
+      "opaqueCoverage": 0.16958300272623697,
+      "zVisiblePixels": 457431,
+      "personSpecificDisplacement": 0.00047776819958456816
+    }
+  },
+  "environmentLimitations": [
+    "No Cargo toolchain: Rust native compile/test not executed.",
+    "No Android device/emulator: native runtime E2E not executed.",
+    "Angled output is image-based 2.5D, not ground-truth unseen-view 3D reconstruction."
+  ],
+  "acceptanceScope": "Usable preview-quality person generation for observed/front and moderate-angle 2.5D output, with a separate mesh mechanics path. Not accepted as photorealistic 360-degree reconstruction."
+}

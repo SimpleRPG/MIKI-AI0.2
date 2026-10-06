@@ -1,0 +1,60 @@
+{
+  "phase": "SEARXNG_MEDIA_LIVE_E2E_P120",
+  "passed": true,
+  "checks": {
+    "httpSearch": true,
+    "sourceFetch": true,
+    "license": true,
+    "binaryMime": true,
+    "binaryBytes": true,
+    "binarySha": true,
+    "realNetworkAttemptRecorded": true
+  },
+  "packet": {
+    "intent": {
+      "query": "commons logo",
+      "kind": "IMAGE",
+      "maxResults": 3
+    },
+    "references": [
+      {
+        "mediaKind": "IMAGE",
+        "title": "Commons Logo Fixture",
+        "sourcePageUrl": "http://127.0.0.1:39737/page",
+        "mediaUrl": "http://127.0.0.1:39737/asset.png",
+        "thumbnailUrl": "http://127.0.0.1:39737/asset.png",
+        "mimeType": "image/png",
+        "creator": "Wikimedia fixture",
+        "searchProvider": "searxng",
+        "sourceEngine": "wikimedia",
+        "sourceVerified": true,
+        "extractionEvidence": [
+          "SEARXNG_RESULT",
+          "DIRECT_MEDIA_URL",
+          "THUMBNAIL_URL",
+          "OPEN_GRAPH_IMAGE",
+          "LICENSE_LINK",
+          "CREATOR_METADATA"
+        ],
+        "license": "CC-BY",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+        "attribution": "Wikimedia fixture / CC-BY"
+      }
+    ],
+    "rejected": [],
+    "packetSha256": "49aef704b23259a1770b05eb5917ad29e8430c5cb253066c2221acfa51c00ea8"
+  },
+  "binary": {
+    "sourcePageUrl": "http://127.0.0.1:39737/page",
+    "mediaUrl": "http://127.0.0.1:39737/asset.png",
+    "mimeType": "image/png",
+    "bytes": 70,
+    "sha256": "a8e2289c4f614a5f139062ed06c7eda228474eb0700b69e9566c379b935c227c"
+  },
+  "liveAttempt": {
+    "attempted": true,
+    "passed": false,
+    "error": "ENOTFOUND"
+  },
+  "environmentNote": "PUBLIC_NETWORK_DNS_OR_EGRESS_UNAVAILABLE"
+}

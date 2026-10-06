@@ -1,0 +1,156 @@
+{
+  "phase": "VISUAL_ASSET_LIBRARY_P118",
+  "passed": true,
+  "checks": {
+    "hash": true,
+    "layers": true,
+    "swap": true,
+    "video": true,
+    "selfImprovement": true,
+    "noDirectMutation": true
+  },
+  "library": {
+    "libraryId": "lib-1",
+    "assets": [
+      {
+        "assetId": "body-a",
+        "kind": "INDEXED_PIXEL",
+        "relativePath": "visual/generated/body-a.json",
+        "mimeType": "application/json",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bytes": 20,
+        "license": "DERIVED_CC0",
+        "temporary": false
+      },
+      {
+        "assetId": "coat",
+        "kind": "INDEXED_PIXEL",
+        "relativePath": "visual/generated/coat.json",
+        "mimeType": "application/json",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "bytes": 20,
+        "license": "DERIVED_CC0",
+        "temporary": false
+      },
+      {
+        "assetId": "ref",
+        "kind": "SOURCE_REFERENCE",
+        "relativePath": "visual/references/ref.json",
+        "mimeType": "video/webm",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "bytes": 0,
+        "sourcePageUrl": "https://example/source",
+        "mediaUrl": "https://example/video.webm",
+        "license": "CC0",
+        "temporary": true
+      },
+      {
+        "assetId": "shirt",
+        "kind": "INDEXED_PIXEL",
+        "relativePath": "visual/generated/shirt.json",
+        "mimeType": "application/json",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "bytes": 20,
+        "license": "DERIVED_CC0",
+        "temporary": false
+      }
+    ],
+    "layers": [
+      {
+        "layerId": "appearance-a",
+        "kind": "SUBJECT_APPEARANCE",
+        "assetIds": [
+          "body-a"
+        ],
+        "parameters": {
+          "toneProfile": "sample-a"
+        },
+        "sourceSha256List": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ]
+      },
+      {
+        "layerId": "coat-layer",
+        "kind": "OUTERWEAR",
+        "assetIds": [
+          "coat"
+        ],
+        "parameters": {
+          "fit": "loose"
+        },
+        "sourceSha256List": [
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ]
+      },
+      {
+        "layerId": "shirt-layer",
+        "kind": "GARMENT_UPPER",
+        "assetIds": [
+          "shirt"
+        ],
+        "parameters": {
+          "fit": "regular"
+        },
+        "sourceSha256List": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ]
+      }
+    ],
+    "manifestSha256": "9357d2c6dcdacaa5df389a44c1f3970d72548cef651fea4cd8cc778395df5c6d"
+  },
+  "avatar": {
+    "libraryId": "lib-1",
+    "selectedLayerIds": [
+      "appearance-a",
+      "coat-layer"
+    ],
+    "renderOrder": [
+      "BODY_SHAPE",
+      "SUBJECT_APPEARANCE",
+      "GARMENT_LOWER",
+      "GARMENT_UPPER",
+      "OUTERWEAR",
+      "FOOTWEAR",
+      "ACCESSORY",
+      "HAIR",
+      "POSE"
+    ],
+    "outputKinds": [
+      "INDEXED_PIXEL",
+      "CANVAS_SPEC",
+      "SPRITE_SHEET"
+    ],
+    "compositionSha256": "87724ed51d0d1e0784db0ee46a7fb719712caf7106618760a6544c26e98b388e"
+  },
+  "delivery": [
+    {
+      "assetId": "ref",
+      "videoUrl": "https://example/video.webm",
+      "sourcePageUrl": "https://example/source",
+      "license": "CC0",
+      "downloadable": false
+    }
+  ],
+  "evidence": {
+    "evidenceType": "VISUAL_ASSET_LIBRARY",
+    "manifestSha256": "9357d2c6dcdacaa5df389a44c1f3970d72548cef651fea4cd8cc778395df5c6d",
+    "paths": [
+      "visual/generated/body-a.json",
+      "visual/generated/coat.json",
+      "visual/references/ref.json",
+      "visual/generated/shirt.json"
+    ],
+    "layerKinds": [
+      "GARMENT_UPPER",
+      "OUTERWEAR",
+      "SUBJECT_APPEARANCE"
+    ],
+    "allowedUses": [
+      "AVATAR_CANDIDATE",
+      "CANVAS_CANDIDATE",
+      "PIXEL_ART_CANDIDATE",
+      "VISUAL_REGRESSION_FIXTURE"
+    ],
+    "directProductionMutation": false
+  }
+}

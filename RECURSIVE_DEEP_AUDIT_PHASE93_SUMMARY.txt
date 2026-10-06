@@ -1,0 +1,47 @@
+MIKI-AI Recursive Deep Audit Phase 93
+
+Scope
+- Indexed 870 TypeScript/TSX source files.
+- Identified 183 conversation/research/unknown/semantic/claim/evidence/memory-adjacent files.
+- Traversed imports from main, App, CoreOrchestrator and DomainIntegrationBootstrap production roots.
+- 714 source files are production-reachable.
+- 167 of 183 adjacent files are production-reachable; 16 remain outside the measured production closure.
+
+Confirmed findings
+1. Category facade drift
+   - conversation had a canonical pipeline, but unknown and memory still returned empty TODO receivers despite exporting mature services.
+   - Fixed by defining canonical category entries and pipeline metadata for unknown and memory.
+2. Orphan or export-only services
+   - 17 relevant service files have no direct non-facade production importer under the static graph.
+   - Seven legacy src/services files have zero importers and zero production reachability.
+   - memorySearchReceiptService and rustMemoryKernelService are also currently not production-reachable.
+   - Several miki services are export-only and reachable through category barrels but have no runtime consumer, including conversationEvaluationService, conversationKnowledgeUsePolicyService, offlineKnowledgePackService, virtualExpertService, scienceExperimentService, internalWebQueryLearningCycleService and dataFactoryService.
+3. Unknown research return bridge
+   - The Phase 92 bridge is exported and production-reachable through the category facade, but no direct runtime caller invokes resolveAndRespond yet. Its E2E is genuine service execution, not proof that every normal chat automatically enters it.
+4. Duplicate authorities
+   - 23 relevant basenames exist in more than one location. Some are intentional compatibility facades, but others need per-file authority review.
+   - Previously fixed ClaimDatabase and FormalSemantics use canonical re-export patterns. The audit does not assume all remaining duplicates are safe.
+5. Stale markers and UI fallback
+   - Unknown and memory TODO receivers were stale and are fixed.
+   - MemoryModal still reports an unconnected embedding path using an eight-dimensional sparse-vector fallback. This remains a real UI/runtime limitation.
+6. Testing truthfulness
+   - Phase 89 initially expected exactly five composition clauses. Natural condition integration reduced this to four without information loss. The stale test was updated to validate semantic content rather than fixed sentence count.
+
+Verification
+- Phase 92: PASS
+- Phase 91: PASS
+- Phase 89 updated contract: PASS
+- TypeScript: PASS
+- Relative imports: PASS
+- Production/server build: PASS
+
+Priority remaining work
+A. Trace and decide the seven completely orphaned legacy src/services implementations: migrate, facade, or delete only after behavior equivalence proof.
+B. Connect or explicitly retire memorySearchReceiptService and rustMemoryKernelService.
+C. Add a real normal-chat caller for unknownResearchConversationBridgeService rather than relying on category export and direct E2E invocation.
+D. Connect ConversationKnowledgeUsePolicy to answer planning so preference, instruction and external fact classification affects every response.
+E. Replace the MemoryModal sparse embedding fallback with the canonical embedding/native route when available, retaining a disclosed fallback.
+F. Audit the 23 duplicate basenames for divergent singleton state and storage-key collisions.
+
+Honest boundary
+Static reachability cannot prove runtime behavior for dynamic imports, plugin callbacks or Android-native registration. Those require instrumented app/device runs. Export through a barrel is not counted as evidence of real feature use.

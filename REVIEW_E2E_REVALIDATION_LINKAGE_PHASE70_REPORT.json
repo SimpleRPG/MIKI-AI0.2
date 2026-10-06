@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "phase": "REVIEW_E2E_REVALIDATION_LINKAGE_70",
+  "workspaceE2EConnected": true,
+  "proofSuiteConnected": true,
+  "manifestGateConnected": true,
+  "cumulativeRevalidationConnected": true,
+  "canaryConnected": true,
+  "explicitExecutionOnly": true,
+  "servicesScanned": 332,
+  "remainingSingleReferenceServices": 0,
+  "requiredStillDisconnected": [],
+  "failures": []
+}

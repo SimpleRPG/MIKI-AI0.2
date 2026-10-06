@@ -1,0 +1,129 @@
+{
+  "phase": "RICH_VISUAL_E2E_P125",
+  "passed": true,
+  "checks": {
+    "characterPng": true,
+    "walkPng": true,
+    "scenePng": true,
+    "eightFrames": true,
+    "sceneSize": true,
+    "hashes": true,
+    "truth": true
+  },
+  "artifacts": {
+    "character": {
+      "kind": "CHARACTER",
+      "width": 48,
+      "height": 64,
+      "sha256": "5610737bba45f25d71e4946ca0294f388d31cbd9abdb5075257f5fe4bb8773a0",
+      "metadataSha256": "2c993636ec8796c042eb65c93de965e2ef0dd1a66c112acf854a31fd49b5280e",
+      "bytes": 410
+    },
+    "walkStrip": {
+      "kind": "WALK_STRIP",
+      "width": 384,
+      "height": 256,
+      "sha256": "dffc7386e1b8f9fd7d037662588a67d18925bc816a756e39f7f4949397beaaac",
+      "metadataSha256": "4a6f0561f5def7afa5ee3a952f39e45718741ab4a775723ff390e3a95e1e2a67",
+      "bytes": 5163
+    },
+    "scene": {
+      "kind": "SCENE",
+      "width": 640,
+      "height": 360,
+      "sha256": "dcb39d9b0f8b25b48f172f54c7baa9189ecc20fcc344ad2b9030e86200893edf",
+      "metadataSha256": "1aebbb2d252f90f74ae734fd193b4e410efb08bb41de6cc1fabeb0c726cba319",
+      "bytes": 5919
+    }
+  },
+  "truth": {
+    "requested": "P125 real output",
+    "receipts": [
+      {
+        "capability": "INTENT_PARSE",
+        "implemented": true,
+        "verified": true,
+        "evidence": [],
+        "limitations": []
+      },
+      {
+        "capability": "MEDIA_REFERENCE",
+        "implemented": true,
+        "verified": true,
+        "evidence": [],
+        "limitations": []
+      },
+      {
+        "capability": "PROJECT_COMPOSITION",
+        "implemented": true,
+        "verified": true,
+        "evidence": [],
+        "limitations": []
+      },
+      {
+        "capability": "RECT_CIRCLE_TEXT_CANVAS",
+        "implemented": true,
+        "verified": true,
+        "evidence": [],
+        "limitations": []
+      },
+      {
+        "capability": "INDEXED_PIXEL_DATA",
+        "implemented": true,
+        "verified": true,
+        "evidence": [],
+        "limitations": []
+      },
+      {
+        "capability": "RICH_PIXEL_CHARACTER",
+        "implemented": true,
+        "verified": true,
+        "evidence": [
+          "5610737bba45f25d71e4946ca0294f388d31cbd9abdb5075257f5fe4bb8773a0",
+          "dffc7386e1b8f9fd7d037662588a67d18925bc816a756e39f7f4949397beaaac"
+        ],
+        "limitations": []
+      },
+      {
+        "capability": "RICH_SCENE",
+        "implemented": true,
+        "verified": true,
+        "evidence": [
+          "dcb39d9b0f8b25b48f172f54c7baa9189ecc20fcc344ad2b9030e86200893edf"
+        ],
+        "limitations": []
+      },
+      {
+        "capability": "PNG_BINARY",
+        "implemented": true,
+        "verified": true,
+        "evidence": [
+          "5610737bba45f25d71e4946ca0294f388d31cbd9abdb5075257f5fe4bb8773a0",
+          "dffc7386e1b8f9fd7d037662588a67d18925bc816a756e39f7f4949397beaaac",
+          "dcb39d9b0f8b25b48f172f54c7baa9189ecc20fcc344ad2b9030e86200893edf"
+        ],
+        "limitations": []
+      },
+      {
+        "capability": "ANIMATED_PREVIEW",
+        "implemented": true,
+        "verified": true,
+        "evidence": [
+          "dffc7386e1b8f9fd7d037662588a67d18925bc816a756e39f7f4949397beaaac"
+        ],
+        "limitations": []
+      }
+    ],
+    "claimLevel": "RICH_OUTPUT_VERIFIED",
+    "allowedClaims": [
+      "通常会話のVisual Intentを構造化できる",
+      "SearXNG由来の画像Card・動画Linkを構造化できる",
+      "複数Visual ProjectとRevisionを構成できる",
+      "基礎CanvasまたはIndexed Pixel Dataを生成できる",
+      "実Binary Previewを生成済みと表明できる",
+      "詳細人物Spriteと探索Sceneを実出力検証済みと表明できる"
+    ],
+    "blockedClaims": [],
+    "receiptSha256": "459d25f2ca15c65446f934ae3a43c828abc29bc6044559e8adf1536deba95f86"
+  }
+}

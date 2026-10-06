@@ -10,6 +10,12 @@ import { reusableComponentFactoryService } from './reusableComponentFactoryServi
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 import { externalDirectiveIntakeService, type ExternalDirectiveStatus } from './externalDirectiveIntakeService';
 import { EvidenceService } from '../../memory/services/evidenceService';
+import { multiReviewerConsensusService, type ReviewConsensus, type ReviewerOpinion } from './multiReviewerConsensusService';
+import { reviewerReliabilityService, type ReviewOutcome, type ReviewerReliabilityProfile } from './reviewerReliabilityService';
+import { humanAdoptionApprovalReceiptService } from '../../selfDevelopment/services/humanAdoptionApprovalReceiptService';
+import { formalAdoptionAuthorizationService } from '../../selfDevelopment/services/formalAdoptionAuthorizationService';
+import { formalAdoptionAuthorizationLedgerService } from '../../selfDevelopment/services/formalAdoptionAuthorizationLedgerService';
+import { isolatedCandidateWorkspaceService } from './isolatedCandidateWorkspaceService';
 
 export type ExternalAiRole = 'REVIEWER' | 'UNKNOWN_COMPONENT_AUTHOR' | 'TEACHER';
 export type ExternalReviewSourceType = 'PASTED_TEXT' | 'IMPORTED_TXT' | 'IMPORTED_JSON';
@@ -20,6 +26,8 @@ export type ExternalReviewDecisionValue = 'ACCEPT' | 'REJECT' | 'REQUEST_CHANGES
 export interface ExternalReviewRecord {
   externalReviewId: string;
   externalAiRole: ExternalAiRole;
+  reviewerId: string;
+  reviewDomain: string;
   packageId: string;
   packageRevision: number;
   candidateManifestSha256: string;
@@ -88,6 +96,8 @@ class ExternalReviewIntakeService {
     rawResponse: string;
     sourceType: ExternalReviewSourceType;
     externalAiRole?: ExternalAiRole;
+    reviewerId?: string;
+    reviewDomain?: string;
     importedFileName?: string;
     importedFileSize?: number;
   }): Promise<ExternalReviewRecord> {
@@ -126,6 +136,8 @@ class ExternalReviewIntakeService {
     const record: ExternalReviewRecord = {
       externalReviewId,
       externalAiRole: input.externalAiRole || 'REVIEWER',
+      reviewerId: input.reviewerId?.trim() || 'EXTERNAL_AI_DEFAULT',
+      reviewDomain: input.reviewDomain?.trim() || 'GENERAL',
       packageId: reviewPackage.packageId,
       packageRevision: reviewPackage.packageRevision,
       candidateManifestSha256: reviewPackage.candidateManifestSha256,
@@ -178,6 +190,17 @@ class ExternalReviewIntakeService {
     }
     if(!lifecycleTransitionPolicyService.isDecisionEligiblePackageStatus(reviewPackage.status))throw new Error(`REVIEW_PACKAGE_NOT_DECISION_ELIGIBLE:${reviewPackage.status}`);
 
+    let adoptionAuthorization;
+    if (input.decision === 'ACCEPT') {
+      const workspace=isolatedCandidateWorkspaceService.get(reviewPackage.workspaceId);
+      if(!workspace)throw new Error('ADOPTION_WORKSPACE_NOT_FOUND');
+      const candidateId=reviewPackage.candidateId||reviewPackage.packageId;
+      const approvalReceipt=humanAdoptionApprovalReceiptService.create({candidateId,candidateHash:reviewPackage.candidateManifestSha256,reviewPackageHash:reviewPackage.zipSha256,baseRevision:workspace.baseSnapshotSha256,approver:'LOCAL_USER',decision:'APPROVE',reason:normalizedReason||'Explicit candidate adoption approval'});
+      adoptionAuthorization=formalAdoptionAuthorizationService.authorize({candidateId,candidateHash:reviewPackage.candidateManifestSha256,reviewPackageHash:reviewPackage.zipSha256,baseRevision:workspace.baseSnapshotSha256,currentBaseRevision:workspace.baseSnapshotSha256,validationPassed:true,unexecutedChecks:[],externalReview:{candidateId,candidateHash:record.candidateManifestSha256,reviewPackageHash:record.zipSha256,verdict:record.externalVerdict,warnings:record.risks},humanApproved:false,approvalReceipt});
+      if(!adoptionAuthorization.authorized)throw new Error(`FORMAL_ADOPTION_AUTHORIZATION_BLOCKED:${adoptionAuthorization.reasons.join('|')}`);
+      formalAdoptionAuthorizationLedgerService.register(adoptionAuthorization);
+    }
+
     const decisionId = `ERD-${crypto.randomUUID()}`;
     let decision: ExternalReviewDecision = {
       decisionId, externalReviewId: record.externalReviewId,
@@ -209,6 +232,7 @@ class ExternalReviewIntakeService {
           transactionId:reviewPackage.transactionId,
           persistenceReceiptId:reviewPackage.persistenceReceiptId,
           operationInstanceId:reviewPackage.operationInstanceId,
+          adoptionAuthorization,
         },
         maxCycles:18,
       });
@@ -344,6 +368,19 @@ class ExternalReviewIntakeService {
     return { ...decision };
   }
 
+  buildConsensus(packageId:string,minimumReviewers=2):ReviewConsensus{
+    const reviews=this.list(packageId);
+    if(!reviews.length)throw new Error('EXTERNAL_REVIEWS_REQUIRED');
+    const candidateManifestSha256=reviews[0].candidateManifestSha256;
+    const opinions:ReviewerOpinion[]=reviews.map(review=>({externalReviewId:review.externalReviewId,reviewerId:review.reviewerId,domain:review.reviewDomain,candidateManifestSha256:review.candidateManifestSha256,verdict:review.externalVerdict==='ACCEPT'?'ACCEPT':review.externalVerdict==='REJECT'?'REJECT':review.externalVerdict==='CHANGES_REQUESTED'?'REQUEST_CHANGES':'HOLD',reasons:[...review.risks,...review.strengths],requestedChanges:[...review.requestedChanges]}));
+    return multiReviewerConsensusService.build({candidateManifestSha256,opinions,minimumReviewers});
+  }
+
+  recordReviewerOutcome(externalReviewId:string,outcome:ReviewOutcome):ReviewerReliabilityProfile{
+    const review=this.records.get(externalReviewId);if(!review)throw new Error('EXTERNAL_REVIEW_NOT_FOUND');
+    return reviewerReliabilityService.record({reviewerId:review.reviewerId,domain:review.reviewDomain,outcome});
+  }
+
   list(packageId?: string): ExternalReviewRecord[] {
     return [...this.records.values()]
       .filter(record => !packageId || record.packageId === packageId)
@@ -421,7 +458,7 @@ class ExternalReviewIntakeService {
   private load(): void {
     try {
       const records = storageService.getJson<ExternalReviewRecord[]>(RECORDS_KEY, []);
-      if (Array.isArray(records)) for (const record of records) if (record?.externalReviewId) this.records.set(record.externalReviewId, record);
+      if (Array.isArray(records)) for (const record of records) if (record?.externalReviewId) this.records.set(record.externalReviewId, { reviewerId:'EXTERNAL_AI_DEFAULT', reviewDomain:'GENERAL', ...record });
       const decisions=storageService.getJson<ExternalReviewDecision[]>(DECISIONS_KEY,[]);
       let recoveredPending=false;
       if(Array.isArray(decisions)){

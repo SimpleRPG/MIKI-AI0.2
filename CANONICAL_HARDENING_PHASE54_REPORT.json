@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "phase": "CANONICAL_SEMANTIC_CONVERSATION_CODEGEN_HARDENING_54",
+  "canonicalServicesEnhanced": 5,
+  "retiredDuplicateReferences": 0,
+  "typescriptFilesScanned": 855,
+  "failures": []
+}

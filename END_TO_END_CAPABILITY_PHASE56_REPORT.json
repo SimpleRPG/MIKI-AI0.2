@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "phase": "END_TO_END_CAPABILITY_INTEGRATION_56",
+  "existingServicesConnected": 7,
+  "newParallelPipelines": 0,
+  "failures": []
+}

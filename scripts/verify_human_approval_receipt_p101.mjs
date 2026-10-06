@@ -1,0 +1,11 @@
+import { writeFileSync } from 'node:fs';
+import { humanAdoptionApprovalReceiptService as service } from '../src/miki/selfDevelopment/services/humanAdoptionApprovalReceiptService.ts';
+const input={candidateId:'C-101',candidateHash:'HASH-A',reviewPackageHash:'ZIP-A',baseRevision:'BASE-A',approver:'user',decision:'APPROVE',reason:'reviewed'};
+const receipt=service.create(input);
+const valid=service.validate(receipt,input);
+service.invalidateForRevision(input.candidateId,'HASH-B','ZIP-B','BASE-B');
+const stale=service.latestActive(input.candidateId);
+const rows=service.list(input.candidateId);
+const tampered={...receipt,reason:'tampered'};
+const report={phase:'HUMAN_APPROVAL_RECEIPT_P101',passed:valid.length===0&&!stale&&rows.some(row=>row.status==='STALE')&&service.validate(tampered,input).includes('HUMAN_APPROVAL_RECEIPT_HASH_INVALID'),valid,rows,tamperedReasons:service.validate(tampered,input)};
+writeFileSync('HUMAN_APPROVAL_RECEIPT_P101_REPORT.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));if(!report.passed)process.exit(1);

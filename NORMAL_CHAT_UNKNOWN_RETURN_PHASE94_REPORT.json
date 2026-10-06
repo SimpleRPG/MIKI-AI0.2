@@ -1,0 +1,41 @@
+{
+  "phase": "NORMAL_CHAT_UNKNOWN_RETURN_94",
+  "passed": true,
+  "result": {
+    "replyText": "「FoobarnativeX」は現時点で確認できません\n\n【次の検証・作業項目】\n・検索または追加資料で確認します\n\n※環境依存パラメータが存在するため、事前の検証テストの実施をお勧めします。 本件がお役に立ちましたら幸甚に存じます。",
+    "nextConversationState": {
+      "currentTopic": "FoobarnativeX",
+      "topLevelGoal": "",
+      "stage": "QUESTION",
+      "confirmedFacts": [],
+      "corrections": [],
+      "invalidatedAssumptions": [],
+      "pendingQuestions": [],
+      "expectedResponseLength": "standard",
+      "recentEntities": [],
+      "updatedAt": 1791275924036
+    },
+    "status": "UNRESOLVED",
+    "reason": "unknown_research_no_evidence",
+    "intentCategory": "QUESTION",
+    "matchedClaimsCount": 0,
+    "usedComponents": [
+      "unknownResearchConversationBridgeService"
+    ],
+    "deterministic": true,
+    "cspSatisfied": true,
+    "telemetry": {
+      "totalMs": 84,
+      "cpuMs": 84,
+      "npuMs": 0,
+      "gpuMs": 0,
+      "stages": {
+        "japanese": 0
+      },
+      "externalBytesSent": 0
+    },
+    "researchPerformed": false,
+    "researchEvidenceCount": 0,
+    "knowledgeGapId": "UNK-1791275924093"
+  }
+}

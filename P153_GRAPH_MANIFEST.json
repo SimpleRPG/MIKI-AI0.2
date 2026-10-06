@@ -1,0 +1,322 @@
+{
+  "format": "MIKI_CORE_GRAPH_SHARDS_V1",
+  "domains": [
+    "core",
+    "autonomy",
+    "capability",
+    "conversation",
+    "data",
+    "execution",
+    "experience",
+    "improvement",
+    "learning",
+    "memory",
+    "promotion",
+    "research",
+    "safety",
+    "selfAwareness",
+    "selfDevelopment",
+    "strategy",
+    "unknown",
+    "verification"
+  ],
+  "shards": [
+    {
+      "shardId": "S-18e6257471f38cfdb6504e8d",
+      "domain": "selfDevelopment",
+      "bucket": "79",
+      "nodeIds": [
+        "N-79352ede1756cbe8fb990d53"
+      ],
+      "edgeIds": [
+        "E-982de8b6cf645275eeb756bd"
+      ],
+      "byteLength": 634,
+      "sha256": "18e6257471f38cfdb6504e8dc45d49ed794a3ba1773bd4a6da58225175aba375"
+    },
+    {
+      "shardId": "S-27e33af988024f1469b8c4ac",
+      "domain": "conversation",
+      "bucket": "7e",
+      "nodeIds": [
+        "N-7e41f1a080ed94b33299efe6"
+      ],
+      "edgeIds": [
+        "E-cc20b6de43ef8543b5a5bb64"
+      ],
+      "byteLength": 599,
+      "sha256": "27e33af988024f1469b8c4ac639058d9fafe0fa710d4bfe521b07119fa543fa7"
+    },
+    {
+      "shardId": "S-27f9167540d6f42a41a219d6",
+      "domain": "verification",
+      "bucket": "8f",
+      "nodeIds": [
+        "N-8f1c5dadc65873834828bd81"
+      ],
+      "edgeIds": [],
+      "byteLength": 329,
+      "sha256": "27f9167540d6f42a41a219d67c0c52a1a82791f4f59f30eb906eca30ed20fffc"
+    },
+    {
+      "shardId": "S-4870a27bcaa990f8333a20ed",
+      "domain": "data",
+      "bucket": "0f",
+      "nodeIds": [
+        "N-0f6414a17d397aec27d22922"
+      ],
+      "edgeIds": [
+        "E-a721b4fc4e7961a0fd343b79"
+      ],
+      "byteLength": 733,
+      "sha256": "4870a27bcaa990f8333a20ed831ca187c0d9ffb816e3cc966e5de99aaee540ba"
+    },
+    {
+      "shardId": "S-5d9983788eb2b1c014dbfa9e",
+      "domain": "conversation",
+      "bucket": "da",
+      "nodeIds": [
+        "N-da2d29b00bab665a8669252a"
+      ],
+      "edgeIds": [
+        "E-822c7cd52ac9251dcaeadadb"
+      ],
+      "byteLength": 555,
+      "sha256": "5d9983788eb2b1c014dbfa9e3fa9a4436de39f5d31506df9830637ae97189fe0"
+    },
+    {
+      "shardId": "S-73abaaf419e8facccb51ecff",
+      "domain": "selfAwareness",
+      "bucket": "38",
+      "nodeIds": [
+        "N-3876b03fcf37c89cf6a6812d"
+      ],
+      "edgeIds": [],
+      "byteLength": 294,
+      "sha256": "73abaaf419e8facccb51ecff1d1475803b6b8fc0faece7db714dadcbfc64f0c1"
+    },
+    {
+      "shardId": "S-789d41d5fb0ebcdf7c277043",
+      "domain": "data",
+      "bucket": "57",
+      "nodeIds": [
+        "N-5747885c19cd5c047093f6ec"
+      ],
+      "edgeIds": [
+        "E-6e6c5b44d91233aff2def65d"
+      ],
+      "byteLength": 3179,
+      "sha256": "789d41d5fb0ebcdf7c2770434dae5e91b9a6d199395cde356bb71f67b015cb57"
+    },
+    {
+      "shardId": "S-8f17d60ef68e26d345663fb7",
+      "domain": "experience",
+      "bucket": "03",
+      "nodeIds": [
+        "N-039f481f09132dc560f091f1"
+      ],
+      "edgeIds": [
+        "E-eef0b6e5c70143198b839cf1"
+      ],
+      "byteLength": 600,
+      "sha256": "8f17d60ef68e26d345663fb7fe6ebe59fe5098dcffca4c20e4c4483599102455"
+    },
+    {
+      "shardId": "S-95d76e5a4f22534e2223fed3",
+      "domain": "verification",
+      "bucket": "7c",
+      "nodeIds": [
+        "N-7c33395831fbb39555fc272e"
+      ],
+      "edgeIds": [
+        "E-f881e04ff62336a02f3ca329"
+      ],
+      "byteLength": 526,
+      "sha256": "95d76e5a4f22534e2223fed36b38762dffd408ad2c1ee0c6d913d640fe78e63e"
+    },
+    {
+      "shardId": "S-97c5e443f317bbef75cf602b",
+      "domain": "strategy",
+      "bucket": "1e",
+      "nodeIds": [
+        "N-1e36a6cbe3172cfa61bdac33"
+      ],
+      "edgeIds": [
+        "E-4a0aaefd0dfe72d50e9f6d62"
+      ],
+      "byteLength": 603,
+      "sha256": "97c5e443f317bbef75cf602bdc90749344152d391156f286f4723cf2557a113a"
+    },
+    {
+      "shardId": "S-9afa126f83dbfb67be2f91d4",
+      "domain": "experience",
+      "bucket": "a9",
+      "nodeIds": [
+        "N-a98b7449611e17be88e5e648"
+      ],
+      "edgeIds": [
+        "E-a940e06d9a2c710679dd1fe2"
+      ],
+      "byteLength": 619,
+      "sha256": "9afa126f83dbfb67be2f91d4e0477917dd1ec2e9f81c449cb9ea4548e237e740"
+    },
+    {
+      "shardId": "S-ab077873b7796a8084b28295",
+      "domain": "selfAwareness",
+      "bucket": "a0",
+      "nodeIds": [
+        "N-a06aac84027aca483d995952"
+      ],
+      "edgeIds": [
+        "E-88147f45b206f232d1f7a9bb"
+      ],
+      "byteLength": 1868,
+      "sha256": "ab077873b7796a8084b28295cca901f5aee317516e735c1f21640b2a0d029069"
+    },
+    {
+      "shardId": "S-da78b443b46e6b43ef472512",
+      "domain": "selfAwareness",
+      "bucket": "84",
+      "nodeIds": [
+        "N-8406911bbe055bd04ae17796"
+      ],
+      "edgeIds": [
+        "E-944ae563f30510bc2059edc8"
+      ],
+      "byteLength": 8359,
+      "sha256": "da78b443b46e6b43ef4725122f2a2a87f1ef57ec2962c823431a1ee8cd4b9a2c"
+    },
+    {
+      "shardId": "S-ddaa3f8831467e11e817cd05",
+      "domain": "memory",
+      "bucket": "b9",
+      "nodeIds": [
+        "N-b95950121944511af8508c19"
+      ],
+      "edgeIds": [
+        "E-ef0bcca9e84b76fac41cf66a"
+      ],
+      "byteLength": 590,
+      "sha256": "ddaa3f8831467e11e817cd055de5687e3f345c694283000dbd4464d27f4b87fa"
+    },
+    {
+      "shardId": "S-f1328c09a35c48e7d21fdcb7",
+      "domain": "data",
+      "bucket": "ad",
+      "nodeIds": [
+        "N-ad3ed8f81520e8394ae41731"
+      ],
+      "edgeIds": [
+        "E-69ba90dd835f1c57f0ea0f0b"
+      ],
+      "byteLength": 3115,
+      "sha256": "f1328c09a35c48e7d21fdcb7296df78cdf6a1e34c24151f04e58b4622ed42189"
+    },
+    {
+      "shardId": "S-f71a983df3e705411e513066",
+      "domain": "memory",
+      "bucket": "75",
+      "nodeIds": [
+        "N-756aed47f28909816334a1b2"
+      ],
+      "edgeIds": [
+        "E-34fd87185458235c7772b7e5"
+      ],
+      "byteLength": 598,
+      "sha256": "f71a983df3e705411e513066f31682e2adc0c508d7a889148feb7e6394e4b6e5"
+    }
+  ],
+  "nodeIndex": {
+    "N-039f481f09132dc560f091f1": "S-8f17d60ef68e26d345663fb7",
+    "N-0f6414a17d397aec27d22922": "S-4870a27bcaa990f8333a20ed",
+    "N-1e36a6cbe3172cfa61bdac33": "S-97c5e443f317bbef75cf602b",
+    "N-3876b03fcf37c89cf6a6812d": "S-73abaaf419e8facccb51ecff",
+    "N-5747885c19cd5c047093f6ec": "S-789d41d5fb0ebcdf7c277043",
+    "N-756aed47f28909816334a1b2": "S-f71a983df3e705411e513066",
+    "N-79352ede1756cbe8fb990d53": "S-18e6257471f38cfdb6504e8d",
+    "N-7c33395831fbb39555fc272e": "S-95d76e5a4f22534e2223fed3",
+    "N-7e41f1a080ed94b33299efe6": "S-27e33af988024f1469b8c4ac",
+    "N-8406911bbe055bd04ae17796": "S-da78b443b46e6b43ef472512",
+    "N-8f1c5dadc65873834828bd81": "S-27f9167540d6f42a41a219d6",
+    "N-a06aac84027aca483d995952": "S-ab077873b7796a8084b28295",
+    "N-a98b7449611e17be88e5e648": "S-9afa126f83dbfb67be2f91d4",
+    "N-ad3ed8f81520e8394ae41731": "S-f1328c09a35c48e7d21fdcb7",
+    "N-b95950121944511af8508c19": "S-ddaa3f8831467e11e817cd05",
+    "N-da2d29b00bab665a8669252a": "S-5d9983788eb2b1c014dbfa9e"
+  },
+  "edgeIndex": {
+    "E-eef0b6e5c70143198b839cf1": "S-8f17d60ef68e26d345663fb7",
+    "E-a721b4fc4e7961a0fd343b79": "S-4870a27bcaa990f8333a20ed",
+    "E-4a0aaefd0dfe72d50e9f6d62": "S-97c5e443f317bbef75cf602b",
+    "E-6e6c5b44d91233aff2def65d": "S-789d41d5fb0ebcdf7c277043",
+    "E-34fd87185458235c7772b7e5": "S-f71a983df3e705411e513066",
+    "E-982de8b6cf645275eeb756bd": "S-18e6257471f38cfdb6504e8d",
+    "E-f881e04ff62336a02f3ca329": "S-95d76e5a4f22534e2223fed3",
+    "E-cc20b6de43ef8543b5a5bb64": "S-27e33af988024f1469b8c4ac",
+    "E-944ae563f30510bc2059edc8": "S-da78b443b46e6b43ef472512",
+    "E-88147f45b206f232d1f7a9bb": "S-ab077873b7796a8084b28295",
+    "E-a940e06d9a2c710679dd1fe2": "S-9afa126f83dbfb67be2f91d4",
+    "E-69ba90dd835f1c57f0ea0f0b": "S-f1328c09a35c48e7d21fdcb7",
+    "E-ef0bcca9e84b76fac41cf66a": "S-ddaa3f8831467e11e817cd05",
+    "E-822c7cd52ac9251dcaeadadb": "S-5d9983788eb2b1c014dbfa9e"
+  },
+  "subjectIndex": {
+    "experience:user-correction": [
+      "N-039f481f09132dc560f091f1"
+    ],
+    "visual:p150": [
+      "N-0f6414a17d397aec27d22922",
+      "N-a06aac84027aca483d995952"
+    ],
+    "requirement:p152": [
+      "N-1e36a6cbe3172cfa61bdac33"
+    ],
+    "person:test": [
+      "N-3876b03fcf37c89cf6a6812d"
+    ],
+    "visual:p149": [
+      "N-5747885c19cd5c047093f6ec"
+    ],
+    "memory:visual-completion": [
+      "N-756aed47f28909816334a1b2"
+    ],
+    "code:unifiedGraphIngestionP152Service": [
+      "N-79352ede1756cbe8fb990d53"
+    ],
+    "validation:p151": [
+      "N-7c33395831fbb39555fc272e"
+    ],
+    "conversation:p152": [
+      "N-7e41f1a080ed94b33299efe6"
+    ],
+    "person:p144": [
+      "N-8406911bbe055bd04ae17796"
+    ],
+    "validation:p152": [
+      "N-8f1c5dadc65873834828bd81"
+    ],
+    "experience:p152": [
+      "N-a98b7449611e17be88e5e648"
+    ],
+    "visual:p148": [
+      "N-ad3ed8f81520e8394ae41731"
+    ],
+    "memory:p152": [
+      "N-b95950121944511af8508c19"
+    ],
+    "conversation:p151": [
+      "N-da2d29b00bab665a8669252a"
+    ]
+  },
+  "blobIndex": {
+    "B-aaaaaaaaaaaaaaaaaaaaaaaa": {
+      "blobId": "B-aaaaaaaaaaaaaaaaaaaaaaaa",
+      "contentSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "mediaType": "image/png",
+      "byteLength": 488812,
+      "storageKey": "blobs/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
+    }
+  },
+  "journalSequence": 30,
+  "manifestSha256": "a954e92809fdfab1b5d7cbfce231ad5085030987e06e510a7191b098bc28abd2"
+}

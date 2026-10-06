@@ -3,6 +3,8 @@ import { reviewCandidateExportService, type ReviewCandidatePackage } from '../..
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { candidateRepairRetryLoopService, type RepairRetryLoopResult } from './candidateRepairRetryLoopService';
 
+export interface CandidateIntegrityEvidence{contractPassed:boolean;semanticPassed:boolean;dependencyPassed:boolean;runtimePassed:boolean;resourcePassed:boolean;reasons:string[];}
+
 export interface CandidateDevelopmentCompletionResult {
   passed:boolean;
   finalWorkspaceId:string;
@@ -14,7 +16,8 @@ export interface CandidateDevelopmentCompletionResult {
 }
 
 class CandidateDevelopmentCompletionService {
-  public async complete(initialWorkspaceId:string,maxRepairAttempts=3):Promise<CandidateDevelopmentCompletionResult>{
+  public async complete(initialWorkspaceId:string,maxRepairAttempts=3,integrity?:CandidateIntegrityEvidence):Promise<CandidateDevelopmentCompletionResult>{
+    if(integrity && (!integrity.contractPassed || !integrity.semanticPassed || !integrity.dependencyPassed || !integrity.runtimePassed || !integrity.resourcePassed)){const retryResult={passed:false,finalWorkspaceId:initialWorkspaceId,attempts:[],stopReason:'INTEGRITY_GATE_REJECTED'} as RepairRetryLoopResult;return this.result(false,retryResult,undefined,undefined,['INTEGRITY_GATE_REJECTED',...(integrity?.reasons||[])]);}
     const retryResult=await candidateRepairRetryLoopService.run(initialWorkspaceId,maxRepairAttempts);
     if(retryResult.passed){
       const reviewPackage=reviewCandidateExportService.create(retryResult.finalWorkspaceId);

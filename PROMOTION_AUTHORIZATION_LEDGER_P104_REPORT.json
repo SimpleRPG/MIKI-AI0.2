@@ -1,0 +1,59 @@
+{
+  "phase": "PROMOTION_AUTHORIZATION_LEDGER_P104",
+  "passed": true,
+  "auth": {
+    "authorizationId": "ADOPT-AUTH-4ccd3db1587c1f2a09dfa2a0",
+    "authorized": true,
+    "reasons": [],
+    "candidateId": "P104-C",
+    "candidateHash": "P104-H",
+    "reviewPackageHash": "P104-Z",
+    "baseRevision": "P104-B",
+    "approvalReceiptSha256": "56dde5761c61dfbc7eea6920c23a872449263fc4bf440c5b4c153a9319c6d05c",
+    "readinessId": "ADOPTREADY-8c576e6f10bdfbb4040315a1",
+    "issuedAt": 1790916259317,
+    "authorizationSha256": "8dead40319109f24e47a66dff900dea3980e69f3e1874395fadb20f503e23764"
+  },
+  "claimed": {
+    "authorization": {
+      "authorizationId": "ADOPT-AUTH-4ccd3db1587c1f2a09dfa2a0",
+      "authorized": true,
+      "reasons": [],
+      "candidateId": "P104-C",
+      "candidateHash": "P104-H",
+      "reviewPackageHash": "P104-Z",
+      "baseRevision": "P104-B",
+      "approvalReceiptSha256": "56dde5761c61dfbc7eea6920c23a872449263fc4bf440c5b4c153a9319c6d05c",
+      "readinessId": "ADOPTREADY-8c576e6f10bdfbb4040315a1",
+      "issuedAt": 1790916259317,
+      "authorizationSha256": "8dead40319109f24e47a66dff900dea3980e69f3e1874395fadb20f503e23764"
+    },
+    "status": "CLAIMED",
+    "candidateId": "P104-C",
+    "claimedAt": 1790916259324,
+    "taskId": "TASK-P104",
+    "recordSha256": "190be63e44fcd9b41df2c724ecd2a58e2fc9e36565ec407a78025c3b5a70271b"
+  },
+  "replay": true,
+  "consumed": {
+    "authorization": {
+      "authorizationId": "ADOPT-AUTH-4ccd3db1587c1f2a09dfa2a0",
+      "authorized": true,
+      "reasons": [],
+      "candidateId": "P104-C",
+      "candidateHash": "P104-H",
+      "reviewPackageHash": "P104-Z",
+      "baseRevision": "P104-B",
+      "approvalReceiptSha256": "56dde5761c61dfbc7eea6920c23a872449263fc4bf440c5b4c153a9319c6d05c",
+      "readinessId": "ADOPTREADY-8c576e6f10bdfbb4040315a1",
+      "issuedAt": 1790916259317,
+      "authorizationSha256": "8dead40319109f24e47a66dff900dea3980e69f3e1874395fadb20f503e23764"
+    },
+    "status": "CONSUMED",
+    "candidateId": "P104-C",
+    "claimedAt": 1790916259324,
+    "taskId": "TASK-P104",
+    "consumedAt": 1790916259326,
+    "recordSha256": "c0d322a0db767c0859ac3a3d7ed05a6bcfd9ace43e23c2c26c34fc8564b9b84e"
+  }
+}

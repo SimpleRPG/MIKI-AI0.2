@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-10-01T08:32:27.874Z",
+  "endedAt": "2026-10-01T08:33:30.932Z",
+  "durationMs": 63058,
+  "timeoutSeconds": 600,
+  "sampleIntervalMs": 2000,
+  "maxOldSpaceMb": 4096,
+  "passed": false,
+  "failedStage": "vite-build",
+  "stages": [
+    {
+      "name": "prepare-self-code-seed",
+      "command": "node scripts/prepare_self_code_seed.mjs",
+      "startedAt": "2026-10-01T08:32:27.874Z",
+      "endedAt": "2026-10-01T08:32:33.617Z",
+      "durationMs": 5743,
+      "exitCode": 0,
+      "timedOut": false,
+      "sampleCount": 2,
+      "peakRssKb": 210484,
+      "lastSample": {
+        "at": 1790843551882,
+        "rssKb": 210040,
+        "peakRssKb": 210484,
+        "threads": 7,
+        "userTicks": 173,
+        "systemTicks": 20
+      },
+      "stdoutTail": [
+        "{",
+        "  \"ok\": true,",
+        "  \"output\": \"public/self-code-seed.zip\",",
+        "  \"appVersion\": \"1.0.4\",",
+        "  \"commitSha\": \"ARCHIVE_WITHOUT_GIT_METADATA\",",
+        "  \"seedRevision\": \"88979e4b38e15ce603bfb92ab63ab8fefcb7c51ab8e53ed2c9b19c15300bac7b\",",
+        "  \"fileCount\": 1420,",
+        "  \"bytes\": 6142168",
+        "}",
+        ""
+      ],
+      "stderrTail": [
+        ""
+      ]
+    },
+    {
+      "name": "vite-build",
+      "command": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build",
+      "startedAt": "2026-10-01T08:32:33.618Z",
+      "endedAt": "2026-10-01T08:33:30.867Z",
+      "durationMs": 57249,
+      "exitCode": 1,
+      "timedOut": false,
+      "sampleCount": 28,
+      "peakRssKb": 1748228,
+      "lastSample": {
+        "at": 1790843609767,
+        "rssKb": 1732900,
+        "peakRssKb": 1748228,
+        "threads": 12,
+        "userTicks": 3030,
+        "systemTicks": 185
+      },
+      "stdoutTail": [
+        "vite v6.4.3 building for production...",
+        "transforming...",
+        "✓ 2278 modules transformed.",
+        "rendering chunks...",
+        ""
+      ],
+      "stderrTail": [
+        "Circular chunk: vendor-common -> vendor-react -> vendor-common. Please adjust the manual chunk logic for these chunks.",
+        "[plugin vite:reporter] ",
+        "(!) /mnt/data/work_phase79/MIKI-AI0.2-main/src/miki/learning/services/teacherRequestService.ts is dynamically imported by /mnt/data/work_phase79/MIKI-AI0.2-main/src/miki/improvement/services/selfImprovementService.ts but also statically imported by /mnt/data/work_phase79/MIKI-AI0.2-main/src/miki/conversation/services/surfaceVariationGrowthService.ts, /mnt/data/work_phase79/MIKI-AI0.2-main/src/miki/execution/services/backgroundWorkerService.ts, /mnt/data/work_phase79/MIKI-AI0.2-main/src/miki/learning.ts, /mnt/data/work_phase79/MIKI-AI0.2-main/src/miki/learning/services/uncertaintyTeacherService.ts, dynamic import will not move module into another chunk.",
+        "",
+        ""
+      ]
+    }
+  ],
+  "dist": {
+    "exists": true,
+    "files": 1,
+    "bytes": 6142168,
+    "largest": [
+      {
+        "path": "dist/self-code-seed.zip",
+        "size": 6142168
+      }
+    ]
+  },
+  "environment": {
+    "node": "v24.16.0",
+    "platform": "linux",
+    "arch": "x64"
+  },
+  "reportSha256": "60a6196f6e2e27c5ed355f4e913c3c864bbf0f78f2e40783c3607bbded0d84ff"
+}

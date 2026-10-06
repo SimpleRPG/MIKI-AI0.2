@@ -1,0 +1,35 @@
+MIKI-AI Conversation Template Audit Phase 88
+
+Final judgment: TEMPLATE-DOMINANT HYBRID.
+
+The current conversation stack is not a pure canned-response bot because AnswerContentIR, Claim/Evidence, semantic frames, conditions, reasons, exceptions, next actions, persona and conversation state inject dynamic content. However, final wording is predominantly assembled from finite skeletons, registered phrase variations, deterministic headings and rule-selected sections.
+
+Measured evidence
+- 82 TypeScript files scanned across conversation, data, strategy and safety areas.
+- 1,198 Japanese string literals of 12 or more characters detected.
+- 600 registered surface variation items.
+- 210 registered skeleton variation items.
+- The two largest fixed-language stores are surfaceVariationData.ts (352 sampled long Japanese literals) and skeletonVariationData.ts (210).
+
+Structure
+1. Input understanding is mainly regex/rule/classifier driven.
+2. AnswerContentIR carries dynamic content and prevents the whole reply from being fixed.
+3. Answer skeleton chooses a finite response organization.
+4. SurfaceVariationService selects registered wording and headings.
+5. RuntimeConversationCompositionService generates a bounded set of candidates and deterministically selects one.
+6. Stable signatures and cache return the same output for the same IR/persona state.
+7. Surface diversity reduces recent repetition but only chooses different items from finite inventories.
+
+Implication
+- The system can produce many visible combinations, but those combinations are composed from a finite phrase library.
+- Adding hundreds of variants improves apparent diversity but does not create general language generation.
+- The Phase 87 120-turn E2E validates intent contracts, not free-form response quality. It should not be used as proof of natural conversation.
+- Template/skeleton behavior is useful as a safe fallback and for deterministic delivery, but it should not remain the primary surface generator if natural conversation is the goal.
+
+Recommended next architecture
+- Preserve AnswerContentIR and meaning-preservation gates.
+- Keep templates only for emergency fallback, compliance wording, short acknowledgements and deterministic task receipts.
+- Add a compositional realization layer that builds clauses from semantic roles, discourse focus, information structure and pragmatic intent.
+- Dynamically plan sentence order and referring expressions rather than selecting entire stored sentences.
+- Measure output novelty, semantic fidelity, cross-turn coherence and phrase-library overlap on unseen conversation corpora.
+- Require fallback to templates whenever compositional realization cannot preserve constraints or certainty.

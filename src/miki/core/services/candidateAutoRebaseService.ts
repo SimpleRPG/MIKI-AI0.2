@@ -1,0 +1,14 @@
+import { canonicalSha256 } from './canonicalSha256Service';
+export interface RebaseFileInput{path:string;baseContent:string;currentContent:string;candidateContent:string;}
+export interface RebaseConflict{path:string;reason:'BOTH_CHANGED'|'FILE_SET_CHANGED';baseSha256:string;currentSha256:string;candidateSha256:string;}
+export interface RebaseFileResult{path:string;content:string;contentSha256:string;source:'CURRENT'|'CANDIDATE'|'UNCHANGED';}
+export interface CandidateRebaseResult{accepted:boolean;status:'NO_REBASE_REQUIRED'|'REBASED'|'CONFLICT';parentCandidateId:string;newCandidateId?:string;previousBaselineSha256:string;currentBaselineSha256:string;candidateSha256:string;rebasedCandidateSha256?:string;files:RebaseFileResult[];conflicts:RebaseConflict[];invalidatedEvidenceIds:string[];}
+class CandidateAutoRebaseService{
+ rebase(input:{parentCandidateId:string;previousBaselineSha256:string;currentBaselineSha256:string;candidateSha256:string;files:RebaseFileInput[];evidenceIds?:string[]}):CandidateRebaseResult{
+  const files:RebaseFileResult[]=[];const conflicts:RebaseConflict[]=[];
+  for(const file of [...input.files].sort((a,b)=>a.path.localeCompare(b.path))){const baseSha256=canonicalSha256(file.baseContent);const currentSha256=canonicalSha256(file.currentContent);const candidateSha256=canonicalSha256(file.candidateContent);const currentChanged=currentSha256!==baseSha256;const candidateChanged=candidateSha256!==baseSha256;if(currentChanged&&candidateChanged&&currentSha256!==candidateSha256){conflicts.push({path:file.path,reason:'BOTH_CHANGED',baseSha256,currentSha256,candidateSha256});continue;}const content=candidateChanged?file.candidateContent:file.currentContent;files.push({path:file.path,content,contentSha256:canonicalSha256(content),source:candidateChanged?'CANDIDATE':currentChanged?'CURRENT':'UNCHANGED'});}
+  if(conflicts.length)return{accepted:false,status:'CONFLICT',parentCandidateId:input.parentCandidateId,previousBaselineSha256:input.previousBaselineSha256,currentBaselineSha256:input.currentBaselineSha256,candidateSha256:input.candidateSha256,files,conflicts,invalidatedEvidenceIds:[]};
+  const rebasedCandidateSha256=canonicalSha256(files.map(file=>({path:file.path,contentSha256:file.contentSha256})));const noRebase=input.previousBaselineSha256===input.currentBaselineSha256;const newCandidateId=`CANDIDATE-${rebasedCandidateSha256.slice(0,24)}`;return{accepted:true,status:noRebase?'NO_REBASE_REQUIRED':'REBASED',parentCandidateId:input.parentCandidateId,newCandidateId,previousBaselineSha256:input.previousBaselineSha256,currentBaselineSha256:input.currentBaselineSha256,candidateSha256:input.candidateSha256,rebasedCandidateSha256,files,conflicts:[],invalidatedEvidenceIds:noRebase?[]:[...(input.evidenceIds||[])]};
+ }
+}
+export const candidateAutoRebaseService=new CandidateAutoRebaseService();

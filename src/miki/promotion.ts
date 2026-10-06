@@ -4,12 +4,12 @@
  * 18分類における「promotion」機能の統合入口。
  * 既存の専門サービスを段階的に接続する。
  *
- * 現段階では受け皿のみを定義し、
- * 既存機能の移動・削除は行わない。
+ * 正規実行はCOREのdomainIntegrationBootstrapService Promotion Adapterが所有し、
+ * このFacadeは専門Serviceの公開入口として使用する。
  */
 
 export function promotion() {
-  // TODO: promotion 関連の既存機能を段階的に統合
+  return { category: 'promotion' as const, canonicalEntry: 'domainIntegrationBootstrapService:APPROVE_REVIEWED_CANDIDATE', pipeline: ['formalAdoptionAuthorizationService','formalAdoptionAuthorizationLedgerService','promotion-domain-adapter'] as const };
 }
 
 // === MIKI CATEGORY SERVICE EXPORTS ===

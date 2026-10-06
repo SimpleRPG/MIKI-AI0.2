@@ -1,0 +1,113 @@
+{
+  "phase": "ADAPTIVE_VISUAL_LEARNING_P121",
+  "passed": true,
+  "checks": {
+    "sparseAccepted": true,
+    "provisional": true,
+    "incremental": true,
+    "paletteAbove256": true,
+    "palette4096": true,
+    "maxResolution": true,
+    "maxPalette": true,
+    "outOfRangeRejected": true,
+    "hash": true
+  },
+  "first": [
+    {
+      "kind": "HAIR_SWAY",
+      "sampleCount": 1,
+      "frameCount": 1,
+      "confidence": 0.05,
+      "status": "PROVISIONAL",
+      "means": {
+        "amplitude": 0.1
+      },
+      "ranges": {
+        "amplitude": {
+          "min": 0.1,
+          "max": 0.1
+        }
+      },
+      "sourceSha256List": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "trendSha256": "e072fa848ff122edb5eb06b383fe8467ecef194506ef12d29bdb191956c6dfda"
+    },
+    {
+      "kind": "WALK",
+      "sampleCount": 1,
+      "frameCount": 2,
+      "confidence": 0.05,
+      "status": "PROVISIONAL",
+      "means": {
+        "armSwing": 0.2,
+        "stride": 0.3
+      },
+      "ranges": {
+        "armSwing": {
+          "min": 0.2,
+          "max": 0.2
+        },
+        "stride": {
+          "min": 0.3,
+          "max": 0.3
+        }
+      },
+      "sourceSha256List": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "trendSha256": "bbe9dbfde9873950bd278e5114aa0866a9fc9623eaabaf5896e3156f48a1c21c"
+    }
+  ],
+  "merged": {
+    "kind": "WALK",
+    "sampleCount": 2,
+    "frameCount": 10,
+    "confidence": 0.2683843710533582,
+    "status": "PROVISIONAL",
+    "means": {
+      "armSwing": 0.30000000000000004,
+      "stride": 0.4
+    },
+    "ranges": {
+      "armSwing": {
+        "min": 0.2,
+        "max": 0.4
+      },
+      "stride": {
+        "min": 0.3,
+        "max": 0.5
+      }
+    },
+    "sourceSha256List": [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    ],
+    "trendSha256": "7e0f97291a1614e538adfbce77b8fd073381e1ccaf1a217eda573b17b1ee04ab"
+  },
+  "quality": {
+    "width": 1024,
+    "height": 1024,
+    "paletteSize": 4096,
+    "paletteIndexBits": 16,
+    "frameCount": 16,
+    "directions": 8,
+    "estimatedIndexBytes": 268435456,
+    "warnings": [],
+    "specSha256": "a760d02897f5e9e3ecbaab89f8f7d7bb9fcf15f28ef29749db8a80d7e8576d16"
+  },
+  "maximum": {
+    "width": 4096,
+    "height": 4096,
+    "paletteSize": 65536,
+    "paletteIndexBits": 16,
+    "frameCount": 1,
+    "directions": 1,
+    "estimatedIndexBytes": 33554432,
+    "warnings": [
+      "HIGH_PIXEL_COUNT",
+      "VERY_LARGE_PALETTE"
+    ],
+    "specSha256": "8a97382e7a8ec45e64cf75d5d483e61179f5d6c31a562b8aef5fc91990582815"
+  }
+}

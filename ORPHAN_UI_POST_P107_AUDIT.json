@@ -1,0 +1,7 @@
+{
+  "phase": "POST_P107_UI_AUDIT",
+  "componentFiles": 35,
+  "zeroReferenceCandidates": [
+    "src/components/ExternalAiResearchBundlesPanel.tsx"
+  ]
+}

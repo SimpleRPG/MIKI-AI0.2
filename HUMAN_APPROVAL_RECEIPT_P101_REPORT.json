@@ -1,0 +1,24 @@
+{
+  "phase": "HUMAN_APPROVAL_RECEIPT_P101",
+  "passed": true,
+  "valid": [],
+  "rows": [
+    {
+      "approvalId": "APPROVAL-cc14f5a2ffe95fa95a0d6927",
+      "candidateId": "C-101",
+      "candidateHash": "HASH-A",
+      "reviewPackageHash": "ZIP-A",
+      "baseRevision": "BASE-A",
+      "approver": "user",
+      "decision": "APPROVE",
+      "reason": "reviewed",
+      "approvedAt": 1790913983824,
+      "status": "STALE",
+      "receiptSha256": "82e705cff0b5d86ed637dd97fee80886395cc6c829bb27b1954085c7bba3320e",
+      "staleReason": "CANDIDATE_HASH_CHANGED|REVIEW_PACKAGE_HASH_CHANGED|BASE_REVISION_CHANGED"
+    }
+  ],
+  "tamperedReasons": [
+    "HUMAN_APPROVAL_RECEIPT_HASH_INVALID"
+  ]
+}

@@ -1,0 +1,41 @@
+MIKI-AI Phase 83 Delivery Report
+Created: 2026-10-02 JST
+Source candidate: MIKI-AI0.2-main_20261002-deep-alternative-gaps-phase82.zip
+
+Implemented
+1. UNIFIED_CANDIDATE_LIFECYCLE_GRAPH
+   - Canonical candidate nodes, legal state transitions, parent/child lineage, ancestor/descendant traversal, trace receipts.
+2. POST_ADOPTION_CASCADE_INVALIDATION_TRANSACTION
+   - Descendant discovery, ordered adapter snapshots, invalidation receipts, reverse-order rollback on adapter failure.
+3. CANONICAL_PROTECTED_INVARIANT_REGISTRY
+   - Versioned canonical registry, SHA-256 snapshot, optimistic version replacement, protected path/symbol/behavior/contract evaluation.
+4. UNIFIED_MULTI_OBJECTIVE_CANDIDATE_SELECTOR
+   - Eligibility and hard limits, normalized vector validation, Pareto front, deterministic weighted tie-breaking, decision SHA-256.
+
+CORE integration
+- candidateGovernanceCoordinatorService is invoked by coreOrchestratorService on SELF_IMPROVEMENT entry.
+- Governance result is recorded as CANDIDATE_GOVERNANCE_PREFLIGHT.
+- Rejected governance is posted to the CORE blackboard as CANDIDATE_GOVERNANCE_BLOCKED.
+- Existing nearby services remain authoritative for their original responsibilities; the four new services unify cross-service concerns without replacing unrelated validation, canary, memory, or route-ranking logic.
+
+Dynamic E2E
+- Phase 83 lifecycle graph traversal: PASS
+- Protected invariant blocking and declared preservation: PASS
+- Multi-objective selection and safety hard limit: PASS
+- Post-adoption descendant cascade invalidation: PASS
+- CORE connection token verification: PASS
+
+Regression and build
+- Phase 75 autonomous code improvement E2E: PASS
+- Phase 76 uncovered routes: PASS
+- Phase 80: PASS
+- Phase 81: PASS
+- Phase 82 historical gap confirmation regression: PASS
+- Phase 83 dynamic E2E: PASS
+- TypeScript tsc --noEmit: PASS
+- Relative import inspection: PASS (1028 files, 3231 relative imports, 0 unresolved)
+- Production Vite build and server build: PASS
+
+Notes
+- Phase 82 is intentionally retained as a historical pre-implementation gap detector. Phase 83 is the acceptance proof for the newly implemented services.
+- Node test execution reports IndexedDB unavailable and uses the existing in-memory fallback. This is expected in the non-browser verification environment and did not fail any suite.

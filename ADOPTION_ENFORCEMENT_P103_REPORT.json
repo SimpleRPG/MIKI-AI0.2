@@ -1,0 +1,10 @@
+{
+  "phase": "ADOPTION_ENFORCEMENT_P103",
+  "passed": true,
+  "checks": {
+    "acceptCreatesAuthorization": true,
+    "blockedAuthorizationStops": true,
+    "routeRequiresAuthorization": true,
+    "timelineAggregates": true
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "phase": "BODY_TYPE_TRENDS_P115",
+  "passed": true,
+  "checks": {
+    "samples": true,
+    "clusters": true,
+    "allAssigned": true,
+    "ranges": true,
+    "hash": true,
+    "interpolation": true,
+    "noIdentityFields": true
+  },
+  "trend": {
+    "sampleCount": 3,
+    "means": {
+      "shoulderToHeight": 0.29000000000000004,
+      "waistToHeight": 0.24,
+      "hipToHeight": 0.25666666666666665,
+      "torsoToHeight": 0.42,
+      "legToHeight": 0.5,
+      "limbThickness": 0.25,
+      "muscleDefinition": 0.36666666666666664,
+      "softness": 0.5,
+      "postureCurve": 0.20000000000000004,
+      "garmentBulk": 0.20000000000000004
+    },
+    "ranges": {
+      "shoulderToHeight": {
+        "min": 0.25,
+        "max": 0.34
+      },
+      "waistToHeight": {
+        "min": 0.2,
+        "max": 0.28
+      },
+      "hipToHeight": {
+        "min": 0.23,
+        "max": 0.29
+      },
+      "torsoToHeight": {
+        "min": 0.42,
+        "max": 0.42
+      },
+      "legToHeight": {
+        "min": 0.5,
+        "max": 0.5
+      },
+      "limbThickness": {
+        "min": 0.15,
+        "max": 0.32
+      },
+      "muscleDefinition": {
+        "min": 0.1,
+        "max": 0.7
+      },
+      "softness": {
+        "min": 0.2,
+        "max": 0.7
+      },
+      "postureCurve": {
+        "min": 0.2,
+        "max": 0.2
+      },
+      "garmentBulk": {
+        "min": 0.2,
+        "max": 0.2
+      }
+    },
+    "clusters": [
+      {
+        "id": "BODY_CLUSTER_1",
+        "centroid": {
+          "shoulderToHeight": 0.25,
+          "waistToHeight": 0.2,
+          "hipToHeight": 0.23,
+          "torsoToHeight": 0.42,
+          "legToHeight": 0.5,
+          "limbThickness": 0.15,
+          "muscleDefinition": 0.1,
+          "softness": 0.6,
+          "postureCurve": 0.2,
+          "garmentBulk": 0.2
+        },
+        "sampleCount": 1
+      },
+      {
+        "id": "BODY_CLUSTER_2",
+        "centroid": {
+          "shoulderToHeight": 0.34,
+          "waistToHeight": 0.24,
+          "hipToHeight": 0.25,
+          "torsoToHeight": 0.42,
+          "legToHeight": 0.5,
+          "limbThickness": 0.28,
+          "muscleDefinition": 0.7,
+          "softness": 0.2,
+          "postureCurve": 0.2,
+          "garmentBulk": 0.2
+        },
+        "sampleCount": 1
+      },
+      {
+        "id": "BODY_CLUSTER_3",
+        "centroid": {
+          "shoulderToHeight": 0.28,
+          "waistToHeight": 0.28,
+          "hipToHeight": 0.29,
+          "torsoToHeight": 0.42,
+          "legToHeight": 0.5,
+          "limbThickness": 0.32,
+          "muscleDefinition": 0.3,
+          "softness": 0.7,
+          "postureCurve": 0.2,
+          "garmentBulk": 0.2
+        },
+        "sampleCount": 1
+      }
+    ],
+    "sourceSha256List": [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    ],
+    "trendSha256": "a397da72927de82edd22f167dbee11dff4f1091d9a0690367b55e0c03dbd2bfe"
+  }
+}

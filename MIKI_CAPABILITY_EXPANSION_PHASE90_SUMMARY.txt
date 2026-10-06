@@ -1,0 +1,43 @@
+MIKI-AI Capability Expansion Phase 90
+
+Purpose
+Recursively re-audit conversation-adjacent implementation and convert confirmed missing capabilities into executable services without deleting existing safe fallbacks.
+
+Newly enabled capabilities
+1. Unknown vocabulary detection in the normal HybridConversationEngine path.
+2. Canonical Japanese dictionary lookup before treating a term as unknown.
+3. Deterministic TERM-GAP identity and research query creation.
+4. SEARCH versus LOCAL_ONLY policy enforcement.
+5. Unknown vocabulary assessment attached to the semantic conversation result.
+6. Clause-level compositional realization from AnswerContentIR.
+7. Preservation of template generation as fallback rather than deleting it.
+8. Existing long-context, focus return, ambiguity, pragmatics, Claim safety and recovery capabilities remain connected.
+
+Existing research route reconfirmed
+- Adaptive route planning can carry unknown/research questions.
+- Research query planning creates query plan and research question identities.
+- Research evidence can be linked to Claim IDs.
+- Web term learning stores evidence-linked reusable term components as UNVERIFIED candidates.
+- User or web repetition alone does not promote an external fact to supported truth.
+
+Dynamic proof
+- Artificial unknown term FoobarnativeX produced one SEARCH handoff and deterministic TERM-GAP.
+- When research was disabled, the same term produced LOCAL_ONLY with no query.
+- Common request words were excluded from unknown vocabulary candidates after the first test exposed over-detection.
+- Compositional realization preserved conclusion, reason, condition, exception and next action as five generated clauses.
+
+Regression proof
+- Conversation Phase 89: PASS
+- Conversation Phase 87: PASS
+- Conversation Phase 86: PASS
+- Phase 83: PASS
+- TypeScript: PASS
+- Relative imports: PASS
+- Production build: PASS
+- Server build: PASS
+
+Honest limitations
+- The offline verification proves routing and handoff preparation, not live web retrieval.
+- Compositional realization is implemented and tested but the older runtime candidate selector remains the primary whole-response surface path. Replacing it globally requires a staged meaning-preservation comparison rather than an unsafe one-step switch.
+- General human-level conversation remains unproven.
+- Galaxy S25 native execution remains not DEVICE_VERIFIED in this environment.

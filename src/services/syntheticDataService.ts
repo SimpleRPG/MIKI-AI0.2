@@ -718,7 +718,7 @@ export class SyntheticDataService {
       prob.status = 'APPROVED';
       approvedCount++;
 
-      selfImprovementService.addTrainingSample({
+      selfImprovementService.registerCapabilityCandidate({
         instruction: safety.redactedUserText ?? prob.instruction,
         inputContext: prob.inputContext,
         outputTarget: safety.redactedAssistantText ?? prob.expectedOutput,

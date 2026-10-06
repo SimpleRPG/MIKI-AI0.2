@@ -1,0 +1,40 @@
+MIKI-AI Autonomous Code Improvement CORE Audit P98
+
+Final judgment
+The canonical autonomous self-improvement loop is genuinely connected to CORE, but CORE is not yet the exclusive authority for every UI-triggered improvement operation. The current architecture is therefore CORE_CONNECTED_WITH_BYPASSES_AND_AUTHORITY_DRIFT.
+
+Confirmed canonical chain
+- typedImprovementUiGatewayService
+- selfImprovementIngressService / improvementIntakeRouterService
+- autonomousSelfImprovementLoopService
+- coreTaskIngressService
+- coreOrchestratorService
+- taskBlackboardService
+- selfDevelopment domain execution
+- validation/evidence
+- review ZIP
+- human-only formal adoption
+
+autonomousSelfImprovementLoopService is initialized by domainIntegrationBootstrapService. It creates and pauses a CORE-owned task, then submits or resumes it through coreTaskIngressService. This proves the main loop is not a decorative facade.
+
+Confirmed problems
+1. Several self-improvement UI components directly import selfDevelopment or improvement service implementations.
+2. DevelopmentReviewLifecyclePanel and UltraSelfEvolverSubView can invoke developmentReviewLifecycleService directly.
+3. SuperchargerToolsSubView directly invokes council-review, test-generation, dead-code scan, lesson and prompt-to-patch tools.
+4. CloudGatewaySubView directly imports improvementProposalService.
+5. These paths coexist with typedImprovementUiGatewayService, creating multiple action authorities.
+6. PromotionGateSubView is ORPHAN in the complete P97 inventory.
+7. selfDevelopment contains 22 ORPHAN and 9 AVAILABLE_EXPORT_ONLY files under the static production graph.
+
+Risk
+Direct UI-to-domain calls can create candidate, review, tool or rollback side effects without proving the same CORE-owned taskId, runId, task-blackboard history, domain reply, persistence receipt and final CORE re-evaluation used by the canonical loop.
+
+Required correction
+- Make typedImprovementUiGatewayService the only UI write/action gateway.
+- Move all direct UI operations behind gateway methods.
+- Require CORE task/run identity and lineage for review lifecycle creation/start.
+- Persist a receipt for every candidate, tool, review, rollback and download action.
+- Add a build-time architecture rule that rejects direct self_improvement UI imports from selfDevelopment/improvement service implementations.
+- Connect or retire the orphan promotion UI and audit all non-USED selfDevelopment services.
+
+No production adoption was performed in this audit.

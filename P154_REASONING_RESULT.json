@@ -1,0 +1,156 @@
+{
+  "claims": [
+    {
+      "claimId": "C-1e656aab677aac550d1f3d70",
+      "subjectId": "renderer:hidden-region",
+      "predicate": "completionPolicy",
+      "value": "SUPPRESS",
+      "validFrom": 1791257533331,
+      "validTo": 1791257535331,
+      "recordedAt": 1791257533331,
+      "status": "SUPERSEDED",
+      "confidence": 0.7,
+      "uncertainty": 0.3,
+      "sourceNodeIds": [
+        "N-0f6414a17d397aec27d22922"
+      ],
+      "claimSha256": "1e656aab677aac550d1f3d7053d737214c356122144cbc95b727a31ebe8d83b4"
+    },
+    {
+      "claimId": "C-fa676fc020e8ff3d11ab214c",
+      "subjectId": "renderer:hidden-region",
+      "predicate": "completionPolicy",
+      "value": "CROSS_PERSON_PRIOR_WITH_PROVENANCE",
+      "validFrom": 1791257535331,
+      "recordedAt": 1791257535331,
+      "status": "SUPPORTED",
+      "confidence": 0.95,
+      "uncertainty": 0.05,
+      "sourceNodeIds": [
+        "N-756aed47f28909816334a1b2",
+        "N-0f6414a17d397aec27d22922"
+      ],
+      "supersedesClaimId": "C-1e656aab677aac550d1f3d70",
+      "claimSha256": "fa676fc020e8ff3d11ab214c6a23009f294012176734cf3dfbb219a90baedf00"
+    },
+    {
+      "claimId": "C-6982c94cb8024f33438a6811",
+      "subjectId": "renderer:hidden-region",
+      "predicate": "completionPolicy",
+      "value": "MIRROR_COPY",
+      "validFrom": 1791257535831,
+      "recordedAt": 1791257535831,
+      "status": "CONTRADICTED",
+      "confidence": 0.2,
+      "uncertainty": 0.8,
+      "sourceNodeIds": [
+        "N-0f6414a17d397aec27d22922"
+      ],
+      "claimSha256": "6982c94cb8024f33438a6811a5733e16b9d8a01450f67962be81c28805215a89"
+    }
+  ],
+  "conflicts": [
+    {
+      "conflictId": "X-702638d9f7932980a4e8135a",
+      "subjectId": "renderer:hidden-region",
+      "predicate": "completionPolicy",
+      "claimIds": [
+        "C-1e656aab677aac550d1f3d70",
+        "C-6982c94cb8024f33438a6811",
+        "C-fa676fc020e8ff3d11ab214c"
+      ],
+      "resolution": "USER_CORRECTION",
+      "winnerClaimId": "C-fa676fc020e8ff3d11ab214c",
+      "conflictSha256": "702638d9f7932980a4e8135aa4240e24e3fe7ea21baaf189d11052ee26cb9f7c"
+    }
+  ],
+  "paths": [
+    {
+      "nodeIds": [
+        "N-7e41f1a080ed94b33299efe6",
+        "N-a98b7449611e17be88e5e648"
+      ],
+      "edgeIds": [
+        "E-cc20b6de43ef8543b5a5bb64"
+      ],
+      "score": 0.43854999999999994,
+      "provenanceComplete": false
+    },
+    {
+      "nodeIds": [
+        "N-7e41f1a080ed94b33299efe6",
+        "N-a98b7449611e17be88e5e648",
+        "N-b95950121944511af8508c19"
+      ],
+      "edgeIds": [
+        "E-cc20b6de43ef8543b5a5bb64",
+        "E-a940e06d9a2c710679dd1fe2"
+      ],
+      "score": 0.19232610249999996,
+      "provenanceComplete": false
+    },
+    {
+      "nodeIds": [
+        "N-7e41f1a080ed94b33299efe6",
+        "N-a98b7449611e17be88e5e648",
+        "N-b95950121944511af8508c19",
+        "N-a06aac84027aca483d995952",
+        "N-5747885c19cd5c047093f6ec"
+      ],
+      "edgeIds": [
+        "E-cc20b6de43ef8543b5a5bb64",
+        "E-a940e06d9a2c710679dd1fe2",
+        "E-ef0bcca9e84b76fac41cf66a",
+        "E-6e6c5b44d91233aff2def65d"
+      ],
+      "score": 0.0369893297028405,
+      "provenanceComplete": false
+    },
+    {
+      "nodeIds": [
+        "N-7e41f1a080ed94b33299efe6",
+        "N-a98b7449611e17be88e5e648",
+        "N-b95950121944511af8508c19",
+        "N-a06aac84027aca483d995952",
+        "N-8f1c5dadc65873834828bd81"
+      ],
+      "edgeIds": [
+        "E-cc20b6de43ef8543b5a5bb64",
+        "E-a940e06d9a2c710679dd1fe2",
+        "E-ef0bcca9e84b76fac41cf66a",
+        "E-88147f45b206f232d1f7a9bb"
+      ],
+      "score": 0.0369893297028405,
+      "provenanceComplete": false
+    },
+    {
+      "nodeIds": [
+        "N-7e41f1a080ed94b33299efe6",
+        "N-a98b7449611e17be88e5e648",
+        "N-b95950121944511af8508c19",
+        "N-a06aac84027aca483d995952",
+        "N-5747885c19cd5c047093f6ec",
+        "N-ad3ed8f81520e8394ae41731"
+      ],
+      "edgeIds": [
+        "E-cc20b6de43ef8543b5a5bb64",
+        "E-a940e06d9a2c710679dd1fe2",
+        "E-ef0bcca9e84b76fac41cf66a",
+        "E-6e6c5b44d91233aff2def65d",
+        "E-69ba90dd835f1c57f0ea0f0b"
+      ],
+      "score": 0.016221670541180698,
+      "provenanceComplete": false
+    }
+  ],
+  "selectedNodeIds": [
+    "N-7e41f1a080ed94b33299efe6",
+    "N-a98b7449611e17be88e5e648",
+    "N-b95950121944511af8508c19",
+    "N-a06aac84027aca483d995952",
+    "N-5747885c19cd5c047093f6ec",
+    "N-8f1c5dadc65873834828bd81",
+    "N-ad3ed8f81520e8394ae41731"
+  ],
+  "resultSha256": "eb6a03b49b20032d5f619d4e1ebe9f8f054575ee4343bec84103908d3516c23b"
+}

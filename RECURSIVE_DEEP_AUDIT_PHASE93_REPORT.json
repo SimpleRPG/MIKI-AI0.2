@@ -1,0 +1,266 @@
+{
+  "phase": "RECURSIVE_DEEP_AUDIT_93",
+  "sourceFiles": 870,
+  "seedFiles": 183,
+  "productionRoots": [
+    "src/main.tsx",
+    "src/App.tsx",
+    "src/miki/core/services/domainIntegrationBootstrapService.ts",
+    "src/miki/core/services/coreOrchestratorService.ts"
+  ],
+  "productionReachable": 714,
+  "conversationAdjacentReachable": 167,
+  "conversationAdjacentUnreachable": 16,
+  "serviceOrphans": [
+    {
+      "file": "src/services/causalMemoryLedgerService.ts",
+      "importers": [],
+      "reachable": false
+    },
+    {
+      "file": "src/services/unknownTaskDecompositionService.ts",
+      "importers": [],
+      "reachable": false
+    },
+    {
+      "file": "src/services/memoryPromotionService.ts",
+      "importers": [],
+      "reachable": false
+    },
+    {
+      "file": "src/services/memoryAuditService.ts",
+      "importers": [],
+      "reachable": false
+    },
+    {
+      "file": "src/services/cognitiveEvidenceIntegrationService.ts",
+      "importers": [],
+      "reachable": false
+    },
+    {
+      "file": "src/services/researchStrategyService.ts",
+      "importers": [],
+      "reachable": false
+    },
+    {
+      "file": "src/services/cognitiveExecutionEvidenceService.ts",
+      "importers": [],
+      "reachable": false
+    },
+    {
+      "file": "src/miki/conversation/services/unknownResearchConversationBridgeService.ts",
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/conversation/index.ts"
+      ],
+      "reachable": true
+    },
+    {
+      "file": "src/miki/conversation/services/conversationEvaluationService.ts",
+      "importers": [
+        "src/miki/conversation.ts"
+      ],
+      "reachable": true
+    },
+    {
+      "file": "src/miki/conversation/services/conversationKnowledgeUsePolicyService.ts",
+      "importers": [
+        "src/miki/conversation.ts",
+        "src/miki/conversation/index.ts"
+      ],
+      "reachable": true
+    },
+    {
+      "file": "src/miki/research/services/offlineKnowledgePackService.ts",
+      "importers": [
+        "src/miki/research.ts"
+      ],
+      "reachable": true
+    },
+    {
+      "file": "src/miki/research/services/virtualExpertService.ts",
+      "importers": [
+        "src/miki/research.ts"
+      ],
+      "reachable": true
+    },
+    {
+      "file": "src/miki/research/services/scienceExperimentService.ts",
+      "importers": [
+        "src/miki/research.ts"
+      ],
+      "reachable": true
+    },
+    {
+      "file": "src/miki/research/services/internalWebQueryLearningCycleService.ts",
+      "importers": [
+        "src/miki/research.ts",
+        "src/miki/research/index.ts"
+      ],
+      "reachable": true
+    },
+    {
+      "file": "src/miki/research/services/dataFactoryService.ts",
+      "importers": [
+        "src/miki/research.ts"
+      ],
+      "reachable": true
+    },
+    {
+      "file": "src/miki/memory/services/memorySearchReceiptService.ts",
+      "importers": [],
+      "reachable": false
+    },
+    {
+      "file": "src/miki/memory/services/rustMemoryKernelService.ts",
+      "importers": [],
+      "reachable": false
+    }
+  ],
+  "duplicateRelevantBasenames": {
+    "causalMemoryLedgerService.ts": [
+      "src/services/causalMemoryLedgerService.ts",
+      "src/miki/memory/services/causalMemoryLedgerService.ts"
+    ],
+    "researchService.ts": [
+      "src/services/researchService.ts",
+      "src/miki/research/services/researchService.ts"
+    ],
+    "unknownTaskDecompositionService.ts": [
+      "src/services/unknownTaskDecompositionService.ts",
+      "src/miki/unknown/services/unknownTaskDecompositionService.ts"
+    ],
+    "japaneseDictionaryService.ts": [
+      "src/services/japaneseDictionaryService.ts",
+      "src/miki/research/services/japaneseDictionaryService.ts"
+    ],
+    "answerPlanService.ts": [
+      "src/services/answerPlanService.ts",
+      "src/miki/strategy/services/answerPlanService.ts"
+    ],
+    "claimDatabaseService.ts": [
+      "src/services/claimDatabaseService.ts",
+      "src/miki/memory/services/claimDatabaseService.ts"
+    ],
+    "japaneseAnalysisService.ts": [
+      "src/services/japaneseAnalysisService.ts",
+      "src/miki/research/services/japaneseAnalysisService.ts"
+    ],
+    "researchToRemediationService.ts": [
+      "src/services/researchToRemediationService.ts",
+      "src/miki/research/services/researchToRemediationService.ts"
+    ],
+    "memoryPromotionService.ts": [
+      "src/services/memoryPromotionService.ts",
+      "src/miki/memory/services/memoryPromotionService.ts"
+    ],
+    "failureMemoryService.ts": [
+      "src/services/failureMemoryService.ts",
+      "src/miki/memory/services/failureMemoryService.ts"
+    ],
+    "evidenceService.ts": [
+      "src/services/evidenceService.ts",
+      "src/miki/memory/services/evidenceService.ts"
+    ],
+    "memoryAuditService.ts": [
+      "src/services/memoryAuditService.ts",
+      "src/miki/memory/services/memoryAuditService.ts"
+    ],
+    "digitalResearchNoteService.ts": [
+      "src/services/digitalResearchNoteService.ts",
+      "src/miki/research/services/digitalResearchNoteService.ts"
+    ],
+    "cognitiveEvidenceIntegrationService.ts": [
+      "src/services/cognitiveEvidenceIntegrationService.ts",
+      "src/miki/selfAwareness/services/cognitiveEvidenceIntegrationService.ts"
+    ],
+    "conversationStateService.ts": [
+      "src/services/conversationStateService.ts",
+      "src/miki/conversation/services/conversationStateService.ts"
+    ],
+    "taskCaseMemoryService.ts": [
+      "src/services/taskCaseMemoryService.ts",
+      "src/miki/memory/services/taskCaseMemoryService.ts"
+    ],
+    "researchStrategyService.ts": [
+      "src/services/researchStrategyService.ts",
+      "src/miki/research/services/researchStrategyService.ts"
+    ],
+    "formalSemanticsKernelService.ts": [
+      "src/services/formalSemanticsKernelService.ts",
+      "src/miki/verification/services/formalSemanticsKernelService.ts"
+    ],
+    "answerContentIrService.ts": [
+      "src/services/answerContentIrService.ts",
+      "src/miki/conversation/services/answerContentIrService.ts"
+    ],
+    "hybridConversationEngineService.ts": [
+      "src/services/hybridConversationEngineService.ts",
+      "src/miki/conversation/services/hybridConversationEngineService.ts"
+    ],
+    "longTermMemoryService.ts": [
+      "src/services/longTermMemoryService.ts",
+      "src/miki/memory/services/longTermMemoryService.ts"
+    ],
+    "cognitiveExecutionEvidenceService.ts": [
+      "src/services/cognitiveExecutionEvidenceService.ts",
+      "src/miki/selfAwareness/services/cognitiveExecutionEvidenceService.ts"
+    ],
+    "responseSurfacePolicyService.ts": [
+      "src/services/responseSurfacePolicyService.ts",
+      "src/miki/strategy/services/responseSurfacePolicyService.ts"
+    ]
+  },
+  "identicalSourceGroups": [],
+  "weakConversationTests": [
+    "scripts/verify_deterministic_semantics_components_stage24.mjs",
+    "scripts/verify_semantic_understanding_v2_stage34.mjs"
+  ],
+  "markers": [
+    {
+      "file": "src/miki/unknown.ts",
+      "line": 7,
+      "text": "* 現段階では受け皿のみを定義し、"
+    },
+    {
+      "file": "src/miki/unknown.ts",
+      "line": 12,
+      "text": "// TODO: unknown 関連の既存機能を段階的に統合"
+    },
+    {
+      "file": "src/miki/research.ts",
+      "line": 7,
+      "text": "* 現段階では受け皿のみを定義し、"
+    },
+    {
+      "file": "src/miki/conversation.ts",
+      "line": 7,
+      "text": "* 現段階では受け皿のみを定義し、"
+    },
+    {
+      "file": "src/miki/memory.ts",
+      "line": 7,
+      "text": "* 現段階では受け皿のみを定義し、"
+    },
+    {
+      "file": "src/miki/memory.ts",
+      "line": 12,
+      "text": "// TODO: memory 関連の既存機能を段階的に統合"
+    },
+    {
+      "file": "src/components/MemoryModal.tsx",
+      "line": 910,
+      "text": "instruction: 'JavaScriptでタイマー機能のついたシンプルなToDoリストを作って。',"
+    },
+    {
+      "file": "src/components/MemoryModal.tsx",
+      "line": 911,
+      "text": "response: `任せて！タイマー付きでサクサク使えるシンプルなToDoアプリの完全コードを作ったよ！HTML/CSS/JSが1つにまとまってるから、そのまま動かせるよ✨`,"
+    },
+    {
+      "file": "src/components/MemoryModal.tsx",
+      "line": 3069,
+      "text": "未接続 (8次元疎ベクトルで代替フォールバック中)"
+    }
+  ]
+}

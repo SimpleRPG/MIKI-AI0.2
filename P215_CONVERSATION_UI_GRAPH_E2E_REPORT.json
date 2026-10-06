@@ -1,0 +1,23 @@
+{
+  "phase": "P215",
+  "status": "PASS",
+  "testLevel": "NODE_E2E_WITH_UI_GATEWAY_AND_BROWSER_STORAGE_POLYFILL",
+  "uiSubmission": true,
+  "coreIngress": true,
+  "inputGraphCommit": true,
+  "outputGraphCommit": true,
+  "validationExperienceLearning": true,
+  "positiveExample": true,
+  "constraintCounterexample": true,
+  "userInputSurfaceLearning": true,
+  "checkpoint": true,
+  "restartRestore": true,
+  "nextConversationLearnedReuse": true,
+  "corruptShaFailClosed": true,
+  "graphBeforeRestartSha256": "add0f93cc250065a0e0ccce1aed09128345dde553d16eb8ec530ece26356dbca",
+  "restoredGraphSha256": "add0f93cc250065a0e0ccce1aed09128345dde553d16eb8ec530ece26356dbca",
+  "nodesAfterInput": 1,
+  "nodesAfterCompletion": 5,
+  "learnedComponentsReused": 1,
+  "limitation": "Physical Galaxy S25 UI automation and OS process-kill were not available in this container."
+}

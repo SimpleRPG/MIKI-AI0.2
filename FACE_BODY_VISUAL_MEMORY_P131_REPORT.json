@@ -1,0 +1,19 @@
+{
+  "phase": "FACE_BODY_VISUAL_MEMORY_P131",
+  "passed": true,
+  "checks": {
+    "pair": true,
+    "faceKind": true,
+    "bodyKind": true,
+    "geometryOnly": true,
+    "reloaded": true,
+    "used": true,
+    "sha": true
+  },
+  "memoryIds": [
+    "VM-0fe4fe723c730c7154bb0937",
+    "VM-0375d6790b65d6fe8e660993"
+  ],
+  "pairSha256": "5e3d5767d639b46e2c8862fcd4d9029011d0e052f5dd0148459ebcfc04765c8e",
+  "selectionSha256": "44a83ea8ee089455adc5b4a430f2672755e3f4a5da3b68cde3bf92aad4ba70f3"
+}

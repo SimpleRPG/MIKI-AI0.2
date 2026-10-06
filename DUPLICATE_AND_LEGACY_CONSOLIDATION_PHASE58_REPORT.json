@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "phase": "DUPLICATE_AND_LEGACY_CONSOLIDATION_58",
+  "typescriptFilesScanned": 619,
+  "exactDuplicateGroups": 0,
+  "retiredCompatibilityMethods": 2,
+  "removedLegacyServices": 1,
+  "canonicalCallSitesMigrated": 2,
+  "failures": []
+}

@@ -1,0 +1,104 @@
+{
+  "phase": "SEARXNG_MEDIA_FETCH_P119",
+  "passed": true,
+  "checks": {
+    "category": true,
+    "imagePreserved": true,
+    "thumbnailPreserved": true,
+    "licenseVerified": true,
+    "attribution": true,
+    "conversationCard": true,
+    "videoDuration": true,
+    "hash": true
+  },
+  "initial": {
+    "intent": {
+      "query": "forest pixel art",
+      "kind": "IMAGE",
+      "maxResults": 5
+    },
+    "references": [
+      {
+        "mediaKind": "IMAGE",
+        "title": "Forest",
+        "sourcePageUrl": "https://example.com/work",
+        "mediaUrl": "https://cdn.example.com/a.jpg",
+        "thumbnailUrl": "https://cdn.example.com/t.jpg",
+        "width": 1200,
+        "height": 800,
+        "searchProvider": "searxng",
+        "sourceEngine": "openverse",
+        "sourceVerified": false,
+        "extractionEvidence": [
+          "SEARXNG_RESULT",
+          "DIRECT_MEDIA_URL",
+          "THUMBNAIL_URL"
+        ]
+      }
+    ],
+    "rejected": [],
+    "packetSha256": "b74bfd75a942420b157668d15a717440777a900bc6d6d8da194941afc187cc52"
+  },
+  "enriched": {
+    "mediaKind": "IMAGE",
+    "title": "Forest",
+    "sourcePageUrl": "https://example.com/work",
+    "mediaUrl": "https://cdn.example.com/a.jpg",
+    "thumbnailUrl": "https://cdn.example.com/t.jpg",
+    "mimeType": "image/jpeg",
+    "width": 1200,
+    "height": 800,
+    "creator": "Artist",
+    "searchProvider": "searxng",
+    "sourceEngine": "openverse",
+    "sourceVerified": true,
+    "extractionEvidence": [
+      "SEARXNG_RESULT",
+      "DIRECT_MEDIA_URL",
+      "THUMBNAIL_URL",
+      "OPEN_GRAPH_IMAGE",
+      "LICENSE_LINK",
+      "CREATOR_METADATA"
+    ],
+    "license": "CC-BY",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution": "Artist / CC-BY"
+  },
+  "delivery": [
+    {
+      "type": "IMAGE_CARD",
+      "title": "Forest",
+      "imageUrl": "https://cdn.example.com/a.jpg",
+      "sourcePageUrl": "https://example.com/work",
+      "license": "CC-BY",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Artist / CC-BY",
+      "verified": true
+    }
+  ],
+  "video": {
+    "intent": {
+      "query": "walk cycle",
+      "kind": "VIDEO",
+      "maxResults": 3
+    },
+    "references": [
+      {
+        "mediaKind": "VIDEO",
+        "title": "Walk",
+        "sourcePageUrl": "https://example.com/video",
+        "thumbnailUrl": "https://example.com/v.jpg",
+        "durationSeconds": 90,
+        "searchProvider": "searxng",
+        "sourceEngine": "youtube",
+        "sourceVerified": false,
+        "extractionEvidence": [
+          "SEARXNG_RESULT",
+          "THUMBNAIL_URL"
+        ]
+      }
+    ],
+    "rejected": [],
+    "packetSha256": "e5da5d3cb746a2fbd8e93c3fe7568c2fb886ccf30c7e733aa86e5ab4ada78674"
+  }
+}

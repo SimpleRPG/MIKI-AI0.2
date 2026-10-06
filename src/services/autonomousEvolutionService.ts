@@ -264,7 +264,7 @@ export class AutonomousEvolutionService {
       };
 
       // DPO/SFT学習サンプルへ自動昇格
-      selfImprovementService.addTrainingSample({
+      selfImprovementService.registerCapabilityCandidate({
         instruction: prompt,
         outputTarget: ideal,
         category: 'chat',

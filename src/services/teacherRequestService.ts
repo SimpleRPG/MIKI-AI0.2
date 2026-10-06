@@ -811,7 +811,7 @@ export class TeacherRequestService {
 
       // 3. 独立検証合格 ➔ 中信頼(medium) & source: 'external_teacher' で保存
       // 勝手な自動マージを防止するため approved: false (ユーザーによる確認・承認待ち) とする
-      const savedSample = selfImprovementService.addTrainingSample({
+      const savedSample = selfImprovementService.registerCapabilityCandidate({
         instruction: safety.redactedUserText ?? mat.instruction,
         inputContext: mat.inputContext,
         outputTarget: safety.redactedAssistantText ?? mat.outputTarget,

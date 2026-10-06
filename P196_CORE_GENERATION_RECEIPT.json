@@ -1,0 +1,89 @@
+{
+  "request": {
+    "requestId": "P196-0",
+    "seed": 196001,
+    "view": {
+      "yaw": 0,
+      "pitch": 0,
+      "roll": 0
+    },
+    "expression": {
+      "eyeOpenLeft": 0.8,
+      "eyeOpenRight": 0.72,
+      "browRaiseLeft": 0.2,
+      "browRaiseRight": 0.15,
+      "mouthOpen": 0.28,
+      "lipCornerLeft": 0.2,
+      "lipCornerRight": 0.12,
+      "jawOpen": 0.18,
+      "cheekRaiseLeft": 0.1,
+      "cheekRaiseRight": 0.16
+    },
+    "maxRepairPasses": 3
+  },
+  "quality": {
+    "score": 1,
+    "passed": true,
+    "failures": [],
+    "parts": [
+      {
+        "part": "eyes",
+        "controlPoints": 8,
+        "patches": 2,
+        "visiblePixels": 3574,
+        "depthMin": 0.15000000000000002,
+        "depthMax": 0.21999999999999997,
+        "passed": true
+      },
+      {
+        "part": "nose",
+        "controlPoints": 5,
+        "patches": 1,
+        "visiblePixels": 1372,
+        "depthMin": 0.09999999999999998,
+        "depthMax": 0.18,
+        "passed": true
+      },
+      {
+        "part": "lips",
+        "controlPoints": 2,
+        "patches": 1,
+        "visiblePixels": 1372,
+        "depthMin": 0.10999999999999999,
+        "depthMax": 0.12,
+        "passed": true
+      },
+      {
+        "part": "ears",
+        "controlPoints": 2,
+        "patches": 1,
+        "visiblePixels": 1631,
+        "depthMin": 0.34,
+        "depthMax": 0.34,
+        "passed": true
+      },
+      {
+        "part": "fingers",
+        "controlPoints": 30,
+        "patches": 30,
+        "visiblePixels": 1090,
+        "depthMin": 0.14,
+        "depthMax": 0.15600000000000003,
+        "passed": true
+      },
+      {
+        "part": "neck",
+        "controlPoints": 2,
+        "patches": 1,
+        "visiblePixels": 3669,
+        "depthMin": 0.38,
+        "depthMax": 0.38,
+        "passed": true
+      }
+    ],
+    "repairPasses": 0
+  },
+  "modelSha256": "632f5f33a5c16f3fe864018c4650748e69abe09564e481fd944718f76b60709f",
+  "synthesisSha256": "9e1aea9d733d7eaee5f2b56b0dafa8f4ea90a148949a9a685fead085f7f45801",
+  "receiptSha256": "7d4573ec3a60180fb405d696ca15223837cccf6bff5db18cf2b10cd1e2833bef"
+}

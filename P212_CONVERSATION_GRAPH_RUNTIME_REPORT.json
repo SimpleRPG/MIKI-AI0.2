@@ -1,0 +1,17 @@
+{
+  "phase": "P212",
+  "status": "PASS",
+  "normalConversationEntryConnected": true,
+  "inputCommitted": true,
+  "dictionaryGraphUsed": true,
+  "semanticGraphUsed": true,
+  "componentPipelineUsed": true,
+  "unknownToResearch": true,
+  "outputCommitted": true,
+  "validationCommitted": true,
+  "experienceCommitted": true,
+  "learningCommitted": true,
+  "counterexampleAndRepairSupported": true,
+  "snapshotRestore": true,
+  "capacityGuardsInheritedFromP211": true
+}

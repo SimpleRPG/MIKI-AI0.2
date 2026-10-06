@@ -1,0 +1,40 @@
+MIKI-AI Conversation Deep Implementation Phase 92
+
+Implemented after recursive review
+1. Short conditions are fronted into the conclusion sentence when natural.
+2. Repeated target names are replaced by contextual references.
+3. Reason-first order is selected for why/reason questions; conclusion-first remains default.
+4. Previous user and assistant turns can trigger demonstratives such as それ.
+5. Repeated target mentions are replaced with その対象.
+6. Paragraphs are planned using bounded sentence groups.
+7. Comparison output uses matched left/right structures and optional verdict.
+8. Exceptions are severity-ranked, with danger, failure and unverified states first.
+9. Warm, neutral and cool realization modes are available; warm mode was dynamically verified.
+10. Unknown resolution now has a bridge back into RuntimeConversationCompositionService.
+
+Deep existing-route findings
+- PersonaProfileService already had warmth scoring, but compositional realization did not consume conversational temperature.
+- conversationStateService already recognized comparison context, but compositional realization did not create symmetric comparison clauses.
+- unifiedUnknownResolutionCoordinatorService already supported local evidence, research and supported reuse, but there was no direct service that converted its result back into an AnswerContentIR and normal runtime response.
+- Runtime semantic preservation remains the final gate.
+
+Dynamic proof
+- Natural result: reason first, condition integrated, repeated target omitted, warm tone and three planned paragraphs.
+- Contextual result: candidate A became それ after the previous assistant turn established the referent.
+- Comparison result: candidate A and B used symmetric sentence forms.
+- Exception result: 実機未検証 preceded a minor warning.
+- Unknown no-search E2E: conversation -> unknown coordinator -> NO_EVIDENCE -> AnswerContentIR -> runtime response, with returnedToConversation=true.
+
+Verification
+- Phase 92: PASS
+- Phase 91: PASS
+- Phase 89 updated contract: PASS
+- Phase 87: PASS
+- Phase 83: PASS
+- TypeScript: PASS
+- Import resolution: PASS
+- Production/server build: PASS
+
+Boundary
+- Live web-provider retrieval is not claimed in this offline container.
+- The complete return path is verified for the local/no-evidence branch. The same bridge accepts researched and supported coordinator statuses, but live researched evidence still requires an available provider.

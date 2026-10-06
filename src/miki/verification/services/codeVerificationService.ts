@@ -1,5 +1,7 @@
 import { vbaStaticVerifierService } from './vbaStaticVerifierService';
 import { failureCatalogService } from '../../memory/services/failureCatalogService';
+import { rustVbaVerificationKernelService, type RustVbaVerificationResult, type RustVbaVerificationOptions } from './rustVbaVerificationKernelService';
+import { rustVerificationReceiptService } from './rustVerificationReceiptService';
 
 export interface CodeBlock {
   lang: string;
@@ -28,6 +30,12 @@ export interface CodeVerificationResult {
 }
 
 export class CodeVerificationService {
+  public async verifyVbaWithRust(code:string,options:RustVbaVerificationOptions={},lineage?:{taskId:string;operationInstanceId:string}):Promise<RustVbaVerificationResult>{
+    const result=await rustVbaVerificationKernelService.verify(code,options);
+    if(lineage)rustVerificationReceiptService.persist({taskId:lineage.taskId,operationInstanceId:lineage.operationInstanceId,result});
+    return result;
+  }
+
   /**
    * テキスト中の全コードブロックを解析し、総合コード安全検証を実施する
    */
@@ -267,6 +275,15 @@ export class CodeVerificationService {
   }
 
   public checkRisks(code: string, lang: string, risks: RiskItem[]): void {
+    if (lang === 'rust' || lang === 'rs') {
+      const patterns = [
+        { pattern: /\bunsafe\s*\{/g, riskType: 'rust_unsafe', description: 'Rust unsafeブロックは境界条件と安全性証拠が必要です。' },
+        { pattern: /\.unwrap\s*\(/g, riskType: 'rust_unwrap', description: 'Rust unwrapは本番経路でpanicする可能性があります。' },
+        { pattern: /\.expect\s*\(/g, riskType: 'rust_expect', description: 'Rust expectは本番経路でpanicする可能性があります。' },
+        { pattern: /\bpanic!\s*\(/g, riskType: 'rust_panic', description: '明示的panicはJNI境界を越えて障害化する可能性があります。' }
+      ];
+      for (const item of patterns) if (item.pattern.test(code)) risks.push({ riskType: item.riskType, severity: 'high', description: item.description });
+    }
     const cLower = code.toLowerCase();
 
     if (
@@ -332,6 +349,23 @@ export class CodeVerificationService {
         description: '脱出条件のない無限ループ(While True / Do While True)が検知されました。UIの完全フリーズを招きます。',
       });
     }
+  }
+
+  public verifyContractEvolution(before: Record<string, string[]>, after: Record<string, string[]>): { passed: boolean; deletedPublicContracts: string[]; duplicateContracts: string[] } {
+    const deletedPublicContracts: string[] = [];
+    const duplicateContracts: string[] = [];
+    for (const [path, signatures] of Object.entries(before)) {
+      const current = new Set(after[path] || []);
+      for (const signature of signatures) if (!current.has(signature)) deletedPublicContracts.push(`${path}:${signature}`);
+    }
+    for (const [path, signatures] of Object.entries(after)) {
+      const seen = new Set<string>();
+      for (const signature of signatures) {
+        if (seen.has(signature)) duplicateContracts.push(`${path}:${signature}`);
+        seen.add(signature);
+      }
+    }
+    return { passed: deletedPublicContracts.length === 0 && duplicateContracts.length === 0, deletedPublicContracts, duplicateContracts };
   }
 
   public checkEnvironment(code: string, lang: string, envReqs: Set<string>): void {

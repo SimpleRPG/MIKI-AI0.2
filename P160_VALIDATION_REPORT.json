@@ -1,0 +1,129 @@
+{
+  "phase": "GRAPH_LEARNED_PERSON_GENERATION_P160",
+  "passed": true,
+  "checks": {
+    "crossPerson": true,
+    "samePersonRejected": true,
+    "lowQualityRejected": true,
+    "trace": true,
+    "observedPreserved": true,
+    "priorSeparated": true,
+    "uncertainty": true,
+    "poseConnected": true,
+    "realPng": true,
+    "receipt": true,
+    "poseChangesPixels": true
+  },
+  "prior": {
+    "targetPersonId": "target-p160",
+    "pose": {
+      "yaw": 26.464285714285715,
+      "pitch": 10.58032786885244
+    },
+    "candidates": {
+      "earDepth": {
+        "feature": "earDepth",
+        "value": 0.23379673995639993,
+        "confidence": 0.78,
+        "uncertainty": 0.5150481837685656,
+        "origin": "CROSS_PERSON_LEARNED_PRIOR",
+        "sampleIds": [
+          "general-side-a",
+          "general-side-b"
+        ],
+        "sourceSha256List": [
+          "1111111111111111111111111111111111111111111111111111111111111111",
+          "2222222222222222222222222222222222222222222222222222222222222222"
+        ],
+        "distance": 0.05277777777777777
+      },
+      "cheekDepth": {
+        "feature": "cheekDepth",
+        "value": 0.3237967399564,
+        "confidence": 0.78,
+        "uncertainty": 0.5150481837685656,
+        "origin": "CROSS_PERSON_LEARNED_PRIOR",
+        "sampleIds": [
+          "general-side-a",
+          "general-side-b"
+        ],
+        "sourceSha256List": [
+          "1111111111111111111111111111111111111111111111111111111111111111",
+          "2222222222222222222222222222222222222222222222222222222222222222"
+        ],
+        "distance": 0.05277777777777777
+      }
+    },
+    "rejectedSampleIds": [
+      "invalid-same",
+      "invalid-low"
+    ],
+    "resultSha256": "22754fccfb6ad8390edacfd937c90ee02849d579807a52d237740e6913b5fb18"
+  },
+  "model": {
+    "personId": "target-p160",
+    "sourceSha256": "d16ba66b13bea74297df039d13c794133ae48d739cf1fdc73672a3f959efbe77",
+    "pose": {
+      "yaw": 26.464285714285715,
+      "pitch": 10.58032786885244,
+      "roll": -8.130102354155978
+    },
+    "visibility": {
+      "leftEye": 0.5335714285714286,
+      "rightEye": 0.85,
+      "nose": 0.52,
+      "mouth": 0.48,
+      "leftCheek": 0.4446428571428571,
+      "rightCheek": 0.92
+    },
+    "face": {
+      "eyeSpacing": 0.42424242424242425,
+      "eyeSize": 0.09,
+      "noseLength": 0.2566666666666666,
+      "mouthWidth": 0.3599999999999999,
+      "jawTaper": 0.42,
+      "earDepth": 0.23379673995639993,
+      "cheekDepth": 0.3237967399564
+    },
+    "palette": {
+      "hair": "#1e1e1e",
+      "surface": "#949494",
+      "garment": "#909090"
+    },
+    "origins": {
+      "eyeSpacing": "PERSON_OBSERVED",
+      "eyeSize": "PERSON_OBSERVED",
+      "noseLength": "PERSON_OBSERVED",
+      "mouthWidth": "PERSON_OBSERVED",
+      "jawTaper": "PERSON_OBSERVED",
+      "earDepth": "CROSS_PERSON_LEARNED_PRIOR",
+      "cheekDepth": "CROSS_PERSON_LEARNED_PRIOR"
+    },
+    "confidence": {
+      "eyeSpacing": 0.6242857142857143,
+      "eyeSize": 0.6242857142857143,
+      "noseLength": 0.6242857142857143,
+      "mouthWidth": 0.6242857142857143,
+      "jawTaper": 0.6242857142857143,
+      "earDepth": 0.78,
+      "cheekDepth": 0.78
+    },
+    "uncertainty": {
+      "eyeSpacing": 0.37571428571428567,
+      "eyeSize": 0.37571428571428567,
+      "noseLength": 0.37571428571428567,
+      "mouthWidth": 0.37571428571428567,
+      "jawTaper": 0.37571428571428567,
+      "earDepth": 0.5150481837685656,
+      "cheekDepth": 0.5150481837685656
+    },
+    "modelSha256": "1307862737ef6d15b3271bed43affc9ccb136879ac6b5d52144787232091c239"
+  },
+  "artifact": {
+    "pngSha256": "78ec755923702704d1d3365cf2c1b288e1eb085bc0e0cb8a0ff42c5b87fe842f",
+    "receiptSha256": "3c70fb6186031dd8aff1d44fc9d52ceccc662036541a35f36138c13d20a53739",
+    "width": 900,
+    "height": 1000
+  },
+  "truthBoundary": "Cross-person validated samples supply only missing structural priors. Observed target-person features remain authoritative. Output is a pose-projected rule-based illustration, not photorealistic identity reconstruction."
+}

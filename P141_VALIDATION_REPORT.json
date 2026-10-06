@@ -1,0 +1,47 @@
+{
+  "phase": "HIGH_FIDELITY_PERSON_RENDERER_P141",
+  "passed": true,
+  "checks": {
+    "threeSources": true,
+    "skeleton": true,
+    "curvedFace": true,
+    "hairClusters": true,
+    "evidenceLineage": true,
+    "threeRealPng": true,
+    "qualityDimensions": true,
+    "profileChangeChangesPixels": true,
+    "receipts": true
+  },
+  "profileSha256": "519c8f4b2deb9d190d8c34c58e2a3a87eff6fdfb72ab5b2769d1ff42f8bb90f0",
+  "modelSha256": "3ebf3803c269e5abd230d78c2e4a9cc0cdf9da062c06a795f7d229cc40156595",
+  "artifacts": [
+    {
+      "quality": "PIXEL_ILLUSTRATION",
+      "width": 384,
+      "height": 576,
+      "pngSha256": "8af76d1d5fcfdc26f3acf80b7c1e388bb132334b564f0df104ed66dd572573fe",
+      "bytes": 7889,
+      "receipt": "1ef2ad28811e2aeea77f8f0c211d7e305582e09b44c98982c6c6a59c5329225d",
+      "fields": 14
+    },
+    {
+      "quality": "ILLUSTRATION_2D",
+      "width": 768,
+      "height": 1152,
+      "pngSha256": "32de700de3636499e25e37130bc5c9af9a8802eb65a0d5eef39a3644fb62a1b5",
+      "bytes": 26659,
+      "receipt": "efbbbcebae1db56322b4fdd1ace930f931ba93c82794463ac1bc14b1bd7b5bf2",
+      "fields": 14
+    },
+    {
+      "quality": "ILLUSTRATION_25D",
+      "width": 1024,
+      "height": 1536,
+      "pngSha256": "cca97adc041da53f1f1fa658e788acf51755665990d975d91916ea8c07060878",
+      "bytes": 46584,
+      "receipt": "8d00036d12e2dc6fc41387a92f823807189c9fa171f4741e1ea4a334107a7d4c",
+      "fields": 14
+    }
+  ],
+  "fixtureDisclosure": "Synthetic multi-photo observations validate the P141 generation model and renderer. Real-person resemblance requires real photographs."
+}

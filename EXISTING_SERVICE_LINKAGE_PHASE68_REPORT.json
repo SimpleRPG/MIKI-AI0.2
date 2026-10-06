@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "phase": "EXISTING_SERVICE_LINKAGE_68",
+  "actionLineageToCore": true,
+  "handoffAuditToCore": true,
+  "servicesScanned": 332,
+  "remainingSingleReferenceServices": 0,
+  "criticalDisconnected": 0,
+  "failures": []
+}

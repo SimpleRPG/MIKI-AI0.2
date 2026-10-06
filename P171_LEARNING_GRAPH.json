@@ -1,0 +1,151 @@
+{
+  "nodes": [
+    {
+      "nodeId": "VKN-c420539a47b53a65a4b16f18",
+      "personScope": "person-0",
+      "feature": "earDepth",
+      "value": 0.21,
+      "origin": "PERSON_OBSERVED",
+      "poseBucket": "YAW_20_40",
+      "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "confidence": 0.72,
+      "uncertainty": 0.14,
+      "validated": true,
+      "createdAt": 1000,
+      "nodeSha256": "c420539a47b53a65a4b16f18b4ec856c92b31f98bf4a6fb4389eaa3ca3069152"
+    },
+    {
+      "nodeId": "VKN-07d87cf9e7d327f5795e4086",
+      "personScope": "person-1",
+      "feature": "earDepth",
+      "value": 0.24,
+      "origin": "PERSON_OBSERVED",
+      "poseBucket": "YAW_20_40",
+      "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "confidence": 0.75,
+      "uncertainty": 0.14,
+      "validated": true,
+      "createdAt": 1001,
+      "nodeSha256": "07d87cf9e7d327f5795e408686ea1b64e1191a94190750c595dac4eafe077466"
+    },
+    {
+      "nodeId": "VKN-7f470ad21f82af6544cd394b",
+      "personScope": "person-2",
+      "feature": "earDepth",
+      "value": 0.23,
+      "origin": "PERSON_OBSERVED",
+      "poseBucket": "YAW_20_40",
+      "sourceSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "confidence": 0.78,
+      "uncertainty": 0.14,
+      "validated": true,
+      "createdAt": 1002,
+      "nodeSha256": "7f470ad21f82af6544cd394b08dff09628070b5b154cf3979ff788a788319862"
+    },
+    {
+      "nodeId": "VKN-5ce84ea3d4f446ae9d4fb07f",
+      "personScope": "person-3",
+      "feature": "earDepth",
+      "value": 0.26,
+      "origin": "PERSON_OBSERVED",
+      "poseBucket": "YAW_20_40",
+      "sourceSha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "confidence": 0.8099999999999999,
+      "uncertainty": 0.14,
+      "validated": true,
+      "createdAt": 1003,
+      "nodeSha256": "5ce84ea3d4f446ae9d4fb07f8ecb6c432a624c1d8e08a073ffd97e0e831845e2"
+    },
+    {
+      "nodeId": "VKN-18f3a4f80c39ace39c92d1c3",
+      "personScope": "person-4",
+      "feature": "earDepth",
+      "value": 0.22,
+      "origin": "PERSON_OBSERVED",
+      "poseBucket": "YAW_20_40",
+      "sourceSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "confidence": 0.84,
+      "uncertainty": 0.14,
+      "validated": true,
+      "createdAt": 1004,
+      "nodeSha256": "18f3a4f80c39ace39c92d1c3abc02370c0fa1e026bb3a93a972badcf0e231fa1"
+    },
+    {
+      "nodeId": "VKN-2d4e6c419d4bdebf928a87e5",
+      "personScope": "GENERAL",
+      "feature": "earDepth",
+      "value": 0.2323076923076923,
+      "origin": "CROSS_PERSON_LEARNED_PRIOR",
+      "poseBucket": "YAW_20_40",
+      "sourceSha256": "b2109e22d8e67c68eebcd5c2e621f0a2c9403bb6a51a486a27b149337df90f03",
+      "confidence": 0.78,
+      "uncertainty": 0.1372074017375144,
+      "validated": true,
+      "createdAt": 1004,
+      "nodeSha256": "2d4e6c419d4bdebf928a87e513780a45e00b9c15623294548fd83c0eebec2bd8"
+    }
+  ],
+  "edges": [
+    {
+      "edgeId": "VKE-a90e62ef9e30545387cb03aa",
+      "from": "VKN-c420539a47b53a65a4b16f18",
+      "to": "VKN-2d4e6c419d4bdebf928a87e5",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.72,
+      "edgeSha256": "a90e62ef9e30545387cb03aa0e0fb0be69ff1c6aa3adb01342d4229a2bb7a344"
+    },
+    {
+      "edgeId": "VKE-90cad5128669562ed7ef8c1e",
+      "from": "VKN-07d87cf9e7d327f5795e4086",
+      "to": "VKN-2d4e6c419d4bdebf928a87e5",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.75,
+      "edgeSha256": "90cad5128669562ed7ef8c1e94bcf2e212a263929898e32b6cd6a04025daa236"
+    },
+    {
+      "edgeId": "VKE-41fd18e1e63521832c8cbb6c",
+      "from": "VKN-7f470ad21f82af6544cd394b",
+      "to": "VKN-2d4e6c419d4bdebf928a87e5",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.78,
+      "edgeSha256": "41fd18e1e63521832c8cbb6c0b456a97ddc2eff2b60d7fe42bbf8e702d6b76c8"
+    },
+    {
+      "edgeId": "VKE-e2047b23c8883f91146fc451",
+      "from": "VKN-5ce84ea3d4f446ae9d4fb07f",
+      "to": "VKN-2d4e6c419d4bdebf928a87e5",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.8099999999999999,
+      "edgeSha256": "e2047b23c8883f91146fc45169c24912f3a21f5a4d0f9446a40758e0865e72b3"
+    },
+    {
+      "edgeId": "VKE-e65e0252aeb9c8581aa1e87c",
+      "from": "VKN-18f3a4f80c39ace39c92d1c3",
+      "to": "VKN-2d4e6c419d4bdebf928a87e5",
+      "type": "GENERALIZES_TO",
+      "confidence": 0.84,
+      "edgeSha256": "e65e0252aeb9c8581aa1e87ce24bc9f6a9b60f9e199052020641bc3aafa9a0df"
+    }
+  ],
+  "featureIndex": {
+    "earDepth": [
+      "VKN-07d87cf9e7d327f5795e4086",
+      "VKN-18f3a4f80c39ace39c92d1c3",
+      "VKN-2d4e6c419d4bdebf928a87e5",
+      "VKN-5ce84ea3d4f446ae9d4fb07f",
+      "VKN-7f470ad21f82af6544cd394b",
+      "VKN-c420539a47b53a65a4b16f18"
+    ]
+  },
+  "poseIndex": {
+    "YAW_20_40": [
+      "VKN-07d87cf9e7d327f5795e4086",
+      "VKN-18f3a4f80c39ace39c92d1c3",
+      "VKN-2d4e6c419d4bdebf928a87e5",
+      "VKN-5ce84ea3d4f446ae9d4fb07f",
+      "VKN-7f470ad21f82af6544cd394b",
+      "VKN-c420539a47b53a65a4b16f18"
+    ]
+  },
+  "graphSha256": "9497c0febd3524482108d086978158f42d41e6255a1962e5c9ba2d3365c9f56d"
+}

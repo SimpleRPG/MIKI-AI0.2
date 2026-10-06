@@ -1,0 +1,377 @@
+{
+  "phase": "CONVERSATION_TEMPLATE_AUDIT_88",
+  "typescriptFilesScanned": 82,
+  "japaneseStringLiterals": 1198,
+  "topTemplateHeavyFiles": [
+    {
+      "file": "src/miki/data/surfaceVariationData.ts",
+      "literalCount": 352,
+      "samples": [
+        "直ちに対処すべき点として",
+        "ただちに確認すべき内容として",
+        "障害切り分けの第一手として",
+        "稼働状態を最優先で確認するため",
+        "ダウンタイム短縮の観点から",
+        "非常時対応ガイドラインに沿って",
+        "現場状況の即時把握のため",
+        "緊急復旧オペレーションとして"
+      ]
+    },
+    {
+      "file": "src/miki/data/skeletonVariationData.ts",
+      "literalCount": 210,
+      "samples": [
+        "了解だよ！前提条件の変更を踏まえて再検討したよ。修正後の対応方針はこちらになるよ。",
+        "訂正承知しました！更新された前提に基づき、改めて手順を整理し直したよ。",
+        "前提の変更について了解です！新しい条件に合わせて導き出した結論をお伝えするね。",
+        "ご指摘ありがとうございます！更新された条件に沿って再評価した結果がこちらだよ。",
+        "前提条件を修正したよ！見直した前提で検討した最適なアプローチを共有するね。",
+        "新しい前提で再計算したよ！条件変更に伴う結論の修正点はこちらだよ。",
+        "前提の訂正を反映したよ！更新された状況を踏まえた回答を提示するね。",
+        "承知いたしました！新条件に合致するようプランを再構成したよ。"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/dialogueEvaluationService.ts",
+      "literalCount": 96,
+      "samples": [
+        "端的な質問に対し、結論ファースト・適切な短文で直接答える",
+        "WebGPUってスマホのブラウザでも動くの？",
+        "簡潔な理由（ChromeやAndroidの対応状況）",
+        "直接回答が冒頭にあり、回答長が簡潔（100〜250文字）であること",
+        "条件や背景を含む相談に対し、構造的かつ適切な標準長で親身に整理して答える",
+        "ローカルAIをGalaxyで動かす時、発熱とバッテリー消費を抑えつつ自然に会話を続けるコツを教えてほしい",
+        "3B/4B級モデルの選定",
+        "極端に短すぎる投げやりな回答"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationEvaluationService.ts",
+      "literalCount": 74,
+      "samples": [
+        "質問への直接回答を先に示し、過剰な前置きや長文を避ける",
+        "今日の東京の最高気温を調べる一番手軽な方法をサクッと教えて！",
+        "ご質問ありがとうございます",
+        "目的、条件、例外を分離し、適切な長さで構造的に答える",
+        "Galaxy S25単体でローカルAIを動かしたいんだけど、モデルの重みとRAM消費と発熱のバランスってどう考えるべきかな？",
+        "3. 前の説明の続きを求める",
+        "直前の会話文脈と話題を正確に維持し、重複なく続きを説明する",
+        "さっき言ってた長期記憶の4大分類の続き、具体的にどう使い分けるのか教えて！"
+      ]
+    },
+    {
+      "file": "src/miki/strategy/services/answerPlanService.ts",
+      "literalCount": 69,
+      "samples": [
+        "以前の前提が明示的または遠回しに訂正された",
+        "1. 訂正を素直に認識する",
+        "2. 古い前提を直ちに無効化し回答へ混入させない",
+        "3. 影響する結論を洗い出し、新しい条件で再判断する",
+        "4. 修正後の結論を先に答える",
+        "謝罪だけで終わる（防衛的にならない）",
+        "いや、そうじゃなくて、そもそもPC環境は利用できない前提なんだよね",
+        "了解だよ！PC環境は使えない前提で再検討したよ。スマホ単体で完結する手順はこちら..."
+      ]
+    },
+    {
+      "file": "src/miki/strategy/services/minimalScopeService.ts",
+      "literalCount": 65,
+      "samples": [
+        "日常の短い挨拶・雑談に対して親身かつ脱ロボットの自然な日本語で応答できる",
+        "tc_persona_01 (合格 95点)",
+        "会話処理三段階分離（6章）とペルソナプロファイルにより達成",
+        "直近数往復の原文と会話段階（7章）を正しく参照し、文脈を踏まえて返答する",
+        "scen_03_continuation (合格 92点)",
+        "7章の会話状態管理および直近原文バッファにより達成",
+        "currentTopic と topLevelGoal を追跡し、会話が横道にそれても主目的を見失わない",
+        "scen_09_return_previous (合格 94点)"
+      ]
+    },
+    {
+      "file": "src/miki/safety/services/featureFlagsService.ts",
+      "literalCount": 32,
+      "samples": [
+        "基盤チャット・ストリーミング (Chat Core)",
+        "ローカルモデルの安定起動、ストリーミング出力、会話ログ保存（1〜5章）。",
+        "会話状態管理 (Short-Term Context)",
+        "話題、最上位目的、確定事項、訂正イベント、無効化前提の追跡（7章）。",
+        "長期記憶・7段階検索 (Long-Term Retrieval)",
+        "完全一致検索、全文検索、メタデータ一致、関連原文の再取得（8章）。",
+        "回答骨格と思考節約 (Answer Plan Cache)",
+        "状況分類に基づく定型骨格の適用、思考手順の定型化と推論計算量削減（9章）。"
+      ]
+    },
+    {
+      "file": "src/miki/safety/services/nonLlmCoreService.ts",
+      "literalCount": 32,
+      "samples": [
+        "手動設定された禁止トピックに該当するため、処理を制限しました。",
+        "ユーザー手動設定によるフィルタが適用されました。",
+        "前提として、本人設定画面より禁止キーワードの追加・解除・編集が可能です。",
+        "対象を自動推測せず保留します。",
+        "同じ確認を繰り返さず、追加情報が得られるまで判断を保留します。",
+        "対象を一意に特定できません。",
+        "比較対象は見つかりましたが、評価軸ごとの確認済み根拠が不足しているため、非LLM中核では推奨を捏造して確定しません。",
+        "現在の実行条件では安全制約を満たせないため、処理を確定できません。"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationComponentCompositionService.ts",
+      "literalCount": 24,
+      "samples": [
+        "主張撤回時は空オブジェクトを返し後続推論を安全に停止",
+        "多軸比較推論テンプレート",
+        "2件の検証済みClaimを受け取り、多軸性能・制約・優劣を決定論的に比較して結論と推奨骨格を出力する",
+        "比較対象Aの検証済み主張",
+        "比較対象Bの検証済み主張",
+        "因果連鎖推論テンプレート",
+        "原因/現象のClaimと対策/帰結のClaimを受け取り、因果連鎖の分析結果と一般回答骨格を出力する",
+        "原因・現象の検証済み主張"
+      ]
+    },
+    {
+      "file": "src/miki/strategy/services/responseDesignService.ts",
+      "literalCount": 22,
+      "samples": [
+        "日常の挨拶または相槌に対する自然な即答",
+        "1〜2文（20〜60文字程度）",
+        "ユーザーからの明示的な簡潔・短文要求",
+        "1〜3文（50〜150文字程度）",
+        "ユーザーからの明示的な詳細・網羅的解説要求",
+        "構造化された段落（400文字以上）",
+        "短い挨拶または相槌に対する自然な即答",
+        "1〜2文（20〜60文字程度）"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/surfaceGrammarAndStyleService.ts",
+      "literalCount": 20,
+      "samples": [
+        "プログラム構造の解析データ",
+        "処理同士の競合による膠着状態",
+        "何度実行しても結果が変わらない性質",
+        "経験則に基づく推論ルール",
+        "バックグラウンド並行処理",
+        "動作を変えずにコード構造を整理すること",
+        "「ですである」という敬体・常体の直接重複",
+        "「だでした」という断定の重複"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/conversationStateService.ts",
+      "literalCount": 20,
+      "samples": [
+        "初心者・意味確認・基礎説明の明示",
+        "根拠・検証・正確性を重視する発言",
+        "高度な技術用語・開発用語を使用",
+        "実装・構造・デバッグ等の技術文脈",
+        "過去の訂正履歴が複数あり、会話内容を精密に扱っている",
+        "明確な理解度シグナルなし",
+        "明示的または既存の短文制約を優先。",
+        "明示的または既存の詳細説明要求を優先。"
+      ]
+    },
+    {
+      "file": "src/miki/strategy/services/taskPlanService.ts",
+      "literalCount": 20,
+      "samples": [
+        "要件定義と制約条件の抽出",
+        "提示された課題のゴール、入力前提、必須要件および禁止事項を論理的に分解します。",
+        "安全数値計算機による精密計算",
+        "曖昧性のない安全再帰下降パーサーを用いて、数式および計算条件を厳密に算出します。",
+        "ワークスペース対象リソースの走査・確認",
+        "対象ファイルの内容、行数、依存構造を読み出し、改修影響範囲を特定します。",
+        "アーキテクチャ・データ構造設計",
+        "型定義、状態遷移、コンポーネント構成およびエラーケースの事前設計を策定します。"
+      ]
+    },
+    {
+      "file": "src/miki/strategy/services/proactiveContextOsService.ts",
+      "literalCount": 18,
+      "samples": [
+        "夜遅くまで頑張っているね！無理しないで、区切りのいいところで休んでね🍵",
+        "リフレッシュ提案・要約保存の先行案内",
+        "VBAのコード作成かな？エラー処理や未宣言変数の静的チェックも任せてね！",
+        "ゼロ省略VBAコードとOption Explicitの先行確認",
+        "知りたいポイントがあれば、図解や身近な例え話で分かりやすく説明するよ！",
+        "段階的理解度追従レスポンス",
+        "みきだよ！いつでも手伝うよ！",
+        "みきはいつでも力になるよ！"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/autonomousAnswerCompositionPlanService.ts",
+      "literalCount": 13,
+      "samples": [
+        "安全境界を先に明示するため",
+        "通常回答では固定の前置きを置かないため",
+        "結論の根拠が存在するため",
+        "根拠要素がIRに存在しないため",
+        "適用条件の欠落を防ぐため",
+        "条件要素がIRに存在しないため",
+        "例外と否定条件を保持するため",
+        "例外要素がIRに存在しないため"
+      ]
+    },
+    {
+      "file": "src/miki/safety/services/recoveryOrchestratorService.ts",
+      "literalCount": 11,
+      "samples": [
+        "Recovery Runが見つかりません。",
+        "Recovery回数上限に達しました。",
+        "Retry対象のOrchestrator Runがありません。",
+        "代替Compositionを構成できませんでした。",
+        "Researchで検証済み情報が得られました。再計画が可能です。",
+        "Researchだけでは検証済みの復旧経路を確立できませんでした。",
+        "Recovery Runが見つかりません。",
+        "検証済みResearch結果がありません。"
+      ]
+    },
+    {
+      "file": "src/miki/strategy/services/unifiedDecisionEngineService.ts",
+      "literalCount": 10,
+      "samples": [
+        "設計検討・アーキテクチャ",
+        "自律・バックグラウンド学習",
+        "既存の検証済み部品の組み合わせで要求を満たせるため、新規コード追加を抑制しCOMPOSEを採用",
+        "技術的根拠・実測データが不足しているため、実装を行わず証拠収集を優先",
+        "端末リソースおよび保守複雑性のオーバーヘッドが利点を上回るため、複雑性抑制(REJECT_COMPLEXITY)を適用",
+        "コード生成ではなく、知識記録・ドキュメント定義として充足",
+        "既存代替がなく、要求の成立要件・検証要件が明確であるため実装を承認",
+        "ユーザーから明示的な優先指示があった場合"
+      ]
+    },
+    {
+      "file": "src/miki/safety/services/remediationFailureRecoveryService.ts",
+      "literalCount": 10,
+      "samples": [
+        "同一Remediationの同一失敗が上限回数を超えたため、反復自己修復を停止しました。第142章の知識検疫を優先します。",
+        "今回のRegression失敗原因を直接説明する公式または一次資料",
+        "現在の実装hash・実行環境・依存条件との整合性",
+        "前回の研究結果と異なる場合は差分と反例",
+        "可能なら同一条件で再現可能な検証結果",
+        "Regression失敗を新しいKnowledge Gapへ戻し、独立したWeb再調査を開始します。",
+        "再調査でVerifierによる解決条件を満たさなかったため、推測修正を行わず停止しました。",
+        "再調査は検証済み知識を得たが、安全に対応付けられる既存VERIFIED能力がないため実行へ戻しません。"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/liveConversationRepairService.ts",
+      "literalCount": 9,
+      "samples": [
+        "回答が長大すぎる。前置きや解説を削除し、要点と結論のみを短縮提示する。",
+        "結論が不明瞭。前置きを廃して「結論」「手順」「具体値」を冒頭に最速提示する。",
+        "前提条件やスコープの誤解。直前の前提を破棄し、ユーザーの本来の意図に合わせ再構成する。",
+        "提示内容の正誤不一致。提示した事実・結論を再検証し、代替の正しい回答へ修正する。",
+        "コード実行不能・構文エラー。第16章/第51章安全規則に基づき動く安全コードへ置換する。",
+        "ユーザーの意図を再確認して回答を即座に修正してください。",
+        "【第31章 ライブリペア: 徹底短縮】前置き、相づち、挨拶、詳細解説をすべて省き、3行以内または箇条書きで結論のみを返してください。",
+        "【第31章 ライブリペア: 結論先出し】1行目に直接の「結論」または「回答」を提示し、その後に必要最小限の理由を1文だけ添えてください。"
+      ]
+    },
+    {
+      "file": "src/miki/strategy/services/conversationStrategyService.ts",
+      "literalCount": 9,
+      "samples": [
+        "疲労・負荷・愚痴表現を検知したため、質問や長い解決策を禁止し共感のみを選択",
+        "訂正直後のため、言い訳・長文説明を回避し短い受け止めを選択",
+        "会話終了ステージのため質問を禁止し終話戦略を選択",
+        "話題転換を検知したためCHANGE_TOPICを選択",
+        "15文字未満の短文発話（質問なし）のため、毎回の質問付加を回避しSHORT_ACKを選択",
+        "| 戦略 (Strategy) | ステージ (Stage) | 累計試行 | 自発的継続 | 訂正 | 離脱 | 勝率スコア |\\n|---|---|---|---|---|---|---|\\n",
+        "| (未記録) | - | 0 | 0 | 0 | 0 | 0.00 |\\n",
+        "高め（質問攻めリスクあり）"
+      ]
+    },
+    {
+      "file": "src/miki/safety/services/nonLlmHardwarePipelineService.ts",
+      "literalCount": 9,
+      "samples": [
+        "語彙辞書インデックス照合 (FTS5)",
+        "安全境界フィルタリング (特権API遮断)",
+        "NPU未接続: 決定論的CPUフォールバック",
+        "GPU未接続: 決定論的CPUフォールバック",
+        "部品レジストリ (第9章) 最適部品検索",
+        "VBAコード合成エンジン稼働 (見出し・配列・重複・出力結合)",
+        "SHA-256 コードハッシュ不変性保証チェック合格",
+        "CSP形式制約充足ソルバー (第59章) 整合性チェック: SAT (充足)"
+      ]
+    },
+    {
+      "file": "src/miki/conversation/services/surfaceVariationService.ts",
+      "literalCount": 8,
+      "samples": [
+        "【現時点で確認済みの影響・二次被害】",
+        "【直ちに実行すべき復旧確認】",
+        "【例外的な発生パターン】",
+        "【推奨する解消ステップ】",
+        "【技術的例外・未検証事項】",
+        "【次の検証・ベンチマーク】",
+        "【稼働環境および前提条件】",
+        "【納品後の確認・受入れテスト】"
+      ]
+    },
+    {
+      "file": "src/miki/strategy/services/planOrchestratorService.ts",
+      "literalCount": 8,
+      "samples": [
+        "実行可能なComposition Planがありません。",
+        "実行可能なComposition Planがありません。",
+        "Orchestrator Runに紐づくRequestではありません。",
+        "Execution Eventの環境がRunと一致しません。",
+        "失敗したため任意Stepをスキップ",
+        "Orchestrator Runに紐づくRequestではありません。",
+        "失敗したため任意Stepをスキップ",
+        "実行失敗。RecoveryがRetryを許可。"
+      ]
+    },
+    {
+      "file": "src/miki/safety/services/cloudAiRestrictedGatewayService.ts",
+      "literalCount": 8,
+      "samples": [
+        "PowerQuery M言語からExcelテーブルへの非同期ロード自動化",
+        "],\n        },\n        verificationStages: {\n          specInspection: true,\n          duplicateCheck: true,\n          staticLint: true,\n          isolatedTest: true,\n          deviceVerifiedGalaxyS25: false,\n        },\n        promotedComponentId: undefined,\n        createdAt: Date.now() - 3600000 * 48,\n        resolvedAt: Date.now() - 3600000 * 46,\n      },\n    ];\n    this.saveToStorage();\n  }\n\n  public getRequests(): CloudAiEscalationRequest[] {\n    return this.requests;\n  }\n\n  /**\n   * クラウドAIへの限定エスカレーションを計画・送信監査を実行\n   */\n  public createEscalationRequest(params: {\n    triggerReason: CloudEscalationTrigger;\n    abstractGoal: string;\n    requiredCapability: string;\n    rawContextToSanitize: string;\n    failureSignature?: string;\n  }): CloudAiEscalationRequest {\n    // 送信データの厳格マスキング・サニタイズ（全会話、全記憶、資格情報、個人情報の剥奪）\n    const strippedKeys: string[] = [];\n    let tokenBefore = params.rawContextToSanitize.length / 3;\n\n    // 擬似マスキング検査\n    strippedKeys.push(",
+        ",\n      `☁️ [第11章 クラウド連携監査] 送信監査合格: ${newReq.abstractGoal} (理由: ${params.triggerReason}, 機密剥奪完了)`\n    );\n\n    return newReq;\n  }\n\n  /**\n   * クラウドからの提案受入れ（CLOUD_PROPOSED）\n   */\n  public receiveProposal(\n    escalationId: string,\n    proposal: { candidateCode: string; proposedSpec: string; testCases: string[] }\n  ): boolean {\n    const req = this.requests.find((r) => r.escalationId === escalationId);\n    if (!req) return false;\n\n    req.proposal = proposal;\n    req.status = ",
+        ",\n      `📥 [第11章 提案受信] ${req.escalationId}: CLOUD_PROPOSED を受領。端末側5段階検証を開始します。`\n    );\n    return true;\n  }\n\n  /**\n   * 端末側5段階検証パイプラインの実行\n   */\n  public runVerificationPipeline(escalationId: string): {\n    success: boolean;\n    stages: CloudAiEscalationRequest[",
+        ";\n\n    // 1. 仕様検査 (Spec Inspection)\n    const specOk = req.proposal.proposedSpec.length > 10;\n    req.verificationStages.specInspection = specOk;\n\n    // 2. 重複検査 (Duplicate Check)\n    const existing = componentRegistryService.getComponentById(req.requiredCapability);\n    const duplicateOk = !existing || existing.component_id === req.requiredCapability || existing.status !== ",
+        ";\n    req.verificationStages.duplicateCheck = duplicateOk;\n\n    // 3. 静的検査 (Static Lint)\n    const lintOk = !req.proposal.candidateCode.includes(",
+        ");\n    req.verificationStages.staticLint = lintOk;\n\n    // 4. 隔離試験 (Isolated Test)\n    const testOk = req.proposal.testCases.length > 0;\n    req.verificationStages.isolatedTest = testOk;\n\n    // 5. Galaxy S25 実機検証はここでは実施しない。\n    // Cloud/Gateway層が実機検証済みと自己申告してVERIFIED化することを禁止する。\n    req.verificationStages.deviceVerifiedGalaxyS25 = false;\n\n    const base = componentRegistryService.getComponent(req.requiredCapability);\n    const guard = base ? improvementStaticGuardService.inspect(base, req.proposal.candidateCode) : undefined;\n    const staticGuardOk = !!guard?.passed;\n    req.verificationStages.staticLint = lintOk && staticGuardOk;\n\n    const allLocalPreconditionsPassed = specOk && duplicateOk && req.verificationStages.staticLint && testOk;\n\n    if (allLocalPreconditionsPassed) {\n      // ここでVERIFIEDにはしない。Candidate化→隔離実行→DEVICE_TESTED→Promotion Gateが必要。\n      req.status = ",
+        ",\n        `📦 [第11章 Candidate待ち] ${req.escalationId}: 静的前提を通過。実機検証・Promotion Gateへは未到達です。`\n      );\n    } else {\n      req.status = "
+      ]
+    },
+    {
+      "file": "src/miki/strategy/services/changeImpactSimulatorService.ts",
+      "literalCount": 7,
+      "samples": [
+        "対象プロシージャを静的IRから特定できない",
+        "実行時の動的呼出・リフレクションは未観測",
+        "呼出元の引数・戻り値契約が壊れる可能性",
+        "保存データ/シートの副作用が変化する可能性",
+        "外部依存の互換性・権限条件を再確認する必要",
+        "静的解析で検出できない動的呼出は未確認",
+        "実データによる実行結果はまだ含めない"
+      ]
+    }
+  ],
+  "skeletonVariationItems": 210,
+  "surfaceVariationItems": 600,
+  "templatePatternIds": [
+    "'PATTERN-CLARIFICATION-01'",
+    "'PATTERN-COMPARISON-01'",
+    "'PATTERN-CONTRADICTION-01'",
+    "'PATTERN-CORRECTION-01'",
+    "'PATTERN-DIRECT-SHORT-01'",
+    "'PATTERN-LOGICAL-PRIORITY-01'",
+    "'PATTERN-TOPIC-RESUME-01'"
+  ],
+  "findings": [
+    "Surface generation is primarily deterministic skeleton/template assembly, not open-ended language generation.",
+    "Variation pools change wording but preserve a finite phrase inventory.",
+    "AnswerContentIR provides dynamic facts/conditions/reasons, so content is not wholly canned.",
+    "Dialogue interpretation is regex and rule oriented; semantic frames add structure but do not create unrestricted linguistic competence.",
+    "Runtime candidate selection chooses among generated skeleton candidates; it does not synthesize arbitrary wording beyond registered components.",
+    "Caching and stable signatures may repeat identical wording for identical IR/persona inputs.",
+    "Surface diversity checks reduce recent repetition but do not remove template dependence."
+  ],
+  "conclusion": "TEMPLATE_DOMINANT_HYBRID"
+}

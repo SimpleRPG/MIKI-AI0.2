@@ -1,0 +1,51 @@
+{
+  "phase": "CONVERSATION_RECURSIVE_AUDIT_86",
+  "passed": true,
+  "checks": [
+    {
+      "name": "SINGLE_CLAIM_SINGLETON",
+      "passed": true,
+      "detail": {}
+    },
+    {
+      "name": "CONVERSATION_CATEGORY_ENTRY",
+      "passed": true,
+      "detail": {
+        "category": "conversation",
+        "canonicalEntry": "hybridConversationEngineService",
+        "pipeline": [
+          "conversationComponentPipelineService",
+          "typedDiscourseModelService",
+          "semanticUnderstandingV2OrchestratorService",
+          "answerContentIrService",
+          "runtimeConversationCompositionService"
+        ]
+      }
+    },
+    {
+      "name": "SEMANTIC_CONTEXT_BUDGET_BEHAVIOR",
+      "passed": true,
+      "detail": {
+        "ranked": [
+          {
+            "item": {
+              "text": "候補Aの会話条件"
+            },
+            "score": 2,
+            "reason": "LEXICAL_SEMANTIC_OVERLAP"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TYPED_DISCOURSE_EXPORTED",
+      "passed": true,
+      "detail": {}
+    }
+  ],
+  "knownResiduals": [
+    "semanticContextBudgetService behavior is valid but not imported by a production consumer",
+    "Android-native conversation and morphology require device E2E",
+    "legacy conversation-learning regression expects unsafe repeated-user-claim promotion and is stale"
+  ]
+}

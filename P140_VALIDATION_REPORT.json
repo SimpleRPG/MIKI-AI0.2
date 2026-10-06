@@ -1,0 +1,99 @@
+{
+  "phase": "RAW_PHOTO_PERSON_P140",
+  "passed": true,
+  "checks": {
+    "rawPixelsAnalyzed": true,
+    "landmarkEvidenceCreated": true,
+    "regionsSeparated": true,
+    "threePhotosFused": true,
+    "similarityPerPhoto": true,
+    "similarityHasSha": true,
+    "profileToPng": true,
+    "realPng": true
+  },
+  "similarity": {
+    "overallScore": 0.7553438549404319,
+    "geometryScore": 0.9999999999999999,
+    "colorScore": 0.9989937182864029,
+    "coveragePenalty": 0.977336539644868,
+    "photoScores": [
+      {
+        "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "score": 0.9995169847774734,
+        "usedFields": [
+          "face.widthRatio",
+          "face.heightRatio",
+          "body.headToBody",
+          "body.shoulderRatio",
+          "body.torsoRatio",
+          "body.armRatio",
+          "body.legRatio",
+          "hair.volume",
+          "hair.length",
+          "hair.baseColor",
+          "hair.highlightColor",
+          "appearance.surfaceColor",
+          "appearance.garmentColor",
+          "appearance.pantsColor",
+          "appearance.shoeColor"
+        ]
+      },
+      {
+        "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "score": 1,
+        "usedFields": [
+          "face.widthRatio",
+          "face.heightRatio",
+          "body.headToBody",
+          "body.shoulderRatio",
+          "body.torsoRatio",
+          "body.armRatio",
+          "body.legRatio",
+          "hair.volume",
+          "hair.length",
+          "hair.baseColor",
+          "hair.highlightColor",
+          "appearance.surfaceColor",
+          "appearance.garmentColor",
+          "appearance.pantsColor",
+          "appearance.shoeColor"
+        ]
+      },
+      {
+        "sourceSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "score": 0.9995169847774734,
+        "usedFields": [
+          "face.widthRatio",
+          "face.heightRatio",
+          "body.headToBody",
+          "body.shoulderRatio",
+          "body.torsoRatio",
+          "body.armRatio",
+          "body.legRatio",
+          "hair.volume",
+          "hair.length",
+          "hair.baseColor",
+          "hair.highlightColor",
+          "appearance.surfaceColor",
+          "appearance.garmentColor",
+          "appearance.pantsColor",
+          "appearance.shoeColor"
+        ]
+      }
+    ],
+    "unresolved": [
+      "face.jawTaper",
+      "face.eyeSpacing",
+      "face.eyeSize",
+      "face.noseLength",
+      "face.mouthWidth",
+      "hair.parting",
+      "hair.wave"
+    ],
+    "profileSha256": "46e614b7d0041ad6566bf8508b9a82c52446ccd4070fe0c3138397ab402227b6",
+    "reportSha256": "25bec2601a4cfe7a652828dbb9a20d07c86cbcad6067ed48e6fc31db316f5061"
+  },
+  "profileSha256": "46e614b7d0041ad6566bf8508b9a82c52446ccd4070fe0c3138397ab402227b6",
+  "pngSha256": "ab940f9174c8e40b17c4e1c507c31ee2bf57c000b77cb2086e4d29e81042622b",
+  "disclosure": "Synthetic pixel fixtures validate the raw RGBA analysis path. Real-person resemblance remains unverified until real photographs are supplied."
+}

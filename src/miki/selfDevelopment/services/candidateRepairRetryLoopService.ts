@@ -4,6 +4,7 @@ import { isolatedCandidateWorkspaceService } from '../../core/services/isolatedC
 import { candidateRepairRevisionService } from './candidateRepairRevisionService';
 import { repairStrategySelectionService } from './repairStrategySelectionService';
 
+const MAX_REPAIR_ATTEMPTS_HARD_LIMIT=8;
 export interface RepairRetryAttempt {
   attempt:number;
   workspaceId:string;
@@ -24,7 +25,7 @@ export interface RepairRetryLoopResult {
 class CandidateRepairRetryLoopService {
   public async run(initialWorkspaceId:string,maxAttempts=3):Promise<RepairRetryLoopResult>{
     const limit=Math.max(1,Math.min(5,Math.floor(maxAttempts)));
-    const attempts:RepairRetryAttempt[]=[];
+    maxAttempts=Math.max(0,Math.min(maxAttempts,MAX_REPAIR_ATTEMPTS_HARD_LIMIT));const attempts:RepairRetryAttempt[]=[];
     const signatures=new Set<string>();
     let workspaceId=initialWorkspaceId;
 

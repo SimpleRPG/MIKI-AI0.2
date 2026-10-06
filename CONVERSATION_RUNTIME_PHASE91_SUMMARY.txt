@@ -1,0 +1,32 @@
+MIKI-AI Conversation Runtime Phase 91
+
+Continued implementation after rechecking the actual runtime selection path.
+
+Confirmed gap
+- compositionalRealizationService existed and passed isolated tests, but RuntimeConversationCompositionService still generated only template/skeleton candidates.
+- Therefore the new non-template path could not affect normal final responses.
+
+Implemented
+- Compositional realization is now inserted as the first normal runtime candidate.
+- It is subjected to the existing semantic-preservation inspection, diversity measurement, weighted selection and deterministic tie-break.
+- Existing skeleton/template candidates remain in the same candidate pool as safe fallback.
+- The runtime selects only a semantic-preserving result when one is available.
+
+Dynamic result
+- Four candidates were evaluated: one compositional candidate and three skeleton candidates.
+- The compositional candidate preserved conclusion, reason, condition, exception and next action.
+- It scored 97.55 and was selected.
+- Two template candidates failed the existing preservation inspection because the condition was omitted.
+- The safe TASK_COMPLETION template remained available and passed preservation with score 89.75.
+
+Regression
+- Phase 91 runtime compositional selection: PASS
+- Phase 89 unknown vocabulary and research handoff: PASS
+- Phase 87 conversation continuity: PASS
+- Phase 83 governance regression: PASS
+- TypeScript: PASS
+- Import resolution: PASS
+- Production and server build: PASS
+
+Boundary
+- Live web retrieval and Galaxy S25 device execution remain environment-dependent and are not claimed as completed here.

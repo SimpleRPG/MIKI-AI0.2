@@ -1,0 +1,108 @@
+{
+  "passed": true,
+  "phase": "AUTONOMOUS_CODE_IMPROVEMENT_E2E_75",
+  "executedAt": "2026-10-02T00:44:56.239Z",
+  "proofScenarios": 7,
+  "proofPassed": 7,
+  "rollbackVerified": true,
+  "coreChainTokens": [
+    "SELF_IMPROVEMENT",
+    "candidateConstraintValidationService.validate",
+    "acceptanceEvidenceMatrixService.evaluate",
+    "workspaceTscAndIsolationE2EService.verify",
+    "autonomousE2EProofSuiteService.runAll",
+    "candidateDevelopmentCompletionService.complete",
+    "reviewManifestInclusionGateService.verify",
+    "cumulativeRevalidationService.run",
+    "canaryPostReviewVerificationService.dryRun",
+    "advancedPipelineHandoffAuditService.audit"
+  ],
+  "results": [
+    {
+      "scenario": "UI_ADDITION",
+      "passed": true,
+      "checks": {
+        "changed": true,
+        "parse": true,
+        "accessible": true
+      },
+      "baselineSha256": "c1c3b31f5e6d9215454b046f41cc25891a9c86419b1d20900533045c5b938165",
+      "candidateSha256": "21aaa1ec4eb788b71e825e31ac90be8f7144173f3347cb5a43cd06b3105b87cc",
+      "reasons": []
+    },
+    {
+      "scenario": "ITEM_ADDITION",
+      "passed": true,
+      "checks": {
+        "accepted": true,
+        "unique": true,
+        "parse": true
+      },
+      "baselineSha256": "c58f62049382b948b7cd9868cddfacefbc089fd18c8bdf069144b40ab50bdcb8",
+      "candidateSha256": "a71b1509840cdab9b37fc8279bf9666051796fd2f45ce5417f4b9a626efb8b8e",
+      "reasons": []
+    },
+    {
+      "scenario": "SAVE_SCHEMA_MIGRATION",
+      "passed": true,
+      "checks": {
+        "versioned": true,
+        "rollback": true,
+        "parse": true
+      },
+      "baselineSha256": "574e9c97ca39bb2ab588b7c8ac6da1f7d89132cedc6b49fda7ba73216846d9b2",
+      "candidateSha256": "38fd592c91972b2b92ce2725d70fe40652ae3b63d0eeb8689e50dbc3b1280f40",
+      "reasons": []
+    },
+    {
+      "scenario": "PERFORMANCE_IMPROVEMENT",
+      "passed": true,
+      "checks": {
+        "changed": true,
+        "linearScanRemoved": true,
+        "parse": true
+      },
+      "baselineSha256": "faf2cf5a7b76c9883400d7588e251af15ac88a6ce6250103a67f60ee77b28e33",
+      "candidateSha256": "a35afe888c488824be31892eea369fe4b1ed97c431a6e523f758bd7d5803493a",
+      "reasons": []
+    },
+    {
+      "scenario": "SECURITY_FIX",
+      "passed": true,
+      "checks": {
+        "unknownInput": true,
+        "guard": true,
+        "parse": true
+      },
+      "baselineSha256": "e9f9415b5d5df02003be97a618f1d109e65d583a601f2687726d667eef8f9782",
+      "candidateSha256": "6e4afc6f15db00885c77c773b63b70f652c2df80e3ba75c5bcd9c0970ee07475",
+      "reasons": []
+    },
+    {
+      "scenario": "MULTI_INTENT",
+      "passed": true,
+      "checks": {
+        "accepted": true,
+        "workspace": true,
+        "rollback": true
+      },
+      "baselineSha256": "964736fcfcec40d340d155fc95a55d8808132c525cb058d522358a8620598415",
+      "candidateSha256": "1f948fb982061955958b6ce257d86f9fd7e8686a652249c5ecdae178c8657e91",
+      "reasons": []
+    },
+    {
+      "scenario": "INTENTIONAL_FAILURE_ROLLBACK",
+      "passed": true,
+      "checks": {
+        "failureDetected": true,
+        "restored": true,
+        "restoredParse": true
+      },
+      "baselineSha256": "5a7e54e8e7c4a77c29baf794eb716c7bdfc4ef71848b41cb8edb48bed3bd05cd",
+      "candidateSha256": "f67d2c3bc5db76742ca7b0f33bbf555136897cc822b253b4f5b24eccabe3f172",
+      "reasons": [],
+      "rollbackSha256": "5a7e54e8e7c4a77c29baf794eb716c7bdfc4ef71848b41cb8edb48bed3bd05cd"
+    }
+  ],
+  "failures": []
+}
