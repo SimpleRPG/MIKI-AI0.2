@@ -6,6 +6,8 @@ import { improvementCanaryRollbackService } from './miki/improvement/services/im
 import React, { useState, useEffect, useRef } from 'react';
 import { appRuntimeLifecycleService } from './app/appRuntimeLifecycleService';
 import { startupPhaseSchedulerService } from './app/startupPhaseSchedulerService';
+import { startupRecoveryService } from './services/startupRecoveryService';
+import { japaneseMorphologyService } from './miki/research/services/japaneseMorphologyService';
 import { selfCodeSpaceService } from './miki/core/services/selfCodeSpaceService';
 import { Header } from './components/Header';
 import { ChatPanel } from './components/ChatPanel';
@@ -302,11 +304,74 @@ export default function App() {
     startupPhaseSchedulerService.registerIdle(() => loadMemoryModal());
     startupPhaseSchedulerService.registerIdle(() => loadImprovementHome());
     startupPhaseSchedulerService.registerIdle(() => loadActivityMonitor());
+
     let disposed = false;
 
+    const yieldToScreen = () => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
+
+    const waitForNativeMorphology = async () => {
+      if (!Capacitor.isNativePlatform()) return;
+
+      startupRecoveryService.update(
+        'NATIVE_MORPHOLOGY',
+        'Android Native日本語解析エンジンの現在状態を確認しています'
+      );
+      await yieldToScreen();
+
+      for (let attempt = 0; attempt < 300 && !disposed; attempt += 1) {
+        const status = await japaneseMorphologyService.status();
+
+        if (status.state === 'INITIALIZING') {
+          startupRecoveryService.update(
+            'NATIVE_MORPHOLOGY',
+            status.message || 'Sudachi辞書を準備しています'
+          );
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 200));
+          continue;
+        }
+
+        if (status.state === 'READY') {
+          startupRecoveryService.update(
+            'NATIVE_MORPHOLOGY',
+            status.message || 'Sudachi日本語解析エンジンの準備が完了しました'
+          );
+          return;
+        }
+
+        startupRecoveryService.update(
+          'NATIVE_MORPHOLOGY',
+          status.message || status.reason || '日本語解析エンジンは利用できません。Web側のフォールバックを使用します'
+        );
+        return;
+      }
+    };
+
     void (async () => {
-      await selfCodeSpaceService.initializeBundledSeed();
-      if (!disposed) { appRuntimeLifecycleService.initialize(); startupPhaseSchedulerService.startIdle(); }
+      try {
+        startupRecoveryService.update('SELF_CODE_SEED', '初期コード資産を準備しています');
+        await yieldToScreen();
+        await selfCodeSpaceService.initializeBundledSeed();
+
+        if (disposed) return;
+
+        startupRecoveryService.update('RUNTIME_INIT', 'MIKIの認知・実行ランタイムを初期化しています');
+        await yieldToScreen();
+        appRuntimeLifecycleService.initialize();
+
+        await waitForNativeMorphology();
+
+        if (!disposed) {
+          startupPhaseSchedulerService.startIdle();
+          startupRecoveryService.update('READY', 'MIKIの起動が完了しました');
+        }
+      } catch (error) {
+        const rootElement = document.getElementById('root');
+        if (rootElement) {
+          startupRecoveryService.renderFatal(rootElement, error);
+        }
+      }
     })();
 
     return () => {

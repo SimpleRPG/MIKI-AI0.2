@@ -54,16 +54,15 @@ if (!rootElement) {
   throw new Error('ROOT_ELEMENT_NOT_FOUND');
 }
 const root = ReactDOM.createRoot(rootElement);
-startupRecoveryService.update('STORAGE_WAIT', 'Waiting for persistent storage hydration');
+startupRecoveryService.update('STORAGE_WAIT', '永続データを準備しています');
+startupRecoveryService.mountStatusOverlay();
 
 root.render(
-  <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-200 text-sm" role="status" aria-live="polite">
-    MIKI 起動中...
-  </div>
+  <div className="min-h-screen bg-slate-950" aria-hidden="true" />
 );
 
 const renderApp = async () => {
-  startupRecoveryService.update('APP_IMPORT', 'Loading application modules');
+  startupRecoveryService.update('APP_IMPORT', 'アプリ本体と起動画面を読み込んでいます');
   const [{ default: App }, { ErrorBoundary }] = await Promise.all([
     import('./App'),
     import('./components/ErrorBoundary'),
@@ -77,8 +76,7 @@ const renderApp = async () => {
       </ErrorBoundary>
     </React.StrictMode>
   );
-  startupRecoveryService.update('APP_RENDERED', 'Application root rendered');
-  window.setTimeout(() => startupRecoveryService.clear(), 3000);
+  startupRecoveryService.update('APP_RENDERED', 'メイン画面を表示しました。残りの初期化を続行しています');
 };
 
 void nonBlockingStartupP156Service.awaitWithoutBlocking(storageService.ready)

@@ -18,7 +18,13 @@ export interface NativeJapaneseMorpheme {
 
 interface JapaneseMorphologyPlugin {
   tokenize(options: { text: string; mode?: MorphologySplitMode }): Promise<{ analyzer: 'SUDACHI'; dictionaryVersion: string; morphemes: NativeJapaneseMorpheme[] }>;
-  status(): Promise<{ available: boolean; dictionaryVersion?: string; reason?: string }>;
+  status(): Promise<{
+    available: boolean;
+    dictionaryVersion?: string;
+    reason?: string;
+    state?: 'INITIALIZING' | 'READY' | 'FAILED';
+    message?: string;
+  }>;
   selfTest(): Promise<{ passed: boolean; dictionaryVersion: string; runner: string; samples: Array<{ text: string; morphemeCount: number; nonEmpty: boolean; hasReading: boolean }> }>;
 }
 

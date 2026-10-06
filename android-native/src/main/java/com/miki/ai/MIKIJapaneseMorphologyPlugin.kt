@@ -15,11 +15,28 @@ import java.io.File
 @CapacitorPlugin(name = "MIKIJapaneseMorphology")
 class MIKIJapaneseMorphologyPlugin : Plugin() {
     companion object { private const val DICT_ASSET = "system_core.dic"; private const val VERSION = "20260723-core" }
+    @Volatile
     private var tokenizer: Tokenizer? = null
+    @Volatile
+    private var initializationState: String = "INITIALIZING"
+    @Volatile
+    private var initializationMessage: String = "Sudachi日本語解析エンジンを初期化中です"
 
     override fun load() {
         super.load()
-        try { tokenizer = createTokenizer(context) } catch (_: Throwable) { tokenizer = null }
+        Thread {
+            try {
+                initializationState = "INITIALIZING"
+                initializationMessage = "Sudachi辞書を準備中です"
+                tokenizer = createTokenizer(context)
+                initializationState = "READY"
+                initializationMessage = "Sudachi日本語解析エンジンの準備が完了しました"
+            } catch (error: Throwable) {
+                tokenizer = null
+                initializationState = "FAILED"
+                initializationMessage = "Sudachi初期化に失敗しました: ${error.message ?: error.javaClass.simpleName}"
+            }
+        }.start()
     }
 
     @PluginMethod
@@ -28,7 +45,9 @@ class MIKIJapaneseMorphologyPlugin : Plugin() {
         val result = JSObject()
         result.put("available", available)
         result.put("dictionaryVersion", VERSION)
-        if (!available) result.put("reason", "SUDACHI_DICTIONARY_UNAVAILABLE")
+        result.put("state", initializationState)
+        result.put("message", initializationMessage)
+        if (!available) result.put("reason", if (initializationState == "FAILED") "SUDACHI_INITIALIZATION_FAILED" else "SUDACHI_DICTIONARY_UNAVAILABLE")
         call.resolve(result)
     }
 

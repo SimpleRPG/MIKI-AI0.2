@@ -23,13 +23,13 @@ MIKI-AI0.2 統合設計書・実装正本
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装正本・完全索引（2026-10-02 P137）】
+【0-A. 現行実装正本・完全索引（2026-10-06 P218）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- Revision: 2026-10-02-P137
+- Revision: 2026-10-06-P218
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -10929,4 +10929,21 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - この修正はGraph StoreのAPI、P211/P212/P216のGraph仕様、Native Coreの処理内容、エラーコードを変更せず、Capacitor `PluginCall.reject` の型契約だけを正規化する。
 - `MIKIGraphStorePlugin` は `MainActivity` から登録済みであり、Android APKビルド経路上の実コードであることを確認済み。
 - CI #819 の当該失敗ログで確認できたコンパイルエラーはこの1件であり、`flatDir`、unchecked operation、strip、Gradle deprecation等の表示はこの失敗原因ではない。
+
+# P218 Android起動可視化・Native初期化非ブロッキング化
+
+- Android起動時にユーザーへ「今何をしているか」を実際の処理状態から表示する。架空の進捗率・架空の完了状態を表示しない。
+- 起動状態は `ENTRY`、`STORAGE_WAIT`、`APP_IMPORT`、`APP_RENDERED`、`SELF_CODE_SEED`、`RUNTIME_INIT`、`NATIVE_MORPHOLOGY`、`READY`、`FAILED` の状態機械として `startupRecoveryService` に集約する。
+- WebViewへReactアプリを描画する前からDOM上の起動ステータス画面をmountし、状態変更ごとに現在フェーズ、実メッセージ、経過時間を表示する。
+- 起動処理中に同期的な重処理を行う場合は、画面描画へ制御を返してから実処理を開始し、ユーザーが黒画面だけを見続ける状態を作らない。
+- `MIKIJapaneseMorphologyPlugin.load()` では `system_core.dic` のコピーおよびSudachi `DictionaryFactory`生成を同期実行しない。Pluginロードは即時に返し、辞書・Tokenizer初期化はバックグラウンドThreadで行う。
+- `MIKIJapaneseMorphology.status()` は `INITIALIZING`、`READY`、`FAILED` の実状態と実メッセージを返す。Web側の起動表示はこのNative状態を問い合わせ、初期化中なら実メッセージを表示する。
+- Native形態素解析の準備完了はUIの描画完了とは分離する。UIは先に利用可能とし、Native解析が準備中でも既存のWeb側フォールバック契約を壊さない。
+- `selfCodeSpaceService.initializeBundledSeed()`、`appRuntimeLifecycleService.initialize()`、Native形態素解析確認はそれぞれ独立した起動フェーズとして画面へ反映する。
+- 起動失敗時は既存のFail-Closed診断画面へ切り替え、実際の例外内容を表示する。黒画面のまま失敗を隠さない。
+- `android-native/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt` と生成済み `android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt` は同一実装内容を維持する。ビルド準備ScriptによるNativeソース同期を正規経路とする。
+- この変更はSudachi API、辞書Version、形態素解析結果の意味契約を変更せず、起動時のブロッキングだけを除去し、実状態の可視化を追加する。
+- CapacitorのNative PluginとWebView間は既存のPlugin契約を使用し、新しい第二の起動Runtimeや第二の状態管理Authorityを作らない。
+- 正本設計書は本ファイル一つだけとし、本P218も既存P156の非ブロッキング起動方針、P214/P215のCheckpoint・実機検証方針、P217のAndroid Native修正へ統合する。
+
 
