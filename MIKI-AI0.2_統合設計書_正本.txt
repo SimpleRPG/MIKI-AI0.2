@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-02
-正本Revision：2026-10-02-P137
+基準日：2026-10-06
+正本Revision：2026-10-06-P217
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -10918,3 +10918,15 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 同CIで確認された `native/miki-native-core/src/domains/data/mod.rs` の `indexes.insert(field.clone(),map)` には文末 `;` を追加した。
 - 同CIで確認された `native/miki-native-core/src/domains/memory/mod.rs` の `baseline_records.into_iter()` では `v.id` を `v.id.clone()` とし、Record本体の所有権を保持するよう修正した。
 - 上記3件はいずれもRustの構文・所有権修正であり、P216の意味仕様、Graph仕様、Domain契約は変更しない。
+    
+#### P217 Android Native Graph Store Kotlin例外型修正
+
+- 2026-10-06 CI #819 の `Build Android APK` 実測で `:app:compileDebugKotlin` が失敗した。
+- 失敗箇所は `android/app/src/main/java/com/miki/ai/MIKIGraphStorePlugin.kt` の `GRAPH_NATIVE_COMMIT_FAILED` 処理である。
+- `catch (error: Throwable)` の `error` を `PluginCall.reject(String, Exception)` へ直接渡していたため、Kotlinコンパイラが `Throwable` を `Exception` として受理できず型不一致になっていた。
+- 同リポジトリの既存 `MIKIJapaneseMorphologyPlugin.kt` で使用済みの `e as? Exception ?: Exception(e)` と同じ境界処理を採用する。
+- 修正後は `call.reject("GRAPH_NATIVE_COMMIT_FAILED", error as? Exception ?: Exception(error))` とし、ThrowableがExceptionの場合はそのまま、それ以外はExceptionへラップする。
+- この修正はGraph StoreのAPI、P211/P212/P216のGraph仕様、Native Coreの処理内容、エラーコードを変更せず、Capacitor `PluginCall.reject` の型契約だけを正規化する。
+- `MIKIGraphStorePlugin` は `MainActivity` から登録済みであり、Android APKビルド経路上の実コードであることを確認済み。
+- CI #819 の当該失敗ログで確認できたコンパイルエラーはこの1件であり、`flatDir`、unchecked operation、strip、Gradle deprecation等の表示はこの失敗原因ではない。
+
