@@ -10967,3 +10967,15 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - P220はNative起動表示のhandoff実装と検証契約だけを修正し、startupRecoveryServiceの唯一Authority、MIKIJapaneseMorphologyPluginの非同期初期化、Sudachi API、辞書Version、CORE + 17分類、Graph意味契約は変更しない。
 - 正本設計書は本ファイル一つだけとする。
 
+
+
+# P221 Web APK vendor chunk循環依存修正
+
+- P220後の実機症状「Androidホームへ戻らなくなったが暗転したまま」を、P220のNative handoffだけに原因帰属せず、生成済みAPKのWeb bundleまで追跡した。
+- 現行 vite.config.ts の stableVendorChunk() は react / react-dom を vendor-react、その他のnode_modulesを vendor-common、recharts / d3-* を vendor-charts へ手動分割していた。生成済みAPKでは vendor-common から vendor-react をimportし、同時に vendor-react から vendor-common をimportする相互依存が生成され、React初期化時にscheduler由来のexportが未初期化となる循環依存が発生していた。
+- 生成済みAPKの実bundleを解析すると、起動時のES Module評価で Cannot set properties of undefined (setting unstable_now) が発生し、src/main.tsx の startupRecoveryService.mountStatusOverlay() および root.render(App) まで到達しない経路を再現した。実機adb logcatは今回も端末未接続のため未取得であり、ここはAPK bundleの静的実行再現として記録する。
+- P221では react / react-dom / recharts / d3-* を手動vendor chunkへ固定しない。これらはRollup/Viteの通常の依存グラフ分割へ委ね、vendor-react・vendor-charts・vendor-common間の手動循環依存を作らない。
+- typescript、sql.js、jszip の既存専用chunk、およびアプリ側のfeature chunkは維持する。P221はvendor循環依存を発生させるReact系の手動境界だけを除去し、機能構造やReactコード自体を変更しない。
+- P221の正規検証は npm run build と生成bundleの起動評価で行い、未実行の実機画面確認をDEVICE_VERIFIEDとは記載しない。
+- Native側のP220修正、startupRecoveryServiceの唯一Authority、P156非ブロッキング起動、Sudachi API、辞書Version、CORE + 17分類、Graph意味契約は変更しない。
+- 正本設計書は本ファイル一つだけとする。
