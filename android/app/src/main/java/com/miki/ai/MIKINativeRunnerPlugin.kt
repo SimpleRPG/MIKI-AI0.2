@@ -66,7 +66,7 @@ class MIKINativeRunnerPlugin : Plugin() {
                 put("created", created)
             })
         } catch (error: Throwable) {
-            call.reject("RUNTIME_LOG_FILE_INIT_FAILED", error)
+            call.reject("RUNTIME_LOG_FILE_INIT_FAILED", error.message ?: error.toString())
         }
     }
 
@@ -108,7 +108,7 @@ class MIKINativeRunnerPlugin : Plugin() {
                 put("filename", runtimeLogFileName)
             })
         } catch (error: Throwable) {
-            call.reject("RUNTIME_LOG_APPEND_FAILED", error)
+            call.reject("RUNTIME_LOG_APPEND_FAILED", error.message ?: error.toString())
         }
     }
 
