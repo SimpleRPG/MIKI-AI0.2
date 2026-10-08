@@ -38,6 +38,7 @@ import { workspaceTscAndIsolationE2EService } from '../../selfDevelopment/servic
 import { canaryPostReviewVerificationService } from '../../selfDevelopment/services/canaryPostReviewVerificationService';
 import { autonomousE2EProofSuiteService } from '../../selfDevelopment/services/autonomousE2EProofSuiteService';
 import { storageService } from '../../../services/storageService';
+import { systemLogger } from '../../../services/systemLogger';
 
 export interface CoreOrchestrationResult { task:BlackboardTask; cycles:number; dispatched:number; coreResult?:CoreResult; }
 
@@ -76,6 +77,10 @@ class CoreOrchestratorService {
  }
  async run(goal:string,source:MikiDomain='core',payload:Record<string,unknown>={},maxCycles=18):Promise<CoreOrchestrationResult>{
   const created=taskBlackboardService.create(goal,source,payload);
+  systemLogger.info(
+    'SYSTEM',
+    `[RUNTIME] CORE task start: ${created.taskId}`,
+  );
   coreExecutionTraceService.record(created.taskId,0,'RUN_START',{
     goal,
     source,
@@ -289,7 +294,80 @@ class CoreOrchestratorService {
   const resumed=taskBlackboardService.resume(taskId,allowRoutingRecovery);if(!resumed)return undefined;
   taskBlackboardService.append(taskId,'DECISION','core','coreResumed',{mode:'CORE_18_DOMAIN_ORCHESTRATION',requestId:reqId,recovery:allowRoutingRecovery&&currentTask?.status==='ROUTING'});
   coreResultService.updateStatus(reqId,'processing',{route:['core']});
-  return this.continueTask(taskId,maxCycles,reqId);
+  return this.continueTask(taskId,maxCycles,reqId)
+    .then((result)=>{
+      systemLogger.info(
+        'SYSTEM',
+        `[RUNTIME] CORE task end: ${result.task.status} (${result.task.taskId})`,
+        {cycles:result.cycles,dispatched:result.dispatched},
+      );
+
+      if(result.task.status==='FAILED'){
+        const task=result.task;
+        const unknowns=[...new Set(task.entries.flatMap(entry=>{
+          const value=entry.value;
+          if(!value || typeof value!=='object') return [];
+          const candidate=(value as Record<string,unknown>).unknowns;
+          return Array.isArray(candidate) ? candidate.map(String) : [];
+        }))];
+
+        systemLogger.error(
+          'SYSTEM',
+          `[RUNTIME_FAILURE] CORE task stopped: ${task.taskId}`,
+          {
+            taskId:task.taskId,
+            runId:typeof payload.runId==='string'?payload.runId:undefined,
+            goal,
+            source,
+            status:task.status,
+            revision:task.revision,
+            lastCycle:task.lastCycle,
+            visitedDomains:[...task.visitedDomains],
+            pendingDomains:[...task.pendingDomains],
+            evidenceIds:[...new Set(task.entries.flatMap(entry=>entry.evidenceIds||[]))],
+            unknowns,
+            lastEntries:task.entries.slice(-15).map(entry=>({
+              kind:entry.kind,
+              domain:entry.domain,
+              key:entry.key,
+              evidenceIds:entry.evidenceIds,
+              value:entry.value,
+            })),
+          },
+        );
+      }
+      return result;
+    })
+    .catch((error)=>{
+      const task=taskBlackboardService.get(taskId);
+      systemLogger.error(
+        'SYSTEM',
+        `[RUNTIME_FAILURE] CORE task threw: ${taskId}`,
+        {
+          taskId,
+          requestId:reqId,
+          runId:typeof payload.runId==='string'?payload.runId:undefined,
+          goal,
+          source,
+          error:error instanceof Error?`${error.name}: ${error.message}`:String(error),
+          stack:error instanceof Error?error.stack:undefined,
+          status:task?.status,
+          revision:task?.revision,
+          lastCycle:task?.lastCycle,
+          visitedDomains:task ? [...task.visitedDomains]:[],
+          pendingDomains:task ? [...task.pendingDomains]:[],
+          evidenceIds:task ? [...new Set(task.entries.flatMap(entry=>entry.evidenceIds||[]))]:[],
+          lastEntries:task?.entries.slice(-20).map(entry=>({
+            kind:entry.kind,
+            domain:entry.domain,
+            key:entry.key,
+            evidenceIds:entry.evidenceIds,
+            value:entry.value,
+          })),
+        },
+      );
+      throw error;
+    });
  }
  pause(taskId:string,reason?:string){
   const currentTask=taskBlackboardService.get(taskId);
@@ -1343,7 +1421,53 @@ class CoreOrchestratorService {
       depth:envelope.depth,
       payloadKeys:Object.keys(route.payload)
     });
-    const reply=await domainRouterService.dispatch(envelope);dispatched+=1;
+    let reply: Awaited<ReturnType<typeof domainRouterService.dispatch>>;
+    try{
+      reply=await domainRouterService.dispatch(envelope);
+    }catch(error){
+      const task=taskBlackboardService.get(taskId);
+      systemLogger.error(
+        'SYSTEM',
+        `[RUNTIME_FAILURE] domain dispatch threw: ${taskId}`,
+        {
+          taskId,
+          cycle:cycles,
+          target:route.target,
+          command:route.command,
+          operationInstanceId:route.payload.operationInstanceId,
+          envelopeId:envelope.envelopeId,
+          error:error instanceof Error?`${error.name}: ${error.message}`:String(error),
+          stack:error instanceof Error?error.stack:undefined,
+          status:task?.status,
+          revision:task?.revision,
+          visitedDomains:task ? [...task.visitedDomains]:[],
+          pendingDomains:task ? [...task.pendingDomains]:[],
+          evidenceIds:task ? [...new Set(task.entries.flatMap(entry=>entry.evidenceIds||[]))]:[],
+          lastEntries:task?.entries.slice(-15).map(entry=>({
+            kind:entry.kind,
+            domain:entry.domain,
+            key:entry.key,
+            evidenceIds:entry.evidenceIds,
+            value:entry.value,
+          })),
+        },
+      );
+      throw error;
+    }
+    dispatched+=1;
+
+    if(reply.accepted){
+      systemLogger.info(
+        'SYSTEM',
+        `[RUNTIME] dispatch OK: ${route.target}.${route.command}`,
+      );
+    }else{
+      systemLogger.warn(
+        'SYSTEM',
+        `[RUNTIME] dispatch rejected: ${route.target}.${route.command}`,
+      );
+    }
+
     coreExecutionTraceService.record(taskId,cycles,'DISPATCH_RESULT',{
       target:route.target,
       command:route.command,

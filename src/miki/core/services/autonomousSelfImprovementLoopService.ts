@@ -208,9 +208,15 @@ class AutonomousSelfImprovementLoopService {
       return;
     }
     this.running = true;
+    let activeRequest: AutonomousImprovementRequest | undefined;
     try {
       while (this.state.queue.length > 0) {
         const request = this.state.queue[0];
+        activeRequest = request;
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `[RUNTIME] AutonomousLoop step: ${request.id}`,
+        );
         this.state.status = 'RUNNING';
         this.state.activeRequestId = request.id;
         this.save();
@@ -268,6 +274,10 @@ class AutonomousSelfImprovementLoopService {
         }
         request.taskId = workflow.task.taskId;
         this.state.lastTaskId = workflow.task.taskId;
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `[RUNTIME] AutonomousLoop CORE result: ${workflow.task.status}`,
+        );
 
         const quality = evidenceQualityGateService.evaluate(workflow.task);
         const hasBusinessResult = workflow.task.entries.some(entry => {
@@ -316,7 +326,49 @@ class AutonomousSelfImprovementLoopService {
       this.state.lastReason = String(error);
       this.state.retryAt = undefined;
       this.save();
-      systemLogger.warn('SELF_IMPROVEMENT', '[AutonomousLoop] cycle failed', String(error));
+
+      const task = activeRequest?.taskId
+        ? taskBlackboardService.get(activeRequest.taskId)
+        : undefined;
+
+      const unknowns=[...new Set(task?.entries.flatMap(entry=>{
+        const value=entry.value;
+        if(!value || typeof value!=='object') return [];
+        const candidate=(value as Record<string,unknown>).unknowns;
+        return Array.isArray(candidate) ? candidate.map(String) : [];
+      }) || [])];
+
+      systemLogger.error(
+        'SELF_IMPROVEMENT',
+        '[RUNTIME_FAILURE] AutonomousLoop cycle stopped',
+        {
+          requestId:activeRequest?.id,
+          runId:activeRequest?.runId,
+          trigger:activeRequest?.trigger,
+          source:activeRequest?.source,
+          attempts:activeRequest?.attempts,
+          taskId:activeRequest?.taskId,
+          loopStatus:this.state.status,
+          lastReason:this.state.lastReason,
+          retryAt:this.state.retryAt,
+          error:error instanceof Error?`${error.name}: ${error.message}`:String(error),
+          stack:error instanceof Error?error.stack:undefined,
+          taskStatus:task?.status,
+          taskRevision:task?.revision,
+          taskLastCycle:task?.lastCycle,
+          visitedDomains:task ? [...task.visitedDomains]:[],
+          pendingDomains:task ? [...task.pendingDomains]:[],
+          evidenceIds:task ? [...new Set(task.entries.flatMap(entry=>entry.evidenceIds||[]))]:[],
+          unknowns,
+          lastEntries:task?.entries.slice(-20).map(entry=>({
+            kind:entry.kind,
+            domain:entry.domain,
+            key:entry.key,
+            evidenceIds:entry.evidenceIds,
+            value:entry.value,
+          })),
+        },
+      );
     } finally {
       this.running = false;
     }

@@ -7283,6 +7283,13 @@ Runtime初期化失敗まで連続して追跡可能にする。
 Downloadsへの永続化が利用できない場合も起動処理を停止させず、既存のSystemLogger、
 永続Storage、Console側の診断を維持する。実機未確認の場合はDEVICE_VERIFIEDと記載しない。
 
+Runtimeログの粒度は「正常経路を短く、停止点を詳しく」とする。
+- 正常なStartup / CORE routing / Domain dispatch / 再評価 / Task完了は、段階・対象・結果を1行程度で記録し、既存の詳細Traceを別系統で重複出力しない。
+- WARNは、再試行・待機・一時停止など「まだ停止ではない状態」を短く記録する。
+- ERRORでTask/AutonomousLoopが実際に停止した場合は、既存SystemLoggerの同一Entryへ、taskId / runId / goalまたはtrigger / source / status / revision / cycle / visitedDomains / pendingDomains / evidenceIds / unknowns / 直近のBlackboard Entry / 例外名・message・stackを可能な範囲で詳細記録する。
+- Domain dispatchが例外をthrowした場合も、対象domain / command / operationInstanceId / envelopeIdと上記Task状態を記録してから元の例外を再throwし、既存の失敗制御を変更しない。
+- 第二Logger、第二Truth、第二CognitiveStateは追加せず、既存`systemLogger`と`coreExecutionTraceService`をそれぞれの既存責務の範囲で利用する。
+
 また、認知状態やKnowledge schemaの変更時には、
 古い状態を新しい形式へ変換するMigrationが必要になる。
 
