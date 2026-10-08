@@ -1,4 +1,11 @@
 import { storageService } from './storageService';
+
+interface RuntimeLogFilePlugin {
+  ensureRuntimeLogFile(options?: { filename?: string }): Promise<void>;
+  appendRuntimeLog(options: { filename?: string; line: string }): Promise<void>;
+}
+
+const RUNTIME_LOG_FILE_NAME = 'MIKI_RUNTIME_LOG.txt';
 export interface SystemLogEntry {
   id: string;
   timestamp: string;
@@ -89,6 +96,10 @@ class SystemLogger {
   private runtimeMemoryInitialized = false;
   private runtimeMemoryVisibilityHandler: (() => void) | null = null;
   private readonly runtimeMemoryStorageKey = 'miki_runtime_memory_diagnostics_v1';
+  private runtimeLogFileInitialized = false;
+  private runtimeLogFileInitPromise: Promise<boolean> | null = null;
+  private runtimeLogFilePlugin: RuntimeLogFilePlugin | null = null;
+  private runtimeLogFileQueue = Promise.resolve();
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -101,6 +112,78 @@ class SystemLogger {
         this.logs = [];
       }
     }
+  }
+
+  /**
+   * Android の Downloads に固定名のランタイムログを確保する。
+   * ログ本体はこの SystemLogger のまま維持し、Downloads は永続的な搬送先に限定する。
+   * ネイティブ側が利用できない場合も起動をブロックしない。
+   */
+  public initializeRuntimeLogFile(): Promise<boolean> {
+    if (typeof window === 'undefined') {
+      return Promise.resolve(false);
+    }
+    if (this.runtimeLogFileInitPromise) {
+      return this.runtimeLogFileInitPromise;
+    }
+
+    this.runtimeLogFileInitPromise = (async () => {
+      const { Capacitor, registerPlugin } = await import('@capacitor/core');
+      if (!Capacitor.isNativePlatform()) {
+        return false;
+      }
+      this.runtimeLogFilePlugin ??= registerPlugin<RuntimeLogFilePlugin>('MIKINativeRunner');
+      await this.runtimeLogFilePlugin.ensureRuntimeLogFile({ filename: RUNTIME_LOG_FILE_NAME });
+      return true;
+    })()
+      .then((ready) => {
+        this.runtimeLogFileInitialized = ready;
+        return ready;
+      })
+      .catch((error) => {
+        this.runtimeLogFileInitialized = false;
+        this.runtimeLogFileInitPromise = null;
+        console.warn('[SystemLogger] runtime log file unavailable', error);
+        return false;
+      });
+
+    return this.runtimeLogFileInitPromise;
+  }
+
+  private queueRuntimeLogFile(entry: SystemLogEntry): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const timingStr =
+      entry.elapsedMs !== undefined
+        ? `[+${String(entry.elapsedMs).padStart(5, ' ')}ms | Δ${String(entry.relativeDeltaMs ?? 0).padStart(4, ' ')}ms] `
+        : '';
+    const details =
+      entry.details !== undefined
+        ? `\n  詳細データ: ${typeof entry.details === 'string' ? entry.details : JSON.stringify(entry.details, null, 2)}`
+        : '';
+    const line = `[${entry.timestamp}] ${timingStr}[${entry.level.padEnd(5)}] [${entry.category.padEnd(18)}] ${entry.message}${details}\n`;
+
+    this.runtimeLogFileQueue = this.runtimeLogFileQueue
+      .catch(() => undefined)
+      .then(async () => {
+        const ready = await this.initializeRuntimeLogFile();
+        if (!ready || !this.runtimeLogFileInitialized) {
+          return;
+        }
+        try {
+          if (!this.runtimeLogFilePlugin) {
+            return;
+          }
+          await this.runtimeLogFilePlugin.appendRuntimeLog({
+            filename: RUNTIME_LOG_FILE_NAME,
+            line,
+          });
+        } catch (error) {
+          console.warn('[SystemLogger] runtime log append failed', error);
+        }
+      });
   }
 
   /**
@@ -321,6 +404,8 @@ class SystemLogger {
     if (this.logs.length > this.maxLogs) {
       this.logs.shift();
     }
+
+    this.queueRuntimeLogFile(entry);
 
     if (typeof window !== 'undefined') {
       try {

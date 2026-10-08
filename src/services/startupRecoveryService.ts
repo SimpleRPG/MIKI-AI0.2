@@ -1,3 +1,5 @@
+import { systemLogger } from './systemLogger';
+
 export type StartupPhase='ENTRY'|'STORAGE_WAIT'|'APP_IMPORT'|'APP_RENDERED'|'SELF_CODE_SEED'|'RUNTIME_INIT'|'NATIVE_MORPHOLOGY'|'READY'|'FAILED';
 export interface StartupDiagnostic{phase:StartupPhase;startedAt:number;updatedAt:number;message:string;error?:string;userAgent:string;}
 const KEY='miki_startup_diagnostic_v1';
@@ -12,6 +14,11 @@ class StartupRecoveryService{
  };
  private overlay:HTMLElement|null=null;
  private elapsedTimer:number|undefined;
+
+ constructor(){
+  void systemLogger.initializeRuntimeLogFile();
+  systemLogger.info('SYSTEM','[STARTUP] JavaScript起動入口に到達しました',{phase:'ENTRY',message:this.diagnostic.message});
+ }
 
  private phaseLabel(phase:StartupPhase):string{
   const labels:Record<StartupPhase,string>={
@@ -36,6 +43,15 @@ class StartupRecoveryService{
    error:error instanceof Error?`${error.name}: ${error.message}`:error?String(error):undefined,
    updatedAt:Date.now()
   };
+  systemLogger.log(
+   phase==='FAILED'||Boolean(error)?'ERROR':'INFO',
+   'SYSTEM',
+   `[STARTUP] ${this.phaseLabel(phase)}: ${message}`,
+   {
+    phase,
+    error:error instanceof Error?`${error.name}: ${error.message}`:error?String(error):undefined,
+   }
+  );
   try{localStorage.setItem(KEY,JSON.stringify(this.diagnostic));}catch{}
   this.renderStatus();
   if(phase==='READY'){

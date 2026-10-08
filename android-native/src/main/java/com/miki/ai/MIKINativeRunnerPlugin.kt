@@ -1,6 +1,12 @@
 package com.miki.ai
 
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -23,6 +29,121 @@ import java.io.File
 class MIKINativeRunnerPlugin : Plugin() {
 
     private val runnerId = "android-native"
+    private val runtimeLogFileName = "MIKI_RUNTIME_LOG.txt"
+
+    @PluginMethod
+    fun ensureRuntimeLogFile(call: PluginCall) {
+        try {
+            validateRuntimeLogFilename(call.getString("filename"))
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                call.reject("RUNTIME_LOG_DOWNLOADS_API_UNSUPPORTED")
+                return
+            }
+            val (uri, created) = getOrCreateRuntimeLogUri()
+            if (created) {
+                context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                    output.write("# MIKI runtime log v1\n".toByteArray(Charsets.UTF_8))
+                    output.flush()
+                } ?: throw IllegalStateException("RUNTIME_LOG_OUTPUT_STREAM_UNAVAILABLE")
+                context.contentResolver.update(
+                    uri,
+                    ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
+                    null,
+                    null
+                )
+            }
+            call.resolve(JSObject().apply {
+                put("success", true)
+                put("filename", runtimeLogFileName)
+                put("location", Environment.DIRECTORY_DOWNLOADS)
+                put("uri", uri.toString())
+                put("created", created)
+            })
+        } catch (error: Throwable) {
+            call.reject("RUNTIME_LOG_FILE_INIT_FAILED", error)
+        }
+    }
+
+    @PluginMethod
+    fun appendRuntimeLog(call: PluginCall) {
+        val line = call.getString("line")
+        if (line.isNullOrEmpty() || line.length > 500_000) {
+            call.reject("RUNTIME_LOG_LINE_INVALID")
+            return
+        }
+        try {
+            validateRuntimeLogFilename(call.getString("filename"))
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                call.reject("RUNTIME_LOG_DOWNLOADS_API_UNSUPPORTED")
+                return
+            }
+            val (uri, created) = getOrCreateRuntimeLogUri()
+            if (created) {
+                context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                    output.write("# MIKI runtime log v1\n".toByteArray(Charsets.UTF_8))
+                    output.flush()
+                } ?: throw IllegalStateException("RUNTIME_LOG_OUTPUT_STREAM_UNAVAILABLE")
+            }
+            context.contentResolver.openOutputStream(uri, "wa")?.use { output ->
+                output.write(line.toByteArray(Charsets.UTF_8))
+                output.flush()
+            } ?: throw IllegalStateException("RUNTIME_LOG_APPEND_STREAM_UNAVAILABLE")
+            if (created) {
+                context.contentResolver.update(
+                    uri,
+                    ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
+                    null,
+                    null
+                )
+            }
+            call.resolve(JSObject().apply {
+                put("success", true)
+                put("byte_length", line.toByteArray(Charsets.UTF_8).size)
+                put("filename", runtimeLogFileName)
+            })
+        } catch (error: Throwable) {
+            call.reject("RUNTIME_LOG_APPEND_FAILED", error)
+        }
+    }
+
+    private fun validateRuntimeLogFilename(requested: String?) {
+        if (requested != null && requested != runtimeLogFileName) {
+            throw IllegalArgumentException("RUNTIME_LOG_FILENAME_FORBIDDEN")
+        }
+    }
+
+    private fun getOrCreateRuntimeLogUri(): Pair<Uri, Boolean> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            throw IllegalStateException("RUNTIME_LOG_DOWNLOADS_API_UNSUPPORTED")
+        }
+
+        val resolver = context.contentResolver
+        val relativePath = "${Environment.DIRECTORY_DOWNLOADS}/"
+        resolver.query(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.Downloads._ID),
+            "${MediaStore.Downloads.DISPLAY_NAME} = ? AND ${MediaStore.Downloads.RELATIVE_PATH} = ?",
+            arrayOf(runtimeLogFileName, relativePath),
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                return ContentUris.withAppendedId(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    cursor.getLong(0)
+                ) to false
+            }
+        }
+
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, runtimeLogFileName)
+            put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+            put(MediaStore.Downloads.RELATIVE_PATH, relativePath)
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: throw IllegalStateException("RUNTIME_LOG_MEDIASTORE_INSERT_FAILED")
+        return uri to true
+    }
 
     @PluginMethod
     fun health(call: PluginCall) {

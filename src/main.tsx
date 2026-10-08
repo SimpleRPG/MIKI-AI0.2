@@ -3,32 +3,44 @@ import ReactDOM from 'react-dom/client';
 import { storageService } from './services/storageService';
 import { startupRecoveryService } from './services/startupRecoveryService';
 import { nonBlockingStartupP156Service } from './services/nonBlockingStartupP156Service';
+import { systemLogger } from './services/systemLogger';
 import './index.css';
+
+void systemLogger.initializeRuntimeLogFile();
+systemLogger.info('SYSTEM','[BOOT] JavaScript entry loaded',{userAgent:typeof navigator==='undefined'?'unknown':navigator.userAgent});
 
 // Prevent WebGPU / background abort recoverable notices from triggering parent frame tab shifts
 window.addEventListener('unhandledrejection', (event) => {
   const reason = String(event?.reason?.message || event?.reason || '');
-  if (
+  const suppressed =
     reason.includes('Device was lost') ||
     reason.includes('GPUBuffer') ||
     reason.includes('unmapped') ||
     reason.includes('AbortError') ||
     reason.includes('aborted') ||
-    reason.includes('plugin is not implemented')
-  ) {
+    reason.includes('plugin is not implemented');
+  systemLogger.log(suppressed ? 'WARN' : 'ERROR','SYSTEM','[WINDOW] unhandledrejection',{reason,suppressed});
+  if (suppressed) {
     event.preventDefault();
   }
 });
 
 window.addEventListener('error', (event) => {
   const msg = String(event?.message || '');
-  if (
+  const suppressed =
     msg.includes('ResizeObserver') ||
     msg.includes('Device was lost') ||
     msg.includes('GPUBuffer') ||
     msg.includes('unmapped') ||
-    msg.includes('plugin is not implemented')
-  ) {
+    msg.includes('plugin is not implemented');
+  systemLogger.log(suppressed ? 'WARN' : 'ERROR','SYSTEM','[WINDOW] error',{
+    message:msg,
+    filename:event?.filename || undefined,
+    lineno:event?.lineno || undefined,
+    colno:event?.colno || undefined,
+    suppressed,
+  });
+  if (suppressed) {
     event.preventDefault();
   }
 });
@@ -51,6 +63,7 @@ window.addEventListener('beforeunload', flushOnHide);
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
+  systemLogger.error('SYSTEM','[BOOT] ROOT_ELEMENT_NOT_FOUND');
   throw new Error('ROOT_ELEMENT_NOT_FOUND');
 }
 const root = ReactDOM.createRoot(rootElement);
@@ -89,6 +102,7 @@ void nonBlockingStartupP156Service.awaitWithoutBlocking(storageService.ready)
   .then(() => import('./services/systemLogger'))
   .then(({ systemLogger }) => systemLogger.initializeRuntimeMemoryDiagnostics())
   .catch((error) => {
+    systemLogger.error('SYSTEM','[BOOTSTRAP_FAILED]',{error:error instanceof Error?`${error.name}: ${error.message}`:String(error)});
     console.error('MIKI application bootstrap failed', error);
     startupRecoveryService.renderFatal(rootElement, error);
   });

@@ -7268,6 +7268,20 @@ Execution前Environment再確認
 ・Foreground遅延
 ・Capability再利用率
 ・Knowledge stale率
+・Startup phase / bootstrap error trace
+・Window error / unhandled rejection trace
+・Android runtime log sinkの可用性
+
+Runtime観測の正規経路は既存 `systemLogger` を唯一のruntime diagnostic authorityとして利用する。
+追加の第二Logger・第二Truth・第二CognitiveStateを作らない。
+
+Android実機では、既存SystemLoggerの同一EntryをAndroid 10 (API 29) 以上の
+`MediaStore.Downloads` に固定名 `MIKI_RUNTIME_LOG.txt` として追記し、
+アプリ起動直後のStartup PhaseからBootstrap、Window Error、Unhandled Rejection、
+Runtime初期化失敗まで連続して追跡可能にする。
+
+Downloadsへの永続化が利用できない場合も起動処理を停止させず、既存のSystemLogger、
+永続Storage、Console側の診断を維持する。実機未確認の場合はDEVICE_VERIFIEDと記載しない。
 
 また、認知状態やKnowledge schemaの変更時には、
 古い状態を新しい形式へ変換するMigrationが必要になる。
