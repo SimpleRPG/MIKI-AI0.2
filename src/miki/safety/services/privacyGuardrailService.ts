@@ -26,11 +26,36 @@ class PrivacyGuardrailService {
     this.loadLogs();
   }
 
+  private sanitizeAuditLogEntry(entry: PrivacyAuditLogEntry): PrivacyAuditLogEntry {
+    const rawTarget = String((entry as any).targetService || 'external_service');
+    const target = /^(gemini_cloud_file|gemini_cloud_ws|github_push)_/.test(rawTarget)
+      ? rawTarget.replace(/^(gemini_cloud_file|gemini_cloud_ws|github_push)_.+$/, '$1_[REDACTED]')
+      : (/^[a-zA-Z0-9_-]{1,64}$/.test(rawTarget) ? rawTarget : 'external_service');
+    const violations = Array.isArray((entry as any).violations) ? (entry as any).violations : [];
+    const safeViolations = violations.map((violation: any) => ({
+      ...violation,
+      snippet: `[REDACTED:${String(violation?.type || 'UNKNOWN')}]`,
+    }));
+    return {
+      ...entry,
+      targetService: target,
+      summary: 'Audit metadata retained; content, reversible mappings, and identifying details redacted.',
+      sanitizedText: '',
+      symbolReplacements: {},
+      violations: safeViolations,
+    };
+  }
+
   private loadLogs(): void {
     try {
       const raw = storageService.getItem(PRIVACY_AUDIT_LOG_KEY);
       if (raw) {
-        this.auditLogs = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        this.auditLogs = Array.isArray(parsed)
+          ? parsed.filter((entry) => Boolean(entry && typeof entry === 'object')).map((entry) => this.sanitizeAuditLogEntry(entry as PrivacyAuditLogEntry))
+          : [];
+        // Migrate prior versions that could retain blocked raw text or reversible mappings.
+        this.saveLogs();
       }
     } catch (e) {
       console.warn('Failed to load privacy audit logs:', e);
@@ -39,7 +64,8 @@ class PrivacyGuardrailService {
 
   public saveLogs(): void {
     try {
-      storageService.setItem(PRIVACY_AUDIT_LOG_KEY, JSON.stringify(this.auditLogs.slice(-MAX_AUDIT_LOGS)));
+      const safeLogs = this.auditLogs.slice(-MAX_AUDIT_LOGS).map((entry) => this.sanitizeAuditLogEntry(entry));
+      storageService.setItem(PRIVACY_AUDIT_LOG_KEY, JSON.stringify(safeLogs));
     } catch (e) {
       console.warn('Failed to save privacy audit logs:', e);
     }
@@ -109,7 +135,7 @@ class PrivacyGuardrailService {
     }
 
     // 3. 社内ファイルパス (Windows/UNC/Linux Home)
-    const pathMatches = text.match(/(?:[A-Za-z]:\\[^<>"|?*\n\r\t]{5,}|\\\\[a-zA-Z0-9._-]+\\[^<>"|?*\n\r\t]+|\/(?:home|Users)\/[a-zA-Z0-9._\-\/]{4,})/g);
+    const pathMatches = text.match(/(?:[A-Za-z]:\\[^<>"|?*\n\r\t]{5,}|\\\\[a-zA-Z0-9._-]+\\[^<>"|?*\n\r\t]+|\/(?:home|Users|data|storage|sdcard|system|mnt|tmp|opt|usr|proc|dev|root)\/[a-zA-Z0-9._\-\/]{4,})/g);
     if (pathMatches) {
       for (const snippet of pathMatches) {
         violations.push({
@@ -205,13 +231,13 @@ class PrivacyGuardrailService {
     };
 
     // ログ記録
-    const logEntry: PrivacyAuditLogEntry = {
+    const logEntry: PrivacyAuditLogEntry = this.sanitizeAuditLogEntry({
       ...auditResult,
       id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       summary: allowed
         ? `[${classification}] ${targetService} への送信を承認 (${violations.length}件検知/置換)`
         : `[BLOCKED] ${targetService} への送信を遮断: ${blockedReason}`,
-    };
+    });
     this.auditLogs.unshift(logEntry);
     this.saveLogs();
 

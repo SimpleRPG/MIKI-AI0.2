@@ -3,6 +3,7 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 
 const SYMBOL_MAPPING_KEY = 'miki_abstract_symbol_mappings_v5';
+const TRANSIENT_SYMBOL_CATEGORIES = new Set<string>(['credential', 'person', 'path', 'host']);
 
 /**
  * 設計思想 Master v5.0 第10章 10.2節:
@@ -34,8 +35,11 @@ class AbstractSanitizerService {
       if (raw) {
         const parsed: AbstractSymbolMapping[] = JSON.parse(raw);
         for (const item of parsed) {
+          if (TRANSIENT_SYMBOL_CATEGORIES.has(item.category)) continue;
           this.mappings.set(item.originalValue.toLowerCase(), item);
         }
+        // Remove credential/PII/path/host originals left by older app versions.
+        this.saveMappings();
       }
     } catch (e) {
       console.warn('Failed to load abstract symbol mappings:', e);
@@ -44,7 +48,7 @@ class AbstractSanitizerService {
 
   public saveMappings(): void {
     try {
-      const list = Array.from(this.mappings.values());
+      const list = Array.from(this.mappings.values()).filter((item) => !TRANSIENT_SYMBOL_CATEGORIES.has(item.category));
       storageService.setItem(SYMBOL_MAPPING_KEY, JSON.stringify(list));
     } catch (e) {
       console.warn('Failed to save abstract symbol mappings:', e);
@@ -55,7 +59,7 @@ class AbstractSanitizerService {
    * 割り当て済みのマッピング一覧を取得
    */
   public getAllMappings(): AbstractSymbolMapping[] {
-    return Array.from(this.mappings.values());
+    return Array.from(this.mappings.values()).filter((item) => !TRANSIENT_SYMBOL_CATEGORIES.has(item.category));
   }
 
   /**
@@ -114,7 +118,7 @@ class AbstractSanitizerService {
       createdAt: Date.now(),
     };
     this.mappings.set(key, mapping);
-    this.saveMappings();
+    if (!TRANSIENT_SYMBOL_CATEGORIES.has(category)) this.saveMappings();
     return symbol;
   }
 
@@ -153,7 +157,7 @@ class AbstractSanitizerService {
     });
 
     // 3. Windows / UNC / Linux ファイルパス
-    const pathRegex = /(?:[A-Za-z]:\\[^<>"|?*\n\r\t]+|\\\\[a-zA-Z0-9._-]+\\[^<>"|?*\n\r\t]+|\/(?:home|etc|var|Users)\/[a-zA-Z0-9._\-\/]+)/g;
+    const pathRegex = /(?:[A-Za-z]:\\[^<>"|?*\n\r\t]+|\\\\[a-zA-Z0-9._-]+\\[^<>"|?*\n\r\t]+|\/(?:home|etc|var|Users|data|storage|sdcard|system|mnt|tmp|opt|usr|proc|dev|root)\/[a-zA-Z0-9._\-\/]+)/g;
     sanitized = sanitized.replace(pathRegex, (match) => {
       const sym = this.getOrCreateSymbol(match, 'path');
       replacements[match] = sym;

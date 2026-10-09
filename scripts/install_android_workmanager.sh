@@ -16,11 +16,13 @@ if [[ ! -d "$ANDROID_DIR" ]]; then
 fi
 
 mkdir -p "$PACKAGE_DIR"
-
-# 1. プラグインおよびWorkerのソースをコピー
-cp "$SRC_DIR/MikiBackgroundWorker.kt" "$PACKAGE_DIR/MikiBackgroundWorker.kt"
-cp "$SRC_DIR/MikiWorkManagerPlugin.kt" "$PACKAGE_DIR/MikiWorkManagerPlugin.kt"
-echo "Copied MikiBackgroundWorker.kt and MikiWorkManagerPlugin.kt to $PACKAGE_DIR"
+WORKER_TARGET="$PACKAGE_DIR/MikiBackgroundWorker.kt"
+PLUGIN_TARGET="$PACKAGE_DIR/MikiWorkManagerPlugin.kt"
+[[ -f "$WORKER_TARGET" ]] || { echo "CANONICAL_WORKER_MISSING: $WORKER_TARGET" >&2; exit 5; }
+[[ -f "$PLUGIN_TARGET" ]] || { echo "CANONICAL_WORKMANAGER_PLUGIN_MISSING: $PLUGIN_TARGET" >&2; exit 5; }
+grep -Fq 'fun runCandidateBrowserE2E(call: PluginCall)' "$PLUGIN_TARGET" || { echo "WORKMANAGER_BROWSER_E2E_METHOD_MISSING" >&2; exit 6; }
+grep -Fq 'fun fetchRenderedPage(call: PluginCall)' "$PLUGIN_TARGET" || { echo "WORKMANAGER_FETCH_RENDERED_PAGE_METHOD_MISSING" >&2; exit 6; }
+grep -Fq 'class MikiBackgroundWorker' "$WORKER_TARGET" || { echo "CANONICAL_BACKGROUND_WORKER_INVALID" >&2; exit 7; }
 
 # 2. MainActivity へのプラグイン登録
 if [[ -f "$MAIN_KT" ]]; then

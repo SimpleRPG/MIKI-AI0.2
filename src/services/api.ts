@@ -12,6 +12,7 @@ import { systemLogger } from './systemLogger';
 import { storageService } from './storageService';
 import { githubSyncService } from './githubSyncService';
 import { privacyGuardrailService } from './privacyGuardrailService';
+import { sanitizeOutboundPayload } from '../miki/safety/services/outboundPayloadSanitizer';
 import {
   nonLlmHardwarePipelineService,
   HardwareTelemetry,
@@ -523,41 +524,26 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     workspaceFilesCount: params.workspaceFiles?.length || 0,
   });
 
-  // 外部クラウド送信前プライバシー監査を実施 (Master v5.0 第11章)
-  const promptAudit = privacyGuardrailService.auditOutboundContent(
-    params.prompt,
-    'gemini_cloud',
-    { autoSanitize: true }
+  // Audit the complete JSON payload, including chat history, attachments, workspace files, and memory fields.
+  // Keep AbortSignal out of JSON so the sanitized object preserves the fetch cancellation contract.
+  const { signal: requestSignal, ...paramsForAudit } = params;
+  const payloadAudit = sanitizeOutboundPayload(paramsForAudit, (serialized) =>
+    privacyGuardrailService.auditOutboundContent(serialized, 'gemini_cloud', { autoSanitize: true })
   );
-
-  if (!promptAudit.allowed) {
-    systemLogger.warn('PRIVACY', `🔒 [外部送信ガードレール] 送信が遮断されました: ${promptAudit.blockedReason}`);
+  if (!payloadAudit.allowed) {
+    const reason = payloadAudit.blockedReason || payloadAudit.audit?.blockedReason || '機密情報検知';
+    systemLogger.warn('PRIVACY', `[外部送信ガードレール] 送信を遮断しました: ${reason}`);
     return {
-      text: `⚠️ 【プライバシー保護ガードレールによる外部送信遮断】\n\n送信内容に外部漏洩不可の機密情報が検出されたため、クラウドAPIへの送信を自動遮断しました。\n・遮断理由: ${promptAudit.blockedReason || '機密情報検知'}\n\n端末内のNon-LLM Coreで処理するか、機密情報を抽象化してから外部教師へ送信してください。`,
+      text: `⚠️ 【プライバシー保護ガードレールによる外部送信遮断】\n\n送信対象のJSON payload全体を安全に検査・サニタイズできなかったため、クラウドAPIへの送信を遮断しました。\n・遮断理由: ${reason}`,
       engineMode: 'gemini_cloud',
       model: 'Privacy Guardrail Interceptor',
-      privacyAudit: promptAudit,
+      privacyAudit: payloadAudit.audit,
     };
   }
-
-  // プロンプトおよび添付ファイルを安全にサニタイズ
-  const sanitizedPrompt = promptAudit.sanitizedText;
-  const sanitizedAttachedFiles = params.attachedFiles?.map((af) => {
-    const fileAudit = privacyGuardrailService.auditOutboundContent(af.content, `gemini_cloud_file_${af.name}`, { autoSanitize: true });
-    return { ...af, content: fileAudit.sanitizedText };
-  });
-  const sanitizedWorkspaceFiles = params.workspaceFiles?.map((wf) => {
-    const wfAudit = privacyGuardrailService.auditOutboundContent(wf.content, `gemini_cloud_ws_${wf.name}`, { autoSanitize: true });
-    return { ...wf, content: wfAudit.sanitizedText };
-  });
-
   const outboundParams: SendChatMessageParams = {
-    ...params,
-    prompt: sanitizedPrompt,
-    attachedFiles: sanitizedAttachedFiles,
-    workspaceFiles: sanitizedWorkspaceFiles,
+    ...payloadAudit.payload,
+    ...(requestSignal ? { signal: requestSignal } : {}),
   };
-
   try {
     // 10 second timeout protection so UI never hangs
     const timeoutController = new AbortController();
@@ -581,7 +567,7 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
 
     if (res.ok) {
       const data: ChatResponse = await res.json();
-      data.privacyAudit = promptAudit;
+      data.privacyAudit = payloadAudit.audit!;
       systemLogger.info('CHAT', 'Chat response received from server API', { model: data.model });
       return data;
     } else {
@@ -605,7 +591,7 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     text: pipelineRes.replyText,
     engineMode: params.engineMode || "autonomous_rule",
     model: "非LLM自律統合中核（フォールバック）",
-    privacyAudit: promptAudit,
+    privacyAudit: payloadAudit.audit,
     hardwareTelemetry: pipelineRes.telemetry,
   };
 }
@@ -626,16 +612,13 @@ export async function distillKnowledgeForLocalLLM(params: {
   };
   error?: string;
 }> {
-  // プライバシーガードレール監査 (蒸留要求の外部漏洩防止)
-  const audit = privacyGuardrailService.auditOutboundContent(
-    `${params.topic}\n${params.currentMemories?.map((m) => m.content).join('\n') || ''}`,
-    'teacher_distill',
-    { autoSanitize: true }
+  const outbound = sanitizeOutboundPayload(params, (serialized) =>
+    privacyGuardrailService.auditOutboundContent(serialized, 'teacher_distill', { autoSanitize: true })
   );
-  if (!audit.allowed) {
+  if (!outbound.allowed) {
     return {
       success: false,
-      error: `プライバシー保護ガードレールにより遮断されました: ${audit.blockedReason}`,
+      error: `プライバシー保護ガードレールにより遮断されました: ${outbound.blockedReason || outbound.audit?.blockedReason || '機密情報検知'}`,
     };
   }
 
@@ -643,7 +626,7 @@ export async function distillKnowledgeForLocalLLM(params: {
     const res = await fetch(apiUrl('/api/train-distill'), {
       method: 'POST',
       headers: getCustomApiHeaders(),
-      body: JSON.stringify({ ...params, topic: audit.sanitizedText }),
+      body: JSON.stringify(outbound.payload),
     });
     if (!res.ok) throw new Error(`Distillation failed with status ${res.status}`);
     return await res.json();

@@ -3,7 +3,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ANDROID_DIR="$ROOT/android"
 PLUGIN_SRC="$ROOT/android-native/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt"
-NATIVE_RUNNER_SRC="$ROOT/android-native/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt"
 SPEECH_SRC="$ROOT/android-native/src/main/java/com/miki/ai/MIKISpeechRecognitionPlugin.kt"
 ASSET_SRC="$ROOT/android-native/src/main/assets/system_core.dic"
 PACKAGE_DIR="$ANDROID_DIR/app/src/main/java/com/miki/ai"
@@ -12,14 +11,20 @@ BUILD_GRADLE="$ANDROID_DIR/app/build.gradle"
 BUILD_GRADLE_KTS="$ANDROID_DIR/app/build.gradle.kts"
 [[ -d "$ANDROID_DIR" ]] || { echo "android/ がありません。先に npx cap add android"; exit 2; }
 mkdir -p "$PACKAGE_DIR" "$ASSET_DIR" "$(dirname "$ASSET_SRC")"
+RUNNER_TARGET="$PACKAGE_DIR/MIKINativeRunnerPlugin.kt"
+CORE_TARGET="$PACKAGE_DIR/MIKINativeCore.kt"
+[[ -f "$RUNNER_TARGET" ]] || { echo "CANONICAL_NATIVE_RUNNER_MISSING: $RUNNER_TARGET" >&2; exit 5; }
+[[ -f "$CORE_TARGET" ]] || { echo "CANONICAL_NATIVE_CORE_MISSING: $CORE_TARGET" >&2; exit 5; }
+grep -Fq 'fun decideCoreGoals(call: PluginCall)' "$RUNNER_TARGET" || { echo "CORE_DECISION_PLUGIN_METHOD_MISSING" >&2; exit 6; }
+grep -Fq 'fun rankDomainRoutes(call: PluginCall)' "$RUNNER_TARGET" || { echo "DOMAIN_ROUTE_PLUGIN_METHOD_MISSING" >&2; exit 6; }
+grep -Fq 'fun decideCoreGoals(requestJson: String)' "$CORE_TARGET" || { echo "CORE_DECISION_NATIVE_BRIDGE_MISSING" >&2; exit 7; }
 cp "$PLUGIN_SRC" "$PACKAGE_DIR/MIKIJapaneseMorphologyPlugin.kt"
-cp "$NATIVE_RUNNER_SRC" "$PACKAGE_DIR/MIKINativeRunnerPlugin.kt"
 cp "$SPEECH_SRC" "$PACKAGE_DIR/MIKISpeechRecognitionPlugin.kt"
 # Sudachi Java consumes the pre-built system_core.dic distributed by
 # SudachiDict. Do not extract it from the Python wheel.
 DICT_VERSION="20260723"
 DICT_URL="https://d2ej7fkh96fzlu.cloudfront.net/sudachidict/sudachi-dictionary-${DICT_VERSION}-core.zip"
-if [[ ! -f "$ASSET_SRC" ]]; then
+if [[ ! -s "$ASSET_SRC" ]]; then
   TMP="$(mktemp -d)"
   trap 'rm -rf "$TMP"' EXIT
   ZIP="$TMP/sudachi-dictionary-${DICT_VERSION}-core.zip"

@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-06
-正本Revision：2026-10-06-P220
+基準日：2026-10-09
+正本Revision：2026-10-09-P222
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -23,13 +23,13 @@ MIKI-AI0.2 統合設計書・実装正本
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装正本・完全索引（2026-10-06 P218）】
+【0-A. 現行実装正本・完全索引（2026-10-09 P222）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- Revision: 2026-10-06-P220
+- Revision: 2026-10-09-P222
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -261,7 +261,7 @@ MIKI-AI0.2 統合設計書・実装正本
 - [USED] CORE | src/miki/core/services/adaptiveRoutePlannerService.ts | lines=3015 | symbols=CoreGoalCandidate, GoalConflictDecision, ImprovementReadiness, PlannedRoute, adaptiveRoutePlannerService | callers=2 | deps=14 | Tests=2
 - [USED] CORE | src/miki/core/services/autonomousCandidatePreparationService.ts | lines=149 | symbols=AutonomousImplementationPlan, CandidateDraft, TargetResolution, autonomousCandidatePreparationService | callers=3 | deps=4
 - [USED] CORE | src/miki/core/services/autonomousIssueDiscoveryService.ts | lines=119 | symbols=DiscoveredIssue, DiscoveredIssueKind, DiscoveryConfig, DiscoveryScanMode, DiscoveryScanResult | callers=5 | deps=12 | Storage=miki_autonomous_issue_discovery_config_v1,miki_autonomous_issue_discovery_v1
-- [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts | lines=490 | symbols=AutonomousImprovementRequest, AutonomousLoopState, AutonomousLoopStatus, autonomousSelfImprovementLoopService | callers=7 | deps=11 | Storage=miki_autonomous_self_improvement_loop_v1,miki_autonomous_self_improvement_loop_v2
+- [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts | lines=542 | symbols=AutonomousImprovementRequest, AutonomousLoopState, AutonomousLoopStatus, autonomousSelfImprovementLoopService | callers=7 | deps=11 | Storage=miki_autonomous_self_improvement_loop_v1,miki_autonomous_self_improvement_loop_v2
 - [USED] CORE | src/miki/core/services/blackboardRecoveryService.ts | lines=6 | symbols=RecoverySummary, blackboardRecoveryService | callers=2 | deps=1
 - [USED] CORE | src/miki/core/services/candidateAutoRebaseService.ts | lines=14 | symbols=CandidateRebaseResult, RebaseConflict, RebaseFileInput, RebaseFileResult, candidateAutoRebaseService | callers=2 | deps=1 | Tests=2
 - [USED] CORE | src/miki/core/services/candidateCodeGenerationService.ts | lines=1588 | symbols=CandidateGenerationFile, CandidateGenerationOutcome, candidateCodeGenerationService | callers=2 | deps=27 | Tests=5
@@ -289,7 +289,7 @@ MIKI-AI0.2 統合設計書・実装正本
 - [USED] CORE | src/miki/core/services/coreExecutionTraceService.ts | lines=85 | symbols=CoreTraceStage, coreExecutionTraceService | callers=1 | deps=1
 - [USED] CORE | src/miki/core/services/coreLineageReadModelService.ts | lines=94 | symbols=VerifiedCoreLineage, coreLineageReadModelService | callers=2 | deps=4 | Tests=1
 - [ORPHAN] CORE | src/miki/core/services/coreOperationRegistryService.ts | lines=37 | symbols=CoreOperationContract, coreOperationRegistryService | callers=0 | deps=0
-- [USED] CORE | src/miki/core/services/coreOrchestratorService.ts | lines=1668 | symbols=CoreImprovementDecision, CoreImprovementDecisionInput, CoreImprovementGateEvidence, CoreOrchestrationResult, UnifiedCognitiveStateSnapshot | callers=4 | deps=40 | Tests=17
+- [USED] CORE | src/miki/core/services/coreOrchestratorService.ts | lines=1799 | symbols=CoreImprovementDecision, CoreImprovementDecisionInput, CoreImprovementGateEvidence, CoreOrchestrationResult, UnifiedCognitiveStateSnapshot | callers=4 | deps=40 | Tests=17
 - [USED] CORE | src/miki/core/services/corePlanRevisionService.ts | lines=134 | symbols=CorePlanRevision, OperationInstanceStatus, RequiredBusinessOperation, corePlanRevisionService | callers=5 | deps=3
 - [USED] CORE | src/miki/core/services/coreResultService.ts | lines=383 | symbols=CoreRequest, CoreResult, CoreResultListener, CoreResultStatus, coreResultService | callers=10 | deps=6 | Storage=miki_core_results_v2
 - [USED] CORE | src/miki/core/services/coreTaskIngressService.ts | lines=20 | symbols=CoreTaskIngressRequest, CoreTaskKind, coreTaskIngressService | callers=12 | deps=3 | Tests=1
@@ -452,7 +452,7 @@ MIKI-AI0.2 統合設計書・実装正本
 - [USED] learning | src/miki/learning/services/taskConversationFeedbackService.ts | lines=150 | symbols=TaskConversationFeedback, TaskConversationFeedbackKind, TaskConversationFeedbackService, taskConversationFeedbackService | callers=3 | deps=4
 - [USED] learning | src/miki/learning/services/taskResultFeedbackService.ts | lines=150 | symbols=TaskFeedbackSnapshot, TaskResultFeedbackService, taskResultFeedbackService | callers=4 | deps=11
 - [USED] learning | src/miki/learning/services/teacherDriftService.ts | lines=170 | symbols=TEACHER_DRIFT_PROMPTS, TeacherDriftService, teacherDriftService | callers=1 | deps=3 | Storage=miki_teacher_baseline_v1,miki_teacher_drift_history_v1
-- [USED] learning | src/miki/learning/services/teacherRequestService.ts | lines=1629 | symbols=TeacherRequestService, teacherRequestService | callers=6 | deps=13 | Storage=miki_ai_auto_teacher_request_enabled,miki_ai_auto_teacher_request_records,miki_ai_delayed_teacher_queue
+- [USED] learning | src/miki/learning/services/teacherRequestService.ts | lines=1609 | symbols=TeacherRequestService, teacherRequestService | callers=6 | deps=13 | Storage=miki_ai_auto_teacher_request_enabled,miki_ai_auto_teacher_request_records,miki_ai_delayed_teacher_queue
 - [USED] learning | src/miki/learning/services/uncertaintyTeacherService.ts | lines=297 | symbols=UncertaintyTeacherService, uncertaintyTeacherService | callers=3 | deps=8 | Storage=miki_uncertainty_divergence_log_v32,miki_uncertainty_domain_thresholds_v1
 - [USED] learning | src/miki/learning/services/userProficiencyService.ts | lines=188 | symbols=UserProficiencyService, userProficiencyService | callers=2 | deps=3 | Storage=miki_user_proficiency_scores_v1
 - [USED] OTHER | src/miki/memory.ts | lines=40 | symbols=memory | callers=1 | deps=24 | Tests=25
@@ -524,7 +524,7 @@ MIKI-AI0.2 統合設計書・実装正本
 - [USED] research | src/miki/research/services/webResearchPolicyService.ts | lines=54 | symbols=IndependentSourceTarget, SourceIndependenceMode, WebResearchPolicy, WebResearchPolicyReceipt, WebResearchProgress | callers=4 | deps=2 | Storage=miki_web_research_policy_v1
 - [USED] research | src/miki/research/services/webTermLearningService.ts | lines=153 | symbols=LearnedWebTerm, WebTermLearningInput, WebTermLearningResult, webTermLearningService | callers=2 | deps=3
 - [USED] OTHER | src/miki/safety.ts | lines=38 | symbols=safety | callers=1 | deps=21 | Tests=18 / Markers=2
-- [USED] safety | src/miki/safety/services/abstractSanitizerService.ts | lines=249 | symbols=abstractSanitizerService | callers=3 | deps=3 | Storage=miki_abstract_symbol_mappings_v5
+- [USED] safety | src/miki/safety/services/abstractSanitizerService.ts | lines=253 | symbols=abstractSanitizerService | callers=3 | deps=3 | Storage=miki_abstract_symbol_mappings_v5
 - [USED] safety | src/miki/safety/services/bannedTopicsConfigService.ts | lines=154 | symbols=BannedTopicsConfig, BannedTopicsConfigService, DEFAULT_BANNED_TOPICS, bannedTopicsConfigService | callers=8 | deps=2 | Storage=miki_ai_banned_topics_config_v19 / Tests=3
 - [USED] safety | src/miki/safety/services/canaryDeploymentSafetyService.ts | lines=169 | symbols=CanaryDeploymentState, canaryDeploymentSafetyService | callers=4 | deps=2
 - [USED] safety | src/miki/safety/services/cloudAiRestrictedGatewayService.ts | lines=260 | symbols=CloudAiRestrictedGatewayService, cloudAiRestrictedGatewayService | callers=3 | deps=5 | Storage=miki_cloud_escalation_requests_v1
@@ -536,7 +536,8 @@ MIKI-AI0.2 統合設計書・実装正本
 - [USED] safety | src/miki/safety/services/nonLlmCoreService.ts | lines=758 | symbols=NonLlmCoreResult, NonLlmCoreService, nonLlmCoreService | callers=4 | deps=45 | Tests=3
 - [USED] safety | src/miki/safety/services/nonLlmHardwarePipelineService.ts | lines=261 | symbols=HardwareTelemetry, NonLlmHardwarePipelineService, NonLlmPipelineExecutionResult, nonLlmHardwarePipelineService | callers=2 | deps=8 | Markers=7
 - [USED] safety | src/miki/safety/services/nonLlmRuntimePolicyService.ts | lines=51 | symbols=NonLlmRuntimeKind, NonLlmRuntimeStatus, nonLlmRuntimePolicyService | callers=2 | deps=0
-- [USED] safety | src/miki/safety/services/privacyGuardrailService.ts | lines=222 | symbols=privacyGuardrailService | callers=9 | deps=5 | Storage=miki_privacy_audit_logs_v5
+- [USED] safety | src/miki/safety/services/privacyGuardrailService.ts | lines=248 | symbols=privacyGuardrailService | callers=9 | deps=5 | Storage=miki_privacy_audit_logs_v5
+- [USED] safety | src/miki/safety/services/outboundPayloadSanitizer.ts | lines=53 | symbols=sanitizeOutboundPayload | callers=2 | deps=0
 - [USED] safety | src/miki/safety/services/recoveryOrchestratorService.ts | lines=257 | symbols=RecoveryOrchestratorService, RecoveryRun, RecoveryRunStatus, recoveryOrchestratorService | callers=4 | deps=9
 - [USED] safety | src/miki/safety/services/remediationFailureRecoveryService.ts | lines=299 | symbols=RecoveryStatus, RemediationFailureRecoveryRecord, RemediationFailureRecoveryService, remediationFailureRecoveryService | callers=2 | deps=13
 - [USED] safety | src/miki/safety/services/resourceGovernanceService.ts | lines=177 | symbols=BackgroundBudgetDecision, CapabilityBudget, ResourceMode, ResourceSnapshot, ResourceTier | callers=9 | deps=2 | Storage=miki_resource_governance_snapshot_v1 / Tests=1
@@ -800,12 +801,12 @@ MIKI-AI0.2 統合設計書・実装正本
 - [USED] verification | src/miki/verification/services/userFeedbackGovernanceService.ts | lines=51 | symbols=UserFeedbackGovernanceService, UserFeedbackRecord, userFeedbackGovernanceService | callers=2 | deps=1 | Storage=miki_user_feedback_governance_records_v1
 - [USED] verification | src/miki/verification/services/vbaStaticVerifierService.ts | lines=638 | symbols=VbaStaticVerifierService, vbaStaticVerifierService | callers=4 | deps=1 | Markers=1
 - [USED] verification | src/miki/verification/services/verifierService.ts | lines=174 | symbols=VerificationOutcome, VerificationResult, VerifierService, verifierService | callers=6 | deps=5
-- [USED] LEGACY_OR_SHARED | src/services/abstractSanitizerService.ts | lines=249 | symbols=abstractSanitizerService | callers=1 | deps=3 | Storage=miki_abstract_symbol_mappings_v5
+- [USED] LEGACY_OR_SHARED | src/services/abstractSanitizerService.ts | lines=253 | symbols=abstractSanitizerService | callers=1 | deps=3 | Storage=miki_abstract_symbol_mappings_v5
 - [USED] LEGACY_OR_SHARED | src/services/affectionDynamicsService.ts | lines=113 | symbols=AffectionDynamicsService, affectionDynamicsService | callers=2 | deps=4 | Storage=miki_affection_dynamic_state_v1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/androidNativeRunnerAdapterService.ts | lines=119 | symbols=AndroidNativeRunnerAdapterService, androidNativeRunnerAdapterService | callers=0 | deps=2 | Plugin=MIKINativeRunner / Tests=16
 - [USED] LEGACY_OR_SHARED | src/services/answerContentIrService.ts | lines=261 | symbols=AnswerContentIrService, answerContentIrService | callers=2 | deps=3 | Tests=1
 - [USED] LEGACY_OR_SHARED | src/services/answerPlanService.ts | lines=543 | symbols=INITIAL_SKELETONS, answerPlanService | callers=4 | deps=4 | Storage=miki_response_skeletons_v32 / Tests=6
-- [USED] LEGACY_OR_SHARED | src/services/api.ts | lines=996 | symbols=ChatResponse, GeminiStatusResult, GitHubPullProgressUpdate, GitHubPushParams, GitHubPushResult | callers=23 | deps=6 | Tests=12 / Markers=1
+- [USED] LEGACY_OR_SHARED | src/services/api.ts | lines=979 | symbols=ChatResponse, GeminiStatusResult, GitHubPullProgressUpdate, GitHubPushParams, GitHubPushResult | callers=23 | deps=6 | Tests=12 / Markers=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/automationStudioService.ts | lines=16 | symbols=WorkflowDefinition, WorkflowStage, WorkflowStep, automationStudioService | callers=0 | deps=1 | Storage=miki_automation_workflows_v1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/autonomousCurriculumService.ts | lines=291 | symbols=AutonomousCurriculumService, CapabilityBoundaryItem, CompressedSkillArtifact, SyntheticCurriculumUnit, autonomousCurriculumService | callers=0 | deps=3 | Storage=miki_capability_boundaries_v1,miki_compressed_skills_v1,miki_synthetic_curriculums_v1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/autonomousEvolutionService.ts | lines=472 | symbols=AutonomousEvolutionService, autonomousEvolutionService | callers=0 | deps=9 | Storage=miki_autonomous_growth_reports,miki_counterfactual_reflections,miki_heuristic_rules
@@ -906,7 +907,7 @@ MIKI-AI0.2 統合設計書・実装正本
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/operationalConformanceService.ts | lines=1 | symbols=- | callers=1 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/operationalGovernanceService.ts | lines=51 | symbols=ApprovalRequest, BlindComparison, CapabilitySlo, CognitiveCheckpoint, DelegationGrant | callers=0 | deps=1
 - [USED] LEGACY_OR_SHARED | src/services/planOrchestratorService.ts | lines=253 | symbols=OrchestratorRun, OrchestratorStep, OrchestratorStepStatus, PlanOrchestratorService, planOrchestratorService | callers=1 | deps=6
-- [USED] LEGACY_OR_SHARED | src/services/privacyGuardrailService.ts | lines=222 | symbols=privacyGuardrailService | callers=5 | deps=5 | Storage=miki_privacy_audit_logs_v5
+- [USED] LEGACY_OR_SHARED | src/services/privacyGuardrailService.ts | lines=248 | symbols=privacyGuardrailService | callers=5 | deps=5 | Storage=miki_privacy_audit_logs_v5
 - [ORPHAN] LEGACY_OR_SHARED | src/services/proactiveContextOsService.ts | lines=297 | symbols=ContextAwarenessSnapshot, PersonaAnchorState, ProactiveContextOsService, ProactiveInsightItem, proactiveContextOsService | callers=0 | deps=2 | Storage=miki_persona_anchors_v1,miki_proactive_context_snapshot_v1
 - [USED] LEGACY_OR_SHARED | src/services/regressionBenchmarkService.ts | lines=1 | symbols=- | callers=2 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/remediationExecutionCoordinatorService.ts | lines=113 | symbols=RemediationDispatchResult, RemediationExecutionCoordinatorService, remediationExecutionCoordinatorService | callers=0 | deps=7
@@ -967,10 +968,10 @@ MIKI-AI0.2 統合設計書・実装正本
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/capacitor.build.gradle | lines=20 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java | lines=26 | symbols=ExampleInstrumentedTest | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/AndroidManifest.xml | lines=44 | symbols=- | callers=0 | deps=0
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt | lines=100 | symbols=MIKIJapaneseMorphologyPlugin | callers=0 | deps=0 | Plugin=MIKIJapaneseMorphology
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeCore.kt | lines=144 | symbols=NativeCoreHealth | callers=0 | deps=0
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt | lines=661 | symbols=MIKINativeRunnerPlugin, NativeTestContext, NativeTestOutcome | callers=0 | deps=0 | Plugin=MIKINativeRunner
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=14 | symbols=MainActivity | callers=0 | deps=0
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt | lines=131 | symbols=MIKIJapaneseMorphologyPlugin | callers=0 | deps=0 | Plugin=MIKIJapaneseMorphology
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeCore.kt | lines=155 | symbols=NativeCoreHealth | callers=0 | deps=0
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt | lines=782 | symbols=MIKINativeRunnerPlugin, NativeTestContext, NativeTestOutcome | callers=0 | deps=0 | Plugin=MIKINativeRunner
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=94 | symbols=MainActivity | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiBackgroundWorker.kt | lines=316 | symbols=ConditionCheckResult, MikiBackgroundWorker | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt | lines=445 | symbols=MikiWorkManagerPlugin | callers=0 | deps=0 | Plugin=MikiWorkManagerPlugin / Markers=1
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml | lines=34 | symbols=- | callers=0 | deps=0
@@ -11000,3 +11001,21 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - P221の正規検証は npm run build と生成bundleの起動評価で行い、未実行の実機画面確認をDEVICE_VERIFIEDとは記載しない。
 - Native側のP220修正、startupRecoveryServiceの唯一Authority、P156非ブロッキング起動、Sudachi API、辞書Version、CORE + 17分類、Graph意味契約は変更しない。
 - 正本設計書は本ファイル一つだけとする。
+
+# P222 Android Native Runner同期漏れ・CORE再開例外・Sudachi辞書Anchor・外部送信サニタイズ修正
+
+- 2026-10-08の実機Runtime Logで、チャット入力4回がすべて `MIKINativeRunner.decideCoreGoals() is not implemented on android` で失敗した。ソース調査により、`.github/workflows/build-apk.yml` はAPKビルド時に `scripts/install_android_japanese_morphology.sh` を呼び、このInstallerが `android-native/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt` を `android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt` へコピーしていたことを確認した。
+- コピー元のNative Runnerは312行で、`health` とallow-list `execute` などの限定APIしか持たない。一方、実行時のcanonical Android Runnerは783行であり、Rust Core Kernelが利用する `decideCoreGoals`、`rankDomainRoutes` およびほかのNative bridge APIを実装している。APK準備時のコピーはこれらのAPIを削除していた。加えて `scripts/install_android_native_runner.sh` にも同じ上書き経路がある。
+- 同じAPKワークフローの `scripts/install_android_workmanager.sh` も、375行の旧 `android-native/MikiWorkManagerPlugin.kt` を446行のAndroid実装へコピーし、実装済みの `runCandidateBrowserE2E` と `fetchRenderedPage` を削除する経路を持つことを確認した。Worker本体は両パスでblob SHAが同一だが、WorkManager Pluginは別SHAであり、コピー元との差分は実在する。P222ではWorkerを含めてAndroid側のcanonicalファイルを上書きせず、必要なAPIを検査する。
+- P222では `android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt` と `MIKINativeCore.kt` を実行時Native bridgeの正本として維持する。日本語形態素解析InstallerはRunnerをコピーしない。Native Runner Installerはcanonical sourceとMainActivity登録を検証するだけとし、不完全な旧テンプレートで置き換えない。不足時はビルド準備を明示的に失敗させる。
+- `scripts/verify_android_native_contract.ts`、`scripts/verify_android_japanese_morphology_contract.ts`、`scripts/verify_rust_core_kernel_phase37.mjs` と `scripts/verify_runtime_failure_fixes.mjs` で、Rust bridgeの存在、Installerの禁止された上書き、MainActivity登録、辞書AnchorおよびCORE再開ログのスコープを検査する。これらは静的契約検証であり、実機検証済みとは扱わない。
+- `coreOrchestratorService.resume()` では、FAILED結果の記録およびcatch内から `payload`、`goal`、`source` が関数スコープ外の値として参照されていた。これらをBlackboardの `INPUT/payload` とタスクの `goal` / `source` から各ログブロック内で取得し、エラーの記録中に別の `ReferenceError` が発生して本来の例外を隠す経路を除去する。
+- Sudachi 0.8.1の実機ログには `Failed to resolve file ... system_core.dic / Tried roots: None{}` が残っていた。`PathAnchor.none()` は設定リソースを解決しないため、アプリ私有 `filesDir` をfilesystem anchorとして指定し、`system_core.dic` を相対パスで解決する。辞書が欠落・空の場合はassetから再取得し、その後も空なら具体的な初期化エラーを返す。
+- `docs/JAPANESE_MORPHOLOGY_SUDACHI_ANDROID.md` の依存表記を、Installerの実設定であるSudachi Java `0.8.1` / SudachiDict `20260723-core` へ合わせた。以前の `0.8.0` / `20240409-core` の記載を現行Versionとして残さない。
+- 正本の現行実装索引で、今回の編集後のソーステキストから対象ファイルの行数を再計算して更新する。行数はソースインベントリ情報であり、実機検証済み状態の表明ではない。
+- Runtime Logのセキュリティ警告は `selfCodeArchitectService.checkInvariants()` の固定テスト文字列と一致するため、ログだけでは実秘密情報の送信証拠とは判断しない。一方、追加の送信経路監査では `sendChatMessage()` がプロンプトだけでなく `history`、添付・workspaceデータも含む完全なJSON payloadを監査後データとして再構築していなかったこと、`distillKnowledgeForLocalLLM()` がtopicとmemoryを連結監査しながら元の `currentMemories` を送信し得ること、教師要求が複数の文字列を連結監査しても `anonymizedExample` 以外のフィールドを原文のまま残すことを確認した。P222ではJSON payload全体を一度監査し、サニタイズ済みJSONのparseが成功した値だけを送信する。設定可能なprivacy feature flagが無効でもcredential・メール・電話番号・ローカルパスの基本置換は必ず先行し、監査機能フラグだけで生データ送信が再び可能にならないようにする。
+- `autonomousSearchService.executeSearch()` は `safeQuery` を生成していたが、SearXNG/Wikipedia/DuckDuckGoへの実URL構築には `cleanQuery` を使っていた。P222では各ProviderのURL、検索fallback表示に渡すクエリも `safeQuery` に統一し、遮断ログにはクエリ本文を含めない。
+- 両方の `privacyGuardrailService` は監査ログへ `sanitizedText`、置換辞書、違反snippetを保存していた。遮断時の `sanitizedText` は原文のままになるため、既存保存ログもロード時に本文・置換辞書・snippet・呼び出し元が与えるsummaryを除去して再保存し、以後はredactedなmetadataだけを保持する。ログに実際に出ていた `/data/user/...` のようなAndroidアプリ私有パスも、プライバシー検出と抽象化対象に含める。両方の `abstractSanitizerService` もcredential/person/path/hostの可逆マッピングを永続化していたため、これらはメモリ内に限定し、旧永続マッピングからも除外する。
+- 正規検証は `node scripts/verify_runtime_failure_fixes.mjs`、`npx tsx scripts/verify_android_native_contract.ts`、`npx tsx scripts/verify_android_japanese_morphology_contract.ts`、`node scripts/verify_rust_core_kernel_phase37.mjs`、`npm run build`、Android Kotlin/APK build、および更新APKを使う実機Runtime Log再確認で行う。ビルド・静的テストのPASSだけで `decideCoreGoals` の実機動作やSudachiのDEVICE_VERIFIEDを宣言しない。
+- 本変更はCORE + 17分類、Rust goal-selection契約、Native Runner allow-list、会話Graph契約、唯一の統合設計書という方針を変更せず、Nativeソース上書き、COREの診断例外、Sudachiパス解決、外部送信後の未監査フィールドおよび機密監査履歴の原文保存を修正する。
+

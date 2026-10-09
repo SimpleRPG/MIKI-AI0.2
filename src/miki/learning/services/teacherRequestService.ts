@@ -25,6 +25,7 @@ import { capabilityGapService } from '../../capability/services/capabilityGapSer
 import { experienceLinkService } from '../../experience/services/experienceLinkService';
 import { answerPlanService } from '../../strategy/services/answerPlanService';
 import { privacyGuardrailService } from '../../safety/services/privacyGuardrailService';
+import { sanitizeOutboundPayload } from '../../safety/services/outboundPayloadSanitizer';
 import { evidenceIdentityService } from '../../core/services/evidenceIdentityService';
 
 const BUDGET_LIMITS_KEY = 'miki_ai_teacher_budget_limits';
@@ -517,41 +518,20 @@ export class TeacherRequestService {
       );
     }
 
-    // 設計思想 Master v5.0 第11章 11.1節: セキュリティ境界・プライバシー監査
-    const textToAudit = [
-      payload.abstractFailurePattern,
-      payload.anonymizedExample || '',
-      payload.idealResponseGuideline || '',
-      payload.contextSummary || '',
-    ].join('\n');
-
-    const auditResult = privacyGuardrailService.auditOutboundContent(
-      textToAudit,
-      'teacher_api',
-      { autoSanitize: true }
+    // Audit the full serialized teacher request and send only the parsed sanitized payload.
+    const outbound = sanitizeOutboundPayload(payload, (serialized) =>
+      privacyGuardrailService.auditOutboundContent(serialized, 'teacher_api', { autoSanitize: true })
     );
-
-    if (!auditResult.allowed) {
-      const blockMsg = `送信遮断: ${auditResult.blockedReason || '機密情報が検出されました'}`;
+    if (!outbound.allowed) {
+      const blockMsg = `送信遮断: ${outbound.blockedReason || outbound.audit?.blockedReason || '機密情報が検出されました'}`;
       systemLogger.warn('SELF_IMPROVEMENT', `🚫 [外部教師送信遮断] ${blockMsg}`);
-      return {
-        success: false,
-        verifiedPassed: false,
-        error: blockMsg,
-      };
+      return { success: false, verifiedPassed: false, error: blockMsg };
     }
-
-    // サニタイズされたテキストがある場合はペイロードを安全に置換
-    const safePayload: TeacherRequestPayload = {
-      ...payload,
-      anonymizedExample: payload.anonymizedExample && auditResult.symbolReplacements && Object.keys(auditResult.symbolReplacements).length > 0
-        ? payload.anonymizedExample.replace(new RegExp(Object.keys(auditResult.symbolReplacements).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g'), (m) => auditResult.symbolReplacements[m] || m)
-        : payload.anonymizedExample,
-    };
+    const safePayload: TeacherRequestPayload = outbound.payload;
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🎓 [外部教師リクエスト開始] カテゴリ: ${safePayload.failureCategory}, 分類: ${auditResult.classification}, パターン: 「${safePayload.abstractFailurePattern.slice(0, 30)}...」`
+      `🎓 [外部教師リクエスト開始] カテゴリ: ${safePayload.failureCategory}, 分類: ${outbound.audit?.classification || 'PUBLIC_SYNTHETIC'}, パターン: 「${safePayload.abstractFailurePattern.slice(0, 30)}...」`
     );
 
     try {

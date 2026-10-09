@@ -112,8 +112,20 @@ class MIKIJapaneseMorphologyPlugin : Plugin() {
 
     private fun createTokenizer(context: Context): Tokenizer {
         val dictFile = File(context.filesDir, DICT_ASSET)
-        if (!dictFile.exists()) context.assets.open(DICT_ASSET).use { input -> dictFile.outputStream().use { input.copyTo(it) } }
-        val settings = "{\"systemDict\":\"${dictFile.absolutePath.replace("\\", "\\\\")}\"}"
-        return DictionaryFactory().create(Config.fromJsonString(settings, PathAnchor.none())).create()
+        if (!dictFile.isFile || dictFile.length() == 0L) {
+            if (dictFile.exists() && !dictFile.delete()) {
+                throw IllegalStateException("SUDACHI_STALE_DICTIONARY_FILE_CANNOT_DELETE")
+            }
+            context.assets.open(DICT_ASSET).use { input ->
+                dictFile.outputStream().use { output -> input.copyTo(output) }
+            }
+        }
+        if (!dictFile.isFile || dictFile.length() <= 0L) {
+            throw IllegalStateException("SUDACHI_SYSTEM_DICTIONARY_MISSING_OR_EMPTY")
+        }
+        val settings = "{\"systemDict\":\"$DICT_ASSET\"}"
+        return DictionaryFactory().create(
+            Config.fromJsonString(settings, PathAnchor.filesystem(context.filesDir.absolutePath))
+        ).create()
     }
 }

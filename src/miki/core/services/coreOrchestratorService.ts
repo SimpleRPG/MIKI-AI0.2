@@ -304,6 +304,9 @@ class CoreOrchestratorService {
 
       if(result.task.status==='FAILED'){
         const task=result.task;
+        const payloadValue=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
+        const payload=payloadValue&&typeof payloadValue==='object'&&!Array.isArray(payloadValue)
+          ? payloadValue as Record<string,unknown> : {};
         const unknowns=[...new Set(task.entries.flatMap(entry=>{
           const value=entry.value;
           if(!value || typeof value!=='object') return [];
@@ -317,8 +320,8 @@ class CoreOrchestratorService {
           {
             taskId:task.taskId,
             runId:typeof payload.runId==='string'?payload.runId:undefined,
-            goal,
-            source,
+            goal:task.goal,
+            source:task.source,
             status:task.status,
             revision:task.revision,
             lastCycle:task.lastCycle,
@@ -340,6 +343,10 @@ class CoreOrchestratorService {
     })
     .catch((error)=>{
       const task=taskBlackboardService.get(taskId);
+      const failureTask=task??resumed;
+      const payloadValue=failureTask.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
+      const payload=payloadValue&&typeof payloadValue==='object'&&!Array.isArray(payloadValue)
+        ? payloadValue as Record<string,unknown> : {};
       systemLogger.error(
         'SYSTEM',
         `[RUNTIME_FAILURE] CORE task threw: ${taskId}`,
@@ -347,8 +354,8 @@ class CoreOrchestratorService {
           taskId,
           requestId:reqId,
           runId:typeof payload.runId==='string'?payload.runId:undefined,
-          goal,
-          source,
+          goal:failureTask.goal,
+          source:failureTask.source,
           error:error instanceof Error?`${error.name}: ${error.message}`:String(error),
           stack:error instanceof Error?error.stack:undefined,
           status:task?.status,

@@ -47,6 +47,13 @@ jobs:
       - name: Install Android WorkManager / headless-fetch plugin
         run: bash scripts/install_android_workmanager.sh
 
+      - name: Verify Native and runtime failure contracts
+        run: |
+          node scripts/verify_runtime_failure_fixes.mjs
+          npx tsx scripts/verify_android_native_contract.ts
+          npx tsx scripts/verify_android_japanese_morphology_contract.ts
+          node scripts/verify_rust_core_kernel_phase37.mjs
+
       - name: Sync Capacitor Android
         run: npx cap sync android
 

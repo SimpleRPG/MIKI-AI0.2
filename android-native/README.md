@@ -23,4 +23,4 @@ The JavaScript service falls back to `Intl.Segmenter` and then to the determinis
 
 ## Native runner
 
-`MIKINativeRunnerPlugin.kt` remains a separate allow-listed execution bridge. It does not execute arbitrary shell/code.
+`android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt` paired with `MIKINativeCore.kt` is the canonical Rust-enabled runtime bridge used by the checked-in Android application. The `android-native/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt` file is a limited legacy/seed adapter and does not include the Rust goal-decision and route-ranking endpoints. Never copy it over the canonical Android app file; the installer validates the canonical bridge and fails closed if it is missing. The runner remains allow-listed and does not execute arbitrary shell/code.

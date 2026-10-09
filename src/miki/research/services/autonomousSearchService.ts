@@ -381,7 +381,7 @@ export class AutonomousSearchService {
     // 設計思想 Master v5.0 第11章 11.1節: 送信前プライバシー・機密監査
     const audit = privacyGuardrailService.auditOutboundContent(cleanQuery, 'web_search', { autoSanitize: true });
     if (!audit.allowed) {
-      systemLogger.warn('SELF_IMPROVEMENT', `🚫 [Web検索遮断] 検索クエリに機密が含まれるため中断: ${cleanQuery}`);
+      systemLogger.warn('SELF_IMPROVEMENT', `🚫 [Web検索遮断] 検索クエリに機密が含まれるため中断 (queryLength=${cleanQuery.length})`);
       return { results: [], summary: 'プライバシー保護のため検索を安全にスキップしました。' };
     }
     const safeQuery = audit.sanitizedText;
@@ -410,15 +410,15 @@ export class AutonomousSearchService {
     if (this.config.allowFallbackMock) {
       const mockResult: WebSearchResultItem[] = [
         {
-          title: `【テスト用モック】トラブルシューティング ガイド (${cleanQuery})`,
-          snippet: `【テスト用モックデータ】「${cleanQuery}」についての手順解説です。実データではありません。`,
-          url: `https://knowledge.local/search?q=${encodeURIComponent(cleanQuery)}`,
+          title: `【テスト用モック】トラブルシューティング ガイド (${safeQuery})`,
+          snippet: `【テスト用モックデータ】「${safeQuery}」についての手順解説です。実データではありません。`,
+          url: `https://knowledge.local/search?q=${encodeURIComponent(safeQuery)}`,
           source: 'Mock (Non-Real)',
         },
       ];
       const mockOutput: AutonomousSearchExecutionResult = {
         results: mockResult,
-        summary: `【テスト用モック】「${cleanQuery}」に関するテスト用モックデータです（実データではありません）。`,
+        summary: `【テスト用モック】「${safeQuery}」に関するテスト用モックデータです（実データではありません）。`,
         provider: 'mock_fallback',
         providers: [],
         providerStatuses: {
@@ -450,7 +450,7 @@ export class AutonomousSearchService {
     const runSearxng = async (): Promise<ProviderSearchOutput | null> => {
       try {
         const searxSettings = getSearxngSearchSettings();
-        const searxUrl = buildSearxngSearchUrl(searxSettings, cleanQuery);
+        const searxUrl = buildSearxngSearchUrl(searxSettings, safeQuery);
         const searxRes = await fetch(searxUrl, { signal: AbortSignal.timeout(searxSettings.timeoutMs) });
 
         if (!searxRes.ok) {
@@ -473,7 +473,7 @@ export class AutonomousSearchService {
           const url = typeof hit?.url === 'string' ? hit.url : '';
           const canonicalUrl = canonicalizeSearchUrl(url);
           const item = {
-            title: hit?.title || cleanQuery,
+            title: hit?.title || safeQuery,
             snippet: (hit?.content || hit?.snippet || '').replace(/<[^>]+>/g, '').trim(),
             url,
             source: 'SearXNG (Local)',
@@ -507,7 +507,7 @@ export class AutonomousSearchService {
 
     const runWikipedia = async (): Promise<ProviderSearchOutput | null> => {
       try {
-        const wikiUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanQuery)}&utf8=&format=json&origin=*&srlimit=${maxResults}`;
+        const wikiUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(safeQuery)}&utf8=&format=json&origin=*&srlimit=${maxResults}`;
         const wikiRes = await fetch(wikiUrl, { signal: AbortSignal.timeout(5000) });
 
         if (!wikiRes.ok) {
@@ -555,7 +555,7 @@ export class AutonomousSearchService {
 
     const runDuckDuckGo = async (): Promise<ProviderSearchOutput | null> => {
       try {
-        const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}&format=json&no_html=1&skip_disambig=1`;
+        const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(safeQuery)}&format=json&no_html=1&skip_disambig=1`;
         const ddgRes = await fetch(ddgUrl, { signal: AbortSignal.timeout(5000) });
 
         if (!ddgRes.ok) {
@@ -569,10 +569,10 @@ export class AutonomousSearchService {
 
         const abstractText = (ddgData.AbstractText || ddgData.Abstract || '').trim();
         if (abstractText) {
-          const url = ddgData.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}`;
+          const url = ddgData.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(safeQuery)}`;
           const canonicalUrl = canonicalizeSearchUrl(url);
           const item = {
-            title: ddgData.Heading || cleanQuery,
+            title: ddgData.Heading || safeQuery,
             snippet: abstractText,
             url,
             source: `DuckDuckGo (${ddgData.AbstractSource || 'Instant Answer'})`,
@@ -667,8 +667,8 @@ export class AutonomousSearchService {
       summary:
         mergedResults[0]?.snippet ||
         (successfulProviders.length
-          ? `「${cleanQuery}」について複数の探索経路から候補を取得しました。`
-          : `「${cleanQuery}」について利用可能な探索経路から結果を取得できませんでした。`),
+          ? `「${safeQuery}」について複数の探索経路から候補を取得しました。`
+          : `「${safeQuery}」について利用可能な探索経路から結果を取得できませんでした。`),
       provider:
         successfulProviders.length > 1
           ? 'parallel'
@@ -688,7 +688,7 @@ export class AutonomousSearchService {
 
     return {
       ...result,
-      summary: `「${cleanQuery}」の検索に失敗しました（各Providerの状態はproviderStatusesを参照）。`,
+      summary: `「${safeQuery}」の検索に失敗しました（各Providerの状態はproviderStatusesを参照）。`,
     };
   }
 
