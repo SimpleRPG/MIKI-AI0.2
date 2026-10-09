@@ -123,7 +123,7 @@ class MIKIJapaneseMorphologyPlugin : Plugin() {
         if (!dictFile.isFile || dictFile.length() <= 0L) {
             throw IllegalStateException("SUDACHI_SYSTEM_DICTIONARY_MISSING_OR_EMPTY")
         }
-        val settings = "{\"systemDict\":\"$DICT_ASSET\"}"
+        val settings = """{"systemDict":"$DICT_ASSET","oovProviderPlugin":[{"class":"com.worksap.nlp.sudachi.SimpleOovProviderPlugin","oovPOS":["補助記号","一般","*","*","*","*"],"leftId":5968,"rightId":5968,"cost":3857}]}"""
         return DictionaryFactory().create(
             Config.fromJsonString(settings, PathAnchor.filesystem(context.filesDir.absolutePath))
         ).create()

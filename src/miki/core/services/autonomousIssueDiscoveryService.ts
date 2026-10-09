@@ -53,7 +53,7 @@ class AutonomousIssueDiscoveryService{
       priority:issue.priority,
       payload:{
        issueId:issue.id,
-       kind:issue.kind,
+       issueKind:issue.kind,
        detail:issue.detail,
        fingerprint:issue.fingerprint
       }

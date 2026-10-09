@@ -727,33 +727,32 @@ export class AutonomousSearchService {
       .filter((r) => typeof r.url === 'string' && /^https?:\/\//i.test(r.url))
       .slice(0, maxPages);
 
-    // 各ページ本文取得も並行化する。ただし出力順は入力順に固定する。
-    const outputs = await Promise.all(
-      readable.map(async (result) => {
-        try {
-          const page = await this.fetchRenderedPage(result.url!, {
-            query,
-            timeoutMs: options?.timeoutMs,
-            renderWaitMs: options?.renderWaitMs,
-          });
-          return {
-            result,
-            success: page.success,
-            text: page.text || '',
-            url: page.url || result.url!,
-            error: page.error,
-          };
-        } catch (error) {
-          return {
-            result,
-            success: false,
-            text: '',
-            url: result.url!,
-            error: error instanceof Error ? error.message : String(error),
-          };
-        }
-      }),
-    );
+    // Native WebView rejects overlapping calls; serialize page reads while preserving input order.
+    const outputs: Array<{ result: T; success: boolean; text: string; url: string; error?: string }> = [];
+    for (const result of readable) {
+      try {
+        const page = await this.fetchRenderedPage(result.url!, {
+          query,
+          timeoutMs: options?.timeoutMs,
+          renderWaitMs: options?.renderWaitMs,
+        });
+        outputs.push({
+          result,
+          success: page.success,
+          text: page.text || '',
+          url: page.url || result.url!,
+          error: page.error,
+        });
+      } catch (error) {
+        outputs.push({
+          result,
+          success: false,
+          text: '',
+          url: result.url!,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     const successCount = outputs.filter((o) => o.success && o.text.trim()).length;
     systemLogger.info(

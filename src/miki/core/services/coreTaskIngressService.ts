@@ -9,7 +9,7 @@ class CoreTaskIngressService {
  async submit(request:CoreTaskIngressRequest):Promise<CoreOrchestrationResult>{
   if(!request.goal.trim())throw new Error('CORE_TASK_GOAL_REQUIRED');
   const maxCycles=request.maxCycles??coreCycleSettingsService.maxCyclesFor(request.kind);
-  const result=await coreOrchestratorService.run(request.goal,request.source as MikiDomain,{kind:request.kind,...(request.payload||{}),...(request.initialPayload||{})},maxCycles);
+  const result=await coreOrchestratorService.run(request.goal,request.source as MikiDomain,{...(request.payload||{}),...(request.initialPayload||{}),kind:request.kind},maxCycles);
   if(request.source==='conversation')conversationGraphRuntimeP212Service.ingestInput(result.task.taskId,request.goal);
   return result;
  }

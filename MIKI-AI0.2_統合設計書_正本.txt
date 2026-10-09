@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-09
-正本Revision：2026-10-09-P224
+基準日：2026-10-10
+正本Revision：2026-10-10-P225
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -23,13 +23,14 @@ MIKI-AI0.2 統合設計書・実装正本
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装正本・完全索引（2026-10-09 P222）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P225）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- Revision: 2026-10-09-P222
+- 現行Revision: 2026-10-10-P225
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -11039,3 +11040,19 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 検証条件を、P222の履歴節が残ること、P223の修正節が残ること、先頭の正本Revisionヘッダーが日付付きP番号形式で存在することへ分離する。履歴を保ったまま現行Revisionを更新しても、履歴側の番号を理由に検証が失敗しないようにする。
 - P224の変更は検証コードと本正本だけを更新する。Actions run 37930890971は静的検証の段階で失敗しており、Kotlin compileやAPK buildは未実行であるため、この時点でAndroidコンパイル成功とは扱わない。修正後のActionsでNative contract、Web/Rust build、Kotlin compile、APK生成を再確認し、端末動作はRuntime Logと実機確認が終わるまで未検証とする。
 - 正本設計書は引き続き本ファイル一つだけとする。
+
+# P225 CORE契約分類統一・自律改善Task種別衝突・再開修正
+
+- 実機Runtime detail（2026-10-10）で、COREからconversationの `ANALYZE_TEXT` が呼び出された後、`DOMAIN_REPLY_CONTRACT_FAILED:BUSINESS_SUCCESS_EVIDENCE_REQUIRED` で拒否され、`REQUIRED_BUSINESS_OPERATION_MISSING` と証拠品質エラーによりタスクがWAITINGになる事象を確認した。
+- `ANALYZE_TEXT` は入力を構造化する読み取り専用解析であり、状態変更・外部事実の確定・永続化を行うBusiness operationではない。P225でこれをDomain contract registryのDiagnostic commandとして定義し、`OBSERVATION + operationClass=DIAGNOSTIC + status=OBSERVED` を成功条件とする。架空のEvidence IDを発行してBusiness gateを通過させない。
+- 実機ログのSudachi初期化エラー `there must be at least one OOV provider plugin` は、Android Kotlin側の設定が `systemDict` だけでOOV providerを一件も指定していない実装と一致する。両方のSudachi plugin sourceに `SimpleOovProviderPlugin` を明示し、辞書の未知語を扱える最低限の設定を追加する。更新APKで `selfTest()` が成功するかは別途実機確認する。
+- `readSearchResultPages()` は `Promise.all` で複数ページを並行取得していたが、Android `fetchRenderedPage()` は `isFetchingPage` の排他制御により同時呼び出しを拒否する。本文取得を逐次化し、入力順を保つ。SearXNGの `Failed to fetch` 自体はネットワーク／エンドポイント到達性の失敗で、現行実装はProvider失敗として記録し他Providerへフォールバックするため、このコード修正でその外部接続まで直ったとは扱わない。
+- `domainRouterService` に重複していた未使用のDiagnostic判定式を除去し、`isDiagnosticDomainCommand` を正規契約の唯一の分類判定として公開した。Core Plan Revisionのrequired operationは、正規分類されたDiagnostic commandに限り、実際に記録された成功OBSERVATIONで充足する。Business operationは従来どおりBusiness RESULTと成功Statusを要求する。
+- AdaptiveRoutePlannerの `ANALYZE_TEXT` / `RESOLVE_UNKNOWN` 読み取りは、Business RESULTだけでなく、正規契約と一致する成功Diagnostic OBSERVATIONも参照する。失敗したOBSERVATIONは成功扱いにしない。Conversation completionとAdaptive completionのDiagnostic分類を共通ヘルパーに揃えた。
+- 自律改善キューの実装経路で、Discovery issueの `kind`（`STALLED_TASK` / `CAPABILITY_GAP` 等）が `SELF_IMPROVEMENT` タスクの `kind` を後勝ちで上書きしていた。これにより自己改善Taskが通常Taskとして分類され、`conversation.ANALYZE_TEXT` → `strategy.ASSESS_DOMAIN` で終了する経路を生んでいた。P225ではIssue分類を `issueKind` metadataへ分離し、CoreTaskIngressの明示的Task kindをpayload mergeより優先させる。
+- 既に永続化されている旧Queue itemには、`orchestrationMode=SELF_IMPROVEMENT_WORKER` とDiscovery issue kindが混在したTaskがあり得る。再開時に該当する未完了TaskをBlackboard CHECKPOINTへ置換理由付きで記録し、旧TaskをCANCELLEDにしたうえで、正しい `SELF_IMPROVEMENT` kindで再作成する。完了済みTaskを自動再実行しない。
+- 自律改善Loopの証拠待ち・通常Retryにタスク単位の `nextAttemptAt` を持たせ、待機中の先頭タスクが後続の実行可能タスクを塞がないようにした。共有リソース不足は従来どおりresource gateで全体待機する。各Taskは既定2/10/30/60分または進捗時5秒後を再評価期限に設定する。ただし既存の背景回復ポーリングは60秒周期のため、実際の再評価は期限後の次回poll時点となる場合がある。
+- `scripts/verify_runtime_failure_fixes.mjs` に、Diagnostic契約、Plan Revision、Conversation Planner、Task-kind precedence、既存Queue移行、Queue head-of-line blocking回避を検査する回帰条件を追加した。
+- 正本は引き続き本ファイルのみ。P222〜P224の履歴は削除せず保持する。完全再帰実装インベントリはP222を基礎にしており、P225で変更したファイルについて全件数を再算出したとは扱わない。
+- 未完了の検証境界：ソース変更・静的検証とGitHub Actionsは別に判定する。APK build成功のみでDEVICE_VERIFIEDとは扱わない。更新APKでのRuntime detail再取得により、旧Task移行、`ANALYZE_TEXT` の契約拒否解消、自己改善Taskの再評価が実際に行われたことを確認する。
+

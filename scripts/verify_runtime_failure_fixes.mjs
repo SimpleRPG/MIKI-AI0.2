@@ -22,6 +22,15 @@ const sanitizerLegacy = read('src/services/abstractSanitizerService.ts');
 const sanitizerCore = read('src/miki/safety/services/abstractSanitizerService.ts');
 const outboundHelper = read('src/miki/safety/services/outboundPayloadSanitizer.ts');
 const design = read('MIKI-AI0.2_統合設計書_正本.txt');
+const domainContract = read('src/miki/core/services/domainContractRegistryService.ts');
+const domainRouter = read('src/miki/core/services/domainRouterService.ts');
+const planRevision = read('src/miki/core/services/corePlanRevisionService.ts');
+const routePlanner = read('src/miki/core/services/adaptiveRoutePlannerService.ts');
+const completionGate = read('src/miki/core/services/coreCompletionGateService.ts');
+const taskIngress = read('src/miki/core/services/coreTaskIngressService.ts');
+const issueDiscovery = read('src/miki/core/services/autonomousIssueDiscoveryService.ts');
+const autonomousLoop = read('src/miki/core/services/autonomousSelfImprovementLoopService.ts');
+const autonomousSearch = read('src/miki/research/services/autonomousSearchService.ts');
 
 check('Canonical Runner exposes decideCoreGoals', runner.includes('fun decideCoreGoals(call: PluginCall)'));
 check('Canonical Runner exposes rankDomainRoutes', runner.includes('fun rankDomainRoutes(call: PluginCall)'));
@@ -98,11 +107,75 @@ check('Legacy sanitizer persists no credential/PII/path/host mappings', sanitize
 check('Legacy sanitizer detects Android app-private paths', sanitizerLegacy.includes('data|storage|sdcard|system'));
 check('CORE sanitizer persists no credential/PII/path/host mappings', sanitizerCore.includes('TRANSIENT_SYMBOL_CATEGORIES') && sanitizerCore.includes('if (!TRANSIENT_SYMBOL_CATEGORIES.has(category)) this.saveMappings()'));
 check('CORE sanitizer detects Android app-private paths', sanitizerCore.includes('data|storage|sdcard|system'));
+check(
+  'Sudachi initializes with an explicit OOV provider in both Android source copies',
+  morphologySource.includes('SimpleOovProviderPlugin') &&
+    morphologyApp.includes('SimpleOovProviderPlugin') &&
+    morphologySource.includes('oovProviderPlugin') &&
+    morphologyApp.includes('oovProviderPlugin')
+);
+check(
+  'HeadlessWebView page reads are serialized to match native single-flight locking',
+  autonomousSearch.includes('for (const result of readable)') &&
+    !autonomousSearch.includes('readable.map(async (result) =>')
+);
+check(
+  'ANALYZE_TEXT uses the canonical evidence-free diagnostic contract',
+  domainContract.includes("'ANALYZE_TEXT'") &&
+    domainContract.includes('export function isDiagnosticDomainCommand') &&
+    domainContract.includes('isDiagnosticDomainCommand(envelope.command)')
+);
+check(
+  'Diagnostic plan operations require a successful diagnostic observation, not a fabricated business receipt',
+  planRevision.includes('isDiagnosticDomainCommand(command)') &&
+    planRevision.includes("entry.kind === 'OBSERVATION'") &&
+    planRevision.includes("normalized.operationClass === 'DIAGNOSTIC'")
+);
+check(
+  'Conversation planner accepts successful diagnostic ANALYZE_TEXT and RESOLVE_UNKNOWN observations',
+  routePlanner.includes("latestSuccessfulOperationResult(task,'ANALYZE_TEXT')") &&
+    routePlanner.includes("latestSuccessfulOperationResult(task,'RESOLVE_UNKNOWN')") &&
+    routePlanner.includes('isSuccessfulOperationEntry')
+);
+check(
+  'Adaptive completion uses the same canonical diagnostic command classifier',
+  completionGate.includes('isDiagnosticDomainCommand(record.command as DomainCommand)') &&
+    !completionGate.includes("['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION','DISCOVER_IMPROVEMENT_ISSUE','RUN_SELF_IMPROVEMENT'].includes(record.command)")
+);
+check(
+  'Explicit CORE task kind cannot be overwritten by payload metadata',
+  /\.\.\.\(request\.initialPayload\|\|\{\}\),\s*kind:request\.kind/.test(taskIngress)
+);
+check(
+  'Issue discovery records issueKind instead of colliding with task kind',
+  issueDiscovery.includes('issueKind:issue.kind') &&
+    !/(?:^|[,{]\s*)kind:issue\.kind/.test(issueDiscovery)
+);
+check(
+  'Legacy queued discovery tasks are replaced instead of resumed as generic tasks',
+  autonomousLoop.includes('replaceLegacyMisclassifiedTask(request)') &&
+    autonomousLoop.includes('legacyWorkerTaskReplaced') &&
+    autonomousLoop.includes('taskBlackboardService.cancel(task.taskId)') &&
+    autonomousLoop.includes("kind:'SELF_IMPROVEMENT'")
+);
+check(
+  'Waiting head does not block other eligible improvement requests',
+  autonomousLoop.includes('item.nextAttemptAt<=Date.now()') &&
+    autonomousLoop.includes('eligibleIndex<0') &&
+    autonomousLoop.includes("request.waitKind='EVIDENCE'") &&
+    autonomousLoop.includes("request.waitKind='RETRY'")
+);
+check(
+  'Router does not maintain a second unused diagnostic classifier',
+  !domainRouter.includes('const diagnostic=resultClass===')
+);
+
 const designRevisionHeader = design.slice(0, 500).match(/^正本Revision：(\d{4}-\d{2}-\d{2}-P\d+)$/m);
 check(
   'Canonical design doc preserves P222 history and current revision metadata',
   design.includes('# P222 Android Native Runner同期漏れ・CORE再開例外・Sudachi辞書Anchor・外部送信サニタイズ修正') &&
     design.includes('# P223 Android Kotlin reject型修正・Web検索サニタイズ経路の修復') &&
+    design.includes('# P225 CORE契約分類統一・自律改善Task種別衝突・再開修正') &&
     Boolean(designRevisionHeader)
 );
 

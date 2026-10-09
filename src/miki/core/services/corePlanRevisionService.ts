@@ -1,6 +1,7 @@
 import type { BlackboardTask } from './taskBlackboardService';
 import type { DomainCommand } from './domainRouterService';
 import { canonicalSha256 } from './canonicalSha256Service';
+import { isDiagnosticDomainCommand } from './domainContractRegistryService';
 
 export type OperationInstanceStatus = 'PENDING' | 'BLOCKED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'SUPERSEDED';
 
@@ -116,16 +117,25 @@ class CorePlanRevisionService {
   private operationSucceeded(task: BlackboardTask, operationInstanceId: string, operation?: DomainCommand): boolean {
     if (!operationInstanceId) return false;
     return task.entries.some(entry => {
-      if (entry.kind !== 'RESULT' || typeof entry.value !== 'object' || entry.value === null) return false;
+      if ((entry.kind !== 'RESULT' && entry.kind !== 'OBSERVATION') || typeof entry.value !== 'object' || entry.value === null) return false;
       const value = entry.value as Record<string, unknown>;
       if (value.operationInstanceId !== operationInstanceId) return false;
       if (operation && value.operation !== operation) return false;
-      if (value.operationClass !== 'BUSINESS') return false;
+      const command = (operation || String(value.operation || '')) as DomainCommand;
       const reply = value.reply;
       if (!reply || typeof reply !== 'object') return false;
       const normalized = reply as Record<string, unknown>;
-      return normalized.operationClass === 'BUSINESS'
-        && ['SUCCEEDED','SUCCESS','COMPLETED'].includes(String(normalized.status || '').toUpperCase());
+      const status = String(normalized.status || '').toUpperCase();
+      if (isDiagnosticDomainCommand(command)) {
+        return entry.kind === 'OBSERVATION'
+          && value.operationClass === 'DIAGNOSTIC'
+          && normalized.operationClass === 'DIAGNOSTIC'
+          && ['OBSERVED','SUCCEEDED','SUCCESS','COMPLETED'].includes(status);
+      }
+      return entry.kind === 'RESULT'
+        && value.operationClass === 'BUSINESS'
+        && normalized.operationClass === 'BUSINESS'
+        && ['SUCCEEDED','SUCCESS','COMPLETED'].includes(status);
     });
   }
 

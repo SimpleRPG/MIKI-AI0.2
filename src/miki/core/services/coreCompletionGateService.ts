@@ -1,6 +1,8 @@
 import { coreLineageReadModelService } from './coreLineageReadModelService';
 import type { BlackboardEntry, BlackboardTask } from './taskBlackboardService';
 import type { MikiDomain } from './crossDomainCirculationService';
+import type { DomainCommand } from './domainRouterService';
+import { isDiagnosticDomainCommand } from './domainContractRegistryService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { corePlanRevisionService } from './corePlanRevisionService';
 import { domainReplyLedgerService } from './domainReplyLedgerService';
@@ -432,8 +434,8 @@ const persistenceConfirmed =
     const plan=corePlanRevisionService.latest(task);
     const requiredOperations=plan?.requiredOperations||[];
     const replyRecords=domainReplyLedgerService.listByTask(task.taskId);
-    const diagnosticOnly=replyRecords.length>0 && replyRecords.every(record=>record.status==='OBSERVED' || ['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION','DISCOVER_IMPROVEMENT_ISSUE','RUN_SELF_IMPROVEMENT'].includes(record.command));
-    const businessReplyRecords=replyRecords.filter(record=>!(record.status==='OBSERVED' || ['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION','DISCOVER_IMPROVEMENT_ISSUE','RUN_SELF_IMPROVEMENT'].includes(record.command)));
+    const diagnosticOnly=replyRecords.length>0 && replyRecords.every(record=>record.status==='OBSERVED' || isDiagnosticDomainCommand(record.command as DomainCommand));
+    const businessReplyRecords=replyRecords.filter(record=>!(record.status==='OBSERVED' || isDiagnosticDomainCommand(record.command as DomainCommand)));
     const missingRequiredOperations=corePlanRevisionService.missingOperations(task)
       .map(item=>`${item.operation}:${item.operationInstanceId}`);
     const failedOperations=requiredOperations.filter(item=>item.status==='FAILED').map(item=>item.operationInstanceId);

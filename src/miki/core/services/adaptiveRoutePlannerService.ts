@@ -5,6 +5,7 @@ import type { DomainCommand } from './domainRouterService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { coreCompletionGateService, type CoreCompletionAssessment } from './coreCompletionGateService';
 import { corePlanRevisionService } from './corePlanRevisionService';
+import { isDiagnosticDomainCommand } from './domainContractRegistryService';
 import { EvidenceService } from '../../memory/services/evidenceService';
 import { proposalQuarantineService } from './proposalQuarantineService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
@@ -1532,8 +1533,8 @@ class AdaptiveRoutePlannerService {
     const parallelKnowledgeUnits=hypothesisSelection.selectedKind==='PARALLEL'
       ? pendingUnits.filter((unit: MultiIntentPlan['units'][number])=>unit.goal==='KNOWLEDGE' || unit.action==='RESEARCH')
       : [];
-    const conversationResult=this.latestBusinessResult(task,'ANALYZE_TEXT');
-    const unknownResult=this.latestBusinessResult(task,'RESOLVE_UNKNOWN');
+    const conversationResult=this.latestSuccessfulOperationResult(task,'ANALYZE_TEXT');
+    const unknownResult=this.latestSuccessfulOperationResult(task,'RESOLVE_UNKNOWN');
     const researchResult=this.latestBusinessResult(task,'RUN_RESEARCH');
     const routes:PlannedRoute[]=[];
 
@@ -2489,7 +2490,7 @@ class AdaptiveRoutePlannerService {
   }
 
   private evaluateConversationCompletion(task:BlackboardTask):CoreCompletionAssessment {
-    const analysis=this.latestBusinessResult(task,'ANALYZE_TEXT');
+    const analysis=this.latestSuccessfulOperationResult(task,'ANALYZE_TEXT');
     const intentPlan=decomposeMultiIntent(task.goal);
     const completedIntentIds=new Set<string>();
     const failedIntentIds=new Set<string>();
@@ -2512,7 +2513,7 @@ class AdaptiveRoutePlannerService {
       return {businessCompletion:reasons.length===0,failClosed:true,requiredDomains:[],missingDomains:[],failedDomains:[],missingReceipts:[],persistenceConfirmed:true,evidenceQualityPassed:true,reasons,missingRequiredOperations:[]};
     }
     const unknownNeeded=/不明|未知|調べ|検索|最新|わから|knowledge.?gap/i.test(task.goal);
-    const unknown=unknownNeeded?this.latestBusinessResult(task,'RESOLVE_UNKNOWN'):undefined;
+    const unknown=unknownNeeded?this.latestSuccessfulOperationResult(task,'RESOLVE_UNKNOWN'):undefined;
     const researchNeeded=task.entries.some(e=>e.kind==='RESULT'&&/gapId|researchQuestion|queryPlanId/i.test(e.key));
     const research=researchNeeded?this.latestBusinessResult(task,'RUN_RESEARCH'):undefined;
     const researchValue=research?objectValue(research):undefined;
@@ -2542,6 +2543,30 @@ class AdaptiveRoutePlannerService {
 
   private payload(task:BlackboardTask):Record<string,unknown> {
     return objectValue(task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')||({} as BlackboardEntry))||{};
+  }
+
+  private isSuccessfulOperationEntry(entry:BlackboardEntry,operation:string):boolean {
+    const value=objectValue(entry);
+    if(!value||String(value.operation||'')!==operation)return false;
+    const reply=value.reply&&typeof value.reply==='object'&&!Array.isArray(value.reply)
+      ? value.reply as Record<string,unknown>
+      : undefined;
+    if(!reply)return false;
+    const status=String(reply.status||'').toUpperCase();
+    if(isDiagnosticDomainCommand(operation as DomainCommand)){
+      return entry.kind==='OBSERVATION'
+        && value.operationClass==='DIAGNOSTIC'
+        && reply.operationClass==='DIAGNOSTIC'
+        && ['OBSERVED','SUCCEEDED','SUCCESS','COMPLETED'].includes(status);
+    }
+    return entry.kind==='RESULT'
+      && value.operationClass==='BUSINESS'
+      && reply.operationClass==='BUSINESS'
+      && ['SUCCEEDED','SUCCESS','COMPLETED'].includes(status);
+  }
+
+  private latestSuccessfulOperationResult(task:BlackboardTask,operation:string):BlackboardEntry|undefined {
+    return [...task.entries].reverse().find(entry=>this.isSuccessfulOperationEntry(entry,operation));
   }
 
   private latestBusinessResult(task:BlackboardTask,operation:string):BlackboardEntry|undefined {
@@ -2815,8 +2840,11 @@ class AdaptiveRoutePlannerService {
   }
 
   private lastOperationFailed(task:BlackboardTask,operation:string):boolean {
-    return Boolean(this.latestOperationError(task,operation))
-      && ![...successfulBusinessEntries(task)].some(entry=>objectValue(entry)?.operation===operation);
+    const latest=[...task.entries].reverse().find(entry=>
+      String(objectValue(entry)?.operation||'')===operation
+      && (entry.kind==='RESULT'||entry.kind==='OBSERVATION'||entry.kind==='ERROR')
+    );
+    return Boolean(latest)&&!this.isSuccessfulOperationEntry(latest!,operation);
   }
 
   private lastOperationFailedAfter(
@@ -2828,16 +2856,9 @@ class AdaptiveRoutePlannerService {
       const entry=task.entries[index];
       const value=objectValue(entry);
       if(String(value?.operation||'')!==operation)continue;
-
-      if(entry.kind==='RESULT'){
-        return false;
-      }
-
-      if(entry.kind==='ERROR'){
-        return true;
-      }
+      if(entry.kind==='ERROR')return true;
+      if(entry.kind==='RESULT'||entry.kind==='OBSERVATION')return !this.isSuccessfulOperationEntry(entry,operation);
     }
-
     return false;
   }
 

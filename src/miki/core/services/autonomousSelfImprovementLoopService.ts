@@ -33,6 +33,9 @@ export interface AutonomousImprovementRequest {
   workspaceId?: string;
   resourceWaitCount?: number;
   evidenceWaitCount?: number;
+  nextAttemptAt?: number;
+  waitKind?: 'RESOURCE' | 'EVIDENCE' | 'RETRY';
+  waitReason?: string;
 }
 
 export interface AutonomousLoopState {
@@ -51,6 +54,18 @@ const MAX_ATTEMPTS = 3;
 const RECOVERY_POLL_MS = 60_000;
 const RESOURCE_WAIT_MS = [2 * 60_000, 5 * 60_000, 15 * 60_000, 30 * 60_000];
 const EVIDENCE_WAIT_MS = [2 * 60_000, 10 * 60_000, 30 * 60_000, 60 * 60_000];
+
+const DISCOVERY_ISSUE_KINDS=new Set(['EXECUTION_FAILURE','KNOWLEDGE_GAP','CAPABILITY_GAP','STALLED_TASK','DOMAIN_DISCONNECTED','CLAIM_CONTRADICTION','IMPROVEMENT_DEBT']);
+function normalizeDiscoveryIssuePayload(payload:Record<string,unknown>|undefined):Record<string,unknown>|undefined{
+  if(!payload)return undefined;
+  const normalized={...payload};
+  const candidate=String(normalized.issueKind||normalized.kind||'');
+  if(DISCOVERY_ISSUE_KINDS.has(candidate)&&typeof normalized.issueId==='string'&&normalized.issueId.trim()){
+    normalized.issueKind=candidate;
+    delete normalized.kind;
+  }
+  return normalized;
+}
 
 class AutonomousSelfImprovementLoopService {
   private state: AutonomousLoopState = { status: 'IDLE', queue: [], updatedAt: 0 };
@@ -99,6 +114,7 @@ class AutonomousSelfImprovementLoopService {
     }
     const now = Date.now();
     this.sequence += 1;
+    const normalizedPayload=normalizeDiscoveryIssuePayload(meta.payload);
     const item: AutonomousImprovementRequest = {
       id: `AIR-${now}-${String(this.sequence).padStart(6, '0')}`,
       trigger,
@@ -108,21 +124,24 @@ class AutonomousSelfImprovementLoopService {
       runType: meta.runType,
       sourceId: meta.sourceId,
       priority: meta.priority,
-      payload: meta.payload ? { ...meta.payload } : undefined,
+      payload: normalizedPayload ? { ...normalizedPayload } : undefined,
       createdAt: now,
       attempts: 0,
       resourceWaitCount: 0,
       evidenceWaitCount: 0,
+      nextAttemptAt: undefined,
+      waitKind: undefined,
+      waitReason: undefined,
     };
     const task=taskBlackboardService.create(trigger,'core',{
-      kind:'SELF_IMPROVEMENT',
+      ...(normalizedPayload||{}),
       runId:meta.runId,
       changeSetId:meta.changeSetId,
       runType:meta.runType,
       sourceId:meta.sourceId,
       priority:meta.priority,
       orchestrationMode:'SELF_IMPROVEMENT_WORKER',
-      ...(meta.payload||{})
+      kind:'SELF_IMPROVEMENT'
     });
     taskBlackboardService.pause(task.taskId,'SELF_IMPROVEMENT_QUEUED');
     item.taskId=task.taskId;
@@ -191,7 +210,8 @@ class AutonomousSelfImprovementLoopService {
         return;
       }
     }
-    if (this.state.retryAt && Date.now() < this.state.retryAt) {
+    const hasReadyRequest=this.state.queue.some(item=>!item.nextAttemptAt||item.nextAttemptAt<=Date.now());
+    if (this.state.retryAt && Date.now() < this.state.retryAt && !hasReadyRequest) {
       return;
     }
     if (['WAITING_RESOURCE', 'WAITING_EVIDENCE', 'PAUSED'].includes(this.state.status)) {
@@ -211,8 +231,26 @@ class AutonomousSelfImprovementLoopService {
     let activeRequest: AutonomousImprovementRequest | undefined;
     try {
       while (this.state.queue.length > 0) {
+        const now=Date.now();
+        const eligibleIndex=this.state.queue.findIndex(item=>!item.nextAttemptAt||item.nextAttemptAt<=now);
+        if(eligibleIndex<0){
+          const earliest=this.state.queue.reduce((best,item)=>!best||Number(item.nextAttemptAt||0)<Number(best.nextAttemptAt||0)?item:best,undefined as AutonomousImprovementRequest|undefined);
+          this.state.status=earliest?.waitKind==='RESOURCE'?'WAITING_RESOURCE':earliest?.waitKind==='EVIDENCE'?'WAITING_EVIDENCE':'PAUSED';
+          this.state.lastReason=earliest?.waitReason||'QUEUE_WAITING_FOR_NEXT_ATTEMPT';
+          this.state.retryAt=earliest?.nextAttemptAt;
+          this.state.activeRequestId=undefined;
+          this.save();
+          break;
+        }
+        if(eligibleIndex>0)this.state.queue.unshift(this.state.queue.splice(eligibleIndex,1)[0]);
         const request = this.state.queue[0];
+        request.nextAttemptAt=undefined;
+        request.waitKind=undefined;
+        request.waitReason=undefined;
         activeRequest = request;
+        this.state.retryAt=undefined;
+        const normalizedPayload=normalizeDiscoveryIssuePayload(request.payload);
+        if(normalizedPayload)request.payload=normalizedPayload;
         systemLogger.info(
           'SELF_IMPROVEMENT',
           `[RUNTIME] AutonomousLoop step: ${request.id}`,
@@ -236,7 +274,7 @@ class AutonomousSelfImprovementLoopService {
           if (!preflight.passed) {
             improvementDebtService.record('UNEXECUTED_CHECK', `PREFLIGHT:${preflight.reasons.join(',')}`, request.runId);
             await this.acquireThenWaitForEvidence(request, preflight.reasons.join(','));
-            break;
+            continue;
           }
         }
 
@@ -246,6 +284,7 @@ class AutonomousSelfImprovementLoopService {
           break;
         }
 
+        this.replaceLegacyMisclassifiedTask(request);
         request.attempts += 1;
         const workflow = request.taskId
           ? await coreTaskIngressService.resume(request.taskId, coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'))
@@ -254,6 +293,7 @@ class AutonomousSelfImprovementLoopService {
               goal: request.trigger,
               source: 'core',
               payload: {
+              ...(request.payload || {}),
               trigger: request.trigger,
               source: request.source,
               runId: request.runId,
@@ -262,14 +302,11 @@ class AutonomousSelfImprovementLoopService {
               sourceId: request.sourceId,
               priority: request.priority,
               orchestrationMode: 'SELF_IMPROVEMENT_WORKER',
-              ...(request.payload || {}),
+              kind: 'SELF_IMPROVEMENT',
               },
             });
         if (!workflow) {
           this.failOrRetry(request, 'BLACKBOARD_TASK_RESUME_FAILED');
-          if (this.state.status !== 'RUNNING') {
-            break;
-          }
           continue;
         }
         request.taskId = workflow.task.taskId;
@@ -300,7 +337,7 @@ class AutonomousSelfImprovementLoopService {
             quality.evidenceIds
           );
           await this.acquireThenWaitForEvidence(request, quality.reasons.join(','));
-          break;
+          continue;
         }
         const cycleBudgetPaused = workflow.task.status === 'PAUSED' && workflow.task.entries.some(entry => entry.kind === 'CHECKPOINT' && entry.key === 'coreCycleBudgetExhausted');
         if (cycleBudgetPaused) {
@@ -311,9 +348,7 @@ class AutonomousSelfImprovementLoopService {
           continue;
         }
         this.failOrRetry(request, `WORKFLOW_${workflow.task.status}`);
-        if (this.state.status !== 'RUNNING') {
-          break;
-        }
+        continue;
       }
       if (this.state.queue.length === 0) {
         this.state.status = 'IDLE';
@@ -374,12 +409,47 @@ class AutonomousSelfImprovementLoopService {
     }
   }
 
+  private replaceLegacyMisclassifiedTask(request:AutonomousImprovementRequest):void{
+    if(!request.taskId)return;
+    const task=taskBlackboardService.get(request.taskId);
+    if(!task)return;
+    const inputEntry=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload');
+    const stored=inputEntry?.value&&typeof inputEntry.value==='object'&&!Array.isArray(inputEntry.value)
+      ? inputEntry.value as Record<string,unknown>
+      : undefined;
+    if(!stored)return;
+    const legacyKind=String(stored.kind||'');
+    if(stored.orchestrationMode!=='SELF_IMPROVEMENT_WORKER'
+      ||!DISCOVERY_ISSUE_KINDS.has(legacyKind)
+      ||typeof stored.issueId!=='string'
+      ||task.status==='COMPLETED'
+      ||task.status==='CANCELLED')return;
+    const normalizedPayload=normalizeDiscoveryIssuePayload({...stored,...(request.payload||{})});
+    if(normalizedPayload)request.payload=normalizedPayload;
+    taskBlackboardService.append(task.taskId,'CHECKPOINT','core','legacyWorkerTaskReplaced',{
+      schemaVersion:1,
+      originalTaskId:task.taskId,
+      originalPayloadKind:legacyKind,
+      issueId:String(stored.issueId),
+      replacementKind:'SELF_IMPROVEMENT',
+      reason:'DISCOVERY_ISSUE_KIND_OVERRODE_SELF_IMPROVEMENT_KIND',
+      replacedAt:Date.now()
+    });
+    taskBlackboardService.cancel(task.taskId);
+    request.taskId=undefined;
+    this.state.lastReason=`LEGACY_WORKER_TASK_REPLACED:${task.taskId}`;
+    this.save();
+  }
+
   private waitForResource(request: AutonomousImprovementRequest, reason: string): void {
     request.resourceWaitCount = (request.resourceWaitCount || 0) + 1;
     const index = Math.min(request.resourceWaitCount - 1, RESOURCE_WAIT_MS.length - 1);
     this.state.status = 'WAITING_RESOURCE';
     this.state.lastReason = reason;
     this.state.retryAt = Date.now() + RESOURCE_WAIT_MS[index];
+    request.nextAttemptAt=this.state.retryAt;
+    request.waitKind='RESOURCE';
+    request.waitReason=reason;
     this.save();
   }
 
@@ -401,10 +471,12 @@ class AutonomousSelfImprovementLoopService {
      */
     if (acquired.acquired) {
       request.evidenceWaitCount = 0;
+      request.nextAttemptAt = Date.now() + 5_000;
+      request.waitKind = 'EVIDENCE';
+      request.waitReason = acquired.reasons.join(',') || 'REQUIRED_ASSET_ACQUIRED_CORE_REEVALUATION';
       this.state.status = 'IDLE';
-      this.state.lastReason =
-        acquired.reasons.join(',') || 'REQUIRED_ASSET_ACQUIRED_CORE_REEVALUATION';
-      this.state.retryAt = undefined;
+      this.state.lastReason = request.waitReason;
+      this.state.retryAt = request.nextAttemptAt;
       this.save();
       return;
     }
@@ -481,6 +553,9 @@ class AutonomousSelfImprovementLoopService {
     this.state.status = 'WAITING_EVIDENCE';
     this.state.lastReason = reason;
     this.state.retryAt = Date.now() + (progressed ? 5_000 : EVIDENCE_WAIT_MS[index]);
+    request.nextAttemptAt=this.state.retryAt;
+    request.waitKind='EVIDENCE';
+    request.waitReason=reason;
     this.save();
   }
 
@@ -497,6 +572,9 @@ class AutonomousSelfImprovementLoopService {
     this.state.status = 'PAUSED';
     this.state.lastReason = reason;
     this.state.retryAt = Date.now() + EVIDENCE_WAIT_MS[Math.min(request.attempts, EVIDENCE_WAIT_MS.length - 1)];
+    request.nextAttemptAt=this.state.retryAt;
+    request.waitKind='RETRY';
+    request.waitReason=reason;
     this.save();
   }
 
