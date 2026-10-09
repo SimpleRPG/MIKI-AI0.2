@@ -37,6 +37,8 @@ class MIKINativeRunnerPlugin : Plugin() {
     private val runnerId = "android-native"
     private val runtimeLogFileName = "MIKI_RUNTIME_LOG.txt"
 
+    private fun Throwable.toCapacitorException(): Exception = this as? Exception ?: Exception(this)
+
     @PluginMethod
     fun ensureRuntimeLogFile(call: PluginCall) {
         try {
@@ -200,7 +202,7 @@ class MIKINativeRunnerPlugin : Plugin() {
             result.put("api_version", MIKINativeCore.health().apiVersion)
             call.resolve(result)
         } catch (error: Throwable) {
-            call.reject("RUST_HASH_FILE_FAILED", error)
+            call.reject("RUST_HASH_FILE_FAILED", error.toCapacitorException())
         }
     }
 
@@ -221,7 +223,7 @@ class MIKINativeRunnerPlugin : Plugin() {
                 result.put("api_version", MIKINativeCore.health().apiVersion)
                 call.resolve(result)
             } catch (error: Throwable) {
-                call.reject("RUST_SEARCH_TEXT_FAILED", error)
+                call.reject("RUST_SEARCH_TEXT_FAILED", error.toCapacitorException())
             }
         }.start()
     }
@@ -231,35 +233,35 @@ class MIKINativeRunnerPlugin : Plugin() {
         val goals=call.getArray("goals")
         val now=call.getLong("now")
         if(goals==null||goals.length()==0||goals.length()>10000||now==null){call.reject("CORE_DECISION_REQUEST_INVALID");return}
-        Thread { try { val request=JSObject();request.put("now",now);request.put("goals",goals);call.resolve(JSObject(MIKINativeCore.decideCoreGoals(request.toString()))) } catch(error:Throwable){call.reject("RUST_CORE_DECISION_FAILED",error)} }.start()
+        Thread { try { val request=JSObject();request.put("now",now);request.put("goals",goals);call.resolve(JSObject(MIKINativeCore.decideCoreGoals(request.toString()))) } catch(error:Throwable){call.reject("RUST_CORE_DECISION_FAILED", error.toCapacitorException())} }.start()
     }
 
     @PluginMethod
     fun rankDomainRoutes(call: PluginCall) {
         val routes=call.getArray("routes")
         if(routes==null||routes.length()>10000){call.reject("DOMAIN_ROUTES_INVALID");return}
-        Thread { try { val request=JSObject();request.put("routes",routes);call.resolve(JSObject(MIKINativeCore.rankDomainRoutes(request.toString()))) } catch(error:Throwable){call.reject("RUST_DOMAIN_ROUTE_FAILED",error)} }.start()
+        Thread { try { val request=JSObject();request.put("routes",routes);call.resolve(JSObject(MIKINativeCore.rankDomainRoutes(request.toString()))) } catch(error:Throwable){call.reject("RUST_DOMAIN_ROUTE_FAILED", error.toCapacitorException())} }.start()
     }
 
     @PluginMethod
     fun verifyVbaCode(call: PluginCall) {
         val code=call.getString("code")
         if(code==null||code.length>20000000){call.reject("VBA_VERIFY_REQUEST_INVALID");return}
-        Thread { try { val request=JSObject();request.put("code",code);request.put("delivery_mode",call.getString("delivery_mode") ?: "CODE");request.put("baseline_code",call.getString("baseline_code"));request.put("expected_code_sha256",call.getString("expected_code_sha256"));request.put("expected_code_length",call.getInt("expected_code_length"));request.put("expected_code_line_count",call.getInt("expected_code_line_count"));call.resolve(JSObject(MIKINativeCore.verifyVbaCode(request.toString()))) } catch(error:Throwable){call.reject("RUST_VBA_VERIFY_FAILED",error)} }.start()
+        Thread { try { val request=JSObject();request.put("code",code);request.put("delivery_mode",call.getString("delivery_mode") ?: "CODE");request.put("baseline_code",call.getString("baseline_code"));request.put("expected_code_sha256",call.getString("expected_code_sha256"));request.put("expected_code_length",call.getInt("expected_code_length"));request.put("expected_code_line_count",call.getInt("expected_code_line_count"));call.resolve(JSObject(MIKINativeCore.verifyVbaCode(request.toString()))) } catch(error:Throwable){call.reject("RUST_VBA_VERIFY_FAILED", error.toCapacitorException())} }.start()
     }
 
     @PluginMethod
     fun processDataRecords(call: PluginCall) {
         val records=call.getArray("records")
         if(records==null||records.length()>1000000){call.reject("DATA_PROCESS_REQUEST_INVALID");return}
-        Thread { try { val request=JSObject();request.put("records",records);request.put("dedupe_keys",call.getArray("dedupe_keys") ?: JSArray());request.put("index_fields",call.getArray("index_fields") ?: JSArray());request.put("required_fields",call.getArray("required_fields") ?: JSArray());request.put("trim_strings",call.getBoolean("trim_strings") ?: true);request.put("lowercase_keys",call.getBoolean("lowercase_keys") ?: false);request.put("baseline_records",call.getArray("baseline_records") ?: JSArray());request.put("schema",call.getArray("schema") ?: JSArray());request.put("normalize_numbers",call.getBoolean("normalize_numbers") ?: false);request.put("normalize_booleans",call.getBoolean("normalize_booleans") ?: false);request.put("normalize_dates",call.getBoolean("normalize_dates") ?: false);request.put("duplicate_policy",call.getString("duplicate_policy") ?: "KEEP_FIRST");request.put("chunk_size",call.getInt("chunk_size") ?: 10000);request.put("memory_limit_bytes",call.getInt("memory_limit_bytes") ?: 268435456);request.put("cancel_after_rows",call.getInt("cancel_after_rows"));request.put("sqlite_columns",call.getArray("sqlite_columns") ?: JSArray());call.resolve(JSObject(MIKINativeCore.processDataRecords(request.toString()))) } catch(error:Throwable){call.reject("RUST_DATA_PROCESS_FAILED",error)} }.start()
+        Thread { try { val request=JSObject();request.put("records",records);request.put("dedupe_keys",call.getArray("dedupe_keys") ?: JSArray());request.put("index_fields",call.getArray("index_fields") ?: JSArray());request.put("required_fields",call.getArray("required_fields") ?: JSArray());request.put("trim_strings",call.getBoolean("trim_strings") ?: true);request.put("lowercase_keys",call.getBoolean("lowercase_keys") ?: false);request.put("baseline_records",call.getArray("baseline_records") ?: JSArray());request.put("schema",call.getArray("schema") ?: JSArray());request.put("normalize_numbers",call.getBoolean("normalize_numbers") ?: false);request.put("normalize_booleans",call.getBoolean("normalize_booleans") ?: false);request.put("normalize_dates",call.getBoolean("normalize_dates") ?: false);request.put("duplicate_policy",call.getString("duplicate_policy") ?: "KEEP_FIRST");request.put("chunk_size",call.getInt("chunk_size") ?: 10000);request.put("memory_limit_bytes",call.getInt("memory_limit_bytes") ?: 268435456);request.put("cancel_after_rows",call.getInt("cancel_after_rows"));request.put("sqlite_columns",call.getArray("sqlite_columns") ?: JSArray());call.resolve(JSObject(MIKINativeCore.processDataRecords(request.toString()))) } catch(error:Throwable){call.reject("RUST_DATA_PROCESS_FAILED", error.toCapacitorException())} }.start()
     }
 
     @PluginMethod
     fun planExecution(call: PluginCall) {
         val nodes=call.getArray("nodes")
         if(nodes==null||nodes.length()>100000){call.reject("EXECUTION_PLAN_REQUEST_INVALID");return}
-        Thread { try { val request=JSObject();request.put("nodes",nodes);request.put("receipts",call.getArray("receipts") ?: JSArray());request.put("completed_idempotency_keys",call.getArray("completed_idempotency_keys") ?: JSArray());request.put("paused_node_id",call.getString("paused_node_id"));request.put("resume_token",call.getString("resume_token"));call.resolve(JSObject(MIKINativeCore.planExecution(request.toString()))) } catch(error:Throwable){call.reject("RUST_EXECUTION_PLAN_FAILED",error)} }.start()
+        Thread { try { val request=JSObject();request.put("nodes",nodes);request.put("receipts",call.getArray("receipts") ?: JSArray());request.put("completed_idempotency_keys",call.getArray("completed_idempotency_keys") ?: JSArray());request.put("paused_node_id",call.getString("paused_node_id"));request.put("resume_token",call.getString("resume_token"));call.resolve(JSObject(MIKINativeCore.planExecution(request.toString()))) } catch(error:Throwable){call.reject("RUST_EXECUTION_PLAN_FAILED", error.toCapacitorException())} }.start()
     }
 
     @PluginMethod
@@ -267,7 +269,7 @@ class MIKINativeRunnerPlugin : Plugin() {
         val records=call.getArray("records")
         val query=call.getString("query")
         if(records==null||records.length()>500000||query==null){call.reject("MEMORY_SEARCH_REQUEST_INVALID");return}
-        Thread { try { val request=JSObject();request.put("records",records);request.put("query",query);request.put("baseline_records",call.getArray("baseline_records") ?: JSArray());request.put("now",call.getLong("now") ?: System.currentTimeMillis());request.put("ngram_size",call.getInt("ngram_size") ?: 3);request.put("limit",call.getInt("limit") ?: 50);request.put("duplicate_threshold",call.getDouble("duplicate_threshold") ?: 0.92);request.put("half_life_ms",call.getLong("half_life_ms") ?: 2592000000L);request.put("required_receipt_ids",call.getArray("required_receipt_ids") ?: JSArray());request.put("available_receipt_ids",call.getArray("available_receipt_ids") ?: JSArray());call.resolve(JSObject(MIKINativeCore.searchMemory(request.toString()))) } catch(error:Throwable){call.reject("RUST_MEMORY_SEARCH_FAILED",error)} }.start()
+        Thread { try { val request=JSObject();request.put("records",records);request.put("query",query);request.put("baseline_records",call.getArray("baseline_records") ?: JSArray());request.put("now",call.getLong("now") ?: System.currentTimeMillis());request.put("ngram_size",call.getInt("ngram_size") ?: 3);request.put("limit",call.getInt("limit") ?: 50);request.put("duplicate_threshold",call.getDouble("duplicate_threshold") ?: 0.92);request.put("half_life_ms",call.getLong("half_life_ms") ?: 2592000000L);request.put("required_receipt_ids",call.getArray("required_receipt_ids") ?: JSArray());request.put("available_receipt_ids",call.getArray("available_receipt_ids") ?: JSArray());call.resolve(JSObject(MIKINativeCore.searchMemory(request.toString()))) } catch(error:Throwable){call.reject("RUST_MEMORY_SEARCH_FAILED", error.toCapacitorException())} }.start()
     }
 
     @PluginMethod
@@ -275,14 +277,14 @@ class MIKINativeRunnerPlugin : Plugin() {
         val candidate=call.getArray("candidate")
         val candidateId=call.getString("candidate_id")
         if(candidate==null||candidate.length()>200000||candidateId==null){call.reject("SELF_DEVELOPMENT_REQUEST_INVALID");return}
-        Thread { try { val request=JSObject();for(key in listOf("candidate_id","baseline","candidate","requirements","requirement_links","allowed_paths","required_contracts","known_candidate_hashes","manifest")){request.put(key,call.data.opt(key))};call.resolve(JSObject(MIKINativeCore.analyzeCandidate(request.toString()))) } catch(error:Throwable){call.reject("RUST_SELF_DEVELOPMENT_FAILED",error)} }.start()
+        Thread { try { val request=JSObject();for(key in listOf("candidate_id","baseline","candidate","requirements","requirement_links","allowed_paths","required_contracts","known_candidate_hashes","manifest")){request.put(key,call.data.opt(key))};call.resolve(JSObject(MIKINativeCore.analyzeCandidate(request.toString()))) } catch(error:Throwable){call.reject("RUST_SELF_DEVELOPMENT_FAILED", error.toCapacitorException())} }.start()
     }
 
     @PluginMethod
     fun analyzeOwnedDomain(call: PluginCall) {
         val domain=call.getString("domain")
         if(domain==null){call.reject("OWNED_DOMAIN_REQUIRED");return}
-        Thread { try { val request=JSObject();request.put("items",call.getArray("items") ?: JSArray());request.put("baseline",call.getArray("baseline") ?: JSArray());request.put("context",call.getObject("context") ?: JSObject());request.put("required",call.getArray("required") ?: JSArray());request.put("receipts",call.getArray("receipts") ?: JSArray());call.resolve(JSObject(MIKINativeCore.analyzeOwnedDomain(domain,request.toString()))) } catch(error:Throwable){call.reject("RUST_OWNED_DOMAIN_FAILED",error)} }.start()
+        Thread { try { val request=JSObject();request.put("items",call.getArray("items") ?: JSArray());request.put("baseline",call.getArray("baseline") ?: JSArray());request.put("context",call.getObject("context") ?: JSObject());request.put("required",call.getArray("required") ?: JSArray());request.put("receipts",call.getArray("receipts") ?: JSArray());call.resolve(JSObject(MIKINativeCore.analyzeOwnedDomain(domain,request.toString()))) } catch(error:Throwable){call.reject("RUST_OWNED_DOMAIN_FAILED", error.toCapacitorException())} }.start()
     }
 
     @PluginMethod
@@ -308,7 +310,7 @@ class MIKINativeRunnerPlugin : Plugin() {
                 verification.put("api_version", MIKINativeCore.health().apiVersion)
                 call.resolve(verification)
             } catch (error: Throwable) {
-                call.reject("RUST_VERIFY_ARTIFACT_FAILED", error)
+                call.reject("RUST_VERIFY_ARTIFACT_FAILED", error.toCapacitorException())
             }
         }.start()
     }
@@ -338,7 +340,7 @@ class MIKINativeRunnerPlugin : Plugin() {
                 for(path in before.keys)if(!after.containsKey(path))deleted.add(path)
                 if(rust.getJSONArray("added").toString()!=JSArray(added).toString()||rust.getJSONArray("changed").toString()!=JSArray(changed).toString()||rust.getJSONArray("deleted").toString()!=JSArray(deleted).toString()||rust.getInt("unchanged_count")!=unchanged)throw IllegalStateException("RUST_REVISION_COMPARE_MISMATCH")
                 val result=JSObject();result.put("added",JSArray(added));result.put("changed",JSArray(changed));result.put("deleted",JSArray(deleted));result.put("unchanged_count",unchanged);result.put("matched",true);result.put("api_version",MIKINativeCore.health().apiVersion);call.resolve(result)
-            }catch(error:Throwable){call.reject("RUST_COMPARE_REVISIONS_FAILED",error)}
+            }catch(error:Throwable){call.reject("RUST_COMPARE_REVISIONS_FAILED", error.toCapacitorException())}
         }.start()
     }
 
@@ -397,7 +399,7 @@ class MIKINativeRunnerPlugin : Plugin() {
                 call.resolve(result)
             } catch (error: Throwable) {
                 output.delete()
-                call.reject("RUST_BUILD_ZIP_FAILED", error)
+                call.reject("RUST_BUILD_ZIP_FAILED", error.toCapacitorException())
             }
         }.start()
     }
@@ -439,7 +441,7 @@ class MIKINativeRunnerPlugin : Plugin() {
                 result.put("api_version", MIKINativeCore.health().apiVersion)
                 call.resolve(result)
             } catch (error: Throwable) {
-                call.reject("RUST_COPY_ZIPTXT_FAILED", error)
+                call.reject("RUST_COPY_ZIPTXT_FAILED", error.toCapacitorException())
             }
         }.start()
     }
@@ -481,7 +483,7 @@ class MIKINativeRunnerPlugin : Plugin() {
                 result.put("api_version", MIKINativeCore.health().apiVersion)
                 call.resolve(result)
             } catch (error: Throwable) {
-                call.reject("RUST_GIT_BLOB_FAILED", error)
+                call.reject("RUST_GIT_BLOB_FAILED", error.toCapacitorException())
             }
         }.start()
     }
@@ -520,7 +522,7 @@ class MIKINativeRunnerPlugin : Plugin() {
                 response.put("files", JSArray(rustFiles.toString()))
                 call.resolve(response)
             } catch (error: Throwable) {
-                call.reject("RUST_SCAN_WORKSPACE_FAILED", error)
+                call.reject("RUST_SCAN_WORKSPACE_FAILED", error.toCapacitorException())
             }
         }.start()
     }
@@ -604,7 +606,7 @@ class MIKINativeRunnerPlugin : Plugin() {
                 response.put("files", results)
                 call.resolve(response)
             } catch (error: Throwable) {
-                call.reject("RUST_HASH_FILES_FAILED", error)
+                call.reject("RUST_HASH_FILES_FAILED", error.toCapacitorException())
             }
         }.start()
     }

@@ -56,11 +56,42 @@ check('Cloud chat audits all JSON fields before fetch', api.includes('sanitizeOu
 check('Cloud chat no longer sends unaudited history/attachments', !api.includes('const sanitizedAttachedFiles = params.attachedFiles?.map') && !api.includes('const sanitizedWorkspaceFiles = params.workspaceFiles?.map'));
 check('Distillation sends its sanitized structured payload', api.includes('sanitizeOutboundPayload(params,') && api.includes('JSON.stringify(outbound.payload)') && !api.includes('topic: audit.sanitizedText'));
 check('Teacher request sends sanitized complete payload', teacher.includes('sanitizeOutboundPayload(payload,') && teacher.includes('const safePayload: TeacherRequestPayload = outbound.payload'));
-const safeSearchStart = search.indexOf('const safeQuery = audit.sanitizedText;');
+check(
+  'Native Runner adapts every Throwable reject to Capacitor Exception',
+  runner.includes('private fun Throwable.toCapacitorException(): Exception') &&
+    (runner.match(/error\.toCapacitorException\(\)/g) || []).length === 17 &&
+    !/call\.reject\(("[A-Z0-9_]+"),\s*error\s*\)/.test(runner)
+);
+const safeSearchStart = search.indexOf('const safeQuery = outbound.payload;');
 const safeSearchEnd = search.indexOf('  public async readSearchResultPages', safeSearchStart);
 const safeSearchRegion = safeSearchStart >= 0 && safeSearchEnd > safeSearchStart ? search.slice(safeSearchStart, safeSearchEnd) : '';
-check('All outbound search provider URLs use sanitized query', Boolean(safeSearchRegion) && !safeSearchRegion.includes('cleanQuery') && safeSearchRegion.includes('safeQuery'));
-check('Blocked search logs never include raw query', search.includes('中断 (queryLength=${cleanQuery.length})'));
+const searchAuditStart = search.indexOf('const outbound = sanitizeOutboundPayload(cleanQuery,');
+const searchAuditEnd = search.indexOf('const safeQuery = outbound.payload;', searchAuditStart);
+const searchAuditRegion = searchAuditStart >= 0 && searchAuditEnd > searchAuditStart ? search.slice(searchAuditStart, searchAuditEnd) : '';
+const bannedSearchStart = search.indexOf('const bannedQueryCheck = bannedTopicsConfigService.checkBanned(safeQuery);');
+const bannedSearchEnd = search.indexOf('const preferred =', bannedSearchStart);
+const bannedSearchRegion = bannedSearchStart >= 0 && bannedSearchEnd > bannedSearchStart ? search.slice(bannedSearchStart, bannedSearchEnd) : '';
+check(
+  'Web search baseline-sanitizes before the configurable privacy audit',
+  search.includes("import { sanitizeOutboundPayload } from '../../safety/services/outboundPayloadSanitizer';") &&
+    Boolean(searchAuditRegion) &&
+    searchAuditRegion.includes("privacyGuardrailService.auditOutboundContent(serialized, 'web_search', { autoSanitize: true })") &&
+    searchAuditRegion.includes('outbound.payload')
+);
+check(
+  'All outbound search provider URLs use sanitized query',
+  Boolean(safeSearchRegion) && !safeSearchRegion.includes('cleanQuery') && safeSearchRegion.includes('safeQuery')
+);
+check(
+  'Blocked search logs and summaries never include query or matched topic',
+  Boolean(bannedSearchRegion) &&
+    !searchAuditRegion.includes('${cleanQuery}') &&
+    !searchAuditRegion.includes('${safeQuery}') &&
+    !bannedSearchRegion.includes('${safeQuery}') &&
+    !bannedSearchRegion.includes('${cleanQuery}') &&
+    !bannedSearchRegion.includes('${bannedQueryCheck.matchedTopic}') &&
+    bannedSearchRegion.includes('query redacted')
+);
 check('Audit logs redact contents and symbol mappings (legacy)', auditLegacy.includes('sanitizeAuditLogEntry') && auditLegacy.includes("sanitizedText: ''") && auditLegacy.includes('symbolReplacements: {}') && auditLegacy.includes('Audit metadata retained; content, reversible mappings, and identifying details redacted.') && auditLegacy.includes('data|storage|sdcard|system'));
 check('Audit logs redact contents and symbol mappings (CORE)', auditCore.includes('sanitizeAuditLogEntry') && auditCore.includes("sanitizedText: ''") && auditCore.includes('symbolReplacements: {}') && auditCore.includes('Audit metadata retained; content, reversible mappings, and identifying details redacted.') && auditCore.includes('data|storage|sdcard|system'));
 check('Legacy sanitizer persists no credential/PII/path/host mappings', sanitizerLegacy.includes('TRANSIENT_SYMBOL_CATEGORIES') && sanitizerLegacy.includes('if (!TRANSIENT_SYMBOL_CATEGORIES.has(category)) this.saveMappings()'));

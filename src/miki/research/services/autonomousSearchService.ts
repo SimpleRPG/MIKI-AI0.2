@@ -12,6 +12,7 @@ import { selfImprovementService } from '../../improvement/services/selfImproveme
 import { experienceLinkService } from '../../experience/services/experienceLinkService';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { privacyGuardrailService } from '../../safety/services/privacyGuardrailService';
+import { sanitizeOutboundPayload } from '../../safety/services/outboundPayloadSanitizer';
 import { bannedTopicsConfigService } from '../../safety/services/bannedTopicsConfigService';
 import { WebMaterialPatternExtractor } from './webMaterialPatternExtractor';
 import { answerPlanService } from '../../strategy/services/answerPlanService';
@@ -378,22 +379,22 @@ export class AutonomousSearchService {
     const cleanQuery = query.trim();
     if (!cleanQuery) return { results: [] };
 
-    // 設計思想 Master v5.0 第11章 11.1節: 送信前プライバシー・機密監査
-    const audit = privacyGuardrailService.auditOutboundContent(cleanQuery, 'web_search', { autoSanitize: true });
-    if (!audit.allowed) {
-      systemLogger.warn('SELF_IMPROVEMENT', `🚫 [Web検索遮断] 検索クエリに機密が含まれるため中断 (queryLength=${cleanQuery.length})`);
+    // Mandatory baseline sanitization runs before the configurable privacy audit.
+    // Only the parsed sanitized payload may be used for cache keys or provider requests.
+    const outbound = sanitizeOutboundPayload(cleanQuery, (serialized) =>
+      privacyGuardrailService.auditOutboundContent(serialized, 'web_search', { autoSanitize: true })
+    );
+    if (!outbound.allowed || typeof outbound.payload !== 'string') {
+      systemLogger.warn('SELF_IMPROVEMENT', '🚫 [Web検索遮断] outbound sanitization failed; query redacted');
       return { results: [], summary: 'プライバシー保護のため検索を安全にスキップしました。' };
     }
-    const safeQuery = audit.sanitizedText;
+    const safeQuery = outbound.payload;
 
     // 作業指示書 v19: 禁止トピック手動設定によるクエリ遮断
     const bannedQueryCheck = bannedTopicsConfigService.checkBanned(safeQuery);
     if (bannedQueryCheck.isBanned) {
-      systemLogger.warn(
-        'SELF_IMPROVEMENT',
-        `🚫 [Web検索遮断] 検索クエリが禁止トピック「${bannedQueryCheck.matchedTopic}」に一致したため中断: ${safeQuery}`
-      );
-      return { results: [], summary: `禁止トピック（${bannedQueryCheck.matchedTopic}）に該当するため安全にスキップしました。` };
+      systemLogger.warn('SELF_IMPROVEMENT', '🚫 [Web検索遮断] 禁止トピックに該当したため中断 (query redacted)');
+      return { results: [], summary: '禁止トピックに該当するため安全にスキップしました。' };
     }
 
     const preferred = options?.preferredProvider || 'auto';

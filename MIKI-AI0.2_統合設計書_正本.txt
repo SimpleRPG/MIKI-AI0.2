@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-09
-正本Revision：2026-10-09-P222
+正本Revision：2026-10-09-P223
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -11019,3 +11019,15 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 正規検証は `node scripts/verify_runtime_failure_fixes.mjs`、`npx tsx scripts/verify_android_native_contract.ts`、`npx tsx scripts/verify_android_japanese_morphology_contract.ts`、`node scripts/verify_rust_core_kernel_phase37.mjs`、`npm run build`、Android Kotlin/APK build、および更新APKを使う実機Runtime Log再確認で行う。ビルド・静的テストのPASSだけで `decideCoreGoals` の実機動作やSudachiのDEVICE_VERIFIEDを宣言しない。
 - 本変更はCORE + 17分類、Rust goal-selection契約、Native Runner allow-list、会話Graph契約、唯一の統合設計書という方針を変更せず、Nativeソース上書き、COREの診断例外、Sudachiパス解決、外部送信後の未監査フィールドおよび機密監査履歴の原文保存を修正する。
 
+
+
+# P223 Android Kotlin reject型修正・Web検索サニタイズ経路の修復
+
+- 2026-10-09のGitHub Actions run #828（commit c17cacbc3445bc23c6ae0799f5c108099eb8e910）を調査し、npm run build、Rust Android build、既存の4本の静的検証は通過している一方、Android Gradleの :app:compileDebugKotlin が失敗することを確認した。失敗ログでは MIKINativeRunnerPlugin.kt の17箇所で、PluginCall.reject(message, Exception) が要求する位置へ Throwable を直接渡していた。
+- P223ではRunnerに Throwable.toCapacitorException() を追加し、17箇所すべてのreject境界で Exception に変換する。元のThrowableはcauseとして保持し、通常のExceptionを不要に再ラップせず、Error系ThrowableもCapacitor APIの型契約に合わせて扱う。
+- P222実装を再監査したところ、autonomousSearchService.executeSearch() は依然として文字列単体を直接 auditOutboundContent() に渡していたため、共通の sanitizeOutboundPayload() がWeb検索経路に適用されていなかった。この経路では PRIVACY_GUARDRAIL=DISABLED 時に基本サニタイズを経ない値が監査結果として返るリスクが残っていた。
+- Web検索は sanitizeOutboundPayload(cleanQuery, ...) を使い、設定可能な監査feature flagより先にmandatory baseline sanitizationを通す。送信候補は監査済みJSONをparseして得た文字列だけとし、拒否・parse失敗時にはProvider呼び出しを行わず安全に終了する。SearXNG/Wikipedia/DuckDuckGo、検索キャッシュキー、mock fallbackの各経路は引き続き safeQuery のみを使う。
+- 検索クエリ機密検出時と禁止topic一致時の警告ログから、クエリ本文、クエリそのもの、禁止語との一致文字列を除去する。ユーザー向けsummaryも一致した禁止topicを埋め込まず、一般化した理由のみを返す。機密内容はログや診断メッセージへ再流出させない。
+- scripts/verify_runtime_failure_fixes.mjs を更新し、Runnerの全17 reject呼び出しが型変換を通ること、Web検索が共通Outbound sanitizerを通ること、Providerがサニタイズ済みqueryを使うこと、遮断ログにquery本文・matched topicが含まれないことを検査する。
+- 正規検証は更新後の node scripts/verify_runtime_failure_fixes.mjs、既存のAndroid Native contract / Japanese morphology contract / Rust core-kernel静的検証、npm run build、GitHub ActionsのKotlin/APK buildで行う。P223のソース修正や静的検証だけではAPK buildまたは実機実行の成功を宣言しない。Android workflowが通過した場合も、実機Runtime Logと画面の実機確認が終わるまでは DEVICE_VERIFIED と記載しない。
+- 正本設計書は引き続き本ファイル一つだけとする。
