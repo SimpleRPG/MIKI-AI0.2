@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-09
-正本Revision：2026-10-09-P223
+正本Revision：2026-10-09-P224
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -11030,4 +11030,12 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 検索クエリ機密検出時と禁止topic一致時の警告ログから、クエリ本文、クエリそのもの、禁止語との一致文字列を除去する。ユーザー向けsummaryも一致した禁止topicを埋め込まず、一般化した理由のみを返す。機密内容はログや診断メッセージへ再流出させない。
 - scripts/verify_runtime_failure_fixes.mjs を更新し、Runnerの全17 reject呼び出しが型変換を通ること、Web検索が共通Outbound sanitizerを通ること、Providerがサニタイズ済みqueryを使うこと、遮断ログにquery本文・matched topicが含まれないことを検査する。
 - 正規検証は更新後の node scripts/verify_runtime_failure_fixes.mjs、既存のAndroid Native contract / Japanese morphology contract / Rust core-kernel静的検証、npm run build、GitHub ActionsのKotlin/APK buildで行う。P223のソース修正や静的検証だけではAPK buildまたは実機実行の成功を宣言しない。Android workflowが通過した場合も、実機Runtime Logと画面の実機確認が終わるまでは DEVICE_VERIFIED と記載しない。
+- 正本設計書は引き続き本ファイル一つだけとする。
+
+
+# P224 設計書Revision検証の履歴互換性修正
+
+- P223を反映した後のGitHub Actions run 37930890971で、runtime failure verifierの35項目中34項目が通過し、唯一「Canonical design doc records P222」が失敗した。原因は、設計書の現行RevisionがP223へ進んだにもかかわらず、検証コードがヘッダーにもP222が残ることを要求していたためである。
+- 検証条件を、P222の履歴節が残ること、P223の修正節が残ること、先頭の正本Revisionヘッダーが日付付きP番号形式で存在することへ分離する。履歴を保ったまま現行Revisionを更新しても、履歴側の番号を理由に検証が失敗しないようにする。
+- P224の変更は検証コードと本正本だけを更新する。Actions run 37930890971は静的検証の段階で失敗しており、Kotlin compileやAPK buildは未実行であるため、この時点でAndroidコンパイル成功とは扱わない。修正後のActionsでNative contract、Web/Rust build、Kotlin compile、APK生成を再確認し、端末動作はRuntime Logと実機確認が終わるまで未検証とする。
 - 正本設計書は引き続き本ファイル一つだけとする。

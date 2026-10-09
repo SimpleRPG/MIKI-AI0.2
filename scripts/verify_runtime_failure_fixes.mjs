@@ -98,7 +98,13 @@ check('Legacy sanitizer persists no credential/PII/path/host mappings', sanitize
 check('Legacy sanitizer detects Android app-private paths', sanitizerLegacy.includes('data|storage|sdcard|system'));
 check('CORE sanitizer persists no credential/PII/path/host mappings', sanitizerCore.includes('TRANSIENT_SYMBOL_CATEGORIES') && sanitizerCore.includes('if (!TRANSIENT_SYMBOL_CATEGORIES.has(category)) this.saveMappings()'));
 check('CORE sanitizer detects Android app-private paths', sanitizerCore.includes('data|storage|sdcard|system'));
-check('Canonical design doc records P222', design.includes('# P222 Android Native Runner同期漏れ・CORE再開例外・Sudachi辞書Anchor・外部送信サニタイズ修正') && design.includes('正本Revision：2026-10-09-P222'));
+const designRevisionHeader = design.slice(0, 500).match(/^正本Revision：(\d{4}-\d{2}-\d{2}-P\d+)$/m);
+check(
+  'Canonical design doc preserves P222 history and current revision metadata',
+  design.includes('# P222 Android Native Runner同期漏れ・CORE再開例外・Sudachi辞書Anchor・外部送信サニタイズ修正') &&
+    design.includes('# P223 Android Kotlin reject型修正・Web検索サニタイズ経路の修復') &&
+    Boolean(designRevisionHeader)
+);
 
 const failures = checks.filter(item => !item.passed);
 for (const item of checks) console.log(`${item.passed ? 'PASS' : 'FAIL'} ${item.name}`);
