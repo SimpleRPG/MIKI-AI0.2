@@ -1,6 +1,6 @@
 import { systemLogger } from './systemLogger';
 
-export type StartupPhase='ENTRY'|'STORAGE_WAIT'|'APP_IMPORT'|'APP_RENDERED'|'SELF_CODE_SEED'|'RUNTIME_INIT'|'NATIVE_MORPHOLOGY'|'READY'|'FAILED';
+export type StartupPhase='ENTRY'|'STORAGE_WAIT'|'APP_IMPORT'|'APP_RENDERED'|'SELF_CODE_SEED'|'RUNTIME_INIT'|'NATIVE_MORPHOLOGY'|'READY'|'UI_READY'|'FAILED';
 export interface StartupDiagnostic{phase:StartupPhase;startedAt:number;updatedAt:number;message:string;error?:string;userAgent:string;}
 const KEY='miki_startup_diagnostic_v1';
 
@@ -30,6 +30,7 @@ class StartupRecoveryService{
    RUNTIME_INIT:'MIKIランタイム初期化',
    NATIVE_MORPHOLOGY:'日本語解析エンジン初期化',
    READY:'起動完了',
+   UI_READY:'画面操作可能',
    FAILED:'起動失敗'
   };
   return labels[phase];
@@ -54,8 +55,8 @@ class StartupRecoveryService{
   );
   try{localStorage.setItem(KEY,JSON.stringify(this.diagnostic));}catch{}
   this.renderStatus();
-  if(phase==='READY'){
-   window.setTimeout(()=>{if(this.diagnostic.phase==='READY')this.clear();},1500);
+  if(phase==='READY'||phase==='UI_READY'){
+   window.setTimeout(()=>{if(this.diagnostic.phase===phase)this.clear();},1500);
   }
   return {...this.diagnostic};
  }

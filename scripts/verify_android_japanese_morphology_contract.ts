@@ -10,11 +10,19 @@ const appPlugin = read('android/app/src/main/java/com/miki/ai/MIKIJapaneseMorpho
 const runner = read('android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt');
 const nativeCore = read('android/app/src/main/java/com/miki/ai/MIKINativeCore.kt');
 const app = read('src/App.tsx');
+const runtimeLifecycle = read('src/app/appRuntimeLifecycleService.ts');
+const participation = read('src/miki/core/services/domainParticipationService.ts');
+const startupRecovery = read('src/services/startupRecoveryService.ts');
 const service = read('src/miki/research/services/japaneseMorphologyService.ts');
 const guide = read('docs/JAPANESE_MORPHOLOGY_SUDACHI_ANDROID.md');
 
 const required: Array<[string, boolean]> = [
-  ['Native morphology does not block UI readiness', !app.includes('await waitForNativeMorphology()') && app.includes('void observeNativeMorphology();') && app.includes("startupRecoveryService.update('READY'")],
+  ['UI_READY precedes runtime initialization', app.includes("'UI_READY'") && app.indexOf("'UI_READY'") < app.indexOf('appRuntimeLifecycleService.initialize()')],
+  ['Runtime initialization yields and logs each stage', runtimeLifecycle.includes('await this.yieldToBrowser();') && runtimeLifecycle.includes('[RUNTIME_INIT] stage begin') && runtimeLifecycle.includes('[RUNTIME_INIT] stage complete') && runtimeLifecycle.includes('[RUNTIME_INIT] stage failed')],
+  ['Domain connectivity audit yields between route commands', participation.split('await yieldToBrowser();').length >= 4],
+  ['UI_READY clears the blocking startup overlay', startupRecovery.includes("UI_READY:'画面操作可能'") && startupRecovery.includes("phase==='READY'||phase==='UI_READY'")],
+  ['Background runtime failure is caught and logged', app.includes('[RUNTIME_INIT] background initialization stopped') && app.includes('appRuntimeLifecycleService.initialize().catch(')],
+  ['Native morphology does not block UI readiness', !app.includes('await waitForNativeMorphology()') && app.includes('void observeNativeMorphology();') && app.includes("'UI_READY'")],
   ['Heavy UI modules are not preloaded during startup', !app.includes('startupPhaseSchedulerService') && !app.includes('registerIdle(() => loadMemoryModal())') && !app.includes('registerIdle(() => loadImprovementHome())') && !app.includes('registerIdle(() => loadActivityMonitor())')],
   ['Mobile tab changes emit diagnostics', app.includes('[UI_NAV] bottom navigation tapped') && app.includes('[UI_NAV] mobile tab state changed')],
   ['Improvement tab does not preload on pointer or touch', !app.includes("onPointerEnter={() => { if (id === 'improvement') void loadImprovementHome(); }}") && !app.includes("onTouchStart={() => { if (id === 'improvement') void loadImprovementHome(); }}")],

@@ -32,57 +32,101 @@ import { selfImprovementMetricsService } from '../miki/improvement/services/self
 
 class AppRuntimeLifecycleService {
   private initialized = false;
+  private generation = 0;
 
-  initialize(): void {
-    if (this.initialized) {
-      return;
-    }
+  private yieldToBrowser(): Promise<void> {
+    return new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+  }
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
     this.initialized = true;
+    const generation = ++this.generation;
 
-    crossDomainCirculationService.initialize();
-    void domainIntegrationBootstrapService.initialize().catch((error) => {
-      // Bootstrap失敗をWebViewのunhandledrejectionへ再伝播させず、
-      // 既存SystemLoggerへ記録して他のruntime初期化を維持する。
-      systemLogger.warn(
-        'SYSTEM',
-        `[DomainIntegration] bootstrap failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    });
-    capabilityLearningService.initialize();
-    initializeChapter69to90();
-    componentArtifactStoreService.reconcile(componentRegistryService.getAllComponents());
-    autonomousHardeningService.reconcileHardeningResults();
-    resourceGovernanceService.initialize();
-    situationalAwarenessService.initialize();
+    const stages: Array<{ name: string; run: () => void | Promise<void> }> = [
+      { name: 'crossDomainCirculationService.initialize', run: () => crossDomainCirculationService.initialize() },
+      {
+        name: 'domainIntegrationBootstrapService.initialize',
+        run: async () => {
+          try {
+            await domainIntegrationBootstrapService.initialize();
+          } catch (error) {
+            systemLogger.warn(
+              'SYSTEM',
+              `[DomainIntegration] bootstrap failed: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        },
+      },
+      { name: 'capabilityLearningService.initialize', run: () => capabilityLearningService.initialize() },
+      { name: 'initializeChapter69to90', run: () => initializeChapter69to90() },
+      {
+        name: 'componentArtifactStoreService.reconcile',
+        run: () => { componentArtifactStoreService.reconcile(componentRegistryService.getAllComponents()); },
+      },
+      { name: 'autonomousHardeningService.reconcileHardeningResults', run: () => { autonomousHardeningService.reconcileHardeningResults(); } },
+      { name: 'resourceGovernanceService.initialize', run: () => resourceGovernanceService.initialize() },
+      { name: 'situationalAwarenessService.initialize', run: () => situationalAwarenessService.initialize() },
+      {
+        name: 'optional service references',
+        run: () => {
+          void automationStudioService;
+          void causalInvestigationService;
+          void benchmarkFactoryService;
+          void dataUnderstandingService;
+          void unknownResolutionService;
+          void reversibilityService;
+          void knowledgeOperatingSystemService;
+          void counterfactualWorkSimulatorService;
+          void personalApiGatewayService;
+        },
+      },
+      { name: 'improvementRegressionCoordinatorService.initialize', run: () => improvementRegressionCoordinatorService.initialize() },
+      { name: 'taskLineageService.initialize', run: () => taskLineageService.initialize() },
+      { name: 'taskCaseMemoryService.initialize', run: () => taskCaseMemoryService.initialize() },
+      { name: 'selfImprovementMetricsService.initialize', run: () => selfImprovementMetricsService.initialize() },
+      { name: 'improvementCanaryRollbackService.initialize', run: () => improvementCanaryRollbackService.initialize() },
+      { name: 'taskExecutionOrchestratorService.initialize', run: () => taskExecutionOrchestratorService.initialize() },
+      { name: 'recoveryOrchestratorService.initialize', run: () => recoveryOrchestratorService.initialize() },
+      { name: 'executionLearningCoordinatorService.initialize', run: () => executionLearningCoordinatorService.initialize() },
+      { name: 'failureUnderstandingService.initialize', run: () => failureUnderstandingService.initialize() },
+      { name: 'decisionLearningService.snapshot', run: () => { decisionLearningService.snapshot(); } },
+      { name: 'taskResultFeedbackService.initialize', run: () => taskResultFeedbackService.initialize() },
+      { name: 'taskConversationFeedbackService.initialize', run: () => taskConversationFeedbackService.initialize() },
+    ];
 
-    void automationStudioService;
-    void causalInvestigationService;
-    void benchmarkFactoryService;
-    void dataUnderstandingService;
-    void unknownResolutionService;
-    void reversibilityService;
-    void knowledgeOperatingSystemService;
-    void counterfactualWorkSimulatorService;
-    void personalApiGatewayService;
+    try {
+      for (const stage of stages) {
+        if (generation !== this.generation) return;
+        await this.yieldToBrowser();
+        if (generation !== this.generation) return;
 
-    improvementRegressionCoordinatorService.initialize();
-    taskLineageService.initialize();
-    taskCaseMemoryService.initialize();
-    selfImprovementMetricsService.initialize();
-    improvementCanaryRollbackService.initialize();
-    taskExecutionOrchestratorService.initialize();
-    recoveryOrchestratorService.initialize();
-    executionLearningCoordinatorService.initialize();
-    failureUnderstandingService.initialize();
-    decisionLearningService.snapshot();
-    taskResultFeedbackService.initialize();
-    taskConversationFeedbackService.initialize();
+        const startedAt = performance.now();
+        systemLogger.info('SYSTEM', '[RUNTIME_INIT] stage begin', { stage: stage.name });
+        try {
+          await stage.run();
+        } catch (error) {
+          systemLogger.error('SYSTEM', '[RUNTIME_INIT] stage failed', {
+            stage: stage.name,
+            elapsedMs: Math.round(performance.now() - startedAt),
+            errorType: error instanceof Error ? error.name : typeof error,
+          });
+          throw error;
+        }
+        systemLogger.info('SYSTEM', '[RUNTIME_INIT] stage complete', {
+          stage: stage.name,
+          elapsedMs: Math.round(performance.now() - startedAt),
+        });
+        await this.yieldToBrowser();
+      }
+    } catch (error) {
+      throw error;
+    }
   }
 
   dispose(): void {
-    if (!this.initialized) {
-      return;
-    }
+    this.generation += 1;
+    if (!this.initialized) return;
     this.initialized = false;
 
     taskConversationFeedbackService.dispose();
@@ -99,5 +143,4 @@ class AppRuntimeLifecycleService {
     capabilityLearningService.dispose();
   }
 }
-
 export const appRuntimeLifecycleService = new AppRuntimeLifecycleService();

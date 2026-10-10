@@ -357,12 +357,16 @@ export default function App() {
 
         if (disposed) return;
 
-        startupRecoveryService.update('RUNTIME_INIT', 'MIKIの認知・実行ランタイムを初期化しています');
-        await yieldToScreen();
-        appRuntimeLifecycleService.initialize();
-
         if (!disposed) {
-          startupRecoveryService.update('READY', 'MIKIの起動が完了しました');
+          startupRecoveryService.update(
+            'UI_READY',
+            'メイン画面を操作できます。ランタイム初期化はバックグラウンドで段階的に続行しています'
+          );
+          void appRuntimeLifecycleService.initialize().catch((error) => {
+            systemLogger.error('SYSTEM', '[RUNTIME_INIT] background initialization stopped', {
+              errorType: error instanceof Error ? error.name : typeof error,
+            });
+          });
           void observeNativeMorphology();
         }
       } catch (error) {

@@ -33,6 +33,8 @@ export interface DomainConnectivityAudit {
 
 const STORAGE_KEY = 'miki_domain_connectivity_audit_v1';
 
+const yieldToBrowser = (): Promise<void> => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
 const DOMAIN_CONTRIBUTIONS: Record<MikiDomain, { diagnosticResponsibility: string; evidenceContract: string[] }> = {
   core: { diagnosticResponsibility: '共通追跡、配送、整合性、停止条件の診断契約', evidenceContract: ['correlationId', 'taskId'] },
   autonomy: { diagnosticResponsibility: '自律実行条件、予算、再試行方針の診断契約', evidenceContract: ['autonomyPolicy'] },
@@ -73,8 +75,11 @@ class DomainParticipationService {
       try {
         const base = { correlationId: auditId, causationId: auditId, source: 'core' as MikiDomain, target: domain, evidenceIds: [] as string[], createdAt: startedAt, depth: 0 };
         const health = await domainRouterService.dispatch({ ...base, envelopeId: `${auditId}_${domain}_health`, command: 'HEALTH_CHECK', payload: { auditId } });
+        await yieldToBrowser();
         const participation = await domainRouterService.dispatch({ ...base, envelopeId: `${auditId}_${domain}_participate`, command: 'PARTICIPATE', payload: { auditId, taskId: auditId } });
+        await yieldToBrowser();
         const connection = await domainRouterService.dispatch({ ...base, envelopeId: `${auditId}_${domain}_connection`, command: 'VERIFY_CONNECTION', payload: { auditId } });
+        await yieldToBrowser();
         entries.push({ domain, healthAccepted: health.accepted, participationAccepted: participation.accepted, connectionAccepted: connection.accepted, order: entries.length + 1, error: health.error || participation.error || connection.error });
       } catch (error) {
         entries.push({ domain, healthAccepted: false, participationAccepted: false, connectionAccepted: false, order: entries.length + 1, error: error instanceof Error ? error.message : String(error) });

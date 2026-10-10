@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-10
-正本Revision：2026-10-10-P226
+正本Revision：2026-10-10-P227
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -23,14 +23,14 @@ MIKI-AI0.2 統合設計書・実装正本
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P226）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P227）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-10-P226
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-10-P227
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -91,8 +91,8 @@ MIKI-AI0.2 統合設計書・実装正本
 
 記載形式: [状態] Domain | ファイル | 行数 | Export/Class/Function | 呼出元数 | 依存数 | Storage/Plugin/Test/Marker。詳細な全配列、SHA-256、全呼出元・依存先はJSON正本索引を参照する。
 
-- [USED] UI | src/App.tsx | lines=4141 | symbols=App | callers=1 | deps=113 | Tests=18
-- [USED] OTHER | src/app/appRuntimeLifecycleService.ts | lines=103 | symbols=appRuntimeLifecycleService | callers=1 | deps=31 | Tests=1
+- [USED] UI | src/App.tsx | lines=4145 | symbols=App | callers=1 | deps=113 | Tests=18
+- [USED] OTHER | src/app/appRuntimeLifecycleService.ts | lines=146 | symbols=appRuntimeLifecycleService | callers=1 | deps=31 | Tests=1
 - [ORPHAN] OTHER | src/app/startupPhaseSchedulerService.ts | lines=3 | symbols=startupPhaseSchedulerService | callers=0 | deps=0 | Tests=2
 - [USED] OTHER | src/autonomous_modules/anaphora_history_stack.ts | lines=89 | symbols=AnaphoraHistoryStack, AnaphoraStackItem, anaphoraHistoryStack | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/anaphora_resolver_sample.ts | lines=162 | symbols=PureAnaphoraResolutionResult, resolveAnaphoraPure | callers=2 | deps=0
@@ -305,7 +305,7 @@ MIKI-AI0.2 統合設計書・実装正本
 - [USED] CORE | src/miki/core/services/domainIntegrationBootstrapService.ts | lines=860 | symbols=domainIntegrationBootstrapService | callers=4 | deps=67 | Tests=10
 - [USED] CORE | src/miki/core/services/domainOperationalAdapterService.ts | lines=101 | symbols=DomainOperationalSnapshot, domainOperationalAdapterService | callers=2 | deps=20
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/domainOwnershipCatalogService.ts | lines=30 | symbols=SourceOwnership, SourceOwnershipKind, getCoreCompatibilityGateways, getDomainOwnershipCatalog, resolveSourceOwnership | callers=1 | deps=2
-- [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=103 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
+- [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=108 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/domainReplyLedgerService.ts | lines=350 | symbols=ActionLineage, DomainReplyLedgerRecord, domainReplyLedgerService | callers=7 | deps=6 | Storage=miki_domain_reply_ledger_v1
 - [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=125 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1 / Tests=3
 - [USED] CORE | src/miki/core/services/domainSequentialConnectionService.ts | lines=35 | symbols=DomainConnectionReceipt, domainSequentialConnectionService | callers=1 | deps=2
@@ -933,7 +933,7 @@ MIKI-AI0.2 統合設計書・実装正本
 - [USED] LEGACY_OR_SHARED | src/services/skillsService.ts | lines=855 | symbols=INITIAL_SKILLS, isDistinctSkillContext, skillsService | callers=2 | deps=5 | Storage=miki_ai_skills_library
 - [ORPHAN] LEGACY_OR_SHARED | src/services/specAstParserService.ts | lines=160 | symbols=ConflictResolutionReport, NormativePriorityLevel, SpecAstDirectiveNode, specAstParserService | callers=0 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/specContractCompilerService.ts | lines=88 | symbols=ContractStatus, Norm, SpecContract, SpecContractClause, SpecContractCompilerService | callers=0 | deps=2 | Storage=miki_spec_contract_v1 / Tests=3
-- [USED] LEGACY_OR_SHARED | src/services/startupRecoveryService.ts | lines=11 | symbols=StartupDiagnostic, StartupPhase, startupRecoveryService | callers=1 | deps=0 | Storage=miki_startup_diagnostic_v1 / Tests=1
+- [USED] LEGACY_OR_SHARED | src/services/startupRecoveryService.ts | lines=190 | symbols=StartupDiagnostic, StartupPhase, startupRecoveryService | callers=1 | deps=0 | Storage=miki_startup_diagnostic_v1 / Tests=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/storagePlanningService.ts | lines=220 | symbols=StoragePlanningService, storagePlanningService | callers=0 | deps=4 | Storage=miki_storage_audit_log_v32
 - [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=653 | symbols=storageService | callers=295 | deps=1 | Tests=7
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/syntheticDataService.ts | lines=779 | symbols=SyntheticDataService, syntheticDataService, toolsService | callers=1 | deps=9 | Storage=miki_ai_synthetic_batches
@@ -11065,3 +11065,13 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - `scripts/verify_android_japanese_morphology_contract.ts` に、UI readinessとNative readinessの分離、起動先読みの撤去、タブ診断、Native lifecycle log、およびKotlin mirror一致の回帰検査を追加する。APK workflowが同検査を実行する。
 - これはソース構造と診断の修正である。Androidプロセスがホーム画面へ戻る事象の直接原因は、最新APKのNative crash/ANR/OS kill記録または実機再現で特定するまで確定扱いしない。静的検査やAPK build成功だけでは `DEVICE_VERIFIED` としない。P218/P219の起動状態Authority、P220のPreDraw handoff、P221のVite分割、CORE + 17分類、ローカルLLM非依存は変更しない。
 - 正本設計書は本ファイル一つだけとする。P222を基準とする全ファイル再帰インベントリは全件再集計していないため、P226では直接編集した `src/App.tsx`、削除したscheduler参照の到達状態、およびAndroid APK側Sudachi pluginの行数だけを現行値に更新する。
+
+# P227 Android起動中のUIブロック・18分類監査の時間分割修正
+
+- P226でNative形態素解析の待機はUI readinessから分離したが、`appRuntimeLifecycleService.initialize()` 自体は同期実行のままであり、完了するまで `startupRecoveryService` の全画面overlayが解除されなかった。実機ログは `RUNTIME_INIT` の途中で止まり、その後JavaScript起動入口へ再到達しているため、タブ処理よりも先に起動時の同期初期化を分割する。
+- 起動状態に `UI_READY` を追加する。これは「メイン画面は操作可能、ランタイム初期化は継続中」を表し、`READY`（初期化系列の完了）とは区別する。UI_READY到達後に全画面overlayを解除し、ランタイム初期化はバックグラウンドへ引き継ぐ。実際の初期化失敗はstageログへ記録し、エラー詳細やユーザー本文を追加ログへ複製しない。
+- 既存 `appRuntimeLifecycleService` の初期化順序は維持したまま、サービス単位のstageへ分割し、stage前後にブラウザのイベントループへ制御を返す。各stageの開始・完了・失敗と経過時間を記録する。失敗時にはstage名と例外型を記録し、後続の初期化を成功扱いで続行しない。
+- 既存 `domainParticipationService.auditAll()` はCORE + 17分類に対しHEALTH_CHECK、PARTICIPATE、VERIFY_CONNECTIONを順次実行する。各コマンドの完了後にイベントループへ制御を返し、永続履歴を書き換え続ける監査処理がモバイルUIの入力・描画を長時間塞がないようにする。監査対象、順番、契約、結果の判定基準は変えない。
+- `scripts/verify_android_japanese_morphology_contract.ts` に、UI_READYとランタイム初期化の順序、stage-yield、監査yield、overlay解除、バックグラウンド失敗処理の回帰検査を追加する。APK workflowは既存の同契約検証を継続利用する。
+- この修正は起動時のUIブロックを抑え、次に停止した箇所をstageログで特定可能にするもの。JS起動入口の再到達はWebViewまたはアプリプロセスの再初期化を示すが、Android本体の強制終了・WebView Renderer crash・ANRのどれかはLogcat等のNative記録なしに断定しない。静的検証・APK生成のみで `DEVICE_VERIFIED` と記載しない。
+- 正本設計書は本ファイル一つだけとする。完全再帰インベントリの全件再集計は行わず、P227で直接編集した4つの実装ファイルの行数だけを索引へ反映する。
