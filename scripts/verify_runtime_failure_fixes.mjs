@@ -22,6 +22,7 @@ const sanitizerLegacy = read('src/services/abstractSanitizerService.ts');
 const sanitizerCore = read('src/miki/safety/services/abstractSanitizerService.ts');
 const outboundHelper = read('src/miki/safety/services/outboundPayloadSanitizer.ts');
 const design = read('MIKI-AI0.2_統合設計書_正本.txt');
+const runtimeLogger = read('src/services/systemLogger.ts');
 const app = read('src/App.tsx');
 const chatPanel = read('src/components/ChatPanel.tsx');
 const domainContract = read('src/miki/core/services/domainContractRegistryService.ts');
@@ -183,6 +184,7 @@ check(
 
 const appIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] UI | src/App.tsx |'));
 const chatPanelIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] UI | src/components/ChatPanel.tsx |'));
+const loggerIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts |'));
 check(
   'Mobile viewport does not mount a hidden duplicate desktop ChatPanel',
   app.includes("window.matchMedia('(min-width: 768px)'") &&
@@ -217,17 +219,36 @@ check(
     chatPanel.includes("'[CHAT_UI] code verification failed'")
 );
 check(
-  'Canonical index line counts match the edited App and ChatPanel files',
+  'Canonical index line counts match edited runtime diagnostic source files',
   appIndexRow?.includes(`lines=${app.split(/\r?\n/).length - 1}`) &&
-    chatPanelIndexRow?.includes(`lines=${chatPanel.split(/\r?\n/).length - 1}`)
+    chatPanelIndexRow?.includes(`lines=${chatPanel.split(/\r?\n/).length - 1}`) &&
+    loggerIndexRow?.includes(`lines=${runtimeLogger.split(/\r?\n/).length - 1}`)
 );
 check(
-  'P230 design records the conversation tab overload mitigation',
-  designRevisionHeader?.[1] === '2026-10-10-P230' &&
+  'P231 design records runtime breadcrumbs and preserves P230 history',
+  designRevisionHeader?.[1] === '2026-10-10-P231' &&
     design.includes('# P230 会話タブ初回描画の重複マウント・履歴自動検証バースト抑制') &&
-    design.includes('P225/P226/P227/P228/P229/P230の対象ファイル変更後に全ファイル件数を再集計したものではない')
+    design.includes('# P231 同期Runtime Breadcrumb記録と次回起動時の回収') &&
+    design.includes('Runtime Breadcrumb Journal') &&
+    design.includes('P225/P226/P227/P228/P229/P230/P231の対象ファイル変更後に全ファイル件数を再集計したものではない')
 );
 
+check(
+  'Runtime breadcrumb journal is synchronous, bounded, and replayed on the next session',
+  runtimeLogger.includes("const RUNTIME_BREADCRUMB_STORAGE_KEY = 'miki_runtime_breadcrumb_journal_v1'") &&
+    runtimeLogger.includes('const MAX_RUNTIME_BREADCRUMBS = 64') &&
+    runtimeLogger.includes('const RUNTIME_BREADCRUMB_EVENTS = new Set([') &&
+    runtimeLogger.includes('const RUNTIME_BREADCRUMB_DETAIL_KEYS = new Set([') &&
+    runtimeLogger.includes('RUNTIME_BREADCRUMB_DETAIL_KEYS.has(key)') &&
+    runtimeLogger.includes('pairs.length <= 12') &&
+    runtimeLogger.includes('public recordRuntimeBreadcrumb(event: string') &&
+    runtimeLogger.includes("this.recordRuntimeBreadcrumb('JS_ENTRY')") &&
+    runtimeLogger.includes('window.localStorage.setItem(') &&
+    runtimeLogger.includes('entry.sessionId !== this.runtimeBreadcrumbSessionId') &&
+    runtimeLogger.includes('RUNTIME_BREADCRUMB_RECOVERED') &&
+    runtimeLogger.includes('sessionId=${entry.sessionId}') &&
+    runtimeLogger.includes('replayPreviousRuntimeBreadcrumbs')
+);
 const failures = checks.filter(item => !item.passed);
 for (const item of checks) console.log(`${item.passed ? 'PASS' : 'FAIL'} ${item.name}`);
 console.log(JSON.stringify({ passed: failures.length === 0, total: checks.length, failed: failures.map(item => item.name) }, null, 2));

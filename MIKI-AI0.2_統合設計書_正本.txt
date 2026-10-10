@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-10
-正本Revision：2026-10-10-P230
+正本Revision：2026-10-10-P231
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -117,8 +117,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-10-P230
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-10-P231
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -1025,7 +1025,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [ORPHAN] LEGACY_OR_SHARED | src/services/storagePlanningService.ts | lines=220 | symbols=StoragePlanningService, storagePlanningService | callers=0 | deps=4 | Storage=miki_storage_audit_log_v32
 - [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=653 | symbols=storageService | callers=295 | deps=1 | Tests=7
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/syntheticDataService.ts | lines=779 | symbols=SyntheticDataService, syntheticDataService, toolsService | callers=1 | deps=9 | Storage=miki_ai_synthetic_batches
-- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=717 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
+- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=921 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
 - [USED] LEGACY_OR_SHARED | src/services/taskCaseMemoryService.ts | lines=45 | symbols=TaskCaseMaturity, TaskCaseMemoryService, TaskCaseOutcome, TaskCaseRecord, taskCaseMemoryService | callers=4 | deps=5
 - [USED] LEGACY_OR_SHARED | src/services/taskExecutionOrchestratorService.ts | lines=237 | symbols=TaskExecutionHandle, TaskExecutionOrchestratorService, TaskExecutionStatus, taskExecutionOrchestratorService | callers=1 | deps=15
 - [USED] LEGACY_OR_SHARED | src/services/taskLineageService.ts | lines=45 | symbols=TaskLineageRecord, TaskLineageService, taskLineageService | callers=1 | deps=2
@@ -7373,6 +7373,14 @@ Runtime初期化失敗まで連続して追跡可能にする。
 Downloadsへの永続化が利用できない場合も起動処理を停止させず、既存のSystemLogger、
 永続Storage、Console側の診断を維持する。実機未確認の場合はDEVICE_VERIFIEDと記載しない。
 
+`Runtime Breadcrumb Journal` は既存 `systemLogger` 内の一時診断journalであり、
+WebViewのlocalStorageへ同期記録する。Journalは最大64件を保持し、
+イベント識別子と上限付きの文字列・数値・真偽値だけを保存し、会話本文・入力文・コード本文は保存しない。
+次回JavaScript entryでは、異なるsessionIdの未復元breadcrumbを既存 `MIKI_RUNTIME_LOG.txt` へ
+まとめて追記し、Native書込成功後に復元済みIDだけをJournalから除く。書込みに失敗した場合は
+Journalを残し、起動を阻害しない。これは第二Loggerではなく、既存systemLoggerのクラッシュ耐性用一時記録層である。
+復元された直近イベントは停止前に確認できた処理段階の証拠であり、OS kill/WebView Renderer crash/ANRの原因を直接確定しない。
+
 Runtimeログの粒度は「正常経路を短く、停止点を詳しく」とする。
 - 正常なStartup / CORE routing / Domain dispatch / 再評価 / Task完了は、段階・対象・結果を1行程度で記録し、既存の詳細Traceを別系統で重複出力しない。
 - WARNは、再試行・待機・一時停止など「まだ停止ではない状態」を短く記録する。
@@ -11183,4 +11191,13 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 会話履歴のDOM初回描画は直近20件に制限し、以前の会話は20件ずつ追加表示できるようにした。保存済み履歴そのものは削除しない。`[CHAT_UI]` 診断ログには会話本文を含めず、件数、ワークスペースファイル数、利用可能なJS heap値、検証の経過時間・結果属性・例外型だけを記録する。
 - `scripts/verify_runtime_failure_fixes.mjs` に、デスクトップUIの条件付きマウント、既存履歴検証の抑止、新規検証の逐次化・重複防止、履歴の段階表示、設計索引の行数整合、P230記録の回帰検査を追加した。
 - 今回の修正は、会話タブを開く時の二重マウントと過去履歴の自動検証バーストという再現し得る負荷経路への対策である。ユーザー報告の強制終了の正確なOS／WebView原因を確定したものではない。Native crash・ANR・OS kill記録と更新APKでの再現確認が終わるまでは `DEVICE_VERIFIED` としない。
-- 正本は本ファイル一つだけとする。完全再帰インベントリ全体は再集計していない。今回直接編集した `src/App.tsx` と `src/components/ChatPanel.tsx` の索引行数のみ実際のソースから更新した。
+- 正本は本ファイル一つだけとする。完全再帰インベントリ全体は再集計していない。今回直接編集した `src/services/systemLogger.ts` の索引行数のみ実際のソースから更新した。
+
+# P231 同期Runtime Breadcrumb記録と次回起動時の回収
+
+- 既存SystemLoggerのDownloads追記は非同期キュー経由のため、プロセス終了のタイミングによっては最後の操作記録がファイルへ到達しない可能性がある。Native Logcatが取得できない条件でも処理段階の証拠を残せるよう、既存Loggerへ限定的なJournalを追加する。
+- P231の第1段階では第二Loggerを作らず、既存 `systemLogger` に最大64件のRuntime Breadcrumb Journalと次回起動時の回収処理を追加する。記録はWebView localStorageへ同期し、イベント名と限定されたscalar metadataだけを保持する。会話本文、入力文、コード本文、例外messageはbreadcrumbへ保存しない。
+- `systemLogger.initializeRuntimeLogFile()` の開始時にJS_ENTRYを同期Journalへ記録し、Native log sinkを初期化する。通常のSystemLoggerログと併存する回収行は `RUNTIME_BREADCRUMB_RECOVERED` と識別する。画面操作と追加ライフサイクルの計測は第2段階で、既存入口へ接続する。
+- 次回JavaScript entryでは、現在のsessionIdとは異なるセッションのjournalを既存 `MIKI_RUNTIME_LOG.txt` へまとめて追記し、Native追記成功後に復元したIDだけをJournalから除く。Native追記できない場合はJournalを残して起動を続ける。追記成功後、Journalの掃除前にプロセスが終了した場合は回収行が重複する可能性があり、欠落回避を優先したat-least-once方式とする。
+- `scripts/verify_runtime_failure_fixes.mjs` と `scripts/verify_runtime_logging_phase1.mjs`、`npm run build`、GitHub Actionsで静的・CI検証し、実機ログの再取得までは `DEVICE_VERIFIED` としない。タブとChatPanelのイベント接続は第2段階で既存画面へ統合する。
+- この変更はOS kill、WebView Renderer crash、ANRの個別原因を確定するものではない。Recovered breadcrumbは停止直前に記録できた最終段階を示す補助証拠として扱う。

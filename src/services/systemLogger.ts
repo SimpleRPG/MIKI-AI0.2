@@ -6,6 +6,28 @@ interface RuntimeLogFilePlugin {
 }
 
 const RUNTIME_LOG_FILE_NAME = 'MIKI_RUNTIME_LOG.txt';
+const RUNTIME_BREADCRUMB_STORAGE_KEY = 'miki_runtime_breadcrumb_journal_v1';
+const MAX_RUNTIME_BREADCRUMBS = 64;
+const RUNTIME_BREADCRUMB_EVENTS = new Set([
+  'JS_ENTRY', 'WINDOW_UNHANDLED_REJECTION', 'WINDOW_ERROR',
+  'APP_VISIBILITY_HIDDEN', 'APP_PAGEHIDE', 'APP_BEFORE_UNLOAD', 'APP_ROOT_RENDER_SUBMITTED', 'BOOTSTRAP_FAILED',
+  'UI_NAV_TAP', 'UI_NAV_STATE_COMMITTED', 'CHAT_PANEL_MOUNT_EFFECT',
+  'CHAT_CODE_VERIFICATION_BEGIN', 'CHAT_CODE_VERIFICATION_COMPLETE', 'CHAT_CODE_VERIFICATION_FAILED',
+]);
+const RUNTIME_BREADCRUMB_DETAIL_KEYS = new Set([
+  'tab', 'from', 'to', 'visibility', 'usedJSHeapMB', 'messageCount', 'historicalCodeMessageCount',
+  'workspaceFileCount', 'initiallyRenderedMessages', 'elapsedMs', 'syntaxPassed', 'testsPassed',
+  'cyclesFound', 'errorType', 'reasonType', 'lineNumber', 'columnNumber', 'filenamePresent', 'suppressed',
+]);
+
+interface RuntimeBreadcrumb {
+  id: string;
+  sessionId: string;
+  timestamp: string;
+  epoch: number;
+  event: string;
+  details: Record<string, string | number | boolean | null>;
+}
 export interface SystemLogEntry {
   id: string;
   timestamp: string;
@@ -100,6 +122,7 @@ class SystemLogger {
   private runtimeLogFileInitPromise: Promise<boolean> | null = null;
   private runtimeLogFilePlugin: RuntimeLogFilePlugin | null = null;
   private runtimeLogFileQueue = Promise.resolve();
+  private readonly runtimeBreadcrumbSessionId = `RBS-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -128,12 +151,14 @@ class SystemLogger {
     }
 
     this.runtimeLogFileInitPromise = (async () => {
+      this.recordRuntimeBreadcrumb('JS_ENTRY');
       const { Capacitor, registerPlugin } = await import('@capacitor/core');
       if (!Capacitor.isNativePlatform()) {
         return false;
       }
       this.runtimeLogFilePlugin ??= registerPlugin<RuntimeLogFilePlugin>('MIKINativeRunner');
       await this.runtimeLogFilePlugin.ensureRuntimeLogFile({ filename: RUNTIME_LOG_FILE_NAME });
+      await this.replayPreviousRuntimeBreadcrumbs();
       return true;
     })()
       .then((ready) => {
@@ -148,6 +173,100 @@ class SystemLogger {
       });
 
     return this.runtimeLogFileInitPromise;
+  }
+
+  private readRuntimeBreadcrumbs(): RuntimeBreadcrumb[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(RUNTIME_BREADCRUMB_STORAGE_KEY);
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((entry): entry is RuntimeBreadcrumb => {
+        if (entry === null || typeof entry !== 'object') return false;
+        const candidate = entry as Partial<RuntimeBreadcrumb>;
+        if (
+          typeof candidate.id !== 'string' || candidate.id.length > 80 ||
+          typeof candidate.sessionId !== 'string' || candidate.sessionId.length > 80 ||
+          typeof candidate.timestamp !== 'string' || candidate.timestamp.length > 40 ||
+          typeof candidate.epoch !== 'number' || !Number.isFinite(candidate.epoch) ||
+          typeof candidate.event !== 'string' || !RUNTIME_BREADCRUMB_EVENTS.has(candidate.event) ||
+          candidate.details === null || typeof candidate.details !== 'object' || Array.isArray(candidate.details)
+        ) return false;
+        const pairs = Object.entries(candidate.details);
+        return pairs.length <= 12 && pairs.every(([key, value]) =>
+          RUNTIME_BREADCRUMB_DETAIL_KEYS.has(key) && (
+            value === null || typeof value === 'boolean' ||
+            (typeof value === 'number' && Number.isFinite(value)) ||
+            (typeof value === 'string' && value.length <= 100 && !/[\r\n\t]/.test(value))
+          )
+        );
+      }).slice(-MAX_RUNTIME_BREADCRUMBS);
+    } catch {
+      return [];
+    }
+  }
+
+  private writeRuntimeBreadcrumbs(entries: RuntimeBreadcrumb[]): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        RUNTIME_BREADCRUMB_STORAGE_KEY,
+        JSON.stringify(entries.slice(-MAX_RUNTIME_BREADCRUMBS)),
+      );
+    } catch {
+      // Diagnostics must never block app startup or navigation.
+    }
+  }
+
+  /**
+   * Synchronously journal only bounded event metadata before asynchronous Native log append.
+   * Never pass conversation text, prompt text, source code, or exception messages here.
+   */
+  public recordRuntimeBreadcrumb(event: string, details: Record<string, unknown> = {}): void {
+    if (typeof window === 'undefined' || !RUNTIME_BREADCRUMB_EVENTS.has(event)) return;
+    const safeDetails: RuntimeBreadcrumb['details'] = {};
+    Object.entries(details).slice(0, 12).forEach(([key, value]) => {
+      if (!RUNTIME_BREADCRUMB_DETAIL_KEYS.has(key)) return;
+      if (typeof value === 'string') {
+        safeDetails[key] = value.replace(/[\r\n\t]/g, ' ').slice(0, 100);
+      } else if (typeof value === 'number' && Number.isFinite(value)) {
+        safeDetails[key] = value;
+      } else if (typeof value === 'boolean' || value === null) {
+        safeDetails[key] = value;
+      }
+    });
+
+    const now = Date.now();
+    const entry: RuntimeBreadcrumb = {
+      id: `rb_${now}_${Math.random().toString(36).slice(2, 8)}`,
+      sessionId: this.runtimeBreadcrumbSessionId,
+      timestamp: new Date(now).toISOString(),
+      epoch: now,
+      event,
+      details: safeDetails,
+    };
+    const journal = this.readRuntimeBreadcrumbs();
+    journal.push(entry);
+    this.writeRuntimeBreadcrumbs(journal);
+  }
+
+  private async replayPreviousRuntimeBreadcrumbs(): Promise<void> {
+    if (typeof window === 'undefined' || !this.runtimeLogFilePlugin) return;
+    const previous = this.readRuntimeBreadcrumbs()
+      .filter((entry) => entry.sessionId !== this.runtimeBreadcrumbSessionId)
+      .slice(-MAX_RUNTIME_BREADCRUMBS);
+    if (previous.length === 0) return;
+
+    const line = previous.map((entry) =>
+      `[${entry.timestamp}] [INFO ] [SYSTEM            ] [RUNTIME_BREADCRUMB_RECOVERED] event=${entry.event} sessionId=${entry.sessionId} id=${entry.id} details=${JSON.stringify(entry.details)}\n`
+    ).join('');
+    try {
+      await this.runtimeLogFilePlugin.appendRuntimeLog({ filename: RUNTIME_LOG_FILE_NAME, line });
+      const recoveredIds = new Set(previous.map((entry) => entry.id));
+      this.writeRuntimeBreadcrumbs(this.readRuntimeBreadcrumbs().filter((entry) => !recoveredIds.has(entry.id)));
+    } catch (error) {
+      console.warn('[SystemLogger] runtime breadcrumb replay failed', error instanceof Error ? error.name : typeof error);
+    }
   }
 
   private queueRuntimeLogFile(entry: SystemLogEntry): void {
