@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-10
-正本Revision：2026-10-10-P225
+正本Revision：2026-10-10-P226
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -23,14 +23,14 @@ MIKI-AI0.2 統合設計書・実装正本
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P225）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P226）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-10-P225
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-10-P226
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -91,9 +91,9 @@ MIKI-AI0.2 統合設計書・実装正本
 
 記載形式: [状態] Domain | ファイル | 行数 | Export/Class/Function | 呼出元数 | 依存数 | Storage/Plugin/Test/Marker。詳細な全配列、SHA-256、全呼出元・依存先はJSON正本索引を参照する。
 
-- [USED] UI | src/App.tsx | lines=4053 | symbols=App | callers=1 | deps=114 | Tests=18
+- [USED] UI | src/App.tsx | lines=4141 | symbols=App | callers=1 | deps=113 | Tests=18
 - [USED] OTHER | src/app/appRuntimeLifecycleService.ts | lines=103 | symbols=appRuntimeLifecycleService | callers=1 | deps=31 | Tests=1
-- [USED] OTHER | src/app/startupPhaseSchedulerService.ts | lines=3 | symbols=startupPhaseSchedulerService | callers=1 | deps=0 | Tests=2
+- [ORPHAN] OTHER | src/app/startupPhaseSchedulerService.ts | lines=3 | symbols=startupPhaseSchedulerService | callers=0 | deps=0 | Tests=2
 - [USED] OTHER | src/autonomous_modules/anaphora_history_stack.ts | lines=89 | symbols=AnaphoraHistoryStack, AnaphoraStackItem, anaphoraHistoryStack | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/anaphora_resolver_sample.ts | lines=162 | symbols=PureAnaphoraResolutionResult, resolveAnaphoraPure | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/chapter_31_collocation_ast_refactor.ts | lines=88 | symbols=AstRefactorProposal, Chapter31CollocationAstService, CollocationMatch, chapter31Service | callers=1 | deps=0
@@ -969,7 +969,7 @@ MIKI-AI0.2 統合設計書・実装正本
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/capacitor.build.gradle | lines=20 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java | lines=26 | symbols=ExampleInstrumentedTest | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/AndroidManifest.xml | lines=44 | symbols=- | callers=0 | deps=0
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt | lines=131 | symbols=MIKIJapaneseMorphologyPlugin | callers=0 | deps=0 | Plugin=MIKIJapaneseMorphology
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt | lines=150 | symbols=MIKIJapaneseMorphologyPlugin | callers=0 | deps=0 | Plugin=MIKIJapaneseMorphology
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeCore.kt | lines=155 | symbols=NativeCoreHealth | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt | lines=782 | symbols=MIKINativeRunnerPlugin, NativeTestContext, NativeTestOutcome | callers=0 | deps=0 | Plugin=MIKINativeRunner
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=94 | symbols=MainActivity | callers=0 | deps=0
@@ -11056,3 +11056,12 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 正本は引き続き本ファイルのみ。P222〜P224の履歴は削除せず保持する。完全再帰実装インベントリはP222を基礎にしており、P225で変更したファイルについて全件数を再算出したとは扱わない。
 - 未完了の検証境界：ソース変更・静的検証とGitHub Actionsは別に判定する。APK build成功のみでDEVICE_VERIFIEDとは扱わない。更新APKでのRuntime detail再取得により、旧Task移行、`ANALYZE_TEXT` の契約拒否解消、自己改善Taskの再評価が実際に行われたことを確認する。
 
+# P226 Androidモバイルタブ応答性・Native形態素解析の独立化・診断ログ
+
+- P218で定義した「UIはNative形態素解析より先に利用可能とし、Native解析の準備状態とUIの描画完了を分離する」という契約に対し、現行 `src/App.tsx` は `waitForNativeMorphology()` を `READY` 前にawaitし、最大約60秒まで全画面起動表示を残す実装になっていた。P226ではこのブロッキング待機を削除し、初期コード資産の準備と既存 `appRuntimeLifecycleService.initialize()` の完了後にUIを `READY` とし、Native形態素解析の状態観測はバックグラウンドで継続する。
+- 起動時のIdle preloadで `MemoryModal`、`AutonomousImprovementHome`、`RealtimeActivityMonitorModal` をまとめてimportしていた経路を削除する。モジュール自体と既存の動的importは保持し、実際に機能が要求された際に読み込む。モバイル下部ナビゲーションの改善タブもpointer/touch開始時の先読みを削除し、クリック操作の前に重い画面を起動しない。
+- モバイル下部ナビゲーションのタップとReact state反映後に、遷移元・遷移先、document visibility、Chromiumが提供する場合だけJS heap使用量を `systemLogger` へ記録する。会話本文やユーザーデータは記録しない。これらのログはタップ受付と画面切替まで到達したかを区別するための診断Evidenceであり、OSによるプロセス終了やNative crashの原因を単独で断定するものではない。
+- AndroidのSudachi pluginは、既存の非同期初期化Threadを維持し、`SUDACHI_INIT_BEGIN`、`SUDACHI_INIT_READY`、`SUDACHI_INIT_FAILED` をLogcatへ出力する。成功ログにはVersion・経過時間・辞書byte数、失敗ログには経過時間・例外型のみを含め、例外メッセージやユーザーデータを追加ログへ複製しない。canonical sourceとAPK source mirrorの実装を同一に維持する。
+- `scripts/verify_android_japanese_morphology_contract.ts` に、UI readinessとNative readinessの分離、起動先読みの撤去、タブ診断、Native lifecycle log、およびKotlin mirror一致の回帰検査を追加する。APK workflowが同検査を実行する。
+- これはソース構造と診断の修正である。Androidプロセスがホーム画面へ戻る事象の直接原因は、最新APKのNative crash/ANR/OS kill記録または実機再現で特定するまで確定扱いしない。静的検査やAPK build成功だけでは `DEVICE_VERIFIED` としない。P218/P219の起動状態Authority、P220のPreDraw handoff、P221のVite分割、CORE + 17分類、ローカルLLM非依存は変更しない。
+- 正本設計書は本ファイル一つだけとする。P222を基準とする全ファイル再帰インベントリは全件再集計していないため、P226では直接編集した `src/App.tsx`、削除したscheduler参照の到達状態、およびAndroid APK側Sudachi pluginの行数だけを現行値に更新する。

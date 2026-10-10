@@ -5,7 +5,6 @@ import { typedCoreUiGatewayService } from './miki/core/ui/typedCoreUiGatewayServ
 import { improvementCanaryRollbackService } from './miki/improvement/services/improvementCanaryRollbackService';
 import React, { useState, useEffect, useRef } from 'react';
 import { appRuntimeLifecycleService } from './app/appRuntimeLifecycleService';
-import { startupPhaseSchedulerService } from './app/startupPhaseSchedulerService';
 import { startupRecoveryService } from './services/startupRecoveryService';
 import { japaneseMorphologyService } from './miki/research/services/japaneseMorphologyService';
 import { selfCodeSpaceService } from './miki/core/services/selfCodeSpaceService';
@@ -301,9 +300,6 @@ export default function App() {
   const [isEvolutionRunning, setIsEvolutionRunning] = useState<boolean>(false);
 
   useEffect(() => {
-    startupPhaseSchedulerService.registerIdle(() => loadMemoryModal());
-    startupPhaseSchedulerService.registerIdle(() => loadImprovementHome());
-    startupPhaseSchedulerService.registerIdle(() => loadActivityMonitor());
 
     let disposed = false;
 
@@ -311,40 +307,45 @@ export default function App() {
       window.requestAnimationFrame(() => resolve());
     });
 
-    const waitForNativeMorphology = async () => {
+    const observeNativeMorphology = async () => {
       if (!Capacitor.isNativePlatform()) return;
 
-      startupRecoveryService.update(
-        'NATIVE_MORPHOLOGY',
-        'Android Native日本語解析エンジンの現在状態を確認しています'
-      );
-      await yieldToScreen();
+      const startedAt = performance.now();
+      let previousState = '';
 
-      for (let attempt = 0; attempt < 300 && !disposed; attempt += 1) {
-        const status = await japaneseMorphologyService.status();
+      try {
+        for (let attempt = 0; attempt < 120 && !disposed; attempt += 1) {
+          const status = await japaneseMorphologyService.status();
+          const state = status.state || (status.available ? 'READY' : 'UNAVAILABLE');
 
-        if (status.state === 'INITIALIZING') {
-          startupRecoveryService.update(
-            'NATIVE_MORPHOLOGY',
-            status.message || 'Sudachi辞書を準備しています'
-          );
-          await new Promise<void>((resolve) => window.setTimeout(resolve, 200));
-          continue;
+          if (state !== previousState) {
+            const reasonCode =
+              typeof status.reason === 'string' && /^[A-Z0-9_]+$/.test(status.reason)
+                ? status.reason
+                : undefined;
+            systemLogger.info('SYSTEM', '[NATIVE_MORPHOLOGY] state changed', {
+              state,
+              available: status.available,
+              dictionaryVersion: status.dictionaryVersion,
+              reasonCode,
+              elapsedMs: Math.round(performance.now() - startedAt),
+            });
+            previousState = state;
+          }
+
+          if (state !== 'INITIALIZING') return;
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 500));
         }
 
-        if (status.state === 'READY') {
-          startupRecoveryService.update(
-            'NATIVE_MORPHOLOGY',
-            status.message || 'Sudachi日本語解析エンジンの準備が完了しました'
-          );
-          return;
+        if (!disposed) {
+          systemLogger.warn('SYSTEM', '[NATIVE_MORPHOLOGY] status observation timed out', {
+            elapsedMs: Math.round(performance.now() - startedAt),
+          });
         }
-
-        startupRecoveryService.update(
-          'NATIVE_MORPHOLOGY',
-          status.message || status.reason || '日本語解析エンジンは利用できません。Web側のフォールバックを使用します'
-        );
-        return;
+      } catch (error) {
+        systemLogger.error('SYSTEM', '[NATIVE_MORPHOLOGY] status observation failed', {
+          errorType: error instanceof Error ? error.name : typeof error,
+        });
       }
     };
 
@@ -360,11 +361,9 @@ export default function App() {
         await yieldToScreen();
         appRuntimeLifecycleService.initialize();
 
-        await waitForNativeMorphology();
-
         if (!disposed) {
-          startupPhaseSchedulerService.startIdle();
           startupRecoveryService.update('READY', 'MIKIの起動が完了しました');
+          void observeNativeMorphology();
         }
       } catch (error) {
         const rootElement = document.getElementById('root');
@@ -379,6 +378,18 @@ export default function App() {
       appRuntimeLifecycleService.dispose();
     };
   }, []);
+
+  useEffect(() => {
+    const memory = (performance as any).memory;
+    systemLogger.info('SYSTEM', '[UI_NAV] mobile tab state changed', {
+      tab: mobileTab,
+      visibilityState: document.visibilityState,
+      usedJSHeapMB:
+        typeof memory?.usedJSHeapSize === 'number'
+          ? Math.round((memory.usedJSHeapSize / 1048576) * 10) / 10
+          : undefined,
+    });
+  }, [mobileTab]);
 
   useEffect(() => {
     const unsub = taskConversationFeedbackService.subscribe((feedback) => {
@@ -4079,7 +4090,19 @@ export default function App() {
               { id: 'library', label: 'ライブラリ', Icon: Library },
               { id: 'settings', label: '設定', Icon: Settings },
             ].map(({ id, label, Icon }) => (
-              <button key={id} onPointerEnter={() => { if (id === 'improvement') void loadImprovementHome(); }} onTouchStart={() => { if (id === 'improvement') void loadImprovementHome(); }} onClick={() => setMobileTab(id as typeof mobileTab)} aria-current={mobileTab === id ? 'page' : undefined} className={`min-h-12 flex-1 rounded-xl py-1.5 flex flex-col items-center justify-center gap-1 transition-all ${mobileTab === id ? 'bg-indigo-500/10 text-indigo-300 font-bold' : 'text-slate-400 hover:text-slate-200'}`}>
+              <button key={id} onClick={() => {
+                const memory = (performance as any).memory;
+                systemLogger.info('SYSTEM', '[UI_NAV] bottom navigation tapped', {
+                  from: mobileTab,
+                  to: id,
+                  visibilityState: document.visibilityState,
+                  usedJSHeapMB:
+                    typeof memory?.usedJSHeapSize === 'number'
+                      ? Math.round((memory.usedJSHeapSize / 1048576) * 10) / 10
+                      : undefined,
+                });
+                setMobileTab(id as typeof mobileTab);
+              }} aria-current={mobileTab === id ? 'page' : undefined} className={`min-h-12 flex-1 rounded-xl py-1.5 flex flex-col items-center justify-center gap-1 transition-all ${mobileTab === id ? 'bg-indigo-500/10 text-indigo-300 font-bold' : 'text-slate-400 hover:text-slate-200'}`}>
                 <Icon className="h-5 w-5" />
                 <span className="text-[10px] leading-none">{label}</span>
               </button>

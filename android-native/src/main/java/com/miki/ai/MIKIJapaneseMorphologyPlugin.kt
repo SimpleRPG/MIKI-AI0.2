@@ -1,6 +1,8 @@
 package com.miki.ai
 
 import android.content.Context
+import android.os.SystemClock
+import android.util.Log
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -14,7 +16,11 @@ import java.io.File
 
 @CapacitorPlugin(name = "MIKIJapaneseMorphology")
 class MIKIJapaneseMorphologyPlugin : Plugin() {
-    companion object { private const val DICT_ASSET = "system_core.dic"; private const val VERSION = "20260723-core" }
+    companion object {
+        private const val TAG = "MIKIJapaneseMorph"
+        private const val DICT_ASSET = "system_core.dic"
+        private const val VERSION = "20260723-core"
+    }
     @Volatile
     private var tokenizer: Tokenizer? = null
     @Volatile
@@ -25,17 +31,30 @@ class MIKIJapaneseMorphologyPlugin : Plugin() {
     override fun load() {
         super.load()
         Thread {
+            val startedAt = SystemClock.elapsedRealtime()
+            Log.i(TAG, "SUDACHI_INIT_BEGIN version=$VERSION")
             try {
                 initializationState = "INITIALIZING"
                 initializationMessage = "Sudachi辞書を準備中です"
                 tokenizer = createTokenizer(context)
                 initializationState = "READY"
                 initializationMessage = "Sudachi日本語解析エンジンの準備が完了しました"
+                val dictionaryBytes = File(context.filesDir, DICT_ASSET).length()
+                Log.i(
+                    TAG,
+                    "SUDACHI_INIT_READY version=$VERSION elapsedMs=${SystemClock.elapsedRealtime() - startedAt} dictionaryBytes=$dictionaryBytes"
+                )
             } catch (error: Throwable) {
                 tokenizer = null
                 initializationState = "FAILED"
                 initializationMessage = "Sudachi初期化に失敗しました: ${error.message ?: error.javaClass.simpleName}"
+                Log.e(
+                    TAG,
+                    "SUDACHI_INIT_FAILED elapsedMs=${SystemClock.elapsedRealtime() - startedAt} errorType=${error.javaClass.simpleName}"
+                )
             }
+        }.apply {
+            name = "MIKI-Sudachi-Init"
         }.start()
     }
 

@@ -9,10 +9,17 @@ const plugin = read('android-native/src/main/java/com/miki/ai/MIKIJapaneseMorpho
 const appPlugin = read('android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt');
 const runner = read('android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt');
 const nativeCore = read('android/app/src/main/java/com/miki/ai/MIKINativeCore.kt');
+const app = read('src/App.tsx');
 const service = read('src/miki/research/services/japaneseMorphologyService.ts');
 const guide = read('docs/JAPANESE_MORPHOLOGY_SUDACHI_ANDROID.md');
 
 const required: Array<[string, boolean]> = [
+  ['Native morphology does not block UI readiness', !app.includes('await waitForNativeMorphology()') && app.includes('void observeNativeMorphology();') && app.includes("startupRecoveryService.update('READY'")],
+  ['Heavy UI modules are not preloaded during startup', !app.includes('startupPhaseSchedulerService') && !app.includes('registerIdle(() => loadMemoryModal())') && !app.includes('registerIdle(() => loadImprovementHome())') && !app.includes('registerIdle(() => loadActivityMonitor())')],
+  ['Mobile tab changes emit diagnostics', app.includes('[UI_NAV] bottom navigation tapped') && app.includes('[UI_NAV] mobile tab state changed')],
+  ['Improvement tab does not preload on pointer or touch', !app.includes("onPointerEnter={() => { if (id === 'improvement') void loadImprovementHome(); }}") && !app.includes("onTouchStart={() => { if (id === 'improvement') void loadImprovementHome(); }}")],
+  ['Canonical and packaged morphology sources match', plugin === appPlugin],
+  ['Morphology initialization emits lifecycle diagnostics', plugin.includes('SUDACHI_INIT_BEGIN') && plugin.includes('SUDACHI_INIT_READY') && plugin.includes('SUDACHI_INIT_FAILED') && appPlugin.includes('SUDACHI_INIT_BEGIN') && appPlugin.includes('SUDACHI_INIT_READY') && appPlugin.includes('SUDACHI_INIT_FAILED')],
   ['Sudachi Java 0.8.1', /sudachi:0\.8\.1/.test(script)],
   ['SudachiDict 20260723', /DICT_VERSION="20260723"/.test(script)],
   ['SudachiDict official core URL', /DICT_URL="https:\/\/d2ej7fkh96fzlu\.cloudfront\.net\/sudachidict\/sudachi-dictionary-\$\{DICT_VERSION\}-core\.zip"/.test(script)],
