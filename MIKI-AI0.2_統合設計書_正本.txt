@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-10
-正本Revision：2026-10-10-P229
+正本Revision：2026-10-10-P230
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -111,14 +111,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P229）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P230）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-10-P229
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-10-P230
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -179,7 +179,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 
 記載形式: [状態] Domain | ファイル | 行数 | Export/Class/Function | 呼出元数 | 依存数 | Storage/Plugin/Test/Marker。詳細な全配列、SHA-256、全呼出元・依存先はJSON正本索引を参照する。
 
-- [USED] UI | src/App.tsx | lines=4145 | symbols=App | callers=1 | deps=113 | Tests=18
+- [USED] UI | src/App.tsx | lines=4158 | symbols=App | callers=1 | deps=113 | Tests=18
 - [USED] OTHER | src/app/appRuntimeLifecycleService.ts | lines=146 | symbols=appRuntimeLifecycleService | callers=1 | deps=31 | Tests=1
 - [ORPHAN] OTHER | src/app/startupPhaseSchedulerService.ts | lines=3 | symbols=startupPhaseSchedulerService | callers=0 | deps=0 | Tests=2
 - [USED] OTHER | src/autonomous_modules/anaphora_history_stack.ts | lines=89 | symbols=AnaphoraHistoryStack, AnaphoraStackItem, anaphoraHistoryStack | callers=2 | deps=0
@@ -194,7 +194,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] UI | src/components/AutonomousImprovementHome.tsx | lines=1750 | symbols=AutonomousImprovementHome, AutonomousImprovementHomeProps | callers=1 | deps=6 | Tests=1
 - [REMOVED-P106] UI | src/components/CharacterCard.tsx | 旧RPG試作UI。現行用途外かつcallers=0のため削除済み。再追加禁止。
 - [REMOVED-P106] UI | src/components/CharacterCreationModal.tsx | 旧RPG試作UI。現行用途外かつcallers=0のため削除済み。再追加禁止。
-- [USED] UI | src/components/ChatPanel.tsx | lines=3831 | symbols=ChatPanel | callers=1 | deps=16 | Tests=1 / Markers=1
+- [USED] UI | src/components/ChatPanel.tsx | lines=3893 | symbols=ChatPanel | callers=1 | deps=16 | Tests=1 / Markers=1
 - [USED] UI | src/components/CodeEditor.tsx | lines=1456 | symbols=CodeEditor | callers=1 | deps=7 | Tests=2
 - [REMOVED-P106] UI | src/components/CombatArena.tsx | 旧RPG試作UI。現行用途外かつcallers=0のため削除済み。再追加禁止。
 - [USED] UI | src/components/CompletionBadge.tsx | lines=319 | symbols=CompletionBadge | callers=1 | deps=2
@@ -11175,3 +11175,12 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - PUSH後の再監査に、最新mainのcommit確認後、Git treeをルートから再帰取得し、全ファイル・全ディレクトリのパスと階層を網羅確認する必須要件を追加した。対象ファイルだけの確認、部分的な検索結果、過去のtree一覧の再利用は全体監査と認めない。
 - 全treeを取得できず監査範囲が不完全な場合に、リポジトリ全体を監査済みと表現しないことを明記した。
 - このP229は作業規則・正本メタデータの更新であり、実行コードの変更、CI PASS、APK生成、実機動作確認を意味しない。
+
+# P230 会話タブ初回描画の重複マウント・履歴自動検証バースト抑制
+
+- 最新mainの `src/App.tsx` では、デスクトップ分割画面がCSSの `hidden md:flex` のみで隠され、モバイルでもReactツリー自体はマウントされていた。その配下の `ChatPanel` に加えて、会話タブを開くとモバイル用 `ChatPanel` が別個にマウントされる二重構造を確認した。P230では768pxのviewport判定でデスクトップ分割画面を条件付きマウントし、モバイルで非表示側の会話画面を生成しない。
+- `ChatPanel` の初期化時、過去に保存された全会話からコードを含む完了済みassistantメッセージを抽出し、それぞれに自動検証を発火していた。自動検証は構文判定だけでなく、単体テスト実行とワークスペースファイル全体の依存グラフ解析を行う。モバイル会話タブの別インスタンスが同じ履歴を再処理すると、複数検証が重複・並行起動し得るため、マウント時点で既に存在する完了済み履歴は対象外とし、新規コード返信だけをキューで逐次検証する。メッセージIDごとの開始済み集合で、state更新中の重複起動も防ぐ。
+- 会話履歴のDOM初回描画は直近20件に制限し、以前の会話は20件ずつ追加表示できるようにした。保存済み履歴そのものは削除しない。`[CHAT_UI]` 診断ログには会話本文を含めず、件数、ワークスペースファイル数、利用可能なJS heap値、検証の経過時間・結果属性・例外型だけを記録する。
+- `scripts/verify_runtime_failure_fixes.mjs` に、デスクトップUIの条件付きマウント、既存履歴検証の抑止、新規検証の逐次化・重複防止、履歴の段階表示、設計索引の行数整合、P230記録の回帰検査を追加した。
+- 今回の修正は、会話タブを開く時の二重マウントと過去履歴の自動検証バーストという再現し得る負荷経路への対策である。ユーザー報告の強制終了の正確なOS／WebView原因を確定したものではない。Native crash・ANR・OS kill記録と更新APKでの再現確認が終わるまでは `DEVICE_VERIFIED` としない。
+- 正本は本ファイル一つだけとする。完全再帰インベントリ全体は再集計していない。今回直接編集した `src/App.tsx` と `src/components/ChatPanel.tsx` の索引行数のみ実際のソースから更新した。

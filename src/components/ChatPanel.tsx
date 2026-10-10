@@ -224,6 +224,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [activeMoreMenuMsgId, setActiveMoreMenuMsgId] = useState<string | null>(null);
   const [expandedNonLlmMsgId, setExpandedNonLlmMsgId] = useState<string | null>(null);
   const [showToolsRow, setShowToolsRow] = useState(false);
+  const [visibleMessageCount, setVisibleMessageCount] = useState(20);
 
   // 第19章: 放置型自律進化レポート状態
   const [unviewedGrowthReport, setUnviewedGrowthReport] = useState<AutonomousGrowthReport | null>(null);
@@ -296,12 +297,39 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   };
 
-  // みき自律自動検証パイプライン: アシスタントからコードが生成されたら全自動でTDDテスト・構文検査・依存関係スキャンを実行
+  // 既存履歴は遡及検証しない。マウント後に新規作成された完了済みコード返信のみを対象にする。
+  const initialHistoryMessageIdsRef = useRef<Set<string> | null>(null);
+  if (initialHistoryMessageIdsRef.current === null) {
+    initialHistoryMessageIdsRef.current = new Set(messages.filter((message) => !message.isStreaming).map((message) => message.id));
+  }
+  const verificationStartedMessageIdsRef = useRef<Set<string>>(new Set());
+  const verificationQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    const historicalCodeMessageCount = messages.filter((message) =>
+      message.role === 'assistant' &&
+      !message.isStreaming &&
+      ['```typescript', '```ts', '```javascript', '```tsx', '```jsx'].some((marker) => message.content.includes(marker))
+    ).length;
+    const memory = (performance as any).memory;
+    systemLogger.info('SYSTEM', '[CHAT_UI] panel mounted', {
+      messageCount: messages.length,
+      historicalCodeMessageCount,
+      workspaceFileCount: workspaceFiles.length,
+      initiallyRenderedMessages: Math.min(messages.length, 20),
+      usedJSHeapMB: typeof memory?.usedJSHeapSize === 'number'
+        ? Math.round((memory.usedJSHeapSize / 1048576) * 10) / 10
+        : undefined,
+    });
+  }, []);
+
+  // 新規コード返信の検証はキューで逐次実行し、state更新を挟んだ重複起動も防ぐ。
   useEffect(() => {
     const assistantMsgsWithCode = messages.filter(
       (m) =>
         m.role === 'assistant' &&
         !m.isStreaming &&
+        !initialHistoryMessageIdsRef.current?.has(m.id) &&
         (m.content.includes('```typescript') ||
           m.content.includes('```ts') ||
           m.content.includes('```javascript') ||
@@ -309,20 +337,37 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           m.content.includes('```jsx'))
     );
     assistantMsgsWithCode.forEach((msg) => {
-      if (autonomousVerifications[msg.id]) return;
+      if (autonomousVerifications[msg.id] || verificationStartedMessageIdsRef.current.has(msg.id)) return;
       const blocks = extractCodeBlocks(msg.content);
       if (blocks.length === 0) return;
 
       const targetBlock = blocks[0];
-      mikiSelfCodingSuperchargerService
-        .runAutonomousVerificationPipeline(targetBlock.content, targetBlock.name, workspaceFiles)
-        .then((result: any) => {
-          setAutonomousVerifications((prev) => ({
-            ...prev,
-            [msg.id]: result.verification,
-          }));
-        })
-        .catch(() => {});
+      verificationStartedMessageIdsRef.current.add(msg.id);
+      verificationQueueRef.current = verificationQueueRef.current.then(async () => {
+        const startedAt = performance.now();
+        systemLogger.info('SYSTEM', '[CHAT_UI] code verification begin', {
+          workspaceFileCount: workspaceFiles.length,
+        });
+        const result: any = await mikiSelfCodingSuperchargerService.runAutonomousVerificationPipeline(
+          targetBlock.content,
+          targetBlock.name,
+          workspaceFiles
+        );
+        setAutonomousVerifications((prev) => ({
+          ...prev,
+          [msg.id]: result.verification,
+        }));
+        systemLogger.info('SYSTEM', '[CHAT_UI] code verification complete', {
+          elapsedMs: Math.round(performance.now() - startedAt),
+          syntaxPassed: Boolean(result.verification?.syntaxPassed),
+          testsPassed: Boolean(result.verification?.testsPassed),
+          cyclesFound: result.verification?.cyclesFound ?? 0,
+        });
+      }).catch((error: unknown) => {
+        systemLogger.warn('SYSTEM', '[CHAT_UI] code verification failed', {
+          errorType: error instanceof Error ? error.name : typeof error,
+        });
+      });
     });
   }, [messages, workspaceFiles, autonomousVerifications]);
 
@@ -417,6 +462,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastSendTimeRef = useRef<number>(0);
+
+  const visibleMessages = messages.slice(-visibleMessageCount);
+
+  useEffect(() => {
+    if (messages.length <= 20 && visibleMessageCount !== 20) {
+      setVisibleMessageCount(20);
+    }
+  }, [messages.length, visibleMessageCount]);
 
   const PUBLIC_APP_URL =
     typeof window !== 'undefined' && window.location.origin
@@ -1130,7 +1183,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         )}
 
-        {messages.map((msg) => {
+        {messages.length > visibleMessageCount && (
+          <button
+            type="button"
+            onClick={() => setVisibleMessageCount((current) => Math.min(messages.length, current + 20))}
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800"
+          >
+            以前の会話をさらに表示（残り {messages.length - visibleMessageCount} 件）
+          </button>
+        )}
+        {visibleMessages.map((msg) => {
           const isUser = msg.role === 'user';
           const codeBlocks = !isUser ? extractCodeBlocks(msg.content) : [];
           const hasCode = codeBlocks.length > 0;

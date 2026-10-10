@@ -224,6 +224,17 @@ const INITIAL_MEMORIES: MemoryItem[] = [
 export default function App() {
   const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'improvement' | 'github'>('preview');
   const [mobileTab, setMobileTab] = useState<'home' | 'chat' | 'preview' | 'code' | 'improvement' | 'github' | 'library' | 'memory' | 'engine' | 'settings'>('home');
+  const [isDesktopViewport, setIsDesktopViewport] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const updateDesktopViewport = () => setIsDesktopViewport(mediaQuery.matches);
+    updateDesktopViewport();
+    mediaQuery.addEventListener('change', updateDesktopViewport);
+    return () => mediaQuery.removeEventListener('change', updateDesktopViewport);
+  }, []);
 
   const [persona, setPersona] = useState<PersonaConfig>(() => {
     try {
@@ -3832,7 +3843,8 @@ export default function App() {
       {/* Main Responsive Layout */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* DESKTOP SPLIT VIEW (Visible on >= md) */}
-        <div className="hidden md:flex flex-1 overflow-hidden">
+        {isDesktopViewport && (
+          <div className="hidden md:flex flex-1 overflow-hidden">
           {/* Left Side: Chat Agent Panel */}
           <div className="w-[380px] lg:w-[440px] xl:w-[480px] h-full shrink-0 flex flex-col">
             <ChatPanel
@@ -3928,7 +3940,8 @@ export default function App() {
               />
             )}
           </div>
-        </div>
+          </div>
+        )}
 
         {/* MOBILE SINGLE VIEW (Visible on < md) */}
         <div className="flex md:hidden flex-1 min-h-0 overflow-hidden flex-col">

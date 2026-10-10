@@ -22,6 +22,8 @@ const sanitizerLegacy = read('src/services/abstractSanitizerService.ts');
 const sanitizerCore = read('src/miki/safety/services/abstractSanitizerService.ts');
 const outboundHelper = read('src/miki/safety/services/outboundPayloadSanitizer.ts');
 const design = read('MIKI-AI0.2_統合設計書_正本.txt');
+const app = read('src/App.tsx');
+const chatPanel = read('src/components/ChatPanel.tsx');
 const domainContract = read('src/miki/core/services/domainContractRegistryService.ts');
 const domainRouter = read('src/miki/core/services/domainRouterService.ts');
 const planRevision = read('src/miki/core/services/corePlanRevisionService.ts');
@@ -177,6 +179,53 @@ check(
     design.includes('# P223 Android Kotlin reject型修正・Web検索サニタイズ経路の修復') &&
     design.includes('# P225 CORE契約分類統一・自律改善Task種別衝突・再開修正') &&
     Boolean(designRevisionHeader)
+);
+
+const appIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] UI | src/App.tsx |'));
+const chatPanelIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] UI | src/components/ChatPanel.tsx |'));
+check(
+  'Mobile viewport does not mount a hidden duplicate desktop ChatPanel',
+  app.includes("window.matchMedia('(min-width: 768px)'") &&
+    app.includes('{isDesktopViewport && (') &&
+    app.includes("mobileTab === 'chat' &&")
+);
+check(
+  'ChatPanel does not rerun automatic verification for completed history',
+  chatPanel.includes('initialHistoryMessageIdsRef') &&
+    chatPanel.includes('new Set(messages.filter((message) => !message.isStreaming).map((message) => message.id))') &&
+    chatPanel.includes('!initialHistoryMessageIdsRef.current?.has(m.id)')
+);
+check(
+  'New message verification is deduplicated and serialized',
+  chatPanel.includes('verificationStartedMessageIdsRef.current.has(msg.id)') &&
+    chatPanel.includes('verificationStartedMessageIdsRef.current.add(msg.id)') &&
+    chatPanel.includes('verificationQueueRef.current = verificationQueueRef.current.then(async () =>')
+);
+check(
+  'Conversation history first render is bounded and older messages remain loadable',
+  chatPanel.includes('const [visibleMessageCount, setVisibleMessageCount] = useState(20)') &&
+    chatPanel.includes('const visibleMessages = messages.slice(-visibleMessageCount)') &&
+    chatPanel.includes('visibleMessages.map((msg) => {') &&
+    chatPanel.includes('current + 20') &&
+    !chatPanel.includes('{messages.map((msg) => {')
+);
+check(
+  'Chat UI writes content-free lifecycle diagnostics',
+  chatPanel.includes("'[CHAT_UI] panel mounted'") &&
+    chatPanel.includes("'[CHAT_UI] code verification begin'") &&
+    chatPanel.includes("'[CHAT_UI] code verification complete'") &&
+    chatPanel.includes("'[CHAT_UI] code verification failed'")
+);
+check(
+  'Canonical index line counts match the edited App and ChatPanel files',
+  appIndexRow?.includes(`lines=${app.split(/\r?\n/).length - 1}`) &&
+    chatPanelIndexRow?.includes(`lines=${chatPanel.split(/\r?\n/).length - 1}`)
+);
+check(
+  'P230 design records the conversation tab overload mitigation',
+  designRevisionHeader?.[1] === '2026-10-10-P230' &&
+    design.includes('# P230 会話タブ初回描画の重複マウント・履歴自動検証バースト抑制') &&
+    design.includes('P225/P226/P227/P228/P229/P230の対象ファイル変更後に全ファイル件数を再集計したものではない')
 );
 
 const failures = checks.filter(item => !item.passed);
