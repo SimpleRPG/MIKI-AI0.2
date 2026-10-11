@@ -224,13 +224,20 @@ check(
     chatPanelIndexRow?.includes(`lines=${chatPanel.split(/\r?\n/).length - 1}`) &&
     loggerIndexRow?.includes(`lines=${runtimeLogger.split(/\r?\n/).length - 1}`)
 );
+const currentRevisionNumber = Number(designRevisionHeader?.[1].match(/-P(\d+)$/)?.[1] ?? 0);
+const inventoryCaveat = design.match(/完全再帰インベントリの最終基準:[^\n]*（以下の件数は当該基準時点。([^）]+)）/)?.[1] ?? '';
+const expectedInventoryRevisionList = Array.from(
+  { length: Math.max(0, currentRevisionNumber - 224) },
+  (_, index) => `P${225 + index}`
+).join('/');
 check(
-  'P231 design records runtime breadcrumbs and preserves P230 history',
-  designRevisionHeader?.[1] === '2026-10-10-P231' &&
+  'P231 breadcrumbs remain verifiable under the current design revision',
+  currentRevisionNumber >= 231 &&
     design.includes('# P230 会話タブ初回描画の重複マウント・履歴自動検証バースト抑制') &&
     design.includes('# P231 同期Runtime Breadcrumb記録と次回起動時の回収') &&
     design.includes('Runtime Breadcrumb Journal') &&
-    design.includes('P225/P226/P227/P228/P229/P230/P231の対象ファイル変更後に全ファイル件数を再集計したものではない')
+    inventoryCaveat.includes(expectedInventoryRevisionList) &&
+    inventoryCaveat.includes('対象ファイル変更後に全ファイル件数を再集計したものではない')
 );
 
 check(
