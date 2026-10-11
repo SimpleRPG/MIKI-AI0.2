@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-10
-正本Revision：2026-10-10-P231
+基準日：2026-10-11
+正本Revision：2026-10-11-P232
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -111,14 +111,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P230）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P232）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-10-P231
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-11-P232
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -5326,7 +5326,7 @@ UIからDomainへ直接到達する旧経路は、
     `mikiCategoryInteractionRuntime` と旧Chapter系が独立して判断主体にならない。
 
 98. [P0][PARTIAL] Local LLM / LoRA / GGUF / WebGPU旧残骸の完全除去
-    現在もREADME、Feature Flag、型、Storage Planning、UI等に
+    現在もFeature Flag、型、Storage Planning、UI等に
     LoRA/GGUF/旧モデル系の参照が残っていることを確認した。
 
 現行方針は「ローカルLLMを一切使用しない」なので、
@@ -7476,7 +7476,7 @@ MIKI-AI0.2 変更指示書
 - package.jsonのdependenciesには、現在 @mlc-ai/web-llm、Ollama SDK、llama.cpp等の明示的なローカルLLM依存は確認されていない。
 - @google/genai は残っており、Gemini外部AI経路として使用されている。
 - 既存のローカルLLM撤廃文書では、nativeLlmService.ts / webLlmService.ts / ggufModels.ts の削除、WebLLM依存削除、EngineModeの限定、Non-LLM Core固定が既に方針化されている。
-- ただしリポジトリの実コード・README・旧資料にはローカルLLM関連名称や接続候補がまだ残っている。したがって「完全撤廃済み」とはまだ扱わない。
+- ただしリポジトリの実コード・docs等の旧資料にはローカルLLM関連名称や接続候補がまだ残っている。したがって「完全撤廃済み」とはまだ扱わない。
 - 撤廃監視用テストは存在しており、ローカルLLM関連文字列・実行経路を検出する役割がある。これらは原則として削除せず、撤廃を守るガードとして維持する。
 
 【最優先の実コード問題：server.ts】
@@ -7555,12 +7555,11 @@ UIには以下を残さない。
 ただし実コードの定義・参照・UIを確認してから統合する。
 
 【旧名称・旧資料】
-README、docs、model_manifest、旧設計コメント等には過去のローカルLLM案が残っている。
+docs、model_manifest、旧設計コメント等には過去のローカルLLM案が残っている。
 完全撤廃後は現行仕様と誤認される古い実行手順を残さない。
 ただし、撤廃を検証するための監視スクリプト内の禁止語は削除しない。
 
 特に確認対象：
-- READMEのllama-server / Ollama / nativeLlmService等の旧提案
 - model_manifest.jsonのllama.cpp / retired-local-generative-runtime
 - src/utils/moeRouter.tsのllama.cpp / vLLM / 外部教師サーバー等の旧コメント・プロンプト
 - src/utils/councilEngine.tsのllama_creative等の旧speaker profile名
@@ -7768,7 +7767,7 @@ Canonical CORE実行についても既存SelfImprovementControllerService.record
 - package.jsonには現在、明示的なWebLLM等のローカルLLM依存は確認されていない。
 - 撤廃監視テストは複数存在し、これらは維持対象。
 - nativeLlmService / webLlmService / ggufModelsは撤廃文書上では削除済みとされているが、実ファイルの存在とimport元は別途mainで確認する。
-- README、model_manifest、moeRouter、councilEngine等には旧名称・旧設計が残っているため、実行経路か単なる履歴・名称かを確認する。
+- model_manifest、moeRouter、councilEngine等には旧名称・旧設計が残っているため、実行経路か単なる履歴・名称かを確認する。
 - selfImprovementIngressServiceとSelfImprovementControllerServiceは同一責務ではない。`improvement` 分類内部の実行基盤・受付基盤として位置付けを確認する。
 - **18構成の用語を固定する。** 「18分類」とは書かず、原則として「CORE＋17分類」「18構成」と表現する。17分類の一覧にはCOREを混ぜない。
 - AutonomousSelfImprovementLoopのQueue、Directive、ImprovementRunは別々の状態としてUIで統合表示する必要がある。
@@ -11201,3 +11200,12 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 次回JavaScript entryでは、現在のsessionIdとは異なるセッションのjournalを既存 `MIKI_RUNTIME_LOG.txt` へまとめて追記し、Native追記成功後に復元したIDだけをJournalから除く。Native追記できない場合はJournalを残して起動を続ける。追記成功後、Journalの掃除前にプロセスが終了した場合は回収行が重複する可能性があり、欠落回避を優先したat-least-once方式とする。
 - `scripts/verify_runtime_failure_fixes.mjs` と `scripts/verify_runtime_logging_phase1.mjs`、`npm run build`、GitHub Actionsで静的・CI検証し、実機ログの再取得までは `DEVICE_VERIFIED` としない。タブとChatPanelのイベント接続は第2段階で既存画面へ統合する。
 - この変更はOS kill、WebView Renderer crash、ANRの個別原因を確定するものではない。Recovered breadcrumbは停止直前に記録できた最終段階を示す補助証拠として扱う。
+
+
+============================================================
+【2026-10-11-P232 ルートREADME撤去】
+============================================================
+
+- ルートの README.md は旧実装履歴と現行設計書の所在誤案内を含むため削除した。
+- 正本の現在状態におけるルートREADMEへの依存記述を除去した。外部コンポーネントのREADMEを未信頼データとして扱う一般規則は維持する。
+- 本変更はドキュメント整理であり、アプリコード・UI・runtime・依存関係の変更を意味しない。
