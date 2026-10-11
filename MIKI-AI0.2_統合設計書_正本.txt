@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-11
-正本Revision：2026-10-11-P233
+基準日：2026-10-12
+正本Revision：2026-10-12-P234
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -111,14 +111,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P233）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P234）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-11-P233
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-12-P234
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -10786,7 +10786,7 @@ QueryはConversation等のSeedから型付きEdgeを辿り、Edge Confidence、N
 Revision: P155
 MIKIは18個の独立Graphではなく、coreが管理する一つのUnified Cognitive Graphを使用する。残り17専門分類はGraphの所有者ではなく、共通Cognitive Contextを読み、専門的なMutation Candidateを提出するWorkerである。確定Node/EdgeへのCommit権限はcoreだけが持つ。
 Memory、Experience、Data、Observation、Knowledge、Correction、Hypothesis、Decision、Action、Result、Validation、Unknownは物理保存区分や独立Graphではなく、単一Graph内部のSemantic Kindとする。Memoryは将来想起する内容、ExperienceはSituation/Decision/Action/Result/Evaluation/Reuse Conditionを持つ過程、Knowledgeは複数根拠から一般化した規則として区別する。
-各認知Node候補はownerDomain一件とparticipantDomains複数件、Confidence、Uncertainty、Source Referencesを持つ。ownerDomainは意味内容の責任者であり、coreを指定できない。検証が必要な候補はverificationをParticipantに含める。17分類は確定Graphを直接変更せず、coreがProvenance、Owner/Participant、Verification、Dangling Edge、重複を検査してCommit Receiptを生成する。
+各認知Node候補はownerDomain一件とparticipantDomains複数件、Confidence、Uncertainty、Source Referencesを持つ。ownerDomainは意味内容の責任者であり、coreを指定できない。検証が必要な候補はverificationをParticipantに含める。17分類は確定Graphを直接変更せず、coreがProvenance、Owner/Participant、Verification、Dangling Edge、重複を検査してCommit Receiptを生成する。CommitとNode ID事前計算には同じP155 Node構築関数を使用し、Domain・正規化Payload・Participantの差によるNode ID不一致を禁止する。
 coreはTaskごとにSeed Nodeから容量制限付きCognitive Contextを構築し、Semantic Kind別Node ID、Active Subject、Conflict、Unknown、Participant Domainを専門分類へ共有する。全GraphをRAMへ展開しない。物理Shardは意味分類ではなくHash・時間・サイズで分割し、論理的には常に一つのGraphとして扱う。正本設計書は本ファイル一つだけとする。
 
 ============================================================
@@ -10972,18 +10972,18 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 # P211 全17分類Graph接続・Core Commit Gateway
 
 - Core以外の17専門分類すべてに専用Graph Connectorを配置した。各分類はGraphを直接更新せず、型付きP211GraphEventをCore Commit Gatewayへ提出する。
-- Core GatewayはイベントをP155 Mutation Candidateへ変換し、P151統合GraphへNode/Edgeを決定的にCommitする。CoreだけがCommit Authorityであり、Worker分類はProposalのみ許可される。
+- Core GatewayはイベントをP155 Mutation Candidateへ変換し、P151統合GraphへNode/Edgeを決定的にCommitする。Node ID事前計算にはP155の共通Node構築関数を使い、Commit時の実Node IDと一致させる。CoreだけがCommit Authorityであり、Worker分類はProposalのみ許可される。
 - INPUT、OUTPUT、DECISION、ACTION、RESULT、ERROR、CORRECTION、UNKNOWN、VALIDATIONを認知Semantic Kindへ写像する。
 - Event SHA、Candidate SHA、Node SHA、Graph SHA、Receipt SHAを保持する。Snapshot復元時はGraph SHA不一致を拒否する。
-- 関連Node IDが存在しないEdge、CoreからのWorker Event、範囲外Score、空Subject、64 KiB超PayloadをFail-Closedで拒否する。
-- 文字列単体が4096文字を超える場合は全文常駐せず、長さ、SHA-256、先頭512文字のPreviewへ圧縮する。Gateway常駐予算は4 MiBとする。
+- relatedNodeIdsで指定した既存Nodeから新規イベントNodeへの型付きEdgeを実生成する。存在しない関連Node ID、CoreからのWorker Event、範囲外Score、空Subject、64 KiB超PayloadはFail-Closedで拒否する。
+- 文字列単体が4096文字を超える場合は全文常駐せず、長さ、SHA-256、先頭512文字のPreviewへ圧縮する。設計上のGateway常駐予算は4 MiBとするが、現行P211のresidentBytesはカウンターを上限で丸めるだけでGraph本体のRAM常駐を制限しない。P153 Working SetとP171 Native Storeの実経路統合までは実効容量制限未達として扱う。
 - 17分類用Connectorは autonomy、capability、conversation、data、execution、experience、improvement、learning、memory、promotion、research、safety、selfAwareness、selfDevelopment、strategy、unknown、verification である。
 
 # P212 通常会話Graph閉ループ接続
 
 - Typed Conversation UI Gatewayの通常入力をP212 Runtimeへ接続した。Core Task作成後、会話入力、辞書Graph、既存会話Component Pipeline、Semantic Graph、正例・反例候補をCore GraphへCommitする。
-- Semantic候補が確定しない場合、Unknown NodeとResearch Actionを同一GraphへCommitする。
-- 応答確定時、Answer、Validation、Experience、LearningをCommitする。Validation失敗時はCounterexample、Repair、Reuse ConditionをLearningとExperienceへ保存できる。
+- Semantic候補が確定しない場合、Unknown NodeとResearch Actionを同一GraphへCommitし、入力からUnknown/Researchへの型付きEdgeを実生成する。
+- 応答確定時、Answer、Validation、Experience、LearningをCommitし、各先行イベントのcreatedNodeIdsをrelatedNodeIdsへ渡してInput→Answer→Validation→Experience→Learningの型付きEdgeを同一Graph内に実生成する。Validation失敗時はCounterexample、Repair、Reuse ConditionをLearningとExperienceへ保存できる。
 - P211の64 KiB Payload制限、4096文字圧縮、4 MiB常駐予算、SHA検査、Snapshot復元を継承する。
 - 通常会話入口と応答確定口の双方がGraph経路を通る。Connectorだけを配置して未使用にする状態を禁止する。
 
@@ -11008,7 +11008,7 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 # P215 会話UI・Graph E2E検証
 
 - Typed Conversation UI GatewayからCore Task Ingress、P212 Runtime、P213 Language Component Graph、P211統合Graphまでを実呼出しするNode E2Eを追加した。
-- UI入力、Graph Commit、応答確定、Validation、Experience、Learning、Positive Example、Constraint欠落時Counterexampleを同一試験で検証する。
+- UI入力、Graph Commit、応答確定、Validation、Experience、Learning、Positive Example、Constraint欠落時Counterexampleを同一試験で検証する。P211実生成Edgeのfrom/to/typeを検査し、Input→Output→Validation→Experience→Learningの接続が欠落した場合は失敗させる。
 - ユーザー入力Surfaceが学習されること、Checkpoint SHAとGraph SHAが一致すること、メモリ初期化後に永続EnvelopeからGraphを復元できることを検証する。
 - 復元後の次回会話解析においてLEARNED_GRAPH部品が再利用されることを検証する。
 - 永続EnvelopeのSHAを改変した場合はFail-Closedで復元しないことを検証する。
@@ -11219,3 +11219,17 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - P232の正本更新後、`scripts/verify_runtime_failure_fixes.mjs` が正本RevisionをP231に固定していたため、現行RevisionがP232であることを理由にGitHub Actionsの検証Stepが失敗することを確認した。
 - P233ではRuntime Breadcrumb Journalに関するP231の履歴検査を維持しつつ、現在のRevision番号と再帰インベントリの未再集計注意書きを動的に照合するよう検証を修正した。以後、新しい正本Revisionを追加しても、過去Revisionが現行ヘッダーに一致しないことだけでは失敗しない。
 - この修正は検証ロジックと設計正本の整合性を対象とし、アプリの実行コード変更、APK生成成功、実機確認を意味しない。
+
+
+
+============================================================
+【2026-10-12-P234 P155/P211 Node ID正規化統一・P212関係Edge実接続】
+============================================================
+
+- P211のNode ID予測とP155のNode CommitでDomain変換とParticipant正規化が別実装になっていたため、relatedNodeIdsからEdgeを作る際に予測Node IDが実Commit後のNode IDと一致しない経路を修正した。
+- P155に共通のbuildNode関数を追加し、Node CommitとP211のID予測が同じDomain、Payload、Participant正規化を使用するよう統一した。Workerによる直接Graph更新や第二Graphは追加していない。
+- P212はTaskごとにInput Node IDを保持し、入力→Unknown/Research、入力→Answer、Answer→Validation、Validation→Experience、Experience→Learningの関係EdgeをP211 Gateway経由で実生成する。各Edgeは直前にCommit済みのcreatedNodeIdsだけを参照する。
+- P211検証は文字列の存在確認に加え、実サービスを実行してNode ID一致、NodeとEdgeの同時Commit、実Edgeのfrom/to/type、存在しない関連Node IDのFail-Closedを検査する。P215 UI Gateway E2Eも実際の応答ループにおける五段階のEdge連鎖を検査する。
+- Android APK WorkflowはP155、P211、P212、P213、P214、P215、P216の関連Graph検証をBuild前に実行する。
+- P211の4 MiB residentBytesは現在カウンター上限であり、Graph本体のRAM常駐を制限しないことを明記した。P153 Working SetとP171 Native Graph Storeの通常会話Runtime接続、ロード／復元、実効容量制御は別バッチであり、本変更では未完了のままとする。
+- 正本は本ファイルのみ。完全再帰インベントリの件数および全ファイル行数はP234後に再集計していない。Node ID／Edge検証はソース実行テスト対象だが、Android APK生成、GitHub Actions完了、Galaxy S25実機、OSプロセスKillの検証結果はこの設計更新だけでは成立しない。

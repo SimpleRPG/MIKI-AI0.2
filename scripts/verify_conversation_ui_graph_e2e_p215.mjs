@@ -36,12 +36,27 @@ const afterInput = conversationGraphRuntimeP212Service.snapshot();
 assert.ok(afterInput.nodes.length > 0, 'UI input must create graph nodes');
 assert.ok(afterInput.nodes.some(n => JSON.stringify(n.payload).includes(input)), 'graph must retain the user input surface');
 assert.ok(localStorage.getItem('miki:p214:conversation-graph'), 'input checkpoint must exist');
+const inputNode=afterInput.nodes.find(n=>n.payload.eventKind==='INPUT'&&n.payload.taskId===taskId);
+assert.ok(inputNode,'submitted task must have a canonical INPUT node');
 
 const goodResponse = '全部を省略せず実装し、既存機能を維持して失わないようにしました。';
 const finalized = typedCoreUiGatewayService.finalizeConversationResponse(taskId, goodResponse);
 assert.ok(finalized, 'UI response finalization must succeed');
 const completed = conversationGraphRuntimeP212Service.snapshot();
 assert.ok(completed.nodes.length > afterInput.nodes.length, 'output, validation, experience and learning nodes must be added');
+const outputNode=completed.nodes.find(n=>n.payload.eventKind==='OUTPUT'&&n.payload.taskId===taskId);
+const validationNode=completed.nodes.find(n=>n.subjectId===`validation:${taskId}`);
+const experienceNode=completed.nodes.find(n=>n.subjectId===`experience:${taskId}`);
+const learningNode=completed.nodes.find(n=>n.subjectId===`learning:${taskId}`);
+assert.ok(outputNode&&validationNode&&experienceNode&&learningNode,'complete response must create OUTPUT, VALIDATION, EXPERIENCE and LEARNING nodes');
+const inputOutputEdge=completed.edges.some(e=>e.from===inputNode.nodeId&&e.to===outputNode.nodeId&&e.type==='P211_OUTPUT_RELATES_TO');
+const outputValidationEdge=completed.edges.some(e=>e.from===outputNode.nodeId&&e.to===validationNode.nodeId&&e.type==='P211_VALIDATION_RELATES_TO');
+const validationExperienceEdge=completed.edges.some(e=>e.from===validationNode.nodeId&&e.to===experienceNode.nodeId&&e.type==='P211_RESULT_RELATES_TO');
+const experienceLearningEdge=completed.edges.some(e=>e.from===experienceNode.nodeId&&e.to===learningNode.nodeId&&e.type==='P211_RESULT_RELATES_TO');
+assert.ok(inputOutputEdge,'INPUT must have an actual edge to OUTPUT');
+assert.ok(outputValidationEdge,'OUTPUT must have an actual edge to VALIDATION');
+assert.ok(validationExperienceEdge,'VALIDATION must have an actual edge to EXPERIENCE');
+assert.ok(experienceLearningEdge,'EXPERIENCE must have an actual edge to LEARNING');
 const payloads = completed.nodes.map(n => JSON.stringify(n.payload));
 assert.ok(payloads.some(p => p.includes('POSITIVE_EXAMPLE')), 'successful response must create a positive example');
 assert.ok(payloads.some(p => p.includes(input)), 'learned surface must be the user input, not only the response');
@@ -79,7 +94,7 @@ const report = {
   phase:'P215', status:'PASS', testLevel:'NODE_E2E_WITH_UI_GATEWAY_AND_BROWSER_STORAGE_POLYFILL',
   uiSubmission:true, coreIngress:true, inputGraphCommit:true, outputGraphCommit:true,
   validationExperienceLearning:true, positiveExample:true, constraintCounterexample:true,
-  userInputSurfaceLearning:true, checkpoint:true, restartRestore:true,
+  userInputSurfaceLearning:true, inputOutputEdge, outputValidationEdge, validationExperienceEdge, experienceLearningEdge, relationshipEdges:completed.edges.length, checkpoint:true, restartRestore:true,
   nextConversationLearnedReuse:true, corruptShaFailClosed:true,
   graphBeforeRestartSha256:completed.graphSha256,
   restoredGraphSha256:restored.graphSha256,

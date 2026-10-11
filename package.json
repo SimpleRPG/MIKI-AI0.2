@@ -221,7 +221,7 @@
     "verify:semantic-graph:p208": "node scripts/verify_semantic_graph_core_p208.mjs && cargo test --manifest-path native/miki-native-core/Cargo.toml semantic_graph",
     "migrate:dictionary-graph:p209": "node scripts/migrate_conversation_dictionary_p209.mjs",
     "verify:dictionary-graph:p209": "node scripts/verify_dictionary_graph_p209.mjs",
-    "verify:cross-domain-graph:p211": "node scripts/verify_cross_domain_graph_p211.mjs",
+    "verify:cross-domain-graph:p211": "tsx scripts/verify_cross_domain_graph_p211.mjs",
     "verify:conversation-graph-runtime:p212": "node scripts/verify_conversation_graph_runtime_p212.mjs",
     "verify:conversation-components:p213": "node scripts/verify_conversation_components_p213.mjs",
     "verify:conversation-graph-completion:p214": "node scripts/verify_conversation_graph_completion_p214.mjs",

@@ -38,6 +38,16 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Verify cognitive graph node identity and conversation edges
+        run: |
+          npm run verify:core-cognitive-graph:p155
+          npm run verify:cross-domain-graph:p211
+          npm run verify:conversation-graph-runtime:p212
+          npm run verify:conversation-components:p213
+          npm run verify:conversation-graph-completion:p214
+          npm run verify:conversation-ui-graph-e2e:p215
+          npm run verify:graph-answer-pipeline:p216
+
       - name: Build Web Application
         run: npm run build
 

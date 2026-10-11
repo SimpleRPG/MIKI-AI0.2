@@ -26,8 +26,17 @@
   "graphSnapshotRestore": true,
   "shaVerification": true,
   "danglingEdgeRejection": true,
+  "runtimeNodeIdentity": true,
+  "runtimeRelatedEdge": true,
+  "runtimeEdgeCount": 1,
+  "runtimeAcceptedNodeAndEdgeCandidates": 2,
   "payloadLimitBytes": 65536,
-  "maxResidentBytes": 4194304,
+  "payloadLimitByteReject": true,
+  "residentBytesAccountingCeiling": 4194304,
+  "graphMemoryHardBoundEnforced": false,
+  "knownLimitations": [
+    "residentBytes is an accounting counter only; the full graph remains resident, and P153/P171 working-set persistence is not wired into this P211 path."
+  ],
   "largeStringCompaction": true,
   "connectorFiles": [
     "src/miki/autonomy/services/autonomyGraphConnectorP211Service.ts",
@@ -52,12 +61,13 @@
     "ALL_17_WORKER_DOMAINS",
     "CORE_COMMIT_GATEWAY",
     "NODE_AND_EDGE_MUTATIONS",
+    "RUNTIME_NODE_IDENTITY_MATCH",
+    "RUNTIME_RELATED_EDGE_CREATION",
     "SNAPSHOT_RESTORE",
     "SHA_VERIFY",
+    "DANGLING_EDGE_REJECTION",
     "PAYLOAD_LIMIT",
-    "RESIDENT_BUDGET",
-    "DETERMINISTIC_COMPACTION",
-    "TYPESCRIPT_COMPILE",
-    "PRODUCTION_BUILD"
+    "RESIDENT_BYTES_ACCOUNTING_CEILING_ONLY",
+    "DETERMINISTIC_COMPACTION"
   ]
 }
