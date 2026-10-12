@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-12
-正本Revision：2026-10-12-P240
+正本Revision：2026-10-12-P241
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -111,14 +111,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P240）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P241）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-12-P240
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-12-P241
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -1063,7 +1063,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=213 | symbols=MainActivity | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiBackgroundWorker.kt | lines=316 | symbols=ConditionCheckResult, MikiBackgroundWorker | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt | lines=445 | symbols=MikiWorkManagerPlugin | callers=0 | deps=0 | Plugin=MikiWorkManagerPlugin / Markers=1
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/NativeWebViewDiagnosticJournal.java | lines=199 | symbols=NativeWebViewDiagnosticJournal | callers=2 | deps=0
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/NativeWebViewDiagnosticJournal.java | lines=200 | symbols=NativeWebViewDiagnosticJournal | callers=2 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml | lines=34 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/drawable/ic_launcher_background.xml | lines=170 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/layout/activity_main.xml | lines=14 | symbols=- | callers=0 | deps=0
@@ -11324,7 +11324,7 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 【2026-10-12-P240 Android Previous Process Exit-Reason Diagnostics】
 ============================================================
 
-- 直近のAndroidプロセス終了について、API 30以降の`ActivityManager.getHistoricalProcessExitReasons()`からアプリ本体プロセスの最新5件を取得し、終了時刻、終了PID、理由名・理由コード、sub-reason、exit status、importance、OSがサンプリングしたPSS/RSSを既存のNative journalへ耐久追記する。PSS/RSSは終了瞬間の厳密値ではなく、OSの最終サンプル値であることを前提に扱う。
+- P240では終了時刻、終了PID、理由名・理由コード、status、importance、OSがサンプリングしたPSS/RSSを取得する実装を追加した。ただしPUSH後のGitHub Actionsで`ApplicationExitInfo.getSubReason()`が存在しないことによるJavaコンパイル失敗を確認したため、P241で当該参照を除去し、公開APIの`getStatus()`を保持する。PSS/RSSは終了瞬間の厳密値ではなく、OSの最終サンプル値である。
 - `NativeWebViewDiagnosticJournal`は既存イベントへ現在PIDと、同クラス初期化時点を起点とする`SystemClock.elapsedRealtime()`差分（`processUptimeMs`）を追加する。Activity再生成とプロセス再起動をPID・経過時間で区別しやすくし、終了時刻はOSのepoch millisecondsを別フィールドで保存する。
 - Androidの人間可読な自由記述`ApplicationExitInfo.getDescription()`、スタック内容、URL、HTML、会話本文、プロンプトは取得・保存しない。OS理由が`UNKNOWN`または`OTHER`等なら、そのまま不確実な分類として扱い、強制終了と断定しない。
 - 専用SharedPreferencesは最後に正常追記した終了時刻の重複防止watermarkだけに使う。イベント本文は既存の64KiB上限付きNative journalと`MIKINativeRunnerPlugin.flushNativeWebViewDiagnostics()`によるDownloadsログ回収経路を再利用し、新しいLogger／DB／別ログファイルは作らない。履歴がない、取得不可、書き込み失敗、watermark保存失敗も状態と例外型のみ記録する。
@@ -11340,4 +11340,23 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
   - post_design_runtime_regressions: 0
   - post_design_whitespace_diff: 0
 - Android実機でのプロセス終了理由取得・Renderer終了・Activity再生成の再現は未実施。OSが履歴を保持しない／OSが`UNKNOWN`・`OTHER`を返す場合は断定できない。静的検証、APKビルド、実機確認を同一視しない。
+
+============================================================
+【2026-10-12-P241 Android Exit-Reason API・Journal Bound Correction】
+============================================================
+
+- P240のGitHub Actions runで`:app:compileDebugJavaWithJavac`が失敗し、`ApplicationExitInfo.getSubReason()`が存在しないという実コンパイルエラーを確認した。P241では呼出しと誤ったVerifier条件を除去し、公開APIで実在確認できるtimestamp／pid／reason／status／importance／PSS／RSSを記録対象とする。プロセス終了理由名はAPI 30以降の既知のreason codeに対応し、reason 17/18も`MEMORY_LIMITER`／`ANOMALY`として分類する。
+- Native journalのdetails上限が140文字のままだと、理由コードが長いケースで末尾のPSS/RSS値を途中で切ることがあるため、フィールド全体を格納できる220文字へ拡張する。プロセスPIDと起動後経過時間は従来通り付加し、全journalの64KiB上限は維持する。
+- 既存のNative journal、SharedPreferences watermark、Downloads回収経路、Runtime verifierを再利用し、別ロガー・DB・ログファイルは追加しない。自由記述の`ApplicationExitInfo.getDescription()`は取得しない。
+- 完全再帰インベントリ全体は再集計していない。変更したソースの正本索引行数のみ実ファイルから更新する。
+- Initial check results (actual command exit codes; 0=PASS):
+  - runtime_failure_regressions: 0
+  - android_native_contract: 0
+  - android_morphology_contract: 0
+  - production_build: 0
+  - whitespace_diff: 0
+- Post-design check results (actual command exit codes; 0=PASS):
+  - post_design_runtime_regressions: 0
+  - post_design_whitespace_diff: 0
+- Previous CI evidence: P240 GitHub Actions run failed at Java compilation because `getSubReason()` was unavailable. This P241 source correction still requires a fresh post-PUSH CI/APK result; no APK or DEVICE_VERIFIED success is claimed by this record.
 

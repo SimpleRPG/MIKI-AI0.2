@@ -49,7 +49,7 @@ public final class NativeWebViewDiagnosticJournal {
     public static synchronized boolean record(Context context, String event, String details, boolean durable) {
         if (context == null || !ALLOWED_EVENTS.contains(event)) return false;
         String safeDetails = details == null ? "" : details.replaceAll("[^A-Za-z0-9_.,:= -]", "_");
-        if (safeDetails.length() > 140) safeDetails = safeDetails.substring(0, 140);
+        if (safeDetails.length() > 220) safeDetails = safeDetails.substring(0, 220);
         String processIdentity = "processPid=" + Process.myPid() + ",processUptimeMs=" + Math.max(0L, SystemClock.elapsedRealtime() - PROCESS_START_ELAPSED_REALTIME_MS);
         safeDetails = safeDetails.isEmpty() ? processIdentity : safeDetails + "," + processIdentity;
         File file = new File(context.getFilesDir(), FILE_NAME);
@@ -124,7 +124,6 @@ public final class NativeWebViewDiagnosticJournal {
                     + ",pid=" + info.getPid()
                     + ",reason=" + reasonName(reason)
                     + ",reasonCode=" + reason
-                    + ",subReason=" + info.getSubReason()
                     + ",status=" + info.getStatus()
                     + ",importance=" + info.getImportance()
                     + ",pssKb=" + info.getPss()
@@ -168,6 +167,8 @@ public final class NativeWebViewDiagnosticJournal {
             case 14: return "FREEZER";
             case 15: return "PACKAGE_STATE_CHANGE";
             case 16: return "PACKAGE_UPDATED";
+            case 17: return "MEMORY_LIMITER";
+            case 18: return "ANOMALY";
             default: return "REASON_CODE_" + reason;
         }
     }

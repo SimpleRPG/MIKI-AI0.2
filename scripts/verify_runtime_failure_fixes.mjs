@@ -384,13 +384,26 @@ check(
     nativeJournal.includes('"PROCESS_EXIT_HISTORY_SCAN"') &&
     nativeJournal.includes('getTimestamp()') &&
     nativeJournal.includes('getReason()') &&
-    nativeJournal.includes('getSubReason()') &&
+    !nativeJournal.includes('getSubReason()') &&
+    nativeJournal.includes('if (safeDetails.length() > 220) safeDetails = safeDetails.substring(0, 220);') &&
     nativeJournal.includes('getPss()') &&
     nativeJournal.includes('getRss()') &&
     nativeJournal.includes('SystemClock.elapsedRealtime()') &&
     nativeJournal.includes('processPid=') &&
     nativeJournal.includes('.commit()') &&
     !nativeJournal.includes('getDescription()')
+);
+
+check(
+  'Exit-reason diagnostics use public Android API fields and retain full bounded details',
+  nativeJournal.includes('info.getReason()') &&
+    nativeJournal.includes('info.getStatus()') &&
+    nativeJournal.includes('info.getImportance()') &&
+    nativeJournal.includes('info.getPss()') &&
+    nativeJournal.includes('info.getRss()') &&
+    nativeJournal.includes('case 17: return "MEMORY_LIMITER";') &&
+    nativeJournal.includes('case 18: return "ANOMALY";') &&
+    !nativeJournal.includes('getSubReason()')
 );
 
 const failures = checks.filter(item => !item.passed);
