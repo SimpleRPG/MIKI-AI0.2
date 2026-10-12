@@ -255,7 +255,7 @@ class StorageService {
     }
   }
 
-  private async flush(): Promise<void>
+  private async flush(): Promise<void> {
     if (this.dirtyKeys.size === 0) return;
     const keys = Array.from(this.dirtyKeys);
     this.dirtyKeys.clear();
