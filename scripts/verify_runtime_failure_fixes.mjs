@@ -369,6 +369,30 @@ check(
     runtimeLogger.includes("'phase'")
 );
 
+check(
+  'Previous Android process exit reasons are collected after Activity creation and before provider diagnostics',
+  main.includes('NativeWebViewDiagnosticJournal.recordPreviousProcessExitReasons(this);') &&
+    main.indexOf('NativeWebViewDiagnosticJournal.recordPreviousProcessExitReasons(this);') > activityCreateIndex &&
+    main.indexOf('NativeWebViewDiagnosticJournal.recordPreviousProcessExitReasons(this);') < providerCallIndex
+);
+check(
+  'Historical process exit records are durable, de-duplicated, and omit free-form system descriptions',
+  nativeJournal.includes('getHistoricalProcessExitReasons(context.getPackageName(), 0, 5)') &&
+    nativeJournal.includes('ApplicationExitInfo') &&
+    nativeJournal.includes('LAST_EXIT_TIMESTAMP_KEY') &&
+    nativeJournal.includes('"PROCESS_EXIT_HISTORY"') &&
+    nativeJournal.includes('"PROCESS_EXIT_HISTORY_SCAN"') &&
+    nativeJournal.includes('getTimestamp()') &&
+    nativeJournal.includes('getReason()') &&
+    nativeJournal.includes('getSubReason()') &&
+    nativeJournal.includes('getPss()') &&
+    nativeJournal.includes('getRss()') &&
+    nativeJournal.includes('SystemClock.elapsedRealtime()') &&
+    nativeJournal.includes('processPid=') &&
+    nativeJournal.includes('.commit()') &&
+    !nativeJournal.includes('getDescription()')
+);
+
 const failures = checks.filter(item => !item.passed);
 for (const item of checks) console.log(`${item.passed ? 'PASS' : 'FAIL'} ${item.name}`);
 console.log(JSON.stringify({ passed: failures.length === 0, total: checks.length, failed: failures.map(item => item.name) }, null, 2));
