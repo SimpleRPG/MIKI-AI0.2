@@ -1,4 +1,5 @@
 import { storageService } from '../../../services/storageService';
+import { systemLogger } from '../../../services/systemLogger';
 import { domainRouterService } from './domainRouterService';
 import { type MikiDomain } from './crossDomainCirculationService';
 import { MIKI_DOMAINS } from './domainCatalogService';
@@ -71,14 +72,67 @@ class DomainParticipationService {
     const startedAt = Date.now();
     const auditId = `domain_audit_${startedAt}_${++this.sequence}`;
     const entries: DomainConnectivityAuditEntry[] = [];
+    const totalOperations = PARTICIPATING_DOMAINS.length * 3;
+    const auditSteps = ['HEALTH_CHECK', 'PARTICIPATE', 'VERIFY_CONNECTION'] as const;
+    let completedOperations = 0;
+    let lastCompletedOperation = 'crossDomainCirculationService.initialize';
+    systemLogger.recordRuntimeBreadcrumb('DOMAIN_AUDIT_BEGIN', {
+      stage: 'DOMAIN_CONNECTIVITY_AUDIT', status: 'STARTED',
+      completedCount: completedOperations, totalCount: totalOperations,
+      lastCompleted: lastCompletedOperation,
+    });
+    const runStep = async (
+      domain: MikiDomain,
+      step: typeof auditSteps[number],
+      envelope: Parameters<typeof domainRouterService.dispatch>[0],
+    ) => {
+      const stepStartedAt = Date.now();
+      const order = completedOperations + 1;
+      const lastCompletedBefore = lastCompletedOperation;
+      systemLogger.recordRuntimeBreadcrumb('DOMAIN_AUDIT_OPERATION_BEGIN', {
+        stage: 'DOMAIN_CONNECTIVITY_AUDIT', domain, step, order,
+        completedCount: completedOperations, totalCount: totalOperations,
+        lastCompleted: lastCompletedBefore, status: 'STARTED',
+      });
+      try {
+        const reply = await domainRouterService.dispatch(envelope);
+        completedOperations += 1;
+        const outcome = reply.accepted ? 'ACCEPTED' : 'REJECTED';
+        lastCompletedOperation = `${domain}/${step}/${outcome}`;
+        const nextIndex = PARTICIPATING_DOMAINS.indexOf(domain) * 3 + auditSteps.indexOf(step) + 1;
+        const nextDomain = nextIndex < totalOperations ? PARTICIPATING_DOMAINS[Math.floor(nextIndex / 3)] : 'NONE';
+        const nextStep = nextIndex < totalOperations ? auditSteps[nextIndex % 3] : 'NONE';
+        systemLogger.recordRuntimeBreadcrumb('DOMAIN_AUDIT_OPERATION_COMPLETE', {
+          stage: 'DOMAIN_CONNECTIVITY_AUDIT', domain, step, order,
+          completedCount: completedOperations, totalCount: totalOperations,
+          lastCompleted: lastCompletedOperation, nextDomain, nextStep,
+          status: outcome, accepted: reply.accepted, elapsedMs: Date.now() - stepStartedAt,
+        });
+        return reply;
+      } catch (error) {
+        completedOperations += 1;
+        lastCompletedOperation = `${domain}/${step}/THREW`;
+        const nextDomainIndex = PARTICIPATING_DOMAINS.indexOf(domain) + 1;
+        const nextDomain = PARTICIPATING_DOMAINS[nextDomainIndex] || 'NONE';
+        systemLogger.recordRuntimeBreadcrumb('DOMAIN_AUDIT_OPERATION_FAILED', {
+          stage: 'DOMAIN_CONNECTIVITY_AUDIT', domain, step, order,
+          completedCount: completedOperations, totalCount: totalOperations,
+          lastCompleted: lastCompletedOperation, nextDomain,
+          nextStep: nextDomain === 'NONE' ? 'NONE' : 'HEALTH_CHECK',
+          status: 'THREW', errorType: error instanceof Error ? error.name : typeof error,
+          elapsedMs: Date.now() - stepStartedAt,
+        });
+        throw error;
+      }
+    };
     for (const domain of PARTICIPATING_DOMAINS) {
       try {
         const base = { correlationId: auditId, causationId: auditId, source: 'core' as MikiDomain, target: domain, evidenceIds: [] as string[], createdAt: startedAt, depth: 0 };
-        const health = await domainRouterService.dispatch({ ...base, envelopeId: `${auditId}_${domain}_health`, command: 'HEALTH_CHECK', payload: { auditId } });
+        const health = await runStep(domain, 'HEALTH_CHECK', { ...base, envelopeId: `${auditId}_${domain}_health`, command: 'HEALTH_CHECK', payload: { auditId } });
         await yieldToBrowser();
-        const participation = await domainRouterService.dispatch({ ...base, envelopeId: `${auditId}_${domain}_participate`, command: 'PARTICIPATE', payload: { auditId, taskId: auditId } });
+        const participation = await runStep(domain, 'PARTICIPATE', { ...base, envelopeId: `${auditId}_${domain}_participate`, command: 'PARTICIPATE', payload: { auditId, taskId: auditId } });
         await yieldToBrowser();
-        const connection = await domainRouterService.dispatch({ ...base, envelopeId: `${auditId}_${domain}_connection`, command: 'VERIFY_CONNECTION', payload: { auditId } });
+        const connection = await runStep(domain, 'VERIFY_CONNECTION', { ...base, envelopeId: `${auditId}_${domain}_connection`, command: 'VERIFY_CONNECTION', payload: { auditId } });
         await yieldToBrowser();
         entries.push({ domain, healthAccepted: health.accepted, participationAccepted: participation.accepted, connectionAccepted: connection.accepted, order: entries.length + 1, error: health.error || participation.error || connection.error });
       } catch (error) {
@@ -87,6 +141,12 @@ class DomainParticipationService {
     }
     const audit: DomainConnectivityAudit = { auditId, startedAt, completedAt: Date.now(), passed: entries.length === PARTICIPATING_DOMAINS.length && entries.every((entry, index) => entry.order === index + 1 && entry.healthAccepted && entry.participationAccepted && entry.connectionAccepted), entries };
     this.lastAudit = audit;
+    systemLogger.recordRuntimeBreadcrumb('DOMAIN_AUDIT_COMPLETE', {
+      stage: 'DOMAIN_CONNECTIVITY_AUDIT', status: audit.passed ? 'PASSED' : 'FAILED',
+      completedCount: completedOperations, totalCount: totalOperations,
+      lastCompleted: lastCompletedOperation, elapsedMs: Date.now() - startedAt,
+      passed: audit.passed,
+    });
     storageService.setItem(STORAGE_KEY, JSON.stringify(audit));
     return audit;
   }

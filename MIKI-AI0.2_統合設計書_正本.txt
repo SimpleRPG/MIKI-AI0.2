@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-12
-正本Revision：2026-10-12-P235
+正本Revision：2026-10-12-P236
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -111,14 +111,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P235）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P236）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-12-P235
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-12-P236
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -180,7 +180,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 記載形式: [状態] Domain | ファイル | 行数 | Export/Class/Function | 呼出元数 | 依存数 | Storage/Plugin/Test/Marker。詳細な全配列、SHA-256、全呼出元・依存先はJSON正本索引を参照する。
 
 - [USED] UI | src/App.tsx | lines=4158 | symbols=App | callers=1 | deps=113 | Tests=18
-- [USED] OTHER | src/app/appRuntimeLifecycleService.ts | lines=146 | symbols=appRuntimeLifecycleService | callers=1 | deps=31 | Tests=1
+- [USED] OTHER | src/app/appRuntimeLifecycleService.ts | lines=161 | symbols=appRuntimeLifecycleService | callers=1 | deps=31 | Tests=1
 - [ORPHAN] OTHER | src/app/startupPhaseSchedulerService.ts | lines=3 | symbols=startupPhaseSchedulerService | callers=0 | deps=0 | Tests=2
 - [USED] OTHER | src/autonomous_modules/anaphora_history_stack.ts | lines=89 | symbols=AnaphoraHistoryStack, AnaphoraStackItem, anaphoraHistoryStack | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/anaphora_resolver_sample.ts | lines=162 | symbols=PureAnaphoraResolutionResult, resolveAnaphoraPure | callers=2 | deps=0
@@ -393,7 +393,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] CORE | src/miki/core/services/domainIntegrationBootstrapService.ts | lines=860 | symbols=domainIntegrationBootstrapService | callers=4 | deps=67 | Tests=10
 - [USED] CORE | src/miki/core/services/domainOperationalAdapterService.ts | lines=101 | symbols=DomainOperationalSnapshot, domainOperationalAdapterService | callers=2 | deps=20
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/domainOwnershipCatalogService.ts | lines=30 | symbols=SourceOwnership, SourceOwnershipKind, getCoreCompatibilityGateways, getDomainOwnershipCatalog, resolveSourceOwnership | callers=1 | deps=2
-- [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=108 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
+- [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=168 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/domainReplyLedgerService.ts | lines=350 | symbols=ActionLineage, DomainReplyLedgerRecord, domainReplyLedgerService | callers=7 | deps=6 | Storage=miki_domain_reply_ledger_v1
 - [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=125 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1 / Tests=3
 - [USED] CORE | src/miki/core/services/domainSequentialConnectionService.ts | lines=35 | symbols=DomainConnectionReceipt, domainSequentialConnectionService | callers=1 | deps=2
@@ -1025,7 +1025,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [ORPHAN] LEGACY_OR_SHARED | src/services/storagePlanningService.ts | lines=220 | symbols=StoragePlanningService, storagePlanningService | callers=0 | deps=4 | Storage=miki_storage_audit_log_v32
 - [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=653 | symbols=storageService | callers=295 | deps=1 | Tests=7
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/syntheticDataService.ts | lines=779 | symbols=SyntheticDataService, syntheticDataService, toolsService | callers=1 | deps=9 | Storage=miki_ai_synthetic_batches
-- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=921 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
+- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=942 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
 - [USED] LEGACY_OR_SHARED | src/services/taskCaseMemoryService.ts | lines=45 | symbols=TaskCaseMaturity, TaskCaseMemoryService, TaskCaseOutcome, TaskCaseRecord, taskCaseMemoryService | callers=4 | deps=5
 - [USED] LEGACY_OR_SHARED | src/services/taskExecutionOrchestratorService.ts | lines=237 | symbols=TaskExecutionHandle, TaskExecutionOrchestratorService, TaskExecutionStatus, taskExecutionOrchestratorService | callers=1 | deps=15
 - [USED] LEGACY_OR_SHARED | src/services/taskLineageService.ts | lines=45 | symbols=TaskLineageRecord, TaskLineageService, taskLineageService | callers=1 | deps=2
@@ -11244,3 +11244,15 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - APK WorkflowのGraph検証Stepに`timeout-minutes: 10`を設定し、別の検証スクリプトに終了不能が残った場合もCI全体を長時間停止させない。TimeoutはFail-fast境界であり、検証PASSを代替しない。
 - TermuxのP155/P211/P212/P213/P214/P215/P216検証結果：PASS（各コマンドが終了コード0。P215はGraphレポート出力後にNode.jsプロセスも終了）。
 - 新しいGitHub Actions runのWeb Build、Rust/Android Build、APK Artifact、Galaxy S25実機試験は本記録の更新だけでは成立しない。新規Actions結果とArtifact、実機証跡を別々に確認する。
+
+============================================================
+【2026-10-12-P236 起動ステージ・18分類監査の通過地点と現在地点Journal】
+============================================================
+
+- 既存のSystemLogger Runtime Breadcrumb Journalを拡張し、起動初期化ステージごとに開始・完了・失敗を記録する。開始イベントは現在のstageとlastCompleted、完了イベントはlastCompletedとnextStageを含む。
+- `domainParticipationService.auditAll()` は各ドメインのHEALTH_CHECK／PARTICIPATE／VERIFY_CONNECTIONについて、開始前と結果確定後に現在のdomain/step、実行順、完了試行数／計画数、lastCompleted、nextDomain/nextStep、status、elapsedMs、acceptedを記録する。例外・不受理・正常終了を区別する。
+- 第2Loggerや別の永続化サービスは追加しない。イベント名とscalar metadataは既存allowlistで検査し、1ストリームにつき現在セッションのprogress checkpointを最新1件へ集約する。過去セッションのcheckpointはNative追記成功による回収まで保持する。既存の64件上限、12詳細キー上限、値の長さ制限、会話本文／プロンプト／コード本文／例外messageを保存しない規則を維持する。
+- 自動検証結果はTermux実行コマンドの出力に従って下記へ記録する。正本Revision・対象ソース行数・P225〜P236のインベントリ未再集計注意書きを更新し、全体インベントリを再集計したとは扱わない。
+- Termux static checks: PASS (runtime_failure_regressions, runtime_logging_contract, production_build, whitespace_diff).
+- Failed checks: none.
+- Android実機での次回起動ログ回収と、強制終了原因の確定は未実施。lastCompleted/current/next checkpointは直近の処理地点を示す証拠であり、OS Kill・WebView Renderer crash・ANRの原因をそれだけで断定しない。

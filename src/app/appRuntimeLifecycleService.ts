@@ -96,26 +96,41 @@ class AppRuntimeLifecycleService {
     ];
 
     try {
-      for (const stage of stages) {
+      let lastCompletedStage = 'BOOT';
+      for (const [stageIndex, stage] of stages.entries()) {
         if (generation !== this.generation) return;
         await this.yieldToBrowser();
         if (generation !== this.generation) return;
 
+        systemLogger.recordRuntimeBreadcrumb('RUNTIME_STAGE_BEGIN', {
+          stage: stage.name, status: 'STARTED', lastCompleted: lastCompletedStage,
+        });
         const startedAt = performance.now();
         systemLogger.info('SYSTEM', '[RUNTIME_INIT] stage begin', { stage: stage.name });
         try {
           await stage.run();
         } catch (error) {
+          const elapsedMs = Math.round(performance.now() - startedAt);
+          systemLogger.recordRuntimeBreadcrumb('RUNTIME_STAGE_FAILED', {
+            stage: stage.name, status: 'FAILED', lastCompleted: lastCompletedStage, elapsedMs,
+            errorType: error instanceof Error ? error.name : typeof error,
+          });
           systemLogger.error('SYSTEM', '[RUNTIME_INIT] stage failed', {
             stage: stage.name,
-            elapsedMs: Math.round(performance.now() - startedAt),
+            elapsedMs,
             errorType: error instanceof Error ? error.name : typeof error,
           });
           throw error;
         }
+        const elapsedMs = Math.round(performance.now() - startedAt);
+        systemLogger.recordRuntimeBreadcrumb('RUNTIME_STAGE_COMPLETE', {
+          stage: stage.name, status: 'COMPLETED', lastCompleted: stage.name,
+          nextStage: stages[stageIndex + 1]?.name || 'NONE', elapsedMs,
+        });
+        lastCompletedStage = stage.name;
         systemLogger.info('SYSTEM', '[RUNTIME_INIT] stage complete', {
           stage: stage.name,
-          elapsedMs: Math.round(performance.now() - startedAt),
+          elapsedMs,
         });
         await this.yieldToBrowser();
       }

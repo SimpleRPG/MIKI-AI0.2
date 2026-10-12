@@ -13,11 +13,27 @@ const RUNTIME_BREADCRUMB_EVENTS = new Set([
   'APP_VISIBILITY_HIDDEN', 'APP_PAGEHIDE', 'APP_BEFORE_UNLOAD', 'APP_ROOT_RENDER_SUBMITTED', 'BOOTSTRAP_FAILED',
   'UI_NAV_TAP', 'UI_NAV_STATE_COMMITTED', 'CHAT_PANEL_MOUNT_EFFECT',
   'CHAT_CODE_VERIFICATION_BEGIN', 'CHAT_CODE_VERIFICATION_COMPLETE', 'CHAT_CODE_VERIFICATION_FAILED',
+  'RUNTIME_STAGE_BEGIN', 'RUNTIME_STAGE_COMPLETE', 'RUNTIME_STAGE_FAILED',
+  'DOMAIN_AUDIT_BEGIN', 'DOMAIN_AUDIT_OPERATION_BEGIN', 'DOMAIN_AUDIT_OPERATION_COMPLETE',
+  'DOMAIN_AUDIT_OPERATION_FAILED', 'DOMAIN_AUDIT_COMPLETE',
 ]);
+const RUNTIME_BREADCRUMB_PROGRESS_STREAM: Record<string, 'RUNTIME_STAGE' | 'DOMAIN_AUDIT'> = {
+  RUNTIME_STAGE_BEGIN: 'RUNTIME_STAGE',
+  RUNTIME_STAGE_COMPLETE: 'RUNTIME_STAGE',
+  RUNTIME_STAGE_FAILED: 'RUNTIME_STAGE',
+  DOMAIN_AUDIT_BEGIN: 'DOMAIN_AUDIT',
+  DOMAIN_AUDIT_OPERATION_BEGIN: 'DOMAIN_AUDIT',
+  DOMAIN_AUDIT_OPERATION_COMPLETE: 'DOMAIN_AUDIT',
+  DOMAIN_AUDIT_OPERATION_FAILED: 'DOMAIN_AUDIT',
+  DOMAIN_AUDIT_COMPLETE: 'DOMAIN_AUDIT',
+};
+
 const RUNTIME_BREADCRUMB_DETAIL_KEYS = new Set([
   'tab', 'from', 'to', 'visibility', 'usedJSHeapMB', 'messageCount', 'historicalCodeMessageCount',
   'workspaceFileCount', 'initiallyRenderedMessages', 'elapsedMs', 'syntaxPassed', 'testsPassed',
   'cyclesFound', 'errorType', 'reasonType', 'lineNumber', 'columnNumber', 'filenamePresent', 'suppressed',
+  'stage', 'domain', 'step', 'status', 'lastCompleted', 'nextStage', 'nextDomain', 'nextStep',
+  'completedCount', 'totalCount', 'order', 'accepted', 'passed',
 ]);
 
 interface RuntimeBreadcrumb {
@@ -245,7 +261,12 @@ class SystemLogger {
       event,
       details: safeDetails,
     };
-    const journal = this.readRuntimeBreadcrumbs();
+    const stream = RUNTIME_BREADCRUMB_PROGRESS_STREAM[event];
+    const journal = this.readRuntimeBreadcrumbs().filter((existing) =>
+      !stream ||
+      existing.sessionId !== this.runtimeBreadcrumbSessionId ||
+      RUNTIME_BREADCRUMB_PROGRESS_STREAM[existing.event] !== stream
+    );
     journal.push(entry);
     this.writeRuntimeBreadcrumbs(journal);
   }

@@ -23,6 +23,8 @@ const sanitizerCore = read('src/miki/safety/services/abstractSanitizerService.ts
 const outboundHelper = read('src/miki/safety/services/outboundPayloadSanitizer.ts');
 const design = read('MIKI-AI0.2_統合設計書_正本.txt');
 const runtimeLogger = read('src/services/systemLogger.ts');
+const runtimeLifecycle = read('src/app/appRuntimeLifecycleService.ts');
+const domainParticipation = read('src/miki/core/services/domainParticipationService.ts');
 const app = read('src/App.tsx');
 const chatPanel = read('src/components/ChatPanel.tsx');
 const domainContract = read('src/miki/core/services/domainContractRegistryService.ts');
@@ -256,6 +258,31 @@ check(
     runtimeLogger.includes('sessionId=${entry.sessionId}') &&
     runtimeLogger.includes('replayPreviousRuntimeBreadcrumbs')
 );
+check(
+  'Runtime initialization checkpoints include current and last completed stages',
+  runtimeLifecycle.includes("recordRuntimeBreadcrumb('RUNTIME_STAGE_BEGIN'") &&
+    runtimeLifecycle.includes("recordRuntimeBreadcrumb('RUNTIME_STAGE_COMPLETE'") &&
+    runtimeLifecycle.includes("recordRuntimeBreadcrumb('RUNTIME_STAGE_FAILED'") &&
+    runtimeLifecycle.includes('lastCompletedStage') &&
+    runtimeLifecycle.includes("nextStage: stages[stageIndex + 1]?.name || 'NONE'")
+);
+check(
+  'Domain audit checkpoints include current step and previous/next operation',
+  domainParticipation.includes("recordRuntimeBreadcrumb('DOMAIN_AUDIT_OPERATION_BEGIN'") &&
+    domainParticipation.includes("recordRuntimeBreadcrumb('DOMAIN_AUDIT_OPERATION_COMPLETE'") &&
+    domainParticipation.includes("recordRuntimeBreadcrumb('DOMAIN_AUDIT_OPERATION_FAILED'") &&
+    domainParticipation.includes('lastCompletedOperation') &&
+    domainParticipation.includes('completedCount: completedOperations') &&
+    domainParticipation.includes('nextDomain') && domainParticipation.includes('nextStep')
+);
+check(
+  'Progress breadcrumbs are coalesced per stream while previous-session evidence is retained',
+  runtimeLogger.includes('RUNTIME_BREADCRUMB_PROGRESS_STREAM') &&
+    runtimeLogger.includes('existing.sessionId !== this.runtimeBreadcrumbSessionId') &&
+    runtimeLogger.includes('RUNTIME_BREADCRUMB_PROGRESS_STREAM[existing.event] !== stream') &&
+    runtimeLogger.includes('MAX_RUNTIME_BREADCRUMBS = 64')
+);
+
 const failures = checks.filter(item => !item.passed);
 for (const item of checks) console.log(`${item.passed ? 'PASS' : 'FAIL'} ${item.name}`);
 console.log(JSON.stringify({ passed: failures.length === 0, total: checks.length, failed: failures.map(item => item.name) }, null, 2));
