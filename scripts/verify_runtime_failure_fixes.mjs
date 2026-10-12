@@ -333,20 +333,35 @@ check(
     runtimeLogger.includes('previousEventTypes')
 );
 
+const providerCallIndex = main.indexOf('recordWebViewProviderInfo();');
+const superCreateIndex = main.indexOf('super.onCreate(savedInstanceState);');
+const activityCreateIndex = main.indexOf('NativeWebViewDiagnosticJournal.record(this, "ACTIVITY_CREATE"');
 check(
-  'WebView provider package/version is durably journaled for incident comparison',
-  main.indexOf('recordWebViewProviderInfo();') >= 0 &&
-    main.indexOf('recordWebViewProviderInfo();') < main.indexOf('super.onCreate(savedInstanceState);') &&
+  'WebView provider package/version is journaled after Activity framework initialization',
+  providerCallIndex > superCreateIndex &&
+    providerCallIndex > activityCreateIndex &&
     main.includes('WebView.getCurrentWebViewPackage()') &&
     main.includes('"WEBVIEW_PROVIDER_INFO"') &&
     nativeJournal.includes('"WEBVIEW_PROVIDER_INFO"')
 );
+const sequentialPhaseMarkers = [
+  "checkpoint('ORDER_LOOKUP_BEGIN', 'STARTED')",
+  'order = resolvedOrder;',
+  "checkpoint('ORDER_LOOKUP_COMPLETE', 'COMPLETED')",
+  "checkpoint('INBOUND_RECORD_BEGIN', 'STARTED')",
+  "crossDomainCirculationService.record('core', domain, `SEQUENTIAL_CONNECTION_IN_${index + 1}`, evidenceId);",
+  "checkpoint('INBOUND_RECORD_COMPLETE', 'COMPLETED')",
+  "checkpoint('RETURN_RECORD_BEGIN', 'STARTED')",
+  "crossDomainCirculationService.record(domain, 'core', `SEQUENTIAL_CONNECTION_RETURN_${index + 1}`, evidenceId);",
+  "checkpoint('RETURN_RECORD_COMPLETE', 'COMPLETED')",
+  "checkpoint('VERIFY_COMPLETE', 'COMPLETED')",
+];
+const sequentialPhasePositions = sequentialPhaseMarkers.map((marker) => domainSequentialConnection.indexOf(marker));
 check(
-  'Sequential connection phases survive independently from domain-audit progress coalescing',
-  domainSequentialConnection.includes("recordRuntimeBreadcrumb('DOMAIN_CONNECTION_CHECKPOINT'") &&
-    domainSequentialConnection.includes("checkpoint('INBOUND_COMPLETE', 'COMPLETED')") &&
-    domainSequentialConnection.includes("checkpoint('RETURN_BEGIN', 'STARTED')") &&
-    domainSequentialConnection.includes("checkpoint('COMPLETE', 'COMPLETED')") &&
+  'Sequential connection lookup and inbound/return mutations have ordered checkpoints',
+  sequentialPhasePositions.every((position, index) =>
+    position >= 0 && (index === 0 || position > sequentialPhasePositions[index - 1])
+  ) &&
     domainSequentialConnection.includes("checkpoint('FAILED', 'FAILED'") &&
     runtimeLogger.includes("'DOMAIN_CONNECTION_CHECKPOINT'") &&
     runtimeLogger.includes("DOMAIN_CONNECTION_CHECKPOINT: 'DOMAIN_CONNECTION'") &&

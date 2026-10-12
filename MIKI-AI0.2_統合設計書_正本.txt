@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-12
-正本Revision：2026-10-12-P238
+正本Revision：2026-10-12-P239
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -111,14 +111,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P238）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P239）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-12-P238
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-12-P239
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -396,7 +396,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=168 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/domainReplyLedgerService.ts | lines=350 | symbols=ActionLineage, DomainReplyLedgerRecord, domainReplyLedgerService | callers=7 | deps=6 | Storage=miki_domain_reply_ledger_v1
 - [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=125 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1 / Tests=3
-- [USED] CORE | src/miki/core/services/domainSequentialConnectionService.ts | lines=55 | symbols=DomainConnectionReceipt, domainSequentialConnectionService | callers=1 | deps=2
+- [USED] CORE | src/miki/core/services/domainSequentialConnectionService.ts | lines=64 | symbols=DomainConnectionReceipt, domainSequentialConnectionService | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/evidenceIdentityService.ts | lines=31 | symbols=evidenceIdentityService | callers=3 | deps=1 | Storage=miki_evidence_identity_sequence_v1
 - [USED] CORE | src/miki/core/services/evidenceQualityGateService.ts | lines=15 | symbols=EvidenceQualityResult, evidenceQualityGateService | callers=4 | deps=1
 - [USED] CORE | src/miki/core/services/executionEnvironmentRouterService.ts | lines=85 | symbols=CiExecutionEnvironment, EnvironmentFingerprint, EnvironmentHints, EnvironmentRoute, executionEnvironmentRouterService | callers=3 | deps=2
@@ -11299,4 +11299,24 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
   - post_design_runtime_regressions: PASS
   - post_design_whitespace_diff: PASS
 - Android実機でのprovider version回収、Renderer終了再現、Sequence中断再現は未実施。静的検証と実機確認を同一視しない。
+
+
+============================================================
+【2026-10-12-P239 WebView Provider Lifecycle・Sequential Connection Boundary Checkpoints】
+============================================================
+
+- WebView provider取得はActivityの`super.onCreate(savedInstanceState)`より前に呼ばれていたため、Android frameworkのActivity初期化と`ACTIVITY_CREATE`記録の後へ移動する。provider/version取得失敗時も、既存のnative journalに例外型だけを記録する。
+- `domainSequentialConnectionService.verify()`の順序取得をtry/catch内へ移し、順序取得開始／完了、IN側の循環記録開始／完了、RETURN側の循環記録開始／完了、検証完了／失敗を別phaseとして記録する。処理停止時に最後に完了した境界と次に開始した境界を区別し、例外本文は保存しない。
+- 既存の`DOMAIN_CONNECTION` progress streamとSystemLogger Journalを再利用し、Logger、保存先、18分類構造を増設しない。Verifierはprovider取得のActivity lifecycle順と接続checkpointの順序を回帰検査する。
+- 完全再帰インベントリ全体は再集計していない。変更したソースの正本索引行数のみ更新する。
+- Initial check results (actual exit codes):
+  - runtime_failure_regressions: PASS
+  - android_native_contract: PASS
+  - android_morphology_contract: PASS
+  - production_build: PASS
+  - whitespace_diff: PASS
+- Post-design check results (actual exit codes):
+  - post_design_runtime_regressions: PASS
+  - post_design_whitespace_diff: PASS
+- Android実機でのprovider取得、Renderer終了、Sequence途中停止の再現は未実施。静的検証と実機確認を同一視しない。
 

@@ -25,9 +25,9 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(MIKIJapaneseMorphologyPlugin.class);
         registerPlugin(MIKINativeRunnerPlugin.class);
         registerPlugin(MIKIGraphStorePlugin.class);
-        recordWebViewProviderInfo();
         super.onCreate(savedInstanceState);
         NativeWebViewDiagnosticJournal.record(this, "ACTIVITY_CREATE", "savedStatePresent=" + (savedInstanceState != null), false);
+        recordWebViewProviderInfo();
         registerWebViewDiagnostics();
         mountNativeStartupStatus();
     }
