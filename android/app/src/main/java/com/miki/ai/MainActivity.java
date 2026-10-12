@@ -1,6 +1,8 @@
 package com.miki.ai;
 
+import android.content.pm.PackageInfo;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -23,6 +25,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(MIKIJapaneseMorphologyPlugin.class);
         registerPlugin(MIKINativeRunnerPlugin.class);
         registerPlugin(MIKIGraphStorePlugin.class);
+        recordWebViewProviderInfo();
         super.onCreate(savedInstanceState);
         NativeWebViewDiagnosticJournal.record(this, "ACTIVITY_CREATE", "savedStatePresent=" + (savedInstanceState != null), false);
         registerWebViewDiagnostics();
@@ -51,6 +54,37 @@ public class MainActivity extends BridgeActivity {
     public void onDestroy() {
         NativeWebViewDiagnosticJournal.record(this, "ACTIVITY_DESTROY", "", false);
         super.onDestroy();
+    }
+
+    private void recordWebViewProviderInfo() {
+        final int sdk = Build.VERSION.SDK_INT;
+        if (sdk < Build.VERSION_CODES.O) {
+            NativeWebViewDiagnosticJournal.record(
+                this, "WEBVIEW_PROVIDER_INFO", "status=UNSUPPORTED,sdk=" + sdk, true
+            );
+            return;
+        }
+        try {
+            PackageInfo provider = WebView.getCurrentWebViewPackage();
+            if (provider == null) {
+                NativeWebViewDiagnosticJournal.record(
+                    this, "WEBVIEW_PROVIDER_INFO", "status=UNAVAILABLE,sdk=" + sdk, true
+                );
+                return;
+            }
+            String version = provider.versionName != null ? provider.versionName : "UNKNOWN";
+            NativeWebViewDiagnosticJournal.record(
+                this, "WEBVIEW_PROVIDER_INFO",
+                "status=AVAILABLE,provider=" + provider.packageName + ",version=" + version + ",sdk=" + sdk,
+                true
+            );
+        } catch (RuntimeException error) {
+            NativeWebViewDiagnosticJournal.record(
+                this, "WEBVIEW_PROVIDER_INFO",
+                "status=ERROR,errorType=" + error.getClass().getSimpleName() + ",sdk=" + sdk,
+                true
+            );
+        }
     }
 
     private void registerWebViewDiagnostics() {

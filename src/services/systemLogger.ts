@@ -17,9 +17,9 @@ const RUNTIME_BREADCRUMB_EVENTS = new Set([
   'CHAT_CODE_VERIFICATION_BEGIN', 'CHAT_CODE_VERIFICATION_COMPLETE', 'CHAT_CODE_VERIFICATION_FAILED',
   'RUNTIME_STAGE_BEGIN', 'RUNTIME_STAGE_COMPLETE', 'RUNTIME_STAGE_FAILED',
   'DOMAIN_AUDIT_BEGIN', 'DOMAIN_AUDIT_OPERATION_BEGIN', 'DOMAIN_AUDIT_OPERATION_COMPLETE',
-  'DOMAIN_AUDIT_OPERATION_FAILED', 'DOMAIN_AUDIT_COMPLETE',
+  'DOMAIN_AUDIT_OPERATION_FAILED', 'DOMAIN_AUDIT_COMPLETE', 'DOMAIN_CONNECTION_CHECKPOINT',
 ]);
-const RUNTIME_BREADCRUMB_PROGRESS_STREAM: Record<string, 'RUNTIME_STAGE' | 'DOMAIN_AUDIT'> = {
+const RUNTIME_BREADCRUMB_PROGRESS_STREAM: Record<string, 'RUNTIME_STAGE' | 'DOMAIN_AUDIT' | 'DOMAIN_CONNECTION'> = {
   RUNTIME_STAGE_BEGIN: 'RUNTIME_STAGE',
   RUNTIME_STAGE_COMPLETE: 'RUNTIME_STAGE',
   RUNTIME_STAGE_FAILED: 'RUNTIME_STAGE',
@@ -28,6 +28,7 @@ const RUNTIME_BREADCRUMB_PROGRESS_STREAM: Record<string, 'RUNTIME_STAGE' | 'DOMA
   DOMAIN_AUDIT_OPERATION_COMPLETE: 'DOMAIN_AUDIT',
   DOMAIN_AUDIT_OPERATION_FAILED: 'DOMAIN_AUDIT',
   DOMAIN_AUDIT_COMPLETE: 'DOMAIN_AUDIT',
+  DOMAIN_CONNECTION_CHECKPOINT: 'DOMAIN_CONNECTION',
 };
 
 const RUNTIME_BREADCRUMB_DETAIL_KEYS = new Set([
@@ -35,7 +36,7 @@ const RUNTIME_BREADCRUMB_DETAIL_KEYS = new Set([
   'workspaceFileCount', 'initiallyRenderedMessages', 'elapsedMs', 'syntaxPassed', 'testsPassed',
   'cyclesFound', 'errorType', 'reasonType', 'lineNumber', 'columnNumber', 'filenamePresent', 'suppressed',
   'stage', 'domain', 'step', 'status', 'lastCompleted', 'nextStage', 'nextDomain', 'nextStep',
-  'completedCount', 'totalCount', 'order', 'accepted', 'passed',
+  'completedCount', 'totalCount', 'order', 'accepted', 'passed', 'correlationId', 'phase',
 ]);
 
 interface RuntimeBreadcrumb {

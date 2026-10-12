@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-12
-正本Revision：2026-10-12-P237
+正本Revision：2026-10-12-P238
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -111,14 +111,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P237）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P238）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-12-P237
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-12-P238
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -396,7 +396,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=168 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/domainReplyLedgerService.ts | lines=350 | symbols=ActionLineage, DomainReplyLedgerRecord, domainReplyLedgerService | callers=7 | deps=6 | Storage=miki_domain_reply_ledger_v1
 - [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=125 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1 / Tests=3
-- [USED] CORE | src/miki/core/services/domainSequentialConnectionService.ts | lines=35 | symbols=DomainConnectionReceipt, domainSequentialConnectionService | callers=1 | deps=2
+- [USED] CORE | src/miki/core/services/domainSequentialConnectionService.ts | lines=55 | symbols=DomainConnectionReceipt, domainSequentialConnectionService | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/evidenceIdentityService.ts | lines=31 | symbols=evidenceIdentityService | callers=3 | deps=1 | Storage=miki_evidence_identity_sequence_v1
 - [USED] CORE | src/miki/core/services/evidenceQualityGateService.ts | lines=15 | symbols=EvidenceQualityResult, evidenceQualityGateService | callers=4 | deps=1
 - [USED] CORE | src/miki/core/services/executionEnvironmentRouterService.ts | lines=85 | symbols=CiExecutionEnvironment, EnvironmentFingerprint, EnvironmentHints, EnvironmentRoute, executionEnvironmentRouterService | callers=3 | deps=2
@@ -1025,7 +1025,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [ORPHAN] LEGACY_OR_SHARED | src/services/storagePlanningService.ts | lines=220 | symbols=StoragePlanningService, storagePlanningService | callers=0 | deps=4 | Storage=miki_storage_audit_log_v32
 - [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=653 | symbols=storageService | callers=295 | deps=1 | Tests=7
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/syntheticDataService.ts | lines=779 | symbols=SyntheticDataService, syntheticDataService, toolsService | callers=1 | deps=9 | Storage=miki_ai_synthetic_batches
-- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=952 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
+- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=953 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
 - [USED] LEGACY_OR_SHARED | src/services/taskCaseMemoryService.ts | lines=45 | symbols=TaskCaseMaturity, TaskCaseMemoryService, TaskCaseOutcome, TaskCaseRecord, taskCaseMemoryService | callers=4 | deps=5
 - [USED] LEGACY_OR_SHARED | src/services/taskExecutionOrchestratorService.ts | lines=237 | symbols=TaskExecutionHandle, TaskExecutionOrchestratorService, TaskExecutionStatus, taskExecutionOrchestratorService | callers=1 | deps=15
 - [USED] LEGACY_OR_SHARED | src/services/taskLineageService.ts | lines=45 | symbols=TaskLineageRecord, TaskLineageService, taskLineageService | callers=1 | deps=2
@@ -1060,7 +1060,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt | lines=150 | symbols=MIKIJapaneseMorphologyPlugin | callers=0 | deps=0 | Plugin=MIKIJapaneseMorphology
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeCore.kt | lines=155 | symbols=NativeCoreHealth | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt | lines=833 | symbols=MIKINativeRunnerPlugin, NativeTestContext, NativeTestOutcome | callers=0 | deps=0 | Plugin=MIKINativeRunner
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=178 | symbols=MainActivity | callers=0 | deps=0
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=212 | symbols=MainActivity | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiBackgroundWorker.kt | lines=316 | symbols=ConditionCheckResult, MikiBackgroundWorker | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt | lines=445 | symbols=MikiWorkManagerPlugin | callers=0 | deps=0 | Plugin=MikiWorkManagerPlugin / Markers=1
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/NativeWebViewDiagnosticJournal.java | lines=83 | symbols=NativeWebViewDiagnosticJournal | callers=2 | deps=0
@@ -11280,4 +11280,23 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
   - post_design_runtime_regressions: PASS
   - post_design_whitespace_diff: FAIL (exit 2)
 - Android実機でのRenderer終了再現、Native spool回収、実機UI検証は未実施。Static check／APK build成功と実機確認を同一視しない。
+
+============================================================
+【2026-10-12-P238 WebView Provider Version・Sequential Connection Micro-Checkpoints】
+============================================================
+
+- P237で記録を開始したRenderer/Activity診断に、Android実機が実際に使っているWebView providerのpackage名・versionName・Android SDKを追加する。取得不能・非対応・例外の場合も状態と例外型のみを記録し、URL、HTML、会話内容、プロンプト、例外本文は保存しない。
+- `domainSequentialConnectionService.verify()`は、`SEQUENTIAL_CONNECTION_IN_n`の記録前、IN側の記録完了、`SEQUENTIAL_CONNECTION_RETURN_n`の記録直前、RETURN側の記録完了を`DOMAIN_CONNECTION_CHECKPOINT`へ同期記録する。domain/order/correlationId/phase/status/elapsedMs/errorTypeを保存し、値は既存のscalar allowlistと長さ制限を通す。
+- Sequential connectionはDomain audit本体と別の`DOMAIN_CONNECTION` progress streamへ集約する。これにより、監査全体の現在地点と、その中の接続処理の現在地点を別々に保持し、プロセス断絶時も「RETURNを呼ぶ前」か「RETURN記録の後」かを区別できる。新しいLoggerや保存DBは追加しない。
+- 完全再帰インベントリ全体は再集計していない。正本インデックスに存在する変更対象ソースの行数のみ実ファイルから更新する。
+- Initial check results (actual exit codes):
+  - runtime_failure_regressions: PASS
+  - android_native_contract: PASS
+  - android_morphology_contract: PASS
+  - production_build: PASS
+  - whitespace_diff: PASS
+- Post-design check results (actual exit codes):
+  - post_design_runtime_regressions: PASS
+  - post_design_whitespace_diff: PASS
+- Android実機でのprovider version回収、Renderer終了再現、Sequence中断再現は未実施。静的検証と実機確認を同一視しない。
 

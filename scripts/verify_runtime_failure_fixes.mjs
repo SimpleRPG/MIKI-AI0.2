@@ -26,6 +26,7 @@ const design = read('MIKI-AI0.2_統合設計書_正本.txt');
 const runtimeLogger = read('src/services/systemLogger.ts');
 const runtimeLifecycle = read('src/app/appRuntimeLifecycleService.ts');
 const domainParticipation = read('src/miki/core/services/domainParticipationService.ts');
+const domainSequentialConnection = read('src/miki/core/services/domainSequentialConnectionService.ts');
 const app = read('src/App.tsx');
 const mainEntry = read('src/main.tsx');
 const chatPanel = read('src/components/ChatPanel.tsx');
@@ -330,6 +331,27 @@ check(
   runtimeLogger.includes("'[RUNTIME_BREADCRUMB] recovery scan'") &&
     runtimeLogger.includes('previousSessionEntryCount') &&
     runtimeLogger.includes('previousEventTypes')
+);
+
+check(
+  'WebView provider package/version is durably journaled for incident comparison',
+  main.indexOf('recordWebViewProviderInfo();') >= 0 &&
+    main.indexOf('recordWebViewProviderInfo();') < main.indexOf('super.onCreate(savedInstanceState);') &&
+    main.includes('WebView.getCurrentWebViewPackage()') &&
+    main.includes('"WEBVIEW_PROVIDER_INFO"') &&
+    nativeJournal.includes('"WEBVIEW_PROVIDER_INFO"')
+);
+check(
+  'Sequential connection phases survive independently from domain-audit progress coalescing',
+  domainSequentialConnection.includes("recordRuntimeBreadcrumb('DOMAIN_CONNECTION_CHECKPOINT'") &&
+    domainSequentialConnection.includes("checkpoint('INBOUND_COMPLETE', 'COMPLETED')") &&
+    domainSequentialConnection.includes("checkpoint('RETURN_BEGIN', 'STARTED')") &&
+    domainSequentialConnection.includes("checkpoint('COMPLETE', 'COMPLETED')") &&
+    domainSequentialConnection.includes("checkpoint('FAILED', 'FAILED'") &&
+    runtimeLogger.includes("'DOMAIN_CONNECTION_CHECKPOINT'") &&
+    runtimeLogger.includes("DOMAIN_CONNECTION_CHECKPOINT: 'DOMAIN_CONNECTION'") &&
+    runtimeLogger.includes("'correlationId'") &&
+    runtimeLogger.includes("'phase'")
 );
 
 const failures = checks.filter(item => !item.passed);

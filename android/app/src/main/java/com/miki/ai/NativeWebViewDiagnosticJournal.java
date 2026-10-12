@@ -26,7 +26,7 @@ public final class NativeWebViewDiagnosticJournal {
     private static final Set<String> ALLOWED_EVENTS = new HashSet<>(Arrays.asList(
         "ACTIVITY_CREATE", "ACTIVITY_RESUME", "ACTIVITY_PAUSE", "ACTIVITY_STOP", "ACTIVITY_DESTROY",
         "WEBVIEW_LISTENER_UNAVAILABLE", "WEBVIEW_PAGE_STARTED", "WEBVIEW_PAGE_COMMIT_VISIBLE", "WEBVIEW_PAGE_LOADED",
-        "WEBVIEW_RENDER_PROCESS_GONE"
+        "WEBVIEW_RENDER_PROCESS_GONE", "WEBVIEW_PROVIDER_INFO"
     ));
 
     private NativeWebViewDiagnosticJournal() {}
