@@ -406,6 +406,30 @@ check(
     !nativeJournal.includes('getSubReason()')
 );
 
+check(
+  'Uncaught Java/Kotlin exceptions are durably journaled before delegating to the original handler',
+  main.includes('NativeWebViewDiagnosticJournal.installUncaughtExceptionHandler(getApplicationContext());') &&
+    nativeJournal.includes('Thread.setDefaultUncaughtExceptionHandler') &&
+    nativeJournal.includes('"UNCAUGHT_EXCEPTION"') &&
+    nativeJournal.includes('previousHandler.uncaughtException(thread, error)') &&
+    nativeJournal.includes('frameCount=') &&
+    nativeJournal.includes('output.getFD().sync()') &&
+    !nativeJournal.includes('error.getMessage()')
+);
+
+check(
+  'Historical exit traces are bounded, hashed, and reduced to selected Java frame names',
+  nativeJournal.includes('getTraceInputStream()') &&
+    nativeJournal.includes('PROCESS_EXIT_TRACE_SUMMARY') &&
+    nativeJournal.includes('PROCESS_EXIT_TRACE_FRAME') &&
+    nativeJournal.includes('MAX_EXIT_TRACE_SAMPLE_BYTES') &&
+    nativeJournal.includes('sampleSha256=') &&
+    nativeJournal.includes('extractTraceFrames') &&
+    nativeJournal.includes('isLikelyTextTrace') &&
+    !nativeJournal.includes('getDescription()') &&
+    !nativeJournal.includes('readAllBytes()')
+);
+
 const failures = checks.filter(item => !item.passed);
 for (const item of checks) console.log(`${item.passed ? 'PASS' : 'FAIL'} ${item.name}`);
 console.log(JSON.stringify({ passed: failures.length === 0, total: checks.length, failed: failures.map(item => item.name) }, null, 2));

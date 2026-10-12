@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-13
-正本Revision：2026-10-13-P242
+正本Revision：2026-10-13-P243
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P242）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P243）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-13-P242
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-13-P243
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -1062,10 +1062,10 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt | lines=150 | symbols=MIKIJapaneseMorphologyPlugin | callers=0 | deps=0 | Plugin=MIKIJapaneseMorphology
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeCore.kt | lines=155 | symbols=NativeCoreHealth | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt | lines=833 | symbols=MIKINativeRunnerPlugin, NativeTestContext, NativeTestOutcome | callers=0 | deps=0 | Plugin=MIKINativeRunner
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=213 | symbols=MainActivity | callers=0 | deps=0
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=214 | symbols=MainActivity | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiBackgroundWorker.kt | lines=316 | symbols=ConditionCheckResult, MikiBackgroundWorker | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt | lines=445 | symbols=MikiWorkManagerPlugin | callers=0 | deps=0 | Plugin=MikiWorkManagerPlugin / Markers=1
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/NativeWebViewDiagnosticJournal.java | lines=200 | symbols=NativeWebViewDiagnosticJournal | callers=2 | deps=0
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/NativeWebViewDiagnosticJournal.java | lines=356 | symbols=NativeWebViewDiagnosticJournal | callers=2 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml | lines=34 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/drawable/ic_launcher_background.xml | lines=170 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/layout/activity_main.xml | lines=14 | symbols=- | callers=0 | deps=0
@@ -7386,6 +7386,8 @@ Journalを残し、起動を阻害しない。これは第二Loggerではなく�
 
 `MainActivity.registerWebViewDiagnostics()`の`onRenderProcessGone()`は現在`return false`を返す。ロック済み依存`@capacitor/android 8.5.2`の`BridgeWebViewClient.onRenderProcessGone()`はlistenerの戻り値をOR集約して返し、このリポジトリで確認できたlistenerは`MainActivity`のみである。Android公式契約ではfalseはrenderer終了を処理済みと示さず、rendererがクラッシュした場合はアプリプロセスがクラッシュし、OSがrendererを終了した場合はアプリプロセスも終了し得る。したがって従来の『診断専用のfalse』という説明は技術的に誤りであり、renderer終了イベントが発生した場合の具体的なプロセス終了リスクとして扱う。公式根拠：https://raw.githubusercontent.com/ionic-team/capacitor/8.5.2/android/capacitor/src/main/java/com/getcapacitor/BridgeWebViewClient.java ; https://developer.android.com/reference/android/webkit/WebViewClient#onRenderProcessGone 。修正時は終了したWebViewを階層から除去して参照を解放し、適切な復旧経路を用意したうえで、処理済みのときのみtrueを返す。ただし今回提示されたログには`WEBVIEW_RENDER_PROCESS_GONE`イベントがなく、今回のCRASH原因そのものと確定はしない。
 
+`NativeWebViewDiagnosticJournal.installUncaughtExceptionHandler()`は`MainActivity.onCreate()`の先頭でJava/Kotlin未処理例外の種類、cause型、先頭スタックフレームを同期Journalへ記録し、その後は既存のuncaught exception handlerへ委譲する。OSの終了履歴では`ApplicationExitInfo.getTraceInputStream()`の取得状態、最大128KiBのサンプルサイズ・切り詰め状態・SHA-256、抽出できた最大8件のJava stack frame名を記録する。例外message・raw trace・自由記述description・URL・会話本文は保存しない。OSがトレースを提供しない場合もstatusを記録する。
+
 Runtimeログの粒度は「正常経路を短く、停止点を詳しく」とする。
 - 正常なStartup / CORE routing / Domain dispatch / 再評価 / Task完了は、段階・対象・結果を1行程度で記録し、既存の詳細Traceを別系統で重複出力しない。
 - WARNは、再試行・待機・一時停止など「まだ停止ではない状態」を短く記録する。
@@ -11377,3 +11379,15 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - Runtime Memory Diagnosticsは`2026-10-12T14:18:29.976Z`に`usedJSHeapMB=110.6`、`totalJSHeapMB=124.9`、`jsHeapLimitMB=2994.5`、`pressure=NORMAL`を記録した。この標本は終了直前そのものではなく、OS全体のメモリ状態や終了原因を確定しない。
 - `MainActivity`の`onRenderProcessGone()`が`false`を返すことは実コードから確認でき、Capacitor Android 8.5.2のBridgeWebViewClientはlistenerの戻り値をOR集約してframeworkへ返す。Android公式契約では未処理のRenderer終了をfalseで返した場合、Renderer crash時はアプリプロセスもクラッシュする。従ってこれは根本原因の有力な調査対象であり、以前の「falseは診断専用」という説明を訂正する。ただし、今回提示されたログに`WEBVIEW_RENDER_PROCESS_GONE`がないため、この実行で当該callbackが呼ばれたとは確定せず、直接原因は未確定のままとする。
 - このRevisionで変更するのは本正本のみであり、アプリのソースコードやUIは変更していない。完全再帰インベントリの再集計は行っていない。次の実装修正ではRenderer callbackの処理・無効WebViewの除去・安全な復旧を検討し、GitHub Actionsでビルド結果を確認する。今回の設計更新だけでソース修正、CI成功、APK生成、DEVICE_VERIFIEDとは扱わない。
+
+============================================================
+【2026-10-13-P243 未処理例外・Android終了トレースの追加記録】
+============================================================
+
+- `MainActivity.onCreate()`の先頭で既定`Thread.UncaughtExceptionHandler`を一度だけラップする。未処理Java/Kotlin例外の型、cause型、main threadかどうか、スタック件数、先頭フレームを既存Native journalへ同期保存し、元のhandlerへ処理を委譲する。例外message・全stack traceは保存しない。
+- `ApplicationExitInfo`の履歴取得時に、`getTraceInputStream()`の有無と取得状態を記録する。取得できる場合は最大128KiBだけをsampleとして読み、byte数・truncated flag・sample SHA-256と、テキストとして解釈できる場合だけ最大8件まで抽出したJava frame名を記録する。API 31以降のnative tombstoneはprotobufの場合があるため、生データをstack text扱いせずsample hashを残す。raw trace／自由記述descriptionは保存せず、既存の64KiB journal上限と次回起動時のDownloads回収を再利用する。
+- Native journalのevent allow-listと`scripts/verify_runtime_failure_fixes.mjs`を更新し、uncaught handlerからの委譲、同期保存、bounded trace、frame抽出、自由記述を保存しない条件を回帰検証する。正本の現行実装索引では、変更した`MainActivity.java`と`NativeWebViewDiagnosticJournal.java`の行数だけ実ファイルから再集計する。完全再帰インベントリは再集計しない。
+- これは終了原因を絞り込むための診断追加であり、プロセスの強制終了を発生中に必ず記録できる保証ではない。OS killではuncaught handlerは実行されず、exit reasonとtraceは次回起動時のAndroid履歴に依存する。traceが存在しない場合も原因を断定しない。
+- 変更範囲は`MainActivity.java`、`NativeWebViewDiagnosticJournal.java`、`scripts/verify_runtime_failure_fixes.mjs`、本正本のみ。UI／通常のCORE経路は変更しない。TermuxではWeb/Rust/Gradle buildを実行せず、GitHub Actions／APK／実機の結果は後続確認とする。
+- Initial runtime verifier exit code (0=PASS): `0`.
+- Post-design runtime verifier exit code (0=PASS): `0`.

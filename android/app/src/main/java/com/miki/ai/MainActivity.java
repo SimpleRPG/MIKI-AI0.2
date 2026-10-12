@@ -21,6 +21,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        NativeWebViewDiagnosticJournal.installUncaughtExceptionHandler(getApplicationContext());
         registerPlugin(MikiWorkManagerPlugin.class);
         registerPlugin(MIKIJapaneseMorphologyPlugin.class);
         registerPlugin(MIKINativeRunnerPlugin.class);

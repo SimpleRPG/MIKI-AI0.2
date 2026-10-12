@@ -14,6 +14,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -25,6 +27,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Small, content-free native journal for WebView/Activity failures.
@@ -33,11 +37,16 @@ import java.util.TimeZone;
 public final class NativeWebViewDiagnosticJournal {
     private static final String FILE_NAME = "miki_native_webview_diagnostics_v1.log";
     private static final int MAX_PENDING_BYTES = 64 * 1024;
+    private static final int MAX_EXIT_TRACE_SAMPLE_BYTES = 128 * 1024;
+    private static final int MAX_EXIT_TRACE_FRAMES = 8;
+    private static final Pattern TRACE_FRAME_PATTERN =
+        Pattern.compile("^\\s*at\\s+([A-Za-z0-9_.$]+)\\((?:[^)]*)\\)");
     private static final Set<String> ALLOWED_EVENTS = new HashSet<>(Arrays.asList(
         "ACTIVITY_CREATE", "ACTIVITY_RESUME", "ACTIVITY_PAUSE", "ACTIVITY_STOP", "ACTIVITY_DESTROY",
         "WEBVIEW_LISTENER_UNAVAILABLE", "WEBVIEW_PAGE_STARTED", "WEBVIEW_PAGE_COMMIT_VISIBLE", "WEBVIEW_PAGE_LOADED",
         "WEBVIEW_RENDER_PROCESS_GONE", "WEBVIEW_PROVIDER_INFO",
-        "PROCESS_EXIT_HISTORY", "PROCESS_EXIT_HISTORY_SCAN"
+        "PROCESS_EXIT_HISTORY", "PROCESS_EXIT_HISTORY_SCAN", "UNCAUGHT_EXCEPTION",
+        "PROCESS_EXIT_TRACE_SUMMARY", "PROCESS_EXIT_TRACE_FRAME"
     ));
 
     private NativeWebViewDiagnosticJournal() {}
@@ -45,6 +54,48 @@ public final class NativeWebViewDiagnosticJournal {
     private static final long PROCESS_START_ELAPSED_REALTIME_MS = SystemClock.elapsedRealtime();
     private static final String EXIT_HISTORY_PREFERENCES = "miki_native_process_exit_history_v1";
     private static final String LAST_EXIT_TIMESTAMP_KEY = "last_reported_exit_timestamp_ms";
+    private static boolean uncaughtExceptionHandlerInstalled = false;
+
+    /**
+     * Captures minimal exception evidence before delegating to Android's original handler.
+     * Exception messages and full stack traces are intentionally not persisted.
+     */
+    public static synchronized void installUncaughtExceptionHandler(Context context) {
+        if (context == null || uncaughtExceptionHandlerInstalled) return;
+        final Context appContext = context.getApplicationContext() != null
+            ? context.getApplicationContext() : context;
+        final Thread.UncaughtExceptionHandler previousHandler = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread thread, Throwable error) {
+                try {
+                    StackTraceElement[] frames = error.getStackTrace();
+                    StringBuilder details = new StringBuilder();
+                    details.append("exceptionType=").append(safeToken(error.getClass().getName()))
+                        .append(",threadIsMain=").append(thread != null && "main".equals(thread.getName()))
+                        .append(",frameCount=").append(frames == null ? 0 : frames.length);
+                    if (frames != null && frames.length > 0) {
+                        StackTraceElement frame = frames[0];
+                        details.append(",frame0=").append(safeToken(frame.getClassName()))
+                            .append(".").append(safeToken(frame.getMethodName()))
+                            .append(":").append(frame.getLineNumber());
+                    }
+                    Throwable cause = error.getCause();
+                    if (cause != null) details.append(",causeType=").append(safeToken(cause.getClass().getName()));
+                    record(appContext, "UNCAUGHT_EXCEPTION", details.toString(), true);
+                } catch (Throwable loggingFailure) {
+                    Log.e("MIKI_NATIVE_DIAGNOSTICS", "uncaught exception diagnostic write failed", loggingFailure);
+                }
+                if (previousHandler != null) {
+                    previousHandler.uncaughtException(thread, error);
+                } else {
+                    android.os.Process.killProcess(android.os.Process.myPid());
+                    System.exit(10);
+                }
+            }
+        });
+        uncaughtExceptionHandlerInstalled = true;
+    }
 
     public static synchronized boolean record(Context context, String event, String details, boolean durable) {
         if (context == null || !ALLOWED_EVENTS.contains(event)) return false;
@@ -79,6 +130,12 @@ public final class NativeWebViewDiagnosticJournal {
      * Copies Android's recent process-death metadata into the existing durable native journal.
      * Human-readable system descriptions, URLs, page content, and conversation data are never stored.
      */
+    private static String safeToken(String value) {
+        if (value == null || value.isEmpty()) return "UNKNOWN";
+        String safe = value.replaceAll("[^A-Za-z0-9_.-]", "_");
+        return safe.length() <= 80 ? safe : safe.substring(0, 80);
+    }
+
     public static synchronized void recordPreviousProcessExitReasons(Context context) {
         if (context == null) return;
         final int sdk = Build.VERSION.SDK_INT;
@@ -132,7 +189,11 @@ public final class NativeWebViewDiagnosticJournal {
                     record(context, "PROCESS_EXIT_HISTORY_SCAN", "status=JOURNAL_WRITE_FAILED,exitTimeMs=" + exitTimestampMs, true);
                     return;
                 }
-                // Advance the watermark only after the durable event append succeeds.
+                if (!recordExitTraceEvidence(context, info)) {
+                    record(context, "PROCESS_EXIT_HISTORY_SCAN", "status=TRACE_JOURNAL_WRITE_FAILED,exitTimeMs=" + exitTimestampMs, true);
+                    return;
+                }
+                // Advance the watermark only after exit metadata and trace evidence are durable.
                 if (!preferences.edit().putLong(LAST_EXIT_TIMESTAMP_KEY, exitTimestampMs).commit()) {
                     record(context, "PROCESS_EXIT_HISTORY_SCAN", "status=WATERMARK_COMMIT_FAILED,exitTimeMs=" + exitTimestampMs, true);
                     return;
@@ -146,6 +207,101 @@ public final class NativeWebViewDiagnosticJournal {
             record(context, "PROCESS_EXIT_HISTORY_SCAN",
                 "status=ERROR,errorType=" + error.getClass().getSimpleName() + ",sdk=" + sdk, true);
         }
+    }
+
+    /**
+     * Copies only bounded trace metadata and selected Java frame names into the journal.
+     * The raw trace, descriptions, URLs, page content, and conversation data are never persisted.
+     */
+    private static boolean recordExitTraceEvidence(Context context, ApplicationExitInfo info) {
+        final long exitTimestampMs = info.getTimestamp();
+        final int pid = info.getPid();
+        final int reason = info.getReason();
+        InputStream traceStream = null;
+        try {
+            traceStream = info.getTraceInputStream();
+            if (traceStream == null) {
+                return record(context, "PROCESS_EXIT_TRACE_SUMMARY",
+                    "status=UNAVAILABLE,exitTimeMs=" + exitTimestampMs + ",pid=" + pid + ",reasonCode=" + reason,
+                    true);
+            }
+
+            ByteArrayOutputStream sample = new ByteArrayOutputStream();
+            boolean sampleTruncated = false;
+            try (InputStream input = traceStream) {
+                byte[] buffer = new byte[4096];
+                int count;
+                while (sample.size() < MAX_EXIT_TRACE_SAMPLE_BYTES) {
+                    int capacity = Math.min(buffer.length, MAX_EXIT_TRACE_SAMPLE_BYTES - sample.size());
+                    count = input.read(buffer, 0, capacity);
+                    if (count < 0) break;
+                    sample.write(buffer, 0, count);
+                }
+                if (sample.size() == MAX_EXIT_TRACE_SAMPLE_BYTES) sampleTruncated = input.read() != -1;
+                traceStream = null;
+            }
+
+            byte[] sampleBytes = sample.toByteArray();
+            String sampleHash = sha256Hex(sampleBytes);
+            List<String> frames = extractTraceFrames(sampleBytes);
+            String summary = "status=AVAILABLE,exitTimeMs=" + exitTimestampMs
+                + ",pid=" + pid + ",reasonCode=" + reason
+                + ",sampledBytes=" + sampleBytes.length
+                + ",sampleTruncated=" + sampleTruncated
+                + ",sampleSha256=" + sampleHash
+                + ",frameCount=" + frames.size();
+            if (!record(context, "PROCESS_EXIT_TRACE_SUMMARY", summary, true)) return false;
+
+            for (int i = 0; i < frames.size() && i < MAX_EXIT_TRACE_FRAMES; i++) {
+                String frameDetails = "exitTimeMs=" + exitTimestampMs + ",pid=" + pid
+                    + ",frameIndex=" + i + ",frame=" + frames.get(i);
+                if (!record(context, "PROCESS_EXIT_TRACE_FRAME", frameDetails, true)) return false;
+            }
+            return true;
+        } catch (Exception error) {
+            return record(context, "PROCESS_EXIT_TRACE_SUMMARY",
+                "status=ERROR,exitTimeMs=" + exitTimestampMs + ",pid=" + pid
+                    + ",reasonCode=" + reason + ",errorType=" + error.getClass().getSimpleName(),
+                true);
+        } finally {
+            if (traceStream != null) {
+                try { traceStream.close(); } catch (IOException ignored) {}
+            }
+        }
+    }
+
+    private static String sha256Hex(byte[] value) throws Exception {
+        byte[] digest = MessageDigest.getInstance("SHA-256").digest(value);
+        StringBuilder result = new StringBuilder();
+        for (byte item : digest) result.append(String.format(Locale.US, "%02x", item & 0xff));
+        return result.toString();
+    }
+
+    private static boolean isLikelyTextTrace(byte[] traceBytes) {
+        if (traceBytes.length == 0) return true;
+        int printable = 0;
+        for (byte item : traceBytes) {
+            int value = item & 0xff;
+            if (value == 9 || value == 10 || value == 13 || (value >= 32 && value <= 126)) printable++;
+        }
+        return printable * 100L / traceBytes.length >= 85L;
+    }
+
+    private static List<String> extractTraceFrames(byte[] traceBytes) {
+        if (!isLikelyTextTrace(traceBytes)) return Collections.emptyList();
+        String traceText = new String(traceBytes, StandardCharsets.UTF_8);
+        List<String> frames = new ArrayList<>();
+        for (String line : traceText.split("\\r?\\n")) {
+            Matcher matcher = TRACE_FRAME_PATTERN.matcher(line);
+            if (!matcher.find()) continue;
+            String frame = matcher.group(1);
+            if (frame == null || frame.isEmpty()) continue;
+            frame = frame.replace('$', '_');
+            if (frame.length() > 120) frame = frame.substring(0, 120);
+            frames.add(frame);
+            if (frames.size() >= MAX_EXIT_TRACE_FRAMES) break;
+        }
+        return frames;
     }
 
     private static String reasonName(int reason) {
