@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-12
-正本Revision：2026-10-12-P241
+基準日：2026-10-13
+正本Revision：2026-10-13-P242
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -42,6 +42,8 @@ MIKI-AI0.2 統合設計書・実装正本
 ■ 3. 最新main同期と編集方法
 
 - PUSHを伴う作業では、Phase BのTermux実行開始時に必ず git pull --ff-only origin main を実行し、その後の最新ローカルmainを基準に編集する。
+- ユーザーがローカル全消去・同期を明示した場合に限り、対象リポジトリとorigin URLを検証し、ローカル作業コピーを削除してorigin URLから`git clone --branch main --single-branch`で新規取得する。取得後は`git pull --ff-only origin main`と`git fetch origin main`を行い、`HEAD`と`origin/main`の一致および作業ツリーcleanを確認する。この操作は未commit変更、未追跡ファイル、ignoredファイル、キャッシュ、ローカル設定を破棄するため、ユーザーが明示した場合以外は実行しない。
+- Termuxでは`npm run build`、Rust Android build、Gradle APK buildを実行しない。コード／契約の静的検査と差分検査に限定し、Web build・Rust build・APK生成の判定はPUSHで起動した`.github/workflows/build-apk.yml`のGitHub Actionsで行う。Actions実行・APK Artifactを実際に確認するまではビルド成功・APK生成済みと記載しない。過去の履歴にあるローカルbuild記録は当時の記録として保持し、現在の作業指示には再利用しない。
 - 調査時点のHEADやblob SHAを、編集を許可する固定条件としてコマンドへ埋め込まない。mainが進んでいた場合、それだけで異常とせず、最新のコード・正本・アンカー・周辺文脈を再調査する。
 - 編集対象は、直前に取得した最新mainから実在確認したファイル・関数・変数・DOM・イベント・データ構造・責務に限定する。記憶、推測、過去会話、断片的な検索結果からファイルや編集位置を再構成しない。
 - 編集アンカーは最新mainから連続して取得した正確な本文を使う。別々の断片を結合したり、空白・改行・インデントを推測してアンカーを作ったりしない。編集コマンド作成直前に、実際の置換本文と前後の文脈を再照合する。
@@ -111,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P241）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P242）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-12-P241
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-13-P242
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -7382,6 +7384,8 @@ WebViewのlocalStorageへ同期記録する。Journalは最大64件を保持し�
 Journalを残し、起動を阻害しない。これは第二Loggerではなく、既存systemLoggerのクラッシュ耐性用一時記録層である。
 復元された直近イベントは停止前に確認できた処理段階の証拠であり、OS kill/WebView Renderer crash/ANRの原因を直接確定しない。
 
+`MainActivity.registerWebViewDiagnostics()`の`onRenderProcessGone()`は現在`return false`を返す。ロック済み依存`@capacitor/android 8.5.2`の`BridgeWebViewClient.onRenderProcessGone()`はlistenerの戻り値をOR集約して返し、このリポジトリで確認できたlistenerは`MainActivity`のみである。Android公式契約ではfalseはrenderer終了を処理済みと示さず、rendererがクラッシュした場合はアプリプロセスがクラッシュし、OSがrendererを終了した場合はアプリプロセスも終了し得る。したがって従来の『診断専用のfalse』という説明は技術的に誤りであり、renderer終了イベントが発生した場合の具体的なプロセス終了リスクとして扱う。公式根拠：https://raw.githubusercontent.com/ionic-team/capacitor/8.5.2/android/capacitor/src/main/java/com/getcapacitor/BridgeWebViewClient.java ; https://developer.android.com/reference/android/webkit/WebViewClient#onRenderProcessGone 。修正時は終了したWebViewを階層から除去して参照を解放し、適切な復旧経路を用意したうえで、処理済みのときのみtrueを返す。ただし今回提示されたログには`WEBVIEW_RENDER_PROCESS_GONE`イベントがなく、今回のCRASH原因そのものと確定はしない。
+
 Runtimeログの粒度は「正常経路を短く、停止点を詳しく」とする。
 - 正常なStartup / CORE routing / Domain dispatch / 再評価 / Task完了は、段階・対象・結果を1行程度で記録し、既存の詳細Traceを別系統で重複出力しない。
 - WARNは、再試行・待機・一時停止など「まだ停止ではない状態」を短く記録する。
@@ -11360,3 +11364,16 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
   - post_design_whitespace_diff: 0
 - Previous CI evidence: P240 GitHub Actions run failed at Java compilation because `getSubReason()` was unavailable. This P241 source correction still requires a fresh post-PUSH CI/APK result; no APK or DEVICE_VERIFIED success is claimed by this record.
 
+============================================================
+【2026-10-13-P242 ローカル全同期・CIビルド方針・クラッシュログ再評価】
+============================================================
+
+- ローカル全消去・同期の手順を明文化した。ユーザーが明示した場合に限り、対象originを確認後、ローカル作業コピーを削除してGitHub origin URLから`main`を新規cloneし、`git pull --ff-only origin main`、`git fetch origin main`、`HEAD == origin/main`、cleanな作業ツリーを確認する。ignoredファイルも破棄される操作であり、通常の更新時には使用しない。
+- TermuxではWeb bundle／Rust Android core／Gradle APKのローカルビルドを実行しない。静的検査と差分検査を行い、ビルドとAPK Artifactの結果はGitHub Actionsで実際に確認する。PUSH、CI成功、APK生成、実機確認は別々の状態として扱う。
+- 実機ログの1つ目のCRASH群では、`UI_NAV_TAP`と`UI_NAV_STATE_COMMITTED`が`home`から`library`への遷移を`2026-10-12T13:05:07Z`に記録した。その約5秒後の`exitTimeMs=1791810312234`と`1791810312243`（9ミリ秒差）に対し、終了履歴はどちらも`pid=21888, reason=CRASH, reasonCode=4`を記録している。
+- 2つ目のCRASH記録では、`home`から`improvement`への遷移が`2026-10-12T14:18:44.834Z`にタップされ、`14:18:45.139Z`にstate commitされた。約9.9秒後の`exitTimeMs=1791814735025`では`pid=28691, reason=CRASH, reasonCode=4`が記録され、その直後に新しい`pid=29124`でActivityとWebViewが再起動した。
+- CRASHの記録行は合計3行だが、PID 21888の2行は同一PIDで9ミリ秒差のため、3件の独立したクラッシュと断定しない。記録は少なくとも異なるPID 21888と28691に関連するCRASH終了を示し、別々のタブ遷移直後に時間的に近接している。ただし時間的相関だけでタブ処理が原因とは確定しない。PID 22310／19789の`reason=OTHER`記録はCRASHとして数えない。
+- 起動時のWebView providerは`AVAILABLE`、ページ読込の`resourceErrors=0`、ドメイン監査は54/54の`PASSED`を記録した。これは該当時点での初期表示成功を示すが、その後のRenderer終了やアプリプロセスクラッシュを除外する根拠ではない。
+- Runtime Memory Diagnosticsは`2026-10-12T14:18:29.976Z`に`usedJSHeapMB=110.6`、`totalJSHeapMB=124.9`、`jsHeapLimitMB=2994.5`、`pressure=NORMAL`を記録した。この標本は終了直前そのものではなく、OS全体のメモリ状態や終了原因を確定しない。
+- `MainActivity`の`onRenderProcessGone()`が`false`を返すことは実コードから確認でき、Capacitor Android 8.5.2のBridgeWebViewClientはlistenerの戻り値をOR集約してframeworkへ返す。Android公式契約では未処理のRenderer終了をfalseで返した場合、Renderer crash時はアプリプロセスもクラッシュする。従ってこれは根本原因の有力な調査対象であり、以前の「falseは診断専用」という説明を訂正する。ただし、今回提示されたログに`WEBVIEW_RENDER_PROCESS_GONE`がないため、この実行で当該callbackが呼ばれたとは確定せず、直接原因は未確定のままとする。
+- このRevisionで変更するのは本正本のみであり、アプリのソースコードやUIは変更していない。完全再帰インベントリの再集計は行っていない。次の実装修正ではRenderer callbackの処理・無効WebViewの除去・安全な復旧を検討し、GitHub Actionsでビルド結果を確認する。今回の設計更新だけでソース修正、CI成功、APK生成、DEVICE_VERIFIEDとは扱わない。
