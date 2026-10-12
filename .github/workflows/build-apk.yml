@@ -39,6 +39,7 @@ jobs:
         run: npm install
 
       - name: Verify cognitive graph node identity and conversation edges
+        timeout-minutes: 10
         run: |
           npm run verify:core-cognitive-graph:p155
           npm run verify:cross-domain-graph:p211

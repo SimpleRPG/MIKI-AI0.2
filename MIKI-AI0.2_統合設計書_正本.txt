@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-12
-正本Revision：2026-10-12-P234
+正本Revision：2026-10-12-P235
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -111,14 +111,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P234）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P235）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-12-P234
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-12-P235
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -11233,3 +11233,14 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - Android APK WorkflowはP155、P211、P212、P213、P214、P215、P216の関連Graph検証をBuild前に実行する。
 - P211の4 MiB residentBytesは現在カウンター上限であり、Graph本体のRAM常駐を制限しないことを明記した。P153 Working SetとP171 Native Graph Storeの通常会話Runtime接続、ロード／復元、実効容量制御は別バッチであり、本変更では未完了のままとする。
 - 正本は本ファイルのみ。完全再帰インベントリの件数および全ファイル行数はP234後に再集計していない。Node ID／Edge検証はソース実行テスト対象だが、Android APK生成、GitHub Actions完了、Galaxy S25実機、OSプロセスKillの検証結果はこの設計更新だけでは成立しない。
+
+============================================================
+【2026-10-12-P235 Node.js E2E終了性・BackgroundWorker Timer unref】
+============================================================
+
+- P215 UI Gateway E2EはGraphの入力・回答・検証・経験・学習EdgeをPASSで検証した一方、GitHub Actions run ID `38162831685` は同じ検証Stepを抜けられず、キャンセル時に後続のAPK Buildがスキップされた。
+- Termuxの`async_hooks`および`setInterval`生成時スタックで、P215の`coreOrchestratorService` importから`BackgroundWorkerService`が生成され、`scheduleNextRun()`が30秒間隔のNode.js Timeoutを作る経路を確認した。UIが存在しないNode.js CLI/E2Eでもタイマーが参照されたままになり、検証結果出力後のプロセス終了を妨げていた。
+- `scheduleNextRun()`でTimer handleの`unref()`を任意呼び出しする。Node.jsではスケジューラTimer単独でCLI/E2Eのイベントループを保持しないが、Node.jsプロセスが他の処理で稼働中は定期処理を継続する。Browser/Android WebView側のTimer IDには通常`unref`がないため、既存の30秒スケジューリングとNative/JS排他は維持する。
+- APK WorkflowのGraph検証Stepに`timeout-minutes: 10`を設定し、別の検証スクリプトに終了不能が残った場合もCI全体を長時間停止させない。TimeoutはFail-fast境界であり、検証PASSを代替しない。
+- TermuxのP155/P211/P212/P213/P214/P215/P216検証結果：PASS（各コマンドが終了コード0。P215はGraphレポート出力後にNode.jsプロセスも終了）。
+- 新しいGitHub Actions runのWeb Build、Rust/Android Build、APK Artifact、Galaxy S25実機試験は本記録の更新だけでは成立しない。新規Actions結果とArtifact、実機証跡を別々に確認する。

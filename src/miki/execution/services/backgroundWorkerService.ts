@@ -442,6 +442,8 @@ export class BackgroundWorkerService {
     this.schedulerTimer = setInterval(() => {
       this.checkAndTriggerScheduledWork();
     }, 30000);
+    // Node.js CLI/E2Eでは、この定期タイマーだけでプロセス終了を妨げない。
+    this.schedulerTimer?.unref?.();
   }
 
   /**
