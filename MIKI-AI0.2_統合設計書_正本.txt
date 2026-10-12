@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-12
-正本Revision：2026-10-12-P236
+正本Revision：2026-10-12-P237
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -111,14 +111,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P236）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P237）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-12-P236
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-12-P237
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -179,7 +179,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 
 記載形式: [状態] Domain | ファイル | 行数 | Export/Class/Function | 呼出元数 | 依存数 | Storage/Plugin/Test/Marker。詳細な全配列、SHA-256、全呼出元・依存先はJSON正本索引を参照する。
 
-- [USED] UI | src/App.tsx | lines=4158 | symbols=App | callers=1 | deps=113 | Tests=18
+- [USED] UI | src/App.tsx | lines=4165 | symbols=App | callers=1 | deps=113 | Tests=18
 - [USED] OTHER | src/app/appRuntimeLifecycleService.ts | lines=161 | symbols=appRuntimeLifecycleService | callers=1 | deps=31 | Tests=1
 - [ORPHAN] OTHER | src/app/startupPhaseSchedulerService.ts | lines=3 | symbols=startupPhaseSchedulerService | callers=0 | deps=0 | Tests=2
 - [USED] OTHER | src/autonomous_modules/anaphora_history_stack.ts | lines=89 | symbols=AnaphoraHistoryStack, AnaphoraStackItem, anaphoraHistoryStack | callers=2 | deps=0
@@ -194,7 +194,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] UI | src/components/AutonomousImprovementHome.tsx | lines=1750 | symbols=AutonomousImprovementHome, AutonomousImprovementHomeProps | callers=1 | deps=6 | Tests=1
 - [REMOVED-P106] UI | src/components/CharacterCard.tsx | 旧RPG試作UI。現行用途外かつcallers=0のため削除済み。再追加禁止。
 - [REMOVED-P106] UI | src/components/CharacterCreationModal.tsx | 旧RPG試作UI。現行用途外かつcallers=0のため削除済み。再追加禁止。
-- [USED] UI | src/components/ChatPanel.tsx | lines=3893 | symbols=ChatPanel | callers=1 | deps=16 | Tests=1 / Markers=1
+- [USED] UI | src/components/ChatPanel.tsx | lines=3903 | symbols=ChatPanel | callers=1 | deps=16 | Tests=1 / Markers=1
 - [USED] UI | src/components/CodeEditor.tsx | lines=1456 | symbols=CodeEditor | callers=1 | deps=7 | Tests=2
 - [REMOVED-P106] UI | src/components/CombatArena.tsx | 旧RPG試作UI。現行用途外かつcallers=0のため削除済み。再追加禁止。
 - [USED] UI | src/components/CompletionBadge.tsx | lines=319 | symbols=CompletionBadge | callers=1 | deps=2
@@ -254,7 +254,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] OTHER | src/data/speakers.ts | lines=63 | symbols=SPEAKER_PROFILES, SpeakerProfile | callers=2 | deps=0
 - [USED] OTHER | src/data/specificationRegistryData.ts | lines=3848 | symbols=FULL_SPECIFICATION_REGISTRY | callers=2 | deps=1 | Markers=1
 - [ORPHAN] OTHER | src/hooks/useVirtualWindow.ts | lines=2 | symbols=useVirtualWindow | callers=0 | deps=0 | Tests=1
-- [USED] UI | src/main.tsx | lines=90 | symbols=if | callers=0 | deps=5 | Tests=60
+- [USED] UI | src/main.tsx | lines=128 | symbols=if | callers=0 | deps=5 | Tests=60
 - [USED] OTHER | src/miki/autonomy.ts | lines=24 | symbols=autonomy | callers=1 | deps=8 | Tests=6 / Markers=2
 - [USED] autonomy | src/miki/autonomy/services/autonomousContinuousEvolutionService.ts | lines=280 | symbols=AutonomousContinuousEvolutionService, AutonomousEvolutionRecord, AutonomousEvolutionStepEvent, AutopilotConfig, autonomousContinuousEvolutionService | callers=11 | deps=6 | Storage=miki_autopilot_config_v1,miki_evolution_history_v1 / Tests=1
 - [USED] autonomy | src/miki/autonomy/services/autonomousEvolutionService.ts | lines=557 | symbols=AutonomousEvolutionService, autonomousEvolutionService | callers=5 | deps=11 | Storage=miki_autonomous_growth_reports,miki_counterfactual_reflections,miki_heuristic_rules
@@ -1025,7 +1025,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [ORPHAN] LEGACY_OR_SHARED | src/services/storagePlanningService.ts | lines=220 | symbols=StoragePlanningService, storagePlanningService | callers=0 | deps=4 | Storage=miki_storage_audit_log_v32
 - [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=653 | symbols=storageService | callers=295 | deps=1 | Tests=7
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/syntheticDataService.ts | lines=779 | symbols=SyntheticDataService, syntheticDataService, toolsService | callers=1 | deps=9 | Storage=miki_ai_synthetic_batches
-- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=942 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
+- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=952 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
 - [USED] LEGACY_OR_SHARED | src/services/taskCaseMemoryService.ts | lines=45 | symbols=TaskCaseMaturity, TaskCaseMemoryService, TaskCaseOutcome, TaskCaseRecord, taskCaseMemoryService | callers=4 | deps=5
 - [USED] LEGACY_OR_SHARED | src/services/taskExecutionOrchestratorService.ts | lines=237 | symbols=TaskExecutionHandle, TaskExecutionOrchestratorService, TaskExecutionStatus, taskExecutionOrchestratorService | callers=1 | deps=15
 - [USED] LEGACY_OR_SHARED | src/services/taskLineageService.ts | lines=45 | symbols=TaskLineageRecord, TaskLineageService, taskLineageService | callers=1 | deps=2
@@ -1059,10 +1059,11 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/AndroidManifest.xml | lines=44 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt | lines=150 | symbols=MIKIJapaneseMorphologyPlugin | callers=0 | deps=0 | Plugin=MIKIJapaneseMorphology
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeCore.kt | lines=155 | symbols=NativeCoreHealth | callers=0 | deps=0
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt | lines=782 | symbols=MIKINativeRunnerPlugin, NativeTestContext, NativeTestOutcome | callers=0 | deps=0 | Plugin=MIKINativeRunner
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=94 | symbols=MainActivity | callers=0 | deps=0
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt | lines=833 | symbols=MIKINativeRunnerPlugin, NativeTestContext, NativeTestOutcome | callers=0 | deps=0 | Plugin=MIKINativeRunner
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=178 | symbols=MainActivity | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiBackgroundWorker.kt | lines=316 | symbols=ConditionCheckResult, MikiBackgroundWorker | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt | lines=445 | symbols=MikiWorkManagerPlugin | callers=0 | deps=0 | Plugin=MikiWorkManagerPlugin / Markers=1
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/NativeWebViewDiagnosticJournal.java | lines=83 | symbols=NativeWebViewDiagnosticJournal | callers=2 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml | lines=34 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/drawable/ic_launcher_background.xml | lines=170 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/layout/activity_main.xml | lines=14 | symbols=- | callers=0 | deps=0
@@ -11256,3 +11257,27 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - Termux static checks: PASS (runtime_failure_regressions, runtime_logging_contract, production_build, whitespace_diff).
 - Failed checks: none.
 - Android実機での次回起動ログ回収と、強制終了原因の確定は未実施。lastCompleted/current/next checkpointは直近の処理地点を示す証拠であり、OS Kill・WebView Renderer crash・ANRの原因をそれだけで断定しない。
+
+============================================================
+【2026-10-12-P237 WebView Renderer・Activity・UI Navigation・Background Checkpoint Diagnostics】
+============================================================
+
+- P236のJS Runtime Breadcrumbだけでは、今回の実機ログで前回セッションのチェックポイントが`JS_ENTRY`以外回収されなかった理由を判別できなかった。P237ではWebView RendererとAndroid ActivityをJSとは独立した経路で記録する。
+- `MainActivity`はCapacitor 8.5.2の`WebViewListener`へ接続し、Activity create/resume/pause/stop/destroy、WebView page-start/commit/load、読み込み中に発生したresource/HTTP error件数、`onRenderProcessGone`の`didCrash`と`rendererPriorityAtExit`を記録する。URL、HTML、会話本文、プロンプト、例外本文はネイティブ診断記録へ保存しない。
+- ネイティブイベントはアプリ内部ファイル`miki_native_webview_diagnostics_v1.log`へ追記し、Renderer終了イベントは`fd.sync()`で永続化を試みる。保存量を64KiB程度に制限する。次回起動時、既存の`MIKINativeRunnerPlugin.flushNativeWebViewDiagnostics()`がDownloadsの`MIKI_RUNTIME_LOG.txt`へ追記し、追記成功後にのみ内部スプールをクリアする。JS Breadcrumbの回収より先に行う。
+- `onRenderProcessGone`の戻り値は、この変更では`false`のまま維持する。新しいWebViewを破棄・再生成する復旧を実装したことにはせず、Renderer終了の証拠を退避するための診断変更とする。Renderer終了原因の修正・復旧は別工程であり、本変更で解決済みとは扱わない。
+- `src/main.tsx`はroot render投入、visibility hidden、pagehide、beforeunload、window error、unhandled rejectionを既存の同期Runtime Breadcrumbへ記録する。`src/App.tsx`はApp mount/unmount、モバイルnavigation tapとstate commitを別イベントで記録する。`ChatPanel`はmount/unmountを会話内容なしで記録し、ChatPanel再マウントとWebViewページ再ロードを区別する。
+- `SystemLogger`は起動時のjournal scanについて、保存エントリ数・前セッションのエントリ数・イベント種類を通常のRuntime Logへ記録する。前セッションの項目が0件だった場合も`NONE`として出力し、今回のような「JS_ENTRY以外がない」状態を次のログから診断できるようにする。ジャーナル書き込み失敗はイベント本文を出さず、エラー型のみconsole warningへ出す。
+- 全リポジトリの完全再帰インベントリ件数は再集計していない。今回のNative source index rowと変更対象の行数のみ更新した。
+- First-round Termux check results (actual command exit codes):
+  - runtime_failure_regressions: PASS
+  - runtime_logging_contract: PASS
+  - android_native_contract: PASS
+  - android_morphology_contract: PASS
+  - production_build: PASS
+  - whitespace_diff: FAIL (exit 2)
+- Post-update verifier results (actual command exit codes):
+  - post_design_runtime_regressions: PASS
+  - post_design_whitespace_diff: FAIL (exit 2)
+- Android実機でのRenderer終了再現、Native spool回収、実機UI検証は未実施。Static check／APK build成功と実機確認を同一視しない。
+

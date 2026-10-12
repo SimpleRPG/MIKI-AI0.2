@@ -3,6 +3,7 @@ import { storageService } from './storageService';
 interface RuntimeLogFilePlugin {
   ensureRuntimeLogFile(options?: { filename?: string }): Promise<void>;
   appendRuntimeLog(options: { filename?: string; line: string }): Promise<void>;
+  flushNativeWebViewDiagnostics(options?: { filename?: string }): Promise<void>;
 }
 
 const RUNTIME_LOG_FILE_NAME = 'MIKI_RUNTIME_LOG.txt';
@@ -11,7 +12,8 @@ const MAX_RUNTIME_BREADCRUMBS = 64;
 const RUNTIME_BREADCRUMB_EVENTS = new Set([
   'JS_ENTRY', 'WINDOW_UNHANDLED_REJECTION', 'WINDOW_ERROR',
   'APP_VISIBILITY_HIDDEN', 'APP_PAGEHIDE', 'APP_BEFORE_UNLOAD', 'APP_ROOT_RENDER_SUBMITTED', 'BOOTSTRAP_FAILED',
-  'UI_NAV_TAP', 'UI_NAV_STATE_COMMITTED', 'CHAT_PANEL_MOUNT_EFFECT',
+  'UI_NAV_TAP', 'UI_NAV_STATE_COMMITTED', 'APP_COMPONENT_MOUNT', 'APP_COMPONENT_UNMOUNT',
+  'CHAT_PANEL_MOUNT_EFFECT', 'CHAT_PANEL_UNMOUNT_EFFECT',
   'CHAT_CODE_VERIFICATION_BEGIN', 'CHAT_CODE_VERIFICATION_COMPLETE', 'CHAT_CODE_VERIFICATION_FAILED',
   'RUNTIME_STAGE_BEGIN', 'RUNTIME_STAGE_COMPLETE', 'RUNTIME_STAGE_FAILED',
   'DOMAIN_AUDIT_BEGIN', 'DOMAIN_AUDIT_OPERATION_BEGIN', 'DOMAIN_AUDIT_OPERATION_COMPLETE',
@@ -174,6 +176,7 @@ class SystemLogger {
       }
       this.runtimeLogFilePlugin ??= registerPlugin<RuntimeLogFilePlugin>('MIKINativeRunner');
       await this.runtimeLogFilePlugin.ensureRuntimeLogFile({ filename: RUNTIME_LOG_FILE_NAME });
+      await this.runtimeLogFilePlugin.flushNativeWebViewDiagnostics({ filename: RUNTIME_LOG_FILE_NAME });
       await this.replayPreviousRuntimeBreadcrumbs();
       return true;
     })()
@@ -229,7 +232,8 @@ class SystemLogger {
         RUNTIME_BREADCRUMB_STORAGE_KEY,
         JSON.stringify(entries.slice(-MAX_RUNTIME_BREADCRUMBS)),
       );
-    } catch {
+    } catch (error) {
+      console.warn('[SystemLogger] runtime breadcrumb journal write failed', error instanceof Error ? error.name : typeof error);
       // Diagnostics must never block app startup or navigation.
     }
   }
@@ -273,9 +277,15 @@ class SystemLogger {
 
   private async replayPreviousRuntimeBreadcrumbs(): Promise<void> {
     if (typeof window === 'undefined' || !this.runtimeLogFilePlugin) return;
-    const previous = this.readRuntimeBreadcrumbs()
+    const journal = this.readRuntimeBreadcrumbs();
+    const previous = journal
       .filter((entry) => entry.sessionId !== this.runtimeBreadcrumbSessionId)
       .slice(-MAX_RUNTIME_BREADCRUMBS);
+    this.info('SYSTEM', '[RUNTIME_BREADCRUMB] recovery scan', {
+      journalEntryCount: journal.length,
+      previousSessionEntryCount: previous.length,
+      previousEventTypes: [...new Set(previous.map((entry) => entry.event))].join('|') || 'NONE',
+    });
     if (previous.length === 0) return;
 
     const line = previous.map((entry) =>

@@ -6,6 +6,7 @@ const check = (name, passed) => checks.push({ name, passed: Boolean(passed) });
 const runner = read('android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt');
 const nativeCore = read('android/app/src/main/java/com/miki/ai/MIKINativeCore.kt');
 const main = read('android/app/src/main/java/com/miki/ai/MainActivity.java');
+const nativeJournal = read('android/app/src/main/java/com/miki/ai/NativeWebViewDiagnosticJournal.java');
 const runnerInstaller = read('scripts/install_android_native_runner.sh');
 const morphologyInstaller = read('scripts/install_android_japanese_morphology.sh');
 const workmanagerInstaller = read('scripts/install_android_workmanager.sh');
@@ -26,6 +27,7 @@ const runtimeLogger = read('src/services/systemLogger.ts');
 const runtimeLifecycle = read('src/app/appRuntimeLifecycleService.ts');
 const domainParticipation = read('src/miki/core/services/domainParticipationService.ts');
 const app = read('src/App.tsx');
+const mainEntry = read('src/main.tsx');
 const chatPanel = read('src/components/ChatPanel.tsx');
 const domainContract = read('src/miki/core/services/domainContractRegistryService.ts');
 const domainRouter = read('src/miki/core/services/domainRouterService.ts');
@@ -281,6 +283,53 @@ check(
     runtimeLogger.includes('existing.sessionId !== this.runtimeBreadcrumbSessionId') &&
     runtimeLogger.includes('RUNTIME_BREADCRUMB_PROGRESS_STREAM[existing.event] !== stream') &&
     runtimeLogger.includes('MAX_RUNTIME_BREADCRUMBS = 64')
+);
+
+check(
+  'Native WebView renderer termination and Activity lifecycle are journaled without URLs or page content',
+  main.includes('addWebViewListener') &&
+    main.includes('onRenderProcessGone') &&
+    main.includes('WEBVIEW_RENDER_PROCESS_GONE') &&
+    main.includes('ACTIVITY_CREATE') &&
+    main.includes('return false;') &&
+    nativeJournal.includes('MAX_PENDING_BYTES') &&
+    nativeJournal.includes('output.getFD().sync()') &&
+    !main.includes('webView.getUrl()')
+);
+check(
+  'Native WebView journal is flushed to Downloads before JS breadcrumb replay',
+  runner.includes('fun flushNativeWebViewDiagnostics') &&
+    runner.includes('NativeWebViewDiagnosticJournal.readPending(context)') &&
+    runner.includes('NativeWebViewDiagnosticJournal.clearPending(context)') &&
+    runtimeLogger.includes('flushNativeWebViewDiagnostics') &&
+    runtimeLogger.includes('await this.runtimeLogFilePlugin.flushNativeWebViewDiagnostics')
+);
+check(
+  'Root, visibility, pagehide, beforeunload, and global JS errors use breadcrumbs',
+  mainEntry.includes("recordRuntimeBreadcrumb('APP_ROOT_RENDER_SUBMITTED'") &&
+    mainEntry.includes("recordRuntimeBreadcrumb('APP_VISIBILITY_HIDDEN'") &&
+    mainEntry.includes("recordRuntimeBreadcrumb('APP_PAGEHIDE'") &&
+    mainEntry.includes("recordRuntimeBreadcrumb('APP_BEFORE_UNLOAD'") &&
+    mainEntry.includes("recordRuntimeBreadcrumb('WINDOW_ERROR'") &&
+    mainEntry.includes("recordRuntimeBreadcrumb('WINDOW_UNHANDLED_REJECTION'")
+);
+check(
+  'Mobile tab taps and committed tab state are journaled independently of ChatPanel',
+  app.includes("recordRuntimeBreadcrumb('UI_NAV_TAP'") &&
+    app.includes("recordRuntimeBreadcrumb('UI_NAV_STATE_COMMITTED'") &&
+    app.includes("recordRuntimeBreadcrumb('APP_COMPONENT_MOUNT'") &&
+    app.includes("recordRuntimeBreadcrumb('APP_COMPONENT_UNMOUNT'")
+);
+check(
+  'ChatPanel mount/unmount is journaled without conversation text',
+  chatPanel.includes("recordRuntimeBreadcrumb('CHAT_PANEL_MOUNT_EFFECT'") &&
+    chatPanel.includes("recordRuntimeBreadcrumb('CHAT_PANEL_UNMOUNT_EFFECT'")
+);
+check(
+  'Breadcrumb recovery scan records whether previous-session entries were available',
+  runtimeLogger.includes("'[RUNTIME_BREADCRUMB] recovery scan'") &&
+    runtimeLogger.includes('previousSessionEntryCount') &&
+    runtimeLogger.includes('previousEventTypes')
 );
 
 const failures = checks.filter(item => !item.passed);

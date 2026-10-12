@@ -311,6 +311,11 @@ export default function App() {
   const [isEvolutionRunning, setIsEvolutionRunning] = useState<boolean>(false);
 
   useEffect(() => {
+    systemLogger.recordRuntimeBreadcrumb('APP_COMPONENT_MOUNT', { stage: 'App' });
+    return () => systemLogger.recordRuntimeBreadcrumb('APP_COMPONENT_UNMOUNT', { stage: 'App' });
+  }, []);
+
+  useEffect(() => {
 
     let disposed = false;
 
@@ -395,6 +400,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    systemLogger.recordRuntimeBreadcrumb('UI_NAV_STATE_COMMITTED', { tab: mobileTab, visibility: document.visibilityState });
     const memory = (performance as any).memory;
     systemLogger.info('SYSTEM', '[UI_NAV] mobile tab state changed', {
       tab: mobileTab,
@@ -4109,6 +4115,7 @@ export default function App() {
             ].map(({ id, label, Icon }) => (
               <button key={id} onClick={() => {
                 const memory = (performance as any).memory;
+                systemLogger.recordRuntimeBreadcrumb('UI_NAV_TAP', { from: mobileTab, to: id, visibility: document.visibilityState });
                 systemLogger.info('SYSTEM', '[UI_NAV] bottom navigation tapped', {
                   from: mobileTab,
                   to: id,

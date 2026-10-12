@@ -6,11 +6,13 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 
 public class MainActivity extends BridgeActivity {
     private View nativeStartupStatusView;
@@ -22,7 +24,89 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(MIKINativeRunnerPlugin.class);
         registerPlugin(MIKIGraphStorePlugin.class);
         super.onCreate(savedInstanceState);
+        NativeWebViewDiagnosticJournal.record(this, "ACTIVITY_CREATE", "savedStatePresent=" + (savedInstanceState != null), false);
+        registerWebViewDiagnostics();
         mountNativeStartupStatus();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        NativeWebViewDiagnosticJournal.record(this, "ACTIVITY_RESUME", "", false);
+    }
+
+    @Override
+    public void onPause() {
+        NativeWebViewDiagnosticJournal.record(this, "ACTIVITY_PAUSE", "", false);
+        super.onPause();
+    }
+
+    @Override
+    public void onStop() {
+        NativeWebViewDiagnosticJournal.record(this, "ACTIVITY_STOP", "", false);
+        super.onStop();
+    }
+
+    @Override
+    public void onDestroy() {
+        NativeWebViewDiagnosticJournal.record(this, "ACTIVITY_DESTROY", "", false);
+        super.onDestroy();
+    }
+
+    private void registerWebViewDiagnostics() {
+        if (getBridge() == null) {
+            NativeWebViewDiagnosticJournal.record(this, "WEBVIEW_LISTENER_UNAVAILABLE", "bridgeAvailable=false", true);
+            return;
+        }
+        getBridge().addWebViewListener(new WebViewListener() {
+            private int resourceErrorCount = 0;
+
+            @Override
+            public void onPageStarted(WebView webView) {
+                resourceErrorCount = 0;
+                NativeWebViewDiagnosticJournal.record(
+                    MainActivity.this, "WEBVIEW_PAGE_STARTED", "progress=" + webView.getProgress(), false
+                );
+            }
+
+            @Override
+            public void onPageCommitVisible(WebView webView, String url) {
+                NativeWebViewDiagnosticJournal.record(
+                    MainActivity.this, "WEBVIEW_PAGE_COMMIT_VISIBLE", "progress=" + webView.getProgress(), false
+                );
+            }
+
+            @Override
+            public void onReceivedError(WebView webView) {
+                resourceErrorCount = Math.min(resourceErrorCount + 1, 9999);
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView webView) {
+                resourceErrorCount = Math.min(resourceErrorCount + 1, 9999);
+            }
+
+            @Override
+            public void onPageLoaded(WebView webView) {
+                NativeWebViewDiagnosticJournal.record(
+                    MainActivity.this, "WEBVIEW_PAGE_LOADED",
+                    "progress=" + webView.getProgress() + ",resourceErrors=" + resourceErrorCount, false
+                );
+            }
+
+            @Override
+            public boolean onRenderProcessGone(WebView webView, RenderProcessGoneDetail detail) {
+                boolean didCrash = detail != null && detail.didCrash();
+                int priorityAtExit = detail != null ? detail.rendererPriorityAtExit() : -1;
+                NativeWebViewDiagnosticJournal.record(
+                    MainActivity.this, "WEBVIEW_RENDER_PROCESS_GONE",
+                    "didCrash=" + didCrash + ",priorityAtExit=" + priorityAtExit + ",resourceErrors=" + resourceErrorCount,
+                    true
+                );
+                // Diagnostic-only: return false because this listener does not destroy/replace the failed WebView.
+                return false;
+            }
+        });
     }
 
     /**

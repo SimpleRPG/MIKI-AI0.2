@@ -312,6 +312,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       ['```typescript', '```ts', '```javascript', '```tsx', '```jsx'].some((marker) => message.content.includes(marker))
     ).length;
     const memory = (performance as any).memory;
+    systemLogger.recordRuntimeBreadcrumb('CHAT_PANEL_MOUNT_EFFECT', {
+      messageCount: messages.length,
+      historicalCodeMessageCount,
+      workspaceFileCount: workspaceFiles.length,
+      initiallyRenderedMessages: Math.min(messages.length, 20),
+      usedJSHeapMB: typeof memory?.usedJSHeapSize === 'number'
+        ? Math.round((memory.usedJSHeapSize / 1048576) * 10) / 10
+        : undefined,
+    });
     systemLogger.info('SYSTEM', '[CHAT_UI] panel mounted', {
       messageCount: messages.length,
       historicalCodeMessageCount,
@@ -321,6 +330,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         ? Math.round((memory.usedJSHeapSize / 1048576) * 10) / 10
         : undefined,
     });
+    return () => systemLogger.recordRuntimeBreadcrumb('CHAT_PANEL_UNMOUNT_EFFECT', { stage: 'CHAT_PANEL' });
   }, []);
 
   // 新規コード返信の検証はキューで逐次実行し、state更新を挟んだ重複起動も防ぐ。

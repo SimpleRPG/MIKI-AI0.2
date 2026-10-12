@@ -114,6 +114,55 @@ class MIKINativeRunnerPlugin : Plugin() {
         }
     }
 
+    @PluginMethod
+    fun flushNativeWebViewDiagnostics(call: PluginCall) {
+        try {
+            validateRuntimeLogFilename(call.getString("filename"))
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                call.reject("NATIVE_WEBVIEW_DIAGNOSTICS_DOWNLOADS_API_UNSUPPORTED")
+                return
+            }
+            synchronized(NativeWebViewDiagnosticJournal::class.java) {
+                val pending = NativeWebViewDiagnosticJournal.readPending(context)
+                if (pending.isEmpty()) {
+                    call.resolve(JSObject().apply {
+                        put("success", true)
+                        put("line_count", 0)
+                        put("byte_length", 0)
+                    })
+                    return@synchronized
+                }
+                val (uri, created) = getOrCreateRuntimeLogUri()
+                if (created) {
+                    context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                        output.write("# MIKI runtime log v1\n".toByteArray(Charsets.UTF_8))
+                        output.flush()
+                    } ?: throw IllegalStateException("RUNTIME_LOG_OUTPUT_STREAM_UNAVAILABLE")
+                }
+                context.contentResolver.openOutputStream(uri, "wa")?.use { output ->
+                    output.write(pending.toByteArray(Charsets.UTF_8))
+                    output.flush()
+                } ?: throw IllegalStateException("RUNTIME_LOG_APPEND_STREAM_UNAVAILABLE")
+                if (created) {
+                    context.contentResolver.update(
+                        uri,
+                        ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
+                        null,
+                        null
+                    )
+                }
+                NativeWebViewDiagnosticJournal.clearPending(context)
+                call.resolve(JSObject().apply {
+                    put("success", true)
+                    put("line_count", pending.lineSequence().count { it.isNotBlank() })
+                    put("byte_length", pending.toByteArray(Charsets.UTF_8).size)
+                })
+            }
+        } catch (error: Throwable) {
+            call.reject("NATIVE_WEBVIEW_DIAGNOSTICS_FLUSH_FAILED", error.message ?: error.toString())
+        }
+    }
+
     private fun validateRuntimeLogFilename(requested: String?) {
         if (requested != null && requested != runtimeLogFileName) {
             throw IllegalArgumentException("RUNTIME_LOG_FILENAME_FORBIDDEN")

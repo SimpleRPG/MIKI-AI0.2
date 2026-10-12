@@ -19,6 +19,10 @@ window.addEventListener('unhandledrejection', (event) => {
     reason.includes('AbortError') ||
     reason.includes('aborted') ||
     reason.includes('plugin is not implemented');
+  systemLogger.recordRuntimeBreadcrumb('WINDOW_UNHANDLED_REJECTION', {
+    reasonType: event?.reason instanceof Error ? event.reason.name : typeof event?.reason,
+    suppressed,
+  });
   systemLogger.log(suppressed ? 'WARN' : 'ERROR','SYSTEM','[WINDOW] unhandledrejection',{reason,suppressed});
   if (suppressed) {
     event.preventDefault();
@@ -33,6 +37,13 @@ window.addEventListener('error', (event) => {
     msg.includes('GPUBuffer') ||
     msg.includes('unmapped') ||
     msg.includes('plugin is not implemented');
+  systemLogger.recordRuntimeBreadcrumb('WINDOW_ERROR', {
+    errorType: event?.error instanceof Error ? event.error.name : typeof event?.error,
+    filenamePresent: Boolean(event?.filename),
+    lineNumber: event?.lineno || undefined,
+    columnNumber: event?.colno || undefined,
+    suppressed,
+  });
   systemLogger.log(suppressed ? 'WARN' : 'ERROR','SYSTEM','[WINDOW] error',{
     message:msg,
     filename:event?.filename || undefined,
@@ -55,11 +66,18 @@ const flushOnHide = () => {
 };
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
+    systemLogger.recordRuntimeBreadcrumb('APP_VISIBILITY_HIDDEN', { visibility: document.visibilityState });
     flushOnHide();
   }
 });
-window.addEventListener('pagehide', flushOnHide);
-window.addEventListener('beforeunload', flushOnHide);
+window.addEventListener('pagehide', () => {
+  systemLogger.recordRuntimeBreadcrumb('APP_PAGEHIDE', { visibility: document.visibilityState });
+  flushOnHide();
+});
+window.addEventListener('beforeunload', () => {
+  systemLogger.recordRuntimeBreadcrumb('APP_BEFORE_UNLOAD', { visibility: document.visibilityState });
+  flushOnHide();
+});
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -70,6 +88,7 @@ const root = ReactDOM.createRoot(rootElement);
 startupRecoveryService.update('STORAGE_WAIT', '永続データを準備しています');
 startupRecoveryService.mountStatusOverlay();
 
+systemLogger.recordRuntimeBreadcrumb('APP_ROOT_RENDER_SUBMITTED', { stage: 'INITIAL_PLACEHOLDER' });
 root.render(
   <div className="min-h-screen bg-slate-950" aria-hidden="true" />
 );
@@ -80,6 +99,7 @@ const renderApp = async () => {
     import('./App'),
     import('./components/ErrorBoundary'),
   ]);
+  systemLogger.recordRuntimeBreadcrumb('APP_ROOT_RENDER_SUBMITTED', { stage: 'APP_COMPONENT_TREE' });
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
