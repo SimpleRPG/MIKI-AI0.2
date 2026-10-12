@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-13
-正本Revision：2026-10-13-P243
+正本Revision：2026-10-13-P244
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P243）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P244）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-13-P243
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243の対象ファイル変更後に全ファイル件数を再集計したものではない）
+- 現行Revision: 2026-10-13-P244
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244の対象ファイル変更後に全ファイル件数を再集計したものではない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -397,7 +397,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/domainOwnershipCatalogService.ts | lines=30 | symbols=SourceOwnership, SourceOwnershipKind, getCoreCompatibilityGateways, getDomainOwnershipCatalog, resolveSourceOwnership | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=168 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/domainReplyLedgerService.ts | lines=350 | symbols=ActionLineage, DomainReplyLedgerRecord, domainReplyLedgerService | callers=7 | deps=6 | Storage=miki_domain_reply_ledger_v1
-- [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=125 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1 / Tests=3
+- [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=149 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1 / Tests=3
 - [USED] CORE | src/miki/core/services/domainSequentialConnectionService.ts | lines=64 | symbols=DomainConnectionReceipt, domainSequentialConnectionService | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/evidenceIdentityService.ts | lines=31 | symbols=evidenceIdentityService | callers=3 | deps=1 | Storage=miki_evidence_identity_sequence_v1
 - [USED] CORE | src/miki/core/services/evidenceQualityGateService.ts | lines=15 | symbols=EvidenceQualityResult, evidenceQualityGateService | callers=4 | deps=1
@@ -438,7 +438,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/runIntegrityAuditorService.ts | lines=11 | symbols=RunIntegrityReport, runIntegrityAuditorService | callers=1 | deps=5 | Storage=miki_run_integrity_reports_v1
 - [USED] CORE | src/miki/core/services/rustCoreDecisionKernelService.ts | lines=14 | symbols=rustCoreDecisionKernelService | callers=1 | deps=0 | Plugin=MIKINativeRunner / Tests=1
 - [USED] CORE | src/miki/core/services/rustDomainParticipationKernelService.ts | lines=6 | symbols=rustDomainParticipationKernelService | callers=1 | deps=0 | Plugin=MIKINativeRunner / Tests=1
-- [USED] CORE | src/miki/core/services/selfCodeSpaceService.ts | lines=756 | symbols=SelfCodeFile, SelfCodeGitHubSettings, SelfCodeSeedProgress, SelfCodeSnapshot, SelfCodeWorkspaceDiagnostic | callers=34 | deps=4 | Storage=miki_self_code_github_settings_v1,miki_self_code_seed_revision_v1,miki_self_code_space_v1 / Tests=1
+- [USED] CORE | src/miki/core/services/selfCodeSpaceService.ts | lines=806 | symbols=SelfCodeFile, SelfCodeGitHubSettings, SelfCodeSeedProgress, SelfCodeSnapshot, SelfCodeWorkspaceDiagnostic | callers=34 | deps=4 | Storage=miki_self_code_github_settings_v1,miki_self_code_seed_revision_v1,miki_self_code_space_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/selfCodeUnderstandingService.ts | lines=432 | symbols=CodeLiteralContract, CodeRelationKind, CodeRelationRecord, CodeSymbolKind, CodeSymbolRecord | callers=5 | deps=3 | Storage=miki_code_understanding_snapshot / Tests=3
 - [USED] CORE | src/miki/core/services/selfImprovementDirectionService.ts | lines=21 | symbols=ImprovementDirection, ImprovementDirectionPolicy, selfImprovementDirectionService | callers=3 | deps=1 | Storage=miki_self_improvement_direction_v1
 - [USED] CORE | src/miki/core/services/selfImprovementIngressService.ts | lines=16 | symbols=SelfImprovementIngressRequest, selfImprovementIngressService | callers=8 | deps=3
@@ -1025,9 +1025,9 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [ORPHAN] LEGACY_OR_SHARED | src/services/specContractCompilerService.ts | lines=88 | symbols=ContractStatus, Norm, SpecContract, SpecContractClause, SpecContractCompilerService | callers=0 | deps=2 | Storage=miki_spec_contract_v1 / Tests=3
 - [USED] LEGACY_OR_SHARED | src/services/startupRecoveryService.ts | lines=190 | symbols=StartupDiagnostic, StartupPhase, startupRecoveryService | callers=1 | deps=0 | Storage=miki_startup_diagnostic_v1 / Tests=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/storagePlanningService.ts | lines=220 | symbols=StoragePlanningService, storagePlanningService | callers=0 | deps=4 | Storage=miki_storage_audit_log_v32
-- [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=653 | symbols=storageService | callers=295 | deps=1 | Tests=7
+- [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=728 | symbols=storageService | callers=295 | deps=1 | Tests=7
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/syntheticDataService.ts | lines=779 | symbols=SyntheticDataService, syntheticDataService, toolsService | callers=1 | deps=9 | Storage=miki_ai_synthetic_batches
-- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=953 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
+- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=1014 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
 - [USED] LEGACY_OR_SHARED | src/services/taskCaseMemoryService.ts | lines=45 | symbols=TaskCaseMaturity, TaskCaseMemoryService, TaskCaseOutcome, TaskCaseRecord, taskCaseMemoryService | callers=4 | deps=5
 - [USED] LEGACY_OR_SHARED | src/services/taskExecutionOrchestratorService.ts | lines=237 | symbols=TaskExecutionHandle, TaskExecutionOrchestratorService, TaskExecutionStatus, taskExecutionOrchestratorService | callers=1 | deps=15
 - [USED] LEGACY_OR_SHARED | src/services/taskLineageService.ts | lines=45 | symbols=TaskLineageRecord, TaskLineageService, taskLineageService | callers=1 | deps=2
@@ -1065,7 +1065,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=214 | symbols=MainActivity | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiBackgroundWorker.kt | lines=316 | symbols=ConditionCheckResult, MikiBackgroundWorker | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt | lines=445 | symbols=MikiWorkManagerPlugin | callers=0 | deps=0 | Plugin=MikiWorkManagerPlugin / Markers=1
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/NativeWebViewDiagnosticJournal.java | lines=356 | symbols=NativeWebViewDiagnosticJournal | callers=2 | deps=0
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/NativeWebViewDiagnosticJournal.java | lines=444 | symbols=NativeWebViewDiagnosticJournal | callers=2 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml | lines=34 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/drawable/ic_launcher_background.xml | lines=170 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/layout/activity_main.xml | lines=14 | symbols=- | callers=0 | deps=0
@@ -11391,3 +11391,19 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 変更範囲は`MainActivity.java`、`NativeWebViewDiagnosticJournal.java`、`scripts/verify_runtime_failure_fixes.mjs`、本正本のみ。UI／通常のCORE経路は変更しない。TermuxではWeb/Rust/Gradle buildを実行せず、GitHub Actions／APK／実機の結果は後続確認とする。
 - Initial runtime verifier exit code (0=PASS): `0`.
 - Post-design runtime verifier exit code (0=PASS): `0`.
+
+
+============================================================
+【2026-10-13-P244 OOMメモリ推移・大容量処理チェックポイント】
+============================================================
+
+- 既存Native journalへ`MEMORY_SAMPLE`を追加する。Java Heap使用量・commit量・上限、Native Heap割当量・容量、PSS、OS利用可能メモリ・lowMemoryを記録する。最初の2分は約3秒ごと、その後はプロセス起動から20分まで約15秒ごとに記録する。新しいログファイル・DBは作らず、既存journalの64KiB上限と次回起動時のDownloads回収を再利用する。
+- 既存Runtime Memory Diagnosticsの10秒JS Heap標本を、通常の診断ログ配列へ追加せず既存Runtime Log append queueへ記録する。直近状態は既存の120標本上限付き保存と64件Runtime Breadcrumb Journalを再利用し、過去セッションの直近checkpointは次回起動時に回収可能にする。
+- `storageService.flush()`は対象クラス・値の文字数・最大値サイズ・backend・処理時間・例外型を記録する。自己コードWorkspace／GitHub同期／大容量flushに対象を絞り、クラス名を固定ラベルへ正規化し、Storage key全文・値・会話本文・ソース本文をログへ複製しない。同一対象群の開始記録は15秒以内に再生成しない。
+- `initializeBundledSeed()`にはZIP取得・展開・manifest検証・ファイル検証進捗・適用・Storage flush・GitHub fallbackのチェックポイントを追加する。記録内容は件数・累積文字数・最大ファイル文字数・経過時間・例外型に限定する。例外message／ファイル内容は診断ログへ追加しない。
+- `domainRouterService.finish()`は先頭および100回単位の境界でシリアライズ開始、完了時に履歴件数・シリアライズ文字数・所要時間を記録する。50ms以上のシリアライズも記録する。履歴の最大2,000件・既存保存動作・18分類構造を変更しない。
+- 実装は既存Native journal、SystemLogger、Storage、Seed、Domain Routerを再利用し、新しい上位Service／Logger／DB／Orchestratorを追加しない。計測はクラッシュ原因を断定せず、Native PSS/Heap、JS Heap、保存サイズ、Seed展開、Routerシリアライズの負荷を次回ログから絞り込むためのものとする。
+- 初回検査結果: js_syntax=0; runtime_verifier=0; runtime_logging=0; typescript_lint=SKIP_NO_LOCAL_TSC; bundled_seed=SKIP_NO_LOCAL_TSC; native_contract=SKIP_NO_LOCAL_TSX; whitespace_diff=2 (0=PASS; SKIP_* means local dependency unavailable)
+- 正本更新後の検査結果: runtime_verifier=0; runtime_logging=0; whitespace_diff=2 (0=PASS)
+- GitHub Actions/APK/実機確認は別判定とし、静的検証結果から成功を推定しない。
+

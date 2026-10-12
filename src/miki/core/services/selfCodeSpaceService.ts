@@ -1,4 +1,5 @@
 import { storageService } from '../../../services/storageService';
+import { systemLogger } from '../../../services/systemLogger';
 import {
   apiService,
   type GitHubPullProgressUpdate,
@@ -261,7 +262,19 @@ class SelfCodeSpaceService {
     seedRevision?: string;
     error?: string;
   }> {
+    const seedStartedAt = Date.now();
+    const checkpoint = (phase: string, details: Record<string, unknown> = {}) => {
+      systemLogger.recordRuntimeDiagnostic('SELF_CODE_SEED_CHECKPOINT', {
+        phase,
+        elapsedMs: Date.now() - seedStartedAt,
+        ...details,
+      });
+    };
+    checkpoint('START');
     const existing = this.get();
+    let manifestFileCount = 0;
+    let totalContentChars = 0;
+    let maxFileChars = 0;
 
     const report = (progress: SelfCodeSeedProgress) => {
       try {
@@ -270,6 +283,7 @@ class SelfCodeSpaceService {
     };
 
     if (existing?.dirty === true && !overwrite) {
+      checkpoint('PRESERVED_DIRTY', { fileCount: existing.files.length });
       report({
         phase: 'COMPLETE',
         detail: '変更中のWorkspaceを保持しました。',
@@ -282,6 +296,7 @@ class SelfCodeSpaceService {
     }
 
     try {
+      checkpoint('FETCH_BEGIN');
       report({
         phase: 'FETCH',
         detail: 'アプリ同梱Seedを取得しています…',
@@ -296,15 +311,18 @@ class SelfCodeSpaceService {
       }
 
       const bytes = await response.arrayBuffer();
+      checkpoint('ZIP_FETCHED', { zipBytes: bytes.byteLength });
 
       report({
         phase: 'FETCH',
         detail: `Seed取得完了: ${(bytes.byteLength / 1024 / 1024).toFixed(1)}MB`,
       });
 
+      checkpoint('DECOMPRESS_BEGIN', { zipBytes: bytes.byteLength });
       const JSZipModule = await import('jszip');
       const JSZipCtor = JSZipModule.default || JSZipModule;
       const zip = await JSZipCtor.loadAsync(bytes);
+      checkpoint('DECOMPRESS_COMPLETE', { zipBytes: bytes.byteLength });
 
       const manifestEntry = zip.file('self-code-seed.manifest.json');
 
@@ -328,6 +346,8 @@ class SelfCodeSpaceService {
       }
 
       const total = manifest.files.length;
+      manifestFileCount = total;
+      checkpoint('MANIFEST_VALIDATED', { fileCount: total, zipBytes: bytes.byteLength });
       const files: SelfCodeFile[] = [];
 
       report({
@@ -362,6 +382,8 @@ class SelfCodeSpaceService {
         }
 
         const content = await entry.async('text');
+        totalContentChars += content.length;
+        maxFileChars = Math.max(maxFileChars, content.length);
 
         // Seed生成側と同じ生テキストSHA-256を使用する。
         const actualSha = sha256HexFromText(content);
@@ -378,6 +400,15 @@ class SelfCodeSpaceService {
           sha256: actualSha,
           blobSha,
         });
+        if (files.length === 1 || files.length % 100 === 0 || files.length === total) {
+          checkpoint('VERIFY_PROGRESS', {
+            completedCount: files.length,
+            totalCount: total,
+            fileCount: total,
+            totalContentChars,
+            maxFileChars,
+          });
+        }
 
         if (
           files.length === 1 ||
@@ -428,6 +459,7 @@ class SelfCodeSpaceService {
         appliedRevision === manifest.seedRevision &&
         existing.files.every(file => Boolean(file.blobSha))
       ) {
+        checkpoint('ALREADY_CURRENT', { fileCount: total, totalContentChars, maxFileChars });
         report({
           phase: 'COMPLETE',
           completed: total,
@@ -448,6 +480,7 @@ class SelfCodeSpaceService {
         detail: `SelfCodeWorkspaceへ${total}ファイルを展開しています…`,
       });
 
+      checkpoint('APPLY_BEGIN', { fileCount: total, totalContentChars, maxFileChars });
       const settings = this.getGitHubSettings();
 
       githubSyncService.applyBundledSeed(
@@ -459,15 +492,19 @@ class SelfCodeSpaceService {
           seedRevision: String(manifest.seedRevision),
         }
       );
+      checkpoint('APPLY_COMPLETE', { fileCount: total, totalContentChars, maxFileChars });
 
       storageService.setItem(
         SEED_APPLIED_KEY,
         String(manifest.seedRevision)
       );
       await storageService.flushNow();
+      checkpoint('SEED_STORAGE_FLUSH_COMPLETE', { fileCount: total, totalContentChars });
       this.getWorkspaceDiagnostic();
       await storageService.flushNow();
+      checkpoint('WORKSPACE_DIAGNOSTIC_FLUSH_COMPLETE', { fileCount: total });
 
+      checkpoint('COMPLETE', { status: 'SEEDED', fileCount: total, totalContentChars, maxFileChars });
       report({
         phase: 'COMPLETE',
         completed: total,
@@ -480,6 +517,12 @@ class SelfCodeSpaceService {
         seedRevision: manifest.seedRevision,
       };
     } catch (error) {
+      checkpoint('SEED_FAILED_FALLBACK_BEGIN', {
+        errorType: error instanceof Error ? error.name : typeof error,
+        fileCount: manifestFileCount,
+        totalContentChars,
+        maxFileChars,
+      });
       const reason = String(error);
 
       report({
@@ -498,8 +541,10 @@ class SelfCodeSpaceService {
             });
           }
         );
+        checkpoint('GITHUB_FALLBACK_SYNC_COMPLETE', { fileCount: fallback.files.length });
 
         await storageService.flushNow();
+        checkpoint('GITHUB_FALLBACK_STORAGE_FLUSH_COMPLETE', { fileCount: fallback.files.length });
         const fallbackDiagnostic = this.getWorkspaceDiagnostic();
         this.saveWorkspaceDiagnostic({
           ...fallbackDiagnostic,
@@ -512,12 +557,17 @@ class SelfCodeSpaceService {
         });
         await storageService.flushNow();
 
+        checkpoint('COMPLETE', { status: 'FALLBACK_GITHUB', fileCount: fallback.files.length });
         return {
           status: 'FALLBACK_GITHUB',
           seedRevision: fallback.repoSha256,
           error: reason,
         };
       } catch (fallbackError) {
+        checkpoint('GITHUB_FALLBACK_FAILED', {
+          errorType: fallbackError instanceof Error ? fallbackError.name : typeof fallbackError,
+          fileCount: manifestFileCount,
+        });
         if (existing) {
           return {
             status: 'NO_SOURCE',

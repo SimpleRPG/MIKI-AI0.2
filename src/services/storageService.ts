@@ -34,6 +34,7 @@ class StorageService {
   private cache = new Map<string, string>();
   private dirtyKeys = new Set<string>();
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastDiagnosticFlushAt = new Map<string, number>();
   private backend: 'sqlite' | 'indexeddb' | 'memory' = 'memory';
   private ftsAvailable: boolean = false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -211,10 +212,71 @@ class StorageService {
     }, 400);
   }
 
-  private async flush(): Promise<void> {
+  private diagnosticKeyClass(key: string): string {
+    if (key === 'miki_self_code_space_v1') return 'self_code_space';
+    if (key.startsWith('miki_github_sync_v2_')) return 'github_sync';
+    if (key === 'miki_domain_router_history_v1') return 'domain_router_history';
+    if (key === 'gamecraft_memories') return 'memory_records';
+    if (key === 'miki_runtime_memory_diagnostics_v1') return 'runtime_memory';
+    if (key === 'miki_system_diagnostics_logs') return 'system_diagnostics';
+    if (key === 'miki_runtime_breadcrumb_journal_v1') return 'runtime_breadcrumb';
+    return 'other';
+  }
+
+  private shouldTraceFlush(
+    keyClasses: string[],
+    totalValueChars: number,
+    maxValueChars: number,
+    keyCount: number,
+  ): boolean {
+    const seedOrSync = keyClasses.some((keyClass) =>
+      keyClass === 'self_code_space' || keyClass === 'github_sync'
+    );
+    const large = totalValueChars >= 512 * 1024 || maxValueChars >= 512 * 1024 || keyCount >= 16;
+    if (!seedOrSync && !large) return false;
+    const group = seedOrSync
+      ? keyClasses.filter((keyClass) => keyClass === 'self_code_space' || keyClass === 'github_sync').join('|')
+      : `large:${keyClasses.join('|') || 'other'}`;
+    const now = Date.now();
+    const last = this.lastDiagnosticFlushAt.get(group) || 0;
+    if (last > 0 && now - last < 15000) return false;
+    this.lastDiagnosticFlushAt.set(group, now);
+    return true;
+  }
+
+  private emitFlushDiagnostic(phase: string, details: Record<string, unknown>): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.dispatchEvent(new CustomEvent('miki-storage-diagnostic', {
+        detail: { phase, ...details },
+      }));
+    } catch {
+      // Diagnostics must never block persistence.
+    }
+  }
+
+  private async flush(): Promise<void>
     if (this.dirtyKeys.size === 0) return;
     const keys = Array.from(this.dirtyKeys);
     this.dirtyKeys.clear();
+    const flushStartedAt = Date.now();
+    let totalValueChars = 0;
+    let maxValueChars = 0;
+    const keyClasses = [...new Set(keys.map((key) => this.diagnosticKeyClass(key)))].sort();
+    for (const key of keys) {
+      const valueChars = this.cache.get(key)?.length ?? 0;
+      totalValueChars += valueChars;
+      maxValueChars = Math.max(maxValueChars, valueChars);
+    }
+    const diagnosticMetrics = {
+      backend: this.backend,
+      keyCount: keys.length,
+      totalValueChars,
+      maxValueChars,
+      keyClasses: keyClasses.join('|') || 'NONE',
+    };
+    const traceFlush = this.shouldTraceFlush(keyClasses, totalValueChars, maxValueChars, keys.length);
+    if (traceFlush) this.emitFlushDiagnostic('BEGIN', diagnosticMetrics);
 
     try {
       if (this.backend === 'sqlite' && this.sqlite) {
@@ -313,7 +375,20 @@ class StorageService {
         });
       }
       // backend === 'memory': nothing to persist beyond the in-memory cache.
+      if (traceFlush) {
+        this.emitFlushDiagnostic('COMPLETE', {
+          ...diagnosticMetrics,
+          elapsedMs: Date.now() - flushStartedAt,
+        });
+      }
     } catch (e) {
+      if (traceFlush) {
+        this.emitFlushDiagnostic('FAILED', {
+          ...diagnosticMetrics,
+          elapsedMs: Date.now() - flushStartedAt,
+          errorType: e instanceof Error ? e.name : typeof e,
+        });
+      }
       // Put the keys back so the next scheduled flush retries them.
       keys.forEach((k) => this.dirtyKeys.add(k));
       throw e;

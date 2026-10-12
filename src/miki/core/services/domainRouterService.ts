@@ -99,7 +99,31 @@ class DomainRouterService {
     const inferred=this.extractEvidenceIds(reply.result);const evidenceIds=[...new Set([...envelope.evidenceIds,...inferred])];const validation=domainContractRegistryService.validateReply(envelope,reply);const completed:DomainReply=validation.valid?{...reply,normalized:validation.normalized}:{accepted:false,domain:envelope.target,command:envelope.command,error:`DOMAIN_REPLY_CONTRACT_FAILED:${validation.reasons.join('|')}`,completedAt:Date.now(),normalized:{status:'REJECTED',operationClass:'DIAGNOSTIC',command:envelope.command,summary:'Domain reply contract rejected',data:{contractSha256:validation.contractSha256,reasons:validation.reasons,originalAccepted:reply.accepted},evidenceIds:validation.normalized?.evidenceIds||evidenceIds,retryable:false}};
     this.history.push({envelope:{...envelope,payload:{...envelope.payload},evidenceIds:[...envelope.evidenceIds]},reply:{...completed}});
     if(this.history.length>MAX_HISTORY)this.history.splice(0,this.history.length-MAX_HISTORY);
-    storageService.setItem(KEY,JSON.stringify(this.history));
+    const reportSerializeBoundary = this.history.length === 1 || this.sequence % 100 === 0;
+    if (reportSerializeBoundary) {
+      systemLogger.recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT', {
+        phase: 'SERIALIZE_BEGIN',
+        command: envelope.command,
+        source: envelope.source,
+        target: envelope.target,
+        historyCount: this.history.length,
+      });
+    }
+    const serializationStartedAt = Date.now();
+    const serializedHistory = JSON.stringify(this.history);
+    const serializationElapsedMs = Date.now() - serializationStartedAt;
+    if (reportSerializeBoundary || serializationElapsedMs >= 50) {
+      systemLogger.recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT', {
+        phase: 'SERIALIZE_COMPLETE',
+        command: envelope.command,
+        source: envelope.source,
+        target: envelope.target,
+        historyCount: this.history.length,
+        serializedChars: serializedHistory.length,
+        serializationElapsedMs,
+      });
+    }
+    storageService.setItem(KEY, serializedHistory);
     if(!reply.accepted)systemLogger.warn('SELF_IMPROVEMENT',`[DomainRouter] ${envelope.target}/${envelope.command} rejected`,reply.error||'unknown');
     return completed;
   }

@@ -5,6 +5,7 @@ import android.app.ApplicationExitInfo;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Build;
+import android.os.Debug;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
@@ -29,6 +30,9 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Small, content-free native journal for WebView/Activity failures.
@@ -46,7 +50,7 @@ public final class NativeWebViewDiagnosticJournal {
         "WEBVIEW_LISTENER_UNAVAILABLE", "WEBVIEW_PAGE_STARTED", "WEBVIEW_PAGE_COMMIT_VISIBLE", "WEBVIEW_PAGE_LOADED",
         "WEBVIEW_RENDER_PROCESS_GONE", "WEBVIEW_PROVIDER_INFO",
         "PROCESS_EXIT_HISTORY", "PROCESS_EXIT_HISTORY_SCAN", "UNCAUGHT_EXCEPTION",
-        "PROCESS_EXIT_TRACE_SUMMARY", "PROCESS_EXIT_TRACE_FRAME"
+        "PROCESS_EXIT_TRACE_SUMMARY", "PROCESS_EXIT_TRACE_FRAME", "MEMORY_SAMPLE"
     ));
 
     private NativeWebViewDiagnosticJournal() {}
@@ -55,6 +59,11 @@ public final class NativeWebViewDiagnosticJournal {
     private static final String EXIT_HISTORY_PREFERENCES = "miki_native_process_exit_history_v1";
     private static final String LAST_EXIT_TIMESTAMP_KEY = "last_reported_exit_timestamp_ms";
     private static boolean uncaughtExceptionHandlerInstalled = false;
+    private static ScheduledExecutorService memorySampler;
+    private static long memorySamplerStartElapsedMs;
+    private static int memorySampleIndex;
+    private static final long MEMORY_SAMPLE_FAST_WINDOW_MS = 2 * 60 * 1000L;
+    private static final long MEMORY_SAMPLE_STOP_AFTER_MS = 20 * 60 * 1000L;
 
     /**
      * Captures minimal exception evidence before delegating to Android's original handler.
@@ -95,6 +104,85 @@ public final class NativeWebViewDiagnosticJournal {
             }
         });
         uncaughtExceptionHandlerInstalled = true;
+        startMemorySampler(appContext);
+    }
+
+    /**
+     * Samples Android/Java memory while the process is alive. The bounded sample
+     * cadence is independent of WebView JavaScript callbacks.
+     */
+    private static synchronized void startMemorySampler(final Context context) {
+        if (context == null || memorySampler != null) return;
+        final Context appContext = context.getApplicationContext() != null
+            ? context.getApplicationContext() : context;
+        memorySamplerStartElapsedMs = SystemClock.elapsedRealtime();
+        memorySampler = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "MIKI-Native-Memory");
+            thread.setDaemon(true);
+            return thread;
+        });
+        scheduleMemorySample(appContext, 0L);
+    }
+
+    private static void scheduleMemorySample(final Context context, long delayMs) {
+        final ScheduledExecutorService scheduler = memorySampler;
+        if (scheduler == null || scheduler.isShutdown()) return;
+        scheduler.schedule(new Runnable() {
+            @Override
+            public void run() {
+                long elapsed = Math.max(0L, SystemClock.elapsedRealtime() - memorySamplerStartElapsedMs);
+                if (elapsed >= MEMORY_SAMPLE_STOP_AFTER_MS) {
+                    scheduler.shutdown();
+                    return;
+                }
+                try {
+                    recordMemorySample(context);
+                } catch (Throwable failure) {
+                    record(context, "MEMORY_SAMPLE",
+                        "status=ERROR,errorType=" + safeToken(failure.getClass().getSimpleName()), false);
+                }
+                long elapsedAfterSample = Math.max(0L, SystemClock.elapsedRealtime() - memorySamplerStartElapsedMs);
+                if (elapsedAfterSample >= MEMORY_SAMPLE_STOP_AFTER_MS) {
+                    scheduler.shutdown();
+                    return;
+                }
+                long nextDelayMs = elapsedAfterSample < MEMORY_SAMPLE_FAST_WINDOW_MS ? 3000L : 15000L;
+                scheduleMemorySample(context, nextDelayMs);
+            }
+        }, Math.max(0L, delayMs), TimeUnit.MILLISECONDS);
+    }
+
+    private static void recordMemorySample(Context context) {
+        Runtime runtime = Runtime.getRuntime();
+        long javaUsedKB = Math.max(0L, (runtime.totalMemory() - runtime.freeMemory()) / 1024L);
+        long javaTotalKB = Math.max(0L, runtime.totalMemory() / 1024L);
+        long javaMaxKB = Math.max(0L, runtime.maxMemory() / 1024L);
+        long nativeAllocKB = Math.max(0L, Debug.getNativeHeapAllocatedSize() / 1024L);
+        long nativeSizeKB = Math.max(0L, Debug.getNativeHeapSize() / 1024L);
+        int pssKB = Math.max(0, Debug.getPss());
+        long availKB = -1L;
+        long thresholdKB = -1L;
+        boolean lowMemory = false;
+        Object service = context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (service instanceof ActivityManager) {
+            ActivityManager.MemoryInfo memoryInfo = new ActivityManager.MemoryInfo();
+            ((ActivityManager) service).getMemoryInfo(memoryInfo);
+            availKB = Math.max(0L, memoryInfo.availMem / 1024L);
+            thresholdKB = Math.max(0L, memoryInfo.threshold / 1024L);
+            lowMemory = memoryInfo.lowMemory;
+        }
+        memorySampleIndex++;
+        String details = "sampleIndex=" + memorySampleIndex
+            + ",javaUsedKB=" + javaUsedKB
+            + ",javaTotalKB=" + javaTotalKB
+            + ",javaMaxKB=" + javaMaxKB
+            + ",nativeAllocKB=" + nativeAllocKB
+            + ",nativeSizeKB=" + nativeSizeKB
+            + ",pssKB=" + pssKB
+            + ",availKB=" + availKB
+            + ",thresholdKB=" + thresholdKB
+            + ",lowMem=" + lowMemory;
+        record(context, "MEMORY_SAMPLE", details, false);
     }
 
     public static synchronized boolean record(Context context, String event, String details, boolean durable) {

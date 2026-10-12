@@ -18,8 +18,9 @@ const RUNTIME_BREADCRUMB_EVENTS = new Set([
   'RUNTIME_STAGE_BEGIN', 'RUNTIME_STAGE_COMPLETE', 'RUNTIME_STAGE_FAILED',
   'DOMAIN_AUDIT_BEGIN', 'DOMAIN_AUDIT_OPERATION_BEGIN', 'DOMAIN_AUDIT_OPERATION_COMPLETE',
   'DOMAIN_AUDIT_OPERATION_FAILED', 'DOMAIN_AUDIT_COMPLETE', 'DOMAIN_CONNECTION_CHECKPOINT',
+  'RUNTIME_MEMORY_SAMPLE', 'STORAGE_FLUSH_CHECKPOINT', 'SELF_CODE_SEED_CHECKPOINT', 'DOMAIN_ROUTER_CHECKPOINT',
 ]);
-const RUNTIME_BREADCRUMB_PROGRESS_STREAM: Record<string, 'RUNTIME_STAGE' | 'DOMAIN_AUDIT' | 'DOMAIN_CONNECTION'> = {
+const RUNTIME_BREADCRUMB_PROGRESS_STREAM: Record<string, 'RUNTIME_STAGE' | 'DOMAIN_AUDIT' | 'DOMAIN_CONNECTION' | 'RUNTIME_MEMORY' | 'STORAGE_FLUSH' | 'SELF_CODE_SEED' | 'DOMAIN_ROUTER'> = {
   RUNTIME_STAGE_BEGIN: 'RUNTIME_STAGE',
   RUNTIME_STAGE_COMPLETE: 'RUNTIME_STAGE',
   RUNTIME_STAGE_FAILED: 'RUNTIME_STAGE',
@@ -29,7 +30,15 @@ const RUNTIME_BREADCRUMB_PROGRESS_STREAM: Record<string, 'RUNTIME_STAGE' | 'DOMA
   DOMAIN_AUDIT_OPERATION_FAILED: 'DOMAIN_AUDIT',
   DOMAIN_AUDIT_COMPLETE: 'DOMAIN_AUDIT',
   DOMAIN_CONNECTION_CHECKPOINT: 'DOMAIN_CONNECTION',
+  RUNTIME_MEMORY_SAMPLE: 'RUNTIME_MEMORY',
+  STORAGE_FLUSH_CHECKPOINT: 'STORAGE_FLUSH',
+  SELF_CODE_SEED_CHECKPOINT: 'SELF_CODE_SEED',
+  DOMAIN_ROUTER_CHECKPOINT: 'DOMAIN_ROUTER',
 };
+
+const RUNTIME_DIAGNOSTIC_EVENTS = new Set([
+  'RUNTIME_MEMORY_SAMPLE', 'STORAGE_FLUSH_CHECKPOINT', 'SELF_CODE_SEED_CHECKPOINT', 'DOMAIN_ROUTER_CHECKPOINT',
+]);
 
 const RUNTIME_BREADCRUMB_DETAIL_KEYS = new Set([
   'tab', 'from', 'to', 'visibility', 'usedJSHeapMB', 'messageCount', 'historicalCodeMessageCount',
@@ -37,6 +46,11 @@ const RUNTIME_BREADCRUMB_DETAIL_KEYS = new Set([
   'cyclesFound', 'errorType', 'reasonType', 'lineNumber', 'columnNumber', 'filenamePresent', 'suppressed',
   'stage', 'domain', 'step', 'status', 'lastCompleted', 'nextStage', 'nextDomain', 'nextStep',
   'completedCount', 'totalCount', 'order', 'accepted', 'passed', 'correlationId', 'phase',
+  'totalJSHeapMB', 'jsHeapLimitMB', 'jsHeapUsageRatio', 'deviceMemoryGB', 'hardwareConcurrency', 'pressure',
+  'keyCount', 'totalValueChars', 'maxValueChars', 'keyClasses', 'backend', 'zipBytes', 'fileCount',
+  'totalContentChars', 'maxFileChars', 'historyCount', 'serializedChars', 'serializationElapsedMs',
+  'command', 'source', 'target', 'javaUsedKB', 'javaTotalKB', 'javaMaxKB',
+  'nativeAllocKB', 'nativeSizeKB', 'pssKB', 'availKB', 'thresholdKB', 'lowMem', 'sampleIndex', 'status',
 ]);
 
 interface RuntimeBreadcrumb {
@@ -153,6 +167,12 @@ class SystemLogger {
       } catch {
         this.logs = [];
       }
+      window.addEventListener('miki-storage-diagnostic', (event: Event) => {
+        const detail = (event as CustomEvent<Record<string, unknown>>).detail;
+        if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+          this.recordRuntimeDiagnostic('STORAGE_FLUSH_CHECKPOINT', detail);
+        }
+      });
     }
   }
 
@@ -276,7 +296,37 @@ class SystemLogger {
     this.writeRuntimeBreadcrumbs(journal);
   }
 
-  private async replayPreviousRuntimeBreadcrumbs(): Promise<void> {
+  /**
+   * Writes bounded, content-free diagnostic metadata to the existing runtime log
+   * queue without adding each sample to the general-purpose in-memory log array.
+   */
+  public recordRuntimeDiagnostic(event: string, details: Record<string, unknown> = {}): void {
+    if (typeof window === 'undefined' || !RUNTIME_DIAGNOSTIC_EVENTS.has(event)) return;
+    const safeDetails: Record<string, string | number | boolean | null> = {};
+    Object.entries(details).slice(0, 12).forEach(([key, value]) => {
+      if (!RUNTIME_BREADCRUMB_DETAIL_KEYS.has(key)) return;
+      if (typeof value === 'string') {
+        safeDetails[key] = value.replace(/[\r\n\t]/g, ' ').slice(0, 100);
+      } else if (typeof value === 'number' && Number.isFinite(value)) {
+        safeDetails[key] = value;
+      } else if (typeof value === 'boolean' || value === null) {
+        safeDetails[key] = value;
+      }
+    });
+    this.recordRuntimeBreadcrumb(event, safeDetails);
+    const now = Date.now();
+    this.queueRuntimeLogFile({
+      id: `runtime-diagnostic-${now}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: new Date(now).toISOString(),
+      epoch: now,
+      level: 'INFO',
+      category: 'SYSTEM',
+      message: `[RUNTIME_DIAGNOSTIC] event=${event}`,
+      details: safeDetails,
+    });
+  }
+
+  private async replayPreviousRuntimeBreadcrumbs(): Promise<void>
     if (typeof window === 'undefined' || !this.runtimeLogFilePlugin) return;
     const journal = this.readRuntimeBreadcrumbs();
     const previous = journal
@@ -387,8 +437,19 @@ class SystemLogger {
 
     const persist = async () => {
       state.lastHeartbeatAt = Date.now();
-      state.lastSample = this.collectRuntimeMemorySample();
-      state.samples = [...state.samples, state.lastSample].slice(-120);
+      const sample = this.collectRuntimeMemorySample();
+      state.lastSample = sample;
+      state.samples = [...state.samples, sample].slice(-120);
+      this.recordRuntimeDiagnostic('RUNTIME_MEMORY_SAMPLE', {
+        visibility: sample.visibility,
+        usedJSHeapMB: sample.usedJSHeapMB ?? null,
+        totalJSHeapMB: sample.totalJSHeapMB ?? null,
+        jsHeapLimitMB: sample.jsHeapLimitMB ?? null,
+        jsHeapUsageRatio: sample.jsHeapUsageRatio ?? null,
+        deviceMemoryGB: sample.deviceMemoryGB ?? null,
+        hardwareConcurrency: sample.hardwareConcurrency ?? null,
+        pressure: sample.pressure,
+      });
       try {
         storageService.setItem(this.runtimeMemoryStorageKey, JSON.stringify(state));
         await storageService.flushNow();

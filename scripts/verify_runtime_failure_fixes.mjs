@@ -32,6 +32,8 @@ const mainEntry = read('src/main.tsx');
 const chatPanel = read('src/components/ChatPanel.tsx');
 const domainContract = read('src/miki/core/services/domainContractRegistryService.ts');
 const domainRouter = read('src/miki/core/services/domainRouterService.ts');
+const oomStorageSource = read('src/services/storageService.ts');
+const oomSeedSource = read('src/miki/core/services/selfCodeSpaceService.ts');
 const planRevision = read('src/miki/core/services/corePlanRevisionService.ts');
 const routePlanner = read('src/miki/core/services/adaptiveRoutePlannerService.ts');
 const completionGate = read('src/miki/core/services/coreCompletionGateService.ts');
@@ -428,6 +430,60 @@ check(
     nativeJournal.includes('isLikelyTextTrace') &&
     !nativeJournal.includes('getDescription()') &&
     !nativeJournal.includes('readAllBytes()')
+);
+
+const storageIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] LEGACY_OR_SHARED | src/services/storageService.ts |'));
+const seedIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] CORE | src/miki/core/services/selfCodeSpaceService.ts |'));
+const routerIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] CORE | src/miki/core/services/domainRouterService.ts |'));
+const nativeJournalIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/NativeWebViewDiagnosticJournal.java |'));
+check(
+  'Android native memory sampler records bounded Java/native/OS memory checkpoints',
+  nativeJournal.includes('"MEMORY_SAMPLE"') &&
+    nativeJournal.includes('Debug.getPss()') &&
+    nativeJournal.includes('javaUsedKB=') &&
+    nativeJournal.includes('MEMORY_SAMPLE_FAST_WINDOW_MS') &&
+    nativeJournal.includes('scheduleMemorySample(appContext, 0L)')
+);
+check(
+  'Runtime JS heap measurements reach the existing log queue and remain bounded',
+  runtimeLogger.includes("this.recordRuntimeDiagnostic('RUNTIME_MEMORY_SAMPLE'") &&
+    runtimeLogger.includes('this.queueRuntimeLogFile({') &&
+    runtimeLogger.includes("RUNTIME_MEMORY_SAMPLE: 'RUNTIME_MEMORY'") &&
+    runtimeLogger.includes('state.samples = [...state.samples, sample].slice(-120)')
+);
+check(
+  'Storage checkpoints record sizes/timing without raw keys or values',
+  oomStorageSource.includes("new CustomEvent('miki-storage-diagnostic'") &&
+    oomStorageSource.includes('totalValueChars') &&
+    oomStorageSource.includes('maxValueChars') &&
+    oomStorageSource.includes('diagnosticKeyClass') &&
+    runtimeLogger.includes("window.addEventListener('miki-storage-diagnostic'")
+);
+check(
+  'Seed checkpoints cover fetch/decompression/verification/apply/flush/fallback',
+  oomSeedSource.includes("recordRuntimeDiagnostic('SELF_CODE_SEED_CHECKPOINT'") &&
+    oomSeedSource.includes("checkpoint('ZIP_FETCHED'") &&
+    oomSeedSource.includes("checkpoint('VERIFY_PROGRESS'") &&
+    oomSeedSource.includes("checkpoint('APPLY_BEGIN'") &&
+    oomSeedSource.includes("checkpoint('GITHUB_FALLBACK_FAILED'") &&
+    oomSeedSource.includes('totalContentChars') &&
+    oomSeedSource.includes('maxFileChars')
+);
+check(
+  'Domain router serialization checkpoints record history size and duration',
+  domainRouter.includes("recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT'") &&
+    domainRouter.includes("phase: 'SERIALIZE_BEGIN'") &&
+    domainRouter.includes("phase: 'SERIALIZE_COMPLETE'") &&
+    domainRouter.includes('serializedChars: serializedHistory.length') &&
+    domainRouter.includes('serializationElapsedMs')
+);
+check(
+  'Canonical index counts match all sources modified for memory diagnostics',
+  storageIndexRow?.includes(`lines=${oomStorageSource.split(/\r?\n/).length - 1}`) &&
+    seedIndexRow?.includes(`lines=${oomSeedSource.split(/\r?\n/).length - 1}`) &&
+    routerIndexRow?.includes(`lines=${domainRouter.split(/\r?\n/).length - 1}`) &&
+    loggerIndexRow?.includes(`lines=${runtimeLogger.split(/\r?\n/).length - 1}`) &&
+    nativeJournalIndexRow?.includes(`lines=${nativeJournal.split(/\r?\n/).length - 1}`)
 );
 
 const failures = checks.filter(item => !item.passed);
