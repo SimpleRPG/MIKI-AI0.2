@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-13
-正本Revision：2026-10-13-P251
+正本Revision：2026-10-13-P252
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P251）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P252）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-13-P251
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正。完全再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-13-P252
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更。完全再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -130,6 +130,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 ■ 不変条件
 
 - CORE + 17分類 = 18構成。
+- 通常対話のCORE 18構成追跡は初期状態で折りたたみ、要約行へ処理状態を表示し、必要時に展開して詳細を確認できる。追跡情報・CORE処理経路・保存データは削減しない。
 - UI → CORE → 必要な17分類 → CORE再評価 → CoreResult → UI。
 - 19番目の分類、第二Orchestrator、第二Result DB、第二Blackboardを作らない。
 - ローカルLLMを通常経路の必要条件としない。
@@ -204,7 +205,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] UI | src/components/AutonomousImprovementHome.tsx | lines=1750 | symbols=AutonomousImprovementHome, AutonomousImprovementHomeProps | callers=1 | deps=6 | Tests=1
 - [REMOVED-P106] UI | src/components/CharacterCard.tsx | 旧RPG試作UI。現行用途外かつcallers=0のため削除済み。再追加禁止。
 - [REMOVED-P106] UI | src/components/CharacterCreationModal.tsx | 旧RPG試作UI。現行用途外かつcallers=0のため削除済み。再追加禁止。
-- [USED] UI | src/components/ChatPanel.tsx | lines=3903 | symbols=ChatPanel | callers=1 | deps=16 | Tests=1 / Markers=1
+- [USED] UI | src/components/ChatPanel.tsx | lines=3906 | symbols=ChatPanel | callers=1 | deps=16 | Tests=1 / Markers=1
 - [USED] UI | src/components/CodeEditor.tsx | lines=1456 | symbols=CodeEditor | callers=1 | deps=7 | Tests=2
 - [REMOVED-P106] UI | src/components/CombatArena.tsx | 旧RPG試作UI。現行用途外かつcallers=0のため削除済み。再追加禁止。
 - [USED] UI | src/components/CompletionBadge.tsx | lines=319 | symbols=CompletionBadge | callers=1 | deps=2
@@ -11487,3 +11488,13 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - P251正本更新後の静的再検査（実測終了コード、0=PASS）: runtime_verifier=0; runtime_logging=0; verifier_syntax=0; typescript_lint=NOT_RUN; whitespace_diff=0。
 - GitHub Actions/APK ArtifactとAndroid実機のOOM・Java heap上限は、静的検査とは別に確認する。
 
+============================================================
+【2026-10-13-P252 CORE追跡パネルの初期折りたたみ】
+============================================================
+
+- 通常対話のChatPanelでは、CORE 18構成追跡をnative details/summaryによる初期閉状態のパネルにする。要約行にタイトル・現在ステータス・展開の目印を残し、Request ID、Interaction ID、Run ID、Directive ID、Route、Processed Categories、Error、更新時刻、CORE Result同期表示は展開時に従来どおり表示する。
+- DOMの追跡状態表示のみを変更し、CoreResultService、CORE/17分類の実行経路、ステータス更新、保存データは変更しない。
+- scripts/verify_runtime_failure_fixes.mjsに、初期閉状態、要約行、状態バッジ、詳細項目の保持を確認する回帰検査を追加する。
+- P252初回静的検査（実測終了コード、0=PASS）: runtime_verifier=P252_INITIAL_RESULTS verifier=0 runtime_logging=0 verifier_syntax=0 typescript_lint=SKIP_NO_LOCAL_TSC whitespace_diff=0; runtime_logging=0; verifier_syntax=0; typescript_lint=0; whitespace_diff=SKIP_NO_LOCAL_TSC。
+- P252正本更新後の静的再検査（実測終了コード、0=PASS）: runtime_verifier=P252_POST_DESIGN_RESULTS verifier=0 runtime_logging=0 verifier_syntax=0 typescript_lint=SKIP_NO_LOCAL_TSC whitespace_diff=0; runtime_logging=0; verifier_syntax=0; typescript_lint=0; whitespace_diff=SKIP_NO_LOCAL_TSC。
+- GitHub ActionsのWeb/Native build・APK ArtifactとAndroid実機の表示確認は静的検査と分け、実行結果を確認するまで成功と扱わない。

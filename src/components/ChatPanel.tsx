@@ -2761,12 +2761,13 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
 
                   {/* CORE 18構成 追跡 (実データ: STEP 10) */}
                   {msg.coreTracking && (
-                    <div className="mt-3 p-3 bg-slate-950/95 border border-indigo-500/40 rounded-xl space-y-2 text-xs shadow-md">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 font-bold text-slate-200">
+                    <details className="group mt-3 overflow-hidden rounded-xl border border-indigo-500/40 bg-slate-950/90 text-xs shadow-sm">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400">
+                        <div className="flex min-w-0 items-center gap-1.5 font-bold text-slate-200">
                           <Network className="w-3.5 h-3.5 text-indigo-400" />
                           <span>CORE 18構成 追跡 (実データ)</span>
                         </div>
+                        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                         <span
                           className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                             msg.coreTracking.status === 'completed'
@@ -2793,9 +2794,11 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                           {msg.coreTracking.status === 'inconclusive' && '❓ 判定不能 (Inconclusive)'}
                           {msg.coreTracking.status === 'blocked' && '🛑 ブロック (Blocked)'}
                         </span>
-                      </div>
+                          <span className="shrink-0 text-[10px] font-medium text-slate-400">詳細を表示 ▾</span>
+                        </div>
+                      </summary>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px] font-mono bg-black/50 p-2.5 rounded-lg border border-slate-800">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px] font-mono bg-black/50 p-3 border-t border-indigo-500/20">
                         <div>
                           <span className="text-slate-500 font-sans">Request ID: </span>
                           <span className="text-indigo-300 font-semibold">{msg.coreTracking.requestId}</span>
@@ -2835,7 +2838,7 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                           <span className="text-indigo-400/80">CORE Result リアルタイム同期</span>
                         </div>
                       </div>
-                    </div>
+                    </details>
                   )}
 
                   {/* 非LLM中心・自己成長アーキテクチャ 詳細展開パネル */}

@@ -221,6 +221,27 @@ check(
     !chatPanel.includes('{messages.map((msg) => {')
 );
 check(
+  'CORE 18 tracking is collapsed by default and keeps the status and detail fields',
+  (() => {
+    const trackingStart = chatPanel.indexOf('{/* CORE 18構成 追跡 (実データ: STEP 10) */}');
+    const trackingEnd = chatPanel.indexOf('{/* 非LLM中心・自己成長アーキテクチャ 詳細展開パネル */}', trackingStart);
+    const trackingBlock = trackingStart >= 0 && trackingEnd > trackingStart
+      ? chatPanel.slice(trackingStart, trackingEnd)
+      : '';
+    return trackingBlock.includes('<details className="group mt-3 overflow-hidden rounded-xl border border-indigo-500/40 bg-slate-950/90 text-xs shadow-sm">') &&
+      trackingBlock.includes('<summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400">') &&
+      trackingBlock.includes('詳細を表示 ▾') &&
+      trackingBlock.includes("msg.coreTracking.status === 'processing'") &&
+      trackingBlock.includes('msg.coreTracking.requestId') &&
+      trackingBlock.includes('msg.coreTracking.route') &&
+      trackingBlock.includes('msg.coreTracking.processedCategories') &&
+      trackingBlock.includes('msg.coreTracking.updatedAt') &&
+      trackingBlock.includes('</summary>') &&
+      trackingBlock.includes('</details>') &&
+      !trackingBlock.includes('<details open');
+  })()
+);
+check(
   'Chat UI writes content-free lifecycle diagnostics',
   chatPanel.includes("'[CHAT_UI] panel mounted'") &&
     chatPanel.includes("'[CHAT_UI] code verification begin'") &&
