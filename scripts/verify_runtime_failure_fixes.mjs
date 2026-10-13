@@ -29,6 +29,8 @@ const domainParticipation = read('src/miki/core/services/domainParticipationServ
 const domainSequentialConnection = read('src/miki/core/services/domainSequentialConnectionService.ts');
 const app = read('src/App.tsx');
 const mainEntry = read('src/main.tsx');
+const appManifest = read('android/app/src/main/AndroidManifest.xml');
+const apkWorkflow = read('.github/workflows/build-apk.yml');
 const chatPanel = read('src/components/ChatPanel.tsx');
 const domainContract = read('src/miki/core/services/domainContractRegistryService.ts');
 const domainRouter = read('src/miki/core/services/domainRouterService.ts');
@@ -495,6 +497,9 @@ check('Oversized diagnostic history is not parsed into a second object graph',
 check('Domain router batches history serialization and retains periodic checkpoints',
   domainRouter.includes('scheduleHistoryPersistence') && domainRouter.includes('persistHistory(envelope, true)') &&
     domainRouter.includes('this.historyPersistTimer') && domainRouter.includes('storageService.setItem(KEY, serializedHistory)'));
+
+check('Android requests a larger Java heap without capping functional data', appManifest.includes('android:largeHeap="true"') && design.includes('操作性・応答性') && design.includes('機能データを削減'));
+check('APK boot log identifies its source commit', apkWorkflow.includes('VITE_MIKI_BUILD_REVISION: ${{ github.sha }}') && mainEntry.includes('VITE_MIKI_BUILD_REVISION') && mainEntry.includes('buildRevision'));
 
 const failures = checks.filter(item => !item.passed);
 for (const item of checks) console.log(`${item.passed ? 'PASS' : 'FAIL'} ${item.name}`);

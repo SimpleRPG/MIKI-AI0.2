@@ -50,6 +50,8 @@ jobs:
           npm run verify:graph-answer-pipeline:p216
 
       - name: Build Web Application
+        env:
+          VITE_MIKI_BUILD_REVISION: ${{ github.sha }}
         run: npm run build
 
       - name: Install Japanese morphology (Sudachi) dependency

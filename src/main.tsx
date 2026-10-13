@@ -7,7 +7,7 @@ import { systemLogger } from './services/systemLogger';
 import './index.css';
 
 void systemLogger.initializeRuntimeLogFile();
-systemLogger.info('SYSTEM','[BOOT] JavaScript entry loaded',{userAgent:typeof navigator==='undefined'?'unknown':navigator.userAgent});
+systemLogger.info('SYSTEM','[BOOT] JavaScript entry loaded',{userAgent:typeof navigator==='undefined'?'unknown':navigator.userAgent,buildRevision:String((import.meta as any).env?.VITE_MIKI_BUILD_REVISION||'UNKNOWN')});
 
 // Prevent WebGPU / background abort recoverable notices from triggering parent frame tab shifts
 window.addEventListener('unhandledrejection', (event) => {
