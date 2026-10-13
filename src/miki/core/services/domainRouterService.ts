@@ -48,6 +48,7 @@ class DomainRouterService {
   private registrations=new Map<MikiDomain,DomainRegistration>();
   private history:Array<{envelope:DomainEnvelope;reply:DomainReply}>=[];
   private sequence=0;
+  private historyPersistTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(){this.load();}
 
@@ -100,33 +101,39 @@ class DomainRouterService {
     this.history.push({envelope:{...envelope,payload:{...envelope.payload},evidenceIds:[...envelope.evidenceIds]},reply:{...completed}});
     if(this.history.length>MAX_HISTORY)this.history.splice(0,this.history.length-MAX_HISTORY);
     const reportSerializeBoundary = this.history.length === 1 || this.sequence % 100 === 0;
-    if (reportSerializeBoundary) {
-      systemLogger.recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT', {
-        phase: 'SERIALIZE_BEGIN',
-        command: envelope.command,
-        source: envelope.source,
-        target: envelope.target,
-        historyCount: this.history.length,
-      });
-    }
-    const serializationStartedAt = Date.now();
-    const serializedHistory = JSON.stringify(this.history);
-    const serializationElapsedMs = Date.now() - serializationStartedAt;
-    if (reportSerializeBoundary || serializationElapsedMs >= 50) {
-      systemLogger.recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT', {
-        phase: 'SERIALIZE_COMPLETE',
-        command: envelope.command,
-        source: envelope.source,
-        target: envelope.target,
-        historyCount: this.history.length,
-        serializedChars: serializedHistory.length,
-        serializationElapsedMs,
-      });
-    }
-    storageService.setItem(KEY, serializedHistory);
+    if (reportSerializeBoundary) this.persistHistory(envelope, true);
+    else this.scheduleHistoryPersistence();
     if(!reply.accepted)systemLogger.warn('SELF_IMPROVEMENT',`[DomainRouter] ${envelope.target}/${envelope.command} rejected`,reply.error||'unknown');
     return completed;
   }
+  private scheduleHistoryPersistence(): void {
+    if (this.historyPersistTimer) return;
+    this.historyPersistTimer = setTimeout(() => {
+      this.historyPersistTimer = null;
+      this.persistHistory();
+    }, 50);
+  }
+
+  private persistHistory(envelope?: DomainEnvelope, reportBoundary = false): void {
+    if (this.historyPersistTimer) {
+      clearTimeout(this.historyPersistTimer);
+      this.historyPersistTimer = null;
+    }
+    if (reportBoundary) systemLogger.recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT', {
+      phase: 'SERIALIZE_BEGIN', command: envelope?.command ?? 'BATCHED',
+      source: envelope?.source ?? 'core', target: envelope?.target ?? 'core', historyCount: this.history.length,
+    });
+    const startedAt = Date.now();
+    const serializedHistory = JSON.stringify(this.history);
+    const serializationElapsedMs = Date.now() - startedAt;
+    if (reportBoundary || serializationElapsedMs >= 50) systemLogger.recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT', {
+      phase: 'SERIALIZE_COMPLETE', command: envelope?.command ?? 'BATCHED',
+      source: envelope?.source ?? 'core', target: envelope?.target ?? 'core',
+      historyCount: this.history.length, serializedChars: serializedHistory.length, serializationElapsedMs,
+    });
+    storageService.setItem(KEY, serializedHistory);
+  }
+
   private extractEvidenceIds(value:unknown):string[]{
     const found=new Set<string>();
     const walk=(item:unknown,depth:number):void=>{

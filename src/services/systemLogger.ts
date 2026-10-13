@@ -138,9 +138,13 @@ interface RuntimeMemoryDiagnosticsState {
   samples: RuntimeMemorySample[];
 }
 
+const MAX_PERSISTED_LOG_CHARS = 512 * 1024;
+const MAX_LOG_MESSAGE_CHARS = 1024;
+const MAX_LOG_DETAIL_CHARS = 768;
+
 class SystemLogger {
   private logs: SystemLogEntry[] = [];
-  private maxLogs = 1000;
+  private maxLogs = 200;
   private storageKey = 'miki_system_diagnostics_logs';
   private sessionStartTime: number = 0;
   private lastStepTimestamp: number = 0;
@@ -161,8 +165,9 @@ class SystemLogger {
     if (typeof window !== 'undefined') {
       try {
         const saved = storageService.getItem(this.storageKey);
-        if (saved) {
-          this.logs = JSON.parse(saved);
+        if (saved && saved.length <= MAX_PERSISTED_LOG_CHARS) {
+          const parsed = JSON.parse(saved);
+          this.logs = Array.isArray(parsed) ? parsed.slice(-this.maxLogs) : [];
         }
       } catch {
         this.logs = [];
@@ -606,10 +611,10 @@ class SystemLogger {
       epoch: nowEpoch,
       level,
       category,
-      message,
+      message: message.slice(0, MAX_LOG_MESSAGE_CHARS),
       elapsedMs,
       relativeDeltaMs,
-      details: details ? (typeof details === 'object' ? JSON.parse(JSON.stringify(details, this.getCircularReplacer())) : details) : undefined,
+      details: details ? this.boundedLogDetails(details) : undefined,
     };
 
     this.logs.push(entry);
@@ -621,7 +626,7 @@ class SystemLogger {
 
     if (typeof window !== 'undefined') {
       try {
-        storageService.setItem(this.storageKey, JSON.stringify(this.logs.slice(-300)));
+        storageService.setItem(this.storageKey, JSON.stringify(this.logs.slice(-this.maxLogs)));
       } catch {}
 
       // Fire and forget server sync to persist in workspace log file
@@ -645,11 +650,11 @@ class SystemLogger {
     const timingPrefix = elapsedMs !== undefined ? `[+${elapsedMs}ms]` : '';
     const formatted = `[${entry.timestamp}] ${timingPrefix} [${entry.level.padEnd(5)}] [${entry.category.padEnd(9)}] ${entry.message}`;
     if (level === 'ERROR') {
-      console.error(formatted, details || '');
+      console.error(formatted, entry.details || '');
     } else if (level === 'WARN') {
-      console.warn(formatted, details || '');
+      console.warn(formatted, entry.details || '');
     } else {
-      console.log(formatted, details || '');
+      console.log(formatted, entry.details || '');
     }
   }
 
@@ -697,6 +702,16 @@ class SystemLogger {
     }
 
     return stepSnapshot;
+  }
+
+  private boundedLogDetails(details: any): any {
+    if (typeof details === 'string') return details.slice(0, MAX_LOG_DETAIL_CHARS);
+    if (typeof details !== 'object' || details === null) return details;
+    try {
+      const serialized = JSON.stringify(details, this.getCircularReplacer());
+      if (serialized === undefined) return undefined;
+      return serialized.length > MAX_LOG_DETAIL_CHARS ? `[details omitted: ${serialized.length} chars]` : JSON.parse(serialized);
+    } catch { return '[details omitted]'; }
   }
 
   private getCircularReplacer() {

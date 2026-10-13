@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-13
-正本Revision：2026-10-13-P247
+正本Revision：2026-10-13-P248
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P247）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P248）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-13-P247
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。完全再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-13-P248
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正.完全再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -397,7 +397,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/domainOwnershipCatalogService.ts | lines=30 | symbols=SourceOwnership, SourceOwnershipKind, getCoreCompatibilityGateways, getDomainOwnershipCatalog, resolveSourceOwnership | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=168 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/domainReplyLedgerService.ts | lines=350 | symbols=ActionLineage, DomainReplyLedgerRecord, domainReplyLedgerService | callers=7 | deps=6 | Storage=miki_domain_reply_ledger_v1
-- [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=149 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1 / Tests=3
+- [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=156 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1 / Tests=3
 - [USED] CORE | src/miki/core/services/domainSequentialConnectionService.ts | lines=64 | symbols=DomainConnectionReceipt, domainSequentialConnectionService | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/evidenceIdentityService.ts | lines=31 | symbols=evidenceIdentityService | callers=3 | deps=1 | Storage=miki_evidence_identity_sequence_v1
 - [USED] CORE | src/miki/core/services/evidenceQualityGateService.ts | lines=15 | symbols=EvidenceQualityResult, evidenceQualityGateService | callers=4 | deps=1
@@ -1025,9 +1025,9 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [ORPHAN] LEGACY_OR_SHARED | src/services/specContractCompilerService.ts | lines=88 | symbols=ContractStatus, Norm, SpecContract, SpecContractClause, SpecContractCompilerService | callers=0 | deps=2 | Storage=miki_spec_contract_v1 / Tests=3
 - [USED] LEGACY_OR_SHARED | src/services/startupRecoveryService.ts | lines=190 | symbols=StartupDiagnostic, StartupPhase, startupRecoveryService | callers=1 | deps=0 | Storage=miki_startup_diagnostic_v1 / Tests=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/storagePlanningService.ts | lines=220 | symbols=StoragePlanningService, storagePlanningService | callers=0 | deps=4 | Storage=miki_storage_audit_log_v32
-- [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=728 | symbols=storageService | callers=295 | deps=1 | Tests=7
+- [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=813 | symbols=storageService | callers=295 | deps=1 | Tests=7
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/syntheticDataService.ts | lines=779 | symbols=SyntheticDataService, syntheticDataService, toolsService | callers=1 | deps=9 | Storage=miki_ai_synthetic_batches
-- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=1014 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
+- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=1029 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
 - [USED] LEGACY_OR_SHARED | src/services/taskCaseMemoryService.ts | lines=45 | symbols=TaskCaseMaturity, TaskCaseMemoryService, TaskCaseOutcome, TaskCaseRecord, taskCaseMemoryService | callers=4 | deps=5
 - [USED] LEGACY_OR_SHARED | src/services/taskExecutionOrchestratorService.ts | lines=237 | symbols=TaskExecutionHandle, TaskExecutionOrchestratorService, TaskExecutionStatus, taskExecutionOrchestratorService | callers=1 | deps=15
 - [USED] LEGACY_OR_SHARED | src/services/taskLineageService.ts | lines=45 | symbols=TaskLineageRecord, TaskLineageService, taskLineageService | callers=1 | deps=2
@@ -5601,7 +5601,7 @@ Correction Learning、Multi-Step Task、Answer Plan、Conversation Evaluation等
      ・PERMISSION_DENIED
      ・EXECUTION_FAILED
      ・WAITING_EXTERNAL
-     ・PENDING_USER_INPUT
+     ・0_USER_INPUT
 
 その状態をConversationStateとCOREへ戻し、
      次に何をするかを決定する。
@@ -11438,3 +11438,14 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - NativeWebViewDiagnosticJournal.javaの行数は変わらないため、正本索引の当該行数は変更しない。完全再帰インベントリ全体は再集計しない。
 - P247静的検査結果（実測終了コード、0=PASS）: js_syntax=0; runtime_verifier=0; runtime_logging=0; pss_source_contract=0; android_native_contract=SKIP_NO_LOCAL_TSX; p215_graph_e2e=SKIP_NO_LOCAL_TSX; whitespace_diff=0
 - Javaコンパイル、APK生成、APK Artifact、Android実機でのログ取得は独立して確認し、静的検証の成功から推定しない。
+
+============================================================
+【2026-10-13-P248 SQLite大容量値分割・Runtime履歴保存のメモリ抑制】
+============================================================
+
+- SQLite backendでは、大容量の論理値を内部chunk行へ分割して保存し、manifestを最後に公開する。読み込み時も大容量の旧行をsubstr単位で回収し、内部chunk行は通常のkey一覧・cacheへ露出させない。storageServiceの同期getItem/setItemと論理キーは維持し、会話・記憶・自己コード等の機能データへサイズ上限を設けない。
+- systemLoggerは保存済み診断ログが512Ki文字を超える場合に起動時のJSON.parseを行わず、通常ログの件数・message・detailsを上限内に保つ。これは診断ログだけを対象とし、アプリの会話・知識・自己コードを削除する処理ではない。
+- domainRouterの履歴上限2,000件と応答経路は維持する。履歴保存は50ms単位でまとめ、初回および100 sequence境界は即時に保存する。大きな履歴を毎dispatchでJSON.stringifyする重複を避ける。
+- 初回静的検査（実測終了コード、0=PASS）: verifier=0; runtime_logging=0; js_syntax=0; whitespace_diff=0
+- 正本更新後の静的再検査（実測終了コード、0=PASS）: verifier=0; runtime_logging=0; js_syntax=0; whitespace_diff=0
+- GitHub Actions/APK生成・APK Artifact・Android実機のOOM再現は、このTermuxコマンドでは検証しない。各結果を独立して確認し、静的検証だけで成功扱いにしない。

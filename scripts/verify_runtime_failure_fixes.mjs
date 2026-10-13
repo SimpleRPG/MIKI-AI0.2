@@ -486,6 +486,16 @@ check(
     nativeJournalIndexRow?.includes(`lines=${nativeJournal.split(/\r?\n/).length - 1}`)
 );
 
+check('Large SQLite values use bounded native bridge reads and chunk writes',
+  oomStorageSource.includes('SQLITE_CHUNK_PREFIX') && oomStorageSource.includes('persistSqliteValue') &&
+    oomStorageSource.includes('SELECT substr(value, ?, ?) AS part') && oomStorageSource.includes('sqliteChunkGenerations'));
+check('Oversized diagnostic history is not parsed into a second object graph',
+  runtimeLogger.includes('MAX_PERSISTED_LOG_CHARS') && runtimeLogger.includes('saved.length <= MAX_PERSISTED_LOG_CHARS') &&
+    runtimeLogger.includes('boundedLogDetails') && runtimeLogger.includes('MAX_LOG_DETAIL_CHARS'));
+check('Domain router batches history serialization and retains periodic checkpoints',
+  domainRouter.includes('scheduleHistoryPersistence') && domainRouter.includes('persistHistory(envelope, true)') &&
+    domainRouter.includes('this.historyPersistTimer') && domainRouter.includes('storageService.setItem(KEY, serializedHistory)'));
+
 const failures = checks.filter(item => !item.passed);
 for (const item of checks) console.log(`${item.passed ? 'PASS' : 'FAIL'} ${item.name}`);
 console.log(JSON.stringify({ passed: failures.length === 0, total: checks.length, failed: failures.map(item => item.name) }, null, 2));

@@ -40,6 +40,10 @@ class StorageService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private sqlite: any = null; // SQLiteDBConnection (native only, loaded dynamically)
   private idb: IDBDatabase | null = null;
+  private readonly SQLITE_CHUNK_PREFIX = '__miki_sqlite_chunk_v1__:';
+  private readonly SQLITE_MANIFEST_PREFIX = '__MIKI_SQLITE_CHUNKED_V1__:';
+  private readonly SQLITE_CHUNK_CHARS = 1024 * 1024;
+  private sqliteChunkGenerations = new Map<string, { generation: string; parts: number }>();
   private readonly STORE = 'kv_store';
   private readonly MEMORIES_STORE = 'memories_store';
   private readonly DB_NAME = 'mikiai_kv';
@@ -85,7 +89,76 @@ class StorageService {
         this.backend = 'memory';
       }
     }
+    if (this.dirtyKeys.size) this.scheduleFlush();
     await this.migrateFromLegacyLocalStorage();
+  }
+
+  private chunkRowKey(key: string, generation: string, part: number): string {
+    return `${this.SQLITE_CHUNK_PREFIX}${encodeURIComponent(key)}:${generation}:${part}`;
+  }
+
+  private parseSqliteChunkManifest(value: unknown): { generation: string; parts: number; length: number } | null {
+    if (typeof value !== 'string' || !value.startsWith(this.SQLITE_MANIFEST_PREFIX)) return null;
+    try {
+      const item = JSON.parse(value.slice(this.SQLITE_MANIFEST_PREFIX.length));
+      return item?.magic === 'MIKI_SQLITE_CHUNK_V1' && typeof item.generation === 'string' &&
+        Number.isInteger(item.parts) && item.parts > 0 && Number.isInteger(item.length) && item.length >= 0
+        ? item : null;
+    } catch { return null; }
+  }
+
+  private async readSqliteChunks(key: string, manifest: { generation: string; parts: number; length: number }): Promise<string> {
+    const pieces: string[] = [];
+    for (let i = 0; i < manifest.parts; i++) {
+      const row = await this.sqlite.query(`SELECT value FROM ${this.STORE} WHERE key = ?;`, [this.chunkRowKey(key, manifest.generation, i)]);
+      const part = row.values?.[0]?.value;
+      if (typeof part !== 'string') throw new Error('SQLITE_CHUNK_MISSING');
+      pieces.push(part);
+    }
+    const value = pieces.join('');
+    if (value.length !== manifest.length) throw new Error('SQLITE_CHUNK_LENGTH_MISMATCH');
+    this.sqliteChunkGenerations.set(key, { generation: manifest.generation, parts: manifest.parts });
+    return value;
+  }
+
+  private async deleteSqliteChunks(key: string, saved: { generation: string; parts: number }): Promise<void> {
+    const prefix = `${this.SQLITE_CHUNK_PREFIX}${encodeURIComponent(key)}:${saved.generation}:`;
+    await this.sqlite.run(`DELETE FROM ${this.STORE} WHERE substr(key, 1, ?) = ?;`, [prefix.length, prefix]);
+  }
+
+  private async persistSqliteValue(key: string, value: string): Promise<void> {
+    const previous = this.sqliteChunkGenerations.get(key);
+    if (value.length <= this.SQLITE_CHUNK_CHARS) {
+      await this.sqlite.run(`INSERT OR REPLACE INTO ${this.STORE} (key, value) VALUES (?, ?);`, [key, value]);
+      if (previous) {
+        await this.deleteSqliteChunks(key, previous);
+        this.sqliteChunkGenerations.delete(key);
+      }
+      return;
+    }
+    const generation = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    let parts = 0;
+    for (let start = 0; start < value.length;) {
+      let end = Math.min(start + this.SQLITE_CHUNK_CHARS, value.length);
+      if (end < value.length && value.charCodeAt(end - 1) >= 0xD800 && value.charCodeAt(end - 1) <= 0xDBFF) end--;
+      await this.sqlite.run(`INSERT OR REPLACE INTO ${this.STORE} (key, value) VALUES (?, ?);`,
+        [this.chunkRowKey(key, generation, parts), value.slice(start, end)]);
+      start = end;
+      parts++;
+    }
+    const manifest = this.SQLITE_MANIFEST_PREFIX + JSON.stringify({ magic: 'MIKI_SQLITE_CHUNK_V1', generation, parts, length: value.length });
+    await this.sqlite.run(`INSERT OR REPLACE INTO ${this.STORE} (key, value) VALUES (?, ?);`, [key, manifest]);
+    if (previous) await this.deleteSqliteChunks(key, previous);
+    this.sqliteChunkGenerations.set(key, { generation, parts });
+  }
+
+  private async deleteSqliteValue(key: string): Promise<void> {
+    await this.sqlite.run(`DELETE FROM ${this.STORE} WHERE key = ?;`, [key]);
+    const previous = this.sqliteChunkGenerations.get(key);
+    if (previous) {
+      await this.deleteSqliteChunks(key, previous);
+      this.sqliteChunkGenerations.delete(key);
+    }
   }
 
   private async initSqlite(): Promise<void> {
@@ -130,9 +203,24 @@ class StorageService {
       console.warn('storageService: FTS5 unavailable on this build, memory search will use JS fallback only', e);
       this.ftsAvailable = false;
     }
-    const res = await this.sqlite.query(`SELECT key, value FROM ${this.STORE};`);
+    const res = await this.sqlite.query(`SELECT key, value FROM ${this.STORE} WHERE substr(key, 1, ?) != ? AND length(value) <= ?;`,
+      [this.SQLITE_CHUNK_PREFIX.length, this.SQLITE_CHUNK_PREFIX, this.SQLITE_CHUNK_CHARS]);
     for (const row of res.values || []) {
-      this.cache.set(row.key, row.value);
+      const manifest = this.parseSqliteChunkManifest(row.value);
+      this.cache.set(row.key, manifest ? await this.readSqliteChunks(row.key, manifest) : row.value);
+    }
+    const large = await this.sqlite.query(`SELECT key, length(value) AS chars FROM ${this.STORE} WHERE substr(key, 1, ?) != ? AND length(value) > ?;`,
+      [this.SQLITE_CHUNK_PREFIX.length, this.SQLITE_CHUNK_PREFIX, this.SQLITE_CHUNK_CHARS]);
+    for (const row of large.values || []) {
+      const pieces: string[] = [];
+      for (let offset = 1, length = Number(row.chars); offset <= length; offset += this.SQLITE_CHUNK_CHARS) {
+        const partRow = await this.sqlite.query(`SELECT substr(value, ?, ?) AS part FROM ${this.STORE} WHERE key = ?;`, [offset, this.SQLITE_CHUNK_CHARS, row.key]);
+        const part = partRow.values?.[0]?.part;
+        if (typeof part !== 'string') throw new Error('SQLITE_LEGACY_CHUNK_READ_FAILED');
+        pieces.push(part);
+      }
+      this.cache.set(row.key, pieces.join(''));
+      this.dirtyKeys.add(row.key);
     }
   }
 
@@ -283,10 +371,7 @@ class StorageService {
         for (const key of keys) {
           if (this.cache.has(key)) {
             const val = this.cache.get(key)!;
-            await this.sqlite.run(`INSERT OR REPLACE INTO ${this.STORE} (key, value) VALUES (?, ?);`, [
-              key,
-              val,
-            ]);
+            await this.persistSqliteValue(key, val);
 
             // If updating memories, also sync structured SQLite table & FTS index
             if (key === 'gamecraft_memories') {
@@ -334,7 +419,7 @@ class StorageService {
               }
             }
           } else {
-            await this.sqlite.run(`DELETE FROM ${this.STORE} WHERE key = ?;`, [key]);
+            await this.deleteSqliteValue(key);
           }
         }
       } else if (this.backend === 'indexeddb' && this.idb) {
