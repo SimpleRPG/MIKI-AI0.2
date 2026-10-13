@@ -494,9 +494,20 @@ check('Large SQLite values use bounded native bridge reads and chunk writes',
 check('Oversized diagnostic history is not parsed into a second object graph',
   runtimeLogger.includes('MAX_PERSISTED_LOG_CHARS') && runtimeLogger.includes('saved.length <= MAX_PERSISTED_LOG_CHARS') &&
     runtimeLogger.includes('boundedLogDetails') && runtimeLogger.includes('MAX_LOG_DETAIL_CHARS'));
-check('Domain router batches history serialization and retains periodic checkpoints',
-  domainRouter.includes('scheduleHistoryPersistence') && domainRouter.includes('persistHistory(envelope, true)') &&
-    domainRouter.includes('this.historyPersistTimer') && domainRouter.includes('storageService.setItem(KEY, serializedHistory)'));
+check(
+  'Domain router coalesces boundary checkpoints into the existing history timer',
+  domainRouter.includes("private pendingHistoryCheckpoint: Pick<DomainEnvelope, 'command' | 'source' | 'target'> | null = null;") &&
+    domainRouter.includes('if (this.history.length === 1) this.persistHistory(envelope, true);') &&
+    domainRouter.includes('this.scheduleHistoryPersistence(reportSerializeBoundary ? envelope : undefined, reportSerializeBoundary);') &&
+    domainRouter.includes('private scheduleHistoryPersistence(envelope?: DomainEnvelope, reportBoundary = false): void') &&
+    domainRouter.includes("private persistHistory(envelope?: Pick<DomainEnvelope, 'command' | 'source' | target'>, reportBoundary = false): void") &&
+    domainRouter.includes('this.pendingHistoryCheckpoint = { command: envelope.command, source: envelope.source, target: envelope.target };') &&
+    domainRouter.includes('const checkpointEnvelope = this.pendingHistoryCheckpoint;') &&
+    domainRouter.includes('this.persistHistory(checkpointEnvelope ?? undefined, checkpointEnvelope !== null);') &&
+    domainRouter.includes('this.historyPersistTimer') &&
+    domainRouter.includes('storageService.setItem(KEY, serializedHistory)') &&
+    !domainRouter.includes('if (reportSerializeBoundary) this.persistHistory(envelope, true)')
+);
 
 check('Android requests a larger Java heap without capping functional data', appManifest.includes('android:largeHeap="true"') && design.includes('操作性・応答性') && design.includes('機能データを削減'));
 check('APK boot log identifies its source commit', apkWorkflow.includes('VITE_MIKI_BUILD_REVISION: ${{ github.sha }}') && mainEntry.includes('VITE_MIKI_BUILD_REVISION') && mainEntry.includes('buildRevision'));

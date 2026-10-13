@@ -49,6 +49,7 @@ class DomainRouterService {
   private history:Array<{envelope:DomainEnvelope;reply:DomainReply}>=[];
   private sequence=0;
   private historyPersistTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingHistoryCheckpoint: Pick<DomainEnvelope, 'command' | 'source' | 'target'> | null = null;
 
   constructor(){this.load();}
 
@@ -101,20 +102,23 @@ class DomainRouterService {
     this.history.push({envelope:{...envelope,payload:{...envelope.payload},evidenceIds:[...envelope.evidenceIds]},reply:{...completed}});
     if(this.history.length>MAX_HISTORY)this.history.splice(0,this.history.length-MAX_HISTORY);
     const reportSerializeBoundary = this.history.length === 1 || this.sequence % 100 === 0;
-    if (reportSerializeBoundary) this.persistHistory(envelope, true);
-    else this.scheduleHistoryPersistence();
+    if (this.history.length === 1) this.persistHistory(envelope, true);
+    else this.scheduleHistoryPersistence(reportSerializeBoundary ? envelope : undefined, reportSerializeBoundary);
     if(!reply.accepted)systemLogger.warn('SELF_IMPROVEMENT',`[DomainRouter] ${envelope.target}/${envelope.command} rejected`,reply.error||'unknown');
     return completed;
   }
-  private scheduleHistoryPersistence(): void {
+  private scheduleHistoryPersistence(envelope?: DomainEnvelope, reportBoundary = false): void {
+    if (reportBoundary && envelope) this.pendingHistoryCheckpoint = { command: envelope.command, source: envelope.source, target: envelope.target };
     if (this.historyPersistTimer) return;
     this.historyPersistTimer = setTimeout(() => {
       this.historyPersistTimer = null;
-      this.persistHistory();
+      const checkpointEnvelope = this.pendingHistoryCheckpoint;
+      this.pendingHistoryCheckpoint = null;
+      this.persistHistory(checkpointEnvelope ?? undefined, checkpointEnvelope !== null);
     }, 50);
   }
 
-  private persistHistory(envelope?: DomainEnvelope, reportBoundary = false): void {
+  private persistHistory(envelope?: Pick<DomainEnvelope, 'command' | 'source' | 'target'>, reportBoundary = false): void {
     if (this.historyPersistTimer) {
       clearTimeout(this.historyPersistTimer);
       this.historyPersistTimer = null;

@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-13
-正本Revision：2026-10-13-P249
+正本Revision：2026-10-13-P250
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P249）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P250）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-13-P249
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加。完全再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-13-P250
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流。完全再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -150,6 +150,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - 常駐メモリの利用と、一時文字列の重複生成・大容量ブリッジ転送などによる瞬間的なメモリ急増は分けて評価する。操作性に重大な影響を与えるピークは抑える。
 - Androidは`android:largeHeap="true"`を要求する。ただし増量は保証されないため、実機の`MEMORY_SAMPLE`にある`javaMaxKB`・Java使用量・PSS・OS空きメモリを見て評価し、設定だけでOOM解消を断定しない。
 - APKの起動ログはビルド元Git commit SHAを記録する。`buildRevision=UNKNOWN`はビルド環境変数未設定を意味し、現行`main`由来の証拠にはしない。
+- Domain Routerの履歴上限2,000件・記録内容・応答経路は維持する。初回記録以外の100 sequence境界は既存50msまとめ保存へ合流させ、境界到来ごとに大容量JSONを即時再シリアライズして保存予約を中断しない。
 
 ■ Domain別実装集計
 
@@ -404,7 +405,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/domainOwnershipCatalogService.ts | lines=30 | symbols=SourceOwnership, SourceOwnershipKind, getCoreCompatibilityGateways, getDomainOwnershipCatalog, resolveSourceOwnership | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=168 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/domainReplyLedgerService.ts | lines=350 | symbols=ActionLineage, DomainReplyLedgerRecord, domainReplyLedgerService | callers=7 | deps=6 | Storage=miki_domain_reply_ledger_v1
-- [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=156 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1 / Tests=3
+- [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=160 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1 / Tests=3
 - [USED] CORE | src/miki/core/services/domainSequentialConnectionService.ts | lines=64 | symbols=DomainConnectionReceipt, domainSequentialConnectionService | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/evidenceIdentityService.ts | lines=31 | symbols=evidenceIdentityService | callers=3 | deps=1 | Storage=miki_evidence_identity_sequence_v1
 - [USED] CORE | src/miki/core/services/evidenceQualityGateService.ts | lines=15 | symbols=EvidenceQualityResult, evidenceQualityGateService | callers=4 | deps=1
@@ -11466,4 +11467,13 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 会話・知識・自己コードのデータ量をメモリ節約目的で切り捨てない。大きな一時コピーによるピークと、操作性に悪影響がない範囲のメモリ利用を別に扱う。
 - Termux静的検査結果（実測終了コード、0=PASS）: runtime_verifier=0; verifier_syntax=0; whitespace_diff=2
 - GitHub ActionsのAPK build/artifactとAndroid実機のOOM解消は静的検査から推定せず、独立して確認する。
+
+============================================================
+【2026-10-13-P250 Domain Router境界保存の合流】
+============================================================
+
+- Domain Routerの履歴上限2,000件・保存対象・応答経路は変更しない。履歴が初めて1件になった場合は従来どおり即時保存し、それ以外の100 sequence境界は既存の50ms保存timerへ合流させる。
+- まとめ保存timer内に複数の100 sequence境界が到来した場合、境界情報を保持して最新履歴を一度だけシリアライズする。履歴件数・シリアライズ文字数・所要時間のチェックポイントを維持し、会話・知識・自己コード等の機能データは削減しない。
+- P250初回静的検査（実測終了コード、0=PASS）: runtime_verifier=1; runtime_logging=0; verifier_syntax=0; typescript_lint=SKIP_NO_LOCAL_TSC; whitespace_diff=0。
+- Android実機のOOM再現・解消、実機Java heap上限、P250 APK Artifactは、この変更の静的検査から推定せず、独立して確認する。
 
