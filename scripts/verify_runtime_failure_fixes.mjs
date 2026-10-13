@@ -500,7 +500,7 @@ check(
     domainRouter.includes('if (this.history.length === 1) this.persistHistory(envelope, true);') &&
     domainRouter.includes('this.scheduleHistoryPersistence(reportSerializeBoundary ? envelope : undefined, reportSerializeBoundary);') &&
     domainRouter.includes('private scheduleHistoryPersistence(envelope?: DomainEnvelope, reportBoundary = false): void') &&
-    domainRouter.includes("private persistHistory(envelope?: Pick<DomainEnvelope, 'command' | 'source' | target'>, reportBoundary = false): void") &&
+    domainRouter.includes("private persistHistory(envelope?: Pick<DomainEnvelope, 'command' | 'source' | 'target'>, reportBoundary = false): void") &&
     domainRouter.includes('this.pendingHistoryCheckpoint = { command: envelope.command, source: envelope.source, target: envelope.target };') &&
     domainRouter.includes('const checkpointEnvelope = this.pendingHistoryCheckpoint;') &&
     domainRouter.includes('this.persistHistory(checkpointEnvelope ?? undefined, checkpointEnvelope !== null);') &&

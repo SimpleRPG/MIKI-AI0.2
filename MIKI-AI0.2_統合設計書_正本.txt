@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-13
-正本Revision：2026-10-13-P250
+正本Revision：2026-10-13-P251
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P250）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P251）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-13-P250
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流。完全再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-13-P251
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正。完全再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -11476,4 +11476,14 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - まとめ保存timer内に複数の100 sequence境界が到来した場合、境界情報を保持して最新履歴を一度だけシリアライズする。履歴件数・シリアライズ文字数・所要時間のチェックポイントを維持し、会話・知識・自己コード等の機能データは削減しない。
 - P250初回静的検査（実測終了コード、0=PASS）: runtime_verifier=1; runtime_logging=0; verifier_syntax=0; typescript_lint=SKIP_NO_LOCAL_TSC; whitespace_diff=0。
 - Android実機のOOM再現・解消、実機Java heap上限、P250 APK Artifactは、この変更の静的検査から推定せず、独立して確認する。
+
+============================================================
+【2026-10-13-P251 Runtime verifier assertion quote correction】
+============================================================
+
+- P250のDomain Router変更を再監査し、検証スクリプトが型文字列内の`'target'`の開始引用符を欠いていたことを確認。Router実装ではなく、検査文字列を実コードの型定義と一致させる。
+- P250の初回検査記録は履歴として保持し、今回の再検査結果で上書きしない。
+- P251初回静的検査（実測終了コード、0=PASS）: runtime_verifier=0; runtime_logging=0; verifier_syntax=0; typescript_lint=SKIP_NO_LOCAL_TSC; whitespace_diff=0。
+- P251正本更新後の静的再検査（実測終了コード、0=PASS）: runtime_verifier=0; runtime_logging=0; verifier_syntax=0; typescript_lint=NOT_RUN; whitespace_diff=0。
+- GitHub Actions/APK ArtifactとAndroid実機のOOM・Java heap上限は、静的検査とは別に確認する。
 
