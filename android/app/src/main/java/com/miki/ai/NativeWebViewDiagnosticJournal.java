@@ -159,7 +159,7 @@ public final class NativeWebViewDiagnosticJournal {
         long javaMaxKB = Math.max(0L, runtime.maxMemory() / 1024L);
         long nativeAllocKB = Math.max(0L, Debug.getNativeHeapAllocatedSize() / 1024L);
         long nativeSizeKB = Math.max(0L, Debug.getNativeHeapSize() / 1024L);
-        int pssKB = Math.max(0, Debug.getPss());
+        long pssKB = Math.max(0L, Debug.getPss());
         long availKB = -1L;
         long thresholdKB = -1L;
         boolean lowMemory = false;

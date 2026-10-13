@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-13
-正本Revision：2026-10-13-P246
+正本Revision：2026-10-13-P247
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P246）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P247）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-13-P246
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.tsの構文を修正。完全再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-13-P247
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。完全再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -11428,3 +11428,13 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - P245のローカル検査欄にあるp215_graph_e2e=SKIP_NO_LOCAL_TSXは、ローカル依存不足を示す値であり、GitHub ActionsのP215成功を意味しない。
 - P246静的検証結果（実測終了コード、0=PASS）: js_syntax=0; runtime_verifier=0; runtime_logging=0; p215_graph_e2e=SKIP_NO_LOCAL_TSX; whitespace_diff=0
 - GitHub Actions/APKとAndroid実機でのログ取得は独立して確認し、静的検証の成功から推定しない。
+
+============================================================
+【2026-10-13-P247 Android PSS memory sample type correction】
+============================================================
+
+- GitHub Actions run 38325337853は会話・知能グラフ検証、Webアプリビルド、Native/runtime契約検証、Rust Nativeビルドを通過したが、Android Javaコンパイルで失敗した。エラーはNativeWebViewDiagnosticJournal.java:162の「possible lossy conversion from long to int」。
+- Android公式APIのDebug.getPss()はlongを返す。PSSの記録変数pssKBがintで宣言されていたため、longに変更し、Math.maxの定数も0Lに統一する。単位・ログ項目・サンプリング頻度・保存経路は変更しない。
+- NativeWebViewDiagnosticJournal.javaの行数は変わらないため、正本索引の当該行数は変更しない。完全再帰インベントリ全体は再集計しない。
+- P247静的検査結果（実測終了コード、0=PASS）: js_syntax=0; runtime_verifier=0; runtime_logging=0; pss_source_contract=0; android_native_contract=SKIP_NO_LOCAL_TSX; p215_graph_e2e=SKIP_NO_LOCAL_TSX; whitespace_diff=0
+- Javaコンパイル、APK生成、APK Artifact、Android実機でのログ取得は独立して確認し、静的検証の成功から推定しない。
