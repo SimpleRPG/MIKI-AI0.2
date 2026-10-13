@@ -71,7 +71,8 @@ class AutonomousSelfImprovementLoopService {
   private state: AutonomousLoopState = { status: 'IDLE', queue: [], updatedAt: 0 };
   private running = false;
   private sequence = 0;
-  private recoveryTimer: ReturnType<typeof setInterval> | null = null;
+  private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+  private disposed = false;
 
   public constructor() {
     this.load();
@@ -84,17 +85,14 @@ class AutonomousSelfImprovementLoopService {
       this.state.retryAt = Date.now();
       this.save();
     }
-    if (!this.recoveryTimer) {
-      this.recoveryTimer = setInterval(() => {
-        void this.recoverIfReady();
-      }, RECOVERY_POLL_MS);
-    }
-    void this.recoverIfReady();
+    this.disposed = false;
+    this.scheduleRecovery();
   }
 
   public dispose(): void {
+    this.disposed = true;
     if (this.recoveryTimer) {
-      clearInterval(this.recoveryTimer);
+      clearTimeout(this.recoveryTimer);
       this.recoveryTimer = null;
     }
   }
@@ -200,6 +198,35 @@ class AutonomousSelfImprovementLoopService {
     void this.drain();
   }
 
+  private scheduleRecovery(delayOverrideMs?: number): void {
+    if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
+    this.recoveryTimer = null;
+    if (this.disposed || this.running || this.state.queue.length === 0) return;
+
+    const now = Date.now();
+    const nextAttemptAtValues = this.state.queue
+      .map(item => item.nextAttemptAt)
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    const hasImmediatelyEligibleRequest = this.state.queue.some(
+      item => typeof item.nextAttemptAt !== 'number' || !Number.isFinite(item.nextAttemptAt),
+    );
+    const fallbackAt = typeof this.state.retryAt === 'number' && Number.isFinite(this.state.retryAt)
+      ? this.state.retryAt
+      : now + RECOVERY_POLL_MS;
+    const nextAt = hasImmediatelyEligibleRequest
+      ? now
+      : nextAttemptAtValues.length > 0
+        ? Math.min(...nextAttemptAtValues)
+        : fallbackAt;
+    const delay = delayOverrideMs === undefined
+      ? Math.max(0, nextAt - now)
+      : Math.max(0, delayOverrideMs);
+    this.recoveryTimer = setTimeout(() => {
+      this.recoveryTimer = null;
+      void this.recoverIfReady();
+    }, delay);
+  }
+
   private async recoverIfReady(): Promise<void> {
     if (this.running || this.state.queue.length === 0) {
       return;
@@ -207,11 +234,13 @@ class AutonomousSelfImprovementLoopService {
     if (this.state.status === 'WAITING_RESOURCE') {
       await resourceGovernanceService.refresh();
       if (!resourceGovernanceService.canRunComponentTests()) {
+        this.scheduleRecovery(RECOVERY_POLL_MS);
         return;
       }
     }
     const hasReadyRequest=this.state.queue.some(item=>!item.nextAttemptAt||item.nextAttemptAt<=Date.now());
     if (this.state.retryAt && Date.now() < this.state.retryAt && !hasReadyRequest) {
+      this.scheduleRecovery();
       return;
     }
     if (['WAITING_RESOURCE', 'WAITING_EVIDENCE', 'PAUSED'].includes(this.state.status)) {
@@ -270,8 +299,12 @@ class AutonomousSelfImprovementLoopService {
         }
 
         if (request.runId) {
-          const preflight = selfImprovementPreflightService.evaluate(request.runId);
+          const preflight = await selfImprovementPreflightService.evaluate(request.runId);
           if (!preflight.passed) {
+            if (preflight.reasons.includes('PERSISTENT_BACKEND_REQUIRED')) {
+              this.waitForResource(request, 'PERSISTENT_BACKEND_REQUIRED');
+              continue;
+            }
             improvementDebtService.record('UNEXECUTED_CHECK', `PREFLIGHT:${preflight.reasons.join(',')}`, request.runId);
             await this.acquireThenWaitForEvidence(request, preflight.reasons.join(','));
             continue;
@@ -406,6 +439,7 @@ class AutonomousSelfImprovementLoopService {
       );
     } finally {
       this.running = false;
+      this.scheduleRecovery();
     }
   }
 

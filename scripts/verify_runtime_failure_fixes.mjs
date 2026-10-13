@@ -43,6 +43,9 @@ const taskIngress = read('src/miki/core/services/coreTaskIngressService.ts');
 const issueDiscovery = read('src/miki/core/services/autonomousIssueDiscoveryService.ts');
 const autonomousLoop = read('src/miki/core/services/autonomousSelfImprovementLoopService.ts');
 const autonomousSearch = read('src/miki/research/services/autonomousSearchService.ts');
+const preflightService = read('src/miki/core/services/selfImprovementPreflightService.ts');
+const requiredAssetAcquisition = read('src/miki/core/services/requiredAssetAcquisitionService.ts');
+const missingAssetSynthesis = read('src/miki/core/services/missingAssetSynthesisService.ts');
 
 check('Canonical Runner exposes decideCoreGoals', runner.includes('fun decideCoreGoals(call: PluginCall)'));
 check('Canonical Runner exposes rankDomainRoutes', runner.includes('fun rankDomainRoutes(call: PluginCall)'));
@@ -178,6 +181,53 @@ check(
     autonomousLoop.includes("request.waitKind='RETRY'")
 );
 check(
+  'Autonomous recovery schedules the earliest retry deadline instead of waiting for the polling interval',
+  autonomousLoop.includes('private recoveryTimer: ReturnType<typeof setTimeout> | null = null;') &&
+    autonomousLoop.includes('private disposed = false;') &&
+    autonomousLoop.includes('this.disposed = false;') &&
+    autonomousLoop.includes('this.disposed = true;') &&
+    autonomousLoop.includes('if (this.disposed || this.running || this.state.queue.length === 0) return;') &&
+    autonomousLoop.includes('private scheduleRecovery(delayOverrideMs?: number): void') &&
+    autonomousLoop.includes('this.recoveryTimer = setTimeout(() => {') &&
+    autonomousLoop.includes('Math.min(...nextAttemptAtValues)') &&
+    autonomousLoop.includes('this.scheduleRecovery(RECOVERY_POLL_MS)') &&
+    autonomousLoop.includes('this.running = false;\n      this.scheduleRecovery();')
+);
+check(
+  'Preflight waits for persistent storage initialization and treats an unavailable backend as a resource wait',
+  preflightService.includes('async evaluate(runId: string): Promise<PreflightResult>') &&
+    preflightService.includes('await storageService.ready;') &&
+    autonomousLoop.includes('await selfImprovementPreflightService.evaluate(request.runId)') &&
+    autonomousLoop.includes("preflight.reasons.includes('PERSISTENT_BACKEND_REQUIRED')")
+);
+check(
+  'Recovery actions are not fed back into evidence classification and candidate drafts are explicitly requested',
+  requiredAssetAcquisition.includes('const requirements = this.classify(input.reasons);') &&
+    !requiredAssetAcquisition.includes('this.classify(expandedReasons)') &&
+    requiredAssetAcquisition.includes("case 'SYNTHESIZE_COMPONENT':") &&
+    requiredAssetAcquisition.includes("kind: 'CODE_COMPONENT' as const") &&
+    requiredAssetAcquisition.includes('requestedDrafts});') &&
+    missingAssetSynthesis.includes('requestedDrafts?:Array<{kind:MissingAssetDraftKind;requirement:string}>') &&
+    missingAssetSynthesis.includes('input.requestedDrafts || []')
+);
+check(
+  'A missing Evidence ID is not mislabeled as an unlinked existing Evidence record',
+  requiredAssetAcquisition.includes('RESEARCH_RETURNED_NO_EVIDENCE_ID:${gap.id}') &&
+    requiredAssetAcquisition.includes('const evidenceAcquired = evidenceIds.length > 0 && unlinkedEvidenceIds.length === 0;') &&
+    requiredAssetAcquisition.includes('acquired: evidenceAcquired,') &&
+    requiredAssetAcquisition.includes('EVIDENCE_RESEARCHED_BUT_UNLINKED:${gap.id}') &&
+    requiredAssetAcquisition.includes('if (/required_asset') &&
+    requiredAssetAcquisition.includes('.capability/i.test(reason)')
+);
+check(
+  'Canonical index counts match the modified autonomous recovery sources',
+  autonomousLoopIndexRow?.includes(`lines=${autonomousLoop.split(/\r?\n/).length - 1}`) &&
+    preflightIndexRow?.includes(`lines=${preflightService.split(/\r?\n/).length - 1}`) &&
+    requiredAssetIndexRow?.includes(`lines=${requiredAssetAcquisition.split(/\r?\n/).length - 1}`) &&
+    missingAssetSynthesisIndexRow?.includes(`lines=${missingAssetSynthesis.split(/\r?\n/).length - 1}`)
+);
+
+check(
   'Router does not maintain a second unused diagnostic classifier',
   !domainRouter.includes('const diagnostic=resultClass===')
 );
@@ -194,6 +244,10 @@ check(
 const appIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] UI | src/App.tsx |'));
 const chatPanelIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] UI | src/components/ChatPanel.tsx |'));
 const loggerIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts |'));
+const autonomousLoopIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts |'));
+const preflightIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] CORE | src/miki/core/services/selfImprovementPreflightService.ts |'));
+const requiredAssetIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] CORE | src/miki/core/services/requiredAssetAcquisitionService.ts |'));
+const missingAssetSynthesisIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] CORE | src/miki/core/services/missingAssetSynthesisService.ts |'));
 check(
   'Mobile viewport does not mount a hidden duplicate desktop ChatPanel',
   app.includes("window.matchMedia('(min-width: 768px)'") &&

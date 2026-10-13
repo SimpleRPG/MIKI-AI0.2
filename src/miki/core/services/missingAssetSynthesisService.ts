@@ -5,9 +5,16 @@ export type MissingAssetDraftKind='KNOWLEDGE'|'CODE_COMPONENT'|'ADAPTER'|'VALIDA
 export interface MissingAssetDraft {draftId:string;runId?:string;taskId?:string;kind:MissingAssetDraftKind;requirement:string;objective:string;evidenceIds:string[];status:'CANDIDATE'|'VERIFIED_CANDIDATE'|'RESEARCH_REQUIRED'|'REJECTED';validationId?:string;validationReasons?:string[];contract:{inputs:string[];outputs:string[];invariants:string[];failureModes:string[];validation:string[]};createdAt:number;}
 const KEY='miki_missing_asset_drafts_v1';
 class MissingAssetSynthesisService{
- synthesize(input:{runId?:string;taskId?:string;objective:string;requirements:string[];evidenceIds:string[]}):MissingAssetDraft[]{
-  const drafts=input.requirements.filter(value=>/COMPONENT_|ADAPTER_|CONSTRUCTION_|IMPLEMENTATION_|VALIDATION_|AUTHORITATIVE_SPEC|RESEARCH_OR_COMPONENT/i.test(value)).map(requirement=>{
-   const kind:MissingAssetDraftKind=/ADAPTER_/i.test(requirement)?'ADAPTER':/VALIDATION_/i.test(requirement)?'VALIDATION':/COMPONENT_|CONSTRUCTION_|IMPLEMENTATION_/i.test(requirement)?'CODE_COMPONENT':'KNOWLEDGE';
+ synthesize(input:{runId?:string;taskId?:string;objective:string;requirements:string[];evidenceIds:string[];requestedDrafts?:Array<{kind:MissingAssetDraftKind;requirement:string}>}):MissingAssetDraft[]{
+  const inferredDrafts: Array<{kind:MissingAssetDraftKind;requirement:string}> = input.requirements
+   .filter(value => /COMPONENT_|ADAPTER_|CONSTRUCTION_|IMPLEMENTATION_|VALIDATION_|AUTHORITATIVE_SPEC|RESEARCH_OR_COMPONENT/i.test(value))
+   .map(requirement => ({
+    requirement,
+    kind: (/ADAPTER_/i.test(requirement) ? 'ADAPTER' : /VALIDATION_/i.test(requirement) ? 'VALIDATION' : /COMPONENT_|CONSTRUCTION_|IMPLEMENTATION_/i.test(requirement) ? 'CODE_COMPONENT' : 'KNOWLEDGE') as MissingAssetDraftKind,
+   }));
+  const specs = new Map<string,{kind:MissingAssetDraftKind;requirement:string}>();
+  for (const spec of [...inferredDrafts, ...(input.requestedDrafts || [])]) specs.set(`${spec.kind}:${spec.requirement}`, spec);
+  const drafts = [...specs.values()].map(({kind,requirement}) => {
    const base={runId:input.runId,taskId:input.taskId,kind,requirement,objective:input.objective,evidenceIds:[...new Set(input.evidenceIds)],status:'CANDIDATE' as const,contract:{inputs:['objective','repository-context','evidence'],outputs:[kind==='KNOWLEDGE'?'knowledge-component':kind==='ADAPTER'?'adapter-candidate':kind==='VALIDATION'?'validation-script-candidate':'code-component-candidate'],invariants:['ISOLATED_UNTIL_VERIFIED','SOURCE_LINEAGE_REQUIRED','NO_RUNTIME_SELF_MODIFICATION'],failureModes:['INSUFFICIENT_EVIDENCE','AMBIGUOUS_CONTRACT','VALIDATION_UNAVAILABLE'],validation:['STRUCTURE','TRACEABILITY','SYNTAX_OR_SCHEMA','NORMAL_BOUNDARY_FAILURE_CASES']},createdAt:Date.now()};
    return {draftId:`MAD-${canonicalSha256({...base,createdAt:undefined}).slice(0,20)}`,...base};
   });

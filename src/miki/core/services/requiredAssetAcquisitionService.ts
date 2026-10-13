@@ -72,8 +72,23 @@ class RequiredAssetAcquisitionService {
   }): Promise<RequiredAssetAcquisitionResult> {
     const recoveryPlans=missingCapabilityRecoveryService.planAll(input.reasons);
     if(input.taskId&&recoveryPlans.length>0){taskBlackboardService.append(input.taskId,'DECISION','core','missing-capability-recovery-plans',{plans:recoveryPlans},[]);}
-    const expandedReasons=[...input.reasons,...recoveryPlans.flatMap(plan=>plan.actions.map(action=>`RECOVERY_ACTION_REQUIRED:${action}:${plan.reason}`))];
-    const requirements = this.classify(expandedReasons);
+    const expandedReasons = [...input.reasons, ...recoveryPlans.flatMap(plan => plan.actions.map(action => `RECOVERY_ACTION_REQUIRED:${action}:${plan.reason}`))];
+    const requestedDrafts = recoveryPlans.flatMap(plan => plan.actions.flatMap(action => {
+      const requirement = `RECOVERY_ACTION_REQUIRED:${action}:${plan.reason}`;
+      switch (action) {
+        case 'SYNTHESIZE_KNOWLEDGE':
+          return [{ kind: 'KNOWLEDGE' as const, requirement }];
+        case 'SYNTHESIZE_COMPONENT':
+          return [{ kind: 'CODE_COMPONENT' as const, requirement }];
+        case 'SYNTHESIZE_ADAPTER':
+          return [{ kind: 'ADAPTER' as const, requirement }];
+        case 'SYNTHESIZE_VALIDATOR':
+          return [{ kind: 'VALIDATION' as const, requirement }];
+        default:
+          return [];
+      }
+    }));
+    const requirements = this.classify(input.reasons);
     const evidenceIds: string[] = [];
     const reasons: string[] = [];
     const localEvidenceIds: string[] = [];
@@ -153,7 +168,7 @@ class RequiredAssetAcquisitionService {
     const uniqueWebEvidenceIds = [...new Set(webEvidenceIds)];
     const uniqueLinkedEvidenceIds = [...new Set(linkedEvidenceIds)];
     const uniqueUnlinkedEvidenceIds = [...new Set(unlinkedEvidenceIds)];
-    const draftAssets=missingAssetSynthesisService.synthesize({runId:input.runId,taskId:input.taskId,objective:input.objective,requirements:expandedReasons,evidenceIds});
+    const draftAssets=missingAssetSynthesisService.synthesize({runId:input.runId,taskId:input.taskId,objective:input.objective,requirements:expandedReasons,evidenceIds,requestedDrafts});
     const draftValidations=missingAssetValidationService.validateAll(draftAssets);
     for(const validation of draftValidations){missingAssetSynthesisService.updateValidation(validation.draftId,{status:validation.status,validationId:validation.validationId,validationReasons:validation.reasons});}
     const verifiedDrafts=draftAssets.filter(draft=>draftValidations.some(validation=>validation.draftId===draft.draftId&&validation.passed));
@@ -344,7 +359,7 @@ class RequiredAssetAcquisitionService {
        * LOCALとWEBは別々に捨てず、同じKnowledge Componentへ統合する。
        */
       const componentReasons:string[]=[];
-      if(evidenceIds.length>0){
+      if(evidenceIds.length>0 && unlinkedEvidenceIds.length===0){
         const researchResult=researched as unknown as Record<string, unknown>;
         const claimIds=this.extractStringIds(
           researchResult,
@@ -405,7 +420,8 @@ class RequiredAssetAcquisitionService {
       request.evidenceIds = [
         ...new Set([...request.evidenceIds, ...evidenceIds]),
       ];
-      request.status = evidenceIds.length > 0 ? 'ACQUIRED' : 'BLOCKED';
+      const evidenceAcquired = evidenceIds.length > 0 && unlinkedEvidenceIds.length === 0;
+      request.status = evidenceAcquired ? 'ACQUIRED' : 'BLOCKED';
 
       systemLogger.info(
         'SELF_IMPROVEMENT',
@@ -414,7 +430,7 @@ class RequiredAssetAcquisitionService {
           gapId: gap.id,
           runId: request.runId,
           taskId: request.taskId,
-          acquired: evidenceIds.length > 0,
+          acquired: evidenceAcquired,
           progressed: true,
           evidenceCount: evidenceIds.length,
           localEvidenceCount: localEvidenceIds.length,
@@ -425,24 +441,24 @@ class RequiredAssetAcquisitionService {
           componentIds,
         }),
       );
-      request.lastError = evidenceIds.length > 0 ? undefined : 'RESEARCH_RETURNED_NO_EVIDENCE_ID';
+      request.lastError = evidenceAcquired ? undefined : evidenceIds.length > 0 ? 'EVIDENCE_IDS_UNLINKED' : 'RESEARCH_RETURNED_NO_EVIDENCE_ID';
       request.updatedAt = Date.now();
       this.save();
 
-      const acquisitionReasons = evidenceIds.length > 0
-        ? [
-            `EVIDENCE_ACQUIRED:${gap.id}`,
+      const acquisitionReasons = evidenceIds.length === 0
+        ? [`RESEARCH_RETURNED_NO_EVIDENCE_ID:${gap.id}`]
+        : [
+            ...(unlinkedEvidenceIds.length > 0 ? [`EVIDENCE_RESEARCHED_BUT_UNLINKED:${gap.id}`] : [`EVIDENCE_ACQUIRED:${gap.id}`]),
             ...(localEvidenceIds.length > 0 ? [`LOCAL_EVIDENCE_ACQUIRED:${localEvidenceIds.length}`] : []),
             ...(webEvidenceIds.length > 0 ? [`WEB_EVIDENCE_ACQUIRED:${webEvidenceIds.length}`] : []),
             ...(unlinkedEvidenceIds.length > 0 ? [`EVIDENCE_IDS_UNLINKED:${unlinkedEvidenceIds.length}`] : []),
             ...(componentIds.length > 0 ? [`COMPONENTS_DISCOVERED:${componentIds.length}`] : []),
             ...componentReasons,
-          ]
-        : [`EVIDENCE_RESEARCHED_BUT_UNLINKED:${gap.id}`];
+          ];
 
       return {
         progressed: true,
-        acquired: evidenceIds.length > 0,
+        acquired: evidenceAcquired,
         evidenceIds,
         localEvidenceIds,
         webEvidenceIds,
@@ -496,7 +512,9 @@ class RequiredAssetAcquisitionService {
       if (!reason) {
         continue;
       }
-      if (/RESOURCE|MEMORY_ONLY|BATTERY|THERMAL|CAPACITY/i.test(reason)) {
+      if (/required_asset\.capability/i.test(reason)) {
+        output.push({ kind: 'CAPABILITY', requirement: reason });
+      } else if (/RESOURCE|MEMORY_ONLY|BATTERY|THERMAL|CAPACITY/i.test(reason)) {
         output.push({ kind: 'RESOURCE_CAPACITY', requirement: reason });
       } else if (/REQUIRED_SCRIPT_NOT_FOUND|MISSING_(STATIC|TYPECHECK|REGRESSION|COUNTEREXAMPLE|GENERALIZATION|PERSISTENCE|DEVICE)/i.test(reason)) {
         output.push({ kind: 'VALIDATION_SCRIPT', requirement: reason });

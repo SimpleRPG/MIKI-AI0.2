@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-13
-正本Revision：2026-10-13-P252
+正本Revision：2026-10-13-P253
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P252）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P253）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-13-P252
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更。完全再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-13-P253
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正。完全再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -152,6 +152,12 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - Androidは`android:largeHeap="true"`を要求する。ただし増量は保証されないため、実機の`MEMORY_SAMPLE`にある`javaMaxKB`・Java使用量・PSS・OS空きメモリを見て評価し、設定だけでOOM解消を断定しない。
 - APKの起動ログはビルド元Git commit SHAを記録する。`buildRevision=UNKNOWN`はビルド環境変数未設定を意味し、現行`main`由来の証拠にはしない。
 - Domain Routerの履歴上限2,000件・記録内容・応答経路は維持する。初回記録以外の100 sequence境界は既存50msまとめ保存へ合流させ、境界到来ごとに大容量JSONを即時再シリアライズして保存予約を中断しない。
+
+■ 自律改善の再試行・能力不足復旧（現行）
+
+- SelfImprovement Preflightは`storageService.ready`完了後に永続Backendを評価し、初期化途中の`memory`既定値を永続Backend不足と誤判定しない。真に`PERSISTENT_BACKEND_REQUIRED`の場合はEvidence調査に誤分類せず、resource waitとして記録する。
+- 自律改善Queueは各Requestの`nextAttemptAt`を次回タイマーへ直接反映する。5秒等のEvidence waitを60秒ポーリングの次回tickまで遅らせず、Resourceが未充足の場合は既存の60秒フォールバック再確認を維持する。
+- RequiredAssetは元の理由だけをEvidence/Capability分類へ渡し、`RECOVERY_ACTION_REQUIRED`の各計画アクション文字列をEvidence要求として再分類しない。SYNTHESIZE_*はdraft要求として明示し、実Evidence IDがない場合は`RESEARCH_RETURNED_NO_EVIDENCE_ID`とする。Candidate draftの存在のみで検証済み能力・実装Artifactの成立とは扱わない。
 
 ■ Domain別実装集計
 
@@ -361,7 +367,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] CORE | src/miki/core/services/adaptiveRoutePlannerService.ts | lines=3015 | symbols=CoreGoalCandidate, GoalConflictDecision, ImprovementReadiness, PlannedRoute, adaptiveRoutePlannerService | callers=2 | deps=14 | Tests=2
 - [USED] CORE | src/miki/core/services/autonomousCandidatePreparationService.ts | lines=149 | symbols=AutonomousImplementationPlan, CandidateDraft, TargetResolution, autonomousCandidatePreparationService | callers=3 | deps=4
 - [USED] CORE | src/miki/core/services/autonomousIssueDiscoveryService.ts | lines=119 | symbols=DiscoveredIssue, DiscoveredIssueKind, DiscoveryConfig, DiscoveryScanMode, DiscoveryScanResult | callers=5 | deps=12 | Storage=miki_autonomous_issue_discovery_config_v1,miki_autonomous_issue_discovery_v1
-- [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts | lines=542 | symbols=AutonomousImprovementRequest, AutonomousLoopState, AutonomousLoopStatus, autonomousSelfImprovementLoopService | callers=7 | deps=11 | Storage=miki_autonomous_self_improvement_loop_v1,miki_autonomous_self_improvement_loop_v2
+- [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts | lines=654 | symbols=AutonomousImprovementRequest, AutonomousLoopState, AutonomousLoopStatus, autonomousSelfImprovementLoopService | callers=7 | deps=11 | Storage=miki_autonomous_self_improvement_loop_v1,miki_autonomous_self_improvement_loop_v2
 - [USED] CORE | src/miki/core/services/blackboardRecoveryService.ts | lines=6 | symbols=RecoverySummary, blackboardRecoveryService | callers=2 | deps=1
 - [USED] CORE | src/miki/core/services/candidateAutoRebaseService.ts | lines=14 | symbols=CandidateRebaseResult, RebaseConflict, RebaseFileInput, RebaseFileResult, candidateAutoRebaseService | callers=2 | deps=1 | Tests=2
 - [USED] CORE | src/miki/core/services/candidateCodeGenerationService.ts | lines=1588 | symbols=CandidateGenerationFile, CandidateGenerationOutcome, candidateCodeGenerationService | callers=2 | deps=27 | Tests=5
@@ -422,7 +428,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] CORE | src/miki/core/services/improvementIntakeRouterService.ts | lines=96 | symbols=ImprovementIntakeRun, ImprovementIntakeStatus, ImprovementRunType, improvementIntakeRouterService | callers=17 | deps=6 | Storage=miki_improvement_intake_runs_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/isolatedCandidateWorkspaceService.ts | lines=25 | symbols=CandidateFile, CandidateWorkspace, CandidateWorkspaceStatus, isolatedCandidateWorkspaceService | callers=35 | deps=3 | Storage=miki_isolated_candidate_workspaces_v1 / Tests=3
 - [USED] CORE | src/miki/core/services/lifecycleTransitionPolicyService.ts | lines=32 | symbols=LifecycleTransitionContext, LifecycleTransitionKind, lifecycleTransitionPolicyService | callers=3 | deps=0 | Tests=1
-- [USED] CORE | src/miki/core/services/missingAssetSynthesisService.ts | lines=20 | symbols=MissingAssetDraft, MissingAssetDraftKind, missingAssetSynthesisService | callers=2 | deps=2 | Storage=miki_missing_asset_drafts_v1
+- [USED] CORE | src/miki/core/services/missingAssetSynthesisService.ts | lines=27 | symbols=MissingAssetDraft, MissingAssetDraftKind, missingAssetSynthesisService | callers=2 | deps=2 | Storage=miki_missing_asset_drafts_v1
 - [USED] CORE | src/miki/core/services/missingAssetValidationService.ts | lines=37 | symbols=MissingAssetValidationResult, missingAssetValidationService | callers=1 | deps=2 | Markers=1
 - [USED] CORE | src/miki/core/services/missingCapabilityRecoveryService.ts | lines=22 | symbols=MissingCapabilityRecoveryPlan, RecoveryAction, missingCapabilityRecoveryService | callers=1 | deps=1
 - [USED] CORE | src/miki/core/services/multiReviewerConsensusService.ts | lines=9 | symbols=ConsensusVerdict, ReviewConsensus, ReviewerOpinion, multiReviewerConsensusService | callers=2 | deps=2 | Tests=2
@@ -433,7 +439,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [ORPHAN] CORE | src/miki/core/services/priority12ArtifactWorkspaceService.ts | lines=43 | symbols=Priority12ArtifactKind, Priority12CompileReceipt, Priority12Diff, Priority12File, Priority12RollbackReceipt | callers=0 | deps=2 | Storage=miki_priority12_artifact_workspaces_v1
 - [USED] CORE | src/miki/core/services/priorityOneRuntimeReadModelService.ts | lines=34 | symbols=PriorityOneAllowedAction, PriorityOneRuntimeItem, priorityOneRuntimeReadModelService | callers=2 | deps=4
 - [USED] CORE | src/miki/core/services/proposalQuarantineService.ts | lines=54 | symbols=QuarantinedProposalRecord, proposalQuarantineService | callers=2 | deps=1 | Storage=miki_proposal_quarantine_v1
-- [USED] CORE | src/miki/core/services/requiredAssetAcquisitionService.ts | lines=700 | symbols=RequiredAssetAcquisitionDiagnostics, RequiredAssetAcquisitionResult, RequiredAssetKind, RequiredAssetRequest, RequiredAssetStatus | callers=3 | deps=10 | Storage=miki_required_asset_acquisition_v1
+- [USED] CORE | src/miki/core/services/requiredAssetAcquisitionService.ts | lines=718 | symbols=RequiredAssetAcquisitionDiagnostics, RequiredAssetAcquisitionResult, RequiredAssetKind, RequiredAssetRequest, RequiredAssetStatus | callers=3 | deps=10 | Storage=miki_required_asset_acquisition_v1
 - [USED] CORE | src/miki/core/services/requirementConsistencyGraphService.ts | lines=12 | symbols=RequirementConflict, requirementConsistencyGraphService | callers=1 | deps=1 | Tests=1
 - [USED] CORE | src/miki/core/services/requirementPriorityResolverService.ts | lines=11 | symbols=PrioritizedRequirement, requirementPriorityResolverService | callers=2 | deps=1 | Tests=1
 - [USED] CORE | src/miki/core/services/requirementTraceabilityMatrixService.ts | lines=5 | symbols=RequirementTraceRow, requirementTraceabilityMatrixService | callers=1 | deps=2 | Tests=1
@@ -451,7 +457,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] CORE | src/miki/core/services/selfCodeUnderstandingService.ts | lines=432 | symbols=CodeLiteralContract, CodeRelationKind, CodeRelationRecord, CodeSymbolKind, CodeSymbolRecord | callers=5 | deps=3 | Storage=miki_code_understanding_snapshot / Tests=3
 - [USED] CORE | src/miki/core/services/selfImprovementDirectionService.ts | lines=21 | symbols=ImprovementDirection, ImprovementDirectionPolicy, selfImprovementDirectionService | callers=3 | deps=1 | Storage=miki_self_improvement_direction_v1
 - [USED] CORE | src/miki/core/services/selfImprovementIngressService.ts | lines=16 | symbols=SelfImprovementIngressRequest, selfImprovementIngressService | callers=8 | deps=3
-- [USED] CORE | src/miki/core/services/selfImprovementPreflightService.ts | lines=8 | symbols=PreflightResult, selfImprovementPreflightService | callers=2 | deps=3
+- [USED] CORE | src/miki/core/services/selfImprovementPreflightService.ts | lines=18 | symbols=PreflightResult, selfImprovementPreflightService | callers=2 | deps=3
 - [USED] CORE | src/miki/core/services/semanticContextBudgetService.ts | lines=3 | symbols=RankedContext, semanticContextBudgetService | callers=1 | deps=0 | Tests=2
 - [USED] CORE | src/miki/core/services/semanticRequirementCompilerService.ts | lines=38 | symbols=SemanticRequirementContract, semanticRequirementCompilerService | callers=4 | deps=0 | Tests=2
 - [USED] CORE | src/miki/core/services/shadowEvaluationService.ts | lines=8 | symbols=ShadowEvaluation, ShadowMeasurement, shadowEvaluationService | callers=5 | deps=1 | Storage=miki_shadow_evaluations_v1
@@ -11498,3 +11504,15 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - P252初回静的検査（実測終了コード、0=PASS）: runtime_verifier=P252_INITIAL_RESULTS verifier=0 runtime_logging=0 verifier_syntax=0 typescript_lint=SKIP_NO_LOCAL_TSC whitespace_diff=0; runtime_logging=0; verifier_syntax=0; typescript_lint=0; whitespace_diff=SKIP_NO_LOCAL_TSC。
 - P252正本更新後の静的再検査（実測終了コード、0=PASS）: runtime_verifier=P252_POST_DESIGN_RESULTS verifier=0 runtime_logging=0 verifier_syntax=0 typescript_lint=SKIP_NO_LOCAL_TSC whitespace_diff=0; runtime_logging=0; verifier_syntax=0; typescript_lint=0; whitespace_diff=SKIP_NO_LOCAL_TSC。
 - GitHub ActionsのWeb/Native build・APK ArtifactとAndroid実機の表示確認は静的検査と分け、実行結果を確認するまで成功と扱わない。
+
+============================================================
+【2026-10-13-P253 能力不足Recovery・再試行期限・Preflight安定化】
+============================================================
+
+- 実機から提供された時系列では、`retryAt=1791888432030`に対し再開記録`reallocatedAt=1791888485513`となり、予定時刻から55,483ms遅れている。従来の60秒Intervalを各Requestの`nextAttemptAt`に合わせたone-shot timeoutへ変更する。Resource不充足時は60秒ごとの再確認へ戻し、Evidenceデータ自体を短縮・削除しない。
+- Preflightは`storageService.ready`を待ってからBackendを評価する。真の`PERSISTENT_BACKEND_REQUIRED`はEvidence調査に送らずResource waitとする。
+- RequiredAssetは入力理由と復旧計画Actionを分離する。SYNTHESIZE_* Actionは適切なKindのcandidate draftとして記録し、証拠・artifactが揃わない候補をVerified扱いしない。Evidence IDゼロの場合の理由は`RESEARCH_RETURNED_NO_EVIDENCE_ID`であり、`EVIDENCE_RESEARCHED_BUT_UNLINKED`は実在する未リンクEvidence IDがある場合にだけ使う。
+- P252の検査結果行に実測値の代わりに出力ラベルが混入していたため、その履歴は上書きせず保持する。P253の初回・設計更新後検査は終了コードを個別変数から直接記録する。
+- P253初回静的検査（実測終了コード、0=PASS）: runtime_verifier=1; runtime_logging=0; verifier_syntax=0; typescript_lint=SKIP_NO_LOCAL_TSC; whitespace_diff=0。
+- P253設計記録後の最終静的検査（実測終了コード、0=PASS）: runtime_verifier=1; runtime_logging=0; verifier_syntax=0; typescript_lint=SKIP_NO_LOCAL_TSC; whitespace_diff=0。
+- GitHub Actions/APK ArtifactとAndroid実機の次回実行・Evidence/Artifact lineageは静的検査から推定せず、独立して確認する。
