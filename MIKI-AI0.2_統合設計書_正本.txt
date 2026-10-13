@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-13
-正本Revision：2026-10-13-P245
+正本Revision：2026-10-13-P246
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P245）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P246）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-13-P245
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245の対象ファイル変更後に全ファイル件数を再集計したものではない。P245は正本末尾監査修正のみで対象ソース変更なし）
+- 現行Revision: 2026-10-13-P246
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.tsの構文を修正。完全再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -11413,7 +11413,18 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 
 - P244の実装commit `aeb3a293d79344e56ca0acb1120d8114cd56e5b9` はGitHub `main` へpushされ、当時の`HEAD`と`origin/main`のSHA一致が確認された。
 - P244最終出力は`whitespace_diff=2`および`POST_PUSH_DESIGN_AUDIT_FAILED`だった。GitHub上の正本末尾に改行のみの余分な空行があることを確認した。監査失敗の詳細条件は前回ログに出力されていないため、空行だけが唯一の原因だったとは断定しない。
-- 本Revisionでは正本末尾の余分な空行を除去し、正本のRevisionメタデータをP245へ更新する。P244の実装ソースと、実ファイルに一致していた4つの索引行数は変更しない。正本以外のruntimeソースは変更しない。
+- 実際のP245コミット b54545fbf0632a0c562104372e2e275a303543f9 は、正本監査に加えてsrc/services/storageService.tsのflush()開始波括弧も復元した。以前の「runtimeソースは変更しない」という記述は実際のコミット内容と一致しないため、本Revisionで訂正する。
 - P244に記録した検査結果は当時の実測値として保持し、後から成功値へ書き換えない。今回の修正後検査・リモート正本監査の結果は、以下のP245検査欄に実際の終了コードとともに記録する。
 - P245検査結果（実測終了コード、0=PASS）: js_syntax=0; runtime_verifier=1; runtime_logging=0; whitespace_diff=0
 - P245修正後の検査結果（実測終了コード、0=PASS）: js_syntax=0; runtime_verifier=0; runtime_logging=0; p215_graph_e2e=SKIP_NO_LOCAL_TSX; whitespace_diff=0; storage_flush_open_brace=RESTORED
+
+============================================================
+【2026-10-13-P246 systemLogger.ts 構文修正】
+============================================================
+
+- GitHub Actions run 38324937854（P245コミット）は失敗。P215検証でsrc/services/systemLogger.ts:330:8に「Expected identifier but found typeof」が記録され、Webビルド・APK生成へ進まなかった。
+- 原因はreplayPreviousRuntimeBreadcrumbs()のメソッド宣言直後に開始波括弧が欠落していたこと。P243の親コミット4bf2e5d8066cc925a825e84fa4abfa67e96528f5では波括弧が存在し、P244の実装後に欠落していることをGitHub上のソースとActionsログで確認した。
+- 本Revisionで該当する開始波括弧を復元する。P245で復元したstorageService.tsのflush()開始波括弧も維持する。
+- P245のローカル検査欄にあるp215_graph_e2e=SKIP_NO_LOCAL_TSXは、ローカル依存不足を示す値であり、GitHub ActionsのP215成功を意味しない。
+- P246静的検証結果（実測終了コード、0=PASS）: js_syntax=0; runtime_verifier=0; runtime_logging=0; p215_graph_e2e=SKIP_NO_LOCAL_TSX; whitespace_diff=0
+- GitHub Actions/APKとAndroid実機でのログ取得は独立して確認し、静的検証の成功から推定しない。

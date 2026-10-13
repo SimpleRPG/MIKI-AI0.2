@@ -326,7 +326,7 @@ class SystemLogger {
     });
   }
 
-  private async replayPreviousRuntimeBreadcrumbs(): Promise<void>
+  private async replayPreviousRuntimeBreadcrumbs(): Promise<void> {
     if (typeof window === 'undefined' || !this.runtimeLogFilePlugin) return;
     const journal = this.readRuntimeBreadcrumbs();
     const previous = journal
