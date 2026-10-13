@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(path, 'utf8');
 const checks = [];
 const check = (name, passed) => checks.push({ name, passed: Boolean(passed) });
+const verifierSource = read('scripts/verify_runtime_failure_fixes.mjs');
 
 const runner = read('android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt');
 const nativeCore = read('android/app/src/main/java/com/miki/ai/MIKINativeCore.kt');
@@ -219,12 +220,21 @@ check(
     requiredAssetAcquisition.includes('if (/required_asset') &&
     requiredAssetAcquisition.includes('.capability/i.test(reason)')
 );
+
 check(
-  'Canonical index counts match the modified autonomous recovery sources',
-  autonomousLoopIndexRow?.includes(`lines=${autonomousLoop.split(/\r?\n/).length - 1}`) &&
-    preflightIndexRow?.includes(`lines=${preflightService.split(/\r?\n/).length - 1}`) &&
-    requiredAssetIndexRow?.includes(`lines=${requiredAssetAcquisition.split(/\r?\n/).length - 1}`) &&
-    missingAssetSynthesisIndexRow?.includes(`lines=${missingAssetSynthesis.split(/\r?\n/).length - 1}`)
+  'Recovery index row declarations precede the index-count assertion in this verifier',
+  (() => {
+    const indexRowsRegionStart = verifierSource.lastIndexOf('const appIndexRow =');
+    const assertionPosition = verifierSource.lastIndexOf("'Canonical index counts match the modified autonomous recovery sources'");
+    const declarations = [
+      'const autonomousLoopIndexRow =',
+      'const preflightIndexRow =',
+      'const requiredAssetIndexRow =',
+      'const missingAssetSynthesisIndexRow =',
+    ].map(marker => verifierSource.lastIndexOf(marker));
+    return indexRowsRegionStart >= 0 && assertionPosition >= 0 &&
+      declarations.every(position => position > indexRowsRegionStart && position < assertionPosition);
+  })()
 );
 
 check(
@@ -248,6 +258,15 @@ const autonomousLoopIndexRow = design.split(/\r?\n/).find(line => line.startsWit
 const preflightIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] CORE | src/miki/core/services/selfImprovementPreflightService.ts |'));
 const requiredAssetIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] CORE | src/miki/core/services/requiredAssetAcquisitionService.ts |'));
 const missingAssetSynthesisIndexRow = design.split(/\r?\n/).find(line => line.startsWith('- [USED] CORE | src/miki/core/services/missingAssetSynthesisService.ts |'));
+
+check(
+  'Canonical index counts match the modified autonomous recovery sources',
+  autonomousLoopIndexRow?.includes(`lines=${autonomousLoop.split(/\r?\n/).length - 1}`) &&
+    preflightIndexRow?.includes(`lines=${preflightService.split(/\r?\n/).length - 1}`) &&
+    requiredAssetIndexRow?.includes(`lines=${requiredAssetAcquisition.split(/\r?\n/).length - 1}`) &&
+    missingAssetSynthesisIndexRow?.includes(`lines=${missingAssetSynthesis.split(/\r?\n/).length - 1}`)
+);
+
 check(
   'Mobile viewport does not mount a hidden duplicate desktop ChatPanel',
   app.includes("window.matchMedia('(min-width: 768px)'") &&
