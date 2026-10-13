@@ -4,11 +4,11 @@ import { coreCognitiveGraphP155Service, type P155MutationCandidate, type P155Sem
 import { unifiedKnowledgeGraphP151Service, type P151Graph } from './unifiedKnowledgeGraphP151Service';
 import type { MikiDomain } from './crossDomainCirculationService';
 
-export type P211GraphEventKind = 'INPUT'|'OUTPUT'|'DECISION'|'ACTION'|'RESULT'|'ERROR'|'CORRECTION'|'UNKNOWN'|'VALIDATION';
+export type P211GraphEventKind = 'INPUT'|'OUTPUT'|'DECISION'|'ACTION'|'RESULT'|'ERROR'|'CORRECTION'|'UNKNOWN'|'VALIDATION'|'SEMANTIC_CANDIDATE';
 export interface P211GraphEvent { domain:MikiDomain; eventKind:P211GraphEventKind; subjectId:string; payload:Record<string,unknown>; confidence:number; uncertainty:number; sourceRefs:string[]; participantDomains?:MikiDomain[]; relatedNodeIds?:string[]; requiresVerification?:boolean; }
 export interface P211ConnectionReceipt { transactionId:string; domain:MikiDomain; acceptedCandidateIds:string[]; rejectedCandidateIds:string[]; createdNodeIds:string[]; graphSha256:string; eventSha256:string; byteLength:number; receiptSha256:string; }
 export interface P211ConnectionStats { connectedDomains:MikiDomain[]; eventCount:number; rejectedCount:number; graphNodes:number; graphEdges:number; graphSha256:string; residentBytes:number; maxResidentBytes:number; }
-const SEMANTIC:Record<P211GraphEventKind,P155SemanticKind>={INPUT:'DATA',OUTPUT:'RESULT',DECISION:'DECISION',ACTION:'ACTION',RESULT:'RESULT',ERROR:'EXPERIENCE',CORRECTION:'CORRECTION',UNKNOWN:'UNKNOWN',VALIDATION:'VALIDATION'};
+const SEMANTIC:Record<P211GraphEventKind,P155SemanticKind>={INPUT:'DATA',OUTPUT:'RESULT',DECISION:'DECISION',ACTION:'ACTION',RESULT:'RESULT',ERROR:'EXPERIENCE',CORRECTION:'CORRECTION',UNKNOWN:'UNKNOWN',VALIDATION:'VALIDATION',SEMANTIC_CANDIDATE:'KNOWLEDGE'};
 const MAX_PAYLOAD_BYTES=64*1024,MAX_RESIDENT_BYTES=4*1024*1024;
 class CrossDomainGraphConnectionP211Service {
  private graph:P151Graph=unifiedKnowledgeGraphP151Service.build([],[]);

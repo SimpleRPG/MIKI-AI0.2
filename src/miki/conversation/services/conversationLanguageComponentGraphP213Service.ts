@@ -26,8 +26,9 @@ class ConversationLanguageComponentGraphP213Service{
   if(found.some(c=>c.conditions.includes('ACTIVE_GOAL_REQUIRED'))&&context.activeGoalIds.length===0)add('CONTEXT_GAP','続き','Active goal is required');
   if(found.some(c=>c.conditions.includes('REFERENT_REQUIRED'))&&context.activeGoalIds.length===0)add('REFERENCE_GAP','それ','Referent is unresolved');
   if(context.openGoalIds.length>1&&found.some(c=>c.meaningIds.includes('intent.continue')))add('AMBIGUITY','続き','Multiple open goals prevent deterministic continuation');
-  if(!components.some(c=>c.kind==='INTENT_COMPONENT'||c.meaningIds.some(id=>id.startsWith('intent.'))))add('INTENT_GAP',text,'No intent component reached the candidate set');
-  const intentIds=[...new Set(components.flatMap(c=>c.meaningIds.filter(id=>id.startsWith('intent.'))))];const constraintIds=[...new Set(components.flatMap(c=>c.meaningIds.filter(id=>id.startsWith('constraint.'))))];const grammarIds=[...new Set(components.flatMap(c=>c.meaningIds.filter(id=>id.startsWith('grammar.'))))];
+  const affirmativeComponents=components.filter(c=>c.kind!=='COUNTEREXAMPLE_COMPONENT'&&c.kind!=='REPAIR_COMPONENT');
+  if(!affirmativeComponents.some(c=>c.kind==='INTENT_COMPONENT'||c.meaningIds.some(id=>id.startsWith('intent.'))))add('INTENT_GAP',text,'No affirmative intent component reached the candidate set');
+  const intentIds=[...new Set(affirmativeComponents.flatMap(c=>c.meaningIds.filter(id=>id.startsWith('intent.'))))];const constraintIds=[...new Set(affirmativeComponents.flatMap(c=>c.meaningIds.filter(id=>id.startsWith('constraint.'))))];const grammarIds=[...new Set(affirmativeComponents.flatMap(c=>c.meaningIds.filter(id=>id.startsWith('grammar.'))))];
   const core={components,gaps,intentIds,constraintIds,grammarIds,reusedLearnedComponentIds:learned.map(c=>c.componentId)};return{...core,analysisSha256:canonicalSha256Object(core)};
  }
  promote(surface:string,meaningIds:string[],kind:ConversationComponentKind='PHRASE_COMPONENT'):LanguageComponent{return definition(kind,surface,meaningIds,[],.8)}

@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-13
-正本Revision：2026-10-13-P254
+正本Revision：2026-10-13-P255
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P254）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P255）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-13-P254
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動。完全再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-13-P255
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -10995,7 +10995,7 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 
 - Core以外の17専門分類すべてに専用Graph Connectorを配置した。各分類はGraphを直接更新せず、型付きP211GraphEventをCore Commit Gatewayへ提出する。
 - Core GatewayはイベントをP155 Mutation Candidateへ変換し、P151統合GraphへNode/Edgeを決定的にCommitする。Node ID事前計算にはP155の共通Node構築関数を使い、Commit時の実Node IDと一致させる。CoreだけがCommit Authorityであり、Worker分類はProposalのみ許可される。
-- INPUT、OUTPUT、DECISION、ACTION、RESULT、ERROR、CORRECTION、UNKNOWN、VALIDATIONを認知Semantic Kindへ写像する。
+- INPUT、OUTPUT、DECISION、ACTION、RESULT、ERROR、CORRECTION、UNKNOWN、VALIDATION、SEMANTIC_CANDIDATEを認知Semantic Kindへ写像する。SEMANTIC_CANDIDATEは既存KNOWLEDGE kindへ写像し、未検証状態をpayloadに保持する。
 - Event SHA、Candidate SHA、Node SHA、Graph SHA、Receipt SHAを保持する。Snapshot復元時はGraph SHA不一致を拒否する。
 - relatedNodeIdsで指定した既存Nodeから新規イベントNodeへの型付きEdgeを実生成する。存在しない関連Node ID、CoreからのWorker Event、範囲外Score、空Subject、64 KiB超PayloadはFail-Closedで拒否する。
 - 文字列単体が4096文字を超える場合は全文常駐せず、長さ、SHA-256、先頭512文字のPreviewへ圧縮する。設計上のGateway常駐予算は4 MiBとするが、現行P211のresidentBytesはカウンターを上限で丸めるだけでGraph本体のRAM常駐を制限しない。P153 Working SetとP171 Native Storeの実経路統合までは実効容量制限未達として扱う。
@@ -11003,7 +11003,7 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 
 # P212 通常会話Graph閉ループ接続
 
-- Typed Conversation UI Gatewayの通常入力をP212 Runtimeへ接続した。Core Task作成後、会話入力、辞書Graph、既存会話Component Pipeline、Semantic Graph、正例・反例候補をCore GraphへCommitする。
+- Typed Conversation UI Gatewayの通常入力をP212 Runtimeへ接続した。Core Task作成後、会話入力、辞書Graph、既存会話Component Pipeline、Semantic Graphを解析する。P208の各mutationCandidateはP211 Core Commit Gateway経由でSEMANTIC_CANDIDATE eventとしてP151へCommitし、入力Nodeから型付きEdgeを作る。Graph上の候補NodeはKNOWLEDGE kindを持つがstatus=CANDIDATE_UNVERIFIED・requiresVerification=trueとし、P208の確定SemanticAssetへ昇格させない。declaredEvidenceIdsはpayloadに保存するが、実Evidence Lineageへの接続は別途検証されるまで未解決と明示する。
 - Semantic候補が確定しない場合、Unknown NodeとResearch Actionを同一GraphへCommitし、入力からUnknown/Researchへの型付きEdgeを実生成する。
 - 応答確定時、Answer、Validation、Experience、LearningをCommitし、各先行イベントのcreatedNodeIdsをrelatedNodeIdsへ渡してInput→Answer→Validation→Experience→Learningの型付きEdgeを同一Graph内に実生成する。Validation失敗時はCounterexample、Repair、Reuse ConditionをLearningとExperienceへ保存できる。
 - P211の64 KiB Payload制限、4096文字圧縮、4 MiB常駐予算、SHA検査、Snapshot復元を継承する。
@@ -11015,7 +11015,7 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 通常会話はP213 Language Component Graph解析を必ず通り、語句・文法・Intent・Constraint部品を抽出する。
 - 不足はLexeme、Phrase、Grammar、Meaning、Intent、Constraint、Context、Reference、Evidence、Capability、Integration、Validation、Ambiguityの13種でGraphへ登録する。
 - Context不足、照応不足、複数Open Goalによる曖昧性を区別し、一括UNKNOWN化しない。
-- 不足NodeはUnknown分類へCommitし、Research Actionへ接続する。検証済みPositive ExampleとCounterexampleは次回解析時にLEARNED_GRAPH部品として再利用する。
+- 不足NodeはUnknown分類へCommitし、Research Actionへ接続する。Positive ExampleとCounterexampleは次回解析時にLEARNED_GRAPH部品として保持・再利用するが、Counterexample/Repair部品のmeaningIdsは肯定的intentIds/constraintIds/grammarIdsの根拠に数えない。肯定側の意味根拠が残らない場合はINTENT_GAPを維持し、負の学習だけから意味を確定しない。
 - 学習部品のSurfaceは最大512文字に制限し、巨大会話全文を部品定義へ複製しない。P211のPayload上限と常駐予算を継承する。
 
 # P214 会話Graph閉ループ完成化
@@ -11526,3 +11526,16 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - P253の失敗結果は履歴として保持し、P254の実測結果を別行へ記録する。
 - P254静的検査（正本更新後、実測終了コード）: runtime_verifier=0; runtime_logging=0; verifier_syntax=0; android_native_contract=SKIP_NO_LOCAL_TSX; japanese_morphology_contract=SKIP_NO_LOCAL_TSX; rust_core_contract=0; typescript_lint=SKIP_NO_LOCAL_TSC; whitespace_diff=0
 - GitHub Actions/APK ArtifactとAndroid実機の成功は、更新後の結果を個別に確認するまで未確認とする。
+
+============================================================
+【2026-10-13-P255 P208意味候補のGraph接続・反例Meaning IDの昇格防止】
+============================================================
+
+- 実装前の最新mainは`36c1e63fa9bf3b881f210afce2ab56067c2b4d14`。変更前の再帰Git treeは1,927 entries（1,780 files / 147 directories、truncated=false）で、P211/P212/P213/P215の既存ファイルと唯一の設計正本を確認した。これは変更後の全Tree再監査を代替しない。
+- P208の`mutationCandidates`がP212通常入力経路で生成・INPUT payload保存される一方、候補ごとのP151 NodeとしてP211 Gatewayに渡されていなかった経路を修正した。新しいGraph/Orchestrator/Commit Authorityは作らず、既存P211 event contractへ`SEMANTIC_CANDIDATE`を加え、P155/P151既存経路でKNOWLEDGE kindの候補NodeとINPUT→Candidate Edgeをcommitする。
+- すべてのP208 mutationCandidateは`CANDIDATE_UNVERIFIED`および`requiresVerification=true`として記録する。候補のdecision/score/asset IDs/declaredEvidenceIds/requiredComponentIds/Counterexample IDs/semantic receipt SHAを保存する。P208内の宣言Evidence IDを実Evidenceへリンク済みと偽装しない。候補Graph Nodeのcommitを、SemanticAssetの採用・Claimの確定・Promotionの成功と扱わない。
+- P213ではCOUNTEREXAMPLE_COMPONENTとREPAIR_COMPONENTを肯定側meaning ID抽出から除外する。負の学習部品は診断・再利用可能な部品として保持し、肯定的なintentIds/constraintIds/grammarIdsへ混入させない。肯定側Intentが残らなければINTENT_GAPでfail-closedにする。
+- P211 Runtime検証でSEMANTIC_CANDIDATE→KNOWLEDGE mapping、未検証status、Verification participant、実際のINPUT→Candidate Edgeを検査する。P215 E2EでP208候補ごとの実Graph commit/Edgeと、Counterexample-only fixtureからのaffirmative meaning ID流入がないことを検査する。P208/P212/P213/P216既存検証も再実行する。
+- 残件：現行`coreTaskIngressService.submit()`は`coreOrchestratorService.run()`のawait完了後にP212 `ingestInput()`を呼ぶ。このバッチではその順序を変更していないため、P208 candidateは共有Graphに接続されるが、同じTaskの最初のCORE routeがその候補を参照することまでは保証しない。Core初期routingへの統合は別のPhase A監査を要する。
+- P255静的検査（正本更新後、実測終了コード）: semantic_graph_p208=0; cross_domain_graph_p211=1; conversation_graph_p212=0; conversation_components_p213=0; answer_pipeline_p216=1; conversation_ui_e2e_p215=1; p211_verifier_syntax=0; p215_verifier_syntax=0; typescript_lint=SKIP_NO_LOCAL_TSC; whitespace_diff=0
+- GitHub Actions/APK ArtifactとAndroid実機の成功は、更新後の実行結果・成果物・実機証跡を別々に確認するまで未確認とする。

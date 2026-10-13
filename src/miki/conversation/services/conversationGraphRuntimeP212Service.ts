@@ -1,5 +1,5 @@
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
-import { semanticGraphCoreP208Service, type SemanticGraphState } from '../../core/services/semanticGraphCoreP208Service';
+import { semanticGraphCoreP208Service, type SemanticCandidate, type SemanticGraphState } from '../../core/services/semanticGraphCoreP208Service';
 import { semanticDictionaryGraphP209Service } from '../../core/services/semanticDictionaryGraphP209Service';
 import { conversationComponentPipelineService } from './conversationComponentPipelineService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
@@ -27,6 +27,35 @@ class ConversationGraphRuntimeP212Service {
   const semantic=semanticGraphCoreP208Service.understand(text,this.semanticState,resolvedContext);
   const lexemes=[...new Set(text.normalize('NFKC').split(/[\s、。！？,.!?]+/u).filter(Boolean))].map(token=>({token,found:semanticDictionaryGraphP209Service.has(token)}));
   const inputReceipt=conversationGraphConnectorP211Service.connect({eventKind:'INPUT',subjectId:turnId,payload:{taskId,text,lexemes,languageComponents,usedComponentIds:analysis.usedComponentIds,semanticCandidates:semantic.candidates},confidence:.95,uncertainty:semantic.selected?0.05:.45,sourceRefs:[`conversation:${taskId}`,semantic.receiptSha256],participantDomains:['memory','capability','research','unknown','verification'],requiresVerification:!semantic.selected});
+  for (const mutation of semantic.mutationCandidates) {
+   const candidate = mutation.payload.candidate as SemanticCandidate;
+   conversationGraphConnectorP211Service.connect({
+    eventKind:'SEMANTIC_CANDIDATE',
+    subjectId:mutation.subjectId,
+    payload:{
+     taskId,
+     status:'CANDIDATE_UNVERIFIED',
+     requiresVerification:true,
+     semanticKind:mutation.semanticKind,
+     decision:candidate.decision,
+     conceptId:candidate.conceptId,
+     score:candidate.score,
+     matchedAssetIds:candidate.matchedAssetIds,
+     declaredEvidenceIds:candidate.evidenceIds,
+     evidenceLinkageStatus:candidate.evidenceIds.length?'DECLARED_IDS_NOT_RESOLVED':'NO_DECLARED_IDS',
+     counterexampleIds:candidate.counterexampleIds,
+     requiredComponentIds:candidate.requiredComponentIds,
+     graphGeneration:mutation.payload.graphGeneration,
+     semanticReceiptSha256:semantic.receiptSha256
+    },
+    confidence:candidate.score,
+    uncertainty:1-candidate.score,
+    sourceRefs:[inputReceipt.eventSha256,semantic.receiptSha256],
+    participantDomains:['conversation','memory','research','capability','verification'],
+    requiresVerification:true,
+    relatedNodeIds:inputReceipt.createdNodeIds
+   });
+  }
   const gapUnknownNodeIds:string[]=[];for(const gap of languageComponents.gaps){const gapReceipt=unknownGraphConnectorP211Service.connect({eventKind:'UNKNOWN',subjectId:gap.gapId,payload:{taskId,text,...gap},confidence:gap.confidence,uncertainty:1-gap.confidence,sourceRefs:[inputReceipt.eventSha256],participantDomains:['conversation','research','learning','verification'],relatedNodeIds:inputReceipt.createdNodeIds});gapUnknownNodeIds.push(...gapReceipt.createdNodeIds);}
   if(semantic.requiresResearch||languageComponents.gaps.length>0){
    const unknownReceipt=unknownGraphConnectorP211Service.connect({eventKind:'UNKNOWN',subjectId:`unknown:${turnId}`,payload:{taskId,text,candidates:semantic.candidates},confidence:.8,uncertainty:.7,sourceRefs:[inputReceipt.eventSha256],participantDomains:['conversation','research'],relatedNodeIds:[...inputReceipt.createdNodeIds,...gapUnknownNodeIds]});

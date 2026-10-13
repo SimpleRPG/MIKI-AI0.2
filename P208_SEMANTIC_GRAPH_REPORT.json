@@ -6,9 +6,6 @@
   "counterexampleAware": true,
   "transactionGenerationGuard": true,
   "mutationCommitReady": true,
-  "auditedFixedMeaningFiles": 69,
-  "auditedRoots": 5,
-  "typescriptProjectCompile": "BLOCKED_DEPENDENCIES_NOT_INSTALLED",
-  "rustCompile": "BLOCKED_CARGO_NOT_AVAILABLE",
-  "structuralVerification": "PASS"
+  "auditedFixedMeaningFiles": 73,
+  "auditedRoots": 5
 }

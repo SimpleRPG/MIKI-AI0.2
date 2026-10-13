@@ -25,6 +25,7 @@ coreOrchestratorService.finalizeConversationResponse = taskId => ({
 const { typedCoreUiGatewayService } = await import('../src/miki/core/ui/typedCoreUiGatewayService.ts');
 const { conversationGraphRuntimeP212Service } = await import('../src/miki/conversation/services/conversationGraphRuntimeP212Service.ts');
 const { conversationGraphCompletionP214Service } = await import('../src/miki/conversation/services/conversationGraphCompletionP214Service.ts');
+const { unifiedKnowledgeGraphP151Service } = await import('../src/miki/core/services/unifiedKnowledgeGraphP151Service.ts');
 const { conversationLanguageComponentGraphP213Service } = await import('../src/miki/conversation/services/conversationLanguageComponentGraphP213Service.ts');
 
 conversationGraphRuntimeP212Service.reset();
@@ -38,6 +39,11 @@ assert.ok(afterInput.nodes.some(n => JSON.stringify(n.payload).includes(input)),
 assert.ok(localStorage.getItem('miki:p214:conversation-graph'), 'input checkpoint must exist');
 const inputNode=afterInput.nodes.find(n=>n.payload.eventKind==='INPUT'&&n.payload.taskId===taskId);
 assert.ok(inputNode,'submitted task must have a canonical INPUT node');
+const semanticCandidateNodes=afterInput.nodes.filter(node=>node.payload.eventKind==='SEMANTIC_CANDIDATE'&&node.payload.taskId===taskId);
+assert.ok(semanticCandidateNodes.length>0,'P208 mutationCandidates must each be committed through the P211 graph gateway');
+assert.ok(semanticCandidateNodes.every(node=>node.payload.status==='CANDIDATE_UNVERIFIED'&&node.payload.requiresVerification===true&&node.payload.evidenceLinkageStatus!=='RESOLVED'),'semantic candidates must remain unverified and must not imply Evidence linkage');
+const semanticCandidateInputEdges=semanticCandidateNodes.every(candidateNode=>afterInput.edges.some(edge=>edge.from===inputNode.nodeId&&edge.to===candidateNode.nodeId&&edge.type==='P211_SEMANTIC_CANDIDATE_RELATES_TO'));
+assert.ok(semanticCandidateInputEdges,'every semantic candidate must have a real edge to its input');
 
 const goodResponse = '全部を省略せず実装し、既存機能を維持して失わないようにしました。';
 const finalized = typedCoreUiGatewayService.finalizeConversationResponse(taskId, goodResponse);
@@ -76,6 +82,18 @@ assert.equal(restored.nodes.length, completed.nodes.length, 'restored node count
 
 const analysis = conversationLanguageComponentGraphP213Service.analyze(input, restored, {activeGoalIds:[],openGoalIds:[]});
 assert.ok(analysis.reusedLearnedComponentIds.length > 0, 'next conversation must reuse a learned graph component');
+const counterexampleOnlyNode=unifiedKnowledgeGraphP151Service.node({
+  domain:'MEMORY',kind:'P255_COUNTEREXAMPLE_REGRESSION',subjectId:'p255-counterexample-only',
+  payload:{semanticKind:'KNOWLEDGE',ownerDomain:'conversation',participantDomains:['conversation','verification'],outcome:'COUNTEREXAMPLE',surface:'p255-counterexample-only-surface',meaningIds:['intent.must-not-promote','constraint.must-not-promote','grammar.must-not-promote'],repair:'P255_REPAIR_ONLY'},
+  confidence:.95,uncertainty:.05,sourceRefs:['test:p255:counterexample']
+});
+const counterexampleOnlyGraph=unifiedKnowledgeGraphP151Service.build([counterexampleOnlyNode],[]);
+const counterexampleOnlyAnalysis=conversationLanguageComponentGraphP213Service.analyze('p255-counterexample-only-surface',counterexampleOnlyGraph,{activeGoalIds:[],openGoalIds:[]});
+assert.ok(counterexampleOnlyAnalysis.components.some(component=>component.kind==='COUNTEREXAMPLE_COMPONENT'),'matching negative example must remain visible as a diagnostic component');
+assert.deepEqual(counterexampleOnlyAnalysis.intentIds,[],'Counterexample meanings must not become affirmative intents');
+assert.deepEqual(counterexampleOnlyAnalysis.constraintIds,[],'Counterexample meanings must not become affirmative constraints');
+assert.deepEqual(counterexampleOnlyAnalysis.grammarIds,[],'Counterexample meanings must not become affirmative grammar');
+assert.ok(counterexampleOnlyAnalysis.gaps.some(gap=>gap.kind==='INTENT_GAP'),'negative-only knowledge must fail closed as an unresolved intent');
 
 const badTask = conversationGraphRuntimeP212Service.ingestInput('p215-bad-task', input);
 assert.ok(badTask.turnId, 'bad-response scenario must ingest');
@@ -95,7 +113,7 @@ const report = {
   uiSubmission:true, coreIngress:true, inputGraphCommit:true, outputGraphCommit:true,
   validationExperienceLearning:true, positiveExample:true, constraintCounterexample:true,
   userInputSurfaceLearning:true, inputOutputEdge, outputValidationEdge, validationExperienceEdge, experienceLearningEdge, relationshipEdges:completed.edges.length, checkpoint:true, restartRestore:true,
-  nextConversationLearnedReuse:true, corruptShaFailClosed:true,
+  nextConversationLearnedReuse:true, corruptShaFailClosed:true, semanticCandidateGraphCommit:semanticCandidateNodes.length>0, semanticCandidateInputEdges, semanticCandidatesRemainUnverified:semanticCandidateNodes.every(node=>node.payload.status==='CANDIDATE_UNVERIFIED'&&node.payload.requiresVerification===true), counterexampleAffirmativeIdsBlocked:counterexampleOnlyAnalysis.intentIds.length===0&&counterexampleOnlyAnalysis.constraintIds.length===0&&counterexampleOnlyAnalysis.grammarIds.length===0,
   graphBeforeRestartSha256:completed.graphSha256,
   restoredGraphSha256:restored.graphSha256,
   nodesAfterInput:afterInput.nodes.length, nodesAfterCompletion:completed.nodes.length,
