@@ -109,3 +109,41 @@ jobs:
           name: miki-ai-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # APK Artifactを作成した後に残りの回帰検査を実行する。
+      - name: Post-push repository regression checks
+        if: always()
+        timeout-minutes: 15
+        run: |
+          set +e
+          failures=0
+          : > p258-regression-results.txt
+
+          run_check() {
+            name="$1"
+            shift
+            echo "::group::$name"
+            "$@"
+            rc=$?
+            echo "::endgroup::"
+            printf '%s=%s\\n' "$name" "$rc" | tee -a p258-regression-results.txt "$GITHUB_STEP_SUMMARY"
+            if [ "$rc" -ne 0 ]; then
+              failures=1
+            fi
+          }
+
+          run_check postpush_import_check npm run check:imports
+          run_check postpush_typescript_lint npm run lint
+          run_check postpush_conversation_learning npx tsx scripts/verify_conversation_learning_and_reasoning.ts
+          run_check postpush_autonomous_infrastructure npx tsx scripts/verify_autonomous_infrastructure_integration.ts
+
+          echo "POSTPUSH_REGRESSION_FAILURES=$failures" | tee -a p258-regression-results.txt "$GITHUB_STEP_SUMMARY"
+          exit "$failures"
+
+      - name: Upload post-push regression results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p258-regression-results
+          path: p258-regression-results.txt
+          if-no-files-found: warn
