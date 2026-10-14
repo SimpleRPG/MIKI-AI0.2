@@ -59,7 +59,7 @@ import { mikiConversationLearningService } from '../../learning/services/mikiCon
 import { conversationComponentCompositionService } from '../../conversation/services/conversationComponentCompositionService';
 import { normalizeKey } from '../../learning/services/mikiUnifiedLearningContinuumService';
 
-export interface NonLlmCoreResult {
+export interface ConversationCoreResult {
   replyText: string;
   nextConversationState: ConversationState;
   status: 'RESOLVED' | 'UNRESOLVED' | 'NEEDS_CONFIRMATION';
@@ -91,16 +91,16 @@ export interface NonLlmCoreResult {
  * 入力 → 会話状態/参照解決 → 記憶/主張 → 要求型 → 判断 → 部品 → 検証 → Answer IR → 表層
  * の順序を固定し、「未解決」を擬似回答で埋めないことを最重要不変条件とする。
  */
-export class NonLlmCoreService {
-  private static instance: NonLlmCoreService;
+export class ConversationCoreService {
+  private static instance: ConversationCoreService;
 
   private constructor() {
     conversationComponentCompositionService.initialize();
   }
 
-  public static getInstance(): NonLlmCoreService {
-    if (!NonLlmCoreService.instance) NonLlmCoreService.instance = new NonLlmCoreService();
-    return NonLlmCoreService.instance;
+  public static getInstance(): ConversationCoreService {
+    if (!ConversationCoreService.instance) ConversationCoreService.instance = new ConversationCoreService();
+    return ConversationCoreService.instance;
   }
 
   public async execute(params: {
@@ -112,7 +112,7 @@ export class NonLlmCoreService {
     persona?: string;
     conversationId?: string;
     messageId?: string;
-  }): Promise<NonLlmCoreResult> {
+  }): Promise<ConversationCoreResult> {
     const started = performance.now();
     const prompt = params.prompt.trim().replace(/\s+/g, ' ');
     const state = params.conversationState || defaultConversationState();
@@ -169,7 +169,7 @@ export class NonLlmCoreService {
         useSearch: /調べ|検索|最新|現在/.test(prompt),
       });
       const nextState = { ...state, currentTopic: unknownTerms.join('、') };
-      const status: NonLlmCoreResult['status'] = ['REUSED_SUPPORTED', 'LOCAL_EVIDENCE'].includes(researched.status) ? 'RESOLVED' : 'UNRESOLVED';
+      const status: ConversationCoreResult['status'] = ['REUSED_SUPPORTED', 'LOCAL_EVIDENCE'].includes(researched.status) ? 'RESOLVED' : 'UNRESOLVED';
       const result = this.buildResult(status, `unknown_research_${researched.status.toLowerCase()}`, researched.surfaceText, nextState, dialogueAct, researched.resolution.evidenceCount, ['unknownResearchConversationBridgeService'], started, stages);
       result.researchPerformed = researched.status === 'RESEARCHED_UNVERIFIED' || researched.resolution.evidenceCount > 0;
       result.researchEvidenceCount = researched.resolution.evidenceCount;
@@ -287,7 +287,7 @@ export class NonLlmCoreService {
     t = performance.now();
     let usedComponents: string[] = [...componentAnalysis.usedComponentIds];
     let assembledCode: string | undefined;
-    let taskExecution: NonLlmCoreResult['taskExecution'];
+    let taskExecution: ConversationCoreResult['taskExecution'];
     const isCodeRequest = compiled.category === 'CODE_SYNTHESIS';
     if (isCodeRequest) {
       const reusable = capabilityReuseService.findReusable(prompt);
@@ -368,7 +368,7 @@ export class NonLlmCoreService {
       if (explicitChoice) {
         decisionText = `明示された選択「${explicitChoice}」を採用します。`;
       } else {
-        decisionText = '比較対象は見つかりましたが、評価軸ごとの確認済み根拠が不足しているため、非LLM中核では推奨を捏造して確定しません。';
+        decisionText = '比較対象は見つかりましたが、評価軸ごとの確認済み根拠が不足しているため、CORE中核では推奨を捏造して確定しません。';
       }
     }
 
@@ -383,7 +383,7 @@ export class NonLlmCoreService {
     // 7. Answer IR。Claimが弱い場合は「不明」を不明のまま表現する。
     let ir;
     let skeleton: AnswerSkeletonType = 'GENERAL_ANSWER';
-    let status: NonLlmCoreResult['status'] = 'RESOLVED';
+    let status: ConversationCoreResult['status'] = 'RESOLVED';
     let reason = implementationSelection.reason;
     if (potentialUnknowns.length > 0) reason += `; potential_unknowns=${potentialUnknowns.length}${potentialUnknownGapId ? `; promoted_gap=${potentialUnknownGapId}` : ''}`;
     let verifiedResearchClaimId: string | undefined;
@@ -699,7 +699,7 @@ export class NonLlmCoreService {
       }, 300);
     }
 
-    systemLogger.info('CHAT', `🧠 [非LLM Core/Unified] ${status} / ${reason} / ${totalMs}ms / intent=${dialogueAct}`);
+    systemLogger.info('CHAT', `🧠 [CORE Core/Unified] ${status} / ${reason} / ${totalMs}ms / intent=${dialogueAct}`);
 
     return {
       replyText: surface.surfaceText,
@@ -726,7 +726,7 @@ export class NonLlmCoreService {
   }
 
   private buildResult(
-    status: NonLlmCoreResult['status'],
+    status: ConversationCoreResult['status'],
     reason: string,
     replyText: string,
     state: ConversationState,
@@ -735,7 +735,7 @@ export class NonLlmCoreService {
     usedComponents: string[],
     started: number,
     stages: Record<string, number>
-  ): NonLlmCoreResult {
+  ): ConversationCoreResult {
     return {
       replyText,
       nextConversationState: state,
@@ -751,4 +751,4 @@ export class NonLlmCoreService {
   }
 }
 
-export const nonLlmCoreService = NonLlmCoreService.getInstance();
+export const conversationCoreService = ConversationCoreService.getInstance();

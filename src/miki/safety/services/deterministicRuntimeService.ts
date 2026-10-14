@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../../../types';
-import { nonLlmCoreService } from './nonLlmCoreService';
+import { conversationCoreService } from './conversationCoreService';
 
 export interface NativeGpuInfo {
   backend: 'NON_LLM_CORE';
@@ -46,7 +46,7 @@ function deterministicEmbedding(text: string, dimensions = 256): number[] {
 
 async function* deterministicStream(messages: ChatMessage[] | any[]): AsyncGenerator<string> {
   const prompt = messagesToPrompt(messages);
-  const result = await nonLlmCoreService.execute({ prompt, recentMessages: messages as ChatMessage[] });
+  const result = await conversationCoreService.execute({ prompt, recentMessages: messages as ChatMessage[] });
   yield result.replyText;
 }
 
@@ -56,7 +56,7 @@ export const deterministicRuntimeService = {
   isLoadingModel: () => false,
   getActiveExternalConfig: () => ({ endpoint: '', type: 'non_llm_core', model: 'deterministic-feature-v1' }) as DeterministicTeacherConfig,
   getActiveLoraInfo: () => null as NativeLoraFile | null,
-  getHardwareSpecs: async (): Promise<NativeGpuInfo> => ({ backend: 'NON_LLM_CORE', deviceName: 'Non-LLM Core', totalMemoryMB: 0, freeMemoryMB: 0, computeUnits: 0 }),
+  getHardwareSpecs: async (): Promise<NativeGpuInfo> => ({ backend: 'NON_LLM_CORE', deviceName: 'Deterministic Core', totalMemoryMB: 0, freeMemoryMB: 0, computeUnits: 0 }),
   getStorageInfo: async () => EMPTY_STORAGE,
   getLoraStorageInfo: async () => EMPTY_LORA,
   isSharedStorageAccessGranted: async () => false,
@@ -77,7 +77,7 @@ export const deterministicRuntimeService = {
     deterministicStream(Array.isArray(first) ? first : (Array.isArray(second) ? second : [])),
   chatStream: (messages: any, _options?: any) => deterministicStream(Array.isArray(messages) ? messages : []),
   streamChat: (messages: any, _options?: any) => deterministicStream(Array.isArray(messages) ? messages : []),
-  isWebGPUSupported: async (..._args: any[]) => ({ supported: false, adapterInfo: { description: 'Non-LLM Core', vendor: 'Deterministic', architecture: 'CPU', maxBufferSize: 0, maxComputeInvocations: 0 }, error: 'WebGPU model runtime is retired.' }),
+  isWebGPUSupported: async (..._args: any[]) => ({ supported: false, adapterInfo: { description: 'Deterministic Core', vendor: 'Deterministic', architecture: 'CPU', maxBufferSize: 0, maxComputeInvocations: 0 }, error: 'WebGPU model runtime is retired.' }),
   isLoaded: () => false,
   isModelLoaded: (_modelId?: string) => false,
   isModelCached: async (_modelId?: string) => false,
@@ -86,7 +86,7 @@ export const deterministicRuntimeService = {
   getVRAMSnapshot: async (): Promise<VRAMSnapshot> => ({ totalMB: 0, usedMB: 0, freeMB: 0, pressureLevel: 'low' }),
   listAllCachedModels: async () => [],
   findBestAvailableModel: async (..._args: any[]) => '',
-  loadModel: async (..._args: any[]) => { throw new Error('Local generative model loading is retired; use the Non-LLM Core.'); },
+  loadModel: async (..._args: any[]) => { throw new Error('Local generative model loading is retired; use the Deterministic Core.'); },
   unloadModel: async (..._args: any[]) => undefined,
   cancelAndReset: () => undefined,
   interruptGenerate: () => undefined,

@@ -1,4 +1,4 @@
-import { nonLlmCoreService } from '../src/miki/safety/services/nonLlmCoreService';
+import { conversationCoreService } from '../src/miki/safety/services/conversationCoreService';
 import { claimDatabaseService } from '../src/miki/memory/services/claimDatabaseService';
 import { mikiUnifiedLearningContinuumService } from '../src/miki/learning/services/mikiUnifiedLearningContinuumService';
 import { mikiReasoningTemplateService } from '../src/miki/selfAwareness/services/mikiReasoningTemplateService';
@@ -18,7 +18,7 @@ async function runVerification() {
   let state = defaultConversationState();
 
   const teachPrompt = '正解は「IndexedDBが使えない場合はメモリフォールバックを使用する」だよ';
-  const teachResult = await nonLlmCoreService.execute({
+  const teachResult = await conversationCoreService.execute({
     prompt: teachPrompt,
     conversationState: state,
   });
@@ -63,7 +63,7 @@ async function runVerification() {
   // ----------------------------------------------------
   console.log('\n--- 3. 2回目肯定・感謝による客観基準昇格テスト ---');
   const affirmPrompt = 'ありがとう！まさにその通り、助かったよ';
-  const affirmResult = await nonLlmCoreService.execute({
+  const affirmResult = await conversationCoreService.execute({
     prompt: affirmPrompt,
     conversationState: state,
   });
@@ -85,7 +85,7 @@ async function runVerification() {
   console.log('\n--- 4. 多軸比較推論 (Reasoning Template: Comparison) テスト ---');
   const compPrompt = 'ループ処理と配列一括処理を比較して';
   state = defaultConversationState();
-  const compResult = await nonLlmCoreService.execute({
+  const compResult = await conversationCoreService.execute({
     prompt: compPrompt,
     conversationState: state,
   });
@@ -108,7 +108,7 @@ async function runVerification() {
   console.log('\n--- 5. 推論後のユーザー評価観測テスト ---');
   state = compResult.nextConversationState;
   const feedbackPrompt = 'わかりやすい比較ありがとう！完璧です';
-  const feedbackResult = await nonLlmCoreService.execute({
+  const feedbackResult = await conversationCoreService.execute({
     prompt: feedbackPrompt,
     conversationState: state,
   });
@@ -126,7 +126,7 @@ async function runVerification() {
   console.log('\n--- 6. 因果連鎖推論 (Reasoning Template: Causality) テスト ---');
   const causePrompt = 'Excelでセルを1つずつ代入すると低下する原因と対策はどうして？';
   state = defaultConversationState();
-  const causeResult = await nonLlmCoreService.execute({
+  const causeResult = await conversationCoreService.execute({
     prompt: causePrompt,
     conversationState: state,
   });

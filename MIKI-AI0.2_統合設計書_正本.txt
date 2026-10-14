@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-14
-正本Revision：2026-10-14-P256
+正本Revision：2026-10-14-P257
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P256）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P257）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-14-P256
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-14-P257
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -187,7 +187,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 
 ■ 正規主要経路
 
-- 会話: UI → nonLlmCoreService.execute → hybridConversationEngineService.interpret → Claim/Memory/Unknown/Research/Strategy → AnswerContentIR → runtimeConversationCompositionService.compose → CoreResult → UI。
+- 会話（現行の単一路線）: UI → typedCoreUiGatewayService.submitConversation → coreTaskIngressService → coreOrchestratorService。回答本文は conversationCoreService.execute が生成し、typedCoreUiGatewayService.finalizeConversationResponse → P216の意味・実行整合性・文法検証 → UI/Graph OUTPUTへ確定回答を渡す。App.tsx内の未到達だった旧shadow/通常経路を削除し、現在の固定engineModeで常に使用される一つの実行経路に整理した。
 - 未知語: conversationUnknownVocabularyService.assess → CORE判定 → unknownResearchConversationBridgeService.resolveAndRespond → unifiedUnknownResolutionCoordinatorService.resolveForChat → Evidence/Research → AnswerContentIR → CORE回答。
 - 表層: AnswerContentIR → compositionalRealizationService + Skeleton/Template fallback → semantic preservation → deterministic selection。
 - Claim: claimDatabaseServiceを正規Authorityとし、User Claimは独立Evidenceなしに外部事実へ昇格させない。
@@ -196,7 +196,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 
 記載形式: [状態] Domain | ファイル | 行数 | Export/Class/Function | 呼出元数 | 依存数 | Storage/Plugin/Test/Marker。詳細な全配列、SHA-256、全呼出元・依存先はJSON正本索引を参照する。
 
-- [USED] UI | src/App.tsx | lines=4165 | symbols=App | callers=1 | deps=113 | Tests=18
+- [USED] UI | src/App.tsx | lines=2031 | symbols=App | callers=1 | deps=113 | Tests=18
 - [USED] OTHER | src/app/appRuntimeLifecycleService.ts | lines=161 | symbols=appRuntimeLifecycleService | callers=1 | deps=31 | Tests=1
 - [ORPHAN] OTHER | src/app/startupPhaseSchedulerService.ts | lines=3 | symbols=startupPhaseSchedulerService | callers=0 | deps=0 | Tests=2
 - [USED] OTHER | src/autonomous_modules/anaphora_history_stack.ts | lines=89 | symbols=AnaphoraHistoryStack, AnaphoraStackItem, anaphoraHistoryStack | callers=2 | deps=0
@@ -639,7 +639,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] safety | src/miki/safety/services/failureRecoveryService.ts | lines=75 | symbols=FailureRecoveryService, RecoveryAction, RecoveryDecision, failureRecoveryService | callers=3 | deps=5
 - [USED] safety | src/miki/safety/services/failureToleranceKernelService.ts | lines=1 | symbols= failureToleranceKernelService  | callers=1 | deps=1
 - [USED] safety | src/miki/safety/services/featureFlagsService.ts | lines=157 | symbols=DEFAULT_FEATURE_FLAGS, FEATURE_FLAG_DESCRIPTIONS, featureFlagsService | callers=4 | deps=3 | Storage=miki_system_feature_flags_v32
-- [USED] safety | src/miki/safety/services/nonLlmCoreService.ts | lines=758 | symbols=NonLlmCoreResult, NonLlmCoreService, nonLlmCoreService | callers=4 | deps=45 | Tests=3
+- [USED] safety | src/miki/safety/services/conversationCoreService.ts | lines=754 | symbols=ConversationCoreResult, ConversationCoreService, conversationCoreService | callers=4 | deps=45 | Tests=3
 - [USED] safety | src/miki/safety/services/nonLlmHardwarePipelineService.ts | lines=261 | symbols=HardwareTelemetry, NonLlmHardwarePipelineService, NonLlmPipelineExecutionResult, nonLlmHardwarePipelineService | callers=2 | deps=8 | Markers=7
 - [USED] safety | src/miki/safety/services/nonLlmRuntimePolicyService.ts | lines=51 | symbols=NonLlmRuntimeKind, NonLlmRuntimeStatus, nonLlmRuntimePolicyService | callers=2 | deps=0
 - [USED] safety | src/miki/safety/services/privacyGuardrailService.ts | lines=248 | symbols=privacyGuardrailService | callers=9 | deps=5 | Storage=miki_privacy_audit_logs_v5
@@ -1222,7 +1222,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - modelLifecycleService.ts: src/miki/promotion/services/modelLifecycleService.ts / src/services/modelLifecycleService.ts
 - nativeWorkManagerService.ts: src/miki/execution/services/nativeWorkManagerService.ts / src/services/nativeWorkManagerService.ts
 - nonLlmCodeSynthesisService.ts: src/miki/selfDevelopment/services/nonLlmCodeSynthesisService.ts / src/services/nonLlmCodeSynthesisService.ts
-- nonLlmCoreService.ts: src/miki/safety/services/nonLlmCoreService.ts / src/services/nonLlmCoreService.ts
+- conversationCoreService.ts: src/miki/safety/services/conversationCoreService.ts; separate legacy implementation remains at src/services/nonLlmCoreService.ts and is still used through src/services/nonLlmRuntimeService.ts; keep it until its runtime/embedding/synthetic-data/long-term-memory/regression callers are migrated.
 - nonLlmHardwarePipelineService.ts: src/miki/safety/services/nonLlmHardwarePipelineService.ts / src/services/nonLlmHardwarePipelineService.ts
 - operationalConformanceService.ts: src/miki/verification/services/operationalConformanceService.ts / src/services/operationalConformanceService.ts
 - operationalGovernanceService.ts: src/miki/autonomy/services/operationalGovernanceService.ts / src/services/operationalGovernanceService.ts
@@ -11549,7 +11549,7 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 【2026-10-14-P256 P216最終回答SurfaceのCORE/UI/Graph統一】
 ============================================================
 
-- 編集前HEADは`12cd5aa001086e0d2c37c35d88c10dcde479c2ce`。再帰Git treeは0 entries（0 files / 0 directories）。この数値はP256編集前の実測であり、P256後の全体インベントリ更新を意味しない。
+- 編集前HEADは`12cd5aa001086e0d2c37c35d88c10dcde479c2ce`。再帰Git treeは1927 entries（1780 files / 147 directories）。この数値はP256編集前の実測であり、P256後の全体インベントリ更新を意味しない。
 - 通常UIとCPU高速UIの双方で、CORE/P216最終化の戻り値`finalAnswer`を表示する。P216最終化を通常経路では完了判定・経験ルーティング・会話評価より前に置き、後続処理は確定後の回答文字列を入力にする。
 - P216は`reply`だけを回答Surfaceとして扱い、`tools`・`components`等のmetadataを本文にJSON文字列として混入させない。`reply`が欠落／空の場合は未確定の説明を返し、`ANSWER_SURFACE_EMPTY`を意味検証の失敗として保持する。
 - CoreTaskIngressはP216の最終回答とSemantic Preservation／Execution Consistency／Grammar判定を受け取り、同じ回答文字列をCore OrchestratorとGraph OUTPUTへ渡す。実行証拠はenvelopeそのものではなく、成功statusと非空の`evidenceIds`または`executionId`を持つ明示的`executionResult`からのみ取得する。
@@ -11559,3 +11559,15 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - Android実機、GitHub Actions、Rust/Android build、APK生成の成功はこのバッチでは未確認。P256後の再帰インベントリ件数・行数も再集計していない。
 - P256検査結果（実測終了コード、0=PASS）: cross_domain_graph_p211=127; conversation_graph_p212=0; conversation_components_p213=0; conversation_graph_p214=0; answer_pipeline_p216=127; conversation_ui_e2e_p215=127; typescript_lint=127; whitespace_diff_pre_result_record=0
 - GitHub Actions/APK ArtifactとAndroid実機の成功は、更新後の実行結果・成果物・実機証跡を別々に確認するまで未確認とする。
+
+============================================================
+【2026-10-14-P257 現行チャット単一路線化・会話中核の名称整理】
+============================================================
+
+- `handleSendMessage`では`engineMode`が`autonomous_rule`に固定されていることを実コードで確認し、常に成立する最初の分岐を単一路線として残した。分岐の`return`以降にあった未到達のshadow/通常経路を削除し、重複した応答処理を除いた。
+- 現行の会話回答サービスを`conversationCoreService`／`ConversationCoreService`／`ConversationCoreResult`へ変更し、実利用側・検証側・barrel・現行索引の参照を同期した。別実装の`src/services/nonLlmCoreService.ts`は`nonLlmRuntimeService`やembedding等の利用関係が残るため削除・統合せず別の移行対象として保持する。
+- チャット追跡メタデータを`conversationPipelineMeta`へ変更し、保存済み履歴に残る`nonLlmPipelineMeta`と旧engineラベルを読込時に移行する。画面から「非LLM」を中心にした表示を取り除き、保存済み会話の追跡内容は保持する。
+- P216検証へ単一路線・中核サービス名・追跡メタデータ名の回帰確認を追加し、ランタイム検証のChatPanelアンカーを同期した。
+- P256の編集前HEAD `12cd5aa001086e0d2c37c35d88c10dcde479c2ce`の再帰Git treeは1,927 entries（1,780 files / 147 directories、truncated=false）と再取得して確認したため、誤っていた0 entriesの履歴記載を訂正した。
+- P257静的検査結果（終了コード0=PASS）: diff_check=2; p216_syntax=0; p215_syntax=0; runtime_verifier_syntax=0; phase94_syntax=0; import_check=1; p216_answer_pipeline=1; p215_ui_graph_e2e=1; runtime_regression=0; conversation_learning_test=1; autonomous_infrastructure_test=1; typescript_static_check=127。
+- 本バッチではTermuxのWeb/Rust/Gradle buildを実行しない。GitHub Actions・APK artifact・Android実機確認はPUSH後の実測で判定し、未確認の成功を宣言しない。

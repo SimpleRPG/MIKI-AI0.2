@@ -10,7 +10,7 @@ import {
 import { systemLogger } from '../../../services/systemLogger';
 import { deterministicRuntimeService } from '../../safety/services/deterministicRuntimeService';
 import { storageService } from '../../../services/storageService';
-import { nonLlmCoreService } from '../../safety/services/nonLlmCoreService';
+import { conversationCoreService } from '../../safety/services/conversationCoreService';
 
 const DUAL_EVAL_REPORTS_KEY = 'miki_ai_dual_eval_reports';
 const FIXED_SCENARIO_RESULTS_KEY = 'miki_ai_fixed_scenario_results';
@@ -260,7 +260,7 @@ export class ConversationEvaluationService {
     const isWebReady = false;
 
     if (!isNativeReady && !isWebReady) {
-      const coreResult = await nonLlmCoreService.execute({ prompt, recentMessages: [] });
+      const coreResult = await conversationCoreService.execute({ prompt, recentMessages: [] });
       return coreResult.replyText;
     }
 
@@ -288,7 +288,7 @@ export class ConversationEvaluationService {
       }
       return fullText.trim();
     } catch (err: any) {
-      const coreResult = await nonLlmCoreService.execute({ prompt, recentMessages: [] });
+      const coreResult = await conversationCoreService.execute({ prompt, recentMessages: [] });
       return coreResult.replyText;
     }
   }
@@ -586,7 +586,7 @@ export class ConversationEvaluationService {
         id: `dyn_${Date.now()}`,
         timestamp: Date.now(),
         modelName: 'Galaxy S25 Companion Core',
-        engineType: false ? '退役生成ランタイム' : 'Non-LLM Core',
+        engineType: false ? '退役生成ランタイム' : 'deterministic Core',
         turns,
         overallScore: avgScore,
         passed,

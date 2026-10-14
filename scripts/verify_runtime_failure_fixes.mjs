@@ -297,7 +297,7 @@ check(
   'CORE 18 tracking is collapsed by default and keeps the status and detail fields',
   (() => {
     const trackingStart = chatPanel.indexOf('{/* CORE 18構成 追跡 (実データ: STEP 10) */}');
-    const trackingEnd = chatPanel.indexOf('{/* 非LLM中心・自己成長アーキテクチャ 詳細展開パネル */}', trackingStart);
+    const trackingEnd = chatPanel.indexOf('{/* 会話パイプライン 詳細展開パネル */}', trackingStart);
     const trackingBlock = trackingStart >= 0 && trackingEnd > trackingStart
       ? chatPanel.slice(trackingStart, trackingEnd)
       : '';

@@ -222,7 +222,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [workflowStatusMessage, setWorkflowStatusMessage] = useState<{ [wfId: string]: string }>({});
   const [experienceToast, setExperienceToast] = useState<{ msgId: string; text: string } | null>(null);
   const [activeMoreMenuMsgId, setActiveMoreMenuMsgId] = useState<string | null>(null);
-  const [expandedNonLlmMsgId, setExpandedNonLlmMsgId] = useState<string | null>(null);
+  const [expandedConversationPipelineMsgId, setExpandedNonLlmMsgId] = useState<string | null>(null);
   const [showToolsRow, setShowToolsRow] = useState(false);
   const [visibleMessageCount, setVisibleMessageCount] = useState(20);
 
@@ -1251,7 +1251,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     {(msg.metrics?.engine || msg.metrics?.tokensPerSec || msg.metrics?.ttftMs) && (
                       <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-2.5 py-0.5 rounded-lg text-[10px] text-slate-400 font-mono shadow-sm">
                         <span className="text-pink-400 font-bold flex items-center gap-1 font-sans">
-                          {msg.metrics?.engine && (msg.metrics.engine.includes('非LLM') || msg.metrics.engine.includes('全機')) ? (
+                          {msg.metrics?.engine && (msg.metrics.engine.includes('CORE') || msg.metrics.engine.includes('全機')) ? (
                             <>
                               <Cpu className="w-3 h-3 text-emerald-400 animate-pulse" />
                               <span className="text-emerald-300 font-bold">{msg.metrics.engine}</span>
@@ -1272,7 +1272,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           ) : (
                             <>
                               <Zap className="w-3 h-3 text-amber-400" />
-                              <span className="text-amber-300 font-bold">{msg.metrics?.engine || '非LLM自律中核'}</span>
+                              <span className="text-amber-300 font-bold">{msg.metrics?.engine || 'CORE自律中核'}</span>
                             </>
                           )}
                         </span>
@@ -1611,24 +1611,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       </button>
                     )}
 
-                    {/* 非LLM中心・自己成長アーキテクチャ追跡バッジ */}
-                    {msg.nonLlmPipelineMeta && (
+                    {/* 会話パイプライン追跡バッジ */}
+                    {msg.conversationPipelineMeta && (
                       <button
                         type="button"
-                        onClick={() => setExpandedNonLlmMsgId(expandedNonLlmMsgId === msg.id ? null : msg.id)}
+                        onClick={() => setExpandedNonLlmMsgId(expandedConversationPipelineMsgId === msg.id ? null : msg.id)}
                         className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-mono border transition-all cursor-pointer ${
-                          expandedNonLlmMsgId === msg.id
+                          expandedConversationPipelineMsgId === msg.id
                             ? 'bg-amber-900/90 border-amber-400 text-amber-100 shadow'
-                            : msg.nonLlmPipelineMeta.isDeterministicAnswer
+                            : msg.conversationPipelineMeta.isDeterministicAnswer
                             ? 'bg-amber-950/70 border-amber-500/70 text-amber-300 hover:border-amber-400'
                             : 'bg-emerald-950/60 border-emerald-700/60 text-emerald-300 hover:border-emerald-500'
                         }`}
-                        title={`【非LLM中心・自己成長アーキテクチャ追跡】\n・即時決定論的回答: ${msg.nonLlmPipelineMeta.isDeterministicAnswer ? 'YES (即座確定)' : 'NO (LLM検証支援)'}\n${msg.nonLlmPipelineMeta.matchedClaim ? `・主張DB照合: ${msg.nonLlmPipelineMeta.matchedClaim.claimId} (${msg.nonLlmPipelineMeta.matchedClaim.world}/${msg.nonLlmPipelineMeta.matchedClaim.maturity})\n` : ''}${msg.nonLlmPipelineMeta.latentGoal ? `・37章 潜在ゴール: ${msg.nonLlmPipelineMeta.latentGoal.latentGoal} (確信度: ${msg.nonLlmPipelineMeta.latentGoal.confidence}%)\n` : ''}${msg.nonLlmPipelineMeta.affection ? `・39章 親愛度力動: ${msg.nonLlmPipelineMeta.affection.detectedEmotion} (親愛度: ${msg.nonLlmPipelineMeta.affection.affectionScore}点)\n` : ''}${msg.nonLlmPipelineMeta.decisionProfile ? `・8章 統合判断: ${msg.nonLlmPipelineMeta.decisionProfile.profile} (過剰追加抑制: ${msg.nonLlmPipelineMeta.decisionProfile.suppressedExcess ? '発動' : '不要'})\n` : ''}(クリックで詳細インスペクターを開閉)`}
+                        title={`【会話パイプライン追跡】\n・即時決定論的回答: ${msg.conversationPipelineMeta.isDeterministicAnswer ? 'YES (即座確定)' : 'NO (補助処理)'}\n${msg.conversationPipelineMeta.matchedClaim ? `・主張DB照合: ${msg.conversationPipelineMeta.matchedClaim.claimId} (${msg.conversationPipelineMeta.matchedClaim.world}/${msg.conversationPipelineMeta.matchedClaim.maturity})\n` : ''}${msg.conversationPipelineMeta.latentGoal ? `・37章 潜在ゴール: ${msg.conversationPipelineMeta.latentGoal.latentGoal} (確信度: ${msg.conversationPipelineMeta.latentGoal.confidence}%)\n` : ''}${msg.conversationPipelineMeta.affection ? `・39章 親愛度力動: ${msg.conversationPipelineMeta.affection.detectedEmotion} (親愛度: ${msg.conversationPipelineMeta.affection.affectionScore}点)\n` : ''}${msg.conversationPipelineMeta.decisionProfile ? `・8章 統合判断: ${msg.conversationPipelineMeta.decisionProfile.profile} (過剰追加抑制: ${msg.conversationPipelineMeta.decisionProfile.suppressedExcess ? '発動' : '不要'})\n` : ''}(クリックで詳細インスペクターを開閉)`}
                       >
-                        <Layers className={`w-3 h-3 ${msg.nonLlmPipelineMeta.isDeterministicAnswer ? 'text-amber-400' : 'text-emerald-400'}`} />
+                        <Layers className={`w-3 h-3 ${msg.conversationPipelineMeta.isDeterministicAnswer ? 'text-amber-400' : 'text-emerald-400'}`} />
                         <span>
-                          {msg.nonLlmPipelineMeta.isDeterministicAnswer ? '⚡非LLM即答' : '非LLMパイプライン'}
-                          {msg.nonLlmPipelineMeta.matchedClaim ? ' (主張DB合致)' : ''}
+                          {msg.conversationPipelineMeta.isDeterministicAnswer ? '⚡CORE即答' : 'COREパイプライン'}
+                          {msg.conversationPipelineMeta.matchedClaim ? ' (主張DB合致)' : ''}
                         </span>
                       </button>
                     )}
@@ -2841,8 +2841,8 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                     </details>
                   )}
 
-                  {/* 非LLM中心・自己成長アーキテクチャ 詳細展開パネル */}
-                  {expandedNonLlmMsgId === msg.id && msg.nonLlmPipelineMeta && (
+                  {/* 会話パイプライン 詳細展開パネル */}
+                  {expandedConversationPipelineMsgId === msg.id && msg.conversationPipelineMeta && (
                     <div className="mt-3 p-3 bg-slate-950/95 border border-amber-500/50 rounded-xl space-y-3 text-xs shadow-lg animate-fadeIn font-mono">
                       <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                         <div className="flex items-center gap-2">
@@ -2851,17 +2851,17 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                           </span>
                           <div>
                             <div className="font-bold text-amber-300 font-sans text-[12px] flex items-center gap-2">
-                              <span>非LLM中心・自己成長アーキテクチャ追跡 (第3/6/8/9/13/37/39章)</span>
+                              <span>会話パイプライン追跡 (第3/6/8/9/13/37/39章)</span>
                               <span className={`px-2 py-0.2 rounded text-[10px] ${
-                                msg.nonLlmPipelineMeta.isDeterministicAnswer
+                                msg.conversationPipelineMeta.isDeterministicAnswer
                                   ? 'bg-amber-900/60 border border-amber-600 text-amber-200'
                                   : 'bg-emerald-900/60 border border-emerald-600 text-emerald-200'
                               }`}>
-                                {msg.nonLlmPipelineMeta.isDeterministicAnswer ? '⚡ 決定論的即答確定' : '🌿 決定論パイプライン支援'}
+                                {msg.conversationPipelineMeta.isDeterministicAnswer ? '⚡ 決定論的即答確定' : '🌿 決定論パイプライン支援'}
                               </span>
                             </div>
                             <span className="text-[10px] text-slate-400 block font-sans">
-                              {msg.nonLlmPipelineMeta.directReplyReason || '非LLM検証・主張DB・感情力動・判断エンジン統合パイプライン'}
+                              {msg.conversationPipelineMeta.directReplyReason || 'CORE検証・主張DB・感情力動・判断エンジン統合パイプライン'}
                             </span>
                           </div>
                         </div>
@@ -2883,27 +2883,27 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                               <Brain className="w-3.5 h-3.5 text-sky-400" />
                               <span>第6章 主張DB (Claim DB)</span>
                             </span>
-                            {msg.nonLlmPipelineMeta.matchedClaim ? (
+                            {msg.conversationPipelineMeta.matchedClaim ? (
                               <span className="px-1.5 py-0.2 rounded bg-sky-900/60 text-sky-200 text-[9px]">
-                                {msg.nonLlmPipelineMeta.matchedClaim.world}
+                                {msg.conversationPipelineMeta.matchedClaim.world}
                               </span>
                             ) : (
                               <span className="text-slate-500 text-[9.5px]">未照合</span>
                             )}
                           </div>
-                          {msg.nonLlmPipelineMeta.matchedClaim ? (
+                          {msg.conversationPipelineMeta.matchedClaim ? (
                             <div className="space-y-1 text-[10.5px]">
                               <div className="text-slate-200 font-sans font-medium">
-                                「{msg.nonLlmPipelineMeta.matchedClaim.statement}」
+                                「{msg.conversationPipelineMeta.matchedClaim.statement}」
                               </div>
                               <div className="text-[9.5px] text-slate-400 flex flex-wrap gap-2">
-                                <span>ID: <code className="text-sky-300">{msg.nonLlmPipelineMeta.matchedClaim.claimId}</code></span>
-                                <span>成熟度: <code className="text-emerald-300">{msg.nonLlmPipelineMeta.matchedClaim.maturity}</code></span>
-                                <span>確信度: <code className="text-amber-300">{msg.nonLlmPipelineMeta.matchedClaim.confidence}</code></span>
+                                <span>ID: <code className="text-sky-300">{msg.conversationPipelineMeta.matchedClaim.claimId}</code></span>
+                                <span>成熟度: <code className="text-emerald-300">{msg.conversationPipelineMeta.matchedClaim.maturity}</code></span>
+                                <span>確信度: <code className="text-amber-300">{msg.conversationPipelineMeta.matchedClaim.confidence}</code></span>
                               </div>
-                              {msg.nonLlmPipelineMeta.scopeNotes && msg.nonLlmPipelineMeta.scopeNotes.length > 0 && (
+                              {msg.conversationPipelineMeta.scopeNotes && msg.conversationPipelineMeta.scopeNotes.length > 0 && (
                                 <div className="text-[9px] text-slate-400 pt-0.5">
-                                  適用前提: {msg.nonLlmPipelineMeta.scopeNotes.join(', ')}
+                                  適用前提: {msg.conversationPipelineMeta.scopeNotes.join(', ')}
                                 </div>
                               )}
                             </div>
@@ -2921,22 +2921,22 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                               <Compass className="w-3.5 h-3.5 text-amber-400" />
                               <span>第37章 潜在意図マイニング</span>
                             </span>
-                            {msg.nonLlmPipelineMeta.latentGoal && (
+                            {msg.conversationPipelineMeta.latentGoal && (
                               <span className="px-1.5 py-0.2 rounded bg-amber-900/60 text-amber-200 text-[9px]">
-                                確信度 {msg.nonLlmPipelineMeta.latentGoal.confidence}%
+                                確信度 {msg.conversationPipelineMeta.latentGoal.confidence}%
                               </span>
                             )}
                           </div>
-                          {msg.nonLlmPipelineMeta.latentGoal ? (
+                          {msg.conversationPipelineMeta.latentGoal ? (
                             <div className="space-y-1 text-[10.5px]">
                               <div className="text-slate-400 text-[10px]">
-                                表層: <span className="text-slate-300">{msg.nonLlmPipelineMeta.latentGoal.surfaceIntent}</span>
+                                表層: <span className="text-slate-300">{msg.conversationPipelineMeta.latentGoal.surfaceIntent}</span>
                               </div>
                               <div className="text-amber-200 font-sans font-medium text-[11px]">
-                                🎯 真の潜在ゴール: {msg.nonLlmPipelineMeta.latentGoal.latentGoal}
+                                🎯 真の潜在ゴール: {msg.conversationPipelineMeta.latentGoal.latentGoal}
                               </div>
                               <div className="text-[9.5px] text-slate-400">
-                                緊急度区分: <span className="text-amber-300">{msg.nonLlmPipelineMeta.latentGoal.urgency}</span>
+                                緊急度区分: <span className="text-amber-300">{msg.conversationPipelineMeta.latentGoal.urgency}</span>
                               </div>
                             </div>
                           ) : (
@@ -2951,19 +2951,19 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                               <Heart className="w-3.5 h-3.5 text-pink-400" />
                               <span>第39章 感情共感力動・親愛度連続継承</span>
                             </span>
-                            {msg.nonLlmPipelineMeta.affection && (
+                            {msg.conversationPipelineMeta.affection && (
                               <span className="px-1.5 py-0.2 rounded bg-pink-900/60 text-pink-200 text-[9px]">
-                                親愛度 {msg.nonLlmPipelineMeta.affection.affectionScore}点
+                                親愛度 {msg.conversationPipelineMeta.affection.affectionScore}点
                               </span>
                             )}
                           </div>
-                          {msg.nonLlmPipelineMeta.affection ? (
+                          {msg.conversationPipelineMeta.affection ? (
                             <div className="space-y-1 text-[10.5px]">
                               <div className="text-slate-300">
-                                検出対話感情: <span className="text-pink-300 font-bold">{msg.nonLlmPipelineMeta.affection.detectedEmotion}</span>
+                                検出対話感情: <span className="text-pink-300 font-bold">{msg.conversationPipelineMeta.affection.detectedEmotion}</span>
                               </div>
                               <div className="text-slate-400 text-[10px]">
-                                推奨応答トーン: <span className="text-slate-200">{msg.nonLlmPipelineMeta.affection.recommendedTone}</span>
+                                推奨応答トーン: <span className="text-slate-200">{msg.conversationPipelineMeta.affection.recommendedTone}</span>
                               </div>
                             </div>
                           ) : (
@@ -2978,24 +2978,24 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                               <span>第8章 統合判断 & 削減知能</span>
                             </span>
-                            {msg.nonLlmPipelineMeta.decisionProfile && (
+                            {msg.conversationPipelineMeta.decisionProfile && (
                               <span className="px-1.5 py-0.2 rounded bg-emerald-900/60 text-emerald-200 text-[9px]">
-                                適合スコア {msg.nonLlmPipelineMeta.decisionProfile.score}点
+                                適合スコア {msg.conversationPipelineMeta.decisionProfile.score}点
                               </span>
                             )}
                           </div>
-                          {msg.nonLlmPipelineMeta.decisionProfile ? (
+                          {msg.conversationPipelineMeta.decisionProfile ? (
                             <div className="space-y-1 text-[10.5px]">
                               <div className="text-slate-300">
-                                状況プロファイル: <code className="text-emerald-300">{msg.nonLlmPipelineMeta.decisionProfile.profile}</code>
+                                状況プロファイル: <code className="text-emerald-300">{msg.conversationPipelineMeta.decisionProfile.profile}</code>
                               </div>
                               <div className="text-slate-400 text-[10px]">
-                                選択アクション: <code className="text-sky-300">{msg.nonLlmPipelineMeta.decisionProfile.chosenAction}</code>
+                                選択アクション: <code className="text-sky-300">{msg.conversationPipelineMeta.decisionProfile.chosenAction}</code>
                               </div>
                               <div className="text-[9.5px] text-slate-400">
                                 過剰追加抑制 (削減知能):{' '}
-                                <span className={msg.nonLlmPipelineMeta.decisionProfile.suppressedExcess ? 'text-amber-300 font-bold' : 'text-emerald-300'}>
-                                  {msg.nonLlmPipelineMeta.decisionProfile.suppressedExcess ? '⚠️ 発動 (不必要な複雑性を除外)' : '✅ 正常 (適正スコープ)'}
+                                <span className={msg.conversationPipelineMeta.decisionProfile.suppressedExcess ? 'text-amber-300 font-bold' : 'text-emerald-300'}>
+                                  {msg.conversationPipelineMeta.decisionProfile.suppressedExcess ? '⚠️ 発動 (不必要な複雑性を除外)' : '✅ 正常 (適正スコープ)'}
                                 </span>
                               </div>
                             </div>
@@ -3006,21 +3006,21 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                       </div>
 
                       {/* 付帯メタ情報: 意味保持検査 & 第9章部品合成 */}
-                      {(msg.nonLlmPipelineMeta.meaningPreservationPassed !== undefined || (msg.nonLlmPipelineMeta.synthesizedComponents && msg.nonLlmPipelineMeta.synthesizedComponents.length > 0)) && (
+                      {(msg.conversationPipelineMeta.meaningPreservationPassed !== undefined || (msg.conversationPipelineMeta.synthesizedComponents && msg.conversationPipelineMeta.synthesizedComponents.length > 0)) && (
                         <div className="p-2 bg-black/40 rounded-lg border border-slate-800 text-[10px] flex flex-wrap items-center justify-between gap-2 text-slate-300 font-sans">
-                          {msg.nonLlmPipelineMeta.meaningPreservationPassed !== undefined && (
+                          {msg.conversationPipelineMeta.meaningPreservationPassed !== undefined && (
                             <div className="flex items-center gap-1.5">
                               <span className="text-slate-400">13.4節 意味保持検査:</span>
-                              <span className={msg.nonLlmPipelineMeta.meaningPreservationPassed ? 'text-emerald-300 font-bold' : 'text-rose-300'}>
-                                {msg.nonLlmPipelineMeta.meaningPreservationPassed ? '✅ 命題の意味・制約が完全保持されています' : '⚠️ 変質検知'}
+                              <span className={msg.conversationPipelineMeta.meaningPreservationPassed ? 'text-emerald-300 font-bold' : 'text-rose-300'}>
+                                {msg.conversationPipelineMeta.meaningPreservationPassed ? '✅ 命題の意味・制約が完全保持されています' : '⚠️ 変質検知'}
                               </span>
                             </div>
                           )}
-                          {msg.nonLlmPipelineMeta.synthesizedComponents && msg.nonLlmPipelineMeta.synthesizedComponents.length > 0 && (
+                          {msg.conversationPipelineMeta.synthesizedComponents && msg.conversationPipelineMeta.synthesizedComponents.length > 0 && (
                             <div className="flex items-center gap-1.5 font-mono">
                               <span className="text-slate-400 font-sans">9章 決定論的合成部品:</span>
                               <span className="text-indigo-300">
-                                [{msg.nonLlmPipelineMeta.synthesizedComponents.join(', ')}]
+                                [{msg.conversationPipelineMeta.synthesizedComponents.join(', ')}]
                               </span>
                             </div>
                           )}

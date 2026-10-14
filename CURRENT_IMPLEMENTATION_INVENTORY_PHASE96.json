@@ -140,8 +140,8 @@
     {
       "name": "Central deterministic chat execution",
       "owner": "CORE",
-      "implementation": "src/miki/safety/services/nonLlmCoreService.ts",
-      "entry": "nonLlmCoreService.execute",
+      "implementation": "src/miki/safety/services/conversationCoreService.ts",
+      "entry": "conversationCoreService.execute",
       "status": "USED",
       "notes": "Normal UI/runtime callers use this central executor."
     },

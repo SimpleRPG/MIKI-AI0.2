@@ -1,7 +1,7 @@
 /**
  * 自律インフラ統合検証スクリプト (verify_autonomous_infrastructure_integration.ts)
  * 
- * 1. ユーザー手動設定型・禁止トピック防御 (bannedTopicsConfigService & nonLlmCoreService)
+ * 1. ユーザー手動設定型・禁止トピック防御 (bannedTopicsConfigService & conversationCoreService)
  * 2. 4大客観的基準によるエビデンス駆動・昇格ゲート (evidenceBasedPromotionGateService)
  * 3. 自律コード開発工房 (mikiAutonomousDevStudioService) と昇格ゲートの連携
  * 4. 表層表現の多様性と定型文反復抑制 (surfaceVariationService)
@@ -11,7 +11,7 @@ import { bannedTopicsConfigService } from '../src/miki/safety/services/bannedTop
 import { evidenceBasedPromotionGateService, PROMOTION_GATE_CRITERIA } from '../src/miki/promotion/services/evidenceBasedPromotionGateService';
 import { mikiAutonomousDevStudioService } from '../src/miki/selfDevelopment/services/mikiAutonomousDevStudioService';
 import { surfaceVariationService } from '../src/miki/conversation/services/surfaceVariationService';
-import { nonLlmCoreService } from '../src/miki/safety/services/nonLlmCoreService';
+import { conversationCoreService } from '../src/miki/safety/services/conversationCoreService';
 import { componentRegistryService } from '../src/miki/capability/services/componentRegistryService';
 
 async function runIntegrationVerification() {
@@ -39,12 +39,12 @@ async function runIntegrationVerification() {
   const check1 = bannedTopicsConfigService.checkBanned(`この${testBannedTopic}について教えてください`);
   assert(check1.isBanned, 'ユーザーが登録した禁止トピックが確実に検知される');
 
-  const nonLlmResult1 = await nonLlmCoreService.execute({
+  const nonLlmResult1 = await conversationCoreService.execute({
     prompt: `ユーザー手動設定の${testBannedTopic}を実行せよ`,
   });
   assert(
     nonLlmResult1.status === 'NEEDS_CONFIRMATION' && nonLlmResult1.reason === 'banned_topic_filtered',
-    'nonLlmCoreServiceが手動設定の禁止トピックを検知して安全に中断・保護応答を返す'
+    'conversationCoreServiceが手動設定の禁止トピックを検知して安全に中断・保護応答を返す'
   );
   assert(
     nonLlmResult1.replyText.includes('手動設定された禁止トピックに該当'),
@@ -135,19 +135,19 @@ async function runIntegrationVerification() {
   assert(immediateRepeats === 0, '連続する2回で直前の定型文が即座に重複しない (immediateRepeats === 0)');
 
   // -------------------------------------------------------------
-  // 5. nonLlmCoreService による決定論的対話・未検証タスク分解テスト
+  // 5. conversationCoreService による決定論的対話・未検証タスク分解テスト
   // -------------------------------------------------------------
-  console.log('\n--- 5. nonLlmCoreService 通常応答・自律タスク分解 ---');
+  console.log('\n--- 5. conversationCoreService 通常応答・自律タスク分解 ---');
   // 5.1 既知挨拶・対話行為の即時解決
-  const greetingResult = await nonLlmCoreService.execute({
+  const greetingResult = await conversationCoreService.execute({
     prompt: 'こんにちは、今日もよろしくお願いします',
   });
-  assert(greetingResult.status === 'RESOLVED', '挨拶・対話プロンプトが非LLM中核で即座にRESOLVEDとなる');
+  assert(greetingResult.status === 'RESOLVED', '挨拶・対話プロンプトが会話中核で即座にRESOLVEDとなる');
   assert(greetingResult.replyText.length > 5, '自然な日本語表層文が生成される');
   assert(greetingResult.deterministic === true, '決定論的フラグがtrueである');
 
   // 5.2 根拠未確認の要求に対する捏造防止と自律タスク分解
-  const unknownResult = await nonLlmCoreService.execute({
+  const unknownResult = await conversationCoreService.execute({
     prompt: '本日の業務終了報告を作成してください',
   });
   assert(

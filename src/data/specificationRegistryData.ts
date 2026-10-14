@@ -19,7 +19,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
       "安全フォールバック"
     ],
     "responsibleServices": [
-      "nonLlmCoreService.ts",
+      "conversationCoreService.ts",
       "storageService.ts"
     ],
     "responsibleComponents": [
