@@ -1205,15 +1205,6 @@ export default function App() {
           }
         }
 
-        const cpuEvaluation = needsToolPass
-          ? completionJudgeService.evaluateCompletion({
-              userGoal: text,
-              assistantResponse: pipelineRes.replyText,
-              executionSteps: systemLogger.getCurrentSessionSteps(),
-              executedTools: cpuExecutedTools,
-            })
-          : { status: 'COMPLETED' as const };
-
         const fastMeta: NonLlmPipelineMeta = {
           isDeterministicAnswer: true,
           directReplyReason: '非LLM高速経路',
@@ -1230,15 +1221,25 @@ export default function App() {
           ? `${pipelineRes.replyText}\n\n${cpuExecutedTools.map((t) => t.outputSummary).join('\n')}`
           : pipelineRes.replyText;
 
-        typedCoreUiGatewayService.finalizeConversationResponse(coreTask.task.taskId, {
+        const coreFinalization = typedCoreUiGatewayService.finalizeConversationResponse(coreTask.task.taskId, {
           reply: finalContent,
           tools: cpuExecutedTools,
           components: pipelineRes.usedComponents,
         });
+        const visibleFinalContent = coreFinalization?.finalAnswer ?? '回答を確定できませんでした。COREの最終化結果を確認してください。';
+
+        const cpuEvaluation = needsToolPass
+          ? completionJudgeService.evaluateCompletion({
+              userGoal: text,
+              assistantResponse: visibleFinalContent,
+              executionSteps: systemLogger.getCurrentSessionSteps(),
+              executedTools: cpuExecutedTools,
+            })
+          : { status: 'COMPLETED' as const };
 
         setMessages((prev) => prev.map((msg) => msg.id === fastAssistantId ? {
           ...msg,
-          content: finalContent,
+          content: visibleFinalContent,
           isStreaming: false,
           executionSteps: systemLogger.getCurrentSessionSteps(),
           nonLlmPipelineMeta: fastMeta,
@@ -1248,7 +1249,7 @@ export default function App() {
         systemLogger.step(10, 10, '⚡ 非LLM高速経路完了', {
           totalElapsedMs: pipelineRes.telemetry.totalMs,
           completionStatus: cpuEvaluation.status,
-          responseLength: finalContent.length,
+          responseLength: visibleFinalContent.length,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -2944,6 +2945,32 @@ export default function App() {
       const personaRestored = proactiveContextOsService.verifyAndRestorePersona(finalVisibleText);
       finalVisibleText = personaRestored.restoredText;
 
+      // 設計思想 Master v5.0 第9章1節: 1.5B/3Bドラフト検証パイプライン (有効時)
+      let draftVerificationData: DraftVerificationResult | undefined = undefined;
+      if (draftVerificationService.getConfig().enabled) {
+        try {
+          const savedExt = storageService.getItem('miki_external_llm_config');
+          const extCfg = savedExt ? JSON.parse(savedExt) : undefined;
+          draftVerificationData = await draftVerificationService.verifyDraftWith3B(
+            text,
+            finalVisibleText,
+            extCfg
+          );
+          if (draftVerificationData.verifiedText) {
+            finalVisibleText = draftVerificationData.verifiedText;
+          }
+        } catch (verErr) {
+          console.warn('Draft verification error:', verErr);
+        }
+      }
+
+      const coreFinalization = typedCoreUiGatewayService.finalizeConversationResponse(coreTask.task.taskId, {
+        reply: finalVisibleText,
+        tokens: tokenCount,
+        elapsedMs: totalElapsedMs,
+      });
+      finalVisibleText = coreFinalization?.finalAnswer ?? '回答を確定できませんでした。COREの最終化結果を確認してください。';
+
       // 文書48章: 完成条件と完了判定器による評価 (Checklist evaluation)
       const streamEvaluation = completionJudgeService.evaluateCompletion({
         userGoal: text,
@@ -3178,25 +3205,6 @@ export default function App() {
         minimalScopeService.updateItemStatus('code_8_natural_flow_explanation', 'VERIFIED_ACTIVE');
       }
 
-      // 設計思想 Master v5.0 第9章1節: 1.5B/3Bドラフト検証パイプライン (有効時)
-      let draftVerificationData: DraftVerificationResult | undefined = undefined;
-      if (draftVerificationService.getConfig().enabled) {
-        try {
-          const savedExt = storageService.getItem('miki_external_llm_config');
-          const extCfg = savedExt ? JSON.parse(savedExt) : undefined;
-          draftVerificationData = await draftVerificationService.verifyDraftWith3B(
-            text,
-            finalVisibleText,
-            extCfg
-          );
-          if (draftVerificationData.verifiedText) {
-            finalVisibleText = draftVerificationData.verifiedText;
-          }
-        } catch (verErr) {
-          console.warn('Draft verification error:', verErr);
-        }
-      }
-
       // 設計思想 Master v5.0 第13章: 自律型Web検索＆能動学習結果の抽出
       const searchTool = executedTools.find((t) => t.toolId === 'tool_web_search');
       let autonomousSearchData: AutonomousSearchMessageMeta | undefined = undefined;
@@ -3262,12 +3270,6 @@ export default function App() {
             : msg
         )
       );
-
-      typedCoreUiGatewayService.finalizeConversationResponse(coreTask.task.taskId, {
-        reply: finalVisibleText,
-        tokens: tokenCount,
-        elapsedMs: totalElapsedMs,
-      });
 
       systemLogger.info(
         'CHAT',

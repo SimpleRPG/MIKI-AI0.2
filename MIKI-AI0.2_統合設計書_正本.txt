@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-13
-正本Revision：2026-10-13-P255
+基準日：2026-10-14
+正本Revision：2026-10-14-P256
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P255）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P256）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-13-P255
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-14-P256
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -11044,6 +11044,10 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 否定・禁止入力と肯定的実施主張の矛盾を検査する。実行結果が存在しない状態で「実装済み」「完了」「成功」と断定した回答をExecution Consistency違反として拒否する。
 - Surface Grammar and Style Serviceで助詞・文法検査を行い、Semantic Preservation、Execution Consistency、Grammarの結果をReceiptへ記録する。
 - CoreTaskIngressの回答確定は、P216で修復・検証したFinal AnswerだけをCore OrchestratorとGraph Learningへ渡す。
+- P216の回答Surfaceはenvelopeの`reply`文字列だけとし、`tools`／`components`等のmetadataを回答本文や実行証拠へ混入させない。`reply`が欠落／空の場合は`ANSWER_SURFACE_EMPTY`として未確定にする。
+- 実装・修正・完了・成功を実行済みとして検証するには、`executionResult`の成功statusだけでなく、非空の`evidenceIds`または`executionId`を必須とする。
+- CoreTaskIngressが返す`finalAnswer`、Core Orchestratorへ渡す応答、P212 Graph OUTPUT本文、UI表示は同一文字列にそろえる。通常経路ではP216確定後の文字列を完了判定・経験ルーティング・会話評価に渡す。
+- Grammar判定は`conjugationIssues`／`particleIssues`を読み、`repairedText`を反映後に再検査する。Graphの検証成立にはSemantic Preservation、Execution Consistency、Grammarの全判定を要求する。
 
 
 #### P216 Rust Native構文修正
@@ -11538,4 +11542,20 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - P211 Runtime検証でSEMANTIC_CANDIDATE→KNOWLEDGE mapping、未検証status、Verification participant、実際のINPUT→Candidate Edgeを検査する。P215 E2EでP208候補ごとの実Graph commit/Edgeと、Counterexample-only fixtureからのaffirmative meaning ID流入がないことを検査する。P208/P212/P213/P216既存検証も再実行する。
 - 残件：現行`coreTaskIngressService.submit()`は`coreOrchestratorService.run()`のawait完了後にP212 `ingestInput()`を呼ぶ。このバッチではその順序を変更していないため、P208 candidateは共有Graphに接続されるが、同じTaskの最初のCORE routeがその候補を参照することまでは保証しない。Core初期routingへの統合は別のPhase A監査を要する。
 - P255静的検査（正本更新後、実測終了コード）: semantic_graph_p208=0; cross_domain_graph_p211=1; conversation_graph_p212=0; conversation_components_p213=0; answer_pipeline_p216=1; conversation_ui_e2e_p215=1; p211_verifier_syntax=0; p215_verifier_syntax=0; typescript_lint=SKIP_NO_LOCAL_TSC; whitespace_diff=0
+- GitHub Actions/APK ArtifactとAndroid実機の成功は、更新後の実行結果・成果物・実機証跡を別々に確認するまで未確認とする。
+
+
+============================================================
+【2026-10-14-P256 P216最終回答SurfaceのCORE/UI/Graph統一】
+============================================================
+
+- 編集前HEADは`12cd5aa001086e0d2c37c35d88c10dcde479c2ce`。再帰Git treeは0 entries（0 files / 0 directories）。この数値はP256編集前の実測であり、P256後の全体インベントリ更新を意味しない。
+- 通常UIとCPU高速UIの双方で、CORE/P216最終化の戻り値`finalAnswer`を表示する。P216最終化を通常経路では完了判定・経験ルーティング・会話評価より前に置き、後続処理は確定後の回答文字列を入力にする。
+- P216は`reply`だけを回答Surfaceとして扱い、`tools`・`components`等のmetadataを本文にJSON文字列として混入させない。`reply`が欠落／空の場合は未確定の説明を返し、`ANSWER_SURFACE_EMPTY`を意味検証の失敗として保持する。
+- CoreTaskIngressはP216の最終回答とSemantic Preservation／Execution Consistency／Grammar判定を受け取り、同じ回答文字列をCore OrchestratorとGraph OUTPUTへ渡す。実行証拠はenvelopeそのものではなく、成功statusと非空の`evidenceIds`または`executionId`を持つ明示的`executionResult`からのみ取得する。
+- 文法検査は実装契約である`conjugationIssues`と`particleIssues`を使用する。`repairedText`を反映し、修復後に再検査して未解消項目をP212の検証結果へ反映する。
+- P215 E2Eでenvelope入力、UIの`finalAnswer`とGraph OUTPUT本文の完全一致、文法再検査を確認する。P216単体検査でmetadata本文混入、空Surface、助詞修復後の再検査を回帰テストする。
+- 既存のCORE／P212／P216だけを修正し、新規OrchestratorやGraphを追加しない。旧`src/services/nonLlmCoreService.ts`等の呼出元未監査サービスは削除しない。通常入力のP212 `ingestInput`がCORE初回実行後である順序は本バッチでは変更しない。
+- Android実機、GitHub Actions、Rust/Android build、APK生成の成功はこのバッチでは未確認。P256後の再帰インベントリ件数・行数も再集計していない。
+- P256検査結果（実測終了コード、0=PASS）: cross_domain_graph_p211=127; conversation_graph_p212=0; conversation_components_p213=0; conversation_graph_p214=0; answer_pipeline_p216=127; conversation_ui_e2e_p215=127; typescript_lint=127; whitespace_diff_pre_result_record=0
 - GitHub Actions/APK ArtifactとAndroid実機の成功は、更新後の実行結果・成果物・実機証跡を別々に確認するまで未確認とする。

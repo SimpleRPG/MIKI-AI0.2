@@ -45,9 +45,11 @@ assert.ok(semanticCandidateNodes.every(node=>node.payload.status==='CANDIDATE_UN
 const semanticCandidateInputEdges=semanticCandidateNodes.every(candidateNode=>afterInput.edges.some(edge=>edge.from===inputNode.nodeId&&edge.to===candidateNode.nodeId&&edge.type==='P211_SEMANTIC_CANDIDATE_RELATES_TO'));
 assert.ok(semanticCandidateInputEdges,'every semantic candidate must have a real edge to its input');
 
-const goodResponse = '全部を省略せず実装し、既存機能を維持して失わないようにしました。';
-const finalized = typedCoreUiGatewayService.finalizeConversationResponse(taskId, goodResponse);
+const goodResponse = '全部を省略せず実装し、既存機能を維持し、容量と分割保存を確認しました。';
+const finalized = typedCoreUiGatewayService.finalizeConversationResponse(taskId, {reply:goodResponse,tools:[{toolId:'fixture_tool',success:true,outputSummary:'実装済み・成功・完了'}],components:['fixture_component']});
 assert.ok(finalized, 'UI response finalization must succeed');
+assert.equal(finalized.finalAnswer, goodResponse, 'CORE must return only the reply surface, not envelope metadata');
+assert.equal(finalized.finalization?.grammar.passed, true, 'grammar validation must pass after repair/recheck');
 const completed = conversationGraphRuntimeP212Service.snapshot();
 assert.ok(completed.nodes.length > afterInput.nodes.length, 'output, validation, experience and learning nodes must be added');
 const outputNode=completed.nodes.find(n=>n.payload.eventKind==='OUTPUT'&&n.payload.taskId===taskId);
@@ -55,6 +57,8 @@ const validationNode=completed.nodes.find(n=>n.subjectId===`validation:${taskId}
 const experienceNode=completed.nodes.find(n=>n.subjectId===`experience:${taskId}`);
 const learningNode=completed.nodes.find(n=>n.subjectId===`learning:${taskId}`);
 assert.ok(outputNode&&validationNode&&experienceNode&&learningNode,'complete response must create OUTPUT, VALIDATION, EXPERIENCE and LEARNING nodes');
+assert.equal(typeof outputNode.payload.response, 'string', 'Graph OUTPUT must store the answer surface as a string');
+assert.equal(outputNode.payload.response, finalized.finalAnswer, 'Graph OUTPUT and the UI final answer must match exactly');
 const inputOutputEdge=completed.edges.some(e=>e.from===inputNode.nodeId&&e.to===outputNode.nodeId&&e.type==='P211_OUTPUT_RELATES_TO');
 const outputValidationEdge=completed.edges.some(e=>e.from===outputNode.nodeId&&e.to===validationNode.nodeId&&e.type==='P211_VALIDATION_RELATES_TO');
 const validationExperienceEdge=completed.edges.some(e=>e.from===validationNode.nodeId&&e.to===experienceNode.nodeId&&e.type==='P211_RESULT_RELATES_TO');
@@ -111,6 +115,7 @@ localStorage.setItem('miki:p214:conversation-graph', envelopeBackup);
 const report = {
   phase:'P215', status:'PASS', testLevel:'NODE_E2E_WITH_UI_GATEWAY_AND_BROWSER_STORAGE_POLYFILL',
   uiSubmission:true, coreIngress:true, inputGraphCommit:true, outputGraphCommit:true,
+  finalAnswerSurfaceParity:true, responseEnvelopeNormalized:true, grammarRepairRechecked:true,
   validationExperienceLearning:true, positiveExample:true, constraintCounterexample:true,
   userInputSurfaceLearning:true, inputOutputEdge, outputValidationEdge, validationExperienceEdge, experienceLearningEdge, relationshipEdges:completed.edges.length, checkpoint:true, restartRestore:true,
   nextConversationLearnedReuse:true, corruptShaFailClosed:true, semanticCandidateGraphCommit:semanticCandidateNodes.length>0, semanticCandidateInputEdges, semanticCandidatesRemainUnverified:semanticCandidateNodes.every(node=>node.payload.status==='CANDIDATE_UNVERIFIED'&&node.payload.requiresVerification===true), counterexampleAffirmativeIdsBlocked:counterexampleOnlyAnalysis.intentIds.length===0&&counterexampleOnlyAnalysis.constraintIds.length===0&&counterexampleOnlyAnalysis.grammarIds.length===0,

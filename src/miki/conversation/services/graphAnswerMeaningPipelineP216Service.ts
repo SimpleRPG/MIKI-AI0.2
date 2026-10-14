@@ -6,6 +6,24 @@ export interface P216MeaningPart { partId:string; kind:'CONCLUSION'|'ACTION'|'CO
 export interface P216AnswerPlan { planId:string; skeleton:'DIRECT_RESULT'|'IMPLEMENTATION_REPORT'|'RESEARCH_REPORT'|'CLARIFICATION'; parts:P216MeaningPart[]; intentIds:string[]; constraintIds:string[]; graphComponentIds:string[]; planSha256:string }
 export interface P216FinalAnswer { text:string; plan:P216AnswerPlan; semanticPreservation:{passed:boolean;missingMeaningIds:string[];contradictions:string[]};executionConsistency:{passed:boolean;unsupportedClaims:string[]};grammar:{passed:boolean;issues:string[]};repaired:boolean;receiptSha256:string }
 
+function normalizeAnswerSurface(candidate: unknown): string {
+  if (typeof candidate === 'string') return candidate;
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return '';
+  const reply = (candidate as Record<string, unknown>).reply;
+  return typeof reply === 'string' ? reply : '';
+}
+
+function hasExecutionEvidence(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const status = typeof record.status === 'string' ? record.status.toUpperCase() : '';
+  const hasEvidenceIds = Array.isArray(record.evidenceIds) && record.evidenceIds.some(
+    (id) => typeof id === 'string' && id.trim().length > 0
+  );
+  const hasExecutionId = typeof record.executionId === 'string' && record.executionId.trim().length > 0;
+  return ['PASS', 'SUCCESS', 'COMPLETED'].includes(status) && (hasEvidenceIds || hasExecutionId);
+}
+
 class GraphAnswerMeaningPipelineP216Service {
  plan(requirements:P216AnswerRequirements):P216AnswerPlan {
   const parts:P216MeaningPart[]=[];
@@ -27,30 +45,43 @@ class GraphAnswerMeaningPipelineP216Service {
   return{...core,planSha256:canonicalSha256Object(core)};
  }
  finalize(candidate:unknown,requirements:P216AnswerRequirements):P216FinalAnswer {
-  const plan=this.plan(requirements);let text=typeof candidate==='string'?candidate:JSON.stringify(candidate);
-  const before=text;const requiredTokens:Record<string,RegExp>={
+  const plan=this.plan(requirements);
+  const before=normalizeAnswerSurface(candidate);
+  const surfaceMissing=!before.trim();
+  let text=surfaceMissing?'回答本文が空のため、内容を確定できませんでした。':before;
+  const requiredTokens:Record<string,RegExp>={
    'intent.implement':/実装|反映|更新/u,'intent.research':/調査|確認|根拠/u,
    'constraint.preserve':/維持|保持|失わ|削除しない/u,'constraint.no-omission':/全部|全て|すべて|省略しない/u,'constraint.capacity':/容量|サイズ|常駐|分割/u
   };
   const requiredIds=[...plan.intentIds,...plan.constraintIds];
   let missing=requiredIds.filter(id=>requiredTokens[id]&&!requiredTokens[id].test(text));
   const prefix:string[]=[];
-  if(missing.includes('intent.implement'))prefix.push('必要な実装を反映しました。');
-  if(missing.includes('intent.research'))prefix.push('必要な調査と確認を行いました。');
-  if(missing.includes('constraint.preserve'))prefix.push('既存機能と学習済み資産は維持しています。');
-  if(missing.includes('constraint.no-omission'))prefix.push('指定範囲は省略せず全て対象にしています。');
-  if(missing.includes('constraint.capacity'))prefix.push('容量増加を抑え、分割保存と常駐量に配慮しています。');
-  if(prefix.length)text=`${prefix.join('\n')}\n${text}`.trim();
+  if(missing.includes('intent.implement'))prefix.push('実装対象と変更点を先に明示します。');
+  if(missing.includes('intent.research'))prefix.push('調査対象と確認根拠を先に明示します。');
+  if(missing.includes('constraint.preserve'))prefix.push('既存機能と学習済み資産の維持条件を明示します。');
+  if(missing.includes('constraint.no-omission'))prefix.push('指定範囲を全て省略せず確認する対象を明示します。');
+  if(missing.includes('constraint.capacity'))prefix.push('容量・分割保存・常駐量の検証条件を明示します。');
+  if(prefix.length&&!surfaceMissing)text=`${prefix.join('\n')}\n${text}`.trim();
   missing=requiredIds.filter(id=>requiredTokens[id]&&!requiredTokens[id].test(text));
   const contradictions:string[]=[];
   if(/しない|禁止|使うな/u.test(requirements.inputSurface)&&/使用しました|導入しました/u.test(text))contradictions.push('NEGATION_OR_PROHIBITION_CONTRADICTION');
   const unsupportedClaims:string[]=[];
-  if(/実装済み|完了|成功/u.test(text)&&requirements.executionResult===undefined)unsupportedClaims.push('COMPLETION_WITHOUT_EXECUTION_RESULT');
+  const completionClaim=/(?:実装済み|実装しました|実装完了|実装完了しました|実装が完了しました|修正済み|修正しました|更新済み|更新しました|反映済み|反映しました|導入済み|導入しました|作業が完了しました|作業は完了しました|処理が成功しました|処理は成功しました|成功しました)/u;
+  if(completionClaim.test(text)&&!hasExecutionEvidence(requirements.executionResult)){
+   unsupportedClaims.push('COMPLETION_WITHOUT_EXECUTION_RESULT');
+   const remaining=text.split(/(?<=[。！？!?])\s*/u).filter(sentence=>!completionClaim.test(sentence)).join('').trim();
+   text=[remaining,'実行・検証の証拠がないため、完了したとは確認できません。'].filter(Boolean).join('\n\n');
+  }
   const grammarInspection=surfaceGrammarAndStyleService.validateGrammarAndParticles(text);
-  const grammarIssues=(grammarInspection as unknown as {issues?:unknown[];warnings?:unknown[]}).issues??(grammarInspection as unknown as {warnings?:unknown[]}).warnings??[];
+  const grammarIssues=[...grammarInspection.conjugationIssues,...grammarInspection.particleIssues];
+  text=grammarInspection.repairedText;
+  const grammarRecheck=surfaceGrammarAndStyleService.validateGrammarAndParticles(text);
+  const remainingGrammarIssues=[...grammarRecheck.conjugationIssues,...grammarRecheck.particleIssues];
+  missing=requiredIds.filter(id=>requiredTokens[id]&&!requiredTokens[id].test(text));
+  if(surfaceMissing)missing.push('ANSWER_SURFACE_EMPTY');
   const semantic={passed:missing.length===0&&contradictions.length===0,missingMeaningIds:missing,contradictions};
   const execution={passed:unsupportedClaims.length===0,unsupportedClaims};
-  const grammar={passed:grammarIssues.length===0,issues:grammarIssues.map(String)};
+  const grammar={passed:remainingGrammarIssues.length===0,issues:[...new Set([...grammarIssues,...remainingGrammarIssues])].map(String)};
   const core={text,plan,semanticPreservation:semantic,executionConsistency:execution,grammar,repaired:text!==before};
   return{...core,receiptSha256:canonicalSha256Object(core)};
  }
