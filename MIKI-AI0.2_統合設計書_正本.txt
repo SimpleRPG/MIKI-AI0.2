@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-16
-正本Revision：2026-10-16-P263
+正本Revision：2026-10-16-P264
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-16-P263
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更したが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-16-P264
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加したが、全tree再帰インベントリは再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -136,7 +136,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - ローカルLLMを通常経路の必要条件としない。
 - Governed memory検索順位はスコープ適合・根拠リンク・confidenceを維持し、取得頻度・時間減衰・成功／失敗の結果フィードバックを控えめなACT-R型活性化として加える。COREの統一認知状態で参照したMEM IDに、タスク結果を一度だけ記録する。
 - EvidenceQualityGateはEvidence IDの存在や異なるDomainだけでは合格させない。研究経路は登録済み・ADMISSIBLE・Claim連結済み根拠を要求し、同じClaim IDに連結された研究根拠が異なるindependence clusterを2つ以上持つ場合に独立確認とする。COUNTEREVIDENCEは肯定側根拠として数えない。実行経路は同じTaskに結び付いた検証済みBUSINESS実行証跡を要求する。Observed RESULT欠落・未解決ERRORは不合格。これは根拠登録・Claim連結・独立性・実行線形性の判定であり、根拠が主張を意味的に含意すること自体の完全証明とは扱わない。
-- SOAR型のimpasse回復は、合格を阻む理由ごとのサブゴール計画を親Blackboardに記録し、既存のRequiredAssetAcquisitionとwait/retry経路へ接続する。独立した子Taskやprocedural chunkingを実装済みとは扱わない。
+- SOAR型のimpasse回復は、親Taskごとに原因別の安定IDを持つrecovery subgoalを親Blackboardへスナップショット付きappend-onlyイベントで記録し、同じ阻害要因の再試行では同一subgoalを更新する。阻害要因が消えた場合またはQuality Gateが通過した場合はRESOLVED、最大試行回数で終了した場合はFAILEDを記録する。RequiredAssetAcquisition／wait-retryを再利用し、独立した子Task作成や完全なprocedural chunkingは未実装として扱う。
 - Evidence、Claim、Verification、Learning、Memory、Promotionを分離する。
 - 未実行の検査、未実行のWeb検索、未実行のNative、未実行の実機確認をPASSまたはDEVICE_VERIFIEDと記載しない。
 
@@ -371,7 +371,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/services/adaptiveRoutePlannerService.ts | lines=3015 | symbols=CoreGoalCandidate, GoalConflictDecision, ImprovementReadiness, PlannedRoute, adaptiveRoutePlannerService | callers=2 | deps=14 | Tests=2
 - [USED] CORE | src/miki/core/services/autonomousCandidatePreparationService.ts | lines=149 | symbols=AutonomousImplementationPlan, CandidateDraft, TargetResolution, autonomousCandidatePreparationService | callers=3 | deps=4
 - [USED] CORE | src/miki/core/services/autonomousIssueDiscoveryService.ts | lines=119 | symbols=DiscoveredIssue, DiscoveredIssueKind, DiscoveryConfig, DiscoveryScanMode, DiscoveryScanResult | callers=5 | deps=12 | Storage=miki_autonomous_issue_discovery_config_v1,miki_autonomous_issue_discovery_v1
-- [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts | lines=674 | symbols=AutonomousImprovementRequest, AutonomousLoopState, AutonomousLoopStatus, autonomousSelfImprovementLoopService | callers=7 | deps=11 | Storage=miki_autonomous_self_improvement_loop_v1,miki_autonomous_self_improvement_loop_v2
+- [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts | lines=863 | symbols=AutonomousImprovementRequest, AutonomousLoopState, AutonomousLoopStatus, autonomousSelfImprovementLoopService | callers=7 | deps=11 | Storage=miki_autonomous_self_improvement_loop_v1,miki_autonomous_self_improvement_loop_v2
 - [USED] CORE | src/miki/core/services/blackboardRecoveryService.ts | lines=6 | symbols=RecoverySummary, blackboardRecoveryService | callers=2 | deps=1
 - [USED] CORE | src/miki/core/services/candidateAutoRebaseService.ts | lines=14 | symbols=CandidateRebaseResult, RebaseConflict, RebaseFileInput, RebaseFileResult, candidateAutoRebaseService | callers=2 | deps=1 | Tests=2
 - [USED] CORE | src/miki/core/services/candidateCodeGenerationService.ts | lines=1588 | symbols=CandidateGenerationFile, CandidateGenerationOutcome, candidateCodeGenerationService | callers=2 | deps=27 | Tests=5
@@ -11634,3 +11634,13 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - COREの通常Task・再開Task・会話確定を含む共通terminal returnで、COMPLETEはSUCCESS、FAILEDはFAILUREとして統一Memory ID集合へfeedbackする。自律改善Loop側に重複するfeedback処理を残さない。Task ID＋結果による既存重複防止を共通に使う。
 - ACT-R統計の保存集約は選択された記憶件数ではなく検索呼出数で数える。大きな検索結果セットを取得するたびに全統計を保存し直す挙動を避け、既存の16回／60秒の集約条件を有効にする。
 - ソース索引は変更した6ファイルの実測行数のみ更新。完全再帰インベントリは再集計していない。Termuxではテスト・lint・build・事前契約検査を実行せず、PUSH後のGitHub ActionsをChatGPTが再確認する。
+
+============================================================
+【2026-10-16-P264 SOARリカバリサブゴールの同一性・終了状態管理】
+============================================================
+
+- 最新GitHub main `d7edccb132f77dc6ef9615e95e6af0ae7b4e754a`の正本、CORE自律改善Loop、TaskBlackboard、EvidenceQualityGate、RequiredAssetAcquisition、既存Skills／Unified Learning、Runtime検証ScriptおよびAPK Workflowを照合した。SOARのimpasse回復記録は存在する一方、試行ごとのID重複とWAITING_FOR_EVIDENCEからの終了遷移が不足していた。
+- Recovery subgoal IDを親Task＋正規化した阻害理由で安定化し、再試行時は同じsubgoalの試行・根拠を更新する。消滅した阻害要因はRESOLVED、Quality Gateを通過した親Taskの未解決subgoalはRESOLVED、最大試行回数で打ち切る場合はFAILEDとして、親Blackboardへイベントスナップショットを追記する。
+- 既存のTaskBlackboard、RequiredAssetAcquisition、wait/retry、Skills／Unified Learningを再利用し、第二CORE、第二Blackboard、独立した子Task、完全なprocedural chunkingは新設しない。要求Domainは記録された回復計画として扱い、新しい独立ルーティングを実装したとは宣言しない。
+- `verify_runtime_failure_fixes.mjs`へ安定ID・終了状態の契約検査を追加し、autonomousSelfImprovementLoopService.tsの実測行数を正本索引へ反映した。完全再帰実装インベントリは再生成していない。
+- Termuxで事前lint／テスト／buildを行わない。PUSH後にChatGPTがGitHub main、Actions結果、APK Artifactおよび今回の差分を監査する。CIや実機動作は実測するまで成功扱いしない。

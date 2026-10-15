@@ -38,6 +38,25 @@ export interface AutonomousImprovementRequest {
   waitReason?: string;
 }
 
+type RecoverySubgoalStatus = 'WAITING_FOR_EVIDENCE' | 'RESOLVED' | 'FAILED';
+
+interface RecoverySubgoalRecord {
+  subgoalId: string;
+  parentTaskId: string;
+  kind: 'SOAR_IMPASSE_RECOVERY';
+  goal: string;
+  reason: string;
+  requiredDomains: string[];
+  evidenceIds: string[];
+  attempt: number;
+  status: RecoverySubgoalStatus;
+  createdAt: number;
+  updatedAt: number;
+  resolvedAt?: number;
+  failedAt?: number;
+  terminalReason?: string;
+}
+
 export interface AutonomousLoopState {
   status: AutonomousLoopStatus;
   queue: AutonomousImprovementRequest[];
@@ -357,37 +376,48 @@ class AutonomousSelfImprovementLoopService {
         });
         const evidenceGateRequired = hasBusinessResult;
         if (workflow.task.status === 'COMPLETED' && (!evidenceGateRequired || quality.passed)) {
+          this.finishRecoverySubgoals(
+            workflow.task.taskId,
+            'RESOLVED',
+            evidenceGateRequired ? 'EVIDENCE_QUALITY_GATE_PASSED' : 'PARENT_TASK_COMPLETED_GATE_NOT_REQUIRED',
+            quality.evidenceIds,
+          );
           this.completeCurrent('IMPROVEMENT_CYCLE_COMPLETED');
           continue;
         }
         if (evidenceGateRequired && !quality.passed) {
-          const domainsForReason=(reason:string):string[]=>{
-            const r=reason.toUpperCase();
-            if(r.includes('INDEPENDENT_EVIDENCE_CONFIRMATION_MISSING'))return ['research','verification'];
-            if(r.includes('EVIDENCE_ID_MISSING')||r.includes('EVIDENCE_REFERENCE_UNRESOLVED')||r.includes('EVIDENCE_NOT_ADMISSIBLE'))return ['research','unknown','verification'];
-            if(r.includes('OBSERVED_RESULT_MISSING')||r.includes('UNRESOLVED_ERROR_PRESENT'))return ['verification','core'];
-            return ['research','verification'];
+          const domainsForReason = (reason: string): string[] => {
+            const normalized = reason.toUpperCase();
+            if (normalized.includes('INDEPENDENT_EVIDENCE_CONFIRMATION_MISSING')) return ['research', 'verification'];
+            if (normalized.includes('EVIDENCE_ID_MISSING') || normalized.includes('EVIDENCE_REFERENCE_UNRESOLVED') || normalized.includes('EVIDENCE_NOT_ADMISSIBLE')) return ['research', 'unknown', 'verification'];
+            if (normalized.includes('OBSERVED_RESULT_MISSING') || normalized.includes('UNRESOLVED_ERROR_PRESENT')) return ['verification', 'core'];
+            return ['research', 'verification'];
           };
-          const recoverySubgoals=quality.reasons.map((reason:string,index:number)=>({
-            subgoalId:`${workflow.task.taskId}:impasse:${request.attempts}:${index+1}`,
-            parentTaskId:workflow.task.taskId,
-            kind:'SOAR_IMPASSE_RECOVERY',
-            goal:`Resolve CORE evidence-quality blocker: ${reason}`,
-            reason,
-            requiredDomains:domainsForReason(reason),
-            evidenceIds:quality.evidenceIds,
-            attempt:request.attempts,
-            status:'WAITING_FOR_EVIDENCE',
-            createdAt:Date.now()
-          }));
-          const requestedDomains=[...new Set(recoverySubgoals.flatMap(item=>item.requiredDomains))];
+          const recoverySubgoals = this.upsertRecoverySubgoals(
+            workflow.task.taskId,
+            quality.reasons,
+            quality.evidenceIds,
+            request.attempts,
+            domainsForReason,
+          );
+          const activeRecoverySubgoals = recoverySubgoals.filter(item => item.status === 'WAITING_FOR_EVIDENCE');
+          const requestedDomains = [...new Set(activeRecoverySubgoals.flatMap(item => item.requiredDomains))];
           taskBlackboardService.append(
             workflow.task.taskId,
             'DECISION',
             'core',
             'evidence-recovery-required',
-            {kind:'SOAR_IMPASSE_RECOVERY',parentTaskId:workflow.task.taskId,reasons:quality.reasons,requestedDomains,subgoals:recoverySubgoals,nextStep:'REQUIRED_ASSET_ACQUISITION_THEN_WAIT'},
-            quality.evidenceIds
+            {
+              kind: 'SOAR_IMPASSE_RECOVERY',
+              parentTaskId: workflow.task.taskId,
+              reasons: quality.reasons,
+              requestedDomains,
+              activeSubgoalIds: activeRecoverySubgoals.map(item => item.subgoalId),
+              subgoals: recoverySubgoals,
+              nextStep: 'REQUIRED_ASSET_ACQUISITION_THEN_WAIT',
+              updatedAt: Date.now(),
+            },
+            quality.evidenceIds,
           );
           await this.acquireThenWaitForEvidence(request, quality.reasons.join(','));
           continue;
@@ -507,6 +537,162 @@ class AutonomousSelfImprovementLoopService {
     this.save();
   }
 
+  private readRecoverySubgoals(taskId: string): RecoverySubgoalRecord[] {
+    const task = taskBlackboardService.get(taskId);
+    if (!task) return [];
+
+    const latestById = new Map<string, RecoverySubgoalRecord>();
+    const lifecycleEventKeys = new Set([
+      'evidence-recovery-required',
+      'evidence-recovery-resolved',
+      'evidence-recovery-failed',
+    ]);
+
+    for (const entry of task.entries) {
+      if (entry.kind !== 'DECISION' || !lifecycleEventKeys.has(entry.key)) continue;
+      if (!entry.value || typeof entry.value !== 'object' || Array.isArray(entry.value)) continue;
+      const rawSubgoals = (entry.value as Record<string, unknown>).subgoals;
+      if (!Array.isArray(rawSubgoals)) continue;
+
+      for (const raw of rawSubgoals) {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+        const item = raw as Record<string, unknown>;
+        const subgoalId = item.subgoalId;
+        const reason = item.reason;
+        const status = item.status;
+        if (typeof subgoalId !== 'string' || typeof reason !== 'string') continue;
+        if (status !== 'WAITING_FOR_EVIDENCE' && status !== 'RESOLVED' && status !== 'FAILED') continue;
+
+        const requiredDomains = Array.isArray(item.requiredDomains)
+          ? item.requiredDomains.filter((value): value is string => typeof value === 'string')
+          : [];
+        const evidenceIds = Array.isArray(item.evidenceIds)
+          ? item.evidenceIds.filter((value): value is string => typeof value === 'string')
+          : [];
+        const createdAt = typeof item.createdAt === 'number' && Number.isFinite(item.createdAt)
+          ? item.createdAt
+          : entry.createdAt;
+        const updatedAt = typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt)
+          ? item.updatedAt
+          : createdAt;
+
+        const record: RecoverySubgoalRecord = {
+          subgoalId,
+          parentTaskId: typeof item.parentTaskId === 'string' ? item.parentTaskId : taskId,
+          kind: 'SOAR_IMPASSE_RECOVERY',
+          goal: typeof item.goal === 'string' ? item.goal : `Resolve CORE evidence-quality blocker: ${reason}`,
+          reason,
+          requiredDomains: [...new Set(requiredDomains)],
+          evidenceIds: [...new Set(evidenceIds)],
+          attempt: typeof item.attempt === 'number' && Number.isFinite(item.attempt) ? item.attempt : 0,
+          status,
+          createdAt,
+          updatedAt,
+          resolvedAt: typeof item.resolvedAt === 'number' && Number.isFinite(item.resolvedAt) ? item.resolvedAt : undefined,
+          failedAt: typeof item.failedAt === 'number' && Number.isFinite(item.failedAt) ? item.failedAt : undefined,
+          terminalReason: typeof item.terminalReason === 'string' ? item.terminalReason : undefined,
+        };
+        latestById.set(record.subgoalId, record);
+      }
+    }
+
+    return [...latestById.values()].sort((a, b) => a.createdAt - b.createdAt || a.subgoalId.localeCompare(b.subgoalId));
+  }
+
+  private upsertRecoverySubgoals(
+    taskId: string,
+    reasons: string[],
+    evidenceIds: string[],
+    attempt: number,
+    domainsForReason: (reason: string) => string[],
+  ): RecoverySubgoalRecord[] {
+    const now = Date.now();
+    const activeReasons = [...new Set(reasons.map(reason => reason.trim()).filter(Boolean))];
+    const activeReasonSet = new Set(activeReasons);
+    const byId = new Map<string, RecoverySubgoalRecord>();
+    for (const subgoal of this.readRecoverySubgoals(taskId)) byId.set(subgoal.subgoalId, subgoal);
+
+    for (const [subgoalId, subgoal] of byId.entries()) {
+      if (subgoal.status === 'WAITING_FOR_EVIDENCE' && !activeReasonSet.has(subgoal.reason)) {
+        byId.set(subgoalId, {
+          ...subgoal,
+          status: 'RESOLVED',
+          updatedAt: now,
+          resolvedAt: now,
+          failedAt: undefined,
+          terminalReason: 'BLOCKER_NO_LONGER_REPORTED',
+        });
+      }
+    }
+
+    for (const reason of activeReasons) {
+      const subgoalId = `${taskId}:impasse:${encodeURIComponent(reason)}`;
+      const previous = byId.get(subgoalId);
+      const next: RecoverySubgoalRecord = {
+        ...(previous || {}),
+        subgoalId,
+        parentTaskId: taskId,
+        kind: 'SOAR_IMPASSE_RECOVERY',
+        goal: `Resolve CORE evidence-quality blocker: ${reason}`,
+        reason,
+        requiredDomains: [...new Set(domainsForReason(reason))],
+        evidenceIds: [...new Set([...(previous?.evidenceIds || []), ...evidenceIds])],
+        attempt,
+        status: 'WAITING_FOR_EVIDENCE',
+        createdAt: previous?.createdAt ?? now,
+        updatedAt: now,
+        resolvedAt: undefined,
+        failedAt: undefined,
+        terminalReason: undefined,
+      };
+      byId.set(subgoalId, next);
+    }
+
+    return [...byId.values()].sort((a, b) => a.createdAt - b.createdAt || a.subgoalId.localeCompare(b.subgoalId));
+  }
+
+  private finishRecoverySubgoals(
+    taskId: string,
+    status: 'RESOLVED' | 'FAILED',
+    terminalReason: string,
+    evidenceIds: string[] = [],
+  ): void {
+    const current = this.readRecoverySubgoals(taskId);
+    const pending = current.filter(subgoal => subgoal.status === 'WAITING_FOR_EVIDENCE');
+    if (pending.length === 0) return;
+
+    const now = Date.now();
+    const subgoals = current.map(subgoal => {
+      if (subgoal.status !== 'WAITING_FOR_EVIDENCE') return subgoal;
+      const terminal: RecoverySubgoalRecord = {
+        ...subgoal,
+        status,
+        updatedAt: now,
+        evidenceIds: [...new Set([...subgoal.evidenceIds, ...evidenceIds])],
+        terminalReason,
+      };
+      if (status === 'RESOLVED') return { ...terminal, resolvedAt: now, failedAt: undefined };
+      return { ...terminal, failedAt: now, resolvedAt: undefined };
+    });
+    const key = status === 'RESOLVED' ? 'evidence-recovery-resolved' : 'evidence-recovery-failed';
+    taskBlackboardService.append(
+      taskId,
+      'DECISION',
+      'core',
+      key,
+      {
+        kind: 'SOAR_IMPASSE_RECOVERY',
+        parentTaskId: taskId,
+        status,
+        terminalReason,
+        terminalSubgoalIds: pending.map(subgoal => subgoal.subgoalId),
+        subgoals,
+        recordedAt: now,
+      },
+      [...new Set([...subgoals.flatMap(subgoal => subgoal.evidenceIds), ...evidenceIds])],
+    );
+  }
+
   private async acquireThenWaitForEvidence(request: AutonomousImprovementRequest, reason: string): Promise<void> {
     const acquired = await requiredAssetAcquisitionService.acquire({
       runId: request.runId,
@@ -615,6 +801,9 @@ class AutonomousSelfImprovementLoopService {
 
   private failOrRetry(request: AutonomousImprovementRequest, reason: string): void {
     if (request.attempts >= MAX_ATTEMPTS) {
+      if (request.taskId) {
+        this.finishRecoverySubgoals(request.taskId, 'FAILED', reason);
+      }
       this.state.queue.shift();
       this.state.status = 'FAILED';
       this.state.lastReason = `${reason}:MAX_ATTEMPTS`;

@@ -225,6 +225,18 @@ check(
 );
 
 check(
+  'SOAR recovery subgoals keep stable blocker identities and terminal lifecycle states',
+  autonomousLoop.includes('private readRecoverySubgoals(taskId: string): RecoverySubgoalRecord[]') &&
+    autonomousLoop.includes('private upsertRecoverySubgoals(') &&
+    autonomousLoop.includes('private finishRecoverySubgoals(') &&
+    autonomousLoop.includes('const subgoalId = `${taskId}:impasse:${encodeURIComponent(reason)}`;') &&
+    autonomousLoop.includes("const key = status === 'RESOLVED' ? 'evidence-recovery-resolved' : 'evidence-recovery-failed';") &&
+    autonomousLoop.includes("type RecoverySubgoalStatus = 'WAITING_FOR_EVIDENCE' | 'RESOLVED' | 'FAILED';") &&
+    autonomousLoop.includes("this.finishRecoverySubgoals(\n            workflow.task.taskId,") &&
+    autonomousLoop.includes("this.finishRecoverySubgoals(request.taskId, 'FAILED', reason);")
+);
+
+check(
   'Recovery index row declarations precede the index-count assertion in this verifier',
   (() => {
     const indexRowsRegionStart = verifierSource.lastIndexOf('const appIndexRow =');
