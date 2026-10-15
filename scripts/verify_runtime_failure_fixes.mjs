@@ -49,6 +49,9 @@ const requiredAssetAcquisition = read('src/miki/core/services/requiredAssetAcqui
 const missingAssetSynthesis = read('src/miki/core/services/missingAssetSynthesisService.ts');
 const autonomousRevalidationLoop = read('src/miki/autonomy/services/autonomousRevalidationLoopService.ts');
 const domainIntegrationBootstrap = read('src/miki/core/services/domainIntegrationBootstrapService.ts');
+const taskCaseMemory = read('src/miki/memory/services/taskCaseMemoryService.ts');
+const candidatePreparation = read('src/miki/core/services/autonomousCandidatePreparationService.ts');
+const failureUnderstanding = read('src/miki/memory/services/failureUnderstandingService.ts');
 
 check('Canonical Runner exposes decideCoreGoals', runner.includes('fun decideCoreGoals(call: PluginCall)'));
 check('Canonical Runner exposes rankDomainRoutes', runner.includes('fun rankDomainRoutes(call: PluginCall)'));
@@ -667,10 +670,37 @@ check(
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
 check(
-  'Canonical design records the P265 autonomous Knowledge Gap path',
-  design.includes('正本Revision：2026-10-16-P265') &&
-    design.includes('現行Revision: 2026-10-16-P265') &&
-    design.includes('2026-10-16-P265 一般Knowledge GapのCORE自律調査経路')
+  'Canonical design retains P265 and records the P266 autonomous improvement loop',
+  design.includes('2026-10-16-P265 一般Knowledge GapのCORE自律調査経路') &&
+    design.includes('正本Revision：2026-10-16-P266') &&
+    design.includes('現行Revision: 2026-10-16-P266') &&
+    design.includes('2026-10-16-P266 自律改善の閉ループと反省記憶接続')
+);
+
+
+check(
+  'Autonomous Issue Discovery reconciles terminal Task outcomes with bounded retries',
+  issueDiscovery.includes('private reconcileQueuedIssues():void') &&
+    issueDiscovery.includes('private releaseForRetry(issue:DiscoveredIssue,outcome:string):void') &&
+    issueDiscovery.includes('if(attempts>=3)') &&
+    issueDiscovery.includes('nextRetryAt') &&
+    issueDiscovery.includes('private isSourceResolved(issue:DiscoveredIssue):boolean') &&
+    issueDiscovery.includes('TASK_CANCELLED_NOT_AUTO_RETRIED')
+);
+check(
+  'Relevant failed Task Cases flow into the autonomous implementation plan as diagnostic context',
+  taskCaseMemory.includes('findRelevantFailures(goal:string, environment?:string, limit=3)') &&
+    issueDiscovery.includes('priorFailureCases') &&
+    candidatePreparation.includes('run.payload.priorFailureCases') &&
+    candidatePreparation.includes('過去の観測失敗（一般則ではなく要再検証）')
+);
+check(
+  'FailureUnderstanding persists Knowledge Gaps without bypassing CORE through direct research or promotion',
+  failureUnderstanding.includes('knowledgeGapService.detect') &&
+    failureUnderstanding.includes('AutonomousRevalidationLoop') &&
+    !failureUnderstanding.includes('researchService.researchGap(') &&
+    !failureUnderstanding.includes('verifiedKnowledgePromotionService.promote(') &&
+    !failureUnderstanding.includes('researchToRemediationService.process(')
 );
 
 const failures = checks.filter(item => !item.passed);

@@ -2,6 +2,7 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { executionEventBusService } from '../../execution/services/executionEventBusService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
+import { taskCaseMemoryService } from '../../memory/services/taskCaseMemoryService';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { taskBlackboardService } from './taskBlackboardService';
 import { crossDomainCirculationService } from './crossDomainCirculationService';
@@ -12,7 +13,28 @@ import { improvementDebtService } from './improvementDebtService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 
 export type DiscoveredIssueKind='EXECUTION_FAILURE'|'KNOWLEDGE_GAP'|'CAPABILITY_GAP'|'STALLED_TASK'|'DOMAIN_DISCONNECTED'|'CLAIM_CONTRADICTION'|'IMPROVEMENT_DEBT';
-export interface DiscoveredIssue { id:string; fingerprint:string; changeSetId?:ChangeSetID; requirementContractId?:string; kind:DiscoveredIssueKind; title:string; detail:string; sourceId:string; priority:number; discoveredAt:number; lastSeenAt:number; occurrences:number; queuedAt?:number; resolvedAt?:number; }
+export interface DiscoveredIssue {
+ id:string;
+ fingerprint:string;
+ changeSetId?:ChangeSetID;
+ requirementContractId?:string;
+ improvementRunId?:string;
+ taskId?:string;
+ kind:DiscoveredIssueKind;
+ title:string;
+ detail:string;
+ sourceId:string;
+ priority:number;
+ discoveredAt:number;
+ lastSeenAt:number;
+ occurrences:number;
+ queuedAt?:number;
+ resolvedAt?:number;
+ retryCount?:number;
+ nextRetryAt?:number;
+ exhausted?:boolean;
+ lastOutcome?:string;
+}
 export interface DiscoveryConfig { enabled:boolean; intervalMinutes:number; maxIssuesPerScan:number; minimumPriority:number; }
 export type DiscoveryScanMode='AUTONOMOUS'|'DIAGNOSTIC';
 export interface DiscoveryScanResult { scannedAt:number; mode:DiscoveryScanMode; discovered:number; queued:number; skipped:number; issues:DiscoveredIssue[]; }
@@ -31,6 +53,7 @@ class AutonomousIssueDiscoveryService{
  async scan(mode:DiscoveryScanMode='AUTONOMOUS'):Promise<DiscoveryScanResult>{
   if(this.scanning)return {scannedAt:Date.now(),mode,discovered:0,queued:0,skipped:0,issues:[]};this.scanning=true;
   try{
+   this.reconcileQueuedIssues();
    const before=this.issues.size;
    for(const event of executionEventBusService.list('execution.failed').slice(0,50))this.upsert('EXECUTION_FAILURE',event.event_id,`実行失敗: ${event.component_id}`,`${event.test_case_id} / ${event.error_message||event.output_summary||event.type}`,90);
    for(const gap of knowledgeGapService.listOpen(50))this.upsert('KNOWLEDGE_GAP',gap.id,`知識不足: ${gap.query}`,gap.reason||gap.query,70);
@@ -44,8 +67,19 @@ class AutonomousIssueDiscoveryService{
 
    let queued=0;
    if(mode==='AUTONOMOUS'){
-    const candidates=this.list(200).filter(item=>!item.resolvedAt&&!item.queuedAt&&item.priority>=this.config.minimumPriority&&this.isActionableIssue(item)).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);
+    const candidates=this.list(200).filter(item=>this.isActionableIssue(item)&&!item.resolvedAt&&!item.queuedAt&&!item.exhausted&&(!item.nextRetryAt||item.nextRetryAt<=Date.now())&&item.priority>=this.config.minimumPriority).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);
     for(const issue of candidates){
+     const priorFailureCases=taskCaseMemoryService.findRelevantFailures(
+      `${issue.title} ${issue.detail}`,undefined,3
+     ).map(record=>({
+      caseId:record.case_id,
+      goal:record.goal.slice(0,160),
+      environment:record.environment,
+      componentIds:record.component_ids.slice(0,3),
+      implementationHashes:Object.entries(record.implementation_hashes).slice(0,3),
+      errorMessage:String(record.error_message||'').slice(0,240),
+      updatedAt:record.updated_at
+     }));
      const queuedRun=await improvementIntakeRouterService.receive({
       runType:'AUTONOMOUS_DISCOVERY',
       sourceId:issue.id,
@@ -55,11 +89,16 @@ class AutonomousIssueDiscoveryService{
        issueId:issue.id,
        issueKind:issue.kind,
        detail:issue.detail,
-       fingerprint:issue.fingerprint
+       fingerprint:issue.fingerprint,
+       priorFailureCases
       }
      });
      issue.changeSetId=queuedRun.changeSetId;
+     issue.improvementRunId=queuedRun.runId;
+     issue.taskId=queuedRun.taskId;
      issue.queuedAt=Date.now();
+     issue.nextRetryAt=undefined;
+     issue.lastOutcome='QUEUED';
      this.issues.set(issue.fingerprint,issue);
      queued+=1;
     }
@@ -77,6 +116,141 @@ class AutonomousIssueDiscoveryService{
    };
   }finally{this.scanning=false;}
  }
+
+ private reconcileQueuedIssues():void{
+  const now=Date.now();
+  const runs=improvementIntakeRouterService.list(500);
+  for(const issue of this.issues.values()){
+   const queuedAt=issue.queuedAt;
+   if(!queuedAt)continue;
+
+   let run=issue.improvementRunId
+    ? improvementIntakeRouterService.get(issue.improvementRunId)
+    : undefined;
+   if(!run){
+    run=runs.find(item=>
+     item.runType==='AUTONOMOUS_DISCOVERY'&&
+     (item.sourceId===issue.id||String(item.payload.issueId||'')===issue.id)
+    );
+   }
+
+   if(!run){
+    if(now-queuedAt>=30*60*1000){
+     this.releaseForRetry(issue,'INTAKE_RUN_MISSING');
+    }
+    continue;
+   }
+
+   issue.improvementRunId=run.runId;
+   issue.taskId=run.taskId||issue.taskId;
+   const task=issue.taskId?taskBlackboardService.get(issue.taskId):undefined;
+   const terminalTask=Boolean(task&&
+    ['COMPLETED','FAILED','CANCELLED'].includes(task.status)
+   );
+
+   if(this.isSourceResolved(issue)&&terminalTask){
+    if(task?.status==='COMPLETED'){
+     improvementIntakeRouterService.update(run.runId,{status:'COMPLETED'});
+    }else if(run.status!=='COMPLETED'&&run.status!=='REJECTED'){
+     improvementIntakeRouterService.reject(run.runId);
+    }
+    issue.resolvedAt=now;
+    issue.queuedAt=undefined;
+    issue.improvementRunId=undefined;
+    issue.taskId=undefined;
+    issue.nextRetryAt=undefined;
+    issue.exhausted=false;
+    issue.lastOutcome='SOURCE_RESOLVED_AFTER_TERMINAL_TASK';
+    this.issues.set(issue.fingerprint,issue);
+    continue;
+   }
+
+   if(task?.status==='CANCELLED'){
+    if(run.status!=='COMPLETED'&&run.status!=='REJECTED'){
+     improvementIntakeRouterService.reject(run.runId);
+    }
+    issue.queuedAt=undefined;
+    issue.improvementRunId=undefined;
+    issue.taskId=undefined;
+    issue.nextRetryAt=undefined;
+    issue.exhausted=true;
+    issue.lastOutcome='TASK_CANCELLED_NOT_AUTO_RETRIED';
+    this.issues.set(issue.fingerprint,issue);
+    continue;
+   }
+
+   if(run.status==='REJECTED'||task?.status==='FAILED'){
+    if(run.status!=='COMPLETED'&&run.status!=='REJECTED'){
+     improvementIntakeRouterService.reject(run.runId);
+    }
+    this.releaseForRetry(
+     issue,
+     task?.status==='FAILED'?'TASK_FAILED':'INTAKE_REJECTED'
+    );
+    continue;
+   }
+
+   if(task?.status==='COMPLETED'||run.status==='COMPLETED'){
+    if(run.status!=='COMPLETED'&&run.status!=='REJECTED'){
+     improvementIntakeRouterService.reject(run.runId);
+    }
+    this.releaseForRetry(issue,'TASK_COMPLETED_SOURCE_STILL_OPEN');
+    continue;
+   }
+
+   if(!task&&now-queuedAt>=6*60*60*1000){
+    if(run.status!=='COMPLETED'&&run.status!=='REJECTED'){
+     improvementIntakeRouterService.reject(run.runId);
+    }
+    this.releaseForRetry(issue,'TASK_RECORD_MISSING');
+    continue;
+   }
+
+   this.issues.set(issue.fingerprint,issue);
+  }
+ }
+
+ private releaseForRetry(issue:DiscoveredIssue,outcome:string):void{
+  const attempts=(issue.retryCount||0)+1;
+  issue.retryCount=attempts;
+  issue.queuedAt=undefined;
+  issue.improvementRunId=undefined;
+  issue.taskId=undefined;
+  issue.lastOutcome=outcome;
+
+  if(attempts>=3){
+   issue.exhausted=true;
+   issue.nextRetryAt=undefined;
+  }else{
+   issue.exhausted=false;
+   issue.nextRetryAt=Date.now()+
+    Math.min(24*60*60*1000,15*60*1000*(2**(attempts-1)));
+  }
+
+  this.issues.set(issue.fingerprint,issue);
+ }
+
+ private isSourceResolved(issue:DiscoveredIssue):boolean{
+  switch(issue.kind){
+   case 'KNOWLEDGE_GAP':
+    return knowledgeGapService.getById(issue.sourceId)?.status==='RESOLVED';
+   case 'CAPABILITY_GAP':
+    return capabilityGapService.getAllGaps().some(
+     gap=>gap.gap_id===issue.sourceId&&gap.status==='RESOLVED'
+    );
+   case 'STALLED_TASK':{
+    const task=taskBlackboardService.get(issue.sourceId);
+    return !task||!this.isStallCandidate(task.status,task.pausedReason);
+   }
+   case 'DOMAIN_DISCONNECTED':
+    return !crossDomainCirculationService.getDisconnectedDomains().includes(issue.sourceId);
+   case 'IMPROVEMENT_DEBT':
+    return !improvementDebtService.listOpen().some(debt=>debt.debtId===issue.sourceId);
+   default:
+    return false;
+  }
+ }
+
  private isStallCandidate(status:string,pausedReason?:string):boolean{
   if(status==='FAILED'||status==='WAITING')return true;
   if(status!=='PAUSED')return false;
@@ -109,7 +283,35 @@ class AutonomousIssueDiscoveryService{
   }
   return text||'作業タスク';
  }
- private upsert(kind:DiscoveredIssueKind,sourceId:string,title:string,detail:string,priority:number):DiscoveredIssue{const fingerprint=this.fingerprint(`${kind}|${sourceId}|${title}`);const now=Date.now();const old=this.issues.get(fingerprint);const directedPriority=selfImprovementDirectionService.score(kind,title,detail,priority);const issue:DiscoveredIssue={id:old?.id||`ISSUE-${fingerprint.slice(4)}`,fingerprint,changeSetId:old?.changeSetId,requirementContractId:old?.requirementContractId,kind,title,detail,sourceId,priority:Math.max(directedPriority,old?.priority||0),discoveredAt:old?.discoveredAt||now,lastSeenAt:now,occurrences:(old?.occurrences||0)+1,queuedAt:old?.queuedAt,resolvedAt:old?.resolvedAt};this.issues.set(fingerprint,issue);return {...issue};}
+ private upsert(kind:DiscoveredIssueKind,sourceId:string,title:string,detail:string,priority:number):DiscoveredIssue{
+  const fingerprint=this.fingerprint(`${kind}|${sourceId}|${title}`);
+  const now=Date.now();
+  const old=this.issues.get(fingerprint);
+  const detailChanged=Boolean(old&&old.detail!==detail);
+  const canReset=detailChanged&&!old?.queuedAt;
+  const directedPriority=selfImprovementDirectionService.score(kind,title,detail,priority);
+  const issue:DiscoveredIssue={
+   id:old?.id||`ISSUE-${fingerprint.slice(4)}`,
+   fingerprint,
+   changeSetId:old?.changeSetId,
+   requirementContractId:old?.requirementContractId,
+   improvementRunId:old?.improvementRunId,
+   taskId:old?.taskId,
+   kind,title,detail,sourceId,
+   priority:Math.max(directedPriority,old?.priority||0),
+   discoveredAt:old?.discoveredAt||now,
+   lastSeenAt:now,
+   occurrences:(old?.occurrences||0)+1,
+   queuedAt:old?.queuedAt,
+   resolvedAt:detailChanged?undefined:old?.resolvedAt,
+   retryCount:canReset?0:(old?.retryCount||0),
+   nextRetryAt:canReset?undefined:old?.nextRetryAt,
+   exhausted:canReset?false:old?.exhausted,
+   lastOutcome:canReset?'ISSUE_DETAIL_CHANGED':old?.lastOutcome
+  };
+  this.issues.set(fingerprint,issue);
+  return {...issue};
+ }
 
  private configureTimer():void{if(this.timer)clearInterval(this.timer);this.timer=null;if(this.config.enabled)this.timer=setInterval(()=>{void this.scan();},this.config.intervalMinutes*60*1000);}
  private fingerprint(raw:string):string{let h=2166136261;for(const ch of raw.toLowerCase()){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return `ISS-${(h>>>0).toString(16).padStart(8,'0')}`;}

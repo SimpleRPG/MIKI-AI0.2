@@ -1,12 +1,6 @@
 import { executionEventBusService, ExecutionEvent } from '../../execution/services/executionEventBusService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
-import { researchService } from '../../research/services/researchService';
 import { systemLogger } from '../../../services/systemLogger';
-import { verifiedKnowledgePromotionService } from '../../promotion/services/verifiedKnowledgePromotionService';
-import { verifiedCapabilityPromotionService } from '../../promotion/services/verifiedCapabilityPromotionService';
-import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
-import { researchToRemediationService } from '../../research/services/researchToRemediationService';
-import { ExecutionEnvironment } from '../../execution/services/executionRunnerService';
 
 export interface FailureUnderstandingRecord {
   id: string;
@@ -19,9 +13,9 @@ export interface FailureUnderstandingRecord {
 }
 
 /**
- * Failure -> unknown-point -> web evidence -> verifier の自動ブリッジ。
- * 「失敗したから推測する」ことはせず、失敗原因をKnowledge Gapとして登録し、
- * 実行可能なWEB_SEARCH経路を明示して既存のEvidence/Claim/Verifier境界へ渡す。
+ * 実行失敗を永続Knowledge Gapとして記録する入口。
+ * Research／Verification／Promotionはここで直接実行せず、既存AutonomousRevalidationLoopから
+ * CORE TaskIngress／TaskBlackboardへ委譲し、Evidence/Claim/Verifier境界を一元化する。
  */
 export class FailureUnderstandingService {
   private static instance: FailureUnderstandingService;
@@ -38,7 +32,7 @@ export class FailureUnderstandingService {
     if (this.initialized) return;
     this.initialized = true;
     this.unsubscribe = executionEventBusService.subscribe('execution.failed', event => { void this.onFailure(event); });
-    systemLogger.info('SELF_IMPROVEMENT', '🔎 [FailureUnderstanding] failure→web research bridge initialized');
+    systemLogger.info('SELF_IMPROVEMENT', '🔎 [FailureUnderstanding] failure→persistent Knowledge Gap→CORE research bridge initialized');
   }
 
   public dispose(): void { this.unsubscribe?.(); this.unsubscribe = undefined; this.initialized = false; }
@@ -68,45 +62,21 @@ export class FailureUnderstandingService {
       reason: '実行失敗。原因を既知知識だけで推測せず、外部証拠を収集して検証する。',
     });
 
-    try {
-      const result = await researchService.researchGap(gap, { forceRoute: 'WEB_SEARCH', maxPasses: 3 });
-      if (result.resolved) {
-        for (const verification of result.verification || []) {
-          if (!verification.promoted) continue;
-          const promotion = verifiedKnowledgePromotionService.promote({ gap, claimId: verification.claimId, sourceRequestId: event.request_id });
-          if (promotion) {
-            verifiedCapabilityPromotionService.promote(promotion);
-            verifiedKnowledgePromotionService.recordIntoContinuum(promotion, mikiUnifiedLearningContinuumService);
-          }
-        }
-        // Knowledge-only promotion is not enough: feed the verified research result
-        // into the existing safe Research→Remediation boundary as well.
-        researchToRemediationService.process(gap, result, event.environment);
-      }
-      this.records.unshift({
-        id: `FAIL-UNDERSTAND-${this.hash(`${event.event_id}|${gap.id}`)}`,
-        componentId: event.component_id,
-        gapId: gap.id,
-        researched: result.performed,
-        resolved: result.resolved,
-        createdAt: Date.now(),
-        reason: result.reason,
-      });
-      this.records = this.records.slice(0, 200);
-      systemLogger.info('SELF_IMPROVEMENT', `🔎 [FailureUnderstanding] ${event.component_id}: Web研究=${result.performed} / resolved=${result.resolved}`);
-    } catch (error) {
-      this.records.unshift({
-        id: `FAIL-UNDERSTAND-${this.hash(`${event.event_id}|${gap.id}`)}`,
-        componentId: event.component_id,
-        gapId: gap.id,
-        researched: false,
-        resolved: false,
-        createdAt: Date.now(),
-        reason: `自動失敗原因調査エラー: ${String(error)}`,
-      });
-      this.records = this.records.slice(0, 200);
-    }
-
+    const record: FailureUnderstandingRecord = {
+      id: `FAIL-UNDERSTAND-${this.hash(`${event.event_id}|${gap.id}`)}`,
+      componentId: event.component_id,
+      gapId: gap.id,
+      researched: false,
+      resolved: gap.status === 'RESOLVED',
+      createdAt: Date.now(),
+      reason: 'Knowledge Gapを永続化。検索・昇格は直接実行せず、AutonomousRevalidationLoopから既存CORE TaskIngressへ委譲する。',
+    };
+    this.records.unshift(record);
+    this.records = this.records.slice(0, 200);
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `🔎 [FailureUnderstanding] ${event.component_id}: Knowledge GapをCORE調査キューへ委譲`
+    );
   }
 
   private hash(raw: string): string { let h = 2166136261; for (let i = 0; i < raw.length; i++) { h ^= raw.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16).padStart(8, '0'); }

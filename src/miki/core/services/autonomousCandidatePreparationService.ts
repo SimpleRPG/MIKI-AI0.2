@@ -135,6 +135,26 @@ class AutonomousCandidatePreparationService {
     reasons:['TARGETS_SELECTED_BY_CORE']
   };
   const implementationPlan=this.buildImplementationPlan(issue,resolution);
+  const priorFailureCases=Array.isArray(run.payload.priorFailureCases)
+   ? run.payload.priorFailureCases.slice(0,3)
+   : [];
+  for(const rawCase of priorFailureCases){
+   if(!rawCase||typeof rawCase!=='object'||Array.isArray(rawCase))continue;
+   const item=rawCase as Record<string,unknown>;
+   const componentText=Array.isArray(item.componentIds)
+    ? item.componentIds.map(String).slice(0,3).join(',')
+    : '';
+   const detail=[
+    `case=${String(item.caseId||'')}`,
+    `environment=${String(item.environment||'')}`,
+    `component=${componentText}`,
+    `failure=${String(item.errorMessage||'').slice(0,180)}`
+   ].filter(value=>!value.endsWith('=')).join(' / ');
+   if(detail)implementationPlan.rationale.push(
+    `過去の観測失敗（一般則ではなく要再検証）: ${detail}`.slice(0,320)
+   );
+  }
+  implementationPlan.rationale=implementationPlan.rationale.slice(0,14);
   improvementIntakeRouterService.update(runId,{implementationPlan,status:'IN_PROGRESS'});
   if(!aiCandidates||aiCandidates.length===0)return {targetPaths:resolution.targetPaths,missingPaths:[]};
   const workspace=await this.prepare(issue.id,aiCandidates,resolution.targetPaths);
