@@ -69,14 +69,21 @@ class AutonomousIssueDiscoveryService{
    if(mode==='AUTONOMOUS'){
     const candidates=this.list(200).filter(item=>this.isActionableIssue(item)&&!item.resolvedAt&&!item.queuedAt&&!item.exhausted&&(!item.nextRetryAt||item.nextRetryAt<=Date.now())&&item.priority>=this.config.minimumPriority).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);
     for(const issue of candidates){
-     const priorFailureCases=taskCaseMemoryService.findRelevantFailures(
-      `${issue.title} ${issue.detail}`,undefined,3
+     const issueEnvironment=issue.kind==='EXECUTION_FAILURE'
+      ? executionEventBusService.list('execution.failed').find(event=>event.event_id===issue.sourceId)?.environment
+      : undefined;
+     const priorCases=taskCaseMemoryService.findRelevantCases(
+      `${issue.title} ${issue.detail}`,issueEnvironment,5
      ).map(record=>({
       caseId:record.case_id,
+      outcome:record.outcome,
+      maturity:record.maturity,
       goal:record.goal.slice(0,160),
       environment:record.environment,
       componentIds:record.component_ids.slice(0,3),
       implementationHashes:Object.entries(record.implementation_hashes).slice(0,3),
+      evidenceEventIds:record.evidence_event_ids.slice(0,3),
+      outputSummary:String(record.output_summary||'').slice(0,180),
       errorMessage:String(record.error_message||'').slice(0,240),
       updatedAt:record.updated_at
      }));
@@ -90,7 +97,7 @@ class AutonomousIssueDiscoveryService{
        issueKind:issue.kind,
        detail:issue.detail,
        fingerprint:issue.fingerprint,
-       priorFailureCases
+       priorCases
       }
      });
      issue.changeSetId=queuedRun.changeSetId;
@@ -149,9 +156,9 @@ class AutonomousIssueDiscoveryService{
    );
 
    if(this.isSourceResolved(issue)&&terminalTask){
-    if(task?.status==='COMPLETED'){
+    if(task?.status==='COMPLETED'&&run.status!=='REJECTED'){
      improvementIntakeRouterService.update(run.runId,{status:'COMPLETED'});
-    }else if(run.status!=='COMPLETED'&&run.status!=='REJECTED'){
+    }else if(task?.status!=='COMPLETED'){
      improvementIntakeRouterService.reject(run.runId);
     }
     issue.resolvedAt=now;
@@ -166,9 +173,7 @@ class AutonomousIssueDiscoveryService{
    }
 
    if(task?.status==='CANCELLED'){
-    if(run.status!=='COMPLETED'&&run.status!=='REJECTED'){
-     improvementIntakeRouterService.reject(run.runId);
-    }
+    improvementIntakeRouterService.reject(run.runId);
     issue.queuedAt=undefined;
     issue.improvementRunId=undefined;
     issue.taskId=undefined;
@@ -180,9 +185,7 @@ class AutonomousIssueDiscoveryService{
    }
 
    if(run.status==='REJECTED'||task?.status==='FAILED'){
-    if(run.status!=='COMPLETED'&&run.status!=='REJECTED'){
-     improvementIntakeRouterService.reject(run.runId);
-    }
+    improvementIntakeRouterService.reject(run.runId);
     this.releaseForRetry(
      issue,
      task?.status==='FAILED'?'TASK_FAILED':'INTAKE_REJECTED'
@@ -191,17 +194,15 @@ class AutonomousIssueDiscoveryService{
    }
 
    if(task?.status==='COMPLETED'||run.status==='COMPLETED'){
-    if(run.status!=='COMPLETED'&&run.status!=='REJECTED'){
-     improvementIntakeRouterService.reject(run.runId);
+    if(task?.status==='COMPLETED'){
+     improvementIntakeRouterService.update(run.runId,{status:'COMPLETED'});
     }
     this.releaseForRetry(issue,'TASK_COMPLETED_SOURCE_STILL_OPEN');
     continue;
    }
 
    if(!task&&now-queuedAt>=6*60*60*1000){
-    if(run.status!=='COMPLETED'&&run.status!=='REJECTED'){
-     improvementIntakeRouterService.reject(run.runId);
-    }
+    improvementIntakeRouterService.reject(run.runId);
     this.releaseForRetry(issue,'TASK_RECORD_MISSING');
     continue;
    }
@@ -218,7 +219,7 @@ class AutonomousIssueDiscoveryService{
   issue.taskId=undefined;
   issue.lastOutcome=outcome;
 
-  if(attempts>=3){
+  if(attempts>=4){
    issue.exhausted=true;
    issue.nextRetryAt=undefined;
   }else{
@@ -243,9 +244,26 @@ class AutonomousIssueDiscoveryService{
     return !task||!this.isStallCandidate(task.status,task.pausedReason);
    }
    case 'DOMAIN_DISCONNECTED':
-    return !crossDomainCirculationService.getDisconnectedDomains().includes(issue.sourceId);
+    return !crossDomainCirculationService.getDisconnectedDomains().some(domain=>String(domain)===issue.sourceId);
    case 'IMPROVEMENT_DEBT':
     return !improvementDebtService.listOpen().some(debt=>debt.debtId===issue.sourceId);
+   case 'EXECUTION_FAILURE':{
+    const failure=executionEventBusService.list('execution.failed')
+     .find(event=>event.event_id===issue.sourceId);
+    if(!failure)return false;
+    const latestOutcome=[
+     ...executionEventBusService.list('execution.completed'),
+     ...executionEventBusService.list('execution.failed')
+    ].filter(event=>
+     event.created_at>failure.created_at&&
+     event.component_id===failure.component_id&&
+     event.implementation_hash===failure.implementation_hash&&
+     event.environment===failure.environment&&
+     event.test_category===failure.test_category&&
+     event.test_case_id===failure.test_case_id
+    ).sort((a,b)=>b.created_at-a.created_at)[0];
+    return latestOutcome?.type==='execution.completed'&&latestOutcome.passed===true;
+   }
    default:
     return false;
   }

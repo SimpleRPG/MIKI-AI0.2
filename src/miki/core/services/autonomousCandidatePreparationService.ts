@@ -5,7 +5,7 @@ import { selfCodeSpaceService } from './selfCodeSpaceService';
 export interface TargetResolution { issueId:string; targetPaths:string[]; evidenceIds:string[]; confidence:number; reasons:string[]; }
 export interface CandidateDraft { issueId:string; targetPath:string; baselineContent:string; candidateContent:string; evidenceIds:string[]; generationMode:'AI_SUPPLIED'|'SAFE_TEMPLATE'; }
 export interface AutonomousImplementationPlan {
- version:1;
+ version:2;
  source:'AUTONOMOUS_ISSUE'|'REVIEW_REVALIDATION';
  issueId:string;
  targetPaths:string[];
@@ -13,6 +13,10 @@ export interface AutonomousImplementationPlan {
  investigationSteps:string[];
  requiredValidation:string[];
  forbiddenExpansion:string[];
+ executionConstraints:string[];
+ dependencyConstraints:string[];
+ retryPolicy:{maxRetries:number;retriesUsed:number;backoffMinutes:number[];retryCancelledTasks:boolean;requireSourceResolution:boolean};
+ stopConditions:string[];
  rationale:string[];
  confidence:number;
 }
@@ -30,9 +34,31 @@ class AutonomousCandidatePreparationService {
   const investigationSteps=stepsByKind[issue.kind]||['既存実装と要求の差分を確認する','最小変更対象を確定する','既存検証経路を確認する'];
   const requiredValidation=['TypeScript/構文検査','既存単体・回帰テスト','Counterexample/境界値検証','RequirementContract評価','既存CORE/安全ゲート通過'];
   const forbiddenExpansion=['対象外ファイルへの変更','新しいDB/Blackboard/Truth Storeの追加','新しいOrchestrator/Queue/最上位司令塔の追加','未検証外部コードの直接実行・採用','検証結果を変更理由の証拠として偽装すること'];
-  const targetPaths=[...resolution.targetPaths].sort((a,b)=>a.localeCompare(b));
+  const targetPaths=[...new Set(resolution.targetPaths)].sort((a,b)=>a.localeCompare(b)).slice(0,3);
   const changeScope=targetPaths.length<=1?'MINIMAL_SINGLE_FILE':'MINIMAL_MULTI_FILE';
-  return {version:1,source:'AUTONOMOUS_ISSUE',issueId:issue.id,targetPaths,changeScope,investigationSteps,requiredValidation,forbiddenExpansion,rationale:[`Issue ${issue.id}: ${issue.title}`,`source=${issue.sourceId}`,`resolutionConfidence=${resolution.confidence.toFixed(3)}`,...resolution.reasons.slice(0,8)],confidence:resolution.confidence};
+  const executionConstraints=[
+   '変更対象は最大3ファイル、可能なら1ファイルに限定する',
+   '候補は隔離Workspace内で作成し、既存のValidationゲートを迂回しない',
+   '過去ケースは参考情報であり、現在のソース・環境・Evidenceとの一致を再確認する'
+  ];
+  const dependencyConstraints=[
+   '変更対象の既存import・呼出元・依存契約を実ソースで確認する',
+   '新しいOrchestrator・Queue・Blackboard・Truth Storeを追加しない',
+   '実在を確認できないAPI・ファイル・依存を前提に変更しない'
+  ];
+  const retryPolicy={
+   maxRetries:3,
+   retriesUsed:Math.min(3,Math.max(0,Math.floor(issue.retryCount||0))),
+   backoffMinutes:[15,30,60],
+   retryCancelledTasks:false,
+   requireSourceResolution:true
+  };
+  const stopConditions=[
+   'Task CANCELLEDは自動再投入せず停止状態を記録する',
+   'Task COMPLETEDでも監視元が未解決なら成功確定せず上限付き再試行へ移す',
+   '監視元の解決根拠を照合できない場合は未解決を維持する'
+  ];
+  return {version:2,source:'AUTONOMOUS_ISSUE',issueId:issue.id,targetPaths,changeScope,investigationSteps,requiredValidation,forbiddenExpansion,executionConstraints,dependencyConstraints,retryPolicy,stopConditions,rationale:[`Issue ${issue.id}: ${issue.title}`,`source=${issue.sourceId}`,`resolutionConfidence=${resolution.confidence.toFixed(3)}`,...resolution.reasons.slice(0,8)],confidence:resolution.confidence};
  }
 
  async prepare(issueId:string,aiCandidates?:Array<{path:string;candidateContent:string;evidenceIds?:string[]}>,targetPaths?:string[]):Promise<CandidateWorkspace|undefined>{
@@ -135,23 +161,41 @@ class AutonomousCandidatePreparationService {
     reasons:['TARGETS_SELECTED_BY_CORE']
   };
   const implementationPlan=this.buildImplementationPlan(issue,resolution);
-  const priorFailureCases=Array.isArray(run.payload.priorFailureCases)
-   ? run.payload.priorFailureCases.slice(0,3)
-   : [];
-  for(const rawCase of priorFailureCases){
+  const rawCases=Array.isArray(run.payload.priorCases)
+   ? run.payload.priorCases.slice(0,5)
+   : Array.isArray(run.payload.priorFailureCases)
+    ? run.payload.priorFailureCases.slice(0,3)
+    : [];
+  for(const rawCase of rawCases){
    if(!rawCase||typeof rawCase!=='object'||Array.isArray(rawCase))continue;
    const item=rawCase as Record<string,unknown>;
    const componentText=Array.isArray(item.componentIds)
     ? item.componentIds.map(String).slice(0,3).join(',')
     : '';
+   const evidenceIds=Array.isArray(item.evidenceEventIds)
+    ? item.evidenceEventIds.map(String).slice(0,3).join(',')
+    : Array.isArray(item.evidence_event_ids)
+     ? item.evidence_event_ids.map(String).slice(0,3).join(',')
+     : '';
+   const implementationHashText=Array.isArray(item.implementationHashes)
+    ? item.implementationHashes.slice(0,3).map(pair=>Array.isArray(pair)?pair.map(String).join(':'):String(pair)).join(',')
+    : '';
+   const outcome=item.outcome==='SUCCESS'?'SUCCESS':'FAILURE';
    const detail=[
-    `case=${String(item.caseId||'')}`,
+    `case=${String(item.caseId||item.case_id||'')}`,
+    `goal=${String(item.goal||'').slice(0,120)}`,
     `environment=${String(item.environment||'')}`,
     `component=${componentText}`,
-    `failure=${String(item.errorMessage||'').slice(0,180)}`
+    `implementation=${implementationHashText}`,
+    `evidence=${evidenceIds}`,
+    `output=${String(item.outputSummary||item.output_summary||'').slice(0,100)}`,
+    `failure=${String(item.errorMessage||item.error_message||'').slice(0,180)}`
    ].filter(value=>!value.endsWith('=')).join(' / ');
+   const caseLabel=outcome==='SUCCESS'
+    ? '既存成功ケース（実装版・環境・根拠を再検証）'
+    : '過去の観測失敗（一般則ではなく要再検証）';
    if(detail)implementationPlan.rationale.push(
-    `過去の観測失敗（一般則ではなく要再検証）: ${detail}`.slice(0,320)
+    `${caseLabel}: ${detail}`.slice(0,320)
    );
   }
   implementationPlan.rationale=implementationPlan.rationale.slice(0,14);

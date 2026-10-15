@@ -33,6 +33,46 @@ export class TaskCaseMemoryService {
     return this.upsert({task_id:input.taskId,goal:input.goal,environment:input.environment,component_ids:[input.componentId],implementation_hashes:{[input.componentId]:input.implementationHash},outcome:'FAILURE',maturity:'OBSERVED',request_id:input.requestId,evidence_event_ids:[input.evidenceEventId],error_message:input.errorMessage});
   }
   public findReusable(goal:string, environment?:string):TaskCaseRecord[]{const n=goal.trim().toLowerCase();return this.records.filter(r=>r.outcome==='SUCCESS'&&(!environment||r.environment===environment)&&r.maturity!=='OBSERVED'&&this.match(r.goal,n)&&r.component_ids.every(id=>{const c=componentRegistryService.getComponent(id);return !!c&&c.status==='VERIFIED'&&c.implementation_hash===r.implementation_hashes[id]&&componentVersionHistoryService.isCurrent(id,c.version,r.implementation_hashes[id])&&!failureMemoryService.shouldAvoid(id,r.environment,r.implementation_hashes[id]);})).sort((a,b)=>this.score(b)-this.score(a)||b.updated_at-a.updated_at).slice(0,10);}
+  public findRelevantCases(goal:string, environment?:string, limit=5):TaskCaseRecord[]{
+    const query=this.normalizeForSimilarity(goal);
+    if(query.length<2)return [];
+    const max=Math.max(1,Math.min(10,Math.floor(limit)||5));
+    const ranked=this.records
+      .filter(record=>{
+        if(record.outcome==='FAILURE')return true;
+        if(record.maturity==='OBSERVED'||record.component_ids.length===0)return false;
+        return record.component_ids.every(id=>{
+          const component=componentRegistryService.getComponent(id);
+          return !!component&&component.status==='VERIFIED'&&
+            component.implementation_hash===record.implementation_hashes[id]&&
+            componentVersionHistoryService.isCurrent(id,component.version,record.implementation_hashes[id])&&
+            !failureMemoryService.shouldAvoid(id,record.environment,record.implementation_hashes[id]);
+        });
+      })
+      .map(record=>{
+        const similarity=this.similarity(query,record.goal);
+        const sameEnvironment=Boolean(environment&&record.environment===environment);
+        return {record,similarity,score:similarity+(sameEnvironment?0.12:0)+(record.outcome==='SUCCESS'?0.02:0)};
+      })
+      .filter(item=>item.similarity>=0.12)
+      .sort((a,b)=>b.score-a.score||b.record.updated_at-a.record.updated_at);
+    const failureCases=ranked.filter(item=>item.record.outcome==='FAILURE').slice(0,Math.ceil(max/2));
+    const successCases=ranked.filter(item=>item.record.outcome==='SUCCESS').slice(0,Math.floor(max/2));
+    const selected=[...failureCases,...successCases];
+    for(const item of ranked){
+      if(selected.length>=max)break;
+      if(!selected.includes(item))selected.push(item);
+    }
+    return selected
+      .sort((a,b)=>b.score-a.score||b.record.updated_at-a.record.updated_at)
+      .slice(0,max)
+      .map(({record})=>({
+        ...record,
+        component_ids:[...record.component_ids],
+        implementation_hashes:{...record.implementation_hashes},
+        evidence_event_ids:[...record.evidence_event_ids]
+      }));
+  }
   public findRelevantFailures(goal:string, environment?:string, limit=3):TaskCaseRecord[]{
     const query=this.normalizeForSimilarity(goal);
     if(query.length<2)return [];
