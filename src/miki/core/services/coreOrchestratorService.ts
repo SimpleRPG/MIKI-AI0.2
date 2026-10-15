@@ -400,9 +400,19 @@ class CoreOrchestratorService {
   const completion=adaptiveRoutePlannerService.assessCompletion(finalTask);
   const payload={...this.buildRuntimeCirculationResult(finalTask,cycles,replyRecords.length,completion.requiredDomains),response,conversationFinalized:true,finalizedBy:'core'};
   const coreResult=coreResultService.complete(reqId,payload,{route:['core'],processedCategories:['conversation']});
+  this.recordTaskMemoryOutcome(finalTask,'SUCCESS');
   return {task:finalTask,cycles,dispatched:replyRecords.length,coreResult};
  }
 
+ private recordTaskMemoryOutcome(task:BlackboardTask,outcome:'SUCCESS'|'FAILURE'):void{
+  const memoryIds=new Set<string>();
+  for(const entry of task.entries){
+   if(entry.kind!=='DECISION'||!entry.key.startsWith('cognitiveState:')||!entry.value||typeof entry.value!=='object'||Array.isArray(entry.value))continue;
+   const ids=(entry.value as Record<string,unknown>).evidenceIds;
+   if(Array.isArray(ids))for(const id of ids)if(typeof id==='string'&&id.startsWith('MEM-'))memoryIds.add(id);
+  }
+  if(memoryIds.size)memoryContextBridgeService.recordOutcome([...memoryIds],outcome,`${task.taskId}:${outcome}`);
+ }
  private async buildSynthesisContext(
   task:BlackboardTask,
   payload:Record<string,unknown>
@@ -1669,7 +1679,10 @@ class CoreOrchestratorService {
   }else{
    coreResultService.inconclusive(reqId,'Task ended without definitive status');
   }
-  return {task:taskBlackboardService.get(taskId)!,cycles,dispatched,coreResult:coreResultService.get(reqId)};
+  const settledTask=taskBlackboardService.get(taskId)!;
+  if(settledTask.status==='COMPLETED')this.recordTaskMemoryOutcome(settledTask,'SUCCESS');
+  else if(settledTask.status==='FAILED')this.recordTaskMemoryOutcome(settledTask,'FAILURE');
+  return {task:settledTask,cycles,dispatched,coreResult:coreResultService.get(reqId)};
  }
  private buildIncompleteCirculationResult(task:BlackboardTask,cycles:number,dispatched:number,completion:ReturnType<typeof adaptiveRoutePlannerService.assessCompletion>):Record<string,unknown>{
   const replyRecords=domainReplyLedgerService.listByTask(task.taskId);

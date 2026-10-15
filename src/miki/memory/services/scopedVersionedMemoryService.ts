@@ -32,7 +32,7 @@ class ScopedVersionedMemoryService{
    const stats=this.retrievalStats.get(record.id)||{memoryId:record.id,retrievalCount:0,successCount:0,failureCount:0,lastRetrievedAt:0,lastOutcomeAt:0,outcomeTaskIds:[]};
    stats.retrievalCount+=1;stats.lastRetrievedAt=now;this.retrievalStats.set(record.id,stats);
   }
-  if(selected.length){this.pendingStatsWrites+=selected.length;if(this.pendingStatsWrites>=16||now-this.lastStatsPersistAt>=60_000)this.saveRetrievalStats();}
+  if(selected.length){this.pendingStatsWrites+=1;if(this.pendingStatsWrites>=16||now-this.lastStatsPersistAt>=60_000)this.saveRetrievalStats();}
   return selected;
  }
  resolveReference(candidates:Array<{id:string;taskMatch:number;featureMatch:number;targetMatch:number;recency:number;evidenceStrength:number;contradiction:number}>):{resolvedId?:string;ambiguous:boolean;scores:Array<{id:string;score:number}>}{const scores=candidates.map(item=>({id:item.id,score:item.taskMatch+item.featureMatch+item.targetMatch+item.recency+item.evidenceStrength-item.contradiction})).sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));return{resolvedId:scores.length&&(!scores[1]||scores[0].score-scores[1].score>=0.15)?scores[0].id:undefined,ambiguous:scores.length>1&&scores[0].score-scores[1].score<0.15,scores};}

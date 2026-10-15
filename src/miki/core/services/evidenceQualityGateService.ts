@@ -26,8 +26,19 @@ class EvidenceQualityGateService{
    if(record.kind==='WEB'&&(!record.url||!/^https?:\/\/[^\s/]+/i.test(record.url)))return false;
    return true;
   });
-  const independentClusters=new Set(researchEvidence.map(record=>typeof record.independence_cluster_id==='string'?record.independence_cluster_id.trim():'').filter(Boolean));
-  const independentEvidenceClusters=independentClusters.size;
+  const clustersByClaim=new Map<string,Set<string>>();
+  for(const record of researchEvidence){
+   const cluster=typeof record.independence_cluster_id==='string'?record.independence_cluster_id.trim():'';
+   if(!cluster)continue;
+   for(const rawClaimId of record.claim_ids){
+    const claimId=typeof rawClaimId==='string'?rawClaimId.trim():'';
+    if(!claimId)continue;
+    const clusters=clustersByClaim.get(claimId)||new Set<string>();
+    clusters.add(cluster);clustersByClaim.set(claimId,clusters);
+   }
+  }
+  const independentlySupportedClaimIds=[...clustersByClaim.entries()].filter(([,clusters])=>clusters.size>=2).map(([claimId])=>claimId);
+  const independentEvidenceClusters=Math.max(0,...[...clustersByClaim.values()].map(clusters=>clusters.size));
   const verifiedExecutionEvidenceIds=[...new Set(lineage.verifiedEvidenceIds.filter(id=>{
    const record=evidenceService.getEvidence(id);
    return record?.kind==='EXECUTION'&&record.metadata?.operation_class==='BUSINESS';
@@ -35,7 +46,7 @@ class EvidenceQualityGateService{
   const registeredEvidenceIds=[...new Set(registered.map(record=>record.evidence_id))];
   const admissibleEvidenceIds=[...new Set(admitted.map(record=>record.evidence_id))];
   const hasUsableEvidence=researchEvidence.length>0||verifiedExecutionEvidenceIds.length>0;
-  const hasIndependentResearch=independentEvidenceClusters>=2;
+  const hasIndependentResearch=independentlySupportedClaimIds.length>0;
   const hasVerifiedExecution=verifiedExecutionEvidenceIds.length>0;
   const independentSupport=hasIndependentResearch||hasVerifiedExecution;
   const hasResult=task.entries.some(entry=>entry.kind==='RESULT');

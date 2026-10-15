@@ -231,6 +231,6 @@ class DomainRouterService {
     walk(value,0);
     return [...found];
   }
-  private load():void{try{const raw=storageService.getItem(KEY);this.history=raw?JSON.parse(raw):[];}catch(error){this.history=[];systemLogger.warn('SELF_IMPROVEMENT','[DomainRouter] history load failed',String(error));}}
+
 }
 export const domainRouterService=new DomainRouterService();

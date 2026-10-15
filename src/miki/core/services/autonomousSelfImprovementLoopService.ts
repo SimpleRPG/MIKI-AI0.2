@@ -1,13 +1,12 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { coreTaskIngressService } from './coreTaskIngressService';
-import { taskBlackboardService, type BlackboardTask } from './taskBlackboardService';
+import { taskBlackboardService } from './taskBlackboardService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { resourceGovernanceService } from '../../safety/services/resourceGovernanceService';
 import { requiredAssetAcquisitionService } from './requiredAssetAcquisitionService';
 import { selfImprovementPreflightService } from './selfImprovementPreflightService';
 import { improvementDebtService } from './improvementDebtService';
-import { memoryContextBridgeService } from '../../memory/services/memoryContextBridgeService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 
@@ -357,9 +356,7 @@ class AutonomousSelfImprovementLoopService {
           return value.operationClass === 'BUSINESS';
         });
         const evidenceGateRequired = hasBusinessResult;
-        if (workflow.task.status === 'FAILED' || (workflow.task.status === 'COMPLETED' && evidenceGateRequired && !quality.passed)) this.recordTaskMemoryOutcome(workflow.task, 'FAILURE');
         if (workflow.task.status === 'COMPLETED' && (!evidenceGateRequired || quality.passed)) {
-          this.recordTaskMemoryOutcome(workflow.task, 'SUCCESS');
           this.completeCurrent('IMPROVEMENT_CYCLE_COMPLETED');
           continue;
         }
@@ -508,16 +505,6 @@ class AutonomousSelfImprovementLoopService {
     request.waitKind='RESOURCE';
     request.waitReason=reason;
     this.save();
-  }
-
-  private recordTaskMemoryOutcome(task:BlackboardTask,outcome:'SUCCESS'|'FAILURE'):void{
-    const memoryIds=new Set<string>();
-    for(const entry of task.entries){
-      if(entry.kind!=='DECISION'||!entry.key.startsWith('cognitiveState:')||!entry.value||typeof entry.value!=='object'||Array.isArray(entry.value))continue;
-      const ids=(entry.value as Record<string,unknown>).evidenceIds;
-      if(Array.isArray(ids))for(const id of ids)if(typeof id==='string'&&id.startsWith('MEM-'))memoryIds.add(id);
-    }
-    if(memoryIds.size)memoryContextBridgeService.recordOutcome([...memoryIds],outcome,`${task.taskId}:${outcome}`);
   }
 
   private async acquireThenWaitForEvidence(request: AutonomousImprovementRequest, reason: string): Promise<void> {

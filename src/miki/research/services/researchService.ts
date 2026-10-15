@@ -409,6 +409,18 @@ export class ResearchService {
           publishedDate: result.publishedDate,
           sourceId: result.sourceId,
           independenceClusterId: result.independenceClusterId,
+          metadata: {
+            research_query_id: queryPlan.status === "READY" ? queryPlan.queries[pass]?.queryId : undefined,
+            research_query_plan_id: queryPlan.status === "READY" ? queryPlan.queryPlanId : undefined,
+            research_source_tier_target: queryPlan.status === "READY" ? queryPlan.queries[pass]?.sourceTierTarget : undefined,
+            research_source_role_target: queryPlan.status === "READY" && queryPlan.queries[pass]
+              ? (({ COUNTEREVIDENCE: "COUNTEREVIDENCE", PRIMARY_SOURCE: "PRIMARY", OFFICIAL_SPECIFICATION: "OFFICIAL" } as Record<string, 'PRIMARY'|'OFFICIAL'|'SECONDARY'|'COUNTEREVIDENCE'|'UNCLASSIFIED'>)[queryPlan.queries[pass].intentType || ""] || "UNCLASSIFIED")
+              : "UNCLASSIFIED",
+            research_source_role: queryPlan.status === "READY" && queryPlan.queries[pass]
+              ? assessResearchSourceRole(queryPlan.queries[pass], { url: result.url || "" })
+              : "UNCLASSIFIED",
+            research_intent_type: queryPlan.status === "READY" ? queryPlan.queries[pass]?.intentType : undefined,
+          },
         });
 
         evidence.push(record);
