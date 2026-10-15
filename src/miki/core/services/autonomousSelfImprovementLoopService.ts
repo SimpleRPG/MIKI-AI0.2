@@ -1,12 +1,13 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { coreTaskIngressService } from './coreTaskIngressService';
-import { taskBlackboardService } from './taskBlackboardService';
+import { taskBlackboardService, type BlackboardTask } from './taskBlackboardService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { resourceGovernanceService } from '../../safety/services/resourceGovernanceService';
 import { requiredAssetAcquisitionService } from './requiredAssetAcquisitionService';
 import { selfImprovementPreflightService } from './selfImprovementPreflightService';
 import { improvementDebtService } from './improvementDebtService';
+import { memoryContextBridgeService } from '../../memory/services/memoryContextBridgeService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 
@@ -356,17 +357,39 @@ class AutonomousSelfImprovementLoopService {
           return value.operationClass === 'BUSINESS';
         });
         const evidenceGateRequired = hasBusinessResult;
+        if (workflow.task.status === 'FAILED' || (workflow.task.status === 'COMPLETED' && evidenceGateRequired && !quality.passed)) this.recordTaskMemoryOutcome(workflow.task, 'FAILURE');
         if (workflow.task.status === 'COMPLETED' && (!evidenceGateRequired || quality.passed)) {
+          this.recordTaskMemoryOutcome(workflow.task, 'SUCCESS');
           this.completeCurrent('IMPROVEMENT_CYCLE_COMPLETED');
           continue;
         }
         if (evidenceGateRequired && !quality.passed) {
+          const domainsForReason=(reason:string):string[]=>{
+            const r=reason.toUpperCase();
+            if(r.includes('INDEPENDENT_EVIDENCE_CONFIRMATION_MISSING'))return ['research','verification'];
+            if(r.includes('EVIDENCE_ID_MISSING')||r.includes('EVIDENCE_REFERENCE_UNRESOLVED')||r.includes('EVIDENCE_NOT_ADMISSIBLE'))return ['research','unknown','verification'];
+            if(r.includes('OBSERVED_RESULT_MISSING')||r.includes('UNRESOLVED_ERROR_PRESENT'))return ['verification','core'];
+            return ['research','verification'];
+          };
+          const recoverySubgoals=quality.reasons.map((reason:string,index:number)=>({
+            subgoalId:`${workflow.task.taskId}:impasse:${request.attempts}:${index+1}`,
+            parentTaskId:workflow.task.taskId,
+            kind:'SOAR_IMPASSE_RECOVERY',
+            goal:`Resolve CORE evidence-quality blocker: ${reason}`,
+            reason,
+            requiredDomains:domainsForReason(reason),
+            evidenceIds:quality.evidenceIds,
+            attempt:request.attempts,
+            status:'WAITING_FOR_EVIDENCE',
+            createdAt:Date.now()
+          }));
+          const requestedDomains=[...new Set(recoverySubgoals.flatMap(item=>item.requiredDomains))];
           taskBlackboardService.append(
             workflow.task.taskId,
             'DECISION',
             'core',
             'evidence-recovery-required',
-            { reasons: quality.reasons, requestedDomains: [...new Set(quality.reasons.flatMap((reason:string)=>{ const r=reason.toUpperCase(); if(r.includes('EVIDENCE_ID_MISSING')) return ['research','unknown']; if(r.includes('INDEPENDENT_DOMAIN_CONFIRMATION_MISSING')||r.includes('OBSERVED_RESULT_MISSING')) return ['verification']; return ['research','verification']; }))] },
+            {kind:'SOAR_IMPASSE_RECOVERY',parentTaskId:workflow.task.taskId,reasons:quality.reasons,requestedDomains,subgoals:recoverySubgoals,nextStep:'REQUIRED_ASSET_ACQUISITION_THEN_WAIT'},
             quality.evidenceIds
           );
           await this.acquireThenWaitForEvidence(request, quality.reasons.join(','));
@@ -485,6 +508,16 @@ class AutonomousSelfImprovementLoopService {
     request.waitKind='RESOURCE';
     request.waitReason=reason;
     this.save();
+  }
+
+  private recordTaskMemoryOutcome(task:BlackboardTask,outcome:'SUCCESS'|'FAILURE'):void{
+    const memoryIds=new Set<string>();
+    for(const entry of task.entries){
+      if(entry.kind!=='DECISION'||!entry.key.startsWith('cognitiveState:')||!entry.value||typeof entry.value!=='object'||Array.isArray(entry.value))continue;
+      const ids=(entry.value as Record<string,unknown>).evidenceIds;
+      if(Array.isArray(ids))for(const id of ids)if(typeof id==='string'&&id.startsWith('MEM-'))memoryIds.add(id);
+    }
+    if(memoryIds.size)memoryContextBridgeService.recordOutcome([...memoryIds],outcome,`${task.taskId}:${outcome}`);
   }
 
   private async acquireThenWaitForEvidence(request: AutonomousImprovementRequest, reason: string): Promise<void> {

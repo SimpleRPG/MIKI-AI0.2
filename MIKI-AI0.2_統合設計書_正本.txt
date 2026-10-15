@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-15
-正本Revision：2026-10-15-P261
+基準日：2026-10-16
+正本Revision：2026-10-16-P262
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -43,7 +43,7 @@ MIKI-AI0.2 統合設計書・実装正本
 
 - PUSHを伴う作業では、Phase BのTermux実行開始時に必ず git pull --ff-only origin main を実行し、その後の最新ローカルmainを基準に編集する。
 - ユーザーがローカル全消去・同期を明示した場合に限り、対象リポジトリとorigin URLを検証し、ローカル作業コピーを削除してorigin URLから`git clone --branch main --single-branch`で新規取得する。取得後は`git pull --ff-only origin main`と`git fetch origin main`を行い、`HEAD`と`origin/main`の一致および作業ツリーcleanを確認する。この操作は未commit変更、未追跡ファイル、ignoredファイル、キャッシュ、ローカル設定を破棄するため、ユーザーが明示した場合以外は実行しない。
-- Termuxでは`npm run build`、Rust Android build、Gradle APK buildを実行しない。コード／契約の静的検査と差分検査に限定し、Web build・Rust build・APK生成の判定はPUSHで起動した`.github/workflows/build-apk.yml`のGitHub Actionsで行う。Actions実行・APK Artifactを実際に確認するまではビルド成功・APK生成済みと記載しない。過去の履歴にあるローカルbuild記録は当時の記録として保持し、現在の作業指示には再利用しない。
+- Termuxでは`npm run build`、Rust Android build、Gradle APK build、lint、テスト、事前の契約検証を実行させない。Termuxで行うのは最新main同期、設計書・コード編集、git add、commit、PUSHまでとする。PUSHで起動した`.github/workflows/build-apk.yml`のGitHub ActionsはPUSH後に私が確認し、関連する失敗や不整合を最新mainのコードで追跡して修正用コマンドを作成する。CIの実行結果・APK Artifactを実際に確認するまではPASS・ビルド成功・APK生成済みと記載しない。
 - 調査時点のHEADやblob SHAを、編集を許可する固定条件としてコマンドへ埋め込まない。mainが進んでいた場合、それだけで異常とせず、最新のコード・正本・アンカー・周辺文脈を再調査する。
 - 編集対象は、直前に取得した最新mainから実在確認したファイル・関数・変数・DOM・イベント・データ構造・責務に限定する。記憶、推測、過去会話、断片的な検索結果からファイルや編集位置を再構成しない。
 - 編集アンカーは最新mainから連続して取得した正確な本文を使う。別々の断片を結合したり、空白・改行・インデントを推測してアンカーを作ったりしない。編集コマンド作成直前に、実際の置換本文と前後の文脈を再照合する。
@@ -69,9 +69,9 @@ Pythonを含むコマンドはPython全体をast.parse等で検証し、シェ�
 
 Phase B：実行・反映・監査
 
-Phase A完了後にのみ、Termuxで 最新main同期 → 編集 → 関連するチェック → git add → git commit → git push origin main → PUSH後の最新GitHub main取得・監査 を一連で実行する。PUSH前にユーザーへ確認作業を要求する工程を挟まない。
+Phase A完了後にのみ、Termuxで 最新main同期 → 設計書・コード編集 → git add → git commit → git push origin main を一連で実行する。Termux上でテスト・lint・build・契約チェックの実行をユーザーへ要求しない。PUSH後の最新GitHub main取得・リポジトリ監査はChatGPTが行い、ユーザーへテスト結果を提出させて代替しない。PUSH前にユーザーへ確認作業を要求する工程を挟まない。
 
-- チェック失敗だけを理由にPUSHを中止する手順へ勝手に変更しない。失敗したチェック名・実際の出力・未解決点を正確に記録し、PUSH後に最新mainで問題箇所を確認・修正・再PUSHする。失敗したチェックをPASSと表現しない。
+- ユーザーにTermux上の事前テスト・lint・build・静的検査を実行させ、その結果待ちでPUSHを止める手順を作らない。pushで起動するGitHub Actionsの結果はChatGPTがPUSH後に実際に取得して確認する。失敗した場合は最新mainの実コード・workflowログ・差分を調べ、原因を修正して再PUSHし、再度ChatGPTが監査する。失敗した検査をPASSと表現しない。
 - アンカーや対象構造が最新mainと合わない場合は、推測編集を続けずPhase Aへ戻る。これはチェック失敗を口実にした別方式への変更ではなく、現在の対象を再確定するための必須手順である。
 - コマンド提示は実行済みを意味せず、編集はcommit済みを意味せず、commitはPUSH済みを意味しない。各段階を事実に基づいて区別する。
 
@@ -84,7 +84,7 @@ Phase A完了後にのみ、Termuxで 最新main同期 → 編集 → 関連す�
 
 ■ 6. PUSH後の再監査と成功判定
 
-PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub mainを再取得し、mainの最新commitを確認する。次に最新commitのGit treeをルートから再帰的に取得し、全ファイル・全ディレクトリのパスと階層を網羅して一覧化・確認する。サブディレクトリを省略せず、対象ファイルだけの取得、検索結果の断片、以前のtree一覧の再利用を全体監査と扱わない。全体treeを確認した後、最新commitの変更diff、今回の変更対象、関連する呼出元／呼出先、UI、runtime、状態更新、保存、再描画、旧／重複／競合実装・旧入口、この正本全文との整合を再監査する。GitHub connector等で全treeを再帰取得できない場合は監査を完了したと主張せず、不足している範囲を明記して、Termux等の規定経路で実データを取得する。必要な範囲でCI Workflow、テスト、Android APKの生成物も確認する。変更ファイルだけを見てリポジトリ監査完了としない。
+PUSHしただけでは実装完了と判定しない。PUSH後の再監査はChatGPTの責務とし、ユーザーにテスト実行や監査結果の提出を要求して代替しない。PUSH後にChatGPTが最新GitHub mainを再取得し、mainの最新commitを確認する。次に最新commitのGit treeをルートから再帰的に取得し、全ファイル・全ディレクトリのパスと階層を網羅して一覧化・確認する。サブディレクトリを省略せず、対象ファイルだけの取得、検索結果の断片、以前のtree一覧の再利用を全体監査と扱わない。全体treeを確認した後、最新commitの変更diff、今回の変更対象、関連する呼出元／呼出先、UI、runtime、状態更新、保存、再描画、旧／重複／競合実装・旧入口、この正本全文との整合を再監査する。GitHub connector等で全treeを再帰取得できない場合は監査を完了したと主張せず、不足している範囲を明記して、Termux等の規定経路で実データを取得する。必要な範囲でCI Workflow、テスト、Android APKの生成物も確認する。変更ファイルだけを見てリポジトリ監査完了としない。
 
 次の状態は明確に分ける。
 
@@ -106,21 +106,21 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 
 ■ 8. 一作業の完了条件
 
-最新main確認 → 正本全文・本節確認 → リポジトリと関連責務の網羅確認 → UI／runtime／保存／再描画確認 → 既存・旧・重複・競合確認 → 変更対象・方法確定 → 編集直前の最新main再照合 → 最終コマンドの構文と同一性検証 → Termux編集 → 関連チェック → commit → PUSH → 最新GitHub main再取得 → 最新commit確認 → Git treeの全ファイル・全ディレクトリ再帰取得と網羅確認 → コード・UI・runtime・設計正本の再監査 → CI／APK／実機状態の事実確認、までを一作業単位とする。未確認項目を完了扱いにせず、確認・編集・commit・PUSH・検証・実装成功を同一視しない。
+最新main確認 → 正本全文・本節確認 → リポジトリと関連責務の網羅確認 → UI／runtime／保存／再描画確認 → 既存・旧・重複・競合確認 → 変更対象・方法確定 → 編集直前の最新main再照合 → ChatGPTによる提示コマンドの構文・同一性検証 → Termux編集・設計書更新 → commit → PUSH → ChatGPTによる最新GitHub main再取得 → 最新commit確認 → Git treeの全ファイル・全ディレクトリ再帰取得と網羅確認 → 差分・コード・UI・runtime・設計正本の再監査 → GitHub Actions／APK／実機状態の事実確認、までを一作業単位とする。ユーザーへ事前テスト・lint・buildを実行させてPUSH前のゲートにしない。未確認項目を完了扱いにせず、commit・PUSH・CI PASS・APK生成・実機確認を別状態として記録する。
 
 統合元：
 - MIKI_AI_18_DOMAIN_DESIGN_PHILOSOPHY_UPDATED.txt
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P260）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P262）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-15-P261
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。全tree再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-16-P262
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更したが、全tree再帰インベントリは再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -134,6 +134,9 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - UI → CORE → 必要な17分類 → CORE再評価 → CoreResult → UI。
 - 19番目の分類、第二Orchestrator、第二Result DB、第二Blackboardを作らない。
 - ローカルLLMを通常経路の必要条件としない。
+- Governed memory検索順位はスコープ適合・根拠リンク・confidenceを維持し、取得頻度・時間減衰・成功／失敗の結果フィードバックを控えめなACT-R型活性化として加える。COREの統一認知状態で参照したMEM IDに、タスク結果を一度だけ記録する。
+- EvidenceQualityGateはEvidence IDの存在や異なるDomainだけでは合格させない。登録済み・ADMISSIBLE・Claim連結済みの研究根拠が独立clusterを2つ以上持つか、同じTaskに結び付いた検証済みBUSINESS実行証跡が必要。Observed RESULT欠落・未解決ERRORは不合格。これは根拠登録・独立性・実行線形性の判定であり、根拠が主張を意味的に含意すること自体の完全証明とは扱わない。
+- SOAR型のimpasse回復は、合格を阻む理由ごとのサブゴール計画を親Blackboardに記録し、既存のRequiredAssetAcquisitionとwait/retry経路へ接続する。独立した子Taskやprocedural chunkingを実装済みとは扱わない。
 - Evidence、Claim、Verification、Learning、Memory、Promotionを分離する。
 - 未実行の検査、未実行のWeb検索、未実行のNative、未実行の実機確認をPASSまたはDEVICE_VERIFIEDと記載しない。
 
@@ -368,7 +371,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] CORE | src/miki/core/services/adaptiveRoutePlannerService.ts | lines=3015 | symbols=CoreGoalCandidate, GoalConflictDecision, ImprovementReadiness, PlannedRoute, adaptiveRoutePlannerService | callers=2 | deps=14 | Tests=2
 - [USED] CORE | src/miki/core/services/autonomousCandidatePreparationService.ts | lines=149 | symbols=AutonomousImplementationPlan, CandidateDraft, TargetResolution, autonomousCandidatePreparationService | callers=3 | deps=4
 - [USED] CORE | src/miki/core/services/autonomousIssueDiscoveryService.ts | lines=119 | symbols=DiscoveredIssue, DiscoveredIssueKind, DiscoveryConfig, DiscoveryScanMode, DiscoveryScanResult | callers=5 | deps=12 | Storage=miki_autonomous_issue_discovery_config_v1,miki_autonomous_issue_discovery_v1
-- [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts | lines=654 | symbols=AutonomousImprovementRequest, AutonomousLoopState, AutonomousLoopStatus, autonomousSelfImprovementLoopService | callers=7 | deps=11 | Storage=miki_autonomous_self_improvement_loop_v1,miki_autonomous_self_improvement_loop_v2
+- [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts | lines=687 | symbols=AutonomousImprovementRequest, AutonomousLoopState, AutonomousLoopStatus, autonomousSelfImprovementLoopService | callers=7 | deps=11 | Storage=miki_autonomous_self_improvement_loop_v1,miki_autonomous_self_improvement_loop_v2
 - [USED] CORE | src/miki/core/services/blackboardRecoveryService.ts | lines=6 | symbols=RecoverySummary, blackboardRecoveryService | callers=2 | deps=1
 - [USED] CORE | src/miki/core/services/candidateAutoRebaseService.ts | lines=14 | symbols=CandidateRebaseResult, RebaseConflict, RebaseFileInput, RebaseFileResult, candidateAutoRebaseService | callers=2 | deps=1 | Tests=2
 - [USED] CORE | src/miki/core/services/candidateCodeGenerationService.ts | lines=1588 | symbols=CandidateGenerationFile, CandidateGenerationOutcome, candidateCodeGenerationService | callers=2 | deps=27 | Tests=5
@@ -416,7 +419,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=236 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1, miki_domain_router_history_v2_index, miki_domain_router_history_v2_segment:* / Tests=3
 - [USED] CORE | src/miki/core/services/domainSequentialConnectionService.ts | lines=64 | symbols=DomainConnectionReceipt, domainSequentialConnectionService | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/evidenceIdentityService.ts | lines=31 | symbols=evidenceIdentityService | callers=3 | deps=1 | Storage=miki_evidence_identity_sequence_v1
-- [USED] CORE | src/miki/core/services/evidenceQualityGateService.ts | lines=15 | symbols=EvidenceQualityResult, evidenceQualityGateService | callers=4 | deps=1
+- [USED] CORE | src/miki/core/services/evidenceQualityGateService.ts | lines=56 | symbols=EvidenceQualityResult, evidenceQualityGateService | callers=4 | deps=1
 - [USED] CORE | src/miki/core/services/executionEnvironmentRouterService.ts | lines=85 | symbols=CiExecutionEnvironment, EnvironmentFingerprint, EnvironmentHints, EnvironmentRoute, executionEnvironmentRouterService | callers=3 | deps=2
 - [USED] CORE | src/miki/core/services/externalConnectionUiService.ts | lines=43 | symbols=ExternalConnectionConfig, ExternalConnectionId, ExternalConnectionStatus, ExternalConnectionView, externalConnectionUiService | callers=1 | deps=4 | Storage=miki_external_connection_config_v1,miki_external_connection_secret_refs_v1,miki_external_connection_status_v1
 - [USED] CORE | src/miki/core/services/externalDirectiveIntakeService.ts | lines=48 | symbols=ExternalDirective, ExternalDirectiveStatus, externalDirectiveIntakeService | callers=5 | deps=6 | Storage=miki_external_directives_v1
@@ -573,7 +576,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] memory | src/miki/memory/services/knowledgeHalfLifeService.ts | lines=20 | symbols=HalfLifeRecord, KnowledgeStability, knowledgeHalfLifeService | callers=2 | deps=1 | Storage=miki_knowledge_half_life_v1
 - [USED] memory | src/miki/memory/services/longTermMemoryService.ts | lines=1123 | symbols=longTermMemoryService | callers=8 | deps=4
 - [USED] memory | src/miki/memory/services/memoryAuditService.ts | lines=397 | symbols=EpistemicStatusAuditResult, MemoryAuditCycleRecord, memoryAuditService | callers=3 | deps=7 | Storage=miki_memory_audit_logs
-- [USED] memory | src/miki/memory/services/memoryContextBridgeService.ts | lines=9 | symbols=MemoryContextRequest, memoryContextBridgeService | callers=3 | deps=2 | Tests=1
+- [USED] memory | src/miki/memory/services/memoryContextBridgeService.ts | lines=10 | symbols=MemoryContextRequest, memoryContextBridgeService | callers=3 | deps=2 | Tests=1
 - [USED] memory | src/miki/memory/services/memoryEligibilityPolicyService.ts | lines=28 | symbols=MemoryEligibilityResult, MemoryUsePurpose, evaluateMemoryEligibility, isMemoryEligible | callers=3 | deps=1
 - [USED] memory | src/miki/memory/services/memoryPromotionService.ts | lines=73 | symbols=MemoryPromotionService, memoryPromotionService | callers=2 | deps=5
 - [USED] memory | src/miki/memory/services/memoryRecordRepositoryService.ts | lines=52 | symbols=MemoryMetricDelta, memoryRecordRepositoryService | callers=2 | deps=3
@@ -584,7 +587,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [USED] memory | src/miki/memory/services/mikiIntrospectionJournalService.ts | lines=206 | symbols=IntrospectionEntry, MikiIntrospectionJournalService, MikiMoodType, mikiIntrospectionJournalService | callers=2 | deps=5 | Storage=miki_ai_introspection_journal_v1
 - [USED] memory | src/miki/memory/services/researchMemoryVerificationSubscriberService.ts | lines=142 | symbols=initializeResearchMemoryVerificationSubscriber, researchMemoryVerificationSubscriberService | callers=2 | deps=5
 - [ORPHAN] memory | src/miki/memory/services/rustMemoryKernelService.ts | lines=7 | symbols=RustMemoryRecord, RustMemoryResult, rustMemoryKernelService | callers=0 | deps=0 | Plugin=MIKINativeRunner / Tests=2
-- [USED] memory | src/miki/memory/services/scopedVersionedMemoryService.ts | lines=24 | symbols=GovernedMemoryKind, GovernedMemoryQuery, GovernedMemoryRecord, GovernedMemoryScope, GovernedMemorySource | callers=2 | deps=2 | Storage=miki_scoped_versioned_memory_v1 / Tests=4
+- [USED] memory | src/miki/memory/services/scopedVersionedMemoryService.ts | lines=92 | symbols=GovernedMemoryKind, GovernedMemoryQuery, GovernedMemoryRecord, GovernedMemoryScope, GovernedMemorySource | callers=2 | deps=2 | Storage=miki_scoped_versioned_memory_v1 / Tests=4
 - [USED] memory | src/miki/memory/services/semanticCacheService.ts | lines=1 | symbols= semanticCacheService  | callers=1 | deps=1
 - [USED] memory | src/miki/memory/services/strictMemoryPromotionGateService.ts | lines=29 | symbols=MemoryPromotionDecision, MemoryPromotionEvidence, strictMemoryPromotionGateService | callers=2 | deps=2
 - [USED] memory | src/miki/memory/services/structuralMemoryService.ts | lines=165 | symbols=structuralMemoryService | callers=2 | deps=3 | Storage=miki_structural_memory_items
@@ -11616,3 +11619,10 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 今回の実機ログではJava OOMやWebView renderer crashは確認されず、旧ProcessはPACKAGE_UPDATEDで終了。今回の修正は観測された永続化競合と巨大履歴JSON再シリアライズを対象とし、実機での再検証はAPK更新後に行う。
 - 今回は現行実装索引の変更ファイル行数のみ更新。完全再帰インベントリ全体の再集計は行っていない。
 
+【P262｜2026-10-16｜ACT-R型記憶活性化・根拠品質・SOAR型インパス回復】
+
+- 作業手順の責務を明確化した。Termuxでユーザーに事前テスト／lint／buildを実行させる工程を置かず、編集・設計書更新・commit・PUSHを行う。PUSH後のGitHub main／全tree／差分／関連コード／設計正本／Actions・Artifact確認と、不整合の修正・再PUSH・再監査はChatGPTの責任とする。CI失敗はPASS扱いしないが、事前ゲートにも使わない。
+- scopedVersionedMemoryServiceの順位へ、既存スコープ適合・根拠リンク・confidenceを維持したうえで、取得頻度・時間減衰・成功／失敗feedbackを上限付きで追加。統計は別storage keyに保存し、保存頻度をまとめ、最大5,000件に制限する。CORE認知状態に含まれるMEM IDへ、terminal task outcomeをtask＋outcome単位で重複しないようfeedbackする。
+- EvidenceQualityGateは登録済み／ADMISSIBLE／Claim連結済み根拠を参照する。研究根拠は独立clusterを2つ以上必要とし、実行根拠は同一Taskに紐づくVERIFIED BUSINESS lineage、plan revision、operation instance、reply ID、content SHA-256を要求する。Domain数だけでは独立根拠として合格しない。RESULT欠落とERRORは不合格。これらの検査は登録・連結・独立性・実行線形性の判定であり、claimとsource本文の完全な意味含意を証明したとは扱わない。
+- SOAR型impasseに対し、不合格理由ごとのrecovery subgoalを親Task Blackboardへ永続記録する。各計画はparent task、原因、要求Domain、evidence IDs、試行、待機状態を持ち、既存のRequiredAssetAcquisitionとwait/retryに接続する。独立した子Task作成やprocedural chunkingを実装済みとは扱わない。
+- 正本索引は変更した4ソースの行数のみ更新。PUSH後のChatGPT監査で完全再帰treeを取得し、全体インベントリを別途再集計するまでは、全インベントリ更新済みと記載しない。Termuxの事前テスト・build・lint実行結果は記録しない。PUSH後のActions・APK状態は実測してから記録する。
