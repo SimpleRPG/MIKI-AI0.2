@@ -202,11 +202,14 @@ check(
     autonomousLoop.includes("preflight.reasons.includes('PERSISTENT_BACKEND_REQUIRED')")
 );
 check(
-  'Recovery actions are not fed back into evidence classification and candidate drafts are explicitly requested',
+  'Recovery actions use original evidence reasons and all synthesis actions request typed candidate drafts',
   requiredAssetAcquisition.includes('const requirements = this.classify(input.reasons);') &&
     !requiredAssetAcquisition.includes('this.classify(expandedReasons)') &&
-    requiredAssetAcquisition.includes("case 'SYNTHESIZE_COMPONENT':") &&
-    requiredAssetAcquisition.includes("kind: 'CODE_COMPONENT' as const") &&
+    requiredAssetAcquisition.includes("case 'SYNTHESIZE_KNOWLEDGE':\n            requestedDrafts.push({ kind: 'KNOWLEDGE', requirement });") &&
+    requiredAssetAcquisition.includes("case 'SYNTHESIZE_COMPONENT':\n            requestedDrafts.push({ kind: 'CODE_COMPONENT', requirement });") &&
+    requiredAssetAcquisition.includes("case 'SYNTHESIZE_ADAPTER':\n            requestedDrafts.push({ kind: 'ADAPTER', requirement });") &&
+    requiredAssetAcquisition.includes("case 'SYNTHESIZE_VALIDATOR':\n            requestedDrafts.push({ kind: 'VALIDATION', requirement });") &&
+    requiredAssetAcquisition.includes('const requestedDrafts: Array<{ kind: MissingAssetDraftKind; requirement: string }> = [];') &&
     requiredAssetAcquisition.includes('requestedDrafts});') &&
     missingAssetSynthesis.includes('requestedDrafts?:Array<{kind:MissingAssetDraftKind;requirement:string}>') &&
     missingAssetSynthesis.includes('input.requestedDrafts || []')
