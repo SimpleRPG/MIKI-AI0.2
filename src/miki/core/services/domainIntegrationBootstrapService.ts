@@ -629,6 +629,13 @@ class DomainIntegrationBootstrapService{
    });
    const evidenceIds=[...new Set(claimIds.flatMap(id=>evidenceService.list({claimId:id}).map(e=>e.evidence_id)))];
    const verified=verification.length===claimIds.length&&verification.every(x=>x.outcome==='SUPPORTED'||x.outcome==='DEVICE_VERIFIED');
+   const researchGapId = String(envelope.payload.gapId || '').trim();
+   let knowledgeGapResolved = false;
+   if (verified && researchGapId) {
+     const {knowledgeGapService}=await import('../../unknown/services/knowledgeGapService');
+     knowledgeGapService.advanceResolutionPlan(researchGapId, 'RESOLVE');
+     knowledgeGapResolved = Boolean(knowledgeGapService.markResolved(researchGapId));
+   }
    const verifiedKnowledgeComponentIds=componentVerification.filter(x=>x.verified).map(x=>x.componentId);
    const conflictedKnowledgeComponentIds=componentVerification.filter(x=>x.conflicted).map(x=>x.componentId);
    return done({
@@ -640,7 +647,8 @@ class DomainIntegrationBootstrapService{
      verified,
      unresolved:verification.some(x=>x.outcome==='UNRESOLVED'),
      contradicted:verification.some(x=>x.outcome==='CONTRADICTED'),
-     researchGapId:String(envelope.payload.gapId||''),
+     researchGapId,
+     knowledgeGapResolved,
      evidenceIds,
      knowledgeComponentIds:componentIds,
      verifiedKnowledgeComponentIds,

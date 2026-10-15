@@ -47,6 +47,8 @@ const autonomousSearch = read('src/miki/research/services/autonomousSearchServic
 const preflightService = read('src/miki/core/services/selfImprovementPreflightService.ts');
 const requiredAssetAcquisition = read('src/miki/core/services/requiredAssetAcquisitionService.ts');
 const missingAssetSynthesis = read('src/miki/core/services/missingAssetSynthesisService.ts');
+const autonomousRevalidationLoop = read('src/miki/autonomy/services/autonomousRevalidationLoopService.ts');
+const domainIntegrationBootstrap = read('src/miki/core/services/domainIntegrationBootstrapService.ts');
 
 check('Canonical Runner exposes decideCoreGoals', runner.includes('fun decideCoreGoals(call: PluginCall)'));
 check('Canonical Runner exposes rankDomainRoutes', runner.includes('fun rankDomainRoutes(call: PluginCall)'));
@@ -633,6 +635,43 @@ check(
 
 check('Android requests a larger Java heap without capping functional data', appManifest.includes('android:largeHeap="true"') && design.includes('操作性・応答性') && design.includes('機能データを削減'));
 check('APK boot log identifies its source commit', apkWorkflow.includes('VITE_MIKI_BUILD_REVISION: ${{ github.sha }}') && mainEntry.includes('VITE_MIKI_BUILD_REVISION') && mainEntry.includes('buildRevision'));
+
+
+const autonomousRevalidationIndexRow = design.split(/\r?\n/).find(
+  line => line.startsWith('- [USED] autonomy | src/miki/autonomy/services/autonomousRevalidationLoopService.ts |')
+);
+const domainBootstrapIndexRow = design.split(/\r?\n/).find(
+  line => line.startsWith('- [USED] CORE | src/miki/core/services/domainIntegrationBootstrapService.ts |')
+);
+
+check(
+  'Autonomous Knowledge Gaps dispatch through bounded CORE Tasks with backoff',
+  autonomousRevalidationLoop.includes('knowledgeGapService.listOpen(500)') &&
+    autonomousRevalidationLoop.includes('coreTaskIngressService.submit({') &&
+    autonomousRevalidationLoop.includes('autonomousKnowledgeGapId: gap.id') &&
+    autonomousRevalidationLoop.includes('const maxGapTasksPerRun = limit >= 6 ? 3 : 1') &&
+    autonomousRevalidationLoop.includes('15 * 60 * 1000 * (2 ** exponent)') &&
+    autonomousRevalidationLoop.includes('coreTaskIngressService.resume(') &&
+    !autonomousRevalidationLoop.includes('researchService.researchGap(')
+);
+check(
+  'Knowledge Gap resolution requires verifier success for every claim',
+  domainIntegrationBootstrap.includes('if (verified && researchGapId)') &&
+    domainIntegrationBootstrap.includes("knowledgeGapService.advanceResolutionPlan(researchGapId, 'RESOLVE')") &&
+    domainIntegrationBootstrap.includes('knowledgeGapService.markResolved(researchGapId)') &&
+    domainIntegrationBootstrap.includes('knowledgeGapResolved')
+);
+check(
+  'Canonical index counts match both changed CORE sources',
+  autonomousRevalidationIndexRow?.includes(`lines=${autonomousRevalidationLoop.split(/\r?\n/).length - 1}`) &&
+    domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
+);
+check(
+  'Canonical design records the P265 autonomous Knowledge Gap path',
+  design.includes('正本Revision：2026-10-16-P265') &&
+    design.includes('現行Revision: 2026-10-16-P265') &&
+    design.includes('2026-10-16-P265 一般Knowledge GapのCORE自律調査経路')
+);
 
 const failures = checks.filter(item => !item.passed);
 for (const item of checks) console.log(`${item.passed ? 'PASS' : 'FAIL'} ${item.name}`);

@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-16
-正本Revision：2026-10-16-P264
+正本Revision：2026-10-16-P265
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P263）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P265）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-16-P264
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加したが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-16-P265
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加したが、全tree再帰インベントリは再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -128,6 +128,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - 同名ファイル組: 147組。
 
 ■ 不変条件
+- 一般Knowledge Gapは既存CORE TaskIngress／TaskBlackboardを使って調査する。通常周期は最大1件、深いスリープ周期は最大3件とし、指数バックオフと既存Task照合で重複投入を抑える。
+- 検索結果だけではKnowledge Gapを解決しない。VERIFY_RESEARCH_CLAIMSで全ClaimがSUPPORTEDまたはDEVICE_VERIFIEDになった場合だけ、対応GapをRESOLVEDへ遷移させる。
 
 - CORE + 17分類 = 18構成。
 - 通常対話のCORE 18構成追跡は初期状態で折りたたみ、要約行へ処理状態を表示し、必要時に展開して詳細を確認できる。追跡情報・CORE処理経路・保存データは削減しない。
@@ -282,7 +284,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] autonomy | src/miki/autonomy/services/autonomousGrowthGovernorService.ts | lines=105 | symbols=AutonomousGrowthCycleResult, AutonomousGrowthGovernorService, autonomousGrowthGovernorService | callers=2 | deps=6 | Storage=miki_autonomous_growth_governor_v1
 - [USED] autonomy | src/miki/autonomy/services/autonomousHardeningService.ts | lines=699 | symbols=AutonomousHardeningService, HardeningResult, HardeningVerdict, MAX_CONSECUTIVE_FAILURES, MAX_DEEP_FUTURE_SCENARIOS | callers=5 | deps=4 | Tests=1
 - [USED] autonomy | src/miki/autonomy/services/autonomousQaService.ts | lines=1 | symbols= autonomousQaService  | callers=1 | deps=1
-- [USED] autonomy | src/miki/autonomy/services/autonomousRevalidationLoopService.ts | lines=153 | symbols=AutonomousRevalidationLoopService, RevalidationRun, autonomousRevalidationLoopService | callers=3 | deps=10
+- [USED] autonomy | src/miki/autonomy/services/autonomousRevalidationLoopService.ts | lines=310 | symbols=AutonomousRevalidationLoopService, RevalidationRun, autonomousRevalidationLoopService | callers=3 | deps=10
 - [USED] autonomy | src/miki/autonomy/services/autonomyRustKernelService.ts | lines=1 | symbols=autonomyRustKernelService | callers=1 | deps=0 | Plugin=MIKINativeRunner
 - [USED] autonomy | src/miki/autonomy/services/collaborationSelfMaintenanceService.ts | lines=1 | symbols= collaborationSelfMaintenanceService  | callers=1 | deps=1
 - [USED] autonomy | src/miki/autonomy/services/mikiUltraEvolverService.ts | lines=256 | symbols=AutonomousWebEvolveResult, BigOOptimizeResult, ComplexityHeatmapItem, ComplexityHeatmapResult, MutantItem | callers=2 | deps=1
@@ -411,7 +413,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/services/directiveReviewPackageCompletionService.ts | lines=5 | symbols=DirectiveCompletionState, DirectiveReviewCompletion, directiveReviewPackageCompletionService | callers=1 | deps=6 | Tests=1
 - [USED] CORE | src/miki/core/services/domainCatalogService.ts | lines=5 | symbols=MIKI_DOMAINS, MIKI_WORKER_DOMAINS, getMikiDomainOrder, isMikiDomain | callers=5 | deps=1 | Tests=1
 - [USED] CORE | src/miki/core/services/domainContractRegistryService.ts | lines=33 | symbols=DomainCapabilityManifest, DomainContractValidation, domainContractRegistryService | callers=1 | deps=3
-- [USED] CORE | src/miki/core/services/domainIntegrationBootstrapService.ts | lines=860 | symbols=domainIntegrationBootstrapService | callers=4 | deps=67 | Tests=10
+- [USED] CORE | src/miki/core/services/domainIntegrationBootstrapService.ts | lines=874 | symbols=domainIntegrationBootstrapService | callers=4 | deps=67 | Tests=10
 - [USED] CORE | src/miki/core/services/domainOperationalAdapterService.ts | lines=101 | symbols=DomainOperationalSnapshot, domainOperationalAdapterService | callers=2 | deps=20
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/domainOwnershipCatalogService.ts | lines=30 | symbols=SourceOwnership, SourceOwnershipKind, getCoreCompatibilityGateways, getDomainOwnershipCatalog, resolveSourceOwnership | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=168 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
@@ -11644,3 +11646,15 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 既存のTaskBlackboard、RequiredAssetAcquisition、wait/retry、Skills／Unified Learningを再利用し、第二CORE、第二Blackboard、独立した子Task、完全なprocedural chunkingは新設しない。要求Domainは記録された回復計画として扱い、新しい独立ルーティングを実装したとは宣言しない。
 - `verify_runtime_failure_fixes.mjs`へ安定ID・終了状態の契約検査を追加し、autonomousSelfImprovementLoopService.tsの実測行数を正本索引へ反映した。完全再帰実装インベントリは再生成していない。
 - Termuxで事前lint／テスト／buildを行わない。PUSH後にChatGPTがGitHub main、Actions結果、APK Artifactおよび今回の差分を監査する。CIや実機動作は実測するまで成功扱いしない。
+
+
+============================================================
+【2026-10-16-P265 一般Knowledge GapのCORE自律調査経路】
+============================================================
+
+- GitHub mainの基準コミット `9e417eeab0ef814a1765a60c7cf17705cb92847f` と、KnowledgeGapService、CoreTaskIngress、TaskBlackboard、AdaptiveRoutePlanner、VERIFY_RESEARCH_CLAIMSの既存実装を照合した。
+- AutonomousRevalidationLoopから既存CORE TaskIngressへ調査を委譲する。通常周期は最大1件、深いスリープ周期は最大3件。15分から最大24時間の指数バックオフと、最近のBlackboard Taskとの同一Gap照合を適用する。
+- `BACKGROUND_BUDGET:` または `coreCycleBudgetExhausted` が確認できる停止Taskだけを再開し、ユーザー停止や外部実行待ちなど、その他の停止理由は維持する。
+- 検索結果だけではGapを解決しない。Verifierの全ClaimがSUPPORTEDまたはDEVICE_VERIFIEDの場合に限り、対応Gapの解決計画と状態を更新する。
+- Runtime検証ScriptへCORE委譲、再試行制御、Verifier後の解決条件、変更した2ソースの正本索引行数を検査する契約を追加した。完全再帰インベントリは再生成していない。
+- Termuxで事前lint／テスト／buildは実行しない。PUSH後にGitHub main、Actions結果、APK Artifactおよび今回の差分を監査する。CIや実機動作は実測するまで成功扱いしない。
