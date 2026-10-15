@@ -35,6 +35,7 @@ class StorageService {
   private dirtyKeys = new Set<string>();
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private lastDiagnosticFlushAt = new Map<string, number>();
+  private lastDeferredFlushDiagnosticAt = 0;
   private backend: 'sqlite' | 'indexeddb' | 'memory' = 'memory';
   private ftsAvailable: boolean = false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -206,12 +207,14 @@ class StorageService {
     const res = await this.sqlite.query(`SELECT key, value FROM ${this.STORE} WHERE substr(key, 1, ?) != ? AND length(value) <= ?;`,
       [this.SQLITE_CHUNK_PREFIX.length, this.SQLITE_CHUNK_PREFIX, this.SQLITE_CHUNK_CHARS]);
     for (const row of res.values || []) {
+      if (this.dirtyKeys.has(row.key)) continue;
       const manifest = this.parseSqliteChunkManifest(row.value);
       this.cache.set(row.key, manifest ? await this.readSqliteChunks(row.key, manifest) : row.value);
     }
     const large = await this.sqlite.query(`SELECT key, length(value) AS chars FROM ${this.STORE} WHERE substr(key, 1, ?) != ? AND length(value) > ?;`,
       [this.SQLITE_CHUNK_PREFIX.length, this.SQLITE_CHUNK_PREFIX, this.SQLITE_CHUNK_CHARS]);
     for (const row of large.values || []) {
+      if (this.dirtyKeys.has(row.key)) continue;
       const pieces: string[] = [];
       for (let offset = 1, length = Number(row.chars); offset <= length; offset += this.SQLITE_CHUNK_CHARS) {
         const partRow = await this.sqlite.query(`SELECT substr(value, ?, ?) AS part FROM ${this.STORE} WHERE key = ?;`, [offset, this.SQLITE_CHUNK_CHARS, row.key]);
@@ -247,7 +250,8 @@ class StorageService {
         cursorReq.onsuccess = () => {
           const cursor = cursorReq.result;
           if (cursor) {
-            this.cache.set(String(cursor.key), cursor.value as string);
+            const key = String(cursor.key);
+            if (!this.dirtyKeys.has(key)) this.cache.set(key, cursor.value as string);
             cursor.continue();
           } else {
             resolve();
@@ -345,6 +349,22 @@ class StorageService {
 
   private async flush(): Promise<void> {
     if (this.dirtyKeys.size === 0) return;
+    const persistentBackendReady =
+      (this.backend === 'sqlite' && Boolean(this.sqlite)) ||
+      (this.backend === 'indexeddb' && Boolean(this.idb));
+    if (!persistentBackendReady) {
+      const now = Date.now();
+      if (now - this.lastDeferredFlushDiagnosticAt >= 15000) {
+        this.lastDeferredFlushDiagnosticAt = now;
+        this.emitFlushDiagnostic('DEFERRED', {
+          backend: this.backend,
+          keyCount: this.dirtyKeys.size,
+          reason: 'PERSISTENT_BACKEND_UNAVAILABLE',
+        });
+      }
+      // 未永続の値を保存済みとして扱わない。
+      return;
+    }
     const keys = Array.from(this.dirtyKeys);
     this.dirtyKeys.clear();
     const flushStartedAt = Date.now();

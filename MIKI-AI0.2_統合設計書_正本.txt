@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-15
-正本Revision：2026-10-15-P260
+正本Revision：2026-10-15-P261
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-15-P260
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-15-P261
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。全tree再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -148,10 +148,11 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 ■ メモリ利用方針（現行）
 
 - 端末メモリは、操作性・応答性に多大な悪影響が出ない範囲で積極的に利用する。メモリ使用量を低く見せることを目的に、会話・知識・自己コード等の機能データを削減・切り捨てない。
+- Appの動的importはstorageService.ready完了後にのみ実行し、同期Facadeを読むmodule-level serviceが未hydrateの空cacheを誤読しない。永続Backend未準備中のflushはDEFERREDとして扱い、dirty keyを消去しない。SQLite/IndexedDBのhydrateでも、起動中にdirtyとなったkeyを保存済み値で上書きしない。
 - 常駐メモリの利用と、一時文字列の重複生成・大容量ブリッジ転送などによる瞬間的なメモリ急増は分けて評価する。操作性に重大な影響を与えるピークは抑える。
 - Androidは`android:largeHeap="true"`を要求する。ただし増量は保証されないため、実機の`MEMORY_SAMPLE`にある`javaMaxKB`・Java使用量・PSS・OS空きメモリを見て評価し、設定だけでOOM解消を断定しない。
 - APKの起動ログはビルド元Git commit SHAを記録する。`buildRevision=UNKNOWN`はビルド環境変数未設定を意味し、現行`main`由来の証拠にはしない。
-- Domain Routerの履歴上限2,000件・記録内容・応答経路は維持する。初回記録以外の100 sequence境界は既存50msまとめ保存へ合流させ、境界到来ごとに大容量JSONを即時再シリアライズして保存予約を中断しない。
+- Domain Routerのアクティブ履歴は2,000件維持。永続履歴は1イベント全体の再シリアライズを避け、最大50件または512 Ki文字以内を目安にsegmentへ追記保存し、indexは最新2,000件を参照する。以前のsegmentは削除せず、保持データを切り捨てない。初回記録以外の100 sequence境界は既存50msまとめ保存へ合流させ、境界到来ごとに全履歴の大容量JSONを再シリアライズしない。旧miki_domain_router_history_v1は新segmentとindexの永続化完了後に限り削除する。
 
 ■ 自律改善の再試行・能力不足復旧（現行）
 
@@ -412,7 +413,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/domainOwnershipCatalogService.ts | lines=30 | symbols=SourceOwnership, SourceOwnershipKind, getCoreCompatibilityGateways, getDomainOwnershipCatalog, resolveSourceOwnership | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=168 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/domainReplyLedgerService.ts | lines=350 | symbols=ActionLineage, DomainReplyLedgerRecord, domainReplyLedgerService | callers=7 | deps=6 | Storage=miki_domain_reply_ledger_v1
-- [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=160 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1 / Tests=3
+- [USED] CORE | src/miki/core/services/domainRouterService.ts | lines=236 | symbols=DomainCommand, DomainEnvelope, DomainHandler, DomainRegistration, DomainReply | callers=10 | deps=6 | Storage=miki_domain_router_history_v1, miki_domain_router_history_v2_index, miki_domain_router_history_v2_segment:* / Tests=3
 - [USED] CORE | src/miki/core/services/domainSequentialConnectionService.ts | lines=64 | symbols=DomainConnectionReceipt, domainSequentialConnectionService | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/evidenceIdentityService.ts | lines=31 | symbols=evidenceIdentityService | callers=3 | deps=1 | Storage=miki_evidence_identity_sequence_v1
 - [USED] CORE | src/miki/core/services/evidenceQualityGateService.ts | lines=15 | symbols=EvidenceQualityResult, evidenceQualityGateService | callers=4 | deps=1
@@ -1040,7 +1041,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - [ORPHAN] LEGACY_OR_SHARED | src/services/specContractCompilerService.ts | lines=88 | symbols=ContractStatus, Norm, SpecContract, SpecContractClause, SpecContractCompilerService | callers=0 | deps=2 | Storage=miki_spec_contract_v1 / Tests=3
 - [USED] LEGACY_OR_SHARED | src/services/startupRecoveryService.ts | lines=190 | symbols=StartupDiagnostic, StartupPhase, startupRecoveryService | callers=1 | deps=0 | Storage=miki_startup_diagnostic_v1 / Tests=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/storagePlanningService.ts | lines=220 | symbols=StoragePlanningService, storagePlanningService | callers=0 | deps=4 | Storage=miki_storage_audit_log_v32
-- [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=813 | symbols=storageService | callers=295 | deps=1 | Tests=7
+- [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=833 | symbols=storageService | callers=295 | deps=1 | Tests=7
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/syntheticDataService.ts | lines=779 | symbols=SyntheticDataService, syntheticDataService, toolsService | callers=1 | deps=9 | Storage=miki_ai_synthetic_batches
 - [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=1033 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
 - [USED] LEGACY_OR_SHARED | src/services/taskCaseMemoryService.ts | lines=45 | symbols=TaskCaseMaturity, TaskCaseMemoryService, TaskCaseOutcome, TaskCaseRecord, taskCaseMemoryService | callers=4 | deps=5
@@ -11607,3 +11608,11 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 会話・学習・保存・Android診断の実装と利用者データは変更しない。正本の現行RevisionとP225以降のインベントリ注意書きをP260に更新する。
 - P260静的検査（正本更新後・実測終了コード、0=PASS）: import_check=1; typescript_lint=127; runtime_verifier_initial=0; conversation_learning=1; autonomous_infrastructure=1; whitespace_diff_pre_record=0。
 - GitHub Actions、APK Artifact、Android実機の状態はPUSH後に直接確認する。静的検査の結果からAPK生成やOOM解消を推定しない。
+
+【P261｜2026-10-15｜実機ランタイムログに基づく起動・履歴保存修正】
+- 起動時はstorageService.readyで選択Backendのhydrate完了を待ってからAppをdynamic importする。memory fallback時は制限モードで起動するが、永続Backendがない状態のflushを成功扱いせず、未保存dirty keyを残す。hydrate中に起動後writeを保存済み値で上書きしない。
+- Domain Routerの旧全履歴JSONキーを互換入力として読込み、各イベントをsegmentへ移行する。最新2,000イベントのindexとsegmentを永続Backendへflushしてからのみ旧キーを削除する。新しいroute完了は全履歴を毎回stringifyせず、50msバッチのsegment追記で保存し、既存履歴segmentは削除しない。
+- 回帰検査に、起動hydrate gate、dirty key保護、memory flush defer、segment/indexによる履歴保存と安全移行の静的契約を追加する。
+- 今回の実機ログではJava OOMやWebView renderer crashは確認されず、旧ProcessはPACKAGE_UPDATEDで終了。今回の修正は観測された永続化競合と巨大履歴JSON再シリアライズを対象とし、実機での再検証はAPK更新後に行う。
+- 今回は現行実装索引の変更ファイル行数のみ更新。完全再帰インベントリ全体の再集計は行っていない。
+

@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { storageService } from './services/storageService';
 import { startupRecoveryService } from './services/startupRecoveryService';
-import { nonBlockingStartupP156Service } from './services/nonBlockingStartupP156Service';
 import { systemLogger } from './services/systemLogger';
 import './index.css';
 
@@ -112,17 +111,23 @@ const renderApp = async () => {
   startupRecoveryService.update('APP_RENDERED', 'メイン画面を表示しました。残りの初期化を続行しています');
 };
 
-void nonBlockingStartupP156Service.awaitWithoutBlocking(storageService.ready)
-  .then((outcome) => {
-    if (outcome.mode === 'LIMITED') {
+void storageService.ready
+  .then(() => {
+    const backend = storageService.getBackendName();
+    if (backend === 'memory') {
       startupRecoveryService.update('APP_IMPORT', 'Persistent storage unavailable; continuing in limited mode');
+      systemLogger.warn('SYSTEM', '[STORAGE] Persistent backend unavailable; keeping writes deferred', { backend });
+    } else {
+      startupRecoveryService.update('APP_IMPORT', 'Persistent storage ready (' + backend + ')');
     }
+    // App modules read storage synchronously during import.
+    // Do not import them until the facade cache has been hydrated.
     return renderApp();
   })
   .then(() => import('./services/systemLogger'))
   .then(({ systemLogger }) => systemLogger.initializeRuntimeMemoryDiagnostics())
   .catch((error) => {
-    systemLogger.error('SYSTEM','[BOOTSTRAP_FAILED]',{error:error instanceof Error?`${error.name}: ${error.message}`:String(error)});
+    systemLogger.error('SYSTEM','[BOOTSTRAP_FAILED]',{error:error instanceof Error?error.name + ': ' + error.message:String(error)});
     console.error('MIKI application bootstrap failed', error);
     startupRecoveryService.renderFatal(rootElement, error);
   });

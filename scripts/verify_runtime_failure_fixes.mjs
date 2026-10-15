@@ -569,13 +569,30 @@ check(
     oomSeedSource.includes('maxFileChars')
 );
 check(
-  'Domain router serialization checkpoints record history size and duration',
+  'Domain router serialization checkpoints measure bounded segment batches',
   domainRouter.includes("recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT'") &&
-    domainRouter.includes("phase: 'SERIALIZE_BEGIN'") &&
-    domainRouter.includes("phase: 'SERIALIZE_COMPLETE'") &&
-    domainRouter.includes('serializedChars: serializedHistory.length') &&
-    domainRouter.includes('serializationElapsedMs')
+    domainRouter.includes("phase:'SERIALIZE_BEGIN'") &&
+    domainRouter.includes("phase:'SERIALIZE_COMPLETE'") &&
+    domainRouter.includes('serializedChars') &&
+    domainRouter.includes('serializationElapsedMs') &&
+    domainRouter.includes('HISTORY_SEGMENT_MAX_CHARS') &&
+    domainRouter.includes('HISTORY_SEGMENT_MAX_ENTRIES') &&
+    !domainRouter.includes('JSON.stringify(this.history)')
 );
+check(
+  'Startup imports App only after storage hydration completes',
+  mainEntry.includes('void storageService.ready') &&
+    mainEntry.includes('Persistent storage ready') &&
+    !mainEntry.includes('nonBlockingStartupP156Service.awaitWithoutBlocking(storageService.ready)')
+);
+check(
+  'Storage hydration preserves writes made before readiness and defers non-durable flushes',
+  oomStorageSource.includes('this.dirtyKeys.has(row.key)') &&
+    oomStorageSource.includes('if (!this.dirtyKeys.has(key)) this.cache.set(key, cursor.value as string)') &&
+    oomStorageSource.includes('const persistentBackendReady =') &&
+    oomStorageSource.includes("emitFlushDiagnostic('DEFERRED'")
+);
+
 check(
   'Canonical index counts match all sources modified for memory diagnostics',
   storageIndexRow?.includes(`lines=${oomStorageSource.split(/\r?\n/).length - 1}`) &&
@@ -592,18 +609,14 @@ check('Oversized diagnostic history is not parsed into a second object graph',
   runtimeLogger.includes('MAX_PERSISTED_LOG_CHARS') && runtimeLogger.includes('saved.length <= MAX_PERSISTED_LOG_CHARS') &&
     runtimeLogger.includes('boundedLogDetails') && runtimeLogger.includes('MAX_LOG_DETAIL_CHARS'));
 check(
-  'Domain router coalesces boundary checkpoints into the existing history timer',
-  domainRouter.includes("private pendingHistoryCheckpoint: Pick<DomainEnvelope, 'command' | 'source' | 'target'> | null = null;") &&
-    domainRouter.includes('if (this.history.length === 1) this.persistHistory(envelope, true);') &&
-    domainRouter.includes('this.scheduleHistoryPersistence(reportSerializeBoundary ? envelope : undefined, reportSerializeBoundary);') &&
-    domainRouter.includes('private scheduleHistoryPersistence(envelope?: DomainEnvelope, reportBoundary = false): void') &&
-    domainRouter.includes("private persistHistory(envelope?: Pick<DomainEnvelope, 'command' | 'source' | 'target'>, reportBoundary = false): void") &&
-    domainRouter.includes('this.pendingHistoryCheckpoint = { command: envelope.command, source: envelope.source, target: envelope.target };') &&
-    domainRouter.includes('const checkpointEnvelope = this.pendingHistoryCheckpoint;') &&
-    domainRouter.includes('this.persistHistory(checkpointEnvelope ?? undefined, checkpointEnvelope !== null);') &&
-    domainRouter.includes('this.historyPersistTimer') &&
-    domainRouter.includes('storageService.setItem(KEY, serializedHistory)') &&
-    !domainRouter.includes('if (reportSerializeBoundary) this.persistHistory(envelope, true)')
+  'Domain router archives full event records in bounded segments and migrates legacy history safely',
+  domainRouter.includes('pendingHistoryRecords:DomainHistoryEntry[]') &&
+    domainRouter.includes('this.pendingHistoryRecords.push(entry)') &&
+    domainRouter.includes('storageService.setItem(HISTORY_INDEX_KEY') &&
+    domainRouter.includes('migrateLegacyHistory') &&
+    domainRouter.includes('await storageService.flushNow()') &&
+    domainRouter.includes('HISTORY_SEGMENT_PREFIX') &&
+    domainRouter.includes('MAX_HISTORY=2000')
 );
 
 check('Android requests a larger Java heap without capping functional data', appManifest.includes('android:largeHeap="true"') && design.includes('操作性・応答性') && design.includes('機能データを削減'));

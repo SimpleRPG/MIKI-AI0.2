@@ -40,16 +40,27 @@ export type DomainHandler = (envelope: DomainEnvelope) => Promise<DomainReply>;
 export interface DomainRegistration { domain:MikiDomain; commands:DomainCommand[]; registeredAt:number; }
 
 const KEY='miki_domain_router_history_v1';
+const HISTORY_SEGMENT_PREFIX='miki_domain_router_history_v2_segment:';
+const HISTORY_INDEX_KEY='miki_domain_router_history_v2_index';
+const HISTORY_SEGMENT_MAX_ENTRIES=50;
+const HISTORY_SEGMENT_MAX_CHARS=512*1024;
 const MAX_DEPTH=18;
 const MAX_HISTORY=2000;
+
+type DomainHistoryEntry={envelope:DomainEnvelope;reply:DomainReply};
+type DomainHistoryIndexEntry={id:string;segmentKey:string;createdAt:number};
 
 class DomainRouterService {
   private handlers=new Map<MikiDomain,DomainHandler>();
   private registrations=new Map<MikiDomain,DomainRegistration>();
-  private history:Array<{envelope:DomainEnvelope;reply:DomainReply}>=[];
+  private history:DomainHistoryEntry[]=[];
+  private historyIndex:DomainHistoryIndexEntry[]=[];
+  private pendingHistoryRecords:DomainHistoryEntry[]=[];
   private sequence=0;
+  private historySegmentSequence=0;
   private historyPersistTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingHistoryCheckpoint: Pick<DomainEnvelope, 'command' | 'source' | 'target'> | null = null;
+  private historyMigrationStarted=false;
 
   constructor(){this.load();}
 
@@ -97,45 +108,110 @@ class DomainRouterService {
   getMissingDomains(all:MikiDomain[]):MikiDomain[]{return all.filter(d=>!this.handlers.has(d));}
   list(limit=200){return this.history.slice(-Math.max(1,limit)).reverse();}
 
+
   private finish(envelope:DomainEnvelope,reply:DomainReply):DomainReply{
-    const inferred=this.extractEvidenceIds(reply.result);const evidenceIds=[...new Set([...envelope.evidenceIds,...inferred])];const validation=domainContractRegistryService.validateReply(envelope,reply);const completed:DomainReply=validation.valid?{...reply,normalized:validation.normalized}:{accepted:false,domain:envelope.target,command:envelope.command,error:`DOMAIN_REPLY_CONTRACT_FAILED:${validation.reasons.join('|')}`,completedAt:Date.now(),normalized:{status:'REJECTED',operationClass:'DIAGNOSTIC',command:envelope.command,summary:'Domain reply contract rejected',data:{contractSha256:validation.contractSha256,reasons:validation.reasons,originalAccepted:reply.accepted},evidenceIds:validation.normalized?.evidenceIds||evidenceIds,retryable:false}};
-    this.history.push({envelope:{...envelope,payload:{...envelope.payload},evidenceIds:[...envelope.evidenceIds]},reply:{...completed}});
+    const inferred=this.extractEvidenceIds(reply.result);
+    const evidenceIds=[...new Set([...envelope.evidenceIds,...inferred])];
+    const validation=domainContractRegistryService.validateReply(envelope,reply);
+    const completed:DomainReply=validation.valid
+      ? {...reply,normalized:validation.normalized}
+      : {accepted:false,domain:envelope.target,command:envelope.command,error:'DOMAIN_REPLY_CONTRACT_FAILED:'+validation.reasons.join('|'),completedAt:Date.now(),normalized:{status:'REJECTED',operationClass:'DIAGNOSTIC',command:envelope.command,summary:'Domain reply contract rejected',data:{contractSha256:validation.contractSha256,reasons:validation.reasons,originalAccepted:reply.accepted},evidenceIds:validation.normalized?.evidenceIds||evidenceIds,retryable:false}};
+    const entry:DomainHistoryEntry={envelope:{...envelope,payload:{...envelope.payload},evidenceIds:[...envelope.evidenceIds]},reply:{...completed}};
+    this.history.push(entry);
     if(this.history.length>MAX_HISTORY)this.history.splice(0,this.history.length-MAX_HISTORY);
-    const reportSerializeBoundary = this.history.length === 1 || this.sequence % 100 === 0;
-    if (this.history.length === 1) this.persistHistory(envelope, true);
-    else this.scheduleHistoryPersistence(reportSerializeBoundary ? envelope : undefined, reportSerializeBoundary);
-    if(!reply.accepted)systemLogger.warn('SELF_IMPROVEMENT',`[DomainRouter] ${envelope.target}/${envelope.command} rejected`,reply.error||'unknown');
+    const reportSerializeBoundary=this.history.length===1||this.sequence%100===0;
+    if(this.history.length===1)this.persistHistoryEntries([entry],envelope,true);
+    else this.scheduleHistoryPersistence(entry,reportSerializeBoundary?envelope:undefined,reportSerializeBoundary);
+    if(!reply.accepted)systemLogger.warn('SELF_IMPROVEMENT','[DomainRouter] '+envelope.target+'/'+envelope.command+' rejected',reply.error||'unknown');
     return completed;
   }
-  private scheduleHistoryPersistence(envelope?: DomainEnvelope, reportBoundary = false): void {
-    if (reportBoundary && envelope) this.pendingHistoryCheckpoint = { command: envelope.command, source: envelope.source, target: envelope.target };
-    if (this.historyPersistTimer) return;
-    this.historyPersistTimer = setTimeout(() => {
-      this.historyPersistTimer = null;
-      const checkpointEnvelope = this.pendingHistoryCheckpoint;
-      this.pendingHistoryCheckpoint = null;
-      this.persistHistory(checkpointEnvelope ?? undefined, checkpointEnvelope !== null);
-    }, 50);
+
+  private historySegmentKey():string{
+    this.historySegmentSequence+=1;
+    const timestamp=String(Date.now()).padStart(13,'0');
+    const sequence=String(this.historySegmentSequence).padStart(8,'0');
+    return HISTORY_SEGMENT_PREFIX+timestamp+'_'+sequence+'_'+Math.random().toString(36).slice(2,8);
   }
 
-  private persistHistory(envelope?: Pick<DomainEnvelope, 'command' | 'source' | 'target'>, reportBoundary = false): void {
-    if (this.historyPersistTimer) {
-      clearTimeout(this.historyPersistTimer);
-      this.historyPersistTimer = null;
+  private scheduleHistoryPersistence(entry:DomainHistoryEntry,envelope?:DomainEnvelope,reportBoundary=false):void{
+    this.pendingHistoryRecords.push(entry);
+    if(reportBoundary&&envelope)this.pendingHistoryCheckpoint={command:envelope.command,source:envelope.source,target:envelope.target};
+    if(this.historyPersistTimer)return;
+    this.historyPersistTimer=setTimeout(()=>{
+      this.historyPersistTimer=null;
+      const checkpoint=this.pendingHistoryCheckpoint;this.pendingHistoryCheckpoint=null;
+      const entries=this.pendingHistoryRecords.splice(0);
+      this.persistHistoryEntries(entries,checkpoint??undefined,checkpoint!==null);
+    },50);
+  }
+
+  private persistHistoryEntries(entries:DomainHistoryEntry[],envelope?:Pick<DomainEnvelope,'command'|'source'|'target'>,reportBoundary=false):void{
+    if(entries.length===0)return;
+    if(reportBoundary)systemLogger.recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT',{phase:'SERIALIZE_BEGIN',command:envelope?.command??'BATCHED',source:envelope?.source??'core',target:envelope?.target??'core',historyCount:this.history.length,entryCount:entries.length});
+    const startedAt=Date.now();let serializedChars=0;let segmentCount=0;
+    let batch:DomainHistoryEntry[]=[];let batchJson:string[]=[];let batchChars=2;
+    const writeBatch=()=>{
+      if(batch.length===0)return;
+      const segmentKey=this.historySegmentKey();
+      const serialized='['+batchJson.join(',')+']';
+      storageService.setItem(segmentKey,serialized);
+      this.historyIndex.push(...batch.map(entry=>({id:entry.envelope.envelopeId,segmentKey,createdAt:entry.envelope.createdAt})));
+      serializedChars+=serialized.length;segmentCount++;batch=[];batchJson=[];batchChars=2;
+    };
+    for(const entry of entries){
+      const serialized=JSON.stringify(entry);
+      if(batch.length>0&&(batch.length>=HISTORY_SEGMENT_MAX_ENTRIES||batchChars+serialized.length+1>HISTORY_SEGMENT_MAX_CHARS))writeBatch();
+      batch.push(entry);batchJson.push(serialized);batchChars+=serialized.length+(batch.length>1?1:0);
     }
-    if (reportBoundary) systemLogger.recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT', {
-      phase: 'SERIALIZE_BEGIN', command: envelope?.command ?? 'BATCHED',
-      source: envelope?.source ?? 'core', target: envelope?.target ?? 'core', historyCount: this.history.length,
-    });
-    const startedAt = Date.now();
-    const serializedHistory = JSON.stringify(this.history);
-    const serializationElapsedMs = Date.now() - startedAt;
-    if (reportBoundary || serializationElapsedMs >= 50) systemLogger.recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT', {
-      phase: 'SERIALIZE_COMPLETE', command: envelope?.command ?? 'BATCHED',
-      source: envelope?.source ?? 'core', target: envelope?.target ?? 'core',
-      historyCount: this.history.length, serializedChars: serializedHistory.length, serializationElapsedMs,
-    });
-    storageService.setItem(KEY, serializedHistory);
+    writeBatch();this.historyIndex=this.historyIndex.slice(-MAX_HISTORY);
+    storageService.setItem(HISTORY_INDEX_KEY,JSON.stringify(this.historyIndex));
+    const serializationElapsedMs=Date.now()-startedAt;
+    if(reportBoundary||serializationElapsedMs>=50)systemLogger.recordRuntimeDiagnostic('DOMAIN_ROUTER_CHECKPOINT',{phase:'SERIALIZE_COMPLETE',command:envelope?.command??'BATCHED',source:envelope?.source??'core',target:envelope?.target??'core',historyCount:this.history.length,entryCount:entries.length,segmentCount,serializedChars,serializationElapsedMs});
+  }
+
+  private isHistoryEntry(value:unknown):value is DomainHistoryEntry{
+    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    const item=value as Record<string,unknown>;const env=item.envelope;const reply=item.reply;
+    return Boolean(env&&typeof env==='object'&&!Array.isArray(env)&&typeof (env as Record<string,unknown>).envelopeId==='string'&&typeof (env as Record<string,unknown>).createdAt==='number'&&reply&&typeof reply==='object'&&!Array.isArray(reply));
+  }
+
+  private isHistoryIndexEntry(value:unknown):value is DomainHistoryIndexEntry{
+    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    const item=value as Record<string,unknown>;
+    return typeof item.id==='string'&&typeof item.segmentKey==='string'&&item.segmentKey.startsWith(HISTORY_SEGMENT_PREFIX)&&typeof item.createdAt==='number';
+  }
+
+  private load():void{
+    const merged=new Map<string,DomainHistoryEntry>();const legacyRaw=storageService.getItem(KEY);let legacyEntries:DomainHistoryEntry[]=[];
+    if(legacyRaw){try{const parsed:unknown=JSON.parse(legacyRaw);if(Array.isArray(parsed))legacyEntries=parsed.filter((item):item is DomainHistoryEntry=>this.isHistoryEntry(item));for(const entry of legacyEntries)merged.set(entry.envelope.envelopeId,entry);}catch(error){systemLogger.warn('SELF_IMPROVEMENT','[DomainRouter] legacy history load failed',String(error));}}
+    const rawIndex=storageService.getItem(HISTORY_INDEX_KEY);
+    if(rawIndex){try{const parsed:unknown=JSON.parse(rawIndex);if(Array.isArray(parsed))this.historyIndex=parsed.filter((item):item is DomainHistoryIndexEntry=>this.isHistoryIndexEntry(item)).slice(-MAX_HISTORY);}catch(error){systemLogger.warn('SELF_IMPROVEMENT','[DomainRouter] history index load failed',String(error));}}
+    const segmentKeys=storageService.keys().filter(key=>key.startsWith(HISTORY_SEGMENT_PREFIX)).sort();
+    const indexed=[...new Set(this.historyIndex.map(item=>item.segmentKey))];
+    const lastIndexed=indexed.slice().sort().at(-1)??'';
+    const orphan=segmentKeys.filter(key=>!indexed.includes(key)&&(!lastIndexed||key.localeCompare(lastIndexed)>0));
+    const toLoad=this.historyIndex.length===0?segmentKeys:[...new Set([...indexed,...orphan])];
+    for(const key of toLoad){try{const raw=storageService.getItem(key);if(!raw)continue;const parsed:unknown=JSON.parse(raw);if(Array.isArray(parsed))for(const item of parsed)if(this.isHistoryEntry(item))merged.set(item.envelope.envelopeId,item);}catch(error){systemLogger.warn('SELF_IMPROVEMENT','[DomainRouter] segment load failed',String(error));}}
+    this.history=[...merged.values()].sort((a,b)=>a.envelope.createdAt-b.envelope.createdAt||a.envelope.envelopeId.localeCompare(b.envelope.envelopeId)).slice(-MAX_HISTORY);
+    if(legacyRaw&&legacyEntries.length>0&&storageService.getBackendName()!=='memory')setTimeout(()=>{void this.migrateLegacyHistory(legacyRaw,legacyEntries);},0);
+  }
+
+  private async migrateLegacyHistory(legacyRaw:string,entries:DomainHistoryEntry[]):Promise<void>{
+    if(this.historyMigrationStarted||storageService.getBackendName()==='memory')return;
+    this.historyMigrationStarted=true;
+    try{
+      const indexedIds=new Set(this.historyIndex.map(item=>item.id));
+      const pending=entries.filter(entry=>!indexedIds.has(entry.envelope.envelopeId));
+      for(let start=0;start<pending.length;start+=HISTORY_SEGMENT_MAX_ENTRIES){
+        this.persistHistoryEntries(pending.slice(start,start+HISTORY_SEGMENT_MAX_ENTRIES));
+        // Keep the old key until migrated segments and their index are durable.
+        await storageService.flushNow();
+        if(storageService.getBackendName()==='memory')return;
+        if(start+HISTORY_SEGMENT_MAX_ENTRIES<pending.length)await new Promise<void>(resolve=>setTimeout(resolve,0));
+      }
+      if(storageService.getBackendName()==='memory'||storageService.getItem(KEY)!==legacyRaw)return;
+      storageService.removeItem(KEY);await storageService.flushNow();
+    }catch(error){systemLogger.warn('SELF_IMPROVEMENT','[DomainRouter] legacy history migration deferred',String(error));}
   }
 
   private extractEvidenceIds(value:unknown):string[]{
