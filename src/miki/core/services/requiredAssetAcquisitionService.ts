@@ -5,7 +5,7 @@ import { researchService } from '../../research/services/researchService';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { taskBlackboardService } from './taskBlackboardService';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
-import { missingAssetSynthesisService } from './missingAssetSynthesisService';
+import { missingAssetSynthesisService, type MissingAssetDraftKind } from './missingAssetSynthesisService';
 import { missingAssetValidationService } from './missingAssetValidationService';
 import { missingCapabilityRecoveryService } from './missingCapabilityRecoveryService';
 
@@ -73,21 +73,28 @@ class RequiredAssetAcquisitionService {
     const recoveryPlans=missingCapabilityRecoveryService.planAll(input.reasons);
     if(input.taskId&&recoveryPlans.length>0){taskBlackboardService.append(input.taskId,'DECISION','core','missing-capability-recovery-plans',{plans:recoveryPlans},[]);}
     const expandedReasons = [...input.reasons, ...recoveryPlans.flatMap(plan => plan.actions.map(action => `RECOVERY_ACTION_REQUIRED:${action}:${plan.reason}`))];
-    const requestedDrafts = recoveryPlans.flatMap(plan => plan.actions.flatMap(action => {
-      const requirement = `RECOVERY_ACTION_REQUIRED:${action}:${plan.reason}`;
-      switch (action) {
-        case 'SYNTHESIZE_KNOWLEDGE':
-          return [{ kind: 'KNOWLEDGE' as const, requirement }];
-        case 'SYNTHESIZE_COMPONENT':
-          return [{ kind: 'CODE_COMPONENT' as const, requirement }];
-        case 'SYNTHESIZE_ADAPTER':
-          return [{ kind: 'ADAPTER' as const, requirement }];
-        case 'SYNTHESIZE_VALIDATOR':
-          return [{ kind: 'VALIDATION' as const, requirement }];
-        default:
-          return [];
+    const requestedDrafts: Array<{ kind: MissingAssetDraftKind; requirement: string }> = [];
+    for (const plan of recoveryPlans) {
+      for (const action of plan.actions) {
+        const requirement = `RECOVERY_ACTION_REQUIRED:${action}:${plan.reason}`;
+        switch (action) {
+          case 'SYNTHESIZE_KNOWLEDGE':
+            requestedDrafts.push({ kind: 'KNOWLEDGE', requirement });
+            break;
+          case 'SYNTHESIZE_COMPONENT':
+            requestedDrafts.push({ kind: 'CODE_COMPONENT', requirement });
+            break;
+          case 'SYNTHESIZE_ADAPTER':
+            requestedDrafts.push({ kind: 'ADAPTER', requirement });
+            break;
+          case 'SYNTHESIZE_VALIDATOR':
+            requestedDrafts.push({ kind: 'VALIDATION', requirement });
+            break;
+          default:
+            break;
+        }
       }
-    }));
+    }
     const requirements = this.classify(input.reasons);
     const evidenceIds: string[] = [];
     const reasons: string[] = [];

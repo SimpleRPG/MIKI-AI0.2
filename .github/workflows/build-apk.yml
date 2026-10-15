@@ -126,7 +126,7 @@ jobs:
             "$@"
             rc=$?
             echo "::endgroup::"
-            printf '%s=%s\\n' "$name" "$rc" | tee -a p258-regression-results.txt "$GITHUB_STEP_SUMMARY"
+            printf '%s=%s\n' "$name" "$rc" | tee -a p258-regression-results.txt "$GITHUB_STEP_SUMMARY"
             if [ "$rc" -ne 0 ]; then
               failures=1
             fi

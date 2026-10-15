@@ -277,8 +277,10 @@ class SystemLogger {
         safeDetails[key] = value.replace(/[\r\n\t]/g, ' ').slice(0, 100);
       } else if (typeof value === 'number' && Number.isFinite(value)) {
         safeDetails[key] = value;
-      } else if (typeof value === 'boolean' || value === null) {
+      } else if (typeof value === 'boolean') {
         safeDetails[key] = value;
+      } else if (value === null) {
+        safeDetails[key] = null;
       }
     });
 
@@ -314,8 +316,10 @@ class SystemLogger {
         safeDetails[key] = value.replace(/[\r\n\t]/g, ' ').slice(0, 100);
       } else if (typeof value === 'number' && Number.isFinite(value)) {
         safeDetails[key] = value;
-      } else if (typeof value === 'boolean' || value === null) {
+      } else if (typeof value === 'boolean') {
         safeDetails[key] = value;
+      } else if (value === null) {
+        safeDetails[key] = null;
       }
     });
     this.recordRuntimeBreadcrumb(event, safeDetails);

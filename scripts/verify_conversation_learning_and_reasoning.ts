@@ -59,9 +59,9 @@ async function runVerification() {
   }
 
   // ----------------------------------------------------
-  // テスト3: ユーザーの肯定的な追認・反復による統計的昇格
+  // テスト3: ユーザーの肯定だけでは外部事実へ昇格しないことの検証
   // ----------------------------------------------------
-  console.log('\n--- 3. 2回目肯定・感謝による客観基準昇格テスト ---');
+  console.log('\n--- 3. ユーザーの肯定だけでの昇格阻止テスト ---');
   const affirmPrompt = 'ありがとう！まさにその通り、助かったよ';
   const affirmResult = await conversationCoreService.execute({
     prompt: affirmPrompt,
@@ -72,11 +72,16 @@ async function runVerification() {
   const updatedClaim = claimDatabaseService.listClaims({ excludeSuperseded: true }).find(
     (c) => c.claim_id === candidateClaimId
   );
-  console.log('Promoted Claim Status:', updatedClaim?.status);
-  console.log('Promoted Claim Maturity:', updatedClaim?.maturity);
+  console.log('Claim Status after affirmation:', updatedClaim?.status);
+  console.log('Claim Source:', updatedClaim?.source);
+  const promoCheck2 = mikiConversationLearningService.evaluateCandidatePromotion(candidateClaimId);
+  console.log('2回目の昇格判定 eligible:', promoCheck2.eligible, '| 理由:', promoCheck2.reason);
 
-  if (updatedClaim?.status !== 'SUPPORTED') {
-    throw new Error(`2回目の一貫した肯定後にもSUPPORTEDに昇格していません: ${updatedClaim?.status}`);
+  if (updatedClaim?.status !== 'CANDIDATE' || updatedClaim?.source !== 'USER_CLAIM') {
+    throw new Error(`独立検証前のUSER_CLAIMが候補状態を維持していません: status=${updatedClaim?.status}, source=${updatedClaim?.source}`);
+  }
+  if (promoCheck2.eligible || promoCheck2.reason !== 'USER_CLAIM_REQUIRES_INDEPENDENT_VERIFICATION') {
+    throw new Error(`独立検証前のUSER_CLAIMに対する昇格ガードが機能していません: ${promoCheck2.reason}`);
   }
 
   // ----------------------------------------------------

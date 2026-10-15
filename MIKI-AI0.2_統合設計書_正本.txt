@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-15
-正本Revision：2026-10-15-P258
+正本Revision：2026-10-15-P259
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後に最新GitHub ma
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P258）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P259）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-15-P258
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない）
+- 現行Revision: 2026-10-15-P259
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -11583,3 +11583,15 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 各検査の実終了コードをStep Summaryおよびp258-regression-results.txtへ記録する。失敗があっても残りの検査を継続し、最後に失敗をCI結果へ反映する。
 - 診断結果はp258-regression-results Artifactにも保存する。PUSH後のGitHub Actions結果を確認するまで合格とは扱わない。
 - アプリの会話経路と利用者データは変更しない。完全再帰Git treeの件数は本バッチでは再集計していない。
+
+============================================================
+【2026-10-15-P259 TypeScript型修正・USER_CLAIM検証契約・CI診断出力修正】
+============================================================
+
+- 編集前mainは`77960df0927627775498ecbb9dcc5304eac96728`。編集前の完全再帰Git treeは1,927 entries（1,780 files / 147 directories、`truncated=false`）。現行mainの正本全文・対象コード・テスト・workflowを照合してから変更した。完全実装分類インベントリの再生成とは区別する。
+- `requiredAssetAcquisitionService.ts`のRecovery Actionから`requestedDrafts`を生成する際、`flatMap`の狭いリテラル型推論に依存せず、`MissingAssetDraftKind`を明記した配列へ各Actionを逐次追加する。KNOWLEDGE / CODE_COMPONENT / ADAPTER / VALIDATION の対応は維持する。
+- `systemLogger.ts`のRuntime BreadcrumbおよびDiagnostic Detailsでは、unknown値のbooleanとnullを別分岐にし、許可済みの診断値のみ保存する。記録対象キー、上限、保存先、メッセージ本文の扱いは変更しない。
+- 会話学習テストは、ユーザーの肯定・感謝だけで`USER_CLAIM`がSUPPORTEDへ昇格することを成功条件にしない。Claimが`CANDIDATE`かつsource=`USER_CLAIM`であること、および`USER_CLAIM_REQUIRES_INDEPENDENT_VERIFICATION`の昇格ガードを回帰検査する。独立検証を要求する実装ガードは弱めない。
+- `.github/workflows/build-apk.yml`の回帰結果出力を、printf format string内の改行エスケープが1個だけになる形へ修正する。各検査結果が別々の行としてSummaryとArtifactに保存されるようにする。
+- P259静的検査（コード変更後・正本更新前、実測終了コード、0=PASS）: import_check=1; typescript_lint=127; conversation_learning=1; autonomous_infrastructure=1; whitespace_diff_pre_design=0。
+- GitHub Actions再実行結果、APK Artifact、Android実機の実行結果はPUSH後に直接確認するまで未確認。CIのPASS、OOM解消、実機動作成功をこの静的検査から推定しない。今回の変更で機能データを削減せず、完全再帰実装分類インベントリの件数も再生成済みとは扱わない。
