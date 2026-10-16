@@ -678,17 +678,18 @@ check(
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
 check(
-  'Canonical design retains P268-P270 and records P271 unverified-autonomy protections',
+  'Canonical design retains P268-P271 and records P272 Cargo zip correction',
   design.includes('2026-10-16-P268 共通実装計画型と終端イベント照合の整合') &&
     design.includes('2026-10-16-P269 Actions索引不一致の修正') &&
-    design.includes('正本Revision：2026-10-16-P271') &&
-    design.includes('現行Revision: 2026-10-16-P271') &&
+    design.includes('正本Revision：2026-10-16-P272') &&
+    design.includes('現行Revision: 2026-10-16-P272') &&
     design.includes('2026-10-16-P270 Rust依存zip crateのyanked問題を修正') &&
-    design.includes('2026-10-16-P271 自律学習・宿題解決の未検証成果昇格防止')
+    design.includes('2026-10-16-P271 自律学習・宿題解決の未検証成果昇格防止') &&
+    design.includes('2026-10-16-P272 Cargo zipのyanked固定版を回避')
 );
 check(
   'Rust native build pins the zip dependency and retains deflate support',
-  rustManifest.includes('zip = { version = "=4.6.1", default-features = false, features = ["deflate"] }')
+  rustManifest.includes('zip = { version = "9.0.3", default-features = false, features = ["deflate"] }')
 );
 
 
