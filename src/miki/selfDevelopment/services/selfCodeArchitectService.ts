@@ -827,7 +827,7 @@ export class SelfCodeArchitectService {
         const factual = resolvedProposal?.contract?.objective || '標準パイプラインによる自己コード改善';
         const context = resolvedProposal?.description || '変更契約に基づくパラメータおよび処理パイプラインのチューニング';
         const simResult = counterfactualReasoningService.simulateBranchReasoning(topic, factual, context);
-        systemLogger.info('SELF_IMPROVEMENT', `[第36章 実体改善] 反実仮想推論・分岐シミュレーションを実走記録しました: ${simResult.conclusion}`);
+        systemLogger.info('SELF_IMPROVEMENT', `[第36章 実体改善] 反実仮想の仮説を記録しました（代替案の実行比較・独立評価は未実施）: ${simResult.conclusion}`);
       } else if (chapterNumber === 37) {
         // 第37章: 多段意図推定・潜在欲求マイニング
         const sampleInput = resolvedProposal?.contract?.objective || resolvedProposal?.description || 'ユーザーの潜在ゴールとマルチターン意図追跡';

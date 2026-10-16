@@ -62,59 +62,33 @@ export class CounterfactualReasoningService {
     contextSummary: string = ''
   ): CounterfactualEvaluationResult {
     // 1. 不変条件チェック（モデル生成系ランタイム除外やプライバシー侵害を試みるシナリオは即座に拒絶）
-    const forbidsAnchorRemoval = !scenario.alternativeChoice.includes('qwen') || !scenario.alternativeChoice.includes('delete');
+    const altLower = scenario.alternativeChoice.toLowerCase();
+    const removesProtectedRuntime =
+      /(?:delete|remove|disable|drop)[\s\S]{0,40}(?:qwen|anchor|runtime)|(?:qwen|anchor|runtime)[\s\S]{0,40}(?:delete|remove|disable|drop)/i.test(altLower);
     const privacyAudit = privacyGuardrailService.auditOutboundContent(
       `${scenario.alternativeChoice} ${scenario.hypothesis}`,
       'GEMINI_TEACHER',
       { autoSanitize: false }
     );
-    const invariantsPassed = forbidsAnchorRemoval && privacyAudit.allowed;
+    const invariantsPassed = !removesProtectedRuntime && privacyAudit.allowed;
 
-    // 2. 評価メトリクスのシミュレーション計算
-    let safetyScore = invariantsPassed ? 95 : 20;
-    let performanceScore = 80;
-    let accuracyScore = 85;
-
-    // シナリオ属性に基づく分岐評価
-    const altLower = scenario.alternativeChoice.toLowerCase();
-    if (altLower.includes('cache') || altLower.includes('キャッシュ')) {
-      performanceScore += 12;
-    }
-    if (altLower.includes('verify') || altLower.includes('tdd') || altLower.includes('検証')) {
-      safetyScore += 4;
-      accuracyScore += 8;
-    }
-    if (altLower.includes('fallback') || altLower.includes('安全退行')) {
-      safetyScore += 5;
-    }
-
-    safetyScore = Math.min(100, Math.max(0, safetyScore));
-    performanceScore = Math.min(100, Math.max(0, performanceScore));
-    accuracyScore = Math.min(100, Math.max(0, accuracyScore));
-
-    // 差分スコア計算（事実選択の基準スコア80点との比較）
-    const factualBenchmark = 80;
-    const counterfactualCombined = Math.round((safetyScore * 0.4) + (performanceScore * 0.3) + (accuracyScore * 0.3));
-    const overallDeltaScore = counterfactualCombined - factualBenchmark;
-
-    let recommendation: 'ADOPT_COUNTERFACTUAL' | 'MAINTAIN_FACTUAL' | 'INCONCLUSIVE' = 'MAINTAIN_FACTUAL';
-    if (!invariantsPassed) {
-      recommendation = 'MAINTAIN_FACTUAL';
-    } else if (overallDeltaScore >= 8) {
-      recommendation = 'ADOPT_COUNTERFACTUAL';
-    } else if (overallDeltaScore >= -3 && overallDeltaScore < 8) {
-      recommendation = 'INCONCLUSIVE';
-    }
+    // 代替案の実行・観測・独立評価をしていないため、測定結果を捏造しない。
+    const measurementStatus: 'NOT_EXECUTED' | 'MEASURED' = 'NOT_EXECUTED';
+    const safetyScore = 0;
+    const performanceScore = 0;
+    const accuracyScore = 0;
+    const overallDeltaScore = 0;
+    const recommendation: 'ADOPT_COUNTERFACTUAL' | 'MAINTAIN_FACTUAL' | 'INCONCLUSIVE' =
+      invariantsPassed ? 'INCONCLUSIVE' : 'MAINTAIN_FACTUAL';
 
     const reasoning = invariantsPassed
-      ? `反実仮想選択肢『${scenario.name}』をシミュレーション: 安全度=${safetyScore}点, 性能=${performanceScore}点, 精度=${accuracyScore}点 (基準比 Δ=${overallDeltaScore >= 0 ? `+${overallDeltaScore}` : overallDeltaScore}点)。判定: ${recommendation === 'ADOPT_COUNTERFACTUAL' ? '反実仮想案が事実選択を有意に上回る' : recommendation === 'MAINTAIN_FACTUAL' ? '事実選択の維持が最善' : '差異僅差・状況に応じて選択'}。`
-      : '⚠️ 反実仮想シナリオが不変条件（アンカーモデル保護・プライバシー境界）に抵触するため却下されました。';
-
+      ? '代替案の実行・観測・独立評価が未実施のため判定保留。数値0は実測値ではなく、未測定を表す。'
+      : '反実仮想シナリオが保護対象ランタイムまたはプライバシー境界に抵触するため却下。';
     return {
       scenarioId: scenario.id,
       scenarioName: scenario.name,
       factualOutcome: `実際の決定: ${factualDecision}`,
-      counterfactualOutcome: `もしもの結果: ${scenario.hypothesis} -> 推定改善度 Δ=${overallDeltaScore}点`,
+      counterfactualOutcome: `もしもの仮説: ${scenario.hypothesis}（未実行・未測定）`,
       safetyScore,
       performanceScore,
       accuracyScore,
@@ -122,6 +96,7 @@ export class CounterfactualReasoningService {
       recommendation,
       reasoning,
       invariantsPassed,
+      measurementStatus,
     };
   }
 
@@ -145,36 +120,39 @@ export class CounterfactualReasoningService {
             name: '積極キャッシュ & 事前推論バイパス',
             condition: 'もし過去の同一文脈応答を積極キャッシュしていたら',
             alternativeChoice: 'LRUインメモリキャッシュを活用し重複推論を完全スキップ',
-            hypothesis: 'TTFT（初速トークンレイテンシ）が90%削減されるが、文脈ドリフトへの感応度が微減する。',
+            hypothesis: 'キャッシュによる応答遅延と文脈ドリフトへの影響を検証する必要がある。具体的な効果は未測定。',
           },
           {
             id: 'cf_opt_formal_verify',
             name: '厳密形式検証 & TDD事前契約',
             condition: 'もしコード配備前にAST形式検証と不変条件テストを二重化していたら',
             alternativeChoice: 'ChangeContractとCSP制約ソルバーによる自動検証を義務化',
-            hypothesis: '配備速度が約15ms増加するが、潜在バグ・退行リスクが99%根絶される。',
+            hypothesis: '形式検証とTDDが不具合・退行へ与える影響を検証する必要がある。具体的な効果は未測定。',
           },
           {
             id: 'cf_opt_minimal_fallback',
             name: '極小スコープ安全退行',
             condition: 'もし高負荷・エラー時に最小スコープへ直ちにフォールバックしていたら',
             alternativeChoice: '依存ライブラリを切り離し、オンデバイスモデル生成系ランタイムのみで応答',
-            hypothesis: 'API利用制限を完全回避し、ネットワーク切断時でも100%の可用性を維持する。',
+            hypothesis: 'フォールバック時の可用性と依存関係の影響を検証する必要がある。具体的な効果は未測定。',
           },
         ];
 
     // 全シナリオを評価
     const evaluations = scenarios.map((s) => this.evaluateScenario(factualDecision, s, contextSummary));
 
-    // 最良代替案を特定
-    const validAlternatives = evaluations.filter((e) => e.invariantsPassed);
+    // 実測済みで、独立評価により採用判定された候補だけを推薦対象にする。
+    const validAlternatives = evaluations.filter(
+      (e) => e.measurementStatus === 'MEASURED' &&
+        e.recommendation === 'ADOPT_COUNTERFACTUAL' &&
+        e.invariantsPassed
+    );
     validAlternatives.sort((a, b) => b.overallDeltaScore - a.overallDeltaScore);
     const bestAlternative = validAlternatives[0];
 
-    const conclusion = bestAlternative && bestAlternative.overallDeltaScore > 5
-      ? `第36章 反実仮想推論完了: 最良の代替案『${bestAlternative.scenarioName}』が事実選択よりΔ=+${bestAlternative.overallDeltaScore}点優位です。次回類似シチュエーションでの先行採用を推奨します。`
-      : `第36章 反実仮想推論完了: 事実の選択（${factualDecision}）が安全性・堅牢性の観点で最適バランスを維持していました。`;
-
+    const conclusion = bestAlternative
+      ? `第36章 反実仮想推論: 独立評価済みの代替案『${bestAlternative.scenarioName}』が採用候補です。`
+      : `第36章 反実仮想推論: 代替案の実行・独立評価が未実施のため採用推奨を行いません。事実選択（${factualDecision}）を維持し、測定待ちとします。`;
     const simulationRecord: BranchReasoningSimulation = {
       id: simulationId,
       timestamp: Date.now(),
@@ -185,6 +163,7 @@ export class CounterfactualReasoningService {
       evaluations,
       bestAlternative,
       conclusion,
+      measurementStatus: 'NOT_EXECUTED',
     };
 
     this.simulations.unshift(simulationRecord);

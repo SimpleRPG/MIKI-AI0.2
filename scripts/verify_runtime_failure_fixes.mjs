@@ -30,6 +30,9 @@ const taskCaseMemoryIndexRow = design.split(/\r?\n/).find(line => line.includes(
 const candidatePreparationIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/autonomousCandidatePreparationService.ts |'));
 const improvementIntakeRouterIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/improvementIntakeRouterService.ts |'));
 const autonomousEvolutionIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/autonomy/services/autonomousEvolutionService.ts |'));
+const counterfactualIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/unknown/services/counterfactualReasoningService.ts |'));
+const chapter36IndexRow = design.split(/\r?\n/).find(line => line.includes('src/autonomous_modules/chapter_36.ts |'));
+const selfCodeArchitectIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/selfDevelopment/services/selfCodeArchitectService.ts |'));
 const runtimeLogger = read('src/services/systemLogger.ts');
 const runtimeLifecycle = read('src/app/appRuntimeLifecycleService.ts');
 const domainParticipation = read('src/miki/core/services/domainParticipationService.ts');
@@ -50,6 +53,9 @@ const taskIngress = read('src/miki/core/services/coreTaskIngressService.ts');
 const issueDiscovery = read('src/miki/core/services/autonomousIssueDiscoveryService.ts');
 const autonomousLoop = read('src/miki/core/services/autonomousSelfImprovementLoopService.ts');
 const autonomousEvolution = read('src/miki/autonomy/services/autonomousEvolutionService.ts');
+const counterfactual = read('src/miki/unknown/services/counterfactualReasoningService.ts');
+const chapter36 = read('src/autonomous_modules/chapter_36.ts');
+const selfCodeArchitect = read('src/miki/selfDevelopment/services/selfCodeArchitectService.ts');
 const autonomousSearch = read('src/miki/research/services/autonomousSearchService.ts');
 const preflightService = read('src/miki/core/services/selfImprovementPreflightService.ts');
 const requiredAssetAcquisition = read('src/miki/core/services/requiredAssetAcquisitionService.ts');
@@ -678,21 +684,53 @@ check(
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
 check(
-  'Canonical design retains P268-P271 and records P272 Cargo zip correction',
+  'Canonical design retains P268-P272 and records P273 counterfactual evidence boundary',
   design.includes('2026-10-16-P268 共通実装計画型と終端イベント照合の整合') &&
     design.includes('2026-10-16-P269 Actions索引不一致の修正') &&
-    design.includes('正本Revision：2026-10-16-P272') &&
-    design.includes('現行Revision: 2026-10-16-P272') &&
     design.includes('2026-10-16-P270 Rust依存zip crateのyanked問題を修正') &&
     design.includes('2026-10-16-P271 自律学習・宿題解決の未検証成果昇格防止') &&
-    design.includes('2026-10-16-P272 Cargo zipのyanked固定版を回避')
+    design.includes('2026-10-16-P272 Cargo zipのyanked固定版を回避') &&
+    design.includes('正本Revision：2026-10-16-P273') &&
+    design.includes('現行Revision: 2026-10-16-P273') &&
+    design.includes('2026-10-16-P273 反実仮想スコアの実測境界修正')
 );
 check(
   'Rust native build pins the zip dependency and retains deflate support',
   rustManifest.includes('zip = { version = "9.0.3", default-features = false, features = ["deflate"] }')
 );
-
-
+check(
+  'Canonical counterfactual results remain unmeasured until an evaluator measures them',
+  counterfactual.includes("const measurementStatus: 'NOT_EXECUTED' | 'MEASURED' = 'NOT_EXECUTED';") &&
+    counterfactual.includes("e.measurementStatus === 'MEASURED'") &&
+    counterfactual.includes("e.recommendation === 'ADOPT_COUNTERFACTUAL'") &&
+    !counterfactual.includes('performanceScore += 12') &&
+    !counterfactual.includes('accuracyScore += 8') &&
+    !counterfactual.includes('factualBenchmark = 80') &&
+    !counterfactual.includes('90%削減') &&
+    !counterfactual.includes('99%根絶') &&
+    !counterfactual.includes('100%の可用性')
+);
+check(
+  'Chapter36 blocks keyword-scored and unmeasured recommendations',
+  chapter36.includes("measurementStatus: 'NOT_EXECUTED' | 'MEASURED'") &&
+    chapter36.includes("e.measurementStatus === 'MEASURED'") &&
+    chapter36.includes("e.recommendation === 'ADOPT_COUNTERFACTUAL'") &&
+    !chapter36.includes('performanceScore += 12') &&
+    !chapter36.includes('accuracyScore += 8') &&
+    !chapter36.includes('factualBenchmark = 80') &&
+    !chapter36.includes('リスクが実質0になる')
+);
+check(
+  'Self-code architect log does not claim an unexecuted counterfactual comparison ran',
+  selfCodeArchitect.includes('反実仮想の仮説を記録しました（代替案の実行比較・独立評価は未実施）') &&
+    !selfCodeArchitect.includes('反実仮想推論・分岐シミュレーションを実走記録しました')
+);
+check(
+  'Canonical index line counts match the three changed counterfactual sources',
+  counterfactualIndexRow?.includes(`lines=${counterfactual.split(/\r?\n/).length - 1}`) &&
+    chapter36IndexRow?.includes(`lines=${chapter36.split(/\r?\n/).length - 1}`) &&
+    selfCodeArchitectIndexRow?.includes(`lines=${selfCodeArchitect.split(/\r?\n/).length - 1}`)
+);
 check(
   'Autonomous Issue Discovery synchronizes terminal outcomes and permits three bounded retries',
   issueDiscovery.includes('private reconcileQueuedIssues():void') &&

@@ -28,6 +28,7 @@ export interface Chapter36Evaluation {
   recommendation: 'ADOPT_COUNTERFACTUAL' | 'MAINTAIN_FACTUAL' | 'INCONCLUSIVE';
   reasoning: string;
   invariantsPassed: boolean;
+  measurementStatus: 'NOT_EXECUTED' | 'MEASURED';
 }
 
 export interface Chapter36SimulationResult {
@@ -38,6 +39,7 @@ export interface Chapter36SimulationResult {
   evaluations: Chapter36Evaluation[];
   bestAlternative?: Chapter36Evaluation;
   conclusion: string;
+  measurementStatus: 'NOT_EXECUTED' | 'MEASURED';
 }
 
 export class Chapter36CounterfactualEngine {
@@ -52,49 +54,28 @@ export class Chapter36CounterfactualEngine {
   ): Chapter36Evaluation {
     // 不変条件保護（モデル生成系ランタイム除外またはプライバシー違反のシナリオを完全遮断）
     const alt = scenario.alternativeChoice.toLowerCase();
-    const invariantsPassed = !alt.includes('delete qwen') && !alt.includes('bypass privacy');
+    const removesProtectedRuntime =
+      /(?:delete|remove|disable|drop)[\s\S]{0,40}(?:qwen|anchor|runtime)|(?:qwen|anchor|runtime)[\s\S]{0,40}(?:delete|remove|disable|drop)/i.test(alt);
+    const bypassesPrivacy =
+      /(?:bypass|disable|skip)[\s\S]{0,40}privacy/i.test(alt);
+    const invariantsPassed = !removesProtectedRuntime && !bypassesPrivacy;
 
-    let safetyScore = invariantsPassed ? 96 : 10;
-    let performanceScore = 82;
-    let accuracyScore = 88;
-
-    if (alt.includes('cache') || alt.includes('キャッシュ')) {
-      performanceScore += 12;
-    }
-    if (alt.includes('verify') || alt.includes('tdd') || alt.includes('形式検証')) {
-      safetyScore += 4;
-      accuracyScore += 8;
-    }
-    if (alt.includes('fallback') || alt.includes('退行防止')) {
-      safetyScore += 4;
-    }
-
-    safetyScore = Math.min(100, Math.max(0, safetyScore));
-    performanceScore = Math.min(100, Math.max(0, performanceScore));
-    accuracyScore = Math.min(100, Math.max(0, accuracyScore));
-
-    const factualBenchmark = 80;
-    const combinedScore = Math.round((safetyScore * 0.4) + (performanceScore * 0.3) + (accuracyScore * 0.3));
-    const overallDeltaScore = combinedScore - factualBenchmark;
-
-    let recommendation: 'ADOPT_COUNTERFACTUAL' | 'MAINTAIN_FACTUAL' | 'INCONCLUSIVE' = 'MAINTAIN_FACTUAL';
-    if (!invariantsPassed) {
-      recommendation = 'MAINTAIN_FACTUAL';
-    } else if (overallDeltaScore >= 8) {
-      recommendation = 'ADOPT_COUNTERFACTUAL';
-    } else if (overallDeltaScore >= -2 && overallDeltaScore < 8) {
-      recommendation = 'INCONCLUSIVE';
-    }
-
+    // 実測と独立評価がない場合は推測スコアを使わない。
+    const measurementStatus: 'NOT_EXECUTED' | 'MEASURED' = 'NOT_EXECUTED';
+    const safetyScore = 0;
+    const performanceScore = 0;
+    const accuracyScore = 0;
+    const overallDeltaScore = 0;
+    const recommendation: 'ADOPT_COUNTERFACTUAL' | 'MAINTAIN_FACTUAL' | 'INCONCLUSIVE' =
+      invariantsPassed ? 'INCONCLUSIVE' : 'MAINTAIN_FACTUAL';
     const reasoning = invariantsPassed
-      ? `反実仮想シナリオ『${scenario.name}』をシミュレーション: 安全=${safetyScore}点, 性能=${performanceScore}点, 精度=${accuracyScore}点 (改善度 Δ=${overallDeltaScore >= 0 ? `+${overallDeltaScore}` : overallDeltaScore}点)。`
-      : '⚠️ 反実仮想シナリオが不変条件（アンカーモデル保護/プライバシー境界）に抵触したため却下されました。';
-
+      ? '代替案の実行・観測・独立評価が未実施のため判定保留。数値0は実測値ではなく、未測定を表す。'
+      : '反実仮想シナリオが保護対象ランタイムまたはプライバシー境界に抵触するため却下。';
     return {
       scenarioId: scenario.id,
       scenarioName: scenario.name,
       factualOutcome: `実際の選択: ${factualDecision}`,
-      counterfactualOutcome: `反実仮想選択: ${scenario.alternativeChoice} (仮説: ${scenario.hypothesis})`,
+      counterfactualOutcome: `反実仮想選択: ${scenario.alternativeChoice} (仮説: ${scenario.hypothesis})（未実行・未測定）`,
       safetyScore,
       performanceScore,
       accuracyScore,
@@ -102,6 +83,7 @@ export class Chapter36CounterfactualEngine {
       recommendation,
       reasoning,
       invariantsPassed,
+      measurementStatus,
     };
   }
 
@@ -128,19 +110,21 @@ export class Chapter36CounterfactualEngine {
             name: '厳格形式検証・二重TDD戦略',
             condition: 'もしコード配備前に形式論理検証を常時義務化していたら',
             alternativeChoice: 'ChangeContractとCSP制約ソルバーによる完全事前証明',
-            hypothesis: '配備速度が微小増加するが、潜在バグ・退行リスクが実質0になる。',
+            hypothesis: '形式検証とTDDが不具合・退行へ与える影響を検証する必要がある。具体的な効果は未測定。',
           },
         ];
 
     const evaluations = targetScenarios.map((s) => this.evaluate(factualDecision, s));
-    const valid = evaluations.filter((e) => e.invariantsPassed);
-    valid.sort((a, b) => b.overallDeltaScore - a.overallDeltaScore);
+    const valid = evaluations.filter(
+      (e) => e.measurementStatus === 'MEASURED' &&
+        e.recommendation === 'ADOPT_COUNTERFACTUAL' &&
+        e.invariantsPassed
+    );
     const best = valid[0];
 
-    const conclusion = best && best.overallDeltaScore > 5
-      ? `最良代替案『${best.scenarioName}』が事実選択より有意に優位 (Δ=+${best.overallDeltaScore}点)。`
-      : `事実の選択（${factualDecision}）が安全性と性能の最適バランスを維持。`;
-
+    const conclusion = best
+      ? `独立評価済みの最良代替案『${best.scenarioName}』が採用候補です。`
+      : `第36章: 代替案の実行・独立評価が未実施のため採用推奨を保留します。事実選択（${factualDecision}）を維持し、測定待ちとします。`;
     const result: Chapter36SimulationResult = {
       id: `sim_chap36_${Date.now()}`,
       timestamp: Date.now(),
@@ -149,6 +133,7 @@ export class Chapter36CounterfactualEngine {
       evaluations,
       bestAlternative: best,
       conclusion,
+      measurementStatus: 'NOT_EXECUTED',
     };
 
     this.history.unshift(result);

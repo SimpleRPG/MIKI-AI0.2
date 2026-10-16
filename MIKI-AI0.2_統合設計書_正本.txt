@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-16
-正本Revision：2026-10-16-P272
+正本Revision：2026-10-16-P273
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-16-P272
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-16-P273
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -211,7 +211,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] OTHER | src/autonomous_modules/anaphora_history_stack.ts | lines=89 | symbols=AnaphoraHistoryStack, AnaphoraStackItem, anaphoraHistoryStack | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/anaphora_resolver_sample.ts | lines=162 | symbols=PureAnaphoraResolutionResult, resolveAnaphoraPure | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/chapter_31_collocation_ast_refactor.ts | lines=88 | symbols=AstRefactorProposal, Chapter31CollocationAstService, CollocationMatch, chapter31Service | callers=1 | deps=0
-- [USED] OTHER | src/autonomous_modules/chapter_36.ts | lines=163 | symbols=Chapter36CounterfactualEngine, Chapter36Evaluation, Chapter36Scenario, Chapter36SimulationResult, chapter36CounterfactualEngine | callers=2 | deps=0
+- [USED] OTHER | src/autonomous_modules/chapter_36.ts | lines=148 | symbols=Chapter36CounterfactualEngine, Chapter36Evaluation, Chapter36Scenario, Chapter36SimulationResult, chapter36CounterfactualEngine | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/chapter_37.ts | lines=88 | symbols=Chapter37IntentMiningEngine, Chapter37IntentResult, Chapter37TurnTrace, chapter37IntentMiningEngine | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/chapter_38.ts | lines=50 | symbols=Chapter38CalibrationOutput, Chapter38MetacognitiveEngine, chapter38MetacognitiveEngine | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/chapter_39.ts | lines=141 | symbols=Chapter39AffectionDynamicsEngine, chapter39AffectionEngine | callers=2 | deps=1
@@ -874,7 +874,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] strategy | src/miki/strategy/services/workingAgendaService.ts | lines=195 | symbols=workingAgendaService | callers=6 | deps=3 | Storage=miki_working_agenda_items
 - [USED] OTHER | src/miki/unknown.ts | lines=24 | symbols=unknown | callers=1 | deps=9 | Tests=14
 - [USED] unknown | src/miki/unknown/services/counterexampleContractRefinementService.ts | lines=144 | symbols=ContractClause, ContractClauseKind, ContractRefinementRecord, ContractRefinementStatus, CounterexampleContractRefinementService | callers=3 | deps=3
-- [USED] unknown | src/miki/unknown/services/counterfactualReasoningService.ts | lines=225 | symbols=CounterfactualReasoningService, counterfactualReasoningService | callers=3 | deps=5 | Storage=miki_counterfactual_simulations_v1
+- [USED] unknown | src/miki/unknown/services/counterfactualReasoningService.ts | lines=204 | symbols=CounterfactualReasoningService, counterfactualReasoningService | callers=3 | deps=5 | Storage=miki_counterfactual_simulations_v1
 - [USED] unknown | src/miki/unknown/services/counterfactualWorkSimulatorService.ts | lines=33 | symbols=CounterfactualTrigger, CounterfactualWorkSimulation, CounterfactualWorkSimulatorService, WorkRoute, counterfactualWorkSimulatorService | callers=3 | deps=2 | Storage=miki_counterfactual_work_v1
 - [USED] unknown | src/miki/unknown/services/knowledgeGapService.ts | lines=351 | symbols=KnowledgeGap, KnowledgeGapDetectionContext, KnowledgeGapIdentity, KnowledgeGapResolutionPlan, KnowledgeGapService | callers=16 | deps=4 | Storage=miki_knowledge_gaps_v1
 - [USED] unknown | src/miki/unknown/services/latentIntentMiningService.ts | lines=211 | symbols=LatentIntentMiningService, latentIntentMiningService | callers=6 | deps=5 | Storage=miki_latent_intent_sessions_v1
@@ -11730,3 +11730,17 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 4.xのexact pinを繰り返す方式をやめ、`zip`の最低対応版を9.0.3としたsemver互換指定を使う。`default-features = false`と`features = ["deflate"]`は維持し、既存コードが必要とするZIP書き込み機能を保つ。
 - Runtime verifierの依存条件をCargo manifestと一致させ、P272の正本Revisionと履歴を更新した。
 - 依存解決、Rust Android向けビルド、APK生成、PUSH後回帰検査はP272のGitHub Actionsで確認する。今回の正本更新や依存指定だけからビルド成功を推定しない。完全再帰インベントリは再集計していない。
+
+============================================================
+【2026-10-16-P273 反実仮想スコアの実測境界修正】
+============================================================
+
+- 編集開始時のGitHub mainは`f3b6d2935a2eac11b5a4621c149cee72d5df9af9`。P272のGitHub Actions Run #878ではWeb build、Native/runtime契約検証、Rust native build、Android APK buildが成功した。実機の起動・長時間動作まで確認したという意味ではない。
+- 正規の反実仮想サービスとChapter 36エンジンが、代替案を実行・観測していないにもかかわらず、キーワードによる固定スコア加点と基準点80との比較から改善量・採用推奨を生成していた問題を修正する。
+- 現状は代替案の実行・観測・独立評価を確認できないため、`measurementStatus=NOT_EXECUTED`とし、各スコアと差分は未測定を示す0として明示する。これを実測値や改善効果として扱わない。
+- 独立評価で`MEASURED`となり、不変条件を通過し、`ADOPT_COUNTERFACTUAL`と判定された候補だけを推薦候補にできるようにする。実行器・独立評価器が未接続の現状では推薦を保留する。
+- デフォルト仮説から根拠のない遅延削減率・リスク削減率・可用性の断定を除去する。保護対象ランタイムおよびプライバシー境界の検査を明示する。
+- SelfCodeArchitectのログを、代替案の実走を完了したかのような表現から、仮説を記録しただけで実行比較・独立評価は未実施と明記する表現に変更する。
+- `scripts/verify_runtime_failure_fixes.mjs`へ未測定スコアの捏造防止、実測済み候補に限定した推薦、ログ表現、対象ソース索引行数の回帰検査を追加する。
+- 変更した3ソースの正本索引行数はファイル実数から更新した。完全再帰インベントリ全体は再集計していない。
+- Termuxでは事前lint／テスト／buildを実行しない。PUSH後のGitHub Actionsで回帰検査・Web/Rust/Android build・APK生成を確認し、実機動作は別の検証状態として扱う。
