@@ -36,7 +36,22 @@ class ImprovementIntakeRouterService{
     if(input.runType==='REVALIDATION'){
       const p=input.payload||{};
       const targets=Array.isArray(p.targetFiles)?p.targetFiles.filter((x):x is string=>typeof x==='string'&&x.trim().length>0).map(x=>x.trim()):[];
-      run.implementationPlan={version:1,source:'REVIEW_REVALIDATION',issueId:typeof p.issueId==='string'?p.issueId:input.sourceId,targetPaths:targets,changeScope:targets.length<=1?'MINIMAL_SINGLE_FILE':'MINIMAL_MULTI_FILE',investigationSteps:['元Review Packageと外部修正要求を確認する','現在Baselineと対象範囲を再確認する','既存CORE/Validation/Promotion境界を確認する'],requiredValidation:['TypeScript/構文検査','既存単体・回帰テスト','Counterexample/境界値検証','RequirementContract評価','既存CORE/安全ゲート通過'],forbiddenExpansion:['対象外ファイルへの変更','新しいDB/Blackboard/Truth Storeの追加','新しいOrchestrator/Queue/最上位司令塔の追加','未検証外部コードの直接実行・採用'],rationale:['REVALIDATION from external review',...((Array.isArray(p.requestedChanges)?p.requestedChanges:[]).filter((x):x is string=>typeof x==='string')).slice(0,8)],confidence:1};
+      run.implementationPlan={
+        version:2,
+        source:'REVIEW_REVALIDATION',
+        issueId:typeof p.issueId==='string'?p.issueId:input.sourceId,
+        targetPaths:targets,
+        changeScope:targets.length<=1?'MINIMAL_SINGLE_FILE':'MINIMAL_MULTI_FILE',
+        investigationSteps:['元Review Packageと外部修正要求を確認する','現在Baselineと対象範囲を再確認する','既存CORE/Validation/Promotion境界を確認する'],
+        requiredValidation:['TypeScript/構文検査','既存単体・回帰テスト','Counterexample/境界値検証','RequirementContract評価','既存CORE/安全ゲート通過'],
+        forbiddenExpansion:['対象外ファイルへの変更','新しいDB/Blackboard/Truth Storeの追加','新しいOrchestrator/Queue/最上位司令塔の追加','未検証外部コードの直接実行・採用'],
+        executionConstraints:['実装は既存Validationゲートを通す','変更対象の既存依存を確認する','一度の変更は最大3ファイル程度に分割し、対象が多い場合は再計画する'],
+        dependencyConstraints:['既存CORE/TaskBlackboard/IntakeRouterを再利用する','新しいOrchestrator・Queue・Blackboard・Truth Storeを追加しない','実在確認のないAPI・ファイル・依存を前提に変更しない'],
+        retryPolicy:{maxRetries:3,retriesUsed:0,backoffMinutes:[15,30,60],retryCancelledTasks:false,requireSourceResolution:true},
+        stopConditions:['Task CANCELLEDは自動再投入しない','監視元の解決Evidenceがない場合は完了扱いしない','要求された対象や依存が見つからない場合は停止して再計画する'],
+        rationale:['REVALIDATION from external review',...((Array.isArray(p.requestedChanges)?p.requestedChanges:[]).filter((x):x is string=>typeof x==='string')).slice(0,8)],
+        confidence:1
+      };
     }
     this.runs.set(run.runId,run);const queued=selfImprovementIngressService.submitRun({...run,changeSetId:input.changeSetId});run.status='QUEUED';run.taskId=queued.taskId;run.updatedAt=Date.now();this.save();return this.clone(run);}
  async ensureForCoreTask(input:{taskId:string;objective:string;payload?:Record<string,unknown>;sourceId?:string}):Promise<ImprovementIntakeRun>{

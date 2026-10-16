@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-16
-正本Revision：2026-10-16-P267
+正本Revision：2026-10-16-P268
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P267）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P268）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-16-P267
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P267の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強したが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-16-P268
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -434,7 +434,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/services/generationTaskDagService.ts | lines=7 | symbols=GenerationTaskNode, generationTaskDagService | callers=1 | deps=1 | Tests=1
 - [USED] CORE | src/miki/core/services/governanceKernelService.ts | lines=17 | symbols=GovernanceDecision, governanceKernelService | callers=2 | deps=2
 - [USED] CORE | src/miki/core/services/improvementDebtService.ts | lines=8 | symbols=ImprovementDebt, ImprovementDebtKind, improvementDebtService | callers=3 | deps=1 | Storage=miki_improvement_debt_v1
-- [USED] CORE | src/miki/core/services/improvementIntakeRouterService.ts | lines=96 | symbols=ImprovementIntakeRun, ImprovementIntakeStatus, ImprovementRunType, improvementIntakeRouterService | callers=17 | deps=6 | Storage=miki_improvement_intake_runs_v1 / Tests=1
+- [USED] CORE | src/miki/core/services/improvementIntakeRouterService.ts | lines=111 | symbols=ImprovementIntakeRun, ImprovementIntakeStatus, ImprovementRunType, improvementIntakeRouterService | callers=17 | deps=6 | Storage=miki_improvement_intake_runs_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/isolatedCandidateWorkspaceService.ts | lines=25 | symbols=CandidateFile, CandidateWorkspace, CandidateWorkspaceStatus, isolatedCandidateWorkspaceService | callers=35 | deps=3 | Storage=miki_isolated_candidate_workspaces_v1 / Tests=3
 - [USED] CORE | src/miki/core/services/lifecycleTransitionPolicyService.ts | lines=32 | symbols=LifecycleTransitionContext, LifecycleTransitionKind, lifecycleTransitionPolicyService | callers=3 | deps=0 | Tests=1
 - [USED] CORE | src/miki/core/services/missingAssetSynthesisService.ts | lines=27 | symbols=MissingAssetDraft, MissingAssetDraftKind, missingAssetSynthesisService | callers=2 | deps=2 | Storage=miki_missing_asset_drafts_v1
@@ -11684,3 +11684,13 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - CandidatePreparationの計画契約に変更範囲、既存依存境界、最大3ファイル、初回＋最大3回の再試行、CANCELLED停止、監視元解決必須の制約・停止条件を追加。新しいOrchestrator／Queue／Blackboardは追加しない。
 - `verify_runtime_failure_fixes.mjs`へ終端状態・解決証拠・再試行上限・成功／失敗ケースの計画接続・計画制約・3ソースの正本索引行数を検査する契約を追加した。変更した3ソースの行数のみを実測更新した。
 - 完全再帰インベントリは再生成していない。Termuxで事前lint／テスト／buildを行わない。PUSH後のGitHub Actions／APK Artifact／実機動作は再確認するまで成功扱いしない。
+============================================================
+【2026-10-16-P268 共通実装計画型と終端イベント照合の整合】
+============================================================
+
+- GitHub main `1eeeb898a707625e656567dfd4a03af3ce47a559` のP267差分と実際の型生成経路を再確認した。CandidatePreparationをv2へ上げた一方、ImprovementIntakeRouterのREVALIDATION生成がv1を残し、`npm run lint`（`tsc --noEmit`）でTS2322となる問題を確認した。
+- REVALIDATION経路も共通のversion 2実装計画、実行・依存制約、3回再試行ポリシー、停止条件を持つように統一した。対象ファイルが多い場合は一括変更せず、段階分割・再計画を明示する。
+- EXECUTION_FAILUREの解決照合へexecution.rejectedとexecution.inconclusiveも追加し、成功イベント後に拒否・判定不能が発生した状態を成功扱いしない。
+- Runtime検証ScriptへREVALIDATION経路の計画型契約とImprovementIntakeRouterの索引行数を追加した。変更ソースの正本索引だけ更新し、完全再帰インベントリは再生成していない。
+- P267のActionsで検出されたP231正本インベントリのP266欠落も修正し、過去からP268までのRevision列を一致させる。
+- Termuxで事前lint／テスト／buildは行わない。PUSH後GitHub Actions、APK Artifact、実機動作の合格は実測して確認する。

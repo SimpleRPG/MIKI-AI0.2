@@ -27,6 +27,7 @@ const design = read('MIKI-AI0.2_統合設計書_正本.txt');
 const issueDiscoveryIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/autonomousIssueDiscoveryService.ts |'));
 const taskCaseMemoryIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/memory/services/taskCaseMemoryService.ts |'));
 const candidatePreparationIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/autonomousCandidatePreparationService.ts |'));
+const improvementIntakeRouterIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/improvementIntakeRouterService.ts |'));
 const runtimeLogger = read('src/services/systemLogger.ts');
 const runtimeLifecycle = read('src/app/appRuntimeLifecycleService.ts');
 const domainParticipation = read('src/miki/core/services/domainParticipationService.ts');
@@ -54,6 +55,7 @@ const autonomousRevalidationLoop = read('src/miki/autonomy/services/autonomousRe
 const domainIntegrationBootstrap = read('src/miki/core/services/domainIntegrationBootstrapService.ts');
 const taskCaseMemory = read('src/miki/memory/services/taskCaseMemoryService.ts');
 const candidatePreparation = read('src/miki/core/services/autonomousCandidatePreparationService.ts');
+const improvementIntakeRouter = read('src/miki/core/services/improvementIntakeRouterService.ts');
 const failureUnderstanding = read('src/miki/memory/services/failureUnderstandingService.ts');
 
 check('Canonical Runner exposes decideCoreGoals', runner.includes('fun decideCoreGoals(call: PluginCall)'));
@@ -673,11 +675,11 @@ check(
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
 check(
-  'Canonical design retains P266 and records the P267 closed-loop implementation',
-  design.includes('2026-10-16-P266 自律改善の閉ループと反省記憶接続') &&
-    design.includes('正本Revision：2026-10-16-P267') &&
-    design.includes('現行Revision: 2026-10-16-P267') &&
-    design.includes('2026-10-16-P267 自律改善の監視・診断・再計画契約の補強')
+  'Canonical design retains P267 and records the P268 plan-contract fix',
+  design.includes('2026-10-16-P267 自律改善の監視・診断・再計画契約の補強') &&
+    design.includes('正本Revision：2026-10-16-P268') &&
+    design.includes('現行Revision: 2026-10-16-P268') &&
+    design.includes('2026-10-16-P268 共通実装計画型と終端イベント照合の整合')
 );
 
 
@@ -707,10 +709,20 @@ check(
     candidatePreparation.includes('stopConditions')
 );
 check(
+  'All IntakeRouter plan construction paths use version-2 planning constraints',
+  candidatePreparation.includes("return {version:2,source:'AUTONOMOUS_ISSUE'") &&
+    improvementIntakeRouter.includes("run.implementationPlan={\n        version:2,\n        source:'REVIEW_REVALIDATION'") &&
+    improvementIntakeRouter.includes('executionConstraints:') &&
+    improvementIntakeRouter.includes('dependencyConstraints:') &&
+    improvementIntakeRouter.includes('retryPolicy:') &&
+    improvementIntakeRouter.includes('stopConditions:')
+);
+check(
   'Canonical index counts match autonomous lifecycle and case-plan source files',
   issueDiscoveryIndexRow?.includes(`lines=${issueDiscovery.split(/\r?\n/).length - 1}`) &&
     taskCaseMemoryIndexRow?.includes(`lines=${taskCaseMemory.split(/\r?\n/).length - 1}`) &&
-    candidatePreparationIndexRow?.includes(`lines=${candidatePreparation.split(/\r?\n/).length - 1}`)
+    candidatePreparationIndexRow?.includes(`lines=${candidatePreparation.split(/\r?\n/).length - 1}`) &&
+    improvementIntakeRouterIndexRow?.includes(`lines=${improvementIntakeRouter.split(/\r?\n/).length - 1}`)
 );
 check(
   'FailureUnderstanding persists Knowledge Gaps without bypassing CORE through direct research or promotion',

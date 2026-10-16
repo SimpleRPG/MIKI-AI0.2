@@ -253,7 +253,9 @@ class AutonomousIssueDiscoveryService{
     if(!failure)return false;
     const latestOutcome=[
      ...executionEventBusService.list('execution.completed'),
-     ...executionEventBusService.list('execution.failed')
+     ...executionEventBusService.list('execution.failed'),
+     ...executionEventBusService.list('execution.rejected'),
+     ...executionEventBusService.list('execution.inconclusive')
     ].filter(event=>
      event.created_at>failure.created_at&&
      event.component_id===failure.component_id&&
