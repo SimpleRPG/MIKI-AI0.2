@@ -675,11 +675,11 @@ check(
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
 check(
-  'Canonical design retains P267 and records the P268 plan-contract fix',
-  design.includes('2026-10-16-P267 自律改善の監視・診断・再計画契約の補強') &&
-    design.includes('正本Revision：2026-10-16-P268') &&
-    design.includes('現行Revision: 2026-10-16-P268') &&
-    design.includes('2026-10-16-P268 共通実装計画型と終端イベント照合の整合')
+  'Canonical design retains P268 and records the P269 Actions index correction',
+  design.includes('2026-10-16-P268 共通実装計画型と終端イベント照合の整合') &&
+    design.includes('正本Revision：2026-10-16-P269') &&
+    design.includes('現行Revision: 2026-10-16-P269') &&
+    design.includes('2026-10-16-P269 Actions索引不一致の修正')
 );
 
 
