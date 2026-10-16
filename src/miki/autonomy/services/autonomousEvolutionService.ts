@@ -7,9 +7,7 @@ import {
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { worldModelService } from '../../selfAwareness/services/worldModelService';
-import { selfImprovementService } from '../../improvement/services/selfImprovementService';
 import { workingAgendaService } from '../../strategy/services/workingAgendaService';
-import { unifiedWebResearchService } from '../../research/services/unifiedWebResearchService';
 import { syntheticDataService } from '../../research/services/syntheticDataService';
 import { selfImprovementIngressService } from '../../core/services/selfImprovementIngressService';
 import { experienceLinkService } from '../../experience/services/experienceLinkService';
@@ -135,7 +133,7 @@ export class AutonomousEvolutionService {
       if (signal?.aborted) throw new Error('ユーザー割り込みにより中断');
       const newReflections = await this.executeCounterfactualReflections(signal);
       if (newReflections.length > 0) {
-        highlights.push(`失敗インシデント${newReflections.length}件を深く反省し、理想的な正解回答と反省教訓を自己生成して学習サンプルへ昇格`);
+        highlights.push(`失敗インシデント${newReflections.length}件について反省仮説を記録（実測検証が済むまで学習データへ昇格しない）`);
       }
 
       // ----------------------------------------------------
@@ -153,7 +151,7 @@ export class AutonomousEvolutionService {
       if (signal?.aborted) throw new Error('ユーザー割り込みにより中断');
       const resolvedTopics = await this.resolvePendingHomeworks(signal);
       if (resolvedTopics.length > 0) {
-        highlights.push(`会話中の未解決宿題「${resolvedTopics.slice(0, 2).join('」「')}」について自発思考と自律調査を完了し、解決ノートを作成`);
+        highlights.push(`会話中の未解決宿題「${resolvedTopics.slice(0, 2).join('」「')}」について独立検証済みの解決結果を確認`);
       }
 
       // ----------------------------------------------------
@@ -179,7 +177,6 @@ export class AutonomousEvolutionService {
           source: 'SYSTEM',
           runType: 'AUTONOMOUS_DISCOVERY',
         });
-        selfCodeImprovementRun = 1;
         selfCodeImprovementSummaryText = 'COREへ自己改善要求を投入しました。対象選択と次の行動はCOREが決定します。';
         highlights.push('【自律改善要求】自己改善要求をCOREへ返し、次の分類・行動の選択をCOREに委譲しました。');
       } catch (archErr: any) {
@@ -276,11 +273,11 @@ export class AutonomousEvolutionService {
         rootCause: `世界モデル予測誤差(${cand.predictionError.errorMagnitude.toFixed(2)}): ${cat}`,
         idealResponse: ideal,
         lessonLearned: lesson,
-        promotedToTrainingSample: true,
+        promotedToTrainingSample: false,
         createdAt: Date.now(),
         experienceId,
         evidenceIds,
-        verifiedEffective: true,
+        verifiedEffective: false,
       };
 
       // 失敗・反実仮想反省から能力ギャップを記録し、決定論的能力パッチへコンパイル
@@ -296,25 +293,8 @@ export class AutonomousEvolutionService {
         evidenceIds: [reflectionItem.id, ...evidenceIds],
       });
 
-      const candidate = selfImprovementService.registerCapabilityCandidate({
-        instruction: prompt,
-        outputTarget: ideal,
-        category: 'chat',
-        reliability: 'high',
-        source: 'autonomous_cycle',
-        approved: true,
-        split: 'train',
-        originalFailureOutput: flawed,
-        failureReason: `[第19章 反実仮想反省] ${reflectionItem.rootCause}`,
-        verifiedEffective: true,
-        verificationNote: `理想応答生成による自己補正: ${reflectionItem.lessonLearned.slice(0, 40)}`,
-        experienceId,
-        evidenceIds: [reflectionItem.id, ...evidenceIds],
-      });
-
-      if (candidate?.id) {
-        experienceLinkService.linkEntity(experienceId, 'trainingSample', candidate.id);
-      }
+      // 自動生成した理想回答は反省仮説にとどめる。
+      // 独立評価がないため、学習サンプルや能力パッチへ登録しない。
       experienceLinkService.linkEntity(experienceId, 'reflection', reflectionItem.id);
 
       this.reflections.unshift(reflectionItem);
@@ -448,37 +428,15 @@ export class AutonomousEvolutionService {
     const homeworks = workingAgendaService.getHomeworkForAutonomousThought();
     if (homeworks.length === 0) return [];
 
-    const resolved: string[] = [];
-
     for (const hw of homeworks.slice(0, 2)) {
       if (signal?.aborted) break;
-
-      // 自発思考用の問い
-      const query = hw.unresolvedQuestions[0] || hw.topic;
-      let thoughtSummary = '';
-
-      // 自律Web学習が有効なら調査を試みる
-      const searchConfig = unifiedWebResearchService.getConfig();
-      if (searchConfig.enabled) {
-        try {
-          const searchRes = await unifiedWebResearchService.executeSearch(query);
-          if (searchRes.results && searchRes.results.length > 0) {
-            thoughtSummary = `Web検索により最新知見を確認: ${searchRes.results[0].snippet.slice(0, 100)}`;
-          }
-        } catch {
-          // fallback
-        }
-      }
-
-      if (!thoughtSummary) {
-        thoughtSummary = `自発思考により解決方針を確定: 「${hw.topic}」についての要件・手順を整理完了`;
-      }
-
-      workingAgendaService.resolveAgenda(hw.id, thoughtSummary);
-      resolved.push(hw.topic);
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `未解決宿題を保持: ${hw.topic.slice(0, 80)}。この経路には独立検証・根拠接続がないため、解決状態へ変更しません。`
+      );
     }
 
-    return resolved;
+    return [];
   }
 
   /**
@@ -490,41 +448,20 @@ export class AutonomousEvolutionService {
     score: number;
     results: Array<{ topic: string; passed: boolean; score: number }>;
   }> {
-    const weakness = syntheticDataService.detectWeaknessCategory();
-    const targetCat = weakness.targetCategory;
+    const targetCat = syntheticDataService.detectWeaknessCategory().targetCategory;
 
-    // ドリルのシミュレーション実行
-    const results: Array<{ topic: string; passed: boolean; score: number }> = [
-      {
-        topic: `${targetCat} 基礎整合性チェック`,
-        passed: true,
-        score: 1.0,
-      },
-      {
-        topic: `${targetCat} 境界値・エラー回避テスト`,
-        passed: true,
-        score: 0.95,
-      },
-    ];
-
-    const avgScore = results.reduce((acc, r) => acc + r.score, 0) / results.length;
-
-    // ドリル合格実績を能力習得状態へ客観的根拠付きで連携 (優先度B - 2.1)
-    const capId = targetCat.toLowerCase().includes('vba') ? 'CAP-VBA-001' : 'CAP-CONV-001';
-    if (avgScore >= 0.85) {
-      capabilityGapService.recordSuccess(capId, {
-        source: 'observed',
-        evaluator: 'autonomous_mastery_drill',
-        evidenceIds: results.map((r) => r.topic),
-        reasonOverride: `自律弱点克服ドリル(${targetCat})での高得点合格(スコア: ${(avgScore * 100).toFixed(0)}%)`,
-      });
+    if (!signal?.aborted) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `自律熟達度測定を保留: ${targetCat}の実行可能なドリル実行器・独立評価器が未接続のため、成功実績を記録しません。`
+      );
     }
 
     return {
       category: targetCat,
-      totalDrills: results.length,
-      score: avgScore,
-      results,
+      totalDrills: 0,
+      score: 0,
+      results: [],
     };
   }
 
@@ -539,7 +476,7 @@ export class AutonomousEvolutionService {
     selfCodeImprovementSummaryText?: string;
   }): string {
     if (data.selfCodeImprovementSummaryText) {
-      return `おかえり！留守の間に、アプリの自己改善提案をまとめておいたよ！✨（${data.selfCodeImprovementSummaryText}）安全弁（第2.1節）に従って本番への自動適用は止めてあるから、zipダウンロードやGitコミットで確認してね！`;
+      return `おかえり！留守の間に自己改善要求をCOREへ渡したよ。改善が完了したわけではないから、実行・独立検証の結果が出てから成果として扱うね！（${data.selfCodeImprovementSummaryText}）`;
     }
     if (data.resolvedTopics.length > 0) {
       return `おかえり！留守の間に、前回の宿題「${data.resolvedTopics[0]}」について調べてまとめておいたよ！いつでも続きを聞いてね！`;
@@ -548,9 +485,9 @@ export class AutonomousEvolutionService {
       return `おかえり！放置している間に過去の会話から「${data.newRules[0].title}」の知恵をまとめておいたよ。これで次からもっと正確にサポートできるよ！`;
     }
     if (data.newReflectionsCount > 0) {
-      return `おかえり！留守の間に前回の反省点を見直して、もっと自然で完璧に答えられるように自習しておいたよ！`;
+      return `おかえり！留守の間に前回の失敗から反省仮説を記録したよ。改善効果はまだ実測できていないから、成功扱いせず次の実行結果で確かめるね！`;
     }
-    return `おかえり！待っている間に弱点ドリルを自習して、頭をすっきり整理しておいたよ！`;
+    return `おかえり！状況を整理したよ。実行していないドリルや検証していない改善は成果として数えていないから、確認できた結果だけ報告するね！`;
   }
 }
 

@@ -29,6 +29,7 @@ const issueDiscoveryIndexRow = design.split(/\r?\n/).find(line => line.includes(
 const taskCaseMemoryIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/memory/services/taskCaseMemoryService.ts |'));
 const candidatePreparationIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/autonomousCandidatePreparationService.ts |'));
 const improvementIntakeRouterIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/improvementIntakeRouterService.ts |'));
+const autonomousEvolutionIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/autonomy/services/autonomousEvolutionService.ts |'));
 const runtimeLogger = read('src/services/systemLogger.ts');
 const runtimeLifecycle = read('src/app/appRuntimeLifecycleService.ts');
 const domainParticipation = read('src/miki/core/services/domainParticipationService.ts');
@@ -48,6 +49,7 @@ const completionGate = read('src/miki/core/services/coreCompletionGateService.ts
 const taskIngress = read('src/miki/core/services/coreTaskIngressService.ts');
 const issueDiscovery = read('src/miki/core/services/autonomousIssueDiscoveryService.ts');
 const autonomousLoop = read('src/miki/core/services/autonomousSelfImprovementLoopService.ts');
+const autonomousEvolution = read('src/miki/autonomy/services/autonomousEvolutionService.ts');
 const autonomousSearch = read('src/miki/research/services/autonomousSearchService.ts');
 const preflightService = read('src/miki/core/services/selfImprovementPreflightService.ts');
 const requiredAssetAcquisition = read('src/miki/core/services/requiredAssetAcquisitionService.ts');
@@ -676,16 +678,17 @@ check(
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
 check(
-  'Canonical design retains P268/P269 and records the P270 Rust dependency correction',
+  'Canonical design retains P268-P270 and records P271 unverified-autonomy protections',
   design.includes('2026-10-16-P268 共通実装計画型と終端イベント照合の整合') &&
     design.includes('2026-10-16-P269 Actions索引不一致の修正') &&
-    design.includes('正本Revision：2026-10-16-P270') &&
-    design.includes('現行Revision: 2026-10-16-P270') &&
-    design.includes('2026-10-16-P270 Rust依存zip crateのyanked問題を修正')
+    design.includes('正本Revision：2026-10-16-P271') &&
+    design.includes('現行Revision: 2026-10-16-P271') &&
+    design.includes('2026-10-16-P270 Rust依存zip crateのyanked問題を修正') &&
+    design.includes('2026-10-16-P271 自律学習・宿題解決の未検証成果昇格防止')
 );
 check(
   'Rust native build pins the zip dependency and retains deflate support',
-  rustManifest.includes('zip = { version = "=4.5.0", default-features = false, features = ["deflate"] }')
+  rustManifest.includes('zip = { version = "=4.6.1", default-features = false, features = ["deflate"] }')
 );
 
 
@@ -737,6 +740,38 @@ check(
     !failureUnderstanding.includes('researchService.researchGap(') &&
     !failureUnderstanding.includes('verifiedKnowledgePromotionService.promote(') &&
     !failureUnderstanding.includes('researchToRemediationService.process(')
+);
+
+
+check(
+  'Idle reflection hypotheses are not promoted to verified training samples',
+  autonomousEvolution.includes('promotedToTrainingSample: false') &&
+    autonomousEvolution.includes('verifiedEffective: false') &&
+    !autonomousEvolution.includes('selfImprovementService.registerCapabilityCandidate(') &&
+    !autonomousEvolution.includes("experienceLinkService.linkEntity(experienceId, 'trainingSample'")
+);
+check(
+  'Legacy idle homework stays unresolved without independent verification and CORE evidence routing',
+  !autonomousEvolution.includes('workingAgendaService.resolveAgenda(') &&
+    !autonomousEvolution.includes('unifiedWebResearchService.executeSearch(') &&
+    !autonomousEvolution.includes('自発思考により解決方針を確定')
+);
+check(
+  'Mastery scoring does not fabricate executed drills, pass scores, or capability success',
+  autonomousEvolution.includes('totalDrills: 0') &&
+    autonomousEvolution.includes('score: 0') &&
+    autonomousEvolution.includes('results: []') &&
+    !autonomousEvolution.includes('passed: true') &&
+    !autonomousEvolution.includes('capabilityGapService.recordSuccess(capId')
+);
+check(
+  'Enqueuing CORE self-improvement is not counted as applied code improvement',
+  autonomousEvolution.includes('let selfCodeImprovementRun = 0;') &&
+    !autonomousEvolution.includes('selfCodeImprovementRun = 1;')
+);
+check(
+  'Canonical index count matches autonomous evolution source',
+  autonomousEvolutionIndexRow?.includes(`lines=${autonomousEvolution.split(/\r?\n/).length - 1}`)
 );
 
 const failures = checks.filter(item => !item.passed);
