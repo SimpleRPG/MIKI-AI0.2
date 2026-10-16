@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-16
-正本Revision：2026-10-16-P273
+正本Revision：2026-10-16-P274
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-16-P273
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-16-P274
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -211,7 +211,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] OTHER | src/autonomous_modules/anaphora_history_stack.ts | lines=89 | symbols=AnaphoraHistoryStack, AnaphoraStackItem, anaphoraHistoryStack | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/anaphora_resolver_sample.ts | lines=162 | symbols=PureAnaphoraResolutionResult, resolveAnaphoraPure | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/chapter_31_collocation_ast_refactor.ts | lines=88 | symbols=AstRefactorProposal, Chapter31CollocationAstService, CollocationMatch, chapter31Service | callers=1 | deps=0
-- [USED] OTHER | src/autonomous_modules/chapter_36.ts | lines=148 | symbols=Chapter36CounterfactualEngine, Chapter36Evaluation, Chapter36Scenario, Chapter36SimulationResult, chapter36CounterfactualEngine | callers=2 | deps=0
+- [USED] OTHER | src/autonomous_modules/chapter_36.ts | lines=133 | symbols=Chapter36CounterfactualEngine, Chapter36Evaluation, Chapter36Scenario, Chapter36SimulationResult, chapter36CounterfactualEngine | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/chapter_37.ts | lines=88 | symbols=Chapter37IntentMiningEngine, Chapter37IntentResult, Chapter37TurnTrace, chapter37IntentMiningEngine | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/chapter_38.ts | lines=50 | symbols=Chapter38CalibrationOutput, Chapter38MetacognitiveEngine, chapter38MetacognitiveEngine | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/chapter_39.ts | lines=141 | symbols=Chapter39AffectionDynamicsEngine, chapter39AffectionEngine | callers=2 | deps=1
@@ -500,7 +500,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] execution | src/miki/execution/services/executableExplanationService.ts | lines=12 | symbols=ExplanationEvidence, executableExplanationService | callers=1 | deps=1
 - [USED] execution | src/miki/execution/services/executionEventBusService.ts | lines=90 | symbols=ExecutionEvent, ExecutionEventBusService, ExecutionEventHandler, ExecutionEventType, executionEventBusService | callers=33 | deps=0
 - [USED] execution | src/miki/execution/services/executionPlanningService.ts | lines=1 | symbols=executionPlanningService | callers=1 | deps=0 | Tests=1
-- [USED] execution | src/miki/execution/services/executionRunnerService.ts | lines=322 | symbols=ExecutionEnvironment, ExecutionRequest, ExecutionRequestStatus, ExecutionResultInput, ExecutionRunnerService | callers=22 | deps=8
+- [USED] execution | src/miki/execution/services/executionRunnerService.ts | lines=352 | symbols=ExecutionEnvironment, ExecutionRequest, ExecutionRequestStatus, ExecutionResultInput, ExecutionRunnerService | callers=22 | deps=8
 - [USED] execution | src/miki/execution/services/externalRunnerAdapterService.ts | lines=100 | symbols=ExternalRunnerAdapterConfig, ExternalRunnerAdapterService, ExternalRunnerResponse, externalRunnerAdapterService | callers=3 | deps=2
 - [USED] execution | src/miki/execution/services/nativeBackgroundService.ts | lines=229 | symbols=NotificationActionListener, nativeBackgroundService | callers=6 | deps=0
 - [USED] execution | src/miki/execution/services/nativeOperationContractService.ts | lines=66 | symbols=NativeOperationKind, NativeOperationMode, NativeOperationReceipt, NativeOperationRequest, nativeOperationContractService | callers=3 | deps=0 | Tests=12
@@ -874,7 +874,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] strategy | src/miki/strategy/services/workingAgendaService.ts | lines=195 | symbols=workingAgendaService | callers=6 | deps=3 | Storage=miki_working_agenda_items
 - [USED] OTHER | src/miki/unknown.ts | lines=24 | symbols=unknown | callers=1 | deps=9 | Tests=14
 - [USED] unknown | src/miki/unknown/services/counterexampleContractRefinementService.ts | lines=144 | symbols=ContractClause, ContractClauseKind, ContractRefinementRecord, ContractRefinementStatus, CounterexampleContractRefinementService | callers=3 | deps=3
-- [USED] unknown | src/miki/unknown/services/counterfactualReasoningService.ts | lines=204 | symbols=CounterfactualReasoningService, counterfactualReasoningService | callers=3 | deps=5 | Storage=miki_counterfactual_simulations_v1
+- [USED] unknown | src/miki/unknown/services/counterfactualEvaluationPolicy.ts | lines=568 | symbols=CounterfactualExecutionTag, CounterfactualMeasurementEvidence, CounterfactualPolicyEvaluation, auditCounterfactualScenario, evaluateCounterfactualScenarioPolicy | callers=2 | deps=3
+- [USED] unknown | src/miki/unknown/services/counterfactualReasoningService.ts | lines=180 | symbols=CounterfactualReasoningService, counterfactualReasoningService | callers=3 | deps=5 | Storage=miki_counterfactual_simulations_v1
 - [USED] unknown | src/miki/unknown/services/counterfactualWorkSimulatorService.ts | lines=33 | symbols=CounterfactualTrigger, CounterfactualWorkSimulation, CounterfactualWorkSimulatorService, WorkRoute, counterfactualWorkSimulatorService | callers=3 | deps=2 | Storage=miki_counterfactual_work_v1
 - [USED] unknown | src/miki/unknown/services/knowledgeGapService.ts | lines=351 | symbols=KnowledgeGap, KnowledgeGapDetectionContext, KnowledgeGapIdentity, KnowledgeGapResolutionPlan, KnowledgeGapService | callers=16 | deps=4 | Storage=miki_knowledge_gaps_v1
 - [USED] unknown | src/miki/unknown/services/latentIntentMiningService.ts | lines=211 | symbols=LatentIntentMiningService, latentIntentMiningService | callers=6 | deps=5 | Storage=miki_latent_intent_sessions_v1
@@ -965,7 +966,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] LEGACY_OR_SHARED | src/services/componentVersionHistoryService.ts | lines=165 | symbols=ComponentVersionChangeType, ComponentVersionHistoryService, ComponentVersionRecord, componentVersionHistoryService | callers=3 | deps=2
 - [USED] LEGACY_OR_SHARED | src/services/conversationStateService.ts | lines=691 | symbols=AnaphoraResolutionResult, CONVERSATION_STATE_INSTRUCTION, ExtractConversationStateOptions, StateExtractionStats, classifyDialogueAct | callers=4 | deps=4 | Tests=4
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/counterexampleContractRefinementService.ts | lines=144 | symbols=ContractClause, ContractClauseKind, ContractRefinementRecord, ContractRefinementStatus, CounterexampleContractRefinementService | callers=2 | deps=3
-- [ORPHAN] LEGACY_OR_SHARED | src/services/counterfactualReasoningService.ts | lines=225 | symbols=CounterfactualReasoningService, counterfactualReasoningService | callers=0 | deps=5 | Storage=miki_counterfactual_simulations_v1
+- [ORPHAN] LEGACY_COMPATIBILITY_SHIM | src/services/counterfactualReasoningService.ts | lines=1 | symbols=CounterfactualReasoningService, counterfactualReasoningService | callers=0 | deps=1 | exports canonical counterfactual reasoning service
 - [USED] LEGACY_OR_SHARED | src/services/decisionLearningService.ts | lines=73 | symbols=DecisionLearningService, DecisionLearningSignal, decisionLearningService | callers=1 | deps=4
 - [USED] LEGACY_OR_SHARED | src/services/deterministicCapabilityEvolutionService.ts | lines=241 | symbols=CapabilityPatch, deterministicCapabilityEvolutionService | callers=1 | deps=5 | Storage=miki_ai_deterministic_capability_patches_v1
 - [USED] LEGACY_OR_SHARED | src/services/deterministicCapabilityExecutionService.ts | lines=99 | symbols=DeterministicCapabilityExecutionResult, DeterministicCapabilityExecutionService, deterministicCapabilityExecutionService | callers=1 | deps=6
@@ -11744,3 +11745,19 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - `scripts/verify_runtime_failure_fixes.mjs`へ未測定スコアの捏造防止、実測済み候補に限定した推薦、ログ表現、対象ソース索引行数の回帰検査を追加する。
 - 変更した3ソースの正本索引行数はファイル実数から更新した。完全再帰インベントリ全体は再集計していない。
 - Termuxでは事前lint／テスト／buildを実行しない。PUSH後のGitHub Actionsで回帰検査・Web/Rust/Android build・APK生成を確認し、実機動作は別の検証状態として扱う。
+
+============================================================
+【2026-10-16-P274 実行イベント由来の反実仮想測定と独立レビュー】
+============================================================
+
+- 編集開始時のGitHub mainは`680cd67d1d909401fc8880941427e0ad4108174a`（P273）。P273のGitHub Actions Run #879は成功し、APK Artifactも生成された。実機起動・長時間動作の証拠ではない。
+- Canonicalの反実仮想サービスとChapter 36は、共通の証拠ポリシーへ評価ロジックを集約した。証拠がない通常経路はNOT_EXECUTEDとし、スコア0を実測値や改善効果として扱わない。
+- 数値は任意のスコア入力から作らず、実行イベントバス上の終端イベントIDを照合して算出する。事実側と代替側で同一テストケース・同一環境・同一メトリクスを対応させ、安全性・正確性・性能の各区分で最低3組を要求する。
+- サンプルは実際のRunner終端イベント、テストAssertion、実装ハッシュ、環境、Request ID、Experiment ID、Scenario IDを検査する。対応の欠落、イベントの消失、重複、ハッシュ・環境不一致、Assertion不整合は拒否する。
+- 採用推薦は、事実側に対して安全性・正確性の低下がなく、安全性テストが全件PASSし、性能中央値が5%以上改善し、別Runner IDによるレビューイベントが承認する場合に限定する。固定の架空基準点80は使わない。
+- ExecutionRunnerServiceは作成時に検証した計測タグを終端イベントに伝搬し、実行要求のAssertion結果をイベントのPASS/FAILへ反映する。レビュー判定はレビュー用Requestにのみ添付可能とする。
+- プライバシー監査不能、保護対象ランタイムの変更、プライバシー境界の迂回、ローカルLLM経路の再導入を検出した候補は採用対象外とする。
+- `src/services/counterfactualReasoningService.ts`の重複スコア実装はCanonical実装を再エクスポートする互換シムに置換した。
+- 本変更は計測タグ、イベント証拠取込、測定判定の契約を用意するもの。既存の自己改善経路が代替実装を自動配備・比較実行するランナーを完成させたことを意味しない。Runner IDの相違は記録上の独立性を示すが、レビュー主体の暗号学的な身元証明そのものではない。
+- 回帰検証スクリプトに証拠契約・Assertion整合・重複実装の統合・索引行数の検査を追加した。変更対象の索引行数は実ファイルから算出して更新したが、完全再帰インベントリ全体は再集計していない。
+- Termuxでは事前lint／テスト／buildを実行しない。PUSH後のGitHub Actionsで回帰検査、Web/Rust/Android build、APK生成を確認し、実機動作は別の検証状態として扱う。

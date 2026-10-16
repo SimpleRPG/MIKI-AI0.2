@@ -6,6 +6,11 @@ import { executionEventBusService } from './executionEventBusService';
 import { storageService } from '../../../services/storageService';
 import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
 import { testAssertionService } from '../../verification/services/testAssertionService';
+import {
+  counterfactualEventMetadata,
+  validateCounterfactualRunnerTag,
+  type CounterfactualExecutionTag,
+} from '../../unknown/services/counterfactualEvaluationPolicy';
 
 export type ExecutionEnvironment = 'ANDROID' | 'TERMUX' | 'EXCEL_WINDOWS' | 'EXCEL_MAC' | 'EXTERNAL_RUNNER';
 export type ExecutionRequestStatus = 'QUEUED' | 'UNSUPPORTED' | 'SUBMITTED' | 'COMPLETED' | 'FAILED' | 'INCONCLUSIVE';
@@ -31,6 +36,7 @@ export interface ExecutionRequest {
   reason?: string;
   /** 8.4: この実行が検証する判断への追跡ID（任意） */
   decision_id?: string;
+  counterfactual_measurement?: CounterfactualExecutionTag;
 }
 
 export interface ExecutionResultInput {
@@ -44,6 +50,7 @@ export interface ExecutionResultInput {
   implementation_hash: string;
   artifact_snapshot_key: string;
   test_case_id: string;
+  counterfactualReviewDecision?: 'APPROVE' | 'REJECT';
 }
 
 /**
@@ -72,6 +79,7 @@ export class ExecutionRunnerService {
     expectedSummary?: string;
     artifactSnapshotKey?: string;
     decisionId?: string;
+    counterfactualMeasurement?: CounterfactualExecutionTag;
   }): ExecutionRequest {
     const component = componentRegistryService.getComponent(input.componentId);
     const requestId = this.makeId(input.componentId, input.environment, input.testCategory, input.testCaseId || '', Date.now());
@@ -118,6 +126,11 @@ export class ExecutionRunnerService {
     );
     const artifactReady = !!currentArtifact && !!artifactSnapshotKey &&
       currentArtifact.implementation_hash === component.implementation_hash;
+    const counterfactualValidation = validateCounterfactualRunnerTag(
+      input.counterfactualMeasurement,
+      input.testCaseId || '',
+      String(input.testCategory || '')
+    );
 
     const request: ExecutionRequest = {
       request_id: requestId,
@@ -131,8 +144,15 @@ export class ExecutionRunnerService {
       decision_id: input.decisionId,
       expected_summary: input.expectedSummary || '',
       created_at: Date.now(),
-      status: supported && artifactReady ? 'QUEUED' : 'UNSUPPORTED',
-      reason: !supported ? `対応環境に${input.environment}が登録されていません。` : !artifactReady ? '実行対象の不変Artifact snapshotを解決できません。' : undefined,
+      status: supported && artifactReady && counterfactualValidation.allowed ? 'QUEUED' : 'UNSUPPORTED',
+      reason: !counterfactualValidation.allowed
+        ? counterfactualValidation.reason
+        : !supported
+          ? `対応環境に${input.environment}が登録されていません。`
+          : !artifactReady
+            ? '実行対象の不変Artifact snapshotを解決できません。'
+            : undefined,
+      counterfactual_measurement: counterfactualValidation.allowed ? counterfactualValidation.tag : undefined,
     };
     this.requests.set(requestId, request);
     this.save();
@@ -142,7 +162,7 @@ export class ExecutionRunnerService {
       type: request.status === 'QUEUED' ? 'execution.queued' : 'execution.rejected',
       request_id: request.request_id, component_id: request.component_id,
       implementation_hash: request.implementation_hash, environment: request.environment,
-      test_category: request.test_category, test_case_id: request.test_case_id, metadata: { reason: request.reason || '' },
+      test_category: request.test_category, test_case_id: request.test_case_id, metadata: { reason: request.reason || '', ...counterfactualEventMetadata(request.counterfactual_measurement) },
     });
     return request;
   }
@@ -156,6 +176,7 @@ export class ExecutionRunnerService {
       type: 'execution.submitted', request_id: request.request_id, component_id: request.component_id,
       implementation_hash: request.implementation_hash, environment: request.environment,
       test_category: request.test_category, test_case_id: request.test_case_id,
+      metadata: counterfactualEventMetadata(request.counterfactual_measurement),
     });
     return request;
   }
@@ -170,6 +191,15 @@ export class ExecutionRunnerService {
     if (!request) return { accepted: false, reason: 'ExecutionRequestが存在しません。' };
     if (request.status !== 'SUBMITTED' && request.status !== 'QUEUED') {
       return { accepted: false, reason: `Request状態=${request.status}のため結果を受領できません。` };
+    }
+    const isCounterfactualReview = request.counterfactual_measurement?.role === 'INDEPENDENT_REVIEW';
+    if (isCounterfactualReview &&
+        input.counterfactualReviewDecision !== 'APPROVE' &&
+        input.counterfactualReviewDecision !== 'REJECT') {
+      return { accepted: false, reason: '独立レビュー実行にはAPPROVEまたはREJECTの明示結果が必要です。' };
+    }
+    if (!isCounterfactualReview && input.counterfactualReviewDecision !== undefined) {
+      return { accepted: false, reason: '通常の実行Requestへ独立レビュー判定を添付できません。' };
     }
     if (request.test_case_id !== input.test_case_id) {
       request.status = 'FAILED'; this.save();
@@ -238,7 +268,7 @@ export class ExecutionRunnerService {
         test_category: request.test_category, test_case_id: request.test_case_id,
         passed: false, output_summary: input.output_summary, error_message: input.error_message,
         runner_id: input.runner_id, duration_ms: input.duration_ms,
-        metadata: { assertion_status: assertion.status, assertion_rule: assertion.rule, assertion_reason: assertion.reason, artifact_snapshot_key: request.artifact_snapshot_key },
+        metadata: { assertion_status: assertion.status, assertion_rule: assertion.rule, assertion_reason: assertion.reason, artifact_snapshot_key: request.artifact_snapshot_key, ...counterfactualEventMetadata(request.counterfactual_measurement, input.counterfactualReviewDecision, input.runner_id) },
       });
       return { accepted: true, reason: `AssertionがINCONCLUSIVEのため、実行成功を検証成功として扱いません: ${assertion.reason}` };
     }
@@ -248,7 +278,7 @@ export class ExecutionRunnerService {
       implementationHash: input.implementation_hash,
       environment: input.environment,
       testCategory: request.test_category,
-      passed: input.passed,
+      passed: assertion.status === 'PASS',
       outputSummary: input.output_summary,
       errorMessage: input.error_message,
       durationMs: input.duration_ms,
@@ -264,13 +294,13 @@ export class ExecutionRunnerService {
     this.save();
 
     executionEventBusService.publish({
-      type: input.passed ? 'execution.completed' : 'execution.failed',
+      type: assertion.status === 'PASS' ? 'execution.completed' : 'execution.failed',
       request_id: request.request_id, component_id: request.component_id,
       implementation_hash: input.implementation_hash, environment: input.environment,
-      test_category: request.test_category, test_case_id: request.test_case_id, passed: input.passed,
+      test_category: request.test_category, test_case_id: request.test_case_id, passed: assertion.status === 'PASS',
       output_summary: input.output_summary, error_message: input.error_message,
       runner_id: input.runner_id, duration_ms: input.duration_ms,
-      metadata: { test_case_id: request.test_case_id, verification_promoted: verification?.nextStatus === 'VERIFIED', component_state_changed: verification?.previousStatus !== verification?.nextStatus, failure_scope: request.test_category === 'REGRESSION' ? 'REGRESSION' : 'NORMAL_EXECUTION', goal: request.input_summary, input_summary: request.input_summary, artifact_snapshot_key: request.artifact_snapshot_key },
+      metadata: { test_case_id: request.test_case_id, assertion_status: assertion.status, assertion_rule: assertion.rule, assertion_reason: assertion.reason, verification_promoted: verification?.nextStatus === 'VERIFIED', component_state_changed: verification?.previousStatus !== verification?.nextStatus, failure_scope: request.test_category === 'REGRESSION' ? 'REGRESSION' : 'NORMAL_EXECUTION', goal: request.input_summary, input_summary: request.input_summary, artifact_snapshot_key: request.artifact_snapshot_key, ...counterfactualEventMetadata(request.counterfactual_measurement, input.counterfactualReviewDecision, input.runner_id) },
     });
 
     return { accepted: true, verification };

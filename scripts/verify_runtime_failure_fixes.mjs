@@ -33,6 +33,9 @@ const autonomousEvolutionIndexRow = design.split(/\r?\n/).find(line => line.incl
 const counterfactualIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/unknown/services/counterfactualReasoningService.ts |'));
 const chapter36IndexRow = design.split(/\r?\n/).find(line => line.includes('src/autonomous_modules/chapter_36.ts |'));
 const selfCodeArchitectIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/selfDevelopment/services/selfCodeArchitectService.ts |'));
+const counterfactualPolicyIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/unknown/services/counterfactualEvaluationPolicy.ts |'));
+const executionRunnerIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/execution/services/executionRunnerService.ts |'));
+const legacyCounterfactualIndexRow = design.split(/\r?\n/).find(line => line.includes('src/services/counterfactualReasoningService.ts |'));
 const runtimeLogger = read('src/services/systemLogger.ts');
 const runtimeLifecycle = read('src/app/appRuntimeLifecycleService.ts');
 const domainParticipation = read('src/miki/core/services/domainParticipationService.ts');
@@ -54,6 +57,9 @@ const issueDiscovery = read('src/miki/core/services/autonomousIssueDiscoveryServ
 const autonomousLoop = read('src/miki/core/services/autonomousSelfImprovementLoopService.ts');
 const autonomousEvolution = read('src/miki/autonomy/services/autonomousEvolutionService.ts');
 const counterfactual = read('src/miki/unknown/services/counterfactualReasoningService.ts');
+const counterfactualPolicy = read('src/miki/unknown/services/counterfactualEvaluationPolicy.ts');
+const executionRunner = read('src/miki/execution/services/executionRunnerService.ts');
+const legacyCounterfactual = read('src/services/counterfactualReasoningService.ts');
 const chapter36 = read('src/autonomous_modules/chapter_36.ts');
 const selfCodeArchitect = read('src/miki/selfDevelopment/services/selfCodeArchitectService.ts');
 const autonomousSearch = read('src/miki/research/services/autonomousSearchService.ts');
@@ -684,41 +690,58 @@ check(
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
 check(
-  'Canonical design retains P268-P272 and records P273 counterfactual evidence boundary',
-  design.includes('2026-10-16-P268 共通実装計画型と終端イベント照合の整合') &&
-    design.includes('2026-10-16-P269 Actions索引不一致の修正') &&
-    design.includes('2026-10-16-P270 Rust依存zip crateのyanked問題を修正') &&
-    design.includes('2026-10-16-P271 自律学習・宿題解決の未検証成果昇格防止') &&
-    design.includes('2026-10-16-P272 Cargo zipのyanked固定版を回避') &&
-    design.includes('正本Revision：2026-10-16-P273') &&
-    design.includes('現行Revision: 2026-10-16-P273') &&
-    design.includes('2026-10-16-P273 反実仮想スコアの実測境界修正')
+  'Canonical design retains P273 and records P274 evidence-bound counterfactual execution',
+  design.includes('2026-10-16-P273 反実仮想スコアの実測境界修正') &&
+    design.includes('正本Revision：2026-10-16-P274') &&
+    design.includes('現行Revision: 2026-10-16-P274') &&
+    design.includes('2026-10-16-P274 実行イベント由来の反実仮想測定と独立レビュー')
 );
 check(
-  'Rust native build pins the zip dependency and retains deflate support',
-  rustManifest.includes('zip = { version = "9.0.3", default-features = false, features = ["deflate"] }')
+  'Shared policy blocks protected runtime, privacy bypass, disabled guardrail, and local LLM route',
+  counterfactualPolicy.includes('auditCounterfactualScenario') &&
+    counterfactualPolicy.includes('PROTECTED_RUNTIME_MUTATION') &&
+    counterfactualPolicy.includes('PRIVACY_BYPASS_INTENT') &&
+    counterfactualPolicy.includes('PRIVACY_GUARDRAIL_DISABLED') &&
+    counterfactualPolicy.includes('PRIVACY_AUDIT_UNAVAILABLE') &&
+    counterfactualPolicy.includes('LOCAL_LLM_PRIMARY_PATH_PROHIBITED')
 );
 check(
-  'Canonical counterfactual results remain unmeasured until an evaluator measures them',
-  counterfactual.includes("const measurementStatus: 'NOT_EXECUTED' | 'MEASURED' = 'NOT_EXECUTED';") &&
-    counterfactual.includes("e.measurementStatus === 'MEASURED'") &&
-    counterfactual.includes("e.recommendation === 'ADOPT_COUNTERFACTUAL'") &&
+  'Measured decisions require actual paired execution events and a distinct review runner event',
+  counterfactualPolicy.includes('MIN_PAIRED_TESTS_PER_METRIC = 3') &&
+    counterfactualPolicy.includes('executionEventBusService.list()') &&
+    counterfactualPolicy.includes('FACTUAL_ALTERNATIVE_TEST_CASES_NOT_PAIRED') &&
+    counterfactualPolicy.includes('MEASUREMENT_BUILD_ENVIRONMENT_OR_COMPONENT_MISMATCH') &&
+    counterfactualPolicy.includes('INDEPENDENT_REVIEW_EVENT_INVALID_OR_NOT_INDEPENDENT') &&
+    counterfactualPolicy.includes('counterfactual_reviewed_event_ids') &&
+    counterfactualPolicy.includes('baselineMedianLatencyMs') &&
+    !counterfactualPolicy.includes('factualBenchmark = 80')
+);
+check(
+  'Execution runner validates tags and derives terminal pass state from assertion',
+  executionRunner.includes('validateCounterfactualRunnerTag(') &&
+    executionRunner.includes('counterfactual_measurement?: CounterfactualExecutionTag') &&
+    executionRunner.includes('counterfactualReviewDecision') &&
+    executionRunner.includes("type: assertion.status === 'PASS' ? 'execution.completed' : 'execution.failed'") &&
+    executionRunner.includes('assertion_status: assertion.status') &&
+    executionRunner.includes('counterfactualEventMetadata(request.counterfactual_measurement')
+);
+check(
+  'Canonical service and Chapter36 use the same evidence-gated policy',
+  counterfactual.includes('chapter36CounterfactualEngine.evaluate(') &&
+    counterfactual.includes('measurementEvidenceByScenario?.[s.id]') &&
+    counterfactual.includes('aggregateCounterfactualMeasurementStatus(evaluations)') &&
+    chapter36.includes('evaluateCounterfactualScenarioPolicy(') &&
+    chapter36.includes('measurementEvidenceByScenario?.[s.id]') &&
+    chapter36.includes('aggregateCounterfactualMeasurementStatus(evaluations)') &&
+    !chapter36.includes('レイテンシが大幅改善する') &&
     !counterfactual.includes('performanceScore += 12') &&
-    !counterfactual.includes('accuracyScore += 8') &&
-    !counterfactual.includes('factualBenchmark = 80') &&
-    !counterfactual.includes('90%削減') &&
-    !counterfactual.includes('99%根絶') &&
-    !counterfactual.includes('100%の可用性')
+    !counterfactual.includes('accuracyScore += 8')
 );
 check(
-  'Chapter36 blocks keyword-scored and unmeasured recommendations',
-  chapter36.includes("measurementStatus: 'NOT_EXECUTED' | 'MEASURED'") &&
-    chapter36.includes("e.measurementStatus === 'MEASURED'") &&
-    chapter36.includes("e.recommendation === 'ADOPT_COUNTERFACTUAL'") &&
-    !chapter36.includes('performanceScore += 12') &&
-    !chapter36.includes('accuracyScore += 8') &&
-    !chapter36.includes('factualBenchmark = 80') &&
-    !chapter36.includes('リスクが実質0になる')
+  'Legacy counterfactual module re-exports canonical service without duplicate scoring',
+  legacyCounterfactual.includes("from '../miki/unknown/services/counterfactualReasoningService'") &&
+    !legacyCounterfactual.includes('performanceScore += 12') &&
+    !legacyCounterfactual.includes('factualBenchmark = 80')
 );
 check(
   'Self-code architect log does not claim an unexecuted counterfactual comparison ran',
@@ -726,10 +749,16 @@ check(
     !selfCodeArchitect.includes('反実仮想推論・分岐シミュレーションを実走記録しました')
 );
 check(
-  'Canonical index line counts match the three changed counterfactual sources',
+  'Canonical index line counts match changed counterfactual source files',
   counterfactualIndexRow?.includes(`lines=${counterfactual.split(/\r?\n/).length - 1}`) &&
     chapter36IndexRow?.includes(`lines=${chapter36.split(/\r?\n/).length - 1}`) &&
-    selfCodeArchitectIndexRow?.includes(`lines=${selfCodeArchitect.split(/\r?\n/).length - 1}`)
+    counterfactualPolicyIndexRow?.includes(`lines=${counterfactualPolicy.split(/\r?\n/).length - 1}`) &&
+    executionRunnerIndexRow?.includes(`lines=${executionRunner.split(/\r?\n/).length - 1}`) &&
+    legacyCounterfactualIndexRow?.includes(`lines=${legacyCounterfactual.split(/\r?\n/).length - 1}`)
+);
+check(
+  'Rust native build pins the zip dependency and retains deflate support',
+  rustManifest.includes('zip = { version = "9.0.3", default-features = false, features = ["deflate"] }')
 );
 check(
   'Autonomous Issue Discovery synchronizes terminal outcomes and permits three bounded retries',

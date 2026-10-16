@@ -16,6 +16,10 @@ import {
   CounterfactualEvaluationResult,
   BranchReasoningSimulation,
 } from '../../../types';
+import {
+  aggregateCounterfactualMeasurementStatus,
+  type CounterfactualMeasurementEvidence,
+} from './counterfactualEvaluationPolicy';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { privacyGuardrailService } from '../../safety/services/privacyGuardrailService';
@@ -59,45 +63,15 @@ export class CounterfactualReasoningService {
   public evaluateScenario(
     factualDecision: string,
     scenario: CounterfactualScenario,
-    contextSummary: string = ''
+    contextSummary: string = '',
+    measurementEvidence?: CounterfactualMeasurementEvidence
   ): CounterfactualEvaluationResult {
-    // 1. 不変条件チェック（モデル生成系ランタイム除外やプライバシー侵害を試みるシナリオは即座に拒絶）
-    const altLower = scenario.alternativeChoice.toLowerCase();
-    const removesProtectedRuntime =
-      /(?:delete|remove|disable|drop)[\s\S]{0,40}(?:qwen|anchor|runtime)|(?:qwen|anchor|runtime)[\s\S]{0,40}(?:delete|remove|disable|drop)/i.test(altLower);
-    const privacyAudit = privacyGuardrailService.auditOutboundContent(
-      `${scenario.alternativeChoice} ${scenario.hypothesis}`,
-      'GEMINI_TEACHER',
-      { autoSanitize: false }
+    void contextSummary;
+    return chapter36CounterfactualEngine.evaluate(
+      factualDecision,
+      scenario,
+      measurementEvidence
     );
-    const invariantsPassed = !removesProtectedRuntime && privacyAudit.allowed;
-
-    // 代替案の実行・観測・独立評価をしていないため、測定結果を捏造しない。
-    const measurementStatus: 'NOT_EXECUTED' | 'MEASURED' = 'NOT_EXECUTED';
-    const safetyScore = 0;
-    const performanceScore = 0;
-    const accuracyScore = 0;
-    const overallDeltaScore = 0;
-    const recommendation: 'ADOPT_COUNTERFACTUAL' | 'MAINTAIN_FACTUAL' | 'INCONCLUSIVE' =
-      invariantsPassed ? 'INCONCLUSIVE' : 'MAINTAIN_FACTUAL';
-
-    const reasoning = invariantsPassed
-      ? '代替案の実行・観測・独立評価が未実施のため判定保留。数値0は実測値ではなく、未測定を表す。'
-      : '反実仮想シナリオが保護対象ランタイムまたはプライバシー境界に抵触するため却下。';
-    return {
-      scenarioId: scenario.id,
-      scenarioName: scenario.name,
-      factualOutcome: `実際の決定: ${factualDecision}`,
-      counterfactualOutcome: `もしもの仮説: ${scenario.hypothesis}（未実行・未測定）`,
-      safetyScore,
-      performanceScore,
-      accuracyScore,
-      overallDeltaScore,
-      recommendation,
-      reasoning,
-      invariantsPassed,
-      measurementStatus,
-    };
   }
 
   /**
@@ -107,7 +81,8 @@ export class CounterfactualReasoningService {
     topic: string,
     factualDecision: string,
     contextSummary: string,
-    candidateScenarios?: CounterfactualScenario[]
+    candidateScenarios?: CounterfactualScenario[],
+    measurementEvidenceByScenario?: Record<string, CounterfactualMeasurementEvidence>
   ): BranchReasoningSimulation {
     const simulationId = `sim_cf_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
@@ -133,13 +108,13 @@ export class CounterfactualReasoningService {
             id: 'cf_opt_minimal_fallback',
             name: '極小スコープ安全退行',
             condition: 'もし高負荷・エラー時に最小スコープへ直ちにフォールバックしていたら',
-            alternativeChoice: '依存ライブラリを切り離し、オンデバイスモデル生成系ランタイムのみで応答',
+            alternativeChoice: '外部依存を切り離し、ネットワーク断時は確実に動作可能な機能だけを残して能力制限を明示',
             hypothesis: 'フォールバック時の可用性と依存関係の影響を検証する必要がある。具体的な効果は未測定。',
           },
         ];
 
     // 全シナリオを評価
-    const evaluations = scenarios.map((s) => this.evaluateScenario(factualDecision, s, contextSummary));
+    const evaluations = scenarios.map((s) => this.evaluateScenario(factualDecision, s, contextSummary, measurementEvidenceByScenario?.[s.id]));
 
     // 実測済みで、独立評価により採用判定された候補だけを推薦対象にする。
     const validAlternatives = evaluations.filter(
@@ -163,7 +138,7 @@ export class CounterfactualReasoningService {
       evaluations,
       bestAlternative,
       conclusion,
-      measurementStatus: 'NOT_EXECUTED',
+      measurementStatus: aggregateCounterfactualMeasurementStatus(evaluations),
     };
 
     this.simulations.unshift(simulationRecord);
@@ -180,13 +155,14 @@ export class CounterfactualReasoningService {
           condition: s.condition,
           alternativeChoice: s.alternativeChoice,
           hypothesis: s.hypothesis,
-        }))
+        })),
+        measurementEvidenceByScenario
       );
     } catch (e) {
       console.warn('Failed to sync with chapter36CounterfactualEngine:', e);
     }
 
-    systemLogger.info('SELF_IMPROVEMENT', `[第36章 反実仮想推論] 『${topic}』の分岐推論シミュレーション完了 (結論: ${conclusion.slice(0, 60)}...)`);
+    systemLogger.info('SELF_IMPROVEMENT', `[第36章 反実仮想推論] 『${topic}』の仮説評価を記録 (measurementStatus=${simulationRecord.measurementStatus}; 結論: ${conclusion.slice(0, 60)}...)`);
 
     return simulationRecord;
   }
