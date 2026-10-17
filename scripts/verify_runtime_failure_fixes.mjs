@@ -695,11 +695,12 @@ check(
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
 check(
-  'Canonical design retains P273 and records P274 evidence-bound counterfactual execution',
+  'Canonical design retains P273/P274 history and records current P275 capability ledger',
   design.includes('2026-10-16-P273 反実仮想スコアの実測境界修正') &&
-    design.includes('正本Revision：2026-10-16-P274') &&
-    design.includes('現行Revision: 2026-10-16-P274') &&
-    design.includes('2026-10-16-P274 実行イベント由来の反実仮想測定と独立レビュー')
+    design.includes('2026-10-16-P274 実行イベント由来の反実仮想測定と独立レビュー') &&
+    design.includes('正本Revision：2026-10-17-P275') &&
+    design.includes('現行Revision: 2026-10-17-P275') &&
+    design.includes('2026-10-17-P275 根拠境界付き自己能力台帳')
 );
 check(
   'Shared policy blocks protected runtime, privacy bypass, disabled guardrail, and local LLM route',
