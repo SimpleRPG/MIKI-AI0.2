@@ -28,6 +28,8 @@ const rustManifest = read('native/miki-native-core/Cargo.toml');
 const issueDiscoveryIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/autonomousIssueDiscoveryService.ts |'));
 const taskCaseMemoryIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/memory/services/taskCaseMemoryService.ts |'));
 const candidatePreparationIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/autonomousCandidatePreparationService.ts |'));
+const capabilityLedgerIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/capability/services/capabilityLedgerService.ts |'));
+const capabilityLedgerScreenIndexRow = design.split(/\r?\n/).find(line => line.includes('src/components/CapabilityLedgerScreen.tsx |'));
 const improvementIntakeRouterIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/improvementIntakeRouterService.ts |'));
 const autonomousEvolutionIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/autonomy/services/autonomousEvolutionService.ts |'));
 const counterfactualIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/unknown/services/counterfactualReasoningService.ts |'));
@@ -70,6 +72,9 @@ const autonomousRevalidationLoop = read('src/miki/autonomy/services/autonomousRe
 const domainIntegrationBootstrap = read('src/miki/core/services/domainIntegrationBootstrapService.ts');
 const taskCaseMemory = read('src/miki/memory/services/taskCaseMemoryService.ts');
 const candidatePreparation = read('src/miki/core/services/autonomousCandidatePreparationService.ts');
+const capabilityLedger = read('src/miki/capability/services/capabilityLedgerService.ts');
+const capabilityLedgerScreen = read('src/components/CapabilityLedgerScreen.tsx');
+const capabilityLedgerIngress = read('src/miki/core/services/coreTaskIngressService.ts');
 const improvementIntakeRouter = read('src/miki/core/services/improvementIntakeRouterService.ts');
 const failureUnderstanding = read('src/miki/memory/services/failureUnderstandingService.ts');
 
@@ -840,6 +845,43 @@ check(
 check(
   'Canonical index count matches autonomous evolution source',
   autonomousEvolutionIndexRow?.includes(`lines=${autonomousEvolution.split(/\r?\n/).length - 1}`)
+);
+
+check(
+  'Capability Ledger separates evidence-backed state and registry-only state',
+  capabilityLedger.includes('VERIFIED_EVIDENCE') &&
+    capabilityLedger.includes('VERIFIED_REGISTRY_ONLY') &&
+    capabilityLedger.includes('REVALIDATION_REQUIRED') &&
+    capabilityLedger.includes('IMPLEMENTED_UNVERIFIED') &&
+    capabilityLedger.includes('UNASSESSED')
+);
+check(
+  'Capability Ledger does not automatically resolve gaps or promote components',
+  capabilityLedger.includes('listOpen(GAP_LIMIT + 1)') &&
+    !capabilityLedger.includes('markResolved(') &&
+    !capabilityLedger.includes('recordSuccess(') &&
+    !capabilityLedger.includes('.promote(')
+);
+check(
+  'CORE self-improvement ingress receives a capability ledger summary',
+  capabilityLedgerIngress.includes("request.kind==='SELF_IMPROVEMENT'") &&
+    capabilityLedgerIngress.includes('capabilityLedgerService.buildCoreContext(request.goal)')
+);
+check(
+  'Autonomous plan checks capability ledger and forbids absence inference',
+  candidatePreparation.includes('capabilityLedgerService.assessGoal') &&
+    candidatePreparation.includes('能力不在と断定しない')
+);
+check(
+  'Capability Ledger UI supports goal assessment and TXT export',
+  capabilityLedgerScreen.includes('capabilityLedgerService.assessGoal(goal)') &&
+    capabilityLedgerScreen.includes('capabilityLedgerService.toText(snapshot)') &&
+    capabilityLedgerScreen.includes('能力が存在しない証拠ではない')
+);
+check(
+  'Canonical index counts match Capability Ledger source files',
+  capabilityLedgerIndexRow?.includes(`lines=${capabilityLedger.split(/\r?\n/).length - 1}`) &&
+    capabilityLedgerScreenIndexRow?.includes(`lines=${capabilityLedgerScreen.split(/\r?\n/).length - 1}`)
 );
 
 const failures = checks.filter(item => !item.passed);

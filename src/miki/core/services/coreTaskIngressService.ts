@@ -3,6 +3,7 @@ import { conversationGraphRuntimeP212Service } from '../../conversation/services
 import { coreOrchestratorService, type CoreOrchestrationResult } from './coreOrchestratorService';
 import type { MikiDomain } from './crossDomainCirculationService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
+import { capabilityLedgerService } from '../../capability/services/capabilityLedgerService';
 export type CoreTaskKind='USER_REQUEST'|'SELF_IMPROVEMENT'|'EXECUTION_EVENT'|'VERIFICATION_EVENT'|'SYSTEM_TASK';
 export interface CoreTaskIngressRequest {kind:CoreTaskKind;goal:string;source:MikiDomain|'core';payload?:Record<string,unknown>;initialPayload?:Record<string,unknown>;maxCycles?:number;}
 export type CoreConversationFinalizationResult = CoreOrchestrationResult & { finalAnswer: string; finalization?: P216FinalAnswer };
@@ -10,7 +11,9 @@ class CoreTaskIngressService {
  async submit(request:CoreTaskIngressRequest):Promise<CoreOrchestrationResult>{
   if(!request.goal.trim())throw new Error('CORE_TASK_GOAL_REQUIRED');
   const maxCycles=request.maxCycles??coreCycleSettingsService.maxCyclesFor(request.kind);
-  const result=await coreOrchestratorService.run(request.goal,request.source as MikiDomain,{...(request.payload||{}),...(request.initialPayload||{}),kind:request.kind},maxCycles);
+  const payload:Record<string,unknown>={...(request.payload||{}),...(request.initialPayload||{}),kind:request.kind};
+  if(request.kind==='SELF_IMPROVEMENT')payload.capabilityLedgerContext=capabilityLedgerService.buildCoreContext(request.goal);
+  const result=await coreOrchestratorService.run(request.goal,request.source as MikiDomain,payload,maxCycles);
   if(request.source==='conversation')conversationGraphRuntimeP212Service.ingestInput(result.task.taskId,request.goal);
   return result;
  }

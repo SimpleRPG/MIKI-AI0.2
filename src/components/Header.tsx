@@ -19,8 +19,8 @@ import {
 import { PersonaConfig, MemoryItem, EngineMode } from '../types';
 
 interface HeaderProps {
-  activeTab: 'preview' | 'code' | 'improvement' | 'github';
-  setActiveTab: (tab: 'preview' | 'code' | 'improvement' | 'github') => void;
+  activeTab: 'preview' | 'code' | 'improvement' | 'github' | 'capabilityLedger';
+  setActiveTab: (tab: 'preview' | 'code' | 'improvement' | 'github' | 'capabilityLedger') => void;
   persona: PersonaConfig;
   memories: MemoryItem[];
   engineMode?: EngineMode;
@@ -135,6 +135,18 @@ export const Header: React.FC<HeaderProps> = ({
           <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
           <span className="hidden sm:inline font-bold">自律改善</span>
           <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/80" />
+        </button>
+        <button
+          onClick={() => setActiveTab('capabilityLedger')}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all shadow-xs ${
+            activeTab === 'capabilityLedger'
+              ? 'bg-indigo-950/80 border-indigo-500/60 text-indigo-300 font-bold'
+              : 'bg-slate-900/90 border-slate-800 hover:border-indigo-500/50 text-slate-300 hover:text-indigo-300 hover:bg-slate-800'
+          }`}
+          title="自己能力台帳: 検証状態・実行根拠・未解決Gapを確認"
+        >
+          <Brain className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="hidden sm:inline font-bold">自己能力</span>
         </button>
       </div>
 

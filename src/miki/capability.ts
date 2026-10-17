@@ -16,6 +16,7 @@ export function capability() {
 // capability 配下のサービスを、この17分類の管理入口から公開する。
 export * from './capability/services/capabilityCompositionProofService';
 export * from './capability/services/capabilityConfidenceService';
+export * from './capability/services/capabilityLedgerService';
 export * from './capability/services/capabilityCouncilService';
 export * from './capability/services/capabilityDependencyService';
 export * from './capability/services/capabilityGapService';

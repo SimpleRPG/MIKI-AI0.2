@@ -1,6 +1,7 @@
 import { autonomousIssueDiscoveryService, type DiscoveredIssue, type DiscoveredIssueKind } from './autonomousIssueDiscoveryService';
 import { isolatedCandidateWorkspaceService, type CandidateWorkspace } from './isolatedCandidateWorkspaceService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
+import { capabilityLedgerService } from '../../capability/services/capabilityLedgerService';
 
 export interface TargetResolution { issueId:string; targetPaths:string[]; evidenceIds:string[]; confidence:number; reasons:string[]; }
 export interface CandidateDraft { issueId:string; targetPath:string; baselineContent:string; candidateContent:string; evidenceIds:string[]; generationMode:'AI_SUPPLIED'|'SAFE_TEMPLATE'; }
@@ -31,7 +32,8 @@ class AutonomousCandidatePreparationService {
    CLAIM_CONTRADICTION:['ClaimのEvidenceと現在のRevision状態を確認する','独立Evidence・矛盾処理経路を確認する','未解決矛盾を確定事実へ変換しない'],
    IMPROVEMENT_DEBT:['負債の発生原因と既存試行履歴を確認する','未実行検証・回帰・反例ゲートを確認する','同一失敗の無限再試行を避ける'],
   };
-  const investigationSteps=stepsByKind[issue.kind]||['既存実装と要求の差分を確認する','最小変更対象を確定する','既存検証経路を確認する'];
+  const ledgerAssessment=capabilityLedgerService.assessGoal(`${issue.kind} ${issue.title}`);
+  const investigationSteps=[...(stepsByKind[issue.kind]||['既存実装と要求の差分を確認する','最小変更対象を確定する','既存検証経路を確認する']),'自己能力台帳の候補・実装hash・実行根拠を確認する','一致候補がないことだけで能力不在と断定しない'];
   const requiredValidation=['TypeScript/構文検査','既存単体・回帰テスト','Counterexample/境界値検証','RequirementContract評価','既存CORE/安全ゲート通過'];
   const forbiddenExpansion=['対象外ファイルへの変更','新しいDB/Blackboard/Truth Storeの追加','新しいOrchestrator/Queue/最上位司令塔の追加','未検証外部コードの直接実行・採用','検証結果を変更理由の証拠として偽装すること'];
   const targetPaths=[...new Set(resolution.targetPaths)].sort((a,b)=>a.localeCompare(b)).slice(0,3);
@@ -58,7 +60,7 @@ class AutonomousCandidatePreparationService {
    'Task COMPLETEDでも監視元が未解決なら成功確定せず上限付き再試行へ移す',
    '監視元の解決根拠を照合できない場合は未解決を維持する'
   ];
-  return {version:2,source:'AUTONOMOUS_ISSUE',issueId:issue.id,targetPaths,changeScope,investigationSteps,requiredValidation,forbiddenExpansion,executionConstraints,dependencyConstraints,retryPolicy,stopConditions,rationale:[`Issue ${issue.id}: ${issue.title}`,`source=${issue.sourceId}`,`resolutionConfidence=${resolution.confidence.toFixed(3)}`,...resolution.reasons.slice(0,8)],confidence:resolution.confidence};
+  return {version:2,source:'AUTONOMOUS_ISSUE',issueId:issue.id,targetPaths,changeScope,investigationSteps,requiredValidation,forbiddenExpansion,executionConstraints,dependencyConstraints,retryPolicy,stopConditions,rationale:[`Issue ${issue.id}: ${issue.title}`,`source=${issue.sourceId}`,`resolutionConfidence=${resolution.confidence.toFixed(3)}`,`CapabilityLedger: ${ledgerAssessment.summary}`,...resolution.reasons.slice(0,7)],confidence:resolution.confidence};
  }
 
  async prepare(issueId:string,aiCandidates?:Array<{path:string;candidateContent:string;evidenceIds?:string[]}>,targetPaths?:string[]):Promise<CandidateWorkspace|undefined>{

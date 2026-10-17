@@ -15,6 +15,7 @@ const loadCodeEditor = () => import('./components/CodeEditor');
 const loadImprovementHome = () => import('./components/AutonomousImprovementHome');
 const loadMemoryModal = () => import('./components/MemoryModal');
 const loadActivityMonitor = () => import('./components/RealtimeActivityMonitorModal');
+const loadCapabilityLedger = () => import('./components/CapabilityLedgerScreen');
 const CodeEditor = React.lazy(() => loadCodeEditor().then(module => ({ default: module.CodeEditor })));
 import { GitHubHub } from './components/GitHubHub';
 const AutonomousImprovementHome = React.lazy(() => loadImprovementHome().then(module => ({ default: module.AutonomousImprovementHome })));
@@ -25,6 +26,7 @@ import { LibraryHub } from './components/LibraryHub';
 const MemoryModal = React.lazy(() => loadMemoryModal().then(module => ({ default: module.MemoryModal })));
 import { ExportModal } from './components/ExportModal';
 const RealtimeActivityMonitorModal = React.lazy(() => loadActivityMonitor().then(module => ({ default: module.RealtimeActivityMonitorModal })));
+const CapabilityLedgerScreen = React.lazy(() => loadCapabilityLedger().then(module => ({ default: module.CapabilityLedgerScreen })));
 import { WORKSPACE_TEMPLATES } from './data/presets';
 import {
   ChatMessage,
@@ -221,8 +223,8 @@ const INITIAL_MEMORIES: MemoryItem[] = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'improvement' | 'github'>('preview');
-  const [mobileTab, setMobileTab] = useState<'home' | 'chat' | 'preview' | 'code' | 'improvement' | 'github' | 'library' | 'memory' | 'engine' | 'settings'>('home');
+  const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'improvement' | 'github' | 'capabilityLedger'>('preview');
+  const [mobileTab, setMobileTab] = useState<'home' | 'chat' | 'preview' | 'code' | 'improvement' | 'github' | 'library' | 'memory' | 'engine' | 'settings' | 'capabilityLedger'>('home');
   const [isDesktopViewport, setIsDesktopViewport] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
   );
@@ -1811,6 +1813,10 @@ export default function App() {
                 onOpenActivityMonitor={() => { void loadActivityMonitor(); setIsGlobalActivityMonitorOpen(true); }}
               />
             )}
+
+            {activeTab === 'capabilityLedger' && (
+              <CapabilityLedgerScreen onBack={() => setActiveTab('preview')} />
+            )}
           </div>
           </div>
         )}
@@ -1825,6 +1831,7 @@ export default function App() {
                 onOpenWorkspace={() => setMobileTab('code')}
                 onOpenLibrary={() => setMobileTab('library')}
                 onOpenConnections={() => setMobileTab('settings')}
+                onOpenCapabilityLedger={() => setMobileTab('capabilityLedger')}
               />
             )}
 
@@ -1926,6 +1933,9 @@ export default function App() {
             {mobileTab === 'library' && <LibraryHub onOpenMemory={() => { void loadMemoryModal(); setIsMemoryModalOpen(true); }} />}
 
             {mobileTab === 'settings' && <ExternalConnectionsScreen />}
+            {mobileTab === 'capabilityLedger' && (
+              <CapabilityLedgerScreen onBack={() => setMobileTab('home')} />
+            )}
 
             {mobileTab === 'memory' && (
               <div className="h-full overflow-y-auto p-4 bg-slate-900">
