@@ -670,7 +670,7 @@ class SelfImprovementService {
 
   /**
    * 検証済み能力改善候補 (CapabilityLearningCandidate) の登録
-   * モデル重み学習 (LoRA/SFT/DPO) ではなく、決定論的な能力パッチ・回答骨格・ルールへの昇格候補として蓄積
+   * モデル重みの更新ではなく、決定論的な能力パッチ・回答骨格・ルールへの昇格候補として蓄積
    */
   public registerCapabilityCandidate(sample: {
     instruction: string;

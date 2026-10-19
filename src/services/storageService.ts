@@ -564,7 +564,21 @@ class StorageService {
     if (!raw) return [];
     try {
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      let migrated = false;
+      const memories = parsed.map((memory: MemoryItem) => {
+        if (memory?.destination !== 'lora_dataset') return memory;
+        migrated = true;
+        return {
+          ...memory,
+          destination: 'quarantine',
+          approved: false,
+          active: false,
+          quarantineReason: '旧学習経路の廃止に伴う移行。内容を失わず隔離しました。手動で確認して再分類してください。',
+        };
+      });
+      if (migrated) this.setMemories(memories);
+      return memories;
     } catch {
       return [];
     }

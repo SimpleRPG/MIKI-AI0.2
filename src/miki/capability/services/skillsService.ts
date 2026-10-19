@@ -195,9 +195,17 @@ class SkillsService {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // 50章対応: 既存の保存済みスキルにdistinctContextsとpromotedToOfficialAtを補完
+            const hasRetiredFields = parsed.some((s: SkillItem) =>
+              Object.prototype.hasOwnProperty.call(s, 'trainingSampleId') ||
+              Object.prototype.hasOwnProperty.call(s, 'graduatedToTrainingAt'),
+            );
+            // Normalize legacy skill records to deterministic capability-candidate field names.
             this.skills = parsed.map((s: SkillItem) => ({
               ...s,
+              capabilityCandidateId: s.capabilityCandidateId || s.trainingSampleId,
+              trainingSampleId: undefined,
+              capabilityCandidateRegisteredAt: s.capabilityCandidateRegisteredAt || s.graduatedToTrainingAt,
+              graduatedToTrainingAt: undefined,
               distinctContexts: Array.isArray(s.distinctContexts) ? s.distinctContexts : [],
               promotedToOfficialAt:
                 s.promotedToOfficialAt ||
@@ -205,6 +213,7 @@ class SkillsService {
                   ? s.createdAt || Date.now() - 86400000 * 31
                   : undefined),
             }));
+            if (hasRetiredFields) this.saveSkills();
             return this.skills;
           }
         }
@@ -310,7 +319,7 @@ class SkillsService {
   /**
    * スキルの実行結果（成功・失敗）と発火文脈を記録し、
    * 候補(candidate) → 試験済み(tested) → 正式(official) → 卒業(official_matured) の自動昇格判定を行う。
-   * 50章: 文脈の多様性（別問題での再試験）およびLoRA教材化（卒業制度）を厳格に適用。
+   * 50章: 文脈の多様性（別問題での再試験）および決定論的能力候補への登録（卒業制度）を厳格に適用。
    */
   public recordExecutionResult(id: string, success: boolean, contextPrompt?: string): void {
     const skill = this.skills.find((s) => s.id === id);
@@ -385,7 +394,7 @@ class SkillsService {
         skill.status = 'candidate';
       }
     } else if (skill.status === 'official') {
-      // 50章: 技能の卒業制度 (Graduation to official_matured & LoRA training dataset)
+      // 50章: 技能の卒業制度 (Graduation to official_matured capability candidate)
       // 条件:
       // 1. 正式スキル(official)として運用開始から30日以上経過
       // 2. 50回以上の成功実績
@@ -397,7 +406,7 @@ class SkillsService {
 
       if (isMaturedDuration && hasMaturedSuccessCount && successRate >= 0.85) {
         skill.status = 'official_matured';
-        this.graduateSkillToTrainingDataset(skill);
+        this.registerGraduatedSkillAsCapabilityCandidate(skill);
       }
       // official でも成績が悪化し続けたら降格 (反証による自己修正)
       else if (total >= 10 && successRate < 0.6) {
@@ -420,10 +429,10 @@ class SkillsService {
 
   /**
    * 50章: 技能の卒業 (official_matured → 決定論的能力パッチおよび回答骨格への昇格)
-   * 旧: LoRA教材プールへの自動投入を廃止し、決定論的能力・回答計画ルールへ正式に登録する
+   * 公式卒業スキルを決定論的能力候補と回答計画ルールへ登録する
    */
-  public graduateSkillToTrainingDataset(skill: SkillItem): void {
-    if (skill.graduatedToTrainingAt) return; // すでに投入済みの場合は多重登録防止
+  public registerGraduatedSkillAsCapabilityCandidate(skill: SkillItem): void {
+    if (skill.capabilityCandidateRegisteredAt) return; // すでに投入済みの場合は多重登録防止
 
     try {
       const representativeContexts =
@@ -460,9 +469,9 @@ class SkillsService {
         evidenceIds: [evidenceId],
       });
 
-      skill.graduatedToTrainingAt = Date.now();
+      skill.capabilityCandidateRegisteredAt = Date.now();
       if (candidate?.id) {
-        skill.trainingSampleId = candidate.id;
+        skill.capabilityCandidateId = candidate.id;
         experienceLinkService.linkEntity(experienceId, 'trainingSample', candidate.id);
       }
 
@@ -672,7 +681,7 @@ class SkillsService {
 
     let nextMilestone = '運用実績を蓄積中';
     if (isGraduated) {
-      nextMilestone = '🎓 正式卒業済み (LoRA教材プールへ投入・オンデマンド技能として常時活用)';
+      nextMilestone = '🎓 正式卒業済み (決定論的能力候補として登録済み・オンデマンド技能として活用)';
     } else if (skill.status === 'candidate') {
       nextMilestone = distinctCount < 3
         ? `文脈多様性の獲得 (現在${distinctCount}/3パターン。別問題での再試験が必要)`
@@ -683,7 +692,7 @@ class SkillsService {
       if (!reqDays.met) nextMilestone = `正式運用の継続 (現在${daysSinceOfficial}/30日経過)`;
       else if (!reqSuccess.met) nextMilestone = `成功件数の蓄積 (現在${skill.successCount}/50回達成)`;
       else if (!reqRate.met) nextMilestone = `成功率の向上 (現在${Math.round(successRate * 100)}%/85%必要)`;
-      else nextMilestone = '50章 卒業要件を完全達成！LoRA教材プールへの進学準備完了';
+      else nextMilestone = '50章 卒業要件を完全達成！決定論的能力候補への登録準備完了';
     }
 
     return {
@@ -698,8 +707,8 @@ class SkillsService {
       },
       overallGraduationReadiness: Math.round(score),
       isGraduated,
-      graduatedAt: skill.graduatedToTrainingAt,
-      trainingSampleId: skill.trainingSampleId,
+      graduatedAt: skill.capabilityCandidateRegisteredAt,
+      capabilityCandidateId: skill.capabilityCandidateId,
       nextMilestone,
     };
   }
@@ -822,9 +831,9 @@ class SkillsService {
   }
 
   /**
-   * 手動または承認による強制卒業 (official_matured への昇格とLoRA教材プールへの登録)
+   * 手動または承認による強制卒業 (official_matured への昇格と決定論的能力候補への登録)
    */
-  public forceGraduateSkill(skillId: string): { success: boolean; message: string; sampleId?: string } {
+  public forceGraduateSkill(skillId: string): { success: boolean; message: string; candidateId?: string } {
     const skill = this.skills.find((s) => s.id === skillId);
     if (!skill) {
       return { success: false, message: 'スキルが見つかりません。' };
@@ -833,13 +842,13 @@ class SkillsService {
     skill.status = 'official_matured';
     skill.promotedToOfficialAt = skill.promotedToOfficialAt || Date.now() - 86400000 * 31;
     skill.successCount = Math.max(skill.successCount || 0, 50);
-    this.graduateSkillToTrainingDataset(skill);
+    this.registerGraduatedSkillAsCapabilityCandidate(skill);
     this.saveSkills();
 
     return {
       success: true,
-      message: `🎓 スキル「${skill.name}」を正式に卒業(official_matured)として承認し、LoRA教材プールへ投入しました！`,
-      sampleId: skill.trainingSampleId,
+      message: `🎓 スキル「${skill.name}」を正式に卒業(official_matured)として承認し、決定論的能力候補へ登録しました！`,
+      candidateId: skill.capabilityCandidateId,
     };
   }
 
@@ -853,7 +862,7 @@ class SkillsService {
     }
 
     skill.status = 'official';
-    skill.graduatedToTrainingAt = undefined;
+    skill.capabilityCandidateRegisteredAt = undefined;
     this.saveSkills();
 
     return {

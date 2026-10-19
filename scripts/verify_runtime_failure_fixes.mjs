@@ -12,6 +12,9 @@ const runnerInstaller = read('scripts/install_android_native_runner.sh');
 const morphologyInstaller = read('scripts/install_android_japanese_morphology.sh');
 const workmanagerInstaller = read('scripts/install_android_workmanager.sh');
 const workmanagerRuntime = read('android/app/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt');
+const workmanagerWorkerRuntime = read('android/app/src/main/java/com/miki/ai/MikiBackgroundWorker.kt');
+const workmanagerNativePlugin = read('android-native/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt');
+const workmanagerNativeWorker = read('android-native/src/main/java/com/miki/ai/MikiBackgroundWorker.kt');
 const morphologySource = read('android-native/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt');
 const morphologyApp = read('android/app/src/main/java/com/miki/ai/MIKIJapaneseMorphologyPlugin.kt');
 const core = read('src/miki/core/services/coreOrchestratorService.ts');
@@ -77,6 +80,24 @@ const capabilityLedgerScreen = read('src/components/CapabilityLedgerScreen.tsx')
 const capabilityLedgerIngress = read('src/miki/core/services/coreTaskIngressService.ts');
 const improvementIntakeRouter = read('src/miki/core/services/improvementIntakeRouterService.ts');
 const failureUnderstanding = read('src/miki/memory/services/failureUnderstandingService.ts');
+const claimDatabase = read('src/miki/memory/services/claimDatabaseService.ts');
+const knowledgeHalfLife = read('src/miki/memory/services/knowledgeHalfLifeService.ts');
+const canonicalServiceAlias = read('src/miki/core/services/canonicalServiceAliasRegistryService.ts');
+const cognitiveQuality = read('src/miki/core/services/cognitiveQualityService.ts');
+const operationalGovernance = read('src/miki/autonomy/services/operationalGovernanceService.ts');
+const backgroundWorker = read('src/miki/execution/services/backgroundWorkerService.ts');
+const continuousEvolution = read('src/miki/autonomy/services/autonomousContinuousEvolutionService.ts');
+const eventService = read('src/miki/improvement/services/selfImprovementRequestEventService.ts');
+const workManagerFacade = read('src/miki/execution/services/workManagerService.ts');
+const orchestratorIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/coreOrchestratorService.ts |'));
+const ingressIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/coreTaskIngressService.ts |'));
+const completionGateIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/coreCompletionGateService.ts |'));
+const cognitiveQualityIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/cognitiveQualityService.ts |'));
+const operationalGovernanceIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/autonomy/services/operationalGovernanceService.ts |'));
+const backgroundWorkerIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/execution/services/backgroundWorkerService.ts |'));
+const workManagerFacadeIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/execution/services/workManagerService.ts |'));
+const continuousEvolutionIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/autonomy/services/autonomousContinuousEvolutionService.ts |'));
+const eventServiceIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/improvement/services/selfImprovementRequestEventService.ts |'));
 
 check('Canonical Runner exposes decideCoreGoals', runner.includes('fun decideCoreGoals(call: PluginCall)'));
 check('Canonical Runner exposes rankDomainRoutes', runner.includes('fun rankDomainRoutes(call: PluginCall)'));
@@ -86,6 +107,16 @@ check('Runner installer never copies legacy template', !runnerInstaller.includes
 check('Morphology installer never copies legacy Runner template', !morphologyInstaller.includes('NATIVE_RUNNER_SRC') && !morphologyInstaller.includes('cp "$NATIVE_RUNNER_SRC" "$PACKAGE_DIR/MIKINativeRunnerPlugin.kt"'));
 check('Morphology installer guards Rust bridge before changes', morphologyInstaller.includes('grep -Fq \'fun decideCoreGoals(call: PluginCall)\' "$RUNNER_TARGET"') && morphologyInstaller.includes('grep -Fq \'fun decideCoreGoals(requestJson: String)\' "$CORE_TARGET"'));
 check('WorkManager source exposes candidate browser E2E', workmanagerRuntime.includes('fun runCandidateBrowserE2E(call: PluginCall)') && workmanagerRuntime.includes('fun fetchRenderedPage(call: PluginCall)'));
+check('WorkManager foreground path waits for a cycle-correlated explicit completion receipt', workmanagerRuntime.includes('MikiAutonomousCycleCallback') && workmanagerRuntime.includes("log.status === 'completed'") && workmanagerRuntime.includes('triggerAutonomousCycle(cycleId: String') && workmanagerRuntime.includes('activeAutonomousCycleId'));
+check('WorkManager does not report trigger acknowledgment as completion', !workmanagerRuntime.includes('notifyListeners("autonomousCycleTriggered", ret)') && !workmanagerRuntime.includes('triggered = evalRes?.contains("OK")'));
+check('Headless Worker requires explicit successful completion receipt', workmanagerWorkerRuntime.includes('MikiAutonomousCycleCallback') && workmanagerWorkerRuntime.includes("log.status === 'completed'") && workmanagerWorkerRuntime.includes('completionDeferred.complete(success)'));
+check('Worker falls back to headless only when active runtime is not attached', workmanagerWorkerRuntime.includes('plugin.hasActiveWebRuntime()') && workmanagerRuntime.includes('fun hasActiveWebRuntime(): Boolean = activity != null && bridge?.webView != null'));
+check('Headless Worker cleans partially created WebView on setup exception', workmanagerWorkerRuntime.includes('cleanupWebView') && workmanagerWorkerRuntime.includes('cleanupClaimed'));
+check('Headless WebView is cleaned in finally for cancellation and timeout', workmanagerWorkerRuntime.includes('finally {') && workmanagerWorkerRuntime.includes('cleanupWebView()'));
+check('Headless Worker never turns a 30-second trigger acknowledgment into success', !workmanagerWorkerRuntime.includes('postDelayed({') || !workmanagerWorkerRuntime.includes('completionDeferred.complete(true)'));
+check('Worker concurrency lock is released for every in-try exit', workmanagerWorkerRuntime.includes('workerExecutionLock.compareAndSet(false, true)') && workmanagerWorkerRuntime.includes('workerExecutionLock.set(false)') && workmanagerWorkerRuntime.includes('finally'));
+check('Timed-out active runtime requests same-cycle cancellation and never launches a second executor', workmanagerWorkerRuntime.includes('refusing fallback') && workmanagerWorkerRuntime.includes('plugin.cancelAutonomousCycle(cycleId)') && !workmanagerWorkerRuntime.includes('tryHttpLocalTrigger()'));
+check('CORE resumes only after validating exact Blackboard checkpoint snapshot', core.includes('validateCognitiveCheckpointForResume(currentTask)') && core.includes('BLACKBOARD_SNAPSHOT_DOES_NOT_MATCH_CHECKPOINT') && core.includes('COGNITIVE_CHECKPOINT_CHAIN_INVALID'));
 check('WorkManager installer does not overwrite canonical code', !workmanagerInstaller.includes('cp "$SRC_DIR/MikiWorkManagerPlugin.kt" "$PACKAGE_DIR/MikiWorkManagerPlugin.kt"') && !workmanagerInstaller.includes('cp "$SRC_DIR/MikiBackgroundWorker.kt" "$PACKAGE_DIR/MikiBackgroundWorker.kt"'));
 check('WorkManager installer validates canonical plugin', workmanagerInstaller.includes('fun runCandidateBrowserE2E(call: PluginCall)') && workmanagerInstaller.includes('fun fetchRenderedPage(call: PluginCall)'));
 check('Both morphology sources use filesystem anchor', morphologySource.includes('PathAnchor.filesystem(context.filesDir.absolutePath)') && morphologyApp.includes('PathAnchor.filesystem(context.filesDir.absolutePath)'));
@@ -147,10 +178,10 @@ check(
     !bannedSearchRegion.includes('${bannedQueryCheck.matchedTopic}') &&
     bannedSearchRegion.includes('query redacted')
 );
-check('Audit logs redact contents and symbol mappings (legacy)', auditLegacy.includes('sanitizeAuditLogEntry') && auditLegacy.includes("sanitizedText: ''") && auditLegacy.includes('symbolReplacements: {}') && auditLegacy.includes('Audit metadata retained; content, reversible mappings, and identifying details redacted.') && auditLegacy.includes('data|storage|sdcard|system'));
+check('Legacy audit service path re-exports the canonical safety implementation', auditLegacy.trim().endsWith("export * from '../miki/safety/services/privacyGuardrailService';") && !auditLegacy.includes('sanitizeAuditLogEntry'));
 check('Audit logs redact contents and symbol mappings (CORE)', auditCore.includes('sanitizeAuditLogEntry') && auditCore.includes("sanitizedText: ''") && auditCore.includes('symbolReplacements: {}') && auditCore.includes('Audit metadata retained; content, reversible mappings, and identifying details redacted.') && auditCore.includes('data|storage|sdcard|system'));
-check('Legacy sanitizer persists no credential/PII/path/host mappings', sanitizerLegacy.includes('TRANSIENT_SYMBOL_CATEGORIES') && sanitizerLegacy.includes('if (!TRANSIENT_SYMBOL_CATEGORIES.has(category)) this.saveMappings()'));
-check('Legacy sanitizer detects Android app-private paths', sanitizerLegacy.includes('data|storage|sdcard|system'));
+check('Legacy sanitizer path re-exports the canonical safety implementation', sanitizerLegacy.trim().endsWith("export * from '../miki/safety/services/abstractSanitizerService';") && !sanitizerLegacy.includes('TRANSIENT_SYMBOL_CATEGORIES'));
+check('Canonical sanitizer detects Android app-private paths through the legacy facade', sanitizerLegacy.includes("export * from '../miki/safety/services/abstractSanitizerService'") && sanitizerCore.includes('data|storage|sdcard|system'));
 check('CORE sanitizer persists no credential/PII/path/host mappings', sanitizerCore.includes('TRANSIENT_SYMBOL_CATEGORIES') && sanitizerCore.includes('if (!TRANSIENT_SYMBOL_CATEGORIES.has(category)) this.saveMappings()'));
 check('CORE sanitizer detects Android app-private paths', sanitizerCore.includes('data|storage|sdcard|system'));
 check(
@@ -695,12 +726,15 @@ check(
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
 check(
-  'Canonical design retains P273/P274 history and records current P275 capability ledger',
+  'Canonical design retains P273/P274/P279 history under current P292 revision',
   design.includes('2026-10-16-P273 反実仮想スコアの実測境界修正') &&
     design.includes('2026-10-16-P274 実行イベント由来の反実仮想測定と独立レビュー') &&
-    design.includes('正本Revision：2026-10-17-P275') &&
-    design.includes('現行Revision: 2026-10-17-P275') &&
-    design.includes('2026-10-17-P275 根拠境界付き自己能力台帳')
+    design.includes('正本Revision：2026-10-19-P292') &&
+    design.includes('現行Revision: 2026-10-19-P292') &&
+    design.includes('2026-10-17-P276 自己台帳グラフ編集レイヤー') &&
+    design.includes('2026-10-18-P277 認知状態の継続性・自律実行接続') &&
+    design.includes('2026-10-18-P278 自律実行完了Receipt・Checkpoint復元境界') &&
+    design.includes('2026-10-18-P279 自律実行Receipt相関・アウトボックス・Checkpoint自己検証')
 );
 check(
   'Shared policy blocks protected runtime, privacy bypass, disabled guardrail, and local LLM route',
@@ -883,6 +917,221 @@ check(
   'Canonical index counts match Capability Ledger source files',
   capabilityLedgerIndexRow?.includes(`lines=${capabilityLedger.split(/\r?\n/).length - 1}`) &&
     capabilityLedgerScreenIndexRow?.includes(`lines=${capabilityLedgerScreen.split(/\r?\n/).length - 1}`)
+);
+
+
+check(
+  'P277 CognitiveState has stable task identity, revision, safety, evidence, hypotheses, failures, and learning refs',
+  core.includes('stateId:`CSTATE-${task.taskId}`') &&
+    core.includes('cognitiveStateId:cognitiveState?.stateId') &&
+    core.includes('cognitiveStateRevision:cognitiveState?.revision') &&
+    core.includes('safetyConstraints') && core.includes('hypothesisRefs') &&
+    core.includes('failureRefs') && core.includes('learningRefs')
+);
+check(
+  'P277 CognitiveState checkpoints persist each CORE cycle and CORE owns snapshot recovery validation',
+  core.includes('cognitiveStateCheckpointService.create') &&
+    core.includes('COGNITIVE_CHECKPOINT_PARENT_CHAIN_INVALID') &&
+    core.includes('cognitiveStateCheckpointService.reconstruct') &&
+    core.includes('BLACKBOARD_COGNITIVE_SNAPSHOT_HASH_MISMATCH') &&
+    !taskIngress.includes('cognitiveStateCheckpointService.reconstruct') &&
+    operationalGovernance.includes('miki_cognitive_state_checkpoints_v1') &&
+    operationalGovernance.includes('COGNITIVE_CHECKPOINT_PERSIST_FAILED')
+);
+check(
+  'P277 checkpoint chains compact long task history without silently accepting corrupted chains',
+  core.includes('compactCheckpointChain') && core.includes('COMPACTED_PARENT_CHAIN:') &&
+    operationalGovernance.includes('MAX_COGNITIVE_CHECKPOINTS=2000')
+);
+check(
+  'P277 CORE ingress records explicit multi-intent, hypothesis, unknown, learning, causal, and transfer candidates',
+  taskIngress.includes('decomposeMultiIntent(request.goal)') &&
+    taskIngress.includes('cognitiveContinuity:requestPlan') &&
+    taskIngress.includes('unknown:potentialCandidates') &&
+    taskIngress.includes('learning:opportunityCandidates') &&
+    taskIngress.includes('learning:causalAttributionCandidate') &&
+    taskIngress.includes('learning:crossDomainTransferCandidates') &&
+    taskIngress.includes('learning:crossDomainTransferEvaluation') &&
+    taskIngress.includes('observedSuccessRate') &&
+    taskIngress.includes('causalEffectEstablished:false') &&
+    taskIngress.includes('causalInvestigationService.create')
+);
+check(
+  'P277 candidate claims remain AI-output UNVERIFIED and candidate evidence is not falsely attached',
+  taskIngress.includes("source:'ai_output'") && taskIngress.includes("status:'UNVERIFIED'") &&
+    taskIngress.includes("self_provenance:'SELF_SUPPORTED'") &&
+    taskIngress.includes('CANDIDATE_ONLY_NOT_ATTACHED') &&
+    taskIngress.includes('AI_OUTPUT_CLAIMS_REMAIN_UNVERIFIED') &&
+    taskIngress.includes('semanticCoreSource') &&
+    taskIngress.includes('SURFACE_HASH_IS_SEPARATE_FROM_MEANING_CORE') &&
+    !taskIngress.includes('meaningCoreHash:canonicalSha256Object({requirements:requirements?')
+);
+check(
+  'P277 information-gain and explanation plans reach CORE synthesis context',
+  cognitiveQuality.includes('MAX_INFORMATION_GAIN_PER_USER_COST') &&
+    cognitiveQuality.includes('planExplanation') &&
+    core.includes('INFORMATION_GAIN_CLARIFICATION') &&
+    core.includes('ANSWER_DETAIL_PLAN')
+);
+check(
+  'P277 potential unknowns and transfer/learning opportunities reach synthesis without being promoted to facts',
+  cognitiveQuality.includes('POTENTIAL_UNKNOWN') &&
+    cognitiveQuality.includes('LEARNING_OPPORTUNITY_CANDIDATE') &&
+    core.includes('POTENTIAL_UNKNOWN_HYPOTHESES') &&
+    core.includes('CROSS_DOMAIN_TRANSFER_CANDIDATES') &&
+    core.includes('must_research_and_verify=true')
+);
+check(
+  'P277 same-input answer changes are recorded as candidates, not invented causal explanations',
+  taskIngress.includes('learning:answerChangeExplanation') &&
+    taskIngress.includes('CAUSE_CANDIDATES_ONLY') &&
+    taskIngress.includes('stateDelta') && taskIngress.includes('semanticCoreChanged') &&
+    taskIngress.toLowerCase().includes('a causal explanation is not asserted')
+);
+check(
+  'P277 revalidation completion gate finds packageId nested in ReviewZipCreateResult.artifact',
+  completionGate.includes('this.findDeepString(value,\'packageId\')') &&
+    completionGate.includes('artifact.packageId') &&
+    completionGate.includes('REVALIDATION_REVIEW_PACKAGE_MISSING')
+);
+check(
+  'P277 native Autopilot dispatch persists an outbox and retries until the CORE event is delivered',
+  backgroundWorker.includes('miki_autopilot_last_native_dispatch_v1') &&
+    backgroundWorker.includes('miki_autopilot_pending_dispatch_v1') &&
+    backgroundWorker.includes('receipt.delivered > 0 && receipt.failed === 0') &&
+    continuousEvolution.includes('nativeWorkManagerService.isAndroidNative()') &&
+    eventService.includes('subscriberCount(): number')
+);
+check(
+  'P277 legacy WorkManager facade delegates to the canonical native service',
+  workManagerFacade.includes('nativeWorkManagerService.schedule') &&
+    workManagerFacade.includes('nativeWorkManagerService.cancel') &&
+    !workManagerFacade.includes('schedulePeriodicWork') &&
+    !workManagerFacade.includes('cancelPeriodicWork')
+);
+check(
+  'P277 canonical index counts match all changed runtime source files',
+  orchestratorIndexRow?.includes(`lines=${core.split(/\r?\n/).length - 1}`) &&
+    ingressIndexRow?.includes(`lines=${taskIngress.split(/\r?\n/).length - 1}`) &&
+    completionGateIndexRow?.includes(`lines=${completionGate.split(/\r?\n/).length - 1}`) &&
+    cognitiveQualityIndexRow?.includes(`lines=${cognitiveQuality.split(/\r?\n/).length - 1}`) &&
+    operationalGovernanceIndexRow?.includes(`lines=${operationalGovernance.split(/\r?\n/).length - 1}`) &&
+    backgroundWorkerIndexRow?.includes(`lines=${backgroundWorker.split(/\r?\n/).length - 1}`) &&
+    workManagerFacadeIndexRow?.includes(`lines=${workManagerFacade.split(/\r?\n/).length - 1}`) &&
+    continuousEvolutionIndexRow?.includes(`lines=${continuousEvolution.split(/\r?\n/).length - 1}`) &&
+    eventServiceIndexRow?.includes(`lines=${eventService.split(/\r?\n/).length - 1}`)
+);
+
+check(
+  'P279 claim half-life tracks freshness without mutating official verification status',
+  claimDatabase.includes('ensureClaimFreshness(newClaim)') &&
+    claimDatabase.includes('MATCHING_CLAIM_REVALIDATION_REQUIRED') &&
+    claimDatabase.includes("status:freshnessDue?'REVALIDATION_DUE'") &&
+    claimDatabase.includes("knowledgeHalfLifeService.observe(`claim:${claimId}`,'SUCCESS',true)") &&
+    knowledgeHalfLife.includes('public get(key:string):HalfLifeRecord|undefined') &&
+    knowledgeHalfLife.includes('now>=r.dueAt') &&
+    claimDatabase.includes('public indexMissingFreshness(limit=24):number') &&
+    !claimDatabase.includes("if(freshnessDue)bestClaim.status='UNVERIFIED'")
+);
+check(
+  'P279 due real-world Claims enter the existing durable CORE revalidation path without auto downgrade',
+  backgroundWorker.includes('claimDatabaseService.indexMissingFreshness(deepSleepExecuted?24:8)') &&
+    backgroundWorker.includes('knowledgeHalfLifeService.due(deepSleepExecuted ? 20 : 8)') &&
+    backgroundWorker.includes("type:'STALE_INFORMATION'") &&
+    backgroundWorker.includes('knowledgeGapService.detect({') &&
+    backgroundWorker.includes('Claim状態は自動で降格せず') &&
+    backgroundWorker.includes('knowledge-half-life:')
+);
+check(
+  'P279 stale local Claims become research-required potential unknowns',
+  cognitiveQuality.includes('claimDatabaseService.findBestMatchingClaim(term)') &&
+    cognitiveQuality.includes("claimMatch.suggestedAction==='DIRECT_ANSWER'") &&
+    cognitiveQuality.includes('LOCAL_CLAIM_REQUIRES_REVALIDATION') &&
+    cognitiveQuality.includes('RESEARCH_AND_VERIFICATION_REQUIRED')
+);
+check(
+  'P279 execution failures persist with event/signature dedupe and only unverified learning observations',
+  failureUnderstanding.includes('miki_failure_understanding_records_v1') &&
+    failureUnderstanding.includes('record.eventId===event.event_id') &&
+    failureUnderstanding.includes('private readonly cooldownMs = 60_000') &&
+    failureUnderstanding.includes("outcome:'FAILURE'") &&
+    failureUnderstanding.includes('verified:false') &&
+    failureUnderstanding.includes('AutonomousRevalidationLoop') &&
+    !failureUnderstanding.includes('verifiedKnowledgePromotionService.promote(')
+);
+const failureAliasRow=canonicalServiceAlias.split(/\r?\n/).find(line=>line.includes("service:'failureUnderstandingService'"));
+const halfLifeAliasRow=canonicalServiceAlias.split(/\r?\n/).find(line=>line.includes("service:'knowledgeHalfLifeService'"));
+check(
+  'P279 service connectivity registry describes the existing half-life and failure-learning runtime paths',
+  failureAliasRow?.includes("classification:'CONNECTED_RUNTIME'") &&
+    halfLifeAliasRow?.includes("classification:'CONNECTED_RUNTIME'") &&
+    failureAliasRow.includes('unverified unified-learning signals') &&
+    halfLifeAliasRow.includes('durable STALE_INFORMATION gaps')
+);
+const p279IndexedSources = [
+  ['src/miki/core/services/coreOrchestratorService.ts',core],
+  ['src/miki/execution/services/backgroundWorkerService.ts',backgroundWorker],
+  ['src/miki/core/services/domainIntegrationBootstrapService.ts',domainIntegrationBootstrap],
+  ['src/miki/core/services/coreTaskIngressService.ts',taskIngress],
+  ['src/miki/improvement/services/selfImprovementRequestEventService.ts',eventService],
+  ['src/miki/core/services/cognitiveQualityService.ts',cognitiveQuality],
+  ['src/miki/memory/services/claimDatabaseService.ts',claimDatabase],
+  ['src/miki/memory/services/knowledgeHalfLifeService.ts',knowledgeHalfLife],
+  ['src/miki/memory/services/failureUnderstandingService.ts',failureUnderstanding],
+  ['src/miki/core/services/canonicalServiceAliasRegistryService.ts',canonicalServiceAlias],
+  ['android/app/src/main/java/com/miki/ai/MikiBackgroundWorker.kt',workmanagerWorkerRuntime],
+  ['android/app/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt',workmanagerRuntime],
+  ['android-native/src/main/java/com/miki/ai/MikiBackgroundWorker.kt',workmanagerNativeWorker],
+  ['android-native/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt',workmanagerNativePlugin],
+];
+check(
+  'P279 source index line counts match every modified source in the execution-integrity and freshness path',
+  p279IndexedSources.every(([path,source])=>{
+    const row=design.split(/\r?\n/).find(line=>line.includes(`${path} |`));
+    return Boolean(row&&row.includes(`lines=${source.split(/\r?\n/).length-1}`));
+  })
+);
+
+check(
+  'P279 Android app and native mirror workers stay byte-identical and both plugins support correlated cancellation',
+  workmanagerWorkerRuntime === workmanagerNativeWorker &&
+    workmanagerRuntime.includes('fun cancelAutonomousCycle(cycleId: String)') &&
+    workmanagerNativePlugin.includes('fun cancelAutonomousCycle(cycleId: String)') &&
+    workmanagerRuntime.includes('MikiAutonomousCycleCallback(cycleId)') &&
+    workmanagerNativePlugin.includes('MikiAutonomousCycleCallback(cycleId)')
+);
+check(
+  'P279 completed maintenance cycles enter review flow, never the execution-failure path',
+  backgroundWorker.includes("runType: 'BACKGROUND_CYCLE_REVIEW'") &&
+    !backgroundWorker.includes("runType: 'EXECUTION_FAILURE'") &&
+    backgroundWorker.includes("type: isAborted ? 'execution.inconclusive' : 'execution.failed'")
+);
+check(
+  'P279 native dispatch outbox is persisted before publish and acknowledged only without subscriber failures',
+  backgroundWorker.includes("storageService.setItem(pendingKey, JSON.stringify(pending))") &&
+    backgroundWorker.includes('selfImprovementRequestEventService.publish(pending)') &&
+    backgroundWorker.includes('receipt.delivered > 0 && receipt.failed === 0') &&
+    domainIntegrationBootstrap.includes('runId:requestId') && domainIntegrationBootstrap.includes('sourceId:requestId')
+);
+check(
+  'P279 benchmark uses real loaded-model readiness instead of constant-false gates',
+  backgroundWorker.includes('regressionBenchmarkService.getActiveLoadedModelInfo()') &&
+    backgroundWorker.includes('activeRuntime.isReady && activeRuntime.modelId') &&
+    !backgroundWorker.includes('const isNativeReady = false') && !backgroundWorker.includes('const isWebReady = false')
+);
+check(
+  'P279 resume recomputes the Blackboard snapshot hash and can re-root only a valid snapshot',
+  core.includes('canonicalSha256Object(snapshotBody)!==recordedStateHash') &&
+    core.includes('VALID_SNAPSHOT_RECHECKPOINTED') &&
+    core.includes('BLACKBOARD_COGNITIVE_SNAPSHOT_HASH_MISMATCH') &&
+    operationalGovernance.includes("'CANONICAL_SHA256_V1'") &&
+    operationalGovernance.includes('FNV1A32_LEGACY')
+);
+check(
+  'P279 claim freshness migration revisits old records and defaults unknown real-world stability to TIME',
+  claimDatabase.includes('miki_claim_freshness_migration_cursor_v1') &&
+    claimDatabase.includes("let stability:KnowledgeStability='TIME'") &&
+    knowledgeHalfLife.includes("return'TIME'")
 );
 
 const failures = checks.filter(item => !item.passed);

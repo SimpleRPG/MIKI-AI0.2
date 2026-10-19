@@ -10,6 +10,7 @@ import type {
 } from '../../../types';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
+import { knowledgeHalfLifeService, type KnowledgeStability } from './knowledgeHalfLifeService';
 
 const CLAIMS_STORAGE_KEY = 'miki_claim_db_v1';
 
@@ -217,6 +218,7 @@ export class ClaimDatabaseService {
 
     this.claims.set(claim_id, newClaim);
     this.saveToStorage();
+    this.ensureClaimFreshness(newClaim);
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
@@ -517,6 +519,7 @@ export class ClaimDatabaseService {
     scopeNotes: string[];
     suggestedAction: 'DIRECT_ANSWER' | 'TRIGGER_WEB_SEARCH' | 'ESCALATE_TO_TEACHER';
     unmetReason?: string;
+    freshness?: { status:'CURRENT'|'REVALIDATION_DUE'; stability:KnowledgeStability; halfLifeDays:number; dueAt:number; lastVerifiedAt:number };
   } {
     const qLower = query.toLowerCase();
     const activeClaims = Array.from(this.claims.values()).filter(
@@ -527,6 +530,7 @@ export class ClaimDatabaseService {
     // 1. スコアリング (キーワード一致、重要語、成熟度、検証状態)
     const scored = activeClaims.map((claim) => {
       let score = 0;
+      let matchedQuery = false;
       const stmtLower = claim.statement.toLowerCase();
 
       // トークン分割マッチング
@@ -534,6 +538,7 @@ export class ClaimDatabaseService {
       for (const w of words) {
         if (stmtLower.includes(w)) {
           score += 15;
+          matchedQuery = true;
         }
       }
 
@@ -542,6 +547,7 @@ export class ClaimDatabaseService {
         for (const val of Object.values(claim.scope)) {
           if (typeof val === 'string' && val.length >= 2 && qLower.includes(val.toLowerCase())) {
             score += 20;
+            matchedQuery = true;
           }
         }
       }
@@ -557,7 +563,9 @@ export class ClaimDatabaseService {
       else if (claim.status === 'DISPUTED' || claim.status === 'CONTRADICTED') score -= 20;
       else if (claim.status === 'UNVERIFIED' || claim.status === 'CANDIDATE') score -= 5;
 
-      return { claim, score };
+      const freshness=matchedQuery?this.ensureClaimFreshness(claim):knowledgeHalfLifeService.get(`claim:${claim.claim_id}`);
+      if(claim.world==='REAL'&&freshness?.revalidationRequired)score-=25;
+      return { claim, score, freshness };
     });
 
     // スコア順にソート
@@ -594,6 +602,9 @@ export class ClaimDatabaseService {
     } else if (bestClaim.status === 'UNVERIFIED' || bestClaim.status === 'CANDIDATE') {
       confidence = 'UNVERIFIED';
     }
+    const freshness=this.ensureClaimFreshness(bestClaim);
+    const freshnessDue=bestClaim.world==='REAL'&&Boolean(freshness?.revalidationRequired);
+    if(freshnessDue)confidence='UNVERIFIED';
 
     // 矛盾主張の取得
     const contradictingClaims = (bestClaim.contradicted_by || [])
@@ -608,8 +619,38 @@ export class ClaimDatabaseService {
       confidence,
       world: bestClaim.world,
       scopeNotes,
-      suggestedAction: confidence === 'UNVERIFIED' ? 'TRIGGER_WEB_SEARCH' : 'DIRECT_ANSWER',
+      suggestedAction: confidence === 'UNVERIFIED' || freshnessDue ? 'TRIGGER_WEB_SEARCH' : 'DIRECT_ANSWER',
+      ...(freshness?{freshness:{status:freshnessDue?'REVALIDATION_DUE' as const:'CURRENT' as const,stability:freshness.stability,halfLifeDays:freshness.halfLifeDays,dueAt:freshness.dueAt,lastVerifiedAt:freshness.lastVerifiedAt}}:{}),
+      ...(freshnessDue?{unmetReason:'MATCHING_CLAIM_REVALIDATION_REQUIRED'}:{}),
     };
+  }
+
+  /**
+   * 旧バージョンから永続化されているClaimへも鮮度ポリシーを段階適用する。
+   * 一回の監査で全件を走査せず、未分類のREAL Claimだけを上限付きで索引化する。
+   */
+  public indexMissingFreshness(limit=24):number {
+    // Reclassify a bounded, round-robin slice. This migrates prior FIXED/10-year records
+    // created by older policy revisions as well as records with no freshness entry, without
+    // making an audit scan unbounded or repeatedly starving later Claim IDs.
+    const max=Math.max(1,Math.min(200,Math.floor(limit)||24));
+    const candidates=Array.from(this.claims.values()).filter(claim=>claim.world==='REAL'&&!['FALSE','SUPERSEDED','CONTEXT_ONLY'].includes(claim.status));
+    if(candidates.length===0)return 0;
+    const cursorKey='miki_claim_freshness_migration_cursor_v1';
+    const previousCursor=storageService.getItem(cursorKey)||'';
+    const previousIndex=candidates.findIndex(claim=>claim.claim_id===previousCursor);
+    const start=previousIndex<0?0:(previousIndex+1)%candidates.length;
+    let indexed=0;
+    const scanned=Math.min(max,candidates.length);
+    for(let offset=0;offset<scanned;offset++){
+      const claim=candidates[(start+offset)%candidates.length];
+      const key=`claim:${claim.claim_id}`;
+      const previous=knowledgeHalfLifeService.get(key);
+      const next=this.ensureClaimFreshness(claim);
+      if(next&&(!previous||previous.stability!==next.stability||previous.importance!==next.importance||previous.changeRisk!==next.changeRisk||previous.halfLifeDays!==next.halfLifeDays))indexed++;
+      storageService.setItem(cursorKey,claim.claim_id);
+    }
+    return indexed;
   }
 
   /**
@@ -635,6 +676,13 @@ export class ClaimDatabaseService {
     claim.status = status;
     claim.updated_at = Date.now();
     this.saveToStorage();
+    const freshness=this.ensureClaimFreshness(claim);
+    if(freshness){
+      try{
+        if(status==='SUPPORTED'||status==='DEVICE_VERIFIED')knowledgeHalfLifeService.observe(`claim:${claimId}`,'SUCCESS',true);
+        else if(status==='FALSE'||status==='DISPUTED'||status==='CONTRADICTED')knowledgeHalfLifeService.observe(`claim:${claimId}`,'FAILURE',false);
+      }catch(error){systemLogger.warn('PERSISTENCE',`[KnowledgeHalfLife] Claim feedback could not be persisted for ${claimId}: ${String(error)}`);}
+    }
     systemLogger.info(
       'SELF_IMPROVEMENT',
       `🔐 [検証状態変更] ${claimId}: ${status} (理由: ${reason})`
@@ -642,11 +690,35 @@ export class ClaimDatabaseService {
     return true;
   }
 
+  private ensureClaimFreshness(claim:ClaimRecord){
+    const key=`claim:${claim.claim_id}`;
+    try{
+      const statement=String(claim.statement||'');
+      let stability:KnowledgeStability='TIME';
+      if(claim.world==='FICTION')stability='FIXED';
+      else if(claim.world==='HYPOTHETICAL'||claim.status==='UNVERIFIED'||claim.status==='CANDIDATE'||claim.status==='UNRESOLVED')stability='HYPOTHESIS';
+      else if(/policy|規約|法律|法令|ユーザー設定|user preference|利用規約|運用方針/i.test(statement))stability='USER_POLICY';
+      else if(/version|バージョン|API|依存関係|SDK|ランタイム|提供終了|サポート期限|互換性/i.test(statement))stability='VERSION';
+      else if(claim.scope?.environment||claim.scope?.device||claim.scope?.backend||claim.scope?.runtime)stability='ENVIRONMENT';
+      else if(/current|currently|latest|today|now|as of|price|pricing|stock|available|availability|open now|president|ceo|役職|現職|現在|最新|今日|価格|料金|在庫|提供中|営業中|就任|退任|所在地|人口|ランキング|相場|為替|スケジュール/i.test(statement))stability='TIME';
+      // Real-world statements with no reliable immutability signal default to TIME, never FIXED.
+      const importance=claim.status==='DEVICE_VERIFIED'?90:claim.status==='SUPPORTED'?75:claim.status==='DISPUTED'||claim.status==='CONTRADICTED'?65:45;
+      const changeRisk=stability==='FIXED'?10:stability==='VERSION'?75:stability==='ENVIRONMENT'?70:stability==='USER_POLICY'?65:stability==='TIME'?85:90;
+      const verified=claim.status==='SUPPORTED'||claim.status==='DEVICE_VERIFIED';
+      const existing=knowledgeHalfLifeService.get(key);
+      if(existing&&existing.stability===stability&&existing.importance===importance&&existing.changeRisk===changeRisk)return existing;
+      return knowledgeHalfLifeService.classify(key,{stability,importance,changeRisk,verifiedAt:verified?claim.updated_at:existing?.lastVerifiedAt??claim.created_at});
+    }catch(error){
+      systemLogger.warn('PERSISTENCE',`[KnowledgeHalfLife] Claim freshness unavailable for ${claim.claim_id}: ${String(error)}`);
+      return undefined;
+    }
+  }
+
   public getClaim(claim_id: string): ClaimRecord | undefined {
     return this.claims.get(claim_id);
   }
 
-  public searchClaims(query: string, limit = 5): Array<ClaimRecord & { claimText?: string; confidence?: number }> {
+  public searchClaims(query: string, limit = 5): Array<ClaimRecord & { claimText?: string; confidence?: number; freshnessStatus?:'CURRENT'|'REVALIDATION_DUE' }> {
     const qLower = query.toLowerCase();
     const tokens = qLower.split(/[^\p{L}\p{N}_-]+/u).filter((t: string) => t.length >= 2);
     const active = Array.from(this.claims.values()).filter((c) => c.status !== 'SUPERSEDED');
@@ -656,11 +728,14 @@ export class ClaimDatabaseService {
       for (const t of tokens) {
         if (text.includes(t)) matches++;
       }
+      const freshness=matches>0?this.ensureClaimFreshness(c):knowledgeHalfLifeService.get(`claim:${c.claim_id}`);
+      const freshnessDue=c.world==='REAL'&&Boolean(freshness?.revalidationRequired);
       return {
         ...c,
         claimText: c.statement,
         confidence: c.confidence_score,
-        _score: matches,
+        freshnessStatus:freshnessDue?'REVALIDATION_DUE' as const:'CURRENT' as const,
+        _score: matches-(freshnessDue?2:0),
       };
     }).filter((c) => c._score > 0 || tokens.length === 0)
       .sort((a, b) => b._score - a._score || (b.confidence_score ?? 0) - (a.confidence_score ?? 0));

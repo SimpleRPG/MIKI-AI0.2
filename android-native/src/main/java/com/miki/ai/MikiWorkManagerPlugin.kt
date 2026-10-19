@@ -49,6 +49,9 @@ class MikiWorkManagerPlugin : Plugin() {
         private val isFetchingPage = AtomicBoolean(false)
     }
 
+    @Volatile
+    private var activeAutonomousCycleId: String? = null
+
     override fun load() {
         super.load()
         activeInstance = this
@@ -59,43 +62,87 @@ class MikiWorkManagerPlugin : Plugin() {
         if (activeInstance == this) {
             activeInstance = null
         }
+        // The Activity/WebView is going away, so its in-process JS executor cannot remain active.
+        activeAutonomousCycleId = null
         super.handleOnDestroy()
     }
 
-    /**
-     * MikiBackgroundWorker から呼ばれるトリガーメソッド
-     */
-    fun triggerAutonomousCycle(onComplete: (Boolean) -> Unit) {
-        val ret = JSObject()
-        ret.put("triggerSource", "android_intent")
-        ret.put("timestamp", System.currentTimeMillis())
+    /** True only while the canonical Capacitor WebView runtime is attached. */
+    fun hasActiveWebRuntime(): Boolean = activity != null && bridge?.webView != null
 
-        // 1. Capacitor イベントリスナーへの通知
-        notifyListeners("autonomousCycleTriggered", ret)
-
-        // 2. WebView の JavaScript インスタンスへ直接呼び出し
-        activity?.runOnUiThread {
-            val script = """
-                (function() {
-                    if (window.mikiRunBackgroundCycle) {
-                        window.mikiRunBackgroundCycle('android_intent')
-                            .then(function() { return true; })
-                            .catch(function(e) { console.error(e); return false; });
-                        return 'OK';
-                    }
-                    return 'NOT_FOUND';
-                })();
-            """.trimIndent()
-
-            bridge?.webView?.evaluateJavascript(script) { evalRes ->
-                Log.i(TAG, "Bridge evaluateJavascript trigger: $evalRes")
-                val triggered = evalRes?.contains("OK") == true
-                onComplete(triggered)
-            } ?: run {
-                onComplete(false)
+    /** Worker trigger with a stable ID; only a matching completed JS Receipt counts as success. */
+    fun triggerAutonomousCycle(cycleId: String, onComplete: (Boolean, String) -> Unit) {
+        val target = bridge?.webView
+        val host = activity
+        if (target == null || host == null) {
+            onComplete(false, "ACTIVE_WEB_RUNTIME_DETACHED")
+            return
+        }
+        if (activeAutonomousCycleId != null) {
+            onComplete(false, "AUTONOMOUS_CYCLE_ALREADY_ACTIVE:${activeAutonomousCycleId}")
+            return
+        }
+        activeAutonomousCycleId = cycleId
+        val delivered = AtomicBoolean(false)
+        fun finish(success: Boolean, detail: String) {
+            if (!delivered.compareAndSet(false, true)) return
+            if (activeAutonomousCycleId == cycleId) activeAutonomousCycleId = null
+            Log.i(TAG, "Autonomous cycle Receipt [$cycleId]: success=$success detail=${detail.take(500)}")
+            host.runOnUiThread {
+                try { target.removeJavascriptInterface("MikiNativeCallback") } catch (_: Exception) {}
             }
-        } ?: run {
-            onComplete(false)
+            onComplete(success, detail)
+        }
+        host.runOnUiThread {
+            try {
+                target.addJavascriptInterface(
+                    MikiAutonomousCycleCallback(cycleId) { success, detail -> finish(success, detail) },
+                    "MikiNativeCallback"
+                )
+                val script = """
+                    (function() {
+                        if (typeof window.mikiRunBackgroundCycle !== 'function') return 'NOT_FOUND';
+                        var cycleId = '${cycleId}';
+                        Promise.resolve().then(function() {
+                            return window.mikiRunBackgroundCycle('android_intent', cycleId);
+                        }).then(function(log) {
+                            var correlated = !!log && log.nativeCycleId === cycleId;
+                            var success = correlated && log.status === 'completed';
+                            var status = success ? 'completed' : 'failed';
+                            var detail = JSON.stringify({status: log && log.status, id: log && log.id, cycleId: cycleId, reason: log && log.reason});
+                            if (window.MikiNativeCallback) window.MikiNativeCallback.onComplete(cycleId, status, detail);
+                        }).catch(function(err) {
+                            if (window.MikiNativeCallback) window.MikiNativeCallback.onComplete(cycleId, 'failed', String(err && (err.stack || err.message) || err));
+                        });
+                        return 'STARTED';
+                    })();
+                """.trimIndent()
+                target.evaluateJavascript(script) { evalResult ->
+                    Log.i(TAG, "Bridge cycle trigger evaluation [$cycleId]: $evalResult")
+                    if (evalResult?.contains("NOT_FOUND") == true) finish(false, "BACKGROUND_CYCLE_ENTRY_NOT_FOUND")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to invoke autonomous cycle: ${e.message}", e)
+                finish(false, e.message ?: "NATIVE_TRIGGER_FAILED")
+            }
+        }
+    }
+
+    /** Ask the existing JS run to abort; never start a fallback executor while it may still be running. */
+    fun cancelAutonomousCycle(cycleId: String) {
+        if (activeAutonomousCycleId != cycleId) return
+        val target = bridge?.webView
+        val host = activity
+        if (target == null || host == null) return
+        host.runOnUiThread {
+            try {
+                target.evaluateJavascript(
+                    "window.mikiCancelBackgroundCycle && window.mikiCancelBackgroundCycle('${cycleId}');",
+                    null
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to deliver cancellation request for $cycleId: ${e.message}")
+            }
         }
     }
 

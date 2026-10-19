@@ -11,10 +11,11 @@ class KnowledgeHalfLifeService {
   const base={FIXED:3650,ENVIRONMENT:30,VERSION:45,TIME:14,USER_POLICY:21,HYPOTHESIS:7}[stability]; const halfLifeDays=Math.max(1,Math.round(base*(1.25-importance/200)*(1.2-changeRisk/250)));
   const lastVerifiedAt=input.verifiedAt??old?.lastVerifiedAt??now; const rec:HalfLifeRecord={key,stability,importance,uses:old?.uses||0,failures:old?.failures||0,lastVerifiedAt,lastObservedAt:now,changeRisk,halfLifeDays,dueAt:lastVerifiedAt+halfLifeDays*86400000,revalidationRequired:now>=lastVerifiedAt+halfLifeDays*86400000};this.records[key]=rec;this.save();return {...rec};
  }
+ public get(key:string):HalfLifeRecord|undefined{const r=this.records[key];if(!r)return undefined;const now=Date.now();return {...r,revalidationRequired:r.revalidationRequired||now>=r.dueAt};}
  public observe(key:string,outcome:'SUCCESS'|'FAILURE',verified=false){const r=this.records[key]||this.classify(key);r.uses++;if(outcome==='FAILURE')r.failures++;r.lastObservedAt=Date.now();if(verified){r.lastVerifiedAt=r.lastObservedAt;r.dueAt=r.lastVerifiedAt+r.halfLifeDays*86400000;r.revalidationRequired=false}this.records[key]=r;this.save();return {...r};}
  public due(limit=20){const now=Date.now();return Object.values(this.records).filter(r=>r.dueAt<=now||r.revalidationRequired).sort((a,b)=>this.priority(b,now)-this.priority(a,now)).slice(0,limit).map(r=>({...r}));}
  private priority(r:HalfLifeRecord,now:number){return r.importance*0.5+r.changeRisk*0.3+Math.min(100,r.failures*10)+(now>=r.dueAt?25:0)}
  public list(limit=100){return Object.values(this.records).sort((a,b)=>b.lastObservedAt-a.lastObservedAt).slice(0,limit).map(r=>({...r}));}
- private infer(k:string):KnowledgeStability{if(/policy|ユーザー|user/i.test(k))return'USER_POLICY';if(/version|v\d|api/i.test(k))return'VERSION';if(/network|android|device|environment/i.test(k))return'ENVIRONMENT';return'FIXED';}
+ private infer(k:string):KnowledgeStability{if(/policy|ユーザー|user/i.test(k))return'USER_POLICY';if(/version|v\d|api/i.test(k))return'VERSION';if(/network|android|device|environment/i.test(k))return'ENVIRONMENT';if(/hypothesis|candidate|unknown|claim/i.test(k))return'HYPOTHESIS';return'TIME';}
 }
 export const knowledgeHalfLifeService=new KnowledgeHalfLifeService();

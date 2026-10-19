@@ -41,6 +41,8 @@ import { virtualExperienceGeneratorService } from '../../experience/services/vir
 import { faultInjectionLabService } from '../../verification/services/faultInjectionLabService';
 import { specContractCompilerService } from '../../selfDevelopment/services/specContractCompilerService';
 import { knowledgeHalfLifeService } from '../../memory/services/knowledgeHalfLifeService';
+import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
+import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
 import { frontierGovernanceService } from '../../strategy/services/frontierGovernanceService';
 import { autonomousHardeningService } from '../../autonomy/services/autonomousHardeningService';
 import { answerPlanService } from '../../strategy/services/answerPlanService';
@@ -48,6 +50,9 @@ import { surfaceVariationGrowthService } from '../../conversation/services/surfa
 import { bannedTopicsConfigService } from '../../safety/services/bannedTopicsConfigService';
 import { WebMaterialPatternExtractor } from '../../research/services/webMaterialPatternExtractor';
 import { conversationStrategyService } from '../../strategy/services/conversationStrategyService';
+import { selfImprovementRequestEventService } from '../../improvement/services/selfImprovementRequestEventService';
+import { executionEventBusService } from './executionEventBusService';
+import { sha256HexFromText } from '../../core/services/canonicalSha256Service';
 
 const WORK_MANAGER_CONSTRAINTS_KEY = 'miki_ai_workmanager_constraints';
 const WORK_MANAGER_LOGS_KEY = 'miki_ai_workmanager_logs';
@@ -155,6 +160,7 @@ export class BackgroundWorkerService {
   private lastUserActivityTimestamp: number = 0;
   private isChatGenerating: boolean = false;
   private activeAbortController: AbortController | null = null;
+  private activeNativeCycleId: string | null = null;
   private idleTimer: any = null;
   private isUserIdle: boolean = false;
   private schedulerTimer: any = null;
@@ -183,9 +189,26 @@ export class BackgroundWorkerService {
     if (typeof window !== 'undefined') {
       // 1. グローバル受け口 (Headless WebView / evaluateJavascript)
       (window as any).mikiRunBackgroundCycle = async (
-        triggerSource: 'manual' | 'periodic_scheduled' | 'android_intent' = 'android_intent'
+        triggerSource: 'manual' | 'periodic_scheduled' | 'android_intent' = 'android_intent',
+        nativeCycleId?: string,
       ) => {
-        return this.runAutonomousBackgroundCycle(triggerSource);
+        if (nativeCycleId && this.isExecutingNow) {
+          return { status: 'rejected', id: '', nativeCycleId, reason: 'BACKGROUND_CYCLE_ALREADY_EXECUTING' };
+        }
+        if (nativeCycleId) this.activeNativeCycleId = nativeCycleId;
+        try {
+          const receipt = await this.runAutonomousBackgroundCycle(triggerSource);
+          return nativeCycleId ? { ...receipt, nativeCycleId } : receipt;
+        } finally {
+          if (nativeCycleId && this.activeNativeCycleId === nativeCycleId) this.activeNativeCycleId = null;
+        }
+      };
+      (window as any).mikiCancelBackgroundCycle = (nativeCycleId: string) => {
+        if (!nativeCycleId || this.activeNativeCycleId !== nativeCycleId || !this.activeAbortController) {
+          return { accepted: false, reason: 'NATIVE_CYCLE_NOT_ACTIVE' };
+        }
+        this.activeAbortController.abort('ANDROID_WORKER_CANCELLED');
+        return { accepted: true, nativeCycleId };
       };
 
       // 2. Capacitor Plugin イベントリスナー経由のトリガー
@@ -504,7 +527,7 @@ export class BackgroundWorkerService {
    * 自律バックグラウンド処理サイクルを実行
    * 設計思想「浅い睡眠 / 深い睡眠」による厳格な2段階ゲート制御
    *
-   * [浅い睡眠]: 記憶統合・知識グラフ構築・LoRA重複除去・スキル抽出 (軽量)
+   * [浅い睡眠]: 記憶統合・知識グラフ構築・候補レコードの重複除去・スキル抽出 (軽量)
    * [深い睡眠]: 自己対話テスト・A/Bベンチマーク・回帰ベンチマーク・教材生成 (重推論)
    */
   public async runAutonomousBackgroundCycle(
@@ -535,6 +558,52 @@ export class BackgroundWorkerService {
 
     const startTime = Date.now();
     const logId = 'bg_' + startTime + '_' + Math.random().toString(36).substring(2, 6);
+
+    // Android WorkManager may wake a headless WebView while the app UI is closed.
+    // Re-emit the existing CORE ingress event only when the configured autopilot interval is due.
+    if (triggerSource === 'android_intent' || triggerSource === 'periodic_scheduled') {
+      try {
+        const autopilotRaw = storageService.getItem('miki_autopilot_config_v1');
+        const autopilot = autopilotRaw ? JSON.parse(autopilotRaw) as Record<string, unknown> : {};
+        const enabled = autopilot.enabled === true;
+        const intervalMinutes = Math.max(60, Math.min(10080, Number(autopilot.intervalMinutes) || 360));
+        const lastKey = 'miki_autopilot_last_native_dispatch_v1';
+        const pendingKey = 'miki_autopilot_pending_dispatch_v1';
+        const lastDispatch = Number(storageService.getItem(lastKey) || 0);
+        let pending: {requestId:string;trigger:string;requestedAt:number;source:'AUTOPILOT'} | undefined;
+        const pendingRaw = storageService.getItem(pendingKey);
+        if (pendingRaw) {
+          try {
+            const parsed = JSON.parse(pendingRaw) as {requestId?:unknown;trigger?:unknown;requestedAt?:unknown};
+            if (typeof parsed.requestId === 'string' && typeof parsed.trigger === 'string' && Number.isFinite(parsed.requestedAt)) {
+              pending = {requestId:parsed.requestId,trigger:parsed.trigger,requestedAt:Number(parsed.requestedAt),source:'AUTOPILOT'};
+            }
+          } catch {
+            systemLogger.warn('PERSISTENCE', '[AUTOPILOT] Discarded malformed pending dispatch record; no request was acknowledged');
+            storageService.removeItem(pendingKey);
+          }
+        }
+        if (enabled && !pending && Date.now() - lastDispatch >= intervalMinutes * 60 * 1000) {
+          const requestedAt = Date.now();
+          const requestId = `AUTOPILOT-${requestedAt}-${sha256HexFromText(`${logId}|${requestedAt}`).slice(0,16)}`;
+          pending = {requestId,trigger:'autopilot-scheduled',requestedAt,source:'AUTOPILOT'};
+          // Write the outbox record before publishing. A process death leaves a retryable request.
+          storageService.setItem(pendingKey, JSON.stringify(pending));
+        }
+        if (enabled && pending) {
+          const receipt = selfImprovementRequestEventService.publish(pending);
+          if (receipt.delivered > 0 && receipt.failed === 0) {
+            storageService.setItem(lastKey, String(pending.requestedAt));
+            storageService.removeItem(pendingKey);
+            systemLogger.info('SELF_IMPROVEMENT', `[AUTOPILOT] Durable CORE ingress accepted request ${pending.requestId} (${receipt.delivered}/${receipt.subscriberCount} subscriber(s), interval=${intervalMinutes}m)`);
+          } else {
+            systemLogger.warn('SELF_IMPROVEMENT', `[AUTOPILOT] CORE ingress is not ready; durable request ${pending.requestId} remains pending for the next WorkManager wake`);
+          }
+        }
+      } catch (error) {
+        systemLogger.warn('SELF_IMPROVEMENT', `[AUTOPILOT] Durable dispatch gate unavailable; request was not marked acknowledged: ${String(error)}`);
+      }
+    }
 
     systemLogger.info('SELF_IMPROVEMENT', `⚡ WorkManager 自律処理開始 [Trigger: ${triggerSource}]`);
 
@@ -608,7 +677,7 @@ export class BackgroundWorkerService {
         );
       }
 
-      // Step 2: DPO / LoRA 学習サンプルの本格クリーンアップ・重複除去
+      // Step 2: 能力候補レコードのクリーンアップ・重複除去
       const cleanupResult = selfImprovementService.cleanAndDeduplicateSamples();
 
       // Step 3: 会話ログからのスキル自動抽出 & 昇格評価
@@ -772,9 +841,8 @@ export class BackgroundWorkerService {
         if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
         try {
           if (!regressionBenchmarkService.isBusy()) {
-            const isNativeReady = false;
-            const isWebReady = false;
-            if (isNativeReady || isWebReady) {
+            const activeRuntime = regressionBenchmarkService.getActiveLoadedModelInfo();
+            if (activeRuntime.isReady && activeRuntime.modelId) {
               regressionReport = await regressionBenchmarkService.runFullSuite();
               if (regressionReport.regressionsCount > 0 || regressionReport.failedTests > 0) {
                 weaknessFound.push(
@@ -782,7 +850,10 @@ export class BackgroundWorkerService {
                 );
               }
             } else {
-              systemLogger.info('SELF_IMPROVEMENT', '自律回帰テスト: 推論モデル未ロードのためスキップ');
+              const reason = `実ロード済み推論モデルなし (${activeRuntime.engineType})`;
+              deepSleepSkippedReason = deepSleepSkippedReason ? `${deepSleepSkippedReason}; regression benchmark: ${reason}` : `regression benchmark: ${reason}`;
+              weaknessFound.push(`[回帰ベンチマーク未実行] ${reason}; PASS判定は行わない`);
+              systemLogger.info('SELF_IMPROVEMENT', `自律回帰テスト: ${reason}のため保留`);
             }
           }
         } catch (benchErr: any) {
@@ -804,25 +875,25 @@ export class BackgroundWorkerService {
           systemLogger.warn('SELF_IMPROVEMENT', '合成教材生成パイプライン実行中に例外が発生しました', synErr);
         }
 
-        // Step 6.6: 設計思想 16章 仮想学習試験 & LoRA検討の発動条件判定
+        // Step 6.6: 決定論的能力充足度判定と候補検証
         if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
         try {
-          const loraAssessment = capabilityEvaluationService.evaluateSufficiencyCondition();
-          if (loraAssessment.triggered) {
+          const capabilityAssessment = capabilityEvaluationService.evaluateSufficiencyCondition();
+          if (capabilityAssessment.triggered) {
             weaknessFound.push(
-              `[16章 LoRA発動条件検知] 言い換え再発または能力停滞を検出 ➔ 仮想学習シミュレーションを実行`
+              `[能力充足度判定] 言い換え再発または能力停滞を検出 ➔ 決定論的能力検証試験を実行`
             );
-            // 仮想学習試験の実行 (LoRA不要判定を優先検証)
+            // 回答骨格・検索・決定論的規則による改善候補を検証
             const trial = await capabilityEvaluationService.runCapabilityEvaluationTrial('cap_correction');
             weaknessFound.push(`[仮想学習判定: ${trial.verdict}] ${trial.verdictDetails}`);
           } else {
             systemLogger.info(
               'SELF_IMPROVEMENT',
-              `[16章 仮想学習監査] 回答骨格(9章)・検索(8章)で制御優位。LoRA発動条件未達(DISABLED維持)`
+              `[能力充足度監査] 回答骨格(9章)・検索(8章)・決定論的規則で制御できています。`
             );
           }
         } catch (vtErr: any) {
-          systemLogger.warn('SELF_IMPROVEMENT', '仮想学習監査中に例外が発生しました', vtErr);
+          systemLogger.warn('SELF_IMPROVEMENT', '決定論的能力検証中に例外が発生しました', vtErr);
         }
 
         // Step 6.7: 設計思想 11章 睡眠ゲート ＆ 20章 遅延外部教師リクエストバッチ処理
@@ -1034,8 +1105,25 @@ export class BackgroundWorkerService {
           specContractCompilerService.compile();
           weaknessFound.push(`[仕様契約] 指示書変更を検知し、追跡可能な最小契約を再コンパイル`);
         }
+        const indexedClaimFreshness=claimDatabaseService.indexMissingFreshness(deepSleepExecuted?24:8);
+        if(indexedClaimFreshness)weaknessFound.push(`[知識半減期] 旧Claim ${indexedClaimFreshness}件へ鮮度索引を段階適用`);
         const due = knowledgeHalfLifeService.due(deepSleepExecuted ? 20 : 8);
-        if (due.length) weaknessFound.push(`[知識半減期] ${due.length}件を再検証候補として優先付け`);
+        let staleClaimGapCount=0;
+        for(const record of due.filter(item=>item.key.startsWith('claim:')).slice(0,deepSleepExecuted?12:4)){
+          const claim=claimDatabaseService.getClaim(record.key.slice('claim:'.length));
+          if(!claim||claim.world!=='REAL'||['FALSE','SUPERSEDED','CONTEXT_ONLY'].includes(claim.status))continue;
+          knowledgeGapService.detect({
+            query:`再検証が必要な主張 ${claim.claim_id}: ${claim.statement}`,
+            type:'STALE_INFORMATION',
+            priority:Math.max(60,Math.min(95,Math.round(record.importance*0.75+record.changeRisk*0.25))),
+            sourceRequestId:`knowledge-half-life:${claim.claim_id}`,
+            requiredEvidence:['現在の時点で有効な一次資料','元Claimと取得Evidenceの主張単位照合','矛盾する新しい証拠の確認'],
+            reason:`半減期ポリシーに基づく再検証候補。stability=${record.stability}; dueAt=${record.dueAt}; lastVerifiedAt=${record.lastVerifiedAt}。Claim状態は自動で降格せず、既存CORE Research/Verifier経路へ委譲する。`,
+          });
+          staleClaimGapCount++;
+        }
+        if(staleClaimGapCount)weaknessFound.push(`[知識半減期] ${staleClaimGapCount}件のSTALE_INFORMATION Gapを既存CORE再検証キューへ接続`);
+        else if(due.length)weaknessFound.push(`[知識半減期] ${due.length}件を再検証候補として優先付け`);
       } catch (specErr: any) {
         systemLogger.warn('SELF_IMPROVEMENT', '仕様契約・知識半減期監査をスキップしました', specErr);
       }
@@ -1257,19 +1345,27 @@ export class BackgroundWorkerService {
       this.nextScheduledRunTimestamp = Date.now() + this.intervalMinutes * 60 * 1000;
       this.saveState();
 
-      // 安全な自己改善司令塔を1サイクルだけ進める。
-      // ここでは自己コード生成を直接許可せず、Knowledge Gap / Stable Case /
-      // Regression候補など、既存の安全境界を持つ改善経路だけを選択する。
+      // A completed maintenance cycle is a review/discovery input, never an execution failure.
+      // Keep cycle completion separate from the later CORE task and Review Package terminal states.
       try {
         const queuedRequest = selfImprovementIngressService.submit({
-          trigger: `background:${triggerSource}`,
-          source: 'EXECUTION',
-          runType: 'EXECUTION_FAILURE',
+          trigger: `background-cycle-review:${logRecord.id}`,
+          source: 'SYSTEM',
+          runType: 'BACKGROUND_CYCLE_REVIEW',
           sourceId: logRecord.id,
-          priority: 60,
-          payload: { triggerSource, backgroundExecutionId: logRecord.id },
+          priority: weaknessFound.length > 0 ? 55 : 35,
+          payload: {
+            triggerSource,
+            backgroundExecutionId: logRecord.id,
+            cycleStatus: 'COMPLETED',
+            observedWeaknesses: weaknessFound.slice(0, 80),
+            regressionReportId: regressionReport?.id,
+            regressionFailedTests: regressionReport?.failedTests,
+            regressionRegressionsCount: regressionReport?.regressionsCount,
+            requiresReview: true,
+          },
         });
-        weaknessFound.push(`[自己改善Queue受付] ${queuedRequest.id}`);
+        weaknessFound.push(`[自己改善Queue受付:正常サイクル評価] ${queuedRequest.id}`);
       } catch (improvementErr: unknown) {
         const message = improvementErr instanceof Error ? improvementErr.message : String(improvementErr);
         systemLogger.warn('SELF_IMPROVEMENT', `自己改善Queue受付をスキップしました: ${message}`);
@@ -1297,6 +1393,24 @@ export class BackgroundWorkerService {
       };
       this.executionLogs.unshift(failedRecord);
       this.saveState();
+      try {
+        const failureMessage = String(err?.message || err || 'UNKNOWN_BACKGROUND_EXECUTION_FAILURE');
+        executionEventBusService.publish({
+          type: isAborted ? 'execution.inconclusive' : 'execution.failed',
+          request_id: logId,
+          component_id: 'miki.background.autonomous-cycle',
+          implementation_hash: sha256HexFromText('miki.background.autonomous-cycle:P279'),
+          environment: nativeWorkManagerService.isAndroidNative() ? 'android-native' : 'web-runtime',
+          test_category: 'autonomous-background-cycle',
+          test_case_id: logId,
+          passed: false,
+          output_summary: failedRecord.summary,
+          error_message: failureMessage,
+          metadata: { goal: 'Autonomous background maintenance cycle', triggerSource, aborted: isAborted },
+        });
+      } catch (eventError) {
+        systemLogger.warn('PERSISTENCE', `Background cycle failure event could not be published: ${String(eventError)}`);
+      }
       throw err;
     } finally {
       this.isExecutingNow = false;

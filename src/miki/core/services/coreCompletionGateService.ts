@@ -1,5 +1,5 @@
 import { coreLineageReadModelService } from './coreLineageReadModelService';
-import type { BlackboardEntry, BlackboardTask } from './taskBlackboardService';
+import { unresolvedTaskErrors, type BlackboardEntry, type BlackboardTask } from './taskBlackboardService';
 import type { MikiDomain } from './crossDomainCirculationService';
 import type { DomainCommand } from './domainRouterService';
 import { isDiagnosticDomainCommand } from './domainContractRegistryService';
@@ -80,7 +80,7 @@ const persistenceConfirmed =
       required.length > 0 && missingReceipts.length === 0;
     const missingRequiredOperations = corePlanRevisionService.missingOperations(task).map((item) => `${item.operation}:${item.dedupeKey}`);
     const reasons: string[] = [];
-    if (task.entries.some((entry) => entry.kind === 'ERROR')) reasons.push('UNRESOLVED_DOMAIN_ERROR');
+    if (unresolvedTaskErrors(task).length > 0) reasons.push('UNRESOLVED_DOMAIN_ERROR');
     if (missingDomains.length) reasons.push(`REQUIRED_DOMAIN_NOT_VISITED:${missingDomains.join(',')}`);
     if (failedDomains.length) reasons.push(`REQUIRED_DOMAIN_NOT_SUCCEEDED:${failedDomains.join(',')}`);
     if (missingReceipts.length) reasons.push(`REQUIRED_DOMAIN_RECEIPT_MISSING:${missingReceipts.join(',')}`);
@@ -296,11 +296,7 @@ const persistenceConfirmed =
       );
     }
 
-    if (
-      task.entries.some(
-        entry => entry.kind === 'ERROR'
-      )
-    ) {
+    if (unresolvedTaskErrors(task).length > 0) {
       reasons.push(
         'UNRESOLVED_DOMAIN_ERROR'
       );
@@ -393,7 +389,7 @@ const persistenceConfirmed =
     });
 
     if (!observed) reasons.push(`CORE_OPERATION_NOT_COMPLETED:${operation}`);
-    if (task.entries.some((entry) => entry.kind === 'ERROR')) reasons.push('UNRESOLVED_DOMAIN_ERROR');
+    if (unresolvedTaskErrors(task).length > 0) reasons.push('UNRESOLVED_DOMAIN_ERROR');
     if (task.pendingDomains.length) reasons.push('PENDING_DOMAIN_REMAINS');
 
     const replyRecords = domainReplyLedgerService.listByTask(task.taskId);
@@ -452,7 +448,7 @@ const persistenceConfirmed =
     if(diagnosticOnly) reasons.push('DIAGNOSTIC_STAGE_IN_PROGRESS');
     if(missingRequiredOperations.length) reasons.push(`REQUIRED_BUSINESS_OPERATION_MISSING:${missingRequiredOperations.join(',')}`);
     if(failedOperations.length) reasons.push(`REQUIRED_OPERATION_FAILED:${failedOperations.join(',')}`);
-    if(task.entries.some(entry=>entry.kind==='ERROR')) reasons.push('UNRESOLVED_DOMAIN_ERROR');
+    if(unresolvedTaskErrors(task).length>0) reasons.push('UNRESOLVED_DOMAIN_ERROR');
     if(task.pendingDomains.length) reasons.push('PENDING_DOMAIN_REMAINS');
     if(!lineage.lineageVerified||lineage.verifiedReplyIds.length===0) reasons.push('LINEAGE_VERIFICATION_FAILED');
 
@@ -475,15 +471,33 @@ const persistenceConfirmed =
     const evidenceQualityPassed=businessReplyRecords.length===0?true:quality.passed;
     if(!evidenceQualityPassed) reasons.push(`EVIDENCE_QUALITY_FAILED:${quality.reasons.join(',')}`);
     const isRevalidation=requiredOperations.some(operation=>operation.operation==='GENERATE_CANDIDATE') && requiredOperations.some(operation=>operation.operation==='CREATE_REVIEW_PACKAGE') && task.entries.some(entry=>entry.kind==='RESULT'&&entry.value&&typeof entry.value==='object'&&(entry.value as Record<string,unknown>).operation==='GENERATE_CANDIDATE'&&typeof (entry.value as Record<string,unknown>).externalReviewId==='string');
-    if(isRevalidation){const packageId=task.entries.filter(entry=>entry.kind==='RESULT'&&entry.value&&typeof entry.value==='object').map(entry=>entry.value as Record<string,unknown>).reverse().find(value=>value.operation==='CREATE_REVIEW_PACKAGE'&&typeof value.packageId==='string')?.packageId as string|undefined;const pkg=packageId?reviewZipExportService.list().find(item=>item.packageId===packageId):undefined;if(!pkg) reasons.push('REVALIDATION_REVIEW_PACKAGE_MISSING');else if(pkg.status!=='EXTERNAL_REVIEW_PENDING') reasons.push(`REVALIDATION_REVIEW_NOT_PENDING:${pkg.status}`);}
-    const packagePending=requiredOperations.some(operation=>operation.operation==='CREATE_REVIEW_PACKAGE') &&
-      !missingRequiredOperations.some(item=>item.startsWith('CREATE_REVIEW_PACKAGE:'));
+    if(isRevalidation){
+      const packageEntry=task.entries.filter(entry=>entry.kind==='RESULT'&&entry.value&&typeof entry.value==='object').map(entry=>entry.value as Record<string,unknown>).reverse().find(value=>value.operation==='CREATE_REVIEW_PACKAGE'&&Boolean(this.findDeepString(value,'packageId')));
+      // CREATE_REVIEW_PACKAGE returns ReviewZipCreateResult; packageId lives under artifact.packageId, not at the top level.
+      const packageId=packageEntry?this.findDeepString(packageEntry,'packageId'):undefined;
+      const pkg=packageId?reviewZipExportService.list().find(item=>item.packageId===packageId):undefined;
+      if(!pkg) reasons.push('REVALIDATION_REVIEW_PACKAGE_MISSING');
+      else if(pkg.status!=='EXTERNAL_REVIEW_PENDING') reasons.push(`REVALIDATION_REVIEW_NOT_PENDING:${pkg.status}`);
+    }
+    const reviewPackageRequired=requiredOperations.some(operation=>operation.operation==='CREATE_REVIEW_PACKAGE');
+    const reviewPackageSatisfied=!reviewPackageRequired || !missingRequiredOperations.some(item=>item.startsWith('CREATE_REVIEW_PACKAGE:'));
     return {
-      businessCompletion:reasons.length===0&&packagePending,
+      businessCompletion:reasons.length===0&&reviewPackageSatisfied,
       failClosed:true,requiredDomains:[],
       missingDomains,failedDomains,missingReceipts,persistenceConfirmed,
       evidenceQualityPassed:evidenceQualityPassed,reasons,missingRequiredOperations
     };
+  }
+
+  private findDeepString(value:unknown,key:string,depth=0):string|undefined {
+    if(depth>12||value===null||value===undefined)return undefined;
+    if(Array.isArray(value)){for(const item of value){const found=this.findDeepString(item,key,depth+1);if(found)return found;}return undefined;}
+    if(typeof value!=='object')return undefined;
+    const record=value as Record<string,unknown>;
+    const direct=record[key];
+    if(typeof direct==='string'&&direct.trim())return direct.trim();
+    for(const child of Object.values(record)){const found=this.findDeepString(child,key,depth+1);if(found)return found;}
+    return undefined;
   }
 
   private hasReceiptDeep(value:unknown):boolean {

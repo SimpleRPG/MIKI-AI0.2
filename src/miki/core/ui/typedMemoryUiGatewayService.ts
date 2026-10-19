@@ -4,7 +4,6 @@ import { experienceRouterService } from '../../experience/services/experienceRou
 import { longTermMemoryService } from '../../memory/services/longTermMemoryService';
 import { embeddingService } from '../../research/services/embeddingService';
 import { memoryAuditService } from '../../memory/services/memoryAuditService';
-import { selfImprovementService } from '../../improvement/services/selfImprovementService';
 
 export type { EmbeddingStats } from '../../research/services/embeddingService';
 export type { MemoryAuditCycleRecord } from '../../memory/services/memoryAuditService';
@@ -65,7 +64,6 @@ class TypedMemoryUiGatewayService {
   runMemoryAudit(...args: Parameters<typeof memoryAuditService.runFullAuditCycle>): ReturnType<typeof memoryAuditService.runFullAuditCycle> {
     return memoryAuditService.runFullAuditCycle(...args);
   }
-  getTrainingSamples(): ReturnType<typeof selfImprovementService.getTrainingSamples> { return selfImprovementService.getTrainingSamples(); }
 }
 
 export const typedMemoryUiGatewayService = new TypedMemoryUiGatewayService();

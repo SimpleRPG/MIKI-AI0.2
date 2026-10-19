@@ -1,23 +1,21 @@
 import {
   CapabilitySufficiencyAssessment,
   CapabilityEvaluationTrial,
-  LoraTriggerAssessment,
-  VirtualTrainingTrial,
 } from '../../../types';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { answerPlanService } from '../../strategy/services/answerPlanService';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 
-const CAPABILITY_TRIALS_KEY = 'miki_virtual_training_trials_v32';
+const CAPABILITY_TRIALS_KEY = 'miki_capability_evaluation_trials_v33';
+const LEGACY_CAPABILITY_TRIALS_KEY = 'miki_virtual_training_trials_v32';
 
 /**
  * 非LLMアーキテクチャ: 決定論的能力検証・充足度評価サービス
  *
  * 目的:
- * - 重み更新・LoRAを行わず、プロンプト/回答骨格/検索/ヒューリスティック規則の
- *   組み合わせで能力が充足しているかを客観的に判定・検証する。
- * - 充足しない場合はLoRAではなく「能力ギャップの再分解」と「対策骨格の生成」に誘導する。
+ * - モデル重みを更新せず、回答骨格・検索・決定論的規則の組み合わせで能力充足度を判定・検証する。
+ * - 充足しない場合は能力ギャップを再分解し、検証可能な対策候補へ誘導する。
  */
 export class CapabilityEvaluationService {
   private trials: CapabilityEvaluationTrial[] = [];
@@ -28,11 +26,32 @@ export class CapabilityEvaluationService {
 
   private loadTrials(): void {
     try {
-      const raw = storageService.getItem(CAPABILITY_TRIALS_KEY);
-      if (raw) {
-        this.trials = JSON.parse(raw);
+      const currentRaw = storageService.getItem(CAPABILITY_TRIALS_KEY);
+      const legacyRaw = storageService.getItem(LEGACY_CAPABILITY_TRIALS_KEY);
+      const currentParsed = currentRaw ? JSON.parse(currentRaw) : [];
+      const legacyParsed = legacyRaw ? JSON.parse(legacyRaw) : [];
+      if (!Array.isArray(currentParsed) || !Array.isArray(legacyParsed)) {
+        throw new Error('Capability evaluation storage must contain arrays');
+      }
+      this.trials = currentParsed;
+      if (legacyRaw) {
+        const existingIds = new Set(
+          this.trials
+            .map((trial: CapabilityEvaluationTrial) => trial?.id)
+            .filter((id: unknown) => typeof id === 'string' && id.length > 0),
+        );
+        for (const legacyTrial of legacyParsed) {
+          const id = legacyTrial?.id;
+          if (typeof id === 'string' && id.length > 0 && existingIds.has(id)) continue;
+          this.trials.push(legacyTrial);
+          if (typeof id === 'string' && id.length > 0) existingIds.add(id);
+        }
+        // Write merged data first; remove the legacy key only after the new save succeeds.
+        storageService.setItem(CAPABILITY_TRIALS_KEY, JSON.stringify(this.trials));
+        storageService.removeItem(LEGACY_CAPABILITY_TRIALS_KEY);
       }
     } catch (e) {
+      // A failed migration leaves the legacy key intact so records can be recovered.
       console.warn('Failed to load capability evaluation trials:', e);
     }
   }

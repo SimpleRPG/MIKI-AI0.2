@@ -17,7 +17,7 @@ import { experienceLinkService } from './experienceLinkService';
  * 49章：経験の保存先ルーター (Experience Destination Router)
  * 新しい経験（会話・コードレビュー・エラー・外部教材など）を
  * 49章が定義する判断要素（更新頻度／適用範囲／再利用可能性／機械検証可能性／出典／承認状態／個人情報有無／既存情報との重複／誤適用時の影響）
- * に基づき、9分類（作業記憶／長期記憶／プロジェクト記憶／スキル／検索ポリシー／評価セット／LoRA教材／隔離／破棄候補）へ自律的に振り分ける。
+ * に基づき、8分類（作業記憶／長期記憶／プロジェクト記憶／スキル／検索ポリシー／評価セット／隔離／破棄候補）へ自律的に振り分ける。
  */
 export class ExperienceRouterService {
   /**
@@ -423,7 +423,7 @@ export class ExperienceRouterService {
 
   /**
    * 能力改善候補 (verified_candidate) の記憶を決定論的能力候補へ連携する
-   * （旧: exportToLoraDataset を移行）
+   * 
    */
   public routeToCapabilityCandidate(item: MemoryItem): void {
     const experienceId = `exp_mem_${item.id}`;

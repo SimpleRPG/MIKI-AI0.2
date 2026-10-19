@@ -14,7 +14,6 @@ export const DEFAULT_FEATURE_FLAGS: SystemFeatureFlags = {
   ANSWER_PLAN_CACHE: 'STABLE',
   TEACHER_ROUTER: 'DEVELOPMENT',
   MULTI_STEP_REASONING: 'SHADOW',
-  LORA_TRAINING: 'DISABLED', // 非LLM化に伴い退役 (DISABLED固定)
   DETERMINISTIC_CAPABILITY_EVOLUTION: 'STABLE',
   CODE_UNDERSTANDING: 'DEVELOPMENT',
   VBA_DESIGN_ASSISTANT: 'DEVELOPMENT',
@@ -51,10 +50,6 @@ export const FEATURE_FLAG_DESCRIPTIONS: Record<keyof SystemFeatureFlags, { title
     title: '多段推論 (Multi-Step Reasoning)',
     desc: '直接回答で解けない複雑問題の分解。過剰思考を抑制するためシャドウ運用（6章）。',
   },
-  LORA_TRAINING: {
-    title: '旧LoRA追加学習 (Retired)',
-    desc: '非LLM化に伴い退役。決定論的能力進化 (Deterministic Capability Evolution) へ移行。',
-  },
   DETERMINISTIC_CAPABILITY_EVOLUTION: {
     title: '決定論的能力進化 (Deterministic Capability Evolution)',
     desc: '検証済みの修正対を重み更新ではなく決定論的な回答骨格・規則・能力パッチへコンパイル。',
@@ -69,11 +64,11 @@ export const FEATURE_FLAG_DESCRIPTIONS: Record<keyof SystemFeatureFlags, { title
   },
   EXPERIENCE_ROUTER: {
     title: '経験保存先ルーター (Experience Router)',
-    desc: '対話や生成結果を9分類（作業・長期・案件記憶・スキル・検索・評価・教材・隔離・破棄）へ自動仕分け（49章）。',
+    desc: '対話や生成結果を8分類（作業・長期・案件記憶・スキル・検索・評価・隔離・破棄）へ自動仕分け（49章）。',
   },
   SKILL_GRADUATION: {
     title: '技能卒業＆多様性再試験 (Skill Graduation)',
-    desc: '多文脈での再試験による過学習防止、長期安定稼働した技能のLoRA教材化とプロンプト卒業（50章）。',
+    desc: '多文脈での再試験による過学習防止、長期安定稼働した技能を決定論的な能力候補として登録（50章）。',
   },
   VBA_STATIC_VERIFIER: {
     title: 'VBA静的検証器 (VBA Static Verifier)',
@@ -104,7 +99,12 @@ class FeatureFlagsService {
     try {
       const raw = storageService.getItem(FLAGS_STORAGE_KEY);
       if (raw) {
-        return { ...DEFAULT_FEATURE_FLAGS, ...JSON.parse(raw) };
+        const persisted = JSON.parse(raw) as SystemFeatureFlags & { LORA_TRAINING?: unknown };
+        const flags: SystemFeatureFlags = { ...DEFAULT_FEATURE_FLAGS, ...persisted };
+        const hadRetiredFlag = Object.prototype.hasOwnProperty.call(persisted, 'LORA_TRAINING');
+        delete (flags as any).LORA_TRAINING;
+        if (hadRetiredFlag) storageService.setItem(FLAGS_STORAGE_KEY, JSON.stringify(flags));
+        return flags;
       }
     } catch (e) {
       console.warn('Failed to load feature flags:', e);

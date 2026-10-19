@@ -19,6 +19,7 @@ async function calculateArtifactSha256(source: string): Promise<string> {
 import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from "../../../services/storageService";
 import { selfImprovementRequestEventService } from '../../improvement/services/selfImprovementRequestEventService';
+import { nativeWorkManagerService } from '../../execution/services/nativeWorkManagerService';
 import { mikiSelfCodingSuperchargerService, MutationTestResult } from '../../selfDevelopment/services/mikiSelfCodingSuperchargerService';
 import { AutonomousVerificationData } from '../../../types';
 import { ChangeSetID, SelfImprovementFailureCategory, CausalExperimentResult, CounterexampleGateResult, GeneralizationGateResult, AdoptionState, DeploymentLifecycleState, NoChangeDecision } from '../../../types/evidenceSelfImprovementTypes';
@@ -136,6 +137,8 @@ export class AutonomousContinuousEvolutionService {
       this.timerId = null;
     }
     if (!this.config.enabled) return;
+    // Android uses the existing WorkManager wake path; do not run a competing WebView timer.
+    if (nativeWorkManagerService.isAndroidNative()) return;
     this.timerId = setInterval(() => {
       if (!this.isRunningCycle && this.config.enabled) {
         selfImprovementRequestEventService.publish({

@@ -226,7 +226,20 @@
     "verify:conversation-components:p213": "node scripts/verify_conversation_components_p213.mjs",
     "verify:conversation-graph-completion:p214": "node scripts/verify_conversation_graph_completion_p214.mjs",
     "verify:conversation-ui-graph-e2e:p215": "tsx scripts/verify_conversation_ui_graph_e2e_p215.mjs",
-    "verify:graph-answer-pipeline:p216": "tsx scripts/verify_graph_answer_pipeline_p216.mjs"
+    "verify:graph-answer-pipeline:p216": "tsx scripts/verify_graph_answer_pipeline_p216.mjs",
+    "verify:service-authority:p290": "node scripts/verify_service_authority_convergence_p290.mjs",
+    "verify:source-ledger:p290": "python scripts/verify_source_relation_ledger_p290.py",
+    "verify:lora-retirement:p290": "python scripts/verify_lora_retirement_p290.py",
+    "verify:core-autonomy-p291": "node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_core_autonomy_regressions_p291.mjs && node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_blackboard_corrupt_snapshot_p291.mjs",
+    "verify:lora-retirement-p291": "python scripts/verify_lora_retirement_p291.py",
+    "verify:source-relation-ledger-p291": "python scripts/verify_source_relation_ledger_p291.py",
+    "verify:production-worker-cancellation-p292": "node scripts/verify_production_worker_cancellation_p292.mjs",
+    "verify:source-relation-ledger-p292": "python scripts/generate_source_relation_ledger_p292.py && python scripts/verify_source_relation_ledger_p292.py",
+    "verify:lora-retirement-p292": "python scripts/verify_lora_retirement_p292.py",
+    "verify:autonomous-worker-safety-p293": "node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_autonomous_worker_safety_p293.mjs",
+    "verify:source-relation-ledger-p293": "python scripts/generate_source_relation_ledger_p293.py && python scripts/verify_source_relation_ledger_p293.py",
+    "verify:lora-retirement-p293": "python scripts/verify_lora_retirement_p293.py",
+    "verify:autonomy-p293": "node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_autonomous_worker_safety_p293.mjs && node scripts/verify_production_worker_cancellation_p292.mjs && node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_core_autonomy_regressions_p291.mjs && node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_blackboard_corrupt_snapshot_p291.mjs && python scripts/verify_lora_retirement_p293.py && python scripts/verify_source_relation_ledger_p293.py"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.0",

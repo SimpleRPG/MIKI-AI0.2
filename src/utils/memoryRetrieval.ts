@@ -32,7 +32,7 @@ export const SEMANTIC_DOMAINS = [
   'episodic_history', // 4: 過去の出来事、前回、失敗談、成功経験
   'relationship',     // 5: 親密度、約束、感情、信頼、思い出
   'game_mechanics',   // 6: ゲーム、RPG、戦闘、アイテム、マップ
-  'meta_learning',    // 7: スキル、自己改善、学習、LoRA、ベンチマーク
+  'meta_learning',    // 7: スキル、自己改善、学習、ベンチマーク
 ] as const;
 
 export type SemanticDomain = typeof SEMANTIC_DOMAINS[number];
@@ -67,7 +67,7 @@ const DOMAIN_KEYWORDS: Record<SemanticDomain, string[]> = {
     'ステータス', 'hp', 'mp', 'レベル', '敵',
   ],
   meta_learning: [
-    'スキル', '改善', '自己学習', 'lora', 'colab', 'ベンチマーク', '評価', '世界モデル',
+    'スキル', '改善', '自己学習', 'ベンチマーク', '評価', '世界モデル',
     '予測誤差', '系統樹', '世代', 'データセット', 'jsonl',
   ],
 };

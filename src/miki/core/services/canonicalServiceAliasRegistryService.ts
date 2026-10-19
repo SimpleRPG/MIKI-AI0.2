@@ -20,12 +20,12 @@ const records:ServiceConnectivityRecord[]=[
 {service:'evidenceIdentityService',path:'src/miki/core/services/evidenceIdentityService.ts',classification:'MISSING_CONNECTION',action:'Connect at evidence persistence boundary to normalize identity.'},
 {service:'failureInjectionSuiteService',path:'src/miki/selfDevelopment/services/failureInjectionSuiteService.ts',classification:'DIAGNOSTIC_ONLY',action:'Explicit verification-only execution.'},
 {service:'failureRecoveryDispatcherService',path:'src/miki/selfDevelopment/services/failureRecoveryDispatcherService.ts',classification:'MISSING_CONNECTION',action:'Connect from core failure route after failure taxonomy decision.'},
-{service:'failureUnderstandingService',path:'src/miki/memory/services/failureUnderstandingService.ts',classification:'MISSING_CONNECTION',action:'Connect failure evidence to governed memory learning.'},
+{service:'failureUnderstandingService',path:'src/miki/memory/services/failureUnderstandingService.ts',classification:'CONNECTED_RUNTIME',action:'Persist execution.failed observations and unverified unified-learning signals; route cause research through durable KnowledgeGap and existing CORE revalidation; never infer or promote failure causes directly.'},
 {service:'hardeningRegressionCandidateService',path:'src/miki/improvement/services/hardeningRegressionCandidateService.ts',classification:'MISSING_CONNECTION',action:'Connect to regression candidate intake, not direct adoption.'},
 {service:'hybridConversationEngineService',path:'src/miki/conversation/services/hybridConversationEngineService.ts',classification:'DYNAMIC_ENTRY',action:'Existing conversation entry; static single-reference result is a false positive.'},
 {service:'improvementProposalService',path:'src/miki/improvement/services/improvementProposalService.ts',classification:'MISSING_CONNECTION',action:'Connect proposals to core intake as candidates only.'},
 {service:'itemDesignPlannerService',path:'src/miki/selfDevelopment/services/itemDesignPlannerService.ts',classification:'UI_OR_MANUAL',action:'Explicit item-design workflow.'},
-{service:'knowledgeHalfLifeService',path:'src/miki/memory/services/knowledgeHalfLifeService.ts',classification:'MISSING_CONNECTION',action:'Connect to memory retrieval ranking and expiry maintenance.'}
+{service:'knowledgeHalfLifeService',path:'src/miki/memory/services/knowledgeHalfLifeService.ts',classification:'CONNECTED_RUNTIME',action:'Claim retrieval penalizes due real-world knowledge and routes it to research; background audit writes durable STALE_INFORMATION gaps through existing CORE revalidation without mutating Claim status.'}
 ];
 class CanonicalServiceAliasRegistryService{
  list():ServiceConnectivityRecord[]{return records.map(record=>({...record}));}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { capabilityLedgerGraphService, type LedgerGraphNode, type LedgerGraphEdge } from '../miki/capability/services/capabilityLedgerGraphService';
 import {
   capabilityLedgerService,
   type CapabilityLedgerAssessment,
@@ -32,6 +33,17 @@ export const CapabilityLedgerScreen: React.FC<CapabilityLedgerScreenProps> = ({ 
   );
   const [goal, setGoal] = useState('');
   const [assessment, setAssessment] = useState<CapabilityLedgerAssessment | null>(null);
+  const [graph, setGraph] = useState(() => capabilityLedgerGraphService.getSnapshot());
+  const [nodeLabel, setNodeLabel] = useState('');
+  const [nodeDetail, setNodeDetail] = useState('');
+  const [edgeFrom, setEdgeFrom] = useState('');
+  const [edgeTo, setEdgeTo] = useState('');
+  const [edgeLabel, setEdgeLabel] = useState('関連');
+  const [editingNode, setEditingNode] = useState<string | null>(null);
+  const [editingEdge, setEditingEdge] = useState<string | null>(null);
+  const [graphError, setGraphError] = useState('');
+  const refreshGraph = () => { setGraph(capabilityLedgerGraphService.getSnapshot()); setGraphError(''); };
+  const graphAction = (action: () => unknown) => { try { action(); refreshGraph(); } catch (error) { setGraphError(String(error instanceof Error ? error.message : error)); } };
 
   const refresh = () => {
     setSnapshot(capabilityLedgerService.getSnapshot());
@@ -178,6 +190,43 @@ export const CapabilityLedgerScreen: React.FC<CapabilityLedgerScreenProps> = ({ 
             )}
           </div>
         )}
+      </section>
+
+      <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div><h2 className="text-lg font-bold">自己台帳グラフ</h2><p className="text-xs text-slate-400">編集用の関係レイヤー。能力Registryや実行根拠の内容は変更しない。</p></div>
+          <button type="button" onClick={refreshGraph} className="rounded-xl border border-slate-700 px-3 py-2 text-sm">再読込</button>
+        </div>
+        {graphError && <p role="alert" className="mb-3 break-words rounded-lg border border-red-800 bg-red-950/40 p-2 text-sm text-red-200">保存できませんでした: {graphError}</p>}
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <form className="space-y-2 rounded-xl border border-slate-800 p-3" onSubmit={(event) => { event.preventDefault(); graphAction(() => capabilityLedgerGraphService.addNode(nodeLabel, nodeDetail)); setNodeLabel(''); setNodeDetail(''); }}>
+            <h3 className="font-semibold">ノードを追加</h3>
+            <input value={nodeLabel} onChange={(event) => setNodeLabel(event.target.value)} maxLength={160} required placeholder="ノード名" className="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm" />
+            <textarea value={nodeDetail} onChange={(event) => setNodeDetail(event.target.value)} maxLength={2000} rows={2} placeholder="説明・メモ（任意）" className="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm" />
+            <button className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold" type="submit">追加して保存</button>
+          </form>
+          <form className="space-y-2 rounded-xl border border-slate-800 p-3" onSubmit={(event) => { event.preventDefault(); graphAction(() => capabilityLedgerGraphService.addEdge(edgeFrom, edgeTo, edgeLabel)); }}>
+            <h3 className="font-semibold">エッジを追加</h3>
+            <select value={edgeFrom} onChange={(event) => setEdgeFrom(event.target.value)} required className="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm"><option value="">接続元ノード</option>{graph.nodes.map((node) => <option key={node.id} value={node.id}>{node.label}</option>)}</select>
+            <select value={edgeTo} onChange={(event) => setEdgeTo(event.target.value)} required className="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm"><option value="">接続先ノード</option>{graph.nodes.map((node) => <option key={node.id} value={node.id}>{node.label}</option>)}</select>
+            <input value={edgeLabel} onChange={(event) => setEdgeLabel(event.target.value)} maxLength={120} placeholder="関係（例：依存する）" className="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm" />
+            <button className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold" type="submit" disabled={!graph.nodes.length}>接続して保存</button>
+          </form>
+        </div>
+        <div className="mb-4 flex flex-wrap gap-2 text-xs text-slate-400"><span>ノード {graph.nodes.length}</span><span>エッジ {graph.edges.length}</span><span>更新 {new Date(graph.updatedAt).toLocaleString()}</span></div>
+        {graph.nodes.length > 0 ? <div className="mb-4 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-2">
+          <svg viewBox={`0 0 ${Math.max(320, Math.min(900, graph.nodes.length * 150))} 260`} role="img" aria-label="自己台帳グラフ" className="min-w-[320px] w-full" style={{ height: 260 }}>
+            {graph.edges.map((edge, index) => { const from = graph.nodes.findIndex(n => n.id === edge.from); const to = graph.nodes.findIndex(n => n.id === edge.to); if (from < 0 || to < 0) return null; const width = Math.max(320, Math.min(900, graph.nodes.length * 150)); const x1 = 65 + (from % Math.max(1, Math.floor(width / 150))) * 145; const x2 = 65 + (to % Math.max(1, Math.floor(width / 150))) * 145; const y1 = 55 + Math.floor(from / Math.max(1, Math.floor(width / 150))) * 85; const y2 = 55 + Math.floor(to / Math.max(1, Math.floor(width / 150))) * 85; return <g key={edge.id}><line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#818cf8" strokeWidth="2"/><text x={(x1+x2)/2} y={(y1+y2)/2-5} fill="#c7d2fe" fontSize="10" textAnchor="middle">{edge.label.slice(0,18)}</text></g>; })}
+            {graph.nodes.map((node, index) => { const width = Math.max(320, Math.min(900, graph.nodes.length * 150)); const cols = Math.max(1, Math.floor(width / 150)); const x = 65 + (index % cols) * 145; const y = 55 + Math.floor(index / cols) * 85; return <g key={node.id}><rect x={x-55} y={y-22} width="110" height="44" rx="9" fill="#1e293b" stroke="#818cf8"/><text x={x} y={y+4} fill="#f1f5f9" fontSize="11" textAnchor="middle">{node.label.slice(0,16)}</text></g>; })}
+          </svg>
+        </div> : <p className="mb-4 rounded-xl border border-dashed border-slate-700 p-4 text-sm text-slate-400">まだノードがありません。上のフォームから追加できます。</p>}
+        <div className="space-y-2">
+          {graph.nodes.map((node) => <div key={node.id} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+            {editingNode === node.id ? <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); graphAction(() => capabilityLedgerGraphService.updateNode(node.id, { label: String(data.get('label') || ''), detail: String(data.get('detail') || '') })); setEditingNode(null); }}><input name="label" defaultValue={node.label} maxLength={160} required className="w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-sm"/><textarea name="detail" defaultValue={node.detail} maxLength={2000} rows={2} className="w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-sm"/><div className="flex gap-2"><button className="rounded-lg bg-indigo-600 px-3 py-2 text-sm" type="submit">保存</button><button className="rounded-lg border border-slate-700 px-3 py-2 text-sm" type="button" onClick={() => setEditingNode(null)}>取消</button></div></form> : <><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="break-words font-semibold">{node.label}</p><p className="mt-1 break-all text-xs text-slate-500">{node.id}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-300">{node.detail}</p></div><div className="flex shrink-0 gap-2"><button type="button" onClick={() => setEditingNode(node.id)} className="rounded-lg border border-slate-700 px-2 py-1 text-xs">編集</button><button type="button" onClick={() => { if (window.confirm(`「${node.label}」と接続エッジを削除しますか？`)) graphAction(() => capabilityLedgerGraphService.deleteNode(node.id)); }} className="rounded-lg border border-red-900 px-2 py-1 text-xs text-red-200">削除</button></div></div>
+            {graph.edges.filter((edge) => edge.from === node.id || edge.to === node.id).map((edge) => <div key={edge.id} className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 p-2 text-xs"><span>{graph.nodes.find((n) => n.id === (edge.from === node.id ? edge.to : edge.from))?.label || '不明'} — {edge.label}</span><div className="flex gap-2"><button type="button" onClick={() => { const label = window.prompt('関係名', edge.label); if (label !== null) graphAction(() => capabilityLedgerGraphService.updateEdge(edge.id, { label })); }} className="rounded border border-slate-700 px-2 py-1">関係編集</button><button type="button" onClick={() => { if (window.confirm('このエッジを削除しますか？')) graphAction(() => capabilityLedgerGraphService.deleteEdge(edge.id)); }} className="rounded border border-red-900 px-2 py-1 text-red-200">接続削除</button></div></div>)}
+            </>}
+          </div>)}
+        </div>
       </section>
 
       <section className="mb-6">

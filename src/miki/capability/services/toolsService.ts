@@ -16,6 +16,7 @@ import { cognitiveDebuggerService } from '../../verification/services/cognitiveD
 import { digitalResearchNoteService } from '../../research/services/digitalResearchNoteService';
 import { codebaseReflectionService } from '../../selfDevelopment/services/codebaseReflectionService';
 import { apiUrl, SERVER_UNAVAILABLE_MESSAGE } from '../../../services/api';
+import { capabilityLedgerGraphService } from './capabilityLedgerGraphService';
 
 const TOOLS_STATS_STORAGE_KEY = 'miki_ai_tools_stats';
 
@@ -310,6 +311,24 @@ class SafeMathEvaluator {
  * 設計思想 13-14章, 22章
  */
 export const BUILTIN_TOOLS: ToolDefinition[] = [
+  {
+    id: 'tool_self_ledger_graph',
+    name: '自己能力台帳グラフ操作',
+    description: '自己台帳の編集用グラフを一覧・編集します。actionはlist/add_node/update_node/delete_node/add_edge/update_edge/delete_edge。削除を含む変更は承認後に実行され、能力Registryや検証根拠そのものは変更しません。',
+    category: 'workspace',
+    permission: 'workspace_write',
+    requiresConfirmation: true,
+    parameters: [
+      { name: 'action', type: 'string', description: '実行する操作', required: true, options: ['list', 'add_node', 'update_node', 'delete_node', 'add_edge', 'update_edge', 'delete_edge'] },
+      { name: 'id', type: 'string', description: '更新・削除するノードまたはエッジID', required: false },
+      { name: 'label', type: 'string', description: 'ノード名、説明、または関係名', required: false },
+      { name: 'detail', type: 'string', description: 'ノードの説明・メモ', required: false },
+      { name: 'from', type: 'string', description: 'エッジの接続元ノードID', required: false },
+      { name: 'to', type: 'string', description: 'エッジの接続先ノードID', required: false },
+    ],
+    linkedSkillIds: ['skill_task_decomposition'],
+    isAvailable: true,
+  },
   {
     id: 'tool_safe_calculator',
     name: '安全数値計算エンジン (Safe Math)',
@@ -1017,6 +1036,19 @@ export class ToolsService {
       }
 
       switch (toolId) {
+        case 'tool_self_ledger_graph': {
+          const graphResult = capabilityLedgerGraphService.executeAgentOperation({
+            action: String(params.action || ''),
+            id: params.id === undefined ? undefined : String(params.id),
+            label: params.label === undefined ? undefined : String(params.label),
+            detail: params.detail === undefined ? undefined : String(params.detail),
+            from: params.from === undefined ? undefined : String(params.from),
+            to: params.to === undefined ? undefined : String(params.to),
+          });
+          execResult = graphResult;
+          outputSummary = `自己台帳グラフ操作 ${String(params.action)} を実行しました。変更は専用グラフ領域へ保存され、能力の検証状態は変更していません。`;
+          break;
+        }
         case 'tool_safe_calculator': {
           const rawExpr = String(params.expression || '');
           const calcRes = this.safeMath.evaluate(rawExpr);

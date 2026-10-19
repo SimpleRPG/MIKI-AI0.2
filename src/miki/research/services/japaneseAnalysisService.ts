@@ -140,6 +140,8 @@ class JapaneseAnalysisService {
   }
 
   public analyze(text: string): JapaneseAnalysisResult {
+    const normalizedText = normalize(text || '');
+    if (!normalizedText) return this.buildResult('', '', [], 'DETERMINISTIC_FALLBACK');
     return this.analyzeIntl(text) || this.analyzeDeterministic(text);
   }
 

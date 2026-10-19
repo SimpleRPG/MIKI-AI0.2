@@ -5,6 +5,45 @@ export type BlackboardStatus='OPEN'|'ROUTING'|'WAITING'|'PAUSED'|'COMPLETED'|'FA
 export type BlackboardEntryKind='INPUT'|'OBSERVATION'|'EVIDENCE'|'CLAIM'|'DECISION'|'RESULT'|'ERROR'|'CHECKPOINT';
 export interface BlackboardEntry { id:string; taskId:string; kind:BlackboardEntryKind; domain:MikiDomain; key:string; value:unknown; evidenceIds:string[]; createdAt:number; }
 export interface BlackboardTask { taskId:string; title?:string; goal:string; source:MikiDomain; status:BlackboardStatus; revision:number; createdAt:number; updatedAt:number; visitedDomains:MikiDomain[]; pendingDomains:MikiDomain[]; entries:BlackboardEntry[]; pausedReason?:string; resumeCount:number; lastCycle:number; }
+
+function entryRecord(entry:BlackboardEntry):Record<string,unknown>|undefined{
+ const value=entry.value;
+ return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:undefined;
+}
+function successfulBusinessResult(entry:BlackboardEntry):boolean{
+ if(entry.kind!=='RESULT')return false;
+ const value=entryRecord(entry);
+ if(!value)return false;
+ const reply=value.reply&&typeof value.reply==='object'&&!Array.isArray(value.reply)?value.reply as Record<string,unknown>:undefined;
+ const status=String(reply?.status||value.status||'').toUpperCase();
+ return ['SUCCEEDED','SUCCESS','COMPLETED','ALREADY_APPLIED'].includes(status);
+}
+
+/**
+ * An ERROR remains in the append-only audit trail after recovery. It blocks
+ * completion only until a later successful result explicitly supersedes its
+ * operation instance. Errors without an operation instance remain fail-closed.
+ */
+export function unresolvedTaskErrors(task:BlackboardTask):BlackboardEntry[]{
+ const entries=task.entries;
+ const unresolved:BlackboardEntry[]=[];
+ entries.forEach((entry,index)=>{
+  if(entry.kind!=='ERROR')return;
+  const value=entryRecord(entry);
+  const operationInstanceId=String(value?.operationInstanceId||'').trim();
+  if(!operationInstanceId){unresolved.push(entry);return;}
+  const recovered=entries.slice(index+1).some(later=>{
+   if(!successfulBusinessResult(later))return false;
+   const result=entryRecord(later);
+   if(!result)return false;
+   if(String(result.operationInstanceId||'')===operationInstanceId)return true;
+   const supersedes=Array.isArray(result.supersedesOperationInstanceIds)?result.supersedesOperationInstanceIds.map(String):[];
+   return supersedes.includes(operationInstanceId);
+  });
+  if(!recovered)unresolved.push(entry);
+ });
+ return unresolved;
+}
 const KEY='miki_task_blackboard_v1';
 
 function summarizeTaskTitle(
@@ -52,7 +91,7 @@ function summarizeTaskTitle(
 }
 const MAX_TASKS=200;
 class TaskBlackboardService{
- private tasks=new Map<string,BlackboardTask>(); private sequence=0;
+ private tasks=new Map<string,BlackboardTask>(); private sequence=0; private persistenceBlocked=false;
  constructor(){this.load();}
  create(goal:string,source:MikiDomain,payload?:Record<string,unknown>):BlackboardTask{
   const now=Date.now();this.sequence+=1;const taskId=`TASK-${now}-${String(this.sequence).padStart(6,'0')}`;
@@ -172,15 +211,17 @@ class TaskBlackboardService{
  get(taskId:string):BlackboardTask|undefined{const task=this.tasks.get(taskId);return task?this.clone(task):undefined;}
  list(limit=50):BlackboardTask[]{return [...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,limit).map(t=>this.clone(t));}
  private clone(t:BlackboardTask):BlackboardTask{return {...t,visitedDomains:[...t.visitedDomains],pendingDomains:[...t.pendingDomains],entries:t.entries.map(e=>({...e,evidenceIds:[...e.evidenceIds]}))};}
- private save():void{const all=[...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,MAX_TASKS);storageService.setItem(KEY,JSON.stringify(all));}
+ private save():void{if(this.persistenceBlocked)return;const all=[...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,MAX_TASKS);storageService.setItem(KEY,JSON.stringify(all));}
  private load():void{
+  let raw:string|null=null;
   try{
-   const raw=storageService.getItem(KEY);
+   raw=storageService.getItem(KEY);
    const all=raw?JSON.parse(raw):[];
-   if(!Array.isArray(all))return;
+   if(!Array.isArray(all))throw new Error('BLACKBOARD_SNAPSHOT_NOT_ARRAY');
    let migrated=false;
    for(const t of all){
-    if(!t||typeof t!=='object'||typeof t.taskId!=='string')continue;
+    if(!t||typeof t!=='object'||Array.isArray(t)||typeof t.taskId!=='string'||!t.taskId.trim()||!Array.isArray(t.entries))throw new Error('BLACKBOARD_TASK_RECORD_INVALID');
+    if(t.entries.some(entry=>!entry||typeof entry!=='object'||Array.isArray(entry)||typeof entry.id!=='string'||typeof entry.kind!=='string'||typeof entry.domain!=='string'||typeof entry.key!=='string'||!Array.isArray(entry.evidenceIds)))throw new Error('BLACKBOARD_ENTRY_RECORD_INVALID');
     const task=t as BlackboardTask;
     if(!task.title||!task.title.trim()){
      const payload=task.entries?.find(
@@ -196,9 +237,34 @@ class TaskBlackboardService{
     this.tasks.set(task.taskId,task);
    }
    if(migrated)this.save();
-  }catch{
+  }catch(error){
    this.tasks.clear();
+   // Preserve the original bytes before any later save can overwrite the only copy.
+   // If storage cannot preserve them, block writes for this process instead.
+   let preserved=false;
+   if(raw!==null){
+    const quarantineBaseKey=`${KEY}_quarantine_v1`;
+    const quarantineValue={version:1,sourceKey:KEY,quarantinedAt:Date.now(),reason:String(error instanceof Error?error.message:error).slice(0,500),raw};
+    try{
+     const existing=storageService.getItem(quarantineBaseKey);
+     if(existing){
+      const parsed=JSON.parse(existing) as Record<string,unknown>;
+      if(parsed.raw===raw)preserved=true;
+      else{
+       const alternateKey=`${quarantineBaseKey}_${Date.now()}`;
+       storageService.setItem(alternateKey,JSON.stringify(quarantineValue));
+       const written=storageService.getItem(alternateKey);
+       preserved=Boolean(written&&JSON.parse(written).raw===raw);
+      }
+     }else{
+      storageService.setItem(quarantineBaseKey,JSON.stringify(quarantineValue));
+      const written=storageService.getItem(quarantineBaseKey);
+      preserved=Boolean(written&&JSON.parse(written).raw===raw);
+     }
+    }catch{preserved=false;}
+   }
+   this.persistenceBlocked=!preserved;
   }
-}
+ }
 }
 export const taskBlackboardService=new TaskBlackboardService();

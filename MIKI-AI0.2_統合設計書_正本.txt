@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-17
-正本Revision：2026-10-17-P275
+基準日：2026-10-19
+正本Revision：2026-10-19-P293
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -113,14 +113,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - MIKI-AI0.2_設計思想_統合指示書_自律未知探索.txt
 - MIKI-AI0.2_UI_REDESIGN_PLAN_MERGED.txt
 
-【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P270）】
+【0-A. 現行実装索引（完全インベントリ基準P222・現行統合修正P284）】
 
 本節は現行実装を理解するための最優先入口である。後続の統合履歴に古い予定、旧名称、「受け皿のみ」、Web Preview前提、ローカルLLM前提、恒久的TypeScript fallback前提が残る場合、それらは履歴であり現行仕様ではない。
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-17-P275
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-19-P292
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -152,6 +152,24 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - ORPHAN: Import元を確認できずProduction Rootから到達しない。
 - NATIVE_SOURCE: Android/Rust Nativeソース。実機成功を意味しない。
 - PARTIAL / NOT_CONNECTED / CONTRACT_READY / DEVICE_VERIFIEDは機能単位の状態として使用する。
+
+■ ファイル関係台帳（P287・能力細分類／重複Authority監査1789ファイル）
+
+- 現行正本は`SOURCE_FILE_RELATION_LEDGER_P287.json`、閲覧用の対応表は`SOURCE_FILE_RELATION_LEDGER_P287.md`。F001〜F1789の1,789レコードを単一JSONへ収録し、Markdownは同じ記録の閲覧版とする。
+- P285 ZIP由来の基準スナップショット1,789ファイルを保全し、P286の全ファイル分類・重複監査を引き継いだうえで、`primaryFunctionalCapability`、`functionalCapabilityTags`、分類確度、分類根拠を追加した。能力細分類の語彙分類は、パス・purpose・export名の重み付きキーワードに基づく調査支援であり、実装の意味や実行時責務の証明とは扱わない。
+- 能力分類は、CORE＋17Domainの`architectureDomain`、技術/成果物カテゴリ`capabilityCategory`、成果物種別`artifactKind`、実装役割`implementationRole`、機能タグ`functionalCapabilityTags`の別軸で管理する。UI、Native、共有基盤、資料、設定、検証ツール、監査レポート、資産、参照プロジェクトは追加Domainとして数えない。
+- 重複・Authority監査では、バイト一致グループ4組、正規化ソース一致候補2組、同名basenameグループ156組／349レコード、`src/miki/`対`src/services/`同名ペア138組を個別管理する。クロス層ペアは純転送Facade 28組、高類似実装候補 91組、中類似 15組、低類似 4組。高類似候補のうち37組は双方がCORE/UIの静的import到達集合に含まれる。
+- 同一バイト、正規化後一致、同名、文字列類似、純転送Facadeは別判定であり、件数を単純合算しない。Androidのアプリコピー/テンプレート、用途別Androidリソース、互換Facade、同じbasenameだけの衝突も区別する。実装を削除・統合する前に、呼び出し元、singleton/状態所有、永続キー、副作用、Android source set、native bridge、公開APIとbehavior parityを確認する。
+- 監査で検出した高類似候補は、特に双方が静的到達可能な37組をP1として優先確認する。これは今後の確認キューであり、重複実装と確定した結果ではない。P287ではruntimeソースの削除・統合を行っていない。
+- パス/静的importの静的証拠は、実行時呼出しの証明ではない。パス分類・キーワード分類に強い根拠がない記録は未確定のまま残す。GitHub main同期、commit/PUSH、CI、型検査、Android build/APK、実機E2Eは未実施。
+
+■ 自己能力台帳グラフ（現行・P276 / P277編集継続）
+
+- 自己能力台帳の関係グラフは、既存Component Registry・Artifact・Capability Confidence・Knowledge Gapの事実を変更しない編集用オーバーレイとして扱う。
+- グラフ専用キー`miki_capability_ledger_graph_v1`へノード・エッジ・更新時刻を保存する。ノード削除時は接続エッジを同時に削除し、存在しない端点・自己接続・空のノード名を拒否する。ノード2,000件、エッジ8,000件を上限とする。
+- CapabilityLedgerScreenからノード／エッジを作成・編集・削除でき、専用`tool_self_ledger_graph`からも同じServiceを使用する。ツール変更は既存Tool permission／user confirmation境界を通し、承認前に変更を適用しない。
+- グラフにノードやエッジが存在することは、能力の実装・検証・根拠・因果関係の証明を意味しない。グラフ編集からRegistry、Claim、Evidence、Promotionを自動更新しない。
+- P276では関連する変更ファイルの索引行数を実測更新した。全tree再帰インベントリ、ビルド、回帰テスト、Android実機確認は未実施として扱う。
 
 ■ メモリ利用方針（現行）
 
@@ -236,7 +254,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] UI | src/components/GitHubHub.tsx | lines=510 | symbols=GitHubHub, GitHubHubProps | callers=1 | deps=3
 - [USED] UI | src/components/Header.tsx | lines=275 | symbols=Header | callers=1 | deps=1
 - [USED] UI | src/components/HomeDashboard.tsx | lines=41 | symbols=HomeDashboard | callers=1 | deps=0
-- [USED] UI | src/components/CapabilityLedgerScreen.tsx | lines=243 | symbols=CapabilityLedgerScreen, CapabilityLedgerScreenProps | callers=1 | deps=1
+- [USED] UI | src/components/CapabilityLedgerScreen.tsx | lines=292 | symbols=CapabilityLedgerScreen, CapabilityLedgerScreenProps | callers=1 | deps=1
 - [REMOVED-P106] UI | src/components/InventoryModal.tsx | 旧RPG試作UI。現行用途外かつcallers=0のため削除済み。再追加禁止。
 - [USED] UI | src/components/LibraryHub.tsx | lines=18 | symbols=LibraryHub | callers=1 | deps=1
 - [USED] UI | src/components/MemoryModal.tsx | lines=3754 | symbols=MemoryModal, MemoryModalProps | callers=1 | deps=5 | Tests=2 / Markers=3
@@ -283,7 +301,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [ORPHAN] OTHER | src/hooks/useVirtualWindow.ts | lines=2 | symbols=useVirtualWindow | callers=0 | deps=0 | Tests=1
 - [USED] UI | src/main.tsx | lines=128 | symbols=if | callers=0 | deps=5 | Tests=60
 - [USED] OTHER | src/miki/autonomy.ts | lines=24 | symbols=autonomy | callers=1 | deps=8 | Tests=6 / Markers=2
-- [USED] autonomy | src/miki/autonomy/services/autonomousContinuousEvolutionService.ts | lines=280 | symbols=AutonomousContinuousEvolutionService, AutonomousEvolutionRecord, AutonomousEvolutionStepEvent, AutopilotConfig, autonomousContinuousEvolutionService | callers=11 | deps=6 | Storage=miki_autopilot_config_v1,miki_evolution_history_v1 / Tests=1
+- [USED] autonomy | src/miki/autonomy/services/autonomousContinuousEvolutionService.ts | lines=283 | symbols=AutonomousContinuousEvolutionService, AutonomousEvolutionRecord, AutonomousEvolutionStepEvent, AutopilotConfig, autonomousContinuousEvolutionService | callers=11 | deps=7 | Storage=miki_autopilot_config_v1,miki_evolution_history_v1 / Tests=1
 - [USED] autonomy | src/miki/autonomy/services/autonomousEvolutionService.ts | lines=494 | symbols=AutonomousEvolutionService, autonomousEvolutionService | callers=5 | deps=11 | Storage=miki_autonomous_growth_reports,miki_counterfactual_reflections,miki_heuristic_rules
 - [USED] autonomy | src/miki/autonomy/services/autonomousGrowthGovernorService.ts | lines=105 | symbols=AutonomousGrowthCycleResult, AutonomousGrowthGovernorService, autonomousGrowthGovernorService | callers=2 | deps=6 | Storage=miki_autonomous_growth_governor_v1
 - [USED] autonomy | src/miki/autonomy/services/autonomousHardeningService.ts | lines=699 | symbols=AutonomousHardeningService, HardeningResult, HardeningVerdict, MAX_CONSECUTIVE_FAILURES, MAX_DEEP_FUTURE_SCENARIOS | callers=5 | deps=4 | Tests=1
@@ -292,30 +310,31 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] autonomy | src/miki/autonomy/services/autonomyRustKernelService.ts | lines=1 | symbols=autonomyRustKernelService | callers=1 | deps=0 | Plugin=MIKINativeRunner
 - [USED] autonomy | src/miki/autonomy/services/collaborationSelfMaintenanceService.ts | lines=1 | symbols= collaborationSelfMaintenanceService  | callers=1 | deps=1
 - [USED] autonomy | src/miki/autonomy/services/mikiUltraEvolverService.ts | lines=256 | symbols=AutonomousWebEvolveResult, BigOOptimizeResult, ComplexityHeatmapItem, ComplexityHeatmapResult, MutantItem | callers=2 | deps=1
-- [USED] autonomy | src/miki/autonomy/services/operationalGovernanceService.ts | lines=51 | symbols=ApprovalRequest, BlindComparison, CapabilitySlo, CognitiveCheckpoint, DelegationGrant | callers=2 | deps=1
+- [USED] autonomy | src/miki/autonomy/services/operationalGovernanceService.ts | lines=77 | symbols=ApprovalRequest, BlindComparison, CapabilitySlo, CognitiveCheckpoint, DelegationGrant | callers=2 | deps=2
 - [USED] OTHER | src/miki/capability.ts | lines=37 | symbols=capability | callers=1 | deps=20 | Tests=17 / Markers=2
 - [USED] capability | src/miki/capability/services/capabilityCompositionProofService.ts | lines=13 | symbols=CompositionProof, capabilityCompositionProofService | callers=1 | deps=1
-- [USED] capability | src/miki/capability/services/capabilityConfidenceService.ts | lines=147 | symbols=CapabilityConfidence, CapabilityConfidenceService, capabilityConfidenceService | callers=6 | deps=4
+- [USED] capability | src/miki/capability/services/capabilityConfidenceService.ts | lines=147 | symbols=CapabilityConfidence, CapabilityConfidenceService, capabilityConfidenceService | callers=9 | deps=4 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] capability | src/miki/capability/services/capabilityLedgerService.ts | lines=428 | symbols=CapabilityLedgerService, capabilityLedgerService | callers=3 | deps=5
+- [USED] capability | src/miki/capability/services/capabilityLedgerGraphService.ts | lines=129 | symbols=CapabilityLedgerGraphService, capabilityLedgerGraphService, LedgerGraphNode, LedgerGraphEdge, LedgerGraphSnapshot | callers=2 | deps=1 | Storage=miki_capability_ledger_graph_v1
 - [USED] capability | src/miki/capability/services/capabilityCouncilService.ts | lines=1 | symbols= capabilityCouncilService  | callers=1 | deps=1
 - [USED] capability | src/miki/capability/services/capabilityDependencyService.ts | lines=1 | symbols= capabilityDependencyService  | callers=1 | deps=1
-- [USED] capability | src/miki/capability/services/capabilityGapService.ts | lines=604 | symbols=INITIAL_GAPS, INITIAL_MASTERY_PROFILES, capabilityGapService | callers=25 | deps=6 | Storage=miki_capability_gaps_v32,miki_capability_mastery_profiles_v32 / Tests=1
-- [USED] capability | src/miki/capability/services/capabilityGraphService.ts | lines=248 | symbols=CapabilityEdge, CapabilityGraphService, CapabilityNode, ComponentPlan, capabilityGraphService | callers=5 | deps=9
-- [USED] capability | src/miki/capability/services/capabilityImplementationRegistryService.ts | lines=91 | symbols=CapabilityImplementationMode, CapabilityImplementationRecord, CapabilityImplementationRegistryService, capabilityImplementationRegistryService | callers=2 | deps=2 | Storage=miki_capability_implementation_registry_v1
-- [USED] capability | src/miki/capability/services/capabilityLearningService.ts | lines=153 | symbols=CapabilityLearningMaturity, CapabilityLearningRecord, CapabilityLearningService, capabilityLearningService | callers=5 | deps=5
+- [USED] capability | src/miki/capability/services/capabilityGapService.ts | lines=604 | symbols=INITIAL_GAPS, INITIAL_MASTERY_PROFILES, capabilityGapService | callers=26 | deps=6 | Storage=miki_capability_gaps_v32,miki_capability_mastery_profiles_v32 / Tests=1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
+- [USED] capability | src/miki/capability/services/capabilityGraphService.ts | lines=248 | symbols=CapabilityEdge, CapabilityGraphService, CapabilityNode, ComponentPlan, capabilityGraphService | callers=6 | deps=9 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
+- [USED] capability | src/miki/capability/services/capabilityImplementationRegistryService.ts | lines=91 | symbols=CapabilityImplementationMode, CapabilityImplementationRecord, CapabilityImplementationRegistryService, capabilityImplementationRegistryService | callers=3 | deps=2 | Storage=miki_capability_implementation_registry_v1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
+- [USED] capability | src/miki/capability/services/capabilityLearningService.ts | lines=153 | symbols=CapabilityLearningMaturity, CapabilityLearningRecord, CapabilityLearningService, capabilityLearningService | callers=6 | deps=5 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] capability | src/miki/capability/services/capabilityPluginService.ts | lines=661 | symbols=BUILTIN_CAPABILITY_PLUGINS, CapabilityPluginService, capabilityPluginService | callers=6 | deps=3 | Storage=miki_capability_plugins
-- [USED] capability | src/miki/capability/services/capabilityReuseService.ts | lines=90 | symbols=CapabilityReuseRecord, CapabilityReuseService, capabilityReuseService | callers=6 | deps=5
+- [USED] capability | src/miki/capability/services/capabilityReuseService.ts | lines=90 | symbols=CapabilityReuseRecord, CapabilityReuseService, capabilityReuseService | callers=7 | deps=5 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] capability | src/miki/capability/services/capabilityRustKernelService.ts | lines=1 | symbols=capabilityRustKernelService | callers=1 | deps=0 | Plugin=MIKINativeRunner
 - [USED] capability | src/miki/capability/services/capabilityTraceabilityService.ts | lines=173 | symbols=CORE_TRACEABILITY_MAPPINGS, CapabilityTraceabilityService, TraceabilityMappingEntry, TraceabilitySummaryReport, capabilityTraceabilityService | callers=1 | deps=4
-- [USED] capability | src/miki/capability/services/componentArtifactStoreService.ts | lines=222 | symbols=ComponentArtifactManifest, ComponentArtifactRecord, componentArtifactStoreService | callers=7 | deps=3 | Storage=miki_component_artifact_index_v1,miki_component_artifact_index_v2
+- [USED] capability | src/miki/capability/services/componentArtifactStoreService.ts | lines=222 | symbols=ComponentArtifactManifest, ComponentArtifactRecord, componentArtifactStoreService | callers=9 | deps=3 | Storage=miki_component_artifact_index_v1,miki_component_artifact_index_v2 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] capability | src/miki/capability/services/componentCompositionService.ts | lines=438 | symbols=ComponentCompositionService, CompositionFailurePolicy, CompositionPlan, CompositionStep, componentCompositionService | callers=14 | deps=5 | Tests=2
 - [USED] capability | src/miki/capability/services/componentRegistryService.ts | lines=989 | symbols=ComponentRegistryService, componentRegistryService | callers=43 | deps=6 | Storage=miki_component_registry_v1 / Tests=3
-- [USED] capability | src/miki/capability/services/componentVersionHistoryService.ts | lines=165 | symbols=ComponentVersionChangeType, ComponentVersionHistoryService, ComponentVersionRecord, componentVersionHistoryService | callers=5 | deps=2
-- [USED] capability | src/miki/capability/services/deterministicCapabilityEvolutionService.ts | lines=249 | symbols=CapabilityPatch, deterministicCapabilityEvolutionService | callers=3 | deps=5 | Storage=miki_ai_deterministic_capability_patches_v1
-- [USED] capability | src/miki/capability/services/deterministicCapabilityExecutionService.ts | lines=99 | symbols=DeterministicCapabilityExecutionResult, DeterministicCapabilityExecutionService, deterministicCapabilityExecutionService | callers=2 | deps=6
+- [USED] capability | src/miki/capability/services/componentVersionHistoryService.ts | lines=165 | symbols=ComponentVersionChangeType, ComponentVersionHistoryService, ComponentVersionRecord, componentVersionHistoryService | callers=6 | deps=2 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
+- [USED] capability | src/miki/capability/services/deterministicCapabilityEvolutionService.ts | lines=249 | symbols=CapabilityPatch, deterministicCapabilityEvolutionService | callers=4 | deps=5 | Storage=miki_ai_deterministic_capability_patches_v1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
+- [USED] capability | src/miki/capability/services/deterministicCapabilityExecutionService.ts | lines=99 | symbols=DeterministicCapabilityExecutionResult, DeterministicCapabilityExecutionService, deterministicCapabilityExecutionService | callers=3 | deps=6 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] capability | src/miki/capability/services/dynamicToolFactoryService.ts | lines=130 | symbols=DynamicToolFactoryService, dynamicToolFactoryService | callers=5 | deps=5 | Storage=miki_ai_dynamic_tools_v1
-- [USED] capability | src/miki/capability/services/skillsService.ts | lines=866 | symbols=INITIAL_SKILLS, isDistinctSkillContext, skillsService | callers=5 | deps=6 | Storage=miki_ai_skills_library
-- [USED] capability | src/miki/capability/services/toolsService.ts | lines=1548 | symbols=BUILTIN_TOOLS, ExecuteToolOptions, ToolExecutionContext, ToolsService, toolsService | callers=9 | deps=10 | Storage=miki_ai_tools_stats / Tests=1 / Markers=7
+- [USED] capability | src/miki/capability/services/skillsService.ts | lines=875 | symbols=INITIAL_SKILLS, isDistinctSkillContext, skillsService | callers=6 | deps=6 | Storage=miki_ai_skills_library | Role=CANONICAL_DOMAIN_IMPLEMENTATION
+- [USED] capability | src/miki/capability/services/toolsService.ts | lines=1580 | symbols=BUILTIN_TOOLS, ExecuteToolOptions, ToolExecutionContext, ToolsService, toolsService | callers=9 | deps=10 | Storage=miki_ai_tools_stats / Tests=1 / Markers=7
 - [USED] OTHER | src/miki/conversation.ts | lines=56 | symbols=conversation | callers=1 | deps=26 | Tests=34 / Markers=1
 - [ORPHAN] conversation | src/miki/conversation/index.ts | lines=12 | symbols=- | callers=0 | deps=8 | Tests=20
 - [USED] conversation | src/miki/conversation/services/answerContentIrService.ts | lines=404 | symbols=AnswerContentIrService, answerContentIrService | callers=8 | deps=8 | Storage=miki_multi_axis_persona_v1 / Tests=1
@@ -375,7 +394,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/mikiInteractionBus.ts | lines=118 | symbols=MIKI_CATEGORIES, MikiCategory, MikiInteraction, MikiInteractionHandler, mikiInteractionBusService | callers=6 | deps=0
 - [USED] CORE | src/miki/core/services/acceptanceTestMatrixService.ts | lines=6 | symbols=AcceptanceTestCase, acceptanceTestMatrixService | callers=3 | deps=1 | Tests=1
 - [USED] CORE | src/miki/core/services/actionLineageService.ts | lines=45 | symbols=ActionLineageService, ActionLineageSummary, actionLineageService | callers=1 | deps=1 | Tests=2
-- [USED] CORE | src/miki/core/services/adaptiveRoutePlannerService.ts | lines=3015 | symbols=CoreGoalCandidate, GoalConflictDecision, ImprovementReadiness, PlannedRoute, adaptiveRoutePlannerService | callers=2 | deps=14 | Tests=2
+- [USED] CORE | src/miki/core/services/adaptiveRoutePlannerService.ts | lines=3064 | symbols=CoreGoalCandidate, GoalConflictDecision, ImprovementReadiness, PlannedRoute, adaptiveRoutePlannerService | callers=2 | deps=14 | Tests=2
 - [USED] CORE | src/miki/core/services/autonomousCandidatePreparationService.ts | lines=215 | symbols=AutonomousImplementationPlan, CandidateDraft, TargetResolution, autonomousCandidatePreparationService | callers=3 | deps=4
 - [USED] CORE | src/miki/core/services/autonomousIssueDiscoveryService.ts | lines=341 | symbols=DiscoveredIssue, DiscoveredIssueKind, DiscoveryConfig, DiscoveryScanMode, DiscoveryScanResult | callers=5 | deps=13 | Storage=miki_autonomous_issue_discovery_config_v1,miki_autonomous_issue_discovery_v1
 - [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts | lines=863 | symbols=AutonomousImprovementRequest, AutonomousLoopState, AutonomousLoopStatus, autonomousSelfImprovementLoopService | callers=7 | deps=11 | Storage=miki_autonomous_self_improvement_loop_v1,miki_autonomous_self_improvement_loop_v2
@@ -401,15 +420,16 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/services/complexCapabilityContractService.ts | lines=34 | symbols=ComplexCapabilityContract, complexCapabilityContractService | callers=2 | deps=0 | Tests=2
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/complexityCostGateService.ts | lines=4 | symbols=ComplexityDecision, complexityCostGateService | callers=1 | deps=1 | Tests=2
 - [USED] CORE | src/miki/core/services/contextClosureReceiptService.ts | lines=63 | symbols=ContextClosureReceipt, contextClosureReceiptService | callers=2 | deps=3 | Storage=miki_context_closure_receipts_v1 / Tests=1
-- [USED] CORE | src/miki/core/services/coreCompletionGateService.ts | lines=501 | symbols=CoreCompletionAssessment, coreCompletionGateService | callers=2 | deps=7
+- [USED] CORE | src/miki/core/services/coreCompletionGateService.ts | lines=517 | symbols=CoreCompletionAssessment, coreCompletionGateService | callers=2 | deps=7
 - [USED] CORE | src/miki/core/services/coreCycleSettingsService.ts | lines=41 | symbols=CoreCycleSettings, coreCycleSettingsService | callers=5 | deps=1 | Storage=miki.core.cycle.settings.v1
 - [USED] CORE | src/miki/core/services/coreExecutionTraceService.ts | lines=85 | symbols=CoreTraceStage, coreExecutionTraceService | callers=1 | deps=1
 - [USED] CORE | src/miki/core/services/coreLineageReadModelService.ts | lines=94 | symbols=VerifiedCoreLineage, coreLineageReadModelService | callers=2 | deps=4 | Tests=1
 - [ORPHAN] CORE | src/miki/core/services/coreOperationRegistryService.ts | lines=37 | symbols=CoreOperationContract, coreOperationRegistryService | callers=0 | deps=0
-- [USED] CORE | src/miki/core/services/coreOrchestratorService.ts | lines=1812 | symbols=CoreImprovementDecision, CoreImprovementDecisionInput, CoreImprovementGateEvidence, CoreOrchestrationResult, UnifiedCognitiveStateSnapshot | callers=4 | deps=40 | Tests=17
+- [USED] CORE | src/miki/core/services/coreOrchestratorService.ts | lines=1956 | symbols=CoreImprovementDecision, CoreImprovementDecisionInput, CoreImprovementGateEvidence, CoreOrchestrationResult, UnifiedCognitiveStateSnapshot | callers=4 | deps=41 | Tests=17
 - [USED] CORE | src/miki/core/services/corePlanRevisionService.ts | lines=134 | symbols=CorePlanRevision, OperationInstanceStatus, RequiredBusinessOperation, corePlanRevisionService | callers=5 | deps=3
 - [USED] CORE | src/miki/core/services/coreResultService.ts | lines=383 | symbols=CoreRequest, CoreResult, CoreResultListener, CoreResultStatus, coreResultService | callers=10 | deps=6 | Storage=miki_core_results_v2
-- [USED] CORE | src/miki/core/services/coreTaskIngressService.ts | lines=46 | symbols=CoreTaskIngressRequest, CoreTaskKind, coreTaskIngressService | callers=12 | deps=3 | Tests=1
+- [USED] CORE | src/miki/core/services/coreTaskIngressService.ts | lines=144 | symbols=CoreTaskIngressRequest, CoreTaskKind, coreTaskIngressService | callers=12 | deps=15 | Tests=1
+- [USED] CORE | src/miki/core/services/cognitiveQualityService.ts | lines=115 | symbols=CognitiveQualityService, cognitiveQualityService, ClarificationPlan, ExplanationPlan | callers=1 | deps=4 | Tests=0
 - [USED] CORE | src/miki/core/services/coreWorldModelGatewayService.ts | lines=8 | symbols=coreWorldModelGatewayService | callers=1 | deps=2 | Tests=1
 - [USED] CORE | src/miki/core/services/crossDomainCirculationService.ts | lines=104 | symbols=DomainCoverage, DomainTransition, MikiDomain, crossDomainCirculationService | callers=23 | deps=2 | Storage=miki_cross_domain_circulation_v1
 - [USED] CORE | src/miki/core/services/cumulativeRevalidationService.ts | lines=7 | symbols=CumulativeRevalidationResult, cumulativeRevalidationService | callers=2 | deps=3 | Tests=2
@@ -474,7 +494,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/services/shadowEvaluationService.ts | lines=8 | symbols=ShadowEvaluation, ShadowMeasurement, shadowEvaluationService | callers=5 | deps=1 | Storage=miki_shadow_evaluations_v1
 - [USED] CORE | src/miki/core/services/singlePromotionGateService.ts | lines=6 | symbols=PromotionDecision, singlePromotionGateService | callers=2 | deps=3
 - [USED] CORE | src/miki/core/services/storageAuthorityRegistryService.ts | lines=15 | symbols=StorageAuthorityEntry, storageAuthorityRegistryService | callers=1 | deps=0
-- [USED] CORE | src/miki/core/services/taskBlackboardService.ts | lines=204 | symbols=BlackboardEntry, BlackboardEntryKind, BlackboardStatus, BlackboardTask, taskBlackboardService | callers=20 | deps=2 | Storage=miki_task_blackboard_v1 / Tests=2
+- [USED] CORE | src/miki/core/services/taskBlackboardService.ts | lines=270 | symbols=BlackboardEntry, BlackboardEntryKind, BlackboardStatus, BlackboardTask, taskBlackboardService, unresolvedTaskErrors | callers=20 | deps=2 | Storage=miki_task_blackboard_v1 / Tests=2
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/unifiedCandidateLifecycleGraphService.ts | lines=17 | symbols=CandidateLifecycleNode, CandidateLifecycleState, CandidateLifecycleTransition, unifiedCandidateLifecycleGraphService | callers=1 | deps=1 | Tests=2
 - [USED] CORE | src/miki/core/services/unifiedDirectiveParser.ts | lines=174 | symbols=ParsedDirectiveText, parseDirectiveText | callers=2 | deps=0 | Tests=1
 - [USED] CORE | src/miki/core/services/universalSynthesisService.ts | lines=493 | symbols=SynthesisArtifact, SynthesisResult, SynthesisSelectionMode, UniversalSynthesisRequest, universalSynthesisService | callers=2 | deps=6
@@ -498,11 +518,11 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] OTHER | src/miki/execution.ts | lines=40 | symbols=execution | callers=1 | deps=22 | Tests=49 / Markers=2
 - [USED] execution | src/miki/execution/services/androidNativeRunnerAdapterService.ts | lines=275 | symbols=AndroidNativeRunnerAdapterService, androidNativeRunnerAdapterService | callers=5 | deps=4 | Plugin=MIKINativeRunner / Tests=16
 - [USED] execution | src/miki/execution/services/automationStudioService.ts | lines=16 | symbols=WorkflowDefinition, WorkflowStage, WorkflowStep, automationStudioService | callers=3 | deps=1 | Storage=miki_automation_workflows_v1
-- [USED] execution | src/miki/execution/services/backgroundWorkerService.ts | lines=1464 | symbols=BackgroundWorkerService, backgroundWorkerService, canRunDeepSleep, canRunShallowSleep, getDeepSleepUnmetReasons | callers=3 | deps=41 | Storage=miki_ai_workmanager_config,miki_ai_workmanager_constraints,miki_ai_workmanager_logs / Tests=5
+- [USED] execution | src/miki/execution/services/backgroundWorkerService.ts | lines=1580 | symbols=BackgroundWorkerService, backgroundWorkerService, canRunDeepSleep, canRunShallowSleep, getDeepSleepUnmetReasons | callers=3 | deps=42 | Storage=miki_ai_workmanager_config,miki_ai_workmanager_constraints,miki_ai_workmanager_logs / Tests=5
 - [USED] execution | src/miki/execution/services/executableExplanationService.ts | lines=12 | symbols=ExplanationEvidence, executableExplanationService | callers=1 | deps=1
 - [USED] execution | src/miki/execution/services/executionEventBusService.ts | lines=90 | symbols=ExecutionEvent, ExecutionEventBusService, ExecutionEventHandler, ExecutionEventType, executionEventBusService | callers=33 | deps=0
 - [USED] execution | src/miki/execution/services/executionPlanningService.ts | lines=1 | symbols=executionPlanningService | callers=1 | deps=0 | Tests=1
-- [USED] execution | src/miki/execution/services/executionRunnerService.ts | lines=352 | symbols=ExecutionEnvironment, ExecutionRequest, ExecutionRequestStatus, ExecutionResultInput, ExecutionRunnerService | callers=22 | deps=8
+- [USED] execution | src/miki/execution/services/executionRunnerService.ts | lines=352 | symbols=ExecutionEnvironment, ExecutionRequest, ExecutionRequestStatus, ExecutionResultInput, ExecutionRunnerService, executionRunnerService | callers=23 | deps=9 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] execution | src/miki/execution/services/externalRunnerAdapterService.ts | lines=100 | symbols=ExternalRunnerAdapterConfig, ExternalRunnerAdapterService, ExternalRunnerResponse, externalRunnerAdapterService | callers=3 | deps=2
 - [USED] execution | src/miki/execution/services/nativeBackgroundService.ts | lines=229 | symbols=NotificationActionListener, nativeBackgroundService | callers=6 | deps=0
 - [USED] execution | src/miki/execution/services/nativeOperationContractService.ts | lines=66 | symbols=NativeOperationKind, NativeOperationMode, NativeOperationReceipt, NativeOperationRequest, nativeOperationContractService | callers=3 | deps=0 | Tests=12
@@ -520,17 +540,17 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] execution | src/miki/execution/services/selfImprovementExecutionCoordinatorService.ts | lines=24 | symbols=SelfImprovementEntryPoint, SelfImprovementExecutionContext, selfImprovementExecutionCoordinatorService | callers=1 | deps=1 | Storage=miki_self_improvement_execution_v2
 - [USED] execution | src/miki/execution/services/simpleRpgRuleEngineService.ts | lines=110 | symbols=RpgAction, RpgActionInput, RpgActionResult, SimpleRpgRuleEngineService, simpleRpgRuleEngineService | callers=2 | deps=2 | Storage=miki_deterministic_rpg_state_v63
 - [USED] execution | src/miki/execution/services/storagePlanningService.ts | lines=197 | symbols=StoragePlanningService, storagePlanningService | callers=3 | deps=3 | Storage=miki_storage_audit_log_v32
-- [USED] execution | src/miki/execution/services/taskExecutionOrchestratorService.ts | lines=237 | symbols=TaskExecutionHandle, TaskExecutionOrchestratorService, TaskExecutionStatus, taskExecutionOrchestratorService | callers=7 | deps=15
-- [USED] execution | src/miki/execution/services/taskLineageService.ts | lines=45 | symbols=TaskLineageRecord, TaskLineageService, taskLineageService | callers=5 | deps=2
+- [USED] execution | src/miki/execution/services/taskExecutionOrchestratorService.ts | lines=237 | symbols=TaskExecutionHandle, TaskExecutionOrchestratorService, TaskExecutionStatus, taskExecutionOrchestratorService | callers=8 | deps=15 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
+- [USED] execution | src/miki/execution/services/taskLineageService.ts | lines=45 | symbols=TaskLineageRecord, TaskLineageService, taskLineageService | callers=6 | deps=2 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] execution | src/miki/execution/services/universalIoService.ts | lines=1 | symbols= universalIoService  | callers=1 | deps=1
-- [USED] execution | src/miki/execution/services/workManagerService.ts | lines=43 | symbols=WorkManagerPlugin, workManagerService | callers=1 | deps=0 | Plugin=MikiWorkManagerPlugin
+- [USED] execution | src/miki/execution/services/workManagerService.ts | lines=30 | symbols=WorkManagerService, workManagerService | callers=0 | deps=2 | Plugin=nativeWorkManagerService facade
 - [USED] execution | src/miki/execution/services/workflowSynthesisService.ts | lines=406 | symbols=WorkflowSynthesisService, workflowSynthesisService | callers=3 | deps=7 | Storage=miki_synthesized_workflows
 - [USED] execution | src/miki/execution/services/workspaceExecutionBrokerService.ts | lines=24 | symbols=WorkspaceExecutionDecision, WorkspaceExecutionRequest, workspaceExecutionBrokerService | callers=1 | deps=0
 - [USED] OTHER | src/miki/experience.ts | lines=23 | symbols=experience | callers=1 | deps=7 | Tests=5 / Markers=2
 - [USED] experience | src/miki/experience/services/digitalTwinService.ts | lines=1 | symbols= digitalTwinService  | callers=1 | deps=1
-- [USED] experience | src/miki/experience/services/experienceFreshnessService.ts | lines=40 | symbols=ExperienceFreshness, ExperienceFreshnessService, experienceFreshnessService | callers=4 | deps=1
+- [USED] experience | src/miki/experience/services/experienceFreshnessService.ts | lines=40 | symbols=ExperienceFreshness, ExperienceFreshnessService, experienceFreshnessService | callers=5 | deps=1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] experience | src/miki/experience/services/experienceLinkService.ts | lines=217 | symbols=ExperienceLinkService, experienceLinkService | callers=10 | deps=3 | Storage=miki_experience_links_v1
-- [USED] experience | src/miki/experience/services/experienceRouterService.ts | lines=454 | symbols=ExperienceRouterService, experienceRouterService | callers=4 | deps=7
+- [USED] experience | src/miki/experience/services/experienceRouterService.ts | lines=454 | symbols=ExperienceRouterService, experienceRouterService | callers=5 | deps=7 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] experience | src/miki/experience/services/experienceRustKernelService.ts | lines=1 | symbols=experienceRustKernelService | callers=1 | deps=0 | Plugin=MIKINativeRunner
 - [USED] experience | src/miki/experience/services/unifiedExperienceImprovementBridgeService.ts | lines=31 | symbols=UnifiedExperienceEnvelope, unifiedExperienceImprovementBridgeService | callers=2 | deps=1
 - [USED] experience | src/miki/experience/services/unifiedMikiExperienceService.ts | lines=315 | symbols=SelfCodeExperienceDetail, UnifiedExperience, UnifiedExperienceDomain, UnifiedMikiExperienceService, UnifiedMikiState | callers=10 | deps=3 | Storage=miki_unified_experience_v1
@@ -539,7 +559,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] improvement | src/miki/improvement/services/componentImprovementCandidateService.ts | lines=147 | symbols=ComponentImprovementCandidate, ComponentImprovementCandidateService, ImprovementCandidateStatus, componentImprovementCandidateService | callers=4 | deps=5
 - [USED] improvement | src/miki/improvement/services/deterministicSelfImprovementLabService.ts | lines=135 | symbols=EvolutionLabResult, EvolutionStage, deterministicSelfImprovementLabService | callers=1 | deps=7
 - [USED] improvement | src/miki/improvement/services/evidenceBasedSelfImprovementEngine.ts | lines=785 | symbols=EvidenceBasedSelfImprovementEngine, evidenceBasedSelfImprovementEngine | callers=2 | deps=3
-- [USED] improvement | src/miki/improvement/services/hardeningRegressionCandidateService.ts | lines=92 | symbols=HardeningRegressionCandidate, HardeningRegressionCandidateService, hardeningRegressionCandidateService | callers=2 | deps=2 | Storage=miki_hardening_regression_candidates_v1 / Tests=1
+- [USED] improvement | src/miki/improvement/services/hardeningRegressionCandidateService.ts | lines=92 | symbols=HardeningRegressionCandidate, HardeningRegressionCandidateService, hardeningRegressionCandidateService | callers=4 | deps=2 | Storage=miki_hardening_regression_candidates_v1 / Tests=1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] improvement | src/miki/improvement/services/improvementAssessmentService.ts | lines=108 | symbols=ImprovementAssessmentInput, ImprovementAssessmentResult, ProposedImprovementOperation, ProposedImprovementOperationType, improvementAssessmentService | callers=1 | deps=4
 - [USED] improvement | src/miki/improvement/services/improvementCanaryRollbackService.ts | lines=214 | symbols=CanaryEvaluation, CanaryMode, CanaryStatus, ImprovementCanaryRecord, ImprovementCanaryRollbackService | callers=4 | deps=8 | Tests=1
 - [USED] improvement | src/miki/improvement/services/improvementProposalService.ts | lines=166 | symbols=ImprovementProposalRecord, ImprovementProposalService, ProposalStatus, improvementProposalService | callers=2 | deps=9
@@ -551,7 +571,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] improvement | src/miki/improvement/services/selfImprovementControllerService.ts | lines=236 | symbols=ImprovementAction, ImprovementDecision, ImprovementRun, SelfImprovementControllerService, selfImprovementControllerService | callers=3 | deps=5 | Tests=1
 - [USED] improvement | src/miki/improvement/services/selfImprovementExperimentService.ts | lines=143 | symbols=ExperimentVerdict, ImprovementExperimentResult, ImprovementExperimentSnapshot, SelfImprovementExperimentService, selfImprovementExperimentService | callers=4 | deps=4
 - [USED] improvement | src/miki/improvement/services/selfImprovementMetricsService.ts | lines=158 | symbols=CognitiveObservabilitySnapshot, SelfImprovementMetrics, SelfImprovementMetricsService, WeaknessKind, WeaknessSignal | callers=6 | deps=12
-- [USED] improvement | src/miki/improvement/services/selfImprovementRequestEventService.ts | lines=28 | symbols=SelfImprovementRequestEvent, selfImprovementRequestEventService | callers=3 | deps=0
+- [USED] improvement | src/miki/improvement/services/selfImprovementRequestEventService.ts | lines=52 | symbols=SelfImprovementRequestEvent, selfImprovementRequestEventService | callers=3 | deps=0
 - [USED] improvement | src/miki/improvement/services/selfImprovementService.ts | lines=1561 | symbols=INITIAL_GENERATIONS, selfImprovementService | callers=18 | deps=13 | Storage=miki_ai_capability_learning_candidates_v1,miki_ai_failure_recurrences,miki_ai_model_generations
 - [USED] improvement | src/miki/improvement/services/selfImprovementSuiteService.ts | lines=285 | symbols=BenchmarkMetrics, CanaryTrialResult, DryRunVerificationResult, FailureSynthesisResult, PairProgrammingReview | callers=1 | deps=3 | Storage=miki_benchmark_history_v1,miki_pair_programming_reviews_v1 / Markers=1
 - [USED] OTHER | src/miki/index.ts | lines=41 | symbols= initializeChapter69to90  | callers=1 | deps=24 | Tests=20
@@ -559,7 +579,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] learning | src/miki/learning/services/autonomousCurriculumService.ts | lines=291 | symbols=AutonomousCurriculumService, CapabilityBoundaryItem, CompressedSkillArtifact, SyntheticCurriculumUnit, autonomousCurriculumService | callers=3 | deps=3 | Storage=miki_capability_boundaries_v1,miki_compressed_skills_v1,miki_synthetic_curriculums_v1
 - [USED] learning | src/miki/learning/services/capabilityEvaluationService.ts | lines=234 | symbols=CapabilityEvaluationService, capabilityEvaluationService | callers=2 | deps=5 | Storage=miki_virtual_training_trials_v32 / Tests=1 / Markers=1
 - [USED] learning | src/miki/learning/services/codeComprehensionQuizService.ts | lines=15 | symbols=CodeComprehensionQuiz, codeComprehensionQuizService | callers=2 | deps=1
-- [USED] learning | src/miki/learning/services/decisionLearningService.ts | lines=69 | symbols=DecisionLearningService, DecisionLearningSignal, decisionLearningService | callers=4 | deps=4
+- [USED] learning | src/miki/learning/services/decisionLearningService.ts | lines=69 | symbols=DecisionLearningService, DecisionLearningSignal, decisionLearningService | callers=5 | deps=4 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] learning | src/miki/learning/services/executionLearningCoordinatorService.ts | lines=120 | symbols=ExecutionLearningCoordinatorService, ExecutionLearningStats, executionLearningCoordinatorService | callers=3 | deps=8
 - [USED] learning | src/miki/learning/services/goalBacksolvingLearningService.ts | lines=1 | symbols= goalBacksolvingLearningService  | callers=1 | deps=1
 - [USED] learning | src/miki/learning/services/learningRustKernelService.ts | lines=1 | symbols=learningRustKernelService | callers=1 | deps=0 | Plugin=MIKINativeRunner
@@ -574,14 +594,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] learning | src/miki/learning/services/userProficiencyService.ts | lines=188 | symbols=UserProficiencyService, userProficiencyService | callers=2 | deps=3 | Storage=miki_user_proficiency_scores_v1
 - [USED] OTHER | src/miki/memory.ts | lines=40 | symbols=memory | callers=1 | deps=24 | Tests=25
 - [USED] memory | src/miki/memory/services/causalMemoryLedgerService.ts | lines=21 | symbols=CausalKind, CausalRecord, causalMemoryLedgerService | callers=4 | deps=2 | Storage=miki_causal_memory_ledger_v1
-- [USED] memory | src/miki/memory/services/claimDatabaseService.ts | lines=778 | symbols=BeliefRevisionResult, BeliefRevisionStatus, ClaimDatabaseService, ClaimRelation, claimDatabaseService | callers=17 | deps=3 | Storage=miki_claim_db_v1 / Tests=3
+- [USED] memory | src/miki/memory/services/claimDatabaseService.ts | lines=853 | symbols=BeliefRevisionResult, BeliefRevisionStatus, ClaimDatabaseService, ClaimRelation, claimDatabaseService | callers=17 | deps=3 | Storage=miki_claim_db_v1 / Tests=3
 - [USED] memory | src/miki/memory/services/evidenceLineageGraphService.ts | lines=1 | symbols= evidenceLineageGraphService  | callers=1 | deps=1 | Tests=1
 - [USED] memory | src/miki/memory/services/evidenceService.ts | lines=449 | symbols=EvidenceKind, EvidenceRecord, EvidenceService, EvidenceStatus, evidenceService | callers=16 | deps=4 | Storage=miki_evidence_db_v1
 - [USED] memory | src/miki/memory/services/failureCatalogService.ts | lines=482 | symbols=INITIAL_FAILURE_SIGNATURES, failureCatalogService | callers=4 | deps=3 | Storage=miki_failure_signatures_v51
-- [USED] memory | src/miki/memory/services/failureMemoryService.ts | lines=122 | symbols=FailureMemoryRecord, FailureMemoryService, FailureRiskAssessment, failureMemoryService | callers=13 | deps=3
-- [USED] memory | src/miki/memory/services/failureUnderstandingService.ts | lines=85 | symbols=FailureUnderstandingRecord, FailureUnderstandingService, failureUnderstandingService | callers=4 | deps=3
-- [USED] memory | src/miki/memory/services/knowledgeHalfLifeService.ts | lines=20 | symbols=HalfLifeRecord, KnowledgeStability, knowledgeHalfLifeService | callers=2 | deps=1 | Storage=miki_knowledge_half_life_v1
-- [USED] memory | src/miki/memory/services/longTermMemoryService.ts | lines=1123 | symbols=longTermMemoryService | callers=8 | deps=4
+- [USED] memory | src/miki/memory/services/failureMemoryService.ts | lines=122 | symbols=FailureMemoryRecord, FailureMemoryService, FailureRiskAssessment, failureMemoryService | callers=14 | deps=3 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
+- [USED] memory | src/miki/memory/services/failureUnderstandingService.ts | lines=137 | symbols=FailureUnderstandingRecord, FailureUnderstandingService, failureUnderstandingService | callers=4 | deps=3
+- [USED] memory | src/miki/memory/services/knowledgeHalfLifeService.ts | lines=21 | symbols=HalfLifeRecord, KnowledgeStability, knowledgeHalfLifeService | callers=2 | deps=1 | Storage=miki_knowledge_half_life_v1
+- [USED] memory | src/miki/memory/services/longTermMemoryService.ts | lines=1123 | symbols=longTermMemoryService | callers=9 | deps=4 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] memory | src/miki/memory/services/memoryAuditService.ts | lines=397 | symbols=EpistemicStatusAuditResult, MemoryAuditCycleRecord, memoryAuditService | callers=3 | deps=7 | Storage=miki_memory_audit_logs
 - [USED] memory | src/miki/memory/services/memoryContextBridgeService.ts | lines=10 | symbols=MemoryContextRequest, memoryContextBridgeService | callers=3 | deps=2 | Tests=1
 - [USED] memory | src/miki/memory/services/memoryEligibilityPolicyService.ts | lines=28 | symbols=MemoryEligibilityResult, MemoryUsePurpose, evaluateMemoryEligibility, isMemoryEligible | callers=3 | deps=1
@@ -619,8 +639,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] research | src/miki/research/services/embeddingService.ts | lines=346 | symbols=EmbeddingStats, embeddingService | callers=5 | deps=5
 - [USED] research | src/miki/research/services/externalAiResearchBundleService.ts | lines=155 | symbols=ExternalAiBundleStatus, ExternalAiProvider, ExternalAiResearchBundle, externalAiResearchBundleService | callers=2 | deps=5 | Storage=miki_external_ai_research_bundles_v1
 - [USED] research | src/miki/research/services/internalWebQueryLearningCycleService.ts | lines=153 | symbols=InternalKnowledgeComponent, InternalResearchClaim, InternalResearchEvidence, InternalWebQueryCycleResult, InternalWebQueryLearningCycleService | callers=2 | deps=1
-- [USED] research | src/miki/research/services/japaneseAnalysisService.ts | lines=246 | symbols=JapaneseAnalysisResult, JapaneseSemanticRole, JapaneseToken, JapaneseTokenKind, japaneseAnalysisService | callers=4 | deps=3
-- [USED] research | src/miki/research/services/japaneseDictionaryService.ts | lines=174 | symbols=JapaneseDictionaryEntry, JapaneseDictionaryPackage, JapaneseDictionaryPackageInfo, JapaneseDictionarySource, JapanesePos | callers=5 | deps=2 | Storage=miki_japanese_dictionary_packages_v1,miki_japanese_personal_dictionary_v1
+- [USED] research | src/miki/research/services/japaneseAnalysisService.ts | lines=248 | symbols=JapaneseAnalysisResult, JapaneseSemanticRole, JapaneseToken, JapaneseTokenKind, japaneseAnalysisService | callers=5 | deps=3 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
+- [USED] research | src/miki/research/services/japaneseDictionaryService.ts | lines=181 | symbols=JapaneseDictionaryEntry, JapaneseDictionaryPackage, JapaneseDictionaryPackageInfo, JapaneseDictionarySource, JapanesePos, japaneseDictionaryService | callers=7 | deps=3 | Storage=miki_japanese_dictionary_packages_v1,miki_japanese_personal_dictionary_v1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] research | src/miki/research/services/japaneseMorphologyService.ts | lines=65 | symbols=MorphologySplitMode, NativeJapaneseMorpheme, japaneseMorphologyService | callers=4 | deps=0 | Plugin=MIKIJapaneseMorphology / Tests=1
 - [USED] research | src/miki/research/services/offlineKnowledgePackService.ts | lines=14 | symbols=OfflineKnowledgePack, offlineKnowledgePackService | callers=1 | deps=1 | Storage=miki_offline_knowledge_packs_v1
 - [USED] research | src/miki/research/services/queryPatternRepositoryService.ts | lines=86 | symbols=QueryPatternLifecycle, QueryPatternRecord, queryPatternRepositoryService | callers=3 | deps=4 | Storage=miki_query_pattern_repository_v80
@@ -641,19 +661,19 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] research | src/miki/research/services/webResearchPolicyService.ts | lines=54 | symbols=IndependentSourceTarget, SourceIndependenceMode, WebResearchPolicy, WebResearchPolicyReceipt, WebResearchProgress | callers=4 | deps=2 | Storage=miki_web_research_policy_v1
 - [USED] research | src/miki/research/services/webTermLearningService.ts | lines=153 | symbols=LearnedWebTerm, WebTermLearningInput, WebTermLearningResult, webTermLearningService | callers=2 | deps=3
 - [USED] OTHER | src/miki/safety.ts | lines=38 | symbols=safety | callers=1 | deps=21 | Tests=18 / Markers=2
-- [USED] safety | src/miki/safety/services/abstractSanitizerService.ts | lines=253 | symbols=abstractSanitizerService | callers=3 | deps=3 | Storage=miki_abstract_symbol_mappings_v5
+- [USED] safety | src/miki/safety/services/abstractSanitizerService.ts | lines=253 | symbols=abstractSanitizerService | callers=5 | deps=3 | Storage=miki_abstract_symbol_mappings_v5 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] safety | src/miki/safety/services/bannedTopicsConfigService.ts | lines=154 | symbols=BannedTopicsConfig, BannedTopicsConfigService, DEFAULT_BANNED_TOPICS, bannedTopicsConfigService | callers=8 | deps=2 | Storage=miki_ai_banned_topics_config_v19 / Tests=3
 - [USED] safety | src/miki/safety/services/canaryDeploymentSafetyService.ts | lines=169 | symbols=CanaryDeploymentState, canaryDeploymentSafetyService | callers=4 | deps=2
 - [USED] safety | src/miki/safety/services/cloudAiRestrictedGatewayService.ts | lines=260 | symbols=CloudAiRestrictedGatewayService, cloudAiRestrictedGatewayService | callers=3 | deps=5 | Storage=miki_cloud_escalation_requests_v1
 - [USED] safety | src/miki/safety/services/deterministicRuntimePolicyService.ts | lines=51 | symbols=DeterministicRuntimeKind, DeterministicRuntimeStatus, deterministicRuntimePolicyService | callers=1 | deps=0
 - [USED] safety | src/miki/safety/services/deterministicRuntimeService.ts | lines=101 | symbols=DeterministicChunkEvent, DeterministicProgressEvent, DeterministicTeacherConfig, NativeDownloadedFile, NativeGpuInfo | callers=10 | deps=2 | Tests=1
-- [USED] safety | src/miki/safety/services/failureRecoveryService.ts | lines=75 | symbols=FailureRecoveryService, RecoveryAction, RecoveryDecision, failureRecoveryService | callers=3 | deps=5
+- [USED] safety | src/miki/safety/services/failureRecoveryService.ts | lines=75 | symbols=FailureRecoveryService, RecoveryAction, RecoveryDecision, failureRecoveryService | callers=4 | deps=5 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] safety | src/miki/safety/services/failureToleranceKernelService.ts | lines=1 | symbols= failureToleranceKernelService  | callers=1 | deps=1
-- [USED] safety | src/miki/safety/services/featureFlagsService.ts | lines=157 | symbols=DEFAULT_FEATURE_FLAGS, FEATURE_FLAG_DESCRIPTIONS, featureFlagsService | callers=4 | deps=3 | Storage=miki_system_feature_flags_v32
+- [USED] safety | src/miki/safety/services/featureFlagsService.ts | lines=157 | symbols=DEFAULT_FEATURE_FLAGS, FEATURE_FLAG_DESCRIPTIONS, featureFlagsService | callers=6 | deps=3 | Storage=miki_system_feature_flags_v32 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] safety | src/miki/safety/services/conversationCoreService.ts | lines=754 | symbols=ConversationCoreResult, ConversationCoreService, conversationCoreService | callers=4 | deps=45 | Tests=3
-- [USED] safety | src/miki/safety/services/nonLlmHardwarePipelineService.ts | lines=261 | symbols=HardwareTelemetry, NonLlmHardwarePipelineService, NonLlmPipelineExecutionResult, nonLlmHardwarePipelineService | callers=2 | deps=8 | Markers=7
+- [USED] safety | src/miki/safety/services/nonLlmHardwarePipelineService.ts | lines=261 | symbols=HardwareTelemetry, NonLlmHardwarePipelineService, NonLlmPipelineExecutionResult, nonLlmHardwarePipelineService | callers=2 | deps=8 | Markers=7 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] safety | src/miki/safety/services/nonLlmRuntimePolicyService.ts | lines=51 | symbols=NonLlmRuntimeKind, NonLlmRuntimeStatus, nonLlmRuntimePolicyService | callers=2 | deps=0
-- [USED] safety | src/miki/safety/services/privacyGuardrailService.ts | lines=248 | symbols=privacyGuardrailService | callers=9 | deps=5 | Storage=miki_privacy_audit_logs_v5
+- [USED] safety | src/miki/safety/services/privacyGuardrailService.ts | lines=248 | symbols=privacyGuardrailService | callers=11 | deps=5 | Storage=miki_privacy_audit_logs_v5 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] safety | src/miki/safety/services/outboundPayloadSanitizer.ts | lines=53 | symbols=sanitizeOutboundPayload | callers=2 | deps=0
 - [USED] safety | src/miki/safety/services/recoveryOrchestratorService.ts | lines=257 | symbols=RecoveryOrchestratorService, RecoveryRun, RecoveryRunStatus, recoveryOrchestratorService | callers=4 | deps=9
 - [USED] safety | src/miki/safety/services/remediationFailureRecoveryService.ts | lines=299 | symbols=RecoveryStatus, RemediationFailureRecoveryRecord, RemediationFailureRecoveryService, remediationFailureRecoveryService | callers=2 | deps=13
@@ -666,7 +686,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] safety | src/miki/safety/services/selfImprovementOperationalGuardService.ts | lines=13 | symbols=ImprovementRunSnapshot, ImprovementRunState, SelfImprovementOperationalGuardService, selfImprovementOperationalGuardService | callers=1 | deps=0 | Tests=1
 - [USED] safety | src/miki/safety/services/workspacePathBoundaryService.ts | lines=25 | symbols=WorkspaceArchiveLimits, WorkspacePathDecision, workspacePathBoundaryService | callers=1 | deps=0 | Tests=1
 - [USED] OTHER | src/miki/selfAwareness.ts | lines=29 | symbols=selfAwareness | callers=1 | deps=13 | Tests=5 / Markers=2
-- [USED] selfAwareness | src/miki/selfAwareness/services/affectionDynamicsService.ts | lines=113 | symbols=AffectionDynamicsService, affectionDynamicsService | callers=5 | deps=4 | Storage=miki_affection_dynamic_state_v1
+- [USED] selfAwareness | src/miki/selfAwareness/services/affectionDynamicsService.ts | lines=113 | symbols=AffectionDynamicsService, affectionDynamicsService | callers=6 | deps=4 | Storage=miki_affection_dynamic_state_v1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] selfAwareness | src/miki/selfAwareness/services/cognitiveEvidenceIntegrationService.ts | lines=42 | symbols=cognitiveEvidenceIntegrationService | callers=3 | deps=4
 - [USED] selfAwareness | src/miki/selfAwareness/services/cognitiveExecutionEvidenceService.ts | lines=57 | symbols=ExecutionEvidenceRecord, cognitiveExecutionEvidenceService | callers=1 | deps=4
 - [USED] selfAwareness | src/miki/selfAwareness/services/intelligenceSnapshotService.ts | lines=1 | symbols= intelligenceSnapshotService  | callers=1 | deps=1
@@ -711,7 +731,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/candidateRepairRevisionService.ts | lines=24 | symbols=RepairRevisionFile, RepairRevisionResult, candidateRepairRevisionService | callers=1 | deps=3 | Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/candidateStructuralAnalysisService.ts | lines=1 | symbols=candidateStructuralAnalysisService | callers=1 | deps=0 | Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/capabilityContractSynthesisService.ts | lines=4 | symbols=CapabilityContract, capabilityContractSynthesisService | callers=2 | deps=2 | Tests=1
-- [USED] selfDevelopment | src/miki/selfDevelopment/services/capabilityProofRegistryService.ts | lines=4 | symbols=CapabilityProofRecord, capabilityProofRegistryService | callers=7 | deps=2 | Storage=miki_capability_proof_registry_v1 / Tests=2
+- [USED] selfDevelopment | src/miki/selfDevelopment/services/capabilityProofRegistryService.ts | lines=14 | symbols=CapabilityProofRecord, capabilityProofRegistryService | callers=7 | deps=2 | Storage=miki_capability_proof_registry_v1 / Tests=2
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/causalSolutionHypothesisService.ts | lines=6 | symbols=CausalHypothesis, SolutionHypothesis, causalSolutionHypothesisService | callers=2 | deps=3 | Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/changeImpactContractPropagationV2Service.ts | lines=4 | symbols=ImpactKind, changeImpactContractPropagationV2Service | callers=3 | deps=2 | Tests=3
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/clarificationLifecycleService.ts | lines=4 | symbols=ClarificationRecord, clarificationLifecycleService | callers=1 | deps=4 | Storage=miki_semantic_clarifications_v1 / Tests=1
@@ -744,7 +764,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/developmentStrategyDecisionService.ts | lines=8 | symbols=DevelopmentStrategy, DevelopmentStrategyDecision, developmentStrategyDecisionService | callers=2 | deps=2 | Tests=2
 - [ORPHAN] selfDevelopment | src/miki/selfDevelopment/services/developmentStrategyExecutionDispatcherService.ts | lines=11 | symbols=StrategyExecutionRequest, StrategyExecutionResult, developmentStrategyExecutionDispatcherService | callers=0 | deps=5
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/diagnosticProgressRetryService.ts | lines=4 | symbols=QualityMetrics, diagnosticProgressRetryService | callers=2 | deps=3 | Storage=miki_diagnostic_progress_retry_v1 / Tests=1
-- [USED] selfDevelopment | src/miki/selfDevelopment/services/durableJobWorkerRuntimeService.ts | lines=5 | symbols=DurableJob, JobState, durableJobWorkerRuntimeService | callers=4 | deps=2 | Storage=miki_durable_job_runtime_v1 / Tests=2
+- [USED] selfDevelopment | src/miki/selfDevelopment/services/durableJobWorkerRuntimeService.ts | lines=49 | symbols=DurableJob, JobState, durableJobWorkerRuntimeService | callers=4 | deps=2 | Storage=miki_durable_job_runtime_v1 / Tests=2
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/environmentRecoveryService.ts | lines=4 | symbols=EnvironmentProfile, environmentRecoveryService | callers=1 | deps=2 | Tests=2
 - [AVAILABLE_EXPORT_ONLY] selfDevelopment | src/miki/selfDevelopment/services/evaluationPackageDownloadService.ts | lines=3 | symbols=evaluationPackageDownloadService | callers=1 | deps=1 | Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/evaluationPackageExportService.ts | lines=12 | symbols=EvaluationPackageInput, EvaluationPackageOutput, evaluationPackageExportService | callers=2 | deps=5 | Tests=7
@@ -787,7 +807,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/naturalLanguageToReviewPackageService.ts | lines=95 | symbols=NaturalLanguageReviewPackagePlan, naturalLanguageToReviewPackageService | callers=1 | deps=5
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/newFeatureConstructionPlanService.ts | lines=54 | symbols=NewArtifactKind, NewArtifactPlan, NewFeatureConstructionPlan, newFeatureConstructionPlanService | callers=3 | deps=2 | Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/nonLlmCodeSynthesisService.ts | lines=131 | symbols=CodeSynthesisPlan, CodeSynthesisSource, NonLlmCodeSynthesisService, nonLlmCodeSynthesisService | callers=3 | deps=4
-- [AVAILABLE_EXPORT_ONLY] selfDevelopment | src/miki/selfDevelopment/services/operationalObservabilityService.ts | lines=4 | symbols=OperationalSpan, operationalObservabilityService | callers=2 | deps=2 | Storage=miki_operational_observability_v1 / Tests=1
+- [AVAILABLE_EXPORT_ONLY] selfDevelopment | src/miki/selfDevelopment/services/operationalObservabilityService.ts | lines=10 | symbols=OperationalSpan, operationalObservabilityService | callers=2 | deps=2 | Storage=miki_operational_observability_v1 / Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/partialSuccessReadinessService.ts | lines=4 | symbols=CheckpointState, ReadinessCheckpoint, partialSuccessReadinessService | callers=1 | deps=2 | Storage=miki_partial_success_readiness_v1 / Tests=2
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/portablePosixPathService.ts | lines=14 | symbols=portablePosixPathService | callers=2 | deps=0
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/productionScaleDevelopmentService.ts | lines=13 | symbols=BuildNode, productionScaleDevelopmentService | callers=1 | deps=2 | Tests=2
@@ -799,7 +819,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/registryAnchorIntegrationService.ts | lines=5 | symbols=RegistryAnchor, RegistryIntegrationResult, registryAnchorIntegrationService | callers=2 | deps=1 | Tests=1
 - [ORPHAN] selfDevelopment | src/miki/selfDevelopment/services/relevantCausalAnalysisService.ts | lines=7 | symbols=RelevantCause, relevantCausalAnalysisService | callers=0 | deps=3 | Tests=1
 - [ORPHAN] selfDevelopment | src/miki/selfDevelopment/services/remoteExecutionAgentProtocolService.ts | lines=4 | symbols=SignedJobManifest, remoteExecutionAgentProtocolService | callers=0 | deps=1 | Tests=3
-- [USED] selfDevelopment | src/miki/selfDevelopment/services/repairQualityLearningService.ts | lines=3 | symbols=repairQualityLearningService | callers=2 | deps=3 | Storage=miki_repair_quality_learning_v1 / Tests=2
+- [USED] selfDevelopment | src/miki/selfDevelopment/services/repairQualityLearningService.ts | lines=11 | symbols=repairQualityLearningService | callers=2 | deps=3 | Storage=miki_repair_quality_learning_v1 / Tests=2
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/repairStrategySelectionService.ts | lines=5 | symbols=RepairStrategyCandidate, repairStrategySelectionService | callers=1 | deps=2 | Tests=2
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/repositoryArtifactAdapterService.ts | lines=4 | symbols=ArtifactAdapterDecision, ArtifactKind, repositoryArtifactAdapterService | callers=3 | deps=0 | Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/repositoryDiagnosticBaselineService.ts | lines=4 | symbols=RepositoryDiagnosticBaseline, repositoryDiagnosticBaselineService | callers=3 | deps=1
@@ -808,8 +828,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [ORPHAN] selfDevelopment | src/miki/selfDevelopment/services/repositoryRepairOrchestratorService.ts | lines=3 | symbols=repositoryRepairOrchestratorService | callers=0 | deps=3 | Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/repositoryTypeScriptAutoRepairLoopService.ts | lines=5 | symbols=RepositoryRepairRound, repositoryTypeScriptAutoRepairLoopService | callers=2 | deps=2 | Tests=4
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/repositoryTypeScriptResolutionService.ts | lines=6 | symbols=TypeScriptResolutionResult, repositoryTypeScriptResolutionService | callers=1 | deps=3 | Tests=2
-- [USED] selfDevelopment | src/miki/selfDevelopment/services/reproducibleDevelopmentLedgerService.ts | lines=4 | symbols=DevelopmentLedgerEntry, reproducibleDevelopmentLedgerService | callers=1 | deps=2 | Storage=miki_reproducible_development_ledger_v1 / Tests=2
-- [USED] selfDevelopment | src/miki/selfDevelopment/services/requestTypeCompilerService.ts | lines=200 | symbols=RequestTypeCompilerService, requestTypeCompilerService | callers=5 | deps=3
+- [USED] selfDevelopment | src/miki/selfDevelopment/services/reproducibleDevelopmentLedgerService.ts | lines=11 | symbols=DevelopmentLedgerEntry, reproducibleDevelopmentLedgerService | callers=1 | deps=2 | Storage=miki_reproducible_development_ledger_v1 / Tests=2
+- [USED] selfDevelopment | src/miki/selfDevelopment/services/requestTypeCompilerService.ts | lines=200 | symbols=RequestTypeCompilerService, requestTypeCompilerService | callers=7 | deps=3 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/reviewManifestInclusionGateService.ts | lines=3 | symbols=reviewManifestInclusionGateService | callers=1 | deps=1 | Tests=3
 - [AVAILABLE_EXPORT_ONLY] selfDevelopment | src/miki/selfDevelopment/services/reviewRevisionPlannerService.ts | lines=6 | symbols=CriterionRevision, ReviewRevisionPlan, reviewRevisionPlannerService | callers=1 | deps=2 | Tests=1
 - [AVAILABLE_EXPORT_ONLY] selfDevelopment | src/miki/selfDevelopment/services/runtimeAdapterService.ts | lines=9 | symbols=RuntimeAdapterKind, runtimeAdapterService | callers=1 | deps=2 | Tests=1
@@ -856,14 +876,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] strategy | src/miki/strategy/services/changeImpactSimulatorService.ts | lines=35 | symbols=ChangeImpactSimulation, ImpactCertainty, changeImpactSimulatorService | callers=2 | deps=2
 - [USED] strategy | src/miki/strategy/services/contextBudgetEngineService.ts | lines=116 | symbols=DeviceHealthState, ThermalState, contextBudgetEngineService | callers=2 | deps=2 | Tests=1
 - [USED] strategy | src/miki/strategy/services/conversationStrategyService.ts | lines=408 | symbols=ConversationStrategyService, StrategyPerformanceRecord, StrategySelectionContext, StrategySelectionResult, conversationStrategyService | callers=5 | deps=3 | Storage=miki_conversation_strategy_records_v1
-- [USED] strategy | src/miki/strategy/services/downstreamImpactService.ts | lines=37 | symbols=DownstreamImpact, DownstreamImpactService, downstreamImpactService | callers=3 | deps=4
-- [USED] strategy | src/miki/strategy/services/executionRouteRankingService.ts | lines=84 | symbols=ExecutionRouteRankingService, ExecutionRouteScore, executionRouteRankingService | callers=2 | deps=7 | Tests=1
+- [USED] strategy | src/miki/strategy/services/downstreamImpactService.ts | lines=37 | symbols=DownstreamImpact, DownstreamImpactService, downstreamImpactService | callers=4 | deps=4 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
+- [USED] strategy | src/miki/strategy/services/executionRouteRankingService.ts | lines=84 | symbols=ExecutionRouteRankingService, ExecutionRouteScore, executionRouteRankingService | callers=3 | deps=7 | Tests=1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] strategy | src/miki/strategy/services/frontierCriteriaService.ts | lines=1 | symbols= frontierCriteriaService  | callers=1 | deps=1
 - [USED] strategy | src/miki/strategy/services/frontierGovernanceService.ts | lines=72 | symbols=AttentionState, CapabilityFrontierState, CoEvolutionRecord, CounterfactualRecord, EnvironmentExploration | callers=2 | deps=1
-- [USED] strategy | src/miki/strategy/services/implementationSelectionService.ts | lines=34 | symbols=ImplementationSelection, ImplementationSelectionService, implementationSelectionService | callers=2 | deps=2 | Tests=1
+- [USED] strategy | src/miki/strategy/services/implementationSelectionService.ts | lines=34 | symbols=ImplementationSelection, ImplementationSelectionService, implementationSelectionService | callers=3 | deps=2 | Tests=1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] strategy | src/miki/strategy/services/longTermProjectManagerService.ts | lines=1 | symbols= longTermProjectManagerService  | callers=1 | deps=1
 - [USED] strategy | src/miki/strategy/services/minimalScopeService.ts | lines=291 | symbols=INITIAL_CODE_V1_ITEMS, INITIAL_CONVERSATION_V1_ITEMS, minimalScopeService | callers=2 | deps=3 | Storage=miki_minimal_scope_status_v32
-- [USED] strategy | src/miki/strategy/services/planOrchestratorService.ts | lines=253 | symbols=OrchestratorRun, OrchestratorStep, OrchestratorStepStatus, PlanOrchestratorService, planOrchestratorService | callers=5 | deps=6
+- [USED] strategy | src/miki/strategy/services/planOrchestratorService.ts | lines=253 | symbols=OrchestratorRun, OrchestratorStep, OrchestratorStepStatus, PlanOrchestratorService, planOrchestratorService | callers=6 | deps=6 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] strategy | src/miki/strategy/services/predictiveContextOsService.ts | lines=1 | symbols= predictiveContextOsService  | callers=1 | deps=1
 - [USED] strategy | src/miki/strategy/services/proactiveContextOsService.ts | lines=307 | symbols=ContextAwarenessSnapshot, PersonaAnchorState, ProactiveContextOsService, ProactiveInsightItem, proactiveContextOsService | callers=6 | deps=2 | Storage=miki_persona_anchors_v1,miki_proactive_context_snapshot_v1
 - [USED] strategy | src/miki/strategy/services/responseDesignService.ts | lines=774 | symbols=PersonaAdaptationResult, ResponseDesignService, StyleAdaptationState, UserSpeakingStyleAnalysis, UserStyleCorrectionRule | callers=4 | deps=3 | Tests=1
@@ -871,7 +891,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] strategy | src/miki/strategy/services/samplingTuningService.ts | lines=227 | symbols=samplingTuningService | callers=1 | deps=3 | Storage=miki_sampling_tuning_stats_v1
 - [USED] strategy | src/miki/strategy/services/strategyRustKernelService.ts | lines=1 | symbols=strategyRustKernelService | callers=1 | deps=0 | Plugin=MIKINativeRunner
 - [USED] strategy | src/miki/strategy/services/taskPlanService.ts | lines=819 | symbols=PlanCompletionJudgement, PlanGenerationContext, StepAdvanceResult, taskPlanService | callers=2 | deps=4 | Storage=miki_active_task_plan,miki_task_plan_history
-- [USED] strategy | src/miki/strategy/services/unifiedDecisionEngineService.ts | lines=386 | symbols=CONTEXT_PROFILES, UnifiedDecisionEngineService, unifiedDecisionEngineService | callers=4 | deps=3 | Storage=miki_unified_decisions_v1 / Tests=1
+- [USED] strategy | src/miki/strategy/services/unifiedDecisionEngineService.ts | lines=386 | symbols=CONTEXT_PROFILES, UnifiedDecisionEngineService, unifiedDecisionEngineService | callers=5 | deps=3 | Storage=miki_unified_decisions_v1 / Tests=1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] strategy | src/miki/strategy/services/unifiedMultiObjectiveCandidateSelectorService.ts | lines=12 | symbols=CandidateSelectionInput, CandidateSelectionPolicy, CandidateSelectionResult, CandidateUtilityVector, unifiedMultiObjectiveCandidateSelectorService | callers=1 | deps=1 | Tests=1
 - [USED] strategy | src/miki/strategy/services/workingAgendaService.ts | lines=195 | symbols=workingAgendaService | callers=6 | deps=3 | Storage=miki_working_agenda_items
 - [USED] OTHER | src/miki/unknown.ts | lines=24 | symbols=unknown | callers=1 | deps=9 | Tests=14
@@ -880,7 +900,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] unknown | src/miki/unknown/services/counterfactualReasoningService.ts | lines=180 | symbols=CounterfactualReasoningService, counterfactualReasoningService | callers=3 | deps=5 | Storage=miki_counterfactual_simulations_v1
 - [USED] unknown | src/miki/unknown/services/counterfactualWorkSimulatorService.ts | lines=33 | symbols=CounterfactualTrigger, CounterfactualWorkSimulation, CounterfactualWorkSimulatorService, WorkRoute, counterfactualWorkSimulatorService | callers=3 | deps=2 | Storage=miki_counterfactual_work_v1
 - [USED] unknown | src/miki/unknown/services/knowledgeGapService.ts | lines=351 | symbols=KnowledgeGap, KnowledgeGapDetectionContext, KnowledgeGapIdentity, KnowledgeGapResolutionPlan, KnowledgeGapService | callers=16 | deps=4 | Storage=miki_knowledge_gaps_v1
-- [USED] unknown | src/miki/unknown/services/latentIntentMiningService.ts | lines=211 | symbols=LatentIntentMiningService, latentIntentMiningService | callers=6 | deps=5 | Storage=miki_latent_intent_sessions_v1
+- [USED] unknown | src/miki/unknown/services/latentIntentMiningService.ts | lines=211 | symbols=LatentIntentMiningService, latentIntentMiningService | callers=7 | deps=5 | Storage=miki_latent_intent_sessions_v1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] unknown | src/miki/unknown/services/multiIntentDecompositionService.ts | lines=84 | symbols=DecomposedIntent, IntentHypothesis, IntentHypothesisEvaluationContext, IntentHypothesisKind, IntentHypothesisSelection | callers=3 | deps=1 | Tests=1
 - [USED] unknown | src/miki/unknown/services/unifiedUnknownResolutionCoordinatorService.ts | lines=136 | symbols=UnifiedUnknownRequest, UnifiedUnknownResult, unifiedUnknownResolutionCoordinatorService | callers=5 | deps=6
 - [USED] unknown | src/miki/unknown/services/unknownFingerprintService.ts | lines=11 | symbols=UnknownCapabilityGapKind, UnknownFingerprint, UnknownFingerprintInput, unknownFingerprintService | callers=1 | deps=1 | Tests=1
@@ -913,14 +933,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] verification | src/miki/verification/services/rustVbaVerificationKernelService.ts | lines=7 | symbols=RustVbaVerificationOptions, RustVbaVerificationResult, rustVbaVerificationKernelService | callers=1 | deps=0 | Plugin=MIKINativeRunner / Tests=5
 - [USED] verification | src/miki/verification/services/rustVerificationReceiptService.ts | lines=8 | symbols=RustVerificationReceipt, rustVerificationReceiptService | callers=1 | deps=0 | Storage=miki_rust_verification_receipts_v1 / Tests=1
 - [USED] verification | src/miki/verification/services/schemaValidationService.ts | lines=230 | symbols=SchemaValidationService, ValidationResult, schemaValidationService | callers=4 | deps=1
-- [USED] verification | src/miki/verification/services/testAssertionService.ts | lines=140 | symbols=TestAssertionResult, TestAssertionService, TestAssertionStatus, testAssertionService | callers=2 | deps=1
+- [USED] verification | src/miki/verification/services/testAssertionService.ts | lines=140 | symbols=TestAssertionResult, TestAssertionService, TestAssertionStatus, testAssertionService | callers=3 | deps=1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] verification | src/miki/verification/services/unifiedValidationCoordinatorService.ts | lines=120 | symbols=UnifiedValidationCoordinatorService, ValidationBundle, ValidationEvidence, unifiedValidationCoordinatorService | callers=2 | deps=1 | Storage=miki_unified_validation_bundles_v1
 - [USED] verification | src/miki/verification/services/unknownVerificationSubscriberService.ts | lines=17 | symbols=initializeUnknownVerificationSubscriber | callers=1 | deps=3
 - [USED] verification | src/miki/verification/services/userFeedbackGovernanceService.ts | lines=51 | symbols=UserFeedbackGovernanceService, UserFeedbackRecord, userFeedbackGovernanceService | callers=2 | deps=1 | Storage=miki_user_feedback_governance_records_v1
-- [USED] verification | src/miki/verification/services/vbaStaticVerifierService.ts | lines=638 | symbols=VbaStaticVerifierService, vbaStaticVerifierService | callers=4 | deps=1 | Markers=1
+- [USED] verification | src/miki/verification/services/vbaStaticVerifierService.ts | lines=638 | symbols=VbaStaticVerifierService, vbaStaticVerifierService | callers=5 | deps=1 | Markers=1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] verification | src/miki/verification/services/verifierService.ts | lines=174 | symbols=VerificationOutcome, VerificationResult, VerifierService, verifierService | callers=6 | deps=5
-- [USED] LEGACY_OR_SHARED | src/services/abstractSanitizerService.ts | lines=253 | symbols=abstractSanitizerService | callers=1 | deps=3 | Storage=miki_abstract_symbol_mappings_v5
-- [USED] LEGACY_OR_SHARED | src/services/affectionDynamicsService.ts | lines=113 | symbols=AffectionDynamicsService, affectionDynamicsService | callers=2 | deps=4 | Storage=miki_affection_dynamic_state_v1
+- [USED] LEGACY_OR_SHARED | src/services/abstractSanitizerService.ts | lines=6 | symbols=abstractSanitizerService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/safety/services/abstractSanitizerService.ts
+- [USED] LEGACY_OR_SHARED | src/services/affectionDynamicsService.ts | lines=6 | symbols=AffectionDynamicsService, affectionDynamicsService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/selfAwareness/services/affectionDynamicsService.ts
 - [ORPHAN] LEGACY_OR_SHARED | src/services/androidNativeRunnerAdapterService.ts | lines=119 | symbols=AndroidNativeRunnerAdapterService, androidNativeRunnerAdapterService | callers=0 | deps=2 | Plugin=MIKINativeRunner / Tests=16
 - [USED] LEGACY_OR_SHARED | src/services/answerContentIrService.ts | lines=261 | symbols=AnswerContentIrService, answerContentIrService | callers=2 | deps=3 | Tests=1
 - [USED] LEGACY_OR_SHARED | src/services/answerPlanService.ts | lines=543 | symbols=INITIAL_SKELETONS, answerPlanService | callers=4 | deps=4 | Storage=miki_response_skeletons_v32 / Tests=6
@@ -933,13 +953,13 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [ORPHAN] LEGACY_OR_SHARED | src/services/autonomousSoftwareFactoryService.ts | lines=126 | symbols=$, CodeArtifactRequest, FactoryPipelineReport, VerificationTestResult, autonomousSoftwareFactoryService | callers=0 | deps=1
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/canaryDeploymentSafetyService.ts | lines=169 | symbols=CanaryDeploymentState, canaryDeploymentSafetyService | callers=1 | deps=2
 - [ORPHAN] LEGACY_OR_SHARED | src/services/capabilityCompositionProofService.ts | lines=13 | symbols=CompositionProof, capabilityCompositionProofService | callers=0 | deps=1
-- [USED] LEGACY_OR_SHARED | src/services/capabilityConfidenceService.ts | lines=147 | symbols=CapabilityConfidence, CapabilityConfidenceService, capabilityConfidenceService | callers=2 | deps=4
-- [USED] LEGACY_OR_SHARED | src/services/capabilityGapService.ts | lines=490 | symbols=INITIAL_GAPS, INITIAL_MASTERY_PROFILES, capabilityGapService | callers=4 | deps=3 | Storage=miki_capability_gaps_v32,miki_capability_mastery_profiles_v32 / Tests=1
-- [USED] LEGACY_OR_SHARED | src/services/capabilityGraphService.ts | lines=228 | symbols=CapabilityEdge, CapabilityGraphService, CapabilityNode, ComponentPlan, capabilityGraphService | callers=4 | deps=9
-- [USED] LEGACY_OR_SHARED | src/services/capabilityImplementationRegistryService.ts | lines=91 | symbols=CapabilityImplementationMode, CapabilityImplementationRecord, CapabilityImplementationRegistryService, capabilityImplementationRegistryService | callers=1 | deps=2 | Storage=miki_capability_implementation_registry_v1
-- [USED] LEGACY_OR_SHARED | src/services/capabilityLearningService.ts | lines=153 | symbols=CapabilityLearningMaturity, CapabilityLearningRecord, CapabilityLearningService, capabilityLearningService | callers=2 | deps=5
+- [USED] LEGACY_OR_SHARED | src/services/capabilityConfidenceService.ts | lines=6 | symbols=CapabilityConfidence, CapabilityConfidenceService, capabilityConfidenceService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/capability/services/capabilityConfidenceService.ts
+- [USED] LEGACY_OR_SHARED | src/services/capabilityGapService.ts | lines=6 | symbols=INITIAL_GAPS, INITIAL_MASTERY_PROFILES, capabilityGapService | callers=2 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/capability/services/capabilityGapService.ts
+- [USED] LEGACY_OR_SHARED | src/services/capabilityGraphService.ts | lines=6 | symbols=CapabilityEdge, CapabilityGraphService, CapabilityNode, ComponentPlan, capabilityGraphService | callers=3 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/capability/services/capabilityGraphService.ts
+- [USED] LEGACY_OR_SHARED | src/services/capabilityImplementationRegistryService.ts | lines=6 | symbols=CapabilityImplementationMode, CapabilityImplementationRecord, CapabilityImplementationRegistryService, capabilityImplementationRegistryService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/capability/services/capabilityImplementationRegistryService.ts
+- [USED] LEGACY_OR_SHARED | src/services/capabilityLearningService.ts | lines=6 | symbols=CapabilityLearningMaturity, CapabilityLearningRecord, CapabilityLearningService, capabilityLearningService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/capability/services/capabilityLearningService.ts
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/capabilityPluginService.ts | lines=661 | symbols=BUILTIN_CAPABILITY_PLUGINS, CapabilityPluginService, capabilityPluginService | callers=1 | deps=3 | Storage=miki_capability_plugins
-- [USED] LEGACY_OR_SHARED | src/services/capabilityReuseService.ts | lines=90 | symbols=CapabilityReuseRecord, CapabilityReuseService, capabilityReuseService | callers=4 | deps=5
+- [USED] LEGACY_OR_SHARED | src/services/capabilityReuseService.ts | lines=6 | symbols=CapabilityReuseRecord, CapabilityReuseService, capabilityReuseService | callers=2 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/capability/services/capabilityReuseService.ts
 - [ORPHAN] LEGACY_OR_SHARED | src/services/causalInvestigationService.ts | lines=22 | symbols=CausalHypothesis, CausalInvestigation, causalInvestigationService | callers=0 | deps=1 | Storage=miki_causal_investigations_v1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/causalMemoryLedgerService.ts | lines=21 | symbols=CausalKind, CausalRecord, causalMemoryLedgerService | callers=0 | deps=2 | Storage=miki_causal_memory_ledger_v1
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/changeImpactSimulatorService.ts | lines=35 | symbols=ChangeImpactSimulation, ImpactCertainty, changeImpactSimulatorService | callers=1 | deps=2
@@ -954,7 +974,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [ORPHAN] LEGACY_OR_SHARED | src/services/cognitiveEvidenceIntegrationService.ts | lines=1 | symbols=- | callers=0 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/cognitiveExecutionEvidenceService.ts | lines=57 | symbols=ExecutionEvidenceRecord, cognitiveExecutionEvidenceService | callers=0 | deps=4
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/completionJudgeService.ts | lines=1 | symbols=- | callers=1 | deps=1
-- [USED] LEGACY_OR_SHARED | src/services/componentArtifactStoreService.ts | lines=222 | symbols=ComponentArtifactManifest, ComponentArtifactRecord, componentArtifactStoreService | callers=4 | deps=3 | Storage=miki_component_artifact_index_v1,miki_component_artifact_index_v2
+- [USED] LEGACY_OR_SHARED | src/services/componentArtifactStoreService.ts | lines=6 | symbols=ComponentArtifactManifest, ComponentArtifactRecord, componentArtifactStoreService | callers=3 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/capability/services/componentArtifactStoreService.ts
 - [USED] LEGACY_OR_SHARED | src/services/componentCompositionService.ts | lines=234 | symbols=ComponentCompositionService, CompositionFailurePolicy, CompositionPlan, CompositionStep, componentCompositionService | callers=6 | deps=4 | Tests=2
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/componentImprovementCandidateService.ts | lines=147 | symbols=ComponentImprovementCandidate, ComponentImprovementCandidateService, ImprovementCandidateStatus, componentImprovementCandidateService | callers=3 | deps=5
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/componentPromotionService.ts | lines=118 | symbols=ComponentPromotionResult, ComponentPromotionService, componentPromotionService | callers=1 | deps=6
@@ -965,51 +985,51 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/componentRegressionService.ts | lines=1 | symbols=- | callers=5 | deps=1
 - [USED] LEGACY_OR_SHARED | src/services/componentTestCaseService.ts | lines=1 | symbols=- | callers=1 | deps=1
 - [USED] LEGACY_OR_SHARED | src/services/componentVerificationService.ts | lines=1 | symbols=- | callers=1 | deps=1
-- [USED] LEGACY_OR_SHARED | src/services/componentVersionHistoryService.ts | lines=165 | symbols=ComponentVersionChangeType, ComponentVersionHistoryService, ComponentVersionRecord, componentVersionHistoryService | callers=3 | deps=2
+- [USED] LEGACY_OR_SHARED | src/services/componentVersionHistoryService.ts | lines=6 | symbols=ComponentVersionChangeType, ComponentVersionHistoryService, ComponentVersionRecord, componentVersionHistoryService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/capability/services/componentVersionHistoryService.ts
 - [USED] LEGACY_OR_SHARED | src/services/conversationStateService.ts | lines=691 | symbols=AnaphoraResolutionResult, CONVERSATION_STATE_INSTRUCTION, ExtractConversationStateOptions, StateExtractionStats, classifyDialogueAct | callers=4 | deps=4 | Tests=4
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/counterexampleContractRefinementService.ts | lines=144 | symbols=ContractClause, ContractClauseKind, ContractRefinementRecord, ContractRefinementStatus, CounterexampleContractRefinementService | callers=2 | deps=3
 - [ORPHAN] LEGACY_COMPATIBILITY_SHIM | src/services/counterfactualReasoningService.ts | lines=1 | symbols=CounterfactualReasoningService, counterfactualReasoningService | callers=0 | deps=1 | exports canonical counterfactual reasoning service
-- [USED] LEGACY_OR_SHARED | src/services/decisionLearningService.ts | lines=73 | symbols=DecisionLearningService, DecisionLearningSignal, decisionLearningService | callers=1 | deps=4
-- [USED] LEGACY_OR_SHARED | src/services/deterministicCapabilityEvolutionService.ts | lines=241 | symbols=CapabilityPatch, deterministicCapabilityEvolutionService | callers=1 | deps=5 | Storage=miki_ai_deterministic_capability_patches_v1
-- [USED] LEGACY_OR_SHARED | src/services/deterministicCapabilityExecutionService.ts | lines=99 | symbols=DeterministicCapabilityExecutionResult, DeterministicCapabilityExecutionService, deterministicCapabilityExecutionService | callers=1 | deps=6
+- [USED] LEGACY_OR_SHARED | src/services/decisionLearningService.ts | lines=6 | symbols=DecisionLearningService, DecisionLearningSignal, decisionLearningService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/learning/services/decisionLearningService.ts
+- [USED] LEGACY_OR_SHARED | src/services/deterministicCapabilityEvolutionService.ts | lines=6 | symbols=CapabilityPatch, deterministicCapabilityEvolutionService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/capability/services/deterministicCapabilityEvolutionService.ts
+- [USED] LEGACY_OR_SHARED | src/services/deterministicCapabilityExecutionService.ts | lines=6 | symbols=DeterministicCapabilityExecutionResult, DeterministicCapabilityExecutionService, deterministicCapabilityExecutionService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/capability/services/deterministicCapabilityExecutionService.ts
 - [ORPHAN] LEGACY_OR_SHARED | src/services/deterministicSelfImprovementLabService.ts | lines=135 | symbols=EvolutionLabResult, EvolutionStage, deterministicSelfImprovementLabService | callers=0 | deps=7
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/digitalResearchNoteService.ts | lines=159 | symbols=DigitalResearchNoteService, ResearchNoteEntry, digitalResearchNoteService | callers=1 | deps=2 | Storage=miki_digital_research_notes_v1
-- [USED] LEGACY_OR_SHARED | src/services/downstreamImpactService.ts | lines=37 | symbols=DownstreamImpact, DownstreamImpactService, downstreamImpactService | callers=2 | deps=4
+- [USED] LEGACY_OR_SHARED | src/services/downstreamImpactService.ts | lines=6 | symbols=DownstreamImpact, DownstreamImpactService, downstreamImpactService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/strategy/services/downstreamImpactService.ts
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/dynamicToolFactoryService.ts | lines=1 | symbols=- | callers=1 | deps=1
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/embeddingService.ts | lines=346 | symbols=EmbeddingStats, embeddingService | callers=1 | deps=5
 - [USED] LEGACY_OR_SHARED | src/services/evidenceService.ts | lines=1 | symbols=- | callers=6 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/executableExplanationService.ts | lines=12 | symbols=ExplanationEvidence, executableExplanationService | callers=0 | deps=1
-- [USED] LEGACY_OR_SHARED | src/services/executionRouteRankingService.ts | lines=84 | symbols=ExecutionRouteRankingService, ExecutionRouteScore, executionRouteRankingService | callers=1 | deps=7 | Tests=1
-- [USED] LEGACY_OR_SHARED | src/services/executionRunnerService.ts | lines=322 | symbols=ExecutionEnvironment, ExecutionRequest, ExecutionRequestStatus, ExecutionResultInput, ExecutionRunnerService | callers=12 | deps=8
-- [USED] LEGACY_OR_SHARED | src/services/experienceFreshnessService.ts | lines=40 | symbols=ExperienceFreshness, ExperienceFreshnessService, experienceFreshnessService | callers=3 | deps=1
-- [USED] LEGACY_OR_SHARED | src/services/experienceRouterService.ts | lines=443 | symbols=ExperienceRouterService, experienceRouterService | callers=1 | deps=6
+- [USED] LEGACY_OR_SHARED | src/services/executionRouteRankingService.ts | lines=6 | symbols=ExecutionRouteRankingService, ExecutionRouteScore, executionRouteRankingService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/strategy/services/executionRouteRankingService.ts
+- [USED] LEGACY_OR_SHARED | src/services/executionRunnerService.ts | lines=6 | symbols=ExecutionEnvironment, ExecutionRequest, ExecutionRequestStatus, ExecutionResultInput, ExecutionRunnerService, executionRunnerService | callers=8 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/execution/services/executionRunnerService.ts
+- [USED] LEGACY_OR_SHARED | src/services/experienceFreshnessService.ts | lines=6 | symbols=ExperienceFreshness, ExperienceFreshnessService, experienceFreshnessService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/experience/services/experienceFreshnessService.ts
+- [USED] LEGACY_OR_SHARED | src/services/experienceRouterService.ts | lines=6 | symbols=ExperienceRouterService, experienceRouterService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/experience/services/experienceRouterService.ts
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/externalRunnerAdapterService.ts | lines=100 | symbols=ExternalRunnerAdapterConfig, ExternalRunnerAdapterService, ExternalRunnerResponse, externalRunnerAdapterService | callers=1 | deps=2
 - [ORPHAN] LEGACY_OR_SHARED | src/services/failureCatalogService.ts | lines=482 | symbols=INITIAL_FAILURE_SIGNATURES, failureCatalogService | callers=0 | deps=3 | Storage=miki_failure_signatures_v51
-- [USED] LEGACY_OR_SHARED | src/services/failureMemoryService.ts | lines=122 | symbols=FailureMemoryRecord, FailureMemoryService, FailureRiskAssessment, failureMemoryService | callers=11 | deps=3
-- [USED] LEGACY_OR_SHARED | src/services/failureRecoveryService.ts | lines=75 | symbols=FailureRecoveryService, RecoveryAction, RecoveryDecision, failureRecoveryService | callers=1 | deps=5
+- [USED] LEGACY_OR_SHARED | src/services/failureMemoryService.ts | lines=6 | symbols=FailureMemoryRecord, FailureMemoryService, FailureRiskAssessment, failureMemoryService | callers=3 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/memory/services/failureMemoryService.ts
+- [USED] LEGACY_OR_SHARED | src/services/failureRecoveryService.ts | lines=6 | symbols=FailureRecoveryService, RecoveryAction, RecoveryDecision, failureRecoveryService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/safety/services/failureRecoveryService.ts
 - [ORPHAN] LEGACY_OR_SHARED | src/services/failureUnderstandingService.ts | lines=1 | symbols=- | callers=0 | deps=1
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/falsificationService.ts | lines=1 | symbols=- | callers=1 | deps=1 | Tests=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/faultInjectionLabService.ts | lines=1 | symbols=- | callers=0 | deps=1
-- [USED] LEGACY_OR_SHARED | src/services/featureFlagsService.ts | lines=152 | symbols=DEFAULT_FEATURE_FLAGS, FEATURE_FLAG_DESCRIPTIONS, featureFlagsService | callers=1 | deps=3 | Storage=miki_system_feature_flags_v32
+- [USED] LEGACY_OR_SHARED | src/services/featureFlagsService.ts | lines=6 | symbols=DEFAULT_FEATURE_FLAGS, FEATURE_FLAG_DESCRIPTIONS, featureFlagsService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/safety/services/featureFlagsService.ts
 - [USED] LEGACY_OR_SHARED | src/services/formalConstraintSolverService.ts | lines=1 | symbols=- | callers=1 | deps=1 | Tests=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/formalProofService.ts | lines=1 | symbols=- | callers=0 | deps=1 | Tests=1
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/formalSemanticsKernelService.ts | lines=1 | symbols=- | callers=3 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/frontierGovernanceService.ts | lines=72 | symbols=AttentionState, CapabilityFrontierState, CoEvolutionRecord, CounterfactualRecord, EnvironmentExploration | callers=0 | deps=1
 - [USED] LEGACY_OR_SHARED | src/services/githubSyncService.ts | lines=553 | symbols=GitHubSyncDiagnostic, GitHubSyncDiagnosticStatus, GitHubSyncFile, GitHubSyncState, githubSyncService | callers=3 | deps=2 | Tests=1
-- [USED] LEGACY_OR_SHARED | src/services/hardeningRegressionCandidateService.ts | lines=92 | symbols=HardeningRegressionCandidate, HardeningRegressionCandidateService, hardeningRegressionCandidateService | callers=1 | deps=2 | Storage=miki_hardening_regression_candidates_v1 / Tests=1
+- [USED] LEGACY_OR_SHARED | src/services/hardeningRegressionCandidateService.ts | lines=6 | symbols=HardeningRegressionCandidate, HardeningRegressionCandidateService, hardeningRegressionCandidateService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/improvement/services/hardeningRegressionCandidateService.ts
 - [USED] LEGACY_OR_SHARED | src/services/hybridConversationEngineService.ts | lines=40 | symbols=ConversationInterpretation, HybridConversationEngineService, hybridConversationEngineService | callers=1 | deps=4 | Tests=4
-- [USED] LEGACY_OR_SHARED | src/services/implementationSelectionService.ts | lines=34 | symbols=ImplementationSelection, ImplementationSelectionService, implementationSelectionService | callers=1 | deps=2 | Tests=1
+- [USED] LEGACY_OR_SHARED | src/services/implementationSelectionService.ts | lines=6 | symbols=ImplementationSelection, ImplementationSelectionService, implementationSelectionService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/strategy/services/implementationSelectionService.ts
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/improvementCanaryRollbackService.ts | lines=191 | symbols=CanaryEvaluation, CanaryStatus, ImprovementCanaryRecord, ImprovementCanaryRollbackService, improvementCanaryRollbackService | callers=1 | deps=8 | Tests=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/improvementProposalService.ts | lines=166 | symbols=ImprovementProposalRecord, ImprovementProposalService, ProposalStatus, improvementProposalService | callers=0 | deps=9
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/improvementRegressionCoordinatorService.ts | lines=231 | symbols=ImprovementRegressionCoordinatorRecord, ImprovementRegressionCoordinatorService, ImprovementRegressionCoordinatorStatus, improvementRegressionCoordinatorService | callers=1 | deps=9 | Tests=1
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/improvementStaticGuardService.ts | lines=98 | symbols=ImprovementGuardIssue, ImprovementGuardResult, ImprovementGuardSeverity, ImprovementStaticGuardService, improvementStaticGuardService | callers=3 | deps=3 | Tests=1
-- [USED] LEGACY_OR_SHARED | src/services/japaneseAnalysisService.ts | lines=240 | symbols=JapaneseAnalysisResult, JapaneseSemanticRole, JapaneseToken, JapaneseTokenKind, japaneseAnalysisService | callers=3 | deps=3
-- [USED] LEGACY_OR_SHARED | src/services/japaneseDictionaryService.ts | lines=174 | symbols=JapaneseDictionaryEntry, JapaneseDictionaryPackage, JapaneseDictionaryPackageInfo, JapaneseDictionarySource, JapanesePos | callers=1 | deps=2 | Storage=miki_japanese_dictionary_packages_v1,miki_japanese_personal_dictionary_v1
+- [USED] LEGACY_OR_SHARED | src/services/japaneseAnalysisService.ts | lines=6 | symbols=JapaneseAnalysisResult, JapaneseSemanticRole, JapaneseToken, JapaneseTokenKind, japaneseAnalysisService | callers=3 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/research/services/japaneseAnalysisService.ts
+- [USED] LEGACY_OR_SHARED | src/services/japaneseDictionaryService.ts | lines=6 | symbols=JapaneseDictionaryEntry, JapaneseDictionaryPackage, JapaneseDictionaryPackageInfo, JapaneseDictionarySource, JapanesePos, japaneseDictionaryService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/research/services/japaneseDictionaryService.ts
 - [USED] LEGACY_OR_SHARED | src/services/knowledgeGapService.ts | lines=1 | symbols=- | callers=3 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/knowledgeHalfLifeService.ts | lines=20 | symbols=HalfLifeRecord, KnowledgeStability, knowledgeHalfLifeService | callers=0 | deps=1 | Storage=miki_knowledge_half_life_v1
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/knowledgeOperatingSystemService.ts | lines=113 | symbols=KnowledgeObject, KnowledgeObjectType, KnowledgeOperatingSystemService, knowledgeOperatingSystemService | callers=1 | deps=2 | Storage=miki_knowledge_os_v1
-- [USED] LEGACY_OR_SHARED | src/services/latentIntentMiningService.ts | lines=211 | symbols=LatentIntentMiningService, latentIntentMiningService | callers=2 | deps=5 | Storage=miki_latent_intent_sessions_v1
-- [USED] LEGACY_OR_SHARED | src/services/longTermMemoryService.ts | lines=1123 | symbols=longTermMemoryService | callers=3 | deps=4
+- [USED] LEGACY_OR_SHARED | src/services/latentIntentMiningService.ts | lines=6 | symbols=LatentIntentMiningService, latentIntentMiningService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/unknown/services/latentIntentMiningService.ts
+- [USED] LEGACY_OR_SHARED | src/services/longTermMemoryService.ts | lines=6 | symbols=longTermMemoryService | callers=3 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/memory/services/longTermMemoryService.ts
 - [ORPHAN] LEGACY_OR_SHARED | src/services/memoryAuditService.ts | lines=397 | symbols=EpistemicStatusAuditResult, MemoryAuditCycleRecord, memoryAuditService | callers=0 | deps=7 | Storage=miki_memory_audit_logs
 - [ORPHAN] LEGACY_OR_SHARED | src/services/memoryPromotionService.ts | lines=59 | symbols=MemoryPromotionService, memoryPromotionService | callers=0 | deps=4
 - [ORPHAN] LEGACY_OR_SHARED | src/services/metacognitiveCalibrationService.ts | lines=166 | symbols=MetacognitiveCalibrationService, metacognitiveCalibrationService | callers=0 | deps=5 | Storage=miki_metacognitive_calibrations_v1
@@ -1020,17 +1040,17 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [ORPHAN] LEGACY_OR_SHARED | src/services/nativeWorkManagerService.ts | lines=140 | symbols=NativeWorkManagerPluginInterface, nativeWorkManagerService | callers=0 | deps=1 | Tests=4
 - [USED] LEGACY_OR_SHARED | src/services/nonLlmCodeSynthesisService.ts | lines=27 | symbols=CodeSynthesisPlan, NonLlmCodeSynthesisService, nonLlmCodeSynthesisService | callers=1 | deps=4
 - [USED] LEGACY_OR_SHARED | src/services/nonLlmCoreService.ts | lines=495 | symbols=NonLlmCoreResult, NonLlmCoreService, nonLlmCoreService | callers=1 | deps=30 | Tests=3
-- [USED] LEGACY_OR_SHARED | src/services/nonLlmHardwarePipelineService.ts | lines=261 | symbols=HardwareTelemetry, NonLlmHardwarePipelineService, NonLlmPipelineExecutionResult, nonLlmHardwarePipelineService | callers=1 | deps=8 | Markers=7
-- [USED] LEGACY_OR_SHARED | src/services/nonLlmRuntimeService.ts | lines=101 | symbols=NativeDownloadedFile, NativeGpuInfo, NativeLlmChunkEvent, NativeLlmProgressEvent, NativeLoraFile | callers=4 | deps=2
+- [USED] LEGACY_OR_SHARED | src/services/nonLlmHardwarePipelineService.ts | lines=6 | symbols=HardwareTelemetry, NonLlmHardwarePipelineService, NonLlmPipelineExecutionResult, nonLlmHardwarePipelineService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/safety/services/nonLlmHardwarePipelineService.ts
+- [USED] LEGACY_OR_SHARED | src/services/nonLlmRuntimeService.ts | lines=93 | symbols=NativeDownloadedFile, NativeGpuInfo, NativeLlmChunkEvent, NativeLlmProgressEvent | callers=4 | deps=2
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/operationalConformanceService.ts | lines=1 | symbols=- | callers=1 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/operationalGovernanceService.ts | lines=51 | symbols=ApprovalRequest, BlindComparison, CapabilitySlo, CognitiveCheckpoint, DelegationGrant | callers=0 | deps=1
-- [USED] LEGACY_OR_SHARED | src/services/planOrchestratorService.ts | lines=253 | symbols=OrchestratorRun, OrchestratorStep, OrchestratorStepStatus, PlanOrchestratorService, planOrchestratorService | callers=1 | deps=6
-- [USED] LEGACY_OR_SHARED | src/services/privacyGuardrailService.ts | lines=248 | symbols=privacyGuardrailService | callers=5 | deps=5 | Storage=miki_privacy_audit_logs_v5
+- [USED] LEGACY_OR_SHARED | src/services/planOrchestratorService.ts | lines=6 | symbols=OrchestratorRun, OrchestratorStep, OrchestratorStepStatus, PlanOrchestratorService, planOrchestratorService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/strategy/services/planOrchestratorService.ts
+- [USED] LEGACY_OR_SHARED | src/services/privacyGuardrailService.ts | lines=6 | symbols=privacyGuardrailService | callers=3 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/safety/services/privacyGuardrailService.ts
 - [ORPHAN] LEGACY_OR_SHARED | src/services/proactiveContextOsService.ts | lines=297 | symbols=ContextAwarenessSnapshot, PersonaAnchorState, ProactiveContextOsService, ProactiveInsightItem, proactiveContextOsService | callers=0 | deps=2 | Storage=miki_persona_anchors_v1,miki_proactive_context_snapshot_v1
 - [USED] LEGACY_OR_SHARED | src/services/regressionBenchmarkService.ts | lines=1 | symbols=- | callers=2 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/remediationExecutionCoordinatorService.ts | lines=113 | symbols=RemediationDispatchResult, RemediationExecutionCoordinatorService, remediationExecutionCoordinatorService | callers=0 | deps=7
 - [ORPHAN] LEGACY_OR_SHARED | src/services/remediationFailureRecoveryService.ts | lines=299 | symbols=RecoveryStatus, RemediationFailureRecoveryRecord, RemediationFailureRecoveryService, remediationFailureRecoveryService | callers=0 | deps=13
-- [USED] LEGACY_OR_SHARED | src/services/requestTypeCompilerService.ts | lines=196 | symbols=RequestTypeCompilerService, requestTypeCompilerService | callers=3 | deps=2
+- [USED] LEGACY_OR_SHARED | src/services/requestTypeCompilerService.ts | lines=6 | symbols=RequestTypeCompilerService, requestTypeCompilerService | callers=2 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/selfDevelopment/services/requestTypeCompilerService.ts
 - [USED] LEGACY_OR_SHARED | src/services/researchService.ts | lines=1 | symbols=- | callers=2 | deps=1 | Tests=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/researchStrategyService.ts | lines=1 | symbols=- | callers=0 | deps=1 | Tests=1
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/researchToRemediationService.ts | lines=1 | symbols=- | callers=2 | deps=1
@@ -1047,29 +1067,29 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/simpleRpgRuleEngineService.ts | lines=110 | symbols=RpgAction, RpgActionInput, RpgActionResult, SimpleRpgRuleEngineService, simpleRpgRuleEngineService | callers=1 | deps=2 | Storage=miki_deterministic_rpg_state_v63
 - [ORPHAN] LEGACY_OR_SHARED | src/services/situationalAwarenessService.ts | lines=17 | symbols=PerceptionEvent, PerceptionSource, SituationModel, situationalAwarenessService | callers=0 | deps=2 | Storage=miki_situation_model_v1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/skillIrCompilerService.ts | lines=325 | symbols=CompiledSkillIR, SkillInstruction, SkillOpcode, SkillVmExecutionResult, skillIrCompilerService | callers=0 | deps=1 | Markers=2
-- [USED] LEGACY_OR_SHARED | src/services/skillsService.ts | lines=855 | symbols=INITIAL_SKILLS, isDistinctSkillContext, skillsService | callers=2 | deps=5 | Storage=miki_ai_skills_library
+- [USED] LEGACY_OR_SHARED | src/services/skillsService.ts | lines=6 | symbols=INITIAL_SKILLS, isDistinctSkillContext, skillsService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/capability/services/skillsService.ts
 - [ORPHAN] LEGACY_OR_SHARED | src/services/specAstParserService.ts | lines=160 | symbols=ConflictResolutionReport, NormativePriorityLevel, SpecAstDirectiveNode, specAstParserService | callers=0 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/specContractCompilerService.ts | lines=88 | symbols=ContractStatus, Norm, SpecContract, SpecContractClause, SpecContractCompilerService | callers=0 | deps=2 | Storage=miki_spec_contract_v1 / Tests=3
 - [USED] LEGACY_OR_SHARED | src/services/startupRecoveryService.ts | lines=190 | symbols=StartupDiagnostic, StartupPhase, startupRecoveryService | callers=1 | deps=0 | Storage=miki_startup_diagnostic_v1 / Tests=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/storagePlanningService.ts | lines=220 | symbols=StoragePlanningService, storagePlanningService | callers=0 | deps=4 | Storage=miki_storage_audit_log_v32
-- [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=833 | symbols=storageService | callers=295 | deps=1 | Tests=7
+- [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=847 | symbols=storageService | callers=277 | deps=1 | Tests=7 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/syntheticDataService.ts | lines=779 | symbols=SyntheticDataService, syntheticDataService, toolsService | callers=1 | deps=9 | Storage=miki_ai_synthetic_batches
 - [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=1033 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
 - [USED] LEGACY_OR_SHARED | src/services/taskCaseMemoryService.ts | lines=45 | symbols=TaskCaseMaturity, TaskCaseMemoryService, TaskCaseOutcome, TaskCaseRecord, taskCaseMemoryService | callers=4 | deps=5
-- [USED] LEGACY_OR_SHARED | src/services/taskExecutionOrchestratorService.ts | lines=237 | symbols=TaskExecutionHandle, TaskExecutionOrchestratorService, TaskExecutionStatus, taskExecutionOrchestratorService | callers=1 | deps=15
-- [USED] LEGACY_OR_SHARED | src/services/taskLineageService.ts | lines=45 | symbols=TaskLineageRecord, TaskLineageService, taskLineageService | callers=1 | deps=2
+- [USED] LEGACY_OR_SHARED | src/services/taskExecutionOrchestratorService.ts | lines=6 | symbols=TaskExecutionHandle, TaskExecutionOrchestratorService, TaskExecutionStatus, taskExecutionOrchestratorService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/execution/services/taskExecutionOrchestratorService.ts
+- [USED] LEGACY_OR_SHARED | src/services/taskLineageService.ts | lines=6 | symbols=TaskLineageRecord, TaskLineageService, taskLineageService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/execution/services/taskLineageService.ts
 - [ORPHAN] LEGACY_OR_SHARED | src/services/teacherRequestService.ts | lines=1615 | symbols=TeacherRequestService, teacherRequestService | callers=0 | deps=11 | Storage=miki_ai_auto_teacher_request_enabled,miki_ai_auto_teacher_request_records,miki_ai_delayed_teacher_queue
-- [USED] LEGACY_OR_SHARED | src/services/testAssertionService.ts | lines=140 | symbols=TestAssertionResult, TestAssertionService, TestAssertionStatus, testAssertionService | callers=1 | deps=1
+- [USED] LEGACY_OR_SHARED | src/services/testAssertionService.ts | lines=6 | symbols=TestAssertionResult, TestAssertionService, TestAssertionStatus, testAssertionService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/verification/services/testAssertionService.ts
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/toolsService.ts | lines=1549 | symbols=BUILTIN_TOOLS, ExecuteToolOptions, ToolExecutionContext, ToolsService, toolsService | callers=1 | deps=10 | Storage=miki_ai_tools_stats / Tests=1 / Markers=6
-- [USED] LEGACY_OR_SHARED | src/services/unifiedDecisionEngineService.ts | lines=386 | symbols=CONTEXT_PROFILES, UnifiedDecisionEngineService, unifiedDecisionEngineService | callers=2 | deps=3 | Storage=miki_unified_decisions_v1 / Tests=1
+- [USED] LEGACY_OR_SHARED | src/services/unifiedDecisionEngineService.ts | lines=6 | symbols=CONTEXT_PROFILES, UnifiedDecisionEngineService, unifiedDecisionEngineService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/strategy/services/unifiedDecisionEngineService.ts
 - [USED] LEGACY_OR_SHARED | src/services/unifiedMikiExperienceService.ts | lines=202 | symbols=UnifiedExperience, UnifiedExperienceDomain, UnifiedMikiExperienceService, UnifiedMikiState, UnifiedOutcome | callers=5 | deps=2 | Storage=miki_unified_experience_v1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/unknownTaskDecompositionService.ts | lines=93 | symbols=DecompositionStatus, TaskDecompositionStep, UnknownTaskDecomposition, unknownTaskDecompositionService | callers=0 | deps=4
-- [USED] LEGACY_OR_SHARED | src/services/vbaStaticVerifierService.ts | lines=638 | symbols=VbaStaticVerifierService, vbaStaticVerifierService | callers=1 | deps=1 | Markers=1
+- [USED] LEGACY_OR_SHARED | src/services/vbaStaticVerifierService.ts | lines=6 | symbols=VbaStaticVerifierService, vbaStaticVerifierService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/verification/services/vbaStaticVerifierService.ts
 - [USED] LEGACY_OR_SHARED | src/services/verifiedCapabilityPromotionService.ts | lines=1 | symbols=- | callers=3 | deps=1
 - [USED] LEGACY_OR_SHARED | src/services/verifiedKnowledgePromotionService.ts | lines=1 | symbols=- | callers=3 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/verifierService.ts | lines=1 | symbols=- | callers=0 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/virtualExperienceGeneratorService.ts | lines=45 | symbols=VirtualExperienceCase, virtualExperienceGeneratorService | callers=0 | deps=4
-- [ORPHAN] LEGACY_OR_SHARED | src/services/virtualTrainingService.ts | lines=216 | symbols=virtualTrainingService | callers=0 | deps=5 | Storage=miki_virtual_training_trials_v32 / Tests=2
+
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/workingAgendaService.ts | lines=195 | symbols=workingAgendaService | callers=1 | deps=3 | Storage=miki_working_agenda_items
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/worldModelService.ts | lines=362 | symbols=WorldModelService, worldModelService | callers=2 | deps=3 | Storage=miki_ai_prediction_error_records,miki_ai_world_model_predictions
 - [USED] OTHER | src/types.ts | lines=304 | symbols=AbstractProcedurePlan, AbstractSymbolMapping, AbstractTestCasePlan, ActionPrediction, AffectionDynamicState | callers=209 | deps=0 | Tests=70
@@ -1090,8 +1110,10 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeCore.kt | lines=155 | symbols=NativeCoreHealth | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt | lines=833 | symbols=MIKINativeRunnerPlugin, NativeTestContext, NativeTestOutcome | callers=0 | deps=0 | Plugin=MIKINativeRunner
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MainActivity.java | lines=214 | symbols=MainActivity | callers=0 | deps=0
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiBackgroundWorker.kt | lines=316 | symbols=ConditionCheckResult, MikiBackgroundWorker | callers=0 | deps=0
-- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt | lines=445 | symbols=MikiWorkManagerPlugin | callers=0 | deps=0 | Plugin=MikiWorkManagerPlugin / Markers=1
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiBackgroundWorker.kt | lines=349 | symbols=ConditionCheckResult, MikiAutonomousCycleCallback, MikiBackgroundWorker | callers=0 | deps=0
+- [NATIVE_MIRROR] ANDROID_NATIVE | android-native/src/main/java/com/miki/ai/MikiBackgroundWorker.kt | lines=349 | symbols=ConditionCheckResult, MikiAutonomousCycleCallback, MikiBackgroundWorker | callers=0 | deps=0 | mirroredFrom=android/app/src/main/java/com/miki/ai/MikiBackgroundWorker.kt
+- [NATIVE_MIRROR] ANDROID_NATIVE | android-native/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt | lines=421 | symbols=MikiWorkManagerPlugin | callers=0 | deps=0 | mirroredFrom=Android-app-compatible plugin contract
+- [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt | lines=492 | symbols=MikiWorkManagerPlugin | callers=0 | deps=0 | Plugin=MikiWorkManagerPlugin / Markers=1
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/java/com/miki/ai/NativeWebViewDiagnosticJournal.java | lines=444 | symbols=NativeWebViewDiagnosticJournal | callers=2 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml | lines=34 | symbols=- | callers=0 | deps=0
 - [NATIVE_SOURCE] ANDROID_NATIVE | android/app/src/main/res/drawable/ic_launcher_background.xml | lines=170 | symbols=- | callers=0 | deps=0
@@ -5074,20 +5096,7 @@ MIKIの知能向上とは、
    UI入力から最終COREResultまで同一CognitiveState ID/Revisionを追跡でき、
    学習・検証・失敗・成功による状態更新が次のCORE判断へ確実に反映される。
 
-2. [PARTIAL] 既存MikiCategoryInteractionRuntimeの固定順序経路を廃止・COREへ統合
-   現在の `mikiCategoryInteractionRuntime.ts` には
-   `NEXT_CATEGORY` による固定順序ルートが残っている。
-
-これは本設計の
-   「COREが目的に応じて必要な17分類だけ選択する」
-   という要件と一致しない。
-
-完成条件：
-   conversation → data → execution → … の固定連鎖を通常経路から除去し、
-   既存CORE Orchestrator / Adaptive Route Plannerを正規経路とする。
-   既存Runtimeが必要なら、COREが発行したDomain処理を受ける実行部として再利用する。
-
-3. [PARTIAL] 会話・研究・学習・自己改善・コード改善の「同一認知サイクル」完全統合
+2. [PARTIAL] 会話・研究・学習・自己改善・コード改善の「同一認知サイクル」完全統合
    現在は統合学習、自己改善、会話、研究などの既存サービスが多数存在する。
    しかしそれぞれの結果が必ず同じCognitiveStateへ集約され、
    COREが再評価して次の行動を決定することを受け入れテストで保証する必要がある。
@@ -5097,7 +5106,7 @@ MIKIの知能向上とは、
    Goal → Gap → 必要17分類 → Action → Verification → Learning → CORE
    の同一構造で処理できる。
 
-4. [PARTIAL] 学習結果のCognitiveStateへの正規反映
+3. [PARTIAL] 学習結果のCognitiveStateへの正規反映
    `mikiUnifiedLearningContinuumService` など学習機構は存在する。
    しかし「学習記録が存在する」ことと
    「次回CORE判断を変更する状態として反映された」ことを分離して検証する必要がある。
@@ -5108,14 +5117,14 @@ MIKIの知能向上とは、
 
 【P1：高優先――推論品質・学習品質を完成させる】
 
-5. [NOT_IMPLEMENTED] Claim → Sentence → Evidenceの一対一/多対一追跡
+4. [PARTIAL] Claim → Sentence → Evidenceの一対一/多対一追跡
    回答文の各事実主張が、
    どのClaim・Evidence・Verification結果から作られたかを追跡可能にする。
 
 完成条件：
    根拠のない主張、根拠不一致、古いEvidence利用を最終回答前に検出できる。
 
-6. [NOT_IMPLEMENTED] 学習原因の因果帰属をLearningへ接続
+5. [PARTIAL] 学習原因の因果帰属をLearningへ接続
    現在の失敗原因・因果評価機構は存在するが、
    「どのKnowledge / Capability / Strategy / Component / Decisionが結果へ寄与したか」
    をLearning更新へ正式接続する経路が未完成。
@@ -5124,7 +5133,7 @@ MIKIの知能向上とは、
    成功/失敗 → 原因候補 → 因果評価 → 学習対象選定 → 次回戦略更新
    が同一認知サイクル内で追跡できる。
 
-7. [NOT_IMPLEMENTED] 情報利得ベースの確認質問
+6. [PARTIAL] 情報利得ベースの確認質問
    「聞けば確実に判断が変わる情報」を優先し、
    会話負担を最小化する質問選択機構。
 
@@ -5132,7 +5141,7 @@ MIKIの知能向上とは、
    自力で文脈解決できる場合は質問しない。
    複数候補がある場合は、最小数の質問で最も大きく不確実性を減らす。
 
-8. [PARTIAL] Multi-Intentの明示的な分解・統合
+7. [PARTIAL] Multi-Intentの明示的な分解・統合
    潜在意図・Goal推定機構は存在するが、
    1発話に複数の独立した目的がある場合に、
    目的を個別Task/Goalへ分解して全て処理したうえで統合結果を返す経路を完成させる。
@@ -5141,14 +5150,14 @@ MIKIの知能向上とは、
    「Aして、Bも調べて、Cならコードを直して」のような入力で、
    A/B/Cのいずれも消失しない。
 
-9. [PARTIAL] 意図・参照対象・ユーザー制約の複数仮説管理
+8. [PARTIAL] 意図・参照対象・ユーザー制約の複数仮説管理
    latent intent等は存在するが、
    「唯一の解釈を即決」せず候補仮説として保持し、
    会話履歴・Evidence・結果により更新する統一経路を完成させる。
 
 【P2：中優先――回答品質と知識転移】
 
-10. [NOT_IMPLEMENTED] ユーザー理解度に応じた説明量の適応
+9. [PARTIAL] ユーザー理解度に応じた説明量の適応
     同じ事実を、
     初心者向け / 経験者向け / 詳細検証向け
     のように必要情報量へ適応する。
@@ -5156,12 +5165,12 @@ MIKIの知能向上とは、
 重要：
     表現を変えるだけでなく、説明量の判断理由をCognitiveStateへ記録する。
 
-11. [NOT_IMPLEMENTED] 回答の中核情報と表面表現の分離保証
+10. [PARTIAL] 回答の中核情報と表面表現の分離保証
     回答文の表現が変わっても、
     Claim / 条件 / Evidence / 実行結果 / 未解決Unknown
     などの意味的中核は変わらないことを検証する。
 
-12. [PARTIAL] Cross-Domain学習の実利用転移評価
+11. [PARTIAL] Cross-Domain学習の実利用転移評価
     統合学習層には複数領域をまたぐ経験・関連情報が存在する。
     しかし、
     「ある領域で得た学習が別領域で実際に成功率を上げた」
@@ -5174,7 +5183,7 @@ MIKIの知能向上とは、
 
 【P3：長期成長――より高度な自律学習】
 
-13. [NOT_IMPLEMENTED] 潜在Unknownの予測
+12. [PARTIAL] 潜在Unknownの予測
     既知のKnowledge/Relation/Capability/Failure/Environment構造から、
     まだKnowledge Gapとして登録されていない
     「存在する可能性が高い未知」を候補化する。
@@ -5184,12 +5193,12 @@ MIKIの知能向上とは、
     Potential Unknown → Research → Evidence → Verification
     へ送る。
 
-14. [PARTIAL] 学習機会の発見
+13. [PARTIAL] 学習機会の発見
     現在のGoalを解決するための未知とは別に、
     将来複数タスクへ再利用できる知識・能力を発見した場合、
     Learning Opportunityとして保留できるようにする。
 
-15. [NOT_IMPLEMENTED] 学習による回答変化の原因説明
+14. [PARTIAL] 学習による回答変化の原因説明
     同じ入力に対して以前と現在で回答が変わった場合、
 
 「どのKnowledge / Evidence / Capability / Experience / Strategy
@@ -5355,14 +5364,17 @@ UIからDomainへ直接到達する旧経路は、
     不要な旧入口、旧初期化、旧命名、旧ルーティングは削除する。
     `mikiCategoryInteractionRuntime` と旧Chapter系が独立して判断主体にならない。
 
-98. [P0][PARTIAL] Local LLM / LoRA / GGUF / WebGPU旧残骸の完全除去
-    現在もFeature Flag、型、Storage Planning、UI等に
-    LoRA/GGUF/旧モデル系の参照が残っていることを確認した。
+98. [PARTIAL] Local LLM / GGUF / WebGPU旧残骸の完全除去（LoRA実行経路はP289で退役）
+    P289でLoRA関連の実行経路、学習データ出力UI、型別名、
+    LORA_TRAININGの有効Flag、旧virtual training service、
+    LoRAストレージ区画、旧ルーティングAPIを削除した。
+    既存保存データは無言で破棄せず、旧LoRA行先のMemoryを
+    非承認・非アクティブの隔離先へ移行する。旧Flagも読み込み時に除去する。
 
-現行方針は「ローカルLLMを一切使用しない」なので、
-    無効化フラグを残すだけではなく、
-    通常実行経路・設定UI・ストレージ管理・モデル管理・
-    教材出力・旧互換層などから実体と不要な接続を除去する。
+現行方針は「ローカルLLMを通常機能として使用しない」。
+    GGUF/WebGPU/旧モデル管理に関する残骸の網羅監査は未完了であり、
+    本項全体を完了とは扱わない。LoRAに関する残存文字列は
+    既存データの安全な一回限りの移行処理に限定する。
 
 監査用の「再導入禁止テスト」は残してよいが、
     廃止対象を通常機能として扱わない。
@@ -11777,3 +11789,250 @@ Graph Mutationはconversation、research、learning、memory、capability、veri
 - 履歴は最大30件のメタデータに制限し、実装コードを複製保存しない。表示上限到達時は切り詰めを明示する。
 - 回帰検査に状態境界、無自動解決・無自動昇格、CORE接続、UI、索引行数を追加した。完全再帰インベントリ全体は再集計していない。
 - 変更後はGitHub mainの差分、Actionsの全ジョブ、APK Artifactを別々に確認する。ビルド成功・APK生成・実機動作は、各結果を観測するまで宣言しない。
+
+
+============================================================
+【2026-10-18-P277 認知状態の継続性・自律実行接続】
+
+- 既存COREのUnifiedCognitiveStateSnapshotを拡張し、同じBlackboard上の状態から仮説、Action参照、安全制約、矛盾候補、確信度集計、Active Task状態、失敗参照、学習参照、意味中核ハッシュを組み立てる。独立した第二のCognitiveState DBは作らない。
+- 現行`mikiCategoryInteractionRuntime.ts`を実読し、通常経路に`NEXT_CATEGORY`固定連鎖がないことを確認したため、古い固定順序経路の削除項目を未実装一覧から除外した。設計書内の過去Revision記述は当時の履歴として残す。
+- CORE ingressでMulti-Intent planを入力時に確定してpayloadへ保持し、実行後に同じTask Blackboardへ計画・仮説・因果帰属候補を追記する。原因候補は検証済み因果と区別し、自動でverified学習へ昇格させない。
+- 最終回答の文単位Claim候補を既存ClaimDatabaseへ`ai_output / UNVERIFIED / SELF_SUPPORTED`として冪等登録し、各Claim候補と候補Evidence ID、回答ハッシュ、意味中核ハッシュを既存Task Blackboardへ保存する。候補Evidenceは意味的な裏付けが確定するまでClaimへ結合せず、自動昇格もしない。 表面回答ハッシュと意味中核ハッシュは別フィールドにし、意味中核はUnified CognitiveStateのGoal/Constraint/Evidence/Unknown由来とする。
+- 再検証完了ゲートの`REVALIDATION_REVIEW_PACKAGE_MISSING`原因をコードで確認した。CREATE_REVIEW_PACKAGEの`packageId`はトップレベルではなく`artifact.packageId`内にあるため、既存結果のネスト構造を再帰走査してPackage Ledgerと照合するよう修正した。
+- CognitiveStateCheckpointを既存storageServiceへ永続化し、COREの各認知サイクルでCheckpoint chainを生成し、追加Evidence差分を記録する。起動時ロード、親Checkpoint存在検証、stateHash/integrityHash再検証、件数上限を実装し、Task Resume時はCheckpoint再構成に失敗したら再開を拒否する。 50段階ごとに親Chainの状態ハッシュを保持したroot checkpointへ圧縮し、長期Taskの親参照が無制限に伸びるのを抑える。
+- Android WorkManager起動時にAutopilot設定を読み、設定された間隔が経過している場合のみ既存selfImprovementRequestEventService経由でCORE改善要求を発行する。dispatch時刻を先に永続化し、再起動による重複発行を抑止する。 Listener未登録時はdispatch時刻を進めず、次回Worker起動で再試行できるようにした。
+- 旧`workManagerService.ts`がNative Pluginに存在しない`schedulePeriodicWork`/`cancelPeriodicWork`を呼ぶ不整合を修正し、既存`nativeWorkManagerService`への互換Facadeに統一した。
+- この変更は静的コード接続を実装したもので、Android実機でアプリ終了後のWorker起動・Headless WebViewの永続Storage共有・長時間処理完遂を実証したものではない。アプリ終了後の動作は端末/OS/WorkManager条件に依存し、実機確認までは保証しない。
+- P0-P3一覧に残る情報利得質問の実対話適用、説明量適応、学習転移の成功率評価、潜在Unknownの精度検証、回答変化の完全因果説明は、この変更だけでは完成扱いにしない。既存サービスの存在のみを完成根拠にしない。
+
+【2026-10-17-P276 自己台帳グラフ編集レイヤー】
+============================================================
+
+- ZIP内の設計正本を先に確認し、18構成・CORE主導・既存責務再利用・設計正本一本化・TermuxからのみPUSHの原則を維持した。
+- CapabilityLedgerScreenへSVGグラフ表示、ノード／エッジの追加・編集・削除UIを追加した。
+- capabilityLedgerGraphServiceを追加し、専用の永続キー、端点整合性、重複エッジ抑制、件数上限、ノード削除時の孤立エッジ除去を実装した。
+- tool_self_ledger_graphを既存ToolsServiceへ登録し、同一Service経由のlist/add/update/deleteを追加した。既存の確認ゲートにより、変更操作は承認前に適用されない。
+- 実能力・検証根拠・Registryをグラフ編集から変更しない境界を明記した。
+- 更新対象ファイルの行数を実測して現行実装索引を更新した。完全再帰インベントリ、CI、APK、実機での長時間自律動作は未確認。
+- P276時点のAutopilotはWebView内タイマー中心で、アプリ終了後の継続を保証していなかった。P277で既存WorkManager wakeからCORE ingressへの接続を追加したが、アプリ終了後の長時間処理完遂を実機確認したとは扱わない。
+
+
+P277 2026-10-18: CORE認知状態ID/Revisionと追加状態フィールド、Multi-Intent/仮説保持、情報利得ベース確認候補、説明量計画、Potential Unknown候補、学習機会/転移候補、Claim候補追跡、因果調査候補、回答変化の差分説明、永続Checkpoint chain/Resume検証、WorkManagerからAutopilot CORE ingressへの接続、再検証Review Package ID抽出を追加。変更ファイルの構文・相対import・限定的ランタイムSmokeを確認し、`verify_runtime_failure_fixes.mjs`の131契約チェックがPASSした。全体型検査は依存パッケージ不在で完了できず、Android実機・CI・APK・長時間自律完遂は未検証。P0-P3の完成条件を満たしていない機能はPARTIALのまま保持。
+
+P277索引注記: 変更ファイルの行数は更新したが、正本の全treeファイル数・静的到達数・同名組の全量再集計は未実施。
+
+
+============================================================
+【2026-10-18-P278 自律実行完了Receipt・Checkpoint復元境界】
+
+■ 現行契約
+- Native WorkManagerの成功条件は「トリガーを開始できた」ではなく、既存`runAutonomousBackgroundCycle()`が明示的に返した`status === completed`をNative callbackが受け取ったこととする。Promise reject、入口未登録、タイムアウト、結果不明は成功に変換せず、WorkerはRetry対象とする。
+- Active RuntimeはPluginインスタンスの存在だけでなく、ActivityとCapacitor WebViewの接続状態を確認する。Plugin参照が残っていてもWebViewが未接続ならHeadless Executorへ切り替える。
+- Active WebViewで処理を開始した後にタイムアウトまたは失敗した場合、Headless WebViewや別Executorを同時起動しない。元のJavaScript処理が継続中の可能性があり、同一Cycleの重複実行を避けるためである。
+- Headless WebViewへ`MikiAutonomousCycleCallback`を登録し、実処理Promiseの解決値、status、拒否理由を受け取る。開始応答や固定時間経過を完了扱いにしない。完了Receiptがない場合は上限時間で失敗／Retryとして扱い、WebViewを破棄する。
+- Headless WebViewはセットアップ例外、時間切れ、WorkerのCoroutineキャンセルのいずれでも`finally`経由で破棄する。cleanupの二重実行を抑止し、途中生成されたWebViewをリークさせない。
+- Workerの排他Lockはハードウェア条件判定を含むすべての実行経路で`finally`から解放する。別Cycle実行中に起動されたWorkは、未実行なのに成功扱いとせずRetryを返す。
+- COREの`resume()`と`resumeFromExecutionEvent()`は、最新Blackboardの`cognitiveState:*`スナップショットと最新Checkpoint Receiptが同じ`stateId/stateHash`を指し、Checkpoint chain、各Hash、Receiptの整合性が検証できる場合だけ再開する。認知スナップショットとCheckpointが欠落・不一致・破損している場合はERROR記録を残し、再開を拒否する。初回サイクル前の状態（認知SnapshotもCheckpointも未生成）だけは再開ガードを通過できる。
+- Checkpointのchain検証はCheckpoint連鎖の整合性を検証し、COREはさらにTask Blackboard内の具体的な認知Snapshotを照合する。これにより、chainの存在だけを「認知状態が復元できた」と誤認しない。
+- `android/app/src/main/java/com/miki/ai/`と`android-native/src/main/java/com/miki/ai/`のWorkerはP278実装を同期する。WorkManager PluginはE2E Browser / fetchRenderedPageの既存APIを持つAndroidアプリ側正本を維持し、旧android-native Pluginをコピー元として上書きしない。
+
+■ 検証と未完了境界
+- `verify_runtime_failure_fixes.mjs`と`verify_android_workmanager_contract.ts`へ、明示的完了Receipt、開始と完了の分離、接続済みActive Runtimeの判定、キャンセル時のWebView cleanup、重複Executor防止、Checkpoint-to-Blackboard照合の契約検査を追加する。今回のZIP作成前検査ではruntime regression 141/141、Android WorkManager static contract 29/29、Rust CORE kernel phase 37 contractをPASSした。これらは静的／契約検査でありAndroidビルドや実機検証ではない。
+- 静的契約検査はAndroid実機でのWorker起動、JavaScript bridge、WebView Storage共有、OSによる実行延期、プロセス kill / 再起動後の回復を証明しない。実機ログまたはCIの実結果が得られるまでDEVICE_VERIFIED / LONG_RUNNING_COMPLETEDとは判定しない。
+- Native WorkManagerが成功Receiptを受信したことは、イベントでQueueへ投入された後の全自己改善TaskやReview ZIPの完成を意味しない。Autopilot dispatch・Queue受理・CORE Task終端・Review Package生成は別の状態として追跡する。
+- P278追加：ClaimDatabaseに知識半減期の読み取りを接続する。期限切れのREAL Claimは公式Verification Statusを直接変更せず、検索信頼度を下げ、`TRIGGER_WEB_SEARCH`と`MATCHING_CLAIM_REVALIDATION_REQUIRED`を返す。CognitiveQualityはそのClaimを確定済み知識として未知除外せず、再調査が必要な`POTENTIAL_UNKNOWN`候補としてCOREへ渡す。
+- 旧バージョンですでに保存されていたClaimには鮮度記録がない場合があるため、`indexMissingFreshness()`を追加し、バックグラウンド監査の各回で上限付き（通常8件／Deep Sleep 24件）に段階索引化する。期限切れのREAL Claimは既存`knowledgeGapService`から`STALE_INFORMATION` Gapへ接続する。Claimの自動降格、Fact昇格、新しい再検証Orchestratorは追加しない。KnowledgeGapの既存ID／Identity統合で重複生成を抑える。
+- P278追加：`failureUnderstandingService`は`execution.failed`イベントをEvent IDで冪等化し、Component／環境／エラー署名の60秒Cooldown、直近200件の永続記録、既存KnowledgeGap ID、原因調査状態を保持する。統合学習へ流す値は`outcome=FAILURE / verified=false`に限定する。失敗原因の断定、検索実行、Claim昇格、能力昇格を直接行わず、既存AutonomousRevalidationLoop → CORE TaskIngressへ委譲する。
+- 正本のService Connectivity Registryで、半減期と失敗理解の両Serviceを`CONNECTED_RUNTIME`として記録する。既存のTaskCaseMemory／AutonomousIssueDiscovery経路は再利用し、別のFailure Queueや第二の学習Authorityを追加しない。
+- P278は実行の完了判定、再開時の復元境界、Claimの鮮度による再調査判断、未検証失敗の永続学習観測を補強した段階である。Claimの意味的なEvidence検証完了、学習転移の効果測定、情報利得による実対話の質問選択、潜在Unknownの精度、回答差分の完全な因果説明、およびAndroid実機の長時間E2Eは未完了のまま維持する。
+
+P278 2026-10-18: WorkManagerのforeground/headless両経路を明示的な完了Receiptに変更。Active Pluginが未接続のWebViewを保持している場合はHeadless経路を選択する。Worker起動応答や固定時間経過を成功と扱う経路を削除し、セットアップ例外・タイムアウト・CoroutineキャンセルでHeadless WebViewをfinally経由で破棄する。処理中の重複Executor起動を防止。CORE resume両入口にCheckpoint chainとBlackboard認知SnapshotのstateId/stateHash照合を追加。さらにClaimの鮮度を検索判断とCORE再検証候補へ接続し、旧Claimの鮮度索引はバックグラウンド監査で上限付き段階移行する。失敗イベントを永続・重複抑止し、未検証学習観測として記録するが原因断定や昇格はしない。変更対象の正本索引行数を実測更新。ZIP作成前にruntime regression 147/147、Android WorkManager static contract 29/29、Rust CORE kernel phase 37 contractをPASS。Android build、CI、APK、OS停止・再起動後の長時間完遂は未検証。
+
+============================================================
+【2026-10-18-P279 自律実行Receipt相関・アウトボックス・Checkpoint自己検証】
+============================================================
+
+■ 現行契約（P278を置き換える追加条件）
+- Native CycleはUUIDのcycleIdで開始・完了Receipt・キャンセル要求を相関させる。Receiptは同一cycleIdかつ`status=completed`の場合だけWorker成功とする。古い／別CycleのReceiptは無視する。WorkerはActive Runtimeのタイムアウト時に同じCycleへキャンセルを要求し、処理停止Receiptを最大10秒待つ。Receiptが来ない場合も成功扱いにせず、別Executorを起動しない。Headless経路はUIスレッド上のWebView破棄完了を待ってからWorkerの終了処理へ進む。
+- `runAutonomousBackgroundCycle()`が正常終了した場合、その完了はローカル保守サイクルの完了であり、自己改善Taskの完了ではない。後続入力は`BACKGROUND_CYCLE_REVIEW`として既存SelfImprovement ingressへ渡し、正常系に`EXECUTION_FAILURE`を発行しない。実際の例外は`execution.failed`、明示的中断は`execution.inconclusive`として既存Execution Event Busへ出し、FailureUnderstanding側で未検証観測として扱う。
+- AutopilotのWorkManager dispatchは永続Outboxへ要求IDとtrigger/requestedAtを先に書いてから既存Event Serviceへpublishする。Listenerが存在しない、またはSubscriberに失敗がある場合はOutboxを削除せず、次のWorker起動で同じrequestIdのまま再試行する。配送成功はCORE ingressへの要求受付だけを示し、CORE Taskの終端・Review ZIP完成を意味しない。DomainIntegrationBootstrapはrequestIdをrunId/sourceIdへ渡し、再送時の重複を抑止する。
+- 回帰ベンチマークの可否は`regressionBenchmarkService.getActiveLoadedModelInfo()`の実ロード状態で判断する。実行モデルがない場合はSkip理由を弱点／保留情報へ残し、ベンチマークをPASS扱いしない。回帰レポートの欠落は「成功を証明した」こととみなさない。
+- Resume時は最新Blackboard CognitiveState本体（stateHashを除くSnapshot body）からSHA-256を再計算し、保存値と一致しなければfail-closedとする。SnapshotのSHA-256が正しい場合に限り、Receipt／Checkpoint chainの欠落・破損・不一致は有効Snapshotを根に新しいCheckpointを作成して復旧できる。復旧不能なSnapshot自体の不一致は自動修正しない。COREが復元判定の単一Authorityであり、`coreTaskIngressService.resume()`は複製検証を持たない。
+- 新しいCognitiveCheckpointは`CANONICAL_SHA256_V1`でstateHash/integrityHashを検証する。旧FNV1A32レコードは移行中に読み取り可能だが、親にLegacy checkpointが含まれる場合は新Checkpoint chainをrootし直して、旧弱ハッシュへの依存を継続しない。
+- REAL Claimの鮮度分類で不明な可変性を`FIXED`（約10年）扱いせず、保守的に`TIME`として再検証期限を設定する。鮮度が未設定のClaimだけでなく旧版で`FIXED`に分類されたClaimも、永続round-robin cursorによる上限付き監査で再分類する。Claimの公式検証状態は鮮度監査だけでは変更しない。
+- 両Android Workerソースは内容同一を維持し、Androidアプリ用PluginのE2E Browser APIは保持する。Native Cycle ReceiptのID相関、キャンセル、終了時のクリーンアップがアプリ側とHeadless側で同じ意味を持つようにする。
+
+■ 回帰検査と未完了境界
+- `scripts/verify_runtime_failure_fixes.mjs`は通常保守サイクルと真の失敗イベントの分離、Outboxの永続化／再配送、モデル準備状態によるベンチマーク判定、Snapshot body再ハッシュ、Legacy checkpoint root化、Claim鮮度の旧記録移行を契約検査する。
+- `scripts/verify_android_workmanager_contract.ts`はActive／Headless両Workerソースの同一性、Cycle ID相関、キャンセルAPI、WebView cleanup wait、Snapshotハッシュ再計算を検査する。これらは静的契約検査であり、Androidコンパイル・実機のJS bridge・WorkManager OS再起動後の長時間完遂を証明しない。
+- Active Cycleがキャンセル要求後に終了Receiptを返さない場合、Workerは別Executorへフォールバックしない。これは二重実行防止を優先するfail-closed動作であり、Activity破棄などでPluginプロセスの回復ができない場合は端末ログによる確認と復旧が必要。
+- 有効なCognitiveState Snapshotがない／Snapshot bodyのハッシュが不一致の場合は、情報を推測して復元しない。手動または既存COREの修復経路へ保留する。
+- `BACKGROUND_CYCLE_REVIEW`の受付、Workerの成功、CORE Task完了、Review ZIP作成、正式採用は異なる状態であり、一つのReceiptでまとめて完了扱いしない。
+- 今回のP279では編集対象ソースの行数を再計測して索引を同期した。完全再帰インベントリ全体、Web全体型検査、Android build/APK、CI、Android実機E2Eは未確認として扱う。
+
+P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを発行する経路をBACKGROUND_CYCLE_REVIEWへ分離し、真の実行失敗／中断をExecution Event Busへ記録。Autopilot requestの永続Outbox・ID付き再送と、実ロードモデル状態による回帰ベンチマークゲートを追加。Active／Headless Native WorkerをCycle ID相関Receipt・キャンセル要求で統一し、タイムアウト後のCancellation receipt待機、WebView破棄完了待ちを追加。CORE ResumeはSnapshot bodyからSHA-256を再計算し、Checkpoint chainだけが失われた場合に有効Snapshotから再rootする。新しいCheckpointはCanonical SHA-256を使い、Legacy FNV1A32を読み取り互換で扱いながら親chainから除外。旧REAL ClaimのFIXED誤分類もround-robin監査で移行する。Runtime regression／Android WorkManager static contractの結果はZIP作成時に実測し、Android build、APK、CI、実機E2Eはそれぞれ別途未確認と記録する。
+
+============================================================
+【2026-10-18-P280 ソースファイル関係台帳100件】
+============================================================
+
+- P279 ZIPに含まれる実コードを読み取り専用で走査し、機能領域・ファイル役割・export・相対import先・import元・同名ファイルの内容一致判定を記録する100ファイルのソース台帳を追加した。
+- 当時のP280では、100件の構造化データ`SOURCE_FILE_RELATION_LEDGER_P280.json`と閲覧一覧`SOURCE_FILE_RELATION_LEDGER_P280.md`を作成した。後続P282でF001〜F100の記録は統合マスターへ引き継ぎ、個別バッチ出力とその生成スクリプトは現行ZIPから廃止した。
+- 作成時の集計は対象ソース拡張子1,330ファイル、解決した相対import辺3,941件、台帳記載100ファイル、CORE/UI rootから相対import辺で到達89ファイル、同名ファイル比較対象あり43件。これはZIP内スナップショットの集計であり、全体tree件数・全ファイルインベントリ・Production runtime到達性を完全再集計したものではない。
+- import関係は静的なモジュール依存の証拠として扱い、関数呼び出し・Event/Native Bridgeのruntime動作を推定で補完しない。各ファイルのSHA-256と行数を紐づけ、同名ファイルは同一責務と決めつけず、byte一致と到達関係を分離して記録した。
+- GitHub main確認時のHEADは`940814799d81918783bee96297b51d5e35fd2fc2`。最新main treeにはP276で追加された`capabilityLedgerGraphService.ts`がなく、mainの最新検証コミットはP275を期待しているため、P279 ZIPとの同期不一致を記録した。この成果物作成はmainへのcommit/PUSHではない。CI、型検査、Android build/APK、実機E2Eはこの作業では実行・確認していない。
+
+
+
+【2026-10-18-P281 ソースファイル関係台帳第2バッチ】
+
+- P280の先行100ファイルと重複しない次の100ファイルをF101〜F200として記録し、P280/P281の累積ユニーク対象を200ファイルへ拡張した。
+- 相対import関係から呼び出し元候補と依存先を抽出し、行数・SHA-256・公開宣言・コメント根拠・同名ファイル比較を記録した。今回の選定は静的到達性と依存数による優先順位付けであり、runtime呼び出しを証明しない。
+- P280 ZIP由来のスナップショットを対象とし、GitHub main同期、commit/PUSH、CI、型検査、Android build/APK、実機E2Eは実施していない。完全再帰インベントリも再集計していない。
+
+
+============================================================
+【2026-10-18-P282 ソースファイル関係台帳500件統合】
+============================================================
+
+- P280のF001〜F100、P281のF101〜F200、新たに追加したF201〜F500を、`SOURCE_FILE_RELATION_LEDGER_P282.json`一つに統合した。閲覧用の`SOURCE_FILE_RELATION_LEDGER_P282.md`も同じ500レコードをID順に表示する。前半／後半の別台帳を現行成果物として残さない。
+- 500件のID連続性、パス一意性、実ファイル存在、記録SHA-256と実ソースの一致を検証した。内訳は従来200件を保持し、先行200パスと重複しない300件を追加した。
+- 選定時の対象ソース走査数は1,331、解決したローカルimport辺は3,941。統合500件に触れる辺は3,411、CORE/UI rootから静的importで到達可能なファイルは489、同名basename比較対象を持つファイルは149。import辺は実行時関数呼び出しの証拠ではなく、500件は全ソースファイルを網羅するものでもない。
+- 各レコードの依存先・静的import元・root到達性・同名ファイル比較を同一スナップショットで再計算した。選定対象500ファイルのSHA-256は全件一致している。
+- 旧P280/P281個別台帳ファイルと分割生成器を現行ZIPから取り除き、P282統合台帳を正本にした。リポジトリスナップショットはZIP由来で、GitHub main同期、commit/PUSHは未実施。CI、型検査、Android build/APK、実機E2Eも未実施として扱う。
+
+============================================================
+【2026-10-18-P283 ソースファイル関係台帳1000件統合】
+============================================================
+
+- P282の統合台帳F001〜F500を維持し、先行500件とパスが重複しない500ファイルをF501〜F1000として追加した。JSON正本1つとMarkdown閲覧一覧1つへ1000件を統合し、別バッチ台帳は現行成果物にしない。
+- 追加500件はP282 ZIP内の未記載ソースから、CORE/UI rootの静的到達性とローカルimportグラフの接続数を基準に選定した。台帳は1,330ソースファイルのうち1000件を記録し、残る330件は未記載として明示する。
+- import元・依存先・root到達性・同名ファイル比較を同一ソーススナップショットから算出する。関係は静的モジュールリンクの根拠であり、関数のruntime呼び出しやNative bridgeの実動作の証明ではない。用途記述もソースコメント・公開宣言・パス・依存先に基づく候補として扱う。
+- P283 ZIPはP282 ZIP由来のスナップショットを更新した成果物であり、GitHub main同期、commit/PUSHは未実施。CI、型検査、Android build/APK、実機E2Eも未確認として扱う。
+
+
+============================================================
+【2026-10-18-P284 ファイル関係台帳1500件統合】
+============================================================
+
+- P283の統合マスターF001〜F1000を保持し、未記載のソースファイル330件と、設計書・実装レポート・設定・その他テキスト形式のリポジトリ成果物から170件をF1001〜F1500として追加した。JSON正本1つとMarkdown閲覧一覧1つへ1500件を統合し、P283の分割前提を現行成果物として残さない。
+- 1500件のID連続性、パス一意性、実ファイル存在、SHA-256一致を検証する。今回の対象スナップショットでは対象ソース1,330件すべてを記録し、非ソース成果物170件を記録した。全リポジトリファイル1,789件のうち289件は未記載であり、未記載であることを未使用・未実装の根拠にしない。
+- 静的import関係は対象ソース1,330件から再計算する。文書・設定・JSONレポート内の文字列参照は、コードのimport辺やruntime接続の証明に数えない。用途はソース内容・文書見出し・JSONのタイトル等から得た役割候補であり、確定したruntime責務とは区別する。
+- P284はP283 ZIP由来の作業スナップショットを更新した成果物であり、GitHub main同期、commit/PUSH、CI、型検査、Android build/APK、実機E2Eは未実施。
+
+============================================================
+【2026-10-18-P285 ファイル関係台帳全件統合】
+============================================================
+
+- P284統合台帳のF001〜F1500を保持し、P284スナップショット内で未記載だった残り289ファイルをF1501〜F1789として追加した。P285 JSON正本1つとMarkdown閲覧一覧1つに、基準スナップショットの全1,789ファイルを統合した。
+- 全1,789件についてID連続性、パス一意性、ファイル存在、SHA-256を照合した。内訳はソースファイル1,330件、非ソース成果物459件。P284時点で未記載だった289件は今回すべて記録し、基準スナップショット内の未記載ファイルは0件となった。
+- ソースコードの静的依存関係は相対import/export/re-export/side-effect/dynamic-importを同じスナップショットから再解析した。静的import辺はモジュール依存の証拠であり、関数の実行時呼び出しやNative bridgeの実動作を証明しない。非ソース成果物の本文文字列はコードimport関係として扱わない。
+- P284のJSON/Markdownは履歴資料として保持する。P285台帳はP284 ZIP由来スナップショットを全件化したものであり、P285台帳自身や新規検証スクリプトは基準スナップショット1,789件の対象外とする。GitHub main同期、commit/PUSH、CI、型検査、Android build/APK、実機E2Eは未実施。
+
+【2026-10-18-P286 能力分類と重複Authority監査】
+
+- P285単一マスターの全1,789基準ファイルへ、能力領域・技術/成果物区分・実装役割・分類根拠を分離した分類を付与した。
+- 17Domain＋COREと、UI境界、共有基盤、Native、参照プロジェクト、検証/開発ツール、設計資料、設定、監査データ、静的資産を別軸に分ける分類方式へ移行した。
+- バイト一致4グループ、正規化ソース一致2グループ、同名グループ156組、同名のsrc/miki対src/servicesペア138組を記録。うち純転送Facade候補28組、高類似91組、中類似15組、低類似4組。高類似91組のうち37組は両方とも静的CORE/UI到達可能であり、優先的な責務統合調査対象とする。
+- 類似コードを即削除せず、確定Authority・singleton・永続化・呼び出し元を確認するまで「候補」として保持する。P286ではruntimeコードを変更していない。
+- 生成元はP285 ZIP由来のソーススナップショットであり、GitHub main、CI、ビルド、実機での動作確認は行っていない。
+
+【2026-10-18-P287 能力細分類と重複Authority優先レビュー】
+
+- P286の1,789件の分類と重複照合を維持し、各レコードへ機能の主カテゴリ、補助タグ、根拠、分類確度を追加する。CORE＋17Domainのアーキテクチャ軸と機能タグは別物として扱う。
+- 重複監査の現行集計：バイト一致4組、正規化ソース一致候補2組、同名グループ156組、src/miki対src/servicesの同名ペア138組。ペア判定はFacade 28、高類似91、中類似15、低類似4。
+- 高類似ペアは責務重複の候補として優先確認するが、類似度や同名だけで正規実装を確定しない。静的呼出元・両方の到達性・公開export・状態/永続化/副作用を確認し、根拠を台帳に残してから統合判断する。
+- P287は監査台帳・設計記録・検証スクリプトの更新であり、runtimeコードの削除・統合、GitHub main同期、CI/build/APK、実機E2Eは未実施。
+
+
+============================================================
+【2026-10-18-P288 重複Authority・状態所有のソース監査】
+============================================================
+
+- P287のP1優先候補37組について、双方の実ファイルを再読し、import文差分と本文差分を分離した。各ペアの直接静的import元とexport参照、公開メソッド宣言、依存module、永続化キー、private state、singleton/instance構築、本文差分を`SOURCE_FILE_RELATION_LEDGER_P288.json`の`duplicateAudit.authorityReviewP288`へ記録する。
+- 結果：import文を除いた本文が一致するペア25組、本文または公開契約の差分候補12組。37組すべてで独立したmodule export instanceまたはsingleton構築パターンを確認し、26組はprivate state/共有永続キーを伴う潜在的状態分岐として要注意。21組は同じ永続化キー値を双方に確認した。これらは競合が実行時に必ず起こるという意味ではなく、両方のmodule pathが静的に利用可能な場合に状態の重複所有が起こり得るという静的リスクである。
+- 36組で`src/miki/<domain>/services/`側の直接静的import元が`src/services/`側より多かった。これはアーキテクチャ所有権の決定証拠ではないが、CORE＋17Domainの配置と併せ、Miki側を一つの実装に集約する推奨根拠とする。
+- Miki側を推奨Authorityとした場合でも、Legacy側をただちに転送Facadeへ置き換えることは禁止する。公開引数の差（capabilityGraphService）、入力契約の差（deterministicCapabilityEvolutionService）、counterfactual契約（executionRunnerService）、複数意図計画（requestTypeCompilerService）、辞書グラフ連携（japaneseDictionaryService）、能力不足のevidence/sourceと関連サービス連携（capabilityGapService）、およびLoRA経路と決定論的候補経路の差（skillsService/experienceRouterService/featureFlagsService）など、固有挙動とAPI互換を先に移行する。
+- 正規配置の原則：今回のP1 37組について、設計上の正規実装先を`src/miki/<domain>/services/`に選定する。根拠はCORE＋17Domainの責務配置と、36/37組でMiki側の直接静的import元が多いこと。これは設計上のAuthority選定であり、runtime実装の一意化が完了したという意味ではない。既存の`src/services/`利用者は呼出元を段階的に移行する。移行中の互換パスは独立実装を複製せず、最終的にre-export facadeまたは明示的adapterにする。ただし固有用途が確認されたファイルは無理に同名へ統合せず、別責務として命名・設計する。
+- 永続キー・保存形式・default/migration behavior・module singleton identity・event side effects・Native/API契約を確認し、各pairのlegacy callerを洗い出して対象回帰ケースを追加するまではruntimeコードを変更しない。今回のP288はソース監査、台帳、設計正本、検証スクリプトのみを更新し、runtime実装の削除・統合・リダイレクトは実施していない。
+- P288はP287 ZIP由来の基準パス1,789件を保持する。正本設計書本文はP288履歴を追記したため、台帳内の当該設計書レコードの行数とSHA-256を現行内容に更新する。P288の台帳・生成器・検証器は自己参照を避けて基準1,789件の外に置く。
+- GitHub main同期、commit/PUSH、CI、型検査、build/APK、Android Native build、実機E2Eは未実施。静的module relationを関数のruntime呼び出しの証拠として扱わない。
+
+
+============================================================
+【2026-10-19-P289 LoRA実行経路の退役】
+============================================================
+
+- MemoryModalからLoRA教材(JSONL)の生成・プレビュー・直接コピーUIと、その専用handler/stateを削除した。記憶の通常バックアップと既存の決定論的能力候補経路は保持する。
+- 旧`src/services/virtualTrainingService.ts`、`LoraTriggerAssessment`／`VirtualTrainingTrial`型別名、`LORA_TRAINING`の通常Feature Flag、Native runtimeのLoRAファイル／adapter API、LoRA専用Storage Planning区画、`experienceRouterService.exportToLoraDataset`と保存先分類を削除した。
+- スキル卒業はLoRA学習データ投入ではなく、検証可能な決定論的能力候補の登録に統一した。モデル重みの学習・更新経路は追加しない。一般的な能力候補・評価記録はLoRAとは別責務のため維持する。
+- 既存Memoryの`destination=lora_dataset`は、payloadを保持したまま`destination=quarantine`、`approved=false`、`active=false`へ移行し、手動再確認対象とする。旧`LORA_TRAINING`永続Flagは読み込み時に除去して保存し直す。旧`miki_virtual_training_trials_v32`は、保存内容を`miki_capability_evaluation_trials_v33`へ一回限り移行してから旧キーを削除する。
+- 旧skillデータの`trainingSampleId`／`graduatedToTrainingAt`は互換読み込み時に`capabilityCandidateId`／`capabilityCandidateRegisteredAt`へ引き継ぎ、旧フィールドは書き戻さない。これは保存済みデータの損失を防ぐ移行処理であり、LoRAを再有効化するものではない。
+- P280〜P288の履歴資料や監査記録にあるLoRAの説明は、P289以前の過去実装に関する履歴証拠であり、現行仕様ではない。現行runtimeで残すLoRA識別子は、上記の旧保存データ・旧Flagを安全に移行するための互換処理に限定する。
+- P289はP288 ZIP由来の作業スナップショットを更新した。基準台帳から旧virtualTrainingService.tsの1レコードを除外し、残る1,788ファイルを現行台帳へ再集計する。GitHub main同期、commit/PUSH、CI、TypeScript build、APK build、Android Native build、実機E2Eは未実施。`node_modules`がないためnpmベースのTypeScript buildも未実行とする。
+
+
+============================================================
+【2026-10-19-P290 高優先重複サービスの実装Authority統合】
+============================================================
+
+- P289スナップショットの現行ソースを再確認し、P288監査のP1 37組を対象に、import文を除いた本文・公開export・契約上の差分を現行内容で再照合した。以前の監査結果は変更後の現行判定ではなく、履歴根拠として保持する。
+- 正規実装はCORE＋17Domainの責務配置に従い `src/miki/<domain>/services/<name>.ts` へ一本化した。対応する37個の `src/services/<name>.ts` は実装・singleton・private state・副作用を持たない `export *` 互換Facadeへ変更し、既存importパスを保ちながら同じ正規module instanceへ集約する。独立した二重実装は37組すべてで除去した。
+- 差分のあった契約・機能は正規側へ集約した。複数意図計画、決定論的スキル候補登録、能力グラフの除外/環境条件、意味辞書Graph統合、経験のverified_candidate経路、退役LoRAフラグ移行、counterfactual実行検証、CapabilityLearningCandidateによる能力パッチ化、日本語解析の質問判定/空入力/フォールバック、source/evidenceとPromotion/UnknownTask/ExperienceLinkへ接続する能力Gap処理を維持する。longTermMemoryは決定論的ランタイムの統一Embedding契約へ集約した。
+- `src/services/deterministicCapabilityEvolutionService.ts` の旧 `TrainingSampleJSONL` 独立実装は削除し、正規実装が `CapabilityLearningCandidate` を受け取ってモデル重みを変更しない能力パッチを構築する経路へ統一した。P289で廃止したLoRAデータセット生成・route・adapter APIは再導入しない。旧識別子を含む保存データの移行処理だけは、既存データ損失と機能再有効化を避けるため保持する。
+- Androidの形態素解析ソースTemplateとアプリ側コピー、Workerの同期コピー、drawable/mipmapのリソース別パスは同じ内容でもinstallerまたはAndroid resource resolution上の独立パスであるため削除しない。別パスが必要なファイルをバイト一致だけで削除しない。
+- `scripts/verify_service_authority_convergence_p290.mjs` と `npm run verify:service-authority:p290` を追加し、37個のFacadeが1つの正規先へ転送することと、固有挙動・LoRA退役条件を静的検査する。これはruntime E2E、TypeScript full build、Android build、実機検証の代替ではない。
+- P290はP289 ZIP由来の作業スナップショットを更新した成果物である。GitHub mainへの同期、commit/PUSH、CI、型検査、Android build/APK、Native build、実機E2Eは未実施として扱う。
+
+
+============================================================
+【2026-10-19-P290 重複サービスの実装Authority統合】
+============================================================
+
+- P288で優先度P1とした37組（`src/miki/<domain>/services/` と `src/services/` の同名サービス）をP289現行ソースで再読し、公開export、静的import元、保存キー、private state、singleton生成、固有挙動を確認した。P288の本文一致25組／差分候補12組という判定は履歴として保持し、現行状態の判定に流用しない。
+- 正本は `src/miki/<domain>/services/<service>.ts` に一本化する。37個の `src/services/<service>.ts` は削除してimport切れを起こすのではなく、`export * from '../miki/<domain>/services/<service>'` のみを持つ互換ファサードへ変更した。これにより従来importパスを維持しつつ、実装本文、module singleton、private状態、side effectの二重所有をなくす。
+- 12組の契約・挙動差分候補は古い側へ折り返さず、現行のMiki正本にある拡張契約を維持した。例：複合意図計画、辞書セマンティックグラフ、検証済み能力候補ルーティング、counterfactual計測と検証、能力不足のsource/evidence・関連サービス連携、決定論的能力候補のコンパイル経路。`capabilityGraphService`の除外条件／environment等の引数と、日本語解析の空入力fallbackも維持する。
+- `longTermMemoryService`は決定論的embedding契約をMikiの `deterministicRuntimeService` に集約する。`decisionLearningService` の差分はローカル変数・型表現の書き換えであり、評価処理フローは正本側に一本化した。各正本の公開名は37組の調査結果に基づき、互換パスでは `export *` により同じexportを利用する。
+- LoRA機能はP289の退役状態を維持し、決定論的能力候補・評価をLoRA学習経路へ再結合しない。旧LoRA名の残存は保存済み旧データ／旧Flagを安全に隔離・除去する移行処理だけとする。
+- バイト一致するAndroid形態素プラグインは `android-native` のソーステンプレートをインストーラが `android/app` へコピーする契約なので両パスを維持する。splash画像のqualifier別パスおよび `ic_launcher.xml`／`ic_launcher_round.xml` はAndroidのリソース名・qualifierで別パスが必要なため維持する。背景workerの同一ファイルはアプリ側がruntimeソースで、インストーラはアプリ側を上書きしない。現行の回帰スクリプトがnative側コピーも直接参照するため、今回は削除せず追跡対象に残した。
+- P290の静的Authority検証は37ファサード、正本の転送先、台帳hash、依存辺、固有契約、LoRAのアクティブ経路がないことを確認する。旧 `src/services/` パスは全て正本へのre-export edgeとして静的グラフに反映する。これらは静的検証であり、型チェックやruntime実行を代替しない。
+- P290ではNodeのAuthority検証スクリプトを実行してPASSを確認した。`scripts/check_imports.mjs` は3398件の相対importを検査し、唯一の未解決は `scripts/analyze_static_bundle_graph.mjs` が相対指定する `../node_modules/typescript/lib/typescript.js` であり、作業スナップショットに `node_modules` がなく確認できなかった。package.jsonのdevDependenciesにはTypeScriptが定義されている。全体TypeScript build、Android build/APK、Native build、実機E2E、GitHub main同期・commit/PUSHは未実施。
+- P290の統合台帳はP289の入力から、誤って収録されていた生成キャッシュ `scripts/__pycache__/verify_source_relation_ledger_p283.cpython-313.pyc` を除外した1,787件のリポジトリパスを保持し、SHA-256・行数・静的依存・importer・CORE/UI静的到達性を再計算する。監査台帳／生成器・検証器の自己参照も避け、固定基準から除外する範囲を台帳に明記する。
+
+============================================================
+【2026-10-19-P292 CORE自律実行・完了判定の回帰修正】
+============================================================
+
+- `EXECUTE_AUTONOMOUS_SEARCH` は入力操作の初回実行だけで `RUN_RESEARCH` を計画する。既に成功したResearch結果がある場合、同じ初回検索分岐を再実行せず、既存の継続調査・Claim検証・完了判定へ戻す。継続可能なKnowledge Gapは既存の `continuationAvailable` / `gapId` による再計画でのみ次の検索へ進める。
+- Adaptive CORE completionで `CREATE_REVIEW_PACKAGE` を全タスク共通の必須条件にしない。レビューPackageはCore Plan Revisionがその操作を明示的に要求した場合だけ必須とする。要求済みPackageが未完了なら既存のmissing-operation判定で不合格にする。
+- Blackboardの `ERROR` は監査履歴から削除しない。`operationInstanceId` を持つエラーは、同一operation instanceの後続成功、または後続成功結果に明示された `supersedesOperationInstanceIds` が一致した場合だけ解消済みと判定する。再試行のsupersessionはtarget/command/query/gap/intentに基づく `operationScopeKey` も照合し、異なる検索やKnowledge Gapの成功で別の失敗を誤って解消しない。operation instanceがないエラーはfail-closedで未解決のまま扱う。
+- BlackboardのJSON解析失敗・配列でないsnapshot・不正task rowは元データを別キーへ完全なraw bytesのまま隔離し、読み戻し照合に成功した場合のみ通常保存を許可する。隔離が失敗した場合はプロセス内の保存をblockし、次回の通常保存で唯一の元データを上書きしない。これは隔離保存であり、破損JSONからの自動レコード復元を意味しない。
+- 会話最終化はP216の意味保持・実行整合性・文法検証を受け取ってから状態を確定する。P216検証失敗は `FAILED`、P216成功でもCORE完了ゲートが未達なら `PAUSED/WAITING`、両方通過した場合のみ `COMPLETED` と成功Outcomeを記録する。成功時は `conversationFinalResponse` のRESULTを記録し、回答最終化キーとの不一致を解消する。
+- `scripts/verify_core_autonomy_regressions_p291.mjs` を追加し、未解決ERRORの保持／回復判定、レビューPackage条件、検索再実行ガード、回答最終化の検証・完了ゲートを検査する。
+- P291の変更対象TypeScript 5ファイルはNode type-stripping parserで構文検査PASS。専用回帰スクリプト14項目PASS。Node環境ではIndexedDBが使えずBlackboardはin-memory fallbackとなる。`adaptiveRoutePlannerService` の依存する `typescript` packageがZIP内にないため、実行時のPlanner E2E、全体型検査、Vite build、Android build/APK、実機E2E、GitHub main同期・commit/PUSHは未実施。
+- 統合設計正本は更新したが、P291で完全再帰インベントリ全体を新規走査したとは扱わない。P291の台帳は既存1,787パス基準について、更新対象ファイルのSHA-256・行数・依存グラフを再照合する。
+
+
+
+============================================================
+【2026-10-19-P292 Production Scale Workerの取消回復修正】
+============================================================
+
+- 実コード調査で、実行中に取消されたジョブが、実行処理のawait後に成功扱いとなる経路と、例外・再起動回復時にRETRYINGへ戻る経路を確認した。取消要求後の再実行と誤った成功証明を引き起こすため修正した。
+- `CANCELLED` をDurableJobの終端状態に追加。実行結果受信後にも保存済みジョブ状態を再確認し、`CANCELLING`なら成功扱いせず`CANCELLED`へ確定する。例外処理でも取消を優先し、リトライへ戻さない。
+- 起動時の期限切れ回復も、`CANCELLING`を`CANCELLED`へ移し、`RUNNING`だけをretry budgetに応じて再試行またはFAILEDへ移す。
+- `scripts/verify_production_worker_cancellation_p292.mjs` の5項目はソース契約検査であり、実行中の実時間競合を再現するworker E2Eではない。全体型検査、Vite build、Android build/APK、実機E2E、GitHub main同期・commit/PUSHは未実施。
+
+
+============================================================
+【2026-10-19-P293 自律Workerの状態整合性・証拠保全強化】
+============================================================
+
+- Durable Job Runtimeに状態遷移表を導入し、完了・取消・失敗などの終端状態からの再開を拒否する。取消要求は冪等とし、待機中ジョブは即時CANCELLED、実行中ジョブはCANCELLINGを経由して終了する。
+- enqueueでworkspace/repository/resource/retry budgetを検証し、プロセス内連番を含むIDで同一ミリ秒の連続登録衝突を防ぎ、未存在・失敗済み依存ジョブを拒否する。依存先が実行後に失敗・取消・BLOCKEDになった場合、待機中の依存ジョブをBLOCKEDにして、永遠にQUEUEDのまま残る状態を避ける。空のfan-in集合は成功とみなさずfail-closedにする。
+- worker leaseのheartbeatはRUNNING状態・一致するowner・期限内leaseを必須とする。worker実行中に外部から状態が変更された場合、後着の実行結果でPAUSED/終端状態を上書きしない。成功証明とCOMPLETED遷移は、現在状態がRUNNINGで取消・状態競合がない場合に限定する。
+- Durable Job snapshotのJSON/shape検証、rawデータの隔離と読み戻し照合を追加。隔離に失敗した場合は保存をfail-closedにする。
+- Capability Proof、Repair Quality Learning、Reproducible Development Ledger、Operational Observabilityの4つの履歴storeに、破損snapshotの隔離・raw bytes照合・隔離失敗時の書込み停止を追加し、空配列へのフォールバック後に既存履歴を黙って上書きする経路を防ぐ。
+- `scripts/verify_autonomous_worker_safety_p293.mjs` を追加。状態遷移拒否、終端取消の冪等性、失敗依存のBLOCKED伝播、資源値検証、lease契約、workerの状態競合防止、4つの履歴storeの隔離契約を検査する。
+- P293の検査はローカルNodeのin-memory storage上で実行し、9項目PASS。IndexedDB永続化、全体TypeScript型検査、Vite build、Android APK build、Galaxy S25実機、長時間稼働、GitHub main同期・commit/PUSHは未実施。
+- 台帳はP292の固定1,787パスを保持し、既存レコードのSHA-256・行数・相対import辺を更新する。完全再帰インベントリ全体の再集計や、追加した監査スクリプトを基準台帳へ含めたとは扱わない。

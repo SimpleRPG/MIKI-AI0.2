@@ -1,4 +1,6 @@
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
+import { storageService } from '../../../services/storageService';
+import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 
 const now = () => Date.now();
 const hash = (s: string) => { let h=2166136261; for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);} return (h>>>0).toString(16).padStart(8,'0'); };
@@ -33,13 +35,37 @@ class ApprovalPermissionService {
 }
 export const approvalPermissionService=new ApprovalPermissionService();
 
-export interface CognitiveCheckpoint { id:string; parentCheckpointId?:string; baseSnapshotId:string; changedFacts:string[]; addedEvidence:string[]; invalidatedAssumptions:string[]; supersededRequirements:string[]; taskStateChanges:string[]; memoryStateChanges:string[]; skillStateChanges:string[]; artifactReferences:string[]; configurationChanges:string[]; stateHash:string; integrityHash:string; layer:'HOT'|'WARM'|'COLD'|'EPHEMERAL'; verified:boolean; createdAt:number; }
+export interface CognitiveCheckpoint { id:string; parentCheckpointId?:string; baseSnapshotId:string; changedFacts:string[]; addedEvidence:string[]; invalidatedAssumptions:string[]; supersededRequirements:string[]; taskStateChanges:string[]; memoryStateChanges:string[]; skillStateChanges:string[]; artifactReferences:string[]; configurationChanges:string[]; stateHash:string; integrityHash:string; hashAlgorithm?:'CANONICAL_SHA256_V1'|'FNV1A32_LEGACY'; layer:'HOT'|'WARM'|'COLD'|'EPHEMERAL'; verified:boolean; createdAt:number; }
+const COGNITIVE_CHECKPOINTS_KEY='miki_cognitive_state_checkpoints_v1';
+const MAX_COGNITIVE_CHECKPOINTS=2000;
 class CognitiveStateCheckpointService {
  private checkpoints=new Map<string,CognitiveCheckpoint>();
- create(input:Omit<CognitiveCheckpoint,'id'|'stateHash'|'integrityHash'|'createdAt'|'verified'>):CognitiveCheckpoint {const payload=JSON.stringify(input);const stateHash=hash(payload);const integrityHash=hash(`${input.parentCheckpointId||''}|${input.baseSnapshotId}|${stateHash}`);const c={...input,id:id('checkpoint'),stateHash,integrityHash,verified:true,createdAt:now()};this.checkpoints.set(c.id,c);return clone(c);}
- verify(id0:string){const c=this.checkpoints.get(id0);if(!c)return false;const {id:_,stateHash,integrityHash,verified:__,createdAt:___,...rest}=c;const ok=hash(JSON.stringify(rest))===stateHash && hash(`${c.parentCheckpointId||''}|${c.baseSnapshotId}|${c.stateHash}`)===integrityHash;c.verified=ok;return ok;}
- chain(id0:string){const out:CognitiveCheckpoint[]=[];const seen=new Set<string>();let cur=this.checkpoints.get(id0);while(cur){if(seen.has(cur.id))return {ok:false,reason:'CYCLE',checkpoints:clone(out)};seen.add(cur.id);out.push(cur);cur=cur.parentCheckpointId?this.checkpoints.get(cur.parentCheckpointId):undefined;}return {ok:out.every(x=>this.verify(x.id)),checkpoints:clone(out.reverse())};}
- reconstruct(id0:string){const c=this.chain(id0);if(!c.ok)return {ok:false,reason:'INTEGRITY_OR_PARENT_FAILURE',checkpoints:c.checkpoints};return {ok:true,checkpointCount:c.checkpoints.length,stateHash:hash(c.checkpoints.map(x=>x.stateHash).join('|')),checkpoints:c.checkpoints};}
+ constructor(){this.load();}
+ private load(){try{const raw=storageService.getItem(COGNITIVE_CHECKPOINTS_KEY);const rows=raw?JSON.parse(raw):[];if(!Array.isArray(rows))return;for(const row of rows){if(row&&typeof row.id==='string'&&typeof row.stateHash==='string'&&typeof row.integrityHash==='string')this.checkpoints.set(row.id,row as CognitiveCheckpoint);}for(const c of this.checkpoints.values())this.verify(c.id);}catch{this.checkpoints.clear();}}
+ private save(){try{const rows=[...this.checkpoints.values()].sort((a,b)=>a.createdAt-b.createdAt).slice(-MAX_COGNITIVE_CHECKPOINTS);this.checkpoints=new Map(rows.map(c=>[c.id,c]));storageService.setItem(COGNITIVE_CHECKPOINTS_KEY,JSON.stringify(rows));return true;}catch{return false;}}
+ create(input:Omit<CognitiveCheckpoint,'id'|'stateHash'|'integrityHash'|'createdAt'|'verified'|'hashAlgorithm'>):CognitiveCheckpoint {
+  if(input.parentCheckpointId&&!this.checkpoints.has(input.parentCheckpointId))throw new Error('COGNITIVE_CHECKPOINT_PARENT_NOT_FOUND');
+  const boundedInput={...input,changedFacts:[...new Set(input.changedFacts)].slice(-100),addedEvidence:[...new Set(input.addedEvidence)].slice(-200),invalidatedAssumptions:[...new Set(input.invalidatedAssumptions)].slice(-100),supersededRequirements:[...new Set(input.supersededRequirements)].slice(-100),taskStateChanges:[...new Set(input.taskStateChanges)].slice(-80),memoryStateChanges:[...new Set(input.memoryStateChanges)].slice(-100),skillStateChanges:[...new Set(input.skillStateChanges)].slice(-100),artifactReferences:[...new Set(input.artifactReferences)].slice(-100),configurationChanges:[...new Set(input.configurationChanges)].slice(-40)};
+  const hashAlgorithm='CANONICAL_SHA256_V1' as const;
+  const payload={...boundedInput,hashAlgorithm};
+  const stateHash=canonicalSha256Object(payload);
+  const integrityHash=canonicalSha256Object({hashAlgorithm,parentCheckpointId:boundedInput.parentCheckpointId||'',baseSnapshotId:boundedInput.baseSnapshotId,stateHash});
+  const c:CognitiveCheckpoint={...boundedInput,hashAlgorithm,id:id('checkpoint'),stateHash,integrityHash,verified:true,createdAt:now()};
+  this.checkpoints.set(c.id,c);if(!this.save()){this.checkpoints.delete(c.id);throw new Error('COGNITIVE_CHECKPOINT_PERSIST_FAILED');}return clone(c);
+ }
+ verify(id0:string){
+  const c=this.checkpoints.get(id0);if(!c)return false;
+  const {id:_,stateHash,integrityHash,verified:__,createdAt:___,...rest}=c;
+  // Legacy 32-bit checkpoints remain readable for migration only; every new checkpoint uses canonical SHA-256.
+  const isCurrent=c.hashAlgorithm==='CANONICAL_SHA256_V1';
+  const validStateHash=isCurrent?canonicalSha256Object(rest)===stateHash:hash(JSON.stringify(rest))===stateHash;
+  const validIntegrity=isCurrent
+   ? canonicalSha256Object({hashAlgorithm:c.hashAlgorithm,parentCheckpointId:c.parentCheckpointId||'',baseSnapshotId:c.baseSnapshotId,stateHash:c.stateHash})===integrityHash
+   : hash(`${c.parentCheckpointId||''}|${c.baseSnapshotId}|${c.stateHash}`)===integrityHash;
+  c.verified=validStateHash&&validIntegrity;return c.verified;
+ }
+ chain(id0:string){const out:CognitiveCheckpoint[]=[];const seen=new Set<string>();let cur=this.checkpoints.get(id0);while(cur){if(seen.has(cur.id))return {ok:false,reason:'CYCLE',checkpoints:clone(out)};seen.add(cur.id);out.push(cur);cur=cur.parentCheckpointId?this.checkpoints.get(cur.parentCheckpointId):undefined;if(cur===undefined&&out[out.length-1]?.parentCheckpointId)return {ok:false,reason:'PARENT_NOT_FOUND',checkpoints:clone(out.reverse())};}return {ok:out.every(x=>this.verify(x.id)),checkpoints:clone(out.reverse())};}
+ reconstruct(id0:string){const c=this.chain(id0);if(!c.ok)return {ok:false,reason:'INTEGRITY_OR_PARENT_FAILURE',checkpoints:c.checkpoints};return {ok:true,checkpointCount:c.checkpoints.length,stateHash:canonicalSha256Object(c.checkpoints.map(x=>x.stateHash)),checkpoints:c.checkpoints};}
  list(limit=100){return clone([...this.checkpoints.values()].slice(-limit).reverse());}
 }
 export const cognitiveStateCheckpointService=new CognitiveStateCheckpointService();

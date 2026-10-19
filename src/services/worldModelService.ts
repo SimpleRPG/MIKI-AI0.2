@@ -43,7 +43,7 @@ function charBigramOverlapRatio(memoryContent: string, response: string): number
  * 2. 行動完了後、実際の結果（使われた記憶、生成コード、口調、ユーザー評価、実行エラー）と比較する。
  * 3. 予測誤差（Prediction Error / Surprisal）を算出し、誤差要因を分類する。
  *    （例: 「記憶追加で改善すると予測したが実際には使われなかった → 記憶不足ではなく利用方針の問題」）
- * 4. 予測誤差が大きい事象を学習シグナル（LoRA教材、メタ記憶、プロンプト境界修正）として蓄積する。
+ * 4. 予測誤差が大きい事象を改善シグナル（決定論的能力候補、メタ記憶、プロンプト境界修正）として蓄積する。
  */
 export class WorldModelService {
   private predictions: ActionPrediction[] = [];
@@ -274,7 +274,7 @@ export class WorldModelService {
       suggestedImprovement = 'refine_prompt_boundary';
     } else if (actual.executionError) {
       errorCategory = 'model_capacity_limit';
-      diagnosisNote = '生成されたコードに構文エラーまたは実行時例外が発生しました。失敗例と修復後の正解をペアにしてLoRA学習データへ送るべきです。';
+      diagnosisNote = '生成されたコードに構文エラーまたは実行時例外が発生しました。失敗例と修復後の正解を根拠付きの修復例・決定論的能力候補として記録すべきです。';
       suggestedImprovement = 'export_dpo_sample';
     } else if (skillSurprisal === 'unpredicted_skill_used') {
       errorCategory = 'intent_misclassification';

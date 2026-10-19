@@ -11,17 +11,20 @@ import android.os.PowerManager
 import android.util.Log
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
+import android.webkit.JavascriptInterface
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.net.HttpURLConnection
-import java.net.URL
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * MikiBackgroundWorker (Android WorkManager CoroutineWorker)
@@ -32,15 +35,32 @@ import java.net.URL
  * 実行方式:
  * 1. メインプロセス (Activity/Capacitor Bridge) が生存している場合:
  *    MikiWorkManagerPlugin 経由で既存の WebView に対し直接実行を要求
- * 2. プロセス生存だがActivity非表示 / ヘッドレス時:
- *    ヘッドレス WebView をメインスレッドで生成し、assets 内のアプリを読み込んで実行
- * 3. 補助方式 (ローカルHTTP):
- *    127.0.0.1:3000 のローカルサーバーが存在する場合は HTTP POST でもトリガー試行
+ * 2. Active Runtime がない場合:
+ *    ヘッドレス WebView をメインスレッドで生成し、アプリを読み込んで実行
+ *
+ * 完了条件:
+ * JavaScript処理の明示的な完了Receiptが返るまで成功としない。開始応答や固定時間経過を
+ * 完了扱いにせず、Active Runtimeを起動した後は重複Executorへフォールバックしない。
  *
  * 制約条件判定:
  * backgroundWorkerService.getExecutionConditions() のロジック (充電状態・電池残量・サーマル状態)
  * と完全に整合するネイティブハードウェア判定を実装。
  */
+/** JavaScript-to-Worker completion receipt. A trigger acknowledgment is not a completion receipt. */
+class MikiAutonomousCycleCallback(
+    private val expectedCycleId: String,
+    private val callback: (Boolean, String) -> Unit
+) {
+    @JavascriptInterface
+    fun onComplete(cycleId: String?, status: String?, detail: String?) {
+        if (cycleId != expectedCycleId) {
+            Log.w(MikiBackgroundWorker.TAG, "Ignored stale/mismatched cycle receipt: expected=$expectedCycleId received=$cycleId")
+            return
+        }
+        callback(status == "completed", detail.orEmpty().take(2000))
+    }
+}
+
 class MikiBackgroundWorker(
     private val appContext: Context,
     workerParams: WorkerParameters
@@ -53,26 +73,26 @@ class MikiBackgroundWorker(
 
         @Volatile
         var isWorkerExecuting: Boolean = false
+        private val workerExecutionLock = AtomicBoolean(false)
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         Log.i(TAG, "MikiBackgroundWorker: doWork started [Trigger: android_intent]")
 
         // 1. 排他制御: 二重実行の完全防止
-        if (isWorkerExecuting) {
-            Log.w(TAG, "MikiBackgroundWorker: Previous cycle still executing, skipping.")
-            return@withContext Result.success()
-        }
-
-        // 2. ハードウェア条件の動的再検証 (backgroundWorkerService.getExecutionConditions と整合)
-        val conditionCheck = validateHardwareConditions()
-        if (!conditionCheck.passed) {
-            Log.w(TAG, "MikiBackgroundWorker: Hardware condition check rejected: ${conditionCheck.reason}")
+        if (!workerExecutionLock.compareAndSet(false, true)) {
+            Log.w(TAG, "MikiBackgroundWorker: Another cycle still executing; this attempt is not complete.")
             return@withContext Result.retry()
         }
 
         isWorkerExecuting = true
         try {
+            // Hardware validation is covered by finally so an unexpected API failure cannot retain the lock.
+            val conditionCheck = validateHardwareConditions()
+            if (!conditionCheck.passed) {
+                Log.w(TAG, "MikiBackgroundWorker: Hardware condition check rejected: ${conditionCheck.reason}")
+                return@withContext Result.retry()
+            }
             val executed = executeAutonomousCycle()
             if (executed) {
                 Log.i(TAG, "MikiBackgroundWorker: Autonomous self-improvement cycle completed successfully.")
@@ -81,11 +101,15 @@ class MikiBackgroundWorker(
                 Log.w(TAG, "MikiBackgroundWorker: Execution could not be confirmed or timed out.")
                 Result.retry()
             }
+        } catch (cancelled: CancellationException) {
+            Log.w(TAG, "MikiBackgroundWorker: Worker cancelled by OS or WorkManager")
+            throw cancelled
         } catch (e: Exception) {
             Log.e(TAG, "MikiBackgroundWorker: Error executing autonomous cycle: ${e.message}", e)
             Result.retry()
         } finally {
             isWorkerExecuting = false
+            workerExecutionLock.set(false)
         }
     }
 
@@ -146,14 +170,18 @@ class MikiBackgroundWorker(
      * 自律改善サイクルの実起動
      */
     private suspend fun executeAutonomousCycle(): Boolean {
-        // 方式1: アクティブな Capacitor Bridge / Activity が生存している場合 (優先)
+        // One stable ID correlates the trigger, JS completion Receipt and cancellation request.
+        val cycleId = UUID.randomUUID().toString()
+        // An active WebView is the canonical runtime. Once invoked, do not launch a second executor
+        // after timeout/failure: the original JavaScript may still be running.
         val plugin = MikiWorkManagerPlugin.activeInstance
-        if (plugin != null) {
-            Log.i(TAG, "MikiBackgroundWorker: Found active MikiWorkManagerPlugin instance. Triggering directly via Bridge.")
+        if (plugin != null && plugin.hasActiveWebRuntime()) {
+            Log.i(TAG, "MikiBackgroundWorker: Awaiting cycle-correlated completion receipt [$cycleId].")
             val completionDeferred = CompletableDeferred<Boolean>()
             Handler(Looper.getMainLooper()).post {
                 try {
-                    plugin.triggerAutonomousCycle { success ->
+                    plugin.triggerAutonomousCycle(cycleId) { success, detail ->
+                        Log.i(TAG, "Active runtime Receipt [$cycleId]: success=$success detail=${detail.take(500)}")
                         completionDeferred.complete(success)
                     }
                 } catch (e: Exception) {
@@ -161,63 +189,66 @@ class MikiBackgroundWorker(
                     completionDeferred.complete(false)
                 }
             }
-            val result = withTimeoutOrNull(60000L) { completionDeferred.await() }
-            if (result == true) {
-                return true
+            var receiptReceived = false
+            try {
+                val result = withTimeoutOrNull(8 * 60 * 1000L) { completionDeferred.await() }
+                receiptReceived = result != null
+                if (!receiptReceived) Log.w(TAG, "Active runtime timed out without correlated Receipt; requesting cancellation and refusing fallback.")
+                return result == true
+            } finally {
+                if (!receiptReceived) {
+                    plugin.cancelAutonomousCycle(cycleId)
+                    // Do not release the worker's single-flight lock while the same JS run may still
+                    // be executing. A negative Receipt confirms termination; no Receipt means fail
+                    // closed and no second executor is started from this Worker.
+                    withContext(NonCancellable) {
+                        val stopped = withTimeoutOrNull(10_000L) { completionDeferred.await() }
+                        if (stopped == null) Log.e(TAG, "Cancellation was requested for $cycleId but no termination Receipt arrived; future attempts remain subject to plugin single-flight guard.")
+                    }
+                }
             }
-            Log.w(TAG, "Plugin direct trigger did not complete within timeout. Trying headless webview / local HTTP.")
         }
 
-        // 方式2: ローカル Node.js サーバー (server.ts) への HTTP トリガー試行
-        val httpTriggered = tryHttpLocalTrigger()
-        if (httpTriggered) {
-            return true
-        }
-
-        // 方式3: ヘッドレス WebView による実行 (アプリプロセス非アクティブ時)
-        return executeViaHeadlessWebView()
-    }
-
-    /**
-     * ローカルHTTPサーバー (127.0.0.1:3000) へのトリガー試行
-     */
-    private fun tryHttpLocalTrigger(): Boolean {
-        return try {
-            val url = URL("http://127.0.0.1:3000/api/background-worker/trigger")
-            val conn = url.openConnection() as HttpURLConnection
-            conn.connectTimeout = 3000
-            conn.readTimeout = 10000
-            conn.requestMethod = "POST"
-            conn.setRequestProperty("Content-Type", "application/json")
-            conn.doOutput = true
-            val jsonBody = "{\"triggerSource\":\"android_intent\",\"timestamp\":${System.currentTimeMillis()}}"
-            conn.outputStream.use { os ->
-                os.write(jsonBody.toByteArray(Charsets.UTF_8))
-            }
-            val responseCode = conn.responseCode
-            conn.disconnect()
-            if (responseCode in 200..299) {
-                Log.i(TAG, "Triggered autonomous cycle via local HTTP server (code $responseCode)")
-                true
-            } else {
-                false
-            }
-        } catch (e: Exception) {
-            // ローカルサーバー非起動時は想定内
-            false
-        }
+        // No active runtime exists: use exactly one headless WebView executor.
+        return executeViaHeadlessWebView(cycleId)
     }
 
     /**
      * ヘッドレス WebView をバックグラウンドで起動し、JS側の runAutonomousBackgroundCycle を実行する
      */
-    private suspend fun executeViaHeadlessWebView(): Boolean {
+    private suspend fun executeViaHeadlessWebView(cycleId: String): Boolean {
         val completionDeferred = CompletableDeferred<Boolean>()
+        val completionClaimed = AtomicBoolean(false)
+        val cleanupClaimed = AtomicBoolean(false)
+        val cleanupFinished = CompletableDeferred<Unit>()
+        var webViewRef: WebView? = null
+        val handler = Handler(Looper.getMainLooper())
+        fun cleanupWebView(afterCleanup: (() -> Unit)? = null) {
+            if (!cleanupClaimed.compareAndSet(false, true)) {
+                afterCleanup?.invoke()
+                return
+            }
+            handler.post {
+                try {
+                    val escapedCycleId = "'${cycleId}'" // UUID is generated locally and contains only hex digits and hyphens.
+                    webViewRef?.evaluateJavascript("window.mikiCancelBackgroundCycle && window.mikiCancelBackgroundCycle($escapedCycleId);", null)
+                    webViewRef?.removeJavascriptInterface("MikiNativeCallback")
+                    webViewRef?.stopLoading()
+                    webViewRef?.destroy()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Headless WebView cleanup failed: ${e.message}")
+                } finally {
+                    cleanupFinished.complete(Unit)
+                    afterCleanup?.invoke()
+                }
+            }
+        }
 
-        Handler(Looper.getMainLooper()).post {
+        handler.post {
             try {
                 Log.i(TAG, "MikiBackgroundWorker: Spawning headless WebView to run autonomous cycle...")
                 val webView = WebView(appContext)
+                webViewRef = webView
                 val settings = webView.settings
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
@@ -225,8 +256,16 @@ class MikiBackgroundWorker(
                 settings.allowFileAccess = true
                 settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
-                var hasTriggered = false
+                fun finish(success: Boolean, detail: String) {
+                    if (!completionClaimed.compareAndSet(false, true)) return
+                    Log.i(TAG, "Headless autonomous cycle receipt: success=$success detail=${detail.take(500)}")
+                    cleanupWebView { completionDeferred.complete(success) }
+                }
 
+                webView.addJavascriptInterface(
+                    MikiAutonomousCycleCallback(cycleId) { success, detail -> finish(success, detail) },
+                    "MikiNativeCallback"
+                )
                 webView.webChromeClient = object : WebChromeClient() {
                     override fun onConsoleMessage(message: ConsoleMessage?): Boolean {
                         val text = message?.message() ?: ""
@@ -237,79 +276,73 @@ class MikiBackgroundWorker(
                     }
                 }
 
+                var hasStartedTrigger = false
                 webView.webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
-                        if (hasTriggered) return
-                        hasTriggered = true
-
-                        Log.i(TAG, "Headless WebView loaded $url. Executing autonomous cycle...")
-                        // window.mikiRunBackgroundCycle が定義されているか待って実行
-                        val script = """
-                            (function() {
-                                if (window.mikiRunBackgroundCycle) {
-                                    window.mikiRunBackgroundCycle('android_intent')
-                                        .then(function(log) {
-                                            console.log('[WorkManager] Headless cycle completed: ' + JSON.stringify(log?.id));
-                                            if (window.MikiNativeCallback) {
-                                                window.MikiNativeCallback.onComplete(true);
-                                            }
-                                        })
-                                        .catch(function(err) {
-                                            console.error('[WorkManager] Headless cycle error: ' + err);
-                                            if (window.MikiNativeCallback) {
-                                                window.MikiNativeCallback.onComplete(false);
-                                            }
-                                        });
-                                    return 'TRIGGERED';
+                        val target = view ?: return
+                        if (hasStartedTrigger) return
+                        hasStartedTrigger = true
+                        var attempts = 0
+                        fun triggerWhenReady() {
+                            if (completionClaimed.get()) return
+                            attempts += 1
+                            val script = """
+                                (function() {
+                                    if (typeof window.mikiRunBackgroundCycle !== 'function') return 'NOT_FOUND';
+                                    var cycleId = '$cycleId';
+                                    Promise.resolve().then(function() {
+                                        return window.mikiRunBackgroundCycle('android_intent', cycleId);
+                                    }).then(function(log) {
+                                        var correlated = !!log && log.nativeCycleId === cycleId;
+                                        var success = correlated && log.status === 'completed';
+                                        var status = success ? 'completed' : 'failed';
+                                        var detail = JSON.stringify({status: log && log.status, id: log && log.id, cycleId: cycleId, reason: log && log.reason});
+                                        if (window.MikiNativeCallback) window.MikiNativeCallback.onComplete(cycleId, status, detail);
+                                    }).catch(function(err) {
+                                        if (window.MikiNativeCallback) window.MikiNativeCallback.onComplete(cycleId, 'failed', String(err && (err.stack || err.message) || err));
+                                    });
+                                    return 'STARTED';
+                                })();
+                            """.trimIndent()
+                            target.evaluateJavascript(script) { result ->
+                                if (result?.contains("NOT_FOUND") == true && attempts < 3 && !completionClaimed.get()) {
+                                    handler.postDelayed({ triggerWhenReady() }, 5000L)
+                                } else if (result?.contains("NOT_FOUND") == true) {
+                                    finish(false, "BACKGROUND_CYCLE_ENTRY_NOT_FOUND")
                                 } else {
-                                    return 'NOT_FOUND';
+                                    Log.i(TAG, "Headless WebView trigger acknowledged; awaiting explicit completion receipt: $result")
                                 }
-                            })();
-                        """.trimIndent()
-
-                        view?.evaluateJavascript(script) { result ->
-                            Log.i(TAG, "evaluateJavascript trigger result: $result")
-                            if (result?.contains("TRIGGERED") == true) {
-                                // 実行開始が確認できた場合、後続の完了コールバックまたはタイマーで成功を確定
-                                Handler(Looper.getMainLooper()).postDelayed({
-                                    try {
-                                        webView.destroy()
-                                    } catch (e: Exception) {}
-                                    if (!completionDeferred.isCompleted) {
-                                        completionDeferred.complete(true)
-                                    }
-                                }, 30000L) // 30秒後に安全に破棄
-                            } else {
-                                // アプリ初期化待ちでリトライ (5秒後)
-                                Handler(Looper.getMainLooper()).postDelayed({
-                                    view.evaluateJavascript(script) { retryResult ->
-                                        Log.i(TAG, "Retry evaluateJavascript result: $retryResult")
-                                        val ok = retryResult?.contains("TRIGGERED") == true
-                                        Handler(Looper.getMainLooper()).postDelayed({
-                                            try { webView.destroy() } catch (e: Exception) {}
-                                            if (!completionDeferred.isCompleted) {
-                                                completionDeferred.complete(ok)
-                                            }
-                                        }, 25000L)
-                                    }
-                                }, 5000L)
                             }
                         }
+                        triggerWhenReady()
                     }
                 }
-
-                // Capacitorの標準ローカルURL (https://localhost/) をロード
                 webView.loadUrl("https://localhost/")
-
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to instantiate headless WebView: ${e.message}", e)
-                completionDeferred.complete(false)
+                val ownsFailure = completionClaimed.compareAndSet(false, true)
+                cleanupWebView {
+                    if (ownsFailure) completionDeferred.complete(false)
+                }
             }
         }
 
-        val result = withTimeoutOrNull(90000L) { completionDeferred.await() }
-        return result ?: false
+        // WorkManager's execution window is bounded. Cancellation, timeout, and exceptions all
+        // release the WebView resource; no missing receipt is converted to success.
+        val result = try {
+            withTimeoutOrNull(8 * 60 * 1000L) { completionDeferred.await() }
+        } finally {
+            completionClaimed.compareAndSet(false, true)
+            cleanupWebView()
+            withContext(NonCancellable) {
+                withTimeoutOrNull(3000L) { cleanupFinished.await() }
+            }
+        }
+        if (result == null) {
+            Log.w(TAG, "Headless autonomous cycle timed out without a completion receipt")
+        }
+        return result == true
     }
 
     private data class ConditionCheckResult(val passed: Boolean, val reason: String)

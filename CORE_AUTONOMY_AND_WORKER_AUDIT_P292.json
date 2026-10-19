@@ -1,0 +1,56 @@
+{
+  "revision": "P292",
+  "confirmedAdditionalBug": "production scale worker cancellation can incorrectly complete or retry cancelled jobs",
+  "fixes": [
+    "persistent CANCELLED state",
+    "post-await cancellation check",
+    "cancellation-priority exception handling",
+    "startup recovery preserves cancellation"
+  ],
+  "verification": {
+    "workerCancellationContract": {
+      "passed": true,
+      "checks": 5
+    },
+    "coreAutonomyRegression": {
+      "passed": true,
+      "checks": 19
+    },
+    "blackboardCorruptSnapshot": {
+      "passed": true,
+      "checks": 4
+    },
+    "runtimeFailureRegression": {
+      "passed": true,
+      "checks": 153
+    },
+    "loraRetirement": {
+      "passed": true,
+      "checks": 34
+    },
+    "sourceRelationLedger": {
+      "passed": true,
+      "paths": 1787,
+      "sha256AndLineCountsVerified": 1787,
+      "staticImportEdges": 3814,
+      "reachableSources": 719,
+      "compatibilityFacades": 37,
+      "duplicatePaths": 0
+    },
+    "changedTypeScriptSyntax": {
+      "passed": true,
+      "files": 2
+    }
+  },
+  "notVerified": [
+    "real-time worker cancellation race E2E",
+    "full TypeScript typecheck",
+    "Vite build",
+    "Android build/APK",
+    "Galaxy S25 E2E",
+    "Android persistent storage and long-running recovery",
+    "full Planner E2E due missing jszip dependency",
+    "GitHub main sync/commit/push"
+  ],
+  "githubMainUpdated": false
+}

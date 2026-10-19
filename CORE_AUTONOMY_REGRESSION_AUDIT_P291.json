@@ -1,0 +1,95 @@
+{
+  "revision": "P291",
+  "base": "MIKI-AI0.2-autonomous-source-authority-convergence-P290.zip",
+  "status": "SOURCE_PATCHED_STATIC_AND_TARGETED_TESTS_PASS_FULL_BUILD_UNVERIFIED",
+  "confirmedFindings": [
+    {
+      "id": "P291-C1",
+      "severity": "P0",
+      "area": "adaptive completion",
+      "source": "src/miki/core/services/coreCompletionGateService.ts",
+      "finding": "Adaptive completion required CREATE_REVIEW_PACKAGE even when the current plan did not declare it.",
+      "fix": "Review package is required only when a CREATE_REVIEW_PACKAGE operation is explicitly present in the plan; a declared but missing package remains blocked by missing-operation checks.",
+      "test": "verify_core_autonomy_regressions_p291.mjs"
+    },
+    {
+      "id": "P291-C2",
+      "severity": "P0",
+      "area": "research routing",
+      "source": "src/miki/core/services/adaptiveRoutePlannerService.ts",
+      "finding": "Two explicit EXECUTE_AUTONOMOUS_SEARCH routing branches could schedule RUN_RESEARCH again after a successful result, before shared continuation/verification planning.",
+      "fix": "Both initial-entry branches now require no successful RUN_RESEARCH result; existing results fall through to the common continuation/verification planner.",
+      "test": "Static branch contract in verify_core_autonomy_regressions_p291.mjs; runtime planner E2E not run because local JSZip dependency is absent."
+    },
+    {
+      "id": "P291-C3",
+      "severity": "P0",
+      "area": "error recovery",
+      "source": "src/miki/core/services/taskBlackboardService.ts; src/miki/core/services/adaptiveRoutePlannerService.ts; src/miki/core/services/coreCompletionGateService.ts; src/miki/core/services/coreOrchestratorService.ts",
+      "finding": "Completion gates treated any historical ERROR as unresolved even after a later successful retry.",
+      "fix": "Added unresolvedTaskErrors. Append-only ERROR history remains intact; recovery is accepted only when a later successful result has the same operation instance or explicitly supersedes its ID. Retry supersession includes an operationScopeKey derived from target/command/operation/query/gap/intent to avoid forgiving a different research query. Errors without operationInstanceId remain fail-closed.",
+      "test": "Five runtime cases in verify_core_autonomy_regressions_p291.mjs."
+    },
+    {
+      "id": "P291-C4",
+      "severity": "P0",
+      "area": "conversation finalization",
+      "source": "src/miki/core/services/coreTaskIngressService.ts; src/miki/core/services/coreOrchestratorService.ts; src/miki/core/services/adaptiveRoutePlannerService.ts",
+      "finding": "Finalization marked a task COMPLETED and recorded success before applying P216 validation; it wrote conversationResponseFinalized while the completion gate looked for conversationFinalResponse.",
+      "fix": "Pass P216 validation into CORE finalization, write conversationFinalResponse only for validated output, and mark COMPLETED/SUCCESS only when both P216 and the CORE completion gate pass. Validation failure becomes FAILED; a valid answer with incomplete task requirements remains PAUSED/WAITING.",
+      "test": "Structural contracts in verify_core_autonomy_regressions_p291.mjs; end-to-end conversation flow not run."
+    },
+    {
+      "id": "P291-C5",
+      "severity": "P1",
+      "area": "Blackboard persistence recovery",
+      "source": "src/miki/core/services/taskBlackboardService.ts",
+      "finding": "Corrupt JSON caused the in-memory task map to be cleared; a later normal save could overwrite the only stored copy. Non-array snapshots and malformed records could also be silently ignored.",
+      "fix": "Invalid snapshots/records are rejected into the same quarantine path. Exact raw bytes are written to a quarantine key and read back before writes resume; if preservation fails, writes are blocked for the process.",
+      "test": "verify_blackboard_corrupt_snapshot_p291.mjs: 4 checks pass using in-memory storage fallback."
+    }
+  ],
+  "verification": {
+    "sourceLedger": {
+      "status": "PASS",
+      "records": 1787,
+      "sha256Verified": 1787,
+      "staticEdges": 3814,
+      "reachableFromCoreUiRoots": 719,
+      "legacyFacades": 37,
+      "duplicatePaths": 0
+    },
+    "coreAutonomyRegression": {
+      "status": "PASS",
+      "checks": 19
+    },
+    "corruptBlackboardSnapshot": {
+      "status": "PASS",
+      "checks": 4
+    },
+    "existingRuntimeFailureRegression": {
+      "status": "PASS",
+      "checks": 153,
+      "note": "Executed with global TypeScript resolver because project-local node_modules is absent."
+    },
+    "loraRetirement": {
+      "status": "PASS",
+      "checks": 34,
+      "activeLoRAExecution": "retired; 4 legacy identifiers remain only in migration/quarantine paths"
+    },
+    "typescriptSyntax": {
+      "status": "PASS",
+      "files": 5
+    }
+  },
+  "notVerified": [
+    "Full TypeScript typecheck",
+    "Vite production build",
+    "Android Gradle build/APK",
+    "Runtime planner E2E through all imported services",
+    "Galaxy S25 device E2E",
+    "GitHub main synchronization or push"
+  ],
+  "workingTreeOnly": true,
+  "githubMainUpdated": false
+}

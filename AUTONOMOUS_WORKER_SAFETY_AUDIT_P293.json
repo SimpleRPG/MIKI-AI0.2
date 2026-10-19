@@ -1,0 +1,88 @@
+{
+  "revision": "P293",
+  "scope": "P292 ZIP-derived working tree; not synced to GitHub main",
+  "confirmedProblemsFixed": [
+    {
+      "area": "Durable Job state machine",
+      "finding": "Any caller could directly assign arbitrary state; terminal jobs could be reopened.",
+      "fix": "Explicit transition graph; terminal-state protection; idempotent cancellation; queued/waiting cancellation immediately reaches CANCELLED; active cancellation follows CANCELLING -> CANCELLED."
+    },
+    {
+      "area": "Worker execution race",
+      "finding": "A late execution result could overwrite a state changed while awaiting the runtime adapter.",
+      "fix": "Re-read persisted state after each await; only RUNNING jobs may be completed/retried by the worker; preserve PAUSED and terminal states; success proof requires RUNNING and no cancellation."
+    },
+    {
+      "area": "Dependency scheduling",
+      "finding": "Jobs with failed/cancelled dependencies could remain queued indefinitely.",
+      "fix": "Reject missing or already-failed dependencies at enqueue; mark waiting dependents BLOCKED when a dependency later ends unsuccessfully."
+    },
+    {
+      "area": "Lease and resource safety",
+      "finding": "Heartbeat accepted non-running jobs and did not reject expired leases; enqueue accepted invalid resource budgets.",
+      "fix": "Validate owner/state/expiry/TTL and resource/retry budget before scheduling."
+    },
+    {
+      "area": "Persistent evidence/history",
+      "finding": "Four critical stores treated malformed JSON as empty history and could overwrite the only copy.",
+      "fix": "Quarantine original raw bytes, read back to verify preservation, block writes if preservation fails, and verify write result size."
+    },
+    {
+      "area": "Durable job snapshot",
+      "finding": "Malformed job snapshot could be interpreted as empty queue.",
+      "fix": "Validate snapshot structure and quarantine malformed data before any overwrite."
+    },
+    {
+      "area": "Job identity",
+      "finding": "Two same-input jobs enqueued within the same millisecond could collide because Date.now was the only nonce.",
+      "fix": "Include a monotonically increasing process-local sequence in jobId and cancelToken derivation."
+    }
+  ],
+  "verification": {
+    "workerSafetyRuntimeAndContracts": {
+      "status": "PASS",
+      "checks": 9
+    },
+    "previousCancellationRegression": {
+      "status": "PASS",
+      "checks": 5
+    },
+    "COREAutonomyRegression": {
+      "status": "PASS",
+      "checks": 19
+    },
+    "BlackboardCorruptionProtection": {
+      "status": "PASS",
+      "checks": 4
+    },
+    "LoRARetirement": {
+      "status": "PASS",
+      "checks": 34
+    },
+    "SourceRelationLedger": {
+      "status": "PASS",
+      "records": 1787,
+      "sha256Verified": 1787,
+      "staticImportEdges": 3814,
+      "reachableSources": 719,
+      "legacyFacades": 37,
+      "duplicatePaths": 0
+    },
+    "TypeScriptSyntaxParsing": {
+      "status": "PASS",
+      "files": 6
+    },
+    "zipIntegrity": {
+      "status": "PASS",
+      "entries": 1838,
+      "freshExtractionVerification": "PASS"
+    }
+  },
+  "limitations": [
+    "Node test environment has no IndexedDB; storage tests used the storageService in-memory fallback. Persistent Android storage behavior is not proven by these tests.",
+    "Full TypeScript typecheck and Vite build were not run.",
+    "Android Gradle build/APK, Galaxy S25 device tests, background/force-stop recovery and long-running worker E2E were not run.",
+    "GitHub main was not fetched or updated, and no commit/PUSH was performed.",
+    "The 1,787-entry relation ledger retains its fixed historical path baseline; it refreshes hashes, line counts and import graph for those paths, but does not claim a new full recursive repository inventory or include newly added audit scripts."
+  ]
+}

@@ -1,10 +1,11 @@
 import { formalAdoptionAuthorizationService, type FormalAdoptionAuthorization } from '../../selfDevelopment/services/formalAdoptionAuthorizationService';
 import type { MikiDomain } from './crossDomainCirculationService';
-import { taskBlackboardService, type BlackboardTask, type BlackboardEntry } from './taskBlackboardService';
+import { taskBlackboardService, unresolvedTaskErrors, type BlackboardTask, type BlackboardEntry } from './taskBlackboardService';
 import type { DomainCommand } from './domainRouterService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { coreCompletionGateService, type CoreCompletionAssessment } from './coreCompletionGateService';
 import { corePlanRevisionService } from './corePlanRevisionService';
+import { canonicalSha256Object } from './canonicalSha256Service';
 import { isDiagnosticDomainCommand } from './domainContractRegistryService';
 import { EvidenceService } from '../../memory/services/evidenceService';
 import { proposalQuarantineService } from './proposalQuarantineService';
@@ -2248,7 +2249,11 @@ class AdaptiveRoutePlannerService {
       });
       return this.decorateOperations(task,this.uniqueOperations(routes));
     }
-    if(operation==='EXECUTE_AUTONOMOUS_SEARCH'){
+    // The explicit UI operation is an entry instruction, not a request to
+    // rerun the same research on every CORE reevaluation. Once a successful
+    // RUN_RESEARCH receipt exists, fall through to the shared continuation /
+    // verification planner below, which decides whether another query is needed.
+    if(operation==='EXECUTE_AUTONOMOUS_SEARCH'&&!this.latestBusinessResult(task,'RUN_RESEARCH')){
       routes.push({
         target:'research',
         command:'RUN_RESEARCH',
@@ -2292,7 +2297,7 @@ class AdaptiveRoutePlannerService {
       'SAVE_CORE_CYCLE_SETTINGS'
     ]);
     const coreOwnedResearchOperations=new Set(['EXECUTE_AUTONOMOUS_SEARCH']);
-    if(coreOwnedResearchOperations.has(operation)){
+    if(coreOwnedResearchOperations.has(operation)&&!this.latestBusinessResult(task,'RUN_RESEARCH')){
       routes.push({target:'research',command:'RUN_RESEARCH',reason:'CORE selected research for explicit autonomous search',payload:{...input,taskId:task.taskId,operation,query:String(input.query||''),adaptive:true,priority:100}});return this.decorateOperations(task,this.uniqueOperations(routes));
     }
     const coreOwnedAutonomyOperations=new Set(['SAVE_AUTONOMY_CONFIG']);
@@ -2463,7 +2468,7 @@ class AdaptiveRoutePlannerService {
     if(operation==='APPROVE_REUSABLE_COMPONENTS'){
       const completed=Boolean(this.latestBusinessResult(task,'APPROVE_REUSABLE_COMPONENTS'));
       const reasons:string[]=[];
-      if(task.entries.some(entry=>entry.kind==='ERROR'))reasons.push('UNRESOLVED_DOMAIN_ERROR');
+      if(unresolvedTaskErrors(task).length>0)reasons.push('UNRESOLVED_DOMAIN_ERROR');
       if(task.pendingDomains.length)reasons.push('PENDING_DOMAIN_REMAINS');
       return {businessCompletion:completed&&reasons.length===0,failClosed:true,requiredDomains:[],missingDomains:completed?[]:['learning'],failedDomains:completed?[]:['learning'],missingReceipts:[],persistenceConfirmed:false,evidenceQualityPassed:true,reasons,missingRequiredOperations:[]};
     }
@@ -3001,7 +3006,24 @@ class AdaptiveRoutePlannerService {
       const dedupeKey=`${task.taskId}:${route.command}:${attempt}${intentSuffix}`;
       const sourceOperationInstanceId=typeof route.payload.sourceOperationInstanceId==='string'
         ? route.payload.sourceOperationInstanceId : '';
-      return {...route,payload:{...route.payload,operationInstanceId,dedupeKey,attempt,
+      const routeIntentIds=Array.isArray(route.payload.intentIds)?route.payload.intentIds.map(String).sort():[];
+      const operationScopeKey=canonicalSha256Object({target:route.target,command:route.command,
+        operation:String(route.payload.operation||''),query:String(route.payload.query||''),
+        gapId:String(route.payload.gapId||''),intentIds:routeIntentIds});
+      const supersedesOperationInstanceIds=unresolvedTaskErrors(task).filter(entry=>{
+        if(entry.domain!==route.target)return false;
+        const value=objectValue(entry);
+        if(String(value?.operation||'')!==route.command)return false;
+        const failedIntentIds=Array.isArray(value?.intentIds)?value.intentIds.map(String).sort():[];
+        if(JSON.stringify(failedIntentIds)!==JSON.stringify(routeIntentIds))return false;
+        const failedScope=String(value?.operationScopeKey||'');
+        if(failedScope)return failedScope===operationScopeKey;
+        // Do not forgive a pre-P291 query/gap failure using a different query;
+        // old unscoped errors remain fail-closed when their scope cannot be proven.
+        return !String(route.payload.query||'').trim()&&!String(route.payload.gapId||'').trim();
+      }).map(entry=>String(objectValue(entry)?.operationInstanceId||'')).filter(Boolean);
+      return {...route,payload:{...route.payload,operationInstanceId,dedupeKey,attempt,operationScopeKey,
+        ...(supersedesOperationInstanceIds.length?{supersedesOperationInstanceIds:[...new Set(supersedesOperationInstanceIds)]}:{}),
         ...(sourceOperationInstanceId?{dependsOn:[sourceOperationInstanceId]}:{})}};
     });
   }

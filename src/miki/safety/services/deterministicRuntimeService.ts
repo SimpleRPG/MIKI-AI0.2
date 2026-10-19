@@ -18,15 +18,12 @@ export interface NativeStorageInfo {
   freeDiskMB?: number;
   totalDiskMB?: number;
 }
-export interface NativeLoraFile { fileName: string; size: number; }
-export interface NativeLoraStorageInfo { totalBytes: number; freeBytes: number; usedBytes: number; files: NativeLoraFile[]; }
 export interface DeterministicTeacherConfig { endpoint: string; model?: string; apiKey?: string; type?: string; slotId?: number; [key: string]: any; }
 export interface DeterministicProgressEvent { stage: string; progress: number; message?: string; }
 export interface DeterministicChunkEvent { content: string; done?: boolean; }
 export interface VRAMSnapshot { totalMB: number; usedMB: number; freeMB: number; pressureLevel: 'low' | 'medium' | 'high' | 'critical'; }
 
 const EMPTY_STORAGE: NativeStorageInfo = { totalBytes: 0, freeBytes: 0, usedBytes: 0 };
-const EMPTY_LORA: NativeLoraStorageInfo = { ...EMPTY_STORAGE, files: [] };
 
 function messagesToPrompt(messages: ChatMessage[] | any[]): string {
   return (messages || []).map((m: any) => String(m?.content ?? '')).filter(Boolean).slice(-8).join('\n');
@@ -55,10 +52,8 @@ export const deterministicRuntimeService = {
   getActiveModelId: () => '' as string,
   isLoadingModel: () => false,
   getActiveExternalConfig: () => ({ endpoint: '', type: 'non_llm_core', model: 'deterministic-feature-v1' }) as DeterministicTeacherConfig,
-  getActiveLoraInfo: () => null as NativeLoraFile | null,
   getHardwareSpecs: async (): Promise<NativeGpuInfo> => ({ backend: 'NON_LLM_CORE', deviceName: 'Deterministic Core', totalMemoryMB: 0, freeMemoryMB: 0, computeUnits: 0 }),
   getStorageInfo: async () => EMPTY_STORAGE,
-  getLoraStorageInfo: async () => EMPTY_LORA,
   isSharedStorageAccessGranted: async () => false,
   requestSharedStorageAccess: async () => false,
   resetDiagnostics: () => undefined,
@@ -69,9 +64,6 @@ export const deterministicRuntimeService = {
   downloadModel: async (..._args: any[]) => { throw new Error('Local generative model downloads have been removed.'); },
   loadNativeModel: async (..._args: any[]) => { throw new Error('Local generative model loading has been removed.'); },
   deleteDownloadedModel: async (..._args: any[]) => false,
-  applyLoraAdapter: async (..._args: any[]) => ({ success: false, reason: 'LoRA model adapters are retired with local generative models.' }),
-  removeLoraAdapter: async (..._args: any[]) => ({ success: true }),
-  deleteLoraFile: async (..._args: any[]) => false,
   autoLoadDownloadedModelIfAvailable: async (..._args: any[]) => false,
   streamDeterministicChat: (first: any, second?: any, _options?: any) =>
     deterministicStream(Array.isArray(first) ? first : (Array.isArray(second) ? second : [])),

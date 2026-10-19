@@ -1,7 +1,7 @@
 import { corePlanRevisionService } from './corePlanRevisionService';
 import { coreLineageReadModelService } from './coreLineageReadModelService';
 import { domainRouterService, type DomainCommand } from './domainRouterService';
-import { taskBlackboardService, type BlackboardTask } from './taskBlackboardService';
+import { taskBlackboardService, unresolvedTaskErrors, type BlackboardTask } from './taskBlackboardService';
 import { adaptiveRoutePlannerService } from './adaptiveRoutePlannerService';
 import { rustCoreDecisionKernelService } from './rustCoreDecisionKernelService';
 import { rustDomainParticipationKernelService } from './rustDomainParticipationKernelService';
@@ -39,6 +39,7 @@ import { canaryPostReviewVerificationService } from '../../selfDevelopment/servi
 import { autonomousE2EProofSuiteService } from '../../selfDevelopment/services/autonomousE2EProofSuiteService';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
+import { cognitiveStateCheckpointService } from '../../autonomy/services/operationalGovernanceService';
 
 export interface CoreOrchestrationResult { task:BlackboardTask; cycles:number; dispatched:number; coreResult?:CoreResult; }
 
@@ -47,8 +48,12 @@ export interface CoreImprovementDecisionInput { instruction:string; baselineSha2
 export interface CoreImprovementDecision { nextAction:'ANALYZE'|'BUILD'|'REPAIR'|'RUN_REGRESSION'|'BUILD_REVIEW_PACKAGE'|'WAIT_EXTERNAL_EVALUATION'|'PREPARE_ADOPTION'|'STOP'; reasons:string[]; canMutateCanonical:false; requiresExternalEvaluation:true; }
 
 export interface UnifiedCognitiveStateSnapshot {
-  schemaVersion:2; taskId:string; cycle:number; revision:number; goal:string; input:string; source:string;
+  schemaVersion:2; stateId:string; taskId:string; cycle:number; revision:number; goal:string; input:string; source:string;
   constraints:string[]; activeDomains:string[]; requiredDomains:string[]; pendingIntentIds:string[]; evidenceIds:string[]; unknowns:string[]; capabilityRefs:string[];
+  hypothesisRefs?:Array<{id:string;kind:string;confidence:number;rationale:string}>;
+  actionRefs?:string[]; safetyConstraints?:string[]; contradictions?:string[]; confidenceSummary?:{knownEvidence:number;unresolvedUnknowns:number;failedActions:number;verifiedOutcomes:number};
+  activeTask?:{status:string;pausedReason?:string;resumeCount:number;lastCycle:number};
+  latestOutcome?:{kind:string;domain:string;key:string;status?:string}; failureRefs?:string[]; learningRefs?:string[]; semanticCoreHash?:string;
   recentOutcomes:Array<{kind:string;domain:string;key:string;status?:string}>;
   learningCandidates:Array<{domain:string;key:string;valueHash:string}>;
   environmentSignature?:string; invariantsVersion:1; stateHash:string;
@@ -273,6 +278,12 @@ class CoreOrchestratorService {
   const currentTask=taskBlackboardService.get(taskId);
   if(!currentTask)return undefined;
   if(currentTask.status==='COMPLETED'||currentTask.status==='CANCELLED')return undefined;
+  const checkpointValidation=this.validateCognitiveCheckpointForResume(currentTask);
+  if(!checkpointValidation.ok){
+   taskBlackboardService.append(taskId,'ERROR','core','cognitiveCheckpointResumeRejected',{reason:checkpointValidation.reason,source:'executionEvent',failClosed:true});
+   systemLogger.error('SYSTEM',`[CORE_RESUME_REJECTED] Cognitive checkpoint invalid for ${taskId}: ${checkpointValidation.reason}`);
+   return undefined;
+  }
   const reqId=this.resolveRequestId(currentTask,taskId);
   if(currentTask.status==='PAUSED'){
    const resumed=taskBlackboardService.resume(taskId);
@@ -290,6 +301,13 @@ class CoreOrchestratorService {
  }
  async resume(taskId:string,maxCycles=18,allowRoutingRecovery=false):Promise<CoreOrchestrationResult|undefined>{
   const currentTask=taskBlackboardService.get(taskId);
+  if(!currentTask)return undefined;
+  const checkpointValidation=this.validateCognitiveCheckpointForResume(currentTask);
+  if(!checkpointValidation.ok){
+   taskBlackboardService.append(taskId,'ERROR','core','cognitiveCheckpointResumeRejected',{reason:checkpointValidation.reason,source:'manualResume',failClosed:true});
+   systemLogger.error('SYSTEM',`[CORE_RESUME_REJECTED] Cognitive checkpoint invalid for ${taskId}: ${checkpointValidation.reason}`);
+   return undefined;
+  }
   const reqId=this.resolveRequestId(currentTask,taskId);
   const resumed=taskBlackboardService.resume(taskId,allowRoutingRecovery);if(!resumed)return undefined;
   taskBlackboardService.append(taskId,'DECISION','core','coreResumed',{mode:'CORE_18_DOMAIN_ORCHESTRATION',requestId:reqId,recovery:allowRoutingRecovery&&currentTask?.status==='ROUTING'});
@@ -388,19 +406,42 @@ class CoreOrchestratorService {
   coreResultService.rejected(reqId,'Task cancelled');
   return taskBlackboardService.cancel(taskId);
  }
- finalizeConversationResponse(taskId:string,response:unknown):CoreOrchestrationResult|undefined{
+ finalizeConversationResponse(taskId:string,response:unknown,validation:{passed:boolean;failedReasons:string[]}):CoreOrchestrationResult|undefined{
   const currentTask=taskBlackboardService.get(taskId);
   if(!currentTask)return undefined;
   const reqId=this.resolveRequestId(currentTask,taskId);
   const cycles=currentTask.lastCycle||0;
   const replyRecords=domainReplyLedgerService.listByTask(taskId);
-  taskBlackboardService.append(taskId,'RESULT','core','conversationResponseFinalized',{response,finalizedBy:'core',requestId:reqId,cycles,dispatched:replyRecords.length});
-  taskBlackboardService.setStatus(taskId,'COMPLETED');
+  taskBlackboardService.append(taskId,validation.passed?'RESULT':'OBSERVATION','core','conversationResponseFinalized',{
+   response,finalizedBy:'core',requestId:reqId,cycles,dispatched:replyRecords.length,
+   answerValidation:{passed:validation.passed,failedReasons:[...validation.failedReasons]}
+  });
+  if(validation.passed){
+   taskBlackboardService.append(taskId,'RESULT','core','conversationFinalResponse',{
+    response,finalizedBy:'core',requestId:reqId,answerValidated:true,validationReasons:[]
+   });
+  }
+  const assessedTask=taskBlackboardService.get(taskId)!;
+  const completion=adaptiveRoutePlannerService.assessCompletion(assessedTask);
+  const completed=validation.passed&&completion.businessCompletion;
+  const payload={...this.buildRuntimeCirculationResult(assessedTask,cycles,replyRecords.length,completion.requiredDomains),response,conversationFinalized:true,finalizedBy:'core',answerValidated:validation.passed,completionReasons:completion.reasons};
+  if(completed){
+   taskBlackboardService.setStatus(taskId,'COMPLETED');
+   const finalTask=taskBlackboardService.get(taskId)!;
+   const coreResult=coreResultService.complete(reqId,payload,{route:['core'],processedCategories:['conversation']});
+   this.recordTaskMemoryOutcome(finalTask,'SUCCESS');
+   return {task:finalTask,cycles,dispatched:replyRecords.length,coreResult};
+  }
+  if(!validation.passed){
+   taskBlackboardService.setStatus(taskId,'FAILED');
+   const finalTask=taskBlackboardService.get(taskId)!;
+   const coreResult=coreResultService.fail(reqId,`CONVERSATION_ANSWER_VALIDATION_FAILED:${validation.failedReasons.join('|')||'UNKNOWN'}`,payload);
+   this.recordTaskMemoryOutcome(finalTask,'FAILURE');
+   return {task:finalTask,cycles,dispatched:replyRecords.length,coreResult};
+  }
+  taskBlackboardService.pause(taskId,`CONVERSATION_COMPLETION_GATE_FAILED:${completion.reasons.join('|')||'UNKNOWN'}`);
   const finalTask=taskBlackboardService.get(taskId)!;
-  const completion=adaptiveRoutePlannerService.assessCompletion(finalTask);
-  const payload={...this.buildRuntimeCirculationResult(finalTask,cycles,replyRecords.length,completion.requiredDomains),response,conversationFinalized:true,finalizedBy:'core'};
-  const coreResult=coreResultService.complete(reqId,payload,{route:['core'],processedCategories:['conversation']});
-  this.recordTaskMemoryOutcome(finalTask,'SUCCESS');
+  const coreResult=coreResultService.waiting(reqId,{...payload,error:'CONVERSATION_COMPLETION_GATE_FAILED'});
   return {task:finalTask,cycles,dispatched:replyRecords.length,coreResult};
  }
 
@@ -426,6 +467,19 @@ class CoreOrchestratorService {
   const recentDecisions:string[]=[];
   const unresolvedRefs:string[]=[];
   const semanticContext:string[]=[];
+  const explanationPlan=payload.explanationPlan&&typeof payload.explanationPlan==='object'&&!Array.isArray(payload.explanationPlan)?payload.explanationPlan as Record<string,unknown>:undefined;
+  if(explanationPlan)semanticContext.push(`ANSWER_DETAIL_PLAN|level=${String(explanationPlan.level||'STANDARD')}|rationale=${JSON.stringify(explanationPlan.rationale||[])}`);
+  const clarificationPlan=payload.clarificationPlan&&typeof payload.clarificationPlan==='object'&&!Array.isArray(payload.clarificationPlan)?payload.clarificationPlan as Record<string,unknown>:undefined;
+  const selectedClarification=clarificationPlan?.selected&&typeof clarificationPlan.selected==='object'&&!Array.isArray(clarificationPlan.selected)?clarificationPlan.selected as Record<string,unknown>:undefined;
+  if(selectedClarification)semanticContext.push(`INFORMATION_GAIN_CLARIFICATION|question=${String(selectedClarification.question||'')}|score=${String(selectedClarification.score||0)}|must_not_guess=true`);
+  const potentialUnknowns=Array.isArray(payload.potentialUnknownCandidates)?payload.potentialUnknownCandidates.filter((value):value is Record<string,unknown>=>Boolean(value&&typeof value==='object'&&!Array.isArray(value))):[];
+  if(potentialUnknowns.length)semanticContext.push(`POTENTIAL_UNKNOWN_HYPOTHESES|candidates=${JSON.stringify(potentialUnknowns.slice(0,12))}|must_research_and_verify=true`);
+  const learningOpportunities=Array.isArray(payload.learningOpportunities)?payload.learningOpportunities.filter((value):value is Record<string,unknown>=>Boolean(value&&typeof value==='object'&&!Array.isArray(value))):[];
+  if(learningOpportunities.length)semanticContext.push(`LEARNING_OPPORTUNITY_CANDIDATES|candidates=${JSON.stringify(learningOpportunities.slice(0,12))}|requires_outcome_evaluation=true`);
+  const transferCandidates=Array.isArray(payload.crossDomainTransferCandidates)?payload.crossDomainTransferCandidates.filter((value):value is Record<string,unknown>=>Boolean(value&&typeof value==='object'&&!Array.isArray(value))):[];
+  if(transferCandidates.length)semanticContext.push(`CROSS_DOMAIN_TRANSFER_CANDIDATES|candidates=${JSON.stringify(transferCandidates.slice(0,12))}|reuse_is_hypothesis_until_target_outcome_is_verified=true`);
+  const intentPlan=payload.intentPlan&&typeof payload.intentPlan==='object'&&!Array.isArray(payload.intentPlan)?payload.intentPlan as Record<string,unknown>:undefined;
+  if(intentPlan)semanticContext.push(`MULTI_INTENT_PLAN|planKey=${String(intentPlan.deterministicKey||'')}|units=${JSON.stringify(Array.isArray(intentPlan.units)?intentPlan.units:[])}`);
 
   for(const entry of task.entries){
     for(const id of entry.evidenceIds||[]) evidenceRefs.add(String(id));
@@ -1024,6 +1078,21 @@ class CoreOrchestratorService {
     continue;
 
    }
+   try {
+    const checkpointEntries=stateBase.entries.filter(entry=>entry.kind==='CHECKPOINT'&&entry.key.startsWith('cognitiveStateCheckpoint:'));
+    const priorCheckpointValue=checkpointEntries.at(-1)?.value;
+    const priorCheckpointId=priorCheckpointValue&&typeof priorCheckpointValue==='object'&&!Array.isArray(priorCheckpointValue)&&typeof (priorCheckpointValue as Record<string,unknown>).id==='string'?String((priorCheckpointValue as Record<string,unknown>).id):undefined;
+    const priorChain=priorCheckpointId?cognitiveStateCheckpointService.chain(priorCheckpointId):undefined;
+    if(priorCheckpointId&&(!priorChain||!priorChain.ok))throw new Error('COGNITIVE_CHECKPOINT_PARENT_CHAIN_INVALID');
+    const compactCheckpointChain=Boolean(priorChain?.ok&&(priorChain.checkpoints.length>=50||priorChain.checkpoints.some(item=>item.hashAlgorithm!=='CANONICAL_SHA256_V1')));
+    const checkpointParentId=compactCheckpointChain?undefined:priorCheckpointId;
+    const priorEvidenceIds=new Set(compactCheckpointChain?[]:(priorChain?.ok?priorChain.checkpoints:[]).flatMap(item=>item.addedEvidence));
+    const newlyAddedEvidence=compactCheckpointChain?[...cognitiveState.evidenceIds]:cognitiveState.evidenceIds.filter(id=>!priorEvidenceIds.has(id));
+    const checkpoint=cognitiveStateCheckpointService.create({parentCheckpointId:checkpointParentId,baseSnapshotId:`${cognitiveState.stateId}:${cognitiveState.stateHash}`,changedFacts:[cognitiveState.semanticCoreHash||cognitiveState.stateHash,...(compactCheckpointChain&&priorChain?.ok?[`COMPACTED_PARENT_CHAIN:${canonicalSha256Object(priorChain.checkpoints.map(item=>item.stateHash))}`]:[])],addedEvidence:newlyAddedEvidence,invalidatedAssumptions:[...new Set(cognitiveState.contradictions||[])],supersededRequirements:[],taskStateChanges:[`status:${stateBase.status}`,`cycle:${cycles}`,`revision:${stateBase.revision}`],memoryStateChanges:[...new Set(cognitiveState.evidenceIds.filter(id=>id.startsWith('MEM-')))],skillStateChanges:[...cognitiveState.capabilityRefs],artifactReferences:[...new Set(stateBase.entries.filter(entry=>/artifact|candidate|reviewPackage/i.test(entry.key)).map(entry=>entry.id))],configurationChanges:[],layer:'HOT'});
+    taskBlackboardService.append(taskId,'CHECKPOINT','core',`cognitiveStateCheckpoint:${cycles}`,{id:checkpoint.id,stateHash:checkpoint.stateHash,integrityHash:checkpoint.integrityHash,verified:checkpoint.verified,baseSnapshotId:checkpoint.baseSnapshotId,parentCheckpointId:checkpoint.parentCheckpointId},cognitiveState.evidenceIds);
+   } catch(error) {
+    taskBlackboardService.append(taskId,'ERROR','core',`cognitiveStateCheckpointPersistFailed:${cycles}`,{error:error instanceof Error?error.message:String(error),stateId:cognitiveState.stateId,stateHash:cognitiveState.stateHash,action:'PERSISTENCE_RETRY_REQUIRED'},cognitiveState.evidenceIds);
+   }
    await this.assessCoreMemoryContext(stateBase,currentPayload,cycles);
    const current=taskBlackboardService.get(taskId)!;
    const plateau=plateauDetectorService.evaluate(current);
@@ -1230,7 +1299,10 @@ class CoreOrchestratorService {
         const reusedValue={
           schemaVersion:3,collectedBy:'core',coreCollected:true,sourceDomain:route.target,
           producerId:'domainReplyLedgerService',operation:route.command,
-          operationInstanceId:route.payload.operationInstanceId,planRevision:route.payload.planRevision,
+          operationInstanceId:route.payload.operationInstanceId,
+          supersedesOperationInstanceIds:Array.isArray(route.payload.supersedesOperationInstanceIds)?route.payload.supersedesOperationInstanceIds.map(String):[],
+          operationScopeKey:typeof route.payload.operationScopeKey==='string'?route.payload.operationScopeKey:'',
+          planRevision:route.payload.planRevision,
           planSha256:route.payload.planSha256,idempotencyKey,
           operationClass,status,
           reply:{status,operationClass,reused:true,reusedFromReplyId:prior.replyId,
@@ -1326,6 +1398,8 @@ class CoreOrchestratorService {
             data:synthesis
           },
           operationInstanceId:route.payload.operationInstanceId,
+          supersedesOperationInstanceIds:Array.isArray(route.payload.supersedesOperationInstanceIds)?route.payload.supersedesOperationInstanceIds.map(String):[],
+          operationScopeKey:typeof route.payload.operationScopeKey==='string'?route.payload.operationScopeKey:'',
           planRevision:route.payload.planRevision,
           planSha256:route.payload.planSha256,
           idempotencyKey:route.payload.idempotencyKey,
@@ -1542,7 +1616,7 @@ class CoreOrchestratorService {
       replyId:replyRecord.replyId,cycle:cycles
     });
     const expectedRevision=taskBlackboardService.get(taskId)?.revision ?? -1;
-    const resultWrite=taskBlackboardService.appendIfRevision(taskId,expectedRevision,resultKind,route.target,`${resultKind==='OBSERVATION'?'domainObservation':'domainResult'}:${route.target}:${route.command}`,{schemaVersion:3,collectedBy:'core',coreCollected:true,sourceDomain:route.target,producerId:'domainRouterService',dispatchId:envelope.envelopeId,replyId:replyRecord.replyId,operation:route.command,operationInstanceId:route.payload.operationInstanceId,planRevision:route.payload.planRevision,intentPlanKey:route.payload.intentPlanKey,intentHypothesisId:route.payload.intentHypothesisId,intentHypothesisKind:route.payload.intentHypothesisKind,intentIds:Array.isArray(route.payload.intentIds)?route.payload.intentIds.map(String):[],planSha256:route.payload.planSha256,idempotencyKey:typeof route.payload.idempotencyKey==='string'?route.payload.idempotencyKey:'',operationClass,reply:reply.normalized||reply.error,auditTag:'coreCollected:'},replyRecord.evidenceIds);
+    const resultWrite=taskBlackboardService.appendIfRevision(taskId,expectedRevision,resultKind,route.target,`${resultKind==='OBSERVATION'?'domainObservation':'domainResult'}:${route.target}:${route.command}`,{schemaVersion:3,collectedBy:'core',coreCollected:true,sourceDomain:route.target,producerId:'domainRouterService',dispatchId:envelope.envelopeId,replyId:replyRecord.replyId,operation:route.command,operationInstanceId:route.payload.operationInstanceId,supersedesOperationInstanceIds:Array.isArray(route.payload.supersedesOperationInstanceIds)?route.payload.supersedesOperationInstanceIds.map(String):[],operationScopeKey:typeof route.payload.operationScopeKey==='string'?route.payload.operationScopeKey:'',planRevision:route.payload.planRevision,intentPlanKey:route.payload.intentPlanKey,intentHypothesisId:route.payload.intentHypothesisId,intentHypothesisKind:route.payload.intentHypothesisKind,intentIds:Array.isArray(route.payload.intentIds)?route.payload.intentIds.map(String):[],planSha256:route.payload.planSha256,idempotencyKey:typeof route.payload.idempotencyKey==='string'?route.payload.idempotencyKey:'',operationClass,reply:reply.normalized||reply.error,auditTag:'coreCollected:'},replyRecord.evidenceIds);
     coreExecutionTraceService.record(taskId,cycles,'BLACKBOARD_WRITE',{
       kind:resultKind,
       target:route.target,
@@ -1653,7 +1727,7 @@ class CoreOrchestratorService {
   }
   const finalTask=taskBlackboardService.get(taskId)!;
   if(finalTask.status==='ROUTING'){
-   const hasError=finalTask.entries.some(entry=>entry.kind==='ERROR');
+   const hasError=unresolvedTaskErrors(finalTask).length>0;
    const finalStatus=hasError?'FAILED':cycleBudget>=cycleLimit?'PAUSED':'WAITING';
    taskBlackboardService.setStatus(taskId,finalStatus);
    if(finalStatus==='PAUSED') taskBlackboardService.append(taskId,'CHECKPOINT','core','coreCycleBudgetExhausted',{cycle:cycles,cycleBudget,cycleLimit,resumeRequired:true});
@@ -1711,7 +1785,7 @@ class CoreOrchestratorService {
     .filter(entry=>entry.domain==='core'&&(entry.kind==='RESULT'||entry.kind==='ERROR')&&(entry.value&&typeof entry.value==='object'&&!Array.isArray(entry.value)?entry.value as Record<string,unknown>:undefined)?.operation==='SYNTHESIZE_UNIVERSAL')
     .map(entry=>(entry.value&&typeof entry.value==='object'&&!Array.isArray(entry.value)?entry.value as Record<string,unknown>:undefined))
     .filter(Boolean);
-  return {taskId:task.taskId,operationId:this.readPayloadString(task,'operationId')||this.readPayloadString(task,'operation')||task.taskId,commandId:this.readPayloadString(task,'uiCommandId')||this.readPayloadString(task,'commandId'),cycles,dispatched,status:'COMPLETED',taskRevision:task.revision,corePlanRevision:plan?.planRevision,currentOperationInstanceId:currentOperation?.operationInstanceId,currentBusinessStage:currentOperation?.operation,nextOperationInstanceId:plan?.requiredOperations.find(operation=>operation.status==='PENDING'&&operation.operationInstanceId!==currentOperation?.operationInstanceId)?.operationInstanceId,requiredDomains,selectedClassificationIds:[...task.visitedDomains],replyIds:lineage.verifiedReplyIds,evidenceIds:lineage.verifiedEvidenceIds,decisionId:lineage.verifiedDecisionId,persistenceReceiptIds:lineage.verifiedReceiptIds,lineageVerified:lineage.lineageVerified,rejectedLineageIds:{replyIds:lineage.rejectedReplyIds,evidenceIds:lineage.rejectedEvidenceIds,receiptIds:lineage.rejectedReceiptIds,decisionIds:lineage.rejectedDecisionIds},unknowns,failures,synthesisResults,latestSynthesisResult:synthesisResults.at(-1)||null,cognitiveState:this.latestUnifiedCognitiveState(task)};
+  const cognitiveState=this.latestUnifiedCognitiveState(task);return {taskId:task.taskId,operationId:this.readPayloadString(task,'operationId')||this.readPayloadString(task,'operation')||task.taskId,commandId:this.readPayloadString(task,'uiCommandId')||this.readPayloadString(task,'commandId'),cycles,dispatched,status:'COMPLETED',taskRevision:task.revision,corePlanRevision:plan?.planRevision,cognitiveStateId:cognitiveState?.stateId,cognitiveStateRevision:cognitiveState?.revision,currentOperationInstanceId:currentOperation?.operationInstanceId,currentBusinessStage:currentOperation?.operation,nextOperationInstanceId:plan?.requiredOperations.find(operation=>operation.status==='PENDING'&&operation.operationInstanceId!==currentOperation?.operationInstanceId)?.operationInstanceId,requiredDomains,selectedClassificationIds:[...task.visitedDomains],replyIds:lineage.verifiedReplyIds,evidenceIds:lineage.verifiedEvidenceIds,decisionId:lineage.verifiedDecisionId,persistenceReceiptIds:lineage.verifiedReceiptIds,lineageVerified:lineage.lineageVerified,rejectedLineageIds:{replyIds:lineage.rejectedReplyIds,evidenceIds:lineage.rejectedEvidenceIds,receiptIds:lineage.rejectedReceiptIds,decisionIds:lineage.rejectedDecisionIds},unknowns,failures,synthesisResults,latestSynthesisResult:synthesisResults.at(-1)||null,cognitiveState};
  }
  private readEnvironmentHints(task:BlackboardTask):Record<string,unknown>{
   const value=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
@@ -1771,7 +1845,8 @@ private collectValues(task:BlackboardTask,pattern:RegExp):string[] {
     ...(Array.isArray(payloadObject.acceptanceCriteria)?payloadObject.acceptanceCriteria:[]),
   ].filter((value):value is string=>typeof value==='string'&&value.trim().length>0).map(value=>value.trim()).slice(0,40);
   const evidenceIds=[...new Set(task.entries.flatMap(entry=>entry.evidenceIds).filter(Boolean))].slice(-120);
-  const unknowns=this.collectUnresolved(task,/unknown|gap|missing|unresolved|blocked/i).slice(0,80);
+  const predictedUnknowns=Array.isArray(payloadObject.potentialUnknownCandidates)?payloadObject.potentialUnknownCandidates.filter((value):value is Record<string,unknown>=>Boolean(value&&typeof value==='object'&&!Array.isArray(value))).map(value=>`POTENTIAL_UNKNOWN:${String(value.term||'')}`).filter(value=>!value.endsWith(':')):[];
+  const unknowns=[...new Set([...this.collectUnresolved(task,/unknown|gap|missing|unresolved|blocked/i),...predictedUnknowns])].slice(0,80);
   const capabilityRefs=this.collectValues(task,/capability|component/i).slice(0,80);
   const recentOutcomes=task.entries.filter(entry=>['RESULT','ERROR','OBSERVATION'].includes(entry.kind)).slice(-40).map(entry=>({
     kind:entry.kind,domain:entry.domain,key:entry.key,
@@ -1785,14 +1860,83 @@ private collectValues(task:BlackboardTask,pattern:RegExp):string[] {
     : [];
   const intentPlanValue=payloadObject.intentPlan&&typeof payloadObject.intentPlan==='object'&&!Array.isArray(payloadObject.intentPlan) ? payloadObject.intentPlan as Record<string,unknown> : undefined;
   const intentUnits=Array.isArray(intentPlanValue?.units)?intentPlanValue.units.filter((item):item is Record<string,unknown>=>Boolean(item&&typeof item==='object')):[];
+  const hypotheses=Array.isArray(intentPlanValue?.hypotheses)?intentPlanValue.hypotheses.filter((item):item is Record<string,unknown>=>Boolean(item&&typeof item==='object')).map(item=>({id:String(item.id||''),kind:String(item.kind||'UNKNOWN'),confidence:Math.max(0,Math.min(1,Number(item.confidence)||0)),rationale:String(item.rationale||'')})).filter(item=>item.id).slice(0,24):[];
+  const actions=task.entries.filter(entry=>entry.kind==='DECISION'||entry.kind==='RESULT').map(entry=>`${entry.domain}:${entry.key}`).slice(-80);
+  const safetyConstraints=[...new Set([...constraints,...task.entries.filter(entry=>entry.domain==='safety'||/safety|prohibit|invariant|permission|approval/i.test(entry.key)).map(entry=>entry.key)])].slice(0,80);
+  const contradictions=task.entries.filter(entry=>/contradict|conflict|counterexample|dispute/i.test(entry.key)).map(entry=>`${entry.domain}:${entry.key}`).slice(-40);
+  const failureRefs=task.entries.filter(entry=>entry.kind==='ERROR'||/failure|failed|blocked|rejected/i.test(entry.key)).map(entry=>`${entry.id}:${entry.key}`).slice(-60);
+  const learningRefs=task.entries.filter(entry=>entry.domain==='learning'||/learning|learn|causal|transfer|lesson/i.test(entry.key)).map(entry=>`${entry.id}:${entry.key}`).slice(-60);
+  const verifiedOutcomes=task.entries.filter(entry=>entry.kind==='RESULT'&&entry.evidenceIds.length>0&&/verified|passed|completed/i.test(entry.key)).length;
+  const latestEntry=[...task.entries].reverse().find(entry=>['RESULT','ERROR','OBSERVATION'].includes(entry.kind));
+  const latestValue=latestEntry?.value&&typeof latestEntry.value==='object'&&!Array.isArray(latestEntry.value)?latestEntry.value as Record<string,unknown>:{};
   const completedIntentIds=new Set(task.entries.filter(entry=>entry.kind==='RESULT').flatMap(entry=>{ const value=entry.value&&typeof entry.value==='object'&&!Array.isArray(entry.value)?entry.value as Record<string,unknown>:{}; return Array.isArray(value.intentIds)?value.intentIds.filter((x):x is string=>typeof x==='string'):[]; }));
   const pendingIntentIds=intentUnits.map(unit=>typeof unit.id==='string'?unit.id:'').filter(id=>Boolean(id)&&!completedIntentIds.has(id));
   const governedMemory=memoryContextBridgeService.cognitiveEvidence({scopeType:'TASK',scopeId:task.taskId,limit:80});
   const actionLineage=actionLineageService.summarizeTask(task.taskId);
   const lineageEvidenceIds=[...new Set(actionLineage.actions.flatMap(action=>action.evidenceIds))];
   const lineageUnknowns=actionLineage.failed+actionLineage.rejected>0?[`ACTION_LINEAGE_FAILURES:${actionLineage.failed+actionLineage.rejected}`]:[];
-  const base={schemaVersion:2 as const,taskId:task.taskId,cycle,revision:task.revision,goal:task.goal,input,source:String(task.source),constraints:[...new Set([...constraints,...governedMemory.constraints])],activeDomains:[...task.visitedDomains],requiredDomains:[...new Set(requiredDomains)],pendingIntentIds:[...new Set(pendingIntentIds)],evidenceIds:[...new Set([...evidenceIds,...governedMemory.evidenceIds,...governedMemory.memoryIds,...lineageEvidenceIds])],unknowns:[...new Set([...unknowns,...lineageUnknowns])],capabilityRefs,recentOutcomes,learningCandidates,environmentSignature:undefined as string|undefined,invariantsVersion:1 as const};
+  const mergedEvidenceIds=[...new Set([...evidenceIds,...governedMemory.evidenceIds,...governedMemory.memoryIds,...lineageEvidenceIds])];
+  const base={schemaVersion:2 as const,stateId:`CSTATE-${task.taskId}`,taskId:task.taskId,cycle,revision:task.revision,goal:task.goal,input,source:String(task.source),constraints:[...new Set([...constraints,...governedMemory.constraints])],activeDomains:[...task.visitedDomains],requiredDomains:[...new Set(requiredDomains)],pendingIntentIds:[...new Set(pendingIntentIds)],evidenceIds:mergedEvidenceIds,unknowns:[...new Set([...unknowns,...lineageUnknowns])],capabilityRefs,hypothesisRefs:hypotheses,actionRefs:actions,safetyConstraints,contradictions,confidenceSummary:{knownEvidence:mergedEvidenceIds.length,unresolvedUnknowns:[...new Set([...unknowns,...lineageUnknowns])].length,failedActions:actionLineage.failed+actionLineage.rejected,verifiedOutcomes},activeTask:{status:task.status,pausedReason:task.pausedReason,resumeCount:task.resumeCount,lastCycle:task.lastCycle},latestOutcome:latestEntry?{kind:latestEntry.kind,domain:latestEntry.domain,key:latestEntry.key,status:typeof latestValue.status==='string'?latestValue.status:undefined}:undefined,failureRefs,learningRefs,semanticCoreHash:canonicalSha256Object({goal:task.goal,constraints:[...new Set([...constraints,...governedMemory.constraints])],evidenceIds:mergedEvidenceIds,unknowns:[...new Set([...unknowns,...lineageUnknowns])]}),recentOutcomes,learningCandidates,environmentSignature:undefined as string|undefined,invariantsVersion:1 as const};
   return {...base,stateHash:canonicalSha256Object(base)};
+ }
+
+ private validateCognitiveCheckpointForResume(task:BlackboardTask):{ok:boolean;reason:string}{
+  const states=task.entries.filter(entry=>entry.kind==='DECISION'&&entry.domain==='core'&&entry.key.startsWith('cognitiveState:'));
+  const checkpoints=task.entries.filter(entry=>entry.kind==='CHECKPOINT'&&entry.key.startsWith('cognitiveStateCheckpoint:'));
+  if(states.length===0&&checkpoints.length===0)return {ok:true,reason:'NO_COGNITIVE_STATE_TO_RESTORE'};
+  if(states.length===0)return {ok:false,reason:'COGNITIVE_STATE_SNAPSHOT_MISSING'};
+  const latestStateEntry=states.at(-1);
+  const latestStateValue=latestStateEntry?.value;
+  if(!latestStateValue||typeof latestStateValue!=='object'||Array.isArray(latestStateValue))return {ok:false,reason:'COGNITIVE_STATE_SNAPSHOT_INVALID'};
+  const latestState=latestStateValue as Partial<UnifiedCognitiveStateSnapshot>;
+  const recordedStateHash=typeof latestState.stateHash==='string'?latestState.stateHash:'';
+  const {stateHash:_discardedStateHash,...snapshotBody}=latestState as Record<string,unknown>;
+  if(!/^[a-f0-9]{64}$/i.test(recordedStateHash)||canonicalSha256Object(snapshotBody)!==recordedStateHash){
+   return {ok:false,reason:'BLACKBOARD_COGNITIVE_SNAPSHOT_HASH_MISMATCH'};
+  }
+
+  const latestCheckpointValue=checkpoints.at(-1)?.value;
+  const checkpointRef=latestCheckpointValue&&typeof latestCheckpointValue==='object'&&!Array.isArray(latestCheckpointValue)
+   ? latestCheckpointValue as Record<string,unknown> : undefined;
+  const checkpointId=typeof checkpointRef?.id==='string'?checkpointRef.id:'';
+  let failureReason='COGNITIVE_CHECKPOINT_REFERENCE_MISSING';
+  if(checkpointId){
+   const reconstruction=cognitiveStateCheckpointService.reconstruct(checkpointId);
+   if(!reconstruction.ok||!reconstruction.checkpoints.length)failureReason='COGNITIVE_CHECKPOINT_CHAIN_INVALID';
+   else{
+    const checkpoint=reconstruction.checkpoints.at(-1);
+    if(!checkpoint||!checkpoint.verified)failureReason='COGNITIVE_CHECKPOINT_NOT_VERIFIED';
+    else if(checkpoint.stateHash!==checkpointRef?.stateHash||checkpoint.integrityHash!==checkpointRef?.integrityHash)failureReason='BLACKBOARD_CHECKPOINT_RECEIPT_MISMATCH';
+    else if(checkpoint.baseSnapshotId!==`${latestState.stateId}:${recordedStateHash}`)failureReason='BLACKBOARD_SNAPSHOT_DOES_NOT_MATCH_CHECKPOINT';
+    else return {ok:true,reason:'CHECKPOINT_CHAIN_AND_BLACKBOARD_SNAPSHOT_HASH_VERIFIED'};
+   }
+  }
+
+  // The Blackboard snapshot is the authoritative current state. If its own SHA-256 is valid but
+  // the checkpoint receipt/chain was lost, re-root a verified checkpoint on that exact snapshot.
+  // Never rewrite an invalid snapshot: that case remains fail-closed for manual/CORE repair.
+  try{
+   const snapshot=latestState as UnifiedCognitiveStateSnapshot;
+   const recovered=cognitiveStateCheckpointService.create({
+    baseSnapshotId:`${snapshot.stateId}:${recordedStateHash}`,
+    changedFacts:[`CHECKPOINT_RECOVERY_FROM_VALID_SNAPSHOT:${failureReason}`,snapshot.semanticCoreHash||recordedStateHash],
+    addedEvidence:[...(snapshot.evidenceIds||[])].slice(-200),
+    invalidatedAssumptions:[...(snapshot.contradictions||[])].slice(-100),
+    supersededRequirements:[],
+    taskStateChanges:[`recovery:${failureReason}`,`status:${task.status}`,`cycle:${snapshot.cycle}`,`revision:${task.revision}`],
+    memoryStateChanges:[...(snapshot.evidenceIds||[]).filter(value=>value.startsWith('MEM-'))].slice(-100),
+    skillStateChanges:[...(snapshot.capabilityRefs||[])].slice(-100),
+    artifactReferences:[],configurationChanges:[],layer:'HOT',
+   });
+   taskBlackboardService.append(task.taskId,'CHECKPOINT','core',`cognitiveStateCheckpoint:recovered:${Date.now()}`,{
+    id:recovered.id,stateHash:recovered.stateHash,integrityHash:recovered.integrityHash,hashAlgorithm:recovered.hashAlgorithm,
+    verified:recovered.verified,baseSnapshotId:recovered.baseSnapshotId,recovery:true,recoveryReason:failureReason,previousCheckpointId:checkpointId||undefined,
+   },snapshot.evidenceIds||[]);
+   systemLogger.warn('SYSTEM',`[CORE_CHECKPOINT_RECOVERED] ${task.taskId}: rebuilt checkpoint receipt from SHA-256-valid Blackboard snapshot after ${failureReason}`);
+   return {ok:true,reason:`VALID_SNAPSHOT_RECHECKPOINTED:${failureReason}`};
+  }catch(error){
+   return {ok:false,reason:`COGNITIVE_CHECKPOINT_RECOVERY_FAILED:${error instanceof Error?error.message:String(error)}`};
+  }
  }
 
  private latestUnifiedCognitiveState(task:BlackboardTask):UnifiedCognitiveStateSnapshot|undefined{

@@ -62,9 +62,8 @@ export class StoragePlanningService {
     // 1. モデル関係: 約18GB (旧モデルキャッシュ)
     // 2. 会話・教材データ: 約12GB (JSONL, 会話ログ, 教師教材)
     // 3. 評価・実験: 約8GB (ベンチマーク, 回帰レポート, A/Bログ)
-    // 4. 旧学習成果物: 約8GB (旧学習アダプター)
-    // 5. バックアップ: 約6GB (SQLite/IndexedDBスナップショット)
-    // 6. 空き・一時領域: 約8GB (作業キャッシュ, 一時スクラッチ)
+    // 4. バックアップ: 約6GB (SQLite/IndexedDBスナップショット)
+    // 5. 空き・一時領域: 約16GB (作業キャッシュ, 一時スクラッチ)
 
     const partitions: StoragePartitionUsage[] = [
       {
@@ -113,20 +112,6 @@ export class StoragePlanningService {
         ],
       },
       {
-        id: 'part_lora_artifacts',
-        category: 'lora_and_artifacts',
-        name: '旧学習成果物 (16-17章 予備手段・候補アダプター)',
-        allocatedGb: 8,
-        usedBytes: 150 * 1024 * 1024,
-        estimatedMb: 150,
-        itemCount: 2,
-        description: '発動条件(16.2)を満たした場合のみ作成される旧学習候補とメタデータ',
-        itemsDetail: [
-          'candidate_lora_vba_adapter.safetensors (128MB)',
-          'rollback_snapshots (22MB)',
-        ],
-      },
-      {
         id: 'part_backups',
         category: 'backups',
         name: 'バックアップ (SQLiteスナップショット / 記憶アーカイブ)',
@@ -144,7 +129,7 @@ export class StoragePlanningService {
         id: 'part_free_temp',
         category: 'free_and_temp',
         name: '空き・一時領域 (作業バッファ / ワークマネージャー)',
-        allocatedGb: 8,
+        allocatedGb: 16,
         usedBytes: 30 * 1024 * 1024,
         estimatedMb: 30,
         itemCount: 12,

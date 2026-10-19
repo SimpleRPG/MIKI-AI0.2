@@ -1,42 +1,29 @@
-import { registerPlugin } from '@capacitor/core';
+import { nativeWorkManagerService } from './nativeWorkManagerService';
+import type { WorkManagerConstraints } from '../../../types';
 
-export interface WorkManagerPlugin {
-  schedulePeriodicWork(options: { intervalMinutes: number }): Promise<{ scheduled: boolean; intervalMinutes: number }>;
-  cancelPeriodicWork(): Promise<{ cancelled: boolean }>;
-}
-
-const NativeWorkManager = registerPlugin<WorkManagerPlugin>('MikiWorkManagerPlugin');
+/**
+ * Compatibility facade for older callers.
+ * The canonical Android WorkManager contract is nativeWorkManagerService;
+ * this module must not register a second plugin interface with mismatched method names.
+ */
+const DEFAULT_CONSTRAINTS: WorkManagerConstraints = {
+  requiresCharging: true,
+  requiresDeviceIdle: false,
+  requiresUnmeteredWifi: false,
+  batteryNotLow: true,
+  nightTimeOnly: false,
+};
 
 class WorkManagerService {
-  private isNativeAvailable(): boolean {
-    return typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform();
-  }
-
-  public async scheduleMaintenance(intervalMinutes: number = 60): Promise<boolean> {
-    if (!this.isNativeAvailable()) {
-      console.log('[WorkManagerService] Non-native environment, skipping native WorkManager');
-      return false;
-    }
-    try {
-      const res = await NativeWorkManager.schedulePeriodicWork({ intervalMinutes });
-      return res.scheduled;
-    } catch (e) {
-      console.warn('[WorkManagerService] Failed to schedule WorkManager:', e);
-      return false;
-    }
+  public async scheduleMaintenance(intervalMinutes = 60): Promise<boolean> {
+    if (!nativeWorkManagerService.isAndroidNative()) return false;
+    const result = await nativeWorkManagerService.schedule(intervalMinutes, DEFAULT_CONSTRAINTS);
+    return result.success;
   }
 
   public async cancelMaintenance(): Promise<boolean> {
-    if (!this.isNativeAvailable()) {
-      return false;
-    }
-    try {
-      const res = await NativeWorkManager.cancelPeriodicWork();
-      return res.cancelled;
-    } catch (e) {
-      console.warn('[WorkManagerService] Failed to cancel WorkManager:', e);
-      return false;
-    }
+    if (!nativeWorkManagerService.isAndroidNative()) return false;
+    return nativeWorkManagerService.cancel();
   }
 }
 
